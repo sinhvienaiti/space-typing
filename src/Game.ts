@@ -13,6 +13,14 @@ import type { BossHudState, BossState } from "./boss/model";
 import type { DifficultyProfile, StageConfig } from "./campaign/types";
 import type { CharacterId } from "./characters/registry";
 import {
+  AEGIS_ACTIVE_SKILL,
+  AEGIS_ACTIVE_SKILL_ID,
+  AEGIS_FORTRESS_DURATION,
+  AEGIS_FORTRESS_SHIELD_RATIO,
+  AEGIS_REFLECT_DURATION,
+  restoreAegisShield,
+} from "./characters/aegis";
+import {
   restoreVanguardShield,
   shouldTriggerVanguardShieldRhythm,
   VANGUARD_ACTIVE_BARRIER_DURATION,
@@ -241,7 +249,11 @@ export class Game {
   private refreshSkillDefinitions(): void {
     const supportDefinitions = this.supportSkillIds.map(getSupportSpell);
     const characterDefinitions =
-      this.characterId === "vanguard" ? [VANGUARD_ACTIVE_SKILL] : [];
+      this.characterId === "vanguard"
+        ? [VANGUARD_ACTIVE_SKILL]
+        : this.characterId === "aegis"
+          ? [AEGIS_ACTIVE_SKILL]
+          : [];
 
     this.skillEngine.setDefinitions([
       ...characterDefinitions,
@@ -331,6 +343,11 @@ export class Game {
       this.characterId === "vanguard"
     ) {
       this.activateVanguardSkill();
+    } else if (
+      id === AEGIS_ACTIVE_SKILL_ID &&
+      this.characterId === "aegis"
+    ) {
+      this.activateAegisSkill();
     } else if (isDefensiveSkillId(id)) {
       this.activateDefensiveSkill(id);
     } else if (isOffensiveSkillId(id)) {
@@ -389,6 +406,20 @@ export class Game {
     this.burst(playerX, playerY, 38, 188);
     this.sfx.power();
     this.emitStats();
+  }
+
+  private activateAegisSkill(): void {
+    this.reflectTimer = Math.max(
+      this.reflectTimer,
+      AEGIS_REFLECT_DURATION,
+    );
+    this.burst(
+      this.width / 2,
+      this.height - PLAYER_Y_OFFSET,
+      36,
+      300,
+    );
+    this.sfx.power();
   }
 
   private activateDefensiveSkill(id: DefensiveSkillId): void {
@@ -1169,6 +1200,7 @@ export class Game {
       eliteModifiers,
       entry,
       typed: 0,
+      wordMissed: false,
       layersRemaining: eliteStats.layers,
       x: baseX,
       y: -profile.radius - 20,
@@ -1300,6 +1332,7 @@ export class Game {
       eliteModifiers: [],
       entry: this.pickVocabularyEntry("scout"),
       typed: 0,
+      wordMissed: false,
       layersRemaining: 1,
       x: carrier.x,
       y: carrier.y + carrier.radius * 0.45,
@@ -1464,6 +1497,7 @@ export class Game {
       }
 
       const perfectWord = !boss.wordMissed;
+      this.applyCharacterPerfectWordPassive(perfectWord);
       boss.wordsCompleted += 1;
       boss.typed = 0;
       boss.entry = this.pickBossEntry();
@@ -1565,6 +1599,7 @@ export class Game {
     const expected = word[enemy.typed];
 
     if (key !== expected) {
+      enemy.wordMissed = true;
       this.registerMiss();
       return;
     }
@@ -1593,12 +1628,15 @@ export class Game {
 
   private completeWord(enemy: Enemy): void {
     const length = typingText(enemy.entry.en).length;
+    const perfectWord = !enemy.wordMissed;
     this.hooks.onWordComplete(enemy.entry);
+    this.applyCharacterPerfectWordPassive(perfectWord);
 
     if (enemy.layersRemaining > 1) {
       enemy.layersRemaining -= 1;
       enemy.entry = this.pickVocabularyEntry(enemy.kind);
       enemy.typed = 0;
+      enemy.wordMissed = false;
       enemy.flash = 1;
       enemy.kick = 1.45;
 
@@ -1705,6 +1743,7 @@ export class Game {
         eliteModifiers: [],
         entry: this.pickVocabularyEntry("mine"),
         typed: 0,
+        wordMissed: false,
         layersRemaining: 1,
         x: splitter.x,
         y: splitter.y,
@@ -1801,6 +1840,25 @@ export class Game {
     }
   }
 
+  private applyCharacterPerfectWordPassive(perfectWord: boolean): void {
+    if (!perfectWord || this.characterId !== "aegis") return;
+
+    const nextShield = restoreAegisShield(
+      this.stats.shield,
+      this.stats.maxShield,
+    );
+    if (nextShield <= this.stats.shield) return;
+
+    this.stats.shield = nextShield;
+    this.burst(
+      this.width / 2,
+      this.height - PLAYER_Y_OFFSET,
+      16,
+      204,
+    );
+    this.sfx.support();
+  }
+
   private applyCharacterCorrectKeyPassive(): void {
     if (
       this.characterId !== "vanguard" ||
@@ -1829,8 +1887,13 @@ export class Game {
     if (this.stats.power < 100) return;
 
     const isVanguard = this.characterId === "vanguard";
+    const isAegis = this.characterId === "aegis";
     this.stats.power = 0;
-    this.overdriveTimer = isVanguard ? VANGUARD_NOVA_DURATION : 4.5;
+    this.overdriveTimer = isVanguard
+      ? VANGUARD_NOVA_DURATION
+      : isAegis
+        ? 0
+        : 4.5;
 
     if (isVanguard) {
       this.stats.shield = restoreVanguardShield(
@@ -1838,17 +1901,43 @@ export class Game {
         this.stats.maxShield,
         VANGUARD_NOVA_SHIELD_RATIO,
       );
+    } else if (isAegis) {
+      this.stats.shield = restoreAegisShield(
+        this.stats.shield,
+        this.stats.maxShield,
+        AEGIS_FORTRESS_SHIELD_RATIO,
+      );
+      this.barrierHp = Math.max(
+        this.barrierHp,
+        140 + this.playerStats.shield * 0.9,
+      );
+      this.barrierTimer = Math.max(
+        this.barrierTimer,
+        AEGIS_FORTRESS_DURATION,
+      );
+      this.reflectTimer = Math.max(
+        this.reflectTimer,
+        AEGIS_FORTRESS_DURATION,
+      );
+      this.guardianTimer = Math.max(
+        this.guardianTimer,
+        AEGIS_FORTRESS_DURATION,
+      );
+      this.guardianBlocks = Math.max(this.guardianBlocks, 5);
     }
 
     this.burst(
       this.width / 2,
       this.height - PLAYER_Y_OFFSET,
-      isVanguard ? 48 : 36,
-      184,
+      isVanguard ? 48 : isAegis ? 56 : 36,
+      isAegis ? 300 : 184,
     );
 
     if (this.settings.screenShake) {
-      this.shake = Math.max(this.shake, isVanguard ? 9 : 7);
+      this.shake = Math.max(
+        this.shake,
+        isVanguard ? 9 : isAegis ? 10 : 7,
+      );
     }
 
     this.sfx.power();

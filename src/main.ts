@@ -15,6 +15,7 @@ import {
   CHARACTER_IDS,
   getCharacter,
 } from "./characters/registry";
+import { AEGIS_ACTIVE_SKILL_ID } from "./characters/aegis";
 import {
   createStarterCharacterState,
   selectCharacter,
@@ -215,7 +216,7 @@ app.innerHTML = `
 
     <div class="power-shell">
       <div class="power-label">
-        <span>overdrive</span>
+        <span>ultimate</span>
         <small id="powerHint">type cleanly to charge</small>
       </div>
       <div class="power-track">
@@ -766,23 +767,34 @@ function renderSupportSkills(): void {
   }
 }
 
+function selectedCharacterSkillId(): string | null {
+  if (characters.selected === "vanguard") {
+    return VANGUARD_ACTIVE_SKILL_ID;
+  }
+  if (characters.selected === "aegis") {
+    return AEGIS_ACTIVE_SKILL_ID;
+  }
+  return null;
+}
+
 function renderCharacterSkill(): void {
   const button = byId<HTMLButtonElement>("characterSkill");
   const name = button.querySelector("span");
   const stateLabel = button.querySelector("strong");
   const character = getCharacter(characters.selected);
+  const skillId = selectedCharacterSkillId();
 
   if (name !== null) name.textContent = character.activeName.toLowerCase();
 
-  if (characters.selected !== "vanguard") {
+  if (skillId === null) {
     if (stateLabel !== null) stateLabel.textContent = "—";
     button.disabled = true;
     button.title = "Character skill is implemented in a later step";
     return;
   }
 
-  const state = game.getSkillState(VANGUARD_ACTIVE_SKILL_ID);
-  const reason = game.canUseSkill(VANGUARD_ACTIVE_SKILL_ID);
+  const state = game.getSkillState(skillId);
+  const reason = game.canUseSkill(skillId);
 
   if (stateLabel !== null) {
     if (state === null) {
@@ -806,12 +818,13 @@ function renderAllSkills(): void {
 }
 
 function useCharacterSkill(): void {
-  if (characters.selected !== "vanguard") {
+  const skillId = selectedCharacterSkillId();
+  if (skillId === null) {
     showNotice("Character skill is not implemented yet");
     return;
   }
 
-  const result = game.useSkill(VANGUARD_ACTIVE_SKILL_ID);
+  const result = game.useSkill(skillId);
   if (!result.ok) {
     showNotice(skillReasonText(result.reason));
     renderAllSkills();

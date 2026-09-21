@@ -81,6 +81,7 @@ export type Enemy = {
   eliteModifiers: EliteModifier[];
   entry: VocabularyEntry;
   typed: number;
+  wordMissed: boolean;
   layersRemaining: number;
   x: number;
   y: number;

@@ -2799,6 +2799,15 @@ Milestone character unlock rules:
 ## Step 42
 Implement remaining milestone characters.
 
+**Status: in progress.**
+
+Implemented character slices:
+
+- Aegis: perfect-word Shield reinforcement, Reflect Field active and Fortress Protocol ultimate;
+- normal enemies now track whether the current word received a miss, creating a reusable perfect-word combat hook for later characters.
+
+Next character slice: Volt.
+
 ## Step 43
 Add Character Level and Mastery.
 
