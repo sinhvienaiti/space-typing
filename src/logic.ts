@@ -8,6 +8,36 @@ export function normalizeWord(word: string): string {
   return word.trim().toLocaleLowerCase("en-US");
 }
 
+export function typingText(text: string): string {
+  return normalizeWord(text).replace(/[^a-z]/g, "");
+}
+
+export function splitDisplayByTypedLetters(
+  text: string,
+  typedLetters: number,
+): { typed: string; remaining: string } {
+  if (typedLetters <= 0) {
+    return { typed: "", remaining: text };
+  }
+
+  let letters = 0;
+  let splitIndex = 0;
+
+  for (let index = 0; index < text.length; index += 1) {
+    if (/[a-z]/i.test(text[index] ?? "")) {
+      letters += 1;
+    }
+
+    splitIndex = index + 1;
+    if (letters >= typedLetters) break;
+  }
+
+  return {
+    typed: text.slice(0, splitIndex),
+    remaining: text.slice(splitIndex),
+  };
+}
+
 export function multiplierForStreak(streak: number): number {
   if (streak >= 100) return 4;
   if (streak >= 50) return 3;
@@ -22,7 +52,7 @@ export function chooseTarget(
   playerY: number,
 ): Enemy | null {
   const candidates = enemies.filter((enemy) => {
-    const word = normalizeWord(enemy.entry.en);
+    const word = typingText(enemy.entry.en);
     return enemy.typed === 0 && word[0] === key;
   });
 

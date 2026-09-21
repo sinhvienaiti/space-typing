@@ -10,6 +10,8 @@ import {
   chooseTarget,
   multiplierForStreak,
   normalizeWord,
+  splitDisplayByTypedLetters,
+  typingText,
 } from "./logic";
 import type {
   Enemy,
@@ -440,7 +442,7 @@ export class Game {
 
   private pickVocabularyEntry(kind: EnemyKind): VocabularyEntry {
     const candidates = this.vocabulary.filter((entry) => {
-      const length = normalizeWord(entry.en).replace(/[^a-z]/g, "").length;
+      const length = typingText(entry.en).length;
       if (length === 0) return false;
       if (kind === "mine") return length <= 6;
       if (kind === "tank") return length >= 5;
@@ -646,7 +648,7 @@ export class Game {
   }
 
   private typeTarget(enemy: Enemy, key: string): void {
-    const word = normalizeWord(enemy.entry.en);
+    const word = typingText(enemy.entry.en);
     const expected = word[enemy.typed];
 
     if (key !== expected) {
@@ -676,7 +678,7 @@ export class Game {
   }
 
   private completeWord(enemy: Enemy): void {
-    const length = normalizeWord(enemy.entry.en).length;
+    const length = typingText(enemy.entry.en).length;
     this.hooks.onWordComplete(enemy.entry);
 
     if (enemy.layersRemaining > 1) {
@@ -1418,6 +1420,7 @@ export class Game {
   private drawEnemyWord(enemy: Enemy, targeted: boolean): void {
     const context = this.context;
     const actualWord = normalizeWord(enemy.entry.en);
+    const typingWord = typingText(enemy.entry.en);
     const hideForCloak = enemy.kind === "cloaker" && !targeted;
     const hideForJam =
       this.interferenceTimer > 0 &&
@@ -1426,13 +1429,14 @@ export class Game {
     const hidden = hideForCloak || hideForJam;
 
     const displayWord = hidden
-      ? (actualWord[0] ?? "?") +
-        "·".repeat(Math.max(3, Math.min(8, actualWord.length - 1)))
+      ? (typingWord[0] ?? "?") +
+        "·".repeat(Math.max(3, Math.min(8, typingWord.length - 1)))
       : actualWord;
-    const typed = hidden ? "" : displayWord.slice(0, enemy.typed);
-    const remaining = hidden
-      ? displayWord
-      : displayWord.slice(enemy.typed);
+    const split = hidden
+      ? { typed: "", remaining: displayWord }
+      : splitDisplayByTypedLetters(displayWord, enemy.typed);
+    const typed = split.typed;
+    const remaining = split.remaining;
 
     context.save();
     context.font =

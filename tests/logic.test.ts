@@ -4,6 +4,8 @@ import {
   chooseTarget,
   multiplierForStreak,
   normalizeWord,
+  splitDisplayByTypedLetters,
+  typingText,
   waveForKills,
 } from "../src/logic";
 import type { Enemy } from "../src/types";
@@ -33,6 +35,24 @@ describe("typing combat logic", () => {
     expect(normalizeWord("  Reactor ")).toBe("reactor");
   });
 
+  it("keeps phrase display text while typing only English letters", () => {
+    expect(typingText("ice cream")).toBe("icecream");
+    expect(typingText("can't-stop")).toBe("cantstop");
+
+    expect(splitDisplayByTypedLetters("ice cream", 3)).toEqual({
+      typed: "ice",
+      remaining: " cream",
+    });
+    expect(splitDisplayByTypedLetters("ice cream", 4)).toEqual({
+      typed: "ice c",
+      remaining: "ream",
+    });
+    expect(splitDisplayByTypedLetters("can't", 4)).toEqual({
+      typed: "can't",
+      remaining: "",
+    });
+  });
+
   it("raises score multiplier at streak milestones", () => {
     expect(multiplierForStreak(24)).toBe(1);
     expect(multiplierForStreak(25)).toBe(2);
@@ -42,7 +62,7 @@ describe("typing combat logic", () => {
 
   it("chooses the nearest matching first-letter target", () => {
     const enemies = [
-      enemy(1, "space", 300, 100),
+      enemy(1, "space travel", 300, 100),
       enemy(2, "shield", 500, 500),
       enemy(3, "code", 400, 600),
     ];
