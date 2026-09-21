@@ -6,6 +6,11 @@ import {
 } from "../campaign/progress";
 import type { CampaignProgress } from "../campaign/types";
 import {
+  createStarterEquipmentState,
+  sanitizeEquipmentState,
+  type EquipmentState,
+} from "../equipment/loadout";
+import {
   createEmptyInventory,
   sanitizeInventory,
   type Inventory,
@@ -17,7 +22,7 @@ const STORE_NAME = "player";
 const SAVE_KEY = "main";
 const RECOVERY_SAVE_KEY = "spaceTypingPlayerSaveRecoveryV3";
 
-export const PLAYER_SAVE_VERSION = 3;
+export const PLAYER_SAVE_VERSION = 4;
 
 export class UnsupportedPlayerSaveVersionError extends Error {
   constructor(readonly version: number) {
@@ -37,6 +42,7 @@ export type SaveReason =
   | "stage-clear"
   | "stage-select"
   | "inventory"
+  | "equipment"
   | "pagehide"
   | "manual"
   | "unknown";
@@ -62,8 +68,16 @@ export type PlayerSaveV3 = {
   lastSaveReason: SaveReason;
 };
 
-export type PlayerSave = PlayerSaveV3;
+export type PlayerSaveV4 = {
+  version: 4;
+  campaign: CampaignProgress;
+  inventory: Inventory;
+  equipment: EquipmentState;
+  updatedAt: string;
+  lastSaveReason: SaveReason;
+};
 
+export type PlayerSave = PlayerSaveV4;
 export type PersistenceSource = "indexeddb" | "localStorage";
 
 export type LoadedPlayerSave = {
@@ -83,6 +97,7 @@ function normalizeSaveReason(value: unknown): SaveReason {
     value === "stage-clear" ||
     value === "stage-select" ||
     value === "inventory" ||
+    value === "equipment" ||
     value === "pagehide" ||
     value === "manual"
     ? value
@@ -94,11 +109,13 @@ export function createPlayerSave(
   updatedAt = new Date().toISOString(),
   lastSaveReason: SaveReason = "unknown",
   inventory: Inventory = createEmptyInventory(),
+  equipment: EquipmentState = createStarterEquipmentState(),
 ): PlayerSave {
   return {
     version: PLAYER_SAVE_VERSION,
     campaign: sanitizeCampaignProgress(campaign),
     inventory: sanitizeInventory(inventory),
+    equipment: sanitizeEquipmentState(equipment),
     updatedAt,
     lastSaveReason,
   };
@@ -117,6 +134,7 @@ export function migratePlayerSave(value: unknown): MigrationResult {
     version?: unknown;
     campaign?: unknown;
     inventory?: unknown;
+    equipment?: unknown;
     updatedAt?: unknown;
     lastSaveReason?: unknown;
   };
@@ -128,9 +146,24 @@ export function migratePlayerSave(value: unknown): MigrationResult {
         typeof raw.updatedAt === "string" ? raw.updatedAt : "",
         "migration",
         createEmptyInventory(),
+        createStarterEquipmentState(),
       ),
       migrated: true,
       fromVersion: raw.version,
+    };
+  }
+
+  if (raw.version === 3) {
+    return {
+      save: createPlayerSave(
+        sanitizeCampaignProgress(raw.campaign),
+        typeof raw.updatedAt === "string" ? raw.updatedAt : "",
+        "migration",
+        sanitizeInventory(raw.inventory),
+        createStarterEquipmentState(),
+      ),
+      migrated: true,
+      fromVersion: 3,
     };
   }
 
@@ -141,16 +174,14 @@ export function migratePlayerSave(value: unknown): MigrationResult {
         typeof raw.updatedAt === "string" ? raw.updatedAt : "",
         normalizeSaveReason(raw.lastSaveReason),
         sanitizeInventory(raw.inventory),
+        sanitizeEquipmentState(raw.equipment),
       ),
       migrated: false,
       fromVersion: PLAYER_SAVE_VERSION,
     };
   }
 
-  if (
-    typeof raw.version === "number" &&
-    Number.isFinite(raw.version)
-  ) {
+  if (typeof raw.version === "number" && Number.isFinite(raw.version)) {
     throw new UnsupportedPlayerSaveVersionError(raw.version);
   }
 
@@ -160,6 +191,7 @@ export function migratePlayerSave(value: unknown): MigrationResult {
       typeof raw.updatedAt === "string" ? raw.updatedAt : "",
       "migration",
       sanitizeInventory(raw.inventory),
+      sanitizeEquipmentState(raw.equipment),
     ),
     migrated: true,
     fromVersion: null,
@@ -170,11 +202,7 @@ export function sanitizePlayerSave(value: unknown): PlayerSave {
   return migratePlayerSave(value).save;
 }
 
-function progressRank(progress: CampaignProgress): [
-  number,
-  number,
-  number,
-] {
+function progressRank(progress: CampaignProgress): [number, number, number] {
   return [
     progress.highestUnlockedStage,
     progress.clearedStages.length,
@@ -205,11 +233,7 @@ function recoverySaveFromLegacy(): PlayerSave {
   try {
     const raw = localStorage.getItem(RECOVERY_SAVE_KEY);
     if (raw === null) {
-      return createPlayerSave(
-        legacyCampaign,
-        "",
-        "migration",
-      );
+      return createPlayerSave(legacyCampaign, "", "migration");
     }
 
     const recovery = migratePlayerSave(JSON.parse(raw)).save;
@@ -223,25 +247,16 @@ function recoverySaveFromLegacy(): PlayerSave {
       recovery.updatedAt,
       recovery.lastSaveReason,
       recovery.inventory,
+      recovery.equipment,
     );
   } catch (error) {
-    if (error instanceof UnsupportedPlayerSaveVersionError) {
-      throw error;
-    }
-
-    return createPlayerSave(
-      legacyCampaign,
-      "",
-      "migration",
-    );
+    if (error instanceof UnsupportedPlayerSaveVersionError) throw error;
+    return createPlayerSave(legacyCampaign, "", "migration");
   }
 }
 
 function saveRecovery(save: PlayerSave): void {
-  localStorage.setItem(
-    RECOVERY_SAVE_KEY,
-    JSON.stringify(save),
-  );
+  localStorage.setItem(RECOVERY_SAVE_KEY, JSON.stringify(save));
   saveCampaignProgress(save.campaign);
 }
 
@@ -255,7 +270,6 @@ function openDatabase(): Promise<IDBDatabase> {
         database.createObjectStore(STORE_NAME);
       }
     };
-
     request.onsuccess = () => resolve(request.result);
     request.onerror = () =>
       reject(request.error ?? new Error("Unable to open IndexedDB."));
@@ -266,21 +280,16 @@ function readSave(database: IDBDatabase): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, "readonly");
     const request = transaction.objectStore(STORE_NAME).get(SAVE_KEY);
-
     request.onsuccess = () => resolve(request.result);
     request.onerror = () =>
       reject(request.error ?? new Error("Unable to read player save."));
   });
 }
 
-function writeSave(
-  database: IDBDatabase,
-  save: PlayerSave,
-): Promise<void> {
+function writeSave(database: IDBDatabase, save: PlayerSave): Promise<void> {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, "readwrite");
     transaction.objectStore(STORE_NAME).put(save, SAVE_KEY);
-
     transaction.oncomplete = () => resolve();
     transaction.onerror = () =>
       reject(transaction.error ?? new Error("Unable to write player save."));
@@ -321,6 +330,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
         new Date().toISOString(),
         "migration",
         recovery.inventory,
+        recovery.equipment,
       );
       await writeSave(database, migrated);
       try {
@@ -328,11 +338,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
       } catch {
         // IndexedDB remains the source of truth.
       }
-      return {
-        save: migrated,
-        source: "indexeddb",
-        migrated: true,
-      };
+      return { save: migrated, source: "indexeddb", migrated: true };
     }
 
     const migration = migratePlayerSave(stored);
@@ -344,18 +350,22 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
     const inventory = useRecovery
       ? recovery.inventory
       : migration.save.inventory;
+    const equipment = useRecovery
+      ? recovery.equipment
+      : migration.save.equipment;
 
     const recoveredProgress =
       campaign !== migration.save.campaign ||
-      inventory !== migration.save.inventory;
-    const shouldWrite = migration.migrated || recoveredProgress;
+      inventory !== migration.save.inventory ||
+      equipment !== migration.save.equipment;
 
-    if (shouldWrite) {
+    if (migration.migrated || recoveredProgress) {
       const recovered = createPlayerSave(
         campaign,
         new Date().toISOString(),
         "migration",
         inventory,
+        equipment,
       );
       await writeSave(database, recovered);
       try {
@@ -363,17 +373,13 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
       } catch {
         // IndexedDB remains the source of truth.
       }
-      return {
-        save: recovered,
-        source: "indexeddb",
-        migrated: true,
-      };
+      return { save: recovered, source: "indexeddb", migrated: true };
     }
 
     try {
       saveRecovery(migration.save);
     } catch {
-      // IndexedDB remains the source of truth if the recovery mirror fails.
+      // IndexedDB remains the source of truth if the mirror fails.
     }
 
     return {
@@ -382,10 +388,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
       migrated: false,
     };
   } catch (error) {
-    if (error instanceof UnsupportedPlayerSaveVersionError) {
-      throw error;
-    }
-
+    if (error instanceof UnsupportedPlayerSaveVersionError) throw error;
     return {
       save: recovery,
       source: "localStorage",
@@ -399,6 +402,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
 export async function savePlayerProgress(
   campaign: CampaignProgress,
   inventory: Inventory,
+  equipment: EquipmentState,
   reason: SaveReason = "unknown",
 ): Promise<PersistenceSource> {
   const save = createPlayerSave(
@@ -406,6 +410,7 @@ export async function savePlayerProgress(
     new Date().toISOString(),
     reason,
     inventory,
+    equipment,
   );
 
   if ("indexedDB" in window) {
@@ -418,7 +423,7 @@ export async function savePlayerProgress(
       }
       return "indexeddb";
     } catch {
-      // Keep the recovery mirror as a fallback if IndexedDB is unavailable.
+      // Use recovery storage below.
     }
   }
 

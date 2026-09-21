@@ -875,3 +875,80 @@ kbd {
     display: none;
   }
 }
+
+
+.equipment-dialog {
+  width: min(760px, calc(100vw - 2rem));
+}
+
+.equipment-note {
+  margin: -0.35rem 0 0.9rem;
+  color: #687b90;
+  font-size: 0.72rem;
+}
+
+.equipment-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  max-height: min(58vh, 560px);
+  overflow: auto;
+  padding-right: 0.15rem;
+}
+
+.equipment-slot {
+  display: grid;
+  gap: 0.42rem;
+  padding: 0.8rem;
+  border: 1px solid rgba(107, 213, 236, 0.08);
+  border-radius: 10px;
+  background: rgba(5, 12, 20, 0.6);
+}
+
+.equipment-slot-name {
+  color: #6ddff1;
+  font-size: 0.6rem;
+  font-weight: 850;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.equipment-slot select {
+  width: 100%;
+  padding: 0.5rem 0.56rem;
+}
+
+.equipment-slot small {
+  min-height: 2.2em;
+  color: #67798e;
+  font-size: 0.66rem;
+  line-height: 1.45;
+}
+
+.equipment-total {
+  display: grid;
+  gap: 0.28rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.equipment-total span {
+  color: #5f7186;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.equipment-total strong {
+  color: #dff8ff;
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+
+@media (max-width: 760px) {
+  .equipment-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,4 +1,9 @@
 import { MAX_CAMPAIGN_STAGE } from "../campaign/stage";
+import {
+  createStarterEquipmentState,
+  isValidEquipmentState,
+  type EquipmentState,
+} from "../equipment/loadout";
 import type { CampaignProgress, StageBest } from "../campaign/types";
 import {
   createEmptyInventory,
@@ -100,6 +105,7 @@ export function exportPlayerSaveJson(
   campaign: CampaignProgress,
   updatedAt = new Date().toISOString(),
   inventory: Inventory = createEmptyInventory(),
+  equipment: EquipmentState = createStarterEquipmentState(),
 ): string {
   return JSON.stringify(
     createPlayerSave(
@@ -107,6 +113,7 @@ export function exportPlayerSaveJson(
       updatedAt,
       "manual",
       inventory,
+      equipment,
     ),
     null,
     2,
@@ -136,6 +143,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   if (
     version !== 1 &&
     version !== 2 &&
+    version !== 3 &&
     version !== PLAYER_SAVE_VERSION
   ) {
     return {
@@ -155,12 +163,22 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    version === PLAYER_SAVE_VERSION &&
+    (version === 3 || version === PLAYER_SAVE_VERSION) &&
     !isValidInventory(parsed.inventory)
   ) {
     return {
       ok: false,
       error: "Inventory contains an unknown item or invalid stack count.",
+    };
+  }
+
+  if (
+    version === PLAYER_SAVE_VERSION &&
+    !isValidEquipmentState(parsed.equipment)
+  ) {
+    return {
+      ok: false,
+      error: "Equipment data contains an invalid item or loadout reference.",
     };
   }
 

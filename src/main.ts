@@ -12,6 +12,18 @@ import {
   STAGES_PER_GALAXY,
 } from "./campaign/stage";
 import {
+  createStarterEquipmentState,
+  equipmentForSlot,
+  equipmentStatBonus,
+  equipInstance,
+  unequipSlot,
+} from "./equipment/loadout";
+import type { EquipmentState } from "./equipment/loadout";
+import {
+  EQUIPMENT_SLOTS,
+  getEquipmentDefinition,
+} from "./equipment/registry";
+import {
   createEmptyInventory,
   inventoryTotal,
   itemCount,
@@ -20,6 +32,7 @@ import {
 import type { Inventory } from "./items/inventory";
 import type { RecoveryItemId } from "./items/consumables";
 import { accuracyPercent } from "./logic";
+import { DEFAULT_PLAYER_BASE_STATS } from "./stats/player";
 import { AutosaveQueue } from "./persistence/autosave";
 import {
   exportPlayerSaveJson,
@@ -212,6 +225,7 @@ app.innerHTML = `
           <button id="startButton" class="primary">Continue · Stage 001</button>
           <button id="stageSelectButton">Stage Select</button>
           <button id="vocabularyButton">Vocabulary</button>
+          <button id="equipmentButton">Equipment</button>
           <button id="dataButton">Data</button>
           <button id="settingsButton">Settings</button>
         </div>
@@ -293,6 +307,24 @@ app.innerHTML = `
         <span id="campaignMeta"></span>
       </div>
       <div id="stageGrid" class="stage-grid"></div>
+    </dialog>
+
+    <dialog id="equipmentDialog" class="settings-dialog equipment-dialog">
+      <form method="dialog" class="dialog-head">
+        <div>
+          <p class="eyebrow">pre-stage build</p>
+          <h2>Equipment Loadout</h2>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+      <p class="equipment-note">
+        Loadout changes are applied to the next stage and saved immediately.
+      </p>
+      <div id="equipmentGrid" class="equipment-grid"></div>
+      <div class="equipment-total">
+        <span>equipped bonuses</span>
+        <strong id="equipmentBonusText">none</strong>
+      </div>
     </dialog>
 
     <dialog id="dataDialog" class="settings-dialog data-dialog">
@@ -459,6 +491,7 @@ app.innerHTML = `
 let settings = loadSettings();
 let campaign = createDefaultCampaignProgress();
 let inventory: Inventory = createEmptyInventory();
+let equipment: EquipmentState = createStarterEquipmentState();
 let persistenceReady = false;
 let sourceState = loadSource();
 let sourceTab: "class" | "custom" = sourceState.mode;
@@ -476,10 +509,12 @@ const settingsDialog = byId<HTMLDialogElement>("settingsDialog");
 const vocabularyDialog = byId<HTMLDialogElement>("vocabularyDialog");
 const stageSelectDialog = byId<HTMLDialogElement>("stageSelectDialog");
 const dataDialog = byId<HTMLDialogElement>("dataDialog");
+const equipmentDialog = byId<HTMLDialogElement>("equipmentDialog");
 
 type AutosaveSnapshot = {
   campaign: typeof campaign;
   inventory: Inventory;
+  equipment: EquipmentState;
 };
 
 const campaignAutosave = new AutosaveQueue<
@@ -489,6 +524,7 @@ const campaignAutosave = new AutosaveQueue<
   savePlayerProgress(
     snapshot.campaign,
     snapshot.inventory,
+    snapshot.equipment,
     reason as SaveReason,
   ),
 );
@@ -688,6 +724,92 @@ const game = new Game(
   },
 );
 
+function applyEquipmentStats(): void {
+  game.setPlayerStats({
+    base: DEFAULT_PLAYER_BASE_STATS,
+    equipment: equipmentStatBonus(equipment),
+  });
+}
+
+function formatEquipmentBonuses(): string {
+  const bonus = equipmentStatBonus(equipment);
+  const parts = Object.entries(bonus)
+    .filter(([, value]) => typeof value === "number" && value !== 0)
+    .map(([key, value]) =>
+      key + " +" + String(Math.round((value ?? 0) * 10) / 10),
+    );
+
+  return parts.length > 0 ? parts.join(" · ") : "none";
+}
+
+function renderEquipment(): void {
+  const grid = byId("equipmentGrid");
+  grid.replaceChildren();
+
+  for (const slot of EQUIPMENT_SLOTS) {
+    const card = document.createElement("label");
+    card.className = "equipment-slot";
+
+    const title = document.createElement("span");
+    title.className = "equipment-slot-name";
+    title.textContent = slot;
+
+    const select = document.createElement("select");
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = "Empty";
+    select.append(empty);
+
+    for (const item of equipmentForSlot(equipment, slot)) {
+      const definition = getEquipmentDefinition(item.definitionId);
+      const option = document.createElement("option");
+      option.value = item.instanceId;
+      option.textContent = definition.name;
+      select.append(option);
+    }
+
+    select.value = equipment.loadout[slot] ?? "";
+    select.addEventListener("change", () => {
+      equipment =
+        select.value === ""
+          ? unequipSlot(equipment, slot)
+          : equipInstance(equipment, select.value);
+
+      applyEquipmentStats();
+      renderEquipment();
+      void autosaveCampaign(
+        "equipment",
+        "✓ Loadout saved · applies next stage",
+      );
+    });
+
+    const currentId = equipment.loadout[slot];
+    const current =
+      currentId === null
+        ? null
+        : equipment.items.find(
+            (item) => item.instanceId === currentId,
+          ) ?? null;
+
+    const detail = document.createElement("small");
+    detail.textContent =
+      current === null
+        ? "No equipment"
+        : getEquipmentDefinition(current.definitionId).description;
+
+    card.append(title, select, detail);
+    grid.append(card);
+  }
+
+  byId("equipmentBonusText").textContent = formatEquipmentBonuses();
+}
+
+function openEquipment(): void {
+  if (!persistenceReady || game.getPhase() !== "title") return;
+  renderEquipment();
+  equipmentDialog.showModal();
+}
+
 function selectedVocabularyLevel(): number {
   return sourceState.mode === "class" ? sourceState.level : 1;
 }
@@ -716,6 +838,7 @@ async function autosaveCampaign(
     {
       campaign,
       inventory,
+      equipment,
     },
     reason,
   );
@@ -745,16 +868,21 @@ async function initializePlayerProgress(): Promise<void> {
     byId<HTMLButtonElement>("dataButton"),
     byId<HTMLButtonElement>("pauseDataButton"),
   ];
+  const equipmentButton =
+    byId<HTMLButtonElement>("equipmentButton");
 
   startButton.disabled = true;
   stageSelectButton.disabled = true;
+  equipmentButton.disabled = true;
   for (const button of dataButtons) button.disabled = true;
 
   try {
     const loaded = await loadPlayerSave();
     campaign = loaded.save.campaign;
     inventory = loaded.save.inventory;
+    equipment = loaded.save.equipment;
     renderInventory();
+    applyEquipmentStats();
     currentGalaxy = Math.ceil(
       campaign.selectedStage / STAGES_PER_GALAXY,
     );
@@ -763,6 +891,7 @@ async function initializePlayerProgress(): Promise<void> {
     updateCampaignUi();
     startButton.disabled = false;
     stageSelectButton.disabled = false;
+    equipmentButton.disabled = false;
     for (const button of dataButtons) button.disabled = false;
 
     if (loaded.migrated) {
@@ -981,6 +1110,7 @@ async function exportSave(): Promise<void> {
     campaign,
     undefined,
     inventory,
+    equipment,
   );
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -1014,6 +1144,7 @@ async function importSaveFile(file: File): Promise<void> {
 
     const imported = result.save.campaign;
     const importedInventory = result.save.inventory;
+    const importedEquipment = result.save.equipment;
     const message =
       "Import Stage " +
       String(imported.highestUnlockedStage).padStart(3, "0") +
@@ -1029,9 +1160,12 @@ async function importSaveFile(file: File): Promise<void> {
 
     const previousCampaign = campaign;
     const previousInventory = inventory;
+    const previousEquipment = equipment;
     campaign = imported;
     inventory = importedInventory;
+    equipment = importedEquipment;
     renderInventory();
+    applyEquipmentStats();
     currentGalaxy = Math.ceil(
       campaign.selectedStage / STAGES_PER_GALAXY,
     );
@@ -1040,7 +1174,9 @@ async function importSaveFile(file: File): Promise<void> {
     if (!saved) {
       campaign = previousCampaign;
       inventory = previousInventory;
+      equipment = previousEquipment;
       renderInventory();
+      applyEquipmentStats();
       currentGalaxy = Math.ceil(
         campaign.selectedStage / STAGES_PER_GALAXY,
       );
@@ -1149,6 +1285,8 @@ for (const [buttonId, itemId] of recoveryButtons) {
     useInventoryItem(itemId);
   });
 }
+
+byId("equipmentButton").addEventListener("click", openEquipment);
 
 for (const id of ["settingsButton", "pauseSettingsButton"]) {
   byId(id).addEventListener("click", openSettings);
@@ -1305,7 +1443,8 @@ window.addEventListener("keydown", (event) => {
     settingsDialog.open ||
     vocabularyDialog.open ||
     stageSelectDialog.open ||
-    dataDialog.open
+    dataDialog.open ||
+    equipmentDialog.open
   ) return;
 
   if (
@@ -1337,7 +1476,7 @@ window.addEventListener("resize", () => game.resize());
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "hidden" || !persistenceReady) return;
   campaignAutosave.schedule(
-    { campaign, inventory },
+    { campaign, inventory, equipment },
     "pagehide",
   );
   void campaignAutosave.flush("pagehide");
@@ -1346,7 +1485,7 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("pagehide", () => {
   if (!persistenceReady) return;
   campaignAutosave.schedule(
-    { campaign, inventory },
+    { campaign, inventory, equipment },
     "pagehide",
   );
   void campaignAutosave.flush("pagehide");

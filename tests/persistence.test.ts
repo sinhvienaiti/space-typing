@@ -75,7 +75,7 @@ describe("player save persistence model", () => {
     expect(migration.save.inventory).toEqual({});
   });
 
-  it("migrates PlayerSave v2 to v3 with an empty inventory", () => {
+  it("migrates PlayerSave v2 to the current schema with starter equipment", () => {
     const progress = createDefaultCampaignProgress();
     const migration = migratePlayerSave({
       version: 2,
@@ -88,6 +88,23 @@ describe("player save persistence model", () => {
     expect(migration.fromVersion).toBe(2);
     expect(migration.save.version).toBe(PLAYER_SAVE_VERSION);
     expect(migration.save.inventory).toEqual({});
+    expect(migration.save.equipment.loadout.weapon).toBe("starter-pulse");
+  });
+
+  it("migrates PlayerSave v3 to v4 without losing inventory", () => {
+    const progress = createDefaultCampaignProgress();
+    const migration = migratePlayerSave({
+      version: 3,
+      campaign: progress,
+      inventory: { "repair-kit": 3 },
+      updatedAt: "2026-09-21T15:29:30.000Z",
+      lastSaveReason: "inventory",
+    });
+
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(3);
+    expect(migration.save.inventory).toEqual({ "repair-kit": 3 });
+    expect(migration.save.equipment.loadout.weapon).toBe("starter-pulse");
   });
 
   it("keeps a valid current-version save without migration", () => {
@@ -103,6 +120,7 @@ describe("player save persistence model", () => {
     expect(migration.fromVersion).toBe(PLAYER_SAVE_VERSION);
     expect(migration.save).toEqual(save);
     expect(migration.save.inventory).toEqual({ "repair-kit": 2 });
+    expect(migration.save.equipment.loadout.weapon).toBe("starter-pulse");
   });
 
   it("refuses unsupported numeric schema versions instead of down-migrating them", () => {

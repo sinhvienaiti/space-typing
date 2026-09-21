@@ -32,12 +32,14 @@ describe("save backup", () => {
       campaign: { highestUnlockedStage: number };
       lastSaveReason: string;
       inventory: { "repair-kit"?: number };
+      equipment: { loadout: { weapon: string | null } };
     };
 
     expect(parsed.version).toBe(PLAYER_SAVE_VERSION);
     expect(parsed.campaign.highestUnlockedStage).toBe(2);
     expect(parsed.lastSaveReason).toBe("manual");
     expect(parsed.inventory["repair-kit"]).toBe(2);
+    expect(parsed.equipment.loadout.weapon).toBe("starter-pulse");
   });
 
   it("imports and migrates a valid v1 backup", () => {
@@ -79,7 +81,7 @@ describe("save backup", () => {
     );
     expect(unsupported).toEqual({
       ok: false,
-      error: "Unsupported save version. Supported versions: 1-3.",
+      error: "Unsupported save version. Supported versions: 1-4.",
     });
   });
 
@@ -123,7 +125,42 @@ describe("save backup", () => {
     });
   });
 
-  it("rejects corrupted best-result values", () => {
+  it("rejects invalid equipment/loadout references in v4", () => {
+    const progress = createDefaultCampaignProgress();
+    const invalid = parsePlayerSaveJson(
+      JSON.stringify({
+        version: PLAYER_SAVE_VERSION,
+        campaign: progress,
+        inventory: {},
+        equipment: {
+          items: [
+            {
+              instanceId: "bad",
+              definitionId: "pulse-laser-mk1",
+            },
+          ],
+          loadout: {
+            weapon: null,
+            armor: "bad",
+            shield: null,
+            reactor: null,
+            utility: null,
+            drone: null,
+            core: null,
+          },
+        },
+        updatedAt: "2026-09-21T15:45:30.000Z",
+        lastSaveReason: "manual",
+      }),
+    );
+
+    expect(invalid).toEqual({
+      ok: false,
+      error: "Equipment data contains an invalid item or loadout reference.",
+    });
+  });
+
+  it("rejects corrupted best-result values",
     const progress = createDefaultCampaignProgress();
     const invalid = parsePlayerSaveJson(
       JSON.stringify({
