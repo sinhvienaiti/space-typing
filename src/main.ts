@@ -14,8 +14,11 @@ import {
 import {
   createEmptyInventory,
   inventoryTotal,
+  itemCount,
+  removeItem,
 } from "./items/inventory";
 import type { Inventory } from "./items/inventory";
+import type { RecoveryItemId } from "./items/consumables";
 import { accuracyPercent } from "./logic";
 import { AutosaveQueue } from "./persistence/autosave";
 import {
@@ -177,6 +180,24 @@ app.innerHTML = `
         <span>energy</span>
         <strong id="energyText">100 / 100</strong>
       </div>
+    </div>
+
+    <div id="quickItems" class="quick-items hidden">
+      <button id="quickRepair" type="button" title="Repair Kit">
+        <kbd>1</kbd>
+        <span>repair</span>
+        <strong id="repairCount">0</strong>
+      </button>
+      <button id="quickShield" type="button" title="Shield Cell">
+        <kbd>2</kbd>
+        <span>shield</span>
+        <strong id="shieldCount">0</strong>
+      </button>
+      <button id="quickEnergy" type="button" title="Energy Cell">
+        <kbd>3</kbd>
+        <span>energy</span>
+        <strong id="energyCount">0</strong>
+      </button>
     </div>
 
     <section id="titleOverlay" class="overlay">
@@ -497,6 +518,52 @@ function renderStats(stats: GameStats): void {
     stats.power >= 100 ? "SPACE — ready" : "type cleanly to charge";
 }
 
+function renderInventory(): void {
+  const entries: Array<{
+    id: RecoveryItemId;
+    countId: string;
+    buttonId: string;
+  }> = [
+    {
+      id: "repair-kit",
+      countId: "repairCount",
+      buttonId: "quickRepair",
+    },
+    {
+      id: "shield-cell",
+      countId: "shieldCount",
+      buttonId: "quickShield",
+    },
+    {
+      id: "energy-cell",
+      countId: "energyCount",
+      buttonId: "quickEnergy",
+    },
+  ];
+
+  for (const entry of entries) {
+    const count = itemCount(inventory, entry.id);
+    byId(entry.countId).textContent = String(count);
+    byId<HTMLButtonElement>(entry.buttonId).disabled =
+      count <= 0 || game.getPhase() !== "playing";
+  }
+}
+
+function useInventoryItem(id: RecoveryItemId): void {
+  if (itemCount(inventory, id) <= 0) return;
+  if (!game.useConsumable(id)) {
+    showNotice("Item not needed right now");
+    return;
+  }
+
+  const removed = removeItem(inventory, id, 1);
+  if (removed.changed <= 0) return;
+
+  inventory = removed.inventory;
+  renderInventory();
+  void autosaveCampaign("inventory", "✓ Item used · progress saved");
+}
+
 function showLearning(entry: VocabularyEntry): void {
   if (learningTimer !== null) window.clearTimeout(learningTimer);
   byId("learningWord").textContent = entry.en;
@@ -527,6 +594,8 @@ function renderPhase(phase: GamePhase): void {
   pauseOverlay.classList.toggle("hidden", phase !== "paused");
   gameOverOverlay.classList.toggle("hidden", phase !== "gameover");
   stageClearOverlay.classList.toggle("hidden", phase !== "stageclear");
+  byId("quickItems").classList.toggle("hidden", phase !== "playing");
+  renderInventory();
 }
 
 function renderStage(stage: number): void {
@@ -685,6 +754,7 @@ async function initializePlayerProgress(): Promise<void> {
     const loaded = await loadPlayerSave();
     campaign = loaded.save.campaign;
     inventory = loaded.save.inventory;
+    renderInventory();
     currentGalaxy = Math.ceil(
       campaign.selectedStage / STAGES_PER_GALAXY,
     );
@@ -961,6 +1031,7 @@ async function importSaveFile(file: File): Promise<void> {
     const previousInventory = inventory;
     campaign = imported;
     inventory = importedInventory;
+    renderInventory();
     currentGalaxy = Math.ceil(
       campaign.selectedStage / STAGES_PER_GALAXY,
     );
@@ -969,6 +1040,7 @@ async function importSaveFile(file: File): Promise<void> {
     if (!saved) {
       campaign = previousCampaign;
       inventory = previousInventory;
+      renderInventory();
       currentGalaxy = Math.ceil(
         campaign.selectedStage / STAGES_PER_GALAXY,
       );
@@ -1064,6 +1136,18 @@ byId("nextStageButton").addEventListener("click", startSelectedStage);
 
 for (const id of ["titleButton", "resultTitleButton", "clearTitleButton"]) {
   byId(id).addEventListener("click", () => game.backToTitle());
+}
+
+const recoveryButtons: Array<[string, RecoveryItemId]> = [
+  ["quickRepair", "repair-kit"],
+  ["quickShield", "shield-cell"],
+  ["quickEnergy", "energy-cell"],
+];
+
+for (const [buttonId, itemId] of recoveryButtons) {
+  byId(buttonId).addEventListener("click", () => {
+    useInventoryItem(itemId);
+  });
 }
 
 for (const id of ["settingsButton", "pauseSettingsButton"]) {
@@ -1223,6 +1307,23 @@ window.addEventListener("keydown", (event) => {
     stageSelectDialog.open ||
     dataDialog.open
   ) return;
+
+  if (
+    game.getPhase() === "playing" &&
+    (event.key === "1" ||
+      event.key === "2" ||
+      event.key === "3")
+  ) {
+    event.preventDefault();
+    const itemId: RecoveryItemId =
+      event.key === "1"
+        ? "repair-kit"
+        : event.key === "2"
+          ? "shield-cell"
+          : "energy-cell";
+    useInventoryItem(itemId);
+    return;
+  }
 
   if (event.key === "Escape" || event.key === " ") {
     event.preventDefault();

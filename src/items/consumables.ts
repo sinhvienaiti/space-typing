@@ -1,0 +1,77 @@
+import { clamp } from "../logic";
+import type { PlayerResources } from "../stats/player";
+
+export type RecoveryItemId =
+  | "repair-kit"
+  | "shield-cell"
+  | "energy-cell";
+
+export type ResourceCaps = {
+  hull: number;
+  shield: number;
+  energy: number;
+};
+
+export type ConsumableResult = {
+  resources: PlayerResources;
+  applied: boolean;
+  restored: number;
+};
+
+export function isRecoveryItemId(
+  value: string,
+): value is RecoveryItemId {
+  return (
+    value === "repair-kit" ||
+    value === "shield-cell" ||
+    value === "energy-cell"
+  );
+}
+
+export function useRecoveryItem(
+  id: RecoveryItemId,
+  resources: PlayerResources,
+  caps: ResourceCaps,
+): ConsumableResult {
+  const next = { ...resources };
+
+  if (id === "repair-kit") {
+    const before = next.hull;
+    next.hull = clamp(
+      next.hull + caps.hull * 0.35,
+      0,
+      caps.hull,
+    );
+    return {
+      resources: next,
+      applied: next.hull > before,
+      restored: next.hull - before,
+    };
+  }
+
+  if (id === "shield-cell") {
+    const before = next.shield;
+    next.shield = clamp(
+      next.shield + caps.shield * 0.5,
+      0,
+      caps.shield,
+    );
+    return {
+      resources: next,
+      applied: next.shield > before,
+      restored: next.shield - before,
+    };
+  }
+
+  const before = next.energy;
+  next.energy = clamp(
+    next.energy + caps.energy * 0.5,
+    0,
+    caps.energy,
+  );
+  return {
+    resources: next,
+    applied: next.energy > before,
+    restored: next.energy - before,
+  };
+}

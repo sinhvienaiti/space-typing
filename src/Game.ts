@@ -36,6 +36,11 @@ import {
   enemyProfile,
 } from "./enemies/kinds";
 import {
+  isRecoveryItemId,
+  useRecoveryItem,
+  type RecoveryItemId,
+} from "./items/consumables";
+import {
   accuracyPercent,
   clamp,
   chooseTarget,
@@ -156,6 +161,55 @@ export class Game {
 
   getStats(): GameStats {
     return { ...this.stats };
+  }
+
+  useConsumable(id: string): boolean {
+    if (
+      this.phase !== "playing" ||
+      !isRecoveryItemId(id)
+    ) {
+      return false;
+    }
+
+    return this.useRecoveryConsumable(id);
+  }
+
+  private useRecoveryConsumable(id: RecoveryItemId): boolean {
+    const result = useRecoveryItem(
+      id,
+      {
+        hull: this.stats.hull,
+        shield: this.stats.shield,
+        energy: this.stats.energy,
+      },
+      {
+        hull: this.stats.maxHull,
+        shield: this.stats.maxShield,
+        energy: this.stats.maxEnergy,
+      },
+    );
+
+    if (!result.applied) return false;
+
+    this.stats.hull = result.resources.hull;
+    this.stats.shield = result.resources.shield;
+    this.stats.energy = result.resources.energy;
+
+    const hue =
+      id === "repair-kit"
+        ? 142
+        : id === "shield-cell"
+          ? 190
+          : 48;
+    this.burst(
+      this.width / 2,
+      this.height - PLAYER_Y_OFFSET,
+      22,
+      hue,
+    );
+    this.sfx.support();
+    this.emitStats();
+    return true;
   }
 
   setPlayerStats(input: EffectiveStatInput): void {

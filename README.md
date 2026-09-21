@@ -89,3 +89,8 @@ Step 31 first consumables
 ## Item foundation
 
 The item layer now uses stable registry IDs and a versioned inventory stored inside PlayerSave v3. Save v1/v2 migrate to v3 with an empty inventory, while current backups reject unknown item IDs or invalid stack counts.
+
+
+## First consumables
+
+Repair Kit, Shield Cell and Energy Cell now have real combat effects. They can be used with 1/2/3 or the compact combat bar, are consumed only when the corresponding resource can actually be restored, and inventory changes autosave immediately.
