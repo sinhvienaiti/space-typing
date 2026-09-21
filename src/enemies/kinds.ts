@@ -29,19 +29,31 @@ export function enemyWeightsForStage(stage: number): EnemyWeights {
   const destroyer =
     safeStage < 8
       ? 0
-      : Math.min(0.22, 0.09 + (safeStage - 8) * 0.00013);
+      : Math.min(0.2, 0.08 + (safeStage - 8) * 0.00012);
 
-  const specialTotal = mine + tank + destroyer;
+  const oppressor =
+    safeStage < 15
+      ? 0
+      : Math.min(0.16, 0.05 + (safeStage - 15) * 0.00011);
+
+  const specialTotal = mine + tank + destroyer + oppressor;
   const scale = specialTotal > 0.7 ? 0.7 / specialTotal : 1;
   const resolvedMine = mine * scale;
   const resolvedTank = tank * scale;
   const resolvedDestroyer = destroyer * scale;
+  const resolvedOppressor = oppressor * scale;
 
   return {
-    scout: 1 - resolvedMine - resolvedTank - resolvedDestroyer,
+    scout:
+      1 -
+      resolvedMine -
+      resolvedTank -
+      resolvedDestroyer -
+      resolvedOppressor,
     mine: resolvedMine,
     tank: resolvedTank,
     destroyer: resolvedDestroyer,
+    oppressor: resolvedOppressor,
   };
 }
 
@@ -56,6 +68,12 @@ export function chooseEnemyKind(
   if (value < weights.mine + weights.tank) return "tank";
   if (value < weights.mine + weights.tank + weights.destroyer) {
     return "destroyer";
+  }
+  if (
+    value <
+    weights.mine + weights.tank + weights.destroyer + weights.oppressor
+  ) {
+    return "oppressor";
   }
   return "scout";
 }
@@ -96,6 +114,18 @@ export function enemyProfile(kind: EnemyKind, galaxy: number): EnemyProfile {
       speedVariance: 9,
       layers: 1,
       fireInterval: Math.max(2.6, 4.4 - galaxyScale * 0.12),
+    };
+  }
+
+  if (kind === "oppressor") {
+    return {
+      radius: 40,
+      driftMin: 20,
+      driftMax: 42,
+      baseSpeed: 23 + galaxyScale * 1.5,
+      speedVariance: 7,
+      layers: 1,
+      fireInterval: Math.max(2.2, 4 - galaxyScale * 0.13),
     };
   }
 

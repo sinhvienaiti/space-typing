@@ -443,24 +443,29 @@ export class Game {
 
     const playerX = this.width / 2;
     const playerY = this.height - PLAYER_Y_OFFSET;
-    const dx = playerX - enemy.x;
-    const dy = playerY - enemy.y;
-    const length = Math.max(1, Math.hypot(dx, dy));
+    const baseAngle = Math.atan2(playerY - enemy.y, playerX - enemy.x);
     const speed = 115 + this.difficulty.projectilePressure * 52;
     const alphabet = "asdfjklqweruiopzxcvbnm";
-    const char =
-      alphabet[Math.floor(Math.random() * alphabet.length)] ?? "a";
+    const count = enemy.kind === "oppressor" ? 3 : 1;
+    const spreadStep = enemy.kind === "oppressor" ? 0.13 : 0;
 
-    this.projectiles.push({
-      id: this.nextProjectileId++,
-      ownerId: enemy.id,
-      char,
-      x: enemy.x,
-      y: enemy.y + enemy.radius * 0.45,
-      vx: (dx / length) * speed,
-      vy: (dy / length) * speed,
-      radius: 14,
-    });
+    for (let index = 0; index < count; index += 1) {
+      const offset = (index - (count - 1) / 2) * spreadStep;
+      const angle = baseAngle + offset;
+      const char =
+        alphabet[Math.floor(Math.random() * alphabet.length)] ?? "a";
+
+      this.projectiles.push({
+        id: this.nextProjectileId++,
+        ownerId: enemy.id,
+        char,
+        x: enemy.x,
+        y: enemy.y + enemy.radius * 0.45,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: enemy.kind === "oppressor" ? 15 : 14,
+      });
+    }
 
     this.sfx.enemyShot();
   }
@@ -915,7 +920,9 @@ export class Game {
           ? "#8f83ff"
           : enemy.kind === "destroyer"
             ? "#57d8ff"
-            : "#ffb75b";
+            : enemy.kind === "oppressor"
+              ? "#e36dff"
+              : "#ffb75b";
     const targetColor = "#80f3ff";
 
     context.save();
@@ -963,6 +970,17 @@ export class Game {
       context.lineTo(-enemy.radius * 0.32, -enemy.radius * 0.72);
       context.lineTo(-enemy.radius, -enemy.radius * 0.45);
       context.closePath();
+    } else if (enemy.kind === "oppressor") {
+      for (let index = 0; index < 6; index += 1) {
+        const angle = (Math.PI * 2 * index) / 6 - Math.PI / 2;
+        const radius =
+          index % 2 === 0 ? enemy.radius : enemy.radius * 0.78;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius * 0.78;
+        if (index === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.closePath();
     } else {
       context.moveTo(0, enemy.radius);
       context.lineTo(enemy.radius * 0.9, -enemy.radius * 0.72);
@@ -987,6 +1005,18 @@ export class Game {
       for (let index = 0; index < enemy.layersRemaining; index += 1) {
         context.fillRect(startX + index * pipGap - 2, enemy.radius + 8, 5, 3);
       }
+    }
+
+    if (enemy.kind === "oppressor") {
+      context.strokeStyle = "rgba(229, 111, 255, 0.38)";
+      context.lineWidth = 1.5;
+      context.beginPath();
+      context.arc(0, 0, enemy.radius * 0.62, 0, Math.PI * 2);
+      context.stroke();
+
+      context.beginPath();
+      context.arc(0, 0, enemy.radius * 0.35, 0, Math.PI * 2);
+      context.stroke();
     }
 
     context.restore();

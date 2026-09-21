@@ -7,7 +7,12 @@ export type GamePhase =
 
 export type VisualQuality = "low" | "medium" | "high" | "ultra";
 
-export type EnemyKind = "scout" | "mine" | "tank" | "destroyer";
+export type EnemyKind =
+  | "scout"
+  | "mine"
+  | "tank"
+  | "destroyer"
+  | "oppressor";
 
 export type VocabularyEntry = {
   id: string;

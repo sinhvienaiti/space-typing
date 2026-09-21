@@ -12,6 +12,7 @@ describe("enemy progression", () => {
       mine: 0,
       tank: 0,
       destroyer: 0,
+      oppressor: 0,
     });
 
     const stage3 = enemyWeightsForStage(3);
@@ -25,19 +26,28 @@ describe("enemy progression", () => {
 
     const stage8 = enemyWeightsForStage(8);
     expect(stage8.destroyer).toBeGreaterThan(0);
+    expect(stage8.oppressor).toBe(0);
+
+    const stage15 = enemyWeightsForStage(15);
+    expect(stage15.oppressor).toBeGreaterThan(0);
   });
 
   it("keeps enemy weights bounded and usable through Stage 1000", () => {
     for (const stage of [1, 5, 100, 500, 1000]) {
       const weights = enemyWeightsForStage(stage);
       const total =
-        weights.scout + weights.mine + weights.tank + weights.destroyer;
+        weights.scout +
+        weights.mine +
+        weights.tank +
+        weights.destroyer +
+        weights.oppressor;
 
       expect(total).toBeCloseTo(1);
       expect(weights.scout).toBeGreaterThanOrEqual(0.3);
       expect(weights.mine).toBeLessThanOrEqual(0.34);
       expect(weights.tank).toBeLessThanOrEqual(0.24);
-      expect(weights.destroyer).toBeLessThanOrEqual(0.22);
+      expect(weights.destroyer).toBeLessThanOrEqual(0.2);
+      expect(weights.oppressor).toBeLessThanOrEqual(0.16);
     }
   });
 
@@ -54,6 +64,11 @@ describe("enemy progression", () => {
     const destroyer = enemyProfile("destroyer", 1);
     expect(destroyer.fireInterval).not.toBeNull();
     expect(destroyer.baseSpeed).toBeLessThan(scout.baseSpeed);
+
+    const oppressor = enemyProfile("oppressor", 1);
+    expect(oppressor.radius).toBeGreaterThan(destroyer.radius);
+    expect(oppressor.fireInterval).not.toBeNull();
+    expect(oppressor.baseSpeed).toBeLessThan(destroyer.baseSpeed);
   });
 
   it("chooses enemy kinds from deterministic random input", () => {
@@ -68,5 +83,13 @@ describe("enemy progression", () => {
     const destroyerPoint =
       stage8.mine + stage8.tank + stage8.destroyer / 2;
     expect(chooseEnemyKind(8, destroyerPoint)).toBe("destroyer");
+
+    const stage15 = enemyWeightsForStage(15);
+    const oppressorPoint =
+      stage15.mine +
+      stage15.tank +
+      stage15.destroyer +
+      stage15.oppressor / 2;
+    expect(chooseEnemyKind(15, oppressorPoint)).toBe("oppressor");
   });
 });
