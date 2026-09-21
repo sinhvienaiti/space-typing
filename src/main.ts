@@ -886,7 +886,7 @@ async function exportSave(): Promise<void> {
   document.body.append(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 
   byId("dataStatus").textContent =
     (saved ? "✓ Backup exported" : "Backup exported from current session") +
@@ -918,14 +918,22 @@ async function importSaveFile(file: File): Promise<void> {
       return;
     }
 
+    const previousCampaign = campaign;
     campaign = imported;
     currentGalaxy = Math.ceil(
       campaign.selectedStage / STAGES_PER_GALAXY,
     );
+
     const saved = await autosaveCampaign("manual");
     if (!saved) {
+      campaign = previousCampaign;
+      currentGalaxy = Math.ceil(
+        campaign.selectedStage / STAGES_PER_GALAXY,
+      );
+      updateCampaignUi();
+      updateDataSummary();
       status.textContent =
-        "Import validated, but storage write failed. Current save was not confirmed.";
+        "Import validated, but storage write failed. Previous progress was restored.";
       return;
     }
 
