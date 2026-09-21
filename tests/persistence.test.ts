@@ -251,6 +251,44 @@ describe("player save persistence model", () => {
       xp: 0,
       mastery: 0,
       masteryXp: 0,
+      talents: {
+        assault: 0,
+        bulwark: 0,
+        reactor: 0,
+      },
+    });
+  });
+
+  it("migrates PlayerSave v9 progression to empty Talent Trees", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const legacyProgress = Object.fromEntries(
+      Object.entries(current.characters.progress).map(([id, progress]) => [
+        id,
+        {
+          level: progress.level,
+          xp: progress.xp,
+          mastery: progress.mastery,
+          masteryXp: progress.masteryXp,
+        },
+      ]),
+    );
+    const legacy = {
+      ...current,
+      version: 9,
+      characters: {
+        selected: current.characters.selected,
+        unlocked: current.characters.unlocked,
+        progress: legacyProgress,
+      },
+    };
+
+    const migration = migratePlayerSave(legacy);
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(9);
+    expect(migration.save.characters.progress.vanguard.talents).toEqual({
+      assault: 0,
+      bulwark: 0,
+      reactor: 0,
     });
   });
 

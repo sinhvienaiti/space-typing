@@ -7,8 +7,12 @@ import {
 import {
   createStarterCharacterProgress,
   isValidCharacterProgress,
+  MAX_CHARACTER_LEVEL,
+  MAX_CHARACTER_MASTERY,
   sanitizeCharacterProgress,
   type CharacterProgress,
+  xpNeededForLevel,
+  xpNeededForMastery,
 } from "./progression";
 
 export type CharacterProgressMap = Record<CharacterId, CharacterProgress>;
@@ -124,6 +128,78 @@ export function isValidLegacyCharacterState(value: unknown): boolean {
   }
 
   return seen.has("vanguard") && seen.has(raw.selected);
+}
+
+function isValidPreTalentProgress(value: unknown): boolean {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const raw = value as {
+    level?: unknown;
+    xp?: unknown;
+    mastery?: unknown;
+    masteryXp?: unknown;
+  };
+
+  if (
+    typeof raw.level !== "number" ||
+    !Number.isInteger(raw.level) ||
+    raw.level < 1 ||
+    raw.level > MAX_CHARACTER_LEVEL ||
+    typeof raw.xp !== "number" ||
+    !Number.isInteger(raw.xp) ||
+    raw.xp < 0 ||
+    typeof raw.mastery !== "number" ||
+    !Number.isInteger(raw.mastery) ||
+    raw.mastery < 0 ||
+    raw.mastery > MAX_CHARACTER_MASTERY ||
+    typeof raw.masteryXp !== "number" ||
+    !Number.isInteger(raw.masteryXp) ||
+    raw.masteryXp < 0
+  ) {
+    return false;
+  }
+
+  if (
+    (raw.level >= MAX_CHARACTER_LEVEL && raw.xp !== 0) ||
+    (raw.level < MAX_CHARACTER_LEVEL &&
+      raw.xp >= xpNeededForLevel(raw.level))
+  ) {
+    return false;
+  }
+
+  return (
+    (raw.mastery >= MAX_CHARACTER_MASTERY && raw.masteryXp === 0) ||
+    (raw.mastery < MAX_CHARACTER_MASTERY &&
+      raw.masteryXp < xpNeededForMastery(raw.mastery))
+  );
+}
+
+export function isValidPreTalentCharacterState(value: unknown): boolean {
+  if (!isValidLegacyCharacterState(value)) return false;
+
+  const raw = value as { progress?: unknown };
+  if (
+    raw.progress === null ||
+    typeof raw.progress !== "object" ||
+    Array.isArray(raw.progress)
+  ) {
+    return false;
+  }
+
+  const progress = raw.progress as Partial<Record<CharacterId, unknown>>;
+  const keys = Object.keys(progress);
+  if (
+    keys.length !== CHARACTER_IDS.length ||
+    !CHARACTER_IDS.every((id) => keys.includes(id))
+  ) {
+    return false;
+  }
+
+  return CHARACTER_IDS.every((id) =>
+    isValidPreTalentProgress(progress[id]),
+  );
 }
 
 export function isValidCharacterState(

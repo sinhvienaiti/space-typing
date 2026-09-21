@@ -1,5 +1,13 @@
 import { clamp } from "../logic";
 import type { StatBonus } from "../stats/core";
+import {
+  createEmptyTalentRanks,
+  isValidTalentRanks,
+  sanitizeTalentRanks,
+  talentPointsForLevel,
+  totalTalentPoints,
+  type TalentRanks,
+} from "./talents";
 
 export const MAX_CHARACTER_LEVEL = 50;
 export const MAX_CHARACTER_MASTERY = 20;
@@ -9,6 +17,7 @@ export type CharacterProgress = {
   xp: number;
   mastery: number;
   masteryXp: number;
+  talents: TalentRanks;
 };
 
 export type CharacterProgressAward = {
@@ -30,6 +39,7 @@ export function createStarterCharacterProgress(): CharacterProgress {
     xp: 0,
     mastery: 0,
     masteryXp: 0,
+    talents: createEmptyTalentRanks(),
   };
 }
 
@@ -105,6 +115,7 @@ export function awardCharacterProgress(
       xp,
       mastery,
       masteryXp,
+      talents: current.talents,
     },
     xpGained,
     levelUps,
@@ -122,6 +133,7 @@ export function sanitizeCharacterProgress(value: unknown): CharacterProgress {
     xp?: unknown;
     mastery?: unknown;
     masteryXp?: unknown;
+    talents?: unknown;
   };
 
   const level =
@@ -132,6 +144,18 @@ export function sanitizeCharacterProgress(value: unknown): CharacterProgress {
     typeof raw.mastery === "number" && Number.isFinite(raw.mastery)
       ? Math.floor(clamp(raw.mastery, 0, MAX_CHARACTER_MASTERY))
       : 0;
+
+  const talents = sanitizeTalentRanks(raw.talents);
+  const allowedTalentPoints = talentPointsForLevel(level);
+  while (totalTalentPoints(talents) > allowedTalentPoints) {
+    if (talents.reactor > 0) {
+      talents.reactor -= 1;
+    } else if (talents.bulwark > 0) {
+      talents.bulwark -= 1;
+    } else if (talents.assault > 0) {
+      talents.assault -= 1;
+    }
+  }
 
   return {
     level,
@@ -150,6 +174,7 @@ export function sanitizeCharacterProgress(value: unknown): CharacterProgress {
               clamp(raw.masteryXp, 0, xpNeededForMastery(mastery) - 1),
             )
           : 0,
+    talents,
   };
 }
 
@@ -171,7 +196,9 @@ export function isValidCharacterProgress(
     raw.mastery < 0 ||
     raw.mastery > MAX_CHARACTER_MASTERY ||
     !Number.isInteger(raw.masteryXp) ||
-    raw.masteryXp < 0
+    raw.masteryXp < 0 ||
+    !isValidTalentRanks(raw.talents) ||
+    totalTalentPoints(raw.talents) > talentPointsForLevel(raw.level)
   ) {
     return false;
   }

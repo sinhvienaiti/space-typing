@@ -1187,6 +1187,69 @@ kbd {
   color: #6c7480;
 }
 
+.talent-panel {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(104, 219, 240, 0.1);
+  display: grid;
+  gap: 0.65rem;
+}
+
+.talent-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: #dffaff;
+}
+
+.talent-head span {
+  color: #72879a;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.talent-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.talent-button,
+.talent-reset {
+  min-height: 44px;
+}
+
+.talent-button {
+  display: grid;
+  gap: 0.22rem;
+  text-align: left;
+  background: rgba(7, 18, 28, 0.72);
+  border-color: rgba(104, 219, 240, 0.12);
+}
+
+.talent-button strong {
+  color: #dffaff;
+  font-size: 0.72rem;
+}
+
+.talent-button span {
+  color: #8395a7;
+  font-size: 0.62rem;
+}
+
+.talent-reset {
+  justify-self: start;
+  padding-inline: 0.9rem;
+}
+
+@media (max-width: 600px) {
+  .talent-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 900px) {
   .character-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

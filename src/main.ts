@@ -34,6 +34,15 @@ import {
   awardCharacterProgress,
   characterProgressStatBonus,
 } from "./characters/progression";
+import {
+  resetTalentRanks,
+  spendTalentPoint,
+  TALENT_BRANCHES,
+  talentBranchLabel,
+  talentPointsForLevel,
+  talentStatBonus,
+  totalTalentPoints,
+} from "./characters/talents";
 import { VANGUARD_ACTIVE_SKILL_ID } from "./characters/vanguard";
 import { VOLT_ACTIVE_SKILL_ID } from "./characters/volt";
 import { WRAITH_ACTIVE_SKILL_ID } from "./characters/wraith";
@@ -410,6 +419,7 @@ app.innerHTML = `
         Selected: Vanguard
       </p>
       <div id="characterGrid" class="character-grid"></div>
+      <div id="talentPanel" class="talent-panel"></div>
     </dialog>
 
     <dialog id="supportDialog" class="settings-dialog support-dialog">
@@ -1219,6 +1229,94 @@ function renderCharacters(): void {
     String(selectedProgress.level) +
     " · Mastery " +
     String(selectedProgress.mastery);
+
+  renderTalentPanel();
+}
+
+function renderTalentPanel(): void {
+  const panel = byId("talentPanel");
+  panel.replaceChildren();
+
+  const id = characters.selected;
+  const progress = characters.progress[id];
+  const available = talentPointsForLevel(progress.level);
+  const spent = totalTalentPoints(progress.talents);
+
+  const head = document.createElement("div");
+  head.className = "talent-head";
+
+  const title = document.createElement("strong");
+  title.textContent = "Talent Tree";
+
+  const meta = document.createElement("span");
+  meta.textContent =
+    String(spent) + "/" + String(available) + " points spent";
+
+  head.append(title, meta);
+
+  const grid = document.createElement("div");
+  grid.className = "talent-grid";
+
+  for (const branch of TALENT_BRANCHES) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "talent-button";
+
+    const label = document.createElement("strong");
+    label.textContent = talentBranchLabel(branch);
+
+    const rank = document.createElement("span");
+    rank.textContent = "Rank " + String(progress.talents[branch]) + "/2";
+
+    button.append(label, rank);
+    button.disabled =
+      spent >= available || progress.talents[branch] >= 2;
+
+    button.addEventListener("click", () => {
+      const nextTalents = spendTalentPoint(
+        characters.progress[id].talents,
+        branch,
+        characters.progress[id].level,
+      );
+      if (nextTalents === characters.progress[id].talents) return;
+
+      characters = updateCharacterProgress(characters, id, {
+        ...characters.progress[id],
+        talents: nextTalents,
+      });
+      applyEquipmentStats();
+      renderCharacters();
+      void autosaveCampaign(
+        "character",
+        "✓ Talent saved · " +
+          getCharacter(id).name +
+          " · " +
+          talentBranchLabel(branch),
+      );
+    });
+
+    grid.append(button);
+  }
+
+  const reset = document.createElement("button");
+  reset.type = "button";
+  reset.className = "talent-reset";
+  reset.textContent = "Reset talents";
+  reset.disabled = spent === 0;
+  reset.addEventListener("click", () => {
+    characters = updateCharacterProgress(characters, id, {
+      ...characters.progress[id],
+      talents: resetTalentRanks(),
+    });
+    applyEquipmentStats();
+    renderCharacters();
+    void autosaveCampaign(
+      "character",
+      "✓ Talents reset · " + getCharacter(id).name,
+    );
+  });
+
+  panel.append(head, grid, reset);
 }
 
 function openCharacters(): void {
@@ -1285,6 +1383,9 @@ function applyEquipmentStats(): void {
       characters.progress[characters.selected],
     ),
     equipment: equipmentStatBonus(equipment),
+    talent: talentStatBonus(
+      characters.progress[characters.selected].talents,
+    ),
   });
 }
 

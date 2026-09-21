@@ -55,6 +55,11 @@ describe("character progression", () => {
       xp: 0,
       mastery: 20,
       masteryXp: 0,
+      talents: {
+        assault: 0,
+        bulwark: 0,
+        reactor: 0,
+      },
     });
   });
 
@@ -64,6 +69,11 @@ describe("character progression", () => {
       xp: 0,
       mastery: 2,
       masteryXp: 0,
+      talents: {
+        assault: 0,
+        bulwark: 0,
+        reactor: 0,
+      },
     });
     expect(bonus.hull).toBeGreaterThan(0);
     expect(bonus.firepower).toBeGreaterThan(0);

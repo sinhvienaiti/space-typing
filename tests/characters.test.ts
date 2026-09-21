@@ -33,6 +33,11 @@ describe("character registry and selection", () => {
       xp: 0,
       mastery: 0,
       masteryXp: 0,
+      talents: {
+        assault: 0,
+        bulwark: 0,
+        reactor: 0,
+      },
     });
   });
 

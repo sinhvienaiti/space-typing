@@ -2844,6 +2844,18 @@ Current progression rules:
 ## Step 44
 Add small branching Talent Trees.
 
+**Status: implemented.**
+
+Talent rules:
+
+- every character has the same compact three-branch structure: Assault, Bulwark and Reactor;
+- talent points unlock at Character Level 10, 25 and 40;
+- each branch caps at rank 2 and each character has at most 3 points, forcing at least one meaningful branch choice at full progression;
+- Assault improves Firepower/Focus, Bulwark improves Shield/Armor and Reactor improves Energy/Reactor;
+- talent bonuses use the shared effective-stat pipeline;
+- Character Select shows and edits the selected character's talents, including a reset action;
+- PlayerSave v9 migrates to v10 with empty Talent Trees while preserving Level, XP, Mastery, unlocks and selection.
+
 ## Step 45
 Implement Supply Pod.
 

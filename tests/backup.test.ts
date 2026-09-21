@@ -91,7 +91,7 @@ describe("save backup", () => {
     );
     expect(unsupported).toEqual({
       ok: false,
-      error: "Unsupported save version. Supported versions: 1-9.",
+      error: "Unsupported save version. Supported versions: 1-10.",
     });
   });
 
@@ -279,6 +279,33 @@ describe("save backup", () => {
 
     expect(result.migrated).toBe(true);
     expect(result.save.characters.progress.vanguard.level).toBe(1);
+  });
+
+  it("imports and migrates a valid v9 Level/Mastery backup", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.version = 9;
+
+    const characters = raw.characters as {
+      selected: string;
+      unlocked: string[];
+      progress: Record<string, Record<string, unknown>>;
+    };
+    for (const progress of Object.values(characters.progress)) {
+      delete progress.talents;
+    }
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.migrated).toBe(true);
+    expect(result.save.characters.progress.vanguard.talents).toEqual({
+      assault: 0,
+      bulwark: 0,
+      reactor: 0,
+    });
   });
 
   it("rejects invalid current character state", () => {
