@@ -2818,10 +2818,13 @@ Implemented character slices:
 - Fortune: character stats add Luck/Salvage, Lucky Star restores Shield and charges Power, and Jackpot restores combat resources with a timed pressure window;
 - Arsenal: character stats add Firepower, Weapon Overclock boosts boss pressure, and Armory Protocol overclocks weapons while advancing nearby targets;
 - Oracle: perfect words add Power and short boss marking, Mark of Weakness is the active skill, and Perfect Sentence applies a stronger precision burst;
-- Bastion: Guardian Matrix blocks incoming pressure, blocked hits recycle into Shield, and Sanctuary combines Shield, barrier and guardian protection;
-- normal enemies track whether the current word received a miss, creating a reusable perfect-word combat hook for later characters.
+- Bastion: Guardian Matrix blocks incoming projectile pressure, destroyed projectiles recycle into Shield, and Sanctuary combines Shield, barrier and guardian protection;
+- Reaper: streak tiers increase boss damage, Execute advances the current threat or damages bosses, and Death Chain sustains a high-risk offensive window;
+- Celestial: perfect words build Celestial Charge, Celestial Stance adapts between offense and defense, and Starfall converts stored charge into a hybrid burst;
+- Zenith: Zenith Core rewards clean streak milestones, Zenith Shift is a short hybrid stance, and Zenith Protocol creates a sustained multi-system combat phase instead of an instant-win attack;
+- normal enemies track whether the current word received a miss, creating a reusable perfect-word combat hook for precision characters.
 
-Next character slice: Reaper.
+**Step 42 status: implemented for all milestone characters.**
 
 ## Step 43
 Add Character Level and Mastery.

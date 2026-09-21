@@ -18,8 +18,10 @@ import {
 import { AEGIS_ACTIVE_SKILL_ID } from "./characters/aegis";
 import { ARSENAL_ACTIVE_SKILL_ID } from "./characters/arsenal";
 import { BASTION_ACTIVE_SKILL_ID } from "./characters/bastion";
+import { CELESTIAL_ACTIVE_SKILL_ID } from "./characters/celestial";
 import { FORTUNE_ACTIVE_SKILL_ID } from "./characters/fortune";
 import { ORACLE_ACTIVE_SKILL_ID } from "./characters/oracle";
+import { REAPER_ACTIVE_SKILL_ID } from "./characters/reaper";
 import {
   createStarterCharacterState,
   selectCharacter,
@@ -30,6 +32,7 @@ import {
 import { VANGUARD_ACTIVE_SKILL_ID } from "./characters/vanguard";
 import { VOLT_ACTIVE_SKILL_ID } from "./characters/volt";
 import { WRAITH_ACTIVE_SKILL_ID } from "./characters/wraith";
+import { ZENITH_ACTIVE_SKILL_ID } from "./characters/zenith";
 import { characterStatBonus } from "./characters/stats";
 import {
   createStarterEquipmentState,
@@ -798,6 +801,15 @@ function selectedCharacterSkillId(): string | null {
   }
   if (characters.selected === "bastion") {
     return BASTION_ACTIVE_SKILL_ID;
+  }
+  if (characters.selected === "reaper") {
+    return REAPER_ACTIVE_SKILL_ID;
+  }
+  if (characters.selected === "celestial") {
+    return CELESTIAL_ACTIVE_SKILL_ID;
+  }
+  if (characters.selected === "zenith") {
+    return ZENITH_ACTIVE_SKILL_ID;
   }
   return null;
 }

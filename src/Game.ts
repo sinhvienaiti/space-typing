@@ -21,6 +21,34 @@ import {
   restoreAegisShield,
 } from "./characters/aegis";
 import {
+  addCelestialCharge,
+  CELESTIAL_ACTIVE_SKILL,
+  CELESTIAL_ACTIVE_SKILL_ID,
+  CELESTIAL_STANCE_DURATION,
+  CELESTIAL_STARFALL_BOSS_RATIO,
+  CELESTIAL_STARFALL_TARGETS,
+  spendCelestialCharge,
+} from "./characters/celestial";
+import {
+  REAPER_ACTIVE_SKILL,
+  REAPER_ACTIVE_SKILL_ID,
+  REAPER_DEATH_CHAIN_BOSS_RATIO,
+  REAPER_DEATH_CHAIN_DURATION,
+  REAPER_DEATH_CHAIN_TARGETS,
+  REAPER_EXECUTE_ADVANCE,
+  REAPER_EXECUTE_BOSS_RATIO,
+  reaperStreakDamageMultiplier,
+} from "./characters/reaper";
+import {
+  shouldTriggerZenithCore,
+  ZENITH_ACTIVE_SKILL,
+  ZENITH_ACTIVE_SKILL_ID,
+  ZENITH_PROTOCOL_DURATION,
+  ZENITH_PROTOCOL_GUARD_BLOCKS,
+  ZENITH_PROTOCOL_MARK_DURATION,
+  ZENITH_SHIFT_DURATION,
+} from "./characters/zenith";
+import {
   BASTION_ACTIVE_SKILL,
   BASTION_ACTIVE_SKILL_ID,
   BASTION_MATRIX_BLOCKS,
@@ -188,6 +216,37 @@ function randomBetween(min: number, max: number): number {
   return min + Math.random() * (max - min);
 }
 
+function ultimateVisual(characterId: CharacterId): {
+  count: number;
+  hue: number;
+  shake: number;
+} {
+  switch (characterId) {
+    case "aegis":
+      return { count: 56, hue: 300, shake: 10 };
+    case "volt":
+      return { count: 62, hue: 202, shake: 11 };
+    case "wraith":
+      return { count: 58, hue: 274, shake: 9 };
+    case "fortune":
+      return { count: 54, hue: 48, shake: 8 };
+    case "arsenal":
+      return { count: 60, hue: 18, shake: 10 };
+    case "oracle":
+      return { count: 58, hue: 326, shake: 9 };
+    case "bastion":
+      return { count: 58, hue: 164, shake: 9 };
+    case "reaper":
+      return { count: 66, hue: 350, shake: 11 };
+    case "celestial":
+      return { count: 68, hue: 220, shake: 10 };
+    case "zenith":
+      return { count: 72, hue: 190, shake: 11 };
+    default:
+      return { count: 48, hue: 184, shake: 9 };
+  }
+}
+
 export class Game {
   private readonly canvas: HTMLCanvasElement;
   private readonly context: CanvasRenderingContext2D;
@@ -243,6 +302,7 @@ export class Game {
   private gravityWellTimer = 0;
   private cloakTimer = 0;
   private weaponOverclockTimer = 0;
+  private celestialCharge = 0;
   private skillHudTimer = 0;
   private lastTime = performance.now();
   private animationFrame = 0;
@@ -320,7 +380,13 @@ export class Game {
                     ? [ORACLE_ACTIVE_SKILL]
                     : this.characterId === "bastion"
                       ? [BASTION_ACTIVE_SKILL]
-                      : [];
+                      : this.characterId === "reaper"
+                        ? [REAPER_ACTIVE_SKILL]
+                        : this.characterId === "celestial"
+                          ? [CELESTIAL_ACTIVE_SKILL]
+                          : this.characterId === "zenith"
+                            ? [ZENITH_ACTIVE_SKILL]
+                            : [];
 
     this.skillEngine.setDefinitions([
       ...characterDefinitions,
@@ -372,6 +438,15 @@ export class Game {
 
     if (
       (id === "mark-of-weakness" || id === ORACLE_ACTIVE_SKILL_ID) &&
+      this.currentTarget() === null &&
+      this.enemies.length === 0 &&
+      this.boss === null
+    ) {
+      return "effect-not-needed";
+    }
+
+    if (
+      id === REAPER_ACTIVE_SKILL_ID &&
       this.currentTarget() === null &&
       this.enemies.length === 0 &&
       this.boss === null
@@ -453,6 +528,21 @@ export class Game {
       this.characterId === "bastion"
     ) {
       this.activateBastionSkill();
+    } else if (
+      id === REAPER_ACTIVE_SKILL_ID &&
+      this.characterId === "reaper"
+    ) {
+      this.activateReaperSkill();
+    } else if (
+      id === CELESTIAL_ACTIVE_SKILL_ID &&
+      this.characterId === "celestial"
+    ) {
+      this.activateCelestialSkill();
+    } else if (
+      id === ZENITH_ACTIVE_SKILL_ID &&
+      this.characterId === "zenith"
+    ) {
+      this.activateZenithSkill();
     } else if (isDefensiveSkillId(id)) {
       this.activateDefensiveSkill(id);
     } else if (isOffensiveSkillId(id)) {
@@ -573,6 +663,98 @@ export class Game {
     );
     this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 30, 164);
     this.sfx.support();
+  }
+
+  private activateReaperSkill(): void {
+    if (this.boss !== null) {
+      const damage = firepowerDamage(
+        Math.max(
+          1,
+          Math.round(this.boss.maxHp * REAPER_EXECUTE_BOSS_RATIO),
+        ),
+        this.playerStats,
+      ) * reaperStreakDamageMultiplier(this.stats.streak);
+      this.boss.hp = Math.max(0, this.boss.hp - damage);
+      this.boss.flash = 1;
+      this.updateBossPhase(this.boss);
+      this.hooks.onBossUpdate(toBossHud(this.boss));
+      if (this.boss.hp <= 0) this.defeatBoss();
+      this.sfx.power();
+      return;
+    }
+
+    const target =
+      this.currentTarget() ??
+      [...this.enemies].sort((a, b) => b.y - a.y)[0] ??
+      null;
+    if (target === null) return;
+
+    const wordLength = typingText(target.entry.en).length;
+    target.typed = Math.min(
+      Math.max(0, wordLength - 1),
+      target.typed + REAPER_EXECUTE_ADVANCE,
+    );
+    target.flash = 1;
+    target.kick = Math.max(target.kick, 1.2);
+    this.burst(target.x, target.y, 22, 350);
+    this.sfx.power();
+  }
+
+  private activateCelestialSkill(): void {
+    const chargeFactor = this.celestialCharge / 100;
+    if (this.stats.shield < this.stats.maxShield * 0.55) {
+      this.stats.shield = clamp(
+        this.stats.shield +
+          this.stats.maxShield * (0.18 + chargeFactor * 0.22),
+        0,
+        this.stats.maxShield,
+      );
+      this.barrierHp = Math.max(
+        this.barrierHp,
+        45 + this.playerStats.shield * chargeFactor * 0.35,
+      );
+      this.barrierTimer = Math.max(this.barrierTimer, 4);
+    } else {
+      this.overdriveTimer = Math.max(
+        this.overdriveTimer,
+        CELESTIAL_STANCE_DURATION,
+      );
+      this.bossMarkTimer = Math.max(
+        this.bossMarkTimer,
+        3 + chargeFactor * 4,
+      );
+    }
+
+    this.stats.energy = clamp(
+      this.stats.energy + this.stats.maxEnergy * (0.1 + chargeFactor * 0.12),
+      0,
+      this.stats.maxEnergy,
+    );
+    this.celestialCharge = spendCelestialCharge(this.celestialCharge);
+    this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 34, 220);
+    this.sfx.support();
+    this.emitStats();
+  }
+
+  private activateZenithSkill(): void {
+    this.overdriveTimer = Math.max(
+      this.overdriveTimer,
+      ZENITH_SHIFT_DURATION,
+    );
+    this.timeShellTimer = Math.max(this.timeShellTimer, 2.5);
+    this.stats.shield = clamp(
+      this.stats.shield + this.stats.maxShield * 0.16,
+      0,
+      this.stats.maxShield,
+    );
+    this.stats.energy = clamp(
+      this.stats.energy + this.stats.maxEnergy * 0.2,
+      0,
+      this.stats.maxEnergy,
+    );
+    this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 38, 190);
+    this.sfx.power();
+    this.emitStats();
   }
 
   private activateEmpPulse(actionDelay: number): void {
@@ -908,6 +1090,7 @@ export class Game {
     this.gravityWellTimer = 0;
     this.cloakTimer = 0;
     this.weaponOverclockTimer = 0;
+    this.celestialCharge = 0;
     this.skillHudTimer = 0;
     this.hooks.onBossUpdate(null);
     this.hooks.onSkills();
@@ -2068,6 +2251,19 @@ export class Game {
         this.hooks.onBossUpdate(toBossHud(this.boss));
       }
     }
+
+    if (this.characterId === "celestial") {
+      this.celestialCharge = addCelestialCharge(
+        this.celestialCharge,
+        true,
+      );
+      this.burst(
+        this.width / 2,
+        this.height - PLAYER_Y_OFFSET,
+        10,
+        220,
+      );
+    }
   }
 
   private applyCharacterCorrectKeyPassive(): void {
@@ -2091,12 +2287,49 @@ export class Game {
       this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 12, 274);
       this.sfx.support();
     }
+
+    if (
+      this.characterId === "zenith" &&
+      shouldTriggerZenithCore(this.stats.streak)
+    ) {
+      this.stats.shield = clamp(
+        this.stats.shield + this.stats.maxShield * 0.08,
+        0,
+        this.stats.maxShield,
+      );
+      this.stats.energy = clamp(
+        this.stats.energy + this.stats.maxEnergy * 0.1,
+        0,
+        this.stats.maxEnergy,
+      );
+      this.gainPower(5);
+      this.burst(
+        this.width / 2,
+        this.height - PLAYER_Y_OFFSET,
+        14,
+        190,
+      );
+    }
   }
 
   private characterBossDamageMultiplier(): number {
-    return this.characterId === "arsenal" && this.weaponOverclockTimer > 0
-      ? 1.35
-      : 1;
+    let multiplier = 1;
+
+    if (this.characterId === "arsenal" && this.weaponOverclockTimer > 0) {
+      multiplier *= 1.35;
+    }
+    if (this.characterId === "reaper") {
+      multiplier *= reaperStreakDamageMultiplier(this.stats.streak);
+    }
+    if (
+      (this.characterId === "celestial" ||
+        this.characterId === "zenith") &&
+      this.overdriveTimer > 0
+    ) {
+      multiplier *= this.characterId === "zenith" ? 1.25 : 1.18;
+    }
+
+    return multiplier;
   }
 
   private activateOverdrive(): void {
@@ -2110,19 +2343,27 @@ export class Game {
     const isArsenal = this.characterId === "arsenal";
     const isOracle = this.characterId === "oracle";
     const isBastion = this.characterId === "bastion";
+    const isReaper = this.characterId === "reaper";
+    const isCelestial = this.characterId === "celestial";
+    const isZenith = this.characterId === "zenith";
     this.stats.power = 0;
     this.overdriveTimer = isVanguard
       ? VANGUARD_NOVA_DURATION
       : isFortune
         ? FORTUNE_JACKPOT_DURATION
-        : isAegis ||
-            isVolt ||
-            isWraith ||
-            isArsenal ||
-            isOracle ||
-            isBastion
-          ? 0
-          : 4.5;
+        : isReaper
+          ? REAPER_DEATH_CHAIN_DURATION
+          : isZenith
+            ? ZENITH_PROTOCOL_DURATION
+            : isAegis ||
+                isVolt ||
+                isWraith ||
+                isArsenal ||
+                isOracle ||
+                isBastion ||
+                isCelestial
+              ? 0
+              : 4.5;
 
     if (isVanguard) {
       this.stats.shield = restoreVanguardShield(
@@ -2297,66 +2538,118 @@ export class Game {
         this.barrierTimer,
         BASTION_SANCTUARY_DURATION,
       );
+    } else if (isReaper) {
+      const targets = [...this.enemies]
+        .sort((a, b) => b.y - a.y)
+        .slice(0, REAPER_DEATH_CHAIN_TARGETS);
+
+      for (const enemy of targets) {
+        const wordLength = typingText(enemy.entry.en).length;
+        enemy.typed = chainTypingAdvance(enemy.typed, wordLength);
+        enemy.flash = 1;
+        enemy.kick = Math.max(enemy.kick, 1.3);
+        this.burst(enemy.x, enemy.y, 20, 350);
+      }
+
+      if (this.boss !== null) {
+        const damage =
+          firepowerDamage(
+            Math.max(
+              1,
+              Math.round(this.boss.maxHp * REAPER_DEATH_CHAIN_BOSS_RATIO),
+            ),
+            this.playerStats,
+          ) * reaperStreakDamageMultiplier(this.stats.streak);
+        this.boss.hp = Math.max(0, this.boss.hp - damage);
+        this.boss.flash = 1;
+        this.updateBossPhase(this.boss);
+        this.hooks.onBossUpdate(toBossHud(this.boss));
+        if (this.boss.hp <= 0) this.defeatBoss();
+      }
+    } else if (isCelestial) {
+      const chargeFactor = this.celestialCharge / 100;
+      const targets = [...this.enemies]
+        .sort((a, b) => b.y - a.y)
+        .slice(0, CELESTIAL_STARFALL_TARGETS);
+
+      for (const enemy of targets) {
+        const wordLength = typingText(enemy.entry.en).length;
+        enemy.typed = chainTypingAdvance(enemy.typed, wordLength);
+        enemy.flash = 1;
+        enemy.kick = Math.max(enemy.kick, 1.25);
+        this.burst(enemy.x, enemy.y, 20, 220);
+      }
+
+      if (this.boss !== null) {
+        const damage = firepowerDamage(
+          Math.max(
+            1,
+            Math.round(
+              this.boss.maxHp *
+                CELESTIAL_STARFALL_BOSS_RATIO *
+                (1 + chargeFactor * 0.7),
+            ),
+          ),
+          this.playerStats,
+        );
+        this.boss.hp = Math.max(0, this.boss.hp - damage);
+        this.boss.flash = 1;
+        this.updateBossPhase(this.boss);
+        this.hooks.onBossUpdate(toBossHud(this.boss));
+        if (this.boss.hp <= 0) this.defeatBoss();
+      }
+
+      this.stats.shield = clamp(
+        this.stats.shield + this.stats.maxShield * (0.12 + chargeFactor * 0.18),
+        0,
+        this.stats.maxShield,
+      );
+      this.stats.energy = clamp(
+        this.stats.energy + this.stats.maxEnergy * (0.18 + chargeFactor * 0.2),
+        0,
+        this.stats.maxEnergy,
+      );
+      this.celestialCharge = 0;
+    } else if (isZenith) {
+      this.timeShellTimer = Math.max(this.timeShellTimer, 5);
+      this.bossMarkTimer = Math.max(
+        this.bossMarkTimer,
+        ZENITH_PROTOCOL_MARK_DURATION,
+      );
+      this.guardianTimer = Math.max(
+        this.guardianTimer,
+        ZENITH_PROTOCOL_DURATION,
+      );
+      this.guardianBlocks = Math.max(
+        this.guardianBlocks,
+        ZENITH_PROTOCOL_GUARD_BLOCKS,
+      );
+      this.barrierHp = Math.max(
+        this.barrierHp,
+        90 + this.playerStats.shield * 0.55,
+      );
+      this.barrierTimer = Math.max(
+        this.barrierTimer,
+        ZENITH_PROTOCOL_DURATION,
+      );
+      this.stats.energy = this.stats.maxEnergy;
+      this.stats.shield = clamp(
+        this.stats.shield + this.stats.maxShield * 0.28,
+        0,
+        this.stats.maxShield,
+      );
     }
 
+    const visual = ultimateVisual(this.characterId);
     this.burst(
       this.width / 2,
       this.height - PLAYER_Y_OFFSET,
-      isVanguard
-        ? 48
-        : isAegis
-          ? 56
-          : isVolt
-            ? 62
-            : isWraith
-              ? 58
-              : isFortune
-                ? 54
-                : isArsenal
-                  ? 60
-                  : isOracle
-                    ? 58
-                    : isBastion
-                      ? 58
-                      : 36,
-      isAegis
-        ? 300
-        : isVolt
-          ? 202
-          : isWraith
-            ? 274
-            : isFortune
-              ? 48
-              : isArsenal
-                ? 18
-                : isOracle
-                  ? 326
-                  : isBastion
-                    ? 164
-                    : 184,
+      visual.count,
+      visual.hue,
     );
 
     if (this.settings.screenShake) {
-      this.shake = Math.max(
-        this.shake,
-        isVanguard
-          ? 9
-          : isAegis
-            ? 10
-            : isVolt
-              ? 11
-              : isWraith
-                ? 9
-                : isFortune
-                  ? 8
-                  : isArsenal
-                    ? 10
-                    : isOracle
-                      ? 9
-                      : isBastion
-                        ? 9
-                        : 7,
-      );
+      this.shake = Math.max(this.shake, visual.shake);
     }
 
     this.sfx.power();
@@ -2386,7 +2679,20 @@ export class Game {
       return;
     }
 
+    const bastionRecycle =
+      this.characterId === "bastion" &&
+      this.guardianTimer > 0 &&
+      this.guardianBlocks > 0;
+
     this.applyPlayerDamage(x, y, 42);
+
+    if (bastionRecycle) {
+      this.stats.shield = recycleBastionShield(
+        this.stats.shield,
+        this.stats.maxShield,
+      );
+      this.emitStats();
+    }
   }
 
   private reflectProjectile(
@@ -2445,14 +2751,6 @@ export class Game {
       this.guardianBlocks -= 1;
       if (this.guardianBlocks <= 0) {
         this.guardianTimer = 0;
-      }
-
-      if (this.characterId === "bastion") {
-        this.stats.shield = recycleBastionShield(
-          this.stats.shield,
-          this.stats.maxShield,
-        );
-        this.emitStats();
       }
 
       this.burst(x, y, 22, 48);
