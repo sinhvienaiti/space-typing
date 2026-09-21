@@ -1,6 +1,10 @@
 import { Sfx } from "./audio/Sfx";
 import type { DifficultyProfile, StageConfig } from "./campaign/types";
 import {
+  chooseEnemyKind,
+  enemyProfile,
+} from "./enemies/kinds";
+import {
   accuracyPercent,
   clamp,
   chooseTarget,
@@ -9,6 +13,7 @@ import {
 } from "./logic";
 import type {
   Enemy,
+  EnemyKind,
   GamePhase,
   GameSettings,
   GameStats,
@@ -325,29 +330,51 @@ export class Game {
   }
 
   private spawnEnemy(): void {
-    const entry =
-      this.vocabulary[Math.floor(Math.random() * this.vocabulary.length)] ??
-      FALLBACK_ENTRIES[0]!;
+    const stage = this.stageConfig?.stage ?? 1;
+    const galaxy = this.stageConfig?.galaxy ?? 1;
+    const kind = chooseEnemyKind(stage);
+    const profile = enemyProfile(kind, galaxy);
+    const entry = this.pickVocabularyEntry(kind);
 
-    const baseX = randomBetween(100, this.width - 100);
+    const baseX = randomBetween(
+      profile.radius + 70,
+      this.width - profile.radius - 70,
+    );
+
     this.enemies.push({
       id: this.nextEnemyId++,
+      kind,
       entry,
       typed: 0,
+      layersRemaining: profile.layers,
       x: baseX,
-      y: -45,
+      y: -profile.radius - 20,
       baseX,
       speed:
-        (34 +
-          (this.stageConfig?.galaxy ?? 1) * 2.2 +
-          randomBetween(0, 14)) *
+        (profile.baseSpeed + randomBetween(0, profile.speedVariance)) *
         (this.difficulty?.enemySpeed ?? 1),
       age: Math.random() * 8,
-      drift: randomBetween(20, 70),
-      radius: randomBetween(20, 27),
+      drift: randomBetween(profile.driftMin, profile.driftMax),
+      radius: profile.radius,
       flash: 0,
       kick: 0,
     });
+  }
+
+  private pickVocabularyEntry(kind: EnemyKind): VocabularyEntry {
+    const candidates = this.vocabulary.filter((entry) => {
+      const length = normalizeWord(entry.en).replace(/[^a-z]/g, "").length;
+      if (length === 0) return false;
+      if (kind === "mine") return length <= 6;
+      if (kind === "tank") return length >= 5;
+      return true;
+    });
+
+    const source = candidates.length > 0 ? candidates : this.vocabulary;
+    return (
+      source[Math.floor(Math.random() * source.length)] ??
+      FALLBACK_ENTRIES[0]!
+    );
   }
 
   private currentTarget(): Enemy | null {
@@ -395,18 +422,44 @@ export class Game {
 
   private completeWord(enemy: Enemy): void {
     const length = normalizeWord(enemy.entry.en).length;
+    this.hooks.onWordComplete(enemy.entry);
+
+    if (enemy.layersRemaining > 1) {
+      enemy.layersRemaining -= 1;
+      enemy.entry = this.pickVocabularyEntry(enemy.kind);
+      enemy.typed = 0;
+      enemy.flash = 1;
+      enemy.kick = 1.45;
+
+      this.stats.score += (45 + length * 8) * this.stats.multiplier;
+      this.stats.power = clamp(this.stats.power + 4, 0, 100);
+
+      this.fireLaser(enemy, 1.25);
+      this.burst(enemy.x, enemy.y, 18, 202);
+      this.sfx.hit();
+      this.targetId = null;
+      return;
+    }
+
     this.stats.kills += 1;
     this.stats.score += (80 + length * 14) * this.stats.multiplier;
     this.stats.power = clamp(this.stats.power + 7, 0, 100);
 
     this.fireLaser(enemy, 1.45);
-    this.burst(enemy.x, enemy.y, 24, 188);
+    this.burst(
+      enemy.x,
+      enemy.y,
+      enemy.kind === "tank" ? 36 : 24,
+      enemy.kind === "mine" ? 342 : 188,
+    );
     this.sfx.hit();
     this.sfx.kill();
-    this.hooks.onWordComplete(enemy.entry);
 
     if (this.settings.screenShake) {
-      this.shake = Math.max(this.shake, 4.5);
+      this.shake = Math.max(
+        this.shake,
+        enemy.kind === "tank" ? 6.5 : 4.5,
+      );
     }
 
     this.enemies = this.enemies.filter((item) => item.id !== enemy.id);
@@ -695,26 +748,77 @@ export class Game {
     const targeted = enemy.id === this.targetId;
     const kick = enemy.kick * 7;
 
+    const baseColor =
+      enemy.kind === "mine"
+        ? "#ff648d"
+        : enemy.kind === "tank"
+          ? "#8f83ff"
+          : "#ffb75b";
+    const targetColor = "#80f3ff";
+
     context.save();
     context.translate(enemy.x, enemy.y - kick);
     context.globalCompositeOperation = "lighter";
-    context.shadowBlur = targeted ? 24 : 14;
-    context.shadowColor = targeted ? "#86f8ff" : "#ffb75b";
+    context.shadowBlur = targeted ? 25 : enemy.kind === "tank" ? 20 : 14;
+    context.shadowColor = targeted ? "#86f8ff" : baseColor;
     context.strokeStyle =
-      enemy.flash > 0 ? "#ffffff" : targeted ? "#80f3ff" : "#ffb75b";
+      enemy.flash > 0 ? "#ffffff" : targeted ? targetColor : baseColor;
     context.fillStyle = targeted
       ? "rgba(65, 226, 255, 0.10)"
-      : "rgba(255, 168, 69, 0.08)";
-    context.lineWidth = targeted ? 2.8 : 1.6;
+      : enemy.kind === "mine"
+        ? "rgba(255, 70, 115, 0.10)"
+        : enemy.kind === "tank"
+          ? "rgba(132, 112, 255, 0.10)"
+          : "rgba(255, 168, 69, 0.08)";
+    context.lineWidth = targeted ? 2.8 : enemy.kind === "tank" ? 2.2 : 1.6;
 
     context.beginPath();
-    context.moveTo(0, enemy.radius);
-    context.lineTo(enemy.radius * 0.9, -enemy.radius * 0.72);
-    context.lineTo(0, -enemy.radius * 0.34);
-    context.lineTo(-enemy.radius * 0.9, -enemy.radius * 0.72);
-    context.closePath();
+
+    if (enemy.kind === "mine") {
+      for (let index = 0; index < 8; index += 1) {
+        const angle = (Math.PI * 2 * index) / 8 - Math.PI / 2;
+        const radius = index % 2 === 0 ? enemy.radius * 1.3 : enemy.radius * 0.62;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+        if (index === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.closePath();
+    } else if (enemy.kind === "tank") {
+      for (let index = 0; index < 6; index += 1) {
+        const angle = (Math.PI * 2 * index) / 6 - Math.PI / 2;
+        const x = Math.cos(angle) * enemy.radius;
+        const y = Math.sin(angle) * enemy.radius * 0.78;
+        if (index === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.closePath();
+    } else {
+      context.moveTo(0, enemy.radius);
+      context.lineTo(enemy.radius * 0.9, -enemy.radius * 0.72);
+      context.lineTo(0, -enemy.radius * 0.34);
+      context.lineTo(-enemy.radius * 0.9, -enemy.radius * 0.72);
+      context.closePath();
+    }
+
     context.fill();
     context.stroke();
+
+    if (enemy.kind === "tank") {
+      context.strokeStyle = "rgba(169, 154, 255, 0.45)";
+      context.lineWidth = 1.4;
+      context.beginPath();
+      context.arc(0, 0, enemy.radius * 0.58, 0, Math.PI * 2);
+      context.stroke();
+
+      const pipGap = 10;
+      const startX = -((enemy.layersRemaining - 1) * pipGap) / 2;
+      context.fillStyle = "#b6abff";
+      for (let index = 0; index < enemy.layersRemaining; index += 1) {
+        context.fillRect(startX + index * pipGap - 2, enemy.radius + 8, 5, 3);
+      }
+    }
+
     context.restore();
 
     this.drawEnemyWord(enemy, targeted);

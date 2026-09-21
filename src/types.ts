@@ -7,6 +7,8 @@ export type GamePhase =
 
 export type VisualQuality = "low" | "medium" | "high" | "ultra";
 
+export type EnemyKind = "scout" | "mine" | "tank";
+
 export type VocabularyEntry = {
   id: string;
   en: string;
@@ -53,8 +55,10 @@ export type GameStats = {
 
 export type Enemy = {
   id: number;
+  kind: EnemyKind;
   entry: VocabularyEntry;
   typed: number;
+  layersRemaining: number;
   x: number;
   y: number;
   baseX: number;
