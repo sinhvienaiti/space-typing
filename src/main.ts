@@ -43,8 +43,13 @@ import {
 } from "./skills/offensive";
 import {
   createStarterSupportSpellState,
+  equipSupportSpell,
   type SupportSpellState,
 } from "./skills/support-loadout";
+import {
+  getSupportSpell,
+  type SupportSpellId,
+} from "./skills/support";
 
 type CombatSkillId = DefensiveSkillId | OffensiveSkillId;
 import { DEFAULT_PLAYER_BASE_STATS } from "./stats/player";
@@ -228,6 +233,15 @@ app.innerHTML = `
       </button>
     </div>
 
+    <div id="quickSupport" class="quick-support hidden">
+      <button id="supportSkill0" type="button">
+        <kbd>[</kbd><span>support 1</span><strong></strong>
+      </button>
+      <button id="supportSkill1" type="button">
+        <kbd>]</kbd><span>support 2</span><strong></strong>
+      </button>
+    </div>
+
     <div id="quickSkills" class="quick-skills hidden">
       <button id="skillBarrier" type="button">
         <kbd>4</kbd><span>barrier</span><strong></strong>
@@ -268,6 +282,7 @@ app.innerHTML = `
           <button id="stageSelectButton">Stage Select</button>
           <button id="vocabularyButton">Vocabulary</button>
           <button id="equipmentButton">Equipment</button>
+          <button id="supportButton">Support Spells</button>
           <button id="dataButton">Data</button>
           <button id="settingsButton">Settings</button>
         </div>
@@ -349,6 +364,31 @@ app.innerHTML = `
         <span id="campaignMeta"></span>
       </div>
       <div id="stageGrid" class="stage-grid"></div>
+    </dialog>
+
+    <dialog id="supportDialog" class="settings-dialog support-dialog">
+      <form method="dialog" class="dialog-head">
+        <div>
+          <p class="eyebrow">pre-stage loadout</p>
+          <h2>Support Spells</h2>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+      <p class="equipment-note">
+        Equip up to two support spells. Changes apply from the next stage.
+      </p>
+      <div class="support-loadout-grid">
+        <label class="equipment-slot">
+          <span class="equipment-slot-name">support slot 1</span>
+          <select id="supportSlot0"></select>
+          <small id="supportSlot0Meta">Empty</small>
+        </label>
+        <label class="equipment-slot">
+          <span class="equipment-slot-name">support slot 2</span>
+          <select id="supportSlot1"></select>
+          <small id="supportSlot1Meta">Empty</small>
+        </label>
+      </div>
     </dialog>
 
     <dialog id="equipmentDialog" class="settings-dialog equipment-dialog">
@@ -553,6 +593,7 @@ const vocabularyDialog = byId<HTMLDialogElement>("vocabularyDialog");
 const stageSelectDialog = byId<HTMLDialogElement>("stageSelectDialog");
 const dataDialog = byId<HTMLDialogElement>("dataDialog");
 const equipmentDialog = byId<HTMLDialogElement>("equipmentDialog");
+const supportDialog = byId<HTMLDialogElement>("supportDialog");
 
 type AutosaveSnapshot = {
   campaign: typeof campaign;
@@ -642,6 +683,73 @@ function skillReasonText(reason: SkillBlockReason): string {
     return "No useful target or effect right now";
   }
   return "Skill unavailable";
+}
+
+function renderSupportSkills(): void {
+  const buttons = [
+    byId<HTMLButtonElement>("supportSkill0"),
+    byId<HTMLButtonElement>("supportSkill1"),
+  ];
+
+  for (let index = 0; index < buttons.length; index += 1) {
+    const button = buttons[index]!;
+    const slot = index as 0 | 1;
+    const id = supportSpells.loadout[slot];
+    const name = button.querySelector("span");
+    const stateLabel = button.querySelector("strong");
+
+    if (id === null) {
+      if (name !== null) name.textContent = "empty";
+      if (stateLabel !== null) stateLabel.textContent = "—";
+      button.disabled = true;
+      button.title = "Empty support spell slot";
+      continue;
+    }
+
+    const spell = getSupportSpell(id);
+    const state = game.getSkillState(id);
+    const reason = game.canUseSkill(id);
+
+    if (name !== null) name.textContent = spell.name.toLowerCase();
+    if (stateLabel !== null) {
+      if (state === null) {
+        stateLabel.textContent = "—";
+      } else if (state.cooldownRemaining > 0.05) {
+        stateLabel.textContent = state.cooldownRemaining.toFixed(1) + "s";
+      } else if (state.chargesRemaining !== null) {
+        stateLabel.textContent = "×" + String(state.chargesRemaining);
+      } else {
+        stateLabel.textContent = "ready";
+      }
+    }
+
+    button.disabled = reason !== null;
+    button.title =
+      reason === null ? spell.description : skillReasonText(reason);
+  }
+}
+
+function renderAllSkills(): void {
+  renderSkills();
+  renderSupportSkills();
+}
+
+function useSupportSpell(slot: 0 | 1): void {
+  const id = supportSpells.loadout[slot];
+  if (id === null) {
+    showNotice("Support spell slot is empty");
+    return;
+  }
+
+  const result = game.useSkill(id);
+  if (!result.ok) {
+    showNotice(skillReasonText(result.reason));
+    renderAllSkills();
+    return;
+  }
+
+  showNotice("✓ " + getSupportSpell(id).name + " activated");
+  renderAllSkills();
 }
 
 function renderSkills(): void {
@@ -751,8 +859,9 @@ function renderPhase(phase: GamePhase): void {
   stageClearOverlay.classList.toggle("hidden", phase !== "stageclear");
   byId("quickItems").classList.toggle("hidden", phase !== "playing");
   byId("quickSkills").classList.toggle("hidden", phase !== "playing");
+  byId("quickSupport").classList.toggle("hidden", phase !== "playing");
   renderInventory();
-  renderSkills();
+  renderAllSkills();
 }
 
 function renderStage(stage: number): void {
@@ -808,7 +917,7 @@ const game = new Game(
     },
     onStage: renderStage,
     onBossUpdate: renderBoss,
-    onSkills: renderSkills,
+    onSkills: renderAllSkills,
     onStageClear: (stats) => {
       const minutes = Math.max(
         1 / 60,
@@ -845,6 +954,56 @@ const game = new Game(
     },
   },
 );
+
+function applySupportSpells(): void {
+  const ids = supportSpells.loadout.filter(
+    (id): id is SupportSpellId => id !== null,
+  );
+  game.setSupportSpells(ids);
+}
+
+function renderSupportLoadout(): void {
+  const selects = [
+    byId<HTMLSelectElement>("supportSlot0"),
+    byId<HTMLSelectElement>("supportSlot1"),
+  ];
+  const metas = [
+    byId("supportSlot0Meta"),
+    byId("supportSlot1Meta"),
+  ];
+
+  for (let index = 0; index < selects.length; index += 1) {
+    const select = selects[index]!;
+    select.replaceChildren();
+
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = "Empty";
+    select.append(empty);
+
+    for (const id of supportSpells.unlocked) {
+      const option = document.createElement("option");
+      const spell = getSupportSpell(id);
+      option.value = id;
+      option.textContent = spell.name;
+      select.append(option);
+    }
+
+    const slot = index as 0 | 1;
+    const selected = supportSpells.loadout[slot];
+    select.value = selected ?? "";
+    metas[index]!.textContent =
+      selected === null
+        ? "No spell equipped"
+        : getSupportSpell(selected).description;
+  }
+}
+
+function openSupportSpells(): void {
+  if (!persistenceReady || game.getPhase() !== "title") return;
+  renderSupportLoadout();
+  supportDialog.showModal();
+}
 
 function applyEquipmentStats(): void {
   game.setPlayerStats({
@@ -1003,10 +1162,13 @@ async function initializePlayerProgress(): Promise<void> {
   ];
   const equipmentButton =
     byId<HTMLButtonElement>("equipmentButton");
+  const supportButton =
+    byId<HTMLButtonElement>("supportButton");
 
   startButton.disabled = true;
   stageSelectButton.disabled = true;
   equipmentButton.disabled = true;
+  supportButton.disabled = true;
   for (const button of dataButtons) button.disabled = true;
 
   try {
@@ -1017,6 +1179,7 @@ async function initializePlayerProgress(): Promise<void> {
     supportSpells = loaded.save.supportSpells;
     renderInventory();
     applyEquipmentStats();
+    applySupportSpells();
     currentGalaxy = Math.ceil(
       campaign.selectedStage / STAGES_PER_GALAXY,
     );
@@ -1026,6 +1189,7 @@ async function initializePlayerProgress(): Promise<void> {
     startButton.disabled = false;
     stageSelectButton.disabled = false;
     equipmentButton.disabled = false;
+    supportButton.disabled = false;
     for (const button of dataButtons) button.disabled = false;
 
     if (loaded.migrated) {
@@ -1304,6 +1468,7 @@ async function importSaveFile(file: File): Promise<void> {
     supportSpells = importedSupportSpells;
     renderInventory();
     applyEquipmentStats();
+    applySupportSpells();
     currentGalaxy = Math.ceil(
       campaign.selectedStage / STAGES_PER_GALAXY,
     );
@@ -1316,6 +1481,7 @@ async function importSaveFile(file: File): Promise<void> {
       supportSpells = previousSupportSpells;
       renderInventory();
       applyEquipmentStats();
+      applySupportSpells();
       currentGalaxy = Math.ceil(
         campaign.selectedStage / STAGES_PER_GALAXY,
       );
@@ -1443,6 +1609,31 @@ for (const [buttonId, skillId] of combatSkillButtons) {
 }
 
 byId("equipmentButton").addEventListener("click", openEquipment);
+byId("supportButton").addEventListener("click", openSupportSpells);
+
+for (const slot of [0, 1] as const) {
+  byId<HTMLSelectElement>("supportSlot" + String(slot)).addEventListener(
+    "change",
+    (event) => {
+      const value = (event.currentTarget as HTMLSelectElement).value;
+      const id = value === "" ? null : (value as SupportSpellId);
+      supportSpells = equipSupportSpell(supportSpells, slot, id);
+      applySupportSpells();
+      renderSupportLoadout();
+      void autosaveCampaign(
+        "support-spells",
+        "✓ Support loadout saved · applies next stage",
+      );
+    },
+  );
+}
+
+byId("supportSkill0").addEventListener("click", () => {
+  useSupportSpell(0);
+});
+byId("supportSkill1").addEventListener("click", () => {
+  useSupportSpell(1);
+});
 
 for (const id of ["settingsButton", "pauseSettingsButton"]) {
   byId(id).addEventListener("click", openSettings);
@@ -1600,8 +1791,18 @@ window.addEventListener("keydown", (event) => {
     vocabularyDialog.open ||
     stageSelectDialog.open ||
     dataDialog.open ||
-    equipmentDialog.open
+    equipmentDialog.open ||
+    supportDialog.open
   ) return;
+
+  if (
+    game.getPhase() === "playing" &&
+    (event.key === "[" || event.key === "]")
+  ) {
+    event.preventDefault();
+    useSupportSpell(event.key === "[" ? 0 : 1);
+    return;
+  }
 
   if (
     game.getPhase() === "playing" &&
@@ -1688,6 +1889,6 @@ renderSettings();
 updateCampaignUi();
 renderStats(game.getStats());
 renderPhase(game.getPhase());
-renderSkills();
+renderAllSkills();
 void initializePlayerProgress();
 void loadInitialVocabulary();

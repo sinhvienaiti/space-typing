@@ -55,6 +55,11 @@ import {
   type OffensiveSkillId,
 } from "./skills/offensive";
 import {
+  getSupportSpell,
+  isSupportSpellId,
+  type SupportSpellId,
+} from "./skills/support";
+import {
   SkillEngine,
   type SkillActivationResult,
   type SkillBlockReason,
@@ -118,6 +123,10 @@ export class Game {
   private readonly sfx = new Sfx();
   private readonly skillEngine = new SkillEngine();
 
+  private supportSkillIds: SupportSpellId[] = [
+    "sanctuary",
+    "gravity-well",
+  ];
   private settings: GameSettings;
   private vocabulary: VocabularyEntry[];
   private phase: GamePhase = "title";
@@ -158,6 +167,7 @@ export class Game {
   private markedEnemyId: number | null = null;
   private markTimer = 0;
   private bossMarkTimer = 0;
+  private gravityWellTimer = 0;
   private skillHudTimer = 0;
   private lastTime = performance.now();
   private animationFrame = 0;
@@ -179,10 +189,7 @@ export class Game {
     this.vocabulary = vocabulary.length > 0 ? vocabulary : FALLBACK_ENTRIES;
     this.settings = settings;
     this.hooks = hooks;
-    this.skillEngine.setDefinitions([
-      ...DEFENSIVE_SKILLS,
-      ...OFFENSIVE_SKILLS,
-    ]);
+    this.refreshSkillDefinitions();
     this.sfx.setVolume(settings.sfxVolume);
     this.resize();
     this.animationFrame = requestAnimationFrame(this.frame);
@@ -202,6 +209,23 @@ export class Game {
 
   setSkills(definitions: readonly SkillDefinition[]): void {
     this.skillEngine.setDefinitions(definitions);
+  }
+
+  setSupportSpells(ids: readonly SupportSpellId[]): void {
+    this.supportSkillIds = Array.from(
+      new Set(ids.filter(isSupportSpellId)),
+    ).slice(0, 2);
+    this.refreshSkillDefinitions();
+    this.hooks.onSkills();
+  }
+
+  private refreshSkillDefinitions(): void {
+    const supportDefinitions = this.supportSkillIds.map(getSupportSpell);
+    this.skillEngine.setDefinitions([
+      ...DEFENSIVE_SKILLS,
+      ...OFFENSIVE_SKILLS,
+      ...supportDefinitions,
+    ]);
   }
 
   getSkillState(id: string): SkillRuntimeState | null {
@@ -245,6 +269,18 @@ export class Game {
       return "effect-not-needed";
     }
 
+    if (id === "cleanse" && this.interferenceTimer <= 0) {
+      return "effect-not-needed";
+    }
+
+    if (
+      id === "meteor" &&
+      this.enemies.length === 0 &&
+      this.boss === null
+    ) {
+      return "effect-not-needed";
+    }
+
     return this.skillEngine.canActivate(id, {
       energy: this.stats.energy,
       streak: this.stats.streak,
@@ -271,6 +307,8 @@ export class Game {
       this.activateDefensiveSkill(id);
     } else if (isOffensiveSkillId(id)) {
       this.activateOffensiveSkill(id);
+    } else if (isSupportSpellId(id)) {
+      this.activateSupportSpell(id);
     }
 
     this.hooks.onSkills();
@@ -448,6 +486,80 @@ export class Game {
     }
   }
 
+  private activateSupportSpell(id: SupportSpellId): void {
+    const playerX = this.width / 2;
+    const playerY = this.height - PLAYER_Y_OFFSET;
+
+    if (id === "sanctuary") {
+      this.stats.shield = clamp(
+        this.stats.shield + this.stats.maxShield * 0.35,
+        0,
+        this.stats.maxShield,
+      );
+      this.barrierHp = Math.max(
+        this.barrierHp,
+        50 + this.playerStats.shield * 0.25,
+      );
+      this.barrierTimer = Math.max(this.barrierTimer, 6);
+      this.burst(playerX, playerY, 34, 164);
+      this.sfx.support();
+      this.emitStats();
+      return;
+    }
+
+    if (id === "gravity-well") {
+      this.gravityWellTimer = Math.max(this.gravityWellTimer, 5);
+      this.burst(this.width / 2, this.height * 0.42, 42, 270);
+      this.sfx.power();
+      return;
+    }
+
+    if (id === "cleanse") {
+      this.interferenceTimer = 0;
+      this.burst(playerX, playerY, 24, 176);
+      this.sfx.support();
+      return;
+    }
+
+    const targets = [...this.enemies]
+      .sort((a, b) => b.y - a.y)
+      .slice(0, 3);
+
+    for (const enemy of targets) {
+      const wordLength = typingText(enemy.entry.en).length;
+
+      if (enemy.layersRemaining > 1) {
+        enemy.layersRemaining -= 1;
+      } else if (wordLength > 1) {
+        enemy.typed = Math.min(
+          wordLength - 1,
+          Math.max(0, enemy.typed) + 1,
+        );
+      }
+
+      enemy.flash = 1;
+      enemy.kick = Math.max(enemy.kick, 1.25);
+      this.burst(enemy.x, enemy.y, 20, 28);
+    }
+
+    if (this.boss !== null && targets.length === 0) {
+      const damage = firepowerDamage(
+        Math.max(1, Math.round(this.boss.maxHp * 0.03)),
+        this.playerStats,
+      );
+      this.boss.hp = Math.max(0, this.boss.hp - damage);
+      this.boss.flash = 1;
+      this.updateBossPhase(this.boss);
+      this.hooks.onBossUpdate(toBossHud(this.boss));
+
+      if (this.boss.hp <= 0) {
+        this.defeatBoss();
+      }
+    }
+
+    this.sfx.power();
+  }
+
   useConsumable(id: string): boolean {
     if (
       this.phase !== "playing" ||
@@ -550,6 +662,7 @@ export class Game {
     this.markedEnemyId = null;
     this.markTimer = 0;
     this.bossMarkTimer = 0;
+    this.gravityWellTimer = 0;
     this.skillHudTimer = 0;
     this.hooks.onBossUpdate(null);
     this.hooks.onSkills();
@@ -680,6 +793,7 @@ export class Game {
     this.guardianTimer = Math.max(0, this.guardianTimer - dt);
     this.markTimer = Math.max(0, this.markTimer - dt);
     this.bossMarkTimer = Math.max(0, this.bossMarkTimer - dt);
+    this.gravityWellTimer = Math.max(0, this.gravityWellTimer - dt);
 
     if (this.barrierTimer <= 0) this.barrierHp = 0;
     if (this.guardianTimer <= 0) this.guardianBlocks = 0;
@@ -696,7 +810,10 @@ export class Game {
     if (difficulty === null || this.stageConfig === null) return;
 
     this.updatePlayerResources(dt);
-    const hostileTimeFactor = this.timeShellTimer > 0 ? 0.42 : 1;
+    const hostileTimeFactor = Math.min(
+      this.timeShellTimer > 0 ? 0.42 : 1,
+      this.gravityWellTimer > 0 ? 0.68 : 1,
+    );
     this.updateBoss(dt * hostileTimeFactor, difficulty);
     this.spawnTimer -= dt * hostileTimeFactor;
 
@@ -2700,6 +2817,20 @@ export class Game {
         context.arc(droneX, droneY, 3.2, 0, Math.PI * 2);
         context.fill();
       }
+    }
+
+    if (this.gravityWellTimer > 0) {
+      context.strokeStyle = "rgba(191, 95, 255, 0.28)";
+      context.lineWidth = 1.2;
+      context.beginPath();
+      context.arc(
+        x,
+        y,
+        68 + Math.sin(time * 2.6) * 7,
+        0,
+        Math.PI * 2,
+      );
+      context.stroke();
     }
 
     if (this.timeShellTimer > 0) {
