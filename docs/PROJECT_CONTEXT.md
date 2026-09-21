@@ -2859,6 +2859,18 @@ Talent rules:
 ## Step 45
 Implement Supply Pod.
 
+**Status: implemented.**
+
+Current Supply Pod slice:
+
+- Supply Pods cross the combat field without blocking stage completion;
+- each pod owns a normal English vocabulary target and must be typed before it exits;
+- beginning a Supply Pod word locks typing to that pod until completion or a miss breaks the streak;
+- completed Supply Pod words still use the normal learning hook, so Vietnamese/IPA/pronunciation behavior remains consistent;
+- starter rewards restore Hull, Shield, Energy or Power/Overdrive;
+- rewards are capped by the normal combat resource limits;
+- later Supply/Luck steps may expand reward tables without changing the typing contract.
+
 ## Step 46
 Implement enemy random drops.
 

@@ -117,6 +117,12 @@ import {
   type EffectiveStatInput,
 } from "./stats/core";
 import {
+  applySupplyReward,
+  rollSupplyReward,
+  supplyRewardLabel,
+  type SupplyPod,
+} from "./supply/pod";
+import {
   applyIncomingDamage,
   createPlayerResources,
   DEFAULT_PLAYER_BASE_STATS,
@@ -304,6 +310,9 @@ export class Game {
   private weaponOverclockTimer = 0;
   private celestialCharge = 0;
   private skillHudTimer = 0;
+  private supplyPod: SupplyPod | null = null;
+  private supplySpawnTimer = 0;
+  private supplySpawnsRemaining = 0;
   private lastTime = performance.now();
   private animationFrame = 0;
   private stars: Array<{ x: number; y: number; z: number }> = [];
@@ -1070,6 +1079,9 @@ export class Game {
     this.lasers = [];
     this.particles = [];
     this.targetId = null;
+    this.supplyPod = null;
+    this.supplySpawnTimer = randomBetween(5.5, 8.5);
+    this.supplySpawnsRemaining = stage.stage >= 500 ? 2 : 1;
     this.spawnRemaining = stage.enemyBudget;
     this.spawnTimer = 0.3;
     this.eliteSpawned = 0;
@@ -1127,6 +1139,8 @@ export class Game {
     this.lasers = [];
     this.particles = [];
     this.targetId = null;
+    this.supplyPod = null;
+    this.supplySpawnsRemaining = 0;
     this.boss = null;
     this.hooks.onBossUpdate(null);
     this.hooks.onPhase(this.phase);
@@ -1158,6 +1172,11 @@ export class Game {
       return;
     }
 
+    if (this.supplyPod !== null && this.supplyPod.typed > 0) {
+      this.typeSupplyPod(this.supplyPod, key);
+      return;
+    }
+
     const projectile = this.findProjectileForKey(key);
     if (projectile !== null) {
       this.destroyProjectile(projectile);
@@ -1166,6 +1185,14 @@ export class Game {
 
     if (this.boss !== null) {
       this.typeBoss(key);
+      return;
+    }
+
+    if (
+      this.supplyPod !== null &&
+      typingText(this.supplyPod.entry.en)[0] === key
+    ) {
+      this.typeSupplyPod(this.supplyPod, key);
       return;
     }
 
@@ -1248,7 +1275,21 @@ export class Game {
       this.gravityWellTimer > 0 ? 0.68 : 1,
     );
     this.updateBoss(dt * hostileTimeFactor, difficulty);
+    this.updateSupplyPod(dt);
     this.spawnTimer -= dt * hostileTimeFactor;
+    this.supplySpawnTimer -= dt;
+
+    if (
+      this.supplyPod === null &&
+      this.supplySpawnsRemaining > 0 &&
+      this.supplySpawnTimer <= 0 &&
+      this.boss === null &&
+      (this.spawnRemaining > 0 || this.enemies.length > 0)
+    ) {
+      this.spawnSupplyPod();
+      this.supplySpawnsRemaining -= 1;
+      this.supplySpawnTimer = randomBetween(11, 16);
+    }
 
     if (
       this.spawnRemaining > 0 &&
@@ -1476,6 +1517,7 @@ export class Game {
     if (this.phase !== "playing") return;
     this.phase = "stageclear";
     this.projectiles = [];
+    this.supplyPod = null;
     this.boss = null;
     this.hooks.onBossUpdate(null);
     this.hooks.onStageClear(this.getStats());
@@ -1492,6 +1534,44 @@ export class Game {
       source[Math.floor(Math.random() * source.length)] ??
       FALLBACK_ENTRIES[8]!
     );
+  }
+
+  private spawnSupplyPod(): void {
+    const candidates = this.vocabulary.filter((entry) => {
+      const length = typingText(entry.en).length;
+      return length >= 4 && length <= 9;
+    });
+    const source = candidates.length > 0 ? candidates : this.vocabulary;
+    const entry =
+      source[Math.floor(Math.random() * source.length)] ??
+      FALLBACK_ENTRIES[1]!;
+
+    this.supplyPod = {
+      entry,
+      typed: 0,
+      reward: rollSupplyReward(),
+      x: -46,
+      y: randomBetween(118, Math.max(150, this.height * 0.42)),
+      speed: randomBetween(68, 88),
+      age: 0,
+      lifetime: 18,
+    };
+
+    this.sfx.support();
+  }
+
+  private updateSupplyPod(dt: number): void {
+    if (this.supplyPod === null) return;
+
+    this.supplyPod.age += dt;
+    this.supplyPod.x += this.supplyPod.speed * dt;
+
+    if (
+      this.supplyPod.age >= this.supplyPod.lifetime ||
+      this.supplyPod.x > this.width + 60
+    ) {
+      this.supplyPod = null;
+    }
   }
 
   private spawnEnemy(): void {
@@ -1933,6 +2013,65 @@ export class Game {
     this.bossDefeated = true;
     this.hooks.onBossUpdate(null);
     this.finishStage();
+  }
+
+  private typeSupplyPod(pod: SupplyPod, key: string): void {
+    const word = typingText(pod.entry.en);
+    const expected = word[pod.typed];
+
+    if (key !== expected) {
+      this.registerMiss();
+      return;
+    }
+
+    pod.typed += 1;
+    this.stats.hits += 1;
+    this.stats.streak += 1;
+    this.stats.maxStreak = Math.max(
+      this.stats.maxStreak,
+      this.stats.streak,
+    );
+    this.stats.multiplier = multiplierForStreak(this.stats.streak);
+    this.stats.score += 8 * this.stats.multiplier;
+    this.gainPower(1.2);
+    this.applyCharacterCorrectKeyPassive();
+
+    this.burst(pod.x, pod.y, 7, 48);
+    this.sfx.shot(this.stats.multiplier);
+
+    if (pod.typed >= word.length) {
+      this.collectSupplyPod(pod);
+    }
+
+    this.emitStats();
+  }
+
+  private collectSupplyPod(pod: SupplyPod): void {
+    const reward = applySupplyReward(
+      pod.reward,
+      {
+        hull: this.stats.hull,
+        shield: this.stats.shield,
+        energy: this.stats.energy,
+      },
+      {
+        hull: this.stats.maxHull,
+        shield: this.stats.maxShield,
+        energy: this.stats.maxEnergy,
+      },
+      this.stats.power,
+    );
+
+    this.stats.hull = reward.resources.hull;
+    this.stats.shield = reward.resources.shield;
+    this.stats.energy = reward.resources.energy;
+    this.stats.power = reward.power;
+    this.stats.score += 140 * this.stats.multiplier;
+    this.hooks.onWordComplete(pod.entry);
+    this.burst(pod.x, pod.y, 34, 48);
+    this.sfx.support();
+    this.supplyPod = null;
+    this.emitStats();
   }
 
   private currentTarget(): Enemy | null {
@@ -2924,6 +3063,10 @@ export class Game {
       this.drawProjectile(projectile);
     }
 
+    if (this.supplyPod !== null) {
+      this.drawSupplyPod(this.supplyPod);
+    }
+
     for (const enemy of this.enemies) {
       this.drawEnemy(enemy);
     }
@@ -3245,6 +3388,58 @@ export class Game {
       left + typedWidth,
       wordY,
     );
+    context.restore();
+  }
+
+  private drawSupplyPod(pod: SupplyPod): void {
+    const context = this.context;
+    const y = pod.y + Math.sin(pod.age * 3.2) * 7;
+    const displayWord = normalizeWord(pod.entry.en);
+    const split = splitDisplayByTypedLetters(displayWord, pod.typed);
+
+    context.save();
+    context.translate(pod.x, y);
+    context.globalCompositeOperation = "lighter";
+    context.shadowBlur = 20;
+    context.shadowColor = "#ffd866";
+
+    context.fillStyle = "rgba(255, 216, 102, 0.12)";
+    context.strokeStyle = "rgba(255, 225, 130, 0.9)";
+    context.lineWidth = 1.6;
+    context.beginPath();
+    context.roundRect(-31, -18, 62, 36, 8);
+    context.fill();
+    context.stroke();
+
+    context.fillStyle = "#fff1b0";
+    context.font =
+      "800 9px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.textAlign = "center";
+    context.fillText(
+      "SUPPLY · " + supplyRewardLabel(pod.reward),
+      0,
+      3,
+    );
+    context.restore();
+
+    context.save();
+    context.font =
+      "750 17px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.textBaseline = "middle";
+    const fullWidth = context.measureText(displayWord).width;
+    const typedWidth = context.measureText(split.typed).width;
+    const left = pod.x - fullWidth / 2;
+    const wordY = y - 36;
+
+    context.fillStyle = "rgba(4, 8, 14, 0.88)";
+    context.fillRect(left - 9, wordY - 14, fullWidth + 18, 28);
+    context.textAlign = "left";
+    context.fillStyle = "rgba(143, 158, 170, 0.5)";
+    context.fillText(split.typed, left, wordY);
+    context.fillStyle = "#fff4bd";
+    context.shadowBlur = 7;
+    context.shadowColor = "#ffd866";
+    context.fillText(split.remaining, left + typedWidth, wordY);
     context.restore();
   }
 
