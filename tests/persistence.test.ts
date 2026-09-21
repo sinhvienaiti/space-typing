@@ -197,6 +197,23 @@ describe("player save persistence model", () => {
     });
   });
 
+  it("migrates PlayerSave v6 to starter support spell loadout", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const legacy = {
+      ...current,
+      version: 6,
+    } as Record<string, unknown>;
+    delete legacy.supportSpells;
+
+    const migration = migratePlayerSave(legacy);
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(6);
+    expect(migration.save.supportSpells.loadout).toEqual([
+      "sanctuary",
+      "gravity-well",
+    ]);
+  });
+
   it("keeps a valid current-version save without migration", () => {
     const save = createPlayerSave(
       createDefaultCampaignProgress(),
@@ -211,6 +228,10 @@ describe("player save persistence model", () => {
     expect(migration.save).toEqual(save);
     expect(migration.save.inventory).toEqual({ "repair-kit": 2 });
     expect(migration.save.equipment.loadout.weapon).toBe("starter-pulse");
+    expect(migration.save.supportSpells.loadout).toEqual([
+      "sanctuary",
+      "gravity-well",
+    ]);
   });
 
   it("refuses unsupported numeric schema versions instead of down-migrating them", () => {

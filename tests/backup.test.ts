@@ -33,6 +33,7 @@ describe("save backup", () => {
       lastSaveReason: string;
       inventory: { "repair-kit"?: number };
       equipment: { loadout: { weapon: string | null } };
+      supportSpells: { loadout: Array<string | null> };
     };
 
     expect(parsed.version).toBe(PLAYER_SAVE_VERSION);
@@ -40,6 +41,10 @@ describe("save backup", () => {
     expect(parsed.lastSaveReason).toBe("manual");
     expect(parsed.inventory["repair-kit"]).toBe(2);
     expect(parsed.equipment.loadout.weapon).toBe("starter-pulse");
+    expect(parsed.supportSpells.loadout).toEqual([
+      "sanctuary",
+      "gravity-well",
+    ]);
   });
 
   it("imports and migrates a valid v1 backup", () => {
@@ -81,7 +86,7 @@ describe("save backup", () => {
     );
     expect(unsupported).toEqual({
       ok: false,
-      error: "Unsupported save version. Supported versions: 1-6.",
+      error: "Unsupported save version. Supported versions: 1-7.",
     });
   });
 
@@ -197,6 +202,40 @@ describe("save backup", () => {
     expect(result.save.equipment.items[0]).toMatchObject({
       rarity: "epic",
       enhancement: 0,
+    });
+  });
+
+  it("imports and migrates a valid v6 backup", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.version = 6;
+    delete raw.supportSpells;
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.migrated).toBe(true);
+    expect(result.save.supportSpells.loadout).toEqual([
+      "sanctuary",
+      "gravity-well",
+    ]);
+  });
+
+  it("rejects invalid or duplicate support spell loadout in v7", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.supportSpells = {
+      unlocked: ["sanctuary", "gravity-well"],
+      loadout: ["sanctuary", "sanctuary"],
+    };
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result).toEqual({
+      ok: false,
+      error: "Support spell data contains an invalid or duplicate loadout.",
     });
   });
 

@@ -13,6 +13,11 @@ import {
   type Inventory,
 } from "../items/inventory";
 import {
+  createStarterSupportSpellState,
+  isValidSupportSpellState,
+  type SupportSpellState,
+} from "../skills/support-loadout";
+import {
   createPlayerSave,
   migratePlayerSave,
   PLAYER_SAVE_VERSION,
@@ -108,6 +113,7 @@ export function exportPlayerSaveJson(
   updatedAt = new Date().toISOString(),
   inventory: Inventory = createEmptyInventory(),
   equipment: EquipmentState = createStarterEquipmentState(),
+  supportSpells: SupportSpellState = createStarterSupportSpellState(),
 ): string {
   return JSON.stringify(
     createPlayerSave(
@@ -116,6 +122,7 @@ export function exportPlayerSaveJson(
       "manual",
       inventory,
       equipment,
+      supportSpells,
     ),
     null,
     2,
@@ -148,6 +155,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     version !== 3 &&
     version !== 4 &&
     version !== 5 &&
+    version !== 6 &&
     version !== PLAYER_SAVE_VERSION
   ) {
     return {
@@ -170,6 +178,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     (version === 3 ||
       version === 4 ||
       version === 5 ||
+      version === 6 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidInventory(parsed.inventory)
   ) {
@@ -200,12 +209,22 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    version === PLAYER_SAVE_VERSION &&
+    (version === 6 || version === PLAYER_SAVE_VERSION) &&
     !isValidEquipmentState(parsed.equipment)
   ) {
     return {
       ok: false,
       error: "Equipment data contains an invalid item or loadout reference.",
+    };
+  }
+
+  if (
+    version === PLAYER_SAVE_VERSION &&
+    !isValidSupportSpellState(parsed.supportSpells)
+  ) {
+    return {
+      ok: false,
+      error: "Support spell data contains an invalid or duplicate loadout.",
     };
   }
 
