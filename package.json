@@ -1,0 +1,17 @@
+{
+  "name": "space-typing",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 3004",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "test": "vitest run",
+    "check": "pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.2",
+    "vite": "^7.1.7",
+    "vitest": "^3.2.4"
+  }
+}

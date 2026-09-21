@@ -1,0 +1,58 @@
+import { describe, expect, it } from "vitest";
+import {
+  accuracyPercent,
+  chooseTarget,
+  multiplierForStreak,
+  normalizeWord,
+  waveForKills,
+} from "../src/logic";
+import type { Enemy } from "../src/types";
+
+function enemy(id: number, word: string, x: number, y: number): Enemy {
+  return {
+    id,
+    word,
+    typed: 0,
+    x,
+    y,
+    baseX: x,
+    speed: 1,
+    age: 0,
+    drift: 0,
+    radius: 20,
+    flash: 0,
+    kick: 0,
+  };
+}
+
+describe("typing combat logic", () => {
+  it("normalizes target words", () => {
+    expect(normalizeWord("  Reactor ")).toBe("reactor");
+  });
+
+  it("raises score multiplier at streak milestones", () => {
+    expect(multiplierForStreak(24)).toBe(1);
+    expect(multiplierForStreak(25)).toBe(2);
+    expect(multiplierForStreak(50)).toBe(3);
+    expect(multiplierForStreak(100)).toBe(4);
+  });
+
+  it("chooses the nearest matching first-letter target", () => {
+    const enemies = [
+      enemy(1, "space", 300, 100),
+      enemy(2, "shield", 500, 500),
+      enemy(3, "code", 400, 600),
+    ];
+
+    expect(chooseTarget(enemies, "s", 400, 700)?.id).toBe(2);
+  });
+
+  it("calculates accuracy and wave progression", () => {
+    expect(accuracyPercent(0, 0)).toBe(100);
+    expect(accuracyPercent(9, 1)).toBe(90);
+    expect(waveForKills(0)).toBe(1);
+    expect(waveForKills(7)).toBe(1);
+    expect(waveForKills(8)).toBe(2);
+    expect(waveForKills(24)).toBe(4);
+  });
+});
