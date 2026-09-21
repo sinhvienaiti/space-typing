@@ -41,6 +41,10 @@ describe("save backup", () => {
         choice: number;
         anomaly: number;
       };
+      hiddenDiscovery: {
+        discovered: string[];
+        lastRollStage: number;
+      };
     };
 
     expect(parsed.version).toBe(PLAYER_SAVE_VERSION);
@@ -61,6 +65,10 @@ describe("save backup", () => {
       treasure: 0,
       choice: 0,
       anomaly: 0,
+    });
+    expect(parsed.hiddenDiscovery).toMatchObject({
+      discovered: [],
+      lastRollStage: 0,
     });
   });
 
@@ -103,7 +111,7 @@ describe("save backup", () => {
     );
     expect(unsupported).toEqual({
       ok: false,
-      error: "Unsupported save version. Supported versions: 1-11.",
+      error: "Unsupported save version. Supported versions: 1-12.",
     });
   });
 
@@ -337,6 +345,39 @@ describe("save backup", () => {
       treasure: 0,
       choice: 0,
       anomaly: 0,
+    });
+  });
+
+  it("imports and migrates a valid v11 backup to hidden discovery state", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.version = 11;
+    delete raw.hiddenDiscovery;
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.migrated).toBe(true);
+    expect(result.save.hiddenDiscovery).toMatchObject({
+      discovered: [],
+      lastRollStage: 0,
+    });
+  });
+
+  it("rejects invalid current hidden discovery state", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    const hidden = raw.hiddenDiscovery as Record<string, unknown>;
+    hidden.lastRollStage = -1;
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result).toEqual({
+      ok: false,
+      error:
+        "Hidden discovery data contains invalid unlock or drought state.",
     });
   });
 

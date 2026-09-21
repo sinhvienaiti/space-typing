@@ -1350,3 +1350,55 @@ kbd {
     grid-template-columns: 1fr;
   }
 }
+
+
+.codex-dialog {
+  width: min(760px, calc(100vw - 32px));
+}
+
+.codex-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.codex-entry {
+  display: grid;
+  gap: 7px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.codex-entry > span,
+.codex-entry > em {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-style: normal;
+}
+
+.codex-entry > strong {
+  font-size: 1rem;
+}
+
+.codex-entry > small {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.codex-entry.discovered {
+  border-color: rgba(239, 193, 79, 0.32);
+}
+
+.codex-entry.unknown > strong {
+  letter-spacing: 0.18em;
+}
+
+@media (max-width: 680px) {
+  .codex-grid {
+    grid-template-columns: 1fr;
+  }
+}
