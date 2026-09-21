@@ -71,6 +71,7 @@ import type { Inventory } from "./items/inventory";
 import type { RecoveryItemId } from "./items/consumables";
 import { accuracyPercent } from "./logic";
 import type { EquipmentDrop } from "./loot/equipment-loot";
+import type { StageRandomEventDefinition } from "./events/stage-scheduler";
 import {
   createLuckPityState,
   type LuckPityState,
@@ -239,6 +240,12 @@ app.innerHTML = `
         <div class="metric"><span>shield</span><strong id="shield">40</strong></div>
       </div>
     </header>
+
+    <div
+      id="stageEventBadge"
+      class="stage-event-badge hidden"
+      aria-live="polite"
+    ></div>
 
     <div id="bossHud" class="boss-hud hidden" aria-live="polite">
       <div class="boss-hud-meta">
@@ -1103,6 +1110,25 @@ function renderStage(stage: number): void {
   badge.classList.add("pulse");
 }
 
+function renderStageEvents(
+  events: readonly StageRandomEventDefinition[],
+): void {
+  const badge = byId("stageEventBadge");
+  if (events.length === 0) {
+    badge.textContent = "";
+    badge.title = "";
+    badge.classList.add("hidden");
+    return;
+  }
+
+  badge.textContent =
+    "EVENT // " + events.map((event) => event.name).join(" · ");
+  badge.title = events
+    .map((event) => event.name + ": " + event.description)
+    .join("\n");
+  badge.classList.remove("hidden");
+}
+
 function renderBoss(boss: BossHudState | null): void {
   const hud = byId("bossHud");
   if (boss === null) {
@@ -1259,6 +1285,7 @@ const game = new Game(
       }
     },
     onStage: renderStage,
+    onStageEvents: renderStageEvents,
     onBossUpdate: renderBoss,
     onSkills: renderAllSkills,
     onStageClear: (stats) => {

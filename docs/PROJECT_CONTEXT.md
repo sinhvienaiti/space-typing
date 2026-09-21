@@ -2966,6 +2966,19 @@ Hidden-discovery rules:
 ## Step 51
 Implement stage random-event scheduler.
 
+**Status: implemented.**
+
+Random-event scheduler rules:
+
+- stage events use the existing `modifierSlots` progression and are deterministic from the stage seed, so retrying a stage cannot reroll for an easier event;
+- the initial event pool is Fast Enemies, Armored Enemies, Low Shield, Double Supply and Projectile Storm;
+- events unlock gradually from Stage 030 onward and later modifier slots have lower activation chances, preventing every late stage from becoming a fully stacked event stage;
+- selected events are unique per stage and capped by the stage's modifier-slot count;
+- Luck increases the weighted selection of beneficial events without reducing the base availability of hazards;
+- effects are applied through the existing enemy speed/layer, Shield, Supply Pod and projectile-pressure paths rather than parallel combat systems;
+- Treasure Drone, Golden Enemy, Choice Crate and Anomaly continue using the Step 50 Luck/pity system and are not rerolled by this scheduler;
+- the HUD shows scheduled event names and descriptions for the active stage.
+
 ## Step 52
 Implement Credits and Normal Shop.
 

@@ -151,6 +151,13 @@ import {
   type HiddenDiscoveryState,
 } from "./discovery/hidden-content";
 import {
+  combineStageEventEffects,
+  createStageEventModifiers,
+  scheduleStageRandomEvents,
+  type StageRandomEventDefinition,
+  type StageRandomEventModifiers,
+} from "./events/stage-scheduler";
+import {
   goldenEnemyChance,
   treasureDroneChance,
   type TreasureDrone,
@@ -235,6 +242,7 @@ type Hooks = {
   onStats(stats: GameStats): void;
   onPhase(phase: GamePhase): void;
   onStage(stage: number): void;
+  onStageEvents(events: readonly StageRandomEventDefinition[]): void;
   onStageClear(stats: GameStats): void;
   onBossUpdate(boss: BossHudState | null): void;
   onWordComplete(entry: VocabularyEntry): void;
@@ -373,6 +381,9 @@ export class Game {
   private luckPity: LuckPityState = createLuckPityState();
   private hiddenDiscovery: HiddenDiscoveryState =
     createHiddenDiscoveryState();
+  private stageEvents: StageRandomEventDefinition[] = [];
+  private stageEventModifiers: StageRandomEventModifiers =
+    createStageEventModifiers();
   private lastTime = performance.now();
   private animationFrame = 0;
   private stars: Array<{ x: number; y: number; z: number }> = [];
@@ -1151,8 +1162,22 @@ export class Game {
       );
     }
 
+    this.stageEvents = scheduleStageRandomEvents(
+      stage,
+      this.playerStats.luck,
+    );
+    this.stageEventModifiers = combineStageEventEffects(
+      this.stageEvents,
+    );
+    this.hooks.onStageEvents(this.stageEvents);
+
     this.phase = "playing";
     this.stats = this.createGameStats(stage.stage);
+    this.stats.shield = Math.min(
+      this.stats.maxShield,
+      this.stats.shield *
+        this.stageEventModifiers.startingShieldMultiplier,
+    );
     this.secondsSinceDamage = Number.POSITIVE_INFINITY;
     this.resourceEmitTimer = 0;
     this.skillEngine.resetStage();
@@ -1163,7 +1188,9 @@ export class Game {
     this.targetId = null;
     this.supplyPod = null;
     this.supplySpawnTimer = randomBetween(5.5, 8.5);
-    this.supplySpawnsRemaining = stage.stage >= 500 ? 2 : 1;
+    this.supplySpawnsRemaining =
+      (stage.stage >= 500 ? 2 : 1) *
+      this.stageEventModifiers.supplyMultiplier;
     this.treasureDrone = null;
     this.treasureDroneTimer = randomBetween(9, 14);
     this.treasureDronePending = this.rollPityEvent(
@@ -1554,7 +1581,8 @@ export class Game {
             enemy.kind === "leech" ||
             enemy.kind === "commander"
               ? difficulty.combatPressure
-              : difficulty.projectilePressure;
+              : difficulty.projectilePressure *
+                this.stageEventModifiers.projectilePressureMultiplier;
           enemy.actionCooldown =
             baseInterval / Math.max(0.7, pressure);
         }
@@ -1921,11 +1949,13 @@ export class Game {
       kind === "commander";
     const actionPressure = supportAction
       ? difficulty?.combatPressure ?? 1
-      : difficulty?.projectilePressure ?? 1;
+      : (difficulty?.projectilePressure ?? 1) *
+        this.stageEventModifiers.projectilePressureMultiplier;
 
     const baseSpeed =
       (profile.baseSpeed + randomBetween(0, profile.speedVariance)) *
-      (difficulty?.enemySpeed ?? 1);
+      (difficulty?.enemySpeed ?? 1) *
+      this.stageEventModifiers.enemySpeedMultiplier;
     const baseCooldown =
       profile.actionInterval === null
         ? null
@@ -1953,7 +1983,11 @@ export class Game {
       entry,
       typed: 0,
       wordMissed: false,
-      layersRemaining: eliteStats.layers,
+      layersRemaining:
+        eliteStats.layers +
+        (!elite && !golden
+          ? this.stageEventModifiers.extraEnemyLayers
+          : 0),
       x: baseX,
       y: -profile.radius - 20,
       baseX,
@@ -2122,6 +2156,7 @@ export class Game {
     const baseAngle = Math.atan2(playerY - enemy.y, playerX - enemy.x);
     const speed =
       (115 + this.difficulty.projectilePressure * 52) *
+      this.stageEventModifiers.projectilePressureMultiplier *
       (enemy.kind === "sniper" ? 1.72 : 1);
     const alphabet = "asdfjklqweruiopzxcvbnm";
     const count = enemy.kind === "oppressor" ? 3 : 1;
