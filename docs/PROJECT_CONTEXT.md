@@ -2974,12 +2974,15 @@ Step 16  Continue / Retry / Stage Select / stage clear unlock flow
 Step 17  Mine + layered Tank
 Step 18  Destroyer + typeable letter projectiles
 Step 19  Oppressor + multi-projectile spread pressure
-Step 20  advanced enemy families completed incrementally:
-         Carrier / Shield / Jammer / Cloaker / Healer /
-         Splitter / Sniper / Leech / Commander
+Step 20  advanced enemy families
+Step 21  Elite modifier framework
+Step 22  Boss base + HP UI
+Step 23  Boss word / per-key damage loop
+Step 24  first multi-phase boss combat:
+         shield phase / perfect-word stagger / rage projectile pressure
 
 Next:
-Step 21  Elite modifier framework
+Step 25  IndexedDB persistence
 ~~~
 
 Implemented gameplay details:
@@ -3000,11 +3003,13 @@ Implemented gameplay details:
 - Stage Select / Retry / Continue;
 - adaptive Stage + WPM + Accuracy + Vocabulary difficulty model;
 - 15 enemy families with distinct typing-combat mechanics;
-- letter-projectile defense;
-- support/interference enemy mechanics;
-- phrase-safe vocabulary typing:
-  spaces/punctuation remain visible while combat input uses a-z only,
-  so Space remains reserved for Overdrive.
+- typeable enemy/boss projectile defense;
+- Elite promotion with Swift / Armored / Frenzy / Volatile;
+- phrase-safe vocabulary typing while Space remains Overdrive;
+- boss HP, rotating vocabulary, per-key damage and full-word bonus damage;
+- boss phases with shield word break;
+- perfect boss word stagger;
+- Major Boss rage phase with increased projectile pressure.
 
 Validation checkpoints:
 
@@ -3025,24 +3030,24 @@ Persistent Campaign stage flow CI
 edb15e4d34c9cde5bbffe0dddfaa3d50c04300de
 PASS
 
-Shield + Carrier checkpoint CI
-3da252a4fdccb2318a4c6b9dcaa6348650620107
-PASS
-
-Jammer + Cloaker checkpoint CI
-ccf7077f22fc0c3a4aed1607212017978439a6ef
-PASS
-
-Healer + Splitter checkpoint CI
-ee6aa67de7083da17d7e31d2c1bb27897dca6d8f
-PASS
-
 Completed advanced enemy families CI
 08f8a01094757da4775f5b03de616a6bf1e3453f
 PASS
 
 Phrase-safe shared vocabulary combat CI
 3204049576db6e08e8944b33f3dd40adce65d171
+PASS
+
+Elite modifier framework CI
+a14ac88de22869d159ee4b29b52ad0a96ae3063e
+PASS
+
+Boss HP + typing damage loop CI
+0e9d31dee78329b50794243311b356814e2295b3
+PASS
+
+Multi-phase boss combat CI
+d90a6f0d26297db97f494687a88ca1bea9d82388
 PASS
 ~~~
 
@@ -3055,11 +3060,8 @@ Project-wide requirements remain:
 - parent shared Music system: already available;
 - docs/PROJECT_CONTEXT.md remains the primary context/handoff/plan document.
 
-The old prototype wave counter has been replaced by persistent Campaign Stage flow.
-The current run represents one Campaign Stage and unlocks the next stage on clear.
-
-Campaign progress currently uses the small local storage adapter defined for the early Campaign checkpoint.
-Phase 6 / Step 25 will migrate full player progression to IndexedDB according to the persistence architecture above.
+Campaign progress currently still uses the temporary localStorage adapter from the early Campaign checkpoint.
+Step 25 migrates player progress to IndexedDB without silently deleting old progress.
 
 ---
 

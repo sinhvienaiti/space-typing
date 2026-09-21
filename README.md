@@ -76,11 +76,11 @@ https://space.typing-game.local
 ## Next implementation checkpoint
 
 ~~~text
-Step 21
-Elite modifier framework
+Step 25
+IndexedDB persistence
 
 Then:
-Step 22 Boss base + HP UI
-Step 23 Boss word/damage loop
-Step 24 First full multi-phase boss
+Step 26 autosave / schema migrations
+Step 27 Export / Import
+Step 28 effective-stat pipeline
 ~~~
