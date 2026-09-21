@@ -2918,6 +2918,18 @@ Reward-choice rules:
 ## Step 49
 Implement Anomaly risk/reward crate.
 
+**Status: implemented.**
+
+Anomaly rules:
+
+- Anomaly Crates begin appearing from mid-Campaign at a bounded low chance;
+- each Anomaly Crate is a normal English typing target and must be completed before it expires;
+- completion pauses combat and forces one of two explicit choices;
+- Stabilize is safe, grants a small Shield recovery and uses the strong Golden reward table;
+- Overload removes a bounded percentage of max Hull, never reducing the player below 1 Hull, and uses an Epic/Legendary-biased Anomaly reward table;
+- the chosen equipment reward uses the existing inventory/autosave path and combat resumes at the same state;
+- the decision dialog cannot be dismissed with Escape, preventing unresolved anomaly state.
+
 ## Step 50
 Implement Luck weighting and soft pity.
 

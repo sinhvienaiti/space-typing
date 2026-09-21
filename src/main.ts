@@ -437,6 +437,28 @@ app.innerHTML = `
       <div id="rewardChoiceGrid" class="reward-choice-grid"></div>
     </dialog>
 
+    <dialog id="anomalyDialog" class="settings-dialog anomaly-dialog">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">anomaly detected</p>
+          <h2>Choose the risk</h2>
+        </div>
+      </div>
+      <p id="anomalyRiskMeta" class="equipment-note">
+        Overload trades Hull for a stronger reward table.
+      </p>
+      <div class="anomaly-choice-grid">
+        <button id="anomalyStabilize" type="button" class="anomaly-choice safe">
+          <strong>Stabilize</strong>
+          <span>Safe reward · small Shield recovery</span>
+        </button>
+        <button id="anomalyOverload" type="button" class="anomaly-choice risk">
+          <strong>Overload</strong>
+          <span>Lose Hull · Epic/Legendary-biased reward</span>
+        </button>
+      </div>
+    </dialog>
+
     <dialog id="supportDialog" class="settings-dialog support-dialog">
       <form method="dialog" class="dialog-head">
         <div>
@@ -670,8 +692,12 @@ const supportDialog = byId<HTMLDialogElement>("supportDialog");
 const characterDialog = byId<HTMLDialogElement>("characterDialog");
 const rewardChoiceDialog =
   byId<HTMLDialogElement>("rewardChoiceDialog");
+const anomalyDialog = byId<HTMLDialogElement>("anomalyDialog");
 
 rewardChoiceDialog.addEventListener("cancel", (event) => {
+  event.preventDefault();
+});
+anomalyDialog.addEventListener("cancel", (event) => {
   event.preventDefault();
 });
 
@@ -1082,6 +1108,13 @@ function createEquipmentDropInstanceId(): string {
   );
 }
 
+function renderAnomalyDecision(riskHullRatio: number): void {
+  byId("anomalyRiskMeta").textContent =
+    "Overload removes " +
+    String(Math.round(riskHullRatio * 100)) +
+    "% max Hull (cannot reduce Hull below 1) for a stronger reward table.";
+}
+
 function renderRewardChoiceOptions(
   options: readonly EquipmentDrop[],
 ): void {
@@ -1243,6 +1276,29 @@ const game = new Game(
       renderRewardChoiceOptions(options);
       rewardChoiceDialog.showModal();
     },
+    onAnomalyReady: (riskHullRatio) => {
+      game.pause();
+      renderAnomalyDecision(riskHullRatio);
+      anomalyDialog.showModal();
+    },
+  },
+);
+
+byId<HTMLButtonElement>("anomalyStabilize").addEventListener(
+  "click",
+  () => {
+    if (!game.resolveAnomaly("stabilize")) return;
+    anomalyDialog.close();
+    game.resume();
+  },
+);
+
+byId<HTMLButtonElement>("anomalyOverload").addEventListener(
+  "click",
+  () => {
+    if (!game.resolveAnomaly("overload")) return;
+    anomalyDialog.close();
+    game.resume();
   },
 );
 

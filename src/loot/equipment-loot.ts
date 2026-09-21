@@ -9,6 +9,7 @@ export type LootSource =
   | "elite"
   | "golden"
   | "treasure"
+  | "anomaly"
   | "boss";
 
 type RarityWeights = Record<EquipmentRarity, number>;
@@ -41,6 +42,12 @@ export const RARITY_WEIGHTS: Record<
     epic: 40,
     legendary: 15,
   },
+  anomaly: {
+    common: 0,
+    rare: 15,
+    epic: 55,
+    legendary: 30,
+  },
   boss: {
     common: 20,
     rare: 40,
@@ -57,6 +64,7 @@ export const EQUIPMENT_LOOT_TABLES: Record<
   elite: EQUIPMENT_IDS,
   golden: EQUIPMENT_IDS,
   treasure: EQUIPMENT_IDS,
+  anomaly: EQUIPMENT_IDS,
   boss: EQUIPMENT_IDS,
 };
 
@@ -143,7 +151,8 @@ export function equipmentDropChance(
   const base =
     source === "boss" ||
     source === "golden" ||
-    source === "treasure"
+    source === "treasure" ||
+    source === "anomaly"
       ? 1
       : source === "elite"
         ? 0.22

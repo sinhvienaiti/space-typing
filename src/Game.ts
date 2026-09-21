@@ -148,6 +148,14 @@ import {
   type RewardChoiceCrate,
 } from "./events/reward-choice";
 import {
+  anomalyRiskHullRatio,
+  anomalyWord,
+  createAnomalyReward,
+  shouldScheduleAnomalyCrate,
+  type AnomalyChoice,
+  type AnomalyCrate,
+} from "./events/anomaly";
+import {
   applyEliteModifiers,
   eliteModifierCount,
   pickEliteModifiers,
@@ -218,6 +226,7 @@ type Hooks = {
   onWordComplete(entry: VocabularyEntry): void;
   onEquipmentDrop(drop: EquipmentDrop): void;
   onRewardChoice(options: readonly EquipmentDrop[]): void;
+  onAnomalyReady(riskHullRatio: number): void;
   onSkills(): void;
 };
 
@@ -337,6 +346,11 @@ export class Game {
   private rewardChoiceCrate: RewardChoiceCrate | null = null;
   private rewardChoiceTimer = 0;
   private rewardChoicePending = false;
+  private anomalyCrate: AnomalyCrate | null = null;
+  private anomalyTimer = 0;
+  private anomalyPending = false;
+  private anomalyResolutionPending = false;
+  private anomalyRiskRatio = 0;
   private lastTime = performance.now();
   private animationFrame = 0;
   private stars: Array<{ x: number; y: number; z: number }> = [];
@@ -1112,6 +1126,11 @@ export class Game {
     this.rewardChoiceCrate = null;
     this.rewardChoiceTimer = randomBetween(14, 20);
     this.rewardChoicePending = shouldScheduleRewardChoiceCrate(stage.stage);
+    this.anomalyCrate = null;
+    this.anomalyTimer = randomBetween(18, 24);
+    this.anomalyPending = shouldScheduleAnomalyCrate(stage.stage);
+    this.anomalyResolutionPending = false;
+    this.anomalyRiskRatio = 0;
     this.spawnRemaining = stage.enemyBudget;
     this.spawnTimer = 0.3;
     this.eliteSpawned = 0;
@@ -1175,6 +1194,10 @@ export class Game {
     this.treasureDronePending = false;
     this.rewardChoiceCrate = null;
     this.rewardChoicePending = false;
+    this.anomalyCrate = null;
+    this.anomalyPending = false;
+    this.anomalyResolutionPending = false;
+    this.anomalyRiskRatio = 0;
     this.boss = null;
     this.hooks.onBossUpdate(null);
     this.hooks.onPhase(this.phase);
@@ -1224,6 +1247,11 @@ export class Game {
       return;
     }
 
+    if (this.anomalyCrate !== null && this.anomalyCrate.typed > 0) {
+      this.typeAnomalyCrate(this.anomalyCrate, key);
+      return;
+    }
+
     const projectile = this.findProjectileForKey(key);
     if (projectile !== null) {
       this.destroyProjectile(projectile);
@@ -1256,6 +1284,14 @@ export class Game {
       typingText(this.rewardChoiceCrate.entry.en)[0] === key
     ) {
       this.typeRewardChoiceCrate(this.rewardChoiceCrate, key);
+      return;
+    }
+
+    if (
+      this.anomalyCrate !== null &&
+      typingText(this.anomalyCrate.entry.en)[0] === key
+    ) {
+      this.typeAnomalyCrate(this.anomalyCrate, key);
       return;
     }
 
@@ -1341,10 +1377,12 @@ export class Game {
     this.updateSupplyPod(dt);
     this.updateTreasureDrone(dt);
     this.updateRewardChoiceCrate(dt);
+    this.updateAnomalyCrate(dt);
     this.spawnTimer -= dt * hostileTimeFactor;
     this.supplySpawnTimer -= dt;
     this.treasureDroneTimer -= dt;
     this.rewardChoiceTimer -= dt;
+    this.anomalyTimer -= dt;
 
     if (
       this.supplyPod === null &&
@@ -1363,6 +1401,7 @@ export class Game {
       this.treasureDrone === null &&
       this.supplyPod === null &&
       this.rewardChoiceCrate === null &&
+      this.anomalyCrate === null &&
       this.treasureDroneTimer <= 0 &&
       this.boss === null &&
       (this.spawnRemaining > 0 || this.enemies.length > 0)
@@ -1376,12 +1415,27 @@ export class Game {
       this.rewardChoiceCrate === null &&
       this.supplyPod === null &&
       this.treasureDrone === null &&
+      this.anomalyCrate === null &&
       this.rewardChoiceTimer <= 0 &&
       this.boss === null &&
       (this.spawnRemaining > 0 || this.enemies.length > 0)
     ) {
       this.spawnRewardChoiceCrate();
       this.rewardChoicePending = false;
+    }
+
+    if (
+      this.anomalyPending &&
+      this.anomalyCrate === null &&
+      this.supplyPod === null &&
+      this.treasureDrone === null &&
+      this.rewardChoiceCrate === null &&
+      this.anomalyTimer <= 0 &&
+      this.boss === null &&
+      (this.spawnRemaining > 0 || this.enemies.length > 0)
+    ) {
+      this.spawnAnomalyCrate();
+      this.anomalyPending = false;
     }
 
     if (
@@ -1613,6 +1667,9 @@ export class Game {
     this.supplyPod = null;
     this.treasureDrone = null;
     this.rewardChoiceCrate = null;
+    this.anomalyCrate = null;
+    this.anomalyResolutionPending = false;
+    this.anomalyRiskRatio = 0;
     this.boss = null;
     this.hooks.onBossUpdate(null);
     this.hooks.onStageClear(this.getStats());
@@ -1737,6 +1794,40 @@ export class Game {
       this.rewardChoiceCrate.y > this.height * 0.63
     ) {
       this.rewardChoiceCrate = null;
+    }
+  }
+
+  private spawnAnomalyCrate(): void {
+    const entry = anomalyWord(this.vocabulary);
+    if (entry === null) {
+      this.anomalyPending = false;
+      return;
+    }
+
+    this.anomalyCrate = {
+      entry,
+      typed: 0,
+      x: randomBetween(90, this.width - 90),
+      y: -46,
+      speed: randomBetween(31, 42),
+      age: 0,
+      lifetime: 19,
+    };
+
+    this.sfx.eliteWarning();
+  }
+
+  private updateAnomalyCrate(dt: number): void {
+    if (this.anomalyCrate === null) return;
+
+    this.anomalyCrate.age += dt;
+    this.anomalyCrate.y += this.anomalyCrate.speed * dt;
+
+    if (
+      this.anomalyCrate.age >= this.anomalyCrate.lifetime ||
+      this.anomalyCrate.y > this.height * 0.62
+    ) {
+      this.anomalyCrate = null;
     }
   }
 
@@ -2337,6 +2428,78 @@ export class Game {
     }
 
     this.emitStats();
+  }
+
+  private typeAnomalyCrate(crate: AnomalyCrate, key: string): void {
+    const word = typingText(crate.entry.en);
+    const expected = word[crate.typed];
+
+    if (key !== expected) {
+      this.registerMiss();
+      return;
+    }
+
+    crate.typed += 1;
+    this.stats.hits += 1;
+    this.stats.streak += 1;
+    this.stats.maxStreak = Math.max(
+      this.stats.maxStreak,
+      this.stats.streak,
+    );
+    this.stats.multiplier = multiplierForStreak(this.stats.streak);
+    this.stats.score += 12 * this.stats.multiplier;
+    this.gainPower(1.4);
+    this.applyCharacterCorrectKeyPassive();
+    this.burst(crate.x, crate.y, 8, 322);
+    this.sfx.shot(this.stats.multiplier);
+
+    if (crate.typed >= word.length) {
+      this.stats.score += 260 * this.stats.multiplier;
+      this.hooks.onWordComplete(crate.entry);
+      this.burst(crate.x, crate.y, 44, 322);
+      this.sfx.support();
+      this.anomalyCrate = null;
+      this.anomalyResolutionPending = true;
+      this.anomalyRiskRatio = anomalyRiskHullRatio(
+        this.stageConfig?.stage ?? 1,
+      );
+      this.hooks.onAnomalyReady(this.anomalyRiskRatio);
+    }
+
+    this.emitStats();
+  }
+
+  resolveAnomaly(choice: AnomalyChoice): boolean {
+    if (!this.anomalyResolutionPending) return false;
+
+    if (choice === "overload") {
+      this.stats.hull = Math.max(
+        1,
+        this.stats.hull - this.stats.maxHull * this.anomalyRiskRatio,
+      );
+      this.burst(
+        this.width / 2,
+        this.height - PLAYER_Y_OFFSET,
+        30,
+        350,
+      );
+    } else {
+      this.stats.shield = clamp(
+        this.stats.shield + this.stats.maxShield * 0.12,
+        0,
+        this.stats.maxShield,
+      );
+    }
+
+    const reward = createAnomalyReward(
+      choice,
+      this.playerStats.luck,
+    );
+    this.hooks.onEquipmentDrop(reward);
+    this.anomalyResolutionPending = false;
+    this.anomalyRiskRatio = 0;
+    this.emitStats();
+    return true;
   }
 
   private currentTarget(): Enemy | null {
@@ -3343,6 +3506,9 @@ export class Game {
     if (this.rewardChoiceCrate !== null) {
       this.drawRewardChoiceCrate(this.rewardChoiceCrate);
     }
+    if (this.anomalyCrate !== null) {
+      this.drawAnomalyCrate(this.anomalyCrate);
+    }
 
     for (const enemy of this.enemies) {
       this.drawEnemy(enemy);
@@ -3822,6 +3988,57 @@ export class Game {
     context.fillStyle = "#eadbff";
     context.shadowBlur = 9;
     context.shadowColor = "#a86cff";
+    context.fillText(split.remaining, left + typedWidth, wordY);
+    context.restore();
+  }
+
+  private drawAnomalyCrate(crate: AnomalyCrate): void {
+    const context = this.context;
+    const x = crate.x + Math.sin(crate.age * 3.1) * 18;
+    const displayWord = normalizeWord(crate.entry.en);
+    const split = splitDisplayByTypedLetters(displayWord, crate.typed);
+
+    context.save();
+    context.translate(x, crate.y);
+    context.rotate(Math.sin(crate.age * 2.2) * 0.08);
+    context.globalCompositeOperation = "lighter";
+    context.shadowBlur = 28;
+    context.shadowColor = "#ff65cc";
+    context.fillStyle = "rgba(255, 83, 193, 0.15)";
+    context.strokeStyle = "#ff9bdd";
+    context.lineWidth = 2;
+    context.beginPath();
+    context.moveTo(0, -27);
+    context.lineTo(26, 0);
+    context.lineTo(0, 27);
+    context.lineTo(-26, 0);
+    context.closePath();
+    context.fill();
+    context.stroke();
+
+    context.fillStyle = "#ffe0f5";
+    context.font =
+      "850 8px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.textAlign = "center";
+    context.fillText("ANOMALY", 0, 3);
+    context.restore();
+
+    context.save();
+    context.font =
+      "800 18px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.textBaseline = "middle";
+    const fullWidth = context.measureText(displayWord).width;
+    const typedWidth = context.measureText(split.typed).width;
+    const left = x - fullWidth / 2;
+    const wordY = crate.y - 40;
+    context.fillStyle = "rgba(4, 8, 14, 0.9)";
+    context.fillRect(left - 9, wordY - 14, fullWidth + 18, 28);
+    context.textAlign = "left";
+    context.fillStyle = "rgba(145, 155, 165, 0.5)";
+    context.fillText(split.typed, left, wordY);
+    context.fillStyle = "#ffd7f0";
+    context.shadowBlur = 10;
+    context.shadowColor = "#ff65cc";
     context.fillText(split.remaining, left + typedWidth, wordY);
     context.restore();
   }

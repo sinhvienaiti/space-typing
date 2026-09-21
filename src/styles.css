@@ -1187,6 +1187,48 @@ kbd {
   color: #6c7480;
 }
 
+.anomaly-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin-top: 0.9rem;
+}
+
+.anomaly-choice {
+  min-height: 128px;
+  padding: 1rem;
+  display: grid;
+  align-content: center;
+  gap: 0.5rem;
+  text-align: left;
+}
+
+.anomaly-choice strong {
+  font-size: 0.9rem;
+}
+
+.anomaly-choice span {
+  color: #8796a5;
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.anomaly-choice.safe {
+  border-color: rgba(100, 229, 247, 0.22);
+  background: rgba(8, 24, 31, 0.74);
+}
+
+.anomaly-choice.risk {
+  border-color: rgba(255, 101, 204, 0.3);
+  background: rgba(31, 8, 25, 0.78);
+}
+
+@media (max-width: 620px) {
+  .anomaly-choice-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .reward-choice-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
