@@ -21,6 +21,26 @@ import {
   restoreAegisShield,
 } from "./characters/aegis";
 import {
+  BASTION_ACTIVE_SKILL,
+  BASTION_ACTIVE_SKILL_ID,
+  BASTION_MATRIX_BLOCKS,
+  BASTION_MATRIX_DURATION,
+  BASTION_SANCTUARY_BLOCKS,
+  BASTION_SANCTUARY_DURATION,
+  BASTION_SANCTUARY_SHIELD_RATIO,
+  recycleBastionShield,
+} from "./characters/bastion";
+import {
+  ORACLE_ACTIVE_SKILL,
+  ORACLE_ACTIVE_SKILL_ID,
+  ORACLE_MARK_DURATION,
+  ORACLE_PERFECT_MARK_DURATION,
+  ORACLE_PERFECT_POWER_GAIN,
+  ORACLE_ULTIMATE_BOSS_RATIO,
+  ORACLE_ULTIMATE_MARK_DURATION,
+  ORACLE_ULTIMATE_TARGETS,
+} from "./characters/oracle";
+import {
   ARSENAL_ACTIVE_SKILL,
   ARSENAL_ACTIVE_SKILL_ID,
   ARSENAL_OVERCLOCK_DURATION,
@@ -296,7 +316,11 @@ export class Game {
                 ? [FORTUNE_ACTIVE_SKILL]
                 : this.characterId === "arsenal"
                   ? [ARSENAL_ACTIVE_SKILL]
-                  : [];
+                  : this.characterId === "oracle"
+                    ? [ORACLE_ACTIVE_SKILL]
+                    : this.characterId === "bastion"
+                      ? [BASTION_ACTIVE_SKILL]
+                      : [];
 
     this.skillEngine.setDefinitions([
       ...characterDefinitions,
@@ -347,7 +371,7 @@ export class Game {
     }
 
     if (
-      id === "mark-of-weakness" &&
+      (id === "mark-of-weakness" || id === ORACLE_ACTIVE_SKILL_ID) &&
       this.currentTarget() === null &&
       this.enemies.length === 0 &&
       this.boss === null
@@ -419,6 +443,16 @@ export class Game {
       this.characterId === "arsenal"
     ) {
       this.activateArsenalSkill();
+    } else if (
+      id === ORACLE_ACTIVE_SKILL_ID &&
+      this.characterId === "oracle"
+    ) {
+      this.activateOracleSkill();
+    } else if (
+      id === BASTION_ACTIVE_SKILL_ID &&
+      this.characterId === "bastion"
+    ) {
+      this.activateBastionSkill();
     } else if (isDefensiveSkillId(id)) {
       this.activateDefensiveSkill(id);
     } else if (isOffensiveSkillId(id)) {
@@ -522,6 +556,23 @@ export class Game {
     );
     this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 30, 18);
     this.sfx.power();
+  }
+
+  private activateOracleSkill(): void {
+    this.activateMarkOfWeakness(ORACLE_MARK_DURATION);
+  }
+
+  private activateBastionSkill(): void {
+    this.guardianTimer = Math.max(
+      this.guardianTimer,
+      BASTION_MATRIX_DURATION,
+    );
+    this.guardianBlocks = Math.max(
+      this.guardianBlocks,
+      BASTION_MATRIX_BLOCKS,
+    );
+    this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 30, 164);
+    this.sfx.support();
   }
 
   private activateEmpPulse(actionDelay: number): void {
@@ -646,8 +697,12 @@ export class Game {
       return;
     }
 
+    this.activateMarkOfWeakness(8);
+  }
+
+  private activateMarkOfWeakness(duration: number): void {
     if (this.boss !== null) {
-      this.bossMarkTimer = Math.max(this.bossMarkTimer, 8);
+      this.bossMarkTimer = Math.max(this.bossMarkTimer, duration);
       this.boss.flash = 1;
       this.hooks.onBossUpdate(toBossHud(this.boss));
       this.sfx.support();
@@ -661,7 +716,7 @@ export class Game {
 
     if (target !== null) {
       this.markedEnemyId = target.id;
-      this.markTimer = 8;
+      this.markTimer = Math.max(this.markTimer, duration);
 
       if (target.layersRemaining > 1) {
         target.layersRemaining -= 1;
@@ -1983,22 +2038,36 @@ export class Game {
   }
 
   private applyCharacterPerfectWordPassive(perfectWord: boolean): void {
-    if (!perfectWord || this.characterId !== "aegis") return;
+    if (!perfectWord) return;
 
-    const nextShield = restoreAegisShield(
-      this.stats.shield,
-      this.stats.maxShield,
-    );
-    if (nextShield <= this.stats.shield) return;
+    if (this.characterId === "aegis") {
+      const nextShield = restoreAegisShield(
+        this.stats.shield,
+        this.stats.maxShield,
+      );
+      if (nextShield > this.stats.shield) {
+        this.stats.shield = nextShield;
+        this.burst(
+          this.width / 2,
+          this.height - PLAYER_Y_OFFSET,
+          16,
+          204,
+        );
+        this.sfx.support();
+      }
+    }
 
-    this.stats.shield = nextShield;
-    this.burst(
-      this.width / 2,
-      this.height - PLAYER_Y_OFFSET,
-      16,
-      204,
-    );
-    this.sfx.support();
+    if (this.characterId === "oracle") {
+      this.gainPower(ORACLE_PERFECT_POWER_GAIN);
+      if (this.boss !== null) {
+        this.bossMarkTimer = Math.max(
+          this.bossMarkTimer,
+          ORACLE_PERFECT_MARK_DURATION,
+        );
+        this.boss.flash = 1;
+        this.hooks.onBossUpdate(toBossHud(this.boss));
+      }
+    }
   }
 
   private applyCharacterCorrectKeyPassive(): void {
@@ -2039,12 +2108,19 @@ export class Game {
     const isWraith = this.characterId === "wraith";
     const isFortune = this.characterId === "fortune";
     const isArsenal = this.characterId === "arsenal";
+    const isOracle = this.characterId === "oracle";
+    const isBastion = this.characterId === "bastion";
     this.stats.power = 0;
     this.overdriveTimer = isVanguard
       ? VANGUARD_NOVA_DURATION
       : isFortune
         ? FORTUNE_JACKPOT_DURATION
-        : isAegis || isVolt || isWraith || isArsenal
+        : isAegis ||
+            isVolt ||
+            isWraith ||
+            isArsenal ||
+            isOracle ||
+            isBastion
           ? 0
           : 4.5;
 
@@ -2165,6 +2241,62 @@ export class Game {
           this.defeatBoss();
         }
       }
+    } else if (isOracle) {
+      this.bossMarkTimer = Math.max(
+        this.bossMarkTimer,
+        ORACLE_ULTIMATE_MARK_DURATION,
+      );
+      const targets = [...this.enemies]
+        .sort((a, b) => b.y - a.y)
+        .slice(0, ORACLE_ULTIMATE_TARGETS);
+
+      for (const enemy of targets) {
+        const wordLength = typingText(enemy.entry.en).length;
+        enemy.typed = chainTypingAdvance(enemy.typed, wordLength);
+        enemy.flash = 1;
+        enemy.kick = Math.max(enemy.kick, 1.1);
+        this.burst(enemy.x, enemy.y, 18, 326);
+      }
+
+      if (this.boss !== null) {
+        const damage = firepowerDamage(
+          Math.max(
+            1,
+            Math.round(this.boss.maxHp * ORACLE_ULTIMATE_BOSS_RATIO),
+          ),
+          this.playerStats,
+        );
+        this.boss.hp = Math.max(0, this.boss.hp - damage);
+        this.boss.flash = 1;
+        this.updateBossPhase(this.boss);
+        this.hooks.onBossUpdate(toBossHud(this.boss));
+
+        if (this.boss.hp <= 0) {
+          this.defeatBoss();
+        }
+      }
+    } else if (isBastion) {
+      this.stats.shield = recycleBastionShield(
+        this.stats.shield,
+        this.stats.maxShield,
+        BASTION_SANCTUARY_SHIELD_RATIO,
+      );
+      this.guardianTimer = Math.max(
+        this.guardianTimer,
+        BASTION_SANCTUARY_DURATION,
+      );
+      this.guardianBlocks = Math.max(
+        this.guardianBlocks,
+        BASTION_SANCTUARY_BLOCKS,
+      );
+      this.barrierHp = Math.max(
+        this.barrierHp,
+        120 + this.playerStats.shield * 0.7,
+      );
+      this.barrierTimer = Math.max(
+        this.barrierTimer,
+        BASTION_SANCTUARY_DURATION,
+      );
     }
 
     this.burst(
@@ -2182,7 +2314,11 @@ export class Game {
                 ? 54
                 : isArsenal
                   ? 60
-                  : 36,
+                  : isOracle
+                    ? 58
+                    : isBastion
+                      ? 58
+                      : 36,
       isAegis
         ? 300
         : isVolt
@@ -2193,7 +2329,11 @@ export class Game {
               ? 48
               : isArsenal
                 ? 18
-                : 184,
+                : isOracle
+                  ? 326
+                  : isBastion
+                    ? 164
+                    : 184,
     );
 
     if (this.settings.screenShake) {
@@ -2211,7 +2351,11 @@ export class Game {
                   ? 8
                   : isArsenal
                     ? 10
-                    : 7,
+                    : isOracle
+                      ? 9
+                      : isBastion
+                        ? 9
+                        : 7,
       );
     }
 
@@ -2302,6 +2446,15 @@ export class Game {
       if (this.guardianBlocks <= 0) {
         this.guardianTimer = 0;
       }
+
+      if (this.characterId === "bastion") {
+        this.stats.shield = recycleBastionShield(
+          this.stats.shield,
+          this.stats.maxShield,
+        );
+        this.emitStats();
+      }
+
       this.burst(x, y, 22, 48);
       this.sfx.support();
       this.hooks.onSkills();

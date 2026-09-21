@@ -17,7 +17,9 @@ import {
 } from "./characters/registry";
 import { AEGIS_ACTIVE_SKILL_ID } from "./characters/aegis";
 import { ARSENAL_ACTIVE_SKILL_ID } from "./characters/arsenal";
+import { BASTION_ACTIVE_SKILL_ID } from "./characters/bastion";
 import { FORTUNE_ACTIVE_SKILL_ID } from "./characters/fortune";
+import { ORACLE_ACTIVE_SKILL_ID } from "./characters/oracle";
 import {
   createStarterCharacterState,
   selectCharacter,
@@ -790,6 +792,12 @@ function selectedCharacterSkillId(): string | null {
   }
   if (characters.selected === "arsenal") {
     return ARSENAL_ACTIVE_SKILL_ID;
+  }
+  if (characters.selected === "oracle") {
+    return ORACLE_ACTIVE_SKILL_ID;
+  }
+  if (characters.selected === "bastion") {
+    return BASTION_ACTIVE_SKILL_ID;
   }
   return null;
 }
