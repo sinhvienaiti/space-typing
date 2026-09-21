@@ -34,7 +34,8 @@ export type SkillBlockReason =
   | "no-charges"
   | "stage-limit"
   | "energy"
-  | "typing-condition";
+  | "typing-condition"
+  | "effect-not-needed";
 
 export type SkillActivationResult =
   | {
