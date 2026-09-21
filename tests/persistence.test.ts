@@ -1,0 +1,75 @@
+import { describe, expect, it } from "vitest";
+import {
+  chooseFurthestCampaign,
+  createPlayerSave,
+  sanitizePlayerSave,
+} from "../src/persistence/player-save";
+import {
+  createDefaultCampaignProgress,
+  recordStageClear,
+} from "../src/campaign/progress";
+
+describe("player save persistence model", () => {
+  it("wraps Campaign progress in a versioned player save", () => {
+    const save = createPlayerSave(
+      createDefaultCampaignProgress(),
+      "2026-09-21T15:00:00.000Z",
+    );
+
+    expect(save.version).toBe(1);
+    expect(save.campaign.highestUnlockedStage).toBe(1);
+    expect(save.updatedAt).toBe("2026-09-21T15:00:00.000Z");
+  });
+
+  it("sanitizes malformed player save data", () => {
+    const save = sanitizePlayerSave({
+      version: 99,
+      campaign: {
+        highestUnlockedStage: 5000,
+        selectedStage: 9000,
+        clearedStages: [1, 2, 2],
+        bestByStage: {},
+      },
+      updatedAt: 123,
+    });
+
+    expect(save.version).toBe(1);
+    expect(save.campaign.highestUnlockedStage).toBe(1000);
+    expect(save.campaign.selectedStage).toBe(1000);
+    expect(save.campaign.clearedStages).toEqual([1, 2]);
+    expect(save.updatedAt).toBe("");
+  });
+
+  it("chooses the furthest progress during legacy migration recovery", () => {
+    const initial = createDefaultCampaignProgress();
+    const stageOne = recordStageClear(initial, 1, {
+      score: 100,
+      accuracy: 98,
+      wpm: 60,
+      clearedAt: "2026-09-21T15:00:00.000Z",
+    });
+    const stageTwo = recordStageClear(stageOne, 2, {
+      score: 200,
+      accuracy: 99,
+      wpm: 65,
+      clearedAt: "2026-09-21T15:10:00.000Z",
+    });
+
+    expect(
+      chooseFurthestCampaign(stageOne, stageTwo).highestUnlockedStage,
+    ).toBe(3);
+    expect(
+      chooseFurthestCampaign(stageTwo, stageOne).highestUnlockedStage,
+    ).toBe(3);
+  });
+
+  it("keeps the preferred save on an exact progress tie", () => {
+    const preferred = createDefaultCampaignProgress();
+    const fallback = {
+      ...createDefaultCampaignProgress(),
+      selectedStage: 1,
+    };
+
+    expect(chooseFurthestCampaign(preferred, fallback)).toBe(preferred);
+  });
+});

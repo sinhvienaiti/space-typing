@@ -2,9 +2,8 @@ import "./styles.css";
 import { Game } from "./Game";
 import { difficultyFor } from "./campaign/difficulty";
 import {
-  loadCampaignProgress,
+  createDefaultCampaignProgress,
   recordStageClear,
-  saveCampaignProgress,
   selectCampaignStage,
 } from "./campaign/progress";
 import {
@@ -13,6 +12,10 @@ import {
   STAGES_PER_GALAXY,
 } from "./campaign/stage";
 import { accuracyPercent } from "./logic";
+import {
+  loadPlayerSave,
+  savePlayerCampaign,
+} from "./persistence/player-save";
 import { speakEnglish, stopSpeech } from "./speech";
 import {
   loadVocabularyIndex,
@@ -373,7 +376,8 @@ app.innerHTML = `
 `;
 
 let settings = loadSettings();
-let campaign = loadCampaignProgress();
+let campaign = createDefaultCampaignProgress();
+let persistenceReady = false;
 let sourceState = loadSource();
 let sourceTab: "class" | "custom" = sourceState.mode;
 let vocabularyIndex: VocabularyIndex | null = null;
@@ -509,7 +513,11 @@ const game = new Game(
         wpm,
         clearedAt: new Date().toISOString(),
       });
-      saveCampaignProgress(campaign);
+      void persistCampaign(
+        "✓ Saved · Stage " +
+          String(stats.stage).padStart(3, "0") +
+          " cleared",
+      );
 
       byId("clearTitle").textContent =
         "Stage " + String(stats.stage).padStart(3, "0") + " complete";
@@ -519,7 +527,6 @@ const game = new Game(
       byId("clearStreak").textContent = String(stats.maxStreak);
 
       updateCampaignUi();
-      showNotice("✓ Saved · Stage " + String(stats.stage).padStart(3, "0") + " cleared");
     },
     onWordComplete: (entry) => {
       showLearning(entry);
@@ -533,6 +540,8 @@ function selectedVocabularyLevel(): number {
 }
 
 function startSelectedStage(): void {
+  if (!persistenceReady) return;
+
   const stage = createStageConfig(campaign.selectedStage);
   const difficulty = difficultyFor({
     stage: stage.stage,
@@ -544,6 +553,40 @@ function startSelectedStage(): void {
 
   stageStartedAt = performance.now();
   game.startStage(stage, difficulty);
+}
+
+async function persistCampaign(successMessage: string): Promise<void> {
+  const source = await savePlayerCampaign(campaign);
+  showNotice(
+    successMessage +
+      (source === "localStorage" ? " · recovery storage" : ""),
+  );
+}
+
+async function initializePlayerProgress(): Promise<void> {
+  const startButton = byId<HTMLButtonElement>("startButton");
+  const stageSelectButton =
+    byId<HTMLButtonElement>("stageSelectButton");
+
+  startButton.disabled = true;
+  stageSelectButton.disabled = true;
+
+  const loaded = await loadPlayerSave();
+  campaign = loaded.save.campaign;
+  currentGalaxy = Math.ceil(
+    campaign.selectedStage / STAGES_PER_GALAXY,
+  );
+  persistenceReady = true;
+
+  updateCampaignUi();
+  startButton.disabled = false;
+  stageSelectButton.disabled = false;
+
+  if (loaded.migrated) {
+    showNotice("✓ Existing progress migrated to IndexedDB");
+  } else if (loaded.source === "localStorage") {
+    showNotice("IndexedDB unavailable · using recovery storage");
+  }
 }
 
 function updateCampaignUi(): void {
@@ -611,10 +654,13 @@ function renderStageGrid(): void {
 
     button.addEventListener("click", () => {
       campaign = selectCampaignStage(campaign, stage);
-      saveCampaignProgress(campaign);
+      void persistCampaign(
+        "✓ Saved · Stage " +
+          String(stage).padStart(3, "0") +
+          " selected",
+      );
       updateCampaignUi();
       stageSelectDialog.close();
-      showNotice("Stage " + String(stage).padStart(3, "0") + " selected");
     });
 
     grid.append(button);
@@ -939,4 +985,5 @@ renderSettings();
 updateCampaignUi();
 renderStats(game.getStats());
 renderPhase(game.getPhase());
+void initializePlayerProgress();
 void loadInitialVocabulary();
