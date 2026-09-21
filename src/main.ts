@@ -41,6 +41,10 @@ import {
   OFFENSIVE_SKILLS,
   type OffensiveSkillId,
 } from "./skills/offensive";
+import {
+  createStarterSupportSpellState,
+  type SupportSpellState,
+} from "./skills/support-loadout";
 
 type CombatSkillId = DefensiveSkillId | OffensiveSkillId;
 import { DEFAULT_PLAYER_BASE_STATS } from "./stats/player";
@@ -530,6 +534,7 @@ let settings = loadSettings();
 let campaign = createDefaultCampaignProgress();
 let inventory: Inventory = createEmptyInventory();
 let equipment: EquipmentState = createStarterEquipmentState();
+let supportSpells: SupportSpellState = createStarterSupportSpellState();
 let persistenceReady = false;
 let sourceState = loadSource();
 let sourceTab: "class" | "custom" = sourceState.mode;
@@ -553,6 +558,7 @@ type AutosaveSnapshot = {
   campaign: typeof campaign;
   inventory: Inventory;
   equipment: EquipmentState;
+  supportSpells: SupportSpellState;
 };
 
 const campaignAutosave = new AutosaveQueue<
@@ -563,6 +569,7 @@ const campaignAutosave = new AutosaveQueue<
     snapshot.campaign,
     snapshot.inventory,
     snapshot.equipment,
+    snapshot.supportSpells,
     reason as SaveReason,
   ),
 );
@@ -964,6 +971,7 @@ async function autosaveCampaign(
       campaign,
       inventory,
       equipment,
+      supportSpells,
     },
     reason,
   );
@@ -1006,6 +1014,7 @@ async function initializePlayerProgress(): Promise<void> {
     campaign = loaded.save.campaign;
     inventory = loaded.save.inventory;
     equipment = loaded.save.equipment;
+    supportSpells = loaded.save.supportSpells;
     renderInventory();
     applyEquipmentStats();
     currentGalaxy = Math.ceil(
@@ -1236,6 +1245,7 @@ async function exportSave(): Promise<void> {
     undefined,
     inventory,
     equipment,
+    supportSpells,
   );
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -1270,6 +1280,7 @@ async function importSaveFile(file: File): Promise<void> {
     const imported = result.save.campaign;
     const importedInventory = result.save.inventory;
     const importedEquipment = result.save.equipment;
+    const importedSupportSpells = result.save.supportSpells;
     const message =
       "Import Stage " +
       String(imported.highestUnlockedStage).padStart(3, "0") +
@@ -1286,9 +1297,11 @@ async function importSaveFile(file: File): Promise<void> {
     const previousCampaign = campaign;
     const previousInventory = inventory;
     const previousEquipment = equipment;
+    const previousSupportSpells = supportSpells;
     campaign = imported;
     inventory = importedInventory;
     equipment = importedEquipment;
+    supportSpells = importedSupportSpells;
     renderInventory();
     applyEquipmentStats();
     currentGalaxy = Math.ceil(
@@ -1300,6 +1313,7 @@ async function importSaveFile(file: File): Promise<void> {
       campaign = previousCampaign;
       inventory = previousInventory;
       equipment = previousEquipment;
+      supportSpells = previousSupportSpells;
       renderInventory();
       applyEquipmentStats();
       currentGalaxy = Math.ceil(
@@ -1650,7 +1664,7 @@ window.addEventListener("resize", () => game.resize());
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "hidden" || !persistenceReady) return;
   campaignAutosave.schedule(
-    { campaign, inventory, equipment },
+    { campaign, inventory, equipment, supportSpells },
     "pagehide",
   );
   void campaignAutosave.flush("pagehide");
@@ -1659,7 +1673,7 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("pagehide", () => {
   if (!persistenceReady) return;
   campaignAutosave.schedule(
-    { campaign, inventory, equipment },
+    { campaign, inventory, equipment, supportSpells },
     "pagehide",
   );
   void campaignAutosave.flush("pagehide");
