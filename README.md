@@ -27,7 +27,13 @@ Implemented foundation + first core typing-combat prototype:
 - Class/Custom explicit vocabulary source flow;
 - English + Vietnamese + IPA completion feedback;
 - queued English pronunciation;
-- parent shared-music ducking signal.
+- parent shared-music ducking signal;
+- 1000-stage deterministic Campaign model;
+- 10 Galaxies and milestone stage roles;
+- Campaign progress with highest unlocked stage;
+- Continue / Retry / Stage Select;
+- stage-clear unlock/save flow;
+- WPM/accuracy/Vocabulary-aware difficulty model.
 
 The full project plan and source of truth is:
 
@@ -70,13 +76,8 @@ https://space.typing-game.local
 ## Next implementation checkpoint
 
 ~~~text
-Step 12
-Campaign persistence with highest unlocked stage
-
-Then:
-Step 13 StageFactory for Stage 001-1000
-Step 14 Galaxy/stage-role model
-Step 15 difficulty model
-Step 15A WPM/Vocabulary adaptive difficulty
-Step 16 Continue / Retry / Stage Select
+Step 17 Mine + Tank
+Step 18 Destroyer + letter projectile typing
+Step 19 Oppressor + multi-projectile pressure
+Step 20 remaining enemy families
 ~~~

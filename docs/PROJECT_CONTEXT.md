@@ -2965,9 +2965,17 @@ Step 08  Scout + prototype wave clear/fail pressure
 Step 09  parent shared vocabulary index/level loader
 Step 10  Class/Custom explicit vocabulary apply flow
 Step 11  VI + IPA + queued English pronunciation + parent music ducking
+Step 12  persistent Campaign progress with highest unlocked stage
+Step 13  deterministic StageFactory for Stage 001-1000
+Step 14  10-Galaxy + milestone stage-role model
+Step 15  gradual multi-axis difficulty model
+Step 15A Adaptive WPM/accuracy/Vocabulary difficulty profile
+Step 16  Continue / Retry / Stage Select / stage clear unlock flow
 
 Next:
-Step 12  Campaign save with highest unlocked stage
+Step 17  Mine and Tank enemy families
+Step 18  Destroyer + letter projectile typing
+Step 19  Oppressor + multi-projectile pressure
 ~~~
 
 Implemented foundation details:
@@ -2995,6 +3003,14 @@ PASS
 Shared vocabulary/pronunciation CI
 2a2118273fd25a013798b1b60b5d93ca068225ec
 PASS
+
+1000-stage Campaign data foundation CI
+6ea047a6ab1e90769d142ecb3b4eaa3e3962f6ce
+PASS
+
+Persistent Campaign stage flow CI
+edb15e4d34c9cde5bbffe0dddfaa3d50c04300de
+PASS
 ~~~
 
 Project-wide requirements remain:
@@ -3006,7 +3022,9 @@ Project-wide requirements remain:
 - parent shared Music system: already available;
 - docs/PROJECT_CONTEXT.md remains the primary context/handoff/plan document.
 
-Do not interpret the prototype wave counter as the final Campaign Stage system. Step 12+ replaces it with persistent Campaign progression.
+The old prototype wave counter has been replaced by persistent Campaign Stage flow. The current run now represents one Campaign Stage and unlocks the next stage on clear.
+
+Campaign progress currently uses the small local storage adapter defined for the early Campaign checkpoint. Phase 6 / Step 25 will migrate full player progression to IndexedDB according to the persistence architecture above.
 
 ---
 
