@@ -112,7 +112,6 @@ describe("save backup", () => {
         version: PLAYER_SAVE_VERSION,
         campaign: progress,
         inventory: { "not-real": 1 },
-        inventory: {},
         updatedAt: "2026-09-21T15:45:00.000Z",
         lastSaveReason: "manual",
       }),
