@@ -959,7 +959,8 @@ kbd {
   z-index: 7;
   right: 18px;
   bottom: 18px;
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(72px, auto));
   gap: 0.4rem;
   pointer-events: auto;
 }
@@ -999,6 +1000,7 @@ kbd {
 @media (max-width: 1060px) {
   .quick-skills {
     bottom: 58px;
+    grid-template-columns: repeat(4, minmax(54px, auto));
   }
 
   .quick-skills button {
@@ -1016,7 +1018,6 @@ kbd {
     right: 10px;
     bottom: 98px;
     max-width: calc(100vw - 20px);
-    flex-wrap: wrap;
-    justify-content: flex-end;
+    grid-template-columns: repeat(4, minmax(48px, auto));
   }
 }

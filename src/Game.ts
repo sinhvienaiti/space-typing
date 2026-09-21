@@ -48,6 +48,13 @@ import {
   type DefensiveSkillId,
 } from "./skills/defensive";
 import {
+  chainTypingAdvance,
+  markedBossDamageMultiplier,
+  OFFENSIVE_SKILLS,
+  isOffensiveSkillId,
+  type OffensiveSkillId,
+} from "./skills/offensive";
+import {
   SkillEngine,
   type SkillActivationResult,
   type SkillBlockReason,
@@ -148,6 +155,9 @@ export class Game {
   private timeShellTimer = 0;
   private guardianTimer = 0;
   private guardianBlocks = 0;
+  private markedEnemyId: number | null = null;
+  private markTimer = 0;
+  private bossMarkTimer = 0;
   private skillHudTimer = 0;
   private lastTime = performance.now();
   private animationFrame = 0;
@@ -169,7 +179,10 @@ export class Game {
     this.vocabulary = vocabulary.length > 0 ? vocabulary : FALLBACK_ENTRIES;
     this.settings = settings;
     this.hooks = hooks;
-    this.skillEngine.setDefinitions(DEFENSIVE_SKILLS);
+    this.skillEngine.setDefinitions([
+      ...DEFENSIVE_SKILLS,
+      ...OFFENSIVE_SKILLS,
+    ]);
     this.sfx.setVolume(settings.sfxVolume);
     this.resize();
     this.animationFrame = requestAnimationFrame(this.frame);
@@ -206,6 +219,32 @@ export class Game {
       return "effect-not-needed";
     }
 
+    if (
+      id === "emp-burst" &&
+      this.projectiles.length === 0 &&
+      this.enemies.length === 0 &&
+      this.boss === null
+    ) {
+      return "effect-not-needed";
+    }
+
+    if (
+      id === "chain-lightning" &&
+      this.enemies.length === 0 &&
+      this.boss === null
+    ) {
+      return "effect-not-needed";
+    }
+
+    if (
+      id === "mark-of-weakness" &&
+      this.currentTarget() === null &&
+      this.enemies.length === 0 &&
+      this.boss === null
+    ) {
+      return "effect-not-needed";
+    }
+
     return this.skillEngine.canActivate(id, {
       energy: this.stats.energy,
       streak: this.stats.streak,
@@ -230,6 +269,8 @@ export class Game {
 
     if (isDefensiveSkillId(id)) {
       this.activateDefensiveSkill(id);
+    } else if (isOffensiveSkillId(id)) {
+      this.activateOffensiveSkill(id);
     }
 
     this.hooks.onSkills();
@@ -307,6 +348,104 @@ export class Game {
     }
 
     this.emitStats();
+  }
+
+  private activateOffensiveSkill(id: OffensiveSkillId): void {
+    if (id === "emp-burst") {
+      const clearedProjectiles = this.projectiles.length;
+      this.projectiles = [];
+
+      for (const enemy of this.enemies) {
+        enemy.flash = 1;
+        enemy.kick = Math.max(enemy.kick, 0.7);
+        if (enemy.actionCooldown !== null) {
+          enemy.actionCooldown += 2.5;
+        }
+      }
+
+      if (this.boss !== null) {
+        this.boss.flash = 1;
+        this.boss.actionCooldown += 2.5;
+      }
+
+      this.interferenceTimer = 0;
+      this.burst(
+        this.width / 2,
+        this.height * 0.44,
+        36 + Math.min(24, clearedProjectiles * 3),
+        192,
+      );
+      this.sfx.power();
+      return;
+    }
+
+    if (id === "chain-lightning") {
+      const targets = [...this.enemies]
+        .sort((a, b) => b.y - a.y)
+        .slice(0, 4);
+
+      for (const enemy of targets) {
+        const wordLength = typingText(enemy.entry.en).length;
+
+        if (enemy.layersRemaining > 1) {
+          enemy.layersRemaining -= 1;
+        } else {
+          enemy.typed = chainTypingAdvance(
+            enemy.typed,
+            wordLength,
+          );
+        }
+
+        enemy.flash = 1;
+        enemy.kick = Math.max(enemy.kick, 1.1);
+        this.burst(enemy.x, enemy.y, 16, 202);
+      }
+
+      if (this.boss !== null && targets.length === 0) {
+        const damage = firepowerDamage(
+          Math.max(1, Math.round(this.boss.maxHp * 0.04)),
+          this.playerStats,
+        );
+        this.boss.hp = Math.max(0, this.boss.hp - damage);
+        this.boss.flash = 1;
+        this.updateBossPhase(this.boss);
+        this.hooks.onBossUpdate(toBossHud(this.boss));
+
+        if (this.boss.hp <= 0) {
+          this.defeatBoss();
+        }
+      }
+
+      this.sfx.power();
+      return;
+    }
+
+    if (this.boss !== null) {
+      this.bossMarkTimer = Math.max(this.bossMarkTimer, 8);
+      this.boss.flash = 1;
+      this.hooks.onBossUpdate(toBossHud(this.boss));
+      this.sfx.support();
+      return;
+    }
+
+    const target =
+      this.currentTarget() ??
+      [...this.enemies].sort((a, b) => b.y - a.y)[0] ??
+      null;
+
+    if (target !== null) {
+      this.markedEnemyId = target.id;
+      this.markTimer = 8;
+
+      if (target.layersRemaining > 1) {
+        target.layersRemaining -= 1;
+      }
+
+      target.flash = 1;
+      target.kick = Math.max(target.kick, 1);
+      this.burst(target.x, target.y, 22, 326);
+      this.sfx.support();
+    }
   }
 
   useConsumable(id: string): boolean {
@@ -408,6 +547,9 @@ export class Game {
     this.timeShellTimer = 0;
     this.guardianTimer = 0;
     this.guardianBlocks = 0;
+    this.markedEnemyId = null;
+    this.markTimer = 0;
+    this.bossMarkTimer = 0;
     this.skillHudTimer = 0;
     this.hooks.onBossUpdate(null);
     this.hooks.onSkills();
@@ -536,9 +678,12 @@ export class Game {
     this.reflectTimer = Math.max(0, this.reflectTimer - dt);
     this.timeShellTimer = Math.max(0, this.timeShellTimer - dt);
     this.guardianTimer = Math.max(0, this.guardianTimer - dt);
+    this.markTimer = Math.max(0, this.markTimer - dt);
+    this.bossMarkTimer = Math.max(0, this.bossMarkTimer - dt);
 
     if (this.barrierTimer <= 0) this.barrierHp = 0;
     if (this.guardianTimer <= 0) this.guardianBlocks = 0;
+    if (this.markTimer <= 0) this.markedEnemyId = null;
 
     this.skillEngine.tick(dt);
     this.skillHudTimer -= dt;
@@ -574,7 +719,11 @@ export class Game {
       enemy.age += dt;
       enemy.flash = Math.max(0, enemy.flash - dt * 7);
       enemy.kick = Math.max(0, enemy.kick - dt * 4);
-      enemy.y += enemy.speed * speedFactor * dt;
+      const markedSlow =
+        enemy.id === this.markedEnemyId && this.markTimer > 0
+          ? 0.72
+          : 1;
+      enemy.y += enemy.speed * speedFactor * markedSlow * dt;
 
       const desiredX =
         enemy.baseX + Math.sin(enemy.age * 1.1 + enemy.id) * enemy.drift;
@@ -1101,10 +1250,11 @@ export class Game {
       boss.hp = Math.max(
         0,
         boss.hp -
-        firepowerDamage(
-          bossKeyDamage(boss.maxHp, boss.role),
-          this.playerStats,
-        ),
+          firepowerDamage(
+            bossKeyDamage(boss.maxHp, boss.role),
+            this.playerStats,
+          ) *
+            markedBossDamageMultiplier(this.bossMarkTimer > 0),
       );
       this.updateBossPhase(boss);
     }
@@ -1133,7 +1283,8 @@ export class Game {
             firepowerDamage(
               bossWordDamage(boss.maxHp, boss.role),
               this.playerStats,
-            ),
+            ) *
+              markedBossDamageMultiplier(this.bossMarkTimer > 0),
         );
       }
 
@@ -1324,6 +1475,10 @@ export class Game {
     }
 
     this.enemies = this.enemies.filter((item) => item.id !== enemy.id);
+    if (this.markedEnemyId === enemy.id) {
+      this.markedEnemyId = null;
+      this.markTimer = 0;
+    }
     this.targetId = null;
   }
 
@@ -1999,6 +2154,17 @@ export class Game {
       context.stroke();
     }
 
+    if (this.bossMarkTimer > 0) {
+      context.strokeStyle = "rgba(255, 103, 204, 0.62)";
+      context.lineWidth = 1.8;
+      context.setLineDash([5, 6]);
+      context.lineDashOffset = -time * 24;
+      context.beginPath();
+      context.arc(0, 0, radius * 1.52, 0, Math.PI * 2);
+      context.stroke();
+      context.setLineDash([]);
+    }
+
     if (boss.staggerTimer > 0) {
       context.strokeStyle = "rgba(255, 245, 178, 0.72)";
       context.setLineDash([4, 5]);
@@ -2100,6 +2266,24 @@ export class Game {
       context.beginPath();
       context.moveTo(enemy.x, enemy.y);
       context.lineTo(this.width / 2, this.height - PLAYER_Y_OFFSET);
+      context.stroke();
+      context.restore();
+    }
+
+    if (enemy.id === this.markedEnemyId && this.markTimer > 0) {
+      context.save();
+      context.strokeStyle = "rgba(255, 105, 202, 0.62)";
+      context.lineWidth = 1.8;
+      context.setLineDash([4, 5]);
+      context.lineDashOffset = -enemy.age * 18;
+      context.beginPath();
+      context.arc(
+        enemy.x,
+        enemy.y - kick,
+        enemy.radius * 1.38,
+        0,
+        Math.PI * 2,
+      );
       context.stroke();
       context.restore();
     }

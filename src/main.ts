@@ -37,6 +37,12 @@ import {
   type DefensiveSkillId,
 } from "./skills/defensive";
 import type { SkillBlockReason } from "./skills/engine";
+import {
+  OFFENSIVE_SKILLS,
+  type OffensiveSkillId,
+} from "./skills/offensive";
+
+type CombatSkillId = DefensiveSkillId | OffensiveSkillId;
 import { DEFAULT_PLAYER_BASE_STATS } from "./stats/player";
 import { AutosaveQueue } from "./persistence/autosave";
 import {
@@ -233,6 +239,15 @@ app.innerHTML = `
       </button>
       <button id="skillGuardian" type="button">
         <kbd>8</kbd><span>guardian</span><strong></strong>
+      </button>
+      <button id="skillEmp" type="button">
+        <kbd>9</kbd><span>emp</span><strong></strong>
+      </button>
+      <button id="skillChain" type="button">
+        <kbd>0</kbd><span>chain</span><strong></strong>
+      </button>
+      <button id="skillMark" type="button">
+        <kbd>-</kbd><span>mark</span><strong></strong>
       </button>
     </div>
 
@@ -617,14 +632,14 @@ function skillReasonText(reason: SkillBlockReason): string {
     return "Typing condition not met";
   }
   if (reason === "effect-not-needed") {
-    return "Repair is not needed right now";
+    return "No useful target or effect right now";
   }
   return "Skill unavailable";
 }
 
 function renderSkills(): void {
   const map: Array<{
-    id: DefensiveSkillId;
+    id: CombatSkillId;
     buttonId: string;
   }> = [
     { id: "barrier", buttonId: "skillBarrier" },
@@ -632,6 +647,9 @@ function renderSkills(): void {
     { id: "time-shell", buttonId: "skillTimeShell" },
     { id: "emergency-repair", buttonId: "skillRepair" },
     { id: "guardian-drone", buttonId: "skillGuardian" },
+    { id: "emp-burst", buttonId: "skillEmp" },
+    { id: "chain-lightning", buttonId: "skillChain" },
+    { id: "mark-of-weakness", buttonId: "skillMark" },
   ];
 
   for (const entry of map) {
@@ -653,15 +671,18 @@ function renderSkills(): void {
     }
 
     button.disabled = reason !== null;
+    const definition =
+      DEFENSIVE_SKILLS.find((skill) => skill.id === entry.id) ??
+      OFFENSIVE_SKILLS.find((skill) => skill.id === entry.id);
+
     button.title =
       reason === null
-        ? DEFENSIVE_SKILLS.find((skill) => skill.id === entry.id)?.name ??
-          entry.id
+        ? definition?.name ?? entry.id
         : skillReasonText(reason);
   }
 }
 
-function useDefensiveSkill(id: DefensiveSkillId): void {
+function useCombatSkill(id: CombatSkillId): void {
   const result = game.useSkill(id);
   if (!result.ok) {
     showNotice(skillReasonText(result.reason));
@@ -669,7 +690,9 @@ function useDefensiveSkill(id: DefensiveSkillId): void {
     return;
   }
 
-  const skill = DEFENSIVE_SKILLS.find((entry) => entry.id === id);
+  const skill =
+    DEFENSIVE_SKILLS.find((entry) => entry.id === id) ??
+    OFFENSIVE_SKILLS.find((entry) => entry.id === id);
   showNotice("✓ " + (skill?.name ?? id) + " activated");
   renderSkills();
 }
@@ -1388,17 +1411,20 @@ for (const [buttonId, itemId] of recoveryButtons) {
   });
 }
 
-const defensiveButtons: Array<[string, DefensiveSkillId]> = [
+const combatSkillButtons: Array<[string, CombatSkillId]> = [
   ["skillBarrier", "barrier"],
   ["skillReflect", "reflect-field"],
   ["skillTimeShell", "time-shell"],
   ["skillRepair", "emergency-repair"],
   ["skillGuardian", "guardian-drone"],
+  ["skillEmp", "emp-burst"],
+  ["skillChain", "chain-lightning"],
+  ["skillMark", "mark-of-weakness"],
 ];
 
-for (const [buttonId, skillId] of defensiveButtons) {
+for (const [buttonId, skillId] of combatSkillButtons) {
   byId(buttonId).addEventListener("click", () => {
-    useDefensiveSkill(skillId);
+    useCombatSkill(skillId);
   });
 }
 
@@ -1569,10 +1595,13 @@ window.addEventListener("keydown", (event) => {
       event.key === "5" ||
       event.key === "6" ||
       event.key === "7" ||
-      event.key === "8")
+      event.key === "8" ||
+      event.key === "9" ||
+      event.key === "0" ||
+      event.key === "-")
   ) {
     event.preventDefault();
-    const skillId: DefensiveSkillId =
+    const skillId: CombatSkillId =
       event.key === "4"
         ? "barrier"
         : event.key === "5"
@@ -1581,8 +1610,14 @@ window.addEventListener("keydown", (event) => {
             ? "time-shell"
             : event.key === "7"
               ? "emergency-repair"
-              : "guardian-drone";
-    useDefensiveSkill(skillId);
+              : event.key === "8"
+                ? "guardian-drone"
+                : event.key === "9"
+                  ? "emp-burst"
+                  : event.key === "0"
+                    ? "chain-lightning"
+                    : "mark-of-weakness";
+    useCombatSkill(skillId);
     return;
   }
 
