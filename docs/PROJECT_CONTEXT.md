@@ -2949,6 +2949,20 @@ Luck/pity rules:
 ## Step 50A
 Implement hidden-content discovery framework: Hidden Shop, Hidden Event/Stage, Hidden Boss trigger, Hidden Skill/Weapon/Mission rewards and Codex ??? entries.
 
+**Status: implemented.**
+
+Hidden-discovery rules:
+
+- six hidden discovery families are registered: Shop, Event/Stage, Boss, Skill, Weapon and Mission;
+- undiscovered Codex entries render as `???` and reveal identity, description and unlock contract only after discovery;
+- discovery rolls occur at most once for each newly reached Campaign stage, so replaying an old stage cannot farm hidden unlocks or pity;
+- each hidden entry has its own introduction stage, Luck-adjusted bounded chance and persistent drought counter;
+- overdue entries use a hard guarantee after their configured drought threshold, while at most one hidden entry can be discovered from a stage roll;
+- discovered IDs, per-entry drought counters and the last evaluated Campaign stage are persisted in PlayerSave v12;
+- PlayerSave v11 migrates with an empty hidden-discovery state while preserving Campaign, Character, Talent, equipment and Luck-pity progress;
+- the title menu exposes a Codex dialog and discovery state autosaves immediately through the existing save queue;
+- hidden unlock records are contracts for later Shop/Event/Boss/Skill/Weapon/Mission steps rather than parallel implementations of those future systems.
+
 ## Step 51
 Implement stage random-event scheduler.
 
