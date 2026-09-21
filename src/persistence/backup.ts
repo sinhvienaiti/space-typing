@@ -2,6 +2,7 @@ import { MAX_CAMPAIGN_STAGE } from "../campaign/stage";
 import {
   createStarterEquipmentState,
   isValidEquipmentState,
+  isValidLegacyEquipmentState,
   type EquipmentState,
 } from "../equipment/loadout";
 import type { CampaignProgress, StageBest } from "../campaign/types";
@@ -144,6 +145,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     version !== 1 &&
     version !== 2 &&
     version !== 3 &&
+    version !== 4 &&
     version !== PLAYER_SAVE_VERSION
   ) {
     return {
@@ -163,12 +165,24 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    (version === 3 || version === PLAYER_SAVE_VERSION) &&
+    (version === 3 ||
+      version === 4 ||
+      version === PLAYER_SAVE_VERSION) &&
     !isValidInventory(parsed.inventory)
   ) {
     return {
       ok: false,
       error: "Inventory contains an unknown item or invalid stack count.",
+    };
+  }
+
+  if (
+    version === 4 &&
+    !isValidLegacyEquipmentState(parsed.equipment)
+  ) {
+    return {
+      ok: false,
+      error: "Equipment data contains an invalid item or loadout reference.",
     };
   }
 

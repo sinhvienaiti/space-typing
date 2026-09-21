@@ -51,6 +51,21 @@ describe("equipment and loadout", () => {
     expect(precision.focus).toBeGreaterThan(pulse.focus ?? 0);
   });
 
+  it("rarity scales equipment contribution", () => {
+    const state = createStarterEquipmentState();
+    const common = equipmentStatBonus(state);
+    const legendary = equipmentStatBonus({
+      ...state,
+      items: state.items.map((item) =>
+        item.instanceId === "starter-pulse"
+          ? { ...item, rarity: "legendary" as const }
+          : item,
+      ),
+    });
+
+    expect(legendary.firepower).toBeGreaterThan(common.firepower ?? 0);
+  });
+
   it("strict validation rejects cross-slot loadout references", () => {
     const valid = createStarterEquipmentState();
     expect(isValidEquipmentState(valid)).toBe(true);

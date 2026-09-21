@@ -107,7 +107,57 @@ describe("player save persistence model", () => {
     expect(migration.save.equipment.loadout.weapon).toBe("starter-pulse");
   });
 
-  it("keeps a valid current-version save without migration", () => {
+  it("migrates PlayerSave v4 equipment to Common rarity", () => {
+    const progress = createDefaultCampaignProgress();
+    const migration = migratePlayerSave({
+      version: 4,
+      campaign: progress,
+      inventory: { "repair-kit": 1 },
+      equipment: {
+        items: [
+          {
+            instanceId: "starter-pulse",
+            definitionId: "pulse-laser-mk1",
+          },
+          {
+            instanceId: "starter-precision",
+            definitionId: "precision-laser-mk1",
+          },
+        ],
+        loadout: {
+          weapon: "starter-precision",
+          armor: null,
+          shield: null,
+          reactor: null,
+          utility: null,
+          drone: null,
+          core: null,
+        },
+      },
+      updatedAt: "2026-09-21T16:10:00.000Z",
+      lastSaveReason: "equipment",
+    });
+
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(4);
+    expect(migration.save.equipment.loadout.weapon).toBe(
+      "starter-precision",
+    );
+    expect(migration.save.equipment.items).toEqual([
+      {
+        instanceId: "starter-pulse",
+        definitionId: "pulse-laser-mk1",
+        rarity: "common",
+      },
+      {
+        instanceId: "starter-precision",
+        definitionId: "precision-laser-mk1",
+        rarity: "common",
+      },
+    ]);
+  });
+
+  it("keeps a valid current-version save without migration",
     const save = createPlayerSave(
       createDefaultCampaignProgress(),
       "2026-09-21T15:30:00.000Z",

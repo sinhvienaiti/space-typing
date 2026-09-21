@@ -7,6 +7,7 @@ import {
 import type { CampaignProgress } from "../campaign/types";
 import {
   createStarterEquipmentState,
+  migrateLegacyEquipmentState,
   sanitizeEquipmentState,
   type EquipmentState,
 } from "../equipment/loadout";
@@ -22,7 +23,7 @@ const STORE_NAME = "player";
 const SAVE_KEY = "main";
 const RECOVERY_SAVE_KEY = "spaceTypingPlayerSaveRecoveryV3";
 
-export const PLAYER_SAVE_VERSION = 4;
+export const PLAYER_SAVE_VERSION = 5;
 
 export class UnsupportedPlayerSaveVersionError extends Error {
   constructor(readonly version: number) {
@@ -72,12 +73,21 @@ export type PlayerSaveV4 = {
   version: 4;
   campaign: CampaignProgress;
   inventory: Inventory;
+  equipment: unknown;
+  updatedAt: string;
+  lastSaveReason: SaveReason;
+};
+
+export type PlayerSaveV5 = {
+  version: 5;
+  campaign: CampaignProgress;
+  inventory: Inventory;
   equipment: EquipmentState;
   updatedAt: string;
   lastSaveReason: SaveReason;
 };
 
-export type PlayerSave = PlayerSaveV4;
+export type PlayerSave = PlayerSaveV5;
 export type PersistenceSource = "indexeddb" | "localStorage";
 
 export type LoadedPlayerSave = {
@@ -164,6 +174,20 @@ export function migratePlayerSave(value: unknown): MigrationResult {
       ),
       migrated: true,
       fromVersion: 3,
+    };
+  }
+
+  if (raw.version === 4) {
+    return {
+      save: createPlayerSave(
+        sanitizeCampaignProgress(raw.campaign),
+        typeof raw.updatedAt === "string" ? raw.updatedAt : "",
+        "migration",
+        sanitizeInventory(raw.inventory),
+        migrateLegacyEquipmentState(raw.equipment),
+      ),
+      migrated: true,
+      fromVersion: 4,
     };
   }
 

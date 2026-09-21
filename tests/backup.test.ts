@@ -81,7 +81,7 @@ describe("save backup", () => {
     );
     expect(unsupported).toEqual({
       ok: false,
-      error: "Unsupported save version. Supported versions: 1-4.",
+      error: "Unsupported save version. Supported versions: 1-5.",
     });
   });
 
@@ -123,6 +123,41 @@ describe("save backup", () => {
       ok: false,
       error: "Inventory contains an unknown item or invalid stack count.",
     });
+  });
+
+  it("imports and migrates a valid v4 equipment backup", () => {
+    const progress = createDefaultCampaignProgress();
+    const result = parsePlayerSaveJson(
+      JSON.stringify({
+        version: 4,
+        campaign: progress,
+        inventory: { "repair-kit": 1 },
+        equipment: {
+          items: [
+            {
+              instanceId: "starter-pulse",
+              definitionId: "pulse-laser-mk1",
+            },
+          ],
+          loadout: {
+            weapon: "starter-pulse",
+            armor: null,
+            shield: null,
+            reactor: null,
+            utility: null,
+            drone: null,
+            core: null,
+          },
+        },
+        updatedAt: "2026-09-21T16:12:00.000Z",
+        lastSaveReason: "equipment",
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.migrated).toBe(true);
+    expect(result.save.equipment.items[0]?.rarity).toBe("common");
   });
 
   it("rejects invalid equipment/loadout references in v4", () => {

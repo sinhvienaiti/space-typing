@@ -764,7 +764,8 @@ function renderEquipment(): void {
       const definition = getEquipmentDefinition(item.definitionId);
       const option = document.createElement("option");
       option.value = item.instanceId;
-      option.textContent = definition.name;
+      option.textContent =
+        "[" + item.rarity.toUpperCase() + "] " + definition.name;
       select.append(option);
     }
 
@@ -795,7 +796,9 @@ function renderEquipment(): void {
     detail.textContent =
       current === null
         ? "No equipment"
-        : getEquipmentDefinition(current.definitionId).description;
+        : current.rarity.toUpperCase() +
+          " · " +
+          getEquipmentDefinition(current.definitionId).description;
 
     card.append(title, select, detail);
     grid.append(card);
