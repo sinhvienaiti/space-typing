@@ -1,5 +1,10 @@
 import { MAX_CAMPAIGN_STAGE } from "../campaign/stage";
 import {
+  createStarterCharacterState,
+  isValidCharacterState,
+  type CharacterState,
+} from "../characters/state";
+import {
   createStarterEquipmentState,
   isValidEquipmentState,
   isValidLegacyEquipmentState,
@@ -114,6 +119,7 @@ export function exportPlayerSaveJson(
   inventory: Inventory = createEmptyInventory(),
   equipment: EquipmentState = createStarterEquipmentState(),
   supportSpells: SupportSpellState = createStarterSupportSpellState(),
+  characters: CharacterState = createStarterCharacterState(),
 ): string {
   return JSON.stringify(
     createPlayerSave(
@@ -123,6 +129,7 @@ export function exportPlayerSaveJson(
       inventory,
       equipment,
       supportSpells,
+      characters,
     ),
     null,
     2,
@@ -156,6 +163,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     version !== 4 &&
     version !== 5 &&
     version !== 6 &&
+    version !== 7 &&
     version !== PLAYER_SAVE_VERSION
   ) {
     return {
@@ -179,6 +187,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 4 ||
       version === 5 ||
       version === 6 ||
+      version === 7 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidInventory(parsed.inventory)
   ) {
@@ -209,7 +218,9 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    (version === 6 || version === PLAYER_SAVE_VERSION) &&
+    (version === 6 ||
+      version === 7 ||
+      version === PLAYER_SAVE_VERSION) &&
     !isValidEquipmentState(parsed.equipment)
   ) {
     return {
@@ -219,12 +230,22 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    version === PLAYER_SAVE_VERSION &&
+    (version === 7 || version === PLAYER_SAVE_VERSION) &&
     !isValidSupportSpellState(parsed.supportSpells)
   ) {
     return {
       ok: false,
       error: "Support spell data contains an invalid or duplicate loadout.",
+    };
+  }
+
+  if (
+    version === PLAYER_SAVE_VERSION &&
+    !isValidCharacterState(parsed.characters)
+  ) {
+    return {
+      ok: false,
+      error: "Character data contains an invalid selection or unlock list.",
     };
   }
 

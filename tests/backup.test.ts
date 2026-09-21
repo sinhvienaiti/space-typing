@@ -34,6 +34,7 @@ describe("save backup", () => {
       inventory: { "repair-kit"?: number };
       equipment: { loadout: { weapon: string | null } };
       supportSpells: { loadout: Array<string | null> };
+      characters: { selected: string; unlocked: string[] };
     };
 
     expect(parsed.version).toBe(PLAYER_SAVE_VERSION);
@@ -45,6 +46,10 @@ describe("save backup", () => {
       "sanctuary",
       "gravity-well",
     ]);
+    expect(parsed.characters).toEqual({
+      selected: "vanguard",
+      unlocked: ["vanguard"],
+    });
   });
 
   it("imports and migrates a valid v1 backup", () => {
@@ -86,7 +91,7 @@ describe("save backup", () => {
     );
     expect(unsupported).toEqual({
       ok: false,
-      error: "Unsupported save version. Supported versions: 1-7.",
+      error: "Unsupported save version. Supported versions: 1-8.",
     });
   });
 
@@ -236,6 +241,40 @@ describe("save backup", () => {
     expect(result).toEqual({
       ok: false,
       error: "Support spell data contains an invalid or duplicate loadout.",
+    });
+  });
+
+  it("imports and migrates a valid v7 backup", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.version = 7;
+    delete raw.characters;
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.migrated).toBe(true);
+    expect(result.save.characters).toEqual({
+      selected: "vanguard",
+      unlocked: ["vanguard"],
+    });
+  });
+
+  it("rejects invalid current character state", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.characters = {
+      selected: "aegis",
+      unlocked: ["vanguard"],
+    };
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result).toEqual({
+      ok: false,
+      error: "Character data contains an invalid selection or unlock list.",
     });
   });
 

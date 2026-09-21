@@ -6,6 +6,11 @@ import {
 } from "../campaign/progress";
 import type { CampaignProgress } from "../campaign/types";
 import {
+  createStarterCharacterState,
+  sanitizeCharacterState,
+  type CharacterState,
+} from "../characters/state";
+import {
   createStarterEquipmentState,
   migrateLegacyEquipmentState,
   migrateRarityEquipmentState,
@@ -29,7 +34,7 @@ const STORE_NAME = "player";
 const SAVE_KEY = "main";
 const RECOVERY_SAVE_KEY = "spaceTypingPlayerSaveRecoveryV3";
 
-export const PLAYER_SAVE_VERSION = 7;
+export const PLAYER_SAVE_VERSION = 8;
 
 export class UnsupportedPlayerSaveVersionError extends Error {
   constructor(readonly version: number) {
@@ -51,6 +56,7 @@ export type SaveReason =
   | "inventory"
   | "equipment"
   | "support-spells"
+  | "character"
   | "pagehide"
   | "manual"
   | "unknown";
@@ -113,7 +119,18 @@ export type PlayerSaveV7 = {
   lastSaveReason: SaveReason;
 };
 
-export type PlayerSave = PlayerSaveV7;
+export type PlayerSaveV8 = {
+  version: 8;
+  campaign: CampaignProgress;
+  inventory: Inventory;
+  equipment: EquipmentState;
+  supportSpells: SupportSpellState;
+  characters: CharacterState;
+  updatedAt: string;
+  lastSaveReason: SaveReason;
+};
+
+export type PlayerSave = PlayerSaveV8;
 export type PersistenceSource = "indexeddb" | "localStorage";
 
 export type LoadedPlayerSave = {
@@ -135,6 +152,7 @@ function normalizeSaveReason(value: unknown): SaveReason {
     value === "inventory" ||
     value === "equipment" ||
     value === "support-spells" ||
+    value === "character" ||
     value === "pagehide" ||
     value === "manual"
     ? value
@@ -148,6 +166,7 @@ export function createPlayerSave(
   inventory: Inventory = createEmptyInventory(),
   equipment: EquipmentState = createStarterEquipmentState(),
   supportSpells: SupportSpellState = createStarterSupportSpellState(),
+  characters: CharacterState = createStarterCharacterState(),
 ): PlayerSave {
   return {
     version: PLAYER_SAVE_VERSION,
@@ -155,6 +174,7 @@ export function createPlayerSave(
     inventory: sanitizeInventory(inventory),
     equipment: sanitizeEquipmentState(equipment),
     supportSpells: sanitizeSupportSpellState(supportSpells),
+    characters: sanitizeCharacterState(characters),
     updatedAt,
     lastSaveReason,
   };
@@ -175,6 +195,7 @@ export function migratePlayerSave(value: unknown): MigrationResult {
     inventory?: unknown;
     equipment?: unknown;
     supportSpells?: unknown;
+    characters?: unknown;
     updatedAt?: unknown;
     lastSaveReason?: unknown;
   };
@@ -250,6 +271,22 @@ export function migratePlayerSave(value: unknown): MigrationResult {
     };
   }
 
+  if (raw.version === 7) {
+    return {
+      save: createPlayerSave(
+        sanitizeCampaignProgress(raw.campaign),
+        typeof raw.updatedAt === "string" ? raw.updatedAt : "",
+        "migration",
+        sanitizeInventory(raw.inventory),
+        sanitizeEquipmentState(raw.equipment),
+        sanitizeSupportSpellState(raw.supportSpells),
+        createStarterCharacterState(),
+      ),
+      migrated: true,
+      fromVersion: 7,
+    };
+  }
+
   if (raw.version === PLAYER_SAVE_VERSION) {
     return {
       save: createPlayerSave(
@@ -259,6 +296,7 @@ export function migratePlayerSave(value: unknown): MigrationResult {
         sanitizeInventory(raw.inventory),
         sanitizeEquipmentState(raw.equipment),
         sanitizeSupportSpellState(raw.supportSpells),
+        sanitizeCharacterState(raw.characters),
       ),
       migrated: false,
       fromVersion: PLAYER_SAVE_VERSION,
@@ -277,6 +315,7 @@ export function migratePlayerSave(value: unknown): MigrationResult {
       sanitizeInventory(raw.inventory),
       sanitizeEquipmentState(raw.equipment),
       sanitizeSupportSpellState(raw.supportSpells),
+      sanitizeCharacterState(raw.characters),
     ),
     migrated: true,
     fromVersion: null,
@@ -334,6 +373,7 @@ function recoverySaveFromLegacy(): PlayerSave {
       recovery.inventory,
       recovery.equipment,
       recovery.supportSpells,
+      recovery.characters,
     );
   } catch (error) {
     if (error instanceof UnsupportedPlayerSaveVersionError) throw error;
@@ -418,6 +458,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
         recovery.inventory,
         recovery.equipment,
         recovery.supportSpells,
+        recovery.characters,
       );
       await writeSave(database, migrated);
       try {
@@ -443,12 +484,16 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
     const supportSpells = useRecovery
       ? recovery.supportSpells
       : migration.save.supportSpells;
+    const characters = useRecovery
+      ? recovery.characters
+      : migration.save.characters;
 
     const recoveredProgress =
       campaign !== migration.save.campaign ||
       inventory !== migration.save.inventory ||
       equipment !== migration.save.equipment ||
-      supportSpells !== migration.save.supportSpells;
+      supportSpells !== migration.save.supportSpells ||
+      characters !== migration.save.characters;
 
     if (migration.migrated || recoveredProgress) {
       const recovered = createPlayerSave(
@@ -458,6 +503,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
         inventory,
         equipment,
         supportSpells,
+        characters,
       );
       await writeSave(database, recovered);
       try {
@@ -496,6 +542,7 @@ export async function savePlayerProgress(
   inventory: Inventory,
   equipment: EquipmentState,
   supportSpells: SupportSpellState,
+  characters: CharacterState,
   reason: SaveReason = "unknown",
 ): Promise<PersistenceSource> {
   const save = createPlayerSave(
@@ -505,6 +552,7 @@ export async function savePlayerProgress(
     inventory,
     equipment,
     supportSpells,
+    characters,
   );
 
   if ("indexedDB" in window) {

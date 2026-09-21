@@ -1102,3 +1102,99 @@ kbd {
     grid-template-columns: repeat(2, minmax(54px, auto));
   }
 }
+
+
+.character-dialog {
+  width: min(980px, calc(100vw - 2rem));
+}
+
+.character-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+  max-height: min(66vh, 660px);
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+
+.character-card {
+  min-height: 170px;
+  padding: 0.85rem;
+  display: grid;
+  align-content: start;
+  gap: 0.62rem;
+  text-align: left;
+  border-color: rgba(104, 219, 240, 0.09);
+  background: rgba(5, 12, 20, 0.62);
+}
+
+.character-card:hover:not(:disabled) {
+  border-color: rgba(100, 229, 247, 0.3);
+  background: rgba(8, 22, 32, 0.78);
+}
+
+.character-card.selected {
+  border-color: rgba(91, 235, 255, 0.48);
+  box-shadow:
+    inset 0 0 0 1px rgba(91, 235, 255, 0.12),
+    0 0 24px rgba(60, 211, 236, 0.08);
+}
+
+.character-card.locked {
+  opacity: 0.42;
+}
+
+.character-card-top {
+  display: grid;
+  gap: 0.16rem;
+}
+
+.character-card-top strong {
+  color: #e9fbff;
+  font-size: 0.92rem;
+}
+
+.character-card-top span {
+  color: #6f879c;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+
+.character-card p {
+  margin: 0;
+  color: #8191a2;
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.character-card small {
+  color: #9b86c8;
+  font-size: 0.64rem;
+  line-height: 1.45;
+}
+
+.character-card em {
+  margin-top: auto;
+  color: #65dff0;
+  font-size: 0.58rem;
+  font-style: normal;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+}
+
+.character-card.locked em {
+  color: #6c7480;
+}
+
+@media (max-width: 900px) {
+  .character-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .character-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -12,6 +12,15 @@ import {
   STAGES_PER_GALAXY,
 } from "./campaign/stage";
 import {
+  CHARACTER_IDS,
+  getCharacter,
+} from "./characters/registry";
+import {
+  createStarterCharacterState,
+  selectCharacter,
+  type CharacterState,
+} from "./characters/state";
+import {
   createStarterEquipmentState,
   equipmentForSlot,
   equipmentStatBonus,
@@ -281,6 +290,7 @@ app.innerHTML = `
           <button id="startButton" class="primary">Continue · Stage 001</button>
           <button id="stageSelectButton">Stage Select</button>
           <button id="vocabularyButton">Vocabulary</button>
+          <button id="characterButton">Characters</button>
           <button id="equipmentButton">Equipment</button>
           <button id="supportButton">Support Spells</button>
           <button id="dataButton">Data</button>
@@ -364,6 +374,20 @@ app.innerHTML = `
         <span id="campaignMeta"></span>
       </div>
       <div id="stageGrid" class="stage-grid"></div>
+    </dialog>
+
+    <dialog id="characterDialog" class="settings-dialog character-dialog">
+      <form method="dialog" class="dialog-head">
+        <div>
+          <p class="eyebrow">pilot roster</p>
+          <h2>Character Select</h2>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+      <p id="characterSelectedMeta" class="equipment-note">
+        Selected: Vanguard
+      </p>
+      <div id="characterGrid" class="character-grid"></div>
     </dialog>
 
     <dialog id="supportDialog" class="settings-dialog support-dialog">
@@ -575,6 +599,7 @@ let campaign = createDefaultCampaignProgress();
 let inventory: Inventory = createEmptyInventory();
 let equipment: EquipmentState = createStarterEquipmentState();
 let supportSpells: SupportSpellState = createStarterSupportSpellState();
+let characters: CharacterState = createStarterCharacterState();
 let persistenceReady = false;
 let sourceState = loadSource();
 let sourceTab: "class" | "custom" = sourceState.mode;
@@ -594,12 +619,14 @@ const stageSelectDialog = byId<HTMLDialogElement>("stageSelectDialog");
 const dataDialog = byId<HTMLDialogElement>("dataDialog");
 const equipmentDialog = byId<HTMLDialogElement>("equipmentDialog");
 const supportDialog = byId<HTMLDialogElement>("supportDialog");
+const characterDialog = byId<HTMLDialogElement>("characterDialog");
 
 type AutosaveSnapshot = {
   campaign: typeof campaign;
   inventory: Inventory;
   equipment: EquipmentState;
   supportSpells: SupportSpellState;
+  characters: CharacterState;
 };
 
 const campaignAutosave = new AutosaveQueue<
@@ -611,6 +638,7 @@ const campaignAutosave = new AutosaveQueue<
     snapshot.inventory,
     snapshot.equipment,
     snapshot.supportSpells,
+    snapshot.characters,
     reason as SaveReason,
   ),
 );
@@ -955,6 +983,74 @@ const game = new Game(
   },
 );
 
+function renderCharacters(): void {
+  const grid = byId("characterGrid");
+  grid.replaceChildren();
+
+  for (const id of CHARACTER_IDS) {
+    const definition = getCharacter(id);
+    const unlocked = characters.unlocked.includes(id);
+    const selected = characters.selected === id;
+
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "character-card";
+    card.classList.toggle("selected", selected);
+    card.classList.toggle("locked", !unlocked);
+    card.disabled = !unlocked;
+
+    const top = document.createElement("div");
+    top.className = "character-card-top";
+
+    const name = document.createElement("strong");
+    name.textContent = definition.name;
+
+    const role = document.createElement("span");
+    role.textContent = definition.role;
+
+    top.append(name, role);
+
+    const summary = document.createElement("p");
+    summary.textContent = definition.summary;
+
+    const skills = document.createElement("small");
+    skills.textContent =
+      definition.activeName + " · " + definition.ultimateName;
+
+    const status = document.createElement("em");
+    status.textContent = selected
+      ? "SELECTED"
+      : unlocked
+        ? "AVAILABLE"
+        : "CLEAR STAGE " + String(definition.unlockStage).padStart(3, "0");
+
+    card.append(top, summary, skills, status);
+
+    if (unlocked && !selected) {
+      card.addEventListener("click", () => {
+        characters = selectCharacter(characters, id);
+        renderCharacters();
+        updateCampaignUi();
+        void autosaveCampaign(
+          "character",
+          "✓ Character selected · " + definition.name,
+        );
+      });
+    }
+
+    grid.append(card);
+  }
+
+  byId("characterSelectedMeta").textContent =
+    "Selected: " + getCharacter(characters.selected).name;
+}
+
+function openCharacters(): void {
+  if (!persistenceReady || game.getPhase() !== "title") return;
+  renderCharacters();
+  characterDialog.showModal();
+}
+
 function applySupportSpells(): void {
   const ids = supportSpells.loadout.filter(
     (id): id is SupportSpellId => id !== null,
@@ -1131,6 +1227,7 @@ async function autosaveCampaign(
       inventory,
       equipment,
       supportSpells,
+      characters,
     },
     reason,
   );
@@ -1164,11 +1261,14 @@ async function initializePlayerProgress(): Promise<void> {
     byId<HTMLButtonElement>("equipmentButton");
   const supportButton =
     byId<HTMLButtonElement>("supportButton");
+  const characterButton =
+    byId<HTMLButtonElement>("characterButton");
 
   startButton.disabled = true;
   stageSelectButton.disabled = true;
   equipmentButton.disabled = true;
   supportButton.disabled = true;
+  characterButton.disabled = true;
   for (const button of dataButtons) button.disabled = true;
 
   try {
@@ -1177,6 +1277,7 @@ async function initializePlayerProgress(): Promise<void> {
     inventory = loaded.save.inventory;
     equipment = loaded.save.equipment;
     supportSpells = loaded.save.supportSpells;
+    characters = loaded.save.characters;
     renderInventory();
     applyEquipmentStats();
     applySupportSpells();
@@ -1190,6 +1291,7 @@ async function initializePlayerProgress(): Promise<void> {
     stageSelectButton.disabled = false;
     equipmentButton.disabled = false;
     supportButton.disabled = false;
+    characterButton.disabled = false;
     for (const button of dataButtons) button.disabled = false;
 
     if (loaded.migrated) {
@@ -1216,7 +1318,8 @@ function updateCampaignUi(): void {
   byId("campaignMeta").textContent =
     "Unlocked " +
     String(campaign.highestUnlockedStage).padStart(3, "0") +
-    " / 1000";
+    " / 1000 · " +
+    getCharacter(characters.selected).name;
 
   currentGalaxy = Math.min(
     GALAXY_COUNT,
@@ -1410,6 +1513,7 @@ async function exportSave(): Promise<void> {
     inventory,
     equipment,
     supportSpells,
+    characters,
   );
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -1445,6 +1549,7 @@ async function importSaveFile(file: File): Promise<void> {
     const importedInventory = result.save.inventory;
     const importedEquipment = result.save.equipment;
     const importedSupportSpells = result.save.supportSpells;
+    const importedCharacters = result.save.characters;
     const message =
       "Import Stage " +
       String(imported.highestUnlockedStage).padStart(3, "0") +
@@ -1462,10 +1567,12 @@ async function importSaveFile(file: File): Promise<void> {
     const previousInventory = inventory;
     const previousEquipment = equipment;
     const previousSupportSpells = supportSpells;
+    const previousCharacters = characters;
     campaign = imported;
     inventory = importedInventory;
     equipment = importedEquipment;
     supportSpells = importedSupportSpells;
+    characters = importedCharacters;
     renderInventory();
     applyEquipmentStats();
     applySupportSpells();
@@ -1479,6 +1586,7 @@ async function importSaveFile(file: File): Promise<void> {
       inventory = previousInventory;
       equipment = previousEquipment;
       supportSpells = previousSupportSpells;
+      characters = previousCharacters;
       renderInventory();
       applyEquipmentStats();
       applySupportSpells();
@@ -1608,6 +1716,7 @@ for (const [buttonId, skillId] of combatSkillButtons) {
   });
 }
 
+byId("characterButton").addEventListener("click", openCharacters);
 byId("equipmentButton").addEventListener("click", openEquipment);
 byId("supportButton").addEventListener("click", openSupportSpells);
 
@@ -1792,7 +1901,8 @@ window.addEventListener("keydown", (event) => {
     stageSelectDialog.open ||
     dataDialog.open ||
     equipmentDialog.open ||
-    supportDialog.open
+    supportDialog.open ||
+    characterDialog.open
   ) return;
 
   if (
@@ -1865,7 +1975,7 @@ window.addEventListener("resize", () => game.resize());
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "hidden" || !persistenceReady) return;
   campaignAutosave.schedule(
-    { campaign, inventory, equipment, supportSpells },
+    { campaign, inventory, equipment, supportSpells, characters },
     "pagehide",
   );
   void campaignAutosave.flush("pagehide");
@@ -1874,7 +1984,7 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("pagehide", () => {
   if (!persistenceReady) return;
   campaignAutosave.schedule(
-    { campaign, inventory, equipment, supportSpells },
+    { campaign, inventory, equipment, supportSpells, characters },
     "pagehide",
   );
   void campaignAutosave.flush("pagehide");

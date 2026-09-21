@@ -214,6 +214,23 @@ describe("player save persistence model", () => {
     ]);
   });
 
+  it("migrates PlayerSave v7 to starter character state", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const legacy = {
+      ...current,
+      version: 7,
+    } as Record<string, unknown>;
+    delete legacy.characters;
+
+    const migration = migratePlayerSave(legacy);
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(7);
+    expect(migration.save.characters).toEqual({
+      selected: "vanguard",
+      unlocked: ["vanguard"],
+    });
+  });
+
   it("keeps a valid current-version save without migration", () => {
     const save = createPlayerSave(
       createDefaultCampaignProgress(),
@@ -232,6 +249,10 @@ describe("player save persistence model", () => {
       "sanctuary",
       "gravity-well",
     ]);
+    expect(migration.save.characters).toEqual({
+      selected: "vanguard",
+      unlocked: ["vanguard"],
+    });
   });
 
   it("refuses unsupported numeric schema versions instead of down-migrating them", () => {
