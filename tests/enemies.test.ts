@@ -11,6 +11,7 @@ describe("enemy progression", () => {
       scout: 1,
       mine: 0,
       tank: 0,
+      destroyer: 0,
     });
 
     const stage3 = enemyWeightsForStage(3);

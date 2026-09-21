@@ -31,11 +31,17 @@ export function enemyWeightsForStage(stage: number): EnemyWeights {
       ? 0
       : Math.min(0.22, 0.09 + (safeStage - 8) * 0.00013);
 
+  const specialTotal = mine + tank + destroyer;
+  const scale = specialTotal > 0.7 ? 0.7 / specialTotal : 1;
+  const resolvedMine = mine * scale;
+  const resolvedTank = tank * scale;
+  const resolvedDestroyer = destroyer * scale;
+
   return {
-    scout: Math.max(0.3, 1 - mine - tank - destroyer),
-    mine,
-    tank,
-    destroyer,
+    scout: 1 - resolvedMine - resolvedTank - resolvedDestroyer,
+    mine: resolvedMine,
+    tank: resolvedTank,
+    destroyer: resolvedDestroyer,
   };
 }
 
