@@ -12,9 +12,14 @@ import {
   STAGES_PER_GALAXY,
 } from "./campaign/stage";
 import { accuracyPercent } from "./logic";
+import { AutosaveQueue } from "./persistence/autosave";
 import {
   loadPlayerSave,
   savePlayerCampaign,
+} from "./persistence/player-save";
+import type {
+  PersistenceSource,
+  SaveReason,
 } from "./persistence/player-save";
 import { speakEnglish, stopSpeech } from "./speech";
 import {
@@ -394,6 +399,13 @@ const settingsDialog = byId<HTMLDialogElement>("settingsDialog");
 const vocabularyDialog = byId<HTMLDialogElement>("vocabularyDialog");
 const stageSelectDialog = byId<HTMLDialogElement>("stageSelectDialog");
 
+const campaignAutosave = new AutosaveQueue<
+  typeof campaign,
+  PersistenceSource
+>((snapshot, reason) =>
+  savePlayerCampaign(snapshot, reason as SaveReason),
+);
+
 function renderStats(stats: GameStats): void {
   byId("score").textContent = stats.score.toLocaleString();
   byId("streak").textContent = String(stats.streak);
@@ -513,7 +525,8 @@ const game = new Game(
         wpm,
         clearedAt: new Date().toISOString(),
       });
-      void persistCampaign(
+      void autosaveCampaign(
+        "stage-clear",
         "✓ Saved · Stage " +
           String(stats.stage).padStart(3, "0") +
           " cleared",
@@ -555,12 +568,19 @@ function startSelectedStage(): void {
   game.startStage(stage, difficulty);
 }
 
-async function persistCampaign(successMessage: string): Promise<void> {
-  const source = await savePlayerCampaign(campaign);
-  showNotice(
-    successMessage +
-      (source === "localStorage" ? " · recovery storage" : ""),
-  );
+async function autosaveCampaign(
+  reason: SaveReason,
+  successMessage?: string,
+): Promise<void> {
+  campaignAutosave.schedule(campaign, reason);
+  const source = await campaignAutosave.flush();
+
+  if (successMessage !== undefined && source !== null) {
+    showNotice(
+      successMessage +
+        (source === "localStorage" ? " · recovery storage" : ""),
+    );
+  }
 }
 
 async function initializePlayerProgress(): Promise<void> {
@@ -654,7 +674,8 @@ function renderStageGrid(): void {
 
     button.addEventListener("click", () => {
       campaign = selectCampaignStage(campaign, stage);
-      void persistCampaign(
+      void autosaveCampaign(
+        "stage-select",
         "✓ Saved · Stage " +
           String(stage).padStart(3, "0") +
           " selected",
@@ -976,6 +997,19 @@ window.addEventListener("keydown", (event) => {
 });
 
 window.addEventListener("resize", () => game.resize());
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "hidden" || !persistenceReady) return;
+  campaignAutosave.schedule(campaign, "pagehide");
+  void campaignAutosave.flush("pagehide");
+});
+
+window.addEventListener("pagehide", () => {
+  if (!persistenceReady) return;
+  campaignAutosave.schedule(campaign, "pagehide");
+  void campaignAutosave.flush("pagehide");
+});
+
 window.addEventListener("beforeunload", () => {
   stopSpeech();
   game.destroy();

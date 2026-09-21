@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   chooseFurthestCampaign,
   createPlayerSave,
+  migratePlayerSave,
+  PLAYER_SAVE_VERSION,
   sanitizePlayerSave,
 } from "../src/persistence/player-save";
 import {
@@ -16,7 +18,7 @@ describe("player save persistence model", () => {
       "2026-09-21T15:00:00.000Z",
     );
 
-    expect(save.version).toBe(1);
+    expect(save.version).toBe(PLAYER_SAVE_VERSION);
     expect(save.campaign.highestUnlockedStage).toBe(1);
     expect(save.updatedAt).toBe("2026-09-21T15:00:00.000Z");
   });
@@ -33,11 +35,54 @@ describe("player save persistence model", () => {
       updatedAt: 123,
     });
 
-    expect(save.version).toBe(1);
+    expect(save.version).toBe(PLAYER_SAVE_VERSION);
     expect(save.campaign.highestUnlockedStage).toBe(1000);
     expect(save.campaign.selectedStage).toBe(1000);
     expect(save.campaign.clearedStages).toEqual([1, 2]);
     expect(save.updatedAt).toBe("");
+    expect(save.lastSaveReason).toBe("migration");
+  });
+
+  it("migrates PlayerSave v1 to v2 without losing Campaign progress", () => {
+    const progress = recordStageClear(
+      createDefaultCampaignProgress(),
+      1,
+      {
+        score: 1234,
+        accuracy: 98.5,
+        wpm: 71,
+        clearedAt: "2026-09-21T15:20:00.000Z",
+      },
+    );
+
+    const migration = migratePlayerSave({
+      version: 1,
+      campaign: progress,
+      updatedAt: "2026-09-21T15:21:00.000Z",
+    });
+
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(1);
+    expect(migration.save.version).toBe(PLAYER_SAVE_VERSION);
+    expect(migration.save.campaign.highestUnlockedStage).toBe(2);
+    expect(migration.save.campaign.clearedStages).toEqual([1]);
+    expect(migration.save.updatedAt).toBe(
+      "2026-09-21T15:21:00.000Z",
+    );
+    expect(migration.save.lastSaveReason).toBe("migration");
+  });
+
+  it("keeps a valid v2 save without migration", () => {
+    const save = createPlayerSave(
+      createDefaultCampaignProgress(),
+      "2026-09-21T15:30:00.000Z",
+      "stage-select",
+    );
+
+    const migration = migratePlayerSave(save);
+    expect(migration.migrated).toBe(false);
+    expect(migration.fromVersion).toBe(PLAYER_SAVE_VERSION);
+    expect(migration.save).toEqual(save);
   });
 
   it("chooses the furthest progress during legacy migration recovery", () => {
