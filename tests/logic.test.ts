@@ -11,7 +11,7 @@ import type { Enemy } from "../src/types";
 function enemy(id: number, word: string, x: number, y: number): Enemy {
   return {
     id,
-    word,
+    entry: { id: "test-" + String(id), en: word, vi: "", ipa: "" },
     typed: 0,
     x,
     y,
@@ -43,7 +43,6 @@ describe("typing combat logic", () => {
       enemy(2, "shield", 500, 500),
       enemy(3, "code", 400, 600),
     ];
-
     expect(chooseTarget(enemies, "s", 400, 700)?.id).toBe(2);
   });
 

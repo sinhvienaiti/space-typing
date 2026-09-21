@@ -22,7 +22,7 @@ export function chooseTarget(
   playerY: number,
 ): Enemy | null {
   const candidates = enemies.filter((enemy) => {
-    const word = normalizeWord(enemy.word);
+    const word = normalizeWord(enemy.entry.en);
     return enemy.typed === 0 && word[0] === key;
   });
 

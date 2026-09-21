@@ -26,7 +26,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -344,6 +345,73 @@ kbd {
   box-shadow: 0 30px 100px rgba(0, 0, 0, 0.62);
 }
 
+.learning-toast {
+  position: absolute;
+  z-index: 14;
+  left: 50%;
+  top: 92px;
+  width: min(500px, calc(100vw - 2rem));
+  padding: 0.75rem 1rem;
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.1rem 0.75rem;
+  align-items: baseline;
+  border: 1px solid rgba(92, 227, 248, 0.12);
+  border-radius: 12px;
+  background: rgba(7, 14, 23, 0.9);
+  box-shadow: 0 16px 54px rgba(0, 0, 0, 0.34);
+  opacity: 0;
+  transform: translate(-50%, -8px);
+  pointer-events: none;
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.learning-toast.visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.learning-toast strong {
+  color: #f2fbff;
+  font-size: 1.05rem;
+}
+
+.learning-toast span {
+  color: #67d9ec;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+}
+
+.learning-toast small {
+  grid-column: 1 / -1;
+  color: #7b8b9e;
+  font-size: 0.72rem;
+}
+
+.notice {
+  position: absolute;
+  z-index: 35;
+  left: 50%;
+  top: 80px;
+  max-width: min(520px, calc(100vw - 2rem));
+  padding: 0.62rem 0.86rem;
+  border: 1px solid rgba(92, 227, 248, 0.18);
+  border-radius: 9px;
+  color: #dffaff;
+  background: rgba(6, 17, 28, 0.94);
+  opacity: 0;
+  transform: translate(-50%, -8px);
+  pointer-events: none;
+  transition: opacity 150ms ease, transform 150ms ease;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.notice.visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
 .settings-dialog::backdrop {
   background: rgba(2, 4, 8, 0.74);
   backdrop-filter: blur(5px);
@@ -368,6 +436,73 @@ kbd {
   height: 34px;
   padding: 0;
   font-size: 1.2rem;
+}
+
+.source-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+  margin-bottom: 0.7rem;
+}
+
+.source-tabs button.active {
+  color: #effcff;
+  border-color: rgba(91, 225, 246, 0.38);
+  background: rgba(53, 158, 187, 0.16);
+}
+
+.source-panel {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.source-panel label {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.field-label {
+  color: #718196;
+  font-size: 0.68rem;
+}
+
+.source-panel select,
+.source-panel textarea {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  outline: none;
+  background: #060b13;
+  color: #eaf6ff;
+  padding: 0.55rem 0.62rem;
+}
+
+.source-panel textarea {
+  min-height: 190px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.source-panel select:focus,
+.source-panel textarea:focus {
+  border-color: rgba(91, 225, 246, 0.38);
+}
+
+.source-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.source-footer small {
+  margin-right: auto;
+  color: #687a90;
+  font-size: 0.68rem;
 }
 
 .settings-section {

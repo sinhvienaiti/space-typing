@@ -2,10 +2,35 @@ export type GamePhase = "title" | "playing" | "paused" | "gameover";
 
 export type VisualQuality = "low" | "medium" | "high" | "ultra";
 
+export type VocabularyEntry = {
+  id: string;
+  en: string;
+  vi: string;
+  ipa: string;
+};
+
+export type VocabularyLevel = {
+  level: number;
+  label: string;
+  file: string;
+  count: number;
+};
+
+export type VocabularyIndex = {
+  version: number;
+  plannedLevels: number;
+  availableLevels: number;
+  totalEntries: number;
+  levels: VocabularyLevel[];
+};
+
 export type GameSettings = {
   sfxVolume: number;
   screenShake: boolean;
   visualQuality: VisualQuality;
+  pronunciationEnabled: boolean;
+  pronunciationRate: number;
+  pronunciationVolume: number;
 };
 
 export type GameStats = {
@@ -23,7 +48,7 @@ export type GameStats = {
 
 export type Enemy = {
   id: number;
-  word: string;
+  entry: VocabularyEntry;
   typed: number;
   x: number;
   y: number;

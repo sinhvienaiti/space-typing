@@ -14,39 +14,27 @@ import type {
   GameStats,
   Laser,
   Particle,
+  VocabularyEntry,
 } from "./types";
 
 type Hooks = {
   onStats(stats: GameStats): void;
   onPhase(phase: GamePhase): void;
   onWave(wave: number): void;
+  onWordComplete(entry: VocabularyEntry): void;
 };
 
-const FALLBACK_WORDS = [
-  "code",
-  "space",
-  "learn",
-  "focus",
-  "laser",
-  "orbit",
-  "shield",
-  "energy",
-  "reactor",
-  "typing",
-  "planet",
-  "galaxy",
-  "signal",
-  "system",
-  "future",
-  "memory",
-  "vector",
-  "module",
-  "syntax",
-  "binary",
-  "comet",
-  "rocket",
-  "engine",
-  "target",
+const FALLBACK_ENTRIES: VocabularyEntry[] = [
+  { id: "fallback-01", en: "code", vi: "mã", ipa: "/koʊd/" },
+  { id: "fallback-02", en: "space", vi: "không gian", ipa: "/speɪs/" },
+  { id: "fallback-03", en: "learn", vi: "học", ipa: "/lɝn/" },
+  { id: "fallback-04", en: "focus", vi: "tập trung", ipa: "/ˈfoʊkəs/" },
+  { id: "fallback-05", en: "laser", vi: "tia laser", ipa: "/ˈleɪzɚ/" },
+  { id: "fallback-06", en: "orbit", vi: "quỹ đạo", ipa: "/ˈɔrbɪt/" },
+  { id: "fallback-07", en: "shield", vi: "lá chắn", ipa: "/ʃild/" },
+  { id: "fallback-08", en: "energy", vi: "năng lượng", ipa: "/ˈɛnɚdʒi/" },
+  { id: "fallback-09", en: "reactor", vi: "lò phản ứng", ipa: "/riˈæktɚ/" },
+  { id: "fallback-10", en: "typing", vi: "gõ phím", ipa: "/ˈtaɪpɪŋ/" },
 ];
 
 const PLAYER_Y_OFFSET = 72;
@@ -62,6 +50,7 @@ export class Game {
   private readonly sfx = new Sfx();
 
   private settings: GameSettings;
+  private vocabulary: VocabularyEntry[];
   private phase: GamePhase = "title";
   private stats: GameStats = {
     score: 0,
@@ -93,6 +82,7 @@ export class Game {
 
   constructor(
     canvas: HTMLCanvasElement,
+    vocabulary: VocabularyEntry[],
     settings: GameSettings,
     hooks: Hooks,
   ) {
@@ -103,6 +93,7 @@ export class Game {
 
     this.canvas = canvas;
     this.context = context;
+    this.vocabulary = vocabulary.length > 0 ? vocabulary : FALLBACK_ENTRIES;
     this.settings = settings;
     this.hooks = hooks;
     this.sfx.setVolume(settings.sfxVolume);
@@ -120,6 +111,14 @@ export class Game {
 
   getStats(): GameStats {
     return { ...this.stats };
+  }
+
+  setVocabulary(entries: VocabularyEntry[]): void {
+    if (entries.length === 0) return;
+    this.vocabulary = entries;
+    this.enemies = [];
+    this.targetId = null;
+    this.spawnTimer = 0.2;
   }
 
   updateSettings(settings: GameSettings): void {
@@ -310,14 +309,14 @@ export class Game {
 
   private spawnEnemy(): void {
     const wave = this.stats.wave;
-    const word =
-      FALLBACK_WORDS[Math.floor(Math.random() * FALLBACK_WORDS.length)] ??
-      "type";
+    const entry =
+      this.vocabulary[Math.floor(Math.random() * this.vocabulary.length)] ??
+      FALLBACK_ENTRIES[0]!;
 
     const baseX = randomBetween(100, this.width - 100);
     this.enemies.push({
       id: this.nextEnemyId++,
-      word,
+      entry,
       typed: 0,
       x: baseX,
       y: -45,
@@ -345,7 +344,7 @@ export class Game {
   }
 
   private typeTarget(enemy: Enemy, key: string): void {
-    const word = normalizeWord(enemy.word);
+    const word = normalizeWord(enemy.entry.en);
     const expected = word[enemy.typed];
 
     if (key !== expected) {
@@ -375,7 +374,7 @@ export class Game {
   }
 
   private completeWord(enemy: Enemy): void {
-    const length = normalizeWord(enemy.word).length;
+    const length = normalizeWord(enemy.entry.en).length;
     this.stats.kills += 1;
     this.stats.score += (80 + length * 14) * this.stats.multiplier;
     this.stats.power = clamp(this.stats.power + 7, 0, 100);
@@ -384,6 +383,7 @@ export class Game {
     this.burst(enemy.x, enemy.y, 24, 188);
     this.sfx.hit();
     this.sfx.kill();
+    this.hooks.onWordComplete(enemy.entry);
 
     if (this.settings.screenShake) {
       this.shake = Math.max(this.shake, 4.5);
@@ -702,7 +702,7 @@ export class Game {
 
   private drawEnemyWord(enemy: Enemy, targeted: boolean): void {
     const context = this.context;
-    const word = normalizeWord(enemy.word);
+    const word = normalizeWord(enemy.entry.en);
     const typed = word.slice(0, enemy.typed);
     const remaining = word.slice(enemy.typed);
 

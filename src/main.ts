@@ -1,7 +1,20 @@
 import "./styles.css";
 import { Game } from "./Game";
 import { accuracyPercent } from "./logic";
-import type { GamePhase, GameSettings, GameStats, VisualQuality } from "./types";
+import { speakEnglish, stopSpeech } from "./speech";
+import {
+  loadVocabularyIndex,
+  loadVocabularyLevel,
+  parseCustomVocabulary,
+} from "./vocabulary";
+import type {
+  GamePhase,
+  GameSettings,
+  GameStats,
+  VisualQuality,
+  VocabularyEntry,
+  VocabularyIndex,
+} from "./types";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (app === null) {
@@ -9,11 +22,20 @@ if (app === null) {
 }
 
 const SETTINGS_KEY = "spaceTypingSettingsV1";
+const SOURCE_KEY = "spaceTypingVocabularySourceV1";
+const CUSTOM_KEY = "spaceTypingCustomVocabularyV1";
+
+type VocabularySource =
+  | { mode: "class"; level: number }
+  | { mode: "custom" };
 
 const defaultSettings: GameSettings = {
   sfxVolume: 0.5,
   screenShake: true,
   visualQuality: "high",
+  pronunciationEnabled: true,
+  pronunciationRate: 1,
+  pronunciationVolume: 1,
 };
 
 function loadSettings(): GameSettings {
@@ -38,10 +60,39 @@ function loadSettings(): GameSettings {
         parsed.visualQuality === "ultra"
           ? parsed.visualQuality
           : defaultSettings.visualQuality,
+      pronunciationEnabled:
+        typeof parsed.pronunciationEnabled === "boolean"
+          ? parsed.pronunciationEnabled
+          : defaultSettings.pronunciationEnabled,
+      pronunciationRate:
+        typeof parsed.pronunciationRate === "number"
+          ? Math.min(1.35, Math.max(0.7, parsed.pronunciationRate))
+          : defaultSettings.pronunciationRate,
+      pronunciationVolume:
+        typeof parsed.pronunciationVolume === "number"
+          ? Math.min(1, Math.max(0, parsed.pronunciationVolume))
+          : defaultSettings.pronunciationVolume,
     };
   } catch {
     return { ...defaultSettings };
   }
+}
+
+function loadSource(): VocabularySource {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SOURCE_KEY) ?? "") as VocabularySource;
+    if (
+      parsed.mode === "class" &&
+      Number.isInteger(parsed.level) &&
+      parsed.level >= 1
+    ) {
+      return parsed;
+    }
+    if (parsed.mode === "custom") return parsed;
+  } catch {
+    // Use default source.
+  }
+  return { mode: "class", level: 1 };
 }
 
 function byId<T extends HTMLElement = HTMLElement>(id: string): T {
@@ -92,6 +143,7 @@ app.innerHTML = `
         </p>
         <div class="actions">
           <button id="startButton" class="primary">Start mission</button>
+          <button id="vocabularyButton">Vocabulary</button>
           <button id="settingsButton">Settings</button>
         </div>
         <div class="hints">
@@ -106,6 +158,7 @@ app.innerHTML = `
         <p class="eyebrow">mission hold</p>
         <h2>Game paused</h2>
         <button id="resumeButton" class="primary">Resume</button>
+        <button id="pauseVocabularyButton">Vocabulary</button>
         <button id="pauseSettingsButton">Settings</button>
         <button id="restartButton">Restart run</button>
         <button id="titleButton">Back to title</button>
@@ -127,6 +180,51 @@ app.innerHTML = `
       </div>
     </section>
 
+    <div id="learningToast" class="learning-toast" aria-live="polite">
+      <strong id="learningWord"></strong>
+      <span id="learningIpa"></span>
+      <small id="learningVi"></small>
+    </div>
+
+    <div id="notice" class="notice" aria-live="polite"></div>
+
+    <dialog id="vocabularyDialog" class="settings-dialog vocabulary-dialog">
+      <form method="dialog" class="dialog-head">
+        <div>
+          <p class="eyebrow">learning source</p>
+          <h2>Vocabulary</h2>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+
+      <div class="source-tabs">
+        <button id="sourceClass" type="button">Class</button>
+        <button id="sourceCustom" type="button">Custom</button>
+      </div>
+
+      <section id="classPanel" class="source-panel">
+        <label>
+          <span class="field-label">Level</span>
+          <select id="levelSelect"></select>
+        </label>
+        <div class="source-footer">
+          <small id="levelMeta">Loading shared vocabulary…</small>
+          <button id="applyLevel" class="primary" type="button">Use level</button>
+        </div>
+      </section>
+
+      <section id="customPanel" class="source-panel hidden">
+        <label>
+          <span class="field-label">English | Vietnamese | IPA</span>
+          <textarea id="customVocabulary" rows="10" placeholder="apple | quả táo | /ˈæpəl/"></textarea>
+        </label>
+        <div class="source-footer">
+          <small>Separators: |, =, →, tab</small>
+          <button id="saveCustom" class="primary" type="button">Save vocabulary</button>
+        </div>
+      </section>
+    </dialog>
+
     <dialog id="settingsDialog" class="settings-dialog">
       <form method="dialog" class="dialog-head">
         <div>
@@ -146,6 +244,39 @@ app.innerHTML = `
           <span class="setting-control range-control">
             <input id="sfxVolume" type="range" min="0" max="1" step="0.05" />
             <output id="sfxValue">50%</output>
+          </span>
+        </label>
+
+        <label class="setting-row">
+          <span>
+            <strong>Pronunciation</strong>
+            <small>English voice after a completed word</small>
+          </span>
+          <select id="pronunciationEnabled">
+            <option value="true">Enabled</option>
+            <option value="false">Disabled</option>
+          </select>
+        </label>
+
+        <label class="setting-row">
+          <span>
+            <strong>Pronunciation rate</strong>
+            <small>Speech speed without cancelling queued words</small>
+          </span>
+          <span class="setting-control range-control">
+            <input id="pronunciationRate" type="range" min="0.7" max="1.35" step="0.05" />
+            <output id="pronunciationRateValue">1.00x</output>
+          </span>
+        </label>
+
+        <label class="setting-row">
+          <span>
+            <strong>Pronunciation volume</strong>
+            <small>Parent music ducks while pronunciation is active</small>
+          </span>
+          <span class="setting-control range-control">
+            <input id="pronunciationVolume" type="range" min="0" max="1" step="0.05" />
+            <output id="pronunciationVolumeValue">100%</output>
           </span>
         </label>
       </div>
@@ -181,11 +312,17 @@ app.innerHTML = `
 `;
 
 let settings = loadSettings();
+let sourceState = loadSource();
+let sourceTab: "class" | "custom" = sourceState.mode;
+let vocabularyIndex: VocabularyIndex | null = null;
+let learningTimer: number | null = null;
+let noticeTimer: number | null = null;
 
 const titleOverlay = byId("titleOverlay");
 const pauseOverlay = byId("pauseOverlay");
 const gameOverOverlay = byId("gameOverOverlay");
 const settingsDialog = byId<HTMLDialogElement>("settingsDialog");
+const vocabularyDialog = byId<HTMLDialogElement>("vocabularyDialog");
 
 function renderStats(stats: GameStats): void {
   byId("score").textContent = stats.score.toLocaleString();
@@ -206,6 +343,31 @@ function renderStats(stats: GameStats): void {
     stats.power >= 100 ? "SPACE — ready" : "type cleanly to charge";
 }
 
+function showLearning(entry: VocabularyEntry): void {
+  if (learningTimer !== null) window.clearTimeout(learningTimer);
+  byId("learningWord").textContent = entry.en;
+  byId("learningIpa").textContent = entry.ipa;
+  byId("learningVi").textContent = entry.vi;
+
+  const toast = byId("learningToast");
+  toast.classList.add("visible");
+  learningTimer = window.setTimeout(() => {
+    toast.classList.remove("visible");
+    learningTimer = null;
+  }, 2200);
+}
+
+function showNotice(message: string): void {
+  if (noticeTimer !== null) window.clearTimeout(noticeTimer);
+  const notice = byId("notice");
+  notice.textContent = message;
+  notice.classList.add("visible");
+  noticeTimer = window.setTimeout(() => {
+    notice.classList.remove("visible");
+    noticeTimer = null;
+  }, 2400);
+}
+
 function renderPhase(phase: GamePhase): void {
   titleOverlay.classList.toggle("hidden", phase !== "title");
   pauseOverlay.classList.toggle("hidden", phase !== "paused");
@@ -222,6 +384,7 @@ function renderWave(wave: number): void {
 
 const game = new Game(
   byId<HTMLCanvasElement>("gameCanvas"),
+  [],
   settings,
   {
     onStats: renderStats,
@@ -237,6 +400,10 @@ const game = new Game(
       }
     },
     onWave: renderWave,
+    onWordComplete: (entry) => {
+      showLearning(entry);
+      speakEnglish(entry.en, settings);
+    },
   },
 );
 
@@ -255,11 +422,130 @@ function renderSettings(): void {
     String(settings.screenShake);
   byId<HTMLSelectElement>("visualQuality").value =
     settings.visualQuality;
+
+  byId<HTMLSelectElement>("pronunciationEnabled").value =
+    String(settings.pronunciationEnabled);
+
+  const rate = byId<HTMLInputElement>("pronunciationRate");
+  rate.value = String(settings.pronunciationRate);
+  byId<HTMLOutputElement>("pronunciationRateValue").value =
+    settings.pronunciationRate.toFixed(2) + "x";
+
+  const voiceVolume = byId<HTMLInputElement>("pronunciationVolume");
+  voiceVolume.value = String(settings.pronunciationVolume);
+  byId<HTMLOutputElement>("pronunciationVolumeValue").value =
+    String(Math.round(settings.pronunciationVolume * 100)) + "%";
 }
 
 function openSettings(): void {
   renderSettings();
   settingsDialog.showModal();
+}
+
+async function ensureVocabularyIndex(): Promise<VocabularyIndex> {
+  vocabularyIndex ??= await loadVocabularyIndex();
+  return vocabularyIndex;
+}
+
+function renderSourceTabs(): void {
+  byId("sourceClass").classList.toggle("active", sourceTab === "class");
+  byId("sourceCustom").classList.toggle("active", sourceTab === "custom");
+  byId("classPanel").classList.toggle("hidden", sourceTab !== "class");
+  byId("customPanel").classList.toggle("hidden", sourceTab !== "custom");
+  if (sourceTab === "custom") {
+    byId<HTMLTextAreaElement>("customVocabulary").value =
+      localStorage.getItem(CUSTOM_KEY) ?? "";
+  }
+}
+
+function updateLevelMeta(): void {
+  const level = Number(byId<HTMLSelectElement>("levelSelect").value);
+  const metadata = vocabularyIndex?.levels.find((item) => item.level === level);
+  byId("levelMeta").textContent =
+    metadata === undefined
+      ? ""
+      : String(metadata.count) + " entries · " + metadata.label;
+}
+
+async function populateLevels(): Promise<void> {
+  const index = await ensureVocabularyIndex();
+  const select = byId<HTMLSelectElement>("levelSelect");
+
+  if (select.options.length === 0) {
+    for (const level of index.levels) {
+      const option = document.createElement("option");
+      option.value = String(level.level);
+      option.textContent =
+        "Level " + String(level.level).padStart(3, "0") + " · " + level.label;
+      select.append(option);
+    }
+  }
+
+  if (sourceState.mode === "class") select.value = String(sourceState.level);
+  updateLevelMeta();
+}
+
+async function openVocabulary(): Promise<void> {
+  sourceTab = sourceState.mode;
+  renderSourceTabs();
+  try {
+    await populateLevels();
+  } catch (error) {
+    byId("levelMeta").textContent =
+      error instanceof Error ? error.message : "Unable to load levels.";
+  }
+  vocabularyDialog.showModal();
+}
+
+async function applyClassLevel(level: number): Promise<void> {
+  const button = byId<HTMLButtonElement>("applyLevel");
+  button.disabled = true;
+  button.textContent = "Applying…";
+
+  try {
+    const index = await ensureVocabularyIndex();
+    const entries = await loadVocabularyLevel(level, index);
+    const metadata = index.levels.find((item) => item.level === level);
+
+    sourceState = { mode: "class", level };
+    sourceTab = "class";
+    localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
+    game.setVocabulary(entries);
+    vocabularyDialog.close();
+
+    showNotice(
+      metadata === undefined
+        ? "Level " + String(level).padStart(3, "0") + " applied"
+        : "Level " +
+            String(level).padStart(3, "0") +
+            " applied · " +
+            String(metadata.count) +
+            " entries",
+    );
+  } catch (error) {
+    alert(error instanceof Error ? error.message : "Unable to apply vocabulary level.");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Use level";
+  }
+}
+
+async function loadInitialVocabulary(): Promise<void> {
+  if (sourceState.mode === "custom") {
+    const custom = parseCustomVocabulary(localStorage.getItem(CUSTOM_KEY) ?? "");
+    if (custom.length > 0) {
+      game.setVocabulary(custom);
+      return;
+    }
+    sourceState = { mode: "class", level: 1 };
+  }
+
+  try {
+    const index = await ensureVocabularyIndex();
+    game.setVocabulary(await loadVocabularyLevel(sourceState.level, index));
+  } catch (error) {
+    console.warn("Shared vocabulary unavailable; using bundled fallback.", error);
+  }
 }
 
 byId("startButton").addEventListener("click", () => game.start());
@@ -274,6 +560,44 @@ for (const id of ["titleButton", "resultTitleButton"]) {
 for (const id of ["settingsButton", "pauseSettingsButton"]) {
   byId(id).addEventListener("click", openSettings);
 }
+
+for (const id of ["vocabularyButton", "pauseVocabularyButton"]) {
+  byId(id).addEventListener("click", () => void openVocabulary());
+}
+
+byId("sourceClass").addEventListener("click", () => {
+  sourceTab = "class";
+  renderSourceTabs();
+  void populateLevels();
+});
+
+byId("sourceCustom").addEventListener("click", () => {
+  sourceTab = "custom";
+  renderSourceTabs();
+});
+
+byId("levelSelect").addEventListener("change", updateLevelMeta);
+
+byId("applyLevel").addEventListener("click", () => {
+  void applyClassLevel(Number(byId<HTMLSelectElement>("levelSelect").value));
+});
+
+byId("saveCustom").addEventListener("click", () => {
+  const input = byId<HTMLTextAreaElement>("customVocabulary");
+  const entries = parseCustomVocabulary(input.value);
+  if (entries.length === 0) {
+    alert("Add at least one valid English vocabulary entry.");
+    return;
+  }
+
+  localStorage.setItem(CUSTOM_KEY, input.value);
+  sourceState = { mode: "custom" };
+  sourceTab = "custom";
+  localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
+  game.setVocabulary(entries);
+  vocabularyDialog.close();
+  showNotice("Custom vocabulary applied · " + String(entries.length) + " entries");
+});
 
 byId<HTMLInputElement>("sfxVolume").addEventListener("input", (event) => {
   settings = {
@@ -296,6 +620,43 @@ byId<HTMLSelectElement>("screenShake").addEventListener(
   },
 );
 
+byId<HTMLSelectElement>("pronunciationEnabled").addEventListener(
+  "change",
+  (event) => {
+    settings = {
+      ...settings,
+      pronunciationEnabled:
+        (event.currentTarget as HTMLSelectElement).value === "true",
+    };
+    if (!settings.pronunciationEnabled) stopSpeech();
+    saveSettings();
+  },
+);
+
+byId<HTMLInputElement>("pronunciationRate").addEventListener(
+  "input",
+  (event) => {
+    settings = {
+      ...settings,
+      pronunciationRate: Number((event.currentTarget as HTMLInputElement).value),
+    };
+    renderSettings();
+    saveSettings();
+  },
+);
+
+byId<HTMLInputElement>("pronunciationVolume").addEventListener(
+  "input",
+  (event) => {
+    settings = {
+      ...settings,
+      pronunciationVolume: Number((event.currentTarget as HTMLInputElement).value),
+    };
+    renderSettings();
+    saveSettings();
+  },
+);
+
 byId<HTMLSelectElement>("visualQuality").addEventListener(
   "change",
   (event) => {
@@ -309,7 +670,7 @@ byId<HTMLSelectElement>("visualQuality").addEventListener(
 );
 
 window.addEventListener("keydown", (event) => {
-  if (settingsDialog.open) return;
+  if (settingsDialog.open || vocabularyDialog.open) return;
 
   if (event.key === "Escape" || event.key === " ") {
     event.preventDefault();
@@ -319,8 +680,12 @@ window.addEventListener("keydown", (event) => {
 });
 
 window.addEventListener("resize", () => game.resize());
-window.addEventListener("beforeunload", () => game.destroy());
+window.addEventListener("beforeunload", () => {
+  stopSpeech();
+  game.destroy();
+});
 
 renderSettings();
 renderStats(game.getStats());
 renderPhase(game.getPhase());
+void loadInitialVocabulary();
