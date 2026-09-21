@@ -2982,6 +2982,20 @@ Random-event scheduler rules:
 ## Step 52
 Implement Credits and Normal Shop.
 
+**Status: implemented.**
+
+Credits and Normal Shop rules:
+
+- Credits are the first main currency and are persisted in PlayerSave v13;
+- PlayerSave v12 migrates with zero Credits while preserving all existing progress and Step 50A discovery state;
+- clearing a stage grants Credits from stage progression, accuracy and the effective Salvage stat;
+- Normal Shop offers the three existing recovery consumables plus three regular equipment offers from the existing equipment registry;
+- current shop offers are deterministic from Campaign progress, so opening the dialog cannot reroll inventory for advantage;
+- later Campaign progress can surface a Rare regular-equipment offer, while hidden equipment remains behind the Step 50A discovery contract;
+- purchases are atomic: insufficient Credits, a full item stack or an invalid equipment instance never deducts currency;
+- successful purchases update inventory/equipment and autosave immediately;
+- repair, enhancement and upgrade services remain Step 53; Black Market/Event Shop behavior remains Step 54.
+
 ## Step 53
 Implement Repair/Upgrade Shop.
 
