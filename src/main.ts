@@ -76,6 +76,12 @@ import {
   type LuckPityState,
 } from "./loot/pity";
 import {
+  createHiddenDiscoveryState,
+  hiddenCodexEntries,
+  type HiddenContentDefinition,
+  type HiddenDiscoveryState,
+} from "./discovery/hidden-content";
+import {
   DEFENSIVE_SKILLS,
   type DefensiveSkillId,
 } from "./skills/defensive";
@@ -330,6 +336,7 @@ app.innerHTML = `
           <button id="characterButton">Characters</button>
           <button id="equipmentButton">Equipment</button>
           <button id="supportButton">Support Spells</button>
+          <button id="codexButton">Codex</button>
           <button id="dataButton">Data</button>
           <button id="settingsButton">Settings</button>
         </div>
@@ -426,6 +433,18 @@ app.innerHTML = `
       </p>
       <div id="characterGrid" class="character-grid"></div>
       <div id="talentPanel" class="talent-panel"></div>
+    </dialog>
+
+    <dialog id="codexDialog" class="settings-dialog codex-dialog">
+      <form method="dialog" class="dialog-head">
+        <div>
+          <p class="eyebrow">hidden-content archive</p>
+          <h2>Codex</h2>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+      <p id="codexMeta" class="equipment-note">0 / 6 hidden discoveries</p>
+      <div id="codexGrid" class="codex-grid"></div>
     </dialog>
 
     <dialog id="rewardChoiceDialog" class="settings-dialog reward-choice-dialog">
@@ -674,6 +693,7 @@ let equipment: EquipmentState = createStarterEquipmentState();
 let supportSpells: SupportSpellState = createStarterSupportSpellState();
 let characters: CharacterState = createStarterCharacterState();
 let luckPity: LuckPityState = createLuckPityState();
+let hiddenDiscovery: HiddenDiscoveryState = createHiddenDiscoveryState();
 let persistenceReady = false;
 let equipmentDropCounter = 0;
 let sourceState = loadSource();
@@ -695,6 +715,7 @@ const dataDialog = byId<HTMLDialogElement>("dataDialog");
 const equipmentDialog = byId<HTMLDialogElement>("equipmentDialog");
 const supportDialog = byId<HTMLDialogElement>("supportDialog");
 const characterDialog = byId<HTMLDialogElement>("characterDialog");
+const codexDialog = byId<HTMLDialogElement>("codexDialog");
 const rewardChoiceDialog =
   byId<HTMLDialogElement>("rewardChoiceDialog");
 const anomalyDialog = byId<HTMLDialogElement>("anomalyDialog");
@@ -713,6 +734,7 @@ type AutosaveSnapshot = {
   supportSpells: SupportSpellState;
   characters: CharacterState;
   luckPity: LuckPityState;
+  hiddenDiscovery: HiddenDiscoveryState;
 };
 
 const campaignAutosave = new AutosaveQueue<
@@ -727,6 +749,7 @@ const campaignAutosave = new AutosaveQueue<
     snapshot.characters,
     reason as SaveReason,
     snapshot.luckPity,
+    snapshot.hiddenDiscovery,
   ),
 );
 
@@ -1115,6 +1138,59 @@ function createEquipmentDropInstanceId(): string {
   );
 }
 
+function renderCodex(): void {
+  const entries = hiddenCodexEntries(hiddenDiscovery);
+  const discoveredCount = entries.filter(
+    (entry) => entry.discovered,
+  ).length;
+  byId("codexMeta").textContent =
+    String(discoveredCount) +
+    " / " +
+    String(entries.length) +
+    " hidden discoveries";
+
+  const grid = byId("codexGrid");
+  grid.replaceChildren();
+
+  for (const entry of entries) {
+    const card = document.createElement("article");
+    card.className =
+      "codex-entry " + (entry.discovered ? "discovered" : "unknown");
+
+    const meta = document.createElement("span");
+    meta.textContent = entry.kind.toUpperCase();
+
+    const title = document.createElement("strong");
+    title.textContent = entry.title;
+
+    const description = document.createElement("small");
+    description.textContent = entry.description;
+
+    const reward = document.createElement("em");
+    reward.textContent = "unlock · " + entry.reward;
+
+    card.append(meta, title, description, reward);
+    grid.append(card);
+  }
+}
+
+function openCodex(): void {
+  if (!persistenceReady || game.getPhase() !== "title") return;
+  renderCodex();
+  codexDialog.showModal();
+}
+
+function hiddenDiscoveryMessage(
+  discovery: HiddenContentDefinition,
+): string {
+  return (
+    "✦ Hidden discovery · " +
+    discovery.name +
+    " · " +
+    discovery.unlock.label
+  );
+}
+
 function renderAnomalyDecision(riskHullRatio: number): void {
   byId("anomalyRiskMeta").textContent =
     "Overload removes " +
@@ -1290,6 +1366,16 @@ const game = new Game(
     },
     onLuckPityUpdate: (state) => {
       luckPity = state;
+    },
+    onHiddenDiscoveryUpdate: (state, discovery) => {
+      hiddenDiscovery = state;
+      renderCodex();
+      void autosaveCampaign(
+        "discovery",
+        discovery === null
+          ? undefined
+          : hiddenDiscoveryMessage(discovery),
+      );
     },
   },
 );
@@ -1674,6 +1760,7 @@ async function autosaveCampaign(
       supportSpells,
       characters,
       luckPity,
+      hiddenDiscovery,
     },
     reason,
   );
@@ -1709,12 +1796,14 @@ async function initializePlayerProgress(): Promise<void> {
     byId<HTMLButtonElement>("supportButton");
   const characterButton =
     byId<HTMLButtonElement>("characterButton");
+  const codexButton = byId<HTMLButtonElement>("codexButton");
 
   startButton.disabled = true;
   stageSelectButton.disabled = true;
   equipmentButton.disabled = true;
   supportButton.disabled = true;
   characterButton.disabled = true;
+  codexButton.disabled = true;
   for (const button of dataButtons) button.disabled = true;
 
   try {
@@ -1724,7 +1813,9 @@ async function initializePlayerProgress(): Promise<void> {
     equipment = loaded.save.equipment;
     supportSpells = loaded.save.supportSpells;
     luckPity = loaded.save.luckPity;
+    hiddenDiscovery = loaded.save.hiddenDiscovery;
     game.setLuckPityState(luckPity);
+    game.setHiddenDiscoveryState(hiddenDiscovery);
     const loadedCharacters = loaded.save.characters;
     characters = syncCharacterUnlocks(
       loadedCharacters,
@@ -1745,6 +1836,8 @@ async function initializePlayerProgress(): Promise<void> {
     equipmentButton.disabled = false;
     supportButton.disabled = false;
     characterButton.disabled = false;
+    codexButton.disabled = false;
+    renderCodex();
     for (const button of dataButtons) button.disabled = false;
 
     if (characters.unlocked.length !== loadedCharacters.unlocked.length) {
@@ -1975,6 +2068,7 @@ async function exportSave(): Promise<void> {
     supportSpells,
     characters,
     luckPity,
+    hiddenDiscovery,
   );
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -2015,6 +2109,7 @@ async function importSaveFile(file: File): Promise<void> {
       imported.clearedStages,
     );
     const importedLuckPity = result.save.luckPity;
+    const importedHiddenDiscovery = result.save.hiddenDiscovery;
     const message =
       "Import Stage " +
       String(imported.highestUnlockedStage).padStart(3, "0") +
@@ -2034,13 +2129,16 @@ async function importSaveFile(file: File): Promise<void> {
     const previousSupportSpells = supportSpells;
     const previousCharacters = characters;
     const previousLuckPity = luckPity;
+    const previousHiddenDiscovery = hiddenDiscovery;
     campaign = imported;
     inventory = importedInventory;
     equipment = importedEquipment;
     supportSpells = importedSupportSpells;
     characters = importedCharacters;
     luckPity = importedLuckPity;
+    hiddenDiscovery = importedHiddenDiscovery;
     game.setLuckPityState(luckPity);
+    game.setHiddenDiscoveryState(hiddenDiscovery);
     applySelectedCharacter();
     renderInventory();
     applyEquipmentStats();
@@ -2057,7 +2155,9 @@ async function importSaveFile(file: File): Promise<void> {
       supportSpells = previousSupportSpells;
       characters = previousCharacters;
       luckPity = previousLuckPity;
+      hiddenDiscovery = previousHiddenDiscovery;
       game.setLuckPityState(luckPity);
+      game.setHiddenDiscoveryState(hiddenDiscovery);
       applySelectedCharacter();
       renderInventory();
       applyEquipmentStats();
@@ -2225,6 +2325,8 @@ for (const id of ["dataButton", "pauseDataButton"]) {
   byId(id).addEventListener("click", openData);
 }
 
+byId("codexButton").addEventListener("click", openCodex);
+
 byId("exportSaveButton").addEventListener("click", () => {
   void exportSave();
 });
@@ -2375,7 +2477,8 @@ window.addEventListener("keydown", (event) => {
     dataDialog.open ||
     equipmentDialog.open ||
     supportDialog.open ||
-    characterDialog.open
+    characterDialog.open ||
+    codexDialog.open
   ) return;
 
   if (game.getPhase() === "playing" && event.key === "=") {
@@ -2461,6 +2564,7 @@ document.addEventListener("visibilitychange", () => {
       supportSpells,
       characters,
       luckPity,
+      hiddenDiscovery,
     },
     "pagehide",
   );
@@ -2477,6 +2581,7 @@ window.addEventListener("pagehide", () => {
       supportSpells,
       characters,
       luckPity,
+      hiddenDiscovery,
     },
     "pagehide",
   );
