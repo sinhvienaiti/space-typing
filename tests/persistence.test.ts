@@ -157,7 +157,7 @@ describe("player save persistence model", () => {
     ]);
   });
 
-  it("keeps a valid current-version save without migration",
+  it("keeps a valid current-version save without migration", () => {
     const save = createPlayerSave(
       createDefaultCampaignProgress(),
       "2026-09-21T15:30:00.000Z",
