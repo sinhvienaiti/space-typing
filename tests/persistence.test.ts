@@ -26,8 +26,9 @@ describe("player save persistence model", () => {
 
   it("sanitizes malformed player save data", () => {
     const save = sanitizePlayerSave({
-      version: 99,
+      version: PLAYER_SAVE_VERSION,
       campaign: {
+        version: 1,
         highestUnlockedStage: 5000,
         selectedStage: 9000,
         clearedStages: [1, 2, 2],
@@ -41,7 +42,7 @@ describe("player save persistence model", () => {
     expect(save.campaign.selectedStage).toBe(1000);
     expect(save.campaign.clearedStages).toEqual([1, 2]);
     expect(save.updatedAt).toBe("");
-    expect(save.lastSaveReason).toBe("migration");
+    expect(save.lastSaveReason).toBe("unknown");
   });
 
   it("migrates PlayerSave v1 to v2 without losing Campaign progress", () => {
