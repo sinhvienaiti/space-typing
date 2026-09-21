@@ -84,3 +84,8 @@ Step 29 all core attributes
 Step 30 Item registry / inventory
 Step 31 first consumables
 ~~~
+
+
+## Item foundation
+
+The item layer now uses stable registry IDs and a versioned inventory stored inside PlayerSave v3. Save v1/v2 migrate to v3 with an empty inventory, while current backups reject unknown item IDs or invalid stack counts.

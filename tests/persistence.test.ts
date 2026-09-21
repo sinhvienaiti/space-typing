@@ -45,7 +45,7 @@ describe("player save persistence model", () => {
     expect(save.lastSaveReason).toBe("unknown");
   });
 
-  it("migrates PlayerSave v1 to v2 without losing Campaign progress", () => {
+  it("migrates PlayerSave v1 to the current schema without losing Campaign progress", () => {
     const progress = recordStageClear(
       createDefaultCampaignProgress(),
       1,
@@ -72,19 +72,37 @@ describe("player save persistence model", () => {
       "2026-09-21T15:21:00.000Z",
     );
     expect(migration.save.lastSaveReason).toBe("migration");
+    expect(migration.save.inventory).toEqual({});
   });
 
-  it("keeps a valid v2 save without migration", () => {
+  it("migrates PlayerSave v2 to v3 with an empty inventory", () => {
+    const progress = createDefaultCampaignProgress();
+    const migration = migratePlayerSave({
+      version: 2,
+      campaign: progress,
+      updatedAt: "2026-09-21T15:29:00.000Z",
+      lastSaveReason: "stage-select",
+    });
+
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(2);
+    expect(migration.save.version).toBe(PLAYER_SAVE_VERSION);
+    expect(migration.save.inventory).toEqual({});
+  });
+
+  it("keeps a valid current-version save without migration", () => {
     const save = createPlayerSave(
       createDefaultCampaignProgress(),
       "2026-09-21T15:30:00.000Z",
       "stage-select",
+      { "repair-kit": 2 },
     );
 
     const migration = migratePlayerSave(save);
     expect(migration.migrated).toBe(false);
     expect(migration.fromVersion).toBe(PLAYER_SAVE_VERSION);
     expect(migration.save).toEqual(save);
+    expect(migration.save.inventory).toEqual({ "repair-kit": 2 });
   });
 
   it("refuses unsupported numeric schema versions instead of down-migrating them", () => {

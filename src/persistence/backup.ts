@@ -1,6 +1,11 @@
 import { MAX_CAMPAIGN_STAGE } from "../campaign/stage";
 import type { CampaignProgress, StageBest } from "../campaign/types";
 import {
+  createEmptyInventory,
+  isValidInventory,
+  type Inventory,
+} from "../items/inventory";
+import {
   createPlayerSave,
   migratePlayerSave,
   PLAYER_SAVE_VERSION,
@@ -94,9 +99,15 @@ function validateCampaign(value: unknown): value is CampaignProgress {
 export function exportPlayerSaveJson(
   campaign: CampaignProgress,
   updatedAt = new Date().toISOString(),
+  inventory: Inventory = createEmptyInventory(),
 ): string {
   return JSON.stringify(
-    createPlayerSave(campaign, updatedAt, "manual"),
+    createPlayerSave(
+      campaign,
+      updatedAt,
+      "manual",
+      inventory,
+    ),
     null,
     2,
   );
@@ -121,7 +132,12 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     };
   }
 
-  if (parsed.version !== 1 && parsed.version !== PLAYER_SAVE_VERSION) {
+  const version = parsed.version;
+  if (
+    version !== 1 &&
+    version !== 2 &&
+    version !== PLAYER_SAVE_VERSION
+  ) {
     return {
       ok: false,
       error:
@@ -135,6 +151,16 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     return {
       ok: false,
       error: "Campaign data is missing, corrupted or out of range.",
+    };
+  }
+
+  if (
+    version === PLAYER_SAVE_VERSION &&
+    !isValidInventory(parsed.inventory)
+  ) {
+    return {
+      ok: false,
+      error: "Inventory contains an unknown item or invalid stack count.",
     };
   }
 

@@ -25,16 +25,19 @@ describe("save backup", () => {
     const json = exportPlayerSaveJson(
       progress,
       "2026-09-21T15:41:00.000Z",
+      { "repair-kit": 2 },
     );
     const parsed = JSON.parse(json) as {
       version: number;
       campaign: { highestUnlockedStage: number };
       lastSaveReason: string;
+      inventory: { "repair-kit"?: number };
     };
 
     expect(parsed.version).toBe(PLAYER_SAVE_VERSION);
     expect(parsed.campaign.highestUnlockedStage).toBe(2);
     expect(parsed.lastSaveReason).toBe("manual");
+    expect(parsed.inventory["repair-kit"]).toBe(2);
   });
 
   it("imports and migrates a valid v1 backup", () => {
@@ -76,7 +79,7 @@ describe("save backup", () => {
     );
     expect(unsupported).toEqual({
       ok: false,
-      error: "Unsupported save version. Supported versions: 1-2.",
+      error: "Unsupported save version. Supported versions: 1-3.",
     });
   });
 
@@ -99,6 +102,25 @@ describe("save backup", () => {
     expect(invalid).toEqual({
       ok: false,
       error: "Campaign data is missing, corrupted or out of range.",
+    });
+  });
+
+  it("rejects unknown item IDs and invalid stack counts in v3", () => {
+    const progress = createDefaultCampaignProgress();
+    const unknown = parsePlayerSaveJson(
+      JSON.stringify({
+        version: PLAYER_SAVE_VERSION,
+        campaign: progress,
+        inventory: { "not-real": 1 },
+        inventory: {},
+        updatedAt: "2026-09-21T15:45:00.000Z",
+        lastSaveReason: "manual",
+      }),
+    );
+
+    expect(unknown).toEqual({
+      ok: false,
+      error: "Inventory contains an unknown item or invalid stack count.",
     });
   });
 

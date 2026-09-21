@@ -11,6 +11,11 @@ import {
   GALAXY_COUNT,
   STAGES_PER_GALAXY,
 } from "./campaign/stage";
+import {
+  createEmptyInventory,
+  inventoryTotal,
+} from "./items/inventory";
+import type { Inventory } from "./items/inventory";
 import { accuracyPercent } from "./logic";
 import { AutosaveQueue } from "./persistence/autosave";
 import {
@@ -19,7 +24,7 @@ import {
 } from "./persistence/backup";
 import {
   loadPlayerSave,
-  savePlayerCampaign,
+  savePlayerProgress,
   UnsupportedPlayerSaveVersionError,
 } from "./persistence/player-save";
 import type {
@@ -432,6 +437,7 @@ app.innerHTML = `
 
 let settings = loadSettings();
 let campaign = createDefaultCampaignProgress();
+let inventory: Inventory = createEmptyInventory();
 let persistenceReady = false;
 let sourceState = loadSource();
 let sourceTab: "class" | "custom" = sourceState.mode;
@@ -450,11 +456,20 @@ const vocabularyDialog = byId<HTMLDialogElement>("vocabularyDialog");
 const stageSelectDialog = byId<HTMLDialogElement>("stageSelectDialog");
 const dataDialog = byId<HTMLDialogElement>("dataDialog");
 
+type AutosaveSnapshot = {
+  campaign: typeof campaign;
+  inventory: Inventory;
+};
+
 const campaignAutosave = new AutosaveQueue<
-  typeof campaign,
+  AutosaveSnapshot,
   PersistenceSource
 >((snapshot, reason) =>
-  savePlayerCampaign(snapshot, reason as SaveReason),
+  savePlayerProgress(
+    snapshot.campaign,
+    snapshot.inventory,
+    reason as SaveReason,
+  ),
 );
 
 function renderStats(stats: GameStats): void {
@@ -628,7 +643,13 @@ async function autosaveCampaign(
   reason: SaveReason,
   successMessage?: string,
 ): Promise<boolean> {
-  campaignAutosave.schedule(campaign, reason);
+  campaignAutosave.schedule(
+    {
+      campaign,
+      inventory,
+    },
+    reason,
+  );
 
   try {
     const source = await campaignAutosave.flush();
@@ -663,6 +684,7 @@ async function initializePlayerProgress(): Promise<void> {
   try {
     const loaded = await loadPlayerSave();
     campaign = loaded.save.campaign;
+    inventory = loaded.save.inventory;
     currentGalaxy = Math.ceil(
       campaign.selectedStage / STAGES_PER_GALAXY,
     );
@@ -868,7 +890,9 @@ function updateDataSummary(): void {
   byId("dataProgress").textContent =
     "Stage " +
     String(campaign.highestUnlockedStage).padStart(3, "0") +
-    " / 1000";
+    " / 1000 · " +
+    String(inventoryTotal(inventory)) +
+    " items";
 }
 
 function openData(): void {
@@ -883,7 +907,11 @@ async function exportSave(): Promise<void> {
   if (!persistenceReady) return;
 
   const saved = await autosaveCampaign("manual");
-  const json = exportPlayerSaveJson(campaign);
+  const json = exportPlayerSaveJson(
+    campaign,
+    undefined,
+    inventory,
+  );
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -915,6 +943,7 @@ async function importSaveFile(file: File): Promise<void> {
     }
 
     const imported = result.save.campaign;
+    const importedInventory = result.save.inventory;
     const message =
       "Import Stage " +
       String(imported.highestUnlockedStage).padStart(3, "0") +
@@ -929,7 +958,9 @@ async function importSaveFile(file: File): Promise<void> {
     }
 
     const previousCampaign = campaign;
+    const previousInventory = inventory;
     campaign = imported;
+    inventory = importedInventory;
     currentGalaxy = Math.ceil(
       campaign.selectedStage / STAGES_PER_GALAXY,
     );
@@ -937,6 +968,7 @@ async function importSaveFile(file: File): Promise<void> {
     const saved = await autosaveCampaign("manual");
     if (!saved) {
       campaign = previousCampaign;
+      inventory = previousInventory;
       currentGalaxy = Math.ceil(
         campaign.selectedStage / STAGES_PER_GALAXY,
       );
@@ -1203,13 +1235,19 @@ window.addEventListener("resize", () => game.resize());
 
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "hidden" || !persistenceReady) return;
-  campaignAutosave.schedule(campaign, "pagehide");
+  campaignAutosave.schedule(
+    { campaign, inventory },
+    "pagehide",
+  );
   void campaignAutosave.flush("pagehide");
 });
 
 window.addEventListener("pagehide", () => {
   if (!persistenceReady) return;
-  campaignAutosave.schedule(campaign, "pagehide");
+  campaignAutosave.schedule(
+    { campaign, inventory },
+    "pagehide",
+  );
   void campaignAutosave.flush("pagehide");
 });
 
