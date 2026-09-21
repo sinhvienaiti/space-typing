@@ -8,6 +8,8 @@ import {
   isValidCharacterState,
   sanitizeCharacterState,
   selectCharacter,
+  syncCharacterUnlocks,
+  unlockCharactersForStage,
 } from "../src/characters/state";
 
 describe("character registry and selection", () => {
@@ -60,6 +62,30 @@ describe("character registry and selection", () => {
       selected: "vanguard",
       unlocked: ["vanguard", "aegis"],
     });
+  });
+
+  it("unlocks milestone characters permanently after their clear stage", () => {
+    const starter = createStarterCharacterState();
+    const beforeMilestone = unlockCharactersForStage(starter, 99);
+    expect(beforeMilestone.state).toBe(starter);
+    expect(beforeMilestone.unlocked).toEqual([]);
+
+    const milestone = unlockCharactersForStage(starter, 100);
+    expect(milestone.unlocked).toEqual(["aegis"]);
+    expect(milestone.state.unlocked).toEqual(["vanguard", "aegis"]);
+
+    const replayEarlier = unlockCharactersForStage(milestone.state, 20);
+    expect(replayEarlier.state.unlocked).toEqual(["vanguard", "aegis"]);
+    expect(replayEarlier.unlocked).toEqual([]);
+  });
+
+  it("synchronizes old saves from the highest cleared milestone", () => {
+    const synced = syncCharacterUnlocks(
+      createStarterCharacterState(),
+      [1, 50, 100, 200],
+    );
+
+    expect(synced.unlocked).toEqual(["vanguard", "aegis", "volt"]);
   });
 
   it("strict validation rejects duplicate or locked selections", () => {

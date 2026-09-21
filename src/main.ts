@@ -18,6 +18,8 @@ import {
 import {
   createStarterCharacterState,
   selectCharacter,
+  syncCharacterUnlocks,
+  unlockCharactersForStage,
   type CharacterState,
 } from "./characters/state";
 import { VANGUARD_ACTIVE_SKILL_ID } from "./characters/vanguard";
@@ -1018,11 +1020,26 @@ const game = new Game(
         wpm,
         clearedAt: new Date().toISOString(),
       });
+
+      const characterUnlock = unlockCharactersForStage(
+        characters,
+        stats.stage,
+      );
+      characters = characterUnlock.state;
+      const unlockedNames = characterUnlock.unlocked.map(
+        (id) => getCharacter(id).name,
+      );
+      const unlockText =
+        unlockedNames.length > 0
+          ? " · " + unlockedNames.join(", ") + " unlocked"
+          : "";
+
       void autosaveCampaign(
         "stage-clear",
         "✓ Saved · Stage " +
           String(stats.stage).padStart(3, "0") +
-          " cleared",
+          " cleared" +
+          unlockText,
       );
 
       byId("clearTitle").textContent =
@@ -1343,7 +1360,11 @@ async function initializePlayerProgress(): Promise<void> {
     inventory = loaded.save.inventory;
     equipment = loaded.save.equipment;
     supportSpells = loaded.save.supportSpells;
-    characters = loaded.save.characters;
+    const loadedCharacters = loaded.save.characters;
+    characters = syncCharacterUnlocks(
+      loadedCharacters,
+      loaded.save.campaign.clearedStages,
+    );
     applySelectedCharacter();
     renderInventory();
     applyEquipmentStats();
@@ -1360,6 +1381,13 @@ async function initializePlayerProgress(): Promise<void> {
     supportButton.disabled = false;
     characterButton.disabled = false;
     for (const button of dataButtons) button.disabled = false;
+
+    if (characters.unlocked.length !== loadedCharacters.unlocked.length) {
+      void autosaveCampaign(
+        "character",
+        "✓ Character milestone unlocks synchronized",
+      );
+    }
 
     if (loaded.migrated) {
       showNotice("✓ Existing progress migrated to IndexedDB");
@@ -1616,7 +1644,10 @@ async function importSaveFile(file: File): Promise<void> {
     const importedInventory = result.save.inventory;
     const importedEquipment = result.save.equipment;
     const importedSupportSpells = result.save.supportSpells;
-    const importedCharacters = result.save.characters;
+    const importedCharacters = syncCharacterUnlocks(
+      result.save.characters,
+      imported.clearedStages,
+    );
     const message =
       "Import Stage " +
       String(imported.highestUnlockedStage).padStart(3, "0") +

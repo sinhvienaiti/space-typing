@@ -1,5 +1,6 @@
 import {
   CHARACTER_IDS,
+  getCharacter,
   isCharacterId,
   type CharacterId,
 } from "./registry";
@@ -99,4 +100,54 @@ export function selectCharacter(
     selected: id,
     unlocked: [...state.unlocked],
   };
+}
+
+
+export type CharacterUnlockResult = {
+  state: CharacterState;
+  unlocked: CharacterId[];
+};
+
+export function unlockCharactersForStage(
+  state: CharacterState,
+  clearedStage: number,
+): CharacterUnlockResult {
+  const newlyUnlocked = CHARACTER_IDS.filter(
+    (id) =>
+      getCharacter(id).unlockStage > 1 &&
+      getCharacter(id).unlockStage <= clearedStage &&
+      !state.unlocked.includes(id),
+  );
+
+  if (newlyUnlocked.length === 0) {
+    return {
+      state,
+      unlocked: [],
+    };
+  }
+
+  const unlocked = CHARACTER_IDS.filter(
+    (id) =>
+      state.unlocked.includes(id) ||
+      newlyUnlocked.includes(id),
+  );
+
+  return {
+    state: {
+      selected: state.selected,
+      unlocked,
+    },
+    unlocked: newlyUnlocked,
+  };
+}
+
+export function syncCharacterUnlocks(
+  state: CharacterState,
+  clearedStages: readonly number[],
+): CharacterState {
+  const highestCleared = clearedStages.reduce(
+    (highest, stage) => Math.max(highest, stage),
+    0,
+  );
+  return unlockCharactersForStage(state, highestCleared).state;
 }

@@ -2787,6 +2787,15 @@ Current Vanguard combat identity:
 ## Step 41
 Implement Stage-100 milestone unlock framework.
 
+**Status: implemented.**
+
+Milestone character unlock rules:
+
+- clearing Stage 100/200/.../1000 unlocks every newly reached milestone character;
+- unlocks only add to the permanent roster and never relock when replaying earlier stages;
+- older/imported saves synchronize character unlocks from cleared Campaign milestones;
+- milestone unlock changes are autosaved with Campaign progress.
+
 ## Step 42
 Implement remaining milestone characters.
 
