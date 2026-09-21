@@ -17,6 +17,8 @@ describe("enemy progression", () => {
       carrier: 0,
       jammer: 0,
       cloaker: 0,
+      healer: 0,
+      splitter: 0,
     });
 
     const stage3 = enemyWeightsForStage(3);
@@ -52,6 +54,15 @@ describe("enemy progression", () => {
 
     const stage35 = enemyWeightsForStage(35);
     expect(stage35.cloaker).toBeGreaterThan(0);
+    expect(stage35.healer).toBe(0);
+    expect(stage35.splitter).toBe(0);
+
+    const stage40 = enemyWeightsForStage(40);
+    expect(stage40.healer).toBeGreaterThan(0);
+    expect(stage40.splitter).toBe(0);
+
+    const stage45 = enemyWeightsForStage(45);
+    expect(stage45.splitter).toBeGreaterThan(0);
   });
 
   it("keeps enemy weights bounded and usable through Stage 1000", () => {
@@ -66,7 +77,9 @@ describe("enemy progression", () => {
         weights.shield +
         weights.carrier +
         weights.jammer +
-        weights.cloaker;
+        weights.cloaker +
+        weights.healer +
+        weights.splitter;
 
       expect(total).toBeCloseTo(1);
       expect(weights.scout).toBeGreaterThanOrEqual(0.3);
@@ -78,6 +91,8 @@ describe("enemy progression", () => {
       expect(weights.carrier).toBeLessThanOrEqual(0.1);
       expect(weights.jammer).toBeLessThanOrEqual(0.09);
       expect(weights.cloaker).toBeLessThanOrEqual(0.08);
+      expect(weights.healer).toBeLessThanOrEqual(0.075);
+      expect(weights.splitter).toBeLessThanOrEqual(0.075);
     }
   });
 
@@ -114,6 +129,13 @@ describe("enemy progression", () => {
     const cloaker = enemyProfile("cloaker", 1);
     expect(cloaker.actionInterval).toBeNull();
     expect(cloaker.baseSpeed).toBeGreaterThan(jammer.baseSpeed);
+
+    const healer = enemyProfile("healer", 1);
+    expect(healer.actionInterval).not.toBeNull();
+
+    const splitter = enemyProfile("splitter", 1);
+    expect(splitter.actionInterval).toBeNull();
+    expect(splitter.radius).toBeGreaterThan(cloaker.radius);
   });
 
   it("chooses enemy kinds from deterministic random input", () => {
@@ -178,5 +200,32 @@ describe("enemy progression", () => {
       stage35.jammer +
       stage35.cloaker / 2;
     expect(chooseEnemyKind(35, cloakerPoint)).toBe("cloaker");
+
+    const stage40 = enemyWeightsForStage(40);
+    const healerPoint =
+      stage40.mine +
+      stage40.tank +
+      stage40.destroyer +
+      stage40.oppressor +
+      stage40.shield +
+      stage40.carrier +
+      stage40.jammer +
+      stage40.cloaker +
+      stage40.healer / 2;
+    expect(chooseEnemyKind(40, healerPoint)).toBe("healer");
+
+    const stage45 = enemyWeightsForStage(45);
+    const splitterPoint =
+      stage45.mine +
+      stage45.tank +
+      stage45.destroyer +
+      stage45.oppressor +
+      stage45.shield +
+      stage45.carrier +
+      stage45.jammer +
+      stage45.cloaker +
+      stage45.healer +
+      stage45.splitter / 2;
+    expect(chooseEnemyKind(45, splitterPoint)).toBe("splitter");
   });
 });

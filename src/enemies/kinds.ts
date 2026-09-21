@@ -56,6 +56,16 @@ export function enemyWeightsForStage(stage: number): EnemyWeights {
       ? 0
       : Math.min(0.08, 0.028 + (safeStage - 35) * 0.000055);
 
+  const healer =
+    safeStage < 40
+      ? 0
+      : Math.min(0.075, 0.026 + (safeStage - 40) * 0.00005);
+
+  const splitter =
+    safeStage < 45
+      ? 0
+      : Math.min(0.075, 0.026 + (safeStage - 45) * 0.00005);
+
   const specialTotal =
     mine +
     tank +
@@ -64,7 +74,9 @@ export function enemyWeightsForStage(stage: number): EnemyWeights {
     shield +
     carrier +
     jammer +
-    cloaker;
+    cloaker +
+    healer +
+    splitter;
   const scale = specialTotal > 0.7 ? 0.7 / specialTotal : 1;
   const resolvedMine = mine * scale;
   const resolvedTank = tank * scale;
@@ -74,6 +86,8 @@ export function enemyWeightsForStage(stage: number): EnemyWeights {
   const resolvedCarrier = carrier * scale;
   const resolvedJammer = jammer * scale;
   const resolvedCloaker = cloaker * scale;
+  const resolvedHealer = healer * scale;
+  const resolvedSplitter = splitter * scale;
 
   const scout = Math.max(
     0.3,
@@ -85,7 +99,9 @@ export function enemyWeightsForStage(stage: number): EnemyWeights {
       resolvedShield -
       resolvedCarrier -
       resolvedJammer -
-      resolvedCloaker,
+      resolvedCloaker -
+      resolvedHealer -
+      resolvedSplitter,
   );
 
   return {
@@ -98,6 +114,8 @@ export function enemyWeightsForStage(stage: number): EnemyWeights {
     carrier: resolvedCarrier,
     jammer: resolvedJammer,
     cloaker: resolvedCloaker,
+    healer: resolvedHealer,
+    splitter: resolvedSplitter,
   };
 }
 
@@ -107,64 +125,25 @@ export function chooseEnemyKind(
 ): EnemyKind {
   const weights = enemyWeightsForStage(stage);
   const value = clamp(random, 0, 0.999999);
+  const order: EnemyKind[] = [
+    "mine",
+    "tank",
+    "destroyer",
+    "oppressor",
+    "shield",
+    "carrier",
+    "jammer",
+    "cloaker",
+    "healer",
+    "splitter",
+  ];
 
-  if (value < weights.mine) return "mine";
-  if (value < weights.mine + weights.tank) return "tank";
-  if (value < weights.mine + weights.tank + weights.destroyer) {
-    return "destroyer";
+  let cumulative = 0;
+  for (const kind of order) {
+    cumulative += weights[kind];
+    if (value < cumulative) return kind;
   }
-  if (
-    value <
-    weights.mine + weights.tank + weights.destroyer + weights.oppressor
-  ) {
-    return "oppressor";
-  }
-  if (
-    value <
-    weights.mine +
-      weights.tank +
-      weights.destroyer +
-      weights.oppressor +
-      weights.shield
-  ) {
-    return "shield";
-  }
-  if (
-    value <
-    weights.mine +
-      weights.tank +
-      weights.destroyer +
-      weights.oppressor +
-      weights.shield +
-      weights.carrier
-  ) {
-    return "carrier";
-  }
-  if (
-    value <
-    weights.mine +
-      weights.tank +
-      weights.destroyer +
-      weights.oppressor +
-      weights.shield +
-      weights.carrier +
-      weights.jammer
-  ) {
-    return "jammer";
-  }
-  if (
-    value <
-    weights.mine +
-      weights.tank +
-      weights.destroyer +
-      weights.oppressor +
-      weights.shield +
-      weights.carrier +
-      weights.jammer +
-      weights.cloaker
-  ) {
-    return "cloaker";
-  }
+
   return "scout";
 }
 
@@ -262,6 +241,30 @@ export function enemyProfile(kind: EnemyKind, galaxy: number): EnemyProfile {
       driftMax: 76,
       baseSpeed: 38 + galaxyScale * 2,
       speedVariance: 11,
+      layers: 1,
+      actionInterval: null,
+    };
+  }
+
+  if (kind === "healer") {
+    return {
+      radius: 28,
+      driftMin: 20,
+      driftMax: 46,
+      baseSpeed: 25 + galaxyScale * 1.5,
+      speedVariance: 7,
+      layers: 1,
+      actionInterval: Math.max(3.7, 5.8 - galaxyScale * 0.12),
+    };
+  }
+
+  if (kind === "splitter") {
+    return {
+      radius: 32,
+      driftMin: 30,
+      driftMax: 58,
+      baseSpeed: 32 + galaxyScale * 1.8,
+      speedVariance: 9,
       layers: 1,
       actionInterval: null,
     };

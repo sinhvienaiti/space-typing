@@ -316,6 +316,8 @@ export class Game {
             this.spawnCarrierChild(enemy);
           } else if (enemy.kind === "jammer") {
             this.activateInterference(enemy);
+          } else if (enemy.kind === "healer") {
+            this.reinforceAlly(enemy);
           } else {
             this.fireEnemyProjectile(enemy);
           }
@@ -323,7 +325,9 @@ export class Game {
           const baseInterval =
             enemyProfile(enemy.kind, this.stageConfig.galaxy).actionInterval ?? 4;
           const pressure =
-            enemy.kind === "carrier" || enemy.kind === "jammer"
+            enemy.kind === "carrier" ||
+            enemy.kind === "jammer" ||
+            enemy.kind === "healer"
               ? difficulty.combatPressure
               : difficulty.projectilePressure;
           enemy.actionCooldown =
@@ -453,6 +457,25 @@ export class Game {
     );
     this.burst(jammer.x, jammer.y, 18, 74);
     this.sfx.enemyShot();
+  }
+
+  private reinforceAlly(healer: Enemy): void {
+    const ally =
+      this.enemies
+        .filter(
+          (enemy) =>
+            enemy.id !== healer.id &&
+            enemy.kind !== "healer" &&
+            enemy.layersRemaining < 2,
+        )
+        .sort((a, b) => b.y - a.y)[0] ?? null;
+
+    if (ally === null) return;
+
+    ally.layersRemaining = 2;
+    ally.flash = 1;
+    this.burst(ally.x, ally.y, 20, 142);
+    this.sfx.support();
   }
 
   private spawnCarrierChild(carrier: Enemy): void {
@@ -647,6 +670,10 @@ export class Game {
     this.sfx.hit();
     this.sfx.kill();
 
+    if (enemy.kind === "splitter") {
+      this.spawnSplitFragments(enemy);
+    }
+
     if (this.settings.screenShake) {
       this.shake = Math.max(
         this.shake,
@@ -656,6 +683,42 @@ export class Game {
 
     this.enemies = this.enemies.filter((item) => item.id !== enemy.id);
     this.targetId = null;
+  }
+
+  private spawnSplitFragments(splitter: Enemy): void {
+    if (this.difficulty === null) return;
+
+    for (const direction of [-1, 1]) {
+      const profile = enemyProfile("scout", this.stageConfig?.galaxy ?? 1);
+      const baseX = clamp(
+        splitter.x + direction * randomBetween(54, 86),
+        55,
+        this.width - 55,
+      );
+
+      this.enemies.push({
+        id: this.nextEnemyId++,
+        kind: "scout",
+        entry: this.pickVocabularyEntry("mine"),
+        typed: 0,
+        layersRemaining: 1,
+        x: splitter.x,
+        y: splitter.y,
+        baseX,
+        speed:
+          (profile.baseSpeed + randomBetween(10, 18)) *
+          this.difficulty.enemySpeed *
+          1.12,
+        age: Math.random() * 8,
+        drift: randomBetween(48, 82),
+        radius: 15,
+        flash: 1,
+        kick: 0.7,
+        actionCooldown: null,
+      });
+    }
+
+    this.burst(splitter.x, splitter.y, 30, 318);
   }
 
   private registerMiss(): void {
@@ -1027,7 +1090,11 @@ export class Game {
                     ? "#d8ff66"
                     : enemy.kind === "cloaker"
                       ? "#7f8dff"
-                      : "#ffb75b";
+                      : enemy.kind === "healer"
+                        ? "#6dffb4"
+                        : enemy.kind === "splitter"
+                          ? "#ff73d4"
+                          : "#ffb75b";
     const targetColor = "#80f3ff";
 
     context.save();
@@ -1046,7 +1113,11 @@ export class Game {
         ? "rgba(255, 70, 115, 0.10)"
         : enemy.kind === "tank"
           ? "rgba(132, 112, 255, 0.10)"
-          : "rgba(255, 168, 69, 0.08)";
+          : enemy.kind === "healer"
+            ? "rgba(95, 255, 180, 0.09)"
+            : enemy.kind === "splitter"
+              ? "rgba(255, 105, 210, 0.09)"
+              : "rgba(255, 168, 69, 0.08)";
     context.lineWidth = targeted ? 2.8 : enemy.kind === "tank" ? 2.2 : 1.6;
 
     context.beginPath();
@@ -1113,6 +1184,24 @@ export class Game {
       context.lineTo(-enemy.radius * 0.28, -enemy.radius * 0.42);
       context.lineTo(-enemy.radius * 0.95, -enemy.radius * 0.62);
       context.closePath();
+    } else if (enemy.kind === "healer") {
+      context.moveTo(0, enemy.radius);
+      context.lineTo(enemy.radius * 0.5, enemy.radius * 0.26);
+      context.lineTo(enemy.radius, 0);
+      context.lineTo(enemy.radius * 0.5, -enemy.radius * 0.26);
+      context.lineTo(0, -enemy.radius);
+      context.lineTo(-enemy.radius * 0.5, -enemy.radius * 0.26);
+      context.lineTo(-enemy.radius, 0);
+      context.lineTo(-enemy.radius * 0.5, enemy.radius * 0.26);
+      context.closePath();
+    } else if (enemy.kind === "splitter") {
+      context.moveTo(0, enemy.radius);
+      context.lineTo(enemy.radius * 0.8, enemy.radius * 0.25);
+      context.lineTo(enemy.radius * 0.45, -enemy.radius * 0.75);
+      context.lineTo(0, -enemy.radius * 0.35);
+      context.lineTo(-enemy.radius * 0.45, -enemy.radius * 0.75);
+      context.lineTo(-enemy.radius * 0.8, enemy.radius * 0.25);
+      context.closePath();
     } else {
       context.moveTo(0, enemy.radius);
       context.lineTo(enemy.radius * 0.9, -enemy.radius * 0.72);
@@ -1130,12 +1219,20 @@ export class Game {
       context.beginPath();
       context.arc(0, 0, enemy.radius * 0.58, 0, Math.PI * 2);
       context.stroke();
+    }
 
+    if (enemy.layersRemaining > 1) {
       const pipGap = 10;
       const startX = -((enemy.layersRemaining - 1) * pipGap) / 2;
-      context.fillStyle = "#b6abff";
+      context.fillStyle =
+        enemy.kind === "shield" ? "#67f0c9" : "#d9e6f2";
       for (let index = 0; index < enemy.layersRemaining; index += 1) {
-        context.fillRect(startX + index * pipGap - 2, enemy.radius + 8, 5, 3);
+        context.fillRect(
+          startX + index * pipGap - 2,
+          enemy.radius + 8,
+          5,
+          3,
+        );
       }
     }
 
@@ -1181,6 +1278,17 @@ export class Game {
         context.arc(0, 0, enemy.radius * scale, Math.PI - 0.75, Math.PI + 0.75);
         context.stroke();
       }
+    }
+
+    if (enemy.kind === "healer") {
+      context.strokeStyle = "rgba(111, 255, 185, 0.55)";
+      context.lineWidth = 2;
+      context.beginPath();
+      context.moveTo(-enemy.radius * 0.42, 0);
+      context.lineTo(enemy.radius * 0.42, 0);
+      context.moveTo(0, -enemy.radius * 0.42);
+      context.lineTo(0, enemy.radius * 0.42);
+      context.stroke();
     }
 
     context.restore();

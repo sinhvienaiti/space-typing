@@ -46,6 +46,11 @@ export class Sfx {
     this.tone(310, 0.09, "triangle", 0.032, 190);
   }
 
+  support(): void {
+    this.tone(440, 0.12, "sine", 0.026, 690);
+    window.setTimeout(() => this.tone(620, 0.12, "sine", 0.02, 820), 45);
+  }
+
   private tone(
     frequency: number,
     duration: number,
