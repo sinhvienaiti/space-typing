@@ -2815,9 +2815,11 @@ Implemented character slices:
 - Aegis: perfect-word Shield reinforcement, Reflect Field active and Fortress Protocol ultimate;
 - Volt: long words restore extra Energy, EMP Burst is the character active and Thunder Grid is the 100-Power ultimate;
 - Wraith: streak milestones trigger short Cloak, Phase Cloak blocks incoming hits and Time Collapse slows hostile time while clearing projectiles;
+- Fortune: character stats add Luck/Salvage, Lucky Star restores Shield and charges Power, and Jackpot restores combat resources with a timed pressure window;
+- Arsenal: character stats add Firepower, Weapon Overclock boosts boss pressure, and Armory Protocol overclocks weapons while advancing nearby targets;
 - normal enemies track whether the current word received a miss, creating a reusable perfect-word combat hook for later characters.
 
-Next character slice: Fortune.
+Next character slice: Oracle.
 
 ## Step 43
 Add Character Level and Mastery.

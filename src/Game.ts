@@ -21,6 +21,22 @@ import {
   restoreAegisShield,
 } from "./characters/aegis";
 import {
+  ARSENAL_ACTIVE_SKILL,
+  ARSENAL_ACTIVE_SKILL_ID,
+  ARSENAL_OVERCLOCK_DURATION,
+  ARSENAL_PROTOCOL_BOSS_RATIO,
+  ARSENAL_PROTOCOL_DURATION,
+  ARSENAL_PROTOCOL_TARGETS,
+} from "./characters/arsenal";
+import {
+  fortunePower,
+  FORTUNE_ACTIVE_SHIELD_RATIO,
+  FORTUNE_ACTIVE_SKILL,
+  FORTUNE_ACTIVE_SKILL_ID,
+  FORTUNE_JACKPOT_DURATION,
+  FORTUNE_JACKPOT_SHIELD_RATIO,
+} from "./characters/fortune";
+import {
   shouldTriggerWraithCloak,
   WRAITH_ACTIVE_SKILL,
   WRAITH_ACTIVE_SKILL_ID,
@@ -206,6 +222,7 @@ export class Game {
   private bossMarkTimer = 0;
   private gravityWellTimer = 0;
   private cloakTimer = 0;
+  private weaponOverclockTimer = 0;
   private skillHudTimer = 0;
   private lastTime = performance.now();
   private animationFrame = 0;
@@ -275,7 +292,11 @@ export class Game {
             ? [VOLT_ACTIVE_SKILL]
             : this.characterId === "wraith"
               ? [WRAITH_ACTIVE_SKILL]
-              : [];
+              : this.characterId === "fortune"
+                ? [FORTUNE_ACTIVE_SKILL]
+                : this.characterId === "arsenal"
+                  ? [ARSENAL_ACTIVE_SKILL]
+                  : [];
 
     this.skillEngine.setDefinitions([
       ...characterDefinitions,
@@ -295,6 +316,14 @@ export class Game {
     if (
       id === "emergency-repair" &&
       this.stats.hull >= this.stats.maxHull &&
+      this.stats.shield >= this.stats.maxShield
+    ) {
+      return "effect-not-needed";
+    }
+
+    if (
+      id === FORTUNE_ACTIVE_SKILL_ID &&
+      this.stats.power >= 100 &&
       this.stats.shield >= this.stats.maxShield
     ) {
       return "effect-not-needed";
@@ -380,6 +409,16 @@ export class Game {
       this.characterId === "wraith"
     ) {
       this.activateWraithSkill();
+    } else if (
+      id === FORTUNE_ACTIVE_SKILL_ID &&
+      this.characterId === "fortune"
+    ) {
+      this.activateFortuneSkill();
+    } else if (
+      id === ARSENAL_ACTIVE_SKILL_ID &&
+      this.characterId === "arsenal"
+    ) {
+      this.activateArsenalSkill();
     } else if (isDefensiveSkillId(id)) {
       this.activateDefensiveSkill(id);
     } else if (isOffensiveSkillId(id)) {
@@ -462,6 +501,27 @@ export class Game {
     this.cloakTimer = Math.max(this.cloakTimer, WRAITH_ACTIVE_CLOAK_DURATION);
     this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 30, 274);
     this.sfx.support();
+  }
+
+  private activateFortuneSkill(): void {
+    this.stats.power = fortunePower(this.stats.power);
+    this.stats.shield = clamp(
+      this.stats.shield + this.stats.maxShield * FORTUNE_ACTIVE_SHIELD_RATIO,
+      0,
+      this.stats.maxShield,
+    );
+    this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 28, 48);
+    this.sfx.support();
+    this.emitStats();
+  }
+
+  private activateArsenalSkill(): void {
+    this.weaponOverclockTimer = Math.max(
+      this.weaponOverclockTimer,
+      ARSENAL_OVERCLOCK_DURATION,
+    );
+    this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 30, 18);
+    this.sfx.power();
   }
 
   private activateEmpPulse(actionDelay: number): void {
@@ -792,6 +852,7 @@ export class Game {
     this.bossMarkTimer = 0;
     this.gravityWellTimer = 0;
     this.cloakTimer = 0;
+    this.weaponOverclockTimer = 0;
     this.skillHudTimer = 0;
     this.hooks.onBossUpdate(null);
     this.hooks.onSkills();
@@ -924,6 +985,10 @@ export class Game {
     this.bossMarkTimer = Math.max(0, this.bossMarkTimer - dt);
     this.gravityWellTimer = Math.max(0, this.gravityWellTimer - dt);
     this.cloakTimer = Math.max(0, this.cloakTimer - dt);
+    this.weaponOverclockTimer = Math.max(
+      0,
+      this.weaponOverclockTimer - dt,
+    );
 
     if (this.barrierTimer <= 0) this.barrierHp = 0;
     if (this.guardianTimer <= 0) this.guardianBlocks = 0;
@@ -1510,7 +1575,8 @@ export class Game {
             bossKeyDamage(boss.maxHp, boss.role),
             this.playerStats,
           ) *
-            markedBossDamageMultiplier(this.bossMarkTimer > 0),
+            markedBossDamageMultiplier(this.bossMarkTimer > 0) *
+            this.characterBossDamageMultiplier(),
       );
       this.updateBossPhase(boss);
     }
@@ -1541,7 +1607,8 @@ export class Game {
               bossWordDamage(boss.maxHp, boss.role),
               this.playerStats,
             ) *
-              markedBossDamageMultiplier(this.bossMarkTimer > 0),
+              markedBossDamageMultiplier(this.bossMarkTimer > 0) *
+            this.characterBossDamageMultiplier(),
         );
       }
 
@@ -1957,6 +2024,12 @@ export class Game {
     }
   }
 
+  private characterBossDamageMultiplier(): number {
+    return this.characterId === "arsenal" && this.weaponOverclockTimer > 0
+      ? 1.35
+      : 1;
+  }
+
   private activateOverdrive(): void {
     if (this.stats.power < 100) return;
 
@@ -1964,12 +2037,16 @@ export class Game {
     const isAegis = this.characterId === "aegis";
     const isVolt = this.characterId === "volt";
     const isWraith = this.characterId === "wraith";
+    const isFortune = this.characterId === "fortune";
+    const isArsenal = this.characterId === "arsenal";
     this.stats.power = 0;
     this.overdriveTimer = isVanguard
       ? VANGUARD_NOVA_DURATION
-      : isAegis || isVolt || isWraith
-        ? 0
-        : 4.5;
+      : isFortune
+        ? FORTUNE_JACKPOT_DURATION
+        : isAegis || isVolt || isWraith || isArsenal
+          ? 0
+          : 4.5;
 
     if (isVanguard) {
       this.stats.shield = restoreVanguardShield(
@@ -2047,19 +2124,94 @@ export class Game {
       this.timeShellTimer = Math.max(this.timeShellTimer, WRAITH_TIME_COLLAPSE_DURATION);
       this.gravityWellTimer = Math.max(this.gravityWellTimer, WRAITH_TIME_COLLAPSE_DURATION);
       this.cloakTimer = Math.max(this.cloakTimer, WRAITH_ACTIVE_CLOAK_DURATION);
+    } else if (isFortune) {
+      this.stats.energy = this.stats.maxEnergy;
+      this.stats.shield = clamp(
+        this.stats.shield + this.stats.maxShield * FORTUNE_JACKPOT_SHIELD_RATIO,
+        0,
+        this.stats.maxShield,
+      );
+    } else if (isArsenal) {
+      this.weaponOverclockTimer = Math.max(
+        this.weaponOverclockTimer,
+        ARSENAL_PROTOCOL_DURATION,
+      );
+      const targets = [...this.enemies]
+        .sort((a, b) => b.y - a.y)
+        .slice(0, ARSENAL_PROTOCOL_TARGETS);
+
+      for (const enemy of targets) {
+        const wordLength = typingText(enemy.entry.en).length;
+        enemy.typed = chainTypingAdvance(enemy.typed, wordLength);
+        enemy.flash = 1;
+        enemy.kick = Math.max(enemy.kick, 1.15);
+        this.burst(enemy.x, enemy.y, 16, 18);
+      }
+
+      if (this.boss !== null) {
+        const damage = firepowerDamage(
+          Math.max(
+            1,
+            Math.round(this.boss.maxHp * ARSENAL_PROTOCOL_BOSS_RATIO),
+          ),
+          this.playerStats,
+        );
+        this.boss.hp = Math.max(0, this.boss.hp - damage);
+        this.boss.flash = 1;
+        this.updateBossPhase(this.boss);
+        this.hooks.onBossUpdate(toBossHud(this.boss));
+
+        if (this.boss.hp <= 0) {
+          this.defeatBoss();
+        }
+      }
     }
 
     this.burst(
       this.width / 2,
       this.height - PLAYER_Y_OFFSET,
-      isVanguard ? 48 : isAegis ? 56 : isVolt ? 62 : isWraith ? 58 : 36,
-      isAegis ? 300 : isVolt ? 202 : isWraith ? 274 : 184,
+      isVanguard
+        ? 48
+        : isAegis
+          ? 56
+          : isVolt
+            ? 62
+            : isWraith
+              ? 58
+              : isFortune
+                ? 54
+                : isArsenal
+                  ? 60
+                  : 36,
+      isAegis
+        ? 300
+        : isVolt
+          ? 202
+          : isWraith
+            ? 274
+            : isFortune
+              ? 48
+              : isArsenal
+                ? 18
+                : 184,
     );
 
     if (this.settings.screenShake) {
       this.shake = Math.max(
         this.shake,
-        isVanguard ? 9 : isAegis ? 10 : isVolt ? 11 : isWraith ? 9 : 7,
+        isVanguard
+          ? 9
+          : isAegis
+            ? 10
+            : isVolt
+              ? 11
+              : isWraith
+                ? 9
+                : isFortune
+                  ? 8
+                  : isArsenal
+                    ? 10
+                    : 7,
       );
     }
 

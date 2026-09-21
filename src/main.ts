@@ -16,6 +16,8 @@ import {
   getCharacter,
 } from "./characters/registry";
 import { AEGIS_ACTIVE_SKILL_ID } from "./characters/aegis";
+import { ARSENAL_ACTIVE_SKILL_ID } from "./characters/arsenal";
+import { FORTUNE_ACTIVE_SKILL_ID } from "./characters/fortune";
 import {
   createStarterCharacterState,
   selectCharacter,
@@ -26,6 +28,7 @@ import {
 import { VANGUARD_ACTIVE_SKILL_ID } from "./characters/vanguard";
 import { VOLT_ACTIVE_SKILL_ID } from "./characters/volt";
 import { WRAITH_ACTIVE_SKILL_ID } from "./characters/wraith";
+import { characterStatBonus } from "./characters/stats";
 import {
   createStarterEquipmentState,
   equipmentForSlot,
@@ -782,6 +785,12 @@ function selectedCharacterSkillId(): string | null {
   if (characters.selected === "wraith") {
     return WRAITH_ACTIVE_SKILL_ID;
   }
+  if (characters.selected === "fortune") {
+    return FORTUNE_ACTIVE_SKILL_ID;
+  }
+  if (characters.selected === "arsenal") {
+    return ARSENAL_ACTIVE_SKILL_ID;
+  }
   return null;
 }
 
@@ -1081,7 +1090,7 @@ const game = new Game(
 
 function applySelectedCharacter(): void {
   game.setCharacter(characters.selected);
-  renderStats(game.getStats());
+  applyEquipmentStats();
   renderAllSkills();
 }
 
@@ -1207,6 +1216,7 @@ function openSupportSpells(): void {
 function applyEquipmentStats(): void {
   game.setPlayerStats({
     base: DEFAULT_PLAYER_BASE_STATS,
+    character: characterStatBonus(characters.selected),
     equipment: equipmentStatBonus(equipment),
   });
 }

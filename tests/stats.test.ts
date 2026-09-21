@@ -31,6 +31,10 @@ describe("effective stat pipeline", () => {
         firepower: 10,
         luck: 5,
       }),
+      character: {
+        shield: 5,
+        luck: 2,
+      },
       level: {
         hull: 10,
         firepower: 2,
@@ -55,14 +59,14 @@ describe("effective stat pipeline", () => {
 
     expect(result).toEqual({
       hull: 110,
-      shield: 45,
+      shield: 50,
       firepower: 21,
       armor: 4,
       energy: 0,
       reactor: 0,
       focus: 5,
       ward: 8,
-      luck: 15,
+      luck: 17,
       salvage: 0,
     });
   });

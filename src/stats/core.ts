@@ -19,6 +19,7 @@ export type StatBonus = Partial<Record<CoreStatKey, number>>;
 
 export type EffectiveStatInput = {
   base: CoreStats;
+  character?: StatBonus;
   level?: StatBonus;
   equipment?: StatBonus;
   talent?: StatBonus;
@@ -73,6 +74,7 @@ export function calculateEffectiveStats(
 ): CoreStats {
   const result = createCoreStats(input.base);
 
+  addStatBonus(result, input.character);
   addStatBonus(result, input.level);
   addStatBonus(result, input.equipment);
   addStatBonus(result, input.talent);
