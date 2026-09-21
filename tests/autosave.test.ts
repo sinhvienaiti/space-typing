@@ -23,11 +23,16 @@ describe("AutosaveQueue", () => {
   it("serializes writes so a later save cannot finish before an older save", async () => {
     const order: string[] = [];
     let releaseFirst: (() => void) | null = null;
+    let markFirstStarted: (() => void) | null = null;
+    const firstStarted = new Promise<void>((resolve) => {
+      markFirstStarted = resolve;
+    });
 
     const queue = new AutosaveQueue<number, number>(
       async (value) => {
         order.push("start-" + String(value));
         if (value === 1) {
+          markFirstStarted?.();
           await new Promise<void>((resolve) => {
             releaseFirst = resolve;
           });
@@ -43,7 +48,7 @@ describe("AutosaveQueue", () => {
     queue.schedule(2, "second");
     const second = queue.flush();
 
-    await Promise.resolve();
+    await firstStarted;
     expect(order).toEqual(["start-1"]);
 
     releaseFirst?.();
