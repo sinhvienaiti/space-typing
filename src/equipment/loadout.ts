@@ -6,6 +6,11 @@ import {
   type EquipmentSlot,
 } from "./registry";
 import {
+  enhancementStatMultiplier,
+  MAX_ENHANCEMENT_LEVEL,
+  sanitizeEnhancementLevel,
+} from "./enhancement";
+import {
   isEquipmentRarity,
   rarityStatMultiplier,
   type EquipmentRarity,
@@ -13,6 +18,13 @@ import {
 import type { StatBonus } from "../stats/core";
 
 export type EquipmentInstance = {
+  instanceId: string;
+  definitionId: EquipmentId;
+  rarity: EquipmentRarity;
+  enhancement: number;
+};
+
+type RarityEquipmentInstance = {
   instanceId: string;
   definitionId: EquipmentId;
   rarity: EquipmentRarity;
@@ -47,14 +59,14 @@ function emptyLoadout(): EquipmentLoadout {
 
 export function createStarterEquipmentState(): EquipmentState {
   const items: EquipmentInstance[] = [
-    { instanceId: "starter-pulse", definitionId: "pulse-laser-mk1", rarity: "common" },
-    { instanceId: "starter-precision", definitionId: "precision-laser-mk1", rarity: "common" },
-    { instanceId: "starter-armor", definitionId: "plated-armor-mk1", rarity: "common" },
-    { instanceId: "starter-shield", definitionId: "deflector-shield-mk1", rarity: "common" },
-    { instanceId: "starter-reactor", definitionId: "compact-reactor-mk1", rarity: "common" },
-    { instanceId: "starter-utility", definitionId: "targeting-module-mk1", rarity: "common" },
-    { instanceId: "starter-drone", definitionId: "support-drone-mk1", rarity: "common" },
-    { instanceId: "starter-core", definitionId: "balanced-core-mk1", rarity: "common" },
+    { instanceId: "starter-pulse", definitionId: "pulse-laser-mk1", rarity: "common", enhancement: 0 },
+    { instanceId: "starter-precision", definitionId: "precision-laser-mk1", rarity: "common", enhancement: 0 },
+    { instanceId: "starter-armor", definitionId: "plated-armor-mk1", rarity: "common", enhancement: 0 },
+    { instanceId: "starter-shield", definitionId: "deflector-shield-mk1", rarity: "common", enhancement: 0 },
+    { instanceId: "starter-reactor", definitionId: "compact-reactor-mk1", rarity: "common", enhancement: 0 },
+    { instanceId: "starter-utility", definitionId: "targeting-module-mk1", rarity: "common", enhancement: 0 },
+    { instanceId: "starter-drone", definitionId: "support-drone-mk1", rarity: "common", enhancement: 0 },
+    { instanceId: "starter-core", definitionId: "balanced-core-mk1", rarity: "common", enhancement: 0 },
   ];
 
   return {
@@ -79,6 +91,8 @@ function validInstance(value: unknown): value is EquipmentInstance {
   const raw = value as {
     instanceId?: unknown;
     definitionId?: unknown;
+    rarity?: unknown;
+    enhancement?: unknown;
   };
 
   return (
@@ -86,8 +100,35 @@ function validInstance(value: unknown): value is EquipmentInstance {
     raw.instanceId.length > 0 &&
     typeof raw.definitionId === "string" &&
     isEquipmentId(raw.definitionId) &&
-    typeof (raw as { rarity?: unknown }).rarity === "string" &&
-    isEquipmentRarity((raw as { rarity: string }).rarity)
+    typeof raw.rarity === "string" &&
+    isEquipmentRarity(raw.rarity) &&
+    typeof raw.enhancement === "number" &&
+    Number.isInteger(raw.enhancement) &&
+    raw.enhancement >= 0 &&
+    raw.enhancement <= MAX_ENHANCEMENT_LEVEL
+  );
+}
+
+function validRarityInstance(
+  value: unknown,
+): value is RarityEquipmentInstance {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const raw = value as {
+    instanceId?: unknown;
+    definitionId?: unknown;
+    rarity?: unknown;
+  };
+
+  return (
+    typeof raw.instanceId === "string" &&
+    raw.instanceId.length > 0 &&
+    typeof raw.definitionId === "string" &&
+    isEquipmentId(raw.definitionId) &&
+    typeof raw.rarity === "string" &&
+    isEquipmentRarity(raw.rarity)
   );
 }
 
@@ -132,6 +173,40 @@ export function migrateLegacyEquipmentState(
     .map((item) => ({
       ...item,
       rarity: "common" as const,
+      enhancement: 0,
+    }));
+
+  if (items.length === 0) {
+    return createStarterEquipmentState();
+  }
+
+  return sanitizeEquipmentState({
+    items,
+    loadout: raw.loadout,
+  });
+}
+
+export function migrateRarityEquipmentState(
+  value: unknown,
+): EquipmentState {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return createStarterEquipmentState();
+  }
+
+  const raw = value as {
+    items?: unknown;
+    loadout?: unknown;
+  };
+
+  if (!Array.isArray(raw.items)) {
+    return createStarterEquipmentState();
+  }
+
+  const items = raw.items
+    .filter(validRarityInstance)
+    .map((item) => ({
+      ...item,
+      enhancement: 0,
     }));
 
   if (items.length === 0) {
@@ -251,6 +326,55 @@ export function isValidLegacyEquipmentState(
   return true;
 }
 
+export function isValidRarityEquipmentState(
+  value: unknown,
+): boolean {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const raw = value as {
+    items?: unknown;
+    loadout?: unknown;
+  };
+
+  if (!Array.isArray(raw.items)) return false;
+
+  const byId = new Map<string, RarityEquipmentInstance>();
+  for (const candidate of raw.items) {
+    if (!validRarityInstance(candidate) || byId.has(candidate.instanceId)) {
+      return false;
+    }
+    byId.set(candidate.instanceId, candidate);
+  }
+
+  if (
+    raw.loadout === null ||
+    typeof raw.loadout !== "object" ||
+    Array.isArray(raw.loadout)
+  ) {
+    return false;
+  }
+
+  const rawLoadout = raw.loadout as Record<string, unknown>;
+
+  for (const slot of EQUIPMENT_SLOTS) {
+    const instanceId = rawLoadout[slot];
+    if (instanceId === null) continue;
+    if (typeof instanceId !== "string") return false;
+
+    const instance = byId.get(instanceId);
+    if (
+      instance === undefined ||
+      getEquipmentDefinition(instance.definitionId).slot !== slot
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export function isValidEquipmentState(
   value: unknown,
 ): value is EquipmentState {
@@ -328,6 +452,38 @@ export function equipInstance(
   };
 }
 
+export function enhanceInstance(
+  state: EquipmentState,
+  instanceId: string,
+): { state: EquipmentState; changed: boolean } {
+  const current = state.items.find(
+    (item) => item.instanceId === instanceId,
+  );
+  if (
+    current === undefined ||
+    current.enhancement >= MAX_ENHANCEMENT_LEVEL
+  ) {
+    return { state, changed: false };
+  }
+
+  return {
+    state: {
+      items: state.items.map((item) =>
+        item.instanceId === instanceId
+          ? {
+              ...item,
+              enhancement: sanitizeEnhancementLevel(
+                item.enhancement + 1,
+              ),
+            }
+          : { ...item },
+      ),
+      loadout: { ...state.loadout },
+    },
+    changed: true,
+  };
+}
+
 export function unequipSlot(
   state: EquipmentState,
   slot: EquipmentSlot,
@@ -356,7 +512,9 @@ export function equipmentStatBonus(
     if (instance === undefined) continue;
 
     const definition = getEquipmentDefinition(instance.definitionId);
-    const multiplier = rarityStatMultiplier(instance.rarity);
+    const multiplier =
+      rarityStatMultiplier(instance.rarity) *
+      enhancementStatMultiplier(instance.enhancement);
     for (const [key, value] of Object.entries(definition.stats)) {
       if (typeof value !== "number" || !Number.isFinite(value)) continue;
       totals[key] = (totals[key] ?? 0) + value * multiplier;

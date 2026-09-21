@@ -81,7 +81,7 @@ describe("save backup", () => {
     );
     expect(unsupported).toEqual({
       ok: false,
-      error: "Unsupported save version. Supported versions: 1-5.",
+      error: "Unsupported save version. Supported versions: 1-6.",
     });
   });
 
@@ -158,6 +158,46 @@ describe("save backup", () => {
     if (!result.ok) return;
     expect(result.migrated).toBe(true);
     expect(result.save.equipment.items[0]?.rarity).toBe("common");
+    expect(result.save.equipment.items[0]?.enhancement).toBe(0);
+  });
+
+  it("imports and migrates a valid v5 rarity backup", () => {
+    const progress = createDefaultCampaignProgress();
+    const result = parsePlayerSaveJson(
+      JSON.stringify({
+        version: 5,
+        campaign: progress,
+        inventory: {},
+        equipment: {
+          items: [
+            {
+              instanceId: "epic-pulse",
+              definitionId: "pulse-laser-mk1",
+              rarity: "epic",
+            },
+          ],
+          loadout: {
+            weapon: "epic-pulse",
+            armor: null,
+            shield: null,
+            reactor: null,
+            utility: null,
+            drone: null,
+            core: null,
+          },
+        },
+        updatedAt: "2026-09-21T16:17:00.000Z",
+        lastSaveReason: "equipment",
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.migrated).toBe(true);
+    expect(result.save.equipment.items[0]).toMatchObject({
+      rarity: "epic",
+      enhancement: 0,
+    });
   });
 
   it("rejects invalid equipment/loadout references in v4", () => {

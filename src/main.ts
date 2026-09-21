@@ -765,7 +765,12 @@ function renderEquipment(): void {
       const option = document.createElement("option");
       option.value = item.instanceId;
       option.textContent =
-        "[" + item.rarity.toUpperCase() + "] " + definition.name;
+        "[" +
+        item.rarity.toUpperCase() +
+        " +" +
+        String(item.enhancement) +
+        "] " +
+        definition.name;
       select.append(option);
     }
 
@@ -797,6 +802,8 @@ function renderEquipment(): void {
       current === null
         ? "No equipment"
         : current.rarity.toUpperCase() +
+          " +" +
+          String(current.enhancement) +
           " · " +
           getEquipmentDefinition(current.definitionId).description;
 

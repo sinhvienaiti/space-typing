@@ -148,13 +148,53 @@ describe("player save persistence model", () => {
         instanceId: "starter-pulse",
         definitionId: "pulse-laser-mk1",
         rarity: "common",
+        enhancement: 0,
       },
       {
         instanceId: "starter-precision",
         definitionId: "precision-laser-mk1",
         rarity: "common",
+        enhancement: 0,
       },
     ]);
+  });
+
+  it("migrates PlayerSave v5 rarity equipment to +0 enhancement", () => {
+    const progress = createDefaultCampaignProgress();
+    const migration = migratePlayerSave({
+      version: 5,
+      campaign: progress,
+      inventory: {},
+      equipment: {
+        items: [
+          {
+            instanceId: "rare-pulse",
+            definitionId: "pulse-laser-mk1",
+            rarity: "rare",
+          },
+        ],
+        loadout: {
+          weapon: "rare-pulse",
+          armor: null,
+          shield: null,
+          reactor: null,
+          utility: null,
+          drone: null,
+          core: null,
+        },
+      },
+      updatedAt: "2026-09-21T16:16:00.000Z",
+      lastSaveReason: "equipment",
+    });
+
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(5);
+    expect(migration.save.equipment.items[0]).toEqual({
+      instanceId: "rare-pulse",
+      definitionId: "pulse-laser-mk1",
+      rarity: "rare",
+      enhancement: 0,
+    });
   });
 
   it("keeps a valid current-version save without migration", () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createStarterEquipmentState,
+  enhanceInstance,
   equipmentForSlot,
   equipmentStatBonus,
   equipInstance,
@@ -64,6 +65,28 @@ describe("equipment and loadout", () => {
     });
 
     expect(legendary.firepower).toBeGreaterThan(common.firepower ?? 0);
+  });
+
+  it("enhancement increases stats and stops at +5", () => {
+    let state = createStarterEquipmentState();
+    const base = equipmentStatBonus(state).firepower ?? 0;
+
+    for (let index = 0; index < 5; index += 1) {
+      const result = enhanceInstance(state, "starter-pulse");
+      expect(result.changed).toBe(true);
+      state = result.state;
+    }
+
+    const enhanced = equipmentStatBonus(state).firepower ?? 0;
+    expect(enhanced).toBeGreaterThan(base);
+    expect(
+      state.items.find((item) => item.instanceId === "starter-pulse")
+        ?.enhancement,
+    ).toBe(5);
+
+    expect(
+      enhanceInstance(state, "starter-pulse").changed,
+    ).toBe(false);
   });
 
   it("strict validation rejects cross-slot loadout references", () => {

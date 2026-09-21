@@ -3,6 +3,7 @@ import {
   createStarterEquipmentState,
   isValidEquipmentState,
   isValidLegacyEquipmentState,
+  isValidRarityEquipmentState,
   type EquipmentState,
 } from "../equipment/loadout";
 import type { CampaignProgress, StageBest } from "../campaign/types";
@@ -146,6 +147,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     version !== 2 &&
     version !== 3 &&
     version !== 4 &&
+    version !== 5 &&
     version !== PLAYER_SAVE_VERSION
   ) {
     return {
@@ -167,6 +169,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   if (
     (version === 3 ||
       version === 4 ||
+      version === 5 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidInventory(parsed.inventory)
   ) {
@@ -179,6 +182,16 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   if (
     version === 4 &&
     !isValidLegacyEquipmentState(parsed.equipment)
+  ) {
+    return {
+      ok: false,
+      error: "Equipment data contains an invalid item or loadout reference.",
+    };
+  }
+
+  if (
+    version === 5 &&
+    !isValidRarityEquipmentState(parsed.equipment)
   ) {
     return {
       ok: false,
