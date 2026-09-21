@@ -41,6 +41,12 @@ import {
   type RecoveryItemId,
 } from "./items/consumables";
 import {
+  SkillEngine,
+  type SkillActivationResult,
+  type SkillDefinition,
+  type SkillRuntimeState,
+} from "./skills/engine";
+import {
   accuracyPercent,
   clamp,
   chooseTarget,
@@ -94,6 +100,7 @@ export class Game {
   private readonly context: CanvasRenderingContext2D;
   private readonly hooks: Hooks;
   private readonly sfx = new Sfx();
+  private readonly skillEngine = new SkillEngine();
 
   private settings: GameSettings;
   private vocabulary: VocabularyEntry[];
@@ -161,6 +168,39 @@ export class Game {
 
   getStats(): GameStats {
     return { ...this.stats };
+  }
+
+  setSkills(definitions: readonly SkillDefinition[]): void {
+    this.skillEngine.setDefinitions(definitions);
+  }
+
+  getSkillState(id: string): SkillRuntimeState | null {
+    return this.skillEngine.getState(id);
+  }
+
+  tryUseSkill(id: string): SkillActivationResult {
+    if (this.phase !== "playing") {
+      return {
+        ok: false,
+        reason: "unknown-skill",
+        energy: this.stats.energy,
+        state: this.skillEngine.getState(id),
+      };
+    }
+
+    const result = this.skillEngine.activate(id, {
+      energy: this.stats.energy,
+      streak: this.stats.streak,
+      hits: this.stats.hits,
+      misses: this.stats.misses,
+    });
+
+    if (result.ok) {
+      this.stats.energy = result.energy;
+      this.emitStats();
+    }
+
+    return result;
   }
 
   useConsumable(id: string): boolean {
@@ -242,6 +282,7 @@ export class Game {
     this.stats = this.createGameStats(stage.stage);
     this.secondsSinceDamage = Number.POSITIVE_INFINITY;
     this.resourceEmitTimer = 0;
+    this.skillEngine.resetStage();
     this.enemies = [];
     this.projectiles = [];
     this.lasers = [];
@@ -377,6 +418,7 @@ export class Game {
     this.shake = Math.max(0, this.shake - dt * 28);
     this.overdriveTimer = Math.max(0, this.overdriveTimer - dt);
     this.interferenceTimer = Math.max(0, this.interferenceTimer - dt);
+    this.skillEngine.tick(dt);
 
     const difficulty = this.difficulty;
     if (difficulty === null || this.stageConfig === null) return;
