@@ -12,7 +12,9 @@ export type EnemyKind =
   | "mine"
   | "tank"
   | "destroyer"
-  | "oppressor";
+  | "oppressor"
+  | "shield"
+  | "carrier";
 
 export type VocabularyEntry = {
   id: string;
@@ -73,7 +75,7 @@ export type Enemy = {
   radius: number;
   flash: number;
   kick: number;
-  fireCooldown: number | null;
+  actionCooldown: number | null;
 };
 
 export type EnemyProjectile = {

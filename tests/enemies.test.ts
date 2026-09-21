@@ -13,6 +13,8 @@ describe("enemy progression", () => {
       tank: 0,
       destroyer: 0,
       oppressor: 0,
+      shield: 0,
+      carrier: 0,
     });
 
     const stage3 = enemyWeightsForStage(3);
@@ -30,6 +32,15 @@ describe("enemy progression", () => {
 
     const stage15 = enemyWeightsForStage(15);
     expect(stage15.oppressor).toBeGreaterThan(0);
+    expect(stage15.shield).toBe(0);
+    expect(stage15.carrier).toBe(0);
+
+    const stage20 = enemyWeightsForStage(20);
+    expect(stage20.shield).toBeGreaterThan(0);
+    expect(stage20.carrier).toBe(0);
+
+    const stage25 = enemyWeightsForStage(25);
+    expect(stage25.carrier).toBeGreaterThan(0);
   });
 
   it("keeps enemy weights bounded and usable through Stage 1000", () => {
@@ -40,7 +51,9 @@ describe("enemy progression", () => {
         weights.mine +
         weights.tank +
         weights.destroyer +
-        weights.oppressor;
+        weights.oppressor +
+        weights.shield +
+        weights.carrier;
 
       expect(total).toBeCloseTo(1);
       expect(weights.scout).toBeGreaterThanOrEqual(0.3);
@@ -48,6 +61,8 @@ describe("enemy progression", () => {
       expect(weights.tank).toBeLessThanOrEqual(0.24);
       expect(weights.destroyer).toBeLessThanOrEqual(0.2);
       expect(weights.oppressor).toBeLessThanOrEqual(0.16);
+      expect(weights.shield).toBeLessThanOrEqual(0.13);
+      expect(weights.carrier).toBeLessThanOrEqual(0.1);
     }
   });
 
@@ -69,6 +84,14 @@ describe("enemy progression", () => {
     expect(oppressor.radius).toBeGreaterThan(destroyer.radius);
     expect(oppressor.fireInterval).not.toBeNull();
     expect(oppressor.baseSpeed).toBeLessThan(destroyer.baseSpeed);
+
+    const shield = enemyProfile("shield", 1);
+    expect(shield.layers).toBe(2);
+    expect(shield.actionInterval).toBeNull();
+
+    const carrier = enemyProfile("carrier", 1);
+    expect(carrier.radius).toBeGreaterThan(shield.radius);
+    expect(carrier.actionInterval).not.toBeNull();
   });
 
   it("chooses enemy kinds from deterministic random input", () => {
@@ -91,5 +114,24 @@ describe("enemy progression", () => {
       stage15.destroyer +
       stage15.oppressor / 2;
     expect(chooseEnemyKind(15, oppressorPoint)).toBe("oppressor");
+
+    const stage20 = enemyWeightsForStage(20);
+    const shieldPoint =
+      stage20.mine +
+      stage20.tank +
+      stage20.destroyer +
+      stage20.oppressor +
+      stage20.shield / 2;
+    expect(chooseEnemyKind(20, shieldPoint)).toBe("shield");
+
+    const stage25 = enemyWeightsForStage(25);
+    const carrierPoint =
+      stage25.mine +
+      stage25.tank +
+      stage25.destroyer +
+      stage25.oppressor +
+      stage25.shield +
+      stage25.carrier / 2;
+    expect(chooseEnemyKind(25, carrierPoint)).toBe("carrier");
   });
 });

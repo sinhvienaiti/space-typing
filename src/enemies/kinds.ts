@@ -10,7 +10,7 @@ export type EnemyProfile = {
   baseSpeed: number;
   speedVariance: number;
   layers: number;
-  fireInterval: number | null;
+  actionInterval: number | null;
 };
 
 export function enemyWeightsForStage(stage: number): EnemyWeights {
@@ -36,12 +36,25 @@ export function enemyWeightsForStage(stage: number): EnemyWeights {
       ? 0
       : Math.min(0.16, 0.05 + (safeStage - 15) * 0.00011);
 
-  const specialTotal = mine + tank + destroyer + oppressor;
+  const shield =
+    safeStage < 20
+      ? 0
+      : Math.min(0.13, 0.045 + (safeStage - 20) * 0.00009);
+
+  const carrier =
+    safeStage < 25
+      ? 0
+      : Math.min(0.1, 0.035 + (safeStage - 25) * 0.00007);
+
+  const specialTotal =
+    mine + tank + destroyer + oppressor + shield + carrier;
   const scale = specialTotal > 0.7 ? 0.7 / specialTotal : 1;
   const resolvedMine = mine * scale;
   const resolvedTank = tank * scale;
   const resolvedDestroyer = destroyer * scale;
   const resolvedOppressor = oppressor * scale;
+  const resolvedShield = shield * scale;
+  const resolvedCarrier = carrier * scale;
 
   return {
     scout:
@@ -49,11 +62,15 @@ export function enemyWeightsForStage(stage: number): EnemyWeights {
       resolvedMine -
       resolvedTank -
       resolvedDestroyer -
-      resolvedOppressor,
+      resolvedOppressor -
+      resolvedShield -
+      resolvedCarrier,
     mine: resolvedMine,
     tank: resolvedTank,
     destroyer: resolvedDestroyer,
     oppressor: resolvedOppressor,
+    shield: resolvedShield,
+    carrier: resolvedCarrier,
   };
 }
 
@@ -75,6 +92,27 @@ export function chooseEnemyKind(
   ) {
     return "oppressor";
   }
+  if (
+    value <
+    weights.mine +
+      weights.tank +
+      weights.destroyer +
+      weights.oppressor +
+      weights.shield
+  ) {
+    return "shield";
+  }
+  if (
+    value <
+    weights.mine +
+      weights.tank +
+      weights.destroyer +
+      weights.oppressor +
+      weights.shield +
+      weights.carrier
+  ) {
+    return "carrier";
+  }
   return "scout";
 }
 
@@ -89,7 +127,7 @@ export function enemyProfile(kind: EnemyKind, galaxy: number): EnemyProfile {
       baseSpeed: 55 + galaxyScale * 2.8,
       speedVariance: 15,
       layers: 1,
-      fireInterval: null,
+      actionInterval: null,
     };
   }
 
@@ -101,7 +139,7 @@ export function enemyProfile(kind: EnemyKind, galaxy: number): EnemyProfile {
       baseSpeed: 22 + galaxyScale * 1.6,
       speedVariance: 8,
       layers: 2,
-      fireInterval: null,
+      actionInterval: null,
     };
   }
 
@@ -113,7 +151,7 @@ export function enemyProfile(kind: EnemyKind, galaxy: number): EnemyProfile {
       baseSpeed: 29 + galaxyScale * 1.9,
       speedVariance: 9,
       layers: 1,
-      fireInterval: Math.max(2.6, 4.4 - galaxyScale * 0.12),
+      actionInterval: Math.max(2.6, 4.4 - galaxyScale * 0.12),
     };
   }
 
@@ -125,7 +163,31 @@ export function enemyProfile(kind: EnemyKind, galaxy: number): EnemyProfile {
       baseSpeed: 23 + galaxyScale * 1.5,
       speedVariance: 7,
       layers: 1,
-      fireInterval: Math.max(2.2, 4 - galaxyScale * 0.13),
+      actionInterval: Math.max(2.2, 4 - galaxyScale * 0.13),
+    };
+  }
+
+  if (kind === "shield") {
+    return {
+      radius: 30,
+      driftMin: 18,
+      driftMax: 44,
+      baseSpeed: 28 + galaxyScale * 1.8,
+      speedVariance: 9,
+      layers: 2,
+      actionInterval: null,
+    };
+  }
+
+  if (kind === "carrier") {
+    return {
+      radius: 42,
+      driftMin: 16,
+      driftMax: 34,
+      baseSpeed: 20 + galaxyScale * 1.3,
+      speedVariance: 6,
+      layers: 1,
+      actionInterval: Math.max(3.6, 6.2 - galaxyScale * 0.15),
     };
   }
 
@@ -136,6 +198,6 @@ export function enemyProfile(kind: EnemyKind, galaxy: number): EnemyProfile {
     baseSpeed: 34 + galaxyScale * 2.2,
     speedVariance: 14,
     layers: 1,
-    fireInterval: null,
+    actionInterval: null,
   };
 }

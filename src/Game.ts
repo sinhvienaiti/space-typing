@@ -306,14 +306,23 @@ export class Game {
         enemy.baseX + Math.sin(enemy.age * 1.1 + enemy.id) * enemy.drift;
       enemy.x += (desiredX - enemy.x) * Math.min(1, dt * 2);
 
-      if (enemy.fireCooldown !== null) {
-        enemy.fireCooldown -= dt;
-        if (enemy.fireCooldown <= 0) {
-          this.fireEnemyProjectile(enemy);
+      if (enemy.actionCooldown !== null) {
+        enemy.actionCooldown -= dt;
+        if (enemy.actionCooldown <= 0) {
+          if (enemy.kind === "carrier") {
+            this.spawnCarrierChild(enemy);
+          } else {
+            this.fireEnemyProjectile(enemy);
+          }
+
           const baseInterval =
-            enemyProfile(enemy.kind, this.stageConfig.galaxy).fireInterval ?? 4;
-          enemy.fireCooldown =
-            baseInterval / Math.max(0.7, difficulty.projectilePressure);
+            enemyProfile(enemy.kind, this.stageConfig.galaxy).actionInterval ?? 4;
+          const pressure =
+            enemy.kind === "carrier"
+              ? difficulty.combatPressure
+              : difficulty.projectilePressure;
+          enemy.actionCooldown =
+            baseInterval / Math.max(0.7, pressure);
         }
       }
 
@@ -406,10 +415,10 @@ export class Game {
       radius: profile.radius,
       flash: 0,
       kick: 0,
-      fireCooldown:
-        profile.fireInterval === null
+      actionCooldown:
+        profile.actionInterval === null
           ? null
-          : profile.fireInterval /
+          : profile.actionInterval /
             Math.max(0.7, this.difficulty?.projectilePressure ?? 1),
     });
   }
@@ -420,6 +429,8 @@ export class Game {
       if (length === 0) return false;
       if (kind === "mine") return length <= 6;
       if (kind === "tank") return length >= 5;
+      if (kind === "shield") return length >= 4 && length <= 10;
+      if (kind === "carrier") return length >= 5;
       return true;
     });
 
@@ -428,6 +439,41 @@ export class Game {
       source[Math.floor(Math.random() * source.length)] ??
       FALLBACK_ENTRIES[0]!
     );
+  }
+
+  private spawnCarrierChild(carrier: Enemy): void {
+    if (this.difficulty === null) return;
+    if (this.enemies.length >= this.difficulty.maxEnemies + 2) return;
+
+    const profile = enemyProfile("scout", this.stageConfig?.galaxy ?? 1);
+    const baseX = clamp(
+      carrier.x + randomBetween(-95, 95),
+      profile.radius + 55,
+      this.width - profile.radius - 55,
+    );
+
+    this.enemies.push({
+      id: this.nextEnemyId++,
+      kind: "scout",
+      entry: this.pickVocabularyEntry("scout"),
+      typed: 0,
+      layersRemaining: 1,
+      x: carrier.x,
+      y: carrier.y + carrier.radius * 0.45,
+      baseX,
+      speed:
+        (profile.baseSpeed + randomBetween(2, profile.speedVariance + 6)) *
+        this.difficulty.enemySpeed *
+        1.08,
+      age: Math.random() * 8,
+      drift: randomBetween(profile.driftMin, profile.driftMax),
+      radius: 19,
+      flash: 0,
+      kick: 0,
+      actionCooldown: null,
+    });
+
+    this.burst(carrier.x, carrier.y, 12, 47);
   }
 
   private findProjectileForKey(key: string): EnemyProjectile | null {
@@ -554,11 +600,20 @@ export class Game {
       enemy.flash = 1;
       enemy.kick = 1.45;
 
+      if (enemy.kind === "shield") {
+        enemy.speed *= 1.2;
+      }
+
       this.stats.score += (45 + length * 8) * this.stats.multiplier;
       this.stats.power = clamp(this.stats.power + 4, 0, 100);
 
       this.fireLaser(enemy, 1.25);
-      this.burst(enemy.x, enemy.y, 18, 202);
+      this.burst(
+        enemy.x,
+        enemy.y,
+        enemy.kind === "shield" ? 25 : 18,
+        enemy.kind === "shield" ? 164 : 202,
+      );
       this.sfx.hit();
       this.targetId = null;
       return;
@@ -922,7 +977,11 @@ export class Game {
             ? "#57d8ff"
             : enemy.kind === "oppressor"
               ? "#e36dff"
-              : "#ffb75b";
+              : enemy.kind === "shield"
+                ? "#58f0c7"
+                : enemy.kind === "carrier"
+                  ? "#ffd866"
+                  : "#ffb75b";
     const targetColor = "#80f3ff";
 
     context.save();
@@ -981,6 +1040,16 @@ export class Game {
         else context.lineTo(x, y);
       }
       context.closePath();
+    } else if (enemy.kind === "carrier") {
+      context.moveTo(0, enemy.radius * 0.78);
+      context.lineTo(enemy.radius * 1.12, enemy.radius * 0.12);
+      context.lineTo(enemy.radius * 0.72, -enemy.radius * 0.58);
+      context.lineTo(0, -enemy.radius * 0.35);
+      context.lineTo(-enemy.radius * 0.72, -enemy.radius * 0.58);
+      context.lineTo(-enemy.radius * 1.12, enemy.radius * 0.12);
+      context.closePath();
+    } else if (enemy.kind === "shield") {
+      context.arc(0, 0, enemy.radius * 0.72, 0, Math.PI * 2);
     } else {
       context.moveTo(0, enemy.radius);
       context.lineTo(enemy.radius * 0.9, -enemy.radius * 0.72);
@@ -1017,6 +1086,25 @@ export class Game {
       context.beginPath();
       context.arc(0, 0, enemy.radius * 0.35, 0, Math.PI * 2);
       context.stroke();
+    }
+
+    if (enemy.kind === "shield" && enemy.layersRemaining > 1) {
+      context.strokeStyle = "rgba(91, 255, 214, 0.55)";
+      context.lineWidth = 2;
+      context.beginPath();
+      context.arc(0, 0, enemy.radius * 1.18, 0, Math.PI * 2);
+      context.stroke();
+
+      context.strokeStyle = "rgba(91, 255, 214, 0.2)";
+      context.beginPath();
+      context.arc(0, 0, enemy.radius * 1.42, 0, Math.PI * 2);
+      context.stroke();
+    }
+
+    if (enemy.kind === "carrier") {
+      context.fillStyle = "rgba(255, 219, 105, 0.75)";
+      context.fillRect(-enemy.radius * 0.85, 2, 7, 7);
+      context.fillRect(enemy.radius * 0.85 - 7, 2, 7, 7);
     }
 
     context.restore();

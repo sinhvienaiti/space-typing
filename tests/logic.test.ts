@@ -24,7 +24,7 @@ function enemy(id: number, word: string, x: number, y: number): Enemy {
     radius: 20,
     flash: 0,
     kick: 0,
-    fireCooldown: null,
+    actionCooldown: null,
   };
 }
 
