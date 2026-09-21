@@ -23,6 +23,8 @@ export type EnemyKind =
   | "leech"
   | "commander";
 
+export type EliteModifier = "swift" | "armored" | "frenzy" | "volatile";
+
 export type VocabularyEntry = {
   id: string;
   en: string;
@@ -70,6 +72,8 @@ export type GameStats = {
 export type Enemy = {
   id: number;
   kind: EnemyKind;
+  elite: boolean;
+  eliteModifiers: EliteModifier[];
   entry: VocabularyEntry;
   typed: number;
   layersRemaining: number;

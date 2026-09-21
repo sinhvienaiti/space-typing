@@ -1,6 +1,12 @@
 import { Sfx } from "./audio/Sfx";
 import type { DifficultyProfile, StageConfig } from "./campaign/types";
 import {
+  applyEliteModifiers,
+  eliteModifierCount,
+  pickEliteModifiers,
+  rollElite,
+} from "./enemies/elite";
+import {
   chooseEnemyKind,
   enemyProfile,
 } from "./enemies/kinds";
@@ -79,6 +85,7 @@ export class Game {
   private dpr = 1;
   private nextEnemyId = 1;
   private nextProjectileId = 1;
+  private eliteSpawned = 0;
   private enemies: Enemy[] = [];
   private projectiles: EnemyProjectile[] = [];
   private lasers: Laser[] = [];
@@ -165,6 +172,7 @@ export class Game {
     this.targetId = null;
     this.spawnRemaining = stage.enemyBudget;
     this.spawnTimer = 0.3;
+    this.eliteSpawned = 0;
     this.overdriveTimer = 0;
     this.interferenceTimer = 0;
     this.hooks.onPhase(this.phase);
@@ -409,6 +417,44 @@ export class Game {
     const kind = chooseEnemyKind(stage);
     const profile = enemyProfile(kind, galaxy);
     const entry = this.pickVocabularyEntry(kind);
+    const difficulty = this.difficulty;
+
+    const forceElite =
+      this.stageConfig?.role === "elite" && this.eliteSpawned === 0;
+    const elite =
+      forceElite ||
+      rollElite(this.stageConfig?.eliteChance ?? 0);
+    const eliteModifiers = elite
+      ? pickEliteModifiers(
+          eliteModifierCount(this.stageConfig?.modifierSlots ?? 0),
+        )
+      : [];
+
+    const supportAction =
+      kind === "carrier" ||
+      kind === "jammer" ||
+      kind === "healer" ||
+      kind === "leech" ||
+      kind === "commander";
+    const actionPressure = supportAction
+      ? difficulty?.combatPressure ?? 1
+      : difficulty?.projectilePressure ?? 1;
+
+    const baseSpeed =
+      (profile.baseSpeed + randomBetween(0, profile.speedVariance)) *
+      (difficulty?.enemySpeed ?? 1);
+    const baseCooldown =
+      profile.actionInterval === null
+        ? null
+        : profile.actionInterval / Math.max(0.7, actionPressure);
+    const eliteStats = applyEliteModifiers(
+      {
+        speed: baseSpeed,
+        layers: profile.layers,
+        actionCooldown: baseCooldown,
+      },
+      eliteModifiers,
+    );
 
     const baseX = randomBetween(
       profile.radius + 70,
@@ -418,26 +464,28 @@ export class Game {
     this.enemies.push({
       id: this.nextEnemyId++,
       kind,
+      elite,
+      eliteModifiers,
       entry,
       typed: 0,
-      layersRemaining: profile.layers,
+      layersRemaining: eliteStats.layers,
       x: baseX,
       y: -profile.radius - 20,
       baseX,
-      speed:
-        (profile.baseSpeed + randomBetween(0, profile.speedVariance)) *
-        (this.difficulty?.enemySpeed ?? 1),
+      speed: eliteStats.speed,
       age: Math.random() * 8,
       drift: randomBetween(profile.driftMin, profile.driftMax),
-      radius: profile.radius,
+      radius: elite ? profile.radius * 1.08 : profile.radius,
       flash: 0,
       kick: 0,
-      actionCooldown:
-        profile.actionInterval === null
-          ? null
-          : profile.actionInterval /
-            Math.max(0.7, this.difficulty?.projectilePressure ?? 1),
+      actionCooldown: eliteStats.actionCooldown,
     });
+
+    if (elite) {
+      const firstElite = this.eliteSpawned === 0;
+      this.eliteSpawned += 1;
+      if (firstElite) this.sfx.eliteWarning();
+    }
   }
 
   private pickVocabularyEntry(kind: EnemyKind): VocabularyEntry {
@@ -540,6 +588,8 @@ export class Game {
     this.enemies.push({
       id: this.nextEnemyId++,
       kind: "scout",
+      elite: false,
+      eliteModifiers: [],
       entry: this.pickVocabularyEntry("scout"),
       typed: 0,
       layersRemaining: 1,
@@ -725,6 +775,10 @@ export class Game {
       this.spawnSplitFragments(enemy);
     }
 
+    if (enemy.eliteModifiers.includes("volatile")) {
+      this.spawnVolatileBurst(enemy);
+    }
+
     if (this.settings.screenShake) {
       this.shake = Math.max(
         this.shake,
@@ -734,6 +788,35 @@ export class Game {
 
     this.enemies = this.enemies.filter((item) => item.id !== enemy.id);
     this.targetId = null;
+  }
+
+  private spawnVolatileBurst(enemy: Enemy): void {
+    if (this.difficulty === null) return;
+
+    const playerX = this.width / 2;
+    const playerY = this.height - PLAYER_Y_OFFSET;
+    const baseAngle = Math.atan2(playerY - enemy.y, playerX - enemy.x);
+    const alphabet = "asdfjklqweruiopzxcvbnm";
+    const speed = 105 + this.difficulty.projectilePressure * 34;
+
+    for (const offset of [-0.13, 0.13]) {
+      const char =
+        alphabet[Math.floor(Math.random() * alphabet.length)] ?? "a";
+      const angle = baseAngle + offset;
+
+      this.projectiles.push({
+        id: this.nextProjectileId++,
+        ownerId: enemy.id,
+        char,
+        x: enemy.x,
+        y: enemy.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: 12,
+      });
+    }
+
+    this.burst(enemy.x, enemy.y, 26, 48);
   }
 
   private spawnSplitFragments(splitter: Enemy): void {
@@ -750,6 +833,8 @@ export class Game {
       this.enemies.push({
         id: this.nextEnemyId++,
         kind: "scout",
+        elite: false,
+        eliteModifiers: [],
         entry: this.pickVocabularyEntry("mine"),
         typed: 0,
         layersRemaining: 1,
@@ -1314,6 +1399,33 @@ export class Game {
 
     context.fill();
     context.stroke();
+
+    if (enemy.elite) {
+      context.strokeStyle = "rgba(255, 226, 105, 0.64)";
+      context.lineWidth = 1.6;
+      context.setLineDash([5, 6]);
+      context.lineDashOffset = -enemy.age * 18;
+      context.beginPath();
+      context.arc(0, 0, enemy.radius * 1.28, 0, Math.PI * 2);
+      context.stroke();
+      context.setLineDash([]);
+
+      const modifierGap = 8;
+      const startX =
+        -((enemy.eliteModifiers.length - 1) * modifierGap) / 2;
+      context.fillStyle = "rgba(255, 230, 123, 0.9)";
+      for (let index = 0; index < enemy.eliteModifiers.length; index += 1) {
+        context.beginPath();
+        context.arc(
+          startX + index * modifierGap,
+          enemy.radius + 17,
+          2.2,
+          0,
+          Math.PI * 2,
+        );
+        context.fill();
+      }
+    }
 
     if (enemy.kind === "tank") {
       context.strokeStyle = "rgba(169, 154, 255, 0.45)";

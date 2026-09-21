@@ -14,6 +14,8 @@ function enemy(id: number, word: string, x: number, y: number): Enemy {
   return {
     id,
     kind: "scout",
+    elite: false,
+    eliteModifiers: [],
     entry: { id: "test-" + String(id), en: word, vi: "", ipa: "" },
     typed: 0,
     layersRemaining: 1,

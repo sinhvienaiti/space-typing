@@ -60,6 +60,11 @@ export class Sfx {
     window.setTimeout(() => this.tone(520, 0.1, "square", 0.024, 760), 55);
   }
 
+  eliteWarning(): void {
+    this.tone(360, 0.11, "triangle", 0.028, 620);
+    window.setTimeout(() => this.tone(620, 0.14, "triangle", 0.025, 930), 70);
+  }
+
   private tone(
     frequency: number,
     duration: number,
