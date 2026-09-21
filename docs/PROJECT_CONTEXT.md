@@ -2889,6 +2889,17 @@ Current drop rules:
 ## Step 47
 Implement Treasure Drone and Golden Enemy.
 
+**Status: implemented.**
+
+Rare-target rules:
+
+- Golden Enemies begin appearing after the early tutorial stages at a bounded low chance;
+- Golden Enemies move slightly faster, have a distinct gold visual identity, grant bonus score and guarantee a higher-quality equipment drop table;
+- Treasure Drone is a rare non-hostile typing target that crosses the arena independently of normal enemies;
+- Treasure Drone uses the normal English vocabulary/learning hook and guarantees a Treasure equipment roll when completed before it escapes;
+- neither rare target is required for Campaign progression;
+- Step 50 may later add Luck weighting and soft pity without changing these base encounter contracts.
+
 ## Step 48
 Implement reward-choice crate.
 

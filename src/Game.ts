@@ -137,6 +137,11 @@ import {
   type LootSource,
 } from "./loot/equipment-loot";
 import {
+  shouldScheduleTreasureDrone,
+  shouldSpawnGoldenEnemy,
+  type TreasureDrone,
+} from "./events/rare-targets";
+import {
   applyEliteModifiers,
   eliteModifierCount,
   pickEliteModifiers,
@@ -319,6 +324,9 @@ export class Game {
   private supplyPod: SupplyPod | null = null;
   private supplySpawnTimer = 0;
   private supplySpawnsRemaining = 0;
+  private treasureDrone: TreasureDrone | null = null;
+  private treasureDroneTimer = 0;
+  private treasureDronePending = false;
   private lastTime = performance.now();
   private animationFrame = 0;
   private stars: Array<{ x: number; y: number; z: number }> = [];
@@ -1088,6 +1096,9 @@ export class Game {
     this.supplyPod = null;
     this.supplySpawnTimer = randomBetween(5.5, 8.5);
     this.supplySpawnsRemaining = stage.stage >= 500 ? 2 : 1;
+    this.treasureDrone = null;
+    this.treasureDroneTimer = randomBetween(9, 14);
+    this.treasureDronePending = shouldScheduleTreasureDrone(stage.stage);
     this.spawnRemaining = stage.enemyBudget;
     this.spawnTimer = 0.3;
     this.eliteSpawned = 0;
@@ -1147,6 +1158,8 @@ export class Game {
     this.targetId = null;
     this.supplyPod = null;
     this.supplySpawnsRemaining = 0;
+    this.treasureDrone = null;
+    this.treasureDronePending = false;
     this.boss = null;
     this.hooks.onBossUpdate(null);
     this.hooks.onPhase(this.phase);
@@ -1183,6 +1196,11 @@ export class Game {
       return;
     }
 
+    if (this.treasureDrone !== null && this.treasureDrone.typed > 0) {
+      this.typeTreasureDrone(this.treasureDrone, key);
+      return;
+    }
+
     const projectile = this.findProjectileForKey(key);
     if (projectile !== null) {
       this.destroyProjectile(projectile);
@@ -1199,6 +1217,14 @@ export class Game {
       typingText(this.supplyPod.entry.en)[0] === key
     ) {
       this.typeSupplyPod(this.supplyPod, key);
+      return;
+    }
+
+    if (
+      this.treasureDrone !== null &&
+      typingText(this.treasureDrone.entry.en)[0] === key
+    ) {
+      this.typeTreasureDrone(this.treasureDrone, key);
       return;
     }
 
@@ -1282,8 +1308,10 @@ export class Game {
     );
     this.updateBoss(dt * hostileTimeFactor, difficulty);
     this.updateSupplyPod(dt);
+    this.updateTreasureDrone(dt);
     this.spawnTimer -= dt * hostileTimeFactor;
     this.supplySpawnTimer -= dt;
+    this.treasureDroneTimer -= dt;
 
     if (
       this.supplyPod === null &&
@@ -1295,6 +1323,18 @@ export class Game {
       this.spawnSupplyPod();
       this.supplySpawnsRemaining -= 1;
       this.supplySpawnTimer = randomBetween(11, 16);
+    }
+
+    if (
+      this.treasureDronePending &&
+      this.treasureDrone === null &&
+      this.supplyPod === null &&
+      this.treasureDroneTimer <= 0 &&
+      this.boss === null &&
+      (this.spawnRemaining > 0 || this.enemies.length > 0)
+    ) {
+      this.spawnTreasureDrone();
+      this.treasureDronePending = false;
     }
 
     if (
@@ -1524,6 +1564,7 @@ export class Game {
     this.phase = "stageclear";
     this.projectiles = [];
     this.supplyPod = null;
+    this.treasureDrone = null;
     this.boss = null;
     this.hooks.onBossUpdate(null);
     this.hooks.onStageClear(this.getStats());
@@ -1580,6 +1621,43 @@ export class Game {
     }
   }
 
+  private spawnTreasureDrone(): void {
+    const candidates = this.vocabulary.filter((entry) => {
+      const length = typingText(entry.en).length;
+      return length >= 5 && length <= 10;
+    });
+    const source = candidates.length > 0 ? candidates : this.vocabulary;
+    const entry =
+      source[Math.floor(Math.random() * source.length)] ??
+      FALLBACK_ENTRIES[5]!;
+
+    this.treasureDrone = {
+      entry,
+      typed: 0,
+      x: this.width + 52,
+      y: randomBetween(105, Math.max(145, this.height * 0.36)),
+      speed: randomBetween(78, 96),
+      age: 0,
+      lifetime: 17,
+    };
+
+    this.sfx.eliteWarning();
+  }
+
+  private updateTreasureDrone(dt: number): void {
+    if (this.treasureDrone === null) return;
+
+    this.treasureDrone.age += dt;
+    this.treasureDrone.x -= this.treasureDrone.speed * dt;
+
+    if (
+      this.treasureDrone.age >= this.treasureDrone.lifetime ||
+      this.treasureDrone.x < -70
+    ) {
+      this.treasureDrone = null;
+    }
+  }
+
   private spawnEnemy(): void {
     const stage = this.stageConfig?.stage ?? 1;
     const galaxy = this.stageConfig?.galaxy ?? 1;
@@ -1593,6 +1671,7 @@ export class Game {
     const elite =
       forceElite ||
       rollElite(this.stageConfig?.eliteChance ?? 0);
+    const golden = !elite && shouldSpawnGoldenEnemy(stage);
     const eliteModifiers = elite
       ? pickEliteModifiers(
           eliteModifierCount(this.stageConfig?.modifierSlots ?? 0),
@@ -1634,6 +1713,7 @@ export class Game {
       id: this.nextEnemyId++,
       kind,
       elite,
+      golden,
       eliteModifiers,
       entry,
       typed: 0,
@@ -1642,7 +1722,7 @@ export class Game {
       x: baseX,
       y: -profile.radius - 20,
       baseX,
-      speed: eliteStats.speed,
+      speed: eliteStats.speed * (golden ? 1.12 : 1),
       age: Math.random() * 8,
       drift: randomBetween(profile.driftMin, profile.driftMax),
       radius: elite ? profile.radius * 1.08 : profile.radius,
@@ -1655,6 +1735,8 @@ export class Game {
       const firstElite = this.eliteSpawned === 0;
       this.eliteSpawned += 1;
       if (firstElite) this.sfx.eliteWarning();
+    } else if (golden) {
+      this.sfx.eliteWarning();
     }
   }
 
@@ -2092,6 +2174,48 @@ export class Game {
     this.emitStats();
   }
 
+  private typeTreasureDrone(drone: TreasureDrone, key: string): void {
+    const word = typingText(drone.entry.en);
+    const expected = word[drone.typed];
+
+    if (key !== expected) {
+      this.registerMiss();
+      return;
+    }
+
+    drone.typed += 1;
+    this.stats.hits += 1;
+    this.stats.streak += 1;
+    this.stats.maxStreak = Math.max(
+      this.stats.maxStreak,
+      this.stats.streak,
+    );
+    this.stats.multiplier = multiplierForStreak(this.stats.streak);
+    this.stats.score += 12 * this.stats.multiplier;
+    this.gainPower(1.5);
+    this.applyCharacterCorrectKeyPassive();
+    this.burst(drone.x, drone.y, 8, 48);
+    this.sfx.shot(this.stats.multiplier);
+
+    if (drone.typed >= word.length) {
+      const drop = rollEquipmentDrop(
+        "treasure",
+        this.playerStats.luck,
+        this.playerStats.salvage,
+      );
+      if (drop !== null) {
+        this.hooks.onEquipmentDrop(drop);
+      }
+      this.stats.score += 320 * this.stats.multiplier;
+      this.hooks.onWordComplete(drone.entry);
+      this.burst(drone.x, drone.y, 44, 48);
+      this.sfx.support();
+      this.treasureDrone = null;
+    }
+
+    this.emitStats();
+  }
+
   private currentTarget(): Enemy | null {
     if (this.targetId === null) return null;
 
@@ -2184,7 +2308,12 @@ export class Game {
     );
     this.sfx.hit();
     this.sfx.kill();
-    this.tryRollEquipmentDrop(enemy.elite ? "elite" : "normal");
+    if (enemy.golden) {
+      this.stats.score += 260 * this.stats.multiplier;
+    }
+    this.tryRollEquipmentDrop(
+      enemy.golden ? "golden" : enemy.elite ? "elite" : "normal",
+    );
 
     if (enemy.kind === "splitter") {
       this.spawnSplitFragments(enemy);
@@ -3085,6 +3214,9 @@ export class Game {
     if (this.supplyPod !== null) {
       this.drawSupplyPod(this.supplyPod);
     }
+    if (this.treasureDrone !== null) {
+      this.drawTreasureDrone(this.treasureDrone);
+    }
 
     for (const enemy of this.enemies) {
       this.drawEnemy(enemy);
@@ -3462,13 +3594,67 @@ export class Game {
     context.restore();
   }
 
+  private drawTreasureDrone(drone: TreasureDrone): void {
+    const context = this.context;
+    const y = drone.y + Math.sin(drone.age * 4) * 9;
+    const displayWord = normalizeWord(drone.entry.en);
+    const split = splitDisplayByTypedLetters(displayWord, drone.typed);
+
+    context.save();
+    context.translate(drone.x, y);
+    context.globalCompositeOperation = "lighter";
+    context.shadowBlur = 26;
+    context.shadowColor = "#ffe066";
+    context.fillStyle = "rgba(255, 224, 102, 0.18)";
+    context.strokeStyle = "#ffe98a";
+    context.lineWidth = 2;
+    context.beginPath();
+    context.moveTo(-28, 0);
+    context.lineTo(-12, -14);
+    context.lineTo(20, -10);
+    context.lineTo(31, 0);
+    context.lineTo(20, 10);
+    context.lineTo(-12, 14);
+    context.closePath();
+    context.fill();
+    context.stroke();
+
+    context.fillStyle = "#fff4bd";
+    context.font =
+      "850 9px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.textAlign = "center";
+    context.fillText("TREASURE DRONE", 0, 3);
+    context.restore();
+
+    context.save();
+    context.font =
+      "800 18px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.textBaseline = "middle";
+    const fullWidth = context.measureText(displayWord).width;
+    const typedWidth = context.measureText(split.typed).width;
+    const left = drone.x - fullWidth / 2;
+    const wordY = y - 34;
+    context.fillStyle = "rgba(4, 8, 14, 0.9)";
+    context.fillRect(left - 9, wordY - 14, fullWidth + 18, 28);
+    context.textAlign = "left";
+    context.fillStyle = "rgba(145, 155, 165, 0.5)";
+    context.fillText(split.typed, left, wordY);
+    context.fillStyle = "#fff1a8";
+    context.shadowBlur = 10;
+    context.shadowColor = "#ffd84d";
+    context.fillText(split.remaining, left + typedWidth, wordY);
+    context.restore();
+  }
+
   private drawEnemy(enemy: Enemy): void {
     const context = this.context;
     const targeted = enemy.id === this.targetId;
     const kick = enemy.kick * 7;
 
     const baseColor =
-      enemy.kind === "mine"
+      enemy.golden
+        ? "#ffd84d"
+        : enemy.kind === "mine"
         ? "#ff648d"
         : enemy.kind === "tank"
           ? "#8f83ff"

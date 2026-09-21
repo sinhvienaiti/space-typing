@@ -4,7 +4,12 @@ import {
 } from "../equipment/registry";
 import type { EquipmentRarity } from "../equipment/rarity";
 
-export type LootSource = "normal" | "elite" | "boss";
+export type LootSource =
+  | "normal"
+  | "elite"
+  | "golden"
+  | "treasure"
+  | "boss";
 
 type RarityWeights = Record<EquipmentRarity, number>;
 
@@ -24,6 +29,18 @@ export const RARITY_WEIGHTS: Record<
     epic: 14,
     legendary: 3,
   },
+  golden: {
+    common: 18,
+    rare: 50,
+    epic: 26,
+    legendary: 6,
+  },
+  treasure: {
+    common: 5,
+    rare: 40,
+    epic: 40,
+    legendary: 15,
+  },
   boss: {
     common: 20,
     rare: 40,
@@ -38,6 +55,8 @@ export const EQUIPMENT_LOOT_TABLES: Record<
 > = {
   normal: EQUIPMENT_IDS,
   elite: EQUIPMENT_IDS,
+  golden: EQUIPMENT_IDS,
+  treasure: EQUIPMENT_IDS,
   boss: EQUIPMENT_IDS,
 };
 
@@ -122,7 +141,9 @@ export function equipmentDropChance(
   salvage: number,
 ): number {
   const base =
-    source === "boss"
+    source === "boss" ||
+    source === "golden" ||
+    source === "treasure"
       ? 1
       : source === "elite"
         ? 0.22

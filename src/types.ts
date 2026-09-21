@@ -78,6 +78,7 @@ export type Enemy = {
   id: number;
   kind: EnemyKind;
   elite: boolean;
+  golden?: boolean;
   eliteModifiers: EliteModifier[];
   entry: VocabularyEntry;
   typed: number;
