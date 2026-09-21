@@ -76,11 +76,11 @@ https://space.typing-game.local
 ## Next implementation checkpoint
 
 ~~~text
-Step 32
-Equipment + Loadout
+Step 39
+Character registry + Character Select
 
 Then:
-Step 33 rarity / loot tables
-Step 34 basic enhancement
-Step 35 skill engine
+Step 40 Vanguard
+Step 41 Stage-100 milestone unlock framework
+Step 42 remaining milestone characters
 ~~~

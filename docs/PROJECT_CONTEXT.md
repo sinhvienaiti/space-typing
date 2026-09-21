@@ -2961,74 +2961,105 @@ Step 27  validated JSON Export / Import
 Step 28  effective-stat calculation pipeline
 Step 29  all 10 core attributes runtime contracts
 Step 30  Item registry + persistent inventory
-Step 31  first consumables:
-         Repair Kit / Shield Cell / Energy Cell
+Step 31  first recovery consumables
+Step 32  Equipment + 7-slot Loadout
+Step 33  Common/Rare/Epic/Legendary + weighted loot tables
+Step 34  Equipment enhancement +0 -> +5
+Step 35  pause-safe Skill Engine
+Step 36  defensive combat skills
+Step 37  offensive combat skills
+Step 38  persistent 2-slot Support Spell loadout
 
 Next:
-Step 32  Equipment + Loadout
+Step 39  Character registry + Character Select
 ~~~
 
 Current gameplay/progression foundation:
 
 - 1000-stage persistent Campaign;
-- Stage + WPM + Accuracy + Vocabulary adaptive difficulty;
+- adaptive Stage + WPM + Accuracy + Vocabulary difficulty;
 - 15 mechanically distinct enemy families;
 - Elite modifier framework;
 - multi-phase boss combat;
-- phrase-safe shared vocabulary typing;
-- Hull / Shield / Armor defensive runtime;
-- Firepower boss-damage scaling;
-- Energy / Reactor resource recovery;
-- Focus Overdrive gain;
-- Ward status-duration reduction;
+- Hull / Shield / Armor / Energy / Reactor / Focus / Ward runtime;
 - Luck / Salvage reward-factor contracts;
-- unified effective-stat pipeline:
-  Character Base + Level + Equipment + Talent + Temporary + Stage;
-- PlayerSave schema v3 in IndexedDB;
-- automatic v1/v2 -> v3 migration;
-- synchronized local recovery save;
-- autosave serialization and page-hide flush;
-- strict JSON backup Export / Import;
-- stable 9-item registry;
-- stack-limited persistent inventory;
-- recovery consumables usable through compact combat buttons or keys 1/2/3;
-- consumables are not spent when the target resource is already full.
+- unified effective-stat pipeline;
+- PlayerSave schema v7 in IndexedDB;
+- explicit migrations from all earlier PlayerSave schemas;
+- synchronized recovery save + autosave queue + JSON backup;
+- stable item registry + persistent inventory;
+- first recovery consumables with keys 1/2/3;
+- seven equipment slots:
+  Weapon / Armor / Shield / Reactor / Utility / Drone / Core;
+- equipment instance persistence with rarity and enhancement;
+- Common / Rare / Epic / Legendary stat scaling;
+- Normal / Elite / Boss weighted equipment loot tables;
+- Luck-adjusted rarity weighting without guaranteed rarity;
+- enhancement foundation +0 through +5;
+- Skill Engine:
+  Energy / cooldown / charges / typing conditions / per-stage limits;
+- defensive skills:
+  Barrier / Reflect Field / Time Shell / Emergency Repair / Guardian Drone;
+- offensive skills:
+  EMP Burst / Chain Lightning / Mark of Weakness;
+- 2-slot Support Spell loadout selected before a stage;
+- support spells:
+  Sanctuary / Gravity Well / Cleanse / Meteor;
+- support loadout is persisted and backup/import validated.
 
 Recent validation checkpoints:
 
 ~~~text
-Persistence review pass 2
-e0a775bff1f74c92b9c949153d2573bc8604387b
+Equipment Loadout
+857b42384c6d8dcd37d2b1a7cadf7c5874b3fc06
 PASS
 
-Effective-stat pipeline
-4006b6395e5d649686d430edcd047a25d0759e68
+Rarity + Loot Tables
+33aaab5fca55c5e84eec6a622a4ea78a7d1e37fb
 PASS
 
-Core attributes runtime
-ff09c0330687cf4da511dfb805cb7724bb377ac5
+Enhancement Foundation
+1ee9192a78a8236b487fd60d067e0a440aa3f4b3
 PASS
 
-Item registry / PlayerSave v3 inventory
-53358181b0b6edfa0f452a8270d34f2fd51adbdf
+Skill Engine
+58eacda38dc4e78313679a13b9b41c4806dae2cc
 PASS
 
-First recovery consumables
-539abd490a2a3cba966f22e5a2bf66046f172683
+Defensive Skill Foundation
+383d7babc3d6828461b70b286a2581e3277b0f2b
+PASS
+
+Defensive Skills Runtime
+4e621a4f69c92e47eb0b6b5a437966546ba0fd07
+PASS
+
+Offensive Skills Runtime
+98a1076d8d3f2542bfe3247315dab37707d8c631
+PASS
+
+Support Spell Persistence
+3c9a6a54ba4d185fa74206a9c4f99ae0620d5efd
+PASS
+
+Support Spell Runtime
+c00fc7543b506480e237903ecfc68eaa5012d763
 PASS
 ~~~
 
 Important implementation notes:
 
-- Inventory is permanent progress and belongs inside PlayerSave, not a separate localStorage system.
-- Current PlayerSave schema is version 3.
-- Future permanent systems must extend PlayerSave using explicit migration steps.
-- The nine stable item IDs currently registered are:
-  repair-kit, shield-cell, energy-cell, nova-bomb, emp-charge,
-  time-crystal, word-bomb, supply-beacon, lucky-dice.
-- Only Repair Kit, Shield Cell and Energy Cell have active effects at this checkpoint.
-  The other items stay registered but must not receive fake placeholder mechanics before
-  their required combat/status/supply systems exist.
+- Current PlayerSave schema is version 7.
+- Permanent systems must extend PlayerSave through explicit migrations.
+- Equipment rarity and enhancement already feed the existing equipment
+  layer of effective-stat calculation.
+- Support spell loadout is separate from core combat skills.
+- Only two support spells may be equipped at once.
+- Core combat skill hotkeys:
+  4-8 defensive, 9/0/- offensive.
+- Support spell hotkeys:
+  [ and ].
+- Inventory hotkeys remain 1/2/3.
 - Parent vocabulary and shared Music contracts remain unchanged.
 
 Project-wide requirements remain:
