@@ -407,6 +407,180 @@ Enemy/boss visuals may use:
 
 For any external asset, record source, author when applicable, license and attribution requirement.
 
+## 4.5 Audio quality is a first-class feature
+
+Audio is not a final-stage decoration.
+
+The game-feel target depends heavily on sound quality.
+
+Required sound layers:
+
+- correct-key shot;
+- target hit;
+- perfect-word impact;
+- wrong-key feedback;
+- enemy attack;
+- projectile warning;
+- Shield hit/break;
+- skill/spell activation;
+- item pickup;
+- rare/Legendary drop;
+- Supply Pod arrival;
+- Elite warning;
+- boss entrance;
+- boss phase change;
+- boss stagger;
+- boss death;
+- stage clear/fail;
+- shop/reward/UI feedback.
+
+Audio principles:
+
+~~~text
+correct typing
+-> immediate crisp response
+
+strong event
+-> deeper/larger impact
+
+rare event
+-> recognizable signature sound
+
+boss
+-> unique sound identity
+~~~
+
+Do not make every event equally loud.
+
+Use a clear mix hierarchy so typing feedback, dangerous warnings and pronunciation remain understandable while parent background music is playing.
+
+Pronunciation keeps priority through shared-music ducking.
+
+SFX should support volume groups where useful:
+
+~~~text
+Master SFX
+Typing
+Combat
+Warnings
+UI
+Pronunciation
+~~~
+
+Avoid requiring all groups in the first UI if a simpler control is enough, but keep the audio architecture capable of supporting them.
+
+## 4.6 UI/UX visual language
+
+Monkeytype is a reference for information design and visual restraint, not a UI to copy.
+
+Desired qualities visible in the reference screenshots:
+
+- dark neutral background;
+- one restrained accent color;
+- strong typography hierarchy;
+- generous spacing;
+- large clean information blocks;
+- simple icons;
+- low border noise;
+- modern but not flashy controls;
+- settings grouped by understandable categories;
+- important values emphasized with size instead of excessive decoration;
+- secondary information visually quieter;
+- consistent alignment;
+- minimal clutter.
+
+Space Typing should use the same design philosophy while keeping its own sci-fi identity.
+
+### Combat HUD rule
+
+Do not display every RPG system at once.
+
+During combat, prioritize only information needed immediately:
+
+~~~text
+Current target
+Boss HP when applicable
+Hull
+Shield
+Energy
+Power / Ultimate
+Skill cooldowns
+Critical active status
+Stage / wave
+Score or streak when useful
+~~~
+
+Inventory details, full stats, collections and long descriptions belong in pause/menu/result screens.
+
+### Settings design
+
+Settings should be a polished first-class page/panel with clear categories such as:
+
+~~~text
+Gameplay
+Difficulty
+Typing
+Sound
+Visual
+Interface
+Accessibility
+Data / Save
+~~~
+
+Use simple rows, predictable controls, good spacing and immediate value feedback.
+
+### Profile / progression presentation
+
+A future Pilot Profile may show:
+
+- Campaign progress;
+- total stages cleared;
+- time typing;
+- WPM/accuracy records;
+- character Mastery;
+- boss records;
+- recent activity;
+- achievement/collection progress;
+- optional activity heatmap/history.
+
+It should remain visually calm and readable, inspired by Monkeytype's information hierarchy without copying its layout.
+
+## 4.7 Performance budget
+
+Visual and audio quality must not compromise responsiveness.
+
+Primary target:
+
+~~~text
+60 FPS during normal combat
+low input latency
+no typing delay caused by effects
+~~~
+
+Implementation rules:
+
+- pool frequently-created particles/projectiles where useful;
+- cap particle counts;
+- cull off-screen effects;
+- avoid unnecessary DOM updates during Canvas combat;
+- avoid expensive full-screen blur every frame;
+- cache reusable graphics;
+- separate simulation from rendering;
+- use delta-time safely;
+- support effect-quality presets;
+- test boss + projectile + particle worst cases.
+
+Suggested Visual quality options:
+
+~~~text
+Low
+Medium
+High
+Ultra
+~~~
+
+Gameplay logic and typing timing must remain identical across quality presets.
+
 ---
 
 # 5. Game modes
@@ -554,9 +728,111 @@ same content
 + only larger numbers
 ~~~
 
+## 6.5 Adaptive difficulty: Stage + Mode + WPM + Vocabulary
+
+Difficulty must account for both Campaign progression and the player's selected typing context.
+
+The effective pressure should combine:
+
+~~~text
+Campaign Stage difficulty
+× selected Game Difficulty
+× measured/selected WPM profile
+× Vocabulary difficulty
+× stage modifiers
+~~~
+
+Do not scale every value linearly from WPM.
+
+A player typing 100 WPM should not simply receive enemies moving twice as fast as a 50 WPM player.
+
+Use WPM mainly to estimate fair reaction windows and pressure.
+
+Standard typing math may estimate typing time from roughly five characters per WPM word:
+
+~~~text
+estimated typing seconds
+≈ character count × 12 / WPM
+~~~
+
+Then add reaction/target-acquisition buffer and clamp the final pressure within fair limits.
+
+### Difficulty options
+
+Recommended options:
+
+~~~text
+Relaxed
+Normal
+Hard
+Expert
+Adaptive
+Custom
+~~~
+
+Adaptive:
+
+- learns from recent valid Campaign performance;
+- uses smoothed WPM rather than one unusually fast/slow stage;
+- considers recent accuracy;
+- never changes difficulty sharply mid-word;
+- adjusts mainly between stages or controlled checkpoints.
+
+Custom may allow:
+
+~~~text
+Target WPM
+Enemy pressure
+Projectile pressure
+Boss pressure
+Random-event intensity
+~~~
+
+### Vocabulary factor
+
+Vocabulary Level already represents learning difficulty and should influence pressure.
+
+Higher Vocabulary Levels may naturally include:
+
+- less common words;
+- harder spelling;
+- longer/less familiar forms;
+- harder pronunciation;
+- phrases.
+
+Therefore a high Vocabulary Level should not also receive the same raw speed scaling as an easy Vocabulary Level without compensation.
+
+The balancing goal is:
+
+~~~text
+harder vocabulary
+-> more cognitive/typing difficulty
+-> slightly more reaction allowance where needed
+
+higher Campaign Stage
+-> more combat-system complexity
+
+higher selected Game Difficulty
+-> less forgiveness / more pressure
+~~~
+
+### Fairness rule
+
+Adaptive difficulty must challenge the player, not punish improvement.
+
+Do not continuously rubber-band so that every improvement is immediately cancelled.
+
+The player must still feel:
+
+~~~text
+I became better
+-> earlier stages/builds feel easier
+-> higher stages become reachable
+~~~
+
 ---
 
-# 7. The 18 core systems
+# 7. Core systems
 
 ## System 01 — Items
 
@@ -936,6 +1212,76 @@ Persist:
 - cosmetics;
 - boss records;
 - collection completion.
+
+## System 19 — Secret / Hidden Discovery
+
+Hidden content is a major replay and Luck system.
+
+Possible hidden content:
+
+~~~text
+Hidden Skill
+Hidden Spell
+Hidden Stage
+Hidden Shop
+Hidden Boss
+Hidden Weapon
+Hidden Equipment
+Hidden Character interaction
+Hidden Mission
+Hidden Event
+Hidden Upgrade path
+Hidden Legendary/Mythic reward
+~~~
+
+Hidden content should use a mix of:
+
+- Luck-based chance;
+- secret conditions;
+- character/build conditions;
+- accuracy/streak conditions;
+- special item possession;
+- stage milestones;
+- repeated-event pity;
+- rare event chains.
+
+Do not make important gameplay content permanently unreachable through pure RNG.
+
+Use soft pity, clues, Codex silhouettes/??? entries or deterministic alternate conditions where appropriate.
+
+Examples:
+
+~~~text
+Hidden Shop
+-> small chance after a perfect stage
+-> chance increased by Luck
+-> guaranteed after a long drought
+
+Hidden Boss
+-> rare portal/event
+-> or guaranteed by completing a secret mission chain
+
+Hidden Skill
+-> boss drop
+-> or secret achievement condition
+~~~
+
+The purpose is discovery, surprise and replayability rather than frustration.
+
+## System 20 — Adaptive Difficulty
+
+Adaptive Difficulty combines:
+
+- Campaign Stage;
+- selected difficulty option;
+- recent/target WPM;
+- recent accuracy;
+- active Vocabulary Level;
+- stage modifiers.
+
+It changes combat pressure while preserving a fair progression curve.
+
+The player may explicitly choose a fixed difficulty or use Adaptive.
 
 ## Cross-system Synergy
 
@@ -1866,7 +2212,9 @@ Deliverables:
 - basic settings;
 - shared vocabulary loader skeleton;
 - persistence schema skeleton;
-- parent audio-focus contract.
+- parent audio-focus contract;
+- base audio mixer/SFX architecture;
+- base UI tokens for typography, spacing, panels and accent color.
 
 Acceptance:
 
@@ -1898,7 +2246,9 @@ Implement:
 - streak;
 - multiplier;
 - Power/Overdrive;
-- pause/resume.
+- pause/resume;
+- first polished typing/combat SFX set;
+- clean minimal HUD with clear information hierarchy.
 
 Acceptance:
 
@@ -1941,7 +2291,11 @@ Implement:
 - Continue;
 - Retry;
 - Stage Select;
-- highest unlocked stage.
+- highest unlocked stage;
+- difficulty mode selection;
+- WPM/accuracy profile;
+- Vocabulary difficulty factor;
+- adaptive-difficulty smoothing/clamping.
 
 Generate stages from data/functions rather than hand-writing 1000 files.
 
@@ -2122,7 +2476,7 @@ Implement:
 
 Do not build an enormous talent graph.
 
-## Phase 13 — Supply, random events and Luck
+## Phase 13 — Supply, random events, Luck and hidden discovery
 
 Implement:
 
@@ -2134,7 +2488,14 @@ Implement:
 - Anomaly crate;
 - Luck weighting;
 - soft pity;
-- event scheduler.
+- event scheduler;
+- Hidden Shop;
+- Hidden Stage/event route;
+- Hidden Boss trigger framework;
+- Hidden Skill/Weapon/Mission reward hooks;
+- Codex ???/discovery presentation.
+
+Hidden content must combine RNG with fair deterministic/pity paths instead of pure permanent RNG lockout.
 
 Use seeded/controlled RNG where useful for testing/debugging.
 
@@ -2197,7 +2558,9 @@ Expand:
 - phrase challenges;
 - shared typing-text special stages.
 
-## Phase 19 — Art and audio polish
+## Phase 19 — Art and audio final polish
+
+Audio/visual quality is developed from Phase 1 onward. This phase is the final production pass, not the first time polish is considered.
 
 Create/curate:
 
@@ -2214,7 +2577,33 @@ Create/curate:
 
 Use original/generated/compatible assets only.
 
+Final audio pass includes:
+
+- per-key sound response;
+- layered hit strength;
+- boss signatures;
+- rare-drop/event signatures;
+- warning readability;
+- pronunciation priority;
+- shared-BGM balance.
+
+Final UI pass includes:
+
+- combat HUD hierarchy;
+- Settings;
+- Character;
+- Loadout;
+- Shop;
+- Stage Select;
+- Result;
+- Pilot Profile/Stats;
+- Codex/Collection.
+
+Use Monkeytype as a reference for clean, modern information hierarchy and settings organization, not as a layout to copy.
+
 Tune SFX so typing remains satisfying with parent BGM.
+
+Re-run worst-case performance profiling after every major VFX/audio change.
 
 ## Phase 20 — Parent platform integration
 
@@ -2307,6 +2696,9 @@ Create Galaxy and stage-role models.
 
 ## Step 15
 Create difficulty model plus automated trend tests.
+
+## Step 15A
+Add fixed difficulty modes and Adaptive Difficulty using smoothed WPM, recent accuracy, Vocabulary Level and fair reaction-window clamps.
 
 ## Step 16
 Add Continue, Retry and Stage Select.
@@ -2412,6 +2804,9 @@ Implement Anomaly risk/reward crate.
 
 ## Step 50
 Implement Luck weighting and soft pity.
+
+## Step 50A
+Implement hidden-content discovery framework: Hidden Shop, Hidden Event/Stage, Hidden Boss trigger, Hidden Skill/Weapon/Mission rewards and Codex ??? entries.
 
 ## Step 51
 Implement stage random-event scheduler.
@@ -2523,8 +2918,10 @@ basic Hull/Shield/Energy
 1 defensive skill
 basic persistence
 Stage Select
+difficulty option + basic WPM adaptation
 Supply Pod
 3 consumables
+1 rare/hidden discovery event
 ~~~
 
 After this is fun/stable, scale toward the full 1000-stage architecture.
@@ -2541,12 +2938,13 @@ A major feature is complete only when:
 4. important deterministic logic has tests;
 5. no known regression remains;
 6. save compatibility is considered;
-7. performance and readability are checked;
-8. child CI passes;
-9. parent integration is updated only when required;
-10. documentation is updated;
-11. Review Pass #1 is clean;
-12. Review Pass #2 is clean.
+7. performance, readability and information hierarchy are checked;
+8. audio feedback is checked for clarity, latency and mix balance;
+9. child CI passes;
+10. parent integration is updated only when required;
+11. documentation is updated;
+12. Review Pass #1 is clean;
+13. Review Pass #2 is clean.
 
 ---
 
