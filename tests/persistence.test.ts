@@ -328,6 +328,20 @@ describe("player save persistence model", () => {
     });
   });
 
+  it("migrates PlayerSave v12 to zero Credits", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const legacy = {
+      ...current,
+      version: 12,
+    } as Record<string, unknown>;
+    delete legacy.credits;
+
+    const migration = migratePlayerSave(legacy);
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(12);
+    expect(migration.save.credits).toBe(0);
+  });
+
   it("keeps a valid current-version save without migration", () => {
     const save = createPlayerSave(
       createDefaultCampaignProgress(),
@@ -361,6 +375,7 @@ describe("player save persistence model", () => {
       discovered: [],
       lastRollStage: 0,
     });
+    expect(migration.save.credits).toBe(0);
   });
 
   it("refuses unsupported numeric schema versions instead of down-migrating them", () => {
