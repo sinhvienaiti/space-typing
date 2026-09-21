@@ -424,6 +424,20 @@ export function isValidEquipmentState(
   return true;
 }
 
+export function addEquipmentInstance(
+  state: EquipmentState,
+  item: EquipmentInstance,
+): EquipmentState {
+  if (state.items.some((current) => current.instanceId === item.instanceId)) {
+    return state;
+  }
+
+  return {
+    items: [...state.items.map((current) => ({ ...current })), { ...item }],
+    loadout: { ...state.loadout },
+  };
+}
+
 export function equipmentForSlot(
   state: EquipmentState,
   slot: EquipmentSlot,

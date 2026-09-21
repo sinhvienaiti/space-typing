@@ -110,3 +110,40 @@ export function rarityChanceSummary(
     legendary: adjusted.legendary / total,
   };
 }
+
+export type EquipmentDrop = {
+  source: LootSource;
+  definitionId: EquipmentId;
+  rarity: EquipmentRarity;
+};
+
+export function equipmentDropChance(
+  source: LootSource,
+  salvage: number,
+): number {
+  const base =
+    source === "boss"
+      ? 1
+      : source === "elite"
+        ? 0.22
+        : 0.035;
+  const salvageBonus = 1 + Math.min(100, Math.max(0, salvage)) * 0.004;
+  return Math.min(1, base * salvageBonus);
+}
+
+export function rollEquipmentDrop(
+  source: LootSource,
+  luck: number,
+  salvage: number,
+  random = Math.random,
+): EquipmentDrop | null {
+  if (random() >= equipmentDropChance(source, salvage)) {
+    return null;
+  }
+
+  return {
+    source,
+    rarity: rollEquipmentRarity(source, luck, random()),
+    definitionId: rollEquipmentDefinition(source, random()),
+  };
+}

@@ -49,6 +49,7 @@ import { WRAITH_ACTIVE_SKILL_ID } from "./characters/wraith";
 import { ZENITH_ACTIVE_SKILL_ID } from "./characters/zenith";
 import { characterStatBonus } from "./characters/stats";
 import {
+  addEquipmentInstance,
   createStarterEquipmentState,
   equipmentForSlot,
   equipmentStatBonus,
@@ -633,6 +634,7 @@ let equipment: EquipmentState = createStarterEquipmentState();
 let supportSpells: SupportSpellState = createStarterSupportSpellState();
 let characters: CharacterState = createStarterCharacterState();
 let persistenceReady = false;
+let equipmentDropCounter = 0;
 let sourceState = loadSource();
 let sourceTab: "class" | "custom" = sourceState.mode;
 let vocabularyIndex: VocabularyIndex | null = null;
@@ -1050,6 +1052,16 @@ function renderBoss(boss: BossHudState | null): void {
   byId("bossHpFill").style.width = percent.toFixed(2) + "%";
 }
 
+function createEquipmentDropInstanceId(): string {
+  equipmentDropCounter += 1;
+  return (
+    "drop-" +
+    Date.now().toString(36) +
+    "-" +
+    equipmentDropCounter.toString(36)
+  );
+}
+
 const game = new Game(
   byId<HTMLCanvasElement>("gameCanvas"),
   [],
@@ -1145,6 +1157,23 @@ const game = new Game(
     onWordComplete: (entry) => {
       showLearning(entry);
       speakEnglish(entry.en, settings);
+    },
+    onEquipmentDrop: (drop) => {
+      const definition = getEquipmentDefinition(drop.definitionId);
+      equipment = addEquipmentInstance(equipment, {
+        instanceId: createEquipmentDropInstanceId(),
+        definitionId: drop.definitionId,
+        rarity: drop.rarity,
+        enhancement: 0,
+      });
+      renderEquipment();
+      void autosaveCampaign(
+        "equipment",
+        "✓ " +
+          drop.rarity.toUpperCase() +
+          " drop · " +
+          definition.name,
+      );
     },
   },
 );

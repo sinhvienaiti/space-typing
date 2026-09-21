@@ -132,6 +132,11 @@ import {
   wardDuration,
 } from "./stats/player";
 import {
+  rollEquipmentDrop,
+  type EquipmentDrop,
+  type LootSource,
+} from "./loot/equipment-loot";
+import {
   applyEliteModifiers,
   eliteModifierCount,
   pickEliteModifiers,
@@ -200,6 +205,7 @@ type Hooks = {
   onStageClear(stats: GameStats): void;
   onBossUpdate(boss: BossHudState | null): void;
   onWordComplete(entry: VocabularyEntry): void;
+  onEquipmentDrop(drop: EquipmentDrop): void;
   onSkills(): void;
 };
 
@@ -2004,6 +2010,7 @@ export class Game {
 
     this.burst(x, y, 70, 24);
     this.sfx.bossDeath();
+    this.tryRollEquipmentDrop("boss");
 
     if (this.settings.screenShake) {
       this.shake = Math.max(this.shake, 13);
@@ -2013,6 +2020,17 @@ export class Game {
     this.bossDefeated = true;
     this.hooks.onBossUpdate(null);
     this.finishStage();
+  }
+
+  private tryRollEquipmentDrop(source: LootSource): void {
+    const drop = rollEquipmentDrop(
+      source,
+      this.playerStats.luck,
+      this.playerStats.salvage,
+    );
+    if (drop !== null) {
+      this.hooks.onEquipmentDrop(drop);
+    }
   }
 
   private typeSupplyPod(pod: SupplyPod, key: string): void {
@@ -2166,6 +2184,7 @@ export class Game {
     );
     this.sfx.hit();
     this.sfx.kill();
+    this.tryRollEquipmentDrop(enemy.elite ? "elite" : "normal");
 
     if (enemy.kind === "splitter") {
       this.spawnSplitFragments(enemy);

@@ -2874,6 +2874,18 @@ Current Supply Pod slice:
 ## Step 46
 Implement enemy random drops.
 
+**Status: implemented.**
+
+Current drop rules:
+
+- defeated normal enemies have a small equipment-drop chance;
+- Elite enemies use a much higher equipment-drop chance;
+- bosses guarantee an equipment drop;
+- dropped equipment uses the existing Common/Rare/Epic/Legendary rarity tables and equipment registry;
+- Luck improves rarity weighting and Salvage improves drop chance through the effective-stat pipeline;
+- drops are added to the existing equipment inventory without auto-equipping them;
+- each accepted drop autosaves immediately so closing the page mid-run does not silently lose the item.
+
 ## Step 47
 Implement Treasure Drone and Golden Enemy.
 
