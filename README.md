@@ -22,7 +22,12 @@ Implemented foundation + first core typing-combat prototype:
 - game-over/result overlay;
 - SFX feedback;
 - clean dark HUD/settings UI;
-- effect quality options.
+- effect quality options;
+- parent shared vocabulary loader;
+- Class/Custom explicit vocabulary source flow;
+- English + Vietnamese + IPA completion feedback;
+- queued English pronunciation;
+- parent shared-music ducking signal.
 
 The full project plan and source of truth is:
 
@@ -59,4 +64,19 @@ Target platform URLs:
 ~~~text
 https://typing-game.local/space-typing
 https://space.typing-game.local
+~~~
+
+
+## Next implementation checkpoint
+
+~~~text
+Step 12
+Campaign persistence with highest unlocked stage
+
+Then:
+Step 13 StageFactory for Stage 001-1000
+Step 14 Galaxy/stage-role model
+Step 15 difficulty model
+Step 15A WPM/Vocabulary adaptive difficulty
+Step 16 Continue / Retry / Stage Select
 ~~~

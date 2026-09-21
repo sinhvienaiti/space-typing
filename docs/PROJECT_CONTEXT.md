@@ -2950,16 +2950,63 @@ A major feature is complete only when:
 
 # 23. Current status
 
-At creation of this master file:
+Current implementation checkpoint:
 
-- sinhvienaiti/space-typing exists as an independent repository;
-- requirements/design are being consolidated before the main implementation sequence;
-- Campaign scope is 1000 stages;
-- character milestone unlocks are every 100 stages;
-- the parent vocabulary library is production-ready at 18,000 entries / 100 levels;
-- the parent typing-text corpus currently has 20 available levels / 300 passages and is still expanding;
-- the parent shared Music system already exists;
-- this file is the primary context/handoff/plan document.
+~~~text
+Completed:
+Step 01  Vite + TypeScript + Vitest + CI
+Step 02  full-height wide Canvas shell
+Step 03  high-DPI game loop + pause-safe clock
+Step 04  typing-first input routing
+Step 05  first-letter target locking + word rendering
+Step 06  laser / hit / recoil / particles / SFX
+Step 07  score / streak / multiplier / Power
+Step 08  Scout + prototype wave clear/fail pressure
+Step 09  parent shared vocabulary index/level loader
+Step 10  Class/Custom explicit vocabulary apply flow
+Step 11  VI + IPA + queued English pronunciation + parent music ducking
+
+Next:
+Step 12  Campaign save with highest unlocked stage
+~~~
+
+Implemented foundation details:
+
+- independent TypeScript/Vite child app;
+- responsive wide high-DPI Canvas;
+- stationary player ship with no movement controls;
+- clean dark HUD and Settings UI;
+- basic SFX mixer using Web Audio;
+- effect quality scaling and particle caps;
+- parent vocabulary runtime contract at /vocabulary/;
+- local fallback vocabulary only when parent shared data is unavailable;
+- Class/Custom vocabulary source state;
+- completion learning toast with English/IPA/Vietnamese;
+- SpeechSynthesis queue that does not cancel rapid later words;
+- typing-game:speech active/inactive messages for shared Music ducking.
+
+Validation checkpoint:
+
+~~~text
+Foundation/Core combat CI
+7816bc3fd7b8dfb66878c77ed3a88f3ee1be71fe
+PASS
+
+Shared vocabulary/pronunciation CI
+2a2118273fd25a013798b1b60b5d93ca068225ec
+PASS
+~~~
+
+Project-wide requirements remain:
+
+- Campaign scope: 1000 stages;
+- character milestone unlocks: every 100 Campaign stages;
+- parent vocabulary library: 18,000 entries / 100 levels;
+- parent typing-text corpus: still expanding;
+- parent shared Music system: already available;
+- docs/PROJECT_CONTEXT.md remains the primary context/handoff/plan document.
+
+Do not interpret the prototype wave counter as the final Campaign Stage system. Step 12+ replaces it with persistent Campaign progression.
 
 ---
 
