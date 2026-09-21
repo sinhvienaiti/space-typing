@@ -1123,6 +1123,10 @@ export class Game {
     }
   }
 
+  getPlayerStats(): CoreStats {
+    return { ...this.playerStats };
+  }
+
   setLuckPityState(state: LuckPityState): void {
     this.luckPity = sanitizeLuckPityState(state);
   }
