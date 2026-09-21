@@ -145,7 +145,8 @@ app.innerHTML = `
       <div class="hud-side hud-side-right">
         <div class="metric"><span>accuracy</span><strong id="accuracy">100%</strong></div>
         <div class="metric"><span>kills</span><strong id="kills">0</strong></div>
-        <div class="lives" id="lives">♥ ♥ ♥</div>
+        <div class="metric"><span>hull</span><strong id="hull">100</strong></div>
+        <div class="metric"><span>shield</span><strong id="shield">40</strong></div>
       </div>
     </header>
 
@@ -166,6 +167,10 @@ app.innerHTML = `
       </div>
       <div class="power-track">
         <div id="powerFill" class="power-fill"></div>
+      </div>
+      <div class="energy-chip">
+        <span>energy</span>
+        <strong id="energyText">100 / 100</strong>
       </div>
     </div>
 
@@ -462,9 +467,14 @@ function renderStats(stats: GameStats): void {
   byId("waveBadge").textContent =
     "stage " + String(stats.stage).padStart(3, "0");
 
-  byId("lives").textContent = Array.from({ length: 3 }, (_, index) =>
-    index < stats.lives ? "♥" : "♡",
-  ).join(" ");
+  byId("hull").textContent =
+    String(Math.ceil(stats.hull)) + " / " + String(Math.ceil(stats.maxHull));
+  byId("shield").textContent =
+    String(Math.ceil(stats.shield)) + " / " + String(Math.ceil(stats.maxShield));
+  byId("energyText").textContent =
+    String(Math.ceil(stats.energy)) +
+    " / " +
+    String(Math.ceil(stats.maxEnergy));
 
   byId("powerFill").style.width = String(stats.power) + "%";
   byId("powerFill").classList.toggle("ready", stats.power >= 100);

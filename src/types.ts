@@ -65,7 +65,12 @@ export type GameStats = {
   misses: number;
   kills: number;
   stage: number;
-  lives: number;
+  hull: number;
+  maxHull: number;
+  shield: number;
+  maxShield: number;
+  energy: number;
+  maxEnergy: number;
   power: number;
 };
 

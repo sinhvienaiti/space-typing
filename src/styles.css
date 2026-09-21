@@ -164,7 +164,7 @@ button.primary {
   width: min(540px, calc(100vw - 160px));
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 0.8rem;
   pointer-events: none;
@@ -779,4 +779,40 @@ kbd {
   min-height: 1.3rem;
   margin: 0;
   font-size: 0.72rem;
+}
+
+
+.energy-chip {
+  display: grid;
+  min-width: 86px;
+  gap: 0.05rem;
+  text-align: right;
+}
+
+.energy-chip span {
+  color: #607185;
+  font-size: 0.54rem;
+  font-weight: 850;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.energy-chip strong {
+  color: #83e9ff;
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 760px) {
+  .energy-chip {
+    display: none;
+  }
+
+  .hud-side {
+    gap: 0.7rem;
+  }
+
+  .metric {
+    min-width: 48px;
+  }
 }

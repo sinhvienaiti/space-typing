@@ -12,6 +12,20 @@ import {
 import type { BossHudState, BossState } from "./boss/model";
 import type { DifficultyProfile, StageConfig } from "./campaign/types";
 import {
+  calculateEffectiveStats,
+  type CoreStats,
+  type EffectiveStatInput,
+} from "./stats/core";
+import {
+  applyIncomingDamage,
+  createPlayerResources,
+  DEFAULT_PLAYER_BASE_STATS,
+  firepowerDamage,
+  focusPowerGain,
+  regenerateResources,
+  wardDuration,
+} from "./stats/player";
+import {
   applyEliteModifiers,
   eliteModifierCount,
   pickEliteModifiers,
@@ -79,18 +93,12 @@ export class Game {
   private settings: GameSettings;
   private vocabulary: VocabularyEntry[];
   private phase: GamePhase = "title";
-  private stats: GameStats = {
-    score: 0,
-    streak: 0,
-    maxStreak: 0,
-    multiplier: 1,
-    hits: 0,
-    misses: 0,
-    kills: 0,
-    stage: 1,
-    lives: 3,
-    power: 0,
-  };
+  private playerStats: CoreStats = calculateEffectiveStats({
+    base: DEFAULT_PLAYER_BASE_STATS,
+  });
+  private stats: GameStats = this.createGameStats(1);
+  private secondsSinceDamage = Number.POSITIVE_INFINITY;
+  private resourceEmitTimer = 0;
 
   private width = 1280;
   private height = 720;
@@ -150,6 +158,15 @@ export class Game {
     return { ...this.stats };
   }
 
+  setPlayerStats(input: EffectiveStatInput): void {
+    this.playerStats = calculateEffectiveStats(input);
+
+    if (this.phase !== "playing" && this.phase !== "paused") {
+      this.stats = this.createGameStats(this.stats.stage);
+      this.emitStats();
+    }
+  }
+
   setVocabulary(entries: VocabularyEntry[]): void {
     if (entries.length === 0) return;
     this.vocabulary = entries;
@@ -168,18 +185,9 @@ export class Game {
     this.stageConfig = stage;
     this.difficulty = difficulty;
     this.phase = "playing";
-    this.stats = {
-      score: 0,
-      streak: 0,
-      maxStreak: 0,
-      multiplier: 1,
-      hits: 0,
-      misses: 0,
-      kills: 0,
-      stage: stage.stage,
-      lives: 3,
-      power: 0,
-    };
+    this.stats = this.createGameStats(stage.stage);
+    this.secondsSinceDamage = Number.POSITIVE_INFINITY;
+    this.resourceEmitTimer = 0;
     this.enemies = [];
     this.projectiles = [];
     this.lasers = [];
@@ -319,6 +327,7 @@ export class Game {
     const difficulty = this.difficulty;
     if (difficulty === null || this.stageConfig === null) return;
 
+    this.updatePlayerResources(dt);
     this.updateBoss(dt, difficulty);
     this.spawnTimer -= dt;
 
@@ -654,7 +663,14 @@ export class Game {
   private activateInterference(jammer: Enemy): void {
     this.interferenceTimer = Math.max(
       this.interferenceTimer,
-      1.15 + Math.min(0.55, (this.difficulty?.combatPressure ?? 1) * 0.12),
+      wardDuration(
+        1.15 +
+          Math.min(
+            0.55,
+            (this.difficulty?.combatPressure ?? 1) * 0.12,
+          ),
+        this.playerStats,
+      ),
     );
     this.burst(jammer.x, jammer.y, 18, 74);
     this.sfx.enemyShot();
@@ -812,7 +828,7 @@ export class Game {
     );
     this.stats.multiplier = multiplierForStreak(this.stats.streak);
     this.stats.score += 35 * this.stats.multiplier;
-    this.stats.power = clamp(this.stats.power + 2.5, 0, 100);
+    this.gainPower(2.5);
 
     this.lasers.push({
       x1: this.width / 2,
@@ -854,12 +870,16 @@ export class Game {
     );
     this.stats.multiplier = multiplierForStreak(this.stats.streak);
     this.stats.score += 16 * this.stats.multiplier;
-    this.stats.power = clamp(this.stats.power + 2, 0, 100);
+    this.gainPower(2);
 
     if (!boss.shieldActive) {
       boss.hp = Math.max(
         0,
-        boss.hp - bossKeyDamage(boss.maxHp, boss.role),
+        boss.hp -
+        firepowerDamage(
+          bossKeyDamage(boss.maxHp, boss.role),
+          this.playerStats,
+        ),
       );
       this.updateBossPhase(boss);
     }
@@ -884,7 +904,11 @@ export class Game {
       } else {
         boss.hp = Math.max(
           0,
-          boss.hp - bossWordDamage(boss.maxHp, boss.role),
+          boss.hp -
+            firepowerDamage(
+              bossWordDamage(boss.maxHp, boss.role),
+              this.playerStats,
+            ),
         );
       }
 
@@ -898,11 +922,7 @@ export class Game {
 
       this.stats.score +=
         (140 + word.length * 18) * this.stats.multiplier;
-      this.stats.power = clamp(
-        this.stats.power + (perfectWord ? 11 : 8),
-        0,
-        100,
-      );
+      this.gainPower(perfectWord ? 11 : 8);
 
       if (perfectWord) {
         boss.staggerTimer = Math.max(boss.staggerTimer, 1.05);
@@ -961,7 +981,7 @@ export class Game {
     const { x, y } = this.bossPosition();
     this.stats.kills += 1;
     this.stats.score += 1200 * this.stats.multiplier;
-    this.stats.power = clamp(this.stats.power + 18, 0, 100);
+    this.gainPower(18);
 
     this.burst(x, y, 70, 24);
     this.sfx.bossDeath();
@@ -1007,7 +1027,7 @@ export class Game {
     this.stats.maxStreak = Math.max(this.stats.maxStreak, this.stats.streak);
     this.stats.multiplier = multiplierForStreak(this.stats.streak);
     this.stats.score += 10 * this.stats.multiplier;
-    this.stats.power = clamp(this.stats.power + 1.8, 0, 100);
+    this.gainPower(1.8);
 
     this.fireLaser(enemy, 0.8);
     this.sfx.shot(this.stats.multiplier);
@@ -1035,7 +1055,7 @@ export class Game {
       }
 
       this.stats.score += (45 + length * 8) * this.stats.multiplier;
-      this.stats.power = clamp(this.stats.power + 4, 0, 100);
+      this.gainPower(4);
 
       this.fireLaser(enemy, 1.25);
       this.burst(
@@ -1051,7 +1071,7 @@ export class Game {
 
     this.stats.kills += 1;
     this.stats.score += (80 + length * 14) * this.stats.multiplier;
-    this.stats.power = clamp(this.stats.power + 7, 0, 100);
+    this.gainPower(7);
 
     this.fireLaser(enemy, 1.45);
     this.burst(
@@ -1163,6 +1183,68 @@ export class Game {
     this.emitStats();
   }
 
+  private createGameStats(stage: number): GameStats {
+    const resources = createPlayerResources(this.playerStats);
+
+    return {
+      score: 0,
+      streak: 0,
+      maxStreak: 0,
+      multiplier: 1,
+      hits: 0,
+      misses: 0,
+      kills: 0,
+      stage,
+      hull: resources.hull,
+      maxHull: this.playerStats.hull,
+      shield: resources.shield,
+      maxShield: this.playerStats.shield,
+      energy: resources.energy,
+      maxEnergy: this.playerStats.energy,
+      power: 0,
+    };
+  }
+
+  private gainPower(baseGain: number): void {
+    this.stats.power = clamp(
+      this.stats.power +
+        focusPowerGain(baseGain, this.playerStats),
+      0,
+      100,
+    );
+  }
+
+  private updatePlayerResources(dt: number): void {
+    this.secondsSinceDamage += dt;
+    this.resourceEmitTimer -= dt;
+
+    const beforeShield = this.stats.shield;
+    const beforeEnergy = this.stats.energy;
+    const next = regenerateResources(
+      {
+        hull: this.stats.hull,
+        shield: this.stats.shield,
+        energy: this.stats.energy,
+      },
+      this.playerStats,
+      dt,
+      this.secondsSinceDamage >= 3,
+    );
+
+    this.stats.hull = next.hull;
+    this.stats.shield = next.shield;
+    this.stats.energy = next.energy;
+
+    const changed =
+      Math.abs(beforeShield - next.shield) > 0.01 ||
+      Math.abs(beforeEnergy - next.energy) > 0.01;
+
+    if (changed && this.resourceEmitTimer <= 0) {
+      this.resourceEmitTimer = 0.15;
+      this.emitStats();
+    }
+  }
+
   private activateOverdrive(): void {
     if (this.stats.power < 100) return;
 
@@ -1186,7 +1268,7 @@ export class Game {
   private damagePlayer(enemyId: number, x: number, y: number): void {
     this.enemies = this.enemies.filter((enemy) => enemy.id !== enemyId);
     if (this.targetId === enemyId) this.targetId = null;
-    this.applyPlayerDamage(x, y);
+    this.applyPlayerDamage(x, y, 60);
   }
 
   private damageFromProjectile(
@@ -1197,11 +1279,28 @@ export class Game {
     this.projectiles = this.projectiles.filter(
       (projectile) => projectile.id !== projectileId,
     );
-    this.applyPlayerDamage(x, y);
+    this.applyPlayerDamage(x, y, 42);
   }
 
-  private applyPlayerDamage(x: number, y: number): void {
-    this.stats.lives -= 1;
+  private applyPlayerDamage(
+    x: number,
+    y: number,
+    rawDamage: number,
+  ): void {
+    const damage = applyIncomingDamage(
+      {
+        hull: this.stats.hull,
+        shield: this.stats.shield,
+        energy: this.stats.energy,
+      },
+      this.playerStats,
+      rawDamage,
+    );
+
+    this.stats.hull = damage.resources.hull;
+    this.stats.shield = damage.resources.shield;
+    this.stats.energy = damage.resources.energy;
+    this.secondsSinceDamage = 0;
     this.stats.streak = 0;
     this.stats.multiplier = 1;
     this.stats.power = clamp(this.stats.power - 30, 0, 100);
@@ -1215,7 +1314,7 @@ export class Game {
     this.sfx.damage();
     this.emitStats();
 
-    if (this.stats.lives <= 0) {
+    if (this.stats.hull <= 0) {
       this.phase = "gameover";
       this.hooks.onPhase(this.phase);
     }
