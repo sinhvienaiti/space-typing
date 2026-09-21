@@ -2954,108 +2954,82 @@ Current implementation checkpoint:
 
 ~~~text
 Completed:
-Step 01  Vite + TypeScript + Vitest + CI
-Step 02  full-height wide Canvas shell
-Step 03  high-DPI game loop + pause-safe clock
-Step 04  typing-first input routing
-Step 05  first-letter target locking + word rendering
-Step 06  laser / hit / recoil / particles / SFX
-Step 07  score / streak / multiplier / Power
-Step 08  Scout + prototype wave clear/fail pressure
-Step 09  parent shared vocabulary index/level loader
-Step 10  Class/Custom explicit vocabulary apply flow
-Step 11  VI + IPA + queued English pronunciation + parent music ducking
-Step 12  persistent Campaign progress with highest unlocked stage
-Step 13  deterministic StageFactory for Stage 001-1000
-Step 14  10-Galaxy + milestone stage-role model
-Step 15  gradual multi-axis difficulty model
-Step 15A Adaptive WPM/accuracy/Vocabulary difficulty profile
-Step 16  Continue / Retry / Stage Select / stage clear unlock flow
-Step 17  Mine + layered Tank
-Step 18  Destroyer + typeable letter projectiles
-Step 19  Oppressor + multi-projectile spread pressure
-Step 20  advanced enemy families
-Step 21  Elite modifier framework
-Step 22  Boss base + HP UI
-Step 23  Boss word / per-key damage loop
-Step 24  first multi-phase boss combat
+Step 01-24 core typing combat / Campaign / enemies / Elite / Boss
 Step 25  IndexedDB PlayerSave persistence
-Step 26  autosave queue + schema v1->v2 migration
+Step 26  autosave + schema migration framework
 Step 27  validated JSON Export / Import
+Step 28  effective-stat calculation pipeline
+Step 29  all 10 core attributes runtime contracts
+Step 30  Item registry + persistent inventory
+Step 31  first consumables:
+         Repair Kit / Shield Cell / Energy Cell
 
 Next:
-Step 28  effective-stat calculation pipeline
+Step 32  Equipment + Loadout
 ~~~
 
-Implemented gameplay/persistence details:
+Current gameplay/progression foundation:
 
-- independent TypeScript/Vite child app;
-- responsive wide high-DPI Canvas;
-- stationary player ship with no movement controls;
-- clean dark HUD and Settings UI;
-- Web Audio SFX mixer;
-- parent vocabulary runtime contract at /vocabulary/;
-- Class/Custom vocabulary source state;
-- EN/VI/IPA learning feedback and queued pronunciation;
-- 1000-stage persistent Campaign flow;
-- adaptive Stage + WPM + Accuracy + Vocabulary difficulty;
-- 15 enemy families with distinct mechanics;
-- typeable enemy/boss projectiles;
-- Elite Swift / Armored / Frenzy / Volatile modifiers;
-- phrase-safe typing while Space remains Overdrive;
-- multi-phase bosses with HP, shield break, stagger and rage pressure;
-- IndexedDB PlayerSave schema v2;
-- migration from PlayerSave v1 and legacy Campaign localStorage;
-- serialized autosave on important Campaign changes;
-- localStorage recovery mirror kept synchronized;
-- page-hide autosave flush;
-- unsupported future save schemas are blocked instead of down-migrated;
-- JSON Export / Import with strict validation and explicit overwrite confirm;
-- failed import storage writes restore the previous in-memory progress.
+- 1000-stage persistent Campaign;
+- Stage + WPM + Accuracy + Vocabulary adaptive difficulty;
+- 15 mechanically distinct enemy families;
+- Elite modifier framework;
+- multi-phase boss combat;
+- phrase-safe shared vocabulary typing;
+- Hull / Shield / Armor defensive runtime;
+- Firepower boss-damage scaling;
+- Energy / Reactor resource recovery;
+- Focus Overdrive gain;
+- Ward status-duration reduction;
+- Luck / Salvage reward-factor contracts;
+- unified effective-stat pipeline:
+  Character Base + Level + Equipment + Talent + Temporary + Stage;
+- PlayerSave schema v3 in IndexedDB;
+- automatic v1/v2 -> v3 migration;
+- synchronized local recovery save;
+- autosave serialization and page-hide flush;
+- strict JSON backup Export / Import;
+- stable 9-item registry;
+- stack-limited persistent inventory;
+- recovery consumables usable through compact combat buttons or keys 1/2/3;
+- consumables are not spent when the target resource is already full.
 
-Validation checkpoints:
+Recent validation checkpoints:
 
 ~~~text
-Advanced enemy families
-08f8a01094757da4775f5b03de616a6bf1e3453f
-PASS
-
-Phrase-safe vocabulary combat
-3204049576db6e08e8944b33f3dd40adce65d171
-PASS
-
-Elite framework
-a14ac88de22869d159ee4b29b52ad0a96ae3063e
-PASS
-
-Boss HP + typing loop
-0e9d31dee78329b50794243311b356814e2295b3
-PASS
-
-Multi-phase boss
-d90a6f0d26297db97f494687a88ca1bea9d82388
-PASS
-
-IndexedDB persistence
-d8dbf640c17a2d4ec5b2fbb71448ee7a326bc649
-PASS
-
-Autosave + schema migration
-57eb1176ae11fce9fa24d0386046ebe5d43d683b
-PASS
-
-Export / Import
-811bba10859a2b67f5cde69081a43290c4a64ac1
-PASS
-
-Persistence review pass 1
-39081acef5b90e04c2db63ef4a39d5d6d7a69716
-PASS
-
 Persistence review pass 2
 e0a775bff1f74c92b9c949153d2573bc8604387b
 PASS
+
+Effective-stat pipeline
+4006b6395e5d649686d430edcd047a25d0759e68
+PASS
+
+Core attributes runtime
+ff09c0330687cf4da511dfb805cb7724bb377ac5
+PASS
+
+Item registry / PlayerSave v3 inventory
+53358181b0b6edfa0f452a8270d34f2fd51adbdf
+PASS
+
+First recovery consumables
+539abd490a2a3cba966f22e5a2bf66046f172683
+PASS
 ~~~
+
+Important implementation notes:
+
+- Inventory is permanent progress and belongs inside PlayerSave, not a separate localStorage system.
+- Current PlayerSave schema is version 3.
+- Future permanent systems must extend PlayerSave using explicit migration steps.
+- The nine stable item IDs currently registered are:
+  repair-kit, shield-cell, energy-cell, nova-bomb, emp-charge,
+  time-crystal, word-bomb, supply-beacon, lucky-dice.
+- Only Repair Kit, Shield Cell and Energy Cell have active effects at this checkpoint.
+  The other items stay registered but must not receive fake placeholder mechanics before
+  their required combat/status/supply systems exist.
+- Parent vocabulary and shared Music contracts remain unchanged.
 
 Project-wide requirements remain:
 
@@ -3063,10 +3037,7 @@ Project-wide requirements remain:
 - character milestone unlocks: every 100 Campaign stages;
 - parent vocabulary library: 18,000 entries / 100 levels;
 - parent typing-text corpus: still expanding;
-- parent shared Music system: already available;
 - docs/PROJECT_CONTEXT.md remains the primary context/handoff/plan document.
-
-Phase 6 persistence foundation is complete. Future RPG systems must extend the versioned PlayerSave through explicit migrations rather than creating separate permanent-progress stores.
 
 ---
 
