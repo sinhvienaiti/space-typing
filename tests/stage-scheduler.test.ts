@@ -41,23 +41,28 @@ describe("stage random-event scheduler", () => {
   });
 
   it("gives Luck extra weight only to beneficial events", () => {
-    const stage = createStageConfig(100);
-    const sequence = [0, 0.69];
+    const stage = createStageConfig(50);
+    const sequence = [0, 0.72];
     let index = 0;
     const withoutLuck = scheduleStageRandomEvents(
       stage,
       0,
-      () => sequence[index++ % sequence.length] ?? 0,
+      () => sequence[index++] ?? 0,
     );
 
     index = 0;
     const withLuck = scheduleStageRandomEvents(
       stage,
       100,
-      () => sequence[index++ % sequence.length] ?? 0,
+      () => sequence[index++] ?? 0,
     );
 
-    expect(withoutLuck).not.toEqual(withLuck);
+    expect(withoutLuck.map((event) => event.id)).toEqual([
+      "low-shield",
+    ]);
+    expect(withLuck.map((event) => event.id)).toEqual([
+      "double-supply",
+    ]);
   });
 
   it("combines scheduler effects without mutating definitions", () => {
