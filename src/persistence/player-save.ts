@@ -32,6 +32,11 @@ import {
   sanitizeLuckPityState,
   type LuckPityState,
 } from "../loot/pity";
+import {
+  createHiddenDiscoveryState,
+  sanitizeHiddenDiscoveryState,
+  type HiddenDiscoveryState,
+} from "../discovery/hidden-content";
 
 const DB_NAME = "space-typing";
 const INDEXED_DB_VERSION = 1;
@@ -39,7 +44,7 @@ const STORE_NAME = "player";
 const SAVE_KEY = "main";
 const RECOVERY_SAVE_KEY = "spaceTypingPlayerSaveRecoveryV3";
 
-export const PLAYER_SAVE_VERSION = 11;
+export const PLAYER_SAVE_VERSION = 12;
 
 export class UnsupportedPlayerSaveVersionError extends Error {
   constructor(readonly version: number) {
@@ -62,6 +67,7 @@ export type SaveReason =
   | "equipment"
   | "support-spells"
   | "character"
+  | "discovery"
   | "pagehide"
   | "manual"
   | "unknown";
@@ -169,7 +175,20 @@ export type PlayerSaveV11 = {
   lastSaveReason: SaveReason;
 };
 
-export type PlayerSave = PlayerSaveV11;
+export type PlayerSaveV12 = {
+  version: 12;
+  campaign: CampaignProgress;
+  inventory: Inventory;
+  equipment: EquipmentState;
+  supportSpells: SupportSpellState;
+  characters: CharacterState;
+  luckPity: LuckPityState;
+  hiddenDiscovery: HiddenDiscoveryState;
+  updatedAt: string;
+  lastSaveReason: SaveReason;
+};
+
+export type PlayerSave = PlayerSaveV12;
 export type PersistenceSource = "indexeddb" | "localStorage";
 
 export type LoadedPlayerSave = {
@@ -192,6 +211,7 @@ function normalizeSaveReason(value: unknown): SaveReason {
     value === "equipment" ||
     value === "support-spells" ||
     value === "character" ||
+    value === "discovery" ||
     value === "pagehide" ||
     value === "manual"
     ? value
@@ -207,6 +227,7 @@ export function createPlayerSave(
   supportSpells: SupportSpellState = createStarterSupportSpellState(),
   characters: CharacterState = createStarterCharacterState(),
   luckPity: LuckPityState = createLuckPityState(),
+  hiddenDiscovery: HiddenDiscoveryState = createHiddenDiscoveryState(),
 ): PlayerSave {
   return {
     version: PLAYER_SAVE_VERSION,
@@ -216,6 +237,7 @@ export function createPlayerSave(
     supportSpells: sanitizeSupportSpellState(supportSpells),
     characters: sanitizeCharacterState(characters),
     luckPity: sanitizeLuckPityState(luckPity),
+    hiddenDiscovery: sanitizeHiddenDiscoveryState(hiddenDiscovery),
     updatedAt,
     lastSaveReason,
   };
@@ -238,6 +260,7 @@ export function migratePlayerSave(value: unknown): MigrationResult {
     supportSpells?: unknown;
     characters?: unknown;
     luckPity?: unknown;
+    hiddenDiscovery?: unknown;
     updatedAt?: unknown;
     lastSaveReason?: unknown;
   };
@@ -378,6 +401,24 @@ export function migratePlayerSave(value: unknown): MigrationResult {
     };
   }
 
+  if (raw.version === 11) {
+    return {
+      save: createPlayerSave(
+        sanitizeCampaignProgress(raw.campaign),
+        typeof raw.updatedAt === "string" ? raw.updatedAt : "",
+        "migration",
+        sanitizeInventory(raw.inventory),
+        sanitizeEquipmentState(raw.equipment),
+        sanitizeSupportSpellState(raw.supportSpells),
+        sanitizeCharacterState(raw.characters),
+        sanitizeLuckPityState(raw.luckPity),
+        createHiddenDiscoveryState(),
+      ),
+      migrated: true,
+      fromVersion: 11,
+    };
+  }
+
   if (raw.version === PLAYER_SAVE_VERSION) {
     return {
       save: createPlayerSave(
@@ -389,6 +430,7 @@ export function migratePlayerSave(value: unknown): MigrationResult {
         sanitizeSupportSpellState(raw.supportSpells),
         sanitizeCharacterState(raw.characters),
         sanitizeLuckPityState(raw.luckPity),
+        sanitizeHiddenDiscoveryState(raw.hiddenDiscovery),
       ),
       migrated: false,
       fromVersion: PLAYER_SAVE_VERSION,
@@ -467,6 +509,7 @@ function recoverySaveFromLegacy(): PlayerSave {
       recovery.supportSpells,
       recovery.characters,
       recovery.luckPity,
+      recovery.hiddenDiscovery,
     );
   } catch (error) {
     if (error instanceof UnsupportedPlayerSaveVersionError) throw error;
@@ -553,6 +596,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
         recovery.supportSpells,
         recovery.characters,
         recovery.luckPity,
+        recovery.hiddenDiscovery,
       );
       await writeSave(database, migrated);
       try {
@@ -584,6 +628,9 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
     const luckPity = useRecovery
       ? recovery.luckPity
       : migration.save.luckPity;
+    const hiddenDiscovery = useRecovery
+      ? recovery.hiddenDiscovery
+      : migration.save.hiddenDiscovery;
 
     const recoveredProgress =
       campaign !== migration.save.campaign ||
@@ -591,7 +638,8 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
       equipment !== migration.save.equipment ||
       supportSpells !== migration.save.supportSpells ||
       characters !== migration.save.characters ||
-      luckPity !== migration.save.luckPity;
+      luckPity !== migration.save.luckPity ||
+      hiddenDiscovery !== migration.save.hiddenDiscovery;
 
     if (migration.migrated || recoveredProgress) {
       const recovered = createPlayerSave(
@@ -603,6 +651,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
         supportSpells,
         characters,
         luckPity,
+        hiddenDiscovery,
       );
       await writeSave(database, recovered);
       try {
@@ -644,6 +693,7 @@ export async function savePlayerProgress(
   characters: CharacterState,
   reason: SaveReason = "unknown",
   luckPity: LuckPityState = createLuckPityState(),
+  hiddenDiscovery: HiddenDiscoveryState = createHiddenDiscoveryState(),
 ): Promise<PersistenceSource> {
   const save = createPlayerSave(
     campaign,
@@ -654,6 +704,7 @@ export async function savePlayerProgress(
     supportSpells,
     characters,
     luckPity,
+    hiddenDiscovery,
   );
 
   if ("indexedDB" in window) {
