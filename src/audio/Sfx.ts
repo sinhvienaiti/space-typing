@@ -65,6 +65,21 @@ export class Sfx {
     window.setTimeout(() => this.tone(620, 0.14, "triangle", 0.025, 930), 70);
   }
 
+  bossEntrance(): void {
+    this.tone(95, 0.28, "sawtooth", 0.045, 58);
+    window.setTimeout(() => this.tone(220, 0.24, "triangle", 0.03, 420), 110);
+  }
+
+  bossHit(): void {
+    this.tone(135, 0.075, "sawtooth", 0.04, 92);
+  }
+
+  bossDeath(): void {
+    this.noise(0.24, 0.075);
+    this.tone(110, 0.35, "sawtooth", 0.055, 42);
+    window.setTimeout(() => this.tone(360, 0.32, "sine", 0.04, 760), 100);
+  }
+
   private tone(
     frequency: number,
     duration: number,

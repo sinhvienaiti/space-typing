@@ -19,6 +19,7 @@ import {
   loadVocabularyLevel,
   parseCustomVocabulary,
 } from "./vocabulary";
+import type { BossHudState } from "./boss/model";
 import type {
   GamePhase,
   GameSettings,
@@ -134,6 +135,16 @@ app.innerHTML = `
         <div class="lives" id="lives">♥ ♥ ♥</div>
       </div>
     </header>
+
+    <div id="bossHud" class="boss-hud hidden" aria-live="polite">
+      <div class="boss-hud-meta">
+        <strong id="bossName">Boss</strong>
+        <span id="bossHpText">0 / 0</span>
+      </div>
+      <div class="boss-hp-track">
+        <div id="bossHpFill" class="boss-hp-fill"></div>
+      </div>
+    </div>
 
     <div class="power-shell">
       <div class="power-label">
@@ -439,6 +450,27 @@ function renderStage(stage: number): void {
   badge.classList.add("pulse");
 }
 
+function renderBoss(boss: BossHudState | null): void {
+  const hud = byId("bossHud");
+  if (boss === null) {
+    hud.classList.add("hidden");
+    return;
+  }
+
+  hud.classList.remove("hidden");
+  byId("bossName").textContent = boss.name;
+  byId("bossHpText").textContent =
+    Math.max(0, Math.ceil(boss.hp)).toLocaleString() +
+    " / " +
+    boss.maxHp.toLocaleString();
+
+  const percent =
+    boss.maxHp <= 0
+      ? 0
+      : Math.max(0, Math.min(100, (boss.hp / boss.maxHp) * 100));
+  byId("bossHpFill").style.width = percent.toFixed(2) + "%";
+}
+
 const game = new Game(
   byId<HTMLCanvasElement>("gameCanvas"),
   [],
@@ -458,6 +490,7 @@ const game = new Game(
       }
     },
     onStage: renderStage,
+    onBossUpdate: renderBoss,
     onStageClear: (stats) => {
       const minutes = Math.max(
         1 / 60,
