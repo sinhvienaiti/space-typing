@@ -1,4 +1,9 @@
-export type GamePhase = "title" | "playing" | "paused" | "gameover";
+export type GamePhase =
+  | "title"
+  | "playing"
+  | "paused"
+  | "stageclear"
+  | "gameover";
 
 export type VisualQuality = "low" | "medium" | "high" | "ultra";
 
@@ -41,7 +46,7 @@ export type GameStats = {
   hits: number;
   misses: number;
   kills: number;
-  wave: number;
+  stage: number;
   lives: number;
   power: number;
 };

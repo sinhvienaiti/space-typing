@@ -1,11 +1,11 @@
 import { Sfx } from "./audio/Sfx";
+import type { DifficultyProfile, StageConfig } from "./campaign/types";
 import {
   accuracyPercent,
   clamp,
   chooseTarget,
   multiplierForStreak,
   normalizeWord,
-  waveForKills,
 } from "./logic";
 import type {
   Enemy,
@@ -20,7 +20,8 @@ import type {
 type Hooks = {
   onStats(stats: GameStats): void;
   onPhase(phase: GamePhase): void;
-  onWave(wave: number): void;
+  onStage(stage: number): void;
+  onStageClear(stats: GameStats): void;
   onWordComplete(entry: VocabularyEntry): void;
 };
 
@@ -60,7 +61,7 @@ export class Game {
     hits: 0,
     misses: 0,
     kills: 0,
-    wave: 1,
+    stage: 1,
     lives: 3,
     power: 0,
   };
@@ -74,6 +75,9 @@ export class Game {
   private particles: Particle[] = [];
   private targetId: number | null = null;
   private spawnTimer = 0;
+  private spawnRemaining = 0;
+  private stageConfig: StageConfig | null = null;
+  private difficulty: DifficultyProfile | null = null;
   private shake = 0;
   private overdriveTimer = 0;
   private lastTime = performance.now();
@@ -126,8 +130,10 @@ export class Game {
     this.sfx.setVolume(settings.sfxVolume);
   }
 
-  start(): void {
+  startStage(stage: StageConfig, difficulty: DifficultyProfile): void {
     this.sfx.unlock();
+    this.stageConfig = stage;
+    this.difficulty = difficulty;
     this.phase = "playing";
     this.stats = {
       score: 0,
@@ -137,7 +143,7 @@ export class Game {
       hits: 0,
       misses: 0,
       kills: 0,
-      wave: 1,
+      stage: stage.stage,
       lives: 3,
       power: 0,
     };
@@ -145,11 +151,12 @@ export class Game {
     this.lasers = [];
     this.particles = [];
     this.targetId = null;
-    this.spawnTimer = 0.25;
+    this.spawnRemaining = stage.enemyBudget;
+    this.spawnTimer = 0.3;
     this.overdriveTimer = 0;
     this.hooks.onPhase(this.phase);
     this.hooks.onStats(this.getStats());
-    this.hooks.onWave(1);
+    this.hooks.onStage(stage.stage);
   }
 
   pause(): void {
@@ -254,20 +261,20 @@ export class Game {
     this.shake = Math.max(0, this.shake - dt * 28);
     this.overdriveTimer = Math.max(0, this.overdriveTimer - dt);
 
-    const wave = waveForKills(this.stats.kills);
-    if (wave !== this.stats.wave) {
-      this.stats.wave = wave;
-      this.hooks.onWave(wave);
-      this.emitStats();
-    }
+    const difficulty = this.difficulty;
+    if (difficulty === null || this.stageConfig === null) return;
 
     this.spawnTimer -= dt;
-    const maxEnemies = Math.min(12, 3 + Math.ceil(wave / 2));
-    const spawnInterval = Math.max(0.48, 1.45 - wave * 0.055);
 
-    if (this.spawnTimer <= 0 && this.enemies.length < maxEnemies) {
+    if (
+      this.spawnRemaining > 0 &&
+      this.spawnTimer <= 0 &&
+      this.enemies.length < difficulty.maxEnemies
+    ) {
       this.spawnEnemy();
-      this.spawnTimer = spawnInterval * randomBetween(0.8, 1.2);
+      this.spawnRemaining -= 1;
+      this.spawnTimer =
+        difficulty.spawnInterval * randomBetween(0.82, 1.16);
     }
 
     const playerY = this.height - PLAYER_Y_OFFSET;
@@ -289,6 +296,16 @@ export class Game {
     }
 
     this.updateEffects(dt);
+
+    if (
+      this.spawnRemaining === 0 &&
+      this.enemies.length === 0 &&
+      this.phase === "playing"
+    ) {
+      this.phase = "stageclear";
+      this.hooks.onStageClear(this.getStats());
+      this.hooks.onPhase(this.phase);
+    }
   }
 
   private updateEffects(dt: number): void {
@@ -308,7 +325,6 @@ export class Game {
   }
 
   private spawnEnemy(): void {
-    const wave = this.stats.wave;
     const entry =
       this.vocabulary[Math.floor(Math.random() * this.vocabulary.length)] ??
       FALLBACK_ENTRIES[0]!;
@@ -321,7 +337,11 @@ export class Game {
       x: baseX,
       y: -45,
       baseX,
-      speed: 34 + wave * 3.6 + randomBetween(0, 14),
+      speed:
+        (34 +
+          (this.stageConfig?.galaxy ?? 1) * 2.2 +
+          randomBetween(0, 14)) *
+        (this.difficulty?.enemySpeed ?? 1),
       age: Math.random() * 8,
       drift: randomBetween(20, 70),
       radius: randomBetween(20, 27),

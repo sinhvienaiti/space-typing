@@ -1,5 +1,17 @@
 import "./styles.css";
 import { Game } from "./Game";
+import { difficultyFor } from "./campaign/difficulty";
+import {
+  loadCampaignProgress,
+  recordStageClear,
+  saveCampaignProgress,
+  selectCampaignStage,
+} from "./campaign/progress";
+import {
+  createStageConfig,
+  GALAXY_COUNT,
+  STAGES_PER_GALAXY,
+} from "./campaign/stage";
 import { accuracyPercent } from "./logic";
 import { speakEnglish, stopSpeech } from "./speech";
 import {
@@ -114,7 +126,7 @@ app.innerHTML = `
         <div class="metric"><span>multi</span><strong id="multiplier">x1</strong></div>
       </div>
 
-      <div id="waveBadge" class="wave-badge">wave 1</div>
+      <div id="waveBadge" class="wave-badge">stage 001</div>
 
       <div class="hud-side hud-side-right">
         <div class="metric"><span>accuracy</span><strong id="accuracy">100%</strong></div>
@@ -142,7 +154,8 @@ app.innerHTML = `
           streak alive. No movement — only typing decisions.
         </p>
         <div class="actions">
-          <button id="startButton" class="primary">Start mission</button>
+          <button id="startButton" class="primary">Continue · Stage 001</button>
+          <button id="stageSelectButton">Stage Select</button>
           <button id="vocabularyButton">Vocabulary</button>
           <button id="settingsButton">Settings</button>
         </div>
@@ -160,7 +173,8 @@ app.innerHTML = `
         <button id="resumeButton" class="primary">Resume</button>
         <button id="pauseVocabularyButton">Vocabulary</button>
         <button id="pauseSettingsButton">Settings</button>
-        <button id="restartButton">Restart run</button>
+        <button id="restartButton">Restart stage</button>
+        <button id="pauseStageSelectButton">Stage Select</button>
         <button id="titleButton">Back to title</button>
       </div>
     </section>
@@ -171,12 +185,30 @@ app.innerHTML = `
         <h2>Run over</h2>
         <div class="results">
           <div><span>score</span><strong id="resultScore">0</strong></div>
-          <div><span>wave</span><strong id="resultWave">1</strong></div>
+          <div><span>stage</span><strong id="resultWave">001</strong></div>
           <div><span>accuracy</span><strong id="resultAccuracy">100%</strong></div>
           <div><span>max streak</span><strong id="resultStreak">0</strong></div>
         </div>
-        <button id="againButton" class="primary">Play again</button>
+        <button id="againButton" class="primary">Retry stage</button>
+        <button id="gameOverStageSelectButton">Stage Select</button>
         <button id="resultTitleButton">Back to title</button>
+      </div>
+    </section>
+
+    <section id="stageClearOverlay" class="overlay hidden">
+      <div class="pause-card">
+        <p class="eyebrow">stage clear</p>
+        <h2 id="clearTitle">Stage 001 complete</h2>
+        <div class="results">
+          <div><span>score</span><strong id="clearScore">0</strong></div>
+          <div><span>accuracy</span><strong id="clearAccuracy">100%</strong></div>
+          <div><span>wpm</span><strong id="clearWpm">0</strong></div>
+          <div><span>max streak</span><strong id="clearStreak">0</strong></div>
+        </div>
+        <button id="nextStageButton" class="primary">Next stage</button>
+        <button id="clearRetryButton">Replay stage</button>
+        <button id="clearStageSelectButton">Stage Select</button>
+        <button id="clearTitleButton">Back to title</button>
       </div>
     </section>
 
@@ -187,6 +219,24 @@ app.innerHTML = `
     </div>
 
     <div id="notice" class="notice" aria-live="polite"></div>
+
+    <dialog id="stageSelectDialog" class="settings-dialog stage-select-dialog">
+      <form method="dialog" class="dialog-head">
+        <div>
+          <p class="eyebrow">campaign</p>
+          <h2>Stage Select</h2>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+      <div class="stage-toolbar">
+        <label>
+          <span class="field-label">Galaxy</span>
+          <select id="galaxySelect"></select>
+        </label>
+        <span id="campaignMeta"></span>
+      </div>
+      <div id="stageGrid" class="stage-grid"></div>
+    </dialog>
 
     <dialog id="vocabularyDialog" class="settings-dialog vocabulary-dialog">
       <form method="dialog" class="dialog-head">
@@ -312,17 +362,22 @@ app.innerHTML = `
 `;
 
 let settings = loadSettings();
+let campaign = loadCampaignProgress();
 let sourceState = loadSource();
 let sourceTab: "class" | "custom" = sourceState.mode;
 let vocabularyIndex: VocabularyIndex | null = null;
 let learningTimer: number | null = null;
 let noticeTimer: number | null = null;
+let stageStartedAt = performance.now();
+let currentGalaxy = Math.ceil(campaign.selectedStage / STAGES_PER_GALAXY);
 
 const titleOverlay = byId("titleOverlay");
 const pauseOverlay = byId("pauseOverlay");
 const gameOverOverlay = byId("gameOverOverlay");
+const stageClearOverlay = byId("stageClearOverlay");
 const settingsDialog = byId<HTMLDialogElement>("settingsDialog");
 const vocabularyDialog = byId<HTMLDialogElement>("vocabularyDialog");
+const stageSelectDialog = byId<HTMLDialogElement>("stageSelectDialog");
 
 function renderStats(stats: GameStats): void {
   byId("score").textContent = stats.score.toLocaleString();
@@ -331,7 +386,8 @@ function renderStats(stats: GameStats): void {
   byId("accuracy").textContent =
     accuracyPercent(stats.hits, stats.misses).toFixed(1) + "%";
   byId("kills").textContent = String(stats.kills);
-  byId("waveBadge").textContent = "wave " + String(stats.wave);
+  byId("waveBadge").textContent =
+    "stage " + String(stats.stage).padStart(3, "0");
 
   byId("lives").textContent = Array.from({ length: 3 }, (_, index) =>
     index < stats.lives ? "♥" : "♡",
@@ -372,11 +428,12 @@ function renderPhase(phase: GamePhase): void {
   titleOverlay.classList.toggle("hidden", phase !== "title");
   pauseOverlay.classList.toggle("hidden", phase !== "paused");
   gameOverOverlay.classList.toggle("hidden", phase !== "gameover");
+  stageClearOverlay.classList.toggle("hidden", phase !== "stageclear");
 }
 
-function renderWave(wave: number): void {
+function renderStage(stage: number): void {
   const badge = byId("waveBadge");
-  badge.textContent = "wave " + String(wave);
+  badge.textContent = "stage " + String(stage).padStart(3, "0");
   badge.classList.remove("pulse");
   void badge.offsetWidth;
   badge.classList.add("pulse");
@@ -393,19 +450,155 @@ const game = new Game(
       if (phase === "gameover") {
         const stats = game.getStats();
         byId("resultScore").textContent = stats.score.toLocaleString();
-        byId("resultWave").textContent = String(stats.wave);
+        byId("resultWave").textContent =
+          String(stats.stage).padStart(3, "0");
         byId("resultAccuracy").textContent =
           accuracyPercent(stats.hits, stats.misses).toFixed(1) + "%";
         byId("resultStreak").textContent = String(stats.maxStreak);
       }
     },
-    onWave: renderWave,
+    onStage: renderStage,
+    onStageClear: (stats) => {
+      const minutes = Math.max(
+        1 / 60,
+        (performance.now() - stageStartedAt) / 60000,
+      );
+      const wpm = (stats.hits / 5) / minutes;
+      const accuracy = accuracyPercent(stats.hits, stats.misses);
+
+      campaign = recordStageClear(campaign, stats.stage, {
+        score: stats.score,
+        accuracy,
+        wpm,
+        clearedAt: new Date().toISOString(),
+      });
+      saveCampaignProgress(campaign);
+
+      byId("clearTitle").textContent =
+        "Stage " + String(stats.stage).padStart(3, "0") + " complete";
+      byId("clearScore").textContent = stats.score.toLocaleString();
+      byId("clearAccuracy").textContent = accuracy.toFixed(1) + "%";
+      byId("clearWpm").textContent = wpm.toFixed(0);
+      byId("clearStreak").textContent = String(stats.maxStreak);
+
+      updateCampaignUi();
+      showNotice("✓ Saved · Stage " + String(stats.stage).padStart(3, "0") + " cleared");
+    },
     onWordComplete: (entry) => {
       showLearning(entry);
       speakEnglish(entry.en, settings);
     },
   },
 );
+
+function selectedVocabularyLevel(): number {
+  return sourceState.mode === "class" ? sourceState.level : 1;
+}
+
+function startSelectedStage(): void {
+  const stage = createStageConfig(campaign.selectedStage);
+  const difficulty = difficultyFor({
+    stage: stage.stage,
+    mode: "normal",
+    vocabularyLevel: selectedVocabularyLevel(),
+    recentWpm: 60,
+    recentAccuracy: 96,
+  });
+
+  stageStartedAt = performance.now();
+  game.startStage(stage, difficulty);
+}
+
+function updateCampaignUi(): void {
+  byId("startButton").textContent =
+    "Continue · Stage " + String(campaign.selectedStage).padStart(3, "0");
+  byId("campaignMeta").textContent =
+    "Unlocked " +
+    String(campaign.highestUnlockedStage).padStart(3, "0") +
+    " / 1000";
+
+  currentGalaxy = Math.min(
+    GALAXY_COUNT,
+    Math.max(1, Math.ceil(campaign.selectedStage / STAGES_PER_GALAXY)),
+  );
+}
+
+function populateGalaxySelect(): void {
+  const select = byId<HTMLSelectElement>("galaxySelect");
+  if (select.options.length > 0) return;
+
+  for (let galaxy = 1; galaxy <= GALAXY_COUNT; galaxy += 1) {
+    const option = document.createElement("option");
+    const firstStage = (galaxy - 1) * STAGES_PER_GALAXY + 1;
+    const lastStage = galaxy * STAGES_PER_GALAXY;
+    option.value = String(galaxy);
+    option.textContent =
+      "Galaxy " +
+      String(galaxy).padStart(2, "0") +
+      " · " +
+      String(firstStage).padStart(3, "0") +
+      "-" +
+      String(lastStage).padStart(3, "0");
+    option.disabled = firstStage > campaign.highestUnlockedStage;
+    select.append(option);
+  }
+}
+
+function renderStageGrid(): void {
+  const grid = byId("stageGrid");
+  grid.replaceChildren();
+
+  const firstStage = (currentGalaxy - 1) * STAGES_PER_GALAXY + 1;
+  const lastStage = currentGalaxy * STAGES_PER_GALAXY;
+  const cleared = new Set(campaign.clearedStages);
+
+  for (let stage = firstStage; stage <= lastStage; stage += 1) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "stage-button";
+    button.textContent = String(stage).padStart(3, "0");
+
+    const locked = stage > campaign.highestUnlockedStage;
+    button.disabled = locked;
+    button.classList.toggle("locked", locked);
+    button.classList.toggle("cleared", cleared.has(stage));
+    button.classList.toggle("selected", stage === campaign.selectedStage);
+
+    if (cleared.has(stage)) {
+      button.title = "Cleared";
+    } else if (locked) {
+      button.title = "Locked";
+    } else {
+      button.title = "Current stage";
+    }
+
+    button.addEventListener("click", () => {
+      campaign = selectCampaignStage(campaign, stage);
+      saveCampaignProgress(campaign);
+      updateCampaignUi();
+      stageSelectDialog.close();
+      showNotice("Stage " + String(stage).padStart(3, "0") + " selected");
+    });
+
+    grid.append(button);
+  }
+}
+
+function openStageSelect(): void {
+  populateGalaxySelect();
+  const select = byId<HTMLSelectElement>("galaxySelect");
+
+  for (const option of Array.from(select.options)) {
+    const galaxy = Number(option.value);
+    option.disabled =
+      (galaxy - 1) * STAGES_PER_GALAXY + 1 >
+      campaign.highestUnlockedStage;
+  }
+
+  select.value = String(currentGalaxy);
+  renderStageGrid();
+  stageSelectDialog.showModal();
+}
 
 function saveSettings(): void {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -548,18 +741,34 @@ async function loadInitialVocabulary(): Promise<void> {
   }
 }
 
-byId("startButton").addEventListener("click", () => game.start());
+byId("startButton").addEventListener("click", startSelectedStage);
 byId("resumeButton").addEventListener("click", () => game.resume());
-byId("restartButton").addEventListener("click", () => game.start());
-byId("againButton").addEventListener("click", () => game.start());
+byId("restartButton").addEventListener("click", startSelectedStage);
+byId("againButton").addEventListener("click", startSelectedStage);
+byId("clearRetryButton").addEventListener("click", startSelectedStage);
+byId("nextStageButton").addEventListener("click", startSelectedStage);
 
-for (const id of ["titleButton", "resultTitleButton"]) {
+for (const id of ["titleButton", "resultTitleButton", "clearTitleButton"]) {
   byId(id).addEventListener("click", () => game.backToTitle());
 }
 
 for (const id of ["settingsButton", "pauseSettingsButton"]) {
   byId(id).addEventListener("click", openSettings);
 }
+
+for (const id of [
+  "stageSelectButton",
+  "pauseStageSelectButton",
+  "gameOverStageSelectButton",
+  "clearStageSelectButton",
+]) {
+  byId(id).addEventListener("click", openStageSelect);
+}
+
+byId("galaxySelect").addEventListener("change", (event) => {
+  currentGalaxy = Number((event.currentTarget as HTMLSelectElement).value);
+  renderStageGrid();
+});
 
 for (const id of ["vocabularyButton", "pauseVocabularyButton"]) {
   byId(id).addEventListener("click", () => void openVocabulary());
@@ -670,7 +879,11 @@ byId<HTMLSelectElement>("visualQuality").addEventListener(
 );
 
 window.addEventListener("keydown", (event) => {
-  if (settingsDialog.open || vocabularyDialog.open) return;
+  if (
+    settingsDialog.open ||
+    vocabularyDialog.open ||
+    stageSelectDialog.open
+  ) return;
 
   if (event.key === "Escape" || event.key === " ") {
     event.preventDefault();
@@ -686,6 +899,7 @@ window.addEventListener("beforeunload", () => {
 });
 
 renderSettings();
+updateCampaignUi();
 renderStats(game.getStats());
 renderPhase(game.getPhase());
 void loadInitialVocabulary();
