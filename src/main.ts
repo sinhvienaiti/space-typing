@@ -14,6 +14,10 @@ import {
 import { accuracyPercent } from "./logic";
 import { AutosaveQueue } from "./persistence/autosave";
 import {
+  exportPlayerSaveJson,
+  parsePlayerSaveJson,
+} from "./persistence/backup";
+import {
   loadPlayerSave,
   savePlayerCampaign,
 } from "./persistence/player-save";
@@ -176,6 +180,7 @@ app.innerHTML = `
           <button id="startButton" class="primary">Continue · Stage 001</button>
           <button id="stageSelectButton">Stage Select</button>
           <button id="vocabularyButton">Vocabulary</button>
+          <button id="dataButton">Data</button>
           <button id="settingsButton">Settings</button>
         </div>
         <div class="hints">
@@ -192,6 +197,7 @@ app.innerHTML = `
         <button id="resumeButton" class="primary">Resume</button>
         <button id="pauseVocabularyButton">Vocabulary</button>
         <button id="pauseSettingsButton">Settings</button>
+        <button id="pauseDataButton">Data</button>
         <button id="restartButton">Restart stage</button>
         <button id="pauseStageSelectButton">Stage Select</button>
         <button id="titleButton">Back to title</button>
@@ -255,6 +261,44 @@ app.innerHTML = `
         <span id="campaignMeta"></span>
       </div>
       <div id="stageGrid" class="stage-grid"></div>
+    </dialog>
+
+    <dialog id="dataDialog" class="settings-dialog data-dialog">
+      <form method="dialog" class="dialog-head">
+        <div>
+          <p class="eyebrow">local data</p>
+          <h2>Save backup</h2>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+
+      <div class="data-panel">
+        <div class="data-summary">
+          <span>Campaign progress</span>
+          <strong id="dataProgress">Stage 001 / 1000</strong>
+          <small>
+            Player progress is stored in IndexedDB. Export a JSON backup
+            before moving browsers or clearing site data.
+          </small>
+        </div>
+
+        <div class="data-actions">
+          <button id="exportSaveButton" class="primary" type="button">
+            Export Save
+          </button>
+          <button id="importSaveButton" type="button">Import Save</button>
+          <input
+            id="importSaveFile"
+            class="hidden"
+            type="file"
+            accept=".json,application/json"
+          />
+        </div>
+
+        <p id="dataStatus" class="data-status">
+          Import validates the save before anything is replaced.
+        </p>
+      </div>
     </dialog>
 
     <dialog id="vocabularyDialog" class="settings-dialog vocabulary-dialog">
@@ -398,6 +442,7 @@ const stageClearOverlay = byId("stageClearOverlay");
 const settingsDialog = byId<HTMLDialogElement>("settingsDialog");
 const vocabularyDialog = byId<HTMLDialogElement>("vocabularyDialog");
 const stageSelectDialog = byId<HTMLDialogElement>("stageSelectDialog");
+const dataDialog = byId<HTMLDialogElement>("dataDialog");
 
 const campaignAutosave = new AutosaveQueue<
   typeof campaign,
@@ -587,9 +632,14 @@ async function initializePlayerProgress(): Promise<void> {
   const startButton = byId<HTMLButtonElement>("startButton");
   const stageSelectButton =
     byId<HTMLButtonElement>("stageSelectButton");
+  const dataButtons = [
+    byId<HTMLButtonElement>("dataButton"),
+    byId<HTMLButtonElement>("pauseDataButton"),
+  ];
 
   startButton.disabled = true;
   stageSelectButton.disabled = true;
+  for (const button of dataButtons) button.disabled = true;
 
   const loaded = await loadPlayerSave();
   campaign = loaded.save.campaign;
@@ -601,6 +651,7 @@ async function initializePlayerProgress(): Promise<void> {
   updateCampaignUi();
   startButton.disabled = false;
   stageSelectButton.disabled = false;
+  for (const button of dataButtons) button.disabled = false;
 
   if (loaded.migrated) {
     showNotice("✓ Existing progress migrated to IndexedDB");
@@ -782,6 +833,87 @@ async function populateLevels(): Promise<void> {
   updateLevelMeta();
 }
 
+function updateDataSummary(): void {
+  byId("dataProgress").textContent =
+    "Stage " +
+    String(campaign.highestUnlockedStage).padStart(3, "0") +
+    " / 1000";
+}
+
+function openData(): void {
+  if (!persistenceReady) return;
+  updateDataSummary();
+  byId("dataStatus").textContent =
+    "Import validates the save before anything is replaced.";
+  dataDialog.showModal();
+}
+
+async function exportSave(): Promise<void> {
+  if (!persistenceReady) return;
+
+  await autosaveCampaign("manual");
+  const json = exportPlayerSaveJson(campaign);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const stamp = new Date()
+    .toISOString()
+    .replace(/[:.]/g, "-");
+
+  link.href = url;
+  link.download = "space-typing-save-" + stamp + ".json";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+
+  byId("dataStatus").textContent =
+    "✓ Backup exported · Stage " +
+    String(campaign.highestUnlockedStage).padStart(3, "0");
+}
+
+async function importSaveFile(file: File): Promise<void> {
+  const status = byId("dataStatus");
+
+  try {
+    const result = parsePlayerSaveJson(await file.text());
+    if (!result.ok) {
+      status.textContent = "Import failed · " + result.error;
+      return;
+    }
+
+    const imported = result.save.campaign;
+    const message =
+      "Import Stage " +
+      String(imported.highestUnlockedStage).padStart(3, "0") +
+      " progress?\n\n" +
+      "Current Stage " +
+      String(campaign.highestUnlockedStage).padStart(3, "0") +
+      " progress will be replaced.";
+
+    if (!window.confirm(message)) {
+      status.textContent = "Import cancelled.";
+      return;
+    }
+
+    campaign = imported;
+    currentGalaxy = Math.ceil(
+      campaign.selectedStage / STAGES_PER_GALAXY,
+    );
+    await autosaveCampaign("manual");
+    updateCampaignUi();
+    updateDataSummary();
+    dataDialog.close();
+
+    showNotice(
+      "✓ Save imported" +
+        (result.migrated ? " · migrated to current schema" : ""),
+    );
+  } catch {
+    status.textContent = "Import failed · Unable to read this file.";
+  }
+}
+
 async function openVocabulary(): Promise<void> {
   sourceTab = sourceState.mode;
   renderSourceTabs();
@@ -859,6 +991,30 @@ for (const id of ["titleButton", "resultTitleButton", "clearTitleButton"]) {
 for (const id of ["settingsButton", "pauseSettingsButton"]) {
   byId(id).addEventListener("click", openSettings);
 }
+
+for (const id of ["dataButton", "pauseDataButton"]) {
+  byId(id).addEventListener("click", openData);
+}
+
+byId("exportSaveButton").addEventListener("click", () => {
+  void exportSave();
+});
+
+byId("importSaveButton").addEventListener("click", () => {
+  byId<HTMLInputElement>("importSaveFile").click();
+});
+
+byId<HTMLInputElement>("importSaveFile").addEventListener(
+  "change",
+  (event) => {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (file !== undefined) {
+      void importSaveFile(file);
+    }
+  },
+);
 
 for (const id of [
   "stageSelectButton",
@@ -986,7 +1142,8 @@ window.addEventListener("keydown", (event) => {
   if (
     settingsDialog.open ||
     vocabularyDialog.open ||
-    stageSelectDialog.open
+    stageSelectDialog.open ||
+    dataDialog.open
   ) return;
 
   if (event.key === "Escape" || event.key === " ") {

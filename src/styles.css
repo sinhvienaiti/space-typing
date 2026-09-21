@@ -730,3 +730,53 @@ kbd {
     top: 132px;
   }
 }
+
+
+.data-dialog {
+  width: min(620px, calc(100vw - 2rem));
+}
+
+.data-panel {
+  display: grid;
+  gap: 1.2rem;
+}
+
+.data-summary {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem 1.05rem;
+  border: 1px solid rgba(126, 211, 234, 0.09);
+  border-radius: 12px;
+  background: rgba(6, 12, 20, 0.64);
+}
+
+.data-summary span {
+  color: #5e7187;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.data-summary strong {
+  color: #eaf8ff;
+  font-size: 1.15rem;
+}
+
+.data-summary small,
+.data-status {
+  color: #6f8093;
+  line-height: 1.55;
+}
+
+.data-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.data-status {
+  min-height: 1.3rem;
+  margin: 0;
+  font-size: 0.72rem;
+}
