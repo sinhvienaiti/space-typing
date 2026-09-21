@@ -137,21 +137,28 @@ import {
   type LootSource,
 } from "./loot/equipment-loot";
 import {
-  shouldScheduleTreasureDrone,
-  shouldSpawnGoldenEnemy,
+  createLuckPityState,
+  rollLuckPity,
+  sanitizeLuckPityState,
+  type LuckPityKey,
+  type LuckPityState,
+} from "./loot/pity";
+import {
+  goldenEnemyChance,
+  treasureDroneChance,
   type TreasureDrone,
 } from "./events/rare-targets";
 import {
   createRewardChoiceOptions,
+  rewardChoiceCrateChance,
   rewardChoiceWord,
-  shouldScheduleRewardChoiceCrate,
   type RewardChoiceCrate,
 } from "./events/reward-choice";
 import {
+  anomalyCrateChance,
   anomalyRiskHullRatio,
   anomalyWord,
   createAnomalyReward,
-  shouldScheduleAnomalyCrate,
   type AnomalyChoice,
   type AnomalyCrate,
 } from "./events/anomaly";
@@ -227,6 +234,7 @@ type Hooks = {
   onEquipmentDrop(drop: EquipmentDrop): void;
   onRewardChoice(options: readonly EquipmentDrop[]): void;
   onAnomalyReady(riskHullRatio: number): void;
+  onLuckPityUpdate(state: LuckPityState): void;
   onSkills(): void;
 };
 
@@ -351,6 +359,7 @@ export class Game {
   private anomalyPending = false;
   private anomalyResolutionPending = false;
   private anomalyRiskRatio = 0;
+  private luckPity: LuckPityState = createLuckPityState();
   private lastTime = performance.now();
   private animationFrame = 0;
   private stars: Array<{ x: number; y: number; z: number }> = [];
@@ -1090,6 +1099,10 @@ export class Game {
     }
   }
 
+  setLuckPityState(state: LuckPityState): void {
+    this.luckPity = sanitizeLuckPityState(state);
+  }
+
   setVocabulary(entries: VocabularyEntry[]): void {
     if (entries.length === 0) return;
     this.vocabulary = entries;
@@ -1122,13 +1135,25 @@ export class Game {
     this.supplySpawnsRemaining = stage.stage >= 500 ? 2 : 1;
     this.treasureDrone = null;
     this.treasureDroneTimer = randomBetween(9, 14);
-    this.treasureDronePending = shouldScheduleTreasureDrone(stage.stage);
+    this.treasureDronePending = this.rollPityEvent(
+      "treasure",
+      treasureDroneChance(stage.stage),
+      0.32,
+    );
     this.rewardChoiceCrate = null;
     this.rewardChoiceTimer = randomBetween(14, 20);
-    this.rewardChoicePending = shouldScheduleRewardChoiceCrate(stage.stage);
+    this.rewardChoicePending = this.rollPityEvent(
+      "choice",
+      rewardChoiceCrateChance(stage.stage),
+      0.25,
+    );
     this.anomalyCrate = null;
     this.anomalyTimer = randomBetween(18, 24);
-    this.anomalyPending = shouldScheduleAnomalyCrate(stage.stage);
+    this.anomalyPending = this.rollPityEvent(
+      "anomaly",
+      anomalyCrateChance(stage.stage),
+      0.2,
+    );
     this.anomalyResolutionPending = false;
     this.anomalyRiskRatio = 0;
     this.spawnRemaining = stage.enemyBudget;
@@ -1844,7 +1869,13 @@ export class Game {
     const elite =
       forceElite ||
       rollElite(this.stageConfig?.eliteChance ?? 0);
-    const golden = !elite && shouldSpawnGoldenEnemy(stage);
+    const golden =
+      !elite &&
+      this.rollPityEvent(
+        "golden",
+        goldenEnemyChance(stage),
+        0.16,
+      );
     const eliteModifiers = elite
       ? pickEliteModifiers(
           eliteModifierCount(this.stageConfig?.modifierSlots ?? 0),
@@ -2275,6 +2306,30 @@ export class Game {
     this.bossDefeated = true;
     this.hooks.onBossUpdate(null);
     this.finishStage();
+  }
+
+  private rollPityEvent(
+    key: LuckPityKey,
+    baseChance: number,
+    maxChance: number,
+  ): boolean {
+    const current = this.luckPity[key];
+    const roll = rollLuckPity(
+      baseChance,
+      this.playerStats.luck,
+      current,
+      maxChance,
+    );
+
+    if (roll.nextPity !== current) {
+      this.luckPity = {
+        ...this.luckPity,
+        [key]: roll.nextPity,
+      };
+      this.hooks.onLuckPityUpdate({ ...this.luckPity });
+    }
+
+    return roll.triggered;
   }
 
   private tryRollEquipmentDrop(source: LootSource): void {

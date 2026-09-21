@@ -35,6 +35,12 @@ describe("save backup", () => {
       equipment: { loadout: { weapon: string | null } };
       supportSpells: { loadout: Array<string | null> };
       characters: { selected: string; unlocked: string[] };
+      luckPity: {
+        golden: number;
+        treasure: number;
+        choice: number;
+        anomaly: number;
+      };
     };
 
     expect(parsed.version).toBe(PLAYER_SAVE_VERSION);
@@ -49,6 +55,12 @@ describe("save backup", () => {
     expect(parsed.characters).toMatchObject({
       selected: "vanguard",
       unlocked: ["vanguard"],
+    });
+    expect(parsed.luckPity).toEqual({
+      golden: 0,
+      treasure: 0,
+      choice: 0,
+      anomaly: 0,
     });
   });
 
@@ -91,7 +103,7 @@ describe("save backup", () => {
     );
     expect(unsupported).toEqual({
       ok: false,
-      error: "Unsupported save version. Supported versions: 1-10.",
+      error: "Unsupported save version. Supported versions: 1-11.",
     });
   });
 
@@ -305,6 +317,44 @@ describe("save backup", () => {
       assault: 0,
       bulwark: 0,
       reactor: 0,
+    });
+  });
+
+  it("imports and migrates a valid v10 backup to Luck pity state", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.version = 10;
+    delete raw.luckPity;
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.migrated).toBe(true);
+    expect(result.save.luckPity).toEqual({
+      golden: 0,
+      treasure: 0,
+      choice: 0,
+      anomaly: 0,
+    });
+  });
+
+  it("rejects invalid current Luck pity counters", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.luckPity = {
+      golden: 0,
+      treasure: -1,
+      choice: 0,
+      anomaly: 0,
+    };
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result).toEqual({
+      ok: false,
+      error: "Luck pity data contains invalid drought counters.",
     });
   });
 

@@ -2933,6 +2933,19 @@ Anomaly rules:
 ## Step 50
 Implement Luck weighting and soft pity.
 
+**Status: implemented.**
+
+Luck/pity rules:
+
+- Luck now increases the trigger chance of Golden Enemy, Treasure Drone, Choice Crate and Anomaly events after each event's normal introduction stage;
+- every rare-event family owns an independent drought counter;
+- a failed eligible roll increments only that event's counter, while a successful trigger resets it to zero;
+- soft pity increases chance gradually and every event has a bounded maximum chance, so Luck never turns rare encounters into constant guaranteed events;
+- stages before an event's introduction do not build pity;
+- equipment rarity continues to use the existing Luck-weighted rarity tables, while Salvage continues to affect normal/Elite equipment-drop frequency;
+- drought counters are persisted in PlayerSave v11 and survive reload/export/import;
+- PlayerSave v10 migrates with zeroed pity counters, preserving all existing Campaign, Character, Talent and equipment progress.
+
 ## Step 50A
 Implement hidden-content discovery framework: Hidden Shop, Hidden Event/Stage, Hidden Boss trigger, Hidden Skill/Weapon/Mission rewards and Codex ??? entries.
 

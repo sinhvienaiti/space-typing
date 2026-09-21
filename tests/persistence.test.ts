@@ -292,6 +292,25 @@ describe("player save persistence model", () => {
     });
   });
 
+  it("migrates PlayerSave v10 to persistent Luck pity counters", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const legacy = {
+      ...current,
+      version: 10,
+    } as Record<string, unknown>;
+    delete legacy.luckPity;
+
+    const migration = migratePlayerSave(legacy);
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(10);
+    expect(migration.save.luckPity).toEqual({
+      golden: 0,
+      treasure: 0,
+      choice: 0,
+      anomaly: 0,
+    });
+  });
+
   it("keeps a valid current-version save without migration", () => {
     const save = createPlayerSave(
       createDefaultCampaignProgress(),
@@ -315,6 +334,12 @@ describe("player save persistence model", () => {
       unlocked: ["vanguard"],
     });
     expect(migration.save.characters.progress.vanguard.level).toBe(1);
+    expect(migration.save.luckPity).toEqual({
+      golden: 0,
+      treasure: 0,
+      choice: 0,
+      anomaly: 0,
+    });
   });
 
   it("refuses unsupported numeric schema versions instead of down-migrating them", () => {

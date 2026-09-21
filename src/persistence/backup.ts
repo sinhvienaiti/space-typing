@@ -29,6 +29,11 @@ import {
   migratePlayerSave,
   PLAYER_SAVE_VERSION,
 } from "./player-save";
+import {
+  createLuckPityState,
+  isValidLuckPityState,
+  type LuckPityState,
+} from "../loot/pity";
 import type { PlayerSave } from "./player-save";
 
 export type BackupParseResult =
@@ -122,6 +127,7 @@ export function exportPlayerSaveJson(
   equipment: EquipmentState = createStarterEquipmentState(),
   supportSpells: SupportSpellState = createStarterSupportSpellState(),
   characters: CharacterState = createStarterCharacterState(),
+  luckPity: LuckPityState = createLuckPityState(),
 ): string {
   return JSON.stringify(
     createPlayerSave(
@@ -132,6 +138,7 @@ export function exportPlayerSaveJson(
       equipment,
       supportSpells,
       characters,
+      luckPity,
     ),
     null,
     2,
@@ -168,6 +175,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     version !== 7 &&
     version !== 8 &&
     version !== 9 &&
+    version !== 10 &&
     version !== PLAYER_SAVE_VERSION
   ) {
     return {
@@ -194,6 +202,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 7 ||
       version === 8 ||
       version === 9 ||
+      version === 10 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidInventory(parsed.inventory)
   ) {
@@ -228,6 +237,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 7 ||
       version === 8 ||
       version === 9 ||
+      version === 10 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidEquipmentState(parsed.equipment)
   ) {
@@ -241,6 +251,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     (version === 7 ||
       version === 8 ||
       version === 9 ||
+      version === 10 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidSupportSpellState(parsed.supportSpells)
   ) {
@@ -271,12 +282,22 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    version === PLAYER_SAVE_VERSION &&
+    (version === 10 || version === PLAYER_SAVE_VERSION) &&
     !isValidCharacterState(parsed.characters)
   ) {
     return {
       ok: false,
       error: "Character data contains an invalid selection or unlock list.",
+    };
+  }
+
+  if (
+    version === PLAYER_SAVE_VERSION &&
+    !isValidLuckPityState(parsed.luckPity)
+  ) {
+    return {
+      ok: false,
+      error: "Luck pity data contains invalid drought counters.",
     };
   }
 

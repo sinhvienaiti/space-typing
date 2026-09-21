@@ -72,6 +72,10 @@ import type { RecoveryItemId } from "./items/consumables";
 import { accuracyPercent } from "./logic";
 import type { EquipmentDrop } from "./loot/equipment-loot";
 import {
+  createLuckPityState,
+  type LuckPityState,
+} from "./loot/pity";
+import {
   DEFENSIVE_SKILLS,
   type DefensiveSkillId,
 } from "./skills/defensive";
@@ -669,6 +673,7 @@ let inventory: Inventory = createEmptyInventory();
 let equipment: EquipmentState = createStarterEquipmentState();
 let supportSpells: SupportSpellState = createStarterSupportSpellState();
 let characters: CharacterState = createStarterCharacterState();
+let luckPity: LuckPityState = createLuckPityState();
 let persistenceReady = false;
 let equipmentDropCounter = 0;
 let sourceState = loadSource();
@@ -707,6 +712,7 @@ type AutosaveSnapshot = {
   equipment: EquipmentState;
   supportSpells: SupportSpellState;
   characters: CharacterState;
+  luckPity: LuckPityState;
 };
 
 const campaignAutosave = new AutosaveQueue<
@@ -720,6 +726,7 @@ const campaignAutosave = new AutosaveQueue<
     snapshot.supportSpells,
     snapshot.characters,
     reason as SaveReason,
+    snapshot.luckPity,
   ),
 );
 
@@ -1281,6 +1288,9 @@ const game = new Game(
       renderAnomalyDecision(riskHullRatio);
       anomalyDialog.showModal();
     },
+    onLuckPityUpdate: (state) => {
+      luckPity = state;
+    },
   },
 );
 
@@ -1663,6 +1673,7 @@ async function autosaveCampaign(
       equipment,
       supportSpells,
       characters,
+      luckPity,
     },
     reason,
   );
@@ -1712,6 +1723,8 @@ async function initializePlayerProgress(): Promise<void> {
     inventory = loaded.save.inventory;
     equipment = loaded.save.equipment;
     supportSpells = loaded.save.supportSpells;
+    luckPity = loaded.save.luckPity;
+    game.setLuckPityState(luckPity);
     const loadedCharacters = loaded.save.characters;
     characters = syncCharacterUnlocks(
       loadedCharacters,
@@ -1961,6 +1974,7 @@ async function exportSave(): Promise<void> {
     equipment,
     supportSpells,
     characters,
+    luckPity,
   );
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -2000,6 +2014,7 @@ async function importSaveFile(file: File): Promise<void> {
       result.save.characters,
       imported.clearedStages,
     );
+    const importedLuckPity = result.save.luckPity;
     const message =
       "Import Stage " +
       String(imported.highestUnlockedStage).padStart(3, "0") +
@@ -2018,11 +2033,14 @@ async function importSaveFile(file: File): Promise<void> {
     const previousEquipment = equipment;
     const previousSupportSpells = supportSpells;
     const previousCharacters = characters;
+    const previousLuckPity = luckPity;
     campaign = imported;
     inventory = importedInventory;
     equipment = importedEquipment;
     supportSpells = importedSupportSpells;
     characters = importedCharacters;
+    luckPity = importedLuckPity;
+    game.setLuckPityState(luckPity);
     applySelectedCharacter();
     renderInventory();
     applyEquipmentStats();
@@ -2038,6 +2056,8 @@ async function importSaveFile(file: File): Promise<void> {
       equipment = previousEquipment;
       supportSpells = previousSupportSpells;
       characters = previousCharacters;
+      luckPity = previousLuckPity;
+      game.setLuckPityState(luckPity);
       applySelectedCharacter();
       renderInventory();
       applyEquipmentStats();
@@ -2434,7 +2454,14 @@ window.addEventListener("resize", () => game.resize());
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "hidden" || !persistenceReady) return;
   campaignAutosave.schedule(
-    { campaign, inventory, equipment, supportSpells, characters },
+    {
+      campaign,
+      inventory,
+      equipment,
+      supportSpells,
+      characters,
+      luckPity,
+    },
     "pagehide",
   );
   void campaignAutosave.flush("pagehide");
@@ -2443,7 +2470,14 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("pagehide", () => {
   if (!persistenceReady) return;
   campaignAutosave.schedule(
-    { campaign, inventory, equipment, supportSpells, characters },
+    {
+      campaign,
+      inventory,
+      equipment,
+      supportSpells,
+      characters,
+      luckPity,
+    },
     "pagehide",
   );
   void campaignAutosave.flush("pagehide");
