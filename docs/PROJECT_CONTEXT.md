@@ -1,0 +1,2582 @@
+
+# Space Typing — Project Context, Requirements, Plan & Implementation Steps
+
+> SOURCE OF TRUTH
+>
+> This document is the primary product, design and implementation source of truth for sinhvienaiti/space-typing.
+> If this document conflicts with older design notes, this document wins.
+> The game remains an independent repository and integrates with sinhvienaiti/typing-game only through the platform contracts described here.
+
+---
+
+# 1. Project identity
+
+## 1.1 Core concept
+
+Space Typing is a wide-screen typing combat game combining:
+
+- fast arcade typing combat;
+- a 1000-stage Campaign;
+- character progression;
+- equipment and builds;
+- offensive and defensive skills;
+- support spells;
+- items and consumables;
+- shops and upgrades;
+- luck, random rewards and special events;
+- bosses with real HP bars and multiple phases;
+- shared English-learning resources from the parent typing-game platform.
+
+ZType is a game-feel reference only. Space Typing may study target locking, combat timing, wave pressure, pause flow, projectile ideas, sound timing, glow, particles and difficulty progression.
+
+Do not fork ZType, copy its proprietary/unlicensed game code, reuse its copyrighted sprites/audio, or make a simple reskin.
+
+## 1.2 Repository and parent integration
+
+Game repository:
+
+~~~text
+sinhvienaiti/space-typing
+~~~
+
+Parent platform:
+
+~~~text
+sinhvienaiti/typing-game
+~~~
+
+Target parent layout:
+
+~~~text
+typing-game/
+└── games/
+    └── space-typing -> sinhvienaiti/space-typing
+~~~
+
+Target URLs:
+
+~~~text
+https://typing-game.local/space-typing
+https://space.typing-game.local
+~~~
+
+Development port:
+
+~~~text
+3004
+~~~
+
+## 1.3 Product identity
+
+Space Typing is not:
+
+- a mode inside Vocabulary Shooter;
+- a spaceship game controlled by movement;
+- a simple typing test with space graphics;
+- a ZType clone.
+
+It is:
+
+~~~text
+Typing skill
++
+Combat decisions
++
+Character/class progression
++
+RPG-lite systems
++
+Items/equipment/spells
++
+Luck/random opportunities
++
+1000-stage campaign
+~~~
+
+---
+
+# 2. Non-negotiable combat rules
+
+## 2.1 No movement
+
+The player does not manually steer the ship or character.
+
+Do not add:
+
+~~~text
+WASD movement
+arrow movement
+mouse steering
+manual dodge
+~~~
+
+The tactical layer comes from:
+
+- what target to type first;
+- typing speed;
+- accuracy;
+- streak;
+- skill timing;
+- Energy management;
+- defensive timing;
+- consumables;
+- loadout;
+- character choice;
+- random opportunities;
+- risk/reward choices.
+
+## 2.2 Typing is still the main skill
+
+Progression helps the player go farther but never replaces typing ability.
+
+A strong build may create:
+
+- more defense;
+- more damage;
+- more resources;
+- recovery opportunities;
+- better loot;
+- useful synergies.
+
+But repeated typing mistakes must remain dangerous.
+
+## 2.3 Input ownership
+
+Letters are reserved for typing.
+
+Preferred combat controls:
+
+~~~text
+1 / 2 / 3 / 4
+-> active abilities
+
+Space
+-> Overdrive / Ultimate
+
+Esc
+-> Pause
+
+Mouse / touch
+-> optional UI actions
+~~~
+
+Any future typed spell must use an explicit command mode so spell text cannot conflict with enemy text.
+
+---
+
+# 3. Shared English resources
+
+## 3.1 Shared vocabulary is mandatory
+
+Space Typing must use the parent platform vocabulary.
+
+Parent data:
+
+~~~text
+shared/vocabulary/index.json
+shared/vocabulary/levels/001.json
+...
+shared/vocabulary/levels/100.json
+~~~
+
+Current production library:
+
+~~~text
+100 levels
+18,000 entries
+~~~
+
+Required runtime entry:
+
+~~~json
+{
+  "id": "L003-025",
+  "en": "cache",
+  "vi": "bộ nhớ đệm",
+  "ipa": "/kæʃ/"
+}
+~~~
+
+Required fields:
+
+~~~text
+id
+en
+vi
+ipa
+~~~
+
+Phrases are supported.
+
+Normal gameplay loads only the selected vocabulary level instead of all 100 files.
+
+## 3.2 Campaign Stage and Vocabulary Level are independent
+
+~~~text
+Campaign Stage
+001 -> 1000
+
+Vocabulary Level
+001 -> 100
+~~~
+
+Example:
+
+~~~text
+Campaign Stage 437
+Vocabulary Level 021
+~~~
+
+Changing vocabulary must not reset Campaign progression.
+
+## 3.3 Vocabulary UX
+
+Use the same explicit apply behavior as Shooter and Recall.
+
+~~~text
+Vocabulary
+├── Class
+│   ├── Level selector
+│   └── Use level
+│
+└── Custom
+    ├── editor/input
+    └── Save vocabulary
+~~~
+
+Switching Class/Custom tabs only changes the view.
+
+Use level is the explicit Class apply action.
+
+Save vocabulary is the explicit Custom apply action.
+
+Success flow:
+
+~~~text
+Applying…
+-> persist source
+-> close dialog
+-> show success notice
+~~~
+
+## 3.4 Shared typing-text corpus
+
+Parent source:
+
+~~~text
+shared/typing-texts/
+~~~
+
+Current state:
+
+~~~text
+planned levels: 100
+available levels: 20
+passages: 300
+~~~
+
+Potential uses:
+
+- boss phrase attacks;
+- sentence challenge stages;
+- special missions;
+- advanced Ultimates;
+- challenge modes.
+
+Do not assume all 100 typing-text levels already exist.
+
+## 3.5 Pronunciation and shared music
+
+Completed learning targets may show:
+
+~~~text
+English
+Vietnamese
+IPA
+pronunciation
+~~~
+
+Pronunciation signals parent shared music:
+
+~~~text
+typing-game:speech
+active true / false
+~~~
+
+Rapid pronunciations must queue and must not cancel later words.
+
+Space Typing does not create competing background music.
+
+Parent typing-game owns:
+
+- Local music;
+- YouTube;
+- Shuffle;
+- Auto next;
+- Repeat one;
+- Music volume;
+- Pronunciation ducking.
+
+Space Typing owns:
+
+- shot SFX;
+- hit SFX;
+- explosion;
+- enemy attack;
+- boss SFX;
+- UI/gameplay SFX;
+- pronunciation.
+
+---
+
+# 4. Screen, visuals and game feel
+
+## 4.1 Wide-screen requirement
+
+Do not reproduce a narrow portrait battlefield.
+
+Primary target:
+
+~~~text
+wide responsive desktop arena
+16:9-like composition
+most of available iframe area
+up to roughly 1500x900 useful gameplay area
+~~~
+
+HUD stays near edges.
+
+## 4.2 Visual quality target
+
+Target:
+
+- 60 FPS;
+- high-DPI Canvas;
+- layered stars/grid/parallax;
+- additive glow;
+- laser trails;
+- particle bursts;
+- hit flash;
+- enemy recoil;
+- target knockback;
+- short hit-stop;
+- controlled screen shake;
+- boss telegraphs;
+- animated Power/Streak meters;
+- shield/core/weak-point effects;
+- large boss silhouettes;
+- polished pause UI.
+
+Visual effects must never hide typing targets.
+
+## 4.3 Per-key feel
+
+Every correct key:
+
+~~~text
+correct key
+-> laser
+-> hit spark
+-> target flash
+-> recoil/knockback
+-> short SFX
+-> score/streak/power response
+~~~
+
+Word completion:
+
+~~~text
+final key
+-> stronger hit
+-> larger recoil
+-> explosion
+-> particles
+-> reward feedback
+-> VI + IPA
+-> pronunciation
+~~~
+
+## 4.4 Art sourcing
+
+Enemy/boss visuals may use:
+
+- original Canvas/vector art;
+- generated art made for this project;
+- openly licensed assets;
+- online references used only as inspiration.
+
+For any external asset, record source, author when applicable, license and attribution requirement.
+
+---
+
+# 5. Game modes
+
+## 5.1 Campaign
+
+Primary mode:
+
+~~~text
+Stage 001 -> Stage 1000
+~~~
+
+Rules:
+
+- save highest unlocked stage;
+- losing never resets to Stage 001;
+- Retry restarts current stage;
+- Stage Select can replay unlocked stages;
+- stage clear unlocks next stage;
+- milestone stages unlock characters/content.
+
+Suggested menu:
+
+~~~text
+CAMPAIGN
+
+Current: Stage 237
+
+[ Continue ]
+[ Stage Select ]
+[ Character ]
+[ Loadout ]
+[ Shop ]
+~~~
+
+## 5.2 Later modes
+
+After Campaign foundation is stable:
+
+- Endless;
+- Boss Rush;
+- Survival;
+- Precision Challenge.
+
+Campaign is implemented first.
+
+---
+
+# 6. 1000-stage Campaign structure
+
+## 6.1 Galaxies
+
+~~~text
+Galaxy 01 -> Stage 001-100
+Galaxy 02 -> Stage 101-200
+Galaxy 03 -> Stage 201-300
+Galaxy 04 -> Stage 301-400
+Galaxy 05 -> Stage 401-500
+Galaxy 06 -> Stage 501-600
+Galaxy 07 -> Stage 601-700
+Galaxy 08 -> Stage 701-800
+Galaxy 09 -> Stage 801-900
+Galaxy 10 -> Stage 901-1000
+~~~
+
+Each Galaxy introduces combinations of:
+
+- new enemies;
+- hazards;
+- visual theme;
+- stage modifiers;
+- equipment/rewards;
+- boss mechanics.
+
+## 6.2 Suggested rhythm inside every 100 stages
+
+~~~text
+x01-x09   normal progression
+x10       Elite
+x20       Mini Boss
+x30       Special Mission
+x40       Elite
+x50       Boss
+x60       Hazard Stage
+x70       Elite
+x80       Mini Boss
+x90       Gauntlet
+x100      Major Boss + milestone unlock
+~~~
+
+The exact rhythm may vary by Galaxy.
+
+## 6.3 Gradual difficulty
+
+Every later stage should be a little harder, but not only through speed.
+
+Difficulty dimensions:
+
+- enemy speed;
+- durability;
+- active-enemy cap;
+- spawn interval;
+- formation complexity;
+- word length;
+- word complexity;
+- projectile speed;
+- projectile count;
+- fire rate;
+- Elite chance;
+- shield layers;
+- support enemies;
+- status effects;
+- environmental pressure;
+- boss mechanics;
+- reaction windows;
+- stage modifiers.
+
+Example:
+
+~~~text
+Stage 101
+-> enemy speed slightly higher
+
+Stage 102
+-> projectile speed slightly higher
+
+Stage 103
+-> durability slightly higher
+
+Stage 104
+-> formation harder
+
+Stage 105
+-> modifier/event pressure
+~~~
+
+## 6.4 Anti-plateau rule
+
+Each new Galaxy increases a global baseline and introduces new combinations.
+
+Do not allow late Campaign to become:
+
+~~~text
+same content
++ only larger numbers
+~~~
+
+---
+
+# 7. The 18 core systems
+
+## System 01 — Items
+
+Includes:
+
+- consumables;
+- emergency items;
+- supply items;
+- materials;
+- special event items;
+- boss items.
+
+Examples:
+
+~~~text
+Repair Kit
+Shield Cell
+Energy Cell
+Nova Bomb
+EMP Charge
+Time Crystal
+Cloak Charge
+Word Bomb
+Resurrection Core
+Supply Beacon
+Lucky Dice
+~~~
+
+## System 02 — Skills
+
+Character abilities.
+
+Categories:
+
+- offense;
+- defense;
+- control;
+- support;
+- utility.
+
+Skills may use Energy, cooldown, charges and typing conditions.
+
+## System 03 — Characters
+
+Each character owns:
+
+~~~text
+base stats
+passive
+active skill
+ultimate
+equipment affinity
+visual identity
+play style
+~~~
+
+## System 04 — Attributes
+
+Primary attributes:
+
+~~~text
+Hull
+Shield
+Firepower
+Armor
+Energy
+Reactor
+Focus
+Ward
+Luck
+Salvage
+~~~
+
+Definitions:
+
+- Hull: health.
+- Shield: renewable protection.
+- Firepower: typing attack damage.
+- Armor: incoming-damage reduction.
+- Energy: active-skill resource capacity.
+- Reactor: Energy recovery.
+- Focus: Power gain, combo stability, precision effects.
+- Ward: defensive spell/status resistance.
+- Luck: reward/event rarity weighting.
+- Salvage: Credits/material/equipment efficiency.
+
+No movement-speed core stat.
+
+## System 05 — Character Level / Mastery
+
+Each character has individual progression.
+
+Potential unlocks:
+
+- small stat growth;
+- passive upgrade;
+- active-skill modifier;
+- ultimate modifier;
+- starting bonus;
+- cosmetic/effect changes;
+- mastery perks.
+
+## System 06 — Support Spells
+
+Equipable abilities separate from character core skills.
+
+Examples:
+
+~~~text
+Barrier
+Time Stop
+Meteor
+Resurrection
+Lucky Blessing
+Cleanse
+Supply Beacon
+Gravity Well
+Sanctuary
+~~~
+
+A limited spell loadout is selected before a stage.
+
+## System 07 — Shop
+
+Types:
+
+~~~text
+Normal Shop
+Upgrade Shop
+Black Market
+Event Shop
+Repair Station
+~~~
+
+Purchases:
+
+- consumables;
+- equipment;
+- materials;
+- upgrades;
+- spells;
+- rerolls;
+- repair;
+- temporary buffs.
+
+## System 08 — Equipment / Loadout
+
+Recommended slots:
+
+~~~text
+Weapon
+Armor
+Shield
+Reactor
+Utility
+Drone
+Core
+~~~
+
+Optional later:
+
+~~~text
+Secondary Module
+~~~
+
+## System 09 — Rarity / Loot / Drops
+
+Rarity:
+
+~~~text
+Common
+Rare
+Epic
+Legendary
+~~~
+
+Optional late endgame:
+
+~~~text
+Mythic
+~~~
+
+Higher rarity should unlock interesting mechanics, not only bigger numbers.
+
+## System 10 — Enhancement / Upgrades
+
+Examples:
+
+~~~text
+Pulse Laser Mk.I -> Mk.V
+Shield Core +1 -> +5
+Armor reinforcement
+Skill modifier upgrade
+Equipment evolution
+~~~
+
+Avoid too many currencies.
+
+## System 11 — Talent / Skill Tree
+
+Characters can specialize.
+
+Example Vanguard branches:
+
+~~~text
+Defense
+Balanced
+Power
+~~~
+
+Talent trees should be small and meaningful rather than huge grids of +1% nodes.
+
+## System 12 — Combat Resources
+
+Resources may include:
+
+~~~text
+Hull
+Shield
+Energy
+Power / Overdrive
+Skill charges
+Bomb charges
+Character-specific resource
+~~~
+
+Energy is tactical in-stage Energy.
+
+There is no mobile-style stamina that blocks play.
+
+## System 13 — Buff / Debuff / Status
+
+Positive:
+
+~~~text
+Shielded
+Fortified
+Lucky
+Overcharged
+Cloaked
+Combo Protected
+Regeneration
+~~~
+
+Negative:
+
+~~~text
+Frozen
+Burning
+Silenced
+Jammed
+Cursed
+Weakened
+Armor Broken
+Slowed
+Marked
+~~~
+
+## System 14 — Enemies / Elites / Bosses
+
+Candidate families:
+
+~~~text
+Scout
+Mine
+Tank
+Destroyer
+Oppressor
+Carrier
+Shield
+Jammer
+Cloaker
+Healer
+Splitter
+Sniper
+Leech
+Commander
+Elite
+Boss
+~~~
+
+They must differ mechanically, not only in HP.
+
+## System 15 — Stage Modifiers / Random Events
+
+Examples:
+
+~~~text
+Fast Enemies
+Armored Enemies
+Low Shield
+Double Supply
+Projectile Storm
+Supply Storm
+Treasure Drone
+Distress Beacon
+Golden Enemy
+Meteor Cache
+Black Market
+Repair Station
+Weapon Trial
+Jackpot Wave
+Cursed Stage
+~~~
+
+This system is critical for keeping 1000 stages varied.
+
+## System 16 — Combo / Accuracy / Perfect Typing
+
+Typing performance directly affects combat.
+
+Examples:
+
+~~~text
+10 correct keys
+-> Shield pulse
+
+25 streak
+-> multiplier
+
+50 streak
+-> special proc
+
+3 perfect words
+-> Rail Strike ready
+
+perfect boss word
+-> stagger
+
+long perfect word
+-> bonus damage/Power
+
+100% wave accuracy
+-> reward choice
+~~~
+
+## System 17 — Missions / Achievements / Challenges
+
+Examples:
+
+~~~text
+Clear without damage
+Finish with 98%+ accuracy
+100 perfect words
+Kill boss without Bomb
+Destroy 30 projectiles
+Clear using specific character
+Clear under time target
+~~~
+
+Rewards:
+
+- Credits;
+- cosmetics;
+- equipment;
+- materials;
+- mastery;
+- collection unlocks.
+
+Normal Campaign progression must not require achievement grinding.
+
+## System 18 — Meta Progression / Collection
+
+Persist:
+
+- highest stage;
+- cleared stages;
+- best results;
+- characters;
+- mastery;
+- inventory;
+- equipment;
+- discovered enemies;
+- discovered bosses;
+- discovered items;
+- achievements;
+- cosmetics;
+- boss records;
+- collection completion.
+
+## Cross-system Synergy
+
+Synergy is a cross-system rule, not a separate numbered system.
+
+Example:
+
+~~~text
+Volt
++ Lightning Core
++ Chain Lightning
+-> enhanced Lightning synergy
+~~~
+
+Build quality should come from interactions, not only the largest raw stat.
+
+---
+
+# 8. Character roster and milestone unlocks
+
+## 8.1 Unlock schedule
+
+~~~text
+Stage 001
+-> Character 01 Vanguard
+
+Clear 100
+-> Character 02 Aegis
+
+Clear 200
+-> Character 03 Volt
+
+Clear 300
+-> Character 04 Wraith
+
+Clear 400
+-> Character 05 Fortune
+
+Clear 500
+-> Character 06 Arsenal
+
+Clear 600
+-> Character 07 Oracle
+
+Clear 700
+-> Character 08 Bastion
+
+Clear 800
+-> Character 09 Reaper
+
+Clear 900
+-> Character 10 Celestial
+
+Clear 1000
+-> Character 11 Zenith
+~~~
+
+Unlocks are permanent.
+
+Later characters may be stronger overall, but earlier characters retain unique builds and Mastery value.
+
+## 8.2 Vanguard
+
+Role: balanced starter.
+
+Passive:
+
+~~~text
+20 consecutive correct keys
+-> restore small Shield
+~~~
+
+Active: Barrier Pulse.
+
+Ultimate: Nova Overdrive.
+
+## 8.3 Aegis
+
+Unlock: Stage 100.
+
+Role: defense/tank.
+
+Passive: perfect words reinforce Shield.
+
+Active: Reflect Field.
+
+Ultimate: Fortress Protocol.
+
+## 8.4 Volt
+
+Unlock: Stage 200.
+
+Role: Energy caster.
+
+Passive: long words restore extra Energy.
+
+Active: EMP Burst.
+
+Ultimate: Thunder Grid.
+
+## 8.5 Wraith
+
+Unlock: Stage 300.
+
+Role: control/survival.
+
+Passive: high streak periodically triggers short Cloak.
+
+Active: Phase Cloak.
+
+Ultimate: Time Collapse.
+
+## 8.6 Fortune
+
+Unlock: Stage 400.
+
+Role: Luck/loot.
+
+High Luck and Salvage.
+
+Passive improves Supply, Treasure Drone and rare-event weighting.
+
+Active: Lucky Star.
+
+Ultimate: Jackpot.
+
+Luck must never trivialize difficulty.
+
+## 8.7 Arsenal
+
+Unlock: Stage 500.
+
+Role: weapon specialist.
+
+Passive: weapon pickups last longer and gain extra effects.
+
+Active: Weapon Overclock.
+
+Ultimate: Armory Protocol.
+
+## 8.8 Oracle
+
+Unlock: Stage 600.
+
+Role: precision typing.
+
+Passive: perfect words deal extra boss damage.
+
+Active: Mark of Weakness.
+
+Ultimate: Perfect Sentence.
+
+## 8.9 Bastion
+
+Unlock: Stage 700.
+
+Role: Shield/support.
+
+Passive: destroying enemy projectiles recharges Shield.
+
+Active: Guardian Matrix.
+
+Ultimate: Sanctuary.
+
+## 8.10 Reaper
+
+Unlock: Stage 800.
+
+Role: high-risk offense.
+
+Passive: damage grows with streak.
+
+Active: Execute.
+
+Ultimate: Death Chain.
+
+## 8.11 Celestial
+
+Unlock: Stage 900.
+
+Role: late-game hybrid.
+
+Passive: perfect words generate Celestial Charge.
+
+Active: Offensive/Defensive Celestial stance.
+
+Ultimate: Starfall.
+
+## 8.12 Zenith
+
+Unlock: Stage 1000.
+
+Role: secret post-Campaign character.
+
+Strongest overall base character, but still skill-dependent.
+
+Ultimate: Zenith Protocol.
+
+It must be a multi-phase typing/combat ability, not an instant-win button.
+
+---
+
+# 9. Offensive, defensive and support mechanics
+
+## 9.1 Defense
+
+Candidate mechanics:
+
+- Barrier;
+- Reflect Field;
+- Time Shell;
+- Phase Cloak;
+- Word Guard;
+- Perfect Guard;
+- Emergency Repair;
+- Guardian Drone;
+- Purify;
+- Last Stand;
+- Fortress;
+- Sanctuary.
+
+Because the player cannot dodge manually, defensive depth is mandatory.
+
+## 9.2 Offense
+
+Candidate mechanics:
+
+- Nova Bomb;
+- EMP;
+- Chain Lightning;
+- Rail Strike;
+- Meteor Barrage;
+- Mark of Weakness;
+- Execute;
+- Pulse Storm;
+- Overclock;
+- Word Collapse;
+- Starfall;
+- Death Chain.
+
+## 9.3 Support/control
+
+Candidate mechanics:
+
+- Freeze;
+- Gravity Well;
+- Silence;
+- Cleanse Word;
+- Scan;
+- Supply Beacon;
+- Lucky Star;
+- Shield regeneration;
+- Energy regeneration;
+- cooldown manipulation.
+
+## 9.4 Ability constraints
+
+Prevent spam through combinations of:
+
+~~~text
+Energy
+Cooldown
+Charges
+Typing conditions
+Per-stage limit
+Per-run limit
+~~~
+
+---
+
+# 10. Items, supplies and luck
+
+## 10.1 Supply Pods
+
+Supply Pods enter the battlefield with their own typing target.
+
+~~~text
+SUPPLY POD
+[repair]
+
+type before it exits
+-> collect reward
+~~~
+
+Rewards may include:
+
+- Hull Repair;
+- Shield Recharge;
+- Energy Cell;
+- Overdrive Charge;
+- Bomb;
+- EMP;
+- temporary weapon;
+- armor buff;
+- projectile slow;
+- Combo Guard;
+- Credits;
+- materials;
+- equipment;
+- Drone repair;
+- Cloak.
+
+## 10.2 Enemy drops
+
+Normal enemies have small drop chance.
+
+Elite/Boss enemies have better tables.
+
+Valuable pickups may require typing before timeout.
+
+## 10.3 Consumables
+
+Examples:
+
+~~~text
+Nova Bomb
+EMP Charge
+Repair Kit
+Shield Cell
+Time Crystal
+Cloak Charge
+Word Bomb
+Resurrection Core
+Supply Beacon
+Lucky Dice
+~~~
+
+## 10.4 Temporary buffs
+
+Examples:
+
+~~~text
+Firepower +20%
+Shield +25%
+Energy regeneration +30%
+Power gain +20%
+Projectile speed -15%
+Enemy speed -10%
+Supply chance +20%
+Perfect-word reward +30%
+One-mistake Combo protection
+~~~
+
+## 10.5 Reward choices
+
+Some crates present:
+
+~~~text
+Choose 1 of 3
+~~~
+
+Example:
+
+~~~text
++8% Firepower
++10% Shield
++12% Energy regeneration
+~~~
+
+## 10.6 Weapon drops
+
+Candidate families:
+
+~~~text
+Pulse Laser
+Twin Laser
+Chain Lightning
+Railgun
+Plasma Cannon
+Burst Cannon
+Precision Beam
+Homing Pulse
+Arc Cannon
+~~~
+
+Weapon behavior should react to typing performance.
+
+## 10.7 Lucky events
+
+Examples:
+
+~~~text
+Supply Storm
+Treasure Drone
+Distress Beacon
+Golden Enemy
+Meteor Cache
+Black Market Beacon
+Repair Station
+Weapon Trial
+Jackpot Wave
+~~~
+
+## 10.8 Risk/reward crates
+
+Example:
+
+~~~text
+ANOMALY CRATE
+
+Possible positive:
+Epic weapon
+Large Credits
+Full repair
+
+Possible negative:
+Elite ambush
+Enemy speed +20%
+Shield disabled temporarily
+~~~
+
+Risk is shown before opening.
+
+## 10.9 Luck
+
+Luck may influence:
+
+- Supply chance;
+- rare crate chance;
+- reward quality;
+- Treasure Drone chance;
+- rare events;
+- item rarity;
+- boss drop quality.
+
+Luck never guarantees success.
+
+## 10.10 Soft pity
+
+Hidden anti-bad-luck rules may slowly raise chance after long droughts.
+
+Examples:
+
+~~~text
+many stages without Supply
+-> Supply chance rises
+
+many Elite/Boss kills without equipment
+-> equipment chance rises
+
+repeated near-end deaths
+-> rescue weighting rises slightly
+~~~
+
+---
+
+# 11. Enemy system
+
+Candidate enemy mechanics:
+
+### Scout
+Basic target.
+
+### Mine
+Fast pressure.
+
+### Tank
+Slow and durable.
+
+### Destroyer
+Shoots letter projectiles.
+
+### Oppressor
+Heavy projectile pressure.
+
+### Carrier
+Spawns smaller enemies.
+
+### Shield Enemy
+Requires shield word then core word.
+
+### Jammer
+Temporarily distorts information without making targets unreadable/unfair.
+
+### Cloaker
+Partially hidden until lock/Scan.
+
+### Healer
+Restores nearby enemies.
+
+### Splitter
+Splits on death.
+
+### Sniper
+Telegraphs a powerful attack.
+
+### Leech
+Steals Energy/Power.
+
+### Commander
+Buffs nearby enemies.
+
+### Elite
+Enhanced mechanics plus better loot.
+
+Enemy projectiles can carry letters/short words and can be destroyed through typing.
+
+Defensive skills may reflect, freeze, block, erase or convert projectiles.
+
+---
+
+# 12. Boss system
+
+## 12.1 Real HP
+
+Bosses have actual HP bars.
+
+~~~text
+BOSS NAME
+HP ████████████████████
+~~~
+
+## 12.2 Typing attack loop
+
+~~~text
+boss word appears
+-> correct key
+-> small damage/hit feedback
+
+complete word
+-> larger damage
+-> stronger impact
+-> boss HP decreases
+-> next controlled-random word
+-> repeat
+~~~
+
+Boss HP is not a fixed word count.
+
+Damage may depend on:
+
+- Firepower;
+- character;
+- equipment;
+- buffs/debuffs;
+- word length;
+- perfect typing;
+- streak;
+- skills.
+
+## 12.3 Boss words
+
+Boss words come from active Vocabulary Level using controlled selection:
+
+- length range;
+- stage difficulty;
+- thematic pool when applicable;
+- phrase challenge when supported;
+- anti-repeat rules.
+
+## 12.4 Phases
+
+Example:
+
+~~~text
+100%-70%
+normal words
+
+70%-40%
+projectiles
+summons
+
+40%-15%
+shield phase
+shield word -> core word
+
+15%-0%
+rage
+harder words
+higher pressure
+~~~
+
+## 12.5 Stagger
+
+Possible triggers:
+
+- perfect boss word;
+- Rail Strike;
+- EMP;
+- phase-break word;
+- Ultimate;
+- build synergy.
+
+## 12.6 Readability
+
+Always prioritize:
+
+- HP;
+- active word;
+- typed position;
+- dangerous projectile text;
+- phase warning.
+
+---
+
+# 13. Character progression
+
+Each character has:
+
+~~~text
+Character Level
+Mastery XP
+Mastery perks
+Skill modifiers
+Ultimate modifiers
+Optional cosmetics
+~~~
+
+Do not make Vanguard useless after Stage 100.
+
+---
+
+# 14. Equipment and builds
+
+Recommended slots:
+
+~~~text
+Weapon
+Armor
+Shield
+Reactor
+Utility
+Drone
+Core
+~~~
+
+Possible build styles:
+
+~~~text
+Tank
+Energy Caster
+Perfect Typing
+Boss Killer
+Luck/Loot
+Shield Counter
+Projectile Control
+High-Streak Glass Cannon
+Supply Hunter
+Weapon Specialist
+~~~
+
+Interesting mechanics are preferred over pure stat inflation.
+
+Example:
+
+Bad:
+
+~~~text
++300 damage
+~~~
+
+Better:
+
+~~~text
+Perfect word
+-> secondary Rail shot
+~~~
+
+---
+
+# 15. Shop and economy
+
+Start with one main currency:
+
+~~~text
+Credits
+~~~
+
+Avoid too many currencies in the first implementation.
+
+Shop types:
+
+- Normal Shop;
+- Upgrade Shop;
+- Black Market;
+- Event Shop;
+- Repair Station.
+
+Possible actions:
+
+- buy consumable;
+- buy equipment;
+- repair;
+- upgrade;
+- buy spell;
+- reroll offers.
+
+Purchases must be atomic and cannot make Credits negative.
+
+---
+
+# 16. Save and persistence architecture
+
+## 16.1 V1 needs no backend
+
+Use:
+
+~~~text
+Static definitions
+-> JSON / TypeScript
+
+Player progress
+-> IndexedDB
+
+Small settings
+-> localStorage
+
+Backup
+-> Export / Import JSON
+~~~
+
+## 16.2 Static definitions
+
+Suggested:
+
+~~~text
+data/
+├── characters/
+├── skills/
+├── spells/
+├── items/
+├── equipment/
+├── enemies/
+├── bosses/
+├── shops/
+├── loot/
+├── galaxies/
+└── modifiers/
+~~~
+
+## 16.3 IndexedDB player save
+
+Persist:
+
+- highest unlocked stage;
+- stage clear history;
+- best stage results;
+- Credits;
+- character unlocks;
+- Character Level;
+- Mastery;
+- inventory;
+- equipment;
+- loadouts;
+- skills;
+- talents;
+- achievements;
+- collection/codex;
+- pity counters;
+- permanent progression.
+
+## 16.4 localStorage
+
+Use for small settings:
+
+- SFX;
+- graphics;
+- vocabulary source;
+- vocabulary level;
+- accessibility;
+- UI preferences;
+- keybinds where applicable.
+
+## 16.5 Autosave
+
+Save immediately after important changes:
+
+~~~text
+stage clear
+stage unlock
+character unlock
+level up
+mastery change
+item receive
+equipment receive
+loadout change
+shop purchase
+upgrade
+talent spend
+achievement unlock
+currency change
+important pity update
+~~~
+
+Show non-blocking:
+
+~~~text
+✓ Saved
+~~~
+
+when useful.
+
+## 16.6 Save schema
+
+Every save has a version.
+
+~~~json
+{
+  "version": 1
+}
+~~~
+
+Use migrations for future schema changes.
+
+Never silently delete old progress when adding new fields.
+
+## 16.7 Export / Import
+
+Data screen:
+
+~~~text
+[ Export Save ]
+[ Import Save ]
+~~~
+
+Import validates:
+
+- version;
+- structure;
+- required data;
+- value ranges;
+- unknown IDs;
+- corruption.
+
+## 16.8 Future backend
+
+PHP/MariaDB is only needed later for:
+
+- cloud save;
+- multi-device sync;
+- accounts;
+- remote leaderboard;
+- shared profiles.
+
+V1 is local/offline-first.
+
+---
+
+# 17. Technical architecture
+
+Preferred stack:
+
+~~~text
+TypeScript
+Vite
+Canvas 2D
+Web Audio / HTML Audio
+IndexedDB
+localStorage
+Vitest
+~~~
+
+Suggested structure:
+
+~~~text
+src/
+├── app/
+├── engine/
+├── combat/
+├── campaign/
+├── characters/
+├── skills/
+├── spells/
+├── items/
+├── equipment/
+├── loot/
+├── shop/
+├── enemies/
+├── bosses/
+├── events/
+├── vocabulary/
+├── audio/
+├── persistence/
+├── ui/
+└── types/
+
+data/
+├── characters/
+├── equipment/
+├── items/
+├── skills/
+├── spells/
+├── enemies/
+├── bosses/
+├── loot/
+├── shops/
+├── galaxies/
+└── modifiers/
+~~~
+
+Keep modules simple. Do not create abstractions before needed.
+
+---
+
+# 18. Engineering rules
+
+- Keep code simple and readable.
+- Do not over-engineer.
+- Verify function inputs and outputs before using them.
+- Reuse existing functions/systems before creating duplicates.
+- Avoid redundant casts and defensive checks with no purpose.
+- Use simple English names.
+- Keep rendering separate from persistence/progression.
+- Do not couple Space Typing to source code from other child games.
+- Integrate through parent HTTP/postMessage/platform contracts.
+- Add targeted tests for deterministic logic.
+- Do not leave invalid partial checkpoints on main.
+- Child CI must pass before parent pins a new submodule revision.
+- Meaningful implementation changes update documentation.
+- A major milestone requires two consecutive clean review passes.
+
+---
+
+# 19. PLAN
+
+## Phase 0 — Foundation
+
+Goal: stable TypeScript/Vite project before gameplay complexity.
+
+Deliverables:
+
+- Vite;
+- TypeScript;
+- Vitest;
+- CI;
+- README;
+- master context;
+- basic settings;
+- shared vocabulary loader skeleton;
+- persistence schema skeleton;
+- parent audio-focus contract.
+
+Acceptance:
+
+~~~text
+pnpm test PASS
+pnpm build PASS
+standalone page loads
+~~~
+
+## Phase 1 — Core typing combat
+
+Implement:
+
+- Canvas loop;
+- responsive wide arena;
+- high-DPI;
+- player ship;
+- Scout;
+- target acquisition;
+- word rendering;
+- correct-key shot;
+- wrong-key penalty;
+- completion;
+- hit flash;
+- knockback;
+- particles;
+- explosion;
+- score;
+- streak;
+- multiplier;
+- Power/Overdrive;
+- pause/resume.
+
+Acceptance:
+
+- typing feedback is immediate;
+- targets stay readable;
+- desktop performance is smooth;
+- pause stops gameplay;
+- no movement controls.
+
+## Phase 2 — English-learning integration
+
+Implement:
+
+- Class/Custom vocabulary UI;
+- 100 Vocabulary Levels;
+- explicit Use level;
+- success notice;
+- VI/IPA;
+- pronunciation;
+- pronunciation queue;
+- music ducking.
+
+Acceptance:
+
+- changing vocabulary does not change Campaign stage;
+- rapid words all receive pronunciation;
+- no competing BGM.
+
+## Phase 3 — 1000-stage Campaign foundation
+
+Implement:
+
+- 10 Galaxies;
+- Stage 001-1000 addressing;
+- StageFactory;
+- Difficulty;
+- stage seed;
+- stage roles;
+- clear/fail;
+- Continue;
+- Retry;
+- Stage Select;
+- highest unlocked stage.
+
+Generate stages from data/functions rather than hand-writing 1000 files.
+
+Acceptance:
+
+- all 1000 stages resolve;
+- difficulty trend rises;
+- losing does not reset progress;
+- deterministic stage behavior is testable.
+
+## Phase 4 — Enemy families and projectile combat
+
+Order:
+
+1. Scout;
+2. Mine;
+3. Tank;
+4. Destroyer;
+5. Oppressor;
+6. Carrier;
+7. Shield;
+8. Jammer;
+9. Cloaker;
+10. Healer;
+11. Splitter;
+12. Sniper;
+13. Leech;
+14. Commander;
+15. Elite variants.
+
+Add projectile typing and threat priority.
+
+## Phase 5 — Boss framework
+
+Implement:
+
+- boss base;
+- HP bar;
+- per-key damage;
+- word-complete damage;
+- phases;
+- shield/core;
+- summons;
+- projectiles;
+- rage;
+- stagger;
+- boss loot.
+
+Acceptance:
+
+- boss requires multiple words;
+- HP reflects actual damage;
+- words rotate;
+- phases are clear.
+
+## Phase 6 — Persistence
+
+Implement before deep RPG progression:
+
+- IndexedDB;
+- autosave;
+- schema version;
+- migrations;
+- Export;
+- Import;
+- validation;
+- save indicator.
+
+## Phase 7 — Attributes and resources
+
+Implement:
+
+- Hull;
+- Shield;
+- Firepower;
+- Armor;
+- Energy;
+- Reactor;
+- Focus;
+- Ward;
+- Luck;
+- Salvage;
+- Overdrive;
+- charges.
+
+Use one effective-stat pipeline:
+
+~~~text
+Character Base
++ Character Level
++ Equipment
++ Talent
++ Temporary Buff
++ Stage Effect
+= Effective Stats
+~~~
+
+## Phase 8 — Items and consumables
+
+Implement registry/inventory and first items:
+
+- Repair Kit;
+- Shield Cell;
+- Energy Cell;
+- Nova Bomb;
+- EMP;
+- Time Crystal;
+- Word Bomb;
+- Supply Beacon;
+- Lucky Dice.
+
+## Phase 9 — Equipment, rarity and loot
+
+Implement:
+
+- slots;
+- loadout;
+- Common/Rare/Epic/Legendary;
+- modifiers;
+- equip/unequip;
+- comparison;
+- weighted loot;
+- Elite/Boss drops.
+
+## Phase 10 — Skills and support spells
+
+Implement skill engine:
+
+- Energy;
+- cooldown;
+- charges;
+- typing conditions.
+
+Initial skills:
+
+- Barrier;
+- Reflect;
+- EMP;
+- Time Shell;
+- Emergency Repair;
+- Chain Lightning;
+- Mark of Weakness;
+- Guardian Drone.
+
+Support spells use a limited pre-stage loadout.
+
+## Phase 11 — Characters and 100-stage milestones
+
+Implement the 11-character data model.
+
+Order:
+
+1. Vanguard;
+2. Aegis;
+3. Volt;
+4. Wraith;
+5. Fortune;
+6. Arsenal;
+7. Oracle;
+8. Bastion;
+9. Reaper;
+10. Celestial;
+11. Zenith.
+
+Milestone unlocks are permanent.
+
+## Phase 12 — Character Level, Mastery and Talent
+
+Implement:
+
+- XP;
+- level;
+- mastery;
+- passive upgrade;
+- active modifier;
+- ultimate modifier;
+- small branching Talent Tree.
+
+Do not build an enormous talent graph.
+
+## Phase 13 — Supply, random events and Luck
+
+Implement:
+
+- Supply Pod;
+- enemy drops;
+- Treasure Drone;
+- Golden Enemy;
+- reward-choice crate;
+- Anomaly crate;
+- Luck weighting;
+- soft pity;
+- event scheduler.
+
+Use seeded/controlled RNG where useful for testing/debugging.
+
+## Phase 14 — Shop and economy
+
+Implement:
+
+- Credits;
+- Normal Shop;
+- repair;
+- consumables;
+- equipment offers;
+- Upgrade Shop;
+- Black Market;
+- reroll.
+
+## Phase 15 — Enhancement and Synergy
+
+Implement:
+
+- equipment upgrade;
+- limited evolution;
+- mechanic upgrades;
+- character/equipment/skill synergies.
+
+Avoid uncontrolled stat inflation.
+
+## Phase 16 — Status engine
+
+Implement:
+
+- timed effects;
+- stacking rules;
+- refresh rules;
+- source tracking;
+- cleanse;
+- resistance/immunity;
+- pause-safe timers.
+
+## Phase 17 — Missions, achievements and collection
+
+Implement:
+
+- achievements;
+- stage challenges;
+- enemy codex;
+- boss codex;
+- item/equipment collection;
+- character collection;
+- best records.
+
+## Phase 18 — Advanced stage variety
+
+Expand:
+
+- Galaxy hazards;
+- special missions;
+- gauntlets;
+- boss variants;
+- phrase challenges;
+- shared typing-text special stages.
+
+## Phase 19 — Art and audio polish
+
+Create/curate:
+
+- characters/ships;
+- enemy families;
+- Elite effects;
+- 10 Galaxy themes;
+- bosses;
+- projectiles;
+- supply pods;
+- crates;
+- equipment icons;
+- spells.
+
+Use original/generated/compatible assets only.
+
+Tune SFX so typing remains satisfying with parent BGM.
+
+## Phase 20 — Parent platform integration
+
+Only after child game is independently stable.
+
+Parent changes:
+
+- add submodule;
+- registry/navigation;
+- nginx;
+- host/certificate;
+- dev.sh;
+- play.sh;
+- package scripts;
+- static build;
+- CI integration.
+
+Do not modify existing games' gameplay code.
+
+## Phase 21 — Final QA and balancing
+
+Run:
+
+- gameplay QA;
+- save/load QA;
+- Campaign generation QA;
+- boss QA;
+- loot simulations;
+- pity simulations;
+- performance profiling;
+- responsive QA;
+- audio balance;
+- readability;
+- parent integration.
+
+Completion requires:
+
+~~~text
+Review Pass #1 -> clean
+Review Pass #2 -> clean
+~~~
+
+---
+
+# 20. IMPLEMENTATION STEPS
+
+Follow this dependency order.
+
+## Step 01
+Initialize Vite + TypeScript + Vitest + CI.
+
+## Step 02
+Create full-height wide Canvas shell.
+
+## Step 03
+Create game loop, high-DPI resize and pause-safe clock.
+
+## Step 04
+Create input router reserving letters for typing.
+
+## Step 05
+Create word renderer and first-letter target locking.
+
+## Step 06
+Create laser, hit, recoil, particles and SFX.
+
+## Step 07
+Create score, streak, multiplier and Power.
+
+## Step 08
+Create Scout and basic clear/fail loop.
+
+## Step 09
+Integrate shared vocabulary index and level loader.
+
+## Step 10
+Create Class/Custom vocabulary dialog with explicit apply confirmation.
+
+## Step 11
+Add VI, IPA, pronunciation and parent music ducking.
+
+## Step 12
+Create Campaign save with highest unlocked stage.
+
+## Step 13
+Create StageFactory for Stage 001-1000.
+
+## Step 14
+Create Galaxy and stage-role models.
+
+## Step 15
+Create difficulty model plus automated trend tests.
+
+## Step 16
+Add Continue, Retry and Stage Select.
+
+## Step 17
+Add Mine and Tank.
+
+## Step 18
+Add Destroyer and letter projectiles.
+
+## Step 19
+Add Oppressor and multi-projectile pressure.
+
+## Step 20
+Add Carrier, Shield, Jammer, Cloaker, Healer, Splitter, Sniper, Leech and Commander incrementally.
+
+## Step 21
+Create Elite modifier framework.
+
+## Step 22
+Create Boss base and HP UI.
+
+## Step 23
+Create boss word/damage loop.
+
+## Step 24
+Create first full multi-phase boss.
+
+## Step 25
+Implement IndexedDB persistence.
+
+## Step 26
+Add autosave, schema version and migrations.
+
+## Step 27
+Add Export/Import.
+
+## Step 28
+Create effective-stat calculation pipeline.
+
+## Step 29
+Implement all core attributes.
+
+## Step 30
+Create Item registry and inventory.
+
+## Step 31
+Implement first consumables.
+
+## Step 32
+Create Equipment and Loadout.
+
+## Step 33
+Implement rarity and loot tables.
+
+## Step 34
+Implement basic enhancement.
+
+## Step 35
+Create skill engine.
+
+## Step 36
+Implement defensive skills.
+
+## Step 37
+Implement offensive skills.
+
+## Step 38
+Implement support-spell loadout.
+
+## Step 39
+Create Character registry and Character Select.
+
+## Step 40
+Implement Vanguard.
+
+## Step 41
+Implement Stage-100 milestone unlock framework.
+
+## Step 42
+Implement remaining milestone characters.
+
+## Step 43
+Add Character Level and Mastery.
+
+## Step 44
+Add small branching Talent Trees.
+
+## Step 45
+Implement Supply Pod.
+
+## Step 46
+Implement enemy random drops.
+
+## Step 47
+Implement Treasure Drone and Golden Enemy.
+
+## Step 48
+Implement reward-choice crate.
+
+## Step 49
+Implement Anomaly risk/reward crate.
+
+## Step 50
+Implement Luck weighting and soft pity.
+
+## Step 51
+Implement stage random-event scheduler.
+
+## Step 52
+Implement Credits and Normal Shop.
+
+## Step 53
+Implement Repair/Upgrade Shop.
+
+## Step 54
+Implement Black Market/Event Shop.
+
+## Step 55
+Implement Buff/Debuff/Status engine.
+
+## Step 56
+Implement build Synergy rules.
+
+## Step 57
+Implement Missions and Achievements.
+
+## Step 58
+Implement Codex/Collection/Meta Progression.
+
+## Step 59
+Add Galaxy hazards and special stages.
+
+## Step 60
+Add typing-text challenges when required parent data is available.
+
+## Step 61
+Create final art/asset pipeline.
+
+## Step 62
+Polish particles, glow, hit-stop, shake and telegraphs.
+
+## Step 63
+Tune SFX and pronunciation balance.
+
+## Step 64
+Profile performance and add quality scaling.
+
+## Step 65
+Run automated drop/pity simulations.
+
+## Step 66
+Manually balance Stage 001-100 through playtesting.
+
+## Step 67
+Statistically validate difficulty across Stage 001-1000.
+
+## Step 68
+Tune later Galaxies using milestone playtests rather than manually playing all 1000 stages one-by-one.
+
+## Step 69
+Integrate space-typing into parent as a submodule.
+
+## Step 70
+Add parent nginx/dev/play/build/navigation support.
+
+## Step 71
+Verify existing games are unaffected.
+
+## Step 72
+Run child CI and parent CI.
+
+## Step 73
+Run complete Review Pass #1 and fix all issues.
+
+## Step 74
+Run complete Review Pass #2.
+
+## Step 75
+Only mark the milestone complete when both review passes are clean.
+
+---
+
+# 21. First playable milestone
+
+The complete vision is intentionally large.
+
+Do not build all 18 systems at once.
+
+The first major playable milestone should prove:
+
+~~~text
+typing feels excellent
+wide arena looks good
+shared vocabulary works
+difficulty rises
+Campaign save/unlock works
+boss HP typing works
+~~~
+
+Recommended first milestone:
+
+~~~text
+Stage 001-020
+Vanguard
+5 enemy types
+1 Elite
+1 Boss
+shared vocabulary
+VI + IPA + pronunciation
+score/streak/power
+basic Hull/Shield/Energy
+1 offensive skill
+1 defensive skill
+basic persistence
+Stage Select
+Supply Pod
+3 consumables
+~~~
+
+After this is fun/stable, scale toward the full 1000-stage architecture.
+
+---
+
+# 22. Definition of done
+
+A major feature is complete only when:
+
+1. behavior matches this source of truth or an explicitly updated requirement;
+2. code is simple and maintainable;
+3. function inputs/outputs are verified;
+4. important deterministic logic has tests;
+5. no known regression remains;
+6. save compatibility is considered;
+7. performance and readability are checked;
+8. child CI passes;
+9. parent integration is updated only when required;
+10. documentation is updated;
+11. Review Pass #1 is clean;
+12. Review Pass #2 is clean.
+
+---
+
+# 23. Current status
+
+At creation of this master file:
+
+- sinhvienaiti/space-typing exists as an independent repository;
+- requirements/design are being consolidated before the main implementation sequence;
+- Campaign scope is 1000 stages;
+- character milestone unlocks are every 100 stages;
+- the parent vocabulary library is production-ready at 18,000 entries / 100 levels;
+- the parent typing-text corpus currently has 20 available levels / 300 passages and is still expanding;
+- the parent shared Music system already exists;
+- this file is the primary context/handoff/plan document.
+
+---
+
+# 24. Handoff rule
+
+For any new session working on Space Typing:
+
+~~~text
+Read:
+sinhvienaiti/space-typing
+docs/PROJECT_CONTEXT.md
+
+Treat it as source of truth.
+
+Then inspect current GitHub main branch state before changing code.
+Do not use chat history as repository state.
+Continue from the latest valid GitHub checkpoint.
+~~~
