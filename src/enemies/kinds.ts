@@ -66,6 +66,21 @@ export function enemyWeightsForStage(stage: number): EnemyWeights {
       ? 0
       : Math.min(0.075, 0.026 + (safeStage - 45) * 0.00005);
 
+  const sniper =
+    safeStage < 50
+      ? 0
+      : Math.min(0.07, 0.024 + (safeStage - 50) * 0.000045);
+
+  const leech =
+    safeStage < 60
+      ? 0
+      : Math.min(0.065, 0.022 + (safeStage - 60) * 0.00004);
+
+  const commander =
+    safeStage < 70
+      ? 0
+      : Math.min(0.06, 0.02 + (safeStage - 70) * 0.000035);
+
   const specialTotal =
     mine +
     tank +
@@ -76,7 +91,10 @@ export function enemyWeightsForStage(stage: number): EnemyWeights {
     jammer +
     cloaker +
     healer +
-    splitter;
+    splitter +
+    sniper +
+    leech +
+    commander;
   const scale = specialTotal > 0.7 ? 0.7 / specialTotal : 1;
   const resolvedMine = mine * scale;
   const resolvedTank = tank * scale;
@@ -88,6 +106,9 @@ export function enemyWeightsForStage(stage: number): EnemyWeights {
   const resolvedCloaker = cloaker * scale;
   const resolvedHealer = healer * scale;
   const resolvedSplitter = splitter * scale;
+  const resolvedSniper = sniper * scale;
+  const resolvedLeech = leech * scale;
+  const resolvedCommander = commander * scale;
 
   const scout = Math.max(
     0.3,
@@ -101,7 +122,10 @@ export function enemyWeightsForStage(stage: number): EnemyWeights {
       resolvedJammer -
       resolvedCloaker -
       resolvedHealer -
-      resolvedSplitter,
+      resolvedSplitter -
+      resolvedSniper -
+      resolvedLeech -
+      resolvedCommander,
   );
 
   return {
@@ -116,6 +140,9 @@ export function enemyWeightsForStage(stage: number): EnemyWeights {
     cloaker: resolvedCloaker,
     healer: resolvedHealer,
     splitter: resolvedSplitter,
+    sniper: resolvedSniper,
+    leech: resolvedLeech,
+    commander: resolvedCommander,
   };
 }
 
@@ -136,6 +163,9 @@ export function chooseEnemyKind(
     "cloaker",
     "healer",
     "splitter",
+    "sniper",
+    "leech",
+    "commander",
   ];
 
   let cumulative = 0;
@@ -267,6 +297,42 @@ export function enemyProfile(kind: EnemyKind, galaxy: number): EnemyProfile {
       speedVariance: 9,
       layers: 1,
       actionInterval: null,
+    };
+  }
+
+  if (kind === "sniper") {
+    return {
+      radius: 27,
+      driftMin: 12,
+      driftMax: 30,
+      baseSpeed: 24 + galaxyScale * 1.5,
+      speedVariance: 6,
+      layers: 1,
+      actionInterval: Math.max(3.6, 5.5 - galaxyScale * 0.11),
+    };
+  }
+
+  if (kind === "leech") {
+    return {
+      radius: 30,
+      driftMin: 34,
+      driftMax: 62,
+      baseSpeed: 30 + galaxyScale * 1.8,
+      speedVariance: 8,
+      layers: 1,
+      actionInterval: Math.max(3.4, 5.2 - galaxyScale * 0.1),
+    };
+  }
+
+  if (kind === "commander") {
+    return {
+      radius: 39,
+      driftMin: 14,
+      driftMax: 34,
+      baseSpeed: 21 + galaxyScale * 1.35,
+      speedVariance: 6,
+      layers: 1,
+      actionInterval: Math.max(3.8, 5.8 - galaxyScale * 0.1),
     };
   }
 

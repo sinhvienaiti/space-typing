@@ -19,6 +19,9 @@ describe("enemy progression", () => {
       cloaker: 0,
       healer: 0,
       splitter: 0,
+      sniper: 0,
+      leech: 0,
+      commander: 0,
     });
 
     const stage3 = enemyWeightsForStage(3);
@@ -63,6 +66,18 @@ describe("enemy progression", () => {
 
     const stage45 = enemyWeightsForStage(45);
     expect(stage45.splitter).toBeGreaterThan(0);
+    expect(stage45.sniper).toBe(0);
+
+    const stage50 = enemyWeightsForStage(50);
+    expect(stage50.sniper).toBeGreaterThan(0);
+    expect(stage50.leech).toBe(0);
+
+    const stage60 = enemyWeightsForStage(60);
+    expect(stage60.leech).toBeGreaterThan(0);
+    expect(stage60.commander).toBe(0);
+
+    const stage70 = enemyWeightsForStage(70);
+    expect(stage70.commander).toBeGreaterThan(0);
   });
 
   it("keeps enemy weights bounded and usable through Stage 1000", () => {
@@ -79,7 +94,10 @@ describe("enemy progression", () => {
         weights.jammer +
         weights.cloaker +
         weights.healer +
-        weights.splitter;
+        weights.splitter +
+        weights.sniper +
+        weights.leech +
+        weights.commander;
 
       expect(total).toBeCloseTo(1);
       expect(weights.scout).toBeGreaterThanOrEqual(0.3);
@@ -93,6 +111,9 @@ describe("enemy progression", () => {
       expect(weights.cloaker).toBeLessThanOrEqual(0.08);
       expect(weights.healer).toBeLessThanOrEqual(0.075);
       expect(weights.splitter).toBeLessThanOrEqual(0.075);
+      expect(weights.sniper).toBeLessThanOrEqual(0.07);
+      expect(weights.leech).toBeLessThanOrEqual(0.065);
+      expect(weights.commander).toBeLessThanOrEqual(0.06);
     }
   });
 
@@ -136,6 +157,16 @@ describe("enemy progression", () => {
     const splitter = enemyProfile("splitter", 1);
     expect(splitter.actionInterval).toBeNull();
     expect(splitter.radius).toBeGreaterThan(cloaker.radius);
+
+    const sniper = enemyProfile("sniper", 1);
+    expect(sniper.actionInterval).not.toBeNull();
+
+    const leech = enemyProfile("leech", 1);
+    expect(leech.actionInterval).not.toBeNull();
+
+    const commander = enemyProfile("commander", 1);
+    expect(commander.actionInterval).not.toBeNull();
+    expect(commander.radius).toBeGreaterThan(sniper.radius);
   });
 
   it("chooses enemy kinds from deterministic random input", () => {
@@ -227,5 +258,53 @@ describe("enemy progression", () => {
       stage45.healer +
       stage45.splitter / 2;
     expect(chooseEnemyKind(45, splitterPoint)).toBe("splitter");
+
+    const stage50 = enemyWeightsForStage(50);
+    const sniperPoint =
+      stage50.mine +
+      stage50.tank +
+      stage50.destroyer +
+      stage50.oppressor +
+      stage50.shield +
+      stage50.carrier +
+      stage50.jammer +
+      stage50.cloaker +
+      stage50.healer +
+      stage50.splitter +
+      stage50.sniper / 2;
+    expect(chooseEnemyKind(50, sniperPoint)).toBe("sniper");
+
+    const stage60 = enemyWeightsForStage(60);
+    const leechPoint =
+      stage60.mine +
+      stage60.tank +
+      stage60.destroyer +
+      stage60.oppressor +
+      stage60.shield +
+      stage60.carrier +
+      stage60.jammer +
+      stage60.cloaker +
+      stage60.healer +
+      stage60.splitter +
+      stage60.sniper +
+      stage60.leech / 2;
+    expect(chooseEnemyKind(60, leechPoint)).toBe("leech");
+
+    const stage70 = enemyWeightsForStage(70);
+    const commanderPoint =
+      stage70.mine +
+      stage70.tank +
+      stage70.destroyer +
+      stage70.oppressor +
+      stage70.shield +
+      stage70.carrier +
+      stage70.jammer +
+      stage70.cloaker +
+      stage70.healer +
+      stage70.splitter +
+      stage70.sniper +
+      stage70.leech +
+      stage70.commander / 2;
+    expect(chooseEnemyKind(70, commanderPoint)).toBe("commander");
   });
 });

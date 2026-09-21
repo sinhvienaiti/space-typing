@@ -51,6 +51,15 @@ export class Sfx {
     window.setTimeout(() => this.tone(620, 0.12, "sine", 0.02, 820), 45);
   }
 
+  drain(): void {
+    this.tone(210, 0.16, "sawtooth", 0.035, 78);
+  }
+
+  command(): void {
+    this.tone(260, 0.11, "square", 0.03, 520);
+    window.setTimeout(() => this.tone(520, 0.1, "square", 0.024, 760), 55);
+  }
+
   private tone(
     frequency: number,
     duration: number,

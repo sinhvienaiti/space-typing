@@ -318,6 +318,10 @@ export class Game {
             this.activateInterference(enemy);
           } else if (enemy.kind === "healer") {
             this.reinforceAlly(enemy);
+          } else if (enemy.kind === "leech") {
+            this.drainOverdrive(enemy);
+          } else if (enemy.kind === "commander") {
+            this.commandPulse(enemy);
           } else {
             this.fireEnemyProjectile(enemy);
           }
@@ -327,7 +331,9 @@ export class Game {
           const pressure =
             enemy.kind === "carrier" ||
             enemy.kind === "jammer" ||
-            enemy.kind === "healer"
+            enemy.kind === "healer" ||
+            enemy.kind === "leech" ||
+            enemy.kind === "commander"
               ? difficulty.combatPressure
               : difficulty.projectilePressure;
           enemy.actionCooldown =
@@ -459,6 +465,46 @@ export class Game {
     this.sfx.enemyShot();
   }
 
+  private drainOverdrive(leech: Enemy): void {
+    const pressure = this.difficulty?.combatPressure ?? 1;
+    const amount = Math.min(18, 8 + pressure * 4);
+    const before = this.stats.power;
+    this.stats.power = clamp(this.stats.power - amount, 0, 100);
+
+    this.burst(
+      this.width / 2,
+      this.height - PLAYER_Y_OFFSET,
+      16,
+      286,
+    );
+    this.burst(leech.x, leech.y, 12, 286);
+    this.sfx.drain();
+
+    if (before !== this.stats.power) {
+      this.emitStats();
+    }
+  }
+
+  private commandPulse(commander: Enemy): void {
+    const allies = this.enemies
+      .filter((enemy) => enemy.id !== commander.id)
+      .sort((a, b) => b.y - a.y)
+      .slice(0, 4);
+
+    for (const ally of allies) {
+      ally.y += 12;
+      ally.flash = Math.max(ally.flash, 0.55);
+
+      if (ally.actionCooldown !== null) {
+        ally.actionCooldown = Math.max(0.18, ally.actionCooldown - 0.55);
+      }
+    }
+
+    this.spawnTimer = Math.min(this.spawnTimer, 0.12);
+    this.burst(commander.x, commander.y, 24, 48);
+    this.sfx.command();
+  }
+
   private reinforceAlly(healer: Enemy): void {
     const ally =
       this.enemies
@@ -527,7 +573,9 @@ export class Game {
     const playerX = this.width / 2;
     const playerY = this.height - PLAYER_Y_OFFSET;
     const baseAngle = Math.atan2(playerY - enemy.y, playerX - enemy.x);
-    const speed = 115 + this.difficulty.projectilePressure * 52;
+    const speed =
+      (115 + this.difficulty.projectilePressure * 52) *
+      (enemy.kind === "sniper" ? 1.72 : 1);
     const alphabet = "asdfjklqweruiopzxcvbnm";
     const count = enemy.kind === "oppressor" ? 3 : 1;
     const spreadStep = enemy.kind === "oppressor" ? 0.13 : 0;
@@ -546,7 +594,8 @@ export class Game {
         y: enemy.y + enemy.radius * 0.45,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
-        radius: enemy.kind === "oppressor" ? 15 : 14,
+        radius:
+          enemy.kind === "oppressor" ? 15 : enemy.kind === "sniper" ? 11 : 14,
       });
     }
 
@@ -1094,8 +1143,32 @@ export class Game {
                         ? "#6dffb4"
                         : enemy.kind === "splitter"
                           ? "#ff73d4"
-                          : "#ffb75b";
+                          : enemy.kind === "sniper"
+                            ? "#ff8b62"
+                            : enemy.kind === "leech"
+                              ? "#bb72ff"
+                              : enemy.kind === "commander"
+                                ? "#fff29a"
+                                : "#ffb75b";
     const targetColor = "#80f3ff";
+
+    if (
+      enemy.kind === "sniper" &&
+      enemy.actionCooldown !== null &&
+      enemy.actionCooldown <= 0.8
+    ) {
+      const warning = clamp(1 - enemy.actionCooldown / 0.8, 0, 1);
+      context.save();
+      context.strokeStyle =
+        "rgba(255, 104, 85, " + String(0.12 + warning * 0.45) + ")";
+      context.setLineDash([5, 7]);
+      context.lineWidth = 1 + warning * 1.2;
+      context.beginPath();
+      context.moveTo(enemy.x, enemy.y);
+      context.lineTo(this.width / 2, this.height - PLAYER_Y_OFFSET);
+      context.stroke();
+      context.restore();
+    }
 
     context.save();
     context.translate(enemy.x, enemy.y - kick);
@@ -1202,6 +1275,33 @@ export class Game {
       context.lineTo(-enemy.radius * 0.45, -enemy.radius * 0.75);
       context.lineTo(-enemy.radius * 0.8, enemy.radius * 0.25);
       context.closePath();
+    } else if (enemy.kind === "sniper") {
+      context.moveTo(0, enemy.radius);
+      context.lineTo(enemy.radius * 0.52, -enemy.radius * 0.3);
+      context.lineTo(enemy.radius * 0.22, -enemy.radius);
+      context.lineTo(0, -enemy.radius * 0.64);
+      context.lineTo(-enemy.radius * 0.22, -enemy.radius);
+      context.lineTo(-enemy.radius * 0.52, -enemy.radius * 0.3);
+      context.closePath();
+    } else if (enemy.kind === "leech") {
+      for (let index = 0; index < 7; index += 1) {
+        const angle = (Math.PI * 2 * index) / 7 - Math.PI / 2;
+        const radius =
+          index % 2 === 0 ? enemy.radius : enemy.radius * 0.7;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+        if (index === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.closePath();
+    } else if (enemy.kind === "commander") {
+      context.moveTo(0, enemy.radius);
+      context.lineTo(enemy.radius, enemy.radius * 0.1);
+      context.lineTo(enemy.radius * 0.65, -enemy.radius * 0.72);
+      context.lineTo(0, -enemy.radius * 0.45);
+      context.lineTo(-enemy.radius * 0.65, -enemy.radius * 0.72);
+      context.lineTo(-enemy.radius, enemy.radius * 0.1);
+      context.closePath();
     } else {
       context.moveTo(0, enemy.radius);
       context.lineTo(enemy.radius * 0.9, -enemy.radius * 0.72);
@@ -1288,6 +1388,25 @@ export class Game {
       context.lineTo(enemy.radius * 0.42, 0);
       context.moveTo(0, -enemy.radius * 0.42);
       context.lineTo(0, enemy.radius * 0.42);
+      context.stroke();
+    }
+
+    if (enemy.kind === "commander") {
+      context.strokeStyle = "rgba(255, 243, 156, 0.52)";
+      context.lineWidth = 1.4;
+      context.beginPath();
+      context.arc(0, 0, enemy.radius * 0.62, 0, Math.PI * 2);
+      context.stroke();
+
+      context.fillStyle = "rgba(255, 243, 156, 0.8)";
+      context.fillRect(-2, -enemy.radius * 0.82, 4, 8);
+    }
+
+    if (enemy.kind === "leech") {
+      context.strokeStyle = "rgba(194, 119, 255, 0.48)";
+      context.lineWidth = 1.5;
+      context.beginPath();
+      context.arc(0, 0, enemy.radius * 0.42, 0, Math.PI * 2);
       context.stroke();
     }
 
