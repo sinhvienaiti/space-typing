@@ -22,10 +22,17 @@ describe("character registry and selection", () => {
     expect(CHARACTER_REGISTRY.zenith.unlockStage).toBe(1000);
   });
 
-  it("starts with Vanguard selected and unlocked", () => {
-    expect(createStarterCharacterState()).toEqual({
+  it("starts with Vanguard selected, unlocked and at base progression", () => {
+    const state = createStarterCharacterState();
+    expect(state).toMatchObject({
       selected: "vanguard",
       unlocked: ["vanguard"],
+    });
+    expect(state.progress.vanguard).toEqual({
+      level: 1,
+      xp: 0,
+      mastery: 0,
+      masteryXp: 0,
     });
   });
 
@@ -35,21 +42,16 @@ describe("character registry and selection", () => {
   });
 
   it("selects an unlocked character without mutating the previous state", () => {
-    const state = {
-      selected: "vanguard" as const,
-      unlocked: ["vanguard", "aegis"] as const,
-    };
+    const state = sanitizeCharacterState({
+      selected: "vanguard",
+      unlocked: ["vanguard", "aegis"],
+    });
 
-    const changed = selectCharacter(
-      {
-        selected: state.selected,
-        unlocked: [...state.unlocked],
-      },
-      "aegis",
-    );
+    const changed = selectCharacter(state, "aegis");
 
     expect(changed.selected).toBe("aegis");
     expect(state.selected).toBe("vanguard");
+    expect(changed.progress).toBe(state.progress);
   });
 
   it("sanitizes unknown selection and always preserves Vanguard", () => {
@@ -58,7 +60,7 @@ describe("character registry and selection", () => {
         selected: "missing",
         unlocked: ["aegis", "missing"],
       }),
-    ).toEqual({
+    ).toMatchObject({
       selected: "vanguard",
       unlocked: ["vanguard", "aegis"],
     });

@@ -2829,6 +2829,18 @@ Implemented character slices:
 ## Step 43
 Add Character Level and Mastery.
 
+**Status: implemented.**
+
+Current progression rules:
+
+- each character owns independent Level, XP, Mastery and Mastery XP;
+- stage clears award progression only to the selected character;
+- later stages and stronger typing performance award more XP;
+- Level and Mastery add small bonuses through the shared effective-stat pipeline;
+- Level is capped at 50 and Mastery at 20;
+- old PlayerSave v8 character data migrates to the new progression shape without losing unlocks or selection;
+- Character Select shows current Level and Mastery.
+
 ## Step 44
 Add small branching Talent Trees.
 

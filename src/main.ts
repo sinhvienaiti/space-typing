@@ -27,8 +27,13 @@ import {
   selectCharacter,
   syncCharacterUnlocks,
   unlockCharactersForStage,
+  updateCharacterProgress,
   type CharacterState,
 } from "./characters/state";
+import {
+  awardCharacterProgress,
+  characterProgressStatBonus,
+} from "./characters/progression";
 import { VANGUARD_ACTIVE_SKILL_ID } from "./characters/vanguard";
 import { VOLT_ACTIVE_SKILL_ID } from "./characters/volt";
 import { WRAITH_ACTIVE_SKILL_ID } from "./characters/wraith";
@@ -1076,6 +1081,22 @@ const game = new Game(
         stats.stage,
       );
       characters = characterUnlock.state;
+
+      const activeCharacterId = characters.selected;
+      const progressAward = awardCharacterProgress(
+        characters.progress[activeCharacterId],
+        {
+          stage: stats.stage,
+          accuracy,
+          wpm,
+        },
+      );
+      characters = updateCharacterProgress(
+        characters,
+        activeCharacterId,
+        progressAward.progress,
+      );
+
       const unlockedNames = characterUnlock.unlocked.map(
         (id) => getCharacter(id).name,
       );
@@ -1083,13 +1104,23 @@ const game = new Game(
         unlockedNames.length > 0
           ? " · " + unlockedNames.join(", ") + " unlocked"
           : "";
+      const progressText =
+        progressAward.levelUps > 0 || progressAward.masteryUps > 0
+          ? " · " +
+            getCharacter(activeCharacterId).name +
+            " Lv " +
+            String(progressAward.progress.level) +
+            " · Mastery " +
+            String(progressAward.progress.mastery)
+          : "";
 
       void autosaveCampaign(
         "stage-clear",
         "✓ Saved · Stage " +
           String(stats.stage).padStart(3, "0") +
           " cleared" +
-          unlockText,
+          unlockText +
+          progressText,
       );
 
       byId("clearTitle").textContent =
@@ -1144,9 +1175,16 @@ function renderCharacters(): void {
     const summary = document.createElement("p");
     summary.textContent = definition.summary;
 
+    const progress = characters.progress[id];
     const skills = document.createElement("small");
     skills.textContent =
-      definition.activeName + " · " + definition.ultimateName;
+      definition.activeName +
+      " · " +
+      definition.ultimateName +
+      " · Lv " +
+      String(progress.level) +
+      " · M " +
+      String(progress.mastery);
 
     const status = document.createElement("em");
     status.textContent = selected
@@ -1173,8 +1211,14 @@ function renderCharacters(): void {
     grid.append(card);
   }
 
+  const selectedProgress = characters.progress[characters.selected];
   byId("characterSelectedMeta").textContent =
-    "Selected: " + getCharacter(characters.selected).name;
+    "Selected: " +
+    getCharacter(characters.selected).name +
+    " · Lv " +
+    String(selectedProgress.level) +
+    " · Mastery " +
+    String(selectedProgress.mastery);
 }
 
 function openCharacters(): void {
@@ -1237,6 +1281,9 @@ function applyEquipmentStats(): void {
   game.setPlayerStats({
     base: DEFAULT_PLAYER_BASE_STATS,
     character: characterStatBonus(characters.selected),
+    level: characterProgressStatBonus(
+      characters.progress[characters.selected],
+    ),
     equipment: equipmentStatBonus(equipment),
   });
 }

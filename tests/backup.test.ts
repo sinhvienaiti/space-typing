@@ -46,7 +46,7 @@ describe("save backup", () => {
       "sanctuary",
       "gravity-well",
     ]);
-    expect(parsed.characters).toEqual({
+    expect(parsed.characters).toMatchObject({
       selected: "vanguard",
       unlocked: ["vanguard"],
     });
@@ -91,7 +91,7 @@ describe("save backup", () => {
     );
     expect(unsupported).toEqual({
       ok: false,
-      error: "Unsupported save version. Supported versions: 1-8.",
+      error: "Unsupported save version. Supported versions: 1-9.",
     });
   });
 
@@ -256,10 +256,29 @@ describe("save backup", () => {
     if (!result.ok) return;
 
     expect(result.migrated).toBe(true);
-    expect(result.save.characters).toEqual({
+    expect(result.save.characters).toMatchObject({
       selected: "vanguard",
       unlocked: ["vanguard"],
     });
+    expect(result.save.characters.progress.vanguard.level).toBe(1);
+  });
+
+  it("imports and migrates a valid v8 character backup", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.version = 8;
+    raw.characters = {
+      selected: "vanguard",
+      unlocked: ["vanguard"],
+    };
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.migrated).toBe(true);
+    expect(result.save.characters.progress.vanguard.level).toBe(1);
   });
 
   it("rejects invalid current character state", () => {

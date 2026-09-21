@@ -225,9 +225,32 @@ describe("player save persistence model", () => {
     const migration = migratePlayerSave(legacy);
     expect(migration.migrated).toBe(true);
     expect(migration.fromVersion).toBe(7);
-    expect(migration.save.characters).toEqual({
+    expect(migration.save.characters).toMatchObject({
       selected: "vanguard",
       unlocked: ["vanguard"],
+    });
+    expect(migration.save.characters.progress.vanguard.level).toBe(1);
+  });
+
+  it("migrates PlayerSave v8 character state to Level and Mastery progression", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const legacy = {
+      ...current,
+      version: 8,
+      characters: {
+        selected: "vanguard",
+        unlocked: ["vanguard"],
+      },
+    };
+
+    const migration = migratePlayerSave(legacy);
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(8);
+    expect(migration.save.characters.progress.vanguard).toEqual({
+      level: 1,
+      xp: 0,
+      mastery: 0,
+      masteryXp: 0,
     });
   });
 
@@ -249,10 +272,11 @@ describe("player save persistence model", () => {
       "sanctuary",
       "gravity-well",
     ]);
-    expect(migration.save.characters).toEqual({
+    expect(migration.save.characters).toMatchObject({
       selected: "vanguard",
       unlocked: ["vanguard"],
     });
+    expect(migration.save.characters.progress.vanguard.level).toBe(1);
   });
 
   it("refuses unsupported numeric schema versions instead of down-migrating them", () => {

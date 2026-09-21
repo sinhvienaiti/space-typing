@@ -4,33 +4,42 @@ import {
   isCharacterId,
   type CharacterId,
 } from "./registry";
+import {
+  createStarterCharacterProgress,
+  isValidCharacterProgress,
+  sanitizeCharacterProgress,
+  type CharacterProgress,
+} from "./progression";
+
+export type CharacterProgressMap = Record<CharacterId, CharacterProgress>;
 
 export type CharacterState = {
   selected: CharacterId;
   unlocked: CharacterId[];
+  progress: CharacterProgressMap;
 };
+
+export function createCharacterProgressMap(): CharacterProgressMap {
+  const progress = {} as CharacterProgressMap;
+  for (const id of CHARACTER_IDS) {
+    progress[id] = createStarterCharacterProgress();
+  }
+  return progress;
+}
 
 export function createStarterCharacterState(): CharacterState {
   return {
     selected: "vanguard",
     unlocked: ["vanguard"],
+    progress: createCharacterProgressMap(),
   };
 }
 
-export function sanitizeCharacterState(value: unknown): CharacterState {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    return createStarterCharacterState();
-  }
-
-  const raw = value as {
-    selected?: unknown;
-    unlocked?: unknown;
-  };
-
-  const unlocked = Array.isArray(raw.unlocked)
+function sanitizeUnlocked(value: unknown): CharacterId[] {
+  const unlocked = Array.isArray(value)
     ? Array.from(
         new Set(
-          raw.unlocked.filter(
+          value.filter(
             (id): id is CharacterId =>
               typeof id === "string" && isCharacterId(id),
           ),
@@ -42,6 +51,34 @@ export function sanitizeCharacterState(value: unknown): CharacterState {
     unlocked.unshift("vanguard");
   }
 
+  return CHARACTER_IDS.filter((id) => unlocked.includes(id));
+}
+
+function sanitizeProgressMap(value: unknown): CharacterProgressMap {
+  const source =
+    value !== null && typeof value === "object" && !Array.isArray(value)
+      ? (value as Partial<Record<CharacterId, unknown>>)
+      : {};
+  const progress = {} as CharacterProgressMap;
+
+  for (const id of CHARACTER_IDS) {
+    progress[id] = sanitizeCharacterProgress(source[id]);
+  }
+
+  return progress;
+}
+
+export function sanitizeCharacterState(value: unknown): CharacterState {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return createStarterCharacterState();
+  }
+
+  const raw = value as {
+    selected?: unknown;
+    unlocked?: unknown;
+    progress?: unknown;
+  };
+  const unlocked = sanitizeUnlocked(raw.unlocked);
   const selected =
     typeof raw.selected === "string" &&
     isCharacterId(raw.selected) &&
@@ -51,13 +88,12 @@ export function sanitizeCharacterState(value: unknown): CharacterState {
 
   return {
     selected,
-    unlocked: CHARACTER_IDS.filter((id) => unlocked.includes(id)),
+    unlocked,
+    progress: sanitizeProgressMap(raw.progress),
   };
 }
 
-export function isValidCharacterState(
-  value: unknown,
-): value is CharacterState {
+export function isValidLegacyCharacterState(value: unknown): boolean {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return false;
   }
@@ -90,6 +126,33 @@ export function isValidCharacterState(
   return seen.has("vanguard") && seen.has(raw.selected);
 }
 
+export function isValidCharacterState(
+  value: unknown,
+): value is CharacterState {
+  if (!isValidLegacyCharacterState(value)) return false;
+
+  const raw = value as CharacterState;
+  if (
+    raw.progress === null ||
+    typeof raw.progress !== "object" ||
+    Array.isArray(raw.progress)
+  ) {
+    return false;
+  }
+
+  const keys = Object.keys(raw.progress);
+  if (
+    keys.length !== CHARACTER_IDS.length ||
+    !CHARACTER_IDS.every((id) => keys.includes(id))
+  ) {
+    return false;
+  }
+
+  return CHARACTER_IDS.every((id) =>
+    isValidCharacterProgress(raw.progress[id]),
+  );
+}
+
 export function selectCharacter(
   state: CharacterState,
   id: CharacterId,
@@ -99,9 +162,24 @@ export function selectCharacter(
   return {
     selected: id,
     unlocked: [...state.unlocked],
+    progress: state.progress,
   };
 }
 
+export function updateCharacterProgress(
+  state: CharacterState,
+  id: CharacterId,
+  progress: CharacterProgress,
+): CharacterState {
+  return {
+    selected: state.selected,
+    unlocked: [...state.unlocked],
+    progress: {
+      ...state.progress,
+      [id]: sanitizeCharacterProgress(progress),
+    },
+  };
+}
 
 export type CharacterUnlockResult = {
   state: CharacterState;
@@ -136,6 +214,7 @@ export function unlockCharactersForStage(
     state: {
       selected: state.selected,
       unlocked,
+      progress: state.progress,
     },
     unlocked: newlyUnlocked,
   };

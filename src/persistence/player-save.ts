@@ -34,7 +34,7 @@ const STORE_NAME = "player";
 const SAVE_KEY = "main";
 const RECOVERY_SAVE_KEY = "spaceTypingPlayerSaveRecoveryV3";
 
-export const PLAYER_SAVE_VERSION = 8;
+export const PLAYER_SAVE_VERSION = 9;
 
 export class UnsupportedPlayerSaveVersionError extends Error {
   constructor(readonly version: number) {
@@ -125,12 +125,23 @@ export type PlayerSaveV8 = {
   inventory: Inventory;
   equipment: EquipmentState;
   supportSpells: SupportSpellState;
+  characters: unknown;
+  updatedAt: string;
+  lastSaveReason: SaveReason;
+};
+
+export type PlayerSaveV9 = {
+  version: 9;
+  campaign: CampaignProgress;
+  inventory: Inventory;
+  equipment: EquipmentState;
+  supportSpells: SupportSpellState;
   characters: CharacterState;
   updatedAt: string;
   lastSaveReason: SaveReason;
 };
 
-export type PlayerSave = PlayerSaveV8;
+export type PlayerSave = PlayerSaveV9;
 export type PersistenceSource = "indexeddb" | "localStorage";
 
 export type LoadedPlayerSave = {
@@ -284,6 +295,22 @@ export function migratePlayerSave(value: unknown): MigrationResult {
       ),
       migrated: true,
       fromVersion: 7,
+    };
+  }
+
+  if (raw.version === 8) {
+    return {
+      save: createPlayerSave(
+        sanitizeCampaignProgress(raw.campaign),
+        typeof raw.updatedAt === "string" ? raw.updatedAt : "",
+        "migration",
+        sanitizeInventory(raw.inventory),
+        sanitizeEquipmentState(raw.equipment),
+        sanitizeSupportSpellState(raw.supportSpells),
+        sanitizeCharacterState(raw.characters),
+      ),
+      migrated: true,
+      fromVersion: 8,
     };
   }
 

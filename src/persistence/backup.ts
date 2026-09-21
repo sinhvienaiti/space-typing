@@ -2,6 +2,7 @@ import { MAX_CAMPAIGN_STAGE } from "../campaign/stage";
 import {
   createStarterCharacterState,
   isValidCharacterState,
+  isValidLegacyCharacterState,
   type CharacterState,
 } from "../characters/state";
 import {
@@ -164,6 +165,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     version !== 5 &&
     version !== 6 &&
     version !== 7 &&
+    version !== 8 &&
     version !== PLAYER_SAVE_VERSION
   ) {
     return {
@@ -188,6 +190,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 5 ||
       version === 6 ||
       version === 7 ||
+      version === 8 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidInventory(parsed.inventory)
   ) {
@@ -220,6 +223,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   if (
     (version === 6 ||
       version === 7 ||
+      version === 8 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidEquipmentState(parsed.equipment)
   ) {
@@ -230,12 +234,22 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    (version === 7 || version === PLAYER_SAVE_VERSION) &&
+    (version === 7 || version === 8 || version === PLAYER_SAVE_VERSION) &&
     !isValidSupportSpellState(parsed.supportSpells)
   ) {
     return {
       ok: false,
       error: "Support spell data contains an invalid or duplicate loadout.",
+    };
+  }
+
+  if (
+    version === 8 &&
+    !isValidLegacyCharacterState(parsed.characters)
+  ) {
+    return {
+      ok: false,
+      error: "Character data contains an invalid selection or unlock list.",
     };
   }
 
