@@ -11,6 +11,17 @@ import {
 } from "./boss/model";
 import type { BossHudState, BossState } from "./boss/model";
 import type { DifficultyProfile, StageConfig } from "./campaign/types";
+import type { CharacterId } from "./characters/registry";
+import {
+  restoreVanguardShield,
+  shouldTriggerVanguardShieldRhythm,
+  VANGUARD_ACTIVE_BARRIER_DURATION,
+  VANGUARD_ACTIVE_BARRIER_SHIELD_RATIO,
+  VANGUARD_ACTIVE_SKILL,
+  VANGUARD_ACTIVE_SKILL_ID,
+  VANGUARD_NOVA_DURATION,
+  VANGUARD_NOVA_SHIELD_RATIO,
+} from "./characters/vanguard";
 import {
   calculateEffectiveStats,
   type CoreStats,
@@ -123,6 +134,7 @@ export class Game {
   private readonly sfx = new Sfx();
   private readonly skillEngine = new SkillEngine();
 
+  private characterId: CharacterId = "vanguard";
   private supportSkillIds: SupportSpellId[] = [
     "sanctuary",
     "gravity-well",
@@ -207,6 +219,13 @@ export class Game {
     return { ...this.stats };
   }
 
+  setCharacter(id: CharacterId): void {
+    if (this.characterId === id) return;
+    this.characterId = id;
+    this.refreshSkillDefinitions();
+    this.hooks.onSkills();
+  }
+
   setSkills(definitions: readonly SkillDefinition[]): void {
     this.skillEngine.setDefinitions(definitions);
   }
@@ -221,7 +240,11 @@ export class Game {
 
   private refreshSkillDefinitions(): void {
     const supportDefinitions = this.supportSkillIds.map(getSupportSpell);
+    const characterDefinitions =
+      this.characterId === "vanguard" ? [VANGUARD_ACTIVE_SKILL] : [];
+
     this.skillEngine.setDefinitions([
+      ...characterDefinitions,
       ...DEFENSIVE_SKILLS,
       ...OFFENSIVE_SKILLS,
       ...supportDefinitions,
@@ -303,7 +326,12 @@ export class Game {
     const result = this.tryUseSkill(id);
     if (!result.ok) return result;
 
-    if (isDefensiveSkillId(id)) {
+    if (
+      id === VANGUARD_ACTIVE_SKILL_ID &&
+      this.characterId === "vanguard"
+    ) {
+      this.activateVanguardSkill();
+    } else if (isDefensiveSkillId(id)) {
       this.activateDefensiveSkill(id);
     } else if (isOffensiveSkillId(id)) {
       this.activateOffensiveSkill(id);
@@ -338,6 +366,29 @@ export class Game {
     }
 
     return result;
+  }
+
+  private activateVanguardSkill(): void {
+    const playerX = this.width / 2;
+    const playerY = this.height - PLAYER_Y_OFFSET;
+
+    this.barrierHp = Math.max(
+      this.barrierHp,
+      90 + this.playerStats.shield * 0.55,
+    );
+    this.barrierTimer = Math.max(
+      this.barrierTimer,
+      VANGUARD_ACTIVE_BARRIER_DURATION,
+    );
+    this.stats.shield = restoreVanguardShield(
+      this.stats.shield,
+      this.stats.maxShield,
+      VANGUARD_ACTIVE_BARRIER_SHIELD_RATIO,
+    );
+
+    this.burst(playerX, playerY, 38, 188);
+    this.sfx.power();
+    this.emitStats();
   }
 
   private activateDefensiveSkill(id: DefensiveSkillId): void {
@@ -829,7 +880,12 @@ export class Game {
     }
 
     const playerY = this.height - PLAYER_Y_OFFSET;
-    const overdriveFactor = this.overdriveTimer > 0 ? 0.58 : 1;
+    const overdriveFactor =
+      this.overdriveTimer > 0
+        ? this.characterId === "vanguard"
+          ? 0.5
+          : 0.58
+        : 1;
     const speedFactor = overdriveFactor * hostileTimeFactor;
 
     for (const enemy of this.enemies) {
@@ -1320,6 +1376,7 @@ export class Game {
     this.stats.multiplier = multiplierForStreak(this.stats.streak);
     this.stats.score += 35 * this.stats.multiplier;
     this.gainPower(2.5);
+    this.applyCharacterCorrectKeyPassive();
 
     this.lasers.push({
       x1: this.width / 2,
@@ -1362,6 +1419,7 @@ export class Game {
     this.stats.multiplier = multiplierForStreak(this.stats.streak);
     this.stats.score += 16 * this.stats.multiplier;
     this.gainPower(2);
+    this.applyCharacterCorrectKeyPassive();
 
     if (!boss.shieldActive) {
       boss.hp = Math.max(
@@ -1521,6 +1579,7 @@ export class Game {
     this.stats.multiplier = multiplierForStreak(this.stats.streak);
     this.stats.score += 10 * this.stats.multiplier;
     this.gainPower(1.8);
+    this.applyCharacterCorrectKeyPassive();
 
     this.fireLaser(enemy, 0.8);
     this.sfx.shot(this.stats.multiplier);
@@ -1742,20 +1801,54 @@ export class Game {
     }
   }
 
-  private activateOverdrive(): void {
-    if (this.stats.power < 100) return;
+  private applyCharacterCorrectKeyPassive(): void {
+    if (
+      this.characterId !== "vanguard" ||
+      !shouldTriggerVanguardShieldRhythm(this.stats.streak)
+    ) {
+      return;
+    }
 
-    this.stats.power = 0;
-    this.overdriveTimer = 4.5;
+    const nextShield = restoreVanguardShield(
+      this.stats.shield,
+      this.stats.maxShield,
+    );
+    if (nextShield <= this.stats.shield) return;
+
+    this.stats.shield = nextShield;
     this.burst(
       this.width / 2,
       this.height - PLAYER_Y_OFFSET,
-      36,
+      14,
+      184,
+    );
+    this.sfx.support();
+  }
+
+  private activateOverdrive(): void {
+    if (this.stats.power < 100) return;
+
+    const isVanguard = this.characterId === "vanguard";
+    this.stats.power = 0;
+    this.overdriveTimer = isVanguard ? VANGUARD_NOVA_DURATION : 4.5;
+
+    if (isVanguard) {
+      this.stats.shield = restoreVanguardShield(
+        this.stats.shield,
+        this.stats.maxShield,
+        VANGUARD_NOVA_SHIELD_RATIO,
+      );
+    }
+
+    this.burst(
+      this.width / 2,
+      this.height - PLAYER_Y_OFFSET,
+      isVanguard ? 48 : 36,
       184,
     );
 
     if (this.settings.screenShake) {
-      this.shake = Math.max(this.shake, 7);
+      this.shake = Math.max(this.shake, isVanguard ? 9 : 7);
     }
 
     this.sfx.power();

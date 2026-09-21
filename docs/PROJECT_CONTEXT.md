@@ -2775,6 +2775,15 @@ Create Character registry and Character Select.
 ## Step 40
 Implement Vanguard.
 
+**Status: implemented.**
+
+Current Vanguard combat identity:
+
+- Shield Rhythm restores a small amount of Shield every 20 consecutive correct keys;
+- Barrier Pulse is the character active skill and uses the existing Energy/cooldown skill engine;
+- Nova Overdrive is Vanguard's 100-Power ultimate, extending Overdrive pressure control and restoring Shield;
+- selected Character is now applied to the live combat runtime instead of only the menu/save state.
+
 ## Step 41
 Implement Stage-100 milestone unlock framework.
 

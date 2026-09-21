@@ -1039,7 +1039,7 @@ kbd {
   left: 50%;
   bottom: 18px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(86px, auto));
+  grid-template-columns: repeat(3, minmax(86px, auto));
   gap: 0.42rem;
   transform: translateX(-50%);
   pointer-events: auto;
@@ -1099,7 +1099,7 @@ kbd {
 
   .quick-support {
     bottom: 18px;
-    grid-template-columns: repeat(2, minmax(54px, auto));
+    grid-template-columns: repeat(3, minmax(54px, auto));
   }
 }
 

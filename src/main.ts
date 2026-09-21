@@ -20,6 +20,7 @@ import {
   selectCharacter,
   type CharacterState,
 } from "./characters/state";
+import { VANGUARD_ACTIVE_SKILL_ID } from "./characters/vanguard";
 import {
   createStarterEquipmentState,
   equipmentForSlot,
@@ -245,6 +246,9 @@ app.innerHTML = `
     <div id="quickSupport" class="quick-support hidden">
       <button id="supportSkill0" type="button">
         <kbd>[</kbd><span>support 1</span><strong></strong>
+      </button>
+      <button id="characterSkill" type="button">
+        <kbd>=</kbd><span>character</span><strong></strong>
       </button>
       <button id="supportSkill1" type="button">
         <kbd>]</kbd><span>support 2</span><strong></strong>
@@ -664,8 +668,11 @@ function renderStats(stats: GameStats): void {
 
   byId("powerFill").style.width = String(stats.power) + "%";
   byId("powerFill").classList.toggle("ready", stats.power >= 100);
+  const ultimateName = getCharacter(characters.selected).ultimateName;
   byId("powerHint").textContent =
-    stats.power >= 100 ? "SPACE — ready" : "type cleanly to charge";
+    stats.power >= 100
+      ? "SPACE — " + ultimateName + " ready"
+      : "charge " + ultimateName.toLowerCase();
 }
 
 function renderInventory(): void {
@@ -757,9 +764,60 @@ function renderSupportSkills(): void {
   }
 }
 
+function renderCharacterSkill(): void {
+  const button = byId<HTMLButtonElement>("characterSkill");
+  const name = button.querySelector("span");
+  const stateLabel = button.querySelector("strong");
+  const character = getCharacter(characters.selected);
+
+  if (name !== null) name.textContent = character.activeName.toLowerCase();
+
+  if (characters.selected !== "vanguard") {
+    if (stateLabel !== null) stateLabel.textContent = "—";
+    button.disabled = true;
+    button.title = "Character skill is implemented in a later step";
+    return;
+  }
+
+  const state = game.getSkillState(VANGUARD_ACTIVE_SKILL_ID);
+  const reason = game.canUseSkill(VANGUARD_ACTIVE_SKILL_ID);
+
+  if (stateLabel !== null) {
+    if (state === null) {
+      stateLabel.textContent = "—";
+    } else if (state.cooldownRemaining > 0.05) {
+      stateLabel.textContent = state.cooldownRemaining.toFixed(1) + "s";
+    } else {
+      stateLabel.textContent = "ready";
+    }
+  }
+
+  button.disabled = reason !== null;
+  button.title =
+    reason === null ? character.activeName : skillReasonText(reason);
+}
+
 function renderAllSkills(): void {
   renderSkills();
   renderSupportSkills();
+  renderCharacterSkill();
+}
+
+function useCharacterSkill(): void {
+  if (characters.selected !== "vanguard") {
+    showNotice("Character skill is not implemented yet");
+    return;
+  }
+
+  const result = game.useSkill(VANGUARD_ACTIVE_SKILL_ID);
+  if (!result.ok) {
+    showNotice(skillReasonText(result.reason));
+    renderAllSkills();
+    return;
+  }
+
+  showNotice("✓ " + getCharacter(characters.selected).activeName + " activated");
+  renderAllSkills();
 }
 
 function useSupportSpell(slot: 0 | 1): void {
@@ -983,6 +1041,12 @@ const game = new Game(
   },
 );
 
+function applySelectedCharacter(): void {
+  game.setCharacter(characters.selected);
+  renderStats(game.getStats());
+  renderAllSkills();
+}
+
 function renderCharacters(): void {
   const grid = byId("characterGrid");
   grid.replaceChildren();
@@ -1029,6 +1093,7 @@ function renderCharacters(): void {
     if (unlocked && !selected) {
       card.addEventListener("click", () => {
         characters = selectCharacter(characters, id);
+        applySelectedCharacter();
         renderCharacters();
         updateCampaignUi();
         void autosaveCampaign(
@@ -1204,6 +1269,7 @@ function selectedVocabularyLevel(): number {
 function startSelectedStage(): void {
   if (!persistenceReady) return;
 
+  game.setCharacter(characters.selected);
   const stage = createStageConfig(campaign.selectedStage);
   const difficulty = difficultyFor({
     stage: stage.stage,
@@ -1278,6 +1344,7 @@ async function initializePlayerProgress(): Promise<void> {
     equipment = loaded.save.equipment;
     supportSpells = loaded.save.supportSpells;
     characters = loaded.save.characters;
+    applySelectedCharacter();
     renderInventory();
     applyEquipmentStats();
     applySupportSpells();
@@ -1573,6 +1640,7 @@ async function importSaveFile(file: File): Promise<void> {
     equipment = importedEquipment;
     supportSpells = importedSupportSpells;
     characters = importedCharacters;
+    applySelectedCharacter();
     renderInventory();
     applyEquipmentStats();
     applySupportSpells();
@@ -1587,6 +1655,7 @@ async function importSaveFile(file: File): Promise<void> {
       equipment = previousEquipment;
       supportSpells = previousSupportSpells;
       characters = previousCharacters;
+      applySelectedCharacter();
       renderInventory();
       applyEquipmentStats();
       applySupportSpells();
@@ -1740,6 +1809,7 @@ for (const slot of [0, 1] as const) {
 byId("supportSkill0").addEventListener("click", () => {
   useSupportSpell(0);
 });
+byId("characterSkill").addEventListener("click", useCharacterSkill);
 byId("supportSkill1").addEventListener("click", () => {
   useSupportSpell(1);
 });
@@ -1904,6 +1974,12 @@ window.addEventListener("keydown", (event) => {
     supportDialog.open ||
     characterDialog.open
   ) return;
+
+  if (game.getPhase() === "playing" && event.key === "=") {
+    event.preventDefault();
+    useCharacterSkill();
+    return;
+  }
 
   if (
     game.getPhase() === "playing" &&
