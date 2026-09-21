@@ -311,6 +311,23 @@ describe("player save persistence model", () => {
     });
   });
 
+  it("migrates PlayerSave v11 to empty hidden discovery state", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const legacy = {
+      ...current,
+      version: 11,
+    } as Record<string, unknown>;
+    delete legacy.hiddenDiscovery;
+
+    const migration = migratePlayerSave(legacy);
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(11);
+    expect(migration.save.hiddenDiscovery).toMatchObject({
+      discovered: [],
+      lastRollStage: 0,
+    });
+  });
+
   it("keeps a valid current-version save without migration", () => {
     const save = createPlayerSave(
       createDefaultCampaignProgress(),
@@ -339,6 +356,10 @@ describe("player save persistence model", () => {
       treasure: 0,
       choice: 0,
       anomaly: 0,
+    });
+    expect(migration.save.hiddenDiscovery).toMatchObject({
+      discovered: [],
+      lastRollStage: 0,
     });
   });
 
