@@ -20,6 +20,7 @@ import {
 import {
   loadPlayerSave,
   savePlayerCampaign,
+  UnsupportedPlayerSaveVersionError,
 } from "./persistence/player-save";
 import type {
   PersistenceSource,
@@ -616,15 +617,23 @@ function startSelectedStage(): void {
 async function autosaveCampaign(
   reason: SaveReason,
   successMessage?: string,
-): Promise<void> {
+): Promise<boolean> {
   campaignAutosave.schedule(campaign, reason);
-  const source = await campaignAutosave.flush();
 
-  if (successMessage !== undefined && source !== null) {
-    showNotice(
-      successMessage +
-        (source === "localStorage" ? " · recovery storage" : ""),
-    );
+  try {
+    const source = await campaignAutosave.flush();
+
+    if (successMessage !== undefined && source !== null) {
+      showNotice(
+        successMessage +
+          (source === "localStorage" ? " · recovery storage" : ""),
+      );
+    }
+    return true;
+  } catch (error) {
+    console.error("Unable to save player progress.", error);
+    showNotice("Save failed · progress is still active in this session");
+    return false;
   }
 }
 
@@ -641,22 +650,34 @@ async function initializePlayerProgress(): Promise<void> {
   stageSelectButton.disabled = true;
   for (const button of dataButtons) button.disabled = true;
 
-  const loaded = await loadPlayerSave();
-  campaign = loaded.save.campaign;
-  currentGalaxy = Math.ceil(
-    campaign.selectedStage / STAGES_PER_GALAXY,
-  );
-  persistenceReady = true;
+  try {
+    const loaded = await loadPlayerSave();
+    campaign = loaded.save.campaign;
+    currentGalaxy = Math.ceil(
+      campaign.selectedStage / STAGES_PER_GALAXY,
+    );
+    persistenceReady = true;
 
-  updateCampaignUi();
-  startButton.disabled = false;
-  stageSelectButton.disabled = false;
-  for (const button of dataButtons) button.disabled = false;
+    updateCampaignUi();
+    startButton.disabled = false;
+    stageSelectButton.disabled = false;
+    for (const button of dataButtons) button.disabled = false;
 
-  if (loaded.migrated) {
-    showNotice("✓ Existing progress migrated to IndexedDB");
-  } else if (loaded.source === "localStorage") {
-    showNotice("IndexedDB unavailable · using recovery storage");
+    if (loaded.migrated) {
+      showNotice("✓ Existing progress migrated to IndexedDB");
+    } else if (loaded.source === "localStorage") {
+      showNotice("IndexedDB unavailable · using recovery storage");
+    }
+  } catch (error) {
+    console.error("Unable to initialize player progress.", error);
+    if (error instanceof UnsupportedPlayerSaveVersionError) {
+      showNotice(
+        "Save is from a newer game version · update Space Typing before playing",
+      );
+      return;
+    }
+
+    showNotice("Unable to load player progress");
   }
 }
 
@@ -851,7 +872,7 @@ function openData(): void {
 async function exportSave(): Promise<void> {
   if (!persistenceReady) return;
 
-  await autosaveCampaign("manual");
+  const saved = await autosaveCampaign("manual");
   const json = exportPlayerSaveJson(campaign);
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -868,7 +889,8 @@ async function exportSave(): Promise<void> {
   URL.revokeObjectURL(url);
 
   byId("dataStatus").textContent =
-    "✓ Backup exported · Stage " +
+    (saved ? "✓ Backup exported" : "Backup exported from current session") +
+    " · Stage " +
     String(campaign.highestUnlockedStage).padStart(3, "0");
 }
 
@@ -900,7 +922,13 @@ async function importSaveFile(file: File): Promise<void> {
     currentGalaxy = Math.ceil(
       campaign.selectedStage / STAGES_PER_GALAXY,
     );
-    await autosaveCampaign("manual");
+    const saved = await autosaveCampaign("manual");
+    if (!saved) {
+      status.textContent =
+        "Import validated, but storage write failed. Current save was not confirmed.";
+      return;
+    }
+
     updateCampaignUi();
     updateDataSummary();
     dataDialog.close();

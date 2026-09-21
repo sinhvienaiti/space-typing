@@ -5,6 +5,7 @@ import {
   migratePlayerSave,
   PLAYER_SAVE_VERSION,
   sanitizePlayerSave,
+  UnsupportedPlayerSaveVersionError,
 } from "../src/persistence/player-save";
 import {
   createDefaultCampaignProgress,
@@ -83,6 +84,16 @@ describe("player save persistence model", () => {
     expect(migration.migrated).toBe(false);
     expect(migration.fromVersion).toBe(PLAYER_SAVE_VERSION);
     expect(migration.save).toEqual(save);
+  });
+
+  it("refuses unsupported numeric schema versions instead of down-migrating them", () => {
+    expect(() =>
+      migratePlayerSave({
+        version: PLAYER_SAVE_VERSION + 1,
+        campaign: createDefaultCampaignProgress(),
+        updatedAt: "2026-09-21T15:35:00.000Z",
+      }),
+    ).toThrow(UnsupportedPlayerSaveVersionError);
   });
 
   it("chooses the furthest progress during legacy migration recovery", () => {

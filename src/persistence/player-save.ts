@@ -13,6 +13,19 @@ const SAVE_KEY = "main";
 
 export const PLAYER_SAVE_VERSION = 2;
 
+export class UnsupportedPlayerSaveVersionError extends Error {
+  constructor(readonly version: number) {
+    super(
+      "Player save version " +
+        String(version) +
+        " is newer or unsupported. Current version: " +
+        String(PLAYER_SAVE_VERSION) +
+        ".",
+    );
+    this.name = "UnsupportedPlayerSaveVersionError";
+  }
+}
+
 export type SaveReason =
   | "migration"
   | "stage-clear"
@@ -124,6 +137,13 @@ export function migratePlayerSave(value: unknown): MigrationResult {
     };
   }
 
+  if (
+    typeof raw.version === "number" &&
+    Number.isFinite(raw.version)
+  ) {
+    throw new UnsupportedPlayerSaveVersionError(raw.version);
+  }
+
   return {
     save: createPlayerSave(
       sanitizeCampaignProgress(raw.campaign),
@@ -131,10 +151,7 @@ export function migratePlayerSave(value: unknown): MigrationResult {
       "migration",
     ),
     migrated: true,
-    fromVersion:
-      typeof raw.version === "number" && Number.isFinite(raw.version)
-        ? raw.version
-        : null,
+    fromVersion: null,
   };
 }
 
@@ -278,12 +295,22 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
       };
     }
 
+    try {
+      saveCampaignProgress(migration.save.campaign);
+    } catch {
+      // IndexedDB remains the source of truth if the recovery mirror fails.
+    }
+
     return {
       save: migration.save,
       source: "indexeddb",
       migrated: false,
     };
-  } catch {
+  } catch (error) {
+    if (error instanceof UnsupportedPlayerSaveVersionError) {
+      throw error;
+    }
+
     return {
       save: createPlayerSave(legacyCampaign),
       source: "localStorage",
@@ -307,6 +334,11 @@ export async function savePlayerCampaign(
   if ("indexedDB" in window) {
     try {
       await writeIndexedDb(save);
+      try {
+        saveCampaignProgress(save.campaign);
+      } catch {
+        // IndexedDB already contains the valid save; recovery mirror is optional.
+      }
       return "indexeddb";
     } catch {
       // Keep the old adapter as a recovery path if IndexedDB is unavailable.
