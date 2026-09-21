@@ -2804,9 +2804,10 @@ Implement remaining milestone characters.
 Implemented character slices:
 
 - Aegis: perfect-word Shield reinforcement, Reflect Field active and Fortress Protocol ultimate;
-- normal enemies now track whether the current word received a miss, creating a reusable perfect-word combat hook for later characters.
+- Volt: long words restore extra Energy, EMP Burst is the character active and Thunder Grid is the 100-Power ultimate;
+- normal enemies track whether the current word received a miss, creating a reusable perfect-word combat hook for later characters.
 
-Next character slice: Volt.
+Next character slice: Wraith.
 
 ## Step 43
 Add Character Level and Mastery.

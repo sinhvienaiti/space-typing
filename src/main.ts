@@ -24,6 +24,7 @@ import {
   type CharacterState,
 } from "./characters/state";
 import { VANGUARD_ACTIVE_SKILL_ID } from "./characters/vanguard";
+import { VOLT_ACTIVE_SKILL_ID } from "./characters/volt";
 import {
   createStarterEquipmentState,
   equipmentForSlot,
@@ -773,6 +774,9 @@ function selectedCharacterSkillId(): string | null {
   }
   if (characters.selected === "aegis") {
     return AEGIS_ACTIVE_SKILL_ID;
+  }
+  if (characters.selected === "volt") {
+    return VOLT_ACTIVE_SKILL_ID;
   }
   return null;
 }

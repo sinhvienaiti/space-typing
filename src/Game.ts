@@ -21,6 +21,15 @@ import {
   restoreAegisShield,
 } from "./characters/aegis";
 import {
+  restoreVoltEnergy,
+  VOLT_ACTIVE_SKILL,
+  VOLT_ACTIVE_SKILL_ID,
+  VOLT_EMP_DELAY,
+  VOLT_LONG_WORD_LENGTH,
+  VOLT_THUNDER_BOSS_RATIO,
+  VOLT_THUNDER_TARGETS,
+} from "./characters/volt";
+import {
   restoreVanguardShield,
   shouldTriggerVanguardShieldRhythm,
   VANGUARD_ACTIVE_BARRIER_DURATION,
@@ -253,7 +262,9 @@ export class Game {
         ? [VANGUARD_ACTIVE_SKILL]
         : this.characterId === "aegis"
           ? [AEGIS_ACTIVE_SKILL]
-          : [];
+          : this.characterId === "volt"
+            ? [VOLT_ACTIVE_SKILL]
+            : [];
 
     this.skillEngine.setDefinitions([
       ...characterDefinitions,
@@ -348,6 +359,11 @@ export class Game {
       this.characterId === "aegis"
     ) {
       this.activateAegisSkill();
+    } else if (
+      id === VOLT_ACTIVE_SKILL_ID &&
+      this.characterId === "volt"
+    ) {
+      this.activateVoltSkill();
     } else if (isDefensiveSkillId(id)) {
       this.activateDefensiveSkill(id);
     } else if (isOffensiveSkillId(id)) {
@@ -422,6 +438,37 @@ export class Game {
     this.sfx.power();
   }
 
+  private activateVoltSkill(): void {
+    this.activateEmpPulse(VOLT_EMP_DELAY);
+  }
+
+  private activateEmpPulse(actionDelay: number): void {
+    const clearedProjectiles = this.projectiles.length;
+    this.projectiles = [];
+
+    for (const enemy of this.enemies) {
+      enemy.flash = 1;
+      enemy.kick = Math.max(enemy.kick, 0.7);
+      if (enemy.actionCooldown !== null) {
+        enemy.actionCooldown += actionDelay;
+      }
+    }
+
+    if (this.boss !== null) {
+      this.boss.flash = 1;
+      this.boss.actionCooldown += actionDelay;
+    }
+
+    this.interferenceTimer = 0;
+    this.burst(
+      this.width / 2,
+      this.height * 0.44,
+      36 + Math.min(24, clearedProjectiles * 3),
+      192,
+    );
+    this.sfx.power();
+  }
+
   private activateDefensiveSkill(id: DefensiveSkillId): void {
     const playerX = this.width / 2;
     const playerY = this.height - PLAYER_Y_OFFSET;
@@ -472,30 +519,7 @@ export class Game {
 
   private activateOffensiveSkill(id: OffensiveSkillId): void {
     if (id === "emp-burst") {
-      const clearedProjectiles = this.projectiles.length;
-      this.projectiles = [];
-
-      for (const enemy of this.enemies) {
-        enemy.flash = 1;
-        enemy.kick = Math.max(enemy.kick, 0.7);
-        if (enemy.actionCooldown !== null) {
-          enemy.actionCooldown += 2.5;
-        }
-      }
-
-      if (this.boss !== null) {
-        this.boss.flash = 1;
-        this.boss.actionCooldown += 2.5;
-      }
-
-      this.interferenceTimer = 0;
-      this.burst(
-        this.width / 2,
-        this.height * 0.44,
-        36 + Math.min(24, clearedProjectiles * 3),
-        192,
-      );
-      this.sfx.power();
+      this.activateEmpPulse(2.5);
       return;
     }
 
@@ -1478,6 +1502,7 @@ export class Game {
 
     if (boss.typed >= word.length) {
       this.hooks.onWordComplete(boss.entry);
+      this.applyCharacterWordCompletePassive(word.length);
 
       if (boss.shieldActive) {
         boss.shieldActive = false;
@@ -1630,6 +1655,7 @@ export class Game {
     const length = typingText(enemy.entry.en).length;
     const perfectWord = !enemy.wordMissed;
     this.hooks.onWordComplete(enemy.entry);
+    this.applyCharacterWordCompletePassive(length);
     this.applyCharacterPerfectWordPassive(perfectWord);
 
     if (enemy.layersRemaining > 1) {
@@ -1840,6 +1866,31 @@ export class Game {
     }
   }
 
+  private applyCharacterWordCompletePassive(wordLength: number): void {
+    if (
+      this.characterId !== "volt" ||
+      wordLength < VOLT_LONG_WORD_LENGTH
+    ) {
+      return;
+    }
+
+    const nextEnergy = restoreVoltEnergy(
+      this.stats.energy,
+      this.stats.maxEnergy,
+      wordLength,
+    );
+    if (nextEnergy <= this.stats.energy) return;
+
+    this.stats.energy = nextEnergy;
+    this.burst(
+      this.width / 2,
+      this.height - PLAYER_Y_OFFSET,
+      14,
+      202,
+    );
+    this.sfx.support();
+  }
+
   private applyCharacterPerfectWordPassive(perfectWord: boolean): void {
     if (!perfectWord || this.characterId !== "aegis") return;
 
@@ -1888,10 +1939,11 @@ export class Game {
 
     const isVanguard = this.characterId === "vanguard";
     const isAegis = this.characterId === "aegis";
+    const isVolt = this.characterId === "volt";
     this.stats.power = 0;
     this.overdriveTimer = isVanguard
       ? VANGUARD_NOVA_DURATION
-      : isAegis
+      : isAegis || isVolt
         ? 0
         : 4.5;
 
@@ -1924,19 +1976,61 @@ export class Game {
         AEGIS_FORTRESS_DURATION,
       );
       this.guardianBlocks = Math.max(this.guardianBlocks, 5);
+    } else if (isVolt) {
+      this.projectiles = [];
+      this.interferenceTimer = 0;
+      this.stats.energy = this.stats.maxEnergy;
+
+      const targets = [...this.enemies]
+        .sort((a, b) => b.y - a.y)
+        .slice(0, VOLT_THUNDER_TARGETS);
+
+      for (const enemy of targets) {
+        const wordLength = typingText(enemy.entry.en).length;
+        if (enemy.layersRemaining > 1) {
+          enemy.layersRemaining -= 1;
+        } else {
+          enemy.typed = chainTypingAdvance(enemy.typed, wordLength);
+        }
+        if (enemy.actionCooldown !== null) {
+          enemy.actionCooldown += VOLT_EMP_DELAY;
+        }
+        enemy.flash = 1;
+        enemy.kick = Math.max(enemy.kick, 1.35);
+        this.burst(enemy.x, enemy.y, 20, 202);
+      }
+
+      if (this.boss !== null) {
+        const damage = firepowerDamage(
+          Math.max(
+            1,
+            Math.round(this.boss.maxHp * VOLT_THUNDER_BOSS_RATIO),
+          ),
+          this.playerStats,
+        );
+        this.boss.hp = Math.max(0, this.boss.hp - damage);
+        this.boss.flash = 1;
+        this.boss.actionCooldown += VOLT_EMP_DELAY;
+        this.updateBossPhase(this.boss);
+        this.hooks.onBossUpdate(toBossHud(this.boss));
+
+        if (this.boss.hp <= 0) {
+          this.defeatBoss();
+        }
+      }
     }
 
     this.burst(
       this.width / 2,
       this.height - PLAYER_Y_OFFSET,
-      isVanguard ? 48 : isAegis ? 56 : 36,
-      isAegis ? 300 : 184,
+      isVanguard ? 48 : isAegis ? 56 : isVolt ? 62 : 36,
+      isAegis ? 300 : isVolt ? 202 : 184,
     );
 
     if (this.settings.screenShake) {
       this.shake = Math.max(
         this.shake,
-        isVanguard ? 9 : isAegis ? 10 : 7,
+        isVanguard ? 9 : isAegis ? 10 : isVolt ? 11 : 7,
       );
     }
 
