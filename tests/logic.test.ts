@@ -11,8 +11,10 @@ import type { Enemy } from "../src/types";
 function enemy(id: number, word: string, x: number, y: number): Enemy {
   return {
     id,
+    kind: "scout",
     entry: { id: "test-" + String(id), en: word, vi: "", ipa: "" },
     typed: 0,
+    layersRemaining: 1,
     x,
     y,
     baseX: x,
