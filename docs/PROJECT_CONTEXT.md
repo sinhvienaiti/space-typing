@@ -66,6 +66,15 @@ Development port:
 3004
 ~~~
 
+Current parent-integration status:
+
+~~~text
+enabled in sinhvienaiti/typing-game
+submodule path: games/space-typing
+public route: /space-typing
+internal origin: https://space.typing-game.local
+~~~
+
 ## 1.3 Product identity
 
 Space Typing is not:

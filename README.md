@@ -63,9 +63,9 @@ pnpm build
 
 ## Platform integration
 
-Parent integration is intentionally deferred until the child game reaches the stable milestone defined in `docs/PROJECT_CONTEXT.md`.
+Parent integration is now enabled through the `sinhvienaiti/typing-game` platform as a Git submodule.
 
-Target platform URLs:
+Platform URLs:
 
 ~~~text
 https://typing-game.local/space-typing
