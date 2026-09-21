@@ -56,15 +56,19 @@ export function enemyWeightsForStage(stage: number): EnemyWeights {
   const resolvedShield = shield * scale;
   const resolvedCarrier = carrier * scale;
 
-  return {
-    scout:
-      1 -
+  const scout = Math.max(
+    0.3,
+    1 -
       resolvedMine -
       resolvedTank -
       resolvedDestroyer -
       resolvedOppressor -
       resolvedShield -
       resolvedCarrier,
+  );
+
+  return {
+    scout,
     mine: resolvedMine,
     tank: resolvedTank,
     destroyer: resolvedDestroyer,
