@@ -160,7 +160,7 @@ describe("save backup", () => {
     });
   });
 
-  it("rejects corrupted best-result values",
+  it("rejects corrupted best-result values", () => {
     const progress = createDefaultCampaignProgress();
     const invalid = parsePlayerSaveJson(
       JSON.stringify({
