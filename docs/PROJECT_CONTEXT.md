@@ -2978,76 +2978,82 @@ Step 20  advanced enemy families
 Step 21  Elite modifier framework
 Step 22  Boss base + HP UI
 Step 23  Boss word / per-key damage loop
-Step 24  first multi-phase boss combat:
-         shield phase / perfect-word stagger / rage projectile pressure
+Step 24  first multi-phase boss combat
+Step 25  IndexedDB PlayerSave persistence
+Step 26  autosave queue + schema v1->v2 migration
+Step 27  validated JSON Export / Import
 
 Next:
-Step 25  IndexedDB persistence
+Step 28  effective-stat calculation pipeline
 ~~~
 
-Implemented gameplay details:
+Implemented gameplay/persistence details:
 
 - independent TypeScript/Vite child app;
 - responsive wide high-DPI Canvas;
 - stationary player ship with no movement controls;
 - clean dark HUD and Settings UI;
-- basic Web Audio SFX mixer;
-- effect quality scaling and particle caps;
+- Web Audio SFX mixer;
 - parent vocabulary runtime contract at /vocabulary/;
-- local fallback vocabulary only when parent shared data is unavailable;
 - Class/Custom vocabulary source state;
-- completion learning toast with English/IPA/Vietnamese;
-- SpeechSynthesis queue that does not cancel rapid later words;
-- typing-game:speech active/inactive messages for shared Music ducking;
-- persistent 1000-stage Campaign flow;
-- Stage Select / Retry / Continue;
-- adaptive Stage + WPM + Accuracy + Vocabulary difficulty model;
-- 15 enemy families with distinct typing-combat mechanics;
-- typeable enemy/boss projectile defense;
-- Elite promotion with Swift / Armored / Frenzy / Volatile;
-- phrase-safe vocabulary typing while Space remains Overdrive;
-- boss HP, rotating vocabulary, per-key damage and full-word bonus damage;
-- boss phases with shield word break;
-- perfect boss word stagger;
-- Major Boss rage phase with increased projectile pressure.
+- EN/VI/IPA learning feedback and queued pronunciation;
+- 1000-stage persistent Campaign flow;
+- adaptive Stage + WPM + Accuracy + Vocabulary difficulty;
+- 15 enemy families with distinct mechanics;
+- typeable enemy/boss projectiles;
+- Elite Swift / Armored / Frenzy / Volatile modifiers;
+- phrase-safe typing while Space remains Overdrive;
+- multi-phase bosses with HP, shield break, stagger and rage pressure;
+- IndexedDB PlayerSave schema v2;
+- migration from PlayerSave v1 and legacy Campaign localStorage;
+- serialized autosave on important Campaign changes;
+- localStorage recovery mirror kept synchronized;
+- page-hide autosave flush;
+- unsupported future save schemas are blocked instead of down-migrated;
+- JSON Export / Import with strict validation and explicit overwrite confirm;
+- failed import storage writes restore the previous in-memory progress.
 
 Validation checkpoints:
 
 ~~~text
-Foundation/Core combat CI
-7816bc3fd7b8dfb66878c77ed3a88f3ee1be71fe
-PASS
-
-Shared vocabulary/pronunciation CI
-2a2118273fd25a013798b1b60b5d93ca068225ec
-PASS
-
-1000-stage Campaign data foundation CI
-6ea047a6ab1e90769d142ecb3b4eaa3e3962f6ce
-PASS
-
-Persistent Campaign stage flow CI
-edb15e4d34c9cde5bbffe0dddfaa3d50c04300de
-PASS
-
-Completed advanced enemy families CI
+Advanced enemy families
 08f8a01094757da4775f5b03de616a6bf1e3453f
 PASS
 
-Phrase-safe shared vocabulary combat CI
+Phrase-safe vocabulary combat
 3204049576db6e08e8944b33f3dd40adce65d171
 PASS
 
-Elite modifier framework CI
+Elite framework
 a14ac88de22869d159ee4b29b52ad0a96ae3063e
 PASS
 
-Boss HP + typing damage loop CI
+Boss HP + typing loop
 0e9d31dee78329b50794243311b356814e2295b3
 PASS
 
-Multi-phase boss combat CI
+Multi-phase boss
 d90a6f0d26297db97f494687a88ca1bea9d82388
+PASS
+
+IndexedDB persistence
+d8dbf640c17a2d4ec5b2fbb71448ee7a326bc649
+PASS
+
+Autosave + schema migration
+57eb1176ae11fce9fa24d0386046ebe5d43d683b
+PASS
+
+Export / Import
+811bba10859a2b67f5cde69081a43290c4a64ac1
+PASS
+
+Persistence review pass 1
+39081acef5b90e04c2db63ef4a39d5d6d7a69716
+PASS
+
+Persistence review pass 2
+e0a775bff1f74c92b9c949153d2573bc8604387b
 PASS
 ~~~
 
@@ -3060,8 +3066,7 @@ Project-wide requirements remain:
 - parent shared Music system: already available;
 - docs/PROJECT_CONTEXT.md remains the primary context/handoff/plan document.
 
-Campaign progress currently still uses the temporary localStorage adapter from the early Campaign checkpoint.
-Step 25 migrates player progress to IndexedDB without silently deleting old progress.
+Phase 6 persistence foundation is complete. Future RPG systems must extend the versioned PlayerSave through explicit migrations rather than creating separate permanent-progress stores.
 
 ---
 

@@ -76,11 +76,11 @@ https://space.typing-game.local
 ## Next implementation checkpoint
 
 ~~~text
-Step 25
-IndexedDB persistence
+Step 28
+Effective-stat calculation pipeline
 
 Then:
-Step 26 autosave / schema migrations
-Step 27 Export / Import
-Step 28 effective-stat pipeline
+Step 29 all core attributes
+Step 30 Item registry / inventory
+Step 31 first consumables
 ~~~
