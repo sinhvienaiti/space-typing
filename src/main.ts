@@ -70,6 +70,7 @@ import {
 import type { Inventory } from "./items/inventory";
 import type { RecoveryItemId } from "./items/consumables";
 import { accuracyPercent } from "./logic";
+import type { EquipmentDrop } from "./loot/equipment-loot";
 import {
   DEFENSIVE_SKILLS,
   type DefensiveSkillId,
@@ -423,6 +424,19 @@ app.innerHTML = `
       <div id="talentPanel" class="talent-panel"></div>
     </dialog>
 
+    <dialog id="rewardChoiceDialog" class="settings-dialog reward-choice-dialog">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">rare reward</p>
+          <h2>Choose one reward</h2>
+        </div>
+      </div>
+      <p class="equipment-note">
+        Combat is paused. Pick one equipment reward to continue.
+      </p>
+      <div id="rewardChoiceGrid" class="reward-choice-grid"></div>
+    </dialog>
+
     <dialog id="supportDialog" class="settings-dialog support-dialog">
       <form method="dialog" class="dialog-head">
         <div>
@@ -654,6 +668,12 @@ const dataDialog = byId<HTMLDialogElement>("dataDialog");
 const equipmentDialog = byId<HTMLDialogElement>("equipmentDialog");
 const supportDialog = byId<HTMLDialogElement>("supportDialog");
 const characterDialog = byId<HTMLDialogElement>("characterDialog");
+const rewardChoiceDialog =
+  byId<HTMLDialogElement>("rewardChoiceDialog");
+
+rewardChoiceDialog.addEventListener("cancel", (event) => {
+  event.preventDefault();
+});
 
 type AutosaveSnapshot = {
   campaign: typeof campaign;
@@ -1062,6 +1082,48 @@ function createEquipmentDropInstanceId(): string {
   );
 }
 
+function renderRewardChoiceOptions(
+  options: readonly EquipmentDrop[],
+): void {
+  const grid = byId("rewardChoiceGrid");
+  grid.replaceChildren();
+
+  for (const option of options) {
+    const definition = getEquipmentDefinition(option.definitionId);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "reward-choice-option";
+
+    const rarity = document.createElement("span");
+    rarity.textContent = option.rarity.toUpperCase();
+
+    const name = document.createElement("strong");
+    name.textContent = definition.name;
+
+    const description = document.createElement("small");
+    description.textContent = definition.description;
+
+    button.append(rarity, name, description);
+    button.addEventListener("click", () => {
+      equipment = addEquipmentInstance(equipment, {
+        instanceId: createEquipmentDropInstanceId(),
+        definitionId: option.definitionId,
+        rarity: option.rarity,
+        enhancement: 0,
+      });
+      renderEquipment();
+      void autosaveCampaign(
+        "equipment",
+        "✓ Reward selected · " + definition.name,
+      );
+      rewardChoiceDialog.close();
+      game.resume();
+    });
+
+    grid.append(button);
+  }
+}
+
 const game = new Game(
   byId<HTMLCanvasElement>("gameCanvas"),
   [],
@@ -1174,6 +1236,12 @@ const game = new Game(
           " drop · " +
           definition.name,
       );
+    },
+    onRewardChoice: (options) => {
+      if (options.length === 0) return;
+      game.pause();
+      renderRewardChoiceOptions(options);
+      rewardChoiceDialog.showModal();
     },
   },
 );

@@ -2903,6 +2903,18 @@ Rare-target rules:
 ## Step 48
 Implement reward-choice crate.
 
+**Status: implemented.**
+
+Reward-choice rules:
+
+- a rare Choice Crate may enter combat after the tutorial portion of Campaign;
+- the crate uses a normal English vocabulary target and must be typed before it expires;
+- completing the crate pauses combat and presents three distinct equipment rewards;
+- reward options use the Treasure rarity table and current Luck stat;
+- exactly one reward may be selected;
+- the selected equipment is added to inventory, autosaved immediately and combat resumes at the same stage state;
+- the reward dialog cannot be dismissed with Escape before choosing, preventing a paused soft-lock.
+
 ## Step 49
 Implement Anomaly risk/reward crate.
 

@@ -142,6 +142,12 @@ import {
   type TreasureDrone,
 } from "./events/rare-targets";
 import {
+  createRewardChoiceOptions,
+  rewardChoiceWord,
+  shouldScheduleRewardChoiceCrate,
+  type RewardChoiceCrate,
+} from "./events/reward-choice";
+import {
   applyEliteModifiers,
   eliteModifierCount,
   pickEliteModifiers,
@@ -211,6 +217,7 @@ type Hooks = {
   onBossUpdate(boss: BossHudState | null): void;
   onWordComplete(entry: VocabularyEntry): void;
   onEquipmentDrop(drop: EquipmentDrop): void;
+  onRewardChoice(options: readonly EquipmentDrop[]): void;
   onSkills(): void;
 };
 
@@ -327,6 +334,9 @@ export class Game {
   private treasureDrone: TreasureDrone | null = null;
   private treasureDroneTimer = 0;
   private treasureDronePending = false;
+  private rewardChoiceCrate: RewardChoiceCrate | null = null;
+  private rewardChoiceTimer = 0;
+  private rewardChoicePending = false;
   private lastTime = performance.now();
   private animationFrame = 0;
   private stars: Array<{ x: number; y: number; z: number }> = [];
@@ -1099,6 +1109,9 @@ export class Game {
     this.treasureDrone = null;
     this.treasureDroneTimer = randomBetween(9, 14);
     this.treasureDronePending = shouldScheduleTreasureDrone(stage.stage);
+    this.rewardChoiceCrate = null;
+    this.rewardChoiceTimer = randomBetween(14, 20);
+    this.rewardChoicePending = shouldScheduleRewardChoiceCrate(stage.stage);
     this.spawnRemaining = stage.enemyBudget;
     this.spawnTimer = 0.3;
     this.eliteSpawned = 0;
@@ -1160,6 +1173,8 @@ export class Game {
     this.supplySpawnsRemaining = 0;
     this.treasureDrone = null;
     this.treasureDronePending = false;
+    this.rewardChoiceCrate = null;
+    this.rewardChoicePending = false;
     this.boss = null;
     this.hooks.onBossUpdate(null);
     this.hooks.onPhase(this.phase);
@@ -1201,6 +1216,14 @@ export class Game {
       return;
     }
 
+    if (
+      this.rewardChoiceCrate !== null &&
+      this.rewardChoiceCrate.typed > 0
+    ) {
+      this.typeRewardChoiceCrate(this.rewardChoiceCrate, key);
+      return;
+    }
+
     const projectile = this.findProjectileForKey(key);
     if (projectile !== null) {
       this.destroyProjectile(projectile);
@@ -1225,6 +1248,14 @@ export class Game {
       typingText(this.treasureDrone.entry.en)[0] === key
     ) {
       this.typeTreasureDrone(this.treasureDrone, key);
+      return;
+    }
+
+    if (
+      this.rewardChoiceCrate !== null &&
+      typingText(this.rewardChoiceCrate.entry.en)[0] === key
+    ) {
+      this.typeRewardChoiceCrate(this.rewardChoiceCrate, key);
       return;
     }
 
@@ -1309,9 +1340,11 @@ export class Game {
     this.updateBoss(dt * hostileTimeFactor, difficulty);
     this.updateSupplyPod(dt);
     this.updateTreasureDrone(dt);
+    this.updateRewardChoiceCrate(dt);
     this.spawnTimer -= dt * hostileTimeFactor;
     this.supplySpawnTimer -= dt;
     this.treasureDroneTimer -= dt;
+    this.rewardChoiceTimer -= dt;
 
     if (
       this.supplyPod === null &&
@@ -1329,12 +1362,26 @@ export class Game {
       this.treasureDronePending &&
       this.treasureDrone === null &&
       this.supplyPod === null &&
+      this.rewardChoiceCrate === null &&
       this.treasureDroneTimer <= 0 &&
       this.boss === null &&
       (this.spawnRemaining > 0 || this.enemies.length > 0)
     ) {
       this.spawnTreasureDrone();
       this.treasureDronePending = false;
+    }
+
+    if (
+      this.rewardChoicePending &&
+      this.rewardChoiceCrate === null &&
+      this.supplyPod === null &&
+      this.treasureDrone === null &&
+      this.rewardChoiceTimer <= 0 &&
+      this.boss === null &&
+      (this.spawnRemaining > 0 || this.enemies.length > 0)
+    ) {
+      this.spawnRewardChoiceCrate();
+      this.rewardChoicePending = false;
     }
 
     if (
@@ -1565,6 +1612,7 @@ export class Game {
     this.projectiles = [];
     this.supplyPod = null;
     this.treasureDrone = null;
+    this.rewardChoiceCrate = null;
     this.boss = null;
     this.hooks.onBossUpdate(null);
     this.hooks.onStageClear(this.getStats());
@@ -1655,6 +1703,40 @@ export class Game {
       this.treasureDrone.x < -70
     ) {
       this.treasureDrone = null;
+    }
+  }
+
+  private spawnRewardChoiceCrate(): void {
+    const entry = rewardChoiceWord(this.vocabulary);
+    if (entry === null) {
+      this.rewardChoicePending = false;
+      return;
+    }
+
+    this.rewardChoiceCrate = {
+      entry,
+      typed: 0,
+      x: randomBetween(100, this.width - 100),
+      y: -42,
+      speed: randomBetween(34, 46),
+      age: 0,
+      lifetime: 18,
+    };
+
+    this.sfx.support();
+  }
+
+  private updateRewardChoiceCrate(dt: number): void {
+    if (this.rewardChoiceCrate === null) return;
+
+    this.rewardChoiceCrate.age += dt;
+    this.rewardChoiceCrate.y += this.rewardChoiceCrate.speed * dt;
+
+    if (
+      this.rewardChoiceCrate.age >= this.rewardChoiceCrate.lifetime ||
+      this.rewardChoiceCrate.y > this.height * 0.63
+    ) {
+      this.rewardChoiceCrate = null;
     }
   }
 
@@ -2211,6 +2293,47 @@ export class Game {
       this.burst(drone.x, drone.y, 44, 48);
       this.sfx.support();
       this.treasureDrone = null;
+    }
+
+    this.emitStats();
+  }
+
+  private typeRewardChoiceCrate(
+    crate: RewardChoiceCrate,
+    key: string,
+  ): void {
+    const word = typingText(crate.entry.en);
+    const expected = word[crate.typed];
+
+    if (key !== expected) {
+      this.registerMiss();
+      return;
+    }
+
+    crate.typed += 1;
+    this.stats.hits += 1;
+    this.stats.streak += 1;
+    this.stats.maxStreak = Math.max(
+      this.stats.maxStreak,
+      this.stats.streak,
+    );
+    this.stats.multiplier = multiplierForStreak(this.stats.streak);
+    this.stats.score += 10 * this.stats.multiplier;
+    this.gainPower(1.3);
+    this.applyCharacterCorrectKeyPassive();
+    this.burst(crate.x, crate.y, 7, 286);
+    this.sfx.shot(this.stats.multiplier);
+
+    if (crate.typed >= word.length) {
+      const options = createRewardChoiceOptions(this.playerStats.luck);
+      this.stats.score += 220 * this.stats.multiplier;
+      this.hooks.onWordComplete(crate.entry);
+      this.burst(crate.x, crate.y, 40, 286);
+      this.sfx.support();
+      this.rewardChoiceCrate = null;
+      if (options.length > 0) {
+        this.hooks.onRewardChoice(options);
+      }
     }
 
     this.emitStats();
@@ -3217,6 +3340,9 @@ export class Game {
     if (this.treasureDrone !== null) {
       this.drawTreasureDrone(this.treasureDrone);
     }
+    if (this.rewardChoiceCrate !== null) {
+      this.drawRewardChoiceCrate(this.rewardChoiceCrate);
+    }
 
     for (const enemy of this.enemies) {
       this.drawEnemy(enemy);
@@ -3642,6 +3768,60 @@ export class Game {
     context.fillStyle = "#fff1a8";
     context.shadowBlur = 10;
     context.shadowColor = "#ffd84d";
+    context.fillText(split.remaining, left + typedWidth, wordY);
+    context.restore();
+  }
+
+  private drawRewardChoiceCrate(crate: RewardChoiceCrate): void {
+    const context = this.context;
+    const x = crate.x + Math.sin(crate.age * 2.6) * 16;
+    const displayWord = normalizeWord(crate.entry.en);
+    const split = splitDisplayByTypedLetters(displayWord, crate.typed);
+
+    context.save();
+    context.translate(x, crate.y);
+    context.globalCompositeOperation = "lighter";
+    context.shadowBlur = 22;
+    context.shadowColor = "#b787ff";
+    context.fillStyle = "rgba(151, 105, 255, 0.16)";
+    context.strokeStyle = "#d7bbff";
+    context.lineWidth = 2;
+    context.beginPath();
+    context.roundRect(-28, -22, 56, 44, 6);
+    context.fill();
+    context.stroke();
+
+    context.strokeStyle = "rgba(255, 236, 167, 0.8)";
+    context.beginPath();
+    context.moveTo(-18, -6);
+    context.lineTo(18, -6);
+    context.moveTo(0, -17);
+    context.lineTo(0, 17);
+    context.stroke();
+
+    context.fillStyle = "#f0e4ff";
+    context.font =
+      "850 8px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.textAlign = "center";
+    context.fillText("CHOICE CRATE", 0, 34);
+    context.restore();
+
+    context.save();
+    context.font =
+      "800 18px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.textBaseline = "middle";
+    const fullWidth = context.measureText(displayWord).width;
+    const typedWidth = context.measureText(split.typed).width;
+    const left = x - fullWidth / 2;
+    const wordY = crate.y - 38;
+    context.fillStyle = "rgba(4, 8, 14, 0.9)";
+    context.fillRect(left - 9, wordY - 14, fullWidth + 18, 28);
+    context.textAlign = "left";
+    context.fillStyle = "rgba(145, 155, 165, 0.5)";
+    context.fillText(split.typed, left, wordY);
+    context.fillStyle = "#eadbff";
+    context.shadowBlur = 9;
+    context.shadowColor = "#a86cff";
     context.fillText(split.remaining, left + typedWidth, wordY);
     context.restore();
   }
