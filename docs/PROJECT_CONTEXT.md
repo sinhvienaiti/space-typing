@@ -2805,9 +2805,10 @@ Implemented character slices:
 
 - Aegis: perfect-word Shield reinforcement, Reflect Field active and Fortress Protocol ultimate;
 - Volt: long words restore extra Energy, EMP Burst is the character active and Thunder Grid is the 100-Power ultimate;
+- Wraith: streak milestones trigger short Cloak, Phase Cloak blocks incoming hits and Time Collapse slows hostile time while clearing projectiles;
 - normal enemies track whether the current word received a miss, creating a reusable perfect-word combat hook for later characters.
 
-Next character slice: Wraith.
+Next character slice: Fortune.
 
 ## Step 43
 Add Character Level and Mastery.

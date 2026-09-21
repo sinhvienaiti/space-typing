@@ -25,6 +25,7 @@ import {
 } from "./characters/state";
 import { VANGUARD_ACTIVE_SKILL_ID } from "./characters/vanguard";
 import { VOLT_ACTIVE_SKILL_ID } from "./characters/volt";
+import { WRAITH_ACTIVE_SKILL_ID } from "./characters/wraith";
 import {
   createStarterEquipmentState,
   equipmentForSlot,
@@ -777,6 +778,9 @@ function selectedCharacterSkillId(): string | null {
   }
   if (characters.selected === "volt") {
     return VOLT_ACTIVE_SKILL_ID;
+  }
+  if (characters.selected === "wraith") {
+    return WRAITH_ACTIVE_SKILL_ID;
   }
   return null;
 }

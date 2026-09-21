@@ -21,6 +21,14 @@ import {
   restoreAegisShield,
 } from "./characters/aegis";
 import {
+  shouldTriggerWraithCloak,
+  WRAITH_ACTIVE_SKILL,
+  WRAITH_ACTIVE_SKILL_ID,
+  WRAITH_ACTIVE_CLOAK_DURATION,
+  WRAITH_PASSIVE_CLOAK_DURATION,
+  WRAITH_TIME_COLLAPSE_DURATION,
+} from "./characters/wraith";
+import {
   restoreVoltEnergy,
   VOLT_ACTIVE_SKILL,
   VOLT_ACTIVE_SKILL_ID,
@@ -197,6 +205,7 @@ export class Game {
   private markTimer = 0;
   private bossMarkTimer = 0;
   private gravityWellTimer = 0;
+  private cloakTimer = 0;
   private skillHudTimer = 0;
   private lastTime = performance.now();
   private animationFrame = 0;
@@ -264,7 +273,9 @@ export class Game {
           ? [AEGIS_ACTIVE_SKILL]
           : this.characterId === "volt"
             ? [VOLT_ACTIVE_SKILL]
-            : [];
+            : this.characterId === "wraith"
+              ? [WRAITH_ACTIVE_SKILL]
+              : [];
 
     this.skillEngine.setDefinitions([
       ...characterDefinitions,
@@ -364,6 +375,11 @@ export class Game {
       this.characterId === "volt"
     ) {
       this.activateVoltSkill();
+    } else if (
+      id === WRAITH_ACTIVE_SKILL_ID &&
+      this.characterId === "wraith"
+    ) {
+      this.activateWraithSkill();
     } else if (isDefensiveSkillId(id)) {
       this.activateDefensiveSkill(id);
     } else if (isOffensiveSkillId(id)) {
@@ -440,6 +456,12 @@ export class Game {
 
   private activateVoltSkill(): void {
     this.activateEmpPulse(VOLT_EMP_DELAY);
+  }
+
+  private activateWraithSkill(): void {
+    this.cloakTimer = Math.max(this.cloakTimer, WRAITH_ACTIVE_CLOAK_DURATION);
+    this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 30, 274);
+    this.sfx.support();
   }
 
   private activateEmpPulse(actionDelay: number): void {
@@ -769,6 +791,7 @@ export class Game {
     this.markTimer = 0;
     this.bossMarkTimer = 0;
     this.gravityWellTimer = 0;
+    this.cloakTimer = 0;
     this.skillHudTimer = 0;
     this.hooks.onBossUpdate(null);
     this.hooks.onSkills();
@@ -900,6 +923,7 @@ export class Game {
     this.markTimer = Math.max(0, this.markTimer - dt);
     this.bossMarkTimer = Math.max(0, this.bossMarkTimer - dt);
     this.gravityWellTimer = Math.max(0, this.gravityWellTimer - dt);
+    this.cloakTimer = Math.max(0, this.cloakTimer - dt);
 
     if (this.barrierTimer <= 0) this.barrierHp = 0;
     if (this.guardianTimer <= 0) this.guardianBlocks = 0;
@@ -1912,26 +1936,25 @@ export class Game {
 
   private applyCharacterCorrectKeyPassive(): void {
     if (
-      this.characterId !== "vanguard" ||
-      !shouldTriggerVanguardShieldRhythm(this.stats.streak)
+      this.characterId === "vanguard" &&
+      shouldTriggerVanguardShieldRhythm(this.stats.streak)
     ) {
-      return;
+      const nextShield = restoreVanguardShield(this.stats.shield, this.stats.maxShield);
+      if (nextShield > this.stats.shield) {
+        this.stats.shield = nextShield;
+        this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 14, 184);
+        this.sfx.support();
+      }
     }
 
-    const nextShield = restoreVanguardShield(
-      this.stats.shield,
-      this.stats.maxShield,
-    );
-    if (nextShield <= this.stats.shield) return;
-
-    this.stats.shield = nextShield;
-    this.burst(
-      this.width / 2,
-      this.height - PLAYER_Y_OFFSET,
-      14,
-      184,
-    );
-    this.sfx.support();
+    if (
+      this.characterId === "wraith" &&
+      shouldTriggerWraithCloak(this.stats.streak)
+    ) {
+      this.cloakTimer = Math.max(this.cloakTimer, WRAITH_PASSIVE_CLOAK_DURATION);
+      this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 12, 274);
+      this.sfx.support();
+    }
   }
 
   private activateOverdrive(): void {
@@ -1940,10 +1963,11 @@ export class Game {
     const isVanguard = this.characterId === "vanguard";
     const isAegis = this.characterId === "aegis";
     const isVolt = this.characterId === "volt";
+    const isWraith = this.characterId === "wraith";
     this.stats.power = 0;
     this.overdriveTimer = isVanguard
       ? VANGUARD_NOVA_DURATION
-      : isAegis || isVolt
+      : isAegis || isVolt || isWraith
         ? 0
         : 4.5;
 
@@ -2018,19 +2042,24 @@ export class Game {
           this.defeatBoss();
         }
       }
+    } else if (isWraith) {
+      this.projectiles = [];
+      this.timeShellTimer = Math.max(this.timeShellTimer, WRAITH_TIME_COLLAPSE_DURATION);
+      this.gravityWellTimer = Math.max(this.gravityWellTimer, WRAITH_TIME_COLLAPSE_DURATION);
+      this.cloakTimer = Math.max(this.cloakTimer, WRAITH_ACTIVE_CLOAK_DURATION);
     }
 
     this.burst(
       this.width / 2,
       this.height - PLAYER_Y_OFFSET,
-      isVanguard ? 48 : isAegis ? 56 : isVolt ? 62 : 36,
-      isAegis ? 300 : isVolt ? 202 : 184,
+      isVanguard ? 48 : isAegis ? 56 : isVolt ? 62 : isWraith ? 58 : 36,
+      isAegis ? 300 : isVolt ? 202 : isWraith ? 274 : 184,
     );
 
     if (this.settings.screenShake) {
       this.shake = Math.max(
         this.shake,
-        isVanguard ? 9 : isAegis ? 10 : isVolt ? 11 : 7,
+        isVanguard ? 9 : isAegis ? 10 : isVolt ? 11 : isWraith ? 9 : 7,
       );
     }
 
@@ -2110,6 +2139,12 @@ export class Game {
     y: number,
     rawDamage: number,
   ): void {
+    if (this.cloakTimer > 0) {
+      this.burst(x, y, 18, 274);
+      this.sfx.support();
+      return;
+    }
+
     if (this.guardianTimer > 0 && this.guardianBlocks > 0) {
       this.guardianBlocks -= 1;
       if (this.guardianBlocks <= 0) {
