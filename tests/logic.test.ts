@@ -18,6 +18,7 @@ function enemy(id: number, word: string, x: number, y: number): Enemy {
     eliteModifiers: [],
     entry: { id: "test-" + String(id), en: word, vi: "", ipa: "" },
     typed: 0,
+    wordMissed: false,
     layersRemaining: 1,
     x,
     y,
