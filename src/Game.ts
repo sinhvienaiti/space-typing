@@ -41,8 +41,16 @@ import {
   type RecoveryItemId,
 } from "./items/consumables";
 import {
+  absorbBarrierDamage,
+  DEFENSIVE_SKILLS,
+  emergencyRepair,
+  isDefensiveSkillId,
+  type DefensiveSkillId,
+} from "./skills/defensive";
+import {
   SkillEngine,
   type SkillActivationResult,
+  type SkillBlockReason,
   type SkillDefinition,
   type SkillRuntimeState,
 } from "./skills/engine";
@@ -74,6 +82,7 @@ type Hooks = {
   onStageClear(stats: GameStats): void;
   onBossUpdate(boss: BossHudState | null): void;
   onWordComplete(entry: VocabularyEntry): void;
+  onSkills(): void;
 };
 
 const FALLBACK_ENTRIES: VocabularyEntry[] = [
@@ -133,6 +142,13 @@ export class Game {
   private shake = 0;
   private overdriveTimer = 0;
   private interferenceTimer = 0;
+  private barrierTimer = 0;
+  private barrierHp = 0;
+  private reflectTimer = 0;
+  private timeShellTimer = 0;
+  private guardianTimer = 0;
+  private guardianBlocks = 0;
+  private skillHudTimer = 0;
   private lastTime = performance.now();
   private animationFrame = 0;
   private stars: Array<{ x: number; y: number; z: number }> = [];
@@ -153,6 +169,7 @@ export class Game {
     this.vocabulary = vocabulary.length > 0 ? vocabulary : FALLBACK_ENTRIES;
     this.settings = settings;
     this.hooks = hooks;
+    this.skillEngine.setDefinitions(DEFENSIVE_SKILLS);
     this.sfx.setVolume(settings.sfxVolume);
     this.resize();
     this.animationFrame = requestAnimationFrame(this.frame);
@@ -178,6 +195,47 @@ export class Game {
     return this.skillEngine.getState(id);
   }
 
+  canUseSkill(id: string): SkillBlockReason | null {
+    if (this.phase !== "playing") return "unknown-skill";
+
+    if (
+      id === "emergency-repair" &&
+      this.stats.hull >= this.stats.maxHull &&
+      this.stats.shield >= this.stats.maxShield
+    ) {
+      return "effect-not-needed";
+    }
+
+    return this.skillEngine.canActivate(id, {
+      energy: this.stats.energy,
+      streak: this.stats.streak,
+      hits: this.stats.hits,
+      misses: this.stats.misses,
+    });
+  }
+
+  useSkill(id: string): SkillActivationResult {
+    const blocked = this.canUseSkill(id);
+    if (blocked !== null) {
+      return {
+        ok: false,
+        reason: blocked,
+        energy: this.stats.energy,
+        state: this.skillEngine.getState(id),
+      };
+    }
+
+    const result = this.tryUseSkill(id);
+    if (!result.ok) return result;
+
+    if (isDefensiveSkillId(id)) {
+      this.activateDefensiveSkill(id);
+    }
+
+    this.hooks.onSkills();
+    return result;
+  }
+
   tryUseSkill(id: string): SkillActivationResult {
     if (this.phase !== "playing") {
       return {
@@ -201,6 +259,54 @@ export class Game {
     }
 
     return result;
+  }
+
+  private activateDefensiveSkill(id: DefensiveSkillId): void {
+    const playerX = this.width / 2;
+    const playerY = this.height - PLAYER_Y_OFFSET;
+
+    if (id === "barrier") {
+      this.barrierHp = Math.max(
+        this.barrierHp,
+        72 + this.playerStats.shield * 0.45,
+      );
+      this.barrierTimer = Math.max(this.barrierTimer, 7);
+      this.burst(playerX, playerY, 28, 188);
+      this.sfx.support();
+    } else if (id === "reflect-field") {
+      this.reflectTimer = Math.max(this.reflectTimer, 4.5);
+      this.burst(playerX, playerY, 30, 300);
+      this.sfx.power();
+    } else if (id === "time-shell") {
+      this.timeShellTimer = Math.max(this.timeShellTimer, 5);
+      this.burst(playerX, playerY, 34, 258);
+      this.sfx.support();
+    } else if (id === "emergency-repair") {
+      const repaired = emergencyRepair(
+        {
+          hull: this.stats.hull,
+          shield: this.stats.shield,
+          energy: this.stats.energy,
+        },
+        {
+          hull: this.stats.maxHull,
+          shield: this.stats.maxShield,
+          energy: this.stats.maxEnergy,
+        },
+      );
+      this.stats.hull = repaired.hull;
+      this.stats.shield = repaired.shield;
+      this.stats.energy = repaired.energy;
+      this.burst(playerX, playerY, 34, 138);
+      this.sfx.support();
+    } else {
+      this.guardianTimer = Math.max(this.guardianTimer, 12);
+      this.guardianBlocks = Math.max(this.guardianBlocks, 3);
+      this.burst(playerX, playerY, 26, 48);
+      this.sfx.support();
+    }
+
+    this.emitStats();
   }
 
   useConsumable(id: string): boolean {
@@ -296,7 +402,15 @@ export class Game {
     this.bossDefeated = false;
     this.overdriveTimer = 0;
     this.interferenceTimer = 0;
+    this.barrierTimer = 0;
+    this.barrierHp = 0;
+    this.reflectTimer = 0;
+    this.timeShellTimer = 0;
+    this.guardianTimer = 0;
+    this.guardianBlocks = 0;
+    this.skillHudTimer = 0;
     this.hooks.onBossUpdate(null);
+    this.hooks.onSkills();
     this.hooks.onPhase(this.phase);
     this.hooks.onStats(this.getStats());
     this.hooks.onStage(stage.stage);
@@ -418,14 +532,28 @@ export class Game {
     this.shake = Math.max(0, this.shake - dt * 28);
     this.overdriveTimer = Math.max(0, this.overdriveTimer - dt);
     this.interferenceTimer = Math.max(0, this.interferenceTimer - dt);
+    this.barrierTimer = Math.max(0, this.barrierTimer - dt);
+    this.reflectTimer = Math.max(0, this.reflectTimer - dt);
+    this.timeShellTimer = Math.max(0, this.timeShellTimer - dt);
+    this.guardianTimer = Math.max(0, this.guardianTimer - dt);
+
+    if (this.barrierTimer <= 0) this.barrierHp = 0;
+    if (this.guardianTimer <= 0) this.guardianBlocks = 0;
+
     this.skillEngine.tick(dt);
+    this.skillHudTimer -= dt;
+    if (this.skillHudTimer <= 0) {
+      this.skillHudTimer = 0.15;
+      this.hooks.onSkills();
+    }
 
     const difficulty = this.difficulty;
     if (difficulty === null || this.stageConfig === null) return;
 
     this.updatePlayerResources(dt);
-    this.updateBoss(dt, difficulty);
-    this.spawnTimer -= dt;
+    const hostileTimeFactor = this.timeShellTimer > 0 ? 0.42 : 1;
+    this.updateBoss(dt * hostileTimeFactor, difficulty);
+    this.spawnTimer -= dt * hostileTimeFactor;
 
     if (
       this.spawnRemaining > 0 &&
@@ -439,7 +567,8 @@ export class Game {
     }
 
     const playerY = this.height - PLAYER_Y_OFFSET;
-    const speedFactor = this.overdriveTimer > 0 ? 0.58 : 1;
+    const overdriveFactor = this.overdriveTimer > 0 ? 0.58 : 1;
+    const speedFactor = overdriveFactor * hostileTimeFactor;
 
     for (const enemy of this.enemies) {
       enemy.age += dt;
@@ -452,7 +581,7 @@ export class Game {
       enemy.x += (desiredX - enemy.x) * Math.min(1, dt * 2);
 
       if (enemy.actionCooldown !== null) {
-        enemy.actionCooldown -= dt;
+        enemy.actionCooldown -= dt * hostileTimeFactor;
         if (enemy.actionCooldown <= 0) {
           if (enemy.kind === "carrier") {
             this.spawnCarrierChild(enemy);
@@ -490,8 +619,8 @@ export class Game {
 
     const playerX = this.width / 2;
     for (const projectile of this.projectiles) {
-      projectile.x += projectile.vx * dt;
-      projectile.y += projectile.vy * dt;
+      projectile.x += projectile.vx * dt * hostileTimeFactor;
+      projectile.y += projectile.vy * dt * hostileTimeFactor;
 
       if (
         Math.hypot(projectile.x - playerX, projectile.y - playerY) <=
@@ -1372,10 +1501,60 @@ export class Game {
     x: number,
     y: number,
   ): void {
+    const projectile =
+      this.projectiles.find((item) => item.id === projectileId) ?? null;
+
     this.projectiles = this.projectiles.filter(
-      (projectile) => projectile.id !== projectileId,
+      (item) => item.id !== projectileId,
     );
+
+    if (this.reflectTimer > 0 && projectile !== null) {
+      this.reflectProjectile(projectile, x, y);
+      return;
+    }
+
     this.applyPlayerDamage(x, y, 42);
+  }
+
+  private reflectProjectile(
+    projectile: EnemyProjectile,
+    x: number,
+    y: number,
+  ): void {
+    if (projectile.ownerId === -1 && this.boss !== null) {
+      const damage = Math.max(
+        1,
+        Math.round(this.boss.maxHp * 0.018),
+      );
+      this.boss.hp = Math.max(0, this.boss.hp - damage);
+      this.boss.flash = 1;
+      this.updateBossPhase(this.boss);
+      this.hooks.onBossUpdate(toBossHud(this.boss));
+
+      if (this.boss.hp <= 0) {
+        this.defeatBoss();
+      }
+    } else {
+      const enemy = this.enemies.find(
+        (item) => item.id === projectile.ownerId,
+      );
+
+      if (enemy !== undefined) {
+        enemy.flash = 1;
+        enemy.kick = Math.max(enemy.kick, 1.2);
+
+        if (enemy.layersRemaining > 1) {
+          enemy.layersRemaining -= 1;
+        } else {
+          enemy.y = Math.max(-enemy.radius, enemy.y - 46);
+        }
+
+        this.fireLaser(enemy, 0.75);
+      }
+    }
+
+    this.burst(x, y, 18, 300);
+    this.sfx.hit();
   }
 
   private applyPlayerDamage(
@@ -1383,6 +1562,39 @@ export class Game {
     y: number,
     rawDamage: number,
   ): void {
+    if (this.guardianTimer > 0 && this.guardianBlocks > 0) {
+      this.guardianBlocks -= 1;
+      if (this.guardianBlocks <= 0) {
+        this.guardianTimer = 0;
+      }
+      this.burst(x, y, 22, 48);
+      this.sfx.support();
+      this.hooks.onSkills();
+      return;
+    }
+
+    let damageRemaining = rawDamage;
+    if (this.barrierTimer > 0 && this.barrierHp > 0) {
+      const barrier = absorbBarrierDamage(
+        this.barrierHp,
+        damageRemaining,
+      );
+      this.barrierHp = barrier.barrierHp;
+      damageRemaining = barrier.damageRemaining;
+
+      if (this.barrierHp <= 0) {
+        this.barrierTimer = 0;
+      }
+
+      this.burst(x, y, 18, 188);
+      this.hooks.onSkills();
+
+      if (damageRemaining <= 0) {
+        this.sfx.hit();
+        return;
+      }
+    }
+
     const damage = applyIncomingDamage(
       {
         hull: this.stats.hull,
@@ -1390,7 +1602,7 @@ export class Game {
         energy: this.stats.energy,
       },
       this.playerStats,
-      rawDamage,
+      damageRemaining,
     );
 
     this.stats.hull = damage.resources.hull;
@@ -1535,6 +1747,7 @@ export class Game {
     }
 
     this.drawPlayer(time);
+    this.drawDefensiveEffects(time);
     this.drawTargetLine();
 
     if (this.overdriveTimer > 0) {
@@ -2250,6 +2463,74 @@ export class Game {
     context.lineTo(0, 36 + Math.sin(time * 12) * 4);
     context.lineTo(5, 18);
     context.stroke();
+
+    context.restore();
+  }
+
+  private drawDefensiveEffects(time: number): void {
+    const context = this.context;
+    const x = this.width / 2;
+    const y = this.height - PLAYER_Y_OFFSET;
+
+    context.save();
+    context.globalCompositeOperation = "lighter";
+
+    if (this.barrierTimer > 0 && this.barrierHp > 0) {
+      context.strokeStyle = "rgba(92, 225, 255, 0.72)";
+      context.lineWidth = 2.2;
+      context.shadowBlur = 18;
+      context.shadowColor = "#5ce1ff";
+      context.beginPath();
+      context.arc(
+        x,
+        y,
+        34 + Math.sin(time * 6) * 2,
+        0,
+        Math.PI * 2,
+      );
+      context.stroke();
+    }
+
+    if (this.reflectTimer > 0) {
+      context.strokeStyle = "rgba(211, 121, 255, 0.66)";
+      context.lineWidth = 1.7;
+      context.setLineDash([5, 7]);
+      context.lineDashOffset = -time * 28;
+      context.beginPath();
+      context.arc(x, y, 43, 0, Math.PI * 2);
+      context.stroke();
+      context.setLineDash([]);
+    }
+
+    if (this.guardianTimer > 0 && this.guardianBlocks > 0) {
+      for (let index = 0; index < this.guardianBlocks; index += 1) {
+        const angle =
+          time * 2.2 +
+          (Math.PI * 2 * index) /
+            Math.max(1, this.guardianBlocks);
+        const droneX = x + Math.cos(angle) * 48;
+        const droneY = y + Math.sin(angle) * 18;
+
+        context.fillStyle = "rgba(255, 226, 98, 0.88)";
+        context.beginPath();
+        context.arc(droneX, droneY, 3.2, 0, Math.PI * 2);
+        context.fill();
+      }
+    }
+
+    if (this.timeShellTimer > 0) {
+      context.strokeStyle = "rgba(152, 117, 255, 0.34)";
+      context.lineWidth = 1.2;
+      context.beginPath();
+      context.arc(
+        x,
+        y,
+        56 + Math.sin(time * 3.5) * 5,
+        0,
+        Math.PI * 2,
+      );
+      context.stroke();
+    }
 
     context.restore();
   }

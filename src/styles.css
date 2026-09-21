@@ -952,3 +952,71 @@ kbd {
     grid-template-columns: 1fr;
   }
 }
+
+
+.quick-skills {
+  position: absolute;
+  z-index: 7;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  gap: 0.4rem;
+  pointer-events: auto;
+}
+
+.quick-skills button {
+  min-width: 78px;
+  padding: 0.42rem 0.55rem;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.35rem;
+  border-color: rgba(186, 127, 255, 0.13);
+  background: rgba(8, 8, 20, 0.76);
+  font-size: 0.62rem;
+}
+
+.quick-skills button span {
+  color: #8b79aa;
+  text-transform: lowercase;
+}
+
+.quick-skills button strong {
+  color: #eadcff;
+  font-variant-numeric: tabular-nums;
+}
+
+.quick-skills button:disabled {
+  opacity: 0.34;
+}
+
+.quick-skills kbd {
+  color: #c794ff;
+  border-color: rgba(198, 144, 255, 0.2);
+  background: rgba(141, 79, 220, 0.08);
+}
+
+@media (max-width: 1060px) {
+  .quick-skills {
+    bottom: 58px;
+  }
+
+  .quick-skills button {
+    min-width: 58px;
+    grid-template-columns: auto auto;
+  }
+
+  .quick-skills button span {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .quick-skills {
+    right: 10px;
+    bottom: 98px;
+    max-width: calc(100vw - 20px);
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}

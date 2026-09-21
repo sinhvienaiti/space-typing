@@ -32,6 +32,11 @@ import {
 import type { Inventory } from "./items/inventory";
 import type { RecoveryItemId } from "./items/consumables";
 import { accuracyPercent } from "./logic";
+import {
+  DEFENSIVE_SKILLS,
+  type DefensiveSkillId,
+} from "./skills/defensive";
+import type { SkillBlockReason } from "./skills/engine";
 import { DEFAULT_PLAYER_BASE_STATS } from "./stats/player";
 import { AutosaveQueue } from "./persistence/autosave";
 import {
@@ -210,6 +215,24 @@ app.innerHTML = `
         <kbd>3</kbd>
         <span>energy</span>
         <strong id="energyCount">0</strong>
+      </button>
+    </div>
+
+    <div id="quickSkills" class="quick-skills hidden">
+      <button id="skillBarrier" type="button">
+        <kbd>4</kbd><span>barrier</span><strong></strong>
+      </button>
+      <button id="skillReflect" type="button">
+        <kbd>5</kbd><span>reflect</span><strong></strong>
+      </button>
+      <button id="skillTimeShell" type="button">
+        <kbd>6</kbd><span>time</span><strong></strong>
+      </button>
+      <button id="skillRepair" type="button">
+        <kbd>7</kbd><span>repair</span><strong></strong>
+      </button>
+      <button id="skillGuardian" type="button">
+        <kbd>8</kbd><span>guardian</span><strong></strong>
       </button>
     </div>
 
@@ -585,6 +608,72 @@ function renderInventory(): void {
   }
 }
 
+function skillReasonText(reason: SkillBlockReason): string {
+  if (reason === "cooldown") return "Skill is cooling down";
+  if (reason === "no-charges") return "No charges left this stage";
+  if (reason === "stage-limit") return "Stage use limit reached";
+  if (reason === "energy") return "Not enough Energy";
+  if (reason === "typing-condition") {
+    return "Typing condition not met";
+  }
+  if (reason === "effect-not-needed") {
+    return "Repair is not needed right now";
+  }
+  return "Skill unavailable";
+}
+
+function renderSkills(): void {
+  const map: Array<{
+    id: DefensiveSkillId;
+    buttonId: string;
+  }> = [
+    { id: "barrier", buttonId: "skillBarrier" },
+    { id: "reflect-field", buttonId: "skillReflect" },
+    { id: "time-shell", buttonId: "skillTimeShell" },
+    { id: "emergency-repair", buttonId: "skillRepair" },
+    { id: "guardian-drone", buttonId: "skillGuardian" },
+  ];
+
+  for (const entry of map) {
+    const button = byId<HTMLButtonElement>(entry.buttonId);
+    const state = game.getSkillState(entry.id);
+    const reason = game.canUseSkill(entry.id);
+    const label = button.querySelector("strong");
+
+    if (label !== null) {
+      if (state === null) {
+        label.textContent = "—";
+      } else if (state.cooldownRemaining > 0.05) {
+        label.textContent = state.cooldownRemaining.toFixed(1) + "s";
+      } else if (state.chargesRemaining !== null) {
+        label.textContent = "×" + String(state.chargesRemaining);
+      } else {
+        label.textContent = "ready";
+      }
+    }
+
+    button.disabled = reason !== null;
+    button.title =
+      reason === null
+        ? DEFENSIVE_SKILLS.find((skill) => skill.id === entry.id)?.name ??
+          entry.id
+        : skillReasonText(reason);
+  }
+}
+
+function useDefensiveSkill(id: DefensiveSkillId): void {
+  const result = game.useSkill(id);
+  if (!result.ok) {
+    showNotice(skillReasonText(result.reason));
+    renderSkills();
+    return;
+  }
+
+  const skill = DEFENSIVE_SKILLS.find((entry) => entry.id === id);
+  showNotice("✓ " + (skill?.name ?? id) + " activated");
+  renderSkills();
+}
+
 function useInventoryItem(id: RecoveryItemId): void {
   if (itemCount(inventory, id) <= 0) return;
   if (!game.useConsumable(id)) {
@@ -631,7 +720,9 @@ function renderPhase(phase: GamePhase): void {
   gameOverOverlay.classList.toggle("hidden", phase !== "gameover");
   stageClearOverlay.classList.toggle("hidden", phase !== "stageclear");
   byId("quickItems").classList.toggle("hidden", phase !== "playing");
+  byId("quickSkills").classList.toggle("hidden", phase !== "playing");
   renderInventory();
+  renderSkills();
 }
 
 function renderStage(stage: number): void {
@@ -687,6 +778,7 @@ const game = new Game(
     },
     onStage: renderStage,
     onBossUpdate: renderBoss,
+    onSkills: renderSkills,
     onStageClear: (stats) => {
       const minutes = Math.max(
         1 / 60,
@@ -1296,6 +1388,20 @@ for (const [buttonId, itemId] of recoveryButtons) {
   });
 }
 
+const defensiveButtons: Array<[string, DefensiveSkillId]> = [
+  ["skillBarrier", "barrier"],
+  ["skillReflect", "reflect-field"],
+  ["skillTimeShell", "time-shell"],
+  ["skillRepair", "emergency-repair"],
+  ["skillGuardian", "guardian-drone"],
+];
+
+for (const [buttonId, skillId] of defensiveButtons) {
+  byId(buttonId).addEventListener("click", () => {
+    useDefensiveSkill(skillId);
+  });
+}
+
 byId("equipmentButton").addEventListener("click", openEquipment);
 
 for (const id of ["settingsButton", "pauseSettingsButton"]) {
@@ -1459,6 +1565,29 @@ window.addEventListener("keydown", (event) => {
 
   if (
     game.getPhase() === "playing" &&
+    (event.key === "4" ||
+      event.key === "5" ||
+      event.key === "6" ||
+      event.key === "7" ||
+      event.key === "8")
+  ) {
+    event.preventDefault();
+    const skillId: DefensiveSkillId =
+      event.key === "4"
+        ? "barrier"
+        : event.key === "5"
+          ? "reflect-field"
+          : event.key === "6"
+            ? "time-shell"
+            : event.key === "7"
+              ? "emergency-repair"
+              : "guardian-drone";
+    useDefensiveSkill(skillId);
+    return;
+  }
+
+  if (
+    game.getPhase() === "playing" &&
     (event.key === "1" ||
       event.key === "2" ||
       event.key === "3")
@@ -1510,5 +1639,6 @@ renderSettings();
 updateCampaignUi();
 renderStats(game.getStats());
 renderPhase(game.getPhase());
+renderSkills();
 void initializePlayerProgress();
 void loadInitialVocabulary();
