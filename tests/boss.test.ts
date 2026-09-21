@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  bossActionInterval,
   bossKeyDamage,
   bossMaxHp,
   bossName,
+  bossPhaseFor,
+  bossProjectileCount,
   bossWordDamage,
   createBossState,
   isBossStageRole,
@@ -42,6 +45,20 @@ describe("boss foundation", () => {
     );
   });
 
+  it("resolves boss phases and projectile pressure by role", () => {
+    expect(bossPhaseFor(90, 100, "mini-boss")).toBe(1);
+    expect(bossPhaseFor(49, 100, "boss")).toBe(2);
+    expect(bossPhaseFor(65, 100, "major-boss")).toBe(2);
+    expect(bossPhaseFor(32, 100, "major-boss")).toBe(3);
+
+    expect(bossProjectileCount("major-boss", 3)).toBe(3);
+    expect(bossProjectileCount("boss", 2)).toBe(2);
+    expect(bossProjectileCount("mini-boss", 1)).toBe(1);
+    expect(bossActionInterval("major-boss", 3)).toBeLessThan(
+      bossActionInterval("major-boss", 1),
+    );
+  });
+
   it("creates a valid HUD snapshot", () => {
     const state = createBossState(50, 1, "boss", entry);
     expect(state.name).toBe(bossName("boss", 1));
@@ -50,6 +67,9 @@ describe("boss foundation", () => {
       name: state.name,
       hp: state.hp,
       maxHp: state.maxHp,
+      phase: 1,
+      shieldActive: false,
+      staggered: false,
     });
   });
 });

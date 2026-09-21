@@ -80,6 +80,20 @@ export class Sfx {
     window.setTimeout(() => this.tone(360, 0.32, "sine", 0.04, 760), 100);
   }
 
+  bossPhase(): void {
+    this.tone(180, 0.16, "sawtooth", 0.04, 320);
+    window.setTimeout(() => this.tone(420, 0.18, "triangle", 0.034, 720), 70);
+  }
+
+  bossShieldBreak(): void {
+    this.tone(760, 0.12, "triangle", 0.036, 240);
+    this.noise(0.08, 0.028);
+  }
+
+  bossStagger(): void {
+    this.tone(250, 0.14, "sine", 0.03, 120);
+  }
+
   private tone(
     frequency: number,
     duration: number,

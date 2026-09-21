@@ -1,6 +1,9 @@
 import { Sfx } from "./audio/Sfx";
 import {
+  bossActionInterval,
   bossKeyDamage,
+  bossPhaseFor,
+  bossProjectileCount,
   bossWordDamage,
   createBossState,
   isBossStageRole,
@@ -316,6 +319,7 @@ export class Game {
     const difficulty = this.difficulty;
     if (difficulty === null || this.stageConfig === null) return;
 
+    this.updateBoss(dt, difficulty);
     this.spawnTimer -= dt;
 
     if (
@@ -461,12 +465,73 @@ export class Game {
     this.bossDefeated = false;
     this.projectiles = [];
     this.targetId = null;
+    this.boss.actionCooldown =
+      bossActionInterval(this.boss.role, this.boss.phase) /
+      Math.max(0.75, this.difficulty?.bossPressure ?? 1);
     this.hooks.onBossUpdate(toBossHud(this.boss));
     this.sfx.bossEntrance();
 
     if (this.settings.screenShake) {
       this.shake = Math.max(this.shake, 7);
     }
+  }
+
+  private updateBoss(
+    dt: number,
+    difficulty: DifficultyProfile,
+  ): void {
+    const boss = this.boss;
+    if (boss === null) return;
+
+    if (boss.staggerTimer > 0) {
+      boss.staggerTimer = Math.max(0, boss.staggerTimer - dt);
+      this.hooks.onBossUpdate(toBossHud(boss));
+      return;
+    }
+
+    boss.actionCooldown -= dt;
+    if (boss.actionCooldown > 0) return;
+
+    this.fireBossProjectiles(boss);
+    boss.actionCooldown =
+      bossActionInterval(boss.role, boss.phase) /
+      Math.max(0.75, difficulty.bossPressure);
+  }
+
+  private fireBossProjectiles(boss: BossState): void {
+    if (this.difficulty === null) return;
+
+    const { x, y } = this.bossPosition();
+    const playerX = this.width / 2;
+    const playerY = this.height - PLAYER_Y_OFFSET;
+    const baseAngle = Math.atan2(playerY - y, playerX - x);
+    const count = bossProjectileCount(boss.role, boss.phase);
+    const spread = count === 1 ? 0 : 0.16;
+    const speed =
+      125 +
+      this.difficulty.bossPressure * 48 +
+      Math.max(0, boss.phase - 1) * 14;
+    const alphabet = "asdfjklqweruiopzxcvbnm";
+
+    for (let index = 0; index < count; index += 1) {
+      const offset = (index - (count - 1) / 2) * spread;
+      const angle = baseAngle + offset;
+      const char =
+        alphabet[Math.floor(Math.random() * alphabet.length)] ?? "a";
+
+      this.projectiles.push({
+        id: this.nextProjectileId++,
+        ownerId: -1,
+        char,
+        x,
+        y: y + 18,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: boss.phase >= 3 ? 15 : 13,
+      });
+    }
+
+    this.sfx.enemyShot();
   }
 
   private finishStage(): void {
@@ -772,6 +837,7 @@ export class Game {
     const expected = word[boss.typed];
 
     if (key !== expected) {
+      boss.wordMissed = true;
       this.registerMiss();
       return;
     }
@@ -790,10 +856,13 @@ export class Game {
     this.stats.score += 16 * this.stats.multiplier;
     this.stats.power = clamp(this.stats.power + 2, 0, 100);
 
-    boss.hp = Math.max(
-      0,
-      boss.hp - bossKeyDamage(boss.maxHp, boss.role),
-    );
+    if (!boss.shieldActive) {
+      boss.hp = Math.max(
+        0,
+        boss.hp - bossKeyDamage(boss.maxHp, boss.role),
+      );
+      this.updateBossPhase(boss);
+    }
 
     this.fireBossLaser(0.9);
     this.sfx.shot(this.stats.multiplier);
@@ -806,23 +875,44 @@ export class Game {
 
     if (boss.typed >= word.length) {
       this.hooks.onWordComplete(boss.entry);
-      boss.hp = Math.max(
-        0,
-        boss.hp - bossWordDamage(boss.maxHp, boss.role),
-      );
+
+      if (boss.shieldActive) {
+        boss.shieldActive = false;
+        this.sfx.bossShieldBreak();
+        const { x, y } = this.bossPosition();
+        this.burst(x, y, 36, 176);
+      } else {
+        boss.hp = Math.max(
+          0,
+          boss.hp - bossWordDamage(boss.maxHp, boss.role),
+        );
+      }
+
+      const perfectWord = !boss.wordMissed;
       boss.wordsCompleted += 1;
       boss.typed = 0;
       boss.entry = this.pickBossEntry();
       boss.flash = 1;
       boss.kick = 1.5;
+      boss.wordMissed = false;
 
       this.stats.score +=
         (140 + word.length * 18) * this.stats.multiplier;
-      this.stats.power = clamp(this.stats.power + 8, 0, 100);
+      this.stats.power = clamp(
+        this.stats.power + (perfectWord ? 11 : 8),
+        0,
+        100,
+      );
+
+      if (perfectWord) {
+        boss.staggerTimer = Math.max(boss.staggerTimer, 1.05);
+        this.sfx.bossStagger();
+      }
 
       const { x, y } = this.bossPosition();
-      this.burst(x, y, 28, 18);
+      this.burst(x, y, perfectWord ? 34 : 28, 18);
       this.sfx.bossHit();
+      this.updateBossPhase(boss);
 
       if (boss.hp <= 0) {
         this.defeatBoss();
@@ -833,6 +923,35 @@ export class Game {
 
     this.hooks.onBossUpdate(toBossHud(boss));
     this.emitStats();
+  }
+
+  private updateBossPhase(boss: BossState): void {
+    const nextPhase = bossPhaseFor(
+      boss.hp,
+      boss.maxHp,
+      boss.role,
+    );
+    if (nextPhase <= boss.phase) return;
+
+    boss.phase = nextPhase;
+    boss.flash = 1;
+    boss.actionCooldown =
+      bossActionInterval(boss.role, boss.phase) /
+      Math.max(0.75, this.difficulty?.bossPressure ?? 1);
+
+    if (boss.phase === 2) {
+      boss.shieldActive = true;
+    }
+
+    const { x, y } = this.bossPosition();
+    this.burst(x, y, 44, boss.phase >= 3 ? 350 : 176);
+    this.sfx.bossPhase();
+
+    if (this.settings.screenShake) {
+      this.shake = Math.max(this.shake, boss.phase >= 3 ? 10 : 7);
+    }
+
+    this.hooks.onBossUpdate(toBossHud(boss));
   }
 
   private defeatBoss(): void {
@@ -1416,9 +1535,16 @@ export class Game {
     context.translate(x, y - boss.kick * 8);
     context.globalCompositeOperation = "lighter";
     context.shadowBlur = boss.flash > 0 ? 36 : 24;
-    context.shadowColor = boss.flash > 0 ? "#ffffff" : "#ff6f5e";
-    context.strokeStyle = boss.flash > 0 ? "#ffffff" : "#ff8a6f";
-    context.fillStyle = "rgba(255, 89, 72, 0.075)";
+    const phaseColor =
+      boss.phase >= 3 ? "#ff527c" : boss.phase === 2 ? "#68e9ff" : "#ff8a6f";
+    context.shadowColor = boss.flash > 0 ? "#ffffff" : phaseColor;
+    context.strokeStyle = boss.flash > 0 ? "#ffffff" : phaseColor;
+    context.fillStyle =
+      boss.phase >= 3
+        ? "rgba(255, 61, 112, 0.09)"
+        : boss.phase === 2
+          ? "rgba(82, 218, 255, 0.08)"
+          : "rgba(255, 89, 72, 0.075)";
     context.lineWidth = boss.role === "major-boss" ? 3.4 : 2.6;
 
     context.beginPath();
@@ -1442,10 +1568,38 @@ export class Game {
     context.arc(0, 0, radius * (0.56 + pulse * 0.04), 0, Math.PI * 2);
     context.stroke();
 
-    context.fillStyle = "rgba(255, 222, 164, 0.75)";
+    context.fillStyle =
+      boss.phase >= 3
+        ? "rgba(255, 112, 157, 0.86)"
+        : boss.phase === 2
+          ? "rgba(119, 239, 255, 0.84)"
+          : "rgba(255, 222, 164, 0.75)";
     context.beginPath();
     context.arc(0, 0, 8 + pulse * 2, 0, Math.PI * 2);
     context.fill();
+
+    if (boss.shieldActive) {
+      context.strokeStyle = "rgba(112, 235, 255, 0.62)";
+      context.lineWidth = 2.4;
+      context.beginPath();
+      context.arc(0, 0, radius * 1.2, 0, Math.PI * 2);
+      context.stroke();
+
+      context.strokeStyle = "rgba(112, 235, 255, 0.22)";
+      context.beginPath();
+      context.arc(0, 0, radius * 1.42, 0, Math.PI * 2);
+      context.stroke();
+    }
+
+    if (boss.staggerTimer > 0) {
+      context.strokeStyle = "rgba(255, 245, 178, 0.72)";
+      context.setLineDash([4, 5]);
+      context.lineWidth = 2;
+      context.beginPath();
+      context.arc(0, 0, radius * 1.08, 0, Math.PI * 2);
+      context.stroke();
+    }
+
     context.restore();
 
     this.drawBossWord(boss, x, y, radius);

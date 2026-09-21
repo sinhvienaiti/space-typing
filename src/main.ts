@@ -458,7 +458,11 @@ function renderBoss(boss: BossHudState | null): void {
   }
 
   hud.classList.remove("hidden");
-  byId("bossName").textContent = boss.name;
+  byId("bossName").textContent =
+    boss.name +
+    " · PHASE " +
+    String(boss.phase) +
+    (boss.shieldActive ? " · SHIELD" : boss.staggered ? " · STAGGER" : "");
   byId("bossHpText").textContent =
     Math.max(0, Math.ceil(boss.hp)).toLocaleString() +
     " / " +
