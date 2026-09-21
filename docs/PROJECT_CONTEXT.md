@@ -2999,6 +2999,18 @@ Credits and Normal Shop rules:
 ## Step 53
 Implement Repair/Upgrade Shop.
 
+**Status: implemented.**
+
+Repair / Upgrade Shop rules:
+
+- the shop reuses the existing +0 through +5 equipment enhancement system rather than creating a second upgrade layer;
+- upgrade prices scale with current enhancement level and equipment rarity;
+- max-level, missing and unaffordable upgrades never deduct Credits;
+- successful upgrades update the existing equipment instance, immediately refresh effective stats and autosave;
+- Repair Station uses existing recovery inventory instead of adding persistent Hull durability that the current game does not have;
+- one Repair Station pack grants 1 Repair Kit + 1 Shield Cell for Credits and is atomic: if either stack is full or Credits are insufficient, nothing is deducted;
+- no additional currency or material type is introduced in this step.
+
 ## Step 54
 Implement Black Market/Event Shop.
 
