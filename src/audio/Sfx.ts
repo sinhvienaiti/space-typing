@@ -42,6 +42,10 @@ export class Sfx {
     this.tone(75, 0.16, "sawtooth", 0.05, 45);
   }
 
+  enemyShot(): void {
+    this.tone(310, 0.09, "triangle", 0.032, 190);
+  }
+
   private tone(
     frequency: number,
     duration: number,

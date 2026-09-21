@@ -7,7 +7,7 @@ export type GamePhase =
 
 export type VisualQuality = "low" | "medium" | "high" | "ultra";
 
-export type EnemyKind = "scout" | "mine" | "tank";
+export type EnemyKind = "scout" | "mine" | "tank" | "destroyer";
 
 export type VocabularyEntry = {
   id: string;
@@ -68,6 +68,18 @@ export type Enemy = {
   radius: number;
   flash: number;
   kick: number;
+  fireCooldown: number | null;
+};
+
+export type EnemyProjectile = {
+  id: number;
+  ownerId: number;
+  char: string;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
 };
 
 export type Laser = {

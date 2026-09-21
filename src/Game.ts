@@ -14,6 +14,7 @@ import {
 import type {
   Enemy,
   EnemyKind,
+  EnemyProjectile,
   GamePhase,
   GameSettings,
   GameStats,
@@ -75,7 +76,9 @@ export class Game {
   private height = 720;
   private dpr = 1;
   private nextEnemyId = 1;
+  private nextProjectileId = 1;
   private enemies: Enemy[] = [];
+  private projectiles: EnemyProjectile[] = [];
   private lasers: Laser[] = [];
   private particles: Particle[] = [];
   private targetId: number | null = null;
@@ -153,6 +156,7 @@ export class Game {
       power: 0,
     };
     this.enemies = [];
+    this.projectiles = [];
     this.lasers = [];
     this.particles = [];
     this.targetId = null;
@@ -188,6 +192,7 @@ export class Game {
   backToTitle(): void {
     this.phase = "title";
     this.enemies = [];
+    this.projectiles = [];
     this.lasers = [];
     this.particles = [];
     this.targetId = null;
@@ -217,6 +222,12 @@ export class Game {
 
     if (target !== null) {
       this.typeTarget(target, key);
+      return;
+    }
+
+    const projectile = this.findProjectileForKey(key);
+    if (projectile !== null) {
+      this.destroyProjectile(projectile);
       return;
     }
 
@@ -295,10 +306,46 @@ export class Game {
         enemy.baseX + Math.sin(enemy.age * 1.1 + enemy.id) * enemy.drift;
       enemy.x += (desiredX - enemy.x) * Math.min(1, dt * 2);
 
+      if (enemy.fireCooldown !== null) {
+        enemy.fireCooldown -= dt;
+        if (enemy.fireCooldown <= 0) {
+          this.fireEnemyProjectile(enemy);
+          const baseInterval =
+            enemyProfile(enemy.kind, this.stageConfig.galaxy).fireInterval ?? 4;
+          enemy.fireCooldown =
+            baseInterval / Math.max(0.7, difficulty.projectilePressure);
+        }
+      }
+
       if (enemy.y + enemy.radius >= playerY - 24) {
         this.damagePlayer(enemy.id, enemy.x, enemy.y);
       }
     }
+
+    const playerX = this.width / 2;
+    for (const projectile of this.projectiles) {
+      projectile.x += projectile.vx * dt;
+      projectile.y += projectile.vy * dt;
+
+      if (
+        Math.hypot(projectile.x - playerX, projectile.y - playerY) <=
+        projectile.radius + 15
+      ) {
+        this.damageFromProjectile(
+          projectile.id,
+          projectile.x,
+          projectile.y,
+        );
+      }
+    }
+
+    this.projectiles = this.projectiles.filter(
+      (projectile) =>
+        projectile.x > -80 &&
+        projectile.x < this.width + 80 &&
+        projectile.y > -80 &&
+        projectile.y < this.height + 100,
+    );
 
     this.updateEffects(dt);
 
@@ -308,6 +355,7 @@ export class Game {
       this.phase === "playing"
     ) {
       this.phase = "stageclear";
+      this.projectiles = [];
       this.hooks.onStageClear(this.getStats());
       this.hooks.onPhase(this.phase);
     }
@@ -358,6 +406,11 @@ export class Game {
       radius: profile.radius,
       flash: 0,
       kick: 0,
+      fireCooldown:
+        profile.fireInterval === null
+          ? null
+          : profile.fireInterval /
+            Math.max(0.7, this.difficulty?.projectilePressure ?? 1),
     });
   }
 
@@ -375,6 +428,71 @@ export class Game {
       source[Math.floor(Math.random() * source.length)] ??
       FALLBACK_ENTRIES[0]!
     );
+  }
+
+  private findProjectileForKey(key: string): EnemyProjectile | null {
+    return (
+      this.projectiles
+        .filter((projectile) => projectile.char === key)
+        .sort((a, b) => b.y - a.y)[0] ?? null
+    );
+  }
+
+  private fireEnemyProjectile(enemy: Enemy): void {
+    if (this.difficulty === null) return;
+
+    const playerX = this.width / 2;
+    const playerY = this.height - PLAYER_Y_OFFSET;
+    const dx = playerX - enemy.x;
+    const dy = playerY - enemy.y;
+    const length = Math.max(1, Math.hypot(dx, dy));
+    const speed = 115 + this.difficulty.projectilePressure * 52;
+    const alphabet = "asdfjklqweruiopzxcvbnm";
+    const char =
+      alphabet[Math.floor(Math.random() * alphabet.length)] ?? "a";
+
+    this.projectiles.push({
+      id: this.nextProjectileId++,
+      ownerId: enemy.id,
+      char,
+      x: enemy.x,
+      y: enemy.y + enemy.radius * 0.45,
+      vx: (dx / length) * speed,
+      vy: (dy / length) * speed,
+      radius: 14,
+    });
+
+    this.sfx.enemyShot();
+  }
+
+  private destroyProjectile(projectile: EnemyProjectile): void {
+    this.projectiles = this.projectiles.filter(
+      (item) => item.id !== projectile.id,
+    );
+
+    this.stats.hits += 1;
+    this.stats.streak += 1;
+    this.stats.maxStreak = Math.max(
+      this.stats.maxStreak,
+      this.stats.streak,
+    );
+    this.stats.multiplier = multiplierForStreak(this.stats.streak);
+    this.stats.score += 35 * this.stats.multiplier;
+    this.stats.power = clamp(this.stats.power + 2.5, 0, 100);
+
+    this.lasers.push({
+      x1: this.width / 2,
+      y1: this.height - PLAYER_Y_OFFSET,
+      x2: projectile.x,
+      y2: projectile.y,
+      life: 0.09,
+      maxLife: 0.09,
+      power: 0.9,
+    });
+
+    this.burst(projectile.x, projectile.y, 13, 342);
+    this.sfx.hit();
+    this.emitStats();
   }
 
   private currentTarget(): Enemy | null {
@@ -502,11 +620,22 @@ export class Game {
 
   private damagePlayer(enemyId: number, x: number, y: number): void {
     this.enemies = this.enemies.filter((enemy) => enemy.id !== enemyId);
+    if (this.targetId === enemyId) this.targetId = null;
+    this.applyPlayerDamage(x, y);
+  }
 
-    if (this.targetId === enemyId) {
-      this.targetId = null;
-    }
+  private damageFromProjectile(
+    projectileId: number,
+    x: number,
+    y: number,
+  ): void {
+    this.projectiles = this.projectiles.filter(
+      (projectile) => projectile.id !== projectileId,
+    );
+    this.applyPlayerDamage(x, y);
+  }
 
+  private applyPlayerDamage(x: number, y: number): void {
     this.stats.lives -= 1;
     this.stats.streak = 0;
     this.stats.multiplier = 1;
@@ -615,6 +744,10 @@ export class Game {
     this.drawBackground(time);
     this.drawLasers();
     this.drawParticles();
+
+    for (const projectile of this.projectiles) {
+      this.drawProjectile(projectile);
+    }
 
     for (const enemy of this.enemies) {
       this.drawEnemy(enemy);
@@ -743,6 +876,33 @@ export class Game {
     context.restore();
   }
 
+  private drawProjectile(projectile: EnemyProjectile): void {
+    const context = this.context;
+
+    context.save();
+    context.translate(projectile.x, projectile.y);
+    context.globalCompositeOperation = "lighter";
+    context.shadowBlur = 18;
+    context.shadowColor = "#ff5c89";
+    context.fillStyle = "rgba(255, 70, 118, 0.13)";
+    context.strokeStyle = "#ff7298";
+    context.lineWidth = 2;
+
+    context.beginPath();
+    context.arc(0, 0, projectile.radius, 0, Math.PI * 2);
+    context.fill();
+    context.stroke();
+
+    context.globalCompositeOperation = "source-over";
+    context.fillStyle = "#fff4f7";
+    context.font = "800 14px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(projectile.char.toUpperCase(), 0, 0);
+
+    context.restore();
+  }
+
   private drawEnemy(enemy: Enemy): void {
     const context = this.context;
     const targeted = enemy.id === this.targetId;
@@ -753,7 +913,9 @@ export class Game {
         ? "#ff648d"
         : enemy.kind === "tank"
           ? "#8f83ff"
-          : "#ffb75b";
+          : enemy.kind === "destroyer"
+            ? "#57d8ff"
+            : "#ffb75b";
     const targetColor = "#80f3ff";
 
     context.save();
@@ -792,6 +954,14 @@ export class Game {
         if (index === 0) context.moveTo(x, y);
         else context.lineTo(x, y);
       }
+      context.closePath();
+    } else if (enemy.kind === "destroyer") {
+      context.moveTo(0, enemy.radius);
+      context.lineTo(enemy.radius, -enemy.radius * 0.45);
+      context.lineTo(enemy.radius * 0.32, -enemy.radius * 0.72);
+      context.lineTo(0, -enemy.radius * 0.38);
+      context.lineTo(-enemy.radius * 0.32, -enemy.radius * 0.72);
+      context.lineTo(-enemy.radius, -enemy.radius * 0.45);
       context.closePath();
     } else {
       context.moveTo(0, enemy.radius);

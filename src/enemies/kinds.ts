@@ -10,6 +10,7 @@ export type EnemyProfile = {
   baseSpeed: number;
   speedVariance: number;
   layers: number;
+  fireInterval: number | null;
 };
 
 export function enemyWeightsForStage(stage: number): EnemyWeights {
@@ -23,12 +24,18 @@ export function enemyWeightsForStage(stage: number): EnemyWeights {
   const tank =
     safeStage < 5
       ? 0
-      : Math.min(0.3, 0.11 + (safeStage - 5) * 0.00019);
+      : Math.min(0.24, 0.1 + (safeStage - 5) * 0.00014);
+
+  const destroyer =
+    safeStage < 8
+      ? 0
+      : Math.min(0.22, 0.09 + (safeStage - 8) * 0.00013);
 
   return {
-    scout: Math.max(0.36, 1 - mine - tank),
+    scout: Math.max(0.3, 1 - mine - tank - destroyer),
     mine,
     tank,
+    destroyer,
   };
 }
 
@@ -41,6 +48,9 @@ export function chooseEnemyKind(
 
   if (value < weights.mine) return "mine";
   if (value < weights.mine + weights.tank) return "tank";
+  if (value < weights.mine + weights.tank + weights.destroyer) {
+    return "destroyer";
+  }
   return "scout";
 }
 
@@ -55,6 +65,7 @@ export function enemyProfile(kind: EnemyKind, galaxy: number): EnemyProfile {
       baseSpeed: 55 + galaxyScale * 2.8,
       speedVariance: 15,
       layers: 1,
+      fireInterval: null,
     };
   }
 
@@ -66,6 +77,19 @@ export function enemyProfile(kind: EnemyKind, galaxy: number): EnemyProfile {
       baseSpeed: 22 + galaxyScale * 1.6,
       speedVariance: 8,
       layers: 2,
+      fireInterval: null,
+    };
+  }
+
+  if (kind === "destroyer") {
+    return {
+      radius: 29,
+      driftMin: 30,
+      driftMax: 56,
+      baseSpeed: 29 + galaxyScale * 1.9,
+      speedVariance: 9,
+      layers: 1,
+      fireInterval: Math.max(2.6, 4.4 - galaxyScale * 0.12),
     };
   }
 
@@ -76,5 +100,6 @@ export function enemyProfile(kind: EnemyKind, galaxy: number): EnemyProfile {
     baseSpeed: 34 + galaxyScale * 2.2,
     speedVariance: 14,
     layers: 1,
+    fireInterval: null,
   };
 }
