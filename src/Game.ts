@@ -144,6 +144,13 @@ import {
   type LuckPityState,
 } from "./loot/pity";
 import {
+  createHiddenDiscoveryState,
+  rollHiddenDiscovery,
+  sanitizeHiddenDiscoveryState,
+  type HiddenContentDefinition,
+  type HiddenDiscoveryState,
+} from "./discovery/hidden-content";
+import {
   goldenEnemyChance,
   treasureDroneChance,
   type TreasureDrone,
@@ -235,6 +242,10 @@ type Hooks = {
   onRewardChoice(options: readonly EquipmentDrop[]): void;
   onAnomalyReady(riskHullRatio: number): void;
   onLuckPityUpdate(state: LuckPityState): void;
+  onHiddenDiscoveryUpdate(
+    state: HiddenDiscoveryState,
+    discovery: HiddenContentDefinition | null,
+  ): void;
   onSkills(): void;
 };
 
@@ -360,6 +371,8 @@ export class Game {
   private anomalyResolutionPending = false;
   private anomalyRiskRatio = 0;
   private luckPity: LuckPityState = createLuckPityState();
+  private hiddenDiscovery: HiddenDiscoveryState =
+    createHiddenDiscoveryState();
   private lastTime = performance.now();
   private animationFrame = 0;
   private stars: Array<{ x: number; y: number; z: number }> = [];
@@ -1103,6 +1116,10 @@ export class Game {
     this.luckPity = sanitizeLuckPityState(state);
   }
 
+  setHiddenDiscoveryState(state: HiddenDiscoveryState): void {
+    this.hiddenDiscovery = sanitizeHiddenDiscoveryState(state);
+  }
+
   setVocabulary(entries: VocabularyEntry[]): void {
     if (entries.length === 0) return;
     this.vocabulary = entries;
@@ -1120,6 +1137,20 @@ export class Game {
     this.sfx.unlock();
     this.stageConfig = stage;
     this.difficulty = difficulty;
+
+    const hiddenRoll = rollHiddenDiscovery(
+      this.hiddenDiscovery,
+      stage.stage,
+      this.playerStats.luck,
+    );
+    if (hiddenRoll.rolled) {
+      this.hiddenDiscovery = hiddenRoll.state;
+      this.hooks.onHiddenDiscoveryUpdate(
+        hiddenRoll.state,
+        hiddenRoll.discovery,
+      );
+    }
+
     this.phase = "playing";
     this.stats = this.createGameStats(stage.stage);
     this.secondsSinceDamage = Number.POSITIVE_INFINITY;
