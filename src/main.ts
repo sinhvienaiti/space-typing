@@ -69,6 +69,18 @@ import {
 } from "./items/inventory";
 import type { Inventory } from "./items/inventory";
 import type { RecoveryItemId } from "./items/consumables";
+import { getItemDefinition } from "./items/registry";
+import {
+  addCredits,
+  stageClearCreditReward,
+} from "./economy/credits";
+import {
+  buyNormalShopOffer,
+  normalShopItemIsFull,
+  normalShopOfferName,
+  normalShopOffers,
+  type NormalShopOffer,
+} from "./shops/normal-shop";
 import { accuracyPercent } from "./logic";
 import type { EquipmentDrop } from "./loot/equipment-loot";
 import type { StageRandomEventDefinition } from "./events/stage-scheduler";
@@ -342,6 +354,7 @@ app.innerHTML = `
           <button id="vocabularyButton">Vocabulary</button>
           <button id="characterButton">Characters</button>
           <button id="equipmentButton">Equipment</button>
+          <button id="shopButton">Shop</button>
           <button id="supportButton">Support Spells</button>
           <button id="codexButton">Codex</button>
           <button id="dataButton">Data</button>
@@ -392,6 +405,7 @@ app.innerHTML = `
           <div><span>score</span><strong id="clearScore">0</strong></div>
           <div><span>accuracy</span><strong id="clearAccuracy">100%</strong></div>
           <div><span>wpm</span><strong id="clearWpm">0</strong></div>
+          <div><span>credits</span><strong id="clearCredits">+0</strong></div>
           <div><span>max streak</span><strong id="clearStreak">0</strong></div>
         </div>
         <button id="nextStageButton" class="primary">Next stage</button>
@@ -530,6 +544,21 @@ app.innerHTML = `
         <span>equipped bonuses</span>
         <strong id="equipmentBonusText">none</strong>
       </div>
+    </dialog>
+
+    <dialog id="shopDialog" class="settings-dialog shop-dialog">
+      <form method="dialog" class="dialog-head">
+        <div>
+          <p class="eyebrow">campaign supply</p>
+          <h2>Normal Shop</h2>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+      <p class="equipment-note">
+        <strong id="shopCredits">0 Credits</strong>
+        · Recovery supplies and regular equipment only.
+      </p>
+      <div id="normalShopGrid" class="shop-grid"></div>
     </dialog>
 
     <dialog id="dataDialog" class="settings-dialog data-dialog">
@@ -701,8 +730,10 @@ let supportSpells: SupportSpellState = createStarterSupportSpellState();
 let characters: CharacterState = createStarterCharacterState();
 let luckPity: LuckPityState = createLuckPityState();
 let hiddenDiscovery: HiddenDiscoveryState = createHiddenDiscoveryState();
+let credits = 0;
 let persistenceReady = false;
 let equipmentDropCounter = 0;
+let shopPurchaseCounter = 0;
 let sourceState = loadSource();
 let sourceTab: "class" | "custom" = sourceState.mode;
 let vocabularyIndex: VocabularyIndex | null = null;
@@ -720,6 +751,7 @@ const vocabularyDialog = byId<HTMLDialogElement>("vocabularyDialog");
 const stageSelectDialog = byId<HTMLDialogElement>("stageSelectDialog");
 const dataDialog = byId<HTMLDialogElement>("dataDialog");
 const equipmentDialog = byId<HTMLDialogElement>("equipmentDialog");
+const shopDialog = byId<HTMLDialogElement>("shopDialog");
 const supportDialog = byId<HTMLDialogElement>("supportDialog");
 const characterDialog = byId<HTMLDialogElement>("characterDialog");
 const codexDialog = byId<HTMLDialogElement>("codexDialog");
@@ -742,6 +774,7 @@ type AutosaveSnapshot = {
   characters: CharacterState;
   luckPity: LuckPityState;
   hiddenDiscovery: HiddenDiscoveryState;
+  credits: number;
 };
 
 const campaignAutosave = new AutosaveQueue<
@@ -757,6 +790,7 @@ const campaignAutosave = new AutosaveQueue<
     reason as SaveReason,
     snapshot.luckPity,
     snapshot.hiddenDiscovery,
+    snapshot.credits,
   ),
 );
 
@@ -1340,6 +1374,12 @@ const game = new Game(
             " · Mastery " +
             String(progressAward.progress.mastery)
           : "";
+      const creditReward = stageClearCreditReward({
+        stage: stats.stage,
+        accuracy,
+        salvage: game.getPlayerStats().salvage,
+      });
+      credits = addCredits(credits, creditReward);
 
       void autosaveCampaign(
         "stage-clear",
@@ -1347,7 +1387,10 @@ const game = new Game(
           String(stats.stage).padStart(3, "0") +
           " cleared" +
           unlockText +
-          progressText,
+          progressText +
+          " · +" +
+          creditReward.toLocaleString() +
+          " Credits",
       );
 
       byId("clearTitle").textContent =
@@ -1355,6 +1398,8 @@ const game = new Game(
       byId("clearScore").textContent = stats.score.toLocaleString();
       byId("clearAccuracy").textContent = accuracy.toFixed(1) + "%";
       byId("clearWpm").textContent = wpm.toFixed(0);
+      byId("clearCredits").textContent =
+        "+" + creditReward.toLocaleString();
       byId("clearStreak").textContent = String(stats.maxStreak);
 
       updateCampaignUi();
@@ -1754,6 +1799,115 @@ function openEquipment(): void {
   equipmentDialog.showModal();
 }
 
+function createShopInstanceId(): string {
+  shopPurchaseCounter += 1;
+  return (
+    "shop-" +
+    Date.now().toString(36) +
+    "-" +
+    shopPurchaseCounter.toString(36)
+  );
+}
+
+function shopOfferDescription(offer: NormalShopOffer): string {
+  if (offer.kind === "item") {
+    return getItemDefinition(offer.itemId).description;
+  }
+
+  const definition = getEquipmentDefinition(offer.definitionId);
+  return (
+    offer.rarity.toUpperCase() +
+    " · " +
+    definition.slot +
+    " · " +
+    definition.description
+  );
+}
+
+function renderNormalShop(): void {
+  byId("shopCredits").textContent =
+    credits.toLocaleString() + " Credits";
+
+  const grid = byId("normalShopGrid");
+  grid.replaceChildren();
+
+  for (const offer of normalShopOffers(campaign.highestUnlockedStage)) {
+    const card = document.createElement("article");
+    card.className = "shop-offer";
+
+    const type = document.createElement("span");
+    type.className = "shop-offer-type";
+    type.textContent =
+      offer.kind === "item"
+        ? "CONSUMABLE"
+        : offer.rarity.toUpperCase() + " EQUIPMENT";
+
+    const title = document.createElement("strong");
+    title.textContent = normalShopOfferName(offer);
+
+    const description = document.createElement("small");
+    description.textContent = shopOfferDescription(offer);
+
+    const buy = document.createElement("button");
+    buy.type = "button";
+    buy.className = "shop-buy";
+
+    const itemFull =
+      offer.kind === "item" &&
+      normalShopItemIsFull(inventory, offer.itemId);
+    buy.disabled = itemFull || credits < offer.price;
+    buy.textContent = itemFull
+      ? "Full"
+      : offer.price.toLocaleString() + " Credits";
+
+    buy.addEventListener("click", () => {
+      const purchase = buyNormalShopOffer(
+        { credits, inventory, equipment },
+        offer,
+        offer.kind === "equipment" ? createShopInstanceId() : "",
+      );
+
+      if (!purchase.purchased) {
+        if (purchase.reason === "credits") {
+          showNotice("Not enough Credits");
+        } else if (purchase.reason === "full") {
+          showNotice("Inventory stack is full");
+        } else {
+          showNotice("Unable to purchase this offer");
+        }
+        renderNormalShop();
+        return;
+      }
+
+      credits = purchase.state.credits;
+      inventory = purchase.state.inventory;
+      equipment = purchase.state.equipment;
+      renderInventory();
+      renderEquipment();
+      applyEquipmentStats();
+      renderNormalShop();
+      updateDataSummary();
+      void autosaveCampaign(
+        "shop",
+        "✓ Purchased " +
+          normalShopOfferName(offer) +
+          " · " +
+          credits.toLocaleString() +
+          " Credits left",
+      );
+    });
+
+    card.append(type, title, description, buy);
+    grid.append(card);
+  }
+}
+
+function openNormalShop(): void {
+  if (!persistenceReady || game.getPhase() !== "title") return;
+  renderNormalShop();
+  shopDialog.showModal();
+}
+
 function selectedVocabularyLevel(): number {
   return sourceState.mode === "class" ? sourceState.level : 1;
 }
@@ -1788,6 +1942,7 @@ async function autosaveCampaign(
       characters,
       luckPity,
       hiddenDiscovery,
+      credits,
     },
     reason,
   );
@@ -1819,6 +1974,7 @@ async function initializePlayerProgress(): Promise<void> {
   ];
   const equipmentButton =
     byId<HTMLButtonElement>("equipmentButton");
+  const shopButton = byId<HTMLButtonElement>("shopButton");
   const supportButton =
     byId<HTMLButtonElement>("supportButton");
   const characterButton =
@@ -1828,6 +1984,7 @@ async function initializePlayerProgress(): Promise<void> {
   startButton.disabled = true;
   stageSelectButton.disabled = true;
   equipmentButton.disabled = true;
+  shopButton.disabled = true;
   supportButton.disabled = true;
   characterButton.disabled = true;
   codexButton.disabled = true;
@@ -1841,6 +1998,7 @@ async function initializePlayerProgress(): Promise<void> {
     supportSpells = loaded.save.supportSpells;
     luckPity = loaded.save.luckPity;
     hiddenDiscovery = loaded.save.hiddenDiscovery;
+    credits = loaded.save.credits;
     game.setLuckPityState(luckPity);
     game.setHiddenDiscoveryState(hiddenDiscovery);
     const loadedCharacters = loaded.save.characters;
@@ -1861,10 +2019,12 @@ async function initializePlayerProgress(): Promise<void> {
     startButton.disabled = false;
     stageSelectButton.disabled = false;
     equipmentButton.disabled = false;
+    shopButton.disabled = false;
     supportButton.disabled = false;
     characterButton.disabled = false;
     codexButton.disabled = false;
     renderCodex();
+    renderNormalShop();
     for (const button of dataButtons) button.disabled = false;
 
     if (characters.unlocked.length !== loadedCharacters.unlocked.length) {
@@ -2072,7 +2232,9 @@ function updateDataSummary(): void {
     String(campaign.highestUnlockedStage).padStart(3, "0") +
     " / 1000 · " +
     String(inventoryTotal(inventory)) +
-    " items";
+    " items · " +
+    credits.toLocaleString() +
+    " Credits";
 }
 
 function openData(): void {
@@ -2096,6 +2258,7 @@ async function exportSave(): Promise<void> {
     characters,
     luckPity,
     hiddenDiscovery,
+    credits,
   );
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -2137,6 +2300,7 @@ async function importSaveFile(file: File): Promise<void> {
     );
     const importedLuckPity = result.save.luckPity;
     const importedHiddenDiscovery = result.save.hiddenDiscovery;
+    const importedCredits = result.save.credits;
     const message =
       "Import Stage " +
       String(imported.highestUnlockedStage).padStart(3, "0") +
@@ -2157,6 +2321,7 @@ async function importSaveFile(file: File): Promise<void> {
     const previousCharacters = characters;
     const previousLuckPity = luckPity;
     const previousHiddenDiscovery = hiddenDiscovery;
+    const previousCredits = credits;
     campaign = imported;
     inventory = importedInventory;
     equipment = importedEquipment;
@@ -2164,6 +2329,7 @@ async function importSaveFile(file: File): Promise<void> {
     characters = importedCharacters;
     luckPity = importedLuckPity;
     hiddenDiscovery = importedHiddenDiscovery;
+    credits = importedCredits;
     game.setLuckPityState(luckPity);
     game.setHiddenDiscoveryState(hiddenDiscovery);
     applySelectedCharacter();
@@ -2183,6 +2349,7 @@ async function importSaveFile(file: File): Promise<void> {
       characters = previousCharacters;
       luckPity = previousLuckPity;
       hiddenDiscovery = previousHiddenDiscovery;
+      credits = previousCredits;
       game.setLuckPityState(luckPity);
       game.setHiddenDiscoveryState(hiddenDiscovery);
       applySelectedCharacter();
@@ -2317,6 +2484,7 @@ for (const [buttonId, skillId] of combatSkillButtons) {
 
 byId("characterButton").addEventListener("click", openCharacters);
 byId("equipmentButton").addEventListener("click", openEquipment);
+byId("shopButton").addEventListener("click", openNormalShop);
 byId("supportButton").addEventListener("click", openSupportSpells);
 
 for (const slot of [0, 1] as const) {
@@ -2505,7 +2673,8 @@ window.addEventListener("keydown", (event) => {
     equipmentDialog.open ||
     supportDialog.open ||
     characterDialog.open ||
-    codexDialog.open
+    codexDialog.open ||
+    shopDialog.open
   ) return;
 
   if (game.getPhase() === "playing" && event.key === "=") {
@@ -2592,6 +2761,7 @@ document.addEventListener("visibilitychange", () => {
       characters,
       luckPity,
       hiddenDiscovery,
+      credits,
     },
     "pagehide",
   );
@@ -2609,6 +2779,7 @@ window.addEventListener("pagehide", () => {
       characters,
       luckPity,
       hiddenDiscovery,
+      credits,
     },
     "pagehide",
   );

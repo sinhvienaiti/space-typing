@@ -45,6 +45,7 @@ describe("save backup", () => {
         discovered: string[];
         lastRollStage: number;
       };
+      credits: number;
     };
 
     expect(parsed.version).toBe(PLAYER_SAVE_VERSION);
@@ -70,6 +71,7 @@ describe("save backup", () => {
       discovered: [],
       lastRollStage: 0,
     });
+    expect(parsed.credits).toBe(0);
   });
 
   it("imports and migrates a valid v1 backup", () => {
@@ -111,7 +113,7 @@ describe("save backup", () => {
     );
     expect(unsupported).toEqual({
       ok: false,
-      error: "Unsupported save version. Supported versions: 1-12.",
+      error: "Unsupported save version. Supported versions: 1-13.",
     });
   });
 
@@ -363,6 +365,34 @@ describe("save backup", () => {
     expect(result.save.hiddenDiscovery).toMatchObject({
       discovered: [],
       lastRollStage: 0,
+    });
+  });
+
+  it("imports and migrates a valid v12 backup to zero Credits", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.version = 12;
+    delete raw.credits;
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.migrated).toBe(true);
+    expect(result.save.credits).toBe(0);
+  });
+
+  it("rejects invalid current Credits", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.credits = -1;
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result).toEqual({
+      ok: false,
+      error: "Credits must be a non-negative whole number.",
     });
   });
 
