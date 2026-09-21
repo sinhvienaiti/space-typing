@@ -2971,29 +2971,42 @@ Step 14  10-Galaxy + milestone stage-role model
 Step 15  gradual multi-axis difficulty model
 Step 15A Adaptive WPM/accuracy/Vocabulary difficulty profile
 Step 16  Continue / Retry / Stage Select / stage clear unlock flow
+Step 17  Mine + layered Tank
+Step 18  Destroyer + typeable letter projectiles
+Step 19  Oppressor + multi-projectile spread pressure
+Step 20  advanced enemy families completed incrementally:
+         Carrier / Shield / Jammer / Cloaker / Healer /
+         Splitter / Sniper / Leech / Commander
 
 Next:
-Step 17  Mine and Tank enemy families
-Step 18  Destroyer + letter projectile typing
-Step 19  Oppressor + multi-projectile pressure
+Step 21  Elite modifier framework
 ~~~
 
-Implemented foundation details:
+Implemented gameplay details:
 
 - independent TypeScript/Vite child app;
 - responsive wide high-DPI Canvas;
 - stationary player ship with no movement controls;
 - clean dark HUD and Settings UI;
-- basic SFX mixer using Web Audio;
+- basic Web Audio SFX mixer;
 - effect quality scaling and particle caps;
 - parent vocabulary runtime contract at /vocabulary/;
 - local fallback vocabulary only when parent shared data is unavailable;
 - Class/Custom vocabulary source state;
 - completion learning toast with English/IPA/Vietnamese;
 - SpeechSynthesis queue that does not cancel rapid later words;
-- typing-game:speech active/inactive messages for shared Music ducking.
+- typing-game:speech active/inactive messages for shared Music ducking;
+- persistent 1000-stage Campaign flow;
+- Stage Select / Retry / Continue;
+- adaptive Stage + WPM + Accuracy + Vocabulary difficulty model;
+- 15 enemy families with distinct typing-combat mechanics;
+- letter-projectile defense;
+- support/interference enemy mechanics;
+- phrase-safe vocabulary typing:
+  spaces/punctuation remain visible while combat input uses a-z only,
+  so Space remains reserved for Overdrive.
 
-Validation checkpoint:
+Validation checkpoints:
 
 ~~~text
 Foundation/Core combat CI
@@ -3011,6 +3024,26 @@ PASS
 Persistent Campaign stage flow CI
 edb15e4d34c9cde5bbffe0dddfaa3d50c04300de
 PASS
+
+Shield + Carrier checkpoint CI
+3da252a4fdccb2318a4c6b9dcaa6348650620107
+PASS
+
+Jammer + Cloaker checkpoint CI
+ccf7077f22fc0c3a4aed1607212017978439a6ef
+PASS
+
+Healer + Splitter checkpoint CI
+ee6aa67de7083da17d7e31d2c1bb27897dca6d8f
+PASS
+
+Completed advanced enemy families CI
+08f8a01094757da4775f5b03de616a6bf1e3453f
+PASS
+
+Phrase-safe shared vocabulary combat CI
+3204049576db6e08e8944b33f3dd40adce65d171
+PASS
 ~~~
 
 Project-wide requirements remain:
@@ -3022,9 +3055,11 @@ Project-wide requirements remain:
 - parent shared Music system: already available;
 - docs/PROJECT_CONTEXT.md remains the primary context/handoff/plan document.
 
-The old prototype wave counter has been replaced by persistent Campaign Stage flow. The current run now represents one Campaign Stage and unlocks the next stage on clear.
+The old prototype wave counter has been replaced by persistent Campaign Stage flow.
+The current run represents one Campaign Stage and unlocks the next stage on clear.
 
-Campaign progress currently uses the small local storage adapter defined for the early Campaign checkpoint. Phase 6 / Step 25 will migrate full player progression to IndexedDB according to the persistence architecture above.
+Campaign progress currently uses the small local storage adapter defined for the early Campaign checkpoint.
+Phase 6 / Step 25 will migrate full player progression to IndexedDB according to the persistence architecture above.
 
 ---
 

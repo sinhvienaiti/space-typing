@@ -76,8 +76,11 @@ https://space.typing-game.local
 ## Next implementation checkpoint
 
 ~~~text
-Step 17 Mine + Tank
-Step 18 Destroyer + letter projectile typing
-Step 19 Oppressor + multi-projectile pressure
-Step 20 remaining enemy families
+Step 21
+Elite modifier framework
+
+Then:
+Step 22 Boss base + HP UI
+Step 23 Boss word/damage loop
+Step 24 First full multi-phase boss
 ~~~
