@@ -290,7 +290,7 @@ export class Game {
     }
 
     if (
-      id === "emp-burst" &&
+      (id === "emp-burst" || id === VOLT_ACTIVE_SKILL_ID) &&
       this.projectiles.length === 0 &&
       this.enemies.length === 0 &&
       this.boss === null
