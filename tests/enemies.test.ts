@@ -77,12 +77,12 @@ describe("enemy progression", () => {
     expect(tank.layers).toBe(2);
 
     const destroyer = enemyProfile("destroyer", 1);
-    expect(destroyer.fireInterval).not.toBeNull();
+    expect(destroyer.actionInterval).not.toBeNull();
     expect(destroyer.baseSpeed).toBeLessThan(scout.baseSpeed);
 
     const oppressor = enemyProfile("oppressor", 1);
     expect(oppressor.radius).toBeGreaterThan(destroyer.radius);
-    expect(oppressor.fireInterval).not.toBeNull();
+    expect(oppressor.actionInterval).not.toBeNull();
     expect(oppressor.baseSpeed).toBeLessThan(destroyer.baseSpeed);
 
     const shield = enemyProfile("shield", 1);
