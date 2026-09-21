@@ -46,8 +46,25 @@ export function enemyWeightsForStage(stage: number): EnemyWeights {
       ? 0
       : Math.min(0.1, 0.035 + (safeStage - 25) * 0.00007);
 
+  const jammer =
+    safeStage < 30
+      ? 0
+      : Math.min(0.09, 0.03 + (safeStage - 30) * 0.00006);
+
+  const cloaker =
+    safeStage < 35
+      ? 0
+      : Math.min(0.08, 0.028 + (safeStage - 35) * 0.000055);
+
   const specialTotal =
-    mine + tank + destroyer + oppressor + shield + carrier;
+    mine +
+    tank +
+    destroyer +
+    oppressor +
+    shield +
+    carrier +
+    jammer +
+    cloaker;
   const scale = specialTotal > 0.7 ? 0.7 / specialTotal : 1;
   const resolvedMine = mine * scale;
   const resolvedTank = tank * scale;
@@ -55,6 +72,8 @@ export function enemyWeightsForStage(stage: number): EnemyWeights {
   const resolvedOppressor = oppressor * scale;
   const resolvedShield = shield * scale;
   const resolvedCarrier = carrier * scale;
+  const resolvedJammer = jammer * scale;
+  const resolvedCloaker = cloaker * scale;
 
   const scout = Math.max(
     0.3,
@@ -64,7 +83,9 @@ export function enemyWeightsForStage(stage: number): EnemyWeights {
       resolvedDestroyer -
       resolvedOppressor -
       resolvedShield -
-      resolvedCarrier,
+      resolvedCarrier -
+      resolvedJammer -
+      resolvedCloaker,
   );
 
   return {
@@ -75,6 +96,8 @@ export function enemyWeightsForStage(stage: number): EnemyWeights {
     oppressor: resolvedOppressor,
     shield: resolvedShield,
     carrier: resolvedCarrier,
+    jammer: resolvedJammer,
+    cloaker: resolvedCloaker,
   };
 }
 
@@ -116,6 +139,31 @@ export function chooseEnemyKind(
       weights.carrier
   ) {
     return "carrier";
+  }
+  if (
+    value <
+    weights.mine +
+      weights.tank +
+      weights.destroyer +
+      weights.oppressor +
+      weights.shield +
+      weights.carrier +
+      weights.jammer
+  ) {
+    return "jammer";
+  }
+  if (
+    value <
+    weights.mine +
+      weights.tank +
+      weights.destroyer +
+      weights.oppressor +
+      weights.shield +
+      weights.carrier +
+      weights.jammer +
+      weights.cloaker
+  ) {
+    return "cloaker";
   }
   return "scout";
 }
@@ -192,6 +240,30 @@ export function enemyProfile(kind: EnemyKind, galaxy: number): EnemyProfile {
       speedVariance: 6,
       layers: 1,
       actionInterval: Math.max(3.6, 6.2 - galaxyScale * 0.15),
+    };
+  }
+
+  if (kind === "jammer") {
+    return {
+      radius: 31,
+      driftMin: 22,
+      driftMax: 50,
+      baseSpeed: 27 + galaxyScale * 1.7,
+      speedVariance: 8,
+      layers: 1,
+      actionInterval: Math.max(3.8, 6 - galaxyScale * 0.12),
+    };
+  }
+
+  if (kind === "cloaker") {
+    return {
+      radius: 25,
+      driftMin: 42,
+      driftMax: 76,
+      baseSpeed: 38 + galaxyScale * 2,
+      speedVariance: 11,
+      layers: 1,
+      actionInterval: null,
     };
   }
 

@@ -15,6 +15,8 @@ describe("enemy progression", () => {
       oppressor: 0,
       shield: 0,
       carrier: 0,
+      jammer: 0,
+      cloaker: 0,
     });
 
     const stage3 = enemyWeightsForStage(3);
@@ -41,6 +43,15 @@ describe("enemy progression", () => {
 
     const stage25 = enemyWeightsForStage(25);
     expect(stage25.carrier).toBeGreaterThan(0);
+    expect(stage25.jammer).toBe(0);
+    expect(stage25.cloaker).toBe(0);
+
+    const stage30 = enemyWeightsForStage(30);
+    expect(stage30.jammer).toBeGreaterThan(0);
+    expect(stage30.cloaker).toBe(0);
+
+    const stage35 = enemyWeightsForStage(35);
+    expect(stage35.cloaker).toBeGreaterThan(0);
   });
 
   it("keeps enemy weights bounded and usable through Stage 1000", () => {
@@ -53,7 +64,9 @@ describe("enemy progression", () => {
         weights.destroyer +
         weights.oppressor +
         weights.shield +
-        weights.carrier;
+        weights.carrier +
+        weights.jammer +
+        weights.cloaker;
 
       expect(total).toBeCloseTo(1);
       expect(weights.scout).toBeGreaterThanOrEqual(0.3);
@@ -63,6 +76,8 @@ describe("enemy progression", () => {
       expect(weights.oppressor).toBeLessThanOrEqual(0.16);
       expect(weights.shield).toBeLessThanOrEqual(0.13);
       expect(weights.carrier).toBeLessThanOrEqual(0.1);
+      expect(weights.jammer).toBeLessThanOrEqual(0.09);
+      expect(weights.cloaker).toBeLessThanOrEqual(0.08);
     }
   });
 
@@ -92,6 +107,13 @@ describe("enemy progression", () => {
     const carrier = enemyProfile("carrier", 1);
     expect(carrier.radius).toBeGreaterThan(shield.radius);
     expect(carrier.actionInterval).not.toBeNull();
+
+    const jammer = enemyProfile("jammer", 1);
+    expect(jammer.actionInterval).not.toBeNull();
+
+    const cloaker = enemyProfile("cloaker", 1);
+    expect(cloaker.actionInterval).toBeNull();
+    expect(cloaker.baseSpeed).toBeGreaterThan(jammer.baseSpeed);
   });
 
   it("chooses enemy kinds from deterministic random input", () => {
@@ -133,5 +155,28 @@ describe("enemy progression", () => {
       stage25.shield +
       stage25.carrier / 2;
     expect(chooseEnemyKind(25, carrierPoint)).toBe("carrier");
+
+    const stage30 = enemyWeightsForStage(30);
+    const jammerPoint =
+      stage30.mine +
+      stage30.tank +
+      stage30.destroyer +
+      stage30.oppressor +
+      stage30.shield +
+      stage30.carrier +
+      stage30.jammer / 2;
+    expect(chooseEnemyKind(30, jammerPoint)).toBe("jammer");
+
+    const stage35 = enemyWeightsForStage(35);
+    const cloakerPoint =
+      stage35.mine +
+      stage35.tank +
+      stage35.destroyer +
+      stage35.oppressor +
+      stage35.shield +
+      stage35.carrier +
+      stage35.jammer +
+      stage35.cloaker / 2;
+    expect(chooseEnemyKind(35, cloakerPoint)).toBe("cloaker");
   });
 });

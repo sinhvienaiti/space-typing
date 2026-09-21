@@ -14,7 +14,9 @@ export type EnemyKind =
   | "destroyer"
   | "oppressor"
   | "shield"
-  | "carrier";
+  | "carrier"
+  | "jammer"
+  | "cloaker";
 
 export type VocabularyEntry = {
   id: string;

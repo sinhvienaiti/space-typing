@@ -88,6 +88,7 @@ export class Game {
   private difficulty: DifficultyProfile | null = null;
   private shake = 0;
   private overdriveTimer = 0;
+  private interferenceTimer = 0;
   private lastTime = performance.now();
   private animationFrame = 0;
   private stars: Array<{ x: number; y: number; z: number }> = [];
@@ -163,6 +164,7 @@ export class Game {
     this.spawnRemaining = stage.enemyBudget;
     this.spawnTimer = 0.3;
     this.overdriveTimer = 0;
+    this.interferenceTimer = 0;
     this.hooks.onPhase(this.phase);
     this.hooks.onStats(this.getStats());
     this.hooks.onStage(stage.stage);
@@ -276,6 +278,7 @@ export class Game {
   private update(dt: number): void {
     this.shake = Math.max(0, this.shake - dt * 28);
     this.overdriveTimer = Math.max(0, this.overdriveTimer - dt);
+    this.interferenceTimer = Math.max(0, this.interferenceTimer - dt);
 
     const difficulty = this.difficulty;
     if (difficulty === null || this.stageConfig === null) return;
@@ -311,6 +314,8 @@ export class Game {
         if (enemy.actionCooldown <= 0) {
           if (enemy.kind === "carrier") {
             this.spawnCarrierChild(enemy);
+          } else if (enemy.kind === "jammer") {
+            this.activateInterference(enemy);
           } else {
             this.fireEnemyProjectile(enemy);
           }
@@ -318,7 +323,7 @@ export class Game {
           const baseInterval =
             enemyProfile(enemy.kind, this.stageConfig.galaxy).actionInterval ?? 4;
           const pressure =
-            enemy.kind === "carrier"
+            enemy.kind === "carrier" || enemy.kind === "jammer"
               ? difficulty.combatPressure
               : difficulty.projectilePressure;
           enemy.actionCooldown =
@@ -439,6 +444,15 @@ export class Game {
       source[Math.floor(Math.random() * source.length)] ??
       FALLBACK_ENTRIES[0]!
     );
+  }
+
+  private activateInterference(jammer: Enemy): void {
+    this.interferenceTimer = Math.max(
+      this.interferenceTimer,
+      1.15 + Math.min(0.55, (this.difficulty?.combatPressure ?? 1) * 0.12),
+    );
+    this.burst(jammer.x, jammer.y, 18, 74);
+    this.sfx.enemyShot();
   }
 
   private spawnCarrierChild(carrier: Enemy): void {
@@ -802,6 +816,9 @@ export class Game {
     }
 
     this.drawBackground(time);
+    if (this.interferenceTimer > 0) {
+      this.drawInterference(time);
+    }
     this.drawLasers();
     this.drawParticles();
 
@@ -882,6 +899,31 @@ export class Game {
       context.stroke();
     }
 
+    context.restore();
+  }
+
+  private drawInterference(time: number): void {
+    const context = this.context;
+    const alpha = Math.min(1, this.interferenceTimer) * 0.11;
+
+    context.save();
+    context.fillStyle = "rgba(202, 255, 84, " + String(alpha * 0.18) + ")";
+    context.fillRect(0, 0, this.width, this.height);
+
+    context.strokeStyle = "rgba(206, 255, 92, " + String(alpha) + ")";
+    context.lineWidth = 1;
+    const offset = (time * 140) % 24;
+    for (let y = -24 + offset; y < this.height; y += 24) {
+      context.beginPath();
+      context.moveTo(0, y);
+      context.lineTo(this.width, y + Math.sin(y * 0.07 + time * 8) * 2);
+      context.stroke();
+    }
+
+    context.fillStyle = "rgba(220, 255, 120, 0.65)";
+    context.font = "700 10px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.textAlign = "right";
+    context.fillText("SIGNAL JAMMED", this.width - 18, 84);
     context.restore();
   }
 
@@ -981,11 +1023,18 @@ export class Game {
                 ? "#58f0c7"
                 : enemy.kind === "carrier"
                   ? "#ffd866"
-                  : "#ffb75b";
+                  : enemy.kind === "jammer"
+                    ? "#d8ff66"
+                    : enemy.kind === "cloaker"
+                      ? "#7f8dff"
+                      : "#ffb75b";
     const targetColor = "#80f3ff";
 
     context.save();
     context.translate(enemy.x, enemy.y - kick);
+    if (enemy.kind === "cloaker" && !targeted) {
+      context.globalAlpha = 0.42;
+    }
     context.globalCompositeOperation = "lighter";
     context.shadowBlur = targeted ? 25 : enemy.kind === "tank" ? 20 : 14;
     context.shadowColor = targeted ? "#86f8ff" : baseColor;
@@ -1050,6 +1099,20 @@ export class Game {
       context.closePath();
     } else if (enemy.kind === "shield") {
       context.arc(0, 0, enemy.radius * 0.72, 0, Math.PI * 2);
+    } else if (enemy.kind === "jammer") {
+      context.moveTo(0, enemy.radius);
+      context.lineTo(enemy.radius * 0.86, 0);
+      context.lineTo(0, -enemy.radius);
+      context.lineTo(-enemy.radius * 0.86, 0);
+      context.closePath();
+    } else if (enemy.kind === "cloaker") {
+      context.moveTo(0, enemy.radius);
+      context.lineTo(enemy.radius * 0.95, -enemy.radius * 0.62);
+      context.lineTo(enemy.radius * 0.28, -enemy.radius * 0.42);
+      context.lineTo(0, -enemy.radius * 0.78);
+      context.lineTo(-enemy.radius * 0.28, -enemy.radius * 0.42);
+      context.lineTo(-enemy.radius * 0.95, -enemy.radius * 0.62);
+      context.closePath();
     } else {
       context.moveTo(0, enemy.radius);
       context.lineTo(enemy.radius * 0.9, -enemy.radius * 0.72);
@@ -1107,6 +1170,19 @@ export class Game {
       context.fillRect(enemy.radius * 0.85 - 7, 2, 7, 7);
     }
 
+    if (enemy.kind === "jammer") {
+      context.strokeStyle = "rgba(221, 255, 105, 0.45)";
+      context.lineWidth = 1.4;
+      for (const scale of [0.75, 1.08]) {
+        context.beginPath();
+        context.arc(0, 0, enemy.radius * scale, -0.75, 0.75);
+        context.stroke();
+        context.beginPath();
+        context.arc(0, 0, enemy.radius * scale, Math.PI - 0.75, Math.PI + 0.75);
+        context.stroke();
+      }
+    }
+
     context.restore();
 
     this.drawEnemyWord(enemy, targeted);
@@ -1114,28 +1190,49 @@ export class Game {
 
   private drawEnemyWord(enemy: Enemy, targeted: boolean): void {
     const context = this.context;
-    const word = normalizeWord(enemy.entry.en);
-    const typed = word.slice(0, enemy.typed);
-    const remaining = word.slice(enemy.typed);
+    const actualWord = normalizeWord(enemy.entry.en);
+    const hideForCloak = enemy.kind === "cloaker" && !targeted;
+    const hideForJam =
+      this.interferenceTimer > 0 &&
+      !targeted &&
+      enemy.kind !== "jammer";
+    const hidden = hideForCloak || hideForJam;
+
+    const displayWord = hidden
+      ? (actualWord[0] ?? "?") +
+        "·".repeat(Math.max(3, Math.min(8, actualWord.length - 1)))
+      : actualWord;
+    const typed = hidden ? "" : displayWord.slice(0, enemy.typed);
+    const remaining = hidden
+      ? displayWord
+      : displayWord.slice(enemy.typed);
 
     context.save();
     context.font =
       "700 18px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.textBaseline = "middle";
 
-    const fullWidth = context.measureText(word).width;
+    const fullWidth = context.measureText(displayWord).width;
     const typedWidth = context.measureText(typed).width;
     const left = enemy.x - fullWidth / 2;
     const y = enemy.y - enemy.radius - 22;
 
-    context.fillStyle = "rgba(2, 7, 14, 0.84)";
+    context.fillStyle = hidden
+      ? "rgba(5, 9, 18, 0.92)"
+      : "rgba(2, 7, 14, 0.84)";
     context.fillRect(left - 8, y - 14, fullWidth + 16, 28);
 
     context.textAlign = "left";
     context.fillStyle = "rgba(133, 151, 171, 0.45)";
     context.fillText(typed, left, y);
 
-    context.fillStyle = targeted ? "#f4feff" : "#f4c87a";
+    context.fillStyle = targeted
+      ? "#f4feff"
+      : hideForJam
+        ? "#d8ff74"
+        : hideForCloak
+          ? "#9ca6ff"
+          : "#f4c87a";
     context.shadowBlur = targeted ? 7 : 0;
     context.shadowColor = "#57efff";
     context.fillText(remaining, left + typedWidth, y);
