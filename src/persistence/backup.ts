@@ -34,6 +34,11 @@ import {
   isValidLuckPityState,
   type LuckPityState,
 } from "../loot/pity";
+import {
+  createHiddenDiscoveryState,
+  isValidHiddenDiscoveryState,
+  type HiddenDiscoveryState,
+} from "../discovery/hidden-content";
 import type { PlayerSave } from "./player-save";
 
 export type BackupParseResult =
@@ -128,6 +133,7 @@ export function exportPlayerSaveJson(
   supportSpells: SupportSpellState = createStarterSupportSpellState(),
   characters: CharacterState = createStarterCharacterState(),
   luckPity: LuckPityState = createLuckPityState(),
+  hiddenDiscovery: HiddenDiscoveryState = createHiddenDiscoveryState(),
 ): string {
   return JSON.stringify(
     createPlayerSave(
@@ -139,6 +145,7 @@ export function exportPlayerSaveJson(
       supportSpells,
       characters,
       luckPity,
+      hiddenDiscovery,
     ),
     null,
     2,
@@ -176,6 +183,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     version !== 8 &&
     version !== 9 &&
     version !== 10 &&
+    version !== 11 &&
     version !== PLAYER_SAVE_VERSION
   ) {
     return {
@@ -203,6 +211,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 8 ||
       version === 9 ||
       version === 10 ||
+      version === 11 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidInventory(parsed.inventory)
   ) {
@@ -238,6 +247,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 8 ||
       version === 9 ||
       version === 10 ||
+      version === 11 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidEquipmentState(parsed.equipment)
   ) {
@@ -252,6 +262,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 8 ||
       version === 9 ||
       version === 10 ||
+      version === 11 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidSupportSpellState(parsed.supportSpells)
   ) {
@@ -282,7 +293,9 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    (version === 10 || version === PLAYER_SAVE_VERSION) &&
+    (version === 10 ||
+      version === 11 ||
+      version === PLAYER_SAVE_VERSION) &&
     !isValidCharacterState(parsed.characters)
   ) {
     return {
@@ -292,12 +305,23 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    version === PLAYER_SAVE_VERSION &&
+    (version === 11 || version === PLAYER_SAVE_VERSION) &&
     !isValidLuckPityState(parsed.luckPity)
   ) {
     return {
       ok: false,
       error: "Luck pity data contains invalid drought counters.",
+    };
+  }
+
+  if (
+    version === PLAYER_SAVE_VERSION &&
+    !isValidHiddenDiscoveryState(parsed.hiddenDiscovery)
+  ) {
+    return {
+      ok: false,
+      error:
+        "Hidden discovery data contains invalid unlock or drought state.",
     };
   }
 
