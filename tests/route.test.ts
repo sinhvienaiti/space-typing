@@ -107,6 +107,26 @@ describe("M14 deterministic route graph", () => {
     expect(nextSector.selectedByStage).toEqual({});
   });
 
+  it("introduces Hidden Signal only after the challenge system is eligible", () => {
+    const early = createRouteGraph(21);
+    expect(
+      early.steps.flatMap((step) => step.nodes).some(
+        (node) => node.type === "hidden-signal",
+      ),
+    ).toBe(false);
+
+    const laterGraphs = Array.from({ length: 40 }, (_, index) =>
+      createRouteGraph(41 + index * 10),
+    );
+    expect(
+      laterGraphs.some((graph) =>
+        graph.steps.flatMap((step) => step.nodes).some(
+          (node) => node.type === "hidden-signal",
+        ),
+      ),
+    ).toBe(true);
+  });
+
   it("keeps route progress bounded to authored choice steps", () => {
     let state = createRouteState(201);
     const initial = routeProgress(state);
