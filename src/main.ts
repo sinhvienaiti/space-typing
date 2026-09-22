@@ -4122,8 +4122,135 @@ function closeRouteAndOpen(action: () => void): void {
   action();
 }
 
+async function startActiveChallengeEncounter(
+  encounter: ChallengeEncounterProfile,
+): Promise<boolean> {
+  if (!persistenceReady || !vocabularyReady) return false;
+
+  game.setCharacter(characters.selected);
+
+  const campaignStage = createStageConfig(
+    campaign.selectedStage,
+  );
+  const role =
+    encounter.forceBoss
+      ? ("boss" as const)
+      : encounter.priorityTargetMode !== "none"
+        ? ("gauntlet" as const)
+        : encounter.kind === "hidden-world"
+          ? ("hazard" as const)
+          : ("special" as const);
+  const challengeStage = {
+    ...campaignStage,
+    role,
+    enemyBudget: Math.max(
+      campaignStage.enemyBudget,
+      encounter.priorityTargetMode === "apex"
+        ? 12
+        : encounter.priorityTargetMode === "champion"
+          ? 10
+          : encounter.kind === "hidden-world"
+            ? 9
+            : 8,
+    ),
+    eliteChance: Math.max(
+      campaignStage.eliteChance,
+      encounter.priorityTargetMode === "apex"
+        ? 0.3
+        : encounter.priorityTargetMode === "champion"
+          ? 0.22
+          : campaignStage.eliteChance,
+    ),
+  };
+
+  const worldStage =
+    encounter.worldStage ?? campaign.selectedStage;
+  const challengeWorld = worldForStage(worldStage);
+  const vocabularyLevel = selectedVocabularyLevel();
+  game.setVocabularyLevel(vocabularyLevel);
+  await prepareStageVocabulary(challengeStage);
+
+  const baseDifficulty = difficultyFor(
+    difficultyInputFromSettings(
+      difficultySettings,
+      campaign.selectedStage,
+      vocabularyLevel,
+    ),
+  );
+  const difficulty = scaleHiddenChallengeDifficulty(
+    baseDifficulty,
+    encounter.tier,
+  );
+  activeStageDifficulty = difficulty;
+  activeChallengeEncounter = encounter;
+
+  stageEntrySnapshot = createStageEntrySnapshot(
+    currentRunPersistentState(),
+    campaignExpansion,
+    checkpointSnapshot,
+    new Date().toISOString(),
+  );
+
+  const recoverySaved = await autosaveCampaign(
+    "challenge",
+    undefined,
+    "hidden-transition",
+  );
+  if (!recoverySaved) {
+    activeChallengeEncounter = null;
+    return false;
+  }
+
+  musicController.setWorldProfile(
+    musicProfileForWorld(challengeWorld),
+  );
+  musicController.setBossPhase(1);
+  const musicState: MusicState =
+    encounter.kind === "hidden-world"
+      ? "HIDDEN_WORLD"
+      : encounter.kind === "champion-hunt" ||
+          encounter.kind === "apex-gauntlet"
+        ? "CHAMPION_HUNT"
+        : "HIDDEN_CHALLENGE";
+  musicController.transitionTo(
+    musicState,
+    musicCrossfadeSeconds(musicState),
+  );
+  musicController.setPaused(false);
+
+  showNotice(
+    hiddenChallengeKindLabel(encounter.kind) +
+      " · Tier " +
+      encounter.tier +
+      " · " +
+      String(encounter.encounterIndex + 1) +
+      " / " +
+      String(encounter.encounterCount),
+  );
+  game.startStage(
+    challengeStage,
+    difficulty,
+    encounter,
+  );
+  return true;
+}
+
 async function startSelectedStage(): Promise<void> {
   if (!persistenceReady || !vocabularyReady || stageStartPending) return;
+
+  const activeChallenge =
+    hiddenChallengeEncounterProfile(challenge);
+  if (activeChallenge !== null) {
+    stageStartPending = true;
+    try {
+      await startActiveChallengeEncounter(activeChallenge);
+    } finally {
+      stageStartPending = false;
+    }
+    return;
+  }
+
+  activeChallengeEncounter = null;
 
   if (
     campaign.selectedStage === campaign.highestUnlockedStage
@@ -4193,7 +4320,7 @@ async function startSelectedStage(): Promise<void> {
       );
     }
 
-    game.startStage(stage, difficulty);
+    game.startStage(stage, difficulty, null);
   } finally {
     stageStartPending = false;
   }
