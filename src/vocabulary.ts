@@ -19,17 +19,74 @@ export function isVocabularyEntry(value: unknown): value is VocabularyEntry {
   );
 }
 
+function isVocabularyLevel(value: unknown): value is VocabularyLevel {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const level = value as Partial<VocabularyLevel>;
+  return (
+    typeof level.level === "number" &&
+    Number.isInteger(level.level) &&
+    level.level >= 1 &&
+    typeof level.label === "string" &&
+    level.label.trim() !== "" &&
+    typeof level.file === "string" &&
+    level.file.trim() !== "" &&
+    typeof level.count === "number" &&
+    Number.isInteger(level.count) &&
+    level.count > 0
+  );
+}
+
+export function parseVocabularyIndex(value: unknown): VocabularyIndex {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Shared vocabulary index is invalid.");
+  }
+
+  const raw = value as Partial<VocabularyIndex>;
+  if (
+    raw.version !== 1 ||
+    typeof raw.plannedLevels !== "number" ||
+    !Number.isInteger(raw.plannedLevels) ||
+    raw.plannedLevels < 1 ||
+    typeof raw.availableLevels !== "number" ||
+    !Number.isInteger(raw.availableLevels) ||
+    raw.availableLevels < 1 ||
+    raw.availableLevels > raw.plannedLevels ||
+    typeof raw.totalEntries !== "number" ||
+    !Number.isInteger(raw.totalEntries) ||
+    raw.totalEntries < 1 ||
+    !Array.isArray(raw.levels) ||
+    raw.levels.length === 0 ||
+    !raw.levels.every(isVocabularyLevel)
+  ) {
+    throw new Error("Shared vocabulary index is invalid.");
+  }
+
+  const levels = raw.levels.map((level) => ({ ...level }));
+  if (
+    new Set(levels.map((level) => level.level)).size !== levels.length ||
+    levels.length > raw.availableLevels
+  ) {
+    throw new Error("Shared vocabulary index is invalid.");
+  }
+
+  return {
+    version: 1,
+    plannedLevels: raw.plannedLevels,
+    availableLevels: raw.availableLevels,
+    totalEntries: raw.totalEntries,
+    levels,
+  };
+}
+
 export async function loadVocabularyIndex(): Promise<VocabularyIndex> {
   const response = await fetch(INDEX_URL, { cache: "no-store" });
   if (!response.ok) {
     throw new Error("Unable to load the shared vocabulary index.");
   }
 
-  const data = (await response.json()) as VocabularyIndex;
-  if (!Array.isArray(data.levels) || data.levels.length === 0) {
-    throw new Error("Shared vocabulary index is invalid.");
-  }
-  return data;
+  return parseVocabularyIndex(await response.json());
 }
 
 export function vocabularyLevelUrl(level: VocabularyLevel): string {
