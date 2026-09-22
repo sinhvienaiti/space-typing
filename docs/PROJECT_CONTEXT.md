@@ -3600,7 +3600,8 @@ Final M14 checkpoint CI #254 PASS Test + Build
 
 M15 Hidden Challenge / Hidden World / Champion Hunt
 CI #256 PASS Test + Build on complete vertical slice
-Final persistence/docs checkpoint pending
+CI #259 tests PASS; Build caught PriorityTargetClass narrowing issue
+CI #260 PASS Test + Build after TypeScript narrowing fix
 ~~~
 
 Important implementation notes:
