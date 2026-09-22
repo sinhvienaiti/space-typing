@@ -235,6 +235,18 @@ import {
 } from "./enemies/word-difficulty";
 import { resolveEnemyTypingProfile } from "./enemies/typing-profile";
 import {
+  enemySkillDefinition,
+  type EnemySkillId,
+} from "./enemies/skills";
+import { resolveEnemyRuntimeProfile } from "./enemies/runtime-profile";
+import {
+  beginHardCc,
+  canApplyHardCc,
+  createHardCcState,
+  tickHardCcState,
+  type HardCcId,
+} from "./combat/cc-guard";
+import {
   isRecoveryItemId,
   useRecoveryItem,
   type RecoveryItemId,
@@ -464,6 +476,7 @@ export class Game {
   private stageEventModifiers: StageRandomEventModifiers =
     createStageEventModifiers();
   private statusState: StatusState = createStatusState();
+  private hardCcState = createHardCcState();
   private activeSynergies = new Set<BuildSynergyId>();
   private stageElapsedSeconds = 0;
   private hitStopTimer = 0;
@@ -574,6 +587,9 @@ export class Game {
 
   canUseSkill(id: string): SkillBlockReason | null {
     if (this.phase !== "playing") return "unknown-skill";
+    if (statusRemaining(this.statusState, "silenced") > 0) {
+      return "silenced";
+    }
 
     if (
       id === "emergency-repair" &&
@@ -1427,6 +1443,7 @@ export class Game {
     this.rewardNotice = null;
     this.celestialCharge = 0;
     this.statusState = createStatusState();
+    this.hardCcState = createHardCcState();
     this.interferenceTimer = 0;
     this.hitStopTimer = 0;
     this.skillHudTimer = 0;
@@ -1531,6 +1548,13 @@ export class Game {
 
     if (rawKey === " ") {
       this.activateOverdrive();
+      return;
+    }
+
+    if (
+      rawKey.length === 1 &&
+      statusRemaining(this.statusState, "frozen") > 0
+    ) {
       return;
     }
 
@@ -1679,6 +1703,7 @@ export class Game {
     this.shake = Math.max(0, this.shake - dt * 28);
     this.overdriveTimer = Math.max(0, this.overdriveTimer - dt);
     this.statusState = tickStatuses(this.statusState, dt);
+    this.hardCcState = tickHardCcState(this.hardCcState, dt);
     this.interferenceTimer = statusRemaining(
       this.statusState,
       "jammed",
