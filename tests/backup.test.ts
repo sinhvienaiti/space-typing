@@ -50,6 +50,16 @@ describe("save backup", () => {
         claimedMissions: string[];
         unlockedAchievements: string[];
       };
+      expansionCurrencies: {
+        alloy: number;
+        starCrystal: number;
+        quantumCore: number;
+      };
+      campaignExpansion: {
+        checkpoint: { stage: number };
+        activeSegment: { currentStage: number };
+        crashRecovery: unknown;
+      };
     };
 
     expect(parsed.version).toBe(PLAYER_SAVE_VERSION);
@@ -78,6 +88,14 @@ describe("save backup", () => {
     expect(parsed.credits).toBe(0);
     expect(parsed.progression.claimedMissions).toEqual([]);
     expect(parsed.progression.unlockedAchievements).toEqual([]);
+    expect(parsed.expansionCurrencies).toEqual({
+      alloy: 0,
+      starCrystal: 0,
+      quantumCore: 0,
+    });
+    expect(parsed.campaignExpansion.checkpoint.stage).toBe(1);
+    expect(parsed.campaignExpansion.activeSegment.currentStage).toBe(2);
+    expect(parsed.campaignExpansion.crashRecovery).toBeNull();
   });
 
   it("imports and migrates a valid v1 backup", () => {
@@ -119,7 +137,7 @@ describe("save backup", () => {
     );
     expect(unsupported).toEqual({
       ok: false,
-      error: "Unsupported save version. Supported versions: 1-14.",
+      error: "Unsupported save version. Supported versions: 1-15.",
     });
   });
 
@@ -403,6 +421,56 @@ describe("save backup", () => {
     expect(result.migrated).toBe(true);
     expect(result.save.progression.claimedMissions).toEqual([]);
     expect(result.save.progression.unlockedAchievements).toEqual([]);
+  });
+
+  it("imports and migrates a valid v14 backup to M01 expansion state", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.version = 14;
+    delete raw.expansionCurrencies;
+    delete raw.campaignExpansion;
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.migrated).toBe(true);
+    expect(result.save.expansionCurrencies).toEqual({
+      alloy: 0,
+      starCrystal: 0,
+      quantumCore: 0,
+    });
+    expect(result.save.campaignExpansion.checkpoint.stage).toBe(1);
+  });
+
+  it("rejects invalid current expansion currencies", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.expansionCurrencies = {
+      alloy: -1,
+      starCrystal: 0,
+      quantumCore: 0,
+    };
+
+    expect(parsePlayerSaveJson(JSON.stringify(raw))).toEqual({
+      ok: false,
+      error: "Expansion currencies must be non-negative whole numbers.",
+    });
+  });
+
+  it("rejects invalid current campaign expansion state", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    const expansion = raw.campaignExpansion as Record<string, unknown>;
+    expansion.sector = { startStage: 11, endStage: 20 };
+
+    expect(parsePlayerSaveJson(JSON.stringify(raw))).toEqual({
+      ok: false,
+      error: "Campaign expansion checkpoint/segment data is invalid.",
+    });
   });
 
   it("rejects invalid current mission progression", () => {

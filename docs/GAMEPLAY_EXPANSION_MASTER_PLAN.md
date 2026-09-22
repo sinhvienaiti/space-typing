@@ -2899,6 +2899,8 @@ Every milestone requires tests, CI and docs before continuing.
 
 ## M01 — Domain contracts + next PlayerSave schema
 
+**Status: Complete.** PlayerSave v15 and the M01 domain foundation are implemented with migration, strict backup validation, tests, and `docs/M01_DOMAIN_CONTRACTS.md`. Runtime checkpoint/death behavior remains intentionally deferred to M02-M04.
+
 Add data contracts for:
 
 - World;
