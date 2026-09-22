@@ -24,6 +24,7 @@ import { createProgressionState } from "../src/progression/missions";
 import { createExpansionCurrencyState } from "../src/economy/currencies";
 import { createShopState } from "../src/shops/state";
 import { createRouteState } from "../src/campaign/route";
+import { createHiddenChallengeState } from "../src/campaign/hidden-challenge";
 
 function progressAt(stage: number): CampaignProgress {
   return {
@@ -52,6 +53,7 @@ function runState(campaign: CampaignProgress): RunPersistentState {
     expansionCurrencies: createExpansionCurrencyState(),
     shops: createShopState(),
     route: createRouteState(campaign.highestUnlockedStage),
+    challenge: createHiddenChallengeState(),
   };
 }
 
