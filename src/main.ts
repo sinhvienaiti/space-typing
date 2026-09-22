@@ -103,6 +103,11 @@ import {
 } from "./economy/currencies";
 import { gradeLabel } from "./grades";
 import {
+  stageInWorld,
+  worldForStage,
+} from "./worlds/registry";
+import type { WorldProfile } from "./worlds/types";
+import {
   buyShopStockEntry,
   canAffordShopPrice,
   createShopState,
@@ -471,6 +476,9 @@ app.innerHTML = `
           Lock a target with its first letter, finish the word, and keep the
           streak alive. No movement — only typing decisions.
         </p>
+        <p id="titleWorldMeta" class="world-meta">
+          World 01 · Rainbow Reach · Stage 001-020
+        </p>
         <div class="actions">
           <button id="startButton" class="primary">Continue · Stage 001</button>
           <button id="stageSelectButton">Stage Select</button>
@@ -560,6 +568,15 @@ app.innerHTML = `
     </div>
 
     <div id="notice" class="notice" aria-live="polite"></div>
+    <div
+      id="worldTransition"
+      class="world-transition hidden"
+      aria-live="polite"
+    >
+      <small id="worldTransitionGalaxy">Galaxy 01 · World 01</small>
+      <strong id="worldTransitionName">Rainbow Reach</strong>
+      <span id="worldTransitionRange">Stage 001-020</span>
+    </div>
 
     <dialog id="stageSelectDialog" class="settings-dialog stage-select-dialog">
       <form method="dialog" class="dialog-head">
@@ -1012,6 +1029,8 @@ const typingChallengeCache = new Map<
 let stageStartPending = false;
 let learningTimer: number | null = null;
 let noticeTimer: number | null = null;
+let worldTransitionTimer: number | null = null;
+let lastPresentedWorldId: string | null = null;
 let currentGalaxy = Math.ceil(campaign.selectedStage / STAGES_PER_GALAXY);
 
 const titleOverlay = byId("titleOverlay");
@@ -2676,9 +2695,48 @@ function createShopInstanceId(): string {
   );
 }
 
+function worldLabel(world: WorldProfile): string {
+  const worldNumber = Math.floor((world.stageStart - 1) / 20) + 1;
+  return (
+    "World " +
+    String(worldNumber).padStart(2, "0") +
+    " · " +
+    world.name
+  );
+}
+
+function showWorldTransition(
+  world: WorldProfile,
+  stage: number,
+): void {
+  const panel = byId("worldTransition");
+  const worldNumber = Math.floor((world.stageStart - 1) / 20) + 1;
+
+  byId("worldTransitionGalaxy").textContent =
+    "Galaxy " +
+    String(world.galaxy).padStart(2, "0") +
+    " · World " +
+    String(worldNumber).padStart(2, "0");
+  byId("worldTransitionName").textContent = world.name;
+  byId("worldTransitionRange").textContent =
+    "Stage " +
+    String(stage).padStart(3, "0") +
+    " · " +
+    String(stageInWorld(stage)).padStart(2, "0") +
+    " / 20";
+
+  panel.classList.remove("hidden");
+  if (worldTransitionTimer !== null) {
+    window.clearTimeout(worldTransitionTimer);
+  }
+  worldTransitionTimer = window.setTimeout(() => {
+    panel.classList.add("hidden");
+    worldTransitionTimer = null;
+  }, 2300);
+}
+
 function shopWorldKey(stage: number): string {
-  const world = Math.ceil(Math.max(1, Math.min(1000, stage)) / 20);
-  return "world-" + String(world).padStart(2, "0");
+  return worldForStage(stage).id;
 }
 
 function currentShopContext(): ShopRollContext {
@@ -3250,6 +3308,14 @@ async function startSelectedStage(): Promise<void> {
   try {
     game.setCharacter(characters.selected);
     const stage = createStageConfig(campaign.selectedStage);
+    const world = worldForStage(stage.stage);
+    if (
+      lastPresentedWorldId !== world.id ||
+      stageInWorld(stage.stage) === 1
+    ) {
+      showWorldTransition(world, stage.stage);
+      lastPresentedWorldId = world.id;
+    }
     await prepareStageVocabulary(stage);
     const difficulty = difficultyFor(
       difficultyInputFromSettings(
@@ -3450,10 +3516,19 @@ async function initializePlayerProgress(): Promise<void> {
 function updateCampaignUi(): void {
   byId("startButton").textContent =
     "Continue · Stage " + String(campaign.selectedStage).padStart(3, "0");
+  const selectedWorld = worldForStage(campaign.selectedStage);
+  byId("titleWorldMeta").textContent =
+    worldLabel(selectedWorld) +
+    " · Stage " +
+    String(selectedWorld.stageStart).padStart(3, "0") +
+    "-" +
+    String(selectedWorld.stageEnd).padStart(3, "0");
   byId("campaignMeta").textContent =
     "Unlocked " +
     String(campaign.highestUnlockedStage).padStart(3, "0") +
-    " / 1000 · checkpoint " +
+    " / 1000 · " +
+    worldLabel(selectedWorld) +
+    " · checkpoint " +
     String(campaignExpansion.checkpoint.stage).padStart(3, "0") +
     " · record " +
     String(campaignExpansion.activeSegment.highestReachedStage).padStart(3, "0") +

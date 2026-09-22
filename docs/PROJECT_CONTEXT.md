@@ -3461,9 +3461,10 @@ Gameplay Expansion:
 - M04 Resurrection/protection items: COMPLETE
 - M05 Grade + core currency migration: COMPLETE
 - M06 Deterministic finite-stock shops: COMPLETE
+- M07 Canonical 50-World engine: COMPLETE
 
 Next:
-- M07 World engine
+- M08 Dynamic World Music / Ambient system
 ~~~
 
 Current gameplay/progression foundation:
@@ -3487,6 +3488,10 @@ Current gameplay/progression foundation:
 - persistent Credits / Alloy / Star Crystal / Quantum Core economy;
 - deterministic finite shop instances with persistent stock;
 - shared Normal / Station / Traveling / Black Market / Hidden / Event stock runtime;
+- canonical 50-World registry with deterministic 20-stage mapping;
+- per-World environment profiles consumed by the existing Canvas background;
+- World transition/title identity presentation;
+- M06 shop identity resolved through the canonical World registry;
 - Service / Upgrade Shop consumes Credits + Alloy through the existing enhancement system;
 - rare resurrection items can appear only as finite stock in eligible rare merchant pools;
 - shop stock participates in checkpoint rollback, crash recovery and stage-entry recovery;
@@ -3517,6 +3522,9 @@ CI #190 PASS
 
 M06 Deterministic Finite-Stock Shops
 CI #195 PASS after removal of superseded parallel shop modules
+
+M07 Canonical World Engine
+CI #202 PASS Test + Build
 ~~~
 
 Important implementation notes:
