@@ -93,8 +93,10 @@ export function simulateEnemyRewardBalance(
       random(),
     );
     const definition = enemyDefinition(definitionId);
-    const reward = definition?.reward;
-    if (reward === undefined) continue;
+    if (definition === undefined || definition.reward === undefined) {
+      continue;
+    }
+    const reward = definition.reward;
 
     rewardKills += 1;
     rewardCounts[reward] = (rewardCounts[reward] ?? 0) + 1;
