@@ -3014,6 +3014,21 @@ Repair / Upgrade Shop rules:
 ## Step 54
 Implement Black Market/Event Shop.
 
+**Status: implemented.**
+
+Black Market / Event Shop rules:
+
+- both shops consume the Step 50A hidden-discovery contracts instead of adding a second unlock system;
+- Black Market appears only after `black-market-signal` is discovered;
+- Event Shop appears only after `echo-rift` is discovered;
+- undiscovered shops stay hidden from the title menu;
+- Black Market offers deterministic Rare/Epic regular equipment, with a Legendary regular-equipment offer only at deep Campaign progress;
+- Event Shop offers deterministic special consumables from the existing item registry;
+- hidden Relic Cannon/skill/boss/mission contracts are not prematurely inserted into these shops;
+- offers are stable for the same Campaign checkpoint and opening the shop cannot reroll them;
+- purchases reuse the Step 52 Credits transaction path and are atomic for insufficient Credits, full item stacks or duplicate equipment instance IDs;
+- successful purchases immediately update existing inventory/equipment and autosave.
+
 ## Step 55
 Implement Buff/Debuff/Status engine.
 
