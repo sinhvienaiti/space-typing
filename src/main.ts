@@ -123,6 +123,20 @@ import {
   type ExpansionCurrencyState,
 } from "./economy/currencies";
 import { gradeLabel } from "./grades";
+import { CORE_STAT_KEYS, type CoreStatKey } from "./stats/core";
+import {
+  createUpgradeState,
+  permanentAttributeBonus,
+  type UpgradeState,
+} from "./progression/upgrades";
+import {
+  UPGRADEABLE_SKILL_IDS,
+  type UpgradeableSkillId,
+} from "./skills/progression";
+import {
+  EQUIPMENT_AFFIX_REGISTRY,
+  maxAffixesForGrade,
+} from "./equipment/affixes";
 import { MusicController } from "./audio/MusicController";
 import {
   musicProfileForWorld,
@@ -148,8 +162,17 @@ import {
   type ShopType,
 } from "./shops/state";
 import {
+  buyAttributeUpgrade,
+  buyEquipmentAffix,
+  buyEquipmentAffixReroll,
+  buyEquipmentEvolution,
   buyEquipmentUpgrade,
   buyRepairPack,
+  buySkillUpgrade,
+  dismantleEquipment,
+  dismantleReward,
+  equipmentAffixRollCost,
+  equipmentEvolutionCost,
   equipmentUpgradeAlloyCost,
   equipmentUpgradeCost,
   REPAIR_PACK_ALLOY_COST,
@@ -1161,6 +1184,7 @@ let luckPity: LuckPityState = createLuckPityState();
 let hiddenDiscovery: HiddenDiscoveryState = createHiddenDiscoveryState();
 let credits = 0;
 let progression: ProgressionState = createProgressionState();
+let upgrades: UpgradeState = createUpgradeState();
 let expansionCurrencies: ExpansionCurrencyState =
   createExpansionCurrencyState();
 let shops: ShopState = createShopState();
@@ -1186,6 +1210,7 @@ let checkpointSnapshot: CheckpointSnapshot =
       hiddenDiscovery,
       credits,
       progression,
+      upgrades,
       expansionCurrencies,
       shops,
       route,
@@ -1272,6 +1297,7 @@ type AutosaveSnapshot = {
   hiddenDiscovery: HiddenDiscoveryState;
   credits: number;
   progression: ProgressionState;
+  upgrades: UpgradeState;
   expansionCurrencies: ExpansionCurrencyState;
   shops: ShopState;
   route: RouteState;
@@ -1303,6 +1329,7 @@ const campaignAutosave = new AutosaveQueue<
     snapshot.stageEntrySnapshot,
     snapshot.shops,
     snapshot.route,
+    snapshot.upgrades,
   ),
 );
 
@@ -1320,6 +1347,7 @@ function currentRunPersistentState(): RunPersistentState {
     expansionCurrencies,
     shops,
     route,
+    upgrades,
   };
 }
 
@@ -1333,6 +1361,7 @@ function applyRunPersistentState(state: RunPersistentState): void {
   hiddenDiscovery = state.hiddenDiscovery;
   credits = state.credits;
   progression = state.progression;
+  upgrades = state.upgrades;
   expansionCurrencies = state.expansionCurrencies;
   shops = state.shops;
   route = state.route;
@@ -1349,6 +1378,7 @@ function currentAutosaveSnapshot(): AutosaveSnapshot {
     hiddenDiscovery,
     credits,
     progression,
+    upgrades,
     expansionCurrencies,
     shops,
     route,
@@ -1398,6 +1428,7 @@ function persistRecoveryMirrorSync(
       stageEntrySnapshot,
       shops,
       route,
+      upgrades,
     ),
   );
 }
@@ -2907,6 +2938,7 @@ function activeBuildSynergies() {
 }
 
 function applyEquipmentStats(): void {
+  game.setSkillLevels(upgrades.skillLevels);
   const synergies = activeBuildSynergies();
   game.setBuildSynergies(synergies);
   game.setPlayerStats({
@@ -2916,6 +2948,7 @@ function applyEquipmentStats(): void {
       characters.progress[characters.selected],
     ),
     equipment: equipmentStatBonus(equipment),
+    permanent: permanentAttributeBonus(upgrades),
     talent: talentStatBonus(
       characters.progress[characters.selected].talents,
     ),
@@ -3351,12 +3384,14 @@ function applyServiceShopState(
     expansionCurrencies: ExpansionCurrencyState;
     inventory: Inventory;
     equipment: EquipmentState;
+    upgrades: UpgradeState;
   },
 ): void {
   credits = next.credits;
   expansionCurrencies = next.expansionCurrencies;
   inventory = next.inventory;
   equipment = next.equipment;
+  upgrades = next.upgrades;
   renderInventory();
   renderEquipment();
   applyEquipmentStats();
@@ -3399,6 +3434,7 @@ function renderServiceShop(): void {
       expansionCurrencies,
       inventory,
       equipment,
+      upgrades,
     });
 
     if (!result.applied) {
@@ -3477,6 +3513,7 @@ function renderServiceShop(): void {
           expansionCurrencies,
           inventory,
           equipment,
+          upgrades,
         },
         item.instanceId,
       );
@@ -4385,6 +4422,7 @@ async function initializePlayerProgress(): Promise<void> {
     hiddenDiscovery = loaded.save.hiddenDiscovery;
     credits = loaded.save.credits;
     progression = loaded.save.progression;
+    upgrades = loaded.save.upgrades;
     expansionCurrencies = loaded.save.expansionCurrencies;
     shops = loaded.save.shops;
     route = loaded.save.route;
@@ -4791,6 +4829,7 @@ async function exportSave(): Promise<void> {
     stageEntrySnapshot,
     shops,
     route,
+    upgrades,
   );
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -4834,6 +4873,7 @@ async function importSaveFile(file: File): Promise<void> {
     const importedHiddenDiscovery = result.save.hiddenDiscovery;
     const importedCredits = result.save.credits;
     const importedProgression = result.save.progression;
+    const importedUpgrades = result.save.upgrades;
     const importedExpansionCurrencies =
       result.save.expansionCurrencies;
     const importedShops = result.save.shops;
@@ -4868,6 +4908,7 @@ async function importSaveFile(file: File): Promise<void> {
     const previousHiddenDiscovery = hiddenDiscovery;
     const previousCredits = credits;
     const previousProgression = progression;
+    const previousUpgrades = upgrades;
     const previousExpansionCurrencies = expansionCurrencies;
     const previousShops = shops;
     const previousRoute = route;
@@ -4884,6 +4925,7 @@ async function importSaveFile(file: File): Promise<void> {
     hiddenDiscovery = importedHiddenDiscovery;
     credits = importedCredits;
     progression = importedProgression;
+    upgrades = importedUpgrades;
     expansionCurrencies = importedExpansionCurrencies;
     shops = importedShops;
     route = importedRoute;
@@ -4918,6 +4960,7 @@ async function importSaveFile(file: File): Promise<void> {
       hiddenDiscovery = previousHiddenDiscovery;
       credits = previousCredits;
       progression = previousProgression;
+      upgrades = previousUpgrades;
       expansionCurrencies = previousExpansionCurrencies;
       shops = previousShops;
       route = previousRoute;
