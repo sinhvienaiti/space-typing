@@ -4551,6 +4551,7 @@ export class Game {
     this.drawDefensiveEffects(time);
     this.drawTargetLine();
     this.drawRewardNotice();
+    this.drawEnemyControlOverlay();
 
     if (this.overdriveTimer > 0) {
       context.fillStyle =
@@ -4562,6 +4563,46 @@ export class Game {
 
     context.restore();
     this.drawRewardBuffTimers();
+  }
+
+  private drawEnemyControlOverlay(): void {
+    const frozen = statusRemaining(this.statusState, "frozen");
+    const silenced = statusRemaining(this.statusState, "silenced");
+    if (frozen <= 0 && silenced <= 0) return;
+
+    const context = this.context;
+    context.save();
+
+    if (frozen > 0) {
+      context.fillStyle = "rgba(126, 220, 255, 0.09)";
+      context.fillRect(0, 0, this.width, this.height);
+      context.strokeStyle = "rgba(174, 239, 255, 0.32)";
+      context.lineWidth = 5;
+      context.strokeRect(4, 4, this.width - 8, this.height - 8);
+      context.fillStyle = "rgba(220, 250, 255, 0.96)";
+      context.font =
+        "900 18px ui-monospace, SFMono-Regular, Menlo, monospace";
+      context.textAlign = "center";
+      context.fillText(
+        "FROZEN · " + frozen.toFixed(1) + "s",
+        this.width / 2,
+        42,
+      );
+    }
+
+    if (silenced > 0) {
+      context.fillStyle = "rgba(190, 135, 255, 0.95)";
+      context.font =
+        "800 13px ui-monospace, SFMono-Regular, Menlo, monospace";
+      context.textAlign = "center";
+      context.fillText(
+        "SKILLS SILENCED · " + silenced.toFixed(1) + "s",
+        this.width / 2,
+        frozen > 0 ? 64 : 42,
+      );
+    }
+
+    context.restore();
   }
 
   private drawBackground(time: number): void {
