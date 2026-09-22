@@ -5653,6 +5653,22 @@ export class Game {
       y - 25,
     );
 
+    if (
+      enemy.pendingSkillId !== undefined &&
+      enemy.pendingSkillId !== null &&
+      (enemy.skillTelegraphRemaining ?? 0) > 0
+    ) {
+      const pending = enemySkillDefinition(enemy.pendingSkillId);
+      context.font =
+        "900 9px ui-monospace, SFMono-Regular, Menlo, monospace";
+      context.fillStyle = "rgba(255, 224, 138, 0.96)";
+      context.fillText(
+        "⚠ " + pending.name.toUpperCase(),
+        enemy.x,
+        y - 37,
+      );
+    }
+
     const segmentGap = 3;
     const segmentWidth = (panelWidth - segmentGap * 2) / 3;
     const segmentY = y - 19;
