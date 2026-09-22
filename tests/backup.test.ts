@@ -46,6 +46,10 @@ describe("save backup", () => {
         lastRollStage: number;
       };
       credits: number;
+      progression: {
+        claimedMissions: string[];
+        unlockedAchievements: string[];
+      };
     };
 
     expect(parsed.version).toBe(PLAYER_SAVE_VERSION);
@@ -72,6 +76,8 @@ describe("save backup", () => {
       lastRollStage: 0,
     });
     expect(parsed.credits).toBe(0);
+    expect(parsed.progression.claimedMissions).toEqual([]);
+    expect(parsed.progression.unlockedAchievements).toEqual([]);
   });
 
   it("imports and migrates a valid v1 backup", () => {
@@ -113,7 +119,7 @@ describe("save backup", () => {
     );
     expect(unsupported).toEqual({
       ok: false,
-      error: "Unsupported save version. Supported versions: 1-13.",
+      error: "Unsupported save version. Supported versions: 1-14.",
     });
   });
 
@@ -381,6 +387,44 @@ describe("save backup", () => {
 
     expect(result.migrated).toBe(true);
     expect(result.save.credits).toBe(0);
+  });
+
+  it("imports and migrates a valid v13 backup to empty progression", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.version = 13;
+    delete raw.progression;
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.migrated).toBe(true);
+    expect(result.save.progression.claimedMissions).toEqual([]);
+    expect(result.save.progression.unlockedAchievements).toEqual([]);
+  });
+
+  it("rejects invalid current mission progression", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.progression = {
+      counters: {
+        stageClears: -1,
+        highAccuracyClears: 0,
+        shopPurchases: 0,
+        equipmentDrops: 0,
+      },
+      claimedMissions: [],
+      unlockedAchievements: [],
+    };
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result).toEqual({
+      ok: false,
+      error: "Mission/Achievement progression data is invalid.",
+    });
   });
 
   it("rejects invalid current Credits", () => {

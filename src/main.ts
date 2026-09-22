@@ -112,6 +112,19 @@ import {
   type LuckPityState,
 } from "./loot/pity";
 import {
+  ACHIEVEMENT_IDS,
+  ACHIEVEMENT_REGISTRY,
+  MISSION_IDS,
+  MISSION_REGISTRY,
+  claimMission,
+  createProgressionState,
+  missionClaimable,
+  missionProgress,
+  recordProgressionEvent,
+  syncAchievements,
+  type ProgressionState,
+} from "./progression/missions";
+import {
   createHiddenDiscoveryState,
   hiddenCodexEntries,
   type HiddenContentDefinition,
@@ -388,6 +401,7 @@ app.innerHTML = `
           <button id="eventShopButton" class="hidden">Event Shop</button>
           <button id="supportButton">Support Spells</button>
           <button id="codexButton">Codex</button>
+          <button id="progressionButton">Missions</button>
           <button id="dataButton">Data</button>
           <button id="settingsButton">Settings</button>
         </div>
@@ -497,6 +511,26 @@ app.innerHTML = `
       </form>
       <p id="codexMeta" class="equipment-note">0 / 6 hidden discoveries</p>
       <div id="codexGrid" class="codex-grid"></div>
+    </dialog>
+
+    <dialog id="progressionDialog" class="settings-dialog progression-dialog">
+      <form method="dialog" class="dialog-head">
+        <div>
+          <p class="eyebrow">pilot records</p>
+          <h2>Missions & Achievements</h2>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+      <div class="progression-columns">
+        <section>
+          <h3>Missions</h3>
+          <div id="missionGrid" class="progression-grid"></div>
+        </section>
+        <section>
+          <h3>Achievements</h3>
+          <div id="achievementGrid" class="progression-grid"></div>
+        </section>
+      </div>
     </dialog>
 
     <dialog id="rewardChoiceDialog" class="settings-dialog reward-choice-dialog">
@@ -797,6 +831,7 @@ let characters: CharacterState = createStarterCharacterState();
 let luckPity: LuckPityState = createLuckPityState();
 let hiddenDiscovery: HiddenDiscoveryState = createHiddenDiscoveryState();
 let credits = 0;
+let progression: ProgressionState = createProgressionState();
 let persistenceReady = false;
 let equipmentDropCounter = 0;
 let shopPurchaseCounter = 0;
@@ -826,6 +861,8 @@ const specialShopDialog =
 const supportDialog = byId<HTMLDialogElement>("supportDialog");
 const characterDialog = byId<HTMLDialogElement>("characterDialog");
 const codexDialog = byId<HTMLDialogElement>("codexDialog");
+const progressionDialog =
+  byId<HTMLDialogElement>("progressionDialog");
 const rewardChoiceDialog =
   byId<HTMLDialogElement>("rewardChoiceDialog");
 const anomalyDialog = byId<HTMLDialogElement>("anomalyDialog");
@@ -846,6 +883,7 @@ type AutosaveSnapshot = {
   luckPity: LuckPityState;
   hiddenDiscovery: HiddenDiscoveryState;
   credits: number;
+  progression: ProgressionState;
 };
 
 const campaignAutosave = new AutosaveQueue<
@@ -862,6 +900,7 @@ const campaignAutosave = new AutosaveQueue<
     snapshot.luckPity,
     snapshot.hiddenDiscovery,
     snapshot.credits,
+    snapshot.progression,
   ),
 );
 
@@ -1333,6 +1372,103 @@ function openCodex(): void {
   codexDialog.showModal();
 }
 
+function syncProgressionAchievements(): string[] {
+  const result = syncAchievements(
+    progression,
+    campaign,
+    hiddenDiscovery,
+  );
+  progression = result.state;
+  return result.newlyUnlocked.map(
+    (id) => ACHIEVEMENT_REGISTRY[id].name,
+  );
+}
+
+function recordShopProgress(): void {
+  progression = recordProgressionEvent(progression, {
+    type: "shop-purchase",
+  });
+}
+
+function renderProgression(): void {
+  const missionGrid = byId("missionGrid");
+  missionGrid.replaceChildren();
+
+  for (const id of MISSION_IDS) {
+    const mission = MISSION_REGISTRY[id];
+    const progress = missionProgress(progression, id);
+    const claimed = progression.claimedMissions.includes(id);
+    const card = document.createElement("article");
+    card.className = "progression-card";
+
+    const title = document.createElement("strong");
+    title.textContent = mission.name;
+
+    const description = document.createElement("small");
+    description.textContent = mission.description;
+
+    const meta = document.createElement("span");
+    meta.textContent =
+      String(progress) +
+      " / " +
+      String(mission.target) +
+      " · " +
+      mission.rewardCredits.toLocaleString() +
+      " Credits";
+
+    const claim = document.createElement("button");
+    claim.type = "button";
+    claim.disabled = claimed || !missionClaimable(progression, id);
+    claim.textContent = claimed ? "Claimed" : "Claim reward";
+    claim.addEventListener("click", () => {
+      const result = claimMission(progression, id);
+      if (!result.claimed) return;
+      progression = result.state;
+      credits = addCredits(credits, result.rewardCredits);
+      renderProgression();
+      updateDataSummary();
+      void autosaveCampaign(
+        "progression",
+        "✓ Mission reward · +" +
+          result.rewardCredits.toLocaleString() +
+          " Credits",
+      );
+    });
+
+    card.append(title, description, meta, claim);
+    missionGrid.append(card);
+  }
+
+  const achievementGrid = byId("achievementGrid");
+  achievementGrid.replaceChildren();
+
+  for (const id of ACHIEVEMENT_IDS) {
+    const definition = ACHIEVEMENT_REGISTRY[id];
+    const unlocked = progression.unlockedAchievements.includes(id);
+    const card = document.createElement("article");
+    card.className =
+      "progression-card " + (unlocked ? "unlocked" : "locked");
+
+    const title = document.createElement("strong");
+    title.textContent = unlocked ? definition.name : "???";
+
+    const description = document.createElement("small");
+    description.textContent = unlocked
+      ? definition.description
+      : "Achievement not unlocked yet.";
+
+    card.append(title, description);
+    achievementGrid.append(card);
+  }
+}
+
+function openProgression(): void {
+  if (!persistenceReady || game.getPhase() !== "title") return;
+  syncProgressionAchievements();
+  renderProgression();
+  progressionDialog.showModal();
+}
+
 function hiddenDiscoveryMessage(
   discovery: HiddenContentDefinition,
 ): string {
@@ -1474,6 +1610,15 @@ const game = new Game(
         salvage: game.getPlayerStats().salvage,
       });
       credits = addCredits(credits, creditReward);
+      progression = recordProgressionEvent(progression, {
+        type: "stage-clear",
+        accuracy,
+      });
+      const achievementNames = syncProgressionAchievements();
+      const achievementText =
+        achievementNames.length > 0
+          ? " · Achievement: " + achievementNames.join(", ")
+          : "";
 
       void autosaveCampaign(
         "stage-clear",
@@ -1484,7 +1629,8 @@ const game = new Game(
           progressText +
           " · +" +
           creditReward.toLocaleString() +
-          " Credits",
+          " Credits" +
+          achievementText,
       );
 
       byId("clearTitle").textContent =
@@ -1510,7 +1656,11 @@ const game = new Game(
         rarity: drop.rarity,
         enhancement: 0,
       });
+      progression = recordProgressionEvent(progression, {
+        type: "equipment-drop",
+      });
       renderEquipment();
+      renderProgression();
       void autosaveCampaign(
         "equipment",
         "✓ " +
@@ -1537,6 +1687,8 @@ const game = new Game(
       hiddenDiscovery = state;
       renderCodex();
       updateSpecialShopAccess();
+      const achievementNames = syncProgressionAchievements();
+      if (achievementNames.length > 0) renderProgression();
       void autosaveCampaign(
         "discovery",
         discovery === null
@@ -1995,6 +2147,8 @@ function renderNormalShop(): void {
       applyEquipmentStats();
       renderNormalShop();
       updateDataSummary();
+      recordShopProgress();
+      renderProgression();
       void autosaveCampaign(
         "shop",
         "✓ Purchased " +
@@ -2072,6 +2226,8 @@ function renderServiceShop(): void {
     }
 
     applyServiceShopState(result.state);
+    recordShopProgress();
+    renderProgression();
     renderServiceShop();
     void autosaveCampaign(
       "shop",
@@ -2137,6 +2293,8 @@ function renderServiceShop(): void {
       }
 
       applyServiceShopState(result.state);
+      recordShopProgress();
+      renderProgression();
       renderNormalShop();
       renderServiceShop();
       void autosaveCampaign(
@@ -2248,6 +2406,8 @@ function renderSpecialShop(): void {
       }
 
       applyServiceShopState(purchase.state);
+      recordShopProgress();
+      renderProgression();
       renderNormalShop();
       renderServiceShop();
       renderSpecialShop();
@@ -2314,6 +2474,7 @@ async function autosaveCampaign(
       luckPity,
       hiddenDiscovery,
       credits,
+      progression,
     },
     reason,
   );
@@ -2357,6 +2518,8 @@ async function initializePlayerProgress(): Promise<void> {
   const characterButton =
     byId<HTMLButtonElement>("characterButton");
   const codexButton = byId<HTMLButtonElement>("codexButton");
+  const progressionButton =
+    byId<HTMLButtonElement>("progressionButton");
 
   startButton.disabled = true;
   stageSelectButton.disabled = true;
@@ -2368,6 +2531,7 @@ async function initializePlayerProgress(): Promise<void> {
   supportButton.disabled = true;
   characterButton.disabled = true;
   codexButton.disabled = true;
+  progressionButton.disabled = true;
   for (const button of dataButtons) button.disabled = true;
 
   try {
@@ -2379,6 +2543,8 @@ async function initializePlayerProgress(): Promise<void> {
     luckPity = loaded.save.luckPity;
     hiddenDiscovery = loaded.save.hiddenDiscovery;
     credits = loaded.save.credits;
+    progression = loaded.save.progression;
+    syncProgressionAchievements();
     game.setLuckPityState(luckPity);
     game.setHiddenDiscoveryState(hiddenDiscovery);
     const loadedCharacters = loaded.save.characters;
@@ -2406,7 +2572,9 @@ async function initializePlayerProgress(): Promise<void> {
     supportButton.disabled = false;
     characterButton.disabled = false;
     codexButton.disabled = false;
+    progressionButton.disabled = false;
     renderCodex();
+    renderProgression();
     renderNormalShop();
     renderServiceShop();
     updateSpecialShopAccess();
@@ -2644,6 +2812,7 @@ async function exportSave(): Promise<void> {
     luckPity,
     hiddenDiscovery,
     credits,
+    progression,
   );
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -2686,6 +2855,7 @@ async function importSaveFile(file: File): Promise<void> {
     const importedLuckPity = result.save.luckPity;
     const importedHiddenDiscovery = result.save.hiddenDiscovery;
     const importedCredits = result.save.credits;
+    const importedProgression = result.save.progression;
     const message =
       "Import Stage " +
       String(imported.highestUnlockedStage).padStart(3, "0") +
@@ -2707,6 +2877,7 @@ async function importSaveFile(file: File): Promise<void> {
     const previousLuckPity = luckPity;
     const previousHiddenDiscovery = hiddenDiscovery;
     const previousCredits = credits;
+    const previousProgression = progression;
     campaign = imported;
     inventory = importedInventory;
     equipment = importedEquipment;
@@ -2715,6 +2886,8 @@ async function importSaveFile(file: File): Promise<void> {
     luckPity = importedLuckPity;
     hiddenDiscovery = importedHiddenDiscovery;
     credits = importedCredits;
+    progression = importedProgression;
+    syncProgressionAchievements();
     game.setLuckPityState(luckPity);
     game.setHiddenDiscoveryState(hiddenDiscovery);
     updateSpecialShopAccess();
@@ -2736,6 +2909,7 @@ async function importSaveFile(file: File): Promise<void> {
       luckPity = previousLuckPity;
       hiddenDiscovery = previousHiddenDiscovery;
       credits = previousCredits;
+      progression = previousProgression;
       game.setLuckPityState(luckPity);
       game.setHiddenDiscoveryState(hiddenDiscovery);
       updateSpecialShopAccess();
@@ -2917,6 +3091,7 @@ for (const id of ["dataButton", "pauseDataButton"]) {
 }
 
 byId("codexButton").addEventListener("click", openCodex);
+byId("progressionButton").addEventListener("click", openProgression);
 
 byId("exportSaveButton").addEventListener("click", () => {
   void exportSave();
@@ -3070,6 +3245,7 @@ window.addEventListener("keydown", (event) => {
     supportDialog.open ||
     characterDialog.open ||
     codexDialog.open ||
+    progressionDialog.open ||
     shopDialog.open ||
     serviceShopDialog.open ||
     specialShopDialog.open
@@ -3160,6 +3336,7 @@ document.addEventListener("visibilitychange", () => {
       luckPity,
       hiddenDiscovery,
       credits,
+      progression,
     },
     "pagehide",
   );
@@ -3178,6 +3355,7 @@ window.addEventListener("pagehide", () => {
       luckPity,
       hiddenDiscovery,
       credits,
+      progression,
     },
     "pagehide",
   );

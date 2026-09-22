@@ -3067,6 +3067,21 @@ Build-synergy rules:
 ## Step 57
 Implement Missions and Achievements.
 
+**Status: implemented.**
+
+Missions / Achievements rules:
+
+- one persisted `ProgressionState` owns mission counters, claimed mission rewards and unlocked achievements;
+- PlayerSave is upgraded to schema v14; v13 migrates with empty mission/achievement progress while preserving Credits and all prior systems;
+- stage clears track total clears and 98%+ accuracy clears;
+- successful shop transactions track purchase count and enemy equipment drops track drop count;
+- mission rewards are explicit one-time claims paid in Credits through the existing Credits cap/sanitization path;
+- achievements are synchronized from durable Campaign/hidden-discovery facts so they cannot be lost when the UI is reopened;
+- current achievements cover first clear, Stage 100, 100 unique clears, 99%+ best accuracy, first hidden discovery and reaching Stage 500;
+- the title menu exposes a Missions dialog with live progress, claim state and concealed locked achievements;
+- progression changes autosave through the existing save queue;
+- fixed a recovery-path regression where mirrored localStorage saves could reconstruct without passing persisted Credits into `createPlayerSave`.
+
 ## Step 58
 Implement Codex/Collection/Meta Progression.
 
