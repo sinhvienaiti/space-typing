@@ -376,6 +376,7 @@ export function rollHiddenDiscovery(
       discovered: nextDiscovered,
       drought,
       lastRollStage: safeStage,
+      encounter: state.encounter,
     },
     discovery,
     rolled: true,
