@@ -232,6 +232,21 @@ export function isValidAscensionState(value: unknown): value is AscensionState {
   });
 }
 
+export function currentAscensionStage(
+  input: AscensionState,
+): number | null {
+  const state = sanitizeAscensionState(input);
+  if (state.selectedTier <= 0) return null;
+  return state.frontierByTier[String(state.selectedTier)] ?? 1;
+}
+
+export function canSwitchAscensionTier(
+  input: AscensionState,
+): boolean {
+  const stage = currentAscensionStage(input);
+  return stage === null || (stage - 1) % 10 === 0;
+}
+
 export function selectAscensionTier(
   input: AscensionState,
   tier: number,
@@ -239,6 +254,7 @@ export function selectAscensionTier(
   const state = sanitizeAscensionState(input);
   const safeTier = clampTier(tier);
   if (
+    !canSwitchAscensionTier(state) ||
     safeTier > state.highestUnlockedTier ||
     (safeTier > 0 && state.completedTiers.includes(safeTier))
   ) {
@@ -248,14 +264,6 @@ export function selectAscensionTier(
     ...state,
     selectedTier: safeTier,
   };
-}
-
-export function currentAscensionStage(
-  input: AscensionState,
-): number | null {
-  const state = sanitizeAscensionState(input);
-  if (state.selectedTier <= 0) return null;
-  return state.frontierByTier[String(state.selectedTier)] ?? 1;
 }
 
 export function advanceAscensionOnStageClear(
