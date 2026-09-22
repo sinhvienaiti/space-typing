@@ -446,6 +446,7 @@ export class Game {
   private lastTime = performance.now();
   private animationFrame = 0;
   private stars: Array<{ x: number; y: number; z: number }> = [];
+  private backgroundGradient: CanvasGradient | null = null;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -1563,6 +1564,7 @@ export class Game {
     this.canvas.width = Math.floor(this.width * this.dpr);
     this.canvas.height = Math.floor(this.height * this.dpr);
     this.context.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.backgroundGradient = null;
     this.seedStars();
   }
 
@@ -4086,20 +4088,22 @@ export class Game {
 
   private drawBackground(time: number): void {
     const context = this.context;
-    const gradient = context.createRadialGradient(
-      this.width * 0.5,
-      this.height * 0.78,
-      50,
-      this.width * 0.5,
-      this.height * 0.52,
-      Math.max(this.width, this.height) * 0.82,
-    );
+    if (this.backgroundGradient === null) {
+      const gradient = context.createRadialGradient(
+        this.width * 0.5,
+        this.height * 0.78,
+        50,
+        this.width * 0.5,
+        this.height * 0.52,
+        Math.max(this.width, this.height) * 0.82,
+      );
+      gradient.addColorStop(0, "#0a2432");
+      gradient.addColorStop(0.45, "#07121d");
+      gradient.addColorStop(1, "#03060c");
+      this.backgroundGradient = gradient;
+    }
 
-    gradient.addColorStop(0, "#0a2432");
-    gradient.addColorStop(0.45, "#07121d");
-    gradient.addColorStop(1, "#03060c");
-
-    context.fillStyle = gradient;
+    context.fillStyle = this.backgroundGradient;
     context.fillRect(-30, -30, this.width + 60, this.height + 60);
 
     for (const star of this.stars) {
