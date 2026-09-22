@@ -2743,10 +2743,12 @@ const game = new Game(
         wpm,
         clearedAt,
       });
-      route = syncRouteStateForStage(
-        route,
-        campaign.highestUnlockedStage,
-      );
+      if (ascension.selectedTier === 0) {
+        route = syncRouteStateForStage(
+          route,
+          campaign.highestUnlockedStage,
+        );
+      }
 
       const characterUnlock = unlockCharactersForStage(
         characters,
