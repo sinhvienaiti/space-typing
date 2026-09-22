@@ -22,6 +22,7 @@ export type EffectiveStatInput = {
   character?: StatBonus;
   level?: StatBonus;
   equipment?: StatBonus;
+  permanent?: StatBonus;
   talent?: StatBonus;
   synergy?: StatBonus;
   temporary?: StatBonus;
@@ -78,6 +79,7 @@ export function calculateEffectiveStats(
   addStatBonus(result, input.character);
   addStatBonus(result, input.level);
   addStatBonus(result, input.equipment);
+  addStatBonus(result, input.permanent);
   addStatBonus(result, input.talent);
   addStatBonus(result, input.synergy);
   addStatBonus(result, input.temporary);
