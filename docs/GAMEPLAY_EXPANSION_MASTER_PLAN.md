@@ -942,6 +942,42 @@ Hidden Worlds:
 - offer premium rewards;
 - are saved deterministically for crash recovery.
 
+
+## 13.4 Champion Hunt / Apex Gauntlet
+
+Add an optional high-pressure stage type designed around chained kills of priority targets rather than normal enemies.
+
+Eligible kill-chain targets:
+
+- Elite;
+- Apex;
+- Champion;
+- future authored priority targets.
+
+Normal enemies do not advance the announcer chain. World Boss/Galaxy Major Boss defeats use their own boss-defeat presentation rather than the normal multi-kill chain.
+
+Initial announcer milestones:
+
+~~~text
+2 -> Double Kill
+3 -> Triple Kill
+4 -> Ultra Kill
+5 -> Rampage
+6 -> Monster Kill
+~~~
+
+The stage may spawn priority targets sequentially or in bounded formations. It must still obey Active Typing Pressure and global difficulty budgets.
+
+Audio architecture:
+
+- announcer playback goes through the existing SFX lifecycle;
+- one repository-owned base audio asset is the safe fallback;
+- each milestone has an independent asset mapping;
+- local/private announcer files may later replace each mapping without changing kill-chain logic;
+- local third-party announcer assets remain subject to `docs/LOCAL_ASSETS_README.md`.
+
+The kill-chain window must ultimately be resolved from global difficulty rather than one hardcoded value. The first implementation may use a temporary default window until M11 owns the final difficulty-specific timing.
+
 ---
 
 # 14. Enemy Threat Rank system
@@ -2292,7 +2328,9 @@ Examples:
 - checkpoint 181 -> death at 190;
 - crash recovery at Stage 190;
 - all reward VFX;
-- all item-use VFX/SFX.
+- all item-use VFX/SFX;
+- Double/Triple/Ultra/Rampage/Monster announcer chain;
+- Champion Hunt / Apex Gauntlet chain timing.
 
 Presets are configuration templates for the one Test Lab, not separate Campaign stages.
 
@@ -2553,9 +2591,11 @@ Implement authored formation packages with aggregate budget validation.
 
 Implement deterministic route graph, choices, station nodes and persisted route/shop state.
 
-## M14 — Hidden Challenge / Hidden World
+## M14 — Hidden Challenge / Hidden World / Champion Hunt
 
 Implement optional challenge discovery, selectable risk tier and premium rewards.
+
+Add Champion Hunt / Apex Gauntlet stage support using the existing Priority Kill Chain announcer foundation.
 
 ## M15 — Stage Objectives + boss typing mechanics
 
