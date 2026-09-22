@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createStarterEquipmentState, equipInstance } from "../src/equipment/loadout";
+import {
+  createStarterEquipmentState,
+  unequipSlot,
+} from "../src/equipment/loadout";
 import { createStarterSupportSpellState } from "../src/skills/support-loadout";
 import {
   buildSynergyStatBonus,
@@ -53,15 +56,12 @@ describe("build synergy", () => {
 
   it("does not activate a synergy when its equipment is owned but unequipped", () => {
     const starter = createStarterEquipmentState();
-    const precision = starter.items.find(
-      (item) => item.instanceId === "starter-precision",
-    )!;
-    const withPrecision = equipInstance(starter, precision.instanceId);
+    const withoutUtility = unequipSlot(starter, "utility");
 
     expect(
       resolveBuildSynergies({
         character: "oracle",
-        equipment: withPrecision,
+        equipment: withoutUtility,
         supportSpells: createStarterSupportSpellState(),
       }),
     ).not.toContain("oracle-lens");
