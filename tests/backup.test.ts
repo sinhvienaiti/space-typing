@@ -65,6 +65,7 @@ describe("save backup", () => {
         credits: number;
       };
       crashRecoverySnapshot: unknown;
+      stageEntrySnapshot: unknown;
     };
 
     expect(parsed.version).toBe(PLAYER_SAVE_VERSION);
@@ -107,6 +108,7 @@ describe("save backup", () => {
     });
     expect(parsed.checkpointSnapshot.credits).toBe(0);
     expect(parsed.crashRecoverySnapshot).toBeNull();
+    expect(parsed.stageEntrySnapshot).toBeNull();
   });
 
   it("imports and migrates a valid v1 backup", () => {
@@ -148,7 +150,7 @@ describe("save backup", () => {
     );
     expect(unsupported).toEqual({
       ok: false,
-      error: "Unsupported save version. Supported versions: 1-17.",
+      error: "Unsupported save version. Supported versions: 1-18.",
     });
   });
 
@@ -486,6 +488,22 @@ describe("save backup", () => {
     expect(result.save.checkpointSnapshot.campaign.selectedStage).toBe(1);
   });
 
+  it("imports and migrates a valid v17 backup to empty stage-entry state", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.version = 17;
+    delete raw.stageEntrySnapshot;
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.migrated).toBe(true);
+    expect(result.save.stageEntrySnapshot).toBeNull();
+    expect(result.save.crashRecoverySnapshot).toBeNull();
+  });
+
   it("rejects invalid current expansion currencies", () => {
     const raw = JSON.parse(
       exportPlayerSaveJson(createDefaultCampaignProgress()),
@@ -541,6 +559,22 @@ describe("save backup", () => {
     expect(parsePlayerSaveJson(JSON.stringify(raw))).toEqual({
       ok: false,
       error: "Crash recovery snapshot is invalid.",
+    });
+  });
+
+  it("rejects an invalid current stage-entry snapshot", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.stageEntrySnapshot = {
+      stage: 999,
+      capturedAt: "2026-09-22T10:15:00.000Z",
+      state: {},
+    };
+
+    expect(parsePlayerSaveJson(JSON.stringify(raw))).toEqual({
+      ok: false,
+      error: "Stage-entry snapshot is invalid.",
     });
   });
 
