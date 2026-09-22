@@ -166,10 +166,12 @@ export class Sfx {
   }
 
   projectileWarning(): void {
+    this.notifyWarning(180);
     this.tone(680, 0.055, "triangle", 0.018, 520, "warnings");
   }
 
   shieldBreak(): void {
+    this.notifyWarning(260);
     this.tone(820, 0.09, "triangle", 0.03, 220, "warnings");
     this.noise(0.055, 0.018, "combat");
   }
@@ -195,6 +197,7 @@ export class Sfx {
   }
 
   eliteWarning(): void {
+    this.notifyWarning(520);
     this.tone(360, 0.11, "triangle", 0.028, 620, "warnings");
     this.schedule(
       () => this.tone(620, 0.14, "triangle", 0.025, 930, "warnings"),
@@ -231,6 +234,7 @@ export class Sfx {
   }
 
   bossEntrance(pitch = 1): void {
+    this.notifyWarning(900);
     const safePitch = Math.max(0.5, Math.min(1.6, pitch));
     this.tone(95 * safePitch, 0.28, "sawtooth", 0.045, 58 * safePitch, "warnings");
     this.schedule(
@@ -254,6 +258,7 @@ export class Sfx {
   }
 
   bossPhase(pitch = 1): void {
+    this.notifyWarning(620);
     const safePitch = Math.max(0.5, Math.min(1.6, pitch));
     this.tone(180 * safePitch, 0.16, "sawtooth", 0.04, 320 * safePitch, "warnings");
     this.schedule(
@@ -269,6 +274,15 @@ export class Sfx {
 
   bossStagger(): void {
     this.tone(250, 0.14, "sine", 0.03, 120, "combat");
+  }
+
+  private notifyWarning(durationMs: number): void {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(
+      new CustomEvent("space-typing:warning", {
+        detail: { durationMs },
+      }),
+    );
   }
 
   private notifyAnnouncer(active: boolean): void {
