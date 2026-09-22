@@ -395,6 +395,24 @@ describe("player save persistence model", () => {
     });
   });
 
+  it("migrates PlayerSave v15 to a committed M02 checkpoint snapshot", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const legacy = {
+      ...current,
+      version: 15,
+    } as Record<string, unknown>;
+    delete legacy.checkpointSnapshot;
+
+    const migration = migratePlayerSave(legacy);
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(15);
+    expect(migration.save.checkpointSnapshot.campaign).toMatchObject({
+      highestUnlockedStage: 1,
+      selectedStage: 1,
+    });
+    expect(migration.save.checkpointSnapshot.credits).toBe(0);
+  });
+
   it("keeps a valid current-version save without migration", () => {
     const save = createPlayerSave(
       createDefaultCampaignProgress(),

@@ -47,6 +47,11 @@ export type CampaignExpansionState = {
   crashRecovery: CrashRecoveryState | null;
 };
 
+export type StageClearExpansionResult = {
+  state: CampaignExpansionState;
+  checkpointCommitted: boolean;
+};
+
 export function sectorForStage(stage: number): CampaignSector {
   const safeStage = normalizeStage(stage);
   const startStage =
@@ -70,7 +75,11 @@ function highestReachedStage(progress: CampaignProgress): number {
       : progress.clearedStages[progress.clearedStages.length - 1] ?? 1;
 
   return normalizeStage(
-    Math.max(progress.selectedStage, highestCleared),
+    Math.max(
+      progress.highestUnlockedStage,
+      progress.selectedStage,
+      highestCleared,
+    ),
   );
 }
 
@@ -78,7 +87,10 @@ export function createCampaignExpansionState(
   progress: CampaignProgress,
   timestamp = "",
 ): CampaignExpansionState {
-  const currentStage = normalizeStage(progress.selectedStage);
+  // M02 treats highestUnlockedStage as the progression frontier.
+  // selectedStage may point at an older replay stage and must not move
+  // the gameplay checkpoint.
+  const currentStage = normalizeStage(progress.highestUnlockedStage);
   const sector = sectorForStage(currentStage);
 
   return {
@@ -159,11 +171,17 @@ export function isValidCampaignExpansionState(
   }
 
   const expectedSector = sectorForStage(activeRaw.currentStage);
+  const terminalCheckpoint =
+    activeRaw.currentStage === MAX_CAMPAIGN_STAGE &&
+    checkpointRaw.stage === MAX_CAMPAIGN_STAGE &&
+    activeRaw.checkpointStage === MAX_CAMPAIGN_STAGE;
   if (
     sectorRaw.startStage !== expectedSector.startStage ||
     sectorRaw.endStage !== expectedSector.endStage ||
-    checkpointRaw.stage !== expectedSector.startStage ||
-    activeRaw.checkpointStage !== expectedSector.startStage ||
+    (!terminalCheckpoint &&
+      checkpointRaw.stage !== expectedSector.startStage) ||
+    (!terminalCheckpoint &&
+      activeRaw.checkpointStage !== expectedSector.startStage) ||
     activeRaw.highestReachedStage < activeRaw.currentStage
   ) {
     return false;
@@ -196,13 +214,169 @@ export function sanitizeCampaignExpansionState(
     return createCampaignExpansionState(progress, timestamp);
   }
 
+  const frontier = normalizeStage(progress.highestUnlockedStage);
+  const minimumHighest = Math.max(
+    value.activeSegment.highestReachedStage,
+    frontier,
+  );
+
+  // M01 had no runtime checkpoint behavior. If a v15 value was based on
+  // a replay-selected stage, rebuild it around the real progression frontier.
+  if (
+    value.activeSegment.currentStage !== frontier &&
+    progress.selectedStage !== frontier
+  ) {
+    const rebuilt = createCampaignExpansionState(progress, timestamp);
+    rebuilt.activeSegment.highestReachedStage = normalizeStage(
+      Math.max(
+        minimumHighest,
+        rebuilt.activeSegment.highestReachedStage,
+      ),
+    );
+    return rebuilt;
+  }
+
   return {
     sector: { ...value.sector },
     checkpoint: { ...value.checkpoint },
-    activeSegment: { ...value.activeSegment },
+    activeSegment: {
+      ...value.activeSegment,
+      highestReachedStage: normalizeStage(minimumHighest),
+    },
     crashRecovery:
       value.crashRecovery === null
         ? null
         : { ...value.crashRecovery },
   };
+}
+
+export function advanceCampaignExpansionOnStageClear(
+  input: CampaignExpansionState,
+  progress: CampaignProgress,
+  clearedStage: number,
+  timestamp: string,
+): StageClearExpansionResult {
+  const state = sanitizeCampaignExpansionState(
+    input,
+    progress,
+    timestamp,
+  );
+  const safeCleared = normalizeStage(clearedStage);
+  const frontierBefore = state.activeSegment.currentStage;
+  const highestReached = normalizeStage(
+    Math.max(
+      state.activeSegment.highestReachedStage,
+      progress.highestUnlockedStage,
+      safeCleared,
+    ),
+  );
+
+  // Replaying a previously reached stage may update records/rewards but
+  // must not move or commit the active progression frontier.
+  if (safeCleared !== frontierBefore) {
+    return {
+      state: {
+        ...state,
+        activeSegment: {
+          ...state.activeSegment,
+          highestReachedStage: highestReached,
+        },
+      },
+      checkpointCommitted: false,
+    };
+  }
+
+  const nextFrontier = normalizeStage(progress.highestUnlockedStage);
+  const reachedSectorEnd = safeCleared === state.sector.endStage;
+
+  if (reachedSectorEnd) {
+    const nextSector = sectorForStage(nextFrontier);
+    const checkpointStage =
+      safeCleared === MAX_CAMPAIGN_STAGE
+        ? MAX_CAMPAIGN_STAGE
+        : nextSector.startStage;
+    return {
+      state: {
+        sector: nextSector,
+        checkpoint: {
+          stage: checkpointStage,
+          committedAt: timestamp,
+        },
+        activeSegment: {
+          checkpointStage,
+          currentStage: nextFrontier,
+          highestReachedStage: highestReached,
+          startedAt: timestamp,
+        },
+        crashRecovery: null,
+      },
+      checkpointCommitted: true,
+    };
+  }
+
+  return {
+    state: {
+      ...state,
+      activeSegment: {
+        ...state.activeSegment,
+        currentStage: nextFrontier,
+        highestReachedStage: highestReached,
+      },
+    },
+    checkpointCommitted: false,
+  };
+}
+
+export function rollbackCampaignExpansion(
+  input: CampaignExpansionState,
+  timestamp: string,
+): CampaignExpansionState {
+  const checkpointStage = normalizeStage(input.checkpoint.stage);
+  const sector = sectorForStage(checkpointStage);
+
+  return {
+    sector,
+    checkpoint: {
+      stage: checkpointStage,
+      committedAt: input.checkpoint.committedAt,
+    },
+    activeSegment: {
+      checkpointStage,
+      currentStage: checkpointStage,
+      highestReachedStage: normalizeStage(
+        Math.max(
+          input.activeSegment.highestReachedStage,
+          input.activeSegment.currentStage,
+        ),
+      ),
+      startedAt: timestamp,
+    },
+    crashRecovery: null,
+  };
+}
+
+export function canSelectCampaignStage(
+  progress: CampaignProgress,
+  expansion: CampaignExpansionState,
+  stage: number,
+): boolean {
+  if (
+    !Number.isInteger(stage) ||
+    stage < 1 ||
+    stage > MAX_CAMPAIGN_STAGE
+  ) {
+    return false;
+  }
+
+  // highestReachedStage is a record only. It intentionally does not
+  // grant Stage Select access after a rollback.
+  const progressionCeiling = Math.min(
+    progress.highestUnlockedStage,
+    Math.max(
+      expansion.activeSegment.currentStage,
+      expansion.checkpoint.stage,
+    ),
+  );
+
+  return stage <= progressionCeiling;
 }

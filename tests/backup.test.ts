@@ -60,6 +60,10 @@ describe("save backup", () => {
         activeSegment: { currentStage: number };
         crashRecovery: unknown;
       };
+      checkpointSnapshot: {
+        campaign: { highestUnlockedStage: number; selectedStage: number };
+        credits: number;
+      };
     };
 
     expect(parsed.version).toBe(PLAYER_SAVE_VERSION);
@@ -96,6 +100,11 @@ describe("save backup", () => {
     expect(parsed.campaignExpansion.checkpoint.stage).toBe(1);
     expect(parsed.campaignExpansion.activeSegment.currentStage).toBe(2);
     expect(parsed.campaignExpansion.crashRecovery).toBeNull();
+    expect(parsed.checkpointSnapshot.campaign).toMatchObject({
+      highestUnlockedStage: 1,
+      selectedStage: 1,
+    });
+    expect(parsed.checkpointSnapshot.credits).toBe(0);
   });
 
   it("imports and migrates a valid v1 backup", () => {
@@ -137,7 +146,7 @@ describe("save backup", () => {
     );
     expect(unsupported).toEqual({
       ok: false,
-      error: "Unsupported save version. Supported versions: 1-15.",
+      error: "Unsupported save version. Supported versions: 1-16.",
     });
   });
 
@@ -444,6 +453,21 @@ describe("save backup", () => {
     expect(result.save.campaignExpansion.checkpoint.stage).toBe(1);
   });
 
+  it("imports and migrates a valid v15 backup to a checkpoint snapshot", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.version = 15;
+    delete raw.checkpointSnapshot;
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.migrated).toBe(true);
+    expect(result.save.checkpointSnapshot.campaign.selectedStage).toBe(1);
+  });
+
   it("rejects invalid current expansion currencies", () => {
     const raw = JSON.parse(
       exportPlayerSaveJson(createDefaultCampaignProgress()),
@@ -470,6 +494,18 @@ describe("save backup", () => {
     expect(parsePlayerSaveJson(JSON.stringify(raw))).toEqual({
       ok: false,
       error: "Campaign expansion checkpoint/segment data is invalid.",
+    });
+  });
+
+  it("rejects an invalid current checkpoint snapshot", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.checkpointSnapshot = { campaign: { selectedStage: 999 } };
+
+    expect(parsePlayerSaveJson(JSON.stringify(raw))).toEqual({
+      ok: false,
+      error: "Committed checkpoint snapshot is invalid.",
     });
   });
 

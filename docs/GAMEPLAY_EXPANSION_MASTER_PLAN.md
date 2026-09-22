@@ -2915,6 +2915,8 @@ No large UI rewrite yet.
 
 ## M02 — Ten-stage checkpoint + rollback
 
+**Status: Complete.** PlayerSave v16 now persists a committed checkpoint snapshot, ten-stage frontier commits are active, ordinary gameplay death rolls back permanent/economic segment state, knowledge/meta records survive, and Stage Select cannot bypass the rolled-back frontier. See `docs/M02_CHECKPOINT_ROLLBACK.md`.
+
 Implement:
 
 - checkpoint every ten stages;

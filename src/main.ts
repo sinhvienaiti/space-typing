@@ -19,6 +19,13 @@ import {
   selectCampaignStage,
 } from "./campaign/progress";
 import {
+  advanceCampaignExpansionOnStageClear,
+  canSelectCampaignStage,
+  createCampaignExpansionState,
+  rollbackCampaignExpansion,
+  type CampaignExpansionState,
+} from "./campaign/expansion-state";
+import {
   createStageConfig,
   GALAXY_COUNT,
   STAGES_PER_GALAXY,
@@ -86,6 +93,10 @@ import {
   addCredits,
   stageClearCreditReward,
 } from "./economy/credits";
+import {
+  createExpansionCurrencyState,
+  type ExpansionCurrencyState,
+} from "./economy/currencies";
 import {
   buyNormalShopOffer,
   normalShopItemIsFull,
@@ -170,6 +181,12 @@ import {
 type CombatSkillId = DefensiveSkillId | OffensiveSkillId;
 import { DEFAULT_PLAYER_BASE_STATS } from "./stats/player";
 import { AutosaveQueue } from "./persistence/autosave";
+import {
+  createCheckpointSnapshot,
+  restoreCheckpointSnapshot,
+  type CheckpointSnapshot,
+  type RunPersistentState,
+} from "./persistence/checkpoint";
 import {
   exportPlayerSaveJson,
   parsePlayerSaveJson,
@@ -923,6 +940,26 @@ let luckPity: LuckPityState = createLuckPityState();
 let hiddenDiscovery: HiddenDiscoveryState = createHiddenDiscoveryState();
 let credits = 0;
 let progression: ProgressionState = createProgressionState();
+let expansionCurrencies: ExpansionCurrencyState =
+  createExpansionCurrencyState();
+let campaignExpansion: CampaignExpansionState =
+  createCampaignExpansionState(campaign);
+let checkpointSnapshot: CheckpointSnapshot =
+  createCheckpointSnapshot(
+    {
+      campaign,
+      inventory,
+      equipment,
+      supportSpells,
+      characters,
+      luckPity,
+      hiddenDiscovery,
+      credits,
+      progression,
+      expansionCurrencies,
+    },
+    campaignExpansion.checkpoint.stage,
+  );
 let persistenceReady = false;
 let vocabularyReady = false;
 let equipmentDropCounter = 0;
@@ -982,6 +1019,9 @@ type AutosaveSnapshot = {
   hiddenDiscovery: HiddenDiscoveryState;
   credits: number;
   progression: ProgressionState;
+  expansionCurrencies: ExpansionCurrencyState;
+  campaignExpansion: CampaignExpansionState;
+  checkpointSnapshot: CheckpointSnapshot;
 };
 
 const campaignAutosave = new AutosaveQueue<
@@ -999,8 +1039,55 @@ const campaignAutosave = new AutosaveQueue<
     snapshot.hiddenDiscovery,
     snapshot.credits,
     snapshot.progression,
+    snapshot.expansionCurrencies,
+    snapshot.campaignExpansion,
+    snapshot.checkpointSnapshot,
   ),
 );
+
+function currentRunPersistentState(): RunPersistentState {
+  return {
+    campaign,
+    inventory,
+    equipment,
+    supportSpells,
+    characters,
+    luckPity,
+    hiddenDiscovery,
+    credits,
+    progression,
+    expansionCurrencies,
+  };
+}
+
+function applyRunPersistentState(state: RunPersistentState): void {
+  campaign = state.campaign;
+  inventory = state.inventory;
+  equipment = state.equipment;
+  supportSpells = state.supportSpells;
+  characters = state.characters;
+  luckPity = state.luckPity;
+  hiddenDiscovery = state.hiddenDiscovery;
+  credits = state.credits;
+  progression = state.progression;
+  expansionCurrencies = state.expansionCurrencies;
+}
+
+function refreshPersistentStateUi(): void {
+  game.setLuckPityState(luckPity);
+  game.setHiddenDiscoveryState(hiddenDiscovery);
+  applySelectedCharacter();
+  renderInventory();
+  applyEquipmentStats();
+  applySupportSpells();
+  renderCodex();
+  renderProgression();
+  renderNormalShop();
+  renderServiceShop();
+  updateSpecialShopAccess();
+  updateCampaignUi();
+  updateDataSummary();
+}
 
 function renderStats(stats: GameStats): void {
   byId("score").textContent = stats.score.toLocaleString();
@@ -1678,7 +1765,27 @@ const game = new Game(
         byId("resultAccuracy").textContent =
           accuracyPercent(stats.hits, stats.misses).toFixed(1) + "%";
         byId("resultStreak").textContent = String(stats.maxStreak);
-        void autosaveCampaign("gameover");
+
+        const restored = restoreCheckpointSnapshot(
+          checkpointSnapshot,
+          currentRunPersistentState(),
+        );
+        applyRunPersistentState(restored);
+        campaignExpansion = rollbackCampaignExpansion(
+          campaignExpansion,
+          new Date().toISOString(),
+        );
+        refreshPersistentStateUi();
+
+        const checkpointStage = campaignExpansion.checkpoint.stage;
+        byId("againButton").textContent =
+          "Retry checkpoint · Stage " +
+          String(checkpointStage).padStart(3, "0");
+        void autosaveCampaign(
+          "gameover",
+          "✓ Rolled back to checkpoint · Stage " +
+            String(checkpointStage).padStart(3, "0"),
+        );
       }
     },
     onStage: renderStage,
@@ -1699,11 +1806,12 @@ const game = new Game(
       );
       saveDifficultySettings();
 
+      const clearedAt = new Date().toISOString();
       campaign = recordStageClear(campaign, stats.stage, {
         score: stats.score,
         accuracy,
         wpm,
-        clearedAt: new Date().toISOString(),
+        clearedAt,
       });
 
       const characterUnlock = unlockCharactersForStage(
@@ -1760,6 +1868,26 @@ const game = new Game(
           ? " · Achievement: " + achievementNames.join(", ")
           : "";
 
+      const expansionResult =
+        advanceCampaignExpansionOnStageClear(
+          campaignExpansion,
+          campaign,
+          stats.stage,
+          clearedAt,
+        );
+      campaignExpansion = expansionResult.state;
+      if (expansionResult.checkpointCommitted) {
+        checkpointSnapshot = createCheckpointSnapshot(
+          currentRunPersistentState(),
+          campaignExpansion.checkpoint.stage,
+        );
+      }
+      const checkpointText = expansionResult.checkpointCommitted
+        ? " · Checkpoint " +
+          String(campaignExpansion.checkpoint.stage).padStart(3, "0") +
+          " committed"
+        : "";
+
       void autosaveCampaign(
         "stage-clear",
         "✓ Saved · Stage " +
@@ -1770,7 +1898,8 @@ const game = new Game(
           " · +" +
           creditReward.toLocaleString() +
           " Credits" +
-          achievementText,
+          achievementText +
+          checkpointText,
       );
 
       byId("clearTitle").textContent =
@@ -2672,6 +2801,9 @@ async function autosaveCampaign(
       hiddenDiscovery,
       credits,
       progression,
+      expansionCurrencies,
+      campaignExpansion,
+      checkpointSnapshot,
     },
     reason,
   );
@@ -2741,6 +2873,9 @@ async function initializePlayerProgress(): Promise<void> {
     hiddenDiscovery = loaded.save.hiddenDiscovery;
     credits = loaded.save.credits;
     progression = loaded.save.progression;
+    expansionCurrencies = loaded.save.expansionCurrencies;
+    campaignExpansion = loaded.save.campaignExpansion;
+    checkpointSnapshot = loaded.save.checkpointSnapshot;
     syncProgressionAchievements();
     game.setLuckPityState(luckPity);
     game.setHiddenDiscoveryState(hiddenDiscovery);
@@ -2808,7 +2943,11 @@ function updateCampaignUi(): void {
   byId("campaignMeta").textContent =
     "Unlocked " +
     String(campaign.highestUnlockedStage).padStart(3, "0") +
-    " / 1000 · " +
+    " / 1000 · checkpoint " +
+    String(campaignExpansion.checkpoint.stage).padStart(3, "0") +
+    " · record " +
+    String(campaignExpansion.activeSegment.highestReachedStage).padStart(3, "0") +
+    " · " +
     getCharacter(characters.selected).name;
 
   currentGalaxy = Math.min(
@@ -2852,7 +2991,11 @@ function renderStageGrid(): void {
     button.className = "stage-button";
     button.textContent = String(stage).padStart(3, "0");
 
-    const locked = stage > campaign.highestUnlockedStage;
+    const locked = !canSelectCampaignStage(
+      campaign,
+      campaignExpansion,
+      stage,
+    );
     button.disabled = locked;
     button.classList.toggle("locked", locked);
     button.classList.toggle("cleared", cleared.has(stage));
@@ -2867,6 +3010,9 @@ function renderStageGrid(): void {
     }
 
     button.addEventListener("click", () => {
+      if (!canSelectCampaignStage(campaign, campaignExpansion, stage)) {
+        return;
+      }
       campaign = selectCampaignStage(campaign, stage);
       void autosaveCampaign(
         "stage-select",
@@ -2888,9 +3034,11 @@ function openStageSelect(): void {
 
   for (const option of Array.from(select.options)) {
     const galaxy = Number(option.value);
-    option.disabled =
-      (galaxy - 1) * STAGES_PER_GALAXY + 1 >
-      campaign.highestUnlockedStage;
+    option.disabled = !canSelectCampaignStage(
+      campaign,
+      campaignExpansion,
+      (galaxy - 1) * STAGES_PER_GALAXY + 1,
+    );
   }
 
   select.value = String(currentGalaxy);
@@ -3048,6 +3196,9 @@ async function exportSave(): Promise<void> {
     hiddenDiscovery,
     credits,
     progression,
+    expansionCurrencies,
+    campaignExpansion,
+    checkpointSnapshot,
   );
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -3091,6 +3242,12 @@ async function importSaveFile(file: File): Promise<void> {
     const importedHiddenDiscovery = result.save.hiddenDiscovery;
     const importedCredits = result.save.credits;
     const importedProgression = result.save.progression;
+    const importedExpansionCurrencies =
+      result.save.expansionCurrencies;
+    const importedCampaignExpansion =
+      result.save.campaignExpansion;
+    const importedCheckpointSnapshot =
+      result.save.checkpointSnapshot;
     const message =
       "Import Stage " +
       String(imported.highestUnlockedStage).padStart(3, "0") +
@@ -3113,6 +3270,9 @@ async function importSaveFile(file: File): Promise<void> {
     const previousHiddenDiscovery = hiddenDiscovery;
     const previousCredits = credits;
     const previousProgression = progression;
+    const previousExpansionCurrencies = expansionCurrencies;
+    const previousCampaignExpansion = campaignExpansion;
+    const previousCheckpointSnapshot = checkpointSnapshot;
     campaign = imported;
     inventory = importedInventory;
     equipment = importedEquipment;
@@ -3122,6 +3282,9 @@ async function importSaveFile(file: File): Promise<void> {
     hiddenDiscovery = importedHiddenDiscovery;
     credits = importedCredits;
     progression = importedProgression;
+    expansionCurrencies = importedExpansionCurrencies;
+    campaignExpansion = importedCampaignExpansion;
+    checkpointSnapshot = importedCheckpointSnapshot;
     syncProgressionAchievements();
     game.setLuckPityState(luckPity);
     game.setHiddenDiscoveryState(hiddenDiscovery);
@@ -3145,6 +3308,9 @@ async function importSaveFile(file: File): Promise<void> {
       hiddenDiscovery = previousHiddenDiscovery;
       credits = previousCredits;
       progression = previousProgression;
+      expansionCurrencies = previousExpansionCurrencies;
+      campaignExpansion = previousCampaignExpansion;
+      checkpointSnapshot = previousCheckpointSnapshot;
       game.setLuckPityState(luckPity);
       game.setHiddenDiscoveryState(hiddenDiscovery);
       updateSpecialShopAccess();
@@ -3658,6 +3824,9 @@ document.addEventListener("visibilitychange", () => {
       hiddenDiscovery,
       credits,
       progression,
+      expansionCurrencies,
+      campaignExpansion,
+      checkpointSnapshot,
     },
     "pagehide",
   );
@@ -3677,6 +3846,9 @@ window.addEventListener("pagehide", () => {
       hiddenDiscovery,
       credits,
       progression,
+      expansionCurrencies,
+      campaignExpansion,
+      checkpointSnapshot,
     },
     "pagehide",
   );
