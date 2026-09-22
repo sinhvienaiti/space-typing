@@ -207,8 +207,7 @@ function isValidLegacyRunPersistentStateWithoutShops(
     isValidHiddenDiscoveryState(raw.hiddenDiscovery) &&
     isValidCredits(raw.credits) &&
     isValidProgressionState(raw.progression) &&
-    isValidExpansionCurrencyState(raw.expansionCurrencies) &&
-    isValidShopState(raw.shops)
+    isValidExpansionCurrencyState(raw.expansionCurrencies)
   );
 }
 
@@ -255,7 +254,8 @@ export function isValidRunPersistentState(
     isValidHiddenDiscoveryState(raw.hiddenDiscovery) &&
     isValidCredits(raw.credits) &&
     isValidProgressionState(raw.progression) &&
-    isValidExpansionCurrencyState(raw.expansionCurrencies)
+    isValidExpansionCurrencyState(raw.expansionCurrencies) &&
+    isValidShopState(raw.shops)
   );
 }
 
