@@ -277,6 +277,14 @@ button.primary {
   line-height: 1.65;
 }
 
+.world-meta {
+  margin: -0.7rem auto 1.4rem;
+  color: #91b9c8;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
 .actions,
 .hints {
   display: flex;
@@ -440,6 +448,50 @@ kbd {
 .notice.visible {
   opacity: 1;
   transform: translate(-50%, 0);
+}
+
+.world-transition {
+  position: absolute;
+  z-index: 34;
+  left: 50%;
+  top: 12%;
+  min-width: min(430px, calc(100vw - 2rem));
+  padding: 1rem 1.35rem;
+  border: 1px solid rgba(128, 226, 255, 0.18);
+  border-radius: 14px;
+  background: rgba(5, 11, 20, 0.88);
+  box-shadow: 0 18px 70px rgba(0, 0, 0, 0.38);
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+  backdrop-filter: blur(7px);
+}
+
+.world-transition small,
+.world-transition span,
+.world-transition strong {
+  display: block;
+}
+
+.world-transition small {
+  color: #5ddcf2;
+  font-size: 0.64rem;
+  font-weight: 850;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.world-transition strong {
+  margin-top: 0.28rem;
+  color: #ecfbff;
+  font-size: clamp(1.35rem, 3vw, 2rem);
+  letter-spacing: -0.02em;
+}
+
+.world-transition span {
+  margin-top: 0.18rem;
+  color: #7f9cad;
+  font-size: 0.72rem;
 }
 
 .settings-dialog::backdrop {
