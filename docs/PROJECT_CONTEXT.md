@@ -3473,9 +3473,10 @@ Gameplay Expansion:
 - M12 Difficulty + Active Typing Pressure scheduler: COMPLETE
 - M13 Formation system: COMPLETE
 - M14 Branching Route Map + Station: COMPLETE
+- M15 Hidden Challenge / Hidden World / Champion Hunt: COMPLETE
 
 Next:
-- M15 Hidden Challenge / Hidden World / Champion Hunt
+- M16 Stage Objectives + boss typing mechanics
 ~~~
 
 Current gameplay/progression foundation:
@@ -3530,6 +3531,11 @@ Current gameplay/progression foundation:
 - mandatory Mini Boss / World Boss / Galaxy Major Boss stages remain forced Combat route nodes;
 - RouteState is part of RunPersistentState, so route choices participate in checkpoint rollback, stage-entry protection and technical crash recovery;
 - Shop/Station route nodes reuse the existing deterministic ShopState / Service Shop / Support Loadout systems rather than creating parallel services;
+- deterministic Hidden Signal nodes extend the same RouteState without rerolling existing v21 sector graphs;
+- Hidden Challenge Tier I-III scales from the selected global difficulty and never advances the numbered Campaign stage;
+- Hidden Worlds reuse production World environment/roster/boss identity for deterministic 1-5 encounter detours;
+- Champion Hunt/Apex Gauntlet reuse the existing Priority Kill Chain announcer and count only Elite/Champion/Apex priority kills;
+- challenge state participates in checkpoint, stage-entry, crash recovery, death rollback and backup/import through PlayerSave v22;
 - difficulty word pressure stays inside the configured vocabulary and does not change authored World Rank access;
 - stage-clear economy rewards use the frozen stage-start difficulty reward multiplier;
 - Service / Upgrade Shop consumes Credits + Alloy through the existing enhancement system;
@@ -3538,7 +3544,7 @@ Current gameplay/progression foundation:
 - Skill Engine:
   Energy / cooldown / charges / typing conditions / per-stage limits;
 - defensive and offensive combat skills plus 2-slot Support Spell loadout;
-- IndexedDB PlayerSave schema v20;
+- IndexedDB PlayerSave schema v22;
 - explicit migrations from all earlier supported PlayerSave schemas;
 - synchronized recovery mirror + autosave queue + validated JSON backup/import.
 
@@ -3590,14 +3596,19 @@ Final docs checkpoint CI #245 PASS Test + Build
 M14 Branching Route Map / Station
 CI #250 PASS Test + Build
 Integration music lifecycle CI #251 PASS Test + Build
+Final M14 checkpoint CI #254 PASS Test + Build
+
+M15 Hidden Challenge / Hidden World / Champion Hunt
+CI #256 PASS Test + Build on complete vertical slice
+Final persistence/docs checkpoint pending
 ~~~
 
 Important implementation notes:
 
-- Current PlayerSave schema is version 21; v20 migrates deterministically to RouteState without losing existing ShopState/checkpoint domains.
+- Current PlayerSave schema is version 22; v21 preserves RouteState/ShopState and migrates additively to an empty HiddenChallengeState without losing checkpoint/recovery domains.
 - Permanent systems must extend PlayerSave through explicit migrations.
 - Current runtime equipment uses the five-grade model; legacy rarity names remain only in migration/compatibility paths and historical step notes.
-- `ShopState` and `RouteState` are part of `RunPersistentState`, so shop stock and route choices are segment state rather than separate local-storage systems.
+- `ShopState`, `RouteState` and `HiddenChallengeState` are part of `RunPersistentState`, so shops/routes/challenges share checkpoint, rollback and recovery semantics rather than separate local-storage systems.
 - M07 canonical World ids are the authoritative World identity used by M06 shop instances, M08 music profiles, M09 enemy/boss roster selection and M10 World rank bands; M12 changes pressure, not World access.
 - Event/special tokens remain optional per the expansion plan. M06 does not create a permanent Event Token before an earning loop exists.
 - Support spell loadout is separate from core combat skills.
