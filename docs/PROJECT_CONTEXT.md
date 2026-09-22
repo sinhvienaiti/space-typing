@@ -3475,9 +3475,10 @@ Gameplay Expansion:
 - M14 Branching Route Map + Station: COMPLETE
 - M15 Hidden Challenge / Hidden World / Champion Hunt: COMPLETE
 - M16 Stage Objectives + boss typing mechanics: COMPLETE
+- M17 Skill/attribute/equipment upgrade expansion: COMPLETE
 
 Next:
-- M17 Skill/attribute/equipment upgrade expansion
+- M18 Run Relics
 ~~~
 
 Current gameplay/progression foundation:
@@ -3544,6 +3545,9 @@ Current gameplay/progression foundation:
 - difficulty word pressure stays inside the configured vocabulary and does not change authored World Rank access;
 - stage-clear economy rewards use the frozen stage-start difficulty reward multiplier;
 - Service / Upgrade Shop consumes Credits + Alloy through the existing enhancement system;
+- M17 UpgradeState persists core skill Lv1-Lv5 and permanent core-stat training through PlayerSave/checkpoint/crash/death rollback;
+- Lv5 core-skill mastery and level scaling compile into the existing SkillEngine/Game execution paths;
+- equipment instances can carry bounded grade-dependent affixes; Station services support dismantle, Silver/Gold evolution and affix roll/reroll without a second equipment system;
 - rare resurrection items can appear only as finite stock in eligible rare merchant pools;
 - shop stock participates in checkpoint rollback, crash recovery and stage-entry recovery;
 - Skill Engine:
@@ -3607,11 +3611,14 @@ CI #262 PASS Test + Build on implementation head
 
 M16 Stage Objectives / Boss Typing Mechanics
 CI #270 PASS Test + Build on implementation head
+
+M17 Skill / Attribute / Equipment Upgrade Expansion
+CI #281 PASS · 517/517 tests · TypeScript check + production build
 ~~~
 
 Important implementation notes:
 
-- Current PlayerSave schema is version 21; v20 migrates deterministically to RouteState without losing existing ShopState/checkpoint domains.
+- Current PlayerSave schema is version 22; v21 migrates deterministically by adding default UpgradeState while preserving existing Campaign, equipment, ShopState, RouteState and checkpoint/recovery domains.
 - Permanent systems must extend PlayerSave through explicit migrations.
 - Current runtime equipment uses the five-grade model; legacy rarity names remain only in migration/compatibility paths and historical step notes.
 - `ShopState` and `RouteState` are part of `RunPersistentState`, so shop stock and route choices are segment state rather than separate local-storage systems.
