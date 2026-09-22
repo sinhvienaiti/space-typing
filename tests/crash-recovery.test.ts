@@ -229,6 +229,18 @@ describe("M03 crash recovery", () => {
       "repair-kit": 5,
       "nova-bomb": 1,
     };
+    const failedOffer = createHiddenChallengeOffer(
+      190,
+      "route-190-death-hidden-signal",
+    );
+    active.challenge = startHiddenChallenge(
+      registerHiddenChallengeOffer(
+        active.challenge,
+        failedOffer,
+      ),
+      failedOffer.id,
+      "II",
+    );
     active.campaign.bestByStage["189"] = {
       score: 9000,
       accuracy: 100,
@@ -273,6 +285,9 @@ describe("M03 crash recovery", () => {
     expect(resolved.state.campaign.selectedStage).toBe(181);
     expect(resolved.state.credits).toBe(120);
     expect(resolved.state.inventory).toEqual({ "repair-kit": 1 });
+    expect(resolved.state.challenge).toEqual(
+      committedState.challenge,
+    );
     expect(resolved.state.campaign.bestByStage["189"]?.score).toBe(9000);
     expect(
       resolved.campaignExpansion.crashRecovery?.deathInvalidated,
