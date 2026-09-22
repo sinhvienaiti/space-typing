@@ -402,6 +402,9 @@ describe("save backup", () => {
       completedMissions: [],
       discoveredEnemies: [],
       discoveredBossStages: [],
+      discoveredItems: [],
+      discoveredEquipment: [],
+      discoveredCharacters: [],
     });
   });
 
@@ -414,6 +417,9 @@ describe("save backup", () => {
       completedMissions: [],
       discoveredEnemies: [],
       discoveredBossStages: [],
+      discoveredItems: [],
+      discoveredEquipment: [],
+      discoveredCharacters: [],
     };
 
     const result = parsePlayerSaveJson(JSON.stringify(raw));
