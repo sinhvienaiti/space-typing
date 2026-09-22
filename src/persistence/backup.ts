@@ -81,7 +81,11 @@ import {
   isValidShopState,
   type ShopState,
 } from "../shops/state";
-import { isValidRouteState } from "../campaign/route";
+import {
+  createRouteState,
+  isValidRouteState,
+  type RouteState,
+} from "../campaign/route";
 
 export type BackupParseResult =
   | {
@@ -186,6 +190,7 @@ export function exportPlayerSaveJson(
   crashRecoverySnapshot: CrashRecoverySnapshot | null = null,
   stageEntrySnapshot: StageEntrySnapshot | null = null,
   shops: ShopState = createShopState(),
+  route: RouteState = createRouteState(campaign.highestUnlockedStage),
 ): string {
   return JSON.stringify(
     createPlayerSave(
@@ -206,6 +211,7 @@ export function exportPlayerSaveJson(
       crashRecoverySnapshot,
       stageEntrySnapshot,
       shops,
+      route,
     ),
     null,
     2,
