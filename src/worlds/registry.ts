@@ -2,12 +2,29 @@ import {
   ENEMY_FAMILY_IDS,
   type EnemyFamilyId,
 } from "../enemies/families";
+import {
+  enemyDefinition,
+  type EnemyDefinitionId,
+} from "../enemies/registry";
 import { normalizeStage } from "../campaign/stage";
 import type { WorldProfile } from "./types";
 
 export const WORLD_COUNT = 50;
 export const WORLDS_PER_GALAXY = 5;
 export const STAGES_PER_WORLD = 20;
+
+export const WORLD_RANK_LABELS = [
+  "I",
+  "II",
+  "III",
+  "IV",
+  "V",
+  "VI",
+  "VII",
+  "VIII",
+  "IX",
+  "X",
+] as const;
 
 export const WORLD_IDS = Array.from(
   { length: WORLD_COUNT },
@@ -175,7 +192,10 @@ const GALAXY_WORLD_SPECS: readonly WorldSpec[] = [
   },
 ] as const;
 
-const FAMILY_ROSTERS: Record<EnemyFamilyId, readonly string[]> = {
+const FAMILY_ROSTERS: Record<
+  EnemyFamilyId,
+  readonly EnemyDefinitionId[]
+> = {
   rainbow: [
     "rainbow-scout",
     "rainbow-dart",
@@ -196,18 +216,24 @@ const FAMILY_ROSTERS: Record<EnemyFamilyId, readonly string[]> = {
   cosmic: ["star-core", "nova-core", "nebula-elite"],
 };
 
-const MINI_BOSS_BY_FAMILY: Record<EnemyFamilyId, string> = {
+const MINI_BOSS_BY_FAMILY: Record<
+  EnemyFamilyId,
+  EnemyDefinitionId
+> = {
   rainbow: "halo-seraph",
   angel: "halo-seraph",
   devil: "crown-demon",
   frost: "glacier-oracle",
   prism: "prism-sentinel",
   nature: "halo-seraph",
-  shadow: "prism-sentinel",
+  shadow: "crown-demon",
   cosmic: "prism-sentinel",
 };
 
-const WORLD_BOSS_BY_FAMILY: Record<EnemyFamilyId, string> = {
+const WORLD_BOSS_BY_FAMILY: Record<
+  EnemyFamilyId,
+  EnemyDefinitionId
+> = {
   rainbow: "prism-archon",
   angel: "archangel-core",
   devil: "demon-lord-orb",
@@ -222,13 +248,29 @@ function unique<T>(values: readonly T[]): T[] {
   return [...new Set(values)];
 }
 
+function bossForFamilies(
+  mapping: Record<EnemyFamilyId, EnemyDefinitionId>,
+  families: readonly EnemyFamilyId[],
+): EnemyDefinitionId {
+  for (const family of families) {
+    const candidate = mapping[family];
+    const definition = enemyDefinition(candidate);
+    if (
+      definition !== undefined &&
+      families.includes(definition.family)
+    ) {
+      return candidate;
+    }
+  }
+
+  return mapping[families[0] ?? "rainbow"];
+}
+
 function rankDistribution(worldIndex: number): Readonly<Record<string, number>> {
   const progress = worldIndex / (WORLD_COUNT - 1);
   const peak = 1 + Math.round(progress * 9);
   const result: Record<string, number> = {};
-  const labels = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
-
-  labels.forEach((label, index) => {
+  WORLD_RANK_LABELS.forEach((label, index) => {
     const rank = index + 1;
     const distance = Math.abs(rank - peak);
     result[label] =
@@ -271,8 +313,8 @@ function worldProfile(index: number): WorldProfile {
         .filter((enemyId) => enemyId.includes("elite")),
     ),
     apexPool: ["apex-" + primary],
-    miniBoss: MINI_BOSS_BY_FAMILY[primary],
-    worldBoss: WORLD_BOSS_BY_FAMILY[primary],
+    miniBoss: bossForFamilies(MINI_BOSS_BY_FAMILY, families),
+    worldBoss: bossForFamilies(WORLD_BOSS_BY_FAMILY, families),
     worldRules: [
       ...spec.rules,
       "world-slot-" + String(slot + 1),
@@ -408,6 +450,74 @@ export function validateWorldRegistry(
       world.worldBoss.trim().length === 0
     ) {
       errors.push(world.id + ": enemy/boss contract cannot be empty.");
+    }
+
+    for (const enemyId of world.enemyRoster) {
+      const definition = enemyDefinition(enemyId);
+      if (definition === undefined) {
+        errors.push(world.id + ": unknown enemy id " + enemyId + ".");
+        continue;
+      }
+      if (!world.enemyFamilies.includes(definition.family)) {
+        errors.push(
+          world.id +
+            ": enemy " +
+            enemyId +
+            " is outside the World family contract.",
+        );
+      }
+      if (
+        definition.role === "boss" ||
+        definition.role === "mini-boss"
+      ) {
+        errors.push(
+          world.id + ": boss definitions cannot be regular roster entries.",
+        );
+      }
+    }
+
+    for (const eliteId of world.elitePool) {
+      const definition = enemyDefinition(eliteId);
+      if (
+        definition === undefined ||
+        definition.role !== "elite" ||
+        !world.enemyRoster.includes(eliteId)
+      ) {
+        errors.push(world.id + ": invalid elite pool entry " + eliteId + ".");
+      }
+    }
+
+    const miniBoss = enemyDefinition(world.miniBoss);
+    if (
+      miniBoss === undefined ||
+      miniBoss.role !== "mini-boss" ||
+      !world.enemyFamilies.includes(miniBoss.family)
+    ) {
+      errors.push(world.id + ": invalid Mini Boss contract.");
+    }
+
+    const worldBoss = enemyDefinition(world.worldBoss);
+    if (
+      worldBoss === undefined ||
+      worldBoss.role !== "boss" ||
+      !world.enemyFamilies.includes(worldBoss.family)
+    ) {
+      errors.push(world.id + ": invalid World Boss contract.");
+    }
+
+    const rankWeights = WORLD_RANK_LABELS.map(
+      (label) => world.rankDistribution[label],
+    );
+    if (
+      rankWeights.some(
+        (weight) =>
+          typeof weight !== "number" ||
+          !Number.isFinite(weight) ||
+          weight < 0,
+      ) ||
+      !rankWeights.some((weight) => (weight ?? 0) > 0)
+    ) {
+      errors.push(world.id + ": invalid rank-distribution contract.");
     }
     if (
       world.visualTheme.trim().length === 0 ||

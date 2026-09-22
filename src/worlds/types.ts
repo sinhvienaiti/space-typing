@@ -1,4 +1,5 @@
 import type { EnemyFamilyId } from "../enemies/families";
+import type { EnemyDefinitionId } from "../enemies/registry";
 
 export type WorldProfile = {
   id: string;
@@ -10,12 +11,12 @@ export type WorldProfile = {
   backgroundProfile: string;
   ambientProfile: string;
   enemyFamilies: readonly EnemyFamilyId[];
-  enemyRoster: readonly string[];
+  enemyRoster: readonly EnemyDefinitionId[];
   rankDistribution: Readonly<Record<string, number>>;
-  elitePool: readonly string[];
+  elitePool: readonly EnemyDefinitionId[];
   apexPool: readonly string[];
-  miniBoss: string;
-  worldBoss: string;
+  miniBoss: EnemyDefinitionId;
+  worldBoss: EnemyDefinitionId;
   worldRules: readonly string[];
   environmentalHazards: readonly string[];
   wordAffinity: readonly string[];

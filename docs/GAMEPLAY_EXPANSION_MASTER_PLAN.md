@@ -3013,9 +3013,20 @@ Integrates with the existing SFX/pronunciation/announcer architecture instead of
 
 ## M09 — World enemy/boss roster mapping
 
-Make enemy families, rank bands, Mini Boss and World Boss come from the World profile.
+**Status: Complete.** The production Game runtime now resolves regular enemy visual/reward identities, Elite identities, Mini Bosses and World Bosses from the current `WorldProfile`. Campaign boss cadence has been intentionally migrated to the canonical 20-stage World rhythm, while existing EnemyKind combat mechanics and BossState behavior remain authoritative. See `docs/M09_WORLD_ROSTERS.md`.
 
-Reuse the existing enemy/boss systems.
+Implemented:
+
+- World-typed enemy/boss roster contracts;
+- validated World enemy families, regular rosters and Elite pools;
+- World-driven production enemy selection;
+- World-contained reward-enemy replacement;
+- World-driven Mini Boss / World Boss / Galaxy Major Boss identity;
+- Campaign local Stage 10 Mini Boss / Stage 20 World Boss rhythm;
+- existing Elite/Special/Hazard/Gauntlet systems retained at intra-World milestones;
+- World rank-band distribution exposed and validated as the M10 source.
+
+M10 owns the actual Rank I-X runtime effects, `WordDifficultyScore` and 1/2/3 typing-layer mechanics.
 
 ## M10 — Enemy Rank + word difficulty + typing layers
 

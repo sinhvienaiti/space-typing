@@ -12,8 +12,8 @@ import {
 } from "./boss/model";
 import type { BossHudState, BossState } from "./boss/model";
 import {
-  bossVisualDefinitionId,
-  bossVisualName,
+  bossVisualDefinitionIdForStage,
+  bossVisualNameForStage,
 } from "./boss/visual-profile";
 import type { DifficultyProfile, StageConfig } from "./campaign/types";
 import {
@@ -219,9 +219,9 @@ import {
 } from "./enemies/reward-runtime";
 import { drawModularEnemy } from "./enemies/renderer";
 import {
-  runtimeEnemyDefinitionId,
-  spawnEnemyDefinitionId,
-} from "./enemies/spawn-profile";
+  spawnWorldEnemyDefinitionId,
+  worldRuntimeEnemyDefinitionId,
+} from "./worlds/roster";
 import {
   isRecoveryItemId,
   useRecoveryItem,
@@ -1933,7 +1933,10 @@ export class Game {
       stage.role,
       entry,
     );
-    this.boss.name = bossVisualName(stage.galaxy, this.boss.role);
+    this.boss.name = bossVisualNameForStage(
+      stage.stage,
+      this.boss.role,
+    );
     this.bossSpawned = true;
     this.bossDefeated = false;
     this.projectiles = [];
@@ -1943,7 +1946,7 @@ export class Game {
       Math.max(0.75, this.difficulty?.bossPressure ?? 1);
     this.hooks.onBossUpdate(toBossHud(this.boss));
     const bossDefinition = enemyDefinition(
-      bossVisualDefinitionId(stage.galaxy, this.boss.role),
+      bossVisualDefinitionIdForStage(stage.stage, this.boss.role),
     );
     if (bossDefinition !== undefined) {
       const fx = enemyFxProfile(bossDefinition.family, "boss-intro");
@@ -2247,7 +2250,11 @@ export class Game {
       profile.radius + 70,
       this.width - profile.radius - 70,
     );
-    const definitionId = spawnEnemyDefinitionId(kind, elite, stage);
+    const definitionId = spawnWorldEnemyDefinitionId(
+      kind,
+      elite,
+      stage,
+    );
 
     this.enemies.push({
       id: this.nextEnemyId++,
@@ -2631,7 +2638,10 @@ export class Game {
 
     const { x, y } = this.bossPosition();
     const definition = enemyDefinition(
-      bossVisualDefinitionId(this.stageConfig?.galaxy ?? 1, boss.role),
+      bossVisualDefinitionIdForStage(
+        this.stageConfig?.stage ?? 1,
+        boss.role,
+      ),
     );
     const fx = enemyFxProfile(
       definition?.family ?? "devil",
@@ -2658,7 +2668,10 @@ export class Game {
     this.gainPower(18);
 
     const definition = enemyDefinition(
-      bossVisualDefinitionId(this.stageConfig?.galaxy ?? 1, boss.role),
+      bossVisualDefinitionIdForStage(
+        this.stageConfig?.stage ?? 1,
+        boss.role,
+      ),
     );
     const fx = enemyFxProfile(
       definition?.family ?? "devil",
@@ -3073,7 +3086,7 @@ export class Game {
   private visualDefinitionForEnemy(enemy: Enemy) {
     return enemyDefinition(
       enemy.definitionId ??
-        runtimeEnemyDefinitionId(
+        worldRuntimeEnemyDefinitionId(
           enemy.kind,
           enemy.elite,
           this.stageConfig?.stage ?? 1,
@@ -4423,7 +4436,10 @@ export class Game {
     const phaseColor =
       boss.phase >= 3 ? "#ff527c" : boss.phase === 2 ? "#68e9ff" : "#ff8a6f";
     const definition = enemyDefinition(
-      bossVisualDefinitionId(this.stageConfig?.galaxy ?? 1, boss.role),
+      bossVisualDefinitionIdForStage(
+        this.stageConfig?.stage ?? 1,
+        boss.role,
+      ),
     );
     const modularDrawn =
       definition !== undefined &&
@@ -4876,7 +4892,7 @@ export class Game {
 
     const visual = enemyDefinition(
       enemy.definitionId ??
-        runtimeEnemyDefinitionId(
+        worldRuntimeEnemyDefinitionId(
           enemy.kind,
           enemy.elite,
           this.stageConfig?.stage ?? 1,

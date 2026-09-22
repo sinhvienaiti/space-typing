@@ -44,7 +44,10 @@ describe("Stage 001-100 balance audit", () => {
   });
 
   it("returns to a lower pressure band after role spikes", () => {
-    for (const stage of [10, 20, 40, 50, 60, 70, 80, 90]) {
+    for (const stage of [
+      5, 10, 20, 25, 30, 35, 40, 45, 50,
+      55, 60, 65, 70, 75, 80, 85, 90, 95,
+    ]) {
       const role = points[stage - 1]!;
       const recovery = points[stage]!;
       expect(recovery.role).toBe("normal");
@@ -72,12 +75,15 @@ describe("Stage 001-100 balance audit", () => {
         .map((point) => [point.stage, point.role]),
     );
 
-    expect(roles.get(10)).toBe("elite");
-    expect(roles.get(20)).toBe("mini-boss");
-    expect(roles.get(30)).toBe("special");
-    expect(roles.get(50)).toBe("boss");
-    expect(roles.get(60)).toBe("hazard");
-    expect(roles.get(90)).toBe("gauntlet");
+    expect(roles.get(5)).toBe("elite");
+    expect(roles.get(10)).toBe("mini-boss");
+    expect(roles.get(15)).toBe("special");
+    expect(roles.get(20)).toBe("boss");
+    expect(roles.get(30)).toBe("mini-boss");
+    expect(roles.get(40)).toBe("boss");
+    expect(roles.get(55)).toBe("hazard");
+    expect(roles.get(90)).toBe("mini-boss");
+    expect(roles.get(95)).toBe("gauntlet");
     expect(roles.get(100)).toBe("major-boss");
   });
 });
