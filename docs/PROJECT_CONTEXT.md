@@ -3032,6 +3032,21 @@ Black Market / Event Shop rules:
 ## Step 55
 Implement Buff/Debuff/Status engine.
 
+**Status: implemented.**
+
+Status-engine rules:
+
+- one generic in-stage status state tracks positive and negative effects with remaining time, stacks and source;
+- status definitions own polarity, stack/refresh behavior, stack caps and cleanseability;
+- Ward provides bounded resistance against negative-status application while existing Ward duration scaling remains intact;
+- status timers advance only from the active `playing` update loop, so pause does not consume status duration;
+- Cleanse removes cleanseable negative statuses and now operates through the generic engine;
+- Jammer interference is represented as the `Jammed` negative status while continuing to drive the existing hidden-word interference mechanic;
+- Barrier and Sanctuary register `Fortified` positive status stacks and the generic status multiplier feeds the existing incoming-damage path;
+- the engine includes the planned positive/negative status IDs from the design so later hazards/enemies can consume the same registry rather than inventing parallel timers;
+- active statuses are surfaced in the combat HUD with remaining duration;
+- temporary status state is stage-local and is intentionally not persisted.
+
 ## Step 56
 Implement build Synergy rules.
 
