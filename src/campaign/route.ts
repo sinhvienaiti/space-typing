@@ -338,6 +338,73 @@ export function isValidRouteGraph(
   return true;
 }
 
+export function isValidRouteState(
+  value: unknown,
+  stage: number,
+): value is RouteState {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    Array.isArray(value)
+  ) {
+    return false;
+  }
+
+  const raw = value as Record<string, unknown>;
+  if (
+    raw.version !== 1 ||
+    !isValidRouteGraph(raw.graph) ||
+    raw.selectedByStage === null ||
+    typeof raw.selectedByStage !== "object" ||
+    Array.isArray(raw.selectedByStage) ||
+    !Array.isArray(raw.visitedNodeIds)
+  ) {
+    return false;
+  }
+
+  const sector = sectorForStage(stage);
+  const graph = raw.graph;
+  if (
+    graph.sectorStart !== sector.startStage ||
+    graph.sectorEnd !== sector.endStage
+  ) {
+    return false;
+  }
+
+  for (const [key, candidate] of Object.entries(
+    raw.selectedByStage as Record<string, unknown>,
+  )) {
+    const targetStage = Number(key);
+    if (
+      !Number.isInteger(targetStage) ||
+      typeof candidate !== "string"
+    ) {
+      return false;
+    }
+    const node = nodeById(graph, candidate);
+    if (
+      node === undefined ||
+      node.targetStage !== targetStage
+    ) {
+      return false;
+    }
+  }
+
+  const visited = raw.visitedNodeIds;
+  if (
+    new Set(visited).size !== visited.length ||
+    !visited.every(
+      (id) =>
+        typeof id === "string" &&
+        nodeById(graph, id) !== undefined,
+    )
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
 export function createRouteState(
   stage: number,
 ): RouteState {
