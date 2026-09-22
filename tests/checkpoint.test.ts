@@ -126,6 +126,11 @@ describe("M02 checkpoint and rollback", () => {
     const committedActive = runState(progressAt(181));
     committedActive.credits = 100;
     committedActive.inventory = { "repair-kit": 1 };
+    committedActive.expansionCurrencies = {
+      alloy: 4,
+      starCrystal: 1,
+      quantumCore: 0,
+    };
     committedActive.hiddenDiscovery.discovered = ["echo-rift"];
     committedActive.progression.unlockedAchievements = ["first-clear"];
 
@@ -139,6 +144,11 @@ describe("M02 checkpoint and rollback", () => {
     active.inventory = {
       "repair-kit": 5,
       "nova-bomb": 2,
+    };
+    active.expansionCurrencies = {
+      alloy: 55,
+      starCrystal: 7,
+      quantumCore: 2,
     };
     active.campaign.bestByStage["189"] = {
       score: 9000,
@@ -161,6 +171,11 @@ describe("M02 checkpoint and rollback", () => {
     expect(restored.campaign.selectedStage).toBe(181);
     expect(restored.credits).toBe(100);
     expect(restored.inventory).toEqual({ "repair-kit": 1 });
+    expect(restored.expansionCurrencies).toEqual({
+      alloy: 4,
+      starCrystal: 1,
+      quantumCore: 0,
+    });
     expect(restored.campaign.bestByStage["189"]?.score).toBe(9000);
     expect(restored.hiddenDiscovery.discovered).toEqual([
       "echo-rift",
