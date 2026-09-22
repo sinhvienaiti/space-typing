@@ -125,8 +125,12 @@ import {
 import { gradeLabel } from "./grades";
 import { CORE_STAT_KEYS, type CoreStatKey } from "./stats/core";
 import {
+  attributeUpgradeCost,
   createUpgradeState,
+  maxAttributeLevel,
   permanentAttributeBonus,
+  skillUpgradeCost,
+  type UpgradeCost,
   type UpgradeState,
 } from "./progression/upgrades";
 import {
@@ -3398,12 +3402,92 @@ function applyServiceShopState(
   updateDataSummary();
 }
 
+function upgradeCostText(cost: UpgradeCost): string {
+  const parts = [
+    cost.credits.toLocaleString() + " Credits",
+    cost.alloy.toLocaleString() + " Alloy",
+  ];
+  if (cost.starCrystal > 0) {
+    parts.push(
+      cost.starCrystal.toLocaleString() + " Star Crystal",
+    );
+  }
+  if (cost.quantumCore > 0) {
+    parts.push(
+      cost.quantumCore.toLocaleString() + " Quantum Core",
+    );
+  }
+  return parts.join(" + ");
+}
+
+function canAffordUpgradeCost(cost: UpgradeCost): boolean {
+  return (
+    campaign.highestUnlockedStage >= cost.requiredStage &&
+    credits >= cost.credits &&
+    expansionCurrencies.alloy >= cost.alloy &&
+    expansionCurrencies.starCrystal >= cost.starCrystal &&
+    expansionCurrencies.quantumCore >= cost.quantumCore
+  );
+}
+
+function serviceFailureText(
+  reason:
+    | "credits"
+    | "alloy"
+    | "star-crystal"
+    | "quantum-core"
+    | "stage"
+    | "full"
+    | "max"
+    | "missing"
+    | "equipped"
+    | "grade"
+    | "affix"
+    | null,
+): string {
+  if (reason === "credits") return "Not enough Credits";
+  if (reason === "alloy") return "Not enough Alloy";
+  if (reason === "star-crystal") return "Not enough Star Crystal";
+  if (reason === "quantum-core") return "Not enough Quantum Core";
+  if (reason === "stage") return "Campaign progress is too low for this service";
+  if (reason === "equipped") return "Unequip this item before dismantling";
+  if (reason === "grade") return "This equipment cannot evolve yet";
+  if (reason === "affix") return "No valid affix slot/action is available";
+  if (reason === "max") return "Already at maximum level";
+  if (reason === "full") return "Inventory stack is full";
+  return "Unable to apply this Station service";
+}
+
+function commitUpgradeService(
+  result: ReturnType<typeof buySkillUpgrade>,
+  message: string,
+  countAsPurchase = true,
+): void {
+  if (!result.applied) {
+    showNotice(serviceFailureText(result.reason));
+    renderServiceShop();
+    return;
+  }
+
+  applyServiceShopState(result.state);
+  if (countAsPurchase) {
+    recordShopProgress();
+    renderProgression();
+  }
+  renderServiceShop();
+  void autosaveCampaign("upgrade", message, "upgrade");
+}
+
 function renderServiceShop(): void {
   byId("serviceShopCredits").textContent =
     credits.toLocaleString() +
     " Credits · " +
     expansionCurrencies.alloy.toLocaleString() +
-    " Alloy";
+    " Alloy · " +
+    expansionCurrencies.starCrystal.toLocaleString() +
+    " Star Crystal · " +
+    expansionCurrencies.quantumCore.toLocaleString() +
+    " Quantum Core";
 
   const repairPanel = byId("repairServicePanel");
   repairPanel.replaceChildren();
@@ -3463,6 +3547,115 @@ function renderServiceShop(): void {
   repairCard.append(repairTitle, repairDescription, repairButton);
   repairPanel.append(repairCard);
 
+  for (const id of UPGRADEABLE_SKILL_IDS) {
+    const level = upgrades.skillLevels[id];
+    const cost = skillUpgradeCost(level);
+    const definition = game.getSkillDefinition(id);
+    const card = document.createElement("article");
+    card.className = "service-shop-card";
+
+    const title = document.createElement("strong");
+    title.textContent =
+      (definition?.name ?? id) +
+      " · Lv" +
+      String(level) +
+      "/5";
+
+    const detail = document.createElement("small");
+    detail.textContent =
+      "Core skill progression · higher levels improve efficiency/effect; Lv5 unlocks mastery behavior.";
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.disabled =
+      cost === null || !canAffordUpgradeCost(cost);
+    button.textContent =
+      cost === null
+        ? "Mastered Lv5"
+        : "Skill Lv" +
+          String(level + 1) +
+          " · " +
+          upgradeCostText(cost);
+    button.addEventListener("click", () => {
+      commitUpgradeService(
+        buySkillUpgrade(
+          {
+            credits,
+            expansionCurrencies,
+            inventory,
+            equipment,
+            upgrades,
+          },
+          id,
+          campaign.highestUnlockedStage,
+        ),
+        "✓ Skill upgraded · " +
+          (definition?.name ?? id) +
+          " Lv" +
+          String(level + 1),
+      );
+    });
+
+    card.append(title, detail, button);
+    repairPanel.append(card);
+  }
+
+  for (const key of CORE_STAT_KEYS) {
+    const level = upgrades.attributeLevels[key];
+    const max = maxAttributeLevel(key);
+    const cost = attributeUpgradeCost(key, level);
+    const card = document.createElement("article");
+    card.className = "service-shop-card";
+
+    const title = document.createElement("strong");
+    title.textContent =
+      key.toUpperCase() +
+      " · Lv" +
+      String(level) +
+      "/" +
+      String(max);
+
+    const detail = document.createElement("small");
+    detail.textContent =
+      key === "luck" || key === "salvage"
+        ? "Economy-sensitive permanent attribute · stricter cap and cost curve."
+        : "Permanent core-stat training · participates in checkpoint rollback semantics.";
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.disabled =
+      cost === null || !canAffordUpgradeCost(cost);
+    button.textContent =
+      cost === null
+        ? "Maxed"
+        : "Train Lv" +
+          String(level + 1) +
+          " · " +
+          upgradeCostText(cost);
+    button.addEventListener("click", () => {
+      commitUpgradeService(
+        buyAttributeUpgrade(
+          {
+            credits,
+            expansionCurrencies,
+            inventory,
+            equipment,
+            upgrades,
+          },
+          key as CoreStatKey,
+          campaign.highestUnlockedStage,
+        ),
+        "✓ Permanent attribute trained · " +
+          key +
+          " Lv" +
+          String(level + 1),
+      );
+    });
+
+    card.append(title, detail, button);
+    repairPanel.append(card);
+  }
+
   const grid = byId("upgradeShopGrid");
   grid.replaceChildren();
 
@@ -3482,10 +3675,18 @@ function renderServiceShop(): void {
       String(item.enhancement);
 
     const detail = document.createElement("small");
+    const affixText =
+      (item.affixes ?? []).length > 0
+        ? " · " +
+          (item.affixes ?? [])
+            .map((id) => EQUIPMENT_AFFIX_REGISTRY[id].name)
+            .join(" / ")
+        : "";
     detail.textContent =
       definition.slot +
       " · " +
       definition.description +
+      affixText +
       (equipment.loadout[definition.slot] === item.instanceId
         ? " · EQUIPPED"
         : "");
@@ -3546,6 +3747,133 @@ function renderServiceShop(): void {
     });
 
     card.append(title, detail, button);
+
+    const evolutionCost = equipmentEvolutionCost(item);
+    if (evolutionCost !== null) {
+      const evolve = document.createElement("button");
+      evolve.type = "button";
+      evolve.disabled = !canAffordUpgradeCost(evolutionCost);
+      evolve.textContent =
+        "Evolve grade · " +
+        upgradeCostText(evolutionCost);
+      evolve.addEventListener("click", () => {
+        commitUpgradeService(
+          buyEquipmentEvolution(
+            {
+              credits,
+              expansionCurrencies,
+              inventory,
+              equipment,
+              upgrades,
+            },
+            item.instanceId,
+            campaign.highestUnlockedStage,
+          ),
+          "✓ Equipment grade evolved · " + definition.name,
+        );
+      });
+      card.append(evolve);
+    }
+
+    const maxAffixes = maxAffixesForGrade(item.grade);
+    const affixCount = (item.affixes ?? []).length;
+    const affixCost = equipmentAffixRollCost(item, false);
+    if (
+      affixCost !== null &&
+      affixCount < maxAffixes
+    ) {
+      const rollAffix = document.createElement("button");
+      rollAffix.type = "button";
+      rollAffix.disabled = !canAffordUpgradeCost(affixCost);
+      rollAffix.textContent =
+        "Roll affix " +
+        String(affixCount + 1) +
+        "/" +
+        String(maxAffixes) +
+        " · " +
+        upgradeCostText(affixCost);
+      rollAffix.addEventListener("click", () => {
+        commitUpgradeService(
+          buyEquipmentAffix(
+            {
+              credits,
+              expansionCurrencies,
+              inventory,
+              equipment,
+              upgrades,
+            },
+            item.instanceId,
+            campaign.highestUnlockedStage,
+          ),
+          "✓ Equipment affix rolled · " + definition.name,
+        );
+      });
+      card.append(rollAffix);
+    }
+
+    const rerollCost = equipmentAffixRollCost(item, true);
+    if (rerollCost !== null && affixCount > 0) {
+      const reroll = document.createElement("button");
+      reroll.type = "button";
+      reroll.disabled = !canAffordUpgradeCost(rerollCost);
+      reroll.textContent =
+        "Reroll first affix · others locked · " +
+        upgradeCostText(rerollCost);
+      reroll.addEventListener("click", () => {
+        commitUpgradeService(
+          buyEquipmentAffixReroll(
+            {
+              credits,
+              expansionCurrencies,
+              inventory,
+              equipment,
+              upgrades,
+            },
+            item.instanceId,
+            0,
+            campaign.highestUnlockedStage,
+          ),
+          "✓ Equipment affix rerolled · " + definition.name,
+        );
+      });
+      card.append(reroll);
+    }
+
+    const dismantle = document.createElement("button");
+    dismantle.type = "button";
+    const equipped =
+      equipment.loadout[definition.slot] === item.instanceId;
+    const salvage = dismantleReward(item);
+    dismantle.disabled = equipped;
+    dismantle.textContent =
+      equipped
+        ? "Dismantle · unequip first"
+        : "Dismantle · +" +
+          salvage.alloy.toLocaleString() +
+          " Alloy" +
+          (salvage.starCrystal > 0
+            ? " + " +
+              salvage.starCrystal.toLocaleString() +
+              " Star Crystal"
+            : "");
+    dismantle.addEventListener("click", () => {
+      commitUpgradeService(
+        dismantleEquipment(
+          {
+            credits,
+            expansionCurrencies,
+            inventory,
+            equipment,
+            upgrades,
+          },
+          item.instanceId,
+        ),
+        "✓ Equipment dismantled · " + definition.name,
+        false,
+      );
+    });
+    card.append(dismantle);
+
     grid.append(card);
   }
 }
