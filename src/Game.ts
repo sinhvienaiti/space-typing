@@ -158,6 +158,17 @@ import {
   type StageRandomEventModifiers,
 } from "./events/stage-scheduler";
 import {
+  applyStatus,
+  cleanseNegativeStatuses,
+  createStatusState,
+  hasCleanseableNegativeStatus,
+  statusIncomingDamageMultiplier,
+  statusRemaining,
+  tickStatuses,
+  type ActiveStatus,
+  type StatusState,
+} from "./status/engine";
+import {
   goldenEnemyChance,
   treasureDroneChance,
   type TreasureDrone,
@@ -254,6 +265,7 @@ type Hooks = {
     state: HiddenDiscoveryState,
     discovery: HiddenContentDefinition | null,
   ): void;
+  onStatuses(statuses: readonly ActiveStatus[]): void;
   onSkills(): void;
 };
 
@@ -384,6 +396,7 @@ export class Game {
   private stageEvents: StageRandomEventDefinition[] = [];
   private stageEventModifiers: StageRandomEventModifiers =
     createStageEventModifiers();
+  private statusState: StatusState = createStatusState();
   private lastTime = performance.now();
   private animationFrame = 0;
   private stars: Array<{ x: number; y: number; z: number }> = [];
@@ -534,7 +547,11 @@ export class Game {
       return "effect-not-needed";
     }
 
-    if (id === "cleanse" && this.interferenceTimer <= 0) {
+    if (
+      id === "cleanse" &&
+      this.interferenceTimer <= 0 &&
+      !hasCleanseableNegativeStatus(this.statusState)
+    ) {
       return "effect-not-needed";
     }
 
@@ -874,6 +891,7 @@ export class Game {
         72 + this.playerStats.shield * 0.45,
       );
       this.barrierTimer = Math.max(this.barrierTimer, 7);
+      this.addStatus("fortified", 7, "skill:barrier");
       this.burst(playerX, playerY, 28, 188);
       this.sfx.support();
     } else if (id === "reflect-field") {
@@ -1006,6 +1024,7 @@ export class Game {
         50 + this.playerStats.shield * 0.25,
       );
       this.barrierTimer = Math.max(this.barrierTimer, 6);
+      this.addStatus("fortified", 6, "support:sanctuary");
       this.burst(playerX, playerY, 34, 164);
       this.sfx.support();
       this.emitStats();
@@ -1020,6 +1039,9 @@ export class Game {
     }
 
     if (id === "cleanse") {
+      this.setStatusState(
+        cleanseNegativeStatuses(this.statusState),
+      );
       this.interferenceTimer = 0;
       this.burst(playerX, playerY, 24, 176);
       this.sfx.support();
@@ -1135,6 +1157,27 @@ export class Game {
     this.hiddenDiscovery = sanitizeHiddenDiscoveryState(state);
   }
 
+  private setStatusState(state: StatusState): void {
+    this.statusState = state;
+    this.interferenceTimer = statusRemaining(state, "jammed");
+    this.hooks.onStatuses(state);
+  }
+
+  private addStatus(
+    id: ActiveStatus["id"],
+    duration: number,
+    source: string,
+    useWard = false,
+  ): boolean {
+    const result = applyStatus(
+      this.statusState,
+      { id, duration, source },
+      useWard ? this.playerStats.ward : 0,
+    );
+    this.setStatusState(result.state);
+    return result.applied;
+  }
+
   setVocabulary(entries: VocabularyEntry[]): void {
     if (entries.length === 0) return;
     this.vocabulary = entries;
@@ -1239,8 +1282,11 @@ export class Game {
     this.cloakTimer = 0;
     this.weaponOverclockTimer = 0;
     this.celestialCharge = 0;
+    this.statusState = createStatusState();
+    this.interferenceTimer = 0;
     this.skillHudTimer = 0;
     this.hooks.onBossUpdate(null);
+    this.hooks.onStatuses(this.statusState);
     this.hooks.onSkills();
     this.hooks.onPhase(this.phase);
     this.hooks.onStats(this.getStats());
@@ -1427,7 +1473,11 @@ export class Game {
   private update(dt: number): void {
     this.shake = Math.max(0, this.shake - dt * 28);
     this.overdriveTimer = Math.max(0, this.overdriveTimer - dt);
-    this.interferenceTimer = Math.max(0, this.interferenceTimer - dt);
+    this.statusState = tickStatuses(this.statusState, dt);
+    this.interferenceTimer = statusRemaining(
+      this.statusState,
+      "jammed",
+    );
     this.barrierTimer = Math.max(0, this.barrierTimer - dt);
     this.reflectTimer = Math.max(0, this.reflectTimer - dt);
     this.timeShellTimer = Math.max(0, this.timeShellTimer - dt);
@@ -1450,6 +1500,7 @@ export class Game {
     if (this.skillHudTimer <= 0) {
       this.skillHudTimer = 0.15;
       this.hooks.onSkills();
+      this.hooks.onStatuses(this.statusState);
     }
 
     const difficulty = this.difficulty;
@@ -2032,16 +2083,19 @@ export class Game {
   }
 
   private activateInterference(jammer: Enemy): void {
-    this.interferenceTimer = Math.max(
-      this.interferenceTimer,
-      wardDuration(
-        1.15 +
-          Math.min(
-            0.55,
-            (this.difficulty?.combatPressure ?? 1) * 0.12,
-          ),
-        this.playerStats,
-      ),
+    const duration = wardDuration(
+      1.15 +
+        Math.min(
+          0.55,
+          (this.difficulty?.combatPressure ?? 1) * 0.12,
+        ),
+      this.playerStats,
+    );
+    this.addStatus(
+      "jammed",
+      duration,
+      "enemy:" + jammer.kind,
+      true,
     );
     this.burst(jammer.x, jammer.y, 18, 74);
     this.sfx.enemyShot();
@@ -3094,6 +3148,9 @@ export class Game {
       this.guardianBlocks = Math.max(this.guardianBlocks, 5);
     } else if (isVolt) {
       this.projectiles = [];
+      this.setStatusState(
+        cleanseNegativeStatuses(this.statusState),
+      );
       this.interferenceTimer = 0;
       this.stats.energy = this.stats.maxEnergy;
 
@@ -3486,7 +3543,8 @@ export class Game {
         energy: this.stats.energy,
       },
       this.playerStats,
-      damageRemaining,
+      damageRemaining *
+        statusIncomingDamageMultiplier(this.statusState),
     );
 
     this.stats.hull = damage.resources.hull;
