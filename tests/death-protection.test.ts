@@ -48,7 +48,7 @@ function stateAt(stage: number): RunPersistentState {
     progression: createProgressionState(),
     expansionCurrencies: createExpansionCurrencyState(),
     shops: createShopState(),
-    route: createRouteState(campaign.highestUnlockedStage),
+    route: createRouteState(stage),
   };
 }
 
