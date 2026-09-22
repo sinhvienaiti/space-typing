@@ -223,12 +223,17 @@ export function resolveCrashRecovery(
   }
 
   if (crashRecovery.deathInvalidated) {
+    const rolledBack = rollbackCampaignExpansion(
+      expansion,
+      timestamp,
+    );
     return {
       state: restoreCheckpointSnapshot(checkpoint, activeState),
-      campaignExpansion: rollbackCampaignExpansion(
-        expansion,
-        timestamp,
-      ),
+      campaignExpansion: {
+        ...rolledBack,
+        crashRecovery:
+          crashRecovery.campaignExpansion.crashRecovery,
+      },
       checkpointSnapshot: checkpoint,
       crashRecoverySnapshot: crashRecovery,
       mode: "death-rollback",
