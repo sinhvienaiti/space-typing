@@ -2939,7 +2939,9 @@ Implemented:
 
 ## M04 — Resurrection/protection items
 
-Implement:
+**Status: Complete.** PlayerSave v18 now persists deterministic stage-entry snapshots, Game Over exposes item-aware death choices, Salvage Anchor and Stage Revival Core reuse the M02/M03 state layers, and Phoenix Core resumes the same in-memory encounter with partial resources plus a visible grace window. See `docs/M04_DEATH_PROTECTION.md`.
+
+Implemented:
 
 - Salvage Anchor;
 - Stage Revival Core;
