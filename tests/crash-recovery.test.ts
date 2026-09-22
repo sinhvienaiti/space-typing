@@ -15,7 +15,13 @@ import {
   selectRouteNode,
   selectedRouteNode,
 } from "../src/campaign/route";
-import { createHiddenChallengeState } from "../src/campaign/hidden-challenge";
+import {
+  completeHiddenChallengeEncounter,
+  createHiddenChallengeOffer,
+  createHiddenChallengeState,
+  registerHiddenChallengeOffer,
+  startHiddenChallenge,
+} from "../src/campaign/hidden-challenge";
 import {
   createCheckpointSnapshot,
   type RunPersistentState,
@@ -151,6 +157,61 @@ describe("M03 crash recovery", () => {
     expect(
       selectedRouteNode(resolved.state.route, 189)?.id,
     ).toBe(routeChoice.id);
+  });
+
+  it("restores an active hidden challenge from the last safe transition", () => {
+    const safeState = stateAt(190);
+    const offer = {
+      ...createHiddenChallengeOffer(
+        190,
+        "route-190-hidden-signal",
+      ),
+      encounterCount: 2,
+    };
+    safeState.challenge = startHiddenChallenge(
+      registerHiddenChallengeOffer(
+        safeState.challenge,
+        offer,
+      ),
+      offer.id,
+      "III",
+    );
+
+    const expansion = createCampaignExpansionState(
+      safeState.campaign,
+      "2026-09-22T11:00:00.000Z",
+    );
+    const checkpoint = createCheckpointSnapshot(
+      stateAt(181),
+      181,
+    );
+    const captured = captureCrashRecoverySnapshot(
+      safeState,
+      expansion,
+      checkpoint,
+      "hidden-transition",
+      "2026-09-22T11:01:00.000Z",
+    );
+
+    const unsafe = stateAt(190);
+    unsafe.challenge = completeHiddenChallengeEncounter(
+      safeState.challenge,
+    );
+
+    const resolved = resolveCrashRecovery(
+      unsafe,
+      captured.campaignExpansion,
+      checkpoint,
+      captured.snapshot,
+      "2026-09-22T11:02:00.000Z",
+    );
+
+    expect(resolved.mode).toBe("crash");
+    expect(resolved.state.challenge.active).toEqual({
+      offerId: offer.id,
+      tier: "III",
+      encounterIndex: 0,
+    });
   });
 
   it("invalidates recovery on real death and restores the committed checkpoint", () => {
