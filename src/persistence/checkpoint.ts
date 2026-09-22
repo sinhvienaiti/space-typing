@@ -49,6 +49,12 @@ import {
   isValidExpansionCurrencyState,
   type ExpansionCurrencyState,
 } from "../economy/currencies";
+import {
+  createShopState,
+  isValidShopState,
+  sanitizeShopState,
+  type ShopState,
+} from "../shops/state";
 
 export type RunPersistentState = {
   campaign: CampaignProgress;
@@ -61,6 +67,7 @@ export type RunPersistentState = {
   credits: number;
   progression: ProgressionState;
   expansionCurrencies: ExpansionCurrencyState;
+  shops: ShopState;
 };
 
 export type CheckpointSnapshot = RunPersistentState;
@@ -182,6 +189,54 @@ function isValidCampaignSnapshot(value: unknown): value is CampaignProgress {
   return true;
 }
 
+function isValidLegacyRunPersistentStateWithoutShops(
+  value: unknown,
+): value is Omit<RunPersistentState, "shops"> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const raw = value as Record<string, unknown>;
+  return (
+    isValidCampaignSnapshot(raw.campaign) &&
+    isValidInventory(raw.inventory) &&
+    isValidEquipmentState(raw.equipment) &&
+    isValidSupportSpellState(raw.supportSpells) &&
+    isValidCharacterState(raw.characters) &&
+    isValidLuckPityState(raw.luckPity) &&
+    isValidHiddenDiscoveryState(raw.hiddenDiscovery) &&
+    isValidCredits(raw.credits) &&
+    isValidProgressionState(raw.progression) &&
+    isValidExpansionCurrencyState(raw.expansionCurrencies) &&
+    isValidShopState(raw.shops)
+  );
+}
+
+export function migrateLegacyRunPersistentState(
+  value: unknown,
+): RunPersistentState | null {
+  if (!isValidLegacyRunPersistentStateWithoutShops(value)) return null;
+  const raw = value as Omit<RunPersistentState, "shops"> & {
+    shops?: unknown;
+  };
+  return {
+    campaign: sanitizeCampaignProgress(raw.campaign),
+    inventory: sanitizeInventory(raw.inventory),
+    equipment: sanitizeEquipmentState(raw.equipment),
+    supportSpells: sanitizeSupportSpellState(raw.supportSpells),
+    characters: sanitizeCharacterState(raw.characters),
+    luckPity: sanitizeLuckPityState(raw.luckPity),
+    hiddenDiscovery: sanitizeHiddenDiscoveryState(raw.hiddenDiscovery),
+    credits: sanitizeCredits(raw.credits),
+    progression: sanitizeProgressionState(raw.progression),
+    expansionCurrencies:
+      sanitizeExpansionCurrencyState(raw.expansionCurrencies),
+    shops: isValidShopState(raw.shops)
+      ? sanitizeShopState(raw.shops)
+      : createShopState(),
+  };
+}
+
 export function isValidRunPersistentState(
   value: unknown,
 ): value is RunPersistentState {
@@ -232,6 +287,7 @@ export function sanitizeRunPersistentState(
     progression: sanitizeProgressionState(value.progression),
     expansionCurrencies:
       sanitizeExpansionCurrencyState(value.expansionCurrencies),
+    shops: sanitizeShopState(value.shops),
   };
 }
 
@@ -240,11 +296,14 @@ export function sanitizeCheckpointSnapshot(
   fallback: RunPersistentState,
   checkpointStage: number,
 ): CheckpointSnapshot {
-  if (!isValidCheckpointSnapshot(value)) {
-    return createCheckpointSnapshot(fallback, checkpointStage);
+  if (isValidCheckpointSnapshot(value)) {
+    return sanitizeRunPersistentState(value);
   }
 
-  return sanitizeRunPersistentState(value);
+  const migrated = migrateLegacyRunPersistentState(value);
+  if (migrated !== null) return migrated;
+
+  return createCheckpointSnapshot(fallback, checkpointStage);
 }
 
 export function sanitizeCrashRecoverySnapshot(
@@ -336,5 +395,6 @@ export function restoreCheckpointSnapshot(
     expansionCurrencies: {
       ...committed.expansionCurrencies,
     },
+    shops: sanitizeShopState(committed.shops),
   };
 }
