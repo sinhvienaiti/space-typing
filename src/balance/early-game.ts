@@ -1,6 +1,8 @@
 import { difficultyFor } from "../campaign/difficulty";
 import { createStageConfig } from "../campaign/stage";
 import type { StageRole } from "../campaign/types";
+import { galaxyStageModifiers } from "../events/galaxy-hazards";
+import { combineStageEventEffects } from "../events/stage-scheduler";
 
 export type EarlyStageBalancePoint = {
   stage: number;
@@ -25,13 +27,22 @@ export function earlyStageBalancePoint(
     recentWpm: 60,
     recentAccuracy: 96,
   });
+  const roleModifiers = combineStageEventEffects(
+    galaxyStageModifiers(config),
+  );
+  const enemySpeed =
+    difficulty.enemySpeed * roleModifiers.enemySpeedMultiplier;
+  const projectilePressure =
+    difficulty.projectilePressure *
+    roleModifiers.projectilePressureMultiplier;
 
-  // Moment-to-moment reaction pressure intentionally excludes total
-  // enemyBudget. Budget controls encounter duration, while speed/spawn
-  // cadence control how stressful a single combat window feels.
+  // Moment-to-moment reaction pressure excludes total enemyBudget because
+  // budget controls encounter duration. It does include deterministic
+  // StageRole modifiers so Hazard/Gauntlet pressure is represented.
   const pressureIndex =
     difficulty.combatPressure *
-    difficulty.enemySpeed /
+    enemySpeed *
+    Math.sqrt(projectilePressure) /
     difficulty.spawnInterval;
 
   return {
@@ -39,9 +50,9 @@ export function earlyStageBalancePoint(
     role: config.role,
     enemyBudget: config.enemyBudget,
     combatPressure: difficulty.combatPressure,
-    enemySpeed: difficulty.enemySpeed,
+    enemySpeed,
     spawnInterval: difficulty.spawnInterval,
-    projectilePressure: difficulty.projectilePressure,
+    projectilePressure,
     bossPressure: difficulty.bossPressure,
     pressureIndex,
   };
