@@ -150,12 +150,14 @@ describe("player save persistence model", () => {
         definitionId: "pulse-laser-mk1",
         grade: "aluminum",
         enhancement: 0,
+        affixes: [],
       },
       {
         instanceId: "starter-precision",
         definitionId: "precision-laser-mk1",
         grade: "aluminum",
         enhancement: 0,
+        affixes: [],
       },
     ]);
   });
@@ -195,6 +197,7 @@ describe("player save persistence model", () => {
       definitionId: "pulse-laser-mk1",
       grade: "copper",
       enhancement: 0,
+      affixes: [],
     });
   });
 
