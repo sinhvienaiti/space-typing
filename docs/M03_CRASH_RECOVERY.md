@@ -73,9 +73,11 @@ A death-invalid snapshot is never restored as active progress. Load/import resol
 
 ## Page lifecycle
 
-`visibilitychange(hidden)` and `pagehide` capture a `pagehide` recovery snapshot and write the recovery mirror synchronously before the async IndexedDB flush.
+`visibilitychange(hidden)` and `pagehide` always write the existing recovery mirror synchronously before the async IndexedDB flush.
 
-This keeps deliberate reload/navigation from reverting persistent inventory/economy changes to an older recovery point.
+They advance the recovery snapshot to a new `pagehide` point only from non-encounter safe phases such as Title or Stage Clear. During Playing/Paused/Game Over, page lifecycle I/O keeps the previous safe recovery snapshot instead of promoting mid-combat equipment drops, item consumption or partial encounter rewards.
+
+This means a deliberate reload during combat restores the previous safe transition rather than turning pagehide into a reward-duplication checkpoint.
 
 ## Backup/import
 
