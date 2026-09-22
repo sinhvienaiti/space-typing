@@ -100,7 +100,10 @@ import {
   type SpecialShopKind,
   type SpecialShopOffer,
 } from "./shops/special-shop";
-import { accuracyPercent } from "./logic";
+import {
+  accuracyPercent,
+  stageWordsPerMinute,
+} from "./logic";
 import type { EquipmentDrop } from "./loot/equipment-loot";
 import type { StageEventDefinition } from "./events/stage-scheduler";
 import {
@@ -868,7 +871,6 @@ const typingChallengeCache = new Map<
 let stageStartPending = false;
 let learningTimer: number | null = null;
 let noticeTimer: number | null = null;
-let stageStartedAt = performance.now();
 let currentGalaxy = Math.ceil(campaign.selectedStage / STAGES_PER_GALAXY);
 
 const titleOverlay = byId("titleOverlay");
@@ -1601,11 +1603,10 @@ const game = new Game(
     onBossUpdate: renderBoss,
     onSkills: renderAllSkills,
     onStageClear: (stats) => {
-      const minutes = Math.max(
-        1 / 60,
-        (performance.now() - stageStartedAt) / 60000,
+      const wpm = stageWordsPerMinute(
+        stats.hits,
+        game.getStageElapsedSeconds(),
       );
-      const wpm = (stats.hits / 5) / minutes;
       const accuracy = accuracyPercent(stats.hits, stats.misses);
 
       campaign = recordStageClear(campaign, stats.stage, {
@@ -2559,7 +2560,6 @@ async function startSelectedStage(): Promise<void> {
       recentAccuracy: 96,
     });
 
-    stageStartedAt = performance.now();
     game.startStage(stage, difficulty);
   } finally {
     stageStartPending = false;
