@@ -345,7 +345,7 @@ export function advanceAscensionOnStageClear(
     state: {
       ...state,
       highestUnlockedTier,
-      selectedTier: 0,
+      selectedTier: unlockedTier ?? 0,
       completedTiers,
       frontierByTier,
     },
