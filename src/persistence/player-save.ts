@@ -841,6 +841,36 @@ export function migratePlayerSave(value: unknown): MigrationResult {
     };
   }
 
+  if (raw.version === 19) {
+    return {
+      save: createPlayerSave(
+        sanitizeCampaignProgress(raw.campaign),
+        typeof raw.updatedAt === "string" ? raw.updatedAt : "",
+        "migration",
+        sanitizeInventory(raw.inventory),
+        sanitizeEquipmentState(raw.equipment),
+        sanitizeSupportSpellState(raw.supportSpells),
+        sanitizeCharacterState(raw.characters),
+        sanitizeLuckPityState(raw.luckPity),
+        sanitizeHiddenDiscoveryState(raw.hiddenDiscovery),
+        sanitizeCredits(raw.credits),
+        sanitizeProgressionState(raw.progression),
+        sanitizeExpansionCurrencyState(raw.expansionCurrencies),
+        sanitizeCampaignExpansionState(
+          raw.campaignExpansion,
+          sanitizeCampaignProgress(raw.campaign),
+          typeof raw.updatedAt === "string" ? raw.updatedAt : "",
+        ),
+        raw.checkpointSnapshot as CheckpointSnapshot | undefined,
+        sanitizeCrashRecoverySnapshot(raw.crashRecoverySnapshot),
+        sanitizeStageEntrySnapshot(raw.stageEntrySnapshot),
+        createShopState(),
+      ),
+      migrated: true,
+      fromVersion: 19,
+    };
+  }
+
   if (raw.version === PLAYER_SAVE_VERSION) {
     return {
       save: createPlayerSave(
@@ -864,6 +894,7 @@ export function migratePlayerSave(value: unknown): MigrationResult {
         raw.checkpointSnapshot as CheckpointSnapshot | undefined,
         sanitizeCrashRecoverySnapshot(raw.crashRecoverySnapshot),
         sanitizeStageEntrySnapshot(raw.stageEntrySnapshot),
+        sanitizeShopState(raw.shops),
       ),
       migrated: false,
       fromVersion: PLAYER_SAVE_VERSION,
