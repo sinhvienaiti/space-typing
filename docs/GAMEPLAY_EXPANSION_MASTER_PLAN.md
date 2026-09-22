@@ -3080,7 +3080,22 @@ M13 must reuse the M12 aggregate pressure contracts for authored formations.
 
 ## M13 — Formation system
 
-Implement authored formation packages with aggregate budget validation.
+**Status: Complete.** Production encounters now support authored formation packages that are validated as one aggregate M12 pressure package before any member spawns. See `docs/M13_FORMATIONS.md`.
+
+Implemented:
+
+- Tank + Healer;
+- Commander + Scout wing;
+- Defender + Sniper;
+- Controller + Assassin;
+- Carrier escort;
+- stage/complexity availability;
+- weighted deterministic selection contract;
+- aggregate pressure / urgent / controller-support / max-enemy admission;
+- atomic package spawn and Campaign enemy-budget consumption;
+- safe fallback to the existing solo spawn path.
+
+M14 owns Branching Route Map + Station and persisted route/shop state.
 
 ## M14 — Branching Route Map + Station
 
