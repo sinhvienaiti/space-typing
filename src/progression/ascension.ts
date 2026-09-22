@@ -334,21 +334,24 @@ export function advanceAscensionOnStageClear(
     frontierByTier[String(nextTier)] = 1;
   }
 
+  const unlockedTier =
+    nextTier > tier &&
+    highestUnlockedTier > state.highestUnlockedTier
+      ? nextTier
+      : null;
+
   return {
     state: {
       ...state,
       highestUnlockedTier,
+      selectedTier: unlockedTier ?? 0,
       completedTiers,
       frontierByTier,
     },
     advanced: true,
     checkpointCommitted: true,
     newlyCompleted: true,
-    unlockedTier:
-      nextTier > tier &&
-      highestUnlockedTier > state.highestUnlockedTier
-        ? nextTier
-        : null,
+    unlockedTier,
   };
 }
 
