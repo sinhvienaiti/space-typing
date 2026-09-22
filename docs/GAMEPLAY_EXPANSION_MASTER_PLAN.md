@@ -3187,7 +3187,24 @@ M18 must compile Run Relics into existing stat/combat/reward/route/persistence c
 
 ## M18 — Run Relics
 
-Implement compiled relic effects and route/reward integration.
+**Status: Complete.** Run Relics extend the existing Game, reward/route transitions, Station and PlayerSave/checkpoint domains. Relic loadouts compile to direct combat fields so the hot path does not scan relic inventory. PlayerSave v23 carries RelicState through crash/death/checkpoint semantics. See `docs/M18_RUN_RELICS.md`.
+
+Implemented:
+
+- bounded RelicState with owned/equipped lists and maximum 3 active Relics;
+- deterministic stage-gated sector and Hidden Encounter Relic acquisition;
+- Station equip/unequip using the existing Service / Upgrade UI and autosave queue;
+- `CompiledRelicEffects` generated only when loadout state changes;
+- first-combat-word Hull recovery;
+- perfect-word chain effect using the existing enemy softening runtime;
+- streak-triggered freeze using the existing enemy control runtime;
+- long boss-word damage modifier;
+- once-per-stage miss guard that spends Shield without breaking streak/Power;
+- PlayerSave v22 -> v23 migration;
+- backup/import/recovery/checkpoint/crash/death integration;
+- 522/522 tests plus TypeScript check and production build passing on CI #286.
+
+M19 must extend the existing stage/boss/reward/Codex paths and existing knowledge-persistence merge semantics rather than create parallel reward or discovery stores.
 
 ## M19 — Reward layer expansion + Codex
 
