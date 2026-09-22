@@ -9,6 +9,7 @@ export const ROUTE_NODE_TYPES = [
   "combat",
   "shop",
   "station",
+  "hidden-signal",
 ] as const;
 
 export type RouteNodeType =
@@ -74,11 +75,13 @@ function isMandatoryCombatStage(stage: number): boolean {
 function optionalNodeType(
   random: () => number,
   lane: number,
+  stage: number,
 ): RouteNodeType {
   if (lane === 0) return "combat";
   const roll = random();
-  if (roll < 0.32) return "station";
-  if (roll < 0.62) return "shop";
+  if (stage >= 35 && roll < 0.12) return "hidden-signal";
+  if (roll < 0.38) return "station";
+  if (roll < 0.68) return "shop";
   return "combat";
 }
 
@@ -130,7 +133,7 @@ function buildStep(
   const nodes: RouteNode[] = [];
 
   for (let lane = 0; lane < laneCount; lane += 1) {
-    let type = optionalNodeType(random, lane);
+    let type = optionalNodeType(random, lane, stage);
 
     // Do not offer duplicate side-service choices in the same step.
     if (
@@ -138,10 +141,20 @@ function buildStep(
       nodes.some((node) => node.type === type) &&
       type !== "combat"
     ) {
-      type = type === "shop" ? "station" : "shop";
-      if (nodes.some((node) => node.type === type)) {
-        type = "combat";
-      }
+      const alternatives: RouteNodeType[] = [
+        "station",
+        "shop",
+        ...(stage >= 35
+          ? (["hidden-signal"] as RouteNodeType[])
+          : []),
+        "combat",
+      ];
+      type =
+        alternatives.find(
+          (candidate) =>
+            candidate === "combat" ||
+            !nodes.some((node) => node.type === candidate),
+        ) ?? "combat";
     }
 
     nodes.push({
@@ -594,6 +607,7 @@ export function routeNodeLabel(
 ): string {
   if (type === "station") return "Station";
   if (type === "shop") return "Shop";
+  if (type === "hidden-signal") return "Hidden Signal";
   return "Combat";
 }
 
@@ -602,9 +616,11 @@ export function routeNodeRisk(
 ): number {
   return type === "combat"
     ? 1
-    : type === "shop"
-      ? 0.35
-      : 0.2;
+    : type === "hidden-signal"
+      ? 1.45
+      : type === "shop"
+        ? 0.35
+        : 0.2;
 }
 
 export function clampRouteLane(
