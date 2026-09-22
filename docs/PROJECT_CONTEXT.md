@@ -3557,7 +3557,9 @@ Current gameplay/progression foundation:
 - Skill Engine:
   Energy / cooldown / charges / typing conditions / per-stage limits;
 - defensive and offensive combat skills plus 2-slot Support Spell loadout;
-- IndexedDB PlayerSave schema v23;
+- M19 expands stage-clear rewards with difficulty-relative performance badges, stronger sector caches and Campaign boss choose-one rewards while reusing the existing reward/economy paths;
+- M19 Codex records World, enemy/boss and reward knowledge; discoveries are merged across persistence sources and intentionally survive gameplay checkpoint rollback;
+- IndexedDB PlayerSave schema v24;
 - explicit migrations from all earlier supported PlayerSave schemas;
 - synchronized recovery mirror + autosave queue + validated JSON backup/import.
 
@@ -3621,11 +3623,15 @@ CI #281 PASS · 517/517 tests · TypeScript check + production build
 
 M18 Run Relics
 CI #286 PASS · 522/522 tests · TypeScript check + production build
+
+M19 Reward Layer Expansion + Codex
+CI #294 PASS · 530/530 tests · TypeScript check + production build
 ~~~
 
 Important implementation notes:
 
-- Current PlayerSave schema is version 23; v22 migrates deterministically by adding empty RelicState while preserving UpgradeState, Campaign, equipment, ShopState, RouteState and checkpoint/recovery domains.
+- Current PlayerSave schema is version 24; v23 migrates deterministically by adding empty CodexState while preserving RelicState, UpgradeState, Campaign, equipment, ShopState, RouteState and checkpoint/recovery domains.
+- Codex knowledge is not part of RunPersistentState/checkpoint rollback; recovery-source selection merges valid discoveries so technical recovery or gameplay rollback cannot erase already learned information.
 - Permanent systems must extend PlayerSave through explicit migrations.
 - Current runtime equipment uses the five-grade model; legacy rarity names remain only in migration/compatibility paths and historical step notes.
 - `ShopState` and `RouteState` are part of `RunPersistentState`, so shop stock and route choices are segment state rather than separate local-storage systems.
