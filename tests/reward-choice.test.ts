@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  createBossRewardChoiceOptions,
   createRewardChoiceOptions,
   rewardChoiceCrateChance,
   rewardChoiceWord,
@@ -27,6 +28,17 @@ describe("reward-choice crate", () => {
       sequence([0, 0.2, 0.15, 0.3, 0.28, 0.4]),
     );
     expect(choices).toHaveLength(3);
+    expect(new Set(choices.map((choice) => choice.definitionId)).size).toBe(3);
+  });
+
+  it("builds three distinct boss-weighted choices without a second reward runtime", () => {
+    const choices = createBossRewardChoiceOptions(
+      30,
+      sequence([0, 0.2, 0.15, 0.3, 0.28, 0.4]),
+    );
+
+    expect(choices).toHaveLength(3);
+    expect(choices.every((choice) => choice.source === "boss")).toBe(true);
     expect(new Set(choices.map((choice) => choice.definitionId)).size).toBe(3);
   });
 
