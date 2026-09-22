@@ -211,11 +211,75 @@ export function sanitizeProgressionState(value: unknown): ProgressionState {
 export function isValidProgressionState(
   value: unknown,
 ): value is ProgressionState {
-  const state = sanitizeProgressionState(value);
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return false;
   }
-  return JSON.stringify(state) === JSON.stringify(value);
+
+  const raw = value as {
+    counters?: unknown;
+    claimedMissions?: unknown;
+    unlockedAchievements?: unknown;
+  };
+  const keys = Object.keys(raw);
+  if (
+    keys.length !== 3 ||
+    !["counters", "claimedMissions", "unlockedAchievements"].every(
+      (key) => keys.includes(key),
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    raw.counters === null ||
+    typeof raw.counters !== "object" ||
+    Array.isArray(raw.counters)
+  ) {
+    return false;
+  }
+
+  const counters = raw.counters as Record<string, unknown>;
+  const counterKeys = [
+    "stageClears",
+    "highAccuracyClears",
+    "shopPurchases",
+    "equipmentDrops",
+  ] as const;
+  if (
+    Object.keys(counters).length !== counterKeys.length ||
+    !counterKeys.every(
+      (key) =>
+        Number.isInteger(counters[key]) &&
+        typeof counters[key] === "number" &&
+        counters[key] >= 0 &&
+        counters[key] <= 1_000_000,
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    !Array.isArray(raw.claimedMissions) ||
+    new Set(raw.claimedMissions).size !== raw.claimedMissions.length ||
+    !raw.claimedMissions.every(
+      (id) =>
+        typeof id === "string" &&
+        MISSION_IDS.includes(id as MissionId),
+    )
+  ) {
+    return false;
+  }
+
+  return (
+    Array.isArray(raw.unlockedAchievements) &&
+    new Set(raw.unlockedAchievements).size ===
+      raw.unlockedAchievements.length &&
+    raw.unlockedAchievements.every(
+      (id) =>
+        typeof id === "string" &&
+        ACHIEVEMENT_IDS.includes(id as AchievementId),
+    )
+  );
 }
 
 export function recordProgressionEvent(
