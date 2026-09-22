@@ -13,6 +13,8 @@ describe("core four enemy visual mapping", () => {
     expect(runtimeEnemyDefinitionId("healer", false)).toBe("angel-healer");
     expect(runtimeEnemyDefinitionId("destroyer", false)).toBe("imp-spark");
     expect(runtimeEnemyDefinitionId("jammer", false)).toBe("snow-wisp");
+    expect(runtimeEnemyDefinitionId("carrier", false)).toBe("leaf-puff");
+    expect(runtimeEnemyDefinitionId("splitter", false)).toBe("prism-sprite");
   });
 
   it("reuses the existing elite flag for elite visual evolution", () => {
@@ -41,6 +43,12 @@ describe("core four enemy visual mapping", () => {
     );
     expect(spawnEnemyDefinitionId("jammer", false, 80, 0)).toBe(
       "freeze-burst-sprite",
+    );
+    expect(spawnEnemyDefinitionId("carrier", false, 100, 0)).toBe(
+      "bloom-puff",
+    );
+    expect(spawnEnemyDefinitionId("splitter", false, 120, 0)).toBe(
+      "treasure-prism",
     );
     expect(spawnEnemyDefinitionId("scout", false, 30, 0.99)).toBe(
       "rainbow-scout",

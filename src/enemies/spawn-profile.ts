@@ -34,11 +34,12 @@ export function runtimeEnemyDefinitionId(
   if (
     kind === "tank" ||
     kind === "shield" ||
-    kind === "carrier" ||
     kind === "commander"
   ) {
     return "rainbow-bubble";
   }
+  if (kind === "carrier") return "leaf-puff";
+  if (kind === "splitter") return "prism-sprite";
   if (kind === "healer") return "angel-healer";
   if (
     kind === "destroyer" ||
@@ -75,6 +76,8 @@ export function spawnEnemyDefinitionId(
   if (kind === "commander") return "angel-blesser";
   if (kind === "destroyer") return "bomb-imp";
   if (kind === "jammer") return "freeze-burst-sprite";
+  if (kind === "carrier") return "bloom-puff";
+  if (kind === "splitter") return "treasure-prism";
 
   return base;
 }

@@ -399,6 +399,7 @@ export class Game {
   private gravityWellTimer = 0;
   private cloakTimer = 0;
   private weaponOverclockTimer = 0;
+  private rewardScoreMultiplierTimer = 0;
   private celestialCharge = 0;
   private skillHudTimer = 0;
   private supplyPod: SupplyPod | null = null;
@@ -1359,6 +1360,7 @@ export class Game {
     this.gravityWellTimer = 0;
     this.cloakTimer = 0;
     this.weaponOverclockTimer = 0;
+    this.rewardScoreMultiplierTimer = 0;
     this.celestialCharge = 0;
     this.statusState = createStatusState();
     this.interferenceTimer = 0;
@@ -1582,6 +1584,10 @@ export class Game {
     this.weaponOverclockTimer = Math.max(
       0,
       this.weaponOverclockTimer - dt,
+    );
+    this.rewardScoreMultiplierTimer = Math.max(
+      0,
+      this.rewardScoreMultiplierTimer - dt,
     );
 
     if (this.barrierTimer <= 0) this.barrierHp = 0;
@@ -2354,7 +2360,7 @@ export class Game {
       this.stats.streak,
     );
     this.stats.multiplier = multiplierForStreak(this.stats.streak);
-    this.stats.score += 35 * this.stats.multiplier;
+    this.addScore(35 * this.stats.multiplier);
     this.gainPower(2.5);
     this.applyCharacterCorrectKeyPassive();
 
@@ -2397,7 +2403,7 @@ export class Game {
       this.stats.streak,
     );
     this.stats.multiplier = multiplierForStreak(this.stats.streak);
-    this.stats.score += 16 * this.stats.multiplier;
+    this.addScore(16 * this.stats.multiplier);
     this.gainPower(2);
     this.applyCharacterCorrectKeyPassive();
 
@@ -2457,8 +2463,9 @@ export class Game {
       boss.kick = 1.5;
       boss.wordMissed = false;
 
-      this.stats.score +=
-        (140 + word.length * 18) * this.stats.multiplier;
+      this.addScore(
+        (140 + word.length * 18) * this.stats.multiplier,
+      );
       this.gainPower(perfectWord ? 11 : 8);
 
       if (perfectWord) {
@@ -2518,7 +2525,7 @@ export class Game {
     const { x, y } = this.bossPosition();
     this.triggerImpactFeedback("boss-defeat");
     this.stats.kills += 1;
-    this.stats.score += 1200 * this.stats.multiplier;
+    this.addScore(1200 * this.stats.multiplier);
     this.gainPower(18);
 
     this.burst(x, y, 70, 24);
@@ -2543,7 +2550,7 @@ export class Game {
     const current = this.luckPity[key];
     const roll = rollLuckPity(
       baseChance,
-      this.playerStats.luck,
+      this.effectiveLuck(),
       current,
       maxChance,
     );
@@ -2562,7 +2569,7 @@ export class Game {
   private tryRollEquipmentDrop(source: LootSource): void {
     const drop = rollEquipmentDrop(
       source,
-      this.playerStats.luck,
+      this.effectiveLuck(),
       this.playerStats.salvage,
     );
     if (drop !== null) {
@@ -2590,7 +2597,7 @@ export class Game {
       this.stats.streak,
     );
     this.stats.multiplier = multiplierForStreak(this.stats.streak);
-    this.stats.score += 8 * this.stats.multiplier;
+    this.addScore(8 * this.stats.multiplier);
     this.gainPower(1.2);
     this.applyCharacterCorrectKeyPassive();
 
@@ -2624,7 +2631,7 @@ export class Game {
     this.stats.shield = reward.resources.shield;
     this.stats.energy = reward.resources.energy;
     this.stats.power = reward.power;
-    this.stats.score += 140 * this.stats.multiplier;
+    this.addScore(140 * this.stats.multiplier);
     this.hooks.onWordComplete(pod.entry);
     this.burst(pod.x, pod.y, 34, 48);
     this.sfx.support();
@@ -2649,7 +2656,7 @@ export class Game {
       this.stats.streak,
     );
     this.stats.multiplier = multiplierForStreak(this.stats.streak);
-    this.stats.score += 12 * this.stats.multiplier;
+    this.addScore(12 * this.stats.multiplier);
     this.gainPower(1.5);
     this.applyCharacterCorrectKeyPassive();
     this.burst(drone.x, drone.y, 8, 48);
@@ -2664,7 +2671,7 @@ export class Game {
       if (drop !== null) {
         this.hooks.onEquipmentDrop(drop);
       }
-      this.stats.score += 320 * this.stats.multiplier;
+      this.addScore(320 * this.stats.multiplier);
       this.hooks.onWordComplete(drone.entry);
       this.burst(drone.x, drone.y, 44, 48);
       this.sfx.support();
@@ -2694,15 +2701,15 @@ export class Game {
       this.stats.streak,
     );
     this.stats.multiplier = multiplierForStreak(this.stats.streak);
-    this.stats.score += 10 * this.stats.multiplier;
+    this.addScore(10 * this.stats.multiplier);
     this.gainPower(1.3);
     this.applyCharacterCorrectKeyPassive();
     this.burst(crate.x, crate.y, 7, 286);
     this.sfx.shot(this.stats.multiplier);
 
     if (crate.typed >= word.length) {
-      const options = createRewardChoiceOptions(this.playerStats.luck);
-      this.stats.score += 220 * this.stats.multiplier;
+      const options = createRewardChoiceOptions(this.effectiveLuck());
+      this.addScore(220 * this.stats.multiplier);
       this.hooks.onWordComplete(crate.entry);
       this.burst(crate.x, crate.y, 40, 286);
       this.sfx.support();
@@ -2732,14 +2739,14 @@ export class Game {
       this.stats.streak,
     );
     this.stats.multiplier = multiplierForStreak(this.stats.streak);
-    this.stats.score += 12 * this.stats.multiplier;
+    this.addScore(12 * this.stats.multiplier);
     this.gainPower(1.4);
     this.applyCharacterCorrectKeyPassive();
     this.burst(crate.x, crate.y, 8, 322);
     this.sfx.shot(this.stats.multiplier);
 
     if (crate.typed >= word.length) {
-      this.stats.score += 260 * this.stats.multiplier;
+      this.addScore(260 * this.stats.multiplier);
       this.hooks.onWordComplete(crate.entry);
       this.burst(crate.x, crate.y, 44, 322);
       this.sfx.support();
@@ -2778,7 +2785,7 @@ export class Game {
 
     const reward = createAnomalyReward(
       choice,
-      this.playerStats.luck,
+      this.effectiveLuck(),
     );
     this.hooks.onEquipmentDrop(reward);
     this.anomalyResolutionPending = false;
@@ -2818,7 +2825,7 @@ export class Game {
     this.stats.streak += 1;
     this.stats.maxStreak = Math.max(this.stats.maxStreak, this.stats.streak);
     this.stats.multiplier = multiplierForStreak(this.stats.streak);
-    this.stats.score += 10 * this.stats.multiplier;
+    this.addScore(10 * this.stats.multiplier);
     this.gainPower(1.8);
     this.applyCharacterCorrectKeyPassive();
 
@@ -2853,7 +2860,7 @@ export class Game {
         enemy.speed *= 1.2;
       }
 
-      this.stats.score += (45 + length * 8) * this.stats.multiplier;
+      this.addScore((45 + length * 8) * this.stats.multiplier);
       this.gainPower(4);
 
       this.fireLaser(enemy, 1.25);
@@ -2869,7 +2876,7 @@ export class Game {
     }
 
     this.stats.kills += 1;
-    this.stats.score += (80 + length * 14) * this.stats.multiplier;
+    this.addScore((80 + length * 14) * this.stats.multiplier);
     this.gainPower(7);
 
     this.fireLaser(enemy, 1.45);
@@ -2882,7 +2889,7 @@ export class Game {
     this.sfx.hit();
     this.sfx.kill();
     if (enemy.golden) {
-      this.stats.score += 260 * this.stats.multiplier;
+      this.addScore(260 * this.stats.multiplier);
     }
     this.tryRollEquipmentDrop(
       enemy.golden ? "golden" : enemy.elite ? "elite" : "normal",
@@ -2965,7 +2972,12 @@ export class Game {
         clearProjectiles: () => {
           this.projectiles = [];
         },
-        setScoreMultiplier: () => {},
+        setScoreMultiplier: (_multiplier, duration) => {
+          this.rewardScoreMultiplierTimer = Math.max(
+            this.rewardScoreMultiplierTimer,
+            duration,
+          );
+        },
         setCreditsMultiplier: () => {},
         reduceSkillCooldowns: (seconds) => {
           this.skillEngine.reduceCooldowns(seconds);
@@ -2990,9 +3002,7 @@ export class Game {
     this.hooks.onStatuses(this.statusState);
     this.emitStats();
 
-    const label = effect.label;
-    const width = this.context.measureText(label).width;
-    void width;
+    void effect;
   }
 
   private spawnVolatileBurst(enemy: Enemy): void {
@@ -3098,6 +3108,18 @@ export class Game {
       maxEnergy: this.playerStats.energy,
       power: 0,
     };
+  }
+
+  private addScore(amount: number): void {
+    const multiplier = this.rewardScoreMultiplierTimer > 0 ? 2 : 1;
+    this.stats.score += Math.max(0, amount) * multiplier;
+  }
+
+  private effectiveLuck(): number {
+    return (
+      this.playerStats.luck +
+      (statusRemaining(this.statusState, "lucky") > 0 ? 25 : 0)
+    );
   }
 
   private gainPower(baseGain: number): void {
