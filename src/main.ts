@@ -2675,14 +2675,78 @@ function createShopInstanceId(): string {
   );
 }
 
-function shopOfferDescription(offer: NormalShopOffer): string {
-  if (offer.kind === "item") {
-    return getItemDefinition(offer.itemId).description;
+function shopWorldKey(stage: number): string {
+  const world = Math.ceil(Math.max(1, Math.min(1000, stage)) / 20);
+  return "world-" + String(world).padStart(2, "0");
+}
+
+function currentShopContext(): ShopRollContext {
+  const stage = campaign.highestUnlockedStage;
+  return {
+    stage,
+    worldKey: shopWorldKey(stage),
+    luck: game.getPlayerStats().luck,
+    progression: campaign.clearedStages.length,
+    hiddenDiscovery,
+  };
+}
+
+function shopBalanceText(): string {
+  return (
+    credits.toLocaleString() +
+    " Credits · " +
+    expansionCurrencies.alloy.toLocaleString() +
+    " Alloy · " +
+    expansionCurrencies.starCrystal.toLocaleString() +
+    " Star Crystal · " +
+    expansionCurrencies.quantumCore.toLocaleString() +
+    " Quantum Core"
+  );
+}
+
+function resolveRuntimeShop(type: ShopType): ShopInstance | null {
+  const context = currentShopContext();
+  if (!shopAvailable(type, context)) return null;
+
+  const resolved = resolveShopInstance(shops, type, context);
+  shops = resolved.state;
+  if (resolved.created) {
+    void autosaveCampaign(
+      "shop",
+      "✓ " + shopPresentation(type).title + " stock locked for this sector",
+      "shop",
+    );
+  }
+  return resolved.instance;
+}
+
+function shopStockName(entry: ShopStockEntry): string {
+  return entry.kind === "item"
+    ? getItemDefinition(entry.itemId).name
+    : getEquipmentDefinition(entry.definitionId).name;
+}
+
+function shopStockType(entry: ShopStockEntry): string {
+  if (entry.kind === "equipment") {
+    return gradeLabel(entry.grade).toUpperCase() + " EQUIPMENT";
+  }
+  const definition = getItemDefinition(entry.itemId);
+  return (
+    (definition.grade === undefined
+      ? definition.category
+      : gradeLabel(definition.grade)) +
+    " ITEM"
+  ).toUpperCase();
+}
+
+function shopStockDescription(entry: ShopStockEntry): string {
+  if (entry.kind === "item") {
+    return getItemDefinition(entry.itemId).description;
   }
 
-  const definition = getEquipmentDefinition(offer.definitionId);
+  const definition = getEquipmentDefinition(entry.definitionId);
   return (
-    gradeLabel(offer.grade).toUpperCase() +
+    gradeLabel(entry.grade).toUpperCase() +
     " · " +
     definition.slot +
     " · " +
@@ -2690,78 +2754,119 @@ function shopOfferDescription(offer: NormalShopOffer): string {
   );
 }
 
-function renderNormalShop(): void {
-  byId("shopCredits").textContent =
-    credits.toLocaleString() + " Credits";
+function shopStockIsFull(entry: ShopStockEntry): boolean {
+  if (entry.kind !== "item") return false;
+  return (
+    itemCount(inventory, entry.itemId) >=
+    getItemDefinition(entry.itemId).maxStack
+  );
+}
 
-  const grid = byId("normalShopGrid");
+function applyShopPurchaseState(
+  next: {
+    credits: number;
+    expansionCurrencies: ExpansionCurrencyState;
+    inventory: Inventory;
+    equipment: EquipmentState;
+    shops: ShopState;
+  },
+): void {
+  credits = next.credits;
+  expansionCurrencies = next.expansionCurrencies;
+  inventory = next.inventory;
+  equipment = next.equipment;
+  shops = next.shops;
+  renderInventory();
+  renderEquipment();
+  applyEquipmentStats();
+  updateDataSummary();
+}
+
+function shopPurchaseFailureMessage(
+  reason: "missing" | "sold-out" | "currency" | "full" | "duplicate" | null,
+): string {
+  if (reason === "currency") return "Not enough shop currency";
+  if (reason === "full") return "Inventory stack is full";
+  if (reason === "sold-out") return "This stock is sold out";
+  if (reason === "duplicate") return "Unable to create equipment instance";
+  return "Unable to purchase this offer";
+}
+
+function appendShopStockCards(
+  instance: ShopInstance,
+  grid: HTMLElement,
+  cardClass: string,
+  rerender: () => void,
+): void {
   grid.replaceChildren();
 
-  for (const offer of normalShopOffers(campaign.highestUnlockedStage)) {
+  for (const entry of instance.stock) {
     const card = document.createElement("article");
-    card.className = "shop-offer";
+    card.className = cardClass;
 
     const type = document.createElement("span");
     type.className = "shop-offer-type";
     type.textContent =
-      offer.kind === "item"
-        ? "CONSUMABLE"
-        : gradeLabel(offer.grade).toUpperCase() + " EQUIPMENT";
+      shopStockType(entry) +
+      " · STOCK " +
+      String(entry.remaining);
 
     const title = document.createElement("strong");
-    title.textContent = normalShopOfferName(offer);
+    title.textContent = shopStockName(entry);
 
     const description = document.createElement("small");
-    description.textContent = shopOfferDescription(offer);
+    description.textContent = shopStockDescription(entry);
 
     const buy = document.createElement("button");
     buy.type = "button";
     buy.className = "shop-buy";
 
-    const itemFull =
-      offer.kind === "item" &&
-      normalShopItemIsFull(inventory, offer.itemId);
-    buy.disabled = itemFull || credits < offer.price;
-    buy.textContent = itemFull
-      ? "Full"
-      : offer.price.toLocaleString() + " Credits";
+    const soldOut = entry.remaining <= 0;
+    const itemFull = shopStockIsFull(entry);
+    const affordable = canAffordShopPrice(
+      credits,
+      expansionCurrencies,
+      entry.price,
+    );
+    buy.disabled = soldOut || itemFull || !affordable;
+    buy.textContent = soldOut
+      ? "Sold out"
+      : itemFull
+        ? "Full"
+        : formatShopPrice(entry.price);
 
     buy.addEventListener("click", () => {
-      const purchase = buyNormalShopOffer(
-        { credits, inventory, equipment },
-        offer,
-        offer.kind === "equipment" ? createShopInstanceId() : "",
+      const purchase = buyShopStockEntry(
+        {
+          credits,
+          expansionCurrencies,
+          inventory,
+          equipment,
+          shops,
+        },
+        instance.id,
+        entry.key,
+        entry.kind === "equipment" ? createShopInstanceId() : "",
       );
 
       if (!purchase.purchased) {
-        if (purchase.reason === "credits") {
-          showNotice("Not enough Credits");
-        } else if (purchase.reason === "full") {
-          showNotice("Inventory stack is full");
-        } else {
-          showNotice("Unable to purchase this offer");
-        }
-        renderNormalShop();
+        showNotice(shopPurchaseFailureMessage(purchase.reason));
+        rerender();
         return;
       }
 
-      credits = purchase.state.credits;
-      inventory = purchase.state.inventory;
-      equipment = purchase.state.equipment;
-      renderInventory();
-      renderEquipment();
-      applyEquipmentStats();
-      renderNormalShop();
-      updateDataSummary();
+      applyShopPurchaseState(purchase.state);
       recordShopProgress();
       renderProgression();
+      rerender();
+      updateShopAccess();
       void autosaveCampaign(
         "shop",
         "✓ Purchased " +
-          normalShopOfferName(offer) +
-          " · " +
-          credits.toLocaleString() +
-          " Credits left",
+          shopStockName(entry) +
+          " · stock " +
+          String(Math.max(0, entry.remaining - 1)) +
+          " left",
         "shop",
       );
     });
@@ -2769,6 +2874,24 @@ function renderNormalShop(): void {
     card.append(type, title, description, buy);
     grid.append(card);
   }
+}
+
+function renderNormalShop(): void {
+  byId("shopCredits").textContent = shopBalanceText();
+  const grid = byId("normalShopGrid");
+  const instance = resolveRuntimeShop("normal");
+
+  if (instance === null) {
+    grid.replaceChildren();
+    return;
+  }
+
+  appendShopStockCards(
+    instance,
+    grid,
+    "shop-offer",
+    renderNormalShop,
+  );
 }
 
 function openNormalShop(): void {
@@ -2780,11 +2903,13 @@ function openNormalShop(): void {
 function applyServiceShopState(
   next: {
     credits: number;
+    expansionCurrencies: ExpansionCurrencyState;
     inventory: Inventory;
     equipment: EquipmentState;
   },
 ): void {
   credits = next.credits;
+  expansionCurrencies = next.expansionCurrencies;
   inventory = next.inventory;
   equipment = next.equipment;
   renderInventory();
@@ -2795,7 +2920,10 @@ function applyServiceShopState(
 
 function renderServiceShop(): void {
   byId("serviceShopCredits").textContent =
-    credits.toLocaleString() + " Credits";
+    credits.toLocaleString() +
+    " Credits · " +
+    expansionCurrencies.alloy.toLocaleString() +
+    " Alloy";
 
   const repairPanel = byId("repairServicePanel");
   repairPanel.replaceChildren();
@@ -2808,16 +2936,22 @@ function renderServiceShop(): void {
 
   const repairDescription = document.createElement("small");
   repairDescription.textContent =
-    "Adds 1 Repair Kit and 1 Shield Cell using the existing inventory system.";
+    "Adds 1 Repair Kit and 1 Shield Cell. Service payment uses Credits + Alloy.";
 
   const repairButton = document.createElement("button");
   repairButton.type = "button";
   repairButton.textContent =
-    REPAIR_PACK_COST.toLocaleString() + " Credits";
-  repairButton.disabled = credits < REPAIR_PACK_COST;
+    REPAIR_PACK_COST.toLocaleString() +
+    " Credits + " +
+    REPAIR_PACK_ALLOY_COST.toLocaleString() +
+    " Alloy";
+  repairButton.disabled =
+    credits < REPAIR_PACK_COST ||
+    expansionCurrencies.alloy < REPAIR_PACK_ALLOY_COST;
   repairButton.addEventListener("click", () => {
     const result = buyRepairPack({
       credits,
+      expansionCurrencies,
       inventory,
       equipment,
     });
@@ -2826,7 +2960,9 @@ function renderServiceShop(): void {
       showNotice(
         result.reason === "credits"
           ? "Not enough Credits"
-          : "Repair Kit or Shield Cell stack is full",
+          : result.reason === "alloy"
+            ? "Not enough Alloy"
+            : "Repair Kit or Shield Cell stack is full",
       );
       renderServiceShop();
       return;
@@ -2838,9 +2974,7 @@ function renderServiceShop(): void {
     renderServiceShop();
     void autosaveCampaign(
       "shop",
-      "✓ Repair Station pack purchased · " +
-        credits.toLocaleString() +
-        " Credits left",
+      "✓ Repair Station pack purchased · Credits + Alloy deducted",
       "shop",
     );
   });
@@ -2854,6 +2988,7 @@ function renderServiceShop(): void {
   for (const item of equipment.items) {
     const definition = getEquipmentDefinition(item.definitionId);
     const cost = equipmentUpgradeCost(item);
+    const alloyCost = equipmentUpgradeAlloyCost(item);
     const card = document.createElement("article");
     card.className = "service-shop-card";
 
@@ -2876,15 +3011,28 @@ function renderServiceShop(): void {
 
     const button = document.createElement("button");
     button.type = "button";
-    button.disabled = cost === null || credits < (cost ?? 0);
+    button.disabled =
+      cost === null ||
+      alloyCost === null ||
+      credits < (cost ?? 0) ||
+      expansionCurrencies.alloy < (alloyCost ?? 0);
     button.textContent =
-      cost === null
+      cost === null || alloyCost === null
         ? "Max +5"
-        : "Upgrade · " + cost.toLocaleString() + " Credits";
+        : "Upgrade · " +
+          cost.toLocaleString() +
+          " Credits + " +
+          alloyCost.toLocaleString() +
+          " Alloy";
 
     button.addEventListener("click", () => {
       const result = buyEquipmentUpgrade(
-        { credits, inventory, equipment },
+        {
+          credits,
+          expansionCurrencies,
+          inventory,
+          equipment,
+        },
         item.instanceId,
       );
 
@@ -2892,9 +3040,11 @@ function renderServiceShop(): void {
         showNotice(
           result.reason === "credits"
             ? "Not enough Credits"
-            : result.reason === "max"
-              ? "Equipment is already +5"
-              : "Unable to upgrade this equipment",
+            : result.reason === "alloy"
+              ? "Not enough Alloy"
+              : result.reason === "max"
+                ? "Equipment is already +5"
+                : "Unable to upgrade this equipment",
         );
         renderServiceShop();
         return;
@@ -2903,15 +3053,12 @@ function renderServiceShop(): void {
       applyServiceShopState(result.state);
       recordShopProgress();
       renderProgression();
-      renderNormalShop();
       renderServiceShop();
       void autosaveCampaign(
         "shop",
         "✓ Upgraded " +
           definition.name +
-          " · " +
-          credits.toLocaleString() +
-          " Credits left",
+          " · Credits + Alloy deducted",
         "upgrade",
       );
     });
@@ -2927,124 +3074,114 @@ function openServiceShop(): void {
   serviceShopDialog.showModal();
 }
 
-function specialShopOfferDescription(
-  offer: SpecialShopOffer,
-): string {
-  if (offer.kind === "item") {
-    return getItemDefinition(offer.itemId).description;
+function shopPresentation(type: ShopType): {
+  eyebrow: string;
+  title: string;
+  meta: string;
+} {
+  if (type === "station") {
+    return {
+      eyebrow: "sector station",
+      title: "Station Shop",
+      meta: "Deterministic sector stock · Credits + Alloy.",
+    };
   }
-  const definition = getEquipmentDefinition(offer.definitionId);
-  return (
-    gradeLabel(offer.grade).toUpperCase() +
-    " · " +
-    definition.slot +
-    " · " +
-    definition.description
-  );
+  if (type === "traveling") {
+    return {
+      eyebrow: "merchant signal",
+      title: "Traveling Merchant",
+      meta: "Random sector appearance · finite Credits + Alloy stock.",
+    };
+  }
+  if (type === "black-market") {
+    return {
+      eyebrow: "hidden market",
+      title: "Black Market",
+      meta: "Finite premium stock · Credits + Star Crystal.",
+    };
+  }
+  if (type === "hidden") {
+    return {
+      eyebrow: "hidden route",
+      title: "Hidden Shop",
+      meta: "Rare finite stock · Star Crystal / Quantum Core.",
+    };
+  }
+  if (type === "event") {
+    return {
+      eyebrow: "event exchange",
+      title: "Event Shop",
+      meta: "Finite special-item stock · Star Crystal exchange.",
+    };
+  }
+  if (type === "service") {
+    return {
+      eyebrow: "maintenance bay",
+      title: "Repair / Upgrade Shop",
+      meta: "Credits + Alloy.",
+    };
+  }
+  return {
+    eyebrow: "campaign supply",
+    title: "Normal Shop",
+    meta: "Finite regular stock · Credits.",
+  };
 }
 
-function updateSpecialShopAccess(): void {
+function updateShopAccess(): void {
+  const context = currentShopContext();
+  byId("travelingShopButton").classList.toggle(
+    "hidden",
+    !shopAvailable("traveling", context),
+  );
   byId("blackMarketButton").classList.toggle(
     "hidden",
-    !specialShopUnlocked("black-market", hiddenDiscovery),
+    !shopAvailable("black-market", context),
+  );
+  byId("hiddenShopButton").classList.toggle(
+    "hidden",
+    !shopAvailable("hidden", context),
   );
   byId("eventShopButton").classList.toggle(
     "hidden",
-    !specialShopUnlocked("event-shop", hiddenDiscovery),
+    !shopAvailable("event", context),
   );
 }
 
 function renderSpecialShop(): void {
-  const isBlackMarket = currentSpecialShop === "black-market";
-  byId("specialShopEyebrow").textContent = isBlackMarket
-    ? "hidden market"
-    : "event exchange";
-  byId("specialShopTitle").textContent = isBlackMarket
-    ? "Black Market"
-    : "Event Shop";
-  byId("specialShopMeta").textContent = isBlackMarket
-    ? "Rare regular equipment with premium pricing."
-    : "Special consumables from the existing item registry.";
-  byId("specialShopCredits").textContent =
-    credits.toLocaleString() + " Credits";
+  const presentation = shopPresentation(currentShopType);
+  byId("specialShopEyebrow").textContent = presentation.eyebrow;
+  byId("specialShopTitle").textContent = presentation.title;
+  byId("specialShopMeta").textContent = presentation.meta;
+  byId("specialShopCredits").textContent = shopBalanceText();
 
   const grid = byId("specialShopGrid");
-  grid.replaceChildren();
-
-  for (const offer of specialShopOffers(
-    currentSpecialShop,
-    campaign.highestUnlockedStage,
-  )) {
-    const card = document.createElement("article");
-    card.className = "special-shop-offer";
-
-    const type = document.createElement("span");
-    type.className = "shop-offer-type";
-    type.textContent =
-      offer.kind === "item"
-        ? "EVENT ITEM"
-        : gradeLabel(offer.grade).toUpperCase() + " EQUIPMENT";
-
-    const title = document.createElement("strong");
-    title.textContent = specialShopOfferName(offer);
-
-    const description = document.createElement("small");
-    description.textContent = specialShopOfferDescription(offer);
-
-    const buy = document.createElement("button");
-    buy.type = "button";
-    buy.textContent = offer.price.toLocaleString() + " Credits";
-    buy.disabled = credits < offer.price;
-    buy.addEventListener("click", () => {
-      const purchase = buySpecialShopOffer(
-        { credits, inventory, equipment },
-        offer,
-        offer.kind === "equipment" ? createShopInstanceId() : "",
-      );
-
-      if (!purchase.purchased) {
-        showNotice(
-          purchase.reason === "credits"
-            ? "Not enough Credits"
-            : purchase.reason === "full"
-              ? "Inventory stack is full"
-              : "Unable to purchase this offer",
-        );
-        renderSpecialShop();
-        return;
-      }
-
-      applyServiceShopState(purchase.state);
-      recordShopProgress();
-      renderProgression();
-      renderNormalShop();
-      renderServiceShop();
-      renderSpecialShop();
-      void autosaveCampaign(
-        "shop",
-        "✓ Purchased " +
-          specialShopOfferName(offer) +
-          " · " +
-          credits.toLocaleString() +
-          " Credits left",
-        "shop",
-      );
-    });
-
-    card.append(type, title, description, buy);
-    grid.append(card);
+  const instance = resolveRuntimeShop(currentShopType);
+  if (instance === null) {
+    grid.replaceChildren();
+    return;
   }
+
+  appendShopStockCards(
+    instance,
+    grid,
+    "special-shop-offer",
+    renderSpecialShop,
+  );
 }
 
-function openSpecialShop(kind: SpecialShopKind): void {
+function openSpecialShop(kind: ShopType): void {
   if (
     !persistenceReady ||
     game.getPhase() !== "title" ||
-    !specialShopUnlocked(kind, hiddenDiscovery)
+    kind === "normal" ||
+    kind === "service" ||
+    !shopAvailable(kind, currentShopContext())
   ) {
     return;
   }
-  currentSpecialShop = kind;
+
+  currentShopType = kind;
   renderSpecialShop();
   specialShopDialog.showModal();
 }
