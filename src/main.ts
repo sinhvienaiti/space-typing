@@ -3783,7 +3783,6 @@ async function loadInitialVocabulary(): Promise<void> {
 for (const id of [
   "startButton",
   "restartButton",
-  "againButton",
   "clearRetryButton",
   "nextStageButton",
 ]) {
@@ -3793,7 +3792,26 @@ for (const id of [
 }
 byId("resumeButton").addEventListener("click", () => game.resume());
 
-for (const id of ["titleButton", "resultTitleButton", "clearTitleButton"]) {
+byId("againButton").addEventListener("click", () => {
+  void resolveCheckpointDeath("retry");
+});
+byId("gameOverStageSelectButton").addEventListener("click", () => {
+  void resolveCheckpointDeath("stage-select");
+});
+byId("resultTitleButton").addEventListener("click", () => {
+  void resolveCheckpointDeath("title");
+});
+byId("salvageAnchorButton").addEventListener("click", () => {
+  void resolveSalvageAnchorDeath();
+});
+byId("stageRevivalButton").addEventListener("click", () => {
+  void resolveStageRevivalDeath();
+});
+byId("phoenixCoreButton").addEventListener("click", () => {
+  void resolvePhoenixDeath();
+});
+
+for (const id of ["titleButton", "clearTitleButton"]) {
   byId(id).addEventListener("click", () => game.backToTitle());
 }
 
@@ -3900,7 +3918,6 @@ byId<HTMLInputElement>("importSaveFile").addEventListener(
 for (const id of [
   "stageSelectButton",
   "pauseStageSelectButton",
-  "gameOverStageSelectButton",
   "clearStageSelectButton",
 ]) {
   byId(id).addEventListener("click", openStageSelect);
