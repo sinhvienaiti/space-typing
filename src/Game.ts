@@ -18,8 +18,8 @@ import {
 import type { DifficultyProfile, StageConfig } from "./campaign/types";
 import {
   challengeEliteChance,
-  hiddenChallengeTierDefinition,
   priorityKillWindowSeconds,
+  priorityTargetChance,
   type ChallengeEncounterProfile,
 } from "./campaign/hidden-challenge";
 import {
@@ -2548,20 +2548,15 @@ export class Game {
     const profile = enemyProfile(kind, galaxy);
 
     const formationMember = request.formationMember === true;
-    const challengeTier =
-      this.encounter === null
-        ? null
-        : hiddenChallengeTierDefinition(this.encounter.tier);
     const priorityMode =
       this.encounter?.priorityTargetMode ?? "none";
     const priorityTarget =
       !formationMember &&
-      priorityMode !== "none" &&
+      this.encounter !== null &&
       Math.random() <
-        clamp(
-          (challengeTier?.priorityTargetRate ?? 0) + 0.18,
-          0,
-          0.92,
+        priorityTargetChance(
+          priorityMode,
+          this.encounter.tier,
         );
     const forceElite =
       !formationMember &&
