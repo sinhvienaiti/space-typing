@@ -112,6 +112,19 @@ import {
   type LuckPityState,
 } from "./loot/pity";
 import {
+  ACHIEVEMENT_IDS,
+  ACHIEVEMENT_REGISTRY,
+  MISSION_IDS,
+  MISSION_REGISTRY,
+  claimMission,
+  createProgressionState,
+  missionClaimable,
+  missionProgress,
+  recordProgressionEvent,
+  syncAchievements,
+  type ProgressionState,
+} from "./progression/missions";
+import {
   createHiddenDiscoveryState,
   hiddenCodexEntries,
   type HiddenContentDefinition,
@@ -388,6 +401,7 @@ app.innerHTML = `
           <button id="eventShopButton" class="hidden">Event Shop</button>
           <button id="supportButton">Support Spells</button>
           <button id="codexButton">Codex</button>
+          <button id="progressionButton">Missions</button>
           <button id="dataButton">Data</button>
           <button id="settingsButton">Settings</button>
         </div>
@@ -497,6 +511,26 @@ app.innerHTML = `
       </form>
       <p id="codexMeta" class="equipment-note">0 / 6 hidden discoveries</p>
       <div id="codexGrid" class="codex-grid"></div>
+    </dialog>
+
+    <dialog id="progressionDialog" class="settings-dialog progression-dialog">
+      <form method="dialog" class="dialog-head">
+        <div>
+          <p class="eyebrow">pilot records</p>
+          <h2>Missions & Achievements</h2>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+      <div class="progression-columns">
+        <section>
+          <h3>Missions</h3>
+          <div id="missionGrid" class="progression-grid"></div>
+        </section>
+        <section>
+          <h3>Achievements</h3>
+          <div id="achievementGrid" class="progression-grid"></div>
+        </section>
+      </div>
     </dialog>
 
     <dialog id="rewardChoiceDialog" class="settings-dialog reward-choice-dialog">
@@ -797,6 +831,7 @@ let characters: CharacterState = createStarterCharacterState();
 let luckPity: LuckPityState = createLuckPityState();
 let hiddenDiscovery: HiddenDiscoveryState = createHiddenDiscoveryState();
 let credits = 0;
+let progression: ProgressionState = createProgressionState();
 let persistenceReady = false;
 let equipmentDropCounter = 0;
 let shopPurchaseCounter = 0;
@@ -826,6 +861,8 @@ const specialShopDialog =
 const supportDialog = byId<HTMLDialogElement>("supportDialog");
 const characterDialog = byId<HTMLDialogElement>("characterDialog");
 const codexDialog = byId<HTMLDialogElement>("codexDialog");
+const progressionDialog =
+  byId<HTMLDialogElement>("progressionDialog");
 const rewardChoiceDialog =
   byId<HTMLDialogElement>("rewardChoiceDialog");
 const anomalyDialog = byId<HTMLDialogElement>("anomalyDialog");
@@ -846,6 +883,7 @@ type AutosaveSnapshot = {
   luckPity: LuckPityState;
   hiddenDiscovery: HiddenDiscoveryState;
   credits: number;
+  progression: ProgressionState;
 };
 
 const campaignAutosave = new AutosaveQueue<
@@ -862,6 +900,7 @@ const campaignAutosave = new AutosaveQueue<
     snapshot.luckPity,
     snapshot.hiddenDiscovery,
     snapshot.credits,
+    snapshot.progression,
   ),
 );
 
