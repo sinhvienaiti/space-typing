@@ -43,6 +43,11 @@ import {
   isValidCredits,
   sanitizeCredits,
 } from "../economy/credits";
+import {
+  createMetaProgressState,
+  isValidMetaProgressState,
+  type MetaProgressState,
+} from "../progression/meta";
 import type { PlayerSave } from "./player-save";
 
 export type BackupParseResult =
@@ -139,6 +144,7 @@ export function exportPlayerSaveJson(
   luckPity: LuckPityState = createLuckPityState(),
   hiddenDiscovery: HiddenDiscoveryState = createHiddenDiscoveryState(),
   credits = 0,
+  metaProgress: MetaProgressState = createMetaProgressState(),
 ): string {
   return JSON.stringify(
     createPlayerSave(
@@ -152,6 +158,7 @@ export function exportPlayerSaveJson(
       luckPity,
       hiddenDiscovery,
       sanitizeCredits(credits),
+      metaProgress,
     ),
     null,
     2,
@@ -191,6 +198,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     version !== 10 &&
     version !== 11 &&
     version !== 12 &&
+    version !== 13 &&
     version !== PLAYER_SAVE_VERSION
   ) {
     return {
@@ -220,6 +228,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 10 ||
       version === 11 ||
       version === 12 ||
+      version === 13 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidInventory(parsed.inventory)
   ) {
@@ -257,6 +266,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 10 ||
       version === 11 ||
       version === 12 ||
+      version === 13 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidEquipmentState(parsed.equipment)
   ) {
@@ -273,6 +283,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 10 ||
       version === 11 ||
       version === 12 ||
+      version === 13 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidSupportSpellState(parsed.supportSpells)
   ) {
@@ -306,6 +317,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     (version === 10 ||
       version === 11 ||
       version === 12 ||
+      version === 13 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidCharacterState(parsed.characters)
   ) {
@@ -318,6 +330,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   if (
     (version === 11 ||
       version === 12 ||
+      version === 13 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidLuckPityState(parsed.luckPity)
   ) {
@@ -328,7 +341,9 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    (version === 12 || version === PLAYER_SAVE_VERSION) &&
+    (version === 12 ||
+      version === 13 ||
+      version === PLAYER_SAVE_VERSION) &&
     !isValidHiddenDiscoveryState(parsed.hiddenDiscovery)
   ) {
     return {
@@ -339,12 +354,22 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    version === PLAYER_SAVE_VERSION &&
+    (version === 13 || version === PLAYER_SAVE_VERSION) &&
     !isValidCredits(parsed.credits)
   ) {
     return {
       ok: false,
       error: "Credits must be a non-negative whole number.",
+    };
+  }
+
+  if (
+    version === PLAYER_SAVE_VERSION &&
+    !isValidMetaProgressState(parsed.metaProgress)
+  ) {
+    return {
+      ok: false,
+      error: "Meta progression data is invalid.",
     };
   }
 
