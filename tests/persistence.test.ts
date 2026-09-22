@@ -572,6 +572,40 @@ describe("player save persistence model", () => {
     ).toBe(0);
   });
 
+  it("migrates PlayerSave v22 to default M18 relic state without losing upgrades", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    current.upgrades.attributeLevels.hull = 3;
+
+    const checkpointSnapshot = {
+      ...current.checkpointSnapshot,
+    } as Record<string, unknown>;
+    delete checkpointSnapshot.relics;
+
+    const legacy = {
+      ...current,
+      version: 22,
+      checkpointSnapshot,
+    } as Record<string, unknown>;
+    delete legacy.relics;
+
+    const migration = migratePlayerSave(legacy);
+
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(22);
+    expect(migration.save.version).toBe(PLAYER_SAVE_VERSION);
+    expect(migration.save.relics).toEqual({
+      version: 1,
+      owned: [],
+      equipped: [],
+    });
+    expect(migration.save.upgrades.attributeLevels.hull).toBe(3);
+    expect(migration.save.checkpointSnapshot.relics).toEqual({
+      version: 1,
+      owned: [],
+      equipped: [],
+    });
+  });
+
   it("keeps a valid current-version save without migration", () => {
     const save = createPlayerSave(
       createDefaultCampaignProgress(),
