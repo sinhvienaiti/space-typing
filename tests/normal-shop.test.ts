@@ -15,7 +15,7 @@ describe("Normal Shop", () => {
     expect(
       offers.some(
         (offer) =>
-          offer.kind === "equipment" && offer.rarity === "rare",
+          offer.kind === "equipment" && offer.grade === "copper",
       ),
     ).toBe(true);
   });
