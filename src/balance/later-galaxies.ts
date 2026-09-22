@@ -3,9 +3,9 @@ import { createStageConfig } from "../campaign/stage";
 import type { StageRole } from "../campaign/types";
 
 export const GALAXY_MILESTONE_OFFSETS = [
-  50,
-  60,
-  90,
+  10,
+  20,
+  95,
   100,
 ] as const;
 
