@@ -60,7 +60,7 @@ const ITEM_OFFERS: readonly NormalShopItemOffer[] = [
 ];
 
 function equipmentPrice(grade: GradeId): number {
-  return rarity === "rare" ? 240 : 145;
+  return grade === "copper" ? 240 : 145;
 }
 
 export function normalShopOffers(stage: number): NormalShopOffer[] {
@@ -73,7 +73,7 @@ export function normalShopOffers(stage: number): NormalShopOffer[] {
       EQUIPMENT_IDS[(start + offset * 2) % EQUIPMENT_IDS.length] ??
       EQUIPMENT_IDS[0];
     const grade: GradeId =
-      safeStage >= 100 && offset === 2 ? "rare" : "common";
+      safeStage >= 100 && offset === 2 ? "copper" : "aluminum";
     equipmentOffers.push({
       key: "equipment-" + definitionId + "-" + grade,
       kind: "equipment",
