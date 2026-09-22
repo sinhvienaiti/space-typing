@@ -144,7 +144,7 @@ export function chooseFormation(
   stage: number,
   formationComplexity: number,
   remainingEnemyBudget: number,
-  random = Math.random(),
+  random: () => number = Math.random,
 ): FormationDefinition | null {
   const candidates = formationCandidates(
     stage,
@@ -206,7 +206,7 @@ export function formationSpawnChance(
 export function shouldAttemptFormation(
   difficulty: DifficultyProfile,
   role: StageRole,
-  random = Math.random(),
+  random: () => number = Math.random,
 ): boolean {
   return (
     clamp(random(), 0, 0.999999) <
