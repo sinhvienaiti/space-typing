@@ -951,13 +951,23 @@ app.innerHTML = `
             <small>Fixed modes, Adaptive, or a Custom typing target</small>
           </span>
           <select id="difficultyMode">
-            <option value="relaxed">Relaxed</option>
-            <option value="normal">Normal</option>
+            <option value="relax">Relax</option>
+            <option value="balanced">Balanced</option>
             <option value="hard">Hard</option>
-            <option value="expert">Expert</option>
+            <option value="extreme">Extreme</option>
+            <option value="nightmare">Nightmare</option>
+            <option value="impossible">Impossible</option>
             <option value="adaptive">Adaptive</option>
             <option value="custom">Custom</option>
           </select>
+        </label>
+
+        <label class="setting-row">
+          <span>
+            <strong>Pressure profile</strong>
+            <small>Recommended WPM · typing budget · urgent cap · reaction · reward</small>
+          </span>
+          <output id="difficultyPressureValue">40-70 WPM · pressure 5.0</output>
         </label>
 
         <label class="setting-row">
@@ -973,15 +983,15 @@ app.innerHTML = `
             <strong>Custom target WPM</strong>
             <small>Used only when Difficulty mode is Custom</small>
           </span>
-          <input id="customTargetWpm" type="number" min="20" max="220" step="5" />
+          <input id="customTargetWpm" type="number" min="10" max="300" step="5" />
         </label>
 
         <label class="setting-row">
           <span>
             <strong>Custom pressure</strong>
-            <small>0.70 is forgiving; 1.45 is the maximum custom pressure</small>
+            <small>0.65 is forgiving; 1.60 is the maximum custom pressure</small>
           </span>
-          <input id="customPressure" type="number" min="0.7" max="1.45" step="0.05" />
+          <input id="customPressure" type="number" min="0.65" max="1.6" step="0.05" />
         </label>
       </div>
 
@@ -2260,12 +2270,15 @@ const game = new Game(
             " · Mastery " +
             String(progressAward.progress.mastery)
           : "";
-      const creditReward =
+      const creditReward = Math.floor(
         stageClearCreditReward({
           stage: stats.stage,
           accuracy,
           salvage: game.getPlayerStats().salvage,
-        }) * game.getCreditsMultiplier();
+        }) *
+          game.getCreditsMultiplier() *
+          game.getDifficultyRewardMultiplier(),
+      );
       credits = addCredits(credits, creditReward);
 
       const stageConfig = createStageConfig(stats.stage);
@@ -3835,6 +3848,26 @@ function renderSettings(): void {
 
   const difficultyMode = byId<HTMLSelectElement>("difficultyMode");
   difficultyMode.value = difficultySettings.mode;
+
+  const difficultyPreview = difficultyFor(
+    difficultyInputFromSettings(
+      difficultySettings,
+      campaign.selectedStage,
+      selectedVocabularyLevel(),
+    ),
+  );
+  byId<HTMLOutputElement>("difficultyPressureValue").value =
+    String(difficultyPreview.recommendedWpmMin) +
+    "-" +
+    String(difficultyPreview.recommendedWpmMax) +
+    " WPM · pressure " +
+    difficultyPreview.activeTypingPressureBudget.toFixed(1) +
+    " · urgent " +
+    String(difficultyPreview.urgentThreatCap) +
+    " · reaction " +
+    difficultyPreview.reactionWindow.toFixed(2) +
+    "s · reward ×" +
+    difficultyPreview.rewardMultiplier.toFixed(2);
 
   byId<HTMLOutputElement>("adaptiveProfileValue").value =
     difficultySettings.profile.smoothedWpm.toFixed(0) +
