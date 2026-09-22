@@ -17,6 +17,13 @@ import {
 } from "./boss/visual-profile";
 import type { DifficultyProfile, StageConfig } from "./campaign/types";
 import {
+  activeThreatPressure,
+  canAdmitSpawn,
+  emptyActivePressureSnapshot,
+  isControllerSupportKind,
+  type ActiveTypingPressureSnapshot,
+} from "./campaign/active-pressure";
+import {
   environmentForWorld,
   type WorldEnvironmentProfile,
 } from "./worlds/environment";
@@ -1830,10 +1837,19 @@ export class Game {
       this.spawnTimer <= 0 &&
       this.enemies.length < difficulty.maxEnemies
     ) {
-      this.spawnEnemy();
-      this.spawnRemaining -= 1;
-      this.spawnTimer =
-        difficulty.spawnInterval * randomBetween(0.82, 1.16);
+      const spawned = this.spawnEnemy();
+      if (spawned) {
+        this.spawnRemaining -= 1;
+        this.spawnTimer =
+          difficulty.spawnInterval * randomBetween(0.82, 1.16);
+      } else {
+        // Pressure denial is not a skipped enemy. Retry shortly after the
+        // active pile becomes more feasible.
+        this.spawnTimer = Math.max(
+          0.12,
+          difficulty.reactionWindow * 0.24,
+        );
+      }
     }
 
     const playerY = this.height - PLAYER_Y_OFFSET;
@@ -2241,12 +2257,28 @@ export class Game {
     }
   }
 
-  private spawnEnemy(): void {
+  private spawnEnemy(): boolean {
     const stage = this.stageConfig?.stage ?? 1;
     const galaxy = this.stageConfig?.galaxy ?? 1;
-    const kind = chooseEnemyKind(stage);
-    const profile = enemyProfile(kind, galaxy);
     const difficulty = this.difficulty;
+    if (difficulty === null) return false;
+
+    let kind = chooseEnemyKind(stage);
+    if (!this.canAdmitEnemyKind(kind, difficulty)) {
+      // Do not deadlock the scheduler because one controller/support roll was
+      // rejected. A Scout fallback is still subject to the same total pressure
+      // and urgent-threat caps.
+      if (
+        kind !== "scout" &&
+        this.canAdmitEnemyKind("scout", difficulty)
+      ) {
+        kind = "scout";
+      } else {
+        return false;
+      }
+    }
+
+    const profile = enemyProfile(kind, galaxy);
 
     const forceElite =
       this.stageConfig?.role === "elite" && this.eliteSpawned === 0;
@@ -2273,18 +2305,19 @@ export class Game {
       kind === "leech" ||
       kind === "commander";
     const actionPressure = supportAction
-      ? difficulty?.combatPressure ?? 1
-      : (difficulty?.projectilePressure ?? 1) *
+      ? difficulty.combatPressure
+      : difficulty.projectilePressure *
         this.stageEventModifiers.projectilePressureMultiplier;
 
     const baseSpeed =
       (profile.baseSpeed + randomBetween(0, profile.speedVariance)) *
-      (difficulty?.enemySpeed ?? 1) *
+      difficulty.enemySpeed *
       this.stageEventModifiers.enemySpeedMultiplier;
     const baseCooldown =
       profile.actionInterval === null
         ? null
-        : profile.actionInterval / Math.max(0.7, actionPressure);
+        : (profile.actionInterval * difficulty.attackIntervalFactor) /
+          Math.max(0.7, actionPressure);
     const eliteStats = applyEliteModifiers(
       {
         speed: baseSpeed,
@@ -2318,6 +2351,7 @@ export class Game {
       minimumLayers,
       vocabularyLevel: this.vocabularyLevel,
       entries: this.vocabulary,
+      wordScoreOffset: difficulty.wordScoreOffset,
     });
     const runtimeProfile = resolveEnemyRuntimeProfile({
       stage,
@@ -2333,7 +2367,7 @@ export class Game {
         ? eliteStats.actionCooldown
         : this.enemySkillCooldown(
             firstSkill,
-            difficulty ?? this.difficulty,
+            difficulty,
           );
 
     this.enemies.push({
@@ -2380,6 +2414,8 @@ export class Game {
     } else if (golden) {
       this.sfx.eliteWarning();
     }
+
+    return true;
   }
 
   private pickVocabularyEntry(kind: EnemyKind): VocabularyEntry {
@@ -2408,6 +2444,7 @@ export class Game {
         this.vocabularyLevel,
         Math.random(),
         enemy.entry.id,
+        this.difficulty?.wordScoreOffset ?? 0,
       ) ?? this.pickVocabularyEntry(enemy.kind);
 
     enemy.wordDifficultyScore = wordDifficultyScore(
@@ -2528,8 +2565,12 @@ export class Game {
     difficulty: DifficultyProfile | null,
   ): number {
     const definition = enemySkillDefinition(skillId);
+    const safeDifficulty = difficulty ?? this.difficulty;
+    const intervalFactor =
+      safeDifficulty?.attackIntervalFactor ?? 1;
     return (
-      definition.cooldown /
+      definition.cooldown *
+      intervalFactor /
       Math.max(
         0.7,
         this.enemySkillPressure(skillId, difficulty),
@@ -2547,7 +2588,10 @@ export class Game {
       0.85,
       1.25,
     );
-    return definition.telegraph / pressure;
+    return Math.max(
+      definition.telegraph / pressure,
+      difficulty.reactionWindow * 0.55,
+    );
   }
 
   private beginEnemySkill(
@@ -2628,12 +2672,8 @@ export class Game {
       return;
     }
 
-    const durationScale = clamp(
-      0.72 + difficulty.combatPressure * 0.2,
-      0.72,
-      1.2,
-    );
-    const duration = effect.duration * durationScale;
+    const duration = effect.duration *
+      difficulty.hardCcDurationFactor;
     const source = "enemy-skill:" + skillId;
 
     if (!effect.hardCc) {
@@ -2659,7 +2699,8 @@ export class Game {
         this.hardCcState,
         hardCcId,
         duration,
-        effect.immunityAfter,
+        effect.immunityAfter *
+          difficulty.ccImmunityFactor,
       );
     }
   }
@@ -2700,7 +2741,11 @@ export class Game {
       : difficulty.projectilePressure *
         this.stageEventModifiers.projectilePressureMultiplier;
 
-    return baseInterval / Math.max(0.7, pressure);
+    return (
+      baseInterval *
+      difficulty.attackIntervalFactor /
+      Math.max(0.7, pressure)
+    );
   }
 
   private spawnCarrierChild(carrier: Enemy): void {
