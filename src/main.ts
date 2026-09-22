@@ -2474,6 +2474,7 @@ async function autosaveCampaign(
       luckPity,
       hiddenDiscovery,
       credits,
+      progression,
     },
     reason,
   );
@@ -2517,6 +2518,8 @@ async function initializePlayerProgress(): Promise<void> {
   const characterButton =
     byId<HTMLButtonElement>("characterButton");
   const codexButton = byId<HTMLButtonElement>("codexButton");
+  const progressionButton =
+    byId<HTMLButtonElement>("progressionButton");
 
   startButton.disabled = true;
   stageSelectButton.disabled = true;
@@ -2528,6 +2531,7 @@ async function initializePlayerProgress(): Promise<void> {
   supportButton.disabled = true;
   characterButton.disabled = true;
   codexButton.disabled = true;
+  progressionButton.disabled = true;
   for (const button of dataButtons) button.disabled = true;
 
   try {
@@ -2539,6 +2543,8 @@ async function initializePlayerProgress(): Promise<void> {
     luckPity = loaded.save.luckPity;
     hiddenDiscovery = loaded.save.hiddenDiscovery;
     credits = loaded.save.credits;
+    progression = loaded.save.progression;
+    syncProgressionAchievements();
     game.setLuckPityState(luckPity);
     game.setHiddenDiscoveryState(hiddenDiscovery);
     const loadedCharacters = loaded.save.characters;
@@ -2566,7 +2572,9 @@ async function initializePlayerProgress(): Promise<void> {
     supportButton.disabled = false;
     characterButton.disabled = false;
     codexButton.disabled = false;
+    progressionButton.disabled = false;
     renderCodex();
+    renderProgression();
     renderNormalShop();
     renderServiceShop();
     updateSpecialShopAccess();
@@ -2804,6 +2812,7 @@ async function exportSave(): Promise<void> {
     luckPity,
     hiddenDiscovery,
     credits,
+    progression,
   );
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -2846,6 +2855,7 @@ async function importSaveFile(file: File): Promise<void> {
     const importedLuckPity = result.save.luckPity;
     const importedHiddenDiscovery = result.save.hiddenDiscovery;
     const importedCredits = result.save.credits;
+    const importedProgression = result.save.progression;
     const message =
       "Import Stage " +
       String(imported.highestUnlockedStage).padStart(3, "0") +
@@ -2867,6 +2877,7 @@ async function importSaveFile(file: File): Promise<void> {
     const previousLuckPity = luckPity;
     const previousHiddenDiscovery = hiddenDiscovery;
     const previousCredits = credits;
+    const previousProgression = progression;
     campaign = imported;
     inventory = importedInventory;
     equipment = importedEquipment;
@@ -2875,6 +2886,8 @@ async function importSaveFile(file: File): Promise<void> {
     luckPity = importedLuckPity;
     hiddenDiscovery = importedHiddenDiscovery;
     credits = importedCredits;
+    progression = importedProgression;
+    syncProgressionAchievements();
     game.setLuckPityState(luckPity);
     game.setHiddenDiscoveryState(hiddenDiscovery);
     updateSpecialShopAccess();
@@ -2896,6 +2909,7 @@ async function importSaveFile(file: File): Promise<void> {
       luckPity = previousLuckPity;
       hiddenDiscovery = previousHiddenDiscovery;
       credits = previousCredits;
+      progression = previousProgression;
       game.setLuckPityState(luckPity);
       game.setHiddenDiscoveryState(hiddenDiscovery);
       updateSpecialShopAccess();
@@ -3077,6 +3091,7 @@ for (const id of ["dataButton", "pauseDataButton"]) {
 }
 
 byId("codexButton").addEventListener("click", openCodex);
+byId("progressionButton").addEventListener("click", openProgression);
 
 byId("exportSaveButton").addEventListener("click", () => {
   void exportSave();
@@ -3230,6 +3245,7 @@ window.addEventListener("keydown", (event) => {
     supportDialog.open ||
     characterDialog.open ||
     codexDialog.open ||
+    progressionDialog.open ||
     shopDialog.open ||
     serviceShopDialog.open ||
     specialShopDialog.open
