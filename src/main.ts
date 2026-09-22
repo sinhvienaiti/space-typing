@@ -1108,6 +1108,16 @@ anomalyDialog.addEventListener("cancel", (event) => {
   event.preventDefault();
 });
 
+for (const dialog of [
+  shopDialog,
+  serviceShopDialog,
+  specialShopDialog,
+]) {
+  dialog.addEventListener("close", () => {
+    if (game.getPhase() === "title") restoreTitleMusic();
+  });
+}
+
 type AutosaveSnapshot = {
   campaign: typeof campaign;
   inventory: Inventory;
@@ -2160,7 +2170,21 @@ const game = new Game(
     onStats: renderStats,
     onPhase: (phase) => {
       renderPhase(phase);
+
+      if (phase === "paused") {
+        musicController.setPaused(true);
+      } else if (phase === "playing") {
+        syncCombatMusic(game.getStats().stage);
+      } else if (phase === "stageclear") {
+        musicController.setPaused(false);
+        musicController.transitionTo("VICTORY", 0.35);
+      } else if (phase === "title") {
+        restoreTitleMusic();
+      }
+
       if (phase === "gameover") {
+        musicController.setPaused(false);
+        musicController.transitionTo("DEFEAT", 0.35);
         const stats = game.getStats();
         byId("resultScore").textContent = stats.score.toLocaleString();
         byId("resultWave").textContent =
@@ -3587,6 +3611,8 @@ async function initializePlayerProgress(): Promise<void> {
     );
     persistenceReady = true;
 
+    syncWorldMusicProfile(campaign.selectedStage);
+    musicController.transitionTo("WORLD_NORMAL", 0.8);
     updateCampaignUi();
     startButton.disabled = !vocabularyReady;
     stageSelectButton.disabled = false;
@@ -3647,6 +3673,9 @@ function updateCampaignUi(): void {
   byId("startButton").textContent =
     "Continue · Stage " + String(campaign.selectedStage).padStart(3, "0");
   const selectedWorld = worldForStage(campaign.selectedStage);
+  musicController.setWorldProfile(
+    musicProfileForWorld(selectedWorld),
+  );
   byId("titleWorldMeta").textContent =
     worldLabel(selectedWorld) +
     " · Stage " +
@@ -4656,11 +4685,29 @@ function persistPageLifecycleRecovery(): void {
 }
 
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState !== "hidden") return;
-  persistPageLifecycleRecovery();
+  const hidden = document.visibilityState === "hidden";
+  if (hidden) {
+    musicController.setPaused(true);
+    persistPageLifecycleRecovery();
+    return;
+  }
+
+  if (game.getPhase() !== "paused") {
+    musicController.setPaused(false);
+  }
 });
 
 window.addEventListener("pagehide", persistPageLifecycleRecovery);
+
+window.addEventListener(
+  "pointerdown",
+  () => {
+    if (game.getPhase() !== "paused") {
+      musicController.setPaused(false);
+    }
+  },
+  { once: true },
+);
 
 window.addEventListener("beforeunload", () => {
   stopSpeech();
