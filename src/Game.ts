@@ -2530,6 +2530,15 @@ export class Game {
       vocabularyLevel: this.vocabularyLevel,
       entries: this.vocabulary,
     });
+    const runtimeProfile = resolveEnemyRuntimeProfile({
+      stage,
+      kind: "scout",
+      rank: typingProfile.rank,
+      elite: false,
+      wordDifficultyScore: typingProfile.wordDifficultyScore,
+      layers: typingProfile.layersRemaining,
+    });
+    const firstSkill = runtimeProfile.skills[0];
 
     this.enemies.push({
       id: this.nextEnemyId++,
@@ -2540,6 +2549,11 @@ export class Game {
       rank: typingProfile.rank,
       wordDifficultyScore: typingProfile.wordDifficultyScore,
       layerPlan: typingProfile.layerPlan,
+      skillIds: runtimeProfile.skills,
+      nextSkillIndex: 0,
+      pendingSkillId: null,
+      skillTelegraphRemaining: 0,
+      threatBudget: runtimeProfile.threatBudget,
       entry: typingProfile.entry,
       typed: 0,
       wordMissed: false,
@@ -2556,7 +2570,10 @@ export class Game {
       radius: 19,
       flash: 0,
       kick: 0,
-      actionCooldown: null,
+      actionCooldown:
+        firstSkill === undefined
+          ? null
+          : this.enemySkillCooldown(firstSkill, this.difficulty),
     });
 
     this.burst(carrier.x, carrier.y, 12, 47);
