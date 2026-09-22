@@ -2313,7 +2313,16 @@ const game = new Game(
       if (phase === "paused") {
         musicController.setPaused(true);
       } else if (phase === "playing") {
-        syncCombatMusic(game.getStats().stage);
+        const hidden = currentHiddenEncounterState().active;
+        if (hidden !== null) {
+          musicController.setPaused(false);
+          musicController.transitionTo(
+            hiddenMusicState(hidden.kind),
+            musicCrossfadeSeconds(hiddenMusicState(hidden.kind)),
+          );
+        } else {
+          syncCombatMusic(game.getStats().stage);
+        }
       } else if (phase === "stageclear") {
         musicController.setPaused(false);
         musicController.transitionTo("VICTORY", 0.35);
@@ -2348,6 +2357,17 @@ const game = new Game(
         game.getStageElapsedSeconds(),
       );
       const accuracy = accuracyPercent(stats.hits, stats.misses);
+      const activeHidden = currentHiddenEncounterState().active;
+      if (activeHidden !== null) {
+        handleHiddenEncounterClear(
+          activeHidden,
+          stats,
+          wpm,
+          accuracy,
+        );
+        return;
+      }
+
       difficultySettings = recordDifficultyResult(
         difficultySettings,
         wpm,
@@ -3611,6 +3631,82 @@ function routeNodeDescription(node: RouteNode): string {
     : "Direct combat route · no service detour before the encounter.";
 }
 
+function handleHiddenEncounterClear(
+  active: ActiveHiddenEncounter,
+  stats: ReturnType<Game["getStats"]>,
+  wpm: number,
+  accuracy: number,
+): void {
+  const label = hiddenEncounterLabel(active);
+  const result = advanceHiddenEncounter(
+    currentHiddenEncounterState(),
+  );
+  setHiddenEncounterState(result.state);
+  stageEntrySnapshot = null;
+
+  let rewardText = "No checkpoint change";
+  let rewardCredits = 0;
+
+  if (result.completed) {
+    const reward = hiddenEncounterReward(
+      active,
+      accuracy,
+    );
+    rewardCredits = reward.credits;
+    credits = addCredits(credits, reward.credits);
+    expansionCurrencies = addExpansionCurrencyReward(
+      expansionCurrencies,
+      reward.currencies,
+    );
+    const currencyText =
+      expansionCurrencyRewardText(reward.currencies);
+    rewardText =
+      "+" +
+      reward.credits.toLocaleString() +
+      " Credits" +
+      (currencyText.length > 0
+        ? " · " + currencyText
+        : "");
+  } else {
+    rewardText =
+      "Hidden World progress · " +
+      String(result.state.active?.step ?? active.step + 1) +
+      "/" +
+      String(active.totalSteps);
+  }
+
+  void autosaveCampaign(
+    "hidden-transition",
+    result.completed
+      ? "✓ " + label + " complete · premium reward secured"
+      : "✓ " + label + " progress saved",
+    "hidden-transition",
+  );
+
+  byId("clearTitle").textContent =
+    result.completed
+      ? label + " complete"
+      : hiddenEncounterLabel(result.state.active!);
+  byId("clearScore").textContent =
+    stats.score.toLocaleString();
+  byId("clearAccuracy").textContent =
+    accuracy.toFixed(1) + "%";
+  byId("clearWpm").textContent = wpm.toFixed(0);
+  byId("clearCredits").textContent = rewardText;
+  byId("clearStreak").textContent =
+    String(stats.maxStreak);
+  byId<HTMLButtonElement>("nextStageButton").textContent =
+    result.completed
+      ? "Continue Campaign"
+      : "Next Hidden Encounter";
+
+  if (rewardCredits > 0) {
+    updateDataSummary();
+  }
+  renderCodex();
+  updateCampaignUi();
+}
+
 function currentHiddenEncounterState(): HiddenEncounterState {
   return hiddenDiscovery.encounter ?? createHiddenEncounterState();
 }
@@ -3960,8 +4056,96 @@ function closeRouteAndOpen(action: () => void): void {
   action();
 }
 
+function hiddenStageConfig(
+  active: ActiveHiddenEncounter,
+): StageConfig {
+  const base = createStageConfig(active.sourceStage);
+  const finalHiddenWorldBoss =
+    active.kind === "hidden-world" &&
+    active.step === active.totalSteps;
+
+  return {
+    ...base,
+    role: finalHiddenWorldBoss ? "boss" : "normal",
+  };
+}
+
+async function startActiveHiddenEncounter(
+  active: ActiveHiddenEncounter,
+): Promise<void> {
+  game.setCharacter(characters.selected);
+  const stage = hiddenStageConfig(active);
+  const vocabularyLevel = selectedVocabularyLevel();
+  game.setVocabularyLevel(vocabularyLevel);
+  await prepareStageVocabulary(stage);
+
+  const baseDifficulty = difficultyFor(
+    difficultyInputFromSettings(
+      difficultySettings,
+      active.sourceStage,
+      vocabularyLevel,
+    ),
+  );
+  const difficulty = hiddenEncounterDifficulty(
+    baseDifficulty,
+    active.kind,
+    active.tier,
+  );
+  const runtime = hiddenEncounterRuntime(
+    active,
+    difficulty,
+  );
+  activeStageDifficulty = difficulty;
+
+  const stageEntryAt = new Date().toISOString();
+  stageEntrySnapshot = createStageEntrySnapshot(
+    currentRunPersistentState(),
+    campaignExpansion,
+    checkpointSnapshot,
+    stageEntryAt,
+  );
+
+  const recoverySaved = await autosaveCampaign(
+    "hidden-transition",
+    undefined,
+    "hidden-transition",
+  );
+  if (!recoverySaved) return;
+
+  const musicStage =
+    runtime.environmentStageOverride ??
+    active.sourceStage;
+  musicController.setWorldProfile(
+    musicProfileForWorld(worldForStage(musicStage)),
+  );
+  musicController.setBossPhase(1);
+  const state = hiddenMusicState(active.kind);
+  musicController.transitionTo(
+    state,
+    musicCrossfadeSeconds(state),
+  );
+  musicController.setPaused(false);
+
+  game.startStage(
+    stage,
+    difficulty,
+    runtime,
+  );
+}
+
 async function startSelectedStage(): Promise<void> {
   if (!persistenceReady || !vocabularyReady || stageStartPending) return;
+
+  const activeHidden = currentHiddenEncounterState().active;
+  if (activeHidden !== null) {
+    stageStartPending = true;
+    try {
+      await startActiveHiddenEncounter(activeHidden);
+    } finally {
+      stageStartPending = false;
+    }
+    return;
+  }
 
   if (
     campaign.selectedStage === campaign.highestUnlockedStage
@@ -4211,6 +4395,7 @@ async function initializePlayerProgress(): Promise<void> {
 }
 
 function updateCampaignUi(): void {
+  byId<HTMLButtonElement>("nextStageButton").textContent = "Next stage";
   byId("startButton").textContent =
     "Continue · Stage " + String(campaign.selectedStage).padStart(3, "0");
   const selectedWorld = worldForStage(campaign.selectedStage);
