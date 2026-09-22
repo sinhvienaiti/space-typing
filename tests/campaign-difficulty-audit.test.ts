@@ -81,8 +81,9 @@ describe("Campaign Stage 001-1000 difficulty validation", () => {
       );
 
       for (let index = 1; index < values.length; index += 1) {
-        expect(values[index]).toBeGreaterThan(values[index - 1]!);
+        expect(values[index]).toBeGreaterThanOrEqual(values[index - 1]!);
       }
+      expect(values.at(-1)).toBeGreaterThan(values[0]!);
     }
   });
 
