@@ -16,6 +16,14 @@ describe("boss visual conversion", () => {
     expect(bossVisualDefinitionId(10)).toBe("cosmic-emperor");
   });
 
+  it("uses the V1 mini-boss roster on mini-boss stages", () => {
+    expect(bossVisualDefinitionId(1, "mini-boss")).toBe("halo-seraph");
+    expect(bossVisualDefinitionId(2, "mini-boss")).toBe("crown-demon");
+    expect(bossVisualDefinitionId(3, "mini-boss")).toBe("glacier-oracle");
+    expect(bossVisualDefinitionId(4, "mini-boss")).toBe("prism-sentinel");
+    expect(bossVisualName(1, "mini-boss")).toBe("Halo Seraph");
+  });
+
   it("keeps all boss visuals inside the shared enemy art registry", () => {
     for (const galaxy of [1, 2, 3, 4, 9, 10]) {
       expect(enemyDefinition(bossVisualDefinitionId(galaxy))).toBeDefined();

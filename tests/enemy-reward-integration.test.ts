@@ -9,6 +9,13 @@ describe("enemy reward integration contracts", () => {
     expect(prism?.rewardPower).toBeGreaterThan(0);
   });
 
+  it("keeps Damage Up durations inside the planned 6-10 second window", () => {
+    expect(enemyDefinition("berserk-devil")?.rewardPower).toBeGreaterThanOrEqual(6);
+    expect(enemyDefinition("berserk-devil")?.rewardPower).toBeLessThanOrEqual(10);
+    expect(enemyDefinition("demon-lord-orb")?.rewardPower).toBeGreaterThanOrEqual(6);
+    expect(enemyDefinition("demon-lord-orb")?.rewardPower).toBeLessThanOrEqual(10);
+  });
+
   it("keeps multiplier duration bounded and explicit", () => {
     expect(timedRewardMultiplier(12)).toBe(2);
     expect(timedRewardMultiplier(0)).toBe(1);

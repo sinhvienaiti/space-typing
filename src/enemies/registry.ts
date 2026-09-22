@@ -44,6 +44,10 @@ export const ENEMY_DEFINITION_IDS = [
   "star-core",
   "nova-core",
   "nebula-elite",
+  "halo-seraph",
+  "crown-demon",
+  "glacier-oracle",
+  "prism-sentinel",
   "archangel-core",
   "demon-lord-orb",
   "glacier-queen",
@@ -62,9 +66,6 @@ export type EnemyDefinition = {
   role: EnemyRoleId;
   rarity: EnemyRarity;
   minStage: number;
-  spawnWeight: number;
-  durabilityScale: number;
-  speedScale: number;
   reward?: EnemyRewardId;
   rewardPower?: number;
   visual: EnemyVisualProfile;
@@ -164,9 +165,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "normal",
     rarity: "common",
     minStage: 1,
-    spawnWeight: 1,
-    durabilityScale: 1,
-    speedScale: 1,
     visual: rainbowBase,
   },
   {
@@ -176,9 +174,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "swift",
     rarity: "uncommon",
     minStage: 10,
-    spawnWeight: 0.35,
-    durabilityScale: 0.8,
-    speedScale: 1.28,
     visual: {
       ...rainbowBase,
       wings: "fairy",
@@ -192,9 +187,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "tank",
     rarity: "uncommon",
     minStage: 20,
-    spawnWeight: 0.25,
-    durabilityScale: 1.8,
-    speedScale: 0.72,
     visual: {
       ...rainbowBase,
       body: "rainbow-water-orb-large",
@@ -208,9 +200,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "normal",
     rarity: "common",
     minStage: 50,
-    spawnWeight: 0.4,
-    durabilityScale: 1,
-    speedScale: 1,
     visual: devilBase,
   },
   {
@@ -220,9 +209,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "normal",
     rarity: "common",
     minStage: 30,
-    spawnWeight: 0.45,
-    durabilityScale: 0.9,
-    speedScale: 0.96,
     visual: frostBase,
   },
   {
@@ -232,9 +218,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "reward",
     rarity: "rare",
     minStage: 15,
-    spawnWeight: 0.08,
-    durabilityScale: 0.9,
-    speedScale: 1.08,
     reward: "luck-up",
     rewardPower: 15,
     visual: {
@@ -250,9 +233,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "support",
     rarity: "rare",
     minStage: 30,
-    spawnWeight: 0.09,
-    durabilityScale: 1,
-    speedScale: 0.9,
     reward: "heal-burst",
     rewardPower: 0.15,
     visual: {
@@ -267,9 +247,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "support",
     rarity: "rare",
     minStage: 20,
-    spawnWeight: 0.07,
-    durabilityScale: 1.3,
-    speedScale: 0.82,
     reward: "shield-burst",
     rewardPower: 0.22,
     visual: {
@@ -285,9 +262,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "reward",
     rarity: "rare",
     minStage: 70,
-    spawnWeight: 0.05,
-    durabilityScale: 1.1,
-    speedScale: 0.88,
     reward: "energy-burst",
     rewardPower: 0.28,
     visual: {
@@ -303,9 +277,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "burst",
     rarity: "rare",
     minStage: 60,
-    spawnWeight: 0.08,
-    durabilityScale: 0.9,
-    speedScale: 1.05,
     reward: "explosion-burst",
     rewardPower: 0.35,
     visual: {
@@ -322,9 +293,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "control",
     rarity: "rare",
     minStage: 40,
-    spawnWeight: 0.08,
-    durabilityScale: 0.9,
-    speedScale: 0.92,
     reward: "freeze-nearby",
     rewardPower: 3,
     visual: {
@@ -340,9 +308,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "elite",
     rarity: "elite",
     minStage: 90,
-    spawnWeight: 0.03,
-    durabilityScale: 1.65,
-    speedScale: 0.92,
     reward: "shield-burst",
     rewardPower: 0.22,
     visual: {
@@ -361,11 +326,8 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "elite",
     rarity: "elite",
     minStage: 120,
-    spawnWeight: 0.03,
-    durabilityScale: 1.5,
-    speedScale: 1.12,
     reward: "damage-up",
-    rewardPower: 1.2,
+    rewardPower: 8,
     visual: {
       ...devilBase,
       wings: "bat-large",
@@ -381,9 +343,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "elite",
     rarity: "elite",
     minStage: 110,
-    spawnWeight: 0.025,
-    durabilityScale: 1.55,
-    speedScale: 0.86,
     reward: "slow-nearby",
     rewardPower: 5,
     visual: {
@@ -402,9 +361,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "elite",
     rarity: "elite",
     minStage: 140,
-    spawnWeight: 0.02,
-    durabilityScale: 1.45,
-    speedScale: 0.96,
     reward: "luck-up",
     rewardPower: 18,
     visual: {
@@ -420,9 +376,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "normal",
     rarity: "uncommon",
     minStage: 80,
-    spawnWeight: 0.18,
-    durabilityScale: 1,
-    speedScale: 1.04,
     visual: prismBase,
   },
   {
@@ -432,9 +385,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "reward",
     rarity: "rare",
     minStage: 100,
-    spawnWeight: 0.055,
-    durabilityScale: 1,
-    speedScale: 0.94,
     reward: "score-x2",
     rewardPower: 10,
     visual: {
@@ -450,9 +400,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "normal",
     rarity: "common",
     minStage: 25,
-    spawnWeight: 0.28,
-    durabilityScale: 1.1,
-    speedScale: 0.86,
     visual: natureBase,
   },
   {
@@ -462,9 +409,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "reward",
     rarity: "rare",
     minStage: 45,
-    spawnWeight: 0.065,
-    durabilityScale: 1.1,
-    speedScale: 0.84,
     reward: "heal-burst",
     rewardPower: 0.1,
     visual: {
@@ -481,9 +425,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "normal",
     rarity: "uncommon",
     minStage: 300,
-    spawnWeight: 0.13,
-    durabilityScale: 0.95,
-    speedScale: 1.08,
     visual: shadowBase,
   },
   {
@@ -493,9 +434,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "control",
     rarity: "rare",
     minStage: 340,
-    spawnWeight: 0.08,
-    durabilityScale: 1,
-    speedScale: 1.02,
     reward: "cooldown-charge",
     rewardPower: 3,
     visual: {
@@ -512,9 +450,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "elite",
     rarity: "elite",
     minStage: 380,
-    spawnWeight: 0.018,
-    durabilityScale: 1.5,
-    speedScale: 1.05,
     reward: "cooldown-charge",
     rewardPower: 5,
     visual: {
@@ -533,9 +468,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "reward",
     rarity: "rare",
     minStage: 520,
-    spawnWeight: 0.045,
-    durabilityScale: 1.1,
-    speedScale: 0.94,
     reward: "overdrive-charge",
     rewardPower: 26,
     visual: {
@@ -551,9 +483,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "burst",
     rarity: "rare",
     minStage: 560,
-    spawnWeight: 0.04,
-    durabilityScale: 1,
-    speedScale: 1.03,
     reward: "explosion-burst",
     rewardPower: 0.45,
     visual: {
@@ -570,9 +499,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "elite",
     rarity: "elite",
     minStage: 620,
-    spawnWeight: 0.015,
-    durabilityScale: 1.6,
-    speedScale: 0.98,
     reward: "energy-burst",
     rewardPower: 0.38,
     visual: {
@@ -584,15 +510,81 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     },
   },
   {
+    id: "halo-seraph",
+    name: "Halo Seraph",
+    family: "angel",
+    role: "mini-boss",
+    rarity: "boss",
+    minStage: 20,
+    visual: {
+      ...angelBase,
+      body: "holy-orb-mini-boss",
+      wings: "feather-large",
+      head: "double-halo",
+      orbit: "holy-orbit",
+      aura: "holy-glow-elite",
+      deathFx: "holy-boss-burst",
+    },
+  },
+  {
+    id: "crown-demon",
+    name: "Crown Demon",
+    family: "devil",
+    role: "mini-boss",
+    rarity: "boss",
+    minStage: 120,
+    visual: {
+      ...devilBase,
+      body: "infernal-orb-mini-boss",
+      wings: "bat-large",
+      head: "demon-crown",
+      side: "ember-tail",
+      orbit: "infernal-orbit",
+      aura: "infernal-flame-elite",
+      deathFx: "infernal-boss-burst",
+    },
+  },
+  {
+    id: "glacier-oracle",
+    name: "Glacier Oracle",
+    family: "frost",
+    role: "mini-boss",
+    rarity: "boss",
+    minStage: 220,
+    visual: {
+      ...frostBase,
+      body: "frost-orb-mini-boss",
+      wings: "crystal-large",
+      head: "ice-crown",
+      orbit: "snow-halo",
+      aura: "frost-mist-elite",
+      deathFx: "frost-boss-burst",
+    },
+  },
+  {
+    id: "prism-sentinel",
+    name: "Prism Sentinel",
+    family: "prism",
+    role: "mini-boss",
+    rarity: "boss",
+    minStage: 320,
+    visual: {
+      ...prismBase,
+      body: "prism-crystal-orb-mini-boss",
+      wings: "fairy-large",
+      head: "prism-crown",
+      orbit: "prism-rune-rings",
+      aura: "prism-sparkle-elite",
+      deathFx: "prism-boss-burst",
+    },
+  },
+  {
     id: "archangel-core",
     name: "Archangel Core",
     family: "angel",
     role: "boss",
     rarity: "boss",
     minStage: 100,
-    spawnWeight: 0,
-    durabilityScale: 1,
-    speedScale: 1,
     reward: "shield-burst",
     rewardPower: 0.4,
     visual: {
@@ -614,9 +606,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "boss",
     rarity: "boss",
     minStage: 300,
-    spawnWeight: 0,
-    durabilityScale: 1,
-    speedScale: 1,
     reward: "freeze-nearby",
     rewardPower: 4,
     visual: {
@@ -638,9 +627,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "boss",
     rarity: "boss",
     minStage: 400,
-    spawnWeight: 0,
-    durabilityScale: 1,
-    speedScale: 1,
     reward: "credits-x2",
     rewardPower: 12,
     visual: {
@@ -662,9 +648,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "boss",
     rarity: "boss",
     minStage: 800,
-    spawnWeight: 0,
-    durabilityScale: 1,
-    speedScale: 1,
     reward: "cooldown-charge",
     rewardPower: 6,
     visual: {
@@ -686,9 +669,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "boss",
     rarity: "boss",
     minStage: 900,
-    spawnWeight: 0,
-    durabilityScale: 1,
-    speedScale: 1,
     reward: "overdrive-charge",
     rewardPower: 40,
     visual: {
@@ -710,11 +690,8 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     role: "boss",
     rarity: "boss",
     minStage: 200,
-    spawnWeight: 0,
-    durabilityScale: 1,
-    speedScale: 1,
     reward: "damage-up",
-    rewardPower: 1.25,
+    rewardPower: 10,
     visual: {
       ...devilBase,
       body: "infernal-orb-boss",
@@ -755,18 +732,6 @@ export function validateEnemyRegistry(
     }
     if (!Number.isInteger(definition.minStage) || definition.minStage < 1) {
       errors.push(definition.id + ": minStage must be >= 1.");
-    }
-    if (!Number.isFinite(definition.spawnWeight) || definition.spawnWeight < 0) {
-      errors.push(definition.id + ": spawnWeight must be >= 0.");
-    }
-    if (
-      !Number.isFinite(definition.durabilityScale) ||
-      definition.durabilityScale <= 0
-    ) {
-      errors.push(definition.id + ": durabilityScale must be > 0.");
-    }
-    if (!Number.isFinite(definition.speedScale) || definition.speedScale <= 0) {
-      errors.push(definition.id + ": speedScale must be > 0.");
     }
     if (!isReadableVisualProfile(definition.visual)) {
       errors.push(definition.id + ": visual profile is incomplete.");

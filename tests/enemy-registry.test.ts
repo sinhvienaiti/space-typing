@@ -48,10 +48,26 @@ describe("enemy visual/reward registry", () => {
         "freeze-burst-sprite",
         "seraph-elite",
         "berserk-devil",
+        "halo-seraph",
+        "crown-demon",
+        "glacier-oracle",
+        "prism-sentinel",
         "archangel-core",
         "demon-lord-orb",
       ]),
     );
+  });
+
+  it("includes the four V1 mini-boss identities", () => {
+    const miniBosses = ENEMY_REGISTRY.filter(
+      (definition) => definition.role === "mini-boss",
+    );
+    expect(miniBosses.map((definition) => definition.id)).toEqual([
+      "halo-seraph",
+      "crown-demon",
+      "glacier-oracle",
+      "prism-sentinel",
+    ]);
   });
 
   it("keeps reward identity visible without relying on color alone", () => {
