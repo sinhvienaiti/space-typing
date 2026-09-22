@@ -73,18 +73,20 @@ export function specialShopUnlocked(
   return hiddenDiscovery.discovered.includes(required);
 }
 
-function blackMarketRarity(
+function blackMarketGrade(
   stage: number,
   offset: number,
-): EquipmentRarity {
-  if (stage >= 500 && offset === 2) return "legendary";
-  if (stage >= 180 && offset >= 1) return "epic";
-  return "rare";
+): GradeId {
+  if (stage >= 800 && offset === 2) return "diamond";
+  if (stage >= 500 && offset === 2) return "gold";
+  if (stage >= 180 && offset >= 1) return "silver";
+  return "copper";
 }
 
 function equipmentPrice(grade: GradeId): number {
-  if (rarity === "legendary") return 1450;
-  if (rarity === "epic") return 720;
+  if (grade === "diamond") return 2600;
+  if (grade === "gold") return 1450;
+  if (grade === "silver") return 720;
   return 390;
 }
 
@@ -186,7 +188,7 @@ export function buySpecialShopOffer(
   const equipment = addEquipmentInstance(current.equipment, {
     instanceId,
     definitionId: offer.definitionId,
-    rarity: offer.grade,
+    grade: offer.grade,
     enhancement: 0,
   });
   const payment = spendCredits(credits, offer.price);
