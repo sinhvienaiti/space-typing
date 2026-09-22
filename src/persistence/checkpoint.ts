@@ -62,6 +62,12 @@ import {
   sanitizeRouteState,
   type RouteState,
 } from "../campaign/route";
+import {
+  createUpgradeState,
+  isValidUpgradeState,
+  sanitizeUpgradeState,
+  type UpgradeState,
+} from "../progression/upgrades";
 
 export type RunPersistentState = {
   campaign: CampaignProgress;
@@ -76,6 +82,7 @@ export type RunPersistentState = {
   expansionCurrencies: ExpansionCurrencyState;
   shops: ShopState;
   route: RouteState;
+  upgrades: UpgradeState;
 };
 
 export type CheckpointSnapshot = RunPersistentState;
@@ -229,7 +236,8 @@ function isValidLegacyRunPersistentStateWithoutRoute(
     isValidCredits(raw.credits) &&
     isValidProgressionState(raw.progression) &&
     isValidExpansionCurrencyState(raw.expansionCurrencies) &&
-    (raw.shops === undefined || isValidShopState(raw.shops))
+    (raw.shops === undefined || isValidShopState(raw.shops)) &&
+    (raw.upgrades === undefined || isValidUpgradeState(raw.upgrades))
   );
 }
 
@@ -260,6 +268,9 @@ export function migrateLegacyRunPersistentState(
       ? sanitizeShopState(raw.shops)
       : createShopState(),
     route: createRouteState(campaign.highestUnlockedStage),
+    upgrades: isValidUpgradeState(raw.upgrades)
+      ? sanitizeUpgradeState(raw.upgrades)
+      : createUpgradeState(),
   };
 }
 
@@ -283,6 +294,7 @@ export function isValidRunPersistentState(
     isValidProgressionState(raw.progression) &&
     isValidExpansionCurrencyState(raw.expansionCurrencies) &&
     isValidShopState(raw.shops) &&
+    isValidUpgradeState(raw.upgrades) &&
     isValidRouteState(
       raw.route,
       (raw.campaign as CampaignProgress).highestUnlockedStage,
@@ -320,6 +332,7 @@ export function sanitizeRunPersistentState(
     expansionCurrencies:
       sanitizeExpansionCurrencyState(value.expansionCurrencies),
     shops: sanitizeShopState(value.shops),
+    upgrades: sanitizeUpgradeState(value.upgrades),
     route: sanitizeRouteState(
       value.route,
       campaign.highestUnlockedStage,
@@ -432,6 +445,7 @@ export function restoreCheckpointSnapshot(
       ...committed.expansionCurrencies,
     },
     shops: sanitizeShopState(committed.shops),
+    upgrades: sanitizeUpgradeState(committed.upgrades),
     route: sanitizeRouteState(
       committed.route,
       committed.campaign.highestUnlockedStage,
