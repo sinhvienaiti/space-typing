@@ -3162,14 +3162,28 @@ M17 must extend the current SkillEngine/stat/equipment/ShopState/PlayerSave upgr
 
 ## M17 — Skill/attribute/equipment upgrade expansion
 
-Implement:
+**Status: Complete.** The existing SkillEngine/stat/equipment/Station/PlayerSave domains now support persistent Lv1-Lv5 core skills, bounded permanent attributes, equipment affixes, dismantling, Silver/Gold grade evolution and richer Station services without parallel progression systems. PlayerSave v22 carries UpgradeState through checkpoint/crash/death rollback semantics. See `docs/M17_UPGRADE_EXPANSION.md`.
 
-- skill Lv1-Lv5;
-- permanent attribute upgrades;
-- richer equipment services;
-- dismantling;
-- optional grade evolution;
-- later affix system.
+Implemented:
+
+- core defensive/offensive skill Lv1-Lv5 compiler;
+- Lv5 mastery behaviors consumed by existing Game skill paths;
+- permanent Hull/Shield/Firepower/Armor/Energy/Reactor/Focus/Ward/Luck/Salvage upgrades;
+- stricter Luck/Salvage caps and economy-sensitive costs;
+- existing effective-stat `permanent` lane integration;
+- compact equipment affix registry and equipped affix stat bonuses;
+- +0 through +5 equipment enhancement retained;
+- dismantling for unequipped equipment;
+- Silver +5 -> Gold +0 evolution;
+- Gold +5 -> Diamond +0 evolution;
+- affix roll and locked-other-affix reroll;
+- existing Credits/Alloy/Star Crystal/Quantum Core costs and stage gates;
+- Station UI/runtime integration;
+- PlayerSave v21 -> v22 migration;
+- checkpoint/crash/death-protection coverage;
+- 517/517 tests plus production build passing on CI #281.
+
+M18 must compile Run Relics into existing stat/combat/reward/route/persistence contracts rather than create a second progression architecture.
 
 ## M18 — Run Relics
 
