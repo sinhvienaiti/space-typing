@@ -51,6 +51,8 @@ export type VocabularyIndex = {
 
 export type GameSettings = {
   sfxVolume: number;
+  musicVolume: number;
+  ambientVolume: number;
   screenShake: boolean;
   visualQuality: VisualQuality;
   pronunciationEnabled: boolean;
