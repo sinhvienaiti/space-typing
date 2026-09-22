@@ -2225,14 +2225,29 @@ export class Game {
       stage.role,
       entry,
     );
+    const bossHpMultiplier = Math.max(
+      1,
+      difficulty.bossHpMultiplier ?? 1,
+    );
+    if (bossHpMultiplier !== 1) {
+      this.boss.maxHp = Math.max(
+        1,
+        Math.round(this.boss.maxHp * bossHpMultiplier),
+      );
+      this.boss.hp = this.boss.maxHp;
+    }
     this.boss.typingMechanic = mechanic;
     this.boss.shieldActive =
       mechanic.id === "shield-sequence" &&
       mechanic.active;
-    this.boss.name = bossVisualNameForStage(
-      bossVisualStage,
-      this.boss.role,
-    );
+    this.boss.name =
+      bossVisualNameForStage(
+        bossVisualStage,
+        this.boss.role,
+      ) +
+      (difficulty.bossMutationLabel === undefined
+        ? ""
+        : " · ASC " + difficulty.bossMutationLabel);
     if (bossDefinition !== undefined) {
       this.notifyEnemySeen(bossDefinition.id);
     }
@@ -2243,7 +2258,8 @@ export class Game {
     this.boss.actionCooldown =
       (bossActionInterval(this.boss.role, this.boss.phase) *
         bossActionIntervalMultiplier(mechanic)) /
-      Math.max(0.75, difficulty.bossPressure);
+      Math.max(0.75, difficulty.bossPressure) /
+      Math.max(1, difficulty.bossActionRateMultiplier ?? 1);
     this.hooks.onBossUpdate(toBossHud(this.boss));
     if (bossDefinition !== undefined) {
       const fx = enemyFxProfile(bossDefinition.family, "boss-intro");
@@ -2309,7 +2325,8 @@ export class Game {
           : bossActionIntervalMultiplier(
               boss.typingMechanic,
             ))) /
-      Math.max(0.75, difficulty.bossPressure);
+      Math.max(0.75, difficulty.bossPressure) /
+      Math.max(1, difficulty.bossActionRateMultiplier ?? 1);
   }
 
   private fireBossProjectiles(boss: BossState): void {
@@ -2319,7 +2336,11 @@ export class Game {
     const playerX = this.width / 2;
     const playerY = this.height - PLAYER_Y_OFFSET;
     const baseAngle = Math.atan2(playerY - y, playerX - x);
-    const count = bossProjectileCount(boss.role, boss.phase);
+    const count = Math.min(
+      5,
+      bossProjectileCount(boss.role, boss.phase) +
+        Math.max(0, Math.floor(this.difficulty.bossProjectileBonus ?? 0)),
+    );
     const spread = count === 1 ? 0 : 0.16;
     const speed =
       125 +
@@ -2915,6 +2936,7 @@ export class Game {
       vocabularyLevel: this.vocabularyLevel,
       entries: this.vocabulary,
       wordScoreOffset: difficulty.wordScoreOffset,
+      rankBonus: difficulty.enemyRankBonus ?? 0,
     });
     const runtimeProfile = resolveEnemyRuntimeProfile({
       stage: rosterStage,
@@ -3661,7 +3683,8 @@ export class Game {
           : bossActionIntervalMultiplier(
               boss.typingMechanic,
             ))) /
-      Math.max(0.75, this.difficulty?.bossPressure ?? 1);
+      Math.max(0.75, this.difficulty?.bossPressure ?? 1) /
+      Math.max(1, this.difficulty?.bossActionRateMultiplier ?? 1);
     const fx = enemyFxProfile(
       definition?.family ?? "devil",
       "boss-phase",
