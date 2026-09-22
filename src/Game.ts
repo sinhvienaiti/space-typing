@@ -403,6 +403,7 @@ export type GameHooks = {
 export type TestLabDeathMode = "immortal" | "real";
 
 export type TestLabEnemySpawn = {
+  definitionId?: EnemyDefinitionId;
   kind?: EnemyKind;
   count?: number;
   elite?: boolean;
@@ -723,6 +724,10 @@ export class Game {
       const enemy = this.enemies.find((item) => item.id === before);
       if (enemy === undefined) continue;
 
+      if (input.definitionId !== undefined) {
+        enemy.definitionId = input.definitionId;
+        this.notifyEnemySeen(input.definitionId);
+      }
       if (input.elite !== undefined) {
         enemy.elite = input.elite;
       }
