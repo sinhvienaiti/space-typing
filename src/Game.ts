@@ -178,6 +178,16 @@ import {
 } from "./events/stage-scheduler";
 import { galaxyStageModifiers } from "./events/galaxy-hazards";
 import {
+  createStageObjectiveState,
+  objectiveForcesCommander,
+  objectiveForcesElite,
+  objectiveForStage,
+  reduceStageObjective,
+  requiredObjectiveAllowsFinish,
+  type StageObjectiveEvent,
+  type StageObjectiveState,
+} from "./events/objectives";
+import {
   applyStatus,
   cleanseNegativeStatuses,
   createStatusState,
@@ -344,6 +354,7 @@ type Hooks = {
   onPhase(phase: GamePhase): void;
   onStage(stage: number): void;
   onStageEvents(events: readonly StageEventDefinition[]): void;
+  onObjectiveUpdate(objective: StageObjectiveState | null): void;
   onStageClear(stats: GameStats): void;
   onBossUpdate(boss: BossHudState | null): void;
   onWordComplete(entry: VocabularyEntry): void;
@@ -497,6 +508,8 @@ export class Game {
   private hiddenDiscovery: HiddenDiscoveryState =
     createHiddenDiscoveryState();
   private stageEvents: StageEventDefinition[] = [];
+  private stageObjective: StageObjectiveState | null = null;
+  private objectiveHudTimer = 0;
   private stageEventModifiers: StageRandomEventModifiers =
     createStageEventModifiers();
   private statusState: StatusState = createStatusState();
@@ -1293,6 +1306,15 @@ export class Game {
     return { ...this.playerStats };
   }
 
+  getStageObjective(): StageObjectiveState | null {
+    return this.stageObjective === null
+      ? null
+      : {
+          ...this.stageObjective,
+          definition: { ...this.stageObjective.definition },
+        };
+  }
+
   getStageElapsedSeconds(): number {
     return this.stageElapsedSeconds;
   }
@@ -1408,6 +1430,16 @@ export class Game {
       this.stageEvents,
     );
     this.hooks.onStageEvents(this.stageEvents);
+    const objectiveDefinition =
+      hiddenEncounterRuntime === null
+        ? objectiveForStage(stage, difficulty)
+        : null;
+    this.stageObjective =
+      objectiveDefinition === null
+        ? null
+        : createStageObjectiveState(objectiveDefinition);
+    this.objectiveHudTimer = 0;
+    this.hooks.onObjectiveUpdate(this.getStageObjective());
 
     this.phase = "playing";
     this.stageElapsedSeconds = 0;
@@ -1798,6 +1830,16 @@ export class Game {
     const difficulty = this.difficulty;
     if (difficulty === null || this.stageConfig === null) return;
 
+    this.updateStageObjective({
+      type: "tick",
+      dt,
+    });
+    this.objectiveHudTimer -= dt;
+    if (this.objectiveHudTimer <= 0) {
+      this.objectiveHudTimer = 0.15;
+      this.hooks.onObjectiveUpdate(this.getStageObjective());
+    }
+
     this.updatePlayerResources(dt);
     const hostileTimeFactor = Math.min(
       this.timeShellTimer > 0 ? 0.42 : 1,
@@ -2135,8 +2177,42 @@ export class Game {
     this.sfx.enemyShot();
   }
 
+  private updateStageObjective(
+    event: StageObjectiveEvent,
+  ): void {
+    if (this.stageObjective === null) return;
+
+    const beforeStatus = this.stageObjective.status;
+    const beforeProgress = this.stageObjective.progress;
+    const beforeIntegrity = this.stageObjective.integrity;
+    const beforeTarget = this.stageObjective.targetEnemyId;
+    this.stageObjective = reduceStageObjective(
+      this.stageObjective,
+      event,
+    );
+
+    if (
+      this.stageObjective.status !== beforeStatus ||
+      this.stageObjective.progress !== beforeProgress ||
+      this.stageObjective.integrity !== beforeIntegrity ||
+      this.stageObjective.targetEnemyId !== beforeTarget
+    ) {
+      this.hooks.onObjectiveUpdate(this.getStageObjective());
+    }
+  }
+
   private finishStage(): void {
     if (this.phase !== "playing") return;
+
+    this.updateStageObjective({
+      type: "stage-clear",
+      hits: this.stats.hits,
+      misses: this.stats.misses,
+    });
+    if (!requiredObjectiveAllowsFinish(this.stageObjective)) {
+      return;
+    }
+
     this.phase = "stageclear";
     this.projectiles = [];
     this.supplyPod = null;
@@ -2454,7 +2530,11 @@ export class Game {
   private trySpawnFormation(
     difficulty: DifficultyProfile,
   ): number {
-    if (this.hiddenEncounterRuntime?.forcePriorityTargets) {
+    if (
+      this.hiddenEncounterRuntime?.forcePriorityTargets ||
+      objectiveForcesCommander(this.stageObjective) ||
+      objectiveForcesElite(this.stageObjective)
+    ) {
       return 0;
     }
     const stageConfig = this.stageConfig;
@@ -2529,7 +2609,14 @@ export class Game {
     const difficulty = this.difficulty;
     if (difficulty === null) return false;
 
-    let kind = request.kind ?? chooseEnemyKind(stage);
+    const objectiveCommander =
+      request.kind === undefined &&
+      objectiveForcesCommander(this.stageObjective);
+    let kind =
+      request.kind ??
+      (objectiveCommander
+        ? "commander"
+        : chooseEnemyKind(stage));
     if (
       !request.skipAdmission &&
       !this.canAdmitEnemyKind(kind, difficulty)
@@ -2539,6 +2626,7 @@ export class Game {
       // and urgent-threat caps.
       if (
         request.kind === undefined &&
+        !objectiveCommander &&
         kind !== "scout" &&
         this.canAdmitEnemyKind("scout", difficulty)
       ) {
@@ -2553,8 +2641,12 @@ export class Game {
     const formationMember = request.formationMember === true;
     const priorityOnly =
       this.hiddenEncounterRuntime?.forcePriorityTargets === true;
+    const forceObjectiveElite =
+      !formationMember &&
+      objectiveForcesElite(this.stageObjective);
     const forceElite =
       priorityOnly ||
+      forceObjectiveElite ||
       (!formationMember &&
         this.stageConfig?.role === "elite" &&
         this.eliteSpawned === 0);
@@ -2658,8 +2750,9 @@ export class Game {
             difficulty,
           );
 
+    const enemyId = this.nextEnemyId++;
     this.enemies.push({
-      id: this.nextEnemyId++,
+      id: enemyId,
       kind,
       definitionId,
       elite,
@@ -2697,6 +2790,13 @@ export class Game {
       const fx = enemyFxProfile(spawnDefinition.family, "spawn");
       this.burst(baseX, 12, fx.count, fx.hue);
     }
+
+    this.updateStageObjective({
+      type: "enemy-spawn",
+      enemyId,
+      kind,
+      elite,
+    });
 
     if (elite) {
       const firstElite = this.eliteSpawned === 0;
@@ -3763,6 +3863,13 @@ export class Game {
       );
     }
 
+    this.updateStageObjective({
+      type: "enemy-kill",
+      enemyId: enemy.id,
+      kind: enemy.kind,
+      elite: enemy.elite,
+    });
+
     this.enemies = this.enemies.filter((item) => item.id !== enemy.id);
     if (this.markedEnemyId === enemy.id) {
       this.markedEnemyId = null;
@@ -4031,6 +4138,7 @@ export class Game {
 
   private registerMiss(): void {
     this.stats.misses += 1;
+    this.updateStageObjective({ type: "miss" });
     this.stats.streak = 0;
     this.stats.multiplier = 1;
     this.stats.power = clamp(this.stats.power - 12, 0, 100);
@@ -4591,6 +4699,17 @@ export class Game {
   }
 
   private damagePlayer(enemyId: number, x: number, y: number): void {
+    const escaped = this.enemies.find(
+      (enemy) => enemy.id === enemyId,
+    );
+    if (escaped !== undefined) {
+      this.updateStageObjective({
+        type: "enemy-escaped",
+        enemyId: escaped.id,
+        kind: escaped.kind,
+        elite: escaped.elite,
+      });
+    }
     this.enemies = this.enemies.filter((enemy) => enemy.id !== enemyId);
     if (this.targetId === enemyId) this.targetId = null;
     this.applyPlayerDamage(x, y, 60);
