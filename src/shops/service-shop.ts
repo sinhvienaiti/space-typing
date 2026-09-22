@@ -3,7 +3,7 @@ import {
   type EquipmentInstance,
   type EquipmentState,
 } from "../equipment/loadout";
-import type { EquipmentRarity } from "../equipment/rarity";
+import type { GradeId } from "../grades";
 import {
   addItem,
   itemCount,
@@ -27,11 +27,12 @@ export type ServiceShopResult = {
   reason: "credits" | "full" | "max" | "missing" | null;
 };
 
-const RARITY_COST_MULTIPLIER: Record<EquipmentRarity, number> = {
-  common: 1,
-  rare: 1.25,
-  epic: 1.6,
-  legendary: 2.1,
+const GRADE_COST_MULTIPLIER: Record<GradeId, number> = {
+  aluminum: 1,
+  copper: 1.25,
+  silver: 1.6,
+  gold: 2.1,
+  diamond: 2.8,
 };
 
 export const REPAIR_PACK_COST = 64;
@@ -41,7 +42,7 @@ export function equipmentUpgradeCost(
 ): number | null {
   if (item.enhancement >= 5) return null;
   const base = 70 + item.enhancement * 55;
-  return Math.floor(base * RARITY_COST_MULTIPLIER[item.rarity]);
+  return Math.floor(base * GRADE_COST_MULTIPLIER[item.grade]);
 }
 
 export function buyEquipmentUpgrade(

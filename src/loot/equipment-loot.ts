@@ -2,7 +2,10 @@ import {
   EQUIPMENT_IDS,
   type EquipmentId,
 } from "../equipment/registry";
-import type { EquipmentRarity } from "../equipment/rarity";
+import {
+  GRADE_IDS,
+  type GradeId,
+} from "../grades";
 
 export type LootSource =
   | "normal"
@@ -12,47 +15,53 @@ export type LootSource =
   | "anomaly"
   | "boss";
 
-type RarityWeights = Record<EquipmentRarity, number>;
+type GradeWeights = Record<GradeId, number>;
 
-export const RARITY_WEIGHTS: Record<
+export const GRADE_DROP_WEIGHTS: Record<
   LootSource,
-  RarityWeights
+  GradeWeights
 > = {
   normal: {
-    common: 78,
-    rare: 18,
-    epic: 3.5,
-    legendary: 0.5,
+    aluminum: 78,
+    copper: 18,
+    silver: 3.5,
+    gold: 0.48,
+    diamond: 0.02,
   },
   elite: {
-    common: 45,
-    rare: 38,
-    epic: 14,
-    legendary: 3,
+    aluminum: 45,
+    copper: 38,
+    silver: 14,
+    gold: 2.9,
+    diamond: 0.1,
   },
   golden: {
-    common: 18,
-    rare: 50,
-    epic: 26,
-    legendary: 6,
+    aluminum: 18,
+    copper: 50,
+    silver: 26,
+    gold: 5.8,
+    diamond: 0.2,
   },
   treasure: {
-    common: 5,
-    rare: 40,
-    epic: 40,
-    legendary: 15,
+    aluminum: 5,
+    copper: 40,
+    silver: 40,
+    gold: 14.5,
+    diamond: 0.5,
   },
   anomaly: {
-    common: 0,
-    rare: 15,
-    epic: 55,
-    legendary: 30,
+    aluminum: 0,
+    copper: 15,
+    silver: 55,
+    gold: 29,
+    diamond: 1,
   },
   boss: {
-    common: 20,
-    rare: 40,
-    epic: 30,
-    legendary: 10,
+    aluminum: 20,
+    copper: 40,
+    silver: 30,
+    gold: 9.5,
+    diamond: 0.5,
   },
 };
 
@@ -71,40 +80,38 @@ export const EQUIPMENT_LOOT_TABLES: Record<
 function adjustedWeights(
   source: LootSource,
   luck: number,
-): RarityWeights {
-  const base = RARITY_WEIGHTS[source];
-  const safeLuck = Math.max(0, luck);
+): GradeWeights {
+  const base = GRADE_DROP_WEIGHTS[source];
+  const safeLuck = Math.min(100, Math.max(0, luck));
 
   return {
-    common: base.common,
-    rare: base.rare * (1 + safeLuck * 0.005),
-    epic: base.epic * (1 + safeLuck * 0.01),
-    legendary: base.legendary * (1 + safeLuck * 0.015),
+    aluminum: base.aluminum,
+    copper: base.copper * (1 + safeLuck * 0.004),
+    silver: base.silver * (1 + safeLuck * 0.008),
+    gold: base.gold * (1 + safeLuck * 0.012),
+    diamond: base.diamond * (1 + safeLuck * 0.015),
   };
 }
 
-export function rollEquipmentRarity(
+export function rollEquipmentGrade(
   source: LootSource,
   luck: number,
   random = Math.random(),
-): EquipmentRarity {
+): GradeId {
   const weights = adjustedWeights(source, luck);
-  const entries = [
-    ["common", weights.common],
-    ["rare", weights.rare],
-    ["epic", weights.epic],
-    ["legendary", weights.legendary],
-  ] as const;
+  const total = GRADE_IDS.reduce(
+    (sum, grade) => sum + weights[grade],
+    0,
+  );
+  let cursor =
+    Math.max(0, Math.min(0.999999, random)) * total;
 
-  const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
-  let cursor = Math.max(0, Math.min(0.999999, random)) * total;
-
-  for (const [rarity, weight] of entries) {
-    cursor -= weight;
-    if (cursor < 0) return rarity;
+  for (const grade of GRADE_IDS) {
+    cursor -= weights[grade];
+    if (cursor < 0) return grade;
   }
 
-  return "legendary";
+  return "diamond";
 }
 
 export function rollEquipmentDefinition(
@@ -114,34 +121,35 @@ export function rollEquipmentDefinition(
   const table = EQUIPMENT_LOOT_TABLES[source];
   const index = Math.min(
     table.length - 1,
-    Math.floor(Math.max(0, Math.min(0.999999, random)) * table.length),
+    Math.floor(
+      Math.max(0, Math.min(0.999999, random)) * table.length,
+    ),
   );
   return table[index] ?? EQUIPMENT_IDS[0];
 }
 
-export function rarityChanceSummary(
+export function gradeChanceSummary(
   source: LootSource,
   luck: number,
-): RarityWeights {
+): GradeWeights {
   const adjusted = adjustedWeights(source, luck);
-  const total =
-    adjusted.common +
-    adjusted.rare +
-    adjusted.epic +
-    adjusted.legendary;
+  const total = GRADE_IDS.reduce(
+    (sum, grade) => sum + adjusted[grade],
+    0,
+  );
 
-  return {
-    common: adjusted.common / total,
-    rare: adjusted.rare / total,
-    epic: adjusted.epic / total,
-    legendary: adjusted.legendary / total,
-  };
+  return Object.fromEntries(
+    GRADE_IDS.map((grade) => [
+      grade,
+      total > 0 ? adjusted[grade] / total : 0,
+    ]),
+  ) as GradeWeights;
 }
 
 export type EquipmentDrop = {
   source: LootSource;
   definitionId: EquipmentId;
-  rarity: EquipmentRarity;
+  grade: GradeId;
 };
 
 export function equipmentDropChance(
@@ -157,7 +165,8 @@ export function equipmentDropChance(
       : source === "elite"
         ? 0.22
         : 0.035;
-  const salvageBonus = 1 + Math.min(100, Math.max(0, salvage)) * 0.004;
+  const salvageBonus =
+    1 + Math.min(100, Math.max(0, salvage)) * 0.004;
   return Math.min(1, base * salvageBonus);
 }
 
@@ -173,7 +182,7 @@ export function rollEquipmentDrop(
 
   return {
     source,
-    rarity: rollEquipmentRarity(source, luck, random()),
+    grade: rollEquipmentGrade(source, luck, random()),
     definitionId: rollEquipmentDefinition(source, random()),
   };
 }

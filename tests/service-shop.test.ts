@@ -9,20 +9,20 @@ import {
 } from "../src/shops/service-shop";
 
 describe("Repair / Upgrade Shop", () => {
-  it("scales enhancement cost by level and rarity", () => {
+  it("scales enhancement cost by level and grade", () => {
     const equipment = createStarterEquipmentState();
-    const common = equipment.items[0]!;
-    const levelOne = { ...common, enhancement: 1 };
-    const rare = { ...common, rarity: "rare" as const };
+    const aluminum = equipment.items[0]!;
+    const levelOne = { ...aluminum, enhancement: 1 };
+    const copper = { ...aluminum, grade: "copper" as const };
 
     expect(equipmentUpgradeCost(levelOne)).toBeGreaterThan(
-      equipmentUpgradeCost(common) ?? 0,
+      equipmentUpgradeCost(aluminum) ?? 0,
     );
-    expect(equipmentUpgradeCost(rare)).toBeGreaterThan(
-      equipmentUpgradeCost(common) ?? 0,
+    expect(equipmentUpgradeCost(copper)).toBeGreaterThan(
+      equipmentUpgradeCost(aluminum) ?? 0,
     );
     expect(
-      equipmentUpgradeCost({ ...common, enhancement: 5 }),
+      equipmentUpgradeCost({ ...aluminum, enhancement: 5 }),
     ).toBeNull();
   });
 

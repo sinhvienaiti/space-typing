@@ -75,7 +75,7 @@ const STORE_NAME = "player";
 const SAVE_KEY = "main";
 const RECOVERY_SAVE_KEY = "spaceTypingPlayerSaveRecoveryV3";
 
-export const PLAYER_SAVE_VERSION = 18;
+export const PLAYER_SAVE_VERSION = 19;
 
 export class UnsupportedPlayerSaveVersionError extends Error {
   constructor(readonly version: number) {
@@ -326,7 +326,27 @@ export type PlayerSaveV18 = {
   lastSaveReason: SaveReason;
 };
 
-export type PlayerSave = PlayerSaveV18;
+export type PlayerSaveV19 = {
+  version: 19;
+  campaign: CampaignProgress;
+  inventory: Inventory;
+  equipment: EquipmentState;
+  supportSpells: SupportSpellState;
+  characters: CharacterState;
+  luckPity: LuckPityState;
+  hiddenDiscovery: HiddenDiscoveryState;
+  credits: number;
+  progression: ProgressionState;
+  expansionCurrencies: ExpansionCurrencyState;
+  campaignExpansion: CampaignExpansionState;
+  checkpointSnapshot: CheckpointSnapshot;
+  crashRecoverySnapshot: CrashRecoverySnapshot | null;
+  stageEntrySnapshot: StageEntrySnapshot | null;
+  updatedAt: string;
+  lastSaveReason: SaveReason;
+};
+
+export type PlayerSave = PlayerSaveV19;
 export type PersistenceSource = "indexeddb" | "localStorage";
 
 export type LoadedPlayerSave = {
@@ -757,6 +777,38 @@ export function migratePlayerSave(value: unknown): MigrationResult {
       ),
       migrated: true,
       fromVersion: 17,
+    };
+  }
+
+  if (raw.version === 18) {
+    const safeCampaign = sanitizeCampaignProgress(raw.campaign);
+    const timestamp =
+      typeof raw.updatedAt === "string" ? raw.updatedAt : "";
+    return {
+      save: createPlayerSave(
+        safeCampaign,
+        timestamp,
+        "migration",
+        sanitizeInventory(raw.inventory),
+        sanitizeEquipmentState(raw.equipment),
+        sanitizeSupportSpellState(raw.supportSpells),
+        sanitizeCharacterState(raw.characters),
+        sanitizeLuckPityState(raw.luckPity),
+        sanitizeHiddenDiscoveryState(raw.hiddenDiscovery),
+        sanitizeCredits(raw.credits),
+        sanitizeProgressionState(raw.progression),
+        sanitizeExpansionCurrencyState(raw.expansionCurrencies),
+        sanitizeCampaignExpansionState(
+          raw.campaignExpansion,
+          safeCampaign,
+          timestamp,
+        ),
+        raw.checkpointSnapshot as CheckpointSnapshot | undefined,
+        sanitizeCrashRecoverySnapshot(raw.crashRecoverySnapshot),
+        sanitizeStageEntrySnapshot(raw.stageEntrySnapshot),
+      ),
+      migrated: true,
+      fromVersion: 18,
     };
   }
 

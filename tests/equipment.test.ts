@@ -52,19 +52,19 @@ describe("equipment and loadout", () => {
     expect(precision.focus).toBeGreaterThan(pulse.focus ?? 0);
   });
 
-  it("rarity scales equipment contribution", () => {
+  it("grade scales equipment contribution", () => {
     const state = createStarterEquipmentState();
-    const common = equipmentStatBonus(state);
-    const legendary = equipmentStatBonus({
+    const aluminum = equipmentStatBonus(state);
+    const diamond = equipmentStatBonus({
       ...state,
       items: state.items.map((item) =>
         item.instanceId === "starter-pulse"
-          ? { ...item, rarity: "legendary" as const }
+          ? { ...item, grade: "diamond" as const }
           : item,
       ),
     });
 
-    expect(legendary.firepower).toBeGreaterThan(common.firepower ?? 0);
+    expect(diamond.firepower).toBeGreaterThan(aluminum.firepower ?? 0);
   });
 
   it("enhancement increases stats and stops at +5", () => {

@@ -45,7 +45,7 @@ describe("enemy equipment drops", () => {
     const changed = addEquipmentInstance(state, {
       instanceId: "drop-test",
       definitionId: "balanced-core-mk1",
-      rarity: "rare",
+      grade: "copper",
       enhancement: 0,
     });
 

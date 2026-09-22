@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   equipmentDropChance,
-  rarityChanceSummary,
+  gradeChanceSummary,
   type LootSource,
 } from "../src/loot/equipment-loot";
 import {
   simulateEquipmentDrops,
   simulateLuckPity,
-  simulateRarityDistribution,
+  simulateGradeDistribution,
 } from "../src/loot/simulation";
 
 const SOURCES: LootSource[] = [
@@ -20,26 +20,27 @@ const SOURCES: LootSource[] = [
 ];
 
 describe("automated loot and pity simulations", () => {
-  it("keeps empirical rarity distribution close to production weights", () => {
+  it("keeps empirical grade distribution close to production weights", () => {
     for (const source of SOURCES) {
-      const expected = rarityChanceSummary(source, 45);
-      const simulated = simulateRarityDistribution(
+      const expected = gradeChanceSummary(source, 45);
+      const simulated = simulateGradeDistribution(
         source,
         45,
         60_000,
         0x650000 + SOURCES.indexOf(source),
       );
 
-      for (const rarity of [
-        "common",
-        "rare",
-        "epic",
-        "legendary",
+      for (const grade of [
+        "aluminum",
+        "copper",
+        "silver",
+        "gold",
+        "diamond",
       ] as const) {
-        const observed = simulated[rarity] / simulated.rolls;
+        const observed = simulated[grade] / simulated.rolls;
         expect(
-          Math.abs(observed - expected[rarity]),
-          source + " " + rarity,
+          Math.abs(observed - expected[grade]),
+          source + " " + grade,
         ).toBeLessThan(0.012);
       }
     }

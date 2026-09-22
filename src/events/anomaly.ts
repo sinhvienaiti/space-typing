@@ -1,7 +1,7 @@
 import { clamp, typingText } from "../logic";
 import {
   rollEquipmentDefinition,
-  rollEquipmentRarity,
+  rollEquipmentGrade,
   type EquipmentDrop,
   type LootSource,
 } from "../loot/equipment-loot";
@@ -53,7 +53,7 @@ export function createAnomalyReward(
   return {
     source,
     definitionId: rollEquipmentDefinition(source, random()),
-    rarity: rollEquipmentRarity(source, luck, random()),
+    grade: rollEquipmentGrade(source, luck, random()),
   };
 }
 

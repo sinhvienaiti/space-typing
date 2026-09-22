@@ -108,7 +108,7 @@ describe("player save persistence model", () => {
     expect(migration.save.equipment.loadout.weapon).toBe("starter-pulse");
   });
 
-  it("migrates PlayerSave v4 equipment to Common rarity", () => {
+  it("migrates PlayerSave v4 equipment to Aluminum grade", () => {
     const progress = createDefaultCampaignProgress();
     const migration = migratePlayerSave({
       version: 4,
@@ -148,19 +148,19 @@ describe("player save persistence model", () => {
       {
         instanceId: "starter-pulse",
         definitionId: "pulse-laser-mk1",
-        rarity: "common",
+        grade: "aluminum",
         enhancement: 0,
       },
       {
         instanceId: "starter-precision",
         definitionId: "precision-laser-mk1",
-        rarity: "common",
+        grade: "aluminum",
         enhancement: 0,
       },
     ]);
   });
 
-  it("migrates PlayerSave v5 rarity equipment to +0 enhancement", () => {
+  it("migrates PlayerSave v5 Rare equipment to Copper +0", () => {
     const progress = createDefaultCampaignProgress();
     const migration = migratePlayerSave({
       version: 5,
@@ -193,7 +193,7 @@ describe("player save persistence model", () => {
     expect(migration.save.equipment.items[0]).toEqual({
       instanceId: "rare-pulse",
       definitionId: "pulse-laser-mk1",
-      rarity: "rare",
+      grade: "copper",
       enhancement: 0,
     });
   });
@@ -441,7 +441,51 @@ describe("player save persistence model", () => {
     expect(migration.fromVersion).toBe(17);
     expect(migration.save.stageEntrySnapshot).toBeNull();
     expect(migration.save.crashRecoverySnapshot).toBeNull();
-    expect(migration.save.stageEntrySnapshot).toBeNull();
+  });
+
+  it("migrates PlayerSave v18 rarity equipment to v19 grades without losing enhancement or currencies", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const legacy = {
+      ...current,
+      version: 18,
+      equipment: {
+        items: current.equipment.items.map((item, index) => ({
+          instanceId: item.instanceId,
+          definitionId: item.definitionId,
+          rarity:
+            index === 0
+              ? "legendary"
+              : index === 1
+                ? "epic"
+                : index === 2
+                  ? "rare"
+                  : "common",
+          enhancement: index === 0 ? 4 : item.enhancement,
+        })),
+        loadout: current.equipment.loadout,
+      },
+      expansionCurrencies: {
+        alloy: 33,
+        starCrystal: 5,
+        quantumCore: 1,
+      },
+    };
+
+    const migration = migratePlayerSave(legacy);
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(18);
+    expect(migration.save.equipment.items[0]).toMatchObject({
+      grade: "gold",
+      enhancement: 4,
+    });
+    expect(migration.save.equipment.items[1]?.grade).toBe("silver");
+    expect(migration.save.equipment.items[2]?.grade).toBe("copper");
+    expect(migration.save.equipment.items[3]?.grade).toBe("aluminum");
+    expect(migration.save.expansionCurrencies).toEqual({
+      alloy: 33,
+      starCrystal: 5,
+      quantumCore: 1,
+    });
   });
 
   it("keeps a valid current-version save without migration", () => {
@@ -458,6 +502,7 @@ describe("player save persistence model", () => {
     expect(migration.save).toEqual(save);
     expect(migration.save.inventory).toEqual({ "repair-kit": 2 });
     expect(migration.save.equipment.loadout.weapon).toBe("starter-pulse");
+    expect(migration.save.equipment.items[0]?.grade).toBe("aluminum");
     expect(migration.save.supportSpells.loadout).toEqual([
       "sanctuary",
       "gravity-well",

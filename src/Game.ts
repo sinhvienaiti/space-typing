@@ -2697,7 +2697,11 @@ export class Game {
       this.playerStats.salvage,
     );
     if (drop !== null) {
-      if (drop.rarity === "epic" || drop.rarity === "legendary") {
+      if (
+        drop.grade === "silver" ||
+        drop.grade === "gold" ||
+        drop.grade === "diamond"
+      ) {
         this.sfx.rareDrop();
       }
       this.hooks.onEquipmentDrop(drop);

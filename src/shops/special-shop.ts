@@ -7,7 +7,7 @@ import {
   getEquipmentDefinition,
   type EquipmentId,
 } from "../equipment/registry";
-import type { EquipmentRarity } from "../equipment/rarity";
+import type { GradeId } from "../grades";
 import {
   addItem,
   type Inventory,
@@ -35,7 +35,7 @@ export type SpecialShopEquipmentOffer = {
   key: string;
   kind: "equipment";
   definitionId: EquipmentId;
-  rarity: EquipmentRarity;
+  grade: GradeId;
   price: number;
 };
 
@@ -73,18 +73,20 @@ export function specialShopUnlocked(
   return hiddenDiscovery.discovered.includes(required);
 }
 
-function blackMarketRarity(
+function blackMarketGrade(
   stage: number,
   offset: number,
-): EquipmentRarity {
-  if (stage >= 500 && offset === 2) return "legendary";
-  if (stage >= 180 && offset >= 1) return "epic";
-  return "rare";
+): GradeId {
+  if (stage >= 800 && offset === 2) return "diamond";
+  if (stage >= 500 && offset === 2) return "gold";
+  if (stage >= 180 && offset >= 1) return "silver";
+  return "copper";
 }
 
-function equipmentPrice(rarity: EquipmentRarity): number {
-  if (rarity === "legendary") return 1450;
-  if (rarity === "epic") return 720;
+function equipmentPrice(grade: GradeId): number {
+  if (grade === "diamond") return 2600;
+  if (grade === "gold") return 1450;
+  if (grade === "silver") return 720;
   return 390;
 }
 
@@ -117,13 +119,13 @@ export function specialShopOffers(
     const definitionId =
       EQUIPMENT_IDS[(start + offset * 3) % EQUIPMENT_IDS.length] ??
       EQUIPMENT_IDS[0];
-    const rarity = blackMarketRarity(safeStage, offset);
+    const grade = blackMarketGrade(safeStage, offset);
     return {
-      key: "black-" + definitionId + "-" + rarity,
+      key: "black-" + definitionId + "-" + grade,
       kind: "equipment" as const,
       definitionId,
-      rarity,
-      price: equipmentPrice(rarity),
+      grade,
+      price: equipmentPrice(grade),
     };
   });
 }
@@ -186,7 +188,7 @@ export function buySpecialShopOffer(
   const equipment = addEquipmentInstance(current.equipment, {
     instanceId,
     definitionId: offer.definitionId,
-    rarity: offer.rarity,
+    grade: offer.grade,
     enhancement: 0,
   });
   const payment = spendCredits(credits, offer.price);

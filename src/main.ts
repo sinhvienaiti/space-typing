@@ -95,9 +95,13 @@ import {
   stageClearCreditReward,
 } from "./economy/credits";
 import {
+  addExpansionCurrencyReward,
   createExpansionCurrencyState,
+  expansionCurrencyRewardText,
+  stageClearExpansionCurrencyReward,
   type ExpansionCurrencyState,
 } from "./economy/currencies";
+import { gradeLabel } from "./grades";
 import {
   buyNormalShopOffer,
   normalShopItemIsFull,
@@ -535,7 +539,7 @@ app.innerHTML = `
           <div><span>score</span><strong id="clearScore">0</strong></div>
           <div><span>accuracy</span><strong id="clearAccuracy">100%</strong></div>
           <div><span>wpm</span><strong id="clearWpm">0</strong></div>
-          <div><span>credits</span><strong id="clearCredits">+0</strong></div>
+          <div><span>rewards</span><strong id="clearCredits">+0</strong></div>
           <div><span>max streak</span><strong id="clearStreak">0</strong></div>
         </div>
         <button id="nextStageButton" class="primary">Next stage</button>
@@ -1834,8 +1838,8 @@ function renderRewardChoiceOptions(
     button.type = "button";
     button.className = "reward-choice-option";
 
-    const rarity = document.createElement("span");
-    rarity.textContent = option.rarity.toUpperCase();
+    const grade = document.createElement("span");
+    grade.textContent = gradeLabel(option.grade).toUpperCase();
 
     const name = document.createElement("strong");
     name.textContent = definition.name;
@@ -1843,12 +1847,12 @@ function renderRewardChoiceOptions(
     const description = document.createElement("small");
     description.textContent = definition.description;
 
-    button.append(rarity, name, description);
+    button.append(grade, name, description);
     button.addEventListener("click", () => {
       equipment = addEquipmentInstance(equipment, {
         instanceId: createEquipmentDropInstanceId(),
         definitionId: option.definitionId,
-        rarity: option.rarity,
+        grade: option.grade,
         enhancement: 0,
       });
       progression = recordProgressionEvent(progression, {
@@ -2151,6 +2155,19 @@ const game = new Game(
           salvage: game.getPlayerStats().salvage,
         }) * game.getCreditsMultiplier();
       credits = addCredits(credits, creditReward);
+
+      const stageConfig = createStageConfig(stats.stage);
+      const currencyReward = stageClearExpansionCurrencyReward(
+        stats.stage,
+        stageConfig.role,
+        accuracy,
+      );
+      expansionCurrencies = addExpansionCurrencyReward(
+        expansionCurrencies,
+        currencyReward,
+      );
+      const currencyRewardText =
+        expansionCurrencyRewardText(currencyReward);
       progression = recordProgressionEvent(progression, {
         type: "stage-clear",
         accuracy,
@@ -2192,6 +2209,9 @@ const game = new Game(
           " · +" +
           creditReward.toLocaleString() +
           " Credits" +
+          (currencyRewardText.length > 0
+            ? " · " + currencyRewardText
+            : "") +
           achievementText +
           checkpointText,
         "stage-clear",
@@ -2203,7 +2223,12 @@ const game = new Game(
       byId("clearAccuracy").textContent = accuracy.toFixed(1) + "%";
       byId("clearWpm").textContent = wpm.toFixed(0);
       byId("clearCredits").textContent =
-        "+" + creditReward.toLocaleString();
+        "+" +
+        creditReward.toLocaleString() +
+        " Credits" +
+        (currencyRewardText.length > 0
+          ? " · " + currencyRewardText
+          : "");
       byId("clearStreak").textContent = String(stats.maxStreak);
 
       updateCampaignUi();
@@ -2217,7 +2242,7 @@ const game = new Game(
       equipment = addEquipmentInstance(equipment, {
         instanceId: createEquipmentDropInstanceId(),
         definitionId: drop.definitionId,
-        rarity: drop.rarity,
+        grade: drop.grade,
         enhancement: 0,
       });
       progression = recordProgressionEvent(progression, {
@@ -2228,7 +2253,7 @@ const game = new Game(
       void autosaveCampaign(
         "equipment",
         "✓ " +
-          drop.rarity.toUpperCase() +
+          gradeLabel(drop.grade).toUpperCase() +
           " drop · " +
           definition.name,
       );
@@ -2571,7 +2596,7 @@ function renderEquipment(): void {
       option.value = item.instanceId;
       option.textContent =
         "[" +
-        item.rarity.toUpperCase() +
+        gradeLabel(item.grade).toUpperCase() +
         " +" +
         String(item.enhancement) +
         "] " +
@@ -2607,7 +2632,7 @@ function renderEquipment(): void {
     detail.textContent =
       current === null
         ? "No equipment"
-        : current.rarity.toUpperCase() +
+        : gradeLabel(current.grade).toUpperCase() +
           " +" +
           String(current.enhancement) +
           " · " +
@@ -2645,7 +2670,7 @@ function shopOfferDescription(offer: NormalShopOffer): string {
 
   const definition = getEquipmentDefinition(offer.definitionId);
   return (
-    offer.rarity.toUpperCase() +
+    gradeLabel(offer.grade).toUpperCase() +
     " · " +
     definition.slot +
     " · " +
@@ -2669,7 +2694,7 @@ function renderNormalShop(): void {
     type.textContent =
       offer.kind === "item"
         ? "CONSUMABLE"
-        : offer.rarity.toUpperCase() + " EQUIPMENT";
+        : gradeLabel(offer.grade).toUpperCase() + " EQUIPMENT";
 
     const title = document.createElement("strong");
     title.textContent = normalShopOfferName(offer);
@@ -2824,7 +2849,7 @@ function renderServiceShop(): void {
     title.textContent =
       definition.name +
       " · " +
-      item.rarity.toUpperCase() +
+      gradeLabel(item.grade).toUpperCase() +
       " +" +
       String(item.enhancement);
 
@@ -2898,7 +2923,7 @@ function specialShopOfferDescription(
   }
   const definition = getEquipmentDefinition(offer.definitionId);
   return (
-    offer.rarity.toUpperCase() +
+    gradeLabel(offer.grade).toUpperCase() +
     " · " +
     definition.slot +
     " · " +
@@ -2946,7 +2971,7 @@ function renderSpecialShop(): void {
     type.textContent =
       offer.kind === "item"
         ? "EVENT ITEM"
-        : offer.rarity.toUpperCase() + " EQUIPMENT";
+        : gradeLabel(offer.grade).toUpperCase() + " EQUIPMENT";
 
     const title = document.createElement("strong");
     title.textContent = specialShopOfferName(offer);
@@ -3492,7 +3517,13 @@ function updateDataSummary(): void {
     String(inventoryTotal(inventory)) +
     " items · " +
     credits.toLocaleString() +
-    " Credits" +
+    " Credits · " +
+    expansionCurrencies.alloy.toLocaleString() +
+    " Alloy · " +
+    expansionCurrencies.starCrystal.toLocaleString() +
+    " Star Crystal · " +
+    expansionCurrencies.quantumCore.toLocaleString() +
+    " Quantum Core" +
     artMeta +
     performanceMeta;
 }

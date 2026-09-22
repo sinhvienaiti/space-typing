@@ -42,6 +42,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
     maxStack: 20,
     combatUsable: true,
     description: "Repairs Hull during a stage.",
+    grade: "aluminum",
   },
   "shield-cell": {
     id: "shield-cell",
@@ -50,6 +51,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
     maxStack: 20,
     combatUsable: true,
     description: "Restores Shield during a stage.",
+    grade: "aluminum",
   },
   "energy-cell": {
     id: "energy-cell",
@@ -58,6 +60,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
     maxStack: 20,
     combatUsable: true,
     description: "Restores Energy during a stage.",
+    grade: "aluminum",
   },
   "nova-bomb": {
     id: "nova-bomb",
@@ -66,6 +69,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
     maxStack: 10,
     combatUsable: true,
     description: "High-impact emergency combat consumable.",
+    grade: "copper",
   },
   "emp-charge": {
     id: "emp-charge",
@@ -74,6 +78,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
     maxStack: 10,
     combatUsable: true,
     description: "Disrupts hostile projectile pressure.",
+    grade: "copper",
   },
   "time-crystal": {
     id: "time-crystal",
@@ -82,6 +87,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
     maxStack: 10,
     combatUsable: true,
     description: "Creates a short tactical time-control window.",
+    grade: "silver",
   },
   "word-bomb": {
     id: "word-bomb",
@@ -90,6 +96,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
     maxStack: 10,
     combatUsable: true,
     description: "Typing-focused offensive consumable.",
+    grade: "copper",
   },
   "supply-beacon": {
     id: "supply-beacon",
@@ -98,6 +105,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
     maxStack: 10,
     combatUsable: true,
     description: "Requests an extra supply opportunity.",
+    grade: "copper",
   },
   "lucky-dice": {
     id: "lucky-dice",
@@ -106,6 +114,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
     maxStack: 10,
     combatUsable: true,
     description: "Influences a future luck-based reward roll.",
+    grade: "silver",
   },
   "salvage-anchor": {
     id: "salvage-anchor",

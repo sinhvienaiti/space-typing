@@ -9,6 +9,43 @@ import {
 } from "../src/campaign/progress";
 import { PLAYER_SAVE_VERSION } from "../src/persistence/player-save";
 
+const GRADE_TO_LEGACY_RARITY = {
+  aluminum: "common",
+  copper: "rare",
+  silver: "epic",
+  gold: "legendary",
+  diamond: "legendary",
+} as const;
+
+function convertEquipmentToLegacyRarity(
+  raw: Record<string, unknown>,
+): void {
+  const equipment = raw.equipment as {
+    items?: Array<Record<string, unknown>>;
+    loadout?: unknown;
+  } | undefined;
+  if (equipment === undefined || !Array.isArray(equipment.items)) return;
+
+  equipment.items = equipment.items.map((item) => {
+    const grade = item.grade;
+    if (
+      grade !== "aluminum" &&
+      grade !== "copper" &&
+      grade !== "silver" &&
+      grade !== "gold" &&
+      grade !== "diamond"
+    ) {
+      return item;
+    }
+
+    const { grade: _grade, ...rest } = item;
+    return {
+      ...rest,
+      rarity: GRADE_TO_LEGACY_RARITY[grade],
+    };
+  });
+}
+
 describe("save backup", () => {
   it("exports a readable current-version JSON backup", () => {
     const progress = recordStageClear(
@@ -150,7 +187,7 @@ describe("save backup", () => {
     );
     expect(unsupported).toEqual({
       ok: false,
-      error: "Unsupported save version. Supported versions: 1-18.",
+      error: "Unsupported save version. Supported versions: 1-19.",
     });
   });
 
@@ -226,7 +263,7 @@ describe("save backup", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.migrated).toBe(true);
-    expect(result.save.equipment.items[0]?.rarity).toBe("common");
+    expect(result.save.equipment.items[0]?.grade).toBe("aluminum");
     expect(result.save.equipment.items[0]?.enhancement).toBe(0);
   });
 
@@ -264,7 +301,7 @@ describe("save backup", () => {
     if (!result.ok) return;
     expect(result.migrated).toBe(true);
     expect(result.save.equipment.items[0]).toMatchObject({
-      rarity: "epic",
+      grade: "silver",
       enhancement: 0,
     });
   });
@@ -274,6 +311,7 @@ describe("save backup", () => {
       exportPlayerSaveJson(createDefaultCampaignProgress()),
     ) as Record<string, unknown>;
     raw.version = 6;
+    convertEquipmentToLegacyRarity(raw);
     delete raw.supportSpells;
 
     const result = parsePlayerSaveJson(JSON.stringify(raw));
@@ -308,6 +346,7 @@ describe("save backup", () => {
       exportPlayerSaveJson(createDefaultCampaignProgress()),
     ) as Record<string, unknown>;
     raw.version = 7;
+    convertEquipmentToLegacyRarity(raw);
     delete raw.characters;
 
     const result = parsePlayerSaveJson(JSON.stringify(raw));
@@ -327,6 +366,7 @@ describe("save backup", () => {
       exportPlayerSaveJson(createDefaultCampaignProgress()),
     ) as Record<string, unknown>;
     raw.version = 8;
+    convertEquipmentToLegacyRarity(raw);
     raw.characters = {
       selected: "vanguard",
       unlocked: ["vanguard"],
@@ -345,6 +385,7 @@ describe("save backup", () => {
       exportPlayerSaveJson(createDefaultCampaignProgress()),
     ) as Record<string, unknown>;
     raw.version = 9;
+    convertEquipmentToLegacyRarity(raw);
 
     const characters = raw.characters as {
       selected: string;
@@ -372,6 +413,7 @@ describe("save backup", () => {
       exportPlayerSaveJson(createDefaultCampaignProgress()),
     ) as Record<string, unknown>;
     raw.version = 10;
+    convertEquipmentToLegacyRarity(raw);
     delete raw.luckPity;
 
     const result = parsePlayerSaveJson(JSON.stringify(raw));
@@ -392,6 +434,7 @@ describe("save backup", () => {
       exportPlayerSaveJson(createDefaultCampaignProgress()),
     ) as Record<string, unknown>;
     raw.version = 11;
+    convertEquipmentToLegacyRarity(raw);
     delete raw.hiddenDiscovery;
 
     const result = parsePlayerSaveJson(JSON.stringify(raw));
@@ -410,6 +453,7 @@ describe("save backup", () => {
       exportPlayerSaveJson(createDefaultCampaignProgress()),
     ) as Record<string, unknown>;
     raw.version = 12;
+    convertEquipmentToLegacyRarity(raw);
     delete raw.credits;
 
     const result = parsePlayerSaveJson(JSON.stringify(raw));
@@ -425,6 +469,7 @@ describe("save backup", () => {
       exportPlayerSaveJson(createDefaultCampaignProgress()),
     ) as Record<string, unknown>;
     raw.version = 13;
+    convertEquipmentToLegacyRarity(raw);
     delete raw.progression;
 
     const result = parsePlayerSaveJson(JSON.stringify(raw));
@@ -441,6 +486,7 @@ describe("save backup", () => {
       exportPlayerSaveJson(createDefaultCampaignProgress()),
     ) as Record<string, unknown>;
     raw.version = 14;
+    convertEquipmentToLegacyRarity(raw);
     delete raw.expansionCurrencies;
     delete raw.campaignExpansion;
 
@@ -462,6 +508,7 @@ describe("save backup", () => {
       exportPlayerSaveJson(createDefaultCampaignProgress()),
     ) as Record<string, unknown>;
     raw.version = 15;
+    convertEquipmentToLegacyRarity(raw);
     delete raw.checkpointSnapshot;
 
     const result = parsePlayerSaveJson(JSON.stringify(raw));
@@ -477,6 +524,7 @@ describe("save backup", () => {
       exportPlayerSaveJson(createDefaultCampaignProgress()),
     ) as Record<string, unknown>;
     raw.version = 16;
+    convertEquipmentToLegacyRarity(raw);
     delete raw.crashRecoverySnapshot;
 
     const result = parsePlayerSaveJson(JSON.stringify(raw));
@@ -493,6 +541,7 @@ describe("save backup", () => {
       exportPlayerSaveJson(createDefaultCampaignProgress()),
     ) as Record<string, unknown>;
     raw.version = 17;
+    convertEquipmentToLegacyRarity(raw);
     delete raw.stageEntrySnapshot;
 
     const result = parsePlayerSaveJson(JSON.stringify(raw));
@@ -502,6 +551,46 @@ describe("save backup", () => {
     expect(result.migrated).toBe(true);
     expect(result.save.stageEntrySnapshot).toBeNull();
     expect(result.save.crashRecoverySnapshot).toBeNull();
+  });
+
+  it("imports and migrates a valid v18 rarity backup to v19 grades", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.version = 18;
+    convertEquipmentToLegacyRarity(raw);
+
+    const equipment = raw.equipment as {
+      items: Array<Record<string, unknown>>;
+    };
+    equipment.items[0] = {
+      ...equipment.items[0],
+      rarity: "legendary",
+      enhancement: 4,
+    };
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.migrated).toBe(true);
+    expect(result.save.equipment.items[0]).toMatchObject({
+      grade: "gold",
+      enhancement: 4,
+    });
+    expect(result.save.stageEntrySnapshot).toBeNull();
+  });
+
+  it("rejects legacy rarity fields in current v19 equipment", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    convertEquipmentToLegacyRarity(raw);
+
+    expect(parsePlayerSaveJson(JSON.stringify(raw))).toEqual({
+      ok: false,
+      error: "Equipment data contains an invalid item or loadout reference.",
+    });
   });
 
   it("rejects invalid current expansion currencies", () => {

@@ -1,6 +1,6 @@
 import {
   rollEquipmentDrop,
-  rollEquipmentRarity,
+  rollEquipmentGrade,
   type LootSource,
 } from "./equipment-loot";
 import { rollLuckPity } from "./pity";
@@ -13,12 +13,13 @@ export type PitySimulation = {
   finalPity: number;
 };
 
-export type RaritySimulation = {
+export type GradeSimulation = {
   rolls: number;
-  common: number;
-  rare: number;
-  epic: number;
-  legendary: number;
+  aluminum: number;
+  copper: number;
+  silver: number;
+  gold: number;
+  diamond: number;
 };
 
 export type DropSimulation = {
@@ -73,24 +74,25 @@ export function simulateLuckPity(
   };
 }
 
-export function simulateRarityDistribution(
+export function simulateGradeDistribution(
   source: LootSource,
   luck: number,
   rolls: number,
   seed: number,
-): RaritySimulation {
+): GradeSimulation {
   const random = seededRandom(seed);
   const safeRolls = Math.max(0, Math.floor(rolls));
-  const result: RaritySimulation = {
+  const result: GradeSimulation = {
     rolls: safeRolls,
-    common: 0,
-    rare: 0,
-    epic: 0,
-    legendary: 0,
+    aluminum: 0,
+    copper: 0,
+    silver: 0,
+    gold: 0,
+    diamond: 0,
   };
 
   for (let index = 0; index < safeRolls; index += 1) {
-    result[rollEquipmentRarity(source, luck, random())] += 1;
+    result[rollEquipmentGrade(source, luck, random())] += 1;
   }
 
   return result;

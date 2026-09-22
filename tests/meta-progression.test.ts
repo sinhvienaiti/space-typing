@@ -40,7 +40,7 @@ describe("Codex collection and meta progression", () => {
     equipment.items.push({
       ...equipment.items[0]!,
       instanceId: "duplicate-pulse",
-      rarity: "rare",
+      grade: "copper",
     });
 
     const meta = resolveMetaProgression({

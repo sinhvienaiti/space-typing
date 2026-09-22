@@ -2952,7 +2952,9 @@ Implemented:
 
 ## M05 — Grade + currency migration
 
-Implement:
+**Status: Complete.** PlayerSave v19 is grade-native, legacy Common/Rare/Epic/Legendary equipment migrates explicitly to Aluminum/Copper/Silver/Gold while preserving enhancement/loadout, Diamond is active as the new top grade, and Alloy/Star Crystal/Quantum Core now flow through the existing persistent economy with M02 checkpoint rollback semantics. See `docs/M05_GRADE_CURRENCY_MIGRATION.md`.
+
+Implemented:
 
 - Aluminum/Copper/Silver/Gold/Diamond;
 - legacy equipment migration;
