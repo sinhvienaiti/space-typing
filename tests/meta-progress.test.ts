@@ -10,6 +10,7 @@ import {
   recordBossDiscovery,
   recordEnemyDiscovery,
   sanitizeMetaProgressState,
+  syncOwnedCollection,
 } from "../src/progression/meta";
 
 describe("missions, achievements and meta collection", () => {
@@ -67,23 +68,33 @@ describe("missions, achievements and meta collection", () => {
     expect(state.completedMissions).toEqual(["special-30"]);
     expect(state.discoveredEnemies).toEqual(["scout"]);
     expect(state.discoveredBossStages).toEqual([100]);
+    expect(state.discoveredItems).toEqual([]);
+    expect(state.discoveredEquipment).toEqual([]);
+    expect(state.discoveredCharacters).toEqual([]);
     expect(isValidMetaProgressState(state)).toBe(true);
   });
 
-  it("summarizes collection from persisted and existing systems", () => {
-    const meta = recordEnemyDiscovery(
+  it("persists owned collection and summarizes it", () => {
+    let meta = recordEnemyDiscovery(
       createMetaProgressState(),
       "scout",
     );
-    const hidden = createHiddenDiscoveryState();
-    hidden.discovered = ["black-market-signal"];
-
-    const summary = collectionSummary(meta, {
+    meta = syncOwnedCollection(meta, {
       inventory: { "repair-kit": 1 },
       equipment: createStarterEquipmentState(),
       characters: ["vanguard"],
-      hiddenDiscovery: hidden,
     });
+
+    // Collection survives after a consumable leaves current inventory.
+    meta = syncOwnedCollection(meta, {
+      inventory: {},
+      equipment: createStarterEquipmentState(),
+      characters: ["vanguard"],
+    });
+
+    const hidden = createHiddenDiscoveryState();
+    hidden.discovered = ["black-market-signal"];
+    const summary = collectionSummary(meta, hidden);
 
     expect(summary.enemies).toEqual([1, 14]);
     expect(summary.items[0]).toBe(1);
