@@ -206,8 +206,8 @@ export const ENEMY_SKILL_REGISTRY: Readonly<
     minRank: 4,
     effect: {
       type: "status",
-      status: "slowed",
-      duration: 3.5,
+      status: "jammed",
+      duration: 1.6,
       hardCc: false,
       immunityAfter: 0,
     },
