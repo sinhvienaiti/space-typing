@@ -3099,7 +3099,22 @@ M14 owns Branching Route Map + Station and persisted route/shop state.
 
 ## M14 — Branching Route Map + Station
 
-Implement deterministic route graph, choices, station nodes and persisted route/shop state.
+**Status: Complete.** Production Campaign now has deterministic ten-stage route graphs with persisted immutable choices, mandatory boss continuity, and Shop/Station nodes that reuse the existing finite-stock/service systems. RouteState is part of the checkpoint/crash/death persistence domain through PlayerSave v21. See `docs/M14_ROUTE_STATION.md`.
+
+Implemented:
+
+- deterministic per-sector route seed/graph;
+- sequential Stage 001-1000 continuity;
+- mandatory Mini Boss / World Boss / Galaxy Major Boss Combat nodes;
+- Combat / Shop / Station branches;
+- immutable persisted route choice;
+- frontier-stage route gating with replay-stage compatibility;
+- existing Normal Shop / Station Shop / Repair-Upgrade / Support integration;
+- checkpoint, crash recovery and death rollback integration;
+- PlayerSave v20 -> v21 migration and v20 backup compatibility;
+- static responsive route UI with no combat-frame animation.
+
+M15 must extend this route/persistence contract for Hidden Challenge / Hidden World / Champion Hunt rather than create a second navigation layer.
 
 ## M15 — Hidden Challenge / Hidden World / Champion Hunt
 
