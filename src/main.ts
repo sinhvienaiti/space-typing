@@ -258,10 +258,11 @@ import {
 } from "./progression/meta";
 import {
   applyAscensionDifficulty,
+  advanceAscensionOnStageClear,
   ascensionCompletionReward,
   ascensionProfile,
-  completeAscensionTier,
   createAscensionState,
+  currentAscensionStage,
   selectAscensionTier,
   type AscensionState,
 } from "./progression/ascension";
@@ -1275,6 +1276,7 @@ let checkpointSnapshot: CheckpointSnapshot =
       progression,
       upgrades,
       relics,
+      ascension,
       expansionCurrencies,
       shops,
       route,
@@ -1420,6 +1422,7 @@ function currentRunPersistentState(): RunPersistentState {
     route,
     upgrades,
     relics,
+    ascension,
   };
 }
 
@@ -1435,6 +1438,14 @@ function applyRunPersistentState(state: RunPersistentState): void {
   progression = state.progression;
   upgrades = state.upgrades;
   relics = state.relics;
+  ascension = state.ascension;
+  const restoredAscensionStage = currentAscensionStage(ascension);
+  if (restoredAscensionStage !== null) {
+    campaign = {
+      ...campaign,
+      selectedStage: restoredAscensionStage,
+    };
+  }
   expansionCurrencies = state.expansionCurrencies;
   shops = state.shops;
   route = state.route;
@@ -2204,6 +2215,10 @@ function renderProgression(): void {
   }
 }
 
+function selectedGameplayStage(): number {
+  return currentAscensionStage(ascension) ?? campaign.selectedStage;
+}
+
 function renderAscension(): void {
   const button = byId<HTMLButtonElement>("ascensionButton");
   const unlocked = ascension.highestUnlockedTier >= 1;
@@ -2219,7 +2234,10 @@ function renderAscension(): void {
       " · selected " +
       (ascension.selectedTier === 0
         ? "Base Campaign"
-        : "Tier " + String(ascension.selectedTier)) +
+        : "Tier " +
+          String(ascension.selectedTier) +
+          " · frontier " +
+          String(currentAscensionStage(ascension) ?? 1).padStart(3, "0")) +
       " · replay the same 1000 stages with remixed pressure and boss mutations."
     : "Complete Stage 1000 to unlock Ascension.";
 
@@ -2228,7 +2246,11 @@ function renderAscension(): void {
   if (!unlocked) return;
 
   for (let tier = 0; tier <= ascension.highestUnlockedTier; tier += 1) {
-    const profile = ascensionProfile(tier, campaign.selectedStage);
+    const tierStage =
+      tier === 0
+        ? campaign.selectedStage
+        : ascension.frontierByTier[String(tier)] ?? 1;
+    const profile = ascensionProfile(tier, tierStage);
     const card = document.createElement("button");
     card.type = "button";
     card.className = "progression-card";
@@ -2247,6 +2269,8 @@ function renderAscension(): void {
           String(profile.formationComplexityBonus) +
           " · rewards x" +
           profile.rewardMultiplier.toFixed(2) +
+          " · frontier " +
+          String(tierStage).padStart(3, "0") +
           " · boss " +
           profile.bossMutations.join(", ");
 
@@ -2254,13 +2278,31 @@ function renderAscension(): void {
     card.addEventListener("click", () => {
       if (tier === ascension.selectedTier) return;
       ascension = selectAscensionTier(ascension, tier);
+      const ascensionStage = currentAscensionStage(ascension);
+      campaign = {
+        ...campaign,
+        selectedStage:
+          ascensionStage ?? campaign.highestUnlockedStage,
+      };
+      stageEntrySnapshot = null;
+      crashRecoverySnapshot = null;
+      checkpointSnapshot = createCheckpointSnapshot(
+        currentRunPersistentState(),
+        campaignExpansion.checkpoint.stage,
+      );
       renderAscension();
       updateCampaignUi();
       ascensionDialog.close();
       void autosaveCampaign(
         "ascension",
         "✓ Ascension selected · " +
-          (tier === 0 ? "Base Campaign" : "Tier " + String(tier)),
+          (tier === 0
+            ? "Base Campaign"
+            : "Tier " +
+              String(tier) +
+              " · Stage " +
+              String(ascensionStage ?? 1).padStart(3, "0")),
+        "stage-select",
       );
     });
     grid.append(card);
@@ -4949,6 +4991,7 @@ async function chooseCurrentRouteNode(
 
 function openRouteMap(): void {
   if (
+    ascension.selectedTier > 0 ||
     !persistenceReady ||
     !canOpenBetweenStageMenu()
   ) {
@@ -5064,6 +5107,7 @@ async function startSelectedStage(): Promise<void> {
   }
 
   if (
+    ascension.selectedTier === 0 &&
     campaign.selectedStage === campaign.highestUnlockedStage
   ) {
     route = syncRouteStateForStage(
@@ -5080,7 +5124,12 @@ async function startSelectedStage(): Promise<void> {
 
   try {
     game.setCharacter(characters.selected);
-    const stage = createStageConfig(campaign.selectedStage);
+    const gameplayStage = selectedGameplayStage();
+    campaign = {
+      ...campaign,
+      selectedStage: gameplayStage,
+    };
+    const stage = createStageConfig(gameplayStage);
     const world = worldForStage(stage.stage);
     if (
       lastPresentedWorldId !== world.id ||
@@ -5237,6 +5286,13 @@ async function initializePlayerProgress(): Promise<void> {
     relics = loaded.save.relics;
     codex = loaded.save.codex;
     ascension = loaded.save.ascension;
+    const loadedAscensionStage = currentAscensionStage(ascension);
+    if (loadedAscensionStage !== null) {
+      campaign = {
+        ...campaign,
+        selectedStage: loadedAscensionStage,
+      };
+    }
     expansionCurrencies = loaded.save.expansionCurrencies;
     shops = loaded.save.shops;
     route = loaded.save.route;
@@ -5324,15 +5380,16 @@ async function initializePlayerProgress(): Promise<void> {
 }
 
 function updateCampaignUi(): void {
+  const gameplayStage = selectedGameplayStage();
   byId<HTMLButtonElement>("nextStageButton").textContent = "Next stage";
   byId("startButton").textContent =
     "Continue · Stage " +
-    String(campaign.selectedStage).padStart(3, "0") +
+    String(gameplayStage).padStart(3, "0") +
     (ascension.selectedTier > 0
       ? " · A" + String(ascension.selectedTier)
       : "");
   renderAscension();
-  const selectedWorld = worldForStage(campaign.selectedStage);
+  const selectedWorld = worldForStage(gameplayStage);
   musicController.setWorldProfile(
     musicProfileForWorld(selectedWorld),
   );
@@ -5348,15 +5405,32 @@ function updateCampaignUi(): void {
     " / 1000 · " +
     worldLabel(selectedWorld) +
     " · checkpoint " +
-    String(campaignExpansion.checkpoint.stage).padStart(3, "0") +
+    (ascension.selectedTier > 0
+      ? "A" +
+        String(ascension.selectedTier) +
+        "-" +
+        String(
+          Math.floor((Math.max(1, gameplayStage) - 1) / 10) * 10 + 1,
+        ).padStart(3, "0")
+      : String(campaignExpansion.checkpoint.stage).padStart(3, "0")) +
     " · record " +
     String(campaignExpansion.activeSegment.highestReachedStage).padStart(3, "0") +
     " · " +
     getCharacter(characters.selected).name;
 
+  const ascensionActive = ascension.selectedTier > 0;
+  for (const id of [
+    "stageSelectButton",
+    "pauseStageSelectButton",
+    "clearStageSelectButton",
+    "routeButton",
+  ]) {
+    byId<HTMLButtonElement>(id).disabled = ascensionActive;
+  }
+
   currentGalaxy = Math.min(
     GALAXY_COUNT,
-    Math.max(1, Math.ceil(campaign.selectedStage / STAGES_PER_GALAXY)),
+    Math.max(1, Math.ceil(gameplayStage / STAGES_PER_GALAXY)),
   );
 }
 
@@ -5434,6 +5508,10 @@ function renderStageGrid(): void {
 }
 
 function openStageSelect(): void {
+  if (ascension.selectedTier > 0) {
+    showNotice("Stage Select is disabled during an Ascension run.");
+    return;
+  }
   populateGalaxySelect();
   const select = byId<HTMLSelectElement>("galaxySelect");
 
@@ -5767,6 +5845,13 @@ async function importSaveFile(file: File): Promise<void> {
     relics = importedRelics;
     codex = importedCodex;
     ascension = importedAscension;
+    const importedAscensionStage = currentAscensionStage(ascension);
+    if (importedAscensionStage !== null) {
+      campaign = {
+        ...campaign,
+        selectedStage: importedAscensionStage,
+      };
+    }
     expansionCurrencies = importedExpansionCurrencies;
     shops = importedShops;
     route = importedRoute;
@@ -5805,6 +5890,13 @@ async function importSaveFile(file: File): Promise<void> {
       relics = previousRelics;
       codex = previousCodex;
       ascension = previousAscension;
+      const previousAscensionStage = currentAscensionStage(ascension);
+      if (previousAscensionStage !== null) {
+        campaign = {
+          ...campaign,
+          selectedStage: previousAscensionStage,
+        };
+      }
       expansionCurrencies = previousExpansionCurrencies;
       shops = previousShops;
       route = previousRoute;
