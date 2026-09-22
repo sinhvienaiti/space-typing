@@ -103,10 +103,8 @@ import {
 } from "./economy/currencies";
 import { gradeLabel } from "./grades";
 import {
-  plannedWorldStageRole,
   stageInWorld,
   worldForStage,
-  type PlannedWorldStageRole,
 } from "./worlds/registry";
 import type { WorldProfile } from "./worlds/types";
 import {
@@ -2697,16 +2695,6 @@ function createShopInstanceId(): string {
   );
 }
 
-function worldRoleLabel(role: PlannedWorldStageRole): string {
-  return role === "galaxy-major-boss"
-    ? "Galaxy Major Boss"
-    : role === "world-boss"
-      ? "World Boss"
-      : role === "mini-boss"
-        ? "Mini Boss"
-        : "Combat";
-}
-
 function worldLabel(world: WorldProfile): string {
   const worldNumber = Math.floor((world.stageStart - 1) / 20) + 1;
   return (
@@ -2720,7 +2708,6 @@ function worldLabel(world: WorldProfile): string {
 function showWorldTransition(
   world: WorldProfile,
   stage: number,
-  role: PlannedWorldStageRole,
 ): void {
   const panel = byId("worldTransition");
   const worldNumber = Math.floor((world.stageStart - 1) / 20) + 1;
@@ -2735,7 +2722,8 @@ function showWorldTransition(
     "Stage " +
     String(stage).padStart(3, "0") +
     " · " +
-    worldRoleLabel(role);
+    String(stageInWorld(stage)).padStart(2, "0") +
+    " / 20";
 
   panel.classList.remove("hidden");
   if (worldTransitionTimer !== null) {
@@ -3321,12 +3309,11 @@ async function startSelectedStage(): Promise<void> {
     game.setCharacter(characters.selected);
     const stage = createStageConfig(campaign.selectedStage);
     const world = worldForStage(stage.stage);
-    const plannedRole = plannedWorldStageRole(stage.stage);
     if (
       lastPresentedWorldId !== world.id ||
       stageInWorld(stage.stage) === 1
     ) {
-      showWorldTransition(world, stage.stage, plannedRole);
+      showWorldTransition(world, stage.stage);
       lastPresentedWorldId = world.id;
     }
     await prepareStageVocabulary(stage);
