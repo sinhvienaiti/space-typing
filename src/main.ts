@@ -3528,6 +3528,7 @@ async function exportSave(): Promise<void> {
     campaignExpansion,
     checkpointSnapshot,
     crashRecoverySnapshot,
+    stageEntrySnapshot,
   );
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -3579,6 +3580,8 @@ async function importSaveFile(file: File): Promise<void> {
       result.save.checkpointSnapshot;
     const importedCrashRecoverySnapshot =
       result.save.crashRecoverySnapshot;
+    const importedStageEntrySnapshot =
+      result.save.stageEntrySnapshot;
     const message =
       "Import Stage " +
       String(imported.highestUnlockedStage).padStart(3, "0") +
@@ -3605,6 +3608,7 @@ async function importSaveFile(file: File): Promise<void> {
     const previousCampaignExpansion = campaignExpansion;
     const previousCheckpointSnapshot = checkpointSnapshot;
     const previousCrashRecoverySnapshot = crashRecoverySnapshot;
+    const previousStageEntrySnapshot = stageEntrySnapshot;
     campaign = imported;
     inventory = importedInventory;
     equipment = importedEquipment;
@@ -3618,6 +3622,7 @@ async function importSaveFile(file: File): Promise<void> {
     campaignExpansion = importedCampaignExpansion;
     checkpointSnapshot = importedCheckpointSnapshot;
     crashRecoverySnapshot = importedCrashRecoverySnapshot;
+    stageEntrySnapshot = importedStageEntrySnapshot;
     syncProgressionAchievements();
     game.setLuckPityState(luckPity);
     game.setHiddenDiscoveryState(hiddenDiscovery);
@@ -3649,6 +3654,7 @@ async function importSaveFile(file: File): Promise<void> {
       campaignExpansion = previousCampaignExpansion;
       checkpointSnapshot = previousCheckpointSnapshot;
       crashRecoverySnapshot = previousCrashRecoverySnapshot;
+      stageEntrySnapshot = previousStageEntrySnapshot;
       game.setLuckPityState(luckPity);
       game.setHiddenDiscoveryState(hiddenDiscovery);
       updateSpecialShopAccess();
