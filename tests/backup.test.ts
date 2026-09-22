@@ -893,6 +893,7 @@ describe("save backup", () => {
         highestUnlockedTier: 1,
         selectedTier: 0,
         completedTiers: [],
+        frontierByTier: { "1": 1 },
       });
     }
   });
@@ -931,6 +932,10 @@ describe("save backup", () => {
       highestUnlockedTier: 2,
       selectedTier: 1,
       completedTiers: [1],
+      frontierByTier: {
+        "1": 1000,
+        "2": 1,
+      },
     };
     const args = createPlayerSave(progress);
     const json = exportPlayerSaveJson(
