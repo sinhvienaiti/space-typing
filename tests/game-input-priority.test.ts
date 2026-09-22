@@ -78,6 +78,7 @@ function createTestGame(): Game {
     onPhase: vi.fn(),
     onStage: vi.fn(),
     onStageEvents: vi.fn(),
+    onObjectiveUpdate: vi.fn(),
     onStageClear: vi.fn(),
     onBossUpdate: vi.fn(),
     onWordComplete: vi.fn(),
