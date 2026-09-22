@@ -7,7 +7,7 @@ import {
   getEquipmentDefinition,
   type EquipmentId,
 } from "../equipment/registry";
-import type { EquipmentRarity } from "../equipment/rarity";
+import type { GradeId } from "../grades";
 import {
   addItem,
   type Inventory,
@@ -33,7 +33,7 @@ export type NormalShopEquipmentOffer = {
   key: string;
   kind: "equipment";
   definitionId: EquipmentId;
-  rarity: EquipmentRarity;
+  grade: GradeId;
   price: number;
 };
 
@@ -59,7 +59,7 @@ const ITEM_OFFERS: readonly NormalShopItemOffer[] = [
   { key: "item-energy-cell", kind: "item", itemId: "energy-cell", price: 38 },
 ];
 
-function equipmentPrice(rarity: EquipmentRarity): number {
+function equipmentPrice(grade: GradeId): number {
   return rarity === "rare" ? 240 : 145;
 }
 
@@ -72,14 +72,14 @@ export function normalShopOffers(stage: number): NormalShopOffer[] {
     const definitionId =
       EQUIPMENT_IDS[(start + offset * 2) % EQUIPMENT_IDS.length] ??
       EQUIPMENT_IDS[0];
-    const rarity: EquipmentRarity =
+    const grade: GradeId =
       safeStage >= 100 && offset === 2 ? "rare" : "common";
     equipmentOffers.push({
-      key: "equipment-" + definitionId + "-" + rarity,
+      key: "equipment-" + definitionId + "-" + grade,
       kind: "equipment",
       definitionId,
-      rarity,
-      price: equipmentPrice(rarity),
+      grade,
+      price: equipmentPrice(grade),
     });
   }
 
@@ -143,7 +143,7 @@ export function buyNormalShopOffer(
   const equipment = addEquipmentInstance(current.equipment, {
     instanceId,
     definitionId: offer.definitionId,
-    rarity: offer.rarity,
+    grade: offer.grade,
     enhancement: 0,
   });
   const payment = spendCredits(credits, offer.price);
