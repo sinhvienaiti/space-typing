@@ -554,21 +554,51 @@ function progressRank(progress: CampaignProgress): [number, number, number] {
   ];
 }
 
+function compareCampaignProgress(
+  left: CampaignProgress,
+  right: CampaignProgress,
+): number {
+  const leftRank = progressRank(left);
+  const rightRank = progressRank(right);
+
+  for (let index = 0; index < leftRank.length; index += 1) {
+    const leftValue = leftRank[index] ?? 0;
+    const rightValue = rightRank[index] ?? 0;
+    if (leftValue > rightValue) return 1;
+    if (rightValue > leftValue) return -1;
+  }
+
+  return 0;
+}
+
 export function chooseFurthestCampaign(
   preferred: CampaignProgress,
   fallback: CampaignProgress,
 ): CampaignProgress {
-  const left = progressRank(preferred);
-  const right = progressRank(fallback);
+  return compareCampaignProgress(preferred, fallback) >= 0
+    ? preferred
+    : fallback;
+}
 
-  for (let index = 0; index < left.length; index += 1) {
-    const leftValue = left[index] ?? 0;
-    const rightValue = right[index] ?? 0;
-    if (leftValue > rightValue) return preferred;
-    if (rightValue > leftValue) return fallback;
-  }
+function saveTimestamp(save: PlayerSave): number {
+  const value = Date.parse(save.updatedAt);
+  return Number.isFinite(value) ? value : 0;
+}
 
-  return preferred;
+export function choosePreferredPlayerSave(
+  preferred: PlayerSave,
+  recovery: PlayerSave,
+): PlayerSave {
+  const campaignComparison = compareCampaignProgress(
+    preferred.campaign,
+    recovery.campaign,
+  );
+  if (campaignComparison > 0) return preferred;
+  if (campaignComparison < 0) return recovery;
+
+  return saveTimestamp(recovery) > saveTimestamp(preferred)
+    ? recovery
+    : preferred;
 }
 
 function recoverySaveFromLegacy(): PlayerSave {
@@ -698,11 +728,12 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
     }
 
     const migration = migratePlayerSave(stored);
-    const campaign = chooseFurthestCampaign(
-      migration.save.campaign,
-      recovery.campaign,
+    const preferredSave = choosePreferredPlayerSave(
+      migration.save,
+      recovery,
     );
-    const useRecovery = campaign === recovery.campaign;
+    const useRecovery = preferredSave === recovery;
+    const campaign = preferredSave.campaign;
     const inventory = useRecovery
       ? recovery.inventory
       : migration.save.inventory;
