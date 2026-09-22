@@ -86,6 +86,20 @@ export type HiddenEncounterReward = {
   credits: number;
   currencies: ExpansionCurrencyReward;
 };
+export type HiddenEncounterRuntime = {
+  kind: HiddenEncounterKind;
+  tier: HiddenChallengeTier;
+  sourceStage: number;
+  step: number;
+  totalSteps: number;
+  environmentStageOverride: number | null;
+  rosterStageOverride: number | null;
+  bossStageOverride: number | null;
+  forcePriorityTargets: boolean;
+  enemyBudgetMultiplier: number;
+  killChainWindowSeconds: number;
+};
+
 
 export function createHiddenEncounterState(): HiddenEncounterState {
   return {
@@ -528,6 +542,45 @@ export function hiddenEncounterReward(
           ? 1
           : 0,
     },
+  };
+}
+
+export function hiddenEncounterRuntime(
+  active: ActiveHiddenEncounter,
+  difficulty: DifficultyProfile,
+): HiddenEncounterRuntime {
+  const world =
+    active.hiddenWorldId === null
+      ? null
+      : HIDDEN_WORLD_PROFILES.find(
+          (entry) => entry.id === active.hiddenWorldId,
+        ) ?? null;
+
+  return {
+    kind: active.kind,
+    tier: active.tier,
+    sourceStage: active.sourceStage,
+    step: active.step,
+    totalSteps: active.totalSteps,
+    environmentStageOverride:
+      world?.environmentStage ?? null,
+    rosterStageOverride:
+      world?.rosterStage ?? null,
+    bossStageOverride:
+      world?.bossStage ?? null,
+    forcePriorityTargets:
+      active.kind === "champion-hunt",
+    enemyBudgetMultiplier:
+      active.kind === "champion-hunt"
+        ? 0.72
+        : active.kind === "hidden-world"
+          ? 1.05
+          : 0.92 + active.tier * 0.08,
+    killChainWindowSeconds:
+      priorityKillChainWindowSeconds(
+        difficulty,
+        active.tier,
+      ),
   };
 }
 
