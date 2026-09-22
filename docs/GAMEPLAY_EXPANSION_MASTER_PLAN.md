@@ -3137,7 +3137,28 @@ M16 must extend the existing StageConfig/BossState typing runtime for Stage Obje
 
 ## M16 — Stage Objectives + boss typing mechanics
 
-Implement objective events and World-specific boss typing interactions.
+**Status: Complete.** Numbered Campaign stages now support deterministic event-driven required/bonus objectives, while existing BossState phases resolve one World-family typing mechanic at a time. Objective rewards scale from M12 difficulty and boss typing reuses the existing vocabulary, phase, projectile, HUD, SFX/VFX and reward paths. See `docs/M16_OBJECTIVES_BOSS_TYPING.md`.
+
+Implemented Stage Objectives:
+
+- survive timer;
+- accuracy target;
+- no-miss;
+- protect integrity;
+- Commander-first;
+- marked target;
+- Elite quota;
+- speed-clear.
+
+Implemented boss typing interactions:
+
+- Interrupt Charge;
+- Shield Sequence;
+- Weak Point;
+- Rapid Rage;
+- Accuracy Curse.
+
+M17 must extend the current SkillEngine/stat/equipment/ShopState/PlayerSave upgrade domains rather than create parallel progression systems.
 
 ## M17 — Skill/attribute/equipment upgrade expansion
 
