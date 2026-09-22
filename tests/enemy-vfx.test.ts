@@ -7,6 +7,9 @@ describe("enemy and reward VFX profiles", () => {
     expect(enemyFxProfile("angel", "death").hue).not.toBe(
       enemyFxProfile("devil", "death").hue,
     );
+    expect(enemyFxProfile("angel", "death").pitch).not.toBe(
+      enemyFxProfile("devil", "death").pitch,
+    );
     expect(enemyFxProfile("frost", "boss-death").count).toBeGreaterThan(
       enemyFxProfile("frost", "death").count,
     );

@@ -64,8 +64,8 @@ export type PerformanceReport = {
 
 export function qualityProfile(
   quality: VisualQuality,
-): QualityProfile {
-  return { ...PROFILES[quality] };
+): Readonly<QualityProfile> {
+  return PROFILES[quality];
 }
 
 export class FrameProfiler {

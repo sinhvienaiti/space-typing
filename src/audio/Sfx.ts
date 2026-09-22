@@ -5,6 +5,8 @@ import {
 
 export class Sfx {
   private context: AudioContext | null = null;
+  private limiter: DynamicsCompressorNode | null = null;
+  private noiseBuffer: AudioBuffer | null = null;
   private volume = 0.5;
   private pronunciationActive = false;
   private destroyed = false;
@@ -39,6 +41,11 @@ export class Sfx {
     }
     this.timers.clear();
 
+    if (this.limiter !== null) {
+      this.limiter.disconnect();
+      this.limiter = null;
+    }
+    this.noiseBuffer = null;
     if (this.context !== null) {
       void this.context.close();
       this.context = null;
@@ -70,8 +77,9 @@ export class Sfx {
     );
   }
 
-  hit(): void {
-    this.tone(190, 0.065, "sawtooth", 0.045, 110, "combat");
+  hit(pitch = 1): void {
+    const safePitch = Math.max(0.5, Math.min(1.6, pitch));
+    this.tone(190 * safePitch, 0.065, "sawtooth", 0.045, 110 * safePitch, "combat");
   }
 
   wordComplete(perfect: boolean): void {
@@ -85,9 +93,10 @@ export class Sfx {
     );
   }
 
-  kill(): void {
+  kill(pitch = 1): void {
+    const safePitch = Math.max(0.5, Math.min(1.6, pitch));
     this.noise(0.1, 0.055, "combat");
-    this.tone(240, 0.12, "sawtooth", 0.045, 90, "combat");
+    this.tone(240 * safePitch, 0.12, "sawtooth", 0.045, 90 * safePitch, "combat");
   }
 
   wrong(): void {
@@ -176,10 +185,11 @@ export class Sfx {
     this.tone(180, 0.2, "sawtooth", 0.03, 82, "ui");
   }
 
-  bossEntrance(): void {
-    this.tone(95, 0.28, "sawtooth", 0.045, 58, "warnings");
+  bossEntrance(pitch = 1): void {
+    const safePitch = Math.max(0.5, Math.min(1.6, pitch));
+    this.tone(95 * safePitch, 0.28, "sawtooth", 0.045, 58 * safePitch, "warnings");
     this.schedule(
-      () => this.tone(220, 0.24, "triangle", 0.03, 420, "warnings"),
+      () => this.tone(220 * safePitch, 0.24, "triangle", 0.03, 420 * safePitch, "warnings"),
       110,
     );
   }
@@ -188,19 +198,21 @@ export class Sfx {
     this.tone(135, 0.075, "sawtooth", 0.04, 92, "combat");
   }
 
-  bossDeath(): void {
+  bossDeath(pitch = 1): void {
+    const safePitch = Math.max(0.5, Math.min(1.6, pitch));
     this.noise(0.24, 0.075, "combat");
-    this.tone(110, 0.35, "sawtooth", 0.055, 42, "combat");
+    this.tone(110 * safePitch, 0.35, "sawtooth", 0.055, 42 * safePitch, "combat");
     this.schedule(
-      () => this.tone(360, 0.32, "sine", 0.04, 760, "combat"),
+      () => this.tone(360 * safePitch, 0.32, "sine", 0.04, 760 * safePitch, "combat"),
       100,
     );
   }
 
-  bossPhase(): void {
-    this.tone(180, 0.16, "sawtooth", 0.04, 320, "warnings");
+  bossPhase(pitch = 1): void {
+    const safePitch = Math.max(0.5, Math.min(1.6, pitch));
+    this.tone(180 * safePitch, 0.16, "sawtooth", 0.04, 320 * safePitch, "warnings");
     this.schedule(
-      () => this.tone(420, 0.18, "triangle", 0.034, 720, "warnings"),
+      () => this.tone(420 * safePitch, 0.18, "triangle", 0.034, 720 * safePitch, "warnings"),
       70,
     );
   }
@@ -259,7 +271,7 @@ export class Sfx {
     gain.gain.setValueAtTime(gainLevel, now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
-    oscillator.connect(gain).connect(context.destination);
+    oscillator.connect(gain).connect(this.outputNode(context));
     oscillator.start(now);
     oscillator.stop(now + duration + 0.02);
   }
@@ -282,17 +294,23 @@ export class Sfx {
     const context = this.context;
     if (context === null) return;
 
-    const length = Math.max(1, Math.floor(context.sampleRate * duration));
-    const buffer = context.createBuffer(1, length, context.sampleRate);
-    const channel = buffer.getChannelData(0);
-
-    for (let index = 0; index < channel.length; index += 1) {
-      channel[index] = Math.random() * 2 - 1;
+    const minNoiseSeconds = 0.35;
+    if (this.noiseBuffer === null) {
+      const length = Math.max(
+        1,
+        Math.floor(context.sampleRate * Math.max(minNoiseSeconds, duration)),
+      );
+      const buffer = context.createBuffer(1, length, context.sampleRate);
+      const channel = buffer.getChannelData(0);
+      for (let index = 0; index < channel.length; index += 1) {
+        channel[index] = Math.random() * 2 - 1;
+      }
+      this.noiseBuffer = buffer;
     }
 
     const source = context.createBufferSource();
     const gain = context.createGain();
-    source.buffer = buffer;
+    source.buffer = this.noiseBuffer;
 
     gain.gain.setValueAtTime(gainLevel, context.currentTime);
     gain.gain.exponentialRampToValueAtTime(
@@ -300,7 +318,25 @@ export class Sfx {
       context.currentTime + duration,
     );
 
-    source.connect(gain).connect(context.destination);
-    source.start();
+    source.connect(gain).connect(this.outputNode(context));
+    source.start(context.currentTime, 0, duration);
+    source.stop(context.currentTime + duration + 0.02);
+  }
+
+  private outputNode(context: AudioContext): AudioNode {
+    if (this.limiter !== null) return this.limiter;
+    if (typeof context.createDynamicsCompressor !== "function") {
+      return context.destination;
+    }
+
+    const limiter = context.createDynamicsCompressor();
+    limiter.threshold.value = -6;
+    limiter.knee.value = 8;
+    limiter.ratio.value = 10;
+    limiter.attack.value = 0.003;
+    limiter.release.value = 0.12;
+    limiter.connect(context.destination);
+    this.limiter = limiter;
+    return limiter;
   }
 }

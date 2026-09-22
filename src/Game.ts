@@ -1873,8 +1873,10 @@ export class Game {
       const fx = enemyFxProfile(bossDefinition.family, "boss-intro");
       const position = this.bossPosition();
       this.burst(position.x, position.y, fx.count, fx.hue);
+      this.sfx.bossEntrance(fx.pitch);
+    } else {
+      this.sfx.bossEntrance();
     }
-    this.sfx.bossEntrance();
 
     if (this.settings.screenShake) {
       this.shake = Math.max(this.shake, 7);
@@ -2560,7 +2562,7 @@ export class Game {
       "boss-phase",
     );
     this.burst(x, y, fx.count, fx.hue);
-    this.sfx.bossPhase();
+    this.sfx.bossPhase(fx.pitch);
 
     if (this.settings.screenShake) {
       this.shake = Math.max(this.shake, boss.phase >= 3 ? 10 : 7);
@@ -2587,7 +2589,7 @@ export class Game {
       "boss-death",
     );
     this.burst(x, y, fx.count, fx.hue);
-    this.sfx.bossDeath();
+    this.sfx.bossDeath(fx.pitch);
     this.tryRollEquipmentDrop("boss");
     if (definition !== undefined) {
       this.activateDefinitionReward(definition, x, y);
@@ -2931,7 +2933,7 @@ export class Game {
         "hit",
       );
       this.burst(enemy.x, enemy.y, hitFx.count, hitFx.hue);
-      this.sfx.hit();
+      this.sfx.hit(hitFx.pitch);
       this.targetId = null;
       return;
     }
@@ -2947,8 +2949,8 @@ export class Game {
       "death",
     );
     this.burst(enemy.x, enemy.y, deathFx.count, deathFx.hue);
-    this.sfx.hit();
-    this.sfx.kill();
+    this.sfx.hit(deathFx.pitch);
+    this.sfx.kill(deathFx.pitch);
     if (enemy.golden) {
       this.addScore(260 * this.stats.multiplier);
     }
@@ -4300,6 +4302,7 @@ export class Game {
         age: time,
         flash: boss.flash,
         targeted: false,
+        glowScale: qualityProfile(this.settings.visualQuality).glowScale,
       });
 
     if (!modularDrawn) {
@@ -4756,6 +4759,7 @@ export class Game {
         age: enemy.age,
         flash: enemy.flash,
         targeted,
+        glowScale: qualityProfile(this.settings.visualQuality).glowScale,
       });
 
     if (!modularDrawn) {

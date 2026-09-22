@@ -15,6 +15,7 @@ export type EnemyRenderInput = {
   age: number;
   flash: number;
   targeted: boolean;
+  glowScale?: number;
 };
 
 const PALETTES: Record<EnemyDefinition["family"], EnemyVisualPalette> = {
@@ -92,27 +93,76 @@ export function enemyVisualPalette(
 
 function drawAura(
   context: CanvasRenderingContext2D,
+  definition: EnemyDefinition,
   radius: number,
   age: number,
   palette: EnemyVisualPalette,
+  glowScale: number,
 ): void {
+  const aura = definition.visual.aura ?? "";
+  const pulse = 1.34 + Math.sin(age * 2.4) * 0.04;
+
   context.save();
   context.strokeStyle = palette.aura;
-  context.lineWidth = 3;
-  context.setLineDash([4, 7]);
-  context.lineDashOffset = -age * 10;
-  context.beginPath();
-  context.arc(
-    0,
-    0,
-    radius * (1.34 + Math.sin(age * 2.4) * 0.04),
-    0,
-    Math.PI * 2,
-  );
-  context.stroke();
+  context.fillStyle = palette.outline;
+  context.lineWidth = 2 + glowScale;
+  context.shadowBlur = 8 * glowScale;
+  context.shadowColor = palette.outline;
+
+  if (aura.includes("shell")) {
+    for (const scale of [1.22, 1.42]) {
+      context.globalAlpha = scale > 1.3 ? 0.42 : 0.7;
+      context.beginPath();
+      context.arc(0, 0, radius * scale, 0, Math.PI * 2);
+      context.stroke();
+    }
+  } else if (aura.includes("flame")) {
+    context.setLineDash([3, 5]);
+    context.lineDashOffset = -age * 18;
+    for (let index = 0; index < 8; index += 1) {
+      const angle = (Math.PI * 2 * index) / 8 + age * 0.35;
+      const inner = radius * 1.14;
+      const outer = radius * (1.38 + (index % 2) * 0.1);
+      context.beginPath();
+      context.moveTo(Math.cos(angle) * inner, Math.sin(angle) * inner);
+      context.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
+      context.stroke();
+    }
+  } else {
+    context.setLineDash(
+      aura.includes("mist") || aura.includes("smoke") ? [9, 8] : [4, 7],
+    );
+    context.lineDashOffset = -age * (aura.includes("elite") ? 16 : 10);
+    context.beginPath();
+    context.arc(0, 0, radius * pulse, 0, Math.PI * 2);
+    context.stroke();
+  }
+
+  if (glowScale >= 0.6 && (
+    aura.includes("sparkle") ||
+    aura.includes("stars") ||
+    aura.includes("pollen")
+  )) {
+    const count = aura.includes("boss") || aura.includes("elite") ? 6 : 4;
+    context.setLineDash([]);
+    context.globalAlpha = 0.68;
+    for (let index = 0; index < count; index += 1) {
+      const angle = age * (0.4 + index * 0.03) + (Math.PI * 2 * index) / count;
+      const distance = radius * (1.3 + (index % 2) * 0.12);
+      context.beginPath();
+      context.arc(
+        Math.cos(angle) * distance,
+        Math.sin(angle) * distance,
+        Math.max(1.2, radius * 0.035),
+        0,
+        Math.PI * 2,
+      );
+      context.fill();
+    }
+  }
+
   context.restore();
 }
-
 
 function drawOrbit(
   context: CanvasRenderingContext2D,
@@ -121,29 +171,64 @@ function drawOrbit(
   age: number,
   palette: EnemyVisualPalette,
 ): void {
-  if (definition.visual.orbit === undefined) return;
+  const orbit = definition.visual.orbit;
+  if (orbit === undefined) return;
 
   context.save();
   context.strokeStyle = palette.outline;
   context.fillStyle = palette.outline;
   context.lineWidth = 1.2;
-  context.globalAlpha = 0.58;
-  context.rotate(age * 0.34);
-  context.beginPath();
-  context.ellipse(0, 0, radius * 1.42, radius * 0.52, 0.2, 0, Math.PI * 2);
-  context.stroke();
+  context.globalAlpha = 0.62;
+  context.rotate(age * 0.28);
 
-  for (let index = 0; index < 3; index += 1) {
-    const angle = (Math.PI * 2 * index) / 3 + age * 0.7;
+  if (orbit.includes("void")) {
     context.beginPath();
-    context.arc(
-      Math.cos(angle) * radius * 1.42,
-      Math.sin(angle) * radius * 0.52,
-      Math.max(1.8, radius * 0.06),
-      0,
-      Math.PI * 2,
-    );
+    context.ellipse(0, 0, radius * 1.5, radius * 0.58, 0, 0, Math.PI * 2);
+    context.stroke();
+    context.beginPath();
+    context.arc(radius * 1.48, 0, Math.max(2, radius * 0.075), 0, Math.PI * 2);
     context.fill();
+  } else {
+    const rings =
+      orbit.includes("rune") || orbit.includes("cosmic") ? 2 : 1;
+    for (let index = 0; index < rings; index += 1) {
+      context.save();
+      context.rotate(index * 0.75);
+      context.beginPath();
+      context.ellipse(
+        0,
+        0,
+        radius * (1.38 + index * 0.12),
+        radius * (0.48 + index * 0.08),
+        0.18,
+        0,
+        Math.PI * 2,
+      );
+      context.stroke();
+      context.restore();
+    }
+
+    const points =
+      orbit.includes("rainbow") ? 5 :
+        orbit.includes("cosmic") ? 4 :
+          orbit.includes("prism") ? 4 : 3;
+    for (let index = 0; index < points; index += 1) {
+      const angle = (Math.PI * 2 * index) / points + age * 0.72;
+      const x = Math.cos(angle) * radius * 1.4;
+      const y = Math.sin(angle) * radius * 0.52;
+      const size = Math.max(1.7, radius * 0.055);
+      if (orbit.includes("prism")) {
+        context.save();
+        context.translate(x, y);
+        context.rotate(angle);
+        context.fillRect(-size, -size, size * 2, size * 2);
+        context.restore();
+      } else {
+        context.beginPath();
+        context.arc(x, y, size, 0, Math.PI * 2);
+        context.fill();
+      }
+    }
   }
   context.restore();
 }
@@ -158,8 +243,7 @@ function drawWing(
   palette: EnemyVisualPalette,
 ): void {
   const flap = Math.sin(age * 7.4 + direction) * radius * 0.08;
-  const longWing =
-    wingId.includes("large") || wingId.includes("four");
+  const longWing = wingId.includes("large") || wingId.includes("four");
   const width = radius * (longWing ? 1.18 : 0.88);
   const height = radius * (longWing ? 0.68 : 0.52);
 
@@ -183,6 +267,36 @@ function drawWing(
     context.lineTo(width, -height * 0.1);
     context.lineTo(width * 0.6, height * 0.62);
     context.closePath();
+  } else if (wingId.includes("shadow")) {
+    context.moveTo(0, 0);
+    context.lineTo(width * 0.48, -height * 0.75);
+    context.lineTo(width * 0.72, -height * 0.16);
+    context.lineTo(width, -height * 0.38);
+    context.lineTo(width * 0.78, height * 0.58);
+    context.lineTo(width * 0.36, height * 0.22);
+    context.closePath();
+  } else if (wingId.includes("cosmic")) {
+    context.moveTo(0, 0);
+    context.quadraticCurveTo(width * 0.42, -height, width, -height * 0.5);
+    context.quadraticCurveTo(width * 0.86, 0, width * 0.58, height * 0.62);
+    context.quadraticCurveTo(width * 0.22, height * 0.22, 0, 0);
+  } else if (wingId.includes("petal")) {
+    context.moveTo(0, 0);
+    context.bezierCurveTo(
+      width * 0.34, -height,
+      width * 0.95, -height * 0.78,
+      width, -height * 0.08,
+    );
+    context.bezierCurveTo(
+      width * 0.78, height * 0.5,
+      width * 0.34, height * 0.48,
+      0, 0,
+    );
+  } else if (wingId.includes("fairy")) {
+    context.moveTo(0, 0);
+    context.quadraticCurveTo(width * 0.3, -height * 1.2, width, -height * 0.52);
+    context.quadraticCurveTo(width * 0.7, -height * 0.02, width * 0.88, height * 0.56);
+    context.quadraticCurveTo(width * 0.3, height * 0.48, 0, 0);
   } else {
     context.moveTo(0, 0);
     context.quadraticCurveTo(width * 0.5, -height, width, -height * 0.24);
@@ -215,66 +329,227 @@ function drawWings(
   }
 }
 
+function bodyPath(
+  context: CanvasRenderingContext2D,
+  definition: EnemyDefinition,
+  radius: number,
+): void {
+  const body = definition.visual.body;
+  context.beginPath();
+
+  if (body.includes("prism")) {
+    for (let index = 0; index < 8; index += 1) {
+      const angle = (Math.PI * 2 * index) / 8 - Math.PI / 2;
+      const scale = index % 2 === 0 ? 1 : 0.82;
+      const x = Math.cos(angle) * radius * scale;
+      const y = Math.sin(angle) * radius * 0.92 * scale;
+      if (index === 0) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    }
+    context.closePath();
+    return;
+  }
+
+  if (body.includes("shadow")) {
+    context.moveTo(0, -radius);
+    context.bezierCurveTo(
+      radius * 0.95, -radius * 0.6,
+      radius * 0.86, radius * 0.62,
+      radius * 0.18, radius * 0.84,
+    );
+    context.quadraticCurveTo(0, radius * 1.2, -radius * 0.18, radius * 0.84);
+    context.bezierCurveTo(
+      -radius * 0.86, radius * 0.62,
+      -radius * 0.95, -radius * 0.6,
+      0, -radius,
+    );
+    context.closePath();
+    return;
+  }
+
+  if (body.includes("nature")) {
+    const lobes = 8;
+    for (let index = 0; index < lobes; index += 1) {
+      const angle = (Math.PI * 2 * index) / lobes;
+      const x = Math.cos(angle) * radius * 0.22;
+      const y = Math.sin(angle) * radius * 0.2;
+      context.moveTo(x + radius * 0.78, y);
+      context.arc(x, y, radius * 0.78, 0, Math.PI * 2);
+    }
+    return;
+  }
+
+  context.ellipse(0, 0, radius, radius * 0.9, 0, 0, Math.PI * 2);
+}
+
 function drawBody(
   context: CanvasRenderingContext2D,
+  definition: EnemyDefinition,
   radius: number,
   palette: EnemyVisualPalette,
   flash: number,
   targeted: boolean,
+  glowScale: number,
 ): void {
-  const gradient = context.createRadialGradient(
-    -radius * 0.34,
-    -radius * 0.42,
-    radius * 0.08,
-    0,
-    0,
-    radius,
-  );
-  gradient.addColorStop(0, flash > 0 ? "#ffffff" : palette.bodyA);
-  gradient.addColorStop(0.68, palette.bodyB);
-  gradient.addColorStop(1, "rgba(14, 28, 55, 0.9)");
-
-  context.fillStyle = gradient;
+  const body = definition.visual.body;
+  context.save();
+  context.fillStyle = flash > 0 ? "#ffffff" : palette.bodyB;
   context.strokeStyle = targeted ? "#8ff8ff" : palette.outline;
   context.lineWidth = targeted ? 2.8 : 1.7;
-  context.shadowBlur = targeted ? 22 : 14;
+  context.shadowBlur = (targeted ? 18 : 10) * glowScale;
   context.shadowColor = targeted ? "#74f2ff" : palette.outline;
 
-  context.beginPath();
-  context.ellipse(0, 0, radius, radius * 0.9, 0, 0, Math.PI * 2);
+  bodyPath(context, definition, radius);
   context.fill();
   context.stroke();
 
-  context.save();
-  context.globalAlpha = 0.5;
+  context.globalAlpha = 0.4;
+  context.fillStyle = palette.bodyA;
+  context.beginPath();
+  context.ellipse(
+    -radius * 0.2,
+    -radius * 0.18,
+    radius * 0.62,
+    radius * 0.5,
+    -0.35,
+    0,
+    Math.PI * 2,
+  );
+  context.fill();
+
+  context.globalAlpha = 0.58;
   context.fillStyle = "#ffffff";
   context.beginPath();
   context.ellipse(
-    -radius * 0.3,
-    -radius * 0.38,
-    radius * 0.24,
-    radius * 0.12,
+    -radius * 0.32,
+    -radius * 0.4,
+    radius * 0.22,
+    radius * 0.1,
     -0.4,
     0,
     Math.PI * 2,
   );
   context.fill();
+
+  if (body.includes("frost") || body.includes("prism")) {
+    context.globalAlpha = 0.38;
+    context.strokeStyle = palette.bodyA;
+    context.lineWidth = 1;
+    for (const offset of [-0.42, 0.1, 0.48]) {
+      context.beginPath();
+      context.moveTo(radius * offset, -radius * 0.58);
+      context.lineTo(radius * (offset * 0.55), radius * 0.6);
+      context.stroke();
+    }
+  }
+
+  if (body.includes("cosmic")) {
+    context.globalAlpha = 0.78;
+    context.fillStyle = "#ffffff";
+    for (const [x, y, size] of [
+      [-0.42, -0.12, 0.045],
+      [0.28, -0.4, 0.035],
+      [0.46, 0.18, 0.04],
+      [-0.12, 0.44, 0.03],
+    ] as const) {
+      context.beginPath();
+      context.arc(radius * x, radius * y, Math.max(1, radius * size), 0, Math.PI * 2);
+      context.fill();
+    }
+  }
+
+  if (body.includes("boss")) {
+    context.globalAlpha = 0.55;
+    context.strokeStyle = palette.outline;
+    context.lineWidth = 1.3;
+    context.beginPath();
+    context.arc(0, 0, radius * 0.64, 0, Math.PI * 2);
+    context.stroke();
+  }
+
   context.restore();
 }
 
 function drawFace(
   context: CanvasRenderingContext2D,
+  definition: EnemyDefinition,
   radius: number,
   palette: EnemyVisualPalette,
+  glowScale: number,
 ): void {
+  const face = definition.visual.face;
+  const eyeY = radius * 0.12;
   context.save();
   context.fillStyle = palette.eye;
-  const eyeY = radius * 0.12;
-  for (const eyeX of [-radius * 0.24, radius * 0.24]) {
-    context.beginPath();
-    context.arc(eyeX, eyeY, Math.max(1.8, radius * 0.075), 0, Math.PI * 2);
-    context.fill();
+  context.strokeStyle = palette.eye;
+  context.lineWidth = Math.max(1.6, radius * 0.06);
+
+  if (face === "cute-fierce") {
+    for (const direction of [-1, 1] as const) {
+      context.beginPath();
+      context.moveTo(direction * radius * 0.36, eyeY - radius * 0.08);
+      context.lineTo(direction * radius * 0.14, eyeY + radius * 0.04);
+      context.stroke();
+    }
+  } else if (face === "star-eyes") {
+    context.shadowBlur = 8 * glowScale;
+    context.shadowColor = palette.eye;
+    for (const eyeX of [-radius * 0.24, radius * 0.24]) {
+      context.save();
+      context.translate(eyeX, eyeY);
+      context.rotate(Math.PI / 4);
+      const size = Math.max(2, radius * 0.08);
+      context.fillRect(-size, -size, size * 2, size * 2);
+      context.restore();
+    }
+  } else {
+    if (face === "bright-eyes") {
+      context.shadowBlur = 10 * glowScale;
+      context.shadowColor = palette.eye;
+    }
+    for (const eyeX of [-radius * 0.24, radius * 0.24]) {
+      context.beginPath();
+      context.ellipse(
+        eyeX,
+        eyeY,
+        Math.max(1.8, radius * 0.075),
+        face === "bright-eyes" ? Math.max(3, radius * 0.12) : Math.max(1.8, radius * 0.075),
+        0,
+        0,
+        Math.PI * 2,
+      );
+      context.fill();
+    }
   }
+  context.restore();
+}
+
+function drawSide(
+  context: CanvasRenderingContext2D,
+  definition: EnemyDefinition,
+  radius: number,
+  age: number,
+  palette: EnemyVisualPalette,
+): void {
+  if (definition.visual.side !== "ember-tail") return;
+
+  context.save();
+  context.strokeStyle = palette.outline;
+  context.lineWidth = Math.max(2, radius * 0.08);
+  context.lineCap = "round";
+  context.beginPath();
+  context.moveTo(radius * 0.7, radius * 0.28);
+  context.quadraticCurveTo(
+    radius * 1.45,
+    radius * (0.38 + Math.sin(age * 5) * 0.08),
+    radius * 1.18,
+    radius * 0.92,
+  );
+  context.stroke();
+  context.fillStyle = palette.bodyA;
+  context.beginPath();
+  context.arc(radius * 1.18, radius * 0.92, Math.max(2, radius * 0.12), 0, Math.PI * 2);
+  context.fill();
   context.restore();
 }
 
@@ -284,6 +559,7 @@ function drawHead(
   radius: number,
   age: number,
   palette: EnemyVisualPalette,
+  glowScale: number,
 ): void {
   const head = definition.visual.head;
   if (head === undefined) return;
@@ -293,7 +569,7 @@ function drawHead(
     context.save();
     context.strokeStyle = palette.outline;
     context.lineWidth = 1.5;
-    context.shadowBlur = 10;
+    context.shadowBlur = 8 * glowScale;
     context.shadowColor = palette.outline;
     for (let index = 0; index < count; index += 1) {
       context.beginPath();
@@ -312,23 +588,30 @@ function drawHead(
     return;
   }
 
-  if (head.includes("prism") || head.includes("void-eye")) {
+  if (head.includes("void-eye")) {
+    context.save();
+    context.strokeStyle = palette.outline;
+    context.fillStyle = palette.eye;
+    context.lineWidth = 1.7;
+    context.shadowBlur = 7 * glowScale;
+    context.shadowColor = palette.outline;
+    context.beginPath();
+    context.ellipse(0, -radius * 0.94, radius * 0.5, radius * 0.2, 0, 0, Math.PI * 2);
+    context.stroke();
+    context.beginPath();
+    context.arc(0, -radius * 0.94, Math.max(2, radius * 0.08), 0, Math.PI * 2);
+    context.fill();
+    context.restore();
+    return;
+  }
+
+  if (head.includes("prism-ring")) {
     context.save();
     context.strokeStyle = palette.outline;
     context.lineWidth = 1.7;
-    context.shadowBlur = 8;
-    context.shadowColor = palette.outline;
     context.rotate(Math.sin(age * 0.8) * 0.08);
     context.beginPath();
-    context.ellipse(
-      0,
-      -radius * 0.92,
-      radius * 0.46,
-      radius * 0.18,
-      0,
-      0,
-      Math.PI * 2,
-    );
+    context.ellipse(0, -radius * 0.92, radius * 0.46, radius * 0.18, 0, 0, Math.PI * 2);
     context.stroke();
     context.restore();
     return;
@@ -349,6 +632,21 @@ function drawHead(
     return;
   }
 
+  if (head.includes("prism-crown")) {
+    context.save();
+    context.fillStyle = palette.outline;
+    for (const x of [-0.35, 0, 0.35]) {
+      context.beginPath();
+      context.moveTo(radius * x - radius * 0.13, -radius * 0.7);
+      context.lineTo(radius * x, -radius * 1.25);
+      context.lineTo(radius * x + radius * 0.13, -radius * 0.7);
+      context.closePath();
+      context.fill();
+    }
+    context.restore();
+    return;
+  }
+
   if (
     head.includes("leaf") ||
     head.includes("flower") ||
@@ -356,7 +654,7 @@ function drawHead(
   ) {
     context.save();
     context.fillStyle = palette.outline;
-    const count = head.includes("flower") ? 5 : 3;
+    const count = head.includes("flower") ? 5 : head.includes("star") ? 5 : 3;
     for (let index = 0; index < count; index += 1) {
       const angle =
         -Math.PI / 2 +
@@ -399,13 +697,14 @@ function drawHead(
   }
 }
 
-function rewardGlyph(marker: string): string {
+export function rewardGlyph(marker: string): string {
   if (marker === "heart") return "♥";
   if (marker === "shield" || marker === "shield-star") return "◆";
   if (marker === "snowflake") return "❄";
   if (marker === "sword") return "↑";
   if (marker === "burst" || marker === "nova") return "✹";
-  if (marker.includes("x2")) return "×2";
+  if (marker === "star-x2") return "★2";
+  if (marker === "coin-x2") return "C2";
   if (marker.includes("clock")) return "◷";
   if (marker === "energy" || marker === "power" || marker === "lightning") {
     return "ϟ";
@@ -426,7 +725,7 @@ function drawRewardMarker(
 
   context.save();
   context.globalCompositeOperation = "source-over";
-  context.fillStyle = "rgba(3, 10, 22, 0.92)";
+  context.fillStyle = "rgba(3, 10, 22, 0.94)";
   context.strokeStyle = palette.outline;
   context.lineWidth = 1.4;
   context.beginPath();
@@ -435,7 +734,7 @@ function drawRewardMarker(
   context.stroke();
   context.fillStyle = "#ffffff";
   context.font =
-    "800 " + String(Math.max(9, Math.round(size * 1.15))) +
+    "800 " + String(Math.max(8, Math.round(size * 0.95))) +
     "px ui-monospace, SFMono-Regular, Menlo, monospace";
   context.textAlign = "center";
   context.textBaseline = "middle";
@@ -452,21 +751,29 @@ export function drawModularEnemy(
 
   const radius = Math.max(8, input.radius);
   const palette = enemyVisualPalette(definition.family);
+  const glowScale = Math.max(0, input.glowScale ?? 1);
 
   context.save();
   context.globalCompositeOperation = "lighter";
-  drawAura(context, radius, input.age, palette);
+  drawAura(context, definition, radius, input.age, palette, glowScale);
   drawOrbit(context, definition, radius, input.age, palette);
+  context.restore();
+
+  context.save();
+  context.globalCompositeOperation = "source-over";
+  drawSide(context, definition, radius, input.age, palette);
   drawWings(context, definition, radius, input.age, palette);
   drawBody(
     context,
+    definition,
     radius,
     palette,
     input.flash,
     input.targeted,
+    glowScale,
   );
-  drawFace(context, radius, palette);
-  drawHead(context, definition, radius, input.age, palette);
+  drawFace(context, definition, radius, palette, glowScale);
+  drawHead(context, definition, radius, input.age, palette, glowScale);
   context.restore();
 
   if (definition.visual.rewardMarker !== undefined) {
