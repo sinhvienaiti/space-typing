@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createDefaultCampaignProgress } from "../src/campaign/progress";
 import { createCampaignExpansionState } from "../src/campaign/expansion-state";
 import { createRouteState } from "../src/campaign/route";
+import { createHiddenChallengeState } from "../src/campaign/hidden-challenge";
 import { createHiddenDiscoveryState } from "../src/discovery/hidden-content";
 import { createStarterEquipmentState } from "../src/equipment/loadout";
 import { createExpansionCurrencyState } from "../src/economy/currencies";
@@ -66,6 +67,7 @@ function runState(): RunPersistentState {
     expansionCurrencies: createExpansionCurrencyState(),
     shops: createShopState(),
     route: createRouteState(1),
+    challenge: createHiddenChallengeState(),
   };
 }
 
