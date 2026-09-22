@@ -3406,12 +3406,30 @@ export class Game {
       this.hooks.onWordComplete(boss.entry);
       this.applyCharacterWordCompletePassive(word.length);
 
+      const perfectWord = !boss.wordMissed;
+      const mechanicResult =
+        boss.typingMechanic === undefined
+          ? null
+          : resolveBossWordMechanic(
+              boss.typingMechanic,
+              perfectWord,
+            );
+      if (mechanicResult !== null) {
+        boss.typingMechanic = mechanicResult.state;
+      }
+
       if (boss.shieldActive) {
-        boss.shieldActive = false;
-        this.sfx.bossShieldBreak();
-        const { x, y } = this.bossPosition();
-        this.burst(x, y, 36, 176);
+        const shieldBroken =
+          mechanicResult?.shieldBroken ?? true;
+        if (shieldBroken) {
+          boss.shieldActive = false;
+          this.sfx.bossShieldBreak();
+          const { x, y } = this.bossPosition();
+          this.burst(x, y, 36, 176);
+        }
       } else {
+        const mechanicDamage =
+          mechanicResult?.damageMultiplier ?? 1;
         boss.hp = Math.max(
           0,
           boss.hp -
@@ -3419,17 +3437,19 @@ export class Game {
               bossWordDamage(boss.maxHp, boss.role),
               this.playerStats,
             ) *
+              mechanicDamage *
               markedBossDamageMultiplier(this.bossMarkTimer > 0) *
-            this.characterBossDamageMultiplier(),
+              this.characterBossDamageMultiplier(),
         );
       }
 
-      const perfectWord = !boss.wordMissed;
       this.sfx.wordComplete(perfectWord);
       this.applyCharacterPerfectWordPassive(perfectWord);
       boss.wordsCompleted += 1;
       boss.typed = 0;
-      boss.entry = this.pickBossEntry();
+      boss.entry = this.pickBossEntry(
+        boss.typingMechanic,
+      );
       boss.flash = 1;
       boss.kick = 1.5;
       boss.wordMissed = false;
@@ -3439,8 +3459,14 @@ export class Game {
       );
       this.gainPower(perfectWord ? 11 : 8);
 
-      if (perfectWord) {
-        boss.staggerTimer = Math.max(boss.staggerTimer, 1.05);
+      const staggerSeconds =
+        mechanicResult?.staggerSeconds ??
+        (perfectWord ? 1.05 : 0);
+      if (staggerSeconds > 0) {
+        boss.staggerTimer = Math.max(
+          boss.staggerTimer,
+          staggerSeconds,
+        );
         this.sfx.bossStagger();
       }
 
@@ -3470,13 +3496,6 @@ export class Game {
 
     boss.phase = nextPhase;
     boss.flash = 1;
-    boss.actionCooldown =
-      bossActionInterval(boss.role, boss.phase) /
-      Math.max(0.75, this.difficulty?.bossPressure ?? 1);
-
-    if (boss.phase === 2) {
-      boss.shieldActive = true;
-    }
 
     const { x, y } = this.bossPosition();
     const definition = enemyDefinition(
@@ -3487,6 +3506,33 @@ export class Game {
         boss.role,
       ),
     );
+    if (this.difficulty !== null) {
+      boss.typingMechanic =
+        createBossTypingMechanicState(
+          definition?.family ?? "devil",
+          boss.role,
+          boss.phase,
+          this.difficulty,
+        );
+      boss.shieldActive =
+        boss.typingMechanic.id === "shield-sequence" &&
+        boss.typingMechanic.active;
+    } else {
+      boss.shieldActive = false;
+    }
+    boss.entry = this.pickBossEntry(
+      boss.typingMechanic,
+    );
+    boss.typed = 0;
+    boss.wordMissed = false;
+    boss.actionCooldown =
+      (bossActionInterval(boss.role, boss.phase) *
+        (boss.typingMechanic === undefined
+          ? 1
+          : bossActionIntervalMultiplier(
+              boss.typingMechanic,
+            ))) /
+      Math.max(0.75, this.difficulty?.bossPressure ?? 1);
     const fx = enemyFxProfile(
       definition?.family ?? "devil",
       "boss-phase",
