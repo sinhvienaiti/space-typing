@@ -56,15 +56,15 @@ export function sanitizeRelicState(value: unknown): RelicState {
     equipped?: unknown;
   };
 
-  const owned = Array.isArray(raw.owned)
-    ? RELIC_IDS.filter((id) => raw.owned!.includes(id))
-    : [];
+  const rawOwned = Array.isArray(raw.owned) ? raw.owned : [];
+  const owned = RELIC_IDS.filter((id) => rawOwned.includes(id));
   const ownedSet = new Set<RelicId>(owned);
-  const equipped = Array.isArray(raw.equipped)
-    ? RELIC_IDS.filter(
-        (id) => raw.equipped!.includes(id) && ownedSet.has(id),
-      ).slice(0, MAX_EQUIPPED_RELICS)
+  const rawEquipped = Array.isArray(raw.equipped)
+    ? raw.equipped
     : [];
+  const equipped = RELIC_IDS.filter(
+    (id) => rawEquipped.includes(id) && ownedSet.has(id),
+  ).slice(0, MAX_EQUIPPED_RELICS);
 
   return {
     version: 1,
