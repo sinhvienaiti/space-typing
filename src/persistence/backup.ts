@@ -63,6 +63,10 @@ import {
   isValidCheckpointSnapshot,
   type CheckpointSnapshot,
 } from "./checkpoint";
+import {
+  isValidCrashRecoverySnapshot,
+  type CrashRecoverySnapshot,
+} from "./crash-recovery";
 
 export type BackupParseResult =
   | {
@@ -164,6 +168,7 @@ export function exportPlayerSaveJson(
   campaignExpansion: CampaignExpansionState =
     createCampaignExpansionState(campaign, updatedAt),
   checkpointSnapshot?: CheckpointSnapshot,
+  crashRecoverySnapshot: CrashRecoverySnapshot | null = null,
 ): string {
   return JSON.stringify(
     createPlayerSave(
@@ -181,6 +186,7 @@ export function exportPlayerSaveJson(
       expansionCurrencies,
       campaignExpansion,
       checkpointSnapshot,
+      crashRecoverySnapshot,
     ),
     null,
     2,
@@ -223,6 +229,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     version !== 13 &&
     version !== 14 &&
     version !== 15 &&
+    version !== 16 &&
     version !== PLAYER_SAVE_VERSION
   ) {
     return {
@@ -255,6 +262,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 13 ||
       version === 14 ||
       version === 15 ||
+      version === 16 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidInventory(parsed.inventory)
   ) {
@@ -295,6 +303,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 13 ||
       version === 14 ||
       version === 15 ||
+      version === 16 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidEquipmentState(parsed.equipment)
   ) {
@@ -314,6 +323,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 13 ||
       version === 14 ||
       version === 15 ||
+      version === 16 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidSupportSpellState(parsed.supportSpells)
   ) {
@@ -350,6 +360,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 13 ||
       version === 14 ||
       version === 15 ||
+      version === 16 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidCharacterState(parsed.characters)
   ) {
@@ -365,6 +376,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 13 ||
       version === 14 ||
       version === 15 ||
+      version === 16 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidLuckPityState(parsed.luckPity)
   ) {
@@ -379,6 +391,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 13 ||
       version === 14 ||
       version === 15 ||
+      version === 16 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidHiddenDiscoveryState(parsed.hiddenDiscovery)
   ) {
@@ -393,6 +406,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     (version === 13 ||
       version === 14 ||
       version === 15 ||
+      version === 16 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidCredits(parsed.credits)
   ) {
@@ -405,6 +419,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   if (
     (version === 14 ||
       version === 15 ||
+      version === 16 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidProgressionState(parsed.progression)
   ) {
@@ -415,7 +430,9 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    (version === 15 || version === PLAYER_SAVE_VERSION) &&
+    (version === 15 ||
+      version === 16 ||
+      version === PLAYER_SAVE_VERSION) &&
     !isValidExpansionCurrencyState(parsed.expansionCurrencies)
   ) {
     return {
@@ -426,7 +443,9 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    (version === 15 || version === PLAYER_SAVE_VERSION) &&
+    (version === 15 ||
+      version === 16 ||
+      version === PLAYER_SAVE_VERSION) &&
     !isValidCampaignExpansionState(parsed.campaignExpansion)
   ) {
     return {
@@ -436,12 +455,23 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    version === PLAYER_SAVE_VERSION &&
+    (version === 16 || version === PLAYER_SAVE_VERSION) &&
     !isValidCheckpointSnapshot(parsed.checkpointSnapshot)
   ) {
     return {
       ok: false,
       error: "Committed checkpoint snapshot is invalid.",
+    };
+  }
+
+  if (
+    version === PLAYER_SAVE_VERSION &&
+    parsed.crashRecoverySnapshot !== null &&
+    !isValidCrashRecoverySnapshot(parsed.crashRecoverySnapshot)
+  ) {
+    return {
+      ok: false,
+      error: "Crash recovery snapshot is invalid.",
     };
   }
 
