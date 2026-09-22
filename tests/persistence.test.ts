@@ -519,6 +519,29 @@ describe("player save persistence model", () => {
     });
   });
 
+  it("migrates PlayerSave v20 to deterministic route state without losing shops", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const checkpointSnapshot = {
+      ...current.checkpointSnapshot,
+    } as Record<string, unknown>;
+    delete checkpointSnapshot.route;
+
+    const legacy = {
+      ...current,
+      version: 20,
+      checkpointSnapshot,
+    } as Record<string, unknown>;
+    delete legacy.route;
+
+    const migration = migratePlayerSave(legacy);
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(20);
+    expect(migration.save.route.version).toBe(1);
+    expect(migration.save.route.graph.sectorStart).toBe(1);
+    expect(migration.save.checkpointSnapshot.route.graph.sectorStart).toBe(1);
+    expect(migration.save.shops).toEqual(current.shops);
+  });
+
   it("keeps a valid current-version save without migration", () => {
     const save = createPlayerSave(
       createDefaultCampaignProgress(),

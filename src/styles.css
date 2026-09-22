@@ -1723,3 +1723,120 @@ kbd {
   text-transform: uppercase;
   pointer-events: none;
 }
+
+
+.route-dialog {
+  width: min(980px, calc(100vw - 32px));
+}
+
+.route-map {
+  display: grid;
+  gap: 10px;
+  max-height: min(50vh, 520px);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.route-step {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.route-step-current {
+  border-color: rgba(86, 217, 239, 0.32);
+  background: rgba(86, 217, 239, 0.055);
+}
+
+.route-stage-label {
+  color: #8da4b7;
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+}
+
+.route-node-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.route-node {
+  min-height: 58px;
+  display: grid;
+  gap: 3px;
+  justify-items: start;
+  text-align: left;
+  padding: 10px 12px;
+}
+
+.route-node strong {
+  font-size: 0.82rem;
+}
+
+.route-node small {
+  color: #6f8498;
+  font-size: 0.66rem;
+}
+
+.route-node.selected {
+  border-color: rgba(118, 234, 251, 0.65);
+  box-shadow: inset 0 0 0 1px rgba(118, 234, 251, 0.18);
+}
+
+.route-node.visited::after {
+  content: "LOCKED";
+  color: #56d9ef;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.route-node-shop {
+  background: rgba(111, 190, 255, 0.06);
+}
+
+.route-node-station {
+  background: rgba(125, 255, 194, 0.055);
+}
+
+.route-node-combat {
+  background: rgba(255, 125, 153, 0.045);
+}
+
+.route-selected-panel {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(86, 217, 239, 0.16);
+  border-radius: 12px;
+  background: rgba(86, 217, 239, 0.035);
+}
+
+.route-selected-panel > span {
+  color: #8da4b7;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.route-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+@media (max-width: 680px) {
+  .route-step {
+    grid-template-columns: 1fr;
+  }
+
+  .route-node-row {
+    grid-template-columns: 1fr;
+  }
+}

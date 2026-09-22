@@ -56,6 +56,12 @@ import {
   sanitizeShopState,
   type ShopState,
 } from "../shops/state";
+import {
+  createRouteState,
+  isValidRouteState,
+  sanitizeRouteState,
+  type RouteState,
+} from "../campaign/route";
 
 export type RunPersistentState = {
   campaign: CampaignProgress;
@@ -69,6 +75,7 @@ export type RunPersistentState = {
   progression: ProgressionState;
   expansionCurrencies: ExpansionCurrencyState;
   shops: ShopState;
+  route: RouteState;
 };
 
 export type CheckpointSnapshot = RunPersistentState;
@@ -100,9 +107,17 @@ export function createCheckpointSnapshot(
   checkpointStage: number,
 ): CheckpointSnapshot {
   const safe = sanitizeRunPersistentState(input);
+  const campaign = campaignAtCheckpoint(
+    safe.campaign,
+    checkpointStage,
+  );
   return {
     ...safe,
-    campaign: campaignAtCheckpoint(safe.campaign, checkpointStage),
+    campaign,
+    route: sanitizeRouteState(
+      safe.route,
+      campaign.highestUnlockedStage,
+    ),
   };
 }
 
@@ -190,10 +205,14 @@ function isValidCampaignSnapshot(value: unknown): value is CampaignProgress {
   return true;
 }
 
-function isValidLegacyRunPersistentStateWithoutShops(
+function isValidLegacyRunPersistentStateWithoutRoute(
   value: unknown,
-): value is Omit<RunPersistentState, "shops"> {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+): boolean {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    Array.isArray(value)
+  ) {
     return false;
   }
 
@@ -209,25 +228,30 @@ function isValidLegacyRunPersistentStateWithoutShops(
     isValidHiddenDiscoveryState(raw.hiddenDiscovery) &&
     isValidCredits(raw.credits) &&
     isValidProgressionState(raw.progression) &&
-    isValidExpansionCurrencyState(raw.expansionCurrencies)
+    isValidExpansionCurrencyState(raw.expansionCurrencies) &&
+    (raw.shops === undefined || isValidShopState(raw.shops))
   );
 }
 
 export function migrateLegacyRunPersistentState(
   value: unknown,
 ): RunPersistentState | null {
-  if (!isValidLegacyRunPersistentStateWithoutShops(value)) return null;
-  const raw = value as Omit<RunPersistentState, "shops"> & {
-    shops?: unknown;
-  };
+  if (!isValidLegacyRunPersistentStateWithoutRoute(value)) {
+    return null;
+  }
+
+  const raw = value as Record<string, unknown>;
+  const campaign = sanitizeCampaignProgress(raw.campaign);
   return {
-    campaign: sanitizeCampaignProgress(raw.campaign),
+    campaign,
     inventory: sanitizeInventory(raw.inventory),
     equipment: sanitizeEquipmentState(raw.equipment),
     supportSpells: sanitizeSupportSpellState(raw.supportSpells),
     characters: sanitizeCharacterState(raw.characters),
     luckPity: sanitizeLuckPityState(raw.luckPity),
-    hiddenDiscovery: sanitizeHiddenDiscoveryState(raw.hiddenDiscovery),
+    hiddenDiscovery: sanitizeHiddenDiscoveryState(
+      raw.hiddenDiscovery,
+    ),
     credits: sanitizeCredits(raw.credits),
     progression: sanitizeProgressionState(raw.progression),
     expansionCurrencies:
@@ -235,6 +259,7 @@ export function migrateLegacyRunPersistentState(
     shops: isValidShopState(raw.shops)
       ? sanitizeShopState(raw.shops)
       : createShopState(),
+    route: createRouteState(campaign.highestUnlockedStage),
   };
 }
 
@@ -257,7 +282,11 @@ export function isValidRunPersistentState(
     isValidCredits(raw.credits) &&
     isValidProgressionState(raw.progression) &&
     isValidExpansionCurrencyState(raw.expansionCurrencies) &&
-    isValidShopState(raw.shops)
+    isValidShopState(raw.shops) &&
+    isValidRouteState(
+      raw.route,
+      (raw.campaign as CampaignProgress).highestUnlockedStage,
+    )
   );
 }
 
@@ -276,8 +305,9 @@ export function isValidCrashRecoverySnapshot(
 export function sanitizeRunPersistentState(
   value: RunPersistentState,
 ): RunPersistentState {
+  const campaign = sanitizeCampaignProgress(value.campaign);
   return {
-    campaign: sanitizeCampaignProgress(value.campaign),
+    campaign,
     inventory: sanitizeInventory(value.inventory),
     equipment: sanitizeEquipmentState(value.equipment),
     supportSpells: sanitizeSupportSpellState(value.supportSpells),
@@ -290,6 +320,10 @@ export function sanitizeRunPersistentState(
     expansionCurrencies:
       sanitizeExpansionCurrencyState(value.expansionCurrencies),
     shops: sanitizeShopState(value.shops),
+    route: sanitizeRouteState(
+      value.route,
+      campaign.highestUnlockedStage,
+    ),
   };
 }
 
@@ -398,5 +432,9 @@ export function restoreCheckpointSnapshot(
       ...committed.expansionCurrencies,
     },
     shops: sanitizeShopState(committed.shops),
+    route: sanitizeRouteState(
+      committed.route,
+      committed.campaign.highestUnlockedStage,
+    ),
   };
 }

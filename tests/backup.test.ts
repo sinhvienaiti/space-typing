@@ -7,7 +7,10 @@ import {
   createDefaultCampaignProgress,
   recordStageClear,
 } from "../src/campaign/progress";
-import { PLAYER_SAVE_VERSION } from "../src/persistence/player-save";
+import {
+  createPlayerSave,
+  PLAYER_SAVE_VERSION,
+} from "../src/persistence/player-save";
 
 const GRADE_TO_LEGACY_RARITY = {
   aluminum: "common",
@@ -187,8 +190,33 @@ describe("save backup", () => {
     );
     expect(unsupported).toEqual({
       ok: false,
-      error: "Unsupported save version. Supported versions: 1-20.",
+      error:
+        "Unsupported save version. Supported versions: 1-" +
+        String(PLAYER_SAVE_VERSION) +
+        ".",
     });
+  });
+
+  it("accepts and migrates a valid PlayerSave v20 backup without route data", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const checkpointSnapshot = {
+      ...current.checkpointSnapshot,
+    } as Record<string, unknown>;
+    delete checkpointSnapshot.route;
+    const legacy = {
+      ...current,
+      version: 20,
+      checkpointSnapshot,
+    } as Record<string, unknown>;
+    delete legacy.route;
+
+    const result = parsePlayerSaveJson(JSON.stringify(legacy));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.migrated).toBe(true);
+    expect(result.save.version).toBe(PLAYER_SAVE_VERSION);
+    expect(result.save.route.graph.sectorStart).toBe(1);
   });
 
   it("rejects out-of-range Campaign data instead of silently clamping it", () => {

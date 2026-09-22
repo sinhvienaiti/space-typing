@@ -37,6 +37,18 @@ import {
   STAGES_PER_GALAXY,
 } from "./campaign/stage";
 import {
+  createRouteState,
+  routeChoicesForStage,
+  routeNeedsChoice,
+  routeNodeLabel,
+  routeProgress,
+  selectRouteNode,
+  selectedRouteNode,
+  syncRouteStateForStage,
+  type RouteNode,
+  type RouteState,
+} from "./campaign/route";
+import {
   CHARACTER_IDS,
   getCharacter,
 } from "./characters/registry";
@@ -503,6 +515,7 @@ app.innerHTML = `
         </p>
         <div class="actions">
           <button id="startButton" class="primary">Continue · Stage 001</button>
+          <button id="routeButton">Route Map</button>
           <button id="stageSelectButton">Stage Select</button>
           <button id="vocabularyButton">Vocabulary</button>
           <button id="characterButton">Characters</button>
@@ -616,6 +629,31 @@ app.innerHTML = `
         <span id="campaignMeta"></span>
       </div>
       <div id="stageGrid" class="stage-grid"></div>
+    </dialog>
+
+    <dialog id="routeDialog" class="settings-dialog route-dialog">
+      <form method="dialog" class="dialog-head">
+        <div>
+          <p class="eyebrow">sector navigation</p>
+          <h2 id="routeTitle">Route Map</h2>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+      <p id="routeMeta" class="equipment-note">
+        Choose one route for the next Campaign encounter.
+      </p>
+      <div id="routeMap" class="route-map"></div>
+      <div id="routeSelectedPanel" class="route-selected-panel hidden">
+        <strong id="routeSelectedTitle">Combat</strong>
+        <span id="routeSelectedMeta"></span>
+        <div class="route-actions">
+          <button id="routeShopAction" class="hidden">Open Shop</button>
+          <button id="routeStationShopAction" class="hidden">Station Shop</button>
+          <button id="routeServiceAction" class="hidden">Repair / Upgrade</button>
+          <button id="routeSupportAction" class="hidden">Support Loadout</button>
+          <button id="routeContinueButton" class="primary">Start Encounter</button>
+        </div>
+      </div>
     </dialog>
 
     <dialog id="characterDialog" class="settings-dialog character-dialog">
@@ -1086,6 +1124,7 @@ let progression: ProgressionState = createProgressionState();
 let expansionCurrencies: ExpansionCurrencyState =
   createExpansionCurrencyState();
 let shops: ShopState = createShopState();
+let route: RouteState = createRouteState(campaign.highestUnlockedStage);
 const musicController = new MusicController();
 musicController.setMusicVolume(settings.musicVolume);
 musicController.setAmbientVolume(settings.ambientVolume);
@@ -1109,6 +1148,7 @@ let checkpointSnapshot: CheckpointSnapshot =
       progression,
       expansionCurrencies,
       shops,
+      route,
     },
     campaignExpansion.checkpoint.stage,
   );
@@ -1142,6 +1182,7 @@ const stageClearOverlay = byId("stageClearOverlay");
 const settingsDialog = byId<HTMLDialogElement>("settingsDialog");
 const vocabularyDialog = byId<HTMLDialogElement>("vocabularyDialog");
 const stageSelectDialog = byId<HTMLDialogElement>("stageSelectDialog");
+const routeDialog = byId<HTMLDialogElement>("routeDialog");
 const dataDialog = byId<HTMLDialogElement>("dataDialog");
 const equipmentDialog = byId<HTMLDialogElement>("equipmentDialog");
 const shopDialog = byId<HTMLDialogElement>("shopDialog");
@@ -1171,7 +1212,13 @@ for (const dialog of [
   specialShopDialog,
 ]) {
   dialog.addEventListener("close", () => {
-    if (game.getPhase() === "title") restoreTitleMusic();
+    const phase = game.getPhase();
+    if (phase === "title") {
+      restoreTitleMusic();
+    } else if (phase === "stageclear") {
+      musicController.transitionTo("VICTORY", 0.35);
+      musicController.setPaused(false);
+    }
   });
 }
 
@@ -1187,6 +1234,7 @@ type AutosaveSnapshot = {
   progression: ProgressionState;
   expansionCurrencies: ExpansionCurrencyState;
   shops: ShopState;
+  route: RouteState;
   campaignExpansion: CampaignExpansionState;
   checkpointSnapshot: CheckpointSnapshot;
   crashRecoverySnapshot: CrashRecoverySnapshot | null;
@@ -1214,6 +1262,7 @@ const campaignAutosave = new AutosaveQueue<
     snapshot.crashRecoverySnapshot,
     snapshot.stageEntrySnapshot,
     snapshot.shops,
+    snapshot.route,
   ),
 );
 
@@ -1230,6 +1279,7 @@ function currentRunPersistentState(): RunPersistentState {
     progression,
     expansionCurrencies,
     shops,
+    route,
   };
 }
 
@@ -1245,6 +1295,7 @@ function applyRunPersistentState(state: RunPersistentState): void {
   progression = state.progression;
   expansionCurrencies = state.expansionCurrencies;
   shops = state.shops;
+  route = state.route;
 }
 
 function currentAutosaveSnapshot(): AutosaveSnapshot {
@@ -1260,6 +1311,7 @@ function currentAutosaveSnapshot(): AutosaveSnapshot {
     progression,
     expansionCurrencies,
     shops,
+    route,
     campaignExpansion,
     checkpointSnapshot,
     crashRecoverySnapshot,
@@ -1305,6 +1357,7 @@ function persistRecoveryMirrorSync(
       crashRecoverySnapshot,
       stageEntrySnapshot,
       shops,
+      route,
     ),
   );
 }
@@ -2279,6 +2332,10 @@ const game = new Game(
         wpm,
         clearedAt,
       });
+      route = syncRouteStateForStage(
+        route,
+        campaign.highestUnlockedStage,
+      );
 
       const characterUnlock = unlockCharactersForStage(
         characters,
@@ -2706,8 +2763,13 @@ function renderSupportLoadout(): void {
   }
 }
 
+function canOpenBetweenStageMenu(): boolean {
+  const phase = game.getPhase();
+  return phase === "title" || phase === "stageclear";
+}
+
 function openSupportSpells(): void {
-  if (!persistenceReady || game.getPhase() !== "title") return;
+  if (!persistenceReady || !canOpenBetweenStageMenu()) return;
   renderSupportLoadout();
   supportDialog.showModal();
 }
@@ -3153,7 +3215,7 @@ function renderNormalShop(): void {
 }
 
 function openNormalShop(): void {
-  if (!persistenceReady || game.getPhase() !== "title") return;
+  if (!persistenceReady || !canOpenBetweenStageMenu()) return;
   enterShopMusic("normal");
   renderNormalShop();
   shopDialog.showModal();
@@ -3328,7 +3390,7 @@ function renderServiceShop(): void {
 }
 
 function openServiceShop(): void {
-  if (!persistenceReady || game.getPhase() !== "title") return;
+  if (!persistenceReady || !canOpenBetweenStageMenu()) return;
   enterShopMusic("service");
   renderServiceShop();
   serviceShopDialog.showModal();
@@ -3433,7 +3495,7 @@ function renderSpecialShop(): void {
 function openSpecialShop(kind: ShopType): void {
   if (
     !persistenceReady ||
-    game.getPhase() !== "title" ||
+    !canOpenBetweenStageMenu() ||
     kind === "normal" ||
     kind === "service" ||
     !shopAvailable(kind, currentShopContext())
@@ -3503,8 +3565,225 @@ async function prepareStageVocabulary(
   }
 }
 
+function routeTargetStage(): number {
+  return campaign.highestUnlockedStage;
+}
+
+function routeNodeDescription(node: RouteNode): string {
+  if (node.type === "station") {
+    return "Maintenance stop · Station Shop, Repair / Upgrade, and Support Loadout are available before the encounter.";
+  }
+  if (node.type === "shop") {
+    return "Supply detour · finite deterministic shop stock is available before the encounter.";
+  }
+  return node.mandatory
+    ? "Mandatory combat route · boss progression cannot be bypassed."
+    : "Direct combat route · no service detour before the encounter.";
+}
+
+function renderRouteMap(): void {
+  const targetStage = routeTargetStage();
+  route = syncRouteStateForStage(route, targetStage);
+
+  const progress = routeProgress(route);
+  byId("routeTitle").textContent =
+    "Sector " +
+    String(route.graph.sectorStart).padStart(3, "0") +
+    "-" +
+    String(route.graph.sectorEnd).padStart(3, "0");
+  byId("routeMeta").textContent =
+    "Stage " +
+    String(targetStage).padStart(3, "0") +
+    " frontier · seed " +
+    String(route.graph.seed) +
+    " · " +
+    String(progress.chosen) +
+    " / " +
+    String(progress.total) +
+    " branch choices locked";
+
+  const map = byId("routeMap");
+  map.replaceChildren();
+
+  for (const step of route.graph.steps) {
+    const row = document.createElement("section");
+    row.className =
+      "route-step" +
+      (step.stage === targetStage ? " route-step-current" : "");
+
+    const stageLabel = document.createElement("strong");
+    stageLabel.className = "route-stage-label";
+    stageLabel.textContent =
+      "Stage " + String(step.stage).padStart(3, "0");
+
+    const nodes = document.createElement("div");
+    nodes.className = "route-node-row";
+
+    const chosenId = route.selectedByStage[String(step.stage)];
+    const currentSelected =
+      step.stage === targetStage
+        ? selectedRouteNode(route, targetStage)
+        : null;
+
+    for (const node of step.nodes) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className =
+        "route-node route-node-" + node.type;
+      button.dataset.nodeId = node.id;
+
+      if (
+        chosenId === node.id ||
+        (step.nodes.length === 1 && node.mandatory)
+      ) {
+        button.classList.add("selected");
+      }
+      if (route.visitedNodeIds.includes(node.id)) {
+        button.classList.add("visited");
+      }
+
+      button.disabled =
+        step.stage !== targetStage ||
+        currentSelected !== null ||
+        step.nodes.length === 1;
+
+      const name = document.createElement("strong");
+      name.textContent = routeNodeLabel(node.type);
+
+      const meta = document.createElement("small");
+      meta.textContent =
+        node.mandatory
+          ? "Mandatory"
+          : "Lane " + String(node.lane + 1);
+
+      button.append(name, meta);
+      button.addEventListener("click", () => {
+        void chooseCurrentRouteNode(node.id);
+      });
+      nodes.append(button);
+    }
+
+    row.append(stageLabel, nodes);
+    map.append(row);
+  }
+
+  const selected = selectedRouteNode(route, targetStage);
+  const panel = byId("routeSelectedPanel");
+  const shopAction =
+    byId<HTMLButtonElement>("routeShopAction");
+  const stationShopAction =
+    byId<HTMLButtonElement>("routeStationShopAction");
+  const serviceAction =
+    byId<HTMLButtonElement>("routeServiceAction");
+  const supportAction =
+    byId<HTMLButtonElement>("routeSupportAction");
+  const continueButton =
+    byId<HTMLButtonElement>("routeContinueButton");
+
+  if (selected === null) {
+    panel.classList.add("hidden");
+    continueButton.disabled = true;
+    return;
+  }
+
+  panel.classList.remove("hidden");
+  byId("routeSelectedTitle").textContent =
+    routeNodeLabel(selected.type) +
+    " · Stage " +
+    String(selected.targetStage).padStart(3, "0");
+  byId("routeSelectedMeta").textContent =
+    routeNodeDescription(selected);
+
+  shopAction.classList.toggle(
+    "hidden",
+    selected.type !== "shop",
+  );
+  stationShopAction.classList.toggle(
+    "hidden",
+    selected.type !== "station",
+  );
+  serviceAction.classList.toggle(
+    "hidden",
+    selected.type !== "station",
+  );
+  supportAction.classList.toggle(
+    "hidden",
+    selected.type !== "station",
+  );
+  continueButton.disabled = false;
+}
+
+async function chooseCurrentRouteNode(
+  nodeId: string,
+): Promise<void> {
+  const targetStage = routeTargetStage();
+  const previousRoute = route;
+  const previousExpansion = campaignExpansion;
+  const previousRecovery = crashRecoverySnapshot;
+  const next = selectRouteNode(route, targetStage, nodeId);
+
+  if (
+    next.selectedByStage[String(targetStage)] ===
+    previousRoute.selectedByStage[String(targetStage)]
+  ) {
+    renderRouteMap();
+    return;
+  }
+
+  route = next;
+  renderRouteMap();
+
+  const saved = await autosaveCampaign(
+    "route-choice",
+    "✓ Route locked · Stage " +
+      String(targetStage).padStart(3, "0"),
+    "route-choice",
+  );
+  if (!saved) {
+    route = previousRoute;
+    campaignExpansion = previousExpansion;
+    crashRecoverySnapshot = previousRecovery;
+    renderRouteMap();
+  }
+}
+
+function openRouteMap(): void {
+  if (
+    !persistenceReady ||
+    !canOpenBetweenStageMenu()
+  ) {
+    return;
+  }
+
+  route = syncRouteStateForStage(
+    route,
+    routeTargetStage(),
+  );
+  renderRouteMap();
+  if (!routeDialog.open) routeDialog.showModal();
+}
+
+function closeRouteAndOpen(action: () => void): void {
+  if (routeDialog.open) routeDialog.close();
+  action();
+}
+
 async function startSelectedStage(): Promise<void> {
   if (!persistenceReady || !vocabularyReady || stageStartPending) return;
+
+  if (
+    campaign.selectedStage === campaign.highestUnlockedStage
+  ) {
+    route = syncRouteStateForStage(
+      route,
+      campaign.highestUnlockedStage,
+    );
+    if (routeNeedsChoice(route, campaign.selectedStage)) {
+      openRouteMap();
+      return;
+    }
+  }
+
   stageStartPending = true;
 
   try {
@@ -3601,6 +3880,7 @@ async function initializePlayerProgress(): Promise<void> {
   const startButton = byId<HTMLButtonElement>("startButton");
   const stageSelectButton =
     byId<HTMLButtonElement>("stageSelectButton");
+  const routeButton = byId<HTMLButtonElement>("routeButton");
   const dataButtons = [
     byId<HTMLButtonElement>("dataButton"),
     byId<HTMLButtonElement>("pauseDataButton"),
@@ -3630,6 +3910,7 @@ async function initializePlayerProgress(): Promise<void> {
 
   startButton.disabled = true;
   stageSelectButton.disabled = true;
+  routeButton.disabled = true;
   equipmentButton.disabled = true;
   shopButton.disabled = true;
   stationShopButton.disabled = true;
@@ -3656,6 +3937,7 @@ async function initializePlayerProgress(): Promise<void> {
     progression = loaded.save.progression;
     expansionCurrencies = loaded.save.expansionCurrencies;
     shops = loaded.save.shops;
+    route = loaded.save.route;
     campaignExpansion = loaded.save.campaignExpansion;
     checkpointSnapshot = loaded.save.checkpointSnapshot;
     crashRecoverySnapshot = loaded.save.crashRecoverySnapshot;
@@ -3682,6 +3964,7 @@ async function initializePlayerProgress(): Promise<void> {
     updateCampaignUi();
     startButton.disabled = !vocabularyReady;
     stageSelectButton.disabled = false;
+    routeButton.disabled = false;
     equipmentButton.disabled = false;
     shopButton.disabled = false;
     stationShopButton.disabled = false;
@@ -4102,6 +4385,7 @@ async function importSaveFile(file: File): Promise<void> {
     const importedExpansionCurrencies =
       result.save.expansionCurrencies;
     const importedShops = result.save.shops;
+    const importedRoute = result.save.route;
     const importedCampaignExpansion =
       result.save.campaignExpansion;
     const importedCheckpointSnapshot =
@@ -4134,6 +4418,7 @@ async function importSaveFile(file: File): Promise<void> {
     const previousProgression = progression;
     const previousExpansionCurrencies = expansionCurrencies;
     const previousShops = shops;
+    const previousRoute = route;
     const previousCampaignExpansion = campaignExpansion;
     const previousCheckpointSnapshot = checkpointSnapshot;
     const previousCrashRecoverySnapshot = crashRecoverySnapshot;
@@ -4149,6 +4434,7 @@ async function importSaveFile(file: File): Promise<void> {
     progression = importedProgression;
     expansionCurrencies = importedExpansionCurrencies;
     shops = importedShops;
+    route = importedRoute;
     campaignExpansion = importedCampaignExpansion;
     checkpointSnapshot = importedCheckpointSnapshot;
     crashRecoverySnapshot = importedCrashRecoverySnapshot;
@@ -4182,6 +4468,7 @@ async function importSaveFile(file: File): Promise<void> {
       progression = previousProgression;
       expansionCurrencies = previousExpansionCurrencies;
       shops = previousShops;
+      route = previousRoute;
       campaignExpansion = previousCampaignExpansion;
       checkpointSnapshot = previousCheckpointSnapshot;
       crashRecoverySnapshot = previousCrashRecoverySnapshot;
@@ -4327,6 +4614,25 @@ for (const id of [
     void startSelectedStage();
   });
 }
+byId("routeButton").addEventListener("click", openRouteMap);
+byId("routeContinueButton").addEventListener("click", () => {
+  if (routeNeedsChoice(route, routeTargetStage())) return;
+  if (routeDialog.open) routeDialog.close();
+  void startSelectedStage();
+});
+byId("routeShopAction").addEventListener("click", () => {
+  closeRouteAndOpen(openNormalShop);
+});
+byId("routeStationShopAction").addEventListener("click", () => {
+  closeRouteAndOpen(() => openSpecialShop("station"));
+});
+byId("routeServiceAction").addEventListener("click", () => {
+  closeRouteAndOpen(openServiceShop);
+});
+byId("routeSupportAction").addEventListener("click", () => {
+  closeRouteAndOpen(openSupportSpells);
+});
+
 byId("resumeButton").addEventListener("click", () => game.resume());
 
 byId("againButton").addEventListener("click", () => {

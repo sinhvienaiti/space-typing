@@ -9,6 +9,7 @@ import { createHiddenDiscoveryState } from "../src/discovery/hidden-content";
 import { createProgressionState } from "../src/progression/missions";
 import { createExpansionCurrencyState } from "../src/economy/currencies";
 import { createShopState } from "../src/shops/state";
+import { createRouteState } from "../src/campaign/route";
 import {
   createCheckpointSnapshot,
   type RunPersistentState,
@@ -47,6 +48,7 @@ function stateAt(stage: number): RunPersistentState {
     progression: createProgressionState(),
     expansionCurrencies: createExpansionCurrencyState(),
     shops: createShopState(),
+    route: createRouteState(stage),
   };
 }
 
