@@ -3223,6 +3223,18 @@ Automated loot/pity simulation rules:
 ## Step 66
 Manually balance Stage 001-100 through playtesting.
 
+**Status: automated balance audit implemented; manual browser playtest still required.**
+
+Current Stage 001-100 balance guardrails:
+
+- the audit uses the production `createStageConfig` and `difficultyFor` paths for Normal difficulty, Vocabulary Level 001 and a 60 WPM / 96% reference player;
+- all 100 first-Galaxy stages are covered and role milestones are verified at their designed cadence;
+- consecutive normal stages may not introduce an abrupt pressure-index jump;
+- the stage immediately after Elite/Mini-boss/Boss/Hazard/Gauntlet milestones must return to a lower pressure band;
+- first-Galaxy enemy speed, spawn interval, projectile pressure and boss pressure remain inside explicit early-game safety bounds;
+- this automated audit is a regression guard, not a substitute for the roadmap's manual browser playtest;
+- manual feel/timing observations must be recorded before Step 66 can be considered fully complete.
+
 ## Step 67
 Statistically validate difficulty across Stage 001-1000.
 
