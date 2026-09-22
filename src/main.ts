@@ -257,6 +257,15 @@ import {
   resolveMetaProgression,
 } from "./progression/meta";
 import {
+  applyAscensionDifficulty,
+  ascensionCompletionReward,
+  ascensionProfile,
+  completeAscensionTier,
+  createAscensionState,
+  selectAscensionTier,
+  type AscensionState,
+} from "./progression/ascension";
+import {
   createHiddenDiscoveryState,
   type HiddenContentDefinition,
   type HiddenDiscoveryState,
@@ -618,6 +627,7 @@ app.innerHTML = `
           <button id="eventShopButton" class="hidden">Event Shop</button>
           <button id="supportButton">Support Spells</button>
           <button id="codexButton">Codex</button>
+          <button id="ascensionButton" class="hidden">Ascension</button>
           <button id="progressionButton">Missions</button>
           <button id="dataButton">Data</button>
           <button id="settingsButton">Settings</button>
@@ -783,6 +793,20 @@ app.innerHTML = `
         0 / 0 collection entries
       </p>
       <div id="codexGrid" class="codex-grid"></div>
+    </dialog>
+
+    <dialog id="ascensionDialog" class="settings-dialog progression-dialog">
+      <form method="dialog" class="dialog-head">
+        <div>
+          <p class="eyebrow">new game+</p>
+          <h2>Ascension</h2>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+      <p id="ascensionMeta" class="equipment-note">
+        Complete Stage 1000 to unlock Ascension.
+      </p>
+      <div id="ascensionGrid" class="progression-grid"></div>
     </dialog>
 
     <dialog id="progressionDialog" class="settings-dialog progression-dialog">
@@ -1223,6 +1247,7 @@ let progression: ProgressionState = createProgressionState();
 let upgrades: UpgradeState = createUpgradeState();
 let relics: RelicState = createRelicState();
 let codex: CodexState = createCodexState();
+let ascension: AscensionState = createAscensionState(campaign);
 let expansionCurrencies: ExpansionCurrencyState =
   createExpansionCurrencyState();
 let shops: ShopState = createShopState();
@@ -1297,6 +1322,7 @@ const specialShopDialog =
 const supportDialog = byId<HTMLDialogElement>("supportDialog");
 const characterDialog = byId<HTMLDialogElement>("characterDialog");
 const codexDialog = byId<HTMLDialogElement>("codexDialog");
+const ascensionDialog = byId<HTMLDialogElement>("ascensionDialog");
 const progressionDialog =
   byId<HTMLDialogElement>("progressionDialog");
 const rewardChoiceDialog =
@@ -1339,6 +1365,7 @@ type AutosaveSnapshot = {
   upgrades: UpgradeState;
   relics: RelicState;
   codex: CodexState;
+  ascension: AscensionState;
   expansionCurrencies: ExpansionCurrencyState;
   shops: ShopState;
   route: RouteState;
@@ -1373,6 +1400,7 @@ const campaignAutosave = new AutosaveQueue<
     snapshot.upgrades,
     snapshot.relics,
     snapshot.codex,
+    snapshot.ascension,
   ),
 );
 
@@ -1426,6 +1454,7 @@ function currentAutosaveSnapshot(): AutosaveSnapshot {
     upgrades,
     relics,
     codex,
+    ascension,
     expansionCurrencies,
     shops,
     route,
@@ -1478,6 +1507,7 @@ function persistRecoveryMirrorSync(
       upgrades,
       relics,
       codex,
+      ascension,
     ),
   );
 }
@@ -2174,6 +2204,81 @@ function renderProgression(): void {
   }
 }
 
+function renderAscension(): void {
+  const button = byId<HTMLButtonElement>("ascensionButton");
+  const unlocked = ascension.highestUnlockedTier >= 1;
+  button.classList.toggle("hidden", !unlocked);
+  button.textContent =
+    ascension.selectedTier <= 0
+      ? "Ascension · Base"
+      : "Ascension · Tier " + String(ascension.selectedTier);
+
+  byId("ascensionMeta").textContent = unlocked
+    ? "Unlocked through Tier " +
+      String(ascension.highestUnlockedTier) +
+      " · selected " +
+      (ascension.selectedTier === 0
+        ? "Base Campaign"
+        : "Tier " + String(ascension.selectedTier)) +
+      " · replay the same 1000 stages with remixed pressure and boss mutations."
+    : "Complete Stage 1000 to unlock Ascension.";
+
+  const grid = byId("ascensionGrid");
+  grid.replaceChildren();
+  if (!unlocked) return;
+
+  for (let tier = 0; tier <= ascension.highestUnlockedTier; tier += 1) {
+    const profile = ascensionProfile(tier, campaign.selectedStage);
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "progression-card";
+    card.classList.toggle("selected", tier === ascension.selectedTier);
+
+    const title = document.createElement("strong");
+    title.textContent = tier === 0 ? "Base Campaign" : "Ascension " + String(tier);
+
+    const description = document.createElement("small");
+    description.textContent =
+      tier === 0
+        ? "Original 50-World campaign rules."
+        : "Rank +" +
+          String(profile.enemyRankBonus) +
+          " · formation +" +
+          String(profile.formationComplexityBonus) +
+          " · rewards x" +
+          profile.rewardMultiplier.toFixed(2) +
+          " · boss " +
+          profile.bossMutations.join(", ");
+
+    card.append(title, description);
+    card.addEventListener("click", () => {
+      if (tier === ascension.selectedTier) return;
+      ascension = selectAscensionTier(ascension, tier);
+      renderAscension();
+      updateCampaignUi();
+      ascensionDialog.close();
+      void autosaveCampaign(
+        "ascension",
+        "✓ Ascension selected · " +
+          (tier === 0 ? "Base Campaign" : "Tier " + String(tier)),
+      );
+    });
+    grid.append(card);
+  }
+}
+
+function openAscension(): void {
+  if (
+    !persistenceReady ||
+    game.getPhase() !== "title" ||
+    ascension.highestUnlockedTier < 1
+  ) {
+    return;
+  }
+  renderAscension();
+  ascensionDialog.showModal();
+}
+
 function openProgression(): void {
   if (!persistenceReady || game.getPhase() !== "title") return;
   syncProgressionAchievements();
@@ -2735,6 +2840,44 @@ const game = new Game(
           ? " · Achievement: " + achievementNames.join(", ")
           : "";
 
+      let ascensionText = "";
+      if (stats.stage === 1000) {
+        const completedTier = ascension.selectedTier;
+        const ascensionResult = completeAscensionTier(
+          ascension,
+          completedTier,
+        );
+        ascension = ascensionResult.state;
+
+        if (completedTier === 0 && ascensionResult.unlockedTier === 1) {
+          ascensionText = " · Ascension 1 unlocked";
+        } else if (
+          completedTier > 0 &&
+          ascensionResult.newlyCompleted
+        ) {
+          const reward = ascensionCompletionReward(completedTier);
+          credits = addCredits(credits, reward.credits);
+          expansionCurrencies = addExpansionCurrencyReward(
+            expansionCurrencies,
+            reward.currencies,
+          );
+          totalCreditReward += reward.credits;
+          totalCurrencyReward = addExpansionCurrencyReward(
+            totalCurrencyReward,
+            reward.currencies,
+          );
+          ascensionText =
+            " · Ascension " +
+            String(completedTier) +
+            " complete" +
+            (ascensionResult.unlockedTier === null
+              ? ""
+              : " · Tier " +
+                String(ascensionResult.unlockedTier) +
+                " unlocked");
+        }
+      }
+
       const expansionResult =
         advanceCampaignExpansionOnStageClear(
           campaignExpansion,
@@ -2752,20 +2895,29 @@ const game = new Game(
       let sectorRewardText = "";
       if (expansionResult.checkpointCommitted) {
         const sectorReward = sectorCheckpointReward(stats.stage);
-        credits = addCredits(credits, sectorReward.credits);
+        const ascensionRewardMultiplier =
+          activeStageDifficulty?.ascensionRewardMultiplier ?? 1;
+        const sectorCredits = Math.round(
+          sectorReward.credits * ascensionRewardMultiplier,
+        );
+        const sectorCurrencies = scaleExpansionCurrencyReward(
+          sectorReward.currencies,
+          ascensionRewardMultiplier,
+        );
+        credits = addCredits(credits, sectorCredits);
         expansionCurrencies = addExpansionCurrencyReward(
           expansionCurrencies,
-          sectorReward.currencies,
+          sectorCurrencies,
         );
-        totalCreditReward += sectorReward.credits;
+        totalCreditReward += sectorCredits;
         totalCurrencyReward = addExpansionCurrencyReward(
           totalCurrencyReward,
-          sectorReward.currencies,
+          sectorCurrencies,
         );
         codex = discoverCodexReward(codex, "sector-cache").state;
         sectorRewardText =
           " · Sector +" +
-          sectorReward.credits.toLocaleString() +
+          sectorCredits.toLocaleString() +
           " Credits";
         checkpointSnapshot = createCheckpointSnapshot(
           currentRunPersistentState(),
@@ -2801,6 +2953,7 @@ const game = new Game(
             ? " · Performance: " + performanceText
             : "") +
           achievementText +
+          ascensionText +
           checkpointText,
         "stage-clear",
       );
@@ -2821,6 +2974,7 @@ const game = new Game(
         (performanceText.length > 0
           ? " · Performance: " + performanceText
           : "") +
+        ascensionText +
         checkpointText;
       byId("clearStreak").textContent = String(stats.maxStreak);
 
@@ -4843,10 +4997,14 @@ async function startActiveHiddenEncounter(
       vocabularyLevel,
     ),
   );
-  const difficulty = hiddenEncounterDifficulty(
-    baseDifficulty,
-    active.kind,
-    active.tier,
+  const difficulty = applyAscensionDifficulty(
+    hiddenEncounterDifficulty(
+      baseDifficulty,
+      active.kind,
+      active.tier,
+    ),
+    ascension.selectedTier,
+    active.sourceStage,
   );
   const runtime = hiddenEncounterRuntime(
     active,
@@ -4933,12 +5091,16 @@ async function startSelectedStage(): Promise<void> {
     const vocabularyLevel = selectedVocabularyLevel();
     game.setVocabularyLevel(vocabularyLevel);
     await prepareStageVocabulary(stage);
-    const difficulty = difficultyFor(
-      difficultyInputFromSettings(
-        difficultySettings,
-        stage.stage,
-        vocabularyLevel,
+    const difficulty = applyAscensionDifficulty(
+      difficultyFor(
+        difficultyInputFromSettings(
+          difficultySettings,
+          stage.stage,
+          vocabularyLevel,
+        ),
       ),
+      ascension.selectedTier,
+      stage.stage,
     );
     activeStageDifficulty = difficulty;
 
@@ -5038,6 +5200,7 @@ async function initializePlayerProgress(): Promise<void> {
   const characterButton =
     byId<HTMLButtonElement>("characterButton");
   const codexButton = byId<HTMLButtonElement>("codexButton");
+  const ascensionButton = byId<HTMLButtonElement>("ascensionButton");
   const progressionButton =
     byId<HTMLButtonElement>("progressionButton");
 
@@ -5055,6 +5218,7 @@ async function initializePlayerProgress(): Promise<void> {
   supportButton.disabled = true;
   characterButton.disabled = true;
   codexButton.disabled = true;
+  ascensionButton.disabled = true;
   progressionButton.disabled = true;
   for (const button of dataButtons) button.disabled = true;
 
@@ -5071,6 +5235,7 @@ async function initializePlayerProgress(): Promise<void> {
     upgrades = loaded.save.upgrades;
     relics = loaded.save.relics;
     codex = loaded.save.codex;
+    ascension = loaded.save.ascension;
     expansionCurrencies = loaded.save.expansionCurrencies;
     shops = loaded.save.shops;
     route = loaded.save.route;
@@ -5113,8 +5278,10 @@ async function initializePlayerProgress(): Promise<void> {
     supportButton.disabled = false;
     characterButton.disabled = false;
     codexButton.disabled = false;
+    ascensionButton.disabled = false;
     progressionButton.disabled = false;
     renderCodex();
+    renderAscension();
     renderProgression();
     renderServiceShop();
     updateShopAccess();
@@ -5158,7 +5325,12 @@ async function initializePlayerProgress(): Promise<void> {
 function updateCampaignUi(): void {
   byId<HTMLButtonElement>("nextStageButton").textContent = "Next stage";
   byId("startButton").textContent =
-    "Continue · Stage " + String(campaign.selectedStage).padStart(3, "0");
+    "Continue · Stage " +
+    String(campaign.selectedStage).padStart(3, "0") +
+    (ascension.selectedTier > 0
+      ? " · A" + String(ascension.selectedTier)
+      : "");
+  renderAscension();
   const selectedWorld = worldForStage(campaign.selectedStage);
   musicController.setWorldProfile(
     musicProfileForWorld(selectedWorld),
@@ -5443,7 +5615,10 @@ function updateDataSummary(): void {
     String(relics.owned.length) +
     " Relics (" +
     String(relics.equipped.length) +
-    " equipped)" +
+    " equipped) · Ascension " +
+    String(ascension.selectedTier) +
+    "/" +
+    String(ascension.highestUnlockedTier) +
     artMeta +
     performanceMeta;
 }
@@ -5485,6 +5660,7 @@ async function exportSave(): Promise<void> {
     upgrades,
     relics,
     codex,
+    ascension,
   );
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -5531,6 +5707,7 @@ async function importSaveFile(file: File): Promise<void> {
     const importedUpgrades = result.save.upgrades;
     const importedRelics = result.save.relics;
     const importedCodex = result.save.codex;
+    const importedAscension = result.save.ascension;
     const importedExpansionCurrencies =
       result.save.expansionCurrencies;
     const importedShops = result.save.shops;
@@ -5568,6 +5745,7 @@ async function importSaveFile(file: File): Promise<void> {
     const previousUpgrades = upgrades;
     const previousRelics = relics;
     const previousCodex = codex;
+    const previousAscension = ascension;
     const previousExpansionCurrencies = expansionCurrencies;
     const previousShops = shops;
     const previousRoute = route;
@@ -5587,6 +5765,7 @@ async function importSaveFile(file: File): Promise<void> {
     upgrades = importedUpgrades;
     relics = importedRelics;
     codex = importedCodex;
+    ascension = importedAscension;
     expansionCurrencies = importedExpansionCurrencies;
     shops = importedShops;
     route = importedRoute;
@@ -5624,6 +5803,7 @@ async function importSaveFile(file: File): Promise<void> {
       upgrades = previousUpgrades;
       relics = previousRelics;
       codex = previousCodex;
+      ascension = previousAscension;
       expansionCurrencies = previousExpansionCurrencies;
       shops = previousShops;
       route = previousRoute;
@@ -5904,6 +6084,7 @@ for (const id of ["dataButton", "pauseDataButton"]) {
 }
 
 byId("codexButton").addEventListener("click", openCodex);
+byId("ascensionButton").addEventListener("click", openAscension);
 byId("progressionButton").addEventListener("click", openProgression);
 
 byId("exportSaveButton").addEventListener("click", () => {
