@@ -27,14 +27,25 @@ describe("Black Market / Event Shop", () => {
     expect(first.every((offer) => offer.kind === "item")).toBe(true);
   });
 
-  it("uses higher-rarity regular equipment in the Black Market", () => {
+  it("uses higher-grade regular equipment in the Black Market", () => {
     const offers = specialShopOffers("black-market", 550);
     expect(offers).toHaveLength(3);
     expect(
       offers.some(
         (offer) =>
           offer.kind === "equipment" &&
-          offer.rarity === "legendary",
+          offer.grade === "gold",
+      ),
+    ).toBe(true);
+  });
+
+  it("exposes Diamond as the new top Black Market grade late-game", () => {
+    const offers = specialShopOffers("black-market", 850);
+    expect(
+      offers.some(
+        (offer) =>
+          offer.kind === "equipment" &&
+          offer.grade === "diamond",
       ),
     ).toBe(true);
   });
