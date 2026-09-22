@@ -130,6 +130,17 @@ export class MusicController {
     else this.releaseDuck("announcer");
   };
 
+  private readonly onWarning = (event: Event): void => {
+    const duration =
+      (event as CustomEvent<{ durationMs?: unknown }>).detail?.durationMs;
+    this.duckFor(
+      "warning",
+      typeof duration === "number" && Number.isFinite(duration)
+        ? duration
+        : 350,
+    );
+  };
+
   constructor(audioFactory: AudioFactory = browserAudioFactory) {
     this.audioFactory = audioFactory;
 
@@ -141,6 +152,10 @@ export class MusicController {
       window.addEventListener(
         "space-typing:announcer",
         this.onAnnouncer,
+      );
+      window.addEventListener(
+        "space-typing:warning",
+        this.onWarning,
       );
     }
   }
@@ -305,6 +320,10 @@ export class MusicController {
       window.removeEventListener(
         "space-typing:announcer",
         this.onAnnouncer,
+      );
+      window.removeEventListener(
+        "space-typing:warning",
+        this.onWarning,
       );
       for (const timer of this.warningTimers.values()) {
         window.clearTimeout(timer);
