@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "player-ships",
+      "category": "player",
+      "sourceType": "procedural",
+      "source": "Space Typing Canvas renderer",
+      "author": "Space Typing project",
+      "license": "Project original",
+      "attributionRequired": false
+    },
+    {
+      "id": "enemy-families",
+      "category": "enemy",
+      "sourceType": "procedural",
+      "source": "Space Typing Canvas renderer",
+      "author": "Space Typing project",
+      "license": "Project original",
+      "attributionRequired": false
+    },
+    {
+      "id": "boss-silhouettes",
+      "category": "boss",
+      "sourceType": "procedural",
+      "source": "Space Typing Canvas renderer",
+      "author": "Space Typing project",
+      "license": "Project original",
+      "attributionRequired": false
+    },
+    {
+      "id": "combat-projectiles",
+      "category": "projectile",
+      "sourceType": "procedural",
+      "source": "Space Typing Canvas renderer",
+      "author": "Space Typing project",
+      "license": "Project original",
+      "attributionRequired": false
+    },
+    {
+      "id": "reward-crates",
+      "category": "crate",
+      "sourceType": "procedural",
+      "source": "Space Typing Canvas renderer",
+      "author": "Space Typing project",
+      "license": "Project original",
+      "attributionRequired": false
+    },
+    {
+      "id": "equipment-icons",
+      "category": "equipment-icon",
+      "sourceType": "procedural",
+      "source": "Space Typing UI renderer",
+      "author": "Space Typing project",
+      "license": "Project original",
+      "attributionRequired": false
+    },
+    {
+      "id": "spell-effects",
+      "category": "spell",
+      "sourceType": "procedural",
+      "source": "Space Typing Canvas renderer",
+      "author": "Space Typing project",
+      "license": "Project original",
+      "attributionRequired": false
+    },
+    {
+      "id": "galaxy-themes",
+      "category": "galaxy-theme",
+      "sourceType": "procedural",
+      "source": "Space Typing layered star/grid renderer",
+      "author": "Space Typing project",
+      "license": "Project original",
+      "attributionRequired": false
+    }
+  ]
+}
