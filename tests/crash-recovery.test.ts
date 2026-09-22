@@ -18,6 +18,11 @@ import {
   isValidCrashRecoverySnapshot,
   resolveCrashRecovery,
 } from "../src/persistence/crash-recovery";
+import {
+  choosePreferredPlayerSave,
+  createPlayerSave,
+  resolvePlayerSaveRecovery,
+} from "../src/persistence/player-save";
 
 function progressAt(stage: number): CampaignProgress {
   return {
@@ -156,6 +161,83 @@ describe("M03 crash recovery", () => {
     expect(resolved.state.campaign.bestByStage["189"]?.score).toBe(9000);
     expect(
       resolved.campaignExpansion.crashRecovery?.deathInvalidated,
+    ).toBe(true);
+  });
+
+  it("prevents reload from preferring a stale pre-death active save", () => {
+    const committedState = stateAt(181);
+    committedState.credits = 80;
+    const checkpoint = createCheckpointSnapshot(
+      committedState,
+      181,
+    );
+
+    const active = stateAt(190);
+    active.credits = 900;
+    const expansion = createCampaignExpansionState(active.campaign);
+    const captured = captureCrashRecoverySnapshot(
+      active,
+      expansion,
+      checkpoint,
+      "stage-entry",
+      "2026-09-22T09:08:00.000Z",
+    );
+    const staleIndexed = createPlayerSave(
+      active.campaign,
+      "2026-09-22T09:08:00.000Z",
+      "stage-entry",
+      active.inventory,
+      active.equipment,
+      active.supportSpells,
+      active.characters,
+      active.luckPity,
+      active.hiddenDiscovery,
+      active.credits,
+      active.progression,
+      active.expansionCurrencies,
+      captured.campaignExpansion,
+      checkpoint,
+      captured.snapshot,
+    );
+
+    const invalidated = invalidateCrashRecoverySnapshot(
+      captured.snapshot,
+      active,
+      captured.campaignExpansion,
+      checkpoint,
+      "2026-09-22T09:09:00.000Z",
+    );
+    const deathMirror = createPlayerSave(
+      active.campaign,
+      "2026-09-22T09:09:00.000Z",
+      "gameover",
+      active.inventory,
+      active.equipment,
+      active.supportSpells,
+      active.characters,
+      active.luckPity,
+      active.hiddenDiscovery,
+      active.credits,
+      active.progression,
+      active.expansionCurrencies,
+      invalidated.campaignExpansion,
+      checkpoint,
+      invalidated.snapshot,
+    );
+
+    expect(
+      choosePreferredPlayerSave(staleIndexed, deathMirror),
+    ).toBe(deathMirror);
+
+    const resolved = resolvePlayerSaveRecovery(
+      deathMirror,
+      "2026-09-22T09:10:00.000Z",
+    );
+    expect(resolved.recoveryMode).toBe("death-rollback");
+    expect(resolved.save.campaign.selectedStage).toBe(181);
+    expect(resolved.save.credits).toBe(80);
+    expect(
+      resolved.save.crashRecoverySnapshot?.deathInvalidated,
     ).toBe(true);
   });
 
