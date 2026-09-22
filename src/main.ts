@@ -37,6 +37,18 @@ import {
   STAGES_PER_GALAXY,
 } from "./campaign/stage";
 import {
+  createRouteState,
+  routeChoicesForStage,
+  routeNeedsChoice,
+  routeNodeLabel,
+  routeProgress,
+  selectRouteNode,
+  selectedRouteNode,
+  syncRouteStateForStage,
+  type RouteNode,
+  type RouteState,
+} from "./campaign/route";
+import {
   CHARACTER_IDS,
   getCharacter,
 } from "./characters/registry";
@@ -1086,6 +1098,7 @@ let progression: ProgressionState = createProgressionState();
 let expansionCurrencies: ExpansionCurrencyState =
   createExpansionCurrencyState();
 let shops: ShopState = createShopState();
+let route: RouteState = createRouteState(campaign.highestUnlockedStage);
 const musicController = new MusicController();
 musicController.setMusicVolume(settings.musicVolume);
 musicController.setAmbientVolume(settings.ambientVolume);
@@ -1109,6 +1122,7 @@ let checkpointSnapshot: CheckpointSnapshot =
       progression,
       expansionCurrencies,
       shops,
+      route,
     },
     campaignExpansion.checkpoint.stage,
   );
@@ -1187,6 +1201,7 @@ type AutosaveSnapshot = {
   progression: ProgressionState;
   expansionCurrencies: ExpansionCurrencyState;
   shops: ShopState;
+  route: RouteState;
   campaignExpansion: CampaignExpansionState;
   checkpointSnapshot: CheckpointSnapshot;
   crashRecoverySnapshot: CrashRecoverySnapshot | null;
@@ -1214,6 +1229,7 @@ const campaignAutosave = new AutosaveQueue<
     snapshot.crashRecoverySnapshot,
     snapshot.stageEntrySnapshot,
     snapshot.shops,
+    snapshot.route,
   ),
 );
 
@@ -1230,6 +1246,7 @@ function currentRunPersistentState(): RunPersistentState {
     progression,
     expansionCurrencies,
     shops,
+    route,
   };
 }
 
@@ -1245,6 +1262,7 @@ function applyRunPersistentState(state: RunPersistentState): void {
   progression = state.progression;
   expansionCurrencies = state.expansionCurrencies;
   shops = state.shops;
+  route = state.route;
 }
 
 function currentAutosaveSnapshot(): AutosaveSnapshot {
@@ -1260,6 +1278,7 @@ function currentAutosaveSnapshot(): AutosaveSnapshot {
     progression,
     expansionCurrencies,
     shops,
+    route,
     campaignExpansion,
     checkpointSnapshot,
     crashRecoverySnapshot,
@@ -1305,6 +1324,7 @@ function persistRecoveryMirrorSync(
       crashRecoverySnapshot,
       stageEntrySnapshot,
       shops,
+      route,
     ),
   );
 }
@@ -3656,6 +3676,7 @@ async function initializePlayerProgress(): Promise<void> {
     progression = loaded.save.progression;
     expansionCurrencies = loaded.save.expansionCurrencies;
     shops = loaded.save.shops;
+    route = loaded.save.route;
     campaignExpansion = loaded.save.campaignExpansion;
     checkpointSnapshot = loaded.save.checkpointSnapshot;
     crashRecoverySnapshot = loaded.save.crashRecoverySnapshot;
