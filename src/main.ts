@@ -103,26 +103,27 @@ import {
 } from "./economy/currencies";
 import { gradeLabel } from "./grades";
 import {
-  buyNormalShopOffer,
-  normalShopItemIsFull,
-  normalShopOfferName,
-  normalShopOffers,
-  type NormalShopOffer,
-} from "./shops/normal-shop";
+  buyShopStockEntry,
+  canAffordShopPrice,
+  createShopState,
+  formatShopPrice,
+  resolveShopInstance,
+  shopAvailable,
+  type ShopInstance,
+  type ShopRollContext,
+  type ShopState,
+  type ShopStockEntry,
+  type ShopType,
+} from "./shops/state";
 import {
   buyEquipmentUpgrade,
   buyRepairPack,
+  equipmentUpgradeAlloyCost,
   equipmentUpgradeCost,
+  REPAIR_PACK_ALLOY_COST,
   REPAIR_PACK_COST,
 } from "./shops/service-shop";
-import {
-  buySpecialShopOffer,
-  specialShopOfferName,
-  specialShopOffers,
-  specialShopUnlocked,
-  type SpecialShopKind,
-  type SpecialShopOffer,
-} from "./shops/special-shop";
+
 import {
   accuracyPercent,
   stageWordsPerMinute,
@@ -969,6 +970,7 @@ let credits = 0;
 let progression: ProgressionState = createProgressionState();
 let expansionCurrencies: ExpansionCurrencyState =
   createExpansionCurrencyState();
+let shops: ShopState = createShopState();
 let campaignExpansion: CampaignExpansionState =
   createCampaignExpansionState(campaign);
 let checkpointSnapshot: CheckpointSnapshot =
@@ -984,6 +986,7 @@ let checkpointSnapshot: CheckpointSnapshot =
       credits,
       progression,
       expansionCurrencies,
+      shops,
     },
     campaignExpansion.checkpoint.stage,
   );
@@ -993,7 +996,7 @@ let persistenceReady = false;
 let vocabularyReady = false;
 let equipmentDropCounter = 0;
 let shopPurchaseCounter = 0;
-let currentSpecialShop: SpecialShopKind = "black-market";
+let currentShopType: ShopType = "black-market";
 let sourceState = loadSource();
 let sourceTab: "class" | "custom" = sourceState.mode;
 let vocabularyIndex: VocabularyIndex | null = null;
@@ -1049,6 +1052,7 @@ type AutosaveSnapshot = {
   credits: number;
   progression: ProgressionState;
   expansionCurrencies: ExpansionCurrencyState;
+  shops: ShopState;
   campaignExpansion: CampaignExpansionState;
   checkpointSnapshot: CheckpointSnapshot;
   crashRecoverySnapshot: CrashRecoverySnapshot | null;
@@ -1075,6 +1079,7 @@ const campaignAutosave = new AutosaveQueue<
     snapshot.checkpointSnapshot,
     snapshot.crashRecoverySnapshot,
     snapshot.stageEntrySnapshot,
+    snapshot.shops,
   ),
 );
 
@@ -1090,6 +1095,7 @@ function currentRunPersistentState(): RunPersistentState {
     credits,
     progression,
     expansionCurrencies,
+    shops,
   };
 }
 
@@ -1104,6 +1110,7 @@ function applyRunPersistentState(state: RunPersistentState): void {
   credits = state.credits;
   progression = state.progression;
   expansionCurrencies = state.expansionCurrencies;
+  shops = state.shops;
 }
 
 function currentAutosaveSnapshot(): AutosaveSnapshot {
@@ -1118,6 +1125,7 @@ function currentAutosaveSnapshot(): AutosaveSnapshot {
     credits,
     progression,
     expansionCurrencies,
+    shops,
     campaignExpansion,
     checkpointSnapshot,
     crashRecoverySnapshot,
@@ -1162,6 +1170,7 @@ function persistRecoveryMirrorSync(
       checkpointSnapshot,
       crashRecoverySnapshot,
       stageEntrySnapshot,
+      shops,
     ),
   );
 }
