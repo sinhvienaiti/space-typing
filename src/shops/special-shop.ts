@@ -99,7 +99,7 @@ export function specialShopOffers(
     return Array.from({ length: 4 }, (_, offset) => {
       const itemId =
         EVENT_ITEMS[(start + offset) % EVENT_ITEMS.length] ??
-        EVENT_ITEMS[0];
+        "nova-bomb";
       return {
         key: "event-" + itemId,
         kind: "item" as const,
