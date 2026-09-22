@@ -3206,6 +3206,20 @@ Performance / quality rules:
 ## Step 65
 Run automated drop/pity simulations.
 
+**Status: implemented.**
+
+Automated loot/pity simulation rules:
+
+- simulations call the production `rollLuckPity`, `rollEquipmentRarity`, `rollEquipmentDrop`, `rarityChanceSummary` and `equipmentDropChance` paths rather than duplicating loot formulas;
+- simulation RNG is seeded and deterministic so CI regressions reproduce exactly;
+- every equipment source (normal, elite, golden, treasure, anomaly and boss) is sampled at large roll counts;
+- empirical rarity frequencies must remain close to the production normalized weights;
+- empirical equipment-drop rates must remain close to the production source/Salvage chance;
+- persistent soft pity is statistically verified to increase event frequency versus the same base roll without pity;
+- high Luck is statistically verified to improve pity-assisted event frequency;
+- guaranteed equipment-drop sources remain at 100% in simulation;
+- pity counters are checked to remain within their persisted 0-50 bounds.
+
 ## Step 66
 Manually balance Stage 001-100 through playtesting.
 
