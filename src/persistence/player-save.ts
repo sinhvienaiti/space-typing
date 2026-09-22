@@ -611,6 +611,7 @@ export function createPlayerSave(
     ),
     upgrades: sanitizeUpgradeState(upgrades),
     relics: sanitizeRelicState(relics),
+    ascension: sanitizeAscensionState(ascension, safeCampaign),
   };
   const safeCampaignExpansion = sanitizeCampaignExpansionState(
     campaignExpansion,
@@ -1415,6 +1416,7 @@ function runStateFromSave(save: PlayerSave): RunPersistentState {
     route: save.route,
     upgrades: save.upgrades,
     relics: save.relics,
+    ascension: save.ascension,
   };
 }
 
@@ -1460,7 +1462,7 @@ export function resolvePlayerSaveRecovery(
       resolution.state.upgrades,
       resolution.state.relics,
       save.codex,
-      save.ascension,
+      resolution.state.ascension,
     ),
     recoveryMode: resolution.mode,
   };
