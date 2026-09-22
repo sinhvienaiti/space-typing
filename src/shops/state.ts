@@ -1,7 +1,6 @@
 import { galaxyForStage, normalizeStage } from "../campaign/stage";
 import type { HiddenDiscoveryState } from "../discovery/hidden-content";
 import {
-  addExpansionCurrencyReward,
   sanitizeExpansionCurrencyState,
   type ExpansionCurrencyState,
 } from "../economy/currencies";
@@ -783,31 +782,6 @@ export function canAffordShopPrice(
     currencies.starCrystal >= price.starCrystal &&
     currencies.quantumCore >= price.quantumCore
   );
-}
-
-function spendPrice(
-  credits: number,
-  currenciesInput: ExpansionCurrencyState,
-  priceInput: ShopPrice,
-): {
-  credits: number;
-  expansionCurrencies: ExpansionCurrencyState;
-} | null {
-  const currencies = sanitizeExpansionCurrencyState(currenciesInput);
-  const price = sanitizeShopPrice(priceInput);
-  if (!canAffordShopPrice(credits, currencies, price)) return null;
-
-  return {
-    credits: credits - price.credits,
-    expansionCurrencies: addExpansionCurrencyReward(
-      currencies,
-      {
-        alloy: -price.alloy,
-        starCrystal: -price.starCrystal,
-        quantumCore: -price.quantumCore,
-      },
-    ),
-  };
 }
 
 function subtractCurrencies(
