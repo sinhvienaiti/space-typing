@@ -5,6 +5,7 @@ import {
   multiplierForStreak,
   normalizeWord,
   splitDisplayByTypedLetters,
+  stageWordsPerMinute,
   typingText,
   waveForKills,
 } from "../src/logic";
@@ -70,6 +71,12 @@ describe("typing combat logic", () => {
       enemy(3, "code", 400, 600),
     ];
     expect(chooseTarget(enemies, "s", 400, 700)?.id).toBe(2);
+  });
+
+  it("calculates WPM from active gameplay time", () => {
+    expect(stageWordsPerMinute(300, 60)).toBe(60);
+    expect(stageWordsPerMinute(150, 30)).toBe(60);
+    expect(stageWordsPerMinute(50, 0)).toBe(600);
   });
 
   it("calculates accuracy and wave progression", () => {
