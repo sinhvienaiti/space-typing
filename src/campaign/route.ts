@@ -456,6 +456,14 @@ export function selectRouteNode(
   nodeId: string,
 ): RouteState {
   const state = sanitizeRouteState(stateInput, stage);
+  const existing = selectedRouteNode(state, stage);
+  if (
+    existing !== null &&
+    state.selectedByStage[String(stage)] !== undefined
+  ) {
+    return state;
+  }
+
   const node = routeChoicesForStage(state, stage).find(
     (candidate) => candidate.id === nodeId,
   );
