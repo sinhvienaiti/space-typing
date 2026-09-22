@@ -3449,108 +3449,85 @@ A major feature is complete only when:
 Current implementation checkpoint:
 
 ~~~text
-Completed:
-Step 01-24 core typing combat / Campaign / enemies / Elite / Boss
-Step 25  IndexedDB PlayerSave persistence
-Step 26  autosave + schema migration framework
-Step 27  validated JSON Export / Import
-Step 28  effective-stat calculation pipeline
-Step 29  all 10 core attributes runtime contracts
-Step 30  Item registry + persistent inventory
-Step 31  first recovery consumables
-Step 32  Equipment + 7-slot Loadout
-Step 33  Common/Rare/Epic/Legendary + weighted loot tables
-Step 34  Equipment enhancement +0 -> +5
-Step 35  pause-safe Skill Engine
-Step 36  defensive combat skills
-Step 37  offensive combat skills
-Step 38  persistent 2-slot Support Spell loadout
+Historical implementation:
+- Steps 01-75 are present in this document and form the pre-expansion gameplay/platform baseline.
+- Automated/code milestones are implemented as recorded in their individual sections.
+- Manual browser/audio/playtest items explicitly left open in Steps 66/68/71/75 remain manual validation work, not missing runtime systems.
+
+Gameplay Expansion:
+- M01 Domain contracts + expansion save foundation: COMPLETE
+- M02 Ten-stage checkpoint + rollback: COMPLETE
+- M03 Crash recovery: COMPLETE
+- M04 Resurrection/protection items: COMPLETE
+- M05 Grade + core currency migration: COMPLETE
+- M06 Deterministic finite-stock shops: COMPLETE
 
 Next:
-Step 39  Character registry + Character Select
+- M07 World engine
 ~~~
 
 Current gameplay/progression foundation:
 
 - 1000-stage persistent Campaign;
+- ten-stage committed checkpoint sectors with separate highest-reached state;
+- technical crash recovery separated from gameplay death rollback;
+- Salvage Anchor / Stage Revival Core / Phoenix Core death-protection paths;
 - adaptive Stage + WPM + Accuracy + Vocabulary difficulty;
-- 15 mechanically distinct enemy families;
-- Elite modifier framework;
-- multi-phase boss combat;
+- 15 mechanically distinct enemy families plus Elite/Boss systems and later enemy-visual/reward layers already present in the repository;
 - Hull / Shield / Armor / Energy / Reactor / Focus / Ward runtime;
-- Luck / Salvage reward-factor contracts;
 - unified effective-stat pipeline;
-- PlayerSave schema v7 in IndexedDB;
-- explicit migrations from all earlier PlayerSave schemas;
-- synchronized recovery save + autosave queue + JSON backup;
+- persistent Character roster, Level/Mastery/Talents and milestone unlocks;
+- generic status engine and build synergies;
 - stable item registry + persistent inventory;
-- first recovery consumables with keys 1/2/3;
 - seven equipment slots:
   Weapon / Armor / Shield / Reactor / Utility / Drone / Core;
-- equipment instance persistence with rarity and enhancement;
-- Common / Rare / Epic / Legendary stat scaling;
-- Normal / Elite / Boss weighted equipment loot tables;
-- Luck-adjusted rarity weighting without guaranteed rarity;
-- enhancement foundation +0 through +5;
+- equipment instance persistence with Aluminum / Copper / Silver / Gold / Diamond grades and +0 through +5 enhancement;
+- legacy Common / Rare / Epic / Legendary equipment is migration-only compatibility data;
+- Luck-adjusted five-grade equipment weighting without guaranteed Diamond;
+- persistent Credits / Alloy / Star Crystal / Quantum Core economy;
+- deterministic finite shop instances with persistent stock;
+- shared Normal / Station / Traveling / Black Market / Hidden / Event stock runtime;
+- Service / Upgrade Shop consumes Credits + Alloy through the existing enhancement system;
+- rare resurrection items can appear only as finite stock in eligible rare merchant pools;
+- shop stock participates in checkpoint rollback, crash recovery and stage-entry recovery;
 - Skill Engine:
   Energy / cooldown / charges / typing conditions / per-stage limits;
-- defensive skills:
-  Barrier / Reflect Field / Time Shell / Emergency Repair / Guardian Drone;
-- offensive skills:
-  EMP Burst / Chain Lightning / Mark of Weakness;
-- 2-slot Support Spell loadout selected before a stage;
-- support spells:
-  Sanctuary / Gravity Well / Cleanse / Meteor;
-- support loadout is persisted and backup/import validated.
+- defensive and offensive combat skills plus 2-slot Support Spell loadout;
+- IndexedDB PlayerSave schema v20;
+- explicit migrations from all earlier supported PlayerSave schemas;
+- synchronized recovery mirror + autosave queue + validated JSON backup/import.
 
-Recent validation checkpoints:
+Recent expansion validation checkpoints:
 
 ~~~text
-Equipment Loadout
-857b42384c6d8dcd37d2b1a7cadf7c5874b3fc06
+M01 Domain Contracts
 PASS
 
-Rarity + Loot Tables
-33aaab5fca55c5e84eec6a622a4ea78a7d1e37fb
+M02 Checkpoint / Rollback
 PASS
 
-Enhancement Foundation
-1ee9192a78a8236b487fd60d067e0a440aa3f4b3
+M03 Crash Recovery
 PASS
 
-Skill Engine
-58eacda38dc4e78313679a13b9b41c4806dae2cc
+M04 Death Protection
 PASS
 
-Defensive Skill Foundation
-383d7babc3d6828461b70b286a2581e3277b0f2b
-PASS
+M05 Grade + Core Currency Migration
+CI #190 PASS
 
-Defensive Skills Runtime
-4e621a4f69c92e47eb0b6b5a437966546ba0fd07
-PASS
-
-Offensive Skills Runtime
-98a1076d8d3f2542bfe3247315dab37707d8c631
-PASS
-
-Support Spell Persistence
-3c9a6a54ba4d185fa74206a9c4f99ae0620d5efd
-PASS
-
-Support Spell Runtime
-c00fc7543b506480e237903ecfc68eaa5012d763
-PASS
+M06 Deterministic Finite-Stock Shops
+CI #195 PASS after removal of superseded parallel shop modules
 ~~~
 
 Important implementation notes:
 
-- Current PlayerSave schema is version 7.
+- Current PlayerSave schema is version 20.
 - Permanent systems must extend PlayerSave through explicit migrations.
-- Equipment rarity and enhancement already feed the existing equipment
-  layer of effective-stat calculation.
+- Current runtime equipment uses the five-grade model; legacy rarity names remain only in migration/compatibility paths and historical step notes.
+- `ShopState` is part of `RunPersistentState`, so shop stock is economic segment state rather than a separate local-storage system.
+- M06 temporarily derives a stable 20-stage `world-XX` key for shop identity; M07 must replace that source with the canonical 50-World registry without creating a second shop system.
+- Event/special tokens remain optional per the expansion plan. M06 does not create a permanent Event Token before an earning loop exists.
 - Support spell loadout is separate from core combat skills.
-- Only two support spells may be equipped at once.
 - Core combat skill hotkeys:
   4-8 defensive, 9/0/- offensive.
 - Support spell hotkeys:
@@ -3561,10 +3538,12 @@ Important implementation notes:
 Project-wide requirements remain:
 
 - Campaign scope: 1000 stages;
+- 50 Worlds × 20 stages is the M07 target mapping;
 - character milestone unlocks: every 100 Campaign stages;
 - parent vocabulary library: 18,000 entries / 100 levels;
-- parent typing-text corpus: still expanding;
-- docs/PROJECT_CONTEXT.md remains the primary context/handoff/plan document.
+- parent typing-text corpus: shared through the parent project;
+- `docs/PROJECT_CONTEXT.md` remains the primary context/handoff document;
+- `docs/GAMEPLAY_EXPANSION_MASTER_PLAN.md` is the numbered expansion execution plan.
 
 ---
 
