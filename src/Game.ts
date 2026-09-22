@@ -12,6 +12,14 @@ import {
 } from "./boss/model";
 import type { BossHudState, BossState } from "./boss/model";
 import {
+  bossActionIntervalMultiplier,
+  bossWordLengthPreference,
+  createBossTypingMechanicState,
+  resolveBossWordMechanic,
+  tickBossTypingMechanic,
+  type BossTypingMechanicState,
+} from "./boss/typing-mechanics";
+import {
   bossVisualDefinitionIdForStage,
   bossVisualNameForStage,
 } from "./boss/visual-profile";
@@ -2075,18 +2083,42 @@ export class Game {
 
   private spawnBoss(): void {
     const stage = this.stageConfig;
-    if (stage === null || !isBossStageRole(stage.role)) return;
+    const difficulty = this.difficulty;
+    if (
+      stage === null ||
+      difficulty === null ||
+      !isBossStageRole(stage.role)
+    ) {
+      return;
+    }
 
-    const entry = this.pickBossEntry();
+    const bossVisualStage =
+      this.hiddenEncounterRuntime?.bossStageOverride ??
+      stage.stage;
+    const bossDefinition = enemyDefinition(
+      bossVisualDefinitionIdForStage(
+        bossVisualStage,
+        stage.role,
+      ),
+    );
+    const family = bossDefinition?.family ?? "devil";
+    const mechanic = createBossTypingMechanicState(
+      family,
+      stage.role,
+      1,
+      difficulty,
+    );
+    const entry = this.pickBossEntry(mechanic);
     this.boss = createBossState(
       stage.stage,
       stage.galaxy,
       stage.role,
       entry,
     );
-    const bossVisualStage =
-      this.hiddenEncounterRuntime?.bossStageOverride ??
-      stage.stage;
+    this.boss.typingMechanic = mechanic;
+    this.boss.shieldActive =
+      mechanic.id === "shield-sequence" &&
+      mechanic.active;
     this.boss.name = bossVisualNameForStage(
       bossVisualStage,
       this.boss.role,
@@ -2096,15 +2128,10 @@ export class Game {
     this.projectiles = [];
     this.targetId = null;
     this.boss.actionCooldown =
-      bossActionInterval(this.boss.role, this.boss.phase) /
-      Math.max(0.75, this.difficulty?.bossPressure ?? 1);
+      (bossActionInterval(this.boss.role, this.boss.phase) *
+        bossActionIntervalMultiplier(mechanic)) /
+      Math.max(0.75, difficulty.bossPressure);
     this.hooks.onBossUpdate(toBossHud(this.boss));
-    const bossDefinition = enemyDefinition(
-      bossVisualDefinitionIdForStage(
-        bossVisualStage,
-        this.boss.role,
-      ),
-    );
     if (bossDefinition !== undefined) {
       const fx = enemyFxProfile(bossDefinition.family, "boss-intro");
       const position = this.bossPosition();
@@ -2126,6 +2153,20 @@ export class Game {
     const boss = this.boss;
     if (boss === null) return;
 
+    if (boss.typingMechanic !== undefined) {
+      const mechanicTick = tickBossTypingMechanic(
+        boss.typingMechanic,
+        dt,
+      );
+      boss.typingMechanic = mechanicTick.state;
+      if (mechanicTick.expiredInterrupt) {
+        this.fireBossProjectiles(boss);
+        this.fireBossProjectiles(boss);
+        boss.flash = 1;
+        this.sfx.bossPhase();
+      }
+    }
+
     if (boss.staggerTimer > 0) {
       boss.staggerTimer = Math.max(0, boss.staggerTimer - dt);
       this.hooks.onBossUpdate(toBossHud(boss));
@@ -2137,7 +2178,12 @@ export class Game {
 
     this.fireBossProjectiles(boss);
     boss.actionCooldown =
-      bossActionInterval(boss.role, boss.phase) /
+      (bossActionInterval(boss.role, boss.phase) *
+        (boss.typingMechanic === undefined
+          ? 1
+          : bossActionIntervalMultiplier(
+              boss.typingMechanic,
+            ))) /
       Math.max(0.75, difficulty.bossPressure);
   }
 
@@ -2228,9 +2274,21 @@ export class Game {
     this.hooks.onPhase(this.phase);
   }
 
-  private pickBossEntry(): VocabularyEntry {
+  private pickBossEntry(
+    mechanic?: BossTypingMechanicState,
+  ): VocabularyEntry {
+    const preference =
+      mechanic === undefined
+        ? "normal"
+        : bossWordLengthPreference(mechanic);
     const candidates = this.vocabulary.filter((entry) => {
       const length = typingText(entry.en).length;
+      if (preference === "short") {
+        return length >= 3 && length <= 6;
+      }
+      if (preference === "long") {
+        return length >= 9 && length <= 18;
+      }
       return length >= 5 && length <= 12;
     });
     const source = candidates.length > 0 ? candidates : this.vocabulary;
