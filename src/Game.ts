@@ -311,6 +311,11 @@ import {
   type SkillRuntimeState,
 } from "./skills/engine";
 import {
+  UPGRADEABLE_SKILL_IDS,
+  resolveSkillDefinitionsForLevels,
+  type UpgradeableSkillId,
+} from "./skills/progression";
+import {
   PHOENIX_REVIVE_GRACE_SECONDS,
   phoenixReviveResources,
 } from "./combat/revival";
@@ -435,6 +440,10 @@ export class Game {
   private readonly sfx = new Sfx();
   private readonly priorityKillChain = new PriorityKillChain();
   private readonly skillEngine = new SkillEngine();
+  private skillLevels: Record<UpgradeableSkillId, number> =
+    Object.fromEntries(
+      UPGRADEABLE_SKILL_IDS.map((id) => [id, 1]),
+    ) as Record<UpgradeableSkillId, number>;
 
   private characterId: CharacterId = "vanguard";
   private supportSkillIds: SupportSpellId[] = [
@@ -584,6 +593,22 @@ export class Game {
     this.skillEngine.setDefinitions(definitions);
   }
 
+  setSkillLevels(
+    levels: Partial<Record<UpgradeableSkillId, number>>,
+  ): void {
+    const next = { ...this.skillLevels };
+    for (const id of UPGRADEABLE_SKILL_IDS) {
+      const value = levels[id];
+      next[id] =
+        typeof value === "number" && Number.isFinite(value)
+          ? clamp(Math.floor(value), 1, 5)
+          : 1;
+    }
+    this.skillLevels = next;
+    this.refreshSkillDefinitions();
+    this.hooks.onSkills();
+  }
+
   setSupportSpells(ids: readonly SupportSpellId[]): void {
     this.supportSkillIds = Array.from(
       new Set(ids.filter(isSupportSpellId)),
@@ -619,16 +644,33 @@ export class Game {
                             ? [ZENITH_ACTIVE_SKILL]
                             : [];
 
+    const coreDefinitions =
+      resolveSkillDefinitionsForLevels(
+        [...DEFENSIVE_SKILLS, ...OFFENSIVE_SKILLS],
+        this.skillLevels,
+      );
+
     this.skillEngine.setDefinitions([
       ...characterDefinitions,
-      ...DEFENSIVE_SKILLS,
-      ...OFFENSIVE_SKILLS,
+      ...coreDefinitions,
       ...supportDefinitions,
     ]);
   }
 
   getSkillState(id: string): SkillRuntimeState | null {
     return this.skillEngine.getState(id);
+  }
+
+  getSkillDefinition(id: string): SkillDefinition | null {
+    return this.skillEngine.getDefinition(id);
+  }
+
+  private coreSkillEffectScale(id: UpgradeableSkillId): number {
+    return this.skillEngine.getDefinition(id)?.effectScale ?? 1;
+  }
+
+  private coreSkillMastery(id: UpgradeableSkillId): boolean {
+    return this.skillEngine.getDefinition(id)?.masteryUnlocked === true;
   }
 
   canUseSkill(id: string): SkillBlockReason | null {
@@ -1025,22 +1067,38 @@ export class Game {
   private activateDefensiveSkill(id: DefensiveSkillId): void {
     const playerX = this.width / 2;
     const playerY = this.height - PLAYER_Y_OFFSET;
+    const effectScale = this.coreSkillEffectScale(id);
+    const mastery = this.coreSkillMastery(id);
 
     if (id === "barrier") {
       this.barrierHp = Math.max(
         this.barrierHp,
-        72 + this.playerStats.shield * 0.45,
+        (72 + this.playerStats.shield * 0.45) * effectScale,
       );
-      this.barrierTimer = Math.max(this.barrierTimer, 7);
-      this.addStatus("fortified", 7, "skill:barrier");
+      const duration = 7 * effectScale;
+      this.barrierTimer = Math.max(this.barrierTimer, duration);
+      this.addStatus("fortified", duration, "skill:barrier");
+      if (mastery) {
+        this.stats.shield = clamp(
+          this.stats.shield + this.stats.maxShield * 0.1,
+          0,
+          this.stats.maxShield,
+        );
+      }
       this.burst(playerX, playerY, 28, 188);
       this.sfx.support();
     } else if (id === "reflect-field") {
-      this.reflectTimer = Math.max(this.reflectTimer, 4.5);
+      this.reflectTimer = Math.max(
+        this.reflectTimer,
+        4.5 * effectScale,
+      );
       this.burst(playerX, playerY, 30, 300);
       this.sfx.power();
     } else if (id === "time-shell") {
-      this.timeShellTimer = Math.max(this.timeShellTimer, 5);
+      this.timeShellTimer = Math.max(
+        this.timeShellTimer,
+        5 * effectScale,
+      );
       this.burst(playerX, playerY, 34, 258);
       this.sfx.support();
     } else if (id === "emergency-repair") {
@@ -1055,6 +1113,7 @@ export class Game {
           shield: this.stats.maxShield,
           energy: this.stats.maxEnergy,
         },
+        effectScale,
       );
       this.stats.hull = repaired.hull;
       this.stats.shield = repaired.shield;
@@ -1062,8 +1121,14 @@ export class Game {
       this.burst(playerX, playerY, 34, 138);
       this.sfx.support();
     } else {
-      this.guardianTimer = Math.max(this.guardianTimer, 12);
-      this.guardianBlocks = Math.max(this.guardianBlocks, 3);
+      this.guardianTimer = Math.max(
+        this.guardianTimer,
+        12 * effectScale,
+      );
+      this.guardianBlocks = Math.max(
+        this.guardianBlocks,
+        3 + (mastery ? 1 : 0),
+      );
       this.burst(playerX, playerY, 26, 48);
       this.sfx.support();
     }
@@ -1072,13 +1137,22 @@ export class Game {
   }
 
   private activateOffensiveSkill(id: OffensiveSkillId): void {
+    const effectScale = this.coreSkillEffectScale(id);
+    const mastery = this.coreSkillMastery(id);
+
     if (id === "emp-burst") {
-      this.activateEmpPulse(2.5);
+      this.activateEmpPulse(2.5 * effectScale);
+      if (mastery) {
+        this.skillEngine.reduceCooldowns(1.25);
+      }
       return;
     }
 
     if (id === "chain-lightning") {
-      const chainTargets = this.hasBuildSynergy("arc-circuit") ? 6 : 4;
+      const chainTargets =
+        (this.hasBuildSynergy("arc-circuit") ? 6 : 4) +
+        Math.floor((effectScale - 1) * 4) +
+        (mastery ? 1 : 0);
       const targets = [...this.enemies]
         .sort((a, b) => b.y - a.y)
         .slice(0, chainTargets);
@@ -1106,7 +1180,8 @@ export class Game {
             1,
             Math.round(
               this.boss.maxHp *
-                (this.hasBuildSynergy("arc-circuit") ? 0.05 : 0.04),
+                (this.hasBuildSynergy("arc-circuit") ? 0.05 : 0.04) *
+                  effectScale,
             ),
           ),
           this.playerStats,
@@ -1126,7 +1201,9 @@ export class Game {
     }
 
     this.activateMarkOfWeakness(
-      this.hasBuildSynergy("oracle-lens") ? 11 : 8,
+      (this.hasBuildSynergy("oracle-lens") ? 11 : 8) *
+        effectScale +
+        (mastery ? 2 : 0),
     );
   }
 
