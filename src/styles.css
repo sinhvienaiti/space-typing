@@ -1808,6 +1808,47 @@ kbd {
   background: rgba(255, 125, 153, 0.045);
 }
 
+.route-node-hidden-signal {
+  border-color: rgba(193, 120, 255, 0.22);
+  background:
+    linear-gradient(
+      135deg,
+      rgba(143, 88, 255, 0.1),
+      rgba(71, 222, 255, 0.04)
+    );
+}
+
+.challenge-dialog {
+  width: min(760px, calc(100vw - 32px));
+}
+
+.challenge-tier-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.challenge-tier-grid button {
+  min-height: 92px;
+  padding: 14px;
+  text-align: left;
+  line-height: 1.45;
+  border-color: rgba(179, 127, 255, 0.2);
+  background: rgba(128, 86, 255, 0.055);
+}
+
+.challenge-tier-grid button:hover {
+  border-color: rgba(193, 150, 255, 0.55);
+  background: rgba(128, 86, 255, 0.1);
+}
+
+@media (max-width: 680px) {
+  .challenge-tier-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .route-selected-panel {
   display: grid;
   gap: 8px;
