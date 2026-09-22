@@ -105,6 +105,10 @@ export function createCheckpointSnapshot(
   };
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
 function isValidCampaignSnapshot(value: unknown): value is CampaignProgress {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return false;
@@ -113,8 +117,14 @@ function isValidCampaignSnapshot(value: unknown): value is CampaignProgress {
   const raw = value as Record<string, unknown>;
   if (
     raw.version !== 1 ||
-    typeof raw.highestUnlockedStage !== "number" ||
-    typeof raw.selectedStage !== "number" ||
+    !Number.isInteger(raw.highestUnlockedStage) ||
+    !isFiniteNumber(raw.highestUnlockedStage) ||
+    raw.highestUnlockedStage < 1 ||
+    raw.highestUnlockedStage > MAX_CAMPAIGN_STAGE ||
+    !Number.isInteger(raw.selectedStage) ||
+    !isFiniteNumber(raw.selectedStage) ||
+    raw.selectedStage < 1 ||
+    raw.selectedStage > raw.highestUnlockedStage ||
     !Array.isArray(raw.clearedStages) ||
     raw.bestByStage === null ||
     typeof raw.bestByStage !== "object" ||
@@ -123,8 +133,53 @@ function isValidCampaignSnapshot(value: unknown): value is CampaignProgress {
     return false;
   }
 
-  const safe = sanitizeCampaignProgress(value);
-  return JSON.stringify(safe) === JSON.stringify(value);
+  const cleared = raw.clearedStages;
+  if (
+    new Set(cleared).size !== cleared.length ||
+    !cleared.every(
+      (stage, index) =>
+        Number.isInteger(stage) &&
+        isFiniteNumber(stage) &&
+        stage >= 1 &&
+        stage <= raw.highestUnlockedStage &&
+        (index === 0 ||
+          (typeof cleared[index - 1] === "number" &&
+            stage > cleared[index - 1])),
+    )
+  ) {
+    return false;
+  }
+
+  for (const [key, best] of Object.entries(raw.bestByStage)) {
+    const stage = Number(key);
+    if (
+      !Number.isInteger(stage) ||
+      stage < 1 ||
+      stage > MAX_CAMPAIGN_STAGE ||
+      best === null ||
+      typeof best !== "object" ||
+      Array.isArray(best)
+    ) {
+      return false;
+    }
+
+    const candidate = best as Record<string, unknown>;
+    if (
+      !isFiniteNumber(candidate.score) ||
+      candidate.score < 0 ||
+      !isFiniteNumber(candidate.accuracy) ||
+      candidate.accuracy < 0 ||
+      candidate.accuracy > 100 ||
+      !isFiniteNumber(candidate.wpm) ||
+      candidate.wpm < 0 ||
+      typeof candidate.clearedAt !== "string" ||
+      candidate.clearedAt.length === 0
+    ) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export function isValidCheckpointSnapshot(
