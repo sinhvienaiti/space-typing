@@ -5,6 +5,7 @@ import {
   equipmentStatBonus,
   evolveEquipmentInstance,
   rerollEquipmentAffix,
+  type EquipmentState,
 } from "../src/equipment/loadout";
 
 describe("M17 equipment affix/evolution runtime", () => {
@@ -35,7 +36,7 @@ describe("M17 equipment affix/evolution runtime", () => {
   it("rerolls one affix while keeping other affixes locked", () => {
     const starter = createStarterEquipmentState();
     const weaponId = starter.loadout.weapon!;
-    const gold = {
+    const gold: EquipmentState = {
       ...starter,
       items: starter.items.map((item) =>
         item.instanceId === weaponId
