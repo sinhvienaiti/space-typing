@@ -26,10 +26,12 @@ export function earlyStageBalancePoint(
     recentAccuracy: 96,
   });
 
+  // Moment-to-moment reaction pressure intentionally excludes total
+  // enemyBudget. Budget controls encounter duration, while speed/spawn
+  // cadence control how stressful a single combat window feels.
   const pressureIndex =
     difficulty.combatPressure *
-    difficulty.enemySpeed *
-    Math.sqrt(config.enemyBudget) /
+    difficulty.enemySpeed /
     difficulty.spawnInterval;
 
   return {
