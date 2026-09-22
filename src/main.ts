@@ -3936,7 +3936,7 @@ function renderRouteMap(): void {
 
   challengeAction.classList.toggle(
     "hidden",
-    hiddenOffer === null || hiddenHandled,
+    hiddenOffer === null || hiddenHandled || hiddenActive,
   );
   if (hiddenOffer !== null) {
     challengeAction.textContent = hiddenActive
@@ -3999,6 +3999,10 @@ function renderChallengeDialog(
       "[data-challenge-tier]",
     ),
   );
+  const active =
+    challenge.active?.offerId === offer.id
+      ? challenge.active
+      : null;
   for (const button of buttons) {
     const tier = button.dataset.challengeTier as
       | HiddenChallengeTier
@@ -4012,8 +4016,12 @@ function renderChallengeDialog(
       definition.pressureMultiplier.toFixed(2) +
       "x pressure · " +
       definition.rewardMultiplier.toFixed(2) +
-      "x premium reward";
+      "x premium reward" +
+      (active?.tier === tier ? " · LOCKED" : "");
+    button.disabled = active !== null;
   }
+  byId<HTMLButtonElement>("challengeSkipButton").disabled =
+    active !== null;
 }
 
 async function openCurrentChallenge(): Promise<void> {
