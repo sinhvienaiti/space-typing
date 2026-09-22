@@ -2505,6 +2505,204 @@ export class Game {
     this.sfx.support();
   }
 
+  private enemySkillPressure(
+    skillId: EnemySkillId,
+    difficulty: DifficultyProfile | null,
+  ): number {
+    const definition = enemySkillDefinition(skillId);
+    const safeDifficulty = difficulty ?? this.difficulty;
+    if (safeDifficulty === null) return 1;
+
+    if (definition.category === "attack") {
+      return (
+        safeDifficulty.projectilePressure *
+        this.stageEventModifiers.projectilePressureMultiplier
+      );
+    }
+
+    return safeDifficulty.combatPressure;
+  }
+
+  private enemySkillCooldown(
+    skillId: EnemySkillId,
+    difficulty: DifficultyProfile | null,
+  ): number {
+    const definition = enemySkillDefinition(skillId);
+    return (
+      definition.cooldown /
+      Math.max(
+        0.7,
+        this.enemySkillPressure(skillId, difficulty),
+      )
+    );
+  }
+
+  private enemySkillTelegraph(
+    skillId: EnemySkillId,
+    difficulty: DifficultyProfile,
+  ): number {
+    const definition = enemySkillDefinition(skillId);
+    const pressure = clamp(
+      0.85 + difficulty.combatPressure * 0.12,
+      0.85,
+      1.25,
+    );
+    return definition.telegraph / pressure;
+  }
+
+  private beginEnemySkill(
+    enemy: Enemy,
+    skillId: EnemySkillId,
+    difficulty: DifficultyProfile,
+  ): void {
+    enemy.pendingSkillId = skillId;
+    enemy.skillTelegraphRemaining = this.enemySkillTelegraph(
+      skillId,
+      difficulty,
+    );
+    enemy.actionCooldown = 0;
+    enemy.flash = Math.max(enemy.flash, 0.35);
+
+    const definition = enemySkillDefinition(skillId);
+    const hue =
+      definition.category === "control"
+        ? 205
+        : definition.category === "support"
+          ? 145
+          : definition.category === "defense"
+            ? 185
+            : 24;
+    this.burst(enemy.x, enemy.y, 10, hue);
+    this.sfx.projectileWarning();
+  }
+
+  private executeEnemySkill(
+    enemy: Enemy,
+    skillId: EnemySkillId,
+    difficulty: DifficultyProfile,
+  ): void {
+    const definition = enemySkillDefinition(skillId);
+    const effect = definition.effect;
+
+    if (effect.type === "projectile") {
+      this.fireEnemyProjectile(enemy);
+      return;
+    }
+
+    if (effect.type === "volley") {
+      this.fireEnemyProjectile(enemy);
+      this.fireEnemyProjectile(enemy);
+      return;
+    }
+
+    if (effect.type === "reinforce-self") {
+      const reinforced = reinforceEnemyLayerPlan(
+        enemy.layerPlan ??
+          enemyLayerPlan(
+            enemy.kind,
+            clamp(enemy.layersRemaining, 1, 3) as 1 | 2 | 3,
+          ),
+        enemy.layersRemaining,
+        enemy.kind,
+      );
+      enemy.layerPlan = reinforced.plan;
+      enemy.layersRemaining = reinforced.remaining;
+      enemy.flash = 1;
+      this.burst(enemy.x, enemy.y, 18, 185);
+      this.sfx.support();
+      return;
+    }
+
+    if (effect.type === "reinforce-ally") {
+      this.reinforceAlly(enemy);
+      return;
+    }
+
+    if (effect.type === "summon-scout") {
+      this.spawnCarrierChild(enemy);
+      return;
+    }
+
+    if (effect.type === "drain") {
+      this.drainOverdrive(enemy);
+      return;
+    }
+
+    const durationScale = clamp(
+      0.72 + difficulty.combatPressure * 0.2,
+      0.72,
+      1.2,
+    );
+    const duration = effect.duration * durationScale;
+    const source = "enemy-skill:" + skillId;
+
+    if (!effect.hardCc) {
+      this.addStatus(effect.status, duration, source, true);
+      return;
+    }
+
+    const hardCcId: HardCcId | null =
+      effect.status === "frozen"
+        ? "freeze"
+        : effect.status === "silenced"
+          ? "silence"
+          : null;
+    if (
+      hardCcId === null ||
+      !canApplyHardCc(this.hardCcState, hardCcId)
+    ) {
+      return;
+    }
+
+    if (this.addStatus(effect.status, duration, source, true)) {
+      this.hardCcState = beginHardCc(
+        this.hardCcState,
+        hardCcId,
+        duration,
+        effect.immunityAfter,
+      );
+    }
+  }
+
+  private executeLegacyEnemyAction(enemy: Enemy): void {
+    if (enemy.kind === "carrier") {
+      this.spawnCarrierChild(enemy);
+    } else if (enemy.kind === "jammer") {
+      this.activateInterference(enemy);
+    } else if (enemy.kind === "healer") {
+      this.reinforceAlly(enemy);
+    } else if (enemy.kind === "leech") {
+      this.drainOverdrive(enemy);
+    } else if (enemy.kind === "commander") {
+      this.commandPulse(enemy);
+    } else {
+      this.fireEnemyProjectile(enemy);
+    }
+  }
+
+  private legacyEnemyActionCooldown(
+    enemy: Enemy,
+    difficulty: DifficultyProfile,
+  ): number {
+    const baseInterval =
+      enemyProfile(
+        enemy.kind,
+        this.stageConfig?.galaxy ?? 1,
+      ).actionInterval ?? 4;
+    const supportAction =
+      enemy.kind === "carrier" ||
+      enemy.kind === "jammer" ||
+      enemy.kind === "healer" ||
+      enemy.kind === "leech" ||
+      enemy.kind === "commander";
+    const pressure = supportAction
+      ? difficulty.combatPressure
+      : difficulty.projectilePressure *
+        this.stageEventModifiers.projectilePressureMultiplier;
+
+    return baseInterval / Math.max(0.7, pressure);
+  }
+
   private spawnCarrierChild(carrier: Enemy): void {
     if (this.difficulty === null) return;
     if (this.enemies.length >= this.difficulty.maxEnemies + 2) return;
