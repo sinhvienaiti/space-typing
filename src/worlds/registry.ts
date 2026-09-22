@@ -13,6 +13,19 @@ export const WORLD_COUNT = 50;
 export const WORLDS_PER_GALAXY = 5;
 export const STAGES_PER_WORLD = 20;
 
+export const WORLD_RANK_LABELS = [
+  "I",
+  "II",
+  "III",
+  "IV",
+  "V",
+  "VI",
+  "VII",
+  "VIII",
+  "IX",
+  "X",
+] as const;
+
 export const WORLD_IDS = Array.from(
   { length: WORLD_COUNT },
   (_, index) => "world-" + String(index + 1).padStart(2, "0"),
@@ -257,9 +270,7 @@ function rankDistribution(worldIndex: number): Readonly<Record<string, number>> 
   const progress = worldIndex / (WORLD_COUNT - 1);
   const peak = 1 + Math.round(progress * 9);
   const result: Record<string, number> = {};
-  const labels = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
-
-  labels.forEach((label, index) => {
+  WORLD_RANK_LABELS.forEach((label, index) => {
     const rank = index + 1;
     const distance = Math.abs(rank - peak);
     result[label] =
@@ -492,6 +503,21 @@ export function validateWorldRegistry(
       !world.enemyFamilies.includes(worldBoss.family)
     ) {
       errors.push(world.id + ": invalid World Boss contract.");
+    }
+
+    const rankWeights = WORLD_RANK_LABELS.map(
+      (label) => world.rankDistribution[label],
+    );
+    if (
+      rankWeights.some(
+        (weight) =>
+          typeof weight !== "number" ||
+          !Number.isFinite(weight) ||
+          weight < 0,
+      ) ||
+      !rankWeights.some((weight) => (weight ?? 0) > 0)
+    ) {
+      errors.push(world.id + ": invalid rank-distribution contract.");
     }
     if (
       world.visualTheme.trim().length === 0 ||
