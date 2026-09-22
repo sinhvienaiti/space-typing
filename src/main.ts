@@ -1711,10 +1711,6 @@ function renderBoss(boss: BossHudState | null): void {
 
   if (boss.phase !== lastMusicBossPhase) {
     musicController.setBossPhase(boss.phase);
-    musicController.duckFor(
-      "warning",
-      lastMusicBossPhase === 0 ? 900 : 600,
-    );
     lastMusicBossPhase = boss.phase;
   }
 
