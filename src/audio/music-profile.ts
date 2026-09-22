@@ -1,3 +1,4 @@
+import type { StageRole } from "../campaign/types";
 import type { WorldProfile } from "../worlds/types";
 import { WORLD_REGISTRY } from "../worlds/registry";
 
@@ -233,6 +234,22 @@ export function resolveMusicState(
   if (context.station) return "STATION";
   if (context.shop) return "SHOP";
   return context.intense ? "WORLD_INTENSE" : "WORLD_NORMAL";
+}
+
+export function musicStateForStageRole(
+  role: StageRole,
+): MusicState {
+  if (role === "major-boss") return "GALAXY_BOSS";
+  if (role === "boss") return "WORLD_BOSS";
+  if (role === "mini-boss") return "MINI_BOSS";
+  if (
+    role === "elite" ||
+    role === "gauntlet" ||
+    role === "hazard"
+  ) {
+    return "WORLD_INTENSE";
+  }
+  return "WORLD_NORMAL";
 }
 
 export function musicAssetForState(
