@@ -261,6 +261,8 @@ import {
   telegraphStrength,
   type ImpactKind,
 } from "./vfx/polish";
+import { enemyFxProfile } from "./vfx/enemy-fx";
+import { rewardFxProfile } from "./vfx/reward-fx";
 import {
   FrameProfiler,
   qualityProfile,
@@ -404,6 +406,13 @@ export class Game {
   private cloakTimer = 0;
   private weaponOverclockTimer = 0;
   private rewardScoreMultiplierTimer = 0;
+  private rewardNotice: {
+    label: string;
+    x: number;
+    y: number;
+    hue: number;
+    remaining: number;
+  } | null = null;
   private celestialCharge = 0;
   private skillHudTimer = 0;
   private supplyPod: SupplyPod | null = null;
@@ -1365,6 +1374,7 @@ export class Game {
     this.cloakTimer = 0;
     this.weaponOverclockTimer = 0;
     this.rewardScoreMultiplierTimer = 0;
+    this.rewardNotice = null;
     this.celestialCharge = 0;
     this.statusState = createStatusState();
     this.interferenceTimer = 0;
@@ -1593,6 +1603,13 @@ export class Game {
       0,
       this.rewardScoreMultiplierTimer - dt,
     );
+    if (this.rewardNotice !== null) {
+      this.rewardNotice.remaining = Math.max(
+        0,
+        this.rewardNotice.remaining - dt,
+      );
+      if (this.rewardNotice.remaining <= 0) this.rewardNotice = null;
+    }
 
     if (this.barrierTimer <= 0) this.barrierHp = 0;
     if (this.guardianTimer <= 0) this.guardianBlocks = 0;
@@ -1842,6 +1859,14 @@ export class Game {
       bossActionInterval(this.boss.role, this.boss.phase) /
       Math.max(0.75, this.difficulty?.bossPressure ?? 1);
     this.hooks.onBossUpdate(toBossHud(this.boss));
+    const bossDefinition = enemyDefinition(
+      bossVisualDefinitionId(stage.galaxy),
+    );
+    if (bossDefinition !== undefined) {
+      const fx = enemyFxProfile(bossDefinition.family, "boss-intro");
+      const position = this.bossPosition();
+      this.burst(position.x, position.y, fx.count, fx.hue);
+    }
     this.sfx.bossEntrance();
 
     if (this.settings.screenShake) {
@@ -2137,11 +2162,12 @@ export class Game {
       profile.radius + 70,
       this.width - profile.radius - 70,
     );
+    const definitionId = spawnEnemyDefinitionId(kind, elite, stage);
 
     this.enemies.push({
       id: this.nextEnemyId++,
       kind,
-      definitionId: spawnEnemyDefinitionId(kind, elite, stage),
+      definitionId,
       elite,
       golden,
       eliteModifiers,
@@ -2164,6 +2190,12 @@ export class Game {
       kick: 0,
       actionCooldown: eliteStats.actionCooldown,
     });
+
+    const spawnDefinition = enemyDefinition(definitionId);
+    if (spawnDefinition !== undefined) {
+      const fx = enemyFxProfile(spawnDefinition.family, "spawn");
+      this.burst(baseX, 12, fx.count, fx.hue);
+    }
 
     if (elite) {
       const firstElite = this.eliteSpawned === 0;
@@ -2513,7 +2545,14 @@ export class Game {
     }
 
     const { x, y } = this.bossPosition();
-    this.burst(x, y, 44, boss.phase >= 3 ? 350 : 176);
+    const definition = enemyDefinition(
+      bossVisualDefinitionId(this.stageConfig?.galaxy ?? 1),
+    );
+    const fx = enemyFxProfile(
+      definition?.family ?? "devil",
+      "boss-phase",
+    );
+    this.burst(x, y, fx.count, fx.hue);
     this.sfx.bossPhase();
 
     if (this.settings.screenShake) {
@@ -2533,7 +2572,14 @@ export class Game {
     this.addScore(1200 * this.stats.multiplier);
     this.gainPower(18);
 
-    this.burst(x, y, 70, 24);
+    const definition = enemyDefinition(
+      bossVisualDefinitionId(this.stageConfig?.galaxy ?? 1),
+    );
+    const fx = enemyFxProfile(
+      definition?.family ?? "devil",
+      "boss-death",
+    );
+    this.burst(x, y, fx.count, fx.hue);
     this.sfx.bossDeath();
     this.tryRollEquipmentDrop("boss");
 
@@ -2670,7 +2716,7 @@ export class Game {
     if (drone.typed >= word.length) {
       const drop = rollEquipmentDrop(
         "treasure",
-        this.playerStats.luck,
+        this.effectiveLuck(),
         this.playerStats.salvage,
       );
       if (drop !== null) {
@@ -2869,12 +2915,12 @@ export class Game {
       this.gainPower(4);
 
       this.fireLaser(enemy, 1.25);
-      this.burst(
-        enemy.x,
-        enemy.y,
-        enemy.kind === "shield" ? 25 : 18,
-        enemy.kind === "shield" ? 164 : 202,
+      const hitDefinition = this.visualDefinitionForEnemy(enemy);
+      const hitFx = enemyFxProfile(
+        hitDefinition?.family ?? "rainbow",
+        "hit",
       );
+      this.burst(enemy.x, enemy.y, hitFx.count, hitFx.hue);
       this.sfx.hit();
       this.targetId = null;
       return;
@@ -2885,12 +2931,12 @@ export class Game {
     this.gainPower(7);
 
     this.fireLaser(enemy, 1.45);
-    this.burst(
-      enemy.x,
-      enemy.y,
-      enemy.kind === "tank" ? 36 : 24,
-      enemy.kind === "mine" ? 342 : 188,
+    const deathDefinition = this.visualDefinitionForEnemy(enemy);
+    const deathFx = enemyFxProfile(
+      deathDefinition?.family ?? "rainbow",
+      "death",
     );
+    this.burst(enemy.x, enemy.y, deathFx.count, deathFx.hue);
     this.sfx.hit();
     this.sfx.kill();
     if (enemy.golden) {
@@ -2924,8 +2970,8 @@ export class Game {
     this.targetId = null;
   }
 
-  private activateEnemyReward(enemy: Enemy): void {
-    const definition = enemyDefinition(
+  private visualDefinitionForEnemy(enemy: Enemy) {
+    return enemyDefinition(
       enemy.definitionId ??
         runtimeEnemyDefinitionId(
           enemy.kind,
@@ -2933,6 +2979,10 @@ export class Game {
           this.stageConfig?.stage ?? 1,
         ),
     );
+  }
+
+  private activateEnemyReward(enemy: Enemy): void {
+    const definition = this.visualDefinitionForEnemy(enemy);
     if (definition?.reward === undefined) return;
 
     const effect = applyEnemyRewardEffect(
@@ -3006,12 +3056,24 @@ export class Game {
       definition.rewardPower,
     );
 
-    this.burst(enemy.x, enemy.y, 32, 48);
-    this.sfx.power();
+    const rewardFx = rewardFxProfile(definition.reward);
+    this.burst(enemy.x, enemy.y, rewardFx.count, rewardFx.hue);
+    if (rewardFx.audio === "support") {
+      this.sfx.support();
+    } else if (rewardFx.audio === "rare-drop") {
+      this.sfx.rareDrop();
+    } else {
+      this.sfx.power();
+    }
+    this.rewardNotice = {
+      label: effect.label,
+      x: enemy.x,
+      y: enemy.y,
+      hue: rewardFx.hue,
+      remaining: 1.05,
+    };
     this.hooks.onStatuses(this.statusState);
     this.emitStats();
-
-    void effect;
   }
 
   private spawnVolatileBurst(enemy: Enemy): void {
@@ -3939,6 +4001,7 @@ export class Game {
     this.drawPlayer(time);
     this.drawDefensiveEffects(time);
     this.drawTargetLine();
+    this.drawRewardNotice();
 
     if (this.overdriveTimer > 0) {
       context.fillStyle =
@@ -4936,6 +4999,36 @@ export class Game {
     context.shadowColor = "#57efff";
     context.fillText(remaining, left + typedWidth, y);
 
+    context.restore();
+  }
+
+  private drawRewardNotice(): void {
+    const notice = this.rewardNotice;
+    if (notice === null) return;
+
+    const context = this.context;
+    const alpha = clamp(notice.remaining / 1.05, 0, 1);
+    const lift = (1 - alpha) * 22;
+    const y = notice.y - 54 - lift;
+
+    context.save();
+    context.globalCompositeOperation = "source-over";
+    context.globalAlpha = alpha;
+    context.font =
+      "850 13px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    const width = context.measureText(notice.label).width;
+    context.fillStyle = "rgba(3, 9, 20, 0.9)";
+    context.fillRect(
+      notice.x - width / 2 - 9,
+      y - 12,
+      width + 18,
+      24,
+    );
+    context.fillStyle =
+      "hsl(" + String(notice.hue) + " 90% 78%)";
+    context.fillText(notice.label, notice.x, y);
     context.restore();
   }
 

@@ -113,6 +113,41 @@ function drawAura(
   context.restore();
 }
 
+
+function drawOrbit(
+  context: CanvasRenderingContext2D,
+  definition: EnemyDefinition,
+  radius: number,
+  age: number,
+  palette: EnemyVisualPalette,
+): void {
+  if (definition.visual.orbit === undefined) return;
+
+  context.save();
+  context.strokeStyle = palette.outline;
+  context.fillStyle = palette.outline;
+  context.lineWidth = 1.2;
+  context.globalAlpha = 0.58;
+  context.rotate(age * 0.34);
+  context.beginPath();
+  context.ellipse(0, 0, radius * 1.42, radius * 0.52, 0.2, 0, Math.PI * 2);
+  context.stroke();
+
+  for (let index = 0; index < 3; index += 1) {
+    const angle = (Math.PI * 2 * index) / 3 + age * 0.7;
+    context.beginPath();
+    context.arc(
+      Math.cos(angle) * radius * 1.42,
+      Math.sin(angle) * radius * 0.52,
+      Math.max(1.8, radius * 0.06),
+      0,
+      Math.PI * 2,
+    );
+    context.fill();
+  }
+  context.restore();
+}
+
 function drawWing(
   context: CanvasRenderingContext2D,
   x: number,
@@ -277,6 +312,72 @@ function drawHead(
     return;
   }
 
+  if (head.includes("prism") || head.includes("void-eye")) {
+    context.save();
+    context.strokeStyle = palette.outline;
+    context.lineWidth = 1.7;
+    context.shadowBlur = 8;
+    context.shadowColor = palette.outline;
+    context.rotate(Math.sin(age * 0.8) * 0.08);
+    context.beginPath();
+    context.ellipse(
+      0,
+      -radius * 0.92,
+      radius * 0.46,
+      radius * 0.18,
+      0,
+      0,
+      Math.PI * 2,
+    );
+    context.stroke();
+    context.restore();
+    return;
+  }
+
+  if (head.includes("ice")) {
+    context.save();
+    context.fillStyle = palette.outline;
+    for (const x of [-0.34, 0, 0.34]) {
+      context.beginPath();
+      context.moveTo(radius * x - radius * 0.13, -radius * 0.68);
+      context.lineTo(radius * x, -radius * 1.28);
+      context.lineTo(radius * x + radius * 0.13, -radius * 0.68);
+      context.closePath();
+      context.fill();
+    }
+    context.restore();
+    return;
+  }
+
+  if (
+    head.includes("leaf") ||
+    head.includes("flower") ||
+    head.includes("star")
+  ) {
+    context.save();
+    context.fillStyle = palette.outline;
+    const count = head.includes("flower") ? 5 : 3;
+    for (let index = 0; index < count; index += 1) {
+      const angle =
+        -Math.PI / 2 +
+        (index - (count - 1) / 2) * 0.34 +
+        Math.sin(age * 1.4) * 0.02;
+      context.beginPath();
+      context.ellipse(
+        Math.cos(angle) * radius * 0.42,
+        -radius * 0.78 + Math.sin(angle) * radius * 0.24,
+        radius * 0.13,
+        radius * 0.25,
+        angle,
+        0,
+        Math.PI * 2,
+      );
+      context.fill();
+    }
+    context.restore();
+    return;
+  }
+
   if (head.includes("horn") || head.includes("crown")) {
     context.save();
     context.fillStyle = palette.outline;
@@ -355,6 +456,7 @@ export function drawModularEnemy(
   context.save();
   context.globalCompositeOperation = "lighter";
   drawAura(context, radius, input.age, palette);
+  drawOrbit(context, definition, radius, input.age, palette);
   drawWings(context, definition, radius, input.age, palette);
   drawBody(
     context,
