@@ -3154,6 +3154,21 @@ Art / asset pipeline rules:
 ## Step 62
 Polish particles, glow, hit-stop, shake and telegraphs.
 
+**Status: implemented.**
+
+VFX polish rules:
+
+- correct-key laser/flash/recoil and existing quality-scaled particle bursts remain the base feedback layer;
+- word completion adds a very short simulation-only hit-stop, while boss-word and boss-defeat impacts use slightly stronger but still sub-100ms stops;
+- keyboard handling remains active during hit-stop so visual emphasis never introduces typing input latency;
+- hit-stop resets at every stage start and cannot leak into Retry/Next Stage;
+- screen shake remains user-controlled and impact feedback only raises the existing bounded shake value;
+- enemies with action cooldowns now receive a readable warning ring during the final attack window;
+- Sniper keeps its line-to-player telegraph in addition to the shared warning ring;
+- bosses receive a larger pulsing attack ring based on their action cooldown and never telegraph while staggered;
+- telegraphs are drawn before ship/word rendering so warnings do not cover typing text;
+- helper math for hit-stop and telegraph strength/pulse is deterministic and unit-tested.
+
 ## Step 63
 Tune SFX and pronunciation balance.
 
