@@ -32,6 +32,8 @@ export const ENEMY_DEFINITION_IDS = [
   "freeze-burst-sprite",
   "seraph-elite",
   "berserk-devil",
+  "frost-keeper",
+  "fortune-prism",
   "archangel-core",
   "demon-lord-orb",
 ] as const;
@@ -94,6 +96,18 @@ const frostBase = {
   spawnFx: "frost-pop",
   hitFx: "ice-spark",
   deathFx: "frost-burst",
+} satisfies EnemyVisualProfile;
+
+const prismBase = {
+  body: "prism-crystal-orb",
+  face: "cute-round",
+  wings: "fairy",
+  head: "prism-ring",
+  aura: "prism-sparkle",
+  orbit: "prism-orbit",
+  spawnFx: "prism-pop",
+  hitFx: "prism-spark",
+  deathFx: "prism-burst",
 } satisfies EnemyVisualProfile;
 
 export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
@@ -312,6 +326,45 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
       head: "large-horns",
       aura: "infernal-flame-elite",
       rewardMarker: ENEMY_REWARD_DEFINITIONS["damage-up"].marker,
+    },
+  },
+  {
+    id: "frost-keeper",
+    name: "Frost Keeper",
+    family: "frost",
+    role: "elite",
+    rarity: "elite",
+    minStage: 110,
+    spawnWeight: 0.025,
+    durabilityScale: 1.55,
+    speedScale: 0.86,
+    reward: "slow-nearby",
+    rewardPower: 5,
+    visual: {
+      ...frostBase,
+      wings: "crystal-large",
+      head: "ice-crown",
+      aura: "frost-mist-elite",
+      rewardMarker:
+        ENEMY_REWARD_DEFINITIONS["slow-nearby"].marker,
+    },
+  },
+  {
+    id: "fortune-prism",
+    name: "Fortune Prism",
+    family: "prism",
+    role: "elite",
+    rarity: "elite",
+    minStage: 140,
+    spawnWeight: 0.02,
+    durabilityScale: 1.45,
+    speedScale: 0.96,
+    reward: "luck-up",
+    rewardPower: 18,
+    visual: {
+      ...prismBase,
+      aura: "prism-sparkle-elite",
+      rewardMarker: ENEMY_REWARD_DEFINITIONS["luck-up"].marker,
     },
   },
   {

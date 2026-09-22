@@ -18,6 +18,8 @@ describe("core four enemy visual mapping", () => {
   it("reuses the existing elite flag for elite visual evolution", () => {
     expect(runtimeEnemyDefinitionId("healer", true)).toBe("seraph-elite");
     expect(runtimeEnemyDefinitionId("destroyer", true)).toBe("berserk-devil");
+    expect(runtimeEnemyDefinitionId("jammer", true)).toBe("frost-keeper");
+    expect(runtimeEnemyDefinitionId("splitter", true)).toBe("fortune-prism");
   });
 
   it("keeps reward enemies rare and deterministic", () => {

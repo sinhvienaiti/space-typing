@@ -15,6 +15,16 @@ export function runtimeEnemyDefinitionId(
     ) {
       return "seraph-elite";
     }
+    if (
+      kind === "jammer" ||
+      kind === "cloaker" ||
+      kind === "sniper"
+    ) {
+      return "frost-keeper";
+    }
+    if (kind === "splitter") {
+      return "fortune-prism";
+    }
 
     return "berserk-devil";
   }
