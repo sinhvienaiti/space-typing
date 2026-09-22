@@ -11,6 +11,7 @@ import {
   hiddenChallengeHandled,
   hiddenChallengeTierDefinition,
   priorityKillWindowSeconds,
+  priorityTargetChance,
   registerHiddenChallengeOffer,
   sanitizeHiddenChallengeState,
   scaleHiddenChallengeDifficulty,
@@ -96,6 +97,32 @@ describe("M15 hidden challenge contracts", () => {
     expect(state.active).toBeNull();
     expect(state.completedOfferIds).toContain(offer.id);
     expect(hiddenChallengeHandled(state, offer.id)).toBe(true);
+  });
+
+  it("locks Tier and Skip after a challenge has started", () => {
+    const offer = createHiddenChallengeOffer(
+      320,
+      "route-311-stage-320-lane-1-hidden-signal",
+    );
+    let state = registerHiddenChallengeOffer(
+      createHiddenChallengeState(),
+      offer,
+    );
+    state = startHiddenChallenge(state, offer.id, "II");
+
+    const changedTier = startHiddenChallenge(
+      state,
+      offer.id,
+      "III",
+    );
+    const skipped = skipHiddenChallenge(
+      state,
+      offer.id,
+    );
+
+    expect(changedTier.active?.tier).toBe("II");
+    expect(skipped.active?.tier).toBe("II");
+    expect(skipped.skippedOfferIds).not.toContain(offer.id);
   });
 
   it("supports skip without marking a challenge complete", () => {
@@ -218,6 +245,18 @@ describe("M15 hidden challenge contracts", () => {
     expect(priorityKillWindowSeconds(impossible)).toBeGreaterThanOrEqual(
       4.5,
     );
+  });
+
+  it("keeps Champion/Apex priority target cadence high but bounded", () => {
+    for (const tier of HIDDEN_CHALLENGE_TIERS) {
+      const champion = priorityTargetChance("champion", tier);
+      const apex = priorityTargetChance("apex", tier);
+
+      expect(champion).toBeGreaterThanOrEqual(0.6);
+      expect(apex).toBeGreaterThan(champion);
+      expect(apex).toBeLessThanOrEqual(0.94);
+    }
+    expect(priorityTargetChance("none", "III")).toBe(0);
   });
 
   it("marks Champion Hunt and Apex Gauntlet as priority-target encounters", () => {
