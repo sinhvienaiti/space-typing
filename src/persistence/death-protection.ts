@@ -13,6 +13,7 @@ import {
 import {
   isValidCheckpointSnapshot,
   isValidRunPersistentState,
+  migrateLegacyRunPersistentState,
   restoreCheckpointSnapshot,
   sanitizeCheckpointSnapshot,
   sanitizeRunPersistentState,
@@ -112,12 +113,51 @@ export function isValidStageEntrySnapshot(
 export function sanitizeStageEntrySnapshot(
   value: unknown,
 ): StageEntrySnapshot | null {
-  if (!isValidStageEntrySnapshot(value)) return null;
+  if (isValidStageEntrySnapshot(value)) {
+    return createStageEntrySnapshot(
+      value.state,
+      value.campaignExpansion,
+      value.checkpointSnapshot,
+      value.capturedAt,
+    );
+  }
+
+  if (
+    !isRecord(value) ||
+    !Number.isInteger(value.stage) ||
+    typeof value.stage !== "number" ||
+    value.stage < 1 ||
+    value.stage > 1000 ||
+    typeof value.capturedAt !== "string"
+  ) {
+    return null;
+  }
+
+  const state = migrateLegacyRunPersistentState(value.state);
+  if (state === null || state.campaign.selectedStage !== value.stage) {
+    return null;
+  }
+
+  const campaignExpansion = sanitizeCampaignExpansionState(
+    value.campaignExpansion,
+    state.campaign,
+    value.capturedAt,
+  );
+  if (
+    JSON.stringify(campaignExpansion) !==
+    JSON.stringify(value.campaignExpansion)
+  ) {
+    return null;
+  }
 
   return createStageEntrySnapshot(
-    value.state,
-    value.campaignExpansion,
-    value.checkpointSnapshot,
+    state,
+    campaignExpansion,
+    sanitizeCheckpointSnapshot(
+      value.checkpointSnapshot,
+      state,
+      campaignExpansion.checkpoint.stage,
+    ),
     value.capturedAt,
   );
 }
