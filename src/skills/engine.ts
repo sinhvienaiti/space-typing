@@ -13,6 +13,9 @@ export type SkillDefinition = {
   charges: number | null;
   perStageLimit: number | null;
   typingCondition?: SkillTypingCondition;
+  level?: number;
+  effectScale?: number;
+  masteryUnlocked?: boolean;
 };
 
 export type SkillRuntimeState = {
