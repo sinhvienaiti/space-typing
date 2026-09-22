@@ -1,8 +1,10 @@
 import { stageRole } from "../campaign/stage";
 import type { CharacterId } from "../characters/registry";
 import type { EquipmentState } from "../equipment/loadout";
+import type { EquipmentId } from "../equipment/registry";
 import type { HiddenDiscoveryState } from "../discovery/hidden-content";
 import type { Inventory } from "../items/inventory";
+import type { ItemId } from "../items/registry";
 import { EQUIPMENT_IDS } from "../equipment/registry";
 import { ITEM_IDS } from "../items/registry";
 import { CHARACTER_IDS } from "../characters/registry";
@@ -41,6 +43,9 @@ export type MetaProgressState = {
   completedMissions: string[];
   discoveredEnemies: EnemyKind[];
   discoveredBossStages: number[];
+  discoveredItems: ItemId[];
+  discoveredEquipment: EquipmentId[];
+  discoveredCharacters: CharacterId[];
 };
 
 export type StageMission = {
@@ -73,6 +78,9 @@ export function createMetaProgressState(): MetaProgressState {
     completedMissions: [],
     discoveredEnemies: [],
     discoveredBossStages: [],
+    discoveredItems: [],
+    discoveredEquipment: [],
+    discoveredCharacters: [],
   };
 }
 
@@ -143,6 +151,49 @@ export function sanitizeMetaProgressState(
     );
   }
 
+  if (Array.isArray(raw.discoveredItems)) {
+    const seen = new Set<ItemId>();
+    for (const id of raw.discoveredItems) {
+      if (
+        typeof id === "string" &&
+        ITEM_IDS.includes(id as ItemId)
+      ) {
+        seen.add(id as ItemId);
+      }
+    }
+    result.discoveredItems = ITEM_IDS.filter((id) => seen.has(id));
+  }
+
+  if (Array.isArray(raw.discoveredEquipment)) {
+    const seen = new Set<EquipmentId>();
+    for (const id of raw.discoveredEquipment) {
+      if (
+        typeof id === "string" &&
+        EQUIPMENT_IDS.includes(id as EquipmentId)
+      ) {
+        seen.add(id as EquipmentId);
+      }
+    }
+    result.discoveredEquipment = EQUIPMENT_IDS.filter((id) =>
+      seen.has(id),
+    );
+  }
+
+  if (Array.isArray(raw.discoveredCharacters)) {
+    const seen = new Set<CharacterId>();
+    for (const id of raw.discoveredCharacters) {
+      if (
+        typeof id === "string" &&
+        CHARACTER_IDS.includes(id as CharacterId)
+      ) {
+        seen.add(id as CharacterId);
+      }
+    }
+    result.discoveredCharacters = CHARACTER_IDS.filter((id) =>
+      seen.has(id),
+    );
+  }
+
   return result;
 }
 
@@ -160,6 +211,9 @@ export function isValidMetaProgressState(
     Array.isArray(raw.completedMissions) &&
     Array.isArray(raw.discoveredEnemies) &&
     Array.isArray(raw.discoveredBossStages) &&
+    Array.isArray(raw.discoveredItems) &&
+    Array.isArray(raw.discoveredEquipment) &&
+    Array.isArray(raw.discoveredCharacters) &&
     JSON.stringify(sanitized) === JSON.stringify(raw)
   );
 }
@@ -318,6 +372,40 @@ export function recordBossDiscovery(
   };
 }
 
+export function syncOwnedCollection(
+  current: MetaProgressState,
+  input: {
+    inventory: Inventory;
+    equipment: EquipmentState;
+    characters: readonly CharacterId[];
+  },
+): MetaProgressState {
+  const state = sanitizeMetaProgressState(current);
+  const items = new Set(state.discoveredItems);
+  for (const id of ITEM_IDS) {
+    if ((input.inventory[id] ?? 0) > 0) items.add(id);
+  }
+
+  const equipmentIds = new Set(state.discoveredEquipment);
+  for (const item of input.equipment.items) {
+    equipmentIds.add(item.definitionId);
+  }
+
+  const characterIds = new Set(state.discoveredCharacters);
+  for (const id of input.characters) characterIds.add(id);
+
+  return {
+    ...state,
+    discoveredItems: ITEM_IDS.filter((id) => items.has(id)),
+    discoveredEquipment: EQUIPMENT_IDS.filter((id) =>
+      equipmentIds.has(id),
+    ),
+    discoveredCharacters: CHARACTER_IDS.filter((id) =>
+      characterIds.has(id),
+    ),
+  };
+}
+
 export type CollectionSummary = {
   enemies: [number, number];
   bosses: [number, number];
@@ -330,35 +418,31 @@ export type CollectionSummary = {
 
 export function collectionSummary(
   meta: MetaProgressState,
-  input: {
-    inventory: Inventory;
-    equipment: EquipmentState;
-    characters: readonly CharacterId[];
-    hiddenDiscovery: HiddenDiscoveryState;
-  },
+  hiddenDiscovery: HiddenDiscoveryState,
 ): CollectionSummary {
-  const itemCount = ITEM_IDS.filter(
-    (id) => (input.inventory[id] ?? 0) > 0,
-  ).length;
-  const equipmentIds = new Set(
-    input.equipment.items.map((item) => item.definitionId),
-  );
+  const state = sanitizeMetaProgressState(meta);
 
   return {
     enemies: [
-      meta.discoveredEnemies.length,
+      state.discoveredEnemies.length,
       COLLECTION_ENEMY_IDS.length,
     ],
-    bosses: [meta.discoveredBossStages.length, 40],
-    items: [itemCount, ITEM_IDS.length],
-    equipment: [equipmentIds.size, EQUIPMENT_IDS.length],
-    characters: [input.characters.length, CHARACTER_IDS.length],
+    bosses: [state.discoveredBossStages.length, 40],
+    items: [state.discoveredItems.length, ITEM_IDS.length],
+    equipment: [
+      state.discoveredEquipment.length,
+      EQUIPMENT_IDS.length,
+    ],
+    characters: [
+      state.discoveredCharacters.length,
+      CHARACTER_IDS.length,
+    ],
     hidden: [
-      input.hiddenDiscovery.discovered.length,
-      Object.keys(input.hiddenDiscovery.drought).length,
+      hiddenDiscovery.discovered.length,
+      Object.keys(hiddenDiscovery.drought).length,
     ],
     achievements: [
-      meta.achievements.length,
+      state.achievements.length,
       ACHIEVEMENT_IDS.length,
     ],
   };
