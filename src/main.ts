@@ -49,6 +49,23 @@ import {
   type RouteState,
 } from "./campaign/route";
 import {
+  activeHiddenChallengeOffer,
+  completeHiddenChallengeEncounter,
+  createHiddenChallengeOffer,
+  createHiddenChallengeState,
+  hiddenChallengeEncounterProfile,
+  hiddenChallengeHandled,
+  hiddenChallengeKindLabel,
+  hiddenChallengeTierDefinition,
+  registerHiddenChallengeOffer,
+  scaleHiddenChallengeDifficulty,
+  skipHiddenChallenge,
+  startHiddenChallenge,
+  type HiddenChallengeOffer,
+  type HiddenChallengeState,
+  type HiddenChallengeTier,
+} from "./campaign/hidden-challenge";
+import {
   CHARACTER_IDS,
   getCharacter,
 } from "./characters/registry";
@@ -1125,6 +1142,7 @@ let expansionCurrencies: ExpansionCurrencyState =
   createExpansionCurrencyState();
 let shops: ShopState = createShopState();
 let route: RouteState = createRouteState(campaign.highestUnlockedStage);
+let challenge: HiddenChallengeState = createHiddenChallengeState();
 const musicController = new MusicController();
 musicController.setMusicVolume(settings.musicVolume);
 musicController.setAmbientVolume(settings.ambientVolume);
@@ -1149,6 +1167,7 @@ let checkpointSnapshot: CheckpointSnapshot =
       expansionCurrencies,
       shops,
       route,
+      challenge,
     },
     campaignExpansion.checkpoint.stage,
   );
@@ -1235,6 +1254,7 @@ type AutosaveSnapshot = {
   expansionCurrencies: ExpansionCurrencyState;
   shops: ShopState;
   route: RouteState;
+  challenge: HiddenChallengeState;
   campaignExpansion: CampaignExpansionState;
   checkpointSnapshot: CheckpointSnapshot;
   crashRecoverySnapshot: CrashRecoverySnapshot | null;
@@ -1263,6 +1283,7 @@ const campaignAutosave = new AutosaveQueue<
     snapshot.stageEntrySnapshot,
     snapshot.shops,
     snapshot.route,
+    snapshot.challenge,
   ),
 );
 
@@ -1280,6 +1301,7 @@ function currentRunPersistentState(): RunPersistentState {
     expansionCurrencies,
     shops,
     route,
+    challenge,
   };
 }
 
@@ -1296,6 +1318,7 @@ function applyRunPersistentState(state: RunPersistentState): void {
   expansionCurrencies = state.expansionCurrencies;
   shops = state.shops;
   route = state.route;
+  challenge = state.challenge;
 }
 
 function currentAutosaveSnapshot(): AutosaveSnapshot {
@@ -1312,6 +1335,7 @@ function currentAutosaveSnapshot(): AutosaveSnapshot {
     expansionCurrencies,
     shops,
     route,
+    challenge,
     campaignExpansion,
     checkpointSnapshot,
     crashRecoverySnapshot,
@@ -1358,6 +1382,7 @@ function persistRecoveryMirrorSync(
       stageEntrySnapshot,
       shops,
       route,
+      challenge,
     ),
   );
 }
@@ -3938,6 +3963,7 @@ async function initializePlayerProgress(): Promise<void> {
     expansionCurrencies = loaded.save.expansionCurrencies;
     shops = loaded.save.shops;
     route = loaded.save.route;
+    challenge = loaded.save.challenge;
     campaignExpansion = loaded.save.campaignExpansion;
     checkpointSnapshot = loaded.save.checkpointSnapshot;
     crashRecoverySnapshot = loaded.save.crashRecoverySnapshot;
@@ -4386,6 +4412,7 @@ async function importSaveFile(file: File): Promise<void> {
       result.save.expansionCurrencies;
     const importedShops = result.save.shops;
     const importedRoute = result.save.route;
+    const importedChallenge = result.save.challenge;
     const importedCampaignExpansion =
       result.save.campaignExpansion;
     const importedCheckpointSnapshot =
@@ -4419,6 +4446,7 @@ async function importSaveFile(file: File): Promise<void> {
     const previousExpansionCurrencies = expansionCurrencies;
     const previousShops = shops;
     const previousRoute = route;
+    const previousChallenge = challenge;
     const previousCampaignExpansion = campaignExpansion;
     const previousCheckpointSnapshot = checkpointSnapshot;
     const previousCrashRecoverySnapshot = crashRecoverySnapshot;
@@ -4435,6 +4463,7 @@ async function importSaveFile(file: File): Promise<void> {
     expansionCurrencies = importedExpansionCurrencies;
     shops = importedShops;
     route = importedRoute;
+    challenge = importedChallenge;
     campaignExpansion = importedCampaignExpansion;
     checkpointSnapshot = importedCheckpointSnapshot;
     crashRecoverySnapshot = importedCrashRecoverySnapshot;
@@ -4469,6 +4498,7 @@ async function importSaveFile(file: File): Promise<void> {
       expansionCurrencies = previousExpansionCurrencies;
       shops = previousShops;
       route = previousRoute;
+      challenge = previousChallenge;
       campaignExpansion = previousCampaignExpansion;
       checkpointSnapshot = previousCheckpointSnapshot;
       crashRecoverySnapshot = previousCrashRecoverySnapshot;
