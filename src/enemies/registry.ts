@@ -77,7 +77,7 @@ const frostBase = {
   deathFx: "frost-burst",
 } satisfies EnemyVisualProfile;
 
-export const ENEMY_REGISTRY = [
+export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
   {
     id: "rainbow-scout",
     name: "Rainbow Scout",
@@ -265,7 +265,7 @@ export const ENEMY_REGISTRY = [
       deathFx: "infernal-boss-burst",
     },
   },
-] as const satisfies readonly EnemyDefinition[];
+] satisfies readonly EnemyDefinition[];
 
 export function enemyDefinition(
   id: string,
