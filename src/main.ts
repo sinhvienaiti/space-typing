@@ -1142,6 +1142,35 @@ function persistRecoveryMirrorSync(
   );
 }
 
+function markCrashRecoveryDeathInvalid(
+  timestamp = new Date().toISOString(),
+): void {
+  const invalidated = invalidateCrashRecoverySnapshot(
+    crashRecoverySnapshot,
+    currentRunPersistentState(),
+    campaignExpansion,
+    checkpointSnapshot,
+    timestamp,
+  );
+  campaignExpansion = invalidated.campaignExpansion;
+  crashRecoverySnapshot = invalidated.snapshot;
+
+  try {
+    persistRecoveryMirrorSync("gameover", timestamp);
+  } catch (error) {
+    console.warn(
+      "Unable to write synchronous death recovery marker.",
+      error,
+    );
+  }
+
+  campaignAutosave.schedule(
+    currentAutosaveSnapshot(),
+    "gameover",
+  );
+  void campaignAutosave.flush("gameover");
+}
+
 function refreshPersistentStateUi(): void {
   game.setLuckPityState(luckPity);
   game.setHiddenDiscoveryState(hiddenDiscovery);
@@ -1835,15 +1864,24 @@ const game = new Game(
           accuracyPercent(stats.hits, stats.misses).toFixed(1) + "%";
         byId("resultStreak").textContent = String(stats.maxStreak);
 
+        const deathAt = new Date().toISOString();
+        markCrashRecoveryDeathInvalid(deathAt);
+
         const restored = restoreCheckpointSnapshot(
           checkpointSnapshot,
           currentRunPersistentState(),
         );
         applyRunPersistentState(restored);
-        campaignExpansion = rollbackCampaignExpansion(
+        const rolledBackExpansion = rollbackCampaignExpansion(
           campaignExpansion,
-          new Date().toISOString(),
+          deathAt,
         );
+        campaignExpansion = {
+          ...rolledBackExpansion,
+          crashRecovery:
+            crashRecoverySnapshot?.campaignExpansion.crashRecovery ??
+            null,
+        };
         refreshPersistentStateUi();
 
         const checkpointStage = campaignExpansion.checkpoint.stage;
@@ -1969,6 +2007,7 @@ const game = new Game(
           " Credits" +
           achievementText +
           checkpointText,
+        "stage-clear",
       );
 
       byId("clearTitle").textContent =
@@ -2849,6 +2888,13 @@ async function startSelectedStage(): Promise<void> {
       ),
     );
 
+    const recoverySaved = await autosaveCampaign(
+      "stage-entry",
+      undefined,
+      "stage-entry",
+    );
+    if (!recoverySaved) return;
+
     game.startStage(stage, difficulty);
   } finally {
     stageStartPending = false;
@@ -2937,6 +2983,7 @@ async function initializePlayerProgress(): Promise<void> {
     expansionCurrencies = loaded.save.expansionCurrencies;
     campaignExpansion = loaded.save.campaignExpansion;
     checkpointSnapshot = loaded.save.checkpointSnapshot;
+    crashRecoverySnapshot = loaded.save.crashRecoverySnapshot;
     syncProgressionAchievements();
     game.setLuckPityState(luckPity);
     game.setHiddenDiscoveryState(hiddenDiscovery);
@@ -2980,7 +3027,17 @@ async function initializePlayerProgress(): Promise<void> {
       );
     }
 
-    if (loaded.migrated) {
+    if (loaded.recoveryMode === "death-rollback") {
+      showNotice(
+        "Death record enforced · returned to checkpoint Stage " +
+          String(campaignExpansion.checkpoint.stage).padStart(3, "0"),
+      );
+    } else if (loaded.recoveryMode === "crash") {
+      showNotice(
+        "✓ Recovered last safe transition · Stage " +
+          String(campaign.selectedStage).padStart(3, "0"),
+      );
+    } else if (loaded.migrated) {
       showNotice("✓ Existing progress migrated to IndexedDB");
     } else if (loaded.source === "localStorage") {
       showNotice("IndexedDB unavailable · using recovery storage");
@@ -3245,7 +3302,11 @@ function openData(): void {
 async function exportSave(): Promise<void> {
   if (!persistenceReady) return;
 
-  const saved = await autosaveCampaign("manual");
+  const saved = await autosaveCampaign(
+    "manual",
+    undefined,
+    "manual",
+  );
   const json = exportPlayerSaveJson(
     campaign,
     undefined,
@@ -3260,6 +3321,7 @@ async function exportSave(): Promise<void> {
     expansionCurrencies,
     campaignExpansion,
     checkpointSnapshot,
+    crashRecoverySnapshot,
   );
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -3309,6 +3371,8 @@ async function importSaveFile(file: File): Promise<void> {
       result.save.campaignExpansion;
     const importedCheckpointSnapshot =
       result.save.checkpointSnapshot;
+    const importedCrashRecoverySnapshot =
+      result.save.crashRecoverySnapshot;
     const message =
       "Import Stage " +
       String(imported.highestUnlockedStage).padStart(3, "0") +
@@ -3334,6 +3398,7 @@ async function importSaveFile(file: File): Promise<void> {
     const previousExpansionCurrencies = expansionCurrencies;
     const previousCampaignExpansion = campaignExpansion;
     const previousCheckpointSnapshot = checkpointSnapshot;
+    const previousCrashRecoverySnapshot = crashRecoverySnapshot;
     campaign = imported;
     inventory = importedInventory;
     equipment = importedEquipment;
@@ -3346,6 +3411,7 @@ async function importSaveFile(file: File): Promise<void> {
     expansionCurrencies = importedExpansionCurrencies;
     campaignExpansion = importedCampaignExpansion;
     checkpointSnapshot = importedCheckpointSnapshot;
+    crashRecoverySnapshot = importedCrashRecoverySnapshot;
     syncProgressionAchievements();
     game.setLuckPityState(luckPity);
     game.setHiddenDiscoveryState(hiddenDiscovery);
@@ -3358,7 +3424,11 @@ async function importSaveFile(file: File): Promise<void> {
       campaign.selectedStage / STAGES_PER_GALAXY,
     );
 
-    const saved = await autosaveCampaign("manual");
+    const saved = await autosaveCampaign(
+      "manual",
+      undefined,
+      "manual",
+    );
     if (!saved) {
       campaign = previousCampaign;
       inventory = previousInventory;
@@ -3372,6 +3442,7 @@ async function importSaveFile(file: File): Promise<void> {
       expansionCurrencies = previousExpansionCurrencies;
       campaignExpansion = previousCampaignExpansion;
       checkpointSnapshot = previousCheckpointSnapshot;
+      crashRecoverySnapshot = previousCrashRecoverySnapshot;
       game.setLuckPityState(luckPity);
       game.setHiddenDiscoveryState(hiddenDiscovery);
       updateSpecialShopAccess();
@@ -3872,49 +3943,34 @@ window.addEventListener("keydown", (event) => {
 
 window.addEventListener("resize", () => game.resize());
 
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState !== "hidden" || !persistenceReady) return;
+function persistPageLifecycleRecovery(): void {
+  if (!persistenceReady) return;
+
+  const savedAt = new Date().toISOString();
+  captureSafeCrashRecovery("pagehide", savedAt);
+
+  try {
+    persistRecoveryMirrorSync("pagehide", savedAt);
+  } catch (error) {
+    console.warn(
+      "Unable to write synchronous page recovery mirror.",
+      error,
+    );
+  }
+
   campaignAutosave.schedule(
-    {
-      campaign,
-      inventory,
-      equipment,
-      supportSpells,
-      characters,
-      luckPity,
-      hiddenDiscovery,
-      credits,
-      progression,
-      expansionCurrencies,
-      campaignExpansion,
-      checkpointSnapshot,
-    },
+    currentAutosaveSnapshot(),
     "pagehide",
   );
   void campaignAutosave.flush("pagehide");
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "hidden") return;
+  persistPageLifecycleRecovery();
 });
 
-window.addEventListener("pagehide", () => {
-  if (!persistenceReady) return;
-  campaignAutosave.schedule(
-    {
-      campaign,
-      inventory,
-      equipment,
-      supportSpells,
-      characters,
-      luckPity,
-      hiddenDiscovery,
-      credits,
-      progression,
-      expansionCurrencies,
-      campaignExpansion,
-      checkpointSnapshot,
-    },
-    "pagehide",
-  );
-  void campaignAutosave.flush("pagehide");
-});
+window.addEventListener("pagehide", persistPageLifecycleRecovery);
 
 window.addEventListener("beforeunload", () => {
   stopSpeech();
