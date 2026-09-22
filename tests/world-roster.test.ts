@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   spawnWorldEnemyDefinitionId,
   validateWorldRosterRuntime,
+  worldRankDistributionForStage,
   worldEnemyFamilyForSpawn,
   worldRuntimeEnemyDefinitionId,
 } from "../src/worlds/roster";
@@ -101,6 +102,14 @@ describe("M09 World enemy/boss roster mapping", () => {
       expect(world.enemyRoster).toContain(id);
       expect(world.enemyFamilies).toContain(
         enemyDefinition(id)?.family,
+      );
+    }
+  });
+
+  it("sources rank-band weights from the current World profile", () => {
+    for (const stage of [1, 21, 201, 501, 1000]) {
+      expect(worldRankDistributionForStage(stage)).toBe(
+        worldForStage(stage).rankDistribution,
       );
     }
   });
