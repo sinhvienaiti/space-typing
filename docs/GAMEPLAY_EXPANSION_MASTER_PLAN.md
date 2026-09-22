@@ -3030,7 +3030,9 @@ M10 owns the actual Rank I-X runtime effects, `WordDifficultyScore` and 1/2/3 ty
 
 ## M10 — Enemy Rank + word difficulty + typing layers
 
-Implement:
+**Status: Complete.** Production enemy spawn now resolves Rank I-X from the current World rank band plus actual vocabulary/mechanical pressure, computes deterministic `WordDifficultyScore`, assigns semantic 1/2/3-layer plans, requires one complete word per layer, and renders Rank/current-layer/three-segment feedback. Carrier/Splitter child spawns also pass through the shared M09 World roster + M10 typing pipeline. See `docs/M10_ENEMY_RANKS_AND_LAYERS.md`.
+
+Implemented:
 
 - Rank I-X;
 - `WordDifficultyScore`;
@@ -3038,6 +3040,8 @@ Implement:
 - layer identity;
 - new word after each completed layer;
 - visual three-segment feedback.
+
+M11 must consume this Rank/layer runtime instead of introducing another enemy difficulty axis.
 
 ## M11 — Enemy skill/effect framework + Threat Budget
 

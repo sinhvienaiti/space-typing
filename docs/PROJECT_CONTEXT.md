@@ -3468,9 +3468,10 @@ Gameplay Expansion:
 - M07 Canonical 50-World engine: COMPLETE
 - M08 Dynamic World Music / Ambient runtime: COMPLETE
 - M09 World enemy/boss roster mapping: COMPLETE
+- M10 Enemy Rank I-X + WordDifficultyScore + typing layers: COMPLETE
 
 Next:
-- M10 Enemy Rank I-X + WordDifficultyScore + typing layers
+- M11 Enemy skill/effect framework + Threat Budget
 ~~~
 
 Current gameplay/progression foundation:
@@ -3505,7 +3506,12 @@ Current gameplay/progression foundation:
 - current WorldProfile is the production source for enemy family/visual/reward identity;
 - World Elite pools and Mini Boss / World Boss identities are validated against the shared enemy registry;
 - Campaign boss cadence follows the canonical World rhythm: local 10 Mini Boss, local 20 World Boss, x100 Galaxy Major Boss;
-- current World rankDistribution is exposed as the authoritative M10 rank-band source;
+- current World rankDistribution is the authoritative Enemy Rank I-X band source;
+- production enemies resolve Rank from World band + WordDifficultyScore + archetype/Elite/layer pressure;
+- Rank I-III / IV-VI / VII-X normally resolve to 1 / 2 / 3 semantic typing layers;
+- each completed enemy layer consumes one complete word and selects a new rank-band word for the next layer;
+- enemy typing UI renders Rank, current Shield/Armor/Ward/Spell Barrier/Core identity and three fixed layer segments;
+- Carrier/Splitter child spawns use the same M09 World roster + M10 typing-profile path;
 - Service / Upgrade Shop consumes Credits + Alloy through the existing enhancement system;
 - rare resurrection items can appear only as finite stock in eligible rare merchant pools;
 - shop stock participates in checkpoint rollback, crash recovery and stage-entry recovery;
@@ -3546,6 +3552,9 @@ Final audio binaries/loudness/licensing remain a manual asset gate.
 
 M09 World Enemy / Boss Roster Mapping
 CI #218 PASS 413 tests + Build
+
+M10 Enemy Rank / Word Difficulty / Typing Layers
+CI #223 PASS Test + Build
 ~~~
 
 Important implementation notes:
@@ -3554,7 +3563,7 @@ Important implementation notes:
 - Permanent systems must extend PlayerSave through explicit migrations.
 - Current runtime equipment uses the five-grade model; legacy rarity names remain only in migration/compatibility paths and historical step notes.
 - `ShopState` is part of `RunPersistentState`, so shop stock is economic segment state rather than a separate local-storage system.
-- M07 canonical World ids are the authoritative World identity used by M06 shop instances, M08 music profiles and M09 enemy/boss roster selection.
+- M07 canonical World ids are the authoritative World identity used by M06 shop instances, M08 music profiles, M09 enemy/boss roster selection and M10 World rank bands.
 - Event/special tokens remain optional per the expansion plan. M06 does not create a permanent Event Token before an earning loop exists.
 - Support spell loadout is separate from core combat skills.
 - Core combat skill hotkeys:

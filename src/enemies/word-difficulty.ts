@@ -1,0 +1,166 @@
+import type { VocabularyEntry } from "../types";
+import { clamp, normalizeWord, typingText } from "../logic";
+import type { EnemyRank } from "./rank";
+import { enemyRankNumber } from "./rank";
+
+export type WordDifficultyBreakdown = {
+  score: number;
+  vocabularyLevel: number;
+  characterScore: number;
+  tokenScore: number;
+  patternScore: number;
+  transitionScore: number;
+};
+
+const RARE_LETTERS = new Set(["j", "q", "v", "x", "z"]);
+const VOWELS = new Set(["a", "e", "i", "o", "u", "y"]);
+
+function tokenCount(text: string): number {
+  const tokens = normalizeWord(text)
+    .split(/[^a-z]+/g)
+    .filter((token) => token.length > 0);
+  return Math.max(1, tokens.length);
+}
+
+function spellingPatternScore(letters: string): number {
+  if (letters.length === 0) return 0;
+
+  let rare = 0;
+  let doubles = 0;
+  for (let index = 0; index < letters.length; index += 1) {
+    const current = letters[index] ?? "";
+    if (RARE_LETTERS.has(current)) rare += 1;
+    if (
+      index > 0 &&
+      current === (letters[index - 1] ?? "")
+    ) {
+      doubles += 1;
+    }
+  }
+
+  const uniqueRatio =
+    new Set(letters).size / Math.max(1, letters.length);
+  return clamp(
+    rare * 2.2 +
+      doubles * 1.25 +
+      uniqueRatio * 5,
+    0,
+    16,
+  );
+}
+
+function awkwardTransitionScore(letters: string): number {
+  let score = 0;
+
+  for (let index = 1; index < letters.length; index += 1) {
+    const left = letters[index - 1] ?? "";
+    const right = letters[index] ?? "";
+    const bothConsonants =
+      !VOWELS.has(left) && !VOWELS.has(right);
+
+    if (bothConsonants) score += 0.7;
+    if (RARE_LETTERS.has(left) || RARE_LETTERS.has(right)) {
+      score += 0.55;
+    }
+  }
+
+  return clamp(score, 0, 14);
+}
+
+export function wordDifficultyBreakdown(
+  entry: VocabularyEntry,
+  vocabularyLevel = 1,
+): WordDifficultyBreakdown {
+  const letters = typingText(entry.en);
+  const safeLevel = clamp(
+    Math.floor(
+      Number.isFinite(vocabularyLevel)
+        ? vocabularyLevel
+        : 1,
+    ),
+    1,
+    100,
+  );
+  const characters = letters.length;
+  const tokens = tokenCount(entry.en);
+
+  const characterScore = clamp(
+    Math.max(0, characters - 3) * 2,
+    0,
+    28,
+  );
+  const tokenScore = clamp((tokens - 1) * 7, 0, 14);
+  const patternScore = spellingPatternScore(letters);
+  const transitionScore = awkwardTransitionScore(letters);
+  const levelScore = ((safeLevel - 1) / 99) * 28;
+
+  return {
+    score: clamp(
+      levelScore +
+        characterScore +
+        tokenScore +
+        patternScore +
+        transitionScore,
+      0,
+      100,
+    ),
+    vocabularyLevel: safeLevel,
+    characterScore,
+    tokenScore,
+    patternScore,
+    transitionScore,
+  };
+}
+
+export function wordDifficultyScore(
+  entry: VocabularyEntry,
+  vocabularyLevel = 1,
+): number {
+  return wordDifficultyBreakdown(entry, vocabularyLevel).score;
+}
+
+export function rankWordTargetScore(rank: EnemyRank): number {
+  return enemyRankNumber(rank) * 10 - 5;
+}
+
+export function pickVocabularyEntryForRank(
+  entries: readonly VocabularyEntry[],
+  rank: EnemyRank,
+  vocabularyLevel = 1,
+  random = Math.random(),
+  excludeId?: string,
+): VocabularyEntry | undefined {
+  if (entries.length === 0) return undefined;
+
+  const filtered =
+    excludeId === undefined
+      ? [...entries]
+      : entries.filter((entry) => entry.id !== excludeId);
+  const source = filtered.length > 0 ? filtered : [...entries];
+  const target = rankWordTargetScore(rank);
+
+  const ordered = source
+    .map((entry) => ({
+      entry,
+      distance: Math.abs(
+        wordDifficultyScore(entry, vocabularyLevel) - target,
+      ),
+    }))
+    .sort(
+      (a, b) =>
+        a.distance - b.distance ||
+        a.entry.id.localeCompare(b.entry.id),
+    );
+
+  // Pick from a small nearest band so repeated layers retain variety while
+  // never switching to a different vocabulary source.
+  const bandSize = Math.min(
+    ordered.length,
+    Math.max(1, Math.min(8, Math.ceil(ordered.length * 0.2))),
+  );
+  const index = Math.min(
+    bandSize - 1,
+    Math.floor(clamp(random, 0, 0.999999) * bandSize),
+  );
+  return ordered[index]?.entry;
+}

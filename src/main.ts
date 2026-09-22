@@ -3451,12 +3451,14 @@ async function startSelectedStage(): Promise<void> {
       showWorldTransition(world, stage.stage);
       lastPresentedWorldId = world.id;
     }
+    const vocabularyLevel = selectedVocabularyLevel();
+    game.setVocabularyLevel(vocabularyLevel);
     await prepareStageVocabulary(stage);
     const difficulty = difficultyFor(
       difficultyInputFromSettings(
         difficultySettings,
         stage.stage,
-        selectedVocabularyLevel(),
+        vocabularyLevel,
       ),
     );
 

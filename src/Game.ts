@@ -223,6 +223,18 @@ import {
   worldRuntimeEnemyDefinitionId,
 } from "./worlds/roster";
 import {
+  currentEnemyLayer,
+  enemyLayerPlan,
+  enemyLayerSegments,
+  reinforceEnemyLayerPlan,
+} from "./enemies/layers";
+import { enemyRankLabel } from "./enemies/rank";
+import {
+  pickVocabularyEntryForRank,
+  wordDifficultyScore,
+} from "./enemies/word-difficulty";
+import { resolveEnemyTypingProfile } from "./enemies/typing-profile";
+import {
   isRecoveryItemId,
   useRecoveryItem,
   type RecoveryItemId,
@@ -377,6 +389,7 @@ export class Game {
   ];
   private settings: GameSettings;
   private vocabulary: VocabularyEntry[];
+  private vocabularyLevel = 1;
   private phase: GamePhase = "title";
   private playerStats: CoreStats = calculateEffectiveStats({
     base: DEFAULT_PLAYER_BASE_STATS,
@@ -1289,6 +1302,14 @@ export class Game {
     this.spawnTimer = 0.2;
   }
 
+  setVocabularyLevel(level: number): void {
+    this.vocabularyLevel = clamp(
+      Number.isFinite(level) ? Math.floor(level) : 1,
+      1,
+      100,
+    );
+  }
+
   updateSettings(settings: GameSettings): void {
     const qualityChanged =
       this.settings.visualQuality !== settings.visualQuality;
@@ -2197,7 +2218,6 @@ export class Game {
     const galaxy = this.stageConfig?.galaxy ?? 1;
     const kind = chooseEnemyKind(stage);
     const profile = enemyProfile(kind, galaxy);
-    const entry = this.pickVocabularyEntry(kind);
     const difficulty = this.difficulty;
 
     const forceElite =
@@ -2255,6 +2275,22 @@ export class Game {
       elite,
       stage,
     );
+    const minimumLayers = clamp(
+      eliteStats.layers +
+        (!elite && !golden
+          ? this.stageEventModifiers.extraEnemyLayers
+          : 0),
+      1,
+      3,
+    );
+    const typingProfile = resolveEnemyTypingProfile({
+      stage,
+      kind,
+      elite,
+      minimumLayers,
+      vocabularyLevel: this.vocabularyLevel,
+      entries: this.vocabulary,
+    });
 
     this.enemies.push({
       id: this.nextEnemyId++,
@@ -2263,14 +2299,13 @@ export class Game {
       elite,
       golden,
       eliteModifiers,
-      entry,
+      rank: typingProfile.rank,
+      wordDifficultyScore: typingProfile.wordDifficultyScore,
+      layerPlan: typingProfile.layerPlan,
+      entry: typingProfile.entry,
       typed: 0,
       wordMissed: false,
-      layersRemaining:
-        eliteStats.layers +
-        (!elite && !golden
-          ? this.stageEventModifiers.extraEnemyLayers
-          : 0),
+      layersRemaining: typingProfile.layersRemaining,
       x: baseX,
       y: -profile.radius - 20,
       baseX,
@@ -2314,6 +2349,23 @@ export class Game {
       source[Math.floor(Math.random() * source.length)] ??
       FALLBACK_ENTRIES[0]!
     );
+  }
+
+  private pickEnemyLayerEntry(enemy: Enemy): VocabularyEntry {
+    const entry =
+      pickVocabularyEntryForRank(
+        this.vocabulary,
+        enemy.rank ?? "I",
+        this.vocabularyLevel,
+        Math.random(),
+        enemy.entry.id,
+      ) ?? this.pickVocabularyEntry(enemy.kind);
+
+    enemy.wordDifficultyScore = wordDifficultyScore(
+      entry,
+      this.vocabularyLevel,
+    );
+    return entry;
   }
 
   private activateInterference(jammer: Enemy): void {
@@ -2388,7 +2440,17 @@ export class Game {
 
     if (ally === null) return;
 
-    ally.layersRemaining = 2;
+    const reinforced = reinforceEnemyLayerPlan(
+      ally.layerPlan ??
+        enemyLayerPlan(
+          ally.kind,
+          clamp(ally.layersRemaining, 1, 3) as 1 | 2 | 3,
+        ),
+      ally.layersRemaining,
+      ally.kind,
+    );
+    ally.layerPlan = reinforced.plan;
+    ally.layersRemaining = reinforced.remaining;
     ally.flash = 1;
     this.burst(ally.x, ally.y, 20, 142);
     this.sfx.support();
@@ -2405,16 +2467,34 @@ export class Game {
       this.width - profile.radius - 55,
     );
 
+    const stage = this.stageConfig?.stage ?? 1;
+    const definitionId = spawnWorldEnemyDefinitionId(
+      "scout",
+      false,
+      stage,
+    );
+    const typingProfile = resolveEnemyTypingProfile({
+      stage,
+      kind: "scout",
+      elite: false,
+      minimumLayers: 1,
+      vocabularyLevel: this.vocabularyLevel,
+      entries: this.vocabulary,
+    });
+
     this.enemies.push({
       id: this.nextEnemyId++,
       kind: "scout",
-      definitionId: "rainbow-scout",
+      definitionId,
       elite: false,
       eliteModifiers: [],
-      entry: this.pickVocabularyEntry("scout"),
+      rank: typingProfile.rank,
+      wordDifficultyScore: typingProfile.wordDifficultyScore,
+      layerPlan: typingProfile.layerPlan,
+      entry: typingProfile.entry,
       typed: 0,
       wordMissed: false,
-      layersRemaining: 1,
+      layersRemaining: typingProfile.layersRemaining,
       x: carrier.x,
       y: carrier.y + carrier.radius * 0.45,
       baseX,
@@ -3006,7 +3086,7 @@ export class Game {
 
     if (enemy.layersRemaining > 1) {
       enemy.layersRemaining -= 1;
-      enemy.entry = this.pickVocabularyEntry(enemy.kind);
+      enemy.entry = this.pickEnemyLayerEntry(enemy);
       enemy.typed = 0;
       enemy.wordMissed = false;
       enemy.flash = 1;
@@ -3271,16 +3351,34 @@ export class Game {
         this.width - 55,
       );
 
+      const stage = this.stageConfig?.stage ?? 1;
+      const definitionId = spawnWorldEnemyDefinitionId(
+        "scout",
+        false,
+        stage,
+      );
+      const typingProfile = resolveEnemyTypingProfile({
+        stage,
+        kind: "scout",
+        elite: false,
+        minimumLayers: 1,
+        vocabularyLevel: this.vocabularyLevel,
+        entries: this.vocabulary,
+      });
+
       this.enemies.push({
         id: this.nextEnemyId++,
         kind: "scout",
-        definitionId: "rainbow-scout",
+        definitionId,
         elite: false,
         eliteModifiers: [],
-        entry: this.pickVocabularyEntry("mine"),
+        rank: typingProfile.rank,
+        wordDifficultyScore: typingProfile.wordDifficultyScore,
+        layerPlan: typingProfile.layerPlan,
+        entry: typingProfile.entry,
         typed: 0,
         wordMissed: false,
-        layersRemaining: 1,
+        layersRemaining: typingProfile.layersRemaining,
         x: splitter.x,
         y: splitter.y,
         baseX,
@@ -5211,6 +5309,23 @@ export class Game {
       : splitDisplayByTypedLetters(displayWord, enemy.typed);
     const typed = split.typed;
     const remaining = split.remaining;
+    const layerPlan =
+      enemy.layerPlan ??
+      enemyLayerPlan(
+        enemy.kind,
+        clamp(enemy.layersRemaining, 1, 3) as 1 | 2 | 3,
+      );
+    const layerSegments = enemyLayerSegments(
+      layerPlan,
+      enemy.layersRemaining,
+    );
+    const currentLayer = currentEnemyLayer(
+      layerPlan,
+      enemy.layersRemaining,
+    );
+    const layerLabel = currentLayer
+      .replace("-", " ")
+      .toUpperCase();
 
     context.save();
     context.font =
@@ -5219,13 +5334,15 @@ export class Game {
 
     const fullWidth = context.measureText(displayWord).width;
     const typedWidth = context.measureText(typed).width;
+    const panelWidth = Math.max(fullWidth + 16, 126);
     const left = enemy.x - fullWidth / 2;
+    const panelLeft = enemy.x - panelWidth / 2;
     const y = enemy.y - enemy.radius - 22;
 
     context.fillStyle = hidden
       ? "rgba(5, 9, 18, 0.92)"
       : "rgba(2, 7, 14, 0.84)";
-    context.fillRect(left - 8, y - 14, fullWidth + 16, 28);
+    context.fillRect(panelLeft, y - 14, panelWidth, 28);
 
     context.textAlign = "left";
     context.fillStyle = "rgba(133, 151, 171, 0.45)";
@@ -5241,6 +5358,39 @@ export class Game {
     context.shadowBlur = targeted ? 7 : 0;
     context.shadowColor = "#57efff";
     context.fillText(remaining, left + typedWidth, y);
+
+    context.shadowBlur = 0;
+    context.font =
+      "800 8px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.textAlign = "center";
+    context.fillStyle = targeted
+      ? "rgba(213, 249, 255, 0.95)"
+      : "rgba(202, 215, 229, 0.8)";
+    context.fillText(
+      enemyRankLabel(enemy.rank ?? "I") + " · " + layerLabel,
+      enemy.x,
+      y - 25,
+    );
+
+    const segmentGap = 3;
+    const segmentWidth = (panelWidth - segmentGap * 2) / 3;
+    const segmentY = y - 19;
+    for (const segment of layerSegments) {
+      const x =
+        panelLeft +
+        segment.slot * (segmentWidth + segmentGap);
+      context.fillStyle =
+        segment.status === "current"
+          ? targeted
+            ? "rgba(103, 239, 255, 0.95)"
+            : "rgba(244, 200, 122, 0.92)"
+          : segment.status === "cleared"
+            ? "rgba(117, 255, 177, 0.45)"
+            : segment.status === "pending"
+              ? "rgba(162, 181, 205, 0.32)"
+              : "rgba(74, 88, 106, 0.14)";
+      context.fillRect(x, segmentY, segmentWidth, 3);
+    }
 
     context.restore();
   }
