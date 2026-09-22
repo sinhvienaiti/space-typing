@@ -7,6 +7,8 @@ export class Sfx {
   private context: AudioContext | null = null;
   private volume = 0.5;
   private pronunciationActive = false;
+  private destroyed = false;
+  private readonly timers = new Set<number>();
 
   private readonly onPronunciation = (event: Event): void => {
     const detail = (event as CustomEvent<{ active?: unknown }>).detail;
@@ -23,12 +25,20 @@ export class Sfx {
   }
 
   destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
+
     if (typeof window !== "undefined") {
       window.removeEventListener(
         "space-typing:pronunciation",
         this.onPronunciation,
       );
+      for (const timer of this.timers) {
+        window.clearTimeout(timer);
+      }
     }
+    this.timers.clear();
+
     if (this.context !== null) {
       void this.context.close();
       this.context = null;
@@ -40,6 +50,7 @@ export class Sfx {
   }
 
   unlock(): void {
+    if (this.destroyed) return;
     if (this.context === null) {
       this.context = new AudioContext();
     }
@@ -85,7 +96,7 @@ export class Sfx {
 
   power(): void {
     this.tone(420, 0.16, "sine", 0.045, 760, "combat");
-    window.setTimeout(
+    this.schedule(
       () => this.tone(700, 0.18, "sine", 0.035, 1050, "combat"),
       60,
     );
@@ -111,7 +122,7 @@ export class Sfx {
 
   support(): void {
     this.tone(440, 0.12, "sine", 0.026, 690, "combat");
-    window.setTimeout(
+    this.schedule(
       () => this.tone(620, 0.12, "sine", 0.02, 820, "combat"),
       45,
     );
@@ -123,7 +134,7 @@ export class Sfx {
 
   command(): void {
     this.tone(260, 0.11, "square", 0.03, 520, "combat");
-    window.setTimeout(
+    this.schedule(
       () => this.tone(520, 0.1, "square", 0.024, 760, "combat"),
       55,
     );
@@ -131,7 +142,7 @@ export class Sfx {
 
   eliteWarning(): void {
     this.tone(360, 0.11, "triangle", 0.028, 620, "warnings");
-    window.setTimeout(
+    this.schedule(
       () => this.tone(620, 0.14, "triangle", 0.025, 930, "warnings"),
       70,
     );
@@ -139,7 +150,7 @@ export class Sfx {
 
   rareDrop(): void {
     this.tone(560, 0.13, "sine", 0.028, 920, "ui");
-    window.setTimeout(
+    this.schedule(
       () => this.tone(920, 0.16, "sine", 0.024, 1260, "ui"),
       70,
     );
@@ -155,7 +166,7 @@ export class Sfx {
 
   stageClear(): void {
     this.tone(420, 0.18, "triangle", 0.035, 760, "ui");
-    window.setTimeout(
+    this.schedule(
       () => this.tone(650, 0.2, "triangle", 0.03, 1040, "ui"),
       90,
     );
@@ -167,7 +178,7 @@ export class Sfx {
 
   bossEntrance(): void {
     this.tone(95, 0.28, "sawtooth", 0.045, 58, "warnings");
-    window.setTimeout(
+    this.schedule(
       () => this.tone(220, 0.24, "triangle", 0.03, 420, "warnings"),
       110,
     );
@@ -180,7 +191,7 @@ export class Sfx {
   bossDeath(): void {
     this.noise(0.24, 0.075, "combat");
     this.tone(110, 0.35, "sawtooth", 0.055, 42, "combat");
-    window.setTimeout(
+    this.schedule(
       () => this.tone(360, 0.32, "sine", 0.04, 760, "combat"),
       100,
     );
@@ -188,7 +199,7 @@ export class Sfx {
 
   bossPhase(): void {
     this.tone(180, 0.16, "sawtooth", 0.04, 320, "warnings");
-    window.setTimeout(
+    this.schedule(
       () => this.tone(420, 0.18, "triangle", 0.034, 720, "warnings"),
       70,
     );
@@ -203,6 +214,16 @@ export class Sfx {
     this.tone(250, 0.14, "sine", 0.03, 120, "combat");
   }
 
+  private schedule(callback: () => void, delayMs: number): void {
+    if (this.destroyed || typeof window === "undefined") return;
+
+    const timer = window.setTimeout(() => {
+      this.timers.delete(timer);
+      if (!this.destroyed) callback();
+    }, delayMs);
+    this.timers.add(timer);
+  }
+
   private tone(
     frequency: number,
     duration: number,
@@ -211,6 +232,7 @@ export class Sfx {
     endFrequency: number,
     group: AudioGroup,
   ): void {
+    if (this.destroyed) return;
     const gainLevel = mixedSfxGain(
       this.volume,
       group,
@@ -247,6 +269,7 @@ export class Sfx {
     gainValue: number,
     group: AudioGroup,
   ): void {
+    if (this.destroyed) return;
     const gainLevel = mixedSfxGain(
       this.volume,
       group,
