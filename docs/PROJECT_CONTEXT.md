@@ -3467,9 +3467,10 @@ Gameplay Expansion:
 - M06 Deterministic finite-stock shops: COMPLETE
 - M07 Canonical 50-World engine: COMPLETE
 - M08 Dynamic World Music / Ambient runtime: COMPLETE
+- M09 World enemy/boss roster mapping: COMPLETE
 
 Next:
-- M09 World enemy/boss roster mapping
+- M10 Enemy Rank I-X + WordDifficultyScore + typing layers
 ~~~
 
 Current gameplay/progression foundation:
@@ -3501,6 +3502,10 @@ Current gameplay/progression foundation:
 - separate Music/Ambient gain buses and crossfade lifecycle;
 - pronunciation/announcer/warning soundtrack ducking through existing audio events;
 - local override -> repository/default -> fail-soft soundtrack asset resolution;
+- current WorldProfile is the production source for enemy family/visual/reward identity;
+- World Elite pools and Mini Boss / World Boss identities are validated against the shared enemy registry;
+- Campaign boss cadence follows the canonical World rhythm: local 10 Mini Boss, local 20 World Boss, x100 Galaxy Major Boss;
+- current World rankDistribution is exposed as the authoritative M10 rank-band source;
 - Service / Upgrade Shop consumes Credits + Alloy through the existing enhancement system;
 - rare resurrection items can appear only as finite stock in eligible rare merchant pools;
 - shop stock participates in checkpoint rollback, crash recovery and stage-entry recovery;
@@ -3538,6 +3543,9 @@ CI #202 PASS Test + Build
 M08 Dynamic World Music / Ambient Runtime
 CI #208 PASS 405 tests + Build
 Final audio binaries/loudness/licensing remain a manual asset gate.
+
+M09 World Enemy / Boss Roster Mapping
+CI #218 PASS 413 tests + Build
 ~~~
 
 Important implementation notes:
@@ -3546,7 +3554,7 @@ Important implementation notes:
 - Permanent systems must extend PlayerSave through explicit migrations.
 - Current runtime equipment uses the five-grade model; legacy rarity names remain only in migration/compatibility paths and historical step notes.
 - `ShopState` is part of `RunPersistentState`, so shop stock is economic segment state rather than a separate local-storage system.
-- M06 temporarily derives a stable 20-stage `world-XX` key for shop identity; M07 must replace that source with the canonical 50-World registry without creating a second shop system.
+- M07 canonical World ids are the authoritative World identity used by M06 shop instances, M08 music profiles and M09 enemy/boss roster selection.
 - Event/special tokens remain optional per the expansion plan. M06 does not create a permanent Event Token before an earning loop exists.
 - Support spell loadout is separate from core combat skills.
 - Core combat skill hotkeys:
@@ -3559,7 +3567,7 @@ Important implementation notes:
 Project-wide requirements remain:
 
 - Campaign scope: 1000 stages;
-- 50 Worlds × 20 stages is the M07 target mapping;
+- 50 Worlds × 20 stages is the canonical Campaign mapping;
 - character milestone unlocks: every 100 Campaign stages;
 - parent vocabulary library: 18,000 entries / 100 levels;
 - parent typing-text corpus: shared through the parent project;
