@@ -266,8 +266,18 @@ export function migrateLegacyRunPersistentState(
     shops: isValidShopState(raw.shops)
       ? sanitizeShopState(raw.shops)
       : createShopState(),
-    route: createRouteState(campaign.highestUnlockedStage),
-    challenge: createHiddenChallengeState(),
+    route: isValidRouteState(
+      raw.route,
+      campaign.highestUnlockedStage,
+    )
+      ? sanitizeRouteState(
+          raw.route,
+          campaign.highestUnlockedStage,
+        )
+      : createRouteState(campaign.highestUnlockedStage),
+    challenge: isValidHiddenChallengeState(raw.challenge)
+      ? sanitizeHiddenChallengeState(raw.challenge)
+      : createHiddenChallengeState(),
   };
 }
 
