@@ -32,13 +32,17 @@ describe("1000-stage Campaign model", () => {
     expect(stages.every((stage) => stage.eliteChance >= 0)).toBe(true);
   });
 
-  it("assigns milestone stage roles", () => {
-    expect(stageRole(10)).toBe("elite");
-    expect(stageRole(20)).toBe("mini-boss");
-    expect(stageRole(30)).toBe("special");
-    expect(stageRole(50)).toBe("boss");
-    expect(stageRole(60)).toBe("hazard");
-    expect(stageRole(90)).toBe("gauntlet");
+  it("assigns milestone roles on the 20-stage World rhythm", () => {
+    expect(stageRole(5)).toBe("elite");
+    expect(stageRole(10)).toBe("mini-boss");
+    expect(stageRole(15)).toBe("special");
+    expect(stageRole(20)).toBe("boss");
+
+    expect(stageRole(30)).toBe("mini-boss");
+    expect(stageRole(40)).toBe("boss");
+    expect(stageRole(55)).toBe("hazard");
+    expect(stageRole(90)).toBe("mini-boss");
+    expect(stageRole(95)).toBe("gauntlet");
     expect(stageRole(100)).toBe("major-boss");
     expect(stageRole(200)).toBe("major-boss");
   });
