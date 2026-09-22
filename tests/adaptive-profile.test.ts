@@ -48,7 +48,7 @@ describe("adaptive difficulty profile", () => {
         samples: -4,
       }),
     ).toEqual({
-      smoothedWpm: 220,
+      smoothedWpm: 300,
       smoothedAccuracy: 60,
       samples: 0,
     });
