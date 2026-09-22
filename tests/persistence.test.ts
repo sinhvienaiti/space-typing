@@ -637,6 +637,42 @@ describe("player save persistence model", () => {
     });
   });
 
+  it("migrates PlayerSave v24 to M20 Ascension without losing Codex or Relics", () => {
+    const completed = recordStageClear(
+      createDefaultCampaignProgress(),
+      1000,
+      {
+        score: 5000,
+        accuracy: 99,
+        wpm: 100,
+        clearedAt: "2026-09-22T18:45:00.000Z",
+      },
+    );
+    const current = createPlayerSave(completed);
+    current.codex.worlds = ["world-01"];
+    current.relics.owned = ["first-light-seed"];
+
+    const legacy = {
+      ...current,
+      version: 24,
+    } as Record<string, unknown>;
+    delete legacy.ascension;
+
+    const migration = migratePlayerSave(legacy);
+
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(24);
+    expect(migration.save.version).toBe(PLAYER_SAVE_VERSION);
+    expect(migration.save.ascension).toEqual({
+      version: 1,
+      highestUnlockedTier: 1,
+      selectedTier: 0,
+      completedTiers: [],
+    });
+    expect(migration.save.codex.worlds).toEqual(["world-01"]);
+    expect(migration.save.relics.owned).toEqual(["first-light-seed"]);
+  });
+
   it("keeps a valid current-version save without migration", () => {
     const save = createPlayerSave(
       createDefaultCampaignProgress(),
