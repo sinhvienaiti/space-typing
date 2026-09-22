@@ -3473,9 +3473,10 @@ Gameplay Expansion:
 - M12 Difficulty + Active Typing Pressure scheduler: COMPLETE
 - M13 Formation system: COMPLETE
 - M14 Branching Route Map + Station: COMPLETE
+- M15 Hidden Challenge / Hidden World / Champion Hunt: COMPLETE
 
 Next:
-- M15 Hidden Challenge / Hidden World / Champion Hunt
+- M16 Stage Objectives + boss typing mechanics
 ~~~
 
 Current gameplay/progression foundation:
@@ -3530,6 +3531,11 @@ Current gameplay/progression foundation:
 - mandatory Mini Boss / World Boss / Galaxy Major Boss stages remain forced Combat route nodes;
 - RouteState is part of RunPersistentState, so route choices participate in checkpoint rollback, stage-entry protection and technical crash recovery;
 - Shop/Station route nodes reuse the existing deterministic ShopState / Service Shop / Support Loadout systems rather than creating parallel services;
+- discovered Hidden Challenge / Hidden World / Champion Hunt offers extend the existing Route Map instead of adding a second navigation layer;
+- hidden encounters use optional state inside HiddenDiscoveryState and therefore participate in existing checkpoint/crash/stage-entry recovery without a PlayerSave version bump;
+- Hidden World reuses environment/World-roster/boss registries to build deterministic 3-4 encounter detours without numbered Campaign stages;
+- Champion Hunt reuses PriorityKillChain and M08 announcer ducking; normal Campaign enemies still do not advance the chain;
+- hidden clears bypass numbered Campaign recordStageClear/checkpoint progression and award premium rewards through existing economy systems;
 - difficulty word pressure stays inside the configured vocabulary and does not change authored World Rank access;
 - stage-clear economy rewards use the frozen stage-start difficulty reward multiplier;
 - Service / Upgrade Shop consumes Credits + Alloy through the existing enhancement system;
@@ -3538,7 +3544,7 @@ Current gameplay/progression foundation:
 - Skill Engine:
   Energy / cooldown / charges / typing conditions / per-stage limits;
 - defensive and offensive combat skills plus 2-slot Support Spell loadout;
-- IndexedDB PlayerSave schema v20;
+- IndexedDB PlayerSave schema v21;
 - explicit migrations from all earlier supported PlayerSave schemas;
 - synchronized recovery mirror + autosave queue + validated JSON backup/import.
 
@@ -3590,6 +3596,9 @@ Final docs checkpoint CI #245 PASS Test + Build
 M14 Branching Route Map / Station
 CI #250 PASS Test + Build
 Integration music lifecycle CI #251 PASS Test + Build
+
+M15 Hidden Challenge / Hidden World / Champion Hunt
+CI #262 PASS Test + Build on implementation head
 ~~~
 
 Important implementation notes:
