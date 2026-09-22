@@ -64,6 +64,13 @@ export type DifficultyProfile = {
   rewardMultiplier: number;
   reactionWindow: number;
   formationComplexity: number;
+  ascensionTier?: number;
+  enemyRankBonus?: number;
+  bossHpMultiplier?: number;
+  bossActionRateMultiplier?: number;
+  bossProjectileBonus?: number;
+  ascensionRewardMultiplier?: number;
+  bossMutationLabel?: string;
 };
 
 export type StageBest = {
