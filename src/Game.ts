@@ -435,6 +435,7 @@ export class Game {
 
   destroy(): void {
     cancelAnimationFrame(this.animationFrame);
+    this.sfx.destroy();
   }
 
   getPhase(): GamePhase {
@@ -1863,6 +1864,7 @@ export class Game {
     this.anomalyRiskRatio = 0;
     this.boss = null;
     this.hooks.onBossUpdate(null);
+    this.sfx.stageClear();
     this.hooks.onStageClear(this.getStats());
     this.hooks.onPhase(this.phase);
   }
@@ -1900,7 +1902,7 @@ export class Game {
       lifetime: 18,
     };
 
-    this.sfx.support();
+    this.sfx.supplyArrival();
   }
 
   private updateSupplyPod(dt: number): void {
@@ -2400,6 +2402,7 @@ export class Game {
       }
 
       const perfectWord = !boss.wordMissed;
+      this.sfx.wordComplete(perfectWord);
       this.applyCharacterPerfectWordPassive(perfectWord);
       boss.wordsCompleted += 1;
       boss.typed = 0;
@@ -2517,6 +2520,9 @@ export class Game {
       this.playerStats.salvage,
     );
     if (drop !== null) {
+      if (drop.rarity === "epic" || drop.rarity === "legendary") {
+        this.sfx.rareDrop();
+      }
       this.hooks.onEquipmentDrop(drop);
     }
   }
@@ -2784,6 +2790,7 @@ export class Game {
     this.triggerImpactFeedback("word");
     const length = typingText(enemy.entry.en).length;
     const perfectWord = !enemy.wordMissed;
+    this.sfx.wordComplete(perfectWord);
     this.hooks.onWordComplete(enemy.entry);
     this.applyCharacterWordCompletePassive(length);
     this.applyCharacterPerfectWordPassive(perfectWord);
@@ -3591,6 +3598,7 @@ export class Game {
       }
     }
 
+    const shieldBefore = this.stats.shield;
     const damage = applyIncomingDamage(
       {
         hull: this.stats.hull,
@@ -3616,11 +3624,15 @@ export class Game {
       this.shake = Math.max(this.shake, 11);
     }
 
+    if (shieldBefore > 0 && this.stats.shield <= 0) {
+      this.sfx.shieldBreak();
+    }
     this.sfx.damage();
     this.emitStats();
 
     if (this.stats.hull <= 0) {
       this.phase = "gameover";
+      this.sfx.stageFail();
       this.hooks.onPhase(this.phase);
     }
   }
