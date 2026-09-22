@@ -3016,6 +3016,7 @@ const game = new Game(
         stage,
         game.getPlayerStats().luck,
         relics,
+        activeStageDifficulty?.ascensionRewardMultiplier ?? 1,
       );
       game.pause();
       renderBossRewardChoiceOptions(options);
