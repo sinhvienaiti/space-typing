@@ -156,7 +156,6 @@ describe("M02 checkpoint and rollback", () => {
       starCrystal: 7,
       quantumCore: 2,
     };
-    committedActive.upgrades.attributeLevels.hull = 2;
     active.upgrades.attributeLevels.hull = 9;
     active.campaign.bestByStage["189"] = {
       score: 9000,
