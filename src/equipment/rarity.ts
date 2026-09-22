@@ -1,3 +1,5 @@
+import type { GradeId } from "../grades";
+
 export const EQUIPMENT_RARITIES = [
   "common",
   "rare",
@@ -7,14 +9,14 @@ export const EQUIPMENT_RARITIES = [
 
 export type EquipmentRarity = (typeof EQUIPMENT_RARITIES)[number];
 
-export const RARITY_STAT_MULTIPLIER: Record<
+export const LEGACY_RARITY_TO_GRADE: Record<
   EquipmentRarity,
-  number
+  GradeId
 > = {
-  common: 1,
-  rare: 1.12,
-  epic: 1.28,
-  legendary: 1.5,
+  common: "aluminum",
+  rare: "copper",
+  epic: "silver",
+  legendary: "gold",
 };
 
 export function isEquipmentRarity(
@@ -23,8 +25,8 @@ export function isEquipmentRarity(
   return (EQUIPMENT_RARITIES as readonly string[]).includes(value);
 }
 
-export function rarityStatMultiplier(
+export function legacyRarityToGrade(
   rarity: EquipmentRarity,
-): number {
-  return RARITY_STAT_MULTIPLIER[rarity];
+): GradeId {
+  return LEGACY_RARITY_TO_GRADE[rarity];
 }
