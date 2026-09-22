@@ -24,6 +24,7 @@ import {
   createCampaignExpansionState,
   rollbackCampaignExpansion,
   type CampaignExpansionState,
+  type CrashRecoveryReason,
 } from "./campaign/expansion-state";
 import {
   createStageConfig,
@@ -188,12 +189,19 @@ import {
   type RunPersistentState,
 } from "./persistence/checkpoint";
 import {
+  captureCrashRecoverySnapshot,
+  invalidateCrashRecoverySnapshot,
+  type CrashRecoverySnapshot,
+} from "./persistence/crash-recovery";
+import {
   exportPlayerSaveJson,
   parsePlayerSaveJson,
 } from "./persistence/backup";
 import {
+  createPlayerSave,
   loadPlayerSave,
   savePlayerProgress,
+  savePlayerRecoveryMirrorSync,
   UnsupportedPlayerSaveVersionError,
 } from "./persistence/player-save";
 import type {
@@ -960,6 +968,7 @@ let checkpointSnapshot: CheckpointSnapshot =
     },
     campaignExpansion.checkpoint.stage,
   );
+let crashRecoverySnapshot: CrashRecoverySnapshot | null = null;
 let persistenceReady = false;
 let vocabularyReady = false;
 let equipmentDropCounter = 0;
@@ -1022,6 +1031,7 @@ type AutosaveSnapshot = {
   expansionCurrencies: ExpansionCurrencyState;
   campaignExpansion: CampaignExpansionState;
   checkpointSnapshot: CheckpointSnapshot;
+  crashRecoverySnapshot: CrashRecoverySnapshot | null;
 };
 
 const campaignAutosave = new AutosaveQueue<
@@ -1042,6 +1052,7 @@ const campaignAutosave = new AutosaveQueue<
     snapshot.expansionCurrencies,
     snapshot.campaignExpansion,
     snapshot.checkpointSnapshot,
+    snapshot.crashRecoverySnapshot,
   ),
 );
 
@@ -1071,6 +1082,64 @@ function applyRunPersistentState(state: RunPersistentState): void {
   credits = state.credits;
   progression = state.progression;
   expansionCurrencies = state.expansionCurrencies;
+}
+
+function currentAutosaveSnapshot(): AutosaveSnapshot {
+  return {
+    campaign,
+    inventory,
+    equipment,
+    supportSpells,
+    characters,
+    luckPity,
+    hiddenDiscovery,
+    credits,
+    progression,
+    expansionCurrencies,
+    campaignExpansion,
+    checkpointSnapshot,
+    crashRecoverySnapshot,
+  };
+}
+
+function captureSafeCrashRecovery(
+  reason: CrashRecoveryReason,
+  savedAt = new Date().toISOString(),
+): void {
+  const captured = captureCrashRecoverySnapshot(
+    currentRunPersistentState(),
+    campaignExpansion,
+    checkpointSnapshot,
+    reason,
+    savedAt,
+  );
+  campaignExpansion = captured.campaignExpansion;
+  crashRecoverySnapshot = captured.snapshot;
+}
+
+function persistRecoveryMirrorSync(
+  reason: SaveReason,
+  timestamp = new Date().toISOString(),
+): void {
+  savePlayerRecoveryMirrorSync(
+    createPlayerSave(
+      campaign,
+      timestamp,
+      reason,
+      inventory,
+      equipment,
+      supportSpells,
+      characters,
+      luckPity,
+      hiddenDiscovery,
+      credits,
+      progression,
+      expansionCurrencies,
+      campaignExpansion,
+      checkpointSnapshot,
+      crashRecoverySnapshot,
+    ),
+  );
 }
 
 function refreshPersistentStateUi(): void {
@@ -2789,22 +2858,14 @@ async function startSelectedStage(): Promise<void> {
 async function autosaveCampaign(
   reason: SaveReason,
   successMessage?: string,
+  recoveryReason?: CrashRecoveryReason,
 ): Promise<boolean> {
+  if (recoveryReason !== undefined) {
+    captureSafeCrashRecovery(recoveryReason);
+  }
+
   campaignAutosave.schedule(
-    {
-      campaign,
-      inventory,
-      equipment,
-      supportSpells,
-      characters,
-      luckPity,
-      hiddenDiscovery,
-      credits,
-      progression,
-      expansionCurrencies,
-      campaignExpansion,
-      checkpointSnapshot,
-    },
+    currentAutosaveSnapshot(),
     reason,
   );
 
