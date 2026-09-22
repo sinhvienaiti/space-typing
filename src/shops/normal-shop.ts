@@ -143,7 +143,7 @@ export function buyNormalShopOffer(
   const equipment = addEquipmentInstance(current.equipment, {
     instanceId,
     definitionId: offer.definitionId,
-    rarity: offer.grade,
+    grade: offer.grade,
     enhancement: 0,
   });
   const payment = spendCredits(credits, offer.price);
