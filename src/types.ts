@@ -1,4 +1,6 @@
 import type { EnemyDefinitionId } from "./enemies/registry";
+import type { EnemyRank } from "./enemies/rank";
+import type { EnemyLayerId } from "./enemies/layers";
 
 export type GamePhase =
   | "title"
@@ -85,6 +87,9 @@ export type Enemy = {
   elite: boolean;
   golden?: boolean;
   eliteModifiers: EliteModifier[];
+  rank?: EnemyRank;
+  wordDifficultyScore?: number;
+  layerPlan?: EnemyLayerId[];
   entry: VocabularyEntry;
   typed: number;
   wordMissed: boolean;
