@@ -257,6 +257,7 @@ type Hooks = {
   onStageEvents(events: readonly StageRandomEventDefinition[]): void;
   onStageClear(stats: GameStats): void;
   onBossUpdate(boss: BossHudState | null): void;
+  onEnemyDiscovered(kind: EnemyKind): void;
   onWordComplete(entry: VocabularyEntry): void;
   onEquipmentDrop(drop: EquipmentDrop): void;
   onRewardChoice(options: readonly EquipmentDrop[]): void;
@@ -2064,6 +2065,7 @@ export class Game {
       this.width - profile.radius - 70,
     );
 
+    this.hooks.onEnemyDiscovered(kind);
     this.enemies.push({
       id: this.nextEnemyId++,
       kind,
