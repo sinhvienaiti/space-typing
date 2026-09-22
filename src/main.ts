@@ -1212,7 +1212,13 @@ for (const dialog of [
   specialShopDialog,
 ]) {
   dialog.addEventListener("close", () => {
-    if (game.getPhase() === "title") restoreTitleMusic();
+    const phase = game.getPhase();
+    if (phase === "title") {
+      restoreTitleMusic();
+    } else if (phase === "stageclear") {
+      musicController.transitionTo("VICTORY", 0.35);
+      musicController.setPaused(false);
+    }
   });
 }
 
