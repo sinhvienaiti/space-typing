@@ -12,14 +12,30 @@ import {
   getItemDefinition,
   ITEM_IDS,
   ITEM_REGISTRY,
+  UNBOUNDED_ITEM_STACK,
 } from "../src/items/registry";
 
 describe("item registry and inventory", () => {
-  it("registers the nine planned Phase 8 consumables with stable IDs", () => {
-    expect(ITEM_IDS).toHaveLength(9);
+  it("registers the existing items plus M01 resurrection contracts", () => {
+    expect(ITEM_IDS).toHaveLength(12);
     expect(Object.keys(ITEM_REGISTRY)).toEqual([...ITEM_IDS]);
     expect(getItemDefinition("repair-kit").name).toBe("Repair Kit");
     expect(getItemDefinition("lucky-dice").name).toBe("Lucky Dice");
+    expect(getItemDefinition("salvage-anchor")).toMatchObject({
+      grade: "silver",
+      maxStack: UNBOUNDED_ITEM_STACK,
+    });
+    expect(getItemDefinition("stage-revival-core").grade).toBe("gold");
+    expect(getItemDefinition("phoenix-core").grade).toBe("diamond");
+  });
+
+  it("allows resurrection items to accumulate without a gameplay stack cap", () => {
+    const amount = 1_000_000;
+    const result = addItem({}, "salvage-anchor", amount);
+
+    expect(result.changed).toBe(amount);
+    expect(itemCount(result.inventory, "salvage-anchor")).toBe(amount);
+    expect(isValidInventory({ "phoenix-core": amount })).toBe(true);
   });
 
   it("adds and removes items without mutating the previous inventory", () => {
