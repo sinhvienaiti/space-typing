@@ -103,6 +103,7 @@ import {
 } from "./economy/currencies";
 import { gradeLabel } from "./grades";
 import {
+  plannedWorldStageRole,
   stageInWorld,
   worldForStage,
   type PlannedWorldStageRole,
@@ -3320,14 +3321,7 @@ async function startSelectedStage(): Promise<void> {
     game.setCharacter(characters.selected);
     const stage = createStageConfig(campaign.selectedStage);
     const world = worldForStage(stage.stage);
-    const plannedRole =
-      stage.stage % 100 === 0
-        ? "galaxy-major-boss"
-        : stageInWorld(stage.stage) === 20
-          ? "world-boss"
-          : stageInWorld(stage.stage) === 10
-            ? "mini-boss"
-            : "normal";
+    const plannedRole = plannedWorldStageRole(stage.stage);
     if (
       lastPresentedWorldId !== world.id ||
       stageInWorld(stage.stage) === 1
