@@ -363,6 +363,14 @@ function priceForItem(
     return price;
   }
 
+  if (type === "event") {
+    price.starCrystal =
+      grade === "silver" || grade === "gold" || grade === "diamond"
+        ? 2
+        : 1;
+    return price;
+  }
+
   if (type === "traveling" || type === "station") {
     price.credits = Math.floor(base * 0.8);
     price.alloy =
