@@ -171,11 +171,17 @@ export function isValidCampaignExpansionState(
   }
 
   const expectedSector = sectorForStage(activeRaw.currentStage);
+  const terminalCheckpoint =
+    activeRaw.currentStage === MAX_CAMPAIGN_STAGE &&
+    checkpointRaw.stage === MAX_CAMPAIGN_STAGE &&
+    activeRaw.checkpointStage === MAX_CAMPAIGN_STAGE;
   if (
     sectorRaw.startStage !== expectedSector.startStage ||
     sectorRaw.endStage !== expectedSector.endStage ||
-    checkpointRaw.stage !== expectedSector.startStage ||
-    activeRaw.checkpointStage !== expectedSector.startStage ||
+    (!terminalCheckpoint &&
+      checkpointRaw.stage !== expectedSector.startStage) ||
+    (!terminalCheckpoint &&
+      activeRaw.checkpointStage !== expectedSector.startStage) ||
     activeRaw.highestReachedStage < activeRaw.currentStage
   ) {
     return false;
@@ -285,15 +291,19 @@ export function advanceCampaignExpansionOnStageClear(
 
   if (reachedSectorEnd) {
     const nextSector = sectorForStage(nextFrontier);
+    const checkpointStage =
+      safeCleared === MAX_CAMPAIGN_STAGE
+        ? MAX_CAMPAIGN_STAGE
+        : nextSector.startStage;
     return {
       state: {
         sector: nextSector,
         checkpoint: {
-          stage: nextSector.startStage,
+          stage: checkpointStage,
           committedAt: timestamp,
         },
         activeSegment: {
-          checkpointStage: nextSector.startStage,
+          checkpointStage,
           currentStage: nextFrontier,
           highestReachedStage: highestReached,
           startedAt: timestamp,
@@ -327,11 +337,11 @@ export function rollbackCampaignExpansion(
   return {
     sector,
     checkpoint: {
-      stage: sector.startStage,
+      stage: checkpointStage,
       committedAt: input.checkpoint.committedAt,
     },
     activeSegment: {
-      checkpointStage: sector.startStage,
+      checkpointStage,
       currentStage: checkpointStage,
       highestReachedStage: normalizeStage(
         Math.max(
