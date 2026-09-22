@@ -131,8 +131,8 @@ export class Sfx {
       this.announcerAudio = null;
       this.notifyAnnouncer(false);
     };
-    audio.addEventListener("ended", finish, { once: true });
-    audio.addEventListener("error", finish, { once: true });
+    audio.addEventListener?.("ended", finish, { once: true });
+    audio.addEventListener?.("error", finish, { once: true });
 
     void audio
       .play()
