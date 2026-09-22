@@ -183,9 +183,9 @@ function isValidCampaignSnapshot(value: unknown): value is CampaignProgress {
   return true;
 }
 
-export function isValidCheckpointSnapshot(
+export function isValidRunPersistentState(
   value: unknown,
-): value is CheckpointSnapshot {
+): value is RunPersistentState {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return false;
   }
@@ -203,6 +203,31 @@ export function isValidCheckpointSnapshot(
     isValidProgressionState(raw.progression) &&
     isValidExpansionCurrencyState(raw.expansionCurrencies)
   );
+}
+
+export function isValidCheckpointSnapshot(
+  value: unknown,
+): value is CheckpointSnapshot {
+  return isValidRunPersistentState(value);
+}
+
+export function sanitizeRunPersistentState(
+  value: RunPersistentState,
+): RunPersistentState {
+  return {
+    campaign: sanitizeCampaignProgress(value.campaign),
+    inventory: sanitizeInventory(value.inventory),
+    equipment: sanitizeEquipmentState(value.equipment),
+    supportSpells: sanitizeSupportSpellState(value.supportSpells),
+    characters: sanitizeCharacterState(value.characters),
+    luckPity: sanitizeLuckPityState(value.luckPity),
+    hiddenDiscovery:
+      sanitizeHiddenDiscoveryState(value.hiddenDiscovery),
+    credits: sanitizeCredits(value.credits),
+    progression: sanitizeProgressionState(value.progression),
+    expansionCurrencies:
+      sanitizeExpansionCurrencyState(value.expansionCurrencies),
+  };
 }
 
 export function sanitizeCheckpointSnapshot(
@@ -287,20 +312,7 @@ export function restoreCheckpointSnapshot(
     activeInput,
     committedInput.campaign.selectedStage,
   );
-  const active = {
-    campaign: sanitizeCampaignProgress(activeInput.campaign),
-    inventory: sanitizeInventory(activeInput.inventory),
-    equipment: sanitizeEquipmentState(activeInput.equipment),
-    supportSpells: sanitizeSupportSpellState(activeInput.supportSpells),
-    characters: sanitizeCharacterState(activeInput.characters),
-    luckPity: sanitizeLuckPityState(activeInput.luckPity),
-    hiddenDiscovery:
-      sanitizeHiddenDiscoveryState(activeInput.hiddenDiscovery),
-    credits: sanitizeCredits(activeInput.credits),
-    progression: sanitizeProgressionState(activeInput.progression),
-    expansionCurrencies:
-      sanitizeExpansionCurrencyState(activeInput.expansionCurrencies),
-  };
+  const active = sanitizeRunPersistentState(activeInput);
 
   return {
     campaign: mergeKnowledgeCampaign(
