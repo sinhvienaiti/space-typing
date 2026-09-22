@@ -206,6 +206,12 @@ export function spawnWorldEnemyDefinitionId(
   return reward?.id ?? base;
 }
 
+export function worldRankDistributionForStage(
+  stage: number,
+): Readonly<Record<string, number>> {
+  return worldForStage(stage).rankDistribution;
+}
+
 export function worldEnemyFamilyForSpawn(
   kind: EnemyKind,
   elite: boolean,
