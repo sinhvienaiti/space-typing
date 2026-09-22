@@ -3208,13 +3208,22 @@ M19 must extend the existing stage/boss/reward/Codex paths and existing knowledg
 
 ## M19 — Reward layer expansion + Codex
 
-Implement:
+**Status: Complete.** M19 extends the existing Campaign stage-clear, boss reward, economy and Codex/meta paths. PlayerSave v24 stores Codex knowledge outside checkpoint rollback while recovery-source selection merges discovered knowledge. See `docs/M19_REWARD_CODEX.md`.
 
-- sector reward;
-- boss reward choice;
-- performance rewards;
-- expanded Codex;
-- knowledge persistence outside rollback.
+Implemented:
+
+- difficulty-relative performance rewards for accuracy, no-miss, streak, tempo and objective completion;
+- stronger ten-stage sector checkpoint cache using the existing Credits / Alloy / Star Crystal / Quantum Core economy;
+- Campaign boss choose-one reward using the existing reward dialog and boss equipment / currency / Run Relic paths;
+- boss stage completion held until the reward choice resolves, with the choice committed by the following stage-clear transaction;
+- expanded existing Codex/meta collection for Worlds, enemies/bosses and reward discoveries;
+- first-seen enemy and stage World discovery hooks without hot-path registry scans;
+- knowledge merge semantics so Codex discoveries survive checkpoint rollback and recovery-source selection;
+- PlayerSave v23 -> v24 migration plus backup/import validation;
+- regression coverage for reward thresholds, sector scaling, boss choice, Codex merge and migration;
+- 530/530 tests plus TypeScript check and production build passing on CI #294.
+
+M20 must reuse the existing 50-World Campaign, World registry, difficulty/pressure model, boss runtime, reward tables and PlayerSave migration path rather than create a second Campaign or endless Stage 1001+ progression.
 
 ## M20 — Ascension
 
