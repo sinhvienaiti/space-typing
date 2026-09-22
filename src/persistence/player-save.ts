@@ -866,7 +866,7 @@ function runStateFromSave(save: PlayerSave): RunPersistentState {
   };
 }
 
-function resolveLoadedSave(
+export function resolvePlayerSaveRecovery(
   save: PlayerSave,
   timestamp = new Date().toISOString(),
 ): {
@@ -958,7 +958,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
   const recovery = recoverySaveFromLegacy();
 
   if (!("indexedDB" in window)) {
-    const resolved = resolveLoadedSave(recovery);
+    const resolved = resolvePlayerSaveRecovery(recovery);
     try {
       if (resolved.recoveryMode !== "none") {
         saveRecovery(resolved.save);
@@ -981,7 +981,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
     const stored = await readSave(database);
 
     if (stored === undefined) {
-      const resolved = resolveLoadedSave(recovery);
+      const resolved = resolvePlayerSaveRecovery(recovery);
       const migrated = createPlayerSave(
         resolved.save.campaign,
         new Date().toISOString(),
@@ -1089,7 +1089,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
       checkpointSnapshot,
       crashRecoverySnapshot,
     );
-    const resolved = resolveLoadedSave(candidate);
+    const resolved = resolvePlayerSaveRecovery(candidate);
 
     if (
       migration.migrated ||
@@ -1143,11 +1143,12 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
     };
   } catch (error) {
     if (error instanceof UnsupportedPlayerSaveVersionError) throw error;
+    const resolved = resolvePlayerSaveRecovery(recovery);
     return {
-      save: resolveLoadedSave(recovery).save,
+      save: resolved.save,
       source: "localStorage",
       migrated: false,
-      recoveryMode: resolveLoadedSave(recovery).recoveryMode,
+      recoveryMode: resolved.recoveryMode,
     };
   } finally {
     database?.close();
