@@ -82,9 +82,9 @@ M19 adds coverage for:
 - PlayerSave v23 -> v24 migration;
 - Game hook fixtures for boss reward / enemy sightings.
 
-CI #294 on implementation head:
+CI #297 on implementation head:
 
 - 107 test files PASS;
-- 530/530 tests PASS;
+- 531/531 tests PASS;
 - TypeScript no-emit check PASS;
 - Vite production build PASS.
