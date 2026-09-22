@@ -371,6 +371,7 @@ export function startHiddenChallenge(
   const offer = state.offers[offerId];
   if (
     offer === undefined ||
+    state.active !== null ||
     state.completedOfferIds.includes(offerId) ||
     state.skippedOfferIds.includes(offerId)
   ) {
@@ -394,6 +395,7 @@ export function skipHiddenChallenge(
   const state = sanitizeHiddenChallengeState(input);
   if (
     state.offers[offerId] === undefined ||
+    state.active !== null ||
     state.completedOfferIds.includes(offerId)
   ) {
     return state;
@@ -401,10 +403,7 @@ export function skipHiddenChallenge(
 
   return {
     ...state,
-    active:
-      state.active?.offerId === offerId
-        ? null
-        : state.active,
+    active: null,
     skippedOfferIds: [
       ...new Set([...state.skippedOfferIds, offerId]),
     ],
@@ -568,6 +567,19 @@ export function challengeEliteChance(
     0,
     0.88,
   );
+}
+
+export function priorityTargetChance(
+  mode: "none" | "champion" | "apex",
+  tier: HiddenChallengeTier,
+): number {
+  if (mode === "none") return 0;
+
+  const tierRate =
+    hiddenChallengeTierDefinition(tier).priorityTargetRate;
+  const base = mode === "apex" ? 0.68 : 0.52;
+  const scale = mode === "apex" ? 0.32 : 0.38;
+  return clamp(base + tierRate * scale, 0, 0.94);
 }
 
 export function priorityKillWindowSeconds(
