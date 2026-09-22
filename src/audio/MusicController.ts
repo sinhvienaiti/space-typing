@@ -46,6 +46,7 @@ type ManagedTrack = {
   mix: number;
   loop: boolean;
   errorListener: EventListener | null;
+  advancingFallback: boolean;
 };
 
 type FadeState = {
@@ -54,6 +55,8 @@ type FadeState = {
   durationMs: number;
   incoming: ManagedTrack[];
   outgoing: ManagedTrack[];
+  incomingStart: number[];
+  outgoingStart: number[];
 };
 
 const DEFAULT_MUSIC_VOLUME = 0.34;
@@ -92,14 +95,6 @@ function stopTrack(track: ManagedTrack): void {
   }
   track.audio.pause();
   track.audio.currentTime = 0;
-}
-
-function isOneShot(state: MusicState): boolean {
-  return (
-    state === "VICTORY" ||
-    state === "DEFEAT" ||
-    state === "TRANSITION"
-  );
 }
 
 export class MusicController {
@@ -214,6 +209,7 @@ export class MusicController {
       this.activeMusic.loop = stateLoops(state);
       this.activeMusic.audio.loop = this.activeMusic.loop;
       this.applyVolumes();
+      void this.playTrack(this.activeMusic);
       return;
     }
 
@@ -256,10 +252,11 @@ export class MusicController {
   }
 
   setPaused(paused: boolean): void {
-    if (this.destroyed || this.paused === paused) return;
-    this.paused = paused;
+    if (this.destroyed) return;
 
     if (paused) {
+      if (this.paused) return;
+      this.paused = true;
       this.activeMusic?.audio.pause();
       for (const track of this.activeAmbient) {
         track.audio.pause();
@@ -267,6 +264,7 @@ export class MusicController {
       return;
     }
 
+    this.paused = false;
     if (this.activeMusic !== null) {
       void this.playTrack(this.activeMusic);
     }
@@ -442,6 +440,8 @@ export class MusicController {
       durationMs,
       incoming,
       outgoing,
+      incomingStart: incoming.map((track) => track.mix),
+      outgoingStart: outgoing.map((track) => track.mix),
     };
 
     fade.timer = window.setInterval(() => {
@@ -450,12 +450,15 @@ export class MusicController {
         0,
         1,
       );
-      for (const track of fade.outgoing) {
-        track.mix = 1 - progress;
-      }
-      for (const track of fade.incoming) {
-        track.mix = progress;
-      }
+      fade.outgoing.forEach((track, index) => {
+        track.mix =
+          (fade.outgoingStart[index] ?? track.mix) *
+          (1 - progress);
+      });
+      fade.incoming.forEach((track, index) => {
+        const start = fade.incomingStart[index] ?? track.mix;
+        track.mix = start + (1 - start) * progress;
+      });
       this.applyVolumes();
 
       if (progress >= 1) {
@@ -492,6 +495,7 @@ export class MusicController {
       mix,
       loop,
       errorListener: null,
+      advancingFallback: false,
     };
 
     this.configureAudio(track);
@@ -523,6 +527,7 @@ export class MusicController {
   private async tryNextCandidate(
     track: ManagedTrack,
   ): Promise<void> {
+    if (track.advancingFallback) return;
     if (
       this.destroyed ||
       track.candidateIndex + 1 >= track.candidates.length
@@ -531,6 +536,7 @@ export class MusicController {
       return;
     }
 
+    track.advancingFallback = true;
     if (
       track.errorListener !== null &&
       track.audio.removeEventListener !== undefined
@@ -546,7 +552,10 @@ export class MusicController {
     const next = this.audioFactory(
       track.candidates[track.candidateIndex]!,
     );
-    if (next === null) return;
+    if (next === null) {
+      track.advancingFallback = false;
+      return;
+    }
 
     track.audio = next;
     track.errorListener = null;
@@ -557,9 +566,12 @@ export class MusicController {
       try {
         await safePlay(track.audio);
       } catch {
+        track.advancingFallback = false;
         await this.tryNextCandidate(track);
+        return;
       }
     }
+    track.advancingFallback = false;
   }
 
   private duckMultiplier(): number {
