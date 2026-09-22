@@ -116,6 +116,22 @@ export class SkillEngine {
     }
   }
 
+  reduceCooldowns(seconds: number): number {
+    const amount = safeNonNegative(seconds);
+    if (amount <= 0) return 0;
+
+    let changed = 0;
+    for (const state of this.states.values()) {
+      if (state.cooldownRemaining <= 0) continue;
+      state.cooldownRemaining = Math.max(
+        0,
+        state.cooldownRemaining - amount,
+      );
+      changed += 1;
+    }
+    return changed;
+  }
+
   getState(id: string): SkillRuntimeState | null {
     const state = this.states.get(id);
     return state === undefined ? null : { ...state };

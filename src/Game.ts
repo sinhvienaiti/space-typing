@@ -10,6 +10,10 @@ import {
   toBossHud,
 } from "./boss/model";
 import type { BossHudState, BossState } from "./boss/model";
+import {
+  bossVisualDefinitionId,
+  bossVisualName,
+} from "./boss/visual-profile";
 import type { DifficultyProfile, StageConfig } from "./campaign/types";
 import type { CharacterId } from "./characters/registry";
 import {
@@ -199,6 +203,19 @@ import {
   chooseEnemyKind,
   enemyProfile,
 } from "./enemies/kinds";
+import { enemyDefinition } from "./enemies/registry";
+import { applyEnemyRewardEffect } from "./enemies/reward-effects";
+import {
+  applyEnemyAreaControl,
+  softenNearbyEnemies,
+  tickEnemyRewardControl,
+  timedRewardMultiplier,
+} from "./enemies/reward-runtime";
+import { drawModularEnemy } from "./enemies/renderer";
+import {
+  runtimeEnemyDefinitionId,
+  spawnEnemyDefinitionId,
+} from "./enemies/spawn-profile";
 import {
   isRecoveryItemId,
   useRecoveryItem,
@@ -245,6 +262,8 @@ import {
   telegraphStrength,
   type ImpactKind,
 } from "./vfx/polish";
+import { enemyFxProfile } from "./vfx/enemy-fx";
+import { rewardFxProfile } from "./vfx/reward-fx";
 import {
   FrameProfiler,
   qualityProfile,
@@ -387,6 +406,15 @@ export class Game {
   private gravityWellTimer = 0;
   private cloakTimer = 0;
   private weaponOverclockTimer = 0;
+  private rewardScoreMultiplierTimer = 0;
+  private rewardCreditsMultiplierTimer = 0;
+  private rewardNotice: {
+    label: string;
+    x: number;
+    y: number;
+    hue: number;
+    remaining: number;
+  } | null = null;
   private celestialCharge = 0;
   private skillHudTimer = 0;
   private supplyPod: SupplyPod | null = null;
@@ -1347,6 +1375,9 @@ export class Game {
     this.gravityWellTimer = 0;
     this.cloakTimer = 0;
     this.weaponOverclockTimer = 0;
+    this.rewardScoreMultiplierTimer = 0;
+    this.rewardCreditsMultiplierTimer = 0;
+    this.rewardNotice = null;
     this.celestialCharge = 0;
     this.statusState = createStatusState();
     this.interferenceTimer = 0;
@@ -1571,6 +1602,21 @@ export class Game {
       0,
       this.weaponOverclockTimer - dt,
     );
+    this.rewardScoreMultiplierTimer = Math.max(
+      0,
+      this.rewardScoreMultiplierTimer - dt,
+    );
+    this.rewardCreditsMultiplierTimer = Math.max(
+      0,
+      this.rewardCreditsMultiplierTimer - dt,
+    );
+    if (this.rewardNotice !== null) {
+      this.rewardNotice.remaining = Math.max(
+        0,
+        this.rewardNotice.remaining - dt,
+      );
+      if (this.rewardNotice.remaining <= 0) this.rewardNotice = null;
+    }
 
     if (this.barrierTimer <= 0) this.barrierHp = 0;
     if (this.guardianTimer <= 0) this.guardianBlocks = 0;
@@ -1681,18 +1727,22 @@ export class Game {
       enemy.age += dt;
       enemy.flash = Math.max(0, enemy.flash - dt * 7);
       enemy.kick = Math.max(0, enemy.kick - dt * 4);
+      const rewardControl = tickEnemyRewardControl(enemy, dt);
       const markedSlow =
         enemy.id === this.markedEnemyId && this.markTimer > 0
           ? 0.72
           : 1;
-      enemy.y += enemy.speed * speedFactor * markedSlow * dt;
+      enemy.y +=
+        enemy.speed * speedFactor * markedSlow * rewardControl * dt;
 
       const desiredX =
         enemy.baseX + Math.sin(enemy.age * 1.1 + enemy.id) * enemy.drift;
-      enemy.x += (desiredX - enemy.x) * Math.min(1, dt * 2);
+      enemy.x +=
+        (desiredX - enemy.x) * Math.min(1, dt * 2 * rewardControl);
 
       if (enemy.actionCooldown !== null) {
-        enemy.actionCooldown -= dt * hostileTimeFactor;
+        enemy.actionCooldown -=
+          dt * hostileTimeFactor * rewardControl;
         if (enemy.actionCooldown <= 0) {
           if (enemy.kind === "carrier") {
             this.spawnCarrierChild(enemy);
@@ -1807,6 +1857,7 @@ export class Game {
       stage.role,
       entry,
     );
+    this.boss.name = bossVisualName(stage.galaxy);
     this.bossSpawned = true;
     this.bossDefeated = false;
     this.projectiles = [];
@@ -1815,6 +1866,14 @@ export class Game {
       bossActionInterval(this.boss.role, this.boss.phase) /
       Math.max(0.75, this.difficulty?.bossPressure ?? 1);
     this.hooks.onBossUpdate(toBossHud(this.boss));
+    const bossDefinition = enemyDefinition(
+      bossVisualDefinitionId(stage.galaxy),
+    );
+    if (bossDefinition !== undefined) {
+      const fx = enemyFxProfile(bossDefinition.family, "boss-intro");
+      const position = this.bossPosition();
+      this.burst(position.x, position.y, fx.count, fx.hue);
+    }
     this.sfx.bossEntrance();
 
     if (this.settings.screenShake) {
@@ -2110,10 +2169,12 @@ export class Game {
       profile.radius + 70,
       this.width - profile.radius - 70,
     );
+    const definitionId = spawnEnemyDefinitionId(kind, elite, stage);
 
     this.enemies.push({
       id: this.nextEnemyId++,
       kind,
+      definitionId,
       elite,
       golden,
       eliteModifiers,
@@ -2136,6 +2197,12 @@ export class Game {
       kick: 0,
       actionCooldown: eliteStats.actionCooldown,
     });
+
+    const spawnDefinition = enemyDefinition(definitionId);
+    if (spawnDefinition !== undefined) {
+      const fx = enemyFxProfile(spawnDefinition.family, "spawn");
+      this.burst(baseX, 12, fx.count, fx.hue);
+    }
 
     if (elite) {
       const firstElite = this.eliteSpawned === 0;
@@ -2256,6 +2323,7 @@ export class Game {
     this.enemies.push({
       id: this.nextEnemyId++,
       kind: "scout",
+      definitionId: "rainbow-scout",
       elite: false,
       eliteModifiers: [],
       entry: this.pickVocabularyEntry("scout"),
@@ -2336,7 +2404,7 @@ export class Game {
       this.stats.streak,
     );
     this.stats.multiplier = multiplierForStreak(this.stats.streak);
-    this.stats.score += 35 * this.stats.multiplier;
+    this.addScore(35 * this.stats.multiplier);
     this.gainPower(2.5);
     this.applyCharacterCorrectKeyPassive();
 
@@ -2379,7 +2447,7 @@ export class Game {
       this.stats.streak,
     );
     this.stats.multiplier = multiplierForStreak(this.stats.streak);
-    this.stats.score += 16 * this.stats.multiplier;
+    this.addScore(16 * this.stats.multiplier);
     this.gainPower(2);
     this.applyCharacterCorrectKeyPassive();
 
@@ -2439,8 +2507,9 @@ export class Game {
       boss.kick = 1.5;
       boss.wordMissed = false;
 
-      this.stats.score +=
-        (140 + word.length * 18) * this.stats.multiplier;
+      this.addScore(
+        (140 + word.length * 18) * this.stats.multiplier,
+      );
       this.gainPower(perfectWord ? 11 : 8);
 
       if (perfectWord) {
@@ -2483,7 +2552,14 @@ export class Game {
     }
 
     const { x, y } = this.bossPosition();
-    this.burst(x, y, 44, boss.phase >= 3 ? 350 : 176);
+    const definition = enemyDefinition(
+      bossVisualDefinitionId(this.stageConfig?.galaxy ?? 1),
+    );
+    const fx = enemyFxProfile(
+      definition?.family ?? "devil",
+      "boss-phase",
+    );
+    this.burst(x, y, fx.count, fx.hue);
     this.sfx.bossPhase();
 
     if (this.settings.screenShake) {
@@ -2500,12 +2576,22 @@ export class Game {
     const { x, y } = this.bossPosition();
     this.triggerImpactFeedback("boss-defeat");
     this.stats.kills += 1;
-    this.stats.score += 1200 * this.stats.multiplier;
+    this.addScore(1200 * this.stats.multiplier);
     this.gainPower(18);
 
-    this.burst(x, y, 70, 24);
+    const definition = enemyDefinition(
+      bossVisualDefinitionId(this.stageConfig?.galaxy ?? 1),
+    );
+    const fx = enemyFxProfile(
+      definition?.family ?? "devil",
+      "boss-death",
+    );
+    this.burst(x, y, fx.count, fx.hue);
     this.sfx.bossDeath();
     this.tryRollEquipmentDrop("boss");
+    if (definition !== undefined) {
+      this.activateDefinitionReward(definition, x, y);
+    }
 
     if (this.settings.screenShake) {
       this.shake = Math.max(this.shake, 13);
@@ -2525,7 +2611,7 @@ export class Game {
     const current = this.luckPity[key];
     const roll = rollLuckPity(
       baseChance,
-      this.playerStats.luck,
+      this.effectiveLuck(),
       current,
       maxChance,
     );
@@ -2544,7 +2630,7 @@ export class Game {
   private tryRollEquipmentDrop(source: LootSource): void {
     const drop = rollEquipmentDrop(
       source,
-      this.playerStats.luck,
+      this.effectiveLuck(),
       this.playerStats.salvage,
     );
     if (drop !== null) {
@@ -2572,7 +2658,7 @@ export class Game {
       this.stats.streak,
     );
     this.stats.multiplier = multiplierForStreak(this.stats.streak);
-    this.stats.score += 8 * this.stats.multiplier;
+    this.addScore(8 * this.stats.multiplier);
     this.gainPower(1.2);
     this.applyCharacterCorrectKeyPassive();
 
@@ -2606,7 +2692,7 @@ export class Game {
     this.stats.shield = reward.resources.shield;
     this.stats.energy = reward.resources.energy;
     this.stats.power = reward.power;
-    this.stats.score += 140 * this.stats.multiplier;
+    this.addScore(140 * this.stats.multiplier);
     this.hooks.onWordComplete(pod.entry);
     this.burst(pod.x, pod.y, 34, 48);
     this.sfx.support();
@@ -2631,7 +2717,7 @@ export class Game {
       this.stats.streak,
     );
     this.stats.multiplier = multiplierForStreak(this.stats.streak);
-    this.stats.score += 12 * this.stats.multiplier;
+    this.addScore(12 * this.stats.multiplier);
     this.gainPower(1.5);
     this.applyCharacterCorrectKeyPassive();
     this.burst(drone.x, drone.y, 8, 48);
@@ -2640,13 +2726,13 @@ export class Game {
     if (drone.typed >= word.length) {
       const drop = rollEquipmentDrop(
         "treasure",
-        this.playerStats.luck,
+        this.effectiveLuck(),
         this.playerStats.salvage,
       );
       if (drop !== null) {
         this.hooks.onEquipmentDrop(drop);
       }
-      this.stats.score += 320 * this.stats.multiplier;
+      this.addScore(320 * this.stats.multiplier);
       this.hooks.onWordComplete(drone.entry);
       this.burst(drone.x, drone.y, 44, 48);
       this.sfx.support();
@@ -2676,15 +2762,15 @@ export class Game {
       this.stats.streak,
     );
     this.stats.multiplier = multiplierForStreak(this.stats.streak);
-    this.stats.score += 10 * this.stats.multiplier;
+    this.addScore(10 * this.stats.multiplier);
     this.gainPower(1.3);
     this.applyCharacterCorrectKeyPassive();
     this.burst(crate.x, crate.y, 7, 286);
     this.sfx.shot(this.stats.multiplier);
 
     if (crate.typed >= word.length) {
-      const options = createRewardChoiceOptions(this.playerStats.luck);
-      this.stats.score += 220 * this.stats.multiplier;
+      const options = createRewardChoiceOptions(this.effectiveLuck());
+      this.addScore(220 * this.stats.multiplier);
       this.hooks.onWordComplete(crate.entry);
       this.burst(crate.x, crate.y, 40, 286);
       this.sfx.support();
@@ -2714,14 +2800,14 @@ export class Game {
       this.stats.streak,
     );
     this.stats.multiplier = multiplierForStreak(this.stats.streak);
-    this.stats.score += 12 * this.stats.multiplier;
+    this.addScore(12 * this.stats.multiplier);
     this.gainPower(1.4);
     this.applyCharacterCorrectKeyPassive();
     this.burst(crate.x, crate.y, 8, 322);
     this.sfx.shot(this.stats.multiplier);
 
     if (crate.typed >= word.length) {
-      this.stats.score += 260 * this.stats.multiplier;
+      this.addScore(260 * this.stats.multiplier);
       this.hooks.onWordComplete(crate.entry);
       this.burst(crate.x, crate.y, 44, 322);
       this.sfx.support();
@@ -2760,7 +2846,7 @@ export class Game {
 
     const reward = createAnomalyReward(
       choice,
-      this.playerStats.luck,
+      this.effectiveLuck(),
     );
     this.hooks.onEquipmentDrop(reward);
     this.anomalyResolutionPending = false;
@@ -2800,7 +2886,7 @@ export class Game {
     this.stats.streak += 1;
     this.stats.maxStreak = Math.max(this.stats.maxStreak, this.stats.streak);
     this.stats.multiplier = multiplierForStreak(this.stats.streak);
-    this.stats.score += 10 * this.stats.multiplier;
+    this.addScore(10 * this.stats.multiplier);
     this.gainPower(1.8);
     this.applyCharacterCorrectKeyPassive();
 
@@ -2835,40 +2921,41 @@ export class Game {
         enemy.speed *= 1.2;
       }
 
-      this.stats.score += (45 + length * 8) * this.stats.multiplier;
+      this.addScore((45 + length * 8) * this.stats.multiplier);
       this.gainPower(4);
 
       this.fireLaser(enemy, 1.25);
-      this.burst(
-        enemy.x,
-        enemy.y,
-        enemy.kind === "shield" ? 25 : 18,
-        enemy.kind === "shield" ? 164 : 202,
+      const hitDefinition = this.visualDefinitionForEnemy(enemy);
+      const hitFx = enemyFxProfile(
+        hitDefinition?.family ?? "rainbow",
+        "hit",
       );
+      this.burst(enemy.x, enemy.y, hitFx.count, hitFx.hue);
       this.sfx.hit();
       this.targetId = null;
       return;
     }
 
     this.stats.kills += 1;
-    this.stats.score += (80 + length * 14) * this.stats.multiplier;
+    this.addScore((80 + length * 14) * this.stats.multiplier);
     this.gainPower(7);
 
     this.fireLaser(enemy, 1.45);
-    this.burst(
-      enemy.x,
-      enemy.y,
-      enemy.kind === "tank" ? 36 : 24,
-      enemy.kind === "mine" ? 342 : 188,
+    const deathDefinition = this.visualDefinitionForEnemy(enemy);
+    const deathFx = enemyFxProfile(
+      deathDefinition?.family ?? "rainbow",
+      "death",
     );
+    this.burst(enemy.x, enemy.y, deathFx.count, deathFx.hue);
     this.sfx.hit();
     this.sfx.kill();
     if (enemy.golden) {
-      this.stats.score += 260 * this.stats.multiplier;
+      this.addScore(260 * this.stats.multiplier);
     }
     this.tryRollEquipmentDrop(
       enemy.golden ? "golden" : enemy.elite ? "elite" : "normal",
     );
+    this.activateEnemyReward(enemy);
 
     if (enemy.kind === "splitter") {
       this.spawnSplitFragments(enemy);
@@ -2891,6 +2978,154 @@ export class Game {
       this.markTimer = 0;
     }
     this.targetId = null;
+  }
+
+  private visualDefinitionForEnemy(enemy: Enemy) {
+    return enemyDefinition(
+      enemy.definitionId ??
+        runtimeEnemyDefinitionId(
+          enemy.kind,
+          enemy.elite,
+          this.stageConfig?.stage ?? 1,
+        ),
+    );
+  }
+
+  private activateEnemyReward(enemy: Enemy): void {
+    const definition = this.visualDefinitionForEnemy(enemy);
+    if (definition?.reward === undefined) return;
+    this.activateDefinitionReward(
+      definition,
+      enemy.x,
+      enemy.y,
+      enemy,
+    );
+  }
+
+  private activateDefinitionReward(
+    definition: NonNullable<ReturnType<typeof enemyDefinition>>,
+    x: number,
+    y: number,
+    sourceEnemy?: Enemy,
+  ): void {
+    if (definition.reward === undefined) return;
+
+    const effect = applyEnemyRewardEffect(
+      definition.reward,
+      {
+        restoreHull: (ratio) => {
+          this.stats.hull = clamp(
+            this.stats.hull + this.stats.maxHull * ratio,
+            0,
+            this.stats.maxHull,
+          );
+        },
+        restoreShield: (ratio) => {
+          this.stats.shield = clamp(
+            this.stats.shield + this.stats.maxShield * ratio,
+            0,
+            this.stats.maxShield,
+          );
+        },
+        applyPlayerStatus: (id, duration) => {
+          this.addStatus(id, duration, "enemy-reward");
+        },
+        setFireRateBoost: (duration) => {
+          this.weaponOverclockTimer = Math.max(
+            this.weaponOverclockTimer,
+            duration,
+          );
+        },
+        freezeNearby: (duration) => {
+          if (sourceEnemy !== undefined) {
+            applyEnemyAreaControl(this.enemies, sourceEnemy, duration, 0);
+          }
+        },
+        slowNearby: (duration) => {
+          if (sourceEnemy !== undefined) {
+            applyEnemyAreaControl(
+              this.enemies,
+              sourceEnemy,
+              duration,
+              0.55,
+            );
+          }
+        },
+        damageNearby: (power) => {
+          if (sourceEnemy !== undefined) {
+            softenNearbyEnemies(this.enemies, sourceEnemy, power, 5);
+          }
+        },
+        chainDamage: (power) => {
+          if (sourceEnemy !== undefined) {
+            softenNearbyEnemies(
+              this.enemies,
+              sourceEnemy,
+              power,
+              4,
+              330,
+            );
+          }
+        },
+        clearNormalEnemies: () => {
+          this.enemies = this.enemies.filter(
+            (target) =>
+              target.elite ||
+              (sourceEnemy !== undefined &&
+                target.id === sourceEnemy.id),
+          );
+        },
+        clearProjectiles: () => {
+          this.projectiles = [];
+        },
+        setScoreMultiplier: (_multiplier, duration) => {
+          this.rewardScoreMultiplierTimer = Math.max(
+            this.rewardScoreMultiplierTimer,
+            duration,
+          );
+        },
+        setCreditsMultiplier: (_multiplier, duration) => {
+          this.rewardCreditsMultiplierTimer = Math.max(
+            this.rewardCreditsMultiplierTimer,
+            duration,
+          );
+        },
+        reduceSkillCooldowns: (seconds) => {
+          this.skillEngine.reduceCooldowns(seconds);
+          this.hooks.onSkills();
+        },
+        restoreEnergy: (ratio) => {
+          this.stats.energy = clamp(
+            this.stats.energy + this.stats.maxEnergy * ratio,
+            0,
+            this.stats.maxEnergy,
+          );
+        },
+        addPower: (amount) => {
+          this.stats.power = clamp(this.stats.power + amount, 0, 100);
+        },
+      },
+      definition.rewardPower,
+    );
+
+    const rewardFx = rewardFxProfile(definition.reward);
+    this.burst(x, y, rewardFx.count, rewardFx.hue);
+    if (rewardFx.audio === "support") {
+      this.sfx.support();
+    } else if (rewardFx.audio === "rare-drop") {
+      this.sfx.rareDrop();
+    } else {
+      this.sfx.power();
+    }
+    this.rewardNotice = {
+      label: effect.label,
+      x,
+      y,
+      hue: rewardFx.hue,
+      remaining: 1.05,
+    };
+    this.hooks.onStatuses(this.statusState);
+    this.emitStats();
   }
 
   private spawnVolatileBurst(enemy: Enemy): void {
@@ -2936,6 +3171,7 @@ export class Game {
       this.enemies.push({
         id: this.nextEnemyId++,
         kind: "scout",
+        definitionId: "rainbow-scout",
         elite: false,
         eliteModifiers: [],
         entry: this.pickVocabularyEntry("mine"),
@@ -2995,6 +3231,24 @@ export class Game {
       maxEnergy: this.playerStats.energy,
       power: 0,
     };
+  }
+
+  getCreditsMultiplier(): number {
+    return timedRewardMultiplier(this.rewardCreditsMultiplierTimer);
+  }
+
+  private addScore(amount: number): void {
+    const multiplier = timedRewardMultiplier(
+      this.rewardScoreMultiplierTimer,
+    );
+    this.stats.score += Math.max(0, amount) * multiplier;
+  }
+
+  private effectiveLuck(): number {
+    return (
+      this.playerStats.luck +
+      (statusRemaining(this.statusState, "lucky") > 0 ? 25 : 0)
+    );
   }
 
   private gainPower(baseGain: number): void {
@@ -3159,6 +3413,9 @@ export class Game {
 
     if (this.characterId === "arsenal" && this.weaponOverclockTimer > 0) {
       multiplier *= 1.35;
+    }
+    if (statusRemaining(this.statusState, "overcharged") > 0) {
+      multiplier *= 1.2;
     }
     if (this.characterId === "reaper") {
       multiplier *= reaperStreakDamageMultiplier(this.stats.streak);
@@ -3805,6 +4062,7 @@ export class Game {
     this.drawPlayer(time);
     this.drawDefensiveEffects(time);
     this.drawTargetLine();
+    this.drawRewardNotice();
 
     if (this.overdriveTimer > 0) {
       context.fillStyle =
@@ -4030,32 +4288,46 @@ export class Game {
       context.restore();
     }
     context.globalCompositeOperation = "lighter";
-    context.shadowBlur = boss.flash > 0 ? 36 : 24;
     const phaseColor =
       boss.phase >= 3 ? "#ff527c" : boss.phase === 2 ? "#68e9ff" : "#ff8a6f";
-    context.shadowColor = boss.flash > 0 ? "#ffffff" : phaseColor;
-    context.strokeStyle = boss.flash > 0 ? "#ffffff" : phaseColor;
-    context.fillStyle =
-      boss.phase >= 3
-        ? "rgba(255, 61, 112, 0.09)"
-        : boss.phase === 2
-          ? "rgba(82, 218, 255, 0.08)"
-          : "rgba(255, 89, 72, 0.075)";
-    context.lineWidth = boss.role === "major-boss" ? 3.4 : 2.6;
+    const definition = enemyDefinition(
+      bossVisualDefinitionId(this.stageConfig?.galaxy ?? 1),
+    );
+    const modularDrawn =
+      definition !== undefined &&
+      drawModularEnemy(context, definition, {
+        radius,
+        age: time,
+        flash: boss.flash,
+        targeted: false,
+      });
 
-    context.beginPath();
-    for (let index = 0; index < 8; index += 1) {
-      const angle = (Math.PI * 2 * index) / 8 - Math.PI / 2;
-      const pointRadius =
-        index % 2 === 0 ? radius : radius * 0.72;
-      const px = Math.cos(angle) * pointRadius;
-      const py = Math.sin(angle) * pointRadius * 0.82;
-      if (index === 0) context.moveTo(px, py);
-      else context.lineTo(px, py);
+    if (!modularDrawn) {
+      context.shadowBlur = boss.flash > 0 ? 36 : 24;
+      context.shadowColor = boss.flash > 0 ? "#ffffff" : phaseColor;
+      context.strokeStyle = boss.flash > 0 ? "#ffffff" : phaseColor;
+      context.fillStyle =
+        boss.phase >= 3
+          ? "rgba(255, 61, 112, 0.09)"
+          : boss.phase === 2
+            ? "rgba(82, 218, 255, 0.08)"
+            : "rgba(255, 89, 72, 0.075)";
+      context.lineWidth = boss.role === "major-boss" ? 3.4 : 2.6;
+
+      context.beginPath();
+      for (let index = 0; index < 8; index += 1) {
+        const angle = (Math.PI * 2 * index) / 8 - Math.PI / 2;
+        const pointRadius =
+          index % 2 === 0 ? radius : radius * 0.72;
+        const px = Math.cos(angle) * pointRadius;
+        const py = Math.sin(angle) * pointRadius * 0.82;
+        if (index === 0) context.moveTo(px, py);
+        else context.lineTo(px, py);
+      }
+      context.closePath();
+      context.fill();
+      context.stroke();
     }
-    context.closePath();
-    context.fill();
-    context.stroke();
 
     context.strokeStyle =
       "rgba(255, 178, 105, " + String(0.35 + pulse * 0.18) + ")";
@@ -4469,125 +4741,144 @@ export class Game {
               : "rgba(255, 168, 69, 0.08)";
     context.lineWidth = targeted ? 2.8 : enemy.kind === "tank" ? 2.2 : 1.6;
 
-    context.beginPath();
+    const visual = enemyDefinition(
+      enemy.definitionId ??
+        runtimeEnemyDefinitionId(
+          enemy.kind,
+          enemy.elite,
+          this.stageConfig?.stage ?? 1,
+        ),
+    );
+    const modularDrawn =
+      visual !== undefined &&
+      drawModularEnemy(context, visual, {
+        radius: enemy.radius,
+        age: enemy.age,
+        flash: enemy.flash,
+        targeted,
+      });
 
-    if (enemy.kind === "mine") {
-      for (let index = 0; index < 8; index += 1) {
-        const angle = (Math.PI * 2 * index) / 8 - Math.PI / 2;
-        const radius = index % 2 === 0 ? enemy.radius * 1.3 : enemy.radius * 0.62;
-        const x = Math.cos(angle) * radius;
-        const y = Math.sin(angle) * radius;
-        if (index === 0) context.moveTo(x, y);
-        else context.lineTo(x, y);
+    if (!modularDrawn) {
+      context.beginPath();
+  
+      if (enemy.kind === "mine") {
+        for (let index = 0; index < 8; index += 1) {
+          const angle = (Math.PI * 2 * index) / 8 - Math.PI / 2;
+          const radius = index % 2 === 0 ? enemy.radius * 1.3 : enemy.radius * 0.62;
+          const x = Math.cos(angle) * radius;
+          const y = Math.sin(angle) * radius;
+          if (index === 0) context.moveTo(x, y);
+          else context.lineTo(x, y);
+        }
+        context.closePath();
+      } else if (enemy.kind === "tank") {
+        for (let index = 0; index < 6; index += 1) {
+          const angle = (Math.PI * 2 * index) / 6 - Math.PI / 2;
+          const x = Math.cos(angle) * enemy.radius;
+          const y = Math.sin(angle) * enemy.radius * 0.78;
+          if (index === 0) context.moveTo(x, y);
+          else context.lineTo(x, y);
+        }
+        context.closePath();
+      } else if (enemy.kind === "destroyer") {
+        context.moveTo(0, enemy.radius);
+        context.lineTo(enemy.radius, -enemy.radius * 0.45);
+        context.lineTo(enemy.radius * 0.32, -enemy.radius * 0.72);
+        context.lineTo(0, -enemy.radius * 0.38);
+        context.lineTo(-enemy.radius * 0.32, -enemy.radius * 0.72);
+        context.lineTo(-enemy.radius, -enemy.radius * 0.45);
+        context.closePath();
+      } else if (enemy.kind === "oppressor") {
+        for (let index = 0; index < 6; index += 1) {
+          const angle = (Math.PI * 2 * index) / 6 - Math.PI / 2;
+          const radius =
+            index % 2 === 0 ? enemy.radius : enemy.radius * 0.78;
+          const x = Math.cos(angle) * radius;
+          const y = Math.sin(angle) * radius * 0.78;
+          if (index === 0) context.moveTo(x, y);
+          else context.lineTo(x, y);
+        }
+        context.closePath();
+      } else if (enemy.kind === "carrier") {
+        context.moveTo(0, enemy.radius * 0.78);
+        context.lineTo(enemy.radius * 1.12, enemy.radius * 0.12);
+        context.lineTo(enemy.radius * 0.72, -enemy.radius * 0.58);
+        context.lineTo(0, -enemy.radius * 0.35);
+        context.lineTo(-enemy.radius * 0.72, -enemy.radius * 0.58);
+        context.lineTo(-enemy.radius * 1.12, enemy.radius * 0.12);
+        context.closePath();
+      } else if (enemy.kind === "shield") {
+        context.arc(0, 0, enemy.radius * 0.72, 0, Math.PI * 2);
+      } else if (enemy.kind === "jammer") {
+        context.moveTo(0, enemy.radius);
+        context.lineTo(enemy.radius * 0.86, 0);
+        context.lineTo(0, -enemy.radius);
+        context.lineTo(-enemy.radius * 0.86, 0);
+        context.closePath();
+      } else if (enemy.kind === "cloaker") {
+        context.moveTo(0, enemy.radius);
+        context.lineTo(enemy.radius * 0.95, -enemy.radius * 0.62);
+        context.lineTo(enemy.radius * 0.28, -enemy.radius * 0.42);
+        context.lineTo(0, -enemy.radius * 0.78);
+        context.lineTo(-enemy.radius * 0.28, -enemy.radius * 0.42);
+        context.lineTo(-enemy.radius * 0.95, -enemy.radius * 0.62);
+        context.closePath();
+      } else if (enemy.kind === "healer") {
+        context.moveTo(0, enemy.radius);
+        context.lineTo(enemy.radius * 0.5, enemy.radius * 0.26);
+        context.lineTo(enemy.radius, 0);
+        context.lineTo(enemy.radius * 0.5, -enemy.radius * 0.26);
+        context.lineTo(0, -enemy.radius);
+        context.lineTo(-enemy.radius * 0.5, -enemy.radius * 0.26);
+        context.lineTo(-enemy.radius, 0);
+        context.lineTo(-enemy.radius * 0.5, enemy.radius * 0.26);
+        context.closePath();
+      } else if (enemy.kind === "splitter") {
+        context.moveTo(0, enemy.radius);
+        context.lineTo(enemy.radius * 0.8, enemy.radius * 0.25);
+        context.lineTo(enemy.radius * 0.45, -enemy.radius * 0.75);
+        context.lineTo(0, -enemy.radius * 0.35);
+        context.lineTo(-enemy.radius * 0.45, -enemy.radius * 0.75);
+        context.lineTo(-enemy.radius * 0.8, enemy.radius * 0.25);
+        context.closePath();
+      } else if (enemy.kind === "sniper") {
+        context.moveTo(0, enemy.radius);
+        context.lineTo(enemy.radius * 0.52, -enemy.radius * 0.3);
+        context.lineTo(enemy.radius * 0.22, -enemy.radius);
+        context.lineTo(0, -enemy.radius * 0.64);
+        context.lineTo(-enemy.radius * 0.22, -enemy.radius);
+        context.lineTo(-enemy.radius * 0.52, -enemy.radius * 0.3);
+        context.closePath();
+      } else if (enemy.kind === "leech") {
+        for (let index = 0; index < 7; index += 1) {
+          const angle = (Math.PI * 2 * index) / 7 - Math.PI / 2;
+          const radius =
+            index % 2 === 0 ? enemy.radius : enemy.radius * 0.7;
+          const x = Math.cos(angle) * radius;
+          const y = Math.sin(angle) * radius;
+          if (index === 0) context.moveTo(x, y);
+          else context.lineTo(x, y);
+        }
+        context.closePath();
+      } else if (enemy.kind === "commander") {
+        context.moveTo(0, enemy.radius);
+        context.lineTo(enemy.radius, enemy.radius * 0.1);
+        context.lineTo(enemy.radius * 0.65, -enemy.radius * 0.72);
+        context.lineTo(0, -enemy.radius * 0.45);
+        context.lineTo(-enemy.radius * 0.65, -enemy.radius * 0.72);
+        context.lineTo(-enemy.radius, enemy.radius * 0.1);
+        context.closePath();
+      } else {
+        context.moveTo(0, enemy.radius);
+        context.lineTo(enemy.radius * 0.9, -enemy.radius * 0.72);
+        context.lineTo(0, -enemy.radius * 0.34);
+        context.lineTo(-enemy.radius * 0.9, -enemy.radius * 0.72);
+        context.closePath();
       }
-      context.closePath();
-    } else if (enemy.kind === "tank") {
-      for (let index = 0; index < 6; index += 1) {
-        const angle = (Math.PI * 2 * index) / 6 - Math.PI / 2;
-        const x = Math.cos(angle) * enemy.radius;
-        const y = Math.sin(angle) * enemy.radius * 0.78;
-        if (index === 0) context.moveTo(x, y);
-        else context.lineTo(x, y);
-      }
-      context.closePath();
-    } else if (enemy.kind === "destroyer") {
-      context.moveTo(0, enemy.radius);
-      context.lineTo(enemy.radius, -enemy.radius * 0.45);
-      context.lineTo(enemy.radius * 0.32, -enemy.radius * 0.72);
-      context.lineTo(0, -enemy.radius * 0.38);
-      context.lineTo(-enemy.radius * 0.32, -enemy.radius * 0.72);
-      context.lineTo(-enemy.radius, -enemy.radius * 0.45);
-      context.closePath();
-    } else if (enemy.kind === "oppressor") {
-      for (let index = 0; index < 6; index += 1) {
-        const angle = (Math.PI * 2 * index) / 6 - Math.PI / 2;
-        const radius =
-          index % 2 === 0 ? enemy.radius : enemy.radius * 0.78;
-        const x = Math.cos(angle) * radius;
-        const y = Math.sin(angle) * radius * 0.78;
-        if (index === 0) context.moveTo(x, y);
-        else context.lineTo(x, y);
-      }
-      context.closePath();
-    } else if (enemy.kind === "carrier") {
-      context.moveTo(0, enemy.radius * 0.78);
-      context.lineTo(enemy.radius * 1.12, enemy.radius * 0.12);
-      context.lineTo(enemy.radius * 0.72, -enemy.radius * 0.58);
-      context.lineTo(0, -enemy.radius * 0.35);
-      context.lineTo(-enemy.radius * 0.72, -enemy.radius * 0.58);
-      context.lineTo(-enemy.radius * 1.12, enemy.radius * 0.12);
-      context.closePath();
-    } else if (enemy.kind === "shield") {
-      context.arc(0, 0, enemy.radius * 0.72, 0, Math.PI * 2);
-    } else if (enemy.kind === "jammer") {
-      context.moveTo(0, enemy.radius);
-      context.lineTo(enemy.radius * 0.86, 0);
-      context.lineTo(0, -enemy.radius);
-      context.lineTo(-enemy.radius * 0.86, 0);
-      context.closePath();
-    } else if (enemy.kind === "cloaker") {
-      context.moveTo(0, enemy.radius);
-      context.lineTo(enemy.radius * 0.95, -enemy.radius * 0.62);
-      context.lineTo(enemy.radius * 0.28, -enemy.radius * 0.42);
-      context.lineTo(0, -enemy.radius * 0.78);
-      context.lineTo(-enemy.radius * 0.28, -enemy.radius * 0.42);
-      context.lineTo(-enemy.radius * 0.95, -enemy.radius * 0.62);
-      context.closePath();
-    } else if (enemy.kind === "healer") {
-      context.moveTo(0, enemy.radius);
-      context.lineTo(enemy.radius * 0.5, enemy.radius * 0.26);
-      context.lineTo(enemy.radius, 0);
-      context.lineTo(enemy.radius * 0.5, -enemy.radius * 0.26);
-      context.lineTo(0, -enemy.radius);
-      context.lineTo(-enemy.radius * 0.5, -enemy.radius * 0.26);
-      context.lineTo(-enemy.radius, 0);
-      context.lineTo(-enemy.radius * 0.5, enemy.radius * 0.26);
-      context.closePath();
-    } else if (enemy.kind === "splitter") {
-      context.moveTo(0, enemy.radius);
-      context.lineTo(enemy.radius * 0.8, enemy.radius * 0.25);
-      context.lineTo(enemy.radius * 0.45, -enemy.radius * 0.75);
-      context.lineTo(0, -enemy.radius * 0.35);
-      context.lineTo(-enemy.radius * 0.45, -enemy.radius * 0.75);
-      context.lineTo(-enemy.radius * 0.8, enemy.radius * 0.25);
-      context.closePath();
-    } else if (enemy.kind === "sniper") {
-      context.moveTo(0, enemy.radius);
-      context.lineTo(enemy.radius * 0.52, -enemy.radius * 0.3);
-      context.lineTo(enemy.radius * 0.22, -enemy.radius);
-      context.lineTo(0, -enemy.radius * 0.64);
-      context.lineTo(-enemy.radius * 0.22, -enemy.radius);
-      context.lineTo(-enemy.radius * 0.52, -enemy.radius * 0.3);
-      context.closePath();
-    } else if (enemy.kind === "leech") {
-      for (let index = 0; index < 7; index += 1) {
-        const angle = (Math.PI * 2 * index) / 7 - Math.PI / 2;
-        const radius =
-          index % 2 === 0 ? enemy.radius : enemy.radius * 0.7;
-        const x = Math.cos(angle) * radius;
-        const y = Math.sin(angle) * radius;
-        if (index === 0) context.moveTo(x, y);
-        else context.lineTo(x, y);
-      }
-      context.closePath();
-    } else if (enemy.kind === "commander") {
-      context.moveTo(0, enemy.radius);
-      context.lineTo(enemy.radius, enemy.radius * 0.1);
-      context.lineTo(enemy.radius * 0.65, -enemy.radius * 0.72);
-      context.lineTo(0, -enemy.radius * 0.45);
-      context.lineTo(-enemy.radius * 0.65, -enemy.radius * 0.72);
-      context.lineTo(-enemy.radius, enemy.radius * 0.1);
-      context.closePath();
-    } else {
-      context.moveTo(0, enemy.radius);
-      context.lineTo(enemy.radius * 0.9, -enemy.radius * 0.72);
-      context.lineTo(0, -enemy.radius * 0.34);
-      context.lineTo(-enemy.radius * 0.9, -enemy.radius * 0.72);
-      context.closePath();
+  
+      context.fill();
+      context.stroke();
     }
-
-    context.fill();
-    context.stroke();
 
     if (enemy.elite) {
       context.strokeStyle = "rgba(255, 226, 105, 0.64)";
@@ -4616,7 +4907,7 @@ export class Game {
       }
     }
 
-    if (enemy.kind === "tank") {
+    if (!modularDrawn && enemy.kind === "tank") {
       context.strokeStyle = "rgba(169, 154, 255, 0.45)";
       context.lineWidth = 1.4;
       context.beginPath();
@@ -4639,7 +4930,7 @@ export class Game {
       }
     }
 
-    if (enemy.kind === "oppressor") {
+    if (!modularDrawn && enemy.kind === "oppressor") {
       context.strokeStyle = "rgba(229, 111, 255, 0.38)";
       context.lineWidth = 1.5;
       context.beginPath();
@@ -4651,7 +4942,7 @@ export class Game {
       context.stroke();
     }
 
-    if (enemy.kind === "shield" && enemy.layersRemaining > 1) {
+    if (!modularDrawn && enemy.kind === "shield" && enemy.layersRemaining > 1) {
       context.strokeStyle = "rgba(91, 255, 214, 0.55)";
       context.lineWidth = 2;
       context.beginPath();
@@ -4664,13 +4955,13 @@ export class Game {
       context.stroke();
     }
 
-    if (enemy.kind === "carrier") {
+    if (!modularDrawn && enemy.kind === "carrier") {
       context.fillStyle = "rgba(255, 219, 105, 0.75)";
       context.fillRect(-enemy.radius * 0.85, 2, 7, 7);
       context.fillRect(enemy.radius * 0.85 - 7, 2, 7, 7);
     }
 
-    if (enemy.kind === "jammer") {
+    if (!modularDrawn && enemy.kind === "jammer") {
       context.strokeStyle = "rgba(221, 255, 105, 0.45)";
       context.lineWidth = 1.4;
       for (const scale of [0.75, 1.08]) {
@@ -4683,7 +4974,7 @@ export class Game {
       }
     }
 
-    if (enemy.kind === "healer") {
+    if (!modularDrawn && enemy.kind === "healer") {
       context.strokeStyle = "rgba(111, 255, 185, 0.55)";
       context.lineWidth = 2;
       context.beginPath();
@@ -4694,7 +4985,7 @@ export class Game {
       context.stroke();
     }
 
-    if (enemy.kind === "commander") {
+    if (!modularDrawn && enemy.kind === "commander") {
       context.strokeStyle = "rgba(255, 243, 156, 0.52)";
       context.lineWidth = 1.4;
       context.beginPath();
@@ -4705,7 +4996,7 @@ export class Game {
       context.fillRect(-2, -enemy.radius * 0.82, 4, 8);
     }
 
-    if (enemy.kind === "leech") {
+    if (!modularDrawn && enemy.kind === "leech") {
       context.strokeStyle = "rgba(194, 119, 255, 0.48)";
       context.lineWidth = 1.5;
       context.beginPath();
@@ -4769,6 +5060,36 @@ export class Game {
     context.shadowColor = "#57efff";
     context.fillText(remaining, left + typedWidth, y);
 
+    context.restore();
+  }
+
+  private drawRewardNotice(): void {
+    const notice = this.rewardNotice;
+    if (notice === null) return;
+
+    const context = this.context;
+    const alpha = clamp(notice.remaining / 1.05, 0, 1);
+    const lift = (1 - alpha) * 22;
+    const y = notice.y - 54 - lift;
+
+    context.save();
+    context.globalCompositeOperation = "source-over";
+    context.globalAlpha = alpha;
+    context.font =
+      "850 13px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    const width = context.measureText(notice.label).width;
+    context.fillStyle = "rgba(3, 9, 20, 0.9)";
+    context.fillRect(
+      notice.x - width / 2 - 9,
+      y - 12,
+      width + 18,
+      24,
+    );
+    context.fillStyle =
+      "hsl(" + String(notice.hue) + " 90% 78%)";
+    context.fillText(notice.label, notice.x, y);
     context.restore();
   }
 

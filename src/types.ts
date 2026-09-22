@@ -1,3 +1,5 @@
+import type { EnemyDefinitionId } from "./enemies/registry";
+
 export type GamePhase =
   | "title"
   | "playing"
@@ -77,6 +79,7 @@ export type GameStats = {
 export type Enemy = {
   id: number;
   kind: EnemyKind;
+  definitionId?: EnemyDefinitionId;
   elite: boolean;
   golden?: boolean;
   eliteModifiers: EliteModifier[];
@@ -94,6 +97,8 @@ export type Enemy = {
   flash: number;
   kick: number;
   actionCooldown: number | null;
+  rewardControlTimer?: number;
+  rewardControlFactor?: number;
 };
 
 export type EnemyProjectile = {

@@ -72,6 +72,87 @@
       "author": "Space Typing project",
       "license": "Project original",
       "attributionRequired": false
+    },
+    {
+      "id": "enemy-family-rainbow",
+      "category": "enemy",
+      "sourceType": "procedural",
+      "source": "src/enemies/renderer.ts + src/enemies/registry.ts (rainbow)",
+      "author": "Space Typing project",
+      "license": "Project original",
+      "attributionRequired": false
+    },
+    {
+      "id": "enemy-family-angel",
+      "category": "enemy",
+      "sourceType": "procedural",
+      "source": "src/enemies/renderer.ts + src/enemies/registry.ts (angel)",
+      "author": "Space Typing project",
+      "license": "Project original",
+      "attributionRequired": false
+    },
+    {
+      "id": "enemy-family-devil",
+      "category": "enemy",
+      "sourceType": "procedural",
+      "source": "src/enemies/renderer.ts + src/enemies/registry.ts (devil)",
+      "author": "Space Typing project",
+      "license": "Project original",
+      "attributionRequired": false
+    },
+    {
+      "id": "enemy-family-frost",
+      "category": "enemy",
+      "sourceType": "procedural",
+      "source": "src/enemies/renderer.ts + src/enemies/registry.ts (frost)",
+      "author": "Space Typing project",
+      "license": "Project original",
+      "attributionRequired": false
+    },
+    {
+      "id": "enemy-family-prism",
+      "category": "enemy",
+      "sourceType": "procedural",
+      "source": "src/enemies/renderer.ts + src/enemies/registry.ts (prism)",
+      "author": "Space Typing project",
+      "license": "Project original",
+      "attributionRequired": false
+    },
+    {
+      "id": "enemy-family-nature",
+      "category": "enemy",
+      "sourceType": "procedural",
+      "source": "src/enemies/renderer.ts + src/enemies/registry.ts (nature)",
+      "author": "Space Typing project",
+      "license": "Project original",
+      "attributionRequired": false
+    },
+    {
+      "id": "enemy-family-shadow",
+      "category": "enemy",
+      "sourceType": "procedural",
+      "source": "src/enemies/renderer.ts + src/enemies/registry.ts (shadow)",
+      "author": "Space Typing project",
+      "license": "Project original",
+      "attributionRequired": false
+    },
+    {
+      "id": "enemy-family-cosmic",
+      "category": "enemy",
+      "sourceType": "procedural",
+      "source": "src/enemies/renderer.ts + src/enemies/registry.ts (cosmic)",
+      "author": "Space Typing project",
+      "license": "Project original",
+      "attributionRequired": false
+    },
+    {
+      "id": "boss-family-modular-v1",
+      "category": "boss",
+      "sourceType": "procedural",
+      "source": "src/enemies/renderer.ts + src/boss/visual-profile.ts",
+      "author": "Space Typing project",
+      "license": "Project original",
+      "attributionRequired": false
     }
   ]
 }

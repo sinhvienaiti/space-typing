@@ -1849,3 +1849,48 @@ not unrelated giant monsters.
 ```
 
 This direction should become the visual foundation for the next major Space Typing milestone.
+
+
+---
+
+# 33. Implementation checkpoint — 2026-09-22
+
+GitHub implementation branch:
+
+`feature/enemy-system-e01`
+
+Pull request:
+
+`#26`
+
+Current reviewed code checkpoint before this documentation update:
+
+`63522b531e92ead52cd904d31e0964ea719467ce`
+
+Roadmap status:
+
+- E01 — implemented: enemy family/role/reward/visual contracts and validation.
+- E02 — implemented: one reward dispatcher reusing existing status, skill, resource and combat systems.
+- E03 — implemented: modular procedural renderer with legacy procedural fallback.
+- E04 — implemented: Rainbow, Angel, Devil and Frost runtime visual families.
+- E05 — implemented: Lucky Rainbow, Angel Healer, Angel Guard, Angel Blesser, Bomb Imp and Freeze Burst Sprite reward targets.
+- E06 — implemented: Seraph Elite, Berserk Devil, Frost Keeper and Fortune Prism using the existing Elite modifier system.
+- E07 — implemented: Prism and Nature normal/reward families.
+- E08 — implemented: Archangel Core and Demon Lord Orb on the existing boss framework.
+- E09 — implemented: Glacier Queen and Prism Archon.
+- E10 — implemented: late-game Shadow and Cosmic expansion, including Void Eye and Cosmic Emperor.
+- E11 — implemented: family-aware spawn/hit/death/reward/boss VFX and audio feedback using the existing particle/SFX systems.
+- E12 — implemented: deterministic reward-frequency and uptime simulations with regression bounds.
+- E13 — automated audit implemented: registry/readability contracts, asset-source coverage and VFX particle-cap checks. Manual browser/art readability approval is still pending and must not be reported as completed.
+- E14 — code review pass #1 completed; reward integration gaps found and fixed.
+- E15 — independent code review pass #2 completed; stale reward-source scope bug found and fixed.
+
+Latest verified CI before this documentation checkpoint:
+
+- CI #151: PASS on `63522b531e92ead52cd904d31e0964ea719467ce`.
+
+Important completion rule:
+
+- the implementation may be merged when code/CI review is clean;
+- the **enemy-system milestone itself remains open** until the manual browser visual/playtest gate confirms text readability, visual clutter, reward recognition, boss readability and acceptable performance;
+- no generated or third-party raster enemy art is required at runtime at this checkpoint; the project-original procedural renderer remains the production fallback and its sources are recorded in `docs/ASSET_SOURCES.md` and the asset manifest.
