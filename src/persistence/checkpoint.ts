@@ -358,8 +358,11 @@ export function sanitizeCheckpointSnapshot(
 export function sanitizeCrashRecoverySnapshot(
   value: unknown,
 ): CrashRecoverySnapshot | null {
-  if (!isValidCrashRecoverySnapshot(value)) return null;
-  return sanitizeRunPersistentState(value);
+  if (isValidCrashRecoverySnapshot(value)) {
+    return sanitizeRunPersistentState(value);
+  }
+
+  return migrateLegacyRunPersistentState(value);
 }
 
 function mergeKnowledgeCampaign(
