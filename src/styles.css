@@ -307,6 +307,36 @@ kbd {
   font-weight: 700;
 }
 
+#gameOverOverlay .pause-card {
+  max-width: 580px;
+}
+
+.death-protection-meta {
+  margin: 0;
+  color: #8da4b7;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.death-protection-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.death-protection-actions button {
+  min-height: 3.4rem;
+  padding: 0.7rem 0.55rem;
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+
+@media (max-width: 560px) {
+  .death-protection-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
 .results {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

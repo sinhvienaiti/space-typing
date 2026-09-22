@@ -249,6 +249,10 @@ import {
   type SkillRuntimeState,
 } from "./skills/engine";
 import {
+  PHOENIX_REVIVE_GRACE_SECONDS,
+  phoenixReviveResources,
+} from "./combat/revival";
+import {
   accuracyPercent,
   clamp,
   chooseTarget,
@@ -408,6 +412,7 @@ export class Game {
   private bossMarkTimer = 0;
   private gravityWellTimer = 0;
   private cloakTimer = 0;
+  private phoenixGraceTimer = 0;
   private weaponOverclockTimer = 0;
   private rewardScoreMultiplierTimer = 0;
   private rewardCreditsMultiplierTimer = 0;
@@ -1379,6 +1384,7 @@ export class Game {
     this.bossMarkTimer = 0;
     this.gravityWellTimer = 0;
     this.cloakTimer = 0;
+    this.phoenixGraceTimer = 0;
     this.weaponOverclockTimer = 0;
     this.rewardScoreMultiplierTimer = 0;
     this.rewardCreditsMultiplierTimer = 0;
@@ -1394,6 +1400,46 @@ export class Game {
     this.hooks.onPhase(this.phase);
     this.hooks.onStats(this.getStats());
     this.hooks.onStage(stage.stage);
+  }
+
+  reviveCurrentEncounter(): boolean {
+    if (
+      this.phase !== "gameover" ||
+      this.stageConfig === null ||
+      this.stats.hull > 0
+    ) {
+      return false;
+    }
+
+    const revived = phoenixReviveResources(
+      this.stats.maxHull,
+      this.stats.maxShield,
+      this.stats.maxEnergy,
+    );
+    this.stats.hull = revived.hull;
+    this.stats.shield = revived.shield;
+    this.stats.energy = revived.energy;
+    this.stats.streak = 0;
+    this.stats.multiplier = 1;
+    this.secondsSinceDamage = 0;
+    this.phoenixGraceTimer = PHOENIX_REVIVE_GRACE_SECONDS;
+    this.projectiles = [];
+    this.phase = "playing";
+    this.lastTime = performance.now();
+
+    this.burst(
+      this.width / 2,
+      this.height - PLAYER_Y_OFFSET,
+      54,
+      28,
+    );
+    if (this.settings.screenShake) {
+      this.shake = Math.max(this.shake, 7);
+    }
+    this.sfx.power();
+    this.emitStats();
+    this.hooks.onPhase(this.phase);
+    return true;
   }
 
   pause(): void {
@@ -1609,6 +1655,10 @@ export class Game {
     this.bossMarkTimer = Math.max(0, this.bossMarkTimer - dt);
     this.gravityWellTimer = Math.max(0, this.gravityWellTimer - dt);
     this.cloakTimer = Math.max(0, this.cloakTimer - dt);
+    this.phoenixGraceTimer = Math.max(
+      0,
+      this.phoenixGraceTimer - dt,
+    );
     this.weaponOverclockTimer = Math.max(
       0,
       this.weaponOverclockTimer - dt,
@@ -3864,6 +3914,12 @@ export class Game {
     y: number,
     rawDamage: number,
   ): void {
+    if (this.phoenixGraceTimer > 0) {
+      this.burst(x, y, 18, 28);
+      this.sfx.support();
+      return;
+    }
+
     if (this.cloakTimer > 0) {
       this.burst(x, y, 18, 274);
       this.sfx.support();
@@ -5237,6 +5293,22 @@ export class Game {
 
     context.save();
     context.globalCompositeOperation = "lighter";
+
+    if (this.phoenixGraceTimer > 0) {
+      context.strokeStyle = "rgba(255, 190, 78, 0.82)";
+      context.lineWidth = 2.6;
+      context.shadowBlur = 22;
+      context.shadowColor = "#ffb347";
+      context.beginPath();
+      context.arc(
+        x,
+        y,
+        30 + Math.sin(time * 10) * 3,
+        0,
+        Math.PI * 2,
+      );
+      context.stroke();
+    }
 
     if (this.barrierTimer > 0 && this.barrierHp > 0) {
       context.strokeStyle = "rgba(92, 225, 255, 0.72)";

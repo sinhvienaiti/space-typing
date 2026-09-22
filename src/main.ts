@@ -189,6 +189,13 @@ import {
   type RunPersistentState,
 } from "./persistence/checkpoint";
 import {
+  consumePhoenixCore,
+  createStageEntrySnapshot,
+  resolveSalvageAnchor,
+  resolveStageRevivalCore,
+  type StageEntrySnapshot,
+} from "./persistence/death-protection";
+import {
   captureCrashRecoverySnapshot,
   invalidateCrashRecoverySnapshot,
   type CrashRecoverySnapshot,
@@ -506,9 +513,17 @@ app.innerHTML = `
           <div><span>accuracy</span><strong id="resultAccuracy">100%</strong></div>
           <div><span>max streak</span><strong id="resultStreak">0</strong></div>
         </div>
-        <button id="againButton" class="primary">Retry stage</button>
-        <button id="gameOverStageSelectButton">Stage Select</button>
-        <button id="resultTitleButton">Back to title</button>
+        <p id="deathProtectionMeta" class="death-protection-meta">
+          Choose a recovery path. Reloading before a choice enforces checkpoint rollback.
+        </p>
+        <div class="death-protection-actions">
+          <button id="salvageAnchorButton">Salvage Anchor · 0</button>
+          <button id="stageRevivalButton">Stage Revival Core · 0</button>
+          <button id="phoenixCoreButton">Phoenix Core · 0</button>
+        </div>
+        <button id="againButton" class="primary">Return to checkpoint</button>
+        <button id="gameOverStageSelectButton">Checkpoint + Stage Select</button>
+        <button id="resultTitleButton">Checkpoint + Back to title</button>
       </div>
     </section>
 
@@ -969,6 +984,7 @@ let checkpointSnapshot: CheckpointSnapshot =
     campaignExpansion.checkpoint.stage,
   );
 let crashRecoverySnapshot: CrashRecoverySnapshot | null = null;
+let stageEntrySnapshot: StageEntrySnapshot | null = null;
 let persistenceReady = false;
 let vocabularyReady = false;
 let equipmentDropCounter = 0;
@@ -1032,6 +1048,7 @@ type AutosaveSnapshot = {
   campaignExpansion: CampaignExpansionState;
   checkpointSnapshot: CheckpointSnapshot;
   crashRecoverySnapshot: CrashRecoverySnapshot | null;
+  stageEntrySnapshot: StageEntrySnapshot | null;
 };
 
 const campaignAutosave = new AutosaveQueue<
@@ -1053,6 +1070,7 @@ const campaignAutosave = new AutosaveQueue<
     snapshot.campaignExpansion,
     snapshot.checkpointSnapshot,
     snapshot.crashRecoverySnapshot,
+    snapshot.stageEntrySnapshot,
   ),
 );
 
@@ -1099,6 +1117,7 @@ function currentAutosaveSnapshot(): AutosaveSnapshot {
     campaignExpansion,
     checkpointSnapshot,
     crashRecoverySnapshot,
+    stageEntrySnapshot,
   };
 }
 
@@ -1138,6 +1157,7 @@ function persistRecoveryMirrorSync(
       campaignExpansion,
       checkpointSnapshot,
       crashRecoverySnapshot,
+      stageEntrySnapshot,
     ),
   );
 }
@@ -1848,6 +1868,197 @@ function renderRewardChoiceOptions(
   }
 }
 
+function clearDeathRecoveryMarker(): void {
+  crashRecoverySnapshot = null;
+  campaignExpansion = {
+    ...campaignExpansion,
+    crashRecovery: null,
+  };
+}
+
+function renderDeathProtectionChoices(failedStage: number): void {
+  const anchorCount = itemCount(inventory, "salvage-anchor");
+  const revivalCount = itemCount(inventory, "stage-revival-core");
+  const phoenixCount = itemCount(inventory, "phoenix-core");
+  const validStageEntry =
+    stageEntrySnapshot !== null &&
+    stageEntrySnapshot.stage === failedStage;
+
+  byId("salvageAnchorButton").textContent =
+    "Salvage Anchor · " + String(anchorCount);
+  byId("stageRevivalButton").textContent =
+    "Stage Revival Core · " + String(revivalCount);
+  byId("phoenixCoreButton").textContent =
+    "Phoenix Core · " + String(phoenixCount);
+
+  byId<HTMLButtonElement>("salvageAnchorButton").disabled =
+    anchorCount <= 0;
+  byId<HTMLButtonElement>("stageRevivalButton").disabled =
+    revivalCount <= 0 || !validStageEntry;
+  byId<HTMLButtonElement>("phoenixCoreButton").disabled =
+    phoenixCount <= 0 || !validStageEntry;
+
+  const checkpointStage = campaignExpansion.checkpoint.stage;
+  byId("againButton").textContent =
+    "Retry checkpoint · Stage " +
+    String(checkpointStage).padStart(3, "0");
+  byId("deathProtectionMeta").textContent =
+    "Death at Stage " +
+    String(failedStage).padStart(3, "0") +
+    " · checkpoint " +
+    String(checkpointStage).padStart(3, "0") +
+    ". Protection items are consumed only when chosen.";
+}
+
+async function persistResolvedDeath(
+  message: string,
+): Promise<boolean> {
+  clearDeathRecoveryMarker();
+  return autosaveCampaign(
+    "gameover",
+    message,
+    "manual",
+  );
+}
+
+async function resolveCheckpointDeath(
+  action: "retry" | "stage-select" | "title",
+): Promise<void> {
+  if (game.getPhase() !== "gameover") return;
+
+  const restored = restoreCheckpointSnapshot(
+    checkpointSnapshot,
+    currentRunPersistentState(),
+  );
+  applyRunPersistentState(restored);
+  campaignExpansion = rollbackCampaignExpansion(
+    campaignExpansion,
+    new Date().toISOString(),
+  );
+  stageEntrySnapshot = null;
+  refreshPersistentStateUi();
+
+  const checkpointStage = campaignExpansion.checkpoint.stage;
+  const saved = await persistResolvedDeath(
+    "✓ Returned to checkpoint · Stage " +
+      String(checkpointStage).padStart(3, "0"),
+  );
+  if (!saved) return;
+
+  if (action === "retry") {
+    await startSelectedStage();
+  } else if (action === "stage-select") {
+    game.backToTitle();
+    openStageSelect();
+  } else {
+    game.backToTitle();
+  }
+}
+
+async function resolveSalvageAnchorDeath(): Promise<void> {
+  if (game.getPhase() !== "gameover") return;
+
+  const result = resolveSalvageAnchor(
+    currentRunPersistentState(),
+    campaignExpansion,
+    checkpointSnapshot,
+    new Date().toISOString(),
+  );
+  if (!result.applied) {
+    renderDeathProtectionChoices(game.getStats().stage);
+    return;
+  }
+
+  applyRunPersistentState(result.state);
+  campaignExpansion = result.campaignExpansion;
+  checkpointSnapshot = result.checkpointSnapshot;
+  stageEntrySnapshot = null;
+  refreshPersistentStateUi();
+
+  const saved = await persistResolvedDeath(
+    "✓ Salvage Anchor consumed · gains preserved · checkpoint Stage " +
+      String(campaignExpansion.checkpoint.stage).padStart(3, "0"),
+  );
+  if (saved) await startSelectedStage();
+}
+
+async function resolveStageRevivalDeath(): Promise<void> {
+  if (game.getPhase() !== "gameover") return;
+
+  const result = resolveStageRevivalCore(
+    currentRunPersistentState(),
+    stageEntrySnapshot,
+  );
+  if (result === null || !result.applied) {
+    renderDeathProtectionChoices(game.getStats().stage);
+    return;
+  }
+
+  applyRunPersistentState(result.state);
+  campaignExpansion = result.campaignExpansion;
+  checkpointSnapshot = result.checkpointSnapshot;
+  stageEntrySnapshot = result.stageEntrySnapshot;
+  refreshPersistentStateUi();
+
+  const saved = await persistResolvedDeath(
+    "✓ Stage Revival Core consumed · restarting Stage " +
+      String(campaign.selectedStage).padStart(3, "0"),
+  );
+  if (saved) await startSelectedStage();
+}
+
+async function resolvePhoenixDeath(): Promise<void> {
+  if (
+    game.getPhase() !== "gameover" ||
+    stageEntrySnapshot === null ||
+    itemCount(inventory, "phoenix-core") <= 0
+  ) {
+    return;
+  }
+
+  if (!game.reviveCurrentEncounter()) return;
+
+  const activeResult = consumePhoenixCore(
+    currentRunPersistentState(),
+  );
+  if (!activeResult.applied) return;
+  applyRunPersistentState(activeResult.state);
+
+  const entryResult = consumePhoenixCore(
+    stageEntrySnapshot.state,
+  );
+  const safeEntryState = entryResult.applied
+    ? entryResult.state
+    : stageEntrySnapshot.state;
+  const safeEntry = createStageEntrySnapshot(
+    safeEntryState,
+    stageEntrySnapshot.campaignExpansion,
+    stageEntrySnapshot.checkpointSnapshot,
+    stageEntrySnapshot.capturedAt,
+  );
+  stageEntrySnapshot = safeEntry;
+
+  const captured = captureCrashRecoverySnapshot(
+    safeEntry.state,
+    safeEntry.campaignExpansion,
+    safeEntry.checkpointSnapshot,
+    "stage-entry",
+    new Date().toISOString(),
+  );
+  crashRecoverySnapshot = captured.snapshot;
+  campaignExpansion = {
+    ...campaignExpansion,
+    crashRecovery: captured.campaignExpansion.crashRecovery,
+  };
+
+  renderInventory();
+  updateDataSummary();
+  void autosaveCampaign(
+    "gameover",
+    "✓ Phoenix Core consumed · encounter resumed",
+  );
+}
+
 const game = new Game(
   byId<HTMLCanvasElement>("gameCanvas"),
   [],
@@ -1867,33 +2078,7 @@ const game = new Game(
 
         const deathAt = new Date().toISOString();
         markCrashRecoveryDeathInvalid(deathAt);
-
-        const restored = restoreCheckpointSnapshot(
-          checkpointSnapshot,
-          currentRunPersistentState(),
-        );
-        applyRunPersistentState(restored);
-        const rolledBackExpansion = rollbackCampaignExpansion(
-          campaignExpansion,
-          deathAt,
-        );
-        campaignExpansion = {
-          ...rolledBackExpansion,
-          crashRecovery:
-            crashRecoverySnapshot?.campaignExpansion.crashRecovery ??
-            null,
-        };
-        refreshPersistentStateUi();
-
-        const checkpointStage = campaignExpansion.checkpoint.stage;
-        byId("againButton").textContent =
-          "Retry checkpoint · Stage " +
-          String(checkpointStage).padStart(3, "0");
-        void autosaveCampaign(
-          "gameover",
-          "✓ Rolled back to checkpoint · Stage " +
-            String(checkpointStage).padStart(3, "0"),
-        );
+        renderDeathProtectionChoices(stats.stage);
       }
     },
     onStage: renderStage,
@@ -1990,6 +2175,7 @@ const game = new Game(
           campaignExpansion.checkpoint.stage,
         );
       }
+      stageEntrySnapshot = null;
       const checkpointText = expansionResult.checkpointCommitted
         ? " · Checkpoint " +
           String(campaignExpansion.checkpoint.stage).padStart(3, "0") +
@@ -2898,6 +3084,14 @@ async function startSelectedStage(): Promise<void> {
       ),
     );
 
+    const stageEntryAt = new Date().toISOString();
+    stageEntrySnapshot = createStageEntrySnapshot(
+      currentRunPersistentState(),
+      campaignExpansion,
+      checkpointSnapshot,
+      stageEntryAt,
+    );
+
     const recoverySaved = await autosaveCampaign(
       "stage-entry",
       undefined,
@@ -2994,6 +3188,7 @@ async function initializePlayerProgress(): Promise<void> {
     campaignExpansion = loaded.save.campaignExpansion;
     checkpointSnapshot = loaded.save.checkpointSnapshot;
     crashRecoverySnapshot = loaded.save.crashRecoverySnapshot;
+    stageEntrySnapshot = loaded.save.stageEntrySnapshot;
     syncProgressionAchievements();
     game.setLuckPityState(luckPity);
     game.setHiddenDiscoveryState(hiddenDiscovery);
@@ -3333,6 +3528,7 @@ async function exportSave(): Promise<void> {
     campaignExpansion,
     checkpointSnapshot,
     crashRecoverySnapshot,
+    stageEntrySnapshot,
   );
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -3384,6 +3580,8 @@ async function importSaveFile(file: File): Promise<void> {
       result.save.checkpointSnapshot;
     const importedCrashRecoverySnapshot =
       result.save.crashRecoverySnapshot;
+    const importedStageEntrySnapshot =
+      result.save.stageEntrySnapshot;
     const message =
       "Import Stage " +
       String(imported.highestUnlockedStage).padStart(3, "0") +
@@ -3410,6 +3608,7 @@ async function importSaveFile(file: File): Promise<void> {
     const previousCampaignExpansion = campaignExpansion;
     const previousCheckpointSnapshot = checkpointSnapshot;
     const previousCrashRecoverySnapshot = crashRecoverySnapshot;
+    const previousStageEntrySnapshot = stageEntrySnapshot;
     campaign = imported;
     inventory = importedInventory;
     equipment = importedEquipment;
@@ -3423,6 +3622,7 @@ async function importSaveFile(file: File): Promise<void> {
     campaignExpansion = importedCampaignExpansion;
     checkpointSnapshot = importedCheckpointSnapshot;
     crashRecoverySnapshot = importedCrashRecoverySnapshot;
+    stageEntrySnapshot = importedStageEntrySnapshot;
     syncProgressionAchievements();
     game.setLuckPityState(luckPity);
     game.setHiddenDiscoveryState(hiddenDiscovery);
@@ -3454,6 +3654,7 @@ async function importSaveFile(file: File): Promise<void> {
       campaignExpansion = previousCampaignExpansion;
       checkpointSnapshot = previousCheckpointSnapshot;
       crashRecoverySnapshot = previousCrashRecoverySnapshot;
+      stageEntrySnapshot = previousStageEntrySnapshot;
       game.setLuckPityState(luckPity);
       game.setHiddenDiscoveryState(hiddenDiscovery);
       updateSpecialShopAccess();
@@ -3588,7 +3789,6 @@ async function loadInitialVocabulary(): Promise<void> {
 for (const id of [
   "startButton",
   "restartButton",
-  "againButton",
   "clearRetryButton",
   "nextStageButton",
 ]) {
@@ -3598,7 +3798,26 @@ for (const id of [
 }
 byId("resumeButton").addEventListener("click", () => game.resume());
 
-for (const id of ["titleButton", "resultTitleButton", "clearTitleButton"]) {
+byId("againButton").addEventListener("click", () => {
+  void resolveCheckpointDeath("retry");
+});
+byId("gameOverStageSelectButton").addEventListener("click", () => {
+  void resolveCheckpointDeath("stage-select");
+});
+byId("resultTitleButton").addEventListener("click", () => {
+  void resolveCheckpointDeath("title");
+});
+byId("salvageAnchorButton").addEventListener("click", () => {
+  void resolveSalvageAnchorDeath();
+});
+byId("stageRevivalButton").addEventListener("click", () => {
+  void resolveStageRevivalDeath();
+});
+byId("phoenixCoreButton").addEventListener("click", () => {
+  void resolvePhoenixDeath();
+});
+
+for (const id of ["titleButton", "clearTitleButton"]) {
   byId(id).addEventListener("click", () => game.backToTitle());
 }
 
@@ -3705,7 +3924,6 @@ byId<HTMLInputElement>("importSaveFile").addEventListener(
 for (const id of [
   "stageSelectButton",
   "pauseStageSelectButton",
-  "gameOverStageSelectButton",
   "clearStageSelectButton",
 ]) {
   byId(id).addEventListener("click", openStageSelect);
