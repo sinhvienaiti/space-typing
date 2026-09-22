@@ -35,7 +35,8 @@ export type SkillBlockReason =
   | "stage-limit"
   | "energy"
   | "typing-condition"
-  | "effect-not-needed";
+  | "effect-not-needed"
+  | "silenced";
 
 export type SkillActivationResult =
   | {
