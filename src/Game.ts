@@ -250,6 +250,10 @@ import {
   tickEnemyRewardControl,
   timedRewardMultiplier,
 } from "./enemies/reward-runtime";
+import {
+  EMPTY_COMPILED_RELIC_EFFECTS,
+  type CompiledRelicEffects,
+} from "./relics/state";
 import { drawModularEnemy } from "./enemies/renderer";
 import {
   spawnWorldEnemyDefinitionId,
@@ -444,6 +448,11 @@ export class Game {
     Object.fromEntries(
       UPGRADEABLE_SKILL_IDS.map((id) => [id, 1]),
     ) as Record<UpgradeableSkillId, number>;
+  private relicEffects: CompiledRelicEffects = {
+    ...EMPTY_COMPILED_RELIC_EFFECTS,
+  };
+  private relicFirstWordTriggered = false;
+  private relicMistakeGuardsUsed = 0;
 
   private characterId: CharacterId = "vanguard";
   private supportSkillIds: SupportSpellId[] = [
@@ -607,6 +616,13 @@ export class Game {
     this.skillLevels = next;
     this.refreshSkillDefinitions();
     this.hooks.onSkills();
+  }
+
+  setRelicEffects(effects: CompiledRelicEffects): void {
+    this.relicEffects = {
+      ...EMPTY_COMPILED_RELIC_EFFECTS,
+      ...effects,
+    };
   }
 
   setSupportSpells(ids: readonly SupportSpellId[]): void {
@@ -1530,6 +1546,8 @@ export class Game {
     this.phase = "playing";
     this.stageElapsedSeconds = 0;
     this.priorityKillChain.reset();
+    this.relicFirstWordTriggered = false;
+    this.relicMistakeGuardsUsed = 0;
     this.stats = this.createGameStats(stage.stage);
     this.stats.shield = Math.min(
       this.stats.maxShield,
@@ -3529,6 +3547,7 @@ export class Game {
               this.playerStats,
             ) *
               mechanicDamage *
+              this.relicBossWordDamageMultiplier(word.length) *
               markedBossDamageMultiplier(this.bossMarkTimer > 0) *
               this.characterBossDamageMultiplier(),
         );
@@ -3536,6 +3555,7 @@ export class Game {
 
       this.sfx.wordComplete(perfectWord);
       this.applyCharacterPerfectWordPassive(perfectWord);
+      this.applyRelicWordComplete(word.length, perfectWord);
       boss.wordsCompleted += 1;
       boss.typed = 0;
       boss.entry = this.pickBossEntry(
@@ -3967,6 +3987,7 @@ export class Game {
     this.addScore(10 * this.stats.multiplier);
     this.gainPower(1.8);
     this.applyCharacterCorrectKeyPassive();
+    this.applyRelicCorrectKeyPassive(enemy);
 
     this.fireLaser(enemy, 0.8);
     this.sfx.shot(this.stats.multiplier);
@@ -3986,6 +4007,7 @@ export class Game {
     this.hooks.onWordComplete(enemy.entry);
     this.applyCharacterWordCompletePassive(length);
     this.applyCharacterPerfectWordPassive(perfectWord);
+    this.applyRelicWordComplete(length, perfectWord, enemy);
 
     if (enemy.layersRemaining > 1) {
       enemy.layersRemaining -= 1;
@@ -4331,15 +4353,118 @@ export class Game {
     this.burst(splitter.x, splitter.y, 30, 318);
   }
 
+  private applyRelicCorrectKeyPassive(source: Enemy): void {
+    const interval = this.relicEffects.streakFreezeInterval;
+    if (
+      interval <= 0 ||
+      this.stats.streak <= 0 ||
+      this.stats.streak % interval !== 0
+    ) {
+      return;
+    }
+
+    const changed = applyEnemyAreaControl(
+      this.enemies,
+      source,
+      this.relicEffects.streakFreezeSeconds,
+      0,
+      280,
+    );
+    if (changed > 0) {
+      this.burst(source.x, source.y, 18, 205);
+      this.sfx.support();
+    }
+  }
+
+  private applyRelicWordComplete(
+    length: number,
+    perfectWord: boolean,
+    source?: Enemy,
+  ): void {
+    if (
+      !this.relicFirstWordTriggered &&
+      this.relicEffects.firstWordHullRatio > 0
+    ) {
+      this.relicFirstWordTriggered = true;
+      this.stats.hull = clamp(
+        this.stats.hull +
+          this.stats.maxHull * this.relicEffects.firstWordHullRatio,
+        0,
+        this.stats.maxHull,
+      );
+      this.burst(
+        this.width / 2,
+        this.height - PLAYER_Y_OFFSET,
+        14,
+        132,
+      );
+    }
+
+    if (
+      perfectWord &&
+      source !== undefined &&
+      this.relicEffects.perfectWordChainRatio > 0 &&
+      this.relicEffects.perfectWordChainTargets > 0
+    ) {
+      const changed = softenNearbyEnemies(
+        this.enemies,
+        source,
+        this.relicEffects.perfectWordChainRatio,
+        this.relicEffects.perfectWordChainTargets,
+        330,
+      );
+      if (changed > 0) {
+        this.burst(source.x, source.y, 16 + changed * 3, 286);
+      }
+    }
+
+    if (
+      length >= this.relicEffects.longBossWordMinLength &&
+      this.relicEffects.longBossWordMinLength > 0
+    ) {
+      this.gainPower(1.5);
+    }
+  }
+
+  private relicBossWordDamageMultiplier(length: number): number {
+    return this.relicEffects.longBossWordMinLength > 0 &&
+      length >= this.relicEffects.longBossWordMinLength
+      ? this.relicEffects.longBossWordDamageMultiplier
+      : 1;
+  }
+
   private registerMiss(): void {
     this.stats.misses += 1;
     this.updateStageObjective({ type: "miss" });
-    this.stats.streak = 0;
-    this.stats.multiplier = 1;
-    this.stats.power = clamp(this.stats.power - 12, 0, 100);
+
+    const guardAvailable =
+      this.relicMistakeGuardsUsed <
+        this.relicEffects.mistakeGuardCharges &&
+      this.relicEffects.mistakeGuardShieldRatio > 0 &&
+      this.stats.shield > 0;
+
+    if (guardAvailable) {
+      this.relicMistakeGuardsUsed += 1;
+      this.stats.shield = Math.max(
+        0,
+        this.stats.shield -
+          this.stats.maxShield *
+            this.relicEffects.mistakeGuardShieldRatio,
+      );
+      this.burst(
+        this.width / 2,
+        this.height - PLAYER_Y_OFFSET,
+        16,
+        198,
+      );
+    } else {
+      this.stats.streak = 0;
+      this.stats.multiplier = 1;
+      this.stats.power = clamp(this.stats.power - 12, 0, 100);
+    }
 
     if (this.settings.screenShake) {
-      this.shake = Math.max(this.shake, 2);
+      this.shake = Math.max(this.shake, guardAvailable ? 1 : 2);
     }
 
     this.sfx.wrong();
