@@ -1831,12 +1831,75 @@ kbd {
   margin-top: 4px;
 }
 
+.route-hidden-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(182, 112, 255, 0.2);
+  border-radius: 12px;
+  background: rgba(132, 74, 196, 0.05);
+}
+
+.route-hidden-head,
+.route-hidden-card {
+  display: grid;
+  gap: 6px;
+}
+
+.route-hidden-head {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.route-hidden-head > span,
+.route-hidden-card > small {
+  color: #8da4b7;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.route-hidden-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.route-hidden-card {
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(7, 11, 20, 0.62);
+}
+
+.route-hidden-card.active {
+  border-color: rgba(105, 230, 255, 0.28);
+}
+
+.route-hidden-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.route-hidden-actions button {
+  flex: 1 1 64px;
+  min-width: 0;
+}
+
+
 @media (max-width: 680px) {
   .route-step {
     grid-template-columns: 1fr;
   }
 
-  .route-node-row {
+  .route-node-row,
+  .route-hidden-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .route-hidden-head {
     grid-template-columns: 1fr;
   }
 }
