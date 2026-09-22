@@ -8,6 +8,7 @@ import { createLuckPityState } from "../src/loot/pity";
 import { createHiddenDiscoveryState } from "../src/discovery/hidden-content";
 import { createProgressionState } from "../src/progression/missions";
 import { createExpansionCurrencyState } from "../src/economy/currencies";
+import { createShopState } from "../src/shops/state";
 import {
   createCheckpointSnapshot,
   type RunPersistentState,
@@ -49,6 +50,7 @@ function stateAt(stage: number): RunPersistentState {
     credits: 0,
     progression: createProgressionState(),
     expansionCurrencies: createExpansionCurrencyState(),
+    shops: createShopState(),
   };
 }
 

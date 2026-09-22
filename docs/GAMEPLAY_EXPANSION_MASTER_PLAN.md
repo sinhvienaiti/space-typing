@@ -2963,7 +2963,9 @@ Implemented:
 
 ## M06 — Random finite-stock shops
 
-Implement:
+**Status: Complete.** PlayerSave v20 persists deterministic finite shop instances and stock through the existing checkpoint/crash/death-protection state layers. Normal, Station, Traveling, Black Market, Hidden and Event shops now share one stock/purchase runtime; Service/Upgrade reuses its existing enhancement path with Credits + Alloy. Rare resurrection items have finite merchant stock and page reload cannot reroll an existing encounter. See `docs/M06_FINITE_STOCK_SHOPS.md`.
+
+Implemented:
 
 - shop instance id/seed;
 - stock persistence;

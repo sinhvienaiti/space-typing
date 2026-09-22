@@ -383,6 +383,10 @@ describe("player save persistence model", () => {
       starCrystal: 0,
       quantumCore: 0,
     });
+    expect(migration.save.shops).toEqual({
+      version: 1,
+      instances: {},
+    });
     expect(migration.save.campaignExpansion).toMatchObject({
       sector: { startStage: 1, endStage: 10 },
       checkpoint: { stage: 1 },
@@ -485,6 +489,33 @@ describe("player save persistence model", () => {
       alloy: 33,
       starCrystal: 5,
       quantumCore: 1,
+    });
+  });
+
+  it("migrates PlayerSave v19 to empty persistent shop state", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const checkpointSnapshot = {
+      ...current.checkpointSnapshot,
+    } as Record<string, unknown>;
+    delete checkpointSnapshot.shops;
+
+    const legacy = {
+      ...current,
+      version: 19,
+      checkpointSnapshot,
+    } as Record<string, unknown>;
+    delete legacy.shops;
+
+    const migration = migratePlayerSave(legacy);
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(19);
+    expect(migration.save.shops).toEqual({
+      version: 1,
+      instances: {},
+    });
+    expect(migration.save.checkpointSnapshot.shops).toEqual({
+      version: 1,
+      instances: {},
     });
   });
 

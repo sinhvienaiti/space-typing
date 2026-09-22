@@ -63,16 +63,24 @@ import {
 } from "../campaign/expansion-state";
 import {
   isValidCheckpointSnapshot,
+  migrateLegacyRunPersistentState,
   type CheckpointSnapshot,
 } from "./checkpoint";
 import {
   isValidCrashRecoverySnapshot,
+  sanitizeCrashRecoverySnapshot,
   type CrashRecoverySnapshot,
 } from "./crash-recovery";
 import {
   isValidStageEntrySnapshot,
+  sanitizeStageEntrySnapshot,
   type StageEntrySnapshot,
 } from "./death-protection";
+import {
+  createShopState,
+  isValidShopState,
+  type ShopState,
+} from "../shops/state";
 
 export type BackupParseResult =
   | {
@@ -176,6 +184,7 @@ export function exportPlayerSaveJson(
   checkpointSnapshot?: CheckpointSnapshot,
   crashRecoverySnapshot: CrashRecoverySnapshot | null = null,
   stageEntrySnapshot: StageEntrySnapshot | null = null,
+  shops: ShopState = createShopState(),
 ): string {
   return JSON.stringify(
     createPlayerSave(
@@ -195,6 +204,7 @@ export function exportPlayerSaveJson(
       checkpointSnapshot,
       crashRecoverySnapshot,
       stageEntrySnapshot,
+      shops,
     ),
     null,
     2,
@@ -240,6 +250,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     version !== 16 &&
     version !== 17 &&
     version !== 18 &&
+    version !== 19 &&
     version !== PLAYER_SAVE_VERSION
   ) {
     return {
@@ -275,6 +286,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 16 ||
       version === 17 ||
       version === 18 ||
+      version === 19 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidInventory(parsed.inventory)
   ) {
@@ -327,7 +339,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    version === PLAYER_SAVE_VERSION &&
+    (version === 19 || version === PLAYER_SAVE_VERSION) &&
     !isValidEquipmentState(parsed.equipment)
   ) {
     return {
@@ -349,6 +361,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 16 ||
       version === 17 ||
       version === 18 ||
+      version === 19 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidSupportSpellState(parsed.supportSpells)
   ) {
@@ -388,6 +401,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 16 ||
       version === 17 ||
       version === 18 ||
+      version === 19 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidCharacterState(parsed.characters)
   ) {
@@ -406,6 +420,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 16 ||
       version === 17 ||
       version === 18 ||
+      version === 19 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidLuckPityState(parsed.luckPity)
   ) {
@@ -423,6 +438,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 16 ||
       version === 17 ||
       version === 18 ||
+      version === 19 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidHiddenDiscoveryState(parsed.hiddenDiscovery)
   ) {
@@ -440,6 +456,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 16 ||
       version === 17 ||
       version === 18 ||
+      version === 19 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidCredits(parsed.credits)
   ) {
@@ -455,6 +472,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 16 ||
       version === 17 ||
       version === 18 ||
+      version === 19 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidProgressionState(parsed.progression)
   ) {
@@ -469,6 +487,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 16 ||
       version === 17 ||
       version === 18 ||
+      version === 19 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidExpansionCurrencyState(parsed.expansionCurrencies)
   ) {
@@ -484,6 +503,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 16 ||
       version === 17 ||
       version === 18 ||
+      version === 19 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidCampaignExpansionState(parsed.campaignExpansion)
   ) {
@@ -497,7 +517,17 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     (version === 16 ||
       version === 17 ||
       version === 18 ||
-      version === PLAYER_SAVE_VERSION) &&
+      version === 19) &&
+    migrateLegacyRunPersistentState(parsed.checkpointSnapshot) === null
+  ) {
+    return {
+      ok: false,
+      error: "Committed checkpoint snapshot is invalid.",
+    };
+  }
+
+  if (
+    version === PLAYER_SAVE_VERSION &&
     !isValidCheckpointSnapshot(parsed.checkpointSnapshot)
   ) {
     return {
@@ -509,7 +539,18 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   if (
     (version === 17 ||
       version === 18 ||
-      version === PLAYER_SAVE_VERSION) &&
+      version === 19) &&
+    parsed.crashRecoverySnapshot !== null &&
+    sanitizeCrashRecoverySnapshot(parsed.crashRecoverySnapshot) === null
+  ) {
+    return {
+      ok: false,
+      error: "Crash recovery snapshot is invalid.",
+    };
+  }
+
+  if (
+    version === PLAYER_SAVE_VERSION &&
     parsed.crashRecoverySnapshot !== null &&
     !isValidCrashRecoverySnapshot(parsed.crashRecoverySnapshot)
   ) {
@@ -520,13 +561,34 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    (version === 18 || version === PLAYER_SAVE_VERSION) &&
+    (version === 18 || version === 19) &&
+    parsed.stageEntrySnapshot !== null &&
+    sanitizeStageEntrySnapshot(parsed.stageEntrySnapshot) === null
+  ) {
+    return {
+      ok: false,
+      error: "Stage-entry snapshot is invalid.",
+    };
+  }
+
+  if (
+    version === PLAYER_SAVE_VERSION &&
     parsed.stageEntrySnapshot !== null &&
     !isValidStageEntrySnapshot(parsed.stageEntrySnapshot)
   ) {
     return {
       ok: false,
       error: "Stage-entry snapshot is invalid.",
+    };
+  }
+
+  if (
+    version === PLAYER_SAVE_VERSION &&
+    !isValidShopState(parsed.shops)
+  ) {
+    return {
+      ok: false,
+      error: "Shop state is invalid.",
     };
   }
 

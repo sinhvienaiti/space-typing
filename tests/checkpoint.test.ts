@@ -22,6 +22,7 @@ import { createLuckPityState } from "../src/loot/pity";
 import { createHiddenDiscoveryState } from "../src/discovery/hidden-content";
 import { createProgressionState } from "../src/progression/missions";
 import { createExpansionCurrencyState } from "../src/economy/currencies";
+import { createShopState } from "../src/shops/state";
 
 function progressAt(stage: number): CampaignProgress {
   return {
@@ -48,6 +49,7 @@ function runState(campaign: CampaignProgress): RunPersistentState {
     credits: 0,
     progression: createProgressionState(),
     expansionCurrencies: createExpansionCurrencyState(),
+    shops: createShopState(),
   };
 }
 
