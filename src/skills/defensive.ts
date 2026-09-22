@@ -90,15 +90,22 @@ export function absorbBarrierDamage(
 export function emergencyRepair(
   resources: PlayerResources,
   caps: PlayerResources,
+  effectScale = 1,
 ): PlayerResources {
+  const scale = clamp(
+    Number.isFinite(effectScale) ? effectScale : 1,
+    1,
+    1.5,
+  );
+
   return {
     hull: clamp(
-      resources.hull + caps.hull * 0.3,
+      resources.hull + caps.hull * 0.3 * scale,
       0,
       caps.hull,
     ),
     shield: clamp(
-      resources.shield + caps.shield * 0.5,
+      resources.shield + caps.shield * 0.5 * scale,
       0,
       caps.shield,
     ),

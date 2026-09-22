@@ -21,12 +21,21 @@ import {
   type GradeId,
 } from "../grades";
 import type { StatBonus } from "../stats/core";
+import {
+  equipmentAffixBonus,
+  isEquipmentAffixId,
+  maxAffixesForGrade,
+  rollEquipmentAffix,
+  sanitizeEquipmentAffixes,
+  type EquipmentAffixId,
+} from "./affixes";
 
 export type EquipmentInstance = {
   instanceId: string;
   definitionId: EquipmentId;
   grade: GradeId;
   enhancement: number;
+  affixes?: EquipmentAffixId[];
 };
 
 type RarityEquipmentInstance = {
@@ -76,14 +85,14 @@ function emptyLoadout(): EquipmentLoadout {
 
 export function createStarterEquipmentState(): EquipmentState {
   const items: EquipmentInstance[] = [
-    { instanceId: "starter-pulse", definitionId: "pulse-laser-mk1", grade: "aluminum", enhancement: 0 },
-    { instanceId: "starter-precision", definitionId: "precision-laser-mk1", grade: "aluminum", enhancement: 0 },
-    { instanceId: "starter-armor", definitionId: "plated-armor-mk1", grade: "aluminum", enhancement: 0 },
-    { instanceId: "starter-shield", definitionId: "deflector-shield-mk1", grade: "aluminum", enhancement: 0 },
-    { instanceId: "starter-reactor", definitionId: "compact-reactor-mk1", grade: "aluminum", enhancement: 0 },
-    { instanceId: "starter-utility", definitionId: "targeting-module-mk1", grade: "aluminum", enhancement: 0 },
-    { instanceId: "starter-drone", definitionId: "support-drone-mk1", grade: "aluminum", enhancement: 0 },
-    { instanceId: "starter-core", definitionId: "balanced-core-mk1", grade: "aluminum", enhancement: 0 },
+    { instanceId: "starter-pulse", definitionId: "pulse-laser-mk1", grade: "aluminum", enhancement: 0, affixes: [] },
+    { instanceId: "starter-precision", definitionId: "precision-laser-mk1", grade: "aluminum", enhancement: 0, affixes: [] },
+    { instanceId: "starter-armor", definitionId: "plated-armor-mk1", grade: "aluminum", enhancement: 0, affixes: [] },
+    { instanceId: "starter-shield", definitionId: "deflector-shield-mk1", grade: "aluminum", enhancement: 0, affixes: [] },
+    { instanceId: "starter-reactor", definitionId: "compact-reactor-mk1", grade: "aluminum", enhancement: 0, affixes: [] },
+    { instanceId: "starter-utility", definitionId: "targeting-module-mk1", grade: "aluminum", enhancement: 0, affixes: [] },
+    { instanceId: "starter-drone", definitionId: "support-drone-mk1", grade: "aluminum", enhancement: 0, affixes: [] },
+    { instanceId: "starter-core", definitionId: "balanced-core-mk1", grade: "aluminum", enhancement: 0, affixes: [] },
   ];
 
   return {
@@ -110,6 +119,7 @@ function validInstance(value: unknown): value is EquipmentInstance {
     definitionId?: unknown;
     grade?: unknown;
     enhancement?: unknown;
+    affixes?: unknown;
   };
 
   return (
@@ -121,7 +131,16 @@ function validInstance(value: unknown): value is EquipmentInstance {
     typeof raw.enhancement === "number" &&
     Number.isInteger(raw.enhancement) &&
     raw.enhancement >= 0 &&
-    raw.enhancement <= MAX_ENHANCEMENT_LEVEL
+    raw.enhancement <= MAX_ENHANCEMENT_LEVEL &&
+    (
+      raw.affixes === undefined ||
+      (
+        Array.isArray(raw.affixes) &&
+        raw.affixes.length <= maxAffixesForGrade(raw.grade) &&
+        new Set(raw.affixes).size === raw.affixes.length &&
+        raw.affixes.every(isEquipmentAffixId)
+      )
+    )
   );
 }
 
@@ -216,6 +235,7 @@ export function migrateLegacyEquipmentState(
       ...item,
       grade: "aluminum" as const,
       enhancement: 0,
+      affixes: [],
     }));
 
   if (items.length === 0) {
@@ -286,6 +306,7 @@ export function migrateEnhancedRarityEquipmentState(
       definitionId: item.definitionId,
       grade: legacyRarityToGrade(item.rarity),
       enhancement: item.enhancement,
+      affixes: [],
     }));
 
   if (items.length === 0) {
@@ -326,7 +347,13 @@ export function sanitizeEquipmentState(value: unknown): EquipmentState {
 
       if (validInstance(candidate)) {
         seen.add(candidate.instanceId);
-        items.push({ ...candidate });
+        items.push({
+          ...candidate,
+          affixes: sanitizeEquipmentAffixes(
+            candidate.affixes,
+            candidate.grade,
+          ),
+        });
         continue;
       }
 
@@ -337,6 +364,7 @@ export function sanitizeEquipmentState(value: unknown): EquipmentState {
           definitionId: candidate.definitionId,
           grade: legacyRarityToGrade(candidate.rarity),
           enhancement: candidate.enhancement,
+          affixes: [],
         });
       }
     }
@@ -585,7 +613,16 @@ export function addEquipmentInstance(
   }
 
   return {
-    items: [...state.items.map((current) => ({ ...current })), { ...item }],
+    items: [
+      ...state.items.map((current) => ({
+        ...current,
+        affixes: [...(current.affixes ?? [])],
+      })),
+      {
+        ...item,
+        affixes: sanitizeEquipmentAffixes(item.affixes, item.grade),
+      },
+    ],
     loadout: { ...state.loadout },
   };
 }
@@ -663,6 +700,198 @@ export function unequipSlot(
   };
 }
 
+export function isEquipmentEquipped(
+  state: EquipmentState,
+  instanceId: string,
+): boolean {
+  return Object.values(state.loadout).includes(instanceId);
+}
+
+export function removeEquipmentInstance(
+  state: EquipmentState,
+  instanceId: string,
+): { state: EquipmentState; changed: boolean } {
+  const item = state.items.find(
+    (candidate) => candidate.instanceId === instanceId,
+  );
+  if (
+    item === undefined ||
+    isEquipmentEquipped(state, instanceId)
+  ) {
+    return { state, changed: false };
+  }
+
+  return {
+    state: {
+      items: state.items
+        .filter((candidate) => candidate.instanceId !== instanceId)
+        .map((candidate) => ({
+          ...candidate,
+          affixes: [...(candidate.affixes ?? [])],
+        })),
+      loadout: { ...state.loadout },
+    },
+    changed: true,
+  };
+}
+
+export function evolveEquipmentInstance(
+  state: EquipmentState,
+  instanceId: string,
+): {
+  state: EquipmentState;
+  changed: boolean;
+  fromGrade: GradeId | null;
+  toGrade: GradeId | null;
+} {
+  const item = state.items.find(
+    (candidate) => candidate.instanceId === instanceId,
+  );
+  if (
+    item === undefined ||
+    item.enhancement < MAX_ENHANCEMENT_LEVEL ||
+    (item.grade !== "silver" && item.grade !== "gold")
+  ) {
+    return {
+      state,
+      changed: false,
+      fromGrade: item?.grade ?? null,
+      toGrade: null,
+    };
+  }
+
+  const toGrade: GradeId =
+    item.grade === "silver" ? "gold" : "diamond";
+
+  return {
+    state: {
+      items: state.items.map((candidate) =>
+        candidate.instanceId === instanceId
+          ? {
+              ...candidate,
+              grade: toGrade,
+              enhancement: 0,
+              affixes: sanitizeEquipmentAffixes(
+                candidate.affixes,
+                toGrade,
+              ),
+            }
+          : {
+              ...candidate,
+              affixes: [...(candidate.affixes ?? [])],
+            },
+      ),
+      loadout: { ...state.loadout },
+    },
+    changed: true,
+    fromGrade: item.grade,
+    toGrade,
+  };
+}
+
+export function addEquipmentAffix(
+  state: EquipmentState,
+  instanceId: string,
+  random: () => number = Math.random,
+): {
+  state: EquipmentState;
+  changed: boolean;
+  affix: EquipmentAffixId | null;
+} {
+  const item = state.items.find(
+    (candidate) => candidate.instanceId === instanceId,
+  );
+  if (item === undefined) {
+    return { state, changed: false, affix: null };
+  }
+
+  const current = sanitizeEquipmentAffixes(
+    item.affixes,
+    item.grade,
+  );
+  if (current.length >= maxAffixesForGrade(item.grade)) {
+    return { state, changed: false, affix: null };
+  }
+
+  const affix = rollEquipmentAffix(current, random);
+  if (affix === null) {
+    return { state, changed: false, affix: null };
+  }
+
+  return {
+    state: {
+      items: state.items.map((candidate) =>
+        candidate.instanceId === instanceId
+          ? {
+              ...candidate,
+              affixes: [...current, affix],
+            }
+          : {
+              ...candidate,
+              affixes: [...(candidate.affixes ?? [])],
+            },
+      ),
+      loadout: { ...state.loadout },
+    },
+    changed: true,
+    affix,
+  };
+}
+
+export function rerollEquipmentAffix(
+  state: EquipmentState,
+  instanceId: string,
+  affixIndex: number,
+  random: () => number = Math.random,
+): {
+  state: EquipmentState;
+  changed: boolean;
+  affix: EquipmentAffixId | null;
+} {
+  const item = state.items.find(
+    (candidate) => candidate.instanceId === instanceId,
+  );
+  if (item === undefined) {
+    return { state, changed: false, affix: null };
+  }
+
+  const current = sanitizeEquipmentAffixes(
+    item.affixes,
+    item.grade,
+  );
+  const index = Math.floor(affixIndex);
+  if (index < 0 || index >= current.length) {
+    return { state, changed: false, affix: null };
+  }
+
+  const locked = current.filter((_, candidateIndex) =>
+    candidateIndex !== index
+  );
+  const affix = rollEquipmentAffix(locked, random);
+  if (affix === null) {
+    return { state, changed: false, affix: null };
+  }
+
+  const next = [...current];
+  next[index] = affix;
+
+  return {
+    state: {
+      items: state.items.map((candidate) =>
+        candidate.instanceId === instanceId
+          ? { ...candidate, affixes: next }
+          : {
+              ...candidate,
+              affixes: [...(candidate.affixes ?? [])],
+            },
+      ),
+      loadout: { ...state.loadout },
+    },
+    changed: true,
+    affix,
+  };
+}
+
 export function equipmentStatBonus(
   state: EquipmentState,
 ): StatBonus {
@@ -684,6 +913,12 @@ export function equipmentStatBonus(
     for (const [key, value] of Object.entries(definition.stats)) {
       if (typeof value !== "number" || !Number.isFinite(value)) continue;
       totals[key] = (totals[key] ?? 0) + value * multiplier;
+    }
+
+    const affixBonus = equipmentAffixBonus(instance.affixes ?? []);
+    for (const [key, value] of Object.entries(affixBonus)) {
+      if (typeof value !== "number" || !Number.isFinite(value)) continue;
+      totals[key] = (totals[key] ?? 0) + value;
     }
   }
 

@@ -15,6 +15,7 @@ import {
   selectRouteNode,
   selectedRouteNode,
 } from "../src/campaign/route";
+import { createUpgradeState } from "../src/progression/upgrades";
 import {
   createCheckpointSnapshot,
   type RunPersistentState,
@@ -58,6 +59,7 @@ function stateAt(stage: number): RunPersistentState {
     expansionCurrencies: createExpansionCurrencyState(),
     shops: createShopState(),
     route: createRouteState(stage),
+    upgrades: createUpgradeState(),
   };
 }
 
