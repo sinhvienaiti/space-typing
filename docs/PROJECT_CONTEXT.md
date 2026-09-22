@@ -3269,17 +3269,59 @@ Later-Galaxy tuning rules:
 ## Step 69
 Integrate space-typing into parent as a submodule.
 
+**Status: implemented.**
+
+- parent repo `sinhvienaiti/typing-game` contains `games/space-typing` as a Git submodule on child branch `main`;
+- parent checkpoint `bcd81cedca6b8fdf55839e6ce7cf10db636337f9` pins child checkpoint `cba924d14b47613439ae5ee1ccc2b7ffa19a21d2`;
+- child remains the authoritative implementation repo; parent only pins a tested child commit.
+
 ## Step 70
 Add parent nginx/dev/play/build/navigation support.
+
+**Status: implemented.**
+
+- parent supports `./dev.sh space`, `pnpm dev:space`, `pnpm build:space` and normal all-app development;
+- Play mode rebuilds Space Typing only when its static output is missing/stale;
+- Portal exposes `/space-typing` and internal origin `https://space.typing-game.local`;
+- Dev and Play nginx expose parent shared `/vocabulary/` and `/shared/typing-texts/` routes on the Space origin;
+- existing shared-music/navigation contracts remain parent-owned.
 
 ## Step 71
 Verify existing games are unaffected.
 
+**Status: implemented at platform-contract level; final manual smoke remains part of review.**
+
+- parent validation protects existing Monkeytype, Vocabulary Shooter, Recall Typing and Karaoke Typing routes/origins while checking the Space Typing integration;
+- Space Typing uses its own port/origin and does not replace existing game scripts or routes;
+- final browser smoke across all games is still included in the final review checklist.
+
 ## Step 72
 Run child CI and parent CI.
 
+**Status: implemented.**
+
+- child push CI #123 passed on `cba924d14b47613439ae5ee1ccc2b7ffa19a21d2`;
+- parent push CI #157 passed on `bcd81cedca6b8fdf55839e6ce7cf10db636337f9`;
+- parent CI runs `pnpm validate:space-integration` as the platform integration contract.
+
 ## Step 73
 Run complete Review Pass #1 and fix all issues.
+
+**Status: implemented and CI-verified.**
+
+Review Pass #1 findings/fixes:
+
+- persistence recovery now prefers the newer full save when Campaign progress ties, preventing newer Credits/inventory/equipment/progression state from being silently replaced by an older IndexedDB snapshot;
+- mission/progression backup validation is structural and no longer depends on JSON object key order;
+- stage WPM uses pause-safe active gameplay seconds instead of wall-clock time, so pause/reward/anomaly dialogs do not reduce measured WPM;
+- runtime difficulty now exposes Relaxed / Normal / Hard / Expert / Adaptive / Custom instead of hardcoding Normal at 60 WPM / 96% accuracy;
+- Adaptive keeps a bounded EMA profile from valid Campaign stage clears and feeds the production `difficultyFor` path between stages;
+- Custom mode wires target WPM and pressure into the existing difficulty model without changing the combat formulas;
+- delayed multi-note SFX timers are cancelled on destroy and cannot recreate an `AudioContext` after teardown;
+- failed stages checkpoint current persistent pity state at Game Over rather than relying only on a later pagehide/save;
+- equipment selected from Choice Crates now counts toward equipment-drop mission progression;
+- targeted tests cover recovery freshness, structural progression validation, active-time WPM, adaptive smoothing/runtime settings and SFX teardown;
+- PR #22 CI #126 passed Test and Build before this documentation checkpoint.
 
 ## Step 74
 Run complete Review Pass #2.
