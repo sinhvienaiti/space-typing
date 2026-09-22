@@ -1,4 +1,10 @@
 import { clamp } from "../logic";
+import {
+  createHiddenEncounterState,
+  isValidHiddenEncounterState,
+  sanitizeHiddenEncounterState,
+  type HiddenEncounterState,
+} from "./hidden-encounter";
 
 export const HIDDEN_CONTENT_IDS = [
   "black-market-signal",
@@ -142,6 +148,7 @@ export type HiddenDiscoveryState = {
   discovered: HiddenContentId[];
   drought: Record<HiddenContentId, number>;
   lastRollStage: number;
+  encounter?: HiddenEncounterState;
 };
 
 export type HiddenDiscoveryRoll = {
@@ -170,6 +177,7 @@ export function createHiddenDiscoveryState(): HiddenDiscoveryState {
     discovered: [],
     drought: createDroughtState(),
     lastRollStage: 0,
+    encounter: createHiddenEncounterState(),
   };
 }
 
@@ -185,6 +193,7 @@ export function sanitizeHiddenDiscoveryState(
     discovered?: unknown;
     drought?: unknown;
     lastRollStage?: unknown;
+    encounter?: unknown;
   };
 
   if (Array.isArray(raw.discovered)) {
@@ -221,6 +230,7 @@ export function sanitizeHiddenDiscoveryState(
     result.lastRollStage = Math.floor(clamp(raw.lastRollStage, 0, 1000));
   }
 
+  result.encounter = sanitizeHiddenEncounterState(raw.encounter);
   return result;
 }
 
@@ -270,7 +280,9 @@ export function isValidHiddenDiscoveryState(
   return (
     Number.isInteger(raw.lastRollStage) &&
     raw.lastRollStage >= 0 &&
-    raw.lastRollStage <= 1000
+    raw.lastRollStage <= 1000 &&
+    (raw.encounter === undefined ||
+      isValidHiddenEncounterState(raw.encounter))
   );
 }
 
