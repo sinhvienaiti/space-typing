@@ -2927,7 +2927,11 @@ export class Game {
   private activateEnemyReward(enemy: Enemy): void {
     const definition = enemyDefinition(
       enemy.definitionId ??
-        runtimeEnemyDefinitionId(enemy.kind, enemy.elite),
+        runtimeEnemyDefinitionId(
+          enemy.kind,
+          enemy.elite,
+          this.stageConfig?.stage ?? 1,
+        ),
     );
     if (definition?.reward === undefined) return;
 
@@ -4615,7 +4619,11 @@ export class Game {
 
     const visual = enemyDefinition(
       enemy.definitionId ??
-        runtimeEnemyDefinitionId(enemy.kind, enemy.elite),
+        runtimeEnemyDefinitionId(
+          enemy.kind,
+          enemy.elite,
+          this.stageConfig?.stage ?? 1,
+        ),
     );
     const modularDrawn =
       visual !== undefined &&

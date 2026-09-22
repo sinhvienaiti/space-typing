@@ -15,6 +15,8 @@ describe("core four enemy visual mapping", () => {
     expect(runtimeEnemyDefinitionId("jammer", false)).toBe("snow-wisp");
     expect(runtimeEnemyDefinitionId("carrier", false)).toBe("leaf-puff");
     expect(runtimeEnemyDefinitionId("splitter", false)).toBe("prism-sprite");
+    expect(runtimeEnemyDefinitionId("cloaker", false, 300)).toBe("shade-wisp");
+    expect(runtimeEnemyDefinitionId("leech", false, 340)).toBe("night-wisp");
   });
 
   it("reuses the existing elite flag for elite visual evolution", () => {
@@ -22,6 +24,10 @@ describe("core four enemy visual mapping", () => {
     expect(runtimeEnemyDefinitionId("destroyer", true)).toBe("berserk-devil");
     expect(runtimeEnemyDefinitionId("jammer", true)).toBe("frost-keeper");
     expect(runtimeEnemyDefinitionId("splitter", true)).toBe("fortune-prism");
+    expect(runtimeEnemyDefinitionId("cloaker", true, 380)).toBe("umbra-elite");
+    expect(runtimeEnemyDefinitionId("commander", true, 620)).toBe(
+      "nebula-elite",
+    );
   });
 
   it("keeps reward enemies rare and deterministic", () => {
@@ -49,6 +55,12 @@ describe("core four enemy visual mapping", () => {
     );
     expect(spawnEnemyDefinitionId("splitter", false, 120, 0)).toBe(
       "treasure-prism",
+    );
+    expect(spawnEnemyDefinitionId("commander", false, 520, 0)).toBe(
+      "star-core",
+    );
+    expect(spawnEnemyDefinitionId("oppressor", false, 560, 0)).toBe(
+      "nova-core",
     );
     expect(spawnEnemyDefinitionId("scout", false, 30, 0.99)).toBe(
       "rainbow-scout",
