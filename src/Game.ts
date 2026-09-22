@@ -208,6 +208,7 @@ import {
   statusRemaining,
   tickStatuses,
   type ActiveStatus,
+  type StatusId,
   type StatusState,
 } from "./status/engine";
 import type { BuildSynergyId } from "./synergy/build";
@@ -272,7 +273,10 @@ import {
   enemyLayerSegments,
   reinforceEnemyLayerPlan,
 } from "./enemies/layers";
-import { enemyRankLabel } from "./enemies/rank";
+import {
+  enemyRankLabel,
+  type EnemyRank,
+} from "./enemies/rank";
 import {
   pickVocabularyEntryForRank,
   wordDifficultyScore,
@@ -373,7 +377,7 @@ type EnemySpawnRequest = {
   yOffset?: number;
 };
 
-type Hooks = {
+export type GameHooks = {
   onStats(stats: GameStats): void;
   onPhase(phase: GamePhase): void;
   onStage(stage: number): void;
@@ -394,6 +398,39 @@ type Hooks = {
   ): void;
   onStatuses(statuses: readonly ActiveStatus[]): void;
   onSkills(): void;
+};
+
+export type TestLabDeathMode = "immortal" | "real";
+
+export type TestLabEnemySpawn = {
+  kind?: EnemyKind;
+  count?: number;
+  elite?: boolean;
+  rank?: EnemyRank;
+  layers?: 1 | 2 | 3;
+  skillIds?: readonly EnemySkillId[];
+};
+
+export type TestLabBossOverride = {
+  hpRatio?: number;
+  phase?: 1 | 2 | 3;
+  shieldActive?: boolean;
+  staggerSeconds?: number;
+};
+
+export type TestLabGameSnapshot = {
+  phase: GamePhase;
+  stage: number | null;
+  difficulty: DifficultyProfile | null;
+  stats: GameStats;
+  enemies: Enemy[];
+  boss: BossHudState | null;
+  statuses: ActiveStatus[];
+  projectiles: number;
+  particles: number;
+  activePressure: ActiveTypingPressureSnapshot;
+  deathMode: TestLabDeathMode;
+  lethalHits: number;
 };
 
 const FALLBACK_ENTRIES: VocabularyEntry[] = [
@@ -449,7 +486,7 @@ function ultimateVisual(characterId: CharacterId): {
 export class Game {
   private readonly canvas: HTMLCanvasElement;
   private readonly context: CanvasRenderingContext2D;
-  private readonly hooks: Hooks;
+  private readonly hooks: GameHooks;
   private readonly sfx = new Sfx();
   private readonly priorityKillChain = new PriorityKillChain();
   private readonly skillEngine = new SkillEngine();
@@ -562,12 +599,15 @@ export class Game {
   private backgroundGradient: CanvasGradient | null = null;
   private worldEnvironment: WorldEnvironmentProfile =
     environmentForWorld("world-01");
+  private testLabEnabled = false;
+  private testLabDeathMode: TestLabDeathMode = "immortal";
+  private testLabLethalHits = 0;
 
   constructor(
     canvas: HTMLCanvasElement,
     vocabulary: VocabularyEntry[],
     settings: GameSettings,
-    hooks: Hooks,
+    hooks: GameHooks,
   ) {
     const context = canvas.getContext("2d");
     if (context === null) {
@@ -600,6 +640,258 @@ export class Game {
 
   getPerformanceReport(): PerformanceReport {
     return this.frameProfiler.report();
+  }
+
+  setTestLabMode(
+    enabled: boolean,
+    deathMode: TestLabDeathMode = "immortal",
+  ): void {
+    this.testLabEnabled = enabled;
+    this.testLabDeathMode = deathMode;
+    if (!enabled) this.testLabLethalHits = 0;
+  }
+
+  testLabSetDeathMode(mode: TestLabDeathMode): boolean {
+    if (!this.testLabEnabled) return false;
+    this.testLabDeathMode = mode;
+    return true;
+  }
+
+  getTestLabSnapshot(): TestLabGameSnapshot | null {
+    if (!this.testLabEnabled) return null;
+    const difficulty = this.difficulty;
+    return {
+      phase: this.phase,
+      stage: this.stageConfig?.stage ?? null,
+      difficulty: difficulty === null ? null : { ...difficulty },
+      stats: this.getStats(),
+      enemies: this.enemies.map((enemy) => ({
+        ...enemy,
+        eliteModifiers: [...enemy.eliteModifiers],
+        layerPlan:
+          enemy.layerPlan === undefined
+            ? undefined
+            : [...enemy.layerPlan],
+        skillIds:
+          enemy.skillIds === undefined
+            ? undefined
+            : [...enemy.skillIds],
+        threatBudget:
+          enemy.threatBudget === undefined
+            ? undefined
+            : { ...enemy.threatBudget },
+        entry: { ...enemy.entry },
+      })),
+      boss: this.boss === null ? null : toBossHud(this.boss),
+      statuses: this.statusState.map((status) => ({ ...status })),
+      projectiles: this.projectiles.length,
+      particles: this.particles.length,
+      activePressure:
+        difficulty === null
+          ? emptyActivePressureSnapshot()
+          : this.activeTypingPressureSnapshot(difficulty),
+      deathMode: this.testLabDeathMode,
+      lethalHits: this.testLabLethalHits,
+    };
+  }
+
+  testLabSpawnEnemies(input: TestLabEnemySpawn = {}): number[] {
+    if (
+      !this.testLabEnabled ||
+      (this.phase !== "playing" && this.phase !== "paused")
+    ) {
+      return [];
+    }
+
+    const count = clamp(
+      Math.floor(input.count ?? 1),
+      1,
+      30,
+    );
+    const spawned: number[] = [];
+    for (let index = 0; index < count; index += 1) {
+      const before = this.nextEnemyId;
+      if (
+        !this.spawnEnemy({
+          kind: input.kind,
+          skipAdmission: true,
+        })
+      ) {
+        continue;
+      }
+
+      const enemy = this.enemies.find((item) => item.id === before);
+      if (enemy === undefined) continue;
+
+      if (input.elite !== undefined) {
+        enemy.elite = input.elite;
+      }
+      if (input.rank !== undefined) {
+        enemy.rank = input.rank;
+      }
+      if (input.layers !== undefined) {
+        enemy.layersRemaining = input.layers;
+        enemy.layerPlan = enemyLayerPlan(enemy.kind, input.layers);
+      }
+      if (input.skillIds !== undefined) {
+        enemy.skillIds = [...new Set(input.skillIds)].slice(0, 3);
+        enemy.nextSkillIndex = 0;
+        enemy.pendingSkillId = null;
+        enemy.skillTelegraphRemaining = 0;
+      }
+      spawned.push(enemy.id);
+    }
+    return spawned;
+  }
+
+  testLabClearEnemies(): boolean {
+    if (!this.testLabEnabled) return false;
+    this.enemies = [];
+    this.projectiles = [];
+    this.targetId = null;
+    return true;
+  }
+
+  testLabForceEnemySkill(
+    enemyId: number,
+    skillId: EnemySkillId,
+  ): boolean {
+    if (!this.testLabEnabled || this.difficulty === null) return false;
+    const enemy = this.enemies.find((item) => item.id === enemyId);
+    if (enemy === undefined) return false;
+
+    this.executeEnemySkill(enemy, skillId, this.difficulty);
+    enemy.actionCooldown = this.enemySkillCooldown(
+      skillId,
+      this.difficulty,
+    );
+    enemy.pendingSkillId = null;
+    enemy.skillTelegraphRemaining = 0;
+    return true;
+  }
+
+  testLabApplyStatus(
+    id: StatusId,
+    duration = 5,
+  ): boolean {
+    if (!this.testLabEnabled) return false;
+    return this.addStatus(
+      id,
+      clamp(duration, 0.1, 120),
+      "test-lab",
+    );
+  }
+
+  testLabClearStatuses(): boolean {
+    if (!this.testLabEnabled) return false;
+    this.setStatusState(createStatusState());
+    this.hardCcState = createHardCcState();
+    return true;
+  }
+
+  testLabSetResources(input: {
+    hull?: number;
+    shield?: number;
+    energy?: number;
+    power?: number;
+  }): boolean {
+    if (!this.testLabEnabled) return false;
+    if (input.hull !== undefined) {
+      this.stats.hull = clamp(input.hull, 0, this.stats.maxHull);
+    }
+    if (input.shield !== undefined) {
+      this.stats.shield = clamp(input.shield, 0, this.stats.maxShield);
+    }
+    if (input.energy !== undefined) {
+      this.stats.energy = clamp(input.energy, 0, this.stats.maxEnergy);
+    }
+    if (input.power !== undefined) {
+      this.stats.power = clamp(input.power, 0, 100);
+    }
+    this.emitStats();
+    return true;
+  }
+
+  testLabDamagePlayer(rawDamage: number): boolean {
+    if (
+      !this.testLabEnabled ||
+      (this.phase !== "playing" && this.phase !== "paused")
+    ) {
+      return false;
+    }
+    this.applyPlayerDamage(
+      this.width / 2,
+      this.height - PLAYER_Y_OFFSET,
+      Math.max(0, rawDamage),
+    );
+    return true;
+  }
+
+  testLabSpawnBoss(): boolean {
+    if (
+      !this.testLabEnabled ||
+      (this.phase !== "playing" && this.phase !== "paused") ||
+      this.boss !== null
+    ) {
+      return false;
+    }
+    this.spawnBoss();
+    return this.boss !== null;
+  }
+
+  testLabSetBoss(input: TestLabBossOverride): boolean {
+    if (!this.testLabEnabled || this.boss === null) return false;
+    if (input.hpRatio !== undefined) {
+      const ratio = clamp(input.hpRatio, 0, 1);
+      this.boss.hp = Math.max(
+        0,
+        Math.round(this.boss.maxHp * ratio),
+      );
+    }
+    if (input.phase !== undefined) {
+      this.boss.phase = input.phase;
+    }
+    if (input.shieldActive !== undefined) {
+      this.boss.shieldActive = input.shieldActive;
+    }
+    if (input.staggerSeconds !== undefined) {
+      this.boss.staggerTimer = clamp(
+        input.staggerSeconds,
+        0,
+        120,
+      );
+    }
+    this.hooks.onBossUpdate(toBossHud(this.boss));
+    return true;
+  }
+
+  testLabClearBoss(): boolean {
+    if (!this.testLabEnabled) return false;
+    this.boss = null;
+    this.bossSpawned = false;
+    this.bossDefeated = false;
+    this.bossRewardPending = false;
+    this.projectiles = [];
+    this.hooks.onBossUpdate(null);
+    return true;
+  }
+
+  testLabResetArena(): boolean {
+    if (!this.testLabEnabled) return false;
+    this.enemies = [];
+    this.projectiles = [];
+    this.lasers = [];
+    this.particles = [];
+    this.targetId = null;
+    this.boss = null;
+    this.bossSpawned = false;
+    this.bossDefeated = false;
+    this.bossRewardPending = false;
+    this.testLabLethalHits = 0;
+    this.setStatusState(createStatusState());
+    this.hardCcState = createHardCcState();
+    this.hooks.onBossUpdate(null);
+    return true;
   }
 
   setCharacter(id: CharacterId): void {
@@ -5262,6 +5554,14 @@ export class Game {
       this.sfx.shieldBreak();
     }
     this.sfx.damage();
+    if (
+      this.stats.hull <= 0 &&
+      this.testLabEnabled &&
+      this.testLabDeathMode === "immortal"
+    ) {
+      this.testLabLethalHits += 1;
+      this.stats.hull = 1;
+    }
     this.emitStats();
 
     if (this.stats.hull <= 0) {
