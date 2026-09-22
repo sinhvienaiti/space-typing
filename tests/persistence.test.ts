@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   chooseFurthestCampaign,
+  choosePreferredPlayerSave,
   createPlayerSave,
   migratePlayerSave,
   PLAYER_SAVE_VERSION,
@@ -434,6 +435,59 @@ describe("player save persistence model", () => {
     expect(
       chooseFurthestCampaign(stageTwo, stageOne).highestUnlockedStage,
     ).toBe(3);
+  });
+
+  it("prefers newer recovery state when Campaign progress ties", () => {
+    const campaign = createDefaultCampaignProgress();
+    const indexed = createPlayerSave(
+      campaign,
+      "2026-09-22T01:00:00.000Z",
+      "shop",
+      {},
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      100,
+    );
+    const recovery = createPlayerSave(
+      campaign,
+      "2026-09-22T01:01:00.000Z",
+      "shop",
+      {},
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      75,
+    );
+
+    expect(choosePreferredPlayerSave(indexed, recovery)).toBe(recovery);
+  });
+
+  it("keeps farther Campaign progress even when the other save is newer", () => {
+    const farther = recordStageClear(
+      createDefaultCampaignProgress(),
+      1,
+      {
+        score: 100,
+        accuracy: 98,
+        wpm: 60,
+        clearedAt: "2026-09-22T01:00:00.000Z",
+      },
+    );
+    const indexed = createPlayerSave(
+      farther,
+      "2026-09-22T01:00:00.000Z",
+    );
+    const recovery = createPlayerSave(
+      createDefaultCampaignProgress(),
+      "2026-09-22T02:00:00.000Z",
+    );
+
+    expect(choosePreferredPlayerSave(indexed, recovery)).toBe(indexed);
   });
 
   it("keeps the preferred save on an exact progress tie", () => {
