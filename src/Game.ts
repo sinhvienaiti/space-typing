@@ -6057,8 +6057,17 @@ export class Game {
     context.fillStyle = targeted
       ? "rgba(213, 249, 255, 0.95)"
       : "rgba(202, 215, 229, 0.8)";
+    const priorityLabel =
+      enemy.priorityClass === "apex"
+        ? "APEX · "
+        : enemy.priorityClass === "champion"
+          ? "CHAMPION · "
+          : "";
     context.fillText(
-      enemyRankLabel(enemy.rank ?? "I") + " · " + layerLabel,
+      priorityLabel +
+        enemyRankLabel(enemy.rank ?? "I") +
+        " · " +
+        layerLabel,
       enemy.x,
       y - 25,
     );
