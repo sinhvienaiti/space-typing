@@ -34,6 +34,19 @@ Before a public release:
 4. add required attribution when the source license requires it;
 5. verify that the final production build does not accidentally bundle ignored/local-only files.
 
+## World music and ambient overrides
+
+M08 actively supports optional local/private overrides at:
+
+```text
+public/local-assets/music/
+public/local-assets/ambient/
+```
+
+These paths are subject to the same publishing audit as announcer files. The runtime tries a local override first, then the repository/default mapping, then fails soft without blocking gameplay.
+
+Do not interpret an audio file playing locally as evidence that it is licensed for redistribution.
+
 ## Future local-only folders
 
 If additional third-party or private assets are added later, register them here before use.

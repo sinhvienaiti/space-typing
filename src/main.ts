@@ -102,6 +102,12 @@ import {
   type ExpansionCurrencyState,
 } from "./economy/currencies";
 import { gradeLabel } from "./grades";
+import { MusicController } from "./audio/MusicController";
+import {
+  musicProfileForWorld,
+  musicStateForStageRole,
+  type MusicState,
+} from "./audio/music-profile";
 import {
   stageInWorld,
   worldForStage,
@@ -261,6 +267,8 @@ type VocabularySource =
 
 const defaultSettings: GameSettings = {
   sfxVolume: 0.5,
+  musicVolume: 0.35,
+  ambientVolume: 0.15,
   screenShake: true,
   visualQuality: "high",
   pronunciationEnabled: true,
@@ -279,6 +287,14 @@ function loadSettings(): GameSettings {
         typeof parsed.sfxVolume === "number"
           ? Math.min(1, Math.max(0, parsed.sfxVolume))
           : defaultSettings.sfxVolume,
+      musicVolume:
+        typeof parsed.musicVolume === "number"
+          ? Math.min(1, Math.max(0, parsed.musicVolume))
+          : defaultSettings.musicVolume,
+      ambientVolume:
+        typeof parsed.ambientVolume === "number"
+          ? Math.min(1, Math.max(0, parsed.ambientVolume))
+          : defaultSettings.ambientVolume,
       screenShake:
         typeof parsed.screenShake === "boolean"
           ? parsed.screenShake
@@ -862,6 +878,28 @@ app.innerHTML = `
         <h3>sound</h3>
         <label class="setting-row">
           <span>
+            <strong>Music volume</strong>
+            <small>World, boss, shop and special-state soundtrack</small>
+          </span>
+          <span class="setting-control range-control">
+            <input id="musicVolume" type="range" min="0" max="1" step="0.05" />
+            <output id="musicValue">35%</output>
+          </span>
+        </label>
+
+        <label class="setting-row">
+          <span>
+            <strong>Ambient volume</strong>
+            <small>World environmental layer; ducks below important audio</small>
+          </span>
+          <span class="setting-control range-control">
+            <input id="ambientVolume" type="range" min="0" max="1" step="0.05" />
+            <output id="ambientValue">15%</output>
+          </span>
+        </label>
+
+        <label class="setting-row">
+          <span>
             <strong>SFX volume</strong>
             <small>Typing, impact and combat feedback</small>
           </span>
@@ -991,6 +1029,13 @@ let progression: ProgressionState = createProgressionState();
 let expansionCurrencies: ExpansionCurrencyState =
   createExpansionCurrencyState();
 let shops: ShopState = createShopState();
+const musicController = new MusicController();
+musicController.setMusicVolume(settings.musicVolume);
+musicController.setAmbientVolume(settings.ambientVolume);
+musicController.setWorldProfile(
+  musicProfileForWorld(worldForStage(campaign.selectedStage)),
+);
+musicController.transitionTo("WORLD_NORMAL");
 let campaignExpansion: CampaignExpansionState =
   createCampaignExpansionState(campaign);
 let checkpointSnapshot: CheckpointSnapshot =
@@ -1062,6 +1107,16 @@ rewardChoiceDialog.addEventListener("cancel", (event) => {
 anomalyDialog.addEventListener("cancel", (event) => {
   event.preventDefault();
 });
+
+for (const dialog of [
+  shopDialog,
+  serviceShopDialog,
+  specialShopDialog,
+]) {
+  dialog.addEventListener("close", () => {
+    if (game.getPhase() === "title") restoreTitleMusic();
+  });
+}
 
 type AutosaveSnapshot = {
   campaign: typeof campaign;
@@ -1644,11 +1699,19 @@ function renderStatuses(
   badge.classList.remove("hidden");
 }
 
+let lastMusicBossPhase = 0;
+
 function renderBoss(boss: BossHudState | null): void {
   const hud = byId("bossHud");
   if (boss === null) {
+    lastMusicBossPhase = 0;
     hud.classList.add("hidden");
     return;
+  }
+
+  if (boss.phase !== lastMusicBossPhase) {
+    musicController.setBossPhase(boss.phase);
+    lastMusicBossPhase = boss.phase;
   }
 
   hud.classList.remove("hidden");
@@ -2103,7 +2166,21 @@ const game = new Game(
     onStats: renderStats,
     onPhase: (phase) => {
       renderPhase(phase);
+
+      if (phase === "paused") {
+        musicController.setPaused(true);
+      } else if (phase === "playing") {
+        syncCombatMusic(game.getStats().stage);
+      } else if (phase === "stageclear") {
+        musicController.setPaused(false);
+        musicController.transitionTo("VICTORY", 0.35);
+      } else if (phase === "title") {
+        restoreTitleMusic();
+      }
+
       if (phase === "gameover") {
+        musicController.setPaused(false);
+        musicController.transitionTo("DEFEAT", 0.35);
         const stats = game.getStats();
         byId("resultScore").textContent = stats.score.toLocaleString();
         byId("resultWave").textContent =
@@ -2695,6 +2772,61 @@ function createShopInstanceId(): string {
   );
 }
 
+function musicCrossfadeSeconds(state: MusicState): number {
+  if (state === "WORLD_INTENSE") return 0.65;
+  if (
+    state === "MINI_BOSS" ||
+    state === "WORLD_BOSS" ||
+    state === "GALAXY_BOSS"
+  ) {
+    return 0.8;
+  }
+  if (
+    state === "SHOP" ||
+    state === "STATION"
+  ) {
+    return 0.7;
+  }
+  return 1.8;
+}
+
+function syncWorldMusicProfile(stage: number): void {
+  musicController.setWorldProfile(
+    musicProfileForWorld(worldForStage(stage)),
+  );
+}
+
+function syncCombatMusic(stage: number): void {
+  const stageConfig = createStageConfig(stage);
+  syncWorldMusicProfile(stageConfig.stage);
+  const state = musicStateForStageRole(stageConfig.role);
+  musicController.transitionTo(
+    state,
+    musicCrossfadeSeconds(state),
+  );
+  musicController.setPaused(false);
+}
+
+function restoreTitleMusic(): void {
+  syncWorldMusicProfile(campaign.selectedStage);
+  musicController.setBossPhase(1);
+  musicController.transitionTo("WORLD_NORMAL", 0.8);
+  musicController.setPaused(false);
+}
+
+function enterShopMusic(type: ShopType): void {
+  syncWorldMusicProfile(campaign.highestUnlockedStage);
+  const state: MusicState =
+    type === "station" || type === "service"
+      ? "STATION"
+      : "SHOP";
+  musicController.transitionTo(
+    state,
+    musicCrossfadeSeconds(state),
+  );
+  musicController.setPaused(false);
+}
+
 function worldLabel(world: WorldProfile): string {
   const worldNumber = Math.floor((world.stageStart - 1) / 20) + 1;
   return (
@@ -2955,6 +3087,7 @@ function renderNormalShop(): void {
 
 function openNormalShop(): void {
   if (!persistenceReady || game.getPhase() !== "title") return;
+  enterShopMusic("normal");
   renderNormalShop();
   shopDialog.showModal();
 }
@@ -3129,6 +3262,7 @@ function renderServiceShop(): void {
 
 function openServiceShop(): void {
   if (!persistenceReady || game.getPhase() !== "title") return;
+  enterShopMusic("service");
   renderServiceShop();
   serviceShopDialog.showModal();
 }
@@ -3241,6 +3375,7 @@ function openSpecialShop(kind: ShopType): void {
   }
 
   currentShopType = kind;
+  enterShopMusic(kind);
   renderSpecialShop();
   specialShopDialog.showModal();
 }
@@ -3339,6 +3474,21 @@ async function startSelectedStage(): Promise<void> {
       "stage-entry",
     );
     if (!recoverySaved) return;
+
+    syncWorldMusicProfile(stage.stage);
+    musicController.setBossPhase(1);
+    const musicState = musicStateForStageRole(stage.role);
+    musicController.transitionTo(
+      musicState,
+      musicCrossfadeSeconds(musicState),
+    );
+    musicController.setPaused(false);
+
+    if (world.stageEnd < 1000 && stageInWorld(stage.stage) >= 18) {
+      musicController.preloadNext(
+        musicProfileForWorld(worldForStage(world.stageEnd + 1)),
+      );
+    }
 
     game.startStage(stage, difficulty);
   } finally {
@@ -3457,6 +3607,8 @@ async function initializePlayerProgress(): Promise<void> {
     );
     persistenceReady = true;
 
+    syncWorldMusicProfile(campaign.selectedStage);
+    musicController.transitionTo("WORLD_NORMAL", 0.8);
     updateCampaignUi();
     startButton.disabled = !vocabularyReady;
     stageSelectButton.disabled = false;
@@ -3517,6 +3669,9 @@ function updateCampaignUi(): void {
   byId("startButton").textContent =
     "Continue · Stage " + String(campaign.selectedStage).padStart(3, "0");
   const selectedWorld = worldForStage(campaign.selectedStage);
+  musicController.setWorldProfile(
+    musicProfileForWorld(selectedWorld),
+  );
   byId("titleWorldMeta").textContent =
     worldLabel(selectedWorld) +
     " · Stage " +
@@ -3635,6 +3790,8 @@ function openStageSelect(): void {
 function saveSettings(): void {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   game.updateSettings(settings);
+  musicController.setMusicVolume(settings.musicVolume);
+  musicController.setAmbientVolume(settings.ambientVolume);
 }
 
 function renderSettings(): void {
@@ -3642,6 +3799,16 @@ function renderSettings(): void {
   volume.value = String(settings.sfxVolume);
   byId<HTMLOutputElement>("sfxValue").value =
     String(Math.round(settings.sfxVolume * 100)) + "%";
+
+  const musicVolume = byId<HTMLInputElement>("musicVolume");
+  musicVolume.value = String(settings.musicVolume);
+  byId<HTMLOutputElement>("musicValue").value =
+    String(Math.round(settings.musicVolume * 100)) + "%";
+
+  const ambientVolume = byId<HTMLInputElement>("ambientVolume");
+  ambientVolume.value = String(settings.ambientVolume);
+  byId<HTMLOutputElement>("ambientValue").value =
+    String(Math.round(settings.ambientVolume * 100)) + "%";
 
   byId<HTMLSelectElement>("screenShake").value =
     String(settings.screenShake);
@@ -4296,6 +4463,34 @@ byId<HTMLInputElement>("customPressure").addEventListener(
   },
 );
 
+byId<HTMLInputElement>("musicVolume").addEventListener(
+  "input",
+  (event) => {
+    settings = {
+      ...settings,
+      musicVolume: Number(
+        (event.currentTarget as HTMLInputElement).value,
+      ),
+    };
+    renderSettings();
+    saveSettings();
+  },
+);
+
+byId<HTMLInputElement>("ambientVolume").addEventListener(
+  "input",
+  (event) => {
+    settings = {
+      ...settings,
+      ambientVolume: Number(
+        (event.currentTarget as HTMLInputElement).value,
+      ),
+    };
+    renderSettings();
+    saveSettings();
+  },
+);
+
 byId<HTMLInputElement>("sfxVolume").addEventListener("input", (event) => {
   settings = {
     ...settings,
@@ -4486,14 +4681,33 @@ function persistPageLifecycleRecovery(): void {
 }
 
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState !== "hidden") return;
-  persistPageLifecycleRecovery();
+  const hidden = document.visibilityState === "hidden";
+  if (hidden) {
+    musicController.setPaused(true);
+    persistPageLifecycleRecovery();
+    return;
+  }
+
+  if (game.getPhase() !== "paused") {
+    musicController.setPaused(false);
+  }
 });
 
 window.addEventListener("pagehide", persistPageLifecycleRecovery);
 
+window.addEventListener(
+  "pointerdown",
+  () => {
+    if (game.getPhase() !== "paused") {
+      musicController.setPaused(false);
+    }
+  },
+  { once: true },
+);
+
 window.addEventListener("beforeunload", () => {
   stopSpeech();
+  musicController.destroy();
   game.destroy();
 });
 

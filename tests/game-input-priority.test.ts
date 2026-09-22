@@ -12,6 +12,8 @@ type GameInternals = {
 
 const settings: GameSettings = {
   sfxVolume: 0,
+  musicVolume: 0,
+  ambientVolume: 0,
   screenShake: false,
   visualQuality: "low",
   pronunciationEnabled: false,

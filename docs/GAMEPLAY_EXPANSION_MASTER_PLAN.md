@@ -2989,7 +2989,9 @@ M08 consumes World music/ambient identity. M09 consumes World enemy/boss roster 
 
 ## M08 — Dynamic World Music / Ambient system
 
-Implement:
+**Status: Runtime implementation complete.** The 50 M07 Worlds now resolve through `WorldMusicProfile`, one `MusicController` owns soundtrack state/crossfade/lifecycle, pronunciation/announcer/warning events duck the soundtrack through the existing audio event architecture, Music/Ambient have separate gain controls, and local/default asset resolution fails soft when files are absent. See `docs/M08_DYNAMIC_WORLD_MUSIC.md`.
+
+Implemented:
 
 - `WorldMusicProfile`;
 - MusicController/state machine;
@@ -3005,7 +3007,9 @@ Implement:
 - graceful missing-asset fallback;
 - audio lifecycle/performance tests.
 
-Integrate with the existing SFX/pronunciation/announcer architecture instead of creating unrelated playback paths.
+Final 50-World track selection/composition, loudness normalization, perceptual crossfade tuning and licensing remain manual asset gates. Missing binary assets do not block gameplay or require another audio architecture.
+
+Integrates with the existing SFX/pronunciation/announcer architecture instead of creating unrelated playback paths.
 
 ## M09 — World enemy/boss roster mapping
 
