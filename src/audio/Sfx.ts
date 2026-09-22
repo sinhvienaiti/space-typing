@@ -1,4 +1,8 @@
 import {
+  announcerAsset,
+  type AnnouncerEvent,
+} from "./announcer";
+import {
   mixedSfxGain,
   type AudioGroup,
 } from "./mix";
@@ -7,6 +11,7 @@ export class Sfx {
   private context: AudioContext | null = null;
   private limiter: DynamicsCompressorNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
+  private announcerAudio: HTMLAudioElement | null = null;
   private volume = 0.5;
   private pronunciationActive = false;
   private destroyed = false;
@@ -46,6 +51,10 @@ export class Sfx {
       this.limiter = null;
     }
     this.noiseBuffer = null;
+    if (this.announcerAudio !== null) {
+      this.announcerAudio.pause();
+      this.announcerAudio = null;
+    }
     if (this.context !== null) {
       void this.context.close();
       this.context = null;
@@ -54,6 +63,9 @@ export class Sfx {
 
   setVolume(volume: number): void {
     this.volume = Math.min(1, Math.max(0, volume));
+    if (this.announcerAudio !== null) {
+      this.announcerAudio.volume = this.announcerVolume();
+    }
   }
 
   unlock(): void {
@@ -97,6 +109,26 @@ export class Sfx {
     const safePitch = Math.max(0.5, Math.min(1.6, pitch));
     this.noise(0.1, 0.055, "combat");
     this.tone(240 * safePitch, 0.12, "sawtooth", 0.045, 90 * safePitch, "combat");
+  }
+
+  announcer(event: AnnouncerEvent): void {
+    if (this.destroyed || typeof Audio === "undefined") return;
+
+    if (this.announcerAudio !== null) {
+      this.announcerAudio.pause();
+      this.announcerAudio.currentTime = 0;
+    }
+
+    const audio = new Audio(announcerAsset(event));
+    audio.preload = "auto";
+    audio.volume = this.announcerVolume();
+    this.announcerAudio = audio;
+
+    void audio.play().catch(() => {
+      if (this.announcerAudio === audio) {
+        this.announcerAudio = null;
+      }
+    });
   }
 
   wrong(): void {
@@ -224,6 +256,18 @@ export class Sfx {
 
   bossStagger(): void {
     this.tone(250, 0.14, "sine", 0.03, 120, "combat");
+  }
+
+  private announcerVolume(): number {
+    return Math.min(
+      1,
+      mixedSfxGain(
+        this.volume,
+        "warnings",
+        1,
+        this.pronunciationActive,
+      ) * 1.08,
+    );
   }
 
   private schedule(callback: () => void, delayMs: number): void {

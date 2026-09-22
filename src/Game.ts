@@ -1,3 +1,4 @@
+import { PriorityKillChain } from "./audio/announcer";
 import { Sfx } from "./audio/Sfx";
 import {
   bossActionInterval,
@@ -357,6 +358,7 @@ export class Game {
   private readonly context: CanvasRenderingContext2D;
   private readonly hooks: Hooks;
   private readonly sfx = new Sfx();
+  private readonly priorityKillChain = new PriorityKillChain();
   private readonly skillEngine = new SkillEngine();
 
   private characterId: CharacterId = "vanguard";
@@ -1315,6 +1317,7 @@ export class Game {
 
     this.phase = "playing";
     this.stageElapsedSeconds = 0;
+    this.priorityKillChain.reset();
     this.stats = this.createGameStats(stage.stage);
     this.stats.shield = Math.min(
       this.stats.maxShield,
@@ -2959,6 +2962,14 @@ export class Game {
     this.burst(enemy.x, enemy.y, deathFx.count, deathFx.hue);
     this.sfx.hit(deathFx.pitch);
     this.sfx.kill(deathFx.pitch);
+    if (enemy.elite || deathDefinition?.rarity === "elite") {
+      const announcerEvent = this.priorityKillChain.registerKill(
+        this.stageElapsedSeconds,
+      );
+      if (announcerEvent !== null) {
+        this.sfx.announcer(announcerEvent);
+      }
+    }
     if (enemy.golden) {
       this.addScore(260 * this.stats.multiplier);
     }
