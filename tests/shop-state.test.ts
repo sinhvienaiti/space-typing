@@ -81,7 +81,7 @@ describe("M06 deterministic finite-stock shops", () => {
     const initial = resolveShopInstance(
       createShopState(),
       "black-market",
-      context(520, "world-26", 5, 300),
+      context(521, "world-26", 5, 300),
     );
     const reopened = resolveShopInstance(
       initial.state,
