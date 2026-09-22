@@ -930,7 +930,7 @@ describe("save backup", () => {
     const state = {
       version: 1 as const,
       highestUnlockedTier: 2,
-      selectedTier: 1,
+      selectedTier: 2,
       completedTiers: [1],
       frontierByTier: {
         "1": 1000,
