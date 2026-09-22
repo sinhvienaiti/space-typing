@@ -31,6 +31,11 @@ export type EnemyKind =
 
 export type EliteModifier = "swift" | "armored" | "frenzy" | "volatile";
 
+export type PriorityTargetClass =
+  | "elite"
+  | "champion"
+  | "apex";
+
 export type VocabularyEntry = {
   id: string;
   en: string;
@@ -87,6 +92,7 @@ export type Enemy = {
   kind: EnemyKind;
   definitionId?: EnemyDefinitionId;
   elite: boolean;
+  priorityClass?: PriorityTargetClass;
   golden?: boolean;
   eliteModifiers: EliteModifier[];
   rank?: EnemyRank;
