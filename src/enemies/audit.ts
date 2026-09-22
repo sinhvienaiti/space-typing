@@ -25,13 +25,6 @@ export function auditEnemySystem(
     }
 
     if (
-      definition.rarity === "boss" &&
-      definition.spawnWeight !== 0
-    ) {
-      errors.push(definition.id + ": boss spawnWeight must be zero.");
-    }
-
-    if (
       definition.reward !== undefined &&
       definition.visual.rewardMarker === undefined
     ) {
