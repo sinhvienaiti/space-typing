@@ -2322,6 +2322,127 @@ async function resolvePhoenixDeath(): Promise<void> {
   );
 }
 
+async function handleHiddenChallengeClear(
+  stats: GameStats,
+  encounter: ChallengeEncounterProfile,
+): Promise<void> {
+  const wpm = stageWordsPerMinute(
+    stats.hits,
+    game.getStageElapsedSeconds(),
+  );
+  const accuracy = accuracyPercent(
+    stats.hits,
+    stats.misses,
+  );
+  const rewardMultiplier =
+    activeStageDifficulty?.rewardMultiplier ?? 1;
+
+  const creditReward = Math.max(
+    1,
+    Math.round(
+      stageClearCreditReward({
+        stage: campaign.selectedStage,
+        accuracy,
+        salvage: game.getPlayerStats().salvage,
+      }) *
+        game.getCreditsMultiplier() *
+        rewardMultiplier,
+    ),
+  );
+  credits = addCredits(credits, creditReward);
+
+  const rewardRole =
+    encounter.forceBoss
+      ? "boss"
+      : encounter.priorityTargetMode !== "none"
+        ? "gauntlet"
+        : encounter.kind === "hidden-world"
+          ? "hazard"
+          : "special";
+  const currencyReward = scaleExpansionCurrencyReward(
+    stageClearExpansionCurrencyReward(
+      campaign.selectedStage,
+      rewardRole,
+      accuracy,
+    ),
+    rewardMultiplier,
+  );
+  expansionCurrencies = addExpansionCurrencyReward(
+    expansionCurrencies,
+    currencyReward,
+  );
+  const currencyRewardText =
+    expansionCurrencyRewardText(currencyReward);
+
+  const finishedOfferId = encounter.offerId;
+  challenge = completeHiddenChallengeEncounter(challenge);
+  stageEntrySnapshot = null;
+  activeChallengeEncounter = null;
+
+  const nextProfile =
+    hiddenChallengeEncounterProfile(challenge);
+  const completed =
+    challenge.completedOfferIds.includes(finishedOfferId);
+
+  const saved = await autosaveCampaign(
+    "challenge",
+    completed
+      ? "✓ " +
+          hiddenChallengeKindLabel(encounter.kind) +
+          " complete · premium rewards secured"
+      : "✓ Hidden encounter " +
+          String(encounter.encounterIndex + 1) +
+          " / " +
+          String(encounter.encounterCount) +
+          " complete",
+    "hidden-transition",
+  );
+
+  byId("clearTitle").textContent =
+    hiddenChallengeKindLabel(encounter.kind) +
+    " · " +
+    (completed
+      ? "Complete"
+      : "Encounter " +
+        String(encounter.encounterIndex + 1) +
+        " / " +
+        String(encounter.encounterCount));
+  byId("clearScore").textContent =
+    stats.score.toLocaleString();
+  byId("clearAccuracy").textContent =
+    accuracy.toFixed(1) + "%";
+  byId("clearWpm").textContent = wpm.toFixed(0);
+  byId("clearCredits").textContent =
+    "+" +
+    creditReward.toLocaleString() +
+    " Credits" +
+    (currencyRewardText.length > 0
+      ? " · " + currencyRewardText
+      : "");
+  byId("clearStreak").textContent =
+    String(stats.maxStreak);
+
+  const nextButton =
+    byId<HTMLButtonElement>("nextStageButton");
+  nextButton.textContent =
+    nextProfile === null
+      ? "Continue Campaign · Stage " +
+        String(campaign.selectedStage).padStart(3, "0")
+      : "Next " +
+        hiddenChallengeKindLabel(nextProfile.kind) +
+        " Encounter";
+  byId<HTMLButtonElement>("clearRetryButton").classList.add(
+    "hidden",
+  );
+
+  updateCampaignUi();
+  if (!saved) {
+    showNotice(
+      "Challenge clear is active in this session, but save failed",
+    );
+  }
+}
+
 const game = new Game(
   byId<HTMLCanvasElement>("gameCanvas"),
   [],
@@ -2364,6 +2485,20 @@ const game = new Game(
     onBossUpdate: renderBoss,
     onSkills: renderAllSkills,
     onStageClear: (stats) => {
+      if (activeChallengeEncounter !== null) {
+        void handleHiddenChallengeClear(
+          stats,
+          activeChallengeEncounter,
+        );
+        return;
+      }
+
+      byId<HTMLButtonElement>("nextStageButton").textContent =
+        "Next stage";
+      byId<HTMLButtonElement>("clearRetryButton").classList.remove(
+        "hidden",
+      );
+
       const wpm = stageWordsPerMinute(
         stats.hits,
         game.getStageElapsedSeconds(),
