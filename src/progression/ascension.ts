@@ -178,6 +178,7 @@ export function isValidAscensionState(value: unknown): value is AscensionState {
     return false;
   }
 
+  const highestUnlockedTier = raw.highestUnlockedTier;
   const completed = raw.completedTiers as unknown[];
   if (
     new Set(completed).size !== completed.length ||
@@ -186,7 +187,7 @@ export function isValidAscensionState(value: unknown): value is AscensionState {
         typeof tier === "number" &&
         Number.isInteger(tier) &&
         tier >= 1 &&
-        tier <= raw.highestUnlockedTier,
+        tier <= highestUnlockedTier,
     )
   ) {
     return false;
@@ -195,7 +196,7 @@ export function isValidAscensionState(value: unknown): value is AscensionState {
   const frontiers = raw.frontierByTier as Record<string, unknown>;
   const completedSet = new Set(completed as number[]);
   const expectedKeys = Array.from(
-    { length: raw.highestUnlockedTier },
+    { length: highestUnlockedTier },
     (_, index) => String(index + 1),
   );
   const keys = Object.keys(frontiers).sort(
