@@ -239,6 +239,12 @@ import {
   splitDisplayByTypedLetters,
   typingText,
 } from "./logic";
+import {
+  impactFeedback,
+  telegraphPulse,
+  telegraphStrength,
+  type ImpactKind,
+} from "./vfx/polish";
 import type {
   Enemy,
   EnemyKind,
@@ -400,6 +406,7 @@ export class Game {
     createStageEventModifiers();
   private statusState: StatusState = createStatusState();
   private activeSynergies = new Set<BuildSynergyId>();
+  private hitStopTimer = 0;
   private lastTime = performance.now();
   private animationFrame = 0;
   private stars: Array<{ x: number; y: number; z: number }> = [];
@@ -1323,6 +1330,7 @@ export class Game {
     this.celestialCharge = 0;
     this.statusState = createStatusState();
     this.interferenceTimer = 0;
+    this.hitStopTimer = 0;
     this.skillHudTimer = 0;
     this.hooks.onBossUpdate(null);
     this.hooks.onStatuses(this.statusState);
@@ -1500,7 +1508,12 @@ export class Game {
     this.lastTime = now;
 
     if (this.phase === "playing") {
-      this.update(dt);
+      if (this.hitStopTimer > 0) {
+        this.hitStopTimer = Math.max(0, this.hitStopTimer - dt);
+        this.updateEffects(dt);
+      } else {
+        this.update(dt);
+      }
     } else {
       this.updateEffects(dt);
     }
@@ -2364,6 +2377,7 @@ export class Game {
     }
 
     if (boss.typed >= word.length) {
+      this.triggerImpactFeedback("boss-word");
       this.hooks.onWordComplete(boss.entry);
       this.applyCharacterWordCompletePassive(word.length);
 
@@ -2453,6 +2467,7 @@ export class Game {
     if (boss === null) return;
 
     const { x, y } = this.bossPosition();
+    this.triggerImpactFeedback("boss-defeat");
     this.stats.kills += 1;
     this.stats.score += 1200 * this.stats.multiplier;
     this.gainPower(18);
@@ -2766,6 +2781,7 @@ export class Game {
   }
 
   private completeWord(enemy: Enemy): void {
+    this.triggerImpactFeedback("word");
     const length = typingText(enemy.entry.en).length;
     const perfectWord = !enemy.wordMissed;
     this.hooks.onWordComplete(enemy.entry);
@@ -3637,6 +3653,17 @@ export class Game {
     this.burst(enemy.x, enemy.y, power > 1 ? 12 : 5, 188);
   }
 
+  private triggerImpactFeedback(kind: ImpactKind): void {
+    const feedback = impactFeedback(kind);
+    this.hitStopTimer = Math.max(
+      this.hitStopTimer,
+      feedback.hitStopSeconds,
+    );
+    if (this.settings.screenShake && feedback.shake > 0) {
+      this.shake = Math.max(this.shake, feedback.shake);
+    }
+  }
+
   private burst(x: number, y: number, count: number, hue: number): void {
     const qualityScale =
       this.settings.visualQuality === "ultra"
@@ -3932,9 +3959,32 @@ export class Game {
     const radius =
       boss.role === "major-boss" ? 82 : boss.role === "boss" ? 70 : 60;
     const pulse = 0.88 + Math.sin(time * 4.5) * 0.12;
+    const warning = telegraphStrength(boss.actionCooldown, 1.1);
+    const warningPulse = telegraphPulse(warning, time);
 
     context.save();
     context.translate(x, y - boss.kick * 8);
+
+    if (warningPulse > 0.02 && boss.staggerTimer <= 0) {
+      context.save();
+      context.strokeStyle =
+        "rgba(255, 83, 106, " +
+        String(0.18 + warningPulse * 0.62) +
+        ")";
+      context.lineWidth = 1.4 + warningPulse * 2.2;
+      context.setLineDash([7, 8]);
+      context.lineDashOffset = -time * 28;
+      context.beginPath();
+      context.arc(
+        0,
+        0,
+        radius * (1.5 + warningPulse * 0.2),
+        0,
+        Math.PI * 2,
+      );
+      context.stroke();
+      context.restore();
+    }
     context.globalCompositeOperation = "lighter";
     context.shadowBlur = boss.flash > 0 ? 36 : 24;
     const phaseColor =
@@ -4302,21 +4352,35 @@ export class Game {
                                 : "#ffb75b";
     const targetColor = "#80f3ff";
 
-    if (
-      enemy.kind === "sniper" &&
-      enemy.actionCooldown !== null &&
-      enemy.actionCooldown <= 0.8
-    ) {
-      const warning = clamp(1 - enemy.actionCooldown / 0.8, 0, 1);
+    const warning = telegraphStrength(enemy.actionCooldown, 0.9);
+    const warningPulse = telegraphPulse(warning, enemy.age);
+    if (warningPulse > 0.02) {
       context.save();
       context.strokeStyle =
-        "rgba(255, 104, 85, " + String(0.12 + warning * 0.45) + ")";
+        "rgba(255, 104, 85, " +
+        String(0.12 + warningPulse * 0.5) +
+        ")";
       context.setLineDash([5, 7]);
-      context.lineWidth = 1 + warning * 1.2;
+      context.lineWidth = 1 + warningPulse * 1.2;
       context.beginPath();
-      context.moveTo(enemy.x, enemy.y);
-      context.lineTo(this.width / 2, this.height - PLAYER_Y_OFFSET);
+      context.arc(
+        enemy.x,
+        enemy.y - kick,
+        enemy.radius * (1.35 + warningPulse * 0.16),
+        0,
+        Math.PI * 2,
+      );
       context.stroke();
+
+      if (enemy.kind === "sniper") {
+        context.beginPath();
+        context.moveTo(enemy.x, enemy.y - kick);
+        context.lineTo(
+          this.width / 2,
+          this.height - PLAYER_Y_OFFSET,
+        );
+        context.stroke();
+      }
       context.restore();
     }
 
