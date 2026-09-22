@@ -2490,6 +2490,18 @@ function clearDeathRecoveryMarker(): void {
   };
 }
 
+function checkpointDisplayLabel(): string {
+  const checkpointAscensionStage =
+    currentAscensionStage(checkpointSnapshot.ascension);
+  return checkpointAscensionStage === null
+    ? "Stage " +
+        String(campaignExpansion.checkpoint.stage).padStart(3, "0")
+    : "A" +
+        String(checkpointSnapshot.ascension.selectedTier) +
+        " Stage " +
+        String(checkpointAscensionStage).padStart(3, "0");
+}
+
 function renderDeathProtectionChoices(failedStage: number): void {
   const anchorCount = itemCount(inventory, "salvage-anchor");
   const revivalCount = itemCount(inventory, "stage-revival-core");
@@ -2512,15 +2524,16 @@ function renderDeathProtectionChoices(failedStage: number): void {
   byId<HTMLButtonElement>("phoenixCoreButton").disabled =
     phoenixCount <= 0 || !validStageEntry;
 
-  const checkpointStage = campaignExpansion.checkpoint.stage;
+  const checkpointLabel = checkpointDisplayLabel();
   byId("againButton").textContent =
-    "Retry checkpoint · Stage " +
-    String(checkpointStage).padStart(3, "0");
+    "Retry checkpoint · " + checkpointLabel;
+  byId<HTMLButtonElement>("gameOverStageSelectButton").disabled =
+    currentAscensionStage(checkpointSnapshot.ascension) !== null;
   byId("deathProtectionMeta").textContent =
     "Death at Stage " +
     String(failedStage).padStart(3, "0") +
     " · checkpoint " +
-    String(checkpointStage).padStart(3, "0") +
+    checkpointLabel +
     ". Protection items are consumed only when chosen.";
 }
 
@@ -2552,10 +2565,8 @@ async function resolveCheckpointDeath(
   stageEntrySnapshot = null;
   refreshPersistentStateUi();
 
-  const checkpointStage = campaignExpansion.checkpoint.stage;
   const saved = await persistResolvedDeath(
-    "✓ Returned to checkpoint · Stage " +
-      String(checkpointStage).padStart(3, "0"),
+    "✓ Returned to checkpoint · " + checkpointDisplayLabel(),
   );
   if (!saved) return;
 
@@ -2590,8 +2601,8 @@ async function resolveSalvageAnchorDeath(): Promise<void> {
   refreshPersistentStateUi();
 
   const saved = await persistResolvedDeath(
-    "✓ Salvage Anchor consumed · gains preserved · checkpoint Stage " +
-      String(campaignExpansion.checkpoint.stage).padStart(3, "0"),
+    "✓ Salvage Anchor consumed · gains preserved · checkpoint " +
+      checkpointDisplayLabel(),
   );
   if (saved) await startSelectedStage();
 }
@@ -5400,12 +5411,17 @@ async function initializePlayerProgress(): Promise<void> {
 
     if (loaded.recoveryMode === "death-rollback") {
       showNotice(
-        "Death record enforced · returned to checkpoint Stage " +
-          String(campaignExpansion.checkpoint.stage).padStart(3, "0"),
+        "Death record enforced · returned to checkpoint " +
+          checkpointDisplayLabel(),
       );
     } else if (loaded.recoveryMode === "crash") {
       showNotice(
-        "✓ Recovered last safe transition · Stage " +
+        "✓ Recovered last safe transition · " +
+          (ascension.selectedTier > 0
+            ? "A" +
+              String(ascension.selectedTier) +
+              " Stage "
+            : "Stage ") +
           String(campaign.selectedStage).padStart(3, "0"),
       );
     } else if (loaded.migrated) {
