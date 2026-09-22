@@ -1862,37 +1862,40 @@ export class Game {
       enemy.x +=
         (desiredX - enemy.x) * Math.min(1, dt * 2 * rewardControl);
 
-      if (enemy.actionCooldown !== null) {
+      if (
+        enemy.pendingSkillId !== undefined &&
+        enemy.pendingSkillId !== null
+      ) {
+        enemy.skillTelegraphRemaining = Math.max(
+          0,
+          (enemy.skillTelegraphRemaining ?? 0) -
+            dt * hostileTimeFactor * rewardControl,
+        );
+        if (enemy.skillTelegraphRemaining <= 0) {
+          const skillId = enemy.pendingSkillId;
+          enemy.pendingSkillId = null;
+          this.executeEnemySkill(enemy, skillId, difficulty);
+          enemy.actionCooldown = this.enemySkillCooldown(
+            skillId,
+            difficulty,
+          );
+        }
+      } else if (enemy.actionCooldown !== null) {
         enemy.actionCooldown -=
           dt * hostileTimeFactor * rewardControl;
         if (enemy.actionCooldown <= 0) {
-          if (enemy.kind === "carrier") {
-            this.spawnCarrierChild(enemy);
-          } else if (enemy.kind === "jammer") {
-            this.activateInterference(enemy);
-          } else if (enemy.kind === "healer") {
-            this.reinforceAlly(enemy);
-          } else if (enemy.kind === "leech") {
-            this.drainOverdrive(enemy);
-          } else if (enemy.kind === "commander") {
-            this.commandPulse(enemy);
+          const skills = enemy.skillIds ?? [];
+          if (skills.length > 0) {
+            const index =
+              (enemy.nextSkillIndex ?? 0) % skills.length;
+            const skillId = skills[index]!;
+            enemy.nextSkillIndex = (index + 1) % skills.length;
+            this.beginEnemySkill(enemy, skillId, difficulty);
           } else {
-            this.fireEnemyProjectile(enemy);
+            this.executeLegacyEnemyAction(enemy);
+            enemy.actionCooldown =
+              this.legacyEnemyActionCooldown(enemy, difficulty);
           }
-
-          const baseInterval =
-            enemyProfile(enemy.kind, this.stageConfig.galaxy).actionInterval ?? 4;
-          const pressure =
-            enemy.kind === "carrier" ||
-            enemy.kind === "jammer" ||
-            enemy.kind === "healer" ||
-            enemy.kind === "leech" ||
-            enemy.kind === "commander"
-              ? difficulty.combatPressure
-              : difficulty.projectilePressure *
-                this.stageEventModifiers.projectilePressureMultiplier;
-          enemy.actionCooldown =
-            baseInterval / Math.max(0.7, pressure);
         }
       }
 
@@ -2316,6 +2319,22 @@ export class Game {
       vocabularyLevel: this.vocabularyLevel,
       entries: this.vocabulary,
     });
+    const runtimeProfile = resolveEnemyRuntimeProfile({
+      stage,
+      kind,
+      rank: typingProfile.rank,
+      elite,
+      wordDifficultyScore: typingProfile.wordDifficultyScore,
+      layers: typingProfile.layersRemaining,
+    });
+    const firstSkill = runtimeProfile.skills[0];
+    const resolvedActionCooldown =
+      firstSkill === undefined
+        ? eliteStats.actionCooldown
+        : this.enemySkillCooldown(
+            firstSkill,
+            difficulty ?? this.difficulty,
+          );
 
     this.enemies.push({
       id: this.nextEnemyId++,
@@ -2327,6 +2346,11 @@ export class Game {
       rank: typingProfile.rank,
       wordDifficultyScore: typingProfile.wordDifficultyScore,
       layerPlan: typingProfile.layerPlan,
+      skillIds: runtimeProfile.skills,
+      nextSkillIndex: 0,
+      pendingSkillId: null,
+      skillTelegraphRemaining: 0,
+      threatBudget: runtimeProfile.threatBudget,
       entry: typingProfile.entry,
       typed: 0,
       wordMissed: false,
@@ -2340,7 +2364,7 @@ export class Game {
       radius: elite ? profile.radius * 1.08 : profile.radius,
       flash: 0,
       kick: 0,
-      actionCooldown: eliteStats.actionCooldown,
+      actionCooldown: resolvedActionCooldown,
     });
 
     const spawnDefinition = enemyDefinition(definitionId);
