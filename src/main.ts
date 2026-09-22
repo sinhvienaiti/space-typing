@@ -5368,8 +5368,9 @@ async function initializePlayerProgress(): Promise<void> {
     musicController.transitionTo("WORLD_NORMAL", 0.8);
     updateCampaignUi();
     startButton.disabled = !vocabularyReady;
-    stageSelectButton.disabled = false;
-    routeButton.disabled = false;
+    const ascensionActive = ascension.selectedTier > 0;
+    stageSelectButton.disabled = ascensionActive;
+    routeButton.disabled = ascensionActive;
     equipmentButton.disabled = false;
     shopButton.disabled = false;
     stationShopButton.disabled = false;
