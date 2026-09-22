@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createDefaultCampaignProgress } from "../src/campaign/progress";
+import { createCampaignExpansionState } from "../src/campaign/expansion-state";
 import { createHiddenDiscoveryState } from "../src/discovery/hidden-content";
 import { createStarterEquipmentState } from "../src/equipment/loadout";
 import { createExpansionCurrencyState } from "../src/economy/currencies";
@@ -8,6 +9,14 @@ import {
   restoreCheckpointSnapshot,
   type RunPersistentState,
 } from "../src/persistence/checkpoint";
+import {
+  captureCrashRecoverySnapshot,
+  resolveCrashRecovery,
+} from "../src/persistence/crash-recovery";
+import {
+  createStageEntrySnapshot,
+  resolveStageRevivalCore,
+} from "../src/persistence/death-protection";
 import { createStarterSupportSpellState } from "../src/skills/support-loadout";
 import { createStarterCharacterState } from "../src/characters/state";
 import { createLuckPityState } from "../src/loot/pity";
@@ -249,6 +258,146 @@ describe("M06 deterministic finite-stock shops", () => {
     }
 
     expect(found).toBe(true);
+  });
+
+  it("restores persisted shop stock from the last safe crash snapshot", () => {
+    const safe = runState();
+    safe.credits = 99999;
+    const rolled = resolveShopInstance(
+      safe.shops,
+      "normal",
+      context(1, "world-01", 0, 0),
+    );
+    safe.shops = rolled.state;
+
+    const offer = rolled.instance.stock.find(
+      (entry) => entry.kind === "equipment",
+    );
+    expect(offer?.kind).toBe("equipment");
+    if (offer?.kind !== "equipment") return;
+
+    const checkpoint = createCheckpointSnapshot(safe, 1);
+    const expansion = createCampaignExpansionState(
+      safe.campaign,
+      "2026-09-22T11:45:00.000Z",
+    );
+    const captured = captureCrashRecoverySnapshot(
+      safe,
+      expansion,
+      checkpoint,
+      "shop",
+      "2026-09-22T11:46:00.000Z",
+    );
+
+    const purchase = buyShopStockEntry(
+      {
+        credits: safe.credits,
+        expansionCurrencies: safe.expansionCurrencies,
+        inventory: safe.inventory,
+        equipment: safe.equipment,
+        shops: safe.shops,
+      },
+      rolled.instance.id,
+      offer.key,
+      "crash-stock-test",
+    );
+    expect(purchase.purchased).toBe(true);
+
+    const unsafe: RunPersistentState = {
+      ...safe,
+      credits: purchase.state.credits,
+      expansionCurrencies: purchase.state.expansionCurrencies,
+      inventory: purchase.state.inventory,
+      equipment: purchase.state.equipment,
+      shops: purchase.state.shops,
+    };
+
+    const recovered = resolveCrashRecovery(
+      unsafe,
+      captured.campaignExpansion,
+      checkpoint,
+      captured.snapshot,
+      "2026-09-22T11:47:00.000Z",
+    );
+
+    expect(recovered.mode).toBe("crash");
+    expect(
+      recovered.state.shops.instances[rolled.instance.id]?.stock.find(
+        (entry) => entry.key === offer.key,
+      )?.remaining,
+    ).toBe(1);
+    expect(
+      recovered.state.equipment.items.some(
+        (item) => item.instanceId === "crash-stock-test",
+      ),
+    ).toBe(false);
+  });
+
+  it("restores stage-entry shop stock when Stage Revival Core is used", () => {
+    const entry = runState();
+    entry.credits = 99999;
+    entry.inventory = { "stage-revival-core": 1 };
+    const rolled = resolveShopInstance(
+      entry.shops,
+      "normal",
+      context(1, "world-01", 0, 0),
+    );
+    entry.shops = rolled.state;
+
+    const offer = rolled.instance.stock.find(
+      (candidate) => candidate.kind === "equipment",
+    );
+    expect(offer?.kind).toBe("equipment");
+    if (offer?.kind !== "equipment") return;
+
+    const expansion = createCampaignExpansionState(
+      entry.campaign,
+      "2026-09-22T11:48:00.000Z",
+    );
+    const checkpoint = createCheckpointSnapshot(entry, 1);
+    const stageEntry = createStageEntrySnapshot(
+      entry,
+      expansion,
+      checkpoint,
+      "2026-09-22T11:49:00.000Z",
+    );
+
+    const purchase = buyShopStockEntry(
+      {
+        credits: entry.credits,
+        expansionCurrencies: entry.expansionCurrencies,
+        inventory: entry.inventory,
+        equipment: entry.equipment,
+        shops: entry.shops,
+      },
+      rolled.instance.id,
+      offer.key,
+      "revival-stock-test",
+    );
+    expect(purchase.purchased).toBe(true);
+
+    const active: RunPersistentState = {
+      ...entry,
+      credits: purchase.state.credits,
+      expansionCurrencies: purchase.state.expansionCurrencies,
+      inventory: purchase.state.inventory,
+      equipment: purchase.state.equipment,
+      shops: purchase.state.shops,
+    };
+
+    const revived = resolveStageRevivalCore(active, stageEntry);
+    expect(revived?.applied).toBe(true);
+    expect(
+      revived?.state.shops.instances[rolled.instance.id]?.stock.find(
+        (candidate) => candidate.key === offer.key,
+      )?.remaining,
+    ).toBe(1);
+    expect(
+      revived?.state.equipment.items.some(
+        (item) => item.instanceId === "revival-stock-test",
+      ),
+    ).toBe(false);
+    expect(revived?.state.inventory["stage-revival-core"] ?? 0).toBe(0);
   });
 
   it("rolls purchased stock back to the committed checkpoint", () => {
