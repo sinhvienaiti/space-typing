@@ -1,5 +1,9 @@
 import type { BossRole } from "./model";
-import type { EnemyDefinitionId } from "../enemies/registry";
+import {
+  enemyDefinition,
+  type EnemyDefinitionId,
+} from "../enemies/registry";
+import { worldForStage } from "../worlds/registry";
 
 export type BossVisualId =
   | "halo-seraph"
@@ -59,3 +63,22 @@ export function bossVisualName(
   };
   return labels[id];
 }
+
+export function bossVisualDefinitionIdForStage(
+  stage: number,
+  role: BossRole = "boss",
+): EnemyDefinitionId {
+  const world = worldForStage(stage);
+  return role === "mini-boss"
+    ? world.miniBoss
+    : world.worldBoss;
+}
+
+export function bossVisualNameForStage(
+  stage: number,
+  role: BossRole = "boss",
+): string {
+  const id = bossVisualDefinitionIdForStage(stage, role);
+  return enemyDefinition(id)?.name ?? id;
+}
+
