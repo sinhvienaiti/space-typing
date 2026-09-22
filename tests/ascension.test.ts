@@ -43,6 +43,23 @@ describe("M20 Ascension", () => {
     expect(selectAscensionTier(state, 2).selectedTier).toBe(2);
   });
 
+  it("sanitizes a completed tier out of active selection", () => {
+    const state = sanitizeAscensionState({
+      version: 1,
+      highestUnlockedTier: 2,
+      selectedTier: 1,
+      completedTiers: [1],
+      frontierByTier: {
+        "1": 1000,
+        "2": 1,
+      },
+    });
+
+    expect(state.selectedTier).toBe(0);
+    expect(state.completedTiers).toEqual([1]);
+    expect(state.frontierByTier["1"]).toBe(1000);
+  });
+
   it("advances only the active Ascension frontier and commits every ten stages", () => {
     const start = {
       ...createAscensionState({ clearedStages: [1000] }),
