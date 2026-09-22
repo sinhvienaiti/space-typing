@@ -42,7 +42,7 @@ describe("M17 equipment affix/evolution runtime", () => {
           ? {
               ...item,
               grade: "gold" as const,
-              affixes: ["fortified", "charged"] as const,
+              affixes: ["fortified", "charged"],
             }
           : item,
       ),
