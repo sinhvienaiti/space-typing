@@ -3,6 +3,7 @@ import type {
   VocabularyEntry,
 } from "../types";
 import {
+  enemyRankForNumber,
   enemyRankNumber,
   resolveEnemyRank,
   sampleWorldEnemyRank,
@@ -37,15 +38,20 @@ export type ResolveEnemyTypingProfileInput = {
   random?: () => number;
   excludeEntryId?: string;
   wordScoreOffset?: number;
+  rankBonus?: number;
 };
 
 export function resolveEnemyTypingProfile(
   input: ResolveEnemyTypingProfileInput,
 ): EnemyTypingProfile {
   const random = input.random ?? Math.random;
-  const sampledRank = sampleWorldEnemyRank(
+  const sampledBaseRank = sampleWorldEnemyRank(
     input.stage,
     random(),
+  );
+  const sampledRank = enemyRankForNumber(
+    enemyRankNumber(sampledBaseRank) +
+      Math.max(0, Math.min(3, Math.floor(input.rankBonus ?? 0))),
   );
 
   // Resolve mechanical pressure first so an armored/tank archetype selects
