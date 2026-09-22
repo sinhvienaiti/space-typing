@@ -3471,9 +3471,10 @@ Gameplay Expansion:
 - M10 Enemy Rank I-X + WordDifficultyScore + typing layers: COMPLETE
 - M11 Enemy skill/effect framework + Threat Budget: COMPLETE
 - M12 Difficulty + Active Typing Pressure scheduler: COMPLETE
+- M13 Formation system: COMPLETE
 
 Next:
-- M13 Formation system
+- M14 Branching Route Map + Station
 ~~~
 
 Current gameplay/progression foundation:
@@ -3522,6 +3523,8 @@ Current gameplay/progression foundation:
 - difficulty exposes explicit pressure budget, urgent-threat cap, controller/support density, reaction, CC, attack and reward dimensions;
 - regular Campaign spawns, Carrier summons and Splitter fragments pass through Active Typing Pressure admission;
 - pressure-denied regular spawns retry without consuming stage enemy budget;
+- authored formations are aggregate M12 pressure packages and spawn atomically only after pressure/urgent/controller-support/max-enemy validation;
+- M13 formation members reuse the same M09 World visual roster + M10 typing profile + M11 skill/Threat Budget runtime as solo enemies;
 - difficulty word pressure stays inside the configured vocabulary and does not change authored World Rank access;
 - stage-clear economy rewards use the frozen stage-start difficulty reward multiplier;
 - Service / Upgrade Shop consumes Credits + Alloy through the existing enhancement system;
@@ -3573,6 +3576,10 @@ CI #227 PASS Test + Build
 
 M12 Difficulty / Active Typing Pressure
 CI #235 PASS Test + Build
+Final docs checkpoint CI #238 PASS Test + Build
+
+M13 Formation System
+CI #242 PASS Test + Build after RNG callback/signature fix
 ~~~
 
 Important implementation notes:

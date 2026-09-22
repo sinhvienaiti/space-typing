@@ -2,6 +2,7 @@ import type {
   DifficultyProfile,
 } from "./types";
 import type { EnemyKind } from "../types";
+import type { FormationDefinition } from "../enemies/formations";
 import { estimatedTypingSeconds } from "./difficulty";
 import { clamp } from "../logic";
 
@@ -129,6 +130,69 @@ export function spawnPressureReserve(
   if (kind === "tank" || kind === "shield") return 0.88;
   if (kind === "sniper" || kind === "destroyer") return 0.94;
   return 0.72;
+}
+
+export function formationPressureReserve(
+  formation: FormationDefinition,
+): number {
+  return (
+    formation.members.reduce(
+      (sum, member) =>
+        sum + spawnPressureReserve(member.kind),
+      0,
+    ) +
+    Math.max(0, formation.coordinationPressure)
+  );
+}
+
+export function formationControllerSupportCount(
+  formation: FormationDefinition,
+): number {
+  return formation.members.filter((member) =>
+    isControllerSupportKind(member.kind),
+  ).length;
+}
+
+export function canAdmitFormation(
+  snapshot: ActiveTypingPressureSnapshot,
+  difficulty: DifficultyProfile,
+  formation: FormationDefinition,
+): boolean {
+  if (
+    formation.minComplexity >
+    difficulty.formationComplexity
+  ) {
+    return false;
+  }
+
+  if (
+    snapshot.enemyCount + formation.members.length >
+    difficulty.maxEnemies
+  ) {
+    return false;
+  }
+
+  if (
+    snapshot.urgentThreats +
+      Math.max(0, Math.floor(formation.urgentReserve)) >
+    difficulty.urgentThreatCap
+  ) {
+    return false;
+  }
+
+  if (
+    snapshot.controllerSupportCount +
+      formationControllerSupportCount(formation) >
+    difficulty.controllerSupportCap
+  ) {
+    return false;
+  }
+
+  return (
+    snapshot.pressure +
+      formationPressureReserve(formation) <=
+    difficulty.pressureBudget
+  );
 }
 
 export function canAdmitSpawn(
