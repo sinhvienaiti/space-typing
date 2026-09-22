@@ -138,6 +138,28 @@ export function stageClearExpansionCurrencyReward(
   };
 }
 
+export function scaleExpansionCurrencyReward(
+  rewardInput: ExpansionCurrencyReward,
+  multiplierInput: number,
+): ExpansionCurrencyReward {
+  const reward = sanitizeExpansionCurrencyState(rewardInput);
+  const multiplier = clamp(
+    Number.isFinite(multiplierInput) ? multiplierInput : 1,
+    0.5,
+    3,
+  );
+  const scale = (value: number): number =>
+    value <= 0
+      ? 0
+      : Math.max(1, Math.round(value * multiplier));
+
+  return {
+    alloy: scale(reward.alloy),
+    starCrystal: scale(reward.starCrystal),
+    quantumCore: scale(reward.quantumCore),
+  };
+}
+
 export function expansionCurrencyRewardText(
   reward: ExpansionCurrencyReward,
 ): string {
