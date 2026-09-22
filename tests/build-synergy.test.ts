@@ -3,7 +3,10 @@ import {
   createStarterEquipmentState,
   unequipSlot,
 } from "../src/equipment/loadout";
-import { createStarterSupportSpellState } from "../src/skills/support-loadout";
+import {
+  createStarterSupportSpellState,
+  equipSupportSpell,
+} from "../src/skills/support-loadout";
 import {
   buildSynergyStatBonus,
   resolveBuildSynergies,
@@ -41,10 +44,16 @@ describe("build synergy", () => {
       }),
     ).toContain("sanctuary-matrix");
 
-    const withoutSanctuary = {
-      ...spells,
-      loadout: ["gravity-well", "cleanse"] as const,
-    };
+    let withoutSanctuary = equipSupportSpell(
+      spells,
+      0,
+      "gravity-well",
+    );
+    withoutSanctuary = equipSupportSpell(
+      withoutSanctuary,
+      1,
+      "cleanse",
+    );
     expect(
       resolveBuildSynergies({
         character: "bastion",
