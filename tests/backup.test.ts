@@ -113,7 +113,7 @@ describe("save backup", () => {
     );
     expect(unsupported).toEqual({
       ok: false,
-      error: "Unsupported save version. Supported versions: 1-13.",
+      error: "Unsupported save version. Supported versions: 1-14.",
     });
   });
 
@@ -381,6 +381,46 @@ describe("save backup", () => {
 
     expect(result.migrated).toBe(true);
     expect(result.save.credits).toBe(0);
+  });
+
+  it("imports and migrates a valid v13 backup to empty meta progression", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.version = 13;
+    raw.credits = 444;
+    delete raw.metaProgress;
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.migrated).toBe(true);
+    expect(result.save.credits).toBe(444);
+    expect(result.save.metaProgress).toEqual({
+      achievements: [],
+      completedMissions: [],
+      discoveredEnemies: [],
+      discoveredBossStages: [],
+    });
+  });
+
+  it("rejects invalid current meta progression", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.metaProgress = {
+      achievements: ["bad"],
+      completedMissions: [],
+      discoveredEnemies: [],
+      discoveredBossStages: [],
+    };
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result).toEqual({
+      ok: false,
+      error: "Meta progression data is invalid.",
+    });
   });
 
   it("rejects invalid current Credits", () => {
