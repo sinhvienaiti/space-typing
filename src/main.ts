@@ -1746,6 +1746,7 @@ function renderProgression(): void {
         "✓ Mission reward · +" +
           result.rewardCredits.toLocaleString() +
           " Credits",
+        "progression",
       );
     });
 
@@ -2071,6 +2072,7 @@ const game = new Game(
         discovery === null
           ? undefined
           : hiddenDiscoveryMessage(discovery),
+        discovery === null ? undefined : "hidden-transition",
       );
     },
   },
@@ -2159,6 +2161,7 @@ function renderCharacters(): void {
         void autosaveCampaign(
           "character",
           "✓ Character selected · " + definition.name,
+          "loadout",
         );
       });
     }
@@ -2237,6 +2240,7 @@ function renderTalentPanel(): void {
           getCharacter(id).name +
           " · " +
           talentBranchLabel(branch),
+        "upgrade",
       );
     });
 
@@ -2258,6 +2262,7 @@ function renderTalentPanel(): void {
     void autosaveCampaign(
       "character",
       "✓ Talents reset · " + getCharacter(id).name,
+      "upgrade",
     );
   });
 
@@ -2400,6 +2405,7 @@ function renderEquipment(): void {
       void autosaveCampaign(
         "equipment",
         "✓ Loadout saved · applies next stage",
+        "loadout",
       );
     });
 
@@ -2533,6 +2539,7 @@ function renderNormalShop(): void {
           " · " +
           credits.toLocaleString() +
           " Credits left",
+        "shop",
       );
     });
 
@@ -2611,6 +2618,7 @@ function renderServiceShop(): void {
       "✓ Repair Station pack purchased · " +
         credits.toLocaleString() +
         " Credits left",
+      "shop",
     );
   });
 
@@ -2681,6 +2689,7 @@ function renderServiceShop(): void {
           " · " +
           credits.toLocaleString() +
           " Credits left",
+        "upgrade",
       );
     });
 
@@ -2795,6 +2804,7 @@ function renderSpecialShop(): void {
           " · " +
           credits.toLocaleString() +
           " Credits left",
+        "shop",
       );
     });
 
@@ -3137,6 +3147,7 @@ function renderStageGrid(): void {
         "✓ Saved · Stage " +
           String(stage).padStart(3, "0") +
           " selected",
+        "stage-select",
       );
       updateCampaignUi();
       stageSelectDialog.close();
@@ -3646,6 +3657,7 @@ for (const slot of [0, 1] as const) {
       void autosaveCampaign(
         "support-spells",
         "✓ Support loadout saved · applies next stage",
+        "loadout",
       );
     },
   );
