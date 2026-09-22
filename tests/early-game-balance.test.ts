@@ -28,6 +28,21 @@ describe("Stage 001-100 balance audit", () => {
     }
   });
 
+  it("keeps normal-stage enemy-budget growth incremental", () => {
+    for (let index = 1; index < points.length; index += 1) {
+      const previous = points[index - 1]!;
+      const current = points[index]!;
+      if (current.role !== "normal" || previous.role !== "normal") {
+        continue;
+      }
+
+      expect(
+        current.enemyBudget - previous.enemyBudget,
+        "Stage " + String(current.stage),
+      ).toBeLessThanOrEqual(1);
+    }
+  });
+
   it("returns to a lower pressure band after role spikes", () => {
     for (const stage of [10, 20, 40, 50, 60, 70, 80, 90]) {
       const role = points[stage - 1]!;
