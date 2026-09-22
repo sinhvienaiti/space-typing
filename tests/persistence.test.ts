@@ -428,6 +428,22 @@ describe("player save persistence model", () => {
     expect(migration.save.checkpointSnapshot.campaign.selectedStage).toBe(1);
   });
 
+  it("migrates PlayerSave v17 to the M04 stage-entry schema", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const legacy = {
+      ...current,
+      version: 17,
+    } as Record<string, unknown>;
+    delete legacy.stageEntrySnapshot;
+
+    const migration = migratePlayerSave(legacy);
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(17);
+    expect(migration.save.stageEntrySnapshot).toBeNull();
+    expect(migration.save.crashRecoverySnapshot).toBeNull();
+    expect(migration.save.stageEntrySnapshot).toBeNull();
+  });
+
   it("keeps a valid current-version save without migration", () => {
     const save = createPlayerSave(
       createDefaultCampaignProgress(),
