@@ -94,6 +94,8 @@ export type Enemy = {
   layerPlan?: EnemyLayerId[];
   skillIds?: EnemySkillId[];
   nextSkillIndex?: number;
+  pendingSkillId?: EnemySkillId | null;
+  skillTelegraphRemaining?: number;
   threatBudget?: ThreatBudget;
   entry: VocabularyEntry;
   typed: number;
