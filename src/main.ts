@@ -4608,6 +4608,25 @@ for (const id of [
     void startSelectedStage();
   });
 }
+byId("routeButton").addEventListener("click", openRouteMap);
+byId("routeContinueButton").addEventListener("click", () => {
+  if (routeNeedsChoice(route, routeTargetStage())) return;
+  if (routeDialog.open) routeDialog.close();
+  void startSelectedStage();
+});
+byId("routeShopAction").addEventListener("click", () => {
+  closeRouteAndOpen(openNormalShop);
+});
+byId("routeStationShopAction").addEventListener("click", () => {
+  closeRouteAndOpen(() => openSpecialShop("station"));
+});
+byId("routeServiceAction").addEventListener("click", () => {
+  closeRouteAndOpen(openServiceShop);
+});
+byId("routeSupportAction").addEventListener("click", () => {
+  closeRouteAndOpen(openSupportSpells);
+});
+
 byId("resumeButton").addEventListener("click", () => game.resume());
 
 byId("againButton").addEventListener("click", () => {
