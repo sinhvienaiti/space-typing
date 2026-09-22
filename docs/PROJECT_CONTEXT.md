@@ -3326,6 +3326,19 @@ Review Pass #1 findings/fixes:
 ## Step 74
 Run complete Review Pass #2.
 
+**Status: implemented and CI-verified.**
+
+Review Pass #2 findings/fixes:
+
+- stage-only HUD state is cleared when leaving active gameplay so event/status/boss/typing-text badges cannot leak onto Title, Stage Clear or Game Over screens;
+- already-visible Supply Pod / Treasure Drone / Choice Crate / Anomaly targets can be started before an untouched Boss, while a Boss word already in progress keeps its input lock;
+- the parent shared vocabulary index is structurally validated before the game exposes level metadata or file paths;
+- Campaign start now waits for both persistence and initial vocabulary bootstrap, eliminating the race where an early click could start a normal stage with bundled fallback words while shared vocabulary was still loading;
+- unavailable shared vocabulary still intentionally falls back to bundled words and unlocks play after the load attempt completes;
+- an invalid stored Custom vocabulary source is normalized back to Class Level 001 instead of retrying the broken source on every reload;
+- regression tests cover boss-stage target priority and shared vocabulary index validation;
+- PR #23 CI #129 passed Test and Build before this documentation checkpoint.
+
 ## Step 75
 Only mark the milestone complete when both review passes are clean.
 
