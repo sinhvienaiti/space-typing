@@ -138,6 +138,21 @@ import {
   type UpgradeableSkillId,
 } from "./skills/progression";
 import {
+  RELIC_REGISTRY,
+  getRelicDefinition,
+  type RelicId,
+} from "./relics/registry";
+import {
+  MAX_EQUIPPED_RELICS,
+  compileRelicEffects,
+  createRelicState,
+  equipRelic,
+  grantRelic,
+  selectRelicReward,
+  unequipRelic,
+  type RelicState,
+} from "./relics/state";
+import {
   EQUIPMENT_AFFIX_REGISTRY,
   maxAffixesForGrade,
 } from "./equipment/affixes";
@@ -1189,6 +1204,7 @@ let hiddenDiscovery: HiddenDiscoveryState = createHiddenDiscoveryState();
 let credits = 0;
 let progression: ProgressionState = createProgressionState();
 let upgrades: UpgradeState = createUpgradeState();
+let relics: RelicState = createRelicState();
 let expansionCurrencies: ExpansionCurrencyState =
   createExpansionCurrencyState();
 let shops: ShopState = createShopState();
@@ -1215,6 +1231,7 @@ let checkpointSnapshot: CheckpointSnapshot =
       credits,
       progression,
       upgrades,
+      relics,
       expansionCurrencies,
       shops,
       route,
@@ -1302,6 +1319,7 @@ type AutosaveSnapshot = {
   credits: number;
   progression: ProgressionState;
   upgrades: UpgradeState;
+  relics: RelicState;
   expansionCurrencies: ExpansionCurrencyState;
   shops: ShopState;
   route: RouteState;
@@ -1334,6 +1352,7 @@ const campaignAutosave = new AutosaveQueue<
     snapshot.shops,
     snapshot.route,
     snapshot.upgrades,
+    snapshot.relics,
   ),
 );
 
@@ -1352,6 +1371,7 @@ function currentRunPersistentState(): RunPersistentState {
     shops,
     route,
     upgrades,
+    relics,
   };
 }
 
@@ -1366,6 +1386,7 @@ function applyRunPersistentState(state: RunPersistentState): void {
   credits = state.credits;
   progression = state.progression;
   upgrades = state.upgrades;
+  relics = state.relics;
   expansionCurrencies = state.expansionCurrencies;
   shops = state.shops;
   route = state.route;
@@ -1383,6 +1404,7 @@ function currentAutosaveSnapshot(): AutosaveSnapshot {
     credits,
     progression,
     upgrades,
+    relics,
     expansionCurrencies,
     shops,
     route,
@@ -1433,6 +1455,7 @@ function persistRecoveryMirrorSync(
       shops,
       route,
       upgrades,
+      relics,
     ),
   );
 }
@@ -1473,6 +1496,7 @@ function refreshPersistentStateUi(): void {
   renderInventory();
   applyEquipmentStats();
   applySupportSpells();
+  applyRelicEffects();
   renderCodex();
   renderProgression();
   if (shopDialog.open) renderNormalShop();
