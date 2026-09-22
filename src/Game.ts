@@ -168,6 +168,7 @@ import {
   type ActiveStatus,
   type StatusState,
 } from "./status/engine";
+import type { BuildSynergyId } from "./synergy/build";
 import {
   goldenEnemyChance,
   treasureDroneChance,
@@ -397,6 +398,7 @@ export class Game {
   private stageEventModifiers: StageRandomEventModifiers =
     createStageEventModifiers();
   private statusState: StatusState = createStatusState();
+  private activeSynergies = new Set<BuildSynergyId>();
   private lastTime = performance.now();
   private animationFrame = 0;
   private stars: Array<{ x: number; y: number; z: number }> = [];
@@ -937,9 +939,10 @@ export class Game {
     }
 
     if (id === "chain-lightning") {
+      const chainTargets = this.hasBuildSynergy("arc-circuit") ? 6 : 4;
       const targets = [...this.enemies]
         .sort((a, b) => b.y - a.y)
-        .slice(0, 4);
+        .slice(0, chainTargets);
 
       for (const enemy of targets) {
         const wordLength = typingText(enemy.entry.en).length;
@@ -960,7 +963,13 @@ export class Game {
 
       if (this.boss !== null && targets.length === 0) {
         const damage = firepowerDamage(
-          Math.max(1, Math.round(this.boss.maxHp * 0.04)),
+          Math.max(
+            1,
+            Math.round(
+              this.boss.maxHp *
+                (this.hasBuildSynergy("arc-circuit") ? 0.05 : 0.04),
+            ),
+          ),
           this.playerStats,
         );
         this.boss.hp = Math.max(0, this.boss.hp - damage);
@@ -977,7 +986,9 @@ export class Game {
       return;
     }
 
-    this.activateMarkOfWeakness(8);
+    this.activateMarkOfWeakness(
+      this.hasBuildSynergy("oracle-lens") ? 11 : 8,
+    );
   }
 
   private activateMarkOfWeakness(duration: number): void {
@@ -1014,17 +1025,33 @@ export class Game {
     const playerY = this.height - PLAYER_Y_OFFSET;
 
     if (id === "sanctuary") {
+      const sanctuaryBoost = this.hasBuildSynergy("sanctuary-matrix")
+        ? 1.2
+        : 1;
       this.stats.shield = clamp(
-        this.stats.shield + this.stats.maxShield * 0.35,
+        this.stats.shield +
+          this.stats.maxShield * 0.35 * sanctuaryBoost,
         0,
         this.stats.maxShield,
       );
       this.barrierHp = Math.max(
         this.barrierHp,
-        50 + this.playerStats.shield * 0.25,
+        (50 + this.playerStats.shield * 0.25) * sanctuaryBoost,
       );
-      this.barrierTimer = Math.max(this.barrierTimer, 6);
-      this.addStatus("fortified", 6, "support:sanctuary");
+      const sanctuaryDuration = this.hasBuildSynergy(
+        "sanctuary-matrix",
+      )
+        ? 8
+        : 6;
+      this.barrierTimer = Math.max(
+        this.barrierTimer,
+        sanctuaryDuration,
+      );
+      this.addStatus(
+        "fortified",
+        sanctuaryDuration,
+        "support:sanctuary",
+      );
       this.burst(playerX, playerY, 34, 164);
       this.sfx.support();
       this.emitStats();
@@ -1155,6 +1182,14 @@ export class Game {
 
   setHiddenDiscoveryState(state: HiddenDiscoveryState): void {
     this.hiddenDiscovery = sanitizeHiddenDiscoveryState(state);
+  }
+
+  setBuildSynergies(ids: readonly BuildSynergyId[]): void {
+    this.activeSynergies = new Set(ids);
+  }
+
+  private hasBuildSynergy(id: BuildSynergyId): boolean {
+    return this.activeSynergies.has(id);
   }
 
   private setStatusState(state: StatusState): void {
