@@ -200,8 +200,17 @@ import {
   enemyProfile,
 } from "./enemies/kinds";
 import { enemyDefinition } from "./enemies/registry";
+import { applyEnemyRewardEffect } from "./enemies/reward-effects";
+import {
+  applyEnemyAreaControl,
+  softenNearbyEnemies,
+  tickEnemyRewardControl,
+} from "./enemies/reward-runtime";
 import { drawModularEnemy } from "./enemies/renderer";
-import { runtimeEnemyDefinitionId } from "./enemies/spawn-profile";
+import {
+  runtimeEnemyDefinitionId,
+  spawnEnemyDefinitionId,
+} from "./enemies/spawn-profile";
 import {
   isRecoveryItemId,
   useRecoveryItem,
@@ -1684,18 +1693,22 @@ export class Game {
       enemy.age += dt;
       enemy.flash = Math.max(0, enemy.flash - dt * 7);
       enemy.kick = Math.max(0, enemy.kick - dt * 4);
+      const rewardControl = tickEnemyRewardControl(enemy, dt);
       const markedSlow =
         enemy.id === this.markedEnemyId && this.markTimer > 0
           ? 0.72
           : 1;
-      enemy.y += enemy.speed * speedFactor * markedSlow * dt;
+      enemy.y +=
+        enemy.speed * speedFactor * markedSlow * rewardControl * dt;
 
       const desiredX =
         enemy.baseX + Math.sin(enemy.age * 1.1 + enemy.id) * enemy.drift;
-      enemy.x += (desiredX - enemy.x) * Math.min(1, dt * 2);
+      enemy.x +=
+        (desiredX - enemy.x) * Math.min(1, dt * 2 * rewardControl);
 
       if (enemy.actionCooldown !== null) {
-        enemy.actionCooldown -= dt * hostileTimeFactor;
+        enemy.actionCooldown -=
+          dt * hostileTimeFactor * rewardControl;
         if (enemy.actionCooldown <= 0) {
           if (enemy.kind === "carrier") {
             this.spawnCarrierChild(enemy);
@@ -2117,7 +2130,7 @@ export class Game {
     this.enemies.push({
       id: this.nextEnemyId++,
       kind,
-      definitionId: runtimeEnemyDefinitionId(kind, elite),
+      definitionId: spawnEnemyDefinitionId(kind, elite, stage),
       elite,
       golden,
       eliteModifiers,
@@ -2874,6 +2887,7 @@ export class Game {
     this.tryRollEquipmentDrop(
       enemy.golden ? "golden" : enemy.elite ? "elite" : "normal",
     );
+    this.activateEnemyReward(enemy);
 
     if (enemy.kind === "splitter") {
       this.spawnSplitFragments(enemy);
@@ -2896,6 +2910,89 @@ export class Game {
       this.markTimer = 0;
     }
     this.targetId = null;
+  }
+
+  private activateEnemyReward(enemy: Enemy): void {
+    const definition = enemyDefinition(
+      enemy.definitionId ??
+        runtimeEnemyDefinitionId(enemy.kind, enemy.elite),
+    );
+    if (definition?.reward === undefined) return;
+
+    const effect = applyEnemyRewardEffect(
+      definition.reward,
+      {
+        restoreHull: (ratio) => {
+          this.stats.hull = clamp(
+            this.stats.hull + this.stats.maxHull * ratio,
+            0,
+            this.stats.maxHull,
+          );
+        },
+        restoreShield: (ratio) => {
+          this.stats.shield = clamp(
+            this.stats.shield + this.stats.maxShield * ratio,
+            0,
+            this.stats.maxShield,
+          );
+        },
+        applyPlayerStatus: (id, duration) => {
+          this.addStatus(id, duration, "enemy-reward");
+        },
+        setFireRateBoost: (duration) => {
+          this.weaponOverclockTimer = Math.max(
+            this.weaponOverclockTimer,
+            duration,
+          );
+        },
+        freezeNearby: (duration) => {
+          applyEnemyAreaControl(this.enemies, enemy, duration, 0);
+        },
+        slowNearby: (duration) => {
+          applyEnemyAreaControl(this.enemies, enemy, duration, 0.55);
+        },
+        damageNearby: (power) => {
+          softenNearbyEnemies(this.enemies, enemy, power, 5);
+        },
+        chainDamage: (power) => {
+          softenNearbyEnemies(this.enemies, enemy, power, 4, 330);
+        },
+        clearNormalEnemies: () => {
+          this.enemies = this.enemies.filter(
+            (target) => target.id === enemy.id || target.elite,
+          );
+        },
+        clearProjectiles: () => {
+          this.projectiles = [];
+        },
+        setScoreMultiplier: () => {},
+        setCreditsMultiplier: () => {},
+        reduceSkillCooldowns: (seconds) => {
+          this.skillEngine.reduceCooldowns(seconds);
+          this.hooks.onSkills();
+        },
+        restoreEnergy: (ratio) => {
+          this.stats.energy = clamp(
+            this.stats.energy + this.stats.maxEnergy * ratio,
+            0,
+            this.stats.maxEnergy,
+          );
+        },
+        addPower: (amount) => {
+          this.stats.power = clamp(this.stats.power + amount, 0, 100);
+        },
+      },
+      definition.rewardPower,
+    );
+
+    this.burst(enemy.x, enemy.y, 32, 48);
+    this.sfx.power();
+    this.hooks.onStatuses(this.statusState);
+    this.emitStats();
+
+    const label = effect.label;
+    const width = this.context.measureText(label).width;
+    void width;
   }
 
   private spawnVolatileBurst(enemy: Enemy): void {

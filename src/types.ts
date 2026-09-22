@@ -97,6 +97,8 @@ export type Enemy = {
   flash: number;
   kick: number;
   actionCooldown: number | null;
+  rewardControlTimer?: number;
+  rewardControlFactor?: number;
 };
 
 export type EnemyProjectile = {
