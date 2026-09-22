@@ -9,7 +9,12 @@ import { createHiddenDiscoveryState } from "../src/discovery/hidden-content";
 import { createProgressionState } from "../src/progression/missions";
 import { createExpansionCurrencyState } from "../src/economy/currencies";
 import { createShopState } from "../src/shops/state";
-import { createRouteState } from "../src/campaign/route";
+import {
+  createRouteState,
+  routeChoicesForStage,
+  selectRouteNode,
+  selectedRouteNode,
+} from "../src/campaign/route";
 import {
   createCheckpointSnapshot,
   type RunPersistentState,
@@ -101,6 +106,49 @@ describe("M03 crash recovery", () => {
       reason: "stage-entry",
       deathInvalidated: false,
     });
+  });
+
+  it("restores the persisted route choice from the last safe route transition", () => {
+    const safeState = stateAt(189);
+    const routeChoice = routeChoicesForStage(
+      safeState.route,
+      189,
+    )[0]!;
+    safeState.route = selectRouteNode(
+      safeState.route,
+      189,
+      routeChoice.id,
+    );
+
+    const expansion = createCampaignExpansionState(
+      safeState.campaign,
+      "2026-09-22T09:00:00.000Z",
+    );
+    const checkpoint = createCheckpointSnapshot(
+      stateAt(181),
+      181,
+    );
+    const captured = captureCrashRecoverySnapshot(
+      safeState,
+      expansion,
+      checkpoint,
+      "route-choice",
+      "2026-09-22T09:00:30.000Z",
+    );
+
+    const unsafeState = stateAt(189);
+    const resolved = resolveCrashRecovery(
+      unsafeState,
+      captured.campaignExpansion,
+      checkpoint,
+      captured.snapshot,
+      "2026-09-22T09:00:40.000Z",
+    );
+
+    expect(resolved.mode).toBe("crash");
+    expect(
+      selectedRouteNode(resolved.state.route, 189)?.id,
+    ).toBe(routeChoice.id);
   });
 
   it("invalidates recovery on real death and restores the committed checkpoint", () => {
