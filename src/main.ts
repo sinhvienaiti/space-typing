@@ -174,6 +174,10 @@ import {
   loadVocabularyLevel,
   parseCustomVocabulary,
 } from "./vocabulary";
+import {
+  loadTypingTextChallenge,
+  type TypingTextChallenge,
+} from "./typing-text";
 import type { BossHudState } from "./boss/model";
 import type {
   GamePhase,
@@ -300,6 +304,11 @@ app.innerHTML = `
     <div
       id="statusBadge"
       class="status-badge hidden"
+      aria-live="polite"
+    ></div>
+    <div
+      id="typingTextBadge"
+      class="typing-text-badge hidden"
       aria-live="polite"
     ></div>
 
@@ -845,6 +854,12 @@ let currentSpecialShop: SpecialShopKind = "black-market";
 let sourceState = loadSource();
 let sourceTab: "class" | "custom" = sourceState.mode;
 let vocabularyIndex: VocabularyIndex | null = null;
+let configuredVocabulary: VocabularyEntry[] = [];
+const typingChallengeCache = new Map<
+  string,
+  Promise<TypingTextChallenge>
+>();
+let stageStartPending = false;
 let learningTimer: number | null = null;
 let noticeTimer: number | null = null;
 let stageStartedAt = performance.now();
@@ -2470,21 +2485,79 @@ function selectedVocabularyLevel(): number {
   return sourceState.mode === "class" ? sourceState.level : 1;
 }
 
-function startSelectedStage(): void {
-  if (!persistenceReady) return;
+function typingChallengeKey(level: number, seed: number): string {
+  return String(level) + ":" + String(seed);
+}
 
-  game.setCharacter(characters.selected);
-  const stage = createStageConfig(campaign.selectedStage);
-  const difficulty = difficultyFor({
-    stage: stage.stage,
-    mode: "normal",
-    vocabularyLevel: selectedVocabularyLevel(),
-    recentWpm: 60,
-    recentAccuracy: 96,
-  });
+async function prepareStageVocabulary(
+  stage: ReturnType<typeof createStageConfig>,
+): Promise<void> {
+  const badge = byId("typingTextBadge");
+  badge.classList.add("hidden");
+  badge.textContent = "";
 
-  stageStartedAt = performance.now();
-  game.startStage(stage, difficulty);
+  if (configuredVocabulary.length > 0) {
+    game.setVocabulary(configuredVocabulary);
+  }
+
+  if (stage.role !== "special" || sourceState.mode !== "class") {
+    return;
+  }
+
+  const level = sourceState.level;
+  const key = typingChallengeKey(level, stage.seed);
+  let pending = typingChallengeCache.get(key);
+  if (pending === undefined) {
+    pending = loadTypingTextChallenge(
+      level,
+      stage.seed,
+      configuredVocabulary,
+    );
+    typingChallengeCache.set(key, pending);
+  }
+
+  try {
+    const challenge = await pending;
+    game.setVocabulary(challenge.entries);
+    badge.textContent =
+      "TYPING TEXT // " +
+      challenge.passage.topic +
+      " · " +
+      challenge.cefr +
+      " · " +
+      String(challenge.entries.length) +
+      " target words";
+    badge.classList.remove("hidden");
+  } catch (error) {
+    typingChallengeCache.delete(key);
+    console.info(
+      "Typing-text challenge unavailable; using configured vocabulary.",
+      error,
+    );
+  }
+}
+
+async function startSelectedStage(): Promise<void> {
+  if (!persistenceReady || stageStartPending) return;
+  stageStartPending = true;
+
+  try {
+    game.setCharacter(characters.selected);
+    const stage = createStageConfig(campaign.selectedStage);
+    await prepareStageVocabulary(stage);
+    const difficulty = difficultyFor({
+      stage: stage.stage,
+      mode: "normal",
+      vocabularyLevel: selectedVocabularyLevel(),
+      recentWpm: 60,
+      recentAccuracy: 96,
+    });
+
+    stageStartedAt = performance.now();
+    game.startStage(stage, difficulty);
+  } finally {
+    stageStartPending = false;
+  }
 }
 
 async function autosaveCampaign(
@@ -2989,6 +3062,8 @@ async function applyClassLevel(level: number): Promise<void> {
     const entries = await loadVocabularyLevel(level, index);
     const metadata = index.levels.find((item) => item.level === level);
 
+    configuredVocabulary = entries;
+    typingChallengeCache.clear();
     sourceState = { mode: "class", level };
     sourceTab = "class";
     localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
@@ -3016,6 +3091,7 @@ async function loadInitialVocabulary(): Promise<void> {
   if (sourceState.mode === "custom") {
     const custom = parseCustomVocabulary(localStorage.getItem(CUSTOM_KEY) ?? "");
     if (custom.length > 0) {
+      configuredVocabulary = custom;
       game.setVocabulary(custom);
       return;
     }
@@ -3024,18 +3100,28 @@ async function loadInitialVocabulary(): Promise<void> {
 
   try {
     const index = await ensureVocabularyIndex();
-    game.setVocabulary(await loadVocabularyLevel(sourceState.level, index));
+    configuredVocabulary = await loadVocabularyLevel(
+      sourceState.level,
+      index,
+    );
+    game.setVocabulary(configuredVocabulary);
   } catch (error) {
     console.warn("Shared vocabulary unavailable; using bundled fallback.", error);
   }
 }
 
-byId("startButton").addEventListener("click", startSelectedStage);
+for (const id of [
+  "startButton",
+  "restartButton",
+  "againButton",
+  "clearRetryButton",
+  "nextStageButton",
+]) {
+  byId(id).addEventListener("click", () => {
+    void startSelectedStage();
+  });
+}
 byId("resumeButton").addEventListener("click", () => game.resume());
-byId("restartButton").addEventListener("click", startSelectedStage);
-byId("againButton").addEventListener("click", startSelectedStage);
-byId("clearRetryButton").addEventListener("click", startSelectedStage);
-byId("nextStageButton").addEventListener("click", startSelectedStage);
 
 for (const id of ["titleButton", "resultTitleButton", "clearTitleButton"]) {
   byId(id).addEventListener("click", () => game.backToTitle());
@@ -3184,6 +3270,8 @@ byId("saveCustom").addEventListener("click", () => {
   }
 
   localStorage.setItem(CUSTOM_KEY, input.value);
+  configuredVocabulary = entries;
+  typingChallengeCache.clear();
   sourceState = { mode: "custom" };
   sourceTab = "custom";
   localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));

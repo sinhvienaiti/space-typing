@@ -3117,6 +3117,22 @@ Galaxy hazard / special-stage rules:
 ## Step 60
 Add typing-text challenges when required parent data is available.
 
+**Status: implemented.**
+
+Typing-text challenge rules:
+
+- the runtime reads the parent `/shared/typing-texts/index.json` contract and level files instead of copying passage content into the child repo;
+- the parent currently exposes production Level 001-020; an exact selected Class level must exist in the parent typing-text index before a challenge activates;
+- Custom vocabulary and Class levels not present in the typing-text index keep the normal configured vocabulary without blocking stage start;
+- typing-text challenges activate only on existing `special` StageRole stages (local Stage x30), reusing the special-stage cadence from Step 59;
+- passage selection is deterministic from the stage seed, so retrying a stage cannot reroll the passage;
+- combat vocabulary comes from the passage `targetWords`; matching entries reuse the selected vocabulary metadata (VI/IPA) and missing metadata degrades to English-only entries;
+- target words are deduplicated before use;
+- configured Class/Custom vocabulary is restored before every stage so a special-stage challenge cannot leak into later normal stages;
+- parent fetch/index/level failures degrade cleanly to the configured vocabulary, preserving standalone child development;
+- the HUD identifies the active passage topic, CEFR label and target-word count;
+- no passage content is persisted in PlayerSave because the parent corpus remains the source of truth.
+
 ## Step 61
 Create final art/asset pipeline.
 
