@@ -49,6 +49,16 @@ import {
   type ProgressionState,
 } from "../progression/missions";
 import type { PlayerSave } from "./player-save";
+import {
+  createExpansionCurrencyState,
+  isValidExpansionCurrencyState,
+  type ExpansionCurrencyState,
+} from "../economy/currencies";
+import {
+  createCampaignExpansionState,
+  isValidCampaignExpansionState,
+  type CampaignExpansionState,
+} from "../campaign/expansion-state";
 
 export type BackupParseResult =
   | {
@@ -145,6 +155,10 @@ export function exportPlayerSaveJson(
   hiddenDiscovery: HiddenDiscoveryState = createHiddenDiscoveryState(),
   credits = 0,
   progression: ProgressionState = createProgressionState(),
+  expansionCurrencies: ExpansionCurrencyState =
+    createExpansionCurrencyState(),
+  campaignExpansion: CampaignExpansionState =
+    createCampaignExpansionState(campaign, updatedAt),
 ): string {
   return JSON.stringify(
     createPlayerSave(
@@ -159,6 +173,8 @@ export function exportPlayerSaveJson(
       hiddenDiscovery,
       sanitizeCredits(credits),
       progression,
+      expansionCurrencies,
+      campaignExpansion,
     ),
     null,
     2,
@@ -199,6 +215,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     version !== 11 &&
     version !== 12 &&
     version !== 13 &&
+    version !== 14 &&
     version !== PLAYER_SAVE_VERSION
   ) {
     return {
@@ -229,6 +246,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 11 ||
       version === 12 ||
       version === 13 ||
+      version === 14 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidInventory(parsed.inventory)
   ) {
@@ -267,6 +285,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 11 ||
       version === 12 ||
       version === 13 ||
+      version === 14 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidEquipmentState(parsed.equipment)
   ) {
@@ -284,6 +303,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 11 ||
       version === 12 ||
       version === 13 ||
+      version === 14 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidSupportSpellState(parsed.supportSpells)
   ) {
@@ -318,6 +338,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 11 ||
       version === 12 ||
       version === 13 ||
+      version === 14 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidCharacterState(parsed.characters)
   ) {
@@ -331,6 +352,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     (version === 11 ||
       version === 12 ||
       version === 13 ||
+      version === 14 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidLuckPityState(parsed.luckPity)
   ) {
@@ -343,6 +365,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   if (
     (version === 12 ||
       version === 13 ||
+      version === 14 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidHiddenDiscoveryState(parsed.hiddenDiscovery)
   ) {
@@ -354,7 +377,9 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    (version === 13 || version === PLAYER_SAVE_VERSION) &&
+    (version === 13 ||
+      version === 14 ||
+      version === PLAYER_SAVE_VERSION) &&
     !isValidCredits(parsed.credits)
   ) {
     return {
@@ -364,12 +389,33 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    version === PLAYER_SAVE_VERSION &&
+    (version === 14 || version === PLAYER_SAVE_VERSION) &&
     !isValidProgressionState(parsed.progression)
   ) {
     return {
       ok: false,
       error: "Mission/Achievement progression data is invalid.",
+    };
+  }
+
+  if (
+    version === PLAYER_SAVE_VERSION &&
+    !isValidExpansionCurrencyState(parsed.expansionCurrencies)
+  ) {
+    return {
+      ok: false,
+      error:
+        "Expansion currencies must be non-negative whole numbers.",
+    };
+  }
+
+  if (
+    version === PLAYER_SAVE_VERSION &&
+    !isValidCampaignExpansionState(parsed.campaignExpansion)
+  ) {
+    return {
+      ok: false,
+      error: "Campaign expansion checkpoint/segment data is invalid.",
     };
   }
 
