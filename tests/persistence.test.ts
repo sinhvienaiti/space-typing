@@ -429,6 +429,13 @@ describe("player save persistence model", () => {
     expect(migration.migrated).toBe(true);
     expect(migration.fromVersion).toBe(16);
     expect(migration.save.crashRecoverySnapshot).toBeNull();
+    expect(migration.save.challenge).toEqual({
+      version: 1,
+      offers: {},
+      active: null,
+      completedOfferIds: [],
+      skippedOfferIds: [],
+    });
     expect(migration.save.checkpointSnapshot.campaign.selectedStage).toBe(1);
   });
 
@@ -540,6 +547,43 @@ describe("player save persistence model", () => {
     expect(migration.save.route.graph.sectorStart).toBe(1);
     expect(migration.save.checkpointSnapshot.route.graph.sectorStart).toBe(1);
     expect(migration.save.shops).toEqual(current.shops);
+  });
+
+  it("migrates PlayerSave v21 to empty challenge state without losing route", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const checkpointSnapshot = {
+      ...current.checkpointSnapshot,
+    } as Record<string, unknown>;
+    delete checkpointSnapshot.challenge;
+
+    const legacy = {
+      ...current,
+      version: 21,
+      checkpointSnapshot,
+    } as Record<string, unknown>;
+    delete legacy.challenge;
+
+    const migration = migratePlayerSave(legacy);
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(21);
+    expect(migration.save.route).toEqual(current.route);
+    expect(migration.save.challenge).toEqual({
+      version: 1,
+      offers: {},
+      active: null,
+      completedOfferIds: [],
+      skippedOfferIds: [],
+    });
+    expect(migration.save.checkpointSnapshot.route).toEqual(
+      current.checkpointSnapshot.route,
+    );
+    expect(migration.save.checkpointSnapshot.challenge).toEqual({
+      version: 1,
+      offers: {},
+      active: null,
+      completedOfferIds: [],
+      skippedOfferIds: [],
+    });
   });
 
   it("keeps a valid current-version save without migration", () => {
