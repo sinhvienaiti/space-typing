@@ -3238,6 +3238,18 @@ Current Stage 001-100 balance guardrails:
 ## Step 67
 Statistically validate difficulty across Stage 001-1000.
 
+**Status: implemented.**
+
+Campaign difficulty validation rules:
+
+- all 1,000 stages are evaluated through the production `createStageConfig` + `difficultyFor` paths;
+- every generated difficulty field must remain finite and inside its production clamp bounds;
+- Normal-mode average combat pressure must increase from Galaxy 01 through Galaxy 10 while average spawn interval decreases;
+- Relaxed, Normal, Hard and Expert retain their intended ordering at milestone stages across the Campaign;
+- higher Vocabulary Levels increase vocabulary complexity while applying the designed reaction-pressure compensation;
+- Adaptive difficulty is checked with both struggling and strong reference profiles to ensure responsiveness without escaping global clamps;
+- the audit is deterministic and runs in CI so future formula changes cannot silently introduce Campaign-wide statistical regressions.
+
 ## Step 68
 Tune later Galaxies using milestone playtests rather than manually playing all 1000 stages one-by-one.
 
