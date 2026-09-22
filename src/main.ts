@@ -99,6 +99,10 @@ import { accuracyPercent } from "./logic";
 import type { EquipmentDrop } from "./loot/equipment-loot";
 import type { StageRandomEventDefinition } from "./events/stage-scheduler";
 import {
+  statusLabel,
+  type ActiveStatus,
+} from "./status/engine";
+import {
   createLuckPityState,
   type LuckPityState,
 } from "./loot/pity";
@@ -270,6 +274,11 @@ app.innerHTML = `
     <div
       id="stageEventBadge"
       class="stage-event-badge hidden"
+      aria-live="polite"
+    ></div>
+    <div
+      id="statusBadge"
+      class="status-badge hidden"
       aria-live="polite"
     ></div>
 
@@ -1216,6 +1225,28 @@ function renderStageEvents(
   badge.classList.remove("hidden");
 }
 
+function renderStatuses(
+  statuses: readonly ActiveStatus[],
+): void {
+  const badge = byId("statusBadge");
+  if (statuses.length === 0) {
+    badge.textContent = "";
+    badge.classList.add("hidden");
+    return;
+  }
+
+  badge.textContent = statuses
+    .map(
+      (status) =>
+        statusLabel(status) +
+        " " +
+        status.remaining.toFixed(1) +
+        "s",
+    )
+    .join(" · ");
+  badge.classList.remove("hidden");
+}
+
 function renderBoss(boss: BossHudState | null): void {
   const hud = byId("bossHud");
   if (boss === null) {
@@ -1373,6 +1404,7 @@ const game = new Game(
     },
     onStage: renderStage,
     onStageEvents: renderStageEvents,
+    onStatuses: renderStatuses,
     onBossUpdate: renderBoss,
     onSkills: renderAllSkills,
     onStageClear: (stats) => {
