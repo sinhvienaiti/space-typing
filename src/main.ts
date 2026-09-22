@@ -1634,7 +1634,11 @@ function renderRewardChoiceOptions(
         rarity: option.rarity,
         enhancement: 0,
       });
+      progression = recordProgressionEvent(progression, {
+        type: "equipment-drop",
+      });
       renderEquipment();
+      renderProgression();
       void autosaveCampaign(
         "equipment",
         "✓ Reward selected · " + definition.name,
@@ -1663,6 +1667,7 @@ const game = new Game(
         byId("resultAccuracy").textContent =
           accuracyPercent(stats.hits, stats.misses).toFixed(1) + "%";
         byId("resultStreak").textContent = String(stats.maxStreak);
+        void autosaveCampaign("gameover");
       }
     },
     onStage: renderStage,
