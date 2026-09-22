@@ -2,6 +2,7 @@ import type { EnemyKind } from "../types";
 import type { EnemyRank } from "./rank";
 import { enemyRankNumber } from "./rank";
 import {
+  enemySignatureSkill,
   enemySkillDefinition,
   orderedEnemySkillPool,
   type EnemySkillId,
@@ -43,24 +44,34 @@ export function resolveEnemyRuntimeProfile(
   const random = input.random ?? Math.random;
   const world = worldForStage(input.stage);
   const rankNumber = enemyRankNumber(input.rank);
-  const pool = orderedEnemySkillPool(world, input.kind)
+  const worldPool = orderedEnemySkillPool(world, input.kind)
     .filter(
       (id) =>
         enemySkillDefinition(id).minRank <= rankNumber,
     );
+  const signature = enemySignatureSkill(input.kind);
+  const pool = [
+    ...(signature !== null &&
+    enemySkillDefinition(signature).minRank <= rankNumber
+      ? [signature]
+      : []),
+    ...worldPool.filter((id) => id !== signature),
+  ];
 
-  // Rotate the already-prioritized World pool for bounded variety.
+  // Keep the signature first, rotate only authored World additions.
+  const worldPart = pool.slice(signature !== null && pool[0] === signature ? 1 : 0);
   const offset =
-    pool.length === 0
+    worldPart.length === 0
       ? 0
       : Math.floor(
           Math.max(0, Math.min(0.999999, random())) *
-            pool.length,
+            worldPart.length,
         );
-  const ordered =
-    pool.length === 0
-      ? []
-      : [...pool.slice(offset), ...pool.slice(0, offset)];
+  const ordered = [
+    ...(signature !== null && pool[0] === signature ? [signature] : []),
+    ...worldPart.slice(offset),
+    ...worldPart.slice(0, offset),
+  ];
 
   const selected: EnemySkillId[] = [];
   const targetCount = desiredSkillCount(
