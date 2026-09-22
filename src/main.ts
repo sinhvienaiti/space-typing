@@ -61,6 +61,7 @@ import {
   scaleHiddenChallengeDifficulty,
   skipHiddenChallenge,
   startHiddenChallenge,
+  type ChallengeEncounterProfile,
   type HiddenChallengeOffer,
   type HiddenChallengeState,
   type HiddenChallengeTier,
@@ -668,8 +669,30 @@ app.innerHTML = `
           <button id="routeStationShopAction" class="hidden">Station Shop</button>
           <button id="routeServiceAction" class="hidden">Repair / Upgrade</button>
           <button id="routeSupportAction" class="hidden">Support Loadout</button>
+          <button id="routeChallengeAction" class="hidden">Decode Hidden Signal</button>
           <button id="routeContinueButton" class="primary">Start Encounter</button>
         </div>
+      </div>
+    </dialog>
+
+    <dialog id="challengeDialog" class="settings-dialog challenge-dialog">
+      <form method="dialog" class="dialog-head">
+        <div>
+          <p class="eyebrow">optional encounter</p>
+          <h2 id="challengeTitle">Hidden Challenge</h2>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+      <p id="challengeMeta" class="equipment-note">
+        Choose a risk tier. This does not advance the numbered Campaign stage.
+      </p>
+      <div id="challengeTierGrid" class="challenge-tier-grid">
+        <button type="button" data-challenge-tier="I"></button>
+        <button type="button" data-challenge-tier="II"></button>
+        <button type="button" data-challenge-tier="III"></button>
+      </div>
+      <div class="route-actions">
+        <button id="challengeSkipButton" type="button">Skip Challenge</button>
       </div>
     </dialog>
 
@@ -1143,6 +1166,7 @@ let expansionCurrencies: ExpansionCurrencyState =
 let shops: ShopState = createShopState();
 let route: RouteState = createRouteState(campaign.highestUnlockedStage);
 let challenge: HiddenChallengeState = createHiddenChallengeState();
+let activeChallengeEncounter: ChallengeEncounterProfile | null = null;
 const musicController = new MusicController();
 musicController.setMusicVolume(settings.musicVolume);
 musicController.setAmbientVolume(settings.ambientVolume);
@@ -1202,6 +1226,8 @@ const settingsDialog = byId<HTMLDialogElement>("settingsDialog");
 const vocabularyDialog = byId<HTMLDialogElement>("vocabularyDialog");
 const stageSelectDialog = byId<HTMLDialogElement>("stageSelectDialog");
 const routeDialog = byId<HTMLDialogElement>("routeDialog");
+const challengeDialog =
+  byId<HTMLDialogElement>("challengeDialog");
 const dataDialog = byId<HTMLDialogElement>("dataDialog");
 const equipmentDialog = byId<HTMLDialogElement>("equipmentDialog");
 const shopDialog = byId<HTMLDialogElement>("shopDialog");
