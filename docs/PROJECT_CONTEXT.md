@@ -3342,6 +3342,22 @@ Review Pass #2 findings/fixes:
 ## Step 75
 Only mark the milestone complete when both review passes are clean.
 
+**Status: code/platform milestone complete.**
+
+Final reviewed checkpoints:
+
+- Review Pass #1 was merged to child `main` and child push CI #128 passed;
+- Review Pass #2 was merged to child `main` at gameplay checkpoint `9b9367479b0d47216cb7a13a859a5c38f0511dc6`, and child push CI #131 passed;
+- parent `sinhvienaiti/typing-game` pins that reviewed gameplay checkpoint through `games/space-typing`;
+- parent final integration commit `157344c36924d1824c53a70f7558f28e5951d475` passed Platform CI #159, including the Space Typing integration contract, shared-data validation, Space Typing test/build, Portal build and Recall Typing regression checks;
+- no known code/CI regression remains in the reviewed milestone.
+
+Manual validation note:
+
+- Steps 66 and 68 intentionally retain browser playtest/feel checks that cannot be proven by GitHub CI alone;
+- Step 71 likewise retains final manual browser smoke across the local games;
+- those manual observations are not falsely marked as executed by this GitHub-only checkpoint.
+
 ---
 
 # 21. First playable milestone
