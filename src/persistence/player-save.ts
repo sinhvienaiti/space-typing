@@ -113,6 +113,7 @@ export type SaveReason =
   | "discovery"
   | "shop"
   | "route-choice"
+  | "hidden-transition"
   | "progression"
   | "pagehide"
   | "manual"
@@ -429,6 +430,7 @@ function normalizeSaveReason(value: unknown): SaveReason {
     value === "discovery" ||
     value === "shop" ||
     value === "route-choice" ||
+    value === "hidden-transition" ||
     value === "progression" ||
     value === "pagehide" ||
     value === "manual"
