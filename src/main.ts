@@ -2260,9 +2260,17 @@ function renderAscension(): void {
     card.type = "button";
     card.className = "progression-card";
     card.classList.toggle("selected", tier === ascension.selectedTier);
+    const completed =
+      tier > 0 && ascension.completedTiers.includes(tier);
+    card.disabled = completed;
 
     const title = document.createElement("strong");
-    title.textContent = tier === 0 ? "Base Campaign" : "Ascension " + String(tier);
+    title.textContent =
+      tier === 0
+        ? "Base Campaign"
+        : "Ascension " +
+          String(tier) +
+          (completed ? " · COMPLETE" : "");
 
     const description = document.createElement("small");
     description.textContent =
