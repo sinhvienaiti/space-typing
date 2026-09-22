@@ -11,6 +11,7 @@ import { createExpansionCurrencyState } from "../src/economy/currencies";
 import { createShopState } from "../src/shops/state";
 import { createRouteState } from "../src/campaign/route";
 import { createUpgradeState } from "../src/progression/upgrades";
+import { createRelicState, grantRelic } from "../src/relics/state";
 import {
   createCheckpointSnapshot,
   type RunPersistentState,
@@ -51,6 +52,7 @@ function stateAt(stage: number): RunPersistentState {
     shops: createShopState(),
     route: createRouteState(stage),
     upgrades: createUpgradeState(),
+    relics: createRelicState(),
   };
 }
 
