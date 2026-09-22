@@ -189,6 +189,13 @@ import {
   type RunPersistentState,
 } from "./persistence/checkpoint";
 import {
+  consumePhoenixCore,
+  createStageEntrySnapshot,
+  resolveSalvageAnchor,
+  resolveStageRevivalCore,
+  type StageEntrySnapshot,
+} from "./persistence/death-protection";
+import {
   captureCrashRecoverySnapshot,
   invalidateCrashRecoverySnapshot,
   type CrashRecoverySnapshot,
@@ -969,6 +976,7 @@ let checkpointSnapshot: CheckpointSnapshot =
     campaignExpansion.checkpoint.stage,
   );
 let crashRecoverySnapshot: CrashRecoverySnapshot | null = null;
+let stageEntrySnapshot: StageEntrySnapshot | null = null;
 let persistenceReady = false;
 let vocabularyReady = false;
 let equipmentDropCounter = 0;
@@ -1032,6 +1040,7 @@ type AutosaveSnapshot = {
   campaignExpansion: CampaignExpansionState;
   checkpointSnapshot: CheckpointSnapshot;
   crashRecoverySnapshot: CrashRecoverySnapshot | null;
+  stageEntrySnapshot: StageEntrySnapshot | null;
 };
 
 const campaignAutosave = new AutosaveQueue<
@@ -1053,6 +1062,7 @@ const campaignAutosave = new AutosaveQueue<
     snapshot.campaignExpansion,
     snapshot.checkpointSnapshot,
     snapshot.crashRecoverySnapshot,
+    snapshot.stageEntrySnapshot,
   ),
 );
 
@@ -1099,6 +1109,7 @@ function currentAutosaveSnapshot(): AutosaveSnapshot {
     campaignExpansion,
     checkpointSnapshot,
     crashRecoverySnapshot,
+    stageEntrySnapshot,
   };
 }
 
@@ -1138,6 +1149,7 @@ function persistRecoveryMirrorSync(
       campaignExpansion,
       checkpointSnapshot,
       crashRecoverySnapshot,
+      stageEntrySnapshot,
     ),
   );
 }
@@ -2994,6 +3006,7 @@ async function initializePlayerProgress(): Promise<void> {
     campaignExpansion = loaded.save.campaignExpansion;
     checkpointSnapshot = loaded.save.checkpointSnapshot;
     crashRecoverySnapshot = loaded.save.crashRecoverySnapshot;
+    stageEntrySnapshot = loaded.save.stageEntrySnapshot;
     syncProgressionAchievements();
     game.setLuckPityState(luckPity);
     game.setHiddenDiscoveryState(hiddenDiscovery);
