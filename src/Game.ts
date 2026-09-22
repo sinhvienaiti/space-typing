@@ -3069,7 +3069,10 @@ export class Game {
         },
         clearNormalEnemies: () => {
           this.enemies = this.enemies.filter(
-            (target) => target.id === enemy.id || target.elite,
+            (target) =>
+              target.elite ||
+              (sourceEnemy !== undefined &&
+                target.id === sourceEnemy.id),
           );
         },
         clearProjectiles: () => {
