@@ -91,6 +91,11 @@ import {
   isValidUpgradeState,
   type UpgradeState,
 } from "../progression/upgrades";
+import {
+  createRelicState,
+  isValidRelicState,
+  type RelicState,
+} from "../relics/state";
 
 export type BackupParseResult =
   | {
@@ -197,6 +202,7 @@ export function exportPlayerSaveJson(
   shops: ShopState = createShopState(),
   route: RouteState = createRouteState(campaign.highestUnlockedStage),
   upgrades: UpgradeState = createUpgradeState(),
+  relics: RelicState = createRelicState(),
 ): string {
   return JSON.stringify(
     createPlayerSave(
@@ -219,6 +225,7 @@ export function exportPlayerSaveJson(
       shops,
       route,
       upgrades,
+      relics,
     ),
     null,
     2,
@@ -267,6 +274,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     version !== 19 &&
     version !== 20 &&
     version !== 21 &&
+    version !== 22 &&
     version !== PLAYER_SAVE_VERSION
   ) {
     return {
@@ -304,6 +312,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 18 ||
       version === 19 ||
       version === 20 ||
+      version === 22 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidInventory(parsed.inventory)
   ) {
@@ -382,6 +391,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 18 ||
       version === 19 ||
       version === 20 ||
+      version === 22 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidSupportSpellState(parsed.supportSpells)
   ) {
@@ -423,6 +433,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 18 ||
       version === 19 ||
       version === 20 ||
+      version === 22 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidCharacterState(parsed.characters)
   ) {
@@ -443,6 +454,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 18 ||
       version === 19 ||
       version === 20 ||
+      version === 22 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidLuckPityState(parsed.luckPity)
   ) {
@@ -462,6 +474,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 18 ||
       version === 19 ||
       version === 20 ||
+      version === 22 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidHiddenDiscoveryState(parsed.hiddenDiscovery)
   ) {
@@ -481,6 +494,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 18 ||
       version === 19 ||
       version === 20 ||
+      version === 22 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidCredits(parsed.credits)
   ) {
@@ -555,6 +569,16 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
+    version === 22 &&
+    migrateLegacyRunPersistentState(parsed.checkpointSnapshot) === null
+  ) {
+    return {
+      ok: false,
+      error: "Committed checkpoint snapshot is invalid.",
+    };
+  }
+
+  if (
     version === PLAYER_SAVE_VERSION &&
     !isValidCheckpointSnapshot(parsed.checkpointSnapshot)
   ) {
@@ -569,6 +593,17 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 18 ||
       version === 19 ||
       version === 20) &&
+    parsed.crashRecoverySnapshot !== null &&
+    sanitizeCrashRecoverySnapshot(parsed.crashRecoverySnapshot) === null
+  ) {
+    return {
+      ok: false,
+      error: "Crash recovery snapshot is invalid.",
+    };
+  }
+
+  if (
+    version === 22 &&
     parsed.crashRecoverySnapshot !== null &&
     sanitizeCrashRecoverySnapshot(parsed.crashRecoverySnapshot) === null
   ) {
@@ -603,6 +638,17 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
+    version === 22 &&
+    parsed.stageEntrySnapshot !== null &&
+    sanitizeStageEntrySnapshot(parsed.stageEntrySnapshot) === null
+  ) {
+    return {
+      ok: false,
+      error: "Stage-entry snapshot is invalid.",
+    };
+  }
+
+  if (
     version === PLAYER_SAVE_VERSION &&
     parsed.stageEntrySnapshot !== null &&
     !isValidStageEntrySnapshot(parsed.stageEntrySnapshot)
@@ -625,7 +671,9 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    version === PLAYER_SAVE_VERSION &&
+    (version === 21 ||
+      version === 22 ||
+      version === PLAYER_SAVE_VERSION) &&
     !isValidRouteState(
       parsed.route,
       (parsed.campaign as CampaignProgress).highestUnlockedStage,
@@ -634,6 +682,26 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     return {
       ok: false,
       error: "Route state is invalid.",
+    };
+  }
+
+  if (
+    (version === 22 || version === PLAYER_SAVE_VERSION) &&
+    !isValidUpgradeState(parsed.upgrades)
+  ) {
+    return {
+      ok: false,
+      error: "Upgrade state is invalid.",
+    };
+  }
+
+  if (
+    version === PLAYER_SAVE_VERSION &&
+    !isValidRelicState(parsed.relics)
+  ) {
+    return {
+      ok: false,
+      error: "Relic state is invalid.",
     };
   }
 
