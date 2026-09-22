@@ -1339,6 +1339,16 @@ function renderPhase(phase: GamePhase): void {
   byId("quickItems").classList.toggle("hidden", phase !== "playing");
   byId("quickSkills").classList.toggle("hidden", phase !== "playing");
   byId("quickSupport").classList.toggle("hidden", phase !== "playing");
+
+  if (phase !== "playing" && phase !== "paused") {
+    renderStageEvents([]);
+    renderStatuses([]);
+    renderBoss(null);
+    const typingTextBadge = byId("typingTextBadge");
+    typingTextBadge.textContent = "";
+    typingTextBadge.classList.add("hidden");
+  }
+
   renderInventory();
   renderAllSkills();
 }
