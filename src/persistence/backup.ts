@@ -59,6 +59,10 @@ import {
   isValidCampaignExpansionState,
   type CampaignExpansionState,
 } from "../campaign/expansion-state";
+import {
+  isValidCheckpointSnapshot,
+  type CheckpointSnapshot,
+} from "./checkpoint";
 
 export type BackupParseResult =
   | {
@@ -159,6 +163,7 @@ export function exportPlayerSaveJson(
     createExpansionCurrencyState(),
   campaignExpansion: CampaignExpansionState =
     createCampaignExpansionState(campaign, updatedAt),
+  checkpointSnapshot?: CheckpointSnapshot,
 ): string {
   return JSON.stringify(
     createPlayerSave(
@@ -175,6 +180,7 @@ export function exportPlayerSaveJson(
       progression,
       expansionCurrencies,
       campaignExpansion,
+      checkpointSnapshot,
     ),
     null,
     2,
@@ -216,6 +222,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     version !== 12 &&
     version !== 13 &&
     version !== 14 &&
+    version !== 15 &&
     version !== PLAYER_SAVE_VERSION
   ) {
     return {
@@ -247,6 +254,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 12 ||
       version === 13 ||
       version === 14 ||
+      version === 15 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidInventory(parsed.inventory)
   ) {
@@ -286,6 +294,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 12 ||
       version === 13 ||
       version === 14 ||
+      version === 15 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidEquipmentState(parsed.equipment)
   ) {
@@ -304,6 +313,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 12 ||
       version === 13 ||
       version === 14 ||
+      version === 15 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidSupportSpellState(parsed.supportSpells)
   ) {
@@ -339,6 +349,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 12 ||
       version === 13 ||
       version === 14 ||
+      version === 15 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidCharacterState(parsed.characters)
   ) {
@@ -353,6 +364,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       version === 12 ||
       version === 13 ||
       version === 14 ||
+      version === 15 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidLuckPityState(parsed.luckPity)
   ) {
@@ -366,6 +378,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     (version === 12 ||
       version === 13 ||
       version === 14 ||
+      version === 15 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidHiddenDiscoveryState(parsed.hiddenDiscovery)
   ) {
@@ -379,6 +392,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   if (
     (version === 13 ||
       version === 14 ||
+      version === 15 ||
       version === PLAYER_SAVE_VERSION) &&
     !isValidCredits(parsed.credits)
   ) {
@@ -389,7 +403,9 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    (version === 14 || version === PLAYER_SAVE_VERSION) &&
+    (version === 14 ||
+      version === 15 ||
+      version === PLAYER_SAVE_VERSION) &&
     !isValidProgressionState(parsed.progression)
   ) {
     return {
@@ -399,7 +415,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    version === PLAYER_SAVE_VERSION &&
+    (version === 15 || version === PLAYER_SAVE_VERSION) &&
     !isValidExpansionCurrencyState(parsed.expansionCurrencies)
   ) {
     return {
@@ -410,12 +426,22 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    version === PLAYER_SAVE_VERSION &&
+    (version === 15 || version === PLAYER_SAVE_VERSION) &&
     !isValidCampaignExpansionState(parsed.campaignExpansion)
   ) {
     return {
       ok: false,
       error: "Campaign expansion checkpoint/segment data is invalid.",
+    };
+  }
+
+  if (
+    version === PLAYER_SAVE_VERSION &&
+    !isValidCheckpointSnapshot(parsed.checkpointSnapshot)
+  ) {
+    return {
+      ok: false,
+      error: "Committed checkpoint snapshot is invalid.",
     };
   }
 
