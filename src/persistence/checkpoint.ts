@@ -133,6 +133,7 @@ function isValidCampaignSnapshot(value: unknown): value is CampaignProgress {
     return false;
   }
 
+  const highestUnlockedStage = raw.highestUnlockedStage;
   const cleared = raw.clearedStages;
   if (
     new Set(cleared).size !== cleared.length ||
@@ -141,7 +142,7 @@ function isValidCampaignSnapshot(value: unknown): value is CampaignProgress {
         Number.isInteger(stage) &&
         isFiniteNumber(stage) &&
         stage >= 1 &&
-        stage <= raw.highestUnlockedStage &&
+        stage <= highestUnlockedStage &&
         (index === 0 ||
           (typeof cleared[index - 1] === "number" &&
             stage > cleared[index - 1])),
