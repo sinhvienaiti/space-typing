@@ -413,6 +413,21 @@ describe("player save persistence model", () => {
     expect(migration.save.checkpointSnapshot.credits).toBe(0);
   });
 
+  it("migrates PlayerSave v16 to the M03 crash recovery schema", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const legacy = {
+      ...current,
+      version: 16,
+    } as Record<string, unknown>;
+    delete legacy.crashRecoverySnapshot;
+
+    const migration = migratePlayerSave(legacy);
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(16);
+    expect(migration.save.crashRecoverySnapshot).toBeNull();
+    expect(migration.save.checkpointSnapshot.campaign.selectedStage).toBe(1);
+  });
+
   it("keeps a valid current-version save without migration", () => {
     const save = createPlayerSave(
       createDefaultCampaignProgress(),
@@ -456,6 +471,7 @@ describe("player save persistence model", () => {
     });
     expect(migration.save.campaignExpansion.checkpoint.stage).toBe(1);
     expect(migration.save.campaignExpansion.crashRecovery).toBeNull();
+    expect(migration.save.crashRecoverySnapshot).toBeNull();
   });
 
   it("refuses unsupported numeric schema versions instead of down-migrating them", () => {
