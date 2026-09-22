@@ -6,6 +6,7 @@ import {
   ascensionCompletionReward,
   ascensionProfile,
   bossMutationsForAscension,
+  canSwitchAscensionTier,
   createAscensionState,
   sanitizeAscensionState,
   selectAscensionTier,
@@ -74,6 +75,23 @@ describe("M20 Ascension", () => {
 
     expect(selectAscensionTier(state, 1)).toEqual(state);
     expect(selectAscensionTier(state, 2).selectedTier).toBe(2);
+  });
+
+  it("allows tier switching only at committed 10-stage boundaries", () => {
+    const base = {
+      ...createAscensionState({ clearedStages: [1000] }),
+      selectedTier: 1,
+      frontierByTier: { "1": 11 },
+    };
+    expect(canSwitchAscensionTier(base)).toBe(true);
+    expect(selectAscensionTier(base, 0).selectedTier).toBe(0);
+
+    const midSegment = {
+      ...base,
+      frontierByTier: { "1": 12 },
+    };
+    expect(canSwitchAscensionTier(midSegment)).toBe(false);
+    expect(selectAscensionTier(midSegment, 0)).toEqual(midSegment);
   });
 
   it("advances only the active Ascension frontier and commits every ten stages", () => {
