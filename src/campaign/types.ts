@@ -9,10 +9,12 @@ export type StageRole =
   | "major-boss";
 
 export type DifficultyMode =
-  | "relaxed"
-  | "normal"
+  | "relax"
+  | "balanced"
   | "hard"
-  | "expert"
+  | "extreme"
+  | "nightmare"
+  | "impossible"
   | "adaptive"
   | "custom";
 
@@ -50,6 +52,18 @@ export type DifficultyProfile = {
   maxEnemies: number;
   projectilePressure: number;
   bossPressure: number;
+  targetWpm: number;
+  pressureBudget: number;
+  urgentThreatCap: number;
+  attackIntervalFactor: number;
+  wordScoreOffset: number;
+  controllerSupportCap: number;
+  hardCcDurationFactor: number;
+  ccImmunityFactor: number;
+  hiddenChallengeMultiplier: number;
+  rewardMultiplier: number;
+  reactionWindow: number;
+  formationComplexity: number;
 };
 
 export type StageBest = {
