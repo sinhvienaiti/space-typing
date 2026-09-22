@@ -4123,6 +4123,7 @@ async function importSaveFile(file: File): Promise<void> {
     const importedExpansionCurrencies =
       result.save.expansionCurrencies;
     const importedShops = result.save.shops;
+    const importedRoute = result.save.route;
     const importedCampaignExpansion =
       result.save.campaignExpansion;
     const importedCheckpointSnapshot =
@@ -4155,6 +4156,7 @@ async function importSaveFile(file: File): Promise<void> {
     const previousProgression = progression;
     const previousExpansionCurrencies = expansionCurrencies;
     const previousShops = shops;
+    const previousRoute = route;
     const previousCampaignExpansion = campaignExpansion;
     const previousCheckpointSnapshot = checkpointSnapshot;
     const previousCrashRecoverySnapshot = crashRecoverySnapshot;
@@ -4170,6 +4172,7 @@ async function importSaveFile(file: File): Promise<void> {
     progression = importedProgression;
     expansionCurrencies = importedExpansionCurrencies;
     shops = importedShops;
+    route = importedRoute;
     campaignExpansion = importedCampaignExpansion;
     checkpointSnapshot = importedCheckpointSnapshot;
     crashRecoverySnapshot = importedCrashRecoverySnapshot;
@@ -4203,6 +4206,7 @@ async function importSaveFile(file: File): Promise<void> {
       progression = previousProgression;
       expansionCurrencies = previousExpansionCurrencies;
       shops = previousShops;
+      route = previousRoute;
       campaignExpansion = previousCampaignExpansion;
       checkpointSnapshot = previousCheckpointSnapshot;
       crashRecoverySnapshot = previousCrashRecoverySnapshot;
