@@ -1749,7 +1749,602 @@ Every schema bump requires:
 
 ---
 
-# 32. Automated balance and simulation requirements
+# 32. Developer QA/Test Lab
+
+After the feature expansion through Ascension is implemented, build one configurable **Developer QA/Test Lab** before the full balance/performance audit.
+
+Do not create 10-20 separate test stages for different enemy/item cases. The goal is one sandbox screen that can configure and reproduce nearly every important production runtime state quickly.
+
+The Test Lab is outside the numbered Stage 001-1000 Campaign.
+
+## 32.1 Production-runtime rule
+
+The Test Lab must reuse the same production code paths for:
+
+- enemy rendering;
+- enemy ranks;
+- enemy word layers;
+- enemy skills;
+- boss phases;
+- player stats;
+- enemy stats;
+- combat damage;
+- Shield/Armor/Hull;
+- status effects and CC;
+- projectiles;
+- VFX;
+- SFX;
+- kill/death effects;
+- items and consumables;
+- equipment;
+- skill execution;
+- reward preview;
+- shop inventory;
+- death resolution;
+- resurrection/protection items.
+
+Do not implement fake Test-Lab-only combat behavior. A feature that works only in the Test Lab does not count as tested.
+
+## 32.2 Single configurable test screen
+
+The tester must be able to configure a scenario from one screen.
+
+### World / environment controls
+
+Allow selection of:
+
+- any Main World;
+- Hidden World/theme when implemented;
+- World background/environment;
+- World rules/hazards;
+- route context where relevant;
+- stage/sector/checkpoint context.
+
+Changing World should optionally auto-load that World's recommended enemy/boss roster, while still allowing manual overrides.
+
+### Enemy controls
+
+Allow:
+
+- select any enemy definition;
+- select multiple enemy types;
+- spawn one;
+- spawn N;
+- spawn all selected;
+- spawn all enemies from current World;
+- remove one/all enemies;
+- choose Rank I-X;
+- override typing-layer count;
+- override word-difficulty band;
+- force Elite/Apex variant;
+- choose archetype/family when valid;
+- force skill list;
+- force skill cooldown ready;
+- trigger a specific enemy skill immediately;
+- pause/resume enemy AI;
+- set movement speed;
+- set attack speed/cooldown;
+- set attack damage;
+- set defense/Armor;
+- set Shield;
+- set layer durability/runtime values;
+- set status resistance;
+- set support/heal strength;
+- set threat-budget fields for validation;
+- inspect resolved EnemyRuntimeProfile.
+
+The tester must be able to display several different enemies simultaneously to verify:
+
+- visual readability;
+- formation interaction;
+- overlapping skills;
+- simultaneous status effects;
+- kill effects;
+- performance.
+
+### Boss controls
+
+Allow:
+
+- select any Mini Boss;
+- select any World Boss;
+- select any Galaxy Major Boss;
+- spawn one or several bosses in explicit stress mode;
+- jump directly to phase;
+- set boss HP;
+- set shield/stagger state;
+- force signature skill;
+- force summon phase;
+- force rage/enrage;
+- force interrupt window;
+- reset boss without resetting the entire lab.
+
+Multi-boss mode is a QA/stress tool and does not imply that Campaign gameplay supports several major bosses at once.
+
+## 32.3 Player configuration
+
+Allow direct test configuration of:
+
+- Hull;
+- Shield;
+- Armor;
+- Firepower;
+- Energy;
+- Reactor;
+- Focus;
+- Ward;
+- Luck;
+- Salvage;
+- Character;
+- Character Level;
+- Mastery;
+- Talent ranks;
+- permanent attribute upgrades;
+- active/equipped combat skills;
+- skill level/grade;
+- support spells;
+- equipment loadout;
+- equipment grade;
+- equipment enhancement;
+- equipment affixes when implemented;
+- relics;
+- currencies.
+
+Support:
+
+- reset to production defaults;
+- save local Test Lab preset;
+- reload Test Lab preset;
+- copy resolved effective stats for debugging.
+
+## 32.4 Item / inventory sandbox
+
+Allow selection and direct grant of any registered testable item.
+
+Controls should include:
+
+- Give x1;
+- Give x5;
+- Give x99;
+- remove item;
+- clear test inventory;
+- set exact quantity;
+- preview item definition and grade;
+- use item normally through the production item path.
+
+This includes:
+
+- recovery consumables;
+- repair/shield/energy items;
+- special items;
+- Relics where itemized;
+- equipment;
+- upgrade materials;
+- currencies;
+- Salvage Anchor;
+- Stage Revival Core;
+- Phoenix Core;
+- future registered consumables.
+
+The Test Lab must not require the player to wait for random drops just to verify an item.
+
+## 32.5 Death modes
+
+Provide at least two explicit modes.
+
+### Immortal Mode
+
+- Shield/Hull/resources take normal damage;
+- status effects still apply;
+- enemy skills still work;
+- lethal damage is recorded;
+- Hull is clamped to a safe minimum such as 1;
+- Game Over is not entered.
+
+Use this for long combat/VFX/status inspection.
+
+### Real Death Mode
+
+- Hull may reach 0;
+- production death flow runs normally;
+- Game Over/death-resolution UI appears;
+- checkpoint/segment logic runs;
+- resurrection/protection items may be selected;
+- item consumption is real inside the sandbox session.
+
+This mode is mandatory for validating resurrection items.
+
+## 32.6 Checkpoint / segment / recovery scenario editor
+
+The tester must be able to create scenarios such as:
+
+~~~text
+Checkpoint Stage = 181
+Current Stage = 190
+Segment Credits = +20000
+Segment Alloy = +120
+Segment Star Crystal = +2
+Segment Equipment = Gold Weapon
+Boss Phase = 2
+Boss HP = 37%
+~~~
+
+Then trigger:
+
+- Force Death;
+- Force Crash Recovery;
+- Use Salvage Anchor;
+- Use Stage Revival Core;
+- Use Phoenix Core;
+- Return to checkpoint;
+- Restart current stage;
+- revive inside current encounter.
+
+The resulting state must be inspectable so rollback/preservation bugs are visible immediately.
+
+## 32.7 Death-item acceptance cases
+
+At minimum test:
+
+### No item
+
+Death at Stage 190:
+
+- rollback to Stage 181;
+- uncommitted economic/build gains are lost.
+
+### Salvage Anchor
+
+Death at Stage 190:
+
+- return to Stage 181;
+- segment economic/build gains remain;
+- item quantity decreases by one.
+
+### Stage Revival Core
+
+Death at Stage 190:
+
+- restart Stage 190;
+- correct pre-stage/segment state is preserved;
+- reward duplication does not occur;
+- item quantity decreases by one.
+
+### Phoenix Core
+
+Death during an encounter:
+
+- continue in the same encounter;
+- boss/enemy progress is preserved where specified;
+- tuned resources are restored;
+- grace/invulnerability window applies;
+- item quantity decreases by one.
+
+Also test:
+
+- repeated deaths;
+- multiple copies of the same resurrection item;
+- all three items owned at once;
+- zero quantity;
+- death during CC;
+- death during boss transition;
+- death in Hidden Challenge;
+- reload after a recorded death;
+- crash before death;
+- crash after item use.
+
+## 32.8 Status-effect controls
+
+Allow applying/removing production statuses directly to the player or enemy.
+
+Examples:
+
+- Freeze;
+- Petrify;
+- Darkness;
+- Jam;
+- Curse;
+- Bind;
+- Silence;
+- Fear;
+- Scramble;
+- Gravity;
+- Infection;
+- Burn;
+- Poison;
+- Slow;
+- future World-specific effects.
+
+Controls:
+
+- apply effect;
+- choose duration;
+- choose strength when supported;
+- stack attempt;
+- clear one;
+- clear all;
+- display immunity/resistance timers.
+
+This is required to verify anti-chain and readability rules.
+
+## 32.9 Skill controls
+
+For player skills:
+
+- select skill;
+- select level/grade;
+- set cooldown ready;
+- set Energy;
+- force activation;
+- reset charges.
+
+For enemy skills:
+
+- select enemy;
+- inspect available skills;
+- force one skill;
+- reset cooldown;
+- disable skill;
+- repeat skill for VFX/audio inspection.
+
+For bosses:
+
+- force signature mechanic;
+- force interrupt word;
+- force shield phase;
+- force summon;
+- force stagger;
+- force phase transition.
+
+## 32.10 Shop / economy sandbox
+
+Allow spawning/configuring:
+
+- Normal Shop;
+- Station Shop;
+- Traveling Merchant;
+- Black Market;
+- Hidden Shop;
+- Event Shop;
+- Service/Upgrade Station.
+
+Allow:
+
+- set shop seed;
+- reroll only through an explicit QA action;
+- inspect deterministic inventory;
+- force a selected item into stock;
+- set stock quantity;
+- set price/currency for a test case;
+- buy item through production purchase flow;
+- verify stock decreases;
+- reload sandbox and verify persisted test stock;
+- reset sandbox to initial preset.
+
+Test scenarios must include rare resurrection items.
+
+## 32.11 Reward / loot controls
+
+Allow:
+
+- force enemy drop;
+- force equipment drop;
+- choose grade;
+- force reward chest;
+- force reward-choice screen;
+- force Star Crystal/Quantum Core reward;
+- force resurrection-item reward;
+- simulate Luck/Salvage values;
+- preview pity state;
+- trigger kill reward VFX/SFX without permanently changing Campaign data.
+
+## 32.12 Spawn and pressure controls
+
+Allow:
+
+- set max active enemies;
+- set spawn interval;
+- enable/disable automatic spawning;
+- choose formation;
+- spawn formation now;
+- override Active Typing Pressure budget;
+- inspect current/projected pressure;
+- inspect urgent-threat count;
+- freeze scheduler;
+- step scheduler manually.
+
+This must make it possible to reproduce "too many enemies at once" bugs without playing hundreds of stages.
+
+## 32.13 Difficulty controls
+
+Allow switching production difficulty profiles directly:
+
+- Relax;
+- Balanced;
+- Hard;
+- Extreme;
+- Nightmare;
+- Impossible;
+- Adaptive;
+- Custom.
+
+Display the resolved runtime values used by the current scenario:
+
+- target/recommended WPM;
+- reaction window;
+- max active enemies;
+- urgent-threat cap;
+- spawn interval;
+- attack interval;
+- CC duration multiplier;
+- projectile pressure;
+- layer probabilities;
+- reward multiplier.
+
+The Test Lab must use the production difficulty resolver.
+
+## 32.14 Time/debug controls
+
+Recommended QA controls:
+
+- Pause;
+- Resume;
+- Slow Motion;
+- single simulation step where practical;
+- normal speed;
+- accelerated cooldowns;
+- reset arena;
+- clear projectiles;
+- clear particles;
+- clear statuses;
+- kill selected enemy;
+- damage selected enemy;
+- next typing layer;
+- force word complete;
+- toggle hitboxes/debug bounds;
+- show enemy ids;
+- show Rank;
+- show active skill/cooldown;
+- show Threat Budget;
+- show Active Typing Pressure;
+- show boss state/phase;
+- show current World/route/checkpoint state.
+
+## 32.15 State Inspector
+
+Provide a readable inspector for:
+
+- Committed Checkpoint State;
+- Active Segment State;
+- Crash Recovery State;
+- current stage-entry snapshot;
+- player effective stats;
+- inventory;
+- equipment;
+- currencies;
+- resurrection item quantities;
+- current World;
+- selected difficulty;
+- current enemies;
+- boss HP/phase;
+- statuses;
+- shop stock;
+- route state;
+- current objective;
+- active relic effects;
+- death reason;
+- last persistence action.
+
+This is a developer QA surface. Readability is more important than decorative UI.
+
+## 32.16 Test state isolation
+
+This is non-negotiable.
+
+Test Lab state must not mutate the player's real Campaign progression.
+
+Required separation:
+
+~~~text
+Production PlayerSave
+!=
+TestLab Session State
+~~~
+
+Allowed approaches:
+
+- in-memory test state;
+- dedicated TestLab IndexedDB namespace/store;
+- sandbox copy of a production save that can never overwrite the source.
+
+Test Lab actions must not:
+
+- advance Campaign;
+- permanently grant Credits/materials/items;
+- unlock stages;
+- consume production inventory;
+- modify real checkpoint;
+- farm Codex/achievements;
+- change production shop stock.
+
+If save migration itself is under test, use an explicit disposable sandbox copy.
+
+## 32.17 Presets
+
+Support reusable presets so common checks take seconds.
+
+Examples:
+
+- World Enemy Showcase;
+- World Boss Showcase;
+- Rank I-X comparison;
+- 3-layer enemy showcase;
+- Freeze/Petrify CC test;
+- overlapping CC anti-chain test;
+- projectile stress;
+- formation pressure;
+- low-WPM Relax scenario;
+- Impossible 300-WPM scenario;
+- Salvage Anchor death test;
+- Stage Revival Core death test;
+- Phoenix Core boss-phase test;
+- Hidden Shop rare-item stock;
+- checkpoint 181 -> death at 190;
+- crash recovery at Stage 190;
+- all reward VFX;
+- all item-use VFX/SFX.
+
+Presets are configuration templates for the one Test Lab, not separate Campaign stages.
+
+## 32.18 World coverage
+
+Every World must be testable from the same screen.
+
+For a selected World provide quick actions:
+
+~~~text
+Spawn World Roster
+Spawn Mini Boss
+Spawn World Boss
+Spawn Galaxy Boss (when applicable)
+Apply World Hazard
+Load World Shop Pool
+Load World Reward Pool
+~~~
+
+The World registry and Test Lab roster should share the same source data so newly added enemies/bosses cannot silently be omitted from QA.
+
+## 32.19 Automated completeness audit
+
+CI should verify that every registered production entity intended for runtime testing is discoverable by the Test Lab registry.
+
+Audit at least:
+
+- all 50 Worlds;
+- all normal enemy definitions;
+- Elite/Apex variants where separately registered;
+- all Mini Bosses;
+- all World Bosses;
+- all Galaxy Major Bosses;
+- all player consumables;
+- all resurrection items;
+- all equipment definitions;
+- all currencies;
+- all combat skills;
+- all supported status effects;
+- all shop types.
+
+This does not replace manual Test Lab usage; it prevents missing entries.
+
+## 32.20 Performance rule
+
+The Test Lab itself may expose more debug information than Campaign, but debug panels must not accidentally ship expensive full-registry scans into normal combat.
+
+All debug-only inspectors and selectors must be dormant outside Test Lab/debug mode.
+
+---
+
+# 33. Automated balance and simulation requirements
 
 Before considering the expansion balanced, add deterministic simulation/audit coverage for:
 
@@ -1783,7 +2378,7 @@ Use seeded RNG in tests/simulations.
 
 ---
 
-# 33. Manual playtest matrix
+# 34. Manual playtest matrix
 
 Automated tests cannot certify game feel.
 
@@ -1820,7 +2415,7 @@ Key questions:
 
 ---
 
-# 34. Implementation roadmap
+# 35. Implementation roadmap
 
 Do not build all systems in one PR.
 
@@ -1995,7 +2590,28 @@ Implement:
 
 Implement endgame replay layer using existing 50 Worlds and new modifier/boss mutation tables.
 
-## M20 — Full balance/performance audit
+## M20 — Developer QA/Test Lab
+
+After M01-M19 feature implementation is complete, build the single configurable Test Lab defined in Section 32.
+
+Required baseline:
+
+- one sandbox screen rather than many separate test stages;
+- select any World/enemy/boss/item/equipment/skill/status/shop/reward;
+- override player and enemy stats;
+- Rank/layer/skill/boss-phase controls;
+- Immortal Mode and Real Death Mode;
+- full resurrection-item testing;
+- checkpoint/segment/crash-recovery scenario editor;
+- isolated test state;
+- reusable QA presets;
+- state inspector;
+- production-runtime code paths;
+- CI completeness audit for registered testable content.
+
+Do not begin the final balance audit until the Test Lab can reproduce the major systems above.
+
+## M21 — Full balance/performance audit
 
 Run:
 
@@ -2004,17 +2620,18 @@ Run:
 - WPM/difficulty pressure audit;
 - economy/drop simulations;
 - stress tests;
+- Test Lab coverage;
 - manual browser/audio/visual playtests.
 
-## M21 — Review Pass #1
+## M22 — Review Pass #1
 
 Complete independent full review and fix all findings.
 
-## M22 — Review Pass #2
+## M23 — Review Pass #2
 
 Repeat from a fresh perspective and fix all findings.
 
-## M23 — Parent integration pin
+## M24 — Parent integration pin
 
 Only after child `main` is clean:
 
@@ -2024,7 +2641,7 @@ Only after child `main` is clean:
 
 ---
 
-# 35. Definition of done for this expansion
+# 36. Definition of done for this expansion
 
 The expansion is not complete until:
 
@@ -2051,11 +2668,13 @@ The expansion is not complete until:
 21. manual gameplay/readability/audio checks are recorded;
 22. Review Pass #1 is clean;
 23. Review Pass #2 is clean;
-24. parent integration CI passes after the child pin is updated.
+24. the configurable Test Lab covers production Worlds/enemies/bosses/items/statuses/death/resurrection and remains isolated from the real Campaign save;
+25. Test Lab registry completeness audit passes;
+26. parent integration CI passes after the child pin is updated.
 
 ---
 
-# 36. Implementation principles for future sessions
+# 37. Implementation principles for future sessions
 
 - GitHub is the only implementation source of truth.
 - Read this file, `PROJECT_CONTEXT.md` and relevant subsystem docs before coding.
