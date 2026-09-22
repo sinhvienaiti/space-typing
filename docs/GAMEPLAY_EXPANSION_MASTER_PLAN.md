@@ -3118,9 +3118,22 @@ M15 must extend this route/persistence contract for Hidden Challenge / Hidden Wo
 
 ## M15 — Hidden Challenge / Hidden World / Champion Hunt
 
-Implement optional challenge discovery, selectable risk tier and premium rewards.
+**Status: Complete.** Discovered optional encounters now extend the existing M14 Route Map, support Tier I-III risk, persist through the existing crash/checkpoint model, and run through the shared Game combat runtime without advancing numbered Campaign stages. Hidden World provides deterministic multi-encounter detours and Champion Hunt reuses the existing Priority Kill Chain announcer. See `docs/M15_HIDDEN_ENCOUNTERS.md`.
 
-Add Champion Hunt / Apex Gauntlet stage support using the existing Priority Kill Chain announcer foundation.
+Implemented:
+
+- discovery-driven optional route offers;
+- Tier I / II / III selection and persisted Skip;
+- Hidden Challenge;
+- deterministic 3-4 encounter Hidden Worlds with composite environment/roster/boss identity;
+- Champion Hunt priority-target chains;
+- difficulty-derived kill-chain window;
+- premium Credits / Alloy / Star Crystal / Quantum Core rewards;
+- dedicated hidden music states;
+- checkpoint/crash/death-protection integration;
+- backward-compatible PlayerSave v21 hidden-state extension.
+
+M16 must extend the existing StageConfig/BossState typing runtime for Stage Objectives and World-specific boss typing mechanics.
 
 ## M16 — Stage Objectives + boss typing mechanics
 
