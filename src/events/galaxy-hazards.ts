@@ -1,5 +1,5 @@
 import type { StageConfig } from "../campaign/types";
-import type { StageRandomEventDefinition } from "./stage-scheduler";
+import type { StageEventDefinition } from "./stage-scheduler";
 
 export type GalaxyStageModifierId =
   | "supply-run"
@@ -10,7 +10,7 @@ export type GalaxyStageModifierId =
   | "gravity-tide"
   | "gauntlet-pressure";
 
-export type GalaxyStageModifier = StageRandomEventDefinition & {
+export type GalaxyStageModifier = StageEventDefinition & {
   id: GalaxyStageModifierId;
 };
 
