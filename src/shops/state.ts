@@ -741,7 +741,7 @@ export function shopAvailable(
       "black-market-signal",
     );
   }
-  if (type === "hidden") {
+  if (type === "hidden" || type === "event") {
     return context.hiddenDiscovery.discovered.includes("echo-rift");
   }
   if (type !== "traveling") return true;
