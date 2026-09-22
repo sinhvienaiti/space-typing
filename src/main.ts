@@ -3627,6 +3627,9 @@ function routeNodeDescription(node: RouteNode): string {
   if (node.type === "shop") {
     return "Supply detour · finite deterministic shop stock is available before the encounter.";
   }
+  if (node.type === "hidden-signal") {
+    return "Encrypted detour · decode an optional Hidden Challenge, choose a risk tier, or skip and continue the normal Campaign route.";
+  }
   return node.mandatory
     ? "Mandatory combat route · boss progression cannot be bypassed."
     : "Direct combat route · no service detour before the encounter.";
@@ -3728,6 +3731,8 @@ function renderRouteMap(): void {
     byId<HTMLButtonElement>("routeServiceAction");
   const supportAction =
     byId<HTMLButtonElement>("routeSupportAction");
+  const challengeAction =
+    byId<HTMLButtonElement>("routeChallengeAction");
   const continueButton =
     byId<HTMLButtonElement>("routeContinueButton");
 
@@ -3761,7 +3766,160 @@ function renderRouteMap(): void {
     "hidden",
     selected.type !== "station",
   );
-  continueButton.disabled = false;
+
+  const hiddenOffer =
+    selected.type === "hidden-signal"
+      ? challengeOfferForNode(selected)
+      : null;
+  const hiddenHandled =
+    hiddenOffer !== null &&
+    hiddenChallengeHandled(challenge, hiddenOffer.id);
+  const hiddenActive =
+    hiddenOffer !== null &&
+    challenge.active?.offerId === hiddenOffer.id;
+
+  challengeAction.classList.toggle(
+    "hidden",
+    hiddenOffer === null || hiddenHandled,
+  );
+  if (hiddenOffer !== null) {
+    challengeAction.textContent = hiddenActive
+      ? "Resume " + hiddenChallengeKindLabel(hiddenOffer.kind)
+      : "Decode " + hiddenChallengeKindLabel(hiddenOffer.kind);
+  }
+
+  continueButton.textContent = hiddenActive
+    ? "Resume Challenge"
+    : "Start Encounter";
+  continueButton.disabled =
+    hiddenOffer !== null &&
+    !hiddenHandled &&
+    !hiddenActive;
+}
+
+function challengeOfferForNode(
+  node: RouteNode,
+): HiddenChallengeOffer | null {
+  if (node.type !== "hidden-signal") return null;
+
+  const deterministic = createHiddenChallengeOffer(
+    node.targetStage,
+    node.id,
+  );
+  return challenge.offers[deterministic.id] ?? deterministic;
+}
+
+function currentRouteChallengeOffer(): HiddenChallengeOffer | null {
+  const selected = selectedRouteNode(
+    route,
+    routeTargetStage(),
+  );
+  return selected === null
+    ? null
+    : challengeOfferForNode(selected);
+}
+
+function renderChallengeDialog(
+  offer: HiddenChallengeOffer,
+): void {
+  byId("challengeTitle").textContent =
+    hiddenChallengeKindLabel(offer.kind);
+  byId("challengeMeta").textContent =
+    "Stage " +
+    String(offer.sourceStage).padStart(3, "0") +
+    " detour · " +
+    String(offer.encounterCount) +
+    (offer.encounterCount === 1
+      ? " encounter"
+      : " encounters") +
+    (offer.hiddenWorldStage === null
+      ? ""
+      : " · hidden theme seed " +
+        String(offer.hiddenWorldStage)) +
+    " · Campaign stage does not advance.";
+
+  const buttons = Array.from(
+    document.querySelectorAll<HTMLButtonElement>(
+      "[data-challenge-tier]",
+    ),
+  );
+  for (const button of buttons) {
+    const tier = button.dataset.challengeTier as
+      | HiddenChallengeTier
+      | undefined;
+    if (tier === undefined) continue;
+    const definition = hiddenChallengeTierDefinition(tier);
+    button.textContent =
+      "Tier " +
+      tier +
+      " · " +
+      definition.pressureMultiplier.toFixed(2) +
+      "x pressure · " +
+      definition.rewardMultiplier.toFixed(2) +
+      "x premium reward";
+  }
+}
+
+async function openCurrentChallenge(): Promise<void> {
+  const offer = currentRouteChallengeOffer();
+  if (offer === null) return;
+
+  challenge = registerHiddenChallengeOffer(challenge, offer);
+  renderChallengeDialog(offer);
+  if (!challengeDialog.open) {
+    challengeDialog.showModal();
+  }
+
+  await autosaveCampaign(
+    "challenge",
+    undefined,
+    "hidden-transition",
+  );
+}
+
+async function chooseHiddenChallengeTier(
+  tier: HiddenChallengeTier,
+): Promise<void> {
+  const offer = currentRouteChallengeOffer();
+  if (offer === null) return;
+
+  challenge = registerHiddenChallengeOffer(challenge, offer);
+  challenge = startHiddenChallenge(
+    challenge,
+    offer.id,
+    tier,
+  );
+  const saved = await autosaveCampaign(
+    "challenge",
+    "✓ " +
+      hiddenChallengeKindLabel(offer.kind) +
+      " Tier " +
+      tier +
+      " locked",
+    "hidden-transition",
+  );
+  if (!saved) return;
+
+  if (challengeDialog.open) challengeDialog.close();
+  if (routeDialog.open) routeDialog.close();
+  void startSelectedStage();
+}
+
+async function skipCurrentChallenge(): Promise<void> {
+  const offer = currentRouteChallengeOffer();
+  if (offer === null) return;
+
+  challenge = registerHiddenChallengeOffer(challenge, offer);
+  challenge = skipHiddenChallenge(challenge, offer.id);
+  const saved = await autosaveCampaign(
+    "challenge",
+    "✓ Hidden challenge skipped · normal route preserved",
+    "hidden-transition",
+  );
+  if (!saved) return;
+
+  if (challengeDialog.open) challengeDialog.close();
+  renderRouteMap();
 }
 
 async function chooseCurrentRouteNode(
@@ -3782,6 +3940,16 @@ async function chooseCurrentRouteNode(
   }
 
   route = next;
+  const selected = selectedRouteNode(route, targetStage);
+  if (selected?.type === "hidden-signal") {
+    const offer = challengeOfferForNode(selected);
+    if (offer !== null) {
+      challenge = registerHiddenChallengeOffer(
+        challenge,
+        offer,
+      );
+    }
+  }
   renderRouteMap();
 
   const saved = await autosaveCampaign(
