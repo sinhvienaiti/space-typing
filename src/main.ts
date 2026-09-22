@@ -515,6 +515,7 @@ app.innerHTML = `
         </p>
         <div class="actions">
           <button id="startButton" class="primary">Continue · Stage 001</button>
+          <button id="routeButton">Route Map</button>
           <button id="stageSelectButton">Stage Select</button>
           <button id="vocabularyButton">Vocabulary</button>
           <button id="characterButton">Characters</button>
@@ -628,6 +629,31 @@ app.innerHTML = `
         <span id="campaignMeta"></span>
       </div>
       <div id="stageGrid" class="stage-grid"></div>
+    </dialog>
+
+    <dialog id="routeDialog" class="settings-dialog route-dialog">
+      <form method="dialog" class="dialog-head">
+        <div>
+          <p class="eyebrow">sector navigation</p>
+          <h2 id="routeTitle">Route Map</h2>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+      <p id="routeMeta" class="equipment-note">
+        Choose one route for the next Campaign encounter.
+      </p>
+      <div id="routeMap" class="route-map"></div>
+      <div id="routeSelectedPanel" class="route-selected-panel hidden">
+        <strong id="routeSelectedTitle">Combat</strong>
+        <span id="routeSelectedMeta"></span>
+        <div class="route-actions">
+          <button id="routeShopAction" class="hidden">Open Shop</button>
+          <button id="routeStationShopAction" class="hidden">Station Shop</button>
+          <button id="routeServiceAction" class="hidden">Repair / Upgrade</button>
+          <button id="routeSupportAction" class="hidden">Support Loadout</button>
+          <button id="routeContinueButton" class="primary">Start Encounter</button>
+        </div>
+      </div>
     </dialog>
 
     <dialog id="characterDialog" class="settings-dialog character-dialog">
@@ -1156,6 +1182,7 @@ const stageClearOverlay = byId("stageClearOverlay");
 const settingsDialog = byId<HTMLDialogElement>("settingsDialog");
 const vocabularyDialog = byId<HTMLDialogElement>("vocabularyDialog");
 const stageSelectDialog = byId<HTMLDialogElement>("stageSelectDialog");
+const routeDialog = byId<HTMLDialogElement>("routeDialog");
 const dataDialog = byId<HTMLDialogElement>("dataDialog");
 const equipmentDialog = byId<HTMLDialogElement>("equipmentDialog");
 const shopDialog = byId<HTMLDialogElement>("shopDialog");
