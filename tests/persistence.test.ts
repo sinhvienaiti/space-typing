@@ -668,6 +668,7 @@ describe("player save persistence model", () => {
       highestUnlockedTier: 1,
       selectedTier: 0,
       completedTiers: [],
+      frontierByTier: { "1": 1 },
     });
     expect(migration.save.codex.worlds).toEqual(["world-01"]);
     expect(migration.save.relics.owned).toEqual(["first-light-seed"]);
