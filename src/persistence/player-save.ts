@@ -70,6 +70,11 @@ import {
   type RouteState,
 } from "../campaign/route";
 import {
+  createHiddenChallengeState,
+  sanitizeHiddenChallengeState,
+  type HiddenChallengeState,
+} from "../campaign/hidden-challenge";
+import {
   resolveCrashRecovery,
   sanitizeCrashRecoverySnapshot,
   type CrashRecoverySnapshot,
@@ -85,7 +90,7 @@ const STORE_NAME = "player";
 const SAVE_KEY = "main";
 const RECOVERY_SAVE_KEY = "spaceTypingPlayerSaveRecoveryV3";
 
-export const PLAYER_SAVE_VERSION = 21;
+export const PLAYER_SAVE_VERSION = 22;
 
 export class UnsupportedPlayerSaveVersionError extends Error {
   constructor(readonly version: number) {
@@ -113,6 +118,7 @@ export type SaveReason =
   | "discovery"
   | "shop"
   | "route-choice"
+  | "challenge"
   | "progression"
   | "pagehide"
   | "manual"
@@ -400,7 +406,30 @@ export type PlayerSaveV21 = {
   lastSaveReason: SaveReason;
 };
 
-export type PlayerSave = PlayerSaveV21;
+export type PlayerSaveV22 = {
+  version: 22;
+  campaign: CampaignProgress;
+  inventory: Inventory;
+  equipment: EquipmentState;
+  supportSpells: SupportSpellState;
+  characters: CharacterState;
+  luckPity: LuckPityState;
+  hiddenDiscovery: HiddenDiscoveryState;
+  credits: number;
+  progression: ProgressionState;
+  expansionCurrencies: ExpansionCurrencyState;
+  campaignExpansion: CampaignExpansionState;
+  checkpointSnapshot: CheckpointSnapshot;
+  crashRecoverySnapshot: CrashRecoverySnapshot | null;
+  stageEntrySnapshot: StageEntrySnapshot | null;
+  shops: ShopState;
+  route: RouteState;
+  challenge: HiddenChallengeState;
+  updatedAt: string;
+  lastSaveReason: SaveReason;
+};
+
+export type PlayerSave = PlayerSaveV22;
 export type PersistenceSource = "indexeddb" | "localStorage";
 
 export type LoadedPlayerSave = {
@@ -429,6 +458,7 @@ function normalizeSaveReason(value: unknown): SaveReason {
     value === "discovery" ||
     value === "shop" ||
     value === "route-choice" ||
+    value === "challenge" ||
     value === "progression" ||
     value === "pagehide" ||
     value === "manual"
@@ -457,6 +487,7 @@ export function createPlayerSave(
   stageEntrySnapshot: StageEntrySnapshot | null = null,
   shops: ShopState = createShopState(),
   route: RouteState = createRouteState(campaign.highestUnlockedStage),
+  challenge: HiddenChallengeState = createHiddenChallengeState(),
 ): PlayerSave {
   const safeCampaign = sanitizeCampaignProgress(campaign);
   const activeState: RunPersistentState = {
@@ -476,6 +507,7 @@ export function createPlayerSave(
       route,
       safeCampaign.highestUnlockedStage,
     ),
+    challenge: sanitizeHiddenChallengeState(challenge),
   };
   const safeCampaignExpansion = sanitizeCampaignExpansionState(
     campaignExpansion,
@@ -535,6 +567,7 @@ export function migratePlayerSave(value: unknown): MigrationResult {
     stageEntrySnapshot?: unknown;
     shops?: unknown;
     route?: unknown;
+    challenge?: unknown;
     updatedAt?: unknown;
     lastSaveReason?: unknown;
   };
@@ -938,6 +971,42 @@ export function migratePlayerSave(value: unknown): MigrationResult {
     };
   }
 
+  if (raw.version === 21) {
+    const safeCampaign = sanitizeCampaignProgress(raw.campaign);
+    return {
+      save: createPlayerSave(
+        safeCampaign,
+        typeof raw.updatedAt === "string" ? raw.updatedAt : "",
+        "migration",
+        sanitizeInventory(raw.inventory),
+        sanitizeEquipmentState(raw.equipment),
+        sanitizeSupportSpellState(raw.supportSpells),
+        sanitizeCharacterState(raw.characters),
+        sanitizeLuckPityState(raw.luckPity),
+        sanitizeHiddenDiscoveryState(raw.hiddenDiscovery),
+        sanitizeCredits(raw.credits),
+        sanitizeProgressionState(raw.progression),
+        sanitizeExpansionCurrencyState(raw.expansionCurrencies),
+        sanitizeCampaignExpansionState(
+          raw.campaignExpansion,
+          safeCampaign,
+          typeof raw.updatedAt === "string" ? raw.updatedAt : "",
+        ),
+        raw.checkpointSnapshot as CheckpointSnapshot | undefined,
+        sanitizeCrashRecoverySnapshot(raw.crashRecoverySnapshot),
+        sanitizeStageEntrySnapshot(raw.stageEntrySnapshot),
+        sanitizeShopState(raw.shops),
+        sanitizeRouteState(
+          raw.route,
+          safeCampaign.highestUnlockedStage,
+        ),
+        createHiddenChallengeState(),
+      ),
+      migrated: true,
+      fromVersion: 21,
+    };
+  }
+
   if (raw.version === PLAYER_SAVE_VERSION) {
     return {
       save: createPlayerSave(
@@ -966,6 +1035,7 @@ export function migratePlayerSave(value: unknown): MigrationResult {
           raw.route,
           sanitizeCampaignProgress(raw.campaign).highestUnlockedStage,
         ),
+        sanitizeHiddenChallengeState(raw.challenge),
       ),
       migrated: false,
       fromVersion: PLAYER_SAVE_VERSION,
@@ -1084,6 +1154,7 @@ function recoverySaveFromLegacy(): PlayerSave {
       recovery.stageEntrySnapshot,
       recovery.shops,
       recovery.route,
+      recovery.challenge,
     );
   } catch (error) {
     if (error instanceof UnsupportedPlayerSaveVersionError) throw error;
@@ -1114,6 +1185,7 @@ function runStateFromSave(save: PlayerSave): RunPersistentState {
     expansionCurrencies: save.expansionCurrencies,
     shops: save.shops,
     route: save.route,
+    challenge: save.challenge,
   };
 }
 
@@ -1156,6 +1228,7 @@ export function resolvePlayerSaveRecovery(
       save.stageEntrySnapshot,
       resolution.state.shops,
       resolution.state.route,
+      resolution.state.challenge,
     ),
     recoveryMode: resolution.mode,
   };
@@ -1255,6 +1328,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
         resolved.save.stageEntrySnapshot,
         resolved.save.shops,
         resolved.save.route,
+        resolved.save.challenge,
       );
       await writeSave(database, migrated);
       try {
@@ -1310,6 +1384,9 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
     const route = useRecovery
       ? recovery.route
       : migration.save.route;
+    const challenge = useRecovery
+      ? recovery.challenge
+      : migration.save.challenge;
     const campaignExpansion = useRecovery
       ? recovery.campaignExpansion
       : migration.save.campaignExpansion;
@@ -1336,6 +1413,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
       expansionCurrencies !== migration.save.expansionCurrencies ||
       shops !== migration.save.shops ||
       route !== migration.save.route ||
+      challenge !== migration.save.challenge ||
       campaignExpansion !== migration.save.campaignExpansion ||
       checkpointSnapshot !== migration.save.checkpointSnapshot ||
       crashRecoverySnapshot !== migration.save.crashRecoverySnapshot ||
@@ -1360,6 +1438,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
       stageEntrySnapshot,
       shops,
       route,
+      challenge,
     );
     const resolved = resolvePlayerSaveRecovery(candidate);
 
@@ -1389,6 +1468,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
         resolved.save.stageEntrySnapshot,
         resolved.save.shops,
         resolved.save.route,
+        resolved.save.challenge,
       );
       await writeSave(database, recovered);
       try {
@@ -1449,6 +1529,7 @@ export async function savePlayerProgress(
   stageEntrySnapshot: StageEntrySnapshot | null = null,
   shops: ShopState = createShopState(),
   route: RouteState = createRouteState(campaign.highestUnlockedStage),
+  challenge: HiddenChallengeState = createHiddenChallengeState(),
 ): Promise<PersistenceSource> {
   const save = createPlayerSave(
     campaign,
@@ -1469,6 +1550,7 @@ export async function savePlayerProgress(
     stageEntrySnapshot,
     shops,
     route,
+    challenge,
   );
 
   if ("indexedDB" in window) {
