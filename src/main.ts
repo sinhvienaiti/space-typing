@@ -3559,6 +3559,209 @@ async function prepareStageVocabulary(
   }
 }
 
+function routeTargetStage(): number {
+  return campaign.highestUnlockedStage;
+}
+
+function routeNodeDescription(node: RouteNode): string {
+  if (node.type === "station") {
+    return "Maintenance stop · Station Shop, Repair / Upgrade, and Support Loadout are available before the encounter.";
+  }
+  if (node.type === "shop") {
+    return "Supply detour · finite deterministic shop stock is available before the encounter.";
+  }
+  return node.mandatory
+    ? "Mandatory combat route · boss progression cannot be bypassed."
+    : "Direct combat route · no service detour before the encounter.";
+}
+
+function renderRouteMap(): void {
+  const targetStage = routeTargetStage();
+  route = syncRouteStateForStage(route, targetStage);
+
+  const progress = routeProgress(route);
+  byId("routeTitle").textContent =
+    "Sector " +
+    String(route.graph.sectorStart).padStart(3, "0") +
+    "-" +
+    String(route.graph.sectorEnd).padStart(3, "0");
+  byId("routeMeta").textContent =
+    "Stage " +
+    String(targetStage).padStart(3, "0") +
+    " frontier · seed " +
+    String(route.graph.seed) +
+    " · " +
+    String(progress.chosen) +
+    " / " +
+    String(progress.total) +
+    " branch choices locked";
+
+  const map = byId("routeMap");
+  map.replaceChildren();
+
+  for (const step of route.graph.steps) {
+    const row = document.createElement("section");
+    row.className =
+      "route-step" +
+      (step.stage === targetStage ? " route-step-current" : "");
+
+    const stageLabel = document.createElement("strong");
+    stageLabel.className = "route-stage-label";
+    stageLabel.textContent =
+      "Stage " + String(step.stage).padStart(3, "0");
+
+    const nodes = document.createElement("div");
+    nodes.className = "route-node-row";
+
+    const chosenId = route.selectedByStage[String(step.stage)];
+    const currentSelected =
+      step.stage === targetStage
+        ? selectedRouteNode(route, targetStage)
+        : null;
+
+    for (const node of step.nodes) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className =
+        "route-node route-node-" + node.type;
+      button.dataset.nodeId = node.id;
+
+      if (
+        chosenId === node.id ||
+        (step.nodes.length === 1 && node.mandatory)
+      ) {
+        button.classList.add("selected");
+      }
+      if (route.visitedNodeIds.includes(node.id)) {
+        button.classList.add("visited");
+      }
+
+      button.disabled =
+        step.stage !== targetStage ||
+        currentSelected !== null ||
+        step.nodes.length === 1;
+
+      const name = document.createElement("strong");
+      name.textContent = routeNodeLabel(node.type);
+
+      const meta = document.createElement("small");
+      meta.textContent =
+        node.mandatory
+          ? "Mandatory"
+          : "Lane " + String(node.lane + 1);
+
+      button.append(name, meta);
+      button.addEventListener("click", () => {
+        void chooseCurrentRouteNode(node.id);
+      });
+      nodes.append(button);
+    }
+
+    row.append(stageLabel, nodes);
+    map.append(row);
+  }
+
+  const selected = selectedRouteNode(route, targetStage);
+  const panel = byId("routeSelectedPanel");
+  const shopAction =
+    byId<HTMLButtonElement>("routeShopAction");
+  const stationShopAction =
+    byId<HTMLButtonElement>("routeStationShopAction");
+  const serviceAction =
+    byId<HTMLButtonElement>("routeServiceAction");
+  const supportAction =
+    byId<HTMLButtonElement>("routeSupportAction");
+  const continueButton =
+    byId<HTMLButtonElement>("routeContinueButton");
+
+  if (selected === null) {
+    panel.classList.add("hidden");
+    continueButton.disabled = true;
+    return;
+  }
+
+  panel.classList.remove("hidden");
+  byId("routeSelectedTitle").textContent =
+    routeNodeLabel(selected.type) +
+    " · Stage " +
+    String(selected.targetStage).padStart(3, "0");
+  byId("routeSelectedMeta").textContent =
+    routeNodeDescription(selected);
+
+  shopAction.classList.toggle(
+    "hidden",
+    selected.type !== "shop",
+  );
+  stationShopAction.classList.toggle(
+    "hidden",
+    selected.type !== "station",
+  );
+  serviceAction.classList.toggle(
+    "hidden",
+    selected.type !== "station",
+  );
+  supportAction.classList.toggle(
+    "hidden",
+    selected.type !== "station",
+  );
+  continueButton.disabled = false;
+}
+
+async function chooseCurrentRouteNode(
+  nodeId: string,
+): Promise<void> {
+  const targetStage = routeTargetStage();
+  const previousRoute = route;
+  const previousExpansion = campaignExpansion;
+  const previousRecovery = crashRecoverySnapshot;
+  const next = selectRouteNode(route, targetStage, nodeId);
+
+  if (
+    next.selectedByStage[String(targetStage)] ===
+    previousRoute.selectedByStage[String(targetStage)]
+  ) {
+    renderRouteMap();
+    return;
+  }
+
+  route = next;
+  renderRouteMap();
+
+  const saved = await autosaveCampaign(
+    "route-choice",
+    "✓ Route locked · Stage " +
+      String(targetStage).padStart(3, "0"),
+    "route-choice",
+  );
+  if (!saved) {
+    route = previousRoute;
+    campaignExpansion = previousExpansion;
+    crashRecoverySnapshot = previousRecovery;
+    renderRouteMap();
+  }
+}
+
+function openRouteMap(): void {
+  if (
+    !persistenceReady ||
+    !canOpenBetweenStageMenu()
+  ) {
+    return;
+  }
+
+  route = syncRouteStateForStage(
+    route,
+    routeTargetStage(),
+  );
+  renderRouteMap();
+  if (!routeDialog.open) routeDialog.showModal();
+}
+
+function closeRouteAndOpen(action: () => void): void {
+  if (routeDialog.open) routeDialog.close();
+  action();
+}
+
 async function startSelectedStage(): Promise<void> {
   if (!persistenceReady || !vocabularyReady || stageStartPending) return;
 
