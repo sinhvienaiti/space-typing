@@ -1,5 +1,7 @@
-import type { DifficultyProfile } from "../campaign/types";
-import type { CampaignProgress } from "../campaign/types";
+import type {
+  CampaignProgress,
+  DifficultyProfile,
+} from "../campaign/types";
 import { MAX_CAMPAIGN_STAGE } from "../campaign/stage";
 import {
   createExpansionCurrencyState,
@@ -23,6 +25,7 @@ export type AscensionState = {
   highestUnlockedTier: number;
   selectedTier: number;
   completedTiers: number[];
+  frontierByTier: Record<string, number>;
 };
 
 export type AscensionProfile = {
@@ -40,6 +43,8 @@ export type AscensionProfile = {
 
 export type AscensionAdvanceResult = {
   state: AscensionState;
+  advanced: boolean;
+  checkpointCommitted: boolean;
   newlyCompleted: boolean;
   unlockedTier: number | null;
 };
@@ -54,21 +59,38 @@ function clampTier(value: number): number {
   return Math.max(0, Math.min(MAX_ASCENSION_TIER, Math.floor(value)));
 }
 
+function clampStage(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.max(1, Math.min(MAX_CAMPAIGN_STAGE, Math.floor(value)));
+}
+
 export function campaignCompleted(
   campaign: Pick<CampaignProgress, "clearedStages">,
 ): boolean {
   return campaign.clearedStages.includes(MAX_CAMPAIGN_STAGE);
 }
 
+function defaultFrontier(
+  highestUnlockedTier: number,
+): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (let tier = 1; tier <= highestUnlockedTier; tier += 1) {
+    result[String(tier)] = 1;
+  }
+  return result;
+}
+
 export function createAscensionState(
   campaign?: Pick<CampaignProgress, "clearedStages">,
 ): AscensionState {
-  const unlocked = campaign !== undefined && campaignCompleted(campaign) ? 1 : 0;
+  const highestUnlockedTier =
+    campaign !== undefined && campaignCompleted(campaign) ? 1 : 0;
   return {
     version: 1,
-    highestUnlockedTier: unlocked,
+    highestUnlockedTier,
     selectedTier: 0,
     completedTiers: [],
+    frontierByTier: defaultFrontier(highestUnlockedTier),
   };
 }
 
@@ -86,6 +108,7 @@ export function sanitizeAscensionState(
     highestUnlockedTier?: unknown;
     selectedTier?: unknown;
     completedTiers?: unknown;
+    frontierByTier?: unknown;
   };
   const rawHighest =
     typeof raw.highestUnlockedTier === "number"
@@ -107,12 +130,28 @@ export function sanitizeAscensionState(
         .filter((tier) => tier >= 1 && tier <= highestUnlockedTier),
     ),
   ).sort((a, b) => a - b);
+  const completedSet = new Set(completedTiers);
+  const rawFrontier =
+    raw.frontierByTier !== null &&
+    typeof raw.frontierByTier === "object" &&
+    !Array.isArray(raw.frontierByTier)
+      ? (raw.frontierByTier as Record<string, unknown>)
+      : {};
+  const frontierByTier: Record<string, number> = {};
+
+  for (let tier = 1; tier <= highestUnlockedTier; tier += 1) {
+    const stored = rawFrontier[String(tier)];
+    frontierByTier[String(tier)] = completedSet.has(tier)
+      ? MAX_CAMPAIGN_STAGE
+      : clampStage(typeof stored === "number" ? stored : 1);
+  }
 
   return {
     version: 1,
     highestUnlockedTier,
     selectedTier,
     completedTiers,
+    frontierByTier,
   };
 }
 
@@ -131,21 +170,55 @@ export function isValidAscensionState(value: unknown): value is AscensionState {
     raw.highestUnlockedTier > MAX_ASCENSION_TIER ||
     raw.selectedTier < 0 ||
     raw.selectedTier > raw.highestUnlockedTier ||
-    !Array.isArray(raw.completedTiers)
+    !Array.isArray(raw.completedTiers) ||
+    raw.frontierByTier === null ||
+    typeof raw.frontierByTier !== "object" ||
+    Array.isArray(raw.frontierByTier)
   ) {
     return false;
   }
+
   const completed = raw.completedTiers as unknown[];
-  return (
-    new Set(completed).size === completed.length &&
-    completed.every(
+  if (
+    new Set(completed).size !== completed.length ||
+    !completed.every(
       (tier) =>
         typeof tier === "number" &&
         Number.isInteger(tier) &&
         tier >= 1 &&
         tier <= raw.highestUnlockedTier,
     )
+  ) {
+    return false;
+  }
+
+  const frontiers = raw.frontierByTier as Record<string, unknown>;
+  const completedSet = new Set(completed as number[]);
+  const expectedKeys = Array.from(
+    { length: raw.highestUnlockedTier },
+    (_, index) => String(index + 1),
   );
+  const keys = Object.keys(frontiers).sort(
+    (left, right) => Number(left) - Number(right),
+  );
+  if (
+    keys.length !== expectedKeys.length ||
+    keys.some((key, index) => key !== expectedKeys[index])
+  ) {
+    return false;
+  }
+
+  return expectedKeys.every((key) => {
+    const tier = Number(key);
+    const stage = frontiers[key];
+    return (
+      typeof stage === "number" &&
+      Number.isInteger(stage) &&
+      stage >= 1 &&
+      stage <= MAX_CAMPAIGN_STAGE &&
+      (!completedSet.has(tier) || stage === MAX_CAMPAIGN_STAGE)
+    );
+  });
 }
 
 export function selectAscensionTier(
@@ -161,50 +234,120 @@ export function selectAscensionTier(
   };
 }
 
-export function completeAscensionTier(
+export function currentAscensionStage(
   input: AscensionState,
-  tierInput: number,
+): number | null {
+  const state = sanitizeAscensionState(input);
+  if (state.selectedTier <= 0) return null;
+  return state.frontierByTier[String(state.selectedTier)] ?? 1;
+}
+
+export function advanceAscensionOnStageClear(
+  input: AscensionState,
+  clearedStageInput: number,
 ): AscensionAdvanceResult {
   const state = sanitizeAscensionState(input);
-  const tier = clampTier(tierInput);
+  const clearedStage = clampStage(clearedStageInput);
 
-  if (tier === 0) {
-    const nextHighest = Math.max(state.highestUnlockedTier, 1);
+  if (state.selectedTier === 0) {
+    if (clearedStage !== MAX_CAMPAIGN_STAGE) {
+      return {
+        state,
+        advanced: false,
+        checkpointCommitted: false,
+        newlyCompleted: false,
+        unlockedTier: null,
+      };
+    }
+
+    const highestUnlockedTier = Math.max(state.highestUnlockedTier, 1);
     return {
       state: {
         ...state,
-        highestUnlockedTier: nextHighest,
+        highestUnlockedTier,
+        frontierByTier: {
+          ...state.frontierByTier,
+          ...(highestUnlockedTier >= 1 && state.frontierByTier["1"] === undefined
+            ? { "1": 1 }
+            : {}),
+        },
       },
+      advanced: highestUnlockedTier > state.highestUnlockedTier,
+      checkpointCommitted: false,
       newlyCompleted: false,
       unlockedTier:
-        nextHighest > state.highestUnlockedTier ? nextHighest : null,
+        highestUnlockedTier > state.highestUnlockedTier ? 1 : null,
     };
   }
 
-  if (tier > state.highestUnlockedTier) {
-    return { state, newlyCompleted: false, unlockedTier: null };
+  const tier = state.selectedTier;
+  const key = String(tier);
+  const expectedStage = state.frontierByTier[key] ?? 1;
+  if (
+    clearedStage !== expectedStage ||
+    state.completedTiers.includes(tier)
+  ) {
+    return {
+      state,
+      advanced: false,
+      checkpointCommitted: false,
+      newlyCompleted: false,
+      unlockedTier: null,
+    };
   }
 
-  const alreadyCompleted = state.completedTiers.includes(tier);
-  const completedTiers = alreadyCompleted
-    ? state.completedTiers
-    : [...state.completedTiers, tier].sort((a, b) => a - b);
-  const nextTier = Math.min(MAX_ASCENSION_TIER, tier + 1);
+  if (clearedStage < MAX_CAMPAIGN_STAGE) {
+    return {
+      state: {
+        ...state,
+        frontierByTier: {
+          ...state.frontierByTier,
+          [key]: clearedStage + 1,
+        },
+      },
+      advanced: true,
+      checkpointCommitted: clearedStage % 10 === 0,
+      newlyCompleted: false,
+      unlockedTier: null,
+    };
+  }
+
+  const completedTiers = [...state.completedTiers, tier].sort(
+    (left, right) => left - right,
+  );
+  const nextTier =
+    tier >= MAX_ASCENSION_TIER
+      ? MAX_ASCENSION_TIER
+      : tier + 1;
   const highestUnlockedTier = Math.max(
     state.highestUnlockedTier,
-    alreadyCompleted ? state.highestUnlockedTier : nextTier,
+    nextTier,
   );
+  const frontierByTier = {
+    ...state.frontierByTier,
+    [key]: MAX_CAMPAIGN_STAGE,
+  };
+  if (
+    nextTier > tier &&
+    frontierByTier[String(nextTier)] === undefined
+  ) {
+    frontierByTier[String(nextTier)] = 1;
+  }
 
   return {
     state: {
       ...state,
       highestUnlockedTier,
       completedTiers,
+      frontierByTier,
     },
-    newlyCompleted: !alreadyCompleted,
+    advanced: true,
+    checkpointCommitted: true,
+    newlyCompleted: true,
     unlockedTier:
-      !alreadyCompleted && highestUnlockedTier > state.highestUnlockedTier
-        ? highestUnlockedTier
+      nextTier > tier &&
+      highestUnlockedTier > state.highestUnlockedTier
+        ? nextTier
         : null,
   };
 }
@@ -253,7 +396,7 @@ export function bossMutationsForAscension(
   const count = mutationCountForTier(tier);
   if (count === 0) return [];
 
-  const stage = Math.max(1, Math.min(MAX_CAMPAIGN_STAGE, Math.floor(stageInput)));
+  const stage = clampStage(stageInput);
   const offset =
     (Math.imul(stage, 17) + Math.imul(tier, 31)) %
     ASCENSION_BOSS_MUTATION_IDS.length;
