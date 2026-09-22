@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createExpansionCurrencyState } from "../src/economy/currencies";
 import { createStarterEquipmentState } from "../src/equipment/loadout";
 import { createEmptyInventory } from "../src/items/inventory";
+import { createUpgradeState } from "../src/progression/upgrades";
 import {
   buyEquipmentUpgrade,
   buyRepairPack,
@@ -47,6 +48,7 @@ describe("Repair / Upgrade Shop", () => {
         },
         inventory: createEmptyInventory(),
         equipment,
+        upgrades: createUpgradeState(),
       },
       item.instanceId,
     );
@@ -74,6 +76,7 @@ describe("Repair / Upgrade Shop", () => {
         },
         inventory: createEmptyInventory(),
         equipment,
+        upgrades: createUpgradeState(),
       },
       item.instanceId,
     );
@@ -87,6 +90,7 @@ describe("Repair / Upgrade Shop", () => {
         expansionCurrencies: createExpansionCurrencyState(),
         inventory: createEmptyInventory(),
         equipment,
+        upgrades: createUpgradeState(),
       },
       item.instanceId,
     );
@@ -115,6 +119,7 @@ describe("Repair / Upgrade Shop", () => {
         },
         inventory: createEmptyInventory(),
         equipment: maxed,
+        upgrades: createUpgradeState(),
       },
       item.instanceId,
     );
@@ -134,6 +139,7 @@ describe("Repair / Upgrade Shop", () => {
       },
       inventory: createEmptyInventory(),
       equipment,
+      upgrades: createUpgradeState(),
     });
 
     expect(result.applied).toBe(true);
@@ -154,6 +160,7 @@ describe("Repair / Upgrade Shop", () => {
       },
       inventory: { "repair-kit": 20 },
       equipment: createStarterEquipmentState(),
+      upgrades: createUpgradeState(),
     });
 
     expect(result.applied).toBe(false);
