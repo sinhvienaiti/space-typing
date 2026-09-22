@@ -3085,6 +3085,19 @@ Missions / Achievements rules:
 ## Step 58
 Implement Codex/Collection/Meta Progression.
 
+**Status: implemented.**
+
+Codex / Collection / Meta Progression rules:
+
+- Codex now combines Characters, equipment definitions, hidden-content entries and Achievements in one collection view;
+- undiscovered identities remain concealed as `???`, including locked Characters, hidden content and locked Achievements;
+- collection counts equipment definitions once even if multiple rarity/enhancement instances are owned;
+- Meta Points are derived from durable progress: unique cleared stages, unlocked Characters, owned equipment types, hidden discoveries and unlocked Achievements;
+- Meta Level is bounded to 1-20 and Meta Rank progresses through Cadet, Navigator, Ace, Commander and Legend thresholds;
+- meta progression is derived rather than separately persisted, preventing drift between the Codex and the underlying save data;
+- no combat stats, currencies or power rewards are attached to Meta Rank in this step, avoiding a second balance layer;
+- the existing Codex menu now shows current Meta Level/Rank/Points plus total collection completion.
+
 ## Step 59
 Add Galaxy hazards and special stages.
 
