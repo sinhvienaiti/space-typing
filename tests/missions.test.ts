@@ -89,4 +89,23 @@ describe("missions and achievements", () => {
     expect(state.claimedMissions).toEqual(["clear-5"]);
     expect(state.unlockedAchievements).toEqual(["first-clear"]);
   });
+
+  it("accepts valid progression objects regardless of property order", async () => {
+    const { isValidProgressionState } = await import(
+      "../src/progression/missions"
+    );
+    expect(
+      isValidProgressionState({
+        unlockedAchievements: ["first-clear"],
+        claimedMissions: ["clear-5"],
+        counters: {
+          equipmentDrops: 10,
+          shopPurchases: 5,
+          highAccuracyClears: 3,
+          stageClears: 25,
+        },
+      }),
+    ).toBe(true);
+  });
+
 });
