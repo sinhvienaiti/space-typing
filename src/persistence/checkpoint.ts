@@ -68,6 +68,12 @@ import {
   sanitizeUpgradeState,
   type UpgradeState,
 } from "../progression/upgrades";
+import {
+  createRelicState,
+  isValidRelicState,
+  sanitizeRelicState,
+  type RelicState,
+} from "../relics/state";
 
 export type RunPersistentState = {
   campaign: CampaignProgress;
@@ -83,6 +89,7 @@ export type RunPersistentState = {
   shops: ShopState;
   route: RouteState;
   upgrades: UpgradeState;
+  relics: RelicState;
 };
 
 export type CheckpointSnapshot = RunPersistentState;
@@ -237,7 +244,8 @@ function isValidLegacyRunPersistentStateWithoutRoute(
     isValidProgressionState(raw.progression) &&
     isValidExpansionCurrencyState(raw.expansionCurrencies) &&
     (raw.shops === undefined || isValidShopState(raw.shops)) &&
-    (raw.upgrades === undefined || isValidUpgradeState(raw.upgrades))
+    (raw.upgrades === undefined || isValidUpgradeState(raw.upgrades)) &&
+    (raw.relics === undefined || isValidRelicState(raw.relics))
   );
 }
 
@@ -271,6 +279,9 @@ export function migrateLegacyRunPersistentState(
     upgrades: isValidUpgradeState(raw.upgrades)
       ? sanitizeUpgradeState(raw.upgrades)
       : createUpgradeState(),
+    relics: isValidRelicState(raw.relics)
+      ? sanitizeRelicState(raw.relics)
+      : createRelicState(),
   };
 }
 
@@ -295,6 +306,7 @@ export function isValidRunPersistentState(
     isValidExpansionCurrencyState(raw.expansionCurrencies) &&
     isValidShopState(raw.shops) &&
     isValidUpgradeState(raw.upgrades) &&
+    isValidRelicState(raw.relics) &&
     isValidRouteState(
       raw.route,
       (raw.campaign as CampaignProgress).highestUnlockedStage,
@@ -333,6 +345,7 @@ export function sanitizeRunPersistentState(
       sanitizeExpansionCurrencyState(value.expansionCurrencies),
     shops: sanitizeShopState(value.shops),
     upgrades: sanitizeUpgradeState(value.upgrades),
+    relics: sanitizeRelicState(value.relics),
     route: sanitizeRouteState(
       value.route,
       campaign.highestUnlockedStage,
@@ -449,6 +462,7 @@ export function restoreCheckpointSnapshot(
     },
     shops: sanitizeShopState(committed.shops),
     upgrades: sanitizeUpgradeState(committed.upgrades),
+    relics: sanitizeRelicState(committed.relics),
     route: sanitizeRouteState(
       committed.route,
       committed.campaign.highestUnlockedStage,
