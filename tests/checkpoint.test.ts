@@ -24,7 +24,12 @@ import { createProgressionState } from "../src/progression/missions";
 import { createExpansionCurrencyState } from "../src/economy/currencies";
 import { createShopState } from "../src/shops/state";
 import { createRouteState } from "../src/campaign/route";
-import { createHiddenChallengeState } from "../src/campaign/hidden-challenge";
+import {
+  createHiddenChallengeOffer,
+  createHiddenChallengeState,
+  registerHiddenChallengeOffer,
+  startHiddenChallenge,
+} from "../src/campaign/hidden-challenge";
 
 function progressAt(stage: number): CampaignProgress {
   return {
@@ -70,6 +75,31 @@ describe("M02 checkpoint and rollback", () => {
     expect(snapshot.campaign.clearedStages.at(-1)).toBe(180);
     expect(snapshot.credits).toBe(900);
     expect(snapshot.inventory["repair-kit"]).toBe(4);
+  });
+
+  it("commits challenge state into the same checkpoint domain", () => {
+    const active = runState(progressAt(181));
+    const offer = createHiddenChallengeOffer(
+      181,
+      "route-181-hidden-signal",
+    );
+    active.challenge = startHiddenChallenge(
+      registerHiddenChallengeOffer(
+        active.challenge,
+        offer,
+      ),
+      offer.id,
+      "II",
+    );
+
+    const snapshot = createCheckpointSnapshot(active, 181);
+
+    expect(snapshot.challenge.active).toEqual({
+      offerId: offer.id,
+      tier: "II",
+      encounterIndex: 0,
+    });
+    expect(snapshot.challenge.offers[offer.id]).toEqual(offer);
   });
 
   it("moves the active frontier and commits only on the sector-end frontier stage", () => {
