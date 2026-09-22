@@ -18,18 +18,28 @@ export function stageInGalaxy(stage: number): number {
 }
 
 export function stageRole(stage: number): StageRole {
-  const local = stageInGalaxy(stage);
+  const safeStage = normalizeStage(stage);
+  const local = stageInGalaxy(safeStage);
+  const worldLocal = ((safeStage - 1) % 20) + 1;
+  const worldSlot = Math.ceil(local / 20);
 
+  // M09 intentionally migrates the old Galaxy-centric boss cadence to the
+  // M07 World rhythm: every World has a Mini Boss at 10 and a World Boss at
+  // 20, while the fifth World ends in the Galaxy Major Boss.
   if (local === 100) return "major-boss";
-  if (local === 90) return "gauntlet";
-  if (local === 80) return "mini-boss";
-  if (local === 70) return "elite";
-  if (local === 60) return "hazard";
-  if (local === 50) return "boss";
-  if (local === 40) return "elite";
-  if (local === 30) return "special";
-  if (local === 20) return "mini-boss";
-  if (local === 10) return "elite";
+  if (worldLocal === 20) return "boss";
+  if (worldLocal === 10) return "mini-boss";
+
+  // Keep the existing non-boss encounter vocabulary active without mixing
+  // the previous x20/x50/x80 boss assumptions back into the World rhythm.
+  if (worldLocal === 5) return "elite";
+  if (worldLocal === 15) {
+    if (worldSlot === 1) return "special";
+    if (worldSlot === 3) return "hazard";
+    if (worldSlot === 5) return "gauntlet";
+    return "elite";
+  }
+
   return "normal";
 }
 
