@@ -253,7 +253,7 @@ function worldProfile(index: number): WorldProfile {
 
   return {
     id,
-    name: spec.names[slot],
+    name: spec.names[slot] ?? spec.names[0],
     galaxy,
     stageStart,
     stageEnd,
