@@ -23,6 +23,9 @@ import {
 import type { StatBonus } from "../stats/core";
 import {
   equipmentAffixBonus,
+  isEquipmentAffixId,
+  maxAffixesForGrade,
+  rollEquipmentAffix,
   sanitizeEquipmentAffixes,
   type EquipmentAffixId,
 } from "./affixes";
@@ -128,7 +131,16 @@ function validInstance(value: unknown): value is EquipmentInstance {
     typeof raw.enhancement === "number" &&
     Number.isInteger(raw.enhancement) &&
     raw.enhancement >= 0 &&
-    raw.enhancement <= MAX_ENHANCEMENT_LEVEL
+    raw.enhancement <= MAX_ENHANCEMENT_LEVEL &&
+    (
+      raw.affixes === undefined ||
+      (
+        Array.isArray(raw.affixes) &&
+        raw.affixes.length <= maxAffixesForGrade(raw.grade) &&
+        new Set(raw.affixes).size === raw.affixes.length &&
+        raw.affixes.every(isEquipmentAffixId)
+      )
+    )
   );
 }
 
@@ -685,6 +697,198 @@ export function unequipSlot(
       ...state.loadout,
       [slot]: null,
     },
+  };
+}
+
+export function isEquipmentEquipped(
+  state: EquipmentState,
+  instanceId: string,
+): boolean {
+  return Object.values(state.loadout).includes(instanceId);
+}
+
+export function removeEquipmentInstance(
+  state: EquipmentState,
+  instanceId: string,
+): { state: EquipmentState; changed: boolean } {
+  const item = state.items.find(
+    (candidate) => candidate.instanceId === instanceId,
+  );
+  if (
+    item === undefined ||
+    isEquipmentEquipped(state, instanceId)
+  ) {
+    return { state, changed: false };
+  }
+
+  return {
+    state: {
+      items: state.items
+        .filter((candidate) => candidate.instanceId !== instanceId)
+        .map((candidate) => ({
+          ...candidate,
+          affixes: [...(candidate.affixes ?? [])],
+        })),
+      loadout: { ...state.loadout },
+    },
+    changed: true,
+  };
+}
+
+export function evolveEquipmentInstance(
+  state: EquipmentState,
+  instanceId: string,
+): {
+  state: EquipmentState;
+  changed: boolean;
+  fromGrade: GradeId | null;
+  toGrade: GradeId | null;
+} {
+  const item = state.items.find(
+    (candidate) => candidate.instanceId === instanceId,
+  );
+  if (
+    item === undefined ||
+    item.enhancement < MAX_ENHANCEMENT_LEVEL ||
+    (item.grade !== "silver" && item.grade !== "gold")
+  ) {
+    return {
+      state,
+      changed: false,
+      fromGrade: item?.grade ?? null,
+      toGrade: null,
+    };
+  }
+
+  const toGrade: GradeId =
+    item.grade === "silver" ? "gold" : "diamond";
+
+  return {
+    state: {
+      items: state.items.map((candidate) =>
+        candidate.instanceId === instanceId
+          ? {
+              ...candidate,
+              grade: toGrade,
+              enhancement: 0,
+              affixes: sanitizeEquipmentAffixes(
+                candidate.affixes,
+                toGrade,
+              ),
+            }
+          : {
+              ...candidate,
+              affixes: [...(candidate.affixes ?? [])],
+            },
+      ),
+      loadout: { ...state.loadout },
+    },
+    changed: true,
+    fromGrade: item.grade,
+    toGrade,
+  };
+}
+
+export function addEquipmentAffix(
+  state: EquipmentState,
+  instanceId: string,
+  random: () => number = Math.random,
+): {
+  state: EquipmentState;
+  changed: boolean;
+  affix: EquipmentAffixId | null;
+} {
+  const item = state.items.find(
+    (candidate) => candidate.instanceId === instanceId,
+  );
+  if (item === undefined) {
+    return { state, changed: false, affix: null };
+  }
+
+  const current = sanitizeEquipmentAffixes(
+    item.affixes,
+    item.grade,
+  );
+  if (current.length >= maxAffixesForGrade(item.grade)) {
+    return { state, changed: false, affix: null };
+  }
+
+  const affix = rollEquipmentAffix(current, random);
+  if (affix === null) {
+    return { state, changed: false, affix: null };
+  }
+
+  return {
+    state: {
+      items: state.items.map((candidate) =>
+        candidate.instanceId === instanceId
+          ? {
+              ...candidate,
+              affixes: [...current, affix],
+            }
+          : {
+              ...candidate,
+              affixes: [...(candidate.affixes ?? [])],
+            },
+      ),
+      loadout: { ...state.loadout },
+    },
+    changed: true,
+    affix,
+  };
+}
+
+export function rerollEquipmentAffix(
+  state: EquipmentState,
+  instanceId: string,
+  affixIndex: number,
+  random: () => number = Math.random,
+): {
+  state: EquipmentState;
+  changed: boolean;
+  affix: EquipmentAffixId | null;
+} {
+  const item = state.items.find(
+    (candidate) => candidate.instanceId === instanceId,
+  );
+  if (item === undefined) {
+    return { state, changed: false, affix: null };
+  }
+
+  const current = sanitizeEquipmentAffixes(
+    item.affixes,
+    item.grade,
+  );
+  const index = Math.floor(affixIndex);
+  if (index < 0 || index >= current.length) {
+    return { state, changed: false, affix: null };
+  }
+
+  const locked = current.filter((_, candidateIndex) =>
+    candidateIndex !== index
+  );
+  const affix = rollEquipmentAffix(locked, random);
+  if (affix === null) {
+    return { state, changed: false, affix: null };
+  }
+
+  const next = [...current];
+  next[index] = affix;
+
+  return {
+    state: {
+      items: state.items.map((candidate) =>
+        candidate.instanceId === instanceId
+          ? { ...candidate, affixes: next }
+          : {
+              ...candidate,
+              affixes: [...(candidate.affixes ?? [])],
+            },
+      ),
+      loadout: { ...state.loadout },
+    },
+    changed: true,
+    affix,
   };
 }
 
