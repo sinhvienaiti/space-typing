@@ -18,10 +18,26 @@ export const ENEMY_RARITIES = [
   "boss",
 ] as const;
 
+export const ENEMY_DEFINITION_IDS = [
+  "rainbow-scout",
+  "rainbow-dart",
+  "rainbow-bubble",
+  "imp-spark",
+  "snow-wisp",
+  "angel-healer",
+  "bomb-imp",
+  "freeze-burst-sprite",
+  "seraph-elite",
+  "berserk-devil",
+  "archangel-core",
+  "demon-lord-orb",
+] as const;
+
 export type EnemyRarity = (typeof ENEMY_RARITIES)[number];
+export type EnemyDefinitionId = (typeof ENEMY_DEFINITION_IDS)[number];
 
 export type EnemyDefinition = {
-  id: string;
+  id: EnemyDefinitionId;
   name: string;
   family: EnemyFamilyId;
   role: EnemyRoleId;
@@ -121,6 +137,30 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
       body: "rainbow-water-orb-large",
       aura: "rainbow-shell",
     },
+  },
+  {
+    id: "imp-spark",
+    name: "Imp Spark",
+    family: "devil",
+    role: "normal",
+    rarity: "common",
+    minStage: 50,
+    spawnWeight: 0.4,
+    durabilityScale: 1,
+    speedScale: 1,
+    visual: devilBase,
+  },
+  {
+    id: "snow-wisp",
+    name: "Snow Wisp",
+    family: "frost",
+    role: "normal",
+    rarity: "common",
+    minStage: 30,
+    spawnWeight: 0.45,
+    durabilityScale: 0.9,
+    speedScale: 0.96,
+    visual: frostBase,
   },
   {
     id: "angel-healer",

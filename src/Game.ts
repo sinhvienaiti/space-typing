@@ -199,6 +199,9 @@ import {
   chooseEnemyKind,
   enemyProfile,
 } from "./enemies/kinds";
+import { enemyDefinition } from "./enemies/registry";
+import { drawModularEnemy } from "./enemies/renderer";
+import { runtimeEnemyDefinitionId } from "./enemies/spawn-profile";
 import {
   isRecoveryItemId,
   useRecoveryItem,
@@ -2114,6 +2117,7 @@ export class Game {
     this.enemies.push({
       id: this.nextEnemyId++,
       kind,
+      definitionId: runtimeEnemyDefinitionId(kind, elite),
       elite,
       golden,
       eliteModifiers,
@@ -2256,6 +2260,7 @@ export class Game {
     this.enemies.push({
       id: this.nextEnemyId++,
       kind: "scout",
+      definitionId: "rainbow-scout",
       elite: false,
       eliteModifiers: [],
       entry: this.pickVocabularyEntry("scout"),
@@ -2936,6 +2941,7 @@ export class Game {
       this.enemies.push({
         id: this.nextEnemyId++,
         kind: "scout",
+        definitionId: "rainbow-scout",
         elite: false,
         eliteModifiers: [],
         entry: this.pickVocabularyEntry("mine"),
@@ -4469,125 +4475,140 @@ export class Game {
               : "rgba(255, 168, 69, 0.08)";
     context.lineWidth = targeted ? 2.8 : enemy.kind === "tank" ? 2.2 : 1.6;
 
-    context.beginPath();
+    const visual = enemyDefinition(
+      enemy.definitionId ??
+        runtimeEnemyDefinitionId(enemy.kind, enemy.elite),
+    );
+    const modularDrawn =
+      visual !== undefined &&
+      drawModularEnemy(context, visual, {
+        radius: enemy.radius,
+        age: enemy.age,
+        flash: enemy.flash,
+        targeted,
+      });
 
-    if (enemy.kind === "mine") {
-      for (let index = 0; index < 8; index += 1) {
-        const angle = (Math.PI * 2 * index) / 8 - Math.PI / 2;
-        const radius = index % 2 === 0 ? enemy.radius * 1.3 : enemy.radius * 0.62;
-        const x = Math.cos(angle) * radius;
-        const y = Math.sin(angle) * radius;
-        if (index === 0) context.moveTo(x, y);
-        else context.lineTo(x, y);
+    if (!modularDrawn) {
+      context.beginPath();
+  
+      if (enemy.kind === "mine") {
+        for (let index = 0; index < 8; index += 1) {
+          const angle = (Math.PI * 2 * index) / 8 - Math.PI / 2;
+          const radius = index % 2 === 0 ? enemy.radius * 1.3 : enemy.radius * 0.62;
+          const x = Math.cos(angle) * radius;
+          const y = Math.sin(angle) * radius;
+          if (index === 0) context.moveTo(x, y);
+          else context.lineTo(x, y);
+        }
+        context.closePath();
+      } else if (enemy.kind === "tank") {
+        for (let index = 0; index < 6; index += 1) {
+          const angle = (Math.PI * 2 * index) / 6 - Math.PI / 2;
+          const x = Math.cos(angle) * enemy.radius;
+          const y = Math.sin(angle) * enemy.radius * 0.78;
+          if (index === 0) context.moveTo(x, y);
+          else context.lineTo(x, y);
+        }
+        context.closePath();
+      } else if (enemy.kind === "destroyer") {
+        context.moveTo(0, enemy.radius);
+        context.lineTo(enemy.radius, -enemy.radius * 0.45);
+        context.lineTo(enemy.radius * 0.32, -enemy.radius * 0.72);
+        context.lineTo(0, -enemy.radius * 0.38);
+        context.lineTo(-enemy.radius * 0.32, -enemy.radius * 0.72);
+        context.lineTo(-enemy.radius, -enemy.radius * 0.45);
+        context.closePath();
+      } else if (enemy.kind === "oppressor") {
+        for (let index = 0; index < 6; index += 1) {
+          const angle = (Math.PI * 2 * index) / 6 - Math.PI / 2;
+          const radius =
+            index % 2 === 0 ? enemy.radius : enemy.radius * 0.78;
+          const x = Math.cos(angle) * radius;
+          const y = Math.sin(angle) * radius * 0.78;
+          if (index === 0) context.moveTo(x, y);
+          else context.lineTo(x, y);
+        }
+        context.closePath();
+      } else if (enemy.kind === "carrier") {
+        context.moveTo(0, enemy.radius * 0.78);
+        context.lineTo(enemy.radius * 1.12, enemy.radius * 0.12);
+        context.lineTo(enemy.radius * 0.72, -enemy.radius * 0.58);
+        context.lineTo(0, -enemy.radius * 0.35);
+        context.lineTo(-enemy.radius * 0.72, -enemy.radius * 0.58);
+        context.lineTo(-enemy.radius * 1.12, enemy.radius * 0.12);
+        context.closePath();
+      } else if (enemy.kind === "shield") {
+        context.arc(0, 0, enemy.radius * 0.72, 0, Math.PI * 2);
+      } else if (enemy.kind === "jammer") {
+        context.moveTo(0, enemy.radius);
+        context.lineTo(enemy.radius * 0.86, 0);
+        context.lineTo(0, -enemy.radius);
+        context.lineTo(-enemy.radius * 0.86, 0);
+        context.closePath();
+      } else if (enemy.kind === "cloaker") {
+        context.moveTo(0, enemy.radius);
+        context.lineTo(enemy.radius * 0.95, -enemy.radius * 0.62);
+        context.lineTo(enemy.radius * 0.28, -enemy.radius * 0.42);
+        context.lineTo(0, -enemy.radius * 0.78);
+        context.lineTo(-enemy.radius * 0.28, -enemy.radius * 0.42);
+        context.lineTo(-enemy.radius * 0.95, -enemy.radius * 0.62);
+        context.closePath();
+      } else if (enemy.kind === "healer") {
+        context.moveTo(0, enemy.radius);
+        context.lineTo(enemy.radius * 0.5, enemy.radius * 0.26);
+        context.lineTo(enemy.radius, 0);
+        context.lineTo(enemy.radius * 0.5, -enemy.radius * 0.26);
+        context.lineTo(0, -enemy.radius);
+        context.lineTo(-enemy.radius * 0.5, -enemy.radius * 0.26);
+        context.lineTo(-enemy.radius, 0);
+        context.lineTo(-enemy.radius * 0.5, enemy.radius * 0.26);
+        context.closePath();
+      } else if (enemy.kind === "splitter") {
+        context.moveTo(0, enemy.radius);
+        context.lineTo(enemy.radius * 0.8, enemy.radius * 0.25);
+        context.lineTo(enemy.radius * 0.45, -enemy.radius * 0.75);
+        context.lineTo(0, -enemy.radius * 0.35);
+        context.lineTo(-enemy.radius * 0.45, -enemy.radius * 0.75);
+        context.lineTo(-enemy.radius * 0.8, enemy.radius * 0.25);
+        context.closePath();
+      } else if (enemy.kind === "sniper") {
+        context.moveTo(0, enemy.radius);
+        context.lineTo(enemy.radius * 0.52, -enemy.radius * 0.3);
+        context.lineTo(enemy.radius * 0.22, -enemy.radius);
+        context.lineTo(0, -enemy.radius * 0.64);
+        context.lineTo(-enemy.radius * 0.22, -enemy.radius);
+        context.lineTo(-enemy.radius * 0.52, -enemy.radius * 0.3);
+        context.closePath();
+      } else if (enemy.kind === "leech") {
+        for (let index = 0; index < 7; index += 1) {
+          const angle = (Math.PI * 2 * index) / 7 - Math.PI / 2;
+          const radius =
+            index % 2 === 0 ? enemy.radius : enemy.radius * 0.7;
+          const x = Math.cos(angle) * radius;
+          const y = Math.sin(angle) * radius;
+          if (index === 0) context.moveTo(x, y);
+          else context.lineTo(x, y);
+        }
+        context.closePath();
+      } else if (enemy.kind === "commander") {
+        context.moveTo(0, enemy.radius);
+        context.lineTo(enemy.radius, enemy.radius * 0.1);
+        context.lineTo(enemy.radius * 0.65, -enemy.radius * 0.72);
+        context.lineTo(0, -enemy.radius * 0.45);
+        context.lineTo(-enemy.radius * 0.65, -enemy.radius * 0.72);
+        context.lineTo(-enemy.radius, enemy.radius * 0.1);
+        context.closePath();
+      } else {
+        context.moveTo(0, enemy.radius);
+        context.lineTo(enemy.radius * 0.9, -enemy.radius * 0.72);
+        context.lineTo(0, -enemy.radius * 0.34);
+        context.lineTo(-enemy.radius * 0.9, -enemy.radius * 0.72);
+        context.closePath();
       }
-      context.closePath();
-    } else if (enemy.kind === "tank") {
-      for (let index = 0; index < 6; index += 1) {
-        const angle = (Math.PI * 2 * index) / 6 - Math.PI / 2;
-        const x = Math.cos(angle) * enemy.radius;
-        const y = Math.sin(angle) * enemy.radius * 0.78;
-        if (index === 0) context.moveTo(x, y);
-        else context.lineTo(x, y);
-      }
-      context.closePath();
-    } else if (enemy.kind === "destroyer") {
-      context.moveTo(0, enemy.radius);
-      context.lineTo(enemy.radius, -enemy.radius * 0.45);
-      context.lineTo(enemy.radius * 0.32, -enemy.radius * 0.72);
-      context.lineTo(0, -enemy.radius * 0.38);
-      context.lineTo(-enemy.radius * 0.32, -enemy.radius * 0.72);
-      context.lineTo(-enemy.radius, -enemy.radius * 0.45);
-      context.closePath();
-    } else if (enemy.kind === "oppressor") {
-      for (let index = 0; index < 6; index += 1) {
-        const angle = (Math.PI * 2 * index) / 6 - Math.PI / 2;
-        const radius =
-          index % 2 === 0 ? enemy.radius : enemy.radius * 0.78;
-        const x = Math.cos(angle) * radius;
-        const y = Math.sin(angle) * radius * 0.78;
-        if (index === 0) context.moveTo(x, y);
-        else context.lineTo(x, y);
-      }
-      context.closePath();
-    } else if (enemy.kind === "carrier") {
-      context.moveTo(0, enemy.radius * 0.78);
-      context.lineTo(enemy.radius * 1.12, enemy.radius * 0.12);
-      context.lineTo(enemy.radius * 0.72, -enemy.radius * 0.58);
-      context.lineTo(0, -enemy.radius * 0.35);
-      context.lineTo(-enemy.radius * 0.72, -enemy.radius * 0.58);
-      context.lineTo(-enemy.radius * 1.12, enemy.radius * 0.12);
-      context.closePath();
-    } else if (enemy.kind === "shield") {
-      context.arc(0, 0, enemy.radius * 0.72, 0, Math.PI * 2);
-    } else if (enemy.kind === "jammer") {
-      context.moveTo(0, enemy.radius);
-      context.lineTo(enemy.radius * 0.86, 0);
-      context.lineTo(0, -enemy.radius);
-      context.lineTo(-enemy.radius * 0.86, 0);
-      context.closePath();
-    } else if (enemy.kind === "cloaker") {
-      context.moveTo(0, enemy.radius);
-      context.lineTo(enemy.radius * 0.95, -enemy.radius * 0.62);
-      context.lineTo(enemy.radius * 0.28, -enemy.radius * 0.42);
-      context.lineTo(0, -enemy.radius * 0.78);
-      context.lineTo(-enemy.radius * 0.28, -enemy.radius * 0.42);
-      context.lineTo(-enemy.radius * 0.95, -enemy.radius * 0.62);
-      context.closePath();
-    } else if (enemy.kind === "healer") {
-      context.moveTo(0, enemy.radius);
-      context.lineTo(enemy.radius * 0.5, enemy.radius * 0.26);
-      context.lineTo(enemy.radius, 0);
-      context.lineTo(enemy.radius * 0.5, -enemy.radius * 0.26);
-      context.lineTo(0, -enemy.radius);
-      context.lineTo(-enemy.radius * 0.5, -enemy.radius * 0.26);
-      context.lineTo(-enemy.radius, 0);
-      context.lineTo(-enemy.radius * 0.5, enemy.radius * 0.26);
-      context.closePath();
-    } else if (enemy.kind === "splitter") {
-      context.moveTo(0, enemy.radius);
-      context.lineTo(enemy.radius * 0.8, enemy.radius * 0.25);
-      context.lineTo(enemy.radius * 0.45, -enemy.radius * 0.75);
-      context.lineTo(0, -enemy.radius * 0.35);
-      context.lineTo(-enemy.radius * 0.45, -enemy.radius * 0.75);
-      context.lineTo(-enemy.radius * 0.8, enemy.radius * 0.25);
-      context.closePath();
-    } else if (enemy.kind === "sniper") {
-      context.moveTo(0, enemy.radius);
-      context.lineTo(enemy.radius * 0.52, -enemy.radius * 0.3);
-      context.lineTo(enemy.radius * 0.22, -enemy.radius);
-      context.lineTo(0, -enemy.radius * 0.64);
-      context.lineTo(-enemy.radius * 0.22, -enemy.radius);
-      context.lineTo(-enemy.radius * 0.52, -enemy.radius * 0.3);
-      context.closePath();
-    } else if (enemy.kind === "leech") {
-      for (let index = 0; index < 7; index += 1) {
-        const angle = (Math.PI * 2 * index) / 7 - Math.PI / 2;
-        const radius =
-          index % 2 === 0 ? enemy.radius : enemy.radius * 0.7;
-        const x = Math.cos(angle) * radius;
-        const y = Math.sin(angle) * radius;
-        if (index === 0) context.moveTo(x, y);
-        else context.lineTo(x, y);
-      }
-      context.closePath();
-    } else if (enemy.kind === "commander") {
-      context.moveTo(0, enemy.radius);
-      context.lineTo(enemy.radius, enemy.radius * 0.1);
-      context.lineTo(enemy.radius * 0.65, -enemy.radius * 0.72);
-      context.lineTo(0, -enemy.radius * 0.45);
-      context.lineTo(-enemy.radius * 0.65, -enemy.radius * 0.72);
-      context.lineTo(-enemy.radius, enemy.radius * 0.1);
-      context.closePath();
-    } else {
-      context.moveTo(0, enemy.radius);
-      context.lineTo(enemy.radius * 0.9, -enemy.radius * 0.72);
-      context.lineTo(0, -enemy.radius * 0.34);
-      context.lineTo(-enemy.radius * 0.9, -enemy.radius * 0.72);
-      context.closePath();
+  
+      context.fill();
+      context.stroke();
     }
-
-    context.fill();
-    context.stroke();
 
     if (enemy.elite) {
       context.strokeStyle = "rgba(255, 226, 105, 0.64)";
@@ -4616,7 +4637,7 @@ export class Game {
       }
     }
 
-    if (enemy.kind === "tank") {
+    if (!modularDrawn && enemy.kind === "tank") {
       context.strokeStyle = "rgba(169, 154, 255, 0.45)";
       context.lineWidth = 1.4;
       context.beginPath();
@@ -4639,7 +4660,7 @@ export class Game {
       }
     }
 
-    if (enemy.kind === "oppressor") {
+    if (!modularDrawn && enemy.kind === "oppressor") {
       context.strokeStyle = "rgba(229, 111, 255, 0.38)";
       context.lineWidth = 1.5;
       context.beginPath();
@@ -4651,7 +4672,7 @@ export class Game {
       context.stroke();
     }
 
-    if (enemy.kind === "shield" && enemy.layersRemaining > 1) {
+    if (!modularDrawn && enemy.kind === "shield" && enemy.layersRemaining > 1) {
       context.strokeStyle = "rgba(91, 255, 214, 0.55)";
       context.lineWidth = 2;
       context.beginPath();
@@ -4664,13 +4685,13 @@ export class Game {
       context.stroke();
     }
 
-    if (enemy.kind === "carrier") {
+    if (!modularDrawn && enemy.kind === "carrier") {
       context.fillStyle = "rgba(255, 219, 105, 0.75)";
       context.fillRect(-enemy.radius * 0.85, 2, 7, 7);
       context.fillRect(enemy.radius * 0.85 - 7, 2, 7, 7);
     }
 
-    if (enemy.kind === "jammer") {
+    if (!modularDrawn && enemy.kind === "jammer") {
       context.strokeStyle = "rgba(221, 255, 105, 0.45)";
       context.lineWidth = 1.4;
       for (const scale of [0.75, 1.08]) {
@@ -4683,7 +4704,7 @@ export class Game {
       }
     }
 
-    if (enemy.kind === "healer") {
+    if (!modularDrawn && enemy.kind === "healer") {
       context.strokeStyle = "rgba(111, 255, 185, 0.55)";
       context.lineWidth = 2;
       context.beginPath();
@@ -4694,7 +4715,7 @@ export class Game {
       context.stroke();
     }
 
-    if (enemy.kind === "commander") {
+    if (!modularDrawn && enemy.kind === "commander") {
       context.strokeStyle = "rgba(255, 243, 156, 0.52)";
       context.lineWidth = 1.4;
       context.beginPath();
@@ -4705,7 +4726,7 @@ export class Game {
       context.fillRect(-2, -enemy.radius * 0.82, 4, 8);
     }
 
-    if (enemy.kind === "leech") {
+    if (!modularDrawn && enemy.kind === "leech") {
       context.strokeStyle = "rgba(194, 119, 255, 0.48)";
       context.lineWidth = 1.5;
       context.beginPath();

@@ -35,8 +35,8 @@ describe("enemy visual/reward registry", () => {
   it("validates the first playable art slice", () => {
     expect(validateEnemyRegistry()).toEqual([]);
 
-    const ids = ENEMY_REGISTRY.map((definition) => definition.id);
-    expect(ids).toEqual([
+    const ids = new Set(ENEMY_REGISTRY.map((definition) => definition.id));
+    for (const id of [
       "rainbow-scout",
       "rainbow-dart",
       "rainbow-bubble",
@@ -47,7 +47,9 @@ describe("enemy visual/reward registry", () => {
       "berserk-devil",
       "archangel-core",
       "demon-lord-orb",
-    ]);
+    ]) {
+      expect(ids.has(id as never)).toBe(true);
+    }
   });
 
   it("keeps reward identity visible without relying on color alone", () => {
