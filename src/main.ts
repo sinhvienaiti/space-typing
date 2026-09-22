@@ -924,6 +924,7 @@ let hiddenDiscovery: HiddenDiscoveryState = createHiddenDiscoveryState();
 let credits = 0;
 let progression: ProgressionState = createProgressionState();
 let persistenceReady = false;
+let vocabularyReady = false;
 let equipmentDropCounter = 0;
 let shopPurchaseCounter = 0;
 let currentSpecialShop: SpecialShopKind = "black-market";
@@ -1339,6 +1340,16 @@ function renderPhase(phase: GamePhase): void {
   byId("quickItems").classList.toggle("hidden", phase !== "playing");
   byId("quickSkills").classList.toggle("hidden", phase !== "playing");
   byId("quickSupport").classList.toggle("hidden", phase !== "playing");
+
+  if (phase !== "playing" && phase !== "paused") {
+    renderStageEvents([]);
+    renderStatuses([]);
+    renderBoss(null);
+    const typingTextBadge = byId("typingTextBadge");
+    typingTextBadge.textContent = "";
+    typingTextBadge.classList.add("hidden");
+  }
+
   renderInventory();
   renderAllSkills();
 }
@@ -2624,7 +2635,7 @@ async function prepareStageVocabulary(
 }
 
 async function startSelectedStage(): Promise<void> {
-  if (!persistenceReady || stageStartPending) return;
+  if (!persistenceReady || !vocabularyReady || stageStartPending) return;
   stageStartPending = true;
 
   try {
@@ -2747,7 +2758,7 @@ async function initializePlayerProgress(): Promise<void> {
     persistenceReady = true;
 
     updateCampaignUi();
-    startButton.disabled = false;
+    startButton.disabled = !vocabularyReady;
     stageSelectButton.disabled = false;
     equipmentButton.disabled = false;
     shopButton.disabled = false;
@@ -3232,17 +3243,21 @@ async function initializeArtPipeline(): Promise<void> {
 }
 
 async function loadInitialVocabulary(): Promise<void> {
-  if (sourceState.mode === "custom") {
-    const custom = parseCustomVocabulary(localStorage.getItem(CUSTOM_KEY) ?? "");
-    if (custom.length > 0) {
-      configuredVocabulary = custom;
-      game.setVocabulary(custom);
-      return;
-    }
-    sourceState = { mode: "class", level: 1 };
-  }
-
   try {
+    if (sourceState.mode === "custom") {
+      const custom = parseCustomVocabulary(
+        localStorage.getItem(CUSTOM_KEY) ?? "",
+      );
+      if (custom.length > 0) {
+        configuredVocabulary = custom;
+        game.setVocabulary(custom);
+        return;
+      }
+
+      sourceState = { mode: "class", level: 1 };
+      localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
+    }
+
     const index = await ensureVocabularyIndex();
     configuredVocabulary = await loadVocabularyLevel(
       sourceState.level,
@@ -3250,7 +3265,13 @@ async function loadInitialVocabulary(): Promise<void> {
     );
     game.setVocabulary(configuredVocabulary);
   } catch (error) {
-    console.warn("Shared vocabulary unavailable; using bundled fallback.", error);
+    console.warn(
+      "Shared vocabulary unavailable; using bundled fallback.",
+      error,
+    );
+  } finally {
+    vocabularyReady = true;
+    byId<HTMLButtonElement>("startButton").disabled = !persistenceReady;
   }
 }
 

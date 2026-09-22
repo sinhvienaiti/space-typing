@@ -1458,7 +1458,7 @@ export class Game {
       return;
     }
 
-    if (this.boss !== null) {
+    if (this.boss !== null && this.boss.typed > 0) {
       this.typeBoss(key);
       return;
     }
@@ -1492,6 +1492,11 @@ export class Game {
       typingText(this.anomalyCrate.entry.en)[0] === key
     ) {
       this.typeAnomalyCrate(this.anomalyCrate, key);
+      return;
+    }
+
+    if (this.boss !== null) {
+      this.typeBoss(key);
       return;
     }
 
