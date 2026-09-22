@@ -606,6 +606,37 @@ describe("player save persistence model", () => {
     });
   });
 
+  it("migrates PlayerSave v23 to default M19 Codex without losing Relics", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const legacy = {
+      ...current,
+      version: 23,
+      relics: {
+        version: 1,
+        owned: ["first-light-seed"],
+        equipped: ["first-light-seed"],
+      },
+    } as Record<string, unknown>;
+    delete legacy.codex;
+
+    const migration = migratePlayerSave(legacy);
+
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(23);
+    expect(migration.save.version).toBe(PLAYER_SAVE_VERSION);
+    expect(migration.save.codex).toEqual({
+      version: 1,
+      worlds: [],
+      enemies: [],
+      rewards: [],
+    });
+    expect(migration.save.relics).toEqual({
+      version: 1,
+      owned: ["first-light-seed"],
+      equipped: ["first-light-seed"],
+    });
+  });
+
   it("keeps a valid current-version save without migration", () => {
     const save = createPlayerSave(
       createDefaultCampaignProgress(),
