@@ -64,6 +64,7 @@ export type RunPersistentState = {
 };
 
 export type CheckpointSnapshot = RunPersistentState;
+export type CrashRecoverySnapshot = RunPersistentState;
 
 function campaignAtCheckpoint(
   input: CampaignProgress,
@@ -90,19 +91,17 @@ export function createCheckpointSnapshot(
   input: RunPersistentState,
   checkpointStage: number,
 ): CheckpointSnapshot {
+  const safe = sanitizeRunPersistentState(input);
   return {
-    campaign: campaignAtCheckpoint(input.campaign, checkpointStage),
-    inventory: sanitizeInventory(input.inventory),
-    equipment: sanitizeEquipmentState(input.equipment),
-    supportSpells: sanitizeSupportSpellState(input.supportSpells),
-    characters: sanitizeCharacterState(input.characters),
-    luckPity: sanitizeLuckPityState(input.luckPity),
-    hiddenDiscovery: sanitizeHiddenDiscoveryState(input.hiddenDiscovery),
-    credits: sanitizeCredits(input.credits),
-    progression: sanitizeProgressionState(input.progression),
-    expansionCurrencies:
-      sanitizeExpansionCurrencyState(input.expansionCurrencies),
+    ...safe,
+    campaign: campaignAtCheckpoint(safe.campaign, checkpointStage),
   };
+}
+
+export function createCrashRecoverySnapshot(
+  input: RunPersistentState,
+): CrashRecoverySnapshot {
+  return sanitizeRunPersistentState(input);
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -211,6 +210,12 @@ export function isValidCheckpointSnapshot(
   return isValidRunPersistentState(value);
 }
 
+export function isValidCrashRecoverySnapshot(
+  value: unknown,
+): value is CrashRecoverySnapshot {
+  return isValidRunPersistentState(value);
+}
+
 export function sanitizeRunPersistentState(
   value: RunPersistentState,
 ): RunPersistentState {
@@ -239,20 +244,14 @@ export function sanitizeCheckpointSnapshot(
     return createCheckpointSnapshot(fallback, checkpointStage);
   }
 
-  return {
-    campaign: sanitizeCampaignProgress(value.campaign),
-    inventory: sanitizeInventory(value.inventory),
-    equipment: sanitizeEquipmentState(value.equipment),
-    supportSpells: sanitizeSupportSpellState(value.supportSpells),
-    characters: sanitizeCharacterState(value.characters),
-    luckPity: sanitizeLuckPityState(value.luckPity),
-    hiddenDiscovery:
-      sanitizeHiddenDiscoveryState(value.hiddenDiscovery),
-    credits: sanitizeCredits(value.credits),
-    progression: sanitizeProgressionState(value.progression),
-    expansionCurrencies:
-      sanitizeExpansionCurrencyState(value.expansionCurrencies),
-  };
+  return sanitizeRunPersistentState(value);
+}
+
+export function sanitizeCrashRecoverySnapshot(
+  value: unknown,
+): CrashRecoverySnapshot | null {
+  if (!isValidCrashRecoverySnapshot(value)) return null;
+  return sanitizeRunPersistentState(value);
 }
 
 function mergeKnowledgeCampaign(
