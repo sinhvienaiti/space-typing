@@ -3959,7 +3959,15 @@ function persistPageLifecycleRecovery(): void {
   if (!persistenceReady) return;
 
   const savedAt = new Date().toISOString();
-  captureSafeCrashRecovery("pagehide", savedAt);
+  const phase = game.getPhase();
+
+  // Mid-encounter page lifecycle events must not promote equipment drops,
+  // item consumption or other unsafe combat mutations into a new recovery
+  // point. The mirror still writes the current top-level state, but load
+  // resolution restores the previous safe snapshot.
+  if (phase === "title" || phase === "stageclear") {
+    captureSafeCrashRecovery("pagehide", savedAt);
+  }
 
   try {
     persistRecoveryMirrorSync("pagehide", savedAt);
