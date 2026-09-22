@@ -114,7 +114,7 @@ function profileFor(world: WorldProfile): WorldEnvironmentProfile {
   return {
     id: world.backgroundProfile,
     worldId: world.id,
-    backgroundCore: palette.cores[slot],
+    backgroundCore: palette.cores[slot] ?? palette.cores[0],
     backgroundMid: palette.mid,
     backgroundEdge: palette.edge,
     starRgb: palette.starRgb,
