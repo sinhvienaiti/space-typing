@@ -2928,7 +2928,9 @@ Implement:
 
 ## M03 — Crash recovery
 
-Implement:
+**Status: Complete.** PlayerSave v17 now persists deterministic safe-transition crash recovery separately from the M02 committed checkpoint, real gameplay death invalidates technical recovery before rollback, page lifecycle handling does not promote unsafe mid-combat state, and load/import paths enforce anti-reload rollback. See `docs/M03_CRASH_RECOVERY.md`.
+
+Implemented:
 
 - technical recovery after safe transitions;
 - death-invalid recovery;
