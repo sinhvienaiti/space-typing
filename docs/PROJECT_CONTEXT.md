@@ -3307,6 +3307,22 @@ Run child CI and parent CI.
 ## Step 73
 Run complete Review Pass #1 and fix all issues.
 
+**Status: implemented and CI-verified.**
+
+Review Pass #1 findings/fixes:
+
+- persistence recovery now prefers the newer full save when Campaign progress ties, preventing newer Credits/inventory/equipment/progression state from being silently replaced by an older IndexedDB snapshot;
+- mission/progression backup validation is structural and no longer depends on JSON object key order;
+- stage WPM uses pause-safe active gameplay seconds instead of wall-clock time, so pause/reward/anomaly dialogs do not reduce measured WPM;
+- runtime difficulty now exposes Relaxed / Normal / Hard / Expert / Adaptive / Custom instead of hardcoding Normal at 60 WPM / 96% accuracy;
+- Adaptive keeps a bounded EMA profile from valid Campaign stage clears and feeds the production `difficultyFor` path between stages;
+- Custom mode wires target WPM and pressure into the existing difficulty model without changing the combat formulas;
+- delayed multi-note SFX timers are cancelled on destroy and cannot recreate an `AudioContext` after teardown;
+- failed stages checkpoint current persistent pity state at Game Over rather than relying only on a later pagehide/save;
+- equipment selected from Choice Crates now counts toward equipment-drop mission progression;
+- targeted tests cover recovery freshness, structural progression validation, active-time WPM, adaptive smoothing/runtime settings and SFX teardown;
+- PR #22 CI #126 passed Test and Build before this documentation checkpoint.
+
 ## Step 74
 Run complete Review Pass #2.
 

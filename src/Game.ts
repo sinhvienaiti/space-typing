@@ -411,6 +411,7 @@ export class Game {
     createStageEventModifiers();
   private statusState: StatusState = createStatusState();
   private activeSynergies = new Set<BuildSynergyId>();
+  private stageElapsedSeconds = 0;
   private hitStopTimer = 0;
   private readonly frameProfiler = new FrameProfiler();
   private lastTime = performance.now();
@@ -1195,6 +1196,10 @@ export class Game {
     return { ...this.playerStats };
   }
 
+  getStageElapsedSeconds(): number {
+    return this.stageElapsedSeconds;
+  }
+
   setLuckPityState(state: LuckPityState): void {
     this.luckPity = sanitizeLuckPityState(state);
   }
@@ -1279,6 +1284,7 @@ export class Game {
     this.hooks.onStageEvents(this.stageEvents);
 
     this.phase = "playing";
+    this.stageElapsedSeconds = 0;
     this.stats = this.createGameStats(stage.stage);
     this.stats.shield = Math.min(
       this.stats.maxShield,
@@ -1525,6 +1531,7 @@ export class Game {
     this.frameProfiler.pushFrame(rawDt);
 
     if (this.phase === "playing") {
+      this.stageElapsedSeconds += dt;
       if (this.hitStopTimer > 0) {
         this.hitStopTimer = Math.max(0, this.hitStopTimer - dt);
         this.updateEffects(dt);
