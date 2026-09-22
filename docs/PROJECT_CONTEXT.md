@@ -3476,9 +3476,10 @@ Gameplay Expansion:
 - M15 Hidden Challenge / Hidden World / Champion Hunt: COMPLETE
 - M16 Stage Objectives + boss typing mechanics: COMPLETE
 - M17 Skill/attribute/equipment upgrade expansion: COMPLETE
+- M18 Run Relics: COMPLETE
 
 Next:
-- M18 Run Relics
+- M19 Reward layer expansion + Codex
 ~~~
 
 Current gameplay/progression foundation:
@@ -3548,12 +3549,15 @@ Current gameplay/progression foundation:
 - M17 UpgradeState persists core skill Lv1-Lv5 and permanent core-stat training through PlayerSave/checkpoint/crash/death rollback;
 - Lv5 core-skill mastery and level scaling compile into the existing SkillEngine/Game execution paths;
 - equipment instances can carry bounded grade-dependent affixes; Station services support dismantle, Silver/Gold evolution and affix roll/reroll without a second equipment system;
+- M18 RelicState is run-persistent build state with up to 3 equipped Relics; sector/Hidden Encounter reward paths unlock deterministic eligible Relics;
+- equipped Relics compile only on loadout changes into direct combat fields for first-word sustain, perfect-word chaining, streak freeze, long boss-word damage and miss guarding;
+- Relic loadout management reuses the existing Station Service / Upgrade screen and autosave queue;
 - rare resurrection items can appear only as finite stock in eligible rare merchant pools;
 - shop stock participates in checkpoint rollback, crash recovery and stage-entry recovery;
 - Skill Engine:
   Energy / cooldown / charges / typing conditions / per-stage limits;
 - defensive and offensive combat skills plus 2-slot Support Spell loadout;
-- IndexedDB PlayerSave schema v21;
+- IndexedDB PlayerSave schema v23;
 - explicit migrations from all earlier supported PlayerSave schemas;
 - synchronized recovery mirror + autosave queue + validated JSON backup/import.
 
@@ -3614,11 +3618,14 @@ CI #270 PASS Test + Build on implementation head
 
 M17 Skill / Attribute / Equipment Upgrade Expansion
 CI #281 PASS · 517/517 tests · TypeScript check + production build
+
+M18 Run Relics
+CI #286 PASS · 522/522 tests · TypeScript check + production build
 ~~~
 
 Important implementation notes:
 
-- Current PlayerSave schema is version 22; v21 migrates deterministically by adding default UpgradeState while preserving existing Campaign, equipment, ShopState, RouteState and checkpoint/recovery domains.
+- Current PlayerSave schema is version 23; v22 migrates deterministically by adding empty RelicState while preserving UpgradeState, Campaign, equipment, ShopState, RouteState and checkpoint/recovery domains.
 - Permanent systems must extend PlayerSave through explicit migrations.
 - Current runtime equipment uses the five-grade model; legacy rarity names remain only in migration/compatibility paths and historical step notes.
 - `ShopState` and `RouteState` are part of `RunPersistentState`, so shop stock and route choices are segment state rather than separate local-storage systems.

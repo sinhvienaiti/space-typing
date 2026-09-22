@@ -22,6 +22,7 @@ import { createLuckPityState } from "../src/loot/pity";
 import { createHiddenDiscoveryState } from "../src/discovery/hidden-content";
 import { createProgressionState } from "../src/progression/missions";
 import { createUpgradeState } from "../src/progression/upgrades";
+import { createRelicState, grantRelic } from "../src/relics/state";
 import { createExpansionCurrencyState } from "../src/economy/currencies";
 import { createShopState } from "../src/shops/state";
 import { createRouteState } from "../src/campaign/route";
@@ -54,6 +55,7 @@ function runState(campaign: CampaignProgress): RunPersistentState {
     expansionCurrencies: createExpansionCurrencyState(),
     shops: createShopState(),
     route: createRouteState(campaign.highestUnlockedStage),
+    relics: createRelicState(),
   };
 }
 
@@ -140,6 +142,10 @@ describe("M02 checkpoint and rollback", () => {
     committedActive.hiddenDiscovery.discovered = ["echo-rift"];
     committedActive.progression.unlockedAchievements = ["first-clear"];
     committedActive.upgrades.attributeLevels.hull = 2;
+    committedActive.relics = grantRelic(
+      committedActive.relics,
+      "first-light-seed",
+    ).state;
 
     const committed = createCheckpointSnapshot(
       committedActive,
@@ -158,6 +164,7 @@ describe("M02 checkpoint and rollback", () => {
       quantumCore: 2,
     };
     active.upgrades.attributeLevels.hull = 9;
+    active.relics = grantRelic(active.relics, "storm-script").state;
     active.campaign.bestByStage["189"] = {
       score: 9000,
       accuracy: 100,
@@ -185,6 +192,7 @@ describe("M02 checkpoint and rollback", () => {
       quantumCore: 0,
     });
     expect(restored.upgrades.attributeLevels.hull).toBe(2);
+    expect(restored.relics.owned).toEqual(["first-light-seed"]);
     expect(restored.campaign.bestByStage["189"]?.score).toBe(9000);
     expect(restored.hiddenDiscovery.discovered).toEqual([
       "echo-rift",

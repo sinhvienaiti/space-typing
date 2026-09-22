@@ -75,6 +75,11 @@ import {
   type UpgradeState,
 } from "../progression/upgrades";
 import {
+  createRelicState,
+  sanitizeRelicState,
+  type RelicState,
+} from "../relics/state";
+import {
   resolveCrashRecovery,
   sanitizeCrashRecoverySnapshot,
   type CrashRecoverySnapshot,
@@ -90,7 +95,7 @@ const STORE_NAME = "player";
 const SAVE_KEY = "main";
 const RECOVERY_SAVE_KEY = "spaceTypingPlayerSaveRecoveryV3";
 
-export const PLAYER_SAVE_VERSION = 22;
+export const PLAYER_SAVE_VERSION = 23;
 
 export class UnsupportedPlayerSaveVersionError extends Error {
   constructor(readonly version: number) {
@@ -119,6 +124,7 @@ export type SaveReason =
   | "shop"
   | "route-choice"
   | "upgrade"
+  | "relic"
   | "hidden-transition"
   | "progression"
   | "pagehide"
@@ -430,7 +436,31 @@ export type PlayerSaveV22 = {
   lastSaveReason: SaveReason;
 };
 
-export type PlayerSave = PlayerSaveV22;
+export type PlayerSaveV23 = {
+  version: 23;
+  campaign: CampaignProgress;
+  inventory: Inventory;
+  equipment: EquipmentState;
+  supportSpells: SupportSpellState;
+  characters: CharacterState;
+  luckPity: LuckPityState;
+  hiddenDiscovery: HiddenDiscoveryState;
+  credits: number;
+  progression: ProgressionState;
+  expansionCurrencies: ExpansionCurrencyState;
+  campaignExpansion: CampaignExpansionState;
+  checkpointSnapshot: CheckpointSnapshot;
+  crashRecoverySnapshot: CrashRecoverySnapshot | null;
+  stageEntrySnapshot: StageEntrySnapshot | null;
+  shops: ShopState;
+  route: RouteState;
+  upgrades: UpgradeState;
+  relics: RelicState;
+  updatedAt: string;
+  lastSaveReason: SaveReason;
+};
+
+export type PlayerSave = PlayerSaveV23;
 export type PersistenceSource = "indexeddb" | "localStorage";
 
 export type LoadedPlayerSave = {
@@ -460,6 +490,7 @@ function normalizeSaveReason(value: unknown): SaveReason {
     value === "shop" ||
     value === "route-choice" ||
     value === "upgrade" ||
+    value === "relic" ||
     value === "hidden-transition" ||
     value === "progression" ||
     value === "pagehide" ||
@@ -490,6 +521,7 @@ export function createPlayerSave(
   shops: ShopState = createShopState(),
   route: RouteState = createRouteState(campaign.highestUnlockedStage),
   upgrades: UpgradeState = createUpgradeState(),
+  relics: RelicState = createRelicState(),
 ): PlayerSave {
   const safeCampaign = sanitizeCampaignProgress(campaign);
   const activeState: RunPersistentState = {
@@ -510,6 +542,7 @@ export function createPlayerSave(
       safeCampaign.highestUnlockedStage,
     ),
     upgrades: sanitizeUpgradeState(upgrades),
+    relics: sanitizeRelicState(relics),
   };
   const safeCampaignExpansion = sanitizeCampaignExpansionState(
     campaignExpansion,
@@ -570,6 +603,7 @@ export function migratePlayerSave(value: unknown): MigrationResult {
     shops?: unknown;
     route?: unknown;
     upgrades?: unknown;
+    relics?: unknown;
     updatedAt?: unknown;
     lastSaveReason?: unknown;
   };
@@ -1009,6 +1043,43 @@ export function migratePlayerSave(value: unknown): MigrationResult {
     };
   }
 
+  if (raw.version === 22) {
+    const safeCampaign = sanitizeCampaignProgress(raw.campaign);
+    return {
+      save: createPlayerSave(
+        safeCampaign,
+        typeof raw.updatedAt === "string" ? raw.updatedAt : "",
+        "migration",
+        sanitizeInventory(raw.inventory),
+        sanitizeEquipmentState(raw.equipment),
+        sanitizeSupportSpellState(raw.supportSpells),
+        sanitizeCharacterState(raw.characters),
+        sanitizeLuckPityState(raw.luckPity),
+        sanitizeHiddenDiscoveryState(raw.hiddenDiscovery),
+        sanitizeCredits(raw.credits),
+        sanitizeProgressionState(raw.progression),
+        sanitizeExpansionCurrencyState(raw.expansionCurrencies),
+        sanitizeCampaignExpansionState(
+          raw.campaignExpansion,
+          safeCampaign,
+          typeof raw.updatedAt === "string" ? raw.updatedAt : "",
+        ),
+        raw.checkpointSnapshot as CheckpointSnapshot | undefined,
+        sanitizeCrashRecoverySnapshot(raw.crashRecoverySnapshot),
+        sanitizeStageEntrySnapshot(raw.stageEntrySnapshot),
+        sanitizeShopState(raw.shops),
+        sanitizeRouteState(
+          raw.route,
+          safeCampaign.highestUnlockedStage,
+        ),
+        sanitizeUpgradeState(raw.upgrades),
+        createRelicState(),
+      ),
+      migrated: true,
+      fromVersion: 22,
+    };
+  }
+
   if (raw.version === PLAYER_SAVE_VERSION) {
     return {
       save: createPlayerSave(
@@ -1038,6 +1109,7 @@ export function migratePlayerSave(value: unknown): MigrationResult {
           sanitizeCampaignProgress(raw.campaign).highestUnlockedStage,
         ),
         sanitizeUpgradeState(raw.upgrades),
+        sanitizeRelicState(raw.relics),
       ),
       migrated: false,
       fromVersion: PLAYER_SAVE_VERSION,
@@ -1157,6 +1229,7 @@ function recoverySaveFromLegacy(): PlayerSave {
       recovery.shops,
       recovery.route,
       recovery.upgrades,
+      recovery.relics,
     );
   } catch (error) {
     if (error instanceof UnsupportedPlayerSaveVersionError) throw error;
@@ -1188,6 +1261,7 @@ function runStateFromSave(save: PlayerSave): RunPersistentState {
     shops: save.shops,
     route: save.route,
     upgrades: save.upgrades,
+    relics: save.relics,
   };
 }
 
@@ -1231,6 +1305,7 @@ export function resolvePlayerSaveRecovery(
       resolution.state.shops,
       resolution.state.route,
       resolution.state.upgrades,
+      resolution.state.relics,
     ),
     recoveryMode: resolution.mode,
   };
@@ -1331,6 +1406,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
         resolved.save.shops,
         resolved.save.route,
         resolved.save.upgrades,
+        resolved.save.relics,
       );
       await writeSave(database, migrated);
       try {
@@ -1389,6 +1465,9 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
     const upgrades = useRecovery
       ? recovery.upgrades
       : migration.save.upgrades;
+    const relics = useRecovery
+      ? recovery.relics
+      : migration.save.relics;
     const campaignExpansion = useRecovery
       ? recovery.campaignExpansion
       : migration.save.campaignExpansion;
@@ -1416,6 +1495,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
       shops !== migration.save.shops ||
       route !== migration.save.route ||
       upgrades !== migration.save.upgrades ||
+      relics !== migration.save.relics ||
       campaignExpansion !== migration.save.campaignExpansion ||
       checkpointSnapshot !== migration.save.checkpointSnapshot ||
       crashRecoverySnapshot !== migration.save.crashRecoverySnapshot ||
@@ -1441,6 +1521,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
       shops,
       route,
       upgrades,
+      relics,
     );
     const resolved = resolvePlayerSaveRecovery(candidate);
 
@@ -1471,6 +1552,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
         resolved.save.shops,
         resolved.save.route,
         resolved.save.upgrades,
+        resolved.save.relics,
       );
       await writeSave(database, recovered);
       try {
@@ -1532,6 +1614,7 @@ export async function savePlayerProgress(
   shops: ShopState = createShopState(),
   route: RouteState = createRouteState(campaign.highestUnlockedStage),
   upgrades: UpgradeState = createUpgradeState(),
+  relics: RelicState = createRelicState(),
 ): Promise<PersistenceSource> {
   const save = createPlayerSave(
     campaign,
@@ -1553,6 +1636,7 @@ export async function savePlayerProgress(
     shops,
     route,
     upgrades,
+    relics,
   );
 
   if ("indexedDB" in window) {

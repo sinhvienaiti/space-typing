@@ -138,6 +138,21 @@ import {
   type UpgradeableSkillId,
 } from "./skills/progression";
 import {
+  RELIC_REGISTRY,
+  getRelicDefinition,
+  type RelicId,
+} from "./relics/registry";
+import {
+  MAX_EQUIPPED_RELICS,
+  compileRelicEffects,
+  createRelicState,
+  equipRelic,
+  grantRelic,
+  selectRelicReward,
+  unequipRelic,
+  type RelicState,
+} from "./relics/state";
+import {
   EQUIPMENT_AFFIX_REGISTRY,
   maxAffixesForGrade,
 } from "./equipment/affixes";
@@ -1189,6 +1204,7 @@ let hiddenDiscovery: HiddenDiscoveryState = createHiddenDiscoveryState();
 let credits = 0;
 let progression: ProgressionState = createProgressionState();
 let upgrades: UpgradeState = createUpgradeState();
+let relics: RelicState = createRelicState();
 let expansionCurrencies: ExpansionCurrencyState =
   createExpansionCurrencyState();
 let shops: ShopState = createShopState();
@@ -1215,6 +1231,7 @@ let checkpointSnapshot: CheckpointSnapshot =
       credits,
       progression,
       upgrades,
+      relics,
       expansionCurrencies,
       shops,
       route,
@@ -1302,6 +1319,7 @@ type AutosaveSnapshot = {
   credits: number;
   progression: ProgressionState;
   upgrades: UpgradeState;
+  relics: RelicState;
   expansionCurrencies: ExpansionCurrencyState;
   shops: ShopState;
   route: RouteState;
@@ -1334,6 +1352,7 @@ const campaignAutosave = new AutosaveQueue<
     snapshot.shops,
     snapshot.route,
     snapshot.upgrades,
+    snapshot.relics,
   ),
 );
 
@@ -1352,6 +1371,7 @@ function currentRunPersistentState(): RunPersistentState {
     shops,
     route,
     upgrades,
+    relics,
   };
 }
 
@@ -1366,6 +1386,7 @@ function applyRunPersistentState(state: RunPersistentState): void {
   credits = state.credits;
   progression = state.progression;
   upgrades = state.upgrades;
+  relics = state.relics;
   expansionCurrencies = state.expansionCurrencies;
   shops = state.shops;
   route = state.route;
@@ -1383,6 +1404,7 @@ function currentAutosaveSnapshot(): AutosaveSnapshot {
     credits,
     progression,
     upgrades,
+    relics,
     expansionCurrencies,
     shops,
     route,
@@ -1433,6 +1455,7 @@ function persistRecoveryMirrorSync(
       shops,
       route,
       upgrades,
+      relics,
     ),
   );
 }
@@ -1473,6 +1496,7 @@ function refreshPersistentStateUi(): void {
   renderInventory();
   applyEquipmentStats();
   applySupportSpells();
+  applyRelicEffects();
   renderCodex();
   renderProgression();
   if (shopDialog.open) renderNormalShop();
@@ -2576,6 +2600,12 @@ const game = new Game(
           clearedAt,
         );
       campaignExpansion = expansionResult.state;
+      const sectorRelic = expansionResult.checkpointCommitted
+        ? grantRelicReward(
+            stats.stage,
+            "sector:" + String(stats.stage),
+          )
+        : null;
       if (expansionResult.checkpointCommitted) {
         checkpointSnapshot = createCheckpointSnapshot(
           currentRunPersistentState(),
@@ -2586,7 +2616,8 @@ const game = new Game(
       const checkpointText = expansionResult.checkpointCommitted
         ? " · Checkpoint " +
           String(campaignExpansion.checkpoint.stage).padStart(3, "0") +
-          " committed"
+          " committed" +
+          relicRewardText(sectorRelic)
         : "";
 
       void autosaveCampaign(
@@ -2620,7 +2651,8 @@ const game = new Game(
         (currencyRewardText.length > 0
           ? " · " + currencyRewardText
           : "") +
-        objectiveText;
+        objectiveText +
+        relicRewardText(sectorRelic);
       byId("clearStreak").textContent = String(stats.maxStreak);
 
       updateCampaignUi();
@@ -2958,6 +2990,31 @@ function applyEquipmentStats(): void {
     ),
     synergy: buildSynergyStatBonus(synergies),
   });
+}
+
+function applyRelicEffects(): void {
+  game.setRelicEffects(compileRelicEffects(relics));
+}
+
+function grantRelicReward(
+  sourceStage: number,
+  sourceKey: string,
+): RelicId | null {
+  const id = selectRelicReward(relics, sourceStage, sourceKey);
+  if (id === null) return null;
+
+  relics = grantRelic(relics, id).state;
+  if (relics.equipped.length < MAX_EQUIPPED_RELICS) {
+    relics = equipRelic(relics, id).state;
+  }
+  applyRelicEffects();
+  return id;
+}
+
+function relicRewardText(id: RelicId | null): string {
+  return id === null
+    ? ""
+    : " · Relic: " + getRelicDefinition(id).name;
 }
 
 function formatEquipmentBonuses(): string {
@@ -3656,6 +3713,75 @@ function renderServiceShop(): void {
     repairPanel.append(card);
   }
 
+  const relicSummary = document.createElement("article");
+  relicSummary.className = "service-shop-card";
+  const relicTitle = document.createElement("strong");
+  relicTitle.textContent =
+    "Run Relics · " +
+    String(relics.equipped.length) +
+    "/" +
+    String(MAX_EQUIPPED_RELICS) +
+    " equipped";
+  const relicMeta = document.createElement("small");
+  relicMeta.textContent =
+    relics.owned.length === 0
+      ? "Sector and Hidden Encounter rewards can unlock Relics. Relic effects are compiled when the loadout changes."
+      : String(relics.owned.length) +
+        " owned · equip up to " +
+        String(MAX_EQUIPPED_RELICS) +
+        " at this Station.";
+  relicSummary.append(relicTitle, relicMeta);
+  repairPanel.append(relicSummary);
+
+  for (const id of relics.owned) {
+    const definition = RELIC_REGISTRY[id];
+    const equipped = relics.equipped.includes(id);
+    const card = document.createElement("article");
+    card.className = "service-shop-card";
+
+    const title = document.createElement("strong");
+    title.textContent =
+      definition.name +
+      " · " +
+      gradeLabel(definition.grade).toUpperCase();
+
+    const detail = document.createElement("small");
+    detail.textContent = definition.description;
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = equipped ? "Unequip Relic" : "Equip Relic";
+    button.disabled =
+      !equipped &&
+      relics.equipped.length >= MAX_EQUIPPED_RELICS;
+    button.addEventListener("click", () => {
+      const result = equipped
+        ? unequipRelic(relics, id)
+        : equipRelic(relics, id);
+      if (!result.changed) {
+        showNotice(
+          relics.equipped.length >= MAX_EQUIPPED_RELICS
+            ? "Relic loadout is full"
+            : "Relic loadout unchanged",
+        );
+        return;
+      }
+
+      relics = result.state;
+      applyRelicEffects();
+      renderServiceShop();
+      updateDataSummary();
+      void autosaveCampaign(
+        "relic",
+        "✓ Relic loadout saved · " + definition.name,
+        "loadout",
+      );
+    });
+
+    card.append(title, detail, button);
+    repairPanel.append(card);
+  }
+
   const grid = byId("upgradeShopGrid");
   grid.replaceChildren();
 
@@ -4099,13 +4225,23 @@ function handleHiddenEncounterClear(
     );
     const currencyText =
       expansionCurrencyRewardText(reward.currencies);
+    const hiddenRelic =
+      active.tier >= 2 ||
+      active.kind === "hidden-world" ||
+      active.kind === "champion-hunt"
+        ? grantRelicReward(
+            active.sourceStage,
+            "hidden:" + active.id + ":" + String(active.tier),
+          )
+        : null;
     rewardText =
       "+" +
       reward.credits.toLocaleString() +
       " Credits" +
       (currencyText.length > 0
         ? " · " + currencyText
-        : "");
+        : "") +
+      relicRewardText(hiddenRelic);
   } else {
     rewardText =
       "Hidden World progress · " +
@@ -4751,6 +4887,7 @@ async function initializePlayerProgress(): Promise<void> {
     credits = loaded.save.credits;
     progression = loaded.save.progression;
     upgrades = loaded.save.upgrades;
+    relics = loaded.save.relics;
     expansionCurrencies = loaded.save.expansionCurrencies;
     shops = loaded.save.shops;
     route = loaded.save.route;
@@ -4770,6 +4907,7 @@ async function initializePlayerProgress(): Promise<void> {
     renderInventory();
     applyEquipmentStats();
     applySupportSpells();
+    applyRelicEffects();
     currentGalaxy = Math.ceil(
       campaign.selectedStage / STAGES_PER_GALAXY,
     );
@@ -5118,7 +5256,11 @@ function updateDataSummary(): void {
     expansionCurrencies.starCrystal.toLocaleString() +
     " Star Crystal · " +
     expansionCurrencies.quantumCore.toLocaleString() +
-    " Quantum Core" +
+    " Quantum Core · " +
+    String(relics.owned.length) +
+    " Relics (" +
+    String(relics.equipped.length) +
+    " equipped)" +
     artMeta +
     performanceMeta;
 }
@@ -5158,6 +5300,7 @@ async function exportSave(): Promise<void> {
     shops,
     route,
     upgrades,
+    relics,
   );
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -5202,6 +5345,7 @@ async function importSaveFile(file: File): Promise<void> {
     const importedCredits = result.save.credits;
     const importedProgression = result.save.progression;
     const importedUpgrades = result.save.upgrades;
+    const importedRelics = result.save.relics;
     const importedExpansionCurrencies =
       result.save.expansionCurrencies;
     const importedShops = result.save.shops;
@@ -5237,6 +5381,7 @@ async function importSaveFile(file: File): Promise<void> {
     const previousCredits = credits;
     const previousProgression = progression;
     const previousUpgrades = upgrades;
+    const previousRelics = relics;
     const previousExpansionCurrencies = expansionCurrencies;
     const previousShops = shops;
     const previousRoute = route;
@@ -5254,6 +5399,7 @@ async function importSaveFile(file: File): Promise<void> {
     credits = importedCredits;
     progression = importedProgression;
     upgrades = importedUpgrades;
+    relics = importedRelics;
     expansionCurrencies = importedExpansionCurrencies;
     shops = importedShops;
     route = importedRoute;
@@ -5289,6 +5435,7 @@ async function importSaveFile(file: File): Promise<void> {
       credits = previousCredits;
       progression = previousProgression;
       upgrades = previousUpgrades;
+      relics = previousRelics;
       expansionCurrencies = previousExpansionCurrencies;
       shops = previousShops;
       route = previousRoute;
@@ -5303,6 +5450,7 @@ async function importSaveFile(file: File): Promise<void> {
       renderInventory();
       applyEquipmentStats();
       applySupportSpells();
+      applyRelicEffects();
       currentGalaxy = Math.ceil(
         campaign.selectedStage / STAGES_PER_GALAXY,
       );
