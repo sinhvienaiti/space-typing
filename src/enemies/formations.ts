@@ -160,7 +160,7 @@ export function chooseFormation(
   if (total <= 0) return candidates[0] ?? null;
 
   let cursor =
-    clamp(random, 0, 0.999999) * total;
+    clamp(random(), 0, 0.999999) * total;
   for (const candidate of candidates) {
     cursor -= Math.max(0, candidate.weight);
     if (cursor < 0) return candidate;
@@ -209,7 +209,7 @@ export function shouldAttemptFormation(
   random = Math.random(),
 ): boolean {
   return (
-    clamp(random, 0, 0.999999) <
+    clamp(random(), 0, 0.999999) <
     formationSpawnChance(difficulty, role)
   );
 }
