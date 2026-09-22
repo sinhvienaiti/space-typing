@@ -477,9 +477,12 @@ app.innerHTML = `
           <button id="vocabularyButton">Vocabulary</button>
           <button id="characterButton">Characters</button>
           <button id="equipmentButton">Equipment</button>
-          <button id="shopButton">Shop</button>
+          <button id="shopButton">Normal Shop</button>
+          <button id="stationShopButton">Station Shop</button>
+          <button id="travelingShopButton" class="hidden">Traveling Merchant</button>
           <button id="serviceShopButton">Repair / Upgrade</button>
           <button id="blackMarketButton" class="hidden">Black Market</button>
+          <button id="hiddenShopButton" class="hidden">Hidden Shop</button>
           <button id="eventShopButton" class="hidden">Event Shop</button>
           <button id="supportButton">Support Spells</button>
           <button id="codexButton">Codex</button>
@@ -732,8 +735,8 @@ app.innerHTML = `
         <button class="icon-button" aria-label="Close">×</button>
       </form>
       <p class="equipment-note">
-        <strong id="serviceShopCredits">0 Credits</strong>
-        · Upgrade owned equipment or restock one Repair Kit + Shield Cell.
+        <strong id="serviceShopCredits">0 Credits · 0 Alloy</strong>
+        · Upgrades and repair packs consume Credits + Alloy.
       </p>
       <div id="repairServicePanel" class="repair-service-panel"></div>
       <div id="upgradeShopGrid" class="upgrade-shop-grid"></div>
