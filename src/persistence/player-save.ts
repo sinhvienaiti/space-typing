@@ -88,6 +88,7 @@ export class UnsupportedPlayerSaveVersionError extends Error {
 
 export type SaveReason =
   | "migration"
+  | "stage-entry"
   | "stage-clear"
   | "gameover"
   | "stage-select"
@@ -319,6 +320,7 @@ export type MigrationResult = {
 
 function normalizeSaveReason(value: unknown): SaveReason {
   return value === "migration" ||
+    value === "stage-entry" ||
     value === "stage-clear" ||
     value === "gameover" ||
     value === "stage-select" ||
