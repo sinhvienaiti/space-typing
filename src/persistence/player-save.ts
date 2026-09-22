@@ -59,6 +59,11 @@ import {
   type CheckpointSnapshot,
   type RunPersistentState,
 } from "./checkpoint";
+import {
+  resolveCrashRecovery,
+  sanitizeCrashRecoverySnapshot,
+  type CrashRecoverySnapshot,
+} from "./crash-recovery";
 
 const DB_NAME = "space-typing";
 const INDEXED_DB_VERSION = 1;
@@ -66,7 +71,7 @@ const STORE_NAME = "player";
 const SAVE_KEY = "main";
 const RECOVERY_SAVE_KEY = "spaceTypingPlayerSaveRecoveryV3";
 
-export const PLAYER_SAVE_VERSION = 16;
+export const PLAYER_SAVE_VERSION = 17;
 
 export class UnsupportedPlayerSaveVersionError extends Error {
   constructor(readonly version: number) {
@@ -277,13 +282,33 @@ export type PlayerSaveV16 = {
   lastSaveReason: SaveReason;
 };
 
-export type PlayerSave = PlayerSaveV16;
+export type PlayerSaveV17 = {
+  version: 17;
+  campaign: CampaignProgress;
+  inventory: Inventory;
+  equipment: EquipmentState;
+  supportSpells: SupportSpellState;
+  characters: CharacterState;
+  luckPity: LuckPityState;
+  hiddenDiscovery: HiddenDiscoveryState;
+  credits: number;
+  progression: ProgressionState;
+  expansionCurrencies: ExpansionCurrencyState;
+  campaignExpansion: CampaignExpansionState;
+  checkpointSnapshot: CheckpointSnapshot;
+  crashRecoverySnapshot: CrashRecoverySnapshot | null;
+  updatedAt: string;
+  lastSaveReason: SaveReason;
+};
+
+export type PlayerSave = PlayerSaveV17;
 export type PersistenceSource = "indexeddb" | "localStorage";
 
 export type LoadedPlayerSave = {
   save: PlayerSave;
   source: PersistenceSource;
   migrated: boolean;
+  recoveryMode: "none" | "crash" | "death-rollback";
 };
 
 export type MigrationResult = {
@@ -327,6 +352,7 @@ export function createPlayerSave(
   campaignExpansion: CampaignExpansionState =
     createCampaignExpansionState(campaign, updatedAt),
   checkpointSnapshot?: CheckpointSnapshot,
+  crashRecoverySnapshot: CrashRecoverySnapshot | null = null,
 ): PlayerSave {
   const safeCampaign = sanitizeCampaignProgress(campaign);
   const activeState: RunPersistentState = {
@@ -364,6 +390,8 @@ export function createPlayerSave(
     ...activeState,
     campaignExpansion: safeCampaignExpansion,
     checkpointSnapshot: safeCheckpoint,
+    crashRecoverySnapshot:
+      sanitizeCrashRecoverySnapshot(crashRecoverySnapshot),
     updatedAt,
     lastSaveReason,
   };
@@ -392,6 +420,7 @@ export function migratePlayerSave(value: unknown): MigrationResult {
     expansionCurrencies?: unknown;
     campaignExpansion?: unknown;
     checkpointSnapshot?: unknown;
+    crashRecoverySnapshot?: unknown;
     updatedAt?: unknown;
     lastSaveReason?: unknown;
   };
@@ -638,6 +667,37 @@ export function migratePlayerSave(value: unknown): MigrationResult {
     };
   }
 
+  if (raw.version === 16) {
+    const safeCampaign = sanitizeCampaignProgress(raw.campaign);
+    const timestamp =
+      typeof raw.updatedAt === "string" ? raw.updatedAt : "";
+    return {
+      save: createPlayerSave(
+        safeCampaign,
+        timestamp,
+        "migration",
+        sanitizeInventory(raw.inventory),
+        sanitizeEquipmentState(raw.equipment),
+        sanitizeSupportSpellState(raw.supportSpells),
+        sanitizeCharacterState(raw.characters),
+        sanitizeLuckPityState(raw.luckPity),
+        sanitizeHiddenDiscoveryState(raw.hiddenDiscovery),
+        sanitizeCredits(raw.credits),
+        sanitizeProgressionState(raw.progression),
+        sanitizeExpansionCurrencyState(raw.expansionCurrencies),
+        sanitizeCampaignExpansionState(
+          raw.campaignExpansion,
+          safeCampaign,
+          timestamp,
+        ),
+        raw.checkpointSnapshot as CheckpointSnapshot | undefined,
+        null,
+      ),
+      migrated: true,
+      fromVersion: 16,
+    };
+  }
+
   if (raw.version === PLAYER_SAVE_VERSION) {
     return {
       save: createPlayerSave(
@@ -659,6 +719,7 @@ export function migratePlayerSave(value: unknown): MigrationResult {
           typeof raw.updatedAt === "string" ? raw.updatedAt : "",
         ),
         raw.checkpointSnapshot as CheckpointSnapshot | undefined,
+        sanitizeCrashRecoverySnapshot(raw.crashRecoverySnapshot),
       ),
       migrated: false,
       fromVersion: PLAYER_SAVE_VERSION,
@@ -773,6 +834,7 @@ function recoverySaveFromLegacy(): PlayerSave {
       recovery.expansionCurrencies,
       recovery.campaignExpansion,
       recovery.checkpointSnapshot,
+      recovery.crashRecoverySnapshot,
     );
   } catch (error) {
     if (error instanceof UnsupportedPlayerSaveVersionError) throw error;
@@ -783,6 +845,66 @@ function recoverySaveFromLegacy(): PlayerSave {
 function saveRecovery(save: PlayerSave): void {
   localStorage.setItem(RECOVERY_SAVE_KEY, JSON.stringify(save));
   saveCampaignProgress(save.campaign);
+}
+
+export function savePlayerRecoveryMirrorSync(save: PlayerSave): void {
+  saveRecovery(save);
+}
+
+function runStateFromSave(save: PlayerSave): RunPersistentState {
+  return {
+    campaign: save.campaign,
+    inventory: save.inventory,
+    equipment: save.equipment,
+    supportSpells: save.supportSpells,
+    characters: save.characters,
+    luckPity: save.luckPity,
+    hiddenDiscovery: save.hiddenDiscovery,
+    credits: save.credits,
+    progression: save.progression,
+    expansionCurrencies: save.expansionCurrencies,
+  };
+}
+
+function resolveLoadedSave(
+  save: PlayerSave,
+  timestamp = new Date().toISOString(),
+): {
+  save: PlayerSave;
+  recoveryMode: LoadedPlayerSave["recoveryMode"];
+} {
+  const resolution = resolveCrashRecovery(
+    runStateFromSave(save),
+    save.campaignExpansion,
+    save.checkpointSnapshot,
+    save.crashRecoverySnapshot,
+    timestamp,
+  );
+
+  if (resolution.mode === "none") {
+    return { save, recoveryMode: "none" };
+  }
+
+  return {
+    save: createPlayerSave(
+      resolution.state.campaign,
+      timestamp,
+      save.lastSaveReason,
+      resolution.state.inventory,
+      resolution.state.equipment,
+      resolution.state.supportSpells,
+      resolution.state.characters,
+      resolution.state.luckPity,
+      resolution.state.hiddenDiscovery,
+      resolution.state.credits,
+      resolution.state.progression,
+      resolution.state.expansionCurrencies,
+      resolution.campaignExpansion,
+      resolution.checkpointSnapshot,
+      resolution.crashRecoverySnapshot,
+    ),
+    recoveryMode: resolution.mode,
+  };
 }
 
 function openDatabase(): Promise<IDBDatabase> {
@@ -836,10 +958,19 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
   const recovery = recoverySaveFromLegacy();
 
   if (!("indexedDB" in window)) {
+    const resolved = resolveLoadedSave(recovery);
+    try {
+      if (resolved.recoveryMode !== "none") {
+        saveRecovery(resolved.save);
+      }
+    } catch {
+      // The resolved in-memory state is still safe to use.
+    }
     return {
-      save: recovery,
+      save: resolved.save,
       source: "localStorage",
       migrated: recovery.lastSaveReason === "migration",
+      recoveryMode: resolved.recoveryMode,
     };
   }
 
@@ -850,21 +981,23 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
     const stored = await readSave(database);
 
     if (stored === undefined) {
+      const resolved = resolveLoadedSave(recovery);
       const migrated = createPlayerSave(
-        recovery.campaign,
+        resolved.save.campaign,
         new Date().toISOString(),
         "migration",
-        recovery.inventory,
-        recovery.equipment,
-        recovery.supportSpells,
-        recovery.characters,
-        recovery.luckPity,
-        recovery.hiddenDiscovery,
-        recovery.credits,
-        recovery.progression,
-        recovery.expansionCurrencies,
-        recovery.campaignExpansion,
-        recovery.checkpointSnapshot,
+        resolved.save.inventory,
+        resolved.save.equipment,
+        resolved.save.supportSpells,
+        resolved.save.characters,
+        resolved.save.luckPity,
+        resolved.save.hiddenDiscovery,
+        resolved.save.credits,
+        resolved.save.progression,
+        resolved.save.expansionCurrencies,
+        resolved.save.campaignExpansion,
+        resolved.save.checkpointSnapshot,
+        resolved.save.crashRecoverySnapshot,
       );
       await writeSave(database, migrated);
       try {
@@ -872,7 +1005,12 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
       } catch {
         // IndexedDB remains the source of truth.
       }
-      return { save: migrated, source: "indexeddb", migrated: true };
+      return {
+        save: migrated,
+        source: "indexeddb",
+        migrated: true,
+        recoveryMode: resolved.recoveryMode,
+      };
     }
 
     const migration = migratePlayerSave(stored);
@@ -915,6 +1053,9 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
     const checkpointSnapshot = useRecovery
       ? recovery.checkpointSnapshot
       : migration.save.checkpointSnapshot;
+    const crashRecoverySnapshot = useRecovery
+      ? recovery.crashRecoverySnapshot
+      : migration.save.crashRecoverySnapshot;
 
     const recoveredProgress =
       campaign !== migration.save.campaign ||
@@ -928,24 +1069,51 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
       progression !== migration.save.progression ||
       expansionCurrencies !== migration.save.expansionCurrencies ||
       campaignExpansion !== migration.save.campaignExpansion ||
-      checkpointSnapshot !== migration.save.checkpointSnapshot;
+      checkpointSnapshot !== migration.save.checkpointSnapshot ||
+      crashRecoverySnapshot !== migration.save.crashRecoverySnapshot;
 
-    if (migration.migrated || recoveredProgress) {
+    const candidate = createPlayerSave(
+      campaign,
+      useRecovery ? recovery.updatedAt : migration.save.updatedAt,
+      useRecovery ? recovery.lastSaveReason : migration.save.lastSaveReason,
+      inventory,
+      equipment,
+      supportSpells,
+      characters,
+      luckPity,
+      hiddenDiscovery,
+      credits,
+      progression,
+      expansionCurrencies,
+      campaignExpansion,
+      checkpointSnapshot,
+      crashRecoverySnapshot,
+    );
+    const resolved = resolveLoadedSave(candidate);
+
+    if (
+      migration.migrated ||
+      recoveredProgress ||
+      resolved.recoveryMode !== "none"
+    ) {
       const recovered = createPlayerSave(
-        campaign,
+        resolved.save.campaign,
         new Date().toISOString(),
-        "migration",
-        inventory,
-        equipment,
-        supportSpells,
-        characters,
-        luckPity,
-        hiddenDiscovery,
-        credits,
-        progression,
-        expansionCurrencies,
-        campaignExpansion,
-        checkpointSnapshot,
+        migration.migrated || recoveredProgress
+          ? "migration"
+          : resolved.save.lastSaveReason,
+        resolved.save.inventory,
+        resolved.save.equipment,
+        resolved.save.supportSpells,
+        resolved.save.characters,
+        resolved.save.luckPity,
+        resolved.save.hiddenDiscovery,
+        resolved.save.credits,
+        resolved.save.progression,
+        resolved.save.expansionCurrencies,
+        resolved.save.campaignExpansion,
+        resolved.save.checkpointSnapshot,
+        resolved.save.crashRecoverySnapshot,
       );
       await writeSave(database, recovered);
       try {
@@ -953,26 +1121,33 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
       } catch {
         // IndexedDB remains the source of truth.
       }
-      return { save: recovered, source: "indexeddb", migrated: true };
+      return {
+        save: recovered,
+        source: "indexeddb",
+        migrated: migration.migrated || recoveredProgress,
+        recoveryMode: resolved.recoveryMode,
+      };
     }
 
     try {
-      saveRecovery(migration.save);
+      saveRecovery(resolved.save);
     } catch {
       // IndexedDB remains the source of truth if the mirror fails.
     }
 
     return {
-      save: migration.save,
+      save: resolved.save,
       source: "indexeddb",
       migrated: false,
+      recoveryMode: resolved.recoveryMode,
     };
   } catch (error) {
     if (error instanceof UnsupportedPlayerSaveVersionError) throw error;
     return {
-      save: recovery,
+      save: resolveLoadedSave(recovery).save,
       source: "localStorage",
       migrated: false,
+      recoveryMode: resolveLoadedSave(recovery).recoveryMode,
     };
   } finally {
     database?.close();
@@ -994,6 +1169,7 @@ export async function savePlayerProgress(
     createExpansionCurrencyState(),
   campaignExpansion?: CampaignExpansionState,
   checkpointSnapshot?: CheckpointSnapshot,
+  crashRecoverySnapshot: CrashRecoverySnapshot | null = null,
 ): Promise<PersistenceSource> {
   const save = createPlayerSave(
     campaign,
@@ -1010,6 +1186,7 @@ export async function savePlayerProgress(
     expansionCurrencies,
     campaignExpansion,
     checkpointSnapshot,
+    crashRecoverySnapshot,
   );
 
   if ("indexedDB" in window) {
