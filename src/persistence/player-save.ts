@@ -81,6 +81,7 @@ import {
 } from "../relics/state";
 import {
   createCodexState,
+  mergeCodexState,
   sanitizeCodexState,
   type CodexState,
 } from "../codex/state";
@@ -1304,6 +1305,7 @@ function recoverySaveFromLegacy(): PlayerSave {
       recovery.route,
       recovery.upgrades,
       recovery.relics,
+      recovery.codex,
     );
   } catch (error) {
     if (error instanceof UnsupportedPlayerSaveVersionError) throw error;
@@ -1482,6 +1484,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
         resolved.save.route,
         resolved.save.upgrades,
         resolved.save.relics,
+        resolved.save.codex,
       );
       await writeSave(database, migrated);
       try {
@@ -1543,6 +1546,10 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
     const relics = useRecovery
       ? recovery.relics
       : migration.save.relics;
+    const codex = mergeCodexState(
+      recovery.codex,
+      migration.save.codex,
+    );
     const campaignExpansion = useRecovery
       ? recovery.campaignExpansion
       : migration.save.campaignExpansion;
@@ -1571,6 +1578,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
       route !== migration.save.route ||
       upgrades !== migration.save.upgrades ||
       relics !== migration.save.relics ||
+      JSON.stringify(codex) !== JSON.stringify(migration.save.codex) ||
       campaignExpansion !== migration.save.campaignExpansion ||
       checkpointSnapshot !== migration.save.checkpointSnapshot ||
       crashRecoverySnapshot !== migration.save.crashRecoverySnapshot ||
@@ -1597,6 +1605,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
       route,
       upgrades,
       relics,
+      codex,
     );
     const resolved = resolvePlayerSaveRecovery(candidate);
 
@@ -1628,6 +1637,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
         resolved.save.route,
         resolved.save.upgrades,
         resolved.save.relics,
+        resolved.save.codex,
       );
       await writeSave(database, recovered);
       try {
