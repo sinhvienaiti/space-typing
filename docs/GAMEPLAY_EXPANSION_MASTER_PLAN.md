@@ -3221,7 +3221,7 @@ Implemented:
 - knowledge merge semantics so Codex discoveries survive checkpoint rollback and recovery-source selection;
 - PlayerSave v23 -> v24 migration plus backup/import validation;
 - regression coverage for reward thresholds, sector scaling, boss choice, Codex merge and migration;
-- 530/530 tests plus TypeScript check and production build passing on CI #294.
+- 531/531 tests plus TypeScript check and production build passing on CI #297.
 
 M20 must reuse the existing 50-World Campaign, World registry, difficulty/pressure model, boss runtime, reward tables and PlayerSave migration path rather than create a second Campaign or endless Stage 1001+ progression.
 
