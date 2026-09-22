@@ -3253,6 +3253,19 @@ Campaign difficulty validation rules:
 ## Step 68
 Tune later Galaxies using milestone playtests rather than manually playing all 1000 stages one-by-one.
 
+**Status: automated milestone tuning audit implemented; manual milestone playtest still required.**
+
+Later-Galaxy tuning rules:
+
+- milestone coverage samples Stage x50 Boss, x60 Hazard, x90 Gauntlet and x100 Major Boss in every Galaxy;
+- the audit uses production `createStageConfig` and `difficultyFor` with progressively harder reference Vocabulary Levels;
+- same-role combat-pressure growth between adjacent Galaxies must stay gradual rather than introducing sudden late-game cliffs;
+- reaction metrics remain inside global speed/spawn/projectile/boss caps;
+- each Galaxy's Major Boss remains harder than its Stage x50 Boss under the production model;
+- the generated 40-stage milestone list is the intended manual playtest set, replacing any requirement to manually play all 1,000 stages;
+- automated statistics found no formula change necessary at this checkpoint;
+- manual feel/timing observations are still required before Step 68 is considered fully complete.
+
 ## Step 69
 Integrate space-typing into parent as a submodule.
 
