@@ -60,6 +60,22 @@ describe("M20 Ascension", () => {
     expect(state.frontierByTier["1"]).toBe(1000);
   });
 
+  it("does not reactivate a completed Ascension tier", () => {
+    const state = sanitizeAscensionState({
+      version: 1,
+      highestUnlockedTier: 2,
+      selectedTier: 0,
+      completedTiers: [1],
+      frontierByTier: {
+        "1": 1000,
+        "2": 1,
+      },
+    });
+
+    expect(selectAscensionTier(state, 1)).toEqual(state);
+    expect(selectAscensionTier(state, 2).selectedTier).toBe(2);
+  });
+
   it("advances only the active Ascension frontier and commits every ten stages", () => {
     const start = {
       ...createAscensionState({ clearedStages: [1000] }),
