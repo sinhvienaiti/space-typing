@@ -139,6 +139,7 @@ describe("M02 checkpoint and rollback", () => {
     };
     committedActive.hiddenDiscovery.discovered = ["echo-rift"];
     committedActive.progression.unlockedAchievements = ["first-clear"];
+    committedActive.upgrades.attributeLevels.hull = 2;
 
     const committed = createCheckpointSnapshot(
       committedActive,
