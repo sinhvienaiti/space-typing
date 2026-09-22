@@ -16,6 +16,7 @@ import {
   createHiddenDiscoveryState,
   isValidHiddenDiscoveryState,
   sanitizeHiddenDiscoveryState,
+  rollHiddenDiscovery,
 } from "../src/discovery/hidden-content";
 import { difficultyFor } from "../src/campaign/difficulty";
 
@@ -38,6 +39,34 @@ describe("M15 hidden encounter foundation", () => {
     expect(
       sanitizeHiddenDiscoveryState(withoutEncounter).encounter,
     ).toEqual(createHiddenEncounterState());
+  });
+
+  it("preserves encounter progress when ordinary discovery rolls advance", () => {
+    const discovery = discoveryWith(["echo-rift"]);
+    const offer = hiddenEncounterOffers(
+      discovery,
+      createHiddenEncounterState(),
+      41,
+    )[0]!;
+    const encounter = startHiddenEncounter(
+      createHiddenEncounterState(),
+      offer,
+      2,
+    );
+    const state = {
+      ...discovery,
+      encounter,
+      lastRollStage: 40,
+    };
+
+    const rolled = rollHiddenDiscovery(
+      state,
+      41,
+      0,
+      () => 0.999999,
+    );
+
+    expect(rolled.state.encounter).toEqual(encounter);
   });
 
   it("offers discovered content deterministically by checkpoint sector", () => {
