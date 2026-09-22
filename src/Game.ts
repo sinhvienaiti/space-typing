@@ -282,6 +282,11 @@ import {
   phoenixReviveResources,
 } from "./combat/revival";
 import {
+  activeTypingPressure,
+  canSpawnWithinTypingPressure,
+  estimateSpawnTypingPressure,
+} from "./combat/typing-pressure";
+import {
   accuracyPercent,
   clamp,
   chooseTarget,
@@ -525,6 +530,10 @@ export class Game {
 
   getPerformanceReport(): PerformanceReport {
     return this.frameProfiler.report();
+  }
+
+  getDifficultyRewardMultiplier(): number {
+    return this.difficulty?.rewardMultiplier ?? 1;
   }
 
   setCharacter(id: CharacterId): void {
@@ -1825,18 +1834,43 @@ export class Game {
       this.anomalyPending = false;
     }
 
+    const playerY = this.height - PLAYER_Y_OFFSET;
+
     if (
       this.spawnRemaining > 0 &&
       this.spawnTimer <= 0 &&
       this.enemies.length < difficulty.maxEnemies
     ) {
-      this.spawnEnemy();
-      this.spawnRemaining -= 1;
-      this.spawnTimer =
-        difficulty.spawnInterval * randomBetween(0.82, 1.16);
-    }
+      const currentPressure = activeTypingPressure(
+        this.enemies,
+        playerY,
+        difficulty,
+      );
+      const candidatePressure = estimateSpawnTypingPressure(
+        this.stageConfig.stage,
+        this.vocabularyLevel,
+        difficulty,
+      );
 
-    const playerY = this.height - PLAYER_Y_OFFSET;
+      if (
+        canSpawnWithinTypingPressure(
+          currentPressure,
+          candidatePressure,
+          difficulty,
+        )
+      ) {
+        this.spawnEnemy();
+        this.spawnRemaining -= 1;
+        this.spawnTimer =
+          difficulty.spawnInterval * randomBetween(0.82, 1.16);
+      } else {
+        // Retry soon, but do not busy-loop or consume the stage spawn budget.
+        this.spawnTimer = Math.max(
+          0.12,
+          Math.min(0.28, difficulty.spawnInterval * 0.22),
+        );
+      }
+    }
     const overdriveFactor =
       this.overdriveTimer > 0
         ? this.characterId === "vanguard"
@@ -2528,8 +2562,11 @@ export class Game {
     difficulty: DifficultyProfile | null,
   ): number {
     const definition = enemySkillDefinition(skillId);
+    const safeDifficulty = difficulty ?? this.difficulty;
+    const timingMultiplier =
+      safeDifficulty?.enemyCooldownMultiplier ?? 1;
     return (
-      definition.cooldown /
+      (definition.cooldown * timingMultiplier) /
       Math.max(
         0.7,
         this.enemySkillPressure(skillId, difficulty),
@@ -2547,7 +2584,11 @@ export class Game {
       0.85,
       1.25,
     );
-    return definition.telegraph / pressure;
+    return Math.max(
+      0.22,
+      (definition.telegraph / pressure) *
+        (difficulty.reactionWindow / 1.05),
+    );
   }
 
   private beginEnemySkill(
@@ -2628,12 +2669,8 @@ export class Game {
       return;
     }
 
-    const durationScale = clamp(
-      0.72 + difficulty.combatPressure * 0.2,
-      0.72,
-      1.2,
-    );
-    const duration = effect.duration * durationScale;
+    const duration = effect.duration *
+      difficulty.ccDurationMultiplier;
     const source = "enemy-skill:" + skillId;
 
     if (!effect.hardCc) {
