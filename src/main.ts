@@ -1345,6 +1345,7 @@ function applyRunPersistentState(state: RunPersistentState): void {
   shops = state.shops;
   route = state.route;
   challenge = state.challenge;
+  activeChallengeEncounter = null;
 }
 
 function currentAutosaveSnapshot(): AutosaveSnapshot {
@@ -3112,6 +3113,26 @@ function syncWorldMusicProfile(stage: number): void {
 }
 
 function syncCombatMusic(stage: number): void {
+  if (activeChallengeEncounter !== null) {
+    const encounter = activeChallengeEncounter;
+    const worldStage =
+      encounter.worldStage ?? campaign.selectedStage;
+    syncWorldMusicProfile(worldStage);
+    const state: MusicState =
+      encounter.kind === "hidden-world"
+        ? "HIDDEN_WORLD"
+        : encounter.kind === "champion-hunt" ||
+            encounter.kind === "apex-gauntlet"
+          ? "CHAMPION_HUNT"
+          : "HIDDEN_CHALLENGE";
+    musicController.transitionTo(
+      state,
+      musicCrossfadeSeconds(state),
+    );
+    musicController.setPaused(false);
+    return;
+  }
+
   const stageConfig = createStageConfig(stage);
   syncWorldMusicProfile(stageConfig.stage);
   const state = musicStateForStageRole(stageConfig.role);
@@ -5117,6 +5138,26 @@ byId("routeServiceAction").addEventListener("click", () => {
 });
 byId("routeSupportAction").addEventListener("click", () => {
   closeRouteAndOpen(openSupportSpells);
+});
+byId("routeChallengeAction").addEventListener("click", () => {
+  void openCurrentChallenge();
+});
+for (const button of Array.from(
+  document.querySelectorAll<HTMLButtonElement>(
+    "[data-challenge-tier]",
+  ),
+)) {
+  button.addEventListener("click", () => {
+    const tier = button.dataset.challengeTier as
+      | HiddenChallengeTier
+      | undefined;
+    if (tier !== undefined) {
+      void chooseHiddenChallengeTier(tier);
+    }
+  });
+}
+byId("challengeSkipButton").addEventListener("click", () => {
+  void skipCurrentChallenge();
 });
 
 byId("resumeButton").addEventListener("click", () => game.resume());
