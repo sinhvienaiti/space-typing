@@ -864,6 +864,109 @@ describe("save backup", () => {
     });
   });
 
+  it("imports a valid v24 backup into v25 Ascension state", () => {
+    const completed = recordStageClear(
+      createDefaultCampaignProgress(),
+      1000,
+      {
+        score: 8000,
+        accuracy: 99.4,
+        wpm: 105,
+        clearedAt: "2026-09-22T18:46:00.000Z",
+      },
+    );
+    const current = createPlayerSave(completed);
+    const raw = {
+      ...current,
+      version: 24,
+    } as Record<string, unknown>;
+    delete raw.ascension;
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.migrated).toBe(true);
+      expect(result.save.version).toBe(PLAYER_SAVE_VERSION);
+      expect(result.save.ascension).toEqual({
+        version: 1,
+        highestUnlockedTier: 1,
+        selectedTier: 0,
+        completedTiers: [],
+      });
+    }
+  });
+
+  it("rejects invalid current-version Ascension data", () => {
+    const raw = createPlayerSave(createDefaultCampaignProgress()) as unknown as Record<
+      string,
+      unknown
+    >;
+    raw.ascension = {
+      version: 1,
+      highestUnlockedTier: 1,
+      selectedTier: 9,
+      completedTiers: [],
+    };
+
+    expect(parsePlayerSaveJson(JSON.stringify(raw))).toEqual({
+      ok: false,
+      error: "Ascension state is invalid.",
+    });
+  });
+
+  it("exports selected Ascension state in the current backup", () => {
+    const progress = recordStageClear(
+      createDefaultCampaignProgress(),
+      1000,
+      {
+        score: 9000,
+        accuracy: 100,
+        wpm: 110,
+        clearedAt: "2026-09-22T18:47:00.000Z",
+      },
+    );
+    const state = {
+      version: 1 as const,
+      highestUnlockedTier: 2,
+      selectedTier: 1,
+      completedTiers: [1],
+    };
+    const args = createPlayerSave(progress);
+    const json = exportPlayerSaveJson(
+      progress,
+      "2026-09-22T18:48:00.000Z",
+      args.inventory,
+      args.equipment,
+      args.supportSpells,
+      args.characters,
+      args.luckPity,
+      args.hiddenDiscovery,
+      args.credits,
+      args.progression,
+      args.expansionCurrencies,
+      args.campaignExpansion,
+      args.checkpointSnapshot,
+      args.crashRecoverySnapshot,
+      args.stageEntrySnapshot,
+      args.shops,
+      args.route,
+      args.upgrades,
+      args.relics,
+      args.codex,
+      state,
+    );
+
+    const parsed = JSON.parse(json) as {
+      ascension: {
+        highestUnlockedTier: number;
+        selectedTier: number;
+        completedTiers: number[];
+      };
+    };
+    expect(parsed.ascension).toEqual(state);
+  });
+
   it("rejects corrupted best-result values", () => {
     const progress = createDefaultCampaignProgress();
     const invalid = parsePlayerSaveJson(
