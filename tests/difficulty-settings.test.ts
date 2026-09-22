@@ -45,7 +45,7 @@ describe("runtime difficulty settings", () => {
     });
 
     expect(state.mode).toBe("adaptive");
-    expect(state.customTargetWpm).toBe(220);
+    expect(state.customTargetWpm).toBe(300);
     expect(state.customPressure).toBe(0.7);
     expect(state.profile.smoothedWpm).toBe(120);
   });
