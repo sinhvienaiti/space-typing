@@ -10,6 +10,7 @@ import {
 } from "../characters/state";
 import {
   sanitizeEquipmentState,
+  isValidEnhancedRarityEquipmentState,
   isValidEquipmentState,
   type EquipmentState,
 } from "../equipment/loadout";
@@ -200,7 +201,8 @@ function isValidLegacyRunPersistentStateWithoutShops(
   return (
     isValidCampaignSnapshot(raw.campaign) &&
     isValidInventory(raw.inventory) &&
-    isValidEquipmentState(raw.equipment) &&
+    (isValidEquipmentState(raw.equipment) ||
+      isValidEnhancedRarityEquipmentState(raw.equipment)) &&
     isValidSupportSpellState(raw.supportSpells) &&
     isValidCharacterState(raw.characters) &&
     isValidLuckPityState(raw.luckPity) &&
