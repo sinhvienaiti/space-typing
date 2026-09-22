@@ -81,6 +81,12 @@ import {
   normalShopOffers,
   type NormalShopOffer,
 } from "./shops/normal-shop";
+import {
+  buyEquipmentUpgrade,
+  buyRepairPack,
+  equipmentUpgradeCost,
+  REPAIR_PACK_COST,
+} from "./shops/service-shop";
 import { accuracyPercent } from "./logic";
 import type { EquipmentDrop } from "./loot/equipment-loot";
 import type { StageRandomEventDefinition } from "./events/stage-scheduler";
@@ -355,6 +361,7 @@ app.innerHTML = `
           <button id="characterButton">Characters</button>
           <button id="equipmentButton">Equipment</button>
           <button id="shopButton">Shop</button>
+          <button id="serviceShopButton">Repair / Upgrade</button>
           <button id="supportButton">Support Spells</button>
           <button id="codexButton">Codex</button>
           <button id="dataButton">Data</button>
@@ -561,6 +568,22 @@ app.innerHTML = `
       <div id="normalShopGrid" class="shop-grid"></div>
     </dialog>
 
+    <dialog id="serviceShopDialog" class="settings-dialog service-shop-dialog">
+      <form method="dialog" class="dialog-head">
+        <div>
+          <p class="eyebrow">maintenance bay</p>
+          <h2>Repair / Upgrade Shop</h2>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+      <p class="equipment-note">
+        <strong id="serviceShopCredits">0 Credits</strong>
+        · Upgrade owned equipment or restock one Repair Kit + Shield Cell.
+      </p>
+      <div id="repairServicePanel" class="repair-service-panel"></div>
+      <div id="upgradeShopGrid" class="upgrade-shop-grid"></div>
+    </dialog>
+
     <dialog id="dataDialog" class="settings-dialog data-dialog">
       <form method="dialog" class="dialog-head">
         <div>
@@ -752,6 +775,8 @@ const stageSelectDialog = byId<HTMLDialogElement>("stageSelectDialog");
 const dataDialog = byId<HTMLDialogElement>("dataDialog");
 const equipmentDialog = byId<HTMLDialogElement>("equipmentDialog");
 const shopDialog = byId<HTMLDialogElement>("shopDialog");
+const serviceShopDialog =
+  byId<HTMLDialogElement>("serviceShopDialog");
 const supportDialog = byId<HTMLDialogElement>("supportDialog");
 const characterDialog = byId<HTMLDialogElement>("characterDialog");
 const codexDialog = byId<HTMLDialogElement>("codexDialog");
@@ -1908,6 +1933,150 @@ function openNormalShop(): void {
   shopDialog.showModal();
 }
 
+function applyServiceShopState(
+  next: {
+    credits: number;
+    inventory: Inventory;
+    equipment: EquipmentState;
+  },
+): void {
+  credits = next.credits;
+  inventory = next.inventory;
+  equipment = next.equipment;
+  renderInventory();
+  renderEquipment();
+  applyEquipmentStats();
+  updateDataSummary();
+}
+
+function renderServiceShop(): void {
+  byId("serviceShopCredits").textContent =
+    credits.toLocaleString() + " Credits";
+
+  const repairPanel = byId("repairServicePanel");
+  repairPanel.replaceChildren();
+
+  const repairCard = document.createElement("article");
+  repairCard.className = "service-shop-card";
+
+  const repairTitle = document.createElement("strong");
+  repairTitle.textContent = "Repair Station Pack";
+
+  const repairDescription = document.createElement("small");
+  repairDescription.textContent =
+    "Adds 1 Repair Kit and 1 Shield Cell using the existing inventory system.";
+
+  const repairButton = document.createElement("button");
+  repairButton.type = "button";
+  repairButton.textContent =
+    REPAIR_PACK_COST.toLocaleString() + " Credits";
+  repairButton.disabled = credits < REPAIR_PACK_COST;
+  repairButton.addEventListener("click", () => {
+    const result = buyRepairPack({
+      credits,
+      inventory,
+      equipment,
+    });
+
+    if (!result.applied) {
+      showNotice(
+        result.reason === "credits"
+          ? "Not enough Credits"
+          : "Repair Kit or Shield Cell stack is full",
+      );
+      renderServiceShop();
+      return;
+    }
+
+    applyServiceShopState(result.state);
+    renderServiceShop();
+    void autosaveCampaign(
+      "shop",
+      "✓ Repair Station pack purchased · " +
+        credits.toLocaleString() +
+        " Credits left",
+    );
+  });
+
+  repairCard.append(repairTitle, repairDescription, repairButton);
+  repairPanel.append(repairCard);
+
+  const grid = byId("upgradeShopGrid");
+  grid.replaceChildren();
+
+  for (const item of equipment.items) {
+    const definition = getEquipmentDefinition(item.definitionId);
+    const cost = equipmentUpgradeCost(item);
+    const card = document.createElement("article");
+    card.className = "service-shop-card";
+
+    const title = document.createElement("strong");
+    title.textContent =
+      definition.name +
+      " · " +
+      item.rarity.toUpperCase() +
+      " +" +
+      String(item.enhancement);
+
+    const detail = document.createElement("small");
+    detail.textContent =
+      definition.slot +
+      " · " +
+      definition.description +
+      (equipment.loadout[definition.slot] === item.instanceId
+        ? " · EQUIPPED"
+        : "");
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.disabled = cost === null || credits < (cost ?? 0);
+    button.textContent =
+      cost === null
+        ? "Max +5"
+        : "Upgrade · " + cost.toLocaleString() + " Credits";
+
+    button.addEventListener("click", () => {
+      const result = buyEquipmentUpgrade(
+        { credits, inventory, equipment },
+        item.instanceId,
+      );
+
+      if (!result.applied) {
+        showNotice(
+          result.reason === "credits"
+            ? "Not enough Credits"
+            : result.reason === "max"
+              ? "Equipment is already +5"
+              : "Unable to upgrade this equipment",
+        );
+        renderServiceShop();
+        return;
+      }
+
+      applyServiceShopState(result.state);
+      renderNormalShop();
+      renderServiceShop();
+      void autosaveCampaign(
+        "shop",
+        "✓ Upgraded " +
+          definition.name +
+          " · " +
+          credits.toLocaleString() +
+          " Credits left",
+      );
+    });
+
+    card.append(title, detail, button);
+    grid.append(card);
+  }
+}
+
+function openServiceShop(): void {
+  if (!persistenceReady || game.getPhase() !== "title") return;
+  renderServiceShop();
+  serviceShopDialog.showModal();
+}
+
 function selectedVocabularyLevel(): number {
   return sourceState.mode === "class" ? sourceState.level : 1;
 }
@@ -1975,6 +2144,8 @@ async function initializePlayerProgress(): Promise<void> {
   const equipmentButton =
     byId<HTMLButtonElement>("equipmentButton");
   const shopButton = byId<HTMLButtonElement>("shopButton");
+  const serviceShopButton =
+    byId<HTMLButtonElement>("serviceShopButton");
   const supportButton =
     byId<HTMLButtonElement>("supportButton");
   const characterButton =
@@ -1985,6 +2156,7 @@ async function initializePlayerProgress(): Promise<void> {
   stageSelectButton.disabled = true;
   equipmentButton.disabled = true;
   shopButton.disabled = true;
+  serviceShopButton.disabled = true;
   supportButton.disabled = true;
   characterButton.disabled = true;
   codexButton.disabled = true;
@@ -2020,11 +2192,13 @@ async function initializePlayerProgress(): Promise<void> {
     stageSelectButton.disabled = false;
     equipmentButton.disabled = false;
     shopButton.disabled = false;
+    serviceShopButton.disabled = false;
     supportButton.disabled = false;
     characterButton.disabled = false;
     codexButton.disabled = false;
     renderCodex();
     renderNormalShop();
+    renderServiceShop();
     for (const button of dataButtons) button.disabled = false;
 
     if (characters.unlocked.length !== loadedCharacters.unlocked.length) {
@@ -2485,6 +2659,7 @@ for (const [buttonId, skillId] of combatSkillButtons) {
 byId("characterButton").addEventListener("click", openCharacters);
 byId("equipmentButton").addEventListener("click", openEquipment);
 byId("shopButton").addEventListener("click", openNormalShop);
+byId("serviceShopButton").addEventListener("click", openServiceShop);
 byId("supportButton").addEventListener("click", openSupportSpells);
 
 for (const slot of [0, 1] as const) {
@@ -2674,7 +2849,8 @@ window.addEventListener("keydown", (event) => {
     supportDialog.open ||
     characterDialog.open ||
     codexDialog.open ||
-    shopDialog.open
+    shopDialog.open ||
+    serviceShopDialog.open
   ) return;
 
   if (game.getPhase() === "playing" && event.key === "=") {

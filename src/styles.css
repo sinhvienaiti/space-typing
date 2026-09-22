@@ -1470,3 +1470,42 @@ kbd {
     grid-template-columns: 1fr;
   }
 }
+
+
+.service-shop-dialog {
+  width: min(900px, calc(100vw - 32px));
+}
+
+.repair-service-panel {
+  margin-bottom: 14px;
+}
+
+.upgrade-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.service-shop-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.service-shop-card > small {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.service-shop-card > button {
+  justify-self: start;
+}
+
+@media (max-width: 680px) {
+  .upgrade-shop-grid {
+    grid-template-columns: 1fr;
+  }
+}
