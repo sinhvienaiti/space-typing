@@ -40,6 +40,8 @@ export const ENEMY_DEFINITION_IDS = [
   "bloom-puff",
   "archangel-core",
   "demon-lord-orb",
+  "glacier-queen",
+  "prism-archon",
 ] as const;
 
 export type EnemyRarity = (typeof ENEMY_RARITIES)[number];
@@ -465,6 +467,54 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
       rewardMarker:
         ENEMY_REWARD_DEFINITIONS["shield-burst"].marker,
       deathFx: "holy-boss-burst",
+    },
+  },
+  {
+    id: "glacier-queen",
+    name: "Glacier Queen",
+    family: "frost",
+    role: "boss",
+    rarity: "boss",
+    minStage: 300,
+    spawnWeight: 0,
+    durabilityScale: 1,
+    speedScale: 1,
+    reward: "freeze-nearby",
+    rewardPower: 4,
+    visual: {
+      ...frostBase,
+      body: "frost-orb-boss",
+      wings: "crystal-large",
+      head: "ice-crown",
+      orbit: "snow-halo",
+      aura: "frost-mist-boss",
+      rewardMarker:
+        ENEMY_REWARD_DEFINITIONS["freeze-nearby"].marker,
+      deathFx: "frost-boss-burst",
+    },
+  },
+  {
+    id: "prism-archon",
+    name: "Prism Archon",
+    family: "prism",
+    role: "boss",
+    rarity: "boss",
+    minStage: 400,
+    spawnWeight: 0,
+    durabilityScale: 1,
+    speedScale: 1,
+    reward: "score-x2",
+    rewardPower: 12,
+    visual: {
+      ...prismBase,
+      body: "prism-crystal-orb-boss",
+      wings: "fairy-large",
+      head: "prism-crown",
+      orbit: "prism-rune-rings",
+      aura: "prism-sparkle-boss",
+      rewardMarker:
+        ENEMY_REWARD_DEFINITIONS["score-x2"].marker,
+      deathFx: "prism-boss-burst",
     },
   },
   {
