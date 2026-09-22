@@ -261,6 +261,7 @@ import {
   advanceAscensionOnStageClear,
   ascensionCompletionReward,
   ascensionProfile,
+  canSwitchAscensionTier,
   createAscensionState,
   currentAscensionStage,
   selectAscensionTier,
@@ -2219,11 +2220,6 @@ function selectedGameplayStage(): number {
   return currentAscensionStage(ascension) ?? campaign.selectedStage;
 }
 
-function canSwitchAscensionTier(): boolean {
-  const stage = currentAscensionStage(ascension);
-  return stage === null || (stage - 1) % 10 === 0;
-}
-
 function renderAscension(): void {
   const button = byId<HTMLButtonElement>("ascensionButton");
   const unlocked = ascension.highestUnlockedTier >= 1;
@@ -2330,7 +2326,7 @@ function openAscension(): void {
   ) {
     return;
   }
-  if (!canSwitchAscensionTier()) {
+  if (!canSwitchAscensionTier(ascension)) {
     showNotice(
       "Ascension tier can change only at a committed 10-stage checkpoint.",
     );
