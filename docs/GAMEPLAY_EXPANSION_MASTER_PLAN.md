@@ -2975,7 +2975,9 @@ Implemented:
 
 ## M07 — World engine
 
-Implement:
+**Status: Complete.** The 1000-stage Campaign now maps deterministically to 50 canonical Worlds (20 stages each, five Worlds per Galaxy), the runtime owns a validated `WorldProfile` registry and per-World environment profiles, the Canvas background consumes current-World visual data, title/stage-entry presentation exposes World identity, and M06 shop identity now uses the canonical World resolver. See `docs/M07_WORLD_ENGINE.md`.
+
+Implemented:
 
 - `WorldProfile`;
 - stage-to-World mapping;
@@ -2983,7 +2985,7 @@ Implement:
 - transition UI;
 - current-World visual/environment contract.
 
-Start with reusable profiles and then fill authored content in batches.
+M08 consumes World music/ambient identity. M09 consumes World enemy/boss roster contracts.
 
 ## M08 — Dynamic World Music / Ambient system
 
