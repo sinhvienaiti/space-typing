@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  createBossRewardChoiceOptions,
   createRewardChoiceOptions,
   rewardChoiceCrateChance,
   rewardChoiceWord,
   shouldScheduleRewardChoiceCrate,
 } from "../src/events/reward-choice";
+import { RELIC_IDS } from "../src/relics/registry";
+import { createRelicState } from "../src/relics/state";
 
 function sequence(values: number[]): () => number {
   let index = 0;
@@ -28,6 +31,54 @@ describe("reward-choice crate", () => {
     );
     expect(choices).toHaveLength(3);
     expect(new Set(choices.map((choice) => choice.definitionId)).size).toBe(3);
+  });
+
+  it("builds one deterministic boss choice set through the existing reward path", () => {
+    const first = createBossRewardChoiceOptions(
+      100,
+      30,
+      createRelicState(),
+    );
+    const second = createBossRewardChoiceOptions(
+      100,
+      30,
+      createRelicState(),
+    );
+
+    expect(first).toEqual(second);
+    expect(first).toHaveLength(3);
+    expect(first.map((choice) => choice.kind)).toEqual([
+      "equipment",
+      "currency",
+      "relic",
+    ]);
+    const equipment = first[0];
+    expect(equipment?.kind).toBe("equipment");
+    if (equipment?.kind === "equipment") {
+      expect(equipment.drop.source).toBe("boss");
+    }
+  });
+
+  it("falls back to premium currency when every eligible Relic is already owned", () => {
+    const fullRelics = {
+      ...createRelicState(),
+      owned: [...RELIC_IDS],
+    };
+    const choices = createBossRewardChoiceOptions(
+      1000,
+      30,
+      fullRelics,
+    );
+
+    expect(choices).toHaveLength(3);
+    expect(choices[2]).toMatchObject({
+      id: "premium-currency",
+      kind: "currency",
+    });
+    if (choices[2]?.kind === "currency") {
+      expect(choices[2].credits).toBeGreaterThan(0);
+      expect(choices[2].currencies.starCrystal).toBeGreaterThan(0);
+    }
   });
 
   it("chooses a medium-length vocabulary word when possible", () => {

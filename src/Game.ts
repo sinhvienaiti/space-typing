@@ -10,7 +10,11 @@ import {
   isBossStageRole,
   toBossHud,
 } from "./boss/model";
-import type { BossHudState, BossState } from "./boss/model";
+import type {
+  BossHudState,
+  BossRole,
+  BossState,
+} from "./boss/model";
 import {
   bossActionIntervalMultiplier,
   bossWordLengthPreference,
@@ -242,7 +246,10 @@ import {
   shouldAttemptFormation,
   type FormationDefinition,
 } from "./enemies/formations";
-import { enemyDefinition } from "./enemies/registry";
+import {
+  enemyDefinition,
+  type EnemyDefinitionId,
+} from "./enemies/registry";
 import { applyEnemyRewardEffect } from "./enemies/reward-effects";
 import {
   applyEnemyAreaControl,
@@ -377,6 +384,8 @@ type Hooks = {
   onWordComplete(entry: VocabularyEntry): void;
   onEquipmentDrop(drop: EquipmentDrop): void;
   onRewardChoice(options: readonly EquipmentDrop[]): void;
+  onBossRewardChoice(stage: number, role: BossRole): void;
+  onEnemySeen(definitionId: EnemyDefinitionId): void;
   onAnomalyReady(riskHullRatio: number): void;
   onLuckPityUpdate(state: LuckPityState): void;
   onHiddenDiscoveryUpdate(
@@ -480,6 +489,8 @@ export class Game {
   private bossHudTimer = 0;
   private bossSpawned = false;
   private bossDefeated = false;
+  private bossRewardPending = false;
+  private seenEnemyDefinitions = new Set<EnemyDefinitionId>();
   private enemies: Enemy[] = [];
   private projectiles: EnemyProjectile[] = [];
   private lasers: Laser[] = [];
@@ -1603,6 +1614,7 @@ export class Game {
     this.bossHudTimer = 0;
     this.bossSpawned = false;
     this.bossDefeated = false;
+    this.bossRewardPending = false;
     this.overdriveTimer = 0;
     this.interferenceTimer = 0;
     this.barrierTimer = 0;
@@ -1714,6 +1726,7 @@ export class Game {
     this.anomalyResolutionPending = false;
     this.anomalyRiskRatio = 0;
     this.boss = null;
+    this.bossRewardPending = false;
     this.hooks.onBossUpdate(null);
     this.hooks.onPhase(this.phase);
   }
@@ -2150,7 +2163,7 @@ export class Game {
         this.spawnBoss();
       } else if (
         !isBossStageRole(this.stageConfig.role) ||
-        this.bossDefeated
+        (this.bossDefeated && !this.bossRewardPending)
       ) {
         this.finishStage();
       }
@@ -2220,6 +2233,9 @@ export class Game {
       bossVisualStage,
       this.boss.role,
     );
+    if (bossDefinition !== undefined) {
+      this.notifyEnemySeen(bossDefinition.id);
+    }
     this.bossSpawned = true;
     this.bossDefeated = false;
     this.projectiles = [];
@@ -2952,6 +2968,7 @@ export class Game {
       actionCooldown: resolvedActionCooldown,
     });
 
+    this.notifyEnemySeen(definitionId);
     const spawnDefinition = enemyDefinition(definitionId);
     if (spawnDefinition !== undefined) {
       const fx = enemyFxProfile(spawnDefinition.family, "spawn");
@@ -3380,6 +3397,7 @@ export class Game {
           ? null
           : this.enemySkillCooldown(firstSkill, this.difficulty),
     });
+    this.notifyEnemySeen(definitionId);
 
     this.burst(carrier.x, carrier.y, 12, 47);
   }
@@ -3694,7 +3712,31 @@ export class Game {
     this.boss = null;
     this.bossDefeated = true;
     this.hooks.onBossUpdate(null);
+
+    if (this.hiddenEncounterRuntime === null) {
+      this.bossRewardPending = true;
+      this.hooks.onBossRewardChoice(
+        this.stageConfig?.stage ?? 1,
+        boss.role,
+      );
+      return;
+    }
+
     this.finishStage();
+  }
+
+  resolveBossRewardChoice(): boolean {
+    if (
+      !this.bossRewardPending ||
+      !this.bossDefeated ||
+      this.phase !== "playing"
+    ) {
+      return false;
+    }
+
+    this.bossRewardPending = false;
+    this.finishStage();
+    return true;
   }
 
   private rollPityEvent(
@@ -4095,6 +4137,12 @@ export class Game {
     this.targetId = null;
   }
 
+  private notifyEnemySeen(definitionId: EnemyDefinitionId): void {
+    if (this.seenEnemyDefinitions.has(definitionId)) return;
+    this.seenEnemyDefinitions.add(definitionId);
+    this.hooks.onEnemySeen(definitionId);
+  }
+
   private visualDefinitionForEnemy(enemy: Enemy) {
     return enemyDefinition(
       enemy.definitionId ??
@@ -4348,6 +4396,7 @@ export class Game {
             ? null
             : this.enemySkillCooldown(firstSkill, this.difficulty),
       });
+      this.notifyEnemySeen(definitionId);
     }
 
     this.burst(splitter.x, splitter.y, 30, 318);

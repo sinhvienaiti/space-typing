@@ -84,6 +84,8 @@ function createTestGame(): Game {
     onWordComplete: vi.fn(),
     onEquipmentDrop: vi.fn(),
     onRewardChoice: vi.fn(),
+    onBossRewardChoice: vi.fn(),
+    onEnemySeen: vi.fn(),
     onAnomalyReady: vi.fn(),
     onLuckPityUpdate: vi.fn(),
     onHiddenDiscoveryUpdate: vi.fn(),

@@ -21,6 +21,13 @@ import {
   ACHIEVEMENT_REGISTRY,
   type ProgressionState,
 } from "./missions";
+import {
+  codexCollectionEntries,
+  codexDiscoveredCount,
+  codexEntryCount,
+  createCodexState,
+  type CodexState,
+} from "../codex/state";
 
 export const META_RANKS = [
   { id: "cadet", name: "Cadet", minPoints: 0 },
@@ -34,7 +41,15 @@ export type MetaRankId = (typeof META_RANKS)[number]["id"];
 
 export type CollectionEntry = {
   id: string;
-  category: "character" | "equipment" | "hidden" | "achievement";
+  category:
+    | "character"
+    | "equipment"
+    | "hidden"
+    | "achievement"
+    | "world"
+    | "enemy"
+    | "boss"
+    | "reward";
   discovered: boolean;
   title: string;
   description: string;
@@ -51,6 +66,7 @@ export type MetaProgression = {
   equipmentTypesOwned: number;
   hiddenDiscovered: number;
   achievementsUnlocked: number;
+  codexDiscovered: number;
   collectionFound: number;
   collectionTotal: number;
 };
@@ -61,17 +77,21 @@ export function metaPoints(input: {
   equipment: EquipmentState;
   hidden: HiddenDiscoveryState;
   progression: ProgressionState;
+  codex?: CodexState;
 }): number {
   const equipmentTypes = new Set(
     input.equipment.items.map((item) => item.definitionId),
   ).size;
+
+  const codex = input.codex ?? createCodexState();
 
   return (
     input.campaign.clearedStages.length +
     input.characters.unlocked.length * 10 +
     equipmentTypes * 5 +
     input.hidden.discovered.length * 25 +
-    input.progression.unlockedAchievements.length * 20
+    input.progression.unlockedAchievements.length * 20 +
+    codexDiscoveredCount(codex) * 2
   );
 }
 
@@ -81,6 +101,7 @@ export function resolveMetaProgression(input: {
   equipment: EquipmentState;
   hidden: HiddenDiscoveryState;
   progression: ProgressionState;
+  codex?: CodexState;
 }): MetaProgression {
   const points = metaPoints(input);
   const equipmentTypesOwned = new Set(
@@ -92,16 +113,20 @@ export function resolveMetaProgression(input: {
       .find((entry) => points >= entry.minPoints) ?? META_RANKS[0];
   const rankIndex = META_RANKS.findIndex((entry) => entry.id === rank.id);
   const next = META_RANKS[rankIndex + 1] ?? null;
+  const codex = input.codex ?? createCodexState();
+  const codexFound = codexDiscoveredCount(codex);
   const collectionFound =
     input.characters.unlocked.length +
     equipmentTypesOwned +
     input.hidden.discovered.length +
-    input.progression.unlockedAchievements.length;
+    input.progression.unlockedAchievements.length +
+    codexFound;
   const collectionTotal =
     CHARACTER_IDS.length +
     EQUIPMENT_IDS.length +
     HIDDEN_CONTENT_IDS.length +
-    ACHIEVEMENT_IDS.length;
+    ACHIEVEMENT_IDS.length +
+    codexEntryCount();
 
   return {
     points,
@@ -114,6 +139,7 @@ export function resolveMetaProgression(input: {
     equipmentTypesOwned,
     hiddenDiscovered: input.hidden.discovered.length,
     achievementsUnlocked: input.progression.unlockedAchievements.length,
+    codexDiscovered: codexFound,
     collectionFound,
     collectionTotal,
   };
@@ -124,6 +150,7 @@ export function collectionEntries(input: {
   equipment: EquipmentState;
   hidden: HiddenDiscoveryState;
   progression: ProgressionState;
+  codex?: CodexState;
 }): CollectionEntry[] {
   const characters = new Set(input.characters.unlocked);
   const equipment = new Set(
@@ -183,10 +210,15 @@ export function collectionEntries(input: {
     };
   });
 
+  const codexEntries = codexCollectionEntries(
+    input.codex ?? createCodexState(),
+  );
+
   return [
     ...characterEntries,
     ...equipmentEntries,
     ...hiddenEntries,
     ...achievementEntries,
+    ...codexEntries,
   ];
 }
