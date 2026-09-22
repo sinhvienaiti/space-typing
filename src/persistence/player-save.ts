@@ -60,6 +60,11 @@ import {
   type RunPersistentState,
 } from "./checkpoint";
 import {
+  createShopState,
+  sanitizeShopState,
+  type ShopState,
+} from "../shops/state";
+import {
   resolveCrashRecovery,
   sanitizeCrashRecoverySnapshot,
   type CrashRecoverySnapshot,
@@ -75,7 +80,7 @@ const STORE_NAME = "player";
 const SAVE_KEY = "main";
 const RECOVERY_SAVE_KEY = "spaceTypingPlayerSaveRecoveryV3";
 
-export const PLAYER_SAVE_VERSION = 19;
+export const PLAYER_SAVE_VERSION = 20;
 
 export class UnsupportedPlayerSaveVersionError extends Error {
   constructor(readonly version: number) {
@@ -346,7 +351,28 @@ export type PlayerSaveV19 = {
   lastSaveReason: SaveReason;
 };
 
-export type PlayerSave = PlayerSaveV19;
+export type PlayerSaveV20 = {
+  version: 20;
+  campaign: CampaignProgress;
+  inventory: Inventory;
+  equipment: EquipmentState;
+  supportSpells: SupportSpellState;
+  characters: CharacterState;
+  luckPity: LuckPityState;
+  hiddenDiscovery: HiddenDiscoveryState;
+  credits: number;
+  progression: ProgressionState;
+  expansionCurrencies: ExpansionCurrencyState;
+  campaignExpansion: CampaignExpansionState;
+  checkpointSnapshot: CheckpointSnapshot;
+  crashRecoverySnapshot: CrashRecoverySnapshot | null;
+  stageEntrySnapshot: StageEntrySnapshot | null;
+  shops: ShopState;
+  updatedAt: string;
+  lastSaveReason: SaveReason;
+};
+
+export type PlayerSave = PlayerSaveV20;
 export type PersistenceSource = "indexeddb" | "localStorage";
 
 export type LoadedPlayerSave = {
@@ -400,6 +426,7 @@ export function createPlayerSave(
   checkpointSnapshot?: CheckpointSnapshot,
   crashRecoverySnapshot: CrashRecoverySnapshot | null = null,
   stageEntrySnapshot: StageEntrySnapshot | null = null,
+  shops: ShopState = createShopState(),
 ): PlayerSave {
   const safeCampaign = sanitizeCampaignProgress(campaign);
   const activeState: RunPersistentState = {
@@ -414,6 +441,7 @@ export function createPlayerSave(
     progression: sanitizeProgressionState(progression),
     expansionCurrencies:
       sanitizeExpansionCurrencyState(expansionCurrencies),
+    shops: sanitizeShopState(shops),
   };
   const safeCampaignExpansion = sanitizeCampaignExpansionState(
     campaignExpansion,
@@ -471,6 +499,7 @@ export function migratePlayerSave(value: unknown): MigrationResult {
     checkpointSnapshot?: unknown;
     crashRecoverySnapshot?: unknown;
     stageEntrySnapshot?: unknown;
+    shops?: unknown;
     updatedAt?: unknown;
     lastSaveReason?: unknown;
   };
