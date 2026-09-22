@@ -7,9 +7,9 @@ import {
 } from "../src/campaign/difficulty-settings";
 
 describe("runtime difficulty settings", () => {
-  it("defaults to current Normal behavior", () => {
+  it("defaults to Balanced behavior", () => {
     expect(createDifficultySettings()).toEqual({
-      mode: "normal",
+      mode: "balanced",
       customTargetWpm: 60,
       customPressure: 1,
       profile: {
@@ -18,6 +18,18 @@ describe("runtime difficulty settings", () => {
         samples: 0,
       },
     });
+  });
+
+  it("migrates legacy fixed-mode ids without losing player intent", () => {
+    expect(
+      sanitizeDifficultySettings({ mode: "relaxed" }).mode,
+    ).toBe("relax");
+    expect(
+      sanitizeDifficultySettings({ mode: "normal" }).mode,
+    ).toBe("balanced");
+    expect(
+      sanitizeDifficultySettings({ mode: "expert" }).mode,
+    ).toBe("extreme");
   });
 
   it("sanitizes modes, custom values and adaptive profile", () => {
@@ -43,7 +55,7 @@ describe("runtime difficulty settings", () => {
     state = recordDifficultyResult(state, 80, 98);
     state = recordDifficultyResult(state, 40, 86);
 
-    expect(state.mode).toBe("normal");
+    expect(state.mode).toBe("balanced");
     expect(state.profile.smoothedWpm).toBe(70);
     expect(state.profile.smoothedAccuracy).toBe(95);
     expect(state.profile.samples).toBe(2);
