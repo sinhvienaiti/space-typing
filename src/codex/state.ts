@@ -289,6 +289,24 @@ export function codexCollectionEntries(
   return [...worlds, ...enemies, ...rewards];
 }
 
+export function mergeCodexState(
+  leftInput: CodexState,
+  rightInput: CodexState,
+): CodexState {
+  const left = sanitizeCodexState(leftInput);
+  const right = sanitizeCodexState(rightInput);
+  const worlds = new Set([...left.worlds, ...right.worlds]);
+  const enemies = new Set([...left.enemies, ...right.enemies]);
+  const rewards = new Set([...left.rewards, ...right.rewards]);
+
+  return {
+    version: 1,
+    worlds: WORLD_IDS.filter((id) => worlds.has(id)),
+    enemies: ENEMY_DEFINITION_IDS.filter((id) => enemies.has(id)),
+    rewards: CODEX_REWARD_IDS.filter((id) => rewards.has(id)),
+  };
+}
+
 export function codexDiscoveredCount(input: CodexState): number {
   const state = sanitizeCodexState(input);
   return (
