@@ -1,10 +1,22 @@
 import type { GameSettings } from "./types";
 
-let pendingSpeech = 0;
+let speechGeneration = 0;
+let speechActive = false;
 
 function notifyParent(active: boolean): void {
   if (window.parent === window) return;
   window.parent.postMessage({ type: "typing-game:speech", active }, "*");
+}
+
+function setSpeechActive(active: boolean): void {
+  if (speechActive === active) return;
+  speechActive = active;
+  notifyParent(active);
+  window.dispatchEvent(
+    new CustomEvent("space-typing:pronunciation", {
+      detail: { active },
+    }),
+  );
 }
 
 function englishVoice(): SpeechSynthesisVoice | null {
@@ -25,6 +37,12 @@ export function speakEnglish(text: string, settings: GameSettings): void {
     return;
   }
 
+  speechGeneration += 1;
+  const generation = speechGeneration;
+
+  // Latest pronunciation wins. Fast typing must not build a stale TTS queue.
+  speechSynthesis.cancel();
+
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "en-US";
   utterance.rate = settings.pronunciationRate;
@@ -33,15 +51,14 @@ export function speakEnglish(text: string, settings: GameSettings): void {
   const voice = englishVoice();
   if (voice !== null) utterance.voice = voice;
 
-  pendingSpeech += 1;
-  if (pendingSpeech === 1) notifyParent(true);
+  setSpeechActive(true);
 
   let finished = false;
   const finish = (): void => {
     if (finished) return;
     finished = true;
-    pendingSpeech = Math.max(0, pendingSpeech - 1);
-    if (pendingSpeech === 0) notifyParent(false);
+    if (generation !== speechGeneration) return;
+    setSpeechActive(false);
   };
 
   utterance.onend = finish;
@@ -50,7 +67,7 @@ export function speakEnglish(text: string, settings: GameSettings): void {
 }
 
 export function stopSpeech(): void {
-  pendingSpeech = 0;
-  notifyParent(false);
+  speechGeneration += 1;
+  setSpeechActive(false);
   if ("speechSynthesis" in window) speechSynthesis.cancel();
 }
