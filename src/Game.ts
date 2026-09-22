@@ -18,6 +18,7 @@ import {
 import type { DifficultyProfile, StageConfig } from "./campaign/types";
 import {
   activeThreatPressure,
+  canAdmitFormation,
   canAdmitSpawn,
   emptyActivePressureSnapshot,
   isControllerSupportKind,
@@ -216,6 +217,12 @@ import {
   chooseEnemyKind,
   enemyProfile,
 } from "./enemies/kinds";
+import {
+  chooseFormation,
+  formationSpawnChance,
+  shouldAttemptFormation,
+  type FormationDefinition,
+} from "./enemies/formations";
 import { enemyDefinition } from "./enemies/registry";
 import { applyEnemyRewardEffect } from "./enemies/reward-effects";
 import {
@@ -322,6 +329,14 @@ import type {
   Particle,
   VocabularyEntry,
 } from "./types";
+
+type EnemySpawnRequest = {
+  kind?: EnemyKind;
+  skipAdmission?: boolean;
+  formationMember?: boolean;
+  x?: number;
+  yOffset?: number;
+};
 
 type Hooks = {
   onStats(stats: GameStats): void;
@@ -1837,18 +1852,26 @@ export class Game {
       this.spawnTimer <= 0 &&
       this.enemies.length < difficulty.maxEnemies
     ) {
-      const spawned = this.spawnEnemy();
-      if (spawned) {
-        this.spawnRemaining -= 1;
+      const formationCount =
+        this.trySpawnFormation(difficulty);
+      if (formationCount > 0) {
+        this.spawnRemaining -= formationCount;
         this.spawnTimer =
-          difficulty.spawnInterval * randomBetween(0.82, 1.16);
+          difficulty.spawnInterval * randomBetween(1.02, 1.28);
       } else {
-        // Pressure denial is not a skipped enemy. Retry shortly after the
-        // active pile becomes more feasible.
-        this.spawnTimer = Math.max(
-          0.12,
-          difficulty.reactionWindow * 0.24,
-        );
+        const spawned = this.spawnEnemy();
+        if (spawned) {
+          this.spawnRemaining -= 1;
+          this.spawnTimer =
+            difficulty.spawnInterval * randomBetween(0.82, 1.16);
+        } else {
+          // Pressure denial is not a skipped enemy. Retry shortly after the
+          // active pile becomes more feasible.
+          this.spawnTimer = Math.max(
+            0.12,
+            difficulty.reactionWindow * 0.24,
+          );
+        }
       }
     }
 
@@ -2390,18 +2413,100 @@ export class Game {
     );
   }
 
-  private spawnEnemy(): boolean {
+  private canAdmitFormation(
+    formation: FormationDefinition,
+    difficulty: DifficultyProfile,
+  ): boolean {
+    return canAdmitFormation(
+      this.activeTypingPressureSnapshot(difficulty),
+      difficulty,
+      formation,
+    );
+  }
+
+  private trySpawnFormation(
+    difficulty: DifficultyProfile,
+  ): number {
+    const stageConfig = this.stageConfig;
+    if (
+      stageConfig === null ||
+      this.spawnRemaining < 2 ||
+      formationSpawnChance(
+        difficulty,
+        stageConfig.role,
+      ) <= 0 ||
+      !shouldAttemptFormation(
+        difficulty,
+        stageConfig.role,
+      )
+    ) {
+      return 0;
+    }
+
+    const formation = chooseFormation(
+      stageConfig.stage,
+      difficulty.formationComplexity,
+      this.spawnRemaining,
+    );
+    if (
+      formation === null ||
+      !this.canAdmitFormation(formation, difficulty)
+    ) {
+      return 0;
+    }
+
+    const anchorPadding = Math.min(
+      Math.max(145, this.width * 0.2),
+      Math.max(145, this.width / 2 - 20),
+    );
+    const anchorX =
+      this.width <= anchorPadding * 2
+        ? this.width / 2
+        : randomBetween(
+            anchorPadding,
+            this.width - anchorPadding,
+          );
+    const initialEnemyCount = this.enemies.length;
+
+    for (const member of formation.members) {
+      const spawned = this.spawnEnemy({
+        kind: member.kind,
+        skipAdmission: true,
+        formationMember: true,
+        x: anchorX + member.xOffset,
+        yOffset: member.yOffset,
+      });
+
+      if (!spawned) {
+        // The package is atomic: a defensive failure cannot leave half a
+        // formation alive or consume the Campaign enemy budget.
+        this.enemies.splice(initialEnemyCount);
+        return 0;
+      }
+    }
+
+    this.burst(anchorX, 22, 18 + formation.members.length * 4, 195);
+    return formation.members.length;
+  }
+
+  private spawnEnemy(
+    request: EnemySpawnRequest = {},
+  ): boolean {
     const stage = this.stageConfig?.stage ?? 1;
     const galaxy = this.stageConfig?.galaxy ?? 1;
     const difficulty = this.difficulty;
     if (difficulty === null) return false;
 
-    let kind = chooseEnemyKind(stage);
-    if (!this.canAdmitEnemyKind(kind, difficulty)) {
+    let kind = request.kind ?? chooseEnemyKind(stage);
+    if (
+      !request.skipAdmission &&
+      !this.canAdmitEnemyKind(kind, difficulty)
+    ) {
       // Do not deadlock the scheduler because one controller/support roll was
       // rejected. A Scout fallback is still subject to the same total pressure
       // and urgent-threat caps.
       if (
+        request.kind === undefined &&
         kind !== "scout" &&
         this.canAdmitEnemyKind("scout", difficulty)
       ) {
@@ -2413,12 +2518,18 @@ export class Game {
 
     const profile = enemyProfile(kind, galaxy);
 
+    const formationMember = request.formationMember === true;
     const forceElite =
-      this.stageConfig?.role === "elite" && this.eliteSpawned === 0;
+      !formationMember &&
+      this.stageConfig?.role === "elite" &&
+      this.eliteSpawned === 0;
     const elite =
-      forceElite ||
-      rollElite(this.stageConfig?.eliteChance ?? 0);
+      formationMember
+        ? false
+        : forceElite ||
+          rollElite(this.stageConfig?.eliteChance ?? 0);
     const golden =
+      !formationMember &&
       !elite &&
       this.rollPityEvent(
         "golden",
@@ -2460,9 +2571,16 @@ export class Game {
       eliteModifiers,
     );
 
-    const baseX = randomBetween(
-      profile.radius + 70,
+    const minX = profile.radius + 70;
+    const maxX = Math.max(
+      minX,
       this.width - profile.radius - 70,
+    );
+    const baseX = clamp(
+      request.x ??
+        randomBetween(minX, maxX),
+      minX,
+      maxX,
     );
     const definitionId = spawnWorldEnemyDefinitionId(
       kind,
@@ -2523,7 +2641,10 @@ export class Game {
       wordMissed: false,
       layersRemaining: typingProfile.layersRemaining,
       x: baseX,
-      y: -profile.radius - 20,
+      y:
+        -profile.radius -
+        20 +
+        (request.yOffset ?? 0),
       baseX,
       speed: eliteStats.speed * (golden ? 1.12 : 1),
       age: Math.random() * 8,
