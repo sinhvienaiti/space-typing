@@ -1545,3 +1545,22 @@ kbd {
     grid-template-columns: 1fr;
   }
 }
+
+
+.status-badge {
+  position: absolute;
+  top: 126px;
+  left: 50%;
+  z-index: 8;
+  max-width: min(760px, calc(100vw - 40px));
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  border: 1px solid rgba(120, 210, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(8, 12, 24, 0.78);
+  color: var(--muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-align: center;
+  pointer-events: none;
+}
