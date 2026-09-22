@@ -10,11 +10,19 @@ import {
   recordStageClear,
 } from "../src/campaign/progress";
 import {
+  addExpansionCurrencyReward,
   createExpansionCurrencyState,
   isValidExpansionCurrencyState,
   sanitizeExpansionCurrencyState,
+  stageClearExpansionCurrencyReward,
 } from "../src/economy/currencies";
-import { GRADE_IDS, isGradeId } from "../src/grades";
+import {
+  GRADE_IDS,
+  gradeLabel,
+  gradeStatMultiplier,
+  isGradeId,
+} from "../src/grades";
+import { legacyRarityToGrade } from "../src/equipment/rarity";
 import type { WorldProfile } from "../src/worlds/types";
 
 describe("gameplay expansion M01 contracts", () => {
@@ -112,7 +120,7 @@ describe("gameplay expansion M01 contracts", () => {
     ).toBe(true);
   });
 
-  it("defines the five approved grades without migrating legacy rarity yet", () => {
+  it("activates the five approved grades and explicit legacy mapping", () => {
     expect(GRADE_IDS).toEqual([
       "aluminum",
       "copper",
@@ -122,6 +130,52 @@ describe("gameplay expansion M01 contracts", () => {
     ]);
     expect(isGradeId("diamond")).toBe(true);
     expect(isGradeId("legendary")).toBe(false);
+    expect(legacyRarityToGrade("common")).toBe("aluminum");
+    expect(legacyRarityToGrade("rare")).toBe("copper");
+    expect(legacyRarityToGrade("epic")).toBe("silver");
+    expect(legacyRarityToGrade("legendary")).toBe("gold");
+    expect(gradeLabel("diamond")).toBe("Diamond");
+    expect(gradeStatMultiplier("diamond")).toBeGreaterThan(
+      gradeStatMultiplier("gold"),
+    );
+  });
+
+  it("awards role-aware core currencies and accumulates them safely", () => {
+    expect(stageClearExpansionCurrencyReward(1, "normal", 100)).toEqual({
+      alloy: 1,
+      starCrystal: 0,
+      quantumCore: 0,
+    });
+    expect(stageClearExpansionCurrencyReward(50, "boss", 100)).toEqual({
+      alloy: 6,
+      starCrystal: 2,
+      quantumCore: 0,
+    });
+    expect(
+      stageClearExpansionCurrencyReward(100, "major-boss", 100),
+    ).toEqual({
+      alloy: 10,
+      starCrystal: 4,
+      quantumCore: 1,
+    });
+    expect(
+      stageClearExpansionCurrencyReward(1000, "major-boss", 100),
+    ).toEqual({
+      alloy: 19,
+      starCrystal: 4,
+      quantumCore: 2,
+    });
+
+    expect(
+      addExpansionCurrencyReward(
+        { alloy: 10, starCrystal: 2, quantumCore: 0 },
+        { alloy: 3, starCrystal: 1, quantumCore: 1 },
+      ),
+    ).toEqual({
+      alloy: 13,
+      starCrystal: 3,
+      quantumCore: 1,
+    });
   });
 
   it("provides the WorldProfile contract without creating a parallel registry", () => {
