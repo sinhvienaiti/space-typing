@@ -115,7 +115,7 @@ export function sanitizeAscensionState(
       ? clampTier(raw.highestUnlockedTier)
       : 0;
   const highestUnlockedTier = Math.max(minimumUnlocked, rawHighest);
-  const selectedTier = Math.min(
+  const selectedCandidate = Math.min(
     highestUnlockedTier,
     typeof raw.selectedTier === "number" ? clampTier(raw.selectedTier) : 0,
   );
@@ -131,6 +131,9 @@ export function sanitizeAscensionState(
     ),
   ).sort((a, b) => a - b);
   const completedSet = new Set(completedTiers);
+  const selectedTier = completedSet.has(selectedCandidate)
+    ? 0
+    : selectedCandidate;
   const rawFrontier =
     raw.frontierByTier !== null &&
     typeof raw.frontierByTier === "object" &&
@@ -195,6 +198,13 @@ export function isValidAscensionState(value: unknown): value is AscensionState {
 
   const frontiers = raw.frontierByTier as Record<string, unknown>;
   const completedSet = new Set(completed as number[]);
+  if (
+    typeof raw.selectedTier === "number" &&
+    completedSet.has(raw.selectedTier)
+  ) {
+    return false;
+  }
+
   const expectedKeys = Array.from(
     { length: highestUnlockedTier },
     (_, index) => String(index + 1),
