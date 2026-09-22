@@ -125,8 +125,11 @@ import {
   type ProgressionState,
 } from "./progression/missions";
 import {
+  collectionEntries,
+  resolveMetaProgression,
+} from "./progression/meta";
+import {
   createHiddenDiscoveryState,
-  hiddenCodexEntries,
   type HiddenContentDefinition,
   type HiddenDiscoveryState,
 } from "./discovery/hidden-content";
@@ -504,12 +507,15 @@ app.innerHTML = `
     <dialog id="codexDialog" class="settings-dialog codex-dialog">
       <form method="dialog" class="dialog-head">
         <div>
-          <p class="eyebrow">hidden-content archive</p>
-          <h2>Codex</h2>
+          <p class="eyebrow">collection archive</p>
+          <h2>Codex & Meta Progression</h2>
         </div>
         <button class="icon-button" aria-label="Close">×</button>
       </form>
-      <p id="codexMeta" class="equipment-note">0 / 6 hidden discoveries</p>
+      <p id="codexMeta" class="equipment-note">Meta Level 1 · Cadet</p>
+      <p id="codexCollectionMeta" class="equipment-note">
+        0 / 0 collection entries
+      </p>
       <div id="codexGrid" class="codex-grid"></div>
     </dialog>
 
@@ -1331,15 +1337,39 @@ function createEquipmentDropInstanceId(): string {
 }
 
 function renderCodex(): void {
-  const entries = hiddenCodexEntries(hiddenDiscovery);
-  const discoveredCount = entries.filter(
-    (entry) => entry.discovered,
-  ).length;
+  const meta = resolveMetaProgression({
+    campaign,
+    characters,
+    equipment,
+    hidden: hiddenDiscovery,
+    progression,
+  });
+  const entries = collectionEntries({
+    characters,
+    equipment,
+    hidden: hiddenDiscovery,
+    progression,
+  });
+
   byId("codexMeta").textContent =
-    String(discoveredCount) +
+    "Meta Level " +
+    String(meta.level) +
+    " · " +
+    meta.rankName +
+    " · " +
+    meta.points.toLocaleString() +
+    " points" +
+    (meta.nextRankAt === null
+      ? " · max rank"
+      : " · next rank at " + meta.nextRankAt.toLocaleString());
+
+  byId("codexCollectionMeta").textContent =
+    String(meta.collectionFound) +
     " / " +
-    String(entries.length) +
-    " hidden discoveries";
+    String(meta.collectionTotal) +
+    " collection entries · " +
+    String(meta.uniqueStagesCleared) +
+    " stages cleared";
 
   const grid = byId("codexGrid");
   grid.replaceChildren();
@@ -1349,8 +1379,8 @@ function renderCodex(): void {
     card.className =
       "codex-entry " + (entry.discovered ? "discovered" : "unknown");
 
-    const meta = document.createElement("span");
-    meta.textContent = entry.kind.toUpperCase();
+    const category = document.createElement("span");
+    category.textContent = entry.category.toUpperCase();
 
     const title = document.createElement("strong");
     title.textContent = entry.title;
@@ -1358,10 +1388,7 @@ function renderCodex(): void {
     const description = document.createElement("small");
     description.textContent = entry.description;
 
-    const reward = document.createElement("em");
-    reward.textContent = "unlock · " + entry.reward;
-
-    card.append(meta, title, description, reward);
+    card.append(category, title, description);
     grid.append(card);
   }
 }
