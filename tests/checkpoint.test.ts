@@ -55,6 +55,7 @@ function runState(campaign: CampaignProgress): RunPersistentState {
     expansionCurrencies: createExpansionCurrencyState(),
     shops: createShopState(),
     route: createRouteState(campaign.highestUnlockedStage),
+    relics: createRelicState(),
   };
 }
 
