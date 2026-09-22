@@ -1509,3 +1509,39 @@ kbd {
     grid-template-columns: 1fr;
   }
 }
+
+
+.special-shop-dialog {
+  width: min(820px, calc(100vw - 32px));
+}
+
+.special-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.special-shop-offer {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid rgba(239, 193, 79, 0.22);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.special-shop-offer > small {
+  min-height: 3em;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.special-shop-offer > button {
+  justify-self: start;
+}
+
+@media (max-width: 680px) {
+  .special-shop-grid {
+    grid-template-columns: 1fr;
+  }
+}
