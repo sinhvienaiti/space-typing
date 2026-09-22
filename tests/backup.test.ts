@@ -187,7 +187,7 @@ describe("save backup", () => {
     );
     expect(unsupported).toEqual({
       ok: false,
-      error: "Unsupported save version. Supported versions: 1-19.",
+      error: "Unsupported save version. Supported versions: 1-20.",
     });
   });
 
@@ -581,7 +581,32 @@ describe("save backup", () => {
     expect(result.save.stageEntrySnapshot).toBeNull();
   });
 
-  it("rejects legacy rarity fields in current v19 equipment", () => {
+  it("imports and migrates a valid v19 backup to empty shop state", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.version = 19;
+    delete raw.shops;
+
+    const checkpoint = raw.checkpointSnapshot as Record<string, unknown>;
+    delete checkpoint.shops;
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.migrated).toBe(true);
+    expect(result.save.shops).toEqual({
+      version: 1,
+      instances: {},
+    });
+    expect(result.save.checkpointSnapshot.shops).toEqual({
+      version: 1,
+      instances: {},
+    });
+  });
+
+  it("rejects legacy rarity fields in current v20 equipment", () => {
     const raw = JSON.parse(
       exportPlayerSaveJson(createDefaultCampaignProgress()),
     ) as Record<string, unknown>;
@@ -590,6 +615,31 @@ describe("save backup", () => {
     expect(parsePlayerSaveJson(JSON.stringify(raw))).toEqual({
       ok: false,
       error: "Equipment data contains an invalid item or loadout reference.",
+    });
+  });
+
+  it("rejects invalid current shop state", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.shops = {
+      version: 1,
+      instances: {
+        broken: {
+          id: "different-id",
+          type: "normal",
+          worldKey: "world-01",
+          stage: 1,
+          sectorStart: 1,
+          seed: 1,
+          stock: [],
+        },
+      },
+    };
+
+    expect(parsePlayerSaveJson(JSON.stringify(raw))).toEqual({
+      ok: false,
+      error: "Shop state is invalid.",
     });
   });
 
