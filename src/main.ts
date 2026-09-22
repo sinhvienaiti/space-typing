@@ -163,6 +163,11 @@ import {
 import type { EquipmentDrop } from "./loot/equipment-loot";
 import type { StageEventDefinition } from "./events/stage-scheduler";
 import {
+  objectiveProgressText,
+  objectiveRewardFactor,
+  type StageObjectiveState,
+} from "./events/objectives";
+import {
   statusLabel,
   type ActiveStatus,
 } from "./status/engine";
@@ -427,6 +432,11 @@ app.innerHTML = `
 
     <div
       id="stageEventBadge"
+      class="stage-event-badge hidden"
+      aria-live="polite"
+    ></div>
+    <div
+      id="objectiveBadge"
       class="stage-event-badge hidden"
       aria-live="polite"
     ></div>
@@ -1820,6 +1830,37 @@ function renderStageEvents(
   badge.classList.remove("hidden");
 }
 
+function renderObjective(
+  objective: StageObjectiveState | null,
+): void {
+  const badge = byId("objectiveBadge");
+  if (objective === null) {
+    badge.textContent = "";
+    badge.title = "";
+    badge.classList.add("hidden");
+    return;
+  }
+
+  const prefix =
+    objective.definition.required
+      ? "OBJECTIVE // REQUIRED"
+      : "OBJECTIVE // BONUS";
+  badge.textContent =
+    prefix +
+    " · " +
+    objective.definition.label +
+    " · " +
+    objectiveProgressText(objective) +
+    " · " +
+    objective.status.toUpperCase();
+  badge.title =
+    objective.definition.label +
+    " · reward +" +
+    Math.round(objective.definition.rewardFactor * 100) +
+    "% base factor";
+  badge.classList.remove("hidden");
+}
+
 function renderStatuses(
   statuses: readonly ActiveStatus[],
 ): void {
@@ -1858,10 +1899,21 @@ function renderBoss(boss: BossHudState | null): void {
   }
 
   hud.classList.remove("hidden");
+  const mechanicMeta =
+    boss.mechanicLabel === undefined
+      ? ""
+      : " · " +
+        boss.mechanicLabel.toUpperCase() +
+        (boss.mechanicTimer !== undefined
+          ? " " + boss.mechanicTimer.toFixed(1) + "s"
+          : boss.mechanicProgress !== undefined
+            ? " " + boss.mechanicProgress
+            : "");
   byId("bossName").textContent =
     boss.name +
     " · PHASE " +
     String(boss.phase) +
+    mechanicMeta +
     (boss.shieldActive ? " · SHIELD" : boss.staggered ? " · STAGGER" : "");
   byId("bossHpText").textContent =
     Math.max(0, Math.ceil(boss.hp)).toLocaleString() +
@@ -2348,6 +2400,7 @@ const game = new Game(
     },
     onStage: renderStage,
     onStageEvents: renderStageEvents,
+    onObjectiveUpdate: renderObjective,
     onStatuses: renderStatuses,
     onBossUpdate: renderBoss,
     onSkills: renderAllSkills,
@@ -2426,6 +2479,17 @@ const game = new Game(
           : "";
       const difficultyRewardMultiplier =
         activeStageDifficulty?.rewardMultiplier ?? 1;
+      const objective = game.getStageObjective();
+      const objectiveBonusFactor =
+        activeStageDifficulty === null
+          ? 0
+          : objectiveRewardFactor(
+              objective,
+              activeStageDifficulty,
+            );
+      const combinedRewardMultiplier =
+        difficultyRewardMultiplier *
+        (1 + objectiveBonusFactor);
       const creditReward =
         stageClearCreditReward({
           stage: stats.stage,
@@ -2433,7 +2497,7 @@ const game = new Game(
           salvage: game.getPlayerStats().salvage,
         }) *
         game.getCreditsMultiplier() *
-        difficultyRewardMultiplier;
+        combinedRewardMultiplier;
       credits = addCredits(credits, creditReward);
 
       const stageConfig = createStageConfig(stats.stage);
@@ -2443,7 +2507,7 @@ const game = new Game(
           stageConfig.role,
           accuracy,
         ),
-        difficultyRewardMultiplier,
+        combinedRewardMultiplier,
       );
       expansionCurrencies = addExpansionCurrencyReward(
         expansionCurrencies,
@@ -2451,6 +2515,14 @@ const game = new Game(
       );
       const currencyRewardText =
         expansionCurrencyRewardText(currencyReward);
+      const objectiveText =
+        objective?.status === "complete"
+          ? " · Objective +" +
+            Math.round(objectiveBonusFactor * 100) +
+            "%"
+          : objective?.status === "failed"
+            ? " · Objective failed"
+            : "";
       progression = recordProgressionEvent(progression, {
         type: "stage-clear",
         accuracy,
@@ -2495,6 +2567,7 @@ const game = new Game(
           (currencyRewardText.length > 0
             ? " · " + currencyRewardText
             : "") +
+          objectiveText +
           achievementText +
           checkpointText,
         "stage-clear",
@@ -2511,7 +2584,8 @@ const game = new Game(
         " Credits" +
         (currencyRewardText.length > 0
           ? " · " + currencyRewardText
-          : "");
+          : "") +
+        objectiveText;
       byId("clearStreak").textContent = String(stats.maxStreak);
 
       updateCampaignUi();

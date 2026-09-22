@@ -12,6 +12,14 @@ import {
 } from "./boss/model";
 import type { BossHudState, BossState } from "./boss/model";
 import {
+  bossActionIntervalMultiplier,
+  bossWordLengthPreference,
+  createBossTypingMechanicState,
+  resolveBossWordMechanic,
+  tickBossTypingMechanic,
+  type BossTypingMechanicState,
+} from "./boss/typing-mechanics";
+import {
   bossVisualDefinitionIdForStage,
   bossVisualNameForStage,
 } from "./boss/visual-profile";
@@ -177,6 +185,16 @@ import {
   type StageRandomEventModifiers,
 } from "./events/stage-scheduler";
 import { galaxyStageModifiers } from "./events/galaxy-hazards";
+import {
+  createStageObjectiveState,
+  objectiveForcesCommander,
+  objectiveForcesElite,
+  objectiveForStage,
+  reduceStageObjective,
+  requiredObjectiveAllowsFinish,
+  type StageObjectiveEvent,
+  type StageObjectiveState,
+} from "./events/objectives";
 import {
   applyStatus,
   cleanseNegativeStatuses,
@@ -344,6 +362,7 @@ type Hooks = {
   onPhase(phase: GamePhase): void;
   onStage(stage: number): void;
   onStageEvents(events: readonly StageEventDefinition[]): void;
+  onObjectiveUpdate(objective: StageObjectiveState | null): void;
   onStageClear(stats: GameStats): void;
   onBossUpdate(boss: BossHudState | null): void;
   onWordComplete(entry: VocabularyEntry): void;
@@ -440,6 +459,7 @@ export class Game {
   private nextProjectileId = 1;
   private eliteSpawned = 0;
   private boss: BossState | null = null;
+  private bossHudTimer = 0;
   private bossSpawned = false;
   private bossDefeated = false;
   private enemies: Enemy[] = [];
@@ -497,6 +517,8 @@ export class Game {
   private hiddenDiscovery: HiddenDiscoveryState =
     createHiddenDiscoveryState();
   private stageEvents: StageEventDefinition[] = [];
+  private stageObjective: StageObjectiveState | null = null;
+  private objectiveHudTimer = 0;
   private stageEventModifiers: StageRandomEventModifiers =
     createStageEventModifiers();
   private statusState: StatusState = createStatusState();
@@ -1293,6 +1315,15 @@ export class Game {
     return { ...this.playerStats };
   }
 
+  getStageObjective(): StageObjectiveState | null {
+    return this.stageObjective === null
+      ? null
+      : {
+          ...this.stageObjective,
+          definition: { ...this.stageObjective.definition },
+        };
+  }
+
   getStageElapsedSeconds(): number {
     return this.stageElapsedSeconds;
   }
@@ -1408,6 +1439,16 @@ export class Game {
       this.stageEvents,
     );
     this.hooks.onStageEvents(this.stageEvents);
+    const objectiveDefinition =
+      hiddenEncounterRuntime === null
+        ? objectiveForStage(stage, difficulty)
+        : null;
+    this.stageObjective =
+      objectiveDefinition === null
+        ? null
+        : createStageObjectiveState(objectiveDefinition);
+    this.objectiveHudTimer = 0;
+    this.hooks.onObjectiveUpdate(this.getStageObjective());
 
     this.phase = "playing";
     this.stageElapsedSeconds = 0;
@@ -1464,6 +1505,7 @@ export class Game {
     this.spawnTimer = 0.3;
     this.eliteSpawned = 0;
     this.boss = null;
+    this.bossHudTimer = 0;
     this.bossSpawned = false;
     this.bossDefeated = false;
     this.overdriveTimer = 0;
@@ -1798,6 +1840,16 @@ export class Game {
     const difficulty = this.difficulty;
     if (difficulty === null || this.stageConfig === null) return;
 
+    this.updateStageObjective({
+      type: "tick",
+      dt,
+    });
+    this.objectiveHudTimer -= dt;
+    if (this.objectiveHudTimer <= 0) {
+      this.objectiveHudTimer = 0.15;
+      this.hooks.onObjectiveUpdate(this.getStageObjective());
+    }
+
     this.updatePlayerResources(dt);
     const hostileTimeFactor = Math.min(
       this.timeShellTimer > 0 ? 0.42 : 1,
@@ -2033,18 +2085,42 @@ export class Game {
 
   private spawnBoss(): void {
     const stage = this.stageConfig;
-    if (stage === null || !isBossStageRole(stage.role)) return;
+    const difficulty = this.difficulty;
+    if (
+      stage === null ||
+      difficulty === null ||
+      !isBossStageRole(stage.role)
+    ) {
+      return;
+    }
 
-    const entry = this.pickBossEntry();
+    const bossVisualStage =
+      this.hiddenEncounterRuntime?.bossStageOverride ??
+      stage.stage;
+    const bossDefinition = enemyDefinition(
+      bossVisualDefinitionIdForStage(
+        bossVisualStage,
+        stage.role,
+      ),
+    );
+    const family = bossDefinition?.family ?? "devil";
+    const mechanic = createBossTypingMechanicState(
+      family,
+      stage.role,
+      1,
+      difficulty,
+    );
+    const entry = this.pickBossEntry(mechanic);
     this.boss = createBossState(
       stage.stage,
       stage.galaxy,
       stage.role,
       entry,
     );
-    const bossVisualStage =
-      this.hiddenEncounterRuntime?.bossStageOverride ??
-      stage.stage;
+    this.boss.typingMechanic = mechanic;
+    this.boss.shieldActive =
+      mechanic.id === "shield-sequence" &&
+      mechanic.active;
     this.boss.name = bossVisualNameForStage(
       bossVisualStage,
       this.boss.role,
@@ -2054,15 +2130,10 @@ export class Game {
     this.projectiles = [];
     this.targetId = null;
     this.boss.actionCooldown =
-      bossActionInterval(this.boss.role, this.boss.phase) /
-      Math.max(0.75, this.difficulty?.bossPressure ?? 1);
+      (bossActionInterval(this.boss.role, this.boss.phase) *
+        bossActionIntervalMultiplier(mechanic)) /
+      Math.max(0.75, difficulty.bossPressure);
     this.hooks.onBossUpdate(toBossHud(this.boss));
-    const bossDefinition = enemyDefinition(
-      bossVisualDefinitionIdForStage(
-        bossVisualStage,
-        this.boss.role,
-      ),
-    );
     if (bossDefinition !== undefined) {
       const fx = enemyFxProfile(bossDefinition.family, "boss-intro");
       const position = this.bossPosition();
@@ -2084,6 +2155,32 @@ export class Game {
     const boss = this.boss;
     if (boss === null) return;
 
+    this.bossHudTimer = Math.max(
+      0,
+      this.bossHudTimer - dt,
+    );
+    if (boss.typingMechanic !== undefined) {
+      const mechanicTick = tickBossTypingMechanic(
+        boss.typingMechanic,
+        dt,
+      );
+      boss.typingMechanic = mechanicTick.state;
+      if (mechanicTick.expiredInterrupt) {
+        this.fireBossProjectiles(boss);
+        this.fireBossProjectiles(boss);
+        boss.flash = 1;
+        this.sfx.bossPhase();
+        this.hooks.onBossUpdate(toBossHud(boss));
+      } else if (
+        boss.typingMechanic.id === "interrupt-charge" &&
+        boss.typingMechanic.active &&
+        this.bossHudTimer <= 0
+      ) {
+        this.bossHudTimer = 0.1;
+        this.hooks.onBossUpdate(toBossHud(boss));
+      }
+    }
+
     if (boss.staggerTimer > 0) {
       boss.staggerTimer = Math.max(0, boss.staggerTimer - dt);
       this.hooks.onBossUpdate(toBossHud(boss));
@@ -2095,7 +2192,12 @@ export class Game {
 
     this.fireBossProjectiles(boss);
     boss.actionCooldown =
-      bossActionInterval(boss.role, boss.phase) /
+      (bossActionInterval(boss.role, boss.phase) *
+        (boss.typingMechanic === undefined
+          ? 1
+          : bossActionIntervalMultiplier(
+              boss.typingMechanic,
+            ))) /
       Math.max(0.75, difficulty.bossPressure);
   }
 
@@ -2135,8 +2237,42 @@ export class Game {
     this.sfx.enemyShot();
   }
 
+  private updateStageObjective(
+    event: StageObjectiveEvent,
+  ): void {
+    if (this.stageObjective === null) return;
+
+    const beforeStatus = this.stageObjective.status;
+    const beforeProgress = this.stageObjective.progress;
+    const beforeIntegrity = this.stageObjective.integrity;
+    const beforeTarget = this.stageObjective.targetEnemyId;
+    this.stageObjective = reduceStageObjective(
+      this.stageObjective,
+      event,
+    );
+
+    if (
+      this.stageObjective.status !== beforeStatus ||
+      this.stageObjective.progress !== beforeProgress ||
+      this.stageObjective.integrity !== beforeIntegrity ||
+      this.stageObjective.targetEnemyId !== beforeTarget
+    ) {
+      this.hooks.onObjectiveUpdate(this.getStageObjective());
+    }
+  }
+
   private finishStage(): void {
     if (this.phase !== "playing") return;
+
+    this.updateStageObjective({
+      type: "stage-clear",
+      hits: this.stats.hits,
+      misses: this.stats.misses,
+    });
+    if (!requiredObjectiveAllowsFinish(this.stageObjective)) {
+      return;
+    }
+
     this.phase = "stageclear";
     this.projectiles = [];
     this.supplyPod = null;
@@ -2152,9 +2288,21 @@ export class Game {
     this.hooks.onPhase(this.phase);
   }
 
-  private pickBossEntry(): VocabularyEntry {
+  private pickBossEntry(
+    mechanic?: BossTypingMechanicState,
+  ): VocabularyEntry {
+    const preference =
+      mechanic === undefined
+        ? "normal"
+        : bossWordLengthPreference(mechanic);
     const candidates = this.vocabulary.filter((entry) => {
       const length = typingText(entry.en).length;
+      if (preference === "short") {
+        return length >= 3 && length <= 6;
+      }
+      if (preference === "long") {
+        return length >= 9 && length <= 18;
+      }
       return length >= 5 && length <= 12;
     });
     const source = candidates.length > 0 ? candidates : this.vocabulary;
@@ -2454,7 +2602,11 @@ export class Game {
   private trySpawnFormation(
     difficulty: DifficultyProfile,
   ): number {
-    if (this.hiddenEncounterRuntime?.forcePriorityTargets) {
+    if (
+      this.hiddenEncounterRuntime?.forcePriorityTargets ||
+      objectiveForcesCommander(this.stageObjective) ||
+      objectiveForcesElite(this.stageObjective)
+    ) {
       return 0;
     }
     const stageConfig = this.stageConfig;
@@ -2529,7 +2681,14 @@ export class Game {
     const difficulty = this.difficulty;
     if (difficulty === null) return false;
 
-    let kind = request.kind ?? chooseEnemyKind(stage);
+    const objectiveCommander =
+      request.kind === undefined &&
+      objectiveForcesCommander(this.stageObjective);
+    let kind =
+      request.kind ??
+      (objectiveCommander
+        ? "commander"
+        : chooseEnemyKind(stage));
     if (
       !request.skipAdmission &&
       !this.canAdmitEnemyKind(kind, difficulty)
@@ -2539,6 +2698,7 @@ export class Game {
       // and urgent-threat caps.
       if (
         request.kind === undefined &&
+        !objectiveCommander &&
         kind !== "scout" &&
         this.canAdmitEnemyKind("scout", difficulty)
       ) {
@@ -2553,8 +2713,12 @@ export class Game {
     const formationMember = request.formationMember === true;
     const priorityOnly =
       this.hiddenEncounterRuntime?.forcePriorityTargets === true;
+    const forceObjectiveElite =
+      !formationMember &&
+      objectiveForcesElite(this.stageObjective);
     const forceElite =
       priorityOnly ||
+      forceObjectiveElite ||
       (!formationMember &&
         this.stageConfig?.role === "elite" &&
         this.eliteSpawned === 0);
@@ -2658,8 +2822,9 @@ export class Game {
             difficulty,
           );
 
+    const enemyId = this.nextEnemyId++;
     this.enemies.push({
-      id: this.nextEnemyId++,
+      id: enemyId,
       kind,
       definitionId,
       elite,
@@ -2697,6 +2862,13 @@ export class Game {
       const fx = enemyFxProfile(spawnDefinition.family, "spawn");
       this.burst(baseX, 12, fx.count, fx.hue);
     }
+
+    this.updateStageObjective({
+      type: "enemy-spawn",
+      enemyId,
+      kind,
+      elite,
+    });
 
     if (elite) {
       const firstElite = this.eliteSpawned === 0;
@@ -3248,12 +3420,30 @@ export class Game {
       this.hooks.onWordComplete(boss.entry);
       this.applyCharacterWordCompletePassive(word.length);
 
+      const perfectWord = !boss.wordMissed;
+      const mechanicResult =
+        boss.typingMechanic === undefined
+          ? null
+          : resolveBossWordMechanic(
+              boss.typingMechanic,
+              perfectWord,
+            );
+      if (mechanicResult !== null) {
+        boss.typingMechanic = mechanicResult.state;
+      }
+
       if (boss.shieldActive) {
-        boss.shieldActive = false;
-        this.sfx.bossShieldBreak();
-        const { x, y } = this.bossPosition();
-        this.burst(x, y, 36, 176);
+        const shieldBroken =
+          mechanicResult?.shieldBroken ?? true;
+        if (shieldBroken) {
+          boss.shieldActive = false;
+          this.sfx.bossShieldBreak();
+          const { x, y } = this.bossPosition();
+          this.burst(x, y, 36, 176);
+        }
       } else {
+        const mechanicDamage =
+          mechanicResult?.damageMultiplier ?? 1;
         boss.hp = Math.max(
           0,
           boss.hp -
@@ -3261,17 +3451,19 @@ export class Game {
               bossWordDamage(boss.maxHp, boss.role),
               this.playerStats,
             ) *
+              mechanicDamage *
               markedBossDamageMultiplier(this.bossMarkTimer > 0) *
-            this.characterBossDamageMultiplier(),
+              this.characterBossDamageMultiplier(),
         );
       }
 
-      const perfectWord = !boss.wordMissed;
       this.sfx.wordComplete(perfectWord);
       this.applyCharacterPerfectWordPassive(perfectWord);
       boss.wordsCompleted += 1;
       boss.typed = 0;
-      boss.entry = this.pickBossEntry();
+      boss.entry = this.pickBossEntry(
+        boss.typingMechanic,
+      );
       boss.flash = 1;
       boss.kick = 1.5;
       boss.wordMissed = false;
@@ -3281,8 +3473,14 @@ export class Game {
       );
       this.gainPower(perfectWord ? 11 : 8);
 
-      if (perfectWord) {
-        boss.staggerTimer = Math.max(boss.staggerTimer, 1.05);
+      const staggerSeconds =
+        mechanicResult?.staggerSeconds ??
+        (perfectWord ? 1.05 : 0);
+      if (staggerSeconds > 0) {
+        boss.staggerTimer = Math.max(
+          boss.staggerTimer,
+          staggerSeconds,
+        );
         this.sfx.bossStagger();
       }
 
@@ -3312,13 +3510,6 @@ export class Game {
 
     boss.phase = nextPhase;
     boss.flash = 1;
-    boss.actionCooldown =
-      bossActionInterval(boss.role, boss.phase) /
-      Math.max(0.75, this.difficulty?.bossPressure ?? 1);
-
-    if (boss.phase === 2) {
-      boss.shieldActive = true;
-    }
 
     const { x, y } = this.bossPosition();
     const definition = enemyDefinition(
@@ -3329,6 +3520,33 @@ export class Game {
         boss.role,
       ),
     );
+    if (this.difficulty !== null) {
+      boss.typingMechanic =
+        createBossTypingMechanicState(
+          definition?.family ?? "devil",
+          boss.role,
+          boss.phase,
+          this.difficulty,
+        );
+      boss.shieldActive =
+        boss.typingMechanic.id === "shield-sequence" &&
+        boss.typingMechanic.active;
+    } else {
+      boss.shieldActive = false;
+    }
+    boss.entry = this.pickBossEntry(
+      boss.typingMechanic,
+    );
+    boss.typed = 0;
+    boss.wordMissed = false;
+    boss.actionCooldown =
+      (bossActionInterval(boss.role, boss.phase) *
+        (boss.typingMechanic === undefined
+          ? 1
+          : bossActionIntervalMultiplier(
+              boss.typingMechanic,
+            ))) /
+      Math.max(0.75, this.difficulty?.bossPressure ?? 1);
     const fx = enemyFxProfile(
       definition?.family ?? "devil",
       "boss-phase",
@@ -3763,6 +3981,13 @@ export class Game {
       );
     }
 
+    this.updateStageObjective({
+      type: "enemy-kill",
+      enemyId: enemy.id,
+      kind: enemy.kind,
+      elite: enemy.elite,
+    });
+
     this.enemies = this.enemies.filter((item) => item.id !== enemy.id);
     if (this.markedEnemyId === enemy.id) {
       this.markedEnemyId = null;
@@ -4031,6 +4256,7 @@ export class Game {
 
   private registerMiss(): void {
     this.stats.misses += 1;
+    this.updateStageObjective({ type: "miss" });
     this.stats.streak = 0;
     this.stats.multiplier = 1;
     this.stats.power = clamp(this.stats.power - 12, 0, 100);
@@ -4591,6 +4817,17 @@ export class Game {
   }
 
   private damagePlayer(enemyId: number, x: number, y: number): void {
+    const escaped = this.enemies.find(
+      (enemy) => enemy.id === enemyId,
+    );
+    if (escaped !== undefined) {
+      this.updateStageObjective({
+        type: "enemy-escaped",
+        enemyId: escaped.id,
+        kind: escaped.kind,
+        elite: escaped.elite,
+      });
+    }
     this.enemies = this.enemies.filter((enemy) => enemy.id !== enemyId);
     if (this.targetId === enemyId) this.targetId = null;
     this.applyPlayerDamage(x, y, 60);
@@ -6042,8 +6279,13 @@ export class Game {
     context.fillStyle = targeted
       ? "rgba(213, 249, 255, 0.95)"
       : "rgba(202, 215, 229, 0.8)";
+    const objectiveTarget =
+      this.stageObjective?.targetEnemyId === enemy.id;
     context.fillText(
-      enemyRankLabel(enemy.rank ?? "I") + " · " + layerLabel,
+      (objectiveTarget ? "OBJECTIVE · " : "") +
+        enemyRankLabel(enemy.rank ?? "I") +
+        " · " +
+        layerLabel,
       enemy.x,
       y - 25,
     );

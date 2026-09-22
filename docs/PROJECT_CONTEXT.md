@@ -3474,9 +3474,10 @@ Gameplay Expansion:
 - M13 Formation system: COMPLETE
 - M14 Branching Route Map + Station: COMPLETE
 - M15 Hidden Challenge / Hidden World / Champion Hunt: COMPLETE
+- M16 Stage Objectives + boss typing mechanics: COMPLETE
 
 Next:
-- M16 Stage Objectives + boss typing mechanics
+- M17 Skill/attribute/equipment upgrade expansion
 ~~~
 
 Current gameplay/progression foundation:
@@ -3536,6 +3537,10 @@ Current gameplay/progression foundation:
 - Hidden World reuses environment/World-roster/boss registries to build deterministic 3-4 encounter detours without numbered Campaign stages;
 - Champion Hunt reuses PriorityKillChain and M08 announcer ducking; normal Campaign enemies still do not advance the chain;
 - hidden clears bypass numbered Campaign recordStageClear/checkpoint progression and award premium rewards through existing economy systems;
+- numbered Campaign stages now support event-driven required/bonus objectives without a parallel polling runtime;
+- M16 objective rewards scale from M12 difficulty and reuse existing Credits/expansion-currency rewards;
+- BossState phases now resolve one World-family typing mechanic at a time: Interrupt Charge / Shield Sequence / Weak Point / Rapid Rage / Accuracy Curse;
+- boss typing mechanics reuse the existing vocabulary, phase, projectile, HUD, SFX/VFX and reward paths;
 - difficulty word pressure stays inside the configured vocabulary and does not change authored World Rank access;
 - stage-clear economy rewards use the frozen stage-start difficulty reward multiplier;
 - Service / Upgrade Shop consumes Credits + Alloy through the existing enhancement system;
@@ -3599,6 +3604,9 @@ Integration music lifecycle CI #251 PASS Test + Build
 
 M15 Hidden Challenge / Hidden World / Champion Hunt
 CI #262 PASS Test + Build on implementation head
+
+M16 Stage Objectives / Boss Typing Mechanics
+CI #270 PASS Test + Build on implementation head
 ~~~
 
 Important implementation notes:
