@@ -3172,6 +3172,21 @@ VFX polish rules:
 ## Step 63
 Tune SFX and pronunciation balance.
 
+**Status: implemented.**
+
+Audio-balance rules:
+
+- SFX now use explicit Typing, Combat, Warnings and UI mix groups under the existing master SFX setting;
+- typing feedback and warnings sit above normal combat effects while UI signatures remain quieter;
+- pronunciation activity ducks all SFX groups, but warnings retain more headroom than normal combat so danger cues stay audible;
+- Web Speech now uses latest-word-wins behavior: starting a new pronunciation cancels stale queued speech instead of building a backlog during fast typing;
+- parent BGM ducking continues through the existing `typing-game:speech` message while the same pronunciation lifecycle also drives child SFX ducking;
+- word completion has a separate light impact signature layered under existing hit/kill feedback;
+- Supply Pod arrival, Epic/Legendary drops, Shield break, stage clear and stage fail have distinct signatures;
+- boss entrance/phase/shield/stagger/death remain distinct warning/combat identities;
+- Game destruction removes the pronunciation listener and closes its AudioContext;
+- grouped gain/duck math is deterministic and unit-tested.
+
 ## Step 64
 Profile performance and add quality scaling.
 
