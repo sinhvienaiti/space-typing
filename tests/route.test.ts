@@ -76,6 +76,18 @@ describe("M14 deterministic route graph", () => {
     expect(routeNeedsChoice(reloaded, 41)).toBe(false);
   });
 
+  it("locks a persisted choice so reload/reclick cannot reroll the path", () => {
+    const state = createRouteState(41);
+    const choices = routeChoicesForStage(state, 41);
+    expect(choices.length).toBeGreaterThan(1);
+
+    const first = selectRouteNode(state, 41, choices[0]!.id);
+    const second = selectRouteNode(first, 41, choices[1]!.id);
+
+    expect(selectedRouteNode(second, 41)?.id).toBe(choices[0]!.id);
+    expect(second.selectedByStage).toEqual(first.selectedByStage);
+  });
+
   it("rejects invalid node ids without mutating selection", () => {
     const state = createRouteState(71);
     const next = selectRouteNode(state, 71, "missing-node");
