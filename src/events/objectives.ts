@@ -72,7 +72,11 @@ export type StageObjectiveEvent =
       kind: EnemyKind;
       elite: boolean;
     }
-  | { type: "stage-clear" };
+  | {
+      type: "stage-clear";
+      hits?: number;
+      misses?: number;
+    };
 
 function objectiveId(
   stage: number,
@@ -402,6 +406,14 @@ export function reduceStageObjective(
   }
 
   if (event.type === "stage-clear") {
+    if (
+      typeof event.hits === "number" &&
+      typeof event.misses === "number"
+    ) {
+      state.hits = Math.max(0, Math.floor(event.hits));
+      state.misses = Math.max(0, Math.floor(event.misses));
+    }
+
     if (state.definition.type === "accuracy") {
       return accuracy(state) >=
         (state.definition.targetAccuracy ?? 0)
