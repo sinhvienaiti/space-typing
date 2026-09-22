@@ -3227,7 +3227,26 @@ M20 must reuse the existing 50-World Campaign, World registry, difficulty/pressu
 
 ## M20 — Ascension
 
-Implement endgame replay layer using existing 50 Worlds and new modifier/boss mutation tables.
+**Status: Complete.** M20 adds a bounded New Game+ replay layer over the existing 1000-stage / 50-World Campaign. It reuses M02-M04 persistence/recovery, M10 Rank/typing, M12 pressure caps, M13 formations, M16 bosses and M19 reward paths. See `docs/M20_ASCENSION.md`.
+
+Implemented:
+
+- 10 Ascension tiers unlocked from base Stage 1000 completion;
+- independent sequential Stage 001-1000 frontier per tier with anti-skip checks;
+- the existing ten-stage `CheckpointSnapshot` / crash / stage-entry / death-protection system carries Ascension frontier state;
+- tier switching only at committed Stage 001/011/021/... boundaries, preventing mid-segment reward commits;
+- completed tiers cannot be reactivated as active progression;
+- bounded Rank, formation, word-pressure and reward modifiers compiled at stage start;
+- deterministic boss mutation tables compiled into existing boss HP/action/projectile runtime fields;
+- existing M12 max-enemy, urgent-threat, controller/support and pressure safety ceilings remain authoritative;
+- sector/boss rewards reuse existing M19/economy paths with bounded Ascension scaling;
+- first tier completion grants the next tier and a one-time endgame completion cache;
+- PlayerSave v24 -> v25 migration with AscensionState, including legacy nested checkpoint/crash/stage-entry migration;
+- title Ascension selector plus Ascension-aware Stage Select/Route locks and recovery labels;
+- regression coverage for migration, sequential progression, checkpoint switching/rollback, Rank integration, boss mutations/rewards and backup validation;
+- 108 test files / 548 tests plus TypeScript check and production build passing on CI #335.
+
+M21 must now build the single isolated Developer QA/Test Lab defined in Section 32. It must invoke production-runtime systems rather than reimplement combat/persistence logic inside the lab.
 
 ## M21 — Developer QA/Test Lab
 
