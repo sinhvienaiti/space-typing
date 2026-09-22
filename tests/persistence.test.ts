@@ -360,6 +360,9 @@ describe("player save persistence model", () => {
       completedMissions: [],
       discoveredEnemies: [],
       discoveredBossStages: [],
+      discoveredItems: [],
+      discoveredEquipment: [],
+      discoveredCharacters: [],
     });
   });
 
@@ -402,6 +405,9 @@ describe("player save persistence model", () => {
       completedMissions: [],
       discoveredEnemies: [],
       discoveredBossStages: [],
+      discoveredItems: [],
+      discoveredEquipment: [],
+      discoveredCharacters: [],
     });
   });
 
