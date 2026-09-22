@@ -16,6 +16,11 @@ import {
   bossVisualName,
 } from "./boss/visual-profile";
 import type { DifficultyProfile, StageConfig } from "./campaign/types";
+import {
+  environmentForWorld,
+  type WorldEnvironmentProfile,
+} from "./worlds/environment";
+import { worldForStage } from "./worlds/registry";
 import type { CharacterId } from "./characters/registry";
 import {
   AEGIS_ACTIVE_SKILL,
@@ -454,6 +459,8 @@ export class Game {
   private animationFrame = 0;
   private stars: Array<{ x: number; y: number; z: number }> = [];
   private backgroundGradient: CanvasGradient | null = null;
+  private worldEnvironment: WorldEnvironmentProfile =
+    environmentForWorld("world-01");
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -1294,6 +1301,14 @@ export class Game {
     this.sfx.unlock();
     this.stageConfig = stage;
     this.difficulty = difficulty;
+    const nextEnvironment = environmentForWorld(
+      worldForStage(stage.stage),
+    );
+    if (nextEnvironment.id !== this.worldEnvironment.id) {
+      this.worldEnvironment = nextEnvironment;
+      this.backgroundGradient = null;
+      this.seedStars();
+    }
 
     const hiddenRoll = rollHiddenDiscovery(
       this.hiddenDiscovery,
@@ -4168,9 +4183,18 @@ export class Game {
         this.height * 0.52,
         Math.max(this.width, this.height) * 0.82,
       );
-      gradient.addColorStop(0, "#0a2432");
-      gradient.addColorStop(0.45, "#07121d");
-      gradient.addColorStop(1, "#03060c");
+      gradient.addColorStop(
+        0,
+        this.worldEnvironment.backgroundCore,
+      );
+      gradient.addColorStop(
+        0.45,
+        this.worldEnvironment.backgroundMid,
+      );
+      gradient.addColorStop(
+        1,
+        this.worldEnvironment.backgroundEdge,
+      );
       this.backgroundGradient = gradient;
     }
 
@@ -4178,9 +4202,20 @@ export class Game {
     context.fillRect(-30, -30, this.width + 60, this.height + 60);
 
     for (const star of this.stars) {
-      const y = ((star.y + time * 0.016 * star.z) % 1) * this.height;
+      const y =
+        ((star.y +
+          time *
+            0.016 *
+            this.worldEnvironment.starDrift *
+            star.z) %
+          1) *
+        this.height;
       context.fillStyle =
-        "rgba(156, 225, 255, " + String(0.12 + star.z * 0.48) + ")";
+        "rgba(" +
+        this.worldEnvironment.starRgb +
+        ", " +
+        String(0.12 + star.z * 0.48) +
+        ")";
       context.fillRect(
         star.x * this.width,
         y,
@@ -4190,8 +4225,21 @@ export class Game {
     }
 
     context.save();
+    context.fillStyle =
+      "rgba(" +
+      this.worldEnvironment.hazeRgb +
+      ", " +
+      String(this.worldEnvironment.hazeIntensity) +
+      ")";
+    context.fillRect(0, 0, this.width, this.height);
+
     context.translate(this.width / 2, this.height * 0.08);
-    context.strokeStyle = "rgba(75, 205, 235, 0.065)";
+    context.strokeStyle =
+      "rgba(" +
+      this.worldEnvironment.gridRgb +
+      ", " +
+      String(this.worldEnvironment.gridIntensity) +
+      ")";
     context.lineWidth = 1;
 
     const profile = qualityProfile(this.settings.visualQuality);
