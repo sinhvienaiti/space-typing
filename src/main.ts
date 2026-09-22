@@ -1368,6 +1368,9 @@ function skillReasonText(reason: SkillBlockReason): string {
   if (reason === "effect-not-needed") {
     return "No useful target or effect right now";
   }
+  if (reason === "silenced") {
+    return "Skills are temporarily Silenced";
+  }
   return "Skill unavailable";
 }
 
