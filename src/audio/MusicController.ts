@@ -163,6 +163,9 @@ export class MusicController {
     const changed = profile.worldId !== this.profile.worldId;
     this.profile = profile;
     if (!changed) {
+      if (this.activeAmbient.length === 0) {
+        this.transitionAmbient(profile.ambientLayers);
+      }
       this.applyVolumes();
       return;
     }
