@@ -1,5 +1,6 @@
 import type { StageRole } from "../campaign/types";
 import type { VocabularyEntry } from "../types";
+import type { BossTypingMechanicState } from "./typing-mechanics";
 
 export type BossRole = Extract<
   StageRole,
@@ -21,6 +22,7 @@ export type BossState = {
   wordMissed: boolean;
   flash: number;
   kick: number;
+  typingMechanic?: BossTypingMechanicState;
 };
 
 export type BossHudState = {
@@ -30,6 +32,9 @@ export type BossHudState = {
   phase: number;
   shieldActive: boolean;
   staggered: boolean;
+  mechanicLabel?: string;
+  mechanicTimer?: number;
+  mechanicProgress?: string;
 };
 
 export function isBossStageRole(role: StageRole): role is BossRole {
@@ -145,6 +150,7 @@ export function bossProjectileCount(
 }
 
 export function toBossHud(state: BossState): BossHudState {
+  const mechanic = state.typingMechanic;
   return {
     name: state.name,
     hp: Math.max(0, state.hp),
@@ -152,5 +158,24 @@ export function toBossHud(state: BossState): BossHudState {
     phase: state.phase,
     shieldActive: state.shieldActive,
     staggered: state.staggerTimer > 0,
+    ...(mechanic === undefined
+      ? {}
+      : {
+          mechanicLabel: mechanic.label,
+          mechanicTimer:
+            mechanic.id === "interrupt-charge" &&
+            mechanic.active
+              ? mechanic.timer
+              : undefined,
+          mechanicProgress:
+            mechanic.id === "shield-sequence"
+              ? String(
+                  mechanic.maxWords -
+                    mechanic.wordsRemaining,
+                ) +
+                " / " +
+                String(mechanic.maxWords)
+              : undefined,
+        }),
   };
 }
