@@ -10,7 +10,10 @@ import {
   difficultyModeDefinition,
   difficultyModePresentation,
 } from "./campaign/difficulty-modes";
-import type { DifficultyProfile } from "./campaign/types";
+import type {
+  DifficultyProfile,
+  StageConfig,
+} from "./campaign/types";
 import {
   createDifficultySettings,
   difficultyInputFromSettings,
@@ -194,6 +197,23 @@ import {
   type HiddenContentDefinition,
   type HiddenDiscoveryState,
 } from "./discovery/hidden-content";
+import {
+  HIDDEN_CHALLENGE_TIERS,
+  advanceHiddenEncounter,
+  createHiddenEncounterState,
+  hiddenEncounterDifficulty,
+  hiddenEncounterLabel,
+  hiddenEncounterOffers,
+  hiddenEncounterReward,
+  hiddenEncounterRuntime,
+  skipHiddenEncounter,
+  startHiddenEncounter,
+  type ActiveHiddenEncounter,
+  type HiddenChallengeTier,
+  type HiddenEncounterKind,
+  type HiddenEncounterOffer,
+  type HiddenEncounterState,
+} from "./discovery/hidden-encounter";
 import {
   DEFENSIVE_SKILLS,
   type DefensiveSkillId,
@@ -654,6 +674,16 @@ app.innerHTML = `
           <button id="routeContinueButton" class="primary">Start Encounter</button>
         </div>
       </div>
+      <section id="hiddenEncounterPanel" class="route-hidden-panel hidden">
+        <div class="route-hidden-head">
+          <div>
+            <p class="eyebrow">optional signal</p>
+            <strong id="hiddenEncounterTitle">Hidden Encounters</strong>
+          </div>
+          <span id="hiddenEncounterMeta"></span>
+        </div>
+        <div id="hiddenEncounterGrid" class="route-hidden-grid"></div>
+      </section>
     </dialog>
 
     <dialog id="characterDialog" class="settings-dialog character-dialog">
@@ -3581,6 +3611,166 @@ function routeNodeDescription(node: RouteNode): string {
     : "Direct combat route · no service detour before the encounter.";
 }
 
+function currentHiddenEncounterState(): HiddenEncounterState {
+  return hiddenDiscovery.encounter ?? createHiddenEncounterState();
+}
+
+function setHiddenEncounterState(state: HiddenEncounterState): void {
+  hiddenDiscovery = {
+    ...hiddenDiscovery,
+    encounter: state,
+  };
+  game.setHiddenDiscoveryState(hiddenDiscovery);
+}
+
+function hiddenMusicState(kind: HiddenEncounterKind): MusicState {
+  if (kind === "champion-hunt") return "CHAMPION_HUNT";
+  if (kind === "hidden-world") return "HIDDEN_WORLD";
+  return "HIDDEN_CHALLENGE";
+}
+
+function renderHiddenEncounterOffers(targetStage: number): void {
+  const panel = byId("hiddenEncounterPanel");
+  const grid = byId("hiddenEncounterGrid");
+  grid.replaceChildren();
+
+  const state = currentHiddenEncounterState();
+  const active = state.active;
+  if (active !== null) {
+    panel.classList.remove("hidden");
+    byId("hiddenEncounterTitle").textContent =
+      hiddenEncounterLabel(active);
+    byId("hiddenEncounterMeta").textContent =
+      "Crash-safe optional encounter · Campaign Stage " +
+      String(active.sourceStage).padStart(3, "0") +
+      " remains unchanged";
+
+    const card = document.createElement("article");
+    card.className = "route-hidden-card active";
+    const title = document.createElement("strong");
+    title.textContent = "Resume " + hiddenEncounterLabel(active);
+    const meta = document.createElement("small");
+    meta.textContent =
+      active.kind === "hidden-world"
+        ? "Encounter " +
+          String(active.step) +
+          " / " +
+          String(active.totalSteps)
+        : "Tier " + String(active.tier);
+    const resume = document.createElement("button");
+    resume.type = "button";
+    resume.className = "primary";
+    resume.textContent = "Resume";
+    resume.addEventListener("click", () => {
+      if (routeDialog.open) routeDialog.close();
+      void startSelectedStage();
+    });
+    card.append(title, meta, resume);
+    grid.append(card);
+    return;
+  }
+
+  const offers = hiddenEncounterOffers(
+    hiddenDiscovery,
+    state,
+    targetStage,
+  );
+  panel.classList.toggle("hidden", offers.length === 0);
+  if (offers.length === 0) return;
+
+  byId("hiddenEncounterTitle").textContent = "Hidden Encounters";
+  byId("hiddenEncounterMeta").textContent =
+    "Optional · choose Tier I-III or skip permanently for this sector";
+
+  for (const offer of offers) {
+    const card = document.createElement("article");
+    card.className =
+      "route-hidden-card route-hidden-" + offer.kind;
+
+    const title = document.createElement("strong");
+    title.textContent = offer.label;
+    const description = document.createElement("small");
+    description.textContent = offer.description;
+
+    const actions = document.createElement("div");
+    actions.className = "route-hidden-actions";
+
+    for (const tier of HIDDEN_CHALLENGE_TIERS) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "Tier " + String(tier);
+      if (tier === 3) button.className = "primary";
+      button.addEventListener("click", () => {
+        void beginHiddenEncounter(offer, tier);
+      });
+      actions.append(button);
+    }
+
+    const skip = document.createElement("button");
+    skip.type = "button";
+    skip.textContent = "Skip";
+    skip.addEventListener("click", () => {
+      void skipCurrentHiddenEncounterOffer(offer);
+    });
+    actions.append(skip);
+
+    card.append(title, description, actions);
+    grid.append(card);
+  }
+}
+
+async function beginHiddenEncounter(
+  offer: HiddenEncounterOffer,
+  tier: HiddenChallengeTier,
+): Promise<void> {
+  const previous = hiddenDiscovery;
+  setHiddenEncounterState(
+    startHiddenEncounter(
+      currentHiddenEncounterState(),
+      offer,
+      tier,
+    ),
+  );
+
+  const saved = await autosaveCampaign(
+    "hidden-transition",
+    "✓ " + offer.label + " Tier " + String(tier) + " locked",
+    "hidden-transition",
+  );
+  if (!saved) {
+    hiddenDiscovery = previous;
+    game.setHiddenDiscoveryState(hiddenDiscovery);
+    renderHiddenEncounterOffers(routeTargetStage());
+    return;
+  }
+
+  if (routeDialog.open) routeDialog.close();
+  void startSelectedStage();
+}
+
+async function skipCurrentHiddenEncounterOffer(
+  offer: HiddenEncounterOffer,
+): Promise<void> {
+  const previous = hiddenDiscovery;
+  setHiddenEncounterState(
+    skipHiddenEncounter(
+      currentHiddenEncounterState(),
+      offer.id,
+    ),
+  );
+
+  const saved = await autosaveCampaign(
+    "hidden-transition",
+    "✓ " + offer.label + " skipped for this sector",
+    "hidden-transition",
+  );
+  if (!saved) {
+    hiddenDiscovery = previous;
+    game.setHiddenDiscoveryState(hiddenDiscovery);
+  }
+  renderHiddenEncounterOffers(routeTargetStage());
+}
+
 function renderRouteMap(): void {
   const targetStage = routeTargetStage();
   route = syncRouteStateForStage(route, targetStage);
@@ -3682,6 +3872,7 @@ function renderRouteMap(): void {
 
   if (selected === null) {
     panel.classList.add("hidden");
+    byId("hiddenEncounterPanel").classList.add("hidden");
     continueButton.disabled = true;
     return;
   }
@@ -3711,6 +3902,7 @@ function renderRouteMap(): void {
     selected.type !== "station",
   );
   continueButton.disabled = false;
+  renderHiddenEncounterOffers(targetStage);
 }
 
 async function chooseCurrentRouteNode(
