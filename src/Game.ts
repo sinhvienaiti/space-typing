@@ -3052,13 +3052,15 @@ export class Game {
     );
 
     const stage = this.stageConfig?.stage ?? 1;
+    const rosterStage =
+      this.hiddenEncounterRuntime?.rosterStageOverride ?? stage;
     const definitionId = spawnWorldEnemyDefinitionId(
       "scout",
       false,
-      stage,
+      rosterStage,
     );
     const typingProfile = resolveEnemyTypingProfile({
-      stage,
+      stage: rosterStage,
       kind: "scout",
       elite: false,
       minimumLayers: 1,
@@ -3067,7 +3069,7 @@ export class Game {
       wordScoreOffset: this.difficulty.wordScoreOffset,
     });
     const runtimeProfile = resolveEnemyRuntimeProfile({
-      stage,
+      stage: rosterStage,
       kind: "scout",
       rank: typingProfile.rank,
       elite: false,
@@ -3321,7 +3323,9 @@ export class Game {
     const { x, y } = this.bossPosition();
     const definition = enemyDefinition(
       bossVisualDefinitionIdForStage(
-        this.stageConfig?.stage ?? 1,
+        this.hiddenEncounterRuntime?.bossStageOverride ??
+          this.stageConfig?.stage ??
+          1,
         boss.role,
       ),
     );
@@ -3351,7 +3355,9 @@ export class Game {
 
     const definition = enemyDefinition(
       bossVisualDefinitionIdForStage(
-        this.stageConfig?.stage ?? 1,
+        this.hiddenEncounterRuntime?.bossStageOverride ??
+          this.stageConfig?.stage ??
+          1,
         boss.role,
       ),
     );
@@ -3957,13 +3963,15 @@ export class Game {
       );
 
       const stage = this.stageConfig?.stage ?? 1;
+      const rosterStage =
+        this.hiddenEncounterRuntime?.rosterStageOverride ?? stage;
       const definitionId = spawnWorldEnemyDefinitionId(
         "scout",
         false,
-        stage,
+        rosterStage,
       );
       const typingProfile = resolveEnemyTypingProfile({
-        stage,
+        stage: rosterStage,
         kind: "scout",
         elite: false,
         minimumLayers: 1,
@@ -3972,7 +3980,7 @@ export class Game {
         wordScoreOffset: this.difficulty.wordScoreOffset,
       });
       const runtimeProfile = resolveEnemyRuntimeProfile({
-        stage,
+        stage: rosterStage,
         kind: "scout",
         rank: typingProfile.rank,
         elite: false,
@@ -5199,7 +5207,9 @@ export class Game {
       boss.phase >= 3 ? "#ff527c" : boss.phase === 2 ? "#68e9ff" : "#ff8a6f";
     const definition = enemyDefinition(
       bossVisualDefinitionIdForStage(
-        this.stageConfig?.stage ?? 1,
+        this.hiddenEncounterRuntime?.bossStageOverride ??
+          this.stageConfig?.stage ??
+          1,
         boss.role,
       ),
     );
@@ -5657,7 +5667,9 @@ export class Game {
         worldRuntimeEnemyDefinitionId(
           enemy.kind,
           enemy.elite,
-          this.stageConfig?.stage ?? 1,
+          this.hiddenEncounterRuntime?.rosterStageOverride ??
+            this.stageConfig?.stage ??
+            1,
         ),
     );
     const modularDrawn =
