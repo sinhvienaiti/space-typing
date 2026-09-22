@@ -203,6 +203,23 @@ import {
   stageWordsPerMinute,
 } from "./logic";
 import type { EquipmentDrop } from "./loot/equipment-loot";
+import {
+  createBossRewardChoiceOptions,
+  type BossRewardChoiceOption,
+} from "./events/reward-choice";
+import {
+  performanceReward,
+  performanceRewardText,
+  sectorCheckpointReward,
+} from "./rewards/campaign-rewards";
+import {
+  createCodexState,
+  discoverCodexEnemy,
+  discoverCodexReward,
+  discoverCodexWorld,
+  type CodexRewardId,
+  type CodexState,
+} from "./codex/state";
 import type { StageEventDefinition } from "./events/stage-scheduler";
 import {
   objectiveProgressText,
@@ -796,7 +813,7 @@ app.innerHTML = `
         </div>
       </div>
       <p class="equipment-note">
-        Combat is paused. Pick one equipment reward to continue.
+        Combat is paused. Pick one reward to continue.
       </p>
       <div id="rewardChoiceGrid" class="reward-choice-grid"></div>
     </dialog>
@@ -1205,6 +1222,7 @@ let credits = 0;
 let progression: ProgressionState = createProgressionState();
 let upgrades: UpgradeState = createUpgradeState();
 let relics: RelicState = createRelicState();
+let codex: CodexState = createCodexState();
 let expansionCurrencies: ExpansionCurrencyState =
   createExpansionCurrencyState();
 let shops: ShopState = createShopState();
@@ -1320,6 +1338,7 @@ type AutosaveSnapshot = {
   progression: ProgressionState;
   upgrades: UpgradeState;
   relics: RelicState;
+  codex: CodexState;
   expansionCurrencies: ExpansionCurrencyState;
   shops: ShopState;
   route: RouteState;
@@ -1353,6 +1372,7 @@ const campaignAutosave = new AutosaveQueue<
     snapshot.route,
     snapshot.upgrades,
     snapshot.relics,
+    snapshot.codex,
   ),
 );
 
@@ -1405,6 +1425,7 @@ function currentAutosaveSnapshot(): AutosaveSnapshot {
     progression,
     upgrades,
     relics,
+    codex,
     expansionCurrencies,
     shops,
     route,
@@ -1456,6 +1477,7 @@ function persistRecoveryMirrorSync(
       route,
       upgrades,
       relics,
+      codex,
     ),
   );
 }
@@ -2003,12 +2025,14 @@ function renderCodex(): void {
     equipment,
     hidden: hiddenDiscovery,
     progression,
+    codex,
   });
   const entries = collectionEntries({
     characters,
     equipment,
     hidden: hiddenDiscovery,
     progression,
+    codex,
   });
 
   byId("codexMeta").textContent =
@@ -2215,6 +2239,81 @@ function renderRewardChoiceOptions(
       );
       rewardChoiceDialog.close();
       game.resume();
+    });
+
+    grid.append(button);
+  }
+}
+
+function renderBossRewardChoiceOptions(
+  options: readonly BossRewardChoiceOption[],
+): void {
+  const grid = byId("rewardChoiceGrid");
+  grid.replaceChildren();
+
+  for (const option of options) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "reward-choice-option";
+
+    const kind = document.createElement("span");
+    kind.textContent = option.kind.toUpperCase();
+
+    const name = document.createElement("strong");
+    const description = document.createElement("small");
+
+    if (option.kind === "equipment") {
+      const definition = getEquipmentDefinition(option.drop.definitionId);
+      name.textContent =
+        gradeLabel(option.drop.grade).toUpperCase() + " · " + definition.name;
+      description.textContent = definition.description;
+    } else if (option.kind === "relic") {
+      const definition = getRelicDefinition(option.relicId);
+      name.textContent = definition.name;
+      description.textContent = definition.description;
+    } else {
+      name.textContent = option.id === "premium-currency"
+        ? "Premium Cache"
+        : "Boss Cache";
+      const currencyText = expansionCurrencyRewardText(option.currencies);
+      description.textContent =
+        "+" +
+        option.credits.toLocaleString() +
+        " Credits" +
+        (currencyText.length > 0 ? " · " + currencyText : "");
+    }
+
+    button.append(kind, name, description);
+    button.addEventListener("click", () => {
+      if (option.kind === "equipment") {
+        equipment = addEquipmentInstance(equipment, {
+          instanceId: createEquipmentDropInstanceId(),
+          definitionId: option.drop.definitionId,
+          grade: option.drop.grade,
+          enhancement: 0,
+        });
+        progression = recordProgressionEvent(progression, {
+          type: "equipment-drop",
+        });
+      } else if (option.kind === "relic") {
+        relics = grantRelic(relics, option.relicId).state;
+        applyRelicEffects();
+      } else {
+        credits = addCredits(credits, option.credits);
+        expansionCurrencies = addExpansionCurrencyReward(
+          expansionCurrencies,
+          option.currencies,
+        );
+      }
+
+      codex = discoverCodexReward(codex, "boss-choice").state;
+      renderEquipment();
+      renderProgression();
+      renderCodex();
+      updateDataSummary();
+      rewardChoiceDialog.close();
+      game.resume();
+      game.resolveBossRewardChoice();
     });
 
     grid.append(button);
@@ -2457,7 +2556,10 @@ const game = new Game(
         renderDeathProtectionChoices(stats.stage);
       }
     },
-    onStage: renderStage,
+    onStage: (stage) => {
+      renderStage(stage);
+      codex = discoverCodexWorld(codex, worldForStage(stage).id).state;
+    },
     onStageEvents: renderStageEvents,
     onObjectiveUpdate: renderObjective,
     onStatuses: renderStatuses,
@@ -2549,7 +2651,7 @@ const game = new Game(
       const combinedRewardMultiplier =
         difficultyRewardMultiplier *
         (1 + objectiveBonusFactor);
-      const creditReward =
+      const baseCreditReward =
         stageClearCreditReward({
           stage: stats.stage,
           accuracy,
@@ -2557,10 +2659,26 @@ const game = new Game(
         }) *
         game.getCreditsMultiplier() *
         combinedRewardMultiplier;
-      credits = addCredits(credits, creditReward);
+      const performance =
+        activeStageDifficulty === null
+          ? null
+          : performanceReward({
+              stats,
+              accuracy,
+              wpm,
+              difficulty: activeStageDifficulty,
+              objectiveComplete: objective?.status === "complete",
+            });
+      const performanceCredits =
+        performance === null
+          ? 0
+          : performance.credits * difficultyRewardMultiplier;
+      let totalCreditReward =
+        baseCreditReward + performanceCredits;
+      credits = addCredits(credits, totalCreditReward);
 
       const stageConfig = createStageConfig(stats.stage);
-      const currencyReward = scaleExpansionCurrencyReward(
+      const baseCurrencyReward = scaleExpansionCurrencyReward(
         stageClearExpansionCurrencyReward(
           stats.stage,
           stageConfig.role,
@@ -2568,12 +2686,37 @@ const game = new Game(
         ),
         combinedRewardMultiplier,
       );
+      let totalCurrencyReward = baseCurrencyReward;
       expansionCurrencies = addExpansionCurrencyReward(
         expansionCurrencies,
-        currencyReward,
+        baseCurrencyReward,
       );
-      const currencyRewardText =
-        expansionCurrencyRewardText(currencyReward);
+
+      if (performance !== null) {
+        const performanceCurrencies =
+          scaleExpansionCurrencyReward(
+            performance.currencies,
+            difficultyRewardMultiplier,
+          );
+        expansionCurrencies = addExpansionCurrencyReward(
+          expansionCurrencies,
+          performanceCurrencies,
+        );
+        totalCurrencyReward = addExpansionCurrencyReward(
+          totalCurrencyReward,
+          performanceCurrencies,
+        );
+        for (const id of performance.earned) {
+          codex = discoverCodexReward(
+            codex,
+            ("performance-" + id) as CodexRewardId,
+          ).state;
+        }
+      }
+      const performanceText =
+        performance === null
+          ? ""
+          : performanceRewardText(performance);
       const objectiveText =
         objective?.status === "complete"
           ? " · Objective +" +
@@ -2606,17 +2749,37 @@ const game = new Game(
             "sector:" + String(stats.stage),
           )
         : null;
+      let sectorRewardText = "";
       if (expansionResult.checkpointCommitted) {
+        const sectorReward = sectorCheckpointReward(stats.stage);
+        credits = addCredits(credits, sectorReward.credits);
+        expansionCurrencies = addExpansionCurrencyReward(
+          expansionCurrencies,
+          sectorReward.currencies,
+        );
+        totalCreditReward += sectorReward.credits;
+        totalCurrencyReward = addExpansionCurrencyReward(
+          totalCurrencyReward,
+          sectorReward.currencies,
+        );
+        codex = discoverCodexReward(codex, "sector-cache").state;
+        sectorRewardText =
+          " · Sector +" +
+          sectorReward.credits.toLocaleString() +
+          " Credits";
         checkpointSnapshot = createCheckpointSnapshot(
           currentRunPersistentState(),
           campaignExpansion.checkpoint.stage,
         );
       }
       stageEntrySnapshot = null;
+      const currencyRewardText =
+        expansionCurrencyRewardText(totalCurrencyReward);
       const checkpointText = expansionResult.checkpointCommitted
         ? " · Checkpoint " +
           String(campaignExpansion.checkpoint.stage).padStart(3, "0") +
           " committed" +
+          sectorRewardText +
           relicRewardText(sectorRelic)
         : "";
 
@@ -2628,12 +2791,15 @@ const game = new Game(
           unlockText +
           progressText +
           " · +" +
-          creditReward.toLocaleString() +
+          totalCreditReward.toLocaleString() +
           " Credits" +
           (currencyRewardText.length > 0
             ? " · " + currencyRewardText
             : "") +
           objectiveText +
+          (performanceText.length > 0
+            ? " · Performance: " + performanceText
+            : "") +
           achievementText +
           checkpointText,
         "stage-clear",
@@ -2646,13 +2812,16 @@ const game = new Game(
       byId("clearWpm").textContent = wpm.toFixed(0);
       byId("clearCredits").textContent =
         "+" +
-        creditReward.toLocaleString() +
+        totalCreditReward.toLocaleString() +
         " Credits" +
         (currencyRewardText.length > 0
           ? " · " + currencyRewardText
           : "") +
         objectiveText +
-        relicRewardText(sectorRelic);
+        (performanceText.length > 0
+          ? " · Performance: " + performanceText
+          : "") +
+        checkpointText;
       byId("clearStreak").textContent = String(stats.maxStreak);
 
       updateCampaignUi();
@@ -2687,6 +2856,19 @@ const game = new Game(
       game.pause();
       renderRewardChoiceOptions(options);
       rewardChoiceDialog.showModal();
+    },
+    onBossRewardChoice: (stage) => {
+      const options = createBossRewardChoiceOptions(
+        stage,
+        game.getPlayerStats().luck,
+        relics,
+      );
+      game.pause();
+      renderBossRewardChoiceOptions(options);
+      rewardChoiceDialog.showModal();
+    },
+    onEnemySeen: (definitionId) => {
+      codex = discoverCodexEnemy(codex, definitionId).state;
     },
     onAnomalyReady: (riskHullRatio) => {
       game.pause();
@@ -4888,6 +5070,7 @@ async function initializePlayerProgress(): Promise<void> {
     progression = loaded.save.progression;
     upgrades = loaded.save.upgrades;
     relics = loaded.save.relics;
+    codex = loaded.save.codex;
     expansionCurrencies = loaded.save.expansionCurrencies;
     shops = loaded.save.shops;
     route = loaded.save.route;
@@ -5301,6 +5484,7 @@ async function exportSave(): Promise<void> {
     route,
     upgrades,
     relics,
+    codex,
   );
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -5346,6 +5530,7 @@ async function importSaveFile(file: File): Promise<void> {
     const importedProgression = result.save.progression;
     const importedUpgrades = result.save.upgrades;
     const importedRelics = result.save.relics;
+    const importedCodex = result.save.codex;
     const importedExpansionCurrencies =
       result.save.expansionCurrencies;
     const importedShops = result.save.shops;
@@ -5382,6 +5567,7 @@ async function importSaveFile(file: File): Promise<void> {
     const previousProgression = progression;
     const previousUpgrades = upgrades;
     const previousRelics = relics;
+    const previousCodex = codex;
     const previousExpansionCurrencies = expansionCurrencies;
     const previousShops = shops;
     const previousRoute = route;
@@ -5400,6 +5586,7 @@ async function importSaveFile(file: File): Promise<void> {
     progression = importedProgression;
     upgrades = importedUpgrades;
     relics = importedRelics;
+    codex = importedCodex;
     expansionCurrencies = importedExpansionCurrencies;
     shops = importedShops;
     route = importedRoute;
@@ -5436,6 +5623,7 @@ async function importSaveFile(file: File): Promise<void> {
       progression = previousProgression;
       upgrades = previousUpgrades;
       relics = previousRelics;
+      codex = previousCodex;
       expansionCurrencies = previousExpansionCurrencies;
       shops = previousShops;
       route = previousRoute;
