@@ -432,6 +432,8 @@ describe("player save persistence model", () => {
     expect(migration.migrated).toBe(true);
     expect(migration.fromVersion).toBe(16);
     expect(migration.save.crashRecoverySnapshot).toBeNull();
+    expect(migration.save.upgrades.skillLevels.barrier).toBe(1);
+    expect(migration.save.upgrades.attributeLevels.luck).toBe(0);
     expect(migration.save.checkpointSnapshot.campaign.selectedStage).toBe(1);
   });
 
@@ -543,6 +545,31 @@ describe("player save persistence model", () => {
     expect(migration.save.route.graph.sectorStart).toBe(1);
     expect(migration.save.checkpointSnapshot.route.graph.sectorStart).toBe(1);
     expect(migration.save.shops).toEqual(current.shops);
+  });
+
+  it("migrates PlayerSave v21 to default M17 upgrade state without losing route/checkpoint data", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const checkpointSnapshot = {
+      ...current.checkpointSnapshot,
+    } as Record<string, unknown>;
+    delete checkpointSnapshot.upgrades;
+
+    const legacy = {
+      ...current,
+      version: 21,
+      checkpointSnapshot,
+    } as Record<string, unknown>;
+    delete legacy.upgrades;
+
+    const migration = migratePlayerSave(legacy);
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(21);
+    expect(migration.save.upgrades.skillLevels.barrier).toBe(1);
+    expect(migration.save.upgrades.attributeLevels.hull).toBe(0);
+    expect(migration.save.route).toEqual(current.route);
+    expect(
+      migration.save.checkpointSnapshot.upgrades.attributeLevels.hull,
+    ).toBe(0);
   });
 
   it("keeps a valid current-version save without migration", () => {
