@@ -235,6 +235,18 @@ import {
 } from "./enemies/word-difficulty";
 import { resolveEnemyTypingProfile } from "./enemies/typing-profile";
 import {
+  enemySkillDefinition,
+  type EnemySkillId,
+} from "./enemies/skills";
+import { resolveEnemyRuntimeProfile } from "./enemies/runtime-profile";
+import {
+  beginHardCc,
+  canApplyHardCc,
+  createHardCcState,
+  tickHardCcState,
+  type HardCcId,
+} from "./combat/cc-guard";
+import {
   isRecoveryItemId,
   useRecoveryItem,
   type RecoveryItemId,
@@ -464,6 +476,7 @@ export class Game {
   private stageEventModifiers: StageRandomEventModifiers =
     createStageEventModifiers();
   private statusState: StatusState = createStatusState();
+  private hardCcState = createHardCcState();
   private activeSynergies = new Set<BuildSynergyId>();
   private stageElapsedSeconds = 0;
   private hitStopTimer = 0;
@@ -574,6 +587,9 @@ export class Game {
 
   canUseSkill(id: string): SkillBlockReason | null {
     if (this.phase !== "playing") return "unknown-skill";
+    if (statusRemaining(this.statusState, "silenced") > 0) {
+      return "silenced";
+    }
 
     if (
       id === "emergency-repair" &&
@@ -1427,6 +1443,7 @@ export class Game {
     this.rewardNotice = null;
     this.celestialCharge = 0;
     this.statusState = createStatusState();
+    this.hardCcState = createHardCcState();
     this.interferenceTimer = 0;
     this.hitStopTimer = 0;
     this.skillHudTimer = 0;
@@ -1531,6 +1548,13 @@ export class Game {
 
     if (rawKey === " ") {
       this.activateOverdrive();
+      return;
+    }
+
+    if (
+      rawKey.length === 1 &&
+      statusRemaining(this.statusState, "frozen") > 0
+    ) {
       return;
     }
 
@@ -1679,6 +1703,7 @@ export class Game {
     this.shake = Math.max(0, this.shake - dt * 28);
     this.overdriveTimer = Math.max(0, this.overdriveTimer - dt);
     this.statusState = tickStatuses(this.statusState, dt);
+    this.hardCcState = tickHardCcState(this.hardCcState, dt);
     this.interferenceTimer = statusRemaining(
       this.statusState,
       "jammed",
@@ -1837,37 +1862,40 @@ export class Game {
       enemy.x +=
         (desiredX - enemy.x) * Math.min(1, dt * 2 * rewardControl);
 
-      if (enemy.actionCooldown !== null) {
+      if (
+        enemy.pendingSkillId !== undefined &&
+        enemy.pendingSkillId !== null
+      ) {
+        enemy.skillTelegraphRemaining = Math.max(
+          0,
+          (enemy.skillTelegraphRemaining ?? 0) -
+            dt * hostileTimeFactor * rewardControl,
+        );
+        if (enemy.skillTelegraphRemaining <= 0) {
+          const skillId = enemy.pendingSkillId;
+          enemy.pendingSkillId = null;
+          this.executeEnemySkill(enemy, skillId, difficulty);
+          enemy.actionCooldown = this.enemySkillCooldown(
+            skillId,
+            difficulty,
+          );
+        }
+      } else if (enemy.actionCooldown !== null) {
         enemy.actionCooldown -=
           dt * hostileTimeFactor * rewardControl;
         if (enemy.actionCooldown <= 0) {
-          if (enemy.kind === "carrier") {
-            this.spawnCarrierChild(enemy);
-          } else if (enemy.kind === "jammer") {
-            this.activateInterference(enemy);
-          } else if (enemy.kind === "healer") {
-            this.reinforceAlly(enemy);
-          } else if (enemy.kind === "leech") {
-            this.drainOverdrive(enemy);
-          } else if (enemy.kind === "commander") {
-            this.commandPulse(enemy);
+          const skills = enemy.skillIds ?? [];
+          if (skills.length > 0) {
+            const index =
+              (enemy.nextSkillIndex ?? 0) % skills.length;
+            const skillId = skills[index]!;
+            enemy.nextSkillIndex = (index + 1) % skills.length;
+            this.beginEnemySkill(enemy, skillId, difficulty);
           } else {
-            this.fireEnemyProjectile(enemy);
+            this.executeLegacyEnemyAction(enemy);
+            enemy.actionCooldown =
+              this.legacyEnemyActionCooldown(enemy, difficulty);
           }
-
-          const baseInterval =
-            enemyProfile(enemy.kind, this.stageConfig.galaxy).actionInterval ?? 4;
-          const pressure =
-            enemy.kind === "carrier" ||
-            enemy.kind === "jammer" ||
-            enemy.kind === "healer" ||
-            enemy.kind === "leech" ||
-            enemy.kind === "commander"
-              ? difficulty.combatPressure
-              : difficulty.projectilePressure *
-                this.stageEventModifiers.projectilePressureMultiplier;
-          enemy.actionCooldown =
-            baseInterval / Math.max(0.7, pressure);
         }
       }
 
@@ -2291,6 +2319,22 @@ export class Game {
       vocabularyLevel: this.vocabularyLevel,
       entries: this.vocabulary,
     });
+    const runtimeProfile = resolveEnemyRuntimeProfile({
+      stage,
+      kind,
+      rank: typingProfile.rank,
+      elite,
+      wordDifficultyScore: typingProfile.wordDifficultyScore,
+      layers: typingProfile.layersRemaining,
+    });
+    const firstSkill = runtimeProfile.skills[0];
+    const resolvedActionCooldown =
+      firstSkill === undefined
+        ? eliteStats.actionCooldown
+        : this.enemySkillCooldown(
+            firstSkill,
+            difficulty ?? this.difficulty,
+          );
 
     this.enemies.push({
       id: this.nextEnemyId++,
@@ -2302,6 +2346,11 @@ export class Game {
       rank: typingProfile.rank,
       wordDifficultyScore: typingProfile.wordDifficultyScore,
       layerPlan: typingProfile.layerPlan,
+      skillIds: runtimeProfile.skills,
+      nextSkillIndex: 0,
+      pendingSkillId: null,
+      skillTelegraphRemaining: 0,
+      threatBudget: runtimeProfile.threatBudget,
       entry: typingProfile.entry,
       typed: 0,
       wordMissed: false,
@@ -2315,7 +2364,7 @@ export class Game {
       radius: elite ? profile.radius * 1.08 : profile.radius,
       flash: 0,
       kick: 0,
-      actionCooldown: eliteStats.actionCooldown,
+      actionCooldown: resolvedActionCooldown,
     });
 
     const spawnDefinition = enemyDefinition(definitionId);
@@ -2456,6 +2505,204 @@ export class Game {
     this.sfx.support();
   }
 
+  private enemySkillPressure(
+    skillId: EnemySkillId,
+    difficulty: DifficultyProfile | null,
+  ): number {
+    const definition = enemySkillDefinition(skillId);
+    const safeDifficulty = difficulty ?? this.difficulty;
+    if (safeDifficulty === null) return 1;
+
+    if (definition.category === "attack") {
+      return (
+        safeDifficulty.projectilePressure *
+        this.stageEventModifiers.projectilePressureMultiplier
+      );
+    }
+
+    return safeDifficulty.combatPressure;
+  }
+
+  private enemySkillCooldown(
+    skillId: EnemySkillId,
+    difficulty: DifficultyProfile | null,
+  ): number {
+    const definition = enemySkillDefinition(skillId);
+    return (
+      definition.cooldown /
+      Math.max(
+        0.7,
+        this.enemySkillPressure(skillId, difficulty),
+      )
+    );
+  }
+
+  private enemySkillTelegraph(
+    skillId: EnemySkillId,
+    difficulty: DifficultyProfile,
+  ): number {
+    const definition = enemySkillDefinition(skillId);
+    const pressure = clamp(
+      0.85 + difficulty.combatPressure * 0.12,
+      0.85,
+      1.25,
+    );
+    return definition.telegraph / pressure;
+  }
+
+  private beginEnemySkill(
+    enemy: Enemy,
+    skillId: EnemySkillId,
+    difficulty: DifficultyProfile,
+  ): void {
+    enemy.pendingSkillId = skillId;
+    enemy.skillTelegraphRemaining = this.enemySkillTelegraph(
+      skillId,
+      difficulty,
+    );
+    enemy.actionCooldown = 0;
+    enemy.flash = Math.max(enemy.flash, 0.35);
+
+    const definition = enemySkillDefinition(skillId);
+    const hue =
+      definition.category === "control"
+        ? 205
+        : definition.category === "support"
+          ? 145
+          : definition.category === "defense"
+            ? 185
+            : 24;
+    this.burst(enemy.x, enemy.y, 10, hue);
+    this.sfx.projectileWarning();
+  }
+
+  private executeEnemySkill(
+    enemy: Enemy,
+    skillId: EnemySkillId,
+    difficulty: DifficultyProfile,
+  ): void {
+    const definition = enemySkillDefinition(skillId);
+    const effect = definition.effect;
+
+    if (effect.type === "projectile") {
+      this.fireEnemyProjectile(enemy);
+      return;
+    }
+
+    if (effect.type === "volley") {
+      this.fireEnemyProjectile(enemy);
+      this.fireEnemyProjectile(enemy);
+      return;
+    }
+
+    if (effect.type === "reinforce-self") {
+      const reinforced = reinforceEnemyLayerPlan(
+        enemy.layerPlan ??
+          enemyLayerPlan(
+            enemy.kind,
+            clamp(enemy.layersRemaining, 1, 3) as 1 | 2 | 3,
+          ),
+        enemy.layersRemaining,
+        enemy.kind,
+      );
+      enemy.layerPlan = reinforced.plan;
+      enemy.layersRemaining = reinforced.remaining;
+      enemy.flash = 1;
+      this.burst(enemy.x, enemy.y, 18, 185);
+      this.sfx.support();
+      return;
+    }
+
+    if (effect.type === "reinforce-ally") {
+      this.reinforceAlly(enemy);
+      return;
+    }
+
+    if (effect.type === "summon-scout") {
+      this.spawnCarrierChild(enemy);
+      return;
+    }
+
+    if (effect.type === "drain") {
+      this.drainOverdrive(enemy);
+      return;
+    }
+
+    const durationScale = clamp(
+      0.72 + difficulty.combatPressure * 0.2,
+      0.72,
+      1.2,
+    );
+    const duration = effect.duration * durationScale;
+    const source = "enemy-skill:" + skillId;
+
+    if (!effect.hardCc) {
+      this.addStatus(effect.status, duration, source, true);
+      return;
+    }
+
+    const hardCcId: HardCcId | null =
+      effect.status === "frozen"
+        ? "freeze"
+        : effect.status === "silenced"
+          ? "silence"
+          : null;
+    if (
+      hardCcId === null ||
+      !canApplyHardCc(this.hardCcState, hardCcId)
+    ) {
+      return;
+    }
+
+    if (this.addStatus(effect.status, duration, source, true)) {
+      this.hardCcState = beginHardCc(
+        this.hardCcState,
+        hardCcId,
+        duration,
+        effect.immunityAfter,
+      );
+    }
+  }
+
+  private executeLegacyEnemyAction(enemy: Enemy): void {
+    if (enemy.kind === "carrier") {
+      this.spawnCarrierChild(enemy);
+    } else if (enemy.kind === "jammer") {
+      this.activateInterference(enemy);
+    } else if (enemy.kind === "healer") {
+      this.reinforceAlly(enemy);
+    } else if (enemy.kind === "leech") {
+      this.drainOverdrive(enemy);
+    } else if (enemy.kind === "commander") {
+      this.commandPulse(enemy);
+    } else {
+      this.fireEnemyProjectile(enemy);
+    }
+  }
+
+  private legacyEnemyActionCooldown(
+    enemy: Enemy,
+    difficulty: DifficultyProfile,
+  ): number {
+    const baseInterval =
+      enemyProfile(
+        enemy.kind,
+        this.stageConfig?.galaxy ?? 1,
+      ).actionInterval ?? 4;
+    const supportAction =
+      enemy.kind === "carrier" ||
+      enemy.kind === "jammer" ||
+      enemy.kind === "healer" ||
+      enemy.kind === "leech" ||
+      enemy.kind === "commander";
+    const pressure = supportAction
+      ? difficulty.combatPressure
+      : difficulty.projectilePressure *
+        this.stageEventModifiers.projectilePressureMultiplier;
+
+    return baseInterval / Math.max(0.7, pressure);
+  }
+
   private spawnCarrierChild(carrier: Enemy): void {
     if (this.difficulty === null) return;
     if (this.enemies.length >= this.difficulty.maxEnemies + 2) return;
@@ -2481,6 +2728,15 @@ export class Game {
       vocabularyLevel: this.vocabularyLevel,
       entries: this.vocabulary,
     });
+    const runtimeProfile = resolveEnemyRuntimeProfile({
+      stage,
+      kind: "scout",
+      rank: typingProfile.rank,
+      elite: false,
+      wordDifficultyScore: typingProfile.wordDifficultyScore,
+      layers: typingProfile.layersRemaining,
+    });
+    const firstSkill = runtimeProfile.skills[0];
 
     this.enemies.push({
       id: this.nextEnemyId++,
@@ -2491,6 +2747,11 @@ export class Game {
       rank: typingProfile.rank,
       wordDifficultyScore: typingProfile.wordDifficultyScore,
       layerPlan: typingProfile.layerPlan,
+      skillIds: runtimeProfile.skills,
+      nextSkillIndex: 0,
+      pendingSkillId: null,
+      skillTelegraphRemaining: 0,
+      threatBudget: runtimeProfile.threatBudget,
       entry: typingProfile.entry,
       typed: 0,
       wordMissed: false,
@@ -2507,7 +2768,10 @@ export class Game {
       radius: 19,
       flash: 0,
       kick: 0,
-      actionCooldown: null,
+      actionCooldown:
+        firstSkill === undefined
+          ? null
+          : this.enemySkillCooldown(firstSkill, this.difficulty),
     });
 
     this.burst(carrier.x, carrier.y, 12, 47);
@@ -3365,6 +3629,15 @@ export class Game {
         vocabularyLevel: this.vocabularyLevel,
         entries: this.vocabulary,
       });
+      const runtimeProfile = resolveEnemyRuntimeProfile({
+        stage,
+        kind: "scout",
+        rank: typingProfile.rank,
+        elite: false,
+        wordDifficultyScore: typingProfile.wordDifficultyScore,
+        layers: typingProfile.layersRemaining,
+      });
+      const firstSkill = runtimeProfile.skills[0];
 
       this.enemies.push({
         id: this.nextEnemyId++,
@@ -3375,6 +3648,11 @@ export class Game {
         rank: typingProfile.rank,
         wordDifficultyScore: typingProfile.wordDifficultyScore,
         layerPlan: typingProfile.layerPlan,
+        skillIds: runtimeProfile.skills,
+        nextSkillIndex: 0,
+        pendingSkillId: null,
+        skillTelegraphRemaining: 0,
+        threatBudget: runtimeProfile.threatBudget,
         entry: typingProfile.entry,
         typed: 0,
         wordMissed: false,
@@ -3391,7 +3669,10 @@ export class Game {
         radius: 15,
         flash: 1,
         kick: 0.7,
-        actionCooldown: null,
+        actionCooldown:
+          firstSkill === undefined
+            ? null
+            : this.enemySkillCooldown(firstSkill, this.difficulty),
       });
     }
 
@@ -4270,6 +4551,7 @@ export class Game {
     this.drawDefensiveEffects(time);
     this.drawTargetLine();
     this.drawRewardNotice();
+    this.drawEnemyControlOverlay();
 
     if (this.overdriveTimer > 0) {
       context.fillStyle =
@@ -4281,6 +4563,46 @@ export class Game {
 
     context.restore();
     this.drawRewardBuffTimers();
+  }
+
+  private drawEnemyControlOverlay(): void {
+    const frozen = statusRemaining(this.statusState, "frozen");
+    const silenced = statusRemaining(this.statusState, "silenced");
+    if (frozen <= 0 && silenced <= 0) return;
+
+    const context = this.context;
+    context.save();
+
+    if (frozen > 0) {
+      context.fillStyle = "rgba(126, 220, 255, 0.09)";
+      context.fillRect(0, 0, this.width, this.height);
+      context.strokeStyle = "rgba(174, 239, 255, 0.32)";
+      context.lineWidth = 5;
+      context.strokeRect(4, 4, this.width - 8, this.height - 8);
+      context.fillStyle = "rgba(220, 250, 255, 0.96)";
+      context.font =
+        "900 18px ui-monospace, SFMono-Regular, Menlo, monospace";
+      context.textAlign = "center";
+      context.fillText(
+        "FROZEN · " + frozen.toFixed(1) + "s",
+        this.width / 2,
+        42,
+      );
+    }
+
+    if (silenced > 0) {
+      context.fillStyle = "rgba(190, 135, 255, 0.95)";
+      context.font =
+        "800 13px ui-monospace, SFMono-Regular, Menlo, monospace";
+      context.textAlign = "center";
+      context.fillText(
+        "SKILLS SILENCED · " + silenced.toFixed(1) + "s",
+        this.width / 2,
+        frozen > 0 ? 64 : 42,
+      );
+    }
+
+    context.restore();
   }
 
   private drawBackground(time: number): void {
@@ -5371,6 +5693,22 @@ export class Game {
       enemy.x,
       y - 25,
     );
+
+    if (
+      enemy.pendingSkillId !== undefined &&
+      enemy.pendingSkillId !== null &&
+      (enemy.skillTelegraphRemaining ?? 0) > 0
+    ) {
+      const pending = enemySkillDefinition(enemy.pendingSkillId);
+      context.font =
+        "900 9px ui-monospace, SFMono-Regular, Menlo, monospace";
+      context.fillStyle = "rgba(255, 224, 138, 0.96)";
+      context.fillText(
+        "⚠ " + pending.name.toUpperCase(),
+        enemy.x,
+        y - 37,
+      );
+    }
 
     const segmentGap = 3;
     const segmentWidth = (panelWidth - segmentGap * 2) / 3;

@@ -3045,13 +3045,17 @@ M11 must consume this Rank/layer runtime instead of introducing another enemy di
 
 ## M11 — Enemy skill/effect framework + Threat Budget
 
-Implement:
+**Status: Complete.** Production enemies now resolve bounded attack/defense/control/support skill sets from archetype signatures plus canonical World family pools. Skills use explicit cooldown -> telegraph -> execute lifecycle, Freeze/Silence reuse the existing status engine with hard-CC anti-chain/immunity, and each runtime enemy receives an audited Threat Budget across Attack/Defense/Speed/Control/Support/Typing/Layers/Urgency. See `docs/M11_ENEMY_SKILLS_THREAT_BUDGET.md`.
+
+Implemented:
 
 - attack/defense/control/support skill contracts;
 - World-specific skill pools;
 - CC anti-chain;
 - runtime resolved skill set;
 - Threat Budget audit.
+
+M12 owns Active Typing Pressure, urgent-threat caps and the expanded global difficulty scheduler.
 
 ## M12 — Difficulty + Active Typing Pressure scheduler
 

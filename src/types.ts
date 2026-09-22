@@ -1,6 +1,8 @@
 import type { EnemyDefinitionId } from "./enemies/registry";
 import type { EnemyRank } from "./enemies/rank";
 import type { EnemyLayerId } from "./enemies/layers";
+import type { EnemySkillId } from "./enemies/skills";
+import type { ThreatBudget } from "./enemies/threat";
 
 export type GamePhase =
   | "title"
@@ -90,6 +92,11 @@ export type Enemy = {
   rank?: EnemyRank;
   wordDifficultyScore?: number;
   layerPlan?: EnemyLayerId[];
+  skillIds?: EnemySkillId[];
+  nextSkillIndex?: number;
+  pendingSkillId?: EnemySkillId | null;
+  skillTelegraphRemaining?: number;
+  threatBudget?: ThreatBudget;
   entry: VocabularyEntry;
   typed: number;
   wordMissed: boolean;
