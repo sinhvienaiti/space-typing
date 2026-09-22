@@ -209,6 +209,7 @@ import {
   applyEnemyAreaControl,
   softenNearbyEnemies,
   tickEnemyRewardControl,
+  timedRewardMultiplier,
 } from "./enemies/reward-runtime";
 import { drawModularEnemy } from "./enemies/renderer";
 import {
@@ -406,6 +407,7 @@ export class Game {
   private cloakTimer = 0;
   private weaponOverclockTimer = 0;
   private rewardScoreMultiplierTimer = 0;
+  private rewardCreditsMultiplierTimer = 0;
   private rewardNotice: {
     label: string;
     x: number;
@@ -1374,6 +1376,7 @@ export class Game {
     this.cloakTimer = 0;
     this.weaponOverclockTimer = 0;
     this.rewardScoreMultiplierTimer = 0;
+    this.rewardCreditsMultiplierTimer = 0;
     this.rewardNotice = null;
     this.celestialCharge = 0;
     this.statusState = createStatusState();
@@ -1602,6 +1605,10 @@ export class Game {
     this.rewardScoreMultiplierTimer = Math.max(
       0,
       this.rewardScoreMultiplierTimer - dt,
+    );
+    this.rewardCreditsMultiplierTimer = Math.max(
+      0,
+      this.rewardCreditsMultiplierTimer - dt,
     );
     if (this.rewardNotice !== null) {
       this.rewardNotice.remaining = Math.max(
@@ -2582,6 +2589,9 @@ export class Game {
     this.burst(x, y, fx.count, fx.hue);
     this.sfx.bossDeath();
     this.tryRollEquipmentDrop("boss");
+    if (definition !== undefined) {
+      this.activateDefinitionReward(definition, x, y);
+    }
 
     if (this.settings.screenShake) {
       this.shake = Math.max(this.shake, 13);
@@ -2984,6 +2994,21 @@ export class Game {
   private activateEnemyReward(enemy: Enemy): void {
     const definition = this.visualDefinitionForEnemy(enemy);
     if (definition?.reward === undefined) return;
+    this.activateDefinitionReward(
+      definition,
+      enemy.x,
+      enemy.y,
+      enemy,
+    );
+  }
+
+  private activateDefinitionReward(
+    definition: NonNullable<ReturnType<typeof enemyDefinition>>,
+    x: number,
+    y: number,
+    sourceEnemy?: Enemy,
+  ): void {
+    if (definition.reward === undefined) return;
 
     const effect = applyEnemyRewardEffect(
       definition.reward,
@@ -3012,16 +3037,35 @@ export class Game {
           );
         },
         freezeNearby: (duration) => {
-          applyEnemyAreaControl(this.enemies, enemy, duration, 0);
+          if (sourceEnemy !== undefined) {
+            applyEnemyAreaControl(this.enemies, sourceEnemy, duration, 0);
+          }
         },
         slowNearby: (duration) => {
-          applyEnemyAreaControl(this.enemies, enemy, duration, 0.55);
+          if (sourceEnemy !== undefined) {
+            applyEnemyAreaControl(
+              this.enemies,
+              sourceEnemy,
+              duration,
+              0.55,
+            );
+          }
         },
         damageNearby: (power) => {
-          softenNearbyEnemies(this.enemies, enemy, power, 5);
+          if (sourceEnemy !== undefined) {
+            softenNearbyEnemies(this.enemies, sourceEnemy, power, 5);
+          }
         },
         chainDamage: (power) => {
-          softenNearbyEnemies(this.enemies, enemy, power, 4, 330);
+          if (sourceEnemy !== undefined) {
+            softenNearbyEnemies(
+              this.enemies,
+              sourceEnemy,
+              power,
+              4,
+              330,
+            );
+          }
         },
         clearNormalEnemies: () => {
           this.enemies = this.enemies.filter(
@@ -3037,7 +3081,12 @@ export class Game {
             duration,
           );
         },
-        setCreditsMultiplier: () => {},
+        setCreditsMultiplier: (_multiplier, duration) => {
+          this.rewardCreditsMultiplierTimer = Math.max(
+            this.rewardCreditsMultiplierTimer,
+            duration,
+          );
+        },
         reduceSkillCooldowns: (seconds) => {
           this.skillEngine.reduceCooldowns(seconds);
           this.hooks.onSkills();
@@ -3057,7 +3106,7 @@ export class Game {
     );
 
     const rewardFx = rewardFxProfile(definition.reward);
-    this.burst(enemy.x, enemy.y, rewardFx.count, rewardFx.hue);
+    this.burst(x, y, rewardFx.count, rewardFx.hue);
     if (rewardFx.audio === "support") {
       this.sfx.support();
     } else if (rewardFx.audio === "rare-drop") {
@@ -3067,8 +3116,8 @@ export class Game {
     }
     this.rewardNotice = {
       label: effect.label,
-      x: enemy.x,
-      y: enemy.y,
+      x,
+      y,
       hue: rewardFx.hue,
       remaining: 1.05,
     };
@@ -3181,8 +3230,14 @@ export class Game {
     };
   }
 
+  getCreditsMultiplier(): number {
+    return timedRewardMultiplier(this.rewardCreditsMultiplierTimer);
+  }
+
   private addScore(amount: number): void {
-    const multiplier = this.rewardScoreMultiplierTimer > 0 ? 2 : 1;
+    const multiplier = timedRewardMultiplier(
+      this.rewardScoreMultiplierTimer,
+    );
     this.stats.score += Math.max(0, amount) * multiplier;
   }
 
@@ -3355,6 +3410,9 @@ export class Game {
 
     if (this.characterId === "arsenal" && this.weaponOverclockTimer > 0) {
       multiplier *= 1.35;
+    }
+    if (statusRemaining(this.statusState, "overcharged") > 0) {
+      multiplier *= 1.2;
     }
     if (this.characterId === "reaper") {
       multiplier *= reaperStreakDamageMultiplier(this.stats.streak);

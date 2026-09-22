@@ -84,3 +84,11 @@ export function softenNearbyEnemies(
   }
   return changed;
 }
+
+export function timedRewardMultiplier(
+  remaining: number,
+  multiplier = 2,
+): number {
+  if (!Number.isFinite(remaining) || remaining <= 0) return 1;
+  return Math.max(1, multiplier);
+}

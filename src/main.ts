@@ -1743,11 +1743,12 @@ const game = new Game(
             " · Mastery " +
             String(progressAward.progress.mastery)
           : "";
-      const creditReward = stageClearCreditReward({
-        stage: stats.stage,
-        accuracy,
-        salvage: game.getPlayerStats().salvage,
-      });
+      const creditReward =
+        stageClearCreditReward({
+          stage: stats.stage,
+          accuracy,
+          salvage: game.getPlayerStats().salvage,
+        }) * game.getCreditsMultiplier();
       credits = addCredits(credits, creditReward);
       progression = recordProgressionEvent(progression, {
         type: "stage-clear",

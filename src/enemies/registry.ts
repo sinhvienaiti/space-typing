@@ -641,7 +641,7 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     spawnWeight: 0,
     durabilityScale: 1,
     speedScale: 1,
-    reward: "score-x2",
+    reward: "credits-x2",
     rewardPower: 12,
     visual: {
       ...prismBase,
@@ -651,7 +651,7 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
       orbit: "prism-rune-rings",
       aura: "prism-sparkle-boss",
       rewardMarker:
-        ENEMY_REWARD_DEFINITIONS["score-x2"].marker,
+        ENEMY_REWARD_DEFINITIONS["credits-x2"].marker,
       deathFx: "prism-boss-burst",
     },
   },

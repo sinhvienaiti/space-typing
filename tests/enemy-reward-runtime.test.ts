@@ -3,6 +3,7 @@ import {
   applyEnemyAreaControl,
   softenNearbyEnemies,
   tickEnemyRewardControl,
+  timedRewardMultiplier,
 } from "../src/enemies/reward-runtime";
 import type { Enemy } from "../src/types";
 
@@ -46,6 +47,12 @@ describe("enemy reward runtime helpers", () => {
     expect(source.rewardControlTimer).toBeUndefined();
     expect(far.rewardControlTimer).toBeUndefined();
     expect(elite.rewardControlTimer).toBeUndefined();
+  });
+
+  it("resolves timed score/credit multipliers without leaking after expiry", () => {
+    expect(timedRewardMultiplier(10)).toBe(2);
+    expect(timedRewardMultiplier(0)).toBe(1);
+    expect(timedRewardMultiplier(-1)).toBe(1);
   });
 
   it("softens nearby words but never completes them automatically", () => {
