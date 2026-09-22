@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { createExpansionCurrencyState } from "../src/economy/currencies";
 import { createStarterEquipmentState } from "../src/equipment/loadout";
 import { createEmptyInventory } from "../src/items/inventory";
 import {
   buyEquipmentUpgrade,
   buyRepairPack,
+  equipmentUpgradeAlloyCost,
   equipmentUpgradeCost,
+  REPAIR_PACK_ALLOY_COST,
   REPAIR_PACK_COST,
 } from "../src/shops/service-shop";
 
@@ -21,19 +24,27 @@ describe("Repair / Upgrade Shop", () => {
     expect(equipmentUpgradeCost(copper)).toBeGreaterThan(
       equipmentUpgradeCost(aluminum) ?? 0,
     );
+    expect(equipmentUpgradeAlloyCost(copper)).toBeGreaterThan(
+      equipmentUpgradeAlloyCost(aluminum) ?? 0,
+    );
     expect(
       equipmentUpgradeCost({ ...aluminum, enhancement: 5 }),
     ).toBeNull();
   });
 
-  it("atomically upgrades equipment and spends Credits", () => {
+  it("atomically upgrades equipment and spends Credits plus Alloy", () => {
     const equipment = createStarterEquipmentState();
     const item = equipment.items[0]!;
     const cost = equipmentUpgradeCost(item)!;
+    const alloyCost = equipmentUpgradeAlloyCost(item)!;
 
     const result = buyEquipmentUpgrade(
       {
         credits: cost,
+        expansionCurrencies: {
+          ...createExpansionCurrencyState(),
+          alloy: alloyCost,
+        },
         inventory: createEmptyInventory(),
         equipment,
       },
@@ -42,6 +53,7 @@ describe("Repair / Upgrade Shop", () => {
 
     expect(result.applied).toBe(true);
     expect(result.state.credits).toBe(0);
+    expect(result.state.expansionCurrencies.alloy).toBe(0);
     expect(
       result.state.equipment.items.find(
         (candidate) => candidate.instanceId === item.instanceId,
@@ -49,20 +61,43 @@ describe("Repair / Upgrade Shop", () => {
     ).toBe(1);
   });
 
-  it("never charges an unaffordable or max-level upgrade", () => {
+  it("does not charge when Credits or Alloy are insufficient", () => {
     const equipment = createStarterEquipmentState();
     const item = equipment.items[0]!;
-    const poor = buyEquipmentUpgrade(
+
+    const poorCredits = buyEquipmentUpgrade(
       {
         credits: 0,
+        expansionCurrencies: {
+          ...createExpansionCurrencyState(),
+          alloy: 999,
+        },
         inventory: createEmptyInventory(),
         equipment,
       },
       item.instanceId,
     );
-    expect(poor.applied).toBe(false);
-    expect(poor.state.credits).toBe(0);
+    expect(poorCredits.applied).toBe(false);
+    expect(poorCredits.reason).toBe("credits");
+    expect(poorCredits.state.expansionCurrencies.alloy).toBe(999);
 
+    const poorAlloy = buyEquipmentUpgrade(
+      {
+        credits: 9999,
+        expansionCurrencies: createExpansionCurrencyState(),
+        inventory: createEmptyInventory(),
+        equipment,
+      },
+      item.instanceId,
+    );
+    expect(poorAlloy.applied).toBe(false);
+    expect(poorAlloy.reason).toBe("alloy");
+    expect(poorAlloy.state.credits).toBe(9999);
+  });
+
+  it("never charges a max-level upgrade", () => {
+    const equipment = createStarterEquipmentState();
+    const item = equipment.items[0]!;
     const maxed = {
       ...equipment,
       items: equipment.items.map((candidate) =>
@@ -74,6 +109,10 @@ describe("Repair / Upgrade Shop", () => {
     const maxResult = buyEquipmentUpgrade(
       {
         credits: 9999,
+        expansionCurrencies: {
+          ...createExpansionCurrencyState(),
+          alloy: 999,
+        },
         inventory: createEmptyInventory(),
         equipment: maxed,
       },
@@ -82,18 +121,24 @@ describe("Repair / Upgrade Shop", () => {
     expect(maxResult.applied).toBe(false);
     expect(maxResult.reason).toBe("max");
     expect(maxResult.state.credits).toBe(9999);
+    expect(maxResult.state.expansionCurrencies.alloy).toBe(999);
   });
 
-  it("buys the repair pack atomically", () => {
+  it("buys the repair pack atomically with Credits plus Alloy", () => {
     const equipment = createStarterEquipmentState();
     const result = buyRepairPack({
       credits: REPAIR_PACK_COST,
+      expansionCurrencies: {
+        ...createExpansionCurrencyState(),
+        alloy: REPAIR_PACK_ALLOY_COST,
+      },
       inventory: createEmptyInventory(),
       equipment,
     });
 
     expect(result.applied).toBe(true);
     expect(result.state.credits).toBe(0);
+    expect(result.state.expansionCurrencies.alloy).toBe(0);
     expect(result.state.inventory).toEqual({
       "repair-kit": 1,
       "shield-cell": 1,
@@ -103,6 +148,10 @@ describe("Repair / Upgrade Shop", () => {
   it("does not charge when either repair-pack stack is full", () => {
     const result = buyRepairPack({
       credits: 999,
+      expansionCurrencies: {
+        ...createExpansionCurrencyState(),
+        alloy: 999,
+      },
       inventory: { "repair-kit": 20 },
       equipment: createStarterEquipmentState(),
     });
@@ -110,6 +159,7 @@ describe("Repair / Upgrade Shop", () => {
     expect(result.applied).toBe(false);
     expect(result.reason).toBe("full");
     expect(result.state.credits).toBe(999);
+    expect(result.state.expansionCurrencies.alloy).toBe(999);
     expect(result.state.inventory).toEqual({ "repair-kit": 20 });
   });
 });
