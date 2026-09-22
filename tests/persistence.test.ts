@@ -366,6 +366,35 @@ describe("player save persistence model", () => {
     });
   });
 
+  it("migrates PlayerSave v14 to the M01 expansion foundation", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const legacy = {
+      ...current,
+      version: 14,
+    } as Record<string, unknown>;
+    delete legacy.expansionCurrencies;
+    delete legacy.campaignExpansion;
+
+    const migration = migratePlayerSave(legacy);
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(14);
+    expect(migration.save.expansionCurrencies).toEqual({
+      alloy: 0,
+      starCrystal: 0,
+      quantumCore: 0,
+    });
+    expect(migration.save.campaignExpansion).toMatchObject({
+      sector: { startStage: 1, endStage: 10 },
+      checkpoint: { stage: 1 },
+      activeSegment: {
+        checkpointStage: 1,
+        currentStage: 1,
+        highestReachedStage: 1,
+      },
+      crashRecovery: null,
+    });
+  });
+
   it("keeps a valid current-version save without migration", () => {
     const save = createPlayerSave(
       createDefaultCampaignProgress(),
@@ -402,6 +431,13 @@ describe("player save persistence model", () => {
     expect(migration.save.credits).toBe(0);
     expect(migration.save.progression.claimedMissions).toEqual([]);
     expect(migration.save.progression.unlockedAchievements).toEqual([]);
+    expect(migration.save.expansionCurrencies).toEqual({
+      alloy: 0,
+      starCrystal: 0,
+      quantumCore: 0,
+    });
+    expect(migration.save.campaignExpansion.checkpoint.stage).toBe(1);
+    expect(migration.save.campaignExpansion.crashRecovery).toBeNull();
   });
 
   it("refuses unsupported numeric schema versions instead of down-migrating them", () => {
