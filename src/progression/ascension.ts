@@ -238,7 +238,12 @@ export function selectAscensionTier(
 ): AscensionState {
   const state = sanitizeAscensionState(input);
   const safeTier = clampTier(tier);
-  if (safeTier > state.highestUnlockedTier) return state;
+  if (
+    safeTier > state.highestUnlockedTier ||
+    (safeTier > 0 && state.completedTiers.includes(safeTier))
+  ) {
+    return state;
+  }
   return {
     ...state,
     selectedTier: safeTier,
