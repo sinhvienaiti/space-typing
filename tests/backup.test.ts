@@ -7,7 +7,10 @@ import {
   createDefaultCampaignProgress,
   recordStageClear,
 } from "../src/campaign/progress";
-import { PLAYER_SAVE_VERSION } from "../src/persistence/player-save";
+import {
+  createPlayerSave,
+  PLAYER_SAVE_VERSION,
+} from "../src/persistence/player-save";
 
 const GRADE_TO_LEGACY_RARITY = {
   aluminum: "common",
