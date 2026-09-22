@@ -459,6 +459,7 @@ export class Game {
   private nextProjectileId = 1;
   private eliteSpawned = 0;
   private boss: BossState | null = null;
+  private bossHudTimer = 0;
   private bossSpawned = false;
   private bossDefeated = false;
   private enemies: Enemy[] = [];
@@ -1504,6 +1505,7 @@ export class Game {
     this.spawnTimer = 0.3;
     this.eliteSpawned = 0;
     this.boss = null;
+    this.bossHudTimer = 0;
     this.bossSpawned = false;
     this.bossDefeated = false;
     this.overdriveTimer = 0;
@@ -2153,6 +2155,10 @@ export class Game {
     const boss = this.boss;
     if (boss === null) return;
 
+    this.bossHudTimer = Math.max(
+      0,
+      this.bossHudTimer - dt,
+    );
     if (boss.typingMechanic !== undefined) {
       const mechanicTick = tickBossTypingMechanic(
         boss.typingMechanic,
@@ -2164,6 +2170,14 @@ export class Game {
         this.fireBossProjectiles(boss);
         boss.flash = 1;
         this.sfx.bossPhase();
+        this.hooks.onBossUpdate(toBossHud(boss));
+      } else if (
+        boss.typingMechanic.id === "interrupt-charge" &&
+        boss.typingMechanic.active &&
+        this.bossHudTimer <= 0
+      ) {
+        this.bossHudTimer = 0.1;
+        this.hooks.onBossUpdate(toBossHud(boss));
       }
     }
 
