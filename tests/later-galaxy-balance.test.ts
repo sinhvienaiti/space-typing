@@ -10,7 +10,7 @@ describe("later Galaxy milestone tuning audit", () => {
 
   it("samples four high-value milestones per Galaxy", () => {
     expect(points).toHaveLength(40);
-    expect(GALAXY_MILESTONE_OFFSETS).toEqual([50, 60, 90, 100]);
+    expect(GALAXY_MILESTONE_OFFSETS).toEqual([10, 20, 95, 100]);
     expect(milestoneStagesForManualPlaytest()).toContain(1000);
   });
 
@@ -47,7 +47,7 @@ describe("later Galaxy milestone tuning audit", () => {
   it("keeps major-boss pressure above same-Galaxy boss pressure", () => {
     for (let galaxy = 1; galaxy <= 10; galaxy += 1) {
       const boss = points.find(
-        (point) => point.galaxy === galaxy && point.stage % 100 === 50,
+        (point) => point.galaxy === galaxy && point.stage % 100 === 20,
       )!;
       const majorBoss = points.find(
         (point) => point.galaxy === galaxy && point.stage % 100 === 0,
