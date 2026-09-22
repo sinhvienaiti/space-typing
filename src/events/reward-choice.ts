@@ -4,7 +4,10 @@ import {
   rollEquipmentGrade,
   type EquipmentDrop,
 } from "../loot/equipment-loot";
-import type { ExpansionCurrencyReward } from "../economy/currencies";
+import {
+  scaleExpansionCurrencyReward,
+  type ExpansionCurrencyReward,
+} from "../economy/currencies";
 import {
   selectRelicReward,
   type RelicState,
@@ -117,8 +120,15 @@ export function createBossRewardChoiceOptions(
   stageInput: number,
   luck: number,
   relics: RelicState,
+  rewardMultiplier = 1,
 ): BossRewardChoiceOption[] {
   const stage = Math.max(1, Math.min(1000, Math.floor(stageInput)));
+  const multiplier = clamp(
+    Number.isFinite(rewardMultiplier) ? rewardMultiplier : 1,
+    1,
+    1.75,
+  );
+  const rewardLuck = luck + (multiplier - 1) * 20;
   const random = rewardChoiceSeededRandom(stage);
   const equipment: BossRewardChoiceOption = {
     id: "equipment",
@@ -126,7 +136,7 @@ export function createBossRewardChoiceOptions(
     drop: {
       source: "boss",
       definitionId: rollEquipmentDefinition("boss", random()),
-      grade: rollEquipmentGrade("boss", luck, random()),
+      grade: rollEquipmentGrade("boss", rewardLuck, random()),
     },
   };
 
@@ -134,12 +144,15 @@ export function createBossRewardChoiceOptions(
   const currency: BossRewardChoiceOption = {
     id: "currency",
     kind: "currency",
-    credits: 110 + stage * 2,
-    currencies: {
-      alloy: 5 + galaxy,
-      starCrystal: 1 + Math.floor(galaxy / 3),
-      quantumCore: stage % 100 === 0 ? 1 : 0,
-    },
+    credits: Math.round((110 + stage * 2) * multiplier),
+    currencies: scaleExpansionCurrencyReward(
+      {
+        alloy: 5 + galaxy,
+        starCrystal: 1 + Math.floor(galaxy / 3),
+        quantumCore: stage % 100 === 0 ? 1 : 0,
+      },
+      multiplier,
+    ),
   };
 
   const relicId = selectRelicReward(
@@ -152,12 +165,15 @@ export function createBossRewardChoiceOptions(
       ? {
           id: "premium-currency",
           kind: "currency",
-          credits: 180 + stage * 3,
-          currencies: {
-            alloy: 7 + galaxy,
-            starCrystal: 2 + Math.floor(galaxy / 2),
-            quantumCore: stage >= 500 ? 1 : 0,
-          },
+          credits: Math.round((180 + stage * 3) * multiplier),
+          currencies: scaleExpansionCurrencyReward(
+            {
+              alloy: 7 + galaxy,
+              starCrystal: 2 + Math.floor(galaxy / 2),
+              quantumCore: stage >= 500 ? 1 : 0,
+            },
+            multiplier,
+          ),
         }
       : {
           id: "relic",
