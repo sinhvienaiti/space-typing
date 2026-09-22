@@ -35,12 +35,9 @@ export function shouldScheduleRewardChoiceCrate(
   return random < rewardChoiceCrateChance(stage);
 }
 
-type RewardChoiceSource = "treasure" | "boss";
-
-function createEquipmentRewardChoiceOptions(
+export function createRewardChoiceOptions(
   luck: number,
-  source: RewardChoiceSource,
-  random: () => number,
+  random = Math.random,
 ): EquipmentDrop[] {
   const choices: EquipmentDrop[] = [];
   const seen = new Set<string>();
@@ -48,32 +45,18 @@ function createEquipmentRewardChoiceOptions(
 
   while (choices.length < 3 && attempts < 30) {
     attempts += 1;
-    const definitionId = rollEquipmentDefinition(source, random());
+    const definitionId = rollEquipmentDefinition("treasure", random());
     if (seen.has(definitionId)) continue;
 
     seen.add(definitionId);
     choices.push({
-      source,
+      source: "treasure",
       definitionId,
-      grade: rollEquipmentGrade(source, luck, random()),
+      grade: rollEquipmentGrade("treasure", luck, random()),
     });
   }
 
   return choices;
-}
-
-export function createRewardChoiceOptions(
-  luck: number,
-  random = Math.random,
-): EquipmentDrop[] {
-  return createEquipmentRewardChoiceOptions(luck, "treasure", random);
-}
-
-export function createBossRewardChoiceOptions(
-  luck: number,
-  random = Math.random,
-): EquipmentDrop[] {
-  return createEquipmentRewardChoiceOptions(luck, "boss", random);
 }
 
 export function rewardChoiceWord(
