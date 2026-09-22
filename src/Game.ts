@@ -2163,7 +2163,7 @@ export class Game {
         this.spawnBoss();
       } else if (
         !isBossStageRole(this.stageConfig.role) ||
-        this.bossDefeated
+        (this.bossDefeated && !this.bossRewardPending)
       ) {
         this.finishStage();
       }
