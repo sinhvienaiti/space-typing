@@ -342,6 +342,27 @@ describe("player save persistence model", () => {
     expect(migration.save.credits).toBe(0);
   });
 
+  it("migrates PlayerSave v13 to empty meta progression", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const legacy = {
+      ...current,
+      version: 13,
+      credits: 321,
+    } as Record<string, unknown>;
+    delete legacy.metaProgress;
+
+    const migration = migratePlayerSave(legacy);
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(13);
+    expect(migration.save.credits).toBe(321);
+    expect(migration.save.metaProgress).toEqual({
+      achievements: [],
+      completedMissions: [],
+      discoveredEnemies: [],
+      discoveredBossStages: [],
+    });
+  });
+
   it("keeps a valid current-version save without migration", () => {
     const save = createPlayerSave(
       createDefaultCampaignProgress(),
@@ -376,6 +397,12 @@ describe("player save persistence model", () => {
       lastRollStage: 0,
     });
     expect(migration.save.credits).toBe(0);
+    expect(migration.save.metaProgress).toEqual({
+      achievements: [],
+      completedMissions: [],
+      discoveredEnemies: [],
+      discoveredBossStages: [],
+    });
   });
 
   it("refuses unsupported numeric schema versions instead of down-migrating them", () => {
