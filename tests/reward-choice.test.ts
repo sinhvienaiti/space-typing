@@ -6,6 +6,7 @@ import {
   rewardChoiceWord,
   shouldScheduleRewardChoiceCrate,
 } from "../src/events/reward-choice";
+import { createRelicState } from "../src/relics/state";
 
 function sequence(values: number[]): () => number {
   let index = 0;
@@ -31,15 +32,30 @@ describe("reward-choice crate", () => {
     expect(new Set(choices.map((choice) => choice.definitionId)).size).toBe(3);
   });
 
-  it("builds three distinct boss-weighted choices without a second reward runtime", () => {
-    const choices = createBossRewardChoiceOptions(
+  it("builds one deterministic boss choice set through the existing reward path", () => {
+    const first = createBossRewardChoiceOptions(
+      100,
       30,
-      sequence([0, 0.2, 0.15, 0.3, 0.28, 0.4]),
+      createRelicState(),
+    );
+    const second = createBossRewardChoiceOptions(
+      100,
+      30,
+      createRelicState(),
     );
 
-    expect(choices).toHaveLength(3);
-    expect(choices.every((choice) => choice.source === "boss")).toBe(true);
-    expect(new Set(choices.map((choice) => choice.definitionId)).size).toBe(3);
+    expect(first).toEqual(second);
+    expect(first).toHaveLength(3);
+    expect(first.map((choice) => choice.kind)).toEqual([
+      "equipment",
+      "currency",
+      "relic",
+    ]);
+    const equipment = first[0];
+    expect(equipment?.kind).toBe("equipment");
+    if (equipment?.kind === "equipment") {
+      expect(equipment.drop.source).toBe("boss");
+    }
   });
 
   it("chooses a medium-length vocabulary word when possible", () => {
