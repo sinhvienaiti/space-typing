@@ -54,6 +54,7 @@ export class Sfx {
     if (this.announcerAudio !== null) {
       this.announcerAudio.pause();
       this.announcerAudio = null;
+      this.notifyAnnouncer(false);
     }
     if (this.context !== null) {
       void this.context.close();
@@ -117,6 +118,7 @@ export class Sfx {
     if (this.announcerAudio !== null) {
       this.announcerAudio.pause();
       this.announcerAudio.currentTime = 0;
+      this.notifyAnnouncer(false);
     }
 
     const audio = new Audio(announcerAsset(event));
@@ -124,11 +126,22 @@ export class Sfx {
     audio.volume = this.announcerVolume();
     this.announcerAudio = audio;
 
-    void audio.play().catch(() => {
-      if (this.announcerAudio === audio) {
-        this.announcerAudio = null;
-      }
-    });
+    const finish = (): void => {
+      if (this.announcerAudio !== audio) return;
+      this.announcerAudio = null;
+      this.notifyAnnouncer(false);
+    };
+    audio.addEventListener("ended", finish, { once: true });
+    audio.addEventListener("error", finish, { once: true });
+
+    void audio
+      .play()
+      .then(() => {
+        if (this.announcerAudio === audio) {
+          this.notifyAnnouncer(true);
+        }
+      })
+      .catch(finish);
   }
 
   wrong(): void {
@@ -256,6 +269,15 @@ export class Sfx {
 
   bossStagger(): void {
     this.tone(250, 0.14, "sine", 0.03, 120, "combat");
+  }
+
+  private notifyAnnouncer(active: boolean): void {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(
+      new CustomEvent("space-typing:announcer", {
+        detail: { active },
+      }),
+    );
   }
 
   private announcerVolume(): number {
