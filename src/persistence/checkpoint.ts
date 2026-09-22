@@ -62,6 +62,12 @@ import {
   sanitizeRouteState,
   type RouteState,
 } from "../campaign/route";
+import {
+  createHiddenChallengeState,
+  isValidHiddenChallengeState,
+  sanitizeHiddenChallengeState,
+  type HiddenChallengeState,
+} from "../campaign/hidden-challenge";
 
 export type RunPersistentState = {
   campaign: CampaignProgress;
@@ -76,6 +82,7 @@ export type RunPersistentState = {
   expansionCurrencies: ExpansionCurrencyState;
   shops: ShopState;
   route: RouteState;
+  challenge: HiddenChallengeState;
 };
 
 export type CheckpointSnapshot = RunPersistentState;
@@ -260,6 +267,7 @@ export function migrateLegacyRunPersistentState(
       ? sanitizeShopState(raw.shops)
       : createShopState(),
     route: createRouteState(campaign.highestUnlockedStage),
+    challenge: createHiddenChallengeState(),
   };
 }
 
@@ -286,7 +294,8 @@ export function isValidRunPersistentState(
     isValidRouteState(
       raw.route,
       (raw.campaign as CampaignProgress).highestUnlockedStage,
-    )
+    ) &&
+    isValidHiddenChallengeState(raw.challenge)
   );
 }
 
@@ -324,6 +333,7 @@ export function sanitizeRunPersistentState(
       value.route,
       campaign.highestUnlockedStage,
     ),
+    challenge: sanitizeHiddenChallengeState(value.challenge),
   };
 }
 
@@ -436,5 +446,6 @@ export function restoreCheckpointSnapshot(
       committed.route,
       committed.campaign.highestUnlockedStage,
     ),
+    challenge: sanitizeHiddenChallengeState(committed.challenge),
   };
 }
