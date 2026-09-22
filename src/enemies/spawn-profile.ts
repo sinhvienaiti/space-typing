@@ -1,6 +1,14 @@
 import { clamp } from "../logic";
 import type { EnemyKind } from "../types";
-import type { EnemyDefinitionId } from "./registry";
+import { enemyDefinition, type EnemyDefinitionId } from "./registry";
+
+function availableDefinition(
+  id: EnemyDefinitionId,
+  stage: number,
+): boolean {
+  const definition = enemyDefinition(id);
+  return definition !== undefined && stage >= definition.minStage;
+}
 
 export function runtimeEnemyDefinitionId(
   kind: EnemyKind,
@@ -10,64 +18,65 @@ export function runtimeEnemyDefinitionId(
   const safeStage = clamp(Math.floor(stage), 1, 1000);
 
   if (elite) {
+    let eliteId: EnemyDefinitionId;
     if (
       safeStage >= 620 &&
       (kind === "commander" || kind === "oppressor")
     ) {
-      return "nebula-elite";
-    }
-    if (
+      eliteId = "nebula-elite";
+    } else if (
       safeStage >= 380 &&
       (kind === "cloaker" || kind === "leech")
     ) {
-      return "umbra-elite";
-    }
-    if (
+      eliteId = "umbra-elite";
+    } else if (
       kind === "healer" ||
       kind === "shield" ||
       kind === "carrier" ||
       kind === "commander"
     ) {
-      return "seraph-elite";
-    }
-    if (
+      eliteId = "seraph-elite";
+    } else if (
       kind === "jammer" ||
       kind === "cloaker" ||
       kind === "sniper"
     ) {
-      return "frost-keeper";
-    }
-    if (kind === "splitter") {
-      return "fortune-prism";
+      eliteId = "frost-keeper";
+    } else if (kind === "splitter") {
+      eliteId = "fortune-prism";
+    } else {
+      eliteId = "berserk-devil";
     }
 
-    return "berserk-devil";
+    if (availableDefinition(eliteId, safeStage)) return eliteId;
+    return runtimeEnemyDefinitionId(kind, false, safeStage);
   }
 
-  if (safeStage >= 340 && kind === "leech") return "night-wisp";
-  if (safeStage >= 300 && kind === "cloaker") return "shade-wisp";
-
-  if (kind === "scout") return "rainbow-scout";
-  if (kind === "mine") return "rainbow-dart";
-  if (
+  let id: EnemyDefinitionId;
+  if (safeStage >= 340 && kind === "leech") id = "night-wisp";
+  else if (safeStage >= 300 && kind === "cloaker") id = "shade-wisp";
+  else if (kind === "scout") id = "rainbow-scout";
+  else if (kind === "mine") id = "rainbow-dart";
+  else if (
     kind === "tank" ||
     kind === "shield" ||
     kind === "commander"
   ) {
-    return "rainbow-bubble";
-  }
-  if (kind === "carrier") return "leaf-puff";
-  if (kind === "splitter") return "prism-sprite";
-  if (kind === "healer") return "angel-healer";
-  if (
+    id = "rainbow-bubble";
+  } else if (kind === "carrier") id = "leaf-puff";
+  else if (kind === "splitter") id = "prism-sprite";
+  else if (kind === "healer") id = "angel-healer";
+  else if (
     kind === "destroyer" ||
     kind === "oppressor" ||
     kind === "leech"
   ) {
-    return "imp-spark";
+    id = "imp-spark";
+  } else {
+    id = "snow-wisp";
   }
 
-  return "snow-wisp";
+  return availableDefinition(id, safeStage) ? id : "rainbow-scout";
 }
 
 export function rewardEnemyChance(stage: number): number {
@@ -90,15 +99,28 @@ export function spawnEnemyDefinitionId(
     return base;
   }
 
-  if (safeStage >= 560 && kind === "oppressor") return "nova-core";
-  if (safeStage >= 520 && kind === "commander") return "star-core";
-  if (kind === "scout") return "lucky-rainbow";
-  if (kind === "shield") return "angel-guard";
-  if (kind === "commander") return "angel-blesser";
-  if (kind === "destroyer") return "bomb-imp";
-  if (kind === "jammer") return "freeze-burst-sprite";
-  if (kind === "carrier") return "bloom-puff";
-  if (kind === "splitter") return "treasure-prism";
+  const rewardId: EnemyDefinitionId | null =
+    safeStage >= 560 && kind === "oppressor"
+      ? "nova-core"
+      : safeStage >= 520 && kind === "commander"
+        ? "star-core"
+        : kind === "scout"
+          ? "lucky-rainbow"
+          : kind === "shield"
+            ? "angel-guard"
+            : kind === "commander"
+              ? "angel-blesser"
+              : kind === "destroyer"
+                ? "bomb-imp"
+                : kind === "jammer"
+                  ? "freeze-burst-sprite"
+                  : kind === "carrier"
+                    ? "bloom-puff"
+                    : kind === "splitter"
+                      ? "treasure-prism"
+                      : null;
 
-  return base;
+  return rewardId !== null && availableDefinition(rewardId, safeStage)
+    ? rewardId
+    : base;
 }

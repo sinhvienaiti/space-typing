@@ -25,13 +25,6 @@ export function auditEnemySystem(
     }
 
     if (
-      definition.rarity === "boss" &&
-      definition.spawnWeight !== 0
-    ) {
-      errors.push(definition.id + ": boss spawnWeight must be zero.");
-    }
-
-    if (
       definition.reward !== undefined &&
       definition.visual.rewardMarker === undefined
     ) {
@@ -56,6 +49,20 @@ export function auditEnemySystem(
     ) {
       warnings.push(
         definition.id + ": large wings need manual word-clearance check.",
+      );
+    }
+  }
+
+  const stageClearSafeBossRewards = new Set(["credits-x2"]);
+  for (const definition of definitions) {
+    if (
+      definition.role === "boss" &&
+      definition.reward !== undefined &&
+      !stageClearSafeBossRewards.has(definition.reward)
+    ) {
+      errors.push(
+        definition.id +
+          ": boss reward would be reset by the immediate stage-clear flow.",
       );
     }
   }

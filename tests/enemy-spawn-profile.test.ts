@@ -7,26 +7,40 @@ import {
 
 describe("core four enemy visual mapping", () => {
   it("maps legacy combat kinds into the new visual families", () => {
-    expect(runtimeEnemyDefinitionId("scout", false)).toBe("rainbow-scout");
-    expect(runtimeEnemyDefinitionId("mine", false)).toBe("rainbow-dart");
-    expect(runtimeEnemyDefinitionId("tank", false)).toBe("rainbow-bubble");
-    expect(runtimeEnemyDefinitionId("healer", false)).toBe("angel-healer");
-    expect(runtimeEnemyDefinitionId("destroyer", false)).toBe("imp-spark");
-    expect(runtimeEnemyDefinitionId("jammer", false)).toBe("snow-wisp");
-    expect(runtimeEnemyDefinitionId("carrier", false)).toBe("leaf-puff");
-    expect(runtimeEnemyDefinitionId("splitter", false)).toBe("prism-sprite");
+    expect(runtimeEnemyDefinitionId("scout", false, 1)).toBe("rainbow-scout");
+    expect(runtimeEnemyDefinitionId("mine", false, 10)).toBe("rainbow-dart");
+    expect(runtimeEnemyDefinitionId("tank", false, 20)).toBe("rainbow-bubble");
+    expect(runtimeEnemyDefinitionId("healer", false, 40)).toBe("angel-healer");
+    expect(runtimeEnemyDefinitionId("destroyer", false, 50)).toBe("imp-spark");
+    expect(runtimeEnemyDefinitionId("jammer", false, 30)).toBe("snow-wisp");
+    expect(runtimeEnemyDefinitionId("carrier", false, 25)).toBe("leaf-puff");
+    expect(runtimeEnemyDefinitionId("splitter", false, 80)).toBe("prism-sprite");
     expect(runtimeEnemyDefinitionId("cloaker", false, 300)).toBe("shade-wisp");
     expect(runtimeEnemyDefinitionId("leech", false, 340)).toBe("night-wisp");
   });
 
   it("reuses the existing elite flag for elite visual evolution", () => {
-    expect(runtimeEnemyDefinitionId("healer", true)).toBe("seraph-elite");
-    expect(runtimeEnemyDefinitionId("destroyer", true)).toBe("berserk-devil");
-    expect(runtimeEnemyDefinitionId("jammer", true)).toBe("frost-keeper");
-    expect(runtimeEnemyDefinitionId("splitter", true)).toBe("fortune-prism");
+    expect(runtimeEnemyDefinitionId("healer", true, 90)).toBe("seraph-elite");
+    expect(runtimeEnemyDefinitionId("destroyer", true, 120)).toBe("berserk-devil");
+    expect(runtimeEnemyDefinitionId("jammer", true, 110)).toBe("frost-keeper");
+    expect(runtimeEnemyDefinitionId("splitter", true, 140)).toBe("fortune-prism");
     expect(runtimeEnemyDefinitionId("cloaker", true, 380)).toBe("umbra-elite");
     expect(runtimeEnemyDefinitionId("commander", true, 620)).toBe(
       "nebula-elite",
+    );
+  });
+
+  it("never exposes a visual definition before its minStage", () => {
+    expect(runtimeEnemyDefinitionId("mine", false, 3)).toBe("rainbow-scout");
+    expect(runtimeEnemyDefinitionId("tank", false, 5)).toBe("rainbow-scout");
+    expect(runtimeEnemyDefinitionId("destroyer", false, 20)).toBe("rainbow-scout");
+    expect(runtimeEnemyDefinitionId("splitter", false, 45)).toBe("rainbow-scout");
+    expect(spawnEnemyDefinitionId("destroyer", false, 20, 0)).toBe(
+      "rainbow-scout",
+    );
+    expect(spawnEnemyDefinitionId("carrier", false, 30, 0)).toBe("leaf-puff");
+    expect(spawnEnemyDefinitionId("splitter", false, 80, 0)).toBe(
+      "prism-sprite",
     );
   });
 

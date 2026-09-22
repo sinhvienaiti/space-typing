@@ -1894,3 +1894,53 @@ Important completion rule:
 - the implementation may be merged when code/CI review is clean;
 - the **enemy-system milestone itself remains open** until the manual browser visual/playtest gate confirms text readability, visual clutter, reward recognition, boss readability and acceptable performance;
 - no generated or third-party raster enemy art is required at runtime at this checkpoint; the project-original procedural renderer remains the production fallback and its sources are recorded in `docs/ASSET_SOURCES.md` and the asset manifest.
+
+
+---
+
+# 34. Final independent audit — 2026-09-22
+
+Audit branch:
+
+`review/enemy-system-final-audit`
+
+Pull request:
+
+`#27`
+
+Reviewed head before this documentation commit:
+
+`9b32699e9812158e5ea4bbbbe0a0916f50ddc7f6`
+
+Verified CI:
+
+- CI #159: PASS — Test + Build.
+
+Issues found and corrected during this independent audit:
+
+- the four V1 Mini Boss identities were missing from the runtime visual registry; Halo Seraph, Crown Demon, Glacier Oracle and Prism Sentinel now use the existing Mini Boss mechanics;
+- visual `minStage` metadata was not enforced by runtime mapping, so later visual identities could appear too early; runtime mapping now respects unlock stages;
+- `spawnWeight`, `durabilityScale` and `speedScale` existed in the visual registry but were not consumed by runtime combat; these misleading dead fields were removed instead of pretending they affected gameplay;
+- Berserk Devil Damage Up used `1.2` as a status duration even though the design calls for a 6-10 second temporary buff; it now uses 8 seconds;
+- most boss death buffs were being activated immediately before stage clear and then reset on the next stage, so they looked successful without producing useful gameplay; only the stage-clear-safe Prism Archon Credits x2 reward remains attached to a boss definition;
+- the modular renderer previously treated many body/face/wing/aura/orbit/side identifiers as naming metadata rather than materially different drawing behavior; these modules now produce visibly different procedural silhouettes/details;
+- active reward markers that were semantically different shared the same glyph; active reward identities are now distinct, including Slow vs Cooldown and Energy vs Power;
+- family combat feedback now also varies audio pitch, while reward activation retains category-specific SFX;
+- procedural noise is cached and the SFX graph uses a dynamics-compressor limiter when supported, reducing repeated audio allocation and peak stacking;
+- Freeze/Slow control state now has visible in-world feedback, and timed Score/Credits multipliers have persistent on-canvas state feedback instead of only a one-second popup;
+- glow now follows visual-quality settings;
+- high-DPI canvas allocation is bounded by a per-quality pixel budget;
+- the static background radial gradient is cached across frames and rebuilt only after resize, reducing avoidable per-frame CanvasGradient allocation.
+
+Performance assessment from code review:
+
+- no unbounded particle growth was found; particles remain capped by quality profile;
+- enemy count remains capped by difficulty;
+- high-cost glow, canvas DPR and particle density now scale with quality;
+- the largest remaining performance uncertainty is real-device Canvas2D/GPU behavior at late-game density, especially High/Ultra quality; this requires browser profiling on target hardware and is not claimed as completed by CI.
+
+Perceptual quality rule:
+
+- automated code/CI review can verify layering, marker separation, audio routing, bounded effect counts and fallback behavior;
+- it cannot honestly certify final visual appeal, word readability under every live composition, perceived sound mix, speaker/headphone balance or animation smoothness;
+- therefore E13 manual browser visual/audio/playtest approval remains open.

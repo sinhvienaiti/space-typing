@@ -9,6 +9,7 @@ export type QualityProfile = {
   starAreaDivisor: number;
   glowScale: number;
   gridStep: number;
+  maxCanvasPixels: number;
 };
 
 const PROFILES: Record<VisualQuality, QualityProfile> = {
@@ -21,6 +22,7 @@ const PROFILES: Record<VisualQuality, QualityProfile> = {
     starAreaDivisor: 18000,
     glowScale: 0.35,
     gridStep: 72,
+    maxCanvasPixels: 3_500_000,
   },
   medium: {
     dprCap: 1.5,
@@ -31,6 +33,7 @@ const PROFILES: Record<VisualQuality, QualityProfile> = {
     starAreaDivisor: 13000,
     glowScale: 0.65,
     gridStep: 60,
+    maxCanvasPixels: 5_000_000,
   },
   high: {
     dprCap: 2,
@@ -41,6 +44,7 @@ const PROFILES: Record<VisualQuality, QualityProfile> = {
     starAreaDivisor: 9000,
     glowScale: 1,
     gridStep: 48,
+    maxCanvasPixels: 7_000_000,
   },
   ultra: {
     dprCap: 2.5,
@@ -51,6 +55,7 @@ const PROFILES: Record<VisualQuality, QualityProfile> = {
     starAreaDivisor: 7000,
     glowScale: 1.2,
     gridStep: 42,
+    maxCanvasPixels: 10_000_000,
   },
 };
 
@@ -64,8 +69,30 @@ export type PerformanceReport = {
 
 export function qualityProfile(
   quality: VisualQuality,
-): QualityProfile {
-  return { ...PROFILES[quality] };
+): Readonly<QualityProfile> {
+  return PROFILES[quality];
+}
+
+export function resolveRenderDpr(
+  profile: Readonly<QualityProfile>,
+  devicePixelRatio: number,
+  width: number,
+  height: number,
+): number {
+  const safeDeviceDpr =
+    Number.isFinite(devicePixelRatio) && devicePixelRatio > 0
+      ? devicePixelRatio
+      : 1;
+  const safeWidth = Math.max(1, Number.isFinite(width) ? width : 1);
+  const safeHeight = Math.max(1, Number.isFinite(height) ? height : 1);
+  const pixelBudgetDpr = Math.sqrt(
+    profile.maxCanvasPixels / (safeWidth * safeHeight),
+  );
+
+  return Math.max(
+    0.5,
+    Math.min(profile.dprCap, safeDeviceDpr, pixelBudgetDpr),
+  );
 }
 
 export class FrameProfiler {

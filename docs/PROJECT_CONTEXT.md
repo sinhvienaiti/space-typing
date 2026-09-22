@@ -3366,12 +3366,15 @@ The next major visual/gameplay expansion is defined in:
 
 Status:
 
-- implementation branch: `feature/enemy-system-e01`;
-- PR: `#26`;
+- original implementation PR #26 is merged;
+- final independent audit branch: `review/enemy-system-final-audit`;
+- final audit PR: `#27`;
 - E01-E12 are implemented;
-- E13 automated readability/asset/performance audit is implemented, while manual browser/art approval is still pending;
-- E14 and E15 code review passes found and fixed integration issues; CI #151 passed at reviewed code checkpoint `63522b531e92ead52cd904d31e0964ea719467ce`;
-- the enemy-system milestone is **not** marked fully complete until the manual visual/browser readability gate is performed;
+- E13 automated readability/asset/performance audit is implemented, while manual browser/art/audio approval is still pending;
+- E14/E15 plus the final independent audit found and fixed additional correctness, visual-readability, audio-lifecycle and performance issues;
+- reviewed audit head `9b32699e9812158e5ea4bbbbe0a0916f50ddc7f6` passed CI #159 Test + Build before the documentation update;
+- the final audit restored all four V1 Mini Boss identities, enforced visual unlock stages, removed misleading unused registry scaling fields, corrected Damage Up duration, removed ineffective boss rewards, differentiated active reward markers, improved family visuals/audio feedback, exposed control/buff state visually, bounded high-DPI canvas cost and cached static render/audio resources;
+- the enemy-system milestone is **not** marked fully complete until the manual visual/browser/audio readability and feel gate is performed;
 - `docs/ENEMY_SYSTEM_MASTER_PLAN.md` remains the source of truth for enemy art direction, modular visual families, reward-on-kill effects, roster and implementation order;
 - implementation reuses the existing combat, status, loot, boss, skill, particle/SFX and asset-pipeline systems rather than creating parallel frameworks;
 - the project-original procedural renderer remains the runtime fallback and asset-source metadata is maintained in `docs/ASSET_SOURCES.md` plus the asset manifest.

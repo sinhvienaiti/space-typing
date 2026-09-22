@@ -11,6 +11,7 @@ export type EnemyFxEvent =
 export type EnemyFxProfile = {
   count: number;
   hue: number;
+  pitch: number;
 };
 
 const FAMILY_HUES: Record<EnemyFamilyId, number> = {
@@ -22,6 +23,17 @@ const FAMILY_HUES: Record<EnemyFamilyId, number> = {
   nature: 124,
   shadow: 264,
   cosmic: 216,
+};
+
+const FAMILY_PITCH: Record<EnemyFamilyId, number> = {
+  rainbow: 1,
+  angel: 1.16,
+  devil: 0.86,
+  frost: 1.08,
+  prism: 1.22,
+  nature: 0.95,
+  shadow: 0.78,
+  cosmic: 0.9,
 };
 
 const EVENT_COUNTS: Record<EnemyFxEvent, number> = {
@@ -40,5 +52,6 @@ export function enemyFxProfile(
   return {
     count: EVENT_COUNTS[event],
     hue: FAMILY_HUES[family],
+    pitch: FAMILY_PITCH[family],
   };
 }
