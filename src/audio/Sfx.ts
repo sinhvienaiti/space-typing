@@ -1,6 +1,39 @@
+import {
+  mixedSfxGain,
+  type AudioGroup,
+} from "./mix";
+
 export class Sfx {
   private context: AudioContext | null = null;
   private volume = 0.5;
+  private pronunciationActive = false;
+
+  private readonly onPronunciation = (event: Event): void => {
+    const detail = (event as CustomEvent<{ active?: unknown }>).detail;
+    this.pronunciationActive = detail?.active === true;
+  };
+
+  constructor() {
+    if (typeof window !== "undefined") {
+      window.addEventListener(
+        "space-typing:pronunciation",
+        this.onPronunciation,
+      );
+    }
+  }
+
+  destroy(): void {
+    if (typeof window !== "undefined") {
+      window.removeEventListener(
+        "space-typing:pronunciation",
+        this.onPronunciation,
+      );
+    }
+    if (this.context !== null) {
+      void this.context.close();
+      this.context = null;
+    }
+  }
 
   setVolume(volume: number): void {
     this.volume = Math.min(1, Math.max(0, volume));
@@ -16,82 +49,158 @@ export class Sfx {
   }
 
   shot(multiplier = 1): void {
-    this.tone(520 + multiplier * 35, 0.038, "square", 0.04, 760);
+    this.tone(
+      520 + multiplier * 35,
+      0.038,
+      "square",
+      0.04,
+      760,
+      "typing",
+    );
   }
 
   hit(): void {
-    this.tone(190, 0.065, "sawtooth", 0.045, 110);
+    this.tone(190, 0.065, "sawtooth", 0.045, 110, "combat");
+  }
+
+  wordComplete(perfect: boolean): void {
+    this.tone(
+      perfect ? 410 : 330,
+      perfect ? 0.11 : 0.085,
+      "triangle",
+      perfect ? 0.04 : 0.03,
+      perfect ? 760 : 520,
+      "typing",
+    );
   }
 
   kill(): void {
-    this.noise(0.1, 0.055);
-    this.tone(240, 0.12, "sawtooth", 0.045, 90);
+    this.noise(0.1, 0.055, "combat");
+    this.tone(240, 0.12, "sawtooth", 0.045, 90, "combat");
   }
 
   wrong(): void {
-    this.tone(92, 0.085, "square", 0.042, 70);
+    this.tone(92, 0.085, "square", 0.042, 70, "typing");
   }
 
   power(): void {
-    this.tone(420, 0.16, "sine", 0.045, 760);
-    window.setTimeout(() => this.tone(700, 0.18, "sine", 0.035, 1050), 60);
+    this.tone(420, 0.16, "sine", 0.045, 760, "combat");
+    window.setTimeout(
+      () => this.tone(700, 0.18, "sine", 0.035, 1050, "combat"),
+      60,
+    );
   }
 
   damage(): void {
-    this.noise(0.11, 0.06);
-    this.tone(75, 0.16, "sawtooth", 0.05, 45);
+    this.noise(0.11, 0.06, "combat");
+    this.tone(75, 0.16, "sawtooth", 0.05, 45, "combat");
   }
 
   enemyShot(): void {
-    this.tone(310, 0.09, "triangle", 0.032, 190);
+    this.tone(310, 0.09, "triangle", 0.032, 190, "combat");
+  }
+
+  projectileWarning(): void {
+    this.tone(680, 0.055, "triangle", 0.018, 520, "warnings");
+  }
+
+  shieldBreak(): void {
+    this.tone(820, 0.09, "triangle", 0.03, 220, "warnings");
+    this.noise(0.055, 0.018, "combat");
   }
 
   support(): void {
-    this.tone(440, 0.12, "sine", 0.026, 690);
-    window.setTimeout(() => this.tone(620, 0.12, "sine", 0.02, 820), 45);
+    this.tone(440, 0.12, "sine", 0.026, 690, "combat");
+    window.setTimeout(
+      () => this.tone(620, 0.12, "sine", 0.02, 820, "combat"),
+      45,
+    );
   }
 
   drain(): void {
-    this.tone(210, 0.16, "sawtooth", 0.035, 78);
+    this.tone(210, 0.16, "sawtooth", 0.035, 78, "combat");
   }
 
   command(): void {
-    this.tone(260, 0.11, "square", 0.03, 520);
-    window.setTimeout(() => this.tone(520, 0.1, "square", 0.024, 760), 55);
+    this.tone(260, 0.11, "square", 0.03, 520, "combat");
+    window.setTimeout(
+      () => this.tone(520, 0.1, "square", 0.024, 760, "combat"),
+      55,
+    );
   }
 
   eliteWarning(): void {
-    this.tone(360, 0.11, "triangle", 0.028, 620);
-    window.setTimeout(() => this.tone(620, 0.14, "triangle", 0.025, 930), 70);
+    this.tone(360, 0.11, "triangle", 0.028, 620, "warnings");
+    window.setTimeout(
+      () => this.tone(620, 0.14, "triangle", 0.025, 930, "warnings"),
+      70,
+    );
+  }
+
+  rareDrop(): void {
+    this.tone(560, 0.13, "sine", 0.028, 920, "ui");
+    window.setTimeout(
+      () => this.tone(920, 0.16, "sine", 0.024, 1260, "ui"),
+      70,
+    );
+  }
+
+  supplyArrival(): void {
+    this.tone(470, 0.1, "triangle", 0.025, 740, "ui");
+  }
+
+  uiConfirm(): void {
+    this.tone(540, 0.06, "sine", 0.018, 700, "ui");
+  }
+
+  stageClear(): void {
+    this.tone(420, 0.18, "triangle", 0.035, 760, "ui");
+    window.setTimeout(
+      () => this.tone(650, 0.2, "triangle", 0.03, 1040, "ui"),
+      90,
+    );
+  }
+
+  stageFail(): void {
+    this.tone(180, 0.2, "sawtooth", 0.03, 82, "ui");
   }
 
   bossEntrance(): void {
-    this.tone(95, 0.28, "sawtooth", 0.045, 58);
-    window.setTimeout(() => this.tone(220, 0.24, "triangle", 0.03, 420), 110);
+    this.tone(95, 0.28, "sawtooth", 0.045, 58, "warnings");
+    window.setTimeout(
+      () => this.tone(220, 0.24, "triangle", 0.03, 420, "warnings"),
+      110,
+    );
   }
 
   bossHit(): void {
-    this.tone(135, 0.075, "sawtooth", 0.04, 92);
+    this.tone(135, 0.075, "sawtooth", 0.04, 92, "combat");
   }
 
   bossDeath(): void {
-    this.noise(0.24, 0.075);
-    this.tone(110, 0.35, "sawtooth", 0.055, 42);
-    window.setTimeout(() => this.tone(360, 0.32, "sine", 0.04, 760), 100);
+    this.noise(0.24, 0.075, "combat");
+    this.tone(110, 0.35, "sawtooth", 0.055, 42, "combat");
+    window.setTimeout(
+      () => this.tone(360, 0.32, "sine", 0.04, 760, "combat"),
+      100,
+    );
   }
 
   bossPhase(): void {
-    this.tone(180, 0.16, "sawtooth", 0.04, 320);
-    window.setTimeout(() => this.tone(420, 0.18, "triangle", 0.034, 720), 70);
+    this.tone(180, 0.16, "sawtooth", 0.04, 320, "warnings");
+    window.setTimeout(
+      () => this.tone(420, 0.18, "triangle", 0.034, 720, "warnings"),
+      70,
+    );
   }
 
   bossShieldBreak(): void {
-    this.tone(760, 0.12, "triangle", 0.036, 240);
-    this.noise(0.08, 0.028);
+    this.tone(760, 0.12, "triangle", 0.036, 240, "warnings");
+    this.noise(0.08, 0.028, "combat");
   }
 
   bossStagger(): void {
-    this.tone(250, 0.14, "sine", 0.03, 120);
+    this.tone(250, 0.14, "sine", 0.03, 120, "combat");
   }
 
   private tone(
@@ -100,8 +209,16 @@ export class Sfx {
     type: OscillatorType,
     gainValue: number,
     endFrequency: number,
+    group: AudioGroup,
   ): void {
-    if (this.volume <= 0) return;
+    const gainLevel = mixedSfxGain(
+      this.volume,
+      group,
+      gainValue,
+      this.pronunciationActive,
+    );
+    if (gainLevel <= 0) return;
+
     this.unlock();
     const context = this.context;
     if (context === null) return;
@@ -117,7 +234,7 @@ export class Sfx {
       now + duration,
     );
 
-    gain.gain.setValueAtTime(gainValue * this.volume, now);
+    gain.gain.setValueAtTime(gainLevel, now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
     oscillator.connect(gain).connect(context.destination);
@@ -125,8 +242,19 @@ export class Sfx {
     oscillator.stop(now + duration + 0.02);
   }
 
-  private noise(duration: number, gainValue: number): void {
-    if (this.volume <= 0) return;
+  private noise(
+    duration: number,
+    gainValue: number,
+    group: AudioGroup,
+  ): void {
+    const gainLevel = mixedSfxGain(
+      this.volume,
+      group,
+      gainValue,
+      this.pronunciationActive,
+    );
+    if (gainLevel <= 0) return;
+
     this.unlock();
     const context = this.context;
     if (context === null) return;
@@ -143,7 +271,7 @@ export class Sfx {
     const gain = context.createGain();
     source.buffer = buffer;
 
-    gain.gain.setValueAtTime(gainValue * this.volume, context.currentTime);
+    gain.gain.setValueAtTime(gainLevel, context.currentTime);
     gain.gain.exponentialRampToValueAtTime(
       0.0001,
       context.currentTime + duration,
