@@ -154,9 +154,10 @@ import {
   combineStageEventEffects,
   createStageEventModifiers,
   scheduleStageRandomEvents,
-  type StageRandomEventDefinition,
+  type StageEventDefinition,
   type StageRandomEventModifiers,
 } from "./events/stage-scheduler";
+import { galaxyStageModifiers } from "./events/galaxy-hazards";
 import {
   applyStatus,
   cleanseNegativeStatuses,
@@ -254,7 +255,7 @@ type Hooks = {
   onStats(stats: GameStats): void;
   onPhase(phase: GamePhase): void;
   onStage(stage: number): void;
-  onStageEvents(events: readonly StageRandomEventDefinition[]): void;
+  onStageEvents(events: readonly StageEventDefinition[]): void;
   onStageClear(stats: GameStats): void;
   onBossUpdate(boss: BossHudState | null): void;
   onWordComplete(entry: VocabularyEntry): void;
@@ -394,7 +395,7 @@ export class Game {
   private luckPity: LuckPityState = createLuckPityState();
   private hiddenDiscovery: HiddenDiscoveryState =
     createHiddenDiscoveryState();
-  private stageEvents: StageRandomEventDefinition[] = [];
+  private stageEvents: StageEventDefinition[] = [];
   private stageEventModifiers: StageRandomEventModifiers =
     createStageEventModifiers();
   private statusState: StatusState = createStatusState();
@@ -1244,10 +1245,13 @@ export class Game {
       );
     }
 
-    this.stageEvents = scheduleStageRandomEvents(
-      stage,
-      this.playerStats.luck,
-    );
+    this.stageEvents = [
+      ...galaxyStageModifiers(stage),
+      ...scheduleStageRandomEvents(
+        stage,
+        this.playerStats.luck,
+      ),
+    ];
     this.stageEventModifiers = combineStageEventEffects(
       this.stageEvents,
     );

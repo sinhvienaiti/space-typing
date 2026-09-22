@@ -3101,6 +3101,19 @@ Codex / Collection / Meta Progression rules:
 ## Step 59
 Add Galaxy hazards and special stages.
 
+**Status: implemented.**
+
+Galaxy hazard / special-stage rules:
+
+- existing StageRole remains the source of truth: local Stage x30 is `special`, x60 is `hazard`, and x90 is `gauntlet`;
+- deterministic role modifiers are prepended to the same stage-event pipeline created in Step 51, so HUD and combat effect application remain shared;
+- special stages alternate between Supply Run and Training Window by Galaxy, giving bounded relief without rerolling;
+- Galaxy hazard stages rotate Ion Storm, Debris Field, Solar Flare and Gravity Tide by Galaxy;
+- gauntlet stages add fixed extra-layer/speed pressure with additional Supply Pod opportunity;
+- role modifiers combine with Step 51 random events through the same speed/layer/Shield/Supply/projectile multipliers;
+- role modifiers are deterministic from stage identity and cannot be rerolled by retrying;
+- no new persistent state or second scheduler is introduced.
+
 ## Step 60
 Add typing-text challenges when required parent data is available.
 

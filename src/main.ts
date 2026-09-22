@@ -97,7 +97,7 @@ import {
 } from "./shops/special-shop";
 import { accuracyPercent } from "./logic";
 import type { EquipmentDrop } from "./loot/equipment-loot";
-import type { StageRandomEventDefinition } from "./events/stage-scheduler";
+import type { StageEventDefinition } from "./events/stage-scheduler";
 import {
   statusLabel,
   type ActiveStatus,
@@ -1261,7 +1261,7 @@ function renderStage(stage: number): void {
 }
 
 function renderStageEvents(
-  events: readonly StageRandomEventDefinition[],
+  events: readonly StageEventDefinition[],
 ): void {
   const badge = byId("stageEventBadge");
   if (events.length === 0) {

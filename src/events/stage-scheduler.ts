@@ -22,14 +22,18 @@ export type StageRandomEventEffect = {
   projectilePressureMultiplier?: number;
 };
 
-export type StageRandomEventDefinition = {
-  id: StageRandomEventId;
+export type StageEventDefinition = {
+  id: string;
   name: string;
   description: string;
   tone: StageRandomEventTone;
   minStage: number;
   weight: number;
   effect: StageRandomEventEffect;
+};
+
+export type StageRandomEventDefinition = StageEventDefinition & {
+  id: StageRandomEventId;
 };
 
 export const STAGE_RANDOM_EVENT_REGISTRY: Record<
@@ -175,7 +179,7 @@ export function scheduleStageRandomEvents(
 }
 
 export function combineStageEventEffects(
-  events: readonly StageRandomEventDefinition[],
+  events: readonly StageEventDefinition[],
 ): StageRandomEventModifiers {
   const result = createStageEventModifiers();
 
