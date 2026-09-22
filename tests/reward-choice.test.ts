@@ -81,6 +81,34 @@ describe("reward-choice crate", () => {
     }
   });
 
+  it("improves boss currency choices under Ascension reward scaling", () => {
+    const fullRelics = {
+      ...createRelicState(),
+      owned: [...RELIC_IDS],
+    };
+    const base = createBossRewardChoiceOptions(
+      1000,
+      30,
+      fullRelics,
+      1,
+    );
+    const ascended = createBossRewardChoiceOptions(
+      1000,
+      30,
+      fullRelics,
+      1.75,
+    );
+
+    expect(base[1]?.kind).toBe("currency");
+    expect(ascended[1]?.kind).toBe("currency");
+    if (base[1]?.kind === "currency" && ascended[1]?.kind === "currency") {
+      expect(ascended[1].credits).toBeGreaterThan(base[1].credits);
+      expect(ascended[1].currencies.alloy).toBeGreaterThan(
+        base[1].currencies.alloy,
+      );
+    }
+  });
+
   it("chooses a medium-length vocabulary word when possible", () => {
     const word = rewardChoiceWord(
       [

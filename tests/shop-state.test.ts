@@ -3,6 +3,7 @@ import { createDefaultCampaignProgress } from "../src/campaign/progress";
 import { createCampaignExpansionState } from "../src/campaign/expansion-state";
 import { createRouteState } from "../src/campaign/route";
 import { createUpgradeState } from "../src/progression/upgrades";
+import { createAscensionState } from "../src/progression/ascension";
 import { createRelicState } from "../src/relics/state";
 import { createHiddenDiscoveryState } from "../src/discovery/hidden-content";
 import { createStarterEquipmentState } from "../src/equipment/loadout";
@@ -70,6 +71,7 @@ function runState(): RunPersistentState {
     route: createRouteState(1),
     upgrades: createUpgradeState(),
     relics: createRelicState(),
+    ascension: createAscensionState(),
   };
 }
 

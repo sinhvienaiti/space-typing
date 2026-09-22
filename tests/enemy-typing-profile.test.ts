@@ -62,6 +62,35 @@ describe("M10 enemy typing profile", () => {
     expect(profile.layerPlan.at(-1)).toBe("core");
   });
 
+  it("applies bounded Ascension Rank pressure through the existing M10 resolver", () => {
+    const base = resolveEnemyTypingProfile({
+      stage: 1,
+      kind: "scout",
+      elite: false,
+      minimumLayers: 1,
+      vocabularyLevel: 1,
+      entries,
+      random: sequence([0, 0, 0]),
+      rankBonus: 0,
+    });
+    const ascended = resolveEnemyTypingProfile({
+      stage: 1,
+      kind: "scout",
+      elite: false,
+      minimumLayers: 1,
+      vocabularyLevel: 1,
+      entries,
+      random: sequence([0, 0, 0]),
+      rankBonus: 3,
+    });
+
+    expect(enemyRankNumber(ascended.rank)).toBeGreaterThan(
+      enemyRankNumber(base.rank),
+    );
+    expect(enemyRankNumber(ascended.rank)).toBeLessThanOrEqual(10);
+    expect(entries).toContain(ascended.entry);
+  });
+
   it("stays inside the configured vocabulary source", () => {
     const profile = resolveEnemyTypingProfile({
       stage: 1000,

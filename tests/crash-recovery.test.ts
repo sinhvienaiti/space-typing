@@ -16,6 +16,7 @@ import {
   selectedRouteNode,
 } from "../src/campaign/route";
 import { createUpgradeState } from "../src/progression/upgrades";
+import { createAscensionState } from "../src/progression/ascension";
 import { createRelicState, grantRelic } from "../src/relics/state";
 import {
   createCheckpointSnapshot,
@@ -47,8 +48,9 @@ function progressAt(stage: number): CampaignProgress {
 }
 
 function stateAt(stage: number): RunPersistentState {
+  const campaign = progressAt(stage);
   return {
-    campaign: progressAt(stage),
+    campaign,
     inventory: {},
     equipment: createStarterEquipmentState(),
     supportSpells: createStarterSupportSpellState(),
@@ -62,6 +64,7 @@ function stateAt(stage: number): RunPersistentState {
     route: createRouteState(stage),
     upgrades: createUpgradeState(),
     relics: createRelicState(),
+    ascension: createAscensionState(campaign),
   };
 }
 

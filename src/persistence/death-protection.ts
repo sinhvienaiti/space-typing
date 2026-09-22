@@ -209,6 +209,7 @@ export function resolveSalvageAnchor(
   const state: RunPersistentState = {
     ...consumed.state,
     campaign: checkpointRestored.campaign,
+    ascension: checkpointRestored.ascension,
   };
 
   return {

@@ -3559,7 +3559,9 @@ Current gameplay/progression foundation:
 - defensive and offensive combat skills plus 2-slot Support Spell loadout;
 - M19 expands stage-clear rewards with difficulty-relative performance badges, stronger sector caches and Campaign boss choose-one rewards while reusing the existing reward/economy paths;
 - M19 Codex records World, enemy/boss and reward knowledge; discoveries are merged across persistence sources and intentionally survive gameplay checkpoint rollback;
-- IndexedDB PlayerSave schema v24;
+- M20 Ascension replays the same 1000-stage / 50-World Campaign across 10 bounded tiers; each tier has a sequential frontier, deterministic boss mutations and bounded Rank/formation/reward pressure while M12 safety caps remain authoritative;
+- Ascension frontier is part of RunPersistentState and therefore reuses the existing checkpoint/crash/stage-entry/death-protection paths; tier switching is allowed only at committed ten-stage boundaries;
+- IndexedDB PlayerSave schema v25;
 - explicit migrations from all earlier supported PlayerSave schemas;
 - synchronized recovery mirror + autosave queue + validated JSON backup/import.
 
@@ -3626,12 +3628,16 @@ CI #286 PASS · 522/522 tests · TypeScript check + production build
 
 M19 Reward Layer Expansion + Codex
 CI #297 PASS · 531/531 tests · TypeScript check + production build
+
+M20 Ascension
+CI #335 PASS · 548/548 tests · TypeScript check + production build
 ~~~
 
 Important implementation notes:
 
-- Current PlayerSave schema is version 24; v23 migrates deterministically by adding empty CodexState while preserving RelicState, UpgradeState, Campaign, equipment, ShopState, RouteState and checkpoint/recovery domains.
-- Codex knowledge is not part of RunPersistentState/checkpoint rollback; recovery-source selection merges valid discoveries so technical recovery or gameplay rollback cannot erase already learned information.
+- Current PlayerSave schema is version 25; v24 migrates deterministically by adding AscensionState while preserving CodexState, RelicState, UpgradeState, Campaign, equipment, ShopState, RouteState and existing recovery domains.
+- AscensionState is part of RunPersistentState because tier frontier/economic progression must obey checkpoint rollback, crash recovery and stage-entry resurrection semantics. No parallel Ascension checkpoint store exists.
+- Codex knowledge remains outside RunPersistentState/checkpoint rollback; recovery-source selection merges valid discoveries so technical recovery or gameplay rollback cannot erase already learned information.
 - Permanent systems must extend PlayerSave through explicit migrations.
 - Current runtime equipment uses the five-grade model; legacy rarity names remain only in migration/compatibility paths and historical step notes.
 - `ShopState` and `RouteState` are part of `RunPersistentState`, so shop stock and route choices are segment state rather than separate local-storage systems.

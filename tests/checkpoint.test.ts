@@ -22,6 +22,7 @@ import { createLuckPityState } from "../src/loot/pity";
 import { createHiddenDiscoveryState } from "../src/discovery/hidden-content";
 import { createProgressionState } from "../src/progression/missions";
 import { createUpgradeState } from "../src/progression/upgrades";
+import { createAscensionState } from "../src/progression/ascension";
 import { createRelicState, grantRelic } from "../src/relics/state";
 import { createExpansionCurrencyState } from "../src/economy/currencies";
 import { createShopState } from "../src/shops/state";
@@ -56,6 +57,7 @@ function runState(campaign: CampaignProgress): RunPersistentState {
     shops: createShopState(),
     route: createRouteState(campaign.highestUnlockedStage),
     relics: createRelicState(),
+    ascension: createAscensionState(campaign),
   };
 }
 
@@ -72,6 +74,33 @@ describe("M02 checkpoint and rollback", () => {
     expect(snapshot.campaign.clearedStages.at(-1)).toBe(180);
     expect(snapshot.credits).toBe(900);
     expect(snapshot.inventory["repair-kit"]).toBe(4);
+  });
+
+  it("rolls Ascension frontier back with the existing checkpoint snapshot", () => {
+    const campaign = progressAt(1000);
+    campaign.clearedStages.push(1000);
+    const committed = runState(campaign);
+    committed.ascension = {
+      version: 1,
+      highestUnlockedTier: 1,
+      selectedTier: 1,
+      completedTiers: [],
+      frontierByTier: { "1": 21 },
+    };
+    const checkpoint = createCheckpointSnapshot(committed, 1000);
+
+    const active = runState(campaign);
+    active.ascension = {
+      ...committed.ascension,
+      frontierByTier: { "1": 29 },
+    };
+    active.credits = 999;
+
+    const restored = restoreCheckpointSnapshot(checkpoint, active);
+
+    expect(restored.ascension.selectedTier).toBe(1);
+    expect(restored.ascension.frontierByTier["1"]).toBe(21);
+    expect(restored.credits).toBe(committed.credits);
   });
 
   it("moves the active frontier and commits only on the sector-end frontier stage", () => {
