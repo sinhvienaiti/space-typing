@@ -584,9 +584,7 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     family: "angel",
     role: "boss",
     rarity: "boss",
-    minStage: 100,
-    reward: "shield-burst",
-    rewardPower: 0.4,
+    minStage: 50,
     visual: {
       ...angelBase,
       body: "holy-orb-boss",
@@ -594,8 +592,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
       head: "triple-halo",
       orbit: "holy-orbit",
       aura: "holy-glow-boss",
-      rewardMarker:
-        ENEMY_REWARD_DEFINITIONS["shield-burst"].marker,
       deathFx: "holy-boss-burst",
     },
   },
@@ -605,9 +601,7 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     family: "frost",
     role: "boss",
     rarity: "boss",
-    minStage: 300,
-    reward: "freeze-nearby",
-    rewardPower: 4,
+    minStage: 250,
     visual: {
       ...frostBase,
       body: "frost-orb-boss",
@@ -615,8 +609,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
       head: "ice-crown",
       orbit: "snow-halo",
       aura: "frost-mist-boss",
-      rewardMarker:
-        ENEMY_REWARD_DEFINITIONS["freeze-nearby"].marker,
       deathFx: "frost-boss-burst",
     },
   },
@@ -626,7 +618,7 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     family: "prism",
     role: "boss",
     rarity: "boss",
-    minStage: 400,
+    minStage: 350,
     reward: "credits-x2",
     rewardPower: 12,
     visual: {
@@ -647,9 +639,7 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     family: "shadow",
     role: "boss",
     rarity: "boss",
-    minStage: 800,
-    reward: "cooldown-charge",
-    rewardPower: 6,
+    minStage: 850,
     visual: {
       ...shadowBase,
       body: "shadow-wisp-boss",
@@ -657,8 +647,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
       head: "void-eye-ring",
       orbit: "void-orbit",
       aura: "shadow-smoke-boss",
-      rewardMarker:
-        ENEMY_REWARD_DEFINITIONS["cooldown-charge"].marker,
       deathFx: "shadow-boss-burst",
     },
   },
@@ -668,9 +656,7 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     family: "cosmic",
     role: "boss",
     rarity: "boss",
-    minStage: 900,
-    reward: "overdrive-charge",
-    rewardPower: 40,
+    minStage: 950,
     visual: {
       ...cosmicBase,
       body: "cosmic-core-boss",
@@ -678,8 +664,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
       head: "star-crown",
       orbit: "cosmic-orbital-rings",
       aura: "cosmic-stars-boss",
-      rewardMarker:
-        ENEMY_REWARD_DEFINITIONS["overdrive-charge"].marker,
       deathFx: "cosmic-boss-burst",
     },
   },
@@ -689,9 +673,7 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
     family: "devil",
     role: "boss",
     rarity: "boss",
-    minStage: 200,
-    reward: "damage-up",
-    rewardPower: 10,
+    minStage: 150,
     visual: {
       ...devilBase,
       body: "infernal-orb-boss",
@@ -700,7 +682,6 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
       side: "ember-tail",
       orbit: "infernal-orbit",
       aura: "infernal-flame-boss",
-      rewardMarker: ENEMY_REWARD_DEFINITIONS["damage-up"].marker,
       deathFx: "infernal-boss-burst",
     },
   },

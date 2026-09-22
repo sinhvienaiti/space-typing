@@ -60,6 +60,20 @@ export function auditEnemySystem(
     }
   }
 
+  const stageClearSafeBossRewards = new Set(["credits-x2"]);
+  for (const definition of definitions) {
+    if (
+      definition.role === "boss" &&
+      definition.reward !== undefined &&
+      !stageClearSafeBossRewards.has(definition.reward)
+    ) {
+      errors.push(
+        definition.id +
+          ": boss reward would be reset by the immediate stage-clear flow.",
+      );
+    }
+  }
+
   for (const family of ENEMY_FAMILY_IDS) {
     if (!definitions.some((definition) => definition.family === family)) {
       errors.push("Missing enemy family: " + family);

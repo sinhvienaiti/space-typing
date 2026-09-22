@@ -9,11 +9,18 @@ describe("enemy reward integration contracts", () => {
     expect(prism?.rewardPower).toBeGreaterThan(0);
   });
 
-  it("keeps Damage Up durations inside the planned 6-10 second window", () => {
+  it("keeps Damage Up duration inside the planned 6-10 second window", () => {
     expect(enemyDefinition("berserk-devil")?.rewardPower).toBeGreaterThanOrEqual(6);
     expect(enemyDefinition("berserk-devil")?.rewardPower).toBeLessThanOrEqual(10);
-    expect(enemyDefinition("demon-lord-orb")?.rewardPower).toBeGreaterThanOrEqual(6);
-    expect(enemyDefinition("demon-lord-orb")?.rewardPower).toBeLessThanOrEqual(10);
+  });
+
+  it("only assigns a boss reward when it survives the immediate stage-clear flow", () => {
+    expect(enemyDefinition("archangel-core")?.reward).toBeUndefined();
+    expect(enemyDefinition("demon-lord-orb")?.reward).toBeUndefined();
+    expect(enemyDefinition("glacier-queen")?.reward).toBeUndefined();
+    expect(enemyDefinition("prism-archon")?.reward).toBe("credits-x2");
+    expect(enemyDefinition("void-eye")?.reward).toBeUndefined();
+    expect(enemyDefinition("cosmic-emperor")?.reward).toBeUndefined();
   });
 
   it("keeps multiplier duration bounded and explicit", () => {

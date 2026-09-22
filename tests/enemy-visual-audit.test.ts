@@ -10,6 +10,9 @@ describe("enemy visual/playtest automated audit", () => {
   it("keeps registry readability and progression contracts clean", () => {
     const audit = auditEnemySystem();
     expect(audit.errors).toEqual([]);
+    expect(
+      audit.errors.some((error) => error.includes("stage-clear flow")),
+    ).toBe(false);
   });
 
   it("records procedural source metadata for every visual family", () => {

@@ -24,6 +24,15 @@ describe("boss visual conversion", () => {
     expect(bossVisualName(1, "mini-boss")).toBe("Halo Seraph");
   });
 
+  it("does not expose boss art before the first matching stage", () => {
+    expect(enemyDefinition(bossVisualDefinitionId(1, "mini-boss"))?.minStage).toBeLessThanOrEqual(20);
+    expect(enemyDefinition(bossVisualDefinitionId(1, "boss"))?.minStage).toBeLessThanOrEqual(50);
+    expect(enemyDefinition(bossVisualDefinitionId(2, "mini-boss"))?.minStage).toBeLessThanOrEqual(120);
+    expect(enemyDefinition(bossVisualDefinitionId(2, "boss"))?.minStage).toBeLessThanOrEqual(150);
+    expect(enemyDefinition(bossVisualDefinitionId(9, "boss"))?.minStage).toBeLessThanOrEqual(850);
+    expect(enemyDefinition(bossVisualDefinitionId(10, "boss"))?.minStage).toBeLessThanOrEqual(950);
+  });
+
   it("keeps all boss visuals inside the shared enemy art registry", () => {
     for (const galaxy of [1, 2, 3, 4, 9, 10]) {
       expect(enemyDefinition(bossVisualDefinitionId(galaxy))).toBeDefined();
