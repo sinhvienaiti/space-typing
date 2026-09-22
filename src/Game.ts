@@ -17,6 +17,12 @@ import {
 } from "./boss/visual-profile";
 import type { DifficultyProfile, StageConfig } from "./campaign/types";
 import {
+  challengeEliteChance,
+  hiddenChallengeTierDefinition,
+  priorityKillWindowSeconds,
+  type ChallengeEncounterProfile,
+} from "./campaign/hidden-challenge";
+import {
   activeThreatPressure,
   canAdmitFormation,
   canAdmitSpawn,
@@ -450,6 +456,7 @@ export class Game {
   private spawnRemaining = 0;
   private stageConfig: StageConfig | null = null;
   private difficulty: DifficultyProfile | null = null;
+  private encounter: ChallengeEncounterProfile | null = null;
   private shake = 0;
   private overdriveTimer = 0;
   private interferenceTimer = 0;
@@ -1356,12 +1363,17 @@ export class Game {
     if (qualityChanged) this.resize();
   }
 
-  startStage(stage: StageConfig, difficulty: DifficultyProfile): void {
+  startStage(
+    stage: StageConfig,
+    difficulty: DifficultyProfile,
+    encounter: ChallengeEncounterProfile | null = null,
+  ): void {
     this.sfx.unlock();
     this.stageConfig = stage;
     this.difficulty = difficulty;
+    this.encounter = encounter;
     const nextEnvironment = environmentForWorld(
-      worldForStage(stage.stage),
+      worldForStage(this.encounterWorldStage()),
     );
     if (nextEnvironment.id !== this.worldEnvironment.id) {
       this.worldEnvironment = nextEnvironment;
@@ -1369,17 +1381,19 @@ export class Game {
       this.seedStars();
     }
 
-    const hiddenRoll = rollHiddenDiscovery(
-      this.hiddenDiscovery,
-      stage.stage,
-      this.playerStats.luck,
-    );
-    if (hiddenRoll.rolled) {
-      this.hiddenDiscovery = hiddenRoll.state;
-      this.hooks.onHiddenDiscoveryUpdate(
-        hiddenRoll.state,
-        hiddenRoll.discovery,
+    if (encounter === null) {
+      const hiddenRoll = rollHiddenDiscovery(
+        this.hiddenDiscovery,
+        stage.stage,
+        this.playerStats.luck,
       );
+      if (hiddenRoll.rolled) {
+        this.hiddenDiscovery = hiddenRoll.state;
+        this.hooks.onHiddenDiscoveryUpdate(
+          hiddenRoll.state,
+          hiddenRoll.discovery,
+        );
+      }
     }
 
     this.stageEvents = [
@@ -1396,6 +1410,9 @@ export class Game {
 
     this.phase = "playing";
     this.stageElapsedSeconds = 0;
+    this.priorityKillChain.setWindowSeconds(
+      priorityKillWindowSeconds(difficulty),
+    );
     this.priorityKillChain.reset();
     this.stats = this.createGameStats(stage.stage);
     this.stats.shield = Math.min(
@@ -2022,7 +2039,7 @@ export class Game {
       entry,
     );
     this.boss.name = bossVisualNameForStage(
-      stage.stage,
+      this.encounterWorldStage(),
       this.boss.role,
     );
     this.bossSpawned = true;
@@ -2034,7 +2051,10 @@ export class Game {
       Math.max(0.75, this.difficulty?.bossPressure ?? 1);
     this.hooks.onBossUpdate(toBossHud(this.boss));
     const bossDefinition = enemyDefinition(
-      bossVisualDefinitionIdForStage(stage.stage, this.boss.role),
+      bossVisualDefinitionIdForStage(
+        this.encounterWorldStage(),
+        this.boss.role,
+      ),
     );
     if (bossDefinition !== undefined) {
       const fx = enemyFxProfile(bossDefinition.family, "boss-intro");
@@ -2489,15 +2509,24 @@ export class Game {
     return formation.members.length;
   }
 
+  private encounterWorldStage(): number {
+    return (
+      this.encounter?.worldStage ??
+      this.stageConfig?.stage ??
+      1
+    );
+  }
+
   private spawnEnemy(
     request: EnemySpawnRequest = {},
   ): boolean {
     const stage = this.stageConfig?.stage ?? 1;
-    const galaxy = this.stageConfig?.galaxy ?? 1;
+    const worldStage = this.encounterWorldStage();
+    const galaxy = worldForStage(worldStage).galaxy;
     const difficulty = this.difficulty;
     if (difficulty === null) return false;
 
-    let kind = request.kind ?? chooseEnemyKind(stage);
+    let kind = request.kind ?? chooseEnemyKind(worldStage);
     if (
       !request.skipAdmission &&
       !this.canAdmitEnemyKind(kind, difficulty)
@@ -2519,16 +2548,48 @@ export class Game {
     const profile = enemyProfile(kind, galaxy);
 
     const formationMember = request.formationMember === true;
+    const challengeTier =
+      this.encounter === null
+        ? null
+        : hiddenChallengeTierDefinition(this.encounter.tier);
+    const priorityMode =
+      this.encounter?.priorityTargetMode ?? "none";
+    const priorityTarget =
+      !formationMember &&
+      priorityMode !== "none" &&
+      Math.random() <
+        clamp(
+          (challengeTier?.priorityTargetRate ?? 0) + 0.18,
+          0,
+          0.92,
+        );
     const forceElite =
       !formationMember &&
       this.stageConfig?.role === "elite" &&
       this.eliteSpawned === 0;
+    const baseEliteChance =
+      this.stageConfig?.eliteChance ?? 0;
+    const effectiveEliteChance =
+      this.encounter === null
+        ? baseEliteChance
+        : challengeEliteChance(
+            baseEliteChance,
+            this.encounter.tier,
+          );
     const elite =
       formationMember
         ? false
-        : forceElite ||
-          rollElite(this.stageConfig?.eliteChance ?? 0);
+        : priorityTarget ||
+          forceElite ||
+          rollElite(effectiveEliteChance);
+    const priorityClass =
+      priorityTarget
+        ? priorityMode
+        : elite
+          ? ("elite" as const)
+          : undefined;
     const golden =
+      this.encounter === null &&
       !formationMember &&
       !elite &&
       this.rollPityEvent(
@@ -2585,7 +2646,7 @@ export class Game {
     const definitionId = spawnWorldEnemyDefinitionId(
       kind,
       elite,
-      stage,
+      worldStage,
     );
     const minimumLayers = clamp(
       eliteStats.layers +
@@ -2596,7 +2657,7 @@ export class Game {
       3,
     );
     const typingProfile = resolveEnemyTypingProfile({
-      stage,
+      stage: worldStage,
       kind,
       elite,
       minimumLayers,
@@ -2605,7 +2666,7 @@ export class Game {
       wordScoreOffset: difficulty.wordScoreOffset,
     });
     const runtimeProfile = resolveEnemyRuntimeProfile({
-      stage,
+      stage: worldStage,
       kind,
       rank: typingProfile.rank,
       elite,
@@ -2626,6 +2687,7 @@ export class Game {
       kind,
       definitionId,
       elite,
+      priorityClass,
       golden,
       eliteModifiers,
       rank: typingProfile.rank,
@@ -3014,7 +3076,7 @@ export class Game {
       this.width - profile.radius - 55,
     );
 
-    const stage = this.stageConfig?.stage ?? 1;
+    const stage = this.encounterWorldStage();
     const definitionId = spawnWorldEnemyDefinitionId(
       "scout",
       false,
@@ -3284,7 +3346,7 @@ export class Game {
     const { x, y } = this.bossPosition();
     const definition = enemyDefinition(
       bossVisualDefinitionIdForStage(
-        this.stageConfig?.stage ?? 1,
+        this.encounterWorldStage(),
         boss.role,
       ),
     );
@@ -3314,7 +3376,7 @@ export class Game {
 
     const definition = enemyDefinition(
       bossVisualDefinitionIdForStage(
-        this.stageConfig?.stage ?? 1,
+        this.encounterWorldStage(),
         boss.role,
       ),
     );
@@ -3689,7 +3751,11 @@ export class Game {
     this.burst(enemy.x, enemy.y, deathFx.count, deathFx.hue);
     this.sfx.hit(deathFx.pitch);
     this.sfx.kill(deathFx.pitch);
-    if (enemy.elite || deathDefinition?.rarity === "elite") {
+    if (
+      enemy.priorityClass !== undefined ||
+      enemy.elite ||
+      deathDefinition?.rarity === "elite"
+    ) {
       const announcerEvent = this.priorityKillChain.registerKill(
         this.stageElapsedSeconds,
       );
@@ -3734,7 +3800,7 @@ export class Game {
         worldRuntimeEnemyDefinitionId(
           enemy.kind,
           enemy.elite,
-          this.stageConfig?.stage ?? 1,
+          this.encounterWorldStage(),
         ),
     );
   }
@@ -3917,7 +3983,7 @@ export class Game {
         this.width - 55,
       );
 
-      const stage = this.stageConfig?.stage ?? 1;
+      const stage = this.encounterWorldStage();
       const definitionId = spawnWorldEnemyDefinitionId(
         "scout",
         false,
@@ -5160,7 +5226,7 @@ export class Game {
       boss.phase >= 3 ? "#ff527c" : boss.phase === 2 ? "#68e9ff" : "#ff8a6f";
     const definition = enemyDefinition(
       bossVisualDefinitionIdForStage(
-        this.stageConfig?.stage ?? 1,
+        this.encounterWorldStage(),
         boss.role,
       ),
     );
