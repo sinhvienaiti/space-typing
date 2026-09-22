@@ -6265,8 +6265,13 @@ export class Game {
     context.fillStyle = targeted
       ? "rgba(213, 249, 255, 0.95)"
       : "rgba(202, 215, 229, 0.8)";
+    const objectiveTarget =
+      this.stageObjective?.targetEnemyId === enemy.id;
     context.fillText(
-      enemyRankLabel(enemy.rank ?? "I") + " · " + layerLabel,
+      (objectiveTarget ? "OBJECTIVE · " : "") +
+        enemyRankLabel(enemy.rank ?? "I") +
+        " · " +
+        layerLabel,
       enemy.x,
       y - 25,
     );
