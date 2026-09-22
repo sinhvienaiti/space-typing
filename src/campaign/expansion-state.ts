@@ -21,10 +21,13 @@ export type ActiveSegmentState = {
 };
 
 export const CRASH_RECOVERY_REASONS = [
+  "stage-entry",
   "stage-clear",
   "route-choice",
   "shop",
   "upgrade",
+  "loadout",
+  "progression",
   "hidden-transition",
   "pagehide",
   "manual",
