@@ -513,9 +513,17 @@ app.innerHTML = `
           <div><span>accuracy</span><strong id="resultAccuracy">100%</strong></div>
           <div><span>max streak</span><strong id="resultStreak">0</strong></div>
         </div>
-        <button id="againButton" class="primary">Retry stage</button>
-        <button id="gameOverStageSelectButton">Stage Select</button>
-        <button id="resultTitleButton">Back to title</button>
+        <p id="deathProtectionMeta" class="death-protection-meta">
+          Choose a recovery path. Reloading before a choice enforces checkpoint rollback.
+        </p>
+        <div class="death-protection-actions">
+          <button id="salvageAnchorButton">Salvage Anchor · 0</button>
+          <button id="stageRevivalButton">Stage Revival Core · 0</button>
+          <button id="phoenixCoreButton">Phoenix Core · 0</button>
+        </div>
+        <button id="againButton" class="primary">Return to checkpoint</button>
+        <button id="gameOverStageSelectButton">Checkpoint + Stage Select</button>
+        <button id="resultTitleButton">Checkpoint + Back to title</button>
       </div>
     </section>
 
@@ -2002,6 +2010,7 @@ const game = new Game(
           campaignExpansion.checkpoint.stage,
         );
       }
+      stageEntrySnapshot = null;
       const checkpointText = expansionResult.checkpointCommitted
         ? " · Checkpoint " +
           String(campaignExpansion.checkpoint.stage).padStart(3, "0") +
@@ -2908,6 +2917,14 @@ async function startSelectedStage(): Promise<void> {
         stage.stage,
         selectedVocabularyLevel(),
       ),
+    );
+
+    const stageEntryAt = new Date().toISOString();
+    stageEntrySnapshot = createStageEntrySnapshot(
+      currentRunPersistentState(),
+      campaignExpansion,
+      checkpointSnapshot,
+      stageEntryAt,
     );
 
     const recoverySaved = await autosaveCampaign(
