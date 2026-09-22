@@ -50,14 +50,14 @@ describe("1000-stage Campaign model", () => {
   it("raises the global stage baseline while keeping all profiles bounded", () => {
     const early = difficultyFor({
       stage: 1,
-      mode: "normal",
+      mode: "balanced",
       vocabularyLevel: 1,
       recentWpm: 60,
       recentAccuracy: 96,
     });
     const late = difficultyFor({
       stage: 1000,
-      mode: "normal",
+      mode: "balanced",
       vocabularyLevel: 1,
       recentWpm: 60,
       recentAccuracy: 96,
@@ -99,14 +99,14 @@ describe("1000-stage Campaign model", () => {
   it("treats harder vocabulary as higher word complexity with reaction compensation", () => {
     const easy = difficultyFor({
       stage: 300,
-      mode: "normal",
+      mode: "balanced",
       vocabularyLevel: 1,
       recentWpm: 70,
       recentAccuracy: 97,
     });
     const hard = difficultyFor({
       stage: 300,
-      mode: "normal",
+      mode: "balanced",
       vocabularyLevel: 100,
       recentWpm: 70,
       recentAccuracy: 97,
