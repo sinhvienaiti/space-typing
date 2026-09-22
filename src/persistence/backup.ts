@@ -86,6 +86,11 @@ import {
   isValidRouteState,
   type RouteState,
 } from "../campaign/route";
+import {
+  createUpgradeState,
+  isValidUpgradeState,
+  type UpgradeState,
+} from "../progression/upgrades";
 
 export type BackupParseResult =
   | {
@@ -191,6 +196,7 @@ export function exportPlayerSaveJson(
   stageEntrySnapshot: StageEntrySnapshot | null = null,
   shops: ShopState = createShopState(),
   route: RouteState = createRouteState(campaign.highestUnlockedStage),
+  upgrades: UpgradeState = createUpgradeState(),
 ): string {
   return JSON.stringify(
     createPlayerSave(
@@ -212,6 +218,7 @@ export function exportPlayerSaveJson(
       stageEntrySnapshot,
       shops,
       route,
+      upgrades,
     ),
     null,
     2,
@@ -259,6 +266,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     version !== 18 &&
     version !== 19 &&
     version !== 20 &&
+    version !== 21 &&
     version !== PLAYER_SAVE_VERSION
   ) {
     return {
