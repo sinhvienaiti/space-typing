@@ -124,6 +124,7 @@ export type SaveReason =
   | "shop"
   | "route-choice"
   | "upgrade"
+  | "relic"
   | "hidden-transition"
   | "progression"
   | "pagehide"
@@ -489,6 +490,7 @@ function normalizeSaveReason(value: unknown): SaveReason {
     value === "shop" ||
     value === "route-choice" ||
     value === "upgrade" ||
+    value === "relic" ||
     value === "hidden-transition" ||
     value === "progression" ||
     value === "pagehide" ||
@@ -1227,6 +1229,7 @@ function recoverySaveFromLegacy(): PlayerSave {
       recovery.shops,
       recovery.route,
       recovery.upgrades,
+      recovery.relics,
     );
   } catch (error) {
     if (error instanceof UnsupportedPlayerSaveVersionError) throw error;
