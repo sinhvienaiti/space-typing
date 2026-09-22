@@ -3695,6 +3695,7 @@ function handleHiddenEncounterClear(
   byId("clearCredits").textContent = rewardText;
   byId("clearStreak").textContent =
     String(stats.maxStreak);
+  updateCampaignUi();
   byId<HTMLButtonElement>("nextStageButton").textContent =
     result.completed
       ? "Continue Campaign"
@@ -3704,7 +3705,6 @@ function handleHiddenEncounterClear(
     updateDataSummary();
   }
   renderCodex();
-  updateCampaignUi();
 }
 
 function currentHiddenEncounterState(): HiddenEncounterState {
@@ -4716,6 +4716,7 @@ async function exportSave(): Promise<void> {
     crashRecoverySnapshot,
     stageEntrySnapshot,
     shops,
+    route,
   );
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
