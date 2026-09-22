@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   FrameProfiler,
   qualityProfile,
+  resolveRenderDpr,
 } from "../src/performance/quality";
 
 describe("performance quality profiles", () => {
@@ -16,6 +17,20 @@ describe("performance quality profiles", () => {
     expect(high.maxParticles).toBeLessThan(ultra.maxParticles);
     expect(low.dprCap).toBeLessThan(high.dprCap);
     expect(ultra.glowScale).toBeGreaterThan(high.glowScale);
+  });
+
+  it("caps large high-DPI canvases by pixel budget", () => {
+    const high = qualityProfile("high");
+    const ultra = qualityProfile("ultra");
+    const highDpr = resolveRenderDpr(high, 2.5, 2560, 1440);
+    const ultraDpr = resolveRenderDpr(ultra, 2.5, 2560, 1440);
+
+    expect(highDpr).toBeLessThan(high.dprCap);
+    expect(ultraDpr).toBeLessThan(ultra.dprCap);
+    expect(2560 * 1440 * highDpr * highDpr).toBeLessThanOrEqual(
+      high.maxCanvasPixels + 1,
+    );
+    expect(ultraDpr).toBeGreaterThan(highDpr);
   });
 
   it("reports rolling frame performance and p95", () => {

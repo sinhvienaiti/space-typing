@@ -898,7 +898,7 @@ app.innerHTML = `
         <label class="setting-row">
           <span>
             <strong>Effects quality</strong>
-            <small>Particle density only; gameplay timing stays identical</small>
+            <small>Particles, glow and render resolution; gameplay timing stays identical</small>
           </span>
           <select id="visualQuality">
             <option value="low">Low</option>

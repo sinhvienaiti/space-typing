@@ -267,6 +267,7 @@ import { rewardFxProfile } from "./vfx/reward-fx";
 import {
   FrameProfiler,
   qualityProfile,
+  resolveRenderDpr,
   type PerformanceReport,
 } from "./performance/quality";
 import type {
@@ -1552,7 +1553,12 @@ export class Game {
     this.width = Math.max(640, rect.width || window.innerWidth);
     this.height = Math.max(420, rect.height || window.innerHeight);
     const profile = qualityProfile(this.settings.visualQuality);
-    this.dpr = Math.min(profile.dprCap, window.devicePixelRatio || 1);
+    this.dpr = resolveRenderDpr(
+      profile,
+      window.devicePixelRatio || 1,
+      this.width,
+      this.height,
+    );
 
     this.canvas.width = Math.floor(this.width * this.dpr);
     this.canvas.height = Math.floor(this.height * this.dpr);
@@ -4075,6 +4081,7 @@ export class Game {
     }
 
     context.restore();
+    this.drawRewardBuffTimers();
   }
 
   private drawBackground(time: number): void {
@@ -4884,6 +4891,38 @@ export class Game {
       context.stroke();
     }
 
+    if ((enemy.rewardControlTimer ?? 0) > 0) {
+      const frozen = (enemy.rewardControlFactor ?? 1) <= 0.05;
+      context.save();
+      context.globalCompositeOperation = "source-over";
+      context.strokeStyle = frozen
+        ? "rgba(153, 241, 255, 0.92)"
+        : "rgba(117, 201, 255, 0.78)";
+      context.fillStyle = frozen
+        ? "rgba(115, 229, 255, 0.10)"
+        : "rgba(102, 183, 255, 0.07)";
+      context.lineWidth = frozen ? 2.3 : 1.7;
+      if (!frozen) {
+        context.setLineDash([4, 5]);
+        context.lineDashOffset = -enemy.age * 12;
+      }
+      context.beginPath();
+      context.arc(0, 0, enemy.radius * 1.18, 0, Math.PI * 2);
+      context.fill();
+      context.stroke();
+      if (frozen) {
+        context.fillStyle = "#e7fcff";
+        context.font =
+          "800 " +
+          String(Math.max(10, Math.round(enemy.radius * 0.42))) +
+          "px ui-monospace, SFMono-Regular, Menlo, monospace";
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillText("❄", 0, enemy.radius * 0.02);
+      }
+      context.restore();
+    }
+
     if (enemy.elite) {
       context.strokeStyle = "rgba(255, 226, 105, 0.64)";
       context.lineWidth = 1.6;
@@ -5063,6 +5102,48 @@ export class Game {
     context.shadowBlur = targeted ? 7 : 0;
     context.shadowColor = "#57efff";
     context.fillText(remaining, left + typedWidth, y);
+
+    context.restore();
+  }
+
+  private drawRewardBuffTimers(): void {
+    const buffs: Array<{ label: string; remaining: number }> = [];
+    if (this.rewardScoreMultiplierTimer > 0) {
+      buffs.push({
+        label: "SCORE ×2",
+        remaining: this.rewardScoreMultiplierTimer,
+      });
+    }
+    if (this.rewardCreditsMultiplierTimer > 0) {
+      buffs.push({
+        label: "CREDITS ×2",
+        remaining: this.rewardCreditsMultiplierTimer,
+      });
+    }
+    if (buffs.length === 0) return;
+
+    const context = this.context;
+    context.save();
+    context.globalCompositeOperation = "source-over";
+    context.font =
+      "800 12px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.textAlign = "right";
+    context.textBaseline = "middle";
+
+    let y = 116;
+    for (const buff of buffs) {
+      const text = buff.label + " · " + buff.remaining.toFixed(1) + "s";
+      const width = context.measureText(text).width + 20;
+      const x = this.width - 18;
+      context.fillStyle = "rgba(3, 9, 18, 0.88)";
+      context.fillRect(x - width, y - 12, width, 24);
+      context.strokeStyle = "rgba(255, 231, 132, 0.72)";
+      context.lineWidth = 1;
+      context.strokeRect(x - width, y - 12, width, 24);
+      context.fillStyle = "#fff0a8";
+      context.fillText(text, x - 10, y);
+      y += 30;
+    }
 
     context.restore();
   }
