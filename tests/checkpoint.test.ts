@@ -21,6 +21,7 @@ import { createStarterCharacterState } from "../src/characters/state";
 import { createLuckPityState } from "../src/loot/pity";
 import { createHiddenDiscoveryState } from "../src/discovery/hidden-content";
 import { createProgressionState } from "../src/progression/missions";
+import { createUpgradeState } from "../src/progression/upgrades";
 import { createExpansionCurrencyState } from "../src/economy/currencies";
 import { createShopState } from "../src/shops/state";
 import { createRouteState } from "../src/campaign/route";
@@ -49,6 +50,7 @@ function runState(campaign: CampaignProgress): RunPersistentState {
     hiddenDiscovery: createHiddenDiscoveryState(),
     credits: 0,
     progression: createProgressionState(),
+    upgrades: createUpgradeState(),
     expansionCurrencies: createExpansionCurrencyState(),
     shops: createShopState(),
     route: createRouteState(campaign.highestUnlockedStage),
@@ -154,6 +156,8 @@ describe("M02 checkpoint and rollback", () => {
       starCrystal: 7,
       quantumCore: 2,
     };
+    committedActive.upgrades.attributeLevels.hull = 2;
+    active.upgrades.attributeLevels.hull = 9;
     active.campaign.bestByStage["189"] = {
       score: 9000,
       accuracy: 100,
@@ -180,6 +184,7 @@ describe("M02 checkpoint and rollback", () => {
       starCrystal: 1,
       quantumCore: 0,
     });
+    expect(restored.upgrades.attributeLevels.hull).toBe(2);
     expect(restored.campaign.bestByStage["189"]?.score).toBe(9000);
     expect(restored.hiddenDiscovery.discovered).toEqual([
       "echo-rift",
