@@ -1,3 +1,7 @@
+import type { GradeId } from "../grades";
+
+export const UNBOUNDED_ITEM_STACK = Number.MAX_SAFE_INTEGER;
+
 export const ITEM_IDS = [
   "repair-kit",
   "shield-cell",
@@ -8,6 +12,9 @@ export const ITEM_IDS = [
   "word-bomb",
   "supply-beacon",
   "lucky-dice",
+  "salvage-anchor",
+  "stage-revival-core",
+  "phoenix-core",
 ] as const;
 
 export type ItemId = (typeof ITEM_IDS)[number];
@@ -24,6 +31,7 @@ export type ItemDefinition = {
   maxStack: number;
   combatUsable: boolean;
   description: string;
+  grade?: GradeId;
 };
 
 export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
@@ -98,6 +106,36 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
     maxStack: 10,
     combatUsable: true,
     description: "Influences a future luck-based reward roll.",
+  },
+  "salvage-anchor": {
+    id: "salvage-anchor",
+    name: "Salvage Anchor",
+    category: "special",
+    maxStack: UNBOUNDED_ITEM_STACK,
+    combatUsable: false,
+    description:
+      "Death-protection contract: preserve segment gains while returning to the checkpoint.",
+    grade: "silver",
+  },
+  "stage-revival-core": {
+    id: "stage-revival-core",
+    name: "Stage Revival Core",
+    category: "special",
+    maxStack: UNBOUNDED_ITEM_STACK,
+    combatUsable: false,
+    description:
+      "Death-protection contract: restart the failed stage while preserving segment gains.",
+    grade: "gold",
+  },
+  "phoenix-core": {
+    id: "phoenix-core",
+    name: "Phoenix Core",
+    category: "special",
+    maxStack: UNBOUNDED_ITEM_STACK,
+    combatUsable: true,
+    description:
+      "Death-protection contract: revive inside the current encounter.",
+    grade: "diamond",
   },
 };
 
