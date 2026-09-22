@@ -21,12 +21,18 @@ import {
   type GradeId,
 } from "../grades";
 import type { StatBonus } from "../stats/core";
+import {
+  equipmentAffixBonus,
+  sanitizeEquipmentAffixes,
+  type EquipmentAffixId,
+} from "./affixes";
 
 export type EquipmentInstance = {
   instanceId: string;
   definitionId: EquipmentId;
   grade: GradeId;
   enhancement: number;
+  affixes?: EquipmentAffixId[];
 };
 
 type RarityEquipmentInstance = {
@@ -76,14 +82,14 @@ function emptyLoadout(): EquipmentLoadout {
 
 export function createStarterEquipmentState(): EquipmentState {
   const items: EquipmentInstance[] = [
-    { instanceId: "starter-pulse", definitionId: "pulse-laser-mk1", grade: "aluminum", enhancement: 0 },
-    { instanceId: "starter-precision", definitionId: "precision-laser-mk1", grade: "aluminum", enhancement: 0 },
-    { instanceId: "starter-armor", definitionId: "plated-armor-mk1", grade: "aluminum", enhancement: 0 },
-    { instanceId: "starter-shield", definitionId: "deflector-shield-mk1", grade: "aluminum", enhancement: 0 },
-    { instanceId: "starter-reactor", definitionId: "compact-reactor-mk1", grade: "aluminum", enhancement: 0 },
-    { instanceId: "starter-utility", definitionId: "targeting-module-mk1", grade: "aluminum", enhancement: 0 },
-    { instanceId: "starter-drone", definitionId: "support-drone-mk1", grade: "aluminum", enhancement: 0 },
-    { instanceId: "starter-core", definitionId: "balanced-core-mk1", grade: "aluminum", enhancement: 0 },
+    { instanceId: "starter-pulse", definitionId: "pulse-laser-mk1", grade: "aluminum", enhancement: 0, affixes: [] },
+    { instanceId: "starter-precision", definitionId: "precision-laser-mk1", grade: "aluminum", enhancement: 0, affixes: [] },
+    { instanceId: "starter-armor", definitionId: "plated-armor-mk1", grade: "aluminum", enhancement: 0, affixes: [] },
+    { instanceId: "starter-shield", definitionId: "deflector-shield-mk1", grade: "aluminum", enhancement: 0, affixes: [] },
+    { instanceId: "starter-reactor", definitionId: "compact-reactor-mk1", grade: "aluminum", enhancement: 0, affixes: [] },
+    { instanceId: "starter-utility", definitionId: "targeting-module-mk1", grade: "aluminum", enhancement: 0, affixes: [] },
+    { instanceId: "starter-drone", definitionId: "support-drone-mk1", grade: "aluminum", enhancement: 0, affixes: [] },
+    { instanceId: "starter-core", definitionId: "balanced-core-mk1", grade: "aluminum", enhancement: 0, affixes: [] },
   ];
 
   return {
@@ -110,6 +116,7 @@ function validInstance(value: unknown): value is EquipmentInstance {
     definitionId?: unknown;
     grade?: unknown;
     enhancement?: unknown;
+    affixes?: unknown;
   };
 
   return (
@@ -216,6 +223,7 @@ export function migrateLegacyEquipmentState(
       ...item,
       grade: "aluminum" as const,
       enhancement: 0,
+      affixes: [],
     }));
 
   if (items.length === 0) {
@@ -286,6 +294,7 @@ export function migrateEnhancedRarityEquipmentState(
       definitionId: item.definitionId,
       grade: legacyRarityToGrade(item.rarity),
       enhancement: item.enhancement,
+      affixes: [],
     }));
 
   if (items.length === 0) {
@@ -326,7 +335,13 @@ export function sanitizeEquipmentState(value: unknown): EquipmentState {
 
       if (validInstance(candidate)) {
         seen.add(candidate.instanceId);
-        items.push({ ...candidate });
+        items.push({
+          ...candidate,
+          affixes: sanitizeEquipmentAffixes(
+            candidate.affixes,
+            candidate.grade,
+          ),
+        });
         continue;
       }
 
@@ -337,6 +352,7 @@ export function sanitizeEquipmentState(value: unknown): EquipmentState {
           definitionId: candidate.definitionId,
           grade: legacyRarityToGrade(candidate.rarity),
           enhancement: candidate.enhancement,
+          affixes: [],
         });
       }
     }
@@ -585,7 +601,16 @@ export function addEquipmentInstance(
   }
 
   return {
-    items: [...state.items.map((current) => ({ ...current })), { ...item }],
+    items: [
+      ...state.items.map((current) => ({
+        ...current,
+        affixes: [...(current.affixes ?? [])],
+      })),
+      {
+        ...item,
+        affixes: sanitizeEquipmentAffixes(item.affixes, item.grade),
+      },
+    ],
     loadout: { ...state.loadout },
   };
 }
@@ -684,6 +709,12 @@ export function equipmentStatBonus(
     for (const [key, value] of Object.entries(definition.stats)) {
       if (typeof value !== "number" || !Number.isFinite(value)) continue;
       totals[key] = (totals[key] ?? 0) + value * multiplier;
+    }
+
+    const affixBonus = equipmentAffixBonus(instance.affixes ?? []);
+    for (const [key, value] of Object.entries(affixBonus)) {
+      if (typeof value !== "number" || !Number.isFinite(value)) continue;
+      totals[key] = (totals[key] ?? 0) + value;
     }
   }
 
