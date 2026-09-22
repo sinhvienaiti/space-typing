@@ -3136,6 +3136,21 @@ Typing-text challenge rules:
 ## Step 61
 Create final art/asset pipeline.
 
+**Status: implemented.**
+
+Art / asset pipeline rules:
+
+- all visual assets are described by a versioned runtime manifest with category, source type, source, author, license and attribution requirement;
+- the current production art remains original procedural Canvas/UI artwork and is explicitly recorded as such;
+- generated or openly licensed assets may add a bundled URL without changing gameplay contracts;
+- optional image assets preload into a catalog/cache before use;
+- image or manifest load failure never blocks gameplay: the existing procedural renderer remains the mandatory fallback;
+- duplicate/invalid manifest entries are rejected rather than silently accepted;
+- required attributions can be derived from the same manifest;
+- `docs/ASSET_SOURCES.md` is the human-readable licensing/source policy companion;
+- the Data screen reports loaded asset-catalog coverage when the manifest is available;
+- no third-party ZType sprites/audio are bundled or referenced.
+
 ## Step 62
 Polish particles, glow, hit-stop, shake and telegraphs.
 
