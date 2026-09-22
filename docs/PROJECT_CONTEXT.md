@@ -3358,6 +3358,20 @@ Manual validation note:
 - Step 71 likewise retains final manual browser smoke across the local games;
 - those manual observations are not falsely marked as executed by this GitHub-only checkpoint.
 
+## Post-milestone enemy visual/reward expansion
+
+The next major visual/gameplay expansion is defined in:
+
+`docs/ENEMY_SYSTEM_MASTER_PLAN.md`
+
+Status:
+
+- planned;
+- not yet implemented;
+- this file is the source of truth for enemy art direction, modular visual families, reward-on-kill effects, V1 enemy/boss roster and implementation order;
+- implementation must reuse the existing combat, status, loot, boss and asset-pipeline systems rather than creating parallel frameworks;
+- visual approval is a gate before expanding the full enemy roster because enemy art/readability is a primary product concern.
+
 ---
 
 # 21. First playable milestone
