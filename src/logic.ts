@@ -73,3 +73,19 @@ export function accuracyPercent(hits: number, misses: number): number {
 export function waveForKills(kills: number): number {
   return Math.floor(Math.max(0, kills) / 8) + 1;
 }
+
+
+export function stageWordsPerMinute(
+  hitCharacters: number,
+  activeSeconds: number,
+): number {
+  const hits = Math.max(
+    0,
+    Number.isFinite(hitCharacters) ? hitCharacters : 0,
+  );
+  const seconds = Math.max(
+    1,
+    Number.isFinite(activeSeconds) ? activeSeconds : 1,
+  );
+  return (hits / 5) / (seconds / 60);
+}
