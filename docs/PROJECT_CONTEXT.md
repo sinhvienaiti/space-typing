@@ -3472,9 +3472,10 @@ Gameplay Expansion:
 - M11 Enemy skill/effect framework + Threat Budget: COMPLETE
 - M12 Difficulty + Active Typing Pressure scheduler: COMPLETE
 - M13 Formation system: COMPLETE
+- M14 Branching Route Map + Station: COMPLETE
 
 Next:
-- M14 Branching Route Map + Station
+- M15 Hidden Challenge / Hidden World / Champion Hunt
 ~~~
 
 Current gameplay/progression foundation:
@@ -3525,6 +3526,10 @@ Current gameplay/progression foundation:
 - pressure-denied regular spawns retry without consuming stage enemy budget;
 - authored formations are aggregate M12 pressure packages and spawn atomically only after pressure/urgent/controller-support/max-enemy validation;
 - M13 formation members reuse the same M09 World visual roster + M10 typing profile + M11 skill/Threat Budget runtime as solo enemies;
+- deterministic ten-stage route graphs keep Campaign stages sequential while adding persisted Combat / Shop / Station choices;
+- mandatory Mini Boss / World Boss / Galaxy Major Boss stages remain forced Combat route nodes;
+- RouteState is part of RunPersistentState, so route choices participate in checkpoint rollback, stage-entry protection and technical crash recovery;
+- Shop/Station route nodes reuse the existing deterministic ShopState / Service Shop / Support Loadout systems rather than creating parallel services;
 - difficulty word pressure stays inside the configured vocabulary and does not change authored World Rank access;
 - stage-clear economy rewards use the frozen stage-start difficulty reward multiplier;
 - Service / Upgrade Shop consumes Credits + Alloy through the existing enhancement system;
@@ -3580,14 +3585,19 @@ Final docs checkpoint CI #238 PASS Test + Build
 
 M13 Formation System
 CI #242 PASS Test + Build after RNG callback/signature fix
+Final docs checkpoint CI #245 PASS Test + Build
+
+M14 Branching Route Map / Station
+CI #250 PASS Test + Build
+Integration music lifecycle CI #251 PASS Test + Build
 ~~~
 
 Important implementation notes:
 
-- Current PlayerSave schema is version 20.
+- Current PlayerSave schema is version 21; v20 migrates deterministically to RouteState without losing existing ShopState/checkpoint domains.
 - Permanent systems must extend PlayerSave through explicit migrations.
 - Current runtime equipment uses the five-grade model; legacy rarity names remain only in migration/compatibility paths and historical step notes.
-- `ShopState` is part of `RunPersistentState`, so shop stock is economic segment state rather than a separate local-storage system.
+- `ShopState` and `RouteState` are part of `RunPersistentState`, so shop stock and route choices are segment state rather than separate local-storage systems.
 - M07 canonical World ids are the authoritative World identity used by M06 shop instances, M08 music profiles, M09 enemy/boss roster selection and M10 World rank bands; M12 changes pressure, not World access.
 - Event/special tokens remain optional per the expansion plan. M06 does not create a permanent Event Token before an earning loop exists.
 - Support spell loadout is separate from core combat skills.
