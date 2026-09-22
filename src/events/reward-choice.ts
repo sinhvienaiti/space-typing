@@ -1,7 +1,7 @@
 import { clamp, typingText } from "../logic";
 import {
   rollEquipmentDefinition,
-  rollEquipmentRarity,
+  rollEquipmentGrade,
   type EquipmentDrop,
 } from "../loot/equipment-loot";
 import type { VocabularyEntry } from "../types";
@@ -46,7 +46,7 @@ export function createRewardChoiceOptions(
     choices.push({
       source: "treasure",
       definitionId,
-      rarity: rollEquipmentRarity("treasure", luck, random()),
+      grade: rollEquipmentGrade("treasure", luck, random()),
     });
   }
 
