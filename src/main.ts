@@ -1372,6 +1372,103 @@ function openCodex(): void {
   codexDialog.showModal();
 }
 
+function syncProgressionAchievements(): string[] {
+  const result = syncAchievements(
+    progression,
+    campaign,
+    hiddenDiscovery,
+  );
+  progression = result.state;
+  return result.newlyUnlocked.map(
+    (id) => ACHIEVEMENT_REGISTRY[id].name,
+  );
+}
+
+function recordShopProgress(): void {
+  progression = recordProgressionEvent(progression, {
+    type: "shop-purchase",
+  });
+}
+
+function renderProgression(): void {
+  const missionGrid = byId("missionGrid");
+  missionGrid.replaceChildren();
+
+  for (const id of MISSION_IDS) {
+    const mission = MISSION_REGISTRY[id];
+    const progress = missionProgress(progression, id);
+    const claimed = progression.claimedMissions.includes(id);
+    const card = document.createElement("article");
+    card.className = "progression-card";
+
+    const title = document.createElement("strong");
+    title.textContent = mission.name;
+
+    const description = document.createElement("small");
+    description.textContent = mission.description;
+
+    const meta = document.createElement("span");
+    meta.textContent =
+      String(progress) +
+      " / " +
+      String(mission.target) +
+      " · " +
+      mission.rewardCredits.toLocaleString() +
+      " Credits";
+
+    const claim = document.createElement("button");
+    claim.type = "button";
+    claim.disabled = claimed || !missionClaimable(progression, id);
+    claim.textContent = claimed ? "Claimed" : "Claim reward";
+    claim.addEventListener("click", () => {
+      const result = claimMission(progression, id);
+      if (!result.claimed) return;
+      progression = result.state;
+      credits = addCredits(credits, result.rewardCredits);
+      renderProgression();
+      updateDataSummary();
+      void autosaveCampaign(
+        "progression",
+        "✓ Mission reward · +" +
+          result.rewardCredits.toLocaleString() +
+          " Credits",
+      );
+    });
+
+    card.append(title, description, meta, claim);
+    missionGrid.append(card);
+  }
+
+  const achievementGrid = byId("achievementGrid");
+  achievementGrid.replaceChildren();
+
+  for (const id of ACHIEVEMENT_IDS) {
+    const definition = ACHIEVEMENT_REGISTRY[id];
+    const unlocked = progression.unlockedAchievements.includes(id);
+    const card = document.createElement("article");
+    card.className =
+      "progression-card " + (unlocked ? "unlocked" : "locked");
+
+    const title = document.createElement("strong");
+    title.textContent = unlocked ? definition.name : "???";
+
+    const description = document.createElement("small");
+    description.textContent = unlocked
+      ? definition.description
+      : "Achievement not unlocked yet.";
+
+    card.append(title, description);
+    achievementGrid.append(card);
+  }
+}
+
+function openProgression(): void {
+  if (!persistenceReady || game.getPhase() !== "title") return;
+  syncProgressionAchievements();
+  renderProgression();
+  progressionDialog.showModal();
+}
+
 function hiddenDiscoveryMessage(
   discovery: HiddenContentDefinition,
 ): string {
