@@ -40,7 +40,7 @@ describe("M20 Ascension", () => {
       },
     });
     expect(selectAscensionTier(state, 4)).toEqual(state);
-    expect(selectAscensionTier(state, 2).selectedTier).toBe(2);
+    expect(selectAscensionTier(state, 2)).toEqual(state);
   });
 
   it("sanitizes a completed tier out of active selection", () => {
