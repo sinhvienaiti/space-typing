@@ -2579,7 +2579,9 @@ export class Game {
           rollElite(effectiveEliteChance);
     const priorityClass =
       priorityTarget
-        ? priorityMode
+        ? priorityMode === "apex"
+          ? ("apex" as const)
+          : ("champion" as const)
         : elite
           ? ("elite" as const)
           : undefined;
