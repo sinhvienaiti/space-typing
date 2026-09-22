@@ -23,6 +23,7 @@ export type ActiveSegmentState = {
 export const CRASH_RECOVERY_REASONS = [
   "stage-entry",
   "stage-clear",
+  "stage-select",
   "route-choice",
   "shop",
   "upgrade",
