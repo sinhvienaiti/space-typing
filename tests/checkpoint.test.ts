@@ -22,6 +22,7 @@ import { createLuckPityState } from "../src/loot/pity";
 import { createHiddenDiscoveryState } from "../src/discovery/hidden-content";
 import { createProgressionState } from "../src/progression/missions";
 import { createUpgradeState } from "../src/progression/upgrades";
+import { createAscensionState } from "../src/progression/ascension";
 import { createRelicState, grantRelic } from "../src/relics/state";
 import { createExpansionCurrencyState } from "../src/economy/currencies";
 import { createShopState } from "../src/shops/state";
@@ -56,6 +57,7 @@ function runState(campaign: CampaignProgress): RunPersistentState {
     shops: createShopState(),
     route: createRouteState(campaign.highestUnlockedStage),
     relics: createRelicState(),
+    ascension: createAscensionState(campaign),
   };
 }
 
