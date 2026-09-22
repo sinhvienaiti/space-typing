@@ -3336,6 +3336,7 @@ document.addEventListener("visibilitychange", () => {
       luckPity,
       hiddenDiscovery,
       credits,
+      progression,
     },
     "pagehide",
   );
@@ -3354,6 +3355,7 @@ window.addEventListener("pagehide", () => {
       luckPity,
       hiddenDiscovery,
       credits,
+      progression,
     },
     "pagehide",
   );
