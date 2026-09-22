@@ -74,6 +74,12 @@ import {
   sanitizeRelicState,
   type RelicState,
 } from "../relics/state";
+import {
+  createAscensionState,
+  isValidAscensionState,
+  sanitizeAscensionState,
+  type AscensionState,
+} from "../progression/ascension";
 
 export type RunPersistentState = {
   campaign: CampaignProgress;
@@ -90,6 +96,7 @@ export type RunPersistentState = {
   route: RouteState;
   upgrades: UpgradeState;
   relics: RelicState;
+  ascension: AscensionState;
 };
 
 export type CheckpointSnapshot = RunPersistentState;
@@ -245,7 +252,8 @@ function isValidLegacyRunPersistentStateWithoutRoute(
     isValidExpansionCurrencyState(raw.expansionCurrencies) &&
     (raw.shops === undefined || isValidShopState(raw.shops)) &&
     (raw.upgrades === undefined || isValidUpgradeState(raw.upgrades)) &&
-    (raw.relics === undefined || isValidRelicState(raw.relics))
+    (raw.relics === undefined || isValidRelicState(raw.relics)) &&
+    (raw.ascension === undefined || isValidAscensionState(raw.ascension))
   );
 }
 
@@ -282,6 +290,9 @@ export function migrateLegacyRunPersistentState(
     relics: isValidRelicState(raw.relics)
       ? sanitizeRelicState(raw.relics)
       : createRelicState(),
+    ascension: isValidAscensionState(raw.ascension)
+      ? sanitizeAscensionState(raw.ascension, campaign)
+      : createAscensionState(campaign),
   };
 }
 
@@ -307,6 +318,7 @@ export function isValidRunPersistentState(
     isValidShopState(raw.shops) &&
     isValidUpgradeState(raw.upgrades) &&
     isValidRelicState(raw.relics) &&
+    isValidAscensionState(raw.ascension) &&
     isValidRouteState(
       raw.route,
       (raw.campaign as CampaignProgress).highestUnlockedStage,
@@ -346,6 +358,7 @@ export function sanitizeRunPersistentState(
     shops: sanitizeShopState(value.shops),
     upgrades: sanitizeUpgradeState(value.upgrades),
     relics: sanitizeRelicState(value.relics),
+    ascension: sanitizeAscensionState(value.ascension, campaign),
     route: sanitizeRouteState(
       value.route,
       campaign.highestUnlockedStage,
@@ -463,6 +476,10 @@ export function restoreCheckpointSnapshot(
     shops: sanitizeShopState(committed.shops),
     upgrades: sanitizeUpgradeState(committed.upgrades),
     relics: sanitizeRelicState(committed.relics),
+    ascension: sanitizeAscensionState(
+      committed.ascension,
+      committed.campaign,
+    ),
     route: sanitizeRouteState(
       committed.route,
       committed.campaign.highestUnlockedStage,
