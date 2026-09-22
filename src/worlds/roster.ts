@@ -7,10 +7,8 @@ import {
 } from "../enemies/registry";
 import { rewardEnemyChance } from "../enemies/spawn-profile";
 import { clamp } from "../logic";
-import {
-  worldForStage,
-  type WorldProfile,
-} from "./registry";
+import { worldForStage } from "./registry";
+import type { WorldProfile } from "./types";
 
 const KIND_ROLE_PREFERENCES: Record<
   EnemyKind,
