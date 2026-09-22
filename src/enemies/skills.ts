@@ -239,6 +239,31 @@ const FAMILY_SKILLS: Record<
   cosmic: ["sniper-shot", "drain-pulse", "silence-field"],
 };
 
+const KIND_SIGNATURE_SKILL: Partial<
+  Record<EnemyKind, EnemySkillId>
+> = {
+  scout: "pulse-shot",
+  mine: "pulse-shot",
+  tank: "barrier-shell",
+  destroyer: "burst-volley",
+  oppressor: "burst-volley",
+  shield: "barrier-shell",
+  carrier: "summon-scout",
+  jammer: "signal-jam",
+  cloaker: "signal-jam",
+  healer: "repair-wave",
+  splitter: "burst-volley",
+  sniper: "sniper-shot",
+  leech: "drain-pulse",
+  commander: "repair-wave",
+};
+
+export function enemySignatureSkill(
+  kind: EnemyKind,
+): EnemySkillId | null {
+  return KIND_SIGNATURE_SKILL[kind] ?? null;
+}
+
 const KIND_CATEGORY_ORDER: Record<
   EnemyKind,
   readonly EnemySkillCategory[]
