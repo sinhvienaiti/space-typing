@@ -7,6 +7,7 @@ import {
 import {
   isValidCheckpointSnapshot,
   isValidRunPersistentState,
+  migrateLegacyRunPersistentState,
   restoreCheckpointSnapshot,
   sanitizeCheckpointSnapshot,
   sanitizeRunPersistentState,
@@ -170,19 +171,59 @@ export function invalidateCrashRecoverySnapshot(
 export function sanitizeCrashRecoverySnapshot(
   value: unknown,
 ): CrashRecoverySnapshot | null {
-  if (!isValidCrashRecoverySnapshot(value)) return null;
+  if (isValidCrashRecoverySnapshot(value)) {
+    return {
+      state: sanitizeRunPersistentState(value.state),
+      campaignExpansion: sanitizeCampaignExpansionState(
+        value.campaignExpansion,
+        value.state.campaign,
+        value.savedAt,
+      ),
+      checkpointSnapshot: sanitizeCheckpointSnapshot(
+        value.checkpointSnapshot,
+        value.state,
+        value.campaignExpansion.checkpoint.stage,
+      ),
+      savedAt: value.savedAt,
+      reason: value.reason,
+      deathInvalidated: value.deathInvalidated,
+    };
+  }
+
+  if (!isRecord(value)) return null;
+  const state = migrateLegacyRunPersistentState(value.state);
+  if (
+    state === null ||
+    typeof value.savedAt !== "string" ||
+    typeof value.reason !== "string" ||
+    typeof value.deathInvalidated !== "boolean"
+  ) {
+    return null;
+  }
+
+  const campaignExpansion = sanitizeCampaignExpansionState(
+    value.campaignExpansion,
+    state.campaign,
+    value.savedAt,
+  );
+  if (
+    campaignExpansion.crashRecovery === null ||
+    campaignExpansion.crashRecovery.savedAt !== value.savedAt ||
+    campaignExpansion.crashRecovery.reason !== value.reason ||
+    campaignExpansion.crashRecovery.deathInvalidated !==
+      value.deathInvalidated ||
+    campaignExpansion.crashRecovery.stage !== state.campaign.selectedStage
+  ) {
+    return null;
+  }
 
   return {
-    state: sanitizeRunPersistentState(value.state),
-    campaignExpansion: sanitizeCampaignExpansionState(
-      value.campaignExpansion,
-      value.state.campaign,
-      value.savedAt,
-    ),
+    state,
+    campaignExpansion,
     checkpointSnapshot: sanitizeCheckpointSnapshot(
       value.checkpointSnapshot,
-      value.state,
-      value.campaignExpansion.checkpoint.stage,
+      state,
+      campaignExpansion.checkpoint.stage,
     ),
     savedAt: value.savedAt,
     reason: value.reason,
