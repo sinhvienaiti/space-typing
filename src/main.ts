@@ -2884,60 +2884,81 @@ const game = new Game(
           ? " · Achievement: " + achievementNames.join(", ")
           : "";
 
-      let ascensionText = "";
-      if (stats.stage === 1000) {
-        const completedTier = ascension.selectedTier;
-        const ascensionResult = completeAscensionTier(
-          ascension,
-          completedTier,
-        );
-        ascension = ascensionResult.state;
-
-        if (completedTier === 0 && ascensionResult.unlockedTier === 1) {
-          ascensionText = " · Ascension 1 unlocked";
-        } else if (
-          completedTier > 0 &&
-          ascensionResult.newlyCompleted
-        ) {
-          const reward = ascensionCompletionReward(completedTier);
-          credits = addCredits(credits, reward.credits);
-          expansionCurrencies = addExpansionCurrencyReward(
-            expansionCurrencies,
-            reward.currencies,
-          );
-          totalCreditReward += reward.credits;
-          totalCurrencyReward = addExpansionCurrencyReward(
-            totalCurrencyReward,
-            reward.currencies,
-          );
-          ascensionText =
-            " · Ascension " +
-            String(completedTier) +
-            " complete" +
-            (ascensionResult.unlockedTier === null
-              ? ""
-              : " · Tier " +
-                String(ascensionResult.unlockedTier) +
-                " unlocked");
-        }
+      const completedTier = ascension.selectedTier;
+      const ascensionResult = advanceAscensionOnStageClear(
+        ascension,
+        stats.stage,
+      );
+      ascension = ascensionResult.state;
+      const nextAscensionStage = currentAscensionStage(ascension);
+      if (completedTier > 0) {
+        campaign = {
+          ...campaign,
+          selectedStage:
+            nextAscensionStage ?? campaign.highestUnlockedStage,
+        };
       }
 
-      const expansionResult =
-        advanceCampaignExpansionOnStageClear(
-          campaignExpansion,
-          campaign,
-          stats.stage,
-          clearedAt,
+      let ascensionText = "";
+      if (completedTier === 0 && ascensionResult.unlockedTier === 1) {
+        ascensionText = " · Ascension 1 unlocked";
+      } else if (
+        completedTier > 0 &&
+        ascensionResult.newlyCompleted
+      ) {
+        const reward = ascensionCompletionReward(completedTier);
+        credits = addCredits(credits, reward.credits);
+        expansionCurrencies = addExpansionCurrencyReward(
+          expansionCurrencies,
+          reward.currencies,
         );
-      campaignExpansion = expansionResult.state;
-      const sectorRelic = expansionResult.checkpointCommitted
+        totalCreditReward += reward.credits;
+        totalCurrencyReward = addExpansionCurrencyReward(
+          totalCurrencyReward,
+          reward.currencies,
+        );
+        ascensionText =
+          " · Ascension " +
+          String(completedTier) +
+          " complete" +
+          (ascensionResult.unlockedTier === null
+            ? " · all tiers complete"
+            : " · Tier " +
+              String(ascensionResult.unlockedTier) +
+              " unlocked");
+      }
+
+      let checkpointCommitted = ascensionResult.checkpointCommitted;
+      if (completedTier === 0) {
+        const expansionResult =
+          advanceCampaignExpansionOnStageClear(
+            campaignExpansion,
+            campaign,
+            stats.stage,
+            clearedAt,
+          );
+        campaignExpansion = expansionResult.state;
+        checkpointCommitted = expansionResult.checkpointCommitted;
+      } else if (checkpointCommitted) {
+        campaignExpansion = {
+          ...campaignExpansion,
+          crashRecovery: null,
+        };
+      }
+
+      const sectorRelic = checkpointCommitted
         ? grantRelicReward(
             stats.stage,
-            "sector:" + String(stats.stage),
+            completedTier > 0
+              ? "ascension:" +
+                  String(completedTier) +
+                  ":sector:" +
+                  String(stats.stage)
+              : "sector:" + String(stats.stage),
           )
         : null;
       let sectorRewardText = "";
-      if (expansionResult.checkpointCommitted) {
+      if (checkpointCommitted) {
         const sectorReward = sectorCheckpointReward(stats.stage);
         const ascensionRewardMultiplier =
           activeStageDifficulty?.ascensionRewardMultiplier ?? 1;
@@ -2971,12 +2992,20 @@ const game = new Game(
       stageEntrySnapshot = null;
       const currencyRewardText =
         expansionCurrencyRewardText(totalCurrencyReward);
-      const checkpointText = expansionResult.checkpointCommitted
-        ? " · Checkpoint " +
-          String(campaignExpansion.checkpoint.stage).padStart(3, "0") +
-          " committed" +
-          sectorRewardText +
-          relicRewardText(sectorRelic)
+      const checkpointText = checkpointCommitted
+        ? completedTier > 0
+          ? " · Ascension A" +
+            String(completedTier) +
+            " checkpoint " +
+            String(stats.stage).padStart(3, "0") +
+            " committed" +
+            sectorRewardText +
+            relicRewardText(sectorRelic)
+          : " · Checkpoint " +
+            String(campaignExpansion.checkpoint.stage).padStart(3, "0") +
+            " committed" +
+            sectorRewardText +
+            relicRewardText(sectorRelic)
         : "";
 
       void autosaveCampaign(
