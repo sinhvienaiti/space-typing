@@ -699,16 +699,19 @@ function drawHead(
 
 export function rewardGlyph(marker: string): string {
   if (marker === "heart") return "♥";
-  if (marker === "shield" || marker === "shield-star") return "◆";
+  if (marker === "shield") return "◆";
+  if (marker === "shield-star") return "✦";
   if (marker === "snowflake") return "❄";
   if (marker === "sword") return "↑";
-  if (marker === "burst" || marker === "nova") return "✹";
+  if (marker === "burst") return "✹";
+  if (marker === "nova") return "◎";
   if (marker === "star-x2") return "★2";
   if (marker === "coin-x2") return "C2";
-  if (marker.includes("clock")) return "◷";
-  if (marker === "energy" || marker === "power" || marker === "lightning") {
-    return "ϟ";
-  }
+  if (marker === "clock") return "◷";
+  if (marker === "clock-bolt") return "↻";
+  if (marker === "energy") return "E";
+  if (marker === "power") return "P";
+  if (marker === "lightning") return "ϟ";
   if (marker === "luck-star") return "★";
   return "•";
 }
