@@ -87,6 +87,14 @@ import {
   equipmentUpgradeCost,
   REPAIR_PACK_COST,
 } from "./shops/service-shop";
+import {
+  buySpecialShopOffer,
+  specialShopOfferName,
+  specialShopOffers,
+  specialShopUnlocked,
+  type SpecialShopKind,
+  type SpecialShopOffer,
+} from "./shops/special-shop";
 import { accuracyPercent } from "./logic";
 import type { EquipmentDrop } from "./loot/equipment-loot";
 import type { StageRandomEventDefinition } from "./events/stage-scheduler";
@@ -362,6 +370,8 @@ app.innerHTML = `
           <button id="equipmentButton">Equipment</button>
           <button id="shopButton">Shop</button>
           <button id="serviceShopButton">Repair / Upgrade</button>
+          <button id="blackMarketButton" class="hidden">Black Market</button>
+          <button id="eventShopButton" class="hidden">Event Shop</button>
           <button id="supportButton">Support Spells</button>
           <button id="codexButton">Codex</button>
           <button id="dataButton">Data</button>
@@ -584,6 +594,21 @@ app.innerHTML = `
       <div id="upgradeShopGrid" class="upgrade-shop-grid"></div>
     </dialog>
 
+    <dialog id="specialShopDialog" class="settings-dialog special-shop-dialog">
+      <form method="dialog" class="dialog-head">
+        <div>
+          <p id="specialShopEyebrow" class="eyebrow">hidden market</p>
+          <h2 id="specialShopTitle">Black Market</h2>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+      <p class="equipment-note">
+        <strong id="specialShopCredits">0 Credits</strong>
+        · <span id="specialShopMeta"></span>
+      </p>
+      <div id="specialShopGrid" class="special-shop-grid"></div>
+    </dialog>
+
     <dialog id="dataDialog" class="settings-dialog data-dialog">
       <form method="dialog" class="dialog-head">
         <div>
@@ -757,6 +782,7 @@ let credits = 0;
 let persistenceReady = false;
 let equipmentDropCounter = 0;
 let shopPurchaseCounter = 0;
+let currentSpecialShop: SpecialShopKind = "black-market";
 let sourceState = loadSource();
 let sourceTab: "class" | "custom" = sourceState.mode;
 let vocabularyIndex: VocabularyIndex | null = null;
@@ -777,6 +803,8 @@ const equipmentDialog = byId<HTMLDialogElement>("equipmentDialog");
 const shopDialog = byId<HTMLDialogElement>("shopDialog");
 const serviceShopDialog =
   byId<HTMLDialogElement>("serviceShopDialog");
+const specialShopDialog =
+  byId<HTMLDialogElement>("specialShopDialog");
 const supportDialog = byId<HTMLDialogElement>("supportDialog");
 const characterDialog = byId<HTMLDialogElement>("characterDialog");
 const codexDialog = byId<HTMLDialogElement>("codexDialog");
@@ -1467,6 +1495,7 @@ const game = new Game(
     onHiddenDiscoveryUpdate: (state, discovery) => {
       hiddenDiscovery = state;
       renderCodex();
+      updateSpecialShopAccess();
       void autosaveCampaign(
         "discovery",
         discovery === null
@@ -2077,6 +2106,125 @@ function openServiceShop(): void {
   serviceShopDialog.showModal();
 }
 
+function specialShopOfferDescription(
+  offer: SpecialShopOffer,
+): string {
+  if (offer.kind === "item") {
+    return getItemDefinition(offer.itemId).description;
+  }
+  const definition = getEquipmentDefinition(offer.definitionId);
+  return (
+    offer.rarity.toUpperCase() +
+    " · " +
+    definition.slot +
+    " · " +
+    definition.description
+  );
+}
+
+function updateSpecialShopAccess(): void {
+  byId("blackMarketButton").classList.toggle(
+    "hidden",
+    !specialShopUnlocked("black-market", hiddenDiscovery),
+  );
+  byId("eventShopButton").classList.toggle(
+    "hidden",
+    !specialShopUnlocked("event-shop", hiddenDiscovery),
+  );
+}
+
+function renderSpecialShop(): void {
+  const isBlackMarket = currentSpecialShop === "black-market";
+  byId("specialShopEyebrow").textContent = isBlackMarket
+    ? "hidden market"
+    : "event exchange";
+  byId("specialShopTitle").textContent = isBlackMarket
+    ? "Black Market"
+    : "Event Shop";
+  byId("specialShopMeta").textContent = isBlackMarket
+    ? "Rare regular equipment with premium pricing."
+    : "Special consumables from the existing item registry.";
+  byId("specialShopCredits").textContent =
+    credits.toLocaleString() + " Credits";
+
+  const grid = byId("specialShopGrid");
+  grid.replaceChildren();
+
+  for (const offer of specialShopOffers(
+    currentSpecialShop,
+    campaign.highestUnlockedStage,
+  )) {
+    const card = document.createElement("article");
+    card.className = "special-shop-offer";
+
+    const type = document.createElement("span");
+    type.className = "shop-offer-type";
+    type.textContent =
+      offer.kind === "item"
+        ? "EVENT ITEM"
+        : offer.rarity.toUpperCase() + " EQUIPMENT";
+
+    const title = document.createElement("strong");
+    title.textContent = specialShopOfferName(offer);
+
+    const description = document.createElement("small");
+    description.textContent = specialShopOfferDescription(offer);
+
+    const buy = document.createElement("button");
+    buy.type = "button";
+    buy.textContent = offer.price.toLocaleString() + " Credits";
+    buy.disabled = credits < offer.price;
+    buy.addEventListener("click", () => {
+      const purchase = buySpecialShopOffer(
+        { credits, inventory, equipment },
+        offer,
+        offer.kind === "equipment" ? createShopInstanceId() : "",
+      );
+
+      if (!purchase.purchased) {
+        showNotice(
+          purchase.reason === "credits"
+            ? "Not enough Credits"
+            : purchase.reason === "full"
+              ? "Inventory stack is full"
+              : "Unable to purchase this offer",
+        );
+        renderSpecialShop();
+        return;
+      }
+
+      applyServiceShopState(purchase.state);
+      renderNormalShop();
+      renderServiceShop();
+      renderSpecialShop();
+      void autosaveCampaign(
+        "shop",
+        "✓ Purchased " +
+          specialShopOfferName(offer) +
+          " · " +
+          credits.toLocaleString() +
+          " Credits left",
+      );
+    });
+
+    card.append(type, title, description, buy);
+    grid.append(card);
+  }
+}
+
+function openSpecialShop(kind: SpecialShopKind): void {
+  if (
+    !persistenceReady ||
+    game.getPhase() !== "title" ||
+    !specialShopUnlocked(kind, hiddenDiscovery)
+  ) {
+    return;
+  }
+  currentSpecialShop = kind;
+  renderSpecialShop();
+  specialShopDialog.showModal();
+}
+
 function selectedVocabularyLevel(): number {
   return sourceState.mode === "class" ? sourceState.level : 1;
 }
@@ -2146,6 +2294,10 @@ async function initializePlayerProgress(): Promise<void> {
   const shopButton = byId<HTMLButtonElement>("shopButton");
   const serviceShopButton =
     byId<HTMLButtonElement>("serviceShopButton");
+  const blackMarketButton =
+    byId<HTMLButtonElement>("blackMarketButton");
+  const eventShopButton =
+    byId<HTMLButtonElement>("eventShopButton");
   const supportButton =
     byId<HTMLButtonElement>("supportButton");
   const characterButton =
@@ -2157,6 +2309,8 @@ async function initializePlayerProgress(): Promise<void> {
   equipmentButton.disabled = true;
   shopButton.disabled = true;
   serviceShopButton.disabled = true;
+  blackMarketButton.disabled = true;
+  eventShopButton.disabled = true;
   supportButton.disabled = true;
   characterButton.disabled = true;
   codexButton.disabled = true;
@@ -2193,12 +2347,15 @@ async function initializePlayerProgress(): Promise<void> {
     equipmentButton.disabled = false;
     shopButton.disabled = false;
     serviceShopButton.disabled = false;
+    blackMarketButton.disabled = false;
+    eventShopButton.disabled = false;
     supportButton.disabled = false;
     characterButton.disabled = false;
     codexButton.disabled = false;
     renderCodex();
     renderNormalShop();
     renderServiceShop();
+    updateSpecialShopAccess();
     for (const button of dataButtons) button.disabled = false;
 
     if (characters.unlocked.length !== loadedCharacters.unlocked.length) {
@@ -2506,6 +2663,7 @@ async function importSaveFile(file: File): Promise<void> {
     credits = importedCredits;
     game.setLuckPityState(luckPity);
     game.setHiddenDiscoveryState(hiddenDiscovery);
+    updateSpecialShopAccess();
     applySelectedCharacter();
     renderInventory();
     applyEquipmentStats();
@@ -2526,6 +2684,7 @@ async function importSaveFile(file: File): Promise<void> {
       credits = previousCredits;
       game.setLuckPityState(luckPity);
       game.setHiddenDiscoveryState(hiddenDiscovery);
+      updateSpecialShopAccess();
       applySelectedCharacter();
       renderInventory();
       applyEquipmentStats();
@@ -2660,6 +2819,12 @@ byId("characterButton").addEventListener("click", openCharacters);
 byId("equipmentButton").addEventListener("click", openEquipment);
 byId("shopButton").addEventListener("click", openNormalShop);
 byId("serviceShopButton").addEventListener("click", openServiceShop);
+byId("blackMarketButton").addEventListener("click", () => {
+  openSpecialShop("black-market");
+});
+byId("eventShopButton").addEventListener("click", () => {
+  openSpecialShop("event-shop");
+});
 byId("supportButton").addEventListener("click", openSupportSpells);
 
 for (const slot of [0, 1] as const) {
@@ -2850,7 +3015,8 @@ window.addEventListener("keydown", (event) => {
     characterDialog.open ||
     codexDialog.open ||
     shopDialog.open ||
-    serviceShopDialog.open
+    serviceShopDialog.open ||
+    specialShopDialog.open
   ) return;
 
   if (game.getPhase() === "playing" && event.key === "=") {
