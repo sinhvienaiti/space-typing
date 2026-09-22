@@ -517,8 +517,17 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     (version === 16 ||
       version === 17 ||
       version === 18 ||
-      version === 19 ||
-      version === PLAYER_SAVE_VERSION) &&
+      version === 19) &&
+    migrateLegacyRunPersistentState(parsed.checkpointSnapshot) === null
+  ) {
+    return {
+      ok: false,
+      error: "Committed checkpoint snapshot is invalid.",
+    };
+  }
+
+  if (
+    version === PLAYER_SAVE_VERSION &&
     !isValidCheckpointSnapshot(parsed.checkpointSnapshot)
   ) {
     return {
@@ -530,8 +539,18 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   if (
     (version === 17 ||
       version === 18 ||
-      version === 19 ||
-      version === PLAYER_SAVE_VERSION) &&
+      version === 19) &&
+    parsed.crashRecoverySnapshot !== null &&
+    sanitizeCrashRecoverySnapshot(parsed.crashRecoverySnapshot) === null
+  ) {
+    return {
+      ok: false,
+      error: "Crash recovery snapshot is invalid.",
+    };
+  }
+
+  if (
+    version === PLAYER_SAVE_VERSION &&
     parsed.crashRecoverySnapshot !== null &&
     !isValidCrashRecoverySnapshot(parsed.crashRecoverySnapshot)
   ) {
@@ -542,13 +561,34 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    (version === 18 || version === PLAYER_SAVE_VERSION) &&
+    (version === 18 || version === 19) &&
+    parsed.stageEntrySnapshot !== null &&
+    sanitizeStageEntrySnapshot(parsed.stageEntrySnapshot) === null
+  ) {
+    return {
+      ok: false,
+      error: "Stage-entry snapshot is invalid.",
+    };
+  }
+
+  if (
+    version === PLAYER_SAVE_VERSION &&
     parsed.stageEntrySnapshot !== null &&
     !isValidStageEntrySnapshot(parsed.stageEntrySnapshot)
   ) {
     return {
       ok: false,
       error: "Stage-entry snapshot is invalid.",
+    };
+  }
+
+  if (
+    version === PLAYER_SAVE_VERSION &&
+    !isValidShopState(parsed.shops)
+  ) {
+    return {
+      ok: false,
+      error: "Shop state is invalid.",
     };
   }
 
