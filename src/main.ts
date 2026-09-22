@@ -1,5 +1,10 @@
 import "./styles.css";
 import { Game } from "./Game";
+import {
+  loadArtAssetManifest,
+  preloadArtAssets,
+  type ArtAssetCatalog,
+} from "./assets/pipeline";
 import { difficultyFor } from "./campaign/difficulty";
 import {
   createDefaultCampaignProgress,
@@ -855,6 +860,7 @@ let sourceState = loadSource();
 let sourceTab: "class" | "custom" = sourceState.mode;
 let vocabularyIndex: VocabularyIndex | null = null;
 let configuredVocabulary: VocabularyEntry[] = [];
+let artCatalog: ArtAssetCatalog | null = null;
 const typingChallengeCache = new Map<
   string,
   Promise<TypingTextChallenge>
@@ -2880,6 +2886,13 @@ async function populateLevels(): Promise<void> {
 }
 
 function updateDataSummary(): void {
+  const artMeta =
+    artCatalog === null
+      ? ""
+      : " · art " +
+        String(artCatalog.assets.size - artCatalog.failed.length) +
+        "/" +
+        String(artCatalog.assets.size);
   byId("dataProgress").textContent =
     "Stage " +
     String(campaign.highestUnlockedStage).padStart(3, "0") +
@@ -2887,7 +2900,8 @@ function updateDataSummary(): void {
     String(inventoryTotal(inventory)) +
     " items · " +
     credits.toLocaleString() +
-    " Credits";
+    " Credits" +
+    artMeta;
 }
 
 function openData(): void {
@@ -3084,6 +3098,27 @@ async function applyClassLevel(level: number): Promise<void> {
   } finally {
     button.disabled = false;
     button.textContent = "Use level";
+  }
+}
+
+async function initializeArtPipeline(): Promise<void> {
+  try {
+    const manifest = await loadArtAssetManifest();
+    artCatalog = await preloadArtAssets(manifest);
+    updateDataSummary();
+
+    if (artCatalog.failed.length > 0) {
+      console.warn(
+        "Optional art assets failed to load; procedural fallbacks remain active.",
+        artCatalog.failed,
+      );
+    }
+  } catch (error) {
+    artCatalog = null;
+    console.warn(
+      "Art manifest unavailable; procedural Canvas renderer remains active.",
+      error,
+    );
   }
 }
 
@@ -3487,5 +3522,6 @@ updateCampaignUi();
 renderStats(game.getStats());
 renderPhase(game.getPhase());
 renderAllSkills();
+void initializeArtPipeline();
 void initializePlayerProgress();
 void loadInitialVocabulary();
