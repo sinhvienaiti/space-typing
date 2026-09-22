@@ -2,6 +2,10 @@ import {
   ENEMY_FAMILY_IDS,
   type EnemyFamilyId,
 } from "../enemies/families";
+import {
+  enemyDefinition,
+  type EnemyDefinitionId,
+} from "../enemies/registry";
 import { normalizeStage } from "../campaign/stage";
 import type { WorldProfile } from "./types";
 
@@ -175,7 +179,10 @@ const GALAXY_WORLD_SPECS: readonly WorldSpec[] = [
   },
 ] as const;
 
-const FAMILY_ROSTERS: Record<EnemyFamilyId, readonly string[]> = {
+const FAMILY_ROSTERS: Record<
+  EnemyFamilyId,
+  readonly EnemyDefinitionId[]
+> = {
   rainbow: [
     "rainbow-scout",
     "rainbow-dart",
@@ -196,18 +203,24 @@ const FAMILY_ROSTERS: Record<EnemyFamilyId, readonly string[]> = {
   cosmic: ["star-core", "nova-core", "nebula-elite"],
 };
 
-const MINI_BOSS_BY_FAMILY: Record<EnemyFamilyId, string> = {
+const MINI_BOSS_BY_FAMILY: Record<
+  EnemyFamilyId,
+  EnemyDefinitionId
+> = {
   rainbow: "halo-seraph",
   angel: "halo-seraph",
   devil: "crown-demon",
   frost: "glacier-oracle",
   prism: "prism-sentinel",
   nature: "halo-seraph",
-  shadow: "prism-sentinel",
+  shadow: "crown-demon",
   cosmic: "prism-sentinel",
 };
 
-const WORLD_BOSS_BY_FAMILY: Record<EnemyFamilyId, string> = {
+const WORLD_BOSS_BY_FAMILY: Record<
+  EnemyFamilyId,
+  EnemyDefinitionId
+> = {
   rainbow: "prism-archon",
   angel: "archangel-core",
   devil: "demon-lord-orb",
@@ -408,6 +421,59 @@ export function validateWorldRegistry(
       world.worldBoss.trim().length === 0
     ) {
       errors.push(world.id + ": enemy/boss contract cannot be empty.");
+    }
+
+    for (const enemyId of world.enemyRoster) {
+      const definition = enemyDefinition(enemyId);
+      if (definition === undefined) {
+        errors.push(world.id + ": unknown enemy id " + enemyId + ".");
+        continue;
+      }
+      if (!world.enemyFamilies.includes(definition.family)) {
+        errors.push(
+          world.id +
+            ": enemy " +
+            enemyId +
+            " is outside the World family contract.",
+        );
+      }
+      if (
+        definition.role === "boss" ||
+        definition.role === "mini-boss"
+      ) {
+        errors.push(
+          world.id + ": boss definitions cannot be regular roster entries.",
+        );
+      }
+    }
+
+    for (const eliteId of world.elitePool) {
+      const definition = enemyDefinition(eliteId);
+      if (
+        definition === undefined ||
+        definition.role !== "elite" ||
+        !world.enemyRoster.includes(eliteId)
+      ) {
+        errors.push(world.id + ": invalid elite pool entry " + eliteId + ".");
+      }
+    }
+
+    const miniBoss = enemyDefinition(world.miniBoss);
+    if (
+      miniBoss === undefined ||
+      miniBoss.role !== "mini-boss" ||
+      !world.enemyFamilies.includes(miniBoss.family)
+    ) {
+      errors.push(world.id + ": invalid Mini Boss contract.");
+    }
+
+    const worldBoss = enemyDefinition(world.worldBoss);
+    if (
+      worldBoss === undefined ||
+      worldBoss.role !== "boss" ||
+      !world.enemyFamilies.includes(worldBoss.family)
+    ) {
+      errors.push(world.id + ": invalid World Boss contract.");
     }
     if (
       world.visualTheme.trim().length === 0 ||
