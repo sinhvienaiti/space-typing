@@ -14,9 +14,14 @@ import {
   sanitizeCredits,
   spendCredits,
 } from "../economy/credits";
+import {
+  sanitizeExpansionCurrencyState,
+  type ExpansionCurrencyState,
+} from "../economy/currencies";
 
 export type ServiceShopState = {
   credits: number;
+  expansionCurrencies: ExpansionCurrencyState;
   inventory: Inventory;
   equipment: EquipmentState;
 };
@@ -24,7 +29,13 @@ export type ServiceShopState = {
 export type ServiceShopResult = {
   state: ServiceShopState;
   applied: boolean;
-  reason: "credits" | "full" | "max" | "missing" | null;
+  reason:
+    | "credits"
+    | "alloy"
+    | "full"
+    | "max"
+    | "missing"
+    | null;
 };
 
 const GRADE_COST_MULTIPLIER: Record<GradeId, number> = {
@@ -35,7 +46,16 @@ const GRADE_COST_MULTIPLIER: Record<GradeId, number> = {
   diamond: 2.8,
 };
 
+const GRADE_ALLOY_COST: Record<GradeId, number> = {
+  aluminum: 1,
+  copper: 2,
+  silver: 4,
+  gold: 7,
+  diamond: 12,
+};
+
 export const REPAIR_PACK_COST = 64;
+export const REPAIR_PACK_ALLOY_COST = 1;
 
 export function equipmentUpgradeCost(
   item: EquipmentInstance,
@@ -45,36 +65,55 @@ export function equipmentUpgradeCost(
   return Math.floor(base * GRADE_COST_MULTIPLIER[item.grade]);
 }
 
+export function equipmentUpgradeAlloyCost(
+  item: EquipmentInstance,
+): number | null {
+  if (item.enhancement >= 5) return null;
+  return GRADE_ALLOY_COST[item.grade] + item.enhancement;
+}
+
 export function buyEquipmentUpgrade(
   current: ServiceShopState,
   instanceId: string,
 ): ServiceShopResult {
   const credits = sanitizeCredits(current.credits);
+  const expansionCurrencies = sanitizeExpansionCurrencyState(
+    current.expansionCurrencies,
+  );
   const item = current.equipment.items.find(
     (candidate) => candidate.instanceId === instanceId,
   );
 
   if (item === undefined) {
     return {
-      state: { ...current, credits },
+      state: { ...current, credits, expansionCurrencies },
       applied: false,
       reason: "missing",
     };
   }
 
   const cost = equipmentUpgradeCost(item);
-  if (cost === null) {
+  const alloyCost = equipmentUpgradeAlloyCost(item);
+  if (cost === null || alloyCost === null) {
     return {
-      state: { ...current, credits },
+      state: { ...current, credits, expansionCurrencies },
       applied: false,
       reason: "max",
+    };
+  }
+
+  if (expansionCurrencies.alloy < alloyCost) {
+    return {
+      state: { ...current, credits, expansionCurrencies },
+      applied: false,
+      reason: "alloy",
     };
   }
 
   const payment = spendCredits(credits, cost);
   if (!payment.spent) {
     return {
-      state: { ...current, credits },
+      state: { ...current, credits, expansionCurrencies },
       applied: false,
       reason: "credits",
     };
@@ -83,7 +122,7 @@ export function buyEquipmentUpgrade(
   const upgrade = enhanceInstance(current.equipment, instanceId);
   if (!upgrade.changed) {
     return {
-      state: { ...current, credits },
+      state: { ...current, credits, expansionCurrencies },
       applied: false,
       reason: "max",
     };
@@ -92,6 +131,10 @@ export function buyEquipmentUpgrade(
   return {
     state: {
       credits: payment.credits,
+      expansionCurrencies: {
+        ...expansionCurrencies,
+        alloy: expansionCurrencies.alloy - alloyCost,
+      },
       inventory: current.inventory,
       equipment: upgrade.state,
     },
@@ -104,6 +147,9 @@ export function buyRepairPack(
   current: ServiceShopState,
 ): ServiceShopResult {
   const credits = sanitizeCredits(current.credits);
+  const expansionCurrencies = sanitizeExpansionCurrencyState(
+    current.expansionCurrencies,
+  );
   const repairMax = getItemDefinition("repair-kit").maxStack;
   const shieldMax = getItemDefinition("shield-cell").maxStack;
 
@@ -112,16 +158,24 @@ export function buyRepairPack(
     itemCount(current.inventory, "shield-cell") >= shieldMax
   ) {
     return {
-      state: { ...current, credits },
+      state: { ...current, credits, expansionCurrencies },
       applied: false,
       reason: "full",
+    };
+  }
+
+  if (expansionCurrencies.alloy < REPAIR_PACK_ALLOY_COST) {
+    return {
+      state: { ...current, credits, expansionCurrencies },
+      applied: false,
+      reason: "alloy",
     };
   }
 
   const payment = spendCredits(credits, REPAIR_PACK_COST);
   if (!payment.spent) {
     return {
-      state: { ...current, credits },
+      state: { ...current, credits, expansionCurrencies },
       applied: false,
       reason: "credits",
     };
@@ -133,6 +187,10 @@ export function buyRepairPack(
   return {
     state: {
       credits: payment.credits,
+      expansionCurrencies: {
+        ...expansionCurrencies,
+        alloy: expansionCurrencies.alloy - REPAIR_PACK_ALLOY_COST,
+      },
       inventory: shielded.inventory,
       equipment: current.equipment,
     },
