@@ -11,13 +11,23 @@ import {
 import { clamp } from "../logic";
 
 export const DIFFICULTY_MODES = [
-  "relaxed",
-  "normal",
+  "relax",
+  "balanced",
   "hard",
-  "expert",
+  "extreme",
+  "nightmare",
+  "impossible",
   "adaptive",
   "custom",
 ] as const satisfies readonly DifficultyMode[];
+
+const LEGACY_DIFFICULTY_MODE_MAP: Readonly<
+  Record<string, DifficultyMode>
+> = {
+  relaxed: "relax",
+  normal: "balanced",
+  expert: "extreme",
+};
 
 export type DifficultySettings = {
   mode: DifficultyMode;
@@ -28,18 +38,22 @@ export type DifficultySettings = {
 
 export function createDifficultySettings(): DifficultySettings {
   return {
-    mode: "normal",
+    mode: "balanced",
     customTargetWpm: 60,
     customPressure: 1,
     profile: createAdaptiveProfile(),
   };
 }
 
-function isDifficultyMode(value: unknown): value is DifficultyMode {
-  return (
-    typeof value === "string" &&
-    DIFFICULTY_MODES.includes(value as DifficultyMode)
-  );
+function sanitizeDifficultyMode(
+  value: unknown,
+  fallback: DifficultyMode,
+): DifficultyMode {
+  if (typeof value !== "string") return fallback;
+  if (DIFFICULTY_MODES.includes(value as DifficultyMode)) {
+    return value as DifficultyMode;
+  }
+  return LEGACY_DIFFICULTY_MODE_MAP[value] ?? fallback;
 }
 
 export function sanitizeDifficultySettings(
@@ -58,16 +72,16 @@ export function sanitizeDifficultySettings(
   };
 
   return {
-    mode: isDifficultyMode(raw.mode) ? raw.mode : fallback.mode,
+    mode: sanitizeDifficultyMode(raw.mode, fallback.mode),
     customTargetWpm:
       typeof raw.customTargetWpm === "number" &&
       Number.isFinite(raw.customTargetWpm)
-        ? clamp(raw.customTargetWpm, 20, 220)
+        ? clamp(raw.customTargetWpm, 10, 300)
         : fallback.customTargetWpm,
     customPressure:
       typeof raw.customPressure === "number" &&
       Number.isFinite(raw.customPressure)
-        ? clamp(raw.customPressure, 0.7, 1.45)
+        ? clamp(raw.customPressure, 0.65, 1.6)
         : fallback.customPressure,
     profile: sanitizeAdaptiveProfile(raw.profile),
   };
