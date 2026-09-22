@@ -24,6 +24,7 @@ import {
   createCampaignExpansionState,
   rollbackCampaignExpansion,
   type CampaignExpansionState,
+  type CrashRecoveryReason,
 } from "./campaign/expansion-state";
 import {
   createStageConfig,
@@ -188,12 +189,19 @@ import {
   type RunPersistentState,
 } from "./persistence/checkpoint";
 import {
+  captureCrashRecoverySnapshot,
+  invalidateCrashRecoverySnapshot,
+  type CrashRecoverySnapshot,
+} from "./persistence/crash-recovery";
+import {
   exportPlayerSaveJson,
   parsePlayerSaveJson,
 } from "./persistence/backup";
 import {
+  createPlayerSave,
   loadPlayerSave,
   savePlayerProgress,
+  savePlayerRecoveryMirrorSync,
   UnsupportedPlayerSaveVersionError,
 } from "./persistence/player-save";
 import type {
@@ -960,6 +968,7 @@ let checkpointSnapshot: CheckpointSnapshot =
     },
     campaignExpansion.checkpoint.stage,
   );
+let crashRecoverySnapshot: CrashRecoverySnapshot | null = null;
 let persistenceReady = false;
 let vocabularyReady = false;
 let equipmentDropCounter = 0;
@@ -1022,6 +1031,7 @@ type AutosaveSnapshot = {
   expansionCurrencies: ExpansionCurrencyState;
   campaignExpansion: CampaignExpansionState;
   checkpointSnapshot: CheckpointSnapshot;
+  crashRecoverySnapshot: CrashRecoverySnapshot | null;
 };
 
 const campaignAutosave = new AutosaveQueue<
@@ -1042,6 +1052,7 @@ const campaignAutosave = new AutosaveQueue<
     snapshot.expansionCurrencies,
     snapshot.campaignExpansion,
     snapshot.checkpointSnapshot,
+    snapshot.crashRecoverySnapshot,
   ),
 );
 
@@ -1071,6 +1082,93 @@ function applyRunPersistentState(state: RunPersistentState): void {
   credits = state.credits;
   progression = state.progression;
   expansionCurrencies = state.expansionCurrencies;
+}
+
+function currentAutosaveSnapshot(): AutosaveSnapshot {
+  return {
+    campaign,
+    inventory,
+    equipment,
+    supportSpells,
+    characters,
+    luckPity,
+    hiddenDiscovery,
+    credits,
+    progression,
+    expansionCurrencies,
+    campaignExpansion,
+    checkpointSnapshot,
+    crashRecoverySnapshot,
+  };
+}
+
+function captureSafeCrashRecovery(
+  reason: CrashRecoveryReason,
+  savedAt = new Date().toISOString(),
+): void {
+  const captured = captureCrashRecoverySnapshot(
+    currentRunPersistentState(),
+    campaignExpansion,
+    checkpointSnapshot,
+    reason,
+    savedAt,
+  );
+  campaignExpansion = captured.campaignExpansion;
+  crashRecoverySnapshot = captured.snapshot;
+}
+
+function persistRecoveryMirrorSync(
+  reason: SaveReason,
+  timestamp = new Date().toISOString(),
+): void {
+  savePlayerRecoveryMirrorSync(
+    createPlayerSave(
+      campaign,
+      timestamp,
+      reason,
+      inventory,
+      equipment,
+      supportSpells,
+      characters,
+      luckPity,
+      hiddenDiscovery,
+      credits,
+      progression,
+      expansionCurrencies,
+      campaignExpansion,
+      checkpointSnapshot,
+      crashRecoverySnapshot,
+    ),
+  );
+}
+
+function markCrashRecoveryDeathInvalid(
+  timestamp = new Date().toISOString(),
+): void {
+  const invalidated = invalidateCrashRecoverySnapshot(
+    crashRecoverySnapshot,
+    currentRunPersistentState(),
+    campaignExpansion,
+    checkpointSnapshot,
+    timestamp,
+  );
+  campaignExpansion = invalidated.campaignExpansion;
+  crashRecoverySnapshot = invalidated.snapshot;
+
+  try {
+    persistRecoveryMirrorSync("gameover", timestamp);
+  } catch (error) {
+    console.warn(
+      "Unable to write synchronous death recovery marker.",
+      error,
+    );
+  }
+
+  campaignAutosave.schedule(
+    currentAutosaveSnapshot(),
+    "gameover",
+  );
+  void campaignAutosave.flush("gameover");
 }
 
 function refreshPersistentStateUi(): void {
@@ -1648,6 +1746,7 @@ function renderProgression(): void {
         "✓ Mission reward · +" +
           result.rewardCredits.toLocaleString() +
           " Credits",
+        "progression",
       );
     });
 
@@ -1766,15 +1865,24 @@ const game = new Game(
           accuracyPercent(stats.hits, stats.misses).toFixed(1) + "%";
         byId("resultStreak").textContent = String(stats.maxStreak);
 
+        const deathAt = new Date().toISOString();
+        markCrashRecoveryDeathInvalid(deathAt);
+
         const restored = restoreCheckpointSnapshot(
           checkpointSnapshot,
           currentRunPersistentState(),
         );
         applyRunPersistentState(restored);
-        campaignExpansion = rollbackCampaignExpansion(
+        const rolledBackExpansion = rollbackCampaignExpansion(
           campaignExpansion,
-          new Date().toISOString(),
+          deathAt,
         );
+        campaignExpansion = {
+          ...rolledBackExpansion,
+          crashRecovery:
+            crashRecoverySnapshot?.campaignExpansion.crashRecovery ??
+            null,
+        };
         refreshPersistentStateUi();
 
         const checkpointStage = campaignExpansion.checkpoint.stage;
@@ -1900,6 +2008,7 @@ const game = new Game(
           " Credits" +
           achievementText +
           checkpointText,
+        "stage-clear",
       );
 
       byId("clearTitle").textContent =
@@ -1963,6 +2072,7 @@ const game = new Game(
         discovery === null
           ? undefined
           : hiddenDiscoveryMessage(discovery),
+        discovery === null ? undefined : "hidden-transition",
       );
     },
   },
@@ -2051,6 +2161,7 @@ function renderCharacters(): void {
         void autosaveCampaign(
           "character",
           "✓ Character selected · " + definition.name,
+          "loadout",
         );
       });
     }
@@ -2129,6 +2240,7 @@ function renderTalentPanel(): void {
           getCharacter(id).name +
           " · " +
           talentBranchLabel(branch),
+        "upgrade",
       );
     });
 
@@ -2150,6 +2262,7 @@ function renderTalentPanel(): void {
     void autosaveCampaign(
       "character",
       "✓ Talents reset · " + getCharacter(id).name,
+      "upgrade",
     );
   });
 
@@ -2292,6 +2405,7 @@ function renderEquipment(): void {
       void autosaveCampaign(
         "equipment",
         "✓ Loadout saved · applies next stage",
+        "loadout",
       );
     });
 
@@ -2425,6 +2539,7 @@ function renderNormalShop(): void {
           " · " +
           credits.toLocaleString() +
           " Credits left",
+        "shop",
       );
     });
 
@@ -2503,6 +2618,7 @@ function renderServiceShop(): void {
       "✓ Repair Station pack purchased · " +
         credits.toLocaleString() +
         " Credits left",
+      "shop",
     );
   });
 
@@ -2573,6 +2689,7 @@ function renderServiceShop(): void {
           " · " +
           credits.toLocaleString() +
           " Credits left",
+        "upgrade",
       );
     });
 
@@ -2687,6 +2804,7 @@ function renderSpecialShop(): void {
           " · " +
           credits.toLocaleString() +
           " Credits left",
+        "shop",
       );
     });
 
@@ -2780,6 +2898,13 @@ async function startSelectedStage(): Promise<void> {
       ),
     );
 
+    const recoverySaved = await autosaveCampaign(
+      "stage-entry",
+      undefined,
+      "stage-entry",
+    );
+    if (!recoverySaved) return;
+
     game.startStage(stage, difficulty);
   } finally {
     stageStartPending = false;
@@ -2789,22 +2914,14 @@ async function startSelectedStage(): Promise<void> {
 async function autosaveCampaign(
   reason: SaveReason,
   successMessage?: string,
+  recoveryReason?: CrashRecoveryReason,
 ): Promise<boolean> {
+  if (recoveryReason !== undefined) {
+    captureSafeCrashRecovery(recoveryReason);
+  }
+
   campaignAutosave.schedule(
-    {
-      campaign,
-      inventory,
-      equipment,
-      supportSpells,
-      characters,
-      luckPity,
-      hiddenDiscovery,
-      credits,
-      progression,
-      expansionCurrencies,
-      campaignExpansion,
-      checkpointSnapshot,
-    },
+    currentAutosaveSnapshot(),
     reason,
   );
 
@@ -2876,6 +2993,7 @@ async function initializePlayerProgress(): Promise<void> {
     expansionCurrencies = loaded.save.expansionCurrencies;
     campaignExpansion = loaded.save.campaignExpansion;
     checkpointSnapshot = loaded.save.checkpointSnapshot;
+    crashRecoverySnapshot = loaded.save.crashRecoverySnapshot;
     syncProgressionAchievements();
     game.setLuckPityState(luckPity);
     game.setHiddenDiscoveryState(hiddenDiscovery);
@@ -2919,7 +3037,17 @@ async function initializePlayerProgress(): Promise<void> {
       );
     }
 
-    if (loaded.migrated) {
+    if (loaded.recoveryMode === "death-rollback") {
+      showNotice(
+        "Death record enforced · returned to checkpoint Stage " +
+          String(campaignExpansion.checkpoint.stage).padStart(3, "0"),
+      );
+    } else if (loaded.recoveryMode === "crash") {
+      showNotice(
+        "✓ Recovered last safe transition · Stage " +
+          String(campaign.selectedStage).padStart(3, "0"),
+      );
+    } else if (loaded.migrated) {
       showNotice("✓ Existing progress migrated to IndexedDB");
     } else if (loaded.source === "localStorage") {
       showNotice("IndexedDB unavailable · using recovery storage");
@@ -3019,6 +3147,7 @@ function renderStageGrid(): void {
         "✓ Saved · Stage " +
           String(stage).padStart(3, "0") +
           " selected",
+        "stage-select",
       );
       updateCampaignUi();
       stageSelectDialog.close();
@@ -3184,7 +3313,11 @@ function openData(): void {
 async function exportSave(): Promise<void> {
   if (!persistenceReady) return;
 
-  const saved = await autosaveCampaign("manual");
+  const saved = await autosaveCampaign(
+    "manual",
+    undefined,
+    "manual",
+  );
   const json = exportPlayerSaveJson(
     campaign,
     undefined,
@@ -3199,6 +3332,7 @@ async function exportSave(): Promise<void> {
     expansionCurrencies,
     campaignExpansion,
     checkpointSnapshot,
+    crashRecoverySnapshot,
   );
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -3248,6 +3382,8 @@ async function importSaveFile(file: File): Promise<void> {
       result.save.campaignExpansion;
     const importedCheckpointSnapshot =
       result.save.checkpointSnapshot;
+    const importedCrashRecoverySnapshot =
+      result.save.crashRecoverySnapshot;
     const message =
       "Import Stage " +
       String(imported.highestUnlockedStage).padStart(3, "0") +
@@ -3273,6 +3409,7 @@ async function importSaveFile(file: File): Promise<void> {
     const previousExpansionCurrencies = expansionCurrencies;
     const previousCampaignExpansion = campaignExpansion;
     const previousCheckpointSnapshot = checkpointSnapshot;
+    const previousCrashRecoverySnapshot = crashRecoverySnapshot;
     campaign = imported;
     inventory = importedInventory;
     equipment = importedEquipment;
@@ -3285,6 +3422,7 @@ async function importSaveFile(file: File): Promise<void> {
     expansionCurrencies = importedExpansionCurrencies;
     campaignExpansion = importedCampaignExpansion;
     checkpointSnapshot = importedCheckpointSnapshot;
+    crashRecoverySnapshot = importedCrashRecoverySnapshot;
     syncProgressionAchievements();
     game.setLuckPityState(luckPity);
     game.setHiddenDiscoveryState(hiddenDiscovery);
@@ -3297,7 +3435,11 @@ async function importSaveFile(file: File): Promise<void> {
       campaign.selectedStage / STAGES_PER_GALAXY,
     );
 
-    const saved = await autosaveCampaign("manual");
+    const saved = await autosaveCampaign(
+      "manual",
+      undefined,
+      "manual",
+    );
     if (!saved) {
       campaign = previousCampaign;
       inventory = previousInventory;
@@ -3311,6 +3453,7 @@ async function importSaveFile(file: File): Promise<void> {
       expansionCurrencies = previousExpansionCurrencies;
       campaignExpansion = previousCampaignExpansion;
       checkpointSnapshot = previousCheckpointSnapshot;
+      crashRecoverySnapshot = previousCrashRecoverySnapshot;
       game.setLuckPityState(luckPity);
       game.setHiddenDiscoveryState(hiddenDiscovery);
       updateSpecialShopAccess();
@@ -3514,6 +3657,7 @@ for (const slot of [0, 1] as const) {
       void autosaveCampaign(
         "support-spells",
         "✓ Support loadout saved · applies next stage",
+        "loadout",
       );
     },
   );
@@ -3811,49 +3955,42 @@ window.addEventListener("keydown", (event) => {
 
 window.addEventListener("resize", () => game.resize());
 
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState !== "hidden" || !persistenceReady) return;
+function persistPageLifecycleRecovery(): void {
+  if (!persistenceReady) return;
+
+  const savedAt = new Date().toISOString();
+  const phase = game.getPhase();
+
+  // Mid-encounter page lifecycle events must not promote equipment drops,
+  // item consumption or other unsafe combat mutations into a new recovery
+  // point. The mirror still writes the current top-level state, but load
+  // resolution restores the previous safe snapshot.
+  if (phase === "title" || phase === "stageclear") {
+    captureSafeCrashRecovery("pagehide", savedAt);
+  }
+
+  try {
+    persistRecoveryMirrorSync("pagehide", savedAt);
+  } catch (error) {
+    console.warn(
+      "Unable to write synchronous page recovery mirror.",
+      error,
+    );
+  }
+
   campaignAutosave.schedule(
-    {
-      campaign,
-      inventory,
-      equipment,
-      supportSpells,
-      characters,
-      luckPity,
-      hiddenDiscovery,
-      credits,
-      progression,
-      expansionCurrencies,
-      campaignExpansion,
-      checkpointSnapshot,
-    },
+    currentAutosaveSnapshot(),
     "pagehide",
   );
   void campaignAutosave.flush("pagehide");
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "hidden") return;
+  persistPageLifecycleRecovery();
 });
 
-window.addEventListener("pagehide", () => {
-  if (!persistenceReady) return;
-  campaignAutosave.schedule(
-    {
-      campaign,
-      inventory,
-      equipment,
-      supportSpells,
-      characters,
-      luckPity,
-      hiddenDiscovery,
-      credits,
-      progression,
-      expansionCurrencies,
-      campaignExpansion,
-      checkpointSnapshot,
-    },
-    "pagehide",
-  );
-  void campaignAutosave.flush("pagehide");
-});
+window.addEventListener("pagehide", persistPageLifecycleRecovery);
 
 window.addEventListener("beforeunload", () => {
   stopSpeech();

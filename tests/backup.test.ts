@@ -64,6 +64,7 @@ describe("save backup", () => {
         campaign: { highestUnlockedStage: number; selectedStage: number };
         credits: number;
       };
+      crashRecoverySnapshot: unknown;
     };
 
     expect(parsed.version).toBe(PLAYER_SAVE_VERSION);
@@ -105,6 +106,7 @@ describe("save backup", () => {
       selectedStage: 1,
     });
     expect(parsed.checkpointSnapshot.credits).toBe(0);
+    expect(parsed.crashRecoverySnapshot).toBeNull();
   });
 
   it("imports and migrates a valid v1 backup", () => {
@@ -146,7 +148,7 @@ describe("save backup", () => {
     );
     expect(unsupported).toEqual({
       ok: false,
-      error: "Unsupported save version. Supported versions: 1-16.",
+      error: "Unsupported save version. Supported versions: 1-17.",
     });
   });
 
@@ -468,6 +470,22 @@ describe("save backup", () => {
     expect(result.save.checkpointSnapshot.campaign.selectedStage).toBe(1);
   });
 
+  it("imports and migrates a valid v16 backup to empty crash recovery", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.version = 16;
+    delete raw.crashRecoverySnapshot;
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.migrated).toBe(true);
+    expect(result.save.crashRecoverySnapshot).toBeNull();
+    expect(result.save.checkpointSnapshot.campaign.selectedStage).toBe(1);
+  });
+
   it("rejects invalid current expansion currencies", () => {
     const raw = JSON.parse(
       exportPlayerSaveJson(createDefaultCampaignProgress()),
@@ -506,6 +524,23 @@ describe("save backup", () => {
     expect(parsePlayerSaveJson(JSON.stringify(raw))).toEqual({
       ok: false,
       error: "Committed checkpoint snapshot is invalid.",
+    });
+  });
+
+  it("rejects an invalid current crash recovery snapshot", () => {
+    const raw = JSON.parse(
+      exportPlayerSaveJson(createDefaultCampaignProgress()),
+    ) as Record<string, unknown>;
+    raw.crashRecoverySnapshot = {
+      state: {},
+      savedAt: "2026-09-22T09:00:00.000Z",
+      reason: "pagehide",
+      deathInvalidated: false,
+    };
+
+    expect(parsePlayerSaveJson(JSON.stringify(raw))).toEqual({
+      ok: false,
+      error: "Crash recovery snapshot is invalid.",
     });
   });
 

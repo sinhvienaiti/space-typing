@@ -21,10 +21,14 @@ export type ActiveSegmentState = {
 };
 
 export const CRASH_RECOVERY_REASONS = [
+  "stage-entry",
   "stage-clear",
+  "stage-select",
   "route-choice",
   "shop",
   "upgrade",
+  "loadout",
+  "progression",
   "hidden-transition",
   "pagehide",
   "manual",
@@ -324,6 +328,55 @@ export function advanceCampaignExpansionOnStageClear(
       },
     },
     checkpointCommitted: false,
+  };
+}
+
+export function markCrashRecovery(
+  input: CampaignExpansionState,
+  stage: number,
+  reason: CrashRecoveryReason,
+  timestamp: string,
+): CampaignExpansionState {
+  return {
+    ...input,
+    sector: { ...input.sector },
+    checkpoint: { ...input.checkpoint },
+    activeSegment: { ...input.activeSegment },
+    crashRecovery: {
+      stage: normalizeStage(stage),
+      savedAt: timestamp,
+      reason,
+      deathInvalidated: false,
+    },
+  };
+}
+
+export function invalidateCrashRecoveryOnDeath(
+  input: CampaignExpansionState,
+  stage: number,
+  timestamp: string,
+): CampaignExpansionState {
+  const previous = input.crashRecovery;
+
+  return {
+    ...input,
+    sector: { ...input.sector },
+    checkpoint: { ...input.checkpoint },
+    activeSegment: {
+      ...input.activeSegment,
+      highestReachedStage: normalizeStage(
+        Math.max(
+          input.activeSegment.highestReachedStage,
+          stage,
+        ),
+      ),
+    },
+    crashRecovery: {
+      stage: normalizeStage(stage),
+      savedAt: timestamp,
+      reason: previous?.reason ?? "manual",
+      deathInvalidated: true,
+    },
   };
 }
 

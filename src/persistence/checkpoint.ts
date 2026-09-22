@@ -64,6 +64,7 @@ export type RunPersistentState = {
 };
 
 export type CheckpointSnapshot = RunPersistentState;
+export type CrashRecoverySnapshot = RunPersistentState;
 
 function campaignAtCheckpoint(
   input: CampaignProgress,
@@ -90,19 +91,17 @@ export function createCheckpointSnapshot(
   input: RunPersistentState,
   checkpointStage: number,
 ): CheckpointSnapshot {
+  const safe = sanitizeRunPersistentState(input);
   return {
-    campaign: campaignAtCheckpoint(input.campaign, checkpointStage),
-    inventory: sanitizeInventory(input.inventory),
-    equipment: sanitizeEquipmentState(input.equipment),
-    supportSpells: sanitizeSupportSpellState(input.supportSpells),
-    characters: sanitizeCharacterState(input.characters),
-    luckPity: sanitizeLuckPityState(input.luckPity),
-    hiddenDiscovery: sanitizeHiddenDiscoveryState(input.hiddenDiscovery),
-    credits: sanitizeCredits(input.credits),
-    progression: sanitizeProgressionState(input.progression),
-    expansionCurrencies:
-      sanitizeExpansionCurrencyState(input.expansionCurrencies),
+    ...safe,
+    campaign: campaignAtCheckpoint(safe.campaign, checkpointStage),
   };
+}
+
+export function createCrashRecoverySnapshot(
+  input: RunPersistentState,
+): CrashRecoverySnapshot {
+  return sanitizeRunPersistentState(input);
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -183,9 +182,9 @@ function isValidCampaignSnapshot(value: unknown): value is CampaignProgress {
   return true;
 }
 
-export function isValidCheckpointSnapshot(
+export function isValidRunPersistentState(
   value: unknown,
-): value is CheckpointSnapshot {
+): value is RunPersistentState {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return false;
   }
@@ -205,15 +204,21 @@ export function isValidCheckpointSnapshot(
   );
 }
 
-export function sanitizeCheckpointSnapshot(
+export function isValidCheckpointSnapshot(
   value: unknown,
-  fallback: RunPersistentState,
-  checkpointStage: number,
-): CheckpointSnapshot {
-  if (!isValidCheckpointSnapshot(value)) {
-    return createCheckpointSnapshot(fallback, checkpointStage);
-  }
+): value is CheckpointSnapshot {
+  return isValidRunPersistentState(value);
+}
 
+export function isValidCrashRecoverySnapshot(
+  value: unknown,
+): value is CrashRecoverySnapshot {
+  return isValidRunPersistentState(value);
+}
+
+export function sanitizeRunPersistentState(
+  value: RunPersistentState,
+): RunPersistentState {
   return {
     campaign: sanitizeCampaignProgress(value.campaign),
     inventory: sanitizeInventory(value.inventory),
@@ -228,6 +233,25 @@ export function sanitizeCheckpointSnapshot(
     expansionCurrencies:
       sanitizeExpansionCurrencyState(value.expansionCurrencies),
   };
+}
+
+export function sanitizeCheckpointSnapshot(
+  value: unknown,
+  fallback: RunPersistentState,
+  checkpointStage: number,
+): CheckpointSnapshot {
+  if (!isValidCheckpointSnapshot(value)) {
+    return createCheckpointSnapshot(fallback, checkpointStage);
+  }
+
+  return sanitizeRunPersistentState(value);
+}
+
+export function sanitizeCrashRecoverySnapshot(
+  value: unknown,
+): CrashRecoverySnapshot | null {
+  if (!isValidCrashRecoverySnapshot(value)) return null;
+  return sanitizeRunPersistentState(value);
 }
 
 function mergeKnowledgeCampaign(
@@ -287,20 +311,7 @@ export function restoreCheckpointSnapshot(
     activeInput,
     committedInput.campaign.selectedStage,
   );
-  const active = {
-    campaign: sanitizeCampaignProgress(activeInput.campaign),
-    inventory: sanitizeInventory(activeInput.inventory),
-    equipment: sanitizeEquipmentState(activeInput.equipment),
-    supportSpells: sanitizeSupportSpellState(activeInput.supportSpells),
-    characters: sanitizeCharacterState(activeInput.characters),
-    luckPity: sanitizeLuckPityState(activeInput.luckPity),
-    hiddenDiscovery:
-      sanitizeHiddenDiscoveryState(activeInput.hiddenDiscovery),
-    credits: sanitizeCredits(activeInput.credits),
-    progression: sanitizeProgressionState(activeInput.progression),
-    expansionCurrencies:
-      sanitizeExpansionCurrencyState(activeInput.expansionCurrencies),
-  };
+  const active = sanitizeRunPersistentState(activeInput);
 
   return {
     campaign: mergeKnowledgeCampaign(
