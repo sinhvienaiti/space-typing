@@ -305,36 +305,40 @@ IPA
 pronunciation
 ~~~
 
-Pronunciation signals parent shared music:
+Pronunciation keeps the parent integration signal:
 
 ~~~text
 typing-game:speech
 active true / false
 ~~~
 
-Rapid pronunciations must queue and must not cancel later words.
+and also emits the local Space Typing audio-priority signal used by M08:
 
-Space Typing does not create competing background music.
+~~~text
+space-typing:pronunciation
+active true / false
+~~~
 
-Parent typing-game owns:
+Rapid pronunciations must remain intelligible and higher priority than background audio.
 
-- Local music;
-- YouTube;
-- Shuffle;
-- Auto next;
-- Repeat one;
-- Music volume;
-- Pronunciation ducking.
+Gameplay Expansion M08 supersedes the earlier restriction that Space Typing could not own an in-game soundtrack. Space Typing now owns its dynamic World/Boss/Shop soundtrack and ambient layers inside the game runtime.
 
-Space Typing owns:
+Parent typing-game may still provide its separate global/local/YouTube music feature. Platform integration must avoid intentionally running two foreground music sources at the same time; the M08 Music volume can be set to zero when the parent/global music source is preferred.
 
+Space Typing audio owns:
+
+- dynamic World/Boss/Shop music state;
+- World ambient layers;
 - shot SFX;
 - hit SFX;
 - explosion;
 - enemy attack;
 - boss SFX;
 - UI/gameplay SFX;
-- pronunciation.
+- pronunciation;
+- Priority Kill Announcer integration.
+
+MusicController consumes pronunciation, announcer and warning lifecycle events so high-priority speech/warnings duck BGM and ambient instead of competing with them.
 
 ---
 
@@ -3462,9 +3466,10 @@ Gameplay Expansion:
 - M05 Grade + core currency migration: COMPLETE
 - M06 Deterministic finite-stock shops: COMPLETE
 - M07 Canonical 50-World engine: COMPLETE
+- M08 Dynamic World Music / Ambient runtime: COMPLETE
 
 Next:
-- M08 Dynamic World Music / Ambient system
+- M09 World enemy/boss roster mapping
 ~~~
 
 Current gameplay/progression foundation:
@@ -3492,6 +3497,10 @@ Current gameplay/progression foundation:
 - per-World environment profiles consumed by the existing Canvas background;
 - World transition/title identity presentation;
 - M06 shop identity resolved through the canonical World registry;
+- one state-driven World music controller with World/Intense/Boss/Shop/Station/Victory/Defeat states;
+- separate Music/Ambient gain buses and crossfade lifecycle;
+- pronunciation/announcer/warning soundtrack ducking through existing audio events;
+- local override -> repository/default -> fail-soft soundtrack asset resolution;
 - Service / Upgrade Shop consumes Credits + Alloy through the existing enhancement system;
 - rare resurrection items can appear only as finite stock in eligible rare merchant pools;
 - shop stock participates in checkpoint rollback, crash recovery and stage-entry recovery;
@@ -3525,6 +3534,10 @@ CI #195 PASS after removal of superseded parallel shop modules
 
 M07 Canonical World Engine
 CI #202 PASS Test + Build
+
+M08 Dynamic World Music / Ambient Runtime
+CI #208 PASS 405 tests + Build
+Final audio binaries/loudness/licensing remain a manual asset gate.
 ~~~
 
 Important implementation notes:
