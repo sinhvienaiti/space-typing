@@ -3050,6 +3050,20 @@ Status-engine rules:
 ## Step 56
 Implement build Synergy rules.
 
+**Status: implemented.**
+
+Build-synergy rules:
+
+- synergy is a cross-system rule over the existing Character, equipped Equipment and Skill/Support systems; it is not a new progression tree;
+- active synergy bonuses feed a dedicated `synergy` layer in effective-stat calculation so they remain separate from Character/Equipment/Talent values;
+- `Arc Circuit`: Volt + equipped Compact Reactor; grants a small Firepower/Reactor bonus and makes Chain Lightning reach up to 6 enemies (or 5% boss pressure instead of 4%);
+- `Oracle Lens`: Oracle + equipped Targeting Module; grants small Firepower/Focus and extends Mark of Weakness from 8s to 11s;
+- `Sanctuary Matrix`: Bastion + equipped Deflector Shield + Sanctuary in the support loadout; grants small Shield/Ward and boosts Sanctuary recovery/barrier duration;
+- owning equipment without equipping it does not activate synergy;
+- changing Character, loadout, equipment or support-spell loadout recalculates synergies immediately for the next stage;
+- active synergies are shown in the Equipment dialog;
+- bonuses are intentionally bounded to avoid uncontrolled stat inflation.
+
 ## Step 57
 Implement Missions and Achievements.
 

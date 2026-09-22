@@ -103,6 +103,11 @@ import {
   type ActiveStatus,
 } from "./status/engine";
 import {
+  buildSynergyStatBonus,
+  buildSynergySummary,
+  resolveBuildSynergies,
+} from "./synergy/build";
+import {
   createLuckPityState,
   type LuckPityState,
 } from "./loot/pity";
@@ -569,6 +574,10 @@ app.innerHTML = `
       <div class="equipment-total">
         <span>equipped bonuses</span>
         <strong id="equipmentBonusText">none</strong>
+      </div>
+      <div class="equipment-total">
+        <span>active synergies</span>
+        <strong id="equipmentSynergyText">none</strong>
       </div>
     </dialog>
 
@@ -1782,7 +1791,17 @@ function openSupportSpells(): void {
   supportDialog.showModal();
 }
 
+function activeBuildSynergies() {
+  return resolveBuildSynergies({
+    character: characters.selected,
+    equipment,
+    supportSpells,
+  });
+}
+
 function applyEquipmentStats(): void {
+  const synergies = activeBuildSynergies();
+  game.setBuildSynergies(synergies);
   game.setPlayerStats({
     base: DEFAULT_PLAYER_BASE_STATS,
     character: characterStatBonus(characters.selected),
@@ -1793,6 +1812,7 @@ function applyEquipmentStats(): void {
     talent: talentStatBonus(
       characters.progress[characters.selected].talents,
     ),
+    synergy: buildSynergyStatBonus(synergies),
   });
 }
 
@@ -1877,6 +1897,8 @@ function renderEquipment(): void {
   }
 
   byId("equipmentBonusText").textContent = formatEquipmentBonuses();
+  byId("equipmentSynergyText").textContent =
+    buildSynergySummary(activeBuildSynergies());
 }
 
 function openEquipment(): void {
@@ -2867,7 +2889,9 @@ for (const slot of [0, 1] as const) {
       const id = value === "" ? null : (value as SupportSpellId);
       supportSpells = equipSupportSpell(supportSpells, slot, id);
       applySupportSpells();
+      applyEquipmentStats();
       renderSupportLoadout();
+      renderEquipment();
       void autosaveCampaign(
         "support-spells",
         "✓ Support loadout saved · applies next stage",
