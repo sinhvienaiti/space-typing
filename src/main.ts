@@ -1216,9 +1216,10 @@ function refreshPersistentStateUi(): void {
   applySupportSpells();
   renderCodex();
   renderProgression();
-  renderNormalShop();
-  renderServiceShop();
-  updateSpecialShopAccess();
+  if (shopDialog.open) renderNormalShop();
+  if (serviceShopDialog.open) renderServiceShop();
+  if (specialShopDialog.open) renderSpecialShop();
+  updateShopAccess();
   updateCampaignUi();
   updateDataSummary();
 }
@@ -2287,7 +2288,7 @@ const game = new Game(
     onHiddenDiscoveryUpdate: (state, discovery) => {
       hiddenDiscovery = state;
       renderCodex();
-      updateSpecialShopAccess();
+      updateShopAccess();
       const achievementNames = syncProgressionAchievements();
       if (achievementNames.length > 0) renderProgression();
       void autosaveCampaign(
@@ -3321,10 +3322,16 @@ async function initializePlayerProgress(): Promise<void> {
   const equipmentButton =
     byId<HTMLButtonElement>("equipmentButton");
   const shopButton = byId<HTMLButtonElement>("shopButton");
+  const stationShopButton =
+    byId<HTMLButtonElement>("stationShopButton");
+  const travelingShopButton =
+    byId<HTMLButtonElement>("travelingShopButton");
   const serviceShopButton =
     byId<HTMLButtonElement>("serviceShopButton");
   const blackMarketButton =
     byId<HTMLButtonElement>("blackMarketButton");
+  const hiddenShopButton =
+    byId<HTMLButtonElement>("hiddenShopButton");
   const eventShopButton =
     byId<HTMLButtonElement>("eventShopButton");
   const supportButton =
@@ -3339,8 +3346,11 @@ async function initializePlayerProgress(): Promise<void> {
   stageSelectButton.disabled = true;
   equipmentButton.disabled = true;
   shopButton.disabled = true;
+  stationShopButton.disabled = true;
+  travelingShopButton.disabled = true;
   serviceShopButton.disabled = true;
   blackMarketButton.disabled = true;
+  hiddenShopButton.disabled = true;
   eventShopButton.disabled = true;
   supportButton.disabled = true;
   characterButton.disabled = true;
@@ -3359,6 +3369,7 @@ async function initializePlayerProgress(): Promise<void> {
     credits = loaded.save.credits;
     progression = loaded.save.progression;
     expansionCurrencies = loaded.save.expansionCurrencies;
+    shops = loaded.save.shops;
     campaignExpansion = loaded.save.campaignExpansion;
     checkpointSnapshot = loaded.save.checkpointSnapshot;
     crashRecoverySnapshot = loaded.save.crashRecoverySnapshot;
@@ -3385,8 +3396,11 @@ async function initializePlayerProgress(): Promise<void> {
     stageSelectButton.disabled = false;
     equipmentButton.disabled = false;
     shopButton.disabled = false;
+    stationShopButton.disabled = false;
+    travelingShopButton.disabled = false;
     serviceShopButton.disabled = false;
     blackMarketButton.disabled = false;
+    hiddenShopButton.disabled = false;
     eventShopButton.disabled = false;
     supportButton.disabled = false;
     characterButton.disabled = false;
@@ -3394,9 +3408,8 @@ async function initializePlayerProgress(): Promise<void> {
     progressionButton.disabled = false;
     renderCodex();
     renderProgression();
-    renderNormalShop();
     renderServiceShop();
-    updateSpecialShopAccess();
+    updateShopAccess();
     for (const button of dataButtons) button.disabled = false;
 
     if (characters.unlocked.length !== loadedCharacters.unlocked.length) {
@@ -3709,6 +3722,7 @@ async function exportSave(): Promise<void> {
     checkpointSnapshot,
     crashRecoverySnapshot,
     stageEntrySnapshot,
+    shops,
   );
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -3754,6 +3768,7 @@ async function importSaveFile(file: File): Promise<void> {
     const importedProgression = result.save.progression;
     const importedExpansionCurrencies =
       result.save.expansionCurrencies;
+    const importedShops = result.save.shops;
     const importedCampaignExpansion =
       result.save.campaignExpansion;
     const importedCheckpointSnapshot =
@@ -3785,6 +3800,7 @@ async function importSaveFile(file: File): Promise<void> {
     const previousCredits = credits;
     const previousProgression = progression;
     const previousExpansionCurrencies = expansionCurrencies;
+    const previousShops = shops;
     const previousCampaignExpansion = campaignExpansion;
     const previousCheckpointSnapshot = checkpointSnapshot;
     const previousCrashRecoverySnapshot = crashRecoverySnapshot;
@@ -3799,6 +3815,7 @@ async function importSaveFile(file: File): Promise<void> {
     credits = importedCredits;
     progression = importedProgression;
     expansionCurrencies = importedExpansionCurrencies;
+    shops = importedShops;
     campaignExpansion = importedCampaignExpansion;
     checkpointSnapshot = importedCheckpointSnapshot;
     crashRecoverySnapshot = importedCrashRecoverySnapshot;
@@ -3806,7 +3823,7 @@ async function importSaveFile(file: File): Promise<void> {
     syncProgressionAchievements();
     game.setLuckPityState(luckPity);
     game.setHiddenDiscoveryState(hiddenDiscovery);
-    updateSpecialShopAccess();
+    updateShopAccess();
     applySelectedCharacter();
     renderInventory();
     applyEquipmentStats();
@@ -3831,13 +3848,14 @@ async function importSaveFile(file: File): Promise<void> {
       credits = previousCredits;
       progression = previousProgression;
       expansionCurrencies = previousExpansionCurrencies;
+      shops = previousShops;
       campaignExpansion = previousCampaignExpansion;
       checkpointSnapshot = previousCheckpointSnapshot;
       crashRecoverySnapshot = previousCrashRecoverySnapshot;
       stageEntrySnapshot = previousStageEntrySnapshot;
       game.setLuckPityState(luckPity);
       game.setHiddenDiscoveryState(hiddenDiscovery);
-      updateSpecialShopAccess();
+      updateShopAccess();
       applySelectedCharacter();
       renderInventory();
       applyEquipmentStats();
@@ -4033,12 +4051,21 @@ for (const [buttonId, skillId] of combatSkillButtons) {
 byId("characterButton").addEventListener("click", openCharacters);
 byId("equipmentButton").addEventListener("click", openEquipment);
 byId("shopButton").addEventListener("click", openNormalShop);
+byId("stationShopButton").addEventListener("click", () => {
+  openSpecialShop("station");
+});
+byId("travelingShopButton").addEventListener("click", () => {
+  openSpecialShop("traveling");
+});
 byId("serviceShopButton").addEventListener("click", openServiceShop);
 byId("blackMarketButton").addEventListener("click", () => {
   openSpecialShop("black-market");
 });
+byId("hiddenShopButton").addEventListener("click", () => {
+  openSpecialShop("hidden");
+});
 byId("eventShopButton").addEventListener("click", () => {
-  openSpecialShop("event-shop");
+  openSpecialShop("event");
 });
 byId("supportButton").addEventListener("click", openSupportSpells);
 
