@@ -3366,11 +3366,15 @@ The next major visual/gameplay expansion is defined in:
 
 Status:
 
-- planned;
-- not yet implemented;
-- this file is the source of truth for enemy art direction, modular visual families, reward-on-kill effects, V1 enemy/boss roster and implementation order;
-- implementation must reuse the existing combat, status, loot, boss and asset-pipeline systems rather than creating parallel frameworks;
-- visual approval is a gate before expanding the full enemy roster because enemy art/readability is a primary product concern.
+- implementation branch: `feature/enemy-system-e01`;
+- PR: `#26`;
+- E01-E12 are implemented;
+- E13 automated readability/asset/performance audit is implemented, while manual browser/art approval is still pending;
+- E14 and E15 code review passes found and fixed integration issues; CI #151 passed at reviewed code checkpoint `63522b531e92ead52cd904d31e0964ea719467ce`;
+- the enemy-system milestone is **not** marked fully complete until the manual visual/browser readability gate is performed;
+- `docs/ENEMY_SYSTEM_MASTER_PLAN.md` remains the source of truth for enemy art direction, modular visual families, reward-on-kill effects, roster and implementation order;
+- implementation reuses the existing combat, status, loot, boss, skill, particle/SFX and asset-pipeline systems rather than creating parallel frameworks;
+- the project-original procedural renderer remains the runtime fallback and asset-source metadata is maintained in `docs/ASSET_SOURCES.md` plus the asset manifest.
 
 ---
 
