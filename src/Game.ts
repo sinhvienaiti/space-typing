@@ -245,6 +245,11 @@ import {
   telegraphStrength,
   type ImpactKind,
 } from "./vfx/polish";
+import {
+  FrameProfiler,
+  qualityProfile,
+  type PerformanceReport,
+} from "./performance/quality";
 import type {
   Enemy,
   EnemyKind,
@@ -407,6 +412,7 @@ export class Game {
   private statusState: StatusState = createStatusState();
   private activeSynergies = new Set<BuildSynergyId>();
   private hitStopTimer = 0;
+  private readonly frameProfiler = new FrameProfiler();
   private lastTime = performance.now();
   private animationFrame = 0;
   private stars: Array<{ x: number; y: number; z: number }> = [];
@@ -444,6 +450,10 @@ export class Game {
 
   getStats(): GameStats {
     return { ...this.stats };
+  }
+
+  getPerformanceReport(): PerformanceReport {
+    return this.frameProfiler.report();
   }
 
   setCharacter(id: CharacterId): void {
@@ -1231,8 +1241,11 @@ export class Game {
   }
 
   updateSettings(settings: GameSettings): void {
+    const qualityChanged =
+      this.settings.visualQuality !== settings.visualQuality;
     this.settings = settings;
     this.sfx.setVolume(settings.sfxVolume);
+    if (qualityChanged) this.resize();
   }
 
   startStage(stage: StageConfig, difficulty: DifficultyProfile): void {
@@ -1496,7 +1509,8 @@ export class Game {
     const rect = this.canvas.getBoundingClientRect();
     this.width = Math.max(640, rect.width || window.innerWidth);
     this.height = Math.max(420, rect.height || window.innerHeight);
-    this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    const profile = qualityProfile(this.settings.visualQuality);
+    this.dpr = Math.min(profile.dprCap, window.devicePixelRatio || 1);
 
     this.canvas.width = Math.floor(this.width * this.dpr);
     this.canvas.height = Math.floor(this.height * this.dpr);
@@ -1505,8 +1519,10 @@ export class Game {
   }
 
   private frame = (now: number): void => {
-    const dt = Math.min(0.05, (now - this.lastTime) / 1000);
+    const rawDt = Math.max(0, (now - this.lastTime) / 1000);
+    const dt = Math.min(0.05, rawDt);
     this.lastTime = now;
+    this.frameProfiler.pushFrame(rawDt);
 
     if (this.phase === "playing") {
       if (this.hitStopTimer > 0) {
@@ -3677,16 +3693,11 @@ export class Game {
   }
 
   private burst(x: number, y: number, count: number, hue: number): void {
-    const qualityScale =
-      this.settings.visualQuality === "ultra"
-        ? 1.35
-        : this.settings.visualQuality === "high"
-          ? 1
-          : this.settings.visualQuality === "medium"
-            ? 0.65
-            : 0.35;
-
-    const finalCount = Math.max(2, Math.round(count * qualityScale));
+    const profile = qualityProfile(this.settings.visualQuality);
+    const finalCount = Math.max(
+      2,
+      Math.round(count * profile.particleScale),
+    );
 
     for (let index = 0; index < finalCount; index += 1) {
       const angle = Math.random() * Math.PI * 2;
@@ -3704,17 +3715,11 @@ export class Game {
       });
     }
 
-    const maxParticles =
-      this.settings.visualQuality === "ultra"
-        ? 520
-        : this.settings.visualQuality === "high"
-          ? 360
-          : this.settings.visualQuality === "medium"
-            ? 220
-            : 110;
-
-    if (this.particles.length > maxParticles) {
-      this.particles.splice(0, this.particles.length - maxParticles);
+    if (this.particles.length > profile.maxParticles) {
+      this.particles.splice(
+        0,
+        this.particles.length - profile.maxParticles,
+      );
     }
   }
 
@@ -3723,9 +3728,15 @@ export class Game {
   }
 
   private seedStars(): void {
+    const profile = qualityProfile(this.settings.visualQuality);
     const count = Math.max(
-      80,
-      Math.min(220, Math.round((this.width * this.height) / 9000)),
+      profile.minStars,
+      Math.min(
+        profile.maxStars,
+        Math.round(
+          (this.width * this.height) / profile.starAreaDivisor,
+        ),
+      ),
     );
 
     this.stars = Array.from({ length: count }, () => ({
@@ -3829,10 +3840,15 @@ export class Game {
     context.strokeStyle = "rgba(75, 205, 235, 0.065)";
     context.lineWidth = 1;
 
+    const profile = qualityProfile(this.settings.visualQuality);
     const horizon = 44;
-    const scroll = (time * 72) % 48;
+    const scroll = (time * 72) % profile.gridStep;
 
-    for (let y = horizon + scroll; y < this.height; y += 48) {
+    for (
+      let y = horizon + scroll;
+      y < this.height;
+      y += profile.gridStep
+    ) {
       const perspective =
         (y - horizon) / Math.max(1, this.height - horizon);
       const lineWidth = this.width * (0.2 + perspective * 1.24);
@@ -3887,7 +3903,10 @@ export class Game {
       const alpha = clamp(laser.life / laser.maxLife, 0, 1);
       context.strokeStyle =
         "rgba(74, 242, 255, " + String(alpha) + ")";
-      context.shadowBlur = 14 * laser.power;
+      context.shadowBlur =
+        14 *
+        laser.power *
+        qualityProfile(this.settings.visualQuality).glowScale;
       context.shadowColor = "#50f6ff";
       context.lineWidth = 1.4 + laser.power * 1.8;
 
@@ -3934,7 +3953,8 @@ export class Game {
     context.save();
     context.translate(projectile.x, projectile.y);
     context.globalCompositeOperation = "lighter";
-    context.shadowBlur = 18;
+    context.shadowBlur =
+      18 * qualityProfile(this.settings.visualQuality).glowScale;
     context.shadowColor = "#ff5c89";
     context.fillStyle = "rgba(255, 70, 118, 0.13)";
     context.strokeStyle = "#ff7298";

@@ -2893,6 +2893,16 @@ function updateDataSummary(): void {
         String(artCatalog.assets.size - artCatalog.failed.length) +
         "/" +
         String(artCatalog.assets.size);
+  const performance = game.getPerformanceReport();
+  const performanceMeta =
+    performance.samples < 30
+      ? ""
+      : " · " +
+        performance.averageFps.toFixed(0) +
+        " FPS · p95 " +
+        performance.p95FrameMs.toFixed(1) +
+        "ms · quality " +
+        settings.visualQuality;
   byId("dataProgress").textContent =
     "Stage " +
     String(campaign.highestUnlockedStage).padStart(3, "0") +
@@ -2901,7 +2911,8 @@ function updateDataSummary(): void {
     " items · " +
     credits.toLocaleString() +
     " Credits" +
-    artMeta;
+    artMeta +
+    performanceMeta;
 }
 
 function openData(): void {

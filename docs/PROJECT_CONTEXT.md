@@ -3190,6 +3190,19 @@ Audio-balance rules:
 ## Step 64
 Profile performance and add quality scaling.
 
+**Status: implemented.**
+
+Performance / quality rules:
+
+- the existing `low / medium / high / ultra` visual-quality setting now drives a shared render-quality profile rather than particle count alone;
+- quality profiles bound DPR, particle scale/cap, star density, glow strength and background-grid density;
+- quality scaling changes rendering cost only; combat timing, enemy pressure, typing rules, loot and progression are unaffected;
+- changing visual quality reapplies canvas DPR and star budget immediately;
+- a rolling `FrameProfiler` records bounded frame samples and reports average FPS, average frame time, p95 frame time and slow-frame ratio;
+- profiling is passive and never changes game difficulty or simulation time;
+- the Data screen surfaces rolling FPS/p95 data once enough samples exist;
+- quality budgets and profiler math are unit-tested.
+
 ## Step 65
 Run automated drop/pity simulations.
 
