@@ -3469,9 +3469,10 @@ Gameplay Expansion:
 - M08 Dynamic World Music / Ambient runtime: COMPLETE
 - M09 World enemy/boss roster mapping: COMPLETE
 - M10 Enemy Rank I-X + WordDifficultyScore + typing layers: COMPLETE
+- M11 Enemy skill/effect framework + Threat Budget: COMPLETE
 
 Next:
-- M11 Enemy skill/effect framework + Threat Budget
+- M12 Difficulty + Active Typing Pressure scheduler
 ~~~
 
 Current gameplay/progression foundation:
@@ -3512,6 +3513,10 @@ Current gameplay/progression foundation:
 - each completed enemy layer consumes one complete word and selects a new rank-band word for the next layer;
 - enemy typing UI renders Rank, current Shield/Armor/Ward/Spell Barrier/Core identity and three fixed layer segments;
 - Carrier/Splitter child spawns use the same M09 World roster + M10 typing-profile path;
+- enemy attack/defense/control/support skill contracts resolve once per spawn from archetype signature + World family pools;
+- enemy skills use explicit cooldown -> telegraph -> execute lifecycle;
+- Freeze/Silence reuse the existing status engine with hard-CC anti-chain and post-effect immunity;
+- every runtime enemy skill profile is bounded by an eight-axis Threat Budget audit;
 - Service / Upgrade Shop consumes Credits + Alloy through the existing enhancement system;
 - rare resurrection items can appear only as finite stock in eligible rare merchant pools;
 - shop stock participates in checkpoint rollback, crash recovery and stage-entry recovery;
@@ -3554,7 +3559,10 @@ M09 World Enemy / Boss Roster Mapping
 CI #218 PASS 413 tests + Build
 
 M10 Enemy Rank / Word Difficulty / Typing Layers
-CI #223 PASS Test + Build
+CI #225 PASS Test + Build
+
+M11 Enemy Skills / CC Guard / Threat Budget
+CI #227 PASS Test + Build
 ~~~
 
 Important implementation notes:
