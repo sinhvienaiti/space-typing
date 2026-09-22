@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   bossVisualDefinitionId,
+  bossVisualDefinitionIdForStage,
   bossVisualName,
+  bossVisualNameForStage,
 } from "../src/boss/visual-profile";
 import { enemyDefinition } from "../src/enemies/registry";
+import { worldForStage } from "../src/worlds/registry";
 
 describe("boss visual conversion", () => {
   it("cycles V1 bosses before late Shadow/Cosmic bosses", () => {
@@ -45,4 +48,22 @@ describe("boss visual conversion", () => {
     expect(bossVisualName(9)).toBe("Void Eye");
     expect(bossVisualName(10)).toBe("Cosmic Emperor");
   });
+  it("resolves M09 boss identity from the current World profile", () => {
+    for (const stage of [10, 20, 30, 40, 90, 100, 550, 1000]) {
+      const world = worldForStage(stage);
+      expect(
+        bossVisualDefinitionIdForStage(stage, "mini-boss"),
+      ).toBe(world.miniBoss);
+      expect(
+        bossVisualDefinitionIdForStage(stage, "boss"),
+      ).toBe(world.worldBoss);
+      expect(
+        bossVisualDefinitionIdForStage(stage, "major-boss"),
+      ).toBe(world.worldBoss);
+      expect(
+        bossVisualNameForStage(stage, "boss"),
+      ).toBe(enemyDefinition(world.worldBoss)?.name);
+    }
+  });
+
 });
