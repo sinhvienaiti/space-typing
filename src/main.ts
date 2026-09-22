@@ -2326,6 +2326,10 @@ const game = new Game(
         wpm,
         clearedAt,
       });
+      route = syncRouteStateForStage(
+        route,
+        campaign.highestUnlockedStage,
+      );
 
       const characterUnlock = unlockCharactersForStage(
         characters,
@@ -2753,8 +2757,13 @@ function renderSupportLoadout(): void {
   }
 }
 
+function canOpenBetweenStageMenu(): boolean {
+  const phase = game.getPhase();
+  return phase === "title" || phase === "stageclear";
+}
+
 function openSupportSpells(): void {
-  if (!persistenceReady || game.getPhase() !== "title") return;
+  if (!persistenceReady || !canOpenBetweenStageMenu()) return;
   renderSupportLoadout();
   supportDialog.showModal();
 }
@@ -3200,7 +3209,7 @@ function renderNormalShop(): void {
 }
 
 function openNormalShop(): void {
-  if (!persistenceReady || game.getPhase() !== "title") return;
+  if (!persistenceReady || !canOpenBetweenStageMenu()) return;
   enterShopMusic("normal");
   renderNormalShop();
   shopDialog.showModal();
@@ -3375,7 +3384,7 @@ function renderServiceShop(): void {
 }
 
 function openServiceShop(): void {
-  if (!persistenceReady || game.getPhase() !== "title") return;
+  if (!persistenceReady || !canOpenBetweenStageMenu()) return;
   enterShopMusic("service");
   renderServiceShop();
   serviceShopDialog.showModal();
@@ -3480,7 +3489,7 @@ function renderSpecialShop(): void {
 function openSpecialShop(kind: ShopType): void {
   if (
     !persistenceReady ||
-    game.getPhase() !== "title" ||
+    !canOpenBetweenStageMenu() ||
     kind === "normal" ||
     kind === "service" ||
     !shopAvailable(kind, currentShopContext())
@@ -3552,6 +3561,20 @@ async function prepareStageVocabulary(
 
 async function startSelectedStage(): Promise<void> {
   if (!persistenceReady || !vocabularyReady || stageStartPending) return;
+
+  if (
+    campaign.selectedStage === campaign.highestUnlockedStage
+  ) {
+    route = syncRouteStateForStage(
+      route,
+      campaign.highestUnlockedStage,
+    );
+    if (routeNeedsChoice(route, campaign.selectedStage)) {
+      openRouteMap();
+      return;
+    }
+  }
+
   stageStartPending = true;
 
   try {
@@ -3648,6 +3671,7 @@ async function initializePlayerProgress(): Promise<void> {
   const startButton = byId<HTMLButtonElement>("startButton");
   const stageSelectButton =
     byId<HTMLButtonElement>("stageSelectButton");
+  const routeButton = byId<HTMLButtonElement>("routeButton");
   const dataButtons = [
     byId<HTMLButtonElement>("dataButton"),
     byId<HTMLButtonElement>("pauseDataButton"),
@@ -3677,6 +3701,7 @@ async function initializePlayerProgress(): Promise<void> {
 
   startButton.disabled = true;
   stageSelectButton.disabled = true;
+  routeButton.disabled = true;
   equipmentButton.disabled = true;
   shopButton.disabled = true;
   stationShopButton.disabled = true;
@@ -3730,6 +3755,7 @@ async function initializePlayerProgress(): Promise<void> {
     updateCampaignUi();
     startButton.disabled = !vocabularyReady;
     stageSelectButton.disabled = false;
+    routeButton.disabled = false;
     equipmentButton.disabled = false;
     shopButton.disabled = false;
     stationShopButton.disabled = false;
