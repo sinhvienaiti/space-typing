@@ -6,6 +6,7 @@ import {
   rewardChoiceWord,
   shouldScheduleRewardChoiceCrate,
 } from "../src/events/reward-choice";
+import { RELIC_IDS } from "../src/relics/registry";
 import { createRelicState } from "../src/relics/state";
 
 function sequence(values: number[]): () => number {
@@ -55,6 +56,28 @@ describe("reward-choice crate", () => {
     expect(equipment?.kind).toBe("equipment");
     if (equipment?.kind === "equipment") {
       expect(equipment.drop.source).toBe("boss");
+    }
+  });
+
+  it("falls back to premium currency when every eligible Relic is already owned", () => {
+    const fullRelics = {
+      ...createRelicState(),
+      owned: [...RELIC_IDS],
+    };
+    const choices = createBossRewardChoiceOptions(
+      1000,
+      30,
+      fullRelics,
+    );
+
+    expect(choices).toHaveLength(3);
+    expect(choices[2]).toMatchObject({
+      id: "premium-currency",
+      kind: "currency",
+    });
+    if (choices[2]?.kind === "currency") {
+      expect(choices[2].credits).toBeGreaterThan(0);
+      expect(choices[2].currencies.starCrystal).toBeGreaterThan(0);
     }
   });
 
