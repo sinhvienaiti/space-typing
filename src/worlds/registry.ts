@@ -235,6 +235,24 @@ function unique<T>(values: readonly T[]): T[] {
   return [...new Set(values)];
 }
 
+function bossForFamilies(
+  mapping: Record<EnemyFamilyId, EnemyDefinitionId>,
+  families: readonly EnemyFamilyId[],
+): EnemyDefinitionId {
+  for (const family of families) {
+    const candidate = mapping[family];
+    const definition = enemyDefinition(candidate);
+    if (
+      definition !== undefined &&
+      families.includes(definition.family)
+    ) {
+      return candidate;
+    }
+  }
+
+  return mapping[families[0] ?? "rainbow"];
+}
+
 function rankDistribution(worldIndex: number): Readonly<Record<string, number>> {
   const progress = worldIndex / (WORLD_COUNT - 1);
   const peak = 1 + Math.round(progress * 9);
@@ -284,8 +302,8 @@ function worldProfile(index: number): WorldProfile {
         .filter((enemyId) => enemyId.includes("elite")),
     ),
     apexPool: ["apex-" + primary],
-    miniBoss: MINI_BOSS_BY_FAMILY[primary],
-    worldBoss: WORLD_BOSS_BY_FAMILY[primary],
+    miniBoss: bossForFamilies(MINI_BOSS_BY_FAMILY, families),
+    worldBoss: bossForFamilies(WORLD_BOSS_BY_FAMILY, families),
     worldRules: [
       ...spec.rules,
       "world-slot-" + String(slot + 1),
