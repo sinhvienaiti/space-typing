@@ -27,6 +27,7 @@ import {
 import {
   createPlayerSave,
   migratePlayerSave,
+  resolvePlayerSaveRecovery,
   PLAYER_SAVE_VERSION,
 } from "./player-save";
 import {
@@ -476,9 +477,13 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   const migration = migratePlayerSave(parsed);
+  const resolved = resolvePlayerSaveRecovery(
+    migration.save,
+    migration.save.updatedAt,
+  );
   return {
     ok: true,
-    save: migration.save,
+    save: resolved.save,
     migrated: migration.migrated,
   };
 }
