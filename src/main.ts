@@ -7,6 +7,13 @@ import {
 } from "./assets/pipeline";
 import { difficultyFor } from "./campaign/difficulty";
 import {
+  createDifficultySettings,
+  difficultyInputFromSettings,
+  recordDifficultyResult,
+  sanitizeDifficultySettings,
+  type DifficultySettings,
+} from "./campaign/difficulty-settings";
+import {
   createDefaultCampaignProgress,
   recordStageClear,
   selectCampaignStage,
@@ -202,6 +209,7 @@ if (app === null) {
 }
 
 const SETTINGS_KEY = "spaceTypingSettingsV1";
+const DIFFICULTY_KEY = "spaceTypingDifficultyV1";
 const SOURCE_KEY = "spaceTypingVocabularySourceV1";
 const CUSTOM_KEY = "spaceTypingCustomVocabularyV1";
 
@@ -256,6 +264,23 @@ function loadSettings(): GameSettings {
   } catch {
     return { ...defaultSettings };
   }
+}
+
+function loadDifficultySettings(): DifficultySettings {
+  try {
+    const raw = localStorage.getItem(DIFFICULTY_KEY);
+    if (raw === null) return createDifficultySettings();
+    return sanitizeDifficultySettings(JSON.parse(raw));
+  } catch {
+    return createDifficultySettings();
+  }
+}
+
+function saveDifficultySettings(): void {
+  localStorage.setItem(
+    DIFFICULTY_KEY,
+    JSON.stringify(difficultySettings),
+  );
 }
 
 function loadSource(): VocabularySource {
@@ -795,7 +820,7 @@ app.innerHTML = `
         <label class="setting-row">
           <span>
             <strong>Pronunciation rate</strong>
-            <small>Speech speed without cancelling queued words</small>
+            <small>Speech speed; the latest completed word takes priority</small>
           </span>
           <span class="setting-control range-control">
             <input id="pronunciationRate" type="range" min="0.7" max="1.35" step="0.05" />
@@ -812,6 +837,48 @@ app.innerHTML = `
             <input id="pronunciationVolume" type="range" min="0" max="1" step="0.05" />
             <output id="pronunciationVolumeValue">100%</output>
           </span>
+        </label>
+      </div>
+
+      <div class="settings-section">
+        <h3>difficulty</h3>
+        <label class="setting-row">
+          <span>
+            <strong>Difficulty mode</strong>
+            <small>Fixed modes, Adaptive, or a Custom typing target</small>
+          </span>
+          <select id="difficultyMode">
+            <option value="relaxed">Relaxed</option>
+            <option value="normal">Normal</option>
+            <option value="hard">Hard</option>
+            <option value="expert">Expert</option>
+            <option value="adaptive">Adaptive</option>
+            <option value="custom">Custom</option>
+          </select>
+        </label>
+
+        <label class="setting-row">
+          <span>
+            <strong>Adaptive profile</strong>
+            <small>Smoothed from valid Campaign stage clears</small>
+          </span>
+          <output id="adaptiveProfileValue">60 WPM · 96%</output>
+        </label>
+
+        <label class="setting-row">
+          <span>
+            <strong>Custom target WPM</strong>
+            <small>Used only when Difficulty mode is Custom</small>
+          </span>
+          <input id="customTargetWpm" type="number" min="20" max="220" step="5" />
+        </label>
+
+        <label class="setting-row">
+          <span>
+            <strong>Custom pressure</strong>
+            <small>0.70 is forgiving; 1.45 is the maximum custom pressure</small>
+          </span>
+          <input id="customPressure" type="number" min="0.7" max="1.45" step="0.05" />
         </label>
       </div>
 
@@ -846,6 +913,7 @@ app.innerHTML = `
 `;
 
 let settings = loadSettings();
+let difficultySettings = loadDifficultySettings();
 let campaign = createDefaultCampaignProgress();
 let inventory: Inventory = createEmptyInventory();
 let equipment: EquipmentState = createStarterEquipmentState();
@@ -1608,6 +1676,12 @@ const game = new Game(
         game.getStageElapsedSeconds(),
       );
       const accuracy = accuracyPercent(stats.hits, stats.misses);
+      difficultySettings = recordDifficultyResult(
+        difficultySettings,
+        wpm,
+        accuracy,
+      );
+      saveDifficultySettings();
 
       campaign = recordStageClear(campaign, stats.stage, {
         score: stats.score,
@@ -2552,13 +2626,13 @@ async function startSelectedStage(): Promise<void> {
     game.setCharacter(characters.selected);
     const stage = createStageConfig(campaign.selectedStage);
     await prepareStageVocabulary(stage);
-    const difficulty = difficultyFor({
-      stage: stage.stage,
-      mode: "normal",
-      vocabularyLevel: selectedVocabularyLevel(),
-      recentWpm: 60,
-      recentAccuracy: 96,
-    });
+    const difficulty = difficultyFor(
+      difficultyInputFromSettings(
+        difficultySettings,
+        stage.stage,
+        selectedVocabularyLevel(),
+      ),
+    );
 
     game.startStage(stage, difficulty);
   } finally {
@@ -2835,6 +2909,25 @@ function renderSettings(): void {
   voiceVolume.value = String(settings.pronunciationVolume);
   byId<HTMLOutputElement>("pronunciationVolumeValue").value =
     String(Math.round(settings.pronunciationVolume * 100)) + "%";
+
+  const difficultyMode = byId<HTMLSelectElement>("difficultyMode");
+  difficultyMode.value = difficultySettings.mode;
+
+  byId<HTMLOutputElement>("adaptiveProfileValue").value =
+    difficultySettings.profile.smoothedWpm.toFixed(0) +
+    " WPM · " +
+    difficultySettings.profile.smoothedAccuracy.toFixed(1) +
+    "% · " +
+    String(difficultySettings.profile.samples) +
+    " clears";
+
+  const customTargetWpm = byId<HTMLInputElement>("customTargetWpm");
+  customTargetWpm.value = String(difficultySettings.customTargetWpm);
+  customTargetWpm.disabled = difficultySettings.mode !== "custom";
+
+  const customPressure = byId<HTMLInputElement>("customPressure");
+  customPressure.value = difficultySettings.customPressure.toFixed(2);
+  customPressure.disabled = difficultySettings.mode !== "custom";
 }
 
 function openSettings(): void {
@@ -3325,6 +3418,46 @@ byId("saveCustom").addEventListener("click", () => {
   vocabularyDialog.close();
   showNotice("Custom vocabulary applied · " + String(entries.length) + " entries");
 });
+
+byId<HTMLSelectElement>("difficultyMode").addEventListener(
+  "change",
+  (event) => {
+    difficultySettings = sanitizeDifficultySettings({
+      ...difficultySettings,
+      mode: (event.currentTarget as HTMLSelectElement).value,
+    });
+    saveDifficultySettings();
+    renderSettings();
+  },
+);
+
+byId<HTMLInputElement>("customTargetWpm").addEventListener(
+  "change",
+  (event) => {
+    difficultySettings = sanitizeDifficultySettings({
+      ...difficultySettings,
+      customTargetWpm: Number(
+        (event.currentTarget as HTMLInputElement).value,
+      ),
+    });
+    saveDifficultySettings();
+    renderSettings();
+  },
+);
+
+byId<HTMLInputElement>("customPressure").addEventListener(
+  "change",
+  (event) => {
+    difficultySettings = sanitizeDifficultySettings({
+      ...difficultySettings,
+      customPressure: Number(
+        (event.currentTarget as HTMLInputElement).value,
+      ),
+    });
+    saveDifficultySettings();
+    renderSettings();
+  },
+);
 
 byId<HTMLInputElement>("sfxVolume").addEventListener("input", (event) => {
   settings = {
