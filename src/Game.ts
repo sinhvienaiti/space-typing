@@ -10,6 +10,10 @@ import {
   toBossHud,
 } from "./boss/model";
 import type { BossHudState, BossState } from "./boss/model";
+import {
+  bossVisualDefinitionId,
+  bossVisualName,
+} from "./boss/visual-profile";
 import type { DifficultyProfile, StageConfig } from "./campaign/types";
 import type { CharacterId } from "./characters/registry";
 import {
@@ -1829,6 +1833,7 @@ export class Game {
       stage.role,
       entry,
     );
+    this.boss.name = bossVisualName(stage.galaxy);
     this.bossSpawned = true;
     this.bossDefeated = false;
     this.projectiles = [];
@@ -4155,32 +4160,46 @@ export class Game {
       context.restore();
     }
     context.globalCompositeOperation = "lighter";
-    context.shadowBlur = boss.flash > 0 ? 36 : 24;
     const phaseColor =
       boss.phase >= 3 ? "#ff527c" : boss.phase === 2 ? "#68e9ff" : "#ff8a6f";
-    context.shadowColor = boss.flash > 0 ? "#ffffff" : phaseColor;
-    context.strokeStyle = boss.flash > 0 ? "#ffffff" : phaseColor;
-    context.fillStyle =
-      boss.phase >= 3
-        ? "rgba(255, 61, 112, 0.09)"
-        : boss.phase === 2
-          ? "rgba(82, 218, 255, 0.08)"
-          : "rgba(255, 89, 72, 0.075)";
-    context.lineWidth = boss.role === "major-boss" ? 3.4 : 2.6;
+    const definition = enemyDefinition(
+      bossVisualDefinitionId(this.stageConfig?.galaxy ?? 1),
+    );
+    const modularDrawn =
+      definition !== undefined &&
+      drawModularEnemy(context, definition, {
+        radius,
+        age: time,
+        flash: boss.flash,
+        targeted: false,
+      });
 
-    context.beginPath();
-    for (let index = 0; index < 8; index += 1) {
-      const angle = (Math.PI * 2 * index) / 8 - Math.PI / 2;
-      const pointRadius =
-        index % 2 === 0 ? radius : radius * 0.72;
-      const px = Math.cos(angle) * pointRadius;
-      const py = Math.sin(angle) * pointRadius * 0.82;
-      if (index === 0) context.moveTo(px, py);
-      else context.lineTo(px, py);
+    if (!modularDrawn) {
+      context.shadowBlur = boss.flash > 0 ? 36 : 24;
+      context.shadowColor = boss.flash > 0 ? "#ffffff" : phaseColor;
+      context.strokeStyle = boss.flash > 0 ? "#ffffff" : phaseColor;
+      context.fillStyle =
+        boss.phase >= 3
+          ? "rgba(255, 61, 112, 0.09)"
+          : boss.phase === 2
+            ? "rgba(82, 218, 255, 0.08)"
+            : "rgba(255, 89, 72, 0.075)";
+      context.lineWidth = boss.role === "major-boss" ? 3.4 : 2.6;
+
+      context.beginPath();
+      for (let index = 0; index < 8; index += 1) {
+        const angle = (Math.PI * 2 * index) / 8 - Math.PI / 2;
+        const pointRadius =
+          index % 2 === 0 ? radius : radius * 0.72;
+        const px = Math.cos(angle) * pointRadius;
+        const py = Math.sin(angle) * pointRadius * 0.82;
+        if (index === 0) context.moveTo(px, py);
+        else context.lineTo(px, py);
+      }
+      context.closePath();
+      context.fill();
+      context.stroke();
     }
-    context.closePath();
-    context.fill();
-    context.stroke();
 
     context.strokeStyle =
       "rgba(255, 178, 105, " + String(0.35 + pulse * 0.18) + ")";
