@@ -1610,6 +1610,15 @@ const game = new Game(
         salvage: game.getPlayerStats().salvage,
       });
       credits = addCredits(credits, creditReward);
+      progression = recordProgressionEvent(progression, {
+        type: "stage-clear",
+        accuracy,
+      });
+      const achievementNames = syncProgressionAchievements();
+      const achievementText =
+        achievementNames.length > 0
+          ? " · Achievement: " + achievementNames.join(", ")
+          : "";
 
       void autosaveCampaign(
         "stage-clear",
@@ -1620,7 +1629,8 @@ const game = new Game(
           progressText +
           " · +" +
           creditReward.toLocaleString() +
-          " Credits",
+          " Credits" +
+          achievementText,
       );
 
       byId("clearTitle").textContent =
@@ -1646,7 +1656,11 @@ const game = new Game(
         rarity: drop.rarity,
         enhancement: 0,
       });
+      progression = recordProgressionEvent(progression, {
+        type: "equipment-drop",
+      });
       renderEquipment();
+      renderProgression();
       void autosaveCampaign(
         "equipment",
         "✓ " +
@@ -1673,6 +1687,8 @@ const game = new Game(
       hiddenDiscovery = state;
       renderCodex();
       updateSpecialShopAccess();
+      const achievementNames = syncProgressionAchievements();
+      if (achievementNames.length > 0) renderProgression();
       void autosaveCampaign(
         "discovery",
         discovery === null
@@ -2131,6 +2147,8 @@ function renderNormalShop(): void {
       applyEquipmentStats();
       renderNormalShop();
       updateDataSummary();
+      recordShopProgress();
+      renderProgression();
       void autosaveCampaign(
         "shop",
         "✓ Purchased " +
@@ -2208,6 +2226,8 @@ function renderServiceShop(): void {
     }
 
     applyServiceShopState(result.state);
+    recordShopProgress();
+    renderProgression();
     renderServiceShop();
     void autosaveCampaign(
       "shop",
@@ -2273,6 +2293,8 @@ function renderServiceShop(): void {
       }
 
       applyServiceShopState(result.state);
+      recordShopProgress();
+      renderProgression();
       renderNormalShop();
       renderServiceShop();
       void autosaveCampaign(
@@ -2384,6 +2406,8 @@ function renderSpecialShop(): void {
       }
 
       applyServiceShopState(purchase.state);
+      recordShopProgress();
+      renderProgression();
       renderNormalShop();
       renderServiceShop();
       renderSpecialShop();
