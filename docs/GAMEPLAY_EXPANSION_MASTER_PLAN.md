@@ -3059,7 +3059,9 @@ M12 owns Active Typing Pressure, urgent-threat caps and the expanded global diff
 
 ## M12 — Difficulty + Active Typing Pressure scheduler
 
-Implement six primary modes:
+**Status: Complete.** Production difficulty now exposes Relax / Balanced / Hard / Extreme / Nightmare / Impossible plus Adaptive/Custom, with bounded pressure/urgent/CC/reaction/reward dimensions. Regular and summoned enemy admission uses live Active Typing Pressure rather than raw count alone, while legacy difficulty ids migrate safely. See `docs/M12_DIFFICULTY_ACTIVE_PRESSURE.md`.
+
+Implemented:
 
 - Relax;
 - Balanced;
@@ -3067,10 +3069,14 @@ Implement six primary modes:
 - Extreme;
 - Nightmare;
 - Impossible;
+- Adaptive/Custom;
+- projected Active Typing Pressure admission;
+- urgent-threat cap;
+- controller/support density cap;
+- mode-specific reaction/CC/attack/reward dimensions;
+- in-Rank word pressure without changing World Rank access.
 
-plus Adaptive/Custom.
-
-Replace count-only spawn assumptions with projected typing-pressure budget.
+M13 must reuse the M12 aggregate pressure contracts for authored formations.
 
 ## M13 — Formation system
 

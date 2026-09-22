@@ -30,7 +30,7 @@ export function laterGalaxyMilestones(): GalaxyMilestonePoint[] {
       const config = createStageConfig(stage);
       const profile = difficultyFor({
         stage,
-        mode: "normal",
+        mode: "balanced",
         vocabularyLevel: Math.min(100, galaxy * 10),
         recentWpm: 60,
         recentAccuracy: 96,

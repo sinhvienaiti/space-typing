@@ -7,6 +7,11 @@ import {
 } from "./assets/pipeline";
 import { difficultyFor } from "./campaign/difficulty";
 import {
+  difficultyModeDefinition,
+  difficultyModePresentation,
+} from "./campaign/difficulty-modes";
+import type { DifficultyProfile } from "./campaign/types";
+import {
   createDifficultySettings,
   difficultyInputFromSettings,
   recordDifficultyResult,
@@ -98,6 +103,7 @@ import {
   addExpansionCurrencyReward,
   createExpansionCurrencyState,
   expansionCurrencyRewardText,
+  scaleExpansionCurrencyReward,
   stageClearExpansionCurrencyReward,
   type ExpansionCurrencyState,
 } from "./economy/currencies";
@@ -951,13 +957,63 @@ app.innerHTML = `
             <small>Fixed modes, Adaptive, or a Custom typing target</small>
           </span>
           <select id="difficultyMode">
-            <option value="relaxed">Relaxed</option>
-            <option value="normal">Normal</option>
+            <option value="relax">Relax</option>
+            <option value="balanced">Balanced</option>
             <option value="hard">Hard</option>
-            <option value="expert">Expert</option>
+            <option value="extreme">Extreme</option>
+            <option value="nightmare">Nightmare</option>
+            <option value="impossible">Impossible</option>
             <option value="adaptive">Adaptive</option>
             <option value="custom">Custom</option>
           </select>
+        </label>
+
+        <label class="setting-row">
+          <span>
+            <strong>Recommended WPM</strong>
+            <small>Guideline only; it does not lock Campaign access</small>
+          </span>
+          <output id="difficultyWpmValue">40–70 WPM</output>
+        </label>
+
+        <label class="setting-row">
+          <span>
+            <strong>Enemy density</strong>
+            <small>Bounded by active typing pressure, not only enemy count</small>
+          </span>
+          <output id="difficultyDensityValue">Low / moderate</output>
+        </label>
+
+        <label class="setting-row">
+          <span>
+            <strong>CC pressure</strong>
+            <small>Hard CC still obeys telegraph and anti-chain rules</small>
+          </span>
+          <output id="difficultyCcValue">Low</output>
+        </label>
+
+        <label class="setting-row">
+          <span>
+            <strong>Reaction window</strong>
+            <small>Minimum scheduler/telegraph safety window</small>
+          </span>
+          <output id="difficultyReactionValue">0.82s+</output>
+        </label>
+
+        <label class="setting-row">
+          <span>
+            <strong>Formation complexity</strong>
+            <small>M13 formations will consume this same difficulty contract</small>
+          </span>
+          <output id="difficultyFormationValue">2 / 5</output>
+        </label>
+
+        <label class="setting-row">
+          <span>
+            <strong>Reward multiplier</strong>
+            <small>Applied to Campaign stage-clear economy rewards</small>
+          </span>
+          <output id="difficultyRewardValue">1.00x</output>
         </label>
 
         <label class="setting-row">
@@ -973,7 +1029,7 @@ app.innerHTML = `
             <strong>Custom target WPM</strong>
             <small>Used only when Difficulty mode is Custom</small>
           </span>
-          <input id="customTargetWpm" type="number" min="20" max="220" step="5" />
+          <input id="customTargetWpm" type="number" min="10" max="300" step="5" />
         </label>
 
         <label class="setting-row">
@@ -1017,6 +1073,7 @@ app.innerHTML = `
 
 let settings = loadSettings();
 let difficultySettings = loadDifficultySettings();
+let activeStageDifficulty: DifficultyProfile | null = null;
 let campaign = createDefaultCampaignProgress();
 let inventory: Inventory = createEmptyInventory();
 let equipment: EquipmentState = createStarterEquipmentState();
@@ -2260,19 +2317,26 @@ const game = new Game(
             " · Mastery " +
             String(progressAward.progress.mastery)
           : "";
+      const difficultyRewardMultiplier =
+        activeStageDifficulty?.rewardMultiplier ?? 1;
       const creditReward =
         stageClearCreditReward({
           stage: stats.stage,
           accuracy,
           salvage: game.getPlayerStats().salvage,
-        }) * game.getCreditsMultiplier();
+        }) *
+        game.getCreditsMultiplier() *
+        difficultyRewardMultiplier;
       credits = addCredits(credits, creditReward);
 
       const stageConfig = createStageConfig(stats.stage);
-      const currencyReward = stageClearExpansionCurrencyReward(
-        stats.stage,
-        stageConfig.role,
-        accuracy,
+      const currencyReward = scaleExpansionCurrencyReward(
+        stageClearExpansionCurrencyReward(
+          stats.stage,
+          stageConfig.role,
+          accuracy,
+        ),
+        difficultyRewardMultiplier,
       );
       expansionCurrencies = addExpansionCurrencyReward(
         expansionCurrencies,
@@ -3464,6 +3528,7 @@ async function startSelectedStage(): Promise<void> {
         vocabularyLevel,
       ),
     );
+    activeStageDifficulty = difficulty;
 
     const stageEntryAt = new Date().toISOString();
     stageEntrySnapshot = createStageEntrySnapshot(
@@ -3835,6 +3900,27 @@ function renderSettings(): void {
 
   const difficultyMode = byId<HTMLSelectElement>("difficultyMode");
   difficultyMode.value = difficultySettings.mode;
+
+  const modeDefinition = difficultyModeDefinition(
+    difficultySettings.mode,
+    difficultySettings.profile.smoothedWpm,
+    difficultySettings.customTargetWpm,
+    difficultySettings.customPressure,
+  );
+  const modePresentation =
+    difficultyModePresentation(modeDefinition);
+  byId<HTMLOutputElement>("difficultyWpmValue").value =
+    modePresentation.recommendedWpm;
+  byId<HTMLOutputElement>("difficultyDensityValue").value =
+    modePresentation.enemyDensity;
+  byId<HTMLOutputElement>("difficultyCcValue").value =
+    modePresentation.ccPressure;
+  byId<HTMLOutputElement>("difficultyReactionValue").value =
+    modePresentation.reactionWindow;
+  byId<HTMLOutputElement>("difficultyFormationValue").value =
+    modePresentation.formationComplexity;
+  byId<HTMLOutputElement>("difficultyRewardValue").value =
+    modePresentation.rewardMultiplier;
 
   byId<HTMLOutputElement>("adaptiveProfileValue").value =
     difficultySettings.profile.smoothedWpm.toFixed(0) +

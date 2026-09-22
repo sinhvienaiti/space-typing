@@ -27,7 +27,7 @@ export function sanitizeAdaptiveProfile(
     smoothedWpm:
       typeof raw.smoothedWpm === "number" &&
       Number.isFinite(raw.smoothedWpm)
-        ? clamp(raw.smoothedWpm, 20, 220)
+        ? clamp(raw.smoothedWpm, 10, 300)
         : fallback.smoothedWpm,
     smoothedAccuracy:
       typeof raw.smoothedAccuracy === "number" &&
@@ -48,7 +48,7 @@ export function recordAdaptiveResult(
   accuracy: number,
 ): AdaptiveProfile {
   const state = sanitizeAdaptiveProfile(input);
-  const nextWpm = clamp(Number.isFinite(wpm) ? wpm : 60, 20, 220);
+  const nextWpm = clamp(Number.isFinite(wpm) ? wpm : 60, 10, 300);
   const nextAccuracy = clamp(
     Number.isFinite(accuracy) ? accuracy : 95,
     60,

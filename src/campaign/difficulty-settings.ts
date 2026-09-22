@@ -9,15 +9,12 @@ import {
   type AdaptiveProfile,
 } from "./adaptive-profile";
 import { clamp } from "../logic";
+import {
+  DIFFICULTY_MODES,
+  migrateDifficultyMode,
+} from "./difficulty-modes";
 
-export const DIFFICULTY_MODES = [
-  "relaxed",
-  "normal",
-  "hard",
-  "expert",
-  "adaptive",
-  "custom",
-] as const satisfies readonly DifficultyMode[];
+export { DIFFICULTY_MODES };
 
 export type DifficultySettings = {
   mode: DifficultyMode;
@@ -28,18 +25,17 @@ export type DifficultySettings = {
 
 export function createDifficultySettings(): DifficultySettings {
   return {
-    mode: "normal",
+    mode: "balanced",
     customTargetWpm: 60,
     customPressure: 1,
     profile: createAdaptiveProfile(),
   };
 }
 
-function isDifficultyMode(value: unknown): value is DifficultyMode {
-  return (
-    typeof value === "string" &&
-    DIFFICULTY_MODES.includes(value as DifficultyMode)
-  );
+function sanitizeDifficultyMode(
+  value: unknown,
+): DifficultyMode | null {
+  return migrateDifficultyMode(value);
 }
 
 export function sanitizeDifficultySettings(
@@ -58,11 +54,11 @@ export function sanitizeDifficultySettings(
   };
 
   return {
-    mode: isDifficultyMode(raw.mode) ? raw.mode : fallback.mode,
+    mode: sanitizeDifficultyMode(raw.mode) ?? fallback.mode,
     customTargetWpm:
       typeof raw.customTargetWpm === "number" &&
       Number.isFinite(raw.customTargetWpm)
-        ? clamp(raw.customTargetWpm, 20, 220)
+        ? clamp(raw.customTargetWpm, 10, 300)
         : fallback.customTargetWpm,
     customPressure:
       typeof raw.customPressure === "number" &&

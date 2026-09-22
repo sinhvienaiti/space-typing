@@ -36,6 +36,7 @@ export type ResolveEnemyTypingProfileInput = {
   entries: readonly VocabularyEntry[];
   random?: () => number;
   excludeEntryId?: string;
+  wordScoreOffset?: number;
 };
 
 export function resolveEnemyTypingProfile(
@@ -84,9 +85,12 @@ export function resolveEnemyTypingProfile(
     sampledRank,
   });
 
-  // If real word complexity moves the resolved Rank, repick once from the
-  // same configured vocabulary source. Never switch vocabulary levels.
-  if (enemyRankNumber(finalRank) !== enemyRankNumber(mechanicalRank)) {
+  // Difficulty may shift word pressure inside the final Rank band, but it
+  // must not change access to the authored World Rank distribution.
+  if (
+    enemyRankNumber(finalRank) !== enemyRankNumber(mechanicalRank) ||
+    (input.wordScoreOffset ?? 0) !== 0
+  ) {
     const adjusted =
       pickVocabularyEntryForRank(
         input.entries,
@@ -94,6 +98,7 @@ export function resolveEnemyTypingProfile(
         input.vocabularyLevel,
         random(),
         input.excludeEntryId,
+        input.wordScoreOffset ?? 0,
       ) ?? entry;
     entry = adjusted;
     score = wordDifficultyScore(

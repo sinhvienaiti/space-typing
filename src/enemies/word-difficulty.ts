@@ -129,6 +129,7 @@ export function pickVocabularyEntryForRank(
   vocabularyLevel = 1,
   random = Math.random(),
   excludeId?: string,
+  scoreOffset = 0,
 ): VocabularyEntry | undefined {
   if (entries.length === 0) return undefined;
 
@@ -137,7 +138,12 @@ export function pickVocabularyEntryForRank(
       ? [...entries]
       : entries.filter((entry) => entry.id !== excludeId);
   const source = filtered.length > 0 ? filtered : [...entries];
-  const target = rankWordTargetScore(rank);
+  const target = clamp(
+    rankWordTargetScore(rank) +
+      (Number.isFinite(scoreOffset) ? scoreOffset : 0),
+    0,
+    100,
+  );
 
   const ordered = source
     .map((entry) => ({

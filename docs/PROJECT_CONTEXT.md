@@ -3470,9 +3470,10 @@ Gameplay Expansion:
 - M09 World enemy/boss roster mapping: COMPLETE
 - M10 Enemy Rank I-X + WordDifficultyScore + typing layers: COMPLETE
 - M11 Enemy skill/effect framework + Threat Budget: COMPLETE
+- M12 Difficulty + Active Typing Pressure scheduler: COMPLETE
 
 Next:
-- M12 Difficulty + Active Typing Pressure scheduler
+- M13 Formation system
 ~~~
 
 Current gameplay/progression foundation:
@@ -3517,6 +3518,12 @@ Current gameplay/progression foundation:
 - enemy skills use explicit cooldown -> telegraph -> execute lifecycle;
 - Freeze/Silence reuse the existing status engine with hard-CC anti-chain and post-effect immunity;
 - every runtime enemy skill profile is bounded by an eight-axis Threat Budget audit;
+- six fixed difficulty modes now cover Relax / Balanced / Hard / Extreme / Nightmare / Impossible, plus Adaptive/Custom;
+- difficulty exposes explicit pressure budget, urgent-threat cap, controller/support density, reaction, CC, attack and reward dimensions;
+- regular Campaign spawns, Carrier summons and Splitter fragments pass through Active Typing Pressure admission;
+- pressure-denied regular spawns retry without consuming stage enemy budget;
+- difficulty word pressure stays inside the configured vocabulary and does not change authored World Rank access;
+- stage-clear economy rewards use the frozen stage-start difficulty reward multiplier;
 - Service / Upgrade Shop consumes Credits + Alloy through the existing enhancement system;
 - rare resurrection items can appear only as finite stock in eligible rare merchant pools;
 - shop stock participates in checkpoint rollback, crash recovery and stage-entry recovery;
@@ -3563,6 +3570,9 @@ CI #225 PASS Test + Build
 
 M11 Enemy Skills / CC Guard / Threat Budget
 CI #227 PASS Test + Build
+
+M12 Difficulty / Active Typing Pressure
+CI #235 PASS Test + Build
 ~~~
 
 Important implementation notes:
@@ -3571,7 +3581,7 @@ Important implementation notes:
 - Permanent systems must extend PlayerSave through explicit migrations.
 - Current runtime equipment uses the five-grade model; legacy rarity names remain only in migration/compatibility paths and historical step notes.
 - `ShopState` is part of `RunPersistentState`, so shop stock is economic segment state rather than a separate local-storage system.
-- M07 canonical World ids are the authoritative World identity used by M06 shop instances, M08 music profiles, M09 enemy/boss roster selection and M10 World rank bands.
+- M07 canonical World ids are the authoritative World identity used by M06 shop instances, M08 music profiles, M09 enemy/boss roster selection and M10 World rank bands; M12 changes pressure, not World access.
 - Event/special tokens remain optional per the expansion plan. M06 does not create a permanent Event Token before an earning loop exists.
 - Support spell loadout is separate from core combat skills.
 - Core combat skill hotkeys:

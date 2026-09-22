@@ -22,7 +22,7 @@ export function earlyStageBalancePoint(
   const config = createStageConfig(stage);
   const difficulty = difficultyFor({
     stage,
-    mode: "normal",
+    mode: "balanced",
     vocabularyLevel: 1,
     recentWpm: 60,
     recentAccuracy: 96,
