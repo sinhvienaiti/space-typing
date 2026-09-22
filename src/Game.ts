@@ -1330,6 +1330,7 @@ export class Game {
     this.celestialCharge = 0;
     this.statusState = createStatusState();
     this.interferenceTimer = 0;
+    this.hitStopTimer = 0;
     this.skillHudTimer = 0;
     this.hooks.onBossUpdate(null);
     this.hooks.onStatuses(this.statusState);
