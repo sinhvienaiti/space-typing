@@ -20,7 +20,7 @@ The major goals are:
 
 - checkpoints that create meaningful risk every 10 stages;
 - crash recovery that protects the player from technical failures without weakening gameplay;
-- 50 main Worlds with enemies, bosses, visuals, hazards, rewards and shops that match each World;
+- 50 main Worlds with enemies, bosses, visuals, hazards, rewards, shops, BGM and ambient identity that match each World;
 - branching route choices without deleting the numeric 001-1000 Campaign identity;
 - optional hidden challenge stages with selectable risk and reward;
 - a clear 10-rank enemy hierarchy;
@@ -710,7 +710,7 @@ WorldProfile
 - shopPool
 - hiddenEventPool
 - hiddenChallengePool
-- musicMood
+- musicProfile
 - transitionPresentation
 ~~~
 
@@ -749,7 +749,378 @@ The World must influence:
 
 Reusable archetypes are allowed, but their presentation and signature mechanics must fit the World.
 
+## 10.3 Dynamic World Music System
+
+Background music is part of World identity and must be designed together with visuals, enemy families and bosses.
+
+The game currently has SFX/pronunciation/announcer foundations, but the expansion requires a real BGM/ambient runtime.
+
+Each World owns a `WorldMusicProfile` referenced by `WorldProfile.musicProfile`.
+
+Suggested contract:
+
+~~~text
+WorldMusicProfile
+- id
+- baseTrack
+- ambientLayers
+- intenseTrackOrLayer
+- miniBossTrack
+- worldBossTrack
+- galaxyBossTrack
+- championHuntTrack
+- hiddenChallengeTrack
+- hiddenWorldTrack
+- shopTrack
+- stationTrack
+- victoryStinger
+- defeatStinger
+- transitionStinger
+- crossfadeSeconds
+- duckingProfile
+- preloadHints
+~~~
+
+Not every field must point to a unique file. A World may reuse one base composition with extra layers or intensity states where that produces a better result and keeps asset size reasonable.
+
+### 10.3.1 Music state machine
+
+Use an explicit music state instead of ad-hoc play/stop calls.
+
+Target states:
+
+~~~text
+SILENT
+WORLD_NORMAL
+WORLD_INTENSE
+MINI_BOSS
+WORLD_BOSS
+GALAXY_BOSS
+CHAMPION_HUNT
+HIDDEN_CHALLENGE
+HIDDEN_WORLD
+SHOP
+STATION
+VICTORY
+DEFEAT
+TRANSITION
+~~~
+
+State changes are driven by production gameplay events.
+
+Examples:
+
+~~~text
+enter World
+-> WORLD_NORMAL
+
+Elite/Apex pressure rises
+-> WORLD_INTENSE
+
+pressure clears
+-> WORLD_NORMAL
+
+enter Mini Boss
+-> MINI_BOSS
+
+enter World Boss
+-> WORLD_BOSS
+
+enter Galaxy Major Boss
+-> GALAXY_BOSS
+
+enter Champion Hunt
+-> CHAMPION_HUNT
+
+open Shop/Station
+-> SHOP / STATION
+
+boss defeated
+-> duck/stop combat music
+-> boss-death SFX
+-> VICTORY stinger
+~~~
+
+Do not restart the same track from the beginning every time a short state changes if a seamless layer transition is possible.
+
+### 10.3.2 Crossfade
+
+Music transitions must not hard-cut unless the design intentionally calls for a dramatic stop.
+
+Default behavior:
+
+- fade outgoing music down;
+- begin/fade incoming music up;
+- preserve a small overlap window;
+- cancel stale transitions if a newer state arrives.
+
+Suggested initial crossfade target:
+
+~~~text
+1.5-2.5 seconds for World/route transitions
+0.4-1.0 seconds for combat intensity changes
+short intentional cut/impact for selected boss/victory moments
+~~~
+
+Exact values must be configurable and validated by manual playtest.
+
+### 10.3.3 Layered intensity
+
+Where practical, prefer layered music over loading many nearly identical full tracks.
+
+Example:
+
+~~~text
+WORLD_NORMAL
+= base pad + rhythm
+
+WORLD_INTENSE
+= base pad + rhythm + percussion/intense layer
+
+BOSS PHASE 2
+= boss base + stronger percussion
+
+BOSS PHASE 3
+= boss base + high-intensity layer
+~~~
+
+The system may use:
+
+- synchronized stems;
+- alternate tracks;
+- one-shot stingers;
+- filtered/volume automation.
+
+Do not require every World to use stems if a simple crossfade is enough.
+
+### 10.3.4 Ambient layer
+
+Each World may have a low-volume environmental ambience independent of the musical track.
+
+Examples:
+
+- Frozen World -> wind, distant ice crack;
+- Forest -> wind/leaves/insects;
+- Shadow -> low drone/whispers;
+- Machine -> machinery/hum;
+- Demon -> fire/low rumble;
+- Ocean -> deep water/pressure;
+- Angel -> airy/choir-like ambience;
+- Void -> sub drone/anomaly noise.
+
+Ambient must remain below important gameplay audio and should be looped/cached efficiently.
+
+### 10.3.5 Audio priority and ducking
+
+Typing/pronunciation and warnings must remain intelligible.
+
+Target priority:
+
+~~~text
+Announcer / critical pronunciation
+> critical warning
+> normal pronunciation / typing feedback
+> combat SFX
+> BGM
+> ambient
+~~~
+
+When a high-priority event occurs:
+
+- BGM ducks smoothly;
+- ambient ducks more strongly;
+- announcer/pronunciation remains clear;
+- music recovers smoothly after the event.
+
+Examples:
+
+~~~text
+DOUBLE KILL
+-> BGM duck
+-> announcer plays
+-> BGM restores
+
+pronunciation starts
+-> BGM/ambient duck slightly
+-> pronunciation ends
+-> restore
+
+boss warning
+-> BGM may duck or transition
+-> warning remains readable
+~~~
+
+The existing SFX/pronunciation event infrastructure should be extended rather than creating an unrelated audio pipeline.
+
+### 10.3.6 Separate volume controls
+
+Settings should ultimately expose separate user controls for:
+
+- Master;
+- Music;
+- Ambient;
+- SFX;
+- Pronunciation;
+- Announcer.
+
+If UI scope must be staged, Music + Ambient may first share one control, but the runtime should keep their gain buses separate.
+
+### 10.3.7 World and stage-type mapping
+
+The music resolver receives:
+
+- current World;
+- current route/stage type;
+- boss type/phase;
+- combat intensity;
+- hidden/shop/station state.
+
+Resolution order should be deterministic.
+
+Example precedence:
+
+~~~text
+Galaxy Boss
+> World Boss
+> Mini Boss
+> Champion Hunt / Hidden Challenge / Hidden World
+> Shop / Station
+> World Intense
+> World Normal
+~~~
+
+A specific authored override may supersede this order when explicitly configured.
+
+### 10.3.8 Boss music behavior
+
+Boss music is not just another random track.
+
+Required behavior:
+
+- boss entrance stinger/transition;
+- dedicated Mini Boss/World Boss/Galaxy Boss state;
+- phase changes can add layers or change intensity;
+- boss death must leave room for death impact and victory stinger;
+- returning to route/World music uses a controlled transition.
+
+Do not restart full boss music on every phase.
+
+### 10.3.9 Champion Hunt / multi-kill interaction
+
+Champion Hunt / Apex Gauntlet receives its own optional music state.
+
+The Priority Kill Chain announcer must temporarily duck this music so:
+
+- Double Kill;
+- Triple Kill;
+- Ultra Kill;
+- Rampage;
+- Monster Kill
+
+remain clearly audible.
+
+Music escalation and announcer escalation may reinforce one another, but must not compete for the same frequency/volume space.
+
+### 10.3.10 Asset layout and local overrides
+
+Repository-owned, redistributable/default audio may live under:
+
+~~~text
+public/assets/audio/music/
+public/assets/audio/ambient/
+public/assets/audio/stingers/
+~~~
+
+Private/local-only replacements may live under:
+
+~~~text
+public/local-assets/music/
+public/local-assets/ambient/
+public/local-assets/announcer/
+~~~
+
+Local-only folders are governed by `docs/LOCAL_ASSETS_README.md` and must remain review-required before any public deployment.
+
+The runtime must not crash if local overrides are absent.
+
+Preferred resolution:
+
+~~~text
+explicit valid local override
+-> use local asset
+
+otherwise
+-> use repository/default asset
+
+asset missing/failed
+-> fail soft, continue gameplay without blocking combat
+~~~
+
+Do not perform synchronous network/file probing in the combat frame loop. Resolve/cache asset availability outside hot paths.
+
+### 10.3.11 Track count strategy
+
+Do not create one song per Campaign stage.
+
+A practical target is:
+
+- one identifiable base theme per Main World;
+- reusable or World-specific ambient layer;
+- special boss/galaxy themes where valuable;
+- reusable Champion Hunt/Hidden/Shop/Station themes where appropriate;
+- stingers for transitions/victory/defeat.
+
+For 50 Worlds this may result in roughly 50 core World themes plus a smaller collection of boss/special-state tracks, rather than hundreds or thousands of files.
+
+Content quality and clear World identity matter more than raw track count.
+
+### 10.3.12 Audio runtime architecture
+
+Use a dedicated music controller layered on top of the existing audio architecture, not scattered `new Audio()` calls around gameplay.
+
+Target responsibilities:
+
+~~~text
+MusicController
+- resolveMusicState()
+- transitionTo(state)
+- setWorldProfile(profile)
+- setIntensity(level)
+- setBossPhase(phase)
+- duck(reason)
+- releaseDuck(reason)
+- setMusicVolume()
+- setAmbientVolume()
+- preloadNext()
+- stop()
+- destroy()
+~~~
+
+Implementation may use Web Audio gain nodes, HTMLAudio media elements routed through Web Audio, or another lightweight browser-native solution, but it must support:
+
+- loop;
+- crossfade;
+- separate music/ambient gain;
+- ducking;
+- cleanup;
+- no leaking audio elements;
+- no duplicate playback after pause/restart;
+- mobile/browser autoplay constraints.
+
+### 10.3.13 Performance requirements
+
+- resolve World music once on World/stage transition;
+- no full music registry scan every frame;
+- no decoding/loading all 50 Worlds at startup;
+- preload only current/next likely tracks;
+- cap simultaneous stems/layers;
+- release unused media/buffers;
+- pause/suspend cleanly when the game is paused/backgrounded where appropriate;
+- do not let failed audio loads break gameplay.
+
 ---
+
+# 11. Proposed 50-World content map
 
 # 11. Proposed 50-World content map
 
@@ -1748,6 +2119,14 @@ Load current/near-future World assets only.
 
 Do not preload 50 full Worlds.
 
+For music/ambient:
+
+- preload the current track and only likely next transitions;
+- avoid decoding all World themes at startup;
+- cache small stingers when useful;
+- release old World media after transition;
+- keep a bounded number of simultaneous music/ambient layers.
+
 Continue using procedural/cached fallback visuals where appropriate.
 
 ---
@@ -1810,6 +2189,10 @@ The Test Lab must reuse the same production code paths for:
 - projectiles;
 - VFX;
 - SFX;
+- BGM/music state;
+- ambient layers;
+- announcer;
+- audio ducking/crossfade;
 - kill/death effects;
 - items and consumables;
 - equipment;
@@ -1837,6 +2220,44 @@ Allow selection of:
 - stage/sector/checkpoint context.
 
 Changing World should optionally auto-load that World's recommended enemy/boss roster, while still allowing manual overrides.
+
+### Music / audio controls
+
+Allow:
+
+- select any WorldMusicProfile;
+- play World Normal;
+- play World Intense;
+- play Mini Boss;
+- play World Boss;
+- play Galaxy Boss;
+- play Champion Hunt;
+- play Hidden Challenge;
+- play Hidden World;
+- play Shop;
+- play Station;
+- trigger victory/defeat/transition stingers;
+- force boss phase 1/2/3 music state;
+- adjust Music/Ambient/SFX/Pronunciation/Announcer volumes;
+- trigger announcer while music is playing;
+- trigger pronunciation while music is playing;
+- inspect current duck reasons and resolved gains;
+- force duck/release duck;
+- set crossfade duration;
+- enable/disable ambient;
+- inspect currently loaded/preloaded audio assets;
+- stop/reset all music without resetting the whole Test Lab.
+
+Required QA cases:
+
+- no hard click/cut during ordinary transition;
+- no duplicate loops after repeated state changes;
+- announcer remains clear above music;
+- pronunciation remains clear above music;
+- boss phase transition does not restart the full track accidentally;
+- missing local/default asset fails soft;
+- World change releases old music correctly;
+- rapid state changes settle on the latest requested state.
 
 ### Enemy controls
 
@@ -2329,6 +2750,15 @@ Examples:
 - crash recovery at Stage 190;
 - all reward VFX;
 - all item-use VFX/SFX;
+- World Normal -> Intense -> Normal music transition;
+- World -> Mini Boss -> World Boss transition;
+- World -> Galaxy Boss -> Victory transition;
+- Shop/Station crossfade;
+- Hidden Challenge / Hidden World music;
+- pronunciation ducking over BGM;
+- announcer ducking over BGM;
+- missing-track fallback;
+- rapid music-state transition stress;
 - Double/Triple/Ultra/Rampage/Monster announcer chain;
 - Champion Hunt / Apex Gauntlet chain timing.
 
@@ -2370,7 +2800,9 @@ Audit at least:
 - all currencies;
 - all combat skills;
 - all supported status effects;
-- all shop types.
+- all shop types;
+- every World has a valid music profile or an explicit documented fallback;
+- every configured music/stinger asset id resolves to a registered asset mapping.
 
 This does not replace manual Test Lab usage; it prevents missing entries.
 
@@ -2541,13 +2973,33 @@ Implement:
 
 Start with reusable profiles and then fill authored content in batches.
 
-## M08 — World enemy/boss roster mapping
+## M08 — Dynamic World Music / Ambient system
+
+Implement:
+
+- `WorldMusicProfile`;
+- MusicController/state machine;
+- World Normal/Intense states;
+- Mini Boss/World Boss/Galaxy Boss music;
+- Champion Hunt/Hidden/Shop/Station states;
+- ambient layers;
+- crossfade;
+- audio priority/ducking;
+- separate music/ambient gain buses;
+- repository/default asset mapping;
+- optional local override mapping;
+- graceful missing-asset fallback;
+- audio lifecycle/performance tests.
+
+Integrate with the existing SFX/pronunciation/announcer architecture instead of creating unrelated playback paths.
+
+## M09 — World enemy/boss roster mapping
 
 Make enemy families, rank bands, Mini Boss and World Boss come from the World profile.
 
 Reuse the existing enemy/boss systems.
 
-## M09 — Enemy Rank + word difficulty + typing layers
+## M10 — Enemy Rank + word difficulty + typing layers
 
 Implement:
 
@@ -2558,7 +3010,7 @@ Implement:
 - new word after each completed layer;
 - visual three-segment feedback.
 
-## M10 — Enemy skill/effect framework + Threat Budget
+## M11 — Enemy skill/effect framework + Threat Budget
 
 Implement:
 
@@ -2568,7 +3020,7 @@ Implement:
 - runtime resolved skill set;
 - Threat Budget audit.
 
-## M11 — Difficulty + Active Typing Pressure scheduler
+## M12 — Difficulty + Active Typing Pressure scheduler
 
 Implement six primary modes:
 
@@ -2583,25 +3035,25 @@ plus Adaptive/Custom.
 
 Replace count-only spawn assumptions with projected typing-pressure budget.
 
-## M12 — Formation system
+## M13 — Formation system
 
 Implement authored formation packages with aggregate budget validation.
 
-## M13 — Branching Route Map + Station
+## M14 — Branching Route Map + Station
 
 Implement deterministic route graph, choices, station nodes and persisted route/shop state.
 
-## M14 — Hidden Challenge / Hidden World / Champion Hunt
+## M15 — Hidden Challenge / Hidden World / Champion Hunt
 
 Implement optional challenge discovery, selectable risk tier and premium rewards.
 
 Add Champion Hunt / Apex Gauntlet stage support using the existing Priority Kill Chain announcer foundation.
 
-## M15 — Stage Objectives + boss typing mechanics
+## M16 — Stage Objectives + boss typing mechanics
 
 Implement objective events and World-specific boss typing interactions.
 
-## M16 — Skill/attribute/equipment upgrade expansion
+## M17 — Skill/attribute/equipment upgrade expansion
 
 Implement:
 
@@ -2612,11 +3064,11 @@ Implement:
 - optional grade evolution;
 - later affix system.
 
-## M17 — Run Relics
+## M18 — Run Relics
 
 Implement compiled relic effects and route/reward integration.
 
-## M18 — Reward layer expansion + Codex
+## M19 — Reward layer expansion + Codex
 
 Implement:
 
@@ -2626,13 +3078,13 @@ Implement:
 - expanded Codex;
 - knowledge persistence outside rollback.
 
-## M19 — Ascension
+## M20 — Ascension
 
 Implement endgame replay layer using existing 50 Worlds and new modifier/boss mutation tables.
 
-## M20 — Developer QA/Test Lab
+## M21 — Developer QA/Test Lab
 
-After M01-M19 feature implementation is complete, build the single configurable Test Lab defined in Section 32.
+After M01-M20 feature implementation is complete, build the single configurable Test Lab defined in Section 32.
 
 Required baseline:
 
@@ -2651,7 +3103,7 @@ Required baseline:
 
 Do not begin the final balance audit until the Test Lab can reproduce the major systems above.
 
-## M21 — Full balance/performance audit
+## M22 — Full balance/performance audit
 
 Run:
 
@@ -2661,17 +3113,19 @@ Run:
 - economy/drop simulations;
 - stress tests;
 - Test Lab coverage;
+- World music mapping/transition audit;
+- audio ducking/crossfade/lifecycle audit;
 - manual browser/audio/visual playtests.
 
-## M22 — Review Pass #1
+## M23 — Review Pass #1
 
 Complete independent full review and fix all findings.
 
-## M23 — Review Pass #2
+## M24 — Review Pass #2
 
 Repeat from a fresh perspective and fix all findings.
 
-## M24 — Parent integration pin
+## M25 — Parent integration pin
 
 Only after child `main` is clean:
 
@@ -2687,30 +3141,35 @@ The expansion is not complete until:
 
 1. the 1000 stages map deterministically to 50 Worlds;
 2. each World has distinct gameplay identity, roster and bosses;
-3. checkpoints occur every 10 stages;
-4. gameplay death and technical crash are correctly distinguished;
-5. all three resurrection/protection items behave exactly as designed;
-6. random shops have finite persistent stock without inventory accumulation limits;
-7. the five-grade system is migrated safely;
-8. multi-currency economy has distinct purposes;
-9. enemy Rank I-X is clear and testable;
-10. multi-word layers work and remain readable;
-11. enemy skills pressure typing without fake keyboard lag;
-12. Threat Budget prevents all-axis overpowered normal enemies;
-13. Active Typing Pressure prevents impossible spawn piles;
-14. all six primary WPM modes are balanced within explicit pressure caps;
-15. Mini Boss/World Boss/Galaxy Boss reflect their Worlds;
-16. Route/Hidden Challenge/Station systems persist deterministically;
-17. upgrade/relic/objective systems obey checkpoint rollback semantics;
-18. performance remains within existing project budgets;
-19. PlayerSave migration/backup/import remain safe;
-20. child Test + Build CI pass;
-21. manual gameplay/readability/audio checks are recorded;
-22. Review Pass #1 is clean;
-23. Review Pass #2 is clean;
-24. the configurable Test Lab covers production Worlds/enemies/bosses/items/statuses/death/resurrection and remains isolated from the real Campaign save;
-25. Test Lab registry completeness audit passes;
-26. parent integration CI passes after the child pin is updated.
+3. each World resolves a valid music/ambient profile or an explicit safe fallback;
+4. music state transitions cover World Normal/Intense, boss, Champion Hunt, Hidden, Shop and Station contexts;
+5. BGM/ambient crossfade and lifecycle do not leak or duplicate playback;
+6. announcer/pronunciation/warnings remain intelligible through deterministic ducking;
+7. checkpoints occur every 10 stages;
+8. gameplay death and technical crash are correctly distinguished;
+9. all three resurrection/protection items behave exactly as designed;
+10. random shops have finite persistent stock without inventory accumulation limits;
+11. the five-grade system is migrated safely;
+12. multi-currency economy has distinct purposes;
+13. enemy Rank I-X is clear and testable;
+14. multi-word layers work and remain readable;
+15. enemy skills pressure typing without fake keyboard lag;
+16. Threat Budget prevents all-axis overpowered normal enemies;
+17. Active Typing Pressure prevents impossible spawn piles;
+18. all six primary WPM modes are balanced within explicit pressure caps;
+19. Mini Boss/World Boss/Galaxy Boss reflect their Worlds;
+20. Champion Hunt / Apex Gauntlet and Priority Kill Chain work without counting ordinary enemies;
+21. Route/Hidden Challenge/Station systems persist deterministically;
+22. upgrade/relic/objective systems obey checkpoint rollback semantics;
+23. performance remains within existing project budgets;
+24. PlayerSave migration/backup/import remain safe;
+25. child Test + Build CI pass;
+26. manual gameplay/readability/audio checks are recorded;
+27. Review Pass #1 is clean;
+28. Review Pass #2 is clean;
+29. the configurable Test Lab covers production Worlds/enemies/bosses/items/statuses/death/resurrection/music/announcer and remains isolated from the real Campaign save;
+30. Test Lab registry completeness audit passes;
+31. parent integration CI passes after the child pin is updated.
 
 ---
 
