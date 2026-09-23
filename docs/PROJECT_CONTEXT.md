@@ -3640,12 +3640,12 @@ CI #376 PASS · 111 test files · 561/561 tests · TypeScript check + production
 M22 Full Balance / Performance Audit — AUTOMATED PASS, MANUAL GATE PENDING
 CI #395 PASS · 116 test files · 583/583 tests · TypeScript check + production build + bundle budget
 Manual-gate support: Developer Test Lab includes a 43-row QA-only recorder with per-row/default browser-device metadata, live runtime/performance/music evidence capture, explicit real-audio + High/Ultra-browser + low/mid/high human-paced attestations and Markdown export; real browser/audio/human-paced execution remains mandatory.
-Pre-M22 polish slice: `docs/PRE_M22_UI_RECALL_CHARACTER_POLISH_PLAN.md` P00-P08 COMPLETE, with P08.1 narrow-screen/Recall sanity follow-up merged. A second approved pre-M22 slice, `docs/PRE_M22_RPG_HUD_HOTBAR_PLAN.md` H01-H06, is now PLANNED: compact player-status bars plus one configurable 1-9 hotbar replacing the separate Item/Skill/Support strips, followed by canonical PlayerSave migration and M22 integration QA. M23 remains blocked until the final M22 manual gate passes.
+Pre-M22 polish slice: `docs/PRE_M22_UI_RECALL_CHARACTER_POLISH_PLAN.md` P00-P08 COMPLETE, with P08.1 narrow-screen/Recall sanity follow-up merged. The second approved slice, `docs/PRE_M22_RPG_HUD_HOTBAR_PLAN.md` H01-H06, is COMPLETE on the implementation branch: compact Character/Level/Hull/Shield/Energy status, one configurable 1-9 hotbar replacing separate Item/Skill/Support strips, title/Pause hotbar setup, PlayerSave v26 migration and responsive/regression QA. Technical gate CI #443 PASS · 120/120 test files · 608/608 tests · TypeScript/build/bundle PASS before docs sync. M23 remains blocked until the final M22 manual gate passes.
 ~~~
 
 Important implementation notes:
 
-- Current PlayerSave schema is version 25; v24 migrates deterministically by adding AscensionState while preserving CodexState, RelicState, UpgradeState, Campaign, equipment, ShopState, RouteState and existing recovery domains.
+- Current PlayerSave schema is version 26. v25 -> v26 adds HotbarState with a deterministic legacy-compatible 1-9 layout while preserving AscensionState, CodexState, RelicState, UpgradeState, Campaign, equipment, ShopState, RouteState and recovery data. HotbarState is top-level PlayerSave preference state rather than RunPersistentState, so checkpoint/death rollback does not undo the user's key layout.
 - AscensionState is part of RunPersistentState because tier frontier/economic progression must obey checkpoint rollback, crash recovery and stage-entry resurrection semantics. No parallel Ascension checkpoint store exists.
 - Codex knowledge remains outside RunPersistentState/checkpoint rollback; recovery-source selection merges valid discoveries so technical recovery or gameplay rollback cannot erase already learned information.
 - Test Lab preset localStorage is QA configuration only; Test Lab gameplay state is in-memory and must never be interpreted as PlayerSave/run persistence.
@@ -3656,12 +3656,9 @@ Important implementation notes:
 - `ShopState` and `RouteState` are part of `RunPersistentState`, so shop stock and route choices are segment state rather than separate local-storage systems.
 - M07 canonical World ids are the authoritative World identity used by M06 shop instances, M08 music profiles, M09 enemy/boss roster selection and M10 World rank bands; M12 changes pressure, not World access.
 - Event/special tokens remain optional per the expansion plan. M06 does not create a permanent Event Token before an earning loop exists.
-- Support spell loadout is separate from core combat skills.
-- Core combat skill hotkeys:
-  4-8 defensive, 9/0/- offensive.
-- Support spell hotkeys:
-  [ and ].
-- Inventory hotkeys remain 1/2/3.
+- Support spell loadout remains separate from core combat skills, but combat shortcuts are unified through the configurable 1-9 hotbar.
+- Hotbar slots 1-9 may reference the three implemented recovery consumables, core defensive/offensive skills, equipped support skills or the selected character's active skill.
+- Space remains the dedicated Overdrive key. Legacy hard-coded 1-3 / 4-9 / 0 / - / [ ] / = combat bindings are replaced by the hotbar routing layer.
 - Parent vocabulary and shared Music contracts remain unchanged.
 
 Project-wide requirements remain:

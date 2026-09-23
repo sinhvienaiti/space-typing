@@ -2552,3 +2552,480 @@ kbd {
     min-height: 0;
   }
 }
+
+
+/* H01-H05 RPG HUD / unified 1-9 hotbar */
+.player-status-hud {
+  position: absolute;
+  z-index: 8;
+  left: 14px;
+  bottom: 72px;
+  width: min(290px, calc(100vw - 28px));
+  min-height: 102px;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 0.55rem;
+  padding: 0.55rem 0.62rem;
+  border: 1px solid rgba(112, 211, 230, 0.12);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(5, 13, 22, 0.88), rgba(7, 15, 27, 0.72));
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.24);
+  pointer-events: none;
+  backdrop-filter: blur(5px);
+}
+
+.player-status-portrait {
+  width: 72px;
+  height: 58px;
+  align-self: center;
+  border-radius: 9px;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(83, 221, 241, 0.09), transparent 58%),
+    rgba(4, 9, 16, 0.58);
+}
+
+.player-status-body {
+  min-width: 0;
+  display: grid;
+  gap: 0.26rem;
+}
+
+.player-status-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.player-status-head strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #ecfbff;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-status-head span {
+  flex: 0 0 auto;
+  color: #77ddf0;
+  font-size: 0.59rem;
+  font-weight: 850;
+}
+
+.resource-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 39px minmax(68px, 1fr) auto;
+  align-items: center;
+  gap: 0.34rem;
+}
+
+.resource-row > span {
+  color: #6f8598;
+  font-size: 0.48rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.resource-row > strong {
+  min-width: 54px;
+  color: #bcd0db;
+  font-size: 0.52rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.resource-track {
+  position: relative;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.resource-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 100%;
+  border-radius: inherit;
+  transition: width 140ms linear;
+}
+
+.resource-damage-fill {
+  background: rgba(255, 198, 111, 0.46);
+  transition: width 700ms ease 160ms;
+}
+
+.hull-fill {
+  background: linear-gradient(90deg, #ff5d83, #ff8b9f);
+  box-shadow: 0 0 8px rgba(255, 94, 131, 0.28);
+}
+
+.shield-fill {
+  background: linear-gradient(90deg, #4fd8ff, #72f3ff);
+  box-shadow: 0 0 8px rgba(79, 216, 255, 0.3);
+}
+
+.energy-fill {
+  background: linear-gradient(90deg, #9b72ff, #6fe9ff);
+  box-shadow: 0 0 8px rgba(122, 164, 255, 0.28);
+}
+
+.player-ultimate {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) 1fr auto;
+  align-items: center;
+  gap: 0.36rem;
+  margin-top: 0.08rem;
+}
+
+.player-ultimate > span {
+  min-width: 0;
+  overflow: hidden;
+  color: #7691a4;
+  font-size: 0.48rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-ultimate .power-track {
+  height: 4px;
+}
+
+.player-ultimate kbd {
+  padding: 0.08rem 0.26rem;
+  font-size: 0.44rem;
+}
+
+.player-status-hud.low-hull {
+  border-color: rgba(255, 89, 121, 0.24);
+  animation: player-low-hull 1.4s ease-in-out infinite;
+}
+
+.player-status-hud.energy-low .energy-row > strong {
+  color: #ac8eff;
+}
+
+.player-status-hud.shield-break {
+  animation: player-shield-break 420ms ease-out;
+}
+
+@keyframes player-low-hull {
+  50% { box-shadow: 0 0 24px rgba(255, 72, 111, 0.13); }
+}
+
+@keyframes player-shield-break {
+  35% {
+    border-color: rgba(108, 230, 255, 0.7);
+    box-shadow: 0 0 34px rgba(81, 220, 255, 0.32);
+  }
+}
+
+.combat-hotbar {
+  position: absolute;
+  z-index: 9;
+  left: 50%;
+  bottom: 10px;
+  width: min(594px, calc(100vw - 24px));
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 0.3rem;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
+.hotbar-slot {
+  position: relative;
+  min-width: 0;
+  height: 52px;
+  padding: 0.25rem 0.2rem 0.2rem;
+  display: grid;
+  grid-template-areas:
+    "key glyph state"
+    "label label label";
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.12rem 0.2rem;
+  overflow: hidden;
+  border-color: rgba(114, 213, 235, 0.11);
+  border-radius: 9px;
+  background: rgba(5, 12, 21, 0.82);
+  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.22);
+}
+
+.hotbar-slot kbd {
+  grid-area: key;
+  padding: 0.06rem 0.22rem;
+  font-size: 0.48rem;
+}
+
+.hotbar-glyph {
+  grid-area: glyph;
+  color: #9fdfee;
+  font-size: 0.88rem;
+  line-height: 1;
+  text-align: center;
+}
+
+.hotbar-label {
+  grid-area: label;
+  overflow: hidden;
+  color: #7f94a6;
+  font-size: 0.48rem;
+  font-weight: 760;
+  line-height: 1.05;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hotbar-state {
+  grid-area: state;
+  color: #bfd5df;
+  font-size: 0.45rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.hotbar-slot.item {
+  border-color: rgba(88, 222, 205, 0.15);
+}
+
+.hotbar-slot.item .hotbar-glyph {
+  color: #78ead4;
+}
+
+.hotbar-slot.skill {
+  border-color: rgba(180, 127, 255, 0.15);
+}
+
+.hotbar-slot.skill .hotbar-glyph {
+  color: #c79aff;
+}
+
+.hotbar-slot.character {
+  border-color: rgba(255, 210, 107, 0.2);
+}
+
+.hotbar-slot.character .hotbar-glyph {
+  color: #ffe08c;
+}
+
+.hotbar-slot.cooldown::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 6, 12, 0.42);
+  pointer-events: none;
+}
+
+.hotbar-slot:disabled {
+  opacity: 0.47;
+}
+
+.hotbar-slot:not(:disabled):hover {
+  transform: translateY(-2px);
+  border-color: rgba(121, 229, 249, 0.34);
+}
+
+.hotbar-loadout-panel {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid rgba(104, 219, 240, 0.1);
+}
+
+.hotbar-loadout-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 0.65rem;
+}
+
+.hotbar-loadout-head strong {
+  display: block;
+  margin-top: 0.2rem;
+  color: #ddf8ff;
+}
+
+.hotbar-loadout-head small {
+  max-width: 360px;
+  color: #718598;
+  font-size: 0.62rem;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.hotbar-loadout-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.44rem;
+}
+
+.hotbar-loadout-slot {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.38rem;
+  padding: 0.38rem;
+  border: 1px solid rgba(105, 212, 234, 0.08);
+  border-radius: 8px;
+  background: rgba(5, 12, 20, 0.54);
+}
+
+.hotbar-loadout-slot select {
+  min-width: 0;
+  width: 100%;
+  padding: 0.36rem;
+  font-size: 0.64rem;
+}
+
+@media (max-width: 980px) {
+  .player-status-hud {
+    bottom: 68px;
+    width: 246px;
+    grid-template-columns: 54px minmax(0, 1fr);
+    padding: 0.46rem;
+  }
+
+  .player-status-portrait {
+    width: 54px;
+    height: 50px;
+  }
+
+  .resource-row {
+    grid-template-columns: 32px minmax(54px, 1fr) auto;
+  }
+
+  .resource-row > strong {
+    min-width: 46px;
+    font-size: 0.47rem;
+  }
+
+  .combat-hotbar {
+    width: min(540px, calc(100vw - 18px));
+    gap: 0.2rem;
+  }
+
+  .hotbar-slot {
+    height: 48px;
+  }
+
+  .hotbar-label {
+    display: none;
+  }
+
+  .hotbar-slot {
+    grid-template-areas: "key glyph state";
+    grid-template-columns: auto 1fr auto;
+  }
+}
+
+@media (max-width: 700px) {
+  .player-status-hud {
+    left: 8px;
+    right: 8px;
+    bottom: 61px;
+    width: auto;
+    min-height: 0;
+    grid-template-columns: 42px minmax(0, 1fr);
+    padding: 0.34rem 0.42rem;
+  }
+
+  .player-status-portrait {
+    width: 42px;
+    height: 42px;
+  }
+
+  .player-status-head {
+    position: absolute;
+    left: 48px;
+    top: -17px;
+    gap: 0.25rem;
+  }
+
+  .player-status-head strong {
+    font-size: 0.58rem;
+  }
+
+  .player-status-head span {
+    font-size: 0.5rem;
+  }
+
+  .player-status-body {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: center;
+    gap: 0.32rem;
+  }
+
+  .resource-row {
+    grid-template-columns: 1fr;
+    gap: 0.14rem;
+  }
+
+  .resource-row > span {
+    display: none;
+  }
+
+  .resource-row > strong {
+    min-width: 0;
+    font-size: 0.45rem;
+    text-align: left;
+  }
+
+  .resource-track {
+    height: 4px;
+  }
+
+  .player-ultimate {
+    grid-column: 1 / -1;
+    grid-template-columns: auto 1fr auto;
+  }
+
+  .combat-hotbar {
+    bottom: 7px;
+    width: calc(100vw - 12px);
+    gap: 0.12rem;
+  }
+
+  .hotbar-slot {
+    height: 46px;
+    padding: 0.2rem 0.12rem;
+    grid-template-areas:
+      "key state"
+      "glyph glyph";
+    grid-template-columns: auto auto;
+  }
+
+  .hotbar-glyph {
+    font-size: 0.76rem;
+  }
+
+  .hotbar-state {
+    font-size: 0.4rem;
+  }
+
+  .hotbar-loadout-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hotbar-loadout-head {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .hotbar-loadout-head small {
+    text-align: left;
+  }
+}
+
+
+.hotbar-dialog {
+  width: min(680px, calc(100vw - 2rem));
+}
+
+.hotbar-dialog .hotbar-loadout-grid {
+  margin-top: 0.2rem;
+}

@@ -5,6 +5,7 @@ import {
   createPlayerSave,
   migratePlayerSave,
   PLAYER_SAVE_VERSION,
+  resolvePlayerSaveRecovery,
   sanitizePlayerSave,
   UnsupportedPlayerSaveVersionError,
 } from "../src/persistence/player-save";
@@ -12,6 +13,7 @@ import {
   createDefaultCampaignProgress,
   recordStageClear,
 } from "../src/campaign/progress";
+import { captureCrashRecoverySnapshot } from "../src/persistence/crash-recovery";
 
 describe("player save persistence model", () => {
   it("wraps Campaign progress in a versioned player save", () => {
@@ -674,6 +676,39 @@ describe("player save persistence model", () => {
     expect(migration.save.relics.owned).toEqual(["first-light-seed"]);
   });
 
+  it("migrates PlayerSave v25 to the default unified 1-9 hotbar", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const legacy = {
+      ...current,
+      version: 25,
+    } as Record<string, unknown>;
+    delete legacy.hotbar;
+
+    const migration = migratePlayerSave(legacy);
+
+    expect(migration.migrated).toBe(true);
+    expect(migration.fromVersion).toBe(25);
+    expect(migration.save.version).toBe(PLAYER_SAVE_VERSION);
+    expect(migration.save.hotbar).toEqual({
+      version: 1,
+      slots: [
+        { kind: "item", id: "repair-kit" },
+        { kind: "item", id: "shield-cell" },
+        { kind: "item", id: "energy-cell" },
+        { kind: "skill", id: "barrier" },
+        { kind: "skill", id: "reflect-field" },
+        { kind: "skill", id: "time-shell" },
+        { kind: "skill", id: "emergency-repair" },
+        { kind: "skill", id: "guardian-drone" },
+        { kind: "skill", id: "emp-burst" },
+      ],
+    });
+    expect(migration.save.ascension).toEqual(current.ascension);
+    expect(migration.save.checkpointSnapshot).toEqual(
+      current.checkpointSnapshot,
+    );
+  });
+
   it("keeps a valid current-version save without migration", () => {
     const save = createPlayerSave(
       createDefaultCampaignProgress(),
@@ -719,6 +754,72 @@ describe("player save persistence model", () => {
     expect(migration.save.campaignExpansion.checkpoint.stage).toBe(1);
     expect(migration.save.campaignExpansion.crashRecovery).toBeNull();
     expect(migration.save.crashRecoverySnapshot).toBeNull();
+    expect(migration.save.hotbar.version).toBe(1);
+    expect(migration.save.hotbar.slots).toHaveLength(9);
+  });
+
+  it("keeps custom hotbar assignments across current-schema sanitization", () => {
+    const save = createPlayerSave(createDefaultCampaignProgress());
+    save.hotbar.slots[0] = { kind: "character-skill" };
+    save.hotbar.slots[1] = { kind: "skill", id: "gravity-well" };
+
+    const migration = migratePlayerSave(save);
+
+    expect(migration.migrated).toBe(false);
+    expect(migration.save.hotbar.slots[0]).toEqual({
+      kind: "character-skill",
+    });
+    expect(migration.save.hotbar.slots[1]).toEqual({
+      kind: "skill",
+      id: "gravity-well",
+    });
+  });
+
+  it("preserves the top-level hotbar across technical crash recovery", () => {
+    const save = createPlayerSave(createDefaultCampaignProgress());
+    save.hotbar.slots[0] = { kind: "character-skill" };
+    save.hotbar.slots[1] = { kind: "skill", id: "gravity-well" };
+
+    const state = {
+      campaign: save.campaign,
+      inventory: save.inventory,
+      equipment: save.equipment,
+      supportSpells: save.supportSpells,
+      characters: save.characters,
+      luckPity: save.luckPity,
+      hiddenDiscovery: save.hiddenDiscovery,
+      credits: save.credits,
+      progression: save.progression,
+      expansionCurrencies: save.expansionCurrencies,
+      shops: save.shops,
+      route: save.route,
+      upgrades: save.upgrades,
+      relics: save.relics,
+      ascension: save.ascension,
+    };
+    const captured = captureCrashRecoverySnapshot(
+      state,
+      save.campaignExpansion,
+      save.checkpointSnapshot,
+      "manual",
+      "2026-09-23T05:50:00.000Z",
+    );
+    save.campaignExpansion = captured.campaignExpansion;
+    save.crashRecoverySnapshot = captured.snapshot;
+
+    const resolved = resolvePlayerSaveRecovery(
+      save,
+      "2026-09-23T05:51:00.000Z",
+    );
+
+    expect(resolved.recoveryMode).toBe("crash");
+    expect(resolved.save.hotbar.slots[0]).toEqual({
+      kind: "character-skill",
+    });
+    expect(resolved.save.hotbar.slots[1]).toEqual({
+      kind: "skill",
+      id: "gravity-well",
+    });
   });
 
   it("refuses unsupported numeric schema versions instead of down-migrating them", () => {

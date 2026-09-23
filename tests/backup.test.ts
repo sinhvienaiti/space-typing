@@ -106,6 +106,7 @@ describe("save backup", () => {
       };
       crashRecoverySnapshot: unknown;
       stageEntrySnapshot: unknown;
+      hotbar: { version: number; slots: unknown[] };
     };
 
     expect(parsed.version).toBe(PLAYER_SAVE_VERSION);
@@ -121,6 +122,8 @@ describe("save backup", () => {
       selected: "vanguard",
       unlocked: ["vanguard"],
     });
+    expect(parsed.hotbar.version).toBe(1);
+    expect(parsed.hotbar.slots).toHaveLength(9);
     expect(parsed.luckPity).toEqual({
       golden: 0,
       treasure: 0,
@@ -896,6 +899,72 @@ describe("save backup", () => {
         frontierByTier: { "1": 1 },
       });
     }
+  });
+
+  it("imports a valid v25 backup into v26 with the legacy-compatible hotbar", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const raw = {
+      ...current,
+      version: 25,
+    } as Record<string, unknown>;
+    delete raw.hotbar;
+
+    const result = parsePlayerSaveJson(JSON.stringify(raw));
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.migrated).toBe(true);
+      expect(result.save.version).toBe(PLAYER_SAVE_VERSION);
+      expect(result.save.hotbar.slots[0]).toEqual({
+        kind: "item",
+        id: "repair-kit",
+      });
+      expect(result.save.hotbar.slots[8]).toEqual({
+        kind: "skill",
+        id: "emp-burst",
+      });
+    }
+  });
+
+  it("still validates v25 checkpoint data before migrating the hotbar", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const raw = {
+      ...current,
+      version: 25,
+      checkpointSnapshot: { stage: 999, state: {} },
+    } as Record<string, unknown>;
+    delete raw.hotbar;
+
+    expect(parsePlayerSaveJson(JSON.stringify(raw))).toEqual({
+      ok: false,
+      error: "Committed checkpoint snapshot is invalid.",
+    });
+  });
+
+  it("rejects invalid current-version hotbar data", () => {
+    const raw = createPlayerSave(createDefaultCampaignProgress()) as unknown as Record<
+      string,
+      unknown
+    >;
+    raw.hotbar = {
+      version: 1,
+      slots: [
+        { kind: "item", id: "repair-kit" },
+        { kind: "item", id: "repair-kit" },
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+      ],
+    };
+
+    expect(parsePlayerSaveJson(JSON.stringify(raw))).toEqual({
+      ok: false,
+      error: "Hotbar loadout is invalid.",
+    });
   });
 
   it("rejects invalid current-version Ascension data", () => {
