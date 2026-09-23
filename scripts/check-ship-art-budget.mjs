@@ -19,6 +19,7 @@ if (entry === undefined) {
 const allowedPaths = [
   "/assets/space-typing/ships/player-ships-v3.webp",
   "/assets/space-typing/ships/player-ships-v3.png",
+  "/assets/space-typing/ships/player-ships-v3.avif",
 ];
 
 if (
@@ -45,7 +46,22 @@ const buffer = readFileSync(path);
 let width = 0;
 let height = 0;
 
-if (entry.url.endsWith(".png")) {
+if (entry.url.endsWith(".avif")) {
+  if (buffer.length < 36 || buffer.toString("ascii", 4, 8) !== "ftyp") {
+    throw new Error("Ship V3 AVIF has an invalid ftyp box.");
+  }
+  const brand = buffer.toString("ascii", 8, 12);
+  if (brand !== "avif") {
+    throw new Error("Ship V3 requires a still-picture AVIF, not animation.");
+  }
+  // AVIF's ispe image spatial extents describe decoded canvas dimensions.
+  const ispe = buffer.indexOf(Buffer.from("ispe"));
+  if (ispe < 0 || ispe + 16 > buffer.length) {
+    throw new Error("Ship V3 AVIF has no ispe image dimensions.");
+  }
+  width = buffer.readUInt32BE(ispe + 8);
+  height = buffer.readUInt32BE(ispe + 12);
+} else if (entry.url.endsWith(".png")) {
   const signature = Buffer.from("89504e470d0a1a0a", "hex");
   if (!buffer.subarray(0, 8).equals(signature) || buffer.length < 24) {
     throw new Error("Ship V3 PNG has an invalid image header.");
