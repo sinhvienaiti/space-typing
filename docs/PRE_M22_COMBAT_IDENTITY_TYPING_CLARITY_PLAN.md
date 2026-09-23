@@ -1,6 +1,6 @@
 # Pre-M22 Combat Identity + Typing Clarity Master Plan
 
-Status: ACTIVE
+Status: IMPLEMENTED · FINAL CI PENDING
 
 This slice is approved before the remaining M22 real-browser/audio/visual gate. It combines two related goals:
 
@@ -8,6 +8,25 @@ This slice is approved before the remaining M22 real-browser/audio/visual gate. 
 2. upgrade the player-side combat identity with illustrated ships, equipment-driven aura, and character-specific projectile/impact VFX.
 
 The manual M22 matrix must run on the final version of this slice.
+
+## Implementation review decisions
+
+The plan was re-reviewed against the production runtime before implementation. The following refinements were adopted:
+
+- one canonical 4x3 Ship Visual V2 sprite sheet is used instead of 11 independent runtime requests; the 11 occupied cells map deterministically to the 11 CharacterIds and the final cell is reserved;
+- the production sheet is a project-original transparent SVG illustration at `public/assets/space-typing/ships/player-ships-v2.svg`, following the approved polished ship concept direction; the existing procedural Canvas ship remains the fail-soft fallback;
+- equipment aura remains fully derived from existing EquipmentState / Grade / enhancement / affixes and therefore requires no PlayerSave schema bump;
+- player shots remain the existing short-lived Laser hit visual. Character-specific tracer, muzzle and impact rendering changes appearance only and does not create a second projectile/damage system;
+- prefix clarity runs inside a near-rank candidate band, so readability cannot silently flatten authored Rank/word difficulty;
+- a deterministic Test Lab scenario with `morning / month / me` verifies nearest same-initial lock behavior through the real Game input path.
+
+Implementation checkpoint:
+
+- C01-C04: prefix-conflict scoring, clarity-aware spawn/layer selection, deterministic nearest-target tie-breaks, target-lock brackets and same-prefix Test Lab scenario implemented;
+- C05-C06: illustrated Ship Visual V2 sprite sheet registered through the existing art pipeline with procedural fallback;
+- C07-C08: eight derived equipment visual affinities and bounded quality-aware aura renderer implemented;
+- C09-C11: all 11 character projectile profiles integrated into the existing Laser renderer with compact muzzle/impact treatments;
+- C12: domain/Game regressions implemented; documentation and final CI remain before merge.
 
 ## Guardrails
 
@@ -100,13 +119,12 @@ Assets:
 - Zenith: white/cyan/violet apex flagship.
 
 Contract:
-- transparent PNG;
-- upward-facing;
-- normalized square canvas;
+- transparent SVG or raster art; the current production implementation is one 4x3 transparent SVG sprite sheet;
+- upward-facing normalized cells with 11 occupied CharacterId positions;
 - compact readable silhouette;
 - no text/background;
 - consistent art direction;
-- generated asset source recorded in manifest.
+- generated/project-original source recorded in the manifest and human-readable asset source doc.
 
 Fallback:
 - current Canvas procedural renderer remains available if an image fails to load.
@@ -114,14 +132,14 @@ Fallback:
 ## C06 — Runtime ship asset integration
 Use the existing art asset pipeline.
 
-- register each ship separately in public/assets/space-typing/manifest.json;
+- register one canonical Ship Visual V2 sprite-sheet asset in public/assets/space-typing/manifest.json;
 - preload through the current catalog;
-- expose loaded player images to the character renderer;
+- crop the deterministic CharacterId cell inside the shared renderer;
 - Character Select, player status preview and battlefield use the same canonical art;
 - retain scale/bob/banking/engine effects around the image rather than baking all motion into the PNG.
 
 Acceptance:
-- missing PNG never breaks gameplay;
+- missing illustrated asset never breaks gameplay;
 - combat footprint stays approximately the current size;
 - previews may be larger without changing gameplay hit position.
 
