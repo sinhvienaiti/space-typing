@@ -46,7 +46,7 @@ These are **acceptance ceilings for the incremental V3 slice**, not claims about
 | Incremental load delay | must not block starting a stage; degraded/fallback art is acceptable while V3 loads |
 | Enemy word obstruction | none; visual effect must never cover or reduce enemy-word contrast |
 
-Target source resolution and file ceiling are **both** required. If high-detail art exceeds either, reduce source complexity/compression first. Only increase the budget by an explicitly reviewed plan amendment backed by measurements; default action is to simplify or drop expensive effects. Keep the existing enforced JS/CSS M22 bundle budgets; image files in `public/` require this separate image budget.
+Target source resolution and file ceiling are **both** required. If high-detail art exceeds either, reduce source complexity/compression first. Only increase the budget by an explicitly reviewed plan amendment backed by measurements; default action is to simplify or drop expensive effects. Keep the existing enforced JS/CSS M22 bundle budgets. The canonical `player-ships-v3.webp`/`.png` raster is excluded from M22 `totalRaw` and `totalGzip` (it has a mandatory, separate 1.2 MiB/dimension check in `scripts/check-ship-art-budget.mjs`); **all other static assets retain their previous M22 accounting**. This prevents double-counting the single optional premium texture without weakening the JavaScript/CSS limits.
 
 ## Milestones
 
