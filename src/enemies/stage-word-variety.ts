@@ -3,11 +3,13 @@ import { typingText } from "../logic";
 import { prefixConflictScore } from "../typing/prefix-clarity";
 import { wordDifficultyScore } from "./word-difficulty";
 
-type Candidate = {
+type IndexedEntry = {
   entry: VocabularyEntry;
   key: string;
-  distance: number;
+  score: number;
 };
+
+type Candidate = IndexedEntry & { distance: number };
 
 /**
  * Per-encounter vocabulary memory. Only words actually assigned to targets
@@ -17,10 +19,15 @@ type Candidate = {
 export class StageWordLedger {
   private readonly used = new Map<string, number[]>();
   private ordinal = 0;
+  private indexedSource: readonly VocabularyEntry[] | null = null;
+  private indexedLevel = -1;
+  private indexedEntries: IndexedEntry[] = [];
 
   reset(): void {
     this.used.clear();
     this.ordinal = 0;
+    this.indexedSource = null;
+    this.indexedEntries = [];
   }
 
   count(word: string): number {
@@ -56,17 +63,29 @@ export class StageWordLedger {
     activeWords: readonly string[],
     random = Math.random(),
   ): VocabularyEntry | null {
-    const target = wordDifficultyScore(preferred, vocabularyLevel);
+    // The selected vocabulary and level stay constant through a stage.
+    // Cache expensive score calculation; only score distances and sorting
+    // change when the preferred Rank/word changes between spawns.
+    if (this.indexedSource !== entries || this.indexedLevel !== vocabularyLevel) {
+      this.indexedSource = entries;
+      this.indexedLevel = vocabularyLevel;
+      this.indexedEntries = entries
+        .map((entry) => ({
+          entry,
+          key: typingText(entry.en),
+          score: wordDifficultyScore(entry, vocabularyLevel),
+        }))
+        .filter((candidate) => candidate.key.length > 0);
+    }
+    const target =
+      this.indexedEntries.find((candidate) => candidate.entry === preferred)?.score ??
+      wordDifficultyScore(preferred, vocabularyLevel);
     const active = new Set(activeWords.map(typingText).filter(Boolean));
-    const all: Candidate[] = entries
-      .map((entry) => ({
-        entry,
-        key: typingText(entry.en),
-        distance: Math.abs(
-          wordDifficultyScore(entry, vocabularyLevel) - target,
-        ),
+    const all: Candidate[] = this.indexedEntries
+      .map((candidate) => ({
+        ...candidate,
+        distance: Math.abs(candidate.score - target),
       }))
-      .filter((candidate) => candidate.key.length > 0)
       .sort(
         (a, b) =>
           a.distance - b.distance ||
@@ -98,12 +117,20 @@ export class StageWordLedger {
             : wideAvailable;
     if (pool.length === 0) return null;
 
+    const conflicts = new Map<string, number>();
+    const conflictFor = (candidate: Candidate): number => {
+      const existing = conflicts.get(candidate.key);
+      if (existing !== undefined) return existing;
+      const score = activeWords.length === 0
+        ? 0
+        : prefixConflictScore(candidate.entry.en, activeWords);
+      conflicts.set(candidate.key, score);
+      return score;
+    };
     pool.sort((a, b) => {
       const used = this.count(a.key) - this.count(b.key);
       if (used !== 0) return used;
-      const conflict =
-        prefixConflictScore(a.entry.en, activeWords) -
-        prefixConflictScore(b.entry.en, activeWords);
+      const conflict = conflictFor(a) - conflictFor(b);
       if (conflict !== 0) return conflict;
       const previousA = this.used.get(a.key)?.at(-1) ?? -1;
       const previousB = this.used.get(b.key)?.at(-1) ?? -1;
@@ -116,15 +143,11 @@ export class StageWordLedger {
 
     const best = pool[0]!;
     const bestCount = this.count(best.key);
-    const bestConflict = prefixConflictScore(
-      best.entry.en,
-      activeWords,
-    );
+    const bestConflict = conflictFor(best);
     const choices = pool.filter(
       (candidate) =>
         this.count(candidate.key) === bestCount &&
-        prefixConflictScore(candidate.entry.en, activeWords) ===
-          bestConflict &&
+        conflictFor(candidate) === bestConflict &&
         candidate.distance <= best.distance + 4,
     );
     const safeRandom = Number.isFinite(random)
