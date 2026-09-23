@@ -312,7 +312,9 @@ export function mountTestLab(
   button.textContent = "Developer Test Lab";
   button.className = "test-lab-launch";
 
-  const actions = document.querySelector("#titleOverlay .actions");
+  const actions =
+    document.querySelector("#titleOverlay .title-dev-actions") ??
+    document.querySelector("#titleOverlay .actions");
   actions?.append(button);
 
   const dialog = document.createElement("dialog");
