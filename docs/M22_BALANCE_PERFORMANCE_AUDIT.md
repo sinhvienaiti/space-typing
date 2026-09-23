@@ -243,4 +243,6 @@ Automated tests cannot certify:
 
 Those checks are tracked in `docs/M22_MANUAL_PLAYTEST_MATRIX.md`.
 
+The Developer Test Lab includes an M22 Manual Gate Recorder that mirrors the 43 manual rows, stores QA-only observations locally and exports a paste-ready Markdown report. This reduces transcription mistakes but does not automate or replace the human perceptual gate.
+
 M22 must **not** be marked fully COMPLETE until the manual matrix is executed on a real browser/audio device and any findings are fixed.
