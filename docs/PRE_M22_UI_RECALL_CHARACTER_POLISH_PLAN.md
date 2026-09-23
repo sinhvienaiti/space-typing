@@ -1,8 +1,22 @@
 # Pre-M22 UI / Recall Bonus / Character Polish Plan
 
-Status: ACTIVE
+Status: COMPLETE
 
 This slice is intentionally inserted before the remaining M22 real-browser/audio/visual gate because the user-facing layout, learning feedback and player-character rendering are changing. The manual M22 matrix must be executed against the polished build, not the older UI.
+
+Implementation checkpoints completed before P08:
+
+- P00 plan checkpoint: PR #58 · CI #410/#411 PASS;
+- P01 title/navigation hierarchy: PR #59 · CI #412/#413 PASS;
+- P02 enemy-local learning feedback: PR #60 · CI #414/#415 PASS;
+- P03 combat HUD density cleanup: PR #61 · CI #416/#417 PASS;
+- P04 Recall Bonus domain rules: PR #62 · CI #418/#419 PASS;
+- P05 Recall Bonus runtime/reward/Test Lab controls: PR #63 · CI #420/#421 PASS;
+- P06 character visual profiles/runtime renderer: PR #64 · CI #422/#423 PASS;
+- P07 character selection previews/hierarchy: PR #65 · CI #424/#425 PASS.
+- P08 integration audit: PR #66 initial technical gate · CI #426 PASS · 119/119 test files · 597/597 tests · TypeScript check + Vite production build + bundle budget PASS.
+
+P00-P08 are complete. The next allowed step is the real M22 browser/audio/visual/human-paced matrix; M23 remains blocked until that matrix is fully PASS.
 
 ## Guardrails
 
