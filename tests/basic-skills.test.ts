@@ -63,7 +63,7 @@ describe("P0 Basic Skill Points share existing character XP", () => {
     expect(spendBasicSkillPoint(first, "barrier", 1)).toMatchObject({
       changed: false, reason: "level",
     });
-    expect(spendBasicSkillPoint(first, "time-shell", 2)).toMatchObject({
+    expect(spendBasicSkillPoint(first, "time-shell", 1)).toMatchObject({
       changed: false, reason: "points",
     });
     const earned = spendBasicSkillPoint(first, "time-shell", 3);
@@ -147,7 +147,7 @@ describe("P0 Basic Skill Points share existing character XP", () => {
     expect(migrated.save.upgrades.basicSkills.zenith.ranks.barrier).toBe(5);
     expect(migrated.save.checkpointSnapshot.upgrades.basicSkills.vanguard.ranks.barrier).toBe(5);
     expect(migrated.save.checkpointSnapshot.upgrades.attributeLevels.hull).toBe(8);
-    const restored = restoreCheckpointSnapshot(migrated.save.checkpointSnapshot);
+    const restored = restoreCheckpointSnapshot(migrated.save.checkpointSnapshot, migrated.save);
     expect(restored.upgrades.basicSkills.vanguard.ranks.barrier).toBe(5);
     expect(restored.upgrades.basicSkills.vanguard.spent).toBe(0);
     expect(createCheckpointSnapshot(restored, 1).upgrades.basicSkills.vanguard.ranks.barrier).toBe(5);
