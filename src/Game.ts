@@ -2752,6 +2752,7 @@ export class Game {
     this.updateBoss(dt * hostileTimeFactor, difficulty);
     this.updateSupplyPod(dt);
     this.updateTreasureDrone(dt);
+    this.updateRecallBonus(dt);
     this.updateRewardChoiceCrate(dt);
     this.updateAnomalyCrate(dt);
     if (!(this.testLabEnabled && this.testLabSchedulerFrozen)) {
@@ -2759,6 +2760,7 @@ export class Game {
     }
     this.supplySpawnTimer -= dt;
     this.treasureDroneTimer -= dt;
+    this.recallBonusTimer -= dt;
     this.rewardChoiceTimer -= dt;
     this.anomalyTimer -= dt;
 
@@ -2778,6 +2780,7 @@ export class Game {
       this.treasureDronePending &&
       this.treasureDrone === null &&
       this.supplyPod === null &&
+      this.recallBonus === null &&
       this.rewardChoiceCrate === null &&
       this.anomalyCrate === null &&
       this.treasureDroneTimer <= 0 &&
@@ -2789,10 +2792,26 @@ export class Game {
     }
 
     if (
+      this.recallBonusPending &&
+      this.recallBonus === null &&
+      this.supplyPod === null &&
+      this.treasureDrone === null &&
+      this.rewardChoiceCrate === null &&
+      this.anomalyCrate === null &&
+      this.recallBonusTimer <= 0 &&
+      this.boss === null &&
+      (this.spawnRemaining > 0 || this.enemies.length > 0)
+    ) {
+      this.spawnRecallBonus();
+      this.recallBonusPending = false;
+    }
+
+    if (
       this.rewardChoicePending &&
       this.rewardChoiceCrate === null &&
       this.supplyPod === null &&
       this.treasureDrone === null &&
+      this.recallBonus === null &&
       this.anomalyCrate === null &&
       this.rewardChoiceTimer <= 0 &&
       this.boss === null &&
@@ -2807,6 +2826,7 @@ export class Game {
       this.anomalyCrate === null &&
       this.supplyPod === null &&
       this.treasureDrone === null &&
+      this.recallBonus === null &&
       this.rewardChoiceCrate === null &&
       this.anomalyTimer <= 0 &&
       this.boss === null &&
