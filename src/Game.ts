@@ -1517,8 +1517,8 @@ export class Game {
       const value = levels[id];
       next[id] =
         typeof value === "number" && Number.isFinite(value)
-          ? clamp(Math.floor(value), 1, 5)
-          : 1;
+          ? clamp(Math.floor(value), 0, 5)
+          : 0;
     }
     this.skillLevels = next;
     this.refreshSkillDefinitions();
@@ -1569,7 +1569,10 @@ export class Game {
 
     const coreDefinitions =
       resolveSkillDefinitionsForLevels(
-        [...DEFENSIVE_SKILLS, ...OFFENSIVE_SKILLS],
+        [...DEFENSIVE_SKILLS, ...OFFENSIVE_SKILLS].filter(
+          (definition) =>
+            this.skillLevels[definition.id as UpgradeableSkillId] > 0,
+        ),
         this.skillLevels,
       );
 
