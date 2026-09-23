@@ -3290,6 +3290,7 @@ Automated work completed:
 - deploy bundle-size budgets enforced by `pnpm build`;
 - M22 stress audit found and fixed Carrier/Splitter child spawn admission exceeding `maxEnemies`;
 - Test Lab includes a QA-only M22 Manual Gate Recorder mirroring all 43 required browser/audio/visual rows and exporting a Markdown observation report without touching PlayerSave;
+- the recorder captures live Test Lab performance/runtime/music evidence and requires explicit real-audio, High/Ultra-browser and low/mid/high human-paced attestations before COMPLETE CANDIDATE status;
 - CI #395 PASS · 116 test files · 583/583 tests · TypeScript check + production build + bundle budget.
 
 Remaining M22 gate:
