@@ -53,6 +53,11 @@ export class AdaptiveRenderBudget {
       const next = Math.max(MIN_SCALE, Math.round((this.value - 0.12) * 100) / 100);
       if (next === this.value) return false;
       this.value = next;
+      // Reprofile at the new DPR. Reusing old slow frames would repeatedly
+      // downscale even if the first change already fixed the bottleneck.
+      this.frameMs.length = 0;
+      this.drawMs.length = 0;
+      this.timeToReview = 3.5;
       return true;
     }
     if (frameP95 < 18.5 && drawP95 < 8) {
@@ -60,6 +65,9 @@ export class AdaptiveRenderBudget {
       if (this.stableSeconds >= 10.5 && this.value < 1) {
         this.stableSeconds = 0;
         this.value = Math.min(1, Math.round((this.value + 0.08) * 100) / 100);
+        this.frameMs.length = 0;
+        this.drawMs.length = 0;
+        this.timeToReview = 3.5;
         return true;
       }
     } else {
