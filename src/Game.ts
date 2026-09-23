@@ -419,6 +419,24 @@ export type TestLabBossOverride = {
   staggerSeconds?: number;
 };
 
+export type TestLabEnemyOverride = {
+  speed?: number;
+  actionCooldown?: number;
+  rank?: EnemyRank;
+  layers?: 1 | 2 | 3;
+  elite?: boolean;
+  threatBudgetUsed?: number;
+};
+
+export type TestLabDifficultyOverride = {
+  maxEnemies?: number;
+  spawnInterval?: number;
+  pressureBudget?: number;
+  urgentThreatCap?: number;
+  formationComplexity?: number;
+  attackIntervalFactor?: number;
+};
+
 export type TestLabGameSnapshot = {
   phase: GamePhase;
   stage: number | null;
@@ -790,6 +808,115 @@ export class Game {
     this.projectiles = [];
     this.targetId = null;
     return true;
+  }
+
+  testLabPatchEnemy(
+    enemyId: number,
+    input: TestLabEnemyOverride,
+  ): boolean {
+    if (!this.testLabEnabled) return false;
+    const enemy = this.enemies.find((item) => item.id === enemyId);
+    if (enemy === undefined) return false;
+
+    if (input.speed !== undefined) {
+      enemy.speed = clamp(input.speed, 0, 2000);
+    }
+    if (input.actionCooldown !== undefined) {
+      enemy.actionCooldown = clamp(input.actionCooldown, 0, 120);
+      enemy.pendingSkillId = null;
+      enemy.skillTelegraphRemaining = 0;
+    }
+    if (input.rank !== undefined) enemy.rank = input.rank;
+    if (input.layers !== undefined) {
+      enemy.layersRemaining = input.layers;
+      enemy.layerPlan = enemyLayerPlan(enemy.kind, input.layers);
+      enemy.typed = 0;
+      enemy.wordMissed = false;
+    }
+    if (input.elite !== undefined) enemy.elite = input.elite;
+    if (
+      input.threatBudgetUsed !== undefined &&
+      enemy.threatBudget !== undefined
+    ) {
+      const used = Math.max(0, input.threatBudgetUsed);
+      enemy.threatBudget = {
+        ...enemy.threatBudget,
+        used,
+        overBudget: used > enemy.threatBudget.cap,
+      };
+    }
+    return true;
+  }
+
+  testLabSetDifficultyOverrides(
+    input: TestLabDifficultyOverride,
+  ): boolean {
+    if (!this.testLabEnabled || this.difficulty === null) return false;
+    if (input.maxEnemies !== undefined) {
+      this.difficulty.maxEnemies = clamp(
+        Math.floor(input.maxEnemies),
+        1,
+        30,
+      );
+    }
+    if (input.spawnInterval !== undefined) {
+      this.difficulty.spawnInterval = clamp(
+        input.spawnInterval,
+        0.05,
+        30,
+      );
+    }
+    if (input.pressureBudget !== undefined) {
+      this.difficulty.pressureBudget = clamp(
+        input.pressureBudget,
+        0.5,
+        100,
+      );
+    }
+    if (input.urgentThreatCap !== undefined) {
+      this.difficulty.urgentThreatCap = clamp(
+        Math.floor(input.urgentThreatCap),
+        1,
+        30,
+      );
+    }
+    if (input.formationComplexity !== undefined) {
+      this.difficulty.formationComplexity = clamp(
+        Math.floor(input.formationComplexity),
+        1,
+        5,
+      );
+    }
+    if (input.attackIntervalFactor !== undefined) {
+      this.difficulty.attackIntervalFactor = clamp(
+        input.attackIntervalFactor,
+        0.2,
+        3,
+      );
+    }
+    return true;
+  }
+
+  testLabSpawnFormationNow(): number {
+    if (
+      !this.testLabEnabled ||
+      this.difficulty === null ||
+      this.stageConfig === null
+    ) {
+      return 0;
+    }
+    const formation = chooseFormation(
+      this.stageConfig.stage,
+      this.difficulty.formationComplexity,
+      Math.max(2, this.spawnRemaining),
+    );
+    if (
+      formation === null ||
+      !this.canAdmitFormation(formation, this.difficulty)
+    ) {
+      return 0;
+    }
+    return this.spawnFormation(formation, this.difficulty);
   }
 
   testLabForceEnemySkill(
@@ -3217,6 +3344,15 @@ export class Game {
     ) {
       return 0;
     }
+
+    return this.spawnFormation(formation, difficulty);
+  }
+
+  private spawnFormation(
+    formation: FormationDefinition,
+    difficulty: DifficultyProfile,
+  ): number {
+    if (!this.canAdmitFormation(formation, difficulty)) return 0;
 
     const anchorPadding = Math.min(
       Math.max(145, this.width * 0.2),
