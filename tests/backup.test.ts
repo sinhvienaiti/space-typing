@@ -926,6 +926,21 @@ describe("save backup", () => {
     }
   });
 
+  it("still validates v25 checkpoint data before migrating the hotbar", () => {
+    const current = createPlayerSave(createDefaultCampaignProgress());
+    const raw = {
+      ...current,
+      version: 25,
+      checkpointSnapshot: { stage: 999, state: {} },
+    } as Record<string, unknown>;
+    delete raw.hotbar;
+
+    expect(parsePlayerSaveJson(JSON.stringify(raw))).toEqual({
+      ok: false,
+      error: "Committed checkpoint snapshot is invalid.",
+    });
+  });
+
   it("rejects invalid current-version hotbar data", () => {
     const raw = createPlayerSave(createDefaultCampaignProgress()) as unknown as Record<
       string,
