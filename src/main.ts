@@ -8,6 +8,7 @@ import {
 } from "./assets/pipeline";
 import { difficultyFor } from "./campaign/difficulty";
 import { journeyNodesForStage, journeyPath } from "./campaign/journey-map";
+import { selectCompletedStageForReplay } from "./campaign/replay";
 import {
   difficultyModeDefinition,
   difficultyModePresentation,
@@ -6875,10 +6876,12 @@ for (const id of ["restartButton", "clearRetryButton"]) {
       return;
     }
     const completedStage = game.getStats().stage;
-    if (canSelectCampaignStage(campaign, campaignExpansion, completedStage)) {
-      campaign = selectCampaignStage(campaign, completedStage);
-      updateCampaignUi();
-    }
+    campaign = selectCompletedStageForReplay(
+      campaign,
+      campaignExpansion,
+      completedStage,
+    );
+    updateCampaignUi();
     void startSelectedStage();
   });
 }
