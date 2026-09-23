@@ -1,6 +1,6 @@
 # Ship Visual V3 — Performance-First Art Polish Plan
 
-Status: V30/V31 IMPLEMENTED · V32–V36 PENDING · premium art NOT yet produced
+Status: V30–V34 ART/PREP IMPLEMENTED · V32 BINARY NOT YET COMMITTED · V35 BROWSER GATE PENDING · V36 FINAL HANDOFF PENDING
 
 Source of truth: this document + `docs/PROJECT_CONTEXT.md` + existing V2 art/runtime contracts.
 This is an approved, scoped follow-up to C05–C11 in `docs/PRE_M22_COMBAT_IDENTITY_TYPING_CLARITY_PLAN.md`.
@@ -124,4 +124,7 @@ Acceptance: independent silhouette and full-color comparison at 64/78/128 CSS px
 
 - V30: 11-ship art direction, exclusion list and hard budgets documented here.
 - V31: implemented `src/characters/ship-art.ts` V3 → V2 → procedural fallback, dimension-validation tests, and `scripts/check-ship-art-budget.mjs` wired to production build. Until a real V3 atlas is registered, **runtime art remains V2**.
-- V32–V36: require actual premium atlas artwork, browser review, verified file/decoded size and paired Test Lab frame timings. **Do not mislabel existing V2 SVG or fallback code as completed V3 art**.
+- V32: 11 distinct generated source sprites and the real 4×3 lossless WebP atlas have been assembled and visually reviewed as local artifacts; the atlas has 1024×768 pixels, 800,054 bytes (781.3 KiB; below the 800 KiB target), 3 MiB decoded RGBA and SHA-256 `fb9434e002d6da650e34192eb425e62d1e2f3bec8804a9b33b7aa8733de10eb3`. Local archive includes the full-resolution atlas, 11 original crops, a contact sheet and 64/78/128px previews. **The raster asset has not yet been committed as a binary GitHub blob.** The GitHub connector available in this environment can update source text but cannot ingest local binary files by path. Do not mark V32 source-of-truth integration complete until it is committed through a verified binary upload.
+- V33/V34: V3-aware render path now accepts the existing V3→V2→procedural selection; avoids V2 engine flames and heavy image-shadow bloom over painted V3 sprite art; startup exposes current art source for QA. Character-specific projectiles and equipment aura still reuse their existing implementations without new emitters. Until the V3 WebP is registered in the existing art manifest **production continues to render V2**. `scripts/install-ship-v3.mjs` SHA-verifies the prepared V3 artwork, places the atlas under the canonical public path, and registers the manifest entry in a local clone.
+- V35: local atlas file/format/source count/transparency and 64/78/128px preview preparation passed. Browser Test Lab V2/V3 paired performance, image contrast and two-build human visual comparison **must still be performed on a clone that has the V3 binary installed**. Never substitute mocked Canvas tests or an infographic's invented benchmarks.
+- V36: docs and CI may merge the safe activation code first; the actual V3 release and final main CI are not complete until Git contains the vetted binary and browser checks have been recorded. M22–M25 remain deferred per user request.
