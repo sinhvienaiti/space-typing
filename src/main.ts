@@ -88,6 +88,8 @@ import {
 import {
   awardCharacterProgress,
   characterProgressStatBonus,
+  MAX_CHARACTER_LEVEL,
+  xpNeededForLevel,
 } from "./characters/progression";
 import {
   resetTalentRanks,
@@ -724,6 +726,7 @@ app.innerHTML = `
           <div class="result-rewards"><span>rewards</span><strong id="clearCredits" class="reward-chips">+0</strong></div>
           <div><span>max streak</span><strong id="clearStreak">0</strong></div>
         </div>
+        <section id="clearCharacterProgress" class="clear-character-progress" aria-live="polite"></section>
         <p id="clearDetails" class="result-details"></p>
         <button id="nextStageButton" class="primary">Next stage</button>
         <button id="clearRetryButton">Replay stage</button>
@@ -3504,6 +3507,50 @@ const game = new Game(
           ascensionText, checkpointText]
           .filter(Boolean).join(" · ").replace(/^\s*·\s*/, "");
       byId("clearStreak").textContent = String(stats.maxStreak);
+
+      const characterProgressPanel = byId("clearCharacterProgress");
+      characterProgressPanel.replaceChildren();
+      const xpTitle = document.createElement("strong");
+      xpTitle.textContent =
+        getCharacter(activeCharacterId).name +
+        " · Lv " + progressAward.previousLevel +
+        (progressAward.levelUps > 0
+          ? " → " + progressAward.progress.level
+          : "") +
+        " · +" + progressAward.xpGained + " XP";
+      const xpTrack = document.createElement("progress");
+      const atMaxLevel = progressAward.progress.level >= MAX_CHARACTER_LEVEL;
+      xpTrack.max = atMaxLevel
+        ? 1
+        : xpNeededForLevel(progressAward.progress.level);
+      xpTrack.value = atMaxLevel ? 1 : progressAward.progress.xp;
+      xpTrack.setAttribute("aria-label", "Character XP");
+      const xpDetail = document.createElement("span");
+      xpDetail.textContent = atMaxLevel
+        ? "Maximum character level"
+        : progressAward.progress.xp + " / " +
+          xpNeededForLevel(progressAward.progress.level) + " XP";
+      characterProgressPanel.append(xpTitle, xpTrack, xpDetail);
+      if (progressAward.levelUps > 0) {
+        const gainedStats = document.createElement("p");
+        gainedStats.className = "clear-auto-stats";
+        gainedStats.textContent = "Automatic growth · " +
+          CORE_STAT_KEYS.map((key) =>
+            key.charAt(0).toUpperCase() + key.slice(1) + " +" +
+            progressAward.autoStatGains[key].toFixed(
+              key === "luck" || key === "salvage" ? 3 : 2,
+            ),
+          ).join(" · ");
+        characterProgressPanel.append(gainedStats);
+      }
+      if (progressAward.masteryUps > 0) {
+        const masteryNotice = document.createElement("span");
+        masteryNotice.textContent =
+          "Mastery " + progressAward.previousMastery +
+          " → " + progressAward.progress.mastery +
+          " (separate from character level)";
+        characterProgressPanel.append(masteryNotice);
+      }
 
       updateCampaignUi();
     },
