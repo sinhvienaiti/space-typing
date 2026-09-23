@@ -59,7 +59,11 @@ import {
   drawCharacterShip,
   setCharacterShipSheet,
 } from "./characters/renderer";
-import { selectCharacterShipSheet } from "./characters/ship-art";
+import {
+  parseShipArtPreference,
+  PREMIUM_SHIP_SHEET_ASSET_ID,
+  selectCharacterShipSheet,
+} from "./characters/ship-art";
 import { CHARACTER_SHIP_SHEET_ASSET_ID } from "./characters/visuals";
 import { deriveEquipmentAura } from "./characters/equipment-aura";
 import { AEGIS_ACTIVE_SKILL_ID } from "./characters/aegis";
@@ -6311,8 +6315,21 @@ async function applyClassLevel(level: number): Promise<void> {
 async function initializeArtPipeline(): Promise<void> {
   try {
     const manifest = await loadArtAssetManifest();
-    artCatalog = await preloadArtAssets(manifest);
-    const shipArt = selectCharacterShipSheet(artCatalog);
+    // QA-only A/B comparison: ?shipArt=v2 excludes V3 from the preload so the
+    // same stage/device can benchmark the old art without hidden V3 decoding.
+    const artPreference = parseShipArtPreference(
+      new URLSearchParams(window.location.search).get("shipArt"),
+    );
+    const loadManifest = artPreference === "v2"
+      ? {
+          ...manifest,
+          entries: manifest.entries.filter(
+            (entry) => entry.id !== PREMIUM_SHIP_SHEET_ASSET_ID,
+          ),
+        }
+      : manifest;
+    artCatalog = await preloadArtAssets(loadManifest);
+    const shipArt = selectCharacterShipSheet(artCatalog, artPreference);
     setCharacterShipSheet(shipArt.image, shipArt.source);
     if (shipArt.source === "v3") {
       // Keep only one decoded full-size art atlas while V3 is active.
