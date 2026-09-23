@@ -3276,17 +3276,28 @@ M22 may now begin the final deterministic balance/performance audit. Do not add 
 
 ## M22 — Full balance/performance audit
 
-Run:
+**Status: Automated audit complete; manual browser/audio/visual gate pending.** See `docs/M22_BALANCE_PERFORMANCE_AUDIT.md` and `docs/M22_MANUAL_PLAYTEST_MATRIX.md`.
 
-- deterministic simulations;
-- 1000-stage mapping audit;
-- WPM/difficulty pressure audit;
-- economy/drop simulations;
-- stress tests;
-- Test Lab coverage;
-- World music mapping/transition audit;
-- audio ducking/crossfade/lifecycle audit;
-- manual browser/audio/visual playtests.
+Automated work completed:
+
+- deterministic cross-system simulation across Stage 001-1000 / 50 Worlds / 100 checkpoint sectors;
+- all six fixed difficulty bands plus full-Campaign Adaptive/Custom reference runs;
+- seeded economy, equipment-drop, Grade and enemy-reward simulations;
+- checkpoint/death/crash and all three resurrection/protection-item integrity scenarios;
+- production Game runtime stress through gated deterministic stepping;
+- Test Lab-driven early/mid/late/max-pressure stress coverage;
+- all-World music mapping, fallback, ducking, crossfade and lifecycle audit;
+- deploy bundle-size budgets enforced by `pnpm build`;
+- M22 stress audit found and fixed Carrier/Splitter child spawn admission exceeding `maxEnemies`;
+- CI #395 PASS · 116 test files · 583/583 tests · TypeScript check + production build + bundle budget.
+
+Remaining M22 gate:
+
+- execute and record the real-browser/audio/visual matrix;
+- fix any manual findings;
+- run final post-fix CI.
+
+Do **not** begin M23 until the manual M22 matrix is complete.
 
 ## M23 — Review Pass #1
 
