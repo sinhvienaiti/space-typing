@@ -81,10 +81,14 @@ describe("hostile projectile intercept SFX", () => {
 
     sfx.projectileIntercept();
 
-    expect(tone).toHaveBeenCalledExactlyOnceWith(
-      1040, 0.075, "sawtooth", 0.055, 260, "combat",
+    expect(tone).toHaveBeenNthCalledWith(
+      1, 1160, 0.11, "sawtooth", 0.09, 310, "combat",
     );
-    expect(noise).toHaveBeenCalledExactlyOnceWith(0.025, 0.014, "combat");
+    expect(tone).toHaveBeenNthCalledWith(
+      2, 630, 0.125, "triangle", 0.05, 170, "combat",
+    );
+    expect(tone).toHaveBeenCalledTimes(2);
+    expect(noise).toHaveBeenCalledExactlyOnceWith(0.045, 0.027, "combat");
     sfx.destroy();
   });
 
@@ -95,6 +99,10 @@ describe("hostile projectile intercept SFX", () => {
     const state = game as unknown as {
       phase: GamePhase;
       projectiles: EnemyProjectile[];
+      lasers: Array<{ life: number }>;
+      projectileImpacts: Array<{ life: number; radius: number }>;
+      particles: unknown[];
+      updateEffects: (dt: number) => void;
     };
     state.phase = "playing";
     state.projectiles = [
@@ -107,6 +115,15 @@ describe("hostile projectile intercept SFX", () => {
     expect(game.getStats().hits).toBe(1);
     expect(intercept).toHaveBeenCalledOnce();
     expect(genericHit).not.toHaveBeenCalled();
+    expect(state.lasers).toHaveLength(1);
+    expect(state.lasers[0]!.life).toBe(0.18);
+    expect(state.projectileImpacts).toHaveLength(1);
+    expect(state.projectileImpacts[0]!.life).toBe(0.34);
+    expect(state.particles.length).toBeGreaterThan(0);
+    state.updateEffects(0.1);
+    expect(state.projectileImpacts[0]!.life).toBeCloseTo(0.24);
+    state.updateEffects(0.25);
+    expect(state.projectileImpacts).toHaveLength(0);
     game.destroy();
   });
 });
