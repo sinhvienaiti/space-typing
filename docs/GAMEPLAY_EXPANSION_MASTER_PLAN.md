@@ -3299,9 +3299,9 @@ The approved user-facing polish slice in `docs/PRE_M22_UI_RECALL_CHARACTER_POLIS
 
 The approved RPG HUD slice in `docs/PRE_M22_RPG_HUD_HOTBAR_PLAN.md` is also COMPLETE: H01-H06 add compact player status, one configurable 1-9 hotbar, title/Pause assignment UI, PlayerSave v26 migration, responsive polish and regression coverage.
 
-The approved transition slice in `docs/PRE_M22_STAGE_TRANSITION_PLAN.md` is implementation-complete pending final CI: T01-T06 replace the World-only notice with a short skippable pre-combat transition for every stage, escalating for World/Galaxy/Boss/Hidden encounters while keeping combat paused until the overlay finishes.
+The approved transition slice in `docs/PRE_M22_STAGE_TRANSITION_PLAN.md` is COMPLETE: T01-T06 replace the World-only notice with a short skippable pre-combat transition for every stage, escalating for World/Galaxy/Boss/Hidden encounters while keeping combat paused until the overlay finishes. PR #70 CI #455 PASS · 121/121 test files · 613/613 tests · TypeScript/build/bundle PASS.
 
-After branch/main CI is green:
+Now:
 
 - execute and record the real-browser/audio/visual matrix on the final polished HUD/transition build;
 - fix any manual findings;
