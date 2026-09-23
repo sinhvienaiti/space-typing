@@ -219,7 +219,10 @@ describe("M21 gated Game Test Lab API", () => {
     expect(second?.layersRemaining).toBe(1);
 
     expect(game.testLabKillEnemy(ids[0]!)).toBe(true);
-    expect(game.getTestLabSnapshot()?.enemies).toHaveLength(0);
+    const finalSnapshot = game.getTestLabSnapshot();
+    expect(finalSnapshot?.enemies).toHaveLength(0);
+    expect(finalSnapshot?.learningEcho?.en.length).toBeGreaterThan(0);
+    expect(finalSnapshot?.learningEcho?.remaining).toBeGreaterThan(0);
 
     game.destroy();
   });
