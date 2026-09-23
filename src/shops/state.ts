@@ -548,7 +548,6 @@ export function createShopState(): ShopState {
   return {
     version: 1,
     instances: {},
-    pendingRestHub: null,
   };
 }
 
@@ -575,7 +574,8 @@ export function markRestHubPending(
 }
 
 export function dismissRestHub(state: ShopState): ShopState {
-  return { ...state, pendingRestHub: null };
+  const { pendingRestHub: _completed, ...rest } = state;
+  return rest;
 }
 
 function validPendingRestHub(value: unknown): boolean {
@@ -714,9 +714,12 @@ export function sanitizeShopState(value: unknown): ShopState {
       result.instances[key] = instance;
     }
   }
-  result.pendingRestHub = validPendingRestHub(raw.pendingRestHub)
-    ? (raw.pendingRestHub ?? null) as number | null
-    : null;
+  // Preserve the exact shape of existing v1 saves when no rest visit
+  // exists. Adding a null field to every migrated save changes backup diffs.
+  if (validPendingRestHub(raw.pendingRestHub) &&
+      typeof raw.pendingRestHub === "number") {
+    result.pendingRestHub = raw.pendingRestHub;
+  }
   return result;
 }
 
