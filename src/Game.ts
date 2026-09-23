@@ -278,7 +278,7 @@ import {
   EMPTY_COMPILED_RELIC_EFFECTS,
   type CompiledRelicEffects,
 } from "./relics/state";
-import { drawModularEnemy } from "./enemies/renderer";
+import { drawModularEnemy, StaticEnemyBodyCache } from "./enemies/renderer";
 import {
   spawnWorldEnemyDefinitionId,
   worldRuntimeEnemyDefinitionId,
@@ -684,6 +684,7 @@ export class Game {
   private readonly frameProfiler = new FrameProfiler();
   private readonly drawProfiler = new FrameProfiler();
   private readonly adaptiveRenderBudget = new AdaptiveRenderBudget();
+  private readonly modularBodyCache = new StaticEnemyBodyCache();
   private lastTime = performance.now();
   private animationFrame = 0;
   private stars: Array<{ x: number; y: number; z: number }> = [];
@@ -720,6 +721,7 @@ export class Game {
 
   destroy(): void {
     cancelAnimationFrame(this.animationFrame);
+    this.modularBodyCache.clear();
     this.sfx.destroy();
   }
 
@@ -741,12 +743,14 @@ export class Game {
     adaptiveScale: number;
     effectiveDpr: number;
     canvasPixels: number;
+    bodySprites: number;
   } {
     return {
       renderP95Ms: this.drawProfiler.report().p95FrameMs,
       adaptiveScale: this.adaptiveRenderBudget.scale,
       effectiveDpr: this.dpr,
       canvasPixels: this.canvas.width * this.canvas.height,
+      bodySprites: this.modularBodyCache.size,
     };
   }
 
@@ -2384,6 +2388,7 @@ export class Game {
     this.sfx.setVolume(settings.sfxVolume);
     if (qualityChanged) {
       this.adaptiveRenderBudget.reset();
+      this.modularBodyCache.clear();
       this.resize();
     }
   }
@@ -7269,7 +7274,7 @@ export class Game {
         flash: boss.flash,
         targeted: false,
         glowScale: qualityProfile(this.settings.visualQuality).glowScale,
-      });
+      }, this.modularBodyCache, this.dpr);
 
     if (!modularDrawn) {
       context.shadowBlur = boss.flash > 0 ? 36 : 24;
@@ -7822,7 +7827,7 @@ export class Game {
         flash: enemy.flash,
         targeted,
         glowScale: qualityProfile(this.settings.visualQuality).glowScale,
-      });
+      }, this.modularBodyCache, this.dpr);
 
     if (!modularDrawn) {
       context.beginPath();
