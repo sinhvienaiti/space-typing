@@ -3640,7 +3640,7 @@ CI #376 PASS · 111 test files · 561/561 tests · TypeScript check + production
 M22 Full Balance / Performance Audit — AUTOMATED PASS, MANUAL GATE PENDING
 CI #395 PASS · 116 test files · 583/583 tests · TypeScript check + production build + bundle budget
 Manual-gate support: Developer Test Lab includes a 43-row QA-only recorder with per-row/default browser-device metadata, live runtime/performance/music evidence capture, explicit real-audio + High/Ultra-browser + low/mid/high human-paced attestations and Markdown export; real browser/audio/human-paced execution remains mandatory.
-Pre-M22 polish slice: `docs/PRE_M22_UI_RECALL_CHARACTER_POLISH_PLAN.md` P00-P08 COMPLETE. CI #426 PASS · 119/119 test files · 597/597 tests · TypeScript check + production build + bundle budget. The next allowed step is the real M22 browser/audio/human-paced matrix; M23 remains blocked until that manual gate passes. P08.1 adds a narrow-screen quick-control overlap fix plus a Recall Bonus non-punitive-input regression check before manual QA.
+Pre-M22 polish slice: `docs/PRE_M22_UI_RECALL_CHARACTER_POLISH_PLAN.md` P00-P08 COMPLETE, with P08.1 narrow-screen/Recall sanity follow-up merged. A second approved pre-M22 slice, `docs/PRE_M22_RPG_HUD_HOTBAR_PLAN.md` H01-H06, is now PLANNED: compact player-status bars plus one configurable 1-9 hotbar replacing the separate Item/Skill/Support strips, followed by canonical PlayerSave migration and M22 integration QA. M23 remains blocked until the final M22 manual gate passes.
 ~~~
 
 Important implementation notes:

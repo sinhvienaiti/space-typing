@@ -3295,11 +3295,13 @@ Automated work completed:
 
 Remaining M22 gate:
 
-The approved user-facing polish slice in `docs/PRE_M22_UI_RECALL_CHARACTER_POLISH_PLAN.md` is COMPLETE. P00-P08 are merged or integration-ready with CI #426 PASS: 119/119 test files, 597/597 tests, TypeScript check, production build and bundle budget.
+The approved user-facing polish slice in `docs/PRE_M22_UI_RECALL_CHARACTER_POLISH_PLAN.md` is COMPLETE. P00-P08 are merged with follow-up P08.1.
 
-Now:
+Before the final manual matrix, complete the approved RPG HUD slice in `docs/PRE_M22_RPG_HUD_HOTBAR_PLAN.md` (H01-H06): compact player status, unified configurable 1-9 hotbar, assignment UI, canonical PlayerSave migration, responsive polish and regression coverage.
 
-- execute and record the real-browser/audio/visual matrix on the polished build;
+Then:
+
+- execute and record the real-browser/audio/visual matrix on the final polished HUD build;
 - fix any manual findings;
 - run final post-fix CI.
 
