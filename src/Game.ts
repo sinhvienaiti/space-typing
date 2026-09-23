@@ -1195,6 +1195,32 @@ export class Game {
     return true;
   }
 
+  testLabAdvanceSimulation(
+    seconds: number,
+    stepSeconds = 1 / 60,
+  ): boolean {
+    if (!this.testLabEnabled) return false;
+    const duration = clamp(
+      Number.isFinite(seconds) ? seconds : 0,
+      0,
+      60,
+    );
+    const step = clamp(
+      Number.isFinite(stepSeconds) ? stepSeconds : 1 / 60,
+      1 / 240,
+      0.05,
+    );
+    let remaining = duration;
+    let guard = 0;
+    while (remaining > 1e-9 && guard < 14_400) {
+      const dt = Math.min(step, remaining);
+      this.advanceSimulation(dt);
+      remaining -= dt;
+      guard += 1;
+    }
+    return true;
+  }
+
   testLabSetTimeScale(scale: number): boolean {
     if (!this.testLabEnabled) return false;
     this.testLabTimeScale = clamp(
@@ -2563,6 +2589,13 @@ export class Game {
     this.lastTime = now;
     this.frameProfiler.pushFrame(rawDt);
 
+    this.advanceSimulation(dt);
+
+    this.draw(now / 1000);
+    this.animationFrame = requestAnimationFrame(this.frame);
+  };
+
+  private advanceSimulation(dt: number): void {
     if (this.phase === "playing") {
       this.stageElapsedSeconds += dt;
       if (this.hitStopTimer > 0) {
@@ -2574,10 +2607,7 @@ export class Game {
     } else {
       this.updateEffects(dt);
     }
-
-    this.draw(now / 1000);
-    this.animationFrame = requestAnimationFrame(this.frame);
-  };
+  }
 
   private update(dt: number): void {
     this.shake = Math.max(0, this.shake - dt * 28);
