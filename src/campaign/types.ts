@@ -37,6 +37,10 @@ export type DifficultyInput = {
   recentAccuracy: number;
   customTargetWpm?: number;
   customPressure?: number;
+  customEnemySpeed?: number;
+  customBulletSpeed?: number;
+  customFireRate?: number;
+  customSpawnRate?: number;
 };
 
 export type DifficultyProfile = {
@@ -51,6 +55,8 @@ export type DifficultyProfile = {
   spawnInterval: number;
   maxEnemies: number;
   projectilePressure: number;
+  /** Multiplier applied only to projectile velocity, not fire frequency. */
+  projectileSpeedScale?: number;
   bossPressure: number;
   targetWpm: number;
   pressureBudget: number;
