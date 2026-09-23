@@ -203,6 +203,10 @@ export function canAdmitSpawn(
   const supportIncrement =
     isControllerSupportKind(kind) ? 1 : 0;
 
+  if (snapshot.enemyCount >= difficulty.maxEnemies) {
+    return false;
+  }
+
   if (
     snapshot.urgentThreats >=
     difficulty.urgentThreatCap
