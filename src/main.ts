@@ -1,5 +1,6 @@
 import "./styles.css";
 import "./character-progress.css";
+import "./basic-skills.css";
 import { Game } from "./Game";
 import { hasUsableDeathProtection } from "./ui/game-over";
 import {
@@ -147,14 +148,19 @@ import {
   createUpgradeState,
   maxAttributeLevel,
   permanentAttributeBonus,
-  skillUpgradeCost,
   type UpgradeCost,
   type UpgradeState,
 } from "./progression/upgrades";
 import {
   UPGRADEABLE_SKILL_IDS,
-  type UpgradeableSkillId,
+  resolveSkillDefinitionLevel,
 } from "./skills/progression";
+import {
+  BASIC_SKILL_PRESENTATION,
+  basicSkillNextUnlockLevel,
+  basicSkillPoints,
+  spendBasicSkillPoint,
+} from "./progression/basic-skills";
 import {
   RELIC_REGISTRY,
   getRelicDefinition,
@@ -857,6 +863,7 @@ app.innerHTML = `
       </p>
       <div id="characterGrid" class="character-grid"></div>
       <div id="talentPanel" class="talent-panel"></div>
+      <section id="basicSkillPanel" class="basic-skill-panel" aria-label="Basic Skill Tree"></section>
       <section class="hotbar-loadout-panel">
         <div class="hotbar-loadout-head">
           <div>
@@ -3544,6 +3551,15 @@ const game = new Game(
           ).join(" · ");
         characterProgressPanel.append(gainedStats);
       }
+      const basicAwardNotice = document.createElement("span");
+      const currentBasicPoints = basicSkillPoints(
+        progressAward.progress.level,
+        upgrades.basicSkills[activeCharacterId],
+      );
+      basicAwardNotice.textContent =
+        "+" + progressAward.levelUps + " Basic Skill Points · " +
+        currentBasicPoints.available + " available (Talent Points separate)";
+      characterProgressPanel.append(basicAwardNotice);
       if (progressAward.masteryUps > 0) {
         const masteryNotice = document.createElement("span");
         masteryNotice.textContent =
@@ -3746,7 +3762,9 @@ function renderCharacters(): void {
       "Lv " +
       String(progress.level) +
       " · Mastery " +
-      String(progress.mastery);
+      String(progress.mastery) +
+      " · " + basicSkillPoints(progress.level, upgrades.basicSkills[id]).available +
+      " Basic Points available";
 
     card.append(preview, top, summary, kit, progressMeta);
 
@@ -3777,6 +3795,7 @@ function renderCharacters(): void {
     String(selectedProgress.mastery);
 
   renderTalentPanel();
+  renderBasicSkillPanel();
   renderHotbarLoadout();
 }
 
@@ -3868,6 +3887,122 @@ function renderTalentPanel(): void {
   panel.append(head, grid, reset);
 }
 
+function renderBasicSkillPanel(): void {
+  const panel = byId("basicSkillPanel");
+  panel.replaceChildren();
+  const characterId = characters.selected;
+  const characterLevel = characters.progress[characterId].level;
+  const wallet = upgrades.basicSkills[characterId];
+  const points = basicSkillPoints(characterLevel, wallet);
+
+  const heading = document.createElement("div");
+  heading.className = "basic-skill-heading";
+  const title = document.createElement("strong");
+  title.textContent = "Basic Skill Tree";
+  const balance = document.createElement("span");
+  balance.textContent =
+    points.available + " available · " + points.spent +
+    " spent / " + points.earned + " earned";
+  heading.append(title, balance);
+  const note = document.createElement("p");
+  note.textContent =
+    "Earn 1 Basic Skill Point for every character level-up. " +
+    "Each character has separate skills; Talent Points and Mastery are unchanged.";
+  panel.append(heading, note);
+
+  const grid = document.createElement("div");
+  grid.className = "basic-skill-grid";
+  const definitions = [...DEFENSIVE_SKILLS, ...OFFENSIVE_SKILLS];
+
+  for (const skillId of UPGRADEABLE_SKILL_IDS) {
+    const rank = wallet.ranks[skillId];
+    const nextRequirement = basicSkillNextUnlockLevel(rank);
+    const presentation = BASIC_SKILL_PRESENTATION[skillId];
+    const definition = definitions.find((skill) => skill.id === skillId);
+    const currentEffect =
+      rank > 0 && definition !== undefined
+        ? resolveSkillDefinitionLevel(definition, rank)
+        : null;
+    const nextEffect =
+      nextRequirement !== null && definition !== undefined
+        ? resolveSkillDefinitionLevel(definition, rank + 1)
+        : null;
+    const card = document.createElement("article");
+    card.className =
+      "basic-skill-card " + (rank > 0 ? "learned" : "locked");
+    const icon = document.createElement("span");
+    icon.className = "basic-skill-icon";
+    icon.textContent = presentation.icon;
+    icon.setAttribute("aria-hidden", "true");
+    const body = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = (definition?.name ?? skillId) + " · Lv" + rank + "/5";
+    const category = document.createElement("span");
+    category.className = "basic-skill-category";
+    category.textContent = presentation.group;
+    const summary = document.createElement("small");
+    summary.textContent = presentation.summary;
+    const effect = document.createElement("small");
+    effect.className = "basic-skill-effect";
+    effect.textContent = nextEffect === null
+      ? "Mastered · final skill rank"
+      : (currentEffect === null
+          ? "Not learned"
+          : "Current: " + currentEffect.energyCost + " Energy · " +
+            currentEffect.cooldown.toFixed(1) + "s cooldown · " +
+            currentEffect.effectScale?.toFixed(2) + "× effect") +
+        " → Next: " + nextEffect.energyCost + " Energy · " +
+        nextEffect.cooldown.toFixed(1) + "s cooldown · " +
+        nextEffect.effectScale?.toFixed(2) + "× effect";
+    const button = document.createElement("button");
+    button.type = "button";
+    const canLearn =
+      nextRequirement !== null &&
+      characterLevel >= nextRequirement &&
+      points.available > 0;
+    button.disabled = !canLearn;
+    button.textContent = nextRequirement === null
+      ? "Max rank"
+      : characterLevel < nextRequirement
+        ? "Unlock at Lv " + nextRequirement
+        : points.available < 1
+          ? "Requires 1 Basic Skill Point"
+          : (rank === 0 ? "Learn" : "Upgrade") + " · 1 point";
+    button.addEventListener("click", () => {
+      // Re-read the latest wallet/level, so repeated quick clicks cannot
+      // spend points or upgrade a rank based on stale rendered UI.
+      const current = upgrades.basicSkills[characterId];
+      const result = spendBasicSkillPoint(
+        current,
+        skillId,
+        characters.progress[characterId].level,
+      );
+      if (!result.changed) return;
+      upgrades = {
+        ...upgrades,
+        basicSkills: {
+          ...upgrades.basicSkills,
+          [characterId]: result.progress,
+        },
+      };
+      applyEquipmentStats();
+      renderCharacters();
+      renderAllSkills();
+      void autosaveCampaign(
+        "upgrade",
+        "✓ " + (definition?.name ?? skillId) +
+          " Lv" + result.progress.ranks[skillId] +
+          " · Basic Skill Point spent",
+        "upgrade",
+      );
+    });
+    body.append(name, category, summary, effect, button);
+    card.append(icon, body);
+    grid.append(card);
+  }
+  panel.append(grid);
+}
+
 function openCharacters(): void {
   if (!persistenceReady || game.getPhase() !== "title") return;
   renderCharacters();
@@ -3938,7 +4073,7 @@ function activeBuildSynergies() {
 }
 
 function applyEquipmentStats(): void {
-  game.setSkillLevels(upgrades.skillLevels);
+  game.setSkillLevels(upgrades.basicSkills[characters.selected].ranks);
   const synergies = activeBuildSynergies();
   game.setBuildSynergies(synergies);
   game.setEquipmentAura(
@@ -4603,58 +4738,14 @@ function renderServiceShop(): void {
   repairCard.append(repairTitle, repairDescription, repairButton);
   repairPanel.append(repairCard);
 
-  for (const id of UPGRADEABLE_SKILL_IDS) {
-    const level = upgrades.skillLevels[id];
-    const cost = skillUpgradeCost(level);
-    const definition = game.getSkillDefinition(id);
-    const card = document.createElement("article");
-    card.className = "service-shop-card";
-
-    const title = document.createElement("strong");
-    title.textContent =
-      (definition?.name ?? id) +
-      " · Lv" +
-      String(level) +
-      "/5";
-
-    const detail = document.createElement("small");
-    detail.textContent =
-      "Core skill progression · higher levels improve efficiency/effect; Lv5 unlocks mastery behavior.";
-
-    const button = document.createElement("button");
-    button.type = "button";
-    button.disabled =
-      cost === null || !canAffordUpgradeCost(cost);
-    button.textContent =
-      cost === null
-        ? "Mastered Lv5"
-        : "Skill Lv" +
-          String(level + 1) +
-          " · " +
-          upgradeCostText(cost);
-    button.addEventListener("click", () => {
-      commitUpgradeService(
-        buySkillUpgrade(
-          {
-            credits,
-            expansionCurrencies,
-            inventory,
-            equipment,
-            upgrades,
-          },
-          id,
-          campaign.highestUnlockedStage,
-        ),
-        "✓ Skill upgraded · " +
-          (definition?.name ?? id) +
-          " Lv" +
-          String(level + 1),
-      );
-    });
-
-    card.append(title, detail, button);
-    repairPanel.append(card);
-  }
+  // Legacy paid Lv1-Lv5 skills remain grandfathered for all characters,
+  // but the Station no longer has a second purchase path for their ranks.
+  const skillsNote = document.createElement("p");
+  skillsNote.className = "equipment-note";
+  skillsNote.textContent =
+    "Core skill ranks now use per-character Basic Skill Points. " +
+    "Open Character Select to learn or upgrade skills; previous paid ranks are retained.";
+  repairPanel.append(skillsNote);
 
   for (const key of CORE_STAT_KEYS) {
     const level = upgrades.attributeLevels[key];
