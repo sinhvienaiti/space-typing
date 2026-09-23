@@ -4349,10 +4349,14 @@ export class Game {
 
   private applyBossPhase(
     boss: BossState,
-    phase: 1 | 2 | 3,
+    phase: number,
     presentation: boolean,
   ): void {
-    boss.phase = phase;
+    boss.phase = clamp(
+      Math.floor(phase),
+      1,
+      3,
+    );
     boss.flash = 1;
 
     const definition = enemyDefinition(
