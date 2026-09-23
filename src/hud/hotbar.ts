@@ -68,6 +68,25 @@ export function createDefaultHotbarState(): HotbarState {
   };
 }
 
+// v25 did not save hotbar data; v26 introduced the original all-eight-skill
+// layout. Preserve that migration behavior separately from new v27 starters.
+export function createLegacyHotbarState(): HotbarState {
+  return {
+    version: 1,
+    slots: [
+      { kind: "item", id: "repair-kit" },
+      { kind: "item", id: "shield-cell" },
+      { kind: "item", id: "energy-cell" },
+      { kind: "skill", id: "barrier" },
+      { kind: "skill", id: "reflect-field" },
+      { kind: "skill", id: "time-shell" },
+      { kind: "skill", id: "emergency-repair" },
+      { kind: "skill", id: "guardian-drone" },
+      { kind: "skill", id: "emp-burst" },
+    ],
+  };
+}
+
 export function isHotbarAction(value: unknown): value is HotbarAction {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return false;
