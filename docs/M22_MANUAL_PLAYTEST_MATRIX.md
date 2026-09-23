@@ -20,6 +20,23 @@ For each row record:
 
 A failed row must become a code/content fix and be re-tested before M22 is marked COMPLETE.
 
+## In-game recording workflow
+
+The M21 Developer Test Lab now includes an **M22 Manual Gate Recorder** that mirrors all 43 required rows in this document.
+
+Use it only as a QA observation recorder:
+
+1. open **Developer Test Lab** from the title screen;
+2. open **M22 Manual Gate Recorder**;
+3. record the real browser/device used;
+4. run the matching Test Lab scenario and set the row to PASS or FAIL;
+5. add reproducible notes for every FAIL and useful device/audio notes for PASS rows;
+6. use **Copy Markdown Report** and preserve the report with the review/checkpoint.
+
+The recorder stores only QA observations in localStorage under `spaceTypingM22ManualGateV1`. It does **not** write PlayerSave, Campaign state, checkpoint state, crash recovery, rewards, equipment, Relics or other gameplay persistence.
+
+The recorder cannot mark M22 complete by itself. Real browser observation, real audio output and human-paced typing are still mandatory.
+
 ## Difficulty and typing pace
 
 | Scenario | Setup | Pass criteria | Status |
