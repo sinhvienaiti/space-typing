@@ -1956,6 +1956,19 @@ function hotbarActionStatus(action: HotbarAction): {
     };
   }
 
+  if (
+    action.kind === "skill" &&
+    isCoreCombatSkillId(action.id) &&
+    upgrades.basicSkills[characters.selected].ranks[action.id] === 0
+  ) {
+    return {
+      disabled: true,
+      state: "locked",
+      title: "Learn this Basic Skill in Character Select",
+      cooldown: false,
+    };
+  }
+
   const state = game.getSkillState(skillId);
   const reason = game.canUseSkill(skillId);
   const cooldown = (state?.cooldownRemaining ?? 0) > 0.05;
@@ -2147,7 +2160,16 @@ function renderHotbarLoadout(): void {
       for (const action of candidates) {
         const option = document.createElement("option");
         option.value = hotbarActionKey(action);
-        option.textContent = hotbarActionLabel(action);
+        const coreId =
+          action.kind === "skill" && isCoreCombatSkillId(action.id)
+            ? action.id
+            : null;
+        const locked =
+          coreId !== null &&
+          upgrades.basicSkills[characters.selected].ranks[coreId] === 0;
+        option.textContent =
+          hotbarActionLabel(action) + (locked ? " · locked" : "");
+        option.disabled = locked;
         select.append(option);
       }
 
