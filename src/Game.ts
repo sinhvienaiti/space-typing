@@ -414,6 +414,7 @@ export type GameHooks = {
   onStageClear(stats: GameStats): void;
   onBossUpdate(boss: BossHudState | null): void;
   onWordComplete(entry: VocabularyEntry): void;
+  onKillTranslation?(entry: VocabularyEntry): void;
   onEquipmentDrop(drop: EquipmentDrop): void;
   onRewardChoice(options: readonly EquipmentDrop[]): void;
   onBossRewardChoice(stage: number, role: BossRole): void;
@@ -4753,6 +4754,7 @@ export class Game {
       this.applyCharacterPerfectWordPassive(perfectWord);
       this.applyRelicWordComplete(word.length, perfectWord);
       boss.wordsCompleted += 1;
+      const completedEntry = { ...boss.entry };
       boss.typed = 0;
       boss.entry = this.pickBossEntry(
         boss.typingMechanic,
@@ -4783,7 +4785,7 @@ export class Game {
       this.updateBossPhase(boss);
 
       if (boss.hp <= 0) {
-        this.defeatBoss();
+        this.defeatBoss(completedEntry);
         this.emitStats();
         return;
       }
@@ -4877,12 +4879,17 @@ export class Game {
     );
   }
 
-  private defeatBoss(): void {
+  private defeatBoss(completedEntry?: VocabularyEntry): void {
     const boss = this.boss;
     if (boss === null) return;
 
     const { x, y } = this.bossPosition();
     this.triggerImpactFeedback("boss-defeat");
+    // Only show translation if the kill completed a typed boss word.
+    // Spell/Nova kills must not misrepresent untyped words as learned.
+    if (completedEntry !== undefined) {
+      this.hooks.onKillTranslation?.({ ...completedEntry });
+    }
     this.stats.kills += 1;
     this.addScore(1200 * this.stats.multiplier);
     this.gainPower(18);
@@ -5321,6 +5328,8 @@ export class Game {
     this.stats.kills += 1;
     this.addScore((80 + length * 14) * this.stats.multiplier);
     this.gainPower(7);
+    // Keep test-lab metadata, but render learning feedback in the dedicated
+    // HTML strip instead of overlapping EN/IPA/VI over the battlefield.
     this.learningEcho = {
       entry: { ...enemy.entry },
       x: enemy.x,
@@ -5328,6 +5337,7 @@ export class Game {
       remaining: 1.1,
       duration: 1.1,
     };
+    this.hooks.onKillTranslation?.({ ...enemy.entry });
 
     this.fireLaser(enemy, 1.45);
     const deathDefinition = this.visualDefinitionForEnemy(enemy);
@@ -6713,7 +6723,6 @@ export class Game {
       this.drawEnemy(enemy);
     }
 
-    this.drawLearningEcho();
 
     if (this.boss !== null) {
       this.drawBoss(time);
@@ -6735,53 +6744,6 @@ export class Game {
 
     context.restore();
     this.drawRewardBuffTimers();
-  }
-
-  private drawLearningEcho(): void {
-    const echo = this.learningEcho;
-    if (echo === null) return;
-
-    const context = this.context;
-    const alpha = clamp(echo.remaining / echo.duration, 0, 1);
-    const rise = (1 - alpha) * 8;
-    const primary =
-      normalizeWord(echo.entry.en) +
-      (echo.entry.ipa.trim().length > 0 ? "  " + echo.entry.ipa : "");
-    const secondary = echo.entry.vi.trim();
-    const width = Math.min(
-      260,
-      Math.max(
-        92,
-        Math.max(primary.length * 7.2, secondary.length * 6.2) + 18,
-      ),
-    );
-    const x = clamp(echo.x, width / 2 + 8, this.width - width / 2 - 8);
-    const y = clamp(echo.y - rise, 78, this.height - 110);
-
-    context.save();
-    context.globalAlpha = alpha * 0.92;
-    context.fillStyle = "rgba(4, 10, 17, 0.72)";
-    context.strokeStyle = "rgba(101, 231, 249, 0.16)";
-    context.lineWidth = 1;
-    context.beginPath();
-    context.roundRect(x - width / 2, y - 14, width, 32, 8);
-    context.fill();
-    context.stroke();
-
-    context.textAlign = "center";
-    context.textBaseline = "middle";
-    context.fillStyle = "#eafcff";
-    context.font =
-      "700 11px ui-monospace, SFMono-Regular, Menlo, monospace";
-    context.fillText(primary, x, y - 4);
-
-    if (secondary.length > 0) {
-      context.fillStyle = "rgba(151, 184, 198, 0.9)";
-      context.font =
-        "650 9px ui-sans-serif, system-ui, -apple-system, sans-serif";
-      context.fillText(secondary, x, y + 9);
-    }
-    context.restore();
   }
 
   private drawEnemyControlOverlay(): void {
