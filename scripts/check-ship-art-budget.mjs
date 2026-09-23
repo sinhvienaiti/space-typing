@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -12,6 +12,18 @@ const entry = manifest.entries.find(
 );
 
 if (entry === undefined) {
+  const orphaned = [
+    "player-ships-v3.webp",
+    "player-ships-v3.png",
+  ].filter((name) =>
+    existsSync(join(root, "public/assets/space-typing/ships", name)),
+  );
+  if (orphaned.length > 0) {
+    throw new Error(
+      "Ship V3 raster file exists but is not in the art manifest. " +
+        "Run node scripts/install-ship-v3.mjs <path-to-atlas> to register it.",
+    );
+  }
   console.log("Ship V3 atlas: not registered yet; existing V2 art remains active.");
   process.exit(0);
 }
