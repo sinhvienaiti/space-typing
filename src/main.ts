@@ -60,6 +60,7 @@ import {
   setCharacterShipSheet,
 } from "./characters/renderer";
 import { selectCharacterShipSheet } from "./characters/ship-art";
+import { CHARACTER_SHIP_SHEET_ASSET_ID } from "./characters/visuals";
 import { deriveEquipmentAura } from "./characters/equipment-aura";
 import { AEGIS_ACTIVE_SKILL_ID } from "./characters/aegis";
 import { ARSENAL_ACTIVE_SKILL_ID } from "./characters/arsenal";
@@ -6313,6 +6314,11 @@ async function initializeArtPipeline(): Promise<void> {
     artCatalog = await preloadArtAssets(manifest);
     const shipArt = selectCharacterShipSheet(artCatalog);
     setCharacterShipSheet(shipArt.image, shipArt.source);
+    if (shipArt.source === "v3") {
+      // Keep only one decoded full-size art atlas while V3 is active.
+      const fallback = artCatalog.assets.get(CHARACTER_SHIP_SHEET_ASSET_ID);
+      if (fallback !== undefined) fallback.image = null;
+    }
     // QA telemetry only; the atlas selection is a one-time startup decision.
     document.documentElement.dataset.shipArt = shipArt.source;
     renderPlayerStatusIdentity();
