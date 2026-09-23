@@ -89,6 +89,36 @@ describe("character progression", () => {
     expect(capped.autoStatGains).toEqual(characterLevelStatGains(50, 50));
   });
 
+  it("keeps early XP pace and spreads the max level across 1,000 stages", () => {
+    expect(xpNeededForLevel(1)).toBe(155);
+    expect(xpNeededForLevel(10)).toBe(470);
+    expect(xpNeededForLevel(11)).toBe(514);
+
+    let normal = createStarterCharacterProgress();
+    let slow = createStarterCharacterProgress();
+    let replay = createStarterCharacterProgress();
+    const checkpoints: Record<number, number> = {};
+    for (let stage = 1; stage <= 1000; stage += 1) {
+      normal = awardCharacterProgress(normal, {
+        stage, accuracy: 95, wpm: 60,
+      }).progress;
+      slow = awardCharacterProgress(slow, {
+        stage, accuracy: 80, wpm: 25,
+      }).progress;
+      replay = awardCharacterProgress(replay, {
+        stage: 1, accuracy: 95, wpm: 60,
+      }).progress;
+      if ([10, 100, 250, 500, 750, 1000].includes(stage)) {
+        checkpoints[stage] = normal.level;
+      }
+    }
+    expect(checkpoints).toEqual({
+      10: 6, 100: 21, 250: 29, 500: 39, 750: 46, 1000: 50,
+    });
+    expect(slow.level).toBe(50);
+    expect(replay.level).toBeLessThan(50);
+  });
+
   it("sanitizes capped progression safely", () => {
     expect(
       sanitizeCharacterProgress({
