@@ -35,6 +35,7 @@ import { RELIC_IDS } from "../relics/registry";
 import {
   MUSIC_STATES,
   WORLD_MUSIC_PROFILES,
+  validateWorldMusicProfiles,
 } from "../audio/music-profile";
 
 export type TestLabRegistry = {
@@ -104,6 +105,20 @@ export function validateTestLabRegistry(
   if (registry.musicProfileIds.length !== WORLD_REGISTRY.length) {
     errors.push("Every World must resolve a Test Lab music profile.");
   }
+
+  const enemyIds = new Set(
+    registry.enemies.map((enemy) => enemy.id),
+  );
+  for (const world of registry.worlds) {
+    if (!enemyIds.has(world.miniBoss)) {
+      errors.push(world.id + ": Mini Boss missing from Test Lab registry.");
+    }
+    if (!enemyIds.has(world.worldBoss)) {
+      errors.push(world.id + ": World Boss missing from Test Lab registry.");
+    }
+  }
+
+  errors.push(...validateWorldMusicProfiles());
 
   const worldIds = new Set(registry.worlds.map((world) => world.id));
   for (const id of registry.musicProfileIds) {
