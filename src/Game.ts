@@ -956,11 +956,9 @@ export class Game {
     return true;
   }
 
-  testLabSetPlayerCoreStats(stats: CoreStats): boolean {
+  testLabSetPlayerStats(input: EffectiveStatInput): boolean {
     if (!this.testLabEnabled) return false;
-    this.playerStats = calculateEffectiveStats({
-      base: stats,
-    });
+    this.playerStats = calculateEffectiveStats(input);
     this.stats.maxHull = this.playerStats.hull;
     this.stats.maxShield = this.playerStats.shield;
     this.stats.maxEnergy = this.playerStats.energy;
@@ -981,6 +979,12 @@ export class Game {
     );
     this.emitStats();
     return true;
+  }
+
+  testLabSetPlayerCoreStats(stats: CoreStats): boolean {
+    return this.testLabSetPlayerStats({
+      base: stats,
+    });
   }
 
   testLabSetResources(input: {
