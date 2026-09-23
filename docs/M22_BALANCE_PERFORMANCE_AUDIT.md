@@ -206,24 +206,28 @@ Budgets:
 - total dist raw <= 800 KiB;
 - total dist gzip <= 250 KiB.
 
-Baseline before enabling the hard gate (CI #393):
+Current hard-gate result (CI #395):
 
-- JS: ~498.08 kB raw / 130.04 kB gzip;
-- CSS: ~27.52 kB raw / 6.43 kB gzip;
-- index.html: ~0.45 kB raw / 0.29 kB gzip.
+- JS raw: 486.41 KiB;
+- JS gzip: 126.99 KiB;
+- CSS raw: 26.87 KiB;
+- CSS gzip: 6.28 KiB;
+- total dist raw: 537.91 KiB;
+- total dist gzip: 151.45 KiB.
 
 The thresholds intentionally leave headroom while preventing silent large regressions.
 
 ## Automated validation checkpoint
 
-CI #393, after the runtime cap fix and before the bundle gate commit:
+CI #395:
 
 - 116/116 test files PASS;
 - 583/583 tests PASS;
 - TypeScript no-emit check PASS;
-- Vite production build PASS.
+- Vite production build PASS;
+- M22 bundle-budget gate PASS.
 
-The latest M22 head must pass the same suite plus the bundle-budget gate before automated M22 is considered clean.
+Subsequent documentation-only commits must keep the same Test + Build + bundle gate green.
 
 ## Manual gate
 
