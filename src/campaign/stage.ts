@@ -54,26 +54,33 @@ export function createStageConfig(stage: number): StageConfig {
   const local = stageInGalaxy(safeStage);
   const role = stageRole(safeStage);
 
+  // A long stage means more TOTAL spawns, never more simultaneous targets.
+  // Game.runSpawnScheduler and M12 active-pressure limits remain authoritative.
+  // Rise by <=1 between consecutive normal stages to avoid abrupt pacing
+  // changes; preserve a lower recovery band after boss/elite milestones.
+  const ordinaryBudget =
+    safeStage <= 10
+      ? 44 + safeStage
+      : safeStage <= 50
+        ? 60 + Math.floor((safeStage - 11) / 2)
+        : Math.min(140, 80 + Math.floor((safeStage - 51) / 3));
+
   const roleBudget =
     role === "major-boss"
-      ? 7
+      ? 35
       : role === "boss"
-        ? 5
+        ? 28
         : role === "gauntlet"
-          ? 8
+          ? 20
           : role === "mini-boss"
-            ? 4
+            ? 20
             : role === "elite"
-              ? 3
+              ? 12
               : role === "hazard" || role === "special"
-                ? 2
+                ? 8
                 : 0;
 
-  const enemyBudget =
-    6 +
-    Math.floor((local - 1) / 8) +
-    (galaxy - 1) * 2 +
-    roleBudget;
+  const enemyBudget = ordinaryBudget + roleBudget;
 
   const eliteChance = Math.min(
     0.42,
