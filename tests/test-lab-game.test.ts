@@ -170,6 +170,30 @@ describe("M21 gated Game Test Lab API", () => {
     game.destroy();
   });
 
+  it("rebuilds the production boss runtime when a QA phase is forced", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 20);
+
+    expect(game.testLabSpawnBoss()).toBe(true);
+    expect(
+      game.testLabSetBoss({
+        hpRatio: 0.37,
+        phase: 2,
+        shieldActive: true,
+        staggerSeconds: 3,
+      }),
+    ).toBe(true);
+
+    const boss = game.getTestLabSnapshot()?.boss;
+    expect(boss?.phase).toBe(2);
+    expect((boss?.hp ?? 0) / (boss?.maxHp ?? 1)).toBeCloseTo(0.37, 2);
+    expect(boss?.shieldActive).toBe(true);
+    expect(boss?.staggered).toBe(true);
+
+    game.destroy();
+  });
+
   it("uses the production enemy instance for force-word and clear controls", () => {
     const game = createTestGame();
     game.setTestLabMode(true);
@@ -186,6 +210,9 @@ describe("M21 gated Game Test Lab API", () => {
     const first = game.getTestLabSnapshot()?.enemies[0];
     expect(first?.rank).toBe("X");
     expect(first?.layersRemaining).toBe(2);
+    expect(first?.wordDifficultyScore).toBeTypeOf("number");
+    expect(first?.threatBudget).toBeDefined();
+    expect(first?.threatBudget?.used).toBeGreaterThan(0);
 
     expect(game.testLabForceWordComplete(ids[0]!)).toBe(true);
     const second = game.getTestLabSnapshot()?.enemies[0];
