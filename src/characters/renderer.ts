@@ -21,6 +21,7 @@ export type CharacterDrawOptions = {
 };
 
 let characterShipSheet: HTMLImageElement | null = null;
+let characterShipSource: "v3" | "v2" | "procedural" = "procedural";
 
 const CHARACTER_SHIP_SPRITE_INDEX: Record<CharacterId, number> = {
   vanguard: 0,
@@ -38,8 +39,10 @@ const CHARACTER_SHIP_SPRITE_INDEX: Record<CharacterId, number> = {
 
 export function setCharacterShipSheet(
   image: HTMLImageElement | null,
+  source: "v3" | "v2" | "procedural" = image === null ? "procedural" : "v2",
 ): void {
   characterShipSheet = image;
+  characterShipSource = image === null ? "procedural" : source;
 }
 
 export function hasCharacterShipImage(_id: CharacterId): boolean {
@@ -64,6 +67,18 @@ function drawEquipmentAura(
   context.save();
   context.globalCompositeOperation = "lighter";
   context.globalAlpha *= 0.16 + intensity * 0.14;
+
+  // Low quality retains a readable equipment-color cue without animated
+  // orbit particles, shadow blur, arcs or extra effect emitters.
+  if (detailScale < 0.5) {
+    context.strokeStyle = colors.primary;
+    context.lineWidth = 1;
+    context.beginPath();
+    context.ellipse(0, 1, 29, 21, 0, 0, Math.PI * 2);
+    context.stroke();
+    context.restore();
+    return;
+  }
   context.strokeStyle = colors.primary;
   context.shadowBlur = (10 + intensity * 12) * glowScale;
   context.shadowColor = colors.primary;
@@ -149,6 +164,7 @@ function drawIllustratedShip(
   characterId: CharacterId,
   profile: Readonly<CharacterVisualProfile>,
   glowScale: number,
+  premium: boolean,
 ): void {
   const size = 78;
   const index = CHARACTER_SHIP_SPRITE_INDEX[characterId];
@@ -158,20 +174,26 @@ function drawIllustratedShip(
   const cellHeight = image.naturalHeight / rows;
   const sourceX = (index % columns) * cellWidth;
   const sourceY = Math.floor(index / columns) * cellHeight;
-  context.save();
-  context.globalCompositeOperation = "lighter";
-  context.globalAlpha *= 0.12;
-  context.fillStyle = profile.glow;
-  context.shadowBlur = 24 * glowScale;
-  context.shadowColor = profile.glow;
-  context.beginPath();
-  context.ellipse(0, 2, 31, 27, 0, 0, Math.PI * 2);
-  context.fill();
-  context.restore();
+  // V3 is already painted with metallic lighting and luminous edges. Avoid
+  // redundant Canvas shadow blurs on every combat frame.
+  if (!premium) {
+    context.save();
+    context.globalCompositeOperation = "lighter";
+    context.globalAlpha *= 0.12;
+    context.fillStyle = profile.glow;
+    context.shadowBlur = 24 * glowScale;
+    context.shadowColor = profile.glow;
+    context.beginPath();
+    context.ellipse(0, 2, 31, 27, 0, 0, Math.PI * 2);
+    context.fill();
+    context.restore();
+  }
 
   context.save();
-  context.shadowBlur = 9 * glowScale;
-  context.shadowColor = profile.glow;
+  if (!premium) {
+    context.shadowBlur = 9 * glowScale;
+    context.shadowColor = profile.glow;
+  }
   context.drawImage(
     image,
     sourceX,
@@ -353,6 +375,7 @@ export function drawCharacterShip(
       characterId,
       profile,
       glowScale,
+      characterShipSource === "v3",
     );
     context.restore();
     return;
