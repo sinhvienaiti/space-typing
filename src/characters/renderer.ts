@@ -19,21 +19,30 @@ export type CharacterDrawOptions = {
   aura?: EquipmentAuraProfile | null;
 };
 
-const CHARACTER_SHIP_IMAGES = new Map<CharacterId, HTMLImageElement>();
+let characterShipSheet: HTMLImageElement | null = null;
 
-export function setCharacterShipImage(
-  id: CharacterId,
+const CHARACTER_SHIP_SPRITE_INDEX: Record<CharacterId, number> = {
+  vanguard: 0,
+  aegis: 1,
+  volt: 2,
+  wraith: 3,
+  fortune: 4,
+  arsenal: 5,
+  oracle: 6,
+  bastion: 7,
+  reaper: 8,
+  celestial: 9,
+  zenith: 10,
+};
+
+export function setCharacterShipSheet(
   image: HTMLImageElement | null,
 ): void {
-  if (image === null) {
-    CHARACTER_SHIP_IMAGES.delete(id);
-    return;
-  }
-  CHARACTER_SHIP_IMAGES.set(id, image);
+  characterShipSheet = image;
 }
 
-export function hasCharacterShipImage(id: CharacterId): boolean {
-  return CHARACTER_SHIP_IMAGES.has(id);
+export function hasCharacterShipImage(_id: CharacterId): boolean {
+  return characterShipSheet !== null;
 }
 
 function drawEquipmentAura(
@@ -132,10 +141,18 @@ function drawEquipmentAura(
 function drawIllustratedShip(
   context: CanvasRenderingContext2D,
   image: HTMLImageElement,
+  characterId: CharacterId,
   profile: Readonly<CharacterVisualProfile>,
   glowScale: number,
 ): void {
   const size = 78;
+  const index = CHARACTER_SHIP_SPRITE_INDEX[characterId];
+  const columns = 4;
+  const rows = 3;
+  const cellWidth = image.naturalWidth / columns;
+  const cellHeight = image.naturalHeight / rows;
+  const sourceX = (index % columns) * cellWidth;
+  const sourceY = Math.floor(index / columns) * cellHeight;
   context.save();
   context.globalCompositeOperation = "lighter";
   context.globalAlpha *= 0.12;
@@ -150,7 +167,17 @@ function drawIllustratedShip(
   context.save();
   context.shadowBlur = 9 * glowScale;
   context.shadowColor = profile.glow;
-  context.drawImage(image, -size / 2, -size / 2, size, size);
+  context.drawImage(
+    image,
+    sourceX,
+    sourceY,
+    cellWidth,
+    cellHeight,
+    -size / 2,
+    -size / 2,
+    size,
+    size,
+  );
   context.restore();
 }
 
@@ -306,9 +333,15 @@ export function drawCharacterShip(
     );
   }
 
-  const illustrated = CHARACTER_SHIP_IMAGES.get(characterId);
-  if (illustrated !== undefined) {
-    drawIllustratedShip(context, illustrated, profile, glowScale);
+  const illustrated = characterShipSheet;
+  if (illustrated !== null) {
+    drawIllustratedShip(
+      context,
+      illustrated,
+      characterId,
+      profile,
+      glowScale,
+    );
     context.restore();
     return;
   }
