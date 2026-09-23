@@ -1356,6 +1356,37 @@ export class Game {
     return true;
   }
 
+  testLabSpawnRecallBonus(entryId?: string): boolean {
+    if (
+      !this.testLabEnabled ||
+      (this.phase !== "playing" && this.phase !== "paused")
+    ) {
+      return false;
+    }
+    const entry =
+      entryId === undefined
+        ? undefined
+        : this.vocabulary.find((item) => item.id === entryId);
+    this.recallBonus = null;
+    this.recallBonusPending = false;
+    return this.spawnRecallBonus(entry);
+  }
+
+  testLabCompleteRecallBonus(): boolean {
+    if (!this.testLabEnabled || this.recallBonus === null) return false;
+    const target = this.recallBonus;
+    const answer = typingText(target.entry.en);
+    let guard = answer.length + 1;
+    while (this.recallBonus !== null && guard > 0) {
+      const key = answer[this.recallBonus.typed];
+      if (key === undefined || !this.typeRecallBonus(this.recallBonus, key)) {
+        return false;
+      }
+      guard -= 1;
+    }
+    return this.recallBonus === null;
+  }
+
   testLabResetArena(): boolean {
     if (!this.testLabEnabled) return false;
     this.enemies = [];
