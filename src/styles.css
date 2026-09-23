@@ -520,49 +520,6 @@ kbd {
   box-shadow: 0 30px 100px rgba(0, 0, 0, 0.62);
 }
 
-.learning-toast {
-  position: absolute;
-  z-index: 14;
-  left: 50%;
-  top: 142px;
-  width: min(500px, calc(100vw - 2rem));
-  padding: 0.75rem 1rem;
-  display: grid;
-  grid-template-columns: auto auto;
-  gap: 0.1rem 0.75rem;
-  align-items: baseline;
-  border: 1px solid rgba(92, 227, 248, 0.12);
-  border-radius: 12px;
-  background: rgba(7, 14, 23, 0.9);
-  box-shadow: 0 16px 54px rgba(0, 0, 0, 0.34);
-  opacity: 0;
-  transform: translate(-50%, -8px);
-  pointer-events: none;
-  transition: opacity 150ms ease, transform 150ms ease;
-}
-
-.learning-toast.visible {
-  opacity: 1;
-  transform: translate(-50%, 0);
-}
-
-.learning-toast strong {
-  color: #f2fbff;
-  font-size: 1.05rem;
-}
-
-.learning-toast span {
-  color: #67d9ec;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.78rem;
-}
-
-.learning-toast small {
-  grid-column: 1 / -1;
-  color: #7b8b9e;
-  font-size: 0.72rem;
-}
-
 .notice {
   position: absolute;
   z-index: 35;
@@ -943,10 +900,6 @@ kbd {
   .boss-hud {
     top: 70px;
     width: calc(100vw - 1.5rem);
-  }
-
-  .learning-toast {
-    top: 132px;
   }
 }
 
