@@ -980,6 +980,17 @@ export function mountTestLab(
     session.deathMode =
       inputValue(dialog, '[data-field="death-mode"]') as TestLabDeathMode;
     session.state.inventory = { ...previous.state.inventory };
+    session.state.equipment = structuredClone(previous.state.equipment);
+    session.state.supportSpells = structuredClone(previous.state.supportSpells);
+    session.state.characters = structuredClone(previous.state.characters);
+    session.state.luckPity = { ...previous.state.luckPity };
+    session.state.hiddenDiscovery = structuredClone(
+      previous.state.hiddenDiscovery,
+    );
+    session.state.progression = structuredClone(previous.state.progression);
+    session.state.shops = structuredClone(previous.state.shops);
+    session.state.upgrades = structuredClone(previous.state.upgrades);
+    session.state.relics = structuredClone(previous.state.relics);
     session.state.credits = Math.max(
       0,
       Math.floor(numberValue(dialog, '[data-field="credits"]', 0)),
