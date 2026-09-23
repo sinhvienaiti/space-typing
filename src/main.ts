@@ -55,7 +55,11 @@ import {
   CHARACTER_IDS,
   getCharacter,
 } from "./characters/registry";
-import { drawCharacterShip } from "./characters/renderer";
+import {
+  drawCharacterShip,
+  setCharacterShipSheet,
+} from "./characters/renderer";
+import { deriveEquipmentAura } from "./characters/equipment-aura";
 import { AEGIS_ACTIVE_SKILL_ID } from "./characters/aegis";
 import { ARSENAL_ACTIVE_SKILL_ID } from "./characters/arsenal";
 import { BASTION_ACTIVE_SKILL_ID } from "./characters/bastion";
@@ -2041,6 +2045,7 @@ function renderPlayerStatusIdentity(): void {
       time: 0.8,
       scale: 0.78,
       glowScale: 0.7,
+      aura: deriveEquipmentAura(equipment, characters.selected),
     });
   }
 }
@@ -3368,6 +3373,9 @@ function renderCharacters(): void {
         scale: selected ? 1.42 : 1.3,
         glowScale: selected ? 1.15 : 0.86,
         alpha: unlocked ? 1 : 0.48,
+        aura: selected
+          ? deriveEquipmentAura(equipment, characters.selected)
+          : null,
       });
     }
 
@@ -3614,6 +3622,9 @@ function applyEquipmentStats(): void {
   game.setSkillLevels(upgrades.skillLevels);
   const synergies = activeBuildSynergies();
   game.setBuildSynergies(synergies);
+  game.setEquipmentAura(
+    deriveEquipmentAura(equipment, characters.selected),
+  );
   game.setPlayerStats({
     base: DEFAULT_PLAYER_BASE_STATS,
     character: characterStatBonus(characters.selected),
@@ -6299,6 +6310,10 @@ async function initializeArtPipeline(): Promise<void> {
   try {
     const manifest = await loadArtAssetManifest();
     artCatalog = await preloadArtAssets(manifest);
+    setCharacterShipSheet(
+      artCatalog.assets.get("player-ship-sheet-v2")?.image ?? null,
+    );
+    renderPlayerStatusIdentity();
     updateDataSummary();
 
     if (artCatalog.failed.length > 0) {
@@ -6309,6 +6324,7 @@ async function initializeArtPipeline(): Promise<void> {
     }
   } catch (error) {
     artCatalog = null;
+    setCharacterShipSheet(null);
     console.warn(
       "Art manifest unavailable; procedural Canvas renderer remains active.",
       error,
