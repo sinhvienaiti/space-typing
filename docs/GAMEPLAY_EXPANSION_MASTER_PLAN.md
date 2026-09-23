@@ -3246,28 +3246,33 @@ Implemented:
 - regression coverage for migration, sequential progression, checkpoint switching/rollback, Rank integration, boss mutations/rewards and backup validation;
 - 108 test files / 548 tests plus TypeScript check and production build passing on CI #335.
 
-M21 must now build the single isolated Developer QA/Test Lab defined in Section 32. It must invoke production-runtime systems rather than reimplement combat/persistence logic inside the lab.
-
 ## M21 — Developer QA/Test Lab
 
-After M01-M20 feature implementation is complete, build the single configurable Test Lab defined in Section 32.
+**Status: Complete.** M21 implements the single isolated configurable Test Lab defined in Section 32. See `docs/M21_TEST_LAB.md`.
 
-Required baseline:
+Implemented baseline:
 
-- one sandbox screen rather than many separate test stages;
-- select any World/enemy/boss/item/equipment/skill/status/shop/reward;
-- override player and enemy stats;
-- Rank/layer/skill/boss-phase controls;
-- Immortal Mode and Real Death Mode;
-- full resurrection-item testing;
-- checkpoint/segment/crash-recovery scenario editor;
-- isolated test state;
-- reusable QA presets;
-- state inspector;
-- production-runtime code paths;
-- CI completeness audit for registered testable content.
+- one title-screen Test Lab sandbox, outside Campaign Stage 001-1000;
+- disposable in-memory `TestLabSession`; no writes to production PlayerSave;
+- dedicated production `Game` instance with debug APIs gated by `testLabEnabled`;
+- selectors for every registered World/enemy/boss/item/equipment/skill/status/shop/music state plus reward/loot controls;
+- direct player core-stat/build configuration and enemy runtime/Threat Budget overrides;
+- Rank I-X, 1-3 layers, enemy skill forcing, boss phase/HP/shield/stagger controls;
+- multi-enemy selection, World roster spawn and production formation admission/spawn;
+- Immortal and Real Death modes;
+- no-item rollback, Salvage Anchor, Stage Revival Core, Phoenix Core and crash-recovery acceptance actions through production persistence functions;
+- isolated checkpoint, stage-entry and crash-recovery snapshots;
+- production shop generation/purchase, equipment, Relic, reward-choice and loot paths;
+- production Difficulty resolver controls including Adaptive/Custom inputs;
+- scheduler freeze/single-step, pressure overrides, time scale and runtime inspector;
+- production MusicController with all music states, duck/release, pronunciation, announcer, warning, crossfade/asset debug state;
+- reusable built-in QA presets plus optional local Test Lab preset storage;
+- keyboard typing routed directly to the isolated Game instance;
+- CI completeness audit derived from production registries, including all 50 Worlds, boss mappings and music asset/fallback contracts;
+- regression coverage proving debug APIs remain dormant outside Test Lab and sandbox/recovery state is detached from production state;
+- final M21 Test + Build: CI #370 PASS · 111 test files · 560/560 tests · TypeScript check + production build.
 
-Do not begin the final balance audit until the Test Lab can reproduce the major systems above.
+M22 may now begin the final deterministic balance/performance audit. Do not add a second Test Lab or duplicate runtime systems during M22.
 
 ## M22 — Full balance/performance audit
 
