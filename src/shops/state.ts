@@ -77,6 +77,9 @@ export type ShopInstance = {
 export type ShopState = {
   version: 1;
   instances: Record<string, ShopInstance>;
+  /** Pending guaranteed rest stop after clearing the sector-ending fight.
+   * Optional for backward compatibility with existing PlayerSave v26 data. */
+  pendingRestHub?: number | null;
 };
 
 export type ShopRollContext = {
@@ -545,7 +548,40 @@ export function createShopState(): ShopState {
   return {
     version: 1,
     instances: {},
+    pendingRestHub: null,
   };
+}
+
+/** Rest state is part of ShopState, so old saves and crash/death checkpoint
+ * snapshots already carry it without an extra unsynchronized storage key. */
+export function pendingRestHubStage(state: ShopState): number | null {
+  return state.pendingRestHub ?? null;
+}
+
+export function markRestHubPending(
+  state: ShopState,
+  clearedStage: number,
+): ShopState {
+  if (
+    !Number.isInteger(clearedStage) ||
+    clearedStage < 10 ||
+    clearedStage >= 1000 ||
+    clearedStage % 10 !== 0
+  ) return state;
+  return {
+    ...state,
+    pendingRestHub: clearedStage,
+  };
+}
+
+export function dismissRestHub(state: ShopState): ShopState {
+  return { ...state, pendingRestHub: null };
+}
+
+function validPendingRestHub(value: unknown): boolean {
+  return value === null || value === undefined ||
+    (typeof value === "number" && Number.isInteger(value) &&
+      value >= 10 && value < 1000 && value % 10 === 0);
 }
 
 function isShopType(value: unknown): value is ShopType {
@@ -678,6 +714,9 @@ export function sanitizeShopState(value: unknown): ShopState {
       result.instances[key] = instance;
     }
   }
+  result.pendingRestHub = validPendingRestHub(raw.pendingRestHub)
+    ? (raw.pendingRestHub ?? null) as number | null
+    : null;
   return result;
 }
 
@@ -694,12 +733,13 @@ export function isValidShopState(value: unknown): value is ShopState {
   ) {
     return false;
   }
-  return Object.entries(raw.instances).every(
-    ([key, candidate]) => {
-      const instance = sanitizeShopInstance(candidate);
-      return instance !== null && instance.id === key;
-    },
-  );
+  return validPendingRestHub(raw.pendingRestHub) &&
+    Object.entries(raw.instances).every(
+      ([key, candidate]) => {
+        const instance = sanitizeShopInstance(candidate);
+        return instance !== null && instance.id === key;
+      },
+    );
 }
 
 export function resolveShopInstance(
