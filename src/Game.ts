@@ -46,6 +46,7 @@ import {
 } from "./worlds/environment";
 import { worldForStage } from "./worlds/registry";
 import type { CharacterId } from "./characters/registry";
+import { drawCharacterShip } from "./characters/renderer";
 import {
   AEGIS_ACTIVE_SKILL,
   AEGIS_ACTIVE_SKILL_ID,
@@ -7833,40 +7834,17 @@ export class Game {
   }
 
   private drawPlayer(time: number): void {
-    const context = this.context;
-    const x = this.width / 2;
-    const y = this.height - PLAYER_Y_OFFSET;
-    const pulse = 0.82 + Math.sin(time * 8) * 0.12;
-
-    context.save();
-    context.translate(x, y);
-    context.globalCompositeOperation = "lighter";
-    context.shadowBlur = 20;
-    context.shadowColor = "#4cf7ff";
-
-    context.fillStyle =
-      "rgba(70, 238, 255, " + String(0.2 + pulse * 0.08) + ")";
-    context.beginPath();
-    context.moveTo(0, -26);
-    context.lineTo(18, 20);
-    context.lineTo(0, 11);
-    context.lineTo(-18, 20);
-    context.closePath();
-    context.fill();
-
-    context.strokeStyle = "#83fbff";
-    context.lineWidth = 2;
-    context.stroke();
-
-    context.strokeStyle =
-      "rgba(100, 225, 255, " + String(0.4 + pulse * 0.2) + ")";
-    context.beginPath();
-    context.moveTo(-5, 18);
-    context.lineTo(0, 36 + Math.sin(time * 12) * 4);
-    context.lineTo(5, 18);
-    context.stroke();
-
-    context.restore();
+    drawCharacterShip(
+      this.context,
+      this.characterId,
+      {
+        x: this.width / 2,
+        y: this.height - PLAYER_Y_OFFSET,
+        time,
+        scale: 1,
+        glowScale: qualityProfile(this.settings.visualQuality).glowScale,
+      },
+    );
   }
 
   private drawDefensiveEffects(time: number): void {
