@@ -69,10 +69,17 @@ export function createStageConfig(stage: number): StageConfig {
                 ? 2
                 : 0;
 
+  // Total encounters, not simultaneous enemies: the pressure scheduler still
+  // limits active targets, projectiles and reaction windows. Early stages
+  // should provide sustained typing practice instead of ending after six kills.
+  const stageInWorld = ((safeStage - 1) % 20) + 1;
   const enemyBudget =
-    6 +
-    Math.floor((local - 1) / 8) +
-    (galaxy - 1) * 2 +
+    (safeStage <= 10
+      ? 34 + (safeStage - 1)
+      : safeStage <= 50
+        ? 54 + Math.floor((safeStage - 11) / 2)
+        : Math.min(140, 90 + Math.floor((safeStage - 51) / 17))) +
+    (stageInWorld === 10 || stageInWorld === 20 ? 4 : 0) +
     roleBudget;
 
   const eliteChance = Math.min(
