@@ -3301,9 +3301,11 @@ The approved RPG HUD slice in `docs/PRE_M22_RPG_HUD_HOTBAR_PLAN.md` is also COMP
 
 The approved transition slice in `docs/PRE_M22_STAGE_TRANSITION_PLAN.md` is COMPLETE: T01-T06 replace the World-only notice with a short skippable pre-combat transition for every stage, escalating for World/Galaxy/Boss/Hidden encounters while keeping combat paused until the overlay finishes. PR #70 CI #455 PASS · 121/121 test files · 613/613 tests · TypeScript/build/bundle PASS.
 
-Now:
+The final approved pre-manual slice in `docs/PRE_M22_COMBAT_IDENTITY_TYPING_CLARITY_PLAN.md` is implementation-complete pending final PR/main CI: C01-C12 reduce same-prefix typing ambiguity, add deterministic nearest-target QA, Ship Visual V2 illustrated player art with procedural fallback, equipment-derived aura, and character-specific player-shot VFX without changing combat damage or persistence schema.
 
-- execute and record the real-browser/audio/visual matrix on the final polished HUD/transition build;
+After PR #71 and final main CI are green:
+
+- execute and record the real-browser/audio/visual matrix on the final polished HUD/transition/combat-identity build;
 - fix any manual findings;
 - run final post-fix CI.
 
