@@ -100,6 +100,7 @@ import {
   testLabCampaignExpansion,
   type TestLabSession,
 } from "./session";
+import { mountM22ManualGate } from "./m22-manual-gate";
 
 const TEST_LAB_PRESET_KEY = "spaceTypingTestLabPresetV1";
 
@@ -616,6 +617,11 @@ export function mountTestLab(
           </div>
         </details>
 
+        <details>
+          <summary>M22 Manual Gate Recorder</summary>
+          <div data-role="m22-manual-gate"></div>
+        </details>
+
         <details open>
           <summary>State Inspector</summary>
           <pre class="test-lab-inspector" data-role="inspector"></pre>
@@ -624,6 +630,12 @@ export function mountTestLab(
     </div>
   `;
   document.body.append(dialog);
+
+  const manualGateRoot =
+    dialog.querySelector<HTMLElement>('[data-role="m22-manual-gate"]')!;
+  const manualGate = mountM22ManualGate(manualGateRoot, {
+    showNotice: (message) => options.showNotice?.("Test Lab · " + message),
+  });
 
   const canvas = dialog.querySelector<HTMLCanvasElement>('[data-role="canvas"]')!;
   const inspector = dialog.querySelector<HTMLElement>('[data-role="inspector"]')!;
@@ -2332,6 +2344,7 @@ export function mountTestLab(
     },
     destroy(): void {
       destroyRuntime();
+      manualGate.destroy();
       dialog.remove();
       button.remove();
     },
