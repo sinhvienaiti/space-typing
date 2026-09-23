@@ -8073,6 +8073,7 @@ export class Game {
         time,
         scale: 1,
         glowScale: qualityProfile(this.settings.visualQuality).glowScale,
+        detailScale: qualityProfile(this.settings.visualQuality).particleScale,
         aura: this.equipmentAura,
       },
     );
