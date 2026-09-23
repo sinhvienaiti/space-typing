@@ -3640,6 +3640,7 @@ CI #376 PASS · 111 test files · 561/561 tests · TypeScript check + production
 M22 Full Balance / Performance Audit — AUTOMATED PASS, MANUAL GATE PENDING
 CI #395 PASS · 116 test files · 583/583 tests · TypeScript check + production build + bundle budget
 Manual-gate support: Developer Test Lab includes a 43-row QA-only recorder with per-row/default browser-device metadata, live runtime/performance/music evidence capture, explicit real-audio + High/Ultra-browser + low/mid/high human-paced attestations and Markdown export; real browser/audio/human-paced execution remains mandatory.
+Approved pre-M22 polish slice: `docs/PRE_M22_UI_RECALL_CHARACTER_POLISH_PLAN.md` P00-P08 must complete before the final manual matrix so the user tests the final title/HUD/learning/Recall Bonus/character visual state. M23 remains blocked until that manual gate passes.
 ~~~
 
 Important implementation notes:
