@@ -4,6 +4,10 @@ import {
   type CharacterSilhouette,
   type CharacterVisualProfile,
 } from "./visuals";
+import {
+  EQUIPMENT_AURA_COLORS,
+  type EquipmentAuraProfile,
+} from "./equipment-aura";
 
 export type CharacterDrawOptions = {
   x: number;
@@ -12,7 +16,143 @@ export type CharacterDrawOptions = {
   scale?: number;
   glowScale?: number;
   alpha?: number;
+  aura?: EquipmentAuraProfile | null;
 };
+
+const CHARACTER_SHIP_IMAGES = new Map<CharacterId, HTMLImageElement>();
+
+export function setCharacterShipImage(
+  id: CharacterId,
+  image: HTMLImageElement | null,
+): void {
+  if (image === null) {
+    CHARACTER_SHIP_IMAGES.delete(id);
+    return;
+  }
+  CHARACTER_SHIP_IMAGES.set(id, image);
+}
+
+export function hasCharacterShipImage(id: CharacterId): boolean {
+  return CHARACTER_SHIP_IMAGES.has(id);
+}
+
+function drawEquipmentAura(
+  context: CanvasRenderingContext2D,
+  aura: EquipmentAuraProfile,
+  time: number,
+  glowScale: number,
+): void {
+  const colors = EQUIPMENT_AURA_COLORS[aura.primary];
+  const secondary =
+    aura.secondary === null
+      ? colors.secondary
+      : EQUIPMENT_AURA_COLORS[aura.secondary].primary;
+  const intensity = aura.intensity;
+  const pulse = 0.92 + Math.sin(time * 3.4) * 0.08;
+
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.globalAlpha *= 0.16 + intensity * 0.14;
+  context.strokeStyle = colors.primary;
+  context.shadowBlur = (10 + intensity * 12) * glowScale;
+  context.shadowColor = colors.primary;
+  context.lineWidth = 1 + intensity * 0.8;
+
+  if (aura.primary === "guard") {
+    context.setLineDash([6, 5]);
+    context.lineDashOffset = -time * 11;
+    context.beginPath();
+    context.arc(0, 0, 32 * pulse, 0, Math.PI * 2);
+    context.stroke();
+    context.setLineDash([]);
+  } else if (aura.primary === "storm") {
+    for (const phase of [0, Math.PI]) {
+      const angle = time * 2.7 + phase;
+      context.beginPath();
+      context.moveTo(Math.cos(angle) * 24, Math.sin(angle) * 15);
+      context.lineTo(
+        Math.cos(angle + 0.45) * 31,
+        Math.sin(angle + 0.45) * 23,
+      );
+      context.lineTo(
+        Math.cos(angle + 0.75) * 26,
+        Math.sin(angle + 0.75) * 18,
+      );
+      context.stroke();
+    }
+  } else if (aura.primary === "flame") {
+    context.fillStyle = colors.primary;
+    context.globalAlpha *= 0.7;
+    for (const x of [-13, 0, 13]) {
+      context.beginPath();
+      context.ellipse(
+        x,
+        26 + Math.sin(time * 7 + x) * 2,
+        3.2,
+        10 + intensity * 5,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      context.fill();
+    }
+  } else if (aura.primary === "fortune" || aura.primary === "celestial") {
+    context.fillStyle = colors.primary;
+    for (let index = 0; index < 4; index += 1) {
+      const angle = time * 0.9 + index * Math.PI / 2;
+      const radius = 29 + Math.sin(time * 2 + index) * 2;
+      const x = Math.cos(angle) * radius;
+      const y = Math.sin(angle) * radius * 0.64;
+      context.beginPath();
+      context.arc(x, y, 1.4 + intensity, 0, Math.PI * 2);
+      context.fill();
+    }
+  } else if (aura.primary === "void") {
+    context.strokeStyle = secondary;
+    context.setLineDash([2, 7]);
+    context.lineDashOffset = time * 16;
+    context.beginPath();
+    context.ellipse(0, 1, 30 * pulse, 20 * pulse, 0, 0, Math.PI * 2);
+    context.stroke();
+    context.setLineDash([]);
+  } else {
+    context.beginPath();
+    context.ellipse(0, 1, 29 * pulse, 21 * pulse, 0, 0, Math.PI * 2);
+    context.stroke();
+  }
+
+  context.globalAlpha *= 0.58;
+  context.strokeStyle = secondary;
+  context.beginPath();
+  context.arc(0, 0, 25 + intensity * 4, 0, Math.PI * 2);
+  context.stroke();
+  context.restore();
+}
+
+function drawIllustratedShip(
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  profile: Readonly<CharacterVisualProfile>,
+  glowScale: number,
+): void {
+  const size = 78;
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.globalAlpha *= 0.12;
+  context.fillStyle = profile.glow;
+  context.shadowBlur = 24 * glowScale;
+  context.shadowColor = profile.glow;
+  context.beginPath();
+  context.ellipse(0, 2, 31, 27, 0, 0, Math.PI * 2);
+  context.fill();
+  context.restore();
+
+  context.save();
+  context.shadowBlur = 9 * glowScale;
+  context.shadowColor = profile.glow;
+  context.drawImage(image, -size / 2, -size / 2, size, size);
+  context.restore();
+}
 
 function hullPath(
   context: CanvasRenderingContext2D,
@@ -156,6 +296,22 @@ export function drawCharacterShip(
   context.rotate(banking);
   context.scale(scale, scale);
   context.globalAlpha = alpha;
+
+  if (options.aura !== undefined && options.aura !== null) {
+    drawEquipmentAura(
+      context,
+      options.aura,
+      options.time,
+      glowScale,
+    );
+  }
+
+  const illustrated = CHARACTER_SHIP_IMAGES.get(characterId);
+  if (illustrated !== undefined) {
+    drawIllustratedShip(context, illustrated, profile, glowScale);
+    context.restore();
+    return;
+  }
 
   context.save();
   context.globalCompositeOperation = "lighter";
