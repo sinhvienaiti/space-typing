@@ -1164,7 +1164,11 @@ export class Game {
       );
     }
     if (input.phase !== undefined) {
-      this.boss.phase = input.phase;
+      this.applyBossPhase(
+        this.boss,
+        input.phase,
+        true,
+      );
     }
     if (input.shieldActive !== undefined) {
       this.boss.shieldActive = input.shieldActive;
@@ -4343,18 +4347,14 @@ export class Game {
     this.emitStats();
   }
 
-  private updateBossPhase(boss: BossState): void {
-    const nextPhase = bossPhaseFor(
-      boss.hp,
-      boss.maxHp,
-      boss.role,
-    );
-    if (nextPhase <= boss.phase) return;
-
-    boss.phase = nextPhase;
+  private applyBossPhase(
+    boss: BossState,
+    phase: 1 | 2 | 3,
+    presentation: boolean,
+  ): void {
+    boss.phase = phase;
     boss.flash = 1;
 
-    const { x, y } = this.bossPosition();
     const definition = enemyDefinition(
       bossVisualDefinitionIdForStage(
         this.hiddenEncounterRuntime?.bossStageOverride ??
@@ -4391,18 +4391,40 @@ export class Game {
             ))) /
       Math.max(0.75, this.difficulty?.bossPressure ?? 1) /
       Math.max(1, this.difficulty?.bossActionRateMultiplier ?? 1);
-    const fx = enemyFxProfile(
-      definition?.family ?? "devil",
-      "boss-phase",
-    );
-    this.burst(x, y, fx.count, fx.hue);
-    this.sfx.bossPhase(fx.pitch);
 
-    if (this.settings.screenShake) {
-      this.shake = Math.max(this.shake, boss.phase >= 3 ? 10 : 7);
+    if (presentation) {
+      const { x, y } = this.bossPosition();
+      const fx = enemyFxProfile(
+        definition?.family ?? "devil",
+        "boss-phase",
+      );
+      this.burst(x, y, fx.count, fx.hue);
+      this.sfx.bossPhase(fx.pitch);
+
+      if (this.settings.screenShake) {
+        this.shake = Math.max(
+          this.shake,
+          boss.phase >= 3 ? 10 : 7,
+        );
+      }
     }
 
     this.hooks.onBossUpdate(toBossHud(boss));
+  }
+
+  private updateBossPhase(boss: BossState): void {
+    const nextPhase = bossPhaseFor(
+      boss.hp,
+      boss.maxHp,
+      boss.role,
+    );
+    if (nextPhase <= boss.phase) return;
+
+    this.applyBossPhase(
+      boss,
+      nextPhase,
+      true,
+    );
   }
 
   private defeatBoss(): void {
