@@ -10,158 +10,100 @@ import {
   selectRouteNode,
   selectedRouteNode,
   syncRouteStateForStage,
+  type RouteState,
 } from "../src/campaign/route";
 import { sectorForStage } from "../src/campaign/expansion-state";
 import { stageRole } from "../src/campaign/stage";
 
-describe("M14 deterministic route graph", () => {
-  it("generates the same graph for every reload of a sector", () => {
-    const first = createRouteGraph(41);
-    const second = createRouteGraph(49);
+function savedLegacySector(stage: number): RouteState {
+  const state = createRouteState(stage);
+  const first = state.graph.steps[0]!;
+  const original = first.nodes[0]!;
+  const oldStation = {
+    ...original,
+    id: original.id.replace("-lane-0-combat", "-lane-1-station"),
+    type: "station" as const,
+    lane: 1,
+  };
+  return {
+    ...state,
+    graph: {
+      ...state.graph,
+      steps: [{ ...first, nodes: [original, oldStation] }, ...state.graph.steps.slice(1)],
+    },
+    selectedByStage: { [String(stage)]: oldStation.id },
+    visitedNodeIds: [oldStation.id],
+  };
+}
 
-    expect(first).toEqual(second);
+describe("checkpoint-only combat routes and old-save compatibility", () => {
+  it("creates a deterministic ten-stage combat-only sector", () => {
+    const first = createRouteGraph(41);
+    expect(first).toEqual(createRouteGraph(49));
+    expect(first.steps).toHaveLength(10);
     expect(first.sectorStart).toBe(41);
     expect(first.sectorEnd).toBe(50);
+    expect(first.steps.every((step) =>
+      step.nodes.length === 1 && step.nodes[0]!.type === "combat",
+    )).toBe(true);
     expect(isValidRouteGraph(first)).toBe(true);
-  });
-
-  it("covers every sequential stage and keeps every non-terminal node connected", () => {
-    const graph = createRouteGraph(111);
-    expect(graph.steps).toHaveLength(10);
-
-    for (let index = 0; index < graph.steps.length; index += 1) {
-      const step = graph.steps[index]!;
-      expect(step.stage).toBe(graph.sectorStart + index);
-      expect(step.nodes.length).toBeGreaterThan(0);
-
-      if (index === graph.steps.length - 1) {
-        expect(step.nodes.every((node) => node.nextIds.length === 0)).toBe(
-          true,
-        );
-      } else {
-        const nextIds = graph.steps[index + 1]!.nodes.map((node) => node.id);
-        for (const node of step.nodes) {
-          expect(node.nextIds).toEqual(nextIds);
-        }
-      }
+    for (let index = 0; index < 9; index += 1) {
+      expect(first.steps[index]!.nodes[0]!.nextIds).toEqual(
+        first.steps[index + 1]!.nodes.map((node) => node.id),
+      );
     }
+    expect(first.steps[9]!.nodes[0]!.nextIds).toEqual([]);
+    expect(routeNeedsChoice(createRouteState(41), 41)).toBe(false);
+    expect(routeProgress(createRouteState(41))).toEqual({ chosen: 0, total: 0 });
   });
 
-  it("forces mandatory Mini/World/Galaxy boss stages to one combat route", () => {
+  it("keeps Mini/World/Galaxy bosses mandatory", () => {
     for (const stage of [10, 20, 100, 200, 1000]) {
-      const graph = createRouteGraph(stage);
-      const step = graph.steps.find((item) => item.stage === stage);
-      expect(step, String(stage)).toBeDefined();
-      expect(step!.nodes).toHaveLength(1);
-      expect(step!.nodes[0]!.type).toBe("combat");
-      expect(step!.nodes[0]!.mandatory).toBe(true);
+      const node = routeChoicesForStage(createRouteState(stage), stage)[0]!;
+      expect(node.type).toBe("combat");
+      expect(node.mandatory).toBe(true);
       expect(["mini-boss", "boss", "major-boss"]).toContain(stageRole(stage));
     }
   });
 
-  it("persists a route choice instead of rerolling on sanitize/reload", () => {
-    const state = createRouteState(41);
-    const choices = routeChoicesForStage(state, 41);
-    expect(choices.length).toBeGreaterThan(1);
-
-    const chosen = choices.at(-1)!;
-    const selected = selectRouteNode(state, 41, chosen.id);
-    const reloaded = sanitizeRouteState(
-      JSON.parse(JSON.stringify(selected)),
-      41,
-    );
-
-    expect(selectedRouteNode(reloaded, 41)?.id).toBe(chosen.id);
-    expect(reloaded.graph).toEqual(state.graph);
-    expect(routeNeedsChoice(reloaded, 41)).toBe(false);
+  it("accepts a saved legacy Station choice and allows switching before encounter", () => {
+    const saved = savedLegacySector(41);
+    expect(isValidRouteGraph(saved.graph)).toBe(true);
+    const loaded = sanitizeRouteState(JSON.parse(JSON.stringify(saved)), 41);
+    expect(selectedRouteNode(loaded, 41)?.type).toBe("station");
+    const [combat] = routeChoicesForStage(loaded, 41);
+    const selected = selectRouteNode(loaded, 41, combat!.id, true);
+    expect(selectedRouteNode(selected, 41)?.type).toBe("combat");
+    expect(selected.visitedNodeIds).toEqual([combat!.id]);
+    expect(routeProgress(selected).total).toBe(1);
+    expect(selectRouteNode(loaded, 41, combat!.id)).toEqual(loaded);
   });
 
-  it("locks a persisted choice so reload/reclick cannot reroll the path", () => {
-    const state = createRouteState(41);
-    const choices = routeChoicesForStage(state, 41);
-    expect(choices.length).toBeGreaterThan(1);
-
-    const first = selectRouteNode(state, 41, choices[0]!.id);
-    const second = selectRouteNode(first, 41, choices[1]!.id);
-
-    expect(selectedRouteNode(second, 41)?.id).toBe(choices[0]!.id);
-    expect(second.selectedByStage).toEqual(first.selectedByStage);
+  it("migrates only untouched legacy sectors, not recorded purchases/routes", () => {
+    const used = savedLegacySector(41);
+    const untouched = {
+      ...used,
+      selectedByStage: {},
+      visitedNodeIds: [],
+    };
+    const migrated = sanitizeRouteState(untouched, 41);
+    expect(migrated.graph).toEqual(createRouteGraph(41));
+    expect(sanitizeRouteState(used, 41).graph).toEqual(used.graph);
+    expect(syncRouteStateForStage(used, 49).graph).toEqual(used.graph);
+    const advanced = syncRouteStateForStage(used, 51);
+    expect(advanced.graph).toEqual(createRouteGraph(51));
+    expect(advanced.selectedByStage).toEqual({});
   });
 
-  it("allows changing the current lane before Start Encounter without duplicating visits", () => {
-    const initial = createRouteState(1);
-    const [combat, station] = routeChoicesForStage(initial, 1);
-    expect(combat).toBeDefined();
-    expect(station).toBeDefined();
-
-    const selected = selectRouteNode(initial, 1, station!.id);
-    const switched = selectRouteNode(selected, 1, combat!.id, true);
-
-    expect(selectedRouteNode(switched, 1)?.id).toBe(combat!.id);
-    expect(switched.selectedByStage["1"]).toBe(combat!.id);
-    expect(switched.visitedNodeIds).toEqual([combat!.id]);
-    expect(switched.graph).toEqual(initial.graph);
-    expect(routeProgress(switched).chosen).toBe(1);
-    expect(routeNeedsChoice(switched, 1)).toBe(false);
-
-    const saved = sanitizeRouteState(
-      JSON.parse(JSON.stringify(switched)),
-      1,
-    );
-    expect(selectedRouteNode(saved, 1)?.id).toBe(combat!.id);
-    expect(selectRouteNode(saved, 1, combat!.id, true)).toEqual(saved);
+  it("rejects invalid legacy node IDs and later-stage lane hijacking", () => {
+    const saved = savedLegacySector(41);
+    const first = selectedRouteNode(saved, 41)!;
+    expect(selectedRouteNode(selectRouteNode(saved, 41, "bad", true), 41)).toEqual(first);
+    const secondStage = routeChoicesForStage(saved, 42)[0]!;
+    expect(selectRouteNode(saved, 41, secondStage.id, true)).toEqual(saved);
   });
 
-  it("does not switch to an invalid or later-stage lane during preview", () => {
-    const state = createRouteState(1);
-    const selected = selectRouteNode(
-      state,
-      1,
-      routeChoicesForStage(state, 1)[0]!.id,
-    );
-    const nextStageNode = routeChoicesForStage(state, 2)[0]!;
-    expect(selectRouteNode(selected, 1, "invalid", true)).toEqual(selected);
-    expect(selectRouteNode(selected, 1, nextStageNode.id, true)).toEqual(
-      selected,
-    );
-  });
-
-  it("rejects invalid node ids without mutating selection", () => {
-    const state = createRouteState(71);
-    const next = selectRouteNode(state, 71, "missing-node");
-
-    expect(next.selectedByStage).toEqual({});
-    expect(routeNeedsChoice(next, 71)).toBe(true);
-  });
-
-  it("creates a fresh deterministic graph only when crossing sectors", () => {
-    const first = createRouteState(1);
-    const sameSector = syncRouteStateForStage(first, 9);
-    const nextSector = syncRouteStateForStage(first, 11);
-
-    expect(sameSector.graph).toEqual(first.graph);
-    expect(nextSector.graph.sectorStart).toBe(11);
-    expect(nextSector.graph).not.toEqual(first.graph);
-    expect(nextSector.selectedByStage).toEqual({});
-  });
-
-  it("keeps route progress bounded to authored choice steps", () => {
-    let state = createRouteState(201);
-    const initial = routeProgress(state);
-    expect(initial.chosen).toBe(0);
-    expect(initial.total).toBeGreaterThan(0);
-    expect(initial.total).toBeLessThanOrEqual(9);
-
-    for (const step of state.graph.steps) {
-      if (step.nodes.length <= 1) continue;
-      state = selectRouteNode(state, step.stage, step.nodes[0]!.id);
-    }
-
-    const final = routeProgress(state);
-    expect(final.chosen).toBe(final.total);
-  });
-
-  it("matches the ten-stage checkpoint sector boundaries", () => {
+  it("respects existing checkpoint sector boundaries", () => {
     for (const stage of [1, 10, 11, 100, 991, 1000]) {
       const graph = createRouteGraph(stage);
       const sector = sectorForStage(stage);
