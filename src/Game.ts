@@ -382,6 +382,14 @@ type EnemySpawnRequest = {
   yOffset?: number;
 };
 
+type LearningEcho = {
+  entry: VocabularyEntry;
+  x: number;
+  y: number;
+  remaining: number;
+  duration: number;
+};
+
 export type GameHooks = {
   onStats(stats: GameStats): void;
   onPhase(phase: GamePhase): void;
@@ -469,6 +477,12 @@ export type TestLabGameSnapshot = {
     usesThisStage: number;
   }>;
   objective: StageObjectiveState | null;
+  learningEcho: {
+    en: string;
+    vi: string;
+    ipa: string;
+    remaining: number;
+  } | null;
 };
 
 const FALLBACK_ENTRIES: VocabularyEntry[] = [
@@ -601,6 +615,7 @@ export class Game {
     hue: number;
     remaining: number;
   } | null = null;
+  private learningEcho: LearningEcho | null = null;
   private celestialCharge = 0;
   private skillHudTimer = 0;
   private supplyPod: SupplyPod | null = null;
@@ -777,6 +792,15 @@ export class Game {
         };
       }),
       objective: this.getStageObjective(),
+      learningEcho:
+        this.learningEcho === null
+          ? null
+          : {
+              en: this.learningEcho.entry.en,
+              vi: this.learningEcho.entry.vi,
+              ipa: this.learningEcho.entry.ipa,
+              remaining: this.learningEcho.remaining,
+            },
     };
   }
 
@@ -2284,6 +2308,7 @@ export class Game {
     this.lasers = [];
     this.particles = [];
     this.targetId = null;
+    this.learningEcho = null;
     this.supplyPod = null;
     this.supplySpawnTimer = randomBetween(5.5, 8.5);
     this.supplySpawnsRemaining =
@@ -2884,6 +2909,17 @@ export class Game {
       particle.vy *= Math.pow(0.12, dt);
     }
     this.particles = this.particles.filter((particle) => particle.life > 0);
+
+    if (this.learningEcho !== null) {
+      this.learningEcho.remaining = Math.max(
+        0,
+        this.learningEcho.remaining - dt,
+      );
+      this.learningEcho.y -= 12 * dt;
+      if (this.learningEcho.remaining <= 0) {
+        this.learningEcho = null;
+      }
+    }
   }
 
   private spawnBoss(): void {
@@ -4865,6 +4901,13 @@ export class Game {
     this.stats.kills += 1;
     this.addScore((80 + length * 14) * this.stats.multiplier);
     this.gainPower(7);
+    this.learningEcho = {
+      entry: { ...enemy.entry },
+      x: enemy.x,
+      y: Math.max(96, enemy.y - enemy.radius - 18),
+      remaining: 1.1,
+      duration: 1.1,
+    };
 
     this.fireLaser(enemy, 1.45);
     const deathDefinition = this.visualDefinitionForEnemy(enemy);
@@ -6173,6 +6216,8 @@ export class Game {
       this.drawEnemy(enemy);
     }
 
+    this.drawLearningEcho();
+
     if (this.boss !== null) {
       this.drawBoss(time);
     }
@@ -6193,6 +6238,53 @@ export class Game {
 
     context.restore();
     this.drawRewardBuffTimers();
+  }
+
+  private drawLearningEcho(): void {
+    const echo = this.learningEcho;
+    if (echo === null) return;
+
+    const context = this.context;
+    const alpha = clamp(echo.remaining / echo.duration, 0, 1);
+    const rise = (1 - alpha) * 8;
+    const primary =
+      normalizeWord(echo.entry.en) +
+      (echo.entry.ipa.trim().length > 0 ? "  " + echo.entry.ipa : "");
+    const secondary = echo.entry.vi.trim();
+    const width = Math.min(
+      260,
+      Math.max(
+        92,
+        Math.max(primary.length * 7.2, secondary.length * 6.2) + 18,
+      ),
+    );
+    const x = clamp(echo.x, width / 2 + 8, this.width - width / 2 - 8);
+    const y = clamp(echo.y - rise, 78, this.height - 110);
+
+    context.save();
+    context.globalAlpha = alpha * 0.92;
+    context.fillStyle = "rgba(4, 10, 17, 0.72)";
+    context.strokeStyle = "rgba(101, 231, 249, 0.16)";
+    context.lineWidth = 1;
+    context.beginPath();
+    context.roundRect(x - width / 2, y - 14, width, 32, 8);
+    context.fill();
+    context.stroke();
+
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillStyle = "#eafcff";
+    context.font =
+      "700 11px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.fillText(primary, x, y - 4);
+
+    if (secondary.length > 0) {
+      context.fillStyle = "rgba(151, 184, 198, 0.9)";
+      context.font =
+        "650 9px ui-sans-serif, system-ui, -apple-system, sans-serif";
+      context.fillText(secondary, x, y + 9);
+    }
+    context.restore();
   }
 
   private drawEnemyControlOverlay(): void {
