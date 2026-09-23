@@ -3675,6 +3675,25 @@ Project-wide requirements remain:
 
 ---
 
+# UI/UX, XP and Skill Progression follow-up (2026-09-24)
+
+The player-requested follow-up is captured in
+[`docs/SPACE_TYPING_UI_UX_CONTENT_PLAN.md`](./SPACE_TYPING_UI_UX_CONTENT_PLAN.md).
+Read it for all outstanding currency-icon, shop/item/spell art, tier-frame,
+translation-feedback, results V2, HUD and performance work. Its **first
+implementation dependency is the Character XP -> level-up -> Basic Skill Point
+-> chosen Basic Skill rank progression**, with **automatic evenly distributed
+growth across all ten current core attributes** on each character level-up.
+
+Do not create a second XP or skill state: extend current CharacterProgress,
+existing skill Lv1-Lv5 and M17 UpgradeState, preserve Talent Points as a separate
+resource until explicitly designed otherwise, and design legacy-save migration.
+The player described two skill types but has defined **only Basic Skills**;
+do not invent the other type's unlock/upgrade rules without confirmation.
+This plan is a roadmap, not evidence that those features are implemented.
+
+---
+
 # 24. Handoff rule
 
 For any new session working on Space Typing:
