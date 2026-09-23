@@ -139,12 +139,39 @@
 - Performance pass after every visually rich batch: cache/reuse icons and text metrics; keep expensive paths off frame loop; make gradients, aura and particles adjustable without reducing typing readability. Record before/after measurements and visual regressions; maintain graceful High/Ultra behavior.
 - Explicitly rank the **measured** current worst costly render paths, with profiling method and limits; don't claim real-world FPS from green CI.
 
+## 10A. Score, Streak and combat-HUD update frequency — measured optimization gate
+
+**Decision: preserve per-correct-key scoring and combat streak in the authoritative Game simulation; optimize how and when the HUD displays them.** Do not replace all internal calculations with once-per-word updates merely on the assumption that per-key arithmetic is slow. The current `Game.ts` awards key score, advances streak/multiplier and invokes passives as correct letters arrive; additional word-completion/kill rewards are awarded separately. `main.ts` currently handles `onStats` by reassigning score, streak, multiplier, accuracy, kills, stage badge and resource HUD text/styles on every stats event, often every typed key. The arithmetic is minimal; **repeated DOM writes/layout** are the relevant area to measure, while full-screen Canvas effects may still dominate frame cost.
+
+### Preserve current authoritative semantics
+
+- Key streak and score remain **per correct key** so `multiplierForStreak` thresholds (currently 25/50/100), character passives (e.g. Vanguard 20-key Shield rhythm, Wraith 30-key Cloak), SkillEngine typing conditions, Power/Rage gain, boss partial-word damage and enemy-projectile interception continue to work unchanged.
+- Retain current separate **word-completion/kill bonus** and special-target rewards. Do not award a full-word bonus for every key, double-count a multi-layer enemy, count an expired Bonus target as a completed word, or make score depend on language word length in a surprising way.
+- `streak` remains consecutive correct typing actions unless a separately approved gameplay redesign changes it; on an actual mistake preserve immediate streak/multiplier reset and its existing guard rules. Never hide a correctness or danger state behind delayed display.
+- If players want a word-oriented achievement, add a **separate Perfect Word Chain / Words Completed** metric in the Stage Results V2 and optionally a small secondary HUD indicator. The semantics of what counts as a completed word must cover boss multi-word attacks, shield layers, regular kills, bonus targets and projectile single-letter interceptions; choose/document consistent inclusion rather than changing the current key streak implicitly.
+- Score may **visually animate in word-sized increments** if desired, but its authoritative total must continue to include all earned key, word, kill and special rewards with no lost points. Label any optional per-word floating score as a summary/animation, not as a new score calculation rule.
+
+### Proposed display optimization (implement only if profiling justifies it)
+
+1. Keep lightweight O(1) numeric counters in simulation on each correct key. Do not introduce extra objects, timers or per-key allocations merely to avoid a few integer additions.
+2. Cache previous HUD values and update only text/style fields that actually changed. Avoid reassigning every stat element on each keystroke.
+3. Consider batching **cosmetic score text animation and noncritical progress labels** into one `requestAnimationFrame`-coalesced HUD update or a measured limit around 10–15 updates/second; keep reactive input feedback, target-letter highlights, typing accuracy, skill-ready thresholds, Rage-ready, fatal Hull/Shield changes and streak reset prompt and accurate. Handle `pause`, `stageclear`, `gameover`, `title`, dialog opening and destruction with a synchronous final flush.
+4. UI update batching must not throttle typing input or delay simulation, skill activation, score rewards or audible feedback. Avoid independent repeating timers; reuse the existing frame clock/event coalescing where practical.
+5. Add an optional **Performance diagnostics** counter for stats callbacks, actual HUD mutations/updates and time spent updating the HUD; compare against measured Canvas draw/frame p95 rather than claim a performance win before testing.
+
+### Required QA
+
+- Test rapid typing at 30/60/120 WPM, wrong keys, shielded/guarded misses, projectile interceptions, boss per-key attacks, multi-layer enemies, bonus word completion, passives at 20/30 and multipliers at 25/50/100.
+- Assert identical final score, streak, max streak, multiplier, XP/performance bonus and Stage Results metrics **before and after HUD optimization**; only visual refresh cadence may change.
+- With browser profiling, compare keypress-to-feedback latency, per-keystroke main-thread cost, HUD mutation count, FPS and frame/draw p95 for score/streak unbatched vs coalesced. If HUD time is negligible compared with Canvas/glow work, keep the simple key-based implementation instead of overengineering.
+- Display user-facing units explicitly: `Key streak` / `Perfect word chain`, `Score`, `Correct keys` and `Words completed`; do not silently rename key streak to word streak or mix their max records.
+
 ## 11. Delivery order and merge gates
 
 1. **Foundation P0:** this plan + XP curve/Basic Skill Point/auto-stat model, second skill type scope check, legacy save/migration design and tests; implement core progression before large skill/item content expansion.
 2. **Batch A:** kill translation readability, EN removal, display settings.
-3. **Batch B:** battlefield HUD split/layout, enemy rank visual cleanup, difficulty slider 0.10× (prefer early if quick).
-4. **Batch C:** Results V2 backed by real typing/combat/XP/skill-point counters; correct replay and reward visuals.
+3. **Batch B:** battlefield HUD split/layout, enemy rank visual cleanup, difficulty slider 0.10× (prefer early if quick), and score/streak HUD-update profiling with change-only writes / measured coalescing when warranted. **Preserve per-key gameplay counters.**
+4. **Batch C:** Results V2 backed by real typing/combat/XP/skill-point counters; correct replay and reward visuals; explicit key streak, correct keys, words completed and (if implemented) separate perfect-word chain.
 5. **Batch D:** icon-first currencies in every UI, item/spell/equipment artwork and rarity cards, shop UX and meaningful content variety. Progression-aware learn/upgrade interfaces belong here after P0 foundation.
 6. **Batch E:** mission/Codex/objective frame and icon consistency.
 7. **Batch F:** per-batch UI QA + measured performance comparison; final integration and browser acceptance.
@@ -159,4 +186,5 @@ For EVERY batch: reconstruct latest child `main`, check open PRs for overlapping
 - IPA and VN kill feedback is easy to see, configurable and excludes redundant EN; HUD is balanced around the ship and not cluttered by rank text.
 - Stage report displays **real** stage, combat, typing, XP, star, skill point and reward data; all replay/checkpoint buttons behave correctly.
 - Custom settings reach 0.10× without runtime safety issues; mission/Codex cards have meaningful tier/importance presentation.
+- Core score/streak semantics and skill/passive thresholds remain correct on every keystroke; HUD writes are measured and optimized only where beneficial. A separate word-chain statistic is allowed but must never silently replace key streak.
 - CI passes, older saves load, parent games remain unaffected and real-browser QA plus quantitative performance comparison has been performed. Until then status remains partial.
