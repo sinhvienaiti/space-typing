@@ -494,33 +494,31 @@ app.innerHTML = `
       <div id="waveBadge" class="wave-badge">stage 001</div>
 
       <div class="hud-side hud-side-right">
-        <div class="metric"><span>accuracy</span><strong id="accuracy">100%</strong></div>
-        <div class="metric"><span>kills</span><strong id="kills">0</strong></div>
-        <div class="metric"><span>hull</span><strong id="hull">100</strong></div>
-        <div class="metric"><span>shield</span><strong id="shield">40</strong></div>
+        <div class="metric metric-secondary"><span>accuracy</span><strong id="accuracy">100%</strong></div>
+        <div class="metric metric-secondary"><span>kills</span><strong id="kills">0</strong></div>
+        <div class="metric metric-vital"><span>hull</span><strong id="hull">100</strong></div>
+        <div class="metric metric-vital"><span>shield</span><strong id="shield">40</strong></div>
       </div>
     </header>
 
-    <div
-      id="stageEventBadge"
-      class="stage-event-badge hidden"
-      aria-live="polite"
-    ></div>
-    <div
-      id="objectiveBadge"
-      class="stage-event-badge hidden"
-      aria-live="polite"
-    ></div>
-    <div
-      id="statusBadge"
-      class="status-badge hidden"
-      aria-live="polite"
-    ></div>
-    <div
-      id="typingTextBadge"
-      class="typing-text-badge hidden"
-      aria-live="polite"
-    ></div>
+    <div class="combat-info-stack" aria-live="polite">
+      <div
+        id="stageEventBadge"
+        class="stage-event-badge hidden"
+      ></div>
+      <div
+        id="objectiveBadge"
+        class="stage-event-badge hidden"
+      ></div>
+      <div
+        id="statusBadge"
+        class="status-badge hidden"
+      ></div>
+      <div
+        id="typingTextBadge"
+        class="typing-text-badge hidden"
+      ></div>
+    </div>
 
     <div id="bossHud" class="boss-hud hidden" aria-live="polite">
       <div class="boss-hud-meta">

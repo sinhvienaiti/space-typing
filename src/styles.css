@@ -2174,3 +2174,219 @@ kbd {
     height: 46vh;
   }
 }
+
+
+/* P03 compact combat HUD: one top information rail and non-overlapping controls. */
+.combat-info-stack {
+  position: absolute;
+  z-index: 8;
+  top: 84px;
+  left: 50%;
+  width: min(760px, calc(100vw - 32px));
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.game-shell:has(#bossHud:not(.hidden)) .combat-info-stack {
+  top: 118px;
+}
+
+.combat-info-stack .stage-event-badge,
+.combat-info-stack .status-badge,
+.combat-info-stack .typing-text-badge {
+  position: static;
+  left: auto;
+  top: auto;
+  z-index: auto;
+  width: fit-content;
+  max-width: 100%;
+  transform: none;
+  padding: 4px 9px;
+  font-size: 0.62rem;
+  line-height: 1.25;
+}
+
+.combat-info-stack #objectiveBadge {
+  border-color: rgba(111, 231, 194, 0.24);
+  color: rgba(173, 244, 218, 0.92);
+}
+
+.notice {
+  left: auto;
+  right: 18px;
+  top: 78px;
+  transform: translateY(-8px);
+}
+
+.notice.visible {
+  transform: translateY(0);
+}
+
+.power-shell {
+  bottom: 62px;
+  width: min(440px, calc(100vw - 2rem));
+}
+
+.quick-items,
+.quick-support,
+.quick-skills {
+  bottom: 18px;
+}
+
+@media (max-width: 1060px) {
+  .quick-skills {
+    bottom: 18px;
+  }
+}
+
+@media (max-width: 760px) {
+  .hud {
+    grid-template-columns: 1fr auto 1fr;
+    gap: 0.4rem;
+    min-height: 62px;
+    padding: 0.62rem 0.7rem;
+  }
+
+  .hud-side {
+    gap: 0.48rem;
+  }
+
+  .hud-side-right {
+    display: flex;
+  }
+
+  .hud-side-right .metric-secondary {
+    display: none;
+  }
+
+  .metric {
+    min-width: 0;
+  }
+
+  .metric span,
+  .power-label span {
+    font-size: 0.5rem;
+    letter-spacing: 0.12em;
+  }
+
+  .metric strong {
+    font-size: 0.82rem;
+  }
+
+  .wave-badge {
+    padding: 0.34rem 0.5rem;
+    font-size: 0.58rem;
+  }
+
+  .boss-hud {
+    top: 64px;
+  }
+
+  .combat-info-stack {
+    top: 98px;
+    width: calc(100vw - 20px);
+    gap: 3px;
+  }
+
+  .game-shell:has(#bossHud:not(.hidden)) .combat-info-stack {
+    top: 108px;
+  }
+
+  .combat-info-stack .stage-event-badge,
+  .combat-info-stack .status-badge,
+  .combat-info-stack .typing-text-badge {
+    padding: 3px 7px;
+    font-size: 0.56rem;
+  }
+
+  .notice {
+    top: 64px;
+    left: 10px;
+    right: 10px;
+    max-width: none;
+    text-align: center;
+  }
+
+  .power-shell {
+    bottom: 96px;
+    width: min(460px, calc(100vw - 20px));
+    grid-template-columns: auto 1fr;
+    gap: 0.45rem;
+  }
+
+  .power-label {
+    min-width: 92px;
+    grid-template-columns: 1fr;
+  }
+
+  .quick-items {
+    left: 8px;
+    bottom: 14px;
+    gap: 0.25rem;
+  }
+
+  .quick-items button {
+    min-width: 44px;
+    padding: 0.34rem 0.4rem;
+  }
+
+  .quick-support {
+    bottom: 14px;
+    grid-template-columns: repeat(3, minmax(44px, auto));
+    gap: 0.25rem;
+  }
+
+  .quick-support button {
+    min-width: 48px;
+    padding: 0.34rem 0.4rem;
+  }
+
+  .quick-skills {
+    left: 50%;
+    right: auto;
+    bottom: 52px;
+    width: min(510px, calc(100vw - 16px));
+    max-width: none;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 0.24rem;
+    transform: translateX(-50%);
+  }
+
+  .quick-skills button {
+    min-width: 0;
+    padding: 0.32rem 0.28rem;
+    grid-template-columns: auto auto;
+    justify-content: center;
+    gap: 0.18rem;
+  }
+
+  .quick-skills button span {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .hud-side {
+    gap: 0.32rem;
+  }
+
+  .hud-side .metric:nth-child(3) {
+    display: none;
+  }
+
+  .hud-side-right .metric-vital {
+    display: grid;
+  }
+
+  .power-shell {
+    bottom: 94px;
+  }
+
+  .quick-items button strong,
+  .quick-support button strong {
+    font-size: 0.56rem;
+  }
+}
