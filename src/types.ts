@@ -1,3 +1,4 @@
+import type { KillTranslationSettings } from "./feedback/kill-translation";
 import type { EnemyDefinitionId } from "./enemies/registry";
 import type { EnemyRank } from "./enemies/rank";
 import type { EnemyLayerId } from "./enemies/layers";
@@ -62,6 +63,7 @@ export type GameSettings = {
   pronunciationEnabled: boolean;
   pronunciationRate: number;
   pronunciationVolume: number;
+  killTranslation?: KillTranslationSettings;
 };
 
 export type GameStats = {
