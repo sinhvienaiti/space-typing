@@ -1,6 +1,6 @@
 # Pre-M22 Combat Identity + Typing Clarity Master Plan
 
-Status: IMPLEMENTED · FINAL CI PENDING
+Status: COMPLETE · M22 REAL-BROWSER MANUAL QA PENDING
 
 This slice is approved before the remaining M22 real-browser/audio/visual gate. It combines two related goals:
 
@@ -26,7 +26,7 @@ Implementation checkpoint:
 - C05-C06: illustrated Ship Visual V2 sprite sheet registered through the existing art pipeline with procedural fallback;
 - C07-C08: eight derived equipment visual affinities and bounded quality-aware aura renderer implemented;
 - C09-C11: all 11 character projectile profiles integrated into the existing Laser renderer with compact muzzle/impact treatments;
-- C12: domain/Game regressions implemented; documentation and final CI remain before merge.
+- C12: domain/Game regressions, plan/roadmap/audit/manual-matrix sync and PR CI #488 PASS (124/124 files, 629/629 tests, TypeScript, production build and bundle budget) complete. A final merged-main CI must also pass before M22 manual playtesting.
 
 ## Guardrails
 
