@@ -99,6 +99,11 @@ import {
   sanitizeStageEntrySnapshot,
   type StageEntrySnapshot,
 } from "./death-protection";
+import {
+  createDefaultHotbarState,
+  sanitizeHotbarState,
+  type HotbarState,
+} from "../hud/hotbar";
 
 const DB_NAME = "space-typing";
 const INDEXED_DB_VERSION = 1;
@@ -106,7 +111,7 @@ const STORE_NAME = "player";
 const SAVE_KEY = "main";
 const RECOVERY_SAVE_KEY = "spaceTypingPlayerSaveRecoveryV3";
 
-export const PLAYER_SAVE_VERSION = 25;
+export const PLAYER_SAVE_VERSION = 26;
 
 export class UnsupportedPlayerSaveVersionError extends Error {
   constructor(readonly version: number) {
@@ -131,6 +136,7 @@ export type SaveReason =
   | "equipment"
   | "support-spells"
   | "character"
+  | "hotbar"
   | "discovery"
   | "shop"
   | "route-choice"
@@ -524,7 +530,34 @@ export type PlayerSaveV25 = {
   lastSaveReason: SaveReason;
 };
 
-export type PlayerSave = PlayerSaveV25;
+export type PlayerSaveV26 = {
+  version: 26;
+  campaign: CampaignProgress;
+  inventory: Inventory;
+  equipment: EquipmentState;
+  supportSpells: SupportSpellState;
+  characters: CharacterState;
+  luckPity: LuckPityState;
+  hiddenDiscovery: HiddenDiscoveryState;
+  credits: number;
+  progression: ProgressionState;
+  expansionCurrencies: ExpansionCurrencyState;
+  campaignExpansion: CampaignExpansionState;
+  checkpointSnapshot: CheckpointSnapshot;
+  crashRecoverySnapshot: CrashRecoverySnapshot | null;
+  stageEntrySnapshot: StageEntrySnapshot | null;
+  shops: ShopState;
+  route: RouteState;
+  upgrades: UpgradeState;
+  relics: RelicState;
+  codex: CodexState;
+  ascension: AscensionState;
+  hotbar: HotbarState;
+  updatedAt: string;
+  lastSaveReason: SaveReason;
+};
+
+export type PlayerSave = PlayerSaveV26;
 export type PersistenceSource = "indexeddb" | "localStorage";
 
 export type LoadedPlayerSave = {
@@ -550,6 +583,7 @@ function normalizeSaveReason(value: unknown): SaveReason {
     value === "equipment" ||
     value === "support-spells" ||
     value === "character" ||
+    value === "hotbar" ||
     value === "discovery" ||
     value === "shop" ||
     value === "route-choice" ||
@@ -590,6 +624,7 @@ export function createPlayerSave(
   relics: RelicState = createRelicState(),
   codex: CodexState = createCodexState(),
   ascension: AscensionState = createAscensionState(campaign),
+  hotbar: HotbarState = createDefaultHotbarState(),
 ): PlayerSave {
   const safeCampaign = sanitizeCampaignProgress(campaign);
   const activeState: RunPersistentState = {
@@ -641,6 +676,7 @@ export function createPlayerSave(
       sanitizeStageEntrySnapshot(stageEntrySnapshot),
     codex: sanitizeCodexState(codex),
     ascension: sanitizeAscensionState(ascension, safeCampaign),
+    hotbar: sanitizeHotbarState(hotbar),
     updatedAt,
     lastSaveReason,
   };
@@ -677,6 +713,7 @@ export function migratePlayerSave(value: unknown): MigrationResult {
     relics?: unknown;
     codex?: unknown;
     ascension?: unknown;
+    hotbar?: unknown;
     updatedAt?: unknown;
     lastSaveReason?: unknown;
   };
@@ -1230,6 +1267,46 @@ export function migratePlayerSave(value: unknown): MigrationResult {
     };
   }
 
+  if (raw.version === 25) {
+    const safeCampaign = sanitizeCampaignProgress(raw.campaign);
+    return {
+      save: createPlayerSave(
+        safeCampaign,
+        typeof raw.updatedAt === "string" ? raw.updatedAt : "",
+        "migration",
+        sanitizeInventory(raw.inventory),
+        sanitizeEquipmentState(raw.equipment),
+        sanitizeSupportSpellState(raw.supportSpells),
+        sanitizeCharacterState(raw.characters),
+        sanitizeLuckPityState(raw.luckPity),
+        sanitizeHiddenDiscoveryState(raw.hiddenDiscovery),
+        sanitizeCredits(raw.credits),
+        sanitizeProgressionState(raw.progression),
+        sanitizeExpansionCurrencyState(raw.expansionCurrencies),
+        sanitizeCampaignExpansionState(
+          raw.campaignExpansion,
+          safeCampaign,
+          typeof raw.updatedAt === "string" ? raw.updatedAt : "",
+        ),
+        raw.checkpointSnapshot as CheckpointSnapshot | undefined,
+        sanitizeCrashRecoverySnapshot(raw.crashRecoverySnapshot),
+        sanitizeStageEntrySnapshot(raw.stageEntrySnapshot),
+        sanitizeShopState(raw.shops),
+        sanitizeRouteState(
+          raw.route,
+          safeCampaign.highestUnlockedStage,
+        ),
+        sanitizeUpgradeState(raw.upgrades),
+        sanitizeRelicState(raw.relics),
+        sanitizeCodexState(raw.codex),
+        sanitizeAscensionState(raw.ascension, safeCampaign),
+        createDefaultHotbarState(),
+      ),
+      migrated: true,
+      fromVersion: 25,
+    };
+  }
+
   if (raw.version === PLAYER_SAVE_VERSION) {
     return {
       save: createPlayerSave(
@@ -1262,6 +1339,7 @@ export function migratePlayerSave(value: unknown): MigrationResult {
         sanitizeRelicState(raw.relics),
         sanitizeCodexState(raw.codex),
         sanitizeAscensionState(raw.ascension, sanitizeCampaignProgress(raw.campaign)),
+        sanitizeHotbarState(raw.hotbar),
       ),
       migrated: false,
       fromVersion: PLAYER_SAVE_VERSION,
@@ -1384,6 +1462,7 @@ function recoverySaveFromLegacy(): PlayerSave {
       recovery.relics,
       recovery.codex,
       recovery.ascension,
+      recovery.hotbar,
     );
   } catch (error) {
     if (error instanceof UnsupportedPlayerSaveVersionError) throw error;
@@ -1463,6 +1542,7 @@ export function resolvePlayerSaveRecovery(
       resolution.state.relics,
       save.codex,
       resolution.state.ascension,
+      save.hotbar,
     ),
     recoveryMode: resolution.mode,
   };
@@ -1566,6 +1646,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
         resolved.save.relics,
         resolved.save.codex,
         resolved.save.ascension,
+        resolved.save.hotbar,
       );
       await writeSave(database, migrated);
       try {
@@ -1634,6 +1715,9 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
     const ascension = useRecovery
       ? recovery.ascension
       : migration.save.ascension;
+    const hotbar = useRecovery
+      ? recovery.hotbar
+      : migration.save.hotbar;
     const campaignExpansion = useRecovery
       ? recovery.campaignExpansion
       : migration.save.campaignExpansion;
@@ -1664,6 +1748,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
       relics !== migration.save.relics ||
       JSON.stringify(codex) !== JSON.stringify(migration.save.codex) ||
       ascension !== migration.save.ascension ||
+      hotbar !== migration.save.hotbar ||
       campaignExpansion !== migration.save.campaignExpansion ||
       checkpointSnapshot !== migration.save.checkpointSnapshot ||
       crashRecoverySnapshot !== migration.save.crashRecoverySnapshot ||
@@ -1692,6 +1777,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
       relics,
       codex,
       ascension,
+      hotbar,
     );
     const resolved = resolvePlayerSaveRecovery(candidate);
 
@@ -1725,6 +1811,7 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
         resolved.save.relics,
         resolved.save.codex,
         resolved.save.ascension,
+        resolved.save.hotbar,
       );
       await writeSave(database, recovered);
       try {
@@ -1789,6 +1876,7 @@ export async function savePlayerProgress(
   relics: RelicState = createRelicState(),
   codex: CodexState = createCodexState(),
   ascension: AscensionState = createAscensionState(campaign),
+  hotbar: HotbarState = createDefaultHotbarState(),
 ): Promise<PersistenceSource> {
   const save = createPlayerSave(
     campaign,
@@ -1813,6 +1901,7 @@ export async function savePlayerProgress(
     relics,
     codex,
     ascension,
+    hotbar,
   );
 
   if ("indexedDB" in window) {
