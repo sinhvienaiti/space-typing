@@ -376,6 +376,7 @@ import {
   resolveRenderDpr,
   type PerformanceReport,
 } from "./performance/quality";
+import { AdaptiveRenderBudget } from "./performance/adaptive-resolution";
 import type {
   Enemy,
   EnemyKind,
@@ -681,6 +682,8 @@ export class Game {
   private stageElapsedSeconds = 0;
   private hitStopTimer = 0;
   private readonly frameProfiler = new FrameProfiler();
+  private readonly drawProfiler = new FrameProfiler();
+  private readonly adaptiveRenderBudget = new AdaptiveRenderBudget();
   private lastTime = performance.now();
   private animationFrame = 0;
   private stars: Array<{ x: number; y: number; z: number }> = [];
@@ -730,6 +733,21 @@ export class Game {
 
   getPerformanceReport(): PerformanceReport {
     return this.frameProfiler.report();
+  }
+
+  /** Rolling paint and compositor timings for comparing High vs Medium. */
+  getRenderDiagnostics(): {
+    renderP95Ms: number;
+    adaptiveScale: number;
+    effectiveDpr: number;
+    canvasPixels: number;
+  } {
+    return {
+      renderP95Ms: this.drawProfiler.report().p95FrameMs,
+      adaptiveScale: this.adaptiveRenderBudget.scale,
+      effectiveDpr: this.dpr,
+      canvasPixels: this.canvas.width * this.canvas.height,
+    };
   }
 
   setTestLabMode(
@@ -2364,7 +2382,10 @@ export class Game {
       this.settings.visualQuality !== settings.visualQuality;
     this.settings = settings;
     this.sfx.setVolume(settings.sfxVolume);
-    if (qualityChanged) this.resize();
+    if (qualityChanged) {
+      this.adaptiveRenderBudget.reset();
+      this.resize();
+    }
   }
 
   startStage(
@@ -2754,18 +2775,36 @@ export class Game {
     this.width = Math.max(640, rect.width || window.innerWidth);
     this.height = Math.max(420, rect.height || window.innerHeight);
     const profile = qualityProfile(this.settings.visualQuality);
-    this.dpr = resolveRenderDpr(
+    this.dpr = Math.max(0.5, resolveRenderDpr(
       profile,
       window.devicePixelRatio || 1,
       this.width,
       this.height,
-    );
+    ) * this.adaptiveRenderBudget.scale);
 
     this.canvas.width = Math.floor(this.width * this.dpr);
     this.canvas.height = Math.floor(this.height * this.dpr);
     this.context.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     this.backgroundGradient = null;
     this.seedStars();
+  }
+
+  private applyAdaptiveRenderScale(): void {
+    const profile = qualityProfile(this.settings.visualQuality);
+    const targetDpr = Math.max(0.5, resolveRenderDpr(
+      profile,
+      window.devicePixelRatio || 1,
+      this.width,
+      this.height,
+    ) * this.adaptiveRenderBudget.scale);
+    if (Math.abs(targetDpr - this.dpr) < 0.025) return;
+    this.dpr = targetDpr;
+    this.canvas.width = Math.floor(this.width * this.dpr);
+    this.canvas.height = Math.floor(this.height * this.dpr);
+    this.context.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.backgroundGradient = null;
+    // Keep already seeded stars/animation state; adaptive pixel resolution
+    // must not reseed gameplay VFX or change movement/physics timing.
   }
 
   private frame = (now: number): void => {
@@ -2778,7 +2817,16 @@ export class Game {
 
     this.advanceSimulation(dt);
 
+    const drawStart = performance.now();
     this.draw(now / 1000);
+    const drawMs = Math.max(0, performance.now() - drawStart);
+    this.drawProfiler.pushFrame(drawMs / 1000);
+    if (
+      this.phase === "playing" &&
+      this.adaptiveRenderBudget.observe(this.settings.visualQuality, rawDt, drawMs)
+    ) {
+      this.applyAdaptiveRenderScale();
+    }
     this.animationFrame = requestAnimationFrame(this.frame);
   };
 
