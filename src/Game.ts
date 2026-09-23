@@ -221,6 +221,14 @@ import {
   type TreasureDrone,
 } from "./events/rare-targets";
 import {
+  eligibleRecallBonusEntry,
+  pickRecallBonusHintIndices,
+  recallBonusMask,
+  recallBonusRewardScore,
+  shouldScheduleRecallBonus,
+  type RecallBonusTarget,
+} from "./events/recall-bonus";
+import {
   createRewardChoiceOptions,
   rewardChoiceCrateChance,
   rewardChoiceWord,
@@ -483,6 +491,14 @@ export type TestLabGameSnapshot = {
     ipa: string;
     remaining: number;
   } | null;
+  recallBonus: {
+    en: string;
+    vi: string;
+    typed: number;
+    mask: string;
+    hintIndices: number[];
+    remaining: number;
+  } | null;
 };
 
 const FALLBACK_ENTRIES: VocabularyEntry[] = [
@@ -624,6 +640,9 @@ export class Game {
   private treasureDrone: TreasureDrone | null = null;
   private treasureDroneTimer = 0;
   private treasureDronePending = false;
+  private recallBonus: RecallBonusTarget | null = null;
+  private recallBonusTimer = 0;
+  private recallBonusPending = false;
   private rewardChoiceCrate: RewardChoiceCrate | null = null;
   private rewardChoiceTimer = 0;
   private rewardChoicePending = false;
@@ -800,6 +819,24 @@ export class Game {
               vi: this.learningEcho.entry.vi,
               ipa: this.learningEcho.entry.ipa,
               remaining: this.learningEcho.remaining,
+            },
+      recallBonus:
+        this.recallBonus === null
+          ? null
+          : {
+              en: this.recallBonus.entry.en,
+              vi: this.recallBonus.entry.vi,
+              typed: this.recallBonus.typed,
+              mask: recallBonusMask(
+                this.recallBonus.entry.en,
+                this.recallBonus.typed,
+                this.recallBonus.hintIndices,
+              ),
+              hintIndices: [...this.recallBonus.hintIndices],
+              remaining: Math.max(
+                0,
+                this.recallBonus.lifetime - this.recallBonus.age,
+              ),
             },
     };
   }
