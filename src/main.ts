@@ -169,6 +169,11 @@ import {
 } from "./worlds/registry";
 import type { WorldProfile } from "./worlds/types";
 import {
+  createHiddenTransitionSpec,
+  createStageTransitionSpec,
+  type StageTransitionSpec,
+} from "./ui/stage-transition";
+import {
   buyShopStockEntry,
   canAffordShopPrice,
   createShopState,
@@ -711,13 +716,19 @@ app.innerHTML = `
 
     <div id="notice" class="notice" aria-live="polite"></div>
     <div
-      id="worldTransition"
-      class="world-transition hidden"
+      id="stageTransition"
+      class="stage-transition hidden"
+      data-tone="regular"
       aria-live="polite"
     >
-      <small id="worldTransitionGalaxy">Galaxy 01 · World 01</small>
-      <strong id="worldTransitionName">Rainbow Reach</strong>
-      <span id="worldTransitionRange">Stage 001-020</span>
+      <div class="stage-transition-warp" aria-hidden="true"></div>
+      <div class="stage-transition-core" aria-hidden="true"></div>
+      <div class="stage-transition-card">
+        <small id="stageTransitionEyebrow">GALAXY 01 // RAINBOW REACH</small>
+        <strong id="stageTransitionTitle">STAGE 001</strong>
+        <span id="stageTransitionSubtitle">Stage 001 · 01 / 20</span>
+        <em>ENTER / SPACE / TAP TO DEPLOY</em>
+      </div>
     </div>
 
     <dialog id="stageSelectDialog" class="settings-dialog stage-select-dialog">
@@ -1334,8 +1345,6 @@ const typingChallengeCache = new Map<
 >();
 let stageStartPending = false;
 let noticeTimer: number | null = null;
-let worldTransitionTimer: number | null = null;
-let lastPresentedWorldId: string | null = null;
 let currentGalaxy = Math.ceil(campaign.selectedStage / STAGES_PER_GALAXY);
 
 const titleOverlay = byId("titleOverlay");
@@ -3812,34 +3821,66 @@ function worldLabel(world: WorldProfile): string {
   );
 }
 
-function showWorldTransition(
-  world: WorldProfile,
-  stage: number,
-): void {
-  const panel = byId("worldTransition");
-  const worldNumber = Math.floor((world.stageStart - 1) / 20) + 1;
+async function presentStageTransition(
+  spec: StageTransitionSpec,
+): Promise<void> {
+  const panel = byId("stageTransition");
+  const reducedMotion =
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+  const fadeMs = reducedMotion ? 20 : 170;
+  const durationMs = reducedMotion
+    ? Math.min(180, spec.durationMs)
+    : spec.durationMs;
 
-  byId("worldTransitionGalaxy").textContent =
-    "Galaxy " +
-    String(world.galaxy).padStart(2, "0") +
-    " · World " +
-    String(worldNumber).padStart(2, "0");
-  byId("worldTransitionName").textContent = world.name;
-  byId("worldTransitionRange").textContent =
-    "Stage " +
-    String(stage).padStart(3, "0") +
-    " · " +
-    String(stageInWorld(stage)).padStart(2, "0") +
-    " / 20";
+  panel.dataset.tone = spec.tone;
+  byId("stageTransitionEyebrow").textContent = spec.eyebrow;
+  byId("stageTransitionTitle").textContent = spec.title;
+  byId("stageTransitionSubtitle").textContent = spec.subtitle;
 
-  panel.classList.remove("hidden");
-  if (worldTransitionTimer !== null) {
-    window.clearTimeout(worldTransitionTimer);
-  }
-  worldTransitionTimer = window.setTimeout(() => {
-    panel.classList.add("hidden");
-    worldTransitionTimer = null;
-  }, 2300);
+  panel.classList.remove("hidden", "leaving", "active");
+  void panel.offsetWidth;
+  panel.classList.add("active");
+
+  await new Promise<void>((resolve) => {
+    let settled = false;
+    let hideTimer: number | null = null;
+
+    const cleanup = (): void => {
+      window.removeEventListener("keydown", onKeyDown, true);
+      panel.removeEventListener("pointerdown", finish);
+      if (hideTimer !== null) window.clearTimeout(hideTimer);
+    };
+
+    const finish = (): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      panel.classList.remove("active");
+      panel.classList.add("leaving");
+      window.setTimeout(() => {
+        panel.classList.add("hidden");
+        panel.classList.remove("leaving");
+        resolve();
+      }, fadeMs);
+    };
+
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (
+        event.key !== "Enter" &&
+        event.key !== " " &&
+        event.key !== "Escape"
+      ) {
+        return;
+      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      finish();
+    };
+
+    window.addEventListener("keydown", onKeyDown, true);
+    panel.addEventListener("pointerdown", finish);
+    hideTimer = window.setTimeout(finish, durationMs);
+  });
 }
 
 function shopWorldKey(stage: number): string {
@@ -5334,6 +5375,13 @@ async function startActiveHiddenEncounter(
   );
   musicController.setPaused(false);
 
+  await presentStageTransition(
+    createHiddenTransitionSpec(
+      hiddenEncounterLabel(active),
+      active.sourceStage,
+    ),
+  );
+
   game.startStage(
     stage,
     difficulty,
@@ -5380,13 +5428,6 @@ async function startSelectedStage(): Promise<void> {
     };
     const stage = createStageConfig(gameplayStage);
     const world = worldForStage(stage.stage);
-    if (
-      lastPresentedWorldId !== world.id ||
-      stageInWorld(stage.stage) === 1
-    ) {
-      showWorldTransition(world, stage.stage);
-      lastPresentedWorldId = world.id;
-    }
     const vocabularyLevel = selectedVocabularyLevel();
     game.setVocabularyLevel(vocabularyLevel);
     await prepareStageVocabulary(stage);
@@ -5432,6 +5473,17 @@ async function startSelectedStage(): Promise<void> {
         musicProfileForWorld(worldForStage(world.stageEnd + 1)),
       );
     }
+
+    await presentStageTransition(
+      createStageTransitionSpec({
+        stage: stage.stage,
+        galaxy: stage.galaxy,
+        stageInGalaxy: stage.stageInGalaxy,
+        stageInWorld: stageInWorld(stage.stage),
+        worldName: world.name,
+        role: stage.role,
+      }),
+    );
 
     game.startStage(stage, difficulty);
   } finally {
