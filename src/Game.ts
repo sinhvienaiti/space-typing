@@ -4504,7 +4504,9 @@ export class Game {
     });
 
     this.burst(projectile.x, projectile.y, 13, 342);
-    this.sfx.hit();
+    // Player interception is a gameplay laser shot, not the generic hit SFX
+    // and not English pronunciation. One-letter bullets resolve in one hit.
+    this.sfx.projectileIntercept();
     this.emitStats();
   }
 
