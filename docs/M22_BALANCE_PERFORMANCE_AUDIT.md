@@ -255,6 +255,12 @@ The final pre-manual C01-C12 combat-identity/typing-clarity slice is implemented
 - all 11 player characters reuse the existing Laser mechanic with distinct bounded tracer/muzzle/impact profiles, so damage and typing cadence are unchanged;
 - Low/Medium quality reduce aura detail while existing glow/particle caps continue to bound visual cost.
 
+## Ship Visual V3 follow-up
+
+Eleven newly illustrated source sprites and one 1024×768 lossless WebP atlas (800,054 bytes, 3 MiB decoded) have been prepared as local artifacts, with 64/78/128px preview sheets. Local alpha/source-count/empty twelfth-cell and source-transfer checks passed. The premium binary is **not yet committed to GitHub**, so production continues to use V2. Once installed and registered through `scripts/install-ship-v3.mjs`, V3 is preferred, duplicate engine flames and heavy image bloom are omitted, and the V2 decoded reference is released.
+
+File checks and TypeScript/unit/build results are **not** evidence of ≤1ms incremental p95 browser-frame performance. Paired V2/V3 real-browser measurements and a two-build aura/rapid-fire visual review remain pending in the M22 manual matrix.
+
 ## Manual gate
 
 Automated tests cannot certify:
