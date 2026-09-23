@@ -3636,6 +3636,9 @@ CI #335 PASS · 548/548 tests · TypeScript check + production build
 
 M21 Developer QA / Test Lab
 CI #376 PASS · 111 test files · 561/561 tests · TypeScript check + production build
+
+M22 Full Balance / Performance Audit — AUTOMATED PASS, MANUAL GATE PENDING
+CI #395 PASS · 116 test files · 583/583 tests · TypeScript check + production build + bundle budget
 ~~~
 
 Important implementation notes:
@@ -3644,6 +3647,8 @@ Important implementation notes:
 - AscensionState is part of RunPersistentState because tier frontier/economic progression must obey checkpoint rollback, crash recovery and stage-entry resurrection semantics. No parallel Ascension checkpoint store exists.
 - Codex knowledge remains outside RunPersistentState/checkpoint rollback; recovery-source selection merges valid discoveries so technical recovery or gameplay rollback cannot erase already learned information.
 - Test Lab preset localStorage is QA configuration only; Test Lab gameplay state is in-memory and must never be interpreted as PlayerSave/run persistence.
+- M22 automated audit found and fixed child/summoned-enemy admission exceeding DifficultyProfile.maxEnemies; shared canAdmitSpawn now enforces the hard active-enemy cap for regular, Carrier and Splitter paths.
+- M22 is not complete until docs/M22_MANUAL_PLAYTEST_MATRIX.md is executed on a real browser/audio device; M23 must not begin before that gate.
 - Permanent systems must extend PlayerSave through explicit migrations.
 - Current runtime equipment uses the five-grade model; legacy rarity names remain only in migration/compatibility paths and historical step notes.
 - `ShopState` and `RouteState` are part of `RunPersistentState`, so shop stock and route choices are segment state rather than separate local-storage systems.
