@@ -2390,3 +2390,162 @@ kbd {
     font-size: 0.56rem;
   }
 }
+
+
+/* P07 character selection presentation */
+.character-card {
+  min-height: 300px;
+  padding: 0.72rem;
+  grid-template-rows: 94px auto auto auto auto;
+  gap: 0.56rem;
+  overflow: hidden;
+}
+
+.character-card-preview {
+  width: 100%;
+  height: 94px;
+  display: block;
+  border: 1px solid rgba(117, 224, 243, 0.08);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 50% 56%, rgba(73, 207, 235, 0.08), transparent 46%),
+    linear-gradient(180deg, rgba(9, 18, 30, 0.84), rgba(4, 9, 16, 0.9));
+}
+
+.character-card.selected .character-card-preview {
+  border-color: rgba(91, 235, 255, 0.24);
+  background:
+    radial-gradient(circle at 50% 56%, rgba(73, 224, 245, 0.15), transparent 48%),
+    linear-gradient(180deg, rgba(9, 24, 35, 0.9), rgba(4, 12, 20, 0.94));
+}
+
+.character-card-top {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.55rem;
+}
+
+.character-card-name {
+  min-width: 0;
+  display: grid;
+  gap: 0.28rem;
+}
+
+.character-card-name strong {
+  color: #eefcff;
+  font-size: 0.98rem;
+}
+
+.character-role {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.18rem 0.42rem;
+  border: 1px solid rgba(133, 210, 235, 0.11);
+  border-radius: 999px;
+  color: #8ca5b8;
+  background: rgba(95, 164, 192, 0.055);
+  font-size: 0.56rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.character-card-state {
+  padding: 0.2rem 0.42rem;
+  border: 1px solid rgba(104, 219, 240, 0.12);
+  border-radius: 999px;
+  color: #708698;
+  background: rgba(7, 15, 24, 0.76);
+  font-size: 0.54rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.character-card.selected .character-card-state {
+  border-color: rgba(86, 225, 246, 0.36);
+  color: #a7f6ff;
+  background: rgba(56, 182, 205, 0.1);
+}
+
+.character-card.locked {
+  opacity: 0.58;
+  filter: saturate(0.45);
+}
+
+.character-card.locked .character-card-state {
+  border-color: rgba(255, 193, 105, 0.16);
+  color: #b69b7a;
+}
+
+.character-card > p {
+  min-height: 3.05em;
+  color: #8b9bad;
+}
+
+.character-card-kit {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.38rem;
+}
+
+.character-card-kit small {
+  min-width: 0;
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.44rem 0.5rem;
+  border: 1px solid rgba(154, 119, 210, 0.08);
+  border-radius: 8px;
+  background: rgba(76, 51, 110, 0.055);
+}
+
+.character-card-kit b {
+  color: #917ab6;
+  font-size: 0.52rem;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.character-card-kit span {
+  overflow: hidden;
+  color: #c6b9de;
+  font-size: 0.61rem;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.character-card-progress {
+  margin-top: auto;
+  color: #68dceb;
+  font-size: 0.58rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.character-card.selected {
+  transform: translateY(-1px);
+  border-color: rgba(91, 235, 255, 0.58);
+  background: rgba(7, 25, 35, 0.82);
+  box-shadow:
+    inset 0 0 0 1px rgba(91, 235, 255, 0.14),
+    0 14px 34px rgba(26, 165, 191, 0.11);
+}
+
+@media (max-width: 600px) {
+  .character-card {
+    min-height: 270px;
+  }
+
+  .character-card-kit {
+    grid-template-columns: 1fr;
+  }
+
+  .character-card > p {
+    min-height: 0;
+  }
+}

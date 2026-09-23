@@ -55,6 +55,7 @@ import {
   CHARACTER_IDS,
   getCharacter,
 } from "./characters/registry";
+import { drawCharacterShip } from "./characters/renderer";
 import { AEGIS_ACTIVE_SKILL_ID } from "./characters/aegis";
 import { ARSENAL_ACTIVE_SKILL_ID } from "./characters/arsenal";
 import { BASTION_ACTIVE_SKILL_ID } from "./characters/bastion";
@@ -3193,7 +3194,7 @@ function renderCharacters(): void {
   const grid = byId("characterGrid");
   grid.replaceChildren();
 
-  for (const id of CHARACTER_IDS) {
+  CHARACTER_IDS.forEach((id, index) => {
     const definition = getCharacter(id);
     const unlocked = characters.unlocked.includes(id);
     const selected = characters.selected === id;
@@ -3204,40 +3205,82 @@ function renderCharacters(): void {
     card.classList.toggle("selected", selected);
     card.classList.toggle("locked", !unlocked);
     card.disabled = !unlocked;
+    card.setAttribute(
+      "aria-label",
+      definition.name +
+        " · " +
+        definition.role +
+        (selected ? " · selected" : unlocked ? " · available" : " · locked"),
+    );
+
+    const preview = document.createElement("canvas");
+    preview.className = "character-card-preview";
+    preview.width = 240;
+    preview.height = 132;
+    preview.setAttribute("aria-hidden", "true");
+    const previewContext = preview.getContext("2d");
+    if (previewContext !== null) {
+      drawCharacterShip(previewContext, id, {
+        x: preview.width / 2,
+        y: 76,
+        time: index * 0.73 + 0.8,
+        scale: selected ? 1.42 : 1.3,
+        glowScale: selected ? 1.15 : 0.86,
+        alpha: unlocked ? 1 : 0.48,
+      });
+    }
 
     const top = document.createElement("div");
     top.className = "character-card-top";
+
+    const nameWrap = document.createElement("div");
+    nameWrap.className = "character-card-name";
 
     const name = document.createElement("strong");
     name.textContent = definition.name;
 
     const role = document.createElement("span");
+    role.className = "character-role";
     role.textContent = definition.role;
 
-    top.append(name, role);
+    nameWrap.append(name, role);
+
+    const state = document.createElement("span");
+    state.className = "character-card-state";
+    state.textContent = selected
+      ? "Selected"
+      : unlocked
+        ? "Available"
+        : "Stage " + String(definition.unlockStage).padStart(3, "0");
+
+    top.append(nameWrap, state);
 
     const summary = document.createElement("p");
     summary.textContent = definition.summary;
 
     const progress = characters.progress[id];
-    const skills = document.createElement("small");
-    skills.textContent =
-      definition.activeName +
-      " · " +
-      definition.ultimateName +
-      " · Lv " +
+    const kit = document.createElement("div");
+    kit.className = "character-card-kit";
+
+    const active = document.createElement("small");
+    active.innerHTML =
+      "<b>Active</b><span>" + definition.activeName + "</span>";
+
+    const ultimate = document.createElement("small");
+    ultimate.innerHTML =
+      "<b>Ultimate</b><span>" + definition.ultimateName + "</span>";
+
+    kit.append(active, ultimate);
+
+    const progressMeta = document.createElement("div");
+    progressMeta.className = "character-card-progress";
+    progressMeta.textContent =
+      "Lv " +
       String(progress.level) +
-      " · M " +
+      " · Mastery " +
       String(progress.mastery);
 
-    const status = document.createElement("em");
-    status.textContent = selected
-      ? "SELECTED"
-      : unlocked
-        ? "AVAILABLE"
-        : "CLEAR STAGE " + String(definition.unlockStage).padStart(3, "0");
-
-    card.append(top, summary, skills, status);
+    card.append(preview, top, summary, kit, progressMeta);
 
     if (unlocked && !selected) {
       card.addEventListener("click", () => {
@@ -3254,7 +3297,7 @@ function renderCharacters(): void {
     }
 
     grid.append(card);
-  }
+  });
 
   const selectedProgress = characters.progress[characters.selected];
   byId("characterSelectedMeta").textContent =
