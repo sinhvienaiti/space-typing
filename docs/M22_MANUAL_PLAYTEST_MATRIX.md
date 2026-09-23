@@ -45,6 +45,17 @@ The recorder additionally requires three explicit human attestations before it c
 
 The recorder cannot mark M22 complete by itself. Real browser observation, real audio output and human-paced typing are still mandatory, and final post-fix CI must still pass after the report is accepted.
 
+## Pre-M22 polish focus inside the existing 43 rows
+
+Do not add extra PASS rows for the P00-P08 polish slice. Verify these points while running the existing rows so the recorder remains exactly aligned with its 43 required scenarios:
+
+- title screen: Continue is visually dominant; Play / Build / Progress / System grouping is understandable; Shops & Services and Developer stay compact/collapsed until opened;
+- combat HUD: boss/event/objective/status/typing information does not overlap; Hull/Shield remain readable at narrow widths; quick controls do not collide with the Ultimate/Energy bar;
+- learning feedback: the old large center toast is gone; pronunciation still fires; the short EN/IPA/VI echo appears near a defeated enemy without masking the central combat lane;
+- Recall Bonus: VI meaning + masked EN answer is readable; it looks distinct from hostile targets; wrong guesses/expiry do not feel punitive; correct completion clearly communicates an optional treasure reward;
+- character visuals: the 11 player characters are visually distinguishable in combat and their selection-card previews match the in-game profile identity;
+- High/Ultra/max-pressure/long-session rows must specifically watch the new HUD rail, Recall Bonus prism effect, enemy-local learning echo and character engine/glow layers for clipping, text obstruction, particle buildup or frame-pacing regressions.
+
 ## Difficulty and typing pace
 
 | Scenario | Setup | Pass criteria | Status |
