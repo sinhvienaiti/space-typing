@@ -240,9 +240,10 @@ Before the real-browser/audio/human-paced gate, the approved P00-P08 polish slic
 - all 11 player characters use reusable distinct ship visual profiles in combat and selection previews;
 - the H01-H06 RPG HUD slice replaces separate quick-control walls with a compact Character/Level/Hull/Shield/Energy status cluster and one configurable 1-9 hotbar;
 - hotbar configuration is PlayerSave v26 top-level preference state, migrates deterministically from v25, survives backup/import and technical recovery, and deliberately does not roll back with combat checkpoints;
-- title/Pause Hotbar Setup edits route into existing production item/skill APIs, so no parallel combat state or Test Lab-only hotbar implementation exists.
+- title/Pause Hotbar Setup edits route into existing production item/skill APIs, so no parallel combat state or Test Lab-only hotbar implementation exists;
+- T01-T06 stage-transition polish adds a deterministic presentation model and a short skippable pre-combat handoff for every stage, with stronger World/Galaxy/Boss/Hidden variants. The transition is awaited before `game.startStage()`, so the visual layer never hides live enemy/projectile/typing advancement.
 
-P00-P08.1 are merged. H01-H06 implementation reached CI #443 PASS with 120/120 test files and 608/608 tests before documentation sync; TypeScript, production build and bundle budget also pass. None of this converts the perceptual gate into an automated one.
+P00-P08.1 and H01-H06 are merged. T01-T06 is the final pre-manual transition slice; its branch CI and final main CI must remain green. None of this converts the perceptual gate into an automated one.
 
 ## Manual gate
 
