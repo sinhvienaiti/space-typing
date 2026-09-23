@@ -6311,9 +6311,13 @@ async function initializeArtPipeline(): Promise<void> {
   try {
     const manifest = await loadArtAssetManifest();
     artCatalog = await preloadArtAssets(manifest);
-    setCharacterShipSheet(
-      selectCharacterShipSheet(artCatalog).image,
-    );
+    const shipSelection = selectCharacterShipSheet(artCatalog);
+    setCharacterShipSheet(shipSelection.image, shipSelection.source);
+    if (shipSelection.source === "v3") {
+      // The V2 decoded image is no longer retained after a valid V3 load.
+      const legacy = artCatalog.assets.get("player-ship-sheet-v2");
+      if (legacy !== undefined) legacy.image = null;
+    }
     renderPlayerStatusIdentity();
     updateDataSummary();
 
