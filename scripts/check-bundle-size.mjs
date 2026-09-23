@@ -28,6 +28,16 @@ let totalGzip = 0;
 
 for (const url of built) {
   const path = url.pathname;
+  // Premium V3 ship art has its own mandatory 1024x768 / 1.2 MiB
+  // check in check-ship-art-budget.mjs. Do not double-count that
+  // static image against the original M22 JS/CSS + non-V3 asset budget.
+  // Keep every other asset in this budget as before.
+  if (
+    path.endsWith("/assets/space-typing/ships/player-ships-v3.webp") ||
+    path.endsWith("/assets/space-typing/ships/player-ships-v3.png")
+  ) {
+    continue;
+  }
   const buffer = readFileSync(url);
   const raw = statSync(url).size;
   const gzip = gzipSync(buffer).length;
