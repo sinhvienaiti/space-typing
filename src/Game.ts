@@ -605,6 +605,13 @@ export class Game {
   private readonly stageWordLedger = new StageWordLedger();
   private projectiles: EnemyProjectile[] = [];
   private lasers: Laser[] = [];
+  private projectileImpacts: Array<{
+    x: number;
+    y: number;
+    life: number;
+    maxLife: number;
+    radius: number;
+  }> = [];
   private particles: Particle[] = [];
   private targetId: number | null = null;
   private spawnTimer = 0;
@@ -1368,6 +1375,7 @@ export class Game {
     if (!this.testLabEnabled) return false;
     this.projectiles = [];
     this.lasers = [];
+    this.projectileImpacts = [];
     return true;
   }
 
@@ -1445,6 +1453,7 @@ export class Game {
     this.enemies = [];
     this.projectiles = [];
     this.lasers = [];
+    this.projectileImpacts = [];
     this.particles = [];
     this.targetId = null;
     this.recallBonus = null;
@@ -2434,6 +2443,7 @@ export class Game {
     this.enemies = [];
     this.projectiles = [];
     this.lasers = [];
+    this.projectileImpacts = [];
     this.particles = [];
     this.targetId = null;
     this.learningEcho = null;
@@ -2580,6 +2590,7 @@ export class Game {
     this.enemies = [];
     this.projectiles = [];
     this.lasers = [];
+    this.projectileImpacts = [];
     this.particles = [];
     this.targetId = null;
     this.supplyPod = null;
@@ -3066,6 +3077,13 @@ export class Game {
       laser.life -= dt;
     }
     this.lasers = this.lasers.filter((laser) => laser.life > 0);
+
+    for (const impact of this.projectileImpacts) {
+      impact.life -= dt;
+    }
+    this.projectileImpacts = this.projectileImpacts.filter(
+      (impact) => impact.life > 0,
+    );
 
     for (const particle of this.particles) {
       particle.life -= dt;
@@ -4537,19 +4555,29 @@ export class Game {
     this.gainPower(2.5);
     this.applyCharacterCorrectKeyPassive();
 
+    // An intercept must read differently from a normal enemy hit: bright
+    // laser tracer plus a persistent cyan shield-break ring and sparks.
     this.lasers.push({
       x1: this.width / 2,
       y1: this.height - PLAYER_Y_OFFSET,
       x2: projectile.x,
       y2: projectile.y,
-      life: 0.09,
-      maxLife: 0.09,
-      power: 0.9,
+      life: 0.18,
+      maxLife: 0.18,
+      power: 1.35,
     });
-
-    this.burst(projectile.x, projectile.y, 13, 342);
-    // Player interception is a gameplay laser shot, not the generic hit SFX
-    // and not English pronunciation. One-letter bullets resolve in one hit.
+    this.projectileImpacts.push({
+      x: projectile.x,
+      y: projectile.y,
+      life: 0.34,
+      maxLife: 0.34,
+      radius: Math.max(15, projectile.radius * 1.4),
+    });
+    if (this.projectileImpacts.length > 12) this.projectileImpacts.shift();
+    this.burst(projectile.x, projectile.y, 28, 190);
+    if (this.settings.screenShake) this.shake = Math.max(this.shake, 1.15);
+    // Dedicated short laser + shatter sound; normal English pronunciation
+    // and its audio priority remain untouched.
     this.sfx.projectileIntercept();
     this.emitStats();
   }
@@ -6534,6 +6562,7 @@ export class Game {
     }
     this.drawLasers(time);
     this.drawParticles();
+    this.drawProjectileImpacts();
 
     for (const projectile of this.projectiles) {
       this.drawProjectile(projectile);
@@ -6967,6 +6996,43 @@ export class Game {
       context.fill();
     }
 
+    context.restore();
+  }
+
+  private drawProjectileImpacts(): void {
+    if (this.projectileImpacts.length === 0) return;
+    const context = this.context;
+    const glow = qualityProfile(this.settings.visualQuality).glowScale;
+    context.save();
+    context.globalCompositeOperation = "lighter";
+    for (const impact of this.projectileImpacts) {
+      const fade = clamp(impact.life / impact.maxLife, 0, 1);
+      const progress = 1 - fade;
+      const radius = impact.radius * (0.65 + progress * 1.75);
+      context.globalAlpha = Math.max(0, fade * 0.95);
+      context.shadowBlur = Math.max(5, 22 * glow);
+      context.shadowColor = "#6af2ff";
+      context.strokeStyle = "#98fcff";
+      context.lineWidth = 2.8 * fade + 0.7;
+      context.beginPath();
+      context.arc(impact.x, impact.y, radius, 0, Math.PI * 2);
+      context.stroke();
+
+      // A four-point cyan shatter remains visible after the fast tracer.
+      context.lineWidth = 2.2 * fade + 0.5;
+      context.strokeStyle = "#e4ffff";
+      context.beginPath();
+      const arm = radius + 8 * fade;
+      context.moveTo(impact.x - arm, impact.y);
+      context.lineTo(impact.x - radius * 0.45, impact.y);
+      context.moveTo(impact.x + radius * 0.45, impact.y);
+      context.lineTo(impact.x + arm, impact.y);
+      context.moveTo(impact.x, impact.y - arm);
+      context.lineTo(impact.x, impact.y - radius * 0.45);
+      context.moveTo(impact.x, impact.y + radius * 0.45);
+      context.lineTo(impact.x, impact.y + arm);
+      context.stroke();
+    }
     context.restore();
   }
 
