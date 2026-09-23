@@ -635,6 +635,63 @@ export function mountTestLab(
     dialog.querySelector<HTMLElement>('[data-role="m22-manual-gate"]')!;
   const manualGate = mountM22ManualGate(manualGateRoot, {
     showNotice: (message) => options.showNotice?.("Test Lab · " + message),
+    captureEvidence: (rowId) => {
+      const snapshot = game?.getTestLabSnapshot() ?? null;
+      const performance = game?.getPerformanceReport() ?? null;
+      const musicSnapshot = music?.getDebugSnapshot() ?? null;
+      const settings = options.getSettings();
+      const runtime =
+        snapshot === null
+          ? "runtime=not-started"
+          : [
+              "phase=" + snapshot.phase,
+              "runtimeStage=" + String(snapshot.stage ?? "none"),
+              "enemies=" + String(snapshot.enemies.length),
+              "projectiles=" + String(snapshot.projectiles),
+              "particles=" + String(snapshot.particles),
+              "boss=" + (snapshot.boss?.name ?? "none"),
+            ].join(",");
+      const performanceText =
+        performance === null
+          ? "perf=not-started"
+          : [
+              "samples=" + String(performance.samples),
+              "avgFps=" + performance.averageFps.toFixed(1),
+              "avgMs=" + performance.averageFrameMs.toFixed(2),
+              "p95Ms=" + performance.p95FrameMs.toFixed(2),
+              "slowRatio=" + performance.slowFrameRatio.toFixed(3),
+            ].join(",");
+      const musicText =
+        musicSnapshot === null
+          ? "music=not-started"
+          : [
+              "music=" + musicSnapshot.state,
+              "musicWorld=" + musicSnapshot.worldId,
+              "duck=" +
+                (musicSnapshot.duckReasons.length > 0
+                  ? musicSnapshot.duckReasons.join("+")
+                  : "none"),
+              "activeMusic=" +
+                (musicSnapshot.activeMusic?.assetId ?? "none"),
+              "retiringMusic=" +
+                String(musicSnapshot.retiringMusic.length),
+              "ambient=" + String(musicSnapshot.activeAmbient.length),
+            ].join(",");
+      return [
+        "evidence=" + rowId,
+        "stage=" + String(session.stage),
+        "checkpoint=" + String(session.checkpointStage),
+        "quality=" + settings.visualQuality,
+        "viewport=" +
+          String(window.innerWidth) +
+          "x" +
+          String(window.innerHeight),
+        "dpr=" + String(window.devicePixelRatio),
+        runtime,
+        performanceText,
+        musicText,
+      ].join(" · ");
+    },
   });
 
   const canvas = dialog.querySelector<HTMLCanvasElement>('[data-role="canvas"]')!;

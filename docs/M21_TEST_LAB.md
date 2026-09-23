@@ -399,9 +399,11 @@ The recorder:
 - mirrors all 43 rows in `docs/M22_MANUAL_PLAYTEST_MATRIX.md`;
 - records PASS / FAIL / PENDING plus notes;
 - supports one default browser/device and a per-row device override;
-- stores only manual QA observations under `spaceTypingM22ManualGateV1`;
+- stores only manual QA observations under `spaceTypingM22ManualGateV2` and migrates V1 recorder data;
+- captures compact evidence from the production FrameProfiler, Test Lab runtime collections and MusicController debug state;
+- requires explicit attestations for real audio output, High/Ultra real-browser observation and low/mid/high human-paced typing before reporting a COMPLETE CANDIDATE;
 - exports a paste-ready Markdown report;
 - never writes PlayerSave or any Campaign/checkpoint/crash/reward/equipment/Relic state.
 
-It is a recording aid only. It cannot replace the real browser, audio-device and human-paced checks required to close M22.
+It is a recording/evidence aid only. It cannot replace the real browser, audio-device and human-paced checks required to close M22.
 

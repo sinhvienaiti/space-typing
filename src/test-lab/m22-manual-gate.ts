@@ -14,10 +14,17 @@ export type M22ManualGateRowResult = {
   notes: string;
 };
 
+export type M22ManualGateAttestations = {
+  realAudioOutput: boolean;
+  realHighUltraBrowser: boolean;
+  humanLowMidHigh: boolean;
+};
+
 export type M22ManualGateState = {
-  version: 1;
+  version: 2;
   browserDevice: string;
   updatedAt: string | null;
+  attestations: M22ManualGateAttestations;
   rows: Record<string, M22ManualGateRowResult>;
 };
 
@@ -26,11 +33,13 @@ export type M22ManualGateSummary = {
   pass: number;
   fail: number;
   pending: number;
+  attestationsComplete: boolean;
   complete: boolean;
 };
 
 export type M22ManualGateMountOptions = {
   showNotice?(message: string): void;
+  captureEvidence?(rowId: string): string | null;
 };
 
 export type M22ManualGateController = {
@@ -39,6 +48,8 @@ export type M22ManualGateController = {
 };
 
 export const M22_MANUAL_GATE_STORAGE_KEY =
+  "spaceTypingM22ManualGateV2";
+const M22_MANUAL_GATE_LEGACY_STORAGE_KEY =
   "spaceTypingM22ManualGateV1";
 
 export const M22_MANUAL_GATE_ROWS: readonly M22ManualGateRow[] = [
@@ -358,6 +369,14 @@ function emptyRowResult(): M22ManualGateRowResult {
   };
 }
 
+function emptyAttestations(): M22ManualGateAttestations {
+  return {
+    realAudioOutput: false,
+    realHighUltraBrowser: false,
+    humanLowMidHigh: false,
+  };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -372,11 +391,16 @@ function stringValue(value: unknown, maxLength: number): string {
     : "";
 }
 
+function booleanValue(value: unknown): boolean {
+  return value === true;
+}
+
 export function createM22ManualGateState(): M22ManualGateState {
   return {
-    version: 1,
+    version: 2,
     browserDevice: "",
     updatedAt: null,
+    attestations: emptyAttestations(),
     rows: Object.fromEntries(
       M22_MANUAL_GATE_ROWS.map((row) => [row.id, emptyRowResult()]),
     ),
@@ -387,13 +411,24 @@ export function sanitizeM22ManualGateState(
   value: unknown,
 ): M22ManualGateState {
   const state = createM22ManualGateState();
-  if (!isRecord(value) || value.version !== 1) return state;
+  if (!isRecord(value)) return state;
+  if (value.version !== 1 && value.version !== 2) return state;
 
   state.browserDevice = stringValue(value.browserDevice, 240);
   state.updatedAt =
     typeof value.updatedAt === "string"
       ? value.updatedAt.slice(0, 80)
       : null;
+
+  if (value.version === 2 && isRecord(value.attestations)) {
+    state.attestations = {
+      realAudioOutput: booleanValue(value.attestations.realAudioOutput),
+      realHighUltraBrowser: booleanValue(
+        value.attestations.realHighUltraBrowser,
+      ),
+      humanLowMidHigh: booleanValue(value.attestations.humanLowMidHigh),
+    };
+  }
 
   const rows = isRecord(value.rows) ? value.rows : {};
   for (const row of M22_MANUAL_GATE_ROWS) {
@@ -427,13 +462,22 @@ export function m22ManualGateSummary(
     const rowDevice = state.rows[row.id]?.browserDevice.trim() ?? "";
     return (rowDevice || state.browserDevice.trim()).length > 0;
   });
+  const attestationsComplete =
+    state.attestations.realAudioOutput &&
+    state.attestations.realHighUltraBrowser &&
+    state.attestations.humanLowMidHigh;
 
   return {
     total: M22_MANUAL_GATE_ROWS.length,
     pass,
     fail,
     pending,
-    complete: fail === 0 && pending === 0 && allRowsHaveDevice,
+    attestationsComplete,
+    complete:
+      fail === 0 &&
+      pending === 0 &&
+      allRowsHaveDevice &&
+      attestationsComplete,
   };
 }
 
@@ -447,6 +491,10 @@ function statusLabel(status: M22ManualGateStatus): string {
   if (status === "pass") return "PASS";
   if (status === "fail") return "FAIL";
   return "PENDING";
+}
+
+function attestationLabel(value: boolean): string {
+  return value ? "YES" : "NO";
 }
 
 export function m22ManualGateMarkdown(
@@ -468,6 +516,12 @@ export function m22ManualGateMarkdown(
       " PENDING / " +
       String(summary.total) +
       " total",
+    "- Real audio output heard: " +
+      attestationLabel(state.attestations.realAudioOutput),
+    "- High + Ultra observed in a real browser: " +
+      attestationLabel(state.attestations.realHighUltraBrowser),
+    "- Low + mid + high WPM human-paced runs performed: " +
+      attestationLabel(state.attestations.humanLowMidHigh),
     "",
   ];
 
@@ -518,10 +572,17 @@ export function m22ManualGateMarkdown(
 
 function loadStoredState(): M22ManualGateState {
   try {
-    const raw = localStorage.getItem(M22_MANUAL_GATE_STORAGE_KEY);
-    return raw === null
+    const current = localStorage.getItem(M22_MANUAL_GATE_STORAGE_KEY);
+    if (current !== null) {
+      return sanitizeM22ManualGateState(JSON.parse(current));
+    }
+
+    const legacy = localStorage.getItem(
+      M22_MANUAL_GATE_LEGACY_STORAGE_KEY,
+    );
+    return legacy === null
       ? createM22ManualGateState()
-      : sanitizeM22ManualGateState(JSON.parse(raw));
+      : sanitizeM22ManualGateState(JSON.parse(legacy));
   } catch {
     return createM22ManualGateState();
   }
@@ -555,6 +616,29 @@ function copyText(text: string): Promise<void> {
   return Promise.resolve();
 }
 
+function detectedBrowserDevice(): string {
+  const viewport =
+    String(window.innerWidth) + "x" + String(window.innerHeight);
+  const dpr = Number.isFinite(window.devicePixelRatio)
+    ? Math.round(window.devicePixelRatio * 100) / 100
+    : 1;
+  return (
+    navigator.userAgent +
+    " · viewport " +
+    viewport +
+    " · DPR " +
+    String(dpr)
+  ).slice(0, 240);
+}
+
+function appendEvidence(notes: string, evidence: string): string {
+  const next =
+    notes.trim().length === 0
+      ? evidence
+      : notes.trimEnd() + " · " + evidence;
+  return next.slice(0, 4000);
+}
+
 export function mountM22ManualGate(
   root: HTMLElement,
   options: M22ManualGateMountOptions = {},
@@ -572,9 +656,36 @@ export function mountM22ManualGate(
   browserLabel.textContent = "Default browser / device";
   const browserInput = document.createElement("input");
   browserInput.type = "text";
-  browserInput.placeholder = "Chrome 151 · macOS · speakers/headphones";
+  browserInput.placeholder = detectedBrowserDevice();
   browserInput.value = state.browserDevice;
   browserLabel.append(browserInput);
+
+  const detectedButton = document.createElement("button");
+  detectedButton.type = "button";
+  detectedButton.textContent = "Use Detected Browser / Device";
+
+  const attestationTitle = document.createElement("strong");
+  attestationTitle.textContent = "Required human attestations";
+
+  const attestationGrid = document.createElement("div");
+  attestationGrid.className = "test-lab-grid";
+  const audioAttestation = attestationCheckbox(
+    "I heard the audio scenarios on a real output device",
+    state.attestations.realAudioOutput,
+  );
+  const visualAttestation = attestationCheckbox(
+    "I observed High and Ultra quality in a real browser",
+    state.attestations.realHighUltraBrowser,
+  );
+  const typingAttestation = attestationCheckbox(
+    "I performed low-, mid- and high-WPM human-paced runs",
+    state.attestations.humanLowMidHigh,
+  );
+  attestationGrid.append(
+    audioAttestation.label,
+    visualAttestation.label,
+    typingAttestation.label,
+  );
 
   const actions = document.createElement("div");
   actions.className = "test-lab-row";
@@ -587,8 +698,15 @@ export function mountM22ManualGate(
   resetButton.type = "button";
   resetButton.textContent = "Reset Recorder";
 
-  actions.append(copyButton, resetButton);
-  root.replaceChildren(intro, summaryNode, browserLabel, actions);
+  actions.append(detectedButton, copyButton, resetButton);
+  root.replaceChildren(
+    intro,
+    summaryNode,
+    browserLabel,
+    attestationTitle,
+    attestationGrid,
+    actions,
+  );
 
   const sectionNodes = new Map<string, HTMLElement>();
   const sectionSummaries = new Map<string, HTMLElement>();
@@ -596,6 +714,11 @@ export function mountM22ManualGate(
   function persist(): void {
     state.updatedAt = new Date().toISOString();
     state.browserDevice = browserInput.value.slice(0, 240);
+    state.attestations = {
+      realAudioOutput: audioAttestation.input.checked,
+      realHighUltraBrowser: visualAttestation.input.checked,
+      humanLowMidHigh: typingAttestation.input.checked,
+    };
     storeState(state);
     renderSummary();
   }
@@ -611,7 +734,8 @@ export function mountM22ManualGate(
       String(summary.fail) +
       " FAIL · " +
       String(summary.pending) +
-      " PENDING";
+      " PENDING · attestations " +
+      (summary.attestationsComplete ? "3/3" : attestationCount(state) + "/3");
 
     for (const [section, node] of sectionSummaries) {
       const rows = M22_MANUAL_GATE_ROWS.filter(
@@ -672,11 +796,19 @@ export function mountM22ManualGate(
     device.maxLength = 240;
     device.value = result.browserDevice;
 
-    const notes = document.createElement("input");
-    notes.type = "text";
+    const notes = document.createElement("textarea");
     notes.placeholder = "Observed issue / steps / screenshot or audio note";
     notes.maxLength = 4000;
+    notes.rows = 2;
     notes.value = result.notes;
+
+    const rowActions = document.createElement("div");
+    rowActions.className = "test-lab-row";
+    const evidenceButton = document.createElement("button");
+    evidenceButton.type = "button";
+    evidenceButton.textContent = "Capture Runtime Evidence";
+    evidenceButton.disabled = options.captureEvidence === undefined;
+    rowActions.append(evidenceButton);
 
     function updateRow(): void {
       state.rows[row.id] = {
@@ -690,12 +822,33 @@ export function mountM22ManualGate(
     status.addEventListener("change", updateRow);
     device.addEventListener("change", updateRow);
     notes.addEventListener("change", updateRow);
+    evidenceButton.addEventListener("click", () => {
+      const evidence = options.captureEvidence?.(row.id) ?? null;
+      if (evidence === null || evidence.length === 0) {
+        options.showNotice?.(
+          "Start the Test Lab runtime before capturing M22 evidence",
+        );
+        return;
+      }
+      notes.value = appendEvidence(notes.value, evidence);
+      updateRow();
+      options.showNotice?.("M22 runtime evidence captured · " + row.scenario);
+    });
 
-    container.append(scenario, status, device, notes);
+    container.append(scenario, status, device, notes, rowActions);
     section.append(container);
   }
 
   browserInput.addEventListener("change", persist);
+  audioAttestation.input.addEventListener("change", persist);
+  visualAttestation.input.addEventListener("change", persist);
+  typingAttestation.input.addEventListener("change", persist);
+
+  detectedButton.addEventListener("click", () => {
+    browserInput.value = detectedBrowserDevice();
+    persist();
+    options.showNotice?.("Detected browser/device recorded");
+  });
 
   copyButton.addEventListener("click", () => {
     persist();
@@ -716,6 +869,9 @@ export function mountM22ManualGate(
     }
     state = createM22ManualGateState();
     browserInput.value = "";
+    audioAttestation.input.checked = false;
+    visualAttestation.input.checked = false;
+    typingAttestation.input.checked = false;
     storeState(state);
     root.querySelectorAll<HTMLSelectElement>("select").forEach((select) => {
       select.value = "pending";
@@ -723,6 +879,11 @@ export function mountM22ManualGate(
     root.querySelectorAll<HTMLInputElement>('input[type="text"]').forEach(
       (input) => {
         if (input !== browserInput) input.value = "";
+      },
+    );
+    root.querySelectorAll<HTMLTextAreaElement>("textarea").forEach(
+      (textarea) => {
+        textarea.value = "";
       },
     );
     renderSummary();
@@ -739,6 +900,29 @@ export function mountM22ManualGate(
       root.replaceChildren();
     },
   };
+}
+
+function attestationCheckbox(
+  labelText: string,
+  checked: boolean,
+): { label: HTMLLabelElement; input: HTMLInputElement } {
+  const label = document.createElement("label");
+  label.className = "test-lab-check";
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.checked = checked;
+  const text = document.createElement("span");
+  text.textContent = labelText;
+  label.append(input, text);
+  return { label, input };
+}
+
+function attestationCount(state: M22ManualGateState): number {
+  return [
+    state.attestations.realAudioOutput,
+    state.attestations.realHighUltraBrowser,
+    state.attestations.humanLowMidHigh,
+  ].filter(Boolean).length;
 }
 
 function optionForStatus(

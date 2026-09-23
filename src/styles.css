@@ -1998,7 +1998,8 @@ kbd {
 }
 
 .test-lab-grid input,
-.test-lab-grid select {
+.test-lab-grid select,
+.test-lab-grid textarea {
   width: 100%;
   min-width: 0;
   padding: 7px 8px;
@@ -2006,6 +2007,13 @@ kbd {
   border-radius: 8px;
   color: #e8faff;
   background: #07111d;
+}
+
+.test-lab-grid textarea {
+  min-height: 58px;
+  resize: vertical;
+  font: inherit;
+  line-height: 1.4;
 }
 
 .test-lab-grid .test-lab-check {
