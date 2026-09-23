@@ -22,8 +22,15 @@ import {
   restoreCheckpointSnapshot,
 } from "../persistence/checkpoint";
 import {
+  consumePhoenixCore,
   resolveSalvageAnchor,
+  resolveStageRevivalCore,
 } from "../persistence/death-protection";
+import {
+  captureCrashRecoverySnapshot,
+  invalidateCrashRecoverySnapshot,
+  resolveCrashRecovery,
+} from "../persistence/crash-recovery";
 import {
   addItem,
   removeItem,
@@ -39,6 +46,7 @@ import {
 import type { EnemyDefinitionId } from "../enemies/registry";
 import type { EnemySkillId } from "../enemies/skills";
 import type { StatusId } from "../status/engine";
+import type { SupportSpellId } from "../skills/support";
 import {
   worldForStage,
 } from "../worlds/registry";
@@ -170,6 +178,17 @@ function snapshotText(
         checkpointStage: session.checkpointStage,
         currencies: currencyText(session),
         inventory: session.state.inventory,
+        campaignExpansion: session.campaignExpansion,
+        stageEntrySnapshot: {
+          stage: session.stageEntrySnapshot.stage,
+          capturedAt: session.stageEntrySnapshot.capturedAt,
+        },
+        crashRecoverySnapshot: {
+          stage: session.crashRecoverySnapshot.state.campaign.selectedStage,
+          savedAt: session.crashRecoverySnapshot.savedAt,
+          reason: session.crashRecoverySnapshot.reason,
+          deathInvalidated: session.crashRecoverySnapshot.deathInvalidated,
+        },
       },
       music:
         music === null
@@ -273,6 +292,18 @@ export function mountTestLab(
           </div>
         </details>
 
+        <details>
+          <summary>Death / Recovery Acceptance</summary>
+          <div class="test-lab-row">
+            <button type="button" data-action="capture-crash">Capture Crash Snapshot</button>
+            <button type="button" data-action="recover-crash">Recover Crash</button>
+            <button type="button" data-action="death-no-item">Death · No Item</button>
+            <button type="button" data-action="salvage-anchor">Death · Salvage Anchor</button>
+            <button type="button" data-action="stage-revival">Death · Stage Revival Core</button>
+            <button type="button" data-action="phoenix-revive">Phoenix Core · Revive Encounter</button>
+          </div>
+        </details>
+
         <details open>
           <summary>Enemy Runtime</summary>
           <div class="test-lab-grid">
@@ -291,6 +322,8 @@ export function mountTestLab(
             <button type="button" data-action="spawn-enemy">Spawn Selected</button>
             <button type="button" data-action="spawn-world-roster">Spawn World Roster</button>
             <button type="button" data-action="force-enemy-skill">Force Skill</button>
+            <button type="button" data-action="force-word">Force Word / Next Layer</button>
+            <button type="button" data-action="kill-enemy">Kill Selected</button>
             <button type="button" data-action="clear-enemies">Clear Enemies</button>
           </div>
         </details>
@@ -330,6 +363,29 @@ export function mountTestLab(
             <button type="button" data-action="damage-lethal">Force Lethal</button>
             <button type="button" data-action="apply-status">Apply Status</button>
             <button type="button" data-action="clear-status">Clear Statuses</button>
+          </div>
+        </details>
+
+        <details>
+          <summary>Skills / Time / Scheduler</summary>
+          <div class="test-lab-grid">
+            <label>Player skill<select data-field="player-skill"></select></label>
+            <label>Time scale<select data-field="time-scale">
+              <option value="0.25">0.25×</option>
+              <option value="0.5">0.5×</option>
+              <option value="1" selected>1×</option>
+              <option value="2">2×</option>
+              <option value="4">4×</option>
+            </select></label>
+            <label class="test-lab-check"><input data-field="scheduler-frozen" type="checkbox"> Freeze auto spawn scheduler</label>
+          </div>
+          <div class="test-lab-row">
+            <button type="button" data-action="use-player-skill">Force Skill Activation</button>
+            <button type="button" data-action="reset-skill-cooldowns">Reset Skill Cooldowns</button>
+            <button type="button" data-action="apply-time">Apply Time / Scheduler</button>
+            <button type="button" data-action="step-scheduler">Step Scheduler Once</button>
+            <button type="button" data-action="clear-projectiles">Clear Projectiles</button>
+            <button type="button" data-action="clear-particles">Clear Particles</button>
           </div>
         </details>
 
@@ -412,6 +468,8 @@ export function mountTestLab(
     dialog.querySelector<HTMLSelectElement>('[data-field="status"]')!;
   const itemSelect =
     dialog.querySelector<HTMLSelectElement>('[data-field="item"]')!;
+  const playerSkillSelect =
+    dialog.querySelector<HTMLSelectElement>('[data-field="player-skill"]')!;
   const musicStateSelect =
     dialog.querySelector<HTMLSelectElement>('[data-field="music-state"]')!;
 
@@ -470,6 +528,19 @@ export function mountTestLab(
       value: item.id,
       label: item.name + " · " + item.category,
     })),
+  );
+  setOptions(
+    playerSkillSelect,
+    [
+      ...registry.playerSkills.map((id) => ({
+        value: id,
+        label: "Core · " + id,
+      })),
+      ...registry.supportSpells.map((id) => ({
+        value: id,
+        label: "Support · " + id,
+      })),
+    ],
   );
   setOptions(
     musicStateSelect,
@@ -767,6 +838,21 @@ export function mountTestLab(
     dialog.querySelector<HTMLInputElement>('[data-field="checkpoint"]')!.value =
       String(stage);
   });
+
+  function syncScenarioInputsFromSession(): void {
+    dialog.querySelector<HTMLInputElement>('[data-field="stage"]')!.value =
+      String(session.stage);
+    dialog.querySelector<HTMLInputElement>('[data-field="checkpoint"]')!.value =
+      String(session.checkpointStage);
+    dialog.querySelector<HTMLInputElement>('[data-field="credits"]')!.value =
+      String(session.state.credits);
+    dialog.querySelector<HTMLInputElement>('[data-field="alloy"]')!.value =
+      String(session.state.expansionCurrencies.alloy);
+    dialog.querySelector<HTMLInputElement>('[data-field="star-crystal"]')!.value =
+      String(session.state.expansionCurrencies.starCrystal);
+    dialog.querySelector<HTMLInputElement>('[data-field="quantum-core"]')!.value =
+      String(session.state.expansionCurrencies.quantumCore);
+  }
 
   dialog.addEventListener("click", (event) => {
     const target = (event.target as HTMLElement).closest<HTMLButtonElement>(
