@@ -28,7 +28,7 @@ describe("M22 manual gate recorder", () => {
     );
   });
 
-  it("sanitizes stored QA data without accepting unknown status or rows", () => {
+  it("migrates the legacy v1 recorder without inventing human attestations", () => {
     const state = sanitizeM22ManualGateState({
       version: 1,
       browserDevice: "Chrome · Mac",
@@ -51,8 +51,13 @@ describe("M22 manual gate recorder", () => {
       },
     });
 
-    expect(state.version).toBe(1);
+    expect(state.version).toBe(2);
     expect(state.browserDevice).toBe("Chrome · Mac");
+    expect(state.attestations).toEqual({
+      realAudioOutput: false,
+      realHighUltraBrowser: false,
+      humanLowMidHigh: false,
+    });
     expect(state.rows["difficulty-relax"]).toEqual({
       status: "pass",
       browserDevice: "Chrome · Mac",
@@ -66,10 +71,45 @@ describe("M22 manual gate recorder", () => {
     expect(state.rows["unknown-row"]).toBeUndefined();
   });
 
-  it("rejects a future incompatible recorder schema", () => {
+  it("sanitizes v2 attestations and row values", () => {
     const state = sanitizeM22ManualGateState({
       version: 2,
+      browserDevice: "Firefox · Linux",
+      attestations: {
+        realAudioOutput: true,
+        realHighUltraBrowser: "yes",
+        humanLowMidHigh: true,
+      },
+      rows: {
+        "visual-high": {
+          status: "pass",
+          browserDevice: "",
+          notes: "No obscured text",
+        },
+      },
+    });
+
+    expect(state.attestations).toEqual({
+      realAudioOutput: true,
+      realHighUltraBrowser: false,
+      humanLowMidHigh: true,
+    });
+    expect(state.rows["visual-high"]).toEqual({
+      status: "pass",
+      browserDevice: "",
+      notes: "No obscured text",
+    });
+  });
+
+  it("rejects a future incompatible recorder schema", () => {
+    const state = sanitizeM22ManualGateState({
+      version: 3,
       browserDevice: "should not carry",
+      attestations: {
+        realAudioOutput: true,
+        realHighUltraBrowser: true,
+        humanLowMidHigh: true,
+      },
       rows: {
         "difficulty-relax": {
           status: "pass",
@@ -79,15 +119,10 @@ describe("M22 manual gate recorder", () => {
       },
     });
 
-    expect(state.browserDevice).toBe("");
-    expect(state.rows["difficulty-relax"]).toEqual({
-      status: "pending",
-      browserDevice: "",
-      notes: "",
-    });
+    expect(state).toEqual(createM22ManualGateState());
   });
 
-  it("requires every row to pass before the manual gate is complete", () => {
+  it("requires rows, device evidence and all human attestations before completion", () => {
     const state = createM22ManualGateState();
     const initial = m22ManualGateSummary(state);
 
@@ -96,6 +131,7 @@ describe("M22 manual gate recorder", () => {
       pass: 0,
       fail: 0,
       pending: 43,
+      attestationsComplete: false,
       complete: false,
     });
 
@@ -113,6 +149,22 @@ describe("M22 manual gate recorder", () => {
       pass: 43,
       fail: 0,
       pending: 0,
+      attestationsComplete: false,
+      complete: false,
+    });
+
+    state.attestations = {
+      realAudioOutput: true,
+      realHighUltraBrowser: true,
+      humanLowMidHigh: true,
+    };
+
+    expect(m22ManualGateSummary(state)).toEqual({
+      total: 43,
+      pass: 43,
+      fail: 0,
+      pending: 0,
+      attestationsComplete: true,
       complete: true,
     });
 
@@ -124,10 +176,15 @@ describe("M22 manual gate recorder", () => {
     expect(m22ManualGateSummary(state).complete).toBe(false);
   });
 
-  it("exports a paste-ready markdown report with observations", () => {
+  it("exports observations and explicit human attestations in markdown", () => {
     const state = createM22ManualGateState();
     state.browserDevice = "Chrome 151 | macOS";
     state.updatedAt = "2026-09-23T03:00:00.000Z";
+    state.attestations = {
+      realAudioOutput: true,
+      realHighUltraBrowser: true,
+      humanLowMidHigh: false,
+    };
     state.rows["visual-ultra"] = {
       status: "fail",
       browserDevice: "Safari · MacBook",
@@ -138,6 +195,13 @@ describe("M22 manual gate recorder", () => {
 
     expect(report).toContain(
       "Browser/device: Chrome 151 | macOS",
+    );
+    expect(report).toContain("Real audio output heard: YES");
+    expect(report).toContain(
+      "High + Ultra observed in a real browser: YES",
+    );
+    expect(report).toContain(
+      "Low + mid + high WPM human-paced runs performed: NO",
     );
     expect(report).toContain(
       "| Ultra quality | high-DPI display | acceptable frame pacing; no runaway particles | Safari · MacBook | FAIL | stutter \\| visible on boss phase |",
