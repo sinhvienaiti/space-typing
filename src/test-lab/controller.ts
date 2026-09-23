@@ -193,6 +193,7 @@ function snapshotText(
   return JSON.stringify(
     {
       sandbox: {
+        world: worldForStage(session.stage),
         stage: session.stage,
         checkpointStage: session.checkpointStage,
         currencies: currencyText(session),
@@ -311,8 +312,11 @@ export function mountTestLab(
           </div>
           <div class="test-lab-row">
             <button type="button" data-action="commit-scenario">Apply Scenario State</button>
+            <button type="button" data-action="world-normal">Start World Stage</button>
+            <button type="button" data-action="world-mini-boss">Mini Boss</button>
+            <button type="button" data-action="world-boss">World Boss</button>
+            <button type="button" data-action="galaxy-boss">Galaxy Boss</button>
             <button type="button" data-action="return-checkpoint">Return to Checkpoint</button>
-            <button type="button" data-action="salvage-anchor">Use Salvage Anchor</button>
           </div>
         </details>
 
@@ -1035,6 +1039,36 @@ export function mountTestLab(
       applyScenarioInputs();
       game?.testLabSetDeathMode(session.deathMode);
       notice("sandbox scenario applied");
+      return;
+    }
+    if (
+      action === "world-normal" ||
+      action === "world-mini-boss" ||
+      action === "world-boss" ||
+      action === "galaxy-boss"
+    ) {
+      const world =
+        registry.worlds.find((entry) => entry.id === worldSelect.value) ??
+        registry.worlds[0]!;
+      const stage =
+        action === "world-mini-boss"
+          ? world.stageStart + 9
+          : action === "world-boss"
+            ? world.stageEnd
+            : action === "galaxy-boss"
+              ? world.galaxy * 100
+              : world.stageStart;
+      dialog.querySelector<HTMLInputElement>('[data-field="stage"]')!.value =
+        String(stage);
+      dialog.querySelector<HTMLInputElement>('[data-field="checkpoint"]')!.value =
+        String(stage);
+      startArena();
+      if (action !== "world-normal") {
+        window.setTimeout(() => {
+          game?.testLabSpawnBoss();
+          renderInspector();
+        }, 0);
+      }
       return;
     }
     if (action === "return-checkpoint") {
