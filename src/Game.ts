@@ -3315,6 +3315,56 @@ export class Game {
     }
   }
 
+  private createRecallBonusTarget(
+    entry?: VocabularyEntry,
+  ): RecallBonusTarget | null {
+    const candidates = this.vocabulary.filter(eligibleRecallBonusEntry);
+    const source = entry !== undefined && eligibleRecallBonusEntry(entry)
+      ? [entry]
+      : candidates;
+    const selected =
+      source[Math.floor(Math.random() * source.length)] ??
+      candidates[0] ??
+      null;
+    if (selected === null) return null;
+
+    return {
+      entry: selected,
+      typed: 0,
+      hintIndices: pickRecallBonusHintIndices(selected.en),
+      x: this.width + 54,
+      y: randomBetween(120, Math.max(160, this.height * 0.4)),
+      speed: randomBetween(58, 72),
+      age: 0,
+      lifetime: 21,
+    };
+  }
+
+  private spawnRecallBonus(entry?: VocabularyEntry): boolean {
+    const target = this.createRecallBonusTarget(entry);
+    if (target === null) {
+      this.recallBonusPending = false;
+      return false;
+    }
+    this.recallBonus = target;
+    this.sfx.supplyArrival();
+    return true;
+  }
+
+  private updateRecallBonus(dt: number): void {
+    const target = this.recallBonus;
+    if (target === null) return;
+
+    target.age += dt;
+    target.x -= target.speed * dt;
+    if (
+      target.age >= target.lifetime ||
+      target.x < -86
+    ) {
+      this.recallBonus = null;
+    }
+  }
+
   private spawnRewardChoiceCrate(): void {
     const entry = rewardChoiceWord(this.vocabulary);
     if (entry === null) {
