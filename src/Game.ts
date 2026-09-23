@@ -7083,6 +7083,8 @@ export class Game {
     context.textAlign = "center";
     context.textBaseline = "middle";
 
+    context.font =
+      "800 15px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.fillStyle = "rgba(5, 9, 17, 0.9)";
     const maskWidth = Math.min(
       300,
@@ -7092,8 +7094,6 @@ export class Game {
     context.fillStyle = "#f5f3ff";
     context.shadowBlur = 7;
     context.shadowColor = "#ae80ff";
-    context.font =
-      "800 15px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.fillText(mask, x, y - 42);
 
     context.shadowBlur = 0;
