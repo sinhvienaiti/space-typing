@@ -389,3 +389,19 @@ Final implementation checkpoint before merge:
 - Vite production build PASS.
 
 The final docs/source-of-truth commit is required to pass the same workflow before PR merge.
+
+## M22 manual-gate extension
+
+M22 extends the existing Test Lab with one QA-only **Manual Gate Recorder**. This is not a second Test Lab and does not change the completed M21 gameplay sandbox architecture.
+
+The recorder:
+
+- mirrors all 43 rows in `docs/M22_MANUAL_PLAYTEST_MATRIX.md`;
+- records PASS / FAIL / PENDING plus notes;
+- supports one default browser/device and a per-row device override;
+- stores only manual QA observations under `spaceTypingM22ManualGateV1`;
+- exports a paste-ready Markdown report;
+- never writes PlayerSave or any Campaign/checkpoint/crash/reward/equipment/Relic state.
+
+It is a recording aid only. It cannot replace the real browser, audio-device and human-paced checks required to close M22.
+
