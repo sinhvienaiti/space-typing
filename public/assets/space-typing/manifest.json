@@ -21,6 +21,16 @@
       "url": "/assets/space-typing/ships/player-ships-v2.svg"
     },
     {
+      "id": "player-ship-sheet-v3",
+      "category": "player",
+      "sourceType": "generated",
+      "source": "Eleven generated premium ship sprites, reviewed 4x3 256px atlas",
+      "author": "Space Typing project",
+      "license": "Project-original generated asset; review provenance before public distribution",
+      "attributionRequired": false,
+      "url": "/assets/space-typing/ships/player-ships-v3.webp"
+    },
+    {
       "id": "enemy-families",
       "category": "enemy",
       "sourceType": "procedural",
