@@ -1,6 +1,6 @@
 # Ship Visual V3 — Performance-First Art Polish Plan
 
-Status: V30/V31 implementation preparation ACTIVE · premium art NOT yet produced
+Status: V30/V31 IMPLEMENTED · V32–V36 PENDING · premium art NOT yet produced
 
 Source of truth: this document + `docs/PROJECT_CONTEXT.md` + existing V2 art/runtime contracts.
 This is an approved, scoped follow-up to C05–C11 in `docs/PRE_M22_COMBAT_IDENTITY_TYPING_CLARITY_PLAN.md`.
@@ -122,6 +122,6 @@ Acceptance: independent silhouette and full-color comparison at 64/78/128 CSS px
 
 ## Execution checkpoints
 
-- V30: source art direction and budgets documented here.
-- V31: implement and test safe asset-preference contract now.
-- V32+: requires actual premium atlas artwork and verified file sizes; **do not mislabel the existing V2 SVG as V3**.
+- V30: 11-ship art direction, exclusion list and hard budgets documented here.
+- V31: implemented `src/characters/ship-art.ts` V3 → V2 → procedural fallback, dimension-validation tests, and `scripts/check-ship-art-budget.mjs` wired to production build. Until a real V3 atlas is registered, **runtime art remains V2**.
+- V32–V36: require actual premium atlas artwork, browser review, verified file/decoded size and paired Test Lab frame timings. **Do not mislabel existing V2 SVG or fallback code as completed V3 art**.
