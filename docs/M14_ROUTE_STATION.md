@@ -41,9 +41,11 @@ Only the current Campaign progression frontier is route-gated.
 
 Replaying an already-unlocked older stage continues to use Stage Select and is not blocked by the current frontier route.
 
-The first explicit route choice for a stage is immutable. Reload/reclick cannot reroll it.
+Interim Route Map UX (before the approved Campaign Map redesign): the player may switch among the current frontier stage's displayed Combat / Shop / Station lanes before pressing Start Encounter. Only one lane is highlighted at a time; switching saves the newly selected lane and replaces the prior pending visit rather than accumulating fake visited lanes. During an in-flight selection save, other lanes and Start Encounter are temporarily disabled. After encounter entry, previous stages remain non-selectable. A reload restores the last saved selection without regenerating the deterministic graph; invalid route IDs are rejected. Purchases and service costs remain persisted independently and cannot be refunded or stock-rerolled by changing lanes.
 
-Mandatory single-node stages auto-resolve and do not require an unnecessary click.
+The underlying `selectRouteNode` helper defaults to immutable first-selection behavior for legacy callers and snapshots. Only the between-encounter UI explicitly opts into reselection. Mandatory single-node stages auto-resolve and do not require an unnecessary click.
+
+This is a transitional usability fix, not completion of `docs/CAMPAIGN_MAP_AND_REST_STOP_REDESIGN.md`. The approved redesign removes routine per-stage Shop/Station lanes entirely and places them at checkpoint rest hubs.
 
 ## Shop and Station reuse
 

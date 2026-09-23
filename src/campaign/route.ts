@@ -454,14 +454,18 @@ export function selectRouteNode(
   stateInput: RouteState,
   stage: number,
   nodeId: string,
+  allowPreEncounterReselection = false,
 ): RouteState {
   const state = sanitizeRouteState(stateInput, stage);
   const existing = selectedRouteNode(state, stage);
-  if (
-    existing !== null &&
-    state.selectedByStage[String(stage)] !== undefined
-  ) {
-    return state;
+  const previousId = state.selectedByStage[String(stage)];
+
+  // Preserve the original immutable choice contract for all callers except
+  // the between-encounter Route Map, where the player may preview another lane.
+  if (existing !== null && previousId !== undefined) {
+    if (!allowPreEncounterReselection || previousId === nodeId) {
+      return state;
+    }
   }
 
   const node = routeChoicesForStage(state, stage).find(
@@ -470,6 +474,10 @@ export function selectRouteNode(
   if (node === undefined) return state;
 
   const visited = new Set(state.visitedNodeIds);
+  if (allowPreEncounterReselection && previousId !== undefined) {
+    // Do not leave the superseded preview marked as a previously visited lane.
+    visited.delete(previousId);
+  }
   visited.add(node.id);
 
   return {

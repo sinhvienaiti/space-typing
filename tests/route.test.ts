@@ -88,6 +88,44 @@ describe("M14 deterministic route graph", () => {
     expect(second.selectedByStage).toEqual(first.selectedByStage);
   });
 
+  it("allows changing the current lane before Start Encounter without duplicating visits", () => {
+    const initial = createRouteState(1);
+    const [combat, station] = routeChoicesForStage(initial, 1);
+    expect(combat).toBeDefined();
+    expect(station).toBeDefined();
+
+    const selected = selectRouteNode(initial, 1, station!.id);
+    const switched = selectRouteNode(selected, 1, combat!.id, true);
+
+    expect(selectedRouteNode(switched, 1)?.id).toBe(combat!.id);
+    expect(switched.selectedByStage["1"]).toBe(combat!.id);
+    expect(switched.visitedNodeIds).toEqual([combat!.id]);
+    expect(switched.graph).toEqual(initial.graph);
+    expect(routeProgress(switched).chosen).toBe(1);
+    expect(routeNeedsChoice(switched, 1)).toBe(false);
+
+    const saved = sanitizeRouteState(
+      JSON.parse(JSON.stringify(switched)),
+      1,
+    );
+    expect(selectedRouteNode(saved, 1)?.id).toBe(combat!.id);
+    expect(selectRouteNode(saved, 1, combat!.id, true)).toEqual(saved);
+  });
+
+  it("does not switch to an invalid or later-stage lane during preview", () => {
+    const state = createRouteState(1);
+    const selected = selectRouteNode(
+      state,
+      1,
+      routeChoicesForStage(state, 1)[0]!.id,
+    );
+    const nextStageNode = routeChoicesForStage(state, 2)[0]!;
+    expect(selectRouteNode(selected, 1, "invalid", true)).toEqual(selected);
+    expect(selectRouteNode(selected, 1, nextStageNode.id, true)).toEqual(
+      selected,
+    );
+  });
+
   it("rejects invalid node ids without mutating selection", () => {
     const state = createRouteState(71);
     const next = selectRouteNode(state, 71, "missing-node");
