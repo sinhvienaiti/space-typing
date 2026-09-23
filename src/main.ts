@@ -1430,7 +1430,6 @@ function currentRunPersistentState(): RunPersistentState {
     inventory,
     equipment,
     supportSpells,
-    hotbar,
     characters,
     luckPity,
     hiddenDiscovery,
@@ -2903,6 +2902,7 @@ const game = new Game(
         activeCharacterId,
         progressAward.progress,
       );
+      renderPlayerStatusIdentity();
 
       const unlockedNames = characterUnlock.unlocked.map(
         (id) => getCharacter(id).name,
