@@ -161,3 +161,7 @@ export function characterVisualProfile(
 ): Readonly<CharacterVisualProfile> {
   return CHARACTER_VISUALS[id];
 }
+
+export function characterShipAssetId(id: CharacterId): string {
+  return "player-ship-" + id;
+}
