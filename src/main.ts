@@ -1306,6 +1306,7 @@ let vocabularyReady = false;
 let equipmentDropCounter = 0;
 let shopPurchaseCounter = 0;
 let currentShopType: ShopType = "black-market";
+let lastHudShield: number | null = null;
 let sourceState = loadSource();
 let sourceTab: "class" | "custom" = sourceState.mode;
 let vocabularyIndex: VocabularyIndex | null = null;
@@ -1619,7 +1620,22 @@ function renderStats(stats: GameStats): void {
   byId("hullDamageFill").style.width = hullPercent.toFixed(2) + "%";
   byId("shieldFill").style.width = shieldPercent.toFixed(2) + "%";
   byId("energyFill").style.width = energyPercent.toFixed(2) + "%";
-  byId("playerStatusHud").classList.toggle("low-hull", hullPercent <= 25);
+  const playerStatusHud = byId("playerStatusHud");
+  if (
+    lastHudShield !== null &&
+    lastHudShield > 0 &&
+    stats.shield <= 0
+  ) {
+    playerStatusHud.classList.remove("shield-break");
+    void playerStatusHud.offsetWidth;
+    playerStatusHud.classList.add("shield-break");
+    window.setTimeout(
+      () => playerStatusHud.classList.remove("shield-break"),
+      420,
+    );
+  }
+  lastHudShield = stats.shield;
+  playerStatusHud.classList.toggle("low-hull", hullPercent <= 25);
   byId("playerStatusHud").classList.toggle("energy-low", energyPercent <= 20);
 
   byId("powerFill").style.width = String(stats.power) + "%";
