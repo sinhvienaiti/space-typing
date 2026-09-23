@@ -604,8 +604,8 @@ app.innerHTML = `
     </div>
 
     <section id="titleOverlay" class="overlay">
-      <div class="main-card">
-        <p class="eyebrow">typing combat // prototype 01</p>
+      <div class="main-card title-main-card">
+        <p class="eyebrow">typing combat // campaign</p>
         <h1>SPACE <span>TYPE</span></h1>
         <p class="intro">
           Lock a target with its first letter, finish the word, and keep the
@@ -614,27 +614,60 @@ app.innerHTML = `
         <p id="titleWorldMeta" class="world-meta">
           World 01 · Rainbow Reach · Stage 001-020
         </p>
-        <div class="actions">
+
+        <div class="title-play-actions">
           <button id="startButton" class="primary">Continue · Stage 001</button>
           <button id="routeButton">Route Map</button>
           <button id="stageSelectButton">Stage Select</button>
-          <button id="vocabularyButton">Vocabulary</button>
-          <button id="characterButton">Characters</button>
-          <button id="equipmentButton">Equipment</button>
-          <button id="shopButton">Normal Shop</button>
-          <button id="stationShopButton">Station Shop</button>
-          <button id="travelingShopButton" class="hidden">Traveling Merchant</button>
-          <button id="serviceShopButton">Repair / Upgrade</button>
-          <button id="blackMarketButton" class="hidden">Black Market</button>
-          <button id="hiddenShopButton" class="hidden">Hidden Shop</button>
-          <button id="eventShopButton" class="hidden">Event Shop</button>
-          <button id="supportButton">Support Spells</button>
-          <button id="codexButton">Codex</button>
-          <button id="ascensionButton" class="hidden">Ascension</button>
-          <button id="progressionButton">Missions</button>
-          <button id="dataButton">Data</button>
-          <button id="settingsButton">Settings</button>
         </div>
+
+        <div class="title-navigation-grid">
+          <section class="title-nav-group" aria-label="Build">
+            <span class="title-group-label">Build</span>
+            <div class="title-group-actions">
+              <button id="characterButton">Characters</button>
+              <button id="equipmentButton">Equipment</button>
+              <button id="supportButton">Support Spells</button>
+              <button id="vocabularyButton">Vocabulary</button>
+            </div>
+          </section>
+
+          <section class="title-nav-group" aria-label="Progress">
+            <span class="title-group-label">Progress</span>
+            <div class="title-group-actions">
+              <button id="progressionButton">Missions</button>
+              <button id="codexButton">Codex</button>
+              <button id="ascensionButton" class="hidden">Ascension</button>
+            </div>
+          </section>
+
+          <section class="title-nav-group" aria-label="System">
+            <span class="title-group-label">System</span>
+            <div class="title-group-actions">
+              <button id="settingsButton">Settings</button>
+              <button id="dataButton">Data</button>
+            </div>
+          </section>
+        </div>
+
+        <details class="title-more">
+          <summary>Shops &amp; Services</summary>
+          <div class="title-more-actions">
+            <button id="shopButton">Normal Shop</button>
+            <button id="stationShopButton">Station Shop</button>
+            <button id="serviceShopButton">Repair / Upgrade</button>
+            <button id="travelingShopButton" class="hidden">Traveling Merchant</button>
+            <button id="blackMarketButton" class="hidden">Black Market</button>
+            <button id="hiddenShopButton" class="hidden">Hidden Shop</button>
+            <button id="eventShopButton" class="hidden">Event Shop</button>
+          </div>
+        </details>
+
+        <details class="title-more title-developer">
+          <summary>Developer</summary>
+          <div class="title-dev-actions"></div>
+        </details>
+
         <div class="hints">
           <span><kbd>ESC</kbd> pause</span>
           <span><kbd>SPACE</kbd> overdrive at 100%</span>
