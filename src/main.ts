@@ -1376,6 +1376,80 @@ let currentGalaxy = Math.ceil(campaign.selectedStage / STAGES_PER_GALAXY);
 let selectedJourneyWorld = Math.ceil(campaign.selectedStage / 20);
 let selectedJourneyStage = campaign.selectedStage;
 
+/** Keyboard-, mouse- and touch-accessible help on existing menu actions.
+ * Existing button IDs and their action listeners remain unchanged. */
+function installMenuHelp(): void {
+  const descriptions: Record<string, [string, string]> = {
+    routeButton: ["Sector route", "Preview the current ten-stage route. Change an available lane before starting combat."],
+    stageSelectButton: ["Campaign Map", "Navigate Worlds, view boss checkpoints and replay stages that are already unlocked."],
+    characterButton: ["Characters", "Choose your pilot and spend character progression upgrades."],
+    equipmentButton: ["Equipment", "Review equipped gear, drops and combat attributes."],
+    supportButton: ["Support Spells", "Assign the support spells available during combat."],
+    hotbarButton: ["Hotbar", "Assign skills and consumables to combat shortcuts."],
+    vocabularyButton: ["Vocabulary", "Select your shared English-learning level or custom list."],
+    progressionButton: ["Missions", "Review progression objectives and claim earned rewards."],
+    codexButton: ["Codex", "See discovered enemies, Worlds and reward records."],
+    settingsButton: ["Settings", "Configure game audio, speech, display quality and controls."],
+    dataButton: ["Data", "Review saves, active stage and combat performance information."],
+    shopButton: ["Normal Shop", "Browse the existing finite-stock shop; purchases are saved."],
+    stationShopButton: ["Station Shop", "Browse maintenance-related items in the station shop."],
+    serviceShopButton: ["Repair and Upgrade", "Repair, improve and manage equipment with available resources."],
+  };
+
+  const wrappers: HTMLElement[] = [];
+  for (const [id, [title, description]] of Object.entries(descriptions)) {
+    const action = byId<HTMLButtonElement>(id);
+    const parent = action.parentElement;
+    if (parent === null) continue;
+    const wrap = document.createElement("div");
+    wrap.className = "menu-help-wrap";
+    const tip = document.createElement("span");
+    tip.className = "menu-help-popup";
+    tip.id = "help-" + id;
+    tip.setAttribute("role", "tooltip");
+    tip.textContent = description;
+
+    const trigger = document.createElement("button");
+    trigger.type = "button";
+    trigger.className = "menu-help-trigger";
+    trigger.setAttribute("aria-label", "About " + title);
+    trigger.setAttribute("aria-describedby", tip.id);
+    trigger.setAttribute("aria-expanded", "false");
+    trigger.textContent = "ⓘ";
+    trigger.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const wasOpen = wrap.dataset.open === "true";
+      for (const other of wrappers) {
+        other.dataset.open = "false";
+        other.querySelector(".menu-help-trigger")?.setAttribute("aria-expanded", "false");
+      }
+      wrap.dataset.open = String(!wasOpen);
+      trigger.setAttribute("aria-expanded", String(!wasOpen));
+    });
+    parent.insertBefore(wrap, action);
+    wrap.append(action, trigger, tip);
+    wrappers.push(wrap);
+    action.title = description; // Native fallback if the tooltip is unavailable.
+  }
+
+  document.addEventListener("click", (event) => {
+    if ((event.target as Element).closest(".menu-help-wrap") !== null) return;
+    for (const wrap of wrappers) {
+      wrap.dataset.open = "false";
+      wrap.querySelector(".menu-help-trigger")?.setAttribute("aria-expanded", "false");
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    for (const wrap of wrappers) {
+      wrap.dataset.open = "false";
+      wrap.querySelector(".menu-help-trigger")?.setAttribute("aria-expanded", "false");
+    }
+  });
+}
+
+installMenuHelp();
+
 const titleOverlay = byId("titleOverlay");
 const pauseOverlay = byId("pauseOverlay");
 const gameOverOverlay = byId("gameOverOverlay");
