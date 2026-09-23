@@ -10,6 +10,7 @@ export type M22ManualGateRow = {
 
 export type M22ManualGateRowResult = {
   status: M22ManualGateStatus;
+  browserDevice: string;
   notes: string;
 };
 
@@ -352,6 +353,7 @@ export const M22_MANUAL_GATE_ROWS: readonly M22ManualGateRow[] = [
 function emptyRowResult(): M22ManualGateRowResult {
   return {
     status: "pending",
+    browserDevice: "",
     notes: "",
   };
 }
@@ -385,7 +387,7 @@ export function sanitizeM22ManualGateState(
   value: unknown,
 ): M22ManualGateState {
   const state = createM22ManualGateState();
-  if (!isRecord(value)) return state;
+  if (!isRecord(value) || value.version !== 1) return state;
 
   state.browserDevice = stringValue(value.browserDevice, 240);
   state.updatedAt =
@@ -399,6 +401,7 @@ export function sanitizeM22ManualGateState(
     if (!isRecord(candidate)) continue;
     state.rows[row.id] = {
       status: statusValue(candidate.status),
+      browserDevice: stringValue(candidate.browserDevice, 240),
       notes: stringValue(candidate.notes, 4000),
     };
   }
@@ -420,12 +423,17 @@ export function m22ManualGateSummary(
     else pending += 1;
   }
 
+  const allRowsHaveDevice = M22_MANUAL_GATE_ROWS.every((row) => {
+    const rowDevice = state.rows[row.id]?.browserDevice.trim() ?? "";
+    return (rowDevice || state.browserDevice.trim()).length > 0;
+  });
+
   return {
     total: M22_MANUAL_GATE_ROWS.length,
     pass,
     fail,
     pending,
-    complete: fail === 0 && pending === 0,
+    complete: fail === 0 && pending === 0 && allRowsHaveDevice,
   };
 }
 
@@ -470,8 +478,8 @@ export function m22ManualGateMarkdown(
       lines.push(
         "## " + section,
         "",
-        "| Scenario | Setup | Pass criteria | Status | Notes |",
-        "| --- | --- | --- | --- | --- |",
+        "| Scenario | Setup | Pass criteria | Browser/device | Status | Notes |",
+        "| --- | --- | --- | --- | --- | --- |",
       );
     }
 
@@ -483,6 +491,12 @@ export function m22ManualGateMarkdown(
         markdownCell(row.setup) +
         " | " +
         markdownCell(row.passCriteria) +
+        " | " +
+        markdownCell(
+          result.browserDevice.trim() ||
+            state.browserDevice.trim() ||
+            "NOT RECORDED",
+        ) +
         " | " +
         statusLabel(result.status) +
         " | " +
@@ -555,7 +569,7 @@ export function mountM22ManualGate(
 
   const summaryNode = document.createElement("strong");
   const browserLabel = document.createElement("label");
-  browserLabel.textContent = "Browser / device";
+  browserLabel.textContent = "Default browser / device";
   const browserInput = document.createElement("input");
   browserInput.type = "text";
   browserInput.placeholder = "Chrome 151 · macOS · speakers/headphones";
@@ -652,29 +666,32 @@ export function mountM22ManualGate(
     );
     status.value = result.status;
 
+    const device = document.createElement("input");
+    device.type = "text";
+    device.placeholder = "Device override (optional)";
+    device.maxLength = 240;
+    device.value = result.browserDevice;
+
     const notes = document.createElement("input");
     notes.type = "text";
     notes.placeholder = "Observed issue / steps / screenshot or audio note";
     notes.maxLength = 4000;
     notes.value = result.notes;
 
-    status.addEventListener("change", () => {
+    function updateRow(): void {
       state.rows[row.id] = {
         status: statusValue(status.value),
+        browserDevice: device.value.slice(0, 240),
         notes: notes.value.slice(0, 4000),
       };
       persist();
-    });
+    }
 
-    notes.addEventListener("change", () => {
-      state.rows[row.id] = {
-        status: statusValue(status.value),
-        notes: notes.value.slice(0, 4000),
-      };
-      persist();
-    });
+    status.addEventListener("change", updateRow);
+    device.addEventListener("change", updateRow);
+    notes.addEventListener("change", updateRow);
 
-    container.append(scenario, status, notes);
+    container.append(scenario, status, device, notes);
     section.append(container);
   }
 
