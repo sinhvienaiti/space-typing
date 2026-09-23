@@ -9,6 +9,7 @@ import {
   characterVisualProfile,
 } from "../src/characters/visuals";
 import {
+  characterShipArtSource,
   drawCharacterShip,
   setCharacterShipSheet,
 } from "../src/characters/renderer";
@@ -89,6 +90,46 @@ describe("character visual profiles", () => {
     } finally {
       setCharacterShipSheet(null);
     }
+  });
+
+  it("renders painted V3 sprites without duplicate animated thrusters or expensive bloom", () => {
+    const operations: string[] = [];
+    const blurs: number[] = [];
+    const context = {
+      globalAlpha: 1,
+      save: () => {},
+      restore: () => {},
+      translate: () => {},
+      rotate: () => {},
+      scale: () => {},
+      beginPath: () => {},
+      moveTo: () => {},
+      quadraticCurveTo: () => operations.push("engine"),
+      closePath: () => {},
+      fill: () => {},
+      ellipse: () => {},
+      drawImage: () => {
+        blurs.push(context.shadowBlur);
+        operations.push("sprite");
+      },
+      shadowBlur: 0,
+    } as unknown as CanvasRenderingContext2D;
+
+    setCharacterShipSheet(
+      { naturalWidth: 1024, naturalHeight: 768 } as HTMLImageElement,
+      "v3",
+    );
+    try {
+      expect(characterShipArtSource()).toBe("v3");
+      drawCharacterShip(context, "aegis", {
+        x: 40, y: 40, time: 1.5, glowScale: 1,
+      });
+      expect(operations).toEqual(["sprite"]);
+      expect(blurs).toEqual([0]);
+    } finally {
+      setCharacterShipSheet(null);
+    }
+    expect(characterShipArtSource()).toBe("procedural");
   });
 
 });
