@@ -894,10 +894,69 @@ export function mountTestLab(
         session.state,
       );
       session.stage = session.state.campaign.selectedStage;
-      dialog.querySelector<HTMLInputElement>('[data-field="stage"]')!.value =
-        String(session.stage);
+      syncScenarioInputsFromSession();
       renderInspector();
       notice("sandbox returned to committed checkpoint");
+      return;
+    }
+    if (action === "capture-crash") {
+      const captured = captureCrashRecoverySnapshot(
+        session.state,
+        session.campaignExpansion,
+        session.checkpointSnapshot,
+        "manual",
+        "test-lab-crash",
+      );
+      session.crashRecoverySnapshot = captured.snapshot;
+      session.campaignExpansion = captured.campaignExpansion;
+      renderInspector();
+      notice("crash snapshot captured through production recovery path");
+      return;
+    }
+    if (action === "recover-crash") {
+      const result = resolveCrashRecovery(
+        session.state,
+        session.campaignExpansion,
+        session.checkpointSnapshot,
+        session.crashRecoverySnapshot,
+        "test-lab-recover",
+      );
+      session.state = result.state;
+      session.campaignExpansion = result.campaignExpansion;
+      session.checkpointSnapshot = result.checkpointSnapshot;
+      if (result.crashRecoverySnapshot !== null) {
+        session.crashRecoverySnapshot = result.crashRecoverySnapshot;
+      }
+      session.stage = result.state.campaign.selectedStage;
+      syncScenarioInputsFromSession();
+      renderInspector();
+      notice("crash recovery resolved · " + result.mode);
+      return;
+    }
+    if (action === "death-no-item") {
+      const invalidated = invalidateCrashRecoverySnapshot(
+        session.crashRecoverySnapshot,
+        session.state,
+        session.campaignExpansion,
+        session.checkpointSnapshot,
+        "test-lab-death",
+      );
+      const result = resolveCrashRecovery(
+        session.state,
+        invalidated.campaignExpansion,
+        session.checkpointSnapshot,
+        invalidated.snapshot,
+        "test-lab-death-resolve",
+      );
+      session.state = result.state;
+      session.campaignExpansion = result.campaignExpansion;
+      session.checkpointSnapshot = result.checkpointSnapshot;
+      session.crashRecoverySnapshot =
+        result.crashRecoverySnapshot ?? invalidated.snapshot;
+      session.stage = result.state.campaign.selectedStage;
+      syncScenarioInputsFromSession();
+      renderInspector();
+      notice("no-item death rollback resolved · " + result.mode);
       return;
     }
     if (action === "salvage-anchor") {
@@ -914,11 +973,64 @@ export function mountTestLab(
       );
       if (result.applied) {
         session.state = result.state;
+        session.campaignExpansion = result.campaignExpansion;
         session.checkpointSnapshot = result.checkpointSnapshot;
+        if (result.stageEntrySnapshot !== null) {
+          session.stageEntrySnapshot = result.stageEntrySnapshot;
+        }
         session.stage = result.state.campaign.selectedStage;
+        syncScenarioInputsFromSession();
         notice("Salvage Anchor resolved through production death-protection path");
       }
       renderInspector();
+      return;
+    }
+    if (action === "stage-revival") {
+      session.state.inventory = addItem(
+        session.state.inventory,
+        "stage-revival-core",
+        1,
+      ).inventory;
+      const result = resolveStageRevivalCore(
+        session.state,
+        session.stageEntrySnapshot,
+      );
+      if (result === null || !result.applied) {
+        notice("Stage Revival Core could not resolve this sandbox scenario");
+        return;
+      }
+      session.state = result.state;
+      session.campaignExpansion = result.campaignExpansion;
+      session.checkpointSnapshot = result.checkpointSnapshot;
+      if (result.stageEntrySnapshot !== null) {
+        session.stageEntrySnapshot = result.stageEntrySnapshot;
+      }
+      session.stage = result.state.campaign.selectedStage;
+      syncScenarioInputsFromSession();
+      renderInspector();
+      notice("Stage Revival Core resolved through production stage-entry path");
+      return;
+    }
+    if (action === "phoenix-revive") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      session.state.inventory = addItem(
+        session.state.inventory,
+        "phoenix-core",
+        1,
+      ).inventory;
+      const consumed = consumePhoenixCore(session.state);
+      if (!consumed.applied) {
+        notice("Phoenix Core is unavailable in sandbox inventory");
+        return;
+      }
+      if (!activeGame.reviveCurrentEncounter()) {
+        notice("Phoenix Core requires a Real Death gameover encounter");
+        return;
+      }
+      session.state = consumed.state;
+      renderInspector();
+      notice("Phoenix Core consumed and encounter revived through production Game");
       return;
     }
     if (action === "spawn-enemy") {
@@ -978,6 +1090,20 @@ export function mountTestLab(
       activeGame.testLabForceEnemySkill(
         Number(enemyIdSelect.value),
         skillSelect.value as EnemySkillId,
+      );
+      renderInspector();
+      return;
+    }
+    if (action === "force-word") {
+      ensureGame()?.testLabForceWordComplete(
+        Number(enemyIdSelect.value),
+      );
+      renderInspector();
+      return;
+    }
+    if (action === "kill-enemy") {
+      ensureGame()?.testLabKillEnemy(
+        Number(enemyIdSelect.value),
       );
       renderInspector();
       return;
@@ -1054,6 +1180,57 @@ export function mountTestLab(
     }
     if (action === "clear-status") {
       ensureGame()?.testLabClearStatuses();
+      renderInspector();
+      return;
+    }
+    if (action === "use-player-skill") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      const id = playerSkillSelect.value;
+      if (registry.supportSpells.includes(id)) {
+        activeGame.setSupportSpells([id as SupportSpellId]);
+      }
+      const result = activeGame.useSkill(id);
+      notice(
+        result.ok
+          ? "skill activated · " + id
+          : "skill blocked · " + String(result.reason),
+      );
+      renderInspector();
+      return;
+    }
+    if (action === "reset-skill-cooldowns") {
+      ensureGame()?.testLabResetSkillCooldowns();
+      renderInspector();
+      return;
+    }
+    if (action === "apply-time") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      activeGame.testLabSetTimeScale(
+        numberValue(dialog, '[data-field="time-scale"]', 1),
+      );
+      activeGame.testLabSetSchedulerFrozen(
+        dialog.querySelector<HTMLInputElement>(
+          '[data-field="scheduler-frozen"]',
+        )!.checked,
+      );
+      renderInspector();
+      return;
+    }
+    if (action === "step-scheduler") {
+      const stepped = ensureGame()?.testLabStepScheduler() ?? false;
+      notice(stepped ? "scheduler admitted one production spawn step" : "scheduler step denied by current state");
+      renderInspector();
+      return;
+    }
+    if (action === "clear-projectiles") {
+      ensureGame()?.testLabClearProjectiles();
+      renderInspector();
+      return;
+    }
+    if (action === "clear-particles") {
+      ensureGame()?.testLabClearParticles();
       renderInspector();
       return;
     }
