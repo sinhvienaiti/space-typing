@@ -745,10 +745,71 @@ function drawRewardMarker(
   context.restore();
 }
 
+
+/** Cache only the detailed glossy body and face; animate wings, aura, head,
+ * telegraphs and text at full frame rate. This removes repeat shadow-blur
+ * operations per enemy without making moving enemies look frame-stepped.
+ * Entries are capped to bound Canvas memory across long Campaign sessions. */
+export class StaticEnemyBodyCache {
+  private readonly entries = new Map<string, { canvas: HTMLCanvasElement; padding: number }>();
+  constructor(private readonly limit = 54) {}
+
+  clear(): void { this.entries.clear(); }
+  get size(): number { return this.entries.size; }
+
+  draw(
+    context: CanvasRenderingContext2D,
+    definition: EnemyDefinition,
+    radius: number,
+    palette: EnemyVisualPalette,
+    glowScale: number,
+    targeted: boolean,
+    deviceScale = 1,
+  ): boolean {
+    if (typeof document === "undefined") return false;
+    const roundedRadius = Math.round(radius * 2) / 2;
+    const roundedGlow = Math.round(glowScale * 10) / 10;
+    const scale = Math.max(1, Math.min(2, Math.ceil(deviceScale * 4) / 4));
+    const key = definition.id + ":" + roundedRadius + ":" + roundedGlow +
+      ":" + targeted + ":" + scale;
+    let entry = this.entries.get(key);
+    if (entry === undefined) {
+      const padding = Math.ceil(roundedRadius * 1.5 + 26);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil(padding * 2 * scale);
+      canvas.height = Math.ceil(padding * 2 * scale);
+      const offscreen = canvas.getContext("2d");
+      if (offscreen === null) return false;
+      offscreen.setTransform(scale, 0, 0, scale, 0, 0);
+      offscreen.translate(padding, padding);
+      drawBody(offscreen, definition, roundedRadius, palette, 0, targeted, roundedGlow);
+      drawFace(offscreen, definition, roundedRadius, palette, roundedGlow);
+      entry = { canvas, padding };
+      if (this.entries.size >= this.limit) {
+        const oldest = this.entries.keys().next().value;
+        if (oldest !== undefined) this.entries.delete(oldest);
+      }
+      this.entries.set(key, entry);
+    } else {
+      // LRU: high-density enemies of the current World should share textures.
+      this.entries.delete(key);
+      this.entries.set(key, entry);
+    }
+    context.save();
+    context.shadowBlur = 0;
+    context.drawImage(entry.canvas, -entry.padding, -entry.padding,
+      entry.padding * 2, entry.padding * 2);
+    context.restore();
+    return true;
+  }
+}
+
 export function drawModularEnemy(
   context: CanvasRenderingContext2D,
   definition: EnemyDefinition,
   input: EnemyRenderInput,
+  staticBodyCache?: StaticEnemyBodyCache,
+  renderDpr = 1,
 ): boolean {
   if (!isReadableVisualProfile(definition.visual)) return false;
 
@@ -766,16 +827,14 @@ export function drawModularEnemy(
   context.globalCompositeOperation = "source-over";
   drawSide(context, definition, radius, input.age, palette);
   drawWings(context, definition, radius, input.age, palette);
-  drawBody(
-    context,
-    definition,
-    radius,
-    palette,
-    input.flash,
-    input.targeted,
-    glowScale,
-  );
-  drawFace(context, definition, radius, palette, glowScale);
+  const cached = input.flash <= 0.03 &&
+    staticBodyCache?.draw(
+      context, definition, radius, palette, glowScale, input.targeted, renderDpr,
+    ) === true;
+  if (!cached) {
+    drawBody(context, definition, radius, palette, input.flash, input.targeted, glowScale);
+    drawFace(context, definition, radius, palette, glowScale);
+  }
   drawHead(context, definition, radius, input.age, palette, glowScale);
   context.restore();
 

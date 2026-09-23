@@ -590,7 +590,7 @@ app.innerHTML = `
           <strong id="energyText">100 / 100</strong>
         </div>
         <div class="player-ultimate">
-          <span id="powerHint">charge ultimate</span>
+          <span id="powerHint" title="Correct typing builds Rage. SPACE at 100% activates your character ultimate and Nova Pulse: removes all visible regular enemies and hostile bullets, and damages an unshielded boss. Bonus targets remain collectible.">Rage · charging</span>
           <div class="power-track">
             <div id="powerFill" class="power-fill"></div>
           </div>
@@ -669,7 +669,7 @@ app.innerHTML = `
 
         <div class="hints">
           <span><kbd>ESC</kbd> pause</span>
-          <span><kbd>SPACE</kbd> overdrive at 100%</span>
+          <span><kbd>SPACE</kbd> Nova Pulse + character ultimate at 100% Rage</span>
         </div>
       </div>
     </section>
@@ -1073,6 +1073,12 @@ app.innerHTML = `
             Player progress is stored in IndexedDB. Export a JSON backup
             before moving browsers or clearing site data.
           </small>
+        </div>
+
+        <div class="data-summary render-performance">
+          <span>Live render diagnostics</span>
+          <strong id="renderDiagnostics">Start an encounter to measure</strong>
+          <small>Frame p95 includes browser timing; draw p95 measures Canvas calls. A high frame p95 with low draw p95 can indicate GPU/compositor pressure. Adaptive resolution only affects High and Ultra.</small>
         </div>
 
         <div class="data-actions">
@@ -1833,8 +1839,8 @@ function renderStats(stats: GameStats): void {
   const ultimateName = getCharacter(characters.selected).ultimateName;
   byId("powerHint").textContent =
     stats.power >= 100
-      ? "SPACE — " + ultimateName + " ready"
-      : "charge " + ultimateName.toLowerCase();
+      ? "RAGE FULL · " + ultimateName + " + NOVA"
+      : "RAGE " + Math.floor(stats.power) + "% · " + ultimateName;
 }
 
 function skillReasonText(reason: SkillBlockReason): string {
@@ -6465,6 +6471,16 @@ function updateDataSummary(): void {
         "/" +
         String(artCatalog.assets.size);
   const performance = game.getPerformanceReport();
+  const render = game.getRenderDiagnostics();
+  byId("renderDiagnostics").textContent = performance.samples < 30
+    ? "Waiting for 30 measured frames"
+    : performance.averageFps.toFixed(0) + " FPS · frame p95 " +
+      performance.p95FrameMs.toFixed(1) + "ms · draw p95 " +
+      render.renderP95Ms.toFixed(1) + "ms · DPR " +
+      render.effectiveDpr.toFixed(2) + " · adaptive " +
+      Math.round(render.adaptiveScale * 100) + "% · cached bodies " +
+      render.bodySprites + " · " +
+      (render.canvasPixels / 1_000_000).toFixed(1) + "M px";
   const performanceMeta =
     performance.samples < 30
       ? ""

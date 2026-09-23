@@ -31,6 +31,8 @@ import {
   bossVisualNameForStage,
 } from "./boss/visual-profile";
 import type { DifficultyProfile, StageConfig } from "./campaign/types";
+import { canFinishCombatStage, canSpawnFinalBoss, type StageClearGate } from "./campaign/stage-clear-gate";
+import { typedRageGain, novaBossDamage, NOVA_PULSE_VISUAL_SECONDS } from "./combat/rage-pulse";
 import type { HiddenEncounterRuntime } from "./discovery/hidden-encounter";
 import {
   activeThreatPressure,
@@ -276,7 +278,7 @@ import {
   EMPTY_COMPILED_RELIC_EFFECTS,
   type CompiledRelicEffects,
 } from "./relics/state";
-import { drawModularEnemy } from "./enemies/renderer";
+import { drawModularEnemy, StaticEnemyBodyCache } from "./enemies/renderer";
 import {
   spawnWorldEnemyDefinitionId,
   worldRuntimeEnemyDefinitionId,
@@ -374,6 +376,7 @@ import {
   resolveRenderDpr,
   type PerformanceReport,
 } from "./performance/quality";
+import { AdaptiveRenderBudget } from "./performance/adaptive-resolution";
 import type {
   Enemy,
   EnemyKind,
@@ -621,6 +624,7 @@ export class Game {
   private hiddenEncounterRuntime: HiddenEncounterRuntime | null = null;
   private shake = 0;
   private overdriveTimer = 0;
+  private novaPulseRemaining = 0;
   private interferenceTimer = 0;
   private barrierTimer = 0;
   private barrierHp = 0;
@@ -678,6 +682,9 @@ export class Game {
   private stageElapsedSeconds = 0;
   private hitStopTimer = 0;
   private readonly frameProfiler = new FrameProfiler();
+  private readonly drawProfiler = new FrameProfiler();
+  private readonly adaptiveRenderBudget = new AdaptiveRenderBudget();
+  private readonly modularBodyCache = new StaticEnemyBodyCache();
   private lastTime = performance.now();
   private animationFrame = 0;
   private stars: Array<{ x: number; y: number; z: number }> = [];
@@ -714,6 +721,7 @@ export class Game {
 
   destroy(): void {
     cancelAnimationFrame(this.animationFrame);
+    this.modularBodyCache.clear();
     this.sfx.destroy();
   }
 
@@ -727,6 +735,23 @@ export class Game {
 
   getPerformanceReport(): PerformanceReport {
     return this.frameProfiler.report();
+  }
+
+  /** Rolling paint and compositor timings for comparing High vs Medium. */
+  getRenderDiagnostics(): {
+    renderP95Ms: number;
+    adaptiveScale: number;
+    effectiveDpr: number;
+    canvasPixels: number;
+    bodySprites: number;
+  } {
+    return {
+      renderP95Ms: this.drawProfiler.report().p95FrameMs,
+      adaptiveScale: this.adaptiveRenderBudget.scale,
+      effectiveDpr: this.dpr,
+      canvasPixels: this.canvas.width * this.canvas.height,
+      bodySprites: this.modularBodyCache.size,
+    };
   }
 
   setTestLabMode(
@@ -2361,7 +2386,11 @@ export class Game {
       this.settings.visualQuality !== settings.visualQuality;
     this.settings = settings;
     this.sfx.setVolume(settings.sfxVolume);
-    if (qualityChanged) this.resize();
+    if (qualityChanged) {
+      this.adaptiveRenderBudget.reset();
+      this.modularBodyCache.clear();
+      this.resize();
+    }
   }
 
   startStage(
@@ -2493,6 +2522,7 @@ export class Game {
     this.bossDefeated = false;
     this.bossRewardPending = false;
     this.overdriveTimer = 0;
+    this.novaPulseRemaining = 0;
     this.interferenceTimer = 0;
     this.barrierTimer = 0;
     this.barrierHp = 0;
@@ -2587,6 +2617,7 @@ export class Game {
 
   backToTitle(): void {
     this.phase = "title";
+    this.novaPulseRemaining = 0;
     this.enemies = [];
     this.projectiles = [];
     this.lasers = [];
@@ -2749,18 +2780,36 @@ export class Game {
     this.width = Math.max(640, rect.width || window.innerWidth);
     this.height = Math.max(420, rect.height || window.innerHeight);
     const profile = qualityProfile(this.settings.visualQuality);
-    this.dpr = resolveRenderDpr(
+    this.dpr = Math.max(0.5, resolveRenderDpr(
       profile,
       window.devicePixelRatio || 1,
       this.width,
       this.height,
-    );
+    ) * this.adaptiveRenderBudget.scale);
 
     this.canvas.width = Math.floor(this.width * this.dpr);
     this.canvas.height = Math.floor(this.height * this.dpr);
     this.context.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     this.backgroundGradient = null;
     this.seedStars();
+  }
+
+  private applyAdaptiveRenderScale(): void {
+    const profile = qualityProfile(this.settings.visualQuality);
+    const targetDpr = Math.max(0.5, resolveRenderDpr(
+      profile,
+      window.devicePixelRatio || 1,
+      this.width,
+      this.height,
+    ) * this.adaptiveRenderBudget.scale);
+    if (Math.abs(targetDpr - this.dpr) < 0.025) return;
+    this.dpr = targetDpr;
+    this.canvas.width = Math.floor(this.width * this.dpr);
+    this.canvas.height = Math.floor(this.height * this.dpr);
+    this.context.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.backgroundGradient = null;
+    // Keep already seeded stars/animation state; adaptive pixel resolution
+    // must not reseed gameplay VFX or change movement/physics timing.
   }
 
   private frame = (now: number): void => {
@@ -2773,7 +2822,16 @@ export class Game {
 
     this.advanceSimulation(dt);
 
+    const drawStart = performance.now();
     this.draw(now / 1000);
+    const drawMs = Math.max(0, performance.now() - drawStart);
+    this.drawProfiler.pushFrame(drawMs / 1000);
+    if (
+      this.phase === "playing" &&
+      this.adaptiveRenderBudget.observe(this.settings.visualQuality, rawDt, drawMs)
+    ) {
+      this.applyAdaptiveRenderScale();
+    }
     this.animationFrame = requestAnimationFrame(this.frame);
   };
 
@@ -3048,26 +3106,18 @@ export class Game {
 
     this.updateEffects(dt);
 
-    if (
-      this.spawnRemaining === 0 &&
-      this.enemies.length === 0 &&
-      this.phase === "playing"
-    ) {
-      if (
-        isBossStageRole(this.stageConfig.role) &&
-        !this.bossSpawned
-      ) {
+    if (this.phase === "playing") {
+      const gate = this.stageClearGate();
+      if (canSpawnFinalBoss(gate, this.bossSpawned)) {
         this.spawnBoss();
-      } else if (
-        !isBossStageRole(this.stageConfig.role) ||
-        (this.bossDefeated && !this.bossRewardPending)
-      ) {
+      } else if (canFinishCombatStage(gate)) {
         this.finishStage();
       }
     }
   }
 
   private updateEffects(dt: number): void {
+    this.novaPulseRemaining = Math.max(0, this.novaPulseRemaining - dt);
     if (this.boss !== null) {
       this.boss.flash = Math.max(0, this.boss.flash - dt * 7);
       this.boss.kick = Math.max(0, this.boss.kick - dt * 4);
@@ -3311,8 +3361,25 @@ export class Game {
     }
   }
 
+  private stageClearGate(): StageClearGate {
+    return {
+      remainingSpawns: this.spawnRemaining,
+      livingEnemies: this.enemies.length,
+      // Hostile bullets intentionally do not hold the player in an empty arena.
+      activeBonusTargets: Number(this.supplyPod !== null) +
+        Number(this.treasureDrone !== null) +
+        Number(this.recallBonus !== null) +
+        Number(this.rewardChoiceCrate !== null) +
+        Number(this.anomalyCrate !== null),
+      unresolvedBonusChoice: this.anomalyResolutionPending,
+      bossRequired: this.stageConfig !== null && isBossStageRole(this.stageConfig.role),
+      bossDefeated: this.bossDefeated,
+      bossRewardPending: this.bossRewardPending,
+    };
+  }
+
   private finishStage(): void {
-    if (this.phase !== "playing") return;
+    if (this.phase !== "playing" || !canFinishCombatStage(this.stageClearGate())) return;
 
     this.updateStageObjective({
       type: "stage-clear",
@@ -5753,7 +5820,7 @@ export class Game {
   private gainPower(baseGain: number): void {
     this.stats.power = clamp(
       this.stats.power +
-        focusPowerGain(baseGain, this.playerStats),
+        focusPowerGain(typedRageGain(baseGain), this.playerStats),
       0,
       100,
     );
@@ -6241,6 +6308,12 @@ export class Game {
       );
     }
 
+    // Every character retains its unique ultimate above. The shared fully
+    // charged Nova Pulse makes Space immediately legible: a full-arena
+    // shockwave clears regular/elite targets and hostile bullets. Bonus
+    // targets stay collectible, boss shields stay meaningful.
+    this.releaseNovaPulse();
+
     const visual = ultimateVisual(this.characterId);
     this.burst(
       this.width / 2,
@@ -6255,6 +6328,49 @@ export class Game {
 
     this.sfx.power();
     this.emitStats();
+  }
+
+  private releaseNovaPulse(): void {
+    this.projectiles = [];
+    const victims = this.enemies;
+    this.enemies = [];
+    for (const enemy of victims) {
+      this.stats.kills += 1;
+      this.addScore((enemy.elite ? 145 : 90) * this.stats.multiplier);
+      this.updateStageObjective({
+        type: "enemy-kill",
+        enemyId: enemy.id,
+        kind: enemy.kind,
+        elite: enemy.elite,
+      });
+      // Elite/golden drops still resolve; do not count untyped targets as
+      // completed English words or trigger uncontrolled death-chain spawns.
+      if (enemy.elite || enemy.golden) {
+        this.tryRollEquipmentDrop(enemy.golden ? "golden" : "elite");
+      }
+    }
+    this.targetId = null;
+    this.markedEnemyId = null;
+    this.markTimer = 0;
+
+    if (this.boss !== null) {
+      const boss = this.boss;
+      const damage = novaBossDamage(boss.maxHp, boss.shieldActive);
+      if (damage > 0) {
+        boss.hp = Math.max(0, boss.hp - damage);
+        boss.flash = 1;
+        this.updateBossPhase(boss);
+        if (boss.hp <= 0) this.defeatBoss();
+        else this.hooks.onBossUpdate(toBossHud(boss));
+      }
+    }
+
+    this.novaPulseRemaining = NOVA_PULSE_VISUAL_SECONDS;
+    this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 45, 190);
+    // Bounded small local spark clusters rather than a screenful of blur.
+    for (const enemy of victims.slice(0, 6)) {
+      this.burst(enemy.x, enemy.y, 11, enemy.elite ? 298 : 188);
+    }
   }
 
   private damagePlayer(enemyId: number, x: number, y: number): void {
@@ -6562,6 +6678,7 @@ export class Game {
     }
 
     this.drawBackground(time);
+    if (this.novaPulseRemaining > 0) this.drawNovaPulse();
     if (this.interferenceTimer > 0) {
       this.drawInterference(time);
     }
@@ -6824,6 +6941,33 @@ export class Game {
     context.font = "700 10px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.textAlign = "right";
     context.fillText("SIGNAL JAMMED", this.width - 18, 84);
+    context.restore();
+  }
+
+  private drawNovaPulse(): void {
+    const context = this.context;
+    const progress = 1 - this.novaPulseRemaining / NOVA_PULSE_VISUAL_SECONDS;
+    const alpha = Math.max(0, 1 - progress);
+    const centerX = this.width / 2;
+    const centerY = this.height - PLAYER_Y_OFFSET;
+    const maxRadius = Math.hypot(this.width / 2, this.height);
+    context.save();
+    context.globalCompositeOperation = "lighter";
+    context.globalAlpha = alpha * 0.14;
+    context.fillStyle = "#6ae6ff";
+    context.fillRect(0, 0, this.width, this.height);
+    context.globalAlpha = alpha * 0.93;
+    context.strokeStyle = "#91fbff";
+    context.lineWidth = 6 * alpha + 1;
+    context.beginPath();
+    context.arc(centerX, centerY, 18 + progress * maxRadius, 0, Math.PI * 2);
+    context.stroke();
+    context.globalAlpha = alpha * 0.5;
+    context.strokeStyle = "#b9a5ff";
+    context.lineWidth = 3;
+    context.beginPath();
+    context.arc(centerX, centerY, 9 + progress * maxRadius * 0.75, 0, Math.PI * 2);
+    context.stroke();
     context.restore();
   }
 
@@ -7130,7 +7274,7 @@ export class Game {
         flash: boss.flash,
         targeted: false,
         glowScale: qualityProfile(this.settings.visualQuality).glowScale,
-      });
+      }, this.modularBodyCache, this.dpr);
 
     if (!modularDrawn) {
       context.shadowBlur = boss.flash > 0 ? 36 : 24;
@@ -7683,7 +7827,7 @@ export class Game {
         flash: enemy.flash,
         targeted,
         glowScale: qualityProfile(this.settings.visualQuality).glowScale,
-      });
+      }, this.modularBodyCache, this.dpr);
 
     if (!modularDrawn) {
       context.beginPath();

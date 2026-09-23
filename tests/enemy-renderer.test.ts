@@ -1,12 +1,47 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ENEMY_REGISTRY,
   enemyDefinition,
 } from "../src/enemies/registry";
 import { ENEMY_REWARD_DEFINITIONS } from "../src/enemies/rewards";
-import { enemyVisualPalette, rewardGlyph } from "../src/enemies/renderer";
+import { enemyVisualPalette, rewardGlyph, StaticEnemyBodyCache } from "../src/enemies/renderer";
 
 describe("modular enemy renderer profiles", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("caches glossy bodies without caching animation or leaking unlimited canvases", () => {
+    const drawImage = vi.fn();
+    const makeContext = () => {
+      const method = vi.fn();
+      return new Proxy({ drawImage }, {
+        get(target, property) {
+          if (property === "drawImage") return target.drawImage;
+          return typeof property === "string" ? method : undefined;
+        },
+        set() { return true; },
+      }) as unknown as CanvasRenderingContext2D;
+    };
+    const createElement = vi.fn(() => ({
+      width: 0, height: 0,
+      getContext: () => makeContext(),
+    }));
+    vi.stubGlobal("document", { createElement });
+    const context = makeContext();
+    const definition = enemyDefinition("rainbow-scout")!;
+    const palette = enemyVisualPalette(definition.family);
+    const cache = new StaticEnemyBodyCache(2);
+
+    expect(cache.draw(context, definition, 24, palette, 1, false, 1.5)).toBe(true);
+    expect(cache.draw(context, definition, 24, palette, 1, false, 1.5)).toBe(true);
+    expect(createElement).toHaveBeenCalledTimes(1);
+    expect(drawImage).toHaveBeenCalledTimes(2);
+    expect(cache.draw(context, definition, 24, palette, 1, true, 1.5)).toBe(true);
+    expect(cache.draw(context, definition, 28, palette, 1, false, 1.5)).toBe(true);
+    expect(cache.size).toBe(2);
+    cache.clear();
+    expect(cache.size).toBe(0);
+  });
+
   it("provides a stable palette for every core visual family", () => {
     const rainbow = enemyVisualPalette("rainbow");
     const angel = enemyVisualPalette("angel");
