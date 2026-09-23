@@ -3545,3 +3545,47 @@ kbd {
   .rest-hub-services { grid-template-columns: 1fr; }
   .rest-hub-services > button { min-height: 70px; }
 }
+
+
+/* Game results: one-line collectible currency glyphs and separate notes. */
+.result-rewards { min-width: 0; }
+.results .reward-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .4rem;
+  margin-top: .4rem;
+  font-size: .86rem;
+}
+.reward-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .27rem;
+  padding: .28rem .42rem;
+  border: 1px solid rgba(107, 218, 234, .25);
+  border-radius: 8px;
+  background: rgba(49, 118, 139, .16);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.reward-chip .currency-glyph {
+  color: #8beafa;
+  font-size: 1.16em;
+}
+.reward-chip:nth-child(2) .currency-glyph { color: #e8c88b; }
+.reward-chip:nth-child(3) .currency-glyph { color: #e1a8ff; }
+.reward-chip:nth-child(4) .currency-glyph { color: #aae6d6; }
+.result-details {
+  min-height: 0;
+  color: #a6bccc;
+  font-size: .75rem;
+  line-height: 1.45;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.custom-combat-controls {
+  padding: .55rem;
+  border: 1px solid rgba(107, 218, 234, .16);
+  border-radius: 12px;
+}
+.custom-combat-controls.disabled { opacity: .55; }
