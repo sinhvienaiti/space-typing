@@ -432,6 +432,19 @@ export type TestLabGameSnapshot = {
   activePressure: ActiveTypingPressureSnapshot;
   deathMode: TestLabDeathMode;
   lethalHits: number;
+  scheduler: {
+    frozen: boolean;
+    spawnRemaining: number;
+    spawnTimer: number;
+    timeScale: number;
+  };
+  skillStates: Array<{
+    id: string;
+    cooldownRemaining: number;
+    chargesRemaining: number | null;
+    usesThisStage: number;
+  }>;
+  objective: StageObjectiveState | null;
 };
 
 const FALLBACK_ENTRIES: VocabularyEntry[] = [
@@ -603,6 +616,8 @@ export class Game {
   private testLabEnabled = false;
   private testLabDeathMode: TestLabDeathMode = "immortal";
   private testLabLethalHits = 0;
+  private testLabTimeScale = 1;
+  private testLabSchedulerFrozen = false;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -649,7 +664,11 @@ export class Game {
   ): void {
     this.testLabEnabled = enabled;
     this.testLabDeathMode = deathMode;
-    if (!enabled) this.testLabLethalHits = 0;
+    if (!enabled) {
+      this.testLabLethalHits = 0;
+      this.testLabTimeScale = 1;
+      this.testLabSchedulerFrozen = false;
+    }
   }
 
   testLabSetDeathMode(mode: TestLabDeathMode): boolean {
@@ -693,6 +712,22 @@ export class Game {
           : this.activeTypingPressureSnapshot(difficulty),
       deathMode: this.testLabDeathMode,
       lethalHits: this.testLabLethalHits,
+      scheduler: {
+        frozen: this.testLabSchedulerFrozen,
+        spawnRemaining: this.spawnRemaining,
+        spawnTimer: this.spawnTimer,
+        timeScale: this.testLabTimeScale,
+      },
+      skillStates: this.skillEngine.getDefinitions().map((definition) => {
+        const state = this.skillEngine.getState(definition.id);
+        return {
+          id: definition.id,
+          cooldownRemaining: state?.cooldownRemaining ?? 0,
+          chargesRemaining: state?.chargesRemaining ?? null,
+          usesThisStage: state?.usesThisStage ?? 0,
+        };
+      }),
+      objective: this.getStageObjective(),
     };
   }
 
@@ -878,6 +913,80 @@ export class Game {
     this.bossRewardPending = false;
     this.projectiles = [];
     this.hooks.onBossUpdate(null);
+    return true;
+  }
+
+  testLabSetTimeScale(scale: number): boolean {
+    if (!this.testLabEnabled) return false;
+    this.testLabTimeScale = clamp(
+      Number.isFinite(scale) ? scale : 1,
+      0.1,
+      4,
+    );
+    return true;
+  }
+
+  testLabSetSchedulerFrozen(frozen: boolean): boolean {
+    if (!this.testLabEnabled) return false;
+    this.testLabSchedulerFrozen = frozen;
+    return true;
+  }
+
+  testLabStepScheduler(): boolean {
+    if (
+      !this.testLabEnabled ||
+      this.difficulty === null ||
+      this.stageConfig === null ||
+      this.spawnRemaining <= 0
+    ) {
+      return false;
+    }
+    this.spawnTimer = 0;
+    return this.runSpawnScheduler(this.difficulty);
+  }
+
+  testLabClearProjectiles(): boolean {
+    if (!this.testLabEnabled) return false;
+    this.projectiles = [];
+    this.lasers = [];
+    return true;
+  }
+
+  testLabClearParticles(): boolean {
+    if (!this.testLabEnabled) return false;
+    this.particles = [];
+    return true;
+  }
+
+  testLabResetSkillCooldowns(): boolean {
+    if (!this.testLabEnabled) return false;
+    this.skillEngine.resetStage();
+    this.hooks.onSkills();
+    return true;
+  }
+
+  testLabForceWordComplete(enemyId: number): boolean {
+    if (!this.testLabEnabled) return false;
+    const enemy = this.enemies.find((item) => item.id === enemyId);
+    if (enemy === undefined) return false;
+    enemy.typed = typingText(enemy.entry.en).length;
+    this.completeWord(enemy);
+    this.emitStats();
+    return true;
+  }
+
+  testLabKillEnemy(enemyId: number): boolean {
+    if (!this.testLabEnabled) return false;
+    let enemy = this.enemies.find((item) => item.id === enemyId);
+    if (enemy === undefined) return false;
+    let guard = 0;
+    while (enemy !== undefined && guard < 4) {
+      enemy.typed = typingText(enemy.entry.en).length;
+      this.completeWord(enemy);
+      enemy = this.enemies.find((item) => item.id === enemyId);
+      guard += 1;
+    }
+    this.emitStats();
     return true;
   }
 
@@ -2169,7 +2278,9 @@ export class Game {
 
   private frame = (now: number): void => {
     const rawDt = Math.max(0, (now - this.lastTime) / 1000);
-    const dt = Math.min(0.05, rawDt);
+    const dt =
+      Math.min(0.05, rawDt) *
+      (this.testLabEnabled ? this.testLabTimeScale : 1);
     this.lastTime = now;
     this.frameProfiler.pushFrame(rawDt);
 
@@ -2265,7 +2376,9 @@ export class Game {
     this.updateTreasureDrone(dt);
     this.updateRewardChoiceCrate(dt);
     this.updateAnomalyCrate(dt);
-    this.spawnTimer -= dt * hostileTimeFactor;
+    if (!(this.testLabEnabled && this.testLabSchedulerFrozen)) {
+      this.spawnTimer -= dt * hostileTimeFactor;
+    }
     this.supplySpawnTimer -= dt;
     this.treasureDroneTimer -= dt;
     this.rewardChoiceTimer -= dt;
@@ -2325,32 +2438,8 @@ export class Game {
       this.anomalyPending = false;
     }
 
-    if (
-      this.spawnRemaining > 0 &&
-      this.spawnTimer <= 0 &&
-      this.enemies.length < difficulty.maxEnemies
-    ) {
-      const formationCount =
-        this.trySpawnFormation(difficulty);
-      if (formationCount > 0) {
-        this.spawnRemaining -= formationCount;
-        this.spawnTimer =
-          difficulty.spawnInterval * randomBetween(1.02, 1.28);
-      } else {
-        const spawned = this.spawnEnemy();
-        if (spawned) {
-          this.spawnRemaining -= 1;
-          this.spawnTimer =
-            difficulty.spawnInterval * randomBetween(0.82, 1.16);
-        } else {
-          // Pressure denial is not a skipped enemy. Retry shortly after the
-          // active pile becomes more feasible.
-          this.spawnTimer = Math.max(
-            0.12,
-            difficulty.reactionWindow * 0.24,
-          );
-        }
-      }
+    if (!(this.testLabEnabled && this.testLabSchedulerFrozen)) {
+      this.runSpawnScheduler(difficulty);
     }
 
     const playerY = this.height - PLAYER_Y_OFFSET;
@@ -3004,6 +3093,42 @@ export class Game {
     }
 
     return snapshot;
+  }
+
+  private runSpawnScheduler(
+    difficulty: DifficultyProfile,
+  ): boolean {
+    if (
+      this.spawnRemaining <= 0 ||
+      this.spawnTimer > 0 ||
+      this.enemies.length >= difficulty.maxEnemies
+    ) {
+      return false;
+    }
+
+    const formationCount = this.trySpawnFormation(difficulty);
+    if (formationCount > 0) {
+      this.spawnRemaining -= formationCount;
+      this.spawnTimer =
+        difficulty.spawnInterval * randomBetween(1.02, 1.28);
+      return true;
+    }
+
+    const spawned = this.spawnEnemy();
+    if (spawned) {
+      this.spawnRemaining -= 1;
+      this.spawnTimer =
+        difficulty.spawnInterval * randomBetween(0.82, 1.16);
+      return true;
+    }
+
+    // Pressure denial is not a skipped enemy. Retry shortly after the
+    // active pile becomes more feasible.
+    this.spawnTimer = Math.max(
+      0.12,
+      difficulty.reactionWindow * 0.24,
+    );
+    return false;
   }
 
   private canAdmitEnemyKind(
