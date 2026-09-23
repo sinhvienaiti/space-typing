@@ -31,6 +31,7 @@ import {
   bossVisualNameForStage,
 } from "./boss/visual-profile";
 import type { DifficultyProfile, StageConfig } from "./campaign/types";
+import { canFinishCombatStage, canSpawnFinalBoss, type StageClearGate } from "./campaign/stage-clear-gate";
 import type { HiddenEncounterRuntime } from "./discovery/hidden-encounter";
 import {
   activeThreatPressure,
@@ -3048,20 +3049,11 @@ export class Game {
 
     this.updateEffects(dt);
 
-    if (
-      this.spawnRemaining === 0 &&
-      this.enemies.length === 0 &&
-      this.phase === "playing"
-    ) {
-      if (
-        isBossStageRole(this.stageConfig.role) &&
-        !this.bossSpawned
-      ) {
+    if (this.phase === "playing") {
+      const gate = this.stageClearGate();
+      if (canSpawnFinalBoss(gate, this.bossSpawned)) {
         this.spawnBoss();
-      } else if (
-        !isBossStageRole(this.stageConfig.role) ||
-        (this.bossDefeated && !this.bossRewardPending)
-      ) {
+      } else if (canFinishCombatStage(gate)) {
         this.finishStage();
       }
     }
@@ -3311,8 +3303,25 @@ export class Game {
     }
   }
 
+  private stageClearGate(): StageClearGate {
+    return {
+      remainingSpawns: this.spawnRemaining,
+      livingEnemies: this.enemies.length,
+      // Hostile bullets intentionally do not hold the player in an empty arena.
+      activeBonusTargets: Number(this.supplyPod !== null) +
+        Number(this.treasureDrone !== null) +
+        Number(this.recallBonus !== null) +
+        Number(this.rewardChoiceCrate !== null) +
+        Number(this.anomalyCrate !== null),
+      unresolvedBonusChoice: this.anomalyResolutionPending,
+      bossRequired: this.stageConfig !== null && isBossStageRole(this.stageConfig.role),
+      bossDefeated: this.bossDefeated,
+      bossRewardPending: this.bossRewardPending,
+    };
+  }
+
   private finishStage(): void {
-    if (this.phase !== "playing") return;
+    if (this.phase !== "playing" || !canFinishCombatStage(this.stageClearGate())) return;
 
     this.updateStageObjective({
       type: "stage-clear",
