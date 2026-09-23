@@ -19,8 +19,8 @@ if (source === undefined) {
 }
 
 const EXPECTED_SHA256 =
-  "edfd579783958b56b3bcec78c5428eb17cdb99ad2255fe82f96eebb0d75bae32";
-const EXPECTED_BYTES = 829918;
+  "fb9434e002d6da650e34192eb425e62d1e2f3bec8804a9b33b7aa8733de10eb3";
+const EXPECTED_BYTES = 800054;
 const raw = readFileSync(resolve(source));
 const digest = createHash("sha256").update(raw).digest("hex");
 
