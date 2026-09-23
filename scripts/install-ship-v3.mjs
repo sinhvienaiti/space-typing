@@ -49,16 +49,16 @@ const entry = {
   url,
 };
 
-const target = join(root, "public", url.slice(1));
-mkdirSync(dirname(target), { recursive: true });
-if (resolve(source) !== target) copyFileSync(resolve(source), target);
-
 const position = manifest.entries.findIndex(
   (candidate) => candidate.id === "player-ship-sheet-v2",
 );
 if (position < 0) {
   throw new Error("Cannot register V3: the existing V2 fallback asset is missing.");
 }
+
+const target = join(root, "public", url.slice(1));
+mkdirSync(dirname(target), { recursive: true });
+if (resolve(source) !== target) copyFileSync(resolve(source), target);
 const already = manifest.entries.findIndex((candidate) => candidate.id === id);
 if (already >= 0) {
   manifest.entries[already] = entry;
