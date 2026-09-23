@@ -306,8 +306,17 @@ import {
 } from "./skills/support-loadout";
 import {
   getSupportSpell,
+  isSupportSpellId,
   type SupportSpellId,
 } from "./skills/support";
+import {
+  assignHotbarSlot,
+  createDefaultHotbarState,
+  hotbarActionKey,
+  hotbarSlotForKey,
+  type HotbarAction,
+  type HotbarState,
+} from "./hud/hotbar";
 
 type CombatSkillId = DefensiveSkillId | OffensiveSkillId;
 import { DEFAULT_PLAYER_BASE_STATS } from "./stats/player";
@@ -495,10 +504,8 @@ app.innerHTML = `
       <div id="waveBadge" class="wave-badge">stage 001</div>
 
       <div class="hud-side hud-side-right">
-        <div class="metric metric-secondary"><span>accuracy</span><strong id="accuracy">100%</strong></div>
-        <div class="metric metric-secondary"><span>kills</span><strong id="kills">0</strong></div>
-        <div class="metric metric-vital"><span>hull</span><strong id="hull">100</strong></div>
-        <div class="metric metric-vital"><span>shield</span><strong id="shield">40</strong></div>
+        <div class="metric"><span>accuracy</span><strong id="accuracy">100%</strong></div>
+        <div class="metric"><span>kills</span><strong id="kills">0</strong></div>
       </div>
     </header>
 
@@ -531,76 +538,46 @@ app.innerHTML = `
       </div>
     </div>
 
-    <div class="power-shell">
-      <div class="power-label">
-        <span>ultimate</span>
-        <small id="powerHint">type cleanly to charge</small>
+    <aside id="playerStatusHud" class="player-status-hud hidden" aria-label="Player status">
+      <canvas id="playerStatusPortrait" class="player-status-portrait" width="84" height="64" aria-hidden="true"></canvas>
+      <div class="player-status-body">
+        <div class="player-status-head">
+          <strong id="playerStatusName">Vanguard</strong>
+          <span id="playerStatusLevel">Lv 1</span>
+        </div>
+        <div class="resource-row hull-row">
+          <span>Hull</span>
+          <div class="resource-track">
+            <i id="hullDamageFill" class="resource-fill resource-damage-fill"></i>
+            <i id="hullFill" class="resource-fill hull-fill"></i>
+          </div>
+          <strong id="hull">100 / 100</strong>
+        </div>
+        <div class="resource-row shield-row">
+          <span>Shield</span>
+          <div class="resource-track">
+            <i id="shieldFill" class="resource-fill shield-fill"></i>
+          </div>
+          <strong id="shield">40 / 40</strong>
+        </div>
+        <div class="resource-row energy-row">
+          <span>Energy</span>
+          <div class="resource-track">
+            <i id="energyFill" class="resource-fill energy-fill"></i>
+          </div>
+          <strong id="energyText">100 / 100</strong>
+        </div>
+        <div class="player-ultimate">
+          <span id="powerHint">charge ultimate</span>
+          <div class="power-track">
+            <div id="powerFill" class="power-fill"></div>
+          </div>
+          <kbd>SPACE</kbd>
+        </div>
       </div>
-      <div class="power-track">
-        <div id="powerFill" class="power-fill"></div>
-      </div>
-      <div class="energy-chip">
-        <span>energy</span>
-        <strong id="energyText">100 / 100</strong>
-      </div>
-    </div>
+    </aside>
 
-    <div id="quickItems" class="quick-items hidden">
-      <button id="quickRepair" type="button" title="Repair Kit">
-        <kbd>1</kbd>
-        <span>repair</span>
-        <strong id="repairCount">0</strong>
-      </button>
-      <button id="quickShield" type="button" title="Shield Cell">
-        <kbd>2</kbd>
-        <span>shield</span>
-        <strong id="shieldCount">0</strong>
-      </button>
-      <button id="quickEnergy" type="button" title="Energy Cell">
-        <kbd>3</kbd>
-        <span>energy</span>
-        <strong id="energyCount">0</strong>
-      </button>
-    </div>
-
-    <div id="quickSupport" class="quick-support hidden">
-      <button id="supportSkill0" type="button">
-        <kbd>[</kbd><span>support 1</span><strong></strong>
-      </button>
-      <button id="characterSkill" type="button">
-        <kbd>=</kbd><span>character</span><strong></strong>
-      </button>
-      <button id="supportSkill1" type="button">
-        <kbd>]</kbd><span>support 2</span><strong></strong>
-      </button>
-    </div>
-
-    <div id="quickSkills" class="quick-skills hidden">
-      <button id="skillBarrier" type="button">
-        <kbd>4</kbd><span>barrier</span><strong></strong>
-      </button>
-      <button id="skillReflect" type="button">
-        <kbd>5</kbd><span>reflect</span><strong></strong>
-      </button>
-      <button id="skillTimeShell" type="button">
-        <kbd>6</kbd><span>time</span><strong></strong>
-      </button>
-      <button id="skillRepair" type="button">
-        <kbd>7</kbd><span>repair</span><strong></strong>
-      </button>
-      <button id="skillGuardian" type="button">
-        <kbd>8</kbd><span>guardian</span><strong></strong>
-      </button>
-      <button id="skillEmp" type="button">
-        <kbd>9</kbd><span>emp</span><strong></strong>
-      </button>
-      <button id="skillChain" type="button">
-        <kbd>0</kbd><span>chain</span><strong></strong>
-      </button>
-      <button id="skillMark" type="button">
-        <kbd>-</kbd><span>mark</span><strong></strong>
-      </button>
-    </div>
+    <div id="combatHotbar" class="combat-hotbar hidden" aria-label="Combat hotbar"></div>
 
     <section id="titleOverlay" class="overlay">
       <div class="main-card title-main-card">
@@ -807,6 +784,16 @@ app.innerHTML = `
       </p>
       <div id="characterGrid" class="character-grid"></div>
       <div id="talentPanel" class="talent-panel"></div>
+      <section class="hotbar-loadout-panel">
+        <div class="hotbar-loadout-head">
+          <div>
+            <p class="eyebrow">combat shortcuts</p>
+            <strong>1–9 Hotbar</strong>
+          </div>
+          <small>Assign items and skills without adding more combat panels.</small>
+        </div>
+        <div id="hotbarLoadoutGrid" class="hotbar-loadout-grid"></div>
+      </section>
     </dialog>
 
     <dialog id="codexDialog" class="settings-dialog codex-dialog">
@@ -1268,6 +1255,7 @@ let campaign = createDefaultCampaignProgress();
 let inventory: Inventory = createEmptyInventory();
 let equipment: EquipmentState = createStarterEquipmentState();
 let supportSpells: SupportSpellState = createStarterSupportSpellState();
+let hotbar: HotbarState = createDefaultHotbarState();
 let characters: CharacterState = createStarterCharacterState();
 let luckPity: LuckPityState = createLuckPityState();
 let hiddenDiscovery: HiddenDiscoveryState = createHiddenDiscoveryState();
@@ -1386,6 +1374,7 @@ type AutosaveSnapshot = {
   inventory: Inventory;
   equipment: EquipmentState;
   supportSpells: SupportSpellState;
+  hotbar: HotbarState;
   characters: CharacterState;
   luckPity: LuckPityState;
   hiddenDiscovery: HiddenDiscoveryState;
@@ -1430,6 +1419,7 @@ const campaignAutosave = new AutosaveQueue<
     snapshot.relics,
     snapshot.codex,
     snapshot.ascension,
+    snapshot.hotbar,
   ),
 );
 
@@ -1439,6 +1429,7 @@ function currentRunPersistentState(): RunPersistentState {
     inventory,
     equipment,
     supportSpells,
+    hotbar,
     characters,
     luckPity,
     hiddenDiscovery,
@@ -1546,6 +1537,7 @@ function persistRecoveryMirrorSync(
       relics,
       codex,
       ascension,
+      hotbar,
     ),
   );
 }
@@ -1583,6 +1575,7 @@ function refreshPersistentStateUi(): void {
   game.setLuckPityState(luckPity);
   game.setHiddenDiscoveryState(hiddenDiscovery);
   applySelectedCharacter();
+  renderPlayerStatusIdentity();
   renderInventory();
   applyEquipmentStats();
   applySupportSpells();
@@ -1616,6 +1609,19 @@ function renderStats(stats: GameStats): void {
     " / " +
     String(Math.ceil(stats.maxEnergy));
 
+  const hullPercent =
+    stats.maxHull <= 0 ? 0 : Math.max(0, Math.min(100, stats.hull / stats.maxHull * 100));
+  const shieldPercent =
+    stats.maxShield <= 0 ? 0 : Math.max(0, Math.min(100, stats.shield / stats.maxShield * 100));
+  const energyPercent =
+    stats.maxEnergy <= 0 ? 0 : Math.max(0, Math.min(100, stats.energy / stats.maxEnergy * 100));
+  byId("hullFill").style.width = hullPercent.toFixed(2) + "%";
+  byId("hullDamageFill").style.width = hullPercent.toFixed(2) + "%";
+  byId("shieldFill").style.width = shieldPercent.toFixed(2) + "%";
+  byId("energyFill").style.width = energyPercent.toFixed(2) + "%";
+  byId("playerStatusHud").classList.toggle("low-hull", hullPercent <= 25);
+  byId("playerStatusHud").classList.toggle("energy-low", energyPercent <= 20);
+
   byId("powerFill").style.width = String(stats.power) + "%";
   byId("powerFill").classList.toggle("ready", stats.power >= 100);
   const ultimateName = getCharacter(characters.selected).ultimateName;
@@ -1625,269 +1631,194 @@ function renderStats(stats: GameStats): void {
       : "charge " + ultimateName.toLowerCase();
 }
 
-function renderInventory(): void {
-  const entries: Array<{
-    id: RecoveryItemId;
-    countId: string;
-    buttonId: string;
-  }> = [
-    {
-      id: "repair-kit",
-      countId: "repairCount",
-      buttonId: "quickRepair",
-    },
-    {
-      id: "shield-cell",
-      countId: "shieldCount",
-      buttonId: "quickShield",
-    },
-    {
-      id: "energy-cell",
-      countId: "energyCount",
-      buttonId: "quickEnergy",
-    },
-  ];
-
-  for (const entry of entries) {
-    const count = itemCount(inventory, entry.id);
-    byId(entry.countId).textContent = String(count);
-    byId<HTMLButtonElement>(entry.buttonId).disabled =
-      count <= 0 || game.getPhase() !== "playing";
-  }
-}
-
 function skillReasonText(reason: SkillBlockReason): string {
   if (reason === "cooldown") return "Skill is cooling down";
   if (reason === "no-charges") return "No charges left this stage";
   if (reason === "stage-limit") return "Stage use limit reached";
   if (reason === "energy") return "Not enough Energy";
-  if (reason === "typing-condition") {
-    return "Typing condition not met";
-  }
-  if (reason === "effect-not-needed") {
-    return "No useful target or effect right now";
-  }
-  if (reason === "silenced") {
-    return "Skills are temporarily Silenced";
-  }
+  if (reason === "typing-condition") return "Typing condition not met";
+  if (reason === "effect-not-needed") return "No useful target or effect right now";
+  if (reason === "silenced") return "Skills are temporarily Silenced";
   return "Skill unavailable";
 }
 
-function renderSupportSkills(): void {
-  const buttons = [
-    byId<HTMLButtonElement>("supportSkill0"),
-    byId<HTMLButtonElement>("supportSkill1"),
-  ];
-
-  for (let index = 0; index < buttons.length; index += 1) {
-    const button = buttons[index]!;
-    const slot = index as 0 | 1;
-    const id = supportSpells.loadout[slot];
-    const name = button.querySelector("span");
-    const stateLabel = button.querySelector("strong");
-
-    if (id === null) {
-      if (name !== null) name.textContent = "empty";
-      if (stateLabel !== null) stateLabel.textContent = "—";
-      button.disabled = true;
-      button.title = "Empty support spell slot";
-      continue;
-    }
-
-    const spell = getSupportSpell(id);
-    const state = game.getSkillState(id);
-    const reason = game.canUseSkill(id);
-
-    if (name !== null) name.textContent = spell.name.toLowerCase();
-    if (stateLabel !== null) {
-      if (state === null) {
-        stateLabel.textContent = "—";
-      } else if (state.cooldownRemaining > 0.05) {
-        stateLabel.textContent = state.cooldownRemaining.toFixed(1) + "s";
-      } else if (state.chargesRemaining !== null) {
-        stateLabel.textContent = "×" + String(state.chargesRemaining);
-      } else {
-        stateLabel.textContent = "ready";
-      }
-    }
-
-    button.disabled = reason !== null;
-    button.title =
-      reason === null ? spell.description : skillReasonText(reason);
-  }
-}
-
 function selectedCharacterSkillId(): string | null {
-  if (characters.selected === "vanguard") {
-    return VANGUARD_ACTIVE_SKILL_ID;
-  }
-  if (characters.selected === "aegis") {
-    return AEGIS_ACTIVE_SKILL_ID;
-  }
-  if (characters.selected === "volt") {
-    return VOLT_ACTIVE_SKILL_ID;
-  }
-  if (characters.selected === "wraith") {
-    return WRAITH_ACTIVE_SKILL_ID;
-  }
-  if (characters.selected === "fortune") {
-    return FORTUNE_ACTIVE_SKILL_ID;
-  }
-  if (characters.selected === "arsenal") {
-    return ARSENAL_ACTIVE_SKILL_ID;
-  }
-  if (characters.selected === "oracle") {
-    return ORACLE_ACTIVE_SKILL_ID;
-  }
-  if (characters.selected === "bastion") {
-    return BASTION_ACTIVE_SKILL_ID;
-  }
-  if (characters.selected === "reaper") {
-    return REAPER_ACTIVE_SKILL_ID;
-  }
-  if (characters.selected === "celestial") {
-    return CELESTIAL_ACTIVE_SKILL_ID;
-  }
-  if (characters.selected === "zenith") {
-    return ZENITH_ACTIVE_SKILL_ID;
-  }
+  if (characters.selected === "vanguard") return VANGUARD_ACTIVE_SKILL_ID;
+  if (characters.selected === "aegis") return AEGIS_ACTIVE_SKILL_ID;
+  if (characters.selected === "volt") return VOLT_ACTIVE_SKILL_ID;
+  if (characters.selected === "wraith") return WRAITH_ACTIVE_SKILL_ID;
+  if (characters.selected === "fortune") return FORTUNE_ACTIVE_SKILL_ID;
+  if (characters.selected === "arsenal") return ARSENAL_ACTIVE_SKILL_ID;
+  if (characters.selected === "oracle") return ORACLE_ACTIVE_SKILL_ID;
+  if (characters.selected === "bastion") return BASTION_ACTIVE_SKILL_ID;
+  if (characters.selected === "reaper") return REAPER_ACTIVE_SKILL_ID;
+  if (characters.selected === "celestial") return CELESTIAL_ACTIVE_SKILL_ID;
+  if (characters.selected === "zenith") return ZENITH_ACTIVE_SKILL_ID;
   return null;
 }
 
-function renderCharacterSkill(): void {
-  const button = byId<HTMLButtonElement>("characterSkill");
-  const name = button.querySelector("span");
-  const stateLabel = button.querySelector("strong");
-  const character = getCharacter(characters.selected);
-  const skillId = selectedCharacterSkillId();
+function isCoreCombatSkillId(id: string): id is CombatSkillId {
+  return (
+    DEFENSIVE_SKILLS.some((skill) => skill.id === id) ||
+    OFFENSIVE_SKILLS.some((skill) => skill.id === id)
+  );
+}
 
-  if (name !== null) name.textContent = character.activeName.toLowerCase();
+function hotbarSkillId(action: HotbarAction): string | null {
+  if (action.kind === "character-skill") {
+    return selectedCharacterSkillId();
+  }
+  return action.kind === "skill" ? action.id : null;
+}
 
+function hotbarActionLabel(action: HotbarAction): string {
+  if (action.kind === "item") return getItemDefinition(action.id).name;
+  if (action.kind === "character-skill") {
+    return getCharacter(characters.selected).activeName;
+  }
+  const definition = game.getSkillDefinition(action.id);
+  if (definition !== null) return definition.name;
+  if (isSupportSpellId(action.id)) return getSupportSpell(action.id).name;
+  return (
+    DEFENSIVE_SKILLS.find((skill) => skill.id === action.id)?.name ??
+    OFFENSIVE_SKILLS.find((skill) => skill.id === action.id)?.name ??
+    action.id
+  );
+}
+
+function hotbarActionGlyph(action: HotbarAction): string {
+  if (action.kind === "item") {
+    if (action.id === "repair-kit") return "✚";
+    if (action.id === "shield-cell") return "⬡";
+    return "⚡";
+  }
+  if (action.kind === "character-skill") return "★";
+  if (action.id === "barrier") return "◈";
+  if (action.id === "reflect-field") return "◇";
+  if (action.id === "time-shell") return "◷";
+  if (action.id === "emergency-repair") return "✦";
+  if (action.id === "guardian-drone") return "◆";
+  if (action.id === "emp-burst") return "ϟ";
+  if (action.id === "chain-lightning") return "↯";
+  if (action.id === "mark-of-weakness") return "◎";
+  if (action.id === "sanctuary") return "✧";
+  if (action.id === "gravity-well") return "◉";
+  if (action.id === "cleanse") return "◇";
+  return "☄";
+}
+
+function hotbarActionStatus(action: HotbarAction): {
+  disabled: boolean;
+  state: string;
+  title: string;
+  cooldown: boolean;
+} {
+  if (action.kind === "item") {
+    const count = itemCount(inventory, action.id);
+    return {
+      disabled: game.getPhase() !== "playing" || count <= 0,
+      state: "×" + String(count),
+      title: getItemDefinition(action.id).description,
+      cooldown: false,
+    };
+  }
+
+  const skillId = hotbarSkillId(action);
   if (skillId === null) {
-    if (stateLabel !== null) stateLabel.textContent = "—";
-    button.disabled = true;
-    button.title = "Character skill is implemented in a later step";
-    return;
+    return {
+      disabled: true,
+      state: "—",
+      title: "Skill unavailable for the selected character",
+      cooldown: false,
+    };
   }
 
   const state = game.getSkillState(skillId);
   const reason = game.canUseSkill(skillId);
+  const cooldown = (state?.cooldownRemaining ?? 0) > 0.05;
+  const stateText =
+    state === null
+      ? "—"
+      : cooldown
+        ? state.cooldownRemaining.toFixed(1) + "s"
+        : state.chargesRemaining !== null
+          ? "×" + String(state.chargesRemaining)
+          : "ready";
 
-  if (stateLabel !== null) {
-    if (state === null) {
-      stateLabel.textContent = "—";
-    } else if (state.cooldownRemaining > 0.05) {
-      stateLabel.textContent = state.cooldownRemaining.toFixed(1) + "s";
-    } else {
-      stateLabel.textContent = "ready";
+  return {
+    disabled: reason !== null,
+    state: stateText,
+    title:
+      reason === null
+        ? hotbarActionLabel(action)
+        : skillReasonText(reason),
+    cooldown,
+  };
+}
+
+function ensureHotbarButtons(): HTMLButtonElement[] {
+  const root = byId("combatHotbar");
+  if (root.children.length !== 9) {
+    root.replaceChildren();
+    for (let index = 0; index < 9; index += 1) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "hotbar-slot";
+      button.id = "hotbarSlot" + String(index + 1);
+      button.innerHTML =
+        "<kbd>" + String(index + 1) + "</kbd>" +
+        "<span class=\"hotbar-glyph\">·</span>" +
+        "<span class=\"hotbar-label\">empty</span>" +
+        "<strong class=\"hotbar-state\">—</strong>";
+      button.addEventListener("click", () => activateHotbarSlot(index));
+      root.append(button);
     }
   }
+  return Array.from(root.querySelectorAll<HTMLButtonElement>(".hotbar-slot"));
+}
 
-  button.disabled = reason !== null;
-  button.title =
-    reason === null ? character.activeName : skillReasonText(reason);
+function renderHotbar(): void {
+  const buttons = ensureHotbarButtons();
+  for (let index = 0; index < buttons.length; index += 1) {
+    const button = buttons[index]!;
+    const action = hotbar.slots[index] ?? null;
+    const glyph = button.querySelector<HTMLElement>(".hotbar-glyph");
+    const label = button.querySelector<HTMLElement>(".hotbar-label");
+    const state = button.querySelector<HTMLElement>(".hotbar-state");
+
+    button.classList.remove("item", "skill", "character", "cooldown");
+    if (action === null) {
+      if (glyph !== null) glyph.textContent = "·";
+      if (label !== null) label.textContent = "empty";
+      if (state !== null) state.textContent = "—";
+      button.disabled = true;
+      button.title = "Unassigned hotbar slot";
+      continue;
+    }
+
+    if (glyph !== null) glyph.textContent = hotbarActionGlyph(action);
+    if (label !== null) label.textContent = hotbarActionLabel(action);
+    const status = hotbarActionStatus(action);
+    if (state !== null) state.textContent = status.state;
+    button.disabled = status.disabled;
+    button.title = status.title;
+    button.classList.add(
+      action.kind === "item"
+        ? "item"
+        : action.kind === "character-skill"
+          ? "character"
+          : "skill",
+    );
+    button.classList.toggle("cooldown", status.cooldown);
+  }
+}
+
+function renderInventory(): void {
+  renderHotbar();
 }
 
 function renderAllSkills(): void {
-  renderSkills();
-  renderSupportSkills();
-  renderCharacterSkill();
-}
-
-function useCharacterSkill(): void {
-  const skillId = selectedCharacterSkillId();
-  if (skillId === null) {
-    showNotice("Character skill is not implemented yet");
-    return;
-  }
-
-  const result = game.useSkill(skillId);
-  if (!result.ok) {
-    showNotice(skillReasonText(result.reason));
-    renderAllSkills();
-    return;
-  }
-
-  showNotice("✓ " + getCharacter(characters.selected).activeName + " activated");
-  renderAllSkills();
-}
-
-function useSupportSpell(slot: 0 | 1): void {
-  const id = supportSpells.loadout[slot];
-  if (id === null) {
-    showNotice("Support spell slot is empty");
-    return;
-  }
-
-  const result = game.useSkill(id);
-  if (!result.ok) {
-    showNotice(skillReasonText(result.reason));
-    renderAllSkills();
-    return;
-  }
-
-  showNotice("✓ " + getSupportSpell(id).name + " activated");
-  renderAllSkills();
-}
-
-function renderSkills(): void {
-  const map: Array<{
-    id: CombatSkillId;
-    buttonId: string;
-  }> = [
-    { id: "barrier", buttonId: "skillBarrier" },
-    { id: "reflect-field", buttonId: "skillReflect" },
-    { id: "time-shell", buttonId: "skillTimeShell" },
-    { id: "emergency-repair", buttonId: "skillRepair" },
-    { id: "guardian-drone", buttonId: "skillGuardian" },
-    { id: "emp-burst", buttonId: "skillEmp" },
-    { id: "chain-lightning", buttonId: "skillChain" },
-    { id: "mark-of-weakness", buttonId: "skillMark" },
-  ];
-
-  for (const entry of map) {
-    const button = byId<HTMLButtonElement>(entry.buttonId);
-    const state = game.getSkillState(entry.id);
-    const reason = game.canUseSkill(entry.id);
-    const label = button.querySelector("strong");
-
-    if (label !== null) {
-      if (state === null) {
-        label.textContent = "—";
-      } else if (state.cooldownRemaining > 0.05) {
-        label.textContent = state.cooldownRemaining.toFixed(1) + "s";
-      } else if (state.chargesRemaining !== null) {
-        label.textContent = "×" + String(state.chargesRemaining);
-      } else {
-        label.textContent = "ready";
-      }
-    }
-
-    button.disabled = reason !== null;
-    const definition =
-      DEFENSIVE_SKILLS.find((skill) => skill.id === entry.id) ??
-      OFFENSIVE_SKILLS.find((skill) => skill.id === entry.id);
-
-    button.title =
-      reason === null
-        ? definition?.name ?? entry.id
-        : skillReasonText(reason);
-  }
-}
-
-function useCombatSkill(id: CombatSkillId): void {
-  const result = game.useSkill(id);
-  if (!result.ok) {
-    showNotice(skillReasonText(result.reason));
-    renderSkills();
-    return;
-  }
-
-  const skill =
-    DEFENSIVE_SKILLS.find((entry) => entry.id === id) ??
-    OFFENSIVE_SKILLS.find((entry) => entry.id === id);
-  showNotice("✓ " + (skill?.name ?? id) + " activated");
-  renderSkills();
+  renderHotbar();
 }
 
 function useInventoryItem(id: RecoveryItemId): void {
@@ -1901,8 +1832,156 @@ function useInventoryItem(id: RecoveryItemId): void {
   if (removed.changed <= 0) return;
 
   inventory = removed.inventory;
-  renderInventory();
+  renderHotbar();
   void autosaveCampaign("inventory", "✓ Item used · progress saved");
+}
+
+function useHotbarSkill(action: HotbarAction): void {
+  const skillId = hotbarSkillId(action);
+  if (skillId === null) {
+    showNotice("Skill unavailable for the selected character");
+    return;
+  }
+
+  const result = game.useSkill(skillId);
+  if (!result.ok) {
+    showNotice(skillReasonText(result.reason));
+    renderHotbar();
+    return;
+  }
+
+  showNotice("✓ " + hotbarActionLabel(action) + " activated");
+  renderHotbar();
+}
+
+function activateHotbarSlot(index: number): void {
+  if (game.getPhase() !== "playing") return;
+  const action = hotbar.slots[index] ?? null;
+  if (action === null) return;
+  if (action.kind === "item") {
+    useInventoryItem(action.id);
+    return;
+  }
+  useHotbarSkill(action);
+}
+
+function hotbarCandidateActions(): HotbarAction[] {
+  const actions: HotbarAction[] = [
+    { kind: "item", id: "repair-kit" },
+    { kind: "item", id: "shield-cell" },
+    { kind: "item", id: "energy-cell" },
+    ...DEFENSIVE_SKILLS.map(
+      (skill): HotbarAction => ({
+        kind: "skill",
+        id: skill.id as DefensiveSkillId,
+      }),
+    ),
+    ...OFFENSIVE_SKILLS.map(
+      (skill): HotbarAction => ({
+        kind: "skill",
+        id: skill.id as OffensiveSkillId,
+      }),
+    ),
+    { kind: "character-skill" },
+  ];
+
+  for (const id of supportSpells.loadout) {
+    if (id !== null) actions.push({ kind: "skill", id });
+  }
+
+  return actions;
+}
+
+function hotbarActionFromKey(key: string): HotbarAction | null {
+  return hotbarCandidateActions().find(
+    (action) => hotbarActionKey(action) === key,
+  ) ?? null;
+}
+
+function renderHotbarLoadout(): void {
+  const root = byId("hotbarLoadoutGrid");
+  root.replaceChildren();
+  const candidates = hotbarCandidateActions();
+
+  for (let index = 0; index < 9; index += 1) {
+    const row = document.createElement("label");
+    row.className = "hotbar-loadout-slot";
+    const key = document.createElement("kbd");
+    key.textContent = String(index + 1);
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", "Hotbar slot " + String(index + 1));
+
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = "Empty";
+    select.append(empty);
+
+    for (const action of candidates) {
+      const option = document.createElement("option");
+      option.value = hotbarActionKey(action);
+      option.textContent = hotbarActionLabel(action);
+      select.append(option);
+    }
+
+    const current = hotbar.slots[index] ?? null;
+    select.value = current === null ? "" : hotbarActionKey(current);
+    select.disabled = game.getPhase() === "playing";
+    select.addEventListener("change", () => {
+      const action =
+        select.value === "" ? null : hotbarActionFromKey(select.value);
+      hotbar = assignHotbarSlot(hotbar, index, action);
+      renderHotbar();
+      renderHotbarLoadout();
+      void autosaveCampaign(
+        "hotbar",
+        "✓ Hotbar saved · slot " + String(index + 1),
+        "loadout",
+      );
+    });
+
+    row.append(key, select);
+    root.append(row);
+  }
+}
+
+function reconcileHotbarSupportAssignments(): void {
+  const equipped = new Set(
+    supportSpells.loadout.filter(
+      (id): id is SupportSpellId => id !== null,
+    ),
+  );
+  let next = hotbar;
+  for (let index = 0; index < next.slots.length; index += 1) {
+    const action = next.slots[index];
+    if (
+      action?.kind === "skill" &&
+      isSupportSpellId(action.id) &&
+      !equipped.has(action.id)
+    ) {
+      next = assignHotbarSlot(next, index, null);
+    }
+  }
+  hotbar = next;
+}
+
+function renderPlayerStatusIdentity(): void {
+  const character = getCharacter(characters.selected);
+  const progress = characters.progress[characters.selected];
+  byId("playerStatusName").textContent = character.name;
+  byId("playerStatusLevel").textContent = "Lv " + String(progress.level);
+
+  const canvas = byId<HTMLCanvasElement>("playerStatusPortrait");
+  const context = canvas.getContext("2d");
+  if (context !== null) {
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    drawCharacterShip(context, characters.selected, {
+      x: canvas.width / 2,
+      y: 35,
+      time: 0.8,
+      scale: 0.78,
+      glowScale: 0.7,
+    });
+  }
 }
 
 function showNotice(message: string): void {
@@ -1921,9 +2000,8 @@ function renderPhase(phase: GamePhase): void {
   pauseOverlay.classList.toggle("hidden", phase !== "paused");
   gameOverOverlay.classList.toggle("hidden", phase !== "gameover");
   stageClearOverlay.classList.toggle("hidden", phase !== "stageclear");
-  byId("quickItems").classList.toggle("hidden", phase !== "playing");
-  byId("quickSkills").classList.toggle("hidden", phase !== "playing");
-  byId("quickSupport").classList.toggle("hidden", phase !== "playing");
+  byId("playerStatusHud").classList.toggle("hidden", phase !== "playing");
+  byId("combatHotbar").classList.toggle("hidden", phase !== "playing");
 
   if (phase !== "playing" && phase !== "paused") {
     renderStageEvents([]);
@@ -3187,6 +3265,7 @@ byId<HTMLButtonElement>("anomalyOverload").addEventListener(
 function applySelectedCharacter(): void {
   game.setCharacter(characters.selected);
   applyEquipmentStats();
+  renderPlayerStatusIdentity();
   renderAllSkills();
 }
 
@@ -3309,6 +3388,7 @@ function renderCharacters(): void {
     String(selectedProgress.mastery);
 
   renderTalentPanel();
+  renderHotbarLoadout();
 }
 
 function renderTalentPanel(): void {
@@ -5394,6 +5474,7 @@ async function initializePlayerProgress(): Promise<void> {
     inventory = loaded.save.inventory;
     equipment = loaded.save.equipment;
     supportSpells = loaded.save.supportSpells;
+    hotbar = loaded.save.hotbar;
     luckPity = loaded.save.luckPity;
     hiddenDiscovery = loaded.save.hiddenDiscovery;
     credits = loaded.save.credits;
@@ -5862,6 +5943,7 @@ async function exportSave(): Promise<void> {
     relics,
     codex,
     ascension,
+    hotbar,
   );
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -5897,6 +5979,7 @@ async function importSaveFile(file: File): Promise<void> {
     const importedInventory = result.save.inventory;
     const importedEquipment = result.save.equipment;
     const importedSupportSpells = result.save.supportSpells;
+    const importedHotbar = result.save.hotbar;
     const importedCharacters = syncCharacterUnlocks(
       result.save.characters,
       imported.clearedStages,
@@ -5938,6 +6021,7 @@ async function importSaveFile(file: File): Promise<void> {
     const previousInventory = inventory;
     const previousEquipment = equipment;
     const previousSupportSpells = supportSpells;
+    const previousHotbar = hotbar;
     const previousCharacters = characters;
     const previousLuckPity = luckPity;
     const previousHiddenDiscovery = hiddenDiscovery;
@@ -5958,6 +6042,7 @@ async function importSaveFile(file: File): Promise<void> {
     inventory = importedInventory;
     equipment = importedEquipment;
     supportSpells = importedSupportSpells;
+    hotbar = importedHotbar;
     characters = importedCharacters;
     luckPity = importedLuckPity;
     hiddenDiscovery = importedHiddenDiscovery;
@@ -6003,6 +6088,7 @@ async function importSaveFile(file: File): Promise<void> {
       inventory = previousInventory;
       equipment = previousEquipment;
       supportSpells = previousSupportSpells;
+      hotbar = previousHotbar;
       characters = previousCharacters;
       luckPity = previousLuckPity;
       hiddenDiscovery = previousHiddenDiscovery;
@@ -6212,35 +6298,6 @@ for (const id of ["titleButton", "clearTitleButton"]) {
   byId(id).addEventListener("click", () => game.backToTitle());
 }
 
-const recoveryButtons: Array<[string, RecoveryItemId]> = [
-  ["quickRepair", "repair-kit"],
-  ["quickShield", "shield-cell"],
-  ["quickEnergy", "energy-cell"],
-];
-
-for (const [buttonId, itemId] of recoveryButtons) {
-  byId(buttonId).addEventListener("click", () => {
-    useInventoryItem(itemId);
-  });
-}
-
-const combatSkillButtons: Array<[string, CombatSkillId]> = [
-  ["skillBarrier", "barrier"],
-  ["skillReflect", "reflect-field"],
-  ["skillTimeShell", "time-shell"],
-  ["skillRepair", "emergency-repair"],
-  ["skillGuardian", "guardian-drone"],
-  ["skillEmp", "emp-burst"],
-  ["skillChain", "chain-lightning"],
-  ["skillMark", "mark-of-weakness"],
-];
-
-for (const [buttonId, skillId] of combatSkillButtons) {
-  byId(buttonId).addEventListener("click", () => {
-    useCombatSkill(skillId);
-  });
-}
-
 byId("characterButton").addEventListener("click", openCharacters);
 byId("equipmentButton").addEventListener("click", openEquipment);
 byId("shopButton").addEventListener("click", openNormalShop);
@@ -6270,9 +6327,12 @@ for (const slot of [0, 1] as const) {
       const id = value === "" ? null : (value as SupportSpellId);
       supportSpells = equipSupportSpell(supportSpells, slot, id);
       applySupportSpells();
+      reconcileHotbarSupportAssignments();
       applyEquipmentStats();
       renderSupportLoadout();
       renderEquipment();
+      renderHotbar();
+      renderHotbarLoadout();
       void autosaveCampaign(
         "support-spells",
         "✓ Support loadout saved · applies next stage",
@@ -6281,14 +6341,6 @@ for (const slot of [0, 1] as const) {
     },
   );
 }
-
-byId("supportSkill0").addEventListener("click", () => {
-  useSupportSpell(0);
-});
-byId("characterSkill").addEventListener("click", useCharacterSkill);
-byId("supportSkill1").addEventListener("click", () => {
-  useSupportSpell(1);
-});
 
 for (const id of ["settingsButton", "pauseSettingsButton"]) {
   byId(id).addEventListener("click", openSettings);
@@ -6529,68 +6581,13 @@ window.addEventListener("keydown", (event) => {
     specialShopDialog.open
   ) return;
 
-  if (game.getPhase() === "playing" && event.key === "=") {
-    event.preventDefault();
-    useCharacterSkill();
-    return;
-  }
-
-  if (
-    game.getPhase() === "playing" &&
-    (event.key === "[" || event.key === "]")
-  ) {
-    event.preventDefault();
-    useSupportSpell(event.key === "[" ? 0 : 1);
-    return;
-  }
-
-  if (
-    game.getPhase() === "playing" &&
-    (event.key === "4" ||
-      event.key === "5" ||
-      event.key === "6" ||
-      event.key === "7" ||
-      event.key === "8" ||
-      event.key === "9" ||
-      event.key === "0" ||
-      event.key === "-")
-  ) {
-    event.preventDefault();
-    const skillId: CombatSkillId =
-      event.key === "4"
-        ? "barrier"
-        : event.key === "5"
-          ? "reflect-field"
-          : event.key === "6"
-            ? "time-shell"
-            : event.key === "7"
-              ? "emergency-repair"
-              : event.key === "8"
-                ? "guardian-drone"
-                : event.key === "9"
-                  ? "emp-burst"
-                  : event.key === "0"
-                    ? "chain-lightning"
-                    : "mark-of-weakness";
-    useCombatSkill(skillId);
-    return;
-  }
-
-  if (
-    game.getPhase() === "playing" &&
-    (event.key === "1" ||
-      event.key === "2" ||
-      event.key === "3")
-  ) {
-    event.preventDefault();
-    const itemId: RecoveryItemId =
-      event.key === "1"
-        ? "repair-kit"
-        : event.key === "2"
-          ? "shield-cell"
-          : "energy-cell";
-    useInventoryItem(itemId);
-    return;
+  if (game.getPhase() === "playing") {
+    const slotIndex = hotbarSlotForKey(event.key);
+    if (slotIndex !== null) {
+      event.preventDefault();
+      activateHotbarSlot(slotIndex);
+      return;
+    }
   }
 
   if (event.key === "Escape" || event.key === " ") {
@@ -6665,6 +6662,7 @@ window.addEventListener("beforeunload", () => {
 
 renderSettings();
 updateCampaignUi();
+renderPlayerStatusIdentity();
 renderStats(game.getStats());
 renderPhase(game.getPhase());
 renderAllSkills();
