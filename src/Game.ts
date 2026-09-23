@@ -296,6 +296,7 @@ import {
   wordDifficultyScore,
 } from "./enemies/word-difficulty";
 import { resolveEnemyTypingProfile } from "./enemies/typing-profile";
+import { StageWordLedger } from "./enemies/stage-word-variety";
 import {
   enemySkillDefinition,
   type EnemySkillId,
@@ -601,6 +602,7 @@ export class Game {
   private bossRewardPending = false;
   private seenEnemyDefinitions = new Set<EnemyDefinitionId>();
   private enemies: Enemy[] = [];
+  private readonly stageWordLedger = new StageWordLedger();
   private projectiles: EnemyProjectile[] = [];
   private lasers: Laser[] = [];
   private particles: Particle[] = [];
@@ -2428,6 +2430,7 @@ export class Game {
     this.secondsSinceDamage = Number.POSITIVE_INFINITY;
     this.resourceEmitTimer = 0;
     this.skillEngine.resetStage();
+    this.stageWordLedger.reset();
     this.enemies = [];
     this.projectiles = [];
     this.lasers = [];
@@ -3334,10 +3337,13 @@ export class Game {
       return length >= 5 && length <= 12;
     });
     const source = candidates.length > 0 ? candidates : this.vocabulary;
-    return (
+    const preferred =
       source[Math.floor(Math.random() * source.length)] ??
-      FALLBACK_ENTRIES[8]!
-    );
+      FALLBACK_ENTRIES[8]!;
+    const varied =
+      this.selectVariedEnemyEntry(preferred, undefined, source) ?? preferred;
+    this.stageWordLedger.record(varied);
+    return varied;
   }
 
   private spawnSupplyPod(): void {
@@ -3785,6 +3791,9 @@ export class Game {
       if (!spawned) {
         // The package is atomic: a defensive failure cannot leave half a
         // formation alive or consume the Campaign enemy budget.
+        for (const tentative of this.enemies.slice(initialEnemyCount)) {
+          this.stageWordLedger.undo(tentative.entry);
+        }
         this.enemies.splice(initialEnemyCount);
         return 0;
       }
@@ -3932,6 +3941,13 @@ export class Game {
         activeWords: this.activeEnemyWords(),
       },
     });
+    const varied = this.selectVariedEnemyEntry(typingProfile.entry);
+    if (varied === null) return false;
+    typingProfile.entry = varied;
+    typingProfile.wordDifficultyScore = wordDifficultyScore(
+      varied,
+      this.vocabularyLevel,
+    );
     const runtimeProfile = resolveEnemyRuntimeProfile({
       stage: rosterStage,
       kind,
@@ -3984,6 +4000,7 @@ export class Game {
       actionCooldown: resolvedActionCooldown,
     });
 
+    this.stageWordLedger.record(typingProfile.entry);
     this.notifyEnemySeen(definitionId);
     const spawnDefinition = enemyDefinition(definitionId);
     if (spawnDefinition !== undefined) {
@@ -4019,6 +4036,23 @@ export class Game {
       .map((enemy) => enemy.entry.en);
   }
 
+  private selectVariedEnemyEntry(
+    preferred: VocabularyEntry,
+    excludeEnemyId?: number,
+    entries: readonly VocabularyEntry[] = this.vocabulary,
+  ): VocabularyEntry | null {
+    // Intentional same-prefix Test Lab scenarios must remain reproducible.
+    if (this.testLabEnabled) return preferred;
+    const activeWords = this.activeEnemyWords(excludeEnemyId);
+    if (this.boss !== null) activeWords.push(this.boss.entry.en);
+    return this.stageWordLedger.pick(
+      entries,
+      preferred,
+      this.vocabularyLevel,
+      activeWords,
+    );
+  }
+
   private pickVocabularyEntry(kind: EnemyKind): VocabularyEntry {
     const candidates = this.vocabulary.filter((entry) => {
       const length = typingText(entry.en).length;
@@ -4051,11 +4085,13 @@ export class Game {
         },
       ) ?? this.pickVocabularyEntry(enemy.kind);
 
+    const varied = this.selectVariedEnemyEntry(entry, enemy.id) ?? entry;
     enemy.wordDifficultyScore = wordDifficultyScore(
-      entry,
+      varied,
       this.vocabularyLevel,
     );
-    return entry;
+    this.stageWordLedger.record(varied);
+    return varied;
   }
 
   private activateInterference(jammer: Enemy): void {
@@ -4383,6 +4419,13 @@ export class Game {
         activeWords: this.activeEnemyWords(),
       },
     });
+    const varied = this.selectVariedEnemyEntry(typingProfile.entry);
+    if (varied === null) return;
+    typingProfile.entry = varied;
+    typingProfile.wordDifficultyScore = wordDifficultyScore(
+      varied,
+      this.vocabularyLevel,
+    );
     const runtimeProfile = resolveEnemyRuntimeProfile({
       stage: rosterStage,
       kind: "scout",
@@ -4428,6 +4471,7 @@ export class Game {
           ? null
           : this.enemySkillCooldown(firstSkill, this.difficulty),
     });
+    this.stageWordLedger.record(typingProfile.entry);
     this.notifyEnemySeen(definitionId);
 
     this.burst(carrier.x, carrier.y, 12, 47);
@@ -5456,6 +5500,13 @@ export class Game {
           activeWords: this.activeEnemyWords(),
         },
       });
+      const varied = this.selectVariedEnemyEntry(typingProfile.entry);
+      if (varied === null) continue;
+      typingProfile.entry = varied;
+      typingProfile.wordDifficultyScore = wordDifficultyScore(
+        varied,
+        this.vocabularyLevel,
+      );
       const runtimeProfile = resolveEnemyRuntimeProfile({
         stage: rosterStage,
         kind: "scout",
@@ -5501,6 +5552,7 @@ export class Game {
             ? null
             : this.enemySkillCooldown(firstSkill, this.difficulty),
       });
+      this.stageWordLedger.record(typingProfile.entry);
       this.notifyEnemySeen(definitionId);
     }
 
