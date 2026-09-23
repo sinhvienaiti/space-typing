@@ -17,8 +17,6 @@ import {
 } from "../audio/music-profile";
 import { difficultyFor } from "../campaign/difficulty";
 import {
-  createDifficultySettings,
-  difficultyInputFromSettings,
   DIFFICULTY_MODES,
 } from "../campaign/difficulty-settings";
 import { createStageConfig } from "../campaign/stage";
@@ -341,6 +339,10 @@ export function mountTestLab(
             <label>Checkpoint<input data-field="checkpoint" type="number" min="1" max="1000" value="1"></label>
             <label>Difficulty<select data-field="difficulty"></select></label>
             <label>Vocabulary level<input data-field="vocab-level" type="number" min="1" max="100" value="1"></label>
+            <label>Recent WPM<input data-field="recent-wpm" type="number" min="10" max="300" value="60"></label>
+            <label>Recent accuracy<input data-field="recent-accuracy" type="number" min="60" max="100" step="0.1" value="96"></label>
+            <label>Custom target WPM<input data-field="custom-wpm" type="number" min="10" max="300" value="60"></label>
+            <label>Custom pressure<input data-field="custom-pressure" type="number" min="0.7" max="1.45" step="0.05" value="1"></label>
             <label>Death mode<select data-field="death-mode">
               <option value="immortal">Immortal</option>
               <option value="real">Real Death</option>
@@ -371,7 +373,7 @@ export function mountTestLab(
         <details open>
           <summary>Enemy Runtime</summary>
           <div class="test-lab-grid">
-            <label>Enemy<select data-field="enemy"></select></label>
+            <label>Enemy<select data-field="enemy" multiple size="8"></select></label>
             <label>Rank<select data-field="rank"></select></label>
             <label>Layers<select data-field="layers">
               <option value="1">1</option>
@@ -387,7 +389,8 @@ export function mountTestLab(
             <label class="test-lab-check"><input data-field="enemy-elite" type="checkbox"> Force Elite</label>
           </div>
           <div class="test-lab-row">
-            <button type="button" data-action="spawn-enemy">Spawn Selected</button>
+            <button type="button" data-action="spawn-enemy">Spawn Selected ×N</button>
+            <button type="button" data-action="spawn-all-selected">Spawn All Selected</button>
             <button type="button" data-action="spawn-world-roster">Spawn World Roster</button>
             <button type="button" data-action="patch-enemy">Apply Runtime Override</button>
             <button type="button" data-action="force-enemy-skill">Force Skill</button>
@@ -790,6 +793,18 @@ export function mountTestLab(
     options.showNotice?.("Test Lab · " + message);
   }
 
+  function selectedEnemyDefinitions() {
+    const ids = new Set(
+      Array.from(enemySelect.selectedOptions, (option) => option.value),
+    );
+    const selected = registry.enemies.filter((enemy) => ids.has(enemy.id));
+    if (selected.length > 0) return selected;
+    const fallback = registry.enemies.find(
+      (enemy) => enemy.id === enemySelect.value,
+    );
+    return fallback === undefined ? [] : [fallback];
+  }
+
   function currentSnapshot(): TestLabGameSnapshot | null {
     return game?.getTestLabSnapshot() ?? null;
   }
@@ -951,9 +966,6 @@ export function mountTestLab(
     applyScenarioInputs();
     const activeGame = createRuntime();
     const stage = createStageConfig(session.stage);
-    const difficultySettings = createDifficultySettings();
-    difficultySettings.mode =
-      inputValue(dialog, '[data-field="difficulty"]') as DifficultyMode;
     const vocabularyLevel = Math.max(
       1,
       Math.min(
@@ -963,13 +975,32 @@ export function mountTestLab(
         ),
       ),
     );
-    const difficulty = difficultyFor(
-      difficultyInputFromSettings(
-        difficultySettings,
-        stage.stage,
-        vocabularyLevel,
+    const difficulty = difficultyFor({
+      stage: stage.stage,
+      mode:
+        inputValue(dialog, '[data-field="difficulty"]') as DifficultyMode,
+      vocabularyLevel,
+      recentWpm: numberValue(
+        dialog,
+        '[data-field="recent-wpm"]',
+        60,
       ),
-    );
+      recentAccuracy: numberValue(
+        dialog,
+        '[data-field="recent-accuracy"]',
+        96,
+      ),
+      customTargetWpm: numberValue(
+        dialog,
+        '[data-field="custom-wpm"]',
+        60,
+      ),
+      customPressure: numberValue(
+        dialog,
+        '[data-field="custom-pressure"]',
+        1,
+      ),
+    });
     activeGame.startStage(stage, difficulty);
     music?.setWorldProfile(musicProfileForWorld(worldForStage(stage.stage)));
     music?.transitionTo("WORLD_NORMAL", 0.25);
@@ -1166,11 +1197,15 @@ export function mountTestLab(
       setField("checkpoint", 1);
       setField("difficulty", "relax");
       setField("vocab-level", 1);
+      setField("recent-wpm", 25);
+      setField("recent-accuracy", 90);
     } else if (id === "impossible") {
       setField("stage", 1000);
       setField("checkpoint", 991);
       setField("difficulty", "impossible");
       setField("vocab-level", 100);
+      setField("recent-wpm", 300);
+      setField("recent-accuracy", 99);
     } else if (
       id === "checkpoint-181" ||
       id === "salvage-anchor" ||
@@ -1487,9 +1522,7 @@ export function mountTestLab(
     if (action === "spawn-enemy") {
       const activeGame = ensureGame();
       if (activeGame === null) return;
-      const definition = registry.enemies.find(
-        (entry) => entry.id === enemySelect.value,
-      );
+      const definition = selectedEnemyDefinitions()[0];
       if (definition === undefined) return;
       activeGame.testLabSpawnEnemies({
         definitionId: definition.id as EnemyDefinitionId,
@@ -1510,6 +1543,25 @@ export function mountTestLab(
         ) as 1 | 2 | 3,
         skillIds: [skillSelect.value as EnemySkillId],
       });
+      renderInspector();
+      return;
+    }
+    if (action === "spawn-all-selected") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      for (const definition of selectedEnemyDefinitions()) {
+        activeGame.testLabSpawnEnemies({
+          definitionId: definition.id as EnemyDefinitionId,
+          kind: enemyKindForRole(definition.role),
+          count: 1,
+          elite: definition.rarity === "elite",
+          rank: rankSelect.value as EnemyRank,
+          layers: Number(
+            inputValue(dialog, '[data-field="layers"]'),
+          ) as 1 | 2 | 3,
+          skillIds: [skillSelect.value as EnemySkillId],
+        });
+      }
       renderInspector();
       return;
     }
