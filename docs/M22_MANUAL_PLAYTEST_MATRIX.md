@@ -57,6 +57,10 @@ Do not add extra PASS rows for the P00-P08 polish slice. Verify these points whi
 - learning feedback: the old large center toast is gone; pronunciation still fires; the short EN/IPA/VI echo appears near a defeated enemy without masking the central combat lane;
 - Recall Bonus: VI meaning + masked EN answer is readable; it looks distinct from hostile targets; wrong guesses/expiry do not feel punitive; correct completion clearly communicates an optional treasure reward;
 - character visuals: the 11 player characters are visually distinguishable in combat and their selection-card previews match the in-game profile identity;
+- typing prefix clarity: use Test Lab **Same-Prefix Scenario** (`morning / month / me`), type `m` quickly and confirm the nearest target locks consistently; then type normal stages and confirm same-initial/prefix piles are noticeably rarer without obvious vocabulary repetition;
+- Ship Visual V2: verify all 11 illustrated ships are distinct at Character Select size and still readable at the smaller combat/HUD size; temporarily block/remove the asset once if useful to confirm procedural fallback remains usable;
+- equipment aura: compare defensive, offensive, precision/luck and late-game builds; aura color/theme should communicate the build without becoming a large permanent combat panel; Low/Medium must visibly reduce detail versus High/Ultra;
+- player projectile VFX: compare several characters under rapid typing and boss words; tracer/muzzle/impact identity should be visibly different while enemy words and hostile projectile letters remain unobstructed;
 - High/Ultra/max-pressure/long-session rows must specifically watch the new HUD rail, Recall Bonus prism effect, enemy-local learning echo and character engine/glow layers for clipping, text obstruction, particle buildup or frame-pacing regressions.
 
 ## Difficulty and typing pace
