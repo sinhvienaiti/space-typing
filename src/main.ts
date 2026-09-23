@@ -701,8 +701,8 @@ app.innerHTML = `
           <button id="phoenixCoreButton">Phoenix Core · 0</button>
         </div>
         <button id="againButton" class="primary">Return to checkpoint</button>
-        <button id="gameOverStageSelectButton">Checkpoint + Stage Select</button>
-        <button id="resultTitleButton">Checkpoint + Back to title</button>
+        <button id="gameOverStageSelectButton">Return to checkpoint &amp; choose stage</button>
+        <button id="resultTitleButton">Return to checkpoint &amp; main menu</button>
       </div>
     </section>
 
@@ -2688,15 +2688,16 @@ function renderDeathProtectionChoices(failedStage: number): void {
 
   const checkpointLabel = checkpointDisplayLabel();
   byId("againButton").textContent =
-    "Retry checkpoint · " + checkpointLabel;
+    "Restart from checkpoint · " + checkpointLabel;
   byId<HTMLButtonElement>("gameOverStageSelectButton").disabled =
     currentAscensionStage(checkpointSnapshot.ascension) !== null;
   byId("deathProtectionMeta").textContent =
     "Death at Stage " +
     String(failedStage).padStart(3, "0") +
-    " · checkpoint " +
+    " · return to checkpoint " +
     checkpointLabel +
-    ". Protection items are consumed only when chosen.";
+    " unless you use a protection item. Restart replays the checkpoint; " +
+    "Choose stage opens unlocked stages. Items are consumed only when chosen.";
 }
 
 async function persistResolvedDeath(
@@ -2732,13 +2733,17 @@ async function resolveCheckpointDeath(
   );
   if (!saved) return;
 
+  // Restoring the checkpoint does not change Game's "gameover" phase.
+  // Start/route selection is only available between encounters; return to
+  // title before navigating so a checkpoint retry cannot silently no-op.
+  game.backToTitle();
   if (action === "retry") {
     await startSelectedStage();
+    if (routeDialog.open) {
+      showNotice("Choose a checkpoint route, then press Start Encounter");
+    }
   } else if (action === "stage-select") {
-    game.backToTitle();
     openStageSelect();
-  } else {
-    game.backToTitle();
   }
 }
 
