@@ -51,6 +51,20 @@ import type { CharacterId } from "../characters/registry";
 import { DEFAULT_PLAYER_BASE_STATS } from "../stats/player";
 import type { CoreStats } from "../stats/core";
 import {
+  addEquipmentInstance,
+  equipInstance,
+  equipmentStatBonus,
+} from "../equipment/loadout";
+import type { EquipmentId } from "../equipment/registry";
+import type { GradeId } from "../grades";
+import {
+  compileRelicEffects,
+  createRelicState,
+  equipRelic,
+  grantRelic,
+} from "../relics/state";
+import type { RelicId } from "../relics/registry";
+import {
   SHOP_TYPES,
   buyShopStockEntry,
   formatShopPrice,
@@ -199,6 +213,8 @@ function snapshotText(
         currencies: currencyText(session),
         inventory: session.state.inventory,
         luckPity: session.state.luckPity,
+        equipment: session.state.equipment,
+        relics: session.state.relics,
         shops: Object.keys(session.state.shops.instances),
         campaignExpansion: session.campaignExpansion,
         stageEntrySnapshot: {
@@ -263,6 +279,7 @@ export function mountTestLab(
   let activeShop: ShopInstance | null = null;
   let shopPurchaseSequence = 0;
   let rewardPreview: unknown = null;
+  let equipmentInstanceSequence = 0;
 
   const button = document.createElement("button");
   button.id = "testLabButton";
@@ -409,6 +426,21 @@ export function mountTestLab(
             <button type="button" data-action="damage-lethal">Force Lethal</button>
             <button type="button" data-action="apply-status">Apply Status</button>
             <button type="button" data-action="clear-status">Clear Statuses</button>
+          </div>
+        </details>
+
+        <details>
+          <summary>Equipment / Relics</summary>
+          <div class="test-lab-grid">
+            <label>Equipment<select data-field="equipment"></select></label>
+            <label>Grade<select data-field="equipment-grade"></select></label>
+            <label>Enhancement<input data-field="equipment-enhancement" type="number" min="0" max="5" value="0"></label>
+            <label>Relic<select data-field="relic"></select></label>
+          </div>
+          <div class="test-lab-row">
+            <button type="button" data-action="grant-equip-equipment">Grant + Equip</button>
+            <button type="button" data-action="grant-equip-relic">Grant + Equip Relic</button>
+            <button type="button" data-action="clear-relics">Clear Relics</button>
           </div>
         </details>
 
@@ -572,6 +604,12 @@ export function mountTestLab(
     dialog.querySelector<HTMLSelectElement>('[data-field="item"]')!;
   const playerSkillSelect =
     dialog.querySelector<HTMLSelectElement>('[data-field="player-skill"]')!;
+  const equipmentSelect =
+    dialog.querySelector<HTMLSelectElement>('[data-field="equipment"]')!;
+  const equipmentGradeSelect =
+    dialog.querySelector<HTMLSelectElement>('[data-field="equipment-grade"]')!;
+  const relicSelect =
+    dialog.querySelector<HTMLSelectElement>('[data-field="relic"]')!;
   const shopTypeSelect =
     dialog.querySelector<HTMLSelectElement>('[data-field="shop-type"]')!;
   const shopStockSelect =
@@ -640,6 +678,27 @@ export function mountTestLab(
     registry.items.map((item) => ({
       value: item.id,
       label: item.name + " · " + item.category,
+    })),
+  );
+  setOptions(
+    equipmentSelect,
+    registry.equipment.map((item) => ({
+      value: item.id,
+      label: item.name + " · " + item.slot,
+    })),
+  );
+  setOptions(
+    equipmentGradeSelect,
+    registry.grades.map((grade) => ({
+      value: grade,
+      label: grade,
+    })),
+  );
+  setOptions(
+    relicSelect,
+    registry.relics.map((id) => ({
+      value: id,
+      label: id,
     })),
   );
   setOptions(
@@ -966,6 +1025,33 @@ export function mountTestLab(
     dialog.querySelector<HTMLInputElement>('[data-field="checkpoint"]')!.value =
       String(stage);
   });
+
+  function coreStatsFromControls(): CoreStats {
+    return {
+      hull: Math.max(0, numberValue(dialog, '[data-field="core-hull"]', DEFAULT_PLAYER_BASE_STATS.hull)),
+      shield: Math.max(0, numberValue(dialog, '[data-field="core-shield"]', DEFAULT_PLAYER_BASE_STATS.shield)),
+      firepower: Math.max(0, numberValue(dialog, '[data-field="core-firepower"]', DEFAULT_PLAYER_BASE_STATS.firepower)),
+      armor: Math.max(0, numberValue(dialog, '[data-field="core-armor"]', DEFAULT_PLAYER_BASE_STATS.armor)),
+      energy: Math.max(0, numberValue(dialog, '[data-field="core-energy"]', DEFAULT_PLAYER_BASE_STATS.energy)),
+      reactor: Math.max(0, numberValue(dialog, '[data-field="core-reactor"]', DEFAULT_PLAYER_BASE_STATS.reactor)),
+      focus: Math.max(0, numberValue(dialog, '[data-field="core-focus"]', DEFAULT_PLAYER_BASE_STATS.focus)),
+      ward: Math.max(0, numberValue(dialog, '[data-field="core-ward"]', DEFAULT_PLAYER_BASE_STATS.ward)),
+      luck: Math.max(0, numberValue(dialog, '[data-field="core-luck"]', DEFAULT_PLAYER_BASE_STATS.luck)),
+      salvage: Math.max(0, numberValue(dialog, '[data-field="core-salvage"]', DEFAULT_PLAYER_BASE_STATS.salvage)),
+    };
+  }
+
+  function applyResolvedBuildStats(): void {
+    const activeGame = game;
+    if (activeGame === null) return;
+    activeGame.testLabSetPlayerStats({
+      base: coreStatsFromControls(),
+      equipment: equipmentStatBonus(session.state.equipment),
+    });
+    activeGame.setRelicEffects(
+      compileRelicEffects(session.state.relics),
+    );
+  }
 
   function shopContext(offset = 0) {
     const world = worldForStage(session.stage);
@@ -1363,19 +1449,10 @@ export function mountTestLab(
       const activeGame = ensureGame();
       if (activeGame === null) return;
       activeGame.setCharacter(characterSelect.value as CharacterId);
-      const core: CoreStats = {
-        hull: Math.max(0, numberValue(dialog, '[data-field="core-hull"]', DEFAULT_PLAYER_BASE_STATS.hull)),
-        shield: Math.max(0, numberValue(dialog, '[data-field="core-shield"]', DEFAULT_PLAYER_BASE_STATS.shield)),
-        firepower: Math.max(0, numberValue(dialog, '[data-field="core-firepower"]', DEFAULT_PLAYER_BASE_STATS.firepower)),
-        armor: Math.max(0, numberValue(dialog, '[data-field="core-armor"]', DEFAULT_PLAYER_BASE_STATS.armor)),
-        energy: Math.max(0, numberValue(dialog, '[data-field="core-energy"]', DEFAULT_PLAYER_BASE_STATS.energy)),
-        reactor: Math.max(0, numberValue(dialog, '[data-field="core-reactor"]', DEFAULT_PLAYER_BASE_STATS.reactor)),
-        focus: Math.max(0, numberValue(dialog, '[data-field="core-focus"]', DEFAULT_PLAYER_BASE_STATS.focus)),
-        ward: Math.max(0, numberValue(dialog, '[data-field="core-ward"]', DEFAULT_PLAYER_BASE_STATS.ward)),
-        luck: Math.max(0, numberValue(dialog, '[data-field="core-luck"]', DEFAULT_PLAYER_BASE_STATS.luck)),
-        salvage: Math.max(0, numberValue(dialog, '[data-field="core-salvage"]', DEFAULT_PLAYER_BASE_STATS.salvage)),
-      };
-      activeGame.testLabSetPlayerCoreStats(core);
+      activeGame.testLabSetPlayerStats({
+        base: coreStatsFromControls(),
+        equipment: equipmentStatBonus(session.state.equipment),
+      });
       renderInspector();
       return;
     }
@@ -1434,6 +1511,63 @@ export function mountTestLab(
     }
     if (action === "clear-status") {
       ensureGame()?.testLabClearStatuses();
+      renderInspector();
+      return;
+    }
+    if (action === "grant-equip-equipment") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      const definitionId = equipmentSelect.value as EquipmentId;
+      const instanceId =
+        "test-lab-equipment-" + String(++equipmentInstanceSequence);
+      session.state.equipment = addEquipmentInstance(
+        session.state.equipment,
+        {
+          instanceId,
+          definitionId,
+          grade: equipmentGradeSelect.value as GradeId,
+          enhancement: Math.max(
+            0,
+            Math.min(
+              5,
+              Math.floor(
+                numberValue(
+                  dialog,
+                  '[data-field="equipment-enhancement"]',
+                  0,
+                ),
+              ),
+            ),
+          ),
+          affixes: [],
+        },
+      );
+      session.state.equipment = equipInstance(
+        session.state.equipment,
+        instanceId,
+      );
+      applyResolvedBuildStats();
+      renderInspector();
+      notice("equipment granted/equipped through production loadout");
+      return;
+    }
+    if (action === "grant-equip-relic") {
+      const id = relicSelect.value as RelicId;
+      const granted = grantRelic(session.state.relics, id);
+      const equipped = equipRelic(granted.state, id);
+      session.state.relics = equipped.state;
+      applyResolvedBuildStats();
+      renderInspector();
+      notice(
+        equipped.changed
+          ? "relic equipped through production RelicState"
+          : "relic granted but equip cap/state blocked the equip",
+      );
+      return;
+    }
+    if (action === "clear-relics") {
+      session.state.relics = createRelicState();
+      applyResolvedBuildStats();
       renderInspector();
       return;
     }
