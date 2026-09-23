@@ -3,7 +3,11 @@ import {
   CHARACTER_IDS,
   type CharacterId,
 } from "../src/characters/registry";
-import { characterVisualProfile } from "../src/characters/visuals";
+import {
+  CHARACTER_SHIP_SHEET_ASSET_ID,
+  characterShipAssetId,
+  characterVisualProfile,
+} from "../src/characters/visuals";
 
 describe("character visual profiles", () => {
   it("covers every playable character with compact render bounds", () => {
@@ -21,6 +25,14 @@ describe("character visual profiles", () => {
       expect(profile.bodyLength).toBeLessThanOrEqual(1.2);
       expect([1, 2, 3]).toContain(profile.engineCount);
     }
+  });
+
+  it("defines stable unique character art ids and one canonical sprite sheet", () => {
+    expect(CHARACTER_SHIP_SHEET_ASSET_ID).toBe("player-ship-sheet-v2");
+    const ids = CHARACTER_IDS.map(characterShipAssetId);
+    expect(new Set(ids).size).toBe(CHARACTER_IDS.length);
+    expect(ids[0]).toBe("player-ship-vanguard");
+    expect(ids.at(-1)).toBe("player-ship-zenith");
   });
 
   it("gives each character a distinct visual identity", () => {
