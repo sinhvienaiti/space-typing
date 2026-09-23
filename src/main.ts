@@ -604,6 +604,7 @@ app.innerHTML = `
               <button id="characterButton">Characters</button>
               <button id="equipmentButton">Equipment</button>
               <button id="supportButton">Support Spells</button>
+              <button id="hotbarButton">Hotbar</button>
               <button id="vocabularyButton">Vocabulary</button>
             </div>
           </section>
@@ -656,6 +657,7 @@ app.innerHTML = `
         <p class="eyebrow">mission hold</p>
         <h2>Game paused</h2>
         <button id="resumeButton" class="primary">Resume</button>
+        <button id="pauseHotbarButton">Hotbar Setup</button>
         <button id="pauseVocabularyButton">Vocabulary</button>
         <button id="pauseSettingsButton">Settings</button>
         <button id="pauseDataButton">Data</button>
@@ -878,6 +880,20 @@ app.innerHTML = `
           <span>Lose Hull · Epic/Legendary-biased reward</span>
         </button>
       </div>
+    </dialog>
+
+    <dialog id="hotbarDialog" class="settings-dialog hotbar-dialog">
+      <form method="dialog" class="dialog-head">
+        <div>
+          <p class="eyebrow">combat shortcuts</p>
+          <h2>1–9 Hotbar</h2>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+      <p class="equipment-note">
+        Assign available consumables and skills. Space remains Overdrive.
+      </p>
+      <div id="hotbarDialogGrid" class="hotbar-loadout-grid"></div>
     </dialog>
 
     <dialog id="supportDialog" class="settings-dialog support-dialog">
@@ -1338,6 +1354,7 @@ const serviceShopDialog =
 const specialShopDialog =
   byId<HTMLDialogElement>("specialShopDialog");
 const supportDialog = byId<HTMLDialogElement>("supportDialog");
+const hotbarDialog = byId<HTMLDialogElement>("hotbarDialog");
 const characterDialog = byId<HTMLDialogElement>("characterDialog");
 const codexDialog = byId<HTMLDialogElement>("codexDialog");
 const ascensionDialog = byId<HTMLDialogElement>("ascensionDialog");
@@ -1915,49 +1932,69 @@ function hotbarActionFromKey(key: string): HotbarAction | null {
 }
 
 function renderHotbarLoadout(): void {
-  const root = byId("hotbarLoadoutGrid");
-  root.replaceChildren();
   const candidates = hotbarCandidateActions();
+  const roots = [
+    byId("hotbarLoadoutGrid"),
+    byId("hotbarDialogGrid"),
+  ];
 
-  for (let index = 0; index < 9; index += 1) {
-    const row = document.createElement("label");
-    row.className = "hotbar-loadout-slot";
-    const key = document.createElement("kbd");
-    key.textContent = String(index + 1);
-    const select = document.createElement("select");
-    select.setAttribute("aria-label", "Hotbar slot " + String(index + 1));
+  for (const root of roots) {
+    root.replaceChildren();
 
-    const empty = document.createElement("option");
-    empty.value = "";
-    empty.textContent = "Empty";
-    select.append(empty);
+    for (let index = 0; index < 9; index += 1) {
+      const row = document.createElement("label");
+      row.className = "hotbar-loadout-slot";
+      const key = document.createElement("kbd");
+      key.textContent = String(index + 1);
+      const select = document.createElement("select");
+      select.setAttribute("aria-label", "Hotbar slot " + String(index + 1));
 
-    for (const action of candidates) {
-      const option = document.createElement("option");
-      option.value = hotbarActionKey(action);
-      option.textContent = hotbarActionLabel(action);
-      select.append(option);
+      const empty = document.createElement("option");
+      empty.value = "";
+      empty.textContent = "Empty";
+      select.append(empty);
+
+      for (const action of candidates) {
+        const option = document.createElement("option");
+        option.value = hotbarActionKey(action);
+        option.textContent = hotbarActionLabel(action);
+        select.append(option);
+      }
+
+      const current = hotbar.slots[index] ?? null;
+      select.value = current === null ? "" : hotbarActionKey(current);
+      select.disabled = game.getPhase() === "playing";
+      select.addEventListener("change", () => {
+        const action =
+          select.value === "" ? null : hotbarActionFromKey(select.value);
+        hotbar = assignHotbarSlot(hotbar, index, action);
+        renderHotbar();
+        renderHotbarLoadout();
+        void autosaveCampaign(
+          "hotbar",
+          "✓ Hotbar saved · slot " + String(index + 1),
+          "loadout",
+        );
+      });
+
+      row.append(key, select);
+      root.append(row);
     }
-
-    const current = hotbar.slots[index] ?? null;
-    select.value = current === null ? "" : hotbarActionKey(current);
-    select.disabled = game.getPhase() === "playing";
-    select.addEventListener("change", () => {
-      const action =
-        select.value === "" ? null : hotbarActionFromKey(select.value);
-      hotbar = assignHotbarSlot(hotbar, index, action);
-      renderHotbar();
-      renderHotbarLoadout();
-      void autosaveCampaign(
-        "hotbar",
-        "✓ Hotbar saved · slot " + String(index + 1),
-        "loadout",
-      );
-    });
-
-    row.append(key, select);
-    root.append(row);
   }
+}
+
+function openHotbarSetup(): void {
+  if (!persistenceReady) return;
+  const phase = game.getPhase();
+  if (
+    phase !== "title" &&
+    phase !== "paused" &&
+    phase !== "stageclear"
+  ) {
+    return;
+  }
+  renderHotbarLoadout();
+  hotbarDialog.showModal();
 }
 
 function reconcileHotbarSupportAssignments(): void {
@@ -6317,6 +6354,8 @@ for (const id of ["titleButton", "clearTitleButton"]) {
 
 byId("characterButton").addEventListener("click", openCharacters);
 byId("equipmentButton").addEventListener("click", openEquipment);
+byId("hotbarButton").addEventListener("click", openHotbarSetup);
+byId("pauseHotbarButton").addEventListener("click", openHotbarSetup);
 byId("shopButton").addEventListener("click", openNormalShop);
 byId("stationShopButton").addEventListener("click", () => {
   openSpecialShop("station");
@@ -6590,6 +6629,7 @@ window.addEventListener("keydown", (event) => {
     dataDialog.open ||
     equipmentDialog.open ||
     supportDialog.open ||
+    hotbarDialog.open ||
     characterDialog.open ||
     codexDialog.open ||
     progressionDialog.open ||
