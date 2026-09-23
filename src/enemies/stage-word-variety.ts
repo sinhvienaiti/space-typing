@@ -75,31 +75,54 @@ export class StageWordLedger {
           key: typingText(entry.en),
           score: wordDifficultyScore(entry, vocabularyLevel),
         }))
-        .filter((candidate) => candidate.key.length > 0);
+        .filter((candidate) => candidate.key.length > 0)
+        .sort(
+          (a, b) =>
+            a.score - b.score ||
+            a.entry.id.localeCompare(b.entry.id),
+        );
     }
-    const target =
-      this.indexedEntries.find((candidate) => candidate.entry === preferred)?.score ??
-      wordDifficultyScore(preferred, vocabularyLevel);
+    const target = wordDifficultyScore(preferred, vocabularyLevel);
     const active = new Set(activeWords.map(typingText).filter(Boolean));
+    if (this.indexedEntries.length === 0) return null;
+
+    // Full-vocabulary sorting for every spawn creates visible frame spikes
+    // with large Custom sources. Sort once above, then binary-search the
+    // narrowest near-Rank window needed for the active selection.
+    const bound = (score: number, inclusive: boolean): number => {
+      let left = 0;
+      let right = this.indexedEntries.length;
+      while (left < right) {
+        const mid = (left + right) >>> 1;
+        const value = this.indexedEntries[mid]!.score;
+        if (value < score || (inclusive && value === score)) left = mid + 1;
+        else right = mid;
+      }
+      return left;
+    };
+    const insertion = bound(target, false);
+    const closest = Math.min(
+      insertion < this.indexedEntries.length
+        ? Math.abs(this.indexedEntries[insertion]!.score - target)
+        : Number.POSITIVE_INFINITY,
+      insertion > 0
+        ? Math.abs(this.indexedEntries[insertion - 1]!.score - target)
+        : Number.POSITIVE_INFINITY,
+    );
+    const radius = closest + 24;
+    const first = bound(target - radius, false);
+    const last = bound(target + radius, true);
     const all: Candidate[] = this.indexedEntries
+      .slice(first, last)
       .map((candidate) => ({
         ...candidate,
         distance: Math.abs(candidate.score - target),
-      }))
-      .sort(
-        (a, b) =>
-          a.distance - b.distance ||
-          a.entry.id.localeCompare(b.entry.id),
-      );
-    if (all.length === 0) return null;
-
-    const closest = all[0]!.distance;
+      }));
     const near = all.filter(
       (candidate) => candidate.distance <= closest + 12,
     );
-    const wide = all.filter(
-      (candidate) => candidate.distance <= closest + 24,
-    );
+    const wide = all;
+
     const available = (pool: Candidate[]): Candidate[] =>
       pool.filter((candidate) => !active.has(candidate.key));
     const unseen = (pool: Candidate[]): Candidate[] =>
