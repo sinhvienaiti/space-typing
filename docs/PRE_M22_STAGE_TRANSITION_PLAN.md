@@ -1,6 +1,6 @@
 # Pre-M22 Stage Transition Polish Plan
 
-Status: ACTIVE
+Status: IMPLEMENTED · FINAL CI PENDING
 
 This slice is approved before the remaining M22 real-browser/audio/visual gate. It upgrades the existing Stage Clear -> Next Stage handoff into a short, skippable transition without consuming combat-screen space.
 
