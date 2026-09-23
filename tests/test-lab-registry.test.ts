@@ -39,6 +39,13 @@ describe("M21 Test Lab production registry", () => {
     expect(registry.characters).toEqual([...CHARACTER_IDS]);
     expect(registry.shopTypes).toEqual([...SHOP_TYPES]);
     expect(registry.musicStates).toEqual([...MUSIC_STATES]);
+    const enemyIds = new Set(
+      registry.enemies.map((enemy) => enemy.id),
+    );
+    for (const world of registry.worlds) {
+      expect(enemyIds.has(world.miniBoss)).toBe(true);
+      expect(enemyIds.has(world.worldBoss)).toBe(true);
+    }
     expect(registry.musicProfileIds).toHaveLength(WORLD_COUNT);
     expect(validateTestLabRegistry(registry)).toEqual([]);
   });
