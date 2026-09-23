@@ -5265,7 +5265,7 @@ function renderRouteMap(): void {
         (step.nodes.length === 1 && node.mandatory);
       if (isSelected) {
         button.classList.add("selected");
-        if (step.stage === targetStage) {
+        if (step.stage === targetStage && step.nodes.length > 1) {
           button.classList.add("current-choice");
         }
       }
