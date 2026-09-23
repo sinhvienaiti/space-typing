@@ -1,10 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 
 const root = new URL("../dist/", import.meta.url);
-const assetDir = new URL("./assets/", root);
-
 const limits = {
   jsRaw: 650 * 1024,
   jsGzip: 180 * 1024,
