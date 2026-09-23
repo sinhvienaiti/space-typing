@@ -6,6 +6,11 @@ import {
 } from "../Game";
 import { MusicController } from "../audio/MusicController";
 import {
+  ANNOUNCER_EVENTS,
+  type AnnouncerEvent,
+} from "../audio/announcer";
+import { speakEnglish } from "../speech";
+import {
   MUSIC_STATES,
   musicProfileForWorld,
   type MusicState,
@@ -231,10 +236,7 @@ function snapshotText(
       music:
         music === null
           ? "not started"
-          : {
-              state: music.getState(),
-              world: music.getWorldProfile().worldId,
-            },
+          : music.getDebugSnapshot(),
       runtime,
     },
     null,
@@ -424,8 +426,9 @@ export function mountTestLab(
             <button type="button" data-action="apply-resources">Apply Resources</button>
             <button type="button" data-action="damage-50">Damage 50</button>
             <button type="button" data-action="damage-lethal">Force Lethal</button>
-            <button type="button" data-action="apply-status">Apply Status</button>
-            <button type="button" data-action="clear-status">Clear Statuses</button>
+            <button type="button" data-action="apply-status">Apply / Stack Status</button>
+            <button type="button" data-action="clear-one-status">Clear Selected Status</button>
+            <button type="button" data-action="clear-status">Clear All Statuses</button>
           </div>
         </details>
 
@@ -540,14 +543,30 @@ export function mountTestLab(
           <div class="test-lab-grid">
             <label>Music state<select data-field="music-state"></select></label>
             <label>Crossfade sec<input data-field="crossfade" type="number" min="0" max="10" step="0.1" value="0.8"></label>
+            <label>Music volume<input data-field="music-volume" type="number" min="0" max="1" step="0.05" value="0.34"></label>
+            <label>Ambient volume<input data-field="ambient-volume" type="number" min="0" max="1" step="0.05" value="0.14"></label>
+            <label>SFX / Announcer volume<input data-field="sfx-volume" type="number" min="0" max="1" step="0.05" value="0.7"></label>
+            <label>Pronunciation volume<input data-field="pronunciation-volume" type="number" min="0" max="1" step="0.05" value="1"></label>
+            <label>Boss music phase<select data-field="music-boss-phase">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+            </select></label>
+            <label>Announcer<select data-field="announcer"></select></label>
+            <label>Pronunciation text<input data-field="pronunciation-text" value="checkpoint"></label>
           </div>
           <div class="test-lab-row">
+            <button type="button" data-action="apply-audio-levels">Apply Audio Levels</button>
             <button type="button" data-action="play-music">Transition</button>
+            <button type="button" data-action="set-music-boss-phase">Apply Boss Music Phase</button>
+            <button type="button" data-action="trigger-announcer">Trigger Announcer</button>
+            <button type="button" data-action="trigger-pronunciation">Trigger Pronunciation</button>
+            <button type="button" data-action="trigger-warning">Trigger Warning</button>
             <button type="button" data-action="duck-announcer">Duck Announcer</button>
             <button type="button" data-action="duck-pronunciation">Duck Pronunciation</button>
             <button type="button" data-action="duck-warning">Duck Warning</button>
             <button type="button" data-action="release-ducks">Release Ducks</button>
-            <button type="button" data-action="stop-music">Stop</button>
+            <button type="button" data-action="stop-music">Stop / Reset Music</button>
           </div>
         </details>
 
@@ -616,6 +635,8 @@ export function mountTestLab(
     dialog.querySelector<HTMLSelectElement>('[data-field="shop-stock"]')!;
   const musicStateSelect =
     dialog.querySelector<HTMLSelectElement>('[data-field="music-state"]')!;
+  const announcerSelect =
+    dialog.querySelector<HTMLSelectElement>('[data-field="announcer"]')!;
 
   setOptions(
     worldSelect,
@@ -726,6 +747,13 @@ export function mountTestLab(
     MUSIC_STATES.map((state) => ({
       value: state,
       label: state,
+    })),
+  );
+  setOptions(
+    announcerSelect,
+    ANNOUNCER_EVENTS.map((event) => ({
+      value: event,
+      label: event,
     })),
   );
 
@@ -1509,6 +1537,13 @@ export function mountTestLab(
       renderInspector();
       return;
     }
+    if (action === "clear-one-status") {
+      ensureGame()?.testLabClearStatus(
+        statusSelect.value as StatusId,
+      );
+      renderInspector();
+      return;
+    }
     if (action === "clear-status") {
       ensureGame()?.testLabClearStatuses();
       renderInspector();
@@ -1827,6 +1862,85 @@ export function mountTestLab(
       return;
     }
 
+    if (action === "apply-audio-levels") {
+      if (music === null || game === null) createRuntime();
+      music?.setMusicVolume(
+        Math.max(
+          0,
+          Math.min(
+            1,
+            numberValue(dialog, '[data-field="music-volume"]', 0.34),
+          ),
+        ),
+      );
+      music?.setAmbientVolume(
+        Math.max(
+          0,
+          Math.min(
+            1,
+            numberValue(dialog, '[data-field="ambient-volume"]', 0.14),
+          ),
+        ),
+      );
+      game?.testLabSetSfxVolume(
+        Math.max(
+          0,
+          Math.min(
+            1,
+            numberValue(dialog, '[data-field="sfx-volume"]', 0.7),
+          ),
+        ),
+      );
+      renderInspector();
+      return;
+    }
+    if (action === "set-music-boss-phase") {
+      if (music === null) createRuntime();
+      music?.setBossPhase(
+        Number(
+          inputValue(dialog, '[data-field="music-boss-phase"]'),
+        ),
+      );
+      renderInspector();
+      return;
+    }
+    if (action === "trigger-announcer") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      activeGame.testLabTriggerAnnouncer(
+        announcerSelect.value as AnnouncerEvent,
+      );
+      renderInspector();
+      return;
+    }
+    if (action === "trigger-pronunciation") {
+      const settings = {
+        ...options.getSettings(),
+        pronunciationEnabled: true,
+        pronunciationVolume: Math.max(
+          0,
+          Math.min(
+            1,
+            numberValue(
+              dialog,
+              '[data-field="pronunciation-volume"]',
+              1,
+            ),
+          ),
+        ),
+      };
+      speakEnglish(
+        inputValue(dialog, '[data-field="pronunciation-text"]'),
+        settings,
+      );
+      renderInspector();
+      return;
+    }
+    if (action === "trigger-warning") {
+      ensureGame()?.testLabTriggerWarning();
+      renderInspector();
+      return;
+    }
     if (action === "play-music") {
       if (music === null) createRuntime();
       const state = musicStateSelect.value as MusicState;
