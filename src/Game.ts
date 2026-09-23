@@ -4511,6 +4511,7 @@ export class Game {
     const baseAngle = Math.atan2(playerY - enemy.y, playerX - enemy.x);
     const speed =
       (115 + this.difficulty.projectilePressure * 52) *
+      (this.difficulty.projectileSpeedScale ?? 1) *
       this.stageEventModifiers.projectilePressureMultiplier *
       (enemy.kind === "sniper" ? 1.72 : 1);
     const alphabet = "asdfjklqweruiopzxcvbnm";
@@ -5474,7 +5475,9 @@ export class Game {
     const playerY = this.height - PLAYER_Y_OFFSET;
     const baseAngle = Math.atan2(playerY - enemy.y, playerX - enemy.x);
     const alphabet = "asdfjklqweruiopzxcvbnm";
-    const speed = 105 + this.difficulty.projectilePressure * 34;
+    const speed =
+      (105 + this.difficulty.projectilePressure * 34) *
+      (this.difficulty.projectileSpeedScale ?? 1);
 
     for (const offset of [-0.13, 0.13]) {
       const char =
