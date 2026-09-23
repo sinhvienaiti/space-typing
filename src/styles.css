@@ -3020,3 +3020,12 @@ kbd {
     text-align: left;
   }
 }
+
+
+.hotbar-dialog {
+  width: min(680px, calc(100vw - 2rem));
+}
+
+.hotbar-dialog .hotbar-loadout-grid {
+  margin-top: 0.2rem;
+}
