@@ -8,7 +8,10 @@ import {
 describe("VFX polish helpers", () => {
   it("keeps hit-stop short and stronger for boss impacts", () => {
     expect(impactFeedback("key").hitStopSeconds).toBe(0);
-    expect(impactFeedback("word").hitStopSeconds).toBeLessThan(0.04);
+    // Ordinary kills must not freeze the entire enemy/projectile simulation.
+    expect(impactFeedback("word").hitStopSeconds).toBe(0);
+    expect(impactFeedback("word").shake).toBeGreaterThan(0);
+    expect(impactFeedback("boss-word").hitStopSeconds).toBeLessThanOrEqual(0.02);
     expect(impactFeedback("boss-word").hitStopSeconds).toBeGreaterThan(
       impactFeedback("word").hitStopSeconds,
     );
