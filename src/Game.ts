@@ -829,6 +829,33 @@ export class Game {
     return true;
   }
 
+  testLabSetPlayerCoreStats(stats: CoreStats): boolean {
+    if (!this.testLabEnabled) return false;
+    this.playerStats = calculateEffectiveStats({
+      base: stats,
+    });
+    this.stats.maxHull = this.playerStats.hull;
+    this.stats.maxShield = this.playerStats.shield;
+    this.stats.maxEnergy = this.playerStats.energy;
+    this.stats.hull = clamp(
+      this.stats.hull,
+      0,
+      this.stats.maxHull,
+    );
+    this.stats.shield = clamp(
+      this.stats.shield,
+      0,
+      this.stats.maxShield,
+    );
+    this.stats.energy = clamp(
+      this.stats.energy,
+      0,
+      this.stats.maxEnergy,
+    );
+    this.emitStats();
+    return true;
+  }
+
   testLabSetResources(input: {
     hull?: number;
     shield?: number;
