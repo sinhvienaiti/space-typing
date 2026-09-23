@@ -590,7 +590,7 @@ app.innerHTML = `
           <strong id="energyText">100 / 100</strong>
         </div>
         <div class="player-ultimate">
-          <span id="powerHint">charge ultimate</span>
+          <span id="powerHint" title="Correct typing builds Rage. SPACE at 100% activates your character ultimate and Nova Pulse: removes all visible regular enemies and hostile bullets, and damages an unshielded boss. Bonus targets remain collectible.">Rage · charging</span>
           <div class="power-track">
             <div id="powerFill" class="power-fill"></div>
           </div>
@@ -669,7 +669,7 @@ app.innerHTML = `
 
         <div class="hints">
           <span><kbd>ESC</kbd> pause</span>
-          <span><kbd>SPACE</kbd> overdrive at 100%</span>
+          <span><kbd>SPACE</kbd> Nova Pulse + character ultimate at 100% Rage</span>
         </div>
       </div>
     </section>
@@ -1833,8 +1833,8 @@ function renderStats(stats: GameStats): void {
   const ultimateName = getCharacter(characters.selected).ultimateName;
   byId("powerHint").textContent =
     stats.power >= 100
-      ? "SPACE — " + ultimateName + " ready"
-      : "charge " + ultimateName.toLowerCase();
+      ? "RAGE FULL · " + ultimateName + " + NOVA"
+      : "RAGE " + Math.floor(stats.power) + "% · " + ultimateName;
 }
 
 function skillReasonText(reason: SkillBlockReason): string {
