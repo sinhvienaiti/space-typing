@@ -229,6 +229,13 @@ function snapshotText(
         world: worldForStage(session.stage),
         stage: session.stage,
         checkpointStage: session.checkpointStage,
+        checkpointSnapshot: {
+          selectedStage: session.checkpointSnapshot.campaign.selectedStage,
+          credits: session.checkpointSnapshot.credits,
+          currencies: session.checkpointSnapshot.expansionCurrencies,
+          inventory: session.checkpointSnapshot.inventory,
+        },
+        route: session.state.route,
         currencies: currencyText(session),
         inventory: session.state.inventory,
         luckPity: session.state.luckPity,
@@ -403,6 +410,7 @@ export function mountTestLab(
         <details>
           <summary>Boss Runtime</summary>
           <div class="test-lab-grid">
+            <label>Boss<select data-field="boss-definition"></select></label>
             <label>HP %<input data-field="boss-hp" type="number" min="0" max="100" value="100"></label>
             <label>Phase<select data-field="boss-phase">
               <option value="1">1</option>
@@ -413,7 +421,8 @@ export function mountTestLab(
             <label class="test-lab-check"><input data-field="boss-shield" type="checkbox"> Shield active</label>
           </div>
           <div class="test-lab-row">
-            <button type="button" data-action="spawn-boss">Spawn Stage Boss</button>
+            <button type="button" data-action="spawn-selected-boss">Load + Spawn Selected Boss</button>
+            <button type="button" data-action="spawn-boss">Spawn Current Stage Boss</button>
             <button type="button" data-action="apply-boss">Apply Boss State</button>
             <button type="button" data-action="clear-boss">Clear Boss</button>
           </div>
@@ -635,6 +644,8 @@ export function mountTestLab(
     dialog.querySelector<HTMLSelectElement>('[data-field="enemy"]')!;
   const rankSelect =
     dialog.querySelector<HTMLSelectElement>('[data-field="rank"]')!;
+  const bossDefinitionSelect =
+    dialog.querySelector<HTMLSelectElement>('[data-field="boss-definition"]')!;
   const skillSelect =
     dialog.querySelector<HTMLSelectElement>('[data-field="enemy-skill"]')!;
   const enemyIdSelect =
@@ -693,6 +704,20 @@ export function mountTestLab(
   setOptions(
     enemySelect,
     registry.enemies.map((enemy) => ({
+      value: enemy.id,
+      label: enemy.name + " · " + enemy.role,
+    })),
+  );
+  const bossDefinitions = registry.enemies.filter((enemy) =>
+    registry.worlds.some(
+      (world) =>
+        world.miniBoss === enemy.id ||
+        world.worldBoss === enemy.id,
+    ),
+  );
+  setOptions(
+    bossDefinitionSelect,
+    bossDefinitions.map((enemy) => ({
       value: enemy.id,
       label: enemy.name + " · " + enemy.role,
     })),
@@ -793,6 +818,14 @@ export function mountTestLab(
     options.showNotice?.("Test Lab · " + message);
   }
 
+  function stageForBossDefinition(id: string): number | null {
+    for (const world of registry.worlds) {
+      if (world.miniBoss === id) return world.stageStart + 9;
+      if (world.worldBoss === id) return world.stageEnd;
+    }
+    return null;
+  }
+
   function selectedEnemyDefinitions() {
     const ids = new Set(
       Array.from(enemySelect.selectedOptions, (option) => option.value),
@@ -835,6 +868,12 @@ export function mountTestLab(
       lastAction,
     );
     inventoryInspector.textContent =
+      JSON.stringify(
+        getItemDefinition(itemSelect.value as ItemId),
+        null,
+        2,
+      ) +
+      "\n\nInventory\n" +
       inventoryText(session) +
       "\n\n" +
       currencyText(session);
@@ -1631,6 +1670,30 @@ export function mountTestLab(
     if (action === "clear-enemies") {
       ensureGame()?.testLabClearEnemies();
       renderInspector();
+      return;
+    }
+    if (action === "spawn-selected-boss") {
+      const stage = stageForBossDefinition(
+        bossDefinitionSelect.value,
+      );
+      if (stage === null) {
+        notice("selected boss has no production World/stage mapping");
+        return;
+      }
+      setField("stage", stage);
+      setField("checkpoint", Math.floor((stage - 1) / 10) * 10 + 1);
+      const world = worldForStage(stage);
+      worldSelect.value = world.id;
+      startArena();
+      window.setTimeout(() => {
+        const spawned = game?.testLabSpawnBoss() ?? false;
+        renderInspector();
+        notice(
+          spawned
+            ? "selected boss spawned through production stage mapping"
+            : "production boss spawn rejected",
+        );
+      }, 0);
       return;
     }
     if (action === "spawn-boss") {
