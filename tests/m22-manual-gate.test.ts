@@ -30,16 +30,18 @@ describe("M22 manual gate recorder", () => {
 
   it("sanitizes stored QA data without accepting unknown status or rows", () => {
     const state = sanitizeM22ManualGateState({
-      version: 99,
+      version: 1,
       browserDevice: "Chrome · Mac",
       updatedAt: "2026-09-23T03:00:00.000Z",
       rows: {
         "difficulty-relax": {
           status: "pass",
+          browserDevice: "Chrome · Mac",
           notes: "Readable",
         },
         "difficulty-balanced": {
           status: "broken",
+          browserDevice: 123,
           notes: 123,
         },
         "unknown-row": {
@@ -53,13 +55,36 @@ describe("M22 manual gate recorder", () => {
     expect(state.browserDevice).toBe("Chrome · Mac");
     expect(state.rows["difficulty-relax"]).toEqual({
       status: "pass",
+      browserDevice: "Chrome · Mac",
       notes: "Readable",
     });
     expect(state.rows["difficulty-balanced"]).toEqual({
       status: "pending",
+      browserDevice: "",
       notes: "",
     });
     expect(state.rows["unknown-row"]).toBeUndefined();
+  });
+
+  it("rejects a future incompatible recorder schema", () => {
+    const state = sanitizeM22ManualGateState({
+      version: 2,
+      browserDevice: "should not carry",
+      rows: {
+        "difficulty-relax": {
+          status: "pass",
+          browserDevice: "should not carry",
+          notes: "should not carry",
+        },
+      },
+    });
+
+    expect(state.browserDevice).toBe("");
+    expect(state.rows["difficulty-relax"]).toEqual({
+      status: "pending",
+      browserDevice: "",
+      notes: "",
+    });
   });
 
   it("requires every row to pass before the manual gate is complete", () => {
@@ -74,9 +99,11 @@ describe("M22 manual gate recorder", () => {
       complete: false,
     });
 
+    state.browserDevice = "Chrome · Mac";
     for (const row of M22_MANUAL_GATE_ROWS) {
       state.rows[row.id] = {
         status: "pass",
+        browserDevice: "",
         notes: "",
       };
     }
@@ -91,6 +118,7 @@ describe("M22 manual gate recorder", () => {
 
     state.rows["audio-world-boss"] = {
       status: "fail",
+      browserDevice: "",
       notes: "Crossfade clips",
     };
     expect(m22ManualGateSummary(state).complete).toBe(false);
@@ -102,6 +130,7 @@ describe("M22 manual gate recorder", () => {
     state.updatedAt = "2026-09-23T03:00:00.000Z";
     state.rows["visual-ultra"] = {
       status: "fail",
+      browserDevice: "Safari · MacBook",
       notes: "stutter | visible on boss phase",
     };
 
@@ -111,7 +140,7 @@ describe("M22 manual gate recorder", () => {
       "Browser/device: Chrome 151 | macOS",
     );
     expect(report).toContain(
-      "| Ultra quality | high-DPI display | acceptable frame pacing; no runaway particles | FAIL | stutter \\| visible on boss phase |",
+      "| Ultra quality | high-DPI display | acceptable frame pacing; no runaway particles | Safari · MacBook | FAIL | stutter \\| visible on boss phase |",
     );
     expect(report).toContain("M22 manual gate result: INCOMPLETE.");
   });
