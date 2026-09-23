@@ -613,7 +613,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    version === PLAYER_SAVE_VERSION &&
+    (version === 25 || version === PLAYER_SAVE_VERSION) &&
     !isValidCheckpointSnapshot(parsed.checkpointSnapshot)
   ) {
     return {
@@ -659,7 +659,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    version === PLAYER_SAVE_VERSION &&
+    (version === 25 || version === PLAYER_SAVE_VERSION) &&
     parsed.crashRecoverySnapshot !== null &&
     !isValidCrashRecoverySnapshot(parsed.crashRecoverySnapshot)
   ) {
@@ -705,7 +705,7 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
   }
 
   if (
-    version === PLAYER_SAVE_VERSION &&
+    (version === 25 || version === PLAYER_SAVE_VERSION) &&
     parsed.stageEntrySnapshot !== null &&
     !isValidStageEntrySnapshot(parsed.stageEntrySnapshot)
   ) {
