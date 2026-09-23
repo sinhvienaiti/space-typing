@@ -62,7 +62,7 @@ export class AdaptiveRenderBudget {
     }
     if (frameP95 < 18.5 && drawP95 < 8) {
       this.stableSeconds += 3.5;
-      if (this.stableSeconds >= 10.5 && this.value < 1) {
+      if (this.stableSeconds >= 7 && this.value < 1) {
         this.stableSeconds = 0;
         this.value = Math.min(1, Math.round((this.value + 0.08) * 100) / 100);
         this.frameMs.length = 0;
