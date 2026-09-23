@@ -1,8 +1,20 @@
 # Pre-M22 RPG HUD / Unified Hotbar Plan
 
-Status: PLANNED
+Status: COMPLETE
 
 This slice is approved before the remaining M22 real-browser/audio/visual gate. Its purpose is to make the combat UI read like a compact RPG HUD without reducing battlefield visibility.
+
+Implementation checkpoint:
+
+- H01: compact Character / Level / Hull / Shield / Energy status cluster with trailing Hull damage, Shield-break flash and low-resource feedback;
+- H02: one compact 1-9 hotbar replaces the three separate Item / Core Skill / Support strips; Space remains Overdrive;
+- H03: assignment is available both in Character management and a compact Hotbar Setup dialog reachable from title or Pause; duplicate unique actions move slots instead of duplicating;
+- H04: PlayerSave v26 persists the hotbar canonically with deterministic v25 migration, backup/import validation and recovery preservation;
+- H05: desktop and <=700px layouts reduce labels before hiding vital information, keeping the center typing lane clear;
+- H06: hotbar-domain, migration, backup and recovery regressions are covered. Production activation still routes through the already-tested `Game.useConsumable` / `Game.useSkill` APIs instead of creating a second Test Lab gameplay state.
+- Technical gate: CI #443 PASS · 120/120 test files · 608/608 tests · TypeScript + production build + bundle budget PASS. A final branch/main CI is still required after documentation sync.
+
+Architecture review adjustment: hotbar configuration is intentionally top-level PlayerSave preference state rather than `RunPersistentState`. Death/checkpoint rollback must not undo the player's key layout. Mid-encounter Pause edits autosave the preference without promoting the current combat/economy state to a new safe recovery checkpoint.
 
 ## Core UX rules
 
@@ -48,13 +60,13 @@ This slice is approved before the remaining M22 real-browser/audio/visual gate. 
   - item count where relevant;
   - cooldown overlay/time;
   - unavailable/energy-blocked state;
-  - active-state highlight.
+  - active/cooldown feedback where already exposed by production runtime state; existing combat VFX/status UI remains the authority for longer-lived effects.
 - Unassigned slots remain visually quiet.
 - Do not increase the permanent bottom combat footprint versus the current combined quick-control UI.
 - Keep `Space` as Overdrive.
 
 ### H03 — Hotbar Assignment / Loadout UI
-- Add assignment controls to existing Inventory/Equipment/Skills/Support/Character interfaces rather than creating a new full-screen combat menu.
+- Keep assignment inside compact management UI rather than creating a full-screen combat overlay: Character management includes the slot editor and the same editor is exposed through a small Hotbar Setup dialog from title/Pause.
 - Support a simple first implementation:
   - choose an action;
   - choose slot 1-9;
@@ -85,14 +97,14 @@ This slice is approved before the remaining M22 real-browser/audio/visual gate. 
 - Avoid excessive glow, animation or large icons that compete with enemy words.
 
 ### H06 — Regression / M22 Integration Gate
-- Add unit tests for hotbar assignment, conflicts, activation and migration defaults.
-- Add Game/Test Lab coverage for:
-  - item activation through assigned slots;
-  - skill activation through assigned slots;
-  - cooldown/unavailable states;
-  - inventory depletion;
-  - character/support skill assignment;
-  - persistence round trip and v25 migration.
+- Add unit tests for hotbar assignment, conflicts, key routing and migration defaults.
+- Keep the hotbar as a thin UI/input routing layer over existing production APIs rather than duplicating item/skill state in Test Lab.
+- Reuse existing Game/Test Lab coverage for consumable/skill effects and add dedicated hotbar persistence coverage for:
+  - character/support/core/item assignment;
+  - duplicate prevention and empty slots;
+  - persistence round trip and v25 migration;
+  - backup/import validation;
+  - survival across technical crash recovery.
 - Run full tests, TypeScript, production build and bundle budget.
 - Update `docs/M22_MANUAL_PLAYTEST_MATRIX.md` with explicit visual checks for:
   - player-status readability;
