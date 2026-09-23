@@ -38,6 +38,7 @@ import {
 } from "./campaign/expansion-state";
 import {
   createStageConfig,
+  stageRole,
   GALAXY_COUNT,
   STAGES_PER_GALAXY,
 } from "./campaign/stage";
@@ -613,7 +614,7 @@ app.innerHTML = `
 
         <div class="title-play-actions">
           <button id="startButton" class="primary">Continue · Stage 001</button>
-          <button id="routeButton">Route Map</button>
+          <button id="routeButton">Sector Briefing</button>
           <button id="stageSelectButton">Stage Select</button>
         </div>
 
@@ -783,13 +784,13 @@ app.innerHTML = `
     <dialog id="routeDialog" class="settings-dialog route-dialog">
       <form method="dialog" class="dialog-head">
         <div>
-          <p class="eyebrow">sector navigation</p>
+          <p class="eyebrow">sector briefing</p>
           <h2 id="routeTitle">Route Map</h2>
         </div>
         <button class="icon-button" aria-label="Close">×</button>
       </form>
       <p id="routeMeta" class="equipment-note">
-        Choose one route for the next Campaign encounter.
+        Upcoming ten-stage sector, mandatory boss and checkpoint rest stop.
       </p>
       <div id="routeMap" class="route-map"></div>
       <div id="routeSelectedPanel" class="route-selected-panel hidden">
@@ -801,6 +802,7 @@ app.innerHTML = `
           <button id="routeServiceAction" class="hidden">Repair / Upgrade</button>
           <button id="routeSupportAction" class="hidden">Support Loadout</button>
           <button id="routeContinueButton" class="primary">Start Encounter</button>
+          <button id="routeCampaignButton" type="button">Open Campaign Map</button>
         </div>
       </div>
       <section id="hiddenEncounterPanel" class="route-hidden-panel hidden">
@@ -1437,7 +1439,7 @@ let selectedJourneyStage = campaign.selectedStage;
  * Existing button IDs and their action listeners remain unchanged. */
 function installMenuHelp(): void {
   const descriptions: Record<string, [string, string]> = {
-    routeButton: ["Sector route", "Preview the current ten-stage route. Change an available lane before starting combat."],
+    routeButton: ["Sector Briefing", "Shows the next ten combat stages, boss and checkpoint. Campaign Map lets you choose or replay an unlocked stage. Old saved sectors may still contain optional lanes."],
     stageSelectButton: ["Campaign Map", "Navigate Worlds, view boss checkpoints and replay stages that are already unlocked."],
     characterButton: ["Characters", "Choose your pilot and spend character progression upgrades."],
     equipmentButton: ["Equipment", "Review equipped gear, drops and combat attributes."],
@@ -5397,21 +5399,38 @@ function renderRouteMap(): void {
     String(route.graph.sectorStart).padStart(3, "0") +
     "-" +
     String(route.graph.sectorEnd).padStart(3, "0");
-  byId("routeMeta").textContent =
-    "Stage " +
-    String(targetStage).padStart(3, "0") +
-    " frontier · seed " +
-    String(route.graph.seed) +
-    " · " +
-    String(progress.chosen) +
-    " / " +
-    String(progress.total) +
-    " stage routes chosen · select a lane before starting the encounter";
+  const linearSector = route.graph.steps.every((step) => step.nodes.length === 1);
+  byId("routeMeta").textContent = linearSector
+    ? "Ten sequential combat stages · boss and checkpoint rest hub at Stage " +
+      String(route.graph.sectorEnd).padStart(3, "0") +
+      ". Campaign Map is for unlocked-stage replay."
+    : "Existing saved branching sector · " +
+      String(progress.chosen) + "/" + String(progress.total) +
+      " route choices · old lanes remain available until the next checkpoint.";
 
   const map = byId("routeMap");
   map.replaceChildren();
+  map.classList.toggle("route-sector-briefing", linearSector);
 
   for (const step of route.graph.steps) {
+    if (linearSector) {
+      const node = document.createElement("div");
+      const role = stageRole(step.stage);
+      const cleared = campaign.clearedStages.includes(step.stage);
+      node.className = "route-sector-node" +
+        (cleared ? " cleared" : "") +
+        (step.stage === targetStage ? " current" : "") +
+        (role.includes("boss") ? " boss" : "");
+      const number = document.createElement("strong");
+      number.textContent = String(step.stage).padStart(3, "0");
+      const description = document.createElement("span");
+      description.textContent = role.includes("boss") ? "♛ Boss" :
+        step.stage % 10 === 0 ? "⚑ Checkpoint" :
+        cleared ? "✓ Cleared" : step.stage === targetStage ? "◆ Next" : "Combat";
+      node.append(number, description);
+      map.append(node);
+      continue;
+    }
     const row = document.createElement("section");
     row.className =
       "route-step" +
@@ -5503,8 +5522,9 @@ function renderRouteMap(): void {
     routeNodeLabel(selected.type) +
     " · Stage " +
     String(selected.targetStage).padStart(3, "0");
-  byId("routeSelectedMeta").textContent =
-    routeNodeDescription(selected);
+  byId("routeSelectedMeta").textContent = linearSector
+    ? "Mandatory combat encounter · shop and maintenance services are available together at the end-of-sector rest hub."
+    : routeNodeDescription(selected);
 
   shopAction.classList.toggle(
     "hidden",
@@ -6863,6 +6883,10 @@ for (const id of ["restartButton", "clearRetryButton"]) {
   });
 }
 byId("routeButton").addEventListener("click", openRouteMap);
+byId("routeCampaignButton").addEventListener("click", () => {
+  if (routeDialog.open) routeDialog.close();
+  openStageSelect();
+});
 restHubDialog.addEventListener("cancel", (event) => {
   event.preventDefault();
   if (restHubDialog.open) restHubDialog.close(); // Pending visit stays saved.
