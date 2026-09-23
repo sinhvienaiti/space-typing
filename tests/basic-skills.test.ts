@@ -25,6 +25,14 @@ import {
 } from "../src/persistence/checkpoint";
 import { createPlayerSave, migratePlayerSave } from "../src/persistence/player-save";
 import { createDefaultCampaignProgress } from "../src/campaign/progress";
+import {
+  createStageEntrySnapshot,
+  sanitizeStageEntrySnapshot,
+} from "../src/persistence/death-protection";
+import {
+  captureCrashRecoverySnapshot,
+  sanitizeCrashRecoverySnapshot,
+} from "../src/persistence/crash-recovery";
 import { awardCharacterProgress } from "../src/characters/progression";
 
 describe("P0 Basic Skill Points share existing character XP", () => {
@@ -133,11 +141,40 @@ describe("P0 Basic Skill Points share existing character XP", () => {
       upgrades: oldUpgrades,
     };
     expect(migrateLegacyRunPersistentState(oldSnapshot)?.upgrades.basicSkills.vanguard.ranks.barrier).toBe(5);
+    const oldStageEntry = createStageEntrySnapshot(
+      base,
+      base.campaignExpansion,
+      base.checkpointSnapshot,
+      "2026-09-23T00:00:00Z",
+    );
+    const legacyStageEntry = {
+      ...oldStageEntry,
+      state: { ...oldStageEntry.state, upgrades: oldUpgrades },
+      checkpointSnapshot: { ...oldStageEntry.checkpointSnapshot, upgrades: oldUpgrades },
+    };
+    const restoredEntry = sanitizeStageEntrySnapshot(legacyStageEntry);
+    expect(restoredEntry?.state.upgrades.basicSkills.vanguard.ranks.barrier).toBe(5);
+    const capture = captureCrashRecoverySnapshot(
+      base,
+      base.campaignExpansion,
+      base.checkpointSnapshot,
+      "stage-entry",
+      "2026-09-23T00:01:00Z",
+    );
+    const oldCrash = {
+      ...capture.snapshot,
+      state: { ...capture.snapshot.state, upgrades: oldUpgrades },
+      checkpointSnapshot: { ...capture.snapshot.checkpointSnapshot, upgrades: oldUpgrades },
+    };
+    const restoredCrash = sanitizeCrashRecoverySnapshot(oldCrash);
+    expect(restoredCrash?.state.upgrades.basicSkills.vanguard.ranks.barrier).toBe(5);
     const old = {
       ...base,
       version: 26,
       upgrades: oldUpgrades,
       checkpointSnapshot: oldSnapshot,
+      stageEntrySnapshot: legacyStageEntry,
+      crashRecoverySnapshot: oldCrash,
     };
     const migrated = migratePlayerSave(old);
     expect(migrated.fromVersion).toBe(26);
@@ -147,6 +184,8 @@ describe("P0 Basic Skill Points share existing character XP", () => {
     expect(migrated.save.upgrades.basicSkills.zenith.ranks.barrier).toBe(5);
     expect(migrated.save.checkpointSnapshot.upgrades.basicSkills.vanguard.ranks.barrier).toBe(5);
     expect(migrated.save.checkpointSnapshot.upgrades.attributeLevels.hull).toBe(8);
+    expect(migrated.save.stageEntrySnapshot?.state.upgrades.basicSkills.vanguard.ranks.barrier).toBe(5);
+    expect(migrated.save.crashRecoverySnapshot?.state.upgrades.basicSkills.vanguard.ranks.barrier).toBe(5);
     const restored = restoreCheckpointSnapshot(migrated.save.checkpointSnapshot, migrated.save);
     expect(restored.upgrades.basicSkills.vanguard.ranks.barrier).toBe(5);
     expect(restored.upgrades.basicSkills.vanguard.spent).toBe(0);
