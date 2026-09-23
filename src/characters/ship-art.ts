@@ -1,0 +1,60 @@
+import type { ArtAssetCatalog } from "../assets/pipeline";
+import { CHARACTER_SHIP_SHEET_ASSET_ID } from "./visuals";
+
+/** V3 is optional until reviewed production-quality raster artwork is committed. */
+export const PREMIUM_SHIP_SHEET_ASSET_ID = "player-ship-sheet-v3";
+
+/** A single 4 × 3 atlas; 256 source pixels per character cell. */
+export const PREMIUM_SHIP_ATLAS_WIDTH = 1024;
+export const PREMIUM_SHIP_ATLAS_HEIGHT = 768;
+export const PREMIUM_SHIP_ATLAS_MAX_FILE_BYTES = Math.floor(1.2 * 1024 * 1024);
+
+export type ShipSheetSelection = {
+  image: HTMLImageElement | null;
+  source: "v3" | "v2" | "procedural";
+};
+
+/** Reject incorrectly sized or oversized V3 atlases before drawing them. */
+export function validPremiumShipDimensions(
+  naturalWidth: number,
+  naturalHeight: number,
+): boolean {
+  return (
+    Number.isInteger(naturalWidth) &&
+    Number.isInteger(naturalHeight) &&
+    naturalWidth === PREMIUM_SHIP_ATLAS_WIDTH &&
+    naturalHeight === PREMIUM_SHIP_ATLAS_HEIGHT
+  );
+}
+
+/**
+ * The already-loaded ArtAssetCatalog owns all images. Never create an Image
+ * or decode an asset in the per-frame Canvas renderer.
+ */
+export function selectCharacterShipSheet(
+  catalog: ArtAssetCatalog | null,
+): ShipSheetSelection {
+  const premium =
+    catalog?.assets.get(PREMIUM_SHIP_SHEET_ASSET_ID)?.image ?? null;
+  if (
+    premium !== null &&
+    validPremiumShipDimensions(
+      premium.naturalWidth,
+      premium.naturalHeight,
+    )
+  ) {
+    return { image: premium, source: "v3" };
+  }
+
+  const existing =
+    catalog?.assets.get(CHARACTER_SHIP_SHEET_ASSET_ID)?.image ?? null;
+  if (
+    existing !== null &&
+    existing.naturalWidth > 0 &&
+    existing.naturalHeight > 0
+  ) {
+    return { image: existing, source: "v2" };
+  }
+
+  return { image: null, source: "procedural" };
+}
