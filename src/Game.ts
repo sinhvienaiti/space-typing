@@ -1363,6 +1363,8 @@ export class Game {
     this.lasers = [];
     this.particles = [];
     this.targetId = null;
+    this.recallBonus = null;
+    this.recallBonusPending = false;
     this.boss = null;
     this.bossSpawned = false;
     this.bossDefeated = false;
@@ -2358,6 +2360,9 @@ export class Game {
       treasureDroneChance(stage.stage),
       0.32,
     );
+    this.recallBonus = null;
+    this.recallBonusTimer = randomBetween(7, 13);
+    this.recallBonusPending = shouldScheduleRecallBonus(stage.stage);
     this.rewardChoiceCrate = null;
     this.rewardChoiceTimer = randomBetween(14, 20);
     this.rewardChoicePending = this.rollPityEvent(
@@ -2492,6 +2497,8 @@ export class Game {
     this.supplySpawnsRemaining = 0;
     this.treasureDrone = null;
     this.treasureDronePending = false;
+    this.recallBonus = null;
+    this.recallBonusPending = false;
     this.rewardChoiceCrate = null;
     this.rewardChoicePending = false;
     this.anomalyCrate = null;
@@ -3177,6 +3184,7 @@ export class Game {
     this.projectiles = [];
     this.supplyPod = null;
     this.treasureDrone = null;
+    this.recallBonus = null;
     this.rewardChoiceCrate = null;
     this.anomalyCrate = null;
     this.anomalyResolutionPending = false;
