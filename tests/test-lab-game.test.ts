@@ -240,6 +240,7 @@ describe("M21 gated Game Test Lab API", () => {
       "month",
       "me",
     ]);
+    expect(before?.scheduler.frozen).toBe(true);
 
     game.handleKey("m");
     const after = game.getTestLabSnapshot();
