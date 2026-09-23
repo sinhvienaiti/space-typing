@@ -3289,6 +3289,7 @@ Automated work completed:
 - all-World music mapping, fallback, ducking, crossfade and lifecycle audit;
 - deploy bundle-size budgets enforced by `pnpm build`;
 - M22 stress audit found and fixed Carrier/Splitter child spawn admission exceeding `maxEnemies`;
+- Test Lab includes a QA-only M22 Manual Gate Recorder mirroring all 43 required browser/audio/visual rows and exporting a Markdown observation report without touching PlayerSave;
 - CI #395 PASS · 116 test files · 583/583 tests · TypeScript check + production build + bundle budget.
 
 Remaining M22 gate:
