@@ -4087,7 +4087,6 @@ export class Game {
 
   private spawnCarrierChild(carrier: Enemy): void {
     if (this.difficulty === null) return;
-    if (this.enemies.length >= this.difficulty.maxEnemies + 2) return;
     if (!this.canAdmitEnemyKind("scout", this.difficulty)) return;
 
     const profile = enemyProfile("scout", this.stageConfig?.galaxy ?? 1);
