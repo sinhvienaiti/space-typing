@@ -33,9 +33,17 @@ Use it only as a QA observation recorder:
 5. add reproducible notes for every FAIL and useful device/audio notes for PASS rows;
 6. use **Copy Markdown Report** and preserve the report with the review/checkpoint.
 
-The recorder stores only QA observations in localStorage under `spaceTypingM22ManualGateV1`. It does **not** write PlayerSave, Campaign state, checkpoint state, crash recovery, rewards, equipment, Relics or other gameplay persistence.
+The recorder stores only QA observations in localStorage under `spaceTypingM22ManualGateV2` and migrates the earlier V1 recorder state when present. It does **not** write PlayerSave, Campaign state, checkpoint state, crash recovery, rewards, equipment, Relics or other gameplay persistence.
 
-The recorder cannot mark M22 complete by itself. Real browser observation, real audio output and human-paced typing are still mandatory.
+For each scenario the recorder can also capture compact runtime evidence from the real Test Lab session: Campaign/Test Lab stage, checkpoint, visual quality, viewport/DPR, enemy/projectile/particle counts, boss identity, rolling FPS/frame-time metrics and current music/duck lifecycle state. This evidence is appended to the row notes and helps make performance/audio findings reproducible.
+
+The recorder additionally requires three explicit human attestations before it can report a COMPLETE CANDIDATE:
+
+- audio scenarios were actually heard on a real output device;
+- High and Ultra were actually observed in a real browser;
+- low-, mid- and high-WPM human-paced runs were actually performed.
+
+The recorder cannot mark M22 complete by itself. Real browser observation, real audio output and human-paced typing are still mandatory, and final post-fix CI must still pass after the report is accepted.
 
 ## Difficulty and typing pace
 
