@@ -3173,7 +3173,8 @@ export class Game {
     this.recallBonus = null;
     this.boss.actionCooldown =
       (bossActionInterval(this.boss.role, this.boss.phase) *
-        bossActionIntervalMultiplier(mechanic)) /
+        bossActionIntervalMultiplier(mechanic) *
+        difficulty.attackIntervalFactor) /
       Math.max(0.75, difficulty.bossPressure) /
       Math.max(1, difficulty.bossActionRateMultiplier ?? 1);
     this.hooks.onBossUpdate(toBossHud(this.boss));
@@ -3240,7 +3241,7 @@ export class Game {
           ? 1
           : bossActionIntervalMultiplier(
               boss.typingMechanic,
-            ))) /
+            )) * difficulty.attackIntervalFactor) /
       Math.max(0.75, difficulty.bossPressure) /
       Math.max(1, difficulty.bossActionRateMultiplier ?? 1);
   }
@@ -3259,9 +3260,10 @@ export class Game {
     );
     const spread = count === 1 ? 0 : 0.16;
     const speed =
-      125 +
-      this.difficulty.bossPressure * 48 +
-      Math.max(0, boss.phase - 1) * 14;
+      (125 +
+        this.difficulty.bossPressure * 48 +
+        Math.max(0, boss.phase - 1) * 14) *
+      (this.difficulty.projectileSpeedScale ?? 1);
     const alphabet = "asdfjklqweruiopzxcvbnm";
 
     for (let index = 0; index < count; index += 1) {
@@ -4766,7 +4768,7 @@ export class Game {
           ? 1
           : bossActionIntervalMultiplier(
               boss.typingMechanic,
-            ))) /
+            )) * (this.difficulty?.attackIntervalFactor ?? 1)) /
       Math.max(0.75, this.difficulty?.bossPressure ?? 1) /
       Math.max(1, this.difficulty?.bossActionRateMultiplier ?? 1);
 

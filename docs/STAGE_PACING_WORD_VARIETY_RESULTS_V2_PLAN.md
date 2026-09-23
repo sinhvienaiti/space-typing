@@ -1,6 +1,6 @@
 # Stage Pacing, Word Variety, Projectile SFX and Stage Results V2
 
-Status: **user-approved design direction; implementation NOT started.** This document is a reviewable implementation specification, not a claim of delivered runtime behavior.
+Status: **partial runtime implementation** as of PR #87 and follow-up: early total stage budgets now start at 34, Stage 051+ starts at 100; existing StageWordLedger already applies across hostile word-selection paths; dedicated projectile intercept audio/VFX ships; Stage Clear Replay, compact currency badges, independent Custom tuning and lighter High/Ultra pixel budgets have merged. This document remains the source of **uncompleted** acceptance criteria: explicit 3–5 wave phase scheduling, measured 90–150s pacing, comprehensive word-attempt trace and Stage Results V2 (word review tabs/stars/stats), exhaustive manual browser profiling/listening and high/low WPM playtesting. Do not mark full design complete merely because Test/Build CI passes.
 
 Source of truth for existing implementation remains `main`, specifically `src/campaign/stage.ts`, `src/Game.ts`, `src/enemies/word-difficulty.ts`, `src/audio/Sfx.ts`, `src/main.ts`, M12 active-pressure rules and the C01-C04 same-prefix clarity work.
 

@@ -194,6 +194,34 @@ describe("M21 gated Game Test Lab API", () => {
     game.destroy();
   });
 
+  it("applies Custom hostile bullet velocity to boss projectiles too", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 20);
+    expect(game.testLabSpawnBoss()).toBe(true);
+
+    const state = game as unknown as {
+      boss: { phase: number } | null;
+      difficulty: { projectileSpeedScale?: number } | null;
+      projectiles: Array<{ vx: number; vy: number }>;
+      fireBossProjectiles: (boss: { phase: number }) => void;
+    };
+    expect(state.boss).not.toBeNull();
+    expect(state.difficulty).not.toBeNull();
+    state.projectiles = [];
+    state.difficulty!.projectileSpeedScale = 1;
+    state.fireBossProjectiles(state.boss!);
+    const normal = Math.hypot(state.projectiles[0]!.vx, state.projectiles[0]!.vy);
+    expect(normal).toBeGreaterThan(0);
+
+    state.projectiles = [];
+    state.difficulty!.projectileSpeedScale = 0.55;
+    state.fireBossProjectiles(state.boss!);
+    const slow = Math.hypot(state.projectiles[0]!.vx, state.projectiles[0]!.vy);
+    expect(slow).toBeCloseTo(normal * 0.55, 5);
+    game.destroy();
+  });
+
   it("keeps Recall Bonus optional, non-hostile and non-punitive", () => {
     const game = createTestGame();
     game.setTestLabMode(true);
