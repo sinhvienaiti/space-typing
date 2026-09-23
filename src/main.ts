@@ -719,9 +719,10 @@ app.innerHTML = `
           <div><span>score</span><strong id="clearScore">0</strong></div>
           <div><span>accuracy</span><strong id="clearAccuracy">100%</strong></div>
           <div><span>wpm</span><strong id="clearWpm">0</strong></div>
-          <div><span>rewards</span><strong id="clearCredits">+0</strong></div>
+          <div class="result-rewards"><span>rewards</span><strong id="clearCredits" class="reward-chips">+0</strong></div>
           <div><span>max streak</span><strong id="clearStreak">0</strong></div>
         </div>
+        <p id="clearDetails" class="result-details"></p>
         <button id="nextStageButton" class="primary">Next stage</button>
         <button id="clearRetryButton">Replay stage</button>
         <button id="clearStageSelectButton">Stage Select</button>
@@ -1295,6 +1296,37 @@ app.innerHTML = `
           </span>
           <input id="customPressure" type="number" min="0.7" max="1.45" step="0.05" />
         </label>
+        <p class="equipment-note">Custom tuning below is independent: 1.00× means default. Changes take effect at the NEXT encounter, never mid-stage.</p>
+        <div class="custom-combat-controls" id="customCombatControls">
+          <label class="setting-row">
+            <span><strong>Enemy movement</strong><small>How quickly enemies approach the player</small></span>
+            <span class="setting-control range-control">
+              <input id="customEnemySpeed" type="range" min="0.45" max="1.65" step="0.05" />
+              <output id="customEnemySpeedValue">1.00×</output>
+            </span>
+          </label>
+          <label class="setting-row">
+            <span><strong>Hostile bullet speed</strong><small>Projectile travel time, separate from fire frequency</small></span>
+            <span class="setting-control range-control">
+              <input id="customBulletSpeed" type="range" min="0.45" max="1.65" step="0.05" />
+              <output id="customBulletSpeedValue">1.00×</output>
+            </span>
+          </label>
+          <label class="setting-row">
+            <span><strong>Enemy fire / skill rate</strong><small>Lower values give more time between hostile attacks</small></span>
+            <span class="setting-control range-control">
+              <input id="customFireRate" type="range" min="0.4" max="1.6" step="0.05" />
+              <output id="customFireRateValue">1.00×</output>
+            </span>
+          </label>
+          <label class="setting-row">
+            <span><strong>Enemy spawn rate</strong><small>Total stage count stays the same; adjusts arrival pacing</small></span>
+            <span class="setting-control range-control">
+              <input id="customSpawnRate" type="range" min="0.55" max="1.45" step="0.05" />
+              <output id="customSpawnRateValue">1.00×</output>
+            </span>
+          </label>
+        </div>
       </div>
 
       <div class="settings-section">
@@ -3434,19 +3466,34 @@ const game = new Game(
       byId("clearScore").textContent = stats.score.toLocaleString();
       byId("clearAccuracy").textContent = accuracy.toFixed(1) + "%";
       byId("clearWpm").textContent = wpm.toFixed(0);
-      byId("clearCredits").textContent =
-        "+" +
-        totalCreditReward.toLocaleString() +
-        " Credits" +
-        (currencyRewardText.length > 0
-          ? " · " + currencyRewardText
-          : "") +
-        objectiveText +
-        (performanceText.length > 0
-          ? " · Performance: " + performanceText
-          : "") +
-        ascensionText +
-        checkpointText;
+      // Use distinct compact currency badges rather than a long wrapped line
+      // that makes the entire results card unusually tall.
+      const rewardContainer = byId("clearCredits");
+      rewardContainer.replaceChildren();
+      for (const [icon, amount, label] of [
+        ["◈", totalCreditReward, "Credits"],
+        ["⬡", totalCurrencyReward.alloy, "Alloy"],
+        ["✧", totalCurrencyReward.starCrystal, "Star Crystal"],
+        ["✦", totalCurrencyReward.quantumCore, "Quantum Core"],
+      ] as const) {
+        if (amount <= 0) continue;
+        const chip = document.createElement("span");
+        chip.className = "reward-chip";
+        chip.title = "+" + amount.toLocaleString() + " " + label;
+        chip.setAttribute("aria-label", chip.title);
+        const glyph = document.createElement("span");
+        glyph.className = "currency-glyph";
+        glyph.setAttribute("aria-hidden", "true");
+        glyph.textContent = icon;
+        const value = document.createElement("span");
+        value.textContent = "+" + amount.toLocaleString();
+        chip.append(glyph, value);
+        rewardContainer.append(chip);
+      }
+      byId("clearDetails").textContent =
+        [objectiveText, performanceText ? "Performance: " + performanceText : "",
+          ascensionText, checkpointText]
+          .filter(Boolean).join(" · ").replace(/^\s*·\s*/, "");
       byId("clearStreak").textContent = String(stats.maxStreak);
 
       updateCampaignUi();
@@ -5163,6 +5210,7 @@ function handleHiddenEncounterClear(
     accuracy.toFixed(1) + "%";
   byId("clearWpm").textContent = wpm.toFixed(0);
   byId("clearCredits").textContent = rewardText;
+  byId("clearDetails").textContent = "Hidden encounter reward";
   byId("clearStreak").textContent =
     String(stats.maxStreak);
   updateCampaignUi();
@@ -6329,6 +6377,14 @@ function renderSettings(): void {
   const customPressure = byId<HTMLInputElement>("customPressure");
   customPressure.value = difficultySettings.customPressure.toFixed(2);
   customPressure.disabled = difficultySettings.mode !== "custom";
+  const customEnabled = difficultySettings.mode === "custom";
+  byId("customCombatControls").classList.toggle("disabled", !customEnabled);
+  for (const id of ["customEnemySpeed", "customBulletSpeed", "customFireRate", "customSpawnRate"] as const) {
+    const control = byId<HTMLInputElement>(id);
+    control.value = String(difficultySettings[id]);
+    control.disabled = !customEnabled;
+    byId<HTMLOutputElement>(id + "Value").value = difficultySettings[id].toFixed(2) + "×";
+  }
 }
 
 function openSettings(): void {
@@ -6787,13 +6843,22 @@ async function loadInitialVocabulary(): Promise<void> {
   }
 }
 
-for (const id of [
-  "startButton",
-  "restartButton",
-  "clearRetryButton",
-  "nextStageButton",
-]) {
+// The clear handler advances campaign.selectedStage immediately after a win.
+ // Replay must explicitly select the completed encounter, not the new frontier.
+for (const id of ["startButton", "nextStageButton"]) {
+  byId(id).addEventListener("click", () => void startSelectedStage());
+}
+for (const id of ["restartButton", "clearRetryButton"]) {
   byId(id).addEventListener("click", () => {
+    if (currentHiddenEncounterState().active !== null) {
+      void startSelectedStage();
+      return;
+    }
+    const completedStage = game.getStats().stage;
+    if (canSelectCampaignStage(campaign, campaignExpansion, completedStage)) {
+      campaign = selectCampaignStage(campaign, completedStage);
+      updateCampaignUi();
+    }
     void startSelectedStage();
   });
 }
@@ -7067,6 +7132,17 @@ byId<HTMLInputElement>("customPressure").addEventListener(
     renderSettings();
   },
 );
+
+for (const id of ["customEnemySpeed", "customBulletSpeed", "customFireRate", "customSpawnRate"] as const) {
+  byId<HTMLInputElement>(id).addEventListener("input", (event) => {
+    difficultySettings = sanitizeDifficultySettings({
+      ...difficultySettings,
+      [id]: Number((event.currentTarget as HTMLInputElement).value),
+    });
+    saveDifficultySettings();
+    byId<HTMLOutputElement>(id + "Value").value = difficultySettings[id].toFixed(2) + "×";
+  });
+}
 
 byId<HTMLInputElement>("musicVolume").addEventListener(
   "input",
