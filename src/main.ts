@@ -1,4 +1,5 @@
 import "./styles.css";
+import "./character-progress.css";
 import { Game } from "./Game";
 import { hasUsableDeathProtection } from "./ui/game-over";
 import {
