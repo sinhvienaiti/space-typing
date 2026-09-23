@@ -5,6 +5,7 @@ import {
   createPlayerSave,
   migratePlayerSave,
   PLAYER_SAVE_VERSION,
+  resolvePlayerSaveRecovery,
   sanitizePlayerSave,
   UnsupportedPlayerSaveVersionError,
 } from "../src/persistence/player-save";
@@ -12,6 +13,7 @@ import {
   createDefaultCampaignProgress,
   recordStageClear,
 } from "../src/campaign/progress";
+import { captureCrashRecoverySnapshot } from "../src/persistence/crash-recovery";
 
 describe("player save persistence model", () => {
   it("wraps Campaign progress in a versioned player save", () => {
@@ -768,6 +770,53 @@ describe("player save persistence model", () => {
       kind: "character-skill",
     });
     expect(migration.save.hotbar.slots[1]).toEqual({
+      kind: "skill",
+      id: "gravity-well",
+    });
+  });
+
+  it("preserves the top-level hotbar across technical crash recovery", () => {
+    const save = createPlayerSave(createDefaultCampaignProgress());
+    save.hotbar.slots[0] = { kind: "character-skill" };
+    save.hotbar.slots[1] = { kind: "skill", id: "gravity-well" };
+
+    const state = {
+      campaign: save.campaign,
+      inventory: save.inventory,
+      equipment: save.equipment,
+      supportSpells: save.supportSpells,
+      characters: save.characters,
+      luckPity: save.luckPity,
+      hiddenDiscovery: save.hiddenDiscovery,
+      credits: save.credits,
+      progression: save.progression,
+      expansionCurrencies: save.expansionCurrencies,
+      shops: save.shops,
+      route: save.route,
+      upgrades: save.upgrades,
+      relics: save.relics,
+      ascension: save.ascension,
+    };
+    const captured = captureCrashRecoverySnapshot(
+      state,
+      save.campaignExpansion,
+      save.checkpointSnapshot,
+      "manual",
+      "2026-09-23T05:50:00.000Z",
+    );
+    save.campaignExpansion = captured.campaignExpansion;
+    save.crashRecoverySnapshot = captured.snapshot;
+
+    const resolved = resolvePlayerSaveRecovery(
+      save,
+      "2026-09-23T05:51:00.000Z",
+    );
+
+    expect(resolved.recoveryMode).toBe("crash");
+    expect(resolved.save.hotbar.slots[0]).toEqual({
+      kind: "character-skill",
+    });
+    expect(resolved.save.hotbar.slots[1]).toEqual({
       kind: "skill",
       id: "gravity-well",
     });
