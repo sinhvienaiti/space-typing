@@ -167,8 +167,11 @@ export class Sfx {
 
   /** Bright, short player laser when a hostile letter projectile is typed. */
   projectileIntercept(): void {
-    this.tone(1040, 0.075, "sawtooth", 0.055, 260, "combat");
-    this.noise(0.025, 0.014, "combat");
+    // Audible paired zap and shatter. Both remain in the COMBAT bus so spoken
+    // English still takes priority when pronunciation is active.
+    this.tone(1160, 0.11, "sawtooth", 0.09, 310, "combat");
+    this.tone(630, 0.125, "triangle", 0.05, 170, "combat");
+    this.noise(0.045, 0.027, "combat");
   }
 
   projectileWarning(): void {
