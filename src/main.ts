@@ -1,6 +1,13 @@
 import "./styles.css";
 import "./character-progress.css";
 import "./basic-skills.css";
+import "./kill-translation.css";
+import {
+  DEFAULT_KILL_TRANSLATION_SETTINGS,
+  KillTranslationQueue,
+  hasVisibleKillTranslation,
+  sanitizeKillTranslationSettings,
+} from "./feedback/kill-translation";
 import { Game } from "./Game";
 import { hasUsableDeathProtection } from "./ui/game-over";
 import {
@@ -429,6 +436,7 @@ const defaultSettings: GameSettings = {
   pronunciationEnabled: true,
   pronunciationRate: 1,
   pronunciationVolume: 1,
+  killTranslation: { ...DEFAULT_KILL_TRANSLATION_SETTINGS },
 };
 
 function loadSettings(): GameSettings {
@@ -473,6 +481,7 @@ function loadSettings(): GameSettings {
         typeof parsed.pronunciationVolume === "number"
           ? Math.min(1, Math.max(0, parsed.pronunciationVolume))
           : defaultSettings.pronunciationVolume,
+      killTranslation: sanitizeKillTranslationSettings(parsed.killTranslation),
     };
   } catch {
     return { ...defaultSettings };
@@ -522,6 +531,13 @@ function byId<T extends HTMLElement = HTMLElement>(id: string): T {
 }
 
 app.innerHTML = `
+  <section id="killLearningStrip" class="kill-learning-strip hidden" aria-live="polite" aria-atomic="true">
+    <span class="kill-learning-label" aria-hidden="true">IPA · NGHĨA TIẾNG VIỆT</span>
+    <div class="kill-learning-text">
+      <strong id="killLearningIpa" class="kill-learning-ipa"></strong>
+      <strong id="killLearningVi" class="kill-learning-vi"></strong>
+    </div>
+  </section>
   <div class="game-shell">
     <canvas id="gameCanvas" aria-label="Space Typing battlefield"></canvas>
 
@@ -1227,6 +1243,46 @@ app.innerHTML = `
       </div>
 
       <div class="settings-section">
+        <h3>Kill translation · learning</h3>
+        <label class="setting-row">
+          <span><strong>Show after killing a typed word</strong><small>Dedicated strip above the battlefield; independent from English speech</small></span>
+          <select id="killTranslationEnabled">
+            <option value="true">Enabled</option>
+            <option value="false">Disabled</option>
+          </select>
+        </label>
+        <label class="setting-row">
+          <span><strong>IPA</strong><small>Show pronunciation only if available</small></span>
+          <select id="killTranslationIpa">
+            <option value="true">Show</option>
+            <option value="false">Hide</option>
+          </select>
+        </label>
+        <label class="setting-row">
+          <span><strong>Vietnamese meaning</strong><small>No repeated English target word</small></span>
+          <select id="killTranslationVi">
+            <option value="true">Show</option>
+            <option value="false">Hide</option>
+          </select>
+        </label>
+        <label class="setting-row">
+          <span><strong>Text size</strong><small>Readable even at large resolutions</small></span>
+          <select id="killTranslationSize">
+            <option value="small">Small</option>
+            <option value="medium">Medium</option>
+            <option value="large">Large</option>
+          </select>
+        </label>
+        <label class="setting-row">
+          <span><strong>Display duration</strong><small>0.8–5.0 seconds per word · two pending words maximum</small></span>
+          <span class="setting-control range-control">
+            <input id="killTranslationDuration" type="range" min="0.8" max="5" step="0.1" />
+            <output id="killTranslationDurationValue">2.4s</output>
+          </span>
+        </label>
+      </div>
+
+      <div class="settings-section">
         <h3>difficulty</h3>
         <label class="setting-row">
           <span>
@@ -1526,6 +1582,68 @@ function installMenuHelp(): void {
 }
 
 installMenuHelp();
+
+const killTranslationQueue = new KillTranslationQueue();
+let killTranslationTimer: number | null = null;
+
+function currentKillTranslationSettings() {
+  return sanitizeKillTranslationSettings(settings.killTranslation);
+}
+
+function clearKillTranslationFeedback(): void {
+  if (killTranslationTimer !== null) window.clearTimeout(killTranslationTimer);
+  killTranslationTimer = null;
+  killTranslationQueue.clear();
+  byId("killLearningIpa").textContent = "";
+  byId("killLearningVi").textContent = "";
+}
+
+function renderActiveKillTranslation(): void {
+  if (killTranslationTimer !== null) window.clearTimeout(killTranslationTimer);
+  killTranslationTimer = null;
+  const config = currentKillTranslationSettings();
+  let entry = killTranslationQueue.peek();
+  while (entry !== null && !hasVisibleKillTranslation(entry, config)) {
+    entry = killTranslationQueue.advance();
+  }
+  const ipa = byId("killLearningIpa");
+  const vi = byId("killLearningVi");
+  ipa.textContent = entry !== null && config.showIpa ? entry.ipa.trim() : "";
+  vi.textContent = entry !== null && config.showVietnamese ? entry.vi.trim() : "";
+  if (entry !== null) {
+    killTranslationTimer = window.setTimeout(() => {
+      killTranslationTimer = null;
+      killTranslationQueue.advance();
+      renderActiveKillTranslation();
+    }, config.durationSeconds * 1000);
+  }
+}
+
+function updateKillTranslationVisibility(phase: GamePhase): void {
+  const config = currentKillTranslationSettings();
+  const show =
+    phase === "playing" && config.enabled &&
+    (config.showIpa || config.showVietnamese);
+  const strip = byId("killLearningStrip");
+  const hiddenBefore = strip.classList.contains("hidden");
+  strip.classList.toggle("hidden", !show);
+  strip.classList.remove("size-small", "size-medium", "size-large");
+  strip.classList.add("size-" + config.size);
+  if (!show) clearKillTranslationFeedback();
+  else renderActiveKillTranslation();
+  if (hiddenBefore !== !show) {
+    // The learning strip reserves its OWN layout row; resize the battlefield
+    // only when that row appears/disappears, never on each kill.
+    window.requestAnimationFrame(() => game.resize());
+  }
+}
+
+function enqueueKillTranslation(entry: VocabularyEntry): void {
+  if (!hasVisibleKillTranslation(entry, currentKillTranslationSettings())) return;
+  if (game.getPhase() !== "playing") return;
+  const becameActive = killTranslationQueue.enqueue(entry);
+  if (becameActive) renderActiveKillTranslation();
+}
 
 const titleOverlay = byId("titleOverlay");
 const pauseOverlay = byId("pauseOverlay");
@@ -2279,6 +2397,7 @@ function renderPhase(phase: GamePhase): void {
 
   renderInventory();
   renderAllSkills();
+  updateKillTranslationVisibility(phase);
 }
 
 function renderStage(stage: number): void {
@@ -3601,6 +3720,7 @@ const game = new Game(
     onWordComplete: (entry) => {
       speakEnglish(entry.en, settings);
     },
+    onKillTranslation: enqueueKillTranslation,
     onEquipmentDrop: (drop) => {
       const definition = getEquipmentDefinition(drop.definitionId);
       equipment = addEquipmentInstance(equipment, {
@@ -6495,6 +6615,7 @@ function saveSettings(): void {
   game.updateSettings(settings);
   musicController.setMusicVolume(settings.musicVolume);
   musicController.setAmbientVolume(settings.ambientVolume);
+  updateKillTranslationVisibility(game.getPhase());
 }
 
 function renderSettings(): void {
@@ -6520,6 +6641,18 @@ function renderSettings(): void {
 
   byId<HTMLSelectElement>("pronunciationEnabled").value =
     String(settings.pronunciationEnabled);
+  const killSettings = currentKillTranslationSettings();
+  byId<HTMLSelectElement>("killTranslationEnabled").value =
+    String(killSettings.enabled);
+  byId<HTMLSelectElement>("killTranslationIpa").value =
+    String(killSettings.showIpa);
+  byId<HTMLSelectElement>("killTranslationVi").value =
+    String(killSettings.showVietnamese);
+  byId<HTMLSelectElement>("killTranslationSize").value = killSettings.size;
+  byId<HTMLInputElement>("killTranslationDuration").value =
+    String(killSettings.durationSeconds);
+  byId<HTMLOutputElement>("killTranslationDurationValue").value =
+    killSettings.durationSeconds.toFixed(1) + "s";
 
   const rate = byId<HTMLInputElement>("pronunciationRate");
   rate.value = String(settings.pronunciationRate);
@@ -7398,6 +7531,52 @@ byId<HTMLSelectElement>("screenShake").addEventListener(
       screenShake:
         (event.currentTarget as HTMLSelectElement).value === "true",
     };
+    saveSettings();
+  },
+);
+
+for (const [id, field] of [
+  ["killTranslationEnabled", "enabled"],
+  ["killTranslationIpa", "showIpa"],
+  ["killTranslationVi", "showVietnamese"],
+] as const) {
+  byId<HTMLSelectElement>(id).addEventListener("change", (event) => {
+    settings = {
+      ...settings,
+      killTranslation: {
+        ...currentKillTranslationSettings(),
+        [field]: (event.currentTarget as HTMLSelectElement).value === "true",
+      },
+    };
+    saveSettings();
+  });
+}
+
+byId<HTMLSelectElement>("killTranslationSize").addEventListener(
+  "change",
+  (event) => {
+    settings = {
+      ...settings,
+      killTranslation: sanitizeKillTranslationSettings({
+        ...currentKillTranslationSettings(),
+        size: (event.currentTarget as HTMLSelectElement).value,
+      }),
+    };
+    saveSettings();
+  },
+);
+
+byId<HTMLInputElement>("killTranslationDuration").addEventListener(
+  "input",
+  (event) => {
+    settings = {
+      ...settings,
+      killTranslation: sanitizeKillTranslationSettings({
+        ...currentKillTranslationSettings(),
+        durationSeconds: Number((event.currentTarget as HTMLInputElement).value),
+      }),
+    };
+    renderSettings();
     saveSettings();
   },
 );
