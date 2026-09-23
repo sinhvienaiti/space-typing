@@ -120,6 +120,58 @@ describe("M21 gated Game Test Lab API", () => {
     game.destroy();
   });
 
+  it("holds stage clear while the visible Recall bonus remains, then clears after collection", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 1);
+    game.testLabSetSchedulerFrozen(true);
+    const runtime = game as unknown as {
+      spawnRemaining: number;
+      supplySpawnsRemaining: number;
+      treasureDronePending: boolean;
+      recallBonusPending: boolean;
+      rewardChoicePending: boolean;
+      anomalyPending: boolean;
+    };
+    runtime.spawnRemaining = 0;
+    runtime.supplySpawnsRemaining = 0;
+    runtime.treasureDronePending = false;
+    runtime.recallBonusPending = false;
+    runtime.rewardChoicePending = false;
+    runtime.anomalyPending = false;
+
+    expect(game.testLabSpawnRecallBonus("qa-1")).toBe(true);
+    expect(game.testLabAdvanceSimulation(0.05)).toBe(true);
+    expect(game.getPhase()).toBe("playing");
+    expect(game.getTestLabSnapshot()?.recallBonus?.en).toBe("orbit");
+
+    expect(game.testLabCompleteRecallBonus()).toBe(true);
+    game.testLabAdvanceSimulation(0.05);
+    expect(game.getPhase()).toBe("stageclear");
+    game.destroy();
+  });
+
+  it("Nova Pulse clears visible enemies/projectiles but preserves collectible bonuses", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 1);
+    expect(game.testLabSpawnEnemies({ kind: "scout", count: 3 })).toHaveLength(3);
+    expect(game.testLabSpawnRecallBonus("qa-1")).toBe(true);
+    const runtime = game as unknown as {
+      projectiles: Array<{id:number;ownerId:number;char:string;x:number;y:number;vx:number;vy:number;radius:number}>;
+    };
+    runtime.projectiles = [{ id:1,ownerId:1,char:"a",x:400,y:100,vx:0,vy:0,radius:10 }];
+    game.testLabSetResources({ power: 100 });
+    game.handleKey(" ");
+    const snapshot = game.getTestLabSnapshot();
+    expect(snapshot?.stats.power).toBe(0);
+    expect(snapshot?.stats.kills).toBe(3);
+    expect(snapshot?.enemies).toHaveLength(0);
+    expect(snapshot?.projectiles).toBe(0);
+    expect(snapshot?.recallBonus?.en).toBe("orbit");
+    game.destroy();
+  });
+
   it("records lethal damage but keeps Immortal mode alive at one Hull", () => {
     const game = createTestGame();
     game.setTestLabMode(true, "immortal");
