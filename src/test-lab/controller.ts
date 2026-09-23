@@ -48,6 +48,22 @@ import type { EnemySkillId } from "../enemies/skills";
 import type { StatusId } from "../status/engine";
 import type { SupportSpellId } from "../skills/support";
 import {
+  SHOP_TYPES,
+  buyShopStockEntry,
+  formatShopPrice,
+  resolveShopInstance,
+  type ShopInstance,
+  type ShopType,
+} from "../shops/state";
+import {
+  createBossRewardChoiceOptions,
+  createRewardChoiceOptions,
+} from "../events/reward-choice";
+import {
+  rollEquipmentDrop,
+  type LootSource,
+} from "../loot/equipment-loot";
+import {
   worldForStage,
 } from "../worlds/registry";
 import type {
@@ -178,6 +194,8 @@ function snapshotText(
         checkpointStage: session.checkpointStage,
         currencies: currencyText(session),
         inventory: session.state.inventory,
+        luckPity: session.state.luckPity,
+        shops: Object.keys(session.state.shops.instances),
         campaignExpansion: session.campaignExpansion,
         stageEntrySnapshot: {
           stage: session.stageEntrySnapshot.stage,
@@ -238,6 +256,9 @@ export function mountTestLab(
   let game: Game | null = null;
   let music: MusicController | null = null;
   let inspectorTimer = 0;
+  let activeShop: ShopInstance | null = null;
+  let shopPurchaseSequence = 0;
+  let rewardPreview: unknown = null;
 
   const button = document.createElement("button");
   button.id = "testLabButton";
@@ -408,6 +429,48 @@ export function mountTestLab(
         </details>
 
         <details>
+          <summary>Shop / Economy Sandbox</summary>
+          <div class="test-lab-grid">
+            <label>Shop type<select data-field="shop-type"></select></label>
+            <label>Stock<select data-field="shop-stock"></select></label>
+            <label>QA seed offset<input data-field="shop-seed-offset" type="number" min="0" value="0"></label>
+          </div>
+          <div class="test-lab-row">
+            <button type="button" data-action="load-shop">Load Production Shop</button>
+            <button type="button" data-action="reroll-shop">QA Reroll</button>
+            <button type="button" data-action="buy-shop">Buy Selected via Production Flow</button>
+          </div>
+          <pre class="test-lab-mini-inspector" data-role="shop"></pre>
+        </details>
+
+        <details>
+          <summary>Reward / Loot Controls</summary>
+          <div class="test-lab-grid">
+            <label>Loot source<select data-field="loot-source">
+              <option value="normal">normal</option>
+              <option value="elite">elite</option>
+              <option value="golden">golden</option>
+              <option value="treasure">treasure</option>
+              <option value="anomaly">anomaly</option>
+              <option value="boss">boss</option>
+            </select></label>
+            <label>Luck<input data-field="reward-luck" type="number" min="0" max="100" value="0"></label>
+            <label>Salvage<input data-field="reward-salvage" type="number" min="0" max="100" value="0"></label>
+          </div>
+          <div class="test-lab-row">
+            <button type="button" data-action="roll-equipment">Roll Equipment Drop</button>
+            <button type="button" data-action="preview-choice">Preview Reward Choice</button>
+            <button type="button" data-action="preview-boss-choice">Preview Boss Choice</button>
+            <button type="button" data-action="grant-star-crystal">Grant Star Crystal</button>
+            <button type="button" data-action="grant-quantum-core">Grant Quantum Core</button>
+            <button type="button" data-action="grant-salvage-anchor">Grant Salvage Anchor</button>
+            <button type="button" data-action="grant-stage-revival">Grant Stage Revival Core</button>
+            <button type="button" data-action="grant-phoenix">Grant Phoenix Core</button>
+          </div>
+          <pre class="test-lab-mini-inspector" data-role="reward"></pre>
+        </details>
+
+        <details>
           <summary>Music / Audio Runtime</summary>
           <div class="test-lab-grid">
             <label>Music state<select data-field="music-state"></select></label>
@@ -451,6 +514,10 @@ export function mountTestLab(
   const inspector = dialog.querySelector<HTMLElement>('[data-role="inspector"]')!;
   const inventoryInspector =
     dialog.querySelector<HTMLElement>('[data-role="inventory"]')!;
+  const shopInspector =
+    dialog.querySelector<HTMLElement>('[data-role="shop"]')!;
+  const rewardInspector =
+    dialog.querySelector<HTMLElement>('[data-role="reward"]')!;
 
   const worldSelect =
     dialog.querySelector<HTMLSelectElement>('[data-field="world"]')!;
@@ -470,6 +537,10 @@ export function mountTestLab(
     dialog.querySelector<HTMLSelectElement>('[data-field="item"]')!;
   const playerSkillSelect =
     dialog.querySelector<HTMLSelectElement>('[data-field="player-skill"]')!;
+  const shopTypeSelect =
+    dialog.querySelector<HTMLSelectElement>('[data-field="shop-type"]')!;
+  const shopStockSelect =
+    dialog.querySelector<HTMLSelectElement>('[data-field="shop-stock"]')!;
   const musicStateSelect =
     dialog.querySelector<HTMLSelectElement>('[data-field="music-state"]')!;
 
@@ -543,6 +614,13 @@ export function mountTestLab(
     ],
   );
   setOptions(
+    shopTypeSelect,
+    SHOP_TYPES.map((type) => ({
+      value: type,
+      label: type,
+    })),
+  );
+  setOptions(
     musicStateSelect,
     MUSIC_STATES.map((state) => ({
       value: state,
@@ -582,6 +660,14 @@ export function mountTestLab(
       inventoryText(session) +
       "\n\n" +
       currencyText(session);
+    shopInspector.textContent =
+      activeShop === null
+        ? "No shop loaded."
+        : JSON.stringify(activeShop, null, 2);
+    rewardInspector.textContent =
+      rewardPreview === null
+        ? "No reward preview."
+        : JSON.stringify(rewardPreview, null, 2);
     refreshEnemyIds(snapshot);
   }
 
@@ -838,6 +924,44 @@ export function mountTestLab(
     dialog.querySelector<HTMLInputElement>('[data-field="checkpoint"]')!.value =
       String(stage);
   });
+
+  function shopContext(offset = 0) {
+    const world = worldForStage(session.stage);
+    return {
+      stage: session.stage,
+      worldKey: world.id,
+      luck: game?.getPlayerStats().luck ?? 0,
+      progression: session.stage + Math.max(0, Math.floor(offset)),
+      hiddenDiscovery: session.state.hiddenDiscovery,
+    };
+  }
+
+  function populateShopStock(instance: ShopInstance): void {
+    activeShop = instance;
+    setOptions(
+      shopStockSelect,
+      instance.stock.map((entry) => ({
+        value: entry.key,
+        label:
+          entry.key +
+          " · " +
+          String(entry.remaining) +
+          " left · " +
+          formatShopPrice(entry.price),
+      })),
+    );
+  }
+
+  function loadShop(qaOffset = 0): void {
+    const resolved = resolveShopInstance(
+      session.state.shops,
+      shopTypeSelect.value as ShopType,
+      shopContext(qaOffset),
+    );
+    session.state.shops = resolved.state;
+    populateShopStock(resolved.instance);
+    renderInspector();
+  }
 
   function syncScenarioInputsFromSession(): void {
     dialog.querySelector<HTMLInputElement>('[data-field="stage"]')!.value =
