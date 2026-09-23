@@ -1,5 +1,5 @@
 import { clamp } from "../logic";
-import type { StatBonus } from "../stats/core";
+import { CORE_STAT_KEYS, createCoreStats, type CoreStats, type StatBonus } from "../stats/core";
 import {
   createEmptyTalentRanks,
   isValidTalentRanks,
@@ -11,6 +11,34 @@ import {
 
 export const MAX_CHARACTER_LEVEL = 50;
 export const MAX_CHARACTER_MASTERY = 20;
+
+// All level-up stats are derived from the existing CharacterProgress.level.
+// Keep the original six gains unchanged for old saves; no persisted stat ledger.
+export const CHARACTER_LEVEL_STAT_GAIN: Readonly<CoreStats> = {
+  hull: 0.6,
+  shield: 0.4,
+  firepower: 0.16,
+  armor: 0.08,
+  energy: 0.35,
+  reactor: 0.05,
+  focus: 0.08,
+  ward: 0.08,
+  luck: 0.015,
+  salvage: 0.015,
+};
+
+export function characterLevelStatGains(
+  previousLevel: number,
+  nextLevel: number,
+): CoreStats {
+  const start = Math.max(1, Math.min(MAX_CHARACTER_LEVEL, Math.floor(previousLevel)));
+  const end = Math.max(start, Math.min(MAX_CHARACTER_LEVEL, Math.floor(nextLevel)));
+  const result = createCoreStats();
+  for (const key of CORE_STAT_KEYS) {
+    result[key] = Number(((end - start) * CHARACTER_LEVEL_STAT_GAIN[key]).toFixed(3));
+  }
+  return result;
+}
 
 export type CharacterProgress = {
   level: number;
@@ -25,6 +53,10 @@ export type CharacterProgressAward = {
   xpGained: number;
   levelUps: number;
   masteryUps: number;
+  previousLevel: number;
+  previousXp: number;
+  previousMastery: number;
+  autoStatGains: CoreStats;
 };
 
 export type CharacterClearPerformance = {
@@ -45,7 +77,10 @@ export function createStarterCharacterProgress(): CharacterProgress {
 
 export function xpNeededForLevel(level: number): number {
   const safeLevel = Math.max(1, Math.min(MAX_CHARACTER_LEVEL, Math.floor(level)));
-  return 120 + safeLevel * 35;
+  // Keep Lv1-Lv10 thresholds exactly compatible with old saves and early
+  // learning pace. Quadratic late growth spreads Lv50 across the campaign.
+  return 120 + safeLevel * 35 +
+    Math.max(0, safeLevel - 10) ** 2 * 9;
 }
 
 export function xpNeededForMastery(mastery: number): number {
@@ -76,6 +111,9 @@ export function awardCharacterProgress(
   performance: CharacterClearPerformance,
 ): CharacterProgressAward {
   const xpGained = stageClearCharacterXp(performance);
+  const previousLevel = current.level;
+  const previousXp = current.xp;
+  const previousMastery = current.mastery;
   let level = current.level;
   let xp = current.xp + xpGained;
   let mastery = current.mastery;
@@ -120,6 +158,10 @@ export function awardCharacterProgress(
     xpGained,
     levelUps,
     masteryUps,
+    previousLevel,
+    previousXp,
+    previousMastery,
+    autoStatGains: characterLevelStatGains(previousLevel, level),
   };
 }
 
@@ -224,12 +266,14 @@ export function characterProgressStatBonus(
   const levelDelta = Math.max(0, progress.level - 1);
   const mastery = Math.max(0, progress.mastery);
 
+  const levelBonus = characterLevelStatGains(1, levelDelta + 1);
   return {
-    hull: levelDelta * 0.6 + mastery * 0.8,
-    shield: levelDelta * 0.4 + mastery * 0.5,
-    firepower: levelDelta * 0.16 + mastery * 0.3,
-    energy: levelDelta * 0.35 + mastery * 0.5,
-    reactor: levelDelta * 0.05 + mastery * 0.1,
-    focus: levelDelta * 0.08 + mastery * 0.2,
+    ...levelBonus,
+    hull: levelBonus.hull + mastery * 0.8,
+    shield: levelBonus.shield + mastery * 0.5,
+    firepower: levelBonus.firepower + mastery * 0.3,
+    energy: levelBonus.energy + mastery * 0.5,
+    reactor: levelBonus.reactor + mastery * 0.1,
+    focus: levelBonus.focus + mastery * 0.2,
   };
 }

@@ -101,6 +101,7 @@ import {
 } from "./death-protection";
 import {
   createDefaultHotbarState,
+  createLegacyHotbarState,
   sanitizeHotbarState,
   type HotbarState,
 } from "../hud/hotbar";
@@ -111,7 +112,7 @@ const STORE_NAME = "player";
 const SAVE_KEY = "main";
 const RECOVERY_SAVE_KEY = "spaceTypingPlayerSaveRecoveryV3";
 
-export const PLAYER_SAVE_VERSION = 26;
+export const PLAYER_SAVE_VERSION = 27;
 
 export class UnsupportedPlayerSaveVersionError extends Error {
   constructor(readonly version: number) {
@@ -557,7 +558,9 @@ export type PlayerSaveV26 = {
   lastSaveReason: SaveReason;
 };
 
-export type PlayerSave = PlayerSaveV26;
+export type PlayerSaveV27 = Omit<PlayerSaveV26, "version"> & { version: 27 };
+
+export type PlayerSave = PlayerSaveV27;
 export type PersistenceSource = "indexeddb" | "localStorage";
 
 export type LoadedPlayerSave = {
@@ -1300,10 +1303,49 @@ export function migratePlayerSave(value: unknown): MigrationResult {
         sanitizeRelicState(raw.relics),
         sanitizeCodexState(raw.codex),
         sanitizeAscensionState(raw.ascension, safeCampaign),
-        createDefaultHotbarState(),
+        createLegacyHotbarState(),
       ),
       migrated: true,
       fromVersion: 25,
+    };
+  }
+
+  if (raw.version === 26) {
+    return {
+      save: createPlayerSave(
+        sanitizeCampaignProgress(raw.campaign),
+        typeof raw.updatedAt === "string" ? raw.updatedAt : "",
+        "migration",
+        sanitizeInventory(raw.inventory),
+        sanitizeEquipmentState(raw.equipment),
+        sanitizeSupportSpellState(raw.supportSpells),
+        sanitizeCharacterState(raw.characters),
+        sanitizeLuckPityState(raw.luckPity),
+        sanitizeHiddenDiscoveryState(raw.hiddenDiscovery),
+        sanitizeCredits(raw.credits),
+        sanitizeProgressionState(raw.progression),
+        sanitizeExpansionCurrencyState(raw.expansionCurrencies),
+        sanitizeCampaignExpansionState(
+          raw.campaignExpansion,
+          sanitizeCampaignProgress(raw.campaign),
+          typeof raw.updatedAt === "string" ? raw.updatedAt : "",
+        ),
+        raw.checkpointSnapshot as CheckpointSnapshot | undefined,
+        sanitizeCrashRecoverySnapshot(raw.crashRecoverySnapshot),
+        sanitizeStageEntrySnapshot(raw.stageEntrySnapshot),
+        sanitizeShopState(raw.shops),
+        sanitizeRouteState(
+          raw.route,
+          sanitizeCampaignProgress(raw.campaign).highestUnlockedStage,
+        ),
+        sanitizeUpgradeState(raw.upgrades),
+        sanitizeRelicState(raw.relics),
+        sanitizeCodexState(raw.codex),
+        sanitizeAscensionState(raw.ascension, sanitizeCampaignProgress(raw.campaign)),
+        sanitizeHotbarState(raw.hotbar),
+      ),
+      migrated: true,
+      fromVersion: 26,
     };
   }
 

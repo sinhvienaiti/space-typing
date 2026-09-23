@@ -14,7 +14,9 @@ describe("RPG hotbar loadout", () => {
     expect(state.slots[0]).toEqual({ kind: "item", id: "repair-kit" });
     expect(state.slots[2]).toEqual({ kind: "item", id: "energy-cell" });
     expect(state.slots[3]).toEqual({ kind: "skill", id: "barrier" });
-    expect(state.slots[8]).toEqual({ kind: "skill", id: "emp-burst" });
+    expect(state.slots[5]).toEqual({ kind: "skill", id: "emp-burst" });
+    expect(state.slots[6]).toEqual({ kind: "character-skill" });
+    expect(state.slots[8]).toBeNull();
     expect(isValidHotbarState(state)).toBe(true);
   });
 
@@ -28,6 +30,13 @@ describe("RPG hotbar loadout", () => {
     expect(next.slots[0]).toBeNull();
     expect(next.slots[8]).toEqual({ kind: "item", id: "repair-kit" });
     expect(isValidHotbarState(next)).toBe(true);
+  });
+
+  it("keeps an old configured slot 9 unchanged during v27 loading", () => {
+    const oldSlots = createDefaultHotbarState().slots;
+    oldSlots[8] = { kind: "skill", id: "chain-lightning" };
+    const loaded = sanitizeHotbarState({ version: 1, slots: oldSlots });
+    expect(loaded.slots[8]).toEqual({ kind: "skill", id: "chain-lightning" });
   });
 
   it("supports support and selected-character actions", () => {
