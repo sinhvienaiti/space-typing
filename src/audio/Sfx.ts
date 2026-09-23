@@ -165,6 +165,12 @@ export class Sfx {
     this.tone(310, 0.09, "triangle", 0.032, 190, "combat");
   }
 
+  /** Bright, short player laser when a hostile letter projectile is typed. */
+  projectileIntercept(): void {
+    this.tone(1040, 0.075, "sawtooth", 0.055, 260, "combat");
+    this.noise(0.025, 0.014, "combat");
+  }
+
   projectileWarning(): void {
     this.notifyWarning(180);
     this.tone(680, 0.055, "triangle", 0.018, 520, "warnings");
