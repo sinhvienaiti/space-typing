@@ -2573,6 +2573,14 @@ export class Game {
       return;
     }
 
+    if (
+      this.recallBonus !== null &&
+      this.recallBonus.typed > 0 &&
+      this.typeRecallBonus(this.recallBonus, key)
+    ) {
+      return;
+    }
+
     if (this.boss !== null && this.boss.typed > 0) {
       this.typeBoss(key);
       return;
@@ -2622,13 +2630,18 @@ export class Game {
       this.height - PLAYER_Y_OFFSET,
     );
 
-    if (candidate === null) {
-      this.registerMiss();
+    if (candidate !== null) {
+      this.targetId = candidate.id;
+      this.typeTarget(candidate, key);
       return;
     }
 
-    this.targetId = candidate.id;
-    this.typeTarget(candidate, key);
+    if (this.recallBonus !== null) {
+      this.typeRecallBonus(this.recallBonus, key);
+      return;
+    }
+
+    this.registerMiss();
   }
 
   resize(): void {
@@ -3050,6 +3063,7 @@ export class Game {
     this.bossDefeated = false;
     this.projectiles = [];
     this.targetId = null;
+    this.recallBonus = null;
     this.boss.actionCooldown =
       (bossActionInterval(this.boss.role, this.boss.phase) *
         bossActionIntervalMultiplier(mechanic)) /
@@ -4773,6 +4787,45 @@ export class Game {
     this.sfx.support();
     this.supplyPod = null;
     this.emitStats();
+  }
+
+  private typeRecallBonus(
+    target: RecallBonusTarget,
+    key: string,
+  ): boolean {
+    const word = typingText(target.entry.en);
+    const expected = word[target.typed];
+    if (key !== expected) {
+      return false;
+    }
+
+    target.typed += 1;
+    this.burst(target.x, target.y, 7, 292);
+    this.sfx.shot(Math.max(1, this.stats.multiplier));
+
+    if (target.typed >= word.length) {
+      const score = recallBonusRewardScore(
+        target.entry.en,
+        target.hintIndices,
+      );
+      this.addScore(score * this.stats.multiplier);
+      this.gainPower(10);
+      this.tryRollEquipmentDrop("treasure");
+      this.hooks.onWordComplete(target.entry);
+      this.rewardNotice = {
+        label: "RECALL BONUS · TREASURE DROP",
+        x: target.x,
+        y: target.y,
+        hue: 292,
+        remaining: 1.8,
+      };
+      this.burst(target.x, target.y, 54, 292);
+      this.sfx.support();
+      this.recallBonus = null;
+      this.emitStats();
+    }
+
+    return true;
   }
 
   private typeTreasureDrone(drone: TreasureDrone, key: string): void {
