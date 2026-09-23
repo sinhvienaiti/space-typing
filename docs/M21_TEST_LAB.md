@@ -1,6 +1,6 @@
 # M21 — Developer QA / Test Lab
 
-Status: implementation complete on the M21 feature branch; final validation is the latest Test + Build workflow for the branch.
+Status: COMPLETE on the M21 feature branch.
 
 ## Architecture
 
@@ -377,3 +377,15 @@ M21 adds coverage for:
 - MusicController debug snapshot;
 - existing music fallback/duck/crossfade lifecycle tests.
 
+
+## Validation
+
+Final implementation checkpoint before merge:
+
+- CI #376 PASS;
+- 111 test files PASS;
+- 561/561 tests PASS;
+- TypeScript no-emit check PASS;
+- Vite production build PASS.
+
+The final docs/source-of-truth commit is required to pass the same workflow before PR merge.
