@@ -1,0 +1,81 @@
+import { describe, expect, it } from "vitest";
+import type { ArtAssetCatalog, ArtAssetEntry } from "../src/assets/pipeline";
+import {
+  PREMIUM_SHIP_SHEET_ASSET_ID,
+  PREMIUM_SHIP_ATLAS_MAX_FILE_BYTES,
+  selectCharacterShipSheet,
+  validPremiumShipDimensions,
+} from "../src/characters/ship-art";
+import { CHARACTER_SHIP_SHEET_ASSET_ID } from "../src/characters/visuals";
+
+function image(width: number, height: number): HTMLImageElement {
+  return {
+    naturalWidth: width,
+    naturalHeight: height,
+  } as HTMLImageElement;
+}
+
+function catalog(
+  premium: HTMLImageElement | null,
+  existing: HTMLImageElement | null,
+): ArtAssetCatalog {
+  const entry = (id: string): ArtAssetEntry => ({
+    id,
+    category: "player",
+    sourceType: "generated",
+    source: "project",
+    author: "Space Typing",
+    license: "project original",
+    attributionRequired: false,
+  });
+  return {
+    manifest: { version: 1, entries: [] },
+    assets: new Map([
+      [
+        PREMIUM_SHIP_SHEET_ASSET_ID,
+        { entry: entry(PREMIUM_SHIP_SHEET_ASSET_ID), image: premium },
+      ],
+      [
+        CHARACTER_SHIP_SHEET_ASSET_ID,
+        { entry: entry(CHARACTER_SHIP_SHEET_ASSET_ID), image: existing },
+      ],
+    ]),
+    failed: [],
+  };
+}
+
+describe("Ship Visual V3 asset budget and fallback", () => {
+  it("requires one 1024 × 768 atlas under the separate file-size budget", () => {
+    expect(validPremiumShipDimensions(1024, 768)).toBe(true);
+    expect(validPremiumShipDimensions(2048, 1536)).toBe(false);
+    expect(validPremiumShipDimensions(1024, 1024)).toBe(false);
+    expect(validPremiumShipDimensions(0, 768)).toBe(false);
+    expect(PREMIUM_SHIP_ATLAS_MAX_FILE_BYTES).toBe(1258291);
+  });
+
+  it("prefers reviewed V3 art when the one decoded image has valid dimensions", () => {
+    const premium = image(1024, 768);
+    const selected = selectCharacterShipSheet(
+      catalog(premium, image(480, 360)),
+    );
+    expect(selected).toEqual({ source: "v3", image: premium });
+  });
+
+  it("retains V2 when premium art is unavailable or oversized", () => {
+    const existing = image(480, 360);
+    expect(
+      selectCharacterShipSheet(catalog(null, existing)),
+    ).toEqual({ source: "v2", image: existing });
+    expect(
+      selectCharacterShipSheet(catalog(image(2048, 1536), existing)),
+    ).toEqual({ source: "v2", image: existing });
+  });
+
+  it("falls back to existing procedural Canvas art when both images fail", () => {
+    expect(selectCharacterShipSheet(catalog(null, null))).toEqual({
+      source: "procedural",
+      image: null,
+    });
+    expect(selectCharacterShipSheet(null).source).toBe("procedural");
+  });
+});
