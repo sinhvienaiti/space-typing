@@ -3545,3 +3545,87 @@ kbd {
   .rest-hub-services { grid-template-columns: 1fr; }
   .rest-hub-services > button { min-height: 70px; }
 }
+
+
+/* Game results: one-line collectible currency glyphs and separate notes. */
+.result-rewards { min-width: 0; }
+.results .reward-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .4rem;
+  margin-top: .4rem;
+  font-size: .86rem;
+}
+.reward-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .27rem;
+  padding: .28rem .42rem;
+  border: 1px solid rgba(107, 218, 234, .25);
+  border-radius: 8px;
+  background: rgba(49, 118, 139, .16);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.reward-chip .currency-glyph {
+  color: #8beafa;
+  font-size: 1.16em;
+}
+.reward-chip:nth-child(2) .currency-glyph { color: #e8c88b; }
+.reward-chip:nth-child(3) .currency-glyph { color: #e1a8ff; }
+.reward-chip:nth-child(4) .currency-glyph { color: #aae6d6; }
+.result-details {
+  min-height: 0;
+  color: #a6bccc;
+  font-size: .75rem;
+  line-height: 1.45;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.custom-combat-controls {
+  padding: .55rem;
+  border: 1px solid rgba(107, 218, 234, .16);
+  border-radius: 12px;
+}
+.custom-combat-controls.disabled { opacity: .55; }
+
+
+/* Sector Briefing is the ten-stage combat outlook; Campaign Map is navigation. */
+.route-map.route-sector-briefing {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: .55rem;
+  max-height: none;
+}
+.route-sector-node {
+  display: grid;
+  place-items: center;
+  gap: .15rem;
+  min-height: 64px;
+  border: 1px solid rgba(138, 172, 202, .24);
+  border-radius: 12px;
+  background: rgba(19, 30, 49, .65);
+  color: #a9baca;
+  font-size: .74rem;
+}
+.route-sector-node strong {
+  color: #dceefa;
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}
+.route-sector-node span { font-size: .63rem; }
+.route-sector-node.cleared { border-color: #53bda7; color: #9de9ca; }
+.route-sector-node.current {
+  border: 2px solid #7debf4;
+  background: rgba(55, 157, 186, .22);
+  box-shadow: 0 0 12px rgba(90, 215, 229, .15);
+}
+.route-sector-node.boss {
+  border-color: #dcb978;
+  color: #f5dba8;
+  background: rgba(111, 82, 41, .2);
+}
+@media (max-width: 540px) {
+  .route-map.route-sector-briefing { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

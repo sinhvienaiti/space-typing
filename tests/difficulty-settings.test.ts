@@ -12,6 +12,10 @@ describe("runtime difficulty settings", () => {
       mode: "balanced",
       customTargetWpm: 60,
       customPressure: 1,
+      customEnemySpeed: 1,
+      customBulletSpeed: 1,
+      customFireRate: 1,
+      customSpawnRate: 1,
       profile: {
         smoothedWpm: 60,
         smoothedAccuracy: 96,
@@ -61,6 +65,22 @@ describe("runtime difficulty settings", () => {
     expect(state.profile.samples).toBe(2);
   });
 
+  it("sanitizes independent custom dimensions without changing fixed modes", () => {
+    const state = sanitizeDifficultySettings({
+      mode: "custom",
+      customEnemySpeed: -4,
+      customBulletSpeed: 99,
+      customFireRate: 0.1,
+      customSpawnRate: 100,
+    });
+    expect(state.customEnemySpeed).toBe(0.45);
+    expect(state.customBulletSpeed).toBe(1.65);
+    expect(state.customFireRate).toBe(0.4);
+    expect(state.customSpawnRate).toBe(1.45);
+    const copy = sanitizeDifficultySettings(JSON.parse(JSON.stringify(state)));
+    expect(copy).toEqual(state);
+  });
+
   it("builds production difficulty input from selected settings", () => {
     const state = sanitizeDifficultySettings({
       mode: "custom",
@@ -81,6 +101,10 @@ describe("runtime difficulty settings", () => {
       recentAccuracy: 97,
       customTargetWpm: 90,
       customPressure: 1.2,
+      customEnemySpeed: 1,
+      customBulletSpeed: 1,
+      customFireRate: 1,
+      customSpawnRate: 1,
     });
   });
 });
