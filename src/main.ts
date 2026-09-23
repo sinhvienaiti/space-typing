@@ -1075,6 +1075,12 @@ app.innerHTML = `
           </small>
         </div>
 
+        <div class="data-summary render-performance">
+          <span>Live render diagnostics</span>
+          <strong id="renderDiagnostics">Start an encounter to measure</strong>
+          <small>Frame p95 includes browser timing; draw p95 measures Canvas calls. A high frame p95 with low draw p95 can indicate GPU/compositor pressure. Adaptive resolution only affects High and Ultra.</small>
+        </div>
+
         <div class="data-actions">
           <button id="exportSaveButton" class="primary" type="button">
             Export Save
@@ -6465,6 +6471,16 @@ function updateDataSummary(): void {
         "/" +
         String(artCatalog.assets.size);
   const performance = game.getPerformanceReport();
+  const render = game.getRenderDiagnostics();
+  byId("renderDiagnostics").textContent = performance.samples < 30
+    ? "Waiting for 30 measured frames"
+    : performance.averageFps.toFixed(0) + " FPS · frame p95 " +
+      performance.p95FrameMs.toFixed(1) + "ms · draw p95 " +
+      render.renderP95Ms.toFixed(1) + "ms · DPR " +
+      render.effectiveDpr.toFixed(2) + " · adaptive " +
+      Math.round(render.adaptiveScale * 100) + "% · cached bodies " +
+      render.bodySprites + " · " +
+      (render.canvasPixels / 1_000_000).toFixed(1) + "M px";
   const performanceMeta =
     performance.samples < 30
       ? ""
