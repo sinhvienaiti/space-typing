@@ -59,11 +59,11 @@ export function createDefaultHotbarState(): HotbarState {
       { kind: "item", id: "shield-cell" },
       { kind: "item", id: "energy-cell" },
       { kind: "skill", id: "barrier" },
-      { kind: "skill", id: "reflect-field" },
-      { kind: "skill", id: "time-shell" },
       { kind: "skill", id: "emergency-repair" },
-      { kind: "skill", id: "guardian-drone" },
       { kind: "skill", id: "emp-burst" },
+      { kind: "character-skill" },
+      null,
+      null,
     ],
   };
 }
