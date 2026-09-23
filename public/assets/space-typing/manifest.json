@@ -11,6 +11,16 @@
       "attributionRequired": false
     },
     {
+      "id": "player-ship-sheet-v2",
+      "category": "player",
+      "sourceType": "generated",
+      "source": "Space Typing Ship Visual V2 generated concept sheet",
+      "author": "Space Typing project",
+      "license": "Project-generated asset; review before public release",
+      "attributionRequired": false,
+      "url": "/assets/space-typing/ships/player-ships-v2.webp"
+    },
+    {
       "id": "enemy-families",
       "category": "enemy",
       "sourceType": "procedural",
