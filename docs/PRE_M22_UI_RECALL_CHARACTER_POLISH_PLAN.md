@@ -15,6 +15,7 @@ Implementation checkpoints completed before P08:
 - P06 character visual profiles/runtime renderer: PR #64 · CI #422/#423 PASS;
 - P07 character selection previews/hierarchy: PR #65 · CI #424/#425 PASS.
 - P08 integration audit: PR #66 initial technical gate · CI #426 PASS · 119/119 test files · 597/597 tests · TypeScript check + Vite production build + bundle budget PASS.
+- P08.1 narrow-screen sanity fix: separate Item and Support quick-control groups on <=760px layouts, measure Recall Bonus masks with their actual display font, and regression-test that wrong Recall guesses do not alter accuracy.
 
 P00-P08 are complete. The next allowed step is the real M22 browser/audio/visual/human-paced matrix; M23 remains blocked until that matrix is fully PASS.
 
