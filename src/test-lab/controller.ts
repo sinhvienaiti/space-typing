@@ -47,6 +47,9 @@ import type { EnemyDefinitionId } from "../enemies/registry";
 import type { EnemySkillId } from "../enemies/skills";
 import type { StatusId } from "../status/engine";
 import type { SupportSpellId } from "../skills/support";
+import type { CharacterId } from "../characters/registry";
+import { DEFAULT_PLAYER_BASE_STATS } from "../stats/player";
+import type { CoreStats } from "../stats/core";
 import {
   SHOP_TYPES,
   buyShopStockEntry,
@@ -371,14 +374,27 @@ export function mountTestLab(
         <details>
           <summary>Player / Status</summary>
           <div class="test-lab-grid">
-            <label>Hull<input data-field="hull" type="number" min="0" value="100"></label>
-            <label>Shield<input data-field="shield" type="number" min="0" value="40"></label>
-            <label>Energy<input data-field="energy" type="number" min="0" value="100"></label>
+            <label>Character<select data-field="character"></select></label>
+            <label>Core Hull<input data-field="core-hull" type="number" min="0" value="100"></label>
+            <label>Core Shield<input data-field="core-shield" type="number" min="0" value="40"></label>
+            <label>Firepower<input data-field="core-firepower" type="number" min="0" value="10"></label>
+            <label>Armor<input data-field="core-armor" type="number" min="0" value="8"></label>
+            <label>Core Energy<input data-field="core-energy" type="number" min="0" value="100"></label>
+            <label>Reactor<input data-field="core-reactor" type="number" min="0" value="8"></label>
+            <label>Focus<input data-field="core-focus" type="number" min="0" value="8"></label>
+            <label>Ward<input data-field="core-ward" type="number" min="0" value="6"></label>
+            <label>Luck<input data-field="core-luck" type="number" min="0" value="5"></label>
+            <label>Salvage<input data-field="core-salvage" type="number" min="0" value="5"></label>
+            <label>Current Hull<input data-field="hull" type="number" min="0" value="100"></label>
+            <label>Current Shield<input data-field="shield" type="number" min="0" value="40"></label>
+            <label>Current Energy<input data-field="energy" type="number" min="0" value="100"></label>
             <label>Power<input data-field="power" type="number" min="0" max="100" value="0"></label>
             <label>Status<select data-field="status"></select></label>
             <label>Duration<input data-field="status-duration" type="number" min="0.1" max="120" step="0.5" value="5"></label>
           </div>
           <div class="test-lab-row">
+            <button type="button" data-action="apply-core-stats">Apply Character / Core Stats</button>
+            <button type="button" data-action="reset-core-stats">Reset Production Defaults</button>
             <button type="button" data-action="apply-resources">Apply Resources</button>
             <button type="button" data-action="damage-50">Damage 50</button>
             <button type="button" data-action="damage-lethal">Force Lethal</button>
@@ -533,6 +549,8 @@ export function mountTestLab(
     dialog.querySelector<HTMLSelectElement>('[data-field="enemy-id"]')!;
   const statusSelect =
     dialog.querySelector<HTMLSelectElement>('[data-field="status"]')!;
+  const characterSelect =
+    dialog.querySelector<HTMLSelectElement>('[data-field="character"]')!;
   const itemSelect =
     dialog.querySelector<HTMLSelectElement>('[data-field="item"]')!;
   const playerSkillSelect =
@@ -584,6 +602,13 @@ export function mountTestLab(
     registry.enemySkills.map((skill) => ({
       value: skill.id,
       label: skill.name + " · " + skill.category,
+    })),
+  );
+  setOptions(
+    characterSelect,
+    registry.characters.map((id) => ({
+      value: id,
+      label: id,
     })),
   );
   setOptions(
@@ -1267,6 +1292,47 @@ export function mountTestLab(
     }
     if (action === "clear-boss") {
       ensureGame()?.testLabClearBoss();
+      renderInspector();
+      return;
+    }
+    if (action === "apply-core-stats") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      activeGame.setCharacter(characterSelect.value as CharacterId);
+      const core: CoreStats = {
+        hull: Math.max(0, numberValue(dialog, '[data-field="core-hull"]', DEFAULT_PLAYER_BASE_STATS.hull)),
+        shield: Math.max(0, numberValue(dialog, '[data-field="core-shield"]', DEFAULT_PLAYER_BASE_STATS.shield)),
+        firepower: Math.max(0, numberValue(dialog, '[data-field="core-firepower"]', DEFAULT_PLAYER_BASE_STATS.firepower)),
+        armor: Math.max(0, numberValue(dialog, '[data-field="core-armor"]', DEFAULT_PLAYER_BASE_STATS.armor)),
+        energy: Math.max(0, numberValue(dialog, '[data-field="core-energy"]', DEFAULT_PLAYER_BASE_STATS.energy)),
+        reactor: Math.max(0, numberValue(dialog, '[data-field="core-reactor"]', DEFAULT_PLAYER_BASE_STATS.reactor)),
+        focus: Math.max(0, numberValue(dialog, '[data-field="core-focus"]', DEFAULT_PLAYER_BASE_STATS.focus)),
+        ward: Math.max(0, numberValue(dialog, '[data-field="core-ward"]', DEFAULT_PLAYER_BASE_STATS.ward)),
+        luck: Math.max(0, numberValue(dialog, '[data-field="core-luck"]', DEFAULT_PLAYER_BASE_STATS.luck)),
+        salvage: Math.max(0, numberValue(dialog, '[data-field="core-salvage"]', DEFAULT_PLAYER_BASE_STATS.salvage)),
+      };
+      activeGame.testLabSetPlayerCoreStats(core);
+      renderInspector();
+      return;
+    }
+    if (action === "reset-core-stats") {
+      for (const [field, value] of Object.entries({
+        "core-hull": DEFAULT_PLAYER_BASE_STATS.hull,
+        "core-shield": DEFAULT_PLAYER_BASE_STATS.shield,
+        "core-firepower": DEFAULT_PLAYER_BASE_STATS.firepower,
+        "core-armor": DEFAULT_PLAYER_BASE_STATS.armor,
+        "core-energy": DEFAULT_PLAYER_BASE_STATS.energy,
+        "core-reactor": DEFAULT_PLAYER_BASE_STATS.reactor,
+        "core-focus": DEFAULT_PLAYER_BASE_STATS.focus,
+        "core-ward": DEFAULT_PLAYER_BASE_STATS.ward,
+        "core-luck": DEFAULT_PLAYER_BASE_STATS.luck,
+        "core-salvage": DEFAULT_PLAYER_BASE_STATS.salvage,
+      })) {
+        dialog.querySelector<HTMLInputElement>(
+          '[data-field="' + field + '"]',
+        )!.value = String(value);
+      }
+      ensureGame()?.testLabSetPlayerCoreStats(DEFAULT_PLAYER_BASE_STATS);
       renderInspector();
       return;
     }
