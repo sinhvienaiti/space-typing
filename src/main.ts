@@ -3591,6 +3591,11 @@ const game = new Game(
         characterProgressPanel.append(masteryNotice);
       }
 
+      // Rewards above use the stats earned DURING this stage. New level
+      // bonuses take effect after reward calculation and before the next stage.
+      if (progressAward.levelUps > 0 || progressAward.masteryUps > 0) {
+        applyEquipmentStats();
+      }
       updateCampaignUi();
     },
     onWordComplete: (entry) => {
