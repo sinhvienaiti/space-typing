@@ -17,6 +17,7 @@ export type CharacterDrawOptions = {
   glowScale?: number;
   alpha?: number;
   aura?: EquipmentAuraProfile | null;
+  detailScale?: number;
 };
 
 let characterShipSheet: HTMLImageElement | null = null;
@@ -50,6 +51,7 @@ function drawEquipmentAura(
   aura: EquipmentAuraProfile,
   time: number,
   glowScale: number,
+  detailScale: number,
 ): void {
   const colors = EQUIPMENT_AURA_COLORS[aura.primary];
   const secondary =
@@ -75,7 +77,9 @@ function drawEquipmentAura(
     context.stroke();
     context.setLineDash([]);
   } else if (aura.primary === "storm") {
-    for (const phase of [0, Math.PI]) {
+    const stormPhases =
+      detailScale < 0.7 ? [0] : [0, Math.PI];
+    for (const phase of stormPhases) {
       const angle = time * 2.7 + phase;
       context.beginPath();
       context.moveTo(Math.cos(angle) * 24, Math.sin(angle) * 15);
@@ -107,8 +111,9 @@ function drawEquipmentAura(
     }
   } else if (aura.primary === "fortune" || aura.primary === "celestial") {
     context.fillStyle = colors.primary;
-    for (let index = 0; index < 4; index += 1) {
-      const angle = time * 0.9 + index * Math.PI / 2;
+    const moteCount = detailScale < 0.7 ? 2 : detailScale < 1 ? 3 : 4;
+    for (let index = 0; index < moteCount; index += 1) {
+      const angle = time * 0.9 + index * Math.PI * 2 / moteCount;
       const radius = 29 + Math.sin(time * 2 + index) * 2;
       const x = Math.cos(angle) * radius;
       const y = Math.sin(angle) * radius * 0.64;
@@ -315,6 +320,7 @@ export function drawCharacterShip(
   const scale = options.scale ?? 1;
   const glowScale = options.glowScale ?? 1;
   const alpha = options.alpha ?? 1;
+  const detailScale = options.detailScale ?? 1;
   const bob = Math.sin(options.time * 3.2) * 1.3;
   const banking = Math.sin(options.time * 1.7) * 0.012;
 
@@ -330,6 +336,7 @@ export function drawCharacterShip(
       options.aura,
       options.time,
       glowScale,
+      detailScale,
     );
   }
 
