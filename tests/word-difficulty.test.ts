@@ -66,4 +66,26 @@ describe("M10 WordDifficultyScore", () => {
       ),
     );
   });
+
+  it("prefers a low-conflict word inside the same near-rank band", () => {
+    const sameBand: VocabularyEntry[] = [
+      { id: "m1", en: "map", vi: "", ipa: "" },
+      { id: "m2", en: "man", vi: "", ipa: "" },
+      { id: "c1", en: "cat", vi: "", ipa: "" },
+      { id: "t1", en: "tap", vi: "", ipa: "" },
+    ];
+
+    const selected = pickVocabularyEntryForRank(
+      sameBand,
+      "I",
+      1,
+      0,
+      undefined,
+      0,
+      { activeWords: ["morning", "month"] },
+    );
+
+    expect(selected).toBeDefined();
+    expect(selected?.en.startsWith("m")).toBe(false);
+  });
 });

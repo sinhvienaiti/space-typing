@@ -226,6 +226,41 @@ describe("M21 gated Game Test Lab API", () => {
     game.destroy();
   });
 
+  it("reproduces same-prefix targeting and locks the nearest enemy", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 50);
+
+    const ids = game.testLabSpawnSamePrefixScenario();
+    expect(ids).toHaveLength(3);
+
+    const before = game.getTestLabSnapshot();
+    expect(before?.enemies.map((enemy) => enemy.entry.en)).toEqual([
+      "morning",
+      "month",
+      "me",
+    ]);
+    expect(before?.scheduler.frozen).toBe(true);
+
+    game.handleKey("m");
+    const after = game.getTestLabSnapshot();
+    const typed = after?.enemies.filter((enemy) => enemy.typed === 1) ?? [];
+
+    expect(typed).toHaveLength(1);
+    expect(typed[0]?.entry.en).toBe("month");
+
+    game.handleKey("o");
+    const locked = game.getTestLabSnapshot();
+    expect(
+      locked?.enemies.find((enemy) => enemy.entry.en === "month")?.typed,
+    ).toBe(2);
+    expect(
+      locked?.enemies.find((enemy) => enemy.entry.en === "morning")?.typed,
+    ).toBe(0);
+
+    game.destroy();
+  });
+
   it("uses the production enemy instance for force-word and clear controls", () => {
     const game = createTestGame();
     game.setTestLabMode(true);

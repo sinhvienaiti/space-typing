@@ -59,7 +59,22 @@ export function chooseTarget(
   candidates.sort((a, b) => {
     const distanceA = Math.hypot(a.x - playerX, a.y - playerY);
     const distanceB = Math.hypot(b.x - playerX, b.y - playerY);
-    return distanceA - distanceB;
+    const distanceDelta = distanceA - distanceB;
+    if (Math.abs(distanceDelta) > 0.01) return distanceDelta;
+
+    // When two targets are effectively the same distance away, the lower
+    // target is the more immediate contact. Remaining ties are deterministic
+    // so fast typing never feels random.
+    const verticalDelta = b.y - a.y;
+    if (Math.abs(verticalDelta) > 0.01) return verticalDelta;
+
+    const idDelta = a.id - b.id;
+    if (idDelta !== 0) return idDelta;
+
+    return (
+      typingText(a.entry.en).length -
+      typingText(b.entry.en).length
+    );
   });
 
   return candidates[0] ?? null;

@@ -4,6 +4,10 @@ import {
   type CharacterSilhouette,
   type CharacterVisualProfile,
 } from "./visuals";
+import {
+  EQUIPMENT_AURA_COLORS,
+  type EquipmentAuraProfile,
+} from "./equipment-aura";
 
 export type CharacterDrawOptions = {
   x: number;
@@ -12,7 +16,175 @@ export type CharacterDrawOptions = {
   scale?: number;
   glowScale?: number;
   alpha?: number;
+  aura?: EquipmentAuraProfile | null;
+  detailScale?: number;
 };
+
+let characterShipSheet: HTMLImageElement | null = null;
+
+const CHARACTER_SHIP_SPRITE_INDEX: Record<CharacterId, number> = {
+  vanguard: 0,
+  aegis: 1,
+  volt: 2,
+  wraith: 3,
+  fortune: 4,
+  arsenal: 5,
+  oracle: 6,
+  bastion: 7,
+  reaper: 8,
+  celestial: 9,
+  zenith: 10,
+};
+
+export function setCharacterShipSheet(
+  image: HTMLImageElement | null,
+): void {
+  characterShipSheet = image;
+}
+
+export function hasCharacterShipImage(_id: CharacterId): boolean {
+  return characterShipSheet !== null;
+}
+
+function drawEquipmentAura(
+  context: CanvasRenderingContext2D,
+  aura: EquipmentAuraProfile,
+  time: number,
+  glowScale: number,
+  detailScale: number,
+): void {
+  const colors = EQUIPMENT_AURA_COLORS[aura.primary];
+  const secondary =
+    aura.secondary === null
+      ? colors.secondary
+      : EQUIPMENT_AURA_COLORS[aura.secondary].primary;
+  const intensity = aura.intensity;
+  const pulse = 0.92 + Math.sin(time * 3.4) * 0.08;
+
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.globalAlpha *= 0.16 + intensity * 0.14;
+  context.strokeStyle = colors.primary;
+  context.shadowBlur = (10 + intensity * 12) * glowScale;
+  context.shadowColor = colors.primary;
+  context.lineWidth = 1 + intensity * 0.8;
+
+  if (aura.primary === "guard") {
+    context.setLineDash([6, 5]);
+    context.lineDashOffset = -time * 11;
+    context.beginPath();
+    context.arc(0, 0, 32 * pulse, 0, Math.PI * 2);
+    context.stroke();
+    context.setLineDash([]);
+  } else if (aura.primary === "storm") {
+    const stormPhases =
+      detailScale < 0.7 ? [0] : [0, Math.PI];
+    for (const phase of stormPhases) {
+      const angle = time * 2.7 + phase;
+      context.beginPath();
+      context.moveTo(Math.cos(angle) * 24, Math.sin(angle) * 15);
+      context.lineTo(
+        Math.cos(angle + 0.45) * 31,
+        Math.sin(angle + 0.45) * 23,
+      );
+      context.lineTo(
+        Math.cos(angle + 0.75) * 26,
+        Math.sin(angle + 0.75) * 18,
+      );
+      context.stroke();
+    }
+  } else if (aura.primary === "flame") {
+    context.fillStyle = colors.primary;
+    context.globalAlpha *= 0.7;
+    for (const x of [-13, 0, 13]) {
+      context.beginPath();
+      context.ellipse(
+        x,
+        26 + Math.sin(time * 7 + x) * 2,
+        3.2,
+        10 + intensity * 5,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      context.fill();
+    }
+  } else if (aura.primary === "fortune" || aura.primary === "celestial") {
+    context.fillStyle = colors.primary;
+    const moteCount = detailScale < 0.7 ? 2 : detailScale < 1 ? 3 : 4;
+    for (let index = 0; index < moteCount; index += 1) {
+      const angle = time * 0.9 + index * Math.PI * 2 / moteCount;
+      const radius = 29 + Math.sin(time * 2 + index) * 2;
+      const x = Math.cos(angle) * radius;
+      const y = Math.sin(angle) * radius * 0.64;
+      context.beginPath();
+      context.arc(x, y, 1.4 + intensity, 0, Math.PI * 2);
+      context.fill();
+    }
+  } else if (aura.primary === "void") {
+    context.strokeStyle = secondary;
+    context.setLineDash([2, 7]);
+    context.lineDashOffset = time * 16;
+    context.beginPath();
+    context.ellipse(0, 1, 30 * pulse, 20 * pulse, 0, 0, Math.PI * 2);
+    context.stroke();
+    context.setLineDash([]);
+  } else {
+    context.beginPath();
+    context.ellipse(0, 1, 29 * pulse, 21 * pulse, 0, 0, Math.PI * 2);
+    context.stroke();
+  }
+
+  context.globalAlpha *= 0.58;
+  context.strokeStyle = secondary;
+  context.beginPath();
+  context.arc(0, 0, 25 + intensity * 4, 0, Math.PI * 2);
+  context.stroke();
+  context.restore();
+}
+
+function drawIllustratedShip(
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  characterId: CharacterId,
+  profile: Readonly<CharacterVisualProfile>,
+  glowScale: number,
+): void {
+  const size = 78;
+  const index = CHARACTER_SHIP_SPRITE_INDEX[characterId];
+  const columns = 4;
+  const rows = 3;
+  const cellWidth = image.naturalWidth / columns;
+  const cellHeight = image.naturalHeight / rows;
+  const sourceX = (index % columns) * cellWidth;
+  const sourceY = Math.floor(index / columns) * cellHeight;
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.globalAlpha *= 0.12;
+  context.fillStyle = profile.glow;
+  context.shadowBlur = 24 * glowScale;
+  context.shadowColor = profile.glow;
+  context.beginPath();
+  context.ellipse(0, 2, 31, 27, 0, 0, Math.PI * 2);
+  context.fill();
+  context.restore();
+
+  context.save();
+  context.shadowBlur = 9 * glowScale;
+  context.shadowColor = profile.glow;
+  context.drawImage(
+    image,
+    sourceX,
+    sourceY,
+    cellWidth,
+    cellHeight,
+    -size / 2,
+    -size / 2,
+    size,
+    size,
+  );
+  context.restore();
+}
 
 function hullPath(
   context: CanvasRenderingContext2D,
@@ -148,6 +320,7 @@ export function drawCharacterShip(
   const scale = options.scale ?? 1;
   const glowScale = options.glowScale ?? 1;
   const alpha = options.alpha ?? 1;
+  const detailScale = options.detailScale ?? 1;
   const bob = Math.sin(options.time * 3.2) * 1.3;
   const banking = Math.sin(options.time * 1.7) * 0.012;
 
@@ -156,6 +329,34 @@ export function drawCharacterShip(
   context.rotate(banking);
   context.scale(scale, scale);
   context.globalAlpha = alpha;
+
+  if (options.aura !== undefined && options.aura !== null) {
+    drawEquipmentAura(
+      context,
+      options.aura,
+      options.time,
+      glowScale,
+      detailScale,
+    );
+  }
+
+  const illustrated = characterShipSheet;
+  if (illustrated !== null) {
+    // Preserve the animated thrusters from the procedural renderer. The
+    // illustrated sheet is the hull layer, not a replacement for motion FX.
+    for (const [index, x] of engineOffsets(profile.engineCount).entries()) {
+      drawEngine(context, profile, x, options.time, index);
+    }
+    drawIllustratedShip(
+      context,
+      illustrated,
+      characterId,
+      profile,
+      glowScale,
+    );
+    context.restore();
+    return;
+  }
 
   context.save();
   context.globalCompositeOperation = "lighter";

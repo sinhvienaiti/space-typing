@@ -14,13 +14,35 @@ Every non-procedural visual asset added to Space Typing must record:
 - whether attribution is required;
 - local runtime URL when the asset is bundled.
 
-The current production renderer is original procedural Canvas/UI artwork. No
-third-party sprite, boss, projectile, crate, equipment-icon or spell artwork is
-bundled at this checkpoint.
+The enemy/boss renderer remains original procedural Canvas/UI artwork. Player
+ships now additionally support a bundled project-original illustrated asset
+while retaining the procedural renderer as the runtime fallback.
 
-If a generated or openly licensed image is added later, it must be entered in
-the manifest before runtime use. Loading failure must keep the procedural
-fallback active so typing targets and gameplay remain functional.
+## Player Ship Visual V2
+
+Manifest ID:
+
+```text
+player-ship-sheet-v2
+```
+
+Bundled runtime asset:
+
+```text
+public/assets/space-typing/ships/player-ships-v2.svg
+```
+
+The sheet is a transparent 4x3 illustrated layout with 11 occupied cells in
+CharacterId order (Vanguard through Zenith) and one reserved final cell. It was
+created for this project following the approved generated ship-concept art
+direction; it is not copied from an external game or sprite pack.
+
+The art pipeline loads it as an optional player asset. If loading fails, the
+existing project-original procedural ship renderer remains active, so gameplay,
+typing readability and Character selection do not depend on the image asset.
+
+Future generated or openly licensed images must likewise be entered in the
+manifest before runtime use.
 
 ## Enemy system procedural coverage
 

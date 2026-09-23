@@ -19,6 +19,7 @@ import {
   rankWordTargetScore,
   wordDifficultyScore,
 } from "./word-difficulty";
+import type { PrefixClarityContext } from "../typing/prefix-clarity";
 
 export type EnemyTypingProfile = {
   rank: EnemyRank;
@@ -39,6 +40,7 @@ export type ResolveEnemyTypingProfileInput = {
   excludeEntryId?: string;
   wordScoreOffset?: number;
   rankBonus?: number;
+  clarity?: PrefixClarityContext;
 };
 
 export function resolveEnemyTypingProfile(
@@ -72,6 +74,8 @@ export function resolveEnemyTypingProfile(
       input.vocabularyLevel,
       random(),
       input.excludeEntryId,
+      0,
+      input.clarity,
     ) ?? input.entries[0];
 
   if (entry === undefined) {
@@ -105,6 +109,7 @@ export function resolveEnemyTypingProfile(
         random(),
         input.excludeEntryId,
         input.wordScoreOffset ?? 0,
+        input.clarity,
       ) ?? entry;
     entry = adjusted;
     score = wordDifficultyScore(

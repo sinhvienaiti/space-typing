@@ -1,5 +1,7 @@
 import type { CharacterId } from "./registry";
 
+export const CHARACTER_SHIP_SHEET_ASSET_ID = "player-ship-sheet-v2";
+
 export type CharacterSilhouette =
   | "spear"
   | "fortress"
@@ -160,4 +162,8 @@ export function characterVisualProfile(
   id: CharacterId,
 ): Readonly<CharacterVisualProfile> {
   return CHARACTER_VISUALS[id];
+}
+
+export function characterShipAssetId(id: CharacterId): string {
+  return "player-ship-" + id;
 }

@@ -47,6 +47,8 @@ import {
 import { worldForStage } from "./worlds/registry";
 import type { CharacterId } from "./characters/registry";
 import { drawCharacterShip } from "./characters/renderer";
+import type { EquipmentAuraProfile } from "./characters/equipment-aura";
+import { playerProjectileProfile } from "./characters/projectiles";
 import {
   AEGIS_ACTIVE_SKILL,
   AEGIS_ACTIVE_SKILL_ID,
@@ -570,6 +572,7 @@ export class Game {
   private relicMistakeGuardsUsed = 0;
 
   private characterId: CharacterId = "vanguard";
+  private equipmentAura: EquipmentAuraProfile | null = null;
   private supportSkillIds: SupportSpellId[] = [
     "sanctuary",
     "gravity-well",
@@ -885,6 +888,53 @@ export class Game {
       spawned.push(enemy.id);
     }
     return spawned;
+  }
+
+  testLabSpawnSamePrefixScenario(): number[] {
+    if (
+      !this.testLabEnabled ||
+      (this.phase !== "playing" && this.phase !== "paused")
+    ) {
+      return [];
+    }
+
+    this.testLabClearEnemies();
+    this.testLabSchedulerFrozen = true;
+    const words = ["morning", "month", "me"] as const;
+    const positions = [
+      { x: this.width * 0.28, y: this.height * 0.32 },
+      { x: this.width * 0.5, y: this.height * 0.7 },
+      { x: this.width * 0.72, y: this.height * 0.42 },
+    ];
+    const ids: number[] = [];
+
+    for (let index = 0; index < words.length; index += 1) {
+      const before = this.nextEnemyId;
+      if (!this.spawnEnemy({ kind: "scout", skipAdmission: true })) {
+        continue;
+      }
+      const enemy = this.enemies.find((item) => item.id === before);
+      if (enemy === undefined) continue;
+      const word = words[index]!;
+      const position = positions[index]!;
+      enemy.entry = {
+        id: "testlab-prefix-" + word,
+        en: word,
+        vi: "",
+        ipa: "",
+      };
+      enemy.typed = 0;
+      enemy.wordMissed = false;
+      enemy.x = position.x;
+      enemy.baseX = position.x;
+      enemy.y = position.y;
+      enemy.speed = 0;
+      enemy.actionCooldown = null;
+      ids.push(enemy.id);
+    }
+
+    this.targetId = null;
+    return ids;
   }
 
   testLabClearEnemies(): boolean {
@@ -1413,6 +1463,10 @@ export class Game {
     this.characterId = id;
     this.refreshSkillDefinitions();
     this.hooks.onSkills();
+  }
+
+  setEquipmentAura(profile: EquipmentAuraProfile): void {
+    this.equipmentAura = { ...profile };
   }
 
   setSkills(definitions: readonly SkillDefinition[]): void {
@@ -3874,6 +3928,9 @@ export class Game {
       entries: this.vocabulary,
       wordScoreOffset: difficulty.wordScoreOffset,
       rankBonus: difficulty.enemyRankBonus ?? 0,
+      clarity: {
+        activeWords: this.activeEnemyWords(),
+      },
     });
     const runtimeProfile = resolveEnemyRuntimeProfile({
       stage: rosterStage,
@@ -3952,6 +4009,16 @@ export class Game {
     return true;
   }
 
+  private activeEnemyWords(excludeEnemyId?: number): string[] {
+    return this.enemies
+      .filter(
+        (enemy) =>
+          excludeEnemyId === undefined ||
+          enemy.id !== excludeEnemyId,
+      )
+      .map((enemy) => enemy.entry.en);
+  }
+
   private pickVocabularyEntry(kind: EnemyKind): VocabularyEntry {
     const candidates = this.vocabulary.filter((entry) => {
       const length = typingText(entry.en).length;
@@ -3979,6 +4046,9 @@ export class Game {
         Math.random(),
         enemy.entry.id,
         this.difficulty?.wordScoreOffset ?? 0,
+        {
+          activeWords: this.activeEnemyWords(enemy.id),
+        },
       ) ?? this.pickVocabularyEntry(enemy.kind);
 
     enemy.wordDifficultyScore = wordDifficultyScore(
@@ -4309,6 +4379,9 @@ export class Game {
       vocabularyLevel: this.vocabularyLevel,
       entries: this.vocabulary,
       wordScoreOffset: this.difficulty.wordScoreOffset,
+      clarity: {
+        activeWords: this.activeEnemyWords(),
+      },
     });
     const runtimeProfile = resolveEnemyRuntimeProfile({
       stage: rosterStage,
@@ -5377,6 +5450,9 @@ export class Game {
         vocabularyLevel: this.vocabularyLevel,
         entries: this.vocabulary,
         wordScoreOffset: this.difficulty.wordScoreOffset,
+        clarity: {
+          activeWords: this.activeEnemyWords(),
+        },
       });
       const runtimeProfile = resolveEnemyRuntimeProfile({
         stage: rosterStage,
@@ -6294,7 +6370,12 @@ export class Game {
       maxLife: 0.09,
       power,
     });
-    this.burst(x, y, 7, 18);
+    this.burst(
+      x,
+      y,
+      7,
+      playerProjectileProfile(this.characterId).impactHue,
+    );
   }
 
   private fireLaser(enemy: Enemy, power: number): void {
@@ -6308,7 +6389,12 @@ export class Game {
       power,
     });
 
-    this.burst(enemy.x, enemy.y, power > 1 ? 12 : 5, 188);
+    this.burst(
+      enemy.x,
+      enemy.y,
+      power > 1 ? 12 : 5,
+      playerProjectileProfile(this.characterId).impactHue,
+    );
   }
 
   private triggerImpactFeedback(kind: ImpactKind): void {
@@ -6392,7 +6478,7 @@ export class Game {
     if (this.interferenceTimer > 0) {
       this.drawInterference(time);
     }
-    this.drawLasers();
+    this.drawLasers(time);
     this.drawParticles();
 
     for (const projectile of this.projectiles) {
@@ -6653,27 +6739,150 @@ export class Game {
     context.restore();
   }
 
-  private drawLasers(): void {
+  private drawLasers(time: number): void {
     const context = this.context;
+    const profile = playerProjectileProfile(this.characterId);
+    const quality = qualityProfile(this.settings.visualQuality);
 
     context.save();
     context.globalCompositeOperation = "lighter";
 
     for (const laser of this.lasers) {
       const alpha = clamp(laser.life / laser.maxLife, 0, 1);
-      context.strokeStyle =
-        "rgba(74, 242, 255, " + String(alpha) + ")";
+      const dx = laser.x2 - laser.x1;
+      const dy = laser.y2 - laser.y1;
+      const length = Math.max(1, Math.hypot(dx, dy));
+      const nx = -dy / length;
+      const ny = dx / length;
+      const power = Math.max(0.7, laser.power);
+
       context.shadowBlur =
         14 *
-        laser.power *
-        qualityProfile(this.settings.visualQuality).glowScale;
-      context.shadowColor = "#50f6ff";
-      context.lineWidth = 1.4 + laser.power * 1.8;
+        power *
+        profile.glow *
+        quality.glowScale;
+      context.shadowColor = profile.primary;
+      context.lineCap = "round";
 
+      // Soft outer tracer.
+      context.globalAlpha = alpha * 0.34;
+      context.strokeStyle = profile.primary;
+      context.lineWidth = profile.width * 2.7 * power;
       context.beginPath();
       context.moveTo(laser.x1, laser.y1);
       context.lineTo(laser.x2, laser.y2);
       context.stroke();
+
+      // Character-specific core treatment remains a short-lived tracer rather
+      // than a second moving projectile system.
+      context.globalAlpha = alpha;
+      context.strokeStyle = profile.secondary;
+      context.lineWidth = profile.width * power;
+
+      if (profile.archetype === "electric") {
+        const segments = 5;
+        context.beginPath();
+        context.moveTo(laser.x1, laser.y1);
+        for (let index = 1; index < segments; index += 1) {
+          const t = index / segments;
+          const jitter =
+            Math.sin(time * 31 + laser.x2 * 0.01 + index * 2.4) *
+            3.4 *
+            alpha;
+          context.lineTo(
+            laser.x1 + dx * t + nx * jitter,
+            laser.y1 + dy * t + ny * jitter,
+          );
+        }
+        context.lineTo(laser.x2, laser.y2);
+        context.stroke();
+      } else if (
+        profile.archetype === "heavy" ||
+        profile.archetype === "guard" ||
+        profile.archetype === "barrage"
+      ) {
+        for (const offset of [-2.2, 2.2]) {
+          context.beginPath();
+          context.moveTo(
+            laser.x1 + nx * offset,
+            laser.y1 + ny * offset,
+          );
+          context.lineTo(
+            laser.x2 + nx * offset,
+            laser.y2 + ny * offset,
+          );
+          context.stroke();
+        }
+      } else if (
+        profile.archetype === "slash" ||
+        profile.archetype === "shadow"
+      ) {
+        context.beginPath();
+        context.moveTo(laser.x1, laser.y1);
+        context.lineTo(
+          laser.x2 + nx * 4.5,
+          laser.y2 + ny * 4.5,
+        );
+        context.stroke();
+        context.globalAlpha = alpha * 0.46;
+        context.strokeStyle = profile.primary;
+        context.beginPath();
+        context.moveTo(laser.x1, laser.y1);
+        context.lineTo(
+          laser.x2 - nx * 4.5,
+          laser.y2 - ny * 4.5,
+        );
+        context.stroke();
+      } else {
+        context.beginPath();
+        context.moveTo(laser.x1, laser.y1);
+        context.lineTo(laser.x2, laser.y2);
+        context.stroke();
+      }
+
+      // Tiny muzzle and impact accents improve feel without covering words.
+      context.globalAlpha = alpha * 0.86;
+      context.fillStyle = profile.secondary;
+      context.shadowColor = profile.primary;
+      context.beginPath();
+      context.arc(
+        laser.x1,
+        laser.y1,
+        1.7 + power * 0.8,
+        0,
+        Math.PI * 2,
+      );
+      context.fill();
+
+      context.fillStyle = profile.primary;
+      if (
+        profile.archetype === "star" ||
+        profile.archetype === "radiant" ||
+        profile.archetype === "cosmic"
+      ) {
+        const radius = 3.1 + power * 1.3;
+        context.beginPath();
+        for (let index = 0; index < 8; index += 1) {
+          const angle = -Math.PI / 2 + index * Math.PI / 4;
+          const r = index % 2 === 0 ? radius : radius * 0.38;
+          const x = laser.x2 + Math.cos(angle) * r;
+          const y = laser.y2 + Math.sin(angle) * r;
+          if (index === 0) context.moveTo(x, y);
+          else context.lineTo(x, y);
+        }
+        context.closePath();
+        context.fill();
+      } else {
+        context.beginPath();
+        context.arc(
+          laser.x2,
+          laser.y2,
+          2.4 + power * 1.1,
+          0,
+          Math.PI * 2,
+        );
+        context.fill();
+      }
     }
 
     context.restore();
@@ -7631,6 +7840,28 @@ export class Game {
 
     context.restore();
 
+    if (targeted) {
+      const bracket = enemy.radius * 1.42;
+      const arm = Math.max(5, enemy.radius * 0.34);
+      context.save();
+      context.strokeStyle = "rgba(126, 244, 255, 0.78)";
+      context.lineWidth = 1.4;
+      context.shadowBlur = 8;
+      context.shadowColor = "#70eaff";
+      for (const sx of [-1, 1]) {
+        for (const sy of [-1, 1]) {
+          const x = enemy.x + sx * bracket;
+          const y = enemy.y - kick + sy * bracket;
+          context.beginPath();
+          context.moveTo(x, y - sy * arm);
+          context.lineTo(x, y);
+          context.lineTo(x - sx * arm, y);
+          context.stroke();
+        }
+      }
+      context.restore();
+    }
+
     this.drawEnemyWord(enemy, targeted);
   }
 
@@ -7843,6 +8074,8 @@ export class Game {
         time,
         scale: 1,
         glowScale: qualityProfile(this.settings.visualQuality).glowScale,
+        detailScale: qualityProfile(this.settings.visualQuality).particleScale,
+        aura: this.equipmentAura,
       },
     );
   }
