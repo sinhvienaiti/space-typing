@@ -3561,6 +3561,8 @@ Current gameplay/progression foundation:
 - M19 Codex records World, enemy/boss and reward knowledge; discoveries are merged across persistence sources and intentionally survive gameplay checkpoint rollback;
 - M20 Ascension replays the same 1000-stage / 50-World Campaign across 10 bounded tiers; each tier has a sequential frontier, deterministic boss mutations and bounded Rank/formation/reward pressure while M12 safety caps remain authoritative;
 - Ascension frontier is part of RunPersistentState and therefore reuses the existing checkpoint/crash/stage-entry/death-protection paths; tier switching is allowed only at committed ten-stage boundaries;
+- M21 adds one isolated Developer Test Lab using a disposable in-memory TestLabSession plus a gated production Game runtime; it never writes production PlayerSave and reuses production combat, recovery, shop, reward, equipment, Relic, difficulty and MusicController paths;
+- Test Lab CI completeness is registry-driven so new production Worlds/enemies/bosses/items/equipment/skills/statuses/shops/music profiles cannot silently disappear from QA discovery;
 - IndexedDB PlayerSave schema v25;
 - explicit migrations from all earlier supported PlayerSave schemas;
 - synchronized recovery mirror + autosave queue + validated JSON backup/import.
@@ -3631,6 +3633,9 @@ CI #297 PASS · 531/531 tests · TypeScript check + production build
 
 M20 Ascension
 CI #335 PASS · 548/548 tests · TypeScript check + production build
+
+M21 Developer QA / Test Lab
+CI #376 PASS · 111 test files · 561/561 tests · TypeScript check + production build
 ~~~
 
 Important implementation notes:
@@ -3638,6 +3643,7 @@ Important implementation notes:
 - Current PlayerSave schema is version 25; v24 migrates deterministically by adding AscensionState while preserving CodexState, RelicState, UpgradeState, Campaign, equipment, ShopState, RouteState and existing recovery domains.
 - AscensionState is part of RunPersistentState because tier frontier/economic progression must obey checkpoint rollback, crash recovery and stage-entry resurrection semantics. No parallel Ascension checkpoint store exists.
 - Codex knowledge remains outside RunPersistentState/checkpoint rollback; recovery-source selection merges valid discoveries so technical recovery or gameplay rollback cannot erase already learned information.
+- Test Lab preset localStorage is QA configuration only; Test Lab gameplay state is in-memory and must never be interpreted as PlayerSave/run persistence.
 - Permanent systems must extend PlayerSave through explicit migrations.
 - Current runtime equipment uses the five-grade model; legacy rarity names remain only in migration/compatibility paths and historical step notes.
 - `ShopState` and `RouteState` are part of `RunPersistentState`, so shop stock and route choices are segment state rather than separate local-storage systems.

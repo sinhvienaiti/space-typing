@@ -97,6 +97,43 @@ function stopTrack(track: ManagedTrack): void {
   track.audio.currentTime = 0;
 }
 
+export type MusicDebugSnapshot = {
+  state: MusicState;
+  worldId: string;
+  bossPhase: number;
+  paused: boolean;
+  musicVolume: number;
+  ambientVolume: number;
+  duckReasons: string[];
+  duckMultiplier: number;
+  activeMusic: null | {
+    assetId: string;
+    candidates: string[];
+    candidateIndex: number;
+    mix: number;
+    loop: boolean;
+    volume: number;
+  };
+  retiringMusic: Array<{
+    assetId: string;
+    mix: number;
+    volume: number;
+  }>;
+  activeAmbient: Array<{
+    assetId: string;
+    candidates: string[];
+    candidateIndex: number;
+    mix: number;
+    loop: boolean;
+    volume: number;
+  }>;
+  retiringAmbient: Array<{
+    assetId: string;
+    mix: number;
+    volume: number;
+  }>;
+};
+
 export class MusicController {
   private profile: WorldMusicProfile =
     musicProfileForWorld("world-01");
@@ -166,6 +203,48 @@ export class MusicController {
 
   getWorldProfile(): WorldMusicProfile {
     return this.profile;
+  }
+
+  getDebugSnapshot(): MusicDebugSnapshot {
+    return {
+      state: this.state,
+      worldId: this.profile.worldId,
+      bossPhase: this.bossPhase,
+      paused: this.paused,
+      musicVolume: this.musicVolume,
+      ambientVolume: this.ambientVolume,
+      duckReasons: [...this.duckReasons].map(String).sort(),
+      duckMultiplier: this.duckMultiplier(),
+      activeMusic:
+        this.activeMusic === null
+          ? null
+          : {
+              assetId: this.activeMusic.assetId,
+              candidates: [...this.activeMusic.candidates],
+              candidateIndex: this.activeMusic.candidateIndex,
+              mix: this.activeMusic.mix,
+              loop: this.activeMusic.loop,
+              volume: this.activeMusic.audio.volume,
+            },
+      retiringMusic: this.retiringMusic.map((track) => ({
+        assetId: track.assetId,
+        mix: track.mix,
+        volume: track.audio.volume,
+      })),
+      activeAmbient: this.activeAmbient.map((track) => ({
+        assetId: track.assetId,
+        candidates: [...track.candidates],
+        candidateIndex: track.candidateIndex,
+        mix: track.mix,
+        loop: track.loop,
+        volume: track.audio.volume,
+      })),
+      retiringAmbient: this.retiringAmbient.map((track) => ({
+        assetId: track.assetId,
+        mix: track.mix,
+        volume: track.audio.volume,
+      })),
+    };
   }
 
   setWorldProfile(profile: WorldMusicProfile): void {

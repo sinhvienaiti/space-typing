@@ -1,4 +1,7 @@
-import { PriorityKillChain } from "./audio/announcer";
+import {
+  PriorityKillChain,
+  type AnnouncerEvent,
+} from "./audio/announcer";
 import { Sfx } from "./audio/Sfx";
 import {
   bossActionInterval,
@@ -208,6 +211,7 @@ import {
   statusRemaining,
   tickStatuses,
   type ActiveStatus,
+  type StatusId,
   type StatusState,
 } from "./status/engine";
 import type { BuildSynergyId } from "./synergy/build";
@@ -272,7 +276,10 @@ import {
   enemyLayerSegments,
   reinforceEnemyLayerPlan,
 } from "./enemies/layers";
-import { enemyRankLabel } from "./enemies/rank";
+import {
+  enemyRankLabel,
+  type EnemyRank,
+} from "./enemies/rank";
 import {
   pickVocabularyEntryForRank,
   wordDifficultyScore,
@@ -283,12 +290,14 @@ import {
   type EnemySkillId,
 } from "./enemies/skills";
 import { resolveEnemyRuntimeProfile } from "./enemies/runtime-profile";
+import { calculateThreatBudget } from "./enemies/threat";
 import {
   beginHardCc,
   canApplyHardCc,
   createHardCcState,
   tickHardCcState,
   type HardCcId,
+  type HardCcState,
 } from "./combat/cc-guard";
 import {
   isRecoveryItemId,
@@ -373,7 +382,7 @@ type EnemySpawnRequest = {
   yOffset?: number;
 };
 
-type Hooks = {
+export type GameHooks = {
   onStats(stats: GameStats): void;
   onPhase(phase: GamePhase): void;
   onStage(stage: number): void;
@@ -394,6 +403,72 @@ type Hooks = {
   ): void;
   onStatuses(statuses: readonly ActiveStatus[]): void;
   onSkills(): void;
+};
+
+export type TestLabDeathMode = "immortal" | "real";
+
+export type TestLabEnemySpawn = {
+  definitionId?: EnemyDefinitionId;
+  kind?: EnemyKind;
+  count?: number;
+  elite?: boolean;
+  rank?: EnemyRank;
+  layers?: 1 | 2 | 3;
+  skillIds?: readonly EnemySkillId[];
+};
+
+export type TestLabBossOverride = {
+  hpRatio?: number;
+  phase?: 1 | 2 | 3;
+  shieldActive?: boolean;
+  staggerSeconds?: number;
+};
+
+export type TestLabEnemyOverride = {
+  speed?: number;
+  actionCooldown?: number;
+  rank?: EnemyRank;
+  layers?: 1 | 2 | 3;
+  elite?: boolean;
+  threatBudgetUsed?: number;
+};
+
+export type TestLabDifficultyOverride = {
+  maxEnemies?: number;
+  spawnInterval?: number;
+  pressureBudget?: number;
+  urgentThreatCap?: number;
+  formationComplexity?: number;
+  attackIntervalFactor?: number;
+};
+
+export type TestLabGameSnapshot = {
+  phase: GamePhase;
+  stage: number | null;
+  difficulty: DifficultyProfile | null;
+  stats: GameStats;
+  enemies: Enemy[];
+  boss: BossHudState | null;
+  statuses: ActiveStatus[];
+  hardCc: HardCcState;
+  projectiles: number;
+  particles: number;
+  activePressure: ActiveTypingPressureSnapshot;
+  deathMode: TestLabDeathMode;
+  lethalHits: number;
+  scheduler: {
+    frozen: boolean;
+    spawnRemaining: number;
+    spawnTimer: number;
+    timeScale: number;
+  };
+  skillStates: Array<{
+    id: string;
+    cooldownRemaining: number;
+    chargesRemaining: number | null;
+    usesThisStage: number;
+  }>;
+  objective: StageObjectiveState | null;
 };
 
 const FALLBACK_ENTRIES: VocabularyEntry[] = [
@@ -449,7 +524,7 @@ function ultimateVisual(characterId: CharacterId): {
 export class Game {
   private readonly canvas: HTMLCanvasElement;
   private readonly context: CanvasRenderingContext2D;
-  private readonly hooks: Hooks;
+  private readonly hooks: GameHooks;
   private readonly sfx = new Sfx();
   private readonly priorityKillChain = new PriorityKillChain();
   private readonly skillEngine = new SkillEngine();
@@ -562,12 +637,17 @@ export class Game {
   private backgroundGradient: CanvasGradient | null = null;
   private worldEnvironment: WorldEnvironmentProfile =
     environmentForWorld("world-01");
+  private testLabEnabled = false;
+  private testLabDeathMode: TestLabDeathMode = "immortal";
+  private testLabLethalHits = 0;
+  private testLabTimeScale = 1;
+  private testLabSchedulerFrozen = false;
 
   constructor(
     canvas: HTMLCanvasElement,
     vocabulary: VocabularyEntry[],
     settings: GameSettings,
-    hooks: Hooks,
+    hooks: GameHooks,
   ) {
     const context = canvas.getContext("2d");
     if (context === null) {
@@ -600,6 +680,611 @@ export class Game {
 
   getPerformanceReport(): PerformanceReport {
     return this.frameProfiler.report();
+  }
+
+  setTestLabMode(
+    enabled: boolean,
+    deathMode: TestLabDeathMode = "immortal",
+  ): void {
+    this.testLabEnabled = enabled;
+    this.testLabDeathMode = deathMode;
+    if (!enabled) {
+      this.testLabLethalHits = 0;
+      this.testLabTimeScale = 1;
+      this.testLabSchedulerFrozen = false;
+    }
+  }
+
+  testLabSetSfxVolume(volume: number): boolean {
+    if (!this.testLabEnabled) return false;
+    this.sfx.setVolume(clamp(volume, 0, 1));
+    return true;
+  }
+
+  testLabTriggerAnnouncer(event: AnnouncerEvent): boolean {
+    if (!this.testLabEnabled) return false;
+    this.sfx.announcer(event);
+    return true;
+  }
+
+  testLabTriggerWarning(): boolean {
+    if (!this.testLabEnabled) return false;
+    this.sfx.projectileWarning();
+    return true;
+  }
+
+  testLabSetDeathMode(mode: TestLabDeathMode): boolean {
+    if (!this.testLabEnabled) return false;
+    this.testLabDeathMode = mode;
+    return true;
+  }
+
+  getTestLabSnapshot(): TestLabGameSnapshot | null {
+    if (!this.testLabEnabled) return null;
+    const difficulty = this.difficulty;
+    return {
+      phase: this.phase,
+      stage: this.stageConfig?.stage ?? null,
+      difficulty: difficulty === null ? null : { ...difficulty },
+      stats: this.getStats(),
+      enemies: this.enemies.map((enemy) => ({
+        ...enemy,
+        eliteModifiers: [...enemy.eliteModifiers],
+        layerPlan:
+          enemy.layerPlan === undefined
+            ? undefined
+            : [...enemy.layerPlan],
+        skillIds:
+          enemy.skillIds === undefined
+            ? undefined
+            : [...enemy.skillIds],
+        threatBudget:
+          enemy.threatBudget === undefined
+            ? undefined
+            : { ...enemy.threatBudget },
+        entry: { ...enemy.entry },
+      })),
+      boss: this.boss === null ? null : toBossHud(this.boss),
+      statuses: this.statusState.map((status) => ({ ...status })),
+      hardCc: {
+        active:
+          this.hardCcState.active === null
+            ? null
+            : { ...this.hardCcState.active },
+        immunity: { ...this.hardCcState.immunity },
+      },
+      projectiles: this.projectiles.length,
+      particles: this.particles.length,
+      activePressure:
+        difficulty === null
+          ? emptyActivePressureSnapshot()
+          : this.activeTypingPressureSnapshot(difficulty),
+      deathMode: this.testLabDeathMode,
+      lethalHits: this.testLabLethalHits,
+      scheduler: {
+        frozen: this.testLabSchedulerFrozen,
+        spawnRemaining: this.spawnRemaining,
+        spawnTimer: this.spawnTimer,
+        timeScale: this.testLabTimeScale,
+      },
+      skillStates: this.skillEngine.getDefinitions().map((definition) => {
+        const state = this.skillEngine.getState(definition.id);
+        return {
+          id: definition.id,
+          cooldownRemaining: state?.cooldownRemaining ?? 0,
+          chargesRemaining: state?.chargesRemaining ?? null,
+          usesThisStage: state?.usesThisStage ?? 0,
+        };
+      }),
+      objective: this.getStageObjective(),
+    };
+  }
+
+  testLabSpawnEnemies(input: TestLabEnemySpawn = {}): number[] {
+    if (
+      !this.testLabEnabled ||
+      (this.phase !== "playing" && this.phase !== "paused")
+    ) {
+      return [];
+    }
+
+    const count = clamp(
+      Math.floor(input.count ?? 1),
+      1,
+      30,
+    );
+    const spawned: number[] = [];
+    for (let index = 0; index < count; index += 1) {
+      const before = this.nextEnemyId;
+      if (
+        !this.spawnEnemy({
+          kind: input.kind,
+          skipAdmission: true,
+        })
+      ) {
+        continue;
+      }
+
+      const enemy = this.enemies.find((item) => item.id === before);
+      if (enemy === undefined) continue;
+
+      if (input.definitionId !== undefined) {
+        enemy.definitionId = input.definitionId;
+        this.notifyEnemySeen(input.definitionId);
+      }
+      if (input.elite !== undefined) {
+        enemy.elite = input.elite;
+      }
+      this.testLabReconfigureEnemy(enemy, {
+        rank: input.rank,
+        layers: input.layers,
+        skillIds: input.skillIds,
+      });
+      spawned.push(enemy.id);
+    }
+    return spawned;
+  }
+
+  testLabClearEnemies(): boolean {
+    if (!this.testLabEnabled) return false;
+    this.enemies = [];
+    this.projectiles = [];
+    this.targetId = null;
+    return true;
+  }
+
+  private testLabReconfigureEnemy(
+    enemy: Enemy,
+    input: {
+      rank?: EnemyRank;
+      layers?: 1 | 2 | 3;
+      skillIds?: readonly EnemySkillId[];
+    },
+  ): void {
+    const rank = input.rank ?? enemy.rank ?? "I";
+    const layers =
+      input.layers ??
+      clamp(enemy.layersRemaining, 1, 3) as 1 | 2 | 3;
+    const entry =
+      pickVocabularyEntryForRank(
+        this.vocabulary,
+        rank,
+        this.vocabularyLevel,
+        Math.random(),
+        undefined,
+        this.difficulty?.wordScoreOffset ?? 0,
+      ) ?? enemy.entry;
+    const score = wordDifficultyScore(
+      entry,
+      this.vocabularyLevel,
+    );
+    const runtime = resolveEnemyRuntimeProfile({
+      stage: this.stageConfig?.stage ?? 1,
+      kind: enemy.kind,
+      rank,
+      elite: enemy.elite,
+      wordDifficultyScore: score,
+      layers,
+    });
+    const skills =
+      input.skillIds === undefined
+        ? runtime.skills
+        : [...new Set(input.skillIds)].slice(0, 3);
+
+    enemy.rank = rank;
+    enemy.entry = entry;
+    enemy.typed = 0;
+    enemy.wordMissed = false;
+    enemy.wordDifficultyScore = score;
+    enemy.layersRemaining = layers;
+    enemy.layerPlan = enemyLayerPlan(enemy.kind, layers);
+    enemy.skillIds = [...skills];
+    enemy.nextSkillIndex = 0;
+    enemy.pendingSkillId = null;
+    enemy.skillTelegraphRemaining = 0;
+    enemy.threatBudget =
+      input.skillIds === undefined
+        ? runtime.threatBudget
+        : calculateThreatBudget({
+            kind: enemy.kind,
+            rank,
+            elite: enemy.elite,
+            wordDifficultyScore: score,
+            layers,
+            skills,
+          });
+
+    const firstSkill = skills[0];
+    enemy.actionCooldown =
+      firstSkill === undefined
+        ? enemy.actionCooldown
+        : this.enemySkillCooldown(
+            firstSkill,
+            this.difficulty,
+          );
+  }
+
+  testLabPatchEnemy(
+    enemyId: number,
+    input: TestLabEnemyOverride,
+  ): boolean {
+    if (!this.testLabEnabled) return false;
+    const enemy = this.enemies.find((item) => item.id === enemyId);
+    if (enemy === undefined) return false;
+
+    if (input.speed !== undefined) {
+      enemy.speed = clamp(input.speed, 0, 2000);
+    }
+    if (input.actionCooldown !== undefined) {
+      enemy.actionCooldown = clamp(input.actionCooldown, 0, 120);
+      enemy.pendingSkillId = null;
+      enemy.skillTelegraphRemaining = 0;
+    }
+    if (input.elite !== undefined) enemy.elite = input.elite;
+    if (
+      input.rank !== undefined ||
+      input.layers !== undefined ||
+      input.elite !== undefined
+    ) {
+      this.testLabReconfigureEnemy(enemy, {
+        rank: input.rank,
+        layers: input.layers,
+        skillIds: enemy.skillIds,
+      });
+    }
+    if (
+      input.threatBudgetUsed !== undefined &&
+      enemy.threatBudget !== undefined
+    ) {
+      const used = Math.max(0, input.threatBudgetUsed);
+      enemy.threatBudget = {
+        ...enemy.threatBudget,
+        used,
+        overBudget: used > enemy.threatBudget.cap,
+      };
+    }
+    return true;
+  }
+
+  testLabSetDifficultyOverrides(
+    input: TestLabDifficultyOverride,
+  ): boolean {
+    if (!this.testLabEnabled || this.difficulty === null) return false;
+    if (input.maxEnemies !== undefined) {
+      this.difficulty.maxEnemies = clamp(
+        Math.floor(input.maxEnemies),
+        1,
+        30,
+      );
+    }
+    if (input.spawnInterval !== undefined) {
+      this.difficulty.spawnInterval = clamp(
+        input.spawnInterval,
+        0.05,
+        30,
+      );
+    }
+    if (input.pressureBudget !== undefined) {
+      this.difficulty.pressureBudget = clamp(
+        input.pressureBudget,
+        0.5,
+        100,
+      );
+    }
+    if (input.urgentThreatCap !== undefined) {
+      this.difficulty.urgentThreatCap = clamp(
+        Math.floor(input.urgentThreatCap),
+        1,
+        30,
+      );
+    }
+    if (input.formationComplexity !== undefined) {
+      this.difficulty.formationComplexity = clamp(
+        Math.floor(input.formationComplexity),
+        1,
+        5,
+      );
+    }
+    if (input.attackIntervalFactor !== undefined) {
+      this.difficulty.attackIntervalFactor = clamp(
+        input.attackIntervalFactor,
+        0.2,
+        3,
+      );
+    }
+    return true;
+  }
+
+  testLabSpawnFormationNow(): number {
+    if (
+      !this.testLabEnabled ||
+      this.difficulty === null ||
+      this.stageConfig === null
+    ) {
+      return 0;
+    }
+    const formation = chooseFormation(
+      this.stageConfig.stage,
+      this.difficulty.formationComplexity,
+      Math.max(2, this.spawnRemaining),
+    );
+    if (
+      formation === null ||
+      !this.canAdmitFormation(formation, this.difficulty)
+    ) {
+      return 0;
+    }
+    return this.spawnFormation(formation, this.difficulty);
+  }
+
+  testLabForceEnemySkill(
+    enemyId: number,
+    skillId: EnemySkillId,
+  ): boolean {
+    if (!this.testLabEnabled || this.difficulty === null) return false;
+    const enemy = this.enemies.find((item) => item.id === enemyId);
+    if (enemy === undefined) return false;
+
+    this.executeEnemySkill(enemy, skillId, this.difficulty);
+    enemy.actionCooldown = this.enemySkillCooldown(
+      skillId,
+      this.difficulty,
+    );
+    enemy.pendingSkillId = null;
+    enemy.skillTelegraphRemaining = 0;
+    return true;
+  }
+
+  testLabApplyStatus(
+    id: StatusId,
+    duration = 5,
+  ): boolean {
+    if (!this.testLabEnabled) return false;
+    return this.addStatus(
+      id,
+      clamp(duration, 0.1, 120),
+      "test-lab",
+    );
+  }
+
+  testLabClearStatus(id: StatusId): boolean {
+    if (!this.testLabEnabled) return false;
+    const next = this.statusState.filter(
+      (status) => status.id !== id,
+    );
+    if (next.length === this.statusState.length) return false;
+    this.setStatusState(next);
+    if (
+      (id === "frozen" && this.hardCcState.active?.id === "freeze") ||
+      (id === "silenced" && this.hardCcState.active?.id === "silence")
+    ) {
+      this.hardCcState = {
+        ...this.hardCcState,
+        active: null,
+      };
+    }
+    return true;
+  }
+
+  testLabClearStatuses(): boolean {
+    if (!this.testLabEnabled) return false;
+    this.setStatusState(createStatusState());
+    this.hardCcState = createHardCcState();
+    return true;
+  }
+
+  testLabSetPlayerStats(input: EffectiveStatInput): boolean {
+    if (!this.testLabEnabled) return false;
+    this.playerStats = calculateEffectiveStats(input);
+    this.stats.maxHull = this.playerStats.hull;
+    this.stats.maxShield = this.playerStats.shield;
+    this.stats.maxEnergy = this.playerStats.energy;
+    this.stats.hull = clamp(
+      this.stats.hull,
+      0,
+      this.stats.maxHull,
+    );
+    this.stats.shield = clamp(
+      this.stats.shield,
+      0,
+      this.stats.maxShield,
+    );
+    this.stats.energy = clamp(
+      this.stats.energy,
+      0,
+      this.stats.maxEnergy,
+    );
+    this.emitStats();
+    return true;
+  }
+
+  testLabSetPlayerCoreStats(stats: CoreStats): boolean {
+    return this.testLabSetPlayerStats({
+      base: stats,
+    });
+  }
+
+  testLabSetResources(input: {
+    hull?: number;
+    shield?: number;
+    energy?: number;
+    power?: number;
+  }): boolean {
+    if (!this.testLabEnabled) return false;
+    if (input.hull !== undefined) {
+      this.stats.hull = clamp(input.hull, 0, this.stats.maxHull);
+    }
+    if (input.shield !== undefined) {
+      this.stats.shield = clamp(input.shield, 0, this.stats.maxShield);
+    }
+    if (input.energy !== undefined) {
+      this.stats.energy = clamp(input.energy, 0, this.stats.maxEnergy);
+    }
+    if (input.power !== undefined) {
+      this.stats.power = clamp(input.power, 0, 100);
+    }
+    this.emitStats();
+    return true;
+  }
+
+  testLabDamagePlayer(rawDamage: number): boolean {
+    if (
+      !this.testLabEnabled ||
+      (this.phase !== "playing" && this.phase !== "paused")
+    ) {
+      return false;
+    }
+    this.applyPlayerDamage(
+      this.width / 2,
+      this.height - PLAYER_Y_OFFSET,
+      Math.max(0, rawDamage),
+    );
+    return true;
+  }
+
+  testLabSpawnBoss(): boolean {
+    if (
+      !this.testLabEnabled ||
+      (this.phase !== "playing" && this.phase !== "paused") ||
+      this.boss !== null
+    ) {
+      return false;
+    }
+    this.spawnBoss();
+    return this.boss !== null;
+  }
+
+  testLabSetBoss(input: TestLabBossOverride): boolean {
+    if (!this.testLabEnabled || this.boss === null) return false;
+    if (input.hpRatio !== undefined) {
+      const ratio = clamp(input.hpRatio, 0, 1);
+      this.boss.hp = Math.max(
+        0,
+        Math.round(this.boss.maxHp * ratio),
+      );
+    }
+    if (input.phase !== undefined) {
+      this.applyBossPhase(
+        this.boss,
+        input.phase,
+        true,
+      );
+    }
+    if (input.shieldActive !== undefined) {
+      this.boss.shieldActive = input.shieldActive;
+    }
+    if (input.staggerSeconds !== undefined) {
+      this.boss.staggerTimer = clamp(
+        input.staggerSeconds,
+        0,
+        120,
+      );
+    }
+    this.hooks.onBossUpdate(toBossHud(this.boss));
+    return true;
+  }
+
+  testLabClearBoss(): boolean {
+    if (!this.testLabEnabled) return false;
+    this.boss = null;
+    this.bossSpawned = false;
+    this.bossDefeated = false;
+    this.bossRewardPending = false;
+    this.projectiles = [];
+    this.hooks.onBossUpdate(null);
+    return true;
+  }
+
+  testLabSetTimeScale(scale: number): boolean {
+    if (!this.testLabEnabled) return false;
+    this.testLabTimeScale = clamp(
+      Number.isFinite(scale) ? scale : 1,
+      0.1,
+      4,
+    );
+    return true;
+  }
+
+  testLabSetSchedulerFrozen(frozen: boolean): boolean {
+    if (!this.testLabEnabled) return false;
+    this.testLabSchedulerFrozen = frozen;
+    return true;
+  }
+
+  testLabStepScheduler(): boolean {
+    if (
+      !this.testLabEnabled ||
+      this.difficulty === null ||
+      this.stageConfig === null ||
+      this.spawnRemaining <= 0
+    ) {
+      return false;
+    }
+    this.spawnTimer = 0;
+    return this.runSpawnScheduler(this.difficulty);
+  }
+
+  testLabClearProjectiles(): boolean {
+    if (!this.testLabEnabled) return false;
+    this.projectiles = [];
+    this.lasers = [];
+    return true;
+  }
+
+  testLabClearParticles(): boolean {
+    if (!this.testLabEnabled) return false;
+    this.particles = [];
+    return true;
+  }
+
+  testLabResetSkillCooldowns(): boolean {
+    if (!this.testLabEnabled) return false;
+    this.skillEngine.resetStage();
+    this.hooks.onSkills();
+    return true;
+  }
+
+  testLabForceWordComplete(enemyId: number): boolean {
+    if (!this.testLabEnabled) return false;
+    const enemy = this.enemies.find((item) => item.id === enemyId);
+    if (enemy === undefined) return false;
+    enemy.typed = typingText(enemy.entry.en).length;
+    this.completeWord(enemy);
+    this.emitStats();
+    return true;
+  }
+
+  testLabKillEnemy(enemyId: number): boolean {
+    if (!this.testLabEnabled) return false;
+    let enemy = this.enemies.find((item) => item.id === enemyId);
+    if (enemy === undefined) return false;
+    let guard = 0;
+    while (enemy !== undefined && guard < 4) {
+      enemy.typed = typingText(enemy.entry.en).length;
+      this.completeWord(enemy);
+      enemy = this.enemies.find((item) => item.id === enemyId);
+      guard += 1;
+    }
+    this.emitStats();
+    return true;
+  }
+
+  testLabResetArena(): boolean {
+    if (!this.testLabEnabled) return false;
+    this.enemies = [];
+    this.projectiles = [];
+    this.lasers = [];
+    this.particles = [];
+    this.targetId = null;
+    this.boss = null;
+    this.bossSpawned = false;
+    this.bossDefeated = false;
+    this.bossRewardPending = false;
+    this.testLabLethalHits = 0;
+    this.setStatusState(createStatusState());
+    this.hardCcState = createHardCcState();
+    this.hooks.onBossUpdate(null);
+    return true;
   }
 
   setCharacter(id: CharacterId): void {
@@ -1872,7 +2557,9 @@ export class Game {
 
   private frame = (now: number): void => {
     const rawDt = Math.max(0, (now - this.lastTime) / 1000);
-    const dt = Math.min(0.05, rawDt);
+    const dt =
+      Math.min(0.05, rawDt) *
+      (this.testLabEnabled ? this.testLabTimeScale : 1);
     this.lastTime = now;
     this.frameProfiler.pushFrame(rawDt);
 
@@ -1968,7 +2655,9 @@ export class Game {
     this.updateTreasureDrone(dt);
     this.updateRewardChoiceCrate(dt);
     this.updateAnomalyCrate(dt);
-    this.spawnTimer -= dt * hostileTimeFactor;
+    if (!(this.testLabEnabled && this.testLabSchedulerFrozen)) {
+      this.spawnTimer -= dt * hostileTimeFactor;
+    }
     this.supplySpawnTimer -= dt;
     this.treasureDroneTimer -= dt;
     this.rewardChoiceTimer -= dt;
@@ -2028,32 +2717,8 @@ export class Game {
       this.anomalyPending = false;
     }
 
-    if (
-      this.spawnRemaining > 0 &&
-      this.spawnTimer <= 0 &&
-      this.enemies.length < difficulty.maxEnemies
-    ) {
-      const formationCount =
-        this.trySpawnFormation(difficulty);
-      if (formationCount > 0) {
-        this.spawnRemaining -= formationCount;
-        this.spawnTimer =
-          difficulty.spawnInterval * randomBetween(1.02, 1.28);
-      } else {
-        const spawned = this.spawnEnemy();
-        if (spawned) {
-          this.spawnRemaining -= 1;
-          this.spawnTimer =
-            difficulty.spawnInterval * randomBetween(0.82, 1.16);
-        } else {
-          // Pressure denial is not a skipped enemy. Retry shortly after the
-          // active pile becomes more feasible.
-          this.spawnTimer = Math.max(
-            0.12,
-            difficulty.reactionWindow * 0.24,
-          );
-        }
-      }
+    if (!(this.testLabEnabled && this.testLabSchedulerFrozen)) {
+      this.runSpawnScheduler(difficulty);
     }
 
     const playerY = this.height - PLAYER_Y_OFFSET;
@@ -2709,6 +3374,42 @@ export class Game {
     return snapshot;
   }
 
+  private runSpawnScheduler(
+    difficulty: DifficultyProfile,
+  ): boolean {
+    if (
+      this.spawnRemaining <= 0 ||
+      this.spawnTimer > 0 ||
+      this.enemies.length >= difficulty.maxEnemies
+    ) {
+      return false;
+    }
+
+    const formationCount = this.trySpawnFormation(difficulty);
+    if (formationCount > 0) {
+      this.spawnRemaining -= formationCount;
+      this.spawnTimer =
+        difficulty.spawnInterval * randomBetween(1.02, 1.28);
+      return true;
+    }
+
+    const spawned = this.spawnEnemy();
+    if (spawned) {
+      this.spawnRemaining -= 1;
+      this.spawnTimer =
+        difficulty.spawnInterval * randomBetween(0.82, 1.16);
+      return true;
+    }
+
+    // Pressure denial is not a skipped enemy. Retry shortly after the
+    // active pile becomes more feasible.
+    this.spawnTimer = Math.max(
+      0.12,
+      difficulty.reactionWindow * 0.24,
+    );
+    return false;
+  }
+
   private canAdmitEnemyKind(
     kind: EnemyKind,
     difficulty: DifficultyProfile,
@@ -2768,6 +3469,15 @@ export class Game {
     ) {
       return 0;
     }
+
+    return this.spawnFormation(formation, difficulty);
+  }
+
+  private spawnFormation(
+    formation: FormationDefinition,
+    difficulty: DifficultyProfile,
+  ): number {
+    if (!this.canAdmitFormation(formation, difficulty)) return 0;
 
     const anchorPadding = Math.min(
       Math.max(145, this.width * 0.2),
@@ -3637,18 +4347,18 @@ export class Game {
     this.emitStats();
   }
 
-  private updateBossPhase(boss: BossState): void {
-    const nextPhase = bossPhaseFor(
-      boss.hp,
-      boss.maxHp,
-      boss.role,
+  private applyBossPhase(
+    boss: BossState,
+    phase: number,
+    presentation: boolean,
+  ): void {
+    boss.phase = clamp(
+      Math.floor(phase),
+      1,
+      3,
     );
-    if (nextPhase <= boss.phase) return;
-
-    boss.phase = nextPhase;
     boss.flash = 1;
 
-    const { x, y } = this.bossPosition();
     const definition = enemyDefinition(
       bossVisualDefinitionIdForStage(
         this.hiddenEncounterRuntime?.bossStageOverride ??
@@ -3685,18 +4395,40 @@ export class Game {
             ))) /
       Math.max(0.75, this.difficulty?.bossPressure ?? 1) /
       Math.max(1, this.difficulty?.bossActionRateMultiplier ?? 1);
-    const fx = enemyFxProfile(
-      definition?.family ?? "devil",
-      "boss-phase",
-    );
-    this.burst(x, y, fx.count, fx.hue);
-    this.sfx.bossPhase(fx.pitch);
 
-    if (this.settings.screenShake) {
-      this.shake = Math.max(this.shake, boss.phase >= 3 ? 10 : 7);
+    if (presentation) {
+      const { x, y } = this.bossPosition();
+      const fx = enemyFxProfile(
+        definition?.family ?? "devil",
+        "boss-phase",
+      );
+      this.burst(x, y, fx.count, fx.hue);
+      this.sfx.bossPhase(fx.pitch);
+
+      if (this.settings.screenShake) {
+        this.shake = Math.max(
+          this.shake,
+          boss.phase >= 3 ? 10 : 7,
+        );
+      }
     }
 
     this.hooks.onBossUpdate(toBossHud(boss));
+  }
+
+  private updateBossPhase(boss: BossState): void {
+    const nextPhase = bossPhaseFor(
+      boss.hp,
+      boss.maxHp,
+      boss.role,
+    );
+    if (nextPhase <= boss.phase) return;
+
+    this.applyBossPhase(
+      boss,
+      nextPhase,
+      true,
+    );
   }
 
   private defeatBoss(): void {
@@ -5262,6 +5994,14 @@ export class Game {
       this.sfx.shieldBreak();
     }
     this.sfx.damage();
+    if (
+      this.stats.hull <= 0 &&
+      this.testLabEnabled &&
+      this.testLabDeathMode === "immortal"
+    ) {
+      this.testLabLethalHits += 1;
+      this.stats.hull = 1;
+    }
     this.emitStats();
 
     if (this.stats.hull <= 0) {

@@ -310,6 +310,7 @@ import {
 
 type CombatSkillId = DefensiveSkillId | OffensiveSkillId;
 import { DEFAULT_PLAYER_BASE_STATS } from "./stats/player";
+import { mountTestLab } from "./test-lab/controller";
 import { AutosaveQueue } from "./persistence/autosave";
 import {
   createCheckpointSnapshot,
@@ -3148,6 +3149,12 @@ const game = new Game(
     },
   },
 );
+
+const testLab = mountTestLab({
+  getSettings: () => settings,
+  getVocabulary: () => configuredVocabulary,
+  showNotice,
+});
 
 byId<HTMLButtonElement>("anomalyStabilize").addEventListener(
   "click",
