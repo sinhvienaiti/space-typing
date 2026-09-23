@@ -13,6 +13,7 @@ describe("M22 full deterministic expansion audit", () => {
     expect(report.metrics.sectors).toBe(100);
     expect(report.metrics.difficultyEvaluations).toBe(6000);
     expect(report.metrics.ascensionEvaluations).toBe(40);
+    expect(report.metrics.adaptiveEvaluations).toBe(4000);
     expect(report.metrics.routeGraphs).toBe(100);
     expect(report.metrics.shopInstances).toBe(350);
   });
@@ -48,6 +49,17 @@ describe("M22 full deterministic expansion audit", () => {
       expect(metric!.minSpawnInterval).toBeGreaterThanOrEqual(0.34);
       expect(metric!.maxEnemies).toBeGreaterThan(0);
     }
+  });
+
+  it("keeps Adaptive responsive to low/mid/high reference players across Campaign", () => {
+    const low = report.metrics.adaptivePressure.low;
+    const mid = report.metrics.adaptivePressure.mid;
+    const high = report.metrics.adaptivePressure.high;
+
+    expect(low.average).toBeLessThanOrEqual(mid.average);
+    expect(mid.average).toBeLessThanOrEqual(high.average);
+    expect(low.min).toBeGreaterThanOrEqual(0.55);
+    expect(high.max).toBeLessThanOrEqual(3.6);
   });
 
   it("keeps higher fixed modes above lower modes on aggregate pressure", () => {
