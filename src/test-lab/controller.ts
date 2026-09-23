@@ -53,6 +53,7 @@ import {
 import {
   cloneTestLabSession,
   createTestLabSession,
+  testLabCampaignExpansion,
   type TestLabSession,
 } from "./session";
 
@@ -671,13 +672,13 @@ export function mountTestLab(
         session.state.inventory,
         id,
         quantity - current,
-      );
+      ).inventory;
     } else if (quantity < current) {
       session.state.inventory = removeItem(
         session.state.inventory,
         id,
         current - quantity,
-      );
+      ).inventory;
     }
     renderInspector();
   }
@@ -818,18 +819,10 @@ export function mountTestLab(
         session.state.inventory,
         "salvage-anchor",
         1,
-      );
+      ).inventory;
       const result = resolveSalvageAnchor(
         session.state,
-        {
-          version: 1,
-          checkpoint: {
-            stage: session.checkpointStage,
-            committedAt: session.createdAt,
-          },
-          highestReachedStage: session.stage,
-          crashRecovery: null,
-        },
+        testLabCampaignExpansion(session),
         session.checkpointSnapshot,
         "test-lab",
       );
