@@ -229,6 +229,18 @@ CI #395:
 
 Subsequent documentation-only commits must keep the same Test + Build + bundle gate green.
 
+## Pre-manual polish integration
+
+Before the real-browser/audio/human-paced gate, the approved P00-P08 polish slice refreshes the user-facing build that will actually be tested:
+
+- title navigation is grouped by player intent instead of one flat action wall;
+- large central learning feedback is replaced by a short enemy-local EN/IPA/VI echo while pronunciation remains unchanged;
+- event/objective/status/typing notices share a compact top information rail and bottom controls are re-spaced;
+- Recall Bonus is an optional non-hostile VI-to-masked-EN target that expires without punishment and reuses the existing treasure reward flow;
+- all 11 player characters use reusable distinct ship visual profiles in combat and selection previews.
+
+P00-P07 are merged with CI through #425 PASS. P08 performs the integration/documentation/bundle audit and must remain green before the manual matrix begins. None of this converts the perceptual gate into an automated one.
+
 ## Manual gate
 
 Automated tests cannot certify:
