@@ -342,6 +342,11 @@ export function drawCharacterShip(
 
   const illustrated = characterShipSheet;
   if (illustrated !== null) {
+    // Preserve the animated thrusters from the procedural renderer. The
+    // illustrated sheet is the hull layer, not a replacement for motion FX.
+    for (const [index, x] of engineOffsets(profile.engineCount).entries()) {
+      drawEngine(context, profile, x, options.time, index);
+    }
     drawIllustratedShip(
       context,
       illustrated,
