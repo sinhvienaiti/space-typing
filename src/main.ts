@@ -7,6 +7,7 @@ import {
   type ArtAssetCatalog,
 } from "./assets/pipeline";
 import { difficultyFor } from "./campaign/difficulty";
+import { journeyNodesForStage, journeyPath } from "./campaign/journey-map";
 import {
   difficultyModeDefinition,
   difficultyModePresentation,
@@ -745,8 +746,8 @@ app.innerHTML = `
     <dialog id="stageSelectDialog" class="settings-dialog stage-select-dialog">
       <form method="dialog" class="dialog-head">
         <div>
-          <p class="eyebrow">campaign</p>
-          <h2>Stage Select</h2>
+          <p class="eyebrow">campaign journey</p>
+          <h2>Campaign Map</h2>
         </div>
         <button class="icon-button" aria-label="Close">×</button>
       </form>
@@ -755,9 +756,24 @@ app.innerHTML = `
           <span class="field-label">Galaxy</span>
           <select id="galaxySelect"></select>
         </label>
+        <label>
+          <span class="field-label">World</span>
+          <select id="journeyWorldSelect"></select>
+        </label>
         <span id="campaignMeta"></span>
       </div>
-      <div id="stageGrid" class="stage-grid"></div>
+      <div class="journey-map-heading">
+        <strong id="journeyWorldTitle">World 01</strong>
+        <span>✦ Cleared · ◆ Current ship · ♛ Boss · ⚑ Checkpoint</span>
+      </div>
+      <div id="stageGrid" class="stage-journey-scroll" role="region" tabindex="0" aria-label="Campaign journey map"></div>
+      <div id="stagePreview" class="stage-preview" aria-live="polite">
+        <div>
+          <strong id="stagePreviewTitle">Choose a stage</strong>
+          <p id="stagePreviewMeta">Unlocked stages may be replayed.</p>
+        </div>
+        <button type="button" id="journeyStartButton" class="primary">Start / Replay</button>
+      </div>
     </dialog>
 
     <dialog id="routeDialog" class="settings-dialog route-dialog">
@@ -1357,6 +1373,8 @@ const typingChallengeCache = new Map<
 let stageStartPending = false;
 let noticeTimer: number | null = null;
 let currentGalaxy = Math.ceil(campaign.selectedStage / STAGES_PER_GALAXY);
+let selectedJourneyWorld = Math.ceil(campaign.selectedStage / 20);
+let selectedJourneyStage = campaign.selectedStage;
 
 const titleOverlay = byId("titleOverlay");
 const pauseOverlay = byId("pauseOverlay");
@@ -5891,55 +5909,148 @@ function populateGalaxySelect(): void {
   }
 }
 
+function populateJourneyWorldSelect(): void {
+  const select = byId<HTMLSelectElement>("journeyWorldSelect");
+  select.replaceChildren();
+  for (let slot = 0; slot < 5; slot += 1) {
+    const number = (currentGalaxy - 1) * 5 + slot + 1;
+    const world = worldForStage((number - 1) * 20 + 1);
+    const option = document.createElement("option");
+    option.value = String(number);
+    option.textContent =
+      "World " + String(number).padStart(2, "0") + " · " + world.name;
+    option.disabled = world.stageStart > campaign.highestUnlockedStage;
+    select.append(option);
+  }
+  const firstWorld = (currentGalaxy - 1) * 5 + 1;
+  if (
+    selectedJourneyWorld < firstWorld ||
+    selectedJourneyWorld >= firstWorld + 5
+  ) {
+    selectedJourneyWorld = firstWorld;
+  }
+  select.value = String(selectedJourneyWorld);
+}
+
+function renderStagePreview(): void {
+  const stage = selectedJourneyStage;
+  const world = worldForStage(stage);
+  const node = journeyNodesForStage(stage).find((entry) => entry.stage === stage)!;
+  const isUnlocked = canSelectCampaignStage(
+    campaign,
+    campaignExpansion,
+    stage,
+  );
+  const cleared = campaign.clearedStages.includes(stage);
+  const title = byId("stagePreviewTitle");
+  title.textContent =
+    "Stage " + String(stage).padStart(3, "0") +
+    " · " + (node.role === "normal" ? "Combat" : node.role.replace(/-/g, " "));
+  byId("stagePreviewMeta").textContent =
+    world.name + " · " +
+    (cleared ? "Cleared · Replay available" : isUnlocked ? "Current frontier" : "Locked") +
+    (node.checkpoint ? " · Checkpoint milestone" : "");
+  const start = byId<HTMLButtonElement>("journeyStartButton");
+  start.disabled = !isUnlocked;
+  start.textContent = cleared ? "Replay Stage" : "Start Stage";
+}
+
 function renderStageGrid(): void {
-  const grid = byId("stageGrid");
-  grid.replaceChildren();
+  const scroll = byId("stageGrid");
+  scroll.replaceChildren();
 
-  const firstStage = (currentGalaxy - 1) * STAGES_PER_GALAXY + 1;
-  const lastStage = currentGalaxy * STAGES_PER_GALAXY;
+  const world = worldForStage((selectedJourneyWorld - 1) * 20 + 1);
+  const nodes = journeyNodesForStage(world.stageStart);
+  byId("journeyWorldTitle").textContent =
+    "World " + String(selectedJourneyWorld).padStart(2, "0") +
+    " · " + world.name;
+
+  const board = document.createElement("div");
+  board.className = "stage-journey";
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "stage-journey-path");
+  svg.setAttribute("viewBox", "0 0 1000 1780");
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("aria-hidden", "true");
+  const base = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  base.setAttribute("d", journeyPath(nodes));
+  base.setAttribute("class", "stage-journey-track");
+  const active = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  active.setAttribute(
+    "d",
+    journeyPath(nodes.filter((node) => node.stage <= campaign.highestUnlockedStage)),
+  );
+  active.setAttribute("class", "stage-journey-progress");
+  svg.append(base, active);
+  board.append(svg);
+
   const cleared = new Set(campaign.clearedStages);
-
-  for (let stage = firstStage; stage <= lastStage; stage += 1) {
+  const current = campaign.highestUnlockedStage;
+  for (const node of nodes) {
+    const unlocked = canSelectCampaignStage(campaign, campaignExpansion, node.stage);
+    const isCleared = cleared.has(node.stage);
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "stage-button";
-    button.textContent = String(stage).padStart(3, "0");
-
-    const locked = !canSelectCampaignStage(
-      campaign,
-      campaignExpansion,
-      stage,
-    );
-    button.disabled = locked;
-    button.classList.toggle("locked", locked);
-    button.classList.toggle("cleared", cleared.has(stage));
-    button.classList.toggle("selected", stage === campaign.selectedStage);
-
-    if (cleared.has(stage)) {
-      button.title = "Cleared";
-    } else if (locked) {
-      button.title = "Locked";
-    } else {
-      button.title = "Current stage";
+    button.className =
+      "journey-node" +
+      (node.role !== "normal" ? " journey-node-special" : "") +
+      (node.role.includes("boss") ? " journey-node-boss" : "") +
+      (node.checkpoint ? " journey-node-checkpoint" : "") +
+      (isCleared ? " cleared" : "") +
+      (!unlocked ? " locked" : "") +
+      (node.stage === current ? " frontier" : "") +
+      (node.stage === selectedJourneyStage ? " selected" : "");
+    button.style.left = String(node.x) + "%";
+    button.style.top = String(node.y) + "px";
+    button.disabled = !unlocked;
+    button.dataset.stage = String(node.stage);
+    button.setAttribute("aria-pressed", String(node.stage === selectedJourneyStage));
+    const label = document.createElement("strong");
+    label.textContent = String(node.stage).padStart(3, "0");
+    button.append(label);
+    if (node.role !== "normal" || node.checkpoint) {
+      const badge = document.createElement("span");
+      badge.className = "journey-node-badge";
+      badge.setAttribute("aria-hidden", "true");
+      badge.textContent = node.role.includes("boss") ? "♛" :
+        node.role === "elite" ? "✦" : node.checkpoint ? "⚑" : "★";
+      button.append(badge);
     }
-
+    const roleLabel = node.role.replace(/-/g, " ");
+    button.setAttribute("aria-label",
+      "Stage " + node.stage + ", " + roleLabel +
+      (node.checkpoint ? ", checkpoint" : "") +
+      (isCleared ? ", cleared" : !unlocked ? ", locked" : ", playable"));
+    if (node.stage === current) {
+      const ship = document.createElement("span");
+      ship.className = "journey-ship";
+      ship.setAttribute("aria-hidden", "true");
+      ship.textContent = "◆";
+      button.append(ship);
+    }
     button.addEventListener("click", () => {
-      if (!canSelectCampaignStage(campaign, campaignExpansion, stage)) {
-        return;
+      selectedJourneyStage = node.stage;
+      for (const sibling of board.querySelectorAll<HTMLButtonElement>(".journey-node")) {
+        const selected = sibling === button;
+        sibling.classList.toggle("selected", selected);
+        sibling.setAttribute("aria-pressed", String(selected));
       }
-      campaign = selectCampaignStage(campaign, stage);
-      void autosaveCampaign(
-        "stage-select",
-        "✓ Saved · Stage " +
-          String(stage).padStart(3, "0") +
-          " selected",
-        "stage-select",
-      );
-      updateCampaignUi();
-      stageSelectDialog.close();
+      renderStagePreview();
     });
+    board.append(button);
+  }
+  scroll.append(board);
+  renderStagePreview();
+}
 
-    grid.append(button);
+function focusJourneyFrontier(): void {
+  const scroll = byId("stageGrid");
+  const node = scroll.querySelector<HTMLElement>(
+    '[data-stage="' + String(Math.max((selectedJourneyWorld - 1) * 20 + 1,
+      Math.min(selectedJourneyWorld * 20, campaign.highestUnlockedStage))) + '"]',
+  );
+  if (node !== null) {
+    scroll.scrollTop = Math.max(0, node.offsetTop - scroll.clientHeight / 2);
   }
 }
 
@@ -5949,6 +6060,9 @@ function openStageSelect(): void {
     return;
   }
   populateGalaxySelect();
+  selectedJourneyStage = campaign.selectedStage;
+  currentGalaxy = Math.ceil(selectedJourneyStage / STAGES_PER_GALAXY);
+  selectedJourneyWorld = Math.ceil(selectedJourneyStage / 20);
   const select = byId<HTMLSelectElement>("galaxySelect");
 
   for (const option of Array.from(select.options)) {
@@ -5961,8 +6075,10 @@ function openStageSelect(): void {
   }
 
   select.value = String(currentGalaxy);
+  populateJourneyWorldSelect();
   renderStageGrid();
   stageSelectDialog.showModal();
+  focusJourneyFrontier();
 }
 
 function saveSettings(): void {
@@ -6645,7 +6761,43 @@ for (const id of [
 
 byId("galaxySelect").addEventListener("change", (event) => {
   currentGalaxy = Number((event.currentTarget as HTMLSelectElement).value);
+  selectedJourneyWorld = (currentGalaxy - 1) * 5 + 1;
+  selectedJourneyStage = (selectedJourneyWorld - 1) * 20 + 1;
+  populateJourneyWorldSelect();
   renderStageGrid();
+  byId("stageGrid").scrollTop = 0;
+});
+
+byId("journeyWorldSelect").addEventListener("change", (event) => {
+  selectedJourneyWorld = Number((event.currentTarget as HTMLSelectElement).value);
+  selectedJourneyStage = (selectedJourneyWorld - 1) * 20 + 1;
+  renderStageGrid();
+  focusJourneyFrontier();
+});
+
+byId("journeyStartButton").addEventListener("click", () => {
+  void (async () => {
+    const stage = selectedJourneyStage;
+    if (!canSelectCampaignStage(campaign, campaignExpansion, stage)) return;
+    const previous = campaign;
+    const next = selectCampaignStage(campaign, stage);
+    if (next.selectedStage !== stage) return;
+    campaign = next;
+    const saved = await autosaveCampaign(
+      "stage-select",
+      "✓ Saved · Stage " + String(stage).padStart(3, "0") + " selected",
+      "stage-select",
+    );
+    if (!saved) {
+      campaign = previous;
+      updateCampaignUi();
+      return;
+    }
+    updateCampaignUi();
+    stageSelectDialog.close();
+    game.backToTitle();
+    await startSelectedStage();
+  })();
 });
 
 for (const id of ["vocabularyButton", "pauseVocabularyButton"]) {
