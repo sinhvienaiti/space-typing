@@ -65,6 +65,7 @@ import {
 import {
   createUpgradeState,
   isValidUpgradeState,
+  isValidLegacyUpgradeState,
   sanitizeUpgradeState,
   type UpgradeState,
 } from "../progression/upgrades";
@@ -251,7 +252,7 @@ function isValidLegacyRunPersistentStateWithoutRoute(
     isValidProgressionState(raw.progression) &&
     isValidExpansionCurrencyState(raw.expansionCurrencies) &&
     (raw.shops === undefined || isValidShopState(raw.shops)) &&
-    (raw.upgrades === undefined || isValidUpgradeState(raw.upgrades)) &&
+    (raw.upgrades === undefined || isValidUpgradeState(raw.upgrades) || isValidLegacyUpgradeState(raw.upgrades)) &&
     (raw.relics === undefined || isValidRelicState(raw.relics)) &&
     (raw.ascension === undefined || isValidAscensionState(raw.ascension))
   );
@@ -260,6 +261,19 @@ function isValidLegacyRunPersistentStateWithoutRoute(
 export function migrateLegacyRunPersistentState(
   value: unknown,
 ): RunPersistentState | null {
+  // v26 snapshots already have routes/shops/relics and paid M17 ranks.
+  // Convert only their upgrade contract, retaining the exact old route and
+  // checkpoint segment instead of rebuilding a starter route.
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    const raw = value as Record<string, unknown>;
+    if (isValidLegacyUpgradeState(raw.upgrades)) {
+      const migrated = { ...raw, upgrades: sanitizeUpgradeState(raw.upgrades) };
+      if (isValidRunPersistentState(migrated)) {
+        return sanitizeRunPersistentState(migrated);
+      }
+    }
+  }
+
   if (!isValidLegacyRunPersistentStateWithoutRoute(value)) {
     return null;
   }
@@ -284,7 +298,7 @@ export function migrateLegacyRunPersistentState(
       ? sanitizeShopState(raw.shops)
       : createShopState(),
     route: createRouteState(campaign.highestUnlockedStage),
-    upgrades: isValidUpgradeState(raw.upgrades)
+    upgrades: isValidUpgradeState(raw.upgrades) || isValidLegacyUpgradeState(raw.upgrades)
       ? sanitizeUpgradeState(raw.upgrades)
       : createUpgradeState(),
     relics: isValidRelicState(raw.relics)
