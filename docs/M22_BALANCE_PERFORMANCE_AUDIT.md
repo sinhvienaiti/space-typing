@@ -243,7 +243,7 @@ Before the real-browser/audio/human-paced gate, the approved P00-P08 polish slic
 - title/Pause Hotbar Setup edits route into existing production item/skill APIs, so no parallel combat state or Test Lab-only hotbar implementation exists;
 - T01-T06 stage-transition polish adds a deterministic presentation model and a short skippable pre-combat handoff for every stage, with stronger World/Galaxy/Boss/Hidden variants. The transition is awaited before `game.startStage()`, so the visual layer never hides live enemy/projectile/typing advancement.
 
-P00-P08.1 and H01-H06 are merged. T01-T06 is the final pre-manual transition slice; its branch CI and final main CI must remain green. None of this converts the perceptual gate into an automated one.
+P00-P08.1 and H01-H06 are merged. T01-T06 is complete on PR #70 with CI #455 PASS: 121/121 test files, 613/613 tests, TypeScript, production build and bundle budget PASS. Final main CI must still remain green after merge. None of this converts the perceptual gate into an automated one.
 
 ## Manual gate
 
