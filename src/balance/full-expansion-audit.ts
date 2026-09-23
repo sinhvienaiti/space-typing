@@ -62,7 +62,12 @@ export type BalanceAuditMetrics = {
   formationCandidates: number;
   formationAdmissions: number;
   hiddenDiscoveries: number;
+  adaptiveEvaluations: number;
   roleCounts: Record<string, number>;
+  adaptivePressure: Record<
+    "low" | "mid" | "high",
+    { min: number; max: number; average: number }
+  >;
   modePressure: Record<
     string,
     {
@@ -419,6 +424,70 @@ export function runFullExpansionAudit(): FullExpansionAuditReport {
     }
   }
 
+  const adaptiveReferences = {
+    low: { recentWpm: 25, recentAccuracy: 88 },
+    mid: { recentWpm: 60, recentAccuracy: 96 },
+    high: { recentWpm: 120, recentAccuracy: 99.2 },
+  } as const;
+  const adaptiveAccumulator = {
+    low: { min: Number.POSITIVE_INFINITY, max: 0, sum: 0 },
+    mid: { min: Number.POSITIVE_INFINITY, max: 0, sum: 0 },
+    high: { min: Number.POSITIVE_INFINITY, max: 0, sum: 0 },
+  };
+  let adaptiveEvaluations = 0;
+
+  for (let stage = 1; stage <= 1000; stage += 1) {
+    let previousPressure = Number.NEGATIVE_INFINITY;
+    for (const id of ["low", "mid", "high"] as const) {
+      const reference = adaptiveReferences[id];
+      const profile = difficultyFor({
+        stage,
+        mode: "adaptive",
+        vocabularyLevel: 50,
+        recentWpm: reference.recentWpm,
+        recentAccuracy: reference.recentAccuracy,
+      });
+      adaptiveEvaluations += 1;
+      finiteProfile(
+        profile,
+        "Adaptive " + id + "/Stage " + String(stage),
+        errors,
+      );
+      if (profile.combatPressure + 1e-9 < previousPressure) {
+        errors.push(
+          "Stage " + String(stage) +
+          ": adaptive pressure did not respond monotonically to player strength.",
+        );
+      }
+      previousPressure = profile.combatPressure;
+      const metric = adaptiveAccumulator[id];
+      metric.min = Math.min(metric.min, profile.combatPressure);
+      metric.max = Math.max(metric.max, profile.combatPressure);
+      metric.sum += profile.combatPressure;
+    }
+
+    const custom = difficultyFor({
+      stage,
+      mode: "custom",
+      vocabularyLevel: 50,
+      recentWpm: 60,
+      recentAccuracy: 96,
+      customTargetWpm: 180,
+      customPressure: 1.45,
+    });
+    adaptiveEvaluations += 1;
+    finiteProfile(
+      custom,
+      "Custom max/Stage " + String(stage),
+      errors,
+    );
+    if (custom.targetWpm > 300 || custom.targetWpm < 10) {
+      errors.push(
+        "Stage " + String(stage) + ": Custom target WPM escaped bounds.",
+      );
+    }
+  }
+
   let ascensionEvaluations = 0;
   for (let tier = 1; tier <= 10; tier += 1) {
     for (const stage of [1, 100, 500, 1000]) {
@@ -476,6 +545,24 @@ export function runFullExpansionAudit(): FullExpansionAuditReport {
     };
   }
 
+  const adaptivePressure: BalanceAuditMetrics["adaptivePressure"] = {
+    low: {
+      min: adaptiveAccumulator.low.min,
+      max: adaptiveAccumulator.low.max,
+      average: adaptiveAccumulator.low.sum / 1000,
+    },
+    mid: {
+      min: adaptiveAccumulator.mid.min,
+      max: adaptiveAccumulator.mid.max,
+      average: adaptiveAccumulator.mid.sum / 1000,
+    },
+    high: {
+      min: adaptiveAccumulator.high.min,
+      max: adaptiveAccumulator.high.max,
+      average: adaptiveAccumulator.high.sum / 1000,
+    },
+  };
+
   const metrics: BalanceAuditMetrics = {
     stages: 1000,
     worlds: worlds.size,
@@ -487,7 +574,9 @@ export function runFullExpansionAudit(): FullExpansionAuditReport {
     formationCandidates: formationCandidateCount,
     formationAdmissions,
     hiddenDiscoveries: hiddenA.discoveries.length,
+    adaptiveEvaluations,
     roleCounts,
+    adaptivePressure,
     modePressure,
   };
 
