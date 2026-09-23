@@ -9,8 +9,10 @@ export type ImpactFeedback = {
 
 const IMPACT_FEEDBACK: Record<ImpactKind, ImpactFeedback> = {
   key: { hitStopSeconds: 0, shake: 0 },
-  word: { hitStopSeconds: 0.028, shake: 1.4 },
-  "boss-word": { hitStopSeconds: 0.042, shake: 2.1 },
+  // Word completion already has recoil, shot SFX and particles. Freezing all
+  // enemies on every word makes fast typing look like dropped frames.
+  word: { hitStopSeconds: 0, shake: 1.4 },
+  "boss-word": { hitStopSeconds: 0.02, shake: 2.1 },
   "boss-defeat": { hitStopSeconds: 0.07, shake: 4.2 },
 };
 
