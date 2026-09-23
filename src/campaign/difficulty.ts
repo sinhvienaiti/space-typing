@@ -97,6 +97,18 @@ export function difficultyFor(
             ? 1.06
             : 1;
 
+  const custom = input.mode === "custom";
+  const enemySpeedSetting = custom ? clamp(input.customEnemySpeed ?? 1, 0.45, 1.65) : 1;
+  const bulletSpeedSetting = custom ? clamp(input.customBulletSpeed ?? 1, 0.45, 1.65) : 1;
+  const fireRateSetting = custom ? clamp(input.customFireRate ?? 1, 0.4, 1.6) : 1;
+  const spawnRateSetting = custom ? clamp(input.customSpawnRate ?? 1, 0.55, 1.45) : 1;
+
+  // Balanced is practice-first in the first Worlds. Total stage duration
+  // grows separately from simultaneous pressure and hostile attack tempo.
+  const earlyPractice = input.mode === "balanced" || input.mode === "relax"
+    ? Math.max(0, 1 - (stage - 1) / 50)
+    : 0;
+
   const combatPressure = clamp(
     stageFactor *
       definition.modeFactor *
@@ -115,18 +127,19 @@ export function difficultyFor(
   );
 
   const enemySpeed = clamp(
-    0.74 + Math.sqrt(combatPressure) * 0.36,
-    0.78,
-    2.08,
+    (0.74 + Math.sqrt(combatPressure) * 0.36) *
+      (1 - earlyPractice * 0.09) * enemySpeedSetting,
+    0.45,
+    2.6,
   );
 
   const rawSpawnInterval =
     1.55 /
     Math.max(0.65, combatPressure);
   const spawnInterval = clamp(
-    rawSpawnInterval,
-    definition.spawnIntervalFloor,
-    definition.spawnIntervalCeiling,
+    rawSpawnInterval / spawnRateSetting,
+    definition.spawnIntervalFloor * (custom ? 0.75 : 1),
+    definition.spawnIntervalCeiling * (custom ? 1.6 : 1),
   );
 
   const desiredMaxEnemies =
@@ -145,8 +158,8 @@ export function difficultyFor(
     (0.62 +
       combatPressure * 0.46 +
       stage / 1800) *
-      definition.projectileScale,
-    0.65,
+      definition.projectileScale * (1 - earlyPractice * 0.16),
+    0.55,
     3.15,
   );
 
@@ -171,6 +184,7 @@ export function difficultyFor(
     spawnInterval,
     maxEnemies,
     projectilePressure,
+    projectileSpeedScale: bulletSpeedSetting * (1 - earlyPractice * 0.18),
     bossPressure,
     targetWpm: targetWpm(input),
     pressureBudget:
@@ -178,7 +192,7 @@ export function difficultyFor(
       modeStageBudgetScale,
     urgentThreatCap: definition.urgentThreatCap,
     attackIntervalFactor:
-      definition.attackIntervalFactor,
+      definition.attackIntervalFactor * (1 + earlyPractice * 0.46) / fireRateSetting,
     wordScoreOffset: definition.wordScoreOffset,
     controllerSupportCap:
       definition.controllerSupportCap,
