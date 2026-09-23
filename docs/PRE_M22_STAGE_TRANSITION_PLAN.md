@@ -1,6 +1,6 @@
 # Pre-M22 Stage Transition Polish Plan
 
-Status: IMPLEMENTED · FINAL CI PENDING
+Status: COMPLETE
 
 This slice is approved before the remaining M22 real-browser/audio/visual gate. It upgrades the existing Stage Clear -> Next Stage handoff into a short, skippable transition without consuming combat-screen space.
 
@@ -13,6 +13,15 @@ This slice is approved before the remaining M22 real-browser/audio/visual gate. 
 - Reuse existing World/StageRole data and music state. Do not create a second campaign/navigation system.
 - No PlayerSave schema change is required.
 - M22 manual QA must run on the transition-polished build before M23.
+
+Implementation checkpoint:
+
+- T01-T06 complete on PR #70.
+- Every normal stage gets a short deterministic briefing; World/Galaxy entries and Mini/World/Galaxy bosses escalate visually; Hidden encounters use the optional-signal variant.
+- The transition is awaited before `game.startStage()`, so no enemy/projectile/typing timer advances behind the overlay.
+- Enter / Space / Escape / pointer/touch skip the transition; reduced-motion shortens it.
+- CI #455 PASS · 121/121 test files · 613/613 tests · TypeScript + production build + M22 bundle budget PASS.
+- Bundle checkpoint: JS gzip 138.05 KiB · CSS gzip 9.74 KiB · total gzip 165.97 KiB.
 
 ## Tasks
 
