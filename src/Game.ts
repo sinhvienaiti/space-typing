@@ -32,6 +32,7 @@ import {
 } from "./boss/visual-profile";
 import type { DifficultyProfile, StageConfig } from "./campaign/types";
 import { canFinishCombatStage, canSpawnFinalBoss, type StageClearGate } from "./campaign/stage-clear-gate";
+import { typedRageGain, novaBossDamage, NOVA_PULSE_VISUAL_SECONDS } from "./combat/rage-pulse";
 import type { HiddenEncounterRuntime } from "./discovery/hidden-encounter";
 import {
   activeThreatPressure,
@@ -622,6 +623,7 @@ export class Game {
   private hiddenEncounterRuntime: HiddenEncounterRuntime | null = null;
   private shake = 0;
   private overdriveTimer = 0;
+  private novaPulseRemaining = 0;
   private interferenceTimer = 0;
   private barrierTimer = 0;
   private barrierHp = 0;
@@ -2494,6 +2496,7 @@ export class Game {
     this.bossDefeated = false;
     this.bossRewardPending = false;
     this.overdriveTimer = 0;
+    this.novaPulseRemaining = 0;
     this.interferenceTimer = 0;
     this.barrierTimer = 0;
     this.barrierHp = 0;
@@ -2588,6 +2591,7 @@ export class Game {
 
   backToTitle(): void {
     this.phase = "title";
+    this.novaPulseRemaining = 0;
     this.enemies = [];
     this.projectiles = [];
     this.lasers = [];
@@ -3060,6 +3064,7 @@ export class Game {
   }
 
   private updateEffects(dt: number): void {
+    this.novaPulseRemaining = Math.max(0, this.novaPulseRemaining - dt);
     if (this.boss !== null) {
       this.boss.flash = Math.max(0, this.boss.flash - dt * 7);
       this.boss.kick = Math.max(0, this.boss.kick - dt * 4);
@@ -5762,7 +5767,7 @@ export class Game {
   private gainPower(baseGain: number): void {
     this.stats.power = clamp(
       this.stats.power +
-        focusPowerGain(baseGain, this.playerStats),
+        focusPowerGain(typedRageGain(baseGain), this.playerStats),
       0,
       100,
     );
@@ -6250,6 +6255,12 @@ export class Game {
       );
     }
 
+    // Every character retains its unique ultimate above. The shared fully
+    // charged Nova Pulse makes Space immediately legible: a full-arena
+    // shockwave clears regular/elite targets and hostile bullets. Bonus
+    // targets stay collectible, boss shields stay meaningful.
+    this.releaseNovaPulse();
+
     const visual = ultimateVisual(this.characterId);
     this.burst(
       this.width / 2,
@@ -6264,6 +6275,49 @@ export class Game {
 
     this.sfx.power();
     this.emitStats();
+  }
+
+  private releaseNovaPulse(): void {
+    this.projectiles = [];
+    const victims = this.enemies;
+    this.enemies = [];
+    for (const enemy of victims) {
+      this.stats.kills += 1;
+      this.addScore((enemy.elite ? 145 : 90) * this.stats.multiplier);
+      this.updateStageObjective({
+        type: "enemy-kill",
+        enemyId: enemy.id,
+        kind: enemy.kind,
+        elite: enemy.elite,
+      });
+      // Elite/golden drops still resolve; do not count untyped targets as
+      // completed English words or trigger uncontrolled death-chain spawns.
+      if (enemy.elite || enemy.golden) {
+        this.tryRollEquipmentDrop(enemy.golden ? "golden" : "elite");
+      }
+    }
+    this.targetId = null;
+    this.markedEnemyId = null;
+    this.markTimer = 0;
+
+    if (this.boss !== null) {
+      const boss = this.boss;
+      const damage = novaBossDamage(boss.maxHp, boss.shieldActive);
+      if (damage > 0) {
+        boss.hp = Math.max(0, boss.hp - damage);
+        boss.flash = 1;
+        this.updateBossPhase(boss);
+        if (boss.hp <= 0) this.defeatBoss();
+        else this.hooks.onBossUpdate(toBossHud(boss));
+      }
+    }
+
+    this.novaPulseRemaining = NOVA_PULSE_VISUAL_SECONDS;
+    this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 45, 190);
+    // Bounded small local spark clusters rather than a screenful of blur.
+    for (const enemy of victims.slice(0, 6)) {
+      this.burst(enemy.x, enemy.y, 11, enemy.elite ? 298 : 188);
+    }
   }
 
   private damagePlayer(enemyId: number, x: number, y: number): void {
@@ -6571,6 +6625,7 @@ export class Game {
     }
 
     this.drawBackground(time);
+    if (this.novaPulseRemaining > 0) this.drawNovaPulse();
     if (this.interferenceTimer > 0) {
       this.drawInterference(time);
     }
@@ -6833,6 +6888,33 @@ export class Game {
     context.font = "700 10px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.textAlign = "right";
     context.fillText("SIGNAL JAMMED", this.width - 18, 84);
+    context.restore();
+  }
+
+  private drawNovaPulse(): void {
+    const context = this.context;
+    const progress = 1 - this.novaPulseRemaining / NOVA_PULSE_VISUAL_SECONDS;
+    const alpha = Math.max(0, 1 - progress);
+    const centerX = this.width / 2;
+    const centerY = this.height - PLAYER_Y_OFFSET;
+    const maxRadius = Math.hypot(this.width / 2, this.height);
+    context.save();
+    context.globalCompositeOperation = "lighter";
+    context.globalAlpha = alpha * 0.14;
+    context.fillStyle = "#6ae6ff";
+    context.fillRect(0, 0, this.width, this.height);
+    context.globalAlpha = alpha * 0.93;
+    context.strokeStyle = "#91fbff";
+    context.lineWidth = 6 * alpha + 1;
+    context.beginPath();
+    context.arc(centerX, centerY, 18 + progress * maxRadius, 0, Math.PI * 2);
+    context.stroke();
+    context.globalAlpha = alpha * 0.5;
+    context.strokeStyle = "#b9a5ff";
+    context.lineWidth = 3;
+    context.beginPath();
+    context.arc(centerX, centerY, 9 + progress * maxRadius * 0.75, 0, Math.PI * 2);
+    context.stroke();
     context.restore();
   }
 
