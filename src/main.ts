@@ -5212,6 +5212,8 @@ async function skipCurrentHiddenEncounterOffer(
   renderHiddenEncounterOffers(routeTargetStage());
 }
 
+let routeChoicePending = false;
+
 function renderRouteMap(): void {
   const targetStage = routeTargetStage();
   route = syncRouteStateForStage(route, targetStage);
@@ -5231,7 +5233,7 @@ function renderRouteMap(): void {
     String(progress.chosen) +
     " / " +
     String(progress.total) +
-    " branch choices locked";
+    " stage routes chosen · select a lane before starting the encounter";
 
   const map = byId("routeMap");
   map.replaceChildren();
@@ -5251,11 +5253,6 @@ function renderRouteMap(): void {
     nodes.className = "route-node-row";
 
     const chosenId = route.selectedByStage[String(step.stage)];
-    const currentSelected =
-      step.stage === targetStage
-        ? selectedRouteNode(route, targetStage)
-        : null;
-
     for (const node of step.nodes) {
       const button = document.createElement("button");
       button.type = "button";
@@ -5263,19 +5260,29 @@ function renderRouteMap(): void {
         "route-node route-node-" + node.type;
       button.dataset.nodeId = node.id;
 
-      if (
+      const isSelected =
         chosenId === node.id ||
-        (step.nodes.length === 1 && node.mandatory)
-      ) {
+        (step.nodes.length === 1 && node.mandatory);
+      if (isSelected) {
         button.classList.add("selected");
+        if (step.stage === targetStage) {
+          button.classList.add("current-choice");
+        }
       }
-      if (route.visitedNodeIds.includes(node.id)) {
+      if (
+        step.stage !== targetStage &&
+        route.visitedNodeIds.includes(node.id)
+      ) {
         button.classList.add("visited");
+      }
+      if (step.stage === targetStage) {
+        button.setAttribute("aria-pressed", String(isSelected));
       }
 
       button.disabled =
         step.stage !== targetStage ||
-        currentSelected !== null ||
+        routeChoicePending ||
+        isSelected ||
         step.nodes.length === 1;
 
       const name = document.createElement("strong");
@@ -5342,40 +5349,55 @@ function renderRouteMap(): void {
     "hidden",
     selected.type !== "station",
   );
-  continueButton.disabled = false;
+  for (const button of [
+    shopAction,
+    stationShopAction,
+    serviceAction,
+    supportAction,
+    continueButton,
+  ]) {
+    button.disabled = routeChoicePending;
+  }
   renderHiddenEncounterOffers(targetStage);
 }
 
 async function chooseCurrentRouteNode(
   nodeId: string,
 ): Promise<void> {
+  // Save the preview before accepting another click or starting an encounter.
+  // The active frontier can switch lanes until Start Encounter commits entry.
+  if (routeChoicePending || !canOpenBetweenStageMenu()) return;
   const targetStage = routeTargetStage();
   const previousRoute = route;
   const previousExpansion = campaignExpansion;
   const previousRecovery = crashRecoverySnapshot;
-  const next = selectRouteNode(route, targetStage, nodeId);
+  const next = selectRouteNode(route, targetStage, nodeId, true);
 
   if (
     next.selectedByStage[String(targetStage)] ===
     previousRoute.selectedByStage[String(targetStage)]
   ) {
-    renderRouteMap();
     return;
   }
 
+  routeChoicePending = true;
   route = next;
   renderRouteMap();
 
-  const saved = await autosaveCampaign(
-    "route-choice",
-    "✓ Route locked · Stage " +
-      String(targetStage).padStart(3, "0"),
-    "route-choice",
-  );
-  if (!saved) {
-    route = previousRoute;
-    campaignExpansion = previousExpansion;
-    crashRecoverySnapshot = previousRecovery;
+  try {
+    const saved = await autosaveCampaign(
+      "route-choice",
+      "✓ Route selected · Stage " +
+        String(targetStage).padStart(3, "0"),
+      "route-choice",
+    );
+    if (!saved) {
+      route = previousRoute;
+      campaignExpansion = previousExpansion;
+      crashRecoverySnapshot = previousRecovery;
+    }
+  } finally {
+    routeChoicePending = false;
     renderRouteMap();
   }
 }
@@ -5491,7 +5513,12 @@ async function startActiveHiddenEncounter(
 }
 
 async function startSelectedStage(): Promise<void> {
-  if (!persistenceReady || !vocabularyReady || stageStartPending) return;
+  if (
+    !persistenceReady ||
+    !vocabularyReady ||
+    stageStartPending ||
+    routeChoicePending
+  ) return;
 
   const activeHidden = currentHiddenEncounterState().active;
   if (activeHidden !== null) {
@@ -6488,7 +6515,7 @@ for (const id of [
 }
 byId("routeButton").addEventListener("click", openRouteMap);
 byId("routeContinueButton").addEventListener("click", () => {
-  if (routeNeedsChoice(route, routeTargetStage())) return;
+  if (routeChoicePending || routeNeedsChoice(route, routeTargetStage())) return;
   if (routeDialog.open) routeDialog.close();
   void startSelectedStage();
 });
