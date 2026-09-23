@@ -8,6 +8,12 @@ import {
   type UpgradeableSkillId,
 } from "../skills/progression";
 import { clamp } from "../logic";
+import {
+  createBasicSkillsByCharacter,
+  isValidBasicSkillsByCharacter,
+  sanitizeBasicSkillsByCharacter,
+  type BasicSkillsByCharacter,
+} from "./basic-skills";
 
 export const MAX_SKILL_LEVEL = 5;
 export const MAX_ATTRIBUTE_LEVEL = 20;
@@ -16,6 +22,7 @@ export const MAX_ECONOMY_ATTRIBUTE_LEVEL = 10;
 export type UpgradeState = {
   skillLevels: Record<UpgradeableSkillId, number>;
   attributeLevels: Record<CoreStatKey, number>;
+  basicSkills: BasicSkillsByCharacter;
 };
 
 export type UpgradeCost = {
@@ -55,6 +62,7 @@ export function createUpgradeState(): UpgradeState {
   return {
     skillLevels: createSkillLevels(),
     attributeLevels: createAttributeLevels(),
+    basicSkills: createBasicSkillsByCharacter(),
   };
 }
 
@@ -92,6 +100,7 @@ export function sanitizeUpgradeState(value: unknown): UpgradeState {
   const raw = value as {
     skillLevels?: unknown;
     attributeLevels?: unknown;
+    basicSkills?: unknown;
   };
 
   if (
@@ -117,6 +126,15 @@ export function sanitizeUpgradeState(value: unknown): UpgradeState {
     }
   }
 
+  // v22-v26 had only currency-paid, globally shared Lv1-Lv5 skill ranks.
+  // Preserve every paid rank for EVERY character at zero Basic Points spent.
+  // Afterwards the old field is retained for compatibility but no longer
+  // provides a second in-game purchase path.
+  result.basicSkills = sanitizeBasicSkillsByCharacter(
+    raw.basicSkills,
+    raw.basicSkills === undefined ? result.skillLevels : undefined,
+  );
+
   return result;
 }
 
@@ -133,7 +151,7 @@ export function isValidUpgradeState(
 
   const raw = value as Record<string, unknown>;
   if (
-    Object.keys(raw).length !== 2 ||
+    Object.keys(raw).length !== 3 ||
     raw.skillLevels === null ||
     typeof raw.skillLevels !== "object" ||
     Array.isArray(raw.skillLevels) ||
@@ -160,6 +178,7 @@ export function isValidUpgradeState(
 
   const attributes = raw.attributeLevels as Record<string, unknown>;
   return (
+    isValidBasicSkillsByCharacter(raw.basicSkills) &&
     Object.keys(attributes).length === CORE_STAT_KEYS.length &&
     CORE_STAT_KEYS.every(
       (key) =>
