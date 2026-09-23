@@ -1903,3 +1903,176 @@ kbd {
     grid-template-columns: 1fr;
   }
 }
+
+
+.test-lab-launch {
+  border-color: rgba(255, 193, 86, 0.28);
+  color: #ffd88c;
+  background: rgba(45, 29, 8, 0.52);
+}
+
+.test-lab-dialog {
+  width: min(1480px, calc(100vw - 24px));
+  max-height: min(94vh, 980px);
+  overflow: hidden;
+}
+
+.test-lab-shell {
+  display: grid;
+  grid-template-columns: minmax(560px, 1.35fr) minmax(420px, 0.9fr);
+  gap: 14px;
+  min-height: 0;
+}
+
+.test-lab-arena {
+  display: grid;
+  grid-template-rows: minmax(420px, 1fr) auto;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.test-lab-arena canvas {
+  width: 100%;
+  height: min(67vh, 720px);
+  min-height: 420px;
+  border: 1px solid rgba(112, 213, 235, 0.16);
+  border-radius: 14px;
+  background: #050913;
+}
+
+.test-lab-arena-actions,
+.test-lab-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.test-lab-controls {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  max-height: min(78vh, 820px);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.test-lab-controls details {
+  border: 1px solid rgba(112, 213, 235, 0.1);
+  border-radius: 12px;
+  background: rgba(4, 10, 18, 0.72);
+}
+
+.test-lab-controls summary {
+  padding: 10px 12px;
+  cursor: pointer;
+  color: #dff8ff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.test-lab-controls details > :not(summary) {
+  margin-left: 10px;
+  margin-right: 10px;
+}
+
+.test-lab-controls details > :last-child {
+  margin-bottom: 10px;
+}
+
+.test-lab-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 9px;
+}
+
+.test-lab-grid label {
+  display: grid;
+  gap: 4px;
+  color: #74889c;
+  font-size: 0.62rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+}
+
+.test-lab-grid input,
+.test-lab-grid select {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid rgba(112, 213, 235, 0.12);
+  border-radius: 8px;
+  color: #e8faff;
+  background: #07111d;
+}
+
+.test-lab-grid .test-lab-check {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  align-content: center;
+}
+
+.test-lab-grid .test-lab-check input {
+  width: auto;
+}
+
+.test-lab-row button,
+.test-lab-arena-actions button {
+  padding: 7px 10px;
+  font-size: 0.64rem;
+}
+
+.test-lab-inspector,
+.test-lab-mini-inspector {
+  margin: 0;
+  padding: 10px;
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid rgba(112, 213, 235, 0.08);
+  border-radius: 8px;
+  color: #a9d9e4;
+  background: rgba(2, 7, 12, 0.88);
+  font: 0.64rem/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.test-lab-mini-inspector {
+  max-height: 160px;
+}
+
+@media (max-width: 1080px) {
+  .test-lab-dialog {
+    overflow: auto;
+  }
+
+  .test-lab-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .test-lab-controls {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .test-lab-arena canvas {
+    height: 56vh;
+  }
+}
+
+@media (max-width: 640px) {
+  .test-lab-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .test-lab-arena {
+    grid-template-rows: minmax(300px, 1fr) auto;
+  }
+
+  .test-lab-arena canvas {
+    min-height: 300px;
+    height: 46vh;
+  }
+}
