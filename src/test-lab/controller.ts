@@ -105,6 +105,20 @@ import {
 
 const TEST_LAB_PRESET_KEY = "spaceTypingTestLabPresetV1";
 
+const TEST_LAB_PRESETS = [
+  { id: "world-showcase", label: "World Enemy Showcase" },
+  { id: "world-boss", label: "World Boss Showcase" },
+  { id: "rank-x-layers", label: "Rank X · 3-layer Enemy" },
+  { id: "formation-pressure", label: "Formation Pressure Stress" },
+  { id: "relax", label: "Low-WPM Relax" },
+  { id: "impossible", label: "Impossible Pressure" },
+  { id: "checkpoint-181", label: "Checkpoint 181 → Death 190" },
+  { id: "salvage-anchor", label: "Salvage Anchor Death Test" },
+  { id: "stage-revival", label: "Stage Revival Core Death Test" },
+  { id: "phoenix-boss", label: "Phoenix Core Boss-Phase Test" },
+  { id: "music-transition", label: "World → Boss Music Transition" },
+] as const;
+
 export type TestLabMountOptions = {
   getSettings(): GameSettings;
   getVocabulary(): VocabularyEntry[];
@@ -179,6 +193,7 @@ function snapshotText(
   snapshot: TestLabGameSnapshot | null,
   session: TestLabSession,
   music: MusicController | null,
+  lastAction: string,
 ): string {
   const runtime =
     snapshot === null
@@ -211,6 +226,7 @@ function snapshotText(
 
   return JSON.stringify(
     {
+      lastAction,
       sandbox: {
         world: worldForStage(session.stage),
         stage: session.stage,
@@ -282,6 +298,7 @@ export function mountTestLab(
   let shopPurchaseSequence = 0;
   let rewardPreview: unknown = null;
   let equipmentInstanceSequence = 0;
+  let lastAction = "Test Lab initialized";
 
   const button = document.createElement("button");
   button.id = "testLabButton";
@@ -573,12 +590,14 @@ export function mountTestLab(
         <details>
           <summary>Sandbox Economy / Preset</summary>
           <div class="test-lab-grid">
+            <label>Built-in preset<select data-field="builtin-preset"></select></label>
             <label>Credits<input data-field="credits" type="number" min="0" value="0"></label>
             <label>Alloy<input data-field="alloy" type="number" min="0" value="0"></label>
             <label>Star Crystal<input data-field="star-crystal" type="number" min="0" value="0"></label>
             <label>Quantum Core<input data-field="quantum-core" type="number" min="0" value="0"></label>
           </div>
           <div class="test-lab-row">
+            <button type="button" data-action="apply-builtin-preset">Apply Built-in Preset</button>
             <button type="button" data-action="apply-economy">Apply Economy</button>
             <button type="button" data-action="save-preset">Save Local Preset</button>
             <button type="button" data-action="load-preset">Load Local Preset</button>
@@ -603,6 +622,8 @@ export function mountTestLab(
   const rewardInspector =
     dialog.querySelector<HTMLElement>('[data-role="reward"]')!;
 
+  const builtInPresetSelect =
+    dialog.querySelector<HTMLSelectElement>('[data-field="builtin-preset"]')!;
   const worldSelect =
     dialog.querySelector<HTMLSelectElement>('[data-field="world"]')!;
   const difficultySelect =
@@ -638,6 +659,13 @@ export function mountTestLab(
   const announcerSelect =
     dialog.querySelector<HTMLSelectElement>('[data-field="announcer"]')!;
 
+  setOptions(
+    builtInPresetSelect,
+    TEST_LAB_PRESETS.map((preset) => ({
+      value: preset.id,
+      label: preset.label,
+    })),
+  );
   setOptions(
     worldSelect,
     registry.worlds.map((world) => ({
@@ -758,6 +786,7 @@ export function mountTestLab(
   );
 
   function notice(message: string): void {
+    lastAction = message;
     options.showNotice?.("Test Lab · " + message);
   }
 
@@ -784,7 +813,12 @@ export function mountTestLab(
 
   function renderInspector(): void {
     const snapshot = currentSnapshot();
-    inspector.textContent = snapshotText(snapshot, session, music);
+    inspector.textContent = snapshotText(
+      snapshot,
+      session,
+      music,
+      lastAction,
+    );
     inventoryInspector.textContent =
       inventoryText(session) +
       "\n\n" +
@@ -1078,6 +1112,113 @@ export function mountTestLab(
     });
     activeGame.setRelicEffects(
       compileRelicEffects(session.state.relics),
+    );
+  }
+
+  function setField(field: string, value: string | number): void {
+    const target = dialog.querySelector<
+      HTMLInputElement | HTMLSelectElement
+    >('[data-field="' + field + '"]');
+    if (target !== null) target.value = String(value);
+  }
+
+  function setChecked(field: string, checked: boolean): void {
+    const target = dialog.querySelector<HTMLInputElement>(
+      '[data-field="' + field + '"]',
+    );
+    if (target !== null) target.checked = checked;
+  }
+
+  function applyBuiltInPreset(id: string): void {
+    const world =
+      registry.worlds.find((entry) => entry.id === worldSelect.value) ??
+      registry.worlds[0]!;
+    setField("enemy-count", 1);
+    setField("rank", "I");
+    setField("layers", 1);
+    setField("difficulty", "balanced");
+    setField("death-mode", "immortal");
+    setField("time-scale", 1);
+    setChecked("scheduler-frozen", false);
+
+    if (id === "world-showcase") {
+      setField("stage", world.stageStart);
+      setField("checkpoint", world.stageStart);
+    } else if (id === "world-boss") {
+      setField("stage", world.stageEnd);
+      setField("checkpoint", world.stageEnd);
+    } else if (id === "rank-x-layers") {
+      setField("stage", Math.max(world.stageStart, 900));
+      setField("checkpoint", Math.max(world.stageStart, 900));
+      setField("rank", "X");
+      setField("layers", 3);
+    } else if (id === "formation-pressure") {
+      setField("stage", 950);
+      setField("checkpoint", 941);
+      setField("difficulty", "impossible");
+      setField("max-enemies", 30);
+      setField("pressure-budget", 100);
+      setField("urgent-cap", 30);
+      setField("formation-complexity", 5);
+      setField("spawn-interval", 0.05);
+    } else if (id === "relax") {
+      setField("stage", 1);
+      setField("checkpoint", 1);
+      setField("difficulty", "relax");
+      setField("vocab-level", 1);
+    } else if (id === "impossible") {
+      setField("stage", 1000);
+      setField("checkpoint", 991);
+      setField("difficulty", "impossible");
+      setField("vocab-level", 100);
+    } else if (
+      id === "checkpoint-181" ||
+      id === "salvage-anchor" ||
+      id === "stage-revival"
+    ) {
+      setField("stage", 190);
+      setField("checkpoint", 181);
+      setField("death-mode", "real");
+      setField("credits", 20000);
+      setField("alloy", 120);
+      setField("star-crystal", 2);
+      if (id === "salvage-anchor") {
+        session.state.inventory = addItem(
+          session.state.inventory,
+          "salvage-anchor",
+          2,
+        ).inventory;
+      } else if (id === "stage-revival") {
+        session.state.inventory = addItem(
+          session.state.inventory,
+          "stage-revival-core",
+          2,
+        ).inventory;
+      }
+    } else if (id === "phoenix-boss") {
+      setField("stage", world.stageEnd);
+      setField("checkpoint", world.stageStart + 10);
+      setField("death-mode", "real");
+      setField("boss-hp", 37);
+      setField("boss-phase", 2);
+      session.state.inventory = addItem(
+        session.state.inventory,
+        "phoenix-core",
+        2,
+      ).inventory;
+    } else if (id === "music-transition") {
+      setField("stage", world.stageStart);
+      setField("checkpoint", world.stageStart);
+      setField("music-state", "WORLD_NORMAL");
+      setField("crossfade", 0.8);
+    }
+
+    applyScenarioInputs();
+    syncScenarioInputsFromSession();
+    renderInspector();
+    notice(
+      TEST_LAB_PRESETS.find((preset) => preset.id === id)?.label ??
+        "built-in preset applied",
     );
   }
 
@@ -1987,6 +2128,10 @@ export function mountTestLab(
         ),
       );
       renderInspector();
+      return;
+    }
+    if (action === "apply-builtin-preset") {
+      applyBuiltInPreset(builtInPresetSelect.value);
       return;
     }
     if (action === "apply-economy") {
