@@ -101,15 +101,16 @@ export function sanitizeHotbarState(value: unknown): HotbarState {
     return createDefaultHotbarState();
   }
 
+  const source = raw.slots;
   const slots = Array.from({ length: HOTBAR_SLOT_COUNT }, (_, index) => {
-    const slot = raw.slots?.[index];
+    const slot = source[index];
     return isHotbarAction(slot) ? { ...slot } : null;
   }) as HotbarState["slots"];
 
   const seen = new Set<string>();
   for (let index = 0; index < slots.length; index += 1) {
     const action = slots[index];
-    if (action === null) continue;
+    if (action == null) continue;
     const key = hotbarActionKey(action);
     if (seen.has(key)) slots[index] = null;
     else seen.add(key);
@@ -161,7 +162,7 @@ export function assignHotbarSlot(
     for (let position = 0; position < slots.length; position += 1) {
       const existing = slots[position];
       if (
-        existing !== null &&
+        existing != null &&
         hotbarActionKey(existing) === key
       ) {
         slots[position] = null;
