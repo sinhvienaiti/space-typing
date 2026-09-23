@@ -2334,9 +2334,12 @@ kbd {
   }
 
   .quick-support {
+    left: auto;
+    right: 8px;
     bottom: 14px;
     grid-template-columns: repeat(3, minmax(44px, auto));
     gap: 0.25rem;
+    transform: none;
   }
 
   .quick-support button {

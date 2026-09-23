@@ -209,6 +209,12 @@ describe("M21 gated Game Test Lab API", () => {
     expect(active?.activePressure.enemyCount).toBe(0);
     expect(active?.activePressure.urgentThreats).toBe(0);
 
+    game.handleKey("x");
+    const afterWrongGuess = game.getTestLabSnapshot();
+    expect(afterWrongGuess?.recallBonus?.typed).toBe(0);
+    expect(afterWrongGuess?.stats.hits).toBe(before?.stats.hits);
+    expect(afterWrongGuess?.stats.misses).toBe(before?.stats.misses);
+
     expect(game.testLabCompleteRecallBonus()).toBe(true);
     const after = game.getTestLabSnapshot();
 
