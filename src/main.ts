@@ -1476,6 +1476,7 @@ function currentAutosaveSnapshot(): AutosaveSnapshot {
     inventory,
     equipment,
     supportSpells,
+    hotbar,
     characters,
     luckPity,
     hiddenDiscovery,
