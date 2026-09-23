@@ -1,4 +1,5 @@
-import { WORLD_REGISTRY, type WorldProfile } from "../worlds/registry";
+import { WORLD_REGISTRY } from "../worlds/registry";
+import type { WorldProfile } from "../worlds/types";
 import {
   ENEMY_REGISTRY,
   type EnemyDefinition,
