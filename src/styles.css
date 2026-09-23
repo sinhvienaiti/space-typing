@@ -544,48 +544,246 @@ kbd {
   transform: translate(-50%, 0);
 }
 
-.world-transition {
+.stage-transition {
   position: absolute;
-  z-index: 34;
-  left: 50%;
-  top: 12%;
-  min-width: min(430px, calc(100vw - 2rem));
-  padding: 1rem 1.35rem;
-  border: 1px solid rgba(128, 226, 255, 0.18);
-  border-radius: 14px;
-  background: rgba(5, 11, 20, 0.88);
-  box-shadow: 0 18px 70px rgba(0, 0, 0, 0.38);
-  transform: translateX(-50%);
-  text-align: center;
-  pointer-events: none;
-  backdrop-filter: blur(7px);
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(66, 188, 226, 0.13), transparent 30rem),
+    rgba(2, 5, 11, 0.9);
+  opacity: 0;
+  pointer-events: auto;
+  transition: opacity 170ms ease;
 }
 
-.world-transition small,
-.world-transition span,
-.world-transition strong {
+.stage-transition.active {
+  opacity: 1;
+}
+
+.stage-transition.leaving {
+  opacity: 0;
+}
+
+.stage-transition-warp,
+.stage-transition-core {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.stage-transition-warp {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 7.5vw,
+      rgba(120, 229, 255, 0.055) 7.65vw 7.78vw
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 7.5vh,
+      rgba(120, 229, 255, 0.035) 7.62vh 7.74vh
+    );
+  mask-image: radial-gradient(circle at center, black, transparent 70%);
+  transform: scale(1.15);
+  animation: stage-warp-grid 760ms cubic-bezier(0.2, 0.75, 0.22, 1) both;
+}
+
+.stage-transition-core {
+  inset: 50% auto auto 50%;
+  width: min(62vw, 720px);
+  aspect-ratio: 1;
+  border: 1px solid rgba(109, 226, 249, 0.12);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(114, 229, 255, 0.18), rgba(91, 101, 255, 0.045) 34%, transparent 66%);
+  box-shadow:
+    0 0 90px rgba(77, 206, 255, 0.13),
+    inset 0 0 70px rgba(101, 108, 255, 0.08);
+  transform: translate(-50%, -50%) scale(0.55);
+  animation: stage-core-arrive 760ms cubic-bezier(0.16, 0.82, 0.24, 1) both;
+}
+
+.stage-transition-card {
+  position: relative;
+  z-index: 2;
+  width: min(720px, calc(100vw - 2rem));
+  padding: 1.2rem 1.4rem;
+  text-align: center;
+  text-shadow: 0 3px 22px rgba(0, 0, 0, 0.75);
+  animation: stage-card-arrive 520ms cubic-bezier(0.2, 0.75, 0.22, 1) both;
+}
+
+.stage-transition-card small,
+.stage-transition-card strong,
+.stage-transition-card span,
+.stage-transition-card em {
   display: block;
 }
 
-.world-transition small {
-  color: #5ddcf2;
-  font-size: 0.64rem;
-  font-weight: 850;
-  letter-spacing: 0.16em;
+.stage-transition-card small {
+  color: #6fe1f5;
+  font-size: 0.67rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
 }
 
-.world-transition strong {
-  margin-top: 0.28rem;
-  color: #ecfbff;
-  font-size: clamp(1.35rem, 3vw, 2rem);
-  letter-spacing: -0.02em;
+.stage-transition-card strong {
+  margin-top: 0.3rem;
+  color: #f1fcff;
+  font-size: clamp(2.1rem, 7vw, 5.2rem);
+  font-weight: 900;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
 }
 
-.world-transition span {
-  margin-top: 0.18rem;
-  color: #7f9cad;
-  font-size: 0.72rem;
+.stage-transition-card span {
+  margin-top: 0.55rem;
+  color: #9fb4c5;
+  font-size: clamp(0.72rem, 2vw, 0.95rem);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.stage-transition-card em {
+  margin-top: 1rem;
+  color: #567083;
+  font-size: 0.52rem;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.stage-transition[data-tone="elite"] {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(176, 119, 255, 0.15), transparent 28rem),
+    rgba(3, 5, 12, 0.92);
+}
+
+.stage-transition[data-tone="world"],
+.stage-transition[data-tone="galaxy"] {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(67, 224, 195, 0.16), transparent 31rem),
+    rgba(2, 7, 13, 0.93);
+}
+
+.stage-transition[data-tone="world"] .stage-transition-card strong,
+.stage-transition[data-tone="galaxy"] .stage-transition-card strong {
+  color: #dcfff7;
+}
+
+.stage-transition[data-tone="mini-boss"] {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 184, 72, 0.17), transparent 29rem),
+    rgba(8, 5, 4, 0.93);
+}
+
+.stage-transition[data-tone="world-boss"],
+.stage-transition[data-tone="galaxy-boss"] {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 71, 120, 0.21), transparent 30rem),
+    rgba(10, 3, 8, 0.95);
+}
+
+.stage-transition[data-tone="world-boss"] .stage-transition-card strong,
+.stage-transition[data-tone="galaxy-boss"] .stage-transition-card strong {
+  color: #fff0f5;
+  text-shadow:
+    0 0 28px rgba(255, 85, 132, 0.26),
+    0 3px 22px rgba(0, 0, 0, 0.8);
+}
+
+.stage-transition[data-tone="galaxy-boss"] .stage-transition-core {
+  width: min(75vw, 860px);
+  border-color: rgba(255, 112, 159, 0.2);
+  box-shadow:
+    0 0 130px rgba(255, 74, 132, 0.16),
+    inset 0 0 90px rgba(156, 77, 255, 0.1);
+}
+
+.stage-transition[data-tone="hidden"] {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(176, 92, 255, 0.21), transparent 29rem),
+    rgba(5, 2, 11, 0.95);
+}
+
+.stage-transition[data-tone="hidden"] .stage-transition-warp {
+  filter: hue-rotate(55deg);
+}
+
+.stage-transition[data-tone="hidden"] .stage-transition-card small,
+.stage-transition[data-tone="hidden"] .stage-transition-card strong {
+  color: #ead9ff;
+}
+
+@keyframes stage-warp-grid {
+  from {
+    opacity: 0;
+    transform: scale(1.42) rotate(-1deg);
+  }
+  42% { opacity: 1; }
+  to {
+    opacity: 0.72;
+    transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes stage-core-arrive {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.25);
+  }
+  55% { opacity: 1; }
+  to {
+    opacity: 0.82;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes stage-card-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+    filter: blur(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@media (max-width: 600px) {
+  .stage-transition-card {
+    width: calc(100vw - 1.2rem);
+    padding: 0.9rem 0.7rem;
+  }
+
+  .stage-transition-card strong {
+    font-size: clamp(1.75rem, 11vw, 3.4rem);
+  }
+
+  .stage-transition-card small {
+    font-size: 0.54rem;
+    letter-spacing: 0.13em;
+  }
+
+  .stage-transition-card em {
+    margin-top: 0.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-transition,
+  .stage-transition-warp,
+  .stage-transition-core,
+  .stage-transition-card {
+    animation: none !important;
+    transition-duration: 20ms !important;
+  }
 }
 
 .settings-dialog::backdrop {
