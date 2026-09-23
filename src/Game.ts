@@ -899,6 +899,7 @@ export class Game {
     }
 
     this.testLabClearEnemies();
+    this.testLabSchedulerFrozen = true;
     const words = ["morning", "month", "me"] as const;
     const positions = [
       { x: this.width * 0.28, y: this.height * 0.32 },
