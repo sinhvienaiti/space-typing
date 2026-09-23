@@ -100,6 +100,34 @@ describe("M08 MusicController", () => {
     controller.destroy();
   });
 
+  it("exposes read-only debug state for Test Lab audio inspection", () => {
+    const created: FakeAudio[] = [];
+    const controller = new MusicController((src) => {
+      const audio = new FakeAudio(src);
+      created.push(audio);
+      return audio;
+    });
+
+    controller.setMusicVolume(0.7);
+    controller.setAmbientVolume(0.3);
+    controller.setWorldProfile(musicProfileForWorld("world-01"));
+    controller.transitionTo("WORLD_BOSS", 0);
+    controller.setBossPhase(2);
+    controller.duck("announcer");
+
+    const snapshot = controller.getDebugSnapshot();
+    expect(snapshot.state).toBe("WORLD_BOSS");
+    expect(snapshot.worldId).toBe("world-01");
+    expect(snapshot.bossPhase).toBe(2);
+    expect(snapshot.duckReasons).toContain("announcer");
+    expect(snapshot.duckMultiplier).toBeLessThan(1);
+    expect(snapshot.activeMusic?.assetId).toBeTruthy();
+    expect(snapshot.activeMusic?.candidates.length).toBeGreaterThan(0);
+    expect(snapshot.activeAmbient.length).toBeGreaterThan(0);
+
+    controller.destroy();
+  });
+
   it("pauses and retries current tracks without recreating them", () => {
     const created: FakeAudio[] = [];
     const controller = new MusicController((src) => {
