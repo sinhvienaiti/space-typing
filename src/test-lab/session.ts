@@ -1,5 +1,9 @@
 import { createDefaultCampaignProgress } from "../campaign/progress";
-import { createCampaignExpansionState } from "../campaign/expansion-state";
+import {
+  createCampaignExpansionState,
+  sectorForStage,
+  type CampaignExpansionState,
+} from "../campaign/expansion-state";
 import { createRouteState } from "../campaign/route";
 import { createStarterEquipmentState } from "../equipment/loadout";
 import { createStarterSupportSpellState } from "../skills/support-loadout";
@@ -17,6 +21,14 @@ import {
   type CheckpointSnapshot,
   type RunPersistentState,
 } from "../persistence/checkpoint";
+import {
+  createStageEntrySnapshot,
+  type StageEntrySnapshot,
+} from "../persistence/death-protection";
+import {
+  captureCrashRecoverySnapshot,
+  type CrashRecoverySnapshot,
+} from "../persistence/crash-recovery";
 
 export type TestLabDeathMode = "immortal" | "real";
 
@@ -27,6 +39,9 @@ export type TestLabSession = {
   deathMode: TestLabDeathMode;
   state: RunPersistentState;
   checkpointSnapshot: CheckpointSnapshot;
+  campaignExpansion: CampaignExpansionState;
+  stageEntrySnapshot: StageEntrySnapshot;
+  crashRecoverySnapshot: CrashRecoverySnapshot;
   createdAt: string;
 };
 
@@ -66,9 +81,37 @@ export function createTestLabSession(
     relics: createRelicState(),
     ascension: createAscensionState(campaign),
   };
-  const safeCheckpoint = Math.max(
+  const productionCheckpoint = sectorForStage(
+    campaign.selectedStage,
+  ).startStage;
+  const requestedCheckpoint = Math.max(
     1,
     Math.min(stage, Math.min(1000, Math.floor(checkpointStage))),
+  );
+  const safeCheckpoint =
+    requestedCheckpoint === productionCheckpoint
+      ? requestedCheckpoint
+      : productionCheckpoint;
+  const checkpointSnapshot = createCheckpointSnapshot(
+    state,
+    safeCheckpoint,
+  );
+  const baseExpansion = createCampaignExpansionState(
+    campaign,
+    createdAt,
+  );
+  const stageEntrySnapshot = createStageEntrySnapshot(
+    state,
+    baseExpansion,
+    checkpointSnapshot,
+    createdAt,
+  );
+  const crash = captureCrashRecoverySnapshot(
+    state,
+    baseExpansion,
+    checkpointSnapshot,
+    "manual",
+    createdAt,
   );
 
   return {
@@ -77,10 +120,10 @@ export function createTestLabSession(
     checkpointStage: safeCheckpoint,
     deathMode: "immortal",
     state,
-    checkpointSnapshot: createCheckpointSnapshot(
-      state,
-      safeCheckpoint,
-    ),
+    checkpointSnapshot,
+    campaignExpansion: crash.campaignExpansion,
+    stageEntrySnapshot,
+    crashRecoverySnapshot: crash.snapshot,
     createdAt,
   };
 }
@@ -123,9 +166,6 @@ export function updateTestLabStage(
 
 export function testLabCampaignExpansion(
   session: TestLabSession,
-) {
-  return createCampaignExpansionState(
-    session.state.campaign,
-    session.createdAt,
-  );
+): CampaignExpansionState {
+  return structuredClone(session.campaignExpansion);
 }
