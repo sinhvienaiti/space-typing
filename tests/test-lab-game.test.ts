@@ -28,6 +28,7 @@ function createTestGame(): Game {
     devicePixelRatio: 1,
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(() => true),
     setTimeout: globalThis.setTimeout,
     clearTimeout: globalThis.clearTimeout,
     setInterval: globalThis.setInterval,
@@ -175,6 +176,7 @@ describe("M21 gated Game Test Lab API", () => {
     start(game, 50);
 
     const ids = game.testLabSpawnEnemies({
+      kind: "scout",
       count: 1,
       rank: "X",
       layers: 2,
