@@ -3270,7 +3270,7 @@ Implemented baseline:
 - keyboard typing routed directly to the isolated Game instance;
 - CI completeness audit derived from production registries, including all 50 Worlds, boss mappings and music asset/fallback contracts;
 - regression coverage proving debug APIs remain dormant outside Test Lab and sandbox/recovery state is detached from production state;
-- final M21 Test + Build: CI #370 PASS · 111 test files · 560/560 tests · TypeScript check + production build.
+- final M21 Test + Build: CI #376 PASS · 111 test files · 561/561 tests · TypeScript check + production build.
 
 M22 may now begin the final deterministic balance/performance audit. Do not add a second Test Lab or duplicate runtime systems during M22.
 
