@@ -402,6 +402,7 @@ export function mountTestLab(
             <button type="button" data-action="spawn-enemy">Spawn Selected ×N</button>
             <button type="button" data-action="spawn-all-selected">Spawn All Selected</button>
             <button type="button" data-action="spawn-world-roster">Spawn World Roster</button>
+            <button type="button" data-action="spawn-prefix-conflict">Same-Prefix Scenario</button>
             <button type="button" data-action="patch-enemy">Apply Runtime Override</button>
             <button type="button" data-action="force-enemy-skill">Force Skill</button>
             <button type="button" data-action="force-word">Force Word / Next Layer</button>
@@ -1727,6 +1728,18 @@ export function mountTestLab(
         });
       }
       renderInspector();
+      return;
+    }
+    if (action === "spawn-prefix-conflict") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      const ids = activeGame.testLabSpawnSamePrefixScenario();
+      renderInspector();
+      notice(
+        ids.length === 3
+          ? "Same-prefix QA scenario: morning / month / me"
+          : "Unable to create same-prefix scenario",
+      );
       return;
     }
     if (action === "patch-enemy") {
