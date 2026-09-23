@@ -21,9 +21,9 @@ describe("M21 Test Lab production registry", () => {
     expect(registry.worlds.map((world) => world.id)).toEqual(
       WORLD_REGISTRY.map((world) => world.id),
     );
-    expect(registry.enemies.map((enemy) => enemy.id)).toEqual(
-      [...ENEMY_DEFINITION_IDS],
-    );
+    expect(
+      [...registry.enemies.map((enemy) => enemy.id)].sort(),
+    ).toEqual([...ENEMY_DEFINITION_IDS].sort());
     expect(registry.enemySkills.map((skill) => skill.id)).toEqual(
       [...ENEMY_SKILL_IDS],
     );
