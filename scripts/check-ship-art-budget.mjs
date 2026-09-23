@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -54,6 +55,18 @@ if (bytes > MAX_FILE_BYTES) {
 }
 
 const buffer = readFileSync(path);
+const EXPECTED_REVIEWED_SHA256 =
+  "fb9434e002d6da650e34192eb425e62d1e2f3bec8804a9b33b7aa8733de10eb3";
+const digest = createHash("sha256").update(buffer).digest("hex");
+// This is the reviewed 11-ship V3 production atlas. If replacing the art,
+// review it again, then deliberately update both installer and build guard.
+if (digest !== EXPECTED_REVIEWED_SHA256) {
+  throw new Error(
+    "Ship V3 atlas differs from the reviewed artwork (SHA-256: " +
+      digest +
+      "). Do not silently ship unreviewed art.",
+  );
+}
 let width = 0;
 let height = 0;
 
