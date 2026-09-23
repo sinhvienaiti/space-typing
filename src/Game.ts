@@ -290,6 +290,7 @@ import {
   type EnemySkillId,
 } from "./enemies/skills";
 import { resolveEnemyRuntimeProfile } from "./enemies/runtime-profile";
+import { calculateThreatBudget } from "./enemies/threat";
 import {
   beginHardCc,
   canApplyHardCc,
@@ -814,19 +815,11 @@ export class Game {
       if (input.elite !== undefined) {
         enemy.elite = input.elite;
       }
-      if (input.rank !== undefined) {
-        enemy.rank = input.rank;
-      }
-      if (input.layers !== undefined) {
-        enemy.layersRemaining = input.layers;
-        enemy.layerPlan = enemyLayerPlan(enemy.kind, input.layers);
-      }
-      if (input.skillIds !== undefined) {
-        enemy.skillIds = [...new Set(input.skillIds)].slice(0, 3);
-        enemy.nextSkillIndex = 0;
-        enemy.pendingSkillId = null;
-        enemy.skillTelegraphRemaining = 0;
-      }
+      this.testLabReconfigureEnemy(enemy, {
+        rank: input.rank,
+        layers: input.layers,
+        skillIds: input.skillIds,
+      });
       spawned.push(enemy.id);
     }
     return spawned;
@@ -838,6 +831,77 @@ export class Game {
     this.projectiles = [];
     this.targetId = null;
     return true;
+  }
+
+  private testLabReconfigureEnemy(
+    enemy: Enemy,
+    input: {
+      rank?: EnemyRank;
+      layers?: 1 | 2 | 3;
+      skillIds?: readonly EnemySkillId[];
+    },
+  ): void {
+    const rank = input.rank ?? enemy.rank ?? "I";
+    const layers =
+      input.layers ??
+      clamp(enemy.layersRemaining, 1, 3) as 1 | 2 | 3;
+    const entry =
+      pickVocabularyEntryForRank(
+        this.vocabulary,
+        rank,
+        this.vocabularyLevel,
+        Math.random(),
+        undefined,
+        this.difficulty?.wordScoreOffset ?? 0,
+      ) ?? enemy.entry;
+    const score = wordDifficultyScore(
+      entry,
+      this.vocabularyLevel,
+    );
+    const runtime = resolveEnemyRuntimeProfile({
+      stage: this.stageConfig?.stage ?? 1,
+      kind: enemy.kind,
+      rank,
+      elite: enemy.elite,
+      wordDifficultyScore: score,
+      layers,
+    });
+    const skills =
+      input.skillIds === undefined
+        ? runtime.skills
+        : [...new Set(input.skillIds)].slice(0, 3);
+
+    enemy.rank = rank;
+    enemy.entry = entry;
+    enemy.typed = 0;
+    enemy.wordMissed = false;
+    enemy.wordDifficultyScore = score;
+    enemy.layersRemaining = layers;
+    enemy.layerPlan = enemyLayerPlan(enemy.kind, layers);
+    enemy.skillIds = [...skills];
+    enemy.nextSkillIndex = 0;
+    enemy.pendingSkillId = null;
+    enemy.skillTelegraphRemaining = 0;
+    enemy.threatBudget =
+      input.skillIds === undefined
+        ? runtime.threatBudget
+        : calculateThreatBudget({
+            kind: enemy.kind,
+            rank,
+            elite: enemy.elite,
+            wordDifficultyScore: score,
+            layers,
+            skills,
+          });
+
+    const firstSkill = skills[0];
+    enemy.actionCooldown =
+      firstSkill === undefined
+        ? enemy.actionCooldown
+        : this.enemySkillCooldown(
+            firstSkill,
+            this.difficulty,
+          );
   }
 
   testLabPatchEnemy(
@@ -856,14 +920,18 @@ export class Game {
       enemy.pendingSkillId = null;
       enemy.skillTelegraphRemaining = 0;
     }
-    if (input.rank !== undefined) enemy.rank = input.rank;
-    if (input.layers !== undefined) {
-      enemy.layersRemaining = input.layers;
-      enemy.layerPlan = enemyLayerPlan(enemy.kind, input.layers);
-      enemy.typed = 0;
-      enemy.wordMissed = false;
-    }
     if (input.elite !== undefined) enemy.elite = input.elite;
+    if (
+      input.rank !== undefined ||
+      input.layers !== undefined ||
+      input.elite !== undefined
+    ) {
+      this.testLabReconfigureEnemy(enemy, {
+        rank: input.rank,
+        layers: input.layers,
+        skillIds: enemy.skillIds,
+      });
+    }
     if (
       input.threatBudgetUsed !== undefined &&
       enemy.threatBudget !== undefined
