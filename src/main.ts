@@ -59,7 +59,7 @@ import {
   drawCharacterShip,
   setCharacterShipSheet,
 } from "./characters/renderer";
-import { CHARACTER_SHIP_SHEET_ASSET_ID } from "./characters/visuals";
+import { selectCharacterShipSheet } from "./characters/ship-art";
 import { deriveEquipmentAura } from "./characters/equipment-aura";
 import { AEGIS_ACTIVE_SKILL_ID } from "./characters/aegis";
 import { ARSENAL_ACTIVE_SKILL_ID } from "./characters/arsenal";
@@ -6312,7 +6312,7 @@ async function initializeArtPipeline(): Promise<void> {
     const manifest = await loadArtAssetManifest();
     artCatalog = await preloadArtAssets(manifest);
     setCharacterShipSheet(
-      artCatalog.assets.get(CHARACTER_SHIP_SHEET_ASSET_ID)?.image ?? null,
+      selectCharacterShipSheet(artCatalog).image,
     );
     renderPlayerStatusIdentity();
     updateDataSummary();
