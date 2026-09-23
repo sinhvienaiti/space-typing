@@ -4,10 +4,10 @@ import { createStageConfig } from "../src/campaign/stage";
 import { difficultyFor } from "../src/campaign/difficulty";
 import { qualityProfile } from "../src/performance/quality";
 import type {
-  DifficultyMode,
   GameSettings,
   VocabularyEntry,
 } from "../src/types";
+import type { DifficultyMode } from "../src/campaign/types";
 
 const settings: GameSettings = {
   sfxVolume: 0,
