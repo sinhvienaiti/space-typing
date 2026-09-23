@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1 --port 3004",
-    "build": "tsc -p tsconfig.json --noEmit && vite build && node scripts/check-bundle-size.mjs && node scripts/check-ship-art-budget.mjs",
+    "dev": "node scripts/prepare-ship-v3.mjs && vite --host 127.0.0.1 --port 3004",
+    "build": "node scripts/prepare-ship-v3.mjs && tsc -p tsconfig.json --noEmit && vite build && node scripts/check-bundle-size.mjs && node scripts/check-ship-art-budget.mjs",
     "test": "vitest run",
     "check": "pnpm test && pnpm build"
   },
