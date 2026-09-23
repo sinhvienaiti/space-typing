@@ -6311,10 +6311,12 @@ async function initializeArtPipeline(): Promise<void> {
   try {
     const manifest = await loadArtAssetManifest();
     artCatalog = await preloadArtAssets(manifest);
-    setCharacterShipSheet(
-      selectCharacterShipSheet(artCatalog).image,
-    );
+    const shipArt = selectCharacterShipSheet(artCatalog);
+    setCharacterShipSheet(shipArt.image, shipArt.source);
+    // QA telemetry only; the atlas selection is a one-time startup decision.
+    document.documentElement.dataset.shipArt = shipArt.source;
     renderPlayerStatusIdentity();
+    if (characterDialog.open) renderCharacters();
     updateDataSummary();
 
     if (artCatalog.failed.length > 0) {
@@ -6326,6 +6328,7 @@ async function initializeArtPipeline(): Promise<void> {
   } catch (error) {
     artCatalog = null;
     setCharacterShipSheet(null);
+    document.documentElement.dataset.shipArt = "procedural";
     console.warn(
       "Art manifest unavailable; procedural Canvas renderer remains active.",
       error,
