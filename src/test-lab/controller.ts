@@ -1403,6 +1403,142 @@ export function mountTestLab(
       return;
     }
 
+    if (action === "load-shop") {
+      loadShop(
+        numberValue(dialog, '[data-field="shop-seed-offset"]', 0),
+      );
+      notice("production shop loaded");
+      return;
+    }
+    if (action === "reroll-shop") {
+      const nextOffset =
+        Math.max(
+          0,
+          Math.floor(
+            numberValue(
+              dialog,
+              '[data-field="shop-seed-offset"]',
+              0,
+            ),
+          ),
+        ) + 1;
+      dialog.querySelector<HTMLInputElement>(
+        '[data-field="shop-seed-offset"]',
+      )!.value = String(nextOffset);
+      if (activeShop !== null) {
+        const nextInstances = { ...session.state.shops.instances };
+        delete nextInstances[activeShop.id];
+        session.state.shops = {
+          version: 1,
+          instances: nextInstances,
+        };
+      }
+      loadShop(nextOffset);
+      notice("QA reroll used production deterministic stock generation");
+      return;
+    }
+    if (action === "buy-shop") {
+      if (activeShop === null) {
+        notice("load a shop first");
+        return;
+      }
+      const result = buyShopStockEntry(
+        {
+          credits: session.state.credits,
+          expansionCurrencies: session.state.expansionCurrencies,
+          inventory: session.state.inventory,
+          equipment: session.state.equipment,
+          shops: session.state.shops,
+        },
+        activeShop.id,
+        shopStockSelect.value,
+        "test-lab-shop-" + String(++shopPurchaseSequence),
+      );
+      session.state.credits = result.state.credits;
+      session.state.expansionCurrencies =
+        result.state.expansionCurrencies;
+      session.state.inventory = result.state.inventory;
+      session.state.equipment = result.state.equipment;
+      session.state.shops = result.state.shops;
+      activeShop =
+        session.state.shops.instances[activeShop.id] ?? null;
+      if (activeShop !== null) populateShopStock(activeShop);
+      renderInspector();
+      notice(
+        result.purchased
+          ? "shop purchase completed through production flow"
+          : "shop purchase blocked · " + String(result.reason),
+      );
+      return;
+    }
+    if (action === "roll-equipment") {
+      rewardPreview = rollEquipmentDrop(
+        inputValue(dialog, '[data-field="loot-source"]') as LootSource,
+        numberValue(dialog, '[data-field="reward-luck"]', 0),
+        numberValue(dialog, '[data-field="reward-salvage"]', 0),
+      );
+      renderInspector();
+      notice(
+        rewardPreview === null
+          ? "equipment roll produced no drop"
+          : "equipment drop rolled through production loot table",
+      );
+      return;
+    }
+    if (action === "preview-choice") {
+      rewardPreview = createRewardChoiceOptions(
+        numberValue(dialog, '[data-field="reward-luck"]', 0),
+      );
+      renderInspector();
+      return;
+    }
+    if (action === "preview-boss-choice") {
+      rewardPreview = createBossRewardChoiceOptions(
+        session.stage,
+        numberValue(dialog, '[data-field="reward-luck"]', 0),
+        session.state.relics,
+      );
+      renderInspector();
+      return;
+    }
+    if (action === "grant-star-crystal") {
+      session.state.expansionCurrencies = {
+        ...session.state.expansionCurrencies,
+        starCrystal:
+          session.state.expansionCurrencies.starCrystal + 1,
+      };
+      renderInspector();
+      return;
+    }
+    if (action === "grant-quantum-core") {
+      session.state.expansionCurrencies = {
+        ...session.state.expansionCurrencies,
+        quantumCore:
+          session.state.expansionCurrencies.quantumCore + 1,
+      };
+      renderInspector();
+      return;
+    }
+    if (
+      action === "grant-salvage-anchor" ||
+      action === "grant-stage-revival" ||
+      action === "grant-phoenix"
+    ) {
+      const id: ItemId =
+        action === "grant-salvage-anchor"
+          ? "salvage-anchor"
+          : action === "grant-stage-revival"
+            ? "stage-revival-core"
+            : "phoenix-core";
+      session.state.inventory = addItem(
+        session.state.inventory,
+        id,
+        1,
+      ).inventory;
+      renderInspector();
+      return;
+    }
+
     if (action === "play-music") {
       if (music === null) createRuntime();
       const state = musicStateSelect.value as MusicState;
