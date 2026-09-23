@@ -190,6 +190,16 @@ export function isValidUpgradeState(
   );
 }
 
+// Strict check for the two-field v22-v26 M17 save contract. The extra
+// per-character Basic Skill field is added during PlayerSave v27 migration.
+export function isValidLegacyUpgradeState(value: unknown): boolean {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const raw = value as Record<string, unknown>;
+  if (Object.keys(raw).length !== 2 || !("skillLevels" in raw) ||
+      !("attributeLevels" in raw)) return false;
+  return isValidUpgradeState({ ...raw, basicSkills: createBasicSkillsByCharacter() });
+}
+
 export function permanentAttributeBonus(
   stateInput: UpgradeState,
 ): StatBonus {
