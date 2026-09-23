@@ -3874,6 +3874,9 @@ export class Game {
       entries: this.vocabulary,
       wordScoreOffset: difficulty.wordScoreOffset,
       rankBonus: difficulty.enemyRankBonus ?? 0,
+      clarity: {
+        activeWords: this.activeEnemyWords(),
+      },
     });
     const runtimeProfile = resolveEnemyRuntimeProfile({
       stage: rosterStage,
@@ -3952,6 +3955,16 @@ export class Game {
     return true;
   }
 
+  private activeEnemyWords(excludeEnemyId?: number): string[] {
+    return this.enemies
+      .filter(
+        (enemy) =>
+          excludeEnemyId === undefined ||
+          enemy.id !== excludeEnemyId,
+      )
+      .map((enemy) => enemy.entry.en);
+  }
+
   private pickVocabularyEntry(kind: EnemyKind): VocabularyEntry {
     const candidates = this.vocabulary.filter((entry) => {
       const length = typingText(entry.en).length;
@@ -3979,6 +3992,9 @@ export class Game {
         Math.random(),
         enemy.entry.id,
         this.difficulty?.wordScoreOffset ?? 0,
+        {
+          activeWords: this.activeEnemyWords(enemy.id),
+        },
       ) ?? this.pickVocabularyEntry(enemy.kind);
 
     enemy.wordDifficultyScore = wordDifficultyScore(
@@ -4309,6 +4325,9 @@ export class Game {
       vocabularyLevel: this.vocabularyLevel,
       entries: this.vocabulary,
       wordScoreOffset: this.difficulty.wordScoreOffset,
+      clarity: {
+        activeWords: this.activeEnemyWords(),
+      },
     });
     const runtimeProfile = resolveEnemyRuntimeProfile({
       stage: rosterStage,
@@ -5377,6 +5396,9 @@ export class Game {
         vocabularyLevel: this.vocabularyLevel,
         entries: this.vocabulary,
         wordScoreOffset: this.difficulty.wordScoreOffset,
+        clarity: {
+          activeWords: this.activeEnemyWords(),
+        },
       });
       const runtimeProfile = resolveEnemyRuntimeProfile({
         stage: rosterStage,
