@@ -6373,6 +6373,9 @@ export class Game {
     if (this.treasureDrone !== null) {
       this.drawTreasureDrone(this.treasureDrone);
     }
+    if (this.recallBonus !== null) {
+      this.drawRecallBonus(this.recallBonus);
+    }
     if (this.rewardChoiceCrate !== null) {
       this.drawRewardChoiceCrate(this.rewardChoiceCrate);
     }
@@ -6984,6 +6987,100 @@ export class Game {
     context.shadowBlur = 10;
     context.shadowColor = "#ffd84d";
     context.fillText(split.remaining, left + typedWidth, wordY);
+    context.restore();
+  }
+
+  private drawRecallBonus(target: RecallBonusTarget): void {
+    const context = this.context;
+    const bob = Math.sin(target.age * 3.8) * 7;
+    const x = target.x;
+    const y = target.y + bob;
+    const pulse = 0.92 + Math.sin(target.age * 5.2) * 0.08;
+    const mask = recallBonusMask(
+      target.entry.en,
+      target.typed,
+      target.hintIndices,
+    );
+
+    context.save();
+    context.translate(x, y);
+    context.rotate(target.age * 0.38);
+    context.globalCompositeOperation = "lighter";
+    context.shadowBlur = 26;
+    context.shadowColor = "#bd8cff";
+
+    const gradient = context.createRadialGradient(
+      -7,
+      -9,
+      3,
+      0,
+      0,
+      30,
+    );
+    gradient.addColorStop(0, "rgba(255, 255, 230, 0.98)");
+    gradient.addColorStop(0.35, "rgba(105, 235, 255, 0.9)");
+    gradient.addColorStop(0.7, "rgba(183, 122, 255, 0.82)");
+    gradient.addColorStop(1, "rgba(255, 111, 211, 0.3)");
+    context.fillStyle = gradient;
+    context.strokeStyle = "rgba(255, 239, 180, 0.96)";
+    context.lineWidth = 2;
+
+    context.beginPath();
+    for (let index = 0; index < 8; index += 1) {
+      const angle = (Math.PI * 2 * index) / 8 - Math.PI / 2;
+      const radius = index % 2 === 0 ? 28 * pulse : 21 * pulse;
+      const px = Math.cos(angle) * radius;
+      const py = Math.sin(angle) * radius;
+      if (index === 0) context.moveTo(px, py);
+      else context.lineTo(px, py);
+    }
+    context.closePath();
+    context.fill();
+    context.stroke();
+
+    context.strokeStyle = "rgba(125, 235, 255, 0.68)";
+    context.lineWidth = 1.2;
+    context.setLineDash([4, 6]);
+    context.lineDashOffset = -target.age * 18;
+    context.beginPath();
+    context.ellipse(0, 0, 42, 16, 0.35, 0, Math.PI * 2);
+    context.stroke();
+    context.restore();
+
+    context.save();
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+
+    context.fillStyle = "rgba(5, 9, 17, 0.9)";
+    const maskWidth = Math.min(
+      300,
+      Math.max(118, context.measureText(mask).width + 28),
+    );
+    context.fillRect(x - maskWidth / 2, y - 56, maskWidth, 27);
+    context.fillStyle = "#f5f3ff";
+    context.shadowBlur = 7;
+    context.shadowColor = "#ae80ff";
+    context.font =
+      "800 15px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.fillText(mask, x, y - 42);
+
+    context.shadowBlur = 0;
+    context.fillStyle = "rgba(255, 230, 151, 0.94)";
+    context.font =
+      "850 8px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.fillText("RECALL BONUS", x, y - 69);
+
+    const meaning = target.entry.vi.trim();
+    const meaningWidth = Math.min(
+      260,
+      Math.max(90, meaning.length * 7 + 20),
+    );
+    context.fillStyle = "rgba(5, 9, 17, 0.86)";
+    context.fillRect(x - meaningWidth / 2, y + 35, meaningWidth, 25);
+    context.fillStyle = "#d9f8ff";
+    context.font =
+      "700 12px ui-sans-serif, system-ui, -apple-system, sans-serif";
+    context.fillText(meaning, x, y + 48);
     context.restore();
   }
 
