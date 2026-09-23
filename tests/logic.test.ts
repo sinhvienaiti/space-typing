@@ -73,6 +73,18 @@ describe("typing combat logic", () => {
     expect(chooseTarget(enemies, "s", 400, 700)?.id).toBe(2);
   });
 
+  it("uses stable tie-breaks for same-initial targets", () => {
+    const enemies = [
+      enemy(9, "morning", 300, 500),
+      enemy(3, "month", 500, 500),
+      enemy(1, "me", 400, 400),
+    ];
+
+    // The first two are the same geometric distance. Their vertical position
+    // is also tied, so the older/lower id wins deterministically.
+    expect(chooseTarget(enemies, "m", 400, 600)?.id).toBe(3);
+  });
+
   it("calculates WPM from active gameplay time", () => {
     expect(stageWordsPerMinute(300, 60)).toBe(60);
     expect(stageWordsPerMinute(150, 30)).toBe(60);
