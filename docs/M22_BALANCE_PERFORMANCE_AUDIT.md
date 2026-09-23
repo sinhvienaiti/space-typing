@@ -245,7 +245,7 @@ Before the real-browser/audio/human-paced gate, the approved P00-P08 polish slic
 
 P00-P08.1 and H01-H06 are merged. T01-T06 is complete on PR #70 with CI #455 PASS: 121/121 test files, 613/613 tests, TypeScript, production build and bundle budget PASS. Final main CI must still remain green after merge. None of this converts the perceptual gate into an automated one.
 
-The final pre-manual C01-C12 combat-identity/typing-clarity slice is implemented on PR #71 pending final documentation CI:
+The final pre-manual C01-C12 combat-identity/typing-clarity slice is implemented on PR #71 with CI #488 PASS: 124/124 test files, 629/629 tests, TypeScript, production build and bundle budget. Merged-main CI and the human M22 manual matrix are still required:
 
 - prefix conflict scoring softly suppresses exact/same-prefix active words inside the existing near-Rank vocabulary band;
 - normal spawns, Carrier children, Splitter fragments and replacement layers reuse that clarity context without changing scheduler/admission pressure;
