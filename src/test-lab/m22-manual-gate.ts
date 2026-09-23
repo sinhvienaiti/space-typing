@@ -700,13 +700,6 @@ export function mountM22ManualGate(
     state = createM22ManualGateState();
     browserInput.value = "";
     storeState(state);
-    for (const row of M22_MANUAL_GATE_ROWS) {
-      const controls = root.querySelectorAll<HTMLSelectElement>("select");
-      const inputs = root.querySelectorAll<HTMLInputElement>('input[type="text"]');
-      void row;
-      void controls;
-      void inputs;
-    }
     root.querySelectorAll<HTMLSelectElement>("select").forEach((select) => {
       select.value = "pending";
     });
