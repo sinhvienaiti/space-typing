@@ -890,6 +890,52 @@ export class Game {
     return spawned;
   }
 
+  testLabSpawnSamePrefixScenario(): number[] {
+    if (
+      !this.testLabEnabled ||
+      (this.phase !== "playing" && this.phase !== "paused")
+    ) {
+      return [];
+    }
+
+    this.testLabClearEnemies();
+    const words = ["morning", "month", "me"] as const;
+    const positions = [
+      { x: this.width * 0.28, y: this.height * 0.32 },
+      { x: this.width * 0.5, y: this.height * 0.7 },
+      { x: this.width * 0.72, y: this.height * 0.42 },
+    ];
+    const ids: number[] = [];
+
+    for (let index = 0; index < words.length; index += 1) {
+      const before = this.nextEnemyId;
+      if (!this.spawnEnemy({ kind: "scout", skipAdmission: true })) {
+        continue;
+      }
+      const enemy = this.enemies.find((item) => item.id === before);
+      if (enemy === undefined) continue;
+      const word = words[index]!;
+      const position = positions[index]!;
+      enemy.entry = {
+        id: "testlab-prefix-" + word,
+        en: word,
+        vi: "",
+        ipa: "",
+      };
+      enemy.typed = 0;
+      enemy.wordMissed = false;
+      enemy.x = position.x;
+      enemy.baseX = position.x;
+      enemy.y = position.y;
+      enemy.speed = 0;
+      enemy.actionCooldown = null;
+      ids.push(enemy.id);
+    }
+
+    this.targetId = null;
+    return ids;
+  }
+
   testLabClearEnemies(): boolean {
     if (!this.testLabEnabled) return false;
     this.enemies = [];
@@ -7792,6 +7838,28 @@ export class Game {
     }
 
     context.restore();
+
+    if (targeted) {
+      const bracket = enemy.radius * 1.42;
+      const arm = Math.max(5, enemy.radius * 0.34);
+      context.save();
+      context.strokeStyle = "rgba(126, 244, 255, 0.78)";
+      context.lineWidth = 1.4;
+      context.shadowBlur = 8;
+      context.shadowColor = "#70eaff";
+      for (const sx of [-1, 1]) {
+        for (const sy of [-1, 1]) {
+          const x = enemy.x + sx * bracket;
+          const y = enemy.y - kick + sy * bracket;
+          context.beginPath();
+          context.moveTo(x, y - sy * arm);
+          context.lineTo(x, y);
+          context.lineTo(x - sx * arm, y);
+          context.stroke();
+        }
+      }
+      context.restore();
+    }
 
     this.drawEnemyWord(enemy, targeted);
   }
