@@ -78,7 +78,7 @@ export function createStageConfig(stage: number): StageConfig {
       ? 34 + (safeStage - 1)
       : safeStage <= 50
         ? 54 + Math.floor((safeStage - 11) / 2)
-        : Math.min(140, 90 + Math.floor((safeStage - 51) / 17))) +
+        : Math.min(145, 100 + Math.floor((safeStage - 51) / 17))) +
     (stageInWorld === 10 || stageInWorld === 20 ? 4 : 0) +
     roleBudget;
 
