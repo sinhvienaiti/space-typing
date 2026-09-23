@@ -3295,9 +3295,9 @@ Automated work completed:
 
 Remaining M22 gate:
 
-The approved user-facing polish slice in `docs/PRE_M22_UI_RECALL_CHARACTER_POLISH_PLAN.md` is now at P08 integration audit. P00-P07 are merged and CI-green through #425: title/navigation cleanup, compact combat HUD cleanup, enemy-local learning feedback, non-hostile Recall Bonus target, and player-character visual/selection polish. P08 must finish green before the perceptual gate begins.
+The approved user-facing polish slice in `docs/PRE_M22_UI_RECALL_CHARACTER_POLISH_PLAN.md` is COMPLETE. P00-P08 are merged or integration-ready with CI #426 PASS: 119/119 test files, 597/597 tests, TypeScript check, production build and bundle budget.
 
-After P08:
+Now:
 
 - execute and record the real-browser/audio/visual matrix on the polished build;
 - fix any manual findings;
