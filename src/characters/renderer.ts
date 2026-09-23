@@ -21,6 +21,7 @@ export type CharacterDrawOptions = {
 };
 
 let characterShipSheet: HTMLImageElement | null = null;
+let characterShipSource: "v3" | "v2" | "procedural" = "procedural";
 
 const CHARACTER_SHIP_SPRITE_INDEX: Record<CharacterId, number> = {
   vanguard: 0,
@@ -38,8 +39,16 @@ const CHARACTER_SHIP_SPRITE_INDEX: Record<CharacterId, number> = {
 
 export function setCharacterShipSheet(
   image: HTMLImageElement | null,
+  source: "v3" | "v2" | "procedural" = image === null
+    ? "procedural"
+    : "v2",
 ): void {
   characterShipSheet = image;
+  characterShipSource = image === null ? "procedural" : source;
+}
+
+export function characterShipArtSource(): "v3" | "v2" | "procedural" {
+  return characterShipSource;
 }
 
 export function hasCharacterShipImage(_id: CharacterId): boolean {
@@ -160,9 +169,10 @@ function drawIllustratedShip(
   const sourceY = Math.floor(index / columns) * cellHeight;
   context.save();
   context.globalCompositeOperation = "lighter";
-  context.globalAlpha *= 0.12;
+  context.globalAlpha *= characterShipSource === "v3" ? 0.05 : 0.12;
   context.fillStyle = profile.glow;
-  context.shadowBlur = 24 * glowScale;
+  // Premium sprites already contain painted light. Avoid double bloom.
+  context.shadowBlur = (characterShipSource === "v3" ? 4 : 24) * glowScale;
   context.shadowColor = profile.glow;
   context.beginPath();
   context.ellipse(0, 2, 31, 27, 0, 0, Math.PI * 2);
@@ -170,7 +180,7 @@ function drawIllustratedShip(
   context.restore();
 
   context.save();
-  context.shadowBlur = 9 * glowScale;
+  context.shadowBlur = (characterShipSource === "v3" ? 0 : 9 * glowScale);
   context.shadowColor = profile.glow;
   context.drawImage(
     image,
@@ -344,9 +354,13 @@ export function drawCharacterShip(
   if (illustrated !== null) {
     // Preserve the animated thrusters from the procedural renderer. The
     // illustrated sheet is the hull layer, not a replacement for motion FX.
-    for (const [index, x] of engineOffsets(profile.engineCount).entries()) {
-      drawEngine(context, profile, x, options.time, index);
+    if (characterShipSource !== "v3") {
+      for (const [index, x] of engineOffsets(profile.engineCount).entries()) {
+        drawEngine(context, profile, x, options.time, index);
+      }
     }
+    // V3 sprites contain painted thrusters and core lighting; using the
+    // old procedural flames as well would double the glow and hurt clarity.
     drawIllustratedShip(
       context,
       illustrated,

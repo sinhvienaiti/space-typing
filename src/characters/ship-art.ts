@@ -9,6 +9,12 @@ export const PREMIUM_SHIP_ATLAS_WIDTH = 1024;
 export const PREMIUM_SHIP_ATLAS_HEIGHT = 768;
 export const PREMIUM_SHIP_ATLAS_MAX_FILE_BYTES = Math.floor(1.2 * 1024 * 1024);
 
+export type ShipArtPreference = "auto" | "v2";
+
+export function parseShipArtPreference(raw: string | null): ShipArtPreference {
+  return raw === "v2" ? "v2" : "auto";
+}
+
 export type ShipSheetSelection = {
   image: HTMLImageElement | null;
   source: "v3" | "v2" | "procedural";
@@ -33,10 +39,12 @@ export function validPremiumShipDimensions(
  */
 export function selectCharacterShipSheet(
   catalog: ArtAssetCatalog | null,
+  preference: ShipArtPreference = "auto",
 ): ShipSheetSelection {
   const premium =
     catalog?.assets.get(PREMIUM_SHIP_SHEET_ASSET_ID)?.image ?? null;
   if (
+    preference === "auto" &&
     premium !== null &&
     validPremiumShipDimensions(
       premium.naturalWidth,
