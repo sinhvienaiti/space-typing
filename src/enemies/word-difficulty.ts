@@ -1,5 +1,9 @@
 import type { VocabularyEntry } from "../types";
 import { clamp, normalizeWord, typingText } from "../logic";
+import {
+  prefixConflictScore,
+  type PrefixClarityContext,
+} from "../typing/prefix-clarity";
 import type { EnemyRank } from "./rank";
 import { enemyRankNumber } from "./rank";
 
@@ -130,6 +134,7 @@ export function pickVocabularyEntryForRank(
   random = Math.random(),
   excludeId?: string,
   scoreOffset = 0,
+  clarity?: PrefixClarityContext,
 ): VocabularyEntry | undefined {
   if (entries.length === 0) return undefined;
 
@@ -160,13 +165,58 @@ export function pickVocabularyEntryForRank(
 
   // Pick from a small nearest band so repeated layers retain variety while
   // never switching to a different vocabulary source.
-  const bandSize = Math.min(
+  const baseBandSize = Math.min(
     ordered.length,
     Math.max(1, Math.min(8, Math.ceil(ordered.length * 0.2))),
   );
-  const index = Math.min(
-    bandSize - 1,
-    Math.floor(clamp(random, 0, 0.999999) * bandSize),
+
+  if (
+    clarity === undefined ||
+    clarity.activeWords.length === 0
+  ) {
+    const index = Math.min(
+      baseBandSize - 1,
+      Math.floor(clamp(random, 0, 0.999999) * baseBandSize),
+    );
+    return ordered[index]?.entry;
+  }
+
+  // Keep the authored difficulty target first: clarity only chooses inside a
+  // larger near-rank band, never from the whole vocabulary.
+  const clarityBandSize = Math.min(
+    ordered.length,
+    Math.max(
+      baseBandSize,
+      Math.min(24, Math.ceil(ordered.length * 0.35)),
+    ),
   );
-  return ordered[index]?.entry;
+  const clarityBand = ordered
+    .slice(0, clarityBandSize)
+    .map((candidate) => ({
+      ...candidate,
+      conflict: prefixConflictScore(
+        candidate.entry.en,
+        clarity.activeWords,
+      ),
+    }))
+    .sort(
+      (a, b) =>
+        a.conflict - b.conflict ||
+        a.distance - b.distance ||
+        a.entry.id.localeCompare(b.entry.id),
+    );
+
+  const bestConflict = clarityBand[0]?.conflict ?? 0;
+  const lowConflictBand = clarityBand.filter(
+    (candidate) => candidate.conflict <= bestConflict + 4,
+  );
+  const sampleBand = lowConflictBand.slice(
+    0,
+    Math.max(1, Math.min(baseBandSize, lowConflictBand.length)),
+  );
+  const index = Math.min(
+    sampleBand.length - 1,
+    Math.floor(clamp(random, 0, 0.999999) * sampleBand.length),
+  );
+  return sampleBand[index]?.entry ?? clarityBand[0]?.entry;
 }
