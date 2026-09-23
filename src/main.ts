@@ -731,12 +731,6 @@ app.innerHTML = `
       </div>
     </section>
 
-    <div id="learningToast" class="learning-toast" aria-live="polite">
-      <strong id="learningWord"></strong>
-      <span id="learningIpa"></span>
-      <small id="learningVi"></small>
-    </div>
-
     <div id="notice" class="notice" aria-live="polite"></div>
     <div
       id="worldTransition"
@@ -1335,7 +1329,6 @@ const typingChallengeCache = new Map<
   Promise<TypingTextChallenge>
 >();
 let stageStartPending = false;
-let learningTimer: number | null = null;
 let noticeTimer: number | null = null;
 let worldTransitionTimer: number | null = null;
 let lastPresentedWorldId: string | null = null;
@@ -1911,20 +1904,6 @@ function useInventoryItem(id: RecoveryItemId): void {
   inventory = removed.inventory;
   renderInventory();
   void autosaveCampaign("inventory", "✓ Item used · progress saved");
-}
-
-function showLearning(entry: VocabularyEntry): void {
-  if (learningTimer !== null) window.clearTimeout(learningTimer);
-  byId("learningWord").textContent = entry.en;
-  byId("learningIpa").textContent = entry.ipa;
-  byId("learningVi").textContent = entry.vi;
-
-  const toast = byId("learningToast");
-  toast.classList.add("visible");
-  learningTimer = window.setTimeout(() => {
-    toast.classList.remove("visible");
-    learningTimer = null;
-  }, 2200);
 }
 
 function showNotice(message: string): void {
@@ -3114,7 +3093,6 @@ const game = new Game(
       updateCampaignUi();
     },
     onWordComplete: (entry) => {
-      showLearning(entry);
       speakEnglish(entry.en, settings);
     },
     onEquipmentDrop: (drop) => {
