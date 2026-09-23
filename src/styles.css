@@ -3429,3 +3429,71 @@ kbd {
   .journey-node-special { width: 53px; height: 53px; }
   .stage-preview button { width: 100%; }
 }
+
+
+/* Compact contextual help; the original action buttons keep their IDs and handlers. */
+.menu-help-wrap {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  gap: 0.3rem;
+}
+.menu-help-wrap > button:not(.menu-help-trigger) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.menu-help-trigger,
+.title-group-actions .menu-help-trigger,
+.title-more-actions .menu-help-trigger {
+  flex: 0 0 29px;
+  width: 29px;
+  min-width: 29px;
+  min-height: 29px;
+  padding: 0;
+  text-align: center;
+  border: 1px solid rgba(113, 226, 238, 0.25);
+  border-radius: 10px;
+  background: rgba(30, 76, 93, 0.24);
+  color: #a4eafa;
+  font-size: 0.93rem;
+  line-height: 1;
+  cursor: help;
+}
+.menu-help-trigger:is(:hover, :focus-visible),
+.menu-help-wrap[data-open="true"] > .menu-help-trigger {
+  border-color: #8bebfd;
+  background: #143e53;
+  color: white;
+}
+.menu-help-popup {
+  position: absolute;
+  z-index: 110;
+  right: 0;
+  top: calc(100% + 8px);
+  width: min(270px, 73vw);
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #619dac;
+  border-radius: 10px;
+  background: #101e2d;
+  box-shadow: 0 12px 35px rgba(0,0,0,.8);
+  color: #e7faff;
+  font-size: .76rem;
+  line-height: 1.45;
+  text-align: left;
+  font-weight: 450;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+.menu-help-wrap:is(:hover, :focus-within) > .menu-help-popup,
+.menu-help-wrap[data-open="true"] > .menu-help-popup {
+  visibility: visible;
+  opacity: 1;
+}
+.title-nav-group,
+.title-navigation-grid,
+.title-play-actions,
+.title-more[open] {
+  overflow: visible;
+}
