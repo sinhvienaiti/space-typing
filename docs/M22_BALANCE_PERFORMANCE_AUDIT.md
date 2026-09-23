@@ -245,6 +245,16 @@ Before the real-browser/audio/human-paced gate, the approved P00-P08 polish slic
 
 P00-P08.1 and H01-H06 are merged. T01-T06 is complete on PR #70 with CI #455 PASS: 121/121 test files, 613/613 tests, TypeScript, production build and bundle budget PASS. Final main CI must still remain green after merge. None of this converts the perceptual gate into an automated one.
 
+The final pre-manual C01-C12 combat-identity/typing-clarity slice is implemented on PR #71 pending final documentation CI:
+
+- prefix conflict scoring softly suppresses exact/same-prefix active words inside the existing near-Rank vocabulary band;
+- normal spawns, Carrier children, Splitter fragments and replacement layers reuse that clarity context without changing scheduler/admission pressure;
+- same-initial acquisition remains nearest-to-player first with deterministic lower-screen / enemy-id / word-length tie-breaks, and Test Lab has a fixed `morning / month / me` reproduction;
+- Ship Visual V2 is one optional transparent 4x3 illustrated sheet loaded by the existing art pipeline, with procedural fallback;
+- equipment aura is derived from existing loadout/Grade/enhancement/affixes and is not persisted separately;
+- all 11 player characters reuse the existing Laser mechanic with distinct bounded tracer/muzzle/impact profiles, so damage and typing cadence are unchanged;
+- Low/Medium quality reduce aura detail while existing glow/particle caps continue to bound visual cost.
+
 ## Manual gate
 
 Automated tests cannot certify:
