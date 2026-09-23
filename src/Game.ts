@@ -1,4 +1,7 @@
-import { PriorityKillChain } from "./audio/announcer";
+import {
+  PriorityKillChain,
+  type AnnouncerEvent,
+} from "./audio/announcer";
 import { Sfx } from "./audio/Sfx";
 import {
   bossActionInterval,
@@ -687,6 +690,24 @@ export class Game {
       this.testLabTimeScale = 1;
       this.testLabSchedulerFrozen = false;
     }
+  }
+
+  testLabSetSfxVolume(volume: number): boolean {
+    if (!this.testLabEnabled) return false;
+    this.sfx.setVolume(clamp(volume, 0, 1));
+    return true;
+  }
+
+  testLabTriggerAnnouncer(event: AnnouncerEvent): boolean {
+    if (!this.testLabEnabled) return false;
+    this.sfx.announcer(event);
+    return true;
+  }
+
+  testLabTriggerWarning(): boolean {
+    if (!this.testLabEnabled) return false;
+    this.sfx.projectileWarning();
+    return true;
   }
 
   testLabSetDeathMode(mode: TestLabDeathMode): boolean {
