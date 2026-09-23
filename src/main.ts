@@ -189,6 +189,9 @@ import {
   buyShopStockEntry,
   canAffordShopPrice,
   createShopState,
+  dismissRestHub,
+  markRestHubPending,
+  pendingRestHubStage,
   formatShopPrice,
   resolveShopInstance,
   shopAvailable,
@@ -809,6 +812,28 @@ app.innerHTML = `
         </div>
         <div id="hiddenEncounterGrid" class="route-hidden-grid"></div>
       </section>
+    </dialog>
+
+    <dialog id="restHubDialog" class="settings-dialog rest-hub-dialog">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">safe checkpoint // maintenance</p>
+          <h2>Checkpoint Rest Hub</h2>
+        </div>
+        <button id="restHubTitleButton" type="button" class="icon-button" aria-label="Return to title">×</button>
+      </div>
+      <p id="restHubMeta" class="equipment-note">Sector cleared · safe rest stop</p>
+      <div class="rest-hub-services">
+        <button type="button" id="restHubShop">◈ Normal Shop<span>Use existing finite-stock shop</span></button>
+        <button type="button" id="restHubStation">✦ Station Shop<span>Available checkpoint supplies</span></button>
+        <button type="button" id="restHubRepair">✧ Repair / Upgrade<span>Repair gear and spend resources</span></button>
+        <button type="button" id="restHubSupport">✺ Support Loadout<span>Prepare your next encounter</span></button>
+      </div>
+      <div class="rest-hub-footer">
+        <button type="button" id="restHubContinue" class="primary">Continue journey</button>
+        <button type="button" id="restHubLeave">Return to title</button>
+      </div>
+      <p class="equipment-note">Shopping is optional. Purchases use existing stock and currencies. Continue commits your checkpoint visit once.</p>
     </dialog>
 
     <dialog id="characterDialog" class="settings-dialog character-dialog">
@@ -1458,6 +1483,7 @@ const settingsDialog = byId<HTMLDialogElement>("settingsDialog");
 const vocabularyDialog = byId<HTMLDialogElement>("vocabularyDialog");
 const stageSelectDialog = byId<HTMLDialogElement>("stageSelectDialog");
 const routeDialog = byId<HTMLDialogElement>("routeDialog");
+const restHubDialog = byId<HTMLDialogElement>("restHubDialog");
 const dataDialog = byId<HTMLDialogElement>("dataDialog");
 const equipmentDialog = byId<HTMLDialogElement>("equipmentDialog");
 const shopDialog = byId<HTMLDialogElement>("shopDialog");
@@ -3324,6 +3350,9 @@ const game = new Game(
         : null;
       let sectorRewardText = "";
       if (checkpointCommitted) {
+        if (completedTier === 0) {
+          shops = markRestHubPending(shops, stats.stage);
+        }
         const sectorReward = sectorCheckpointReward(stats.stage);
         const ascensionRewardMultiplier =
           activeStageDifficulty?.ascensionRewardMultiplier ?? 1;
@@ -3394,7 +3423,11 @@ const game = new Game(
           ascensionText +
           checkpointText,
         "stage-clear",
-      );
+      ).then((saved) => {
+        if (saved && pendingRestHubStage(shops) === stats.stage) {
+          openRestHub();
+        }
+      });
 
       byId("clearTitle").textContent =
         "Stage " + String(stats.stage).padStart(3, "0") + " complete";
@@ -5511,6 +5544,59 @@ function openRouteMap(): void {
   if (!routeDialog.open) routeDialog.showModal();
 }
 
+function openRestHub(): void {
+  const stage = pendingRestHubStage(shops);
+  if (
+    stage === null ||
+    !persistenceReady ||
+    ascension.selectedTier > 0 ||
+    (game.getPhase() !== "title" && game.getPhase() !== "stageclear")
+  ) return;
+  byId("restHubMeta").textContent =
+    "Stage " + String(stage).padStart(3, "0") +
+    " cleared · checkpoint saved · choose either or both services";
+  if (!restHubDialog.open) restHubDialog.showModal();
+}
+
+let restHubContinuePending = false;
+async function continueRestHub(): Promise<void> {
+  if (restHubContinuePending || pendingRestHubStage(shops) === null) return;
+  restHubContinuePending = true;
+  const button = byId<HTMLButtonElement>("restHubContinue");
+  button.disabled = true;
+  const previousShop = shops;
+  const previousSnapshot = checkpointSnapshot;
+  const previousExpansion = campaignExpansion;
+  const previousRecovery = crashRecoverySnapshot;
+  try {
+    shops = dismissRestHub(shops);
+    // Commit post-checkpoint purchases alongside the next sector's starting
+    // loadout. Without this, a later death could reroll consumed shop stock.
+    checkpointSnapshot = createCheckpointSnapshot(
+      currentRunPersistentState(),
+      campaignExpansion.checkpoint.stage,
+    );
+    const saved = await autosaveCampaign(
+      "shop",
+      "✓ Checkpoint rest complete · loadout saved",
+      "shop",
+    );
+    if (!saved) {
+      shops = previousShop;
+      checkpointSnapshot = previousSnapshot;
+      campaignExpansion = previousExpansion;
+      crashRecoverySnapshot = previousRecovery;
+      return;
+    }
+    if (restHubDialog.open) restHubDialog.close();
+    game.backToTitle();
+    await startSelectedStage();
+  } finally {
+    restHubContinuePending = false;
+    button.disabled = false;
+  }
+}
+
 function closeRouteAndOpen(action: () => void): void {
   if (routeDialog.open) routeDialog.close();
   action();
@@ -5611,6 +5697,11 @@ async function startSelectedStage(): Promise<void> {
     stageStartPending ||
     routeChoicePending
   ) return;
+  // Do not let rapid Next clicks skip an unvisited checkpoint rest stop.
+  if (pendingRestHubStage(shops) !== null && ascension.selectedTier === 0) {
+    openRestHub();
+    return;
+  }
 
   const activeHidden = currentHiddenEncounterState().active;
   if (activeHidden !== null) {
@@ -5866,6 +5957,9 @@ async function initializePlayerProgress(): Promise<void> {
     renderServiceShop();
     updateShopAccess();
     for (const button of dataButtons) button.disabled = false;
+    if (pendingRestHubStage(shops) !== null && ascension.selectedTier === 0) {
+      openRestHub();
+    }
 
     if (characters.unlocked.length !== loadedCharacters.unlocked.length) {
       void autosaveCampaign(
@@ -6704,6 +6798,26 @@ for (const id of [
   });
 }
 byId("routeButton").addEventListener("click", openRouteMap);
+restHubDialog.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  if (restHubDialog.open) restHubDialog.close(); // Pending visit stays saved.
+  game.backToTitle();
+});
+byId("restHubTitleButton").addEventListener("click", () => {
+  restHubDialog.close();
+  game.backToTitle();
+});
+byId("restHubLeave").addEventListener("click", () => {
+  restHubDialog.close();
+  game.backToTitle();
+});
+byId("restHubShop").addEventListener("click", openNormalShop);
+byId("restHubStation").addEventListener("click", () => openSpecialShop("station"));
+byId("restHubRepair").addEventListener("click", openServiceShop);
+byId("restHubSupport").addEventListener("click", openSupportSpells);
+byId("restHubContinue").addEventListener("click", () => {
+  void continueRestHub();
+});
 byId("routeContinueButton").addEventListener("click", () => {
   if (routeChoicePending || routeNeedsChoice(route, routeTargetStage())) return;
   if (routeDialog.open) routeDialog.close();

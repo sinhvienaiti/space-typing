@@ -1,6 +1,6 @@
-# M14 — Branching Route Map + Station
+# M14 — Legacy Branching Routes and Checkpoint Rest Hub
 
-M14 adds a deterministic, persisted route layer between Campaign encounters without replacing the sequential Stage 001-1000 progression model.
+M14 originally added a persisted route layer to the 1000-stage Campaign. The approved Campaign redesign now creates **combat-only new ten-stage sectors** and a **guaranteed rest hub after Stage 010, 020, ...**. Existing in-progress route graphs with visited/selected lanes retain the M14 legacy interface until the next checkpoint. The original historical M14 implementation details below describe that compatibility path, not new-sector behavior.
 
 ## Route model
 
@@ -27,8 +27,8 @@ Therefore route selection cannot bypass authored boss cadence.
 The graph:
 
 - covers every stage in the current ten-stage sector;
-- has 2-3 lanes on ordinary branching steps;
-- has at least one Combat lane on ordinary steps;
+- new graphs have exactly one Combat node per numbered stage;
+- old saved branching graphs retain their authored 2-3 Combat/Shop/Station nodes until the next checkpoint;
 - connects every non-terminal node to the next stage step;
 - is recreated from the same seed on reload;
 - creates a new graph only when the Campaign frontier crosses into a new checkpoint sector.
@@ -45,13 +45,11 @@ Interim Route Map UX (before the approved Campaign Map redesign): the player may
 
 The underlying `selectRouteNode` helper defaults to immutable first-selection behavior for legacy callers and snapshots. Only the between-encounter UI explicitly opts into reselection. Mandatory single-node stages auto-resolve and do not require an unnecessary click.
 
-This is a transitional usability fix, not completion of `docs/CAMPAIGN_MAP_AND_REST_STOP_REDESIGN.md`. The approved redesign removes routine per-stage Shop/Station lanes entirely and places them at checkpoint rest hubs.
+The ability to change selected lanes now applies only to a recorded in-progress **legacy** branching sector. Fresh sectors use combat-only nodes; optional Shop and Station services are available together in the guaranteed checkpoint rest hub. Hidden combat remains accessible through the legacy sector-detail dialog until unified map integration is completed.
 
 ## Shop and Station reuse
 
-Shop nodes open the existing deterministic finite-stock Normal Shop.
-
-Station nodes expose existing production systems:
+The guaranteed hub uses the existing finite-stock Normal Shop and Station Shop, and exposes Repair / Upgrade and Support Loadout together. Legacy Shop nodes still open the Normal Shop; legacy Station nodes still expose:
 
 - Station Shop;
 - Repair / Upgrade;

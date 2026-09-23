@@ -1,8 +1,8 @@
 # Campaign Map, Checkpoint Services and Auto-Discovered Hidden Stops
 
-Status: approved product direction; **design checkpoint only, not implemented**.
+Status: **partially implemented**. The World journey/map and contextual title-menu icons were implemented in PR #85. This PR implements new combat-only sectors, old-route transition, and guaranteed checkpoint rest hubs. **Rare automatic Hidden Shop/Station discovery, full sector detail merging, contextual HUD resource help and real-browser QA remain pending.** Do not mark the complete redesign finished until all acceptance checks pass.
 
-This proposal supersedes the player-facing normal-stage Combat/Shop/Station lane choice in M14 when implemented. M14 and M15 currently describe the *existing* shipped systems; do not mark this redesign complete until code, persistence, tests, CI and manual UX checks pass.
+Existing in-progress sectors with recorded Combat/Shop/Station choices continue in legacy compatibility mode until the next ten-stage checkpoint; untouched legacy graphs migrate to combat-only.
 
 ## 1. Campaign rules
 

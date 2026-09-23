@@ -51,17 +51,6 @@ function routeSeedForSector(sectorStart: number): number {
   ) >>> 0;
 }
 
-function createSeededRandom(seed: number): () => number {
-  let value = seed >>> 0;
-  return () => {
-    value += 0x6d2b79f5;
-    let next = value;
-    next = Math.imul(next ^ (next >>> 15), next | 1);
-    next ^= next + Math.imul(next ^ (next >>> 7), next | 61);
-    return ((next ^ (next >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 function isMandatoryCombatStage(stage: number): boolean {
   const role = stageRole(stage);
   return (
@@ -69,17 +58,6 @@ function isMandatoryCombatStage(stage: number): boolean {
     role === "boss" ||
     role === "major-boss"
   );
-}
-
-function optionalNodeType(
-  random: () => number,
-  lane: number,
-): RouteNodeType {
-  if (lane === 0) return "combat";
-  const roll = random();
-  if (roll < 0.32) return "station";
-  if (roll < 0.62) return "shop";
-  return "combat";
 }
 
 function routeNodeId(
@@ -103,63 +81,20 @@ function routeNodeId(
 function buildStep(
   sectorStart: number,
   stage: number,
-  random: () => number,
 ): RouteStageStep {
-  if (isMandatoryCombatStage(stage)) {
-    return {
-      stage,
-      nodes: [
-        {
-          id: routeNodeId(
-            sectorStart,
-            stage,
-            0,
-            "combat",
-          ),
-          type: "combat",
-          targetStage: stage,
-          lane: 0,
-          mandatory: true,
-          nextIds: [],
-        },
-      ],
-    };
-  }
-
-  const laneCount = random() < 0.36 ? 3 : 2;
-  const nodes: RouteNode[] = [];
-
-  for (let lane = 0; lane < laneCount; lane += 1) {
-    let type = optionalNodeType(random, lane);
-
-    // Do not offer duplicate side-service choices in the same step.
-    if (
-      lane > 1 &&
-      nodes.some((node) => node.type === type) &&
-      type !== "combat"
-    ) {
-      type = type === "shop" ? "station" : "shop";
-      if (nodes.some((node) => node.type === type)) {
-        type = "combat";
-      }
-    }
-
-    nodes.push({
-      id: routeNodeId(
-        sectorStart,
-        stage,
-        lane,
-        type,
-      ),
-      type,
+  // New sectors are sequential combat only. Old persisted v1 graphs with
+  // Shop/Station choices remain valid until their existing sector completes.
+  return {
+    stage,
+    nodes: [{
+      id: routeNodeId(sectorStart, stage, 0, "combat"),
+      type: "combat",
       targetStage: stage,
-      lane,
-      mandatory: false,
+      lane: 0,
+      mandatory: isMandatoryCombatStage(stage),
       nextIds: [],
-    });
-  }
-
-  return { stage, nodes };
+    }],
+  };
 }
 
 export function createRouteGraph(
@@ -167,7 +102,6 @@ export function createRouteGraph(
 ): RouteGraph {
   const sector = sectorForStage(stage);
   const seed = routeSeedForSector(sector.startStage);
-  const random = createSeededRandom(seed);
   const steps: RouteStageStep[] = [];
 
   for (
@@ -179,7 +113,6 @@ export function createRouteGraph(
       buildStep(
         sector.startStage,
         targetStage,
-        random,
       ),
     );
   }
@@ -527,6 +460,20 @@ export function sanitizeRouteState(
     graph.sectorStart !== sector.startStage ||
     graph.sectorEnd !== sector.endStage
   ) {
+    return createRouteState(stage);
+  }
+
+  // Migrate a never-used legacy sector directly to the new combat-only
+  // journey. Preserve every in-progress legacy sector with a recorded visit
+  // until the next checkpoint, without refunding purchases or rerolling stock.
+  const hasLegacyBranches = graph.steps.some((step) => step.nodes.length > 1);
+  const hasRecordedChoice = raw.selectedByStage !== null &&
+    typeof raw.selectedByStage === "object" &&
+    !Array.isArray(raw.selectedByStage) &&
+    Object.keys(raw.selectedByStage).length > 0;
+  const hasVisitedNode = Array.isArray(raw.visitedNodeIds) &&
+    raw.visitedNodeIds.length > 0;
+  if (hasLegacyBranches && !hasRecordedChoice && !hasVisitedNode) {
     return createRouteState(stage);
   }
 
