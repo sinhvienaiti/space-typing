@@ -66,6 +66,27 @@ describe("M12 Active Typing Pressure", () => {
     ).toBe(false);
   });
 
+  it("blocks child and regular spawns at the raw max-enemy safety cap", () => {
+    const difficulty = difficultyFor({
+      stage: 950,
+      mode: "impossible",
+      vocabularyLevel: 80,
+      recentWpm: 280,
+      recentAccuracy: 99,
+    });
+    const snapshot = {
+      ...emptyActivePressureSnapshot(),
+      enemyCount: difficulty.maxEnemies,
+    };
+
+    expect(
+      canAdmitSpawn(snapshot, difficulty, "scout"),
+    ).toBe(false);
+    expect(
+      canAdmitSpawn(snapshot, difficulty, "carrier"),
+    ).toBe(false);
+  });
+
   it("blocks controller/support density before impossible piles form", () => {
     const difficulty = difficultyFor({
       stage: 500,
