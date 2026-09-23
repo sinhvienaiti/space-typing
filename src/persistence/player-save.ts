@@ -101,6 +101,7 @@ import {
 } from "./death-protection";
 import {
   createDefaultHotbarState,
+  createLegacyHotbarState,
   sanitizeHotbarState,
   type HotbarState,
 } from "../hud/hotbar";
@@ -1302,7 +1303,7 @@ export function migratePlayerSave(value: unknown): MigrationResult {
         sanitizeRelicState(raw.relics),
         sanitizeCodexState(raw.codex),
         sanitizeAscensionState(raw.ascension, safeCampaign),
-        createDefaultHotbarState(),
+        createLegacyHotbarState(),
       ),
       migrated: true,
       fromVersion: 25,
