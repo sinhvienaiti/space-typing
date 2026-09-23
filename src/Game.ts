@@ -296,6 +296,7 @@ import {
   createHardCcState,
   tickHardCcState,
   type HardCcId,
+  type HardCcState,
 } from "./combat/cc-guard";
 import {
   isRecoveryItemId,
@@ -448,6 +449,7 @@ export type TestLabGameSnapshot = {
   enemies: Enemy[];
   boss: BossHudState | null;
   statuses: ActiveStatus[];
+  hardCc: HardCcState;
   projectiles: number;
   particles: number;
   activePressure: ActiveTypingPressureSnapshot;
@@ -743,6 +745,13 @@ export class Game {
       })),
       boss: this.boss === null ? null : toBossHud(this.boss),
       statuses: this.statusState.map((status) => ({ ...status })),
+      hardCc: {
+        active:
+          this.hardCcState.active === null
+            ? null
+            : { ...this.hardCcState.active },
+        immunity: { ...this.hardCcState.immunity },
+      },
       projectiles: this.projectiles.length,
       particles: this.particles.length,
       activePressure:
@@ -968,6 +977,25 @@ export class Game {
       clamp(duration, 0.1, 120),
       "test-lab",
     );
+  }
+
+  testLabClearStatus(id: StatusId): boolean {
+    if (!this.testLabEnabled) return false;
+    const next = this.statusState.filter(
+      (status) => status.id !== id,
+    );
+    if (next.length === this.statusState.length) return false;
+    this.setStatusState(next);
+    if (
+      (id === "frozen" && this.hardCcState.active?.id === "freeze") ||
+      (id === "silenced" && this.hardCcState.active?.id === "silence")
+    ) {
+      this.hardCcState = {
+        ...this.hardCcState,
+        active: null,
+      };
+    }
+    return true;
   }
 
   testLabClearStatuses(): boolean {
