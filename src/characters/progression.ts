@@ -77,7 +77,10 @@ export function createStarterCharacterProgress(): CharacterProgress {
 
 export function xpNeededForLevel(level: number): number {
   const safeLevel = Math.max(1, Math.min(MAX_CHARACTER_LEVEL, Math.floor(level)));
-  return 120 + safeLevel * 35;
+  // Keep Lv1-Lv10 thresholds exactly compatible with old saves and early
+  // learning pace. Quadratic late growth spreads Lv50 across the campaign.
+  return 120 + safeLevel * 35 +
+    Math.max(0, safeLevel - 10) ** 2 * 9;
 }
 
 export function xpNeededForMastery(mastery: number): number {
