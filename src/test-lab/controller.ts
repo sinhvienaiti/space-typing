@@ -330,7 +330,7 @@ export function mountTestLab(
     </p>
     <div class="test-lab-shell">
       <section class="test-lab-arena">
-        <canvas data-role="canvas" aria-label="Test Lab battlefield"></canvas>
+        <canvas data-role="canvas" tabindex="0" aria-label="Test Lab battlefield"></canvas>
         <div class="test-lab-arena-actions">
           <button type="button" class="primary" data-action="start">Start / Restart Arena</button>
           <button type="button" data-action="pause">Pause / Resume</button>
@@ -1041,6 +1041,7 @@ export function mountTestLab(
       ),
     });
     activeGame.startStage(stage, difficulty);
+    canvas.focus();
     music?.setWorldProfile(musicProfileForWorld(worldForStage(stage.stage)));
     music?.transitionTo("WORLD_NORMAL", 0.25);
     startInspector();
@@ -1348,6 +1349,24 @@ export function mountTestLab(
     dialog.querySelector<HTMLInputElement>('[data-field="quantum-core"]')!.value =
       String(session.state.expansionCurrencies.quantumCore);
   }
+
+  dialog.addEventListener("keydown", (event) => {
+    const target = event.target as HTMLElement;
+    if (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLSelectElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLButtonElement
+    ) {
+      return;
+    }
+    if (game === null) return;
+    if (event.key === "Escape") return;
+
+    game.handleKey(event.key);
+    event.preventDefault();
+    event.stopPropagation();
+  });
 
   dialog.addEventListener("click", (event) => {
     const target = (event.target as HTMLElement).closest<HTMLButtonElement>(
