@@ -3589,3 +3589,43 @@ kbd {
   border-radius: 12px;
 }
 .custom-combat-controls.disabled { opacity: .55; }
+
+
+/* Sector Briefing is the ten-stage combat outlook; Campaign Map is navigation. */
+.route-map.route-sector-briefing {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: .55rem;
+  max-height: none;
+}
+.route-sector-node {
+  display: grid;
+  place-items: center;
+  gap: .15rem;
+  min-height: 64px;
+  border: 1px solid rgba(138, 172, 202, .24);
+  border-radius: 12px;
+  background: rgba(19, 30, 49, .65);
+  color: #a9baca;
+  font-size: .74rem;
+}
+.route-sector-node strong {
+  color: #dceefa;
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}
+.route-sector-node span { font-size: .63rem; }
+.route-sector-node.cleared { border-color: #53bda7; color: #9de9ca; }
+.route-sector-node.current {
+  border: 2px solid #7debf4;
+  background: rgba(55, 157, 186, .22);
+  box-shadow: 0 0 12px rgba(90, 215, 229, .15);
+}
+.route-sector-node.boss {
+  border-color: #dcb978;
+  color: #f5dba8;
+  background: rgba(111, 82, 41, .2);
+}
+@media (max-width: 540px) {
+  .route-map.route-sector-briefing { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
