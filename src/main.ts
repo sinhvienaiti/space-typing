@@ -1973,7 +1973,6 @@ function renderHotbarLoadout(): void {
         void autosaveCampaign(
           "hotbar",
           "✓ Hotbar saved · slot " + String(index + 1),
-          "loadout",
         );
       });
 
