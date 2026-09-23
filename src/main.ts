@@ -1,5 +1,6 @@
 import "./styles.css";
 import { Game } from "./Game";
+import { hasUsableDeathProtection } from "./ui/game-over";
 import {
   loadArtAssetManifest,
   preloadArtAssets,
@@ -692,17 +693,17 @@ app.innerHTML = `
           <div><span>accuracy</span><strong id="resultAccuracy">100%</strong></div>
           <div><span>max streak</span><strong id="resultStreak">0</strong></div>
         </div>
-        <p id="deathProtectionMeta" class="death-protection-meta">
-          Choose a recovery path. Reloading before a choice enforces checkpoint rollback.
+        <p id="deathProtectionMeta" class="death-protection-meta" role="status" aria-live="polite">
+          Checkpoint recovery is available.
         </p>
-        <div class="death-protection-actions">
+        <div id="deathProtectionActions" class="death-protection-actions">
           <button id="salvageAnchorButton">Salvage Anchor · 0</button>
           <button id="stageRevivalButton">Stage Revival Core · 0</button>
           <button id="phoenixCoreButton">Phoenix Core · 0</button>
         </div>
-        <button id="againButton" class="primary">Return to checkpoint</button>
-        <button id="gameOverStageSelectButton">Return to checkpoint &amp; choose stage</button>
-        <button id="resultTitleButton">Return to checkpoint &amp; main menu</button>
+        <button id="againButton" class="primary">Replay checkpoint stage</button>
+        <button id="gameOverStageSelectButton">Choose unlocked stage</button>
+        <button id="resultTitleButton">Main menu</button>
       </div>
     </section>
 
@@ -2664,13 +2665,34 @@ function checkpointDisplayLabel(): string {
         String(checkpointAscensionStage).padStart(3, "0");
 }
 
-function renderDeathProtectionChoices(failedStage: number): void {
+// A checkpoint is restored automatically when no usable revival choice exists.
+// When a recovery item is available, the three navigation buttons are still
+// direct actions: they restore the checkpoint only if the player skips the item.
+let checkpointRollbackApplied = false;
+let checkpointRollbackSaved = false;
+let checkpointRollbackPromise: Promise<boolean> | null = null;
+let deathNavigationPending = false;
+
+function setDeathNavigationDisabled(pending: boolean): void {
+  byId<HTMLButtonElement>("againButton").disabled = pending;
+  byId<HTMLButtonElement>("gameOverStageSelectButton").disabled =
+    pending || currentAscensionStage(checkpointSnapshot.ascension) !== null;
+  byId<HTMLButtonElement>("resultTitleButton").disabled = pending;
+}
+
+function renderDeathProtectionChoices(failedStage: number): boolean {
   const anchorCount = itemCount(inventory, "salvage-anchor");
   const revivalCount = itemCount(inventory, "stage-revival-core");
   const phoenixCount = itemCount(inventory, "phoenix-core");
   const validStageEntry =
     stageEntrySnapshot !== null &&
     stageEntrySnapshot.stage === failedStage;
+  const hasProtection = hasUsableDeathProtection({
+    salvageAnchors: anchorCount,
+    stageRevivalCores: revivalCount,
+    phoenixCores: phoenixCount,
+    hasValidStageEntry: validStageEntry,
+  });
 
   byId("salvageAnchorButton").textContent =
     "Salvage Anchor · " + String(anchorCount);
@@ -2678,7 +2700,7 @@ function renderDeathProtectionChoices(failedStage: number): void {
     "Stage Revival Core · " + String(revivalCount);
   byId("phoenixCoreButton").textContent =
     "Phoenix Core · " + String(phoenixCount);
-
+  byId("deathProtectionActions").classList.toggle("hidden", !hasProtection);
   byId<HTMLButtonElement>("salvageAnchorButton").disabled =
     anchorCount <= 0;
   byId<HTMLButtonElement>("stageRevivalButton").disabled =
@@ -2687,17 +2709,23 @@ function renderDeathProtectionChoices(failedStage: number): void {
     phoenixCount <= 0 || !validStageEntry;
 
   const checkpointLabel = checkpointDisplayLabel();
-  byId("againButton").textContent =
-    "Restart from checkpoint · " + checkpointLabel;
-  byId<HTMLButtonElement>("gameOverStageSelectButton").disabled =
-    currentAscensionStage(checkpointSnapshot.ascension) !== null;
-  byId("deathProtectionMeta").textContent =
-    "Death at Stage " +
-    String(failedStage).padStart(3, "0") +
-    " · return to checkpoint " +
-    checkpointLabel +
-    " unless you use a protection item. Restart replays the checkpoint; " +
-    "Choose stage opens unlocked stages. Items are consumed only when chosen.";
+  byId("againButton").textContent = "Replay " + checkpointLabel;
+  byId("gameOverStageSelectButton").textContent = "Choose unlocked stage";
+  byId("resultTitleButton").textContent = "Main menu";
+  setDeathNavigationDisabled(false);
+
+  byId("deathProtectionMeta").textContent = hasProtection
+    ? "Defeated at Stage " +
+      String(failedStage).padStart(3, "0") +
+      " · use a revival item, or choose a destination to return to " +
+      checkpointLabel +
+      ". Items are consumed only when selected."
+    : "Defeated at Stage " +
+      String(failedStage).padStart(3, "0") +
+      " · restoring " +
+      checkpointLabel +
+      " automatically…";
+  return hasProtection;
 }
 
 async function persistResolvedDeath(
@@ -2711,39 +2739,80 @@ async function persistResolvedDeath(
   );
 }
 
+/** One in-flight rollback protects the death state from rapid repeated clicks. */
+async function ensureCheckpointRollback(): Promise<boolean> {
+  if (checkpointRollbackSaved) return true;
+  if (checkpointRollbackPromise !== null) return checkpointRollbackPromise;
+
+  const rollback = (async (): Promise<boolean> => {
+    if (!checkpointRollbackApplied) {
+      const restored = restoreCheckpointSnapshot(
+        checkpointSnapshot,
+        currentRunPersistentState(),
+      );
+      applyRunPersistentState(restored);
+      campaignExpansion = rollbackCampaignExpansion(
+        campaignExpansion,
+        new Date().toISOString(),
+      );
+      stageEntrySnapshot = null;
+      checkpointRollbackApplied = true;
+      refreshPersistentStateUi();
+    }
+
+    // Reviving the failed encounter is no longer possible once rollback
+    // starts; never leave stale consumable buttons enabled while saving.
+    byId("deathProtectionActions").classList.add("hidden");
+    setDeathNavigationDisabled(true);
+
+    const saved = await persistResolvedDeath(
+      "✓ Checkpoint restored · " + checkpointDisplayLabel(),
+    );
+    if (saved) {
+      checkpointRollbackSaved = true;
+      byId("deathProtectionMeta").textContent =
+        "Checkpoint " +
+        checkpointDisplayLabel() +
+        " restored. Choose where to go next.";
+    } else {
+      byId("deathProtectionMeta").textContent =
+        "Could not save the restored checkpoint. Choose an action to retry saving.";
+    }
+    setDeathNavigationDisabled(false);
+    return saved;
+  })();
+
+  checkpointRollbackPromise = rollback;
+  try {
+    return await rollback;
+  } finally {
+    if (checkpointRollbackPromise === rollback) {
+      checkpointRollbackPromise = null;
+    }
+  }
+}
+
 async function resolveCheckpointDeath(
   action: "retry" | "stage-select" | "title",
 ): Promise<void> {
-  if (game.getPhase() !== "gameover") return;
+  if (game.getPhase() !== "gameover" || deathNavigationPending) return;
+  deathNavigationPending = true;
+  try {
+    if (!(await ensureCheckpointRollback())) return;
 
-  const restored = restoreCheckpointSnapshot(
-    checkpointSnapshot,
-    currentRunPersistentState(),
-  );
-  applyRunPersistentState(restored);
-  campaignExpansion = rollbackCampaignExpansion(
-    campaignExpansion,
-    new Date().toISOString(),
-  );
-  stageEntrySnapshot = null;
-  refreshPersistentStateUi();
-
-  const saved = await persistResolvedDeath(
-    "✓ Returned to checkpoint · " + checkpointDisplayLabel(),
-  );
-  if (!saved) return;
-
-  // Restoring the checkpoint does not change Game's "gameover" phase.
-  // Start/route selection is only available between encounters; return to
-  // title before navigating so a checkpoint retry cannot silently no-op.
-  game.backToTitle();
-  if (action === "retry") {
-    await startSelectedStage();
-    if (routeDialog.open) {
-      showNotice("Choose a checkpoint route, then press Start Encounter");
+    // The rollback changes persistence, not Game's gameover phase.
+    // Exit gameover before requesting an encounter or opening Stage Select.
+    game.backToTitle();
+    if (action === "retry") {
+      await startSelectedStage();
+      if (routeDialog.open) {
+        showNotice("Choose a route, then press Start Encounter");
+      }
+    } else if (action === "stage-select") {
+      openStageSelect();
     }
-  } else if (action === "stage-select") {
-    openStageSelect();
+  } finally {
+    deathNavigationPending = false;
   }
 }
 
@@ -2891,9 +2960,19 @@ const game = new Game(
           accuracyPercent(stats.hits, stats.misses).toFixed(1) + "%";
         byId("resultStreak").textContent = String(stats.maxStreak);
 
+        checkpointRollbackApplied = false;
+        checkpointRollbackSaved = false;
+        checkpointRollbackPromise = null;
+        deathNavigationPending = false;
+
         const deathAt = new Date().toISOString();
         markCrashRecoveryDeathInvalid(deathAt);
-        renderDeathProtectionChoices(stats.stage);
+        const hasProtection = renderDeathProtectionChoices(stats.stage);
+        if (!hasProtection) {
+          // Let the death event finish before applying the rollback. Keep the
+          // result overlay visible so the player can still review the run.
+          void Promise.resolve().then(() => ensureCheckpointRollback());
+        }
       }
     },
     onStage: (stage) => {
