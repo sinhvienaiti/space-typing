@@ -345,10 +345,15 @@ export function mountTestLab(
             <label>Count<input data-field="enemy-count" type="number" min="1" max="30" value="1"></label>
             <label>Skill<select data-field="enemy-skill"></select></label>
             <label>Enemy ID<select data-field="enemy-id"></select></label>
+            <label>Speed px/s<input data-field="enemy-speed" type="number" min="0" max="2000" value="90"></label>
+            <label>Action cooldown<input data-field="enemy-cooldown" type="number" min="0" max="120" step="0.1" value="1"></label>
+            <label>Threat used<input data-field="enemy-threat" type="number" min="0" max="100" step="0.1" value="0"></label>
+            <label class="test-lab-check"><input data-field="enemy-elite" type="checkbox"> Force Elite</label>
           </div>
           <div class="test-lab-row">
             <button type="button" data-action="spawn-enemy">Spawn Selected</button>
             <button type="button" data-action="spawn-world-roster">Spawn World Roster</button>
+            <button type="button" data-action="patch-enemy">Apply Runtime Override</button>
             <button type="button" data-action="force-enemy-skill">Force Skill</button>
             <button type="button" data-action="force-word">Force Word / Next Layer</button>
             <button type="button" data-action="kill-enemy">Kill Selected</button>
@@ -419,12 +424,20 @@ export function mountTestLab(
               <option value="4">4×</option>
             </select></label>
             <label class="test-lab-check"><input data-field="scheduler-frozen" type="checkbox"> Freeze auto spawn scheduler</label>
+            <label>Max active enemies<input data-field="max-enemies" type="number" min="1" max="30" value="8"></label>
+            <label>Spawn interval<input data-field="spawn-interval" type="number" min="0.05" max="30" step="0.05" value="1"></label>
+            <label>Pressure budget<input data-field="pressure-budget" type="number" min="0.5" max="100" step="0.1" value="10"></label>
+            <label>Urgent threat cap<input data-field="urgent-cap" type="number" min="1" max="30" value="3"></label>
+            <label>Formation complexity<input data-field="formation-complexity" type="number" min="1" max="5" value="1"></label>
+            <label>Attack interval factor<input data-field="attack-factor" type="number" min="0.2" max="3" step="0.05" value="1"></label>
           </div>
           <div class="test-lab-row">
             <button type="button" data-action="use-player-skill">Force Skill Activation</button>
             <button type="button" data-action="reset-skill-cooldowns">Reset Skill Cooldowns</button>
             <button type="button" data-action="apply-time">Apply Time / Scheduler</button>
+            <button type="button" data-action="apply-pressure">Apply Pressure Overrides</button>
             <button type="button" data-action="step-scheduler">Step Scheduler Once</button>
+            <button type="button" data-action="spawn-formation">Spawn Formation Now</button>
             <button type="button" data-action="clear-projectiles">Clear Projectiles</button>
             <button type="button" data-action="clear-particles">Clear Particles</button>
           </div>
@@ -1267,6 +1280,23 @@ export function mountTestLab(
       renderInspector();
       return;
     }
+    if (action === "patch-enemy") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      activeGame.testLabPatchEnemy(
+        Number(enemyIdSelect.value),
+        {
+          speed: numberValue(dialog, '[data-field="enemy-speed"]', 90),
+          actionCooldown: numberValue(dialog, '[data-field="enemy-cooldown"]', 1),
+          rank: rankSelect.value as EnemyRank,
+          layers: Number(inputValue(dialog, '[data-field="layers"]')) as 1 | 2 | 3,
+          elite: dialog.querySelector<HTMLInputElement>('[data-field="enemy-elite"]')!.checked,
+          threatBudgetUsed: numberValue(dialog, '[data-field="enemy-threat"]', 0),
+        },
+      );
+      renderInspector();
+      return;
+    }
     if (action === "force-enemy-skill") {
       const activeGame = ensureGame();
       if (activeGame === null) return;
@@ -1438,6 +1468,30 @@ export function mountTestLab(
         dialog.querySelector<HTMLInputElement>(
           '[data-field="scheduler-frozen"]',
         )!.checked,
+      );
+      renderInspector();
+      return;
+    }
+    if (action === "apply-pressure") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      activeGame.testLabSetDifficultyOverrides({
+        maxEnemies: numberValue(dialog, '[data-field="max-enemies"]', 8),
+        spawnInterval: numberValue(dialog, '[data-field="spawn-interval"]', 1),
+        pressureBudget: numberValue(dialog, '[data-field="pressure-budget"]', 10),
+        urgentThreatCap: numberValue(dialog, '[data-field="urgent-cap"]', 3),
+        formationComplexity: numberValue(dialog, '[data-field="formation-complexity"]', 1),
+        attackIntervalFactor: numberValue(dialog, '[data-field="attack-factor"]', 1),
+      });
+      renderInspector();
+      return;
+    }
+    if (action === "spawn-formation") {
+      const count = ensureGame()?.testLabSpawnFormationNow() ?? 0;
+      notice(
+        count > 0
+          ? "spawned production formation · " + String(count) + " members"
+          : "formation denied by production pressure/admission rules",
       );
       renderInspector();
       return;
