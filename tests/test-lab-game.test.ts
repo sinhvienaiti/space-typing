@@ -16,9 +16,9 @@ const settings: GameSettings = {
 };
 
 const vocabulary: VocabularyEntry[] = [
-  { id: "qa-1", en: "orbit", vi: "", ipa: "" },
-  { id: "qa-2", en: "shield", vi: "", ipa: "" },
-  { id: "qa-3", en: "stellar", vi: "", ipa: "" },
+  { id: "qa-1", en: "orbit", vi: "quỹ đạo", ipa: "/ˈɔrbɪt/" },
+  { id: "qa-2", en: "shield", vi: "lá chắn", ipa: "/ʃild/" },
+  { id: "qa-3", en: "stellar", vi: "thuộc về sao", ipa: "/ˈstelər/" },
 ];
 
 function createTestGame(): Game {
@@ -190,6 +190,32 @@ describe("M21 gated Game Test Lab API", () => {
     expect((boss?.hp ?? 0) / (boss?.maxHp ?? 1)).toBeCloseTo(0.37, 2);
     expect(boss?.shieldActive).toBe(true);
     expect(boss?.staggered).toBe(true);
+
+    game.destroy();
+  });
+
+  it("keeps Recall Bonus optional, non-hostile and non-punitive", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 80);
+
+    const before = game.getTestLabSnapshot();
+    expect(game.testLabSpawnRecallBonus("qa-1")).toBe(true);
+
+    const active = game.getTestLabSnapshot();
+    expect(active?.recallBonus?.en).toBe("orbit");
+    expect(active?.recallBonus?.vi).toBe("quỹ đạo");
+    expect(active?.recallBonus?.mask).toContain("_");
+    expect(active?.activePressure.enemyCount).toBe(0);
+    expect(active?.activePressure.urgentThreats).toBe(0);
+
+    expect(game.testLabCompleteRecallBonus()).toBe(true);
+    const after = game.getTestLabSnapshot();
+
+    expect(after?.recallBonus).toBeNull();
+    expect(after?.stats.hits).toBe(before?.stats.hits);
+    expect(after?.stats.misses).toBe(before?.stats.misses);
+    expect(after?.stats.score ?? 0).toBeGreaterThan(before?.stats.score ?? 0);
 
     game.destroy();
   });

@@ -561,6 +561,8 @@ export function mountTestLab(
             <button type="button" data-action="roll-equipment">Roll Equipment Drop</button>
             <button type="button" data-action="preview-choice">Preview Reward Choice</button>
             <button type="button" data-action="preview-boss-choice">Preview Boss Choice</button>
+            <button type="button" data-action="spawn-recall-bonus">Spawn Recall Bonus</button>
+            <button type="button" data-action="complete-recall-bonus">Complete Recall Bonus</button>
             <button type="button" data-action="grant-star-crystal">Grant Star Crystal</button>
             <button type="button" data-action="grant-quantum-core">Grant Quantum Core</button>
             <button type="button" data-action="grant-salvage-anchor">Grant Salvage Anchor</button>
@@ -2179,6 +2181,30 @@ export function mountTestLab(
         session.state.relics,
       );
       renderInspector();
+      return;
+    }
+    if (action === "spawn-recall-bonus") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      const spawned = activeGame.testLabSpawnRecallBonus();
+      renderInspector();
+      notice(
+        spawned
+          ? "Recall Bonus spawned · non-hostile recall target"
+          : "Recall Bonus could not spawn with current vocabulary",
+      );
+      return;
+    }
+    if (action === "complete-recall-bonus") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      const completed = activeGame.testLabCompleteRecallBonus();
+      renderInspector();
+      notice(
+        completed
+          ? "Recall Bonus completed through production reward flow"
+          : "spawn a Recall Bonus first",
+      );
       return;
     }
     if (action === "grant-star-crystal") {

@@ -221,6 +221,14 @@ import {
   type TreasureDrone,
 } from "./events/rare-targets";
 import {
+  eligibleRecallBonusEntry,
+  pickRecallBonusHintIndices,
+  recallBonusMask,
+  recallBonusRewardScore,
+  shouldScheduleRecallBonus,
+  type RecallBonusTarget,
+} from "./events/recall-bonus";
+import {
   createRewardChoiceOptions,
   rewardChoiceCrateChance,
   rewardChoiceWord,
@@ -483,6 +491,14 @@ export type TestLabGameSnapshot = {
     ipa: string;
     remaining: number;
   } | null;
+  recallBonus: {
+    en: string;
+    vi: string;
+    typed: number;
+    mask: string;
+    hintIndices: number[];
+    remaining: number;
+  } | null;
 };
 
 const FALLBACK_ENTRIES: VocabularyEntry[] = [
@@ -624,6 +640,9 @@ export class Game {
   private treasureDrone: TreasureDrone | null = null;
   private treasureDroneTimer = 0;
   private treasureDronePending = false;
+  private recallBonus: RecallBonusTarget | null = null;
+  private recallBonusTimer = 0;
+  private recallBonusPending = false;
   private rewardChoiceCrate: RewardChoiceCrate | null = null;
   private rewardChoiceTimer = 0;
   private rewardChoicePending = false;
@@ -800,6 +819,24 @@ export class Game {
               vi: this.learningEcho.entry.vi,
               ipa: this.learningEcho.entry.ipa,
               remaining: this.learningEcho.remaining,
+            },
+      recallBonus:
+        this.recallBonus === null
+          ? null
+          : {
+              en: this.recallBonus.entry.en,
+              vi: this.recallBonus.entry.vi,
+              typed: this.recallBonus.typed,
+              mask: recallBonusMask(
+                this.recallBonus.entry.en,
+                this.recallBonus.typed,
+                this.recallBonus.hintIndices,
+              ),
+              hintIndices: [...this.recallBonus.hintIndices],
+              remaining: Math.max(
+                0,
+                this.recallBonus.lifetime - this.recallBonus.age,
+              ),
             },
     };
   }
@@ -1319,6 +1356,37 @@ export class Game {
     return true;
   }
 
+  testLabSpawnRecallBonus(entryId?: string): boolean {
+    if (
+      !this.testLabEnabled ||
+      (this.phase !== "playing" && this.phase !== "paused")
+    ) {
+      return false;
+    }
+    const entry =
+      entryId === undefined
+        ? undefined
+        : this.vocabulary.find((item) => item.id === entryId);
+    this.recallBonus = null;
+    this.recallBonusPending = false;
+    return this.spawnRecallBonus(entry);
+  }
+
+  testLabCompleteRecallBonus(): boolean {
+    if (!this.testLabEnabled || this.recallBonus === null) return false;
+    const target = this.recallBonus;
+    const answer = typingText(target.entry.en);
+    let guard = answer.length + 1;
+    while (this.recallBonus !== null && guard > 0) {
+      const key = answer[this.recallBonus.typed];
+      if (key === undefined || !this.typeRecallBonus(this.recallBonus, key)) {
+        return false;
+      }
+      guard -= 1;
+    }
+    return this.recallBonus === null;
+  }
+
   testLabResetArena(): boolean {
     if (!this.testLabEnabled) return false;
     this.enemies = [];
@@ -1326,6 +1394,8 @@ export class Game {
     this.lasers = [];
     this.particles = [];
     this.targetId = null;
+    this.recallBonus = null;
+    this.recallBonusPending = false;
     this.boss = null;
     this.bossSpawned = false;
     this.bossDefeated = false;
@@ -2321,6 +2391,9 @@ export class Game {
       treasureDroneChance(stage.stage),
       0.32,
     );
+    this.recallBonus = null;
+    this.recallBonusTimer = randomBetween(7, 13);
+    this.recallBonusPending = shouldScheduleRecallBonus(stage.stage);
     this.rewardChoiceCrate = null;
     this.rewardChoiceTimer = randomBetween(14, 20);
     this.rewardChoicePending = this.rollPityEvent(
@@ -2455,6 +2528,8 @@ export class Game {
     this.supplySpawnsRemaining = 0;
     this.treasureDrone = null;
     this.treasureDronePending = false;
+    this.recallBonus = null;
+    this.recallBonusPending = false;
     this.rewardChoiceCrate = null;
     this.rewardChoicePending = false;
     this.anomalyCrate = null;
@@ -2529,6 +2604,14 @@ export class Game {
       return;
     }
 
+    if (
+      this.recallBonus !== null &&
+      this.recallBonus.typed > 0 &&
+      this.typeRecallBonus(this.recallBonus, key)
+    ) {
+      return;
+    }
+
     if (this.boss !== null && this.boss.typed > 0) {
       this.typeBoss(key);
       return;
@@ -2578,13 +2661,18 @@ export class Game {
       this.height - PLAYER_Y_OFFSET,
     );
 
-    if (candidate === null) {
-      this.registerMiss();
+    if (candidate !== null) {
+      this.targetId = candidate.id;
+      this.typeTarget(candidate, key);
       return;
     }
 
-    this.targetId = candidate.id;
-    this.typeTarget(candidate, key);
+    if (this.recallBonus !== null) {
+      this.typeRecallBonus(this.recallBonus, key);
+      return;
+    }
+
+    this.registerMiss();
   }
 
   resize(): void {
@@ -2708,6 +2796,7 @@ export class Game {
     this.updateBoss(dt * hostileTimeFactor, difficulty);
     this.updateSupplyPod(dt);
     this.updateTreasureDrone(dt);
+    this.updateRecallBonus(dt);
     this.updateRewardChoiceCrate(dt);
     this.updateAnomalyCrate(dt);
     if (!(this.testLabEnabled && this.testLabSchedulerFrozen)) {
@@ -2715,6 +2804,7 @@ export class Game {
     }
     this.supplySpawnTimer -= dt;
     this.treasureDroneTimer -= dt;
+    this.recallBonusTimer -= dt;
     this.rewardChoiceTimer -= dt;
     this.anomalyTimer -= dt;
 
@@ -2734,6 +2824,7 @@ export class Game {
       this.treasureDronePending &&
       this.treasureDrone === null &&
       this.supplyPod === null &&
+      this.recallBonus === null &&
       this.rewardChoiceCrate === null &&
       this.anomalyCrate === null &&
       this.treasureDroneTimer <= 0 &&
@@ -2745,10 +2836,26 @@ export class Game {
     }
 
     if (
+      this.recallBonusPending &&
+      this.recallBonus === null &&
+      this.supplyPod === null &&
+      this.treasureDrone === null &&
+      this.rewardChoiceCrate === null &&
+      this.anomalyCrate === null &&
+      this.recallBonusTimer <= 0 &&
+      this.boss === null &&
+      (this.spawnRemaining > 0 || this.enemies.length > 0)
+    ) {
+      this.spawnRecallBonus();
+      this.recallBonusPending = false;
+    }
+
+    if (
       this.rewardChoicePending &&
       this.rewardChoiceCrate === null &&
       this.supplyPod === null &&
       this.treasureDrone === null &&
+      this.recallBonus === null &&
       this.anomalyCrate === null &&
       this.rewardChoiceTimer <= 0 &&
       this.boss === null &&
@@ -2763,6 +2870,7 @@ export class Game {
       this.anomalyCrate === null &&
       this.supplyPod === null &&
       this.treasureDrone === null &&
+      this.recallBonus === null &&
       this.rewardChoiceCrate === null &&
       this.anomalyTimer <= 0 &&
       this.boss === null &&
@@ -2986,6 +3094,7 @@ export class Game {
     this.bossDefeated = false;
     this.projectiles = [];
     this.targetId = null;
+    this.recallBonus = null;
     this.boss.actionCooldown =
       (bossActionInterval(this.boss.role, this.boss.phase) *
         bossActionIntervalMultiplier(mechanic)) /
@@ -3140,6 +3249,7 @@ export class Game {
     this.projectiles = [];
     this.supplyPod = null;
     this.treasureDrone = null;
+    this.recallBonus = null;
     this.rewardChoiceCrate = null;
     this.anomalyCrate = null;
     this.anomalyResolutionPending = false;
@@ -3247,6 +3357,56 @@ export class Game {
       this.treasureDrone.x < -70
     ) {
       this.treasureDrone = null;
+    }
+  }
+
+  private createRecallBonusTarget(
+    entry?: VocabularyEntry,
+  ): RecallBonusTarget | null {
+    const candidates = this.vocabulary.filter(eligibleRecallBonusEntry);
+    const source = entry !== undefined && eligibleRecallBonusEntry(entry)
+      ? [entry]
+      : candidates;
+    const selected =
+      source[Math.floor(Math.random() * source.length)] ??
+      candidates[0] ??
+      null;
+    if (selected === null) return null;
+
+    return {
+      entry: selected,
+      typed: 0,
+      hintIndices: pickRecallBonusHintIndices(selected.en),
+      x: this.width + 54,
+      y: randomBetween(120, Math.max(160, this.height * 0.4)),
+      speed: randomBetween(58, 72),
+      age: 0,
+      lifetime: 21,
+    };
+  }
+
+  private spawnRecallBonus(entry?: VocabularyEntry): boolean {
+    const target = this.createRecallBonusTarget(entry);
+    if (target === null) {
+      this.recallBonusPending = false;
+      return false;
+    }
+    this.recallBonus = target;
+    this.sfx.supplyArrival();
+    return true;
+  }
+
+  private updateRecallBonus(dt: number): void {
+    const target = this.recallBonus;
+    if (target === null) return;
+
+    target.age += dt;
+    target.x -= target.speed * dt;
+    if (
+      target.age >= target.lifetime ||
+      target.x < -86
+    ) {
+      this.recallBonus = null;
     }
   }
 
@@ -4658,6 +4818,45 @@ export class Game {
     this.sfx.support();
     this.supplyPod = null;
     this.emitStats();
+  }
+
+  private typeRecallBonus(
+    target: RecallBonusTarget,
+    key: string,
+  ): boolean {
+    const word = typingText(target.entry.en);
+    const expected = word[target.typed];
+    if (key !== expected) {
+      return false;
+    }
+
+    target.typed += 1;
+    this.burst(target.x, target.y, 7, 292);
+    this.sfx.shot(Math.max(1, this.stats.multiplier));
+
+    if (target.typed >= word.length) {
+      const score = recallBonusRewardScore(
+        target.entry.en,
+        target.hintIndices,
+      );
+      this.addScore(score * this.stats.multiplier);
+      this.gainPower(10);
+      this.tryRollEquipmentDrop("treasure");
+      this.hooks.onWordComplete(target.entry);
+      this.rewardNotice = {
+        label: "RECALL BONUS · TREASURE DROP",
+        x: target.x,
+        y: target.y,
+        hue: 292,
+        remaining: 1.8,
+      };
+      this.burst(target.x, target.y, 54, 292);
+      this.sfx.support();
+      this.recallBonus = null;
+      this.emitStats();
+    }
+
+    return true;
   }
 
   private typeTreasureDrone(drone: TreasureDrone, key: string): void {
@@ -6205,6 +6404,9 @@ export class Game {
     if (this.treasureDrone !== null) {
       this.drawTreasureDrone(this.treasureDrone);
     }
+    if (this.recallBonus !== null) {
+      this.drawRecallBonus(this.recallBonus);
+    }
     if (this.rewardChoiceCrate !== null) {
       this.drawRewardChoiceCrate(this.rewardChoiceCrate);
     }
@@ -6816,6 +7018,100 @@ export class Game {
     context.shadowBlur = 10;
     context.shadowColor = "#ffd84d";
     context.fillText(split.remaining, left + typedWidth, wordY);
+    context.restore();
+  }
+
+  private drawRecallBonus(target: RecallBonusTarget): void {
+    const context = this.context;
+    const bob = Math.sin(target.age * 3.8) * 7;
+    const x = target.x;
+    const y = target.y + bob;
+    const pulse = 0.92 + Math.sin(target.age * 5.2) * 0.08;
+    const mask = recallBonusMask(
+      target.entry.en,
+      target.typed,
+      target.hintIndices,
+    );
+
+    context.save();
+    context.translate(x, y);
+    context.rotate(target.age * 0.38);
+    context.globalCompositeOperation = "lighter";
+    context.shadowBlur = 26;
+    context.shadowColor = "#bd8cff";
+
+    const gradient = context.createRadialGradient(
+      -7,
+      -9,
+      3,
+      0,
+      0,
+      30,
+    );
+    gradient.addColorStop(0, "rgba(255, 255, 230, 0.98)");
+    gradient.addColorStop(0.35, "rgba(105, 235, 255, 0.9)");
+    gradient.addColorStop(0.7, "rgba(183, 122, 255, 0.82)");
+    gradient.addColorStop(1, "rgba(255, 111, 211, 0.3)");
+    context.fillStyle = gradient;
+    context.strokeStyle = "rgba(255, 239, 180, 0.96)";
+    context.lineWidth = 2;
+
+    context.beginPath();
+    for (let index = 0; index < 8; index += 1) {
+      const angle = (Math.PI * 2 * index) / 8 - Math.PI / 2;
+      const radius = index % 2 === 0 ? 28 * pulse : 21 * pulse;
+      const px = Math.cos(angle) * radius;
+      const py = Math.sin(angle) * radius;
+      if (index === 0) context.moveTo(px, py);
+      else context.lineTo(px, py);
+    }
+    context.closePath();
+    context.fill();
+    context.stroke();
+
+    context.strokeStyle = "rgba(125, 235, 255, 0.68)";
+    context.lineWidth = 1.2;
+    context.setLineDash([4, 6]);
+    context.lineDashOffset = -target.age * 18;
+    context.beginPath();
+    context.ellipse(0, 0, 42, 16, 0.35, 0, Math.PI * 2);
+    context.stroke();
+    context.restore();
+
+    context.save();
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+
+    context.fillStyle = "rgba(5, 9, 17, 0.9)";
+    const maskWidth = Math.min(
+      300,
+      Math.max(118, context.measureText(mask).width + 28),
+    );
+    context.fillRect(x - maskWidth / 2, y - 56, maskWidth, 27);
+    context.fillStyle = "#f5f3ff";
+    context.shadowBlur = 7;
+    context.shadowColor = "#ae80ff";
+    context.font =
+      "800 15px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.fillText(mask, x, y - 42);
+
+    context.shadowBlur = 0;
+    context.fillStyle = "rgba(255, 230, 151, 0.94)";
+    context.font =
+      "850 8px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.fillText("RECALL BONUS", x, y - 69);
+
+    const meaning = target.entry.vi.trim();
+    const meaningWidth = Math.min(
+      260,
+      Math.max(90, meaning.length * 7 + 20),
+    );
+    context.fillStyle = "rgba(5, 9, 17, 0.86)";
+    context.fillRect(x - meaningWidth / 2, y + 35, meaningWidth, 25);
+    context.fillStyle = "#d9f8ff";
+    context.font =
+      "700 12px ui-sans-serif, system-ui, -apple-system, sans-serif";
+    context.fillText(meaning, x, y + 48);
     context.restore();
   }
 
