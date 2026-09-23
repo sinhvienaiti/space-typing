@@ -3,6 +3,7 @@ import type { ArtAssetCatalog, ArtAssetEntry } from "../src/assets/pipeline";
 import {
   PREMIUM_SHIP_SHEET_ASSET_ID,
   PREMIUM_SHIP_ATLAS_MAX_FILE_BYTES,
+  parseShipArtPreference,
   selectCharacterShipSheet,
   validPremiumShipDimensions,
 } from "../src/characters/ship-art";
@@ -59,6 +60,21 @@ describe("Ship Visual V3 asset budget and fallback", () => {
       catalog(premium, image(480, 360)),
     );
     expect(selected).toEqual({ source: "v3", image: premium });
+  });
+
+  it("keeps V2 as the deterministic A/B baseline even when V3 is loaded", () => {
+    expect(parseShipArtPreference("v2")).toBe("v2");
+    expect(parseShipArtPreference("V2")).toBe("auto");
+    expect(parseShipArtPreference(null)).toBe("auto");
+    const existing = image(480, 360);
+    expect(
+      selectCharacterShipSheet(
+        catalog(image(1024, 768), existing),
+        "v2",
+      ),
+    ).toEqual({ source: "v2", image: existing });
+    expect(selectCharacterShipSheet(catalog(image(1024, 768), null), "v2"))
+      .toEqual({ source: "procedural", image: null });
   });
 
   it("retains V2 when premium art is unavailable or oversized", () => {
