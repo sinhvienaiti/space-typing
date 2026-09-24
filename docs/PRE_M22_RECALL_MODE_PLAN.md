@@ -1,6 +1,6 @@
 # Pre-M22 Recall Mode V1 Plan
 
-Status: APPROVED / IMPLEMENTATION IN PROGRESS  
+Status: V1 IMPLEMENTATION COMPLETE / MANUAL M22 VALIDATION PENDING  
 Source branch: `feature/recall-mode-v1`  
 Base main: `d28ccd927166dfa2fb98fb3f67e7916a6b89dad4`
 
@@ -105,6 +105,27 @@ Translation remains user-controlled regardless of preset.
 ## Boss behavior
 
 V1 keeps existing boss identity, HP, phases, art, rewards and word/layer progression. Projectile emission is suppressed in Recall. Boss words are hidden and pronounced at activation. Future R07+ may add explicit Recall boss mechanics such as multi-word memory chains, replay lock, delayed translation and audio interference, but V1 must not introduce fake listening difficulty by making speech unintelligible.
+
+
+## Implementation checkpoint — 2026-09-24
+
+R00-R06 are implemented on PR #110. CI #656 PASS: 149/149 test files, 748/748 tests, TypeScript, production Vite build, audio asset guard, JS/CSS bundle budgets and Ship V3 art budget.
+
+Implemented runtime behavior:
+
+- Combat / Recall mode switch persisted separately from PlayerSave.
+- five Recall difficulty presets and independent Vietnamese / IPA / auto-pronounce preferences;
+- one normal enemy at a time; formations and hostile enemy projectile/action paths suppressed in Recall;
+- existing enemy approach + collision damage retained;
+- Recall boss words are hidden/pronounced and boss pressure damages the player without hostile projectile spawning;
+- hidden Recall Core slots reveal typed letters plus deterministic preset/manual hints;
+- auto pronunciation on enemy, next-layer and boss prompts using the existing speech + MusicController ducking path;
+- replay budget and Reveal Letter controls;
+- Combat completion pronunciation and kill-translation behavior remain Combat-only;
+- per-word attempts, clears, perfect clears, failures, hint/replay usage and response-time totals persist in Recall learning memory outside Campaign rollback;
+- Class / Topic / Word Type / Grammar / Custom vocabulary and the existing Campaign map/stage/RPG/reward systems remain shared.
+
+R07 remains an explicit follow-up after real-browser V1 validation: adaptive spaced-repetition weighting and dedicated Recall post-stage/mistake-review presentation. Existing Stage Results word review remains available in V1, but it is not yet memory-strength weighted.
 
 ## Performance constraints
 
