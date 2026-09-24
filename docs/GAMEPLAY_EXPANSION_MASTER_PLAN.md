@@ -3317,16 +3317,21 @@ Closure policy agreed 2026-09-24:
 
 ## M23 — Review Pass #1
 
-**Status: IN PROGRESS (2026-09-24).**
+**Status: COMPLETE (2026-09-24).** PR #112.
 
-Complete independent full review and fix all findings.
+Independent review covered Recall runtime isolation, enemy death paths, hostile projectile rules, transient Recall state, learning feedback, persistence hot paths, audio-controller lifecycle, hotbar/render paths and the production frame update for avoidable collection work.
 
-Current findings being fixed on `review/m23-pass1`:
+Findings fixed:
 
-- Recall typed kills incorrectly inherited Combat-only Splitter fragments and Volatile death projectiles; Word Bomb already had the correct mode isolation.
-- Recall typed kills still emitted the Combat learning translation echo even when Recall translation was disabled.
-- Recall hint-index state was not released after normal typed kills or Nova clears, leaving unnecessary per-stage retained state.
-- Regression coverage must prove the Recall isolation while preserving Splitter/Volatile behavior in Combat.
+- Recall typed kills incorrectly inherited Combat-only Splitter fragments and Volatile death projectiles; Combat behavior is preserved and explicitly regression-tested.
+- Recall typed kills generated Combat-only learning echo/translation state; Recall now stays inside its own VI/IPA visibility controls.
+- Recall hint-index state was retained after typed kills/Nova clears; transient entries are now released.
+- Recall learning memory previously serialized and synchronously wrote the whole memory object after every word; writes are now batched every six Recall results and persisted at stage clear/page lifecycle boundaries.
+- Duplicate bootstrap mode copy was removed; runtime rendering remains the single source for the visible mode intro.
+- Recall Auto Pronounce was re-checked during review: the authoritative gate already lives in `Game.activateEnemyRecallPrompt` / boss prompt activation, so no redundant second gate was kept in `main.ts`.
+- Production frame update contains no new unbounded sort/filter/map/JSON/storage work from the Recall changes.
+
+Validation at code-complete HEAD before this documentation checkpoint: CI #674 PASS · 149/149 test files · 751/751 tests · TypeScript/build/audio guard/bundle/Ship V3 guards PASS · JS 649.85 KiB raw / 173.11 KiB gzip · CSS 60.00 KiB raw / 13.67 KiB gzip.
 
 ## M24 — Review Pass #2
 
