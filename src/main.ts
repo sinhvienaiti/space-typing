@@ -9,6 +9,11 @@ import {
   sanitizeKillTranslationSettings,
 } from "./feedback/kill-translation";
 import { Game } from "./Game";
+import {
+  stageResultStars,
+  type StageSessionSnapshot,
+  type StageWordOutcome,
+} from "./results/stage-session";
 import { hasUsableDeathProtection } from "./ui/game-over";
 import {
   loadArtAssetManifest,
@@ -722,8 +727,9 @@ app.innerHTML = `
           <div><span>score</span><strong id="resultScore">0</strong></div>
           <div><span>stage</span><strong id="resultWave">001</strong></div>
           <div><span>accuracy</span><strong id="resultAccuracy">100%</strong></div>
-          <div><span>max streak</span><strong id="resultStreak">0</strong></div>
+          <div><span>max key streak</span><strong id="resultStreak">0</strong></div>
         </div>
+        <div id="gameOverMeasured" class="result-measured-grid" aria-label="Measured run statistics"></div>
         <p id="deathProtectionMeta" class="death-protection-meta" role="status" aria-live="polite">
           Checkpoint recovery is available.
         </p>
@@ -739,22 +745,64 @@ app.innerHTML = `
     </section>
 
     <section id="stageClearOverlay" class="overlay hidden">
-      <div class="pause-card">
-        <p class="eyebrow">stage clear</p>
-        <h2 id="clearTitle">Stage 001 complete</h2>
-        <div class="results">
+      <div class="pause-card stage-results-card">
+        <header class="stage-results-header">
+          <div>
+            <p class="eyebrow">stage clear · measured report</p>
+            <h2 id="clearTitle">Stage 001 complete</h2>
+            <p id="clearMeta" class="stage-results-meta"></p>
+          </div>
+          <div class="stage-stars" aria-label="Stage rating">
+            <strong id="clearStars">★☆☆</strong>
+            <small id="clearStarRule">1★ clear · 2★ 90% · 3★ objective / 97%</small>
+          </div>
+        </header>
+
+        <div class="results stage-results-summary">
           <div><span>score</span><strong id="clearScore">0</strong></div>
-          <div><span>accuracy</span><strong id="clearAccuracy">100%</strong></div>
-          <div><span>wpm</span><strong id="clearWpm">0</strong></div>
-          <div class="result-rewards"><span>rewards</span><strong id="clearCredits" class="reward-chips">+0</strong></div>
-          <div><span>max streak</span><strong id="clearStreak">0</strong></div>
+          <div><span>target accuracy</span><strong id="clearAccuracy">100%</strong></div>
+          <div><span>target WPM</span><strong id="clearWpm">0</strong></div>
+          <div><span>time</span><strong id="clearTime">0:00</strong></div>
+          <div><span>max key streak</span><strong id="clearStreak">0</strong></div>
+          <div><span>kill rate</span><strong id="clearKillRate">0/min</strong></div>
         </div>
+
+        <section class="stage-result-section">
+          <h3>Combat</h3>
+          <div id="clearCombatMetrics" class="result-measured-grid"></div>
+        </section>
+
+        <section class="stage-result-section">
+          <h3>Typing & learning</h3>
+          <p class="result-denominator-note">
+            WPM/target accuracy use hostile enemy + boss word keys only. Projectile letters and bonus targets do not inflate these learning metrics. Key Streak keeps the existing gameplay semantics.
+          </p>
+          <div id="clearTypingMetrics" class="result-measured-grid"></div>
+          <details class="word-review">
+            <summary>Word review <span id="wordReviewCount"></span></summary>
+            <div id="wordReviewTabs" class="word-review-tabs" role="tablist" aria-label="Word result filter">
+              <button type="button" data-word-filter="all" class="active">All</button>
+              <button type="button" data-word-filter="perfect">Perfect</button>
+              <button type="button" data-word-filter="corrected">Corrected</button>
+              <button type="button" data-word-filter="missed">Missed</button>
+            </div>
+            <div id="wordReviewList" class="word-review-list"></div>
+          </details>
+        </section>
+
+        <section class="stage-result-section">
+          <h3>Rewards</h3>
+          <div id="clearCredits" class="reward-chips stage-reward-chips" aria-label="Stage rewards"></div>
+        </section>
+
         <section id="clearCharacterProgress" class="clear-character-progress" aria-live="polite"></section>
         <p id="clearDetails" class="result-details"></p>
-        <button id="nextStageButton" class="primary">Next stage</button>
-        <button id="clearRetryButton">Replay stage</button>
-        <button id="clearStageSelectButton">Stage Select</button>
-        <button id="clearTitleButton">Back to title</button>
+        <div class="stage-result-actions">
+          <button id="nextStageButton" class="primary">Next stage</button>
+          <button id="clearRetryButton">Replay stage</button>
+          <button id="clearStageSelectButton">Stage Select</button>
+          <button id="clearTitleButton">Back to title</button>
+        </div>
       </div>
     </section>
 
