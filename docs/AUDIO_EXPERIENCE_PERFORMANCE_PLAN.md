@@ -1,6 +1,6 @@
 # Audio Experience + Post-Implementation Review Plan
 
-Status: **IMPLEMENTATION IN PROGRESS**
+Status: **AUTOMATED IMPLEMENTATION COMPLETE / REAL-AUDIO M22 ACCEPTANCE PENDING**
 
 ## 1. Goal
 
@@ -201,3 +201,39 @@ Every finding must be classified as:
 9. Run the post-implementation UI/UX + logic + performance review.
 10. Fix confirmed review findings and repeat CI.
 11. Real-browser/audio M22 remains the final non-automatable acceptance gate.
+
+
+## 13. Implementation checkpoint — 2026-09-24
+
+Completed in this implementation:
+
+- committed verified CC0 default music for calm, pressure and boss/high-risk states;
+- committed victory stinger;
+- committed two spacecraft ambient loops;
+- committed a curated Kenney SFX subset;
+- added `SampleSfxBank` with bounded reusable voices;
+- preserved Web Audio synthesis and pronunciation ducking;
+- added critical-hull one-shot threshold warning;
+- normal stage pacing now drives calm/intense music without overriding special encounter states;
+- added CC0 attribution/provenance;
+- added an audio binary integrity + payload guard;
+- kept the existing executable bundle thresholds unchanged and separated non-executable audio media into its own 6 MiB guard.
+
+Latest automated gate on the implementation branch:
+
+- CI #622: PASS;
+- 147 test files / 732 tests PASS;
+- TypeScript PASS;
+- production Vite build PASS;
+- audio asset guard PASS: 15 OGG files / 3.22 MiB;
+- existing M22 JS/CSS bundle thresholds PASS;
+- existing Ship V3 art budget PASS.
+
+Remaining acceptance is intentionally manual:
+
+- listen on a real audio device;
+- verify pronunciation remains dominant;
+- verify normal -> pressure -> recovery -> finale transitions;
+- verify boss arrival/phase pressure;
+- verify shop/station calm contrast;
+- verify 15+ minute session has no duplicate loops or accumulating audio artifacts.
