@@ -3759,3 +3759,19 @@ A further automated source review after T16 identified and fixed:
 - Route Map action ambiguity between optional station/shop services and the primary Start Stage action.
 
 The fixes preserve all gameplay and presentation features. See `docs/AUDIO_EXPERIENCE_PERFORMANCE_PLAN.md` §15 for the detailed checkpoint. Real-browser M22 acceptance remains pending.
+
+
+## 2026-09-24 — Post-T16 async-action race review
+
+A further interaction-lifecycle review found two confirmed double-action races:
+
+- Campaign Map Start/Replay performed an async selection autosave before `stageStartPending` became active, leaving a double-click window that could start overlapping save/navigation flows.
+- Game-over recovery items such as Salvage Anchor and Stage Revival Core had no shared in-flight action lock; repeated clicks during persistence could consume more than one item while the Game remained in `gameover`.
+
+Fixes:
+- added a small reusable `ActionGate` for mutually exclusive async UI actions;
+- Campaign Map locks Start/Replay and its selectors while the selected Stage is being persisted;
+- recovery-item and checkpoint-navigation actions now share one gate, so only one death-resolution transaction can run at a time;
+- failed/incomplete game-over transactions restore the correct enabled/disabled recovery choices from current state.
+
+No recovery rules, item counts, Campaign progression, checkpoint semantics or gameplay feature was changed.

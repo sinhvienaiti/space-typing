@@ -322,6 +322,7 @@ import {
   objectiveImportance,
   type ImportancePresentation,
 } from "./ui/importance";
+import { ActionGate } from "./ui/action-gate";
 import {
   applyAscensionDifficulty,
   advanceAscensionOnStageClear,
@@ -3342,13 +3343,25 @@ function checkpointDisplayLabel(): string {
 let checkpointRollbackApplied = false;
 let checkpointRollbackSaved = false;
 let checkpointRollbackPromise: Promise<boolean> | null = null;
-let deathNavigationPending = false;
+const deathActionGate = new ActionGate();
+const journeyStartGate = new ActionGate();
 
 function setDeathNavigationDisabled(pending: boolean): void {
   byId<HTMLButtonElement>("againButton").disabled = pending;
   byId<HTMLButtonElement>("gameOverStageSelectButton").disabled =
     pending || currentAscensionStage(checkpointSnapshot.ascension) !== null;
   byId<HTMLButtonElement>("resultTitleButton").disabled = pending;
+}
+
+function setDeathActionPending(pending: boolean): void {
+  setDeathNavigationDisabled(pending);
+  for (const id of [
+    "salvageAnchorButton",
+    "stageRevivalButton",
+    "phoenixCoreButton",
+  ]) {
+    byId<HTMLButtonElement>(id).disabled = pending;
+  }
 }
 
 function renderDeathProtectionChoices(failedStage: number): boolean {
@@ -3466,8 +3479,12 @@ async function ensureCheckpointRollback(): Promise<boolean> {
 async function resolveCheckpointDeath(
   action: "retry" | "stage-select" | "title",
 ): Promise<void> {
-  if (game.getPhase() !== "gameover" || deathNavigationPending) return;
-  deathNavigationPending = true;
+  if (
+    game.getPhase() !== "gameover" ||
+    !deathActionGate.tryEnter()
+  ) return;
+
+  setDeathActionPending(true);
   try {
     if (!(await ensureCheckpointRollback())) return;
 
@@ -3483,112 +3500,140 @@ async function resolveCheckpointDeath(
       openStageSelect();
     }
   } finally {
-    deathNavigationPending = false;
+    deathActionGate.leave();
+    if (game.getPhase() === "gameover") {
+      renderDeathProtectionChoices(game.getStats().stage);
+    }
   }
 }
 
 async function resolveSalvageAnchorDeath(): Promise<void> {
-  if (game.getPhase() !== "gameover") return;
+  if (
+    game.getPhase() !== "gameover" ||
+    !deathActionGate.tryEnter()
+  ) return;
 
-  const result = resolveSalvageAnchor(
-    currentRunPersistentState(),
-    campaignExpansion,
-    checkpointSnapshot,
-    new Date().toISOString(),
-  );
-  if (!result.applied) {
-    renderDeathProtectionChoices(game.getStats().stage);
-    return;
+  setDeathActionPending(true);
+  try {
+    const result = resolveSalvageAnchor(
+      currentRunPersistentState(),
+      campaignExpansion,
+      checkpointSnapshot,
+      new Date().toISOString(),
+    );
+    if (!result.applied) return;
+
+    applyRunPersistentState(result.state);
+    campaignExpansion = result.campaignExpansion;
+    checkpointSnapshot = result.checkpointSnapshot;
+    stageEntrySnapshot = null;
+    refreshPersistentStateUi();
+
+    const saved = await persistResolvedDeath(
+      "✓ Salvage Anchor consumed · gains preserved · checkpoint " +
+        checkpointDisplayLabel(),
+    );
+    if (saved) await startSelectedStage();
+  } finally {
+    deathActionGate.leave();
+    if (game.getPhase() === "gameover") {
+      renderDeathProtectionChoices(game.getStats().stage);
+    }
   }
-
-  applyRunPersistentState(result.state);
-  campaignExpansion = result.campaignExpansion;
-  checkpointSnapshot = result.checkpointSnapshot;
-  stageEntrySnapshot = null;
-  refreshPersistentStateUi();
-
-  const saved = await persistResolvedDeath(
-    "✓ Salvage Anchor consumed · gains preserved · checkpoint " +
-      checkpointDisplayLabel(),
-  );
-  if (saved) await startSelectedStage();
 }
 
 async function resolveStageRevivalDeath(): Promise<void> {
-  if (game.getPhase() !== "gameover") return;
+  if (
+    game.getPhase() !== "gameover" ||
+    !deathActionGate.tryEnter()
+  ) return;
 
-  const result = resolveStageRevivalCore(
-    currentRunPersistentState(),
-    stageEntrySnapshot,
-  );
-  if (result === null || !result.applied) {
-    renderDeathProtectionChoices(game.getStats().stage);
-    return;
+  setDeathActionPending(true);
+  try {
+    const result = resolveStageRevivalCore(
+      currentRunPersistentState(),
+      stageEntrySnapshot,
+    );
+    if (result === null || !result.applied) return;
+
+    applyRunPersistentState(result.state);
+    campaignExpansion = result.campaignExpansion;
+    checkpointSnapshot = result.checkpointSnapshot;
+    stageEntrySnapshot = result.stageEntrySnapshot;
+    refreshPersistentStateUi();
+
+    const saved = await persistResolvedDeath(
+      "✓ Stage Revival Core consumed · restarting Stage " +
+        String(campaign.selectedStage).padStart(3, "0"),
+    );
+    if (saved) await startSelectedStage();
+  } finally {
+    deathActionGate.leave();
+    if (game.getPhase() === "gameover") {
+      renderDeathProtectionChoices(game.getStats().stage);
+    }
   }
-
-  applyRunPersistentState(result.state);
-  campaignExpansion = result.campaignExpansion;
-  checkpointSnapshot = result.checkpointSnapshot;
-  stageEntrySnapshot = result.stageEntrySnapshot;
-  refreshPersistentStateUi();
-
-  const saved = await persistResolvedDeath(
-    "✓ Stage Revival Core consumed · restarting Stage " +
-      String(campaign.selectedStage).padStart(3, "0"),
-  );
-  if (saved) await startSelectedStage();
 }
 
 async function resolvePhoenixDeath(): Promise<void> {
   if (
     game.getPhase() !== "gameover" ||
     stageEntrySnapshot === null ||
-    itemCount(inventory, "phoenix-core") <= 0
+    itemCount(inventory, "phoenix-core") <= 0 ||
+    !deathActionGate.tryEnter()
   ) {
     return;
   }
 
-  if (!game.reviveCurrentEncounter()) return;
+  setDeathActionPending(true);
+  try {
+    if (!game.reviveCurrentEncounter()) return;
 
-  const activeResult = consumePhoenixCore(
-    currentRunPersistentState(),
-  );
-  if (!activeResult.applied) return;
-  applyRunPersistentState(activeResult.state);
+    const activeResult = consumePhoenixCore(
+      currentRunPersistentState(),
+    );
+    if (!activeResult.applied) return;
+    applyRunPersistentState(activeResult.state);
 
-  const entryResult = consumePhoenixCore(
-    stageEntrySnapshot.state,
-  );
-  const safeEntryState = entryResult.applied
-    ? entryResult.state
-    : stageEntrySnapshot.state;
-  const safeEntry = createStageEntrySnapshot(
-    safeEntryState,
-    stageEntrySnapshot.campaignExpansion,
-    stageEntrySnapshot.checkpointSnapshot,
-    stageEntrySnapshot.capturedAt,
-  );
-  stageEntrySnapshot = safeEntry;
+    const entryResult = consumePhoenixCore(
+      stageEntrySnapshot.state,
+    );
+    const safeEntryState = entryResult.applied
+      ? entryResult.state
+      : stageEntrySnapshot.state;
+    const safeEntry = createStageEntrySnapshot(
+      safeEntryState,
+      stageEntrySnapshot.campaignExpansion,
+      stageEntrySnapshot.checkpointSnapshot,
+      stageEntrySnapshot.capturedAt,
+    );
+    stageEntrySnapshot = safeEntry;
 
-  const captured = captureCrashRecoverySnapshot(
-    safeEntry.state,
-    safeEntry.campaignExpansion,
-    safeEntry.checkpointSnapshot,
-    "stage-entry",
-    new Date().toISOString(),
-  );
-  crashRecoverySnapshot = captured.snapshot;
-  campaignExpansion = {
-    ...campaignExpansion,
-    crashRecovery: captured.campaignExpansion.crashRecovery,
-  };
+    const captured = captureCrashRecoverySnapshot(
+      safeEntry.state,
+      safeEntry.campaignExpansion,
+      safeEntry.checkpointSnapshot,
+      "stage-entry",
+      new Date().toISOString(),
+    );
+    crashRecoverySnapshot = captured.snapshot;
+    campaignExpansion = {
+      ...campaignExpansion,
+      crashRecovery: captured.campaignExpansion.crashRecovery,
+    };
 
-  renderInventory();
-  updateDataSummary();
-  void autosaveCampaign(
-    "gameover",
-    "✓ Phoenix Core consumed · encounter resumed",
-  );
+    renderInventory();
+    updateDataSummary();
+    await autosaveCampaign(
+      "gameover",
+      "✓ Phoenix Core consumed · encounter resumed",
+    );
+  } finally {
+    deathActionGate.leave();
+    if (game.getPhase() === "gameover") {
+      renderDeathProtectionChoices(game.getStats().stage);
+    }
+  }
 }
 
 type WordReviewFilter = "all" | "perfect" | "corrected" | "missed";
@@ -3851,7 +3896,7 @@ const game = new Game(
         checkpointRollbackApplied = false;
         checkpointRollbackSaved = false;
         checkpointRollbackPromise = null;
-        deathNavigationPending = false;
+        deathActionGate.leave();
 
         const deathAt = new Date().toISOString();
         markCrashRecoveryDeathInvalid(deathAt);
@@ -7281,8 +7326,12 @@ function renderStagePreview(): void {
     (cleared ? "Cleared · Replay available" : isUnlocked ? "Current frontier" : "Locked") +
     (node.checkpoint ? " · Checkpoint milestone" : "");
   const start = byId<HTMLButtonElement>("journeyStartButton");
-  start.disabled = !isUnlocked;
-  start.textContent = cleared ? "Replay Stage" : "Start Stage";
+  start.disabled = !isUnlocked || journeyStartGate.active;
+  start.textContent = journeyStartGate.active
+    ? "Saving selection…"
+    : cleared
+      ? "Replay Stage"
+      : "Start Stage";
 }
 
 function renderStageGrid(): void {
@@ -7359,6 +7408,7 @@ function renderStageGrid(): void {
       button.append(ship);
     }
     button.addEventListener("click", () => {
+      if (journeyStartGate.active) return;
       selectedJourneyStage = node.stage;
       for (const sibling of board.querySelectorAll<HTMLButtonElement>(".journey-node")) {
         const selected = sibling === button;
@@ -8595,26 +8645,43 @@ byId("journeyWorldSelect").addEventListener("change", (event) => {
 
 byId("journeyStartButton").addEventListener("click", () => {
   void (async () => {
+    if (!journeyStartGate.tryEnter()) return;
+
     const stage = selectedJourneyStage;
-    if (!canSelectCampaignStage(campaign, campaignExpansion, stage)) return;
-    const previous = campaign;
-    const next = selectCampaignStage(campaign, stage);
-    if (next.selectedStage !== stage) return;
-    campaign = next;
-    const saved = await autosaveCampaign(
-      "stage-select",
-      "✓ Saved · Stage " + String(stage).padStart(3, "0") + " selected",
-      "stage-select",
-    );
-    if (!saved) {
-      campaign = previous;
+    const galaxySelect = byId<HTMLSelectElement>("galaxySelect");
+    const worldSelect = byId<HTMLSelectElement>("journeyWorldSelect");
+    stageSelectDialog.setAttribute("aria-busy", "true");
+    galaxySelect.disabled = true;
+    worldSelect.disabled = true;
+    renderStagePreview();
+
+    try {
+      if (!canSelectCampaignStage(campaign, campaignExpansion, stage)) return;
+      const previous = campaign;
+      const next = selectCampaignStage(campaign, stage);
+      if (next.selectedStage !== stage) return;
+      campaign = next;
+      const saved = await autosaveCampaign(
+        "stage-select",
+        "✓ Saved · Stage " + String(stage).padStart(3, "0") + " selected",
+        "stage-select",
+      );
+      if (!saved) {
+        campaign = previous;
+        updateCampaignUi();
+        return;
+      }
       updateCampaignUi();
-      return;
+      stageSelectDialog.close();
+      game.backToTitle();
+      await startSelectedStage();
+    } finally {
+      journeyStartGate.leave();
+      stageSelectDialog.removeAttribute("aria-busy");
+      galaxySelect.disabled = false;
+      worldSelect.disabled = false;
+      if (stageSelectDialog.open) renderStagePreview();
     }
-    updateCampaignUi();
-    stageSelectDialog.close();
-    game.backToTitle();
-    await startSelectedStage();
   })();
 });
 
