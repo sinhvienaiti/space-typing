@@ -5824,19 +5824,58 @@ function handleHiddenEncounterClear(
     "hidden-transition",
   );
 
+  const stageSession = game.getStageSessionSnapshot();
+  const rating = stageResultStars(accuracy, null);
+  const measuredKills =
+    stageSession.regularKills +
+    stageSession.eliteKills +
+    stageSession.bossKills;
+  const killRate =
+    stageSession.elapsedSeconds <= 0
+      ? 0
+      : measuredKills / stageSession.elapsedSeconds * 60;
+
   byId("clearTitle").textContent =
     result.completed
       ? label + " complete"
       : hiddenEncounterLabel(result.state.active!);
+  byId("clearMeta").textContent =
+    "Hidden encounter · Tier " + String(active.tier) +
+    " · Campaign Stage " + String(active.sourceStage).padStart(3, "0");
+  byId("clearStars").textContent =
+    "★".repeat(rating.stars) + "☆".repeat(3 - rating.stars);
+  byId("clearStarRule").textContent =
+    "1★ clear · 2★ ≥90% target accuracy · 3★ " + rating.thirdStarRule;
   byId("clearScore").textContent =
     stats.score.toLocaleString();
   byId("clearAccuracy").textContent =
     accuracy.toFixed(1) + "%";
   byId("clearWpm").textContent = wpm.toFixed(0);
-  byId("clearCredits").textContent = rewardText;
-  byId("clearDetails").textContent = "Hidden encounter reward";
+  byId("clearTime").textContent =
+    formatStageDuration(stageSession.elapsedSeconds);
+  byId("clearKillRate").textContent =
+    killRate.toFixed(1) + "/min";
   byId("clearStreak").textContent =
     String(stats.maxStreak);
+
+  wordReviewFilter = "all";
+  renderMeasuredStageSession(stageSession, stats.hits, stats.misses);
+
+  const rewardContainer = byId("clearCredits");
+  rewardContainer.replaceChildren();
+  const rewardChip = document.createElement("span");
+  rewardChip.className = "reward-chip";
+  rewardChip.textContent = rewardText;
+  rewardContainer.append(rewardChip);
+
+  const hiddenProgress = byId("clearCharacterProgress");
+  hiddenProgress.replaceChildren();
+  const hiddenProgressNote = document.createElement("span");
+  hiddenProgressNote.textContent =
+    "Character XP is not awarded by the current Hidden Encounter reward path.";
+  hiddenProgress.append(hiddenProgressNote);
+
+  byId("clearDetails").textContent = "Hidden encounter reward · no Campaign checkpoint advancement";
   updateCampaignUi();
   byId<HTMLButtonElement>("nextStageButton").textContent =
     result.completed
