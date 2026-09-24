@@ -5576,7 +5576,7 @@ function renderServiceShop(): void {
           "✓ Equipment grade evolved · " + definition.name,
         );
       });
-      card.append(evolve);
+      cardBody.append(evolve);
     }
 
     const maxAffixes = maxAffixesForGrade(item.grade);
@@ -5613,7 +5613,7 @@ function renderServiceShop(): void {
           "✓ Equipment affix rolled · " + definition.name,
         );
       });
-      card.append(rollAffix);
+      cardBody.append(rollAffix);
     }
 
     const rerollCost = equipmentAffixRollCost(item, true);
@@ -5643,7 +5643,7 @@ function renderServiceShop(): void {
           "✓ Equipment affix rerolled · " + definition.name,
         );
       });
-      card.append(reroll);
+      cardBody.append(reroll);
     }
 
     const dismantle = document.createElement("button");
@@ -5681,7 +5681,7 @@ function renderServiceShop(): void {
         false,
       );
     });
-    card.append(dismantle);
+    cardBody.append(dismantle);
 
     grid.append(card);
   }
