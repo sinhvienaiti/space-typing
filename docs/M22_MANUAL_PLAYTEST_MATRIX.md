@@ -2,6 +2,8 @@
 
 Status: **PENDING REAL BROWSER / AUDIO DEVICE EXECUTION**.
 
+Automated prerequisite update (2026-09-24): the repository now includes verified default CC0 music/ambient/SFX assets, bounded sampled-SFX runtime support, stage-phase adaptive music, and an audio payload guard. CI #622 passed. The rows below remain PENDING until they are actually heard/observed on a real device.
+
 This matrix is the final non-automatable gate for M22.
 
 Use the M21 **Developer Test Lab** whenever possible so testing stays isolated from PlayerSave.
