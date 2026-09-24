@@ -4,6 +4,7 @@ import {
   isVocabularyEntry,
   loadVocabularyLevel,
   loadVocabularyGrammarModule,
+  loadVocabularyKeys,
   loadVocabularyPosCategory,
   loadVocabularyTopic,
   parseCustomVocabulary,
@@ -397,6 +398,72 @@ describe("shared vocabulary helpers", () => {
       "travel",
     ]);
     expect(loaded.representativeLevel).toBe(50);
+  });
+
+  it("resolves Smart Review keys in parent order and fails closed on missing keys", async () => {
+    const vocabularyIndex = parseVocabularyIndex({
+      version: 1,
+      plannedLevels: 100,
+      availableLevels: 2,
+      totalEntries: 2,
+      levels: [
+        { level: 10, label: "Ten", file: "levels/010.json", count: 1 },
+        { level: 30, label: "Thirty", file: "levels/030.json", count: 1 },
+      ],
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        const body = url.endsWith("/lookup.json")
+          ? {
+              version: 1,
+              totalEntries: 2,
+              entries: { airport: 10, passport: 30 },
+            }
+          : url.endsWith("/010.json")
+            ? {
+                entries: [
+                  {
+                    id: "L010-001",
+                    en: "airport",
+                    vi: "sân bay",
+                    ipa: "/ˈerˌpɔrt/",
+                  },
+                ],
+              }
+            : {
+                entries: [
+                  {
+                    id: "L030-001",
+                    en: "passport",
+                    vi: "hộ chiếu",
+                    ipa: "/ˈpæsˌpɔrt/",
+                  },
+                ],
+              };
+        return {
+          ok: true,
+          status: 200,
+          json: async () => body,
+        } as Response;
+      }),
+    );
+
+    const loaded = await loadVocabularyKeys(
+      ["passport", "airport"],
+      vocabularyIndex,
+    );
+    expect(loaded.entries.map((entry) => entry.en)).toEqual([
+      "passport",
+      "airport",
+    ]);
+    expect(loaded.levels).toEqual([10, 30]);
+
+    await expect(
+      loadVocabularyKeys(["airport", "missing"], vocabularyIndex),
+    ).rejects.toThrow("missing Smart Review item");
   });
 
   it("parses custom EN-VI-IPA rows and removes duplicate English entries", () => {
