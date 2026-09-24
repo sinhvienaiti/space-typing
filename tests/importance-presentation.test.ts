@@ -5,6 +5,11 @@ import {
   missionImportance,
   objectiveImportance,
 } from "../src/ui/importance";
+import {
+  ACHIEVEMENT_IDS,
+  MISSION_IDS,
+} from "../src/progression/missions";
+import { STAGE_OBJECTIVE_TYPES } from "../src/events/objectives";
 
 describe("Batch E importance presentation", () => {
   it("gives every mission semantic icon/state without inventing persisted rarity", () => {
@@ -17,6 +22,29 @@ describe("Batch E importance presentation", () => {
       .toBe("Reward ready");
     expect(missionImportance("drops-10", "claimed").stateLabel)
       .toBe("Claimed");
+  });
+
+  it("covers every real mission, achievement and objective type with readable icon/state text", () => {
+    for (const id of MISSION_IDS) {
+      const presentation = missionImportance(id, "active");
+      expect(presentation.icon.length, id).toBeGreaterThan(0);
+      expect(presentation.label.length, id).toBeGreaterThan(0);
+      expect(presentation.stateLabel, id).toBe("In progress");
+    }
+
+    for (const id of ACHIEVEMENT_IDS) {
+      const unlocked = achievementImportance(id, true);
+      expect(unlocked.icon.length, id).toBeGreaterThan(0);
+      expect(unlocked.label.length, id).toBeGreaterThan(0);
+      expect(unlocked.stateLabel, id).toBe("Unlocked");
+    }
+
+    for (const type of STAGE_OBJECTIVE_TYPES) {
+      const presentation = objectiveImportance(type, false, "active");
+      expect(presentation.icon.length, type).toBeGreaterThan(0);
+      expect(presentation.label.length, type).toBeGreaterThan(0);
+      expect(presentation.stateLabel, type).toBe("Bonus");
+    }
   });
 
   it("does not expose locked achievement identity through presentation", () => {
