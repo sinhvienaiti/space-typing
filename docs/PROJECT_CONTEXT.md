@@ -3777,3 +3777,15 @@ Fixes:
 - failed/incomplete game-over transactions restore the correct enabled/disabled recovery choices from current state.
 
 No recovery rules, item counts, Campaign progression, checkpoint semantics or gameplay feature was changed.
+
+
+## 2026-09-24 — M22 accepted; M23 Review Pass #1 started
+
+- M22 is accepted/closed by owner decision after extensive iterative manual play plus the completed automated audit. The 43-row manual recorder remains a non-blocking regression checklist; untouched PENDING rows are not retroactively claimed PASS.
+- M23 branch: `review/m23-pass1`.
+- M23 first findings:
+  - typed Recall kills leaked Combat Splitter fragment spawning and Volatile death projectiles;
+  - typed Recall kills leaked the Combat learning translation echo despite Recall translation controls;
+  - Recall hint-index entries were retained after typed kills/Nova clears.
+- Fix direction: isolate Combat-only death traits/learning echo, clean Recall transient hint state, and add regression coverage that also proves Combat Splitter/Volatile behavior remains intact.
+- Future real-device/audio/visual findings after M22 acceptance are normal regressions: fix the root cause and add focused tests where practical; do not reopen the entire 43-row gate by default.
