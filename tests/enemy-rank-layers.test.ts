@@ -45,6 +45,8 @@ describe("M10 Enemy Rank I-X", () => {
     expect(high.lineWidthBoost).toBeGreaterThan(low.lineWidthBoost);
     expect(high.auraAlpha).toBeGreaterThan(low.auraAlpha);
     expect(high.auraRadiusScale).toBeGreaterThan(low.auraRadiusScale);
+    expect(low.accentColor).not.toBe(mid.accentColor);
+    expect(mid.accentColor).not.toBe(high.accentColor);
   });
 
   it("samples authored World rank distributions deterministically", () => {
