@@ -7605,8 +7605,6 @@ function renderRecallSetup(): void {
 
   const profile = recallDifficultyProfile(recallSettings.difficulty);
   byId("recallProfileMeta").textContent =
-    profile.label +
-    " · " +
     profile.enemySpeedScale.toFixed(2) +
     "× approach · " +
     String(Math.round(profile.initialHintRatio * 100)) +
