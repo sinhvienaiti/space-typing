@@ -3350,11 +3350,19 @@ Validation before documentation checkpoint: CI #678 PASS · 149/149 test files �
 
 ## M25 — Parent integration pin
 
-Only after child `main` is clean:
+**Status: COMPLETE (2026-09-24).**
 
-- update `sinhvienaiti/typing-game` submodule pin;
-- run Platform CI;
-- verify existing games remain unaffected.
+Completed after child `main` was clean:
+
+- parent `sinhvienaiti/typing-game` PR #43 updated only `games/space-typing` to child `7030ed539aeb3972ce5e6c3b5e8a46cc9c09ad21`;
+- final parent Platform CI #240 PASS;
+- Monkeytype play-mode contract, shared vocabulary/curriculum/typing-text/music, Portal layout/registry, Space Typing integration contract, Recall Typing tests/build, Space Typing tests/build and Portal build all passed;
+- parent PR #43 merged to `typing-game/main` as `b3129aab3e5753bc750535a53eb2949212362f8a`;
+- no other child gitlink or platform route/launcher contract was changed.
+
+### Expansion completion checkpoint
+
+M00-M25 are complete. M22 was closed by owner acceptance after the completed automated audit and extensive iterative manual play; the unexecuted rows in the 43-row recorder remain explicitly PENDING and are preserved as non-blocking regression checks rather than being falsely marked PASS. M23 and M24 both completed with green child CI, and M25 completed with green parent Platform CI.
 
 ---
 
