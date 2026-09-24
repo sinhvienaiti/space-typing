@@ -3701,7 +3701,9 @@ This plan is a roadmap, not evidence that every acceptance gate is complete.
 - Batch D did **not** create the still-unapproved second skill category. Existing Basic Skills, Support Spells and character abilities remain separate.
 - CI #588 measured bundle output at JS raw 599.18 KiB / gzip 160.44 KiB and CSS raw 59.60 KiB / gzip 13.57 KiB, remaining under the existing 60 KiB CSS budget without increasing the limit.
 - Real-browser responsive/visual QA and the parent `typing-game` gitlink integration remain mandatory merge/acceptance gates. Do not interpret green CI as measured user-hardware FPS or final visual acceptance.
-- After reconstructing latest `main`, the next planned implementation batch is Batch E (Mission/Codex/objective visual semantics), then Batch F browser/performance/final integration.
+- Batch E implementation is validated on PR #97 / CI #592: **143 test files / 711 tests**, TypeScript, production Build, bundle budget and ship-art budget all PASS. Mission/Achievement/Codex/Objective UI now uses one non-persisted semantic presentation contract with icon, readable state text and accent border; undiscovered Codex entries remain generic so hidden categories are not leaked.
+- Batch E adds no stylesheet rules. CI #592 measured JS raw 602.33 KiB / gzip 161.53 KiB and CSS raw 59.60 KiB / gzip 13.57 KiB; the existing CSS budget remains unchanged.
+- Real-browser responsive/visual QA and measured hardware performance are still pending. After reconstructing latest `main`, the next planned implementation batch is Batch F (browser/performance/final integration).
 
 ---
 
