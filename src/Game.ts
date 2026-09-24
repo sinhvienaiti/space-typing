@@ -177,6 +177,7 @@ import {
 } from "./loot/equipment-loot";
 import {
   createLuckPityState,
+  LUCK_PITY_KEYS,
   rollLuckPity,
   sanitizeLuckPityState,
   type LuckPityKey,
@@ -318,8 +319,13 @@ import {
   type HardCcState,
 } from "./combat/cc-guard";
 import {
+  EMP_CHARGE_DELAY_SECONDS,
+  isCombatConsumableId,
   isRecoveryItemId,
+  LUCKY_DICE_PITY_BOOST,
+  TIME_CRYSTAL_DURATION_SECONDS,
   useRecoveryItem,
+  type CombatConsumableId,
   type RecoveryItemId,
 } from "./items/consumables";
 import {
@@ -2266,14 +2272,133 @@ export class Game {
   useConsumable(id: string): boolean {
     if (
       this.phase !== "playing" ||
-      !isRecoveryItemId(id)
+      !isCombatConsumableId(id)
     ) {
       return false;
     }
 
-    const used = this.useRecoveryConsumable(id);
+    const used = isRecoveryItemId(id)
+      ? this.useRecoveryConsumable(id)
+      : this.useTacticalConsumable(id);
     if (used) this.stageResultTracker.recordConsumableUse();
     return used;
+  }
+
+  private useTacticalConsumable(
+    id: Exclude<CombatConsumableId, RecoveryItemId>,
+  ): boolean {
+    if (id === "nova-bomb") {
+      if (
+        this.enemies.length === 0 &&
+        this.projectiles.length === 0 &&
+        this.boss === null
+      ) {
+        return false;
+      }
+      this.releaseNovaPulse();
+      this.sfx.power();
+      this.emitStats();
+      return true;
+    }
+
+    if (id === "emp-charge") {
+      const hasPressure =
+        this.projectiles.length > 0 ||
+        this.enemies.some((enemy) => enemy.actionCooldown !== null) ||
+        this.boss !== null;
+      if (!hasPressure) return false;
+
+      this.projectiles = [];
+      for (const enemy of this.enemies) {
+        if (enemy.actionCooldown !== null) {
+          enemy.actionCooldown += EMP_CHARGE_DELAY_SECONDS;
+          enemy.flash = Math.max(enemy.flash, 0.6);
+        }
+      }
+      if (this.boss !== null) {
+        this.boss.actionCooldown += EMP_CHARGE_DELAY_SECONDS;
+        this.boss.flash = Math.max(this.boss.flash, 0.6);
+        this.hooks.onBossUpdate(toBossHud(this.boss));
+      }
+      this.burst(
+        this.width / 2,
+        this.height - PLAYER_Y_OFFSET,
+        28,
+        198,
+      );
+      this.sfx.support();
+      return true;
+    }
+
+    if (id === "time-crystal") {
+      if (this.timeShellTimer >= TIME_CRYSTAL_DURATION_SECONDS) {
+        return false;
+      }
+      this.timeShellTimer = Math.max(
+        this.timeShellTimer,
+        TIME_CRYSTAL_DURATION_SECONDS,
+      );
+      this.burst(
+        this.width / 2,
+        this.height - PLAYER_Y_OFFSET,
+        24,
+        212,
+      );
+      this.sfx.support();
+      return true;
+    }
+
+    if (id === "word-bomb") {
+      const target =
+        this.currentTarget() ??
+        [...this.enemies].sort((left, right) => right.y - left.y)[0] ??
+        null;
+      if (target === null) return false;
+      this.destroyEnemyWithWordBomb(target);
+      this.emitStats();
+      return true;
+    }
+
+    if (id === "supply-beacon") {
+      if (
+        this.supplyPod !== null ||
+        this.boss !== null ||
+        (this.spawnRemaining <= 0 && this.enemies.length === 0)
+      ) {
+        return false;
+      }
+      this.spawnSupplyPod();
+      return true;
+    }
+
+    if (id === "lucky-dice") {
+      let changed = false;
+      const next = { ...this.luckPity };
+      for (const key of LUCK_PITY_KEYS) {
+        const boosted = Math.min(
+          50,
+          next[key] + LUCKY_DICE_PITY_BOOST,
+        );
+        if (boosted !== next[key]) changed = true;
+        next[key] = boosted;
+      }
+      if (!changed) return false;
+
+      this.luckPity = next;
+      this.hooks.onLuckPityUpdate({ ...next });
+      this.rewardNotice = {
+        label: "LUCKY DICE · FUTURE RARE-EVENT PITY +" +
+          String(LUCKY_DICE_PITY_BOOST),
+        x: this.width / 2,
+        y: this.height - PLAYER_Y_OFFSET - 72,
+        hue: 48,
+        remaining: 1.8,
+      };
+      this.sfx.support();
+      return true;
+    }
+
+    return false;
   }
 
   private useRecoveryConsumable(id: RecoveryItemId): boolean {
@@ -5293,6 +5418,50 @@ export class Game {
     this.anomalyRiskRatio = 0;
     this.emitStats();
     return true;
+  }
+
+  private destroyEnemyWithWordBomb(enemy: Enemy): void {
+    this.stageResultTracker.skillKillWord(
+      "enemy",
+      enemy.id,
+      enemy.entry,
+      this.stageElapsedSeconds,
+    );
+    this.stageResultTracker.recordEnemyKill(enemy.elite);
+    this.stats.kills += 1;
+    this.addScore((enemy.elite ? 150 : 95) * this.stats.multiplier);
+    this.gainPower(4);
+    this.updateStageObjective({
+      type: "enemy-kill",
+      enemyId: enemy.id,
+      kind: enemy.kind,
+      elite: enemy.elite,
+    });
+
+    this.tryRollEquipmentDrop(
+      enemy.golden ? "golden" : enemy.elite ? "elite" : "normal",
+    );
+    if (enemy.kind === "splitter") {
+      this.spawnSplitFragments(enemy);
+    }
+    if (enemy.eliteModifiers.includes("volatile")) {
+      this.spawnVolatileBurst(enemy);
+    }
+
+    this.enemies = this.enemies.filter((item) => item.id !== enemy.id);
+    if (this.targetId === enemy.id) this.targetId = null;
+    if (this.markedEnemyId === enemy.id) {
+      this.markedEnemyId = null;
+      this.markTimer = 0;
+    }
+
+    const definition = this.visualDefinitionForEnemy(enemy);
+    const fx = enemyFxProfile(
+      definition?.family ?? "rainbow",
+      "death",
+    );
+    this.burst(enemy.x, enemy.y, fx.count, fx.hue);
+    this.sfx.kill(fx.pitch);
   }
 
   private currentTarget(): Enemy | null {
