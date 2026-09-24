@@ -108,7 +108,7 @@ function createTestGame() {
     createStageConfig(1),
     difficultyFor({
       stage: 1,
-      mode: "normal",
+      mode: "balanced",
       vocabularyLevel: 1,
       recentWpm: 60,
       recentAccuracy: 96,
