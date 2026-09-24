@@ -6,7 +6,8 @@ export type StageWordOutcome =
   | "perfect"
   | "corrected"
   | "missed"
-  | "skill-kill";
+  | "skill-kill"
+  | "interrupted";
 
 export type StageWordAttempt = {
   en: string;
@@ -28,6 +29,7 @@ export type StageWordGroup = {
   corrected: number;
   missed: number;
   skillKilled: number;
+  interrupted: number;
   correctKeys: number;
   wrongKeys: number;
 };
@@ -57,6 +59,7 @@ export type StageSessionSnapshot = {
   correctedWords: number;
   missedWords: number;
   skillKilledWords: number;
+  interruptedWords: number;
   perfectWordChain: number;
   maxPerfectWordChain: number;
   wordAttempts: StageWordAttempt[];
@@ -90,6 +93,7 @@ export function groupStageWordAttempts(
         corrected: 0,
         missed: 0,
         skillKilled: 0,
+        interrupted: 0,
         correctKeys: 0,
         wrongKeys: 0,
       };
@@ -102,7 +106,8 @@ export function groupStageWordAttempts(
     if (attempt.outcome === "perfect") group.perfect += 1;
     else if (attempt.outcome === "corrected") group.corrected += 1;
     else if (attempt.outcome === "missed") group.missed += 1;
-    else group.skillKilled += 1;
+    else if (attempt.outcome === "skill-kill") group.skillKilled += 1;
+    else group.interrupted += 1;
   }
 
   return [...grouped.values()].sort((left, right) =>
@@ -157,6 +162,7 @@ export class StageSessionTracker {
   private correctedWords = 0;
   private missedWords = 0;
   private skillKilledWords = 0;
+  private interruptedWords = 0;
   private perfectWordChain = 0;
   private maxPerfectWordChain = 0;
   private readonly attempts: StageWordAttempt[] = [];
@@ -187,6 +193,7 @@ export class StageSessionTracker {
     this.correctedWords = 0;
     this.missedWords = 0;
     this.skillKilledWords = 0;
+    this.interruptedWords = 0;
     this.perfectWordChain = 0;
     this.maxPerfectWordChain = 0;
     this.attempts.length = 0;
@@ -196,6 +203,10 @@ export class StageSessionTracker {
 
   recordEnemySpawn(): void {
     this.enemiesSpawned += 1;
+  }
+
+  discardEnemySpawns(count: number): void {
+    this.enemiesSpawned = Math.max(0, this.enemiesSpawned - Math.max(0, Math.floor(count)));
   }
 
   recordEnemyKill(elite: boolean): void {
@@ -315,6 +326,17 @@ export class StageSessionTracker {
     this.finishAttempt(key, entry, source, "skill-kill", elapsedSeconds);
   }
 
+  interruptWord(
+    source: StageWordSource,
+    targetId: number | string,
+    entry: VocabularyEntry,
+    elapsedSeconds: number,
+  ): void {
+    const key = attemptKey(source, targetId);
+    this.interruptedWords += 1;
+    this.finishAttempt(key, entry, source, "interrupted", elapsedSeconds);
+  }
+
   private finishAttempt(
     key: string,
     entry: VocabularyEntry,
@@ -363,6 +385,7 @@ export class StageSessionTracker {
       correctedWords: this.correctedWords,
       missedWords: this.missedWords,
       skillKilledWords: this.skillKilledWords,
+      interruptedWords: this.interruptedWords,
       perfectWordChain: this.perfectWordChain,
       maxPerfectWordChain: this.maxPerfectWordChain,
       wordAttempts,
