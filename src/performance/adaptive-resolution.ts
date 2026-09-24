@@ -11,6 +11,7 @@ const MIN_SCALE = 0.72;
 export class AdaptiveRenderBudget {
   private readonly frameMs: number[] = [];
   private readonly drawMs: number[] = [];
+  private sampleCursor = 0;
   private timeToReview = 3.5;
   private stableSeconds = 0;
   private value = 1;
@@ -18,8 +19,7 @@ export class AdaptiveRenderBudget {
   get scale(): number { return this.value; }
 
   reset(): void {
-    this.frameMs.length = 0;
-    this.drawMs.length = 0;
+    this.clearSamples();
     this.timeToReview = 3.5;
     this.stableSeconds = 0;
     this.value = 1;
@@ -31,10 +31,15 @@ export class AdaptiveRenderBudget {
         !Number.isFinite(drawMilliseconds) || drawMilliseconds < 0) {
       return false; // Background tab, first frame, debugger pause, etc.
     }
-    this.frameMs.push(frameSeconds * 1000);
-    this.drawMs.push(drawMilliseconds);
-    if (this.frameMs.length > SAMPLE_COUNT) this.frameMs.shift();
-    if (this.drawMs.length > SAMPLE_COUNT) this.drawMs.shift();
+    const frameMs = frameSeconds * 1000;
+    if (this.frameMs.length < SAMPLE_COUNT) {
+      this.frameMs.push(frameMs);
+      this.drawMs.push(drawMilliseconds);
+    } else {
+      this.frameMs[this.sampleCursor] = frameMs;
+      this.drawMs[this.sampleCursor] = drawMilliseconds;
+      this.sampleCursor = (this.sampleCursor + 1) % SAMPLE_COUNT;
+    }
     this.timeToReview -= Math.min(frameSeconds, 0.05);
     if (this.frameMs.length < 90 || this.timeToReview > 0) return false;
     this.timeToReview = 3.5;
@@ -55,8 +60,7 @@ export class AdaptiveRenderBudget {
       this.value = next;
       // Reprofile at the new DPR. Reusing old slow frames would repeatedly
       // downscale even if the first change already fixed the bottleneck.
-      this.frameMs.length = 0;
-      this.drawMs.length = 0;
+      this.clearSamples();
       this.timeToReview = 3.5;
       return true;
     }
@@ -74,5 +78,11 @@ export class AdaptiveRenderBudget {
       this.stableSeconds = 0;
     }
     return false;
+  }
+
+  private clearSamples(): void {
+    this.frameMs.length = 0;
+    this.drawMs.length = 0;
+    this.sampleCursor = 0;
   }
 }
