@@ -3659,7 +3659,7 @@ Important implementation notes:
 - M07 canonical World ids are the authoritative World identity used by M06 shop instances, M08 music profiles, M09 enemy/boss roster selection and M10 World rank bands; M12 changes pressure, not World access.
 - Event/special tokens remain optional per the expansion plan. M06 does not create a permanent Event Token before an earning loop exists.
 - Support spell loadout remains separate from core combat skills, but combat shortcuts are unified through the configurable 1-9 hotbar.
-- Hotbar slots 1-9 may reference the three implemented recovery consumables, core defensive/offensive skills, equipped support skills or the selected character's active skill.
+- Hotbar slots 1-9 may reference the nine implemented combat consumables (Repair Kit, Shield Cell, Energy Cell, Nova Bomb, EMP Charge, Time Crystal, Word Bomb, Supply Beacon, Lucky Dice), core defensive/offensive skills, equipped support skills or the selected character's active skill. Tactical item support is additive to the existing PlayerSave v26 HotbarState; slot numbering/schema remain unchanged.
 - Space remains the dedicated Overdrive key. Legacy hard-coded 1-3 / 4-9 / 0 / - / [ ] / = combat bindings are replaced by the hotbar routing layer.
 - Parent vocabulary and shared Music contracts remain unchanged.
 
@@ -3690,7 +3690,18 @@ existing skill Lv1-Lv5 and M17 UpgradeState, preserve Talent Points as a separat
 resource until explicitly designed otherwise, and design legacy-save migration.
 The player described two skill types but has defined **only Basic Skills**;
 do not invent the other type's unlock/upgrade rules without confirmation.
-This plan is a roadmap, not evidence that those features are implemented.
+This plan is a roadmap, not evidence that every acceptance gate is complete.
+
+## UI/UX execution checkpoint — 2026-09-24
+
+- Foundation P0 and Batches A–C were merged before the current Batch D work.
+- Batch D code/test/build validation is recorded on PR #96. CI #588 passes **142 test files / 706 tests**, TypeScript, production Vite build, bundle budget and ship-art budget.
+- Batch D introduces shared icon-first currency presentation, actual Aluminum/Copper/Silver/Gold/Diamond grade presentation, reusable visual-card primitives and expands the existing equipment registry to 21 stat-bearing definitions with multiple options per slot.
+- Existing shop items Nova Bomb, EMP Charge, Time Crystal, Word Bomb, Supply Beacon and Lucky Dice are no longer text-only/no-op stock: they are valid hotbar actions with bounded runtime effects and integration tests. Word Bomb/Nova forced kills do not masquerade as typed/learned words in Results V2 telemetry.
+- Batch D did **not** create the still-unapproved second skill category. Existing Basic Skills, Support Spells and character abilities remain separate.
+- CI #588 measured bundle output at JS raw 599.18 KiB / gzip 160.44 KiB and CSS raw 59.60 KiB / gzip 13.57 KiB, remaining under the existing 60 KiB CSS budget without increasing the limit.
+- Real-browser responsive/visual QA and the parent `typing-game` gitlink integration remain mandatory merge/acceptance gates. Do not interpret green CI as measured user-hardware FPS or final visual acceptance.
+- After reconstructing latest `main`, the next planned implementation batch is Batch E (Mission/Codex/objective visual semantics), then Batch F browser/performance/final integration.
 
 ---
 
