@@ -5369,8 +5369,7 @@ function renderServiceShop(): void {
       );
     });
 
-    cardBody.append(titleRow, detail, button);
-    card.append(visual, cardBody);
+    card.append(title, detail, button);
     repairPanel.append(card);
   }
 
@@ -5548,7 +5547,8 @@ function renderServiceShop(): void {
       );
     });
 
-    card.append(title, detail, button);
+    cardBody.append(titleRow, detail, button);
+    card.append(visual, cardBody);
 
     const evolutionCost = equipmentEvolutionCost(item);
     if (evolutionCost !== null) {
