@@ -292,7 +292,6 @@ import {
 import {
   currentEnemyLayer,
   enemyLayerPlan,
-  enemyLayerSegments,
   reinforceEnemyLayerPlan,
 } from "./enemies/layers";
 import {
@@ -8557,9 +8556,16 @@ export class Game {
         enemy.kind,
         clamp(enemy.layersRemaining, 1, 3) as 1 | 2 | 3,
       );
-    const layerSegments = enemyLayerSegments(
-      layerPlan,
-      enemy.layersRemaining,
+    const layerCount = Math.min(3, layerPlan.length);
+    const layerOffset = 3 - layerCount;
+    const clearedLayerCount = Math.max(
+      0,
+      layerCount -
+        clamp(
+          Math.floor(enemy.layersRemaining),
+          0,
+          layerCount,
+        ),
     );
     const currentLayer = currentEnemyLayer(
       layerPlan,
@@ -8635,18 +8641,27 @@ export class Game {
     const segmentGap = 3;
     const segmentWidth = (panelWidth - segmentGap * 2) / 3;
     const segmentY = y - 19;
-    for (const segment of layerSegments) {
+    for (let slot = 0; slot < 3; slot += 1) {
+      const planIndex = slot - layerOffset;
+      const status =
+        planIndex < 0
+          ? "inactive"
+          : planIndex < clearedLayerCount
+            ? "cleared"
+            : planIndex === clearedLayerCount
+              ? "current"
+              : "pending";
       const x =
         panelLeft +
-        segment.slot * (segmentWidth + segmentGap);
+        slot * (segmentWidth + segmentGap);
       context.fillStyle =
-        segment.status === "current"
+        status === "current"
           ? targeted
             ? "rgba(103, 239, 255, 0.95)"
             : "rgba(244, 200, 122, 0.92)"
-          : segment.status === "cleared"
+          : status === "cleared"
             ? "rgba(117, 255, 177, 0.45)"
-            : segment.status === "pending"
+            : status === "pending"
               ? "rgba(162, 181, 205, 0.32)"
               : "rgba(74, 88, 106, 0.14)";
       context.fillRect(x, segmentY, segmentWidth, 3);
