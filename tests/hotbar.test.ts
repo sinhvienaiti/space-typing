@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   assignHotbarSlot,
   createDefaultHotbarState,
+  hotbarPlacementForSlot,
   hotbarSlotForKey,
   isValidHotbarState,
   sanitizeHotbarState,
@@ -66,6 +67,22 @@ describe("RPG hotbar loadout", () => {
     expect(state.slots[1]).toBeNull();
     expect(state.slots[2]).toBeNull();
     expect(state.slots).toHaveLength(9);
+  });
+
+  it("places 1-4 left, 5-8 right and keeps slot 9 as utility", () => {
+    expect([0, 1, 2, 3].map(hotbarPlacementForSlot)).toEqual([
+      "left",
+      "left",
+      "left",
+      "left",
+    ]);
+    expect([4, 5, 6, 7].map(hotbarPlacementForSlot)).toEqual([
+      "right",
+      "right",
+      "right",
+      "right",
+    ]);
+    expect(hotbarPlacementForSlot(8)).toBe("utility");
   });
 
   it("maps only number keys 1-9", () => {
