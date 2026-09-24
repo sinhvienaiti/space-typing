@@ -3559,14 +3559,7 @@ kbd {
 }
 
 
-/* Non-currency reward notes; currency rewards use shared Batch D chips. */
-.result-rewards { min-width: 0; }
-.reward-chip {
-  display: inline-flex;
-  padding: .2rem .35rem;
-  border: 1px solid rgba(107,218,234,.2);
-  border-radius: 8px;
-}
+.reward-chip{display:inline-flex}
 .result-details {
   min-height: 0;
   color: #a6bccc;
@@ -3947,14 +3940,13 @@ kbd {
 }
 
 
-/* Batch D shared tokens; base cards/layout stay authoritative. */
-.currency-chip-row{display:flex;flex-wrap:wrap;align-items:center;gap:.3rem}
-.currency-chip{display:inline-flex;gap:.2rem;padding:.14rem .28rem;border:1px solid #36515c;border-radius:7px;font-size:.64rem;white-space:nowrap}
+/* Batch D identity tokens; base cards/layout stay authoritative. */
+.currency-chip-row{display:flex;flex-wrap:wrap;gap:.3rem}
+.currency-chip{display:inline-flex;gap:.2rem;padding:.12rem .25rem;font-size:.64rem}
 .currency-credits .currency-icon{color:#a9efff}.currency-alloy .currency-icon{color:#d6b37f}.currency-star-crystal .currency-icon{color:#e5b4ff}.currency-quantum-core .currency-icon{color:#aef4d8}
 .rarity-frame{--grade-accent:#8798a6;border-left:3px solid var(--grade-accent)!important}
 .grade-copper{--grade-accent:#cc8755}.grade-silver{--grade-accent:#b9d2dc}.grade-gold{--grade-accent:#e5bd62}.grade-diamond{--grade-accent:#8de9e6}
-.grade-badge{color:var(--grade-accent);font-size:.56rem;font-weight:850}
-.local-item-icon{display:grid;place-items:center;width:42px;height:42px;font-weight:900}
-.item-card{display:grid;grid-template-columns:46px minmax(0,1fr);gap:.5rem}
-.item-card-body{min-width:0}
+.grade-badge{color:var(--grade-accent);font-size:.56rem}
+.local-item-icon{display:grid;place-items:center;height:42px}
+.item-card{display:grid;grid-template-columns:46px 1fr;gap:.5rem}
 
