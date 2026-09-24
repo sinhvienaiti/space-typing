@@ -99,15 +99,23 @@ export function resolveRenderDpr(
 
 export class FrameProfiler {
   private readonly samples: number[] = [];
+  private cursor = 0;
+  private readonly capacity: number;
 
-  constructor(private readonly capacity = 180) {}
+  constructor(capacity = 180) {
+    this.capacity = Math.max(1, Math.floor(capacity));
+  }
 
   pushFrame(seconds: number): void {
     if (!Number.isFinite(seconds) || seconds <= 0) return;
-    this.samples.push(Math.min(0.25, seconds));
-    if (this.samples.length > this.capacity) {
-      this.samples.splice(0, this.samples.length - this.capacity);
+    const sample = Math.min(0.25, seconds);
+    if (this.samples.length < this.capacity) {
+      this.samples.push(sample);
+      return;
     }
+
+    this.samples[this.cursor] = sample;
+    this.cursor = (this.cursor + 1) % this.capacity;
   }
 
   report(): PerformanceReport {

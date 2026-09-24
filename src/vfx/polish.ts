@@ -2,6 +2,36 @@ import { clamp } from "../logic";
 
 export type ImpactKind = "key" | "word" | "boss-word" | "boss-defeat";
 
+export type CameraShakeOffset = { x: number; y: number };
+
+/**
+ * Smooth camera impulse used instead of a new random offset on every frame.
+ * The amplitude still comes from the existing impact feedback, but the
+ * position is continuous in time so moving enemies/text do not look like
+ * dropped frames after frequent word impacts.
+ */
+export function cameraShakeOffset(
+  amplitude: number,
+  timeSeconds: number,
+): CameraShakeOffset {
+  const safeAmplitude =
+    Number.isFinite(amplitude) && amplitude > 0 ? amplitude : 0;
+  if (safeAmplitude === 0) return { x: 0, y: 0 };
+
+  const time = Number.isFinite(timeSeconds) ? timeSeconds : 0;
+  const x =
+    ((Math.sin(time * 31.7) + Math.sin(time * 53.3 + 1.1) * 0.45) /
+      1.45) *
+    safeAmplitude;
+  const y =
+    ((Math.sin(time * 27.1 + 2.4) + Math.sin(time * 47.9) * 0.4) /
+      1.4) *
+    safeAmplitude *
+    0.72;
+
+  return { x, y };
+}
+
 export type ImpactFeedback = {
   hitStopSeconds: number;
   shake: number;

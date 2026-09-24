@@ -378,6 +378,7 @@ import {
   typingText,
 } from "./logic";
 import {
+  cameraShakeOffset,
   impactFeedback,
   telegraphPulse,
   telegraphStrength,
@@ -714,6 +715,7 @@ export class Game {
   private readonly drawProfiler = new FrameProfiler();
   private readonly adaptiveRenderBudget = new AdaptiveRenderBudget();
   private readonly modularBodyCache = new StaticEnemyBodyCache();
+  private readonly textWidthCache = new Map<string, number>();
   private lastTime = performance.now();
   private animationFrame = 0;
   private stars: Array<{ x: number; y: number; z: number }> = [];
@@ -751,6 +753,7 @@ export class Game {
   destroy(): void {
     cancelAnimationFrame(this.animationFrame);
     this.modularBodyCache.clear();
+    this.textWidthCache.clear();
     this.sfx.destroy();
   }
 
@@ -3306,26 +3309,34 @@ export class Game {
       this.boss.kick = Math.max(0, this.boss.kick - dt * 4);
     }
 
+    let liveLasers = 0;
     for (const laser of this.lasers) {
       laser.life -= dt;
+      if (laser.life > 0) this.lasers[liveLasers++] = laser;
     }
-    this.lasers = this.lasers.filter((laser) => laser.life > 0);
+    this.lasers.length = liveLasers;
 
+    let liveImpacts = 0;
     for (const impact of this.projectileImpacts) {
       impact.life -= dt;
+      if (impact.life > 0) {
+        this.projectileImpacts[liveImpacts++] = impact;
+      }
     }
-    this.projectileImpacts = this.projectileImpacts.filter(
-      (impact) => impact.life > 0,
-    );
+    this.projectileImpacts.length = liveImpacts;
 
+    let liveParticles = 0;
     for (const particle of this.particles) {
       particle.life -= dt;
       particle.x += particle.vx * dt;
       particle.y += particle.vy * dt;
       particle.vx *= Math.pow(0.12, dt);
       particle.vy *= Math.pow(0.12, dt);
+      if (particle.life > 0) {
+        this.particles[liveParticles++] = particle;
+      }
     }
-    this.particles = this.particles.filter((particle) => particle.life > 0);
+    this.particles.length = liveParticles;
 
     if (this.learningEcho !== null) {
       this.learningEcho.remaining = Math.max(
@@ -7028,6 +7039,20 @@ export class Game {
     this.hooks.onStats(this.getStats());
   }
 
+  private measureTextWidth(text: string): number {
+    const key = this.context.font + "\u0000" + text;
+    const cached = this.textWidthCache.get(key);
+    if (cached !== undefined) return cached;
+
+    const width = this.context.measureText(text).width;
+    if (this.textWidthCache.size >= 1024) {
+      const oldestKey = this.textWidthCache.keys().next().value;
+      if (oldestKey !== undefined) this.textWidthCache.delete(oldestKey);
+    }
+    this.textWidthCache.set(key, width);
+    return width;
+  }
+
   private seedStars(): void {
     const profile = qualityProfile(this.settings.visualQuality);
     const count = Math.max(
@@ -7053,10 +7078,8 @@ export class Game {
     context.save();
 
     if (this.shake > 0 && this.settings.screenShake) {
-      context.translate(
-        randomBetween(-this.shake, this.shake),
-        randomBetween(-this.shake, this.shake),
-      );
+      const offset = cameraShakeOffset(this.shake, time);
+      context.translate(offset.x, offset.y);
     }
 
     this.drawBackground(time);
@@ -7707,8 +7730,8 @@ export class Game {
       "800 24px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.textBaseline = "middle";
 
-    const fullWidth = context.measureText(displayWord).width;
-    const typedWidth = context.measureText(split.typed).width;
+    const fullWidth = this.measureTextWidth(displayWord);
+    const typedWidth = this.measureTextWidth(split.typed);
     const left = x - fullWidth / 2;
     const wordY = y + radius + 34;
 
@@ -7765,8 +7788,8 @@ export class Game {
     context.font =
       "750 17px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.textBaseline = "middle";
-    const fullWidth = context.measureText(displayWord).width;
-    const typedWidth = context.measureText(split.typed).width;
+    const fullWidth = this.measureTextWidth(displayWord);
+    const typedWidth = this.measureTextWidth(split.typed);
     const left = pod.x - fullWidth / 2;
     const wordY = y - 36;
 
@@ -7818,8 +7841,8 @@ export class Game {
     context.font =
       "800 18px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.textBaseline = "middle";
-    const fullWidth = context.measureText(displayWord).width;
-    const typedWidth = context.measureText(split.typed).width;
+    const fullWidth = this.measureTextWidth(displayWord);
+    const typedWidth = this.measureTextWidth(split.typed);
     const left = drone.x - fullWidth / 2;
     const wordY = y - 34;
     context.fillStyle = "rgba(4, 8, 14, 0.9)";
@@ -7900,7 +7923,7 @@ export class Game {
     context.fillStyle = "rgba(5, 9, 17, 0.9)";
     const maskWidth = Math.min(
       300,
-      Math.max(118, context.measureText(mask).width + 28),
+      Math.max(118, this.measureTextWidth(mask) + 28),
     );
     context.fillRect(x - maskWidth / 2, y - 56, maskWidth, 27);
     context.fillStyle = "#f5f3ff";
@@ -7966,8 +7989,8 @@ export class Game {
     context.font =
       "800 18px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.textBaseline = "middle";
-    const fullWidth = context.measureText(displayWord).width;
-    const typedWidth = context.measureText(split.typed).width;
+    const fullWidth = this.measureTextWidth(displayWord);
+    const typedWidth = this.measureTextWidth(split.typed);
     const left = x - fullWidth / 2;
     const wordY = crate.y - 38;
     context.fillStyle = "rgba(4, 8, 14, 0.9)";
@@ -8017,8 +8040,8 @@ export class Game {
     context.font =
       "800 18px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.textBaseline = "middle";
-    const fullWidth = context.measureText(displayWord).width;
-    const typedWidth = context.measureText(split.typed).width;
+    const fullWidth = this.measureTextWidth(displayWord);
+    const typedWidth = this.measureTextWidth(split.typed);
     const left = x - fullWidth / 2;
     const wordY = crate.y - 40;
     context.fillStyle = "rgba(4, 8, 14, 0.9)";
@@ -8540,8 +8563,8 @@ export class Game {
       "700 18px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.textBaseline = "middle";
 
-    const fullWidth = context.measureText(displayWord).width;
-    const typedWidth = context.measureText(typed).width;
+    const fullWidth = this.measureTextWidth(displayWord);
+    const typedWidth = this.measureTextWidth(typed);
     const panelWidth = Math.max(fullWidth + 16, 126);
     const left = enemy.x - fullWidth / 2;
     const panelLeft = enemy.x - panelWidth / 2;
@@ -8648,7 +8671,7 @@ export class Game {
     let y = 116;
     for (const buff of buffs) {
       const text = buff.label + " · " + buff.remaining.toFixed(1) + "s";
-      const width = context.measureText(text).width + 20;
+      const width = this.measureTextWidth(text) + 20;
       const x = this.width - 18;
       context.fillStyle = "rgba(3, 9, 18, 0.88)";
       context.fillRect(x - width, y - 12, width, 24);
@@ -8679,7 +8702,7 @@ export class Game {
       "850 13px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.textAlign = "center";
     context.textBaseline = "middle";
-    const width = context.measureText(notice.label).width;
+    const width = this.measureTextWidth(notice.label);
     context.fillStyle = "rgba(3, 9, 20, 0.9)";
     context.fillRect(
       notice.x - width / 2 - 9,

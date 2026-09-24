@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  cameraShakeOffset,
   impactFeedback,
   telegraphPulse,
   telegraphStrength,
@@ -16,6 +17,20 @@ describe("VFX polish helpers", () => {
       impactFeedback("word").hitStopSeconds,
     );
     expect(impactFeedback("boss-defeat").hitStopSeconds).toBeLessThan(0.1);
+  });
+
+  it("keeps camera shake smooth, deterministic and inside the requested amplitude", () => {
+    const amplitude = 4;
+    const a = cameraShakeOffset(amplitude, 1.25);
+    const b = cameraShakeOffset(amplitude, 1.25);
+    const next = cameraShakeOffset(amplitude, 1.251);
+
+    expect(a).toEqual(b);
+    expect(Math.abs(a.x)).toBeLessThanOrEqual(amplitude);
+    expect(Math.abs(a.y)).toBeLessThanOrEqual(amplitude);
+    expect(Math.abs(next.x - a.x)).toBeLessThan(0.25);
+    expect(Math.abs(next.y - a.y)).toBeLessThan(0.25);
+    expect(cameraShakeOffset(0, 99)).toEqual({ x: 0, y: 0 });
   });
 
   it("only shows attack telegraph inside the warning window", () => {
