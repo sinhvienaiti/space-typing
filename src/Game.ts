@@ -3266,29 +3266,28 @@ export class Game {
     }
 
     const playerX = this.width / 2;
-    for (const projectile of this.projectiles) {
+    for (let index = this.projectiles.length - 1; index >= 0; index -= 1) {
+      const projectile = this.projectiles[index]!;
       projectile.x += projectile.vx * dt * hostileTimeFactor;
       projectile.y += projectile.vy * dt * hostileTimeFactor;
 
+      const dx = projectile.x - playerX;
+      const dy = projectile.y - playerY;
+      const collisionRadius = projectile.radius + 15;
+      if (dx * dx + dy * dy <= collisionRadius * collisionRadius) {
+        this.damageFromProjectile(projectile, index);
+        continue;
+      }
+
       if (
-        Math.hypot(projectile.x - playerX, projectile.y - playerY) <=
-        projectile.radius + 15
+        projectile.x <= -80 ||
+        projectile.x >= this.width + 80 ||
+        projectile.y <= -80 ||
+        projectile.y >= this.height + 100
       ) {
-        this.damageFromProjectile(
-          projectile.id,
-          projectile.x,
-          projectile.y,
-        );
+        this.projectiles.splice(index, 1);
       }
     }
-
-    this.projectiles = this.projectiles.filter(
-      (projectile) =>
-        projectile.x > -80 &&
-        projectile.x < this.width + 80 &&
-        projectile.y > -80 &&
-        projectile.y < this.height + 100,
-    );
 
     this.updateEffects(dt);
 
@@ -6778,18 +6777,21 @@ export class Game {
   }
 
   private damageFromProjectile(
-    projectileId: number,
-    x: number,
-    y: number,
+    projectile: EnemyProjectile,
+    projectileIndex: number,
   ): void {
-    const projectile =
-      this.projectiles.find((item) => item.id === projectileId) ?? null;
+    if (this.projectiles[projectileIndex]?.id === projectile.id) {
+      this.projectiles.splice(projectileIndex, 1);
+    } else {
+      const resolvedIndex = this.projectiles.findIndex(
+        (item) => item.id === projectile.id,
+      );
+      if (resolvedIndex >= 0) this.projectiles.splice(resolvedIndex, 1);
+    }
 
-    this.projectiles = this.projectiles.filter(
-      (item) => item.id !== projectileId,
-    );
+    const { x, y } = projectile;
 
-    if (this.reflectTimer > 0 && projectile !== null) {
+    if (this.reflectTimer > 0) {
       this.reflectProjectile(projectile, x, y);
       return;
     }
