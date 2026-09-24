@@ -3279,6 +3279,7 @@ M22 may now begin the final deterministic balance/performance audit. Do not add 
 **Status: Automated audit complete; manual browser/audio/visual gate pending.** See `docs/M22_BALANCE_PERFORMANCE_AUDIT.md` and `docs/M22_MANUAL_PLAYTEST_MATRIX.md`.
 
 Pre-M22 Recall Mode V1 (`docs/PRE_M22_RECALL_MODE_PLAN.md`) is implementation-complete on PR #110. CI #656 PASS: 149/149 test files, 748/748 tests, TypeScript, production build, audio guard, bundle budget (JS 650.00 KiB raw / CSS 60.00 KiB raw) and Ship V3 art budget. This slice does not close M22: the manual matrix must now include Recall pronunciation, hidden-slot readability, translation/IPA toggles, replay/hint behavior, sequential enemy contact damage and Recall boss pressure on a real browser/audio device.
+Recall R07 adaptive repetition/mistake review is implementation-complete on PR #111. CI #665 PASS: 149/149 files, 749/749 tests and all unchanged build/audio/bundle/Ship-V3 guards. Weak remembered words receive bounded extra stage-start selection weight while every original vocabulary entry remains eligible; Stage Results add Recall learning metrics and mistake-first review ordering. This remains pre-M22 work and does not satisfy the real-browser/audio manual gate.
 
 Automated work completed:
 
