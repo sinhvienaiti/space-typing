@@ -82,14 +82,6 @@ const RECALL_DIFFICULTY: Record<RecallDifficultyId, RecallDifficultyProfile> = {
   },
 };
 
-export const RECALL_DIFFICULTY_IDS = [
-  "beginner",
-  "easy",
-  "normal",
-  "hard",
-  "extreme",
-] as const satisfies readonly RecallDifficultyId[];
-
 export function recallDifficultyProfile(
   id: RecallDifficultyId,
 ): RecallDifficultyProfile {
@@ -102,11 +94,11 @@ export function sanitizeRecallSettings(value: unknown): RecallSettings {
   }
 
   const candidate = value as Partial<RecallSettings>;
-  const difficulty = RECALL_DIFFICULTY_IDS.includes(
-    candidate.difficulty as RecallDifficultyId,
-  )
-    ? (candidate.difficulty as RecallDifficultyId)
-    : DEFAULT_RECALL_SETTINGS.difficulty;
+  const difficulty =
+    typeof candidate.difficulty === "string" &&
+    candidate.difficulty in RECALL_DIFFICULTY
+      ? candidate.difficulty as RecallDifficultyId
+      : DEFAULT_RECALL_SETTINGS.difficulty;
 
   return {
     difficulty,
@@ -261,43 +253,6 @@ export function buildAdaptiveRecallVocabulary(
   }
 
   return extras.length === 0 ? base : base.concat(extras);
-}
-
-export function summarizeRecallAttempts(
-  results: readonly RecallAttemptResult[],
-): {
-  attempts: number;
-  completed: number;
-  perfect: number;
-  needsReview: number;
-  hints: number;
-  replays: number;
-  averageResponseMs: number;
-} {
-  let completed = 0;
-  let perfect = 0;
-  let hints = 0;
-  let replays = 0;
-  let responseMs = 0;
-
-  for (const result of results) {
-    if (result.completed) completed += 1;
-    if (result.perfect) perfect += 1;
-    hints += result.hintCount;
-    replays += result.replayCount;
-    responseMs += result.responseMs;
-  }
-
-  const attempts = results.length;
-  return {
-    attempts,
-    completed,
-    perfect,
-    needsReview: attempts - perfect,
-    hints,
-    replays,
-    averageResponseMs: attempts === 0 ? 0 : responseMs / attempts,
-  };
 }
 
 export function recordRecallAttempt(
