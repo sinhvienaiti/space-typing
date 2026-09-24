@@ -934,11 +934,16 @@ app.innerHTML = `
       <div id="routeSelectedPanel" class="route-selected-panel hidden">
         <strong id="routeSelectedTitle">Combat</strong>
         <span id="routeSelectedMeta"></span>
-        <div class="route-actions">
-          <button id="routeShopAction" class="hidden">Open Shop</button>
-          <button id="routeStationShopAction" class="hidden">Station Shop</button>
-          <button id="routeServiceAction" class="hidden">Repair / Upgrade</button>
-          <button id="routeSupportAction" class="hidden">Support Loadout</button>
+        <div id="routeServiceGroup" class="route-service-group hidden">
+          <small>Optional services at this stop</small>
+          <div class="route-actions route-service-actions">
+            <button id="routeShopAction" class="hidden">Open Shop</button>
+            <button id="routeStationShopAction" class="hidden">Station Shop</button>
+            <button id="routeServiceAction" class="hidden">Repair / Upgrade</button>
+            <button id="routeSupportAction" class="hidden">Support Loadout</button>
+          </div>
+        </div>
+        <div class="route-actions route-primary-actions">
           <button id="routeContinueButton" class="primary">Start Encounter</button>
           <button id="routeCampaignButton" type="button">Open Campaign Map</button>
         </div>
@@ -2309,61 +2314,99 @@ function hotbarActionStatus(action: HotbarAction): {
   };
 }
 
-function ensureHotbarButtons(): HTMLButtonElement[] {
+type HotbarButtonView = {
+  button: HTMLButtonElement;
+  glyph: HTMLElement;
+  label: HTMLElement;
+  state: HTMLElement;
+};
+
+let hotbarButtonViews: HotbarButtonView[] | null = null;
+
+function ensureHotbarButtons(): HotbarButtonView[] {
   const root = byId("combatHotbar");
-  if (root.children.length !== 9) {
+  if (root.children.length !== 9 || hotbarButtonViews === null) {
     root.replaceChildren();
+    const views: HotbarButtonView[] = [];
     for (let index = 0; index < 9; index += 1) {
       const button = document.createElement("button");
       button.type = "button";
       button.className =
         "hotbar-slot hotbar-" + hotbarPlacementForSlot(index);
       button.id = "hotbarSlot" + String(index + 1);
-      button.innerHTML =
-        "<kbd>" + String(index + 1) + "</kbd>" +
-        "<span class=\"hotbar-glyph\">·</span>" +
-        "<span class=\"hotbar-label\">empty</span>" +
-        "<strong class=\"hotbar-state\">—</strong>";
+      const key = document.createElement("kbd");
+      key.textContent = String(index + 1);
+      const glyph = document.createElement("span");
+      glyph.className = "hotbar-glyph";
+      glyph.textContent = "·";
+      const label = document.createElement("span");
+      label.className = "hotbar-label";
+      label.textContent = "empty";
+      const state = document.createElement("strong");
+      state.className = "hotbar-state";
+      state.textContent = "—";
+      button.append(key, glyph, label, state);
       button.addEventListener("click", () => activateHotbarSlot(index));
       root.append(button);
+      views.push({ button, glyph, label, state });
     }
+    hotbarButtonViews = views;
   }
-  return Array.from(root.querySelectorAll<HTMLButtonElement>(".hotbar-slot"));
+  return hotbarButtonViews;
 }
 
 function renderHotbar(): void {
-  const buttons = ensureHotbarButtons();
-  for (let index = 0; index < buttons.length; index += 1) {
-    const button = buttons[index]!;
+  const views = ensureHotbarButtons();
+  for (let index = 0; index < views.length; index += 1) {
+    const view = views[index]!;
     const action = hotbar.slots[index] ?? null;
-    const glyph = button.querySelector<HTMLElement>(".hotbar-glyph");
-    const label = button.querySelector<HTMLElement>(".hotbar-label");
-    const state = button.querySelector<HTMLElement>(".hotbar-state");
 
-    button.classList.remove("item", "skill", "character", "cooldown");
     if (action === null) {
-      if (glyph !== null) glyph.textContent = "·";
-      if (label !== null) label.textContent = "empty";
-      if (state !== null) state.textContent = "—";
-      button.disabled = true;
-      button.title = "Unassigned hotbar slot";
+      const renderKey = "empty";
+      if (view.button.dataset.renderKey === renderKey) continue;
+      view.button.dataset.renderKey = renderKey;
+      view.glyph.textContent = "·";
+      view.label.textContent = "empty";
+      view.state.textContent = "—";
+      view.button.disabled = true;
+      view.button.title = "Unassigned hotbar slot";
+      view.button.className =
+        "hotbar-slot hotbar-" + hotbarPlacementForSlot(index);
       continue;
     }
 
-    if (glyph !== null) glyph.textContent = hotbarActionGlyph(action);
-    if (label !== null) label.textContent = hotbarActionLabel(action);
     const status = hotbarActionStatus(action);
-    if (state !== null) state.textContent = status.state;
-    button.disabled = status.disabled;
-    button.title = status.title;
-    button.classList.add(
+    const kindClass =
       action.kind === "item"
         ? "item"
         : action.kind === "character-skill"
           ? "character"
-          : "skill",
-    );
-    button.classList.toggle("cooldown", status.cooldown);
+          : "skill";
+    const glyph = hotbarActionGlyph(action);
+    const label = hotbarActionLabel(action);
+    const renderKey = [
+      hotbarActionKey(action),
+      glyph,
+      label,
+      status.state,
+      status.disabled ? "disabled" : "enabled",
+      status.cooldown ? "cooldown" : "ready",
+      status.title,
+    ].join("\u0000");
+    if (view.button.dataset.renderKey === renderKey) continue;
+
+    view.button.dataset.renderKey = renderKey;
+    view.glyph.textContent = glyph;
+    view.label.textContent = label;
+    view.state.textContent = status.state;
+    view.button.disabled = status.disabled;
+    view.button.title = status.title;
+    view.button.className =
+      "hotbar-slot hotbar-" +
+      hotbarPlacementForSlot(index) +
+      " " +
+      kindClass +
+      (status.cooldown ? " cooldown" : "");
   }
 }
 
@@ -2747,10 +2790,9 @@ function renderStatuses(
 let lastMusicBossPhase = 0;
 
 function renderBoss(boss: BossHudState | null): void {
-  const hud = byId("bossHud");
   if (boss === null) {
     lastMusicBossPhase = 0;
-    hud.classList.add("hidden");
+    hudClass("bossHud", "hidden", true);
     return;
   }
 
@@ -2759,7 +2801,7 @@ function renderBoss(boss: BossHudState | null): void {
     lastMusicBossPhase = boss.phase;
   }
 
-  hud.classList.remove("hidden");
+  hudClass("bossHud", "hidden", false);
   const mechanicMeta =
     boss.mechanicLabel === undefined
       ? ""
@@ -2770,22 +2812,26 @@ function renderBoss(boss: BossHudState | null): void {
           : boss.mechanicProgress !== undefined
             ? " " + boss.mechanicProgress
             : "");
-  byId("bossName").textContent =
+  hudText(
+    "bossName",
     boss.name +
-    " · PHASE " +
-    String(boss.phase) +
-    mechanicMeta +
-    (boss.shieldActive ? " · SHIELD" : boss.staggered ? " · STAGGER" : "");
-  byId("bossHpText").textContent =
+      " · PHASE " +
+      String(boss.phase) +
+      mechanicMeta +
+      (boss.shieldActive ? " · SHIELD" : boss.staggered ? " · STAGGER" : ""),
+  );
+  hudText(
+    "bossHpText",
     Math.max(0, Math.ceil(boss.hp)).toLocaleString() +
-    " / " +
-    boss.maxHp.toLocaleString();
+      " / " +
+      boss.maxHp.toLocaleString(),
+  );
 
   const percent =
     boss.maxHp <= 0
       ? 0
       : Math.max(0, Math.min(100, (boss.hp / boss.maxHp) * 100));
-  byId("bossHpFill").style.width = percent.toFixed(2) + "%";
+  hudWidth("bossHpFill", percent.toFixed(2) + "%");
 }
 
 function createEquipmentDropInstanceId(): string {
@@ -6579,6 +6625,17 @@ function renderRouteMap(): void {
     "hidden",
     selected.type !== "station",
   );
+  const hasOptionalService =
+    selected.type === "shop" || selected.type === "station";
+  byId("routeServiceGroup").classList.toggle(
+    "hidden",
+    !hasOptionalService,
+  );
+  continueButton.textContent =
+    "Start Stage " + String(selected.targetStage).padStart(3, "0");
+  continueButton.title = hasOptionalService
+    ? "Services are optional. Start the encounter when you are ready."
+    : "Start the selected combat encounter.";
   for (const button of [
     shopAction,
     stationShopAction,
