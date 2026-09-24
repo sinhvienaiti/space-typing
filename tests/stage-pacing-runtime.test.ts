@@ -32,6 +32,7 @@ function createRuntime(stageNumber = 1) {
     devicePixelRatio: 1,
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(() => true),
     setTimeout: globalThis.setTimeout,
     clearTimeout: globalThis.clearTimeout,
   });
