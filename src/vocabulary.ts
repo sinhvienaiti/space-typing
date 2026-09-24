@@ -10,6 +10,10 @@ const TOPIC_INDEX_URL = "/vocabulary/topics/index.json";
 const POS_INDEX_URL = "/vocabulary/parts-of-speech/index.json";
 const GRAMMAR_INDEX_URL = "/vocabulary/grammar/index.json";
 const LEVEL_BASE = "/vocabulary/";
+const vocabularyLevelCache = new Map<
+  string,
+  Promise<VocabularyEntry[]>
+>();
 
 export type VocabularyTopicEntry = {
   key: string;
@@ -424,6 +428,10 @@ export function vocabularyLevelUrl(level: VocabularyLevel): string {
   return LEVEL_BASE + level.file.replace(/^\/+/, "");
 }
 
+export function clearVocabularyRuntimeCache(): void {
+  vocabularyLevelCache.clear();
+}
+
 export async function loadVocabularyLevel(
   levelNumber: number,
   index: VocabularyIndex,
@@ -433,23 +441,43 @@ export async function loadVocabularyLevel(
     throw new Error("Vocabulary level " + String(levelNumber) + " is unavailable.");
   }
 
-  const response = await fetch(vocabularyLevelUrl(level), { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error("Unable to load vocabulary level " + String(levelNumber) + ".");
+  const url = vocabularyLevelUrl(level);
+  let pending = vocabularyLevelCache.get(url);
+  if (pending === undefined) {
+    pending = (async (): Promise<VocabularyEntry[]> => {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(
+          "Unable to load vocabulary level " + String(levelNumber) + ".",
+        );
+      }
+
+      const raw = (await response.json()) as unknown;
+      const entries =
+        raw !== null &&
+        typeof raw === "object" &&
+        Array.isArray((raw as { entries?: unknown }).entries)
+          ? (raw as { entries: unknown[] }).entries.filter(isVocabularyEntry)
+          : [];
+
+      if (entries.length === 0) {
+        throw new Error(
+          "Vocabulary level " + String(levelNumber) + " has no valid entries.",
+        );
+      }
+      return entries;
+    })();
+    vocabularyLevelCache.set(url, pending);
   }
 
-  const raw = (await response.json()) as unknown;
-  const entries =
-    raw !== null &&
-    typeof raw === "object" &&
-    Array.isArray((raw as { entries?: unknown }).entries)
-      ? (raw as { entries: unknown[] }).entries.filter(isVocabularyEntry)
-      : [];
-
-  if (entries.length === 0) {
-    throw new Error("Vocabulary level " + String(levelNumber) + " has no valid entries.");
+  try {
+    return await pending;
+  } catch (error) {
+    if (vocabularyLevelCache.get(url) === pending) {
+      vocabularyLevelCache.delete(url);
+    }
+    throw error;
   }
-  return entries;
 }
 
 async function topicReferences(
@@ -474,9 +502,17 @@ async function loadVocabularyReferences(
   levels: number[];
   representativeLevel: number;
 }> {
+  const uniqueReferences = [
+    ...new Map(
+      references.map((entry) => [
+        normalizeEnglish(entry.key),
+        entry,
+      ]),
+    ).values(),
+  ];
   const levels = [
     ...new Set(
-      references
+      uniqueReferences
         .map((entry) => entry.level)
         .filter(
           (level) =>
@@ -517,7 +553,7 @@ async function loadVocabularyReferences(
   return {
     entries,
     levels,
-    representativeLevel: representativeTopicLevel(references),
+    representativeLevel: representativeTopicLevel(uniqueReferences),
   };
 }
 

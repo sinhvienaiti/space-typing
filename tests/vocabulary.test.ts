@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  clearVocabularyRuntimeCache,
   isVocabularyEntry,
+  loadVocabularyLevel,
   loadVocabularyGrammarModule,
   loadVocabularyPosCategory,
   loadVocabularyTopic,
@@ -14,7 +16,10 @@ import {
 } from "../src/vocabulary";
 
 describe("shared vocabulary helpers", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    clearVocabularyRuntimeCache();
+    vi.unstubAllGlobals();
+  });
 
   it("recognizes the parent vocabulary entry shape", () => {
     expect(isVocabularyEntry({
@@ -108,6 +113,34 @@ describe("shared vocabulary helpers", () => {
         topics: [{ id: "", label: "Broken", group: "x", levels: [], count: 1, keys: [] }],
       }),
     ).toThrow("Shared vocabulary topic index is invalid.");
+  });
+
+  it("reuses an already loaded level within the current session", async () => {
+    const vocabularyIndex = parseVocabularyIndex({
+      version: 1,
+      plannedLevels: 100,
+      availableLevels: 1,
+      totalEntries: 1,
+      levels: [
+        { level: 1, label: "One", file: "levels/001.json", count: 1 },
+      ],
+    });
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        entries: [
+          { id: "L001-001", en: "good", vi: "tốt", ipa: "/ɡʊd/" },
+        ],
+      }),
+    }) as Response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const first = await loadVocabularyLevel(1, vocabularyIndex);
+    const second = await loadVocabularyLevel(1, vocabularyIndex);
+
+    expect(second).toBe(first);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("loads only Topic levels and derives a representative difficulty level", async () => {
@@ -285,6 +318,85 @@ describe("shared vocabulary helpers", () => {
     );
     expect(loaded.entries.map((entry) => entry.en)).toEqual(["today", "work"]);
     expect(loaded.module.label).toBe("Present");
+  });
+
+  it("does not double-weight a grammar signal repeated by linked topics", async () => {
+    const grammarIndex = parseVocabularyGrammarIndex({
+      version: 1,
+      primaryTimeGroups: ["time.present"],
+      modules: [
+        {
+          id: "time.present",
+          label: "Present",
+          group: "present",
+          focus: ["current context"],
+          topicIds: ["everyday.routine"],
+          signalTokens: ["today"],
+          signalEntries: [{ key: "today", level: 1 }],
+          missingSignalKeys: [],
+        },
+      ],
+    });
+    const topicIndex = parseVocabularyTopicIndex({
+      version: 1,
+      totalGroups: 1,
+      totalTopics: 1,
+      uniqueVocabularyKeys: 3,
+      topics: [
+        {
+          id: "everyday.routine",
+          label: "Daily Routine",
+          group: "everyday-life",
+          groupLabel: "Everyday Life",
+          levels: ["A1", "B1"],
+          count: 3,
+          keys: ["today", "work", "travel"],
+          entries: [
+            { key: "today", level: 1 },
+            { key: "work", level: 50 },
+            { key: "travel", level: 60 },
+          ],
+        },
+      ],
+    });
+    const vocabularyIndex = parseVocabularyIndex({
+      version: 1,
+      plannedLevels: 100,
+      availableLevels: 3,
+      totalEntries: 3,
+      levels: [
+        { level: 1, label: "One", file: "levels/001.json", count: 1 },
+        { level: 50, label: "Fifty", file: "levels/050.json", count: 1 },
+        { level: 60, label: "Sixty", file: "levels/060.json", count: 1 },
+      ],
+    });
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const entry = url.endsWith("/001.json")
+        ? { id: "L001-001", en: "today", vi: "hôm nay", ipa: "/təˈdeɪ/" }
+        : url.endsWith("/050.json")
+          ? { id: "L050-001", en: "work", vi: "công việc", ipa: "/wɝk/" }
+          : { id: "L060-001", en: "travel", vi: "du lịch", ipa: "/ˈtrævəl/" };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ entries: [entry] }),
+      } as Response;
+    }));
+
+    const loaded = await loadVocabularyGrammarModule(
+      "time.present",
+      grammarIndex,
+      topicIndex,
+      vocabularyIndex,
+    );
+
+    expect(loaded.entries.map((entry) => entry.en)).toEqual([
+      "today",
+      "work",
+      "travel",
+    ]);
+    expect(loaded.representativeLevel).toBe(50);
   });
 
   it("parses custom EN-VI-IPA rows and removes duplicate English entries", () => {

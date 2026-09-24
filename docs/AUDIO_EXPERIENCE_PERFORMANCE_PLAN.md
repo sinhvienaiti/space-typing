@@ -237,3 +237,30 @@ Remaining acceptance is intentionally manual:
 - verify boss arrival/phase pressure;
 - verify shop/station calm contrast;
 - verify 15+ minute session has no duplicate loops or accumulating audio artifacts.
+
+
+## 14. T16 source-review checkpoint — 2026-09-24
+
+A second post-implementation source review was performed after the adaptive-audio and shared-curriculum integrations.
+
+Confirmed issues fixed in this pass:
+
+- Vocabulary dialog no longer eagerly loads Class, Topic, Word type and Grammar indexes together; only the active source is loaded.
+- A failure in one curriculum source no longer writes the same failure into every source panel.
+- Five source tabs now use a balanced responsive layout and expose `aria-pressed` state.
+- Shared vocabulary level JSON documents are cached per browser session; failed requests are evicted so retry remains possible.
+- Grammar references are deduplicated before deriving the representative vocabulary difficulty profile.
+- Particle damping now computes the same exponential coefficient once per simulation frame instead of once per particle axis.
+- Sampled SFX now prewarm their complete bounded voice pools before combat, removing first-use `Audio` allocation from combat events.
+
+Review findings explicitly *not* treated as removable features:
+
+- particle counts remain unchanged;
+- Canvas effects and visual quality modes remain unchanged;
+- enemy/projectile counts and combat timing remain unchanged;
+- sampled and synthesized SFX remain enabled;
+- curriculum content and 18,000-word lexical data remain unchanged.
+
+Automated acceptance for this review is the full child CI, including unit/runtime tests, TypeScript, production build, bundle guard, Ship V3 guard and audio asset guard.
+
+Real browser/audio M22 acceptance remains pending and must still validate perceived motion smoothness, pronunciation priority, long-session audio lifecycle, UI readability and measured frame-time gates on actual hardware.

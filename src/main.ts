@@ -7490,11 +7490,19 @@ function curriculumLabel(id: string): string {
 }
 
 function renderSourceTabs(): void {
-  byId("sourceClass").classList.toggle("active", sourceTab === "class");
-  byId("sourceTopic").classList.toggle("active", sourceTab === "topic");
-  byId("sourceWordType").classList.toggle("active", sourceTab === "word-type");
-  byId("sourceGrammar").classList.toggle("active", sourceTab === "grammar");
-  byId("sourceCustom").classList.toggle("active", sourceTab === "custom");
+  const tabButtons: Array<[string, VocabularySourceTab]> = [
+    ["sourceClass", "class"],
+    ["sourceTopic", "topic"],
+    ["sourceWordType", "word-type"],
+    ["sourceGrammar", "grammar"],
+    ["sourceCustom", "custom"],
+  ];
+  for (const [id, tab] of tabButtons) {
+    const button = byId<HTMLButtonElement>(id);
+    const active = sourceTab === tab;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  }
   byId("classPanel").classList.toggle("hidden", sourceTab !== "class");
   byId("topicPanel").classList.toggle("hidden", sourceTab !== "topic");
   byId("wordTypePanel").classList.toggle("hidden", sourceTab !== "word-type");
@@ -7979,25 +7987,55 @@ async function importSaveFile(file: File): Promise<void> {
   }
 }
 
+function sourceMetaId(tab: VocabularySourceTab): string | null {
+  if (tab === "class") return "levelMeta";
+  if (tab === "topic") return "topicMeta";
+  if (tab === "word-type") return "wordTypeMeta";
+  if (tab === "grammar") return "grammarMeta";
+  return null;
+}
+
+async function populateVocabularySourceTab(
+  tab: VocabularySourceTab,
+): Promise<void> {
+  if (tab === "class") {
+    await populateLevels();
+  } else if (tab === "topic") {
+    await populateTopics();
+  } else if (tab === "word-type") {
+    await populateWordTypes();
+  } else if (tab === "grammar") {
+    await populateGrammar();
+  }
+}
+
+async function populateVocabularySourceTabSafely(
+  tab: VocabularySourceTab,
+): Promise<void> {
+  const metaId = sourceMetaId(tab);
+  try {
+    await populateVocabularySourceTab(tab);
+  } catch (error) {
+    if (metaId !== null) {
+      byId(metaId).textContent =
+        error instanceof Error
+          ? error.message
+          : "Unable to load this learning source.";
+    }
+  }
+}
+
+function selectVocabularySourceTab(tab: VocabularySourceTab): void {
+  sourceTab = tab;
+  renderSourceTabs();
+  void populateVocabularySourceTabSafely(tab);
+}
+
 async function openVocabulary(): Promise<void> {
   sourceTab = sourceState.mode;
   renderSourceTabs();
-  try {
-    await Promise.all([
-      populateLevels(),
-      populateTopics(),
-      populateWordTypes(),
-      populateGrammar(),
-    ]);
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unable to load learning sources.";
-    byId("levelMeta").textContent = message;
-    byId("topicMeta").textContent = message;
-    byId("wordTypeMeta").textContent = message;
-    byId("grammarMeta").textContent = message;
-  }
-  vocabularyDialog.showModal();
+  await populateVocabularySourceTabSafely(sourceTab);
+  if (!vocabularyDialog.open) vocabularyDialog.showModal();
 }
 
 async function applyClassLevel(level: number): Promise<void> {
@@ -8528,32 +8566,23 @@ for (const id of ["vocabularyButton", "pauseVocabularyButton"]) {
 }
 
 byId("sourceClass").addEventListener("click", () => {
-  sourceTab = "class";
-  renderSourceTabs();
-  void populateLevels();
+  selectVocabularySourceTab("class");
 });
 
 byId("sourceTopic").addEventListener("click", () => {
-  sourceTab = "topic";
-  renderSourceTabs();
-  void populateTopics();
+  selectVocabularySourceTab("topic");
 });
 
 byId("sourceWordType").addEventListener("click", () => {
-  sourceTab = "word-type";
-  renderSourceTabs();
-  void populateWordTypes();
+  selectVocabularySourceTab("word-type");
 });
 
 byId("sourceGrammar").addEventListener("click", () => {
-  sourceTab = "grammar";
-  renderSourceTabs();
-  void populateGrammar();
+  selectVocabularySourceTab("grammar");
 });
 
 byId("sourceCustom").addEventListener("click", () => {
-  sourceTab = "custom";
-  renderSourceTabs();
+  selectVocabularySourceTab("custom");
 });
 
 byId("levelSelect").addEventListener("change", updateLevelMeta);
