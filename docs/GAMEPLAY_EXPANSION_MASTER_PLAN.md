@@ -3276,7 +3276,7 @@ M22 may now begin the final deterministic balance/performance audit. Do not add 
 
 ## M22 — Full balance/performance audit
 
-**Status: Automated audit complete; manual browser/audio/visual gate pending.** See `docs/M22_BALANCE_PERFORMANCE_AUDIT.md` and `docs/M22_MANUAL_PLAYTEST_MATRIX.md`.
+**Status: ACCEPTED / CLOSED (2026-09-24).** Automated audit is complete. The owner accepted the current real-play state after extensive iterative testing; the remaining 43-row recorder is retained as a regression checklist rather than a roadmap blocker. See `docs/M22_BALANCE_PERFORMANCE_AUDIT.md` and `docs/M22_MANUAL_PLAYTEST_MATRIX.md`.
 
 Pre-M22 Recall Mode V1 (`docs/PRE_M22_RECALL_MODE_PLAN.md`) is implementation-complete on PR #110. CI #656 PASS: 149/149 test files, 748/748 tests, TypeScript, production build, audio guard, bundle budget (JS 650.00 KiB raw / CSS 60.00 KiB raw) and Ship V3 art budget. This slice does not close M22: the manual matrix must now include Recall pronunciation, hidden-slot readability, translation/IPA toggles, replay/hint behavior, sequential enemy contact damage and Recall boss pressure on a real browser/audio device.
 Recall R07 adaptive repetition/mistake review is implementation-complete on PR #111. CI #665 PASS: 149/149 files, 749/749 tests and all unchanged build/audio/bundle/Ship-V3 guards. Weak remembered words receive bounded extra stage-start selection weight while every original vocabulary entry remains eligible; Stage Results add Recall learning metrics and mistake-first review ordering. This remains pre-M22 work and does not satisfy the real-browser/audio manual gate.
@@ -3296,7 +3296,7 @@ Automated work completed:
 - the recorder captures live Test Lab performance/runtime/music evidence and requires explicit real-audio, High/Ultra-browser and low/mid/high human-paced attestations before COMPLETE CANDIDATE status;
 - CI #395 PASS · 116 test files · 583/583 tests · TypeScript check + production build + bundle budget.
 
-Remaining M22 gate:
+M22 closure decision:
 
 The approved user-facing polish slice in `docs/PRE_M22_UI_RECALL_CHARACTER_POLISH_PLAN.md` is COMPLETE. P00-P08 are merged with follow-up P08.1.
 
@@ -3306,19 +3306,27 @@ The approved transition slice in `docs/PRE_M22_STAGE_TRANSITION_PLAN.md` is COMP
 
 The final approved pre-manual slice in `docs/PRE_M22_COMBAT_IDENTITY_TYPING_CLARITY_PLAN.md` has completed C01-C12: same-prefix spawn suppression, deterministic nearest-target QA, Ship Visual V2 illustrated player art with procedural fallback, equipment-derived aura, and character-specific player-shot VFX without changing combat damage or persistence schema. PR #71 CI #488 PASS · 124/124 test files · 629/629 tests · TypeScript/build/bundle PASS; merged-main CI #493 also PASS.
 
-The additional approved art-only `docs/SHIP_VISUAL_V3_PERFORMANCE_FIRST_PLAN.md` is in progress. V30/V31 establish 11 distinct premium-art specs, measured asset/frame budgets, a safe V3 → V2 → procedural selection layer and optional build-time atlas-size validation. Eleven illustrated source sprites and a genuine 1024×768 lossless WebP atlas have been prepared externally (800,054 bytes; 3 MiB decoded; 64/78/128px previews). The binary is **not yet committed to GitHub and is not active in production**; V2 remains the default until the reviewed atlas and manifest are committed and CI plus paired V2/V3 browser/performance gates pass. The renderer avoids duplicate V2 thrusters and heavy image bloom for V3. Drop V3 effects/features that exceed the defined budgets rather than raising the budget by default.
+The approved art-only `docs/SHIP_VISUAL_V3_PERFORMANCE_FIRST_PLAN.md` has V30-V34 implemented, with the reviewed V3 atlas committed and active behind the V3 → V2 → procedural fallback chain. Static asset/hash/build budgets are enforced by CI. The previously requested dedicated same-device V2/V3 browser A/B recording remains useful as a regression diagnostic, but after the 2026-09-24 owner acceptance it is no longer an M22 roadmap blocker. Do not claim an unrecorded browser benchmark as measured evidence; future visual/performance findings are fixed as normal regressions.
 
-After completing the V3 artwork/performance gate and final main CI:
+Closure policy agreed 2026-09-24:
 
-- execute and record the real-browser/audio/visual matrix on the final polished HUD/transition/combat-identity/V3 artwork build;
-- fix any manual findings;
-- run final post-fix CI.
-
-Do **not** begin M23 until the manual M22 matrix is complete.
+- do not require the owner to repeat the full 43-row matrix before continuing;
+- preserve unrecorded rows as optional targeted regression checks;
+- treat any later real-device/audio/visual issue as a normal bug/regression and add focused coverage where practical;
+- M23 may proceed from the accepted M22 baseline.
 
 ## M23 — Review Pass #1
 
+**Status: IN PROGRESS (2026-09-24).**
+
 Complete independent full review and fix all findings.
+
+Current findings being fixed on `review/m23-pass1`:
+
+- Recall typed kills incorrectly inherited Combat-only Splitter fragments and Volatile death projectiles; Word Bomb already had the correct mode isolation.
+- Recall typed kills still emitted the Combat learning translation echo even when Recall translation was disabled.
+- Recall hint-index state was not released after normal typed kills or Nova clears, leaving unnecessary per-stage retained state.
+- Regression coverage must prove the Recall isolation while preserving Splitter/Volatile behavior in Combat.
 
 ## M24 — Review Pass #2
 
