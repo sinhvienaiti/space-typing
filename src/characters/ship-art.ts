@@ -1,7 +1,7 @@
 import type { ArtAssetCatalog } from "../assets/pipeline";
 import { CHARACTER_SHIP_SHEET_ASSET_ID } from "./visuals";
 
-/** V3 is optional until reviewed production-quality raster artwork is committed. */
+/** V3 is the reviewed default atlas; V2/procedural remain fail-soft and QA fallbacks. */
 export const PREMIUM_SHIP_SHEET_ASSET_ID = "player-ship-sheet-v3";
 
 /** A single 4 × 3 atlas; 256 source pixels per character cell. */
