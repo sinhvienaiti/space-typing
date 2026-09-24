@@ -11,7 +11,6 @@ import {
 import { Game } from "./Game";
 import {
   DEFAULT_RECALL_SETTINGS,
-  RECALL_DIFFICULTY_IDS,
   recallDifficultyProfile,
   recordRecallAttempt,
   sanitizeRecallMemory,
@@ -741,7 +740,7 @@ app.innerHTML = `
 
     <div id="combatHotbar" class="combat-hotbar hidden" aria-label="Combat hotbar"></div>
 
-    <div id="recallAssistBar" class="recall-assist-bar hidden" aria-live="polite">
+    <div id="recallAssistBar" class="boss-hud recall-assist-bar hidden" aria-live="polite">
       <div>
         <strong>RECALL</strong>
         <span id="recallAssistMeta">Listen, remember, type.</span>
@@ -9112,15 +9111,8 @@ for (const id of [
   "recallAutoPronounce",
 ]) {
   byId<HTMLSelectElement>(id).addEventListener("change", () => {
-    const difficultyValue =
-      byId<HTMLSelectElement>("recallDifficulty").value;
-    const difficulty = RECALL_DIFFICULTY_IDS.includes(
-      difficultyValue as RecallSettings["difficulty"],
-    )
-      ? (difficultyValue as RecallSettings["difficulty"])
-      : DEFAULT_RECALL_SETTINGS.difficulty;
     recallSettings = sanitizeRecallSettings({
-      difficulty,
+      difficulty: byId<HTMLSelectElement>("recallDifficulty").value,
       showTranslation:
         byId<HTMLSelectElement>("recallTranslation").value === "true",
       showIpa: byId<HTMLSelectElement>("recallIpa").value === "true",
