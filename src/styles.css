@@ -2134,12 +2134,32 @@ kbd {
   line-height: 1.5;
 }
 
+.route-service-group {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 9px 10px;
+  border: 1px solid rgba(102, 214, 230, 0.14);
+  border-radius: 10px;
+  background: rgba(25, 74, 91, 0.12);
+}
+
+.route-service-group > small {
+  color: #8fb7c6;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
 .route-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 4px;
 }
+
+.route-service-actions { margin-top: 0; }
 
 .route-hidden-panel {
   display: grid;
