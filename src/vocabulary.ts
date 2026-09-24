@@ -7,6 +7,8 @@ import type {
 const INDEX_URL = "/vocabulary/index.json";
 const LOOKUP_URL = "/vocabulary/lookup.json";
 const TOPIC_INDEX_URL = "/vocabulary/topics/index.json";
+const POS_INDEX_URL = "/vocabulary/parts-of-speech/index.json";
+const GRAMMAR_INDEX_URL = "/vocabulary/grammar/index.json";
 const LEVEL_BASE = "/vocabulary/";
 
 export type VocabularyTopicEntry = {
@@ -33,6 +35,35 @@ export type VocabularyTopicIndex = {
   topics: VocabularyTopicMeta[];
 };
 
+export type VocabularyPosCategory = {
+  id: string;
+  tokens: string[];
+  entries: VocabularyTopicEntry[];
+  missing: string[];
+};
+
+export type VocabularyPosIndex = {
+  version: 1;
+  categories: VocabularyPosCategory[];
+};
+
+export type VocabularyGrammarModule = {
+  id: string;
+  label: string;
+  group: string;
+  focus: string[];
+  topicIds: string[];
+  signalTokens: string[];
+  signalEntries: VocabularyTopicEntry[];
+  missingSignalKeys: string[];
+};
+
+export type VocabularyGrammarIndex = {
+  version: 1;
+  primaryTimeGroups: string[];
+  modules: VocabularyGrammarModule[];
+};
+
 type VocabularyLookup = {
   version: 1;
   totalEntries: number;
@@ -41,6 +72,20 @@ type VocabularyLookup = {
 
 export type LoadedVocabularyTopic = {
   topic: VocabularyTopicMeta;
+  entries: VocabularyEntry[];
+  levels: number[];
+  representativeLevel: number;
+};
+
+export type LoadedVocabularyPos = {
+  category: VocabularyPosCategory;
+  entries: VocabularyEntry[];
+  levels: number[];
+  representativeLevel: number;
+};
+
+export type LoadedVocabularyGrammar = {
+  module: VocabularyGrammarModule;
   entries: VocabularyEntry[];
   levels: number[];
   representativeLevel: number;
@@ -97,6 +142,21 @@ function isVocabularyLevel(value: unknown): value is VocabularyLevel {
   );
 }
 
+function isVocabularyReference(value: unknown): value is VocabularyTopicEntry {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const item = value as Partial<VocabularyTopicEntry>;
+  return (
+    typeof item.key === "string" &&
+    item.key.trim() !== "" &&
+    typeof item.level === "number" &&
+    Number.isInteger(item.level) &&
+    item.level >= 1 &&
+    item.level <= 100
+  );
+}
+
 function isVocabularyTopicMeta(value: unknown): value is VocabularyTopicMeta {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return false;
@@ -123,18 +183,51 @@ function isVocabularyTopicMeta(value: unknown): value is VocabularyTopicMeta {
     (topic.entries === undefined ||
       (Array.isArray(topic.entries) &&
         topic.entries.length === topic.count &&
-        topic.entries.every((entry) => {
-          if (entry === null || typeof entry !== "object") return false;
-          const item = entry as Partial<VocabularyTopicEntry>;
-          return (
-            typeof item.key === "string" &&
-            item.key.trim() !== "" &&
-            typeof item.level === "number" &&
-            Number.isInteger(item.level) &&
-            item.level >= 1 &&
-            item.level <= 100
-          );
-        })))
+        topic.entries.every(isVocabularyReference)))
+  );
+}
+
+function isVocabularyPosCategory(value: unknown): value is VocabularyPosCategory {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const category = value as Partial<VocabularyPosCategory>;
+  return (
+    typeof category.id === "string" &&
+    category.id.trim() !== "" &&
+    Array.isArray(category.tokens) &&
+    category.tokens.every((token) => typeof token === "string") &&
+    Array.isArray(category.entries) &&
+    category.entries.every(isVocabularyReference) &&
+    Array.isArray(category.missing) &&
+    category.missing.every((token) => typeof token === "string")
+  );
+}
+
+function isVocabularyGrammarModule(
+  value: unknown,
+): value is VocabularyGrammarModule {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const module = value as Partial<VocabularyGrammarModule>;
+  return (
+    typeof module.id === "string" &&
+    module.id.trim() !== "" &&
+    typeof module.label === "string" &&
+    module.label.trim() !== "" &&
+    typeof module.group === "string" &&
+    module.group.trim() !== "" &&
+    Array.isArray(module.focus) &&
+    module.focus.every((item) => typeof item === "string") &&
+    Array.isArray(module.topicIds) &&
+    module.topicIds.every((item) => typeof item === "string") &&
+    Array.isArray(module.signalTokens) &&
+    module.signalTokens.every((item) => typeof item === "string") &&
+    Array.isArray(module.signalEntries) &&
+    module.signalEntries.every(isVocabularyReference) &&
+    Array.isArray(module.missingSignalKeys) &&
+    module.missingSignalKeys.every((item) => typeof item === "string")
   );
 }
 
@@ -219,6 +312,61 @@ export function parseVocabularyTopicIndex(value: unknown): VocabularyTopicIndex 
   };
 }
 
+export function parseVocabularyPosIndex(value: unknown): VocabularyPosIndex {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Shared vocabulary word-type index is invalid.");
+  }
+  const raw = value as Partial<VocabularyPosIndex>;
+  if (
+    raw.version !== 1 ||
+    !Array.isArray(raw.categories) ||
+    raw.categories.length === 0 ||
+    !raw.categories.every(isVocabularyPosCategory)
+  ) {
+    throw new Error("Shared vocabulary word-type index is invalid.");
+  }
+  return {
+    version: 1,
+    categories: raw.categories.map((category) => ({
+      ...category,
+      tokens: [...category.tokens],
+      entries: category.entries.map((entry) => ({ ...entry })),
+      missing: [...category.missing],
+    })),
+  };
+}
+
+export function parseVocabularyGrammarIndex(
+  value: unknown,
+): VocabularyGrammarIndex {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Shared vocabulary grammar index is invalid.");
+  }
+  const raw = value as Partial<VocabularyGrammarIndex>;
+  if (
+    raw.version !== 1 ||
+    !Array.isArray(raw.primaryTimeGroups) ||
+    !raw.primaryTimeGroups.every((id) => typeof id === "string") ||
+    !Array.isArray(raw.modules) ||
+    raw.modules.length === 0 ||
+    !raw.modules.every(isVocabularyGrammarModule)
+  ) {
+    throw new Error("Shared vocabulary grammar index is invalid.");
+  }
+  return {
+    version: 1,
+    primaryTimeGroups: [...raw.primaryTimeGroups],
+    modules: raw.modules.map((module) => ({
+      ...module,
+      focus: [...module.focus],
+      topicIds: [...module.topicIds],
+      signalTokens: [...module.signalTokens],
+      signalEntries: module.signalEntries.map((entry) => ({ ...entry })),
+      missingSignalKeys: [...module.missingSignalKeys],
+    })),
+  };
+}
+
 export async function loadVocabularyIndex(): Promise<VocabularyIndex> {
   const response = await fetch(INDEX_URL, { cache: "no-store" });
   if (!response.ok) {
@@ -234,6 +382,22 @@ export async function loadVocabularyTopicIndex(): Promise<VocabularyTopicIndex> 
     throw new Error("Unable to load the shared vocabulary topic index.");
   }
   return parseVocabularyTopicIndex(await response.json());
+}
+
+export async function loadVocabularyPosIndex(): Promise<VocabularyPosIndex> {
+  const response = await fetch(POS_INDEX_URL, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("Unable to load the shared vocabulary word-type index.");
+  }
+  return parseVocabularyPosIndex(await response.json());
+}
+
+export async function loadVocabularyGrammarIndex(): Promise<VocabularyGrammarIndex> {
+  const response = await fetch(GRAMMAR_INDEX_URL, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("Unable to load the shared vocabulary grammar index.");
+  }
+  return parseVocabularyGrammarIndex(await response.json());
 }
 
 async function loadVocabularyLookup(): Promise<VocabularyLookup> {
@@ -288,36 +452,41 @@ export async function loadVocabularyLevel(
   return entries;
 }
 
-export async function loadVocabularyTopic(
-  topicId: string,
-  topicIndex: VocabularyTopicIndex,
+async function topicReferences(
+  topic: VocabularyTopicMeta,
+): Promise<VocabularyTopicEntry[]> {
+  if (topic.entries !== undefined) return topic.entries;
+  const lookup = await loadVocabularyLookup();
+  return topic.keys.flatMap((key) => {
+    const level = lookup.entries[normalizeEnglish(key)];
+    return Number.isInteger(level) ? [{ key, level }] : [];
+  });
+}
+
+async function loadVocabularyReferences(
+  references: readonly VocabularyTopicEntry[],
+  keys: readonly string[],
   vocabularyIndex: VocabularyIndex,
-): Promise<LoadedVocabularyTopic> {
-  const topic = topicIndex.topics.find((item) => item.id === topicId);
-  if (topic === undefined) {
-    throw new Error("Vocabulary topic " + topicId + " is unavailable.");
-  }
-
-  let levelHints: VocabularyTopicEntry[];
-  if (topic.entries !== undefined) {
-    levelHints = topic.entries;
-  } else {
-    const lookup = await loadVocabularyLookup();
-    levelHints = [];
-    for (const key of topic.keys) {
-      const level = lookup.entries[normalizeEnglish(key)];
-      if (level !== undefined && Number.isInteger(level)) {
-        levelHints.push({ key, level });
-      }
-    }
-  }
-
+): Promise<{
+  entries: VocabularyEntry[];
+  levels: number[];
+  representativeLevel: number;
+}> {
   const levels = [
-    ...new Set(levelHints.map((entry) => entry.level)),
+    ...new Set(
+      references
+        .map((entry) => entry.level)
+        .filter(
+          (level) =>
+            Number.isInteger(level) &&
+            level >= 1 &&
+            level <= 100,
+        ),
+    ),
   ].sort((left, right) => left - right);
 
   if (levels.length === 0) {
-    throw new Error("Vocabulary topic " + topicId + " has no mapped levels.");
+    throw new Error("Selected curriculum item has no mapped levels.");
   }
 
   const documents = await Promise.all(
@@ -328,21 +497,118 @@ export async function loadVocabularyTopic(
     byKey.set(normalizeEnglish(entry.en), entry);
   }
 
-  const entries = topic.keys
-    .map((key) => byKey.get(normalizeEnglish(key)))
-    .filter((entry): entry is VocabularyEntry => entry !== undefined);
-
-  if (entries.length === 0) {
-    throw new Error("Vocabulary topic " + topicId + " has no valid entries.");
+  const entries: VocabularyEntry[] = [];
+  const seen = new Set<string>();
+  for (const key of keys) {
+    const normalized = normalizeEnglish(key);
+    if (seen.has(normalized)) continue;
+    const entry = byKey.get(normalized);
+    if (entry === undefined) continue;
+    seen.add(normalized);
+    entries.push(entry);
   }
 
-  const representativeLevel = representativeTopicLevel(levelHints);
+  if (entries.length === 0) {
+    throw new Error("Selected curriculum item has no valid entries.");
+  }
 
   return {
-    topic: { ...topic, levels: [...topic.levels], keys: [...topic.keys] },
     entries,
     levels,
-    representativeLevel,
+    representativeLevel: representativeTopicLevel(references),
+  };
+}
+
+export async function loadVocabularyTopic(
+  topicId: string,
+  topicIndex: VocabularyTopicIndex,
+  vocabularyIndex: VocabularyIndex,
+): Promise<LoadedVocabularyTopic> {
+  const topic = topicIndex.topics.find((item) => item.id === topicId);
+  if (topic === undefined) {
+    throw new Error("Vocabulary topic " + topicId + " is unavailable.");
+  }
+
+  const references = await topicReferences(topic);
+  const loaded = await loadVocabularyReferences(
+    references,
+    topic.keys,
+    vocabularyIndex,
+  );
+
+  return {
+    topic: {
+      ...topic,
+      levels: [...topic.levels],
+      keys: [...topic.keys],
+      entries: topic.entries?.map((entry) => ({ ...entry })),
+    },
+    ...loaded,
+  };
+}
+
+export async function loadVocabularyPosCategory(
+  posId: string,
+  posIndex: VocabularyPosIndex,
+  vocabularyIndex: VocabularyIndex,
+): Promise<LoadedVocabularyPos> {
+  const category = posIndex.categories.find((item) => item.id === posId);
+  if (category === undefined) {
+    throw new Error("Vocabulary word type " + posId + " is unavailable.");
+  }
+
+  const loaded = await loadVocabularyReferences(
+    category.entries,
+    category.entries.map((entry) => entry.key),
+    vocabularyIndex,
+  );
+  return {
+    category: {
+      ...category,
+      tokens: [...category.tokens],
+      entries: category.entries.map((entry) => ({ ...entry })),
+      missing: [...category.missing],
+    },
+    ...loaded,
+  };
+}
+
+export async function loadVocabularyGrammarModule(
+  grammarId: string,
+  grammarIndex: VocabularyGrammarIndex,
+  topicIndex: VocabularyTopicIndex,
+  vocabularyIndex: VocabularyIndex,
+): Promise<LoadedVocabularyGrammar> {
+  const module = grammarIndex.modules.find((item) => item.id === grammarId);
+  if (module === undefined) {
+    throw new Error("Vocabulary grammar module " + grammarId + " is unavailable.");
+  }
+
+  const references: VocabularyTopicEntry[] = [...module.signalEntries];
+  const keys = module.signalEntries.map((entry) => entry.key);
+
+  for (const topicId of module.topicIds) {
+    const topic = topicIndex.topics.find((item) => item.id === topicId);
+    if (topic === undefined) continue;
+    references.push(...(await topicReferences(topic)));
+    keys.push(...topic.keys);
+  }
+
+  const loaded = await loadVocabularyReferences(
+    references,
+    keys,
+    vocabularyIndex,
+  );
+  return {
+    module: {
+      ...module,
+      focus: [...module.focus],
+      topicIds: [...module.topicIds],
+      signalTokens: [...module.signalTokens],
+      signalEntries: module.signalEntries.map((entry) => ({ ...entry })),
+      missingSignalKeys: [...module.missingSignalKeys],
+    },
+    ...loaded,
   };
 }
 
