@@ -2159,22 +2159,7 @@ kbd {
   margin-top: 4px;
 }
 
-.route-service-actions {
-  margin-top: 0;
-}
-
-.route-service-actions button {
-  flex: 1 1 132px;
-}
-
-.route-primary-actions {
-  padding-top: 4px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.route-primary-actions .primary {
-  flex: 1 1 190px;
-}
+.route-service-actions { margin-top: 0; }
 
 .route-hidden-panel {
   display: grid;
