@@ -97,6 +97,26 @@ export function currentEnemyLayer(
   return plan[index] ?? plan[plan.length - 1] ?? "core";
 }
 
+export function enemyLayerSegmentStatusAtSlot(
+  planLengthInput: number,
+  remaining: number,
+  slot: 0 | 1 | 2,
+): EnemyLayerSegmentStatus {
+  const planLength = clamp(Math.floor(planLengthInput), 0, 3);
+  const offset = 3 - planLength;
+  const planIndex = slot - offset;
+  if (planIndex < 0) return "inactive";
+
+  const completed = Math.max(
+    0,
+    planLength -
+      clamp(Math.floor(remaining), 0, planLength),
+  );
+  if (planIndex < completed) return "cleared";
+  if (planIndex === completed) return "current";
+  return "pending";
+}
+
 export function enemyLayerSegments(
   plan: readonly EnemyLayerId[],
   remaining: number,
@@ -120,12 +140,11 @@ export function enemyLayerSegments(
     }
 
     const id = safePlan[planIndex] ?? null;
-    const status: EnemyLayerSegmentStatus =
-      planIndex < completed
-        ? "cleared"
-        : planIndex === completed
-          ? "current"
-          : "pending";
+    const status = enemyLayerSegmentStatusAtSlot(
+      safePlan.length,
+      remaining,
+      slot as 0 | 1 | 2,
+    );
 
     return {
       slot: slot as 0 | 1 | 2,
