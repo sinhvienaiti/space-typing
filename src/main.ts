@@ -1771,6 +1771,11 @@ let vocabularyTopicIndex: VocabularyTopicIndex | null = null;
 let vocabularyPosIndex: VocabularyPosIndex | null = null;
 let vocabularyGrammarIndex: VocabularyGrammarIndex | null = null;
 let configuredVocabulary: VocabularyEntry[] = [];
+let activeReviewGoal: SpaceReviewGoal | undefined;
+let activeReviewVocabulary: VocabularyEntry[] = [];
+let activeReviewLevel = 1;
+let gameplayModeBeforeReview: GameplayMode | null = null;
+let learningRequestSequence = 0;
 let artCatalog: ArtAssetCatalog | null = null;
 const typingChallengeCache = new Map<
   string,
