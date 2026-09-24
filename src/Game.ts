@@ -31,6 +31,11 @@ import {
   bossVisualNameForStage,
 } from "./boss/visual-profile";
 import type { DifficultyProfile, StageConfig } from "./campaign/types";
+import {
+  createStagePacingPlan,
+  type StagePacingPhase,
+  type StagePacingPlan,
+} from "./campaign/stage-pacing";
 import { canFinishCombatStage, canSpawnFinalBoss, type StageClearGate } from "./campaign/stage-clear-gate";
 import { typedRageGain, novaBossDamage, NOVA_PULSE_VISUAL_SECONDS } from "./combat/rage-pulse";
 import type { HiddenEncounterRuntime } from "./discovery/hidden-encounter";
@@ -419,6 +424,7 @@ export type GameHooks = {
   onStats(stats: GameStats): void;
   onPhase(phase: GamePhase): void;
   onStage(stage: number): void;
+  onStagePhase?(phase: StagePacingPhase): void;
   onStageEvents(events: readonly StageEventDefinition[]): void;
   onObjectiveUpdate(objective: StageObjectiveState | null): void;
   onStageClear(stats: GameStats): void;
@@ -495,6 +501,12 @@ export type TestLabGameSnapshot = {
     spawnRemaining: number;
     spawnTimer: number;
     timeScale: number;
+    phaseIndex: number;
+    phaseCount: number;
+    phaseLabel: string | null;
+    phaseBudget: number;
+    phaseSpawned: number;
+    phaseBreakTimer: number;
   };
   skillStates: Array<{
     id: string;
@@ -631,6 +643,11 @@ export class Game {
   private targetId: number | null = null;
   private spawnTimer = 0;
   private spawnRemaining = 0;
+  private stagePacingPlan: StagePacingPlan | null = null;
+  private stagePhaseIndex = 0;
+  private stagePhaseSpawned = 0;
+  private stagePhaseBreakTimer = 0;
+  private stagePhaseBreakArmed = false;
   private stageConfig: StageConfig | null = null;
   private difficulty: DifficultyProfile | null = null;
   private hiddenEncounterRuntime: HiddenEncounterRuntime | null = null;
@@ -850,6 +867,12 @@ export class Game {
         spawnRemaining: this.spawnRemaining,
         spawnTimer: this.spawnTimer,
         timeScale: this.testLabTimeScale,
+        phaseIndex: this.stagePhaseIndex,
+        phaseCount: this.stagePacingPlan?.phases.length ?? 0,
+        phaseLabel: this.currentStagePacingPhase()?.label ?? null,
+        phaseBudget: this.currentStagePacingPhase()?.budget ?? 0,
+        phaseSpawned: this.stagePhaseSpawned,
+        phaseBreakTimer: this.stagePhaseBreakTimer,
       },
       skillStates: this.skillEngine.getDefinitions().map((definition) => {
         const state = this.skillEngine.getState(definition.id);
@@ -2649,14 +2672,27 @@ export class Game {
     );
     this.anomalyResolutionPending = false;
     this.anomalyRiskRatio = 0;
-    this.spawnRemaining = Math.max(
+    const runtimeEnemyBudget = Math.max(
       1,
       Math.round(
         stage.enemyBudget *
           (hiddenEncounterRuntime?.enemyBudgetMultiplier ?? 1),
       ),
     );
+    this.stagePacingPlan = createStagePacingPlan(
+      stage,
+      runtimeEnemyBudget,
+    );
+    this.stagePhaseIndex = 0;
+    this.stagePhaseSpawned = 0;
+    this.stagePhaseBreakTimer = 0;
+    this.stagePhaseBreakArmed = false;
+    this.spawnRemaining = this.stagePacingPlan.totalBudget;
     this.spawnTimer = 0.3;
+    const openingPhase = this.currentStagePacingPhase();
+    if (openingPhase !== null) {
+      this.hooks.onStagePhase?.({ ...openingPhase });
+    }
     this.eliteSpawned = 0;
     this.boss = null;
     this.bossHudTimer = 0;
