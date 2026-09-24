@@ -2517,10 +2517,6 @@ function renderStageEvents(
   if (events.length === 0) {
     badge.textContent = "";
     badge.title = "";
-    badge.style.removeProperty("border-color");
-    badge.style.removeProperty("color");
-    delete badge.dataset.importance;
-    delete badge.dataset.importanceState;
     badge.classList.add("hidden");
     return;
   }
@@ -2568,6 +2564,10 @@ function renderObjective(
   if (objective === null) {
     badge.textContent = "";
     badge.title = "";
+    badge.style.removeProperty("border-color");
+    badge.style.removeProperty("color");
+    delete badge.dataset.importance;
+    delete badge.dataset.importanceState;
     badge.classList.add("hidden");
     return;
   }
