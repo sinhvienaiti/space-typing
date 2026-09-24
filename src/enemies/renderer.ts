@@ -751,10 +751,18 @@ function drawRewardMarker(
  * operations per enemy without making moving enemies look frame-stepped.
  * Entries are capped to bound Canvas memory across long Campaign sessions. */
 export class StaticEnemyBodyCache {
-  private readonly entries = new Map<string, { canvas: HTMLCanvasElement; padding: number }>();
+  private readonly entries = new Map<
+    string,
+    { canvas: HTMLCanvasElement; padding: number; lastUsed: number }
+  >();
+  private accessTick = 0;
+
   constructor(private readonly limit = 54) {}
 
-  clear(): void { this.entries.clear(); }
+  clear(): void {
+    this.entries.clear();
+    this.accessTick = 0;
+  }
   get size(): number { return this.entries.size; }
 
   draw(
@@ -784,16 +792,24 @@ export class StaticEnemyBodyCache {
       offscreen.translate(padding, padding);
       drawBody(offscreen, definition, roundedRadius, palette, 0, targeted, roundedGlow);
       drawFace(offscreen, definition, roundedRadius, palette, roundedGlow);
-      entry = { canvas, padding };
+      entry = { canvas, padding, lastUsed: ++this.accessTick };
       if (this.entries.size >= this.limit) {
-        const oldest = this.entries.keys().next().value;
-        if (oldest !== undefined) this.entries.delete(oldest);
+        let oldestKey: string | null = null;
+        let oldestTick = Number.POSITIVE_INFINITY;
+        for (const [candidateKey, candidate] of this.entries) {
+          if (candidate.lastUsed < oldestTick) {
+            oldestKey = candidateKey;
+            oldestTick = candidate.lastUsed;
+          }
+        }
+        if (oldestKey !== null) this.entries.delete(oldestKey);
       }
       this.entries.set(key, entry);
     } else {
-      // LRU: high-density enemies of the current World should share textures.
-      this.entries.delete(key);
-      this.entries.set(key, entry);
+      // Keep real LRU semantics without delete+set Map mutations for every
+      // enemy on every frame. Eviction scans only when a new cache entry is
+      // created, which is rare compared with draw hits.
+      entry.lastUsed = ++this.accessTick;
     }
     context.save();
     context.shadowBlur = 0;
