@@ -98,10 +98,10 @@ export function difficultyFor(
             : 1;
 
   const custom = input.mode === "custom";
-  const enemySpeedSetting = custom ? clamp(input.customEnemySpeed ?? 1, 0.45, 1.65) : 1;
-  const bulletSpeedSetting = custom ? clamp(input.customBulletSpeed ?? 1, 0.45, 1.65) : 1;
-  const fireRateSetting = custom ? clamp(input.customFireRate ?? 1, 0.4, 1.6) : 1;
-  const spawnRateSetting = custom ? clamp(input.customSpawnRate ?? 1, 0.55, 1.45) : 1;
+  const enemySpeedSetting = custom ? clamp(input.customEnemySpeed ?? 1, 0.1, 1.65) : 1;
+  const bulletSpeedSetting = custom ? clamp(input.customBulletSpeed ?? 1, 0.1, 1.65) : 1;
+  const fireRateSetting = custom ? clamp(input.customFireRate ?? 1, 0.1, 1.6) : 1;
+  const spawnRateSetting = custom ? clamp(input.customSpawnRate ?? 1, 0.1, 1.45) : 1;
 
   // Balanced is practice-first in the first Worlds. Total stage duration
   // grows separately from simultaneous pressure and hostile attack tempo.
@@ -129,18 +129,20 @@ export function difficultyFor(
   const enemySpeed = clamp(
     (0.74 + Math.sqrt(combatPressure) * 0.36) *
       (1 - earlyPractice * 0.09) * enemySpeedSetting,
-    0.45,
+    custom ? 0.08 : 0.45,
     2.6,
   );
 
   const rawSpawnInterval =
     1.55 /
     Math.max(0.65, combatPressure);
-  const spawnInterval = clamp(
-    rawSpawnInterval / spawnRateSetting,
-    definition.spawnIntervalFloor * (custom ? 0.75 : 1),
-    definition.spawnIntervalCeiling * (custom ? 1.6 : 1),
-  );
+  const spawnInterval = custom
+    ? clamp(rawSpawnInterval / spawnRateSetting, 0.05, 30)
+    : clamp(
+        rawSpawnInterval,
+        definition.spawnIntervalFloor,
+        definition.spawnIntervalCeiling,
+      );
 
   const desiredMaxEnemies =
     2 +
