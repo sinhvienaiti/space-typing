@@ -1750,19 +1750,10 @@ const hudDomMetrics = {
 let gameplayMode: GameplayMode = loadGameplayMode();
 let recallSettings: RecallSettings = loadRecallSettings();
 let recallMemory: RecallMemoryState = loadRecallMemory();
-let recallMemorySaveTimer: number | null = null;
 let recallStage = { attempts: 0, perfect: 0, hints: 0, replays: 0, responseMs: 0 };
 
-function flushRecallMemory(): void {
-  if (recallMemorySaveTimer === null) return;
-  window.clearTimeout(recallMemorySaveTimer);
-  recallMemorySaveTimer = null;
+function saveRecallMemory(): void {
   localStorage.setItem(RECALL_MEMORY_KEY, JSON.stringify(recallMemory));
-}
-
-function scheduleRecallMemorySave(): void {
-  if (recallMemorySaveTimer !== null) return;
-  recallMemorySaveTimer = window.setTimeout(flushRecallMemory, 900);
 }
 let sourceState = loadSource();
 let sourceTab: VocabularySourceTab = sourceState.mode;
@@ -4049,7 +4040,7 @@ const game = new Game(
     onBossUpdate: renderBoss,
     onSkills: renderAllSkills,
     onStageClear: (stats) => {
-      flushRecallMemory();
+      saveRecallMemory();
       const stageSession = game.getStageSessionSnapshot();
       const wpm = stageWordsPerMinute(
         stageSession.correctWordKeys,
@@ -4526,7 +4517,7 @@ const game = new Game(
       recallStage.replays += result.replayCount;
       recallStage.responseMs += result.responseMs;
       recallMemory = recordRecallAttempt(recallMemory, result);
-      scheduleRecallMemorySave();
+      if (recallStage.attempts % 6 === 0) saveRecallMemory();
       renderRecallAssistUi();
     },
     onKillTranslation: (entry) => {
@@ -9249,7 +9240,7 @@ window.addEventListener("keydown", (event) => {
 window.addEventListener("resize", () => game.resize());
 
 function persistPageLifecycleRecovery(): void {
-  flushRecallMemory();
+  saveRecallMemory();
   if (!persistenceReady) return;
 
   const savedAt = new Date().toISOString();
@@ -9305,7 +9296,7 @@ window.addEventListener(
 );
 
 window.addEventListener("beforeunload", () => {
-  flushRecallMemory();
+  saveRecallMemory();
   stopSpeech();
   musicController.destroy();
   game.destroy();
