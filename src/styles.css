@@ -3559,34 +3559,7 @@ kbd {
 }
 
 
-/* Game results: one-line collectible currency glyphs and separate notes. */
-.result-rewards { min-width: 0; }
-.results .reward-chips {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: .4rem;
-  margin-top: .4rem;
-  font-size: .86rem;
-}
-.reward-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: .27rem;
-  padding: .28rem .42rem;
-  border: 1px solid rgba(107, 218, 234, .25);
-  border-radius: 8px;
-  background: rgba(49, 118, 139, .16);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.reward-chip .currency-glyph {
-  color: #8beafa;
-  font-size: 1.16em;
-}
-.reward-chip:nth-child(2) .currency-glyph { color: #e8c88b; }
-.reward-chip:nth-child(3) .currency-glyph { color: #e1a8ff; }
-.reward-chip:nth-child(4) .currency-glyph { color: #aae6d6; }
+.reward-chip{display:inline-flex}
 .result-details {
   min-height: 0;
   color: #a6bccc;
@@ -3965,3 +3938,15 @@ kbd {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+
+/* Batch D identity tokens; base cards/layout stay authoritative. */
+.currency-chip-row{display:flex;flex-wrap:wrap;gap:.3rem}
+.currency-chip{display:inline-flex;gap:.2rem;padding:.12rem .25rem;font-size:.64rem}
+.currency-credits .currency-icon{color:#a9efff}.currency-alloy .currency-icon{color:#d6b37f}.currency-star-crystal .currency-icon{color:#e5b4ff}.currency-quantum-core .currency-icon{color:#aef4d8}
+.rarity-frame{--grade-accent:#8798a6;border-left:3px solid var(--grade-accent)!important}
+.grade-copper{--grade-accent:#cc8755}.grade-silver{--grade-accent:#b9d2dc}.grade-gold{--grade-accent:#e5bd62}.grade-diamond{--grade-accent:#8de9e6}
+.grade-badge{color:var(--grade-accent);font-size:.56rem}
+.local-item-icon{display:grid;place-items:center;height:42px}
+.item-card{display:grid;grid-template-columns:46px 1fr;gap:.5rem}
+

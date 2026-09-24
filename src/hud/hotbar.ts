@@ -1,4 +1,7 @@
-import type { RecoveryItemId } from "../items/consumables";
+import {
+  isCombatConsumableId,
+  type CombatConsumableId,
+} from "../items/consumables";
 import {
   isDefensiveSkillId,
   type DefensiveSkillId,
@@ -26,7 +29,7 @@ export function hotbarPlacementForSlot(slotIndex: number): HotbarPlacement {
 export type CoreCombatSkillId = DefensiveSkillId | OffensiveSkillId;
 
 export type HotbarAction =
-  | { kind: "item"; id: RecoveryItemId }
+  | { kind: "item"; id: CombatConsumableId }
   | { kind: "skill"; id: CoreCombatSkillId | SupportSpellId }
   | { kind: "character-skill" };
 
@@ -46,14 +49,6 @@ export type HotbarState = {
     HotbarSlot,
   ];
 };
-
-function isRecoveryItemId(value: unknown): value is RecoveryItemId {
-  return (
-    value === "repair-kit" ||
-    value === "shield-cell" ||
-    value === "energy-cell"
-  );
-}
 
 export function hotbarActionKey(action: HotbarAction): string {
   if (action.kind === "character-skill") return "character-skill";
@@ -105,7 +100,7 @@ export function isHotbarAction(value: unknown): value is HotbarAction {
   if (raw.kind === "character-skill") return raw.id === undefined;
 
   if (raw.kind === "item") {
-    return isRecoveryItemId(raw.id);
+    return typeof raw.id === "string" && isCombatConsumableId(raw.id);
   }
 
   if (raw.kind === "skill" && typeof raw.id === "string") {

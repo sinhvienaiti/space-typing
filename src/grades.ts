@@ -24,6 +24,40 @@ export const GRADE_STAT_MULTIPLIER: Record<GradeId, number> = {
   diamond: 1.8,
 };
 
+export type GradePresentation = {
+  label: string;
+  icon: string;
+  cssClass: string;
+};
+
+export const GRADE_PRESENTATION: Record<GradeId, GradePresentation> = {
+  aluminum: {
+    label: "Aluminum",
+    icon: "◇",
+    cssClass: "grade-aluminum",
+  },
+  copper: {
+    label: "Copper",
+    icon: "⬡",
+    cssClass: "grade-copper",
+  },
+  silver: {
+    label: "Silver",
+    icon: "◆",
+    cssClass: "grade-silver",
+  },
+  gold: {
+    label: "Gold",
+    icon: "✦",
+    cssClass: "grade-gold",
+  },
+  diamond: {
+    label: "Diamond",
+    icon: "✧",
+    cssClass: "grade-diamond",
+  },
+};
+
 export function isGradeId(value: unknown): value is GradeId {
   return (
     typeof value === "string" &&

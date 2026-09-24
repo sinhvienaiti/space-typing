@@ -40,6 +40,23 @@ describe("RPG hotbar loadout", () => {
     expect(loaded.slots[8]).toEqual({ kind: "skill", id: "chain-lightning" });
   });
 
+  it("accepts existing tactical consumables without changing the 9-slot schema", () => {
+    let state = createDefaultHotbarState();
+    state = assignHotbarSlot(state, 7, {
+      kind: "item",
+      id: "nova-bomb",
+    });
+    state = assignHotbarSlot(state, 8, {
+      kind: "item",
+      id: "lucky-dice",
+    });
+
+    expect(state.slots[7]).toEqual({ kind: "item", id: "nova-bomb" });
+    expect(state.slots[8]).toEqual({ kind: "item", id: "lucky-dice" });
+    expect(isValidHotbarState(state)).toBe(true);
+    expect(sanitizeHotbarState(state)).toEqual(state);
+  });
+
   it("supports support and selected-character actions", () => {
     let state = createDefaultHotbarState();
     state = assignHotbarSlot(state, 0, {

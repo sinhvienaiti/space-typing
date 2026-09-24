@@ -30,6 +30,7 @@ export type ItemDefinition = {
   category: ItemCategory;
   maxStack: number;
   combatUsable: boolean;
+  icon: string;
   description: string;
   grade?: GradeId;
 };
@@ -37,6 +38,7 @@ export type ItemDefinition = {
 export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
   "repair-kit": {
     id: "repair-kit",
+    icon: "✚",
     name: "Repair Kit",
     category: "consumable",
     maxStack: 20,
@@ -46,6 +48,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
   },
   "shield-cell": {
     id: "shield-cell",
+    icon: "◈",
     name: "Shield Cell",
     category: "consumable",
     maxStack: 20,
@@ -55,6 +58,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
   },
   "energy-cell": {
     id: "energy-cell",
+    icon: "⚡",
     name: "Energy Cell",
     category: "consumable",
     maxStack: 20,
@@ -64,60 +68,67 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
   },
   "nova-bomb": {
     id: "nova-bomb",
+    icon: "✹",
     name: "Nova Bomb",
     category: "consumable",
     maxStack: 10,
     combatUsable: true,
-    description: "High-impact emergency combat consumable.",
+    description: "Clears current hostile bullets and detonates a Nova pulse against active enemies and the boss.",
     grade: "copper",
   },
   "emp-charge": {
     id: "emp-charge",
+    icon: "⌁",
     name: "EMP Charge",
     category: "consumable",
     maxStack: 10,
     combatUsable: true,
-    description: "Disrupts hostile projectile pressure.",
+    description: "Clears hostile bullets and delays enemy and boss attack timers.",
     grade: "copper",
   },
   "time-crystal": {
     id: "time-crystal",
+    icon: "◷",
     name: "Time Crystal",
     category: "special",
     maxStack: 10,
     combatUsable: true,
-    description: "Creates a short tactical time-control window.",
+    description: "Slows hostile simulation for a 5-second tactical window.",
     grade: "silver",
   },
   "word-bomb": {
     id: "word-bomb",
+    icon: "Aa",
     name: "Word Bomb",
     category: "consumable",
     maxStack: 10,
     combatUsable: true,
-    description: "Typing-focused offensive consumable.",
+    description: "Destroys one active enemy without counting its word as typed or learned.",
     grade: "copper",
   },
   "supply-beacon": {
     id: "supply-beacon",
+    icon: "⇧",
     name: "Supply Beacon",
     category: "supply",
     maxStack: 10,
     combatUsable: true,
-    description: "Requests an extra supply opportunity.",
+    description: "Immediately calls one Supply Pod when the battlefield allows it.",
     grade: "copper",
   },
   "lucky-dice": {
     id: "lucky-dice",
+    icon: "◇",
     name: "Lucky Dice",
     category: "special",
     maxStack: 10,
     combatUsable: true,
-    description: "Influences a future luck-based reward roll.",
+    description: "Raises pity for future Golden, Treasure, Choice and Anomaly reward rolls.",
     grade: "silver",
   },
   "salvage-anchor": {
     id: "salvage-anchor",
+    icon: "⚓",
     name: "Salvage Anchor",
     category: "special",
     maxStack: UNBOUNDED_ITEM_STACK,
@@ -128,6 +139,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
   },
   "stage-revival-core": {
     id: "stage-revival-core",
+    icon: "↻",
     name: "Stage Revival Core",
     category: "special",
     maxStack: UNBOUNDED_ITEM_STACK,
@@ -138,6 +150,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
   },
   "phoenix-core": {
     id: "phoenix-core",
+    icon: "♨",
     name: "Phoenix Core",
     category: "special",
     maxStack: UNBOUNDED_ITEM_STACK,

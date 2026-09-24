@@ -9,6 +9,8 @@
 > This document consolidates outstanding player-requested work. Some underlying
 > functionality already exists; inspect current code before changing it.
 > **Do not mark an item COMPLETE until code, tests, CI and manual browser QA support it.**
+>
+> **Execution checkpoint — 2026-09-24:** P0 and Batches A–C were merged before Batch D. Batch D implementation is validated on PR #96 / CI #588 (142 files, 706/706 tests, TypeScript + production build + bundle/art budgets). It adds shared currency/grade/icon card primitives, 21 real equipment definitions and real runtime behavior for the six previously shop-visible tactical consumables. CSS raw is 59.60 KiB under the existing 60 KiB budget. Browser/manual QA plus parent gitlink integration are still required, so this is **not** a final COMPLETE claim. Batch E is the next planned code slice after reconstructing latest `main`.
 
 ## 0. Non-negotiable design and integration rules
 

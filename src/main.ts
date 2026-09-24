@@ -139,7 +139,10 @@ import {
   removeItem,
 } from "./items/inventory";
 import type { Inventory } from "./items/inventory";
-import type { RecoveryItemId } from "./items/consumables";
+import {
+  COMBAT_CONSUMABLE_IDS,
+  type CombatConsumableId,
+} from "./items/consumables";
 import { getItemDefinition } from "./items/registry";
 import {
   addCredits,
@@ -153,7 +156,17 @@ import {
   stageClearExpansionCurrencyReward,
   type ExpansionCurrencyState,
 } from "./economy/currencies";
-import { gradeLabel } from "./grades";
+import { gradeLabel, type GradeId } from "./grades";
+import {
+  applyGradeFrame,
+  createGradeBadge,
+  createLocalIcon,
+  replaceCurrencyChips,
+} from "./ui/components";
+import {
+  currencyAccessibleText,
+  type CurrencyAmounts,
+} from "./ui/currency";
 import { CORE_STAT_KEYS, type CoreStatKey } from "./stats/core";
 import {
   attributeUpgradeCost,
@@ -2271,10 +2284,10 @@ function renderAllSkills(): void {
   renderHotbar();
 }
 
-function useInventoryItem(id: RecoveryItemId): void {
+function useInventoryItem(id: CombatConsumableId): void {
   if (itemCount(inventory, id) <= 0) return;
   if (!game.useConsumable(id)) {
-    showNotice("Item not needed right now");
+    showNotice("Item cannot be used right now");
     return;
   }
 
@@ -2317,9 +2330,9 @@ function activateHotbarSlot(index: number): void {
 
 function hotbarCandidateActions(): HotbarAction[] {
   const actions: HotbarAction[] = [
-    { kind: "item", id: "repair-kit" },
-    { kind: "item", id: "shield-cell" },
-    { kind: "item", id: "energy-cell" },
+    ...COMBAT_CONSUMABLE_IDS.map(
+      (id): HotbarAction => ({ kind: "item", id }),
+    ),
     ...DEFENSIVE_SKILLS.map(
       (skill): HotbarAction => ({
         kind: "skill",
@@ -2720,10 +2733,15 @@ function renderProgression(): void {
     meta.textContent =
       String(progress) +
       " / " +
-      String(mission.target) +
-      " · " +
-      mission.rewardCredits.toLocaleString() +
-      " Credits";
+      String(mission.target);
+
+    const reward = document.createElement("div");
+    reward.className = "progression-reward";
+    replaceCurrencyChips(
+      reward,
+      { credits: mission.rewardCredits },
+      { signed: true },
+    );
 
     const claim = document.createElement("button");
     claim.type = "button";
@@ -2745,7 +2763,7 @@ function renderProgression(): void {
       );
     });
 
-    card.append(title, description, meta, claim);
+    card.append(title, description, meta, reward, claim);
     missionGrid.append(card);
   }
 
@@ -2979,29 +2997,47 @@ function renderBossRewardChoiceOptions(
 
     const name = document.createElement("strong");
     const description = document.createElement("small");
+    const extra = document.createElement("div");
+    extra.className = "reward-choice-extra";
 
     if (option.kind === "equipment") {
       const definition = getEquipmentDefinition(option.drop.definitionId);
-      name.textContent =
-        gradeLabel(option.drop.grade).toUpperCase() + " · " + definition.name;
+      applyGradeFrame(button, option.drop.grade);
+      extra.append(
+        createLocalIcon(
+          definition.icon,
+          definition.name + " icon",
+          "reward-choice-icon",
+        ),
+        createGradeBadge(option.drop.grade),
+      );
+      name.textContent = definition.name;
       description.textContent = definition.description;
     } else if (option.kind === "relic") {
       const definition = getRelicDefinition(option.relicId);
+      applyGradeFrame(button, definition.grade);
+      extra.append(createGradeBadge(definition.grade));
       name.textContent = definition.name;
       description.textContent = definition.description;
     } else {
       name.textContent = option.id === "premium-currency"
         ? "Premium Cache"
         : "Boss Cache";
-      const currencyText = expansionCurrencyRewardText(option.currencies);
-      description.textContent =
-        "+" +
-        option.credits.toLocaleString() +
-        " Credits" +
-        (currencyText.length > 0 ? " · " + currencyText : "");
+      description.textContent = "Currency reward";
+      replaceCurrencyChips(
+        extra,
+        {
+          credits: option.credits,
+          alloy: option.currencies.alloy,
+          starCrystal: option.currencies.starCrystal,
+          quantumCore: option.currencies.quantumCore,
+        },
+        { signed: true },
+      );
     }
 
-    button.append(kind, name, description);
+    button.classList.add("visual-card");
+    button.append(kind, extra, name, description);
     button.addEventListener("click", () => {
       if (option.kind === "equipment") {
         equipment = addEquipmentInstance(equipment, {
@@ -3962,27 +3998,19 @@ const game = new Game(
       // Use distinct compact currency badges rather than a long wrapped line
       // that makes the entire results card unusually tall.
       const rewardContainer = byId("clearCredits");
-      rewardContainer.replaceChildren();
-      for (const [icon, amount, label] of [
-        ["◈", totalCreditReward, "Credits"],
-        ["⬡", totalCurrencyReward.alloy, "Alloy"],
-        ["✧", totalCurrencyReward.starCrystal, "Star Crystal"],
-        ["✦", totalCurrencyReward.quantumCore, "Quantum Core"],
-      ] as const) {
-        if (amount <= 0) continue;
-        const chip = document.createElement("span");
-        chip.className = "reward-chip";
-        chip.title = "+" + amount.toLocaleString() + " " + label;
-        chip.setAttribute("aria-label", chip.title);
-        const glyph = document.createElement("span");
-        glyph.className = "currency-glyph";
-        glyph.setAttribute("aria-hidden", "true");
-        glyph.textContent = icon;
-        const value = document.createElement("span");
-        value.textContent = "+" + amount.toLocaleString();
-        chip.append(glyph, value);
-        rewardContainer.append(chip);
-      }
+      replaceCurrencyChips(
+        rewardContainer,
+        {
+          credits: totalCreditReward,
+          alloy: totalCurrencyReward.alloy,
+          starCrystal: totalCurrencyReward.starCrystal,
+          quantumCore: totalCurrencyReward.quantumCore,
+        },
+        {
+          signed: true,
+          className: "stage-reward-chips",
+        },
+      );
       byId("clearDetails").textContent =
         [objectiveText, performanceText ? "Performance: " + performanceText : "",
           ascensionText, checkpointText]
@@ -4419,7 +4447,8 @@ function renderBasicSkillPanel(): void {
         : null;
     const card = document.createElement("article");
     card.className =
-      "basic-skill-card " + (rank > 0 ? "learned" : "locked");
+      "basic-skill-card visual-card skill-card " +
+      (rank > 0 ? "learned" : "locked");
     const icon = document.createElement("span");
     icon.className = "basic-skill-icon";
     icon.textContent = presentation.icon;
@@ -4626,7 +4655,7 @@ function renderEquipment(): void {
 
   for (const slot of EQUIPMENT_SLOTS) {
     const card = document.createElement("label");
-    card.className = "equipment-slot";
+    card.className = "equipment-slot visual-card equipment-card";
 
     const title = document.createElement("span");
     title.className = "equipment-slot-name";
@@ -4676,17 +4705,37 @@ function renderEquipment(): void {
             (item) => item.instanceId === currentId,
           ) ?? null;
 
+    const definition =
+      current === null
+        ? null
+        : getEquipmentDefinition(current.definitionId);
+    applyGradeFrame(card, current?.grade ?? "aluminum");
+
+    const head = document.createElement("div");
+    head.className = "equipment-card-head";
+    const visual = createLocalIcon(
+      definition?.icon ?? "○",
+      definition === null ? slot + " slot" : definition.name + " icon",
+      "equipment-card-icon",
+    );
+    const identity = document.createElement("div");
+    identity.className = "equipment-card-identity";
+    identity.append(title);
+    if (current !== null) {
+      identity.append(createGradeBadge(current.grade));
+    }
+    head.append(visual, identity);
+
     const detail = document.createElement("small");
     detail.textContent =
       current === null
         ? "No equipment"
-        : gradeLabel(current.grade).toUpperCase() +
-          " +" +
+        : "+" +
           String(current.enhancement) +
           " · " +
-          getEquipmentDefinition(current.definitionId).description;
+          (definition?.description ?? "");
 
-    card.append(title, select, detail);
+    card.append(head, select, detail);
     grid.append(card);
   }
 
@@ -4853,16 +4902,45 @@ function currentShopContext(): ShopRollContext {
   };
 }
 
-function shopBalanceText(): string {
-  return (
-    credits.toLocaleString() +
-    " Credits · " +
-    expansionCurrencies.alloy.toLocaleString() +
-    " Alloy · " +
-    expansionCurrencies.starCrystal.toLocaleString() +
-    " Star Crystal · " +
-    expansionCurrencies.quantumCore.toLocaleString() +
-    " Quantum Core"
+function renderShopBalance(root: HTMLElement): void {
+  replaceCurrencyChips(
+    root,
+    {
+      credits,
+      alloy: expansionCurrencies.alloy,
+      starCrystal: expansionCurrencies.starCrystal,
+      quantumCore: expansionCurrencies.quantumCore,
+    },
+    {
+      includeZero: true,
+      className: "shop-wallet-chips",
+    },
+  );
+}
+
+function setCurrencyButton(
+  button: HTMLButtonElement,
+  label: string,
+  amounts: CurrencyAmounts,
+  options: {
+    signed?: boolean;
+  } = {},
+): void {
+  button.replaceChildren();
+  const action = document.createElement("span");
+  action.className = "currency-action-label";
+  action.textContent = label;
+  const chips = document.createElement("span");
+  chips.className = "currency-action-price";
+  replaceCurrencyChips(chips, amounts, {
+    signed: options.signed,
+  });
+  button.append(action, chips);
+  button.setAttribute(
+    "aria-label",
+    label + " · " + currencyAccessibleText(amounts, {
+      signed: options.signed,
+    }),
   );
 }
 
@@ -4888,17 +4966,22 @@ function shopStockName(entry: ShopStockEntry): string {
     : getEquipmentDefinition(entry.definitionId).name;
 }
 
+function shopStockGrade(entry: ShopStockEntry): GradeId {
+  if (entry.kind === "equipment") return entry.grade;
+  return getItemDefinition(entry.itemId).grade ?? "aluminum";
+}
+
+function shopStockIcon(entry: ShopStockEntry): string {
+  return entry.kind === "item"
+    ? getItemDefinition(entry.itemId).icon
+    : getEquipmentDefinition(entry.definitionId).icon;
+}
+
 function shopStockType(entry: ShopStockEntry): string {
   if (entry.kind === "equipment") {
-    return gradeLabel(entry.grade).toUpperCase() + " EQUIPMENT";
+    return getEquipmentDefinition(entry.definitionId).slot.toUpperCase();
   }
-  const definition = getItemDefinition(entry.itemId);
-  return (
-    (definition.grade === undefined
-      ? definition.category
-      : gradeLabel(definition.grade)) +
-    " ITEM"
-  ).toUpperCase();
+  return getItemDefinition(entry.itemId).category.toUpperCase();
 }
 
 function shopStockDescription(entry: ShopStockEntry): string {
@@ -4963,20 +5046,38 @@ function appendShopStockCards(
   grid.replaceChildren();
 
   for (const entry of instance.stock) {
+    const grade = shopStockGrade(entry);
     const card = document.createElement("article");
-    card.className = cardClass;
+    card.className = cardClass + " visual-card item-card";
+    applyGradeFrame(card, grade);
+    card.title = shopStockDescription(entry);
 
+    const visual = createLocalIcon(
+      shopStockIcon(entry),
+      shopStockName(entry) + " icon",
+      "item-card-icon",
+    );
+
+    const body = document.createElement("div");
+    body.className = "item-card-body";
+
+    const meta = document.createElement("div");
+    meta.className = "item-card-meta";
+    const gradeBadge = createGradeBadge(grade);
     const type = document.createElement("span");
     type.className = "shop-offer-type";
     type.textContent =
       shopStockType(entry) +
       " · STOCK " +
       String(entry.remaining);
+    meta.append(gradeBadge, type);
 
     const title = document.createElement("strong");
+    title.className = "item-card-title";
     title.textContent = shopStockName(entry);
 
     const description = document.createElement("small");
+    description.className = "item-card-description";
     description.textContent = shopStockDescription(entry);
 
     const buy = document.createElement("button");
@@ -4991,11 +5092,22 @@ function appendShopStockCards(
       entry.price,
     );
     buy.disabled = soldOut || itemFull || !affordable;
-    buy.textContent = soldOut
-      ? "Sold out"
-      : itemFull
-        ? "Full"
-        : formatShopPrice(entry.price);
+
+    if (soldOut || itemFull) {
+      buy.textContent = soldOut ? "Sold out" : "Full";
+    } else {
+      const price = document.createElement("span");
+      price.className = "shop-price";
+      replaceCurrencyChips(price, entry.price);
+      buy.append(price);
+      buy.setAttribute(
+        "aria-label",
+        "Buy " + shopStockName(entry) + " for " + formatShopPrice(entry.price),
+      );
+      if (!affordable) {
+        buy.title = "Insufficient currency · " + formatShopPrice(entry.price);
+      }
+    }
 
     buy.addEventListener("click", () => {
       const purchase = buyShopStockEntry(
@@ -5033,13 +5145,14 @@ function appendShopStockCards(
       );
     });
 
-    card.append(type, title, description, buy);
+    body.append(meta, title, description, buy);
+    card.append(visual, body);
     grid.append(card);
   }
 }
 
 function renderNormalShop(): void {
-  byId("shopCredits").textContent = shopBalanceText();
+  renderShopBalance(byId("shopCredits"));
   const grid = byId("normalShopGrid");
   const instance = resolveRuntimeShop("normal");
 
@@ -5081,24 +5194,6 @@ function applyServiceShopState(
   renderEquipment();
   applyEquipmentStats();
   updateDataSummary();
-}
-
-function upgradeCostText(cost: UpgradeCost): string {
-  const parts = [
-    cost.credits.toLocaleString() + " Credits",
-    cost.alloy.toLocaleString() + " Alloy",
-  ];
-  if (cost.starCrystal > 0) {
-    parts.push(
-      cost.starCrystal.toLocaleString() + " Star Crystal",
-    );
-  }
-  if (cost.quantumCore > 0) {
-    parts.push(
-      cost.quantumCore.toLocaleString() + " Quantum Core",
-    );
-  }
-  return parts.join(" + ");
 }
 
 function canAffordUpgradeCost(cost: UpgradeCost): boolean {
@@ -5160,21 +5255,22 @@ function commitUpgradeService(
 }
 
 function renderServiceShop(): void {
-  byId("serviceShopCredits").textContent =
-    credits.toLocaleString() +
-    " Credits · " +
-    expansionCurrencies.alloy.toLocaleString() +
-    " Alloy · " +
-    expansionCurrencies.starCrystal.toLocaleString() +
-    " Star Crystal · " +
-    expansionCurrencies.quantumCore.toLocaleString() +
-    " Quantum Core";
+  renderShopBalance(byId("serviceShopCredits"));
 
   const repairPanel = byId("repairServicePanel");
   repairPanel.replaceChildren();
 
   const repairCard = document.createElement("article");
-  repairCard.className = "service-shop-card";
+  repairCard.className = "service-shop-card visual-card item-card";
+  applyGradeFrame(repairCard, "aluminum");
+  const repairIcon = createLocalIcon(
+    getItemDefinition("repair-kit").icon,
+    "Repair Station Pack icon",
+    "item-card-icon",
+  );
+
+  const repairBody = document.createElement("div");
+  repairBody.className = "item-card-body";
 
   const repairTitle = document.createElement("strong");
   repairTitle.textContent = "Repair Station Pack";
@@ -5185,11 +5281,14 @@ function renderServiceShop(): void {
 
   const repairButton = document.createElement("button");
   repairButton.type = "button";
-  repairButton.textContent =
-    REPAIR_PACK_COST.toLocaleString() +
-    " Credits + " +
-    REPAIR_PACK_ALLOY_COST.toLocaleString() +
-    " Alloy";
+  setCurrencyButton(
+    repairButton,
+    "Buy Repair Pack",
+    {
+      credits: REPAIR_PACK_COST,
+      alloy: REPAIR_PACK_ALLOY_COST,
+    },
+  );
   repairButton.disabled =
     credits < REPAIR_PACK_COST ||
     expansionCurrencies.alloy < REPAIR_PACK_ALLOY_COST;
@@ -5225,7 +5324,8 @@ function renderServiceShop(): void {
     );
   });
 
-  repairCard.append(repairTitle, repairDescription, repairButton);
+  repairBody.append(repairTitle, repairDescription, repairButton);
+  repairCard.append(repairIcon, repairBody);
   repairPanel.append(repairCard);
 
   // Legacy paid Lv1-Lv5 skills remain grandfathered for all characters,
@@ -5242,7 +5342,7 @@ function renderServiceShop(): void {
     const max = maxAttributeLevel(key);
     const cost = attributeUpgradeCost(key, level);
     const card = document.createElement("article");
-    card.className = "service-shop-card";
+    card.className = "service-shop-card visual-card stat-card";
 
     const title = document.createElement("strong");
     title.textContent =
@@ -5262,13 +5362,15 @@ function renderServiceShop(): void {
     button.type = "button";
     button.disabled =
       cost === null || !canAffordUpgradeCost(cost);
-    button.textContent =
-      cost === null
-        ? "Maxed"
-        : "Train Lv" +
-          String(level + 1) +
-          " · " +
-          upgradeCostText(cost);
+    if (cost === null) {
+      button.textContent = "Maxed";
+    } else {
+      setCurrencyButton(
+        button,
+        "Train Lv" + String(level + 1),
+        cost,
+      );
+    }
     button.addEventListener("click", () => {
       commitUpgradeService(
         buyAttributeUpgrade(
@@ -5370,15 +5472,26 @@ function renderServiceShop(): void {
     const cost = equipmentUpgradeCost(item);
     const alloyCost = equipmentUpgradeAlloyCost(item);
     const card = document.createElement("article");
-    card.className = "service-shop-card";
+    card.className = "service-shop-card visual-card item-card equipment-service-card";
+    applyGradeFrame(card, item.grade);
 
+    const visual = createLocalIcon(
+      definition.icon,
+      definition.name + " icon",
+      "item-card-icon",
+    );
+    const cardBody = document.createElement("div");
+    cardBody.className = "item-card-body";
+
+    const titleRow = document.createElement("div");
+    titleRow.className = "item-card-meta";
+    const gradeBadge = createGradeBadge(item.grade);
     const title = document.createElement("strong");
     title.textContent =
       definition.name +
-      " · " +
-      gradeLabel(item.grade).toUpperCase() +
       " +" +
       String(item.enhancement);
+    titleRow.append(gradeBadge, title);
 
     const detail = document.createElement("small");
     const affixText =
@@ -5404,14 +5517,18 @@ function renderServiceShop(): void {
       alloyCost === null ||
       credits < (cost ?? 0) ||
       expansionCurrencies.alloy < (alloyCost ?? 0);
-    button.textContent =
-      cost === null || alloyCost === null
-        ? "Max +5"
-        : "Upgrade · " +
-          cost.toLocaleString() +
-          " Credits + " +
-          alloyCost.toLocaleString() +
-          " Alloy";
+    if (cost === null || alloyCost === null) {
+      button.textContent = "Max +5";
+    } else {
+      setCurrencyButton(
+        button,
+        "Upgrade",
+        {
+          credits: cost,
+          alloy: alloyCost,
+        },
+      );
+    }
 
     button.addEventListener("click", () => {
       const result = buyEquipmentUpgrade(
@@ -5452,16 +5569,19 @@ function renderServiceShop(): void {
       );
     });
 
-    card.append(title, detail, button);
+    cardBody.append(titleRow, detail, button);
+    card.append(visual, cardBody);
 
     const evolutionCost = equipmentEvolutionCost(item);
     if (evolutionCost !== null) {
       const evolve = document.createElement("button");
       evolve.type = "button";
       evolve.disabled = !canAffordUpgradeCost(evolutionCost);
-      evolve.textContent =
-        "Evolve grade · " +
-        upgradeCostText(evolutionCost);
+      setCurrencyButton(
+        evolve,
+        "Evolve grade",
+        evolutionCost,
+      );
       evolve.addEventListener("click", () => {
         commitUpgradeService(
           buyEquipmentEvolution(
@@ -5478,7 +5598,7 @@ function renderServiceShop(): void {
           "✓ Equipment grade evolved · " + definition.name,
         );
       });
-      card.append(evolve);
+      cardBody.append(evolve);
     }
 
     const maxAffixes = maxAffixesForGrade(item.grade);
@@ -5491,13 +5611,14 @@ function renderServiceShop(): void {
       const rollAffix = document.createElement("button");
       rollAffix.type = "button";
       rollAffix.disabled = !canAffordUpgradeCost(affixCost);
-      rollAffix.textContent =
+      setCurrencyButton(
+        rollAffix,
         "Roll affix " +
-        String(affixCount + 1) +
-        "/" +
-        String(maxAffixes) +
-        " · " +
-        upgradeCostText(affixCost);
+          String(affixCount + 1) +
+          "/" +
+          String(maxAffixes),
+        affixCost,
+      );
       rollAffix.addEventListener("click", () => {
         commitUpgradeService(
           buyEquipmentAffix(
@@ -5514,7 +5635,7 @@ function renderServiceShop(): void {
           "✓ Equipment affix rolled · " + definition.name,
         );
       });
-      card.append(rollAffix);
+      cardBody.append(rollAffix);
     }
 
     const rerollCost = equipmentAffixRollCost(item, true);
@@ -5522,9 +5643,11 @@ function renderServiceShop(): void {
       const reroll = document.createElement("button");
       reroll.type = "button";
       reroll.disabled = !canAffordUpgradeCost(rerollCost);
-      reroll.textContent =
-        "Reroll first affix · others locked · " +
-        upgradeCostText(rerollCost);
+      setCurrencyButton(
+        reroll,
+        "Reroll first affix · others locked",
+        rerollCost,
+      );
       reroll.addEventListener("click", () => {
         commitUpgradeService(
           buyEquipmentAffixReroll(
@@ -5542,7 +5665,7 @@ function renderServiceShop(): void {
           "✓ Equipment affix rerolled · " + definition.name,
         );
       });
-      card.append(reroll);
+      cardBody.append(reroll);
     }
 
     const dismantle = document.createElement("button");
@@ -5551,17 +5674,19 @@ function renderServiceShop(): void {
       equipment.loadout[definition.slot] === item.instanceId;
     const salvage = dismantleReward(item);
     dismantle.disabled = equipped;
-    dismantle.textContent =
-      equipped
-        ? "Dismantle · unequip first"
-        : "Dismantle · +" +
-          salvage.alloy.toLocaleString() +
-          " Alloy" +
-          (salvage.starCrystal > 0
-            ? " + " +
-              salvage.starCrystal.toLocaleString() +
-              " Star Crystal"
-            : "");
+    if (equipped) {
+      dismantle.textContent = "Dismantle · unequip first";
+    } else {
+      setCurrencyButton(
+        dismantle,
+        "Dismantle",
+        {
+          alloy: salvage.alloy,
+          starCrystal: salvage.starCrystal,
+        },
+        { signed: true },
+      );
+    }
     dismantle.addEventListener("click", () => {
       commitUpgradeService(
         dismantleEquipment(
@@ -5578,7 +5703,7 @@ function renderServiceShop(): void {
         false,
       );
     });
-    card.append(dismantle);
+    cardBody.append(dismantle);
 
     grid.append(card);
   }
@@ -5670,7 +5795,7 @@ function renderSpecialShop(): void {
   byId("specialShopEyebrow").textContent = presentation.eyebrow;
   byId("specialShopTitle").textContent = presentation.title;
   byId("specialShopMeta").textContent = presentation.meta;
-  byId("specialShopCredits").textContent = shopBalanceText();
+  renderShopBalance(byId("specialShopCredits"));
 
   const grid = byId("specialShopGrid");
   const instance = resolveRuntimeShop(currentShopType);
@@ -5791,6 +5916,8 @@ function handleHiddenEncounterClear(
 
   let rewardText = "No checkpoint change";
   let rewardCredits = 0;
+  let rewardCurrencies = createExpansionCurrencyState();
+  let rewardRelic: RelicId | null = null;
 
   if (result.completed) {
     const reward = hiddenEncounterReward(
@@ -5798,14 +5925,13 @@ function handleHiddenEncounterClear(
       accuracy,
     );
     rewardCredits = reward.credits;
+    rewardCurrencies = reward.currencies;
     credits = addCredits(credits, reward.credits);
     expansionCurrencies = addExpansionCurrencyReward(
       expansionCurrencies,
       reward.currencies,
     );
-    const currencyText =
-      expansionCurrencyRewardText(reward.currencies);
-    const hiddenRelic =
+    rewardRelic =
       active.tier >= 2 ||
       active.kind === "hidden-world" ||
       active.kind === "champion-hunt"
@@ -5815,13 +5941,16 @@ function handleHiddenEncounterClear(
           )
         : null;
     rewardText =
-      "+" +
-      reward.credits.toLocaleString() +
-      " Credits" +
-      (currencyText.length > 0
-        ? " · " + currencyText
-        : "") +
-      relicRewardText(hiddenRelic);
+      currencyAccessibleText(
+        {
+          credits: reward.credits,
+          alloy: reward.currencies.alloy,
+          starCrystal: reward.currencies.starCrystal,
+          quantumCore: reward.currencies.quantumCore,
+        },
+        { signed: true },
+      ) +
+      relicRewardText(rewardRelic);
   } else {
     rewardText =
       "Hidden World progress · " +
@@ -5876,11 +6005,30 @@ function handleHiddenEncounterClear(
   renderMeasuredStageSession(stageSession, stats.hits, stats.misses);
 
   const rewardContainer = byId("clearCredits");
-  rewardContainer.replaceChildren();
-  const rewardChip = document.createElement("span");
-  rewardChip.className = "reward-chip";
-  rewardChip.textContent = rewardText;
-  rewardContainer.append(rewardChip);
+  if (result.completed) {
+    replaceCurrencyChips(
+      rewardContainer,
+      {
+        credits: rewardCredits,
+        alloy: rewardCurrencies.alloy,
+        starCrystal: rewardCurrencies.starCrystal,
+        quantumCore: rewardCurrencies.quantumCore,
+      },
+      { signed: true },
+    );
+    if (rewardRelic !== null) {
+      const relic = document.createElement("span");
+      relic.className = "reward-chip";
+      relic.textContent = "Relic · " + getRelicDefinition(rewardRelic).name;
+      rewardContainer.append(relic);
+    }
+  } else {
+    rewardContainer.replaceChildren();
+    const progressChip = document.createElement("span");
+    progressChip.className = "reward-chip";
+    progressChip.textContent = rewardText;
+    rewardContainer.append(progressChip);
+  }
 
   const hiddenProgress = byId("clearCharacterProgress");
   hiddenProgress.replaceChildren();
