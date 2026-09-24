@@ -3978,6 +3978,44 @@ function renderGameOverMeasured(snapshot: StageSessionSnapshot): void {
   appendResultMetric(root, "Skills / Nova", String(snapshot.skillsUsed) + " / " + String(snapshot.novaUses));
 }
 
+function postLearningEvent(event: ReturnType<
+  typeof buildCombatLearningEvent | typeof buildRecallLearningEvent
+>): void {
+  if (window.parent === window) return;
+  learningRequestSequence++;
+  window.parent.postMessage(
+    {
+      type: LEARNING_ATTEMPT_MESSAGE,
+      requestId:
+        "space-typing-" +
+        Date.now().toString(36) +
+        "-" +
+        learningRequestSequence.toString(36),
+      event,
+    },
+    PARENT_ORIGIN,
+  );
+}
+
+function leaveReviewMode(): void {
+  if (activeReviewGoal === undefined) return;
+
+  activeReviewGoal = undefined;
+  activeReviewVocabulary = [];
+  activeReviewLevel = 1;
+
+  if (gameplayModeBeforeReview !== null) {
+    gameplayMode = gameplayModeBeforeReview;
+    gameplayModeBeforeReview = null;
+  }
+
+  if (configuredVocabulary.length > 0) {
+    game.setVocabulary(configuredVocabulary);
+    game.setVocabularyLevel(selectedVocabularyLevel());
+  }
+  renderGameplayMode();
+}
+
 const game = new Game(
   byId<HTMLCanvasElement>("gameCanvas"),
   [],
@@ -4512,9 +4550,15 @@ const game = new Game(
       }
       updateCampaignUi();
     },
-    onWordComplete: (entry) => {
+    onWordComplete: (entry, outcome) => {
       if (gameplayMode === "combat") {
         speakEnglish(entry.en, settings);
+        postLearningEvent(
+          buildCombatLearningEvent({
+            entry,
+            perfect: outcome?.perfect ?? true,
+          }),
+        );
       }
     },
     onRecallPrompt: (entry) => {
@@ -4530,6 +4574,7 @@ const game = new Game(
       recallStage.replays += result.replayCount;
       recallStage.responseMs += result.responseMs;
       recallMemory = recordRecallAttempt(recallMemory, result);
+      postLearningEvent(buildRecallLearningEvent(result));
       if (recallStage.attempts % 6 === 0) saveRecallMemory();
       renderRecallAssistUi();
     },
