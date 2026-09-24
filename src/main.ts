@@ -744,7 +744,7 @@ app.innerHTML = `
     <div id="recallAssistBar" class="boss-hud recall-assist-bar hidden" aria-live="polite">
       <div>
         <strong>RECALL</strong>
-        <span id="recallAssistMeta">Listen, remember, type.</span>
+        <span id="recallAssistMeta">Listen · recall · type</span>
       </div>
       <button id="recallReplayButton" type="button">↻ Replay audio</button>
       <button id="recallHintButton" type="button">✦ Reveal letter</button>
@@ -1777,20 +1777,20 @@ let selectedJourneyStage = campaign.selectedStage;
  * Existing button IDs and their action listeners remain unchanged. */
 function installMenuHelp(): void {
   const descriptions: Record<string, string> = {
-    routeButton: "Sector, boss and checkpoint preview",
-    stageSelectButton: "Browse/replay unlocked stages",
+    routeButton: "Sector, boss, checkpoint",
+    stageSelectButton: "Replay unlocked stages",
     characterButton: "Pilot and progression",
     equipmentButton: "Gear and combat stats",
     supportButton: "Combat support spells",
-    hotbarButton: "Skills/items on number keys",
-    vocabularyButton: "Shared/custom vocabulary",
+    hotbarButton: "Skills/items on 1-9",
+    vocabularyButton: "Vocabulary source",
     progressionButton: "Missions and rewards",
-    codexButton: "Discovered content",
-    settingsButton: "Audio/display/Recall controls",
+    codexButton: "Codex entries",
+    settingsButton: "Audio/display/Recall",
     dataButton: "Save/performance info",
-    shopButton: "Finite-stock items",
-    stationShopButton: "Maintenance items",
-    serviceShopButton: "Repair/upgrade gear",
+    shopButton: "Finite-stock shop",
+    stationShopButton: "Station items",
+    serviceShopButton: "Repair/upgrade",
   };
 
   const wrappers: HTMLElement[] = [];
@@ -4504,10 +4504,9 @@ const game = new Game(
       }
     },
     onRecallPrompt: (entry) => {
-      speakEnglish(entry.en, {
-        ...settings,
-        pronunciationEnabled: true,
-      });
+      if (recallSettings.autoPronounce) {
+        speakEnglish(entry.en, { ...settings, pronunciationEnabled: true });
+      }
       renderRecallAssistUi();
     },
     onRecallResult: (result) => {
@@ -7658,8 +7657,8 @@ function renderGameplayMode(): void {
     ? "Recall · hear, remember, type"
     : "Combat · see, type, shoot";
   byId("titleModeIntro").textContent = recall
-    ? "Hear the word, rebuild it, stop the enemy before contact."
-    : "Type visible words, shoot and keep your streak.";
+    ? "Hear, recall and type before contact."
+    : "See words, type, shoot, keep the streak.";
   game.setGameplayMode(gameplayMode, recallSettings);
   updateCampaignUi();
   renderRecallAssistUi();
