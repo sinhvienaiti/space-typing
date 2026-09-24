@@ -3278,6 +3278,8 @@ M22 may now begin the final deterministic balance/performance audit. Do not add 
 
 **Status: Automated audit complete; manual browser/audio/visual gate pending.** See `docs/M22_BALANCE_PERFORMANCE_AUDIT.md` and `docs/M22_MANUAL_PLAYTEST_MATRIX.md`.
 
+Pre-M22 Recall Mode V1 (`docs/PRE_M22_RECALL_MODE_PLAN.md`) is implementation-complete on PR #110. CI #656 PASS: 149/149 test files, 748/748 tests, TypeScript, production build, audio guard, bundle budget (JS 650.00 KiB raw / CSS 60.00 KiB raw) and Ship V3 art budget. This slice does not close M22: the manual matrix must now include Recall pronunciation, hidden-slot readability, translation/IPA toggles, replay/hint behavior, sequential enemy contact damage and Recall boss pressure on a real browser/audio device.
+
 Automated work completed:
 
 - deterministic cross-system simulation across Stage 001-1000 / 50 Worlds / 100 checkpoint sectors;

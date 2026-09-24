@@ -3970,3 +3970,6 @@ kbd {
 .local-item-icon{display:grid;place-items:center;height:42px}
 .item-card{display:grid;grid-template-columns:46px 1fr;gap:.5rem}
 
+
+
+.recall-assist-bar{top:124px;display:flex;pointer-events:auto}
