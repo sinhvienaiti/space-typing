@@ -8774,9 +8774,7 @@ export class Game {
     );
     this.recallReplayCount = 0;
     this.recallPromptStartedAtSeconds = this.stageElapsedSeconds;
-    if (this.recallSettings.autoPronounce) {
-      this.hooks.onRecallPrompt?.({ ...enemy.entry });
-    }
+    this.hooks.onRecallPrompt?.({ ...enemy.entry });
   }
 
   private activateBossRecallPrompt(): void {
@@ -8790,9 +8788,7 @@ export class Game {
     );
     this.recallReplayCount = 0;
     this.recallPromptStartedAtSeconds = this.stageElapsedSeconds;
-    if (this.recallSettings.autoPronounce) {
-      this.hooks.onRecallPrompt?.({ ...this.boss.entry });
-    }
+    this.hooks.onRecallPrompt?.({ ...this.boss.entry });
   }
 
   private resolveRecallPrompt(
