@@ -17,7 +17,7 @@ function voice() {
 }
 
 describe("sampled sci-fi SFX bank", () => {
-  it("preloads one bounded voice per curated sample and expands only to the event pool limit", () => {
+  it("prewarms every bounded event voice so combat does not allocate audio elements", () => {
     const created: Array<{ src: string; voice: HTMLAudioElement }> = [];
     const bank = new SampleSfxBank((src) => {
       const next = voice();
@@ -26,13 +26,18 @@ describe("sampled sci-fi SFX bank", () => {
     });
 
     bank.preload();
-    expect(created).toHaveLength(Object.keys(SAMPLE_SFX).length);
+    const totalPoolSize = Object.values(SAMPLE_SFX).reduce(
+      (sum, definition) => sum + definition.poolSize,
+      0,
+    );
+    expect(created).toHaveLength(totalPoolSize);
 
     for (let index = 0; index < 12; index += 1) {
       expect(
         bank.play("projectile-intercept", 0.8, false),
       ).toBe(true);
     }
+    expect(created).toHaveLength(totalPoolSize);
 
     const projectileVoices = created.filter(
       (item) =>
