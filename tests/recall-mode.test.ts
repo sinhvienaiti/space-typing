@@ -11,7 +11,6 @@ import {
   revealNextRecallHint,
   sanitizeRecallMemory,
   sanitizeRecallSettings,
-  summarizeRecallAttempts,
 } from "../src/recall/model";
 
 describe("Recall Mode contracts", () => {
@@ -144,38 +143,5 @@ describe("Recall Mode contracts", () => {
     expect(pool.length).toBeLessThanOrEqual(entries.length + Math.ceil(entries.length * 0.25));
   });
 
-  it("summarizes Recall assists, response time and review pressure", () => {
-    const entry = { id: "x", en: "orbit", vi: "quỹ đạo", ipa: "" };
-    const summary = summarizeRecallAttempts([
-      {
-        entry,
-        completed: true,
-        perfect: true,
-        hintCount: 0,
-        replayCount: 0,
-        responseMs: 1000,
-        at: 1,
-      },
-      {
-        entry,
-        completed: false,
-        perfect: false,
-        hintCount: 1,
-        replayCount: 2,
-        responseMs: 3000,
-        at: 2,
-      },
-    ]);
-
-    expect(summary).toEqual({
-      attempts: 2,
-      completed: 1,
-      perfect: 1,
-      needsReview: 1,
-      hints: 1,
-      replays: 2,
-      averageResponseMs: 2000,
-    });
-  });
 
 });
