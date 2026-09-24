@@ -3325,12 +3325,13 @@ export class Game {
     this.projectileImpacts.length = liveImpacts;
 
     let liveParticles = 0;
+    const particleDamping = Math.pow(0.12, dt);
     for (const particle of this.particles) {
       particle.life -= dt;
       particle.x += particle.vx * dt;
       particle.y += particle.vy * dt;
-      particle.vx *= Math.pow(0.12, dt);
-      particle.vy *= Math.pow(0.12, dt);
+      particle.vx *= particleDamping;
+      particle.vy *= particleDamping;
       if (particle.life > 0) {
         this.particles[liveParticles++] = particle;
       }
