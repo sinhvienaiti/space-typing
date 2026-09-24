@@ -459,7 +459,9 @@ async function topicReferences(
   const lookup = await loadVocabularyLookup();
   return topic.keys.flatMap((key) => {
     const level = lookup.entries[normalizeEnglish(key)];
-    return Number.isInteger(level) ? [{ key, level }] : [];
+    return typeof level === "number" && Number.isInteger(level)
+      ? [{ key, level }]
+      : [];
   });
 }
 
