@@ -16,9 +16,7 @@ import {
   recordRecallAttempt,
   sanitizeRecallMemory,
   sanitizeRecallSettings,
-  summarizeRecallAttempts,
   type GameplayMode,
-  type RecallAttemptResult,
   type RecallMemoryState,
   type RecallSettings,
 } from "./recall/model";
@@ -1752,7 +1750,7 @@ const hudDomMetrics = {
 let gameplayMode: GameplayMode = loadGameplayMode();
 let recallSettings: RecallSettings = loadRecallSettings();
 let recallMemory: RecallMemoryState = loadRecallMemory();
-let recallStageAttempts: RecallAttemptResult[] = [];
+let recallStage = { attempts: 0, perfect: 0, hints: 0, replays: 0, responseMs: 0 };
 let sourceState = loadSource();
 let sourceTab: VocabularySourceTab = sourceState.mode;
 let vocabularyIndex: VocabularyIndex | null = null;
@@ -3775,19 +3773,15 @@ function renderWordReview(snapshot: StageSessionSnapshot): void {
     if (wordReviewFilter === "missed") return group.missed > 0;
     return true;
   });
-  const recallSummary =
-    gameplayMode === "recall" ? summarizeRecallAttempts(recallStageAttempts) : null;
-  if (recallSummary !== null) {
-    groups.sort(
-      (a, b) =>
-        b.missed + b.corrected - a.missed - a.corrected ||
-        a.en.localeCompare(b.en, "en"),
-    );
+  if (gameplayMode === "recall") {
+    groups.sort((a, b) => b.missed + b.corrected - a.missed - a.corrected);
   }
 
   byId("wordReviewCount").textContent =
     "(" + snapshot.wordAttempts.length + " stored attempts" +
-    (recallSummary === null ? "" : " · " + recallSummary.needsReview + " need review") +
+    (gameplayMode === "recall"
+      ? " · " + (recallStage.attempts - recallStage.perfect) + " need review"
+      : "") +
     (snapshot.wordAttemptsTruncated > 0
       ? " · " + snapshot.wordAttemptsTruncated + " omitted after safety cap"
       : "") +
@@ -3936,24 +3930,22 @@ function renderMeasuredStageSession(
     "independent from Key Streak",
   );
   if (gameplayMode === "recall") {
-    const recall = summarizeRecallAttempts(recallStageAttempts);
     appendResultMetric(
       typing,
       "Recall perfect",
-      recall.perfect + " / " + recall.attempts,
-      recall.needsReview + " need review",
+      recallStage.perfect + " / " + recallStage.attempts,
+      (recallStage.attempts - recallStage.perfect) + " need review",
     );
     appendResultMetric(
       typing,
       "Recall assists",
-      recall.hints + " hints",
-      recall.replays + " replays",
+      recallStage.hints + " hints",
+      recallStage.replays + " replays",
     );
     appendResultMetric(
       typing,
       "Recall response",
-      (recall.averageResponseMs / 1000).toFixed(1) + "s",
-      "average prompt response",
+      (recallStage.responseMs / Math.max(1, recallStage.attempts) / 1000).toFixed(1) + "s",
     );
   }
 
@@ -4038,7 +4030,7 @@ const game = new Game(
       }
     },
     onStage: (stage) => {
-      recallStageAttempts = [];
+      recallStage = { attempts: 0, perfect: 0, hints: 0, replays: 0, responseMs: 0 };
       renderStage(stage);
       codex = discoverCodexWorld(codex, worldForStage(stage).id).state;
     },
@@ -4522,7 +4514,11 @@ const game = new Game(
       renderRecallAssistUi();
     },
     onRecallResult: (result) => {
-      recallStageAttempts.push(result);
+      recallStage.attempts += 1;
+      recallStage.perfect += result.perfect ? 1 : 0;
+      recallStage.hints += result.hintCount;
+      recallStage.replays += result.replayCount;
+      recallStage.responseMs += result.responseMs;
       recallMemory = recordRecallAttempt(recallMemory, result);
       localStorage.setItem(RECALL_MEMORY_KEY, JSON.stringify(recallMemory));
       renderRecallAssistUi();
