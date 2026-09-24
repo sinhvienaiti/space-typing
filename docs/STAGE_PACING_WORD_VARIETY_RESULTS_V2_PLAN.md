@@ -1,6 +1,6 @@
 # Stage Pacing, Word Variety, Projectile SFX and Stage Results V2
 
-Status: **partial runtime implementation** as of PR #87 and follow-up: early total stage budgets now start at 34, Stage 051+ starts at 100; existing StageWordLedger already applies across hostile word-selection paths; dedicated projectile intercept audio/VFX ships; Stage Clear Replay, compact currency badges, independent Custom tuning and lighter High/Ultra pixel budgets have merged. This document remains the source of **uncompleted** acceptance criteria: explicit 3–5 wave phase scheduling, measured 90–150s pacing, comprehensive word-attempt trace and Stage Results V2 (word review tabs/stars/stats), exhaustive manual browser profiling/listening and high/low WPM playtesting. Do not mark full design complete merely because Test/Build CI passes.
+Status: **runtime implementation substantially complete; real-browser pacing/audio/visual acceptance still pending**. Current `main` already carries the expanded total stage budgets (Stage 001 = 34, Stage 051 = 100, ordinary Campaign average >100), StageWordLedger hostile-word variation, dedicated projectile-intercept audio/VFX, Stage Results V2 with bounded per-attempt word trace, replay/reward fixes, independent Custom controls and the Batch F performance-evidence tooling. PR #99 adds the missing authored **3–5 phase/wave runtime scheduler** without changing the existing total enemy budgets or M12 concurrent-pressure caps. CI #604 passes 146 test files / 727 tests plus TypeScript, production build, bundle budget and ship-art budget. Remaining acceptance is measured real-browser 90–150s / 120–210s pacing, low/high-WPM playtesting, listening/visual review and the final M22 manual matrix. Do not mark the full design or M22 COMPLETE from CI alone.
 
 Source of truth for existing implementation remains `main`, specifically `src/campaign/stage.ts`, `src/Game.ts`, `src/enemies/word-difficulty.ts`, `src/audio/Sfx.ts`, `src/main.ts`, M12 active-pressure rules and the C01-C04 same-prefix clarity work.
 
@@ -8,7 +8,7 @@ This is a user-facing polish/functional slice to complete and manually test **be
 
 ## A. Why current stages are short
 
-The current `createStageConfig` starts Stage 001 with `enemyBudget = 6` and increments modestly, while `Game.startStage` copies it to `spawnRemaining` and `Game` clears when remaining spawns and living enemies reach zero (with the existing boss conditions). The existing `waveForKills` is a display-derived counter, not an authored multi-phase scheduler. Extend the actual spawn budget and pacing deliberately; do not only change the HUD label or add an idle minimum timer.
+The original implementation started Stage 001 with only six scheduled enemies and used no authored multi-phase scheduler. Current runtime has already expanded total budgets (Stage 001 = 34, Stage 051 = 100, late ordinary stages up to the existing bounded curve) and still uses the existing StageClearGate for boss/final completion. PR #99 now adds a real stage-local phase plan—rather than a display-only wave counter—with exact per-phase quotas, bounded recovery beats, formation quota protection and phase-aware spawn/Elite pacing. The HUD reads the same runtime phase state. No artificial minimum timer keeps an empty arena open after combat is resolved.
 
 ## B. Stage pacing and enemy count
 
@@ -17,7 +17,7 @@ The current `createStageConfig` starts Stage 001 with `enemyBudget = 6` and incr
   - Stage 011-050: approximately 60-90.
   - Stage 051+: target roughly 100-150 for ordinary stages as the sustainable baseline, with some special/gauntlet stages above 150 when typing-pressure audits pass.
   - Campaign-wide ordinary-stage average should exceed 100 enemies without forcing Stage 001 newcomers to clear 100 full words immediately.
-- Use an explicit 3-5 phase/wave pacing plan (opening, pressure ramp, mixed elite/support, optional event/recovery beat, finale where applicable). Author role/World variation. Keep the existing World Mini Boss at World stage 10, World Boss at 20, Galaxy Major Boss at 100.
+- **Implemented by PR #99:** explicit 3–5 phase/wave pacing uses Opening, Pressure Ramp, Mixed Threats, an optional Recovery Beat and Finale. Phase quotas sum exactly to the already-authored total enemy budget; formations cannot spill across a phase quota; transitions wait for a bounded battlefield drain/recovery beat; phase spawn cadence and Elite chance ramp within bounded multipliers. Stage roles select 3/4/5 phases while the existing World Mini Boss at World stage 10, World Boss at 20 and Galaxy Major Boss at 100 remain unchanged.
 - Target stage durations: ordinary stages roughly 90-150 seconds; milestone/boss stages roughly 120-210 seconds, calibrated across difficulty and WPM bands. These are playtest targets, not artificial timers that leave an empty arena after the last kill.
 - Preserve M11/M12 Threat Budget, maximum concurrent active targets, urgent-threat ceilings, formation admission, reaction windows and late-stage performance budgets. A high **total stage spawn count** must not turn into 100 simultaneous on-screen enemies.
 - Spawn rate and wave lengths adapt to chosen difficulty and vocabulary difficulty; do not multiply every axis linearly with WPM. Ensure boss arrival and stage-clear remain reachable; count spawned and resolved enemies accurately even when Carrier/Splitter add children, enemies escape or special non-hostile targets exist.
@@ -95,10 +95,10 @@ Replace the current five loose result cells and overgrown Rewards text with an o
 
 ## F. Reviewable development order
 
-1. Instrument stage lifecycle, spawn budget, explicit phases and per-stage word ledger (first get word selection correct; then raise total enemies without destroying variety). Add deterministic simulation/regression tests.
-2. Integrate exact-active-duplicate exclusion and fair least-used fallback at **every** hostile word-creation path; audit same-prefix selection and replay/reset/recovery.
-3. Integrate dedicated projectile intercept SFX and manual listening/Test Lab trigger.
-4. Add isolated stage word attempt/event tracker, reconcile typed-word versus projectile metrics, and implement the new result layout/stars/word tabs.
-5. Run complete Test/TypeScript/build/bundle CI, review passes and M22 real-browser/audio/visual matrix on the final combined build. Preserve and integrate the independently proposed Campaign Map/checkpoint rest-stop redesign in PR #75 without silently overriding its pending status.
+1. **Implemented in runtime:** stage lifecycle, expanded spawn budgets, deterministic 3–5 phase scheduler and per-stage word ledger. PR #99 adds phase quotas/recovery/pressure pacing and full Campaign/runtime regression coverage without changing the current total-budget curve.
+2. **Implemented:** exact-active-duplicate exclusion plus stage least-used/least-recent selection is integrated through hostile word paths, with same-prefix clarity and replay/reset coverage.
+3. **Implemented in code/Test Lab; manual listening still pending:** dedicated projectile-intercept SFX/VFX.
+4. **Implemented by Batch C / PR #95:** bounded stage word-attempt tracker, hostile-word WPM/accuracy denominators, real combat metrics, stars and All/Perfect/Corrected/Missed review tabs. Skill-killed/interrupted targets remain distinct from typing mistakes.
+5. **Automated CI complete; manual gate pending:** complete Test/TypeScript/build/bundle checks pass on the current slices. Execute the M22 real-browser/audio/visual matrix on the final combined build, including Stage 001/010/011/051+ low/high-WPM duration evidence. Preserve the merged Campaign Map/checkpoint behavior; do not revive stale design branches over current `main`.
 
 Do not mark any of these steps COMPLETE because this document or its draft PR exists.
