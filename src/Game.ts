@@ -7730,8 +7730,8 @@ export class Game {
       "800 24px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.textBaseline = "middle";
 
-    const fullWidth = this.measureTextWidth(displayWord).width;
-    const typedWidth = this.measureTextWidth(split.typed).width;
+    const fullWidth = this.measureTextWidth(displayWord);
+    const typedWidth = this.measureTextWidth(split.typed);
     const left = x - fullWidth / 2;
     const wordY = y + radius + 34;
 
@@ -7788,8 +7788,8 @@ export class Game {
     context.font =
       "750 17px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.textBaseline = "middle";
-    const fullWidth = this.measureTextWidth(displayWord).width;
-    const typedWidth = this.measureTextWidth(split.typed).width;
+    const fullWidth = this.measureTextWidth(displayWord);
+    const typedWidth = this.measureTextWidth(split.typed);
     const left = pod.x - fullWidth / 2;
     const wordY = y - 36;
 
@@ -7841,8 +7841,8 @@ export class Game {
     context.font =
       "800 18px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.textBaseline = "middle";
-    const fullWidth = this.measureTextWidth(displayWord).width;
-    const typedWidth = this.measureTextWidth(split.typed).width;
+    const fullWidth = this.measureTextWidth(displayWord);
+    const typedWidth = this.measureTextWidth(split.typed);
     const left = drone.x - fullWidth / 2;
     const wordY = y - 34;
     context.fillStyle = "rgba(4, 8, 14, 0.9)";
@@ -7923,7 +7923,7 @@ export class Game {
     context.fillStyle = "rgba(5, 9, 17, 0.9)";
     const maskWidth = Math.min(
       300,
-      Math.max(118, this.measureTextWidth(mask).width + 28),
+      Math.max(118, this.measureTextWidth(mask) + 28),
     );
     context.fillRect(x - maskWidth / 2, y - 56, maskWidth, 27);
     context.fillStyle = "#f5f3ff";
@@ -7989,8 +7989,8 @@ export class Game {
     context.font =
       "800 18px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.textBaseline = "middle";
-    const fullWidth = this.measureTextWidth(displayWord).width;
-    const typedWidth = this.measureTextWidth(split.typed).width;
+    const fullWidth = this.measureTextWidth(displayWord);
+    const typedWidth = this.measureTextWidth(split.typed);
     const left = x - fullWidth / 2;
     const wordY = crate.y - 38;
     context.fillStyle = "rgba(4, 8, 14, 0.9)";
@@ -8040,8 +8040,8 @@ export class Game {
     context.font =
       "800 18px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.textBaseline = "middle";
-    const fullWidth = this.measureTextWidth(displayWord).width;
-    const typedWidth = this.measureTextWidth(split.typed).width;
+    const fullWidth = this.measureTextWidth(displayWord);
+    const typedWidth = this.measureTextWidth(split.typed);
     const left = x - fullWidth / 2;
     const wordY = crate.y - 40;
     context.fillStyle = "rgba(4, 8, 14, 0.9)";
@@ -8563,8 +8563,8 @@ export class Game {
       "700 18px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.textBaseline = "middle";
 
-    const fullWidth = this.measureTextWidth(displayWord).width;
-    const typedWidth = this.measureTextWidth(typed).width;
+    const fullWidth = this.measureTextWidth(displayWord);
+    const typedWidth = this.measureTextWidth(typed);
     const panelWidth = Math.max(fullWidth + 16, 126);
     const left = enemy.x - fullWidth / 2;
     const panelLeft = enemy.x - panelWidth / 2;
@@ -8671,7 +8671,7 @@ export class Game {
     let y = 116;
     for (const buff of buffs) {
       const text = buff.label + " · " + buff.remaining.toFixed(1) + "s";
-      const width = this.measureTextWidth(text).width + 20;
+      const width = this.measureTextWidth(text) + 20;
       const x = this.width - 18;
       context.fillStyle = "rgba(3, 9, 18, 0.88)";
       context.fillRect(x - width, y - 12, width, 24);
@@ -8702,7 +8702,7 @@ export class Game {
       "850 13px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.textAlign = "center";
     context.textBaseline = "middle";
-    const width = this.measureTextWidth(notice.label).width;
+    const width = this.measureTextWidth(notice.label);
     context.fillStyle = "rgba(3, 9, 20, 0.9)";
     context.fillRect(
       notice.x - width / 2 - 9,
