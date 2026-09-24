@@ -290,7 +290,7 @@ import {
   reinforceEnemyLayerPlan,
 } from "./enemies/layers";
 import {
-  enemyRankLabel,
+  enemyRankVisualProfile,
   type EnemyRank,
 } from "./enemies/rank";
 import {
@@ -7238,7 +7238,9 @@ export class Game {
         age: time,
         flash: boss.flash,
         targeted: false,
-        glowScale: qualityProfile(this.settings.visualQuality).glowScale,
+        glowScale:
+          qualityProfile(this.settings.visualQuality).glowScale *
+          rankVisual.glowScale,
       }, this.modularBodyCache, this.dpr);
 
     if (!modularDrawn) {
@@ -7668,6 +7670,7 @@ export class Game {
     const context = this.context;
     const targeted = enemy.id === this.targetId;
     const kick = enemy.kick * 7;
+    const rankVisual = enemyRankVisualProfile(enemy.rank ?? "I");
 
     const baseColor =
       enemy.golden
@@ -7700,6 +7703,28 @@ export class Game {
                                 ? "#fff29a"
                                 : "#ffb75b";
     const targetColor = "#80f3ff";
+
+    // Rank is communicated by bounded aura strength/thickness instead of
+    // another text label competing with the English typing target.
+    context.save();
+    context.globalCompositeOperation = "lighter";
+    context.globalAlpha = rankVisual.auraAlpha;
+    context.strokeStyle = targeted ? targetColor : baseColor;
+    context.lineWidth = 1 + rankVisual.lineWidthBoost;
+    context.shadowBlur =
+      (8 + rankVisual.intensity * 16) *
+      qualityProfile(this.settings.visualQuality).glowScale;
+    context.shadowColor = targeted ? targetColor : baseColor;
+    context.beginPath();
+    context.arc(
+      enemy.x,
+      enemy.y - kick,
+      enemy.radius * rankVisual.auraRadiusScale,
+      0,
+      Math.PI * 2,
+    );
+    context.stroke();
+    context.restore();
 
     const warning = telegraphStrength(enemy.actionCooldown, 0.9);
     const warningPulse = telegraphPulse(warning, enemy.age);
@@ -7757,7 +7782,9 @@ export class Game {
       context.globalAlpha = 0.42;
     }
     context.globalCompositeOperation = "lighter";
-    context.shadowBlur = targeted ? 25 : enemy.kind === "tank" ? 20 : 14;
+    context.shadowBlur =
+      (targeted ? 25 : enemy.kind === "tank" ? 20 : 14) *
+      rankVisual.glowScale;
     context.shadowColor = targeted ? "#86f8ff" : baseColor;
     context.strokeStyle =
       enemy.flash > 0 ? "#ffffff" : targeted ? targetColor : baseColor;
@@ -7772,7 +7799,9 @@ export class Game {
             : enemy.kind === "splitter"
               ? "rgba(255, 105, 210, 0.09)"
               : "rgba(255, 168, 69, 0.08)";
-    context.lineWidth = targeted ? 2.8 : enemy.kind === "tank" ? 2.2 : 1.6;
+    context.lineWidth =
+      (targeted ? 2.8 : enemy.kind === "tank" ? 2.2 : 1.6) +
+      rankVisual.lineWidthBoost;
 
     const visual = enemyDefinition(
       enemy.definitionId ??
@@ -8179,10 +8208,7 @@ export class Game {
     const objectiveTarget =
       this.stageObjective?.targetEnemyId === enemy.id;
     context.fillText(
-      (objectiveTarget ? "OBJECTIVE · " : "") +
-        enemyRankLabel(enemy.rank ?? "I") +
-        " · " +
-        layerLabel,
+      (objectiveTarget ? "OBJECTIVE · " : "") + layerLabel,
       enemy.x,
       y - 25,
     );
