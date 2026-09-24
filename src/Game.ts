@@ -300,6 +300,10 @@ import {
 import { resolveEnemyTypingProfile } from "./enemies/typing-profile";
 import { StageWordLedger } from "./enemies/stage-word-variety";
 import {
+  StageSessionTracker,
+  type StageSessionSnapshot,
+} from "./results/stage-session";
+import {
   enemySkillDefinition,
   type EnemySkillId,
 } from "./enemies/skills";
@@ -590,6 +594,7 @@ export class Game {
     base: DEFAULT_PLAYER_BASE_STATS,
   });
   private stats: GameStats = this.createGameStats(1);
+  private readonly stageResultTracker = new StageSessionTracker();
   private secondsSinceDamage = Number.POSITIVE_INFINITY;
   private resourceEmitTimer = 0;
 
@@ -1758,6 +1763,7 @@ export class Game {
       this.activateSupportSpell(id);
     }
 
+    this.stageResultTracker.recordSkillUse();
     this.hooks.onSkills();
     return result;
   }
@@ -2265,7 +2271,9 @@ export class Game {
       return false;
     }
 
-    return this.useRecoveryConsumable(id);
+    const used = this.useRecoveryConsumable(id);
+    if (used) this.stageResultTracker.recordConsumableUse();
+    return used;
   }
 
   private useRecoveryConsumable(id: RecoveryItemId): boolean {
@@ -2330,6 +2338,10 @@ export class Game {
 
   getStageElapsedSeconds(): number {
     return this.stageElapsedSeconds;
+  }
+
+  getStageSessionSnapshot(): StageSessionSnapshot {
+    return this.stageResultTracker.snapshot(this.stageElapsedSeconds);
   }
 
   setLuckPityState(state: LuckPityState): void {
@@ -2464,6 +2476,7 @@ export class Game {
     this.relicFirstWordTriggered = false;
     this.relicMistakeGuardsUsed = 0;
     this.stats = this.createGameStats(stage.stage);
+    this.stageResultTracker.reset();
     this.stats.shield = Math.min(
       this.stats.maxShield,
       this.stats.shield *
@@ -3471,6 +3484,7 @@ export class Game {
       this.supplyPod.age >= this.supplyPod.lifetime ||
       this.supplyPod.x > this.width + 60
     ) {
+      this.stageResultTracker.recordBonusMissed();
       this.supplyPod = null;
     }
   }
@@ -3508,6 +3522,7 @@ export class Game {
       this.treasureDrone.age >= this.treasureDrone.lifetime ||
       this.treasureDrone.x < -70
     ) {
+      this.stageResultTracker.recordBonusMissed();
       this.treasureDrone = null;
     }
   }
@@ -3558,6 +3573,7 @@ export class Game {
       target.age >= target.lifetime ||
       target.x < -86
     ) {
+      this.stageResultTracker.recordBonusMissed();
       this.recallBonus = null;
     }
   }
@@ -3592,6 +3608,7 @@ export class Game {
       this.rewardChoiceCrate.age >= this.rewardChoiceCrate.lifetime ||
       this.rewardChoiceCrate.y > this.height * 0.63
     ) {
+      this.stageResultTracker.recordBonusMissed();
       this.rewardChoiceCrate = null;
     }
   }
@@ -3626,6 +3643,7 @@ export class Game {
       this.anomalyCrate.age >= this.anomalyCrate.lifetime ||
       this.anomalyCrate.y > this.height * 0.62
     ) {
+      this.stageResultTracker.recordBonusMissed();
       this.anomalyCrate = null;
     }
   }
@@ -3885,7 +3903,9 @@ export class Game {
         for (const tentative of this.enemies.slice(initialEnemyCount)) {
           this.stageWordLedger.undo(tentative.entry);
         }
+        const discarded = this.enemies.length - initialEnemyCount;
         this.enemies.splice(initialEnemyCount);
+        this.stageResultTracker.discardEnemySpawns(discarded);
         return 0;
       }
     }
@@ -4092,6 +4112,7 @@ export class Game {
     });
 
     this.stageWordLedger.record(typingProfile.entry);
+    this.stageResultTracker.recordEnemySpawn();
     this.notifyEnemySeen(definitionId);
     const spawnDefinition = enemyDefinition(definitionId);
     if (spawnDefinition !== undefined) {
@@ -4563,6 +4584,7 @@ export class Game {
           : this.enemySkillCooldown(firstSkill, this.difficulty),
     });
     this.stageWordLedger.record(typingProfile.entry);
+    this.stageResultTracker.recordEnemySpawn();
     this.notifyEnemySeen(definitionId);
 
     this.burst(carrier.x, carrier.y, 12, 47);
@@ -4614,6 +4636,7 @@ export class Game {
   }
 
   private destroyProjectile(projectile: EnemyProjectile): void {
+    this.stageResultTracker.recordProjectileIntercept();
     this.projectiles = this.projectiles.filter(
       (item) => item.id !== projectile.id,
     );
@@ -4665,11 +4688,13 @@ export class Game {
 
     if (key !== expected) {
       boss.wordMissed = true;
+      this.stageResultTracker.recordWordWrongKey("boss", "boss");
       this.registerMiss();
       return;
     }
 
     boss.typed += 1;
+    this.stageResultTracker.recordWordCorrectKey("boss", "boss");
     boss.flash = 1;
     boss.kick = 1;
 
@@ -4713,6 +4738,12 @@ export class Game {
       this.applyCharacterWordCompletePassive(word.length);
 
       const perfectWord = !boss.wordMissed;
+      this.stageResultTracker.completeWord(
+        "boss",
+        "boss",
+        boss.entry,
+        this.stageElapsedSeconds,
+      );
       const mechanicResult =
         boss.typingMechanic === undefined
           ? null
@@ -4872,6 +4903,15 @@ export class Game {
     );
     if (nextPhase <= boss.phase) return;
 
+    if (boss.typed > 0) {
+      this.stageResultTracker.interruptWord(
+        "boss",
+        "boss",
+        boss.entry,
+        this.stageElapsedSeconds,
+      );
+    }
+
     this.applyBossPhase(
       boss,
       nextPhase,
@@ -4889,7 +4929,15 @@ export class Game {
     // Spell/Nova kills must not misrepresent untyped words as learned.
     if (completedEntry !== undefined) {
       this.hooks.onKillTranslation?.({ ...completedEntry });
+    } else {
+      this.stageResultTracker.interruptWord(
+        "boss",
+        "boss",
+        boss.entry,
+        this.stageElapsedSeconds,
+      );
     }
+    this.stageResultTracker.recordBossKill();
     this.stats.kills += 1;
     this.addScore(1200 * this.stats.multiplier);
     this.gainPower(18);
@@ -5044,6 +5092,7 @@ export class Game {
     this.hooks.onWordComplete(pod.entry);
     this.burst(pod.x, pod.y, 34, 48);
     this.sfx.support();
+    this.stageResultTracker.recordBonusCollected();
     this.supplyPod = null;
     this.emitStats();
   }
@@ -5080,6 +5129,7 @@ export class Game {
       };
       this.burst(target.x, target.y, 54, 292);
       this.sfx.support();
+      this.stageResultTracker.recordBonusCollected();
       this.recallBonus = null;
       this.emitStats();
     }
@@ -5123,6 +5173,7 @@ export class Game {
       this.hooks.onWordComplete(drone.entry);
       this.burst(drone.x, drone.y, 44, 48);
       this.sfx.support();
+      this.stageResultTracker.recordBonusCollected();
       this.treasureDrone = null;
     }
 
@@ -5161,6 +5212,7 @@ export class Game {
       this.hooks.onWordComplete(crate.entry);
       this.burst(crate.x, crate.y, 40, 286);
       this.sfx.support();
+      this.stageResultTracker.recordBonusCollected();
       this.rewardChoiceCrate = null;
       if (options.length > 0) {
         this.hooks.onRewardChoice(options);
@@ -5198,6 +5250,7 @@ export class Game {
       this.hooks.onWordComplete(crate.entry);
       this.burst(crate.x, crate.y, 44, 322);
       this.sfx.support();
+      this.stageResultTracker.recordBonusCollected();
       this.anomalyCrate = null;
       this.anomalyResolutionPending = true;
       this.anomalyRiskRatio = anomalyRiskHullRatio(
@@ -5261,11 +5314,13 @@ export class Game {
 
     if (key !== expected) {
       enemy.wordMissed = true;
+      this.stageResultTracker.recordWordWrongKey("enemy", enemy.id);
       this.registerMiss();
       return;
     }
 
     enemy.typed += 1;
+    this.stageResultTracker.recordWordCorrectKey("enemy", enemy.id);
     enemy.flash = 1;
     enemy.kick = 1;
 
@@ -5292,6 +5347,12 @@ export class Game {
     this.triggerImpactFeedback("word");
     const length = typingText(enemy.entry.en).length;
     const perfectWord = !enemy.wordMissed;
+    this.stageResultTracker.completeWord(
+      "enemy",
+      enemy.id,
+      enemy.entry,
+      this.stageElapsedSeconds,
+    );
     this.sfx.wordComplete(perfectWord);
     this.hooks.onWordComplete(enemy.entry);
     this.applyCharacterWordCompletePassive(length);
@@ -5325,6 +5386,7 @@ export class Game {
       return;
     }
 
+    this.stageResultTracker.recordEnemyKill(enemy.elite);
     this.stats.kills += 1;
     this.addScore((80 + length * 14) * this.stats.multiplier);
     this.gainPower(7);
@@ -5666,6 +5728,7 @@ export class Game {
             : this.enemySkillCooldown(firstSkill, this.difficulty),
       });
       this.stageWordLedger.record(typingProfile.entry);
+      this.stageResultTracker.recordEnemySpawn();
       this.notifyEnemySeen(definitionId);
     }
 
@@ -6013,6 +6076,7 @@ export class Game {
   private activateOverdrive(): void {
     if (this.stats.power < 100) return;
 
+    this.stageResultTracker.recordNovaUse();
     const isVanguard = this.characterId === "vanguard";
     const isAegis = this.characterId === "aegis";
     const isVolt = this.characterId === "volt";
@@ -6348,6 +6412,13 @@ export class Game {
     const victims = this.enemies;
     this.enemies = [];
     for (const enemy of victims) {
+      this.stageResultTracker.skillKillWord(
+        "enemy",
+        enemy.id,
+        enemy.entry,
+        this.stageElapsedSeconds,
+      );
+      this.stageResultTracker.recordEnemyKill(enemy.elite);
       this.stats.kills += 1;
       this.addScore((enemy.elite ? 145 : 90) * this.stats.multiplier);
       this.updateStageObjective({
@@ -6391,6 +6462,13 @@ export class Game {
       (enemy) => enemy.id === enemyId,
     );
     if (escaped !== undefined) {
+      this.stageResultTracker.missWord(
+        "enemy",
+        escaped.id,
+        escaped.entry,
+        this.stageElapsedSeconds,
+      );
+      this.stageResultTracker.recordEnemyEscape();
       this.updateStageObjective({
         type: "enemy-escaped",
         enemyId: escaped.id,
@@ -6420,6 +6498,7 @@ export class Game {
       return;
     }
 
+    this.stageResultTracker.recordProjectileHit();
     const bastionRecycle =
       this.characterId === "bastion" &&
       this.guardianTimer > 0 &&
@@ -6528,6 +6607,7 @@ export class Game {
       }
     }
 
+    const hullBefore = this.stats.hull;
     const shieldBefore = this.stats.shield;
     const damage = applyIncomingDamage(
       {
@@ -6543,6 +6623,10 @@ export class Game {
     this.stats.hull = damage.resources.hull;
     this.stats.shield = damage.resources.shield;
     this.stats.energy = damage.resources.energy;
+    this.stageResultTracker.recordDamage(
+      Math.max(0, hullBefore - this.stats.hull),
+      Math.max(0, shieldBefore - this.stats.shield),
+    );
     this.secondsSinceDamage = 0;
     this.stats.streak = 0;
     this.stats.multiplier = 1;
