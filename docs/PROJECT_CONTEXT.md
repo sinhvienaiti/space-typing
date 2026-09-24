@@ -3811,3 +3811,15 @@ No recovery rules, item counts, Campaign progression, checkpoint semantics or ga
 - Regression coverage added for Auto Pronounce OFF prompt lifecycle.
 - CI #678 PASS: 149 files / 752 tests; TypeScript, production build, audio guard, Ship V3 guard and unchanged bundle limits pass. JS 649.80 KiB raw / 173.11 KiB gzip; CSS 60.00 KiB raw / 13.67 KiB gzip.
 - Next roadmap milestone after merge: M25 parent integration pin in `sinhvienaiti/typing-game`.
+
+
+## 2026-09-24 — M25 COMPLETE / expansion M00-M25 complete
+
+- Space Typing reviewed child integrated into parent at child commit `7030ed539aeb3972ce5e6c3b5e8a46cc9c09ad21`.
+- Parent repo: `sinhvienaiti/typing-game`, PR #43.
+- Parent final Platform CI #240: PASS.
+- Parent merge commit: `b3129aab3e5753bc750535a53eb2949212362f8a`.
+- Platform validation passed for existing game routes/launchers, shared vocabulary/curriculum/typing-text/music, Portal layout/registry, Recall Typing tests/build, Space Typing tests/build and Portal build.
+- No other child gitlink was changed by M25.
+- Expansion roadmap M00-M25 is complete.
+- M22 closure remains intentionally evidence-honest: owner acceptance closes the roadmap gate, while untouched manual recorder rows remain PENDING regression checks and are not retroactively claimed PASS.
