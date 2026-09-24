@@ -95,6 +95,12 @@ export type LoadedVocabularyGrammar = {
   representativeLevel: number;
 };
 
+export type LoadedVocabularyKeys = {
+  entries: VocabularyEntry[];
+  levels: number[];
+  representativeLevel: number;
+};
+
 export function representativeTopicLevel(
   entries: readonly VocabularyTopicEntry[],
 ): number {
@@ -555,6 +561,50 @@ async function loadVocabularyReferences(
     levels,
     representativeLevel: representativeTopicLevel(uniqueReferences),
   };
+}
+
+export async function loadVocabularyKeys(
+  keys: readonly string[],
+  vocabularyIndex: VocabularyIndex,
+): Promise<LoadedVocabularyKeys> {
+  const normalizedKeys = [
+    ...new Set(keys.map(normalizeEnglish).filter((key) => key !== "")),
+  ];
+  if (normalizedKeys.length === 0) {
+    throw new Error("Smart Review vocabulary is empty.");
+  }
+
+  const lookup = await loadVocabularyLookup();
+  const references = normalizedKeys.flatMap((key) => {
+    const level = lookup.entries[key];
+    return typeof level === "number" && Number.isInteger(level)
+      ? [{ key, level }]
+      : [];
+  });
+
+  if (references.length !== normalizedKeys.length) {
+    const mapped = new Set(
+      references.map((entry) => normalizeEnglish(entry.key)),
+    );
+    const missing = normalizedKeys.filter((key) => !mapped.has(key));
+    throw new Error(
+      "Shared vocabulary is missing Smart Review item" +
+        (missing.length === 1 ? ": " : "s: ") +
+        missing.join(", "),
+    );
+  }
+
+  const loaded = await loadVocabularyReferences(
+    references,
+    normalizedKeys,
+    vocabularyIndex,
+  );
+  if (loaded.entries.length !== normalizedKeys.length) {
+    throw new Error(
+      "Shared vocabulary could not resolve every Smart Review item.",
+    );
+  }
+  return loaded;
 }
 
 export async function loadVocabularyTopic(
