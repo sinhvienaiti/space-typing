@@ -57,6 +57,7 @@ export type StageSessionSnapshot = {
   wordsCompleted: number;
   perfectWords: number;
   correctedWords: number;
+  correctedErrors: number;
   missedWords: number;
   skillKilledWords: number;
   interruptedWords: number;
@@ -160,6 +161,7 @@ export class StageSessionTracker {
   private wordsCompleted = 0;
   private perfectWords = 0;
   private correctedWords = 0;
+  private correctedErrors = 0;
   private missedWords = 0;
   private skillKilledWords = 0;
   private interruptedWords = 0;
@@ -191,6 +193,7 @@ export class StageSessionTracker {
     this.wordsCompleted = 0;
     this.perfectWords = 0;
     this.correctedWords = 0;
+    this.correctedErrors = 0;
     this.missedWords = 0;
     this.skillKilledWords = 0;
     this.interruptedWords = 0;
@@ -298,6 +301,7 @@ export class StageSessionTracker {
       );
     } else {
       this.correctedWords += 1;
+      this.correctedErrors += wrongKeys;
       this.perfectWordChain = 0;
     }
     this.finishAttempt(key, entry, source, outcome, elapsedSeconds);
@@ -383,6 +387,7 @@ export class StageSessionTracker {
       wordsCompleted: this.wordsCompleted,
       perfectWords: this.perfectWords,
       correctedWords: this.correctedWords,
+      correctedErrors: this.correctedErrors,
       missedWords: this.missedWords,
       skillKilledWords: this.skillKilledWords,
       interruptedWords: this.interruptedWords,
