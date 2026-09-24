@@ -292,6 +292,7 @@ import {
 import {
   currentEnemyLayer,
   enemyLayerPlan,
+  enemyLayerSegmentStatusAtSlot,
   reinforceEnemyLayerPlan,
 } from "./enemies/layers";
 import {
@@ -8556,17 +8557,6 @@ export class Game {
         enemy.kind,
         clamp(enemy.layersRemaining, 1, 3) as 1 | 2 | 3,
       );
-    const layerCount = Math.min(3, layerPlan.length);
-    const layerOffset = 3 - layerCount;
-    const clearedLayerCount = Math.max(
-      0,
-      layerCount -
-        clamp(
-          Math.floor(enemy.layersRemaining),
-          0,
-          layerCount,
-        ),
-    );
     const currentLayer = currentEnemyLayer(
       layerPlan,
       enemy.layersRemaining,
@@ -8642,15 +8632,11 @@ export class Game {
     const segmentWidth = (panelWidth - segmentGap * 2) / 3;
     const segmentY = y - 19;
     for (let slot = 0; slot < 3; slot += 1) {
-      const planIndex = slot - layerOffset;
-      const status =
-        planIndex < 0
-          ? "inactive"
-          : planIndex < clearedLayerCount
-            ? "cleared"
-            : planIndex === clearedLayerCount
-              ? "current"
-              : "pending";
+      const status = enemyLayerSegmentStatusAtSlot(
+        layerPlan.length,
+        enemy.layersRemaining,
+        slot as 0 | 1 | 2,
+      );
       const x =
         panelLeft +
         slot * (segmentWidth + segmentGap);
