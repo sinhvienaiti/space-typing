@@ -314,6 +314,13 @@ import {
   resolveMetaProgression,
 } from "./progression/meta";
 import {
+  achievementImportance,
+  collectionImportance,
+  missionImportance,
+  objectiveImportance,
+  type ImportancePresentation,
+} from "./ui/importance";
+import {
   applyAscensionDifficulty,
   advanceAscensionOnStageClear,
   ascensionCompletionReward,
@@ -2510,6 +2517,10 @@ function renderStageEvents(
   if (events.length === 0) {
     badge.textContent = "";
     badge.title = "";
+    badge.style.removeProperty("border-color");
+    badge.style.removeProperty("color");
+    delete badge.dataset.importance;
+    delete badge.dataset.importanceState;
     badge.classList.add("hidden");
     return;
   }
@@ -2520,6 +2531,34 @@ function renderStageEvents(
     .map((event) => event.name + ": " + event.description)
     .join("\n");
   badge.classList.remove("hidden");
+}
+
+function createImportanceMeta(
+  presentation: ImportancePresentation,
+): HTMLElement {
+  const meta = document.createElement("span");
+  meta.textContent =
+    presentation.icon +
+    " " +
+    presentation.label +
+    " · " +
+    presentation.stateLabel;
+  meta.style.color = presentation.accent;
+  meta.setAttribute(
+    "aria-label",
+    presentation.label + " · " + presentation.stateLabel,
+  );
+  return meta;
+}
+
+function applyImportanceBorder(
+  element: HTMLElement,
+  presentation: ImportancePresentation,
+): void {
+  element.style.borderColor = presentation.accent;
+  element.dataset.importance = presentation.label.toLowerCase();
+  element.dataset.importanceState =
+    presentation.stateLabel.toLowerCase().replaceAll(" ", "-");
 }
 
 function renderObjective(
@@ -2533,19 +2572,29 @@ function renderObjective(
     return;
   }
 
-  const prefix =
-    objective.definition.required
-      ? "OBJECTIVE // REQUIRED"
-      : "OBJECTIVE // BONUS";
+  const presentation = objectiveImportance(
+    objective.definition.type,
+    objective.definition.required,
+    objective.status,
+  );
+  badge.style.borderColor = presentation.accent;
+  badge.style.color = presentation.accent;
+  badge.dataset.importance = presentation.label.toLowerCase();
+  badge.dataset.importanceState =
+    presentation.stateLabel.toLowerCase().replaceAll(" ", "-");
   badge.textContent =
-    prefix +
+    presentation.icon +
+    " OBJECTIVE // " +
+    presentation.stateLabel.toUpperCase() +
     " · " +
     objective.definition.label +
     " · " +
-    objectiveProgressText(objective) +
-    " · " +
-    objective.status.toUpperCase();
+    objectiveProgressText(objective);
   badge.title =
+    presentation.label +
+    " · " +
+    presentation.stateLabel +
+    " · " +
     objective.definition.label +
     " · reward +" +
     Math.round(objective.definition.rewardFactor * 100) +
@@ -2674,15 +2723,24 @@ function renderCodex(): void {
     card.className =
       "codex-entry " + (entry.discovered ? "discovered" : "unknown");
 
-    const category = document.createElement("span");
-    category.textContent = entry.category.toUpperCase();
+    const presentation = collectionImportance(
+      entry.category,
+      entry.discovered,
+    );
+    applyImportanceBorder(card, presentation);
 
+    const category = createImportanceMeta(presentation);
     const title = document.createElement("strong");
     title.textContent = entry.title;
 
     const description = document.createElement("small");
     description.textContent = entry.description;
 
+    card.title =
+      presentation.label +
+      " · " +
+      presentation.stateLabel +
+      (entry.discovered ? " · " + entry.title : "");
     card.append(category, title, description);
     grid.append(card);
   }
@@ -2720,9 +2778,17 @@ function renderProgression(): void {
     const mission = MISSION_REGISTRY[id];
     const progress = missionProgress(progression, id);
     const claimed = progression.claimedMissions.includes(id);
+    const claimable = !claimed && missionClaimable(progression, id);
+    const presentation = missionImportance(
+      id,
+      claimed ? "claimed" : claimable ? "claimable" : "active",
+    );
     const card = document.createElement("article");
     card.className = "progression-card";
+    card.classList.toggle("unlocked", claimable || claimed);
+    applyImportanceBorder(card, presentation);
 
+    const importance = createImportanceMeta(presentation);
     const title = document.createElement("strong");
     title.textContent = mission.name;
 
@@ -2745,7 +2811,7 @@ function renderProgression(): void {
 
     const claim = document.createElement("button");
     claim.type = "button";
-    claim.disabled = claimed || !missionClaimable(progression, id);
+    claim.disabled = claimed || !claimable;
     claim.textContent = claimed ? "Claimed" : "Claim reward";
     claim.addEventListener("click", () => {
       const result = claimMission(progression, id);
@@ -2763,7 +2829,9 @@ function renderProgression(): void {
       );
     });
 
-    card.append(title, description, meta, reward, claim);
+    card.title =
+      presentation.label + " · " + presentation.stateLabel;
+    card.append(importance, title, description, meta, reward, claim);
     missionGrid.append(card);
   }
 
@@ -2773,10 +2841,13 @@ function renderProgression(): void {
   for (const id of ACHIEVEMENT_IDS) {
     const definition = ACHIEVEMENT_REGISTRY[id];
     const unlocked = progression.unlockedAchievements.includes(id);
+    const presentation = achievementImportance(id, unlocked);
     const card = document.createElement("article");
     card.className =
       "progression-card " + (unlocked ? "unlocked" : "locked");
+    applyImportanceBorder(card, presentation);
 
+    const importance = createImportanceMeta(presentation);
     const title = document.createElement("strong");
     title.textContent = unlocked ? definition.name : "???";
 
@@ -2785,7 +2856,12 @@ function renderProgression(): void {
       ? definition.description
       : "Achievement not unlocked yet.";
 
-    card.append(title, description);
+    card.title =
+      presentation.label +
+      " · " +
+      presentation.stateLabel +
+      (unlocked ? " · " + definition.name : "");
+    card.append(importance, title, description);
     achievementGrid.append(card);
   }
 }
