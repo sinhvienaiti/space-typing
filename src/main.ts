@@ -153,7 +153,13 @@ import {
   stageClearExpansionCurrencyReward,
   type ExpansionCurrencyState,
 } from "./economy/currencies";
-import { gradeLabel } from "./grades";
+import { gradeLabel, type GradeId } from "./grades";
+import {
+  applyGradeFrame,
+  createGradeBadge,
+  createLocalIcon,
+  replaceCurrencyChips,
+} from "./ui/components";
 import { CORE_STAT_KEYS, type CoreStatKey } from "./stats/core";
 import {
   attributeUpgradeCost,
@@ -4853,16 +4859,19 @@ function currentShopContext(): ShopRollContext {
   };
 }
 
-function shopBalanceText(): string {
-  return (
-    credits.toLocaleString() +
-    " Credits · " +
-    expansionCurrencies.alloy.toLocaleString() +
-    " Alloy · " +
-    expansionCurrencies.starCrystal.toLocaleString() +
-    " Star Crystal · " +
-    expansionCurrencies.quantumCore.toLocaleString() +
-    " Quantum Core"
+function renderShopBalance(root: HTMLElement): void {
+  replaceCurrencyChips(
+    root,
+    {
+      credits,
+      alloy: expansionCurrencies.alloy,
+      starCrystal: expansionCurrencies.starCrystal,
+      quantumCore: expansionCurrencies.quantumCore,
+    },
+    {
+      includeZero: true,
+      className: "shop-wallet-chips",
+    },
   );
 }
 
@@ -4888,17 +4897,22 @@ function shopStockName(entry: ShopStockEntry): string {
     : getEquipmentDefinition(entry.definitionId).name;
 }
 
+function shopStockGrade(entry: ShopStockEntry): GradeId {
+  if (entry.kind === "equipment") return entry.grade;
+  return getItemDefinition(entry.itemId).grade ?? "aluminum";
+}
+
+function shopStockIcon(entry: ShopStockEntry): string {
+  return entry.kind === "item"
+    ? getItemDefinition(entry.itemId).icon
+    : getEquipmentDefinition(entry.definitionId).icon;
+}
+
 function shopStockType(entry: ShopStockEntry): string {
   if (entry.kind === "equipment") {
-    return gradeLabel(entry.grade).toUpperCase() + " EQUIPMENT";
+    return getEquipmentDefinition(entry.definitionId).slot.toUpperCase();
   }
-  const definition = getItemDefinition(entry.itemId);
-  return (
-    (definition.grade === undefined
-      ? definition.category
-      : gradeLabel(definition.grade)) +
-    " ITEM"
-  ).toUpperCase();
+  return getItemDefinition(entry.itemId).category.toUpperCase();
 }
 
 function shopStockDescription(entry: ShopStockEntry): string {
@@ -4963,20 +4977,38 @@ function appendShopStockCards(
   grid.replaceChildren();
 
   for (const entry of instance.stock) {
+    const grade = shopStockGrade(entry);
     const card = document.createElement("article");
-    card.className = cardClass;
+    card.className = cardClass + " visual-card item-card";
+    applyGradeFrame(card, grade);
+    card.title = shopStockDescription(entry);
 
+    const visual = createLocalIcon(
+      shopStockIcon(entry),
+      shopStockName(entry) + " icon",
+      "item-card-icon",
+    );
+
+    const body = document.createElement("div");
+    body.className = "item-card-body";
+
+    const meta = document.createElement("div");
+    meta.className = "item-card-meta";
+    const gradeBadge = createGradeBadge(grade);
     const type = document.createElement("span");
     type.className = "shop-offer-type";
     type.textContent =
       shopStockType(entry) +
       " · STOCK " +
       String(entry.remaining);
+    meta.append(gradeBadge, type);
 
     const title = document.createElement("strong");
+    title.className = "item-card-title";
     title.textContent = shopStockName(entry);
 
     const description = document.createElement("small");
+    description.className = "item-card-description";
     description.textContent = shopStockDescription(entry);
 
     const buy = document.createElement("button");
@@ -4991,11 +5023,22 @@ function appendShopStockCards(
       entry.price,
     );
     buy.disabled = soldOut || itemFull || !affordable;
-    buy.textContent = soldOut
-      ? "Sold out"
-      : itemFull
-        ? "Full"
-        : formatShopPrice(entry.price);
+
+    if (soldOut || itemFull) {
+      buy.textContent = soldOut ? "Sold out" : "Full";
+    } else {
+      const price = document.createElement("span");
+      price.className = "shop-price";
+      replaceCurrencyChips(price, entry.price);
+      buy.append(price);
+      buy.setAttribute(
+        "aria-label",
+        "Buy " + shopStockName(entry) + " for " + formatShopPrice(entry.price),
+      );
+      if (!affordable) {
+        buy.title = "Insufficient currency · " + formatShopPrice(entry.price);
+      }
+    }
 
     buy.addEventListener("click", () => {
       const purchase = buyShopStockEntry(
@@ -5033,13 +5076,14 @@ function appendShopStockCards(
       );
     });
 
-    card.append(type, title, description, buy);
+    body.append(meta, title, description, buy);
+    card.append(visual, body);
     grid.append(card);
   }
 }
 
 function renderNormalShop(): void {
-  byId("shopCredits").textContent = shopBalanceText();
+  renderShopBalance(byId("shopCredits"));
   const grid = byId("normalShopGrid");
   const instance = resolveRuntimeShop("normal");
 
