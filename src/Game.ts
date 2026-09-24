@@ -404,6 +404,17 @@ import type {
   Particle,
   VocabularyEntry,
 } from "./types";
+import {
+  canReplayRecall,
+  initialRecallHintIndices,
+  recallDifficultyProfile,
+  recallDisplayMask,
+  remainingRecallReplays,
+  revealNextRecallHint,
+  type GameplayMode,
+  type RecallAttemptResult,
+  type RecallSettings,
+} from "./recall/model";
 
 type EnemySpawnRequest = {
   kind?: EnemyKind;
@@ -431,6 +442,8 @@ export type GameHooks = {
   onStageClear(stats: GameStats): void;
   onBossUpdate(boss: BossHudState | null): void;
   onWordComplete(entry: VocabularyEntry): void;
+  onRecallPrompt?(entry: VocabularyEntry): void;
+  onRecallResult?(result: RecallAttemptResult): void;
   onKillTranslation?(entry: VocabularyEntry): void;
   onEquipmentDrop(drop: EquipmentDrop): void;
   onRewardChoice(options: readonly EquipmentDrop[]): void;
@@ -608,6 +621,17 @@ export class Game {
   private settings: GameSettings;
   private vocabulary: VocabularyEntry[];
   private vocabularyLevel = 1;
+  private gameplayMode: GameplayMode = "combat";
+  private recallSettings: RecallSettings = {
+    difficulty: "normal",
+    showTranslation: true,
+    showIpa: false,
+    autoPronounce: true,
+  };
+  private recallHintIndices = new Map<number, Set<number>>();
+  private recallBossHintIndices = new Set<number>();
+  private recallPromptStartedAtSeconds = 0;
+  private recallReplayCount = 0;
   private phase: GamePhase = "title";
   private playerStats: CoreStats = calculateEffectiveStats({
     base: DEFAULT_PLAYER_BASE_STATS,
@@ -1530,6 +1554,84 @@ export class Game {
     this.setStatusState(createStatusState());
     this.hardCcState = createHardCcState();
     this.hooks.onBossUpdate(null);
+    return true;
+  }
+
+  setGameplayMode(mode: GameplayMode, recallSettings?: RecallSettings): void {
+    this.gameplayMode = mode;
+    if (recallSettings !== undefined) {
+      this.recallSettings = { ...recallSettings };
+    }
+    if (mode !== "recall") {
+      this.recallHintIndices.clear();
+      this.recallBossHintIndices.clear();
+      this.recallReplayCount = 0;
+    }
+  }
+
+  getGameplayMode(): GameplayMode {
+    return this.gameplayMode;
+  }
+
+  updateRecallSettings(settings: RecallSettings): void {
+    this.recallSettings = { ...settings };
+  }
+
+  getRecallPrompt(): {
+    entry: VocabularyEntry;
+    replaysRemaining: number | null;
+    hintCount: number;
+  } | null {
+    if (this.gameplayMode !== "recall") return null;
+
+    const profile = recallDifficultyProfile(this.recallSettings.difficulty);
+    if (this.boss !== null) {
+      return {
+        entry: { ...this.boss.entry },
+        replaysRemaining: remainingRecallReplays(profile, this.recallReplayCount),
+        hintCount: this.recallBossHintIndices.size,
+      };
+    }
+
+    const enemy = this.currentTarget() ?? this.enemies[0] ?? null;
+    if (enemy === null) return null;
+    return {
+      entry: { ...enemy.entry },
+      replaysRemaining: remainingRecallReplays(profile, this.recallReplayCount),
+      hintCount: this.recallHintIndices.get(enemy.id)?.size ?? 0,
+    };
+  }
+
+  replayRecallPrompt(): VocabularyEntry | null {
+    if (this.gameplayMode !== "recall") return null;
+    const prompt = this.getRecallPrompt();
+    if (prompt === null) return null;
+    const profile = recallDifficultyProfile(this.recallSettings.difficulty);
+    if (!canReplayRecall(profile, this.recallReplayCount)) return null;
+    this.recallReplayCount += 1;
+    return prompt.entry;
+  }
+
+  revealRecallLetter(): boolean {
+    if (this.gameplayMode !== "recall") return false;
+
+    if (this.boss !== null) {
+      const next = revealNextRecallHint(
+        this.boss.entry.en,
+        this.boss.typed,
+        this.recallBossHintIndices,
+      );
+      if (next.size === this.recallBossHintIndices.size) return false;
+      this.recallBossHintIndices = next;
+      return true;
+    }
+
+    const enemy = this.currentTarget() ?? this.enemies[0] ?? null;
+    if (enemy === null) return false;
+    const current = this.recallHintIndices.get(enemy.id) ?? new Set<number>();
+    const next = revealNextRecallHint(enemy.entry.en, enemy.typed, current);
+    if (next.size === current.size) return false;
+    this.recallHintIndices.set(enemy.id, next);
     return true;
   }
 
@@ -2640,6 +2742,10 @@ export class Game {
     this.stageWordLedger.reset();
     this.enemies = [];
     this.projectiles = [];
+    this.recallHintIndices.clear();
+    this.recallBossHintIndices.clear();
+    this.recallReplayCount = 0;
+    this.recallPromptStartedAtSeconds = 0;
     this.lasers = [];
     this.projectileImpacts = [];
     this.particles = [];
@@ -2855,6 +2961,19 @@ export class Game {
     if (target !== null) {
       this.typeTarget(target, key);
       return;
+    }
+
+    if (this.gameplayMode === "recall") {
+      if (this.boss !== null) {
+        this.typeBoss(key);
+        return;
+      }
+      const recallEnemy = this.enemies[0] ?? null;
+      if (recallEnemy !== null) {
+        this.targetId = recallEnemy.id;
+        this.typeTarget(recallEnemy, key);
+        return;
+      }
     }
 
     if (this.supplyPod !== null && this.supplyPod.typed > 0) {
@@ -3224,6 +3343,7 @@ export class Game {
         (desiredX - enemy.x) * Math.min(1, dt * 2 * rewardControl);
 
       if (
+        this.gameplayMode !== "recall" &&
         enemy.pendingSkillId !== undefined &&
         enemy.pendingSkillId !== null
       ) {
@@ -3241,7 +3361,10 @@ export class Game {
             difficulty,
           );
         }
-      } else if (enemy.actionCooldown !== null) {
+      } else if (
+        this.gameplayMode !== "recall" &&
+        enemy.actionCooldown !== null
+      ) {
         enemy.actionCooldown -=
           dt * hostileTimeFactor * rewardControl;
         if (enemy.actionCooldown <= 0) {
@@ -3266,6 +3389,9 @@ export class Game {
     }
 
     const playerX = this.width / 2;
+    if (this.gameplayMode === "recall" && this.projectiles.length > 0) {
+      this.projectiles = [];
+    }
     for (let index = this.projectiles.length - 1; index >= 0; index -= 1) {
       const projectile = this.projectiles[index]!;
       projectile.x += projectile.vx * dt * hostileTimeFactor;
@@ -3395,7 +3521,8 @@ export class Game {
       );
       this.boss.hp = this.boss.maxHp;
     }
-    this.boss.typingMechanic = mechanic;
+    this.boss.typingMechanic =
+      this.gameplayMode === "recall" ? undefined : mechanic;
     this.boss.shieldActive =
       mechanic.id === "shield-sequence" &&
       mechanic.active;
@@ -3422,6 +3549,9 @@ export class Game {
       Math.max(0.75, difficulty.bossPressure) /
       Math.max(1, difficulty.bossActionRateMultiplier ?? 1);
     this.hooks.onBossUpdate(toBossHud(this.boss));
+    if (this.gameplayMode === "recall") {
+      this.activateBossRecallPrompt();
+    }
     if (bossDefinition !== undefined) {
       const fx = enemyFxProfile(bossDefinition.family, "boss-intro");
       const position = this.bossPosition();
@@ -3442,6 +3572,20 @@ export class Game {
   ): void {
     const boss = this.boss;
     if (boss === null) return;
+
+    if (this.gameplayMode === "recall") {
+      boss.actionCooldown -= dt;
+      if (boss.actionCooldown <= 0) {
+        const position = this.bossPosition();
+        this.applyPlayerDamage(position.x, position.y, 54);
+        this.sfx.bossPhase();
+        boss.actionCooldown =
+          (bossActionInterval(boss.role, boss.phase) *
+            difficulty.attackIntervalFactor) /
+          Math.max(0.75, difficulty.bossPressure);
+      }
+      return;
+    }
 
     this.bossHudTimer = Math.max(
       0,
@@ -3498,7 +3642,7 @@ export class Game {
   }
 
   private fireBossProjectiles(boss: BossState): void {
-    if (this.difficulty === null) return;
+    if (this.gameplayMode === "recall" || this.difficulty === null) return;
 
     const { x, y } = this.bossPosition();
     const playerX = this.width / 2;
@@ -4001,10 +4145,12 @@ export class Game {
   private runSpawnScheduler(
     difficulty: DifficultyProfile,
   ): boolean {
+    const activeEnemyCap =
+      this.gameplayMode === "recall" ? 1 : difficulty.maxEnemies;
     if (
       this.spawnRemaining <= 0 ||
       this.spawnTimer > 0 ||
-      this.enemies.length >= difficulty.maxEnemies
+      this.enemies.length >= activeEnemyCap
     ) {
       return false;
     }
@@ -4022,10 +4168,13 @@ export class Game {
     );
     if (phaseRemaining <= 0) return false;
 
-    const formationCount = this.trySpawnFormation(
-      difficulty,
-      phaseRemaining,
-    );
+    const formationCount =
+      this.gameplayMode === "recall"
+        ? 0
+        : this.trySpawnFormation(
+            difficulty,
+            phaseRemaining,
+          );
     if (formationCount > 0) {
       this.spawnRemaining -= formationCount;
       this.stagePhaseSpawned += formationCount;
@@ -4328,13 +4477,19 @@ export class Game {
     });
     const firstSkill = runtimeProfile.skills[0];
     const resolvedActionCooldown =
-      firstSkill === undefined
-        ? eliteStats.actionCooldown
-        : this.enemySkillCooldown(
-            firstSkill,
-            difficulty,
-          );
+      this.gameplayMode === "recall"
+        ? null
+        : firstSkill === undefined
+          ? eliteStats.actionCooldown
+          : this.enemySkillCooldown(
+              firstSkill,
+              difficulty,
+            );
 
+    const recallSpeedScale =
+      this.gameplayMode === "recall"
+        ? recallDifficultyProfile(this.recallSettings.difficulty).enemySpeedScale
+        : 1;
     const enemyId = this.nextEnemyId++;
     this.enemies.push({
       id: enemyId,
@@ -4346,7 +4501,8 @@ export class Game {
       rank: typingProfile.rank,
       wordDifficultyScore: typingProfile.wordDifficultyScore,
       layerPlan: typingProfile.layerPlan,
-      skillIds: runtimeProfile.skills,
+      skillIds:
+        this.gameplayMode === "recall" ? [] : runtimeProfile.skills,
       nextSkillIndex: 0,
       pendingSkillId: null,
       skillTelegraphRemaining: 0,
@@ -4361,7 +4517,10 @@ export class Game {
         20 +
         (request.yOffset ?? 0),
       baseX,
-      speed: eliteStats.speed * (golden ? 1.12 : 1),
+      speed:
+        eliteStats.speed *
+        (golden ? 1.12 : 1) *
+        recallSpeedScale,
       age: Math.random() * 8,
       drift: randomBetween(profile.driftMin, profile.driftMax),
       radius: elite ? profile.radius * 1.08 : profile.radius,
@@ -4385,6 +4544,11 @@ export class Game {
       kind,
       elite,
     });
+
+    if (this.gameplayMode === "recall") {
+      this.targetId = enemyId;
+      this.activateEnemyRecallPrompt(enemyId);
+    }
 
     if (elite) {
       const firstElite = this.eliteSpawned === 0;
@@ -4968,7 +5132,7 @@ export class Game {
     this.gainPower(2);
     this.applyCharacterCorrectKeyPassive();
 
-    if (!boss.shieldActive) {
+    if (!boss.shieldActive && this.gameplayMode !== "recall") {
       boss.hp = Math.max(
         0,
         boss.hp -
@@ -4993,6 +5157,9 @@ export class Game {
 
     if (boss.typed >= word.length) {
       this.triggerImpactFeedback("boss-word");
+      if (this.gameplayMode === "recall") {
+        this.resolveRecallPrompt(boss.entry, true, !boss.wordMissed);
+      }
       this.hooks.onWordComplete(boss.entry);
       this.applyCharacterWordCompletePassive(word.length);
 
@@ -5050,6 +5217,9 @@ export class Game {
         boss.typingMechanic,
       );
       boss.flash = 1;
+      if (this.gameplayMode === "recall" && boss.hp > 0) {
+        this.activateBossRecallPrompt();
+      }
       boss.kick = 1.5;
       boss.wordMissed = false;
 
@@ -5575,14 +5745,18 @@ export class Game {
     this.tryRollEquipmentDrop(
       enemy.golden ? "golden" : enemy.elite ? "elite" : "normal",
     );
-    if (enemy.kind === "splitter") {
+    if (this.gameplayMode !== "recall" && enemy.kind === "splitter") {
       this.spawnSplitFragments(enemy);
     }
-    if (enemy.eliteModifiers.includes("volatile")) {
+    if (
+      this.gameplayMode !== "recall" &&
+      enemy.eliteModifiers.includes("volatile")
+    ) {
       this.spawnVolatileBurst(enemy);
     }
 
     this.enemies = this.enemies.filter((item) => item.id !== enemy.id);
+    this.recallHintIndices.delete(enemy.id);
     if (this.targetId === enemy.id) this.targetId = null;
     if (this.markedEnemyId === enemy.id) {
       this.markedEnemyId = null;
@@ -5650,6 +5824,9 @@ export class Game {
     this.triggerImpactFeedback("word");
     const length = typingText(enemy.entry.en).length;
     const perfectWord = !enemy.wordMissed;
+    if (this.gameplayMode === "recall") {
+      this.resolveRecallPrompt(enemy.entry, true, perfectWord);
+    }
     this.stageResultTracker.completeWord(
       "enemy",
       enemy.id,
@@ -5669,6 +5846,9 @@ export class Game {
       enemy.wordMissed = false;
       enemy.flash = 1;
       enemy.kick = 1.45;
+      if (this.gameplayMode === "recall") {
+        this.activateEnemyRecallPrompt(enemy.id);
+      }
 
       if (enemy.kind === "shield") {
         enemy.speed *= 1.2;
@@ -6765,6 +6945,10 @@ export class Game {
       (enemy) => enemy.id === enemyId,
     );
     if (escaped !== undefined) {
+      if (this.gameplayMode === "recall") {
+        this.resolveRecallPrompt(escaped.entry, false, false);
+        this.recallHintIndices.delete(escaped.id);
+      }
       this.stageResultTracker.missWord(
         "enemy",
         escaped.id,
@@ -7740,6 +7924,47 @@ export class Game {
     radius: number,
   ): void {
     const context = this.context;
+    if (this.gameplayMode === "recall") {
+      const display = recallDisplayMask(
+        boss.entry.en,
+        boss.typed,
+        this.recallBossHintIndices,
+      );
+      const wordY = y + radius + 38;
+      context.save();
+      context.font =
+        "900 24px ui-monospace, SFMono-Regular, Menlo, monospace";
+      context.textBaseline = "middle";
+      context.textAlign = "center";
+      const width = Math.max(180, context.measureText(display).width + 32);
+      context.fillStyle = "rgba(4, 8, 18, 0.94)";
+      context.strokeStyle = "rgba(255, 139, 105, 0.84)";
+      context.lineWidth = 2;
+      context.shadowBlur = 14;
+      context.shadowColor = "#ff806b";
+      context.beginPath();
+      context.roundRect(x - width / 2, wordY - 21, width, 42, 10);
+      context.fill();
+      context.stroke();
+      context.fillStyle = "#fff5ef";
+      context.fillText(display.toUpperCase(), x, wordY);
+      const meaningParts: string[] = [];
+      if (this.recallSettings.showTranslation && boss.entry.vi.trim() !== "") {
+        meaningParts.push(boss.entry.vi.trim());
+      }
+      if (this.recallSettings.showIpa && boss.entry.ipa.trim() !== "") {
+        meaningParts.push(boss.entry.ipa.trim());
+      }
+      if (meaningParts.length > 0) {
+        context.shadowBlur = 0;
+        context.font =
+          "650 13px ui-sans-serif, system-ui, -apple-system, sans-serif";
+        context.fillStyle = "rgba(255, 226, 213, 0.9)";
+        context.fillText(meaningParts.join(" · "), x, wordY + 31);
+      }
+      context.restore();
+      return;
+    }
     const displayWord = normalizeWord(boss.entry.en);
     const split = splitDisplayByTypedLetters(displayWord, boss.typed);
 
@@ -8538,7 +8763,79 @@ export class Game {
     this.drawEnemyWord(enemy, targeted);
   }
 
+  private activateEnemyRecallPrompt(enemyId: number): void {
+    if (this.gameplayMode !== "recall") return;
+    const enemy = this.enemies.find((item) => item.id === enemyId);
+    if (enemy === undefined) return;
+    const profile = recallDifficultyProfile(this.recallSettings.difficulty);
+    const stageSeed = this.stageConfig?.seed ?? 0;
+    this.recallHintIndices.set(
+      enemy.id,
+      initialRecallHintIndices(
+        enemy.entry.en,
+        profile,
+        stageSeed + enemy.id * 7_919 + enemy.layersRemaining * 101,
+      ),
+    );
+    this.recallReplayCount = 0;
+    this.recallPromptStartedAtSeconds = this.stageElapsedSeconds;
+    if (this.recallSettings.autoPronounce) {
+      this.hooks.onRecallPrompt?.({ ...enemy.entry });
+    }
+  }
+
+  private activateBossRecallPrompt(): void {
+    if (this.gameplayMode !== "recall" || this.boss === null) return;
+    const profile = recallDifficultyProfile(this.recallSettings.difficulty);
+    const stageSeed = this.stageConfig?.seed ?? 0;
+    this.recallBossHintIndices = initialRecallHintIndices(
+      this.boss.entry.en,
+      profile,
+      stageSeed + this.boss.wordsCompleted * 10_007 + 97,
+    );
+    this.recallReplayCount = 0;
+    this.recallPromptStartedAtSeconds = this.stageElapsedSeconds;
+    if (this.recallSettings.autoPronounce) {
+      this.hooks.onRecallPrompt?.({ ...this.boss.entry });
+    }
+  }
+
+  private resolveRecallPrompt(
+    entry: VocabularyEntry,
+    completed: boolean,
+    noTypingMiss: boolean,
+  ): void {
+    if (this.gameplayMode !== "recall") return;
+    const hintCount =
+      this.boss !== null
+        ? this.recallBossHintIndices.size
+        : this.targetId === null
+          ? 0
+          : this.recallHintIndices.get(this.targetId)?.size ?? 0;
+    const responseMs = Math.max(
+      0,
+      (this.stageElapsedSeconds - this.recallPromptStartedAtSeconds) * 1_000,
+    );
+    this.hooks.onRecallResult?.({
+      entry: { ...entry },
+      completed,
+      perfect:
+        completed &&
+        noTypingMiss &&
+        hintCount === 0 &&
+        this.recallReplayCount === 0,
+      hintCount,
+      replayCount: this.recallReplayCount,
+      responseMs,
+      at: Date.now(),
+    });
+  }
+
   private drawEnemyWord(enemy: Enemy, targeted: boolean): void {
+    if (this.gameplayMode === "recall") {
+      this.drawRecallEnemyWord(enemy, targeted);
+      return;
+    }
     const context = this.context;
     const actualWord = normalizeWord(enemy.entry.en);
     const typingWord = typingText(enemy.entry.en);
@@ -8659,6 +8956,63 @@ export class Game {
       context.fillRect(x, segmentY, segmentWidth, 3);
     }
 
+    context.restore();
+  }
+
+  private drawRecallEnemyWord(enemy: Enemy, targeted: boolean): void {
+    const context = this.context;
+    const hints = this.recallHintIndices.get(enemy.id) ?? new Set<number>();
+    const display = recallDisplayMask(enemy.entry.en, enemy.typed, hints);
+    const pulse = 0.72 + Math.sin(enemy.age * 4.2) * 0.16;
+    const fontSize = Math.max(15, Math.min(21, 21 - Math.max(0, display.length - 11) * 0.35));
+    const y = enemy.y - enemy.radius - 26;
+
+    context.save();
+    context.font =
+      "800 " + String(fontSize) + "px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.textBaseline = "middle";
+    context.textAlign = "center";
+    const width = Math.max(132, context.measureText(display).width + 24);
+
+    context.fillStyle = "rgba(2, 8, 18, 0.9)";
+    context.strokeStyle = targeted
+      ? "rgba(105, 240, 255, " + String(pulse) + ")"
+      : "rgba(128, 170, 210, 0.56)";
+    context.lineWidth = targeted ? 1.8 : 1.1;
+    context.shadowBlur = targeted ? 13 : 5;
+    context.shadowColor = "#65efff";
+    context.beginPath();
+    context.roundRect(enemy.x - width / 2, y - 18, width, 36, 8);
+    context.fill();
+    context.stroke();
+
+    context.shadowBlur = targeted ? 8 : 0;
+    context.fillStyle = targeted ? "#effeff" : "#d5e3ef";
+    context.fillText(display.toUpperCase(), enemy.x, y);
+
+    const meaningParts: string[] = [];
+    if (this.recallSettings.showTranslation && enemy.entry.vi.trim() !== "") {
+      meaningParts.push(enemy.entry.vi.trim());
+    }
+    if (this.recallSettings.showIpa && enemy.entry.ipa.trim() !== "") {
+      meaningParts.push(enemy.entry.ipa.trim());
+    }
+    if (meaningParts.length > 0) {
+      context.shadowBlur = 0;
+      context.font =
+        "650 12px ui-sans-serif, system-ui, -apple-system, sans-serif";
+      context.fillStyle = "rgba(208, 232, 244, 0.88)";
+      context.fillText(
+        meaningParts.join(" · "),
+        enemy.x,
+        enemy.y + enemy.radius + 23,
+      );
+    }
+
+    context.font =
+      "800 8px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.fillStyle = "rgba(139, 241, 255, 0.8)";
+    context.fillText("RECALL CORE", enemy.x, y - 28);
     context.restore();
   }
 
