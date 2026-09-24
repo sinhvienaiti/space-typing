@@ -5,6 +5,7 @@ import {
   assetCandidates,
   musicAssetForState,
   musicProfileForWorld,
+  musicStateForStagePhase,
   musicStateForStageRole,
   resolveMusicState,
   stateLoops,
@@ -81,13 +82,26 @@ describe("M08 World music profiles", () => {
     expect(musicStateForStageRole("major-boss")).toBe("GALAXY_BOSS");
   });
 
+  it("moves normal stages between calm and intense music without overriding special roles", () => {
+    expect(musicStateForStagePhase("normal", "opening")).toBe("WORLD_NORMAL");
+    expect(musicStateForStagePhase("normal", "pressure")).toBe("WORLD_INTENSE");
+    expect(musicStateForStagePhase("normal", "mixed")).toBe("WORLD_INTENSE");
+    expect(musicStateForStagePhase("normal", "recovery")).toBe("WORLD_NORMAL");
+    expect(musicStateForStagePhase("normal", "finale")).toBe("WORLD_INTENSE");
+    expect(musicStateForStagePhase("boss", "recovery")).toBeNull();
+    expect(musicStateForStagePhase("elite", "finale")).toBeNull();
+  });
+
   it("resolves local overrides before repository defaults and loops only sustained states", () => {
     const profile = musicProfileForWorld("world-01");
     const base = musicAssetForState(profile, "WORLD_NORMAL");
     const candidates = assetCandidates(base);
 
     expect(candidates[0]).toContain("/local-assets/music/");
-    expect(candidates[1]).toContain("/assets/audio/music/");
+    expect(candidates[1]).toBe("/assets/audio/music/sector.ogg");
+    expect(
+      assetCandidates(profile.ambientLayers[0] ?? null)[1],
+    ).toBe("/assets/audio/ambient/engine-loop.ogg");
     expect(stateLoops("WORLD_NORMAL")).toBe(true);
     expect(stateLoops("WORLD_BOSS")).toBe(true);
     expect(stateLoops("VICTORY")).toBe(false);

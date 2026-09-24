@@ -1,66 +1,104 @@
-# Space Typing Music / Ambient Asset Layout
+# Space Typing Default Audio Layout
 
-M08 resolves audio from these repository/default paths:
+Space Typing now ships a curated redistributable **CC0** default audio set.
+
+Runtime resolution remains:
+
+1. local/private override where a world-specific local path exists;
+2. committed repository fallback;
+3. fail-soft silence if playback is unavailable.
+
+See `ATTRIBUTION.md` for source and license provenance.
+
+## Default music
 
 ```text
 public/assets/audio/music/
-public/assets/audio/ambient/
-public/assets/audio/stingers/
+  sector.ogg   # calm exploration / shop / station / hidden fallback
+  pulse.ogg    # pressure / intense / mini-boss / hidden challenge
+  urgent.ogg   # world boss / galaxy boss / champion / defeat fallback
 ```
 
-Optional local/private overrides use:
+The game does **not** create one song per Campaign stage.
+
+World-specific personal overrides are still supported:
 
 ```text
-public/local-assets/music/
+public/local-assets/music/world-01.ogg
+...
+public/local-assets/music/world-50.ogg
+```
+
+If a private world file is absent, the runtime uses the committed calm default.
+
+## Ambient spacecraft layer
+
+```text
+public/assets/audio/ambient/
+  engine-loop.ogg
+  computer-loop.ogg
+```
+
+World/galaxy private ambient overrides remain supported under:
+
+```text
 public/local-assets/ambient/
 ```
 
-Resolution order is local override -> repository/default -> fail-soft silence.
+The controller keeps at most two active ambient layers and ducks them more aggressively than music when pronunciation/warnings are active.
 
-## World files
-
-The canonical World ids are `world-01` through `world-50`.
-
-Suggested base files:
+## Stingers
 
 ```text
-music/world-01.ogg
-...
-music/world-50.ogg
-
-ambient/world-01.ogg
-...
-ambient/world-50.ogg
+public/assets/audio/stingers/
+  victory.ogg
 ```
 
-Galaxy ambient fallback names may use:
+Victory is non-looping.
+
+Defeat and transition currently reuse the verified music fallbacks in non-looping state mode plus existing synthesized SFX. This avoids vendoring extra large tracks merely for variety.
+
+## Curated sampled SFX
 
 ```text
-ambient/galaxy-01.ogg
-...
-ambient/galaxy-10.ogg
+public/assets/audio/sfx/kenney/
+  laser-small.ogg
+  laser-large.ogg
+  force-field.ogg
+  explosion-crunch.ogg
+  explosion-low.ogg
+  engine-large.ogg
+  thruster.ogg
+  confirm.ogg
+  error.ogg
 ```
 
-## Shared special-state files
+These samples layer over the existing Web Audio synthesis for selected high-value events. Ordinary typing remains lightweight and does not allocate a new Audio element per keypress.
 
-Current runtime mappings expect names such as:
+## Performance contract
+
+- sampled SFX use a bounded reusable voice pool;
+- sample preload starts after audio is unlocked by user interaction;
+- no per-frame audio allocations;
+- no 50-world eager music preload;
+- only a small next-world hint set is preloaded;
+- music crossfades reuse the existing controller;
+- English pronunciation retains mix priority.
+
+## Adaptive stage pacing
+
+For ordinary stages, the pacing phases also drive music intensity:
 
 ```text
-music/intense.ogg
-music/mini-boss.ogg
-music/world-boss.ogg
-music/galaxy-boss.ogg
-music/champion-hunt.ogg
-music/hidden-challenge.ogg
-music/hidden-world.ogg
-music/shop.ogg
-music/station.ogg
-
-stingers/victory.ogg
-stingers/defeat.ogg
-stingers/world-transition.ogg
+Opening       -> calm
+Pressure Ramp -> intense
+Mixed Threats -> intense
+Recovery Beat -> calm
+Finale        -> intense
 ```
 
-Final assets may reuse compositions/stems where appropriate. Do not create one song per Campaign stage.
+Boss/elite/hazard/hidden music states remain authoritative and are not replaced by normal-wave logic.
 
-No final World music binaries are committed by M08. Add repository/default files only when redistribution rights are verified. Local/private files remain governed by `docs/LOCAL_ASSETS_README.md`.
+## Manual acceptance
+
+The committed assets make the M22 audio scenarios executable, but M22 still requires real browser + real audio-device observation. Automated CI cannot declare subjective loudness, clarity or listening quality PASS.

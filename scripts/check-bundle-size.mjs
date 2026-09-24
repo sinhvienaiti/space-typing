@@ -38,6 +38,13 @@ for (const url of built) {
   ) {
     continue;
   }
+  // Committed default audio has an independent integrity + 6 MiB payload
+  // guard in check-audio-assets.mjs. Keep the original executable/static
+  // bundle thresholds unchanged instead of inflating them to accommodate
+  // non-executable OGG media.
+  if (path.includes("/assets/audio/") && path.endsWith(".ogg")) {
+    continue;
+  }
   const buffer = readFileSync(url);
   const raw = statSync(url).size;
   const gzip = gzipSync(buffer).length;

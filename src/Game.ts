@@ -6939,6 +6939,14 @@ export class Game {
     if (shieldBefore > 0 && this.stats.shield <= 0) {
       this.sfx.shieldBreak();
     }
+    const criticalHullThreshold = this.stats.maxHull * 0.25;
+    if (
+      hullBefore > criticalHullThreshold &&
+      this.stats.hull > 0 &&
+      this.stats.hull <= criticalHullThreshold
+    ) {
+      this.sfx.criticalHull();
+    }
     this.sfx.damage();
     if (
       this.stats.hull <= 0 &&
