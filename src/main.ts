@@ -11,11 +11,14 @@ import {
 import { Game } from "./Game";
 import {
   DEFAULT_RECALL_SETTINGS,
+  buildAdaptiveRecallVocabulary,
   recallDifficultyProfile,
   recordRecallAttempt,
   sanitizeRecallMemory,
   sanitizeRecallSettings,
+  summarizeRecallAttempts,
   type GameplayMode,
+  type RecallAttemptResult,
   type RecallMemoryState,
   type RecallSettings,
 } from "./recall/model";
@@ -1749,6 +1752,7 @@ const hudDomMetrics = {
 let gameplayMode: GameplayMode = loadGameplayMode();
 let recallSettings: RecallSettings = loadRecallSettings();
 let recallMemory: RecallMemoryState = loadRecallMemory();
+let recallStageAttempts: RecallAttemptResult[] = [];
 let sourceState = loadSource();
 let sourceTab: VocabularySourceTab = sourceState.mode;
 let vocabularyIndex: VocabularyIndex | null = null;
@@ -3771,9 +3775,19 @@ function renderWordReview(snapshot: StageSessionSnapshot): void {
     if (wordReviewFilter === "missed") return group.missed > 0;
     return true;
   });
+  const recallSummary =
+    gameplayMode === "recall" ? summarizeRecallAttempts(recallStageAttempts) : null;
+  if (recallSummary !== null) {
+    groups.sort(
+      (a, b) =>
+        b.missed + b.corrected - a.missed - a.corrected ||
+        a.en.localeCompare(b.en, "en"),
+    );
+  }
 
   byId("wordReviewCount").textContent =
     "(" + snapshot.wordAttempts.length + " stored attempts" +
+    (recallSummary === null ? "" : " · " + recallSummary.needsReview + " need review") +
     (snapshot.wordAttemptsTruncated > 0
       ? " · " + snapshot.wordAttemptsTruncated + " omitted after safety cap"
       : "") +
@@ -3921,6 +3935,27 @@ function renderMeasuredStageSession(
     String(snapshot.maxPerfectWordChain),
     "independent from Key Streak",
   );
+  if (gameplayMode === "recall") {
+    const recall = summarizeRecallAttempts(recallStageAttempts);
+    appendResultMetric(
+      typing,
+      "Recall perfect",
+      recall.perfect + " / " + recall.attempts,
+      recall.needsReview + " need review",
+    );
+    appendResultMetric(
+      typing,
+      "Recall assists",
+      recall.hints + " hints",
+      recall.replays + " replays",
+    );
+    appendResultMetric(
+      typing,
+      "Recall response",
+      (recall.averageResponseMs / 1000).toFixed(1) + "s",
+      "average prompt response",
+    );
+  }
 
   renderWordReview(snapshot);
 }
@@ -4003,6 +4038,7 @@ const game = new Game(
       }
     },
     onStage: (stage) => {
+      recallStageAttempts = [];
       renderStage(stage);
       codex = discoverCodexWorld(codex, worldForStage(stage).id).state;
     },
@@ -4486,6 +4522,7 @@ const game = new Game(
       renderRecallAssistUi();
     },
     onRecallResult: (result) => {
+      recallStageAttempts.push(result);
       recallMemory = recordRecallAttempt(recallMemory, result);
       localStorage.setItem(RECALL_MEMORY_KEY, JSON.stringify(recallMemory));
       renderRecallAssistUi();
@@ -6261,7 +6298,11 @@ async function prepareStageVocabulary(
   badge.textContent = "";
 
   if (configuredVocabulary.length > 0) {
-    game.setVocabulary(configuredVocabulary);
+    game.setVocabulary(
+      gameplayMode === "recall"
+        ? buildAdaptiveRecallVocabulary(configuredVocabulary, recallMemory)
+        : configuredVocabulary,
+    );
   }
 
   if (stage.role !== "special" || sourceState.mode !== "class") {
@@ -6282,7 +6323,11 @@ async function prepareStageVocabulary(
 
   try {
     const challenge = await pending;
-    game.setVocabulary(challenge.entries);
+    game.setVocabulary(
+      gameplayMode === "recall"
+        ? buildAdaptiveRecallVocabulary(challenge.entries, recallMemory)
+        : challenge.entries,
+    );
     badge.textContent =
       "TYPING TEXT // " +
       challenge.passage.topic +
