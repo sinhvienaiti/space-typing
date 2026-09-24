@@ -441,7 +441,10 @@ export type GameHooks = {
   onObjectiveUpdate(objective: StageObjectiveState | null): void;
   onStageClear(stats: GameStats): void;
   onBossUpdate(boss: BossHudState | null): void;
-  onWordComplete(entry: VocabularyEntry): void;
+  onWordComplete(
+    entry: VocabularyEntry,
+    outcome?: { perfect: boolean },
+  ): void;
   onRecallPrompt?(entry: VocabularyEntry): void;
   onRecallResult?(result: RecallAttemptResult): void;
   onKillTranslation?(entry: VocabularyEntry): void;
@@ -5160,10 +5163,9 @@ export class Game {
       if (this.gameplayMode === "recall") {
         this.resolveRecallPrompt(boss.entry, true, !boss.wordMissed);
       }
-      this.hooks.onWordComplete(boss.entry);
-      this.applyCharacterWordCompletePassive(word.length);
-
       const perfectWord = !boss.wordMissed;
+      this.hooks.onWordComplete(boss.entry, { perfect: perfectWord });
+      this.applyCharacterWordCompletePassive(word.length);
       this.stageResultTracker.completeWord(
         "boss",
         "boss",
@@ -5826,7 +5828,7 @@ export class Game {
       this.stageElapsedSeconds,
     );
     this.sfx.wordComplete(perfectWord);
-    this.hooks.onWordComplete(enemy.entry);
+    this.hooks.onWordComplete(enemy.entry, { perfect: perfectWord });
     this.applyCharacterWordCompletePassive(length);
     this.applyCharacterPerfectWordPassive(perfectWord);
     this.applyRelicWordComplete(length, perfectWord, enemy);
