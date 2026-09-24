@@ -7460,12 +7460,20 @@ async function populateTopics(): Promise<void> {
   const select = byId<HTMLSelectElement>("topicSelect");
 
   if (select.options.length === 0) {
+    const groups = new Map<string, HTMLOptGroupElement>();
     for (const topic of index.topics) {
+      let group = groups.get(topic.group);
+      if (group === undefined) {
+        group = document.createElement("optgroup");
+        group.label = topic.groupLabel ?? topic.group;
+        groups.set(topic.group, group);
+        select.append(group);
+      }
+
       const option = document.createElement("option");
       option.value = topic.id;
-      option.textContent =
-        topic.group + " · " + topic.label + " · " + String(topic.count);
-      select.append(option);
+      option.textContent = topic.label + " · " + String(topic.count);
+      group.append(option);
     }
   }
 

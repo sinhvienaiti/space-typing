@@ -5,6 +5,7 @@ import {
   parseCustomVocabulary,
   parseVocabularyIndex,
   parseVocabularyTopicIndex,
+  representativeTopicLevel,
   vocabularyLevelUrl,
 } from "../src/vocabulary";
 
@@ -82,9 +83,14 @@ describe("shared vocabulary helpers", () => {
           id: "travel.airport",
           label: "Airport",
           group: "travel-tourism",
+          groupLabel: "Travel & Tourism",
           levels: ["A1", "B1"],
           count: 2,
           keys: ["passport", "airport"],
+          entries: [
+            { key: "passport", level: 30 },
+            { key: "airport", level: 10 },
+          ],
         },
       ],
     });
@@ -111,9 +117,14 @@ describe("shared vocabulary helpers", () => {
           id: "travel.airport",
           label: "Airport",
           group: "travel-tourism",
+          groupLabel: "Travel & Tourism",
           levels: ["A1", "B1"],
           count: 2,
           keys: ["passport", "airport"],
+          entries: [
+            { key: "passport", level: 30 },
+            { key: "airport", level: 10 },
+          ],
         },
       ],
     });
@@ -132,10 +143,8 @@ describe("shared vocabulary helpers", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       const body =
-        url.endsWith("/lookup.json")
-          ? { version: 1, totalEntries: 3, entries: { airport: 10, passport: 30, unused: 80 } }
-          : url.endsWith("/levels/010.json")
-            ? { entries: [{ id: "L010-001", en: "airport", vi: "sân bay", ipa: "/ˈerˌpɔrt/" }] }
+        url.endsWith("/levels/010.json")
+          ? { entries: [{ id: "L010-001", en: "airport", vi: "sân bay", ipa: "/ˈerˌpɔrt/" }] }
             : url.endsWith("/levels/030.json")
               ? { entries: [{ id: "L030-001", en: "passport", vi: "hộ chiếu", ipa: "/ˈpæsˌpɔrt/" }] }
               : { entries: [] };
@@ -153,7 +162,20 @@ describe("shared vocabulary helpers", () => {
     expect(loaded.levels).toEqual([10, 30]);
     expect(loaded.representativeLevel).toBe(10);
     const urls = fetchMock.mock.calls.map(([input]) => String(input));
+    expect(urls.some((url) => url.endsWith("/lookup.json"))).toBe(false);
     expect(urls.some((url) => url.endsWith("/levels/080.json"))).toBe(false);
+  });
+
+  it("derives Topic difficulty from the vocabulary distribution, not only distinct levels", () => {
+    expect(
+      representativeTopicLevel([
+        { key: "basic", level: 10 },
+        { key: "mid", level: 30 },
+        { key: "advanced-a", level: 80 },
+        { key: "advanced-b", level: 80 },
+        { key: "advanced-c", level: 80 },
+      ]),
+    ).toBe(80);
   });
 
   it("parses custom EN-VI-IPA rows and removes duplicate English entries", () => {

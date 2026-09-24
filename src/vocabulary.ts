@@ -9,13 +9,20 @@ const LOOKUP_URL = "/vocabulary/lookup.json";
 const TOPIC_INDEX_URL = "/vocabulary/topics/index.json";
 const LEVEL_BASE = "/vocabulary/";
 
+export type VocabularyTopicEntry = {
+  key: string;
+  level: number;
+};
+
 export type VocabularyTopicMeta = {
   id: string;
   label: string;
   group: string;
+  groupLabel?: string;
   levels: string[];
   count: number;
   keys: string[];
+  entries?: VocabularyTopicEntry[];
 };
 
 export type VocabularyTopicIndex = {
@@ -38,6 +45,22 @@ export type LoadedVocabularyTopic = {
   levels: number[];
   representativeLevel: number;
 };
+
+export function representativeTopicLevel(
+  entries: readonly VocabularyTopicEntry[],
+): number {
+  const profile = entries
+    .map((entry) => entry.level)
+    .filter(
+      (level) =>
+        Number.isInteger(level) &&
+        level >= 1 &&
+        level <= 100,
+    )
+    .sort((left, right) => left - right);
+
+  return profile[Math.floor((profile.length - 1) / 2)] ?? 1;
+}
 
 function normalizeEnglish(value: string): string {
   return value.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
@@ -86,14 +109,32 @@ function isVocabularyTopicMeta(value: unknown): value is VocabularyTopicMeta {
     topic.label.trim() !== "" &&
     typeof topic.group === "string" &&
     topic.group.trim() !== "" &&
+    (topic.groupLabel === undefined ||
+      (typeof topic.groupLabel === "string" &&
+        topic.groupLabel.trim() !== "")) &&
     Array.isArray(topic.levels) &&
     topic.levels.every((level) => typeof level === "string") &&
     typeof topic.count === "number" &&
     Number.isInteger(topic.count) &&
     topic.count > 0 &&
     Array.isArray(topic.keys) &&
-    topic.keys.length > 0 &&
-    topic.keys.every((key) => typeof key === "string" && key.trim() !== "")
+    topic.keys.length === topic.count &&
+    topic.keys.every((key) => typeof key === "string" && key.trim() !== "") &&
+    (topic.entries === undefined ||
+      (Array.isArray(topic.entries) &&
+        topic.entries.length === topic.count &&
+        topic.entries.every((entry) => {
+          if (entry === null || typeof entry !== "object") return false;
+          const item = entry as Partial<VocabularyTopicEntry>;
+          return (
+            typeof item.key === "string" &&
+            item.key.trim() !== "" &&
+            typeof item.level === "number" &&
+            Number.isInteger(item.level) &&
+            item.level >= 1 &&
+            item.level <= 100
+          );
+        })))
   );
 }
 
@@ -173,6 +214,7 @@ export function parseVocabularyTopicIndex(value: unknown): VocabularyTopicIndex 
       ...topic,
       levels: [...topic.levels],
       keys: [...topic.keys],
+      entries: topic.entries?.map((entry) => ({ ...entry })),
     })),
   };
 }
@@ -256,13 +298,22 @@ export async function loadVocabularyTopic(
     throw new Error("Vocabulary topic " + topicId + " is unavailable.");
   }
 
-  const lookup = await loadVocabularyLookup();
+  let levelHints: VocabularyTopicEntry[];
+  if (topic.entries !== undefined) {
+    levelHints = topic.entries;
+  } else {
+    const lookup = await loadVocabularyLookup();
+    levelHints = [];
+    for (const key of topic.keys) {
+      const level = lookup.entries[normalizeEnglish(key)];
+      if (level !== undefined && Number.isInteger(level)) {
+        levelHints.push({ key, level });
+      }
+    }
+  }
+
   const levels = [
-    ...new Set(
-      topic.keys
-        .map((key) => lookup.entries[normalizeEnglish(key)])
-        .filter((level): level is number => Number.isInteger(level)),
-    ),
+    ...new Set(levelHints.map((entry) => entry.level)),
   ].sort((left, right) => left - right);
 
   if (levels.length === 0) {
@@ -285,8 +336,7 @@ export async function loadVocabularyTopic(
     throw new Error("Vocabulary topic " + topicId + " has no valid entries.");
   }
 
-  const representativeLevel =
-    levels[Math.floor((levels.length - 1) / 2)] ?? levels[0] ?? 1;
+  const representativeLevel = representativeTopicLevel(levelHints);
 
   return {
     topic: { ...topic, levels: [...topic.levels], keys: [...topic.keys] },
