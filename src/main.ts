@@ -423,11 +423,17 @@ import type {
 } from "./persistence/player-save";
 import { speakEnglish, stopSpeech } from "./speech";
 import {
+  loadVocabularyGrammarIndex,
+  loadVocabularyGrammarModule,
   loadVocabularyIndex,
   loadVocabularyLevel,
+  loadVocabularyPosCategory,
+  loadVocabularyPosIndex,
   loadVocabularyTopic,
   loadVocabularyTopicIndex,
   parseCustomVocabulary,
+  type VocabularyGrammarIndex,
+  type VocabularyPosIndex,
   type VocabularyTopicIndex,
 } from "./vocabulary";
 import {
@@ -457,7 +463,11 @@ const CUSTOM_KEY = "spaceTypingCustomVocabularyV1";
 type VocabularySource =
   | { mode: "class"; level: number }
   | { mode: "topic"; topicId: string; level: number }
+  | { mode: "word-type"; posId: string; level: number }
+  | { mode: "grammar"; grammarId: string; level: number }
   | { mode: "custom" };
+
+type VocabularySourceTab = VocabularySource["mode"];
 
 const defaultSettings: GameSettings = {
   sfxVolume: 0.5,
@@ -551,6 +561,24 @@ function loadSource(): VocabularySource {
       parsed.mode === "topic" &&
       typeof parsed.topicId === "string" &&
       parsed.topicId.trim() !== "" &&
+      Number.isInteger(parsed.level) &&
+      parsed.level >= 1
+    ) {
+      return parsed;
+    }
+    if (
+      parsed.mode === "word-type" &&
+      typeof parsed.posId === "string" &&
+      parsed.posId.trim() !== "" &&
+      Number.isInteger(parsed.level) &&
+      parsed.level >= 1
+    ) {
+      return parsed;
+    }
+    if (
+      parsed.mode === "grammar" &&
+      typeof parsed.grammarId === "string" &&
+      parsed.grammarId.trim() !== "" &&
       Number.isInteger(parsed.level) &&
       parsed.level >= 1
     ) {
@@ -1222,6 +1250,8 @@ app.innerHTML = `
       <div class="source-tabs">
         <button id="sourceClass" type="button">Class</button>
         <button id="sourceTopic" type="button">Topic</button>
+        <button id="sourceWordType" type="button">Word type</button>
+        <button id="sourceGrammar" type="button">Grammar</button>
         <button id="sourceCustom" type="button">Custom</button>
       </div>
 
@@ -1244,6 +1274,28 @@ app.innerHTML = `
         <div class="source-footer">
           <small id="topicMeta">Loading shared topics…</small>
           <button id="applyTopic" class="primary" type="button">Use topic</button>
+        </div>
+      </section>
+
+      <section id="wordTypePanel" class="source-panel hidden">
+        <label>
+          <span class="field-label">Word type</span>
+          <select id="wordTypeSelect"></select>
+        </label>
+        <div class="source-footer">
+          <small id="wordTypeMeta">Loading word types…</small>
+          <button id="applyWordType" class="primary" type="button">Use word type</button>
+        </div>
+      </section>
+
+      <section id="grammarPanel" class="source-panel hidden">
+        <label>
+          <span class="field-label">Grammar practice</span>
+          <select id="grammarSelect"></select>
+        </label>
+        <div class="source-footer">
+          <small id="grammarMeta">Loading grammar…</small>
+          <button id="applyGrammar" class="primary" type="button">Use grammar</button>
         </div>
       </section>
 
@@ -1599,9 +1651,11 @@ const hudDomMetrics = {
   maxRenderMs: 0,
 };
 let sourceState = loadSource();
-let sourceTab: "class" | "topic" | "custom" = sourceState.mode;
+let sourceTab: VocabularySourceTab = sourceState.mode;
 let vocabularyIndex: VocabularyIndex | null = null;
 let vocabularyTopicIndex: VocabularyTopicIndex | null = null;
+let vocabularyPosIndex: VocabularyPosIndex | null = null;
+let vocabularyGrammarIndex: VocabularyGrammarIndex | null = null;
 let configuredVocabulary: VocabularyEntry[] = [];
 let artCatalog: ArtAssetCatalog | null = null;
 const typingChallengeCache = new Map<
@@ -5990,9 +6044,7 @@ function openSpecialShop(kind: ShopType): void {
 }
 
 function selectedVocabularyLevel(): number {
-  return sourceState.mode === "class" || sourceState.mode === "topic"
-    ? sourceState.level
-    : 1;
+  return sourceState.mode === "custom" ? 1 : sourceState.level;
 }
 
 function typingChallengeKey(level: number, seed: number): string {
@@ -7420,12 +7472,33 @@ async function ensureVocabularyTopicIndex(): Promise<VocabularyTopicIndex> {
   return vocabularyTopicIndex;
 }
 
+async function ensureVocabularyPosIndex(): Promise<VocabularyPosIndex> {
+  vocabularyPosIndex ??= await loadVocabularyPosIndex();
+  return vocabularyPosIndex;
+}
+
+async function ensureVocabularyGrammarIndex(): Promise<VocabularyGrammarIndex> {
+  vocabularyGrammarIndex ??= await loadVocabularyGrammarIndex();
+  return vocabularyGrammarIndex;
+}
+
+function curriculumLabel(id: string): string {
+  return id
+    .split("-")
+    .map((part) => part === "" ? part : part[0]!.toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 function renderSourceTabs(): void {
   byId("sourceClass").classList.toggle("active", sourceTab === "class");
   byId("sourceTopic").classList.toggle("active", sourceTab === "topic");
+  byId("sourceWordType").classList.toggle("active", sourceTab === "word-type");
+  byId("sourceGrammar").classList.toggle("active", sourceTab === "grammar");
   byId("sourceCustom").classList.toggle("active", sourceTab === "custom");
   byId("classPanel").classList.toggle("hidden", sourceTab !== "class");
   byId("topicPanel").classList.toggle("hidden", sourceTab !== "topic");
+  byId("wordTypePanel").classList.toggle("hidden", sourceTab !== "word-type");
+  byId("grammarPanel").classList.toggle("hidden", sourceTab !== "grammar");
   byId("customPanel").classList.toggle("hidden", sourceTab !== "custom");
   if (sourceTab === "custom") {
     byId<HTMLTextAreaElement>("customVocabulary").value =
@@ -7484,6 +7557,101 @@ async function populateTopics(): Promise<void> {
     select.value = index.topics[0]?.id ?? "";
   }
   updateTopicMeta();
+}
+
+function updateWordTypeMeta(): void {
+  const id = byId<HTMLSelectElement>("wordTypeSelect").value;
+  const category = vocabularyPosIndex?.categories.find((item) => item.id === id);
+  byId("wordTypeMeta").textContent =
+    category === undefined
+      ? ""
+      : String(category.entries.length) +
+        " available · " +
+        String(category.missing.length) +
+        " coverage gaps";
+}
+
+async function populateWordTypes(): Promise<void> {
+  const index = await ensureVocabularyPosIndex();
+  const select = byId<HTMLSelectElement>("wordTypeSelect");
+
+  if (select.options.length === 0) {
+    for (const category of index.categories) {
+      const option = document.createElement("option");
+      option.value = category.id;
+      option.textContent =
+        curriculumLabel(category.id) +
+        " · " +
+        String(category.entries.length);
+      option.disabled = category.entries.length === 0;
+      select.append(option);
+    }
+  }
+
+  if (sourceState.mode === "word-type") {
+    select.value = sourceState.posId;
+  }
+  if (
+    select.value === "" ||
+    select.selectedOptions[0]?.disabled === true
+  ) {
+    select.value =
+      index.categories.find((item) => item.entries.length > 0)?.id ?? "";
+  }
+  updateWordTypeMeta();
+}
+
+function updateGrammarMeta(): void {
+  const id = byId<HTMLSelectElement>("grammarSelect").value;
+  const module = vocabularyGrammarIndex?.modules.find((item) => item.id === id);
+  byId("grammarMeta").textContent =
+    module === undefined
+      ? ""
+      : module.focus.join(" · ") +
+        " · " +
+        String(module.signalEntries.length) +
+        " signal words";
+}
+
+async function populateGrammar(): Promise<void> {
+  const index = await ensureVocabularyGrammarIndex();
+  const select = byId<HTMLSelectElement>("grammarSelect");
+
+  if (select.options.length === 0) {
+    const timeGroup = document.createElement("optgroup");
+    timeGroup.label = "Past / Present / Future";
+    for (const id of index.primaryTimeGroups) {
+      const module = index.modules.find((item) => item.id === id);
+      if (module === undefined) continue;
+      const option = document.createElement("option");
+      option.value = module.id;
+      option.textContent = module.label;
+      timeGroup.append(option);
+    }
+    if (timeGroup.childElementCount > 0) select.append(timeGroup);
+
+    const practicalGroup = document.createElement("optgroup");
+    practicalGroup.label = "Practical grammar";
+    for (const module of index.modules) {
+      if (index.primaryTimeGroups.includes(module.id)) continue;
+      const option = document.createElement("option");
+      option.value = module.id;
+      option.textContent = module.label;
+      practicalGroup.append(option);
+    }
+    if (practicalGroup.childElementCount > 0) select.append(practicalGroup);
+  }
+
+  if (sourceState.mode === "grammar") {
+    select.value = sourceState.grammarId;
+  }
+  if (select.value === "") {
+    select.value =
+      index.primaryTimeGroups[0] ??
+      index.modules[0]?.id ??
+      "";
+  }
+  updateGrammarMeta();
 }
 
 async function populateLevels(): Promise<void> {
@@ -7815,12 +7983,19 @@ async function openVocabulary(): Promise<void> {
   sourceTab = sourceState.mode;
   renderSourceTabs();
   try {
-    await Promise.all([populateLevels(), populateTopics()]);
+    await Promise.all([
+      populateLevels(),
+      populateTopics(),
+      populateWordTypes(),
+      populateGrammar(),
+    ]);
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unable to load learning sources.";
     byId("levelMeta").textContent = message;
     byId("topicMeta").textContent = message;
+    byId("wordTypeMeta").textContent = message;
+    byId("grammarMeta").textContent = message;
   }
   vocabularyDialog.showModal();
 }
@@ -7904,6 +8079,100 @@ async function applyTopicVocabulary(topicId: string): Promise<void> {
   }
 }
 
+async function applyWordTypeVocabulary(posId: string): Promise<void> {
+  const button = byId<HTMLButtonElement>("applyWordType");
+  button.disabled = true;
+  button.textContent = "Applying…";
+
+  try {
+    const [wordTypes, levels] = await Promise.all([
+      ensureVocabularyPosIndex(),
+      ensureVocabularyIndex(),
+    ]);
+    const loaded = await loadVocabularyPosCategory(posId, wordTypes, levels);
+
+    configuredVocabulary = loaded.entries;
+    typingChallengeCache.clear();
+    sourceState = {
+      mode: "word-type",
+      posId: loaded.category.id,
+      level: loaded.representativeLevel,
+    };
+    sourceTab = "word-type";
+    localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
+    game.setVocabulary(loaded.entries);
+    game.setVocabularyLevel(loaded.representativeLevel);
+    vocabularyDialog.close();
+
+    showNotice(
+      curriculumLabel(loaded.category.id) +
+        " applied · " +
+        String(loaded.entries.length) +
+        " entries · level profile " +
+        String(loaded.representativeLevel).padStart(3, "0"),
+    );
+  } catch (error) {
+    alert(
+      error instanceof Error
+        ? error.message
+        : "Unable to apply vocabulary word type.",
+    );
+  } finally {
+    button.disabled = false;
+    button.textContent = "Use word type";
+  }
+}
+
+async function applyGrammarVocabulary(grammarId: string): Promise<void> {
+  const button = byId<HTMLButtonElement>("applyGrammar");
+  button.disabled = true;
+  button.textContent = "Applying…";
+
+  try {
+    const [grammar, topics, levels] = await Promise.all([
+      ensureVocabularyGrammarIndex(),
+      ensureVocabularyTopicIndex(),
+      ensureVocabularyIndex(),
+    ]);
+    const loaded = await loadVocabularyGrammarModule(
+      grammarId,
+      grammar,
+      topics,
+      levels,
+    );
+
+    configuredVocabulary = loaded.entries;
+    typingChallengeCache.clear();
+    sourceState = {
+      mode: "grammar",
+      grammarId: loaded.module.id,
+      level: loaded.representativeLevel,
+    };
+    sourceTab = "grammar";
+    localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
+    game.setVocabulary(loaded.entries);
+    game.setVocabularyLevel(loaded.representativeLevel);
+    vocabularyDialog.close();
+
+    showNotice(
+      loaded.module.label +
+        " applied · " +
+        String(loaded.entries.length) +
+        " entries · level profile " +
+        String(loaded.representativeLevel).padStart(3, "0"),
+    );
+  } catch (error) {
+    alert(
+      error instanceof Error
+        ? error.message
+        : "Unable to apply vocabulary grammar module.",
+    );
+  } finally {
+    button.disabled = false;
+    button.textContent = "Use grammar";
+  }
+}
+
 async function initializeArtPipeline(): Promise<void> {
   try {
     const manifest = await loadArtAssetManifest();
@@ -7979,6 +8248,42 @@ async function loadInitialVocabulary(): Promise<void> {
       sourceState = {
         mode: "topic",
         topicId: loaded.topic.id,
+        level: loaded.representativeLevel,
+      };
+      localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
+      game.setVocabulary(configuredVocabulary);
+      game.setVocabularyLevel(loaded.representativeLevel);
+    } else if (sourceState.mode === "word-type") {
+      const wordTypes = await ensureVocabularyPosIndex();
+      const loaded = await loadVocabularyPosCategory(
+        sourceState.posId,
+        wordTypes,
+        index,
+      );
+      configuredVocabulary = loaded.entries;
+      sourceState = {
+        mode: "word-type",
+        posId: loaded.category.id,
+        level: loaded.representativeLevel,
+      };
+      localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
+      game.setVocabulary(configuredVocabulary);
+      game.setVocabularyLevel(loaded.representativeLevel);
+    } else if (sourceState.mode === "grammar") {
+      const [grammar, topics] = await Promise.all([
+        ensureVocabularyGrammarIndex(),
+        ensureVocabularyTopicIndex(),
+      ]);
+      const loaded = await loadVocabularyGrammarModule(
+        sourceState.grammarId,
+        grammar,
+        topics,
+        index,
+      );
+      configuredVocabulary = loaded.entries;
+      sourceState = {
+        mode: "grammar",
+        grammarId: loaded.module.id,
         level: loaded.representativeLevel,
       };
       localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
@@ -8234,6 +8539,18 @@ byId("sourceTopic").addEventListener("click", () => {
   void populateTopics();
 });
 
+byId("sourceWordType").addEventListener("click", () => {
+  sourceTab = "word-type";
+  renderSourceTabs();
+  void populateWordTypes();
+});
+
+byId("sourceGrammar").addEventListener("click", () => {
+  sourceTab = "grammar";
+  renderSourceTabs();
+  void populateGrammar();
+});
+
 byId("sourceCustom").addEventListener("click", () => {
   sourceTab = "custom";
   renderSourceTabs();
@@ -8241,12 +8558,24 @@ byId("sourceCustom").addEventListener("click", () => {
 
 byId("levelSelect").addEventListener("change", updateLevelMeta);
 byId("topicSelect").addEventListener("change", updateTopicMeta);
+byId("wordTypeSelect").addEventListener("change", updateWordTypeMeta);
+byId("grammarSelect").addEventListener("change", updateGrammarMeta);
 
 byId("applyLevel").addEventListener("click", () => {
   void applyClassLevel(Number(byId<HTMLSelectElement>("levelSelect").value));
 });
 byId("applyTopic").addEventListener("click", () => {
   void applyTopicVocabulary(byId<HTMLSelectElement>("topicSelect").value);
+});
+byId("applyWordType").addEventListener("click", () => {
+  void applyWordTypeVocabulary(
+    byId<HTMLSelectElement>("wordTypeSelect").value,
+  );
+});
+byId("applyGrammar").addEventListener("click", () => {
+  void applyGrammarVocabulary(
+    byId<HTMLSelectElement>("grammarSelect").value,
+  );
 });
 
 byId("saveCustom").addEventListener("click", () => {
