@@ -171,7 +171,7 @@ describe("M08 MusicController", () => {
 
     expect(
       created.some((audio) =>
-        audio.src.includes("/assets/audio/music/world-01.ogg"),
+        audio.src.includes("/assets/audio/music/sector.ogg"),
       ),
     ).toBe(true);
     controller.destroy();
