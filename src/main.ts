@@ -3896,7 +3896,7 @@ const game = new Game(
         checkpointRollbackApplied = false;
         checkpointRollbackSaved = false;
         checkpointRollbackPromise = null;
-        deathNavigationPending = false;
+        deathActionGate.leave();
 
         const deathAt = new Date().toISOString();
         markCrashRecoveryDeathInvalid(deathAt);
