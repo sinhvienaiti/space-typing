@@ -3789,3 +3789,15 @@ No recovery rules, item counts, Campaign progression, checkpoint semantics or ga
   - Recall hint-index entries were retained after typed kills/Nova clears.
 - Fix direction: isolate Combat-only death traits/learning echo, clean Recall transient hint state, and add regression coverage that also proves Combat Splitter/Volatile behavior remains intact.
 - Future real-device/audio/visual findings after M22 acceptance are normal regressions: fix the root cause and add focused tests where practical; do not reopen the entire 43-row gate by default.
+
+
+## 2026-09-24 — M23 Review Pass #1 COMPLETE
+
+- PR #112 completes the first independent review after M22 acceptance.
+- Fixed Recall mode leakage from Combat Splitter/Volatile death traits while preserving those traits in Combat.
+- Removed Combat learning echo/translation state from Recall typed kills and cleaned transient Recall hint state after typed kills/Nova clears.
+- Recall learning-memory persistence no longer serializes/writes the entire memory object after every word; it batches every six Recall results and saves at stage clear/page lifecycle boundaries.
+- Reviewed the authoritative Auto Pronounce gate and kept it in Game prompt activation rather than duplicating the condition in main UI callbacks.
+- Reviewed the production update loop for new Recall hot-path collection/storage work; no unbounded per-frame sort/filter/map/JSON/localStorage path was introduced.
+- CI #674 PASS at code-complete HEAD: 149 files / 751 tests; TypeScript, production build, audio guard, Ship V3 guard and unchanged bundle limits all pass. JS 649.85 KiB raw / 173.11 KiB gzip; CSS 60.00 KiB raw / 13.67 KiB gzip.
+- Next roadmap milestone after merge: M24 Review Pass #2 from a fresh perspective.
