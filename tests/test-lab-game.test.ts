@@ -496,4 +496,56 @@ describe("M21 gated Game Test Lab API", () => {
 
     game.destroy();
   });
+  it("reports completed-word quality once for shared learning", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 1);
+    game.testLabSetSchedulerFrozen(true);
+
+    const onWordComplete = vi.fn();
+    const runtime = game as unknown as {
+      hooks: {
+        onWordComplete: (
+          entry: VocabularyEntry,
+          outcome?: { perfect: boolean },
+        ) => void;
+      };
+      enemies: Array<{
+        id: number;
+        wordMissed: boolean;
+      }>;
+    };
+    runtime.hooks.onWordComplete = onWordComplete;
+
+    const cleanIds = game.testLabSpawnEnemies({
+      kind: "scout",
+      count: 1,
+      layers: 1,
+    });
+    expect(game.testLabForceWordComplete(cleanIds[0]!)).toBe(true);
+    expect(onWordComplete).toHaveBeenLastCalledWith(
+      expect.any(Object),
+      { perfect: true },
+    );
+
+    const correctedIds = game.testLabSpawnEnemies({
+      kind: "scout",
+      count: 1,
+      layers: 1,
+    });
+    const corrected = runtime.enemies.find(
+      (enemy) => enemy.id === correctedIds[0],
+    );
+    if (corrected === undefined) throw new Error("Missing test enemy");
+    corrected.wordMissed = true;
+    expect(game.testLabForceWordComplete(corrected.id)).toBe(true);
+    expect(onWordComplete).toHaveBeenLastCalledWith(
+      expect.any(Object),
+      { perfect: false },
+    );
+    expect(onWordComplete).toHaveBeenCalledTimes(2);
+
+    game.destroy();
+  });
+
 });
