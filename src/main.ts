@@ -3357,8 +3357,11 @@ function renderWordReview(snapshot: StageSessionSnapshot): void {
   });
 
   byId("wordReviewCount").textContent =
-    "(" + snapshot.wordAttempts.length + " attempts · " +
-    snapshot.wordGroups.length + " unique)";
+    "(" + snapshot.wordAttempts.length + " stored attempts" +
+    (snapshot.wordAttemptsTruncated > 0
+      ? " · " + snapshot.wordAttemptsTruncated + " omitted after safety cap"
+      : "") +
+    " · " + snapshot.wordGroups.length + " unique)";
 
   for (const button of byId("wordReviewTabs").querySelectorAll<HTMLButtonElement>(
     "button[data-word-filter]",
