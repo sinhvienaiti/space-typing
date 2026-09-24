@@ -754,10 +754,7 @@ app.innerHTML = `
       <div class="main-card title-main-card">
         <p class="eyebrow">typing combat // campaign</p>
         <h1>SPACE <span>TYPE</span></h1>
-        <p id="titleModeIntro" class="intro">
-          Lock a target with its first letter, finish the word, and keep the
-          streak alive. No movement — only typing decisions.
-        </p>
+        <p id="titleModeIntro" class="intro"></p>
         <p id="titleWorldMeta" class="world-meta">
           World 01 · Rainbow Reach · Stage 001-020
         </p>
@@ -768,7 +765,7 @@ app.innerHTML = `
             <button id="combatModeButton" type="button">Combat</button>
             <button id="recallModeButton" type="button">Recall</button>
           </div>
-          <small id="titleModeMeta" class="world-meta">Combat · see, type, shoot</small>
+          <small id="titleModeMeta" class="world-meta"></small>
         </section>
 
         <div class="title-play-actions">
