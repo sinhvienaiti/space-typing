@@ -514,10 +514,16 @@ async function loadVocabularyReferences(
     throw new Error("Selected curriculum item has no valid entries.");
   }
 
+  const uniqueReferences = [
+    ...new Map(
+      references.map((entry) => [normalizeEnglish(entry.key), entry] as const),
+    ).values(),
+  ];
+
   return {
     entries,
     levels,
-    representativeLevel: representativeTopicLevel(references),
+    representativeLevel: representativeTopicLevel(uniqueReferences),
   };
 }
 
