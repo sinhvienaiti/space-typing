@@ -2730,10 +2730,15 @@ function renderProgression(): void {
     meta.textContent =
       String(progress) +
       " / " +
-      String(mission.target) +
-      " · " +
-      mission.rewardCredits.toLocaleString() +
-      " Credits";
+      String(mission.target);
+
+    const reward = document.createElement("div");
+    reward.className = "progression-reward";
+    replaceCurrencyChips(
+      reward,
+      { credits: mission.rewardCredits },
+      { signed: true },
+    );
 
     const claim = document.createElement("button");
     claim.type = "button";
@@ -2755,7 +2760,7 @@ function renderProgression(): void {
       );
     });
 
-    card.append(title, description, meta, claim);
+    card.append(title, description, meta, reward, claim);
     missionGrid.append(card);
   }
 
@@ -2989,29 +2994,47 @@ function renderBossRewardChoiceOptions(
 
     const name = document.createElement("strong");
     const description = document.createElement("small");
+    const extra = document.createElement("div");
+    extra.className = "reward-choice-extra";
 
     if (option.kind === "equipment") {
       const definition = getEquipmentDefinition(option.drop.definitionId);
-      name.textContent =
-        gradeLabel(option.drop.grade).toUpperCase() + " · " + definition.name;
+      applyGradeFrame(button, option.drop.grade);
+      extra.append(
+        createLocalIcon(
+          definition.icon,
+          definition.name + " icon",
+          "reward-choice-icon",
+        ),
+        createGradeBadge(option.drop.grade),
+      );
+      name.textContent = definition.name;
       description.textContent = definition.description;
     } else if (option.kind === "relic") {
       const definition = getRelicDefinition(option.relicId);
+      applyGradeFrame(button, definition.grade);
+      extra.append(createGradeBadge(definition.grade));
       name.textContent = definition.name;
       description.textContent = definition.description;
     } else {
       name.textContent = option.id === "premium-currency"
         ? "Premium Cache"
         : "Boss Cache";
-      const currencyText = expansionCurrencyRewardText(option.currencies);
-      description.textContent =
-        "+" +
-        option.credits.toLocaleString() +
-        " Credits" +
-        (currencyText.length > 0 ? " · " + currencyText : "");
+      description.textContent = "Currency reward";
+      replaceCurrencyChips(
+        extra,
+        {
+          credits: option.credits,
+          alloy: option.currencies.alloy,
+          starCrystal: option.currencies.starCrystal,
+          quantumCore: option.currencies.quantumCore,
+        },
+        { signed: true },
+      );
     }
 
-    button.append(kind, name, description);
+    button.classList.add("visual-card");
+    button.append(kind, extra, name, description);
     button.addEventListener("click", () => {
       if (option.kind === "equipment") {
         equipment = addEquipmentInstance(equipment, {
@@ -5894,6 +5917,8 @@ function handleHiddenEncounterClear(
 
   let rewardText = "No checkpoint change";
   let rewardCredits = 0;
+  let rewardCurrencies = createExpansionCurrencyState();
+  let rewardRelic: RelicId | null = null;
 
   if (result.completed) {
     const reward = hiddenEncounterReward(
@@ -5901,6 +5926,7 @@ function handleHiddenEncounterClear(
       accuracy,
     );
     rewardCredits = reward.credits;
+    rewardCurrencies = reward.currencies;
     credits = addCredits(credits, reward.credits);
     expansionCurrencies = addExpansionCurrencyReward(
       expansionCurrencies,
@@ -5908,7 +5934,7 @@ function handleHiddenEncounterClear(
     );
     const currencyText =
       expansionCurrencyRewardText(reward.currencies);
-    const hiddenRelic =
+    rewardRelic =
       active.tier >= 2 ||
       active.kind === "hidden-world" ||
       active.kind === "champion-hunt"
@@ -5918,13 +5944,16 @@ function handleHiddenEncounterClear(
           )
         : null;
     rewardText =
-      "+" +
-      reward.credits.toLocaleString() +
-      " Credits" +
-      (currencyText.length > 0
-        ? " · " + currencyText
-        : "") +
-      relicRewardText(hiddenRelic);
+      currencyAccessibleText(
+        {
+          credits: reward.credits,
+          alloy: reward.currencies.alloy,
+          starCrystal: reward.currencies.starCrystal,
+          quantumCore: reward.currencies.quantumCore,
+        },
+        { signed: true },
+      ) +
+      relicRewardText(rewardRelic);
   } else {
     rewardText =
       "Hidden World progress · " +
@@ -5979,11 +6008,30 @@ function handleHiddenEncounterClear(
   renderMeasuredStageSession(stageSession, stats.hits, stats.misses);
 
   const rewardContainer = byId("clearCredits");
-  rewardContainer.replaceChildren();
-  const rewardChip = document.createElement("span");
-  rewardChip.className = "reward-chip";
-  rewardChip.textContent = rewardText;
-  rewardContainer.append(rewardChip);
+  if (result.completed) {
+    replaceCurrencyChips(
+      rewardContainer,
+      {
+        credits: rewardCredits,
+        alloy: rewardCurrencies.alloy,
+        starCrystal: rewardCurrencies.starCrystal,
+        quantumCore: rewardCurrencies.quantumCore,
+      },
+      { signed: true },
+    );
+    if (rewardRelic !== null) {
+      const relic = document.createElement("span");
+      relic.className = "reward-chip";
+      relic.textContent = "Relic · " + getRelicDefinition(rewardRelic).name;
+      rewardContainer.append(relic);
+    }
+  } else {
+    rewardContainer.replaceChildren();
+    const progressChip = document.createElement("span");
+    progressChip.className = "reward-chip";
+    progressChip.textContent = rewardText;
+    rewardContainer.append(progressChip);
+  }
 
   const hiddenProgress = byId("clearCharacterProgress");
   hiddenProgress.replaceChildren();
