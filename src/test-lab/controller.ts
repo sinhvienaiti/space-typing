@@ -101,6 +101,10 @@ import {
   type TestLabSession,
 } from "./session";
 import { mountM22ManualGate } from "./m22-manual-gate";
+import {
+  mountBatchFPerformanceGate,
+  type BatchFPerformanceCapture,
+} from "./batch-f-performance-gate";
 
 const TEST_LAB_PRESET_KEY = "spaceTypingTestLabPresetV1";
 
@@ -627,6 +631,11 @@ export function mountTestLab(
           <div data-role="m22-manual-gate"></div>
         </details>
 
+        <details>
+          <summary>Batch F Browser Performance Baseline</summary>
+          <div data-role="batch-f-performance-gate"></div>
+        </details>
+
         <details open>
           <summary>State Inspector</summary>
           <pre class="test-lab-inspector" data-role="inspector"></pre>
@@ -638,11 +647,51 @@ export function mountTestLab(
 
   const manualGateRoot =
     dialog.querySelector<HTMLElement>('[data-role="m22-manual-gate"]')!;
+  const performanceGateRoot =
+    dialog.querySelector<HTMLElement>(
+      '[data-role="batch-f-performance-gate"]',
+    )!;
+
+  function captureBatchFPerformance(): BatchFPerformanceCapture | null {
+    const activeGame = game;
+    if (activeGame === null) return null;
+    const performance = activeGame.getPerformanceReport();
+    if (performance.samples <= 0) return null;
+    const render = activeGame.getRenderDiagnostics();
+    const snapshot = activeGame.getTestLabSnapshot();
+    const settings = options.getSettings();
+
+    return {
+      version: 1,
+      capturedAt: new Date().toISOString(),
+      browserDevice: navigator.userAgent.slice(0, 320),
+      stage: snapshot?.stage ?? session.stage,
+      quality: settings.visualQuality,
+      viewport:
+        String(window.innerWidth) + "x" + String(window.innerHeight),
+      deviceDpr: Number.isFinite(window.devicePixelRatio)
+        ? window.devicePixelRatio
+        : 1,
+      performance,
+      render,
+    };
+  }
+
+  const performanceGate = mountBatchFPerformanceGate(
+    performanceGateRoot,
+    {
+      capture: captureBatchFPerformance,
+      showNotice: (message) =>
+        options.showNotice?.("Test Lab · " + message),
+    },
+  );
+
   const manualGate = mountM22ManualGate(manualGateRoot, {
     showNotice: (message) => options.showNotice?.("Test Lab · " + message),
     captureEvidence: (rowId) => {
       const snapshot = game?.getTestLabSnapshot() ?? null;
       const performance = game?.getPerformanceReport() ?? null;
+      const render = game?.getRenderDiagnostics() ?? null;
       const musicSnapshot = music?.getDebugSnapshot() ?? null;
       const settings = options.getSettings();
       const runtime =
@@ -665,6 +714,16 @@ export function mountTestLab(
               "avgMs=" + performance.averageFrameMs.toFixed(2),
               "p95Ms=" + performance.p95FrameMs.toFixed(2),
               "slowRatio=" + performance.slowFrameRatio.toFixed(3),
+            ].join(",");
+      const renderText =
+        render === null
+          ? "render=not-started"
+          : [
+              "drawP95Ms=" + render.renderP95Ms.toFixed(2),
+              "adaptiveScale=" + render.adaptiveScale.toFixed(3),
+              "effectiveDpr=" + render.effectiveDpr.toFixed(3),
+              "canvasPixels=" + String(render.canvasPixels),
+              "bodySprites=" + String(render.bodySprites),
             ].join(",");
       const musicText =
         musicSnapshot === null
@@ -694,6 +753,7 @@ export function mountTestLab(
         "dpr=" + String(window.devicePixelRatio),
         runtime,
         performanceText,
+        renderText,
         musicText,
       ].join(" · ");
     },
@@ -2443,6 +2503,7 @@ export function mountTestLab(
     destroy(): void {
       destroyRuntime();
       manualGate.destroy();
+      performanceGate.destroy();
       dialog.remove();
       button.remove();
     },

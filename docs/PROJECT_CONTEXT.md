@@ -3703,7 +3703,10 @@ This plan is a roadmap, not evidence that every acceptance gate is complete.
 - Real-browser responsive/visual QA and the parent `typing-game` gitlink integration remain mandatory merge/acceptance gates. Do not interpret green CI as measured user-hardware FPS or final visual acceptance.
 - Batch E implementation is validated on PR #97 / CI #592: **143 test files / 711 tests**, TypeScript, production Build, bundle budget and ship-art budget all PASS. Mission/Achievement/Codex/Objective UI now uses one non-persisted semantic presentation contract with icon, readable state text and accent border; undiscovered Codex entries remain generic so hidden categories are not leaked.
 - Batch E adds no stylesheet rules. CI #592 measured JS raw 602.33 KiB / gzip 161.53 KiB and CSS raw 59.60 KiB / gzip 13.57 KiB; the existing CSS budget remains unchanged.
-- Real-browser responsive/visual QA and measured hardware performance are still pending. After reconstructing latest `main`, the next planned implementation batch is Batch F (browser/performance/final integration).
+- Batch F automated/support implementation is validated on PR #98 / CI #597: **144 test files / 717 tests**, TypeScript, production Build, bundle budget and ship-art budget PASS. Developer Test Lab now has a QA-only baseline/candidate comparator that requires matching browser/device, Stage, quality, viewport and DPR, at least 120 frame samples, and reports frame p95, Canvas draw p95, average FPS, slow-frame ratio, effective DPR, Canvas pixels and sprite-cache occupancy.
+- Batch F also enriches the existing M22 Manual Gate evidence with draw p95, adaptive scale, effective DPR, Canvas pixels and sprite-cache occupancy. Procedure: `docs/UI_UX_BATCH_F_BROWSER_QA.md`.
+- CI #597 measured JS raw 609.77 KiB / gzip 163.33 KiB and CSS raw 59.60 KiB / gzip 13.57 KiB; no Batch F stylesheet rules were added and existing bundle limits were not relaxed.
+- **Batch F remains PENDING REAL-BROWSER ACCEPTANCE.** Green CI does not satisfy the required paired baseline/candidate runs, visual review, audio-device review or user-hardware performance evidence.
 
 ---
 
