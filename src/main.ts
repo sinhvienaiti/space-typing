@@ -5239,7 +5239,16 @@ function renderServiceShop(): void {
   repairPanel.replaceChildren();
 
   const repairCard = document.createElement("article");
-  repairCard.className = "service-shop-card";
+  repairCard.className = "service-shop-card visual-card item-card";
+  applyGradeFrame(repairCard, "aluminum");
+  const repairIcon = createLocalIcon(
+    getItemDefinition("repair-kit").icon,
+    "Repair Station Pack icon",
+    "item-card-icon",
+  );
+
+  const repairBody = document.createElement("div");
+  repairBody.className = "item-card-body";
 
   const repairTitle = document.createElement("strong");
   repairTitle.textContent = "Repair Station Pack";
@@ -5250,11 +5259,14 @@ function renderServiceShop(): void {
 
   const repairButton = document.createElement("button");
   repairButton.type = "button";
-  repairButton.textContent =
-    REPAIR_PACK_COST.toLocaleString() +
-    " Credits + " +
-    REPAIR_PACK_ALLOY_COST.toLocaleString() +
-    " Alloy";
+  setCurrencyButton(
+    repairButton,
+    "Buy Repair Pack",
+    {
+      credits: REPAIR_PACK_COST,
+      alloy: REPAIR_PACK_ALLOY_COST,
+    },
+  );
   repairButton.disabled =
     credits < REPAIR_PACK_COST ||
     expansionCurrencies.alloy < REPAIR_PACK_ALLOY_COST;
@@ -5290,7 +5302,8 @@ function renderServiceShop(): void {
     );
   });
 
-  repairCard.append(repairTitle, repairDescription, repairButton);
+  repairBody.append(repairTitle, repairDescription, repairButton);
+  repairCard.append(repairIcon, repairBody);
   repairPanel.append(repairCard);
 
   // Legacy paid Lv1-Lv5 skills remain grandfathered for all characters,
@@ -5307,7 +5320,7 @@ function renderServiceShop(): void {
     const max = maxAttributeLevel(key);
     const cost = attributeUpgradeCost(key, level);
     const card = document.createElement("article");
-    card.className = "service-shop-card";
+    card.className = "service-shop-card visual-card stat-card";
 
     const title = document.createElement("strong");
     title.textContent =
@@ -5327,13 +5340,15 @@ function renderServiceShop(): void {
     button.type = "button";
     button.disabled =
       cost === null || !canAffordUpgradeCost(cost);
-    button.textContent =
-      cost === null
-        ? "Maxed"
-        : "Train Lv" +
-          String(level + 1) +
-          " · " +
-          upgradeCostText(cost);
+    if (cost === null) {
+      button.textContent = "Maxed";
+    } else {
+      setCurrencyButton(
+        button,
+        "Train Lv" + String(level + 1),
+        cost,
+      );
+    }
     button.addEventListener("click", () => {
       commitUpgradeService(
         buyAttributeUpgrade(
@@ -5354,7 +5369,8 @@ function renderServiceShop(): void {
       );
     });
 
-    card.append(title, detail, button);
+    cardBody.append(titleRow, detail, button);
+    card.append(visual, cardBody);
     repairPanel.append(card);
   }
 
@@ -5435,15 +5451,26 @@ function renderServiceShop(): void {
     const cost = equipmentUpgradeCost(item);
     const alloyCost = equipmentUpgradeAlloyCost(item);
     const card = document.createElement("article");
-    card.className = "service-shop-card";
+    card.className = "service-shop-card visual-card item-card equipment-service-card";
+    applyGradeFrame(card, item.grade);
 
+    const visual = createLocalIcon(
+      definition.icon,
+      definition.name + " icon",
+      "item-card-icon",
+    );
+    const cardBody = document.createElement("div");
+    cardBody.className = "item-card-body";
+
+    const titleRow = document.createElement("div");
+    titleRow.className = "item-card-meta";
+    const gradeBadge = createGradeBadge(item.grade);
     const title = document.createElement("strong");
     title.textContent =
       definition.name +
-      " · " +
-      gradeLabel(item.grade).toUpperCase() +
       " +" +
       String(item.enhancement);
+    titleRow.append(gradeBadge, title);
 
     const detail = document.createElement("small");
     const affixText =
@@ -5469,14 +5496,18 @@ function renderServiceShop(): void {
       alloyCost === null ||
       credits < (cost ?? 0) ||
       expansionCurrencies.alloy < (alloyCost ?? 0);
-    button.textContent =
-      cost === null || alloyCost === null
-        ? "Max +5"
-        : "Upgrade · " +
-          cost.toLocaleString() +
-          " Credits + " +
-          alloyCost.toLocaleString() +
-          " Alloy";
+    if (cost === null || alloyCost === null) {
+      button.textContent = "Max +5";
+    } else {
+      setCurrencyButton(
+        button,
+        "Upgrade",
+        {
+          credits: cost,
+          alloy: alloyCost,
+        },
+      );
+    }
 
     button.addEventListener("click", () => {
       const result = buyEquipmentUpgrade(
@@ -5524,9 +5555,11 @@ function renderServiceShop(): void {
       const evolve = document.createElement("button");
       evolve.type = "button";
       evolve.disabled = !canAffordUpgradeCost(evolutionCost);
-      evolve.textContent =
-        "Evolve grade · " +
-        upgradeCostText(evolutionCost);
+      setCurrencyButton(
+        evolve,
+        "Evolve grade",
+        evolutionCost,
+      );
       evolve.addEventListener("click", () => {
         commitUpgradeService(
           buyEquipmentEvolution(
@@ -5556,13 +5589,14 @@ function renderServiceShop(): void {
       const rollAffix = document.createElement("button");
       rollAffix.type = "button";
       rollAffix.disabled = !canAffordUpgradeCost(affixCost);
-      rollAffix.textContent =
+      setCurrencyButton(
+        rollAffix,
         "Roll affix " +
-        String(affixCount + 1) +
-        "/" +
-        String(maxAffixes) +
-        " · " +
-        upgradeCostText(affixCost);
+          String(affixCount + 1) +
+          "/" +
+          String(maxAffixes),
+        affixCost,
+      );
       rollAffix.addEventListener("click", () => {
         commitUpgradeService(
           buyEquipmentAffix(
@@ -5587,9 +5621,11 @@ function renderServiceShop(): void {
       const reroll = document.createElement("button");
       reroll.type = "button";
       reroll.disabled = !canAffordUpgradeCost(rerollCost);
-      reroll.textContent =
-        "Reroll first affix · others locked · " +
-        upgradeCostText(rerollCost);
+      setCurrencyButton(
+        reroll,
+        "Reroll first affix · others locked",
+        rerollCost,
+      );
       reroll.addEventListener("click", () => {
         commitUpgradeService(
           buyEquipmentAffixReroll(
@@ -5616,17 +5652,19 @@ function renderServiceShop(): void {
       equipment.loadout[definition.slot] === item.instanceId;
     const salvage = dismantleReward(item);
     dismantle.disabled = equipped;
-    dismantle.textContent =
-      equipped
-        ? "Dismantle · unequip first"
-        : "Dismantle · +" +
-          salvage.alloy.toLocaleString() +
-          " Alloy" +
-          (salvage.starCrystal > 0
-            ? " + " +
-              salvage.starCrystal.toLocaleString() +
-              " Star Crystal"
-            : "");
+    if (equipped) {
+      dismantle.textContent = "Dismantle · unequip first";
+    } else {
+      setCurrencyButton(
+        dismantle,
+        "Dismantle",
+        {
+          alloy: salvage.alloy,
+          starCrystal: salvage.starCrystal,
+        },
+        { signed: true },
+      );
+    }
     dismantle.addEventListener("click", () => {
       commitUpgradeService(
         dismantleEquipment(
