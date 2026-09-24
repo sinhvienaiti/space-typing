@@ -1,4 +1,4 @@
-import { typingText } from "../typing-text";
+import { typingText } from "../logic";
 import type { VocabularyEntry } from "../types";
 
 export const MAX_STAGE_WORD_ATTEMPTS = 600;
