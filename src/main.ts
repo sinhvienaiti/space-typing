@@ -139,7 +139,10 @@ import {
   removeItem,
 } from "./items/inventory";
 import type { Inventory } from "./items/inventory";
-import type { RecoveryItemId } from "./items/consumables";
+import {
+  COMBAT_CONSUMABLE_IDS,
+  type CombatConsumableId,
+} from "./items/consumables";
 import { getItemDefinition } from "./items/registry";
 import {
   addCredits,
@@ -2281,7 +2284,7 @@ function renderAllSkills(): void {
   renderHotbar();
 }
 
-function useInventoryItem(id: RecoveryItemId): void {
+function useInventoryItem(id: CombatConsumableId): void {
   if (itemCount(inventory, id) <= 0) return;
   if (!game.useConsumable(id)) {
     showNotice("Item not needed right now");
@@ -2327,9 +2330,9 @@ function activateHotbarSlot(index: number): void {
 
 function hotbarCandidateActions(): HotbarAction[] {
   const actions: HotbarAction[] = [
-    { kind: "item", id: "repair-kit" },
-    { kind: "item", id: "shield-cell" },
-    { kind: "item", id: "energy-cell" },
+    ...COMBAT_CONSUMABLE_IDS.map(
+      (id): HotbarAction => ({ kind: "item", id }),
+    ),
     ...DEFENSIVE_SKILLS.map(
       (skill): HotbarAction => ({
         kind: "skill",
