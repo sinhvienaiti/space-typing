@@ -264,3 +264,24 @@ Review findings explicitly *not* treated as removable features:
 Automated acceptance for this review is the full child CI, including unit/runtime tests, TypeScript, production build, bundle guard, Ship V3 guard and audio asset guard.
 
 Real browser/audio M22 acceptance remains pending and must still validate perceived motion smoothness, pronunciation priority, long-session audio lifecycle, UI readability and measured frame-time gates on actual hardware.
+
+
+## 15. Post-T16 HUD / route review checkpoint — 2026-09-24
+
+A follow-up source review after T16 found additional avoidable UI/main-thread work and one route-action clarity issue.
+
+Confirmed fixes in this pass:
+
+- Combat Hotbar DOM nodes are created and cached once instead of querying all nine buttons and their three descendants every 150 ms.
+- Hotbar render state now uses a stable signature so unchanged slots do not receive repeated text/class/title/disabled writes.
+- Boss stagger no longer emits DOM HUD updates every simulation frame. The Canvas stagger ring still reads the live runtime timer each frame; the HUD is updated when stagger begins through the existing action event and again when stagger ends.
+- Boss HUD text, HP width and hidden-state changes now use the existing guarded HUD write helpers.
+- Route Map separates optional Shop/Station services from the primary encounter navigation and labels them as optional, reducing the earlier ambiguity around multiple action buttons.
+- The Start Encounter action now names the actual target Stage.
+
+No enemy count, projectile count, particle count, animation, boss mechanic, audio layer or curriculum content is removed or reduced.
+
+Regression coverage:
+- Test Lab verifies that a staggered boss does not spam boss-HUD callbacks during simulation and emits the end-state update once.
+
+Remaining acceptance is still the real-browser M22 gate: visual readability, perceived motion smoothness, actual device frame-time evidence and real audio-output listening.
