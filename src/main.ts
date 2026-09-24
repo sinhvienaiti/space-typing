@@ -4018,6 +4018,97 @@ function leaveReviewMode(): void {
   renderGameplayMode();
 }
 
+async function applySpaceReviewDataset(data: unknown): Promise<void> {
+  const raw =
+    data !== null && typeof data === "object"
+      ? (data as Record<string, unknown>)
+      : null;
+  const fallbackRequestId =
+    raw !== null && typeof raw["requestId"] === "string"
+      ? raw["requestId"].slice(0, 100)
+      : "invalid";
+
+  try {
+    const dataset = parseSpaceReviewDataset(data);
+    if (dataset === null) return;
+
+    const index = vocabularyIndex ?? (await loadVocabularyIndex());
+    vocabularyIndex = index;
+    const loaded = await loadVocabularyKeys(dataset.entityIds, index);
+    if (loaded.entries.length !== dataset.entityIds.length) {
+      throw new Error(
+        "Shared vocabulary could not resolve every Space Smart Review item.",
+      );
+    }
+
+    if (gameplayModeBeforeReview === null) {
+      gameplayModeBeforeReview = gameplayMode;
+    }
+
+    activeReviewGoal = dataset.goal;
+    activeReviewVocabulary = loaded.entries;
+    activeReviewLevel = loaded.representativeLevel;
+    gameplayMode =
+      dataset.goal === "remember-words" ? "recall" : "combat";
+
+    if (game.getPhase() !== "title") {
+      game.backToTitle();
+    }
+    game.setVocabulary(activeReviewVocabulary);
+    game.setVocabularyLevel(activeReviewLevel);
+    renderGameplayMode();
+
+    window.parent.postMessage(
+      {
+        type: REVIEW_READY_MESSAGE,
+        requestId: dataset.requestId,
+        result: {
+          items: activeReviewVocabulary.length,
+          goal: dataset.goal,
+          gameplayMode,
+          vocabularyLevel: activeReviewLevel,
+        },
+      },
+      PARENT_ORIGIN,
+    );
+
+    showNotice(
+      "Smart Review ready · " +
+        String(activeReviewVocabulary.length) +
+        " selected words · press Continue",
+    );
+  } catch (error) {
+    leaveReviewMode();
+    if (window.parent !== window) {
+      window.parent.postMessage(
+        {
+          type: REVIEW_ERROR_MESSAGE,
+          requestId: fallbackRequestId,
+          message:
+            error instanceof Error
+              ? error.message
+              : "Space Smart Review dataset failed",
+        },
+        PARENT_ORIGIN,
+      );
+    }
+  }
+}
+
+window.addEventListener("message", (event: MessageEvent<unknown>) => {
+  if (
+    event.source !== window.parent ||
+    event.origin !== PARENT_ORIGIN ||
+    event.data === null ||
+    typeof event.data !== "object"
+  ) {
+    return;
+  }
+  const data = event.data as Record<string, unknown>;
+  if (data["type"] !== REVIEW_DATASET_MESSAGE) return;
+  void applySpaceReviewDataset(event.data);
+});
+
 const game = new Game(
   byId<HTMLCanvasElement>("gameCanvas"),
   [],
@@ -7731,12 +7822,24 @@ function renderGameplayMode(): void {
   const recall = gameplayMode === "recall";
   byId<HTMLButtonElement>("combatModeButton").classList.toggle("primary", !recall);
   byId<HTMLButtonElement>("recallModeButton").classList.toggle("primary", recall);
-  byId("titleModeMeta").textContent = recall
-    ? "Recall · hear, remember, type"
-    : "Combat · see, type, shoot";
-  byId("titleModeIntro").textContent = recall
-    ? "Hear, recall and type before contact."
-    : "See words, type, shoot, keep the streak.";
+  byId("titleModeMeta").textContent =
+    activeReviewGoal === undefined
+      ? recall
+        ? "Recall · hear, remember, type"
+        : "Combat · see, type, shoot"
+      : "Smart Review · " +
+        activeReviewGoal.replaceAll("-", " ") +
+        " · " +
+        String(activeReviewVocabulary.length) +
+        " selected words";
+  byId("titleModeIntro").textContent =
+    activeReviewGoal === undefined
+      ? recall
+        ? "Hear, recall and type before contact."
+        : "See words, type, shoot, keep the streak."
+      : recall
+        ? "Smart Review Recall · use the campaign combat flow with the selected review vocabulary."
+        : "Smart Review Combat · campaign systems stay active while the selected review vocabulary drives spawns.";
   game.setGameplayMode(gameplayMode, recallSettings);
   updateCampaignUi();
   renderRecallAssistUi();
@@ -7744,6 +7847,7 @@ function renderGameplayMode(): void {
 
 function selectGameplayMode(mode: GameplayMode): void {
   if (game.getPhase() === "playing") return;
+  leaveReviewMode();
   gameplayMode = mode;
   saveRecallPreferences();
   stopSpeech();
