@@ -22,6 +22,7 @@ import {
 } from "./assets/pipeline";
 import { difficultyFor } from "./campaign/difficulty";
 import { journeyNodesForStage, journeyPath } from "./campaign/journey-map";
+import type { StagePacingPhase } from "./campaign/stage-pacing";
 import { selectCompletedStageForReplay } from "./campaign/replay";
 import {
   difficultyModeDefinition,
@@ -1562,6 +1563,7 @@ let equipmentDropCounter = 0;
 let shopPurchaseCounter = 0;
 let currentShopType: ShopType = "black-market";
 let lastHudShield: number | null = null;
+let currentStagePhaseDisplay: StagePacingPhase | null = null;
 const hudDomMetrics = {
   renderCalls: 0,
   attemptedWrites: 0,
@@ -2027,7 +2029,7 @@ function renderStats(stats: GameStats): void {
     accuracyPercent(stats.hits, stats.misses).toFixed(1) + "%",
   );
   hudText("kills", String(stats.kills));
-  hudText("waveBadge", "stage " + String(stats.stage).padStart(3, "0"));
+  hudText("waveBadge", stageBadgeText(stats.stage));
 
   hudText(
     "hull",
@@ -2502,9 +2504,38 @@ function renderPhase(phase: GamePhase): void {
   updateKillTranslationVisibility(phase);
 }
 
+function stageBadgeText(stage: number): string {
+  const base = "stage " + String(stage).padStart(3, "0");
+  if (currentStagePhaseDisplay === null) return base;
+  return (
+    base +
+    " · wave " +
+    String(currentStagePhaseDisplay.index + 1) +
+    "/" +
+    String(currentStagePhaseDisplay.count)
+  );
+}
+
 function renderStage(stage: number): void {
+  currentStagePhaseDisplay = null;
   const badge = byId("waveBadge");
-  badge.textContent = "stage " + String(stage).padStart(3, "0");
+  badge.textContent = stageBadgeText(stage);
+  badge.title = "";
+  badge.classList.remove("pulse");
+  void badge.offsetWidth;
+  badge.classList.add("pulse");
+}
+
+function renderStagePhase(phase: StagePacingPhase): void {
+  currentStagePhaseDisplay = phase;
+  const badge = byId("waveBadge");
+  const stage = game.getStats().stage;
+  badge.textContent = stageBadgeText(stage);
+  badge.title =
+    phase.label +
+    " · " +
+    String(phase.budget) +
+    " scheduled enemies in this wave";
   badge.classList.remove("pulse");
   void badge.offsetWidth;
   badge.classList.add("pulse");
@@ -3701,6 +3732,7 @@ const game = new Game(
       renderStage(stage);
       codex = discoverCodexWorld(codex, worldForStage(stage).id).state;
     },
+    onStagePhase: renderStagePhase,
     onStageEvents: renderStageEvents,
     onObjectiveUpdate: renderObjective,
     onStatuses: renderStatuses,
