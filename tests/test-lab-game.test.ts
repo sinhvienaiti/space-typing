@@ -246,6 +246,35 @@ describe("M21 gated Game Test Lab API", () => {
     game.destroy();
   });
 
+  it("does not emit boss HUD updates every frame while staggered", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 20);
+    expect(game.testLabSpawnBoss()).toBe(true);
+
+    const onBossUpdate = vi.fn();
+    const runtime = game as unknown as {
+      hooks: { onBossUpdate: (boss: unknown) => void };
+      boss: {
+        staggerTimer: number;
+        typingMechanic?: unknown;
+      } | null;
+    };
+    runtime.hooks.onBossUpdate = onBossUpdate;
+    expect(runtime.boss).not.toBeNull();
+    runtime.boss!.typingMechanic = undefined;
+    runtime.boss!.staggerTimer = 1;
+    onBossUpdate.mockClear();
+
+    game.testLabAdvanceSimulation(0.5, 1 / 120);
+    expect(onBossUpdate).not.toHaveBeenCalled();
+
+    game.testLabAdvanceSimulation(0.55, 1 / 120);
+    expect(onBossUpdate).toHaveBeenCalledTimes(1);
+
+    game.destroy();
+  });
+
   it("applies Custom hostile bullet velocity to boss projectiles too", () => {
     const game = createTestGame();
     game.setTestLabMode(true);
