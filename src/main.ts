@@ -1678,7 +1678,7 @@ function installMenuHelp(): void {
     equipmentButton: ["Equipment", "Review equipped gear, drops and combat attributes."],
     supportButton: ["Support Spells", "Assign the support spells available during combat."],
     hotbarButton: ["Hotbar", "Assign skills and consumables to combat shortcuts."],
-    vocabularyButton: ["Vocabulary", "Select a shared level, learning topic or custom English list."],
+    vocabularyButton: ["Vocabulary", "Select a shared level, topic, word type, grammar practice set or custom English list."],
     progressionButton: ["Missions", "Review progression objectives and claim earned rewards."],
     codexButton: ["Codex", "See discovered enemies, Worlds and reward records."],
     settingsButton: ["Settings", "Configure game audio, speech, display quality and controls."],
@@ -7979,23 +7979,30 @@ async function importSaveFile(file: File): Promise<void> {
   }
 }
 
+async function populateActiveVocabularySource(): Promise<void> {
+  if (sourceTab === "class") {
+    await populateLevels();
+  } else if (sourceTab === "topic") {
+    await populateTopics();
+  } else if (sourceTab === "word-type") {
+    await populateWordTypes();
+  } else if (sourceTab === "grammar") {
+    await populateGrammar();
+  }
+}
+
 async function openVocabulary(): Promise<void> {
   sourceTab = sourceState.mode;
   renderSourceTabs();
   try {
-    await Promise.all([
-      populateLevels(),
-      populateTopics(),
-      populateWordTypes(),
-      populateGrammar(),
-    ]);
+    await populateActiveVocabularySource();
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Unable to load learning sources.";
-    byId("levelMeta").textContent = message;
-    byId("topicMeta").textContent = message;
-    byId("wordTypeMeta").textContent = message;
-    byId("grammarMeta").textContent = message;
+      error instanceof Error ? error.message : "Unable to load learning source.";
+    if (sourceTab === "class") byId("levelMeta").textContent = message;
+    if (sourceTab === "topic") byId("topicMeta").textContent = message;
+    if (sourceTab === "word-type") byId("wordTypeMeta").textContent = message;
+    if (sourceTab === "grammar") byId("grammarMeta").textContent = message;
   }
   vocabularyDialog.showModal();
 }
