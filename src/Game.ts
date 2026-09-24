@@ -2690,10 +2690,6 @@ export class Game {
     this.stagePhaseBreakArmed = false;
     this.spawnRemaining = this.stagePacingPlan.totalBudget;
     this.spawnTimer = 0.3;
-    const openingPhase = this.currentStagePacingPhase();
-    if (openingPhase !== null) {
-      this.hooks.onStagePhase?.({ ...openingPhase });
-    }
     this.eliteSpawned = 0;
     this.boss = null;
     this.bossHudTimer = 0;
@@ -2731,6 +2727,10 @@ export class Game {
     this.hooks.onPhase(this.phase);
     this.hooks.onStats(this.getStats());
     this.hooks.onStage(stage.stage);
+    const openingPhase = this.currentStagePacingPhase();
+    if (openingPhase !== null) {
+      this.hooks.onStagePhase?.({ ...openingPhase });
+    }
   }
 
   reviveCurrentEncounter(): boolean {
