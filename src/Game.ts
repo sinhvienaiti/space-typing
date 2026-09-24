@@ -3470,8 +3470,15 @@ export class Game {
     }
 
     if (boss.staggerTimer > 0) {
+      const wasStaggered = boss.staggerTimer > 0;
       boss.staggerTimer = Math.max(0, boss.staggerTimer - dt);
-      this.hooks.onBossUpdate(toBossHud(boss));
+      // The Canvas stagger ring reads the runtime timer directly. The DOM HUD
+      // only needs an update when STAGGER ends; emitting every simulation frame
+      // caused unnecessary layout/text work during one of the busiest boss
+      // presentation moments.
+      if (wasStaggered && boss.staggerTimer <= 0) {
+        this.hooks.onBossUpdate(toBossHud(boss));
+      }
       return;
     }
 
