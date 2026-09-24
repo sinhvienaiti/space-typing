@@ -100,5 +100,5 @@ export function currencyAccessibleText(
     .map((chip) =>
       prefix + chip.amount.toLocaleString() + " " + chip.label,
     )
-    .join(" + ");
+    .join(options.signed === true ? " · " : " + ");
 }
