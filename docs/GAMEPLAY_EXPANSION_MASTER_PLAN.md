@@ -3335,7 +3335,18 @@ Validation at code-complete HEAD before this documentation checkpoint: CI #674 P
 
 ## M24 — Review Pass #2
 
-Repeat from a fresh perspective and fix all findings.
+**Status: COMPLETE (2026-09-24).** PR #113.
+
+Fresh review concentrated on Recall event contracts and assist/audio separation after the first pass.
+
+Finding fixed:
+
+- Recall prompt activation incorrectly used `autoPronounce` to gate the whole `onRecallPrompt` lifecycle callback. With Auto Pronounce disabled, Game state still had a valid prompt but Replay/Hint UI refresh could wait for an unrelated render.
+- Enemy and boss Recall activation now always emits the semantic prompt event. The UI integration alone decides whether to invoke TTS, so Auto Pronounce now controls speech only.
+- Manual Replay remains available and speaks on demand even when automatic pronunciation is disabled.
+- Regression coverage verifies prompt lifecycle still fires with Auto Pronounce OFF.
+
+Validation before documentation checkpoint: CI #678 PASS · 149/149 test files · 752/752 tests · TypeScript/build/audio guard/bundle/Ship V3 guards PASS · JS 649.80 KiB raw / 173.11 KiB gzip · CSS 60.00 KiB raw / 13.67 KiB gzip.
 
 ## M25 — Parent integration pin
 

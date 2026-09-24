@@ -3801,3 +3801,13 @@ No recovery rules, item counts, Campaign progression, checkpoint semantics or ga
 - Reviewed the production update loop for new Recall hot-path collection/storage work; no unbounded per-frame sort/filter/map/JSON/localStorage path was introduced.
 - CI #674 PASS at code-complete HEAD: 149 files / 751 tests; TypeScript, production build, audio guard, Ship V3 guard and unchanged bundle limits all pass. JS 649.85 KiB raw / 173.11 KiB gzip; CSS 60.00 KiB raw / 13.67 KiB gzip.
 - Next roadmap milestone after merge: M24 Review Pass #2 from a fresh perspective.
+
+
+## 2026-09-24 — M24 Review Pass #2 COMPLETE
+
+- PR #113 completes the second independent review.
+- Fixed Recall event/TTS coupling: enemy and boss prompt activation now always emits `onRecallPrompt`; `main.ts` uses `recallSettings.autoPronounce` only to decide whether to call speech.
+- This keeps Replay/Hint assist UI synchronized even when automatic pronunciation is disabled, while preserving manual Replay behavior.
+- Regression coverage added for Auto Pronounce OFF prompt lifecycle.
+- CI #678 PASS: 149 files / 752 tests; TypeScript, production build, audio guard, Ship V3 guard and unchanged bundle limits pass. JS 649.80 KiB raw / 173.11 KiB gzip; CSS 60.00 KiB raw / 13.67 KiB gzip.
+- Next roadmap milestone after merge: M25 parent integration pin in `sinhvienaiti/typing-game`.

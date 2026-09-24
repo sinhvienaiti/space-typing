@@ -173,6 +173,33 @@ describe("M21 gated Game Test Lab API", () => {
     game.destroy();
   });
 
+  it("emits Recall prompt lifecycle with auto pronunciation disabled", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    game.setGameplayMode("recall", {
+      ...DEFAULT_RECALL_SETTINGS,
+      autoPronounce: false,
+    });
+    start(game, 900);
+    game.testLabSetSchedulerFrozen(true);
+
+    const onRecallPrompt = vi.fn();
+    const runtime = game as unknown as {
+      hooks: {
+        onRecallPrompt?: (entry: VocabularyEntry) => void;
+      };
+    };
+    runtime.hooks.onRecallPrompt = onRecallPrompt;
+
+    expect(game.testLabSpawnEnemies({ kind: "scout", count: 1 })).toHaveLength(1);
+    expect(onRecallPrompt).toHaveBeenCalledTimes(1);
+    expect(onRecallPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ en: expect.any(String) }),
+    );
+    expect(game.getRecallPrompt()).not.toBeNull();
+    game.destroy();
+  });
+
   it("keeps Recall typed kills sequential, projectile-free and free of Combat translation echo", () => {
     const game = createTestGame();
     game.setTestLabMode(true);
