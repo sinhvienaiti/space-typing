@@ -73,9 +73,9 @@ describe("runtime difficulty settings", () => {
       customFireRate: 0.1,
       customSpawnRate: 100,
     });
-    expect(state.customEnemySpeed).toBe(0.45);
+    expect(state.customEnemySpeed).toBe(0.1);
     expect(state.customBulletSpeed).toBe(1.65);
-    expect(state.customFireRate).toBe(0.4);
+    expect(state.customFireRate).toBe(0.1);
     expect(state.customSpawnRate).toBe(1.45);
     const copy = sanitizeDifficultySettings(JSON.parse(JSON.stringify(state)));
     expect(copy).toEqual(state);

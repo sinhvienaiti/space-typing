@@ -78,13 +78,13 @@ export function sanitizeDifficultySettings(
         ? clamp(raw.customPressure, 0.7, 1.45)
         : fallback.customPressure,
     customEnemySpeed: typeof raw.customEnemySpeed === "number" && Number.isFinite(raw.customEnemySpeed)
-      ? clamp(raw.customEnemySpeed, 0.45, 1.65) : fallback.customEnemySpeed,
+      ? clamp(raw.customEnemySpeed, 0.1, 1.65) : fallback.customEnemySpeed,
     customBulletSpeed: typeof raw.customBulletSpeed === "number" && Number.isFinite(raw.customBulletSpeed)
-      ? clamp(raw.customBulletSpeed, 0.45, 1.65) : fallback.customBulletSpeed,
+      ? clamp(raw.customBulletSpeed, 0.1, 1.65) : fallback.customBulletSpeed,
     customFireRate: typeof raw.customFireRate === "number" && Number.isFinite(raw.customFireRate)
-      ? clamp(raw.customFireRate, 0.4, 1.6) : fallback.customFireRate,
+      ? clamp(raw.customFireRate, 0.1, 1.6) : fallback.customFireRate,
     customSpawnRate: typeof raw.customSpawnRate === "number" && Number.isFinite(raw.customSpawnRate)
-      ? clamp(raw.customSpawnRate, 0.55, 1.45) : fallback.customSpawnRate,
+      ? clamp(raw.customSpawnRate, 0.1, 1.45) : fallback.customSpawnRate,
     profile: sanitizeAdaptiveProfile(raw.profile),
   };
 }

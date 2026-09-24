@@ -351,6 +351,7 @@ import {
   assignHotbarSlot,
   createDefaultHotbarState,
   hotbarActionKey,
+  hotbarPlacementForSlot,
   hotbarSlotForKey,
   type HotbarAction,
   type HotbarState,
@@ -586,7 +587,6 @@ app.innerHTML = `
     </div>
 
     <aside id="playerStatusHud" class="player-status-hud hidden" aria-label="Player status">
-      <canvas id="playerStatusPortrait" class="player-status-portrait" width="84" height="64" aria-hidden="true"></canvas>
       <div class="player-status-body">
         <div class="player-status-head">
           <strong id="playerStatusName">Vanguard</strong>
@@ -1377,28 +1377,28 @@ app.innerHTML = `
           <label class="setting-row">
             <span><strong>Enemy movement</strong><small>How quickly enemies approach the player</small></span>
             <span class="setting-control range-control">
-              <input id="customEnemySpeed" type="range" min="0.45" max="1.65" step="0.05" />
+              <input id="customEnemySpeed" type="range" min="0.10" max="1.65" step="0.05" />
               <output id="customEnemySpeedValue">1.00×</output>
             </span>
           </label>
           <label class="setting-row">
             <span><strong>Hostile bullet speed</strong><small>Projectile travel time, separate from fire frequency</small></span>
             <span class="setting-control range-control">
-              <input id="customBulletSpeed" type="range" min="0.45" max="1.65" step="0.05" />
+              <input id="customBulletSpeed" type="range" min="0.10" max="1.65" step="0.05" />
               <output id="customBulletSpeedValue">1.00×</output>
             </span>
           </label>
           <label class="setting-row">
             <span><strong>Enemy fire / skill rate</strong><small>Lower values give more time between hostile attacks</small></span>
             <span class="setting-control range-control">
-              <input id="customFireRate" type="range" min="0.4" max="1.6" step="0.05" />
+              <input id="customFireRate" type="range" min="0.10" max="1.6" step="0.05" />
               <output id="customFireRateValue">1.00×</output>
             </span>
           </label>
           <label class="setting-row">
             <span><strong>Enemy spawn rate</strong><small>Total stage count stays the same; adjusts arrival pacing</small></span>
             <span class="setting-control range-control">
-              <input id="customSpawnRate" type="range" min="0.55" max="1.45" step="0.05" />
+              <input id="customSpawnRate" type="range" min="0.10" max="1.45" step="0.05" />
               <output id="customSpawnRateValue">1.00×</output>
             </span>
           </label>
@@ -1494,6 +1494,13 @@ let equipmentDropCounter = 0;
 let shopPurchaseCounter = 0;
 let currentShopType: ShopType = "black-market";
 let lastHudShield: number | null = null;
+const hudDomMetrics = {
+  renderCalls: 0,
+  attemptedWrites: 0,
+  appliedWrites: 0,
+  totalRenderMs: 0,
+  maxRenderMs: 0,
+};
 let sourceState = loadSource();
 let sourceTab: "class" | "custom" = sourceState.mode;
 let vocabularyIndex: VocabularyIndex | null = null;
@@ -1916,24 +1923,58 @@ function refreshPersistentStateUi(): void {
   updateDataSummary();
 }
 
-function renderStats(stats: GameStats): void {
-  byId("score").textContent = stats.score.toLocaleString();
-  byId("streak").textContent = String(stats.streak);
-  byId("multiplier").textContent = "x" + String(stats.multiplier);
-  byId("accuracy").textContent =
-    accuracyPercent(stats.hits, stats.misses).toFixed(1) + "%";
-  byId("kills").textContent = String(stats.kills);
-  byId("waveBadge").textContent =
-    "stage " + String(stats.stage).padStart(3, "0");
+function hudText(id: string, value: string): void {
+  hudDomMetrics.attemptedWrites += 1;
+  const element = byId(id);
+  if (element.textContent === value) return;
+  element.textContent = value;
+  hudDomMetrics.appliedWrites += 1;
+}
 
-  byId("hull").textContent =
-    String(Math.ceil(stats.hull)) + " / " + String(Math.ceil(stats.maxHull));
-  byId("shield").textContent =
-    String(Math.ceil(stats.shield)) + " / " + String(Math.ceil(stats.maxShield));
-  byId("energyText").textContent =
+function hudWidth(id: string, value: string): void {
+  hudDomMetrics.attemptedWrites += 1;
+  const element = byId<HTMLElement>(id);
+  if (element.style.width === value) return;
+  element.style.width = value;
+  hudDomMetrics.appliedWrites += 1;
+}
+
+function hudClass(id: string, className: string, enabled: boolean): void {
+  hudDomMetrics.attemptedWrites += 1;
+  const element = byId(id);
+  if (element.classList.contains(className) === enabled) return;
+  element.classList.toggle(className, enabled);
+  hudDomMetrics.appliedWrites += 1;
+}
+
+function renderStats(stats: GameStats): void {
+  const startedAt = performance.now();
+  hudDomMetrics.renderCalls += 1;
+
+  hudText("score", stats.score.toLocaleString());
+  hudText("streak", String(stats.streak));
+  hudText("multiplier", "x" + String(stats.multiplier));
+  hudText(
+    "accuracy",
+    accuracyPercent(stats.hits, stats.misses).toFixed(1) + "%",
+  );
+  hudText("kills", String(stats.kills));
+  hudText("waveBadge", "stage " + String(stats.stage).padStart(3, "0"));
+
+  hudText(
+    "hull",
+    String(Math.ceil(stats.hull)) + " / " + String(Math.ceil(stats.maxHull)),
+  );
+  hudText(
+    "shield",
+    String(Math.ceil(stats.shield)) + " / " + String(Math.ceil(stats.maxShield)),
+  );
+  hudText(
+    "energyText",
     String(Math.ceil(stats.energy)) +
-    " / " +
-    String(Math.ceil(stats.maxEnergy));
+      " / " +
+      String(Math.ceil(stats.maxEnergy)),
+  );
 
   const hullPercent =
     stats.maxHull <= 0 ? 0 : Math.max(0, Math.min(100, stats.hull / stats.maxHull * 100));
@@ -1941,10 +1982,10 @@ function renderStats(stats: GameStats): void {
     stats.maxShield <= 0 ? 0 : Math.max(0, Math.min(100, stats.shield / stats.maxShield * 100));
   const energyPercent =
     stats.maxEnergy <= 0 ? 0 : Math.max(0, Math.min(100, stats.energy / stats.maxEnergy * 100));
-  byId("hullFill").style.width = hullPercent.toFixed(2) + "%";
-  byId("hullDamageFill").style.width = hullPercent.toFixed(2) + "%";
-  byId("shieldFill").style.width = shieldPercent.toFixed(2) + "%";
-  byId("energyFill").style.width = energyPercent.toFixed(2) + "%";
+  hudWidth("hullFill", hullPercent.toFixed(2) + "%");
+  hudWidth("hullDamageFill", hullPercent.toFixed(2) + "%");
+  hudWidth("shieldFill", shieldPercent.toFixed(2) + "%");
+  hudWidth("energyFill", energyPercent.toFixed(2) + "%");
   const playerStatusHud = byId("playerStatusHud");
   if (
     lastHudShield !== null &&
@@ -1960,16 +2001,22 @@ function renderStats(stats: GameStats): void {
     );
   }
   lastHudShield = stats.shield;
-  playerStatusHud.classList.toggle("low-hull", hullPercent <= 25);
-  byId("playerStatusHud").classList.toggle("energy-low", energyPercent <= 20);
+  hudClass("playerStatusHud", "low-hull", hullPercent <= 25);
+  hudClass("playerStatusHud", "energy-low", energyPercent <= 20);
 
-  byId("powerFill").style.width = String(stats.power) + "%";
-  byId("powerFill").classList.toggle("ready", stats.power >= 100);
+  hudWidth("powerFill", String(stats.power) + "%");
+  hudClass("powerFill", "ready", stats.power >= 100);
   const ultimateName = getCharacter(characters.selected).ultimateName;
-  byId("powerHint").textContent =
+  hudText(
+    "powerHint",
     stats.power >= 100
       ? "RAGE FULL · " + ultimateName + " + NOVA"
-      : "RAGE " + Math.floor(stats.power) + "% · " + ultimateName;
+      : "RAGE " + Math.floor(stats.power) + "% · " + ultimateName,
+  );
+
+  const elapsed = performance.now() - startedAt;
+  hudDomMetrics.totalRenderMs += elapsed;
+  hudDomMetrics.maxRenderMs = Math.max(hudDomMetrics.maxRenderMs, elapsed);
 }
 
 function skillReasonText(reason: SkillBlockReason): string {
@@ -2117,7 +2164,8 @@ function ensureHotbarButtons(): HTMLButtonElement[] {
     for (let index = 0; index < 9; index += 1) {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "hotbar-slot";
+      button.className =
+        "hotbar-slot hotbar-" + hotbarPlacementForSlot(index);
       button.id = "hotbarSlot" + String(index + 1);
       button.innerHTML =
         "<kbd>" + String(index + 1) + "</kbd>" +
@@ -2351,20 +2399,6 @@ function renderPlayerStatusIdentity(): void {
   const progress = characters.progress[characters.selected];
   byId("playerStatusName").textContent = character.name;
   byId("playerStatusLevel").textContent = "Lv " + String(progress.level);
-
-  const canvas = byId<HTMLCanvasElement>("playerStatusPortrait");
-  const context = canvas.getContext("2d");
-  if (context !== null) {
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    drawCharacterShip(context, characters.selected, {
-      x: canvas.width / 2,
-      y: 35,
-      time: 0.8,
-      scale: 0.78,
-      glowScale: 0.7,
-      aura: deriveEquipmentAura(equipment, characters.selected),
-    });
-  }
 }
 
 function showNotice(message: string): void {
@@ -6771,7 +6805,22 @@ function updateDataSummary(): void {
         String(artCatalog.assets.size);
   const performance = game.getPerformanceReport();
   const render = game.getRenderDiagnostics();
-  byId("renderDiagnostics").textContent = performance.samples < 30
+  const hudAttempted = hudDomMetrics.attemptedWrites;
+  const hudApplied = hudDomMetrics.appliedWrites;
+  const hudAvoidedPercent =
+    hudAttempted <= 0
+      ? 0
+      : Math.round((1 - hudApplied / hudAttempted) * 100);
+  const hudAverageMs =
+    hudDomMetrics.renderCalls <= 0
+      ? 0
+      : hudDomMetrics.totalRenderMs / hudDomMetrics.renderCalls;
+  const hudDiagnostics =
+    " · HUD DOM " + hudApplied + "/" + hudAttempted +
+    " writes (" + hudAvoidedPercent + "% avoided)" +
+    " · HUD avg " + hudAverageMs.toFixed(3) + "ms" +
+    " · max " + hudDomMetrics.maxRenderMs.toFixed(3) + "ms";
+  byId("renderDiagnostics").textContent = (performance.samples < 30
     ? "Waiting for 30 measured frames"
     : performance.averageFps.toFixed(0) + " FPS · frame p95 " +
       performance.p95FrameMs.toFixed(1) + "ms · draw p95 " +
@@ -6779,7 +6828,8 @@ function updateDataSummary(): void {
       render.effectiveDpr.toFixed(2) + " · adaptive " +
       Math.round(render.adaptiveScale * 100) + "% · cached bodies " +
       render.bodySprites + " · " +
-      (render.canvasPixels / 1_000_000).toFixed(1) + "M px";
+      (render.canvasPixels / 1_000_000).toFixed(1) + "M px") +
+    hudDiagnostics;
   const performanceMeta =
     performance.samples < 30
       ? ""

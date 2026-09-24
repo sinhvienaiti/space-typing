@@ -28,6 +28,38 @@ export function enemyRankNumber(rank: EnemyRank): number {
   return ENEMY_RANKS.indexOf(rank) + 1;
 }
 
+export type EnemyRankVisualProfile = {
+  intensity: number;
+  glowScale: number;
+  lineWidthBoost: number;
+  auraAlpha: number;
+  auraRadiusScale: number;
+  accentColor: string;
+};
+
+export function enemyRankVisualProfile(
+  rank: EnemyRank,
+): EnemyRankVisualProfile {
+  const intensity = clamp((enemyRankNumber(rank) - 1) / 9, 0, 1);
+  const rankNumber = enemyRankNumber(rank);
+  const accentColor =
+    rankNumber >= 10
+      ? "#ff8fd8"
+      : rankNumber >= 7
+        ? "#ffd86f"
+        : rankNumber >= 4
+          ? "#a999ff"
+          : "#7edff3";
+  return {
+    intensity,
+    glowScale: 1 + intensity * 0.65,
+    lineWidthBoost: intensity * 1.5,
+    auraAlpha: 0.07 + intensity * 0.28,
+    auraRadiusScale: 1.12 + intensity * 0.18,
+    accentColor,
+  };
+}
+
 export function enemyRankForNumber(value: number): EnemyRank {
   const index = clamp(Math.floor(value), 1, 10) - 1;
   return ENEMY_RANKS[index] ?? "I";

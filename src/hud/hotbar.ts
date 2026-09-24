@@ -14,6 +14,15 @@ import {
 
 export const HOTBAR_SLOT_COUNT = 9;
 
+export type HotbarPlacement = "left" | "right" | "utility";
+
+export function hotbarPlacementForSlot(slotIndex: number): HotbarPlacement {
+  const index = Math.max(0, Math.min(HOTBAR_SLOT_COUNT - 1, Math.floor(slotIndex)));
+  if (index < 4) return "left";
+  if (index < 8) return "right";
+  return "utility";
+}
+
 export type CoreCombatSkillId = DefensiveSkillId | OffensiveSkillId;
 
 export type HotbarAction =
