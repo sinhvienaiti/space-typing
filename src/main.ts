@@ -425,7 +425,10 @@ import { speakEnglish, stopSpeech } from "./speech";
 import {
   loadVocabularyIndex,
   loadVocabularyLevel,
+  loadVocabularyTopic,
+  loadVocabularyTopicIndex,
   parseCustomVocabulary,
+  type VocabularyTopicIndex,
 } from "./vocabulary";
 import {
   loadTypingTextChallenge,
@@ -453,6 +456,7 @@ const CUSTOM_KEY = "spaceTypingCustomVocabularyV1";
 
 type VocabularySource =
   | { mode: "class"; level: number }
+  | { mode: "topic"; topicId: string; level: number }
   | { mode: "custom" };
 
 const defaultSettings: GameSettings = {
@@ -538,6 +542,15 @@ function loadSource(): VocabularySource {
     const parsed = JSON.parse(localStorage.getItem(SOURCE_KEY) ?? "") as VocabularySource;
     if (
       parsed.mode === "class" &&
+      Number.isInteger(parsed.level) &&
+      parsed.level >= 1
+    ) {
+      return parsed;
+    }
+    if (
+      parsed.mode === "topic" &&
+      typeof parsed.topicId === "string" &&
+      parsed.topicId.trim() !== "" &&
       Number.isInteger(parsed.level) &&
       parsed.level >= 1
     ) {
@@ -1208,6 +1221,7 @@ app.innerHTML = `
 
       <div class="source-tabs">
         <button id="sourceClass" type="button">Class</button>
+        <button id="sourceTopic" type="button">Topic</button>
         <button id="sourceCustom" type="button">Custom</button>
       </div>
 
@@ -1219,6 +1233,17 @@ app.innerHTML = `
         <div class="source-footer">
           <small id="levelMeta">Loading shared vocabulary…</small>
           <button id="applyLevel" class="primary" type="button">Use level</button>
+        </div>
+      </section>
+
+      <section id="topicPanel" class="source-panel hidden">
+        <label>
+          <span class="field-label">Learning topic</span>
+          <select id="topicSelect"></select>
+        </label>
+        <div class="source-footer">
+          <small id="topicMeta">Loading shared topics…</small>
+          <button id="applyTopic" class="primary" type="button">Use topic</button>
         </div>
       </section>
 
@@ -1574,8 +1599,9 @@ const hudDomMetrics = {
   maxRenderMs: 0,
 };
 let sourceState = loadSource();
-let sourceTab: "class" | "custom" = sourceState.mode;
+let sourceTab: "class" | "topic" | "custom" = sourceState.mode;
 let vocabularyIndex: VocabularyIndex | null = null;
+let vocabularyTopicIndex: VocabularyTopicIndex | null = null;
 let configuredVocabulary: VocabularyEntry[] = [];
 let artCatalog: ArtAssetCatalog | null = null;
 const typingChallengeCache = new Map<
@@ -1598,7 +1624,7 @@ function installMenuHelp(): void {
     equipmentButton: ["Equipment", "Review equipped gear, drops and combat attributes."],
     supportButton: ["Support Spells", "Assign the support spells available during combat."],
     hotbarButton: ["Hotbar", "Assign skills and consumables to combat shortcuts."],
-    vocabularyButton: ["Vocabulary", "Select your shared English-learning level or custom list."],
+    vocabularyButton: ["Vocabulary", "Select a shared level, learning topic or custom English list."],
     progressionButton: ["Missions", "Review progression objectives and claim earned rewards."],
     codexButton: ["Codex", "See discovered enemies, Worlds and reward records."],
     settingsButton: ["Settings", "Configure game audio, speech, display quality and controls."],
@@ -5964,7 +5990,9 @@ function openSpecialShop(kind: ShopType): void {
 }
 
 function selectedVocabularyLevel(): number {
-  return sourceState.mode === "class" ? sourceState.level : 1;
+  return sourceState.mode === "class" || sourceState.mode === "topic"
+    ? sourceState.level
+    : 1;
 }
 
 function typingChallengeKey(level: number, seed: number): string {
@@ -7387,10 +7415,17 @@ async function ensureVocabularyIndex(): Promise<VocabularyIndex> {
   return vocabularyIndex;
 }
 
+async function ensureVocabularyTopicIndex(): Promise<VocabularyTopicIndex> {
+  vocabularyTopicIndex ??= await loadVocabularyTopicIndex();
+  return vocabularyTopicIndex;
+}
+
 function renderSourceTabs(): void {
   byId("sourceClass").classList.toggle("active", sourceTab === "class");
+  byId("sourceTopic").classList.toggle("active", sourceTab === "topic");
   byId("sourceCustom").classList.toggle("active", sourceTab === "custom");
   byId("classPanel").classList.toggle("hidden", sourceTab !== "class");
+  byId("topicPanel").classList.toggle("hidden", sourceTab !== "topic");
   byId("customPanel").classList.toggle("hidden", sourceTab !== "custom");
   if (sourceTab === "custom") {
     byId<HTMLTextAreaElement>("customVocabulary").value =
@@ -7405,6 +7440,42 @@ function updateLevelMeta(): void {
     metadata === undefined
       ? ""
       : String(metadata.count) + " entries · " + metadata.label;
+}
+
+function updateTopicMeta(): void {
+  const topicId = byId<HTMLSelectElement>("topicSelect").value;
+  const metadata = vocabularyTopicIndex?.topics.find(
+    (item) => item.id === topicId,
+  );
+  byId("topicMeta").textContent =
+    metadata === undefined
+      ? ""
+      : String(metadata.count) +
+        " entries · " +
+        metadata.levels.join(" / ");
+}
+
+async function populateTopics(): Promise<void> {
+  const index = await ensureVocabularyTopicIndex();
+  const select = byId<HTMLSelectElement>("topicSelect");
+
+  if (select.options.length === 0) {
+    for (const topic of index.topics) {
+      const option = document.createElement("option");
+      option.value = topic.id;
+      option.textContent =
+        topic.group + " · " + topic.label + " · " + String(topic.count);
+      select.append(option);
+    }
+  }
+
+  if (sourceState.mode === "topic") {
+    select.value = sourceState.topicId;
+  }
+  if (select.value === "" && index.topics.length > 0) {
+    select.value = index.topics[0]?.id ?? "";
+  }
+  updateTopicMeta();
 }
 
 async function populateLevels(): Promise<void> {
@@ -7736,10 +7807,12 @@ async function openVocabulary(): Promise<void> {
   sourceTab = sourceState.mode;
   renderSourceTabs();
   try {
-    await populateLevels();
+    await Promise.all([populateLevels(), populateTopics()]);
   } catch (error) {
-    byId("levelMeta").textContent =
-      error instanceof Error ? error.message : "Unable to load levels.";
+    const message =
+      error instanceof Error ? error.message : "Unable to load learning sources.";
+    byId("levelMeta").textContent = message;
+    byId("topicMeta").textContent = message;
   }
   vocabularyDialog.showModal();
 }
@@ -7776,6 +7849,50 @@ async function applyClassLevel(level: number): Promise<void> {
   } finally {
     button.disabled = false;
     button.textContent = "Use level";
+  }
+}
+
+async function applyTopicVocabulary(topicId: string): Promise<void> {
+  const button = byId<HTMLButtonElement>("applyTopic");
+  button.disabled = true;
+  button.textContent = "Applying…";
+
+  try {
+    const [topics, levels] = await Promise.all([
+      ensureVocabularyTopicIndex(),
+      ensureVocabularyIndex(),
+    ]);
+    const loaded = await loadVocabularyTopic(topicId, topics, levels);
+
+    configuredVocabulary = loaded.entries;
+    typingChallengeCache.clear();
+    sourceState = {
+      mode: "topic",
+      topicId: loaded.topic.id,
+      level: loaded.representativeLevel,
+    };
+    sourceTab = "topic";
+    localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
+    game.setVocabulary(loaded.entries);
+    game.setVocabularyLevel(loaded.representativeLevel);
+    vocabularyDialog.close();
+
+    showNotice(
+      loaded.topic.label +
+        " applied · " +
+        String(loaded.entries.length) +
+        " entries · level profile " +
+        String(loaded.representativeLevel).padStart(3, "0"),
+    );
+  } catch (error) {
+    alert(
+      error instanceof Error
+        ? error.message
+        : "Unable to apply vocabulary topic.",
+    );
+  } finally {
+    button.disabled = false;
+    button.textContent = "Use topic";
   }
 }
 
@@ -7843,11 +7960,29 @@ async function loadInitialVocabulary(): Promise<void> {
     }
 
     const index = await ensureVocabularyIndex();
-    configuredVocabulary = await loadVocabularyLevel(
-      sourceState.level,
-      index,
-    );
-    game.setVocabulary(configuredVocabulary);
+    if (sourceState.mode === "topic") {
+      const topics = await ensureVocabularyTopicIndex();
+      const loaded = await loadVocabularyTopic(
+        sourceState.topicId,
+        topics,
+        index,
+      );
+      configuredVocabulary = loaded.entries;
+      sourceState = {
+        mode: "topic",
+        topicId: loaded.topic.id,
+        level: loaded.representativeLevel,
+      };
+      localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
+      game.setVocabulary(configuredVocabulary);
+      game.setVocabularyLevel(loaded.representativeLevel);
+    } else {
+      configuredVocabulary = await loadVocabularyLevel(
+        sourceState.level,
+        index,
+      );
+      game.setVocabulary(configuredVocabulary);
+    }
   } catch (error) {
     console.warn(
       "Shared vocabulary unavailable; using bundled fallback.",
@@ -8085,15 +8220,25 @@ byId("sourceClass").addEventListener("click", () => {
   void populateLevels();
 });
 
+byId("sourceTopic").addEventListener("click", () => {
+  sourceTab = "topic";
+  renderSourceTabs();
+  void populateTopics();
+});
+
 byId("sourceCustom").addEventListener("click", () => {
   sourceTab = "custom";
   renderSourceTabs();
 });
 
 byId("levelSelect").addEventListener("change", updateLevelMeta);
+byId("topicSelect").addEventListener("change", updateTopicMeta);
 
 byId("applyLevel").addEventListener("click", () => {
   void applyClassLevel(Number(byId<HTMLSelectElement>("levelSelect").value));
+});
+byId("applyTopic").addEventListener("click", () => {
+  void applyTopicVocabulary(byId<HTMLSelectElement>("topicSelect").value);
 });
 
 byId("saveCustom").addEventListener("click", () => {
