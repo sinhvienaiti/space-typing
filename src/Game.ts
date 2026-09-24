@@ -7238,9 +7238,7 @@ export class Game {
         age: time,
         flash: boss.flash,
         targeted: false,
-        glowScale:
-          qualityProfile(this.settings.visualQuality).glowScale *
-          rankVisual.glowScale,
+        glowScale: qualityProfile(this.settings.visualQuality).glowScale,
       }, this.modularBodyCache, this.dpr);
 
     if (!modularDrawn) {
@@ -7820,7 +7818,9 @@ export class Game {
         age: enemy.age,
         flash: enemy.flash,
         targeted,
-        glowScale: qualityProfile(this.settings.visualQuality).glowScale,
+        glowScale:
+          qualityProfile(this.settings.visualQuality).glowScale *
+          rankVisual.glowScale,
       }, this.modularBodyCache, this.dpr);
 
     if (!modularDrawn) {
