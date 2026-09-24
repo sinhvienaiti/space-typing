@@ -73,7 +73,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
     category: "consumable",
     maxStack: 10,
     combatUsable: true,
-    description: "High-impact emergency combat consumable.",
+    description: "Clears current hostile bullets and detonates a Nova pulse against active enemies and the boss.",
     grade: "copper",
   },
   "emp-charge": {
@@ -83,7 +83,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
     category: "consumable",
     maxStack: 10,
     combatUsable: true,
-    description: "Disrupts hostile projectile pressure.",
+    description: "Clears hostile bullets and delays enemy and boss attack timers.",
     grade: "copper",
   },
   "time-crystal": {
@@ -93,7 +93,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
     category: "special",
     maxStack: 10,
     combatUsable: true,
-    description: "Creates a short tactical time-control window.",
+    description: "Slows hostile simulation for a 5-second tactical window.",
     grade: "silver",
   },
   "word-bomb": {
@@ -103,7 +103,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
     category: "consumable",
     maxStack: 10,
     combatUsable: true,
-    description: "Typing-focused offensive consumable.",
+    description: "Destroys one active enemy without counting its word as typed or learned.",
     grade: "copper",
   },
   "supply-beacon": {
@@ -113,7 +113,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
     category: "supply",
     maxStack: 10,
     combatUsable: true,
-    description: "Requests an extra supply opportunity.",
+    description: "Immediately calls one Supply Pod when the battlefield allows it.",
     grade: "copper",
   },
   "lucky-dice": {
@@ -123,7 +123,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
     category: "special",
     maxStack: 10,
     combatUsable: true,
-    description: "Influences a future luck-based reward roll.",
+    description: "Raises pity for future Golden, Treasure, Choice and Anomaly reward rolls.",
     grade: "silver",
   },
   "salvage-anchor": {
