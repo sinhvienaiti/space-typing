@@ -5193,10 +5193,6 @@ function applyServiceShopState(
   updateDataSummary();
 }
 
-function upgradeCostText(cost: UpgradeCost): string {
-  return currencyAccessibleText(cost);
-}
-
 function canAffordUpgradeCost(cost: UpgradeCost): boolean {
   return (
     campaign.highestUnlockedStage >= cost.requiredStage &&
@@ -5932,8 +5928,6 @@ function handleHiddenEncounterClear(
       expansionCurrencies,
       reward.currencies,
     );
-    const currencyText =
-      expansionCurrencyRewardText(reward.currencies);
     rewardRelic =
       active.tier >= 2 ||
       active.kind === "hidden-world" ||
