@@ -205,19 +205,16 @@ describe("Batch D tactical consumable runtime", () => {
     const { game, hooks } = createTestGame();
     const internals = game as unknown as GameInternals;
 
+    const before = { ...internals.luckPity };
     expect(game.useConsumable("lucky-dice")).toBe(true);
-    expect(internals.luckPity).toEqual({
-      golden: 6,
-      treasure: 6,
-      choice: 6,
-      anomaly: 6,
-    });
-    expect(hooks.onLuckPityUpdate).toHaveBeenLastCalledWith({
-      golden: 6,
-      treasure: 6,
-      choice: 6,
-      anomaly: 6,
-    });
+    const expected = {
+      golden: Math.min(50, before.golden + 6),
+      treasure: Math.min(50, before.treasure + 6),
+      choice: Math.min(50, before.choice + 6),
+      anomaly: Math.min(50, before.anomaly + 6),
+    };
+    expect(internals.luckPity).toEqual(expected);
+    expect(hooks.onLuckPityUpdate).toHaveBeenLastCalledWith(expected);
     expect(game.getStageSessionSnapshot().consumablesUsed).toBe(1);
     game.destroy();
   });
