@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_RECALL_SETTINGS,
+  buildAdaptiveRecallVocabulary,
   canReplayRecall,
   initialRecallHintIndices,
   recallDifficultyProfile,
@@ -96,4 +97,47 @@ describe("Recall Mode contracts", () => {
     });
     expect(sanitizeRecallMemory(JSON.parse(JSON.stringify(next)))).toEqual(next);
   });
+
+  it("biases weak learned words without removing unseen vocabulary", () => {
+    const entries = [
+      { id: "a", en: "apple", vi: "táo", ipa: "" },
+      { id: "b", en: "brave", vi: "dũng cảm", ipa: "" },
+      { id: "c", en: "cloud", vi: "mây", ipa: "" },
+      { id: "d", en: "dream", vi: "giấc mơ", ipa: "" },
+    ];
+    const memory = {
+      a: {
+        entryId: "a",
+        attempts: 4,
+        completed: 1,
+        perfect: 0,
+        failed: 3,
+        hintsUsed: 3,
+        replaysUsed: 2,
+        totalResponseMs: 26000,
+        lastSeenAt: 1,
+      },
+      b: {
+        entryId: "b",
+        attempts: 4,
+        completed: 4,
+        perfect: 4,
+        failed: 0,
+        hintsUsed: 0,
+        replaysUsed: 0,
+        totalResponseMs: 6000,
+        lastSeenAt: 1,
+      },
+    };
+
+    const pool = buildAdaptiveRecallVocabulary(entries, memory);
+    for (const entry of entries) {
+      expect(pool.filter((item) => item.id === entry.id).length).toBeGreaterThanOrEqual(1);
+    }
+    expect(pool.filter((item) => item.id === "a").length).toBeGreaterThan(1);
+    expect(pool.filter((item) => item.id === "b")).toHaveLength(1);
+    expect(pool.length).toBeLessThanOrEqual(entries.length + Math.ceil(entries.length * 0.25));
+  });
+
+
 });

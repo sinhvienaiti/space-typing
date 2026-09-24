@@ -1,6 +1,6 @@
 # Pre-M22 Recall Mode V1 Plan
 
-Status: V1 IMPLEMENTATION COMPLETE / MANUAL M22 VALIDATION PENDING  
+Status: R00-R07 IMPLEMENTATION COMPLETE / MANUAL M22 VALIDATION PENDING  
 Source branch: `feature/recall-mode-v1`  
 Base main: `d28ccd927166dfa2fb98fb3f67e7916a6b89dad4`
 
@@ -97,10 +97,13 @@ Translation remains user-controlled regardless of preset.
 - Learning memory is meta-learning data and is not rolled back by Campaign checkpoint/death recovery.
 - Do not put it on the hot frame path.
 
-### R07 — Follow-up adaptive repetition
-- After V1 is stable, use R06 strength/weakness data to bias future word selection without starving unseen words.
-- Add Mistake Review and post-stage Recall metrics.
-- This is deliberately after the playable V1 gate so word-selection changes can be tested independently.
+### R07 — Adaptive repetition + mistake review — COMPLETE
+- R06 memory now biases future Recall vocabulary toward weak words without removing any original vocabulary entry.
+- Extra weighted references are bounded to 25% of the active source and at most 512 entries, so large dictionaries stay controlled.
+- Class / Topic / Word Type / Grammar / Custom and typing-text challenge sources use the same Recall bias.
+- Stage Results show Recall perfect/review count, hint/replay usage and average prompt response time.
+- Recall word review sorts missed/corrected words first so mistakes are visible immediately.
+- No adaptive-memory scan or DOM write was added to the frame loop.
 
 ## Boss behavior
 
@@ -125,7 +128,7 @@ Implemented runtime behavior:
 - per-word attempts, clears, perfect clears, failures, hint/replay usage and response-time totals persist in Recall learning memory outside Campaign rollback;
 - Class / Topic / Word Type / Grammar / Custom vocabulary and the existing Campaign map/stage/RPG/reward systems remain shared.
 
-R07 remains an explicit follow-up after real-browser V1 validation: adaptive spaced-repetition weighting and dedicated Recall post-stage/mistake-review presentation. Existing Stage Results word review remains available in V1, but it is not yet memory-strength weighted.
+R07 is complete on PR #111. CI #665 PASS: 149/149 test files, 749/749 tests, TypeScript, production build, audio guard, JS/CSS bundle budgets and Ship V3 art budget. The production JS/CSS budgets remain unchanged at 650 KiB / 60 KiB raw. The remaining Recall gate is real-browser/audio/readability validation inside M22; R07 does not mark M22 complete.
 
 ## Performance constraints
 

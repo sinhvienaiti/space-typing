@@ -18,8 +18,6 @@ export type RecallSettings = {
 };
 
 export type RecallDifficultyProfile = {
-  id: RecallDifficultyId;
-  label: string;
   enemySpeedScale: number;
   initialHintRatio: number;
   replayLimit: number | null;
@@ -58,53 +56,31 @@ export const DEFAULT_RECALL_SETTINGS: RecallSettings = {
 
 const RECALL_DIFFICULTY: Record<RecallDifficultyId, RecallDifficultyProfile> = {
   beginner: {
-    id: "beginner",
-    label: "Beginner",
     enemySpeedScale: 0.52,
     initialHintRatio: 0.45,
     replayLimit: null,
   },
   easy: {
-    id: "easy",
-    label: "Easy",
     enemySpeedScale: 0.68,
     initialHintRatio: 0.28,
     replayLimit: 4,
   },
   normal: {
-    id: "normal",
-    label: "Normal",
     enemySpeedScale: 0.86,
     initialHintRatio: 0.12,
     replayLimit: 2,
   },
   hard: {
-    id: "hard",
-    label: "Hard",
     enemySpeedScale: 1.05,
     initialHintRatio: 0,
     replayLimit: 1,
   },
   extreme: {
-    id: "extreme",
-    label: "Extreme",
     enemySpeedScale: 1.22,
     initialHintRatio: 0,
     replayLimit: 0,
   },
 };
-
-export const RECALL_DIFFICULTY_IDS = [
-  "beginner",
-  "easy",
-  "normal",
-  "hard",
-  "extreme",
-] as const satisfies readonly RecallDifficultyId[];
-
-export function isGameplayMode(value: unknown): value is GameplayMode {
-  return value === "combat" || value === "recall";
-}
 
 export function recallDifficultyProfile(
   id: RecallDifficultyId,
@@ -118,11 +94,11 @@ export function sanitizeRecallSettings(value: unknown): RecallSettings {
   }
 
   const candidate = value as Partial<RecallSettings>;
-  const difficulty = RECALL_DIFFICULTY_IDS.includes(
-    candidate.difficulty as RecallDifficultyId,
-  )
-    ? (candidate.difficulty as RecallDifficultyId)
-    : DEFAULT_RECALL_SETTINGS.difficulty;
+  const difficulty =
+    typeof candidate.difficulty === "string" &&
+    candidate.difficulty in RECALL_DIFFICULTY
+      ? candidate.difficulty as RecallDifficultyId
+      : DEFAULT_RECALL_SETTINGS.difficulty;
 
   return {
     difficulty,
@@ -231,6 +207,44 @@ export function canReplayRecall(
 ): boolean {
   const remaining = remainingRecallReplays(profile, used);
   return remaining === null || remaining > 0;
+}
+
+export function buildAdaptiveRecallVocabulary(
+  entries: readonly VocabularyEntry[],
+  memory: RecallMemoryState,
+): VocabularyEntry[] {
+  if (entries.length < 2) return [...entries];
+
+  const ranked = entries
+    .map((entry) => {
+      const item = memory[entry.id || entry.en.toLocaleLowerCase("en-US")];
+      const attempts = item?.attempts ?? 0;
+      const score = item === undefined || attempts <= 0
+        ? 0
+        : (item.failed * 2.5 +
+            Math.max(0, attempts - item.perfect) * 0.75 +
+            (item.hintsUsed + item.replaysUsed) * 0.35) / attempts +
+          Math.min(1, item.totalResponseMs / attempts / 8_000);
+      return { entry, score };
+    })
+    .filter((item) => item.score >= 1)
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        left.entry.id.localeCompare(right.entry.id),
+    );
+  const extraCap = Math.min(512, Math.ceil(entries.length / 4));
+  const extras: VocabularyEntry[] = [];
+
+  for (const item of ranked) {
+    const copies = Math.min(3, Math.max(1, Math.ceil(item.score) - 1));
+    for (let copy = 0; copy < copies && extras.length < extraCap; copy += 1) {
+      extras.push(item.entry);
+    }
+    if (extras.length >= extraCap) break;
+  }
+
+  return [...entries, ...extras];
 }
 
 export function recordRecallAttempt(
