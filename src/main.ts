@@ -4501,7 +4501,9 @@ const game = new Game(
       }
     },
     onRecallPrompt: (entry) => {
-      speakEnglish(entry.en, { ...settings, pronunciationEnabled: true });
+      if (recallSettings.autoPronounce) {
+        speakEnglish(entry.en, { ...settings, pronunciationEnabled: true });
+      }
       renderRecallAssistUi();
     },
     onRecallResult: (result) => {
