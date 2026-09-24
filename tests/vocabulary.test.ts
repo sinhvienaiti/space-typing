@@ -5,6 +5,7 @@ import {
   parseCustomVocabulary,
   parseVocabularyIndex,
   parseVocabularyTopicIndex,
+  representativeTopicLevel,
   vocabularyLevelUrl,
 } from "../src/vocabulary";
 
@@ -163,6 +164,18 @@ describe("shared vocabulary helpers", () => {
     const urls = fetchMock.mock.calls.map(([input]) => String(input));
     expect(urls.some((url) => url.endsWith("/lookup.json"))).toBe(false);
     expect(urls.some((url) => url.endsWith("/levels/080.json"))).toBe(false);
+  });
+
+  it("derives Topic difficulty from the vocabulary distribution, not only distinct levels", () => {
+    expect(
+      representativeTopicLevel([
+        { key: "basic", level: 10 },
+        { key: "mid", level: 30 },
+        { key: "advanced-a", level: 80 },
+        { key: "advanced-b", level: 80 },
+        { key: "advanced-c", level: 80 },
+      ]),
+    ).toBe(80);
   });
 
   it("parses custom EN-VI-IPA rows and removes duplicate English entries", () => {
