@@ -30,6 +30,7 @@ export type ItemDefinition = {
   category: ItemCategory;
   maxStack: number;
   combatUsable: boolean;
+  icon: string;
   description: string;
   grade?: GradeId;
 };
@@ -37,6 +38,7 @@ export type ItemDefinition = {
 export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
   "repair-kit": {
     id: "repair-kit",
+    icon: "✚",
     name: "Repair Kit",
     category: "consumable",
     maxStack: 20,
@@ -46,6 +48,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
   },
   "shield-cell": {
     id: "shield-cell",
+    icon: "◈",
     name: "Shield Cell",
     category: "consumable",
     maxStack: 20,
@@ -55,6 +58,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
   },
   "energy-cell": {
     id: "energy-cell",
+    icon: "⚡",
     name: "Energy Cell",
     category: "consumable",
     maxStack: 20,
@@ -64,6 +68,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
   },
   "nova-bomb": {
     id: "nova-bomb",
+    icon: "✹",
     name: "Nova Bomb",
     category: "consumable",
     maxStack: 10,
@@ -73,6 +78,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
   },
   "emp-charge": {
     id: "emp-charge",
+    icon: "⌁",
     name: "EMP Charge",
     category: "consumable",
     maxStack: 10,
@@ -82,6 +88,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
   },
   "time-crystal": {
     id: "time-crystal",
+    icon: "◷",
     name: "Time Crystal",
     category: "special",
     maxStack: 10,
@@ -91,6 +98,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
   },
   "word-bomb": {
     id: "word-bomb",
+    icon: "Aa",
     name: "Word Bomb",
     category: "consumable",
     maxStack: 10,
@@ -100,6 +108,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
   },
   "supply-beacon": {
     id: "supply-beacon",
+    icon: "⇧",
     name: "Supply Beacon",
     category: "supply",
     maxStack: 10,
@@ -109,6 +118,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
   },
   "lucky-dice": {
     id: "lucky-dice",
+    icon: "◇",
     name: "Lucky Dice",
     category: "special",
     maxStack: 10,
@@ -118,6 +128,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
   },
   "salvage-anchor": {
     id: "salvage-anchor",
+    icon: "⚓",
     name: "Salvage Anchor",
     category: "special",
     maxStack: UNBOUNDED_ITEM_STACK,
@@ -128,6 +139,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
   },
   "stage-revival-core": {
     id: "stage-revival-core",
+    icon: "↻",
     name: "Stage Revival Core",
     category: "special",
     maxStack: UNBOUNDED_ITEM_STACK,
@@ -138,6 +150,7 @@ export const ITEM_REGISTRY: Record<ItemId, ItemDefinition> = {
   },
   "phoenix-core": {
     id: "phoenix-core",
+    icon: "♨",
     name: "Phoenix Core",
     category: "special",
     maxStack: UNBOUNDED_ITEM_STACK,
