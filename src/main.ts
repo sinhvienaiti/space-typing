@@ -2287,7 +2287,7 @@ function renderAllSkills(): void {
 function useInventoryItem(id: CombatConsumableId): void {
   if (itemCount(inventory, id) <= 0) return;
   if (!game.useConsumable(id)) {
-    showNotice("Item not needed right now");
+    showNotice("Item cannot be used right now");
     return;
   }
 
