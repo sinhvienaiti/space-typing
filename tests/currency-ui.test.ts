@@ -37,7 +37,7 @@ describe("Batch D currency presentation", () => {
       alloy: 7,
       starCrystal: 2,
     }, { signed: true })).toBe(
-      "+1,200 Credits + +7 Alloy + +2 Star Crystal",
+      "+1,200 Credits · +7 Alloy · +2 Star Crystal",
     );
   });
 
