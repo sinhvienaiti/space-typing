@@ -1564,6 +1564,7 @@ let shopPurchaseCounter = 0;
 let currentShopType: ShopType = "black-market";
 let lastHudShield: number | null = null;
 let currentStagePhaseDisplay: StagePacingPhase | null = null;
+let currentStagePhaseStage: number | null = null;
 const hudDomMetrics = {
   renderCalls: 0,
   attemptedWrites: 0,
@@ -2506,7 +2507,12 @@ function renderPhase(phase: GamePhase): void {
 
 function stageBadgeText(stage: number): string {
   const base = "stage " + String(stage).padStart(3, "0");
-  if (currentStagePhaseDisplay === null) return base;
+  if (
+    currentStagePhaseDisplay === null ||
+    currentStagePhaseStage !== stage
+  ) {
+    return base;
+  }
   return (
     base +
     " · wave " +
@@ -2518,6 +2524,7 @@ function stageBadgeText(stage: number): string {
 
 function renderStage(stage: number): void {
   currentStagePhaseDisplay = null;
+  currentStagePhaseStage = stage;
   const badge = byId("waveBadge");
   badge.textContent = stageBadgeText(stage);
   badge.title = "";
@@ -2530,6 +2537,7 @@ function renderStagePhase(phase: StagePacingPhase): void {
   currentStagePhaseDisplay = phase;
   const badge = byId("waveBadge");
   const stage = game.getStats().stage;
+  currentStagePhaseStage = stage;
   badge.textContent = stageBadgeText(stage);
   badge.title =
     phase.label +
