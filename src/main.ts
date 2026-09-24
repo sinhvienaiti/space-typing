@@ -3555,12 +3555,17 @@ const game = new Game(
         musicController.setPaused(false);
         musicController.transitionTo("DEFEAT", 0.35);
         const stats = game.getStats();
+        const stageSession = game.getStageSessionSnapshot();
         byId("resultScore").textContent = stats.score.toLocaleString();
         byId("resultWave").textContent =
           String(stats.stage).padStart(3, "0");
         byId("resultAccuracy").textContent =
-          accuracyPercent(stats.hits, stats.misses).toFixed(1) + "%";
+          accuracyPercent(
+            stageSession.correctWordKeys,
+            stageSession.wrongWordKeys,
+          ).toFixed(1) + "%";
         byId("resultStreak").textContent = String(stats.maxStreak);
+        renderGameOverMeasured(stageSession);
 
         checkpointRollbackApplied = false;
         checkpointRollbackSaved = false;
@@ -3587,11 +3592,15 @@ const game = new Game(
     onBossUpdate: renderBoss,
     onSkills: renderAllSkills,
     onStageClear: (stats) => {
+      const stageSession = game.getStageSessionSnapshot();
       const wpm = stageWordsPerMinute(
-        stats.hits,
-        game.getStageElapsedSeconds(),
+        stageSession.correctWordKeys,
+        stageSession.elapsedSeconds,
       );
-      const accuracy = accuracyPercent(stats.hits, stats.misses);
+      const accuracy = accuracyPercent(
+        stageSession.correctWordKeys,
+        stageSession.wrongWordKeys,
+      );
       const activeHidden = currentHiddenEncounterState().active;
       if (activeHidden !== null) {
         handleHiddenEncounterClear(
@@ -3913,11 +3922,40 @@ const game = new Game(
         }
       });
 
+      const world = worldForStage(stats.stage);
+      const rating = stageResultStars(
+        accuracy,
+        objective?.status ?? null,
+      );
+      const measuredKills =
+        stageSession.regularKills +
+        stageSession.eliteKills +
+        stageSession.bossKills;
+      const killRate =
+        stageSession.elapsedSeconds <= 0
+          ? 0
+          : measuredKills / stageSession.elapsedSeconds * 60;
+
       byId("clearTitle").textContent =
         "Stage " + String(stats.stage).padStart(3, "0") + " complete";
+      byId("clearMeta").textContent =
+        world.name + " · " +
+        stageRole(stats.stage).replaceAll("-", " ") + " · " +
+        difficultySettings.mode.toUpperCase();
+      byId("clearStars").textContent =
+        "★".repeat(rating.stars) + "☆".repeat(3 - rating.stars);
+      byId("clearStarRule").textContent =
+        "1★ clear · 2★ ≥90% target accuracy · 3★ " +
+        rating.thirdStarRule;
       byId("clearScore").textContent = stats.score.toLocaleString();
       byId("clearAccuracy").textContent = accuracy.toFixed(1) + "%";
       byId("clearWpm").textContent = wpm.toFixed(0);
+      byId("clearTime").textContent =
+        formatStageDuration(stageSession.elapsedSeconds);
+      byId("clearKillRate").textContent =
+        killRate.toFixed(1) + "/min";
+      wordReviewFilter = "all";
+      renderMeasuredStageSession(stageSession, stats.hits, stats.misses);
       // Use distinct compact currency badges rather than a long wrapped line
       // that makes the entire results card unusually tall.
       const rewardContainer = byId("clearCredits");
