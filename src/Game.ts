@@ -7707,12 +7707,12 @@ export class Game {
     context.save();
     context.globalCompositeOperation = "lighter";
     context.globalAlpha = rankVisual.auraAlpha;
-    context.strokeStyle = targeted ? targetColor : baseColor;
+    context.strokeStyle = targeted ? targetColor : rankVisual.accentColor;
     context.lineWidth = 1 + rankVisual.lineWidthBoost;
     context.shadowBlur =
       (8 + rankVisual.intensity * 16) *
       qualityProfile(this.settings.visualQuality).glowScale;
-    context.shadowColor = targeted ? targetColor : baseColor;
+    context.shadowColor = targeted ? targetColor : rankVisual.accentColor;
     context.beginPath();
     context.arc(
       enemy.x,
