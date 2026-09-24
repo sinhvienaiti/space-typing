@@ -1,12 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   isVocabularyEntry,
+  loadVocabularyTopic,
   parseCustomVocabulary,
   parseVocabularyIndex,
+  parseVocabularyTopicIndex,
   vocabularyLevelUrl,
 } from "../src/vocabulary";
 
 describe("shared vocabulary helpers", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it("recognizes the parent vocabulary entry shape", () => {
     expect(isVocabularyEntry({
       id: "L001-001",
@@ -65,6 +69,91 @@ describe("shared vocabulary helpers", () => {
         ],
       }),
     ).toThrow("Shared vocabulary index is invalid.");
+  });
+
+  it("validates shared Topic metadata", () => {
+    const index = parseVocabularyTopicIndex({
+      version: 1,
+      totalGroups: 1,
+      totalTopics: 1,
+      uniqueVocabularyKeys: 2,
+      topics: [
+        {
+          id: "travel.airport",
+          label: "Airport",
+          group: "travel-tourism",
+          levels: ["A1", "B1"],
+          count: 2,
+          keys: ["passport", "airport"],
+        },
+      ],
+    });
+    expect(index.topics[0]?.id).toBe("travel.airport");
+    expect(() =>
+      parseVocabularyTopicIndex({
+        version: 1,
+        totalGroups: 1,
+        totalTopics: 1,
+        uniqueVocabularyKeys: 1,
+        topics: [{ id: "", label: "Broken", group: "x", levels: [], count: 1, keys: [] }],
+      }),
+    ).toThrow("Shared vocabulary topic index is invalid.");
+  });
+
+  it("loads only Topic levels and derives a representative difficulty level", async () => {
+    const topicIndex = parseVocabularyTopicIndex({
+      version: 1,
+      totalGroups: 1,
+      totalTopics: 1,
+      uniqueVocabularyKeys: 2,
+      topics: [
+        {
+          id: "travel.airport",
+          label: "Airport",
+          group: "travel-tourism",
+          levels: ["A1", "B1"],
+          count: 2,
+          keys: ["passport", "airport"],
+        },
+      ],
+    });
+    const vocabularyIndex = parseVocabularyIndex({
+      version: 1,
+      plannedLevels: 100,
+      availableLevels: 3,
+      totalEntries: 3,
+      levels: [
+        { level: 10, label: "Ten", file: "levels/010.json", count: 1 },
+        { level: 30, label: "Thirty", file: "levels/030.json", count: 1 },
+        { level: 80, label: "Unused", file: "levels/080.json", count: 1 },
+      ],
+    });
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const body =
+        url.endsWith("/lookup.json")
+          ? { version: 1, totalEntries: 3, entries: { airport: 10, passport: 30, unused: 80 } }
+          : url.endsWith("/levels/010.json")
+            ? { entries: [{ id: "L010-001", en: "airport", vi: "sân bay", ipa: "/ˈerˌpɔrt/" }] }
+            : url.endsWith("/levels/030.json")
+              ? { entries: [{ id: "L030-001", en: "passport", vi: "hộ chiếu", ipa: "/ˈpæsˌpɔrt/" }] }
+              : { entries: [] };
+      return { ok: true, status: 200, json: async () => body } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const loaded = await loadVocabularyTopic(
+      "travel.airport",
+      topicIndex,
+      vocabularyIndex,
+    );
+
+    expect(loaded.entries.map((entry) => entry.en)).toEqual(["passport", "airport"]);
+    expect(loaded.levels).toEqual([10, 30]);
+    expect(loaded.representativeLevel).toBe(10);
+    const urls = fetchMock.mock.calls.map(([input]) => String(input));
+    expect(urls.some((url) => url.endsWith("/levels/080.json"))).toBe(false);
   });
 
   it("parses custom EN-VI-IPA rows and removes duplicate English entries", () => {
