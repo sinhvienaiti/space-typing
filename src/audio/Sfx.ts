@@ -286,21 +286,25 @@ export class Sfx {
   }
 
   private notifyWarning(durationMs: number): void {
-    if (typeof window === "undefined") return;
-    window.dispatchEvent(
-      new CustomEvent("space-typing:warning", {
-        detail: { durationMs },
-      }),
-    );
+    this.dispatchMixEvent("space-typing:warning", { durationMs });
   }
 
   private notifyAnnouncer(active: boolean): void {
-    if (typeof window === "undefined") return;
-    window.dispatchEvent(
-      new CustomEvent("space-typing:announcer", {
-        detail: { active },
-      }),
-    );
+    this.dispatchMixEvent("space-typing:announcer", { active });
+  }
+
+  private dispatchMixEvent(
+    name: string,
+    detail: Record<string, number | boolean>,
+  ): void {
+    if (
+      typeof window === "undefined" ||
+      typeof window.dispatchEvent !== "function" ||
+      typeof CustomEvent === "undefined"
+    ) {
+      return;
+    }
+    window.dispatchEvent(new CustomEvent(name, { detail }));
   }
 
   private announcerVolume(): number {
