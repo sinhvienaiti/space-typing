@@ -1,6 +1,8 @@
 import { typingText } from "../typing-text";
 import type { VocabularyEntry } from "../types";
 
+export const MAX_STAGE_WORD_ATTEMPTS = 600;
+
 export type StageWordSource = "enemy" | "boss";
 export type StageWordOutcome =
   | "perfect"
@@ -64,6 +66,7 @@ export type StageSessionSnapshot = {
   perfectWordChain: number;
   maxPerfectWordChain: number;
   wordAttempts: StageWordAttempt[];
+  wordAttemptsTruncated: number;
   wordGroups: StageWordGroup[];
 };
 
@@ -168,6 +171,7 @@ export class StageSessionTracker {
   private perfectWordChain = 0;
   private maxPerfectWordChain = 0;
   private readonly attempts: StageWordAttempt[] = [];
+  private wordAttemptsTruncated = 0;
   private readonly correctByAttempt = new Map<string, number>();
   private readonly wrongByAttempt = new Map<string, number>();
 
@@ -200,6 +204,7 @@ export class StageSessionTracker {
     this.perfectWordChain = 0;
     this.maxPerfectWordChain = 0;
     this.attempts.length = 0;
+    this.wordAttemptsTruncated = 0;
     this.correctByAttempt.clear();
     this.wrongByAttempt.clear();
   }
@@ -348,16 +353,20 @@ export class StageSessionTracker {
     outcome: StageWordOutcome,
     elapsedSeconds: number,
   ): void {
-    this.attempts.push({
-      en: entry.en,
-      vi: entry.vi,
-      ipa: entry.ipa,
-      source,
-      outcome,
-      correctKeys: this.correctByAttempt.get(key) ?? 0,
-      wrongKeys: this.wrongByAttempt.get(key) ?? 0,
-      elapsedSeconds: rounded(elapsedSeconds),
-    });
+    if (this.attempts.length < MAX_STAGE_WORD_ATTEMPTS) {
+      this.attempts.push({
+        en: entry.en,
+        vi: entry.vi,
+        ipa: entry.ipa,
+        source,
+        outcome,
+        correctKeys: this.correctByAttempt.get(key) ?? 0,
+        wrongKeys: this.wrongByAttempt.get(key) ?? 0,
+        elapsedSeconds: rounded(elapsedSeconds),
+      });
+    } else {
+      this.wordAttemptsTruncated += 1;
+    }
     this.correctByAttempt.delete(key);
     this.wrongByAttempt.delete(key);
   }
@@ -394,6 +403,7 @@ export class StageSessionTracker {
       perfectWordChain: this.perfectWordChain,
       maxPerfectWordChain: this.maxPerfectWordChain,
       wordAttempts,
+      wordAttemptsTruncated: this.wordAttemptsTruncated,
       wordGroups: groupStageWordAttempts(wordAttempts),
     };
   }
