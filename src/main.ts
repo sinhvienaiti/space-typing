@@ -7576,14 +7576,6 @@ function openStageSelect(): void {
   focusJourneyFrontier();
 }
 
-function recallReplayLabel(): string {
-  const prompt = game.getRecallPrompt();
-  if (prompt === null) return "↻ Replay audio";
-  return prompt.replaysRemaining === null
-    ? "↻ Replay audio · ∞"
-    : "↻ Replay audio · " + String(prompt.replaysRemaining);
-}
-
 function renderRecallAssistUi(): void {
   const bar = byId("recallAssistBar");
   const active = gameplayMode === "recall" && game.getPhase() === "playing";
@@ -7600,7 +7592,10 @@ function renderRecallAssistUi(): void {
         String(prompt.hintCount) +
         " clues";
   const replay = byId<HTMLButtonElement>("recallReplayButton");
-  replay.textContent = recallReplayLabel();
+  replay.textContent =
+    prompt?.replaysRemaining === null
+      ? "↻ Replay · ∞"
+      : "↻ Replay · " + String(prompt?.replaysRemaining ?? "—");
   replay.disabled =
     prompt === null ||
     (prompt.replaysRemaining !== null && prompt.replaysRemaining <= 0);
