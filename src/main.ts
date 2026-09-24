@@ -351,6 +351,7 @@ import {
   assignHotbarSlot,
   createDefaultHotbarState,
   hotbarActionKey,
+  hotbarPlacementForSlot,
   hotbarSlotForKey,
   type HotbarAction,
   type HotbarState,
@@ -2164,8 +2165,7 @@ function ensureHotbarButtons(): HTMLButtonElement[] {
       const button = document.createElement("button");
       button.type = "button";
       button.className =
-        "hotbar-slot " +
-        (index < 4 ? "hotbar-left" : index < 8 ? "hotbar-right" : "hotbar-utility");
+        "hotbar-slot hotbar-" + hotbarPlacementForSlot(index);
       button.id = "hotbarSlot" + String(index + 1);
       button.innerHTML =
         "<kbd>" + String(index + 1) + "</kbd>" +
