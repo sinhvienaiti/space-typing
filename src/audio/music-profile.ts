@@ -72,58 +72,18 @@ export type MusicResolveContext = {
 };
 
 const SHARED = {
-  intense: asset(
-    "world-intense",
-    "intense.ogg",
-    "music",
-  ),
-  miniBoss: asset(
-    "mini-boss",
-    "mini-boss.ogg",
-    "music",
-  ),
-  worldBoss: asset(
-    "world-boss",
-    "world-boss.ogg",
-    "music",
-  ),
-  galaxyBoss: asset(
-    "galaxy-boss",
-    "galaxy-boss.ogg",
-    "music",
-  ),
-  championHunt: asset(
-    "champion-hunt",
-    "champion-hunt.ogg",
-    "music",
-  ),
-  hiddenChallenge: asset(
-    "hidden-challenge",
-    "hidden-challenge.ogg",
-    "music",
-  ),
-  hiddenWorld: asset(
-    "hidden-world",
-    "hidden-world.ogg",
-    "music",
-  ),
-  shop: asset("shop", "shop.ogg", "music"),
-  station: asset("station", "station.ogg", "music"),
-  victory: asset(
-    "victory",
-    "victory.ogg",
-    "stingers",
-  ),
-  defeat: asset(
-    "defeat",
-    "defeat.ogg",
-    "stingers",
-  ),
-  transition: asset(
-    "transition",
-    "world-transition.ogg",
-    "stingers",
-  ),
+  intense: asset("world-intense", "pulse.ogg", "music"),
+  miniBoss: asset("mini-boss", "pulse.ogg", "music"),
+  worldBoss: asset("world-boss", "urgent.ogg", "music"),
+  galaxyBoss: asset("galaxy-boss", "urgent.ogg", "music"),
+  championHunt: asset("champion-hunt", "urgent.ogg", "music"),
+  hiddenChallenge: asset("hidden-challenge", "pulse.ogg", "music"),
+  hiddenWorld: asset("hidden-world", "sector.ogg", "music"),
+  shop: asset("shop", "sector.ogg", "music"),
+  station: asset("station", "sector.ogg", "music"),
+  victory: asset("victory", "victory.ogg", "stingers"),
+  defeat: asset("defeat", "urgent.ogg", "music"),
+  transition: asset("transition", "pulse.ogg", "music"),
 } as const;
 
 function asset(
@@ -141,23 +101,39 @@ function asset(
   };
 }
 
+function fallbackAsset(
+  id: string,
+  localFile: string,
+  defaultFile: string,
+  folder: "music" | "ambient",
+): AudioAssetRef {
+  return {
+    id,
+    localPath: "/local-assets/" + folder + "/" + localFile,
+    defaultPath: "/assets/audio/" + folder + "/" + defaultFile,
+  };
+}
+
 function worldProfile(world: WorldProfile): WorldMusicProfile {
   const worldFile = world.id + ".ogg";
   const galaxyFile =
     "galaxy-" + String(world.galaxy).padStart(2, "0") + ".ogg";
-  const baseTrack = asset(
+  const baseTrack = fallbackAsset(
     world.id + "-base",
     worldFile,
+    "sector.ogg",
     "music",
   );
-  const ambient = asset(
+  const ambient = fallbackAsset(
     world.id + "-ambient",
     worldFile,
+    "engine-loop.ogg",
     "ambient",
   );
-  const galaxyAmbient = asset(
+  const galaxyAmbient = fallbackAsset(
     "galaxy-" + String(world.galaxy).padStart(2, "0") + "-ambient",
     galaxyFile,
+    "computer-loop.ogg",
     "ambient",
   );
 
@@ -250,6 +226,18 @@ export function musicStateForStageRole(
     return "WORLD_INTENSE";
   }
   return "WORLD_NORMAL";
+}
+
+
+export function musicStateForStagePhase(
+  role: StageRole,
+  phaseKind: "opening" | "pressure" | "mixed" | "recovery" | "finale",
+): MusicState | null {
+  if (role !== "normal") return null;
+  if (phaseKind === "opening" || phaseKind === "recovery") {
+    return "WORLD_NORMAL";
+  }
+  return "WORLD_INTENSE";
 }
 
 export function musicAssetForState(
