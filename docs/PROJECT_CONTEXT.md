@@ -3728,3 +3728,23 @@ Then inspect current GitHub main branch state before changing code.
 Do not use chat history as repository state.
 Continue from the latest valid GitHub checkpoint.
 ~~~
+
+
+## 2026-09-24 — Adaptive audio implementation checkpoint
+
+Space Typing now has a committed default sci-fi soundscape instead of only an audio runtime contract.
+
+Implemented:
+- CC0 default music: calm `sector`, pressure `pulse`, high-risk/boss `urgent`;
+- CC0 victory stinger;
+- low-level spacecraft engine + computer ambience;
+- curated sampled laser / force-field / explosion / engine / thruster / UI / warning SFX;
+- bounded reusable sample pools, no per-key `Audio` allocation;
+- pronunciation-aware sampled-SFX ducking;
+- normal-stage phase-driven calm/intense music;
+- critical Hull warning on the 25% downward threshold crossing;
+- independent audio payload guard (15 OGG / 3.22 MiB) while preserving existing JS/CSS bundle thresholds.
+
+Automated validation: child CI #622 PASS, 147 test files / 732 tests, TypeScript/build/bundle/Ship V3/audio guards PASS.
+
+The remaining audio gate is the existing M22 real-browser + real-output-device listening matrix. Do not mark M22 complete from CI alone.
