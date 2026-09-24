@@ -6,6 +6,25 @@ export type RecoveryItemId =
   | "shield-cell"
   | "energy-cell";
 
+export const COMBAT_CONSUMABLE_IDS = [
+  "repair-kit",
+  "shield-cell",
+  "energy-cell",
+  "nova-bomb",
+  "emp-charge",
+  "time-crystal",
+  "word-bomb",
+  "supply-beacon",
+  "lucky-dice",
+] as const;
+
+export type CombatConsumableId =
+  (typeof COMBAT_CONSUMABLE_IDS)[number];
+
+export const EMP_CHARGE_DELAY_SECONDS = 3.5;
+export const TIME_CRYSTAL_DURATION_SECONDS = 5;
+export const LUCKY_DICE_PITY_BOOST = 6;
+
 export type ResourceCaps = {
   hull: number;
   shield: number;
@@ -25,6 +44,14 @@ export function isRecoveryItemId(
     value === "repair-kit" ||
     value === "shield-cell" ||
     value === "energy-cell"
+  );
+}
+
+export function isCombatConsumableId(
+  value: string,
+): value is CombatConsumableId {
+  return COMBAT_CONSUMABLE_IDS.includes(
+    value as CombatConsumableId,
   );
 }
 
