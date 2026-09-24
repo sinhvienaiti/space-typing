@@ -687,10 +687,14 @@ export const ENEMY_REGISTRY: readonly EnemyDefinition[] = [
   },
 ] satisfies readonly EnemyDefinition[];
 
+const ENEMY_REGISTRY_BY_ID = new Map<string, EnemyDefinition>(
+  ENEMY_REGISTRY.map((definition) => [definition.id, definition]),
+);
+
 export function enemyDefinition(
   id: string,
 ): EnemyDefinition | undefined {
-  return ENEMY_REGISTRY.find((definition) => definition.id === id);
+  return ENEMY_REGISTRY_BY_ID.get(id);
 }
 
 export function validateEnemyRegistry(
