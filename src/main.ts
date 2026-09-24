@@ -8551,6 +8551,7 @@ async function applyClassLevel(level: number): Promise<void> {
 
     configuredVocabulary = entries;
     typingChallengeCache.clear();
+    leaveReviewMode();
     sourceState = { mode: "class", level };
     sourceTab = "class";
     localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
@@ -8588,6 +8589,7 @@ async function applyTopicVocabulary(topicId: string): Promise<void> {
 
     configuredVocabulary = loaded.entries;
     typingChallengeCache.clear();
+    leaveReviewMode();
     sourceState = {
       mode: "topic",
       topicId: loaded.topic.id,
@@ -8632,6 +8634,7 @@ async function applyWordTypeVocabulary(posId: string): Promise<void> {
 
     configuredVocabulary = loaded.entries;
     typingChallengeCache.clear();
+    leaveReviewMode();
     sourceState = {
       mode: "word-type",
       posId: loaded.category.id,
@@ -8682,6 +8685,7 @@ async function applyGrammarVocabulary(grammarId: string): Promise<void> {
 
     configuredVocabulary = loaded.entries;
     typingChallengeCache.clear();
+    leaveReviewMode();
     sourceState = {
       mode: "grammar",
       grammarId: loaded.module.id,
@@ -9161,6 +9165,7 @@ byId("saveCustom").addEventListener("click", () => {
   localStorage.setItem(CUSTOM_KEY, input.value);
   configuredVocabulary = entries;
   typingChallengeCache.clear();
+  leaveReviewMode();
   sourceState = { mode: "custom" };
   sourceTab = "custom";
   localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
