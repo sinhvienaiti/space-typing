@@ -1,10 +1,10 @@
 # M22 — Manual Browser / Audio / Visual Playtest Matrix
 
-Status: **PENDING REAL BROWSER / AUDIO DEVICE EXECUTION**.
+Status: **ARCHIVED AS NON-BLOCKING REGRESSION CHECKLIST (M22 ACCEPTED 2026-09-24)**.
 
 Automated prerequisite update (2026-09-24): the repository now includes verified default CC0 music/ambient/SFX assets, bounded sampled-SFX runtime support, stage-phase adaptive music, and an audio payload guard. CI #622 passed. The rows below remain PENDING until they are actually heard/observed on a real device.
 
-This matrix is the final non-automatable gate for M22.
+This matrix was designed as the final non-automatable M22 gate. On 2026-09-24 the owner accepted the current build after extensive iterative manual play and chose not to repeat all 43 rows. Rows still marked PENDING below mean only that no dedicated recorder evidence was captured for that row; they must not be re-labeled PASS retroactively. Use them for targeted regression testing when a related issue appears.
 
 Use the M21 **Developer Test Lab** whenever possible so testing stays isolated from PlayerSave.
 
@@ -144,13 +144,8 @@ Do not add extra PASS rows for the P00-P08 polish slice. Verify these points whi
 | Shop / Station | transition in/out | music state clearly changes and restores | PENDING |
 | Victory / defeat | complete/fail encounter | stinger does not leave looping track behind | PENDING |
 
-## Completion rule
+## Historical completion rule
 
-M22 manual gate is complete only when:
+The original strict gate required all 43 rows to be individually recorded PASS plus real audio, High/Ultra browser observation, low/mid/high human-paced runs and final green CI.
 
-1. every required row above is PASS;
-2. every FAIL has a linked fix/checkpoint;
-3. audio has been heard on a real output device;
-4. High and Ultra have been observed in a real browser;
-5. at least one low-, mid- and high-WPM human-paced run has been performed;
-6. the final post-fix CI is green.
+That strict recorder-completeness requirement was retired as a roadmap blocker by owner decision on 2026-09-24. M22 is accepted based on the completed automated audit plus extensive iterative manual testing already performed during development. Keep this matrix intact for focused future regression checks; do not infer that untouched PENDING rows were individually executed.

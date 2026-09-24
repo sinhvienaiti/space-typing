@@ -1,10 +1,10 @@
 # Ship Visual V3 — Performance-First Art Polish Plan
 
-Status: V30–V34 IMPLEMENTED · V32/V33 REVIEWED BINARY COMMITTED + ACTIVE · V35 BROWSER A/B GATE PENDING · V36 FINAL HANDOFF PENDING
+Status: V30–V34 IMPLEMENTED · V32/V33 REVIEWED BINARY COMMITTED + ACTIVE · CURRENT ROADMAP ACCEPTED 2026-09-24 · V35 DEDICATED BROWSER A/B RETAINED AS OPTIONAL REGRESSION CHECK
 
 Source of truth: this document + `docs/PROJECT_CONTEXT.md` + existing V2 art/runtime contracts.
 This is an approved, scoped follow-up to C05–C11 in `docs/PRE_M22_COMBAT_IDENTITY_TYPING_CLARITY_PLAN.md`.
-It must not be reported complete until the **actual new illustrated art** has been committed, loaded, reviewed in a browser and benchmarked. The existing V2 vector artwork is a usable fallback, not a substitute for the promised V3 premium art.
+The actual illustrated V3 art is committed and loaded with V2/procedural fallback. The original dedicated same-device browser benchmark remains valuable evidence, but after the 2026-09-24 owner acceptance it no longer blocks the roadmap. Do not invent benchmark numbers; run the A/B check when investigating a visual/performance regression.
 
 ## Product goal
 

@@ -744,7 +744,7 @@ app.innerHTML = `
     <div id="recallAssistBar" class="boss-hud recall-assist-bar hidden" aria-live="polite">
       <div>
         <strong>RECALL</strong>
-        <span id="recallAssistMeta">Listen, remember, type.</span>
+        <span id="recallAssistMeta">Listen · recall · type</span>
       </div>
       <button id="recallReplayButton" type="button">↻ Replay audio</button>
       <button id="recallHintButton" type="button">✦ Reveal letter</button>
@@ -754,10 +754,7 @@ app.innerHTML = `
       <div class="main-card title-main-card">
         <p class="eyebrow">typing combat // campaign</p>
         <h1>SPACE <span>TYPE</span></h1>
-        <p id="titleModeIntro" class="intro">
-          Lock a target with its first letter, finish the word, and keep the
-          streak alive. No movement — only typing decisions.
-        </p>
+        <p id="titleModeIntro" class="intro"></p>
         <p id="titleWorldMeta" class="world-meta">
           World 01 · Rainbow Reach · Stage 001-020
         </p>
@@ -768,7 +765,7 @@ app.innerHTML = `
             <button id="combatModeButton" type="button">Combat</button>
             <button id="recallModeButton" type="button">Recall</button>
           </div>
-          <small id="titleModeMeta" class="world-meta">Combat · see, type, shoot</small>
+          <small id="titleModeMeta" class="world-meta"></small>
         </section>
 
         <div class="title-play-actions">
@@ -1751,6 +1748,10 @@ let gameplayMode: GameplayMode = loadGameplayMode();
 let recallSettings: RecallSettings = loadRecallSettings();
 let recallMemory: RecallMemoryState = loadRecallMemory();
 let recallStage = { attempts: 0, perfect: 0, hints: 0, replays: 0, responseMs: 0 };
+
+function saveRecallMemory(): void {
+  localStorage.setItem(RECALL_MEMORY_KEY, JSON.stringify(recallMemory));
+}
 let sourceState = loadSource();
 let sourceTab: VocabularySourceTab = sourceState.mode;
 let vocabularyIndex: VocabularyIndex | null = null;
@@ -1773,20 +1774,20 @@ let selectedJourneyStage = campaign.selectedStage;
  * Existing button IDs and their action listeners remain unchanged. */
 function installMenuHelp(): void {
   const descriptions: Record<string, string> = {
-    routeButton: "Sector, boss and checkpoint preview",
-    stageSelectButton: "Browse/replay unlocked stages",
+    routeButton: "Sector, boss, checkpoint",
+    stageSelectButton: "Replay unlocked stages",
     characterButton: "Pilot and progression",
     equipmentButton: "Gear and combat stats",
     supportButton: "Combat support spells",
-    hotbarButton: "Skills/items on number keys",
-    vocabularyButton: "Shared/custom vocabulary",
+    hotbarButton: "Skills/items on 1-9",
+    vocabularyButton: "Vocabulary source",
     progressionButton: "Missions and rewards",
-    codexButton: "Discovered content",
-    settingsButton: "Audio/display/Recall controls",
+    codexButton: "Codex entries",
+    settingsButton: "Audio/display/Recall",
     dataButton: "Save/performance info",
-    shopButton: "Finite-stock items",
-    stationShopButton: "Maintenance items",
-    serviceShopButton: "Repair/upgrade gear",
+    shopButton: "Finite-stock shop",
+    stationShopButton: "Station items",
+    serviceShopButton: "Repair/upgrade",
   };
 
   const wrappers: HTMLElement[] = [];
@@ -4036,6 +4037,7 @@ const game = new Game(
     onBossUpdate: renderBoss,
     onSkills: renderAllSkills,
     onStageClear: (stats) => {
+      saveRecallMemory();
       const stageSession = game.getStageSessionSnapshot();
       const wpm = stageWordsPerMinute(
         stageSession.correctWordKeys,
@@ -4499,10 +4501,7 @@ const game = new Game(
       }
     },
     onRecallPrompt: (entry) => {
-      speakEnglish(entry.en, {
-        ...settings,
-        pronunciationEnabled: true,
-      });
+      speakEnglish(entry.en, { ...settings, pronunciationEnabled: true });
       renderRecallAssistUi();
     },
     onRecallResult: (result) => {
@@ -4512,7 +4511,7 @@ const game = new Game(
       recallStage.replays += result.replayCount;
       recallStage.responseMs += result.responseMs;
       recallMemory = recordRecallAttempt(recallMemory, result);
-      localStorage.setItem(RECALL_MEMORY_KEY, JSON.stringify(recallMemory));
+      if (recallStage.attempts % 6 === 0) saveRecallMemory();
       renderRecallAssistUi();
     },
     onKillTranslation: (entry) => {
@@ -7653,8 +7652,8 @@ function renderGameplayMode(): void {
     ? "Recall · hear, remember, type"
     : "Combat · see, type, shoot";
   byId("titleModeIntro").textContent = recall
-    ? "Hear the word, rebuild it, stop the enemy before contact."
-    : "Type visible words, shoot and keep your streak.";
+    ? "Hear, recall and type before contact."
+    : "See words, type, shoot, keep the streak.";
   game.setGameplayMode(gameplayMode, recallSettings);
   updateCampaignUi();
   renderRecallAssistUi();
@@ -9235,6 +9234,7 @@ window.addEventListener("keydown", (event) => {
 window.addEventListener("resize", () => game.resize());
 
 function persistPageLifecycleRecovery(): void {
+  saveRecallMemory();
   if (!persistenceReady) return;
 
   const savedAt = new Date().toISOString();
@@ -9290,6 +9290,7 @@ window.addEventListener(
 );
 
 window.addEventListener("beforeunload", () => {
+  saveRecallMemory();
   stopSpeech();
   musicController.destroy();
   game.destroy();

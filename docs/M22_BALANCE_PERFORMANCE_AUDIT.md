@@ -1,6 +1,6 @@
 # M22 — Full Balance / Performance Audit
 
-Status: **AUTOMATED AUDIT COMPLETE; MANUAL PLAYTEST GATE PENDING**.
+Status: **ACCEPTED / CLOSED 2026-09-24**. Automated audit remains complete. The owner accepted the current extensively play-tested build and chose not to block the roadmap on re-running every recorder row. Unrecorded real-device rows remain targeted regression checks, not claimed PASS evidence.
 
 M22 audits the production expansion after M21. It does not add a second balance engine or simulation-only gameplay implementation.
 

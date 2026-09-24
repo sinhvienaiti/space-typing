@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Game } from "../src/Game";
 import { createStageConfig } from "../src/campaign/stage";
 import { difficultyFor } from "../src/campaign/difficulty";
+import { DEFAULT_RECALL_SETTINGS } from "../src/recall/model";
 import type { GameSettings, VocabularyEntry } from "../src/types";
 
 const settings: GameSettings = {
@@ -169,6 +170,72 @@ describe("M21 gated Game Test Lab API", () => {
     expect(snapshot?.enemies).toHaveLength(0);
     expect(snapshot?.projectiles).toBe(0);
     expect(snapshot?.recallBonus?.en).toBe("orbit");
+    game.destroy();
+  });
+
+  it("keeps Recall typed kills sequential, projectile-free and free of Combat translation echo", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    game.setGameplayMode("recall", {
+      ...DEFAULT_RECALL_SETTINGS,
+      showTranslation: false,
+      autoPronounce: false,
+    });
+    start(game, 900);
+    game.testLabSetSchedulerFrozen(true);
+
+    const ids = game.testLabSpawnEnemies({
+      kind: "splitter",
+      count: 1,
+      layers: 1,
+    });
+    expect(ids).toHaveLength(1);
+
+    const onKillTranslation = vi.fn();
+    const runtime = game as unknown as {
+      enemies: Array<{ id: number; eliteModifiers: string[] }>;
+      projectiles: unknown[];
+      recallHintIndices: Map<number, Set<number>>;
+      hooks: {
+        onKillTranslation?: (entry: VocabularyEntry) => void;
+      };
+    };
+    runtime.hooks.onKillTranslation = onKillTranslation;
+    runtime.enemies[0]!.eliteModifiers = ["volatile"];
+
+    expect(runtime.recallHintIndices.size).toBe(1);
+    expect(game.testLabForceWordComplete(ids[0]!)).toBe(true);
+
+    expect(game.getTestLabSnapshot()?.enemies).toHaveLength(0);
+    expect(game.getTestLabSnapshot()?.projectiles).toBe(0);
+    expect(runtime.recallHintIndices.size).toBe(0);
+    expect(onKillTranslation).not.toHaveBeenCalled();
+    game.destroy();
+  });
+
+  it("preserves Splitter fragments and Volatile burst in Combat", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 900);
+    game.testLabSetSchedulerFrozen(true);
+
+    const ids = game.testLabSpawnEnemies({
+      kind: "splitter",
+      count: 1,
+      layers: 1,
+    });
+    expect(ids).toHaveLength(1);
+
+    const runtime = game as unknown as {
+      enemies: Array<{ id: number; eliteModifiers: string[] }>;
+    };
+    runtime.enemies[0]!.eliteModifiers = ["volatile"];
+
+    expect(game.testLabForceWordComplete(ids[0]!)).toBe(true);
+    const snapshot = game.getTestLabSnapshot();
+
+    expect(snapshot?.enemies.length).toBeGreaterThan(0);
+    expect(snapshot?.projectiles).toBeGreaterThan(0);
     game.destroy();
   });
 

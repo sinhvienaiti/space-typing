@@ -5745,15 +5745,7 @@ export class Game {
     this.tryRollEquipmentDrop(
       enemy.golden ? "golden" : enemy.elite ? "elite" : "normal",
     );
-    if (this.gameplayMode !== "recall" && enemy.kind === "splitter") {
-      this.spawnSplitFragments(enemy);
-    }
-    if (
-      this.gameplayMode !== "recall" &&
-      enemy.eliteModifiers.includes("volatile")
-    ) {
-      this.spawnVolatileBurst(enemy);
-    }
+    this.triggerEnemyDeathTraits(enemy);
 
     this.enemies = this.enemies.filter((item) => item.id !== enemy.id);
     this.recallHintIndices.delete(enemy.id);
@@ -5873,16 +5865,17 @@ export class Game {
     this.stats.kills += 1;
     this.addScore((80 + length * 14) * this.stats.multiplier);
     this.gainPower(7);
-    // Keep test-lab metadata, but render learning feedback in the dedicated
-    // HTML strip instead of overlapping EN/IPA/VI over the battlefield.
-    this.learningEcho = {
-      entry: { ...enemy.entry },
-      x: enemy.x,
-      y: Math.max(96, enemy.y - enemy.radius - 18),
-      remaining: 1.1,
-      duration: 1.1,
-    };
-    this.hooks.onKillTranslation?.({ ...enemy.entry });
+    if (this.gameplayMode !== "recall") {
+      // Combat learning feedback stays separate from Recall's configurable prompt.
+      this.learningEcho = {
+        entry: { ...enemy.entry },
+        x: enemy.x,
+        y: Math.max(96, enemy.y - enemy.radius - 18),
+        remaining: 1.1,
+        duration: 1.1,
+      };
+      this.hooks.onKillTranslation?.({ ...enemy.entry });
+    }
 
     this.fireLaser(enemy, 1.45);
     const deathDefinition = this.visualDefinitionForEnemy(enemy);
@@ -5909,13 +5902,7 @@ export class Game {
     );
     this.activateEnemyReward(enemy);
 
-    if (enemy.kind === "splitter") {
-      this.spawnSplitFragments(enemy);
-    }
-
-    if (enemy.eliteModifiers.includes("volatile")) {
-      this.spawnVolatileBurst(enemy);
-    }
+    this.triggerEnemyDeathTraits(enemy);
 
     if (this.settings.screenShake) {
       this.shake = Math.max(
@@ -5932,6 +5919,7 @@ export class Game {
     });
 
     this.enemies = this.enemies.filter((item) => item.id !== enemy.id);
+    this.recallHintIndices.delete(enemy.id);
     if (this.markedEnemyId === enemy.id) {
       this.markedEnemyId = null;
       this.markTimer = 0;
@@ -6093,6 +6081,12 @@ export class Game {
     };
     this.hooks.onStatuses(this.statusState);
     this.emitStats();
+  }
+
+  private triggerEnemyDeathTraits(enemy: Enemy): void {
+    if (this.gameplayMode === "recall") return;
+    if (enemy.kind === "splitter") this.spawnSplitFragments(enemy);
+    if (enemy.eliteModifiers.includes("volatile")) this.spawnVolatileBurst(enemy);
   }
 
   private spawnVolatileBurst(enemy: Enemy): void {
@@ -6894,6 +6888,7 @@ export class Game {
     this.projectiles = [];
     const victims = this.enemies;
     this.enemies = [];
+    this.recallHintIndices.clear();
     for (const enemy of victims) {
       this.stageResultTracker.skillKillWord(
         "enemy",
