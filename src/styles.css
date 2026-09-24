@@ -3973,27 +3973,5 @@ kbd {
 
 
 /* Pre-M22 Recall Mode */
-.recall-assist-bar {
-  position: absolute;
-  z-index: 18;
-  top: 78px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: min(620px, calc(100% - 32px));
-  padding: 8px 10px;
-  border: 1px solid rgba(105, 239, 255, .4);
-  border-radius: 10px;
-  background: rgba(3, 10, 21, .9);
-}
-.recall-assist-bar > div { display: grid; margin-right: auto; }
-.recall-assist-bar strong { color: #87f5ff; font-size: 10px; letter-spacing: .14em; }
-.recall-assist-bar span { color: rgba(228, 242, 250, .82); font-size: 12px; }
-.recall-assist-bar button { min-height: 34px; padding: 6px 9px; }
-@media (max-width: 720px) {
-  .recall-assist-bar { top: 68px; flex-wrap: wrap; }
-  .recall-assist-bar > div { flex-basis: 100%; }
-  .recall-assist-bar button { flex: 1; }
-}
+.recall-assist-bar{position:absolute;z-index:18;top:78px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:7px 9px;border:1px solid #4ecfe366;border-radius:9px;background:#030a15e8}
+.recall-assist-bar>div{display:grid;margin-right:auto}.recall-assist-bar strong{color:#87f5ff}.recall-assist-bar span{font-size:12px}.recall-assist-bar button{min-height:32px}
