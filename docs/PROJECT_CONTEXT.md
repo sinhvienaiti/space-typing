@@ -3707,6 +3707,9 @@ This plan is a roadmap, not evidence that every acceptance gate is complete.
 - Batch F also enriches the existing M22 Manual Gate evidence with draw p95, adaptive scale, effective DPR, Canvas pixels and sprite-cache occupancy. Procedure: `docs/UI_UX_BATCH_F_BROWSER_QA.md`.
 - CI #597 measured JS raw 609.77 KiB / gzip 163.33 KiB and CSS raw 59.60 KiB / gzip 13.57 KiB; no Batch F stylesheet rules were added and existing bundle limits were not relaxed.
 - **Batch F remains PENDING REAL-BROWSER ACCEPTANCE.** Green CI does not satisfy the required paired baseline/candidate runs, visual review, audio-device review or user-hardware performance evidence.
+- Stage pacing follow-up PR #99 adds the previously missing explicit 3–5 runtime phase scheduler over the existing total enemy budgets. CI #604 passes **146 test files / 727 tests**, TypeScript, production Build, bundle budget and ship-art budget. The scheduler preserves M12 concurrent-pressure caps, prevents formation quota spill, drains the battlefield between phases, exposes phase state in Test Lab, and shows Wave N/M in the existing HUD without adding PlayerSave state.
+- PR #99 CI #604 measured JS raw 613.57 KiB / gzip 164.40 KiB and CSS raw 59.60 KiB / gzip 13.57 KiB under unchanged limits.
+- The stage-pacing manual gate is still open: real-browser low/high-WPM evidence must validate the target duration bands (ordinary about 90–150s; milestone/boss about 120–210s) and readability/audio behavior. Draft PR #82 contains an older conflicting enemy-budget curve and must not be merged over the current scheduler without a fresh balance/economy review.
 
 ---
 
