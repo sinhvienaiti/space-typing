@@ -46,6 +46,22 @@ export type LoadedVocabularyTopic = {
   representativeLevel: number;
 };
 
+export function representativeTopicLevel(
+  entries: readonly VocabularyTopicEntry[],
+): number {
+  const profile = entries
+    .map((entry) => entry.level)
+    .filter(
+      (level) =>
+        Number.isInteger(level) &&
+        level >= 1 &&
+        level <= 100,
+    )
+    .sort((left, right) => left - right);
+
+  return profile[Math.floor((profile.length - 1) / 2)] ?? 1;
+}
+
 function normalizeEnglish(value: string): string {
   return value.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
 }
@@ -315,8 +331,7 @@ export async function loadVocabularyTopic(
     throw new Error("Vocabulary topic " + topicId + " has no valid entries.");
   }
 
-  const representativeLevel =
-    levels[Math.floor((levels.length - 1) / 2)] ?? levels[0] ?? 1;
+  const representativeLevel = representativeTopicLevel(levelHints);
 
   return {
     topic: { ...topic, levels: [...topic.levels], keys: [...topic.keys] },
