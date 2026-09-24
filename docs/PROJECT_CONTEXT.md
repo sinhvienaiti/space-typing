@@ -3748,3 +3748,14 @@ Implemented:
 Automated validation: child CI #622 PASS, 147 test files / 732 tests, TypeScript/build/bundle/Ship V3/audio guards PASS.
 
 The remaining audio gate is the existing M22 real-browser + real-output-device listening matrix. Do not mark M22 complete from CI alone.
+
+
+## 2026-09-24 — Post-T16 HUD hot-path review
+
+A further automated source review after T16 identified and fixed:
+- repeated Combat Hotbar DOM queries/writes on the 150 ms skill/status cadence;
+- per-frame boss HUD callbacks while a boss remained staggered;
+- redundant direct boss HUD DOM writes;
+- Route Map action ambiguity between optional station/shop services and the primary Start Stage action.
+
+The fixes preserve all gameplay and presentation features. See `docs/AUDIO_EXPERIENCE_PERFORMANCE_PLAN.md` §15 for the detailed checkpoint. Real-browser M22 acceptance remains pending.
