@@ -1773,26 +1773,26 @@ let selectedJourneyStage = campaign.selectedStage;
  * Existing button IDs and their action listeners remain unchanged. */
 function installMenuHelp(): void {
   const descriptions: Record<string, string> = {
-    routeButton: "Preview sector, boss and checkpoint.",
-    stageSelectButton: "Browse and replay unlocked stages.",
-    characterButton: "Choose pilot and progression.",
-    equipmentButton: "Equip gear and review stats.",
-    supportButton: "Assign support spells.",
-    hotbarButton: "Assign skills and items to keys.",
-    vocabularyButton: "Choose shared or custom vocabulary.",
-    progressionButton: "Review missions and rewards.",
-    codexButton: "Review discovered content.",
-    settingsButton: "Audio, display, Recall and controls.",
-    dataButton: "Save and performance information.",
-    shopButton: "Finite-stock shop.",
-    stationShopButton: "Maintenance shop.",
-    serviceShopButton: "Repair and upgrade gear.",
+    routeButton: "Sector, boss and checkpoint preview",
+    stageSelectButton: "Browse/replay unlocked stages",
+    characterButton: "Pilot and progression",
+    equipmentButton: "Gear and combat stats",
+    supportButton: "Combat support spells",
+    hotbarButton: "Skills/items on number keys",
+    vocabularyButton: "Shared/custom vocabulary",
+    progressionButton: "Missions and rewards",
+    codexButton: "Discovered content",
+    settingsButton: "Audio/display/Recall controls",
+    dataButton: "Save/performance info",
+    shopButton: "Finite-stock items",
+    stationShopButton: "Maintenance items",
+    serviceShopButton: "Repair/upgrade gear",
   };
 
   const wrappers: HTMLElement[] = [];
   for (const [id, description] of Object.entries(descriptions)) {
     const action = byId<HTMLButtonElement>(id);
-    const title = action.textContent?.trim() || id;
+    const title = action.textContent || id;
     const parent = action.parentElement;
     if (parent === null) continue;
     const wrap = document.createElement("div");
@@ -7653,8 +7653,8 @@ function renderGameplayMode(): void {
     ? "Recall · hear, remember, type"
     : "Combat · see, type, shoot";
   byId("titleModeIntro").textContent = recall
-    ? "Hear the word, rebuild its hidden Recall Core, and stop the enemy before contact."
-    : "Type visible enemy words to lock, shoot and keep your streak.";
+    ? "Hear the word, rebuild it, stop the enemy before contact."
+    : "Type visible words, shoot and keep your streak.";
   game.setGameplayMode(gameplayMode, recallSettings);
   updateCampaignUi();
   renderRecallAssistUi();
