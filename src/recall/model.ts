@@ -209,39 +209,31 @@ export function canReplayRecall(
   return remaining === null || remaining > 0;
 }
 
-export function recallReviewScore(
-  entry: VocabularyEntry,
-  memory: RecallMemoryState,
-): number {
-  const key = entry.id || entry.en.toLocaleLowerCase("en-US");
-  const item = memory[key];
-  if (item === undefined || item.attempts <= 0) return 0;
-  const attempts = item.attempts;
-  const imperfect = Math.max(0, attempts - item.perfect);
-  const assist = item.hintsUsed + item.replaysUsed;
-  const averageMs = item.totalResponseMs / attempts;
-  return (
-    (item.failed * 2.5 + imperfect * 0.75 + assist * 0.35) / attempts +
-    Math.min(1, averageMs / 8_000)
-  );
-}
-
 export function buildAdaptiveRecallVocabulary(
   entries: readonly VocabularyEntry[],
   memory: RecallMemoryState,
 ): VocabularyEntry[] {
-  const base = [...entries];
-  if (base.length < 2) return base;
+  if (entries.length < 2) return [...entries];
 
-  const ranked = base
-    .map((entry) => ({ entry, score: recallReviewScore(entry, memory) }))
+  const ranked = entries
+    .map((entry) => {
+      const item = memory[entry.id || entry.en.toLocaleLowerCase("en-US")];
+      const attempts = item?.attempts ?? 0;
+      const score = item === undefined || attempts <= 0
+        ? 0
+        : (item.failed * 2.5 +
+            Math.max(0, attempts - item.perfect) * 0.75 +
+            (item.hintsUsed + item.replaysUsed) * 0.35) / attempts +
+          Math.min(1, item.totalResponseMs / attempts / 8_000);
+      return { entry, score };
+    })
     .filter((item) => item.score >= 1)
     .sort(
       (left, right) =>
         right.score - left.score ||
         left.entry.id.localeCompare(right.entry.id),
     );
-  const extraCap = Math.min(512, Math.ceil(base.length * 0.25));
+  const extraCap = Math.min(512, Math.ceil(entries.length / 4));
   const extras: VocabularyEntry[] = [];
 
   for (const item of ranked) {
@@ -252,7 +244,7 @@ export function buildAdaptiveRecallVocabulary(
     if (extras.length >= extraCap) break;
   }
 
-  return extras.length === 0 ? base : base.concat(extras);
+  return [...entries, ...extras];
 }
 
 export function recordRecallAttempt(
