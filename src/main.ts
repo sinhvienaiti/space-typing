@@ -3972,27 +3972,19 @@ const game = new Game(
       // Use distinct compact currency badges rather than a long wrapped line
       // that makes the entire results card unusually tall.
       const rewardContainer = byId("clearCredits");
-      rewardContainer.replaceChildren();
-      for (const [icon, amount, label] of [
-        ["◈", totalCreditReward, "Credits"],
-        ["⬡", totalCurrencyReward.alloy, "Alloy"],
-        ["✧", totalCurrencyReward.starCrystal, "Star Crystal"],
-        ["✦", totalCurrencyReward.quantumCore, "Quantum Core"],
-      ] as const) {
-        if (amount <= 0) continue;
-        const chip = document.createElement("span");
-        chip.className = "reward-chip";
-        chip.title = "+" + amount.toLocaleString() + " " + label;
-        chip.setAttribute("aria-label", chip.title);
-        const glyph = document.createElement("span");
-        glyph.className = "currency-glyph";
-        glyph.setAttribute("aria-hidden", "true");
-        glyph.textContent = icon;
-        const value = document.createElement("span");
-        value.textContent = "+" + amount.toLocaleString();
-        chip.append(glyph, value);
-        rewardContainer.append(chip);
-      }
+      replaceCurrencyChips(
+        rewardContainer,
+        {
+          credits: totalCreditReward,
+          alloy: totalCurrencyReward.alloy,
+          starCrystal: totalCurrencyReward.starCrystal,
+          quantumCore: totalCurrencyReward.quantumCore,
+        },
+        {
+          signed: true,
+          className: "stage-reward-chips",
+        },
+      );
       byId("clearDetails").textContent =
         [objectiveText, performanceText ? "Performance: " + performanceText : "",
           ascensionText, checkpointText]
@@ -4429,7 +4421,8 @@ function renderBasicSkillPanel(): void {
         : null;
     const card = document.createElement("article");
     card.className =
-      "basic-skill-card " + (rank > 0 ? "learned" : "locked");
+      "basic-skill-card visual-card skill-card " +
+      (rank > 0 ? "learned" : "locked");
     const icon = document.createElement("span");
     icon.className = "basic-skill-icon";
     icon.textContent = presentation.icon;
@@ -4636,7 +4629,7 @@ function renderEquipment(): void {
 
   for (const slot of EQUIPMENT_SLOTS) {
     const card = document.createElement("label");
-    card.className = "equipment-slot";
+    card.className = "equipment-slot visual-card equipment-card";
 
     const title = document.createElement("span");
     title.className = "equipment-slot-name";
@@ -4686,17 +4679,37 @@ function renderEquipment(): void {
             (item) => item.instanceId === currentId,
           ) ?? null;
 
+    const definition =
+      current === null
+        ? null
+        : getEquipmentDefinition(current.definitionId);
+    applyGradeFrame(card, current?.grade ?? "aluminum");
+
+    const head = document.createElement("div");
+    head.className = "equipment-card-head";
+    const visual = createLocalIcon(
+      definition?.icon ?? "○",
+      definition === null ? slot + " slot" : definition.name + " icon",
+      "equipment-card-icon",
+    );
+    const identity = document.createElement("div");
+    identity.className = "equipment-card-identity";
+    identity.append(title);
+    if (current !== null) {
+      identity.append(createGradeBadge(current.grade));
+    }
+    head.append(visual, identity);
+
     const detail = document.createElement("small");
     detail.textContent =
       current === null
         ? "No equipment"
-        : gradeLabel(current.grade).toUpperCase() +
-          " +" +
+        : "+" +
           String(current.enhancement) +
           " · " +
-          getEquipmentDefinition(current.definitionId).description;
+          (definition?.description ?? "");
 
-    card.append(title, select, detail);
+    card.append(head, select, detail);
     grid.append(card);
   }
 
