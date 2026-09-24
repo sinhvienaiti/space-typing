@@ -3970,3 +3970,121 @@ kbd {
 .local-item-icon{display:grid;place-items:center;height:42px}
 .item-card{display:grid;grid-template-columns:46px 1fr;gap:.5rem}
 
+
+
+/* Pre-M22 Recall Mode */
+.title-mode-panel {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(104, 231, 255, 0.2);
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(88, 225, 255, 0.1), transparent 45%),
+    rgba(4, 10, 20, 0.62);
+}
+
+.title-mode-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.title-mode-panel small {
+  color: rgba(205, 226, 240, 0.72);
+  line-height: 1.35;
+}
+
+.recall-assist-bar {
+  position: absolute;
+  z-index: 18;
+  top: 78px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: min(620px, calc(100% - 32px));
+  max-width: calc(100% - 32px);
+  padding: 8px 10px;
+  border: 1px solid rgba(105, 239, 255, 0.4);
+  border-radius: 12px;
+  background: rgba(3, 10, 21, 0.88);
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.24),
+    inset 0 0 24px rgba(78, 222, 255, 0.05);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.recall-assist-bar > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  margin-right: auto;
+}
+
+.recall-assist-bar strong {
+  color: #87f5ff;
+  font: 850 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.16em;
+}
+
+.recall-assist-bar span {
+  overflow: hidden;
+  color: rgba(228, 242, 250, 0.82);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recall-assist-bar button {
+  min-height: 34px;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.recall-dialog {
+  width: min(650px, calc(100vw - 30px));
+}
+
+.recall-dialog-copy {
+  margin: 0 0 14px;
+  color: rgba(218, 233, 244, 0.78);
+  line-height: 1.55;
+}
+
+.recall-profile-summary {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(107, 235, 255, 0.2);
+  border-radius: 10px;
+  background: rgba(81, 218, 255, 0.055);
+}
+
+.recall-profile-summary strong {
+  color: #9cf7ff;
+}
+
+.recall-profile-summary span {
+  color: rgba(217, 237, 247, 0.72);
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .recall-assist-bar {
+    top: 68px;
+    flex-wrap: wrap;
+  }
+
+  .recall-assist-bar > div {
+    flex-basis: 100%;
+  }
+
+  .recall-assist-bar button {
+    flex: 1 1 0;
+  }
+}
