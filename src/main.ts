@@ -768,7 +768,7 @@ app.innerHTML = `
             <button id="combatModeButton" type="button">Combat</button>
             <button id="recallModeButton" type="button">Recall</button>
           </div>
-          <small id="titleModeMeta" class="world-meta">Combat · see English, type, shoot</small>
+          <small id="titleModeMeta" class="world-meta">Combat · see, type, shoot</small>
         </section>
 
         <div class="title-play-actions">
@@ -1773,20 +1773,20 @@ let selectedJourneyStage = campaign.selectedStage;
  * Existing button IDs and their action listeners remain unchanged. */
 function installMenuHelp(): void {
   const descriptions: Record<string, [string, string]> = {
-    routeButton: ["Sector Briefing", "Shows the next ten combat stages, boss and checkpoint. Campaign Map lets you choose or replay an unlocked stage. Old saved sectors may still contain optional lanes."],
-    stageSelectButton: ["Campaign Map", "Navigate Worlds, view boss checkpoints and replay stages that are already unlocked."],
-    characterButton: ["Characters", "Choose your pilot and spend character progression upgrades."],
-    equipmentButton: ["Equipment", "Review equipped gear, drops and combat attributes."],
-    supportButton: ["Support Spells", "Assign the support spells available during combat."],
-    hotbarButton: ["Hotbar", "Assign skills and consumables to combat shortcuts."],
-    vocabularyButton: ["Vocabulary", "Select a shared level, learning topic or custom English list."],
-    progressionButton: ["Missions", "Review progression objectives and claim earned rewards."],
-    codexButton: ["Codex", "See discovered enemies, Worlds and reward records."],
-    settingsButton: ["Settings", "Configure game audio, speech, display quality, Recall and controls."],
-    dataButton: ["Data", "Review saves, active stage and combat performance information."],
-    shopButton: ["Normal Shop", "Browse the existing finite-stock shop; purchases are saved."],
-    stationShopButton: ["Station Shop", "Browse maintenance-related items in the station shop."],
-    serviceShopButton: ["Repair and Upgrade", "Repair, improve and manage equipment with available resources."],
+    routeButton: ["Sector Briefing", "Preview the next sector, boss, checkpoint and optional services."],
+    stageSelectButton: ["Campaign Map", "Browse Worlds and replay unlocked stages."],
+    characterButton: ["Characters", "Choose a pilot and spend progression upgrades."],
+    equipmentButton: ["Equipment", "Equip gear and review combat stats."],
+    supportButton: ["Support Spells", "Assign support spells for combat."],
+    hotbarButton: ["Hotbar", "Assign skills and items to number keys."],
+    vocabularyButton: ["Vocabulary", "Choose Class, Topic, Word Type, Grammar or Custom words."],
+    progressionButton: ["Missions", "Review missions and claim rewards."],
+    codexButton: ["Codex", "Review discovered enemies, Worlds and rewards."],
+    settingsButton: ["Settings", "Audio, speech, display, Recall and controls."],
+    dataButton: ["Data", "Save, stage and performance information."],
+    shopButton: ["Normal Shop", "Finite-stock general shop."],
+    stationShopButton: ["Station Shop", "Maintenance-focused station shop."],
+    serviceShopButton: ["Repair and Upgrade", "Repair and upgrade equipment."],
   };
 
   const wrappers: HTMLElement[] = [];
@@ -3801,7 +3801,7 @@ function renderWordReview(snapshot: StageSessionSnapshot): void {
   if (groups.length === 0) {
     const empty = document.createElement("p");
     empty.className = "word-review-empty";
-    empty.textContent = "No word attempts in this category.";
+    empty.textContent = "No words in this category.";
     list.append(empty);
     return;
   }
@@ -3814,9 +3814,9 @@ function renderWordReview(snapshot: StageSessionSnapshot): void {
     const word = document.createElement("strong");
     word.textContent = group.en;
     const ipa = document.createElement("span");
-    ipa.textContent = group.ipa || "IPA unavailable";
+    ipa.textContent = group.ipa || "No IPA";
     const meaning = document.createElement("span");
-    meaning.textContent = group.vi || "Vietnamese meaning unavailable";
+    meaning.textContent = group.vi || "No Vietnamese meaning";
     learning.append(word, ipa, meaning);
 
     const outcomes = document.createElement("div");
@@ -3900,7 +3900,7 @@ function renderMeasuredStageSession(
     typing,
     "Corrected errors",
     String(snapshot.correctedErrors),
-    "wrong target keys on attempts later completed",
+    "wrong keys later corrected",
   );
   appendResultMetric(
     typing,
@@ -3916,7 +3916,7 @@ function renderMeasuredStageSession(
     typing,
     "Skill-killed words",
     String(snapshot.skillKilledWords),
-    "not counted as typing mistakes",
+    "not typing mistakes",
   );
   appendResultMetric(
     typing,
@@ -3932,20 +3932,11 @@ function renderMeasuredStageSession(
   if (gameplayMode === "recall") {
     appendResultMetric(
       typing,
-      "Recall perfect",
-      recallStage.perfect + " / " + recallStage.attempts,
-      (recallStage.attempts - recallStage.perfect) + " need review",
-    );
-    appendResultMetric(
-      typing,
-      "Recall assists",
-      recallStage.hints + " hints",
-      recallStage.replays + " replays",
-    );
-    appendResultMetric(
-      typing,
-      "Recall response",
-      (recallStage.responseMs / Math.max(1, recallStage.attempts) / 1000).toFixed(1) + "s",
+      "Recall",
+      recallStage.perfect + " / " + recallStage.attempts + " perfect",
+      (recallStage.attempts - recallStage.perfect) + " review · " +
+        recallStage.hints + " hints · " + recallStage.replays + " replays · " +
+        (recallStage.responseMs / Math.max(1, recallStage.attempts) / 1000).toFixed(1) + "s avg",
     );
   }
 
@@ -7658,11 +7649,11 @@ function renderGameplayMode(): void {
   byId<HTMLButtonElement>("combatModeButton").classList.toggle("primary", !recall);
   byId<HTMLButtonElement>("recallModeButton").classList.toggle("primary", recall);
   byId("titleModeMeta").textContent = recall
-    ? "Recall · hear English, reconstruct the hidden word, survive contact"
-    : "Combat · see English, type, shoot";
+    ? "Recall · hear, remember, type"
+    : "Combat · see, type, shoot";
   byId("titleModeIntro").textContent = recall
-    ? "Listen to each English word, reconstruct its hidden Recall Core, and stop one approaching enemy at a time before it reaches your ship."
-    : "Lock a target with its first letter, finish the word, and keep the streak alive. No movement — only typing decisions.";
+    ? "Hear the word, rebuild its hidden Recall Core, and stop the enemy before contact."
+    : "Type visible enemy words to lock, shoot and keep your streak.";
   game.setGameplayMode(gameplayMode, recallSettings);
   updateCampaignUi();
   renderRecallAssistUi();
