@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  MAX_STAGE_WORD_ATTEMPTS,
   StageSessionTracker,
   groupStageWordAttempts,
   stageResultStars,
@@ -115,6 +116,22 @@ describe("Batch C stage session telemetry", () => {
       correctKeys: 12,
       wrongKeys: 2,
     });
+  });
+
+  it("bounds the per-stage word trace while keeping aggregate counters", () => {
+    const tracker = new StageSessionTracker();
+    for (let index = 0; index < MAX_STAGE_WORD_ATTEMPTS + 5; index += 1) {
+      tracker.missWord(
+        "enemy",
+        index,
+        { ...entry, id: "word-" + index, en: "word" + index },
+        index,
+      );
+    }
+    const result = tracker.snapshot(700);
+    expect(result.wordAttempts).toHaveLength(MAX_STAGE_WORD_ATTEMPTS);
+    expect(result.wordAttemptsTruncated).toBe(5);
+    expect(result.missedWords).toBe(MAX_STAGE_WORD_ATTEMPTS + 5);
   });
 
   it("publishes deterministic star rules with an objective-aware third star", () => {
