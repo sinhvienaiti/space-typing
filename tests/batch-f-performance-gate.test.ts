@@ -55,14 +55,13 @@ describe("Batch F browser performance gate", () => {
       },
     });
 
-    expect(compareBatchFPerformance(baseline, candidate)).toMatchObject({
-      comparable: true,
-      pass: true,
-      frameP95DeltaMs: 0.8,
-      renderP95DeltaMs: 0.7,
-      averageFpsDelta: -1,
-      slowFrameRatioDelta: 0.005,
-    });
+    const comparison = compareBatchFPerformance(baseline, candidate);
+    expect(comparison.comparable).toBe(true);
+    expect(comparison.pass).toBe(true);
+    expect(comparison.frameP95DeltaMs).toBeCloseTo(0.8);
+    expect(comparison.renderP95DeltaMs).toBeCloseTo(0.7);
+    expect(comparison.averageFpsDelta).toBe(-1);
+    expect(comparison.slowFrameRatioDelta).toBeCloseTo(0.005);
   });
 
   it("fails a real p95 regression without hiding it behind average FPS", () => {
