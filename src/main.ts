@@ -438,6 +438,7 @@ import {
   loadVocabularyGrammarIndex,
   loadVocabularyGrammarModule,
   loadVocabularyIndex,
+  loadVocabularyKeys,
   loadVocabularyLevel,
   loadVocabularyPosCategory,
   loadVocabularyPosIndex,
@@ -448,6 +449,17 @@ import {
   type VocabularyPosIndex,
   type VocabularyTopicIndex,
 } from "./vocabulary";
+import {
+  LEARNING_ATTEMPT_MESSAGE,
+  PARENT_ORIGIN,
+  REVIEW_DATASET_MESSAGE,
+  REVIEW_ERROR_MESSAGE,
+  REVIEW_READY_MESSAGE,
+  buildCombatLearningEvent,
+  buildRecallLearningEvent,
+  parseSpaceReviewDataset,
+  type SpaceReviewGoal,
+} from "./learning/shared";
 import {
   loadTypingTextChallenge,
   type TypingTextChallenge,
