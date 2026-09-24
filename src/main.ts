@@ -4007,10 +4007,21 @@ const game = new Game(
       xpTrack.value = atMaxLevel ? 1 : progressAward.progress.xp;
       xpTrack.setAttribute("aria-label", "Character XP");
       const xpDetail = document.createElement("span");
-      xpDetail.textContent = atMaxLevel
-        ? "Maximum character level"
-        : progressAward.progress.xp + " / " +
-          xpNeededForLevel(progressAward.progress.level) + " XP";
+      const previousAtMax =
+        progressAward.previousLevel >= MAX_CHARACTER_LEVEL;
+      const previousTarget = previousAtMax
+        ? 1
+        : xpNeededForLevel(progressAward.previousLevel);
+      const previousXpText = previousAtMax
+        ? "MAX"
+        : String(progressAward.previousXp) + " / " +
+          String(previousTarget);
+      const nextXpText = atMaxLevel
+        ? "MAX"
+        : String(progressAward.progress.xp) + " / " +
+          String(xpNeededForLevel(progressAward.progress.level));
+      xpDetail.textContent =
+        "XP " + previousXpText + " → " + nextXpText;
       characterProgressPanel.append(xpTitle, xpTrack, xpDetail);
       if (progressAward.levelUps > 0) {
         const gainedStats = document.createElement("p");
