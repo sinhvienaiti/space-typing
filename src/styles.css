@@ -3972,6 +3972,4 @@ kbd {
 
 
 
-/* Pre-M22 Recall Mode */
 .recall-assist-bar{top:124px;display:flex;gap:8px;pointer-events:auto}
-.recall-assist-bar>div{margin-right:auto}
