@@ -7583,13 +7583,7 @@ function renderRecallAssistUi(): void {
 
   const prompt = game.getRecallPrompt();
   byId("recallAssistMeta").textContent =
-    prompt === null
-      ? "Incoming signal…"
-      : "Listen · " +
-        String(prompt.entry.en.replace(/[^a-z]/gi, "").length) +
-        " letters · " +
-        String(prompt.hintCount) +
-        " clues";
+    prompt === null ? "Incoming…" : "Listen · clues " + String(prompt.hintCount);
   const replay = byId<HTMLButtonElement>("recallReplayButton");
   replay.textContent =
     prompt?.replaysRemaining === null
