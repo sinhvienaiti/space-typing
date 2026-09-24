@@ -1428,6 +1428,7 @@ export class Game {
       return false;
     }
     this.spawnTimer = 0;
+    this.stagePhaseBreakTimer = 0;
     return this.runSpawnScheduler(this.difficulty);
   }
 
@@ -3106,6 +3107,10 @@ export class Game {
     this.updateAnomalyCrate(dt);
     if (!(this.testLabEnabled && this.testLabSchedulerFrozen)) {
       this.spawnTimer -= dt * hostileTimeFactor;
+      this.stagePhaseBreakTimer = Math.max(
+        0,
+        this.stagePhaseBreakTimer - dt,
+      );
     }
     this.supplySpawnTimer -= dt;
     this.treasureDroneTimer -= dt;
@@ -3931,6 +3936,50 @@ export class Game {
     return snapshot;
   }
 
+  private currentStagePacingPhase(): StagePacingPhase | null {
+    return this.stagePacingPlan?.phases[this.stagePhaseIndex] ?? null;
+  }
+
+  private stagePhaseAllowsSpawn(
+    phase: StagePacingPhase,
+    difficulty: DifficultyProfile,
+  ): boolean {
+    if (this.stagePhaseSpawned < phase.budget) return true;
+
+    const phaseCount = this.stagePacingPlan?.phases.length ?? 0;
+    if (this.stagePhaseIndex >= phaseCount - 1) return false;
+
+    if (this.enemies.length > phase.drainThreshold) {
+      this.spawnTimer = Math.max(
+        0.12,
+        difficulty.reactionWindow * 0.2,
+      );
+      return false;
+    }
+
+    if (!this.stagePhaseBreakArmed) {
+      this.stagePhaseBreakArmed = true;
+      this.stagePhaseBreakTimer = phase.recoverySeconds;
+      this.spawnTimer = 0;
+      return false;
+    }
+
+    if (this.stagePhaseBreakTimer > 0) return false;
+
+    this.stagePhaseIndex += 1;
+    this.stagePhaseSpawned = 0;
+    this.stagePhaseBreakArmed = false;
+    const next = this.currentStagePacingPhase();
+    if (next === null) return false;
+
+    this.spawnTimer =
+      difficulty.spawnInterval *
+      next.spawnIntervalMultiplier *
+      0.35;
+    this.hooks.onStagePhase?.({ ...next });
+    return false;
+  }
+
   private runSpawnScheduler(
     difficulty: DifficultyProfile,
   ): boolean {
@@ -3942,19 +3991,41 @@ export class Game {
       return false;
     }
 
-    const formationCount = this.trySpawnFormation(difficulty);
+    const phase = this.currentStagePacingPhase();
+    if (
+      phase === null ||
+      !this.stagePhaseAllowsSpawn(phase, difficulty)
+    ) {
+      return false;
+    }
+    const phaseRemaining = Math.max(
+      0,
+      phase.budget - this.stagePhaseSpawned,
+    );
+    if (phaseRemaining <= 0) return false;
+
+    const formationCount = this.trySpawnFormation(
+      difficulty,
+      phaseRemaining,
+    );
     if (formationCount > 0) {
       this.spawnRemaining -= formationCount;
+      this.stagePhaseSpawned += formationCount;
       this.spawnTimer =
-        difficulty.spawnInterval * randomBetween(1.02, 1.28);
+        difficulty.spawnInterval *
+        phase.spawnIntervalMultiplier *
+        randomBetween(1.02, 1.28);
       return true;
     }
 
     const spawned = this.spawnEnemy();
     if (spawned) {
       this.spawnRemaining -= 1;
+      this.stagePhaseSpawned += 1;
       this.spawnTimer =
-        difficulty.spawnInterval * randomBetween(0.82, 1.16);
+        difficulty.spawnInterval *
+        phase.spawnIntervalMultiplier *
+        randomBetween(0.82, 1.16);
       return true;
     }
 
@@ -3991,6 +4062,7 @@ export class Game {
 
   private trySpawnFormation(
     difficulty: DifficultyProfile,
+    phaseBudgetRemaining = this.spawnRemaining,
   ): number {
     if (
       this.hiddenEncounterRuntime?.forcePriorityTargets ||
@@ -4003,6 +4075,7 @@ export class Game {
     if (
       stageConfig === null ||
       this.spawnRemaining < 2 ||
+      phaseBudgetRemaining < 2 ||
       formationSpawnChance(
         difficulty,
         stageConfig.role,
@@ -4018,7 +4091,7 @@ export class Game {
     const formation = chooseFormation(
       stageConfig.stage,
       difficulty.formationComplexity,
-      this.spawnRemaining,
+      Math.min(this.spawnRemaining, phaseBudgetRemaining),
     );
     if (
       formation === null ||
@@ -4132,7 +4205,14 @@ export class Game {
         : formationMember
           ? false
           : forceElite ||
-            rollElite(this.stageConfig?.eliteChance ?? 0);
+            rollElite(
+              Math.min(
+                0.72,
+                (this.stageConfig?.eliteChance ?? 0) *
+                  (this.currentStagePacingPhase()
+                    ?.eliteChanceMultiplier ?? 1),
+              ),
+            );
     const golden =
       !formationMember &&
       !elite &&
