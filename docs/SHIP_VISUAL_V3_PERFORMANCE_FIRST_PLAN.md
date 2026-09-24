@@ -1,6 +1,6 @@
 # Ship Visual V3 — Performance-First Art Polish Plan
 
-Status: V30–V34 ART/PREP IMPLEMENTED · V32 BINARY NOT YET COMMITTED · V35 BROWSER GATE PENDING · V36 FINAL HANDOFF PENDING
+Status: V30–V34 IMPLEMENTED · V32/V33 REVIEWED BINARY COMMITTED + ACTIVE · V35 BROWSER A/B GATE PENDING · V36 FINAL HANDOFF PENDING
 
 Source of truth: this document + `docs/PROJECT_CONTEXT.md` + existing V2 art/runtime contracts.
 This is an approved, scoped follow-up to C05–C11 in `docs/PRE_M22_COMBAT_IDENTITY_TYPING_CLARITY_PLAN.md`.
@@ -27,7 +27,7 @@ Replace the current fairly geometric illustrated SVG ships with **11 clearly dis
 5. Reuse current engine flames, one derived equipment aura, 11 projectile profiles and state VFX. Do not bake an animated aura/shot into ship artwork or introduce sprite-sheet frame-by-frame animation.
 6. Layer only the minimum runtime animation: current low-amplitude hover/bank, existing engine flames, already-shipped equipment aura and projectile VFX. Restrict or omit extra bloom, secondary particle clouds, 3D tilts, animated mechanical wings and large trails unless profiling proves their value.
 7. An image load failure or budget violation must prefer V2 SVG; if V2 also fails, fall back to the current procedural Canvas silhouettes. Do not block gameplay.
-8. The approved generated concept is a **reference**. Ship V3 remains PENDING until 11 new production-quality sprites are actually prepared, checked and integrated. A performance scaffold or rebranding of V2 is not completion.
+8. The approved generated concept was only a **reference**. The reviewed 11-ship production atlas is now committed and integrated; V3 still remains **acceptance-pending** until the required same-device browser performance/readability review is recorded. A green file/hash/build check is not a substitute for V35.
 
 ## Non-negotiable measured budgets
 
@@ -123,8 +123,8 @@ Acceptance: independent silhouette and full-color comparison at 64/78/128 CSS px
 ## Execution checkpoints
 
 - V30: 11-ship art direction, exclusion list and hard budgets documented here.
-- V31: implemented `src/characters/ship-art.ts` V3 → V2 → procedural fallback, dimension-validation tests, and `scripts/check-ship-art-budget.mjs` wired to production build. Until a real V3 atlas is registered, **runtime art remains V2**.
-- V32: 11 distinct generated source sprites and the real 4×3 lossless WebP atlas have been assembled and visually reviewed as local artifacts; the atlas has 1024×768 pixels, 800,054 bytes (781.3 KiB; below the 800 KiB target), 3 MiB decoded RGBA and SHA-256 `fb9434e002d6da650e34192eb425e62d1e2f3bec8804a9b33b7aa8733de10eb3`. Local archive includes the full-resolution atlas, 11 original crops, a contact sheet and 64/78/128px previews. **The raster asset has not yet been committed as a binary GitHub blob.** The GitHub connector available in this environment can update source text but cannot ingest local binary files by path. Do not mark V32 source-of-truth integration complete until it is committed through a verified binary upload.
-- V33/V34: V3-aware render path now accepts the existing V3→V2→procedural selection; avoids V2 engine flames and heavy image-shadow bloom over painted V3 sprite art; startup exposes current art source for QA. Character-specific projectiles and equipment aura still reuse their existing implementations without new emitters. Until the V3 WebP is registered in the existing art manifest **production continues to render V2**. `scripts/install-ship-v3.mjs` SHA-verifies the prepared V3 artwork, places the atlas under the canonical public path, and registers the manifest entry in a local clone.
-- V35: local atlas file/format/source count/transparency and 64/78/128px preview preparation passed. Browser Test Lab V2/V3 paired performance, image contrast and two-build human visual comparison **must still be performed on a clone that has the V3 binary installed**. Never substitute mocked Canvas tests or an infographic's invented benchmarks.
-- V36: docs and CI may merge the safe activation code first; the actual V3 release and final main CI are not complete until Git contains the vetted binary and browser checks have been recorded. M22–M25 remain deferred per user request.
+- V31: implemented `src/characters/ship-art.ts` V3 → V2 → procedural fallback, dimension-validation tests, and `scripts/check-ship-art-budget.mjs` wired to production build. The real V3 atlas is now registered; `?shipArt=v2` remains the QA baseline override.
+- V32: 11 distinct generated source sprites and the reviewed 4×3 lossless WebP atlas are complete. The production atlas is committed in Git as `public/assets/space-typing/ships/player-ships-v3.webp` by commit `6756a943`; it is 1024×768, 800,054 bytes (781.3 KiB), ~3 MiB decoded RGBA and SHA-256 `fb9434e002d6da650e34192eb425e62d1e2f3bec8804a9b33b7aa8733de10eb3`. The production manifest registers `player-ship-sheet-v3`, and the build guard verifies the exact reviewed hash/dimensions/size.
+- V33/V34: the V3-aware render path is active by default through V3→V2→procedural selection; it avoids V2 engine flames and heavy image-shadow bloom over painted V3 art, and startup exposes `document.documentElement.dataset.shipArt` for QA. Character-specific projectiles and equipment aura still reuse existing implementations without new emitters. On successful V3 selection the decoded V2 fallback image reference is released; `?shipArt=v2` intentionally excludes V3 preload for clean A/B measurements.
+- V35: atlas file/hash/header/dimensions/transfer checks now pass in production CI and V3 is available on normal startup. The remaining gate is the paired **same-device real-browser** V2/V3 Test Lab benchmark plus image-contrast/two-build human visual review. Never substitute mocked Canvas tests, CI frame simulations or invented benchmarks.
+- V36: safe activation code and the vetted binary are now in Git and automated build guards pass. Final V3/M22 acceptance remains incomplete until the browser A/B and human visual/audio rows are recorded; M23/M24 remain blocked by the M22 manual gate.

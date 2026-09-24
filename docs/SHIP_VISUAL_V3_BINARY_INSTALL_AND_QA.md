@@ -1,6 +1,6 @@
 # Ship Visual V3 — verified binary installation and performance QA
 
-The V3 source-art bundle has **11 genuinely distinct illustrated source ships** and one optimized 1024×768 transparent lossless WebP atlas. The binary is **not active** until it is committed in this repository at the exact canonical path below and the asset manifest is updated. The existing V2 SVG stays active as fallback.
+The V3 source-art bundle has **11 genuinely distinct illustrated source ships** and one optimized 1024×768 transparent lossless WebP atlas. The reviewed binary is now committed at the canonical path and registered in the production manifest (commit `6756a943`); normal startup therefore prefers V3. The existing V2 SVG and procedural renderer remain fail-soft fallbacks, and `?shipArt=v2` remains the explicit same-device A/B reference.
 
 ## Reviewed production file
 
@@ -13,21 +13,18 @@ The V3 source-art bundle has **11 genuinely distinct illustrated source ships** 
 
 `scripts/install-ship-v3.mjs` verifies the exact SHA and byte count, copies the binary into `public/`, and inserts the V3 art manifest entry just after V2. `scripts/check-ship-art-budget.mjs` runs under `pnpm build` and rejects unregistered, oversized, invalid-header, wrong-resolution and unreviewed-hash V3 files.
 
-## Install on a local clone after PR #73 merges
+## Current production registration
 
-Download/extract the reviewed release art archive from the original ChatGPT handoff. From the `space-typing` repository root:
+Current `main` already contains:
 
-```sh
-node scripts/install-ship-v3.mjs /ABSOLUTE/PATH/TO/EXTRACTED/player-ships-v3.webp
-pnpm build
-git add public/assets/space-typing/ships/player-ships-v3.webp public/assets/space-typing/manifest.json
-git commit -m "Ship V3: add reviewed premium atlas"
-git push origin main
-```
+- `public/assets/space-typing/ships/player-ships-v3.webp` — 800,054 bytes;
+- `public/assets/space-typing/manifest.json` entry `player-ship-sheet-v3`;
+- the reviewed SHA-256 guard in `scripts/check-ship-art-budget.mjs`;
+- startup selection `V3 → V2 → procedural`, with `?shipArt=v2` explicitly excluding V3 from preload for A/B measurements.
 
-If the original atlas file is unavailable, **do not register a new random or upscaled replacement**; request the reviewed archive. The user may also apply the included `ship-v3-binary.patch` via `git apply --binary` to install the same image before running the verified installer.
+`pnpm build` verifies the binary hash, RIFF/WebP header, exact 1024×768 dimensions and 1.2 MiB hard ceiling. CI #606 on the latest combined stage-pacing head also reports **Ship V3 art budget PASS**.
 
-Once the binary is committed, `main` CI and the artifact guard must pass. Only then does the normal startup use V3 instead of V2.
+The installer remains a recovery/replacement tool only. Do **not** rerun it on a healthy clone merely because an older document said the binary was missing. If the committed file is intentionally replaced in the future, the new artwork must be reviewed and the expected hash updated deliberately; never substitute a random/upscaled image.
 
 ## Same-device browser A/B checklist (V35)
 
