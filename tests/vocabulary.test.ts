@@ -287,6 +287,72 @@ describe("shared vocabulary helpers", () => {
     expect(loaded.module.label).toBe("Present");
   });
 
+  it("does not let duplicate Grammar references bias the difficulty profile", async () => {
+    const grammarIndex = parseVocabularyGrammarIndex({
+      version: 1,
+      primaryTimeGroups: ["time.present"],
+      modules: [
+        {
+          id: "time.present",
+          label: "Present",
+          group: "present",
+          focus: ["current states"],
+          topicIds: ["everyday.routine"],
+          signalTokens: ["today"],
+          signalEntries: [{ key: "today", level: 80 }],
+          missingSignalKeys: [],
+        },
+      ],
+    });
+    const topicIndex = parseVocabularyTopicIndex({
+      version: 1,
+      totalGroups: 1,
+      totalTopics: 1,
+      uniqueVocabularyKeys: 2,
+      topics: [
+        {
+          id: "everyday.routine",
+          label: "Daily Routine",
+          group: "everyday-life",
+          levels: ["A1"],
+          count: 2,
+          keys: ["today", "work"],
+          entries: [
+            { key: "today", level: 80 },
+            { key: "work", level: 1 },
+          ],
+        },
+      ],
+    });
+    const vocabularyIndex = parseVocabularyIndex({
+      version: 1,
+      plannedLevels: 100,
+      availableLevels: 2,
+      totalEntries: 2,
+      levels: [
+        { level: 1, label: "One", file: "levels/001.json", count: 1 },
+        { level: 80, label: "Eighty", file: "levels/080.json", count: 1 },
+      ],
+    });
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const body = url.endsWith("/001.json")
+        ? { entries: [{ id: "L001-001", en: "work", vi: "công việc", ipa: "/wɝk/" }] }
+        : { entries: [{ id: "L080-001", en: "today", vi: "hôm nay", ipa: "/təˈdeɪ/" }] };
+      return { ok: true, status: 200, json: async () => body } as Response;
+    }));
+
+    const loaded = await loadVocabularyGrammarModule(
+      "time.present",
+      grammarIndex,
+      topicIndex,
+      vocabularyIndex,
+    );
+
+    expect(loaded.entries.map((entry) => entry.en)).toEqual(["today", "work"]);
+    expect(loaded.representativeLevel).toBe(1);
+  });
+
   it("parses custom EN-VI-IPA rows and removes duplicate English entries", () => {
     const entries = parseCustomVocabulary(
       "apple | quả táo | /ˈæpəl/\nAPPLE = trùng = /x/\nspace → không gian → /speɪs/",
