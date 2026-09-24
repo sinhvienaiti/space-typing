@@ -3313,6 +3313,215 @@ async function resolvePhoenixDeath(): Promise<void> {
   );
 }
 
+type WordReviewFilter = "all" | "perfect" | "corrected" | "missed";
+
+let latestStageSession: StageSessionSnapshot | null = null;
+let wordReviewFilter: WordReviewFilter = "all";
+
+function formatStageDuration(seconds: number): string {
+  const total = Math.max(0, Math.round(seconds));
+  const minutes = Math.floor(total / 60);
+  return String(minutes) + ":" + String(total % 60).padStart(2, "0");
+}
+
+function appendResultMetric(
+  root: HTMLElement,
+  label: string,
+  value: string,
+  detail?: string,
+): void {
+  const card = document.createElement("div");
+  const name = document.createElement("span");
+  name.textContent = label;
+  const amount = document.createElement("strong");
+  amount.textContent = value;
+  card.append(name, amount);
+  if (detail !== undefined && detail.length > 0) {
+    const note = document.createElement("small");
+    note.textContent = detail;
+    card.append(note);
+  }
+  root.append(card);
+}
+
+function renderWordReview(snapshot: StageSessionSnapshot): void {
+  latestStageSession = snapshot;
+  const list = byId("wordReviewList");
+  list.replaceChildren();
+
+  const groups = snapshot.wordGroups.filter((group) => {
+    if (wordReviewFilter === "perfect") return group.perfect > 0;
+    if (wordReviewFilter === "corrected") return group.corrected > 0;
+    if (wordReviewFilter === "missed") return group.missed > 0;
+    return true;
+  });
+
+  byId("wordReviewCount").textContent =
+    "(" + snapshot.wordAttempts.length + " attempts · " +
+    snapshot.wordGroups.length + " unique)";
+
+  for (const button of byId("wordReviewTabs").querySelectorAll<HTMLButtonElement>(
+    "button[data-word-filter]",
+  )) {
+    const filter = button.dataset.wordFilter as WordReviewFilter;
+    button.classList.toggle("active", filter === wordReviewFilter);
+    button.onclick = () => {
+      wordReviewFilter = filter;
+      if (latestStageSession !== null) renderWordReview(latestStageSession);
+    };
+  }
+
+  if (groups.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "word-review-empty";
+    empty.textContent = "No word attempts in this category.";
+    list.append(empty);
+    return;
+  }
+
+  for (const group of groups) {
+    const row = document.createElement("article");
+    row.className = "word-review-row";
+
+    const learning = document.createElement("div");
+    const word = document.createElement("strong");
+    word.textContent = group.en;
+    const ipa = document.createElement("span");
+    ipa.textContent = group.ipa || "IPA unavailable";
+    const meaning = document.createElement("span");
+    meaning.textContent = group.vi || "Vietnamese meaning unavailable";
+    learning.append(word, ipa, meaning);
+
+    const outcomes = document.createElement("div");
+    outcomes.className = "word-review-outcomes";
+    const chips: Array<[string, number, StageWordOutcome]> = [
+      ["Perfect", group.perfect, "perfect"],
+      ["Corrected", group.corrected, "corrected"],
+      ["Missed", group.missed, "missed"],
+      ["Skill kill", group.skillKilled, "skill-kill"],
+      ["Interrupted", group.interrupted, "interrupted"],
+    ];
+    for (const [label, count, outcome] of chips) {
+      if (count <= 0) continue;
+      const chip = document.createElement("span");
+      chip.dataset.outcome = outcome;
+      chip.textContent = label + " ×" + String(count);
+      outcomes.append(chip);
+    }
+
+    const meta = document.createElement("small");
+    meta.textContent =
+      String(group.occurrences) + " occurrence" +
+      (group.occurrences === 1 ? "" : "s") +
+      " · " + String(group.correctKeys) + " correct target keys" +
+      (group.wrongKeys > 0
+        ? " · " + String(group.wrongKeys) + " wrong"
+        : "");
+
+    row.append(learning, outcomes, meta);
+    list.append(row);
+  }
+}
+
+function renderMeasuredStageSession(
+  snapshot: StageSessionSnapshot,
+  totalCorrectInputs: number,
+  totalWrongInputs: number,
+): void {
+  const combat = byId("clearCombatMetrics");
+  combat.replaceChildren();
+  const killTotal =
+    snapshot.regularKills + snapshot.eliteKills + snapshot.bossKills;
+  appendResultMetric(
+    combat,
+    "Enemies resolved",
+    String(snapshot.enemiesResolved) + " / " + String(snapshot.enemiesSpawned),
+    String(snapshot.enemyEscapes) + " escaped",
+  );
+  appendResultMetric(combat, "Regular kills", String(snapshot.regularKills));
+  appendResultMetric(combat, "Elite kills", String(snapshot.eliteKills));
+  appendResultMetric(combat, "Boss kills", String(snapshot.bossKills));
+  appendResultMetric(
+    combat,
+    "Projectile defense",
+    String(snapshot.hostileBulletsIntercepted) + " intercepted",
+    String(snapshot.hostileBulletsHit) + " hit the player",
+  );
+  appendResultMetric(
+    combat,
+    "Damage taken",
+    snapshot.damageTaken.toFixed(0),
+    snapshot.shieldAbsorbed.toFixed(0) + " absorbed by Shield · " +
+      String(snapshot.hitsTaken) + " damaging hits",
+  );
+  appendResultMetric(combat, "Skills used", String(snapshot.skillsUsed));
+  appendResultMetric(combat, "Consumables", String(snapshot.consumablesUsed));
+  appendResultMetric(combat, "Nova / Ultimate", String(snapshot.novaUses));
+  appendResultMetric(
+    combat,
+    "Bonus targets",
+    String(snapshot.bonusCollected) + " collected",
+    String(snapshot.bonusMissed) + " expired",
+  );
+  appendResultMetric(combat, "Measured kills", String(killTotal));
+
+  const typing = byId("clearTypingMetrics");
+  typing.replaceChildren();
+  appendResultMetric(typing, "Correct inputs", String(totalCorrectInputs));
+  appendResultMetric(typing, "Wrong inputs", String(totalWrongInputs));
+  appendResultMetric(
+    typing,
+    "Corrected errors",
+    String(snapshot.correctedErrors),
+    "wrong target keys on attempts later completed",
+  );
+  appendResultMetric(
+    typing,
+    "Hostile target keys",
+    String(snapshot.correctWordKeys) + " correct",
+    String(snapshot.wrongWordKeys) + " wrong",
+  );
+  appendResultMetric(typing, "Words completed", String(snapshot.wordsCompleted));
+  appendResultMetric(typing, "Perfect words", String(snapshot.perfectWords));
+  appendResultMetric(typing, "Corrected words", String(snapshot.correctedWords));
+  appendResultMetric(typing, "Missed words", String(snapshot.missedWords));
+  appendResultMetric(
+    typing,
+    "Skill-killed words",
+    String(snapshot.skillKilledWords),
+    "not counted as typing mistakes",
+  );
+  appendResultMetric(
+    typing,
+    "Interrupted boss words",
+    String(snapshot.interruptedWords),
+  );
+  appendResultMetric(
+    typing,
+    "Perfect Word Chain",
+    String(snapshot.maxPerfectWordChain),
+    "independent from Key Streak",
+  );
+
+  renderWordReview(snapshot);
+}
+
+function renderGameOverMeasured(snapshot: StageSessionSnapshot): void {
+  const root = byId("gameOverMeasured");
+  root.replaceChildren();
+  appendResultMetric(root, "Active time", formatStageDuration(snapshot.elapsedSeconds));
+  appendResultMetric(
+    root,
+    "Enemies resolved",
+    String(snapshot.enemiesResolved) + " / " + String(snapshot.enemiesSpawned),
+  );
+  appendResultMetric(root, "Damage taken", snapshot.damageTaken.toFixed(0));
+  appendResultMetric(root, "Hits taken", String(snapshot.hitsTaken));
+  appendResultMetric(root, "Words completed", String(snapshot.wordsCompleted));
+  appendResultMetric(root, "Perfect Word Chain", String(snapshot.maxPerfectWordChain));
+  appendResultMetric(root, "Skills / Nova", String(snapshot.skillsUsed) + " / " + String(snapshot.novaUses));
+}
+
 const game = new Game(
   byId<HTMLCanvasElement>("gameCanvas"),
   [],
