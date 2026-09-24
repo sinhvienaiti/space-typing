@@ -160,6 +160,10 @@ import {
   createLocalIcon,
   replaceCurrencyChips,
 } from "./ui/components";
+import {
+  currencyAccessibleText,
+  type CurrencyAmounts,
+} from "./ui/currency";
 import { CORE_STAT_KEYS, type CoreStatKey } from "./stats/core";
 import {
   attributeUpgradeCost,
@@ -4875,6 +4879,32 @@ function renderShopBalance(root: HTMLElement): void {
   );
 }
 
+function setCurrencyButton(
+  button: HTMLButtonElement,
+  label: string,
+  amounts: CurrencyAmounts,
+  options: {
+    signed?: boolean;
+  } = {},
+): void {
+  button.replaceChildren();
+  const action = document.createElement("span");
+  action.className = "currency-action-label";
+  action.textContent = label;
+  const chips = document.createElement("span");
+  chips.className = "currency-action-price";
+  replaceCurrencyChips(chips, amounts, {
+    signed: options.signed,
+  });
+  button.append(action, chips);
+  button.setAttribute(
+    "aria-label",
+    label + " · " + currencyAccessibleText(amounts, {
+      signed: options.signed,
+    }),
+  );
+}
+
 function resolveRuntimeShop(type: ShopType): ShopInstance | null {
   const context = currentShopContext();
   if (!shopAvailable(type, context)) return null;
@@ -5128,21 +5158,7 @@ function applyServiceShopState(
 }
 
 function upgradeCostText(cost: UpgradeCost): string {
-  const parts = [
-    cost.credits.toLocaleString() + " Credits",
-    cost.alloy.toLocaleString() + " Alloy",
-  ];
-  if (cost.starCrystal > 0) {
-    parts.push(
-      cost.starCrystal.toLocaleString() + " Star Crystal",
-    );
-  }
-  if (cost.quantumCore > 0) {
-    parts.push(
-      cost.quantumCore.toLocaleString() + " Quantum Core",
-    );
-  }
-  return parts.join(" + ");
+  return currencyAccessibleText(cost);
 }
 
 function canAffordUpgradeCost(cost: UpgradeCost): boolean {
@@ -5204,15 +5220,7 @@ function commitUpgradeService(
 }
 
 function renderServiceShop(): void {
-  byId("serviceShopCredits").textContent =
-    credits.toLocaleString() +
-    " Credits · " +
-    expansionCurrencies.alloy.toLocaleString() +
-    " Alloy · " +
-    expansionCurrencies.starCrystal.toLocaleString() +
-    " Star Crystal · " +
-    expansionCurrencies.quantumCore.toLocaleString() +
-    " Quantum Core";
+  renderShopBalance(byId("serviceShopCredits"));
 
   const repairPanel = byId("repairServicePanel");
   repairPanel.replaceChildren();
@@ -5714,7 +5722,7 @@ function renderSpecialShop(): void {
   byId("specialShopEyebrow").textContent = presentation.eyebrow;
   byId("specialShopTitle").textContent = presentation.title;
   byId("specialShopMeta").textContent = presentation.meta;
-  byId("specialShopCredits").textContent = shopBalanceText();
+  renderShopBalance(byId("specialShopCredits"));
 
   const grid = byId("specialShopGrid");
   const instance = resolveRuntimeShop(currentShopType);
