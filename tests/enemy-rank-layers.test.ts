@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ENEMY_RANKS,
   enemyRankNumber,
+  enemyRankVisualProfile,
   resolveEnemyRank,
   sampleWorldEnemyRank,
   validateEnemyRankDistribution,
@@ -30,6 +31,20 @@ describe("M10 Enemy Rank I-X", () => {
     ]);
     expect(enemyRankNumber("I")).toBe(1);
     expect(enemyRankNumber("X")).toBe(10);
+  });
+
+  it("maps higher ranks to stronger aura/glow without requiring rank text", () => {
+    const low = enemyRankVisualProfile("I");
+    const mid = enemyRankVisualProfile("V");
+    const high = enemyRankVisualProfile("X");
+
+    expect(low.intensity).toBe(0);
+    expect(high.intensity).toBe(1);
+    expect(mid.glowScale).toBeGreaterThan(low.glowScale);
+    expect(high.glowScale).toBeGreaterThan(mid.glowScale);
+    expect(high.lineWidthBoost).toBeGreaterThan(low.lineWidthBoost);
+    expect(high.auraAlpha).toBeGreaterThan(low.auraAlpha);
+    expect(high.auraRadiusScale).toBeGreaterThan(low.auraRadiusScale);
   });
 
   it("samples authored World rank distributions deterministically", () => {
