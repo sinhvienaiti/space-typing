@@ -10,6 +10,17 @@ import {
 } from "./feedback/kill-translation";
 import { Game } from "./Game";
 import {
+  DEFAULT_RECALL_SETTINGS,
+  RECALL_DIFFICULTY_IDS,
+  recallDifficultyProfile,
+  recordRecallAttempt,
+  sanitizeRecallMemory,
+  sanitizeRecallSettings,
+  type GameplayMode,
+  type RecallMemoryState,
+  type RecallSettings,
+} from "./recall/model";
+import {
   stageResultStars,
   type StageSessionSnapshot,
   type StageWordOutcome,
@@ -460,6 +471,9 @@ const SETTINGS_KEY = "spaceTypingSettingsV1";
 const DIFFICULTY_KEY = "spaceTypingDifficultyV1";
 const SOURCE_KEY = "spaceTypingVocabularySourceV1";
 const CUSTOM_KEY = "spaceTypingCustomVocabularyV1";
+const GAMEPLAY_MODE_KEY = "spaceTypingGameplayModeV1";
+const RECALL_SETTINGS_KEY = "spaceTypingRecallSettingsV1";
+const RECALL_MEMORY_KEY = "spaceTypingRecallMemoryV1";
 
 type VocabularySource =
   | { mode: "class"; level: number }
@@ -529,6 +543,38 @@ function loadSettings(): GameSettings {
   } catch {
     return { ...defaultSettings };
   }
+}
+
+function loadGameplayMode(): GameplayMode {
+  return localStorage.getItem(GAMEPLAY_MODE_KEY) === "recall"
+    ? "recall"
+    : "combat";
+}
+
+function loadRecallSettings(): RecallSettings {
+  try {
+    const raw = localStorage.getItem(RECALL_SETTINGS_KEY);
+    return raw === null
+      ? { ...DEFAULT_RECALL_SETTINGS }
+      : sanitizeRecallSettings(JSON.parse(raw));
+  } catch {
+    return { ...DEFAULT_RECALL_SETTINGS };
+  }
+}
+
+function loadRecallMemory(): RecallMemoryState {
+  try {
+    const raw = localStorage.getItem(RECALL_MEMORY_KEY);
+    return raw === null ? {} : sanitizeRecallMemory(JSON.parse(raw));
+  } catch {
+    return {};
+  }
+}
+
+function saveRecallPreferences(): void {
+  localStorage.setItem(GAMEPLAY_MODE_KEY, gameplayMode);
+  localStorage.setItem(RECALL_SETTINGS_KEY, JSON.stringify(recallSettings));
+  game.updateRecallSettings(recallSettings);
 }
 
 function loadDifficultySettings(): DifficultySettings {
@@ -695,17 +741,36 @@ app.innerHTML = `
 
     <div id="combatHotbar" class="combat-hotbar hidden" aria-label="Combat hotbar"></div>
 
+    <div id="recallAssistBar" class="recall-assist-bar hidden" aria-live="polite">
+      <div>
+        <strong>RECALL</strong>
+        <span id="recallAssistMeta">Listen, remember, type.</span>
+      </div>
+      <button id="recallReplayButton" type="button">↻ Replay audio</button>
+      <button id="recallHintButton" type="button">✦ Reveal letter</button>
+    </div>
+
     <section id="titleOverlay" class="overlay">
       <div class="main-card title-main-card">
         <p class="eyebrow">typing combat // campaign</p>
         <h1>SPACE <span>TYPE</span></h1>
-        <p class="intro">
+        <p id="titleModeIntro" class="intro">
           Lock a target with its first letter, finish the word, and keep the
           streak alive. No movement — only typing decisions.
         </p>
         <p id="titleWorldMeta" class="world-meta">
           World 01 · Rainbow Reach · Stage 001-020
         </p>
+
+        <section class="title-mode-panel" aria-label="Game mode">
+          <span class="title-group-label">Game mode</span>
+          <div class="title-mode-actions">
+            <button id="combatModeButton" type="button">Combat</button>
+            <button id="recallModeButton" type="button">Recall</button>
+            <button id="recallSetupButton" type="button">Recall setup</button>
+          </div>
+          <small id="titleModeMeta">Combat · see English, type, shoot</small>
+        </section>
 
         <div class="title-play-actions">
           <button id="startButton" class="primary">Continue · Stage 001</button>
@@ -1317,6 +1382,77 @@ app.innerHTML = `
       </section>
     </dialog>
 
+    <dialog id="recallDialog" class="settings-dialog recall-dialog">
+      <form method="dialog" class="dialog-head">
+        <div>
+          <p class="eyebrow">listening + memory</p>
+          <h2>Recall Mode setup</h2>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+
+      <p class="recall-dialog-copy">
+        One enemy at a time. Listen to the English prompt, reconstruct the hidden
+        word, and destroy it before contact. Campaign map, bosses, equipment,
+        rewards and your current vocabulary source are shared with Combat Mode.
+      </p>
+
+      <div class="settings-section">
+        <label class="setting-row">
+          <span>
+            <strong>Recall difficulty</strong>
+            <small>Changes approach speed, starting clues and replay budget.</small>
+          </span>
+          <select id="recallDifficulty">
+            <option value="beginner">Beginner</option>
+            <option value="easy">Easy</option>
+            <option value="normal">Normal</option>
+            <option value="hard">Hard</option>
+            <option value="extreme">Extreme</option>
+          </select>
+        </label>
+
+        <label class="setting-row">
+          <span>
+            <strong>Vietnamese meaning</strong>
+            <small>Independent from difficulty; hide it for pure listening recall.</small>
+          </span>
+          <select id="recallTranslation">
+            <option value="true">Show</option>
+            <option value="false">Hide</option>
+          </select>
+        </label>
+
+        <label class="setting-row">
+          <span>
+            <strong>IPA</strong>
+            <small>Optional pronunciation clue below the Recall Core.</small>
+          </span>
+          <select id="recallIpa">
+            <option value="false">Hide</option>
+            <option value="true">Show</option>
+          </select>
+        </label>
+
+        <label class="setting-row">
+          <span>
+            <strong>Auto pronunciation</strong>
+            <small>Speak every new enemy layer and boss word when it becomes active.</small>
+          </span>
+          <select id="recallAutoPronounce">
+            <option value="true">Enabled</option>
+            <option value="false">Disabled</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="recall-profile-summary">
+        <strong id="recallProfileLabel">Normal</strong>
+        <span id="recallProfileMeta">0.86× approach · 12% starting clues · 2 replays</span>
+      </div>
+      <p id="recallMemoryMeta" class="data-status">No Recall attempts recorded yet.</p>
+    </dialog>
+
     <dialog id="settingsDialog" class="settings-dialog">
       <form method="dialog" class="dialog-head">
         <div>
@@ -1656,6 +1792,9 @@ const hudDomMetrics = {
   totalRenderMs: 0,
   maxRenderMs: 0,
 };
+let gameplayMode: GameplayMode = loadGameplayMode();
+let recallSettings: RecallSettings = loadRecallSettings();
+let recallMemory: RecallMemoryState = loadRecallMemory();
 let sourceState = loadSource();
 let sourceTab: VocabularySourceTab = sourceState.mode;
 let vocabularyIndex: VocabularyIndex | null = null;
@@ -1688,6 +1827,7 @@ function installMenuHelp(): void {
     progressionButton: ["Missions", "Review progression objectives and claim earned rewards."],
     codexButton: ["Codex", "See discovered enemies, Worlds and reward records."],
     settingsButton: ["Settings", "Configure game audio, speech, display quality and controls."],
+    recallSetupButton: ["Recall setup", "Configure Recall speed, visible meaning, IPA and automatic English pronunciation."],
     dataButton: ["Data", "Review saves, active stage and combat performance information."],
     shopButton: ["Normal Shop", "Browse the existing finite-stock shop; purchases are saved."],
     stationShopButton: ["Station Shop", "Browse maintenance-related items in the station shop."],
@@ -1815,6 +1955,7 @@ const pauseOverlay = byId("pauseOverlay");
 const gameOverOverlay = byId("gameOverOverlay");
 const stageClearOverlay = byId("stageClearOverlay");
 const settingsDialog = byId<HTMLDialogElement>("settingsDialog");
+const recallDialog = byId<HTMLDialogElement>("recallDialog");
 const vocabularyDialog = byId<HTMLDialogElement>("vocabularyDialog");
 const stageSelectDialog = byId<HTMLDialogElement>("stageSelectDialog");
 const routeDialog = byId<HTMLDialogElement>("routeDialog");
@@ -3857,6 +3998,7 @@ const game = new Game(
     onPhase: (phase) => {
       renderPhase(phase);
 
+      renderRecallAssistUi();
       if (phase === "paused") {
         musicController.setPaused(true);
       } else if (phase === "playing") {
@@ -4380,9 +4522,25 @@ const game = new Game(
       updateCampaignUi();
     },
     onWordComplete: (entry) => {
-      speakEnglish(entry.en, settings);
+      if (gameplayMode === "combat") {
+        speakEnglish(entry.en, settings);
+      }
     },
-    onKillTranslation: enqueueKillTranslation,
+    onRecallPrompt: (entry) => {
+      speakEnglish(entry.en, {
+        ...settings,
+        pronunciationEnabled: true,
+      });
+      renderRecallAssistUi();
+    },
+    onRecallResult: (result) => {
+      recallMemory = recordRecallAttempt(recallMemory, result);
+      localStorage.setItem(RECALL_MEMORY_KEY, JSON.stringify(recallMemory));
+      renderRecallAssistUi();
+    },
+    onKillTranslation: (entry) => {
+      if (gameplayMode === "combat") enqueueKillTranslation(entry);
+    },
     onEquipmentDrop: (drop) => {
       const definition = getEquipmentDefinition(drop.definitionId);
       equipment = addEquipmentInstance(equipment, {
@@ -4448,6 +4606,7 @@ const game = new Game(
     },
   },
 );
+game.setGameplayMode(gameplayMode, recallSettings);
 
 const testLab = mountTestLab({
   getSettings: () => settings,
@@ -6826,6 +6985,7 @@ function hiddenStageConfig(
 async function startActiveHiddenEncounter(
   active: ActiveHiddenEncounter,
 ): Promise<void> {
+  game.setGameplayMode(gameplayMode, recallSettings);
   game.setCharacter(characters.selected);
   const stage = hiddenStageConfig(active);
   const vocabularyLevel = selectedVocabularyLevel();
@@ -6938,6 +7098,7 @@ async function startSelectedStage(): Promise<void> {
   stageStartPending = true;
 
   try {
+    game.setGameplayMode(gameplayMode, recallSettings);
     game.setCharacter(characters.selected);
     const gameplayStage = selectedGameplayStage();
     campaign = {
@@ -7216,7 +7377,8 @@ function updateCampaignUi(): void {
     String(gameplayStage).padStart(3, "0") +
     (ascension.selectedTier > 0
       ? " · A" + String(ascension.selectedTier)
-      : "");
+      : "") +
+    (gameplayMode === "recall" ? " · Recall" : "");
   renderAscension();
   const selectedWorld = worldForStage(gameplayStage);
   musicController.setWorldProfile(
@@ -7459,6 +7621,98 @@ function openStageSelect(): void {
   renderStageGrid();
   stageSelectDialog.showModal();
   focusJourneyFrontier();
+}
+
+function recallReplayLabel(): string {
+  const prompt = game.getRecallPrompt();
+  if (prompt === null) return "↻ Replay audio";
+  return prompt.replaysRemaining === null
+    ? "↻ Replay audio · ∞"
+    : "↻ Replay audio · " + String(prompt.replaysRemaining);
+}
+
+function renderRecallAssistUi(): void {
+  const bar = byId("recallAssistBar");
+  const active = gameplayMode === "recall" && game.getPhase() === "playing";
+  bar.classList.toggle("hidden", !active);
+  if (!active) return;
+
+  const prompt = game.getRecallPrompt();
+  byId("recallAssistMeta").textContent =
+    prompt === null
+      ? "Incoming signal…"
+      : "Listen · " +
+        String(prompt.entry.en.replace(/[^a-z]/gi, "").length) +
+        " letters · " +
+        String(prompt.hintCount) +
+        " clues";
+  const replay = byId<HTMLButtonElement>("recallReplayButton");
+  replay.textContent = recallReplayLabel();
+  replay.disabled =
+    prompt === null ||
+    (prompt.replaysRemaining !== null && prompt.replaysRemaining <= 0);
+  byId<HTMLButtonElement>("recallHintButton").disabled = prompt === null;
+}
+
+function renderRecallSetup(): void {
+  byId<HTMLSelectElement>("recallDifficulty").value = recallSettings.difficulty;
+  byId<HTMLSelectElement>("recallTranslation").value =
+    String(recallSettings.showTranslation);
+  byId<HTMLSelectElement>("recallIpa").value = String(recallSettings.showIpa);
+  byId<HTMLSelectElement>("recallAutoPronounce").value =
+    String(recallSettings.autoPronounce);
+
+  const profile = recallDifficultyProfile(recallSettings.difficulty);
+  byId("recallProfileLabel").textContent = profile.label;
+  byId("recallProfileMeta").textContent =
+    profile.enemySpeedScale.toFixed(2) +
+    "× approach · " +
+    String(Math.round(profile.initialHintRatio * 100)) +
+    "% starting clues · " +
+    (profile.replayLimit === null
+      ? "unlimited replays"
+      : String(profile.replayLimit) + " replays");
+
+  const records = Object.values(recallMemory);
+  const attempts = records.reduce((sum, item) => sum + item.attempts, 0);
+  const completed = records.reduce((sum, item) => sum + item.completed, 0);
+  const perfect = records.reduce((sum, item) => sum + item.perfect, 0);
+  byId("recallMemoryMeta").textContent =
+    attempts === 0
+      ? "No Recall attempts recorded yet."
+      : String(records.length) +
+        " words · " +
+        String(completed) +
+        "/" +
+        String(attempts) +
+        " cleared · " +
+        String(perfect) +
+        " perfect recall";
+}
+
+function renderGameplayMode(): void {
+  const recall = gameplayMode === "recall";
+  byId<HTMLButtonElement>("combatModeButton").classList.toggle("primary", !recall);
+  byId<HTMLButtonElement>("recallModeButton").classList.toggle("primary", recall);
+  byId<HTMLButtonElement>("recallSetupButton").classList.toggle("hidden", !recall);
+  byId("titleModeMeta").textContent = recall
+    ? "Recall · hear English, reconstruct the hidden word, survive contact"
+    : "Combat · see English, type, shoot";
+  byId("titleModeIntro").textContent = recall
+    ? "Listen to each English word, reconstruct its hidden Recall Core, and stop one approaching enemy at a time before it reaches your ship."
+    : "Lock a target with its first letter, finish the word, and keep the streak alive. No movement — only typing decisions.";
+  game.setGameplayMode(gameplayMode, recallSettings);
+  updateCampaignUi();
+  renderRecallAssistUi();
+}
+
+function selectGameplayMode(mode: GameplayMode): void {
+  if (game.getPhase() === "playing") return;
+  gameplayMode = mode;
+  saveRecallPreferences();
+  stopSpeech();
+  renderGameplayMode();
+  if (mode === "recall") renderRecallSetup();
 }
 
 function saveSettings(): void {
@@ -8454,6 +8708,35 @@ async function loadInitialVocabulary(): Promise<void> {
 
 // The clear handler advances campaign.selectedStage immediately after a win.
  // Replay must explicitly select the completed encounter, not the new frontier.
+byId("combatModeButton").addEventListener("click", () => {
+  selectGameplayMode("combat");
+});
+byId("recallModeButton").addEventListener("click", () => {
+  selectGameplayMode("recall");
+});
+byId("recallSetupButton").addEventListener("click", () => {
+  renderRecallSetup();
+  recallDialog.showModal();
+});
+byId("recallReplayButton").addEventListener("click", () => {
+  const entry = game.replayRecallPrompt();
+  if (entry === null) {
+    showNotice("No Recall replay available");
+  } else {
+    speakEnglish(entry.en, {
+      ...settings,
+      pronunciationEnabled: true,
+    });
+  }
+  renderRecallAssistUi();
+});
+byId("recallHintButton").addEventListener("click", () => {
+  if (!game.revealRecallLetter()) {
+    showNotice("No more letters to reveal");
+  }
+  renderRecallAssistUi();
+});
+
 for (const id of ["startButton", "nextStageButton"]) {
   byId(id).addEventListener("click", () => void startSelectedStage());
 }
@@ -8896,6 +9179,34 @@ byId<HTMLInputElement>("killTranslationDuration").addEventListener(
   },
 );
 
+for (const id of [
+  "recallDifficulty",
+  "recallTranslation",
+  "recallIpa",
+  "recallAutoPronounce",
+]) {
+  byId<HTMLSelectElement>(id).addEventListener("change", () => {
+    const difficultyValue =
+      byId<HTMLSelectElement>("recallDifficulty").value;
+    const difficulty = RECALL_DIFFICULTY_IDS.includes(
+      difficultyValue as RecallSettings["difficulty"],
+    )
+      ? (difficultyValue as RecallSettings["difficulty"])
+      : DEFAULT_RECALL_SETTINGS.difficulty;
+    recallSettings = sanitizeRecallSettings({
+      difficulty,
+      showTranslation:
+        byId<HTMLSelectElement>("recallTranslation").value === "true",
+      showIpa: byId<HTMLSelectElement>("recallIpa").value === "true",
+      autoPronounce:
+        byId<HTMLSelectElement>("recallAutoPronounce").value === "true",
+    });
+    saveRecallPreferences();
+    renderRecallSetup();
+    renderRecallAssistUi();
+  });
+}
+
 byId<HTMLSelectElement>("pronunciationEnabled").addEventListener(
   "change",
   (event) => {
@@ -8948,6 +9259,7 @@ byId<HTMLSelectElement>("visualQuality").addEventListener(
 window.addEventListener("keydown", (event) => {
   if (
     settingsDialog.open ||
+    recallDialog.open ||
     vocabularyDialog.open ||
     stageSelectDialog.open ||
     dataDialog.open ||
@@ -9042,6 +9354,8 @@ window.addEventListener("beforeunload", () => {
 });
 
 renderSettings();
+renderGameplayMode();
+renderRecallSetup();
 updateCampaignUi();
 renderPlayerStatusIdentity();
 renderStats(game.getStats());
