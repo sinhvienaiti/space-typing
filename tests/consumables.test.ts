@@ -1,11 +1,45 @@
 import { describe, expect, it } from "vitest";
-import { useRecoveryItem } from "../src/items/consumables";
+import {
+  COMBAT_CONSUMABLE_IDS,
+  EMP_CHARGE_DELAY_SECONDS,
+  isCombatConsumableId,
+  LUCKY_DICE_PITY_BOOST,
+  TIME_CRYSTAL_DURATION_SECONDS,
+  useRecoveryItem,
+} from "../src/items/consumables";
 
 const caps = {
   hull: 100,
   shield: 40,
   energy: 100,
 };
+
+describe("combat consumable registry", () => {
+  it("exposes all existing shop combat items as real hotbar-compatible consumables", () => {
+    expect(COMBAT_CONSUMABLE_IDS).toEqual([
+      "repair-kit",
+      "shield-cell",
+      "energy-cell",
+      "nova-bomb",
+      "emp-charge",
+      "time-crystal",
+      "word-bomb",
+      "supply-beacon",
+      "lucky-dice",
+    ]);
+    for (const id of COMBAT_CONSUMABLE_IDS) {
+      expect(isCombatConsumableId(id)).toBe(true);
+    }
+    expect(isCombatConsumableId("phoenix-core")).toBe(false);
+  });
+
+  it("keeps tactical constants positive and bounded", () => {
+    expect(EMP_CHARGE_DELAY_SECONDS).toBeGreaterThan(0);
+    expect(TIME_CRYSTAL_DURATION_SECONDS).toBeGreaterThan(0);
+    expect(LUCKY_DICE_PITY_BOOST).toBeGreaterThan(0);
+    expect(LUCKY_DICE_PITY_BOOST).toBeLessThanOrEqual(50);
+  });
+});
 
 describe("recovery consumables", () => {
   it("repairs 35% max Hull without exceeding the cap", () => {
