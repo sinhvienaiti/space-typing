@@ -762,14 +762,13 @@ app.innerHTML = `
           World 01 · Rainbow Reach · Stage 001-020
         </p>
 
-        <section class="title-mode-panel" aria-label="Game mode">
+        <section class="title-nav-group" aria-label="Game mode">
           <span class="title-group-label">Game mode</span>
-          <div class="title-mode-actions">
+          <div class="title-group-actions">
             <button id="combatModeButton" type="button">Combat</button>
             <button id="recallModeButton" type="button">Recall</button>
-            <button id="recallSetupButton" type="button">Recall setup</button>
           </div>
-          <small id="titleModeMeta">Combat · see English, type, shoot</small>
+          <small id="titleModeMeta" class="world-meta">Combat · see English, type, shoot</small>
         </section>
 
         <div class="title-play-actions">
@@ -1382,77 +1381,6 @@ app.innerHTML = `
       </section>
     </dialog>
 
-    <dialog id="recallDialog" class="settings-dialog recall-dialog">
-      <form method="dialog" class="dialog-head">
-        <div>
-          <p class="eyebrow">listening + memory</p>
-          <h2>Recall Mode setup</h2>
-        </div>
-        <button class="icon-button" aria-label="Close">×</button>
-      </form>
-
-      <p class="recall-dialog-copy">
-        One enemy at a time. Listen to the English prompt, reconstruct the hidden
-        word, and destroy it before contact. Campaign map, bosses, equipment,
-        rewards and your current vocabulary source are shared with Combat Mode.
-      </p>
-
-      <div class="settings-section">
-        <label class="setting-row">
-          <span>
-            <strong>Recall difficulty</strong>
-            <small>Changes approach speed, starting clues and replay budget.</small>
-          </span>
-          <select id="recallDifficulty">
-            <option value="beginner">Beginner</option>
-            <option value="easy">Easy</option>
-            <option value="normal">Normal</option>
-            <option value="hard">Hard</option>
-            <option value="extreme">Extreme</option>
-          </select>
-        </label>
-
-        <label class="setting-row">
-          <span>
-            <strong>Vietnamese meaning</strong>
-            <small>Independent from difficulty; hide it for pure listening recall.</small>
-          </span>
-          <select id="recallTranslation">
-            <option value="true">Show</option>
-            <option value="false">Hide</option>
-          </select>
-        </label>
-
-        <label class="setting-row">
-          <span>
-            <strong>IPA</strong>
-            <small>Optional pronunciation clue below the Recall Core.</small>
-          </span>
-          <select id="recallIpa">
-            <option value="false">Hide</option>
-            <option value="true">Show</option>
-          </select>
-        </label>
-
-        <label class="setting-row">
-          <span>
-            <strong>Auto pronunciation</strong>
-            <small>Speak every new enemy layer and boss word when it becomes active.</small>
-          </span>
-          <select id="recallAutoPronounce">
-            <option value="true">Enabled</option>
-            <option value="false">Disabled</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="recall-profile-summary">
-        <strong id="recallProfileLabel">Normal</strong>
-        <span id="recallProfileMeta">0.86× approach · 12% starting clues · 2 replays</span>
-      </div>
-      <p id="recallMemoryMeta" class="data-status">No Recall attempts recorded yet.</p>
-    </dialog>
-
     <dialog id="settingsDialog" class="settings-dialog">
       <form method="dialog" class="dialog-head">
         <div>
@@ -1461,6 +1389,33 @@ app.innerHTML = `
         </div>
         <button class="icon-button" aria-label="Close">×</button>
       </form>
+
+      <div class="settings-section">
+        <h3>Recall mode</h3>
+        <label class="setting-row">
+          <span><strong>Difficulty</strong><small>Approach speed, clues and replay budget</small></span>
+          <select id="recallDifficulty">
+            <option value="beginner">Beginner</option>
+            <option value="easy">Easy</option>
+            <option value="normal">Normal</option>
+            <option value="hard">Hard</option>
+            <option value="extreme">Extreme</option>
+          </select>
+        </label>
+        <label class="setting-row">
+          <span><strong>Vietnamese meaning</strong><small>Independent from Recall difficulty</small></span>
+          <select id="recallTranslation"><option value="true">Show</option><option value="false">Hide</option></select>
+        </label>
+        <label class="setting-row">
+          <span><strong>IPA</strong><small>Optional clue below the Recall Core</small></span>
+          <select id="recallIpa"><option value="false">Hide</option><option value="true">Show</option></select>
+        </label>
+        <label class="setting-row">
+          <span><strong>Auto pronunciation</strong><small>Speak each new Recall prompt</small></span>
+          <select id="recallAutoPronounce"><option value="true">Enabled</option><option value="false">Disabled</option></select>
+        </label>
+        <p id="recallProfileMeta" class="data-status"></p>
+      </div>
 
       <div class="settings-section">
         <h3>sound</h3>
@@ -1826,8 +1781,7 @@ function installMenuHelp(): void {
     vocabularyButton: ["Vocabulary", "Select a shared level, learning topic or custom English list."],
     progressionButton: ["Missions", "Review progression objectives and claim earned rewards."],
     codexButton: ["Codex", "See discovered enemies, Worlds and reward records."],
-    settingsButton: ["Settings", "Configure game audio, speech, display quality and controls."],
-    recallSetupButton: ["Recall setup", "Configure Recall speed, visible meaning, IPA and automatic English pronunciation."],
+    settingsButton: ["Settings", "Configure game audio, speech, display quality, Recall and controls."],
     dataButton: ["Data", "Review saves, active stage and combat performance information."],
     shopButton: ["Normal Shop", "Browse the existing finite-stock shop; purchases are saved."],
     stationShopButton: ["Station Shop", "Browse maintenance-related items in the station shop."],
@@ -1955,7 +1909,6 @@ const pauseOverlay = byId("pauseOverlay");
 const gameOverOverlay = byId("gameOverOverlay");
 const stageClearOverlay = byId("stageClearOverlay");
 const settingsDialog = byId<HTMLDialogElement>("settingsDialog");
-const recallDialog = byId<HTMLDialogElement>("recallDialog");
 const vocabularyDialog = byId<HTMLDialogElement>("vocabularyDialog");
 const stageSelectDialog = byId<HTMLDialogElement>("stageSelectDialog");
 const routeDialog = byId<HTMLDialogElement>("routeDialog");
@@ -7663,38 +7616,20 @@ function renderRecallSetup(): void {
     String(recallSettings.autoPronounce);
 
   const profile = recallDifficultyProfile(recallSettings.difficulty);
-  byId("recallProfileLabel").textContent = profile.label;
   byId("recallProfileMeta").textContent =
+    profile.label +
+    " · " +
     profile.enemySpeedScale.toFixed(2) +
     "× approach · " +
     String(Math.round(profile.initialHintRatio * 100)) +
-    "% starting clues · " +
-    (profile.replayLimit === null
-      ? "unlimited replays"
-      : String(profile.replayLimit) + " replays");
-
-  const records = Object.values(recallMemory);
-  const attempts = records.reduce((sum, item) => sum + item.attempts, 0);
-  const completed = records.reduce((sum, item) => sum + item.completed, 0);
-  const perfect = records.reduce((sum, item) => sum + item.perfect, 0);
-  byId("recallMemoryMeta").textContent =
-    attempts === 0
-      ? "No Recall attempts recorded yet."
-      : String(records.length) +
-        " words · " +
-        String(completed) +
-        "/" +
-        String(attempts) +
-        " cleared · " +
-        String(perfect) +
-        " perfect recall";
+    "% clues · " +
+    (profile.replayLimit === null ? "∞ replays" : String(profile.replayLimit) + " replays");
 }
 
 function renderGameplayMode(): void {
   const recall = gameplayMode === "recall";
   byId<HTMLButtonElement>("combatModeButton").classList.toggle("primary", !recall);
   byId<HTMLButtonElement>("recallModeButton").classList.toggle("primary", recall);
-  byId<HTMLButtonElement>("recallSetupButton").classList.toggle("hidden", !recall);
   byId("titleModeMeta").textContent = recall
     ? "Recall · hear English, reconstruct the hidden word, survive contact"
     : "Combat · see English, type, shoot";
@@ -7712,7 +7647,7 @@ function selectGameplayMode(mode: GameplayMode): void {
   saveRecallPreferences();
   stopSpeech();
   renderGameplayMode();
-  if (mode === "recall") renderRecallSetup();
+  renderRecallSetup();
 }
 
 function saveSettings(): void {
@@ -8714,10 +8649,6 @@ byId("combatModeButton").addEventListener("click", () => {
 byId("recallModeButton").addEventListener("click", () => {
   selectGameplayMode("recall");
 });
-byId("recallSetupButton").addEventListener("click", () => {
-  renderRecallSetup();
-  recallDialog.showModal();
-});
 byId("recallReplayButton").addEventListener("click", () => {
   const entry = game.replayRecallPrompt();
   if (entry === null) {
@@ -9259,7 +9190,6 @@ byId<HTMLSelectElement>("visualQuality").addEventListener(
 window.addEventListener("keydown", (event) => {
   if (
     settingsDialog.open ||
-    recallDialog.open ||
     vocabularyDialog.open ||
     stageSelectDialog.open ||
     dataDialog.open ||
