@@ -100,7 +100,7 @@ export class SampleSfxBank {
     this.preloaded = true;
 
     for (const id of Object.keys(SAMPLE_SFX) as SampleSfxId[]) {
-      this.ensurePool(id, 1);
+      this.ensurePool(id, SAMPLE_SFX[id].poolSize);
     }
   }
 
