@@ -3681,3 +3681,287 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   .player-ultimate .power-fill.ready { animation: none; }
 }
+
+
+/* Batch C — measured Stage Results V2. */
+.stage-results-card {
+  width: min(1040px, calc(100vw - 24px));
+  max-height: min(92vh, 900px);
+  overflow: auto;
+  padding: 1.1rem;
+}
+
+.stage-results-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: .8rem;
+}
+
+.stage-results-header h2 {
+  margin-bottom: .2rem;
+}
+
+.stage-results-meta,
+.result-denominator-note {
+  margin: .2rem 0;
+  color: #8499aa;
+  font-size: .72rem;
+  line-height: 1.5;
+}
+
+.stage-stars {
+  min-width: 190px;
+  display: grid;
+  justify-items: end;
+  gap: .18rem;
+  text-align: right;
+}
+
+.stage-stars strong {
+  color: #ffd877;
+  font-size: 1.6rem;
+  letter-spacing: .08em;
+  text-shadow: 0 0 14px rgba(255, 210, 94, .18);
+}
+
+.stage-stars small {
+  max-width: 270px;
+  color: #8ea0af;
+  font-size: .64rem;
+  line-height: 1.35;
+}
+
+.stage-results-summary {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin-bottom: .8rem;
+}
+
+.stage-result-section {
+  margin: .65rem 0;
+  padding: .72rem;
+  border: 1px solid rgba(121, 205, 223, .11);
+  border-radius: 12px;
+  background: rgba(5, 13, 22, .42);
+}
+
+.stage-result-section h3 {
+  margin: 0 0 .55rem;
+  color: #d9f8ff;
+  font-size: .78rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.result-measured-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: .4rem;
+}
+
+.result-measured-grid > div {
+  min-width: 0;
+  display: grid;
+  gap: .15rem;
+  padding: .52rem .58rem;
+  border-radius: 9px;
+  background: rgba(11, 25, 39, .64);
+  border: 1px solid rgba(116, 199, 221, .07);
+}
+
+.result-measured-grid span {
+  color: #71889c;
+  font-size: .58rem;
+  font-weight: 750;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.result-measured-grid strong {
+  color: #e4f8ff;
+  font-size: .86rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-measured-grid small {
+  color: #7790a2;
+  font-size: .58rem;
+  line-height: 1.35;
+}
+
+.word-review {
+  margin-top: .65rem;
+  border-top: 1px solid rgba(122, 198, 217, .08);
+  padding-top: .55rem;
+}
+
+.word-review summary {
+  cursor: pointer;
+  color: #bfeef7;
+  font-size: .72rem;
+  font-weight: 750;
+}
+
+.word-review-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  margin: .6rem 0;
+}
+
+.word-review-tabs button {
+  padding: .35rem .65rem;
+  font-size: .64rem;
+}
+
+.word-review-tabs button.active {
+  border-color: rgba(105, 228, 235, .58);
+  color: #cfffff;
+  background: rgba(73, 184, 202, .14);
+}
+
+.word-review-list {
+  display: grid;
+  gap: .35rem;
+  max-height: min(38vh, 360px);
+  overflow: auto;
+  padding-right: .16rem;
+}
+
+.word-review-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(180px, 1fr) minmax(160px, .8fr);
+  align-items: center;
+  gap: .55rem;
+  padding: .52rem .6rem;
+  border-radius: 9px;
+  background: rgba(8, 18, 29, .68);
+}
+
+.word-review-row > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: .08rem;
+}
+
+.word-review-row > div:first-child strong {
+  color: #f0fbff;
+  font-size: .82rem;
+  overflow-wrap: anywhere;
+}
+
+.word-review-row > div:first-child span {
+  color: #8ba5b4;
+  font-size: .64rem;
+  overflow-wrap: anywhere;
+}
+
+.word-review-row > small {
+  color: #71889a;
+  font-size: .6rem;
+  line-height: 1.35;
+}
+
+.word-review-outcomes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .25rem;
+}
+
+.word-review-outcomes span {
+  padding: .2rem .34rem;
+  border-radius: 999px;
+  background: rgba(95, 159, 178, .1);
+  color: #acc6d2;
+  font-size: .56rem;
+}
+
+.word-review-outcomes span[data-outcome="perfect"] {
+  color: #9ff1c8;
+  background: rgba(72, 194, 135, .11);
+}
+
+.word-review-outcomes span[data-outcome="corrected"] {
+  color: #ffe39d;
+  background: rgba(213, 163, 66, .11);
+}
+
+.word-review-outcomes span[data-outcome="missed"] {
+  color: #ffaaa9;
+  background: rgba(217, 80, 82, .11);
+}
+
+.word-review-outcomes span[data-outcome="skill-kill"],
+.word-review-outcomes span[data-outcome="interrupted"] {
+  color: #c4b4ff;
+  background: rgba(139, 112, 219, .11);
+}
+
+.word-review-empty {
+  color: #778c9d;
+  font-size: .68rem;
+}
+
+.stage-reward-chips {
+  justify-content: flex-start;
+}
+
+.stage-result-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .45rem;
+  margin-top: .7rem;
+}
+
+@media (max-width: 980px) {
+  .stage-results-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .result-measured-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .word-review-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .word-review-row > small {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .stage-results-card {
+    width: calc(100vw - 12px);
+    max-height: 95vh;
+    padding: .75rem;
+  }
+
+  .stage-results-header {
+    display: grid;
+  }
+
+  .stage-stars {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .stage-results-summary,
+  .result-measured-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .word-review-row {
+    grid-template-columns: 1fr;
+  }
+
+  .word-review-row > small {
+    grid-column: auto;
+  }
+
+  .stage-result-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
