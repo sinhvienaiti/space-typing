@@ -7408,6 +7408,7 @@ function renderStageGrid(): void {
       button.append(ship);
     }
     button.addEventListener("click", () => {
+      if (journeyStartGate.active) return;
       selectedJourneyStage = node.stage;
       for (const sibling of board.querySelectorAll<HTMLButtonElement>(".journey-node")) {
         const selected = sibling === button;
