@@ -1772,26 +1772,27 @@ let selectedJourneyStage = campaign.selectedStage;
 /** Keyboard-, mouse- and touch-accessible help on existing menu actions.
  * Existing button IDs and their action listeners remain unchanged. */
 function installMenuHelp(): void {
-  const descriptions: Record<string, [string, string]> = {
-    routeButton: ["Sector Briefing", "Preview the next sector, boss, checkpoint and optional services."],
-    stageSelectButton: ["Campaign Map", "Browse Worlds and replay unlocked stages."],
-    characterButton: ["Characters", "Choose a pilot and spend progression upgrades."],
-    equipmentButton: ["Equipment", "Equip gear and review combat stats."],
-    supportButton: ["Support Spells", "Assign support spells for combat."],
-    hotbarButton: ["Hotbar", "Assign skills and items to number keys."],
-    vocabularyButton: ["Vocabulary", "Choose Class, Topic, Word Type, Grammar or Custom words."],
-    progressionButton: ["Missions", "Review missions and claim rewards."],
-    codexButton: ["Codex", "Review discovered enemies, Worlds and rewards."],
-    settingsButton: ["Settings", "Audio, speech, display, Recall and controls."],
-    dataButton: ["Data", "Save, stage and performance information."],
-    shopButton: ["Normal Shop", "Finite-stock general shop."],
-    stationShopButton: ["Station Shop", "Maintenance-focused station shop."],
-    serviceShopButton: ["Repair and Upgrade", "Repair and upgrade equipment."],
+  const descriptions: Record<string, string> = {
+    routeButton: "Preview sector, boss and checkpoint.",
+    stageSelectButton: "Browse and replay unlocked stages.",
+    characterButton: "Choose pilot and progression.",
+    equipmentButton: "Equip gear and review stats.",
+    supportButton: "Assign support spells.",
+    hotbarButton: "Assign skills and items to keys.",
+    vocabularyButton: "Choose shared or custom vocabulary.",
+    progressionButton: "Review missions and rewards.",
+    codexButton: "Review discovered content.",
+    settingsButton: "Audio, display, Recall and controls.",
+    dataButton: "Save and performance information.",
+    shopButton: "Finite-stock shop.",
+    stationShopButton: "Maintenance shop.",
+    serviceShopButton: "Repair and upgrade gear.",
   };
 
   const wrappers: HTMLElement[] = [];
-  for (const [id, [title, description]] of Object.entries(descriptions)) {
+  for (const [id, description] of Object.entries(descriptions)) {
     const action = byId<HTMLButtonElement>(id);
+    const title = action.textContent?.trim() || id;
     const parent = action.parentElement;
     if (parent === null) continue;
     const wrap = document.createElement("div");
