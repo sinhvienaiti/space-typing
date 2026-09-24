@@ -3978,9 +3978,11 @@ function renderGameOverMeasured(snapshot: StageSessionSnapshot): void {
   appendResultMetric(root, "Skills / Nova", String(snapshot.skillsUsed) + " / " + String(snapshot.novaUses));
 }
 
-function postLearningEvent(event: ReturnType<
-  typeof buildCombatLearningEvent | typeof buildRecallLearningEvent
->): void {
+function postLearningEvent(
+  event:
+    | ReturnType<typeof buildCombatLearningEvent>
+    | ReturnType<typeof buildRecallLearningEvent>,
+): void {
   if (window.parent === window) return;
   learningRequestSequence++;
   window.parent.postMessage(
