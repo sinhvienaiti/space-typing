@@ -209,6 +209,7 @@ import {
 import { MusicController } from "./audio/MusicController";
 import {
   musicProfileForWorld,
+  musicStateForStagePhase,
   musicStateForStageRole,
   type MusicState,
 } from "./audio/music-profile";
@@ -3740,7 +3741,10 @@ const game = new Game(
       renderStage(stage);
       codex = discoverCodexWorld(codex, worldForStage(stage).id).state;
     },
-    onStagePhase: renderStagePhase,
+    onStagePhase: (phase) => {
+      renderStagePhase(phase);
+      syncStagePhaseMusic(phase);
+    },
     onStageEvents: renderStageEvents,
     onObjectiveUpdate: renderObjective,
     onStatuses: renderStatuses,
@@ -4898,6 +4902,20 @@ function syncWorldMusicProfile(stage: number): void {
   musicController.setWorldProfile(
     musicProfileForWorld(worldForStage(stage)),
   );
+}
+
+function syncStagePhaseMusic(phase: StagePacingPhase): void {
+  if (currentHiddenEncounterState().active !== null) return;
+  const stage = game.getStats().stage;
+  const stageConfig = createStageConfig(stage);
+  const state = musicStateForStagePhase(stageConfig.role, phase.kind);
+  if (state === null) return;
+
+  musicController.transitionTo(
+    state,
+    phase.kind === "recovery" ? 0.75 : 0.55,
+  );
+  musicController.setPaused(false);
 }
 
 function syncCombatMusic(stage: number): void {
