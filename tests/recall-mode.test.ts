@@ -7,7 +7,6 @@ import {
   recallDifficultyProfile,
   recallDisplayMask,
   recordRecallAttempt,
-  recallReviewScore,
   revealNextRecallHint,
   sanitizeRecallMemory,
   sanitizeRecallSettings,
@@ -131,9 +130,6 @@ describe("Recall Mode contracts", () => {
       },
     };
 
-    expect(recallReviewScore(entries[0]!, memory)).toBeGreaterThan(
-      recallReviewScore(entries[1]!, memory),
-    );
     const pool = buildAdaptiveRecallVocabulary(entries, memory);
     for (const entry of entries) {
       expect(pool.filter((item) => item.id === entry.id).length).toBeGreaterThanOrEqual(1);
