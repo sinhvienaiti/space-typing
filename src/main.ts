@@ -6336,6 +6336,7 @@ function openSpecialShop(kind: ShopType): void {
 }
 
 function selectedVocabularyLevel(): number {
+  if (activeReviewGoal !== undefined) return activeReviewLevel;
   return sourceState.mode === "custom" ? 1 : sourceState.level;
 }
 
@@ -6349,6 +6350,22 @@ async function prepareStageVocabulary(
   const badge = byId("typingTextBadge");
   badge.classList.add("hidden");
   badge.textContent = "";
+
+  if (activeReviewGoal !== undefined && activeReviewVocabulary.length > 0) {
+    game.setVocabulary(
+      gameplayMode === "recall"
+        ? buildAdaptiveRecallVocabulary(activeReviewVocabulary, recallMemory)
+        : activeReviewVocabulary,
+    );
+    badge.textContent =
+      "SMART REVIEW // " +
+      activeReviewGoal.replaceAll("-", " ") +
+      " · " +
+      String(activeReviewVocabulary.length) +
+      " selected words";
+    badge.classList.remove("hidden");
+    return;
+  }
 
   if (configuredVocabulary.length > 0) {
     game.setVocabulary(
