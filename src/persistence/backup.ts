@@ -274,32 +274,10 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
 
   const version = parsed.version;
   if (
-    version !== 1 &&
-    version !== 2 &&
-    version !== 3 &&
-    version !== 4 &&
-    version !== 5 &&
-    version !== 6 &&
-    version !== 7 &&
-    version !== 8 &&
-    version !== 9 &&
-    version !== 10 &&
-    version !== 11 &&
-    version !== 12 &&
-    version !== 13 &&
-    version !== 14 &&
-    version !== 15 &&
-    version !== 16 &&
-    version !== 17 &&
-    version !== 18 &&
-    version !== 19 &&
-    version !== 20 &&
-    version !== 21 &&
-    version !== 22 &&
-    version !== 23 &&
-    version !== 24 &&
-    version !== 25 &&
-    version !== PLAYER_SAVE_VERSION
+    typeof version !== "number" ||
+    !Number.isInteger(version) ||
+    version < 1 ||
+    version > PLAYER_SAVE_VERSION
   ) {
     return {
       ok: false,
@@ -315,6 +293,96 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
       ok: false,
       error: "Campaign data is missing, corrupted or out of range.",
     };
+  }
+
+  // Versions 21+ use the modern persistent-state shape with monotonic
+  // additions. Validate every field declared by that version before migration
+  // so corrupted backups are rejected rather than silently sanitized.
+  if (version >= 21) {
+    if (!isValidInventory(parsed.inventory)) {
+      return { ok: false, error: "Inventory contains an unknown item or invalid stack count." };
+    }
+    if (!isValidEquipmentState(parsed.equipment)) {
+      return { ok: false, error: "Equipment data contains an invalid item or loadout reference." };
+    }
+    if (!isValidSupportSpellState(parsed.supportSpells)) {
+      return { ok: false, error: "Support spell data contains an invalid or duplicate loadout." };
+    }
+    if (!isValidCharacterState(parsed.characters)) {
+      return { ok: false, error: "Character data contains an invalid selection or unlock list." };
+    }
+    if (!isValidLuckPityState(parsed.luckPity)) {
+      return { ok: false, error: "Luck pity data contains invalid drought counters." };
+    }
+    if (!isValidHiddenDiscoveryState(parsed.hiddenDiscovery)) {
+      return { ok: false, error: "Hidden discovery data contains invalid unlock or drought state." };
+    }
+    if (!isValidCredits(parsed.credits)) {
+      return { ok: false, error: "Credits must be a non-negative whole number." };
+    }
+    if (!isValidProgressionState(parsed.progression)) {
+      return { ok: false, error: "Mission/Achievement progression data is invalid." };
+    }
+    if (!isValidExpansionCurrencyState(parsed.expansionCurrencies)) {
+      return { ok: false, error: "Expansion currencies must be non-negative whole numbers." };
+    }
+    if (!isValidCampaignExpansionState(parsed.campaignExpansion)) {
+      return { ok: false, error: "Campaign expansion checkpoint/segment data is invalid." };
+    }
+
+    const legacyCheckpoint = version < 25;
+    if (
+      legacyCheckpoint
+        ? migrateLegacyRunPersistentState(parsed.checkpointSnapshot) === null
+        : !isValidCheckpointSnapshot(parsed.checkpointSnapshot)
+    ) {
+      return { ok: false, error: "Committed checkpoint snapshot is invalid." };
+    }
+
+    if (
+      parsed.crashRecoverySnapshot !== null &&
+      (legacyCheckpoint
+        ? sanitizeCrashRecoverySnapshot(parsed.crashRecoverySnapshot) === null
+        : !isValidCrashRecoverySnapshot(parsed.crashRecoverySnapshot))
+    ) {
+      return { ok: false, error: "Crash recovery snapshot is invalid." };
+    }
+
+    if (
+      parsed.stageEntrySnapshot !== null &&
+      (legacyCheckpoint
+        ? sanitizeStageEntrySnapshot(parsed.stageEntrySnapshot) === null
+        : !isValidStageEntrySnapshot(parsed.stageEntrySnapshot))
+    ) {
+      return { ok: false, error: "Stage-entry snapshot is invalid." };
+    }
+
+    if (!isValidShopState(parsed.shops)) {
+      return { ok: false, error: "Shop state is invalid." };
+    }
+    if (
+      !isValidRouteState(
+        parsed.route,
+        (parsed.campaign as CampaignProgress).highestUnlockedStage,
+      )
+    ) {
+      return { ok: false, error: "Route state is invalid." };
+    }
+    if (version >= 22 && !isValidUpgradeState(parsed.upgrades)) {
+      return { ok: false, error: "Upgrade state is invalid." };
+    }
+    if (version >= 23 && !isValidRelicState(parsed.relics)) {
+      return { ok: false, error: "Relic state is invalid." };
+    }
+    if (version >= 24 && !isValidCodexState(parsed.codex)) {
+      return { ok: false, error: "Codex state is invalid." };
+    }
+    if (version >= 25 && !isValidAscensionState(parsed.ascension)) {
+      return { ok: false, error: "Ascension state is invalid." };
+    }
+    if (version >= 26 && !isValidHotbarState(parsed.hotbar)) {
+      return { ok: false, error: "Hotbar loadout is invalid." };
+    }
   }
 
   if (

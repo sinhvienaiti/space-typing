@@ -1,3 +1,5 @@
+const PARENT_ORIGIN = "https://typing-game.local";
+
 import type { GameSettings } from "./types";
 
 let speechGeneration = 0;

@@ -222,6 +222,48 @@ describe("save backup", () => {
     expect(result.save.route.graph.sectorStart).toBe(1);
   });
 
+  it("accepts and migrates a valid PlayerSave v26 backup", () => {
+    const legacy = {
+      ...createPlayerSave(createDefaultCampaignProgress()),
+      version: 26,
+    };
+
+    const result = parsePlayerSaveJson(JSON.stringify(legacy));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.migrated).toBe(true);
+    expect(result.save.version).toBe(PLAYER_SAVE_VERSION);
+    expect(result.save.hotbar).toEqual(legacy.hotbar);
+  });
+
+  it("rejects malformed required persistent state in v21", () => {
+    const legacy = {
+      ...createPlayerSave(createDefaultCampaignProgress()),
+      version: 21,
+      inventory: { "not-real": 1 },
+    };
+
+    const result = parsePlayerSaveJson(JSON.stringify(legacy));
+    expect(result).toEqual({
+      ok: false,
+      error: "Inventory contains an unknown item or invalid stack count.",
+    });
+  });
+
+  it("rejects malformed required persistent state in v22", () => {
+    const legacy = {
+      ...createPlayerSave(createDefaultCampaignProgress()),
+      version: 22,
+      progression: { claimedMissions: "broken" },
+    };
+
+    const result = parsePlayerSaveJson(JSON.stringify(legacy));
+    expect(result).toEqual({
+      ok: false,
+      error: "Mission/Achievement progression data is invalid.",
+    });
+  });
+
   it("rejects out-of-range Campaign data instead of silently clamping it", () => {
     const invalid = parsePlayerSaveJson(
       JSON.stringify({
