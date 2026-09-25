@@ -24,6 +24,24 @@ export const WORLD_SCENE_MOTIONS = [
 export type WorldSceneMotion =
   (typeof WORLD_SCENE_MOTIONS)[number];
 
+export const WORLD_CINEMATIC_MOTIONS = [
+  "deep-flight",
+  "cloud-drift",
+  "orbital-swirl",
+  "asteroid-flow",
+  "meteor-storm",
+  "ember-rise",
+  "snow-flight",
+  "aurora-wave",
+  "organic-drift",
+  "void-drift",
+  "reactor-motion",
+  "sacred-drift",
+] as const;
+
+export type WorldCinematicMotion =
+  (typeof WORLD_CINEMATIC_MOTIONS)[number];
+
 export type WorldSceneProfile = {
   id: string;
   worldId: string;
@@ -33,6 +51,16 @@ export type WorldSceneProfile = {
   floorStyle: string;
   particleStyle: string;
   motion: WorldSceneMotion;
+  primaryMotion: WorldCinematicMotion;
+  secondaryMotion: WorldCinematicMotion | null;
+  flightIntensity: number;
+  starDensity: number;
+  midObjectDensity: number;
+  foregroundDensity: number;
+  eventFrequency: number;
+  vortexStrength: number;
+  asteroidDensity: number;
+  cloudDensity: number;
   seed: number;
   horizonRatio: number;
   landmarkIntensity: number;
@@ -42,4 +70,9 @@ export type WorldSceneQualityBudget = {
   ambientParticles: number;
   farDetails: number;
   midDetails: number;
+  farStars: number;
+  nearStars: number;
+  midObjects: number;
+  foregroundObjects: number;
+  eventObjects: number;
 };
