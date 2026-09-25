@@ -3103,6 +3103,11 @@ export class Game {
       return;
     }
 
+    // Recall Bonus is an optional learning/reward target. A key that does not
+    // advance it must not create a normal combat miss when there is no other
+    // eligible target for that key.
+    if (this.recallBonus !== null) return;
+
     this.registerMiss();
   }
 
