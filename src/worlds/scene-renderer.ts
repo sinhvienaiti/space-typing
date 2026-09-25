@@ -193,42 +193,91 @@ function drawCelestialCloudMass(
   palette: SceneSkyPalette,
   variant: number,
 ): void {
-  context.save();
-  context.globalAlpha = 0.11;
-  context.fillStyle = palette.glowA;
-  const baseY = height * (0.22 + variant * 0.006);
-  for (let index = 0; index < 9; index += 1) {
-    const x = width * (0.02 + index * 0.125);
-    const y = baseY + Math.sin(index * 1.45 + variant) * height * 0.012;
-    context.beginPath();
-    context.ellipse(
+  const drawCloud = (
+    x: number,
+    y: number,
+    rx: number,
+    ry: number,
+    color: string,
+    alpha: number,
+  ): void => {
+    const gradient = context.createRadialGradient(
       x,
       y,
-      width * (0.09 + (index % 3) * 0.015),
-      height * (0.025 + (index % 2) * 0.01),
       0,
-      0,
-      TAU,
-    );
-    context.fill();
-  }
-  context.globalAlpha = 0.08;
-  context.fillStyle = palette.glowC;
-  for (let index = 0; index < 6; index += 1) {
-    const x = width * (0.08 + index * 0.18);
-    context.beginPath();
-    context.ellipse(
       x,
-      baseY + height * 0.055,
-      width * 0.12,
-      height * 0.035,
-      0,
-      0,
-      TAU,
+      y,
+      Math.max(rx, ry),
     );
+    gradient.addColorStop(0, color);
+    gradient.addColorStop(0.48, color);
+    gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+
+    context.save();
+    context.translate(x, y);
+    context.scale(1, ry / Math.max(1, rx));
+    context.globalAlpha = alpha;
+    context.fillStyle = gradient;
+    context.beginPath();
+    context.arc(0, 0, rx, 0, TAU);
     context.fill();
-  }
-  context.restore();
+    context.restore();
+  };
+
+  const drift = (variant - 3) * width * 0.012;
+
+  // Keep the center combat corridor clear. Clouds frame the scene from the
+  // sides instead of forming one horizontal stripe behind enemy labels.
+  drawCloud(
+    width * 0.13 + drift,
+    height * 0.23,
+    width * 0.2,
+    height * 0.085,
+    palette.glowA,
+    0.13,
+  );
+  drawCloud(
+    width * 0.27 + drift,
+    height * 0.18,
+    width * 0.14,
+    height * 0.06,
+    palette.glowB,
+    0.09,
+  );
+  drawCloud(
+    width * 0.84 - drift,
+    height * 0.24,
+    width * 0.22,
+    height * 0.09,
+    palette.glowA,
+    0.12,
+  );
+  drawCloud(
+    width * 0.72 - drift,
+    height * 0.17,
+    width * 0.13,
+    height * 0.055,
+    palette.glowC,
+    0.075,
+  );
+
+  // A dim lower atmospheric layer adds depth without crossing the target area.
+  drawCloud(
+    width * 0.18,
+    height * 0.4,
+    width * 0.18,
+    height * 0.06,
+    palette.glowB,
+    0.045,
+  );
+  drawCloud(
+    width * 0.82,
+    height * 0.42,
+    width * 0.2,
+    height * 0.065,
+    palette.glowA,
+    0.04,
+  );
 }
 
 function drawArchetypeBackdrop(
@@ -243,60 +292,85 @@ function drawArchetypeBackdrop(
 
   if (profile.archetype === "celestial-rainbow") {
     drawCelestialCloudMass(context, width, height, palette, profile.variant);
-    const centerX = width * (0.56 + (profile.variant - 3) * 0.018);
-    const centerY = height * 0.16;
-    context.globalAlpha = 0.22;
-    context.strokeStyle = palette.glowC;
-    context.lineWidth = Math.max(2, width * 0.0024);
-    context.beginPath();
-    context.arc(centerX, centerY, Math.min(width, height) * 0.082, 0, TAU);
-    context.stroke();
-    context.globalAlpha = 0.09;
-    context.fillStyle = palette.glowB;
-    context.beginPath();
-    context.arc(
+
+    // Large off-center celestial body. Avoid placing perfect geometry directly
+    // behind the center target lane.
+    const haloOnRight = profile.variant % 2 === 1;
+    const centerX = width * (haloOnRight ? 0.79 : 0.21);
+    const centerY = height * (0.125 + profile.variant * 0.004);
+    const haloRadius = Math.min(width, height) * 0.09;
+
+    drawNebulaGlow(
+      context,
       centerX,
       centerY,
-      Math.min(width, height) * 0.052,
-      0,
-      TAU,
+      haloRadius * 2.2,
+      palette.glowB,
+      0.08,
     );
+
+    context.globalAlpha = 0.26;
+    context.strokeStyle = palette.glowC;
+    context.lineWidth = Math.max(2.2, width * 0.0026);
+    context.beginPath();
+    context.arc(centerX, centerY, haloRadius, 0, TAU);
+    context.stroke();
+
+    context.globalAlpha = 0.1;
+    context.fillStyle = palette.glowB;
+    context.beginPath();
+    context.arc(centerX, centerY, haloRadius * 0.62, 0, TAU);
     context.fill();
 
+    // Narrow diagonal nebula ribbon in the upper sky, not a full-width band.
     const rainbow = context.createLinearGradient(
-      width * 0.18,
-      height * 0.08,
-      width * 0.82,
-      height * 0.32,
+      width * 0.08,
+      height * 0.02,
+      width * 0.7,
+      height * 0.2,
     );
     rainbow.addColorStop(0, "rgba(74, 220, 255, 0)");
-    rainbow.addColorStop(0.2, "rgba(74, 220, 255, 0.13)");
-    rainbow.addColorStop(0.48, "rgba(151, 104, 255, 0.12)");
-    rainbow.addColorStop(0.72, "rgba(255, 103, 193, 0.11)");
+    rainbow.addColorStop(0.22, "rgba(74, 220, 255, 0.14)");
+    rainbow.addColorStop(0.5, "rgba(151, 104, 255, 0.13)");
+    rainbow.addColorStop(0.76, "rgba(255, 103, 193, 0.11)");
     rainbow.addColorStop(1, "rgba(255, 211, 122, 0)");
-    context.globalAlpha = 1;
+
+    context.globalAlpha = 0.9;
     context.fillStyle = rainbow;
     context.beginPath();
-    context.moveTo(width * 0.12, height * 0.05);
+    context.moveTo(width * 0.03, height * 0.035);
     context.bezierCurveTo(
-      width * 0.32,
-      height * 0.12,
-      width * 0.54,
-      height * 0.28,
-      width * 0.88,
-      height * 0.2,
+      width * 0.22,
+      height * 0.055,
+      width * 0.38,
+      height * 0.14,
+      width * 0.68,
+      height * 0.16,
     );
-    context.lineTo(width * 0.9, height * 0.29);
+    context.lineTo(width * 0.71, height * 0.205);
     context.bezierCurveTo(
-      width * 0.58,
-      height * 0.36,
-      width * 0.33,
-      height * 0.2,
-      width * 0.1,
-      height * 0.12,
+      width * 0.4,
+      height * 0.19,
+      width * 0.22,
+      height * 0.105,
+      width * 0.015,
+      height * 0.085,
     );
     context.closePath();
     context.fill();
+
+    // Soft lower vignette gives foreground depth without adding another grid.
+    const foreground = context.createLinearGradient(
+      0,
+      height * 0.52,
+      0,
+      height,
+    );
+    foreground.addColorStop(0, "rgba(0,0,0,0)");
+    foreground.addColorStop(1, "rgba(1,3,12,0.36)");
+    context.globalAlpha = 1;
+    context.fillStyle = foreground;
+    context.fillRect(0, height * 0.5, width, height * 0.5);
   } else if (profile.archetype === "infernal") {
     context.globalAlpha = 0.22;
     context.fillStyle = palette.glowB;
@@ -540,58 +614,68 @@ function drawCelestialLandmarks(
 ): void {
   const { width, height, profile, environment } = input;
   const horizon = height * profile.horizonRatio;
-  const centerX = width * (0.48 + (profile.variant - 3) * 0.025);
 
   context.save();
-  context.strokeStyle = rgba(environment.gridRgb, 0.22);
-  context.fillStyle = rgba(environment.hazeRgb, 0.08);
-  context.lineWidth = 2;
+  context.strokeStyle = rgba(environment.gridRgb, 0.14);
+  context.fillStyle = rgba(environment.hazeRgb, 0.065);
+  context.lineWidth = Math.max(1.2, width * 0.0012);
 
-  const ringCount = 2 + (profile.variant % 3);
-  for (let index = 0; index < ringCount; index += 1) {
-    context.globalAlpha = 0.5 - index * 0.08;
-    context.beginPath();
-    context.ellipse(
-      centerX,
-      horizon * (0.9 + index * 0.18),
-      width * (0.09 + index * 0.035),
-      height * (0.025 + index * 0.012),
-      index * 0.12,
-      0,
-      TAU,
-    );
-    context.stroke();
-  }
+  // Far floating temple/island silhouettes frame the center instead of
+  // stacking rings behind enemy labels.
+  const islands = [
+    { x: 0.1, y: 0.2, w: 0.12, h: 0.025 },
+    { x: 0.29, y: 0.17, w: 0.08, h: 0.018 },
+    { x: 0.72, y: 0.19, w: 0.09, h: 0.02 },
+    { x: 0.9, y: 0.22, w: 0.13, h: 0.028 },
+  ];
 
   context.globalAlpha = 0.34;
-  const pillarCount = 3 + profile.variant;
-  for (let index = 0; index < pillarCount; index += 1) {
-    const side = index % 2 === 0 ? -1 : 1;
-    const step = Math.floor(index / 2) + 1;
-    const x = centerX + side * width * (0.12 + step * 0.095);
-    const h = height * (0.12 + seededUnit(profile.seed, index, 15) * 0.14);
-    context.fillRect(x - width * 0.009, horizon - h, width * 0.018, h);
-    context.beginPath();
-    context.ellipse(x, horizon - h, width * 0.035, height * 0.01, 0, 0, TAU);
-    context.stroke();
-  }
-
-  context.globalAlpha = 0.16;
-  for (let index = 0; index < 5; index += 1) {
-    const x = width * (0.08 + index * 0.22);
-    const y = horizon * (0.8 + (index % 2) * 0.16);
+  for (const island of islands) {
+    const x = width * island.x;
+    const y = height * island.y;
     context.beginPath();
     context.ellipse(
       x,
       y,
-      width * 0.09,
-      height * 0.025,
+      width * island.w,
+      height * island.h,
       0,
       0,
       TAU,
     );
     context.fill();
+
+    context.beginPath();
+    context.moveTo(x - width * island.w * 0.6, y);
+    context.lineTo(x, y + height * island.h * 1.7);
+    context.lineTo(x + width * island.w * 0.6, y);
+    context.closePath();
+    context.fill();
   }
+
+  // Sparse side spires only; keep the central combat lane open.
+  context.globalAlpha = 0.22;
+  const sideXs = [0.075, 0.18, 0.82, 0.925];
+  for (let index = 0; index < sideXs.length; index += 1) {
+    const x = width * sideXs[index]!;
+    const h =
+      height *
+      (0.065 + seededUnit(profile.seed, index, 15) * 0.075);
+    const baseY = Math.max(horizon, height * 0.205);
+    context.fillRect(
+      x - width * 0.006,
+      baseY - h,
+      width * 0.012,
+      h,
+    );
+    context.beginPath();
+    context.moveTo(x - width * 0.012, baseY - h);
+    context.lineTo(x, baseY - h - height * 0.024);
+    context.lineTo(x + width * 0.012, baseY - h);
+    context.closePath();
+    context.fill();
+  }
+
   context.restore();
 }
 
@@ -1476,32 +1560,48 @@ function drawCelestialFloor(
   input: WorldSceneDrawInput,
 ): void {
   const { width, height, time, profile, environment } = input;
-  const horizon = height * profile.horizonRatio;
+  const vanishingY = height * Math.max(0.34, profile.horizonRatio + 0.12);
+  const pulse = 0.72 + Math.sin(time * 0.22) * 0.08;
+
   context.save();
-  context.strokeStyle = rgba(environment.gridRgb, 0.045);
+  context.strokeStyle = rgba(environment.gridRgb, 0.038 * pulse);
   context.lineWidth = 1;
-  const offset = (time * 22) % 70;
-  for (let index = 0; index < 6; index += 1) {
-    const y = perspectiveY(horizon, height, index, offset, 72);
-    const p = (y - horizon) / Math.max(1, height - horizon);
+
+  // Sparse light-lane perspective: enough depth to guide the eye, without
+  // creating the previous "stack of rings" look.
+  for (const endX of [0.12, 0.34, 0.66, 0.88]) {
     context.beginPath();
-    context.ellipse(
-      width * 0.5,
-      y,
-      width * (0.08 + p * 0.62),
-      height * (0.008 + p * 0.025),
-      0,
-      0,
-      TAU,
+    context.moveTo(width * 0.5, vanishingY);
+    context.quadraticCurveTo(
+      width * (0.5 + (endX - 0.5) * 0.35),
+      height * 0.67,
+      width * endX,
+      height,
     );
     context.stroke();
   }
-  for (const side of [-1, 1]) {
-    context.beginPath();
-    context.moveTo(width * 0.5 + side * width * 0.035, horizon);
-    context.lineTo(width * 0.5 + side * width * 0.38, height);
-    context.stroke();
-  }
+
+  context.globalAlpha = 0.35;
+  context.beginPath();
+  context.moveTo(width * 0.31, height);
+  context.quadraticCurveTo(
+    width * 0.42,
+    height * 0.67,
+    width * 0.485,
+    vanishingY,
+  );
+  context.stroke();
+
+  context.beginPath();
+  context.moveTo(width * 0.69, height);
+  context.quadraticCurveTo(
+    width * 0.58,
+    height * 0.67,
+    width * 0.515,
+    vanishingY,
+  );
+  context.stroke();
+
   context.restore();
 }
 
