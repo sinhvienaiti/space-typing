@@ -64,6 +64,11 @@ import {
   type WorldEnvironmentProfile,
 } from "./worlds/environment";
 import { worldForStage } from "./worlds/registry";
+import { sceneProfileForWorld } from "./worlds/scene-registry";
+import {
+  WorldSceneRenderer,
+} from "./worlds/scene-renderer";
+import type { WorldSceneProfile } from "./worlds/scene-types";
 import type { CharacterId } from "./characters/registry";
 import { drawCharacterShip } from "./characters/renderer";
 import type { EquipmentAuraProfile } from "./characters/equipment-aura";
@@ -758,9 +763,11 @@ export class Game {
   private lastTime = performance.now();
   private animationFrame = 0;
   private stars: Array<{ x: number; y: number; z: number }> = [];
-  private backgroundGradient: CanvasGradient | null = null;
+  private readonly worldSceneRenderer = new WorldSceneRenderer();
   private worldEnvironment: WorldEnvironmentProfile =
     environmentForWorld("world-01");
+  private worldSceneProfile: WorldSceneProfile =
+    sceneProfileForWorld("world-01");
   private testLabEnabled = false;
   private testLabDeathMode: TestLabDeathMode = "immortal";
   private testLabLethalHits = 0;
@@ -792,6 +799,7 @@ export class Game {
   destroy(): void {
     cancelAnimationFrame(this.animationFrame);
     this.modularBodyCache.clear();
+    this.worldSceneRenderer.destroy();
     this.textWidthCache.clear();
     this.sfx.destroy();
   }
@@ -2693,12 +2701,16 @@ export class Game {
     const environmentStage =
       hiddenEncounterRuntime?.environmentStageOverride ??
       stage.stage;
-    const nextEnvironment = environmentForWorld(
-      worldForStage(environmentStage),
-    );
-    if (nextEnvironment.id !== this.worldEnvironment.id) {
+    const nextWorld = worldForStage(environmentStage);
+    const nextEnvironment = environmentForWorld(nextWorld);
+    const nextSceneProfile = sceneProfileForWorld(nextWorld);
+    if (
+      nextEnvironment.id !== this.worldEnvironment.id ||
+      nextSceneProfile.id !== this.worldSceneProfile.id
+    ) {
       this.worldEnvironment = nextEnvironment;
-      this.backgroundGradient = null;
+      this.worldSceneProfile = nextSceneProfile;
+      this.worldSceneRenderer.invalidate();
       this.seedStars();
     }
 
@@ -3133,7 +3145,7 @@ export class Game {
     this.canvas.width = Math.floor(this.width * this.dpr);
     this.canvas.height = Math.floor(this.height * this.dpr);
     this.context.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    this.backgroundGradient = null;
+    this.worldSceneRenderer.invalidate();
     this.seedStars();
   }
 
@@ -3150,7 +3162,7 @@ export class Game {
     this.canvas.width = Math.floor(this.width * this.dpr);
     this.canvas.height = Math.floor(this.height * this.dpr);
     this.context.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    this.backgroundGradient = null;
+    this.worldSceneRenderer.invalidate();
     // Keep already seeded stars/animation state; adaptive pixel resolution
     // must not reseed gameplay VFX or change movement/physics timing.
   }
@@ -7472,101 +7484,16 @@ export class Game {
   }
 
   private drawBackground(time: number): void {
-    const context = this.context;
-    if (this.backgroundGradient === null) {
-      const gradient = context.createRadialGradient(
-        this.width * 0.5,
-        this.height * 0.78,
-        50,
-        this.width * 0.5,
-        this.height * 0.52,
-        Math.max(this.width, this.height) * 0.82,
-      );
-      gradient.addColorStop(
-        0,
-        this.worldEnvironment.backgroundCore,
-      );
-      gradient.addColorStop(
-        0.45,
-        this.worldEnvironment.backgroundMid,
-      );
-      gradient.addColorStop(
-        1,
-        this.worldEnvironment.backgroundEdge,
-      );
-      this.backgroundGradient = gradient;
-    }
-
-    context.fillStyle = this.backgroundGradient;
-    context.fillRect(-30, -30, this.width + 60, this.height + 60);
-
-    for (const star of this.stars) {
-      const y =
-        ((star.y +
-          time *
-            0.016 *
-            this.worldEnvironment.starDrift *
-            star.z) %
-          1) *
-        this.height;
-      context.fillStyle =
-        "rgba(" +
-        this.worldEnvironment.starRgb +
-        ", " +
-        String(0.12 + star.z * 0.48) +
-        ")";
-      context.fillRect(
-        star.x * this.width,
-        y,
-        star.z * 1.7,
-        star.z * 1.7,
-      );
-    }
-
-    context.save();
-    context.fillStyle =
-      "rgba(" +
-      this.worldEnvironment.hazeRgb +
-      ", " +
-      String(this.worldEnvironment.hazeIntensity) +
-      ")";
-    context.fillRect(0, 0, this.width, this.height);
-
-    context.translate(this.width / 2, this.height * 0.08);
-    context.strokeStyle =
-      "rgba(" +
-      this.worldEnvironment.gridRgb +
-      ", " +
-      String(this.worldEnvironment.gridIntensity) +
-      ")";
-    context.lineWidth = 1;
-
-    const profile = qualityProfile(this.settings.visualQuality);
-    const horizon = 44;
-    const scroll = (time * 72) % profile.gridStep;
-
-    for (
-      let y = horizon + scroll;
-      y < this.height;
-      y += profile.gridStep
-    ) {
-      const perspective =
-        (y - horizon) / Math.max(1, this.height - horizon);
-      const lineWidth = this.width * (0.2 + perspective * 1.24);
-      context.beginPath();
-      context.moveTo(-lineWidth / 2, y);
-      context.lineTo(lineWidth / 2, y);
-      context.stroke();
-    }
-
-    for (let index = -12; index <= 12; index += 1) {
-      context.beginPath();
-      context.moveTo(index * 14, horizon);
-      context.lineTo(index * this.width * 0.082, this.height);
-      context.stroke();
-    }
-
-    context.restore();
+    this.worldSceneRenderer.draw(this.context, {
+      profile: this.worldSceneProfile,
+      environment: this.worldEnvironment,
+      quality: this.settings.visualQuality,
+      width: this.width,
+      height: this.height,
+      dpr: this.dpr,
+      time,
+      stars: this.stars,
+    });
   }
 
   private drawInterference(time: number): void {
