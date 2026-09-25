@@ -382,6 +382,55 @@ Target:
 
 Visual effects must never hide typing targets.
 
+### World background scene system
+
+World identity must be visible in the combat environment itself, not only in
+labels or palette changes.
+
+The current production contract is the procedural/cached World Scene System in
+`docs/WORLD_BACKGROUND_SCENE_SYSTEM_PLAN.md`.
+
+All 50 Worlds resolve a `WorldSceneProfile`. The renderer supports distinct
+scene families for:
+
+- celestial/rainbow/heaven;
+- infernal/hell;
+- frost/prism;
+- verdant/nature;
+- shadow/eclipsed nature;
+- cosmic forge/mechanical;
+- abyss/void;
+- aurora/meteor/cosmic;
+- sacred void cathedral;
+- eternity/final crown.
+
+A World scene combines:
+
+- sky/nebula;
+- far landmarks;
+- World-specific landmark signature;
+- themed floor/lane;
+- stars;
+- bounded ambient particles;
+- restrained motion/parallax.
+
+The five Worlds inside each Galaxy use deterministic variants with different
+landmark, floor and particle style contracts. Background style fields must be
+consumed by runtime rendering; do not leave fake scene config.
+
+Performance rules:
+
+- cache static scenery by World + dimensions + DPR + quality;
+- rebuild only on World/size/DPR/quality changes;
+- keep animated atmosphere bounded by Visual Quality;
+- never use unbounded per-frame World registry scans;
+- do not require 50 large bitmap backgrounds;
+- visual detail must remain behind and quieter than typing targets/telegraphs.
+
+There is no separate setting that enables these backgrounds. Visual Quality only
+changes detail budgets; it must not collapse different Worlds back into one
+generic grid.
+
 ## 4.3 Per-key feel
 
 Every correct key:
