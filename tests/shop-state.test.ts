@@ -229,12 +229,9 @@ describe("M06 deterministic finite-stock shops", () => {
     expect(shopAvailable("event", input)).toBe(true);
   });
 
-  it("keeps resurrection stock finite and restricted to eligible merchant types", () => {
-    const protectedIds = new Set([
-      "salvage-anchor",
-      "stage-revival-core",
-      "phoenix-core",
-    ]);
+  it("offers only Phoenix Core as generated death-revive stock", () => {
+    const protectedIds = new Set(["phoenix-core"]);
+    const legacyIds = new Set(["salvage-anchor", "stage-revival-core"]);
 
     const normal = resolveShopInstance(
       createShopState(),
@@ -266,6 +263,19 @@ describe("M06 deterministic finite-stock shops", () => {
     }
 
     expect(found).toBe(true);
+
+    for (let index = 1; index <= 250; index += 1) {
+      const instance = resolveShopInstance(
+        createShopState(),
+        "hidden",
+        context(900, "legacy-check-" + String(index), 100, index),
+      ).instance;
+      expect(
+        instance.stock.some(
+          (entry) => entry.kind === "item" && legacyIds.has(entry.itemId),
+        ),
+      ).toBe(false);
+    }
   });
 
   it("restores persisted shop stock from the last safe crash snapshot", () => {
