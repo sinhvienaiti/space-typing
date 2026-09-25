@@ -3514,7 +3514,7 @@ kbd {
   opacity: 0;
   pointer-events: none;
 }
-.menu-help-wrap:is(:hover, :focus-within) > .menu-help-popup,
+.menu-help-trigger:is(:hover, :focus-visible) + .menu-help-popup,
 .menu-help-wrap[data-open="true"] > .menu-help-popup {
   visibility: visible;
   opacity: 1;
@@ -3958,6 +3958,6 @@ kbd {
 .rarity-frame{--grade-accent:#8798a6;border-left:3px solid var(--grade-accent)!important}
 .grade-copper{--grade-accent:#cc8755}.grade-silver{--grade-accent:#b9d2dc}.grade-gold{--grade-accent:#e5bd62}.grade-diamond{--grade-accent:#8de9e6}
 .grade-badge{color:var(--grade-accent);font-size:.56rem}
-.local-item-icon{display:grid;place-items:center;height:42px}
-.equipment-card-icon.local-item-icon{height:72px}
+.local-item-icon{display:grid;place-items:center;height:48px;font-size:1.45rem;line-height:1}
+.equipment-card-icon.local-item-icon{height:92px;min-height:92px;font-size:3rem;line-height:1}
 .recall-assist-bar{right:12px;left:auto;width:auto;transform:none;pointer-events:auto}
