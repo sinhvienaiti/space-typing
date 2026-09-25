@@ -73,7 +73,7 @@ Workflow:
 Do not create low-detail replacement art merely because it is faster if a
 higher-quality permissive source already exists.
 
-## 4. Hybrid rendering model
+## 3. Hybrid rendering model
 
 The production background is a hybrid of:
 
@@ -503,7 +503,7 @@ The layered asset system is complete when:
 
 ---
 
-## 12. Implementation checkpoint — 2026-09-26
+## 13. Implementation checkpoint — 2026-09-26
 
 Implemented on child `main`:
 
