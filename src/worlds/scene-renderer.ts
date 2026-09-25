@@ -43,6 +43,15 @@ function rgba(rgb: string, alpha: number): string {
   return "rgba(" + rgb + ", " + String(clamp(alpha, 0, 1)) + ")";
 }
 
+function stringSeed(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
 export function worldSceneCacheKey(
   profile: WorldSceneProfile,
   width: number,
@@ -611,11 +620,214 @@ function drawEternityLandmarks(
   context.restore();
 }
 
+function drawLandmarkSignature(
+  context: CanvasRenderingContext2D,
+  input: WorldSceneDrawInput,
+): void {
+  const { width, height, profile, environment } = input;
+  const style = profile.landmarkStyle;
+  const horizon = height * profile.horizonRatio;
+  const seed = stringSeed(style) ^ profile.seed;
+  const centerX =
+    width * (0.5 + (seededUnit(seed, 0, 201) - 0.5) * 0.08);
+  const alpha = 0.08 + profile.landmarkIntensity * 0.16;
+
+  context.save();
+  context.globalAlpha = alpha;
+  context.strokeStyle = rgba(environment.starRgb, 0.78);
+  context.fillStyle = rgba(environment.hazeRgb, 0.44);
+  context.lineWidth = Math.max(1.2, Math.min(width, height) * 0.002);
+
+  if (
+    style.includes("gate") ||
+    style.includes("cathedral") ||
+    style.includes("chapel") ||
+    style.includes("basilica") ||
+    style.includes("sanctuary") ||
+    style.includes("crypt")
+  ) {
+    const archW = width * (0.075 + profile.variant * 0.008);
+    const archH = height * (0.07 + profile.variant * 0.007);
+    context.beginPath();
+    context.ellipse(
+      centerX,
+      horizon - archH * 0.12,
+      archW,
+      archH,
+      0,
+      Math.PI,
+      TAU,
+    );
+    context.stroke();
+    for (const side of [-1, 1]) {
+      context.fillRect(
+        centerX + side * archW - width * 0.006,
+        horizon - archH * 0.1,
+        width * 0.012,
+        archH * 1.1,
+      );
+    }
+  } else if (style.includes("crown") || style.includes("throne")) {
+    const points = 5 + (profile.variant % 2) * 2;
+    const baseY = horizon - height * 0.012;
+    const span = width * 0.15;
+    context.beginPath();
+    context.moveTo(centerX - span / 2, baseY);
+    for (let index = 0; index < points; index += 1) {
+      const x =
+        centerX - span / 2 + (span * index) / Math.max(1, points - 1);
+      const peak =
+        index % 2 === 0
+          ? height * (0.065 + profile.variant * 0.006)
+          : height * 0.028;
+      context.lineTo(x, baseY - peak);
+    }
+    context.lineTo(centerX + span / 2, baseY);
+    context.closePath();
+    context.stroke();
+  } else if (
+    style.includes("prism") ||
+    style.includes("crystal") ||
+    style.includes("glass")
+  ) {
+    const radius =
+      Math.min(width, height) * (0.045 + profile.variant * 0.004);
+    context.save();
+    context.translate(centerX, horizon - radius * 0.9);
+    context.rotate((profile.variant - 3) * 0.08);
+    context.beginPath();
+    context.moveTo(0, -radius);
+    context.lineTo(radius * 0.7, 0);
+    context.lineTo(0, radius);
+    context.lineTo(-radius * 0.7, 0);
+    context.closePath();
+    context.stroke();
+    context.beginPath();
+    context.moveTo(0, -radius);
+    context.lineTo(0, radius);
+    context.moveTo(-radius * 0.7, 0);
+    context.lineTo(radius * 0.7, 0);
+    context.stroke();
+    context.restore();
+  } else if (
+    style.includes("furnace") ||
+    style.includes("foundry") ||
+    style.includes("works") ||
+    style.includes("engine") ||
+    style.includes("reactor") ||
+    style.includes("port") ||
+    style.includes("circuit")
+  ) {
+    const ring = width * (0.045 + profile.variant * 0.006);
+    context.beginPath();
+    context.arc(centerX, horizon - height * 0.07, ring, 0, TAU);
+    context.stroke();
+    context.beginPath();
+    context.arc(centerX, horizon - height * 0.07, ring * 0.58, 0, TAU);
+    context.stroke();
+    for (let index = -2; index <= 2; index += 1) {
+      const x = centerX + index * ring * 0.72;
+      context.fillRect(
+        x - width * 0.005,
+        horizon - height * (0.04 + Math.abs(index) * 0.012),
+        width * 0.01,
+        height * (0.04 + Math.abs(index) * 0.012),
+      );
+    }
+  } else if (
+    style.includes("grove") ||
+    style.includes("garden") ||
+    style.includes("meadow") ||
+    style.includes("bloom") ||
+    style.includes("orchard") ||
+    style.includes("pollen") ||
+    style.includes("leaf")
+  ) {
+    const trunkH = height * (0.07 + profile.variant * 0.01);
+    context.beginPath();
+    context.moveTo(centerX, horizon);
+    context.quadraticCurveTo(
+      centerX - width * 0.025,
+      horizon - trunkH * 0.55,
+      centerX,
+      horizon - trunkH,
+    );
+    context.stroke();
+    for (let index = 0; index < 5; index += 1) {
+      const angle = -Math.PI * 0.88 + index * 0.44;
+      context.beginPath();
+      context.ellipse(
+        centerX + Math.cos(angle) * width * 0.04,
+        horizon - trunkH + Math.sin(angle) * height * 0.022,
+        width * 0.025,
+        height * 0.013,
+        angle,
+        0,
+        TAU,
+      );
+      context.fill();
+    }
+  } else if (
+    style.includes("eclipse") ||
+    style.includes("halo") ||
+    style.includes("orbit") ||
+    style.includes("singularity") ||
+    style.includes("nexus") ||
+    style.includes("cosmos") ||
+    style.includes("aurora")
+  ) {
+    const ring =
+      Math.min(width, height) * (0.055 + profile.variant * 0.004);
+    context.beginPath();
+    context.arc(centerX, height * 0.135, ring, 0, TAU);
+    context.stroke();
+    context.globalAlpha *= 0.7;
+    context.beginPath();
+    context.arc(
+      centerX + ring * 0.45,
+      height * 0.135 - ring * 0.22,
+      ring * 0.44,
+      0,
+      TAU,
+    );
+    context.fill();
+  } else if (
+    style.includes("snow") ||
+    style.includes("winter") ||
+    style.includes("glacier") ||
+    style.includes("tundra")
+  ) {
+    const count = 3 + profile.variant;
+    for (let index = 0; index < count; index += 1) {
+      const x =
+        centerX + (index - (count - 1) / 2) * width * 0.026;
+      const h =
+        height *
+        (0.035 + (index % 3) * 0.018 + profile.variant * 0.003);
+      context.beginPath();
+      context.moveTo(x - width * 0.011, horizon);
+      context.lineTo(x, horizon - h);
+      context.lineTo(x + width * 0.011, horizon);
+      context.closePath();
+      context.stroke();
+    }
+  } else {
+    const radius = Math.min(width, height) * 0.04;
+    context.beginPath();
+    context.arc(centerX, horizon - radius, radius, 0, TAU);
+    context.stroke();
+  }
+
+  context.restore();
+}
+
 function drawStaticLandmarks(
   context: CanvasRenderingContext2D,
   input: WorldSceneDrawInput,
 ): void {
   const archetype = input.profile.archetype;
+  context.save();
+  context.globalAlpha = input.profile.landmarkIntensity;
   if (archetype === "celestial-rainbow") {
     drawCelestialLandmarks(context, input);
   } else if (archetype === "infernal") {
@@ -637,6 +849,8 @@ function drawStaticLandmarks(
   } else {
     drawEternityLandmarks(context, input);
   }
+  context.restore();
+  drawLandmarkSignature(context, input);
 }
 
 function drawStaticScene(
@@ -692,6 +906,7 @@ function drawAmbientParticles(
   const count = sceneQualityBudget(quality).ambientParticles;
   const speed = particleMotionScale(profile);
   const archetype = profile.archetype;
+  const particleStyle = profile.particleStyle;
 
   context.save();
   context.lineCap = "round";
@@ -711,7 +926,66 @@ function drawAmbientParticles(
     const size = 1 + depth * 2.6;
     const alpha = 0.12 + depth * 0.24;
 
-    if (archetype === "infernal") {
+    if (
+      particleStyle.includes("feather") ||
+      particleStyle.includes("droplet")
+    ) {
+      context.strokeStyle = rgba(environment.starRgb, alpha);
+      context.lineWidth = Math.max(1, size * 0.32);
+      context.beginPath();
+      context.moveTo(px, py - size * 1.6);
+      context.quadraticCurveTo(
+        px + size * 0.9,
+        py,
+        px - size * 0.3,
+        py + size * 1.7,
+      );
+      context.stroke();
+    } else if (
+      particleStyle.includes("spark") ||
+      particleStyle.includes("ember") ||
+      particleStyle.includes("fire")
+    ) {
+      context.strokeStyle = rgba(environment.starRgb, alpha + 0.08);
+      context.lineWidth = size * 0.65;
+      context.beginPath();
+      context.moveTo(px, py);
+      context.lineTo(px - drift * 11, py + 5 + size * 2);
+      context.stroke();
+    } else if (
+      particleStyle.includes("snow") ||
+      particleStyle.includes("dust") ||
+      particleStyle.includes("mote") ||
+      particleStyle.includes("spore")
+    ) {
+      context.fillStyle = rgba(environment.starRgb, alpha);
+      context.beginPath();
+      context.arc(px, py, size * 0.52, 0, TAU);
+      context.fill();
+    } else if (
+      particleStyle.includes("leaf") ||
+      particleStyle.includes("petal") ||
+      particleStyle.includes("pollen")
+    ) {
+      context.fillStyle = rgba(environment.gridRgb, alpha);
+      context.beginPath();
+      context.ellipse(px, py, size, size * 0.45, phase, 0, TAU);
+      context.fill();
+    } else if (
+      particleStyle.includes("shard") ||
+      particleStyle.includes("fragment") ||
+      particleStyle.includes("glass") ||
+      particleStyle.includes("debris") ||
+      particleStyle.includes("meteor") ||
+      particleStyle.includes("comet")
+    ) {
+      context.strokeStyle = rgba(environment.starRgb, alpha + 0.04);
+      context.lineWidth = Math.max(1, size * 0.4);
+      context.beginPath();
+      context.moveTo(px - size * 2.8, py - size);
+      context.lineTo(px + size, py + size * 0.35);
+      context.stroke();
+    } else if (archetype === "infernal") {
       context.strokeStyle = rgba(environment.starRgb, alpha + 0.08);
       context.lineWidth = size * 0.7;
       context.beginPath();
@@ -1097,6 +1371,114 @@ function drawEternityFloor(
   context.restore();
 }
 
+function drawFloorSignature(
+  context: CanvasRenderingContext2D,
+  input: WorldSceneDrawInput,
+): void {
+  const { width, height, time, profile, environment } = input;
+  const style = profile.floorStyle;
+  const horizon = height * profile.horizonRatio;
+  const accent = rgba(environment.gridRgb, 0.055);
+
+  context.save();
+  context.strokeStyle = accent;
+  context.lineWidth = 1;
+
+  if (style.includes("rift")) {
+    context.beginPath();
+    context.moveTo(width * 0.5, horizon);
+    for (let step = 1; step <= 12; step += 1) {
+      const t = step / 12;
+      context.lineTo(
+        width * 0.5 +
+          Math.sin(step * 2.35 + profile.variant) *
+            width *
+            0.022 *
+            t,
+        horizon + (height - horizon) * t,
+      );
+    }
+    context.stroke();
+  } else if (style.includes("root") || style.includes("vine")) {
+    for (const side of [-1, 1]) {
+      context.beginPath();
+      context.moveTo(width * 0.5, horizon);
+      context.bezierCurveTo(
+        width * 0.5 + side * width * 0.04,
+        height * 0.48,
+        width * 0.5 + side * width * 0.2,
+        height * 0.72,
+        width * 0.5 + side * width * 0.34,
+        height,
+      );
+      context.stroke();
+    }
+  } else if (
+    style.includes("grid") ||
+    style.includes("panel") ||
+    style.includes("conduit") ||
+    style.includes("track")
+  ) {
+    const offset = (time * 32) % 64;
+    for (let index = 0; index < 8; index += 1) {
+      const y = perspectiveY(horizon, height, index, offset, 74);
+      const p = (y - horizon) / Math.max(1, height - horizon);
+      const half = width * (0.035 + p * 0.3);
+      context.strokeRect(
+        width * 0.5 - half,
+        y,
+        half * 2,
+        Math.max(2, p * 11),
+      );
+    }
+  } else if (
+    style.includes("ice") ||
+    style.includes("frozen") ||
+    style.includes("glacier")
+  ) {
+    for (let index = 0; index < 5; index += 1) {
+      const startX = width * (0.18 + index * 0.16);
+      context.beginPath();
+      context.moveTo(startX, height);
+      context.lineTo(
+        width * 0.5 + (index - 2) * width * 0.02,
+        horizon,
+      );
+      context.stroke();
+    }
+  } else if (
+    style.includes("halo") ||
+    style.includes("prism") ||
+    style.includes("crown") ||
+    style.includes("infinity")
+  ) {
+    for (let index = 0; index < 4; index += 1) {
+      const t = (index + 1) / 5;
+      const y = horizon + (height - horizon) * t * t;
+      context.beginPath();
+      context.ellipse(
+        width * 0.5,
+        y,
+        width * (0.06 + t * 0.34),
+        height * (0.006 + t * 0.014),
+        0,
+        0,
+        TAU,
+      );
+      context.stroke();
+    }
+  } else {
+    for (const side of [-1, 1]) {
+      context.beginPath();
+      context.moveTo(width * 0.5 + side * width * 0.04, horizon);
+      context.lineTo(width * 0.5 + side * width * 0.32, height);
+      context.stroke();
+    }
+  }
+
+  context.restore();
+}
+
 function drawFloor(
   context: CanvasRenderingContext2D,
   input: WorldSceneDrawInput,
@@ -1123,6 +1505,7 @@ function drawFloor(
   } else {
     drawEternityFloor(context, input);
   }
+  drawFloorSignature(context, input);
 }
 
 export class WorldSceneRenderer {
