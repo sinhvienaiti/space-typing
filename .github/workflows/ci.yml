@@ -12,7 +12,7 @@ jobs:
       - name: Checkout exact Space Typing source
         uses: actions/checkout@v4
         with:
-          ref: d7ec4858a0c046799b49eb246f6fa7d875fc7b1b
+          ref: 784986d7d6a96624170ea102ca13ae6f466ee9b3
           path: source
           fetch-depth: 1
 
@@ -22,15 +22,15 @@ jobs:
           cat > source/OFFLINE_EXPORT_INFO.txt <<'EOF'
           Repository: sinhvienaiti/space-typing
           Branch source: main
-          Commit: d7ec4858a0c046799b49eb246f6fa7d875fc7b1b
-          Commit message: Remove redundant Rage CSS overrides
+          Commit: 784986d7d6a96624170ea102ca13ae6f466ee9b3
+          Commit message: Dock Recall assist controls to screen edge
           Export purpose: offline transfer to Mac mini
           EOF
 
       - name: Upload source artifact
         uses: actions/upload-artifact@v4
         with:
-          name: space-typing-d7ec4858-source
+          name: space-typing-784986d7-source
           path: source
           include-hidden-files: true
           if-no-files-found: error
