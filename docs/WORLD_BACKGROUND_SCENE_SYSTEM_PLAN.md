@@ -1036,3 +1036,32 @@ It should instead read as:
 - no per-frame registry scans;
 - no persistence changes;
 - parent gitlink is updated after child CI passes.
+
+
+### BG14 implementation result
+
+Status: COMPLETE (2026-09-25).
+
+Owner screenshot analysis confirmed the visual issue was composition, not scene
+selection. The screenshot showed a broad cyan/purple stripe across the active
+enemy area, repeated ellipse rings and too much empty lower gradient.
+
+Implemented correction:
+
+- removed the full-width celestial cloud stripe;
+- replaced it with separate left/right soft radial cloud clusters;
+- moved the major celestial halo/planet off-center;
+- narrowed the rainbow/nebula ribbon into the upper sky;
+- replaced the centered celestial landmark ring stack with side floating
+  islands/spires that frame the combat corridor;
+- removed celestial floor ellipse stacks;
+- replaced them with sparse converging light-lane curves;
+- added a restrained lower foreground vignette for depth;
+- kept the target/word-label center visually quieter.
+
+Validation for commit 6c71174bf197b1ec73882c63c3f2b51c0af9c3e1:
+- Test: PASS;
+- Build: PASS;
+- CI: SUCCESS.
+
+Final perceptual approval remains owner-reviewed from a real browser screenshot.
