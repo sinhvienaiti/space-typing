@@ -122,12 +122,12 @@ Acceptance: independent silhouette and full-color comparison at 64/78/128 CSS px
 - heavy real-time bloom, continuously blurred shadows, large full-screen engine trails;
 - extra particle emitter per equipment item;
 - new permanent combat HUD panels or visual overlays on typed words;
-- claims that a generated sample image is production-ready without file/size/browser verification.
+- claims that a generated sample image is production-ready without file-integrity/dimension/browser verification.
 
 ## Execution checkpoints
 
 - V30: 11-ship art direction, exclusion list and performance/integrity constraints documented here.
-- V31: implemented `src/characters/ship-art.ts` V3 → V2 → procedural fallback, dimension-validation tests, and `scripts/check-ship-art-budget.mjs` wired to production build. The real V3 atlas is now registered; `?shipArt=v2` remains the QA baseline override.
+- V31: implemented `src/characters/ship-art.ts` V3 → V2 → procedural fallback, dimension-validation tests, and `scripts/check-ship-art-integrity.mjs` wired to production build. The real V3 atlas is now registered; `?shipArt=v2` remains the QA baseline override.
 - V32: 11 distinct generated source sprites and the reviewed 4×3 lossless WebP atlas are complete. The production atlas is committed in Git as `public/assets/space-typing/ships/player-ships-v3.webp` by commit `6756a943`; it is 1024×768, 800,054 bytes (781.3 KiB), ~3 MiB decoded RGBA and SHA-256 `fb9434e002d6da650e34192eb425e62d1e2f3bec8804a9b33b7aa8733de10eb3`. The production manifest registers `player-ship-sheet-v3`, and the build integrity guard verifies the exact reviewed hash and dimensions while reporting transfer size.
 - V33/V34: the V3-aware render path is active by default through V3→V2→procedural selection; it avoids V2 engine flames and heavy image-shadow bloom over painted V3 art, and startup exposes `document.documentElement.dataset.shipArt` for QA. Character-specific projectiles and equipment aura still reuse existing implementations without new emitters. On successful V3 selection the decoded V2 fallback image reference is released; `?shipArt=v2` intentionally excludes V3 preload for clean A/B measurements.
 - V35: atlas file/hash/header/dimensions/transfer checks now pass in production CI and V3 is available on normal startup. The remaining gate is the paired **same-device real-browser** V2/V3 Test Lab benchmark plus image-contrast/two-build human visual review. Never substitute mocked Canvas tests, CI frame simulations or invented benchmarks.
