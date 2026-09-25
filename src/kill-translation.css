@@ -23,16 +23,9 @@
   padding: .24rem clamp(.7rem, 2vw, 1.35rem);
   overflow: hidden;
   border-bottom: 1px solid rgba(111, 234, 248, .12);
-  background: linear-gradient(
-    90deg,
-    rgba(9, 23, 35, .34),
-    rgba(18, 42, 55, .42),
-    rgba(9, 23, 35, .34)
-  );
-  box-shadow: inset 0 -1px 0 rgba(102, 222, 239, .05);
+  background: rgba(12, 31, 44, .36);
   color: #f3fdff;
   pointer-events: none;
-  font-variant-numeric: tabular-nums;
 }
 .kill-learning-strip.hidden { display: none; }
 .kill-learning-label {
@@ -64,7 +57,7 @@
 .kill-learning-strip.size-large .kill-learning-vi { font-size: clamp(1.1rem, 1.6vw, 1.38rem); }
 @media(max-width: 650px) {
   .kill-learning-strip { height: 54px; flex-wrap:wrap; gap:.14rem .7rem; padding:.22rem .65rem; }
-  .kill-learning-label { width:100%; text-align:center; font-size:.5rem; line-height:1; }
+  .kill-learning-label { width:100%; text-align:center; font-size:.5rem; }
   .kill-learning-text { flex-wrap:wrap; column-gap:.75rem; row-gap:.08rem; }
   .kill-learning-strip.size-large .kill-learning-ipa { font-size:1rem; }
   .kill-learning-strip.size-large .kill-learning-vi { font-size:1.12rem; }
