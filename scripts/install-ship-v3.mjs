@@ -69,5 +69,5 @@ writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
 console.log(
   "Ship V3 installed: 11 generated ships, 1024x768, " +
     String(raw.length) +
-    " reviewed bytes. Run pnpm build to validate the atlas integrity.",
+    " bytes (informational). Run pnpm build to validate the atlas integrity.",
 );
