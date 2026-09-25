@@ -1392,7 +1392,7 @@ function drawStars(
       budget.nearStars *
         profile.starDensity *
         Math.max(0.25, profile.flightIntensity) *
-        0.62,
+        0.34,
     ),
   );
   const vanishingX = width * (0.5 + (profile.variant - 3) * 0.006);
@@ -1509,6 +1509,9 @@ function drawCinematicVortex(
   input: WorldSceneDrawInput,
 ): void {
   const { width, height, time, profile } = input;
+  // Galaxy/Celestial scenes now use curated authored scenic objects. Avoid
+  // reintroducing procedural swirl art that reads like a placeholder.
+  if (profile.archetype === "celestial-rainbow") return;
   if (profile.vortexStrength < 0.28) return;
 
   const palette = sceneSkyPalette(profile);
@@ -1648,6 +1651,9 @@ function drawCinematicAsteroids(
     quality,
     environment,
   } = input;
+  // The curated Galaxy/Celestial layer registry supplies real asteroid sprites
+  // at multiple depths. Do not draw the old gray procedural polygons on top.
+  if (profile.archetype === "celestial-rainbow") return;
   if (profile.asteroidDensity <= 0.02) return;
 
   const budget = sceneQualityBudget(quality);
