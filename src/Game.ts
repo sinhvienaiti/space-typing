@@ -1,4 +1,9 @@
 import {
+  hasVisibleKillTranslation,
+  sanitizeKillTranslationSettings,
+  usesKillPositionTranslation,
+} from "./feedback/kill-translation";
+import {
   PriorityKillChain,
   type AnnouncerEvent,
 } from "./audio/announcer";
@@ -5891,13 +5896,21 @@ export class Game {
     this.gainPower(7);
     if (this.gameplayMode !== "recall") {
       // Combat learning feedback stays separate from Recall's configurable prompt.
-      this.learningEcho = {
-        entry: { ...enemy.entry },
-        x: enemy.x,
-        y: Math.max(96, enemy.y - enemy.radius - 18),
-        remaining: 1.1,
-        duration: 1.1,
-      };
+      const translationSettings = sanitizeKillTranslationSettings(
+        this.settings.killTranslation,
+      );
+      if (
+        usesKillPositionTranslation(translationSettings) &&
+        hasVisibleKillTranslation(enemy.entry, translationSettings)
+      ) {
+        this.learningEcho = {
+          entry: { ...enemy.entry },
+          x: enemy.x,
+          y: Math.max(96, enemy.y - enemy.radius - 18),
+          remaining: translationSettings.durationSeconds,
+          duration: translationSettings.durationSeconds,
+        };
+      }
       this.hooks.onKillTranslation?.({ ...enemy.entry });
     }
 
@@ -7336,6 +7349,7 @@ export class Game {
       this.drawEnemy(enemy);
     }
 
+    this.drawLearningEcho();
 
     if (this.boss !== null) {
       this.drawBoss(time);
@@ -8116,6 +8130,76 @@ export class Game {
     context.shadowBlur = 10;
     context.shadowColor = "#ffd84d";
     context.fillText(split.remaining, left + typedWidth, wordY);
+    context.restore();
+  }
+
+  private drawLearningEcho(): void {
+    const echo = this.learningEcho;
+    if (echo === null) return;
+
+    const config = sanitizeKillTranslationSettings(this.settings.killTranslation);
+    if (
+      !usesKillPositionTranslation(config) ||
+      !hasVisibleKillTranslation(echo.entry, config)
+    ) {
+      return;
+    }
+
+    const lines: string[] = [];
+    if (config.showIpa && echo.entry.ipa.trim() !== "") {
+      lines.push(echo.entry.ipa.trim());
+    }
+    if (config.showVietnamese && echo.entry.vi.trim() !== "") {
+      lines.push(echo.entry.vi.trim());
+    }
+    if (lines.length === 0) return;
+
+    const fontSize =
+      config.size === "small" ? 12 : config.size === "medium" ? 15 : 18;
+    const lineHeight = fontSize + 5;
+    const paddingX = 12;
+    const paddingY = 7;
+    const context = this.context;
+
+    context.save();
+    context.font =
+      "800 " + String(fontSize) +
+      "px ui-sans-serif, system-ui, sans-serif";
+    let width = 0;
+    for (const line of lines) {
+      width = Math.max(width, this.measureTextWidth(line));
+    }
+    width = Math.min(360, width + paddingX * 2);
+    const height = lines.length * lineHeight + paddingY * 2;
+    const x = clamp(echo.x, width / 2 + 8, this.width - width / 2 - 8);
+    const y = Math.max(height / 2 + 8, echo.y);
+    const fade = Math.min(1, echo.remaining / Math.min(0.35, echo.duration));
+
+    context.globalAlpha = fade;
+    context.fillStyle = "rgba(5, 12, 21, 0.88)";
+    context.strokeStyle = "rgba(129, 229, 247, 0.5)";
+    context.lineWidth = 1;
+    context.shadowBlur = 14;
+    context.shadowColor = "rgba(121, 222, 247, 0.35)";
+    context.fillRect(x - width / 2, y - height / 2, width, height);
+    context.strokeRect(x - width / 2, y - height / 2, width, height);
+    context.shadowBlur = 0;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+
+    lines.forEach((line, index) => {
+      context.fillStyle =
+        index === 0 && config.showIpa
+          ? "#a1f0f9"
+          : "#fff3c9";
+      context.fillText(
+        line,
+        x,
+        y - ((lines.length - 1) * lineHeight) / 2 + index * lineHeight,
+        width - paddingX * 2,
+      );
+    });
+
     context.restore();
   }
 
