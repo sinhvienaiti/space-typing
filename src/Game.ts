@@ -9059,6 +9059,8 @@ export class Game {
           glowScale: glow,
           fillBody: false,
           drawFace: false,
+          bodyOutlineAlpha: 0.42,
+          bodyOutlineGlowScale: 0.45,
         },
         this.modularBodyCache,
         this.dpr,
