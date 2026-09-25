@@ -185,28 +185,34 @@ Controller lifecycle audit verifies:
 
 This is functional/lifecycle validation. It cannot certify subjective loudness or whether a real local audio file sounds good.
 
-## Performance / build budget
+## Performance / build measurement policy
 
-Runtime structural budgets already include:
+Runtime structural safety remains enforced where it directly protects gameplay:
 
 - M12 hard active-enemy caps;
 - VisualQuality particle caps;
-- DPR/pixel budgets;
+- DPR/pixel safeguards;
 - rolling FrameProfiler;
-- bounded music/ambient active tracks.
+- bounded music/ambient lifecycle.
 
-M22 additionally makes bundle size a production build gate via `scripts/check-bundle-size.mjs`.
+The original M22 implementation also introduced hard JS/CSS/total-dist byte
+ceilings. **That static-size policy was superseded on 2026-09-25.**
 
-Budgets:
+Current production behavior:
 
-- JS raw <= 650 KiB;
-- JS gzip <= 180 KiB;
-- CSS raw <= 60 KiB;
-- CSS gzip <= 20 KiB;
-- total dist raw <= 800 KiB;
-- total dist gzip <= 250 KiB.
+- `scripts/report-bundle-metrics.mjs` reports JS, CSS and total `dist`
+  raw/gzip sizes for review and trend visibility;
+- those byte counts do **not** fail CI by themselves;
+- audio payload size and Ship V3 transfer size are also reported rather than
+  hard-capped;
+- correctness/integrity checks remain active;
+- meaningful performance decisions use runtime profiling and real-browser
+  evidence rather than forcing source/build output under an arbitrary historic
+  size number.
 
-Current hard-gate result (CI #395):
+Canonical policy: `docs/CODE_QUALITY_AND_PERFORMANCE_RULES.md`.
+
+For historical context, CI #395 measured:
 
 - JS raw: 486.41 KiB;
 - JS gzip: 126.99 KiB;
@@ -215,7 +221,8 @@ Current hard-gate result (CI #395):
 - total dist raw: 537.91 KiB;
 - total dist gzip: 151.45 KiB.
 
-The thresholds intentionally leave headroom while preventing silent large regressions.
+Those values are retained as historical measurements, **not current acceptance
+ceilings**.
 
 ## Automated validation checkpoint
 
@@ -225,9 +232,9 @@ CI #395:
 - 583/583 tests PASS;
 - TypeScript no-emit check PASS;
 - Vite production build PASS;
-- M22 bundle-budget gate PASS.
+- historical M22 bundle-size gate PASS at that time; current builds report size metrics without a hard byte ceiling.
 
-Subsequent documentation-only commits must keep the same Test + Build + bundle gate green.
+Subsequent commits must keep Test + Build green; bundle sizes remain visible report-only metrics.
 
 ## Pre-manual polish integration
 
