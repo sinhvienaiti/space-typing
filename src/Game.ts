@@ -9006,151 +9006,164 @@ export class Game {
     const context = this.context;
     const x = enemy.x;
     const y = enemy.y - kick;
-    const radius = Math.max(22, enemy.radius * 0.92);
-    const pulse = 0.94 + Math.sin(enemy.age * 4.4) * 0.06;
+    const radius = Math.max(24, enemy.radius * 0.96);
+    const pulse = 0.97 + Math.sin(enemy.age * 3.8) * 0.03;
     const glow = qualityProfile(this.settings.visualQuality).glowScale;
 
     context.save();
     context.translate(x, y);
 
-    context.globalCompositeOperation = "lighter";
-    context.globalAlpha = 0.7;
-    context.shadowBlur = (targeted ? 30 : 20) * glow;
-    context.shadowColor = targeted ? "#7ef4ff" : "#8adfff";
+    // Recall keeps the original quiet memory-target identity: a dark glass orb,
+    // cyan brackets and two warm floating memory nodes. Combat enemy families
+    // are deliberately not rendered in Recall mode.
+    context.globalCompositeOperation = "source-over";
+    context.shadowBlur = (targeted ? 20 : 12) * glow;
+    context.shadowColor = "rgba(78, 232, 255, 0.72)";
 
-    const halo = context.createRadialGradient(
-      -radius * 0.2,
-      -radius * 0.28,
-      radius * 0.08,
+    const aura = context.createRadialGradient(
       0,
       0,
-      radius * 1.3,
+      radius * 0.4,
+      0,
+      0,
+      radius * 1.42,
     );
-    halo.addColorStop(0, "rgba(255,255,255,0.78)");
-    halo.addColorStop(0.26, "rgba(126,235,255,0.42)");
-    halo.addColorStop(0.68, "rgba(98,182,255,0.18)");
-    halo.addColorStop(1, "rgba(110,120,255,0)");
-    context.fillStyle = halo;
+    aura.addColorStop(0, "rgba(77, 222, 244, 0.08)");
+    aura.addColorStop(0.72, "rgba(56, 189, 221, 0.06)");
+    aura.addColorStop(1, "rgba(56, 189, 221, 0)");
+    context.fillStyle = aura;
     context.beginPath();
-    context.arc(0, 0, radius * 1.28 * pulse, 0, Math.PI * 2);
+    context.arc(0, 0, radius * 1.42, 0, Math.PI * 2);
     context.fill();
 
-    context.globalAlpha = 1;
-    context.shadowBlur = (targeted ? 24 : 15) * glow;
-    context.strokeStyle = targeted
-      ? "rgba(139,247,255,0.98)"
-      : "rgba(134,224,255,0.78)";
-    context.lineWidth = targeted ? 2.4 : 1.6;
-
     const glass = context.createRadialGradient(
-      -radius * 0.3,
-      -radius * 0.36,
+      -radius * 0.28,
+      -radius * 0.32,
       radius * 0.08,
       0,
       0,
       radius,
     );
-    glass.addColorStop(0, "rgba(243,255,255,0.96)");
-    glass.addColorStop(0.23, "rgba(146,239,255,0.82)");
-    glass.addColorStop(0.58, "rgba(91,193,244,0.45)");
-    glass.addColorStop(0.84, "rgba(87,126,232,0.32)");
-    glass.addColorStop(1, "rgba(121,91,220,0.18)");
+    glass.addColorStop(0, "rgba(127, 227, 241, 0.16)");
+    glass.addColorStop(0.38, "rgba(31, 93, 113, 0.2)");
+    glass.addColorStop(0.78, "rgba(5, 27, 38, 0.5)");
+    glass.addColorStop(1, "rgba(2, 14, 23, 0.7)");
+
     context.fillStyle = glass;
+    context.strokeStyle = targeted
+      ? "rgba(106, 241, 255, 0.82)"
+      : "rgba(92, 203, 225, 0.6)";
+    context.lineWidth = targeted ? 2 : 1.4;
     context.beginPath();
     context.arc(0, 0, radius * pulse, 0, Math.PI * 2);
     context.fill();
     context.stroke();
 
-    // Soft inner core keeps the Recall target visually distinct from every
-    // Combat enemy family while preserving the original glass-bubble feel.
-    const core = context.createRadialGradient(
-      -radius * 0.12,
-      -radius * 0.08,
-      radius * 0.04,
-      0,
-      0,
-      radius * 0.58,
-    );
-    core.addColorStop(0, "rgba(255,239,255,0.96)");
-    core.addColorStop(0.5, "rgba(255,151,221,0.78)");
-    core.addColorStop(1, "rgba(191,93,229,0.22)");
-    context.fillStyle = core;
+    context.shadowBlur = 0;
+    context.strokeStyle = "rgba(197, 247, 255, 0.18)";
+    context.lineWidth = 1.1;
     context.beginPath();
-    context.arc(0, radius * 0.06, radius * 0.55, 0, Math.PI * 2);
+    context.arc(
+      -radius * 0.08,
+      -radius * 0.1,
+      radius * 0.68,
+      Math.PI * 1.08,
+      Math.PI * 1.55,
+    );
+    context.stroke();
+
+    context.fillStyle = targeted
+      ? "rgba(128, 245, 255, 0.9)"
+      : "rgba(111, 220, 236, 0.7)";
+    const eyeRadius = Math.max(1.35, radius * 0.055);
+    context.beginPath();
+    context.arc(-radius * 0.22, -radius * 0.05, eyeRadius, 0, Math.PI * 2);
+    context.arc(radius * 0.22, -radius * 0.05, eyeRadius, 0, Math.PI * 2);
     context.fill();
 
-    context.shadowBlur = 0;
-    context.strokeStyle = "rgba(236,252,255,0.82)";
-    context.lineWidth = Math.max(1.2, radius * 0.06);
+    context.strokeStyle = "rgba(104, 224, 240, 0.62)";
+    context.lineWidth = Math.max(1.1, radius * 0.045);
     context.lineCap = "round";
-
-    // Small friendly face from the original Recall identity.
-    const eyeY = -radius * 0.02;
-    const eyeX = radius * 0.18;
-    context.beginPath();
-    context.moveTo(-eyeX, eyeY - radius * 0.04);
-    context.lineTo(-eyeX, eyeY + radius * 0.04);
-    context.moveTo(eyeX, eyeY - radius * 0.04);
-    context.lineTo(eyeX, eyeY + radius * 0.04);
-    context.stroke();
-
     context.beginPath();
     context.arc(
       0,
-      radius * 0.09,
-      radius * 0.19,
-      Math.PI * 0.14,
-      Math.PI * 0.86,
+      radius * 0.05,
+      radius * 0.27,
+      Math.PI * 0.16,
+      Math.PI * 0.84,
     );
     context.stroke();
 
-    // Glass highlight and small orbit sparks make the core read as a memory
-    // object rather than an enemy sprite.
-    context.strokeStyle = "rgba(255,255,255,0.72)";
-    context.lineWidth = 1.2;
+    const nodeY = -radius * 1.03;
+    const nodeX = radius * 0.62;
+    context.strokeStyle = "rgba(104, 216, 230, 0.3)";
+    context.lineWidth = 1;
     context.beginPath();
-    context.arc(
-      -radius * 0.12,
-      -radius * 0.13,
-      radius * 0.66,
-      Math.PI * 1.08,
-      Math.PI * 1.58,
-    );
+    context.moveTo(-radius * 0.34, -radius * 0.72);
+    context.lineTo(-nodeX, nodeY + radius * 0.16);
+    context.moveTo(radius * 0.34, -radius * 0.72);
+    context.lineTo(nodeX, nodeY + radius * 0.16);
     context.stroke();
 
-    context.strokeStyle = "rgba(119,235,255,0.42)";
-    context.setLineDash([4, 6]);
-    context.lineDashOffset = -enemy.age * 16;
-    context.beginPath();
-    context.ellipse(
-      0,
-      radius * 0.04,
-      radius * 1.35,
-      radius * 0.54,
-      -0.18,
-      0,
-      Math.PI * 2,
-    );
-    context.stroke();
-    context.setLineDash([]);
-
-    for (const angle of [-0.72, 1.45, 2.7]) {
-      const orbitX = Math.cos(angle + enemy.age * 0.65) * radius * 1.24;
-      const orbitY =
-        Math.sin(angle + enemy.age * 0.65) * radius * 0.48 +
-        radius * 0.04;
-      context.fillStyle = "rgba(211,250,255,0.92)";
+    const memoryNode = (nodeCenterX: number): void => {
+      const nodeGradient = context.createRadialGradient(
+        nodeCenterX - radius * 0.08,
+        nodeY - radius * 0.04,
+        radius * 0.03,
+        nodeCenterX,
+        nodeY,
+        radius * 0.28,
+      );
+      nodeGradient.addColorStop(0, "rgba(255, 252, 211, 0.98)");
+      nodeGradient.addColorStop(0.55, "rgba(244, 221, 126, 0.92)");
+      nodeGradient.addColorStop(1, "rgba(199, 157, 70, 0.42)");
+      context.fillStyle = nodeGradient;
+      context.shadowBlur = 10 * glow;
+      context.shadowColor = "rgba(255, 221, 116, 0.48)";
       context.beginPath();
-      context.arc(orbitX, orbitY, Math.max(1.5, radius * 0.07), 0, Math.PI * 2);
+      context.ellipse(
+        nodeCenterX,
+        nodeY,
+        radius * 0.29,
+        radius * 0.13,
+        0,
+        0,
+        Math.PI * 2,
+      );
       context.fill();
-    }
+      context.shadowBlur = 0;
+    };
+    memoryNode(-nodeX);
+    memoryNode(nodeX);
+
+    const frame = radius * 1.2;
+    const corner = radius * 0.26;
+    context.strokeStyle = targeted
+      ? "rgba(99, 240, 255, 0.82)"
+      : "rgba(74, 198, 220, 0.54)";
+    context.lineWidth = 1.4;
+    context.beginPath();
+    context.moveTo(-frame, -frame + corner);
+    context.lineTo(-frame, -frame);
+    context.lineTo(-frame + corner, -frame);
+    context.moveTo(frame - corner, -frame);
+    context.lineTo(frame, -frame);
+    context.lineTo(frame, -frame + corner);
+    context.moveTo(-frame, frame - corner);
+    context.lineTo(-frame, frame);
+    context.lineTo(-frame + corner, frame);
+    context.moveTo(frame - corner, frame);
+    context.lineTo(frame, frame);
+    context.lineTo(frame, frame - corner);
+    context.stroke();
 
     if (enemy.flash > 0) {
-      context.globalAlpha = Math.min(0.7, enemy.flash);
-      context.fillStyle = "#ffffff";
+      context.globalAlpha = Math.min(0.5, enemy.flash);
+      context.strokeStyle = "#d9fbff";
+      context.lineWidth = 2.2;
       context.beginPath();
-      context.arc(0, 0, radius * pulse, 0, Math.PI * 2);
-      context.fill();
+      context.arc(0, 0, radius * 1.08, 0, Math.PI * 2);
+      context.stroke();
     }
 
     context.restore();
@@ -9287,17 +9300,65 @@ export class Game {
   private drawRecallEnemyWord(enemy: Enemy, targeted: boolean): void {
     const context = this.context;
     const hints = this.recallHintIndices.get(enemy.id) ?? new Set<number>();
-    const display = recallDisplayMask(enemy.entry.en, enemy.typed, hints);
+    const normalized = enemy.entry.en.trim().toLocaleUpperCase("en-US");
+    const tokens: Array<{
+      text: string;
+      kind: "typed" | "hint" | "hidden" | "punctuation";
+      letterIndex: number | null;
+    }> = [];
+    let letterIndex = 0;
+
+    for (const char of normalized) {
+      if (/[A-Z]/.test(char)) {
+        const currentIndex = letterIndex;
+        tokens.push({
+          text:
+            currentIndex < enemy.typed || hints.has(currentIndex)
+              ? char
+              : "_",
+          kind:
+            currentIndex < enemy.typed
+              ? "typed"
+              : hints.has(currentIndex)
+                ? "hint"
+                : "hidden",
+          letterIndex: currentIndex,
+        });
+        letterIndex += 1;
+      } else {
+        tokens.push({
+          text: char,
+          kind: "punctuation",
+          letterIndex: null,
+        });
+      }
+    }
+
     const pulse = 0.72 + Math.sin(enemy.age * 4.2) * 0.16;
-    const fontSize = Math.max(15, Math.min(21, 21 - Math.max(0, display.length - 11) * 0.35));
+    const fontSize = Math.max(
+      15,
+      Math.min(21, 21 - Math.max(0, tokens.length - 9) * 0.42),
+    );
     const y = enemy.y - enemy.radius - 26;
 
     context.save();
     context.font =
-      "800 " + String(fontSize) + "px ui-monospace, SFMono-Regular, Menlo, monospace";
+      "800 " +
+      String(fontSize) +
+      "px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.textBaseline = "middle";
-    context.textAlign = "center";
-    const width = Math.max(132, context.measureText(display).width + 24);
+    context.textAlign = "left";
+
+    const gap = Math.max(4, fontSize * 0.24);
+    const tokenWidths = tokens.map((token) =>
+      token.text === " "
+        ? fontSize * 0.42
+        : context.measureText(token.text).width,
+    );
+    const contentWidth =
+      tokenWidths.reduce((sum, width) => sum + width, 0) +
+      gap * Math.max(0, tokens.length - 1);
+    const width = Math.max(132, contentWidth + 28);
 
     context.fillStyle = "rgba(2, 8, 18, 0.9)";
     context.strokeStyle = targeted
@@ -9311,15 +9372,56 @@ export class Game {
     context.fill();
     context.stroke();
 
-    context.shadowBlur = targeted ? 8 : 0;
-    context.fillStyle = targeted ? "#effeff" : "#d5e3ef";
-    context.fillText(display.toUpperCase(), enemy.x, y);
+    let cursorX = enemy.x - contentWidth / 2;
+    for (let index = 0; index < tokens.length; index += 1) {
+      const token = tokens[index]!;
+      const tokenWidth = tokenWidths[index]!;
+      const isCurrent =
+        token.letterIndex !== null &&
+        token.letterIndex === enemy.typed;
+
+      context.shadowBlur = 0;
+      if (token.kind === "typed") {
+        context.fillStyle = "#83f6ff";
+        context.shadowBlur = targeted ? 12 : 7;
+        context.shadowColor = "rgba(84, 236, 255, 0.9)";
+      } else if (token.kind === "hint") {
+        context.fillStyle = "#f5d77f";
+        context.shadowBlur = 5;
+        context.shadowColor = "rgba(245, 215, 127, 0.45)";
+      } else if (token.kind === "hidden") {
+        context.fillStyle = "rgba(201, 224, 235, 0.62)";
+      } else {
+        context.fillStyle = "rgba(205, 228, 238, 0.78)";
+      }
+
+      context.fillText(token.text, cursorX, y);
+
+      if (isCurrent) {
+        context.shadowBlur = 0;
+        context.fillStyle = "rgba(111, 241, 255, 0.9)";
+        context.fillRect(
+          cursorX - 1,
+          y + fontSize * 0.68,
+          Math.max(tokenWidth + 2, fontSize * 0.56),
+          2,
+        );
+      }
+
+      cursorX += tokenWidth + gap;
+    }
 
     const meaningParts: string[] = [];
-    if (this.recallSettings.showTranslation && enemy.entry.vi.trim() !== "") {
+    if (
+      this.recallSettings.showTranslation &&
+      enemy.entry.vi.trim() !== ""
+    ) {
       meaningParts.push(enemy.entry.vi.trim());
     }
-    if (this.recallSettings.showIpa && enemy.entry.ipa.trim() !== "") {
+    if (
+      this.recallSettings.showIpa &&
+      enemy.entry.ipa.trim() !== ""
+    ) {
       meaningParts.push(enemy.entry.ipa.trim());
     }
     if (meaningParts.length > 0) {
@@ -9327,6 +9429,7 @@ export class Game {
       context.font =
         "650 12px ui-sans-serif, system-ui, -apple-system, sans-serif";
       context.fillStyle = "rgba(208, 232, 244, 0.88)";
+      context.textAlign = "center";
       context.fillText(
         meaningParts.join(" · "),
         enemy.x,
@@ -9334,9 +9437,11 @@ export class Game {
       );
     }
 
+    context.shadowBlur = 0;
     context.font =
       "800 8px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.fillStyle = "rgba(139, 241, 255, 0.8)";
+    context.textAlign = "center";
     context.fillText("RECALL CORE", enemy.x, y - 28);
     context.restore();
   }
