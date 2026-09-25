@@ -1,15 +1,17 @@
-import { canSelectCampaignStage, type CampaignExpansionState } from "./expansion-state";
 import { selectCampaignStage } from "./progress";
+import type { CampaignExpansionState } from "./expansion-state";
 import type { CampaignProgress } from "./types";
 
-/** Stage clear advances the selected frontier. Replay explicitly targets
- * the just-completed stage, subject to the existing checkpoint ceiling. */
+/** Replay targets a stage that has already been cleared. Persistent campaign
+ * progression is authoritative; legacy checkpoint ceilings must not hide or
+ * roll back cleared stages. */
 export function selectCompletedStageForReplay(
   campaign: CampaignProgress,
-  expansion: CampaignExpansionState,
+  _expansion: CampaignExpansionState,
   justCompletedStage: number,
 ): CampaignProgress {
-  return canSelectCampaignStage(campaign, expansion, justCompletedStage)
-    ? selectCampaignStage(campaign, justCompletedStage)
-    : campaign;
+  if (!campaign.clearedStages.includes(justCompletedStage)) {
+    return campaign;
+  }
+  return selectCampaignStage(campaign, justCompletedStage);
 }
