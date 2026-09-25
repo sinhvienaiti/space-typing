@@ -42,7 +42,14 @@ import {
   type StagePacingPlan,
 } from "./campaign/stage-pacing";
 import { canFinishCombatStage, canSpawnFinalBoss, type StageClearGate } from "./campaign/stage-clear-gate";
-import { typedRageGain, novaBossDamage, NOVA_PULSE_VISUAL_SECONDS } from "./combat/rage-pulse";
+import {
+  rageScaledCount,
+  rageScaledValue,
+  spendRage,
+  typedRageGain,
+  novaBossDamage,
+  NOVA_PULSE_VISUAL_SECONDS,
+} from "./combat/rage-pulse";
 import type { HiddenEncounterRuntime } from "./discovery/hidden-encounter";
 import {
   activeThreatPressure,
@@ -6593,7 +6600,8 @@ export class Game {
   }
 
   private activateOverdrive(): void {
-    if (this.stats.power < 100) return;
+    const rage = spendRage(this.stats.power);
+    if (rage.segments <= 0) return;
 
     this.stageResultTracker.recordNovaUse();
     const isVanguard = this.characterId === "vanguard";
@@ -6607,15 +6615,20 @@ export class Game {
     const isReaper = this.characterId === "reaper";
     const isCelestial = this.characterId === "celestial";
     const isZenith = this.characterId === "zenith";
-    this.stats.power = 0;
+    const scale = rage.scale;
+
+    // SPACE spends every currently completed 20% segment. Partial charge is
+    // preserved, so the player may use a small signature Rage at one segment
+    // or wait for all five segments to reach the full authored ultimate.
+    this.stats.power = rage.remainingPower;
     this.overdriveTimer = isVanguard
-      ? VANGUARD_NOVA_DURATION
+      ? rageScaledValue(VANGUARD_NOVA_DURATION, rage.segments)
       : isFortune
-        ? FORTUNE_JACKPOT_DURATION
+        ? rageScaledValue(FORTUNE_JACKPOT_DURATION, rage.segments)
         : isReaper
-          ? REAPER_DEATH_CHAIN_DURATION
+          ? rageScaledValue(REAPER_DEATH_CHAIN_DURATION, rage.segments)
           : isZenith
-            ? ZENITH_PROTOCOL_DURATION
+            ? rageScaledValue(ZENITH_PROTOCOL_DURATION, rage.segments)
             : isAegis ||
                 isVolt ||
                 isWraith ||
@@ -6624,48 +6637,50 @@ export class Game {
                 isBastion ||
                 isCelestial
               ? 0
-              : 4.5;
+              : rageScaledValue(4.5, rage.segments);
 
     if (isVanguard) {
       this.stats.shield = restoreVanguardShield(
         this.stats.shield,
         this.stats.maxShield,
-        VANGUARD_NOVA_SHIELD_RATIO,
+        VANGUARD_NOVA_SHIELD_RATIO * scale,
       );
     } else if (isAegis) {
       this.stats.shield = restoreAegisShield(
         this.stats.shield,
         this.stats.maxShield,
-        AEGIS_FORTRESS_SHIELD_RATIO,
+        AEGIS_FORTRESS_SHIELD_RATIO * scale,
       );
       this.barrierHp = Math.max(
         this.barrierHp,
-        140 + this.playerStats.shield * 0.9,
+        (140 + this.playerStats.shield * 0.9) * scale,
       );
-      this.barrierTimer = Math.max(
-        this.barrierTimer,
+      const duration = rageScaledValue(
         AEGIS_FORTRESS_DURATION,
+        rage.segments,
       );
-      this.reflectTimer = Math.max(
-        this.reflectTimer,
-        AEGIS_FORTRESS_DURATION,
+      this.barrierTimer = Math.max(this.barrierTimer, duration);
+      this.reflectTimer = Math.max(this.reflectTimer, duration);
+      this.guardianTimer = Math.max(this.guardianTimer, duration);
+      this.guardianBlocks = Math.max(
+        this.guardianBlocks,
+        rageScaledCount(5, rage.segments),
       );
-      this.guardianTimer = Math.max(
-        this.guardianTimer,
-        AEGIS_FORTRESS_DURATION,
-      );
-      this.guardianBlocks = Math.max(this.guardianBlocks, 5);
     } else if (isVolt) {
-      this.projectiles = [];
-      this.setStatusState(
-        cleanseNegativeStatuses(this.statusState),
+      if (rage.full) {
+        this.projectiles = [];
+        this.setStatusState(cleanseNegativeStatuses(this.statusState));
+        this.interferenceTimer = 0;
+      }
+      this.stats.energy = clamp(
+        this.stats.energy + this.stats.maxEnergy * scale,
+        0,
+        this.stats.maxEnergy,
       );
-      this.interferenceTimer = 0;
-      this.stats.energy = this.stats.maxEnergy;
 
       const targets = [...this.enemies]
         .sort((a, b) => b.y - a.y)
-        .slice(0, VOLT_THUNDER_TARGETS);
+        .slice(0, rageScaledCount(VOLT_THUNDER_TARGETS, rage.segments));
 
       for (const enemy of targets) {
         const wordLength = typingText(enemy.entry.en).length;
@@ -6675,65 +6690,78 @@ export class Game {
           enemy.typed = chainTypingAdvance(enemy.typed, wordLength);
         }
         if (enemy.actionCooldown !== null) {
-          enemy.actionCooldown += VOLT_EMP_DELAY;
+          enemy.actionCooldown += VOLT_EMP_DELAY * scale;
         }
         enemy.flash = 1;
         enemy.kick = Math.max(enemy.kick, 1.35);
-        this.burst(enemy.x, enemy.y, 20, 202);
+        this.burst(enemy.x, enemy.y, rageScaledCount(20, rage.segments), 202);
       }
 
       if (this.boss !== null) {
         const damage = firepowerDamage(
           Math.max(
             1,
-            Math.round(this.boss.maxHp * VOLT_THUNDER_BOSS_RATIO),
+            Math.round(
+              this.boss.maxHp * VOLT_THUNDER_BOSS_RATIO * scale,
+            ),
           ),
           this.playerStats,
         );
         this.boss.hp = Math.max(0, this.boss.hp - damage);
         this.boss.flash = 1;
-        this.boss.actionCooldown += VOLT_EMP_DELAY;
+        this.boss.actionCooldown += VOLT_EMP_DELAY * scale;
         this.updateBossPhase(this.boss);
         this.hooks.onBossUpdate(toBossHud(this.boss));
-
-        if (this.boss.hp <= 0) {
-          this.defeatBoss();
-        }
+        if (this.boss.hp <= 0) this.defeatBoss();
       }
     } else if (isWraith) {
-      this.projectiles = [];
-      this.timeShellTimer = Math.max(this.timeShellTimer, WRAITH_TIME_COLLAPSE_DURATION);
-      this.gravityWellTimer = Math.max(this.gravityWellTimer, WRAITH_TIME_COLLAPSE_DURATION);
-      this.cloakTimer = Math.max(this.cloakTimer, WRAITH_ACTIVE_CLOAK_DURATION);
+      if (rage.full) this.projectiles = [];
+      const collapse = rageScaledValue(
+        WRAITH_TIME_COLLAPSE_DURATION,
+        rage.segments,
+      );
+      this.timeShellTimer = Math.max(this.timeShellTimer, collapse);
+      this.gravityWellTimer = Math.max(this.gravityWellTimer, collapse);
+      this.cloakTimer = Math.max(
+        this.cloakTimer,
+        rageScaledValue(WRAITH_ACTIVE_CLOAK_DURATION, rage.segments),
+      );
     } else if (isFortune) {
-      this.stats.energy = this.stats.maxEnergy;
+      this.stats.energy = clamp(
+        this.stats.energy + this.stats.maxEnergy * scale,
+        0,
+        this.stats.maxEnergy,
+      );
       this.stats.shield = clamp(
-        this.stats.shield + this.stats.maxShield * FORTUNE_JACKPOT_SHIELD_RATIO,
+        this.stats.shield +
+          this.stats.maxShield * FORTUNE_JACKPOT_SHIELD_RATIO * scale,
         0,
         this.stats.maxShield,
       );
     } else if (isArsenal) {
       this.weaponOverclockTimer = Math.max(
         this.weaponOverclockTimer,
-        ARSENAL_PROTOCOL_DURATION,
+        rageScaledValue(ARSENAL_PROTOCOL_DURATION, rage.segments),
       );
       const targets = [...this.enemies]
         .sort((a, b) => b.y - a.y)
-        .slice(0, ARSENAL_PROTOCOL_TARGETS);
+        .slice(0, rageScaledCount(ARSENAL_PROTOCOL_TARGETS, rage.segments));
 
       for (const enemy of targets) {
         const wordLength = typingText(enemy.entry.en).length;
         enemy.typed = chainTypingAdvance(enemy.typed, wordLength);
         enemy.flash = 1;
         enemy.kick = Math.max(enemy.kick, 1.15);
-        this.burst(enemy.x, enemy.y, 16, 18);
+        this.burst(enemy.x, enemy.y, rageScaledCount(16, rage.segments), 18);
       }
 
       if (this.boss !== null) {
         const damage = firepowerDamage(
           Math.max(
             1,
-            Math.round(this.boss.maxHp * ARSENAL_PROTOCOL_BOSS_RATIO),
+            Math.round(
+              this.boss.maxHp * ARSENAL_PROTOCOL_BOSS_RATIO * scale,
+            ),
           ),
           this.playerStats,
         );
@@ -6741,33 +6769,32 @@ export class Game {
         this.boss.flash = 1;
         this.updateBossPhase(this.boss);
         this.hooks.onBossUpdate(toBossHud(this.boss));
-
-        if (this.boss.hp <= 0) {
-          this.defeatBoss();
-        }
+        if (this.boss.hp <= 0) this.defeatBoss();
       }
     } else if (isOracle) {
       this.bossMarkTimer = Math.max(
         this.bossMarkTimer,
-        ORACLE_ULTIMATE_MARK_DURATION,
+        rageScaledValue(ORACLE_ULTIMATE_MARK_DURATION, rage.segments),
       );
       const targets = [...this.enemies]
         .sort((a, b) => b.y - a.y)
-        .slice(0, ORACLE_ULTIMATE_TARGETS);
+        .slice(0, rageScaledCount(ORACLE_ULTIMATE_TARGETS, rage.segments));
 
       for (const enemy of targets) {
         const wordLength = typingText(enemy.entry.en).length;
         enemy.typed = chainTypingAdvance(enemy.typed, wordLength);
         enemy.flash = 1;
         enemy.kick = Math.max(enemy.kick, 1.1);
-        this.burst(enemy.x, enemy.y, 18, 326);
+        this.burst(enemy.x, enemy.y, rageScaledCount(18, rage.segments), 326);
       }
 
       if (this.boss !== null) {
         const damage = firepowerDamage(
           Math.max(
             1,
-            Math.round(this.boss.maxHp * ORACLE_ULTIMATE_BOSS_RATIO),
+            Math.round(
+              this.boss.maxHp * ORACLE_ULTIMATE_BOSS_RATIO * scale,
+            ),
           ),
           this.playerStats,
         );
@@ -6775,44 +6802,39 @@ export class Game {
         this.boss.flash = 1;
         this.updateBossPhase(this.boss);
         this.hooks.onBossUpdate(toBossHud(this.boss));
-
-        if (this.boss.hp <= 0) {
-          this.defeatBoss();
-        }
+        if (this.boss.hp <= 0) this.defeatBoss();
       }
     } else if (isBastion) {
       this.stats.shield = recycleBastionShield(
         this.stats.shield,
         this.stats.maxShield,
-        BASTION_SANCTUARY_SHIELD_RATIO,
+        BASTION_SANCTUARY_SHIELD_RATIO * scale,
       );
-      this.guardianTimer = Math.max(
-        this.guardianTimer,
+      const duration = rageScaledValue(
         BASTION_SANCTUARY_DURATION,
+        rage.segments,
       );
+      this.guardianTimer = Math.max(this.guardianTimer, duration);
       this.guardianBlocks = Math.max(
         this.guardianBlocks,
-        BASTION_SANCTUARY_BLOCKS,
+        rageScaledCount(BASTION_SANCTUARY_BLOCKS, rage.segments),
       );
       this.barrierHp = Math.max(
         this.barrierHp,
-        120 + this.playerStats.shield * 0.7,
+        (120 + this.playerStats.shield * 0.7) * scale,
       );
-      this.barrierTimer = Math.max(
-        this.barrierTimer,
-        BASTION_SANCTUARY_DURATION,
-      );
+      this.barrierTimer = Math.max(this.barrierTimer, duration);
     } else if (isReaper) {
       const targets = [...this.enemies]
         .sort((a, b) => b.y - a.y)
-        .slice(0, REAPER_DEATH_CHAIN_TARGETS);
+        .slice(0, rageScaledCount(REAPER_DEATH_CHAIN_TARGETS, rage.segments));
 
       for (const enemy of targets) {
         const wordLength = typingText(enemy.entry.en).length;
         enemy.typed = chainTypingAdvance(enemy.typed, wordLength);
         enemy.flash = 1;
         enemy.kick = Math.max(enemy.kick, 1.3);
-        this.burst(enemy.x, enemy.y, 20, 350);
+        this.burst(enemy.x, enemy.y, rageScaledCount(20, rage.segments), 350);
       }
 
       if (this.boss !== null) {
@@ -6820,7 +6842,9 @@ export class Game {
           firepowerDamage(
             Math.max(
               1,
-              Math.round(this.boss.maxHp * REAPER_DEATH_CHAIN_BOSS_RATIO),
+              Math.round(
+                this.boss.maxHp * REAPER_DEATH_CHAIN_BOSS_RATIO * scale,
+              ),
             ),
             this.playerStats,
           ) * reaperStreakDamageMultiplier(this.stats.streak);
@@ -6834,14 +6858,14 @@ export class Game {
       const chargeFactor = this.celestialCharge / 100;
       const targets = [...this.enemies]
         .sort((a, b) => b.y - a.y)
-        .slice(0, CELESTIAL_STARFALL_TARGETS);
+        .slice(0, rageScaledCount(CELESTIAL_STARFALL_TARGETS, rage.segments));
 
       for (const enemy of targets) {
         const wordLength = typingText(enemy.entry.en).length;
         enemy.typed = chainTypingAdvance(enemy.typed, wordLength);
         enemy.flash = 1;
         enemy.kick = Math.max(enemy.kick, 1.25);
-        this.burst(enemy.x, enemy.y, 20, 220);
+        this.burst(enemy.x, enemy.y, rageScaledCount(20, rage.segments), 220);
       }
 
       if (this.boss !== null) {
@@ -6851,7 +6875,8 @@ export class Game {
             Math.round(
               this.boss.maxHp *
                 CELESTIAL_STARFALL_BOSS_RATIO *
-                (1 + chargeFactor * 0.7),
+                (1 + chargeFactor * 0.7) *
+                scale,
             ),
           ),
           this.playerStats,
@@ -6864,62 +6889,68 @@ export class Game {
       }
 
       this.stats.shield = clamp(
-        this.stats.shield + this.stats.maxShield * (0.12 + chargeFactor * 0.18),
+        this.stats.shield +
+          this.stats.maxShield * (0.12 + chargeFactor * 0.18) * scale,
         0,
         this.stats.maxShield,
       );
       this.stats.energy = clamp(
-        this.stats.energy + this.stats.maxEnergy * (0.18 + chargeFactor * 0.2),
+        this.stats.energy +
+          this.stats.maxEnergy * (0.18 + chargeFactor * 0.2) * scale,
         0,
         this.stats.maxEnergy,
       );
-      this.celestialCharge = 0;
+      this.celestialCharge = Math.max(
+        0,
+        this.celestialCharge - 100 * scale,
+      );
     } else if (isZenith) {
-      this.timeShellTimer = Math.max(this.timeShellTimer, 5);
+      this.timeShellTimer = Math.max(
+        this.timeShellTimer,
+        rageScaledValue(5, rage.segments),
+      );
       this.bossMarkTimer = Math.max(
         this.bossMarkTimer,
-        ZENITH_PROTOCOL_MARK_DURATION,
+        rageScaledValue(ZENITH_PROTOCOL_MARK_DURATION, rage.segments),
       );
-      this.guardianTimer = Math.max(
-        this.guardianTimer,
+      const duration = rageScaledValue(
         ZENITH_PROTOCOL_DURATION,
+        rage.segments,
       );
+      this.guardianTimer = Math.max(this.guardianTimer, duration);
       this.guardianBlocks = Math.max(
         this.guardianBlocks,
-        ZENITH_PROTOCOL_GUARD_BLOCKS,
+        rageScaledCount(ZENITH_PROTOCOL_GUARD_BLOCKS, rage.segments),
       );
       this.barrierHp = Math.max(
         this.barrierHp,
-        90 + this.playerStats.shield * 0.55,
+        (90 + this.playerStats.shield * 0.55) * scale,
       );
-      this.barrierTimer = Math.max(
-        this.barrierTimer,
-        ZENITH_PROTOCOL_DURATION,
+      this.barrierTimer = Math.max(this.barrierTimer, duration);
+      this.stats.energy = clamp(
+        this.stats.energy + this.stats.maxEnergy * scale,
+        0,
+        this.stats.maxEnergy,
       );
-      this.stats.energy = this.stats.maxEnergy;
       this.stats.shield = clamp(
-        this.stats.shield + this.stats.maxShield * 0.28,
+        this.stats.shield + this.stats.maxShield * 0.28 * scale,
         0,
         this.stats.maxShield,
       );
     }
 
-    // Every character retains its unique ultimate above. The shared fully
-    // charged Nova Pulse makes Space immediately legible: a full-arena
-    // shockwave clears regular/elite targets and hostile bullets. Bonus
-    // targets stay collectible, boss shields stay meaningful.
-    this.releaseNovaPulse();
-
+    // Character Rage is ship-specific. The generic Nova screen clear is
+    // intentionally not fired here; Nova Bomb remains the separate consumable.
     const visual = ultimateVisual(this.characterId);
     this.burst(
       this.width / 2,
       this.height - PLAYER_Y_OFFSET,
-      visual.count,
+      rageScaledCount(visual.count, rage.segments),
       visual.hue,
     );
 
     if (this.settings.screenShake) {
-      this.shake = Math.max(this.shake, visual.shake);
+      this.shake = Math.max(this.shake, visual.shake * scale);
     }
 
     this.sfx.power();
