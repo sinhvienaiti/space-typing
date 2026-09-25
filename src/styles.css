@@ -3968,8 +3968,54 @@ kbd {
 .grade-copper{--grade-accent:#cc8755}.grade-silver{--grade-accent:#b9d2dc}.grade-gold{--grade-accent:#e5bd62}.grade-diamond{--grade-accent:#8de9e6}
 .grade-badge{color:var(--grade-accent);font-size:.56rem}
 .local-item-icon{display:grid;place-items:center;height:42px}
+.equipment-card-head{display:flex;align-items:center;gap:.75rem;min-width:0}
+.equipment-card-icon.local-item-icon{
+  flex:0 0 clamp(64px,7vw,84px);
+  width:clamp(64px,7vw,84px);
+  height:clamp(64px,7vw,84px);
+  border:1px solid rgba(130,220,240,.14);
+  border-radius:14px;
+  background:
+    radial-gradient(circle at 35% 25%,rgba(255,255,255,.1),transparent 45%),
+    rgba(8,20,31,.72);
+  font-size:clamp(1.8rem,3.2vw,2.65rem);
+  line-height:1;
+  box-shadow:
+    inset 0 0 18px rgba(115,220,240,.06),
+    0 8px 24px rgba(0,0,0,.18);
+}
+.equipment-card-identity{min-width:0;display:grid;gap:.2rem}
+
 .item-card{display:grid;grid-template-columns:46px 1fr;gap:.5rem}
 
 
 
-.recall-assist-bar{top:124px;display:flex;pointer-events:auto}
+.recall-assist-bar{
+  top:88px;
+  left:auto;
+  right:12px;
+  width:min(360px,calc(100vw - 24px));
+  transform:none;
+  display:flex;
+  justify-content:flex-end;
+  gap:.45rem;
+  padding:.38rem .5rem;
+  border:1px solid rgba(138,220,244,.15);
+  border-radius:12px;
+  background:rgba(6,15,25,.84);
+  box-shadow:0 10px 28px rgba(0,0,0,.24);
+  pointer-events:auto
+}
+.recall-assist-bar>div{min-width:0;margin-right:auto}
+.recall-assist-bar button{white-space:nowrap}
+@media(max-width:700px){
+  .recall-assist-bar{
+    top:auto;
+    right:8px;
+    bottom:122px;
+    left:8px;
+    width:auto;
+    justify-content:stretch
+  }
+  .recall-assist-bar button{flex:1 1 auto}
+}
