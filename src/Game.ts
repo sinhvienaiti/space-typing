@@ -9065,80 +9065,8 @@ export class Game {
       );
     }
 
-    // Recall's only custom facial element: two large warm-gold memory eyes,
-    // centered inside the hollow normal-enemy shell.
-    const eyeY = radius * 0.02;
-    const eyeX = radius * 0.27;
-    const eyeWidth = radius * 0.34;
-    const eyeHeight = radius * 0.2;
-
-    const drawRecallEye = (
-      centerX: number,
-      direction: -1 | 1,
-    ): void => {
-      context.save();
-      context.translate(centerX, eyeY);
-      context.scale(direction, 1);
-      context.rotate(-0.035);
-
-      const eyeGlow = context.createLinearGradient(
-        -eyeWidth * 0.5,
-        0,
-        eyeWidth * 0.5,
-        0,
-      );
-      eyeGlow.addColorStop(0, "rgba(255, 211, 77, 0.96)");
-      eyeGlow.addColorStop(0.34, "rgba(255, 248, 194, 1)");
-      eyeGlow.addColorStop(0.68, "rgba(255, 252, 218, 1)");
-      eyeGlow.addColorStop(1, "rgba(255, 205, 66, 0.98)");
-
-      context.fillStyle = eyeGlow;
-      context.strokeStyle = "rgba(255, 226, 118, 0.98)";
-      context.lineWidth = Math.max(1.1, radius * 0.045);
-      context.shadowBlur = 10 * glow;
-      context.shadowColor = "rgba(255, 218, 80, 0.74)";
-
-      context.beginPath();
-      context.moveTo(-eyeWidth * 0.5, 0);
-      context.bezierCurveTo(
-        -eyeWidth * 0.26,
-        -eyeHeight * 0.58,
-        eyeWidth * 0.25,
-        -eyeHeight * 0.58,
-        eyeWidth * 0.5,
-        -eyeHeight * 0.04,
-      );
-      context.bezierCurveTo(
-        eyeWidth * 0.27,
-        eyeHeight * 0.58,
-        -eyeWidth * 0.28,
-        eyeHeight * 0.56,
-        -eyeWidth * 0.5,
-        0,
-      );
-      context.closePath();
-      context.fill();
-      context.stroke();
-
-      context.shadowBlur = 0;
-      context.globalAlpha = 0.72;
-      context.fillStyle = "#ffffff";
-      context.beginPath();
-      context.ellipse(
-        -eyeWidth * 0.12,
-        -eyeHeight * 0.17,
-        eyeWidth * 0.11,
-        eyeHeight * 0.13,
-        -0.2,
-        0,
-        Math.PI * 2,
-      );
-      context.fill();
-      context.restore();
-    };
-
-    drawRecallEye(-eyeX, -1);
-    drawRecallEye(eyeX, 1);
+    // Keep the two bright outer wing shapes from the normal enemy shell.
+    // Recall has no additional eyes or face inside the hollow center.
 
     context.restore();
 
