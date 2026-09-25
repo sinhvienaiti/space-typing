@@ -190,7 +190,11 @@ export function recallDisplayMask(
     letterIndex += 1;
   }
 
-  return output.join("");
+  // Keep Recall prompts visually stable as one lightweight text row:
+  // typed/hinted letters remain visible and unresolved letters use underscores.
+  // Spacing is intentional so the prompt reads like "l _ _ _" instead of a
+  // row of boxed glyphs that can drift with font/rendering differences.
+  return output.join(" ").replace(/ {3,}/g, "   ");
 }
 
 export function remainingRecallReplays(
