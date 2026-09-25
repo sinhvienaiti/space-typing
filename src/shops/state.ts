@@ -143,11 +143,9 @@ const EVENT_ITEM_POOL: readonly ItemId[] = [
   "lucky-dice",
 ];
 
-const RESURRECTION_ITEMS: readonly ItemId[] = [
-  "salvage-anchor",
-  "stage-revival-core",
-  "phoenix-core",
-];
+// Legacy Salvage Anchor / Stage Revival Core remain schema-compatible for old
+// saves but are no longer generated. Phoenix Core is the only death-revive item.
+const RESURRECTION_ITEMS: readonly ItemId[] = ["phoenix-core"];
 
 function emptyPrice(): ShopPrice {
   return {
