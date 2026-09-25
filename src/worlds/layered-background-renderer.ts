@@ -156,22 +156,55 @@ export class LayeredBackgroundRenderer {
       time * layer.rotationSpeed +
       Math.sin(time * 0.07 + phase) * layer.rotationSpeed * 0.3;
 
-    context.save();
-    context.globalAlpha = opacity;
-    context.globalCompositeOperation = blendMode(layer.blend);
-    context.translate(
-      x + drawWidth * 0.5,
-      y + drawHeight * 0.5,
-    );
-    context.rotate(rotation);
-    context.drawImage(
-      image,
-      -drawWidth * 0.5,
-      -drawHeight * 0.5,
-      drawWidth,
-      drawHeight,
-    );
-    context.restore();
+    const drawAt = (
+      centerX: number,
+      centerY: number,
+    ): void => {
+      context.save();
+      context.globalAlpha = opacity;
+      context.globalCompositeOperation = blendMode(layer.blend);
+      context.translate(centerX, centerY);
+      context.rotate(rotation);
+      context.drawImage(
+        image,
+        -drawWidth * 0.5,
+        -drawHeight * 0.5,
+        drawWidth,
+        drawHeight,
+      );
+      context.restore();
+    };
+
+    const centerX = x + drawWidth * 0.5;
+    const centerY = y + drawHeight * 0.5;
+    drawAt(centerX, centerY);
+
+    if (travelling) {
+      const wrapX = width * 1.16;
+      const wrapY = height * 1.1;
+      const marginX = drawWidth * 0.65;
+      const marginY = drawHeight * 0.65;
+
+      const extraX: number[] = [];
+      const extraY: number[] = [];
+      if (centerX - marginX < 0) extraX.push(wrapX);
+      if (centerX + marginX > width) extraX.push(-wrapX);
+      if (centerY - marginY < 0) extraY.push(wrapY);
+      if (centerY + marginY > height) extraY.push(-wrapY);
+
+      for (const dx of extraX) {
+        drawAt(centerX + dx, centerY);
+      }
+      for (const dy of extraY) {
+        drawAt(centerX, centerY + dy);
+      }
+      for (const dx of extraX) {
+        for (const dy of extraY) {
+          drawAt(centerX + dx, centerY + dy);
+        }
+      }
+    }
+
     return true;
   }
 
