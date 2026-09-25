@@ -214,12 +214,15 @@ forward travel.
 ### Galaxy / Deep Space
 
 Must include:
-- deep-space sky;
-- milky-way/nebula;
-- ringed or illuminated planet;
-- spiral galaxy / vortex;
-- asteroid cluster;
+- clean deep-space sky;
+- restrained milky-way/nebula texture;
+- at least one high-quality illuminated planet;
+- additional far celestial body when readability allows;
+- multiple sourced asteroid/meteor variants across depth bands;
 - individual near asteroids.
+
+A vortex/black-hole is optional and must only be used when a sourced asset
+passes the same resolution/style quality gate.
 
 Motion:
 - nebula drift;
@@ -504,14 +507,14 @@ Update `sinhvienaiti/typing-game` gitlink after child CI succeeds.
 
 World 01 must contain, at minimum:
 
-- rich deep-space sky image;
-- visible milky-way/nebula mass;
-- large ringed planet;
-- visible spiral galaxy/vortex;
-- asteroid cluster;
+- clean deep-space sky;
+- visible but restrained nebula structure;
+- one large high-quality planet;
+- at least one smaller/far celestial body;
+- multiple sourced meteor variants at far/mid/near depths;
 - moving near asteroid(s);
-- dense stars;
-- subtle comet/meteor event.
+- readable stars;
+- subtle event FX only when they do not compete with typing.
 
 Paused frame acceptance:
 - clearly looks like a beautiful galaxy scene.
@@ -691,3 +694,35 @@ During motion:
 - Galaxy registry tests assert no old custom Galaxy SVGs or deprecated
   low-quality Galaxy vendor assets are active;
 - parent gitlink is updated after child CI succeeds.
+
+
+---
+
+## 15. LB12 implementation checkpoint — 2026-09-26
+
+**Status: IMPLEMENTED — awaiting owner visual QA after local pull.**
+
+Completed:
+
+- replaced the rejected noisy first-pass Galaxy composition;
+- active Galaxy sky is now a low-noise Kenney space backdrop with a restrained
+  1024px Screaming Brain nebula overlay;
+- active planets/sun use shaded 512px Screaming Brain Planet Pack 2 assets;
+- procedural gray polygon asteroids are disabled for the curated
+  `celestial-rainbow` scene path;
+- Galaxy now uses six active sourced Kenney meteor sprites across far/mid/near
+  depth bands;
+- meteor drift/rotation speeds scale by depth so near objects visibly move
+  faster than distant objects;
+- travel wrapping now fades/smooths across boundaries instead of hard popping;
+- near line-streak stars are disabled for the curated celestial scene path;
+- the old procedural Galaxy SVG pack and rejected first-pass vendor assets were
+  removed from the repository;
+- unused curated meteor variants were removed instead of being kept as dead
+  assets;
+- tests verify the active Galaxy registry does not reference the deprecated
+  custom/rejected asset paths.
+
+Remaining acceptance is visual owner QA in the browser. If the scene still
+fails the quality target, iterate by replacing individual sourced assets or
+composition values — do not restore procedural polygon/line placeholders.
