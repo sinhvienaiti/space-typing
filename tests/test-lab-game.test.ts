@@ -160,7 +160,7 @@ describe("M21 gated Game Test Lab API", () => {
     game.destroy();
   });
 
-  it("Nova Pulse clears visible enemies/projectiles but preserves collectible bonuses", () => {
+  it("ship Rage no longer triggers a generic Nova screen clear", () => {
     const game = createTestGame();
     game.setTestLabMode(true);
     start(game, 1);
@@ -174,9 +174,9 @@ describe("M21 gated Game Test Lab API", () => {
     game.handleKey(" ");
     const snapshot = game.getTestLabSnapshot();
     expect(snapshot?.stats.power).toBe(0);
-    expect(snapshot?.stats.kills).toBe(3);
-    expect(snapshot?.enemies).toHaveLength(0);
-    expect(snapshot?.projectiles).toBe(0);
+    expect(snapshot?.stats.kills).toBe(0);
+    expect(snapshot?.enemies).toHaveLength(3);
+    expect(snapshot?.projectiles).toBe(1);
     expect(snapshot?.recallBonus?.en).toBe("orbit");
     game.destroy();
   });
