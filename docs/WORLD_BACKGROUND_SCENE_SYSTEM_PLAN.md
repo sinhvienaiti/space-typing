@@ -6,6 +6,10 @@
 > This plan extends the M07 World Engine visual contract. M07 remains authoritative
 > for World/stage mapping; this document is authoritative for how each World is
 > presented as a distinct combat environment.
+>
+> Implementation checkpoint (2026-09-25): BG00-BG11 are code/documentation
+> complete on child main. BG12 is the external parent gitlink pin and is verified
+> in sinhvienaiti/typing-game rather than by changing this child plan again.
 
 ---
 
@@ -793,3 +797,48 @@ The background upgrade is complete when:
 10. automated tests, TypeScript and production build pass;
 11. source-of-truth docs are updated;
 12. parent typing-game pins the final child commit.
+
+
+---
+
+## 10. Implementation checkpoint — 2026-09-25
+
+Implemented child runtime:
+
+- `src/worlds/scene-types.ts` defines the scene contracts;
+- `src/worlds/scene-registry.ts` resolves all 50 Worlds into ten archetypes and
+  five deterministic variants per Galaxy;
+- `src/worlds/scene-renderer.ts` owns cached static scenery plus bounded dynamic
+  stars, themed floors and ambient particles;
+- per-World landmark/floor/particle style ids are consumed by runtime signatures,
+  not stored as unused config;
+- `src/Game.ts` resolves the scene only on environment/World changes and
+  invalidates the static cache on World/size/DPR/quality changes;
+- the old universal gradient + perspective-grid draw path has been removed;
+- hidden encounter environment-stage overrides continue to select both the
+  environment palette and scene;
+- Low/Medium/High/Ultra keep the same scene identity with bounded detail budgets.
+
+Implemented visual families:
+
+- BG03 celestial/rainbow/heaven;
+- BG04 infernal/hell;
+- BG05 frost/prism + verdant/nature;
+- BG06 shadow/eclipsed nature + cosmic forge;
+- BG07 abyssal + aurora/meteor/cosmic;
+- BG08 sacred void cathedral + eternity/final crown.
+
+Automated coverage:
+
+- all 50 Worlds resolve scene profiles;
+- all ten archetypes are covered;
+- each Galaxy resolves variants 1-5;
+- scene seeds and style contracts are deterministic;
+- scene detail budgets are bounded;
+- static cache identity reacts to World/size/DPR/quality;
+- existing M07 World/environment tests remain in the normal suite.
+
+Perceptual quality remains a real-browser review item. CI can validate contracts,
+TypeScript and build behavior, but it cannot certify that a particular backdrop
+looks beautiful enough on the owner's display. Follow-up visual tuning should
+reuse this scene system rather than reintroducing a parallel background path.
