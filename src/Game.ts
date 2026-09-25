@@ -8927,28 +8927,42 @@ export class Game {
     context.restore();
 
     if (targeted) {
-      const bracket = enemy.radius * 1.42;
-      const arm = Math.max(5, enemy.radius * 0.34);
-      context.save();
-      context.strokeStyle = "rgba(126, 244, 255, 0.78)";
-      context.lineWidth = 1.4;
-      context.shadowBlur = 8;
-      context.shadowColor = "#70eaff";
-      for (const sx of [-1, 1]) {
-        for (const sy of [-1, 1]) {
-          const x = enemy.x + sx * bracket;
-          const y = enemy.y - kick + sy * bracket;
-          context.beginPath();
-          context.moveTo(x, y - sy * arm);
-          context.lineTo(x, y);
-          context.lineTo(x - sx * arm, y);
-          context.stroke();
-        }
-      }
-      context.restore();
+      this.drawEnemyTargetBrackets(
+        enemy.x,
+        enemy.y - kick,
+        enemy.radius,
+      );
     }
 
     this.drawEnemyWord(enemy, targeted);
+  }
+
+  private drawEnemyTargetBrackets(
+    centerX: number,
+    centerY: number,
+    radius: number,
+  ): void {
+    const context = this.context;
+    const bracket = radius * 1.42;
+    const arm = Math.max(5, radius * 0.34);
+
+    context.save();
+    context.strokeStyle = "rgba(126, 244, 255, 0.78)";
+    context.lineWidth = 1.4;
+    context.shadowBlur = 8;
+    context.shadowColor = "#70eaff";
+    for (const sx of [-1, 1]) {
+      for (const sy of [-1, 1]) {
+        const x = centerX + sx * bracket;
+        const y = centerY + sy * bracket;
+        context.beginPath();
+        context.moveTo(x, y - sy * arm);
+        context.lineTo(x, y);
+        context.lineTo(x - sx * arm, y);
+        context.stroke();
+      }
+    }
+    context.restore();
   }
 
   private activateEnemyRecallPrompt(enemyId: number): void {
@@ -9030,10 +9044,10 @@ export class Game {
     context.translate(x, y);
     context.globalCompositeOperation = "source-over";
 
-    // Recall's classic target is intentionally minimal and non-hostile:
-    // a dark translucent orb, two pale-gold feather nodes above it,
-    // a faint segmented halo and compact cyan targeting brackets.
-    // There is deliberately no face/eyes inside the orb.
+    // Recall keeps the classic non-hostile silhouette from the reference:
+    // a dark round core with two large luminous memory eyes centered inside it.
+    // The normal enemy target brackets are reused below so Recall still belongs
+    // to the same combat visual language instead of looking like a placeholder.
     const orb = context.createRadialGradient(
       -radius * 0.22,
       -radius * 0.28,
@@ -9042,16 +9056,16 @@ export class Game {
       0,
       radius,
     );
-    orb.addColorStop(0, "rgba(21, 48, 57, 0.08)");
-    orb.addColorStop(0.52, "rgba(7, 25, 33, 0.26)");
-    orb.addColorStop(1, "rgba(1, 10, 16, 0.42)");
+    orb.addColorStop(0, "rgba(35, 73, 82, 0.18)");
+    orb.addColorStop(0.48, "rgba(9, 31, 40, 0.44)");
+    orb.addColorStop(1, "rgba(1, 10, 16, 0.7)");
     context.fillStyle = orb;
     context.strokeStyle = targeted
-      ? "rgba(82, 211, 230, 0.14)"
-      : "rgba(69, 167, 188, 0.08)";
-    context.lineWidth = targeted ? 0.8 : 0.6;
-    context.shadowBlur = targeted ? 2 * glow : 1 * glow;
-    context.shadowColor = "rgba(71, 215, 235, 0.2)";
+      ? "rgba(95, 221, 236, 0.32)"
+      : "rgba(70, 177, 196, 0.2)";
+    context.lineWidth = targeted ? 1.15 : 0.85;
+    context.shadowBlur = targeted ? 4 * glow : 2 * glow;
+    context.shadowColor = "rgba(71, 215, 235, 0.28)";
     context.beginPath();
     context.arc(0, 0, radius, 0, Math.PI * 2);
     context.fill();
@@ -9077,67 +9091,74 @@ export class Game {
     }
     context.restore();
 
-    const nodeY = -radius * 0.78;
-    const nodeX = radius * 0.58;
+    // The eyes are the Recall enemy's main identity. Keep them large, rounded
+    // and unmistakably inside the circular body. The previous implementation
+    // placed them above the orb, which made them read like detached decorations.
+    const eyeY = -radius * 0.08;
+    const eyeX = radius * 0.38;
 
-    // Very light connector stems under the two old feather nodes.
-    context.strokeStyle = "rgba(76, 181, 197, 0.2)";
-    context.lineWidth = 1;
-    context.beginPath();
-    context.moveTo(-radius * 0.35, -radius * 0.74);
-    context.lineTo(-nodeX + radius * 0.08, nodeY + radius * 0.13);
-    context.moveTo(radius * 0.35, -radius * 0.74);
-    context.lineTo(nodeX - radius * 0.08, nodeY + radius * 0.13);
-    context.stroke();
-
-    const drawMemoryWing = (
+    const drawMemoryEye = (
       centerX: number,
       direction: -1 | 1,
     ): void => {
       context.save();
-      context.translate(centerX, nodeY);
+      context.translate(centerX, eyeY);
       context.scale(direction, 1);
-      context.rotate(-0.04);
+      context.rotate(-0.035);
 
-      context.fillStyle = "rgba(244, 247, 232, 0.98)";
-      context.strokeStyle = "rgba(248, 220, 122, 0.92)";
-      context.lineWidth = 1.2;
-      context.shadowBlur = 7 * glow;
-      context.shadowColor = "rgba(255, 226, 116, 0.52)";
-
-      // The old reference uses fuller, brighter almond/leaf shapes rather than
-      // thin blades. Keep them soft and slightly chubby so they read as the
-      // distinctive Recall "eyes" above the hollow core.
-      const width = radius * 0.72;
-      const height = radius * 0.34;
-      context.beginPath();
-      context.moveTo(-width * 0.5, height * 0.06);
-      context.quadraticCurveTo(
-        -width * 0.08,
-        -height * 0.86,
-        width * 0.5,
-        -height * 0.12,
-      );
-      context.quadraticCurveTo(
-        width * 0.24,
-        height * 0.78,
+      const width = radius * 0.66;
+      const height = radius * 0.38;
+      const eyeGlow = context.createLinearGradient(
         -width * 0.5,
-        height * 0.06,
+        0,
+        width * 0.5,
+        0,
+      );
+      eyeGlow.addColorStop(0, "rgba(255, 222, 111, 0.92)");
+      eyeGlow.addColorStop(0.38, "rgba(255, 250, 218, 1)");
+      eyeGlow.addColorStop(0.72, "rgba(255, 247, 202, 1)");
+      eyeGlow.addColorStop(1, "rgba(255, 215, 93, 0.94)");
+
+      context.fillStyle = eyeGlow;
+      context.strokeStyle = "rgba(255, 224, 111, 0.96)";
+      context.lineWidth = 1.25;
+      context.shadowBlur = 9 * glow;
+      context.shadowColor = "rgba(255, 221, 101, 0.68)";
+
+      context.beginPath();
+      context.moveTo(-width * 0.5, height * 0.02);
+      context.bezierCurveTo(
+        -width * 0.28,
+        -height * 0.58,
+        width * 0.24,
+        -height * 0.58,
+        width * 0.5,
+        -height * 0.04,
+      );
+      context.bezierCurveTo(
+        width * 0.25,
+        height * 0.58,
+        -width * 0.3,
+        height * 0.56,
+        -width * 0.5,
+        height * 0.02,
       );
       context.closePath();
       context.fill();
       context.stroke();
 
+      // A restrained highlight gives the eyes volume without turning them into
+      // busy cartoon faces or adding pupils that are absent from the reference.
       context.shadowBlur = 0;
-      context.globalAlpha = 0.58;
+      context.globalAlpha = 0.72;
       context.fillStyle = "#ffffff";
       context.beginPath();
       context.ellipse(
-        -width * 0.08,
+        -width * 0.12,
         -height * 0.18,
-        width * 0.15,
-        height * 0.16,
-        -0.2,
+        width * 0.12,
+        height * 0.13,
+        -0.18,
         0,
         Math.PI * 2,
       );
@@ -9145,30 +9166,8 @@ export class Game {
       context.restore();
     };
 
-    drawMemoryWing(-nodeX, -1);
-    drawMemoryWing(nodeX, 1);
-
-    // Four compact corner brackets, matching the old Recall lock-on frame.
-    const frame = radius * 1.15;
-    const arm = radius * 0.19;
-    context.strokeStyle = targeted
-      ? "rgba(83, 226, 242, 0.58)"
-      : "rgba(66, 179, 199, 0.36)";
-    context.lineWidth = 1.05;
-    context.shadowBlur = targeted ? 2.5 * glow : 0;
-    context.shadowColor = "rgba(81, 225, 242, 0.52)";
-    context.beginPath();
-    for (const sx of [-1, 1] as const) {
-      for (const sy of [-1, 1] as const) {
-        const bx = sx * frame;
-        const by = sy * frame;
-        context.moveTo(bx, by - sy * arm);
-        context.lineTo(bx, by);
-        context.lineTo(bx - sx * arm, by);
-      }
-    }
-    context.stroke();
-    context.shadowBlur = 0;
+    drawMemoryEye(-eyeX, -1);
+    drawMemoryEye(eyeX, 1);
 
     // A single dim tracer keeps the old ghost-like feel without making the
     // target read as a polished Combat orb.
@@ -9195,6 +9194,10 @@ export class Game {
     }
 
     context.restore();
+
+    if (targeted) {
+      this.drawEnemyTargetBrackets(x, y, radius);
+    }
   }
 
   private drawEnemyWord(enemy: Enemy, targeted: boolean): void {
