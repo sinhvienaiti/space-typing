@@ -52,10 +52,16 @@ describe("Layered authored background registry", () => {
     const sources = galaxy.layers.map((layer) => layer.src);
 
     expect(sources).toContain(
+      "/assets/space-typing/backgrounds/vendor/kenney-remastered/bg-dark-purple.png",
+    );
+    expect(sources).toContain(
       "/assets/space-typing/backgrounds/vendor/screaming-brain/nebula-purple-3-1024.png",
     );
     expect(sources).toContain(
       "/assets/space-typing/backgrounds/vendor/screaming-brain/planet-ocean-03-512.png",
+    );
+    expect(sources).toContain(
+      "/assets/space-typing/backgrounds/vendor/screaming-brain/planet-blue-giant-04-512.png",
     );
 
     const meteorSources = sources.filter((src) =>
