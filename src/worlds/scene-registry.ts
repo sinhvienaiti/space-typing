@@ -2,8 +2,8 @@ import type { VisualQuality } from "../types";
 import {
   WORLD_REGISTRY,
   worldById,
-  type WorldProfile,
 } from "./registry";
+import type { WorldProfile } from "./types";
 import {
   WORLD_SCENE_ARCHETYPES,
   WORLD_SCENE_MOTIONS,
