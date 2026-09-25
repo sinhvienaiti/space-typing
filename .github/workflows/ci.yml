@@ -1,30 +1,37 @@
-name: CI
+name: Offline Source Export
 
 on:
   push:
-    branches: [main]
-  pull_request:
+    branches:
+      - automation/offline-source-export
 
 jobs:
-  test-build:
+  export-source:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
+      - name: Checkout exact Space Typing source
+        uses: actions/checkout@v4
         with:
-          version: 11.21.0
-          run_install: false
+          ref: d7ec4858a0c046799b49eb246f6fa7d875fc7b1b
+          path: source
+          fetch-depth: 1
 
-      - uses: actions/setup-node@v4
+      - name: Prepare offline source package
+        run: |
+          rm -rf source/.git
+          cat > source/OFFLINE_EXPORT_INFO.txt <<'EOF'
+          Repository: sinhvienaiti/space-typing
+          Branch source: main
+          Commit: d7ec4858a0c046799b49eb246f6fa7d875fc7b1b
+          Commit message: Remove redundant Rage CSS overrides
+          Export purpose: offline transfer to Mac mini
+          EOF
+
+      - name: Upload source artifact
+        uses: actions/upload-artifact@v4
         with:
-          node-version: 24
-
-      - name: Install
-        run: pnpm install --no-frozen-lockfile
-
-      - name: Test
-        run: pnpm test
-
-      - name: Build
-        run: pnpm build
+          name: space-typing-d7ec4858-source
+          path: source
+          include-hidden-files: true
+          if-no-files-found: error
+          compression-level: 6
