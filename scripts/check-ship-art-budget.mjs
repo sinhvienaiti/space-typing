@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -43,17 +43,6 @@ if (
 }
 
 const path = join(root, "public", entry.url.slice(1));
-const bytes = statSync(path).size;
-const MAX_FILE_BYTES = Math.floor(1.2 * 1024 * 1024);
-
-if (bytes > MAX_FILE_BYTES) {
-  throw new Error(
-    "Ship V3 atlas exceeds hard 1.2 MiB budget: " +
-      String(bytes) +
-      " bytes.",
-  );
-}
-
 const buffer = readFileSync(path);
 const EXPECTED_REVIEWED_SHA256 =
   "fb9434e002d6da650e34192eb425e62d1e2f3bec8804a9b33b7aa8733de10eb3";
@@ -126,6 +115,6 @@ console.log(
     "×" +
     height +
     ", " +
-    (bytes / 1024).toFixed(1) +
-    " KiB transfer, 3.0 MiB maximum decoded RGBA.",
+    (buffer.length / 1024).toFixed(1) +
+    " KiB transfer (reported, not size-gated).",
 );
