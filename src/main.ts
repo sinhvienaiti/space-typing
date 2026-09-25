@@ -866,6 +866,7 @@ function updateKillTranslationVisibility(phase: GamePhase): void {
   const config = currentKillTranslationSettings();
   const show =
     phase === "playing" &&
+    gameplayMode === "combat" &&
     usesTopKillTranslation(config) &&
     (config.showIpa || config.showVietnamese);
   const strip = byId("killLearningStrip");
@@ -6675,6 +6676,7 @@ function renderGameplayMode(): void {
   game.setGameplayMode(gameplayMode, recallSettings);
   updateCampaignUi();
   renderRecallAssistUi();
+  updateKillTranslationVisibility(game.getPhase());
 }
 
 function selectGameplayMode(mode: GameplayMode): void {
