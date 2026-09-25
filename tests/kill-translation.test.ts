@@ -4,6 +4,8 @@ import {
   KillTranslationQueue,
   hasVisibleKillTranslation,
   sanitizeKillTranslationSettings,
+  usesKillPositionTranslation,
+  usesTopKillTranslation,
 } from "../src/feedback/kill-translation";
 import type { VocabularyEntry } from "../src/types";
 
@@ -28,12 +30,13 @@ describe("Batch A kill translation settings and rapid feedback", () => {
   it("clamps persisted duration into 0.8–5 seconds and validates size/booleans", () => {
     expect(sanitizeKillTranslationSettings({
       enabled: false,
+      mode: "kill-position",
       showIpa: false,
       showVietnamese: true,
       size: "small",
       durationSeconds: 0.1,
     })).toMatchObject({
-      enabled: false, showIpa: false, showVietnamese: true, size: "small",
+      enabled: false, mode: "kill-position", showIpa: false, showVietnamese: true, size: "small",
       durationSeconds: 0.8,
     });
     expect(sanitizeKillTranslationSettings({
@@ -45,6 +48,19 @@ describe("Batch A kill translation settings and rapid feedback", () => {
     expect(sanitizeKillTranslationSettings({
       durationSeconds: 1.24,
     }).durationSeconds).toBe(1.2);
+  });
+
+  it("validates placement and distinguishes top from kill-position display", () => {
+    const top = sanitizeKillTranslationSettings({ mode: "top" });
+    const local = sanitizeKillTranslationSettings({ mode: "kill-position" });
+    const both = sanitizeKillTranslationSettings({ mode: "both" });
+    expect(usesTopKillTranslation(top)).toBe(true);
+    expect(usesKillPositionTranslation(top)).toBe(false);
+    expect(usesTopKillTranslation(local)).toBe(false);
+    expect(usesKillPositionTranslation(local)).toBe(true);
+    expect(usesTopKillTranslation(both)).toBe(true);
+    expect(usesKillPositionTranslation(both)).toBe(true);
+    expect(sanitizeKillTranslationSettings({ mode: "bad" }).mode).toBe("top");
   });
 
   it("keeps IPA-only and Vietnamese-only kills independently available", () => {
