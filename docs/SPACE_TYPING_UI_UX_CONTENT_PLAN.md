@@ -20,6 +20,9 @@
 - **Prioritize the progression foundation before expanding skills, item art and shop stock.** Levels, learnable basic skills, auto attributes and the reward feedback loop must work as one coherent system.
 - Respect existing permanent-vs-run segment/checkpoint rollback rules. Preserve older saves and inventory, paid upgrades, mission/Codex unlocks, support loadouts and character progress. Add explicit migrations and replay/resurrection tests when schemas change.
 - Visual clarity, English-learning and steady framerate outrank decorative effects. Reuse local assets, use licenses correctly, never download or load hundreds of image assets at runtime.
+- **Reuse before adding:** inspect existing components/helpers/renderers/state/CSS first and extend or refactor the authoritative path when the responsibility already exists. Do not create a parallel implementation simply to avoid touching existing code.
+- **Remove dead code immediately when safe:** obsolete selectors, superseded helpers/renderers, unused imports/assets, temporary debug code and duplicate mappings must not be left behind after a replacement is accepted. Git history is the backup; commented-out production code is not.
+- Static JS/CSS/dist/audio/image byte counts are **reporting metrics, not hard implementation ceilings**. Do not reduce code quality, UX or maintainability merely to fit a historical KiB/MiB threshold. Follow `docs/CODE_QUALITY_AND_PERFORMANCE_RULES.md`.
 - Avoid regressions to existing games in the parent typing-game platform.
 
 ## 1. HIGH PRIORITY — Character XP, level-up and automatic stat progression
