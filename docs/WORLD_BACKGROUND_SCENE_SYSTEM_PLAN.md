@@ -7,9 +7,14 @@
 > for World/stage mapping; this document is authoritative for how each World is
 > presented as a distinct combat environment.
 >
-> Implementation checkpoint (2026-09-25): BG00-BG11 are code/documentation
-> complete on child main. BG12 is the external parent gitlink pin and is verified
-> in sinhvienaiti/typing-game rather than by changing this child plan again.
+> Implementation checkpoint (2026-09-25): BG00-BG14 established the World-aware
+> scene architecture and first visual composition passes.
+>
+> **Runtime art direction has now advanced to the animated cinematic system in
+> `docs/CINEMATIC_BACKGROUND_SYSTEM_PLAN.md`.** This file remains source of
+> truth for the World-scene registry/cache foundation; the cinematic plan is
+> authoritative for motion, parallax, flight sensation and living environmental
+> scenery.
 
 ---
 
