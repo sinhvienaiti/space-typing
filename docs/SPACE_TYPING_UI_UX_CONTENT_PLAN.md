@@ -133,6 +133,43 @@
 - Distinct icon and color-coded yet accessible frame per actual rarity/importance for mission, challenge, Codex and objective cards, reusing the same central rarity/importance tokens when appropriate.
 - Keep discovery vs locked status legible without spoiling hidden content. Clear progress, claim state, level rewards and concise tooltips.
 
+## 9.5 Real-browser correction batch — 2026-09-25
+
+The following five UI/UX issues were confirmed from real-browser screenshots and are now explicit acceptance requirements for the current polish pass. These are corrective changes to existing systems, not new gameplay features.
+
+1. **Top learning strip must not visually dominate enemies or target names.**
+   - Keep enemy readability as the priority.
+   - Reduce the strip height substantially (approximately half of the previous 92px desktop row).
+   - Use a more transparent/glass treatment instead of an opaque full-width block.
+   - Preserve a dedicated non-overlap layout so enemy/nameplate rendering is never intentionally hidden behind the learning strip.
+   - Reflow/rescale the battlefield only when the strip is enabled/disabled, not per kill.
+
+2. **Equipment/item visual icons must be large enough to read at a glance.**
+   - Existing distinct local icons remain the source of truth.
+   - Increase actual glyph/SVG visual size, not only the empty icon container height.
+   - Equipment-card icons must read as a primary visual element rather than a tiny symbol floating in a large card.
+   - Preserve accessible labels and grade identity.
+
+3. **Menu help must have exactly one tooltip and it must belong to the info icon.**
+   - Hovering/focusing the normal action text (for example `Characters`) must not open the custom help popup.
+   - Do not attach a native `title` tooltip to the action button when a dedicated info icon exists.
+   - Hover/focus/click on the info icon may open the single custom tooltip; Escape/outside click closes it.
+   - Keep action button IDs and existing action handlers unchanged.
+
+4. **The `IPA · NGHĨA TIẾNG VIỆT` top rail must be much thinner.**
+   - Target roughly half the previous desktop height while preserving readability.
+   - Reduce vertical padding and label/text footprint.
+   - Mobile may be slightly taller for wrapping, but must remain compact.
+
+5. **Kill-position learning feedback must use a clean, borderless hierarchy.**
+   - Vietnamese meaning appears first as the primary line.
+   - IPA appears second as the supporting pronunciation line.
+   - Remove the hard rectangle/border around this local feedback.
+   - A restrained text shadow/fade is allowed for contrast; do not reintroduce a heavy card.
+   - English target text is still not repeated.
+
+**Acceptance gate:** code + automated CI must pass, and the next real-browser review must confirm the thinner strip, readable enlarged icons, one-tooltip behavior, and borderless VN-first kill feedback before this corrective batch is considered visually accepted.
+
 ## 10. Performance profiling AFTER each UI/VFX batch
 
 - Latest known child main already has bounded static glossy enemy-body cache, adaptive High/Ultra resolution and frame/draw diagnostics; check current `main` before proposing another renderer.
