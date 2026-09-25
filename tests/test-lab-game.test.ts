@@ -14,6 +14,14 @@ const settings: GameSettings = {
   pronunciationEnabled: false,
   pronunciationRate: 1,
   pronunciationVolume: 0,
+  killTranslation: {
+    enabled: true,
+    mode: "kill-position",
+    showIpa: true,
+    showVietnamese: true,
+    size: "large",
+    durationSeconds: 2.4,
+  },
 };
 
 const vocabulary: VocabularyEntry[] = [
