@@ -8226,11 +8226,12 @@ byId("saveCustom").addEventListener("click", () => {
 byId<HTMLSelectElement>("difficultyMode").addEventListener(
   "change",
   (event) => {
-    difficultySettings = sanitizeDifficultySettings({
-      ...difficultySettings,
+    const current = difficultySettingsDraft ?? difficultySettings;
+    difficultySettingsDraft = sanitizeDifficultySettings({
+      ...current,
       mode: (event.currentTarget as HTMLSelectElement).value,
     });
-    saveDifficultySettings();
+    markSettingsDirty(true);
     renderSettings();
   },
 );
@@ -8238,13 +8239,14 @@ byId<HTMLSelectElement>("difficultyMode").addEventListener(
 byId<HTMLInputElement>("customTargetWpm").addEventListener(
   "change",
   (event) => {
-    difficultySettings = sanitizeDifficultySettings({
-      ...difficultySettings,
+    const current = difficultySettingsDraft ?? difficultySettings;
+    difficultySettingsDraft = sanitizeDifficultySettings({
+      ...current,
       customTargetWpm: Number(
         (event.currentTarget as HTMLInputElement).value,
       ),
     });
-    saveDifficultySettings();
+    markSettingsDirty(true);
     renderSettings();
   },
 );
@@ -8252,90 +8254,77 @@ byId<HTMLInputElement>("customTargetWpm").addEventListener(
 byId<HTMLInputElement>("customPressure").addEventListener(
   "change",
   (event) => {
-    difficultySettings = sanitizeDifficultySettings({
-      ...difficultySettings,
+    const current = difficultySettingsDraft ?? difficultySettings;
+    difficultySettingsDraft = sanitizeDifficultySettings({
+      ...current,
       customPressure: Number(
         (event.currentTarget as HTMLInputElement).value,
       ),
     });
-    saveDifficultySettings();
+    markSettingsDirty(true);
     renderSettings();
   },
 );
 
 for (const id of ["customEnemySpeed", "customBulletSpeed", "customFireRate", "customSpawnRate"] as const) {
   byId<HTMLInputElement>(id).addEventListener("input", (event) => {
-    difficultySettings = sanitizeDifficultySettings({
-      ...difficultySettings,
+    const current = difficultySettingsDraft ?? difficultySettings;
+    difficultySettingsDraft = sanitizeDifficultySettings({
+      ...current,
       [id]: Number((event.currentTarget as HTMLInputElement).value),
     });
-    saveDifficultySettings();
-    byId<HTMLOutputElement>(id + "Value").value = difficultySettings[id].toFixed(2) + "×";
+    markSettingsDirty(true);
+    renderSettings();
   });
 }
 
-byId<HTMLInputElement>("musicVolume").addEventListener(
-  "input",
-  (event) => {
-    settings = {
-      ...settings,
-      musicVolume: Number(
-        (event.currentTarget as HTMLInputElement).value,
-      ),
+for (const [id, field] of [
+  ["musicVolume", "musicVolume"],
+  ["ambientVolume", "ambientVolume"],
+  ["sfxVolume", "sfxVolume"],
+  ["pronunciationRate", "pronunciationRate"],
+  ["pronunciationVolume", "pronunciationVolume"],
+] as const) {
+  byId<HTMLInputElement>(id).addEventListener("input", (event) => {
+    const current = settingsDraft ?? settings;
+    settingsDraft = {
+      ...current,
+      [field]: Number((event.currentTarget as HTMLInputElement).value),
     };
+    markSettingsDirty();
     renderSettings();
-    saveSettings();
-  },
-);
-
-byId<HTMLInputElement>("ambientVolume").addEventListener(
-  "input",
-  (event) => {
-    settings = {
-      ...settings,
-      ambientVolume: Number(
-        (event.currentTarget as HTMLInputElement).value,
-      ),
-    };
-    renderSettings();
-    saveSettings();
-  },
-);
-
-byId<HTMLInputElement>("sfxVolume").addEventListener("input", (event) => {
-  settings = {
-    ...settings,
-    sfxVolume: Number((event.currentTarget as HTMLInputElement).value),
-  };
-  renderSettings();
-  saveSettings();
-});
+  });
+}
 
 byId<HTMLSelectElement>("screenShake").addEventListener(
   "change",
   (event) => {
-    settings = {
-      ...settings,
+    const current = settingsDraft ?? settings;
+    settingsDraft = {
+      ...current,
       screenShake:
         (event.currentTarget as HTMLSelectElement).value === "true",
     };
-    saveSettings();
+    markSettingsDirty();
   },
 );
 
 byId<HTMLSelectElement>("killTranslationEnabled").addEventListener(
   "change",
   (event) => {
+    const current = settingsDraft ?? settings;
+    const currentKill = sanitizeKillTranslationSettings(current.killTranslation);
     const value = (event.currentTarget as HTMLSelectElement).value;
-    settings = {
-      ...settings,
+    settingsDraft = {
+      ...current,
       killTranslation: sanitizeKillTranslationSettings({
-        ...currentKillTranslationSettings(),
+        ...currentKill,
         enabled: value !== "off",
         mode: value === "kill-position" || value === "both" ? value : "top",
       }),
     };
-    saveSettings();
+    markSettingsDirty();
+    renderSettings();
   },
 );
 
@@ -8344,43 +8333,48 @@ for (const [id, field] of [
   ["killTranslationVi", "showVietnamese"],
 ] as const) {
   byId<HTMLSelectElement>(id).addEventListener("change", (event) => {
-    settings = {
-      ...settings,
-      killTranslation: {
-        ...currentKillTranslationSettings(),
+    const current = settingsDraft ?? settings;
+    settingsDraft = {
+      ...current,
+      killTranslation: sanitizeKillTranslationSettings({
+        ...sanitizeKillTranslationSettings(current.killTranslation),
         [field]: (event.currentTarget as HTMLSelectElement).value === "true",
-      },
+      }),
     };
-    saveSettings();
+    markSettingsDirty();
+    renderSettings();
   });
 }
 
 byId<HTMLSelectElement>("killTranslationSize").addEventListener(
   "change",
   (event) => {
-    settings = {
-      ...settings,
+    const current = settingsDraft ?? settings;
+    settingsDraft = {
+      ...current,
       killTranslation: sanitizeKillTranslationSettings({
-        ...currentKillTranslationSettings(),
+        ...sanitizeKillTranslationSettings(current.killTranslation),
         size: (event.currentTarget as HTMLSelectElement).value,
       }),
     };
-    saveSettings();
+    markSettingsDirty();
+    renderSettings();
   },
 );
 
 byId<HTMLInputElement>("killTranslationDuration").addEventListener(
   "input",
   (event) => {
-    settings = {
-      ...settings,
+    const current = settingsDraft ?? settings;
+    settingsDraft = {
+      ...current,
       killTranslation: sanitizeKillTranslationSettings({
-        ...currentKillTranslationSettings(),
+        ...sanitizeKillTranslationSettings(current.killTranslation),
         durationSeconds: Number((event.currentTarget as HTMLInputElement).value),
       }),
     };
+    markSettingsDirty();
     renderSettings();
-    saveSettings();
   },
 );
 
@@ -8391,7 +8385,7 @@ for (const id of [
   "recallAutoPronounce",
 ]) {
   byId<HTMLSelectElement>(id).addEventListener("change", () => {
-    recallSettings = sanitizeRecallSettings({
+    recallSettingsDraft = sanitizeRecallSettings({
       difficulty: byId<HTMLSelectElement>("recallDifficulty").value,
       showTranslation:
         byId<HTMLSelectElement>("recallTranslation").value === "true",
@@ -8399,60 +8393,46 @@ for (const id of [
       autoPronounce:
         byId<HTMLSelectElement>("recallAutoPronounce").value === "true",
     });
-    saveRecallPreferences();
-    renderRecallSetup();
-    renderRecallAssistUi();
+    markSettingsDirty();
+    renderSettings();
   });
 }
 
 byId<HTMLSelectElement>("pronunciationEnabled").addEventListener(
   "change",
   (event) => {
-    settings = {
-      ...settings,
+    const current = settingsDraft ?? settings;
+    settingsDraft = {
+      ...current,
       pronunciationEnabled:
         (event.currentTarget as HTMLSelectElement).value === "true",
     };
-    if (!settings.pronunciationEnabled) stopSpeech();
-    saveSettings();
-  },
-);
-
-byId<HTMLInputElement>("pronunciationRate").addEventListener(
-  "input",
-  (event) => {
-    settings = {
-      ...settings,
-      pronunciationRate: Number((event.currentTarget as HTMLInputElement).value),
-    };
-    renderSettings();
-    saveSettings();
-  },
-);
-
-byId<HTMLInputElement>("pronunciationVolume").addEventListener(
-  "input",
-  (event) => {
-    settings = {
-      ...settings,
-      pronunciationVolume: Number((event.currentTarget as HTMLInputElement).value),
-    };
-    renderSettings();
-    saveSettings();
+    markSettingsDirty();
   },
 );
 
 byId<HTMLSelectElement>("visualQuality").addEventListener(
   "change",
   (event) => {
-    settings = {
-      ...settings,
+    const current = settingsDraft ?? settings;
+    settingsDraft = {
+      ...current,
       visualQuality:
         (event.currentTarget as HTMLSelectElement).value as VisualQuality,
     };
-    saveSettings();
+    markSettingsDirty();
   },
 );
+
+byId("settingsCancelButton").addEventListener("click", () => {
+  settingsDialog.close();
+});
+
+byId("settingsSaveButton").addEventListener("click", () => {
+  void commitSettingsDraft();
+});
+
+settingsDialog.addEventListener("close", discardSettingsDraft);
 
 window.addEventListener("keydown", (event) => {
   if (
