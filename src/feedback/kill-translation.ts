@@ -1,9 +1,11 @@
 import type { VocabularyEntry } from "../types";
 
 export type KillTranslationSize = "small" | "medium" | "large";
+export type KillTranslationMode = "top" | "kill-position" | "both";
 
 export type KillTranslationSettings = {
   enabled: boolean;
+  mode: KillTranslationMode;
   showIpa: boolean;
   showVietnamese: boolean;
   size: KillTranslationSize;
@@ -12,6 +14,7 @@ export type KillTranslationSettings = {
 
 export const DEFAULT_KILL_TRANSLATION_SETTINGS: Readonly<KillTranslationSettings> = {
   enabled: true,
+  mode: "top",
   showIpa: true,
   showVietnamese: true,
   size: "large",
@@ -27,6 +30,10 @@ export function sanitizeKillTranslationSettings(value: unknown): KillTranslation
     enabled: typeof raw.enabled === "boolean"
       ? raw.enabled
       : DEFAULT_KILL_TRANSLATION_SETTINGS.enabled,
+    mode:
+      raw.mode === "top" || raw.mode === "kill-position" || raw.mode === "both"
+        ? raw.mode
+        : DEFAULT_KILL_TRANSLATION_SETTINGS.mode,
     showIpa: typeof raw.showIpa === "boolean"
       ? raw.showIpa
       : DEFAULT_KILL_TRANSLATION_SETTINGS.showIpa,
@@ -41,6 +48,20 @@ export function sanitizeKillTranslationSettings(value: unknown): KillTranslation
       ? Math.round(Math.max(0.8, Math.min(5, duration)) * 10) / 10
       : DEFAULT_KILL_TRANSLATION_SETTINGS.durationSeconds,
   };
+}
+
+export function usesTopKillTranslation(
+  settings: KillTranslationSettings,
+): boolean {
+  return settings.enabled && (settings.mode === "top" || settings.mode === "both");
+}
+
+export function usesKillPositionTranslation(
+  settings: KillTranslationSettings,
+): boolean {
+  return settings.enabled && (
+    settings.mode === "kill-position" || settings.mode === "both"
+  );
 }
 
 export function hasVisibleKillTranslation(
