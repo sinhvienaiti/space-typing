@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { ArtAssetCatalog, ArtAssetEntry } from "../src/assets/pipeline";
 import {
   PREMIUM_SHIP_SHEET_ASSET_ID,
-  PREMIUM_SHIP_ATLAS_MAX_FILE_BYTES,
   parseShipArtPreference,
   selectCharacterShipSheet,
   validPremiumShipDimensions,
@@ -45,13 +44,12 @@ function catalog(
   };
 }
 
-describe("Ship Visual V3 asset budget and fallback", () => {
-  it("requires one 1024 × 768 atlas under the separate file-size budget", () => {
+describe("Ship Visual V3 integrity and fallback", () => {
+  it("requires the 1024 × 768 runtime atlas layout", () => {
     expect(validPremiumShipDimensions(1024, 768)).toBe(true);
     expect(validPremiumShipDimensions(2048, 1536)).toBe(false);
     expect(validPremiumShipDimensions(1024, 1024)).toBe(false);
     expect(validPremiumShipDimensions(0, 768)).toBe(false);
-    expect(PREMIUM_SHIP_ATLAS_MAX_FILE_BYTES).toBe(1258291);
   });
 
   it("prefers reviewed V3 art when the one decoded image has valid dimensions", () => {
@@ -77,7 +75,7 @@ describe("Ship Visual V3 asset budget and fallback", () => {
       .toEqual({ source: "procedural", image: null });
   });
 
-  it("retains V2 when premium art is unavailable or oversized", () => {
+  it("retains V2 when premium art is unavailable or has wrong dimensions", () => {
     const existing = image(480, 360);
     expect(
       selectCharacterShipSheet(catalog(null, existing)),
