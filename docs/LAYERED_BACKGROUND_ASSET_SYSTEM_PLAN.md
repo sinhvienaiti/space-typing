@@ -73,6 +73,48 @@ Workflow:
 Do not create low-detail replacement art merely because it is faster if a
 higher-quality permissive source already exists.
 
+### Asset quality gate
+
+A permissive license is necessary but not sufficient. Before an asset enters a
+production scene, it must also pass a visual curation gate.
+
+Prefer sources that have at least one of the following:
+
+- meaningful community favorites/downloads or long-term use in game projects;
+- an established game-asset author/publisher;
+- a coherent pack that supplies multiple related objects in one visual style;
+- enough source resolution for the intended on-screen scale.
+
+For every candidate asset:
+
+1. inspect the actual image, not only its title/license;
+2. reject obvious placeholder, debug, icon-only or low-resolution art when it
+   will be shown as a large scenic object;
+3. reject full-screen backgrounds whose star/noise density competes with enemy
+   labels or projectiles;
+4. prefer a visually coherent family over mixing unrelated photorealistic,
+   pixel-art and flat-vector assets in one scene;
+5. source visible environmental objects too — planets, asteroids, suns,
+   vortexes, debris and landmarks — instead of sourcing only the sky image;
+6. use at least two depth classes of sourced moving objects where the family
+   calls for flight/parallax;
+7. record why a selected pack is appropriate in
+   `docs/THIRD_PARTY_BACKGROUND_ASSETS.md`.
+
+### Current Galaxy curation baseline
+
+The next Galaxy pass should prefer:
+
+- Screaming Brain Studios **Seamless Space Backgrounds** for a restrained
+  nebula/space texture rather than the current overly noisy full-screen art;
+- Screaming Brain Studios **2D Planet Pack 2** for high-resolution shaded
+  planets/suns;
+- Kenney **Space Shooter Remastered / Space Shooter** for cohesive arcade
+  meteor/debris sprites;
+- a sourced vortex/wormhole only if its visual style and resolution pass this
+  quality gate. A weak pixel-art vortex must be omitted rather than forced into
+  the scene.
+
 ## 3. Hybrid rendering model
 
 The production background is a hybrid of:
@@ -591,3 +633,61 @@ The next visual QA step is owner review of World 01 in a real browser. If the
 Galaxy scene is still not painterly/rich enough, the next iteration should
 improve the authored SVG/WebP art itself rather than adding more procedural
 lines.
+
+
+---
+
+## 14. LB12 — Galaxy curated asset replacement
+
+**Reason**
+
+Owner screenshot review of the first sourced Galaxy pass showed that sourcing
+alone is not enough. The full-screen background was too noisy and the scene
+still displayed rough procedural polygon asteroids. The first source set also
+mixed unrelated visual styles.
+
+**Required work**
+
+1. Replace the noisy Galaxy background composition with a cleaner dark-space
+   base plus a lower-opacity high-resolution nebula layer.
+2. Replace low-detail planets with shaded high-resolution planet sprites from a
+   coherent CC0 planet pack.
+3. Replace every visible procedural polygon asteroid in Galaxy with sourced
+   meteor/asteroid sprites.
+4. Use multiple sourced asteroid variants at far/mid/near depths, with different
+   sizes, drift rates and rotation speeds.
+5. Remove the low-resolution black-hole image from the active Galaxy profile.
+   Keep a vortex only if a sourced visual passes the quality gate; otherwise the
+   scene is better without one.
+6. Keep the central combat corridor less noisy than the side thirds.
+7. Reduce straight/streak effects further when authored moving objects provide
+   enough flight sensation.
+8. Delete superseded custom Galaxy SVG assets and unused vendor files once the
+   registry no longer references them.
+
+**Acceptance**
+
+A paused World 01 screenshot must show:
+
+- clean deep-space/star backdrop;
+- readable purple/blue nebula structure;
+- one large high-quality planet;
+- one smaller/far high-quality planet or sun;
+- sourced asteroid sprites, not gray polygons;
+- no low-resolution pixel-art black hole;
+- no full-screen wall of bright noise.
+
+During motion:
+
+- far planet/nebula drift slowly;
+- mid asteroids drift/rotate at medium speed;
+- near asteroids move faster;
+- no large object visibly pops when wrapping;
+- enemies and words remain easier to read than the scenery.
+
+**Validation**
+
+- child tests/build pass;
+- Galaxy registry tests assert no old custom Galaxy SVGs or deprecated
+  low-quality Galaxy vendor assets are active;
+- parent gitlink is updated after child CI succeeds.
