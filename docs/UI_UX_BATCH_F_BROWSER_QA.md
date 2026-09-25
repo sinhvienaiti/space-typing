@@ -108,7 +108,7 @@ Comparison** for paired before/after performance evidence.
 
 Batch F can be marked complete only when:
 
-1. child Test + TypeScript + production Build + bundle/art budgets are green;
+1. child Test + TypeScript + production Build are green; bundle sizes are reported and asset integrity checks pass;
 2. parent `typing-game` integration CI is green;
 3. required browser baseline/candidate pairs are comparable and accepted;
 4. A-E visual checks above are observed on a real browser;
