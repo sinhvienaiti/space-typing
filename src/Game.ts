@@ -8464,6 +8464,16 @@ export class Game {
     const context = this.context;
     const targeted = enemy.id === this.targetId;
     const kick = enemy.kick * 7;
+
+    // Recall has its own non-hostile visual language. Do not reuse the Combat
+    // enemy body renderer here: Recall Core is intentionally a translucent
+    // memory orb, while only the shared movement/collision runtime is reused.
+    if (this.gameplayMode === "recall") {
+      this.drawRecallCoreEnemy(enemy, targeted, kick);
+      this.drawRecallEnemyWord(enemy, targeted);
+      return;
+    }
+
     const rankVisual = enemyRankVisualProfile(enemy.rank ?? "I");
 
     const baseColor =
@@ -8986,6 +8996,164 @@ export class Game {
       responseMs,
       at: Date.now(),
     });
+  }
+
+  private drawRecallCoreEnemy(
+    enemy: Enemy,
+    targeted: boolean,
+    kick: number,
+  ): void {
+    const context = this.context;
+    const x = enemy.x;
+    const y = enemy.y - kick;
+    const radius = Math.max(22, enemy.radius * 0.92);
+    const pulse = 0.94 + Math.sin(enemy.age * 4.4) * 0.06;
+    const glow = qualityProfile(this.settings.visualQuality).glowScale;
+
+    context.save();
+    context.translate(x, y);
+
+    context.globalCompositeOperation = "lighter";
+    context.globalAlpha = 0.7;
+    context.shadowBlur = (targeted ? 30 : 20) * glow;
+    context.shadowColor = targeted ? "#7ef4ff" : "#8adfff";
+
+    const halo = context.createRadialGradient(
+      -radius * 0.2,
+      -radius * 0.28,
+      radius * 0.08,
+      0,
+      0,
+      radius * 1.3,
+    );
+    halo.addColorStop(0, "rgba(255,255,255,0.78)");
+    halo.addColorStop(0.26, "rgba(126,235,255,0.42)");
+    halo.addColorStop(0.68, "rgba(98,182,255,0.18)");
+    halo.addColorStop(1, "rgba(110,120,255,0)");
+    context.fillStyle = halo;
+    context.beginPath();
+    context.arc(0, 0, radius * 1.28 * pulse, 0, Math.PI * 2);
+    context.fill();
+
+    context.globalAlpha = 1;
+    context.shadowBlur = (targeted ? 24 : 15) * glow;
+    context.strokeStyle = targeted
+      ? "rgba(139,247,255,0.98)"
+      : "rgba(134,224,255,0.78)";
+    context.lineWidth = targeted ? 2.4 : 1.6;
+
+    const glass = context.createRadialGradient(
+      -radius * 0.3,
+      -radius * 0.36,
+      radius * 0.08,
+      0,
+      0,
+      radius,
+    );
+    glass.addColorStop(0, "rgba(243,255,255,0.96)");
+    glass.addColorStop(0.23, "rgba(146,239,255,0.82)");
+    glass.addColorStop(0.58, "rgba(91,193,244,0.45)");
+    glass.addColorStop(0.84, "rgba(87,126,232,0.32)");
+    glass.addColorStop(1, "rgba(121,91,220,0.18)");
+    context.fillStyle = glass;
+    context.beginPath();
+    context.arc(0, 0, radius * pulse, 0, Math.PI * 2);
+    context.fill();
+    context.stroke();
+
+    // Soft inner core keeps the Recall target visually distinct from every
+    // Combat enemy family while preserving the original glass-bubble feel.
+    const core = context.createRadialGradient(
+      -radius * 0.12,
+      -radius * 0.08,
+      radius * 0.04,
+      0,
+      0,
+      radius * 0.58,
+    );
+    core.addColorStop(0, "rgba(255,239,255,0.96)");
+    core.addColorStop(0.5, "rgba(255,151,221,0.78)");
+    core.addColorStop(1, "rgba(191,93,229,0.22)");
+    context.fillStyle = core;
+    context.beginPath();
+    context.arc(0, radius * 0.06, radius * 0.55, 0, Math.PI * 2);
+    context.fill();
+
+    context.shadowBlur = 0;
+    context.strokeStyle = "rgba(236,252,255,0.82)";
+    context.lineWidth = Math.max(1.2, radius * 0.06);
+    context.lineCap = "round";
+
+    // Small friendly face from the original Recall identity.
+    const eyeY = -radius * 0.02;
+    const eyeX = radius * 0.18;
+    context.beginPath();
+    context.moveTo(-eyeX, eyeY - radius * 0.04);
+    context.lineTo(-eyeX, eyeY + radius * 0.04);
+    context.moveTo(eyeX, eyeY - radius * 0.04);
+    context.lineTo(eyeX, eyeY + radius * 0.04);
+    context.stroke();
+
+    context.beginPath();
+    context.arc(
+      0,
+      radius * 0.09,
+      radius * 0.19,
+      Math.PI * 0.14,
+      Math.PI * 0.86,
+    );
+    context.stroke();
+
+    // Glass highlight and small orbit sparks make the core read as a memory
+    // object rather than an enemy sprite.
+    context.strokeStyle = "rgba(255,255,255,0.72)";
+    context.lineWidth = 1.2;
+    context.beginPath();
+    context.arc(
+      -radius * 0.12,
+      -radius * 0.13,
+      radius * 0.66,
+      Math.PI * 1.08,
+      Math.PI * 1.58,
+    );
+    context.stroke();
+
+    context.strokeStyle = "rgba(119,235,255,0.42)";
+    context.setLineDash([4, 6]);
+    context.lineDashOffset = -enemy.age * 16;
+    context.beginPath();
+    context.ellipse(
+      0,
+      radius * 0.04,
+      radius * 1.35,
+      radius * 0.54,
+      -0.18,
+      0,
+      Math.PI * 2,
+    );
+    context.stroke();
+    context.setLineDash([]);
+
+    for (const angle of [-0.72, 1.45, 2.7]) {
+      const orbitX = Math.cos(angle + enemy.age * 0.65) * radius * 1.24;
+      const orbitY =
+        Math.sin(angle + enemy.age * 0.65) * radius * 0.48 +
+        radius * 0.04;
+      context.fillStyle = "rgba(211,250,255,0.92)";
+      context.beginPath();
+      context.arc(orbitX, orbitY, Math.max(1.5, radius * 0.07), 0, Math.PI * 2);
+      context.fill();
+    }
+
+    if (enemy.flash > 0) {
+      context.globalAlpha = Math.min(0.7, enemy.flash);
+      context.fillStyle = "#ffffff";
+      context.beginPath();
+      context.arc(0, 0, radius * pulse, 0, Math.PI * 2);
+      context.fill();
+    }
+
+    context.restore();
   }
 
   private drawEnemyWord(enemy: Enemy, targeted: boolean): void {
