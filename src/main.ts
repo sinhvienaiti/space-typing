@@ -730,6 +730,10 @@ const hudDomMetrics = {
 };
 let gameplayMode: GameplayMode = loadGameplayMode();
 let recallSettings: RecallSettings = loadRecallSettings();
+let settingsDraft: GameSettings | null = null;
+let difficultySettingsDraft: DifficultySettings | null = null;
+let recallSettingsDraft: RecallSettings | null = null;
+let settingsOpenPhase: GamePhase | null = null;
 let recallMemory: RecallMemoryState = loadRecallMemory();
 let recallStage = { attempts: 0, perfect: 0, hints: 0, replays: 0, responseMs: 0 };
 
@@ -6827,29 +6831,49 @@ function saveSettings(): void {
 }
 
 function renderSettings(): void {
+  const renderedSettings = settingsDraft ?? settings;
+  const renderedDifficulty = difficultySettingsDraft ?? difficultySettings;
+  const renderedRecall = recallSettingsDraft ?? recallSettings;
+
+  byId<HTMLSelectElement>("recallDifficulty").value = renderedRecall.difficulty;
+  byId<HTMLSelectElement>("recallTranslation").value =
+    String(renderedRecall.showTranslation);
+  byId<HTMLSelectElement>("recallIpa").value = String(renderedRecall.showIpa);
+  byId<HTMLSelectElement>("recallAutoPronounce").value =
+    String(renderedRecall.autoPronounce);
+  const recallProfile = recallDifficultyProfile(renderedRecall.difficulty);
+  byId("recallProfileMeta").textContent =
+    recallProfile.enemySpeedScale.toFixed(2) +
+    "× approach · " +
+    String(Math.round(recallProfile.initialHintRatio * 100)) +
+    "% clues · " +
+    (recallProfile.replayLimit === null
+      ? "∞ replays"
+      : String(recallProfile.replayLimit) + " replays");
+
   const volume = byId<HTMLInputElement>("sfxVolume");
-  volume.value = String(settings.sfxVolume);
+  volume.value = String(renderedSettings.sfxVolume);
   byId<HTMLOutputElement>("sfxValue").value =
-    String(Math.round(settings.sfxVolume * 100)) + "%";
+    String(Math.round(renderedSettings.sfxVolume * 100)) + "%";
 
   const musicVolume = byId<HTMLInputElement>("musicVolume");
-  musicVolume.value = String(settings.musicVolume);
+  musicVolume.value = String(renderedSettings.musicVolume);
   byId<HTMLOutputElement>("musicValue").value =
-    String(Math.round(settings.musicVolume * 100)) + "%";
+    String(Math.round(renderedSettings.musicVolume * 100)) + "%";
 
   const ambientVolume = byId<HTMLInputElement>("ambientVolume");
-  ambientVolume.value = String(settings.ambientVolume);
+  ambientVolume.value = String(renderedSettings.ambientVolume);
   byId<HTMLOutputElement>("ambientValue").value =
-    String(Math.round(settings.ambientVolume * 100)) + "%";
+    String(Math.round(renderedSettings.ambientVolume * 100)) + "%";
 
   byId<HTMLSelectElement>("screenShake").value =
-    String(settings.screenShake);
+    String(renderedSettings.screenShake);
   byId<HTMLSelectElement>("visualQuality").value =
-    settings.visualQuality;
+    renderedSettings.visualQuality;
 
   byId<HTMLSelectElement>("pronunciationEnabled").value =
-    String(settings.pronunciationEnabled);
-  const killSettings = currentKillTranslationSettings();
+    String(renderedSettings.pronunciationEnabled);
+  const killSettings = sanitizeKillTranslationSettings(renderedSettings.killTranslation);
   byId<HTMLSelectElement>("killTranslationEnabled").value =
     killSettings.enabled ? killSettings.mode : "off";
   byId<HTMLSelectElement>("killTranslationIpa").value =
@@ -6863,23 +6887,23 @@ function renderSettings(): void {
     killSettings.durationSeconds.toFixed(1) + "s";
 
   const rate = byId<HTMLInputElement>("pronunciationRate");
-  rate.value = String(settings.pronunciationRate);
+  rate.value = String(renderedSettings.pronunciationRate);
   byId<HTMLOutputElement>("pronunciationRateValue").value =
-    settings.pronunciationRate.toFixed(2) + "x";
+    renderedSettings.pronunciationRate.toFixed(2) + "x";
 
   const voiceVolume = byId<HTMLInputElement>("pronunciationVolume");
-  voiceVolume.value = String(settings.pronunciationVolume);
+  voiceVolume.value = String(renderedSettings.pronunciationVolume);
   byId<HTMLOutputElement>("pronunciationVolumeValue").value =
-    String(Math.round(settings.pronunciationVolume * 100)) + "%";
+    String(Math.round(renderedSettings.pronunciationVolume * 100)) + "%";
 
   const difficultyMode = byId<HTMLSelectElement>("difficultyMode");
-  difficultyMode.value = difficultySettings.mode;
+  difficultyMode.value = renderedDifficulty.mode;
 
   const modeDefinition = difficultyModeDefinition(
-    difficultySettings.mode,
-    difficultySettings.profile.smoothedWpm,
-    difficultySettings.customTargetWpm,
-    difficultySettings.customPressure,
+    renderedDifficulty.mode,
+    renderedDifficulty.profile.smoothedWpm,
+    renderedDifficulty.customTargetWpm,
+    renderedDifficulty.customPressure,
   );
   const modePresentation =
     difficultyModePresentation(modeDefinition);
@@ -6897,33 +6921,95 @@ function renderSettings(): void {
     modePresentation.rewardMultiplier;
 
   byId<HTMLOutputElement>("adaptiveProfileValue").value =
-    difficultySettings.profile.smoothedWpm.toFixed(0) +
+    renderedDifficulty.profile.smoothedWpm.toFixed(0) +
     " WPM · " +
-    difficultySettings.profile.smoothedAccuracy.toFixed(1) +
+    renderedDifficulty.profile.smoothedAccuracy.toFixed(1) +
     "% · " +
-    String(difficultySettings.profile.samples) +
+    String(renderedDifficulty.profile.samples) +
     " clears";
 
   const customTargetWpm = byId<HTMLInputElement>("customTargetWpm");
-  customTargetWpm.value = String(difficultySettings.customTargetWpm);
-  customTargetWpm.disabled = difficultySettings.mode !== "custom";
+  customTargetWpm.value = String(renderedDifficulty.customTargetWpm);
+  customTargetWpm.disabled = renderedDifficulty.mode !== "custom";
 
   const customPressure = byId<HTMLInputElement>("customPressure");
-  customPressure.value = difficultySettings.customPressure.toFixed(2);
-  customPressure.disabled = difficultySettings.mode !== "custom";
-  const customEnabled = difficultySettings.mode === "custom";
+  customPressure.value = renderedDifficulty.customPressure.toFixed(2);
+  customPressure.disabled = renderedDifficulty.mode !== "custom";
+  const customEnabled = renderedDifficulty.mode === "custom";
   byId("customCombatControls").classList.toggle("disabled", !customEnabled);
   for (const id of ["customEnemySpeed", "customBulletSpeed", "customFireRate", "customSpawnRate"] as const) {
     const control = byId<HTMLInputElement>(id);
-    control.value = String(difficultySettings[id]);
+    control.value = String(renderedDifficulty[id]);
     control.disabled = !customEnabled;
-    byId<HTMLOutputElement>(id + "Value").value = difficultySettings[id].toFixed(2) + "×";
+    byId<HTMLOutputElement>(id + "Value").value = renderedDifficulty[id].toFixed(2) + "×";
   }
 }
 
+function markSettingsDirty(difficultyChanged = false): void {
+  const status = byId("settingsSaveStatus");
+  status.textContent = difficultyChanged
+    ? "Unsaved difficulty change · saving while paused will reload this stage."
+    : "Unsaved changes.";
+}
+
 function openSettings(): void {
+  settingsDraft = structuredClone(settings);
+  difficultySettingsDraft = structuredClone(difficultySettings);
+  recallSettingsDraft = structuredClone(recallSettings);
+  settingsOpenPhase = game.getPhase();
   renderSettings();
+  byId("settingsSaveStatus").textContent =
+    "Changes are not applied until you save.";
   settingsDialog.showModal();
+}
+
+async function commitSettingsDraft(): Promise<void> {
+  if (
+    settingsDraft === null ||
+    difficultySettingsDraft === null ||
+    recallSettingsDraft === null
+  ) {
+    return;
+  }
+
+  const difficultyChanged =
+    JSON.stringify(difficultySettingsDraft) !==
+    JSON.stringify(difficultySettings);
+  const shouldReloadStage =
+    difficultyChanged && settingsOpenPhase === "paused";
+
+  if (
+    shouldReloadStage &&
+    !window.confirm(
+      "Difficulty changed. Saving will reload the current stage so the new difficulty is applied consistently. Save and reload now?",
+    )
+  ) {
+    byId("settingsSaveStatus").textContent =
+      "Not saved · difficulty changes still require a stage reload.";
+    return;
+  }
+
+  settings = structuredClone(settingsDraft);
+  difficultySettings = structuredClone(difficultySettingsDraft);
+  recallSettings = structuredClone(recallSettingsDraft);
+
+  saveSettings();
+  saveDifficultySettings();
+  saveRecallPreferences();
+  settingsDialog.close();
+  showNotice("✓ Settings saved");
+
+  if (shouldReloadStage) {
+    game.backToTitle();
+    await startSelectedStage();
+  }
+}
+
+function discardSettingsDraft(): void {
+  settingsDraft = null;
+  difficultySettingsDraft = null;
+  recallSettingsDraft = null;
+  settingsOpenPhase = null;
 }
 
 async function ensureVocabularyIndex(): Promise<VocabularyIndex> {
