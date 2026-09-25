@@ -387,8 +387,16 @@ Visual effects must never hide typing targets.
 World identity must be visible in the combat environment itself, not only in
 labels or palette changes.
 
-The current production contract is the procedural/cached World Scene System in
-`docs/WORLD_BACKGROUND_SCENE_SYSTEM_PLAN.md`.
+The current production contract has two layers:
+
+- `docs/WORLD_BACKGROUND_SCENE_SYSTEM_PLAN.md` — World mapping, scene identity,
+  static cache and base scene architecture;
+- `docs/CINEMATIC_BACKGROUND_SYSTEM_PLAN.md` — authoritative runtime direction
+  for animated scenery, parallax, forward-flight sensation and cinematic
+  environmental motion.
+
+The production renderer is no longer intended to be a restrained procedural
+background. It must read as a living place in motion.
 
 All 50 Worlds resolve a `WorldSceneProfile`. The renderer supports distinct
 scene families for:
