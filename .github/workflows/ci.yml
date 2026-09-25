@@ -12,7 +12,7 @@ jobs:
       - name: Checkout exact Space Typing source
         uses: actions/checkout@v4
         with:
-          ref: 8209d54d33b416af51bd4abf8e2fb89eec08b0de
+          ref: f1bc930d32f95b0492c933492677a297bc7d86e8
           path: source
           fetch-depth: 1
 
@@ -22,15 +22,15 @@ jobs:
           cat > source/OFFLINE_EXPORT_INFO.txt <<'EOF'
           Repository: sinhvienaiti/space-typing
           Branch source: main
-          Commit: 8209d54d33b416af51bd4abf8e2fb89eec08b0de
-          Commit message: Match Recall reference visual and correct text state colors
+          Commit: f1bc930d32f95b0492c933492677a297bc7d86e8
+          Commit message: Match classic Recall orb reference exactly
           Export purpose: offline transfer to Mac mini
           EOF
 
       - name: Upload source artifact
         uses: actions/upload-artifact@v4
         with:
-          name: space-typing-8209d54d-source
+          name: space-typing-f1bc930d-source
           path: source
           include-hidden-files: true
           if-no-files-found: error
