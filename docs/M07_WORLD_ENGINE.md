@@ -79,21 +79,63 @@ The current combat stage-role implementation is not silently rewritten in M07. P
 
 ## Visual / environment contract
 
-`src/worlds/environment.ts` provides one validated environment profile per World.
-
-The current Canvas renderer consumes:
+`src/worlds/environment.ts` remains the validated color/atmosphere source for
+each World:
 
 - background core / mid / edge colors;
 - star color;
-- grid color;
+- grid/accent color;
 - haze color;
-- grid intensity;
+- grid/accent intensity;
 - haze intensity;
 - star drift.
 
-The renderer resolves the environment once when a stage starts or the World changes. It does not scan the World registry each combat frame.
+The production background is no longer one generic star/grid scene with palette
+changes only. The current World Scene System is defined by:
 
-The existing Canvas renderer, particle system and visual-quality budgets remain authoritative.
+- `src/worlds/scene-types.ts`;
+- `src/worlds/scene-registry.ts`;
+- `src/worlds/scene-renderer.ts`;
+- `docs/WORLD_BACKGROUND_SCENE_SYSTEM_PLAN.md`.
+
+Every one of the 50 Worlds resolves one `WorldSceneProfile`. The ten Galaxy
+groups use ten scene archetypes:
+
+- celestial/rainbow;
+- infernal;
+- frost/prism;
+- verdant;
+- shadow/nature;
+- cosmic forge;
+- abyssal;
+- aurora/cosmic/meteor;
+- void cathedral;
+- eternity/final crown.
+
+Each five-World Galaxy group also has five deterministic scene variants with
+World-specific landmark, floor and ambient-particle identities. These style
+contracts are consumed by runtime rendering; they are not decorative config
+fields.
+
+The Canvas scene renderer separates static and dynamic work:
+
+- static sky/nebula/landmark geometry is cached per World + size + DPR + quality;
+- stars, themed floor motion and ambient particles remain lightweight dynamic
+  layers;
+- scene ambient counts are bounded by Visual Quality;
+- cache invalidation happens on World change, resize, adaptive DPR change or
+  visual-quality change;
+- the existing hidden-encounter environment-stage override also selects the
+  corresponding scene.
+
+The scene is resolved when a stage starts or the environment World changes. It
+does not scan the World registry each combat frame.
+
+There is no separate hidden setting required to enable World backgrounds.
+Low/Medium/High/Ultra change detail budgets, not scene identity.
+
+The existing Canvas renderer, combat particle system and adaptive visual-quality
+budgets remain authoritative.
 
 ## Transition / menu presentation
 
@@ -137,6 +179,10 @@ M07 tests verify:
 - registry ids/names/ranges are valid and unique;
 - World-local stage helpers are deterministic;
 - every World has a valid environment profile;
+- every World resolves one valid WorldSceneProfile;
+- all ten scene archetypes are represented;
+- every Galaxy has five deterministic scene variants;
+- scene quality budgets remain bounded;
 - every profile has non-empty contracts for later enemy/reward/shop/music consumers;
 - M06 shop identity receives the canonical World id and changes at World boundaries.
 
