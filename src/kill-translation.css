@@ -27,7 +27,6 @@
   color: #f3fdff;
   pointer-events: none;
 }
-.kill-learning-strip.hidden { display: none; }
 .kill-learning-label {
   flex: 0 0 auto;
   color: rgba(143, 220, 221, .9);
