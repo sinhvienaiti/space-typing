@@ -9006,163 +9006,178 @@ export class Game {
     const context = this.context;
     const x = enemy.x;
     const y = enemy.y - kick;
-    const radius = Math.max(24, enemy.radius * 0.96);
-    const pulse = 0.97 + Math.sin(enemy.age * 3.8) * 0.03;
+    const radius = Math.max(26, enemy.radius * 1.02);
+    const pulse = 0.985 + Math.sin(enemy.age * 3.2) * 0.015;
     const glow = qualityProfile(this.settings.visualQuality).glowScale;
 
     context.save();
     context.translate(x, y);
-
-    // Recall keeps the original quiet memory-target identity: a dark glass orb,
-    // cyan brackets and two warm floating memory nodes. Combat enemy families
-    // are deliberately not rendered in Recall mode.
     context.globalCompositeOperation = "source-over";
-    context.shadowBlur = (targeted ? 20 : 12) * glow;
-    context.shadowColor = "rgba(78, 232, 255, 0.72)";
 
-    const aura = context.createRadialGradient(
+    // Match the original Recall reference: a dark transparent glass orb with
+    // a friendly cyan face, two wide warm memory nodes above it, and compact
+    // cyan tracking brackets. Do not reuse Combat enemy art.
+    const halo = context.createRadialGradient(
       0,
       0,
-      radius * 0.4,
+      radius * 0.72,
       0,
       0,
-      radius * 1.42,
+      radius * 1.36,
     );
-    aura.addColorStop(0, "rgba(77, 222, 244, 0.08)");
-    aura.addColorStop(0.72, "rgba(56, 189, 221, 0.06)");
-    aura.addColorStop(1, "rgba(56, 189, 221, 0)");
-    context.fillStyle = aura;
+    halo.addColorStop(0, "rgba(55, 198, 218, 0.04)");
+    halo.addColorStop(0.74, "rgba(55, 198, 218, 0.08)");
+    halo.addColorStop(1, "rgba(55, 198, 218, 0)");
+    context.fillStyle = halo;
     context.beginPath();
-    context.arc(0, 0, radius * 1.42, 0, Math.PI * 2);
+    context.arc(0, 0, radius * 1.36, 0, Math.PI * 2);
     context.fill();
 
+    context.shadowBlur = (targeted ? 17 : 9) * glow;
+    context.shadowColor = "rgba(74, 230, 247, 0.58)";
     const glass = context.createRadialGradient(
-      -radius * 0.28,
-      -radius * 0.32,
+      -radius * 0.34,
+      -radius * 0.4,
       radius * 0.08,
       0,
-      0,
+      radius * 0.02,
       radius,
     );
-    glass.addColorStop(0, "rgba(127, 227, 241, 0.16)");
-    glass.addColorStop(0.38, "rgba(31, 93, 113, 0.2)");
-    glass.addColorStop(0.78, "rgba(5, 27, 38, 0.5)");
-    glass.addColorStop(1, "rgba(2, 14, 23, 0.7)");
-
+    glass.addColorStop(0, "rgba(92, 191, 205, 0.16)");
+    glass.addColorStop(0.42, "rgba(16, 58, 68, 0.32)");
+    glass.addColorStop(0.78, "rgba(5, 28, 36, 0.58)");
+    glass.addColorStop(1, "rgba(2, 15, 22, 0.74)");
     context.fillStyle = glass;
     context.strokeStyle = targeted
-      ? "rgba(106, 241, 255, 0.82)"
-      : "rgba(92, 203, 225, 0.6)";
-    context.lineWidth = targeted ? 2 : 1.4;
+      ? "rgba(97, 229, 244, 0.7)"
+      : "rgba(76, 183, 203, 0.48)";
+    context.lineWidth = targeted ? 1.7 : 1.25;
     context.beginPath();
     context.arc(0, 0, radius * pulse, 0, Math.PI * 2);
     context.fill();
     context.stroke();
 
+    // Soft interior crescent keeps the orb glassy rather than opaque.
     context.shadowBlur = 0;
-    context.strokeStyle = "rgba(197, 247, 255, 0.18)";
-    context.lineWidth = 1.1;
-    context.beginPath();
-    context.arc(
-      -radius * 0.08,
-      -radius * 0.1,
-      radius * 0.68,
-      Math.PI * 1.08,
-      Math.PI * 1.55,
-    );
-    context.stroke();
-
-    context.fillStyle = targeted
-      ? "rgba(128, 245, 255, 0.9)"
-      : "rgba(111, 220, 236, 0.7)";
-    const eyeRadius = Math.max(1.35, radius * 0.055);
-    context.beginPath();
-    context.arc(-radius * 0.22, -radius * 0.05, eyeRadius, 0, Math.PI * 2);
-    context.arc(radius * 0.22, -radius * 0.05, eyeRadius, 0, Math.PI * 2);
-    context.fill();
-
-    context.strokeStyle = "rgba(104, 224, 240, 0.62)";
-    context.lineWidth = Math.max(1.1, radius * 0.045);
-    context.lineCap = "round";
-    context.beginPath();
-    context.arc(
-      0,
-      radius * 0.05,
-      radius * 0.27,
-      Math.PI * 0.16,
-      Math.PI * 0.84,
-    );
-    context.stroke();
-
-    const nodeY = -radius * 1.03;
-    const nodeX = radius * 0.62;
-    context.strokeStyle = "rgba(104, 216, 230, 0.3)";
+    context.strokeStyle = "rgba(187, 241, 247, 0.11)";
     context.lineWidth = 1;
     context.beginPath();
-    context.moveTo(-radius * 0.34, -radius * 0.72);
-    context.lineTo(-nodeX, nodeY + radius * 0.16);
-    context.moveTo(radius * 0.34, -radius * 0.72);
-    context.lineTo(nodeX, nodeY + radius * 0.16);
+    context.arc(
+      -radius * 0.05,
+      -radius * 0.02,
+      radius * 0.68,
+      Math.PI * 1.12,
+      Math.PI * 1.57,
+    );
     context.stroke();
 
-    const memoryNode = (nodeCenterX: number): void => {
+    // Original friendly face: two small cyan eyes and a shallow smile.
+    context.fillStyle = targeted
+      ? "rgba(112, 238, 248, 0.9)"
+      : "rgba(88, 199, 215, 0.7)";
+    const eyeRadius = Math.max(1.25, radius * 0.048);
+    context.beginPath();
+    context.arc(-radius * 0.22, -radius * 0.02, eyeRadius, 0, Math.PI * 2);
+    context.arc(radius * 0.22, -radius * 0.02, eyeRadius, 0, Math.PI * 2);
+    context.fill();
+
+    context.strokeStyle = targeted
+      ? "rgba(111, 239, 250, 0.82)"
+      : "rgba(87, 203, 219, 0.66)";
+    context.lineWidth = Math.max(1.05, radius * 0.04);
+    context.lineCap = "round";
+    context.beginPath();
+    context.moveTo(-radius * 0.22, radius * 0.12);
+    context.quadraticCurveTo(
+      0,
+      radius * 0.26,
+      radius * 0.22,
+      radius * 0.12,
+    );
+    context.stroke();
+
+    // Two gold memory nodes sit clearly above the orb, as in the original
+    // reference. Their thin cyan stems remain visually separate from the word
+    // panel above.
+    const nodeY = -radius * 1.18;
+    const nodeX = radius * 0.64;
+    context.strokeStyle = "rgba(83, 189, 205, 0.26)";
+    context.lineWidth = 1;
+    context.beginPath();
+    context.moveTo(-radius * 0.34, -radius * 0.78);
+    context.lineTo(-nodeX, nodeY + radius * 0.15);
+    context.moveTo(radius * 0.34, -radius * 0.78);
+    context.lineTo(nodeX, nodeY + radius * 0.15);
+    context.stroke();
+
+    const memoryNode = (nodeCenterX: number, tilt: number): void => {
+      context.save();
+      context.translate(nodeCenterX, nodeY);
+      context.rotate(tilt);
       const nodeGradient = context.createRadialGradient(
-        nodeCenterX - radius * 0.08,
-        nodeY - radius * 0.04,
-        radius * 0.03,
-        nodeCenterX,
-        nodeY,
-        radius * 0.28,
+        -radius * 0.08,
+        -radius * 0.04,
+        radius * 0.02,
+        0,
+        0,
+        radius * 0.3,
       );
-      nodeGradient.addColorStop(0, "rgba(255, 252, 211, 0.98)");
-      nodeGradient.addColorStop(0.55, "rgba(244, 221, 126, 0.92)");
-      nodeGradient.addColorStop(1, "rgba(199, 157, 70, 0.42)");
+      nodeGradient.addColorStop(0, "rgba(255, 255, 224, 0.98)");
+      nodeGradient.addColorStop(0.52, "rgba(236, 218, 128, 0.94)");
+      nodeGradient.addColorStop(1, "rgba(176, 145, 69, 0.48)");
       context.fillStyle = nodeGradient;
-      context.shadowBlur = 10 * glow;
-      context.shadowColor = "rgba(255, 221, 116, 0.48)";
+      context.shadowBlur = 8 * glow;
+      context.shadowColor = "rgba(239, 219, 128, 0.36)";
       context.beginPath();
       context.ellipse(
-        nodeCenterX,
-        nodeY,
-        radius * 0.29,
-        radius * 0.13,
+        0,
+        0,
+        radius * 0.31,
+        radius * 0.125,
         0,
         0,
         Math.PI * 2,
       );
       context.fill();
-      context.shadowBlur = 0;
+      context.restore();
     };
-    memoryNode(-nodeX);
-    memoryNode(nodeX);
+    memoryNode(-nodeX, 0.1);
+    memoryNode(nodeX, -0.1);
 
-    const frame = radius * 1.2;
-    const corner = radius * 0.26;
+    // Compact cyan corner markers reproduce the old tracking-frame silhouette.
+    const frameX = radius * 1.18;
+    const frameY = radius * 1.12;
+    const corner = radius * 0.23;
     context.strokeStyle = targeted
-      ? "rgba(99, 240, 255, 0.82)"
-      : "rgba(74, 198, 220, 0.54)";
-    context.lineWidth = 1.4;
+      ? "rgba(88, 227, 243, 0.78)"
+      : "rgba(67, 178, 198, 0.5)";
+    context.lineWidth = 1.3;
     context.beginPath();
-    context.moveTo(-frame, -frame + corner);
-    context.lineTo(-frame, -frame);
-    context.lineTo(-frame + corner, -frame);
-    context.moveTo(frame - corner, -frame);
-    context.lineTo(frame, -frame);
-    context.lineTo(frame, -frame + corner);
-    context.moveTo(-frame, frame - corner);
-    context.lineTo(-frame, frame);
-    context.lineTo(-frame + corner, frame);
-    context.moveTo(frame - corner, frame);
-    context.lineTo(frame, frame);
-    context.lineTo(frame, frame - corner);
+    context.moveTo(-frameX, -frameY + corner);
+    context.lineTo(-frameX, -frameY);
+    context.lineTo(-frameX + corner, -frameY);
+    context.moveTo(frameX - corner, -frameY);
+    context.lineTo(frameX, -frameY);
+    context.lineTo(frameX, -frameY + corner);
+    context.moveTo(-frameX, frameY - corner);
+    context.lineTo(-frameX, frameY);
+    context.lineTo(-frameX + corner, frameY);
+    context.moveTo(frameX - corner, frameY);
+    context.lineTo(frameX, frameY);
+    context.lineTo(frameX, frameY - corner);
     context.stroke();
 
+    // Tiny center ticks are visible in the original Recall reticle.
+    context.fillStyle = "rgba(81, 207, 224, 0.55)";
+    context.fillRect(-1, -frameY - radius * 0.08, 2, radius * 0.12);
+    context.fillRect(-1, frameY - radius * 0.04, 2, radius * 0.12);
+
     if (enemy.flash > 0) {
-      context.globalAlpha = Math.min(0.5, enemy.flash);
-      context.strokeStyle = "#d9fbff";
-      context.lineWidth = 2.2;
+      context.globalAlpha = Math.min(0.46, enemy.flash);
+      context.strokeStyle = "#dbfbff";
+      context.lineWidth = 2;
       context.beginPath();
-      context.arc(0, 0, radius * 1.08, 0, Math.PI * 2);
+      context.arc(0, 0, radius * 1.06, 0, Math.PI * 2);
       context.stroke();
     }
 
@@ -9382,29 +9397,32 @@ export class Game {
 
       context.shadowBlur = 0;
       if (token.kind === "typed") {
-        context.fillStyle = "#83f6ff";
-        context.shadowBlur = targeted ? 12 : 7;
-        context.shadowColor = "rgba(84, 236, 255, 0.9)";
+        // Only correctly typed letters switch to the warm progress color.
+        // This is the strongest state so typing progress is obvious instantly.
+        context.fillStyle = "#f6d374";
+        context.shadowBlur = targeted ? 11 : 7;
+        context.shadowColor = "rgba(246, 211, 116, 0.72)";
       } else if (token.kind === "hint") {
-        context.fillStyle = "#f5d77f";
-        context.shadowBlur = 5;
-        context.shadowColor = "rgba(245, 215, 127, 0.45)";
+        // Revealed/default letters keep the original cool-white Recall color.
+        context.fillStyle = "#e8f7fb";
+        context.shadowBlur = targeted ? 5 : 2;
+        context.shadowColor = "rgba(137, 226, 238, 0.38)";
       } else if (token.kind === "hidden") {
-        context.fillStyle = "rgba(201, 224, 235, 0.62)";
+        context.fillStyle = "rgba(170, 195, 207, 0.58)";
       } else {
-        context.fillStyle = "rgba(205, 228, 238, 0.78)";
+        context.fillStyle = "rgba(210, 232, 239, 0.78)";
       }
 
       context.fillText(token.text, cursorX, y);
 
-      if (isCurrent) {
+      if (isCurrent && token.kind === "hidden") {
         context.shadowBlur = 0;
-        context.fillStyle = "rgba(111, 241, 255, 0.9)";
+        context.fillStyle = "rgba(116, 220, 232, 0.52)";
         context.fillRect(
           cursorX - 1,
           y + fontSize * 0.68,
           Math.max(tokenWidth + 2, fontSize * 0.56),
-          2,
+          1.5,
         );
       }
 
