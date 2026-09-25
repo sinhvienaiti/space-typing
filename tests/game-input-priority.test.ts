@@ -8,6 +8,9 @@ type GameInternals = {
   phase: GamePhase;
   boss: BossState | null;
   supplyPod: SupplyPod | null;
+  targetId: number | null;
+  enemies: Array<{ id: number; entry: VocabularyEntry; typed: number }>;
+  recallBonus: { entry: VocabularyEntry; typed: number } | null;
 };
 
 const settings: GameSettings = {
@@ -28,7 +31,7 @@ const bossEntry: VocabularyEntry = {
   ipa: "",
 };
 
-function createTestGame(): Game {
+function createTestGame(vocabulary: VocabularyEntry[] = [bossEntry]): Game {
   vi.stubGlobal("window", {
     innerWidth: 1280,
     innerHeight: 720,
@@ -73,7 +76,7 @@ function createTestGame(): Game {
     })),
   } as unknown as HTMLCanvasElement;
 
-  return new Game(canvas, [bossEntry], settings, {
+  return new Game(canvas, vocabulary, settings, {
     onStats: vi.fn(),
     onPhase: vi.fn(),
     onStage: vi.fn(),
@@ -141,3 +144,41 @@ describe("boss-stage input priority", () => {
     game.destroy();
   });
 });
+
+describe("Recall Bonus input priority", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("lets a matching Recall Bonus key bypass a locked enemy wrong key", () => {
+    const bonusEntries: VocabularyEntry[] = [
+      { id: "orbit", en: "orbit", vi: "quỹ đạo", ipa: "" },
+      { id: "apple", en: "apple", vi: "táo", ipa: "" },
+      { id: "zebra", en: "zebra", vi: "ngựa vằn", ipa: "" },
+    ];
+    const game = createTestGame(bonusEntries);
+    const state = game as unknown as GameInternals;
+    state.phase = "playing";
+    game.setTestLabMode(true);
+    const ids = game.testLabSpawnSamePrefixScenario();
+    expect(ids.length).toBeGreaterThan(0);
+
+    game.handleKey("m");
+    const locked = state.enemies.find((enemy) => enemy.id === state.targetId);
+    expect(locked?.typed).toBe(1);
+    const enemyExpected = locked?.entry.en[1];
+
+    const bonus =
+      bonusEntries.find((entry) => entry.en[0] !== enemyExpected) ??
+      bonusEntries[0]!;
+    expect(game.testLabSpawnRecallBonus(bonus.id)).toBe(true);
+    expect(state.recallBonus?.typed).toBe(0);
+
+    game.handleKey(bonus.en[0]!);
+
+    expect(state.recallBonus?.typed).toBe(1);
+    expect(locked?.typed).toBe(1);
+    game.destroy();
+  });
+});
+

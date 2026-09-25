@@ -2962,6 +2962,25 @@ export class Game {
     const target = this.currentTarget();
 
     if (target !== null) {
+      const enemyExpected = typingText(target.entry.en)[target.typed];
+      const recallExpected =
+        this.recallBonus === null
+          ? undefined
+          : typingText(this.recallBonus.entry.en)[this.recallBonus.typed];
+
+      if (enemyExpected === key) {
+        this.typeTarget(target, key);
+        return;
+      }
+
+      if (
+        recallExpected === key &&
+        this.recallBonus !== null &&
+        this.typeRecallBonus(this.recallBonus, key)
+      ) {
+        return;
+      }
+
       this.typeTarget(target, key);
       return;
     }
@@ -3058,6 +3077,14 @@ export class Game {
       return;
     }
 
+    if (
+      this.recallBonus !== null &&
+      typingText(this.recallBonus.entry.en)[this.recallBonus.typed] === key &&
+      this.typeRecallBonus(this.recallBonus, key)
+    ) {
+      return;
+    }
+
     const candidate = chooseTarget(
       this.enemies,
       key,
@@ -3068,11 +3095,6 @@ export class Game {
     if (candidate !== null) {
       this.targetId = candidate.id;
       this.typeTarget(candidate, key);
-      return;
-    }
-
-    if (this.recallBonus !== null) {
-      this.typeRecallBonus(this.recallBonus, key);
       return;
     }
 
