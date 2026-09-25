@@ -583,6 +583,29 @@ Implementation rules:
 - support effect-quality presets;
 - test boss + projectile + particle worst cases.
 
+### Static file/bundle-size policy — superseded 2026-09-25
+
+Do **not** use arbitrary source/build byte ceilings as a coding constraint. Earlier
+M22 JS/CSS/total-dist, audio-payload and Ship-V3 transfer-size limits are
+superseded by `docs/CODE_QUALITY_AND_PERFORMANCE_RULES.md`.
+
+Current rules:
+
+- reuse/extend existing production code before creating a parallel implementation;
+- remove dead, superseded and duplicate code/assets when they are no longer needed;
+- keep one source of truth for equivalent behavior;
+- report bundle/asset sizes for visibility, but do not fail CI solely because a
+  valid feature crosses a historical KiB/MiB number;
+- judge performance primarily with runtime evidence: frame-time/FPS, Canvas cost,
+  DOM/layout churn, allocation pressure, input latency, memory/load behavior and
+  real-browser QA;
+- keep correctness/integrity guards such as valid formats, required asset
+  presence, reviewed hashes/provenance and atlas dimensions where runtime layout
+  depends on them.
+
+Historical CI lines later in this document that mention old bundle/art/audio
+budgets describe what those old runs checked; they are not current size gates.
+
 Suggested Visual quality options:
 
 ~~~text
