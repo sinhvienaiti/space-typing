@@ -1386,15 +1386,18 @@ function drawStars(
     18,
     Math.round(budget.farStars * profile.starDensity),
   );
-  const nearCount = Math.max(
-    0,
-    Math.round(
-      budget.nearStars *
-        profile.starDensity *
-        Math.max(0.25, profile.flightIntensity) *
-        0.34,
-    ),
-  );
+  const nearCount =
+    profile.archetype === "celestial-rainbow"
+      ? 0
+      : Math.max(
+          0,
+          Math.round(
+            budget.nearStars *
+              profile.starDensity *
+              Math.max(0.25, profile.flightIntensity) *
+              0.34,
+          ),
+        );
   const vanishingX = width * (0.5 + (profile.variant - 3) * 0.006);
   const vanishingY = height * 0.34;
   const flight = 0.45 + profile.flightIntensity * 0.85;
@@ -1829,7 +1832,6 @@ function drawCinematicEvents(
     profile.secondaryMotion === "meteor-storm";
   const supportsTravelStreaks =
     hasMeteorMotion ||
-    profile.archetype === "celestial-rainbow" ||
     profile.archetype === "aurora-cosmic" ||
     profile.archetype === "infernal" ||
     profile.archetype === "cosmic-forge" ||
