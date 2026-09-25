@@ -9006,178 +9006,173 @@ export class Game {
     const context = this.context;
     const x = enemy.x;
     const y = enemy.y - kick;
-    const radius = Math.max(26, enemy.radius * 1.02);
-    const pulse = 0.985 + Math.sin(enemy.age * 3.2) * 0.015;
+    const radius = Math.max(24, enemy.radius * 0.95);
     const glow = qualityProfile(this.settings.visualQuality).glowScale;
 
     context.save();
     context.translate(x, y);
     context.globalCompositeOperation = "source-over";
 
-    // Match the original Recall reference: a dark transparent glass orb with
-    // a friendly cyan face, two wide warm memory nodes above it, and compact
-    // cyan tracking brackets. Do not reuse Combat enemy art.
-    const halo = context.createRadialGradient(
+    // Recall's classic target is intentionally minimal and non-hostile:
+    // a dark translucent orb, two pale-gold feather nodes above it,
+    // a faint segmented halo and compact cyan targeting brackets.
+    // There is deliberately no face/eyes inside the orb.
+    const orb = context.createRadialGradient(
+      -radius * 0.22,
+      -radius * 0.28,
+      radius * 0.04,
       0,
       0,
-      radius * 0.72,
-      0,
-      0,
-      radius * 1.36,
-    );
-    halo.addColorStop(0, "rgba(55, 198, 218, 0.04)");
-    halo.addColorStop(0.74, "rgba(55, 198, 218, 0.08)");
-    halo.addColorStop(1, "rgba(55, 198, 218, 0)");
-    context.fillStyle = halo;
-    context.beginPath();
-    context.arc(0, 0, radius * 1.36, 0, Math.PI * 2);
-    context.fill();
-
-    context.shadowBlur = (targeted ? 17 : 9) * glow;
-    context.shadowColor = "rgba(74, 230, 247, 0.58)";
-    const glass = context.createRadialGradient(
-      -radius * 0.34,
-      -radius * 0.4,
-      radius * 0.08,
-      0,
-      radius * 0.02,
       radius,
     );
-    glass.addColorStop(0, "rgba(92, 191, 205, 0.16)");
-    glass.addColorStop(0.42, "rgba(16, 58, 68, 0.32)");
-    glass.addColorStop(0.78, "rgba(5, 28, 36, 0.58)");
-    glass.addColorStop(1, "rgba(2, 15, 22, 0.74)");
-    context.fillStyle = glass;
+    orb.addColorStop(0, "rgba(42, 83, 94, 0.16)");
+    orb.addColorStop(0.55, "rgba(11, 35, 45, 0.34)");
+    orb.addColorStop(1, "rgba(3, 18, 27, 0.5)");
+    context.fillStyle = orb;
     context.strokeStyle = targeted
-      ? "rgba(97, 229, 244, 0.7)"
-      : "rgba(76, 183, 203, 0.48)";
-    context.lineWidth = targeted ? 1.7 : 1.25;
+      ? "rgba(82, 211, 230, 0.5)"
+      : "rgba(69, 167, 188, 0.34)";
+    context.lineWidth = targeted ? 1.35 : 1.05;
+    context.shadowBlur = targeted ? 7 * glow : 3 * glow;
+    context.shadowColor = "rgba(71, 215, 235, 0.34)";
     context.beginPath();
-    context.arc(0, 0, radius * pulse, 0, Math.PI * 2);
+    context.arc(0, 0, radius, 0, Math.PI * 2);
     context.fill();
     context.stroke();
-
-    // Soft interior crescent keeps the orb glassy rather than opaque.
     context.shadowBlur = 0;
-    context.strokeStyle = "rgba(187, 241, 247, 0.11)";
+
+    // Faint segmented halo around the body. The old reference shows this as
+    // small cyan fragments, strongest around the lower half.
+    context.save();
+    context.globalAlpha = targeted ? 0.42 : 0.28;
+    context.strokeStyle = "rgba(80, 200, 218, 0.64)";
+    context.lineWidth = 2;
+    context.setLineDash([2.4, 7.2]);
+    context.lineDashOffset = -enemy.age * 5;
+    context.beginPath();
+    context.arc(0, 0, radius * 1.23, 0, Math.PI * 2);
+    context.stroke();
+    context.restore();
+
+    const nodeY = -radius * 0.93;
+    const nodeX = radius * 0.7;
+
+    // Very light connector stems under the two old feather nodes.
+    context.strokeStyle = "rgba(76, 181, 197, 0.2)";
     context.lineWidth = 1;
     context.beginPath();
-    context.arc(
-      -radius * 0.05,
-      -radius * 0.02,
-      radius * 0.68,
-      Math.PI * 1.12,
-      Math.PI * 1.57,
-    );
+    context.moveTo(-radius * 0.35, -radius * 0.74);
+    context.lineTo(-nodeX + radius * 0.08, nodeY + radius * 0.13);
+    context.moveTo(radius * 0.35, -radius * 0.74);
+    context.lineTo(nodeX - radius * 0.08, nodeY + radius * 0.13);
     context.stroke();
 
-    // Original friendly face: two small cyan eyes and a shallow smile.
-    context.fillStyle = targeted
-      ? "rgba(112, 238, 248, 0.9)"
-      : "rgba(88, 199, 215, 0.7)";
-    const eyeRadius = Math.max(1.25, radius * 0.048);
-    context.beginPath();
-    context.arc(-radius * 0.22, -radius * 0.02, eyeRadius, 0, Math.PI * 2);
-    context.arc(radius * 0.22, -radius * 0.02, eyeRadius, 0, Math.PI * 2);
-    context.fill();
-
-    context.strokeStyle = targeted
-      ? "rgba(111, 239, 250, 0.82)"
-      : "rgba(87, 203, 219, 0.66)";
-    context.lineWidth = Math.max(1.05, radius * 0.04);
-    context.lineCap = "round";
-    context.beginPath();
-    context.moveTo(-radius * 0.22, radius * 0.12);
-    context.quadraticCurveTo(
-      0,
-      radius * 0.26,
-      radius * 0.22,
-      radius * 0.12,
-    );
-    context.stroke();
-
-    // Two gold memory nodes sit clearly above the orb, as in the original
-    // reference. Their thin cyan stems remain visually separate from the word
-    // panel above.
-    const nodeY = -radius * 1.18;
-    const nodeX = radius * 0.64;
-    context.strokeStyle = "rgba(83, 189, 205, 0.26)";
-    context.lineWidth = 1;
-    context.beginPath();
-    context.moveTo(-radius * 0.34, -radius * 0.78);
-    context.lineTo(-nodeX, nodeY + radius * 0.15);
-    context.moveTo(radius * 0.34, -radius * 0.78);
-    context.lineTo(nodeX, nodeY + radius * 0.15);
-    context.stroke();
-
-    const memoryNode = (nodeCenterX: number, tilt: number): void => {
+    const drawMemoryWing = (
+      centerX: number,
+      direction: -1 | 1,
+    ): void => {
       context.save();
-      context.translate(nodeCenterX, nodeY);
-      context.rotate(tilt);
-      const nodeGradient = context.createRadialGradient(
-        -radius * 0.08,
-        -radius * 0.04,
-        radius * 0.02,
-        0,
-        0,
-        radius * 0.3,
+      context.translate(centerX, nodeY);
+      context.scale(direction, 1);
+      context.rotate(-0.04);
+
+      context.fillStyle = "rgba(220, 240, 245, 0.9)";
+      context.strokeStyle = "rgba(255, 232, 139, 0.92)";
+      context.lineWidth = 1.35;
+      context.shadowBlur = 7 * glow;
+      context.shadowColor = "rgba(255, 225, 120, 0.38)";
+
+      const width = radius * 0.58;
+      const height = radius * 0.24;
+      context.beginPath();
+      context.moveTo(-width * 0.48, height * 0.08);
+      context.quadraticCurveTo(
+        -width * 0.12,
+        -height * 0.72,
+        width * 0.48,
+        -height * 0.18,
       );
-      nodeGradient.addColorStop(0, "rgba(255, 255, 224, 0.98)");
-      nodeGradient.addColorStop(0.52, "rgba(236, 218, 128, 0.94)");
-      nodeGradient.addColorStop(1, "rgba(176, 145, 69, 0.48)");
-      context.fillStyle = nodeGradient;
-      context.shadowBlur = 8 * glow;
-      context.shadowColor = "rgba(239, 219, 128, 0.36)";
+      context.quadraticCurveTo(
+        width * 0.22,
+        height * 0.56,
+        -width * 0.48,
+        height * 0.08,
+      );
+      context.closePath();
+      context.fill();
+      context.stroke();
+
+      context.shadowBlur = 0;
+      context.globalAlpha = 0.42;
+      context.fillStyle = "#ffffff";
       context.beginPath();
       context.ellipse(
-        0,
-        0,
-        radius * 0.31,
-        radius * 0.125,
-        0,
+        -width * 0.08,
+        -height * 0.16,
+        width * 0.12,
+        height * 0.12,
+        -0.2,
         0,
         Math.PI * 2,
       );
       context.fill();
       context.restore();
     };
-    memoryNode(-nodeX, 0.1);
-    memoryNode(nodeX, -0.1);
 
-    // Compact cyan corner markers reproduce the old tracking-frame silhouette.
-    const frameX = radius * 1.18;
-    const frameY = radius * 1.12;
-    const corner = radius * 0.23;
+    drawMemoryWing(-nodeX, -1);
+    drawMemoryWing(nodeX, 1);
+
+    // Four compact corner brackets, matching the old Recall lock-on frame.
+    const frame = radius * 1.2;
+    const arm = radius * 0.24;
     context.strokeStyle = targeted
-      ? "rgba(88, 227, 243, 0.78)"
-      : "rgba(67, 178, 198, 0.5)";
-    context.lineWidth = 1.3;
+      ? "rgba(83, 226, 242, 0.78)"
+      : "rgba(66, 179, 199, 0.5)";
+    context.lineWidth = 1.35;
+    context.shadowBlur = targeted ? 5 * glow : 0;
+    context.shadowColor = "rgba(81, 225, 242, 0.52)";
     context.beginPath();
-    context.moveTo(-frameX, -frameY + corner);
-    context.lineTo(-frameX, -frameY);
-    context.lineTo(-frameX + corner, -frameY);
-    context.moveTo(frameX - corner, -frameY);
-    context.lineTo(frameX, -frameY);
-    context.lineTo(frameX, -frameY + corner);
-    context.moveTo(-frameX, frameY - corner);
-    context.lineTo(-frameX, frameY);
-    context.lineTo(-frameX + corner, frameY);
-    context.moveTo(frameX - corner, frameY);
-    context.lineTo(frameX, frameY);
-    context.lineTo(frameX, frameY - corner);
+    for (const sx of [-1, 1] as const) {
+      for (const sy of [-1, 1] as const) {
+        const bx = sx * frame;
+        const by = sy * frame;
+        context.moveTo(bx, by - sy * arm);
+        context.lineTo(bx, by);
+        context.lineTo(bx - sx * arm, by);
+      }
+    }
     context.stroke();
+    context.shadowBlur = 0;
 
-    // Tiny center ticks are visible in the original Recall reticle.
-    context.fillStyle = "rgba(81, 207, 224, 0.55)";
-    context.fillRect(-1, -frameY - radius * 0.08, 2, radius * 0.12);
-    context.fillRect(-1, frameY - radius * 0.04, 2, radius * 0.12);
+    // Sparse particles from the old reference, kept subtle and deterministic.
+    const sparklePhase = enemy.age * 0.65;
+    for (let index = 0; index < 3; index += 1) {
+      const angle = sparklePhase + index * 2.25;
+      const distance = radius * (1.05 + index * 0.16);
+      const sx = Math.cos(angle) * distance;
+      const sy = Math.sin(angle) * distance * 0.58 + radius * 0.12;
+      context.globalAlpha = 0.28 + index * 0.08;
+      context.fillStyle =
+        index === 1
+          ? "rgba(255, 238, 157, 0.84)"
+          : "rgba(95, 215, 229, 0.7)";
+      context.beginPath();
+      context.arc(
+        sx,
+        sy,
+        Math.max(1.1, radius * (index === 1 ? 0.055 : 0.04)),
+        0,
+        Math.PI * 2,
+      );
+      context.fill();
+    }
 
     if (enemy.flash > 0) {
-      context.globalAlpha = Math.min(0.46, enemy.flash);
-      context.strokeStyle = "#dbfbff";
-      context.lineWidth = 2;
+      context.globalAlpha = Math.min(0.32, enemy.flash);
+      context.strokeStyle = "rgba(221, 250, 255, 0.9)";
+      context.lineWidth = 1.6;
       context.beginPath();
-      context.arc(0, 0, radius * 1.06, 0, Math.PI * 2);
+      context.arc(0, 0, radius * 1.04, 0, Math.PI * 2);
       context.stroke();
     }
 
