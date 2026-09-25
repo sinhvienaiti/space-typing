@@ -26,7 +26,7 @@ function layer(
     depth,
     opacity,
     scale,
-    fit: "contain",
+    fit: id.endsWith("-sky") ? "cover" : "contain",
     anchorX,
     anchorY,
     driftX,
