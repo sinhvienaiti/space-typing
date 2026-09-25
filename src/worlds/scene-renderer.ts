@@ -1391,7 +1391,8 @@ function drawStars(
     Math.round(
       budget.nearStars *
         profile.starDensity *
-        Math.max(0.25, profile.flightIntensity),
+        Math.max(0.25, profile.flightIntensity) *
+        0.62,
     ),
   );
   const vanishingX = width * (0.5 + (profile.variant - 3) * 0.006);
@@ -1465,15 +1466,39 @@ function drawStars(
       continue;
     }
 
-    context.strokeStyle = rgba(
-      environment.starRgb,
-      0.08 + depth * 0.2,
+    const trailGradient = context.createLinearGradient(
+      x0,
+      y0,
+      x,
+      y,
     );
-    context.lineWidth = 0.8 + depth * 1.15;
+    trailGradient.addColorStop(
+      0,
+      rgba(environment.starRgb, 0),
+    );
+    trailGradient.addColorStop(
+      0.65,
+      rgba(environment.starRgb, 0.025 + depth * 0.055),
+    );
+    trailGradient.addColorStop(
+      1,
+      rgba(environment.starRgb, 0.11 + depth * 0.12),
+    );
+
+    context.strokeStyle = trailGradient;
+    context.lineWidth = 0.55 + depth * 0.72;
     context.beginPath();
     context.moveTo(x0, y0);
     context.lineTo(x, y);
     context.stroke();
+
+    context.fillStyle = rgba(
+      environment.starRgb,
+      0.14 + depth * 0.12,
+    );
+    context.beginPath();
+    context.arc(x, y, 0.7 + depth * 0.7, 0, TAU);
+    context.fill();
   }
 
   context.restore();
