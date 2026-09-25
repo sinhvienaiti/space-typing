@@ -20,23 +20,10 @@ let totalGzip = 0;
 
 for (const url of built) {
   const path = url.pathname;
-
-  // Premium V3 ship art and committed default audio have dedicated integrity
-  // validation. Keep them out of executable/static bundle reporting so the
-  // trend remains comparable with earlier M22 measurements.
-  if (
-    path.endsWith("/assets/space-typing/ships/player-ships-v3.webp") ||
-    path.endsWith("/assets/space-typing/ships/player-ships-v3.png")
-  ) {
-    continue;
-  }
-  if (path.includes("/assets/audio/") && path.endsWith(".ogg")) {
-    continue;
-  }
-
   const buffer = readFileSync(url);
   const raw = statSync(url).size;
   const gzip = gzipSync(buffer).length;
+
   totalRaw += raw;
   totalGzip += gzip;
 
@@ -49,21 +36,14 @@ for (const url of built) {
   }
 }
 
-const metrics = {
-  jsRaw,
-  jsGzip,
-  cssRaw,
-  cssGzip,
-  totalRaw,
-  totalGzip,
-};
-
 console.log(
-  "Production bundle metrics (report-only):",
-  Object.fromEntries(
-    Object.entries(metrics).map(([key, value]) => [
-      key,
-      (value / 1024).toFixed(2) + " KiB",
-    ]),
-  ),
+  "Production bundle metrics (report-only, no hard byte limits):",
+  {
+    jsRaw: (jsRaw / 1024).toFixed(2) + " KiB",
+    jsGzip: (jsGzip / 1024).toFixed(2) + " KiB",
+    cssRaw: (cssRaw / 1024).toFixed(2) + " KiB",
+    cssGzip: (cssGzip / 1024).toFixed(2) + " KiB",
+    totalRaw: (totalRaw / 1024).toFixed(2) + " KiB",
+    totalGzip: (totalGzip / 1024).toFixed(2) + " KiB",
+  },
 );
