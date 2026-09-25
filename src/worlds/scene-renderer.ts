@@ -43,6 +43,16 @@ function rgba(rgb: string, alpha: number): string {
   return "rgba(" + rgb + ", " + String(clamp(alpha, 0, 1)) + ")";
 }
 
+function hexRgb(hex: string): string {
+  const value = hex.startsWith("#") ? hex.slice(1) : hex;
+  if (value.length !== 6) return "255, 255, 255";
+  return [
+    parseInt(value.slice(0, 2), 16),
+    parseInt(value.slice(2, 4), 16),
+    parseInt(value.slice(4, 6), 16),
+  ].join(", ");
+}
+
 function stringSeed(value: string): number {
   let hash = 2166136261;
   for (let index = 0; index < value.length; index += 1) {
@@ -1482,6 +1492,11 @@ function drawCinematicVortex(
     Math.min(width, height) *
     (profile.archetype === "abyssal" ? 0.13 : 0.17);
 
+  const armColors = [
+    hexRgb(palette.glowA),
+    hexRgb(palette.glowB),
+  ] as const;
+
   context.save();
   context.globalCompositeOperation = "lighter";
 
@@ -1503,22 +1518,10 @@ function drawCinematicVortex(
       const alpha =
         (0.035 + (1 - t) * 0.1) *
         strength;
-      context.fillStyle =
-        arm % 2 === 0
-          ? rgba(
-              palette.glowA.slice(1)
-                .match(/.{2}/g)!
-                .map((hex) => parseInt(hex, 16))
-                .join(", "),
-              alpha,
-            )
-          : rgba(
-              palette.glowB.slice(1)
-                .match(/.{2}/g)!
-                .map((hex) => parseInt(hex, 16))
-                .join(", "),
-              alpha,
-            );
+      context.fillStyle = rgba(
+        armColors[arm % armColors.length]!,
+        alpha,
+      );
       context.beginPath();
       context.arc(x, y, size, 0, TAU);
       context.fill();
@@ -1784,6 +1787,18 @@ function drawCinematicEvents(
 ): void {
   const { width, height, time, profile, quality, environment } = input;
   if (profile.eventFrequency < 0.12) return;
+
+  const hasMeteorMotion =
+    profile.primaryMotion === "meteor-storm" ||
+    profile.secondaryMotion === "meteor-storm";
+  const supportsTravelStreaks =
+    hasMeteorMotion ||
+    profile.archetype === "celestial-rainbow" ||
+    profile.archetype === "aurora-cosmic" ||
+    profile.archetype === "infernal" ||
+    profile.archetype === "cosmic-forge" ||
+    profile.archetype === "eternity";
+  if (!supportsTravelStreaks) return;
 
   const budget = sceneQualityBudget(quality);
   const count = Math.max(
