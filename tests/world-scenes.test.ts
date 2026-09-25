@@ -5,7 +5,10 @@ import {
   validateWorldSceneRegistry,
   WORLD_SCENE_REGISTRY,
 } from "../src/worlds/scene-registry";
-import { WORLD_SCENE_ARCHETYPES } from "../src/worlds/scene-types";
+import {
+  WORLD_CINEMATIC_MOTIONS,
+  WORLD_SCENE_ARCHETYPES,
+} from "../src/worlds/scene-types";
 import { WORLD_REGISTRY } from "../src/worlds/registry";
 
 describe("World background scene registry", () => {
@@ -18,6 +21,18 @@ describe("World background scene registry", () => {
       expect(scene.worldId).toBe(world.id);
       expect(scene.id).toContain(world.backgroundProfile);
       expect(scene.seed).toBeGreaterThan(0);
+      expect(WORLD_CINEMATIC_MOTIONS).toContain(scene.primaryMotion);
+      if (scene.secondaryMotion !== null) {
+        expect(WORLD_CINEMATIC_MOTIONS).toContain(scene.secondaryMotion);
+      }
+      expect(scene.flightIntensity).toBeGreaterThanOrEqual(0);
+      expect(scene.starDensity).toBeGreaterThanOrEqual(0);
+      expect(scene.midObjectDensity).toBeGreaterThanOrEqual(0);
+      expect(scene.foregroundDensity).toBeGreaterThanOrEqual(0);
+      expect(scene.eventFrequency).toBeGreaterThanOrEqual(0);
+      expect(scene.vortexStrength).toBeGreaterThanOrEqual(0);
+      expect(scene.asteroidDensity).toBeGreaterThanOrEqual(0);
+      expect(scene.cloudDensity).toBeGreaterThanOrEqual(0);
     }
   });
 
@@ -62,6 +77,31 @@ describe("World background scene registry", () => {
     expect(ultra.ambientParticles).toBeLessThanOrEqual(28);
     expect(ultra.farDetails).toBeLessThanOrEqual(6);
     expect(ultra.midDetails).toBeLessThanOrEqual(5);
+
+    expect(low.farStars).toBeLessThan(medium.farStars);
+    expect(medium.farStars).toBeLessThan(high.farStars);
+    expect(high.farStars).toBeLessThan(ultra.farStars);
+    expect(ultra.farStars).toBeLessThanOrEqual(210);
+
+    expect(low.nearStars).toBeLessThan(medium.nearStars);
+    expect(ultra.nearStars).toBeLessThanOrEqual(34);
+    expect(ultra.midObjects).toBeLessThanOrEqual(13);
+    expect(ultra.foregroundObjects).toBeLessThanOrEqual(22);
+    expect(ultra.eventObjects).toBeLessThanOrEqual(2);
+  });
+
+  it("gives Galaxy and meteor Worlds strong cinematic motion identities", () => {
+    const galaxy = sceneProfileForWorld("world-01");
+    const meteor = sceneProfileForWorld("world-36");
+
+    expect(galaxy.primaryMotion).toBe("deep-flight");
+    expect(galaxy.starDensity).toBeGreaterThan(0.9);
+    expect(galaxy.vortexStrength).toBeGreaterThan(0.5);
+    expect(galaxy.asteroidDensity).toBeGreaterThan(0.4);
+
+    expect(meteor.primaryMotion).toBe("asteroid-flow");
+    expect(meteor.asteroidDensity).toBeGreaterThan(0.9);
+    expect(meteor.eventFrequency).toBeGreaterThan(0.4);
   });
 
   it("falls back safely to World 01 for unknown ids", () => {
