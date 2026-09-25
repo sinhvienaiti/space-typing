@@ -66,8 +66,8 @@ export class LayeredBackgroundRenderer {
     asset: LoadedBackgroundAsset,
     input: LayeredBackgroundDrawInput,
     index: number,
-  ): void {
-    if (!asset.loaded || asset.failed) return;
+  ): boolean {
+    if (!asset.loaded || asset.failed) return false;
 
     const { width, height, time, flightIntensity, variant } = input;
     const image = asset.image;
@@ -172,14 +172,16 @@ export class LayeredBackgroundRenderer {
       drawHeight,
     );
     context.restore();
+    return true;
   }
 
   draw(
     context: CanvasRenderingContext2D,
     profile: LayeredBackgroundProfile,
     input: LayeredBackgroundDrawInput,
-  ): void {
+  ): boolean {
     this.preload(profile);
+    let drewAny = false;
 
     for (let index = 0; index < profile.layers.length; index += 1) {
       const layer = profile.layers[index]!;
@@ -188,7 +190,11 @@ export class LayeredBackgroundRenderer {
       }
       const asset = this.asset(layer.src);
       if (asset === null) continue;
-      this.drawImageLayer(context, layer, asset, input, index);
+      drewAny =
+        this.drawImageLayer(context, layer, asset, input, index) ||
+        drewAny;
     }
+
+    return drewAny;
   }
 }
