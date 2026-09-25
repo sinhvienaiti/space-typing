@@ -100,12 +100,24 @@ export class LayeredBackgroundRenderer {
 
     let offsetX: number;
     let offsetY: number;
+    let travelFade = 1;
 
     const travelling =
       Math.abs(layer.driftX) >= 0.005 ||
       Math.abs(layer.driftY) >= 0.005;
 
     if (travelling) {
+      const dominantDrift = Math.max(
+        Math.abs(layer.driftX),
+        Math.abs(layer.driftY),
+      );
+      const travelPhase = positiveModulo(
+        time * dominantDrift * motion + phase * 0.137,
+        1,
+      );
+      const edge = Math.min(travelPhase, 1 - travelPhase);
+      travelFade = Math.max(0, Math.min(1, edge / 0.085));
+
       const travelX =
         time * layer.driftX * width * motion;
       const travelY =
@@ -141,7 +153,7 @@ export class LayeredBackgroundRenderer {
             layer.pulseAmount;
     const opacity = Math.max(
       0,
-      Math.min(1, layer.opacity * pulse),
+      Math.min(1, layer.opacity * pulse * travelFade),
     );
 
     const x =
