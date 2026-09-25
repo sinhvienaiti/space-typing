@@ -20,6 +20,7 @@ export type EnemyRenderInput = {
   drawFace?: boolean;
   bodyOutlineAlpha?: number;
   bodyOutlineGlowScale?: number;
+  bodyOutlineWidthScale?: number;
 };
 
 const PALETTES: Record<EnemyDefinition["family"], EnemyVisualPalette> = {
@@ -397,12 +398,14 @@ function drawBody(
   fillBody = true,
   outlineAlpha = 1,
   outlineGlowScale = 1,
+  outlineWidthScale = 1,
 ): void {
   const body = definition.visual.body;
   context.save();
   context.fillStyle = flash > 0 ? "#ffffff" : palette.bodyB;
   context.strokeStyle = targeted ? "#8ff8ff" : palette.outline;
-  context.lineWidth = targeted ? 2.8 : 1.7;
+  context.lineWidth =
+    (targeted ? 2.8 : 1.7) * Math.max(0, outlineWidthScale);
   context.shadowBlur =
     (targeted ? 18 : 10) * glowScale * outlineGlowScale;
   context.shadowColor = targeted ? "#74f2ff" : palette.outline;
@@ -877,6 +880,7 @@ export function drawModularEnemy(
       input.fillBody !== false,
       input.bodyOutlineAlpha ?? 1,
       input.bodyOutlineGlowScale ?? 1,
+      input.bodyOutlineWidthScale ?? 1,
     );
     if (input.drawFace !== false) {
       drawFace(context, definition, radius, palette, glowScale);
