@@ -1,6 +1,11 @@
 import type { VisualQuality } from "../types";
 import type { WorldEnvironmentProfile } from "./environment";
 import { sceneQualityBudget } from "./scene-registry";
+import {
+  layeredBackgroundForScene,
+} from "./layered-background-registry";
+import { LayeredBackgroundRenderer } from "./layered-background-renderer";
+import type { LayeredBackgroundProfile } from "./layered-background-types";
 import type { WorldSceneProfile } from "./scene-types";
 
 export type WorldSceneStar = {
@@ -2524,6 +2529,9 @@ function drawFloor(
 export class WorldSceneRenderer {
   private cacheCanvas: HTMLCanvasElement | null = null;
   private cacheKey = "";
+  private readonly layeredRenderer = new LayeredBackgroundRenderer();
+  private layeredProfile: LayeredBackgroundProfile | null = null;
+  private layeredProfileSceneId = "";
 
   invalidate(): void {
     this.cacheKey = "";
@@ -2532,6 +2540,22 @@ export class WorldSceneRenderer {
 
   destroy(): void {
     this.invalidate();
+    this.layeredRenderer.clear();
+    this.layeredProfile = null;
+    this.layeredProfileSceneId = "";
+  }
+
+  private authoredProfile(
+    scene: WorldSceneProfile,
+  ): LayeredBackgroundProfile {
+    if (
+      this.layeredProfile === null ||
+      this.layeredProfileSceneId !== scene.id
+    ) {
+      this.layeredProfile = layeredBackgroundForScene(scene);
+      this.layeredProfileSceneId = scene.id;
+    }
+    return this.layeredProfile;
   }
 
   private prepareStaticCache(input: WorldSceneDrawInput): void {
@@ -2585,9 +2609,28 @@ export class WorldSceneRenderer {
       drawStaticScene(context, input);
     }
 
+    const authoredReady = this.layeredRenderer.draw(
+      context,
+      this.authoredProfile(input.profile),
+      {
+        width: input.width,
+        height: input.height,
+        time: input.time,
+        quality: input.quality,
+        flightIntensity: input.profile.flightIntensity,
+        variant: input.profile.variant,
+      },
+    );
+
     drawStars(context, input);
     drawCinematicMotion(context, input);
-    drawFloor(context, input);
+
+    // The old perspective floor is a fallback only. Once authored imagery is
+    // available it must not reintroduce debug-like rings/lines over the scene.
+    if (!authoredReady) {
+      drawFloor(context, input);
+    }
+
     drawAmbientParticles(context, input);
     drawCinematicEvents(context, input);
   }
