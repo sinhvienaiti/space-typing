@@ -232,16 +232,18 @@ Curation signal at review time:
 - Space Shooter Remastered contains 295 files;
 - one established arcade-space visual family.
 
-Selected assets:
+Selected production assets:
+- bg_darkPurple;
 - meteorBrown_big1;
 - meteorBrown_big2;
-- meteorBrown_big3;
 - meteorBrown_big4;
-- meteorGrey_big1;
 - meteorGrey_big3;
 - meteorGrey_med2;
-- meteorGrey_small1;
-- bg_darkPurple retained as a possible low-noise fallback.
+- meteorGrey_small1.
+
+Two initially copied variants (meteorBrown_big3 and meteorGrey_big1) were not
+needed by the final composition and were removed rather than kept as dead
+assets.
 
 Vendored under:
 - `public/assets/space-typing/backgrounds/vendor/kenney-remastered/`
@@ -269,5 +271,6 @@ selected by the active Galaxy registry:
 - old two-meteor vendor paths: superseded by the larger curated Kenney meteor
   set.
 
-These files should be removed from the repository when no remaining registry or
-documentation reference requires them.
+These superseded binary/custom assets have now been removed from the repository.
+Their source history remains in this document only for provenance and review
+traceability.
