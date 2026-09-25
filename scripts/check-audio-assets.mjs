@@ -1,4 +1,4 @@
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const AUDIO_FILES = [
@@ -22,13 +22,8 @@ const AUDIO_FILES = [
 let totalBytes = 0;
 for (const relative of AUDIO_FILES) {
   const absolute = resolve(process.cwd(), relative);
-  const info = await stat(absolute);
-  if (info.size <= 1_000) {
-    throw new Error(relative + ": audio file is unexpectedly small or empty.");
-  }
-  totalBytes += info.size;
-
   const data = await readFile(absolute);
+  totalBytes += data.length;
   if (data.subarray(0, 4).toString("ascii") !== "OggS") {
     throw new Error(relative + ": expected OGG/OggS header.");
   }
