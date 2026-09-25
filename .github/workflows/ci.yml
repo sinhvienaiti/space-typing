@@ -12,7 +12,7 @@ jobs:
       - name: Checkout exact Space Typing source
         uses: actions/checkout@v4
         with:
-          ref: b1c17652224e2efa0f433768a96c5f1267028aa7
+          ref: 6efa9ce231d1a43e20686db33defbf5839912916
           path: source
           fetch-depth: 1
 
@@ -22,15 +22,15 @@ jobs:
           cat > source/OFFLINE_EXPORT_INFO.txt <<'EOF'
           Repository: sinhvienaiti/space-typing
           Branch source: main
-          Commit: b1c17652224e2efa0f433768a96c5f1267028aa7
-          Commit message: Center and brighten classic Recall memory eyes
+          Commit: 6efa9ce231d1a43e20686db33defbf5839912916
+          Commit message: Polish learning rail, icons, help tooltips and kill feedback
           Export purpose: offline transfer to Mac mini
           EOF
 
       - name: Upload source artifact
         uses: actions/upload-artifact@v4
         with:
-          name: space-typing-b1c17652-source
+          name: space-typing-6efa9ce2-source
           path: source
           include-hidden-files: true
           if-no-files-found: error
