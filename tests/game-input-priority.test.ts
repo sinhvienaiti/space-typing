@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Game } from "../src/Game";
 import { createBossState, type BossState } from "../src/boss/model";
+import { createStageConfig } from "../src/campaign/stage";
+import { difficultyFor } from "../src/campaign/difficulty";
 import type { SupplyPod } from "../src/supply/pod";
 import type { GamePhase, GameSettings, VocabularyEntry } from "../src/types";
 
@@ -158,8 +160,17 @@ describe("Recall Bonus input priority", () => {
     ];
     const game = createTestGame(bonusEntries);
     const state = game as unknown as GameInternals;
-    state.phase = "playing";
     game.setTestLabMode(true);
+    game.startStage(
+      createStageConfig(50),
+      difficultyFor({
+        stage: 50,
+        vocabularyLevel: 1,
+        mode: "balanced",
+        recentWpm: 60,
+        recentAccuracy: 96,
+      }),
+    );
     const ids = game.testLabSpawnSamePrefixScenario();
     expect(ids.length).toBeGreaterThan(0);
 
