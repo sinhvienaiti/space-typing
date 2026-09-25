@@ -842,3 +842,84 @@ Perceptual quality remains a real-browser review item. CI can validate contracts
 TypeScript and build behavior, but it cannot certify that a particular backdrop
 looks beautiful enough on the owner's display. Follow-up visual tuning should
 reuse this scene system rather than reintroducing a parallel background path.
+
+
+---
+
+## BG13 — Visual richness corrective pass
+
+**Reason**
+
+Real-browser review of World 01 showed that the first implementation was
+structurally correct but visually too conservative. The scene still read as the
+old dark teal background with a few new thin rings/lines. The renderer therefore
+met the registry/cache contract but did not yet meet the product goal that a
+player should immediately recognize Heaven/Galaxy/Hell/Frost/Meteor/etc. from
+the scene itself.
+
+**Goal**
+
+Move the scene renderer from "themed line overlay" to a clearly authored
+background composition while preserving the existing cache/performance
+architecture.
+
+**Required changes**
+
+1. Add scene-family sky palettes independent from the legacy M07 base palette.
+   The legacy environment palette remains useful for World accent/star/haze, but
+   it must no longer dominate the whole canvas.
+
+2. Add strong filled background masses, not only strokes:
+   - celestial: multicolor nebula/rainbow aurora + luminous cloud horizon;
+   - infernal: lava horizon + red/orange atmospheric glow;
+   - frost: deep blue sky + broad aurora + ice mass;
+   - verdant: forest/canopy silhouettes + green luminous horizon;
+   - shadow: eclipse + dark fog banks;
+   - forge: machinery/reactor mass + industrial light;
+   - abyss: black-hole/void mass + ruined structures;
+   - aurora/meteor: comet/asteroid field + aurora;
+   - cathedral: large architectural silhouette + sacred light;
+   - eternity: dimensional/crown/prism composition.
+
+3. Increase landmark scale/opacity where necessary. Major scenery must be
+   visible on a normal desktop screenshot without needing zoom.
+
+4. Reduce reliance on thin repeated floor rings. Floor treatment should support
+   the scene rather than become the main visible change.
+
+5. Keep combat readability:
+   - no bright scenery directly behind active word labels at high opacity;
+   - target/Recall/boss telegraphs retain stronger contrast than scenery.
+
+6. Keep static work cached. Do not add heavy full-screen work every frame.
+
+**World 01 acceptance screenshot**
+
+Stage 001-020 / Rainbow Reach must no longer look like the old teal grid.
+Without reading the World name, the scene should visibly show:
+- celestial/rainbow sky color separation;
+- large luminous celestial landmark/halo;
+- cloud/nebula mass;
+- a light-lane/bridge depth cue;
+- stars/ambient light only as supporting detail.
+
+**Cross-family acceptance**
+
+At minimum these representative Worlds must be visually distinguishable from a
+single screenshot:
+- World 01 celestial;
+- World 06 infernal;
+- World 11 frost;
+- World 16 verdant;
+- World 26 forge;
+- World 36 meteor/aurora;
+- World 41 cathedral;
+- World 46 eternity.
+
+**Validation**
+
+- existing World scene registry tests stay green;
+- TypeScript/build pass;
+- no new persistence state;
+- static cache contract remains intact;
+- parent submodule pin is updated after child CI passes.
