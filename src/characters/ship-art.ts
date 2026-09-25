@@ -7,7 +7,6 @@ export const PREMIUM_SHIP_SHEET_ASSET_ID = "player-ship-sheet-v3";
 /** A single 4 × 3 atlas; 256 source pixels per character cell. */
 export const PREMIUM_SHIP_ATLAS_WIDTH = 1024;
 export const PREMIUM_SHIP_ATLAS_HEIGHT = 768;
-export const PREMIUM_SHIP_ATLAS_MAX_FILE_BYTES = Math.floor(1.2 * 1024 * 1024);
 
 export type ShipArtPreference = "auto" | "v2";
 
@@ -20,7 +19,7 @@ export type ShipSheetSelection = {
   source: "v3" | "v2" | "procedural";
 };
 
-/** Reject incorrectly sized or oversized V3 atlases before drawing them. */
+/** Reject V3 atlases whose dimensions do not match the runtime slicing contract. */
 export function validPremiumShipDimensions(
   naturalWidth: number,
   naturalHeight: number,
