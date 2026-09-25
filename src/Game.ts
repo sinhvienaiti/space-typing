@@ -5765,7 +5765,20 @@ export class Game {
     return true;
   }
 
-  private destroyEnemyWithWordBomb(enemy: Enemy): void {
+  private resolveSkillEnemyKill(
+    enemy: Enemy,
+    options: {
+      normalScore: number;
+      eliteScore: number;
+      grantPower?: number;
+      rollDrop?: boolean;
+      triggerDeathTraits?: boolean;
+      playDeathFx?: boolean;
+    },
+  ): void {
+    // Skill/consumable kills receive gameplay kill, score, objective and loot
+    // credit, but they deliberately stay on the Stage Result "skill-kill"
+    // path and never emit Shared Learning typing evidence.
     this.stageResultTracker.skillKillWord(
       "enemy",
       enemy.id,
@@ -5774,8 +5787,13 @@ export class Game {
     );
     this.stageResultTracker.recordEnemyKill(enemy.elite);
     this.stats.kills += 1;
-    this.addScore((enemy.elite ? 150 : 95) * this.stats.multiplier);
-    this.gainPower(4);
+    this.addScore(
+      (enemy.elite ? options.eliteScore : options.normalScore) *
+        this.stats.multiplier,
+    );
+    if ((options.grantPower ?? 0) > 0) {
+      this.gainPower(options.grantPower ?? 0);
+    }
     this.updateStageObjective({
       type: "enemy-kill",
       enemyId: enemy.id,
@@ -5783,10 +5801,14 @@ export class Game {
       elite: enemy.elite,
     });
 
-    this.tryRollEquipmentDrop(
-      enemy.golden ? "golden" : enemy.elite ? "elite" : "normal",
-    );
-    this.triggerEnemyDeathTraits(enemy);
+    if (options.rollDrop ?? true) {
+      this.tryRollEquipmentDrop(
+        enemy.golden ? "golden" : enemy.elite ? "elite" : "normal",
+      );
+    }
+    if (options.triggerDeathTraits ?? false) {
+      this.triggerEnemyDeathTraits(enemy);
+    }
 
     this.enemies = this.enemies.filter((item) => item.id !== enemy.id);
     this.recallHintIndices.delete(enemy.id);
@@ -5796,13 +5818,26 @@ export class Game {
       this.markTimer = 0;
     }
 
-    const definition = this.visualDefinitionForEnemy(enemy);
-    const fx = enemyFxProfile(
-      definition?.family ?? "rainbow",
-      "death",
-    );
-    this.burst(enemy.x, enemy.y, fx.count, fx.hue);
-    this.sfx.kill(fx.pitch);
+    if (options.playDeathFx ?? true) {
+      const definition = this.visualDefinitionForEnemy(enemy);
+      const fx = enemyFxProfile(
+        definition?.family ?? "rainbow",
+        "death",
+      );
+      this.burst(enemy.x, enemy.y, fx.count, fx.hue);
+      this.sfx.kill(fx.pitch);
+    }
+  }
+
+  private destroyEnemyWithWordBomb(enemy: Enemy): void {
+    this.resolveSkillEnemyKill(enemy, {
+      normalScore: 95,
+      eliteScore: 150,
+      grantPower: 4,
+      rollDrop: true,
+      triggerDeathTraits: true,
+      playDeathFx: true,
+    });
   }
 
   private currentTarget(): Enemy | null {
@@ -6959,30 +6994,17 @@ export class Game {
 
   private releaseNovaPulse(): void {
     this.projectiles = [];
-    const victims = this.enemies;
-    this.enemies = [];
-    this.recallHintIndices.clear();
+    const victims = [...this.enemies];
     for (const enemy of victims) {
-      this.stageResultTracker.skillKillWord(
-        "enemy",
-        enemy.id,
-        enemy.entry,
-        this.stageElapsedSeconds,
-      );
-      this.stageResultTracker.recordEnemyKill(enemy.elite);
-      this.stats.kills += 1;
-      this.addScore((enemy.elite ? 145 : 90) * this.stats.multiplier);
-      this.updateStageObjective({
-        type: "enemy-kill",
-        enemyId: enemy.id,
-        kind: enemy.kind,
-        elite: enemy.elite,
+      this.resolveSkillEnemyKill(enemy, {
+        normalScore: 90,
+        eliteScore: 145,
+        // Preserve the old Nova Bomb policy: only rare targets roll loot and
+        // no uncontrolled death-chain traits are triggered by the screen clear.
+        rollDrop: enemy.elite || enemy.golden,
+        triggerDeathTraits: false,
+        playDeathFx: false,
       });
-      // Elite/golden drops still resolve; do not count untyped targets as
-      // completed English words or trigger uncontrolled death-chain spawns.
-      if (enemy.elite || enemy.golden) {
-        this.tryRollEquipmentDrop(enemy.golden ? "golden" : "elite");
-      }
     }
     this.targetId = null;
     this.markedEnemyId = null;
