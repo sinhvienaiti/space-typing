@@ -923,3 +923,34 @@ single screenshot:
 - no new persistence state;
 - static cache contract remains intact;
 - parent submodule pin is updated after child CI passes.
+
+
+### BG13 implementation result
+
+Status: COMPLETE (2026-09-25).
+
+Implemented after real-browser review showed World 01 still looked too close to
+the legacy teal/grid background.
+
+Changes:
+
+- scene-family sky palettes now drive the large background color composition;
+- broad multicolor nebula/aurora glows replace the legacy single-color dominance;
+- each archetype now has a stronger filled backdrop mass (clouds, lava horizon,
+  ice mass, canopy, eclipse, machinery, black-hole/void, aurora, cathedral or
+  eternity rings);
+- World 01 celestial scene now includes a luminous halo, rainbow/cyan/violet/pink
+  atmospheric separation and visible cloud mass;
+- celestial floor rings were reduced in opacity/count so they no longer become
+  the main visible difference;
+- existing per-World landmark/floor/particle signatures remain active on top of
+  the richer archetype backdrop;
+- static caching and bounded dynamic layers are unchanged.
+
+Child validation for the corrective implementation:
+- Test: PASS;
+- TypeScript/build: PASS;
+- CI run for commit 895c238060393ef145bfdc30dac7b3b49caef40b: SUCCESS.
+
+Real-browser visual approval remains owner-reviewed because CI cannot judge
+perceptual scene quality.
