@@ -2606,9 +2606,6 @@ kbd {
     gap: 0.18rem;
   }
 
-  .quick-skills button span {
-    display: none;
-  }
 }
 
 @media (max-width: 520px) {
@@ -3968,6 +3965,5 @@ kbd {
 .grade-copper{--grade-accent:#cc8755}.grade-silver{--grade-accent:#b9d2dc}.grade-gold{--grade-accent:#e5bd62}.grade-diamond{--grade-accent:#8de9e6}
 .grade-badge{color:var(--grade-accent);font-size:.56rem}
 .local-item-icon{display:grid;place-items:center;height:42px}
-.equipment-card-head{display:flex;align-items:center;gap:.75rem}
-.equipment-card-icon.local-item-icon{width:72px;height:72px;font-size:2.2rem}
+.equipment-card-icon.local-item-icon{height:72px}
 .recall-assist-bar{top:88px;right:12px;left:auto;transform:none;pointer-events:auto}
