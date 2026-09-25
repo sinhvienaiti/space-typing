@@ -3633,7 +3633,6 @@ kbd {
 }
 
 
-/* Rage is a player action, not a 4px decorative progress stripe. */
 .player-ultimate {
   grid-template-columns: minmax(0, 1fr) auto;
   row-gap: .33rem;
@@ -3649,10 +3648,8 @@ kbd {
 .player-ultimate .power-track {
   grid-column: 1;
   height: 10px;
-  border-color: rgba(101,221,248,.45);
   background: linear-gradient(90deg,transparent calc(100% - 1px),#050e19 0) 0/20% 100%;
 }
-.player-ultimate .power-track.ready { box-shadow: 0 0 14px rgba(255,201,106,.5); }
 .player-ultimate .power-fill {
   background:
     linear-gradient(90deg,transparent calc(100% - 1px),#050e19 0) 0/20% 100%,
@@ -3663,6 +3660,7 @@ kbd {
   background:
     linear-gradient(90deg,transparent calc(100% - 1px),#050e19 0) 0/20% 100%,
     linear-gradient(90deg,#73fff1,#d1a1ff,#ffdf8f);
+  box-shadow:0 0 12px #ffca6a;
 }
 .player-ultimate kbd {
   grid-column: 2;
@@ -3672,11 +3670,6 @@ kbd {
   color: #d9fcff;
   border-color: rgba(108,226,244,.55);
 }
-@media (prefers-reduced-motion: reduce) {
-  .player-ultimate .power-fill.ready { animation: none; }
-}
-
-
 /* Batch C — measured Stage Results V2. */
 .stage-results-card {
   width: min(1040px, calc(100vw - 24px));
