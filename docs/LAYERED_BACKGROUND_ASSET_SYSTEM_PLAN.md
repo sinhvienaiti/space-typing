@@ -1,6 +1,6 @@
 # Layered Background Asset System — Spec & Implementation Plan
 
-> Status: APPROVED FOR IMPLEMENTATION
+> Status: IMPLEMENTED — FIRST AUTHORED ASSET PASS
 >
 > Created 2026-09-26 after owner review of the first cinematic/procedural pass.
 >
@@ -474,3 +474,95 @@ The layered asset system is complete when:
 8. performance stays bounded;
 9. tests/build pass;
 10. project docs and parent gitlink are updated.
+
+
+---
+
+## 12. Implementation checkpoint — 2026-09-26
+
+Implemented on child `main`:
+
+- layered background types/registry/renderer;
+- local image cache using browser `Image` objects;
+- cover/contain placement;
+- depth-aware parallax;
+- smooth oscillatory drift for landmarks;
+- wrapped travel motion for near/mid assets;
+- layer rotation and pulse;
+- quality filtering for optional layers;
+- safe procedural fallback while authored images are still loading.
+
+Authored local asset packs now exist for:
+
+- Galaxy:
+  - deep-space sky;
+  - nebula;
+  - ringed planet;
+  - spiral galaxy;
+  - asteroid cluster.
+- Heaven:
+  - celestial sky;
+  - halo gate;
+  - cloud islands.
+- Infernal:
+  - infernal sky;
+  - lava ridge;
+  - fortress.
+- Frost:
+  - frozen sky;
+  - aurora;
+  - ice spires.
+- Verdant:
+  - green atmospheric sky;
+  - canopy;
+  - roots.
+- Shadow:
+  - shadow sky;
+  - eclipse;
+  - ruins.
+- Cosmic Forge:
+  - industrial sky;
+  - reactor;
+  - towers.
+- Abyss:
+  - void sky;
+  - black hole;
+  - ruins.
+- Meteor:
+  - cosmic sky;
+  - asteroid belt;
+  - comet cluster.
+- Cathedral:
+  - astral sky;
+  - cathedral;
+  - sacred light window.
+- Eternity:
+  - final-realm sky;
+  - dimensional rings;
+  - cosmic crown.
+
+Runtime integration:
+
+- `WorldSceneRenderer` now composes `LayeredBackgroundRenderer`;
+- authored imagery is drawn before bounded procedural support FX;
+- once authored imagery is ready, the old perspective-floor line system is
+  skipped instead of being drawn over the scene;
+- hard straight near-star streaks were reduced and changed to softer faded
+  trails with a glowing head;
+- the previous procedural system remains only as a loading/fallback path.
+
+Automated validation:
+
+- all 50 Worlds resolve valid local authored background layers;
+- all asset paths are local under
+  `/assets/space-typing/backgrounds/`;
+- representative Worlds map to distinct authored families;
+- layer ids are unique per scene;
+- Test: PASS;
+- Build: PASS;
+- child CI: SUCCESS.
+
+The next visual QA step is owner review of World 01 in a real browser. If the
+Galaxy scene is still not painterly/rich enough, the next iteration should
+improve the authored SVG/WebP art itself rather than adding more procedural
+lines.
