@@ -8203,60 +8203,77 @@ export class Game {
       return;
     }
 
-    const lines: string[] = [];
-    if (config.showIpa && echo.entry.ipa.trim() !== "") {
-      lines.push(echo.entry.ipa.trim());
-    }
+    const lines: Array<{
+      text: string;
+      kind: "vi" | "ipa";
+      fontSize: number;
+    }> = [];
+    const primarySize =
+      config.size === "small" ? 13 : config.size === "medium" ? 16 : 19;
+    const ipaSize = Math.max(11, primarySize - 3);
+
+    // Vietnamese is the primary learning result; IPA supports it underneath.
     if (config.showVietnamese && echo.entry.vi.trim() !== "") {
-      lines.push(echo.entry.vi.trim());
+      lines.push({
+        text: echo.entry.vi.trim(),
+        kind: "vi",
+        fontSize: primarySize,
+      });
+    }
+    if (config.showIpa && echo.entry.ipa.trim() !== "") {
+      lines.push({
+        text: echo.entry.ipa.trim(),
+        kind: "ipa",
+        fontSize: ipaSize,
+      });
     }
     if (lines.length === 0) return;
 
-    const fontSize =
-      config.size === "small" ? 12 : config.size === "medium" ? 15 : 18;
-    const lineHeight = fontSize + 5;
-    const paddingX = 12;
-    const paddingY = 7;
+    const lineGap = 5;
     const context = this.context;
-
     context.save();
-    context.font =
-      "800 " + String(fontSize) +
-      "px ui-sans-serif, system-ui, sans-serif";
+
     let width = 0;
     for (const line of lines) {
-      width = Math.max(width, this.measureTextWidth(line));
+      context.font =
+        (line.kind === "vi" ? "850 " : "760 ") +
+        String(line.fontSize) +
+        "px ui-sans-serif, system-ui, sans-serif";
+      width = Math.max(width, context.measureText(line.text).width);
     }
-    width = Math.min(360, width + paddingX * 2);
-    const height = lines.length * lineHeight + paddingY * 2;
-    const x = clamp(echo.x, width / 2 + 8, this.width - width / 2 - 8);
-    const y = Math.max(height / 2 + 8, echo.y);
-    const fade = Math.min(1, echo.remaining / Math.min(0.35, echo.duration));
+
+    const totalHeight =
+      lines.reduce((sum, line) => sum + line.fontSize, 0) +
+      lineGap * Math.max(0, lines.length - 1);
+    const x = clamp(
+      echo.x,
+      width / 2 + 10,
+      this.width - width / 2 - 10,
+    );
+    const y = Math.max(totalHeight / 2 + 10, echo.y);
+    const fade = Math.min(
+      1,
+      echo.remaining / Math.min(0.35, echo.duration),
+    );
 
     context.globalAlpha = fade;
-    context.fillStyle = "rgba(5, 12, 21, 0.88)";
-    context.strokeStyle = "rgba(129, 229, 247, 0.5)";
-    context.lineWidth = 1;
-    context.shadowBlur = 14;
-    context.shadowColor = "rgba(121, 222, 247, 0.35)";
-    context.fillRect(x - width / 2, y - height / 2, width, height);
-    context.strokeRect(x - width / 2, y - height / 2, width, height);
-    context.shadowBlur = 0;
     context.textAlign = "center";
     context.textBaseline = "middle";
 
-    lines.forEach((line, index) => {
+    let cursorY = y - totalHeight / 2;
+    for (const line of lines) {
+      const lineCenter = cursorY + line.fontSize / 2;
+      context.font =
+        (line.kind === "vi" ? "850 " : "760 ") +
+        String(line.fontSize) +
+        "px ui-sans-serif, system-ui, sans-serif";
       context.fillStyle =
-        index === 0 && config.showIpa
-          ? "#a1f0f9"
-          : "#fff3c9";
-      context.fillText(
-        line,
-        x,
-        y - ((lines.length - 1) * lineHeight) / 2 + index * lineHeight,
-        width - paddingX * 2,
-      );
-    });
+        line.kind === "vi" ? "#fff3c9" : "#a1f0f9";
+      context.shadowBlur = line.kind === "vi" ? 9 : 7;
+      context.shadowColor = "rgba(2, 8, 15, 0.96)";
+      context.fillText(line.text, x, lineCenter, Math.min(360, this.width - 20));
+      cursorY += line.fontSize + lineGap;
+    }
 
     context.restore();
   }
