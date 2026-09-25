@@ -12,7 +12,7 @@ jobs:
       - name: Checkout exact Space Typing source
         uses: actions/checkout@v4
         with:
-          ref: 784986d7d6a96624170ea102ca13ae6f466ee9b3
+          ref: fc36b4cee929e2ffc376d411982946b71fad6b0e
           path: source
           fetch-depth: 1
 
@@ -22,15 +22,15 @@ jobs:
           cat > source/OFFLINE_EXPORT_INFO.txt <<'EOF'
           Repository: sinhvienaiti/space-typing
           Branch source: main
-          Commit: 784986d7d6a96624170ea102ca13ae6f466ee9b3
-          Commit message: Dock Recall assist controls to screen edge
+          Commit: fc36b4cee929e2ffc376d411982946b71fad6b0e
+          Commit message: Match original Recall core and highlight typing progress
           Export purpose: offline transfer to Mac mini
           EOF
 
       - name: Upload source artifact
         uses: actions/upload-artifact@v4
         with:
-          name: space-typing-784986d7-source
+          name: space-typing-fc36b4ce-source
           path: source
           include-hidden-files: true
           if-no-files-found: error
