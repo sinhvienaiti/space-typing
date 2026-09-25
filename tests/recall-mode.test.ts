@@ -55,8 +55,8 @@ describe("Recall Mode contracts", () => {
 
   it("renders hidden slots while keeping typed, hinted and punctuation characters", () => {
     const hints = new Set([3]);
-    expect(recallDisplayMask("ice-cream", 2, hints)).toBe("ic▢-c▢▢▢▢");
-    expect(recallDisplayMask("orbit", 0, new Set())).toBe("▢▢▢▢▢");
+    expect(recallDisplayMask("ice-cream", 2, hints)).toBe("i c _ - c _ _ _ _");
+    expect(recallDisplayMask("orbit", 0, new Set())).toBe("_ _ _ _ _");
   });
 
   it("reveals the next unresolved letter after the typed prefix", () => {
