@@ -653,7 +653,6 @@ kbd {
   color: #567083;
   font-size: 0.52rem;
   font-style: normal;
-  font-weight: 800;
   letter-spacing: 0.14em;
 }
 
@@ -3654,7 +3653,6 @@ kbd {
   background:
     linear-gradient(90deg,transparent calc(100% - 1px),#050e19 0) 0/20% 100%,
     linear-gradient(90deg,#299de5,#796aff 65%,#f49f69);
-  transition: width 100ms linear;
 }
 .player-ultimate .power-fill.ready {
   background:
@@ -3664,7 +3662,6 @@ kbd {
 }
 .player-ultimate kbd {
   grid-column: 2;
-  min-width: 45px;
   font-size: .58rem;
   font-weight: 800;
   color: #d9fcff;
