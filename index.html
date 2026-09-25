@@ -847,10 +847,12 @@
       <div class="settings-section">
         <h3>Kill translation · learning</h3>
         <label class="setting-row">
-          <span><strong>Show after killing a typed word</strong><small>Dedicated strip above the battlefield; independent from English speech</small></span>
+          <span><strong>Learning display</strong><small>Top stays until the next typed kill; kill-position uses a short local fade</small></span>
           <select id="killTranslationEnabled">
-            <option value="true">Enabled</option>
-            <option value="false">Disabled</option>
+            <option value="top">Top banner</option>
+            <option value="kill-position">Killed enemy position</option>
+            <option value="both">Both</option>
+            <option value="off">Off</option>
           </select>
         </label>
         <label class="setting-row">
@@ -876,7 +878,7 @@
           </select>
         </label>
         <label class="setting-row">
-          <span><strong>Display duration</strong><small>0.8–5.0 seconds per word · two pending words maximum</small></span>
+          <span><strong>Kill-position fade</strong><small>0.8–5.0 seconds; top banner does not auto-hide</small></span>
           <span class="setting-control range-control">
             <input id="killTranslationDuration" type="range" min="0.8" max="5" step="0.1" />
             <output id="killTranslationDurationValue">2.4s</output>
