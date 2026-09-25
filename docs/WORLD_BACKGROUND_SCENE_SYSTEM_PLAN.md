@@ -954,3 +954,85 @@ Child validation for the corrective implementation:
 
 Real-browser visual approval remains owner-reviewed because CI cannot judge
 perceptual scene quality.
+
+
+---
+
+## BG14 — Scene composition polish after owner screenshot review
+
+**Trigger**
+
+Owner screenshot review of Stage 002 / World 01 after BG13 still showed a scene
+that felt visually wrong even though the palette was no longer the legacy teal.
+
+Observed problems in the screenshot:
+
+- a wide cyan/purple horizontal band cuts across the enemy area and reads like a
+  UI overlay/fog stripe rather than a believable celestial environment;
+- repeated thin ellipses still look like debug/procedural rings;
+- the lower half is mostly an empty gradient, so the scene lacks foreground /
+  midground / background depth;
+- the major celestial landmark is too weak/abstract to establish a real place;
+- scenery is too centered/symmetrical, making it look generated rather than
+  authored;
+- scene contrast is concentrated behind enemy labels instead of around them.
+
+**Goal**
+
+Make World 01 read as an authored celestial/galaxy battlefield rather than an
+abstract gradient with rings, and apply the same composition rules to the shared
+scene renderer.
+
+**Composition rules**
+
+1. No full-width opaque or semi-opaque horizontal color bands through the active
+   enemy/word-label zone.
+2. No repeated ellipse stack as the dominant depth cue.
+3. Use asymmetric large landmarks in the upper-left/upper-right thirds.
+4. Build depth with three clear layers:
+   - far sky / nebula;
+   - horizon / architecture / cloud mass;
+   - subtle foreground lane or edge vignette.
+5. Keep the central combat corridor visually quiet:
+   - enemy labels and projectiles must remain the strongest elements;
+   - background detail should frame, not cross, active targets.
+6. Avoid centered perfect geometry unless the World specifically calls for it.
+7. Use large soft radial/Bezier masses rather than many thin strokes.
+8. The lower third should contain subtle depth cues, not a flat empty gradient.
+
+**World 01 target**
+
+Rainbow Reach should show:
+
+- deep navy/violet space;
+- one large off-center celestial planet/halo;
+- diagonal cyan-violet-pink nebula ribbon;
+- soft cloud/island silhouettes near the upper horizon, broken into clusters
+  rather than a full-width stripe;
+- two or three very faint converging light-lane strokes in the lower half;
+- no dense stack of horizontal ellipses.
+
+**Implementation**
+
+- replace the current World 01 cloud strip with clustered radial/Bezier masses;
+- replace celestial floor ellipse rings with sparse converging light lanes;
+- move the main halo/planet off center;
+- add soft dark foreground vignette/edge masses for depth;
+- reduce/relocate celestial landmark strokes away from the active target center;
+- keep existing scene caching and bounded dynamic particle budgets.
+
+**Acceptance**
+
+A Stage 002 screenshot should no longer resemble:
+"purple/blue gradient + horizontal fog stripe + ellipse rings".
+
+It should instead read as:
+"celestial/galaxy world with layered depth".
+
+**Validation**
+
+- existing scene registry/cache tests remain green;
+- TypeScript/build pass;
+- no per-frame registry scans;
+- no persistence changes;
+- parent gitlink is updated after child CI passes.
