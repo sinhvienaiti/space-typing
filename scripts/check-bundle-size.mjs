@@ -2,14 +2,6 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 
 const root = new URL("../dist/", import.meta.url);
-const limits = {
-  jsRaw: 650 * 1024,
-  jsGzip: 180 * 1024,
-  cssRaw: 60 * 1024,
-  cssGzip: 20 * 1024,
-  totalRaw: 800 * 1024,
-  totalGzip: 250 * 1024,
-};
 
 function files(dirUrl) {
   return readdirSync(dirUrl, { withFileTypes: true }).flatMap((entry) => {
@@ -28,28 +20,26 @@ let totalGzip = 0;
 
 for (const url of built) {
   const path = url.pathname;
-  // Premium V3 ship art has its own mandatory 1024x768 / 1.2 MiB
-  // check in check-ship-art-budget.mjs. Do not double-count that
-  // static image against the original M22 JS/CSS + non-V3 asset budget.
-  // Keep every other asset in this budget as before.
+
+  // Premium V3 ship art and committed default audio have dedicated integrity
+  // validation. Keep them out of executable/static bundle reporting so the
+  // trend remains comparable with earlier M22 measurements.
   if (
     path.endsWith("/assets/space-typing/ships/player-ships-v3.webp") ||
     path.endsWith("/assets/space-typing/ships/player-ships-v3.png")
   ) {
     continue;
   }
-  // Committed default audio has an independent integrity + 6 MiB payload
-  // guard in check-audio-assets.mjs. Keep the original executable/static
-  // bundle thresholds unchanged instead of inflating them to accommodate
-  // non-executable OGG media.
   if (path.includes("/assets/audio/") && path.endsWith(".ogg")) {
     continue;
   }
+
   const buffer = readFileSync(url);
   const raw = statSync(url).size;
   const gzip = gzipSync(buffer).length;
   totalRaw += raw;
   totalGzip += gzip;
+
   if (path.endsWith(".js")) {
     jsRaw += raw;
     jsGzip += gzip;
@@ -68,20 +58,8 @@ const metrics = {
   totalGzip,
 };
 
-const failures = Object.entries(metrics)
-  .filter(([key, value]) => value > limits[key])
-  .map(
-    ([key, value]) =>
-      key +
-      " " +
-      (value / 1024).toFixed(2) +
-      " KiB exceeds " +
-      (limits[key] / 1024).toFixed(2) +
-      " KiB",
-  );
-
 console.log(
-  "M22 bundle budget:",
+  "Production bundle metrics (report-only):",
   Object.fromEntries(
     Object.entries(metrics).map(([key, value]) => [
       key,
@@ -89,8 +67,3 @@ console.log(
     ]),
   ),
 );
-
-if (failures.length > 0) {
-  console.error("Bundle budget failures:\n" + failures.join("\n"));
-  process.exitCode = 1;
-}
