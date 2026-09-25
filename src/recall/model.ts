@@ -186,7 +186,7 @@ export function recallDisplayMask(
     }
 
     const visible = letterIndex < typedLetters || hints.has(letterIndex);
-    output.push(visible ? char : "▢");
+    output.push(visible ? char : "_");
     letterIndex += 1;
   }
 
