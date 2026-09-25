@@ -91,8 +91,8 @@
           <strong id="energyText">100 / 100</strong>
         </div>
         <div class="player-ultimate">
-          <span id="powerHint" title="Correct typing builds Rage. SPACE at 100% activates your character ultimate and Nova Pulse: removes all visible regular enemies and hostile bullets, and damages an unshielded boss. Bonus targets remain collectible.">Rage · charging</span>
-          <div class="power-track">
+          <span id="powerHint" title="Correct typing fills five 20% Rage segments. SPACE activates your ship signature Rage using all currently filled segments; five segments gives the full ultimate. Nova Bomb remains a separate consumable.">Rage · charging</span>
+          <div id="powerTrack" class="power-track" data-rage-segments="0">
             <div id="powerFill" class="power-fill"></div>
           </div>
           <kbd>SPACE</kbd>
@@ -185,7 +185,7 @@
 
         <div class="hints">
           <span><kbd>ESC</kbd> pause</span>
-          <span><kbd>SPACE</kbd> Nova Pulse + character ultimate at 100% Rage</span>
+          <span><kbd>SPACE</kbd> ship Rage · usable from 1 filled segment · 5/5 = full ultimate</span>
         </div>
       </div>
     </section>
