@@ -12,7 +12,7 @@ jobs:
       - name: Checkout exact Space Typing source
         uses: actions/checkout@v4
         with:
-          ref: 6efa9ce231d1a43e20686db33defbf5839912916
+          ref: 35948ff707559ccec518fea656041399e35c7a8b
           path: source
           fetch-depth: 1
 
@@ -22,15 +22,15 @@ jobs:
           cat > source/OFFLINE_EXPORT_INFO.txt <<'EOF'
           Repository: sinhvienaiti/space-typing
           Branch source: main
-          Commit: 6efa9ce231d1a43e20686db33defbf5839912916
-          Commit message: Polish learning rail, icons, help tooltips and kill feedback
+          Commit: 35948ff707559ccec518fea656041399e35c7a8b
+          Commit message: Replace static size limits with code-quality and runtime rules
           Export purpose: offline transfer to Mac mini
           EOF
 
       - name: Upload source artifact
         uses: actions/upload-artifact@v4
         with:
-          name: space-typing-6efa9ce2-source
+          name: space-typing-35948ff7-source
           path: source
           include-hidden-files: true
           if-no-files-found: error
