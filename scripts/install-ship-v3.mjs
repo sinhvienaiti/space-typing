@@ -20,11 +20,10 @@ if (source === undefined) {
 
 const EXPECTED_SHA256 =
   "fb9434e002d6da650e34192eb425e62d1e2f3bec8804a9b33b7aa8733de10eb3";
-const EXPECTED_BYTES = 800054;
 const raw = readFileSync(resolve(source));
 const digest = createHash("sha256").update(raw).digest("hex");
 
-if (digest !== EXPECTED_SHA256 || raw.length !== EXPECTED_BYTES) {
+if (digest !== EXPECTED_SHA256) {
   throw new Error(
     "Ship V3 atlas does not match the reviewed generated art package. " +
       "Do not install or register an unknown/modified image without reviewing it.",
@@ -69,6 +68,6 @@ writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
 
 console.log(
   "Ship V3 installed: 11 generated ships, 1024x768, " +
-    String(EXPECTED_BYTES) +
-    " bytes. Run pnpm build to enforce the atlas and bundle budgets.",
+    String(raw.length) +
+    " reviewed bytes. Run pnpm build to validate the atlas integrity.",
 );
