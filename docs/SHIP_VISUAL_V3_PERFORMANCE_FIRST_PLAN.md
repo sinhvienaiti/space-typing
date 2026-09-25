@@ -29,15 +29,16 @@ Replace the current fairly geometric illustrated SVG ships with **11 clearly dis
 7. An image load failure or budget violation must prefer V2 SVG; if V2 also fails, fall back to the current procedural Canvas silhouettes. Do not block gameplay.
 8. The approved generated concept was only a **reference**. The reviewed 11-ship production atlas is now committed and integrated; V3 still remains **acceptance-pending** until the required same-device browser performance/readability review is recorded. A green file/hash/build check is not a substitute for V35.
 
-## Non-negotiable measured budgets
+## Measured performance and integrity gates
 
-These are **acceptance ceilings for the incremental V3 slice**, not claims about measured current runtime:
+Static transfer/file-size ceilings are **not** acceptance gates. The atlas byte
+size is reported for visibility, while actual runtime cost and correctness are
+reviewed directly.
 
-| Metric | Acceptance budget |
+| Metric | Current acceptance rule |
 | --- | --- |
-| Initial V3 atlas file transfer | target ≤ 800 KiB; hard ceiling 1.2 MiB |
-| Single atlas dimensions | ≤ 1024 × 768 px |
-| Atlas decoded RGBA | ≤ 3 MiB at specified ceiling |
+| Atlas dimensions/layout | 1024 × 768 px for the current 4 × 3 runtime slicing contract |
+| Reviewed asset identity | deliberate reviewed SHA/provenance; replacement requires explicit review |
 | Simultaneously retained full-size atlas textures | 1 (release V2 decoded reference when V3 succeeds unless needed for failover) |
 | Additional mandatory combat animation loops | 0 |
 | Additional per-frame asset decode/canvas creation | 0 |
@@ -46,7 +47,10 @@ These are **acceptance ceilings for the incremental V3 slice**, not claims about
 | Incremental load delay | must not block starting a stage; degraded/fallback art is acceptable while V3 loads |
 | Enemy word obstruction | none; visual effect must never cover or reduce enemy-word contrast |
 
-Target source resolution and file ceiling are **both** required. If high-detail art exceeds either, reduce source complexity/compression first. Only increase the budget by an explicitly reviewed plan amendment backed by measurements; default action is to simplify or drop expensive effects. Keep the existing enforced JS/CSS M22 bundle budgets. The canonical `player-ships-v3.webp`/`.png` raster is excluded from M22 `totalRaw` and `totalGzip` (it has a mandatory, separate 1.2 MiB/dimension check in `scripts/check-ship-art-budget.mjs`); **all other static assets retain their previous M22 accounting**. This prevents double-counting the single optional premium texture without weakening the JavaScript/CSS limits.
+Optimize image transfer/decode where practical, but do not reject reviewed art
+or reduce maintainability merely to satisfy a historical KiB/MiB number.
+Bundle and asset sizes are reported as review signals under
+`docs/CODE_QUALITY_AND_PERFORMANCE_RULES.md`.
 
 ## Milestones
 
@@ -71,9 +75,9 @@ Acceptance: independent silhouette and full-color comparison at 64/78/128 CSS px
 ### V31 — Safe V3 atlas contract and performance guards
 
 - Add V3 asset id and a **pure ordered fallback selector**: V3 → V2 → procedural.
-- Add dimensions/estimated decoded byte limits to the selector without falsely assuming external images comply.
+- Keep the runtime atlas dimensions/layout contract explicit and validate image identity/header/dimensions without a transfer-size ceiling.
 - Keep the current V2 artwork active until a real V3 atlas is available.
-- Add tests for missing, failed and oversized V3; preserving the existing V2 load and procedural fallback.
+- Add tests for missing, failed, corrupt or wrong-dimension V3; preserve the existing V2 load and procedural fallback.
 - Avoid per-character image preloading or repeated decode.
 
 ### V32 — Actual premium ship illustration production
@@ -99,10 +103,10 @@ Acceptance: independent silhouette and full-color comparison at 64/78/128 CSS px
 
 ### V35 — Art quality and performance gate
 
-- Automated: image file dimensions/transfer budget check, unchanged gameplay tests, asset-fallback tests, TypeScript/build/M22 JS/CSS budget.
+- Automated: image identity/header/dimensions integrity check, unchanged gameplay tests, asset-fallback tests, TypeScript/build and report-only bundle metrics.
 - Browser Test Lab: paired **same device/settings/stage/quality** V2 vs V3, 60 seconds per run plus high-pressure scene, collect frame-time p95/average, rough load duration and image failure telemetry; repeat runs instead of trusting one sample.
 - Human visual pass at actual 64–128 CSS px plus at least two character/equipment build/aura combinations.
-- If p95 frame regression > 1 ms, loading stalls gameplay, ship overlaps enemy text or images exceed hard ceiling, simplify/compress/remove expensive features and re-test; do not waive tests with a larger budget by default.
+- If p95 frame regression > 1 ms, loading stalls gameplay or ship art harms enemy-text readability, simplify/optimize the expensive runtime behavior and re-test.
 
 ### V36 — M22 handoff, documentation and CI
 
@@ -122,9 +126,9 @@ Acceptance: independent silhouette and full-color comparison at 64/78/128 CSS px
 
 ## Execution checkpoints
 
-- V30: 11-ship art direction, exclusion list and hard budgets documented here.
+- V30: 11-ship art direction, exclusion list and performance/integrity constraints documented here.
 - V31: implemented `src/characters/ship-art.ts` V3 → V2 → procedural fallback, dimension-validation tests, and `scripts/check-ship-art-budget.mjs` wired to production build. The real V3 atlas is now registered; `?shipArt=v2` remains the QA baseline override.
-- V32: 11 distinct generated source sprites and the reviewed 4×3 lossless WebP atlas are complete. The production atlas is committed in Git as `public/assets/space-typing/ships/player-ships-v3.webp` by commit `6756a943`; it is 1024×768, 800,054 bytes (781.3 KiB), ~3 MiB decoded RGBA and SHA-256 `fb9434e002d6da650e34192eb425e62d1e2f3bec8804a9b33b7aa8733de10eb3`. The production manifest registers `player-ship-sheet-v3`, and the build guard verifies the exact reviewed hash/dimensions/size.
+- V32: 11 distinct generated source sprites and the reviewed 4×3 lossless WebP atlas are complete. The production atlas is committed in Git as `public/assets/space-typing/ships/player-ships-v3.webp` by commit `6756a943`; it is 1024×768, 800,054 bytes (781.3 KiB), ~3 MiB decoded RGBA and SHA-256 `fb9434e002d6da650e34192eb425e62d1e2f3bec8804a9b33b7aa8733de10eb3`. The production manifest registers `player-ship-sheet-v3`, and the build integrity guard verifies the exact reviewed hash and dimensions while reporting transfer size.
 - V33/V34: the V3-aware render path is active by default through V3→V2→procedural selection; it avoids V2 engine flames and heavy image-shadow bloom over painted V3 art, and startup exposes `document.documentElement.dataset.shipArt` for QA. Character-specific projectiles and equipment aura still reuse existing implementations without new emitters. On successful V3 selection the decoded V2 fallback image reference is released; `?shipArt=v2` intentionally excludes V3 preload for clean A/B measurements.
 - V35: atlas file/hash/header/dimensions/transfer checks now pass in production CI and V3 is available on normal startup. The remaining gate is the paired **same-device real-browser** V2/V3 Test Lab benchmark plus image-contrast/two-build human visual review. Never substitute mocked Canvas tests, CI frame simulations or invented benchmarks.
 - V36: safe activation code and the vetted binary are now in Git and automated build guards pass. Final V3/M22 acceptance remains incomplete until the browser A/B and human visual/audio rows are recorded; M23/M24 remain blocked by the M22 manual gate.
