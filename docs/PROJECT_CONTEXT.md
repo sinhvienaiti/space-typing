@@ -442,6 +442,21 @@ There is no separate setting that enables these backgrounds. Visual Quality only
 changes detail budgets; it must not collapse different Worlds back into one
 generic grid.
 
+Current Galaxy production rule after owner visual QA:
+
+- source/curate the sky **and** visible environmental objects;
+- do not ship large procedural polygon asteroids or debug-like line streaks as
+  final Galaxy art;
+- use a quiet base sky plus restrained nebula so typing remains dominant;
+- planets/suns must use sufficiently detailed source art at their displayed
+  scale;
+- meteor/asteroid sprites use multiple far/mid/near depth bands with smooth
+  wrap/fade and depth-scaled motion;
+- prefer established coherent CC0 packs and record provenance in
+  `docs/THIRD_PARTY_BACKGROUND_ASSETS.md`;
+- a licensed asset can still be rejected for poor style, resolution or gameplay
+  readability.
+
 ## 4.3 Per-key feel
 
 Every correct key:
