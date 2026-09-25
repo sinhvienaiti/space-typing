@@ -48,7 +48,32 @@ The target is:
 
 ---
 
-## 2. Hybrid rendering model
+## 2. Asset sourcing policy
+
+Before drawing or generating a new scenic asset, search established game-art
+sources for a suitable asset with a verified permissive license.
+
+Preferred sources include:
+
+- OpenGameArt items explicitly marked CC0;
+- Kenney CC0 packs;
+- other repositories/packs with explicit CC0/public-domain licensing;
+- NASA/SVS material only when the specific item and usage terms are verified.
+
+Workflow:
+
+1. search;
+2. verify the exact asset license;
+3. preview visual/style fit;
+4. vendor the original local file;
+5. record provenance in `docs/THIRD_PARTY_BACKGROUND_ASSETS.md`;
+6. integrate it into the layer registry;
+7. create custom art only when sourced assets cannot meet the requirement.
+
+Do not create low-detail replacement art merely because it is faster if a
+higher-quality permissive source already exists.
+
+## 4. Hybrid rendering model
 
 The production background is a hybrid of:
 
@@ -86,7 +111,7 @@ Procedural drawing must not be responsible for the primary scenic identity.
 
 ---
 
-## 3. Layer model
+## 4. Layer model
 
 ### Layer 0 — base sky image
 Large cover image defining the main color/texture language.
@@ -119,7 +144,7 @@ Each layer has:
 
 ---
 
-## 4. Motion / parallax contract
+## 5. Motion / parallax contract
 
 Normalized depth:
 
@@ -142,7 +167,7 @@ forward travel.
 
 ---
 
-## 5. Asset family requirements
+## 6. Asset family requirements
 
 ### Galaxy / Deep Space
 
@@ -286,7 +311,7 @@ Motion:
 
 ---
 
-## 6. Asset packaging
+## 7. Asset packaging
 
 Canonical path:
 
@@ -316,7 +341,7 @@ WebP is preferred later for:
 
 ---
 
-## 7. Runtime architecture
+## 8. Runtime architecture
 
 Add:
 
@@ -349,7 +374,7 @@ Responsibilities:
 
 ---
 
-## 8. Combat-readability rules
+## 9. Combat-readability rules
 
 1. Primary landmarks prefer screen thirds instead of dead center.
 2. Large near objects avoid the upper-middle word-label zone.
@@ -360,7 +385,7 @@ Responsibilities:
 
 ---
 
-## 9. Implementation tasks
+## 10. Implementation tasks
 
 ### LB00 — Commit this spec
 No runtime behavior changes.
@@ -433,7 +458,7 @@ Update `sinhvienaiti/typing-game` gitlink after child CI succeeds.
 
 ---
 
-## 10. Galaxy acceptance target
+## 11. Galaxy acceptance target
 
 World 01 must contain, at minimum:
 
@@ -460,7 +485,7 @@ Failure conditions:
 
 ---
 
-## 11. Definition of done
+## 12. Definition of done
 
 The layered asset system is complete when:
 
