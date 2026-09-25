@@ -816,7 +816,9 @@ function installMenuHelp(): void {
     parent.insertBefore(wrap, action);
     wrap.append(action, trigger, tip);
     wrappers.push(wrap);
-    action.title = description; // Native fallback if the tooltip is unavailable.
+    // The dedicated info trigger owns help. Avoid a second native tooltip on
+    // the action text itself, which otherwise produces duplicate hover UI.
+    action.removeAttribute("title");
   }
 
   document.addEventListener("click", (event) => {
