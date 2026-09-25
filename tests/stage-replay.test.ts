@@ -26,11 +26,20 @@ describe("Stage Clear replay targets the completed stage", () => {
     expect(replay.clearedStages).toEqual(cleared.clearedStages);
   });
 
-  it("cannot use replay to skip a future stage or bypass rollback ceiling", () => {
-    const progress = { ...createDefaultCampaignProgress(), highestUnlockedStage: 5, selectedStage: 5 };
+  it("cannot replay an uncleared future stage but ignores legacy checkpoint ceilings", () => {
+    const progress = {
+      ...createDefaultCampaignProgress(),
+      highestUnlockedStage: 6,
+      selectedStage: 6,
+      clearedStages: [1, 2, 3, 4, 5],
+    };
     const segment = createCampaignExpansionState(progress);
     expect(selectCompletedStageForReplay(progress, segment, 6)).toEqual(progress);
+
     const restored = rollbackCampaignExpansion(segment, "2026-01-01");
-    expect(selectCompletedStageForReplay(progress, restored, 5)).toEqual(progress);
+    const replay = selectCompletedStageForReplay(progress, restored, 5);
+    expect(replay.selectedStage).toBe(5);
+    expect(replay.highestUnlockedStage).toBe(6);
+    expect(replay.clearedStages).toEqual(progress.clearedStages);
   });
 });
