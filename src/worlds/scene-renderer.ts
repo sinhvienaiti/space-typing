@@ -52,6 +52,390 @@ function stringSeed(value: string): number {
   return hash >>> 0;
 }
 
+type SceneSkyPalette = {
+  top: string;
+  mid: string;
+  horizon: string;
+  edge: string;
+  glowA: string;
+  glowB: string;
+  glowC: string;
+};
+
+function sceneSkyPalette(profile: WorldSceneProfile): SceneSkyPalette {
+  switch (profile.archetype) {
+    case "celestial-rainbow":
+      return {
+        top: "#071126",
+        mid: "#172451",
+        horizon: "#302454",
+        edge: "#030610",
+        glowA: "#66e7ff",
+        glowB: "#a57cff",
+        glowC: profile.variant % 2 === 0 ? "#ffd27a" : "#ff78c8",
+      };
+    case "infernal":
+      return {
+        top: "#170609",
+        mid: "#351014",
+        horizon: "#681f12",
+        edge: "#050203",
+        glowA: "#ff4c2f",
+        glowB: "#ff9a32",
+        glowC: "#b3132f",
+      };
+    case "frost-prism":
+      return {
+        top: "#06101d",
+        mid: "#0d2e4c",
+        horizon: "#165b72",
+        edge: "#02060b",
+        glowA: "#77eaff",
+        glowB: "#87a7ff",
+        glowC: "#d8fbff",
+      };
+    case "verdant":
+      return {
+        top: "#06140f",
+        mid: "#103526",
+        horizon: "#1f5c37",
+        edge: "#020805",
+        glowA: "#7dffb0",
+        glowB: "#4fd3a2",
+        glowC: "#d6ff8e",
+      };
+    case "shadow-nature":
+      return {
+        top: "#080612",
+        mid: "#171027",
+        horizon: "#25153a",
+        edge: "#020205",
+        glowA: "#7c53c9",
+        glowB: "#b35fff",
+        glowC: "#3a214f",
+      };
+    case "cosmic-forge":
+      return {
+        top: "#071021",
+        mid: "#152445",
+        horizon: "#263e61",
+        edge: "#02040b",
+        glowA: "#6bc5ff",
+        glowB: "#8a7dff",
+        glowC: "#ffbf5c",
+      };
+    case "abyssal":
+      return {
+        top: "#050308",
+        mid: "#100716",
+        horizon: "#25102c",
+        edge: "#010102",
+        glowA: "#bd55ff",
+        glowB: "#ff4d87",
+        glowC: "#4a1a61",
+      };
+    case "aurora-cosmic":
+      return {
+        top: "#04111d",
+        mid: "#0b3453",
+        horizon: "#174f6e",
+        edge: "#02060b",
+        glowA: "#5ef2d6",
+        glowB: "#67a8ff",
+        glowC: "#c77bff",
+      };
+    case "void-cathedral":
+      return {
+        top: "#070713",
+        mid: "#17172a",
+        horizon: "#292543",
+        edge: "#020207",
+        glowA: "#d5d2ff",
+        glowB: "#9888ff",
+        glowC: "#7f6bbd",
+      };
+    case "eternity":
+    default:
+      return {
+        top: "#08071a",
+        mid: "#1a1742",
+        horizon: "#37255e",
+        edge: "#020207",
+        glowA: "#72ecff",
+        glowB: "#c27dff",
+        glowC: "#ff7fc6",
+      };
+  }
+}
+
+function drawHorizonGlow(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  color: string,
+  alpha: number,
+): void {
+  const gradient = context.createLinearGradient(0, height * 0.06, 0, height * 0.62);
+  gradient.addColorStop(0, "rgba(0,0,0,0)");
+  gradient.addColorStop(0.55, color);
+  gradient.addColorStop(1, "rgba(0,0,0,0)");
+  context.save();
+  context.globalAlpha = alpha;
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, width, height * 0.72);
+  context.restore();
+}
+
+function drawCelestialCloudMass(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  palette: SceneSkyPalette,
+  variant: number,
+): void {
+  context.save();
+  context.globalAlpha = 0.11;
+  context.fillStyle = palette.glowA;
+  const baseY = height * (0.22 + variant * 0.006);
+  for (let index = 0; index < 9; index += 1) {
+    const x = width * (0.02 + index * 0.125);
+    const y = baseY + Math.sin(index * 1.45 + variant) * height * 0.012;
+    context.beginPath();
+    context.ellipse(
+      x,
+      y,
+      width * (0.09 + (index % 3) * 0.015),
+      height * (0.025 + (index % 2) * 0.01),
+      0,
+      0,
+      TAU,
+    );
+    context.fill();
+  }
+  context.globalAlpha = 0.08;
+  context.fillStyle = palette.glowC;
+  for (let index = 0; index < 6; index += 1) {
+    const x = width * (0.08 + index * 0.18);
+    context.beginPath();
+    context.ellipse(
+      x,
+      baseY + height * 0.055,
+      width * 0.12,
+      height * 0.035,
+      0,
+      0,
+      TAU,
+    );
+    context.fill();
+  }
+  context.restore();
+}
+
+function drawArchetypeBackdrop(
+  context: CanvasRenderingContext2D,
+  input: WorldSceneDrawInput,
+  palette: SceneSkyPalette,
+): void {
+  const { width, height, profile } = input;
+  const horizon = height * profile.horizonRatio;
+
+  context.save();
+
+  if (profile.archetype === "celestial-rainbow") {
+    drawCelestialCloudMass(context, width, height, palette, profile.variant);
+    const centerX = width * (0.56 + (profile.variant - 3) * 0.018);
+    const centerY = height * 0.16;
+    context.globalAlpha = 0.22;
+    context.strokeStyle = palette.glowC;
+    context.lineWidth = Math.max(2, width * 0.0024);
+    context.beginPath();
+    context.arc(centerX, centerY, Math.min(width, height) * 0.082, 0, TAU);
+    context.stroke();
+    context.globalAlpha = 0.09;
+    context.fillStyle = palette.glowB;
+    context.beginPath();
+    context.arc(
+      centerX,
+      centerY,
+      Math.min(width, height) * 0.052,
+      0,
+      TAU,
+    );
+    context.fill();
+
+    const rainbow = context.createLinearGradient(
+      width * 0.18,
+      height * 0.08,
+      width * 0.82,
+      height * 0.32,
+    );
+    rainbow.addColorStop(0, "rgba(74, 220, 255, 0)");
+    rainbow.addColorStop(0.2, "rgba(74, 220, 255, 0.13)");
+    rainbow.addColorStop(0.48, "rgba(151, 104, 255, 0.12)");
+    rainbow.addColorStop(0.72, "rgba(255, 103, 193, 0.11)");
+    rainbow.addColorStop(1, "rgba(255, 211, 122, 0)");
+    context.globalAlpha = 1;
+    context.fillStyle = rainbow;
+    context.beginPath();
+    context.moveTo(width * 0.12, height * 0.05);
+    context.bezierCurveTo(
+      width * 0.32,
+      height * 0.12,
+      width * 0.54,
+      height * 0.28,
+      width * 0.88,
+      height * 0.2,
+    );
+    context.lineTo(width * 0.9, height * 0.29);
+    context.bezierCurveTo(
+      width * 0.58,
+      height * 0.36,
+      width * 0.33,
+      height * 0.2,
+      width * 0.1,
+      height * 0.12,
+    );
+    context.closePath();
+    context.fill();
+  } else if (profile.archetype === "infernal") {
+    context.globalAlpha = 0.22;
+    context.fillStyle = palette.glowB;
+    context.fillRect(0, horizon * 0.72, width, height * 0.055);
+    context.globalAlpha = 0.24;
+    context.fillStyle = "#130204";
+    context.beginPath();
+    context.moveTo(0, horizon);
+    for (let index = 0; index <= 10; index += 1) {
+      const x = width * (index / 10);
+      const peak = height * (0.025 + ((index * 7 + profile.variant) % 4) * 0.028);
+      context.lineTo(x, horizon - peak);
+    }
+    context.lineTo(width, horizon + height * 0.06);
+    context.lineTo(0, horizon + height * 0.06);
+    context.closePath();
+    context.fill();
+  } else if (profile.archetype === "frost-prism") {
+    context.globalAlpha = 0.16;
+    context.fillStyle = palette.glowA;
+    context.fillRect(0, horizon, width, height * 0.04);
+    context.globalAlpha = 0.1;
+    context.fillStyle = "#bff6ff";
+    for (let index = 0; index < 9; index += 1) {
+      const x = width * (0.03 + index * 0.12);
+      const h = height * (0.035 + (index % 4) * 0.018);
+      context.beginPath();
+      context.moveTo(x - width * 0.018, horizon);
+      context.lineTo(x, horizon - h);
+      context.lineTo(x + width * 0.018, horizon);
+      context.closePath();
+      context.fill();
+    }
+  } else if (profile.archetype === "verdant") {
+    context.globalAlpha = 0.18;
+    context.fillStyle = "#05140d";
+    for (let index = 0; index < 11; index += 1) {
+      const x = width * (index / 10);
+      const r = width * (0.05 + (index % 3) * 0.012);
+      context.beginPath();
+      context.arc(x, horizon - height * 0.02, r, 0, TAU);
+      context.fill();
+    }
+    context.globalAlpha = 0.13;
+    context.fillStyle = palette.glowC;
+    context.fillRect(0, horizon * 0.96, width, height * 0.028);
+  } else if (profile.archetype === "shadow-nature") {
+    context.globalAlpha = 0.22;
+    context.fillStyle = "#020105";
+    context.beginPath();
+    context.arc(
+      width * (0.52 + (profile.variant - 3) * 0.025),
+      height * 0.145,
+      Math.min(width, height) * 0.075,
+      0,
+      TAU,
+    );
+    context.fill();
+    context.globalAlpha = 0.12;
+    context.fillStyle = palette.glowB;
+    context.fillRect(0, horizon * 0.88, width, height * 0.035);
+  } else if (profile.archetype === "cosmic-forge") {
+    context.globalAlpha = 0.16;
+    context.fillStyle = "#080d18";
+    const towerCount = 8;
+    for (let index = 0; index < towerCount; index += 1) {
+      const x = width * (0.03 + index * 0.135);
+      const h = height * (0.06 + (index % 4) * 0.028);
+      context.fillRect(x, horizon - h, width * 0.055, h);
+    }
+    context.globalAlpha = 0.17;
+    context.strokeStyle = palette.glowC;
+    context.lineWidth = Math.max(2, width * 0.002);
+    context.beginPath();
+    context.arc(width * 0.5, horizon * 0.76, width * 0.09, 0, TAU);
+    context.stroke();
+  } else if (profile.archetype === "abyssal") {
+    context.globalAlpha = 0.3;
+    context.fillStyle = "#000";
+    context.beginPath();
+    context.arc(width * 0.5, height * 0.15, Math.min(width, height) * 0.085, 0, TAU);
+    context.fill();
+    context.globalAlpha = 0.11;
+    context.strokeStyle = palette.glowA;
+    context.lineWidth = Math.max(2, width * 0.002);
+    context.beginPath();
+    context.arc(width * 0.5, height * 0.15, Math.min(width, height) * 0.112, 0, TAU);
+    context.stroke();
+  } else if (profile.archetype === "aurora-cosmic") {
+    context.globalAlpha = 0.14;
+    context.strokeStyle = palette.glowA;
+    context.lineWidth = Math.max(5, height * 0.01);
+    for (let band = 0; band < 3; band += 1) {
+      context.beginPath();
+      context.moveTo(0, height * (0.08 + band * 0.03));
+      for (let step = 1; step <= 8; step += 1) {
+        const x = width * (step / 8);
+        const y =
+          height * (0.08 + band * 0.03) +
+          Math.sin(step * 0.9 + band + profile.variant) * height * 0.025;
+        context.lineTo(x, y);
+      }
+      context.stroke();
+    }
+  } else if (profile.archetype === "void-cathedral") {
+    context.globalAlpha = 0.2;
+    context.fillStyle = "#060611";
+    for (const side of [-1, 1]) {
+      const x = width * 0.5 + side * width * 0.2;
+      context.fillRect(x - width * 0.018, horizon - height * 0.18, width * 0.036, height * 0.18);
+    }
+    context.globalAlpha = 0.12;
+    context.strokeStyle = palette.glowA;
+    context.lineWidth = Math.max(2, width * 0.002);
+    context.beginPath();
+    context.ellipse(width * 0.5, horizon - height * 0.04, width * 0.17, height * 0.14, 0, Math.PI, TAU);
+    context.stroke();
+  } else {
+    context.globalAlpha = 0.14;
+    context.strokeStyle = palette.glowB;
+    context.lineWidth = Math.max(3, width * 0.0025);
+    for (let index = 0; index < 3; index += 1) {
+      context.beginPath();
+      context.ellipse(
+        width * 0.5,
+        height * (0.12 + index * 0.025),
+        width * (0.11 + index * 0.055),
+        height * (0.026 + index * 0.012),
+        index * 0.3,
+        0,
+        TAU,
+      );
+      context.stroke();
+    }
+  }
+
+  context.restore();
+}
+
 export function worldSceneCacheKey(
   profile: WorldSceneProfile,
   width: number,
@@ -103,35 +487,51 @@ function drawBaseSky(
 ): void {
   const { width, height, environment, profile, quality } = input;
   const budget = sceneQualityBudget(quality);
-  const gradient = context.createRadialGradient(
-    width * 0.5,
-    height * 0.68,
-    Math.min(width, height) * 0.05,
-    width * 0.5,
-    height * 0.44,
-    Math.max(width, height) * 0.9,
-  );
-  gradient.addColorStop(0, environment.backgroundCore);
-  gradient.addColorStop(0.48, environment.backgroundMid);
-  gradient.addColorStop(1, environment.backgroundEdge);
+  const palette = sceneSkyPalette(profile);
+
+  const gradient = context.createLinearGradient(0, 0, 0, height);
+  gradient.addColorStop(0, palette.top);
+  gradient.addColorStop(0.48, palette.mid);
+  gradient.addColorStop(0.72, palette.horizon);
+  gradient.addColorStop(1, palette.edge);
   context.fillStyle = gradient;
   context.fillRect(0, 0, width, height);
 
-  for (let index = 0; index < budget.farDetails; index += 1) {
-    const x = width * (0.08 + seededUnit(profile.seed, index, 1) * 0.84);
-    const y = height * (0.08 + seededUnit(profile.seed, index, 2) * 0.48);
+  drawHorizonGlow(
+    context,
+    width,
+    height,
+    palette.glowA,
+    profile.archetype === "celestial-rainbow" ? 0.13 : 0.085,
+  );
+
+  const glowColors = [palette.glowA, palette.glowB, palette.glowC] as const;
+  for (let index = 0; index < budget.farDetails + 2; index += 1) {
+    const x = width * (0.06 + seededUnit(profile.seed, index, 1) * 0.88);
+    const y = height * (0.05 + seededUnit(profile.seed, index, 2) * 0.42);
     const radius =
       Math.min(width, height) *
-      (0.2 + seededUnit(profile.seed, index, 3) * 0.3);
+      (0.18 + seededUnit(profile.seed, index, 3) * 0.3);
     drawNebulaGlow(
       context,
       x,
       y,
       radius,
-      rgba(environment.hazeRgb, 0.42),
-      0.045 + index * 0.012,
+      glowColors[index % glowColors.length]!,
+      0.055 + index * 0.012,
     );
   }
+
+  drawNebulaGlow(
+    context,
+    width * 0.5,
+    height * 0.28,
+    Math.min(width, height) * 0.58,
+    rgba(environment.hazeRgb, 0.72),
+    0.045,
+  );
+
+  drawArchetypeBackdrop(context, input, palette);
 }
 
 function drawCelestialLandmarks(
@@ -1078,10 +1478,10 @@ function drawCelestialFloor(
   const { width, height, time, profile, environment } = input;
   const horizon = height * profile.horizonRatio;
   context.save();
-  context.strokeStyle = rgba(environment.gridRgb, 0.09);
-  context.lineWidth = 1.2;
-  const offset = (time * 26) % 60;
-  for (let index = 0; index < 9; index += 1) {
+  context.strokeStyle = rgba(environment.gridRgb, 0.045);
+  context.lineWidth = 1;
+  const offset = (time * 22) % 70;
+  for (let index = 0; index < 6; index += 1) {
     const y = perspectiveY(horizon, height, index, offset, 72);
     const p = (y - horizon) / Math.max(1, height - horizon);
     context.beginPath();
