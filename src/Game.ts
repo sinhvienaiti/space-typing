@@ -9006,7 +9006,7 @@ export class Game {
     const context = this.context;
     const x = enemy.x;
     const y = enemy.y - kick;
-    const radius = Math.max(24, enemy.radius * 0.95);
+    const radius = Math.max(22, enemy.radius * 0.9);
     const glow = qualityProfile(this.settings.visualQuality).glowScale;
 
     context.save();
@@ -9025,37 +9025,43 @@ export class Game {
       0,
       radius,
     );
-    orb.addColorStop(0, "rgba(42, 83, 94, 0.16)");
-    orb.addColorStop(0.55, "rgba(11, 35, 45, 0.34)");
-    orb.addColorStop(1, "rgba(3, 18, 27, 0.5)");
+    orb.addColorStop(0, "rgba(21, 48, 57, 0.08)");
+    orb.addColorStop(0.52, "rgba(7, 25, 33, 0.26)");
+    orb.addColorStop(1, "rgba(1, 10, 16, 0.42)");
     context.fillStyle = orb;
     context.strokeStyle = targeted
-      ? "rgba(82, 211, 230, 0.5)"
-      : "rgba(69, 167, 188, 0.34)";
-    context.lineWidth = targeted ? 1.35 : 1.05;
-    context.shadowBlur = targeted ? 7 * glow : 3 * glow;
-    context.shadowColor = "rgba(71, 215, 235, 0.34)";
+      ? "rgba(82, 211, 230, 0.24)"
+      : "rgba(69, 167, 188, 0.14)";
+    context.lineWidth = targeted ? 0.95 : 0.75;
+    context.shadowBlur = targeted ? 3 * glow : 1.5 * glow;
+    context.shadowColor = "rgba(71, 215, 235, 0.2)";
     context.beginPath();
     context.arc(0, 0, radius, 0, Math.PI * 2);
     context.fill();
     context.stroke();
     context.shadowBlur = 0;
 
-    // Faint segmented halo around the body. The old reference shows this as
-    // small cyan fragments, strongest around the lower half.
+    // The classic reference does not show a clean full halo. Keep only faint,
+    // broken tracking fragments, weighted toward the sides and lower half.
     context.save();
-    context.globalAlpha = targeted ? 0.42 : 0.28;
-    context.strokeStyle = "rgba(80, 200, 218, 0.64)";
-    context.lineWidth = 2;
-    context.setLineDash([2.4, 7.2]);
-    context.lineDashOffset = -enemy.age * 5;
-    context.beginPath();
-    context.arc(0, 0, radius * 1.23, 0, Math.PI * 2);
-    context.stroke();
+    context.globalAlpha = targeted ? 0.34 : 0.2;
+    context.strokeStyle = "rgba(80, 200, 218, 0.52)";
+    context.lineWidth = 1.45;
+    context.setLineDash([2, 8]);
+    context.lineDashOffset = -enemy.age * 3.5;
+    for (const [from, to] of [
+      [Math.PI * 0.08, Math.PI * 0.42],
+      [Math.PI * 0.62, Math.PI * 0.92],
+      [Math.PI * 1.08, Math.PI * 1.9],
+    ] as const) {
+      context.beginPath();
+      context.arc(0, 0, radius * 1.2, from, to);
+      context.stroke();
+    }
     context.restore();
 
-    const nodeY = -radius * 0.93;
-    const nodeX = radius * 0.7;
+    const nodeY = -radius * 0.8;
+    const nodeX = radius * 0.72;
 
     // Very light connector stems under the two old feather nodes.
     context.strokeStyle = "rgba(76, 181, 197, 0.2)";
@@ -9076,14 +9082,14 @@ export class Game {
       context.scale(direction, 1);
       context.rotate(-0.04);
 
-      context.fillStyle = "rgba(220, 240, 245, 0.9)";
-      context.strokeStyle = "rgba(255, 232, 139, 0.92)";
-      context.lineWidth = 1.35;
-      context.shadowBlur = 7 * glow;
+      context.fillStyle = "rgba(235, 243, 226, 0.94)";
+      context.strokeStyle = "rgba(246, 218, 126, 0.86)";
+      context.lineWidth = 1.1;
+      context.shadowBlur = 5 * glow;
       context.shadowColor = "rgba(255, 225, 120, 0.38)";
 
-      const width = radius * 0.58;
-      const height = radius * 0.24;
+      const width = radius * 0.68;
+      const height = radius * 0.28;
       context.beginPath();
       context.moveTo(-width * 0.48, height * 0.08);
       context.quadraticCurveTo(
@@ -9123,13 +9129,13 @@ export class Game {
     drawMemoryWing(nodeX, 1);
 
     // Four compact corner brackets, matching the old Recall lock-on frame.
-    const frame = radius * 1.2;
-    const arm = radius * 0.24;
+    const frame = radius * 1.15;
+    const arm = radius * 0.19;
     context.strokeStyle = targeted
-      ? "rgba(83, 226, 242, 0.78)"
-      : "rgba(66, 179, 199, 0.5)";
-    context.lineWidth = 1.35;
-    context.shadowBlur = targeted ? 5 * glow : 0;
+      ? "rgba(83, 226, 242, 0.58)"
+      : "rgba(66, 179, 199, 0.36)";
+    context.lineWidth = 1.05;
+    context.shadowBlur = targeted ? 2.5 * glow : 0;
     context.shadowColor = "rgba(81, 225, 242, 0.52)";
     context.beginPath();
     for (const sx of [-1, 1] as const) {
@@ -9144,28 +9150,20 @@ export class Game {
     context.stroke();
     context.shadowBlur = 0;
 
-    // Sparse particles from the old reference, kept subtle and deterministic.
-    const sparklePhase = enemy.age * 0.65;
-    for (let index = 0; index < 3; index += 1) {
-      const angle = sparklePhase + index * 2.25;
-      const distance = radius * (1.05 + index * 0.16);
-      const sx = Math.cos(angle) * distance;
-      const sy = Math.sin(angle) * distance * 0.58 + radius * 0.12;
-      context.globalAlpha = 0.28 + index * 0.08;
-      context.fillStyle =
-        index === 1
-          ? "rgba(255, 238, 157, 0.84)"
-          : "rgba(95, 215, 229, 0.7)";
-      context.beginPath();
-      context.arc(
-        sx,
-        sy,
-        Math.max(1.1, radius * (index === 1 ? 0.055 : 0.04)),
-        0,
-        Math.PI * 2,
-      );
-      context.fill();
-    }
+    // A single dim tracer keeps the old ghost-like feel without making the
+    // target read as a polished Combat orb.
+    const tracerAngle = enemy.age * 0.42 + Math.PI * 0.72;
+    context.globalAlpha = 0.24;
+    context.fillStyle = "rgba(83, 199, 214, 0.66)";
+    context.beginPath();
+    context.arc(
+      Math.cos(tracerAngle) * radius * 1.12,
+      Math.sin(tracerAngle) * radius * 0.68 + radius * 0.12,
+      Math.max(1, radius * 0.038),
+      0,
+      Math.PI * 2,
+    );
+    context.fill();
 
     if (enemy.flash > 0) {
       context.globalAlpha = Math.min(0.32, enemy.flash);
