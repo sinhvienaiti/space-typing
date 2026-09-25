@@ -9030,10 +9030,10 @@ export class Game {
     orb.addColorStop(1, "rgba(1, 10, 16, 0.42)");
     context.fillStyle = orb;
     context.strokeStyle = targeted
-      ? "rgba(82, 211, 230, 0.24)"
-      : "rgba(69, 167, 188, 0.14)";
-    context.lineWidth = targeted ? 0.95 : 0.75;
-    context.shadowBlur = targeted ? 3 * glow : 1.5 * glow;
+      ? "rgba(82, 211, 230, 0.14)"
+      : "rgba(69, 167, 188, 0.08)";
+    context.lineWidth = targeted ? 0.8 : 0.6;
+    context.shadowBlur = targeted ? 2 * glow : 1 * glow;
     context.shadowColor = "rgba(71, 215, 235, 0.2)";
     context.beginPath();
     context.arc(0, 0, radius, 0, Math.PI * 2);
@@ -9044,9 +9044,9 @@ export class Game {
     // The classic reference does not show a clean full halo. Keep only faint,
     // broken tracking fragments, weighted toward the sides and lower half.
     context.save();
-    context.globalAlpha = targeted ? 0.34 : 0.2;
-    context.strokeStyle = "rgba(80, 200, 218, 0.52)";
-    context.lineWidth = 1.45;
+    context.globalAlpha = targeted ? 0.48 : 0.3;
+    context.strokeStyle = "rgba(86, 212, 230, 0.68)";
+    context.lineWidth = 1.7;
     context.setLineDash([2, 8]);
     context.lineDashOffset = -enemy.age * 3.5;
     for (const [from, to] of [
@@ -9060,8 +9060,8 @@ export class Game {
     }
     context.restore();
 
-    const nodeY = -radius * 0.8;
-    const nodeX = radius * 0.72;
+    const nodeY = -radius * 0.78;
+    const nodeX = radius * 0.58;
 
     // Very light connector stems under the two old feather nodes.
     context.strokeStyle = "rgba(76, 181, 197, 0.2)";
@@ -9082,41 +9082,44 @@ export class Game {
       context.scale(direction, 1);
       context.rotate(-0.04);
 
-      context.fillStyle = "rgba(235, 243, 226, 0.94)";
-      context.strokeStyle = "rgba(246, 218, 126, 0.86)";
-      context.lineWidth = 1.1;
-      context.shadowBlur = 5 * glow;
-      context.shadowColor = "rgba(255, 225, 120, 0.38)";
+      context.fillStyle = "rgba(244, 247, 232, 0.98)";
+      context.strokeStyle = "rgba(248, 220, 122, 0.92)";
+      context.lineWidth = 1.2;
+      context.shadowBlur = 7 * glow;
+      context.shadowColor = "rgba(255, 226, 116, 0.52)";
 
-      const width = radius * 0.68;
-      const height = radius * 0.28;
+      // The old reference uses fuller, brighter almond/leaf shapes rather than
+      // thin blades. Keep them soft and slightly chubby so they read as the
+      // distinctive Recall "eyes" above the hollow core.
+      const width = radius * 0.72;
+      const height = radius * 0.34;
       context.beginPath();
-      context.moveTo(-width * 0.48, height * 0.08);
+      context.moveTo(-width * 0.5, height * 0.06);
       context.quadraticCurveTo(
-        -width * 0.12,
-        -height * 0.72,
-        width * 0.48,
-        -height * 0.18,
+        -width * 0.08,
+        -height * 0.86,
+        width * 0.5,
+        -height * 0.12,
       );
       context.quadraticCurveTo(
-        width * 0.22,
-        height * 0.56,
-        -width * 0.48,
-        height * 0.08,
+        width * 0.24,
+        height * 0.78,
+        -width * 0.5,
+        height * 0.06,
       );
       context.closePath();
       context.fill();
       context.stroke();
 
       context.shadowBlur = 0;
-      context.globalAlpha = 0.42;
+      context.globalAlpha = 0.58;
       context.fillStyle = "#ffffff";
       context.beginPath();
       context.ellipse(
         -width * 0.08,
-        -height * 0.16,
-        width * 0.12,
-        height * 0.12,
+        -height * 0.18,
+        width * 0.15,
+        height * 0.16,
         -0.2,
         0,
         Math.PI * 2,
