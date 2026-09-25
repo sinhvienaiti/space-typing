@@ -145,3 +145,129 @@ Visual review still decides whether a source image is appropriate for:
 
 If an asset is visually weak in production, replace the asset with another
 licensed source rather than hiding the problem with more procedural geometry.
+
+
+---
+
+## Galaxy curation pass 2 — 2026-09-26
+
+The first sourced pass was visually rejected after browser review because the
+selected full-screen background was too noisy and the runtime still overlaid
+procedural polygon asteroids.
+
+The production Galaxy selection was therefore re-curated using both license and
+quality/popularity signals.
+
+### Screaming Brain Studios — Seamless Space Backgrounds
+
+Canonical source:
+- https://opengameart.org/content/seamless-space-backgrounds
+
+License:
+- CC0
+
+Curation signal at review time:
+- 32 OpenGameArt favorites;
+- 6,633 downloads for the 1024x1024 pack;
+- 32 coordinated seamless backgrounds in the same family.
+
+Selected source asset:
+- `Purple Nebula 3 - 1024x1024.png`
+
+Vendored project path:
+- `public/assets/space-typing/backgrounds/vendor/screaming-brain/nebula-purple-3-1024.png`
+
+Binary acquisition route:
+- curated CC0 copy from
+  `EamonnMR/galactic-night`.
+
+Use:
+- restrained Galaxy sky/nebula layer at reduced opacity.
+
+### Screaming Brain Studios — 2D Planet Pack 2
+
+Canonical source:
+- https://opengameart.org/node/145528
+
+License:
+- CC0
+
+Curation signal at review time:
+- 18 OpenGameArt favorites;
+- 420 rendered planet sprites;
+- 512x512 transparent shaded originals;
+- one coherent family covering terrestrial planets, gas giants and suns.
+
+Selected assets:
+- Ocean_03 512x512;
+- BlueGiant_04 512x512;
+- Cratered_03 512x512;
+- Sun_Blue_03 512x512.
+
+Vendored project paths:
+- `vendor/screaming-brain/planet-ocean-03-512.png`;
+- `vendor/screaming-brain/planet-blue-giant-04-512.png`;
+- `vendor/screaming-brain/planet-cratered-03-512.png`;
+- `vendor/screaming-brain/sun-blue-03-512.png`.
+
+Binary acquisition route:
+- curated CC0 copies from
+  `ShaimHowl/STEAL-A-COINS-1`.
+
+Use:
+- large, far and optional celestial bodies with separate parallax depths.
+
+### Kenney — Space Shooter / Space Shooter Remastered meteors
+
+Canonical sources:
+- https://opengameart.org/content/space-shooter-art
+- https://kenney.nl/assets/space-shooter-remastered
+
+License:
+- CC0
+
+Curation signal at review time:
+- original Space Shooter art has 153 OpenGameArt favorites and more than
+  23,000 downloads;
+- Space Shooter Remastered contains 295 files;
+- one established arcade-space visual family.
+
+Selected assets:
+- meteorBrown_big1;
+- meteorBrown_big2;
+- meteorBrown_big3;
+- meteorBrown_big4;
+- meteorGrey_big1;
+- meteorGrey_big3;
+- meteorGrey_med2;
+- meteorGrey_small1;
+- bg_darkPurple retained as a possible low-noise fallback.
+
+Vendored under:
+- `public/assets/space-typing/backgrounds/vendor/kenney-remastered/`
+
+Binary acquisition route:
+- extracted CC0 copies from `judaheland-dev/astrobro`.
+
+Use:
+- multiple far/mid/near moving meteor layers with different parallax, scale and
+  rotation.
+
+### Deprecated from active Galaxy composition
+
+The following first-pass assets remain documented historically but are no longer
+selected by the active Galaxy registry:
+
+- Rawdanitsu `space-background-4.png`: visually too noisy for the active typing
+  lane at the previous composition/opacity;
+- old 512px Screaming Brain nebula/starfield copies: superseded by the cleaner
+  1024px nebula plus runtime stars;
+- Wisedawn small planet sprites: superseded by the coherent 512px shaded planet
+  family;
+- Sparklin Labs black-hole image: valid CC0, but too low-resolution/pixel-like
+  for the current visual quality target;
+- old two-meteor vendor paths: superseded by the larger curated Kenney meteor
+  set.
+
+These files should be removed from the repository when no remaining registry or
+documentation reference requires them.
