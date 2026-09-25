@@ -16,6 +16,8 @@ export type EnemyRenderInput = {
   flash: number;
   targeted: boolean;
   glowScale?: number;
+  fillBody?: boolean;
+  drawFace?: boolean;
 };
 
 const PALETTES: Record<EnemyDefinition["family"], EnemyVisualPalette> = {
@@ -390,6 +392,7 @@ function drawBody(
   flash: number,
   targeted: boolean,
   glowScale: number,
+  fillBody = true,
 ): void {
   const body = definition.visual.body;
   context.save();
@@ -400,8 +403,13 @@ function drawBody(
   context.shadowColor = targeted ? "#74f2ff" : palette.outline;
 
   bodyPath(context, definition, radius);
-  context.fill();
+  if (fillBody) context.fill();
   context.stroke();
+
+  if (!fillBody) {
+    context.restore();
+    return;
+  }
 
   context.globalAlpha = 0.4;
   context.fillStyle = palette.bodyA;
@@ -843,13 +851,27 @@ export function drawModularEnemy(
   context.globalCompositeOperation = "source-over";
   drawSide(context, definition, radius, input.age, palette);
   drawWings(context, definition, radius, input.age, palette);
-  const cached = input.flash <= 0.03 &&
+  const usesDefaultStaticBody =
+    input.fillBody !== false && input.drawFace !== false;
+  const cached = usesDefaultStaticBody &&
+    input.flash <= 0.03 &&
     staticBodyCache?.draw(
       context, definition, radius, palette, glowScale, input.targeted, renderDpr,
     ) === true;
   if (!cached) {
-    drawBody(context, definition, radius, palette, input.flash, input.targeted, glowScale);
-    drawFace(context, definition, radius, palette, glowScale);
+    drawBody(
+      context,
+      definition,
+      radius,
+      palette,
+      input.flash,
+      input.targeted,
+      glowScale,
+      input.fillBody !== false,
+    );
+    if (input.drawFace !== false) {
+      drawFace(context, definition, radius, palette, glowScale);
+    }
   }
   drawHead(context, definition, radius, input.age, palette, glowScale);
   context.restore();
