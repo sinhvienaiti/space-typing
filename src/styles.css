@@ -3960,4 +3960,4 @@ kbd {
 .grade-badge{color:var(--grade-accent);font-size:.56rem}
 .local-item-icon{display:grid;place-items:center;height:42px}
 .equipment-card-icon.local-item-icon{height:72px}
-.recall-assist-bar{top:88px;right:12px;left:auto;transform:none;pointer-events:auto}
+.recall-assist-bar{right:12px;left:auto;width:auto;transform:none;pointer-events:auto}
