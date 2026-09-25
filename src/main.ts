@@ -4,9 +4,9 @@ import "./basic-skills.css";
 import "./kill-translation.css";
 import {
   DEFAULT_KILL_TRANSLATION_SETTINGS,
-  KillTranslationQueue,
   hasVisibleKillTranslation,
   sanitizeKillTranslationSettings,
+  usesTopKillTranslation,
 } from "./feedback/kill-translation";
 import { Game } from "./Game";
 import {
@@ -834,46 +834,36 @@ function installMenuHelp(): void {
 
 installMenuHelp();
 
-const killTranslationQueue = new KillTranslationQueue();
-let killTranslationTimer: number | null = null;
+let latestKillTranslation: VocabularyEntry | null = null;
 
 function currentKillTranslationSettings() {
   return sanitizeKillTranslationSettings(settings.killTranslation);
 }
 
 function clearKillTranslationFeedback(): void {
-  if (killTranslationTimer !== null) window.clearTimeout(killTranslationTimer);
-  killTranslationTimer = null;
-  killTranslationQueue.clear();
+  latestKillTranslation = null;
   byId("killLearningIpa").textContent = "";
   byId("killLearningVi").textContent = "";
 }
 
 function renderActiveKillTranslation(): void {
-  if (killTranslationTimer !== null) window.clearTimeout(killTranslationTimer);
-  killTranslationTimer = null;
   const config = currentKillTranslationSettings();
-  let entry = killTranslationQueue.peek();
-  while (entry !== null && !hasVisibleKillTranslation(entry, config)) {
-    entry = killTranslationQueue.advance();
-  }
+  const entry =
+    latestKillTranslation !== null &&
+    hasVisibleKillTranslation(latestKillTranslation, config)
+      ? latestKillTranslation
+      : null;
   const ipa = byId("killLearningIpa");
   const vi = byId("killLearningVi");
   ipa.textContent = entry !== null && config.showIpa ? entry.ipa.trim() : "";
   vi.textContent = entry !== null && config.showVietnamese ? entry.vi.trim() : "";
-  if (entry !== null) {
-    killTranslationTimer = window.setTimeout(() => {
-      killTranslationTimer = null;
-      killTranslationQueue.advance();
-      renderActiveKillTranslation();
-    }, config.durationSeconds * 1000);
-  }
 }
 
 function updateKillTranslationVisibility(phase: GamePhase): void {
   const config = currentKillTranslationSettings();
   const show =
-    phase === "playing" && config.enabled &&
+    phase === "playing" &&
+    usesTopKillTranslation(config) &&
     (config.showIpa || config.showVietnamese);
   const strip = byId("killLearningStrip");
   const hiddenBefore = strip.classList.contains("hidden");
@@ -890,10 +880,11 @@ function updateKillTranslationVisibility(phase: GamePhase): void {
 }
 
 function enqueueKillTranslation(entry: VocabularyEntry): void {
-  if (!hasVisibleKillTranslation(entry, currentKillTranslationSettings())) return;
+  const config = currentKillTranslationSettings();
+  if (!usesTopKillTranslation(config) || !hasVisibleKillTranslation(entry, config)) return;
   if (game.getPhase() !== "playing") return;
-  const becameActive = killTranslationQueue.enqueue(entry);
-  if (becameActive) renderActiveKillTranslation();
+  latestKillTranslation = { ...entry };
+  renderActiveKillTranslation();
 }
 
 const titleOverlay = byId("titleOverlay");
@@ -6860,7 +6851,7 @@ function renderSettings(): void {
     String(settings.pronunciationEnabled);
   const killSettings = currentKillTranslationSettings();
   byId<HTMLSelectElement>("killTranslationEnabled").value =
-    String(killSettings.enabled);
+    killSettings.enabled ? killSettings.mode : "off";
   byId<HTMLSelectElement>("killTranslationIpa").value =
     String(killSettings.showIpa);
   byId<HTMLSelectElement>("killTranslationVi").value =
@@ -8246,8 +8237,23 @@ byId<HTMLSelectElement>("screenShake").addEventListener(
   },
 );
 
+byId<HTMLSelectElement>("killTranslationEnabled").addEventListener(
+  "change",
+  (event) => {
+    const value = (event.currentTarget as HTMLSelectElement).value;
+    settings = {
+      ...settings,
+      killTranslation: sanitizeKillTranslationSettings({
+        ...currentKillTranslationSettings(),
+        enabled: value !== "off",
+        mode: value === "kill-position" || value === "both" ? value : "top",
+      }),
+    };
+    saveSettings();
+  },
+);
+
 for (const [id, field] of [
-  ["killTranslationEnabled", "enabled"],
   ["killTranslationIpa", "showIpa"],
   ["killTranslationVi", "showVietnamese"],
 ] as const) {
