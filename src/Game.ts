@@ -8482,9 +8482,8 @@ export class Game {
     const targeted = enemy.id === this.targetId;
     const kick = enemy.kick * 7;
 
-    // Recall has its own non-hostile visual language. Do not reuse the Combat
-    // enemy body renderer here: Recall Core is intentionally a translucent
-    // memory orb, while only the shared movement/collision runtime is reused.
+    // Recall reuses the normal enemy art language. Only the filled inner orb
+    // and default face are removed; the normal shell, wings and aura remain.
     if (this.gameplayMode === "recall") {
       this.drawRecallCoreEnemy(enemy, targeted, kick);
       this.drawRecallEnemyWord(enemy, targeted);
@@ -9037,67 +9036,43 @@ export class Game {
     const context = this.context;
     const x = enemy.x;
     const y = enemy.y - kick;
-    const radius = Math.max(22, enemy.radius * 0.9);
-    const glow = qualityProfile(this.settings.visualQuality).glowScale;
+    const radius = enemy.radius;
+    const glow =
+      qualityProfile(this.settings.visualQuality).glowScale;
+    const baseVisual = enemyDefinition("rainbow-scout");
 
     context.save();
     context.translate(x, y);
-    context.globalCompositeOperation = "source-over";
 
-    // Recall keeps the classic non-hostile silhouette from the reference:
-    // a dark round core with two large luminous memory eyes centered inside it.
-    // The normal enemy target brackets are reused below so Recall still belongs
-    // to the same combat visual language instead of looking like a placeholder.
-    const orb = context.createRadialGradient(
-      -radius * 0.22,
-      -radius * 0.28,
-      radius * 0.04,
-      0,
-      0,
-      radius,
-    );
-    orb.addColorStop(0, "rgba(35, 73, 82, 0.18)");
-    orb.addColorStop(0.48, "rgba(9, 31, 40, 0.44)");
-    orb.addColorStop(1, "rgba(1, 10, 16, 0.7)");
-    context.fillStyle = orb;
-    context.strokeStyle = targeted
-      ? "rgba(95, 221, 236, 0.32)"
-      : "rgba(70, 177, 196, 0.2)";
-    context.lineWidth = targeted ? 1.15 : 0.85;
-    context.shadowBlur = targeted ? 4 * glow : 2 * glow;
-    context.shadowColor = "rgba(71, 215, 235, 0.28)";
-    context.beginPath();
-    context.arc(0, 0, radius, 0, Math.PI * 2);
-    context.fill();
-    context.stroke();
-    context.shadowBlur = 0;
-
-    // The classic reference does not show a clean full halo. Keep only faint,
-    // broken tracking fragments, weighted toward the sides and lower half.
-    context.save();
-    context.globalAlpha = targeted ? 0.48 : 0.3;
-    context.strokeStyle = "rgba(86, 212, 230, 0.68)";
-    context.lineWidth = 1.7;
-    context.setLineDash([2, 8]);
-    context.lineDashOffset = -enemy.age * 3.5;
-    for (const [from, to] of [
-      [Math.PI * 0.08, Math.PI * 0.42],
-      [Math.PI * 0.62, Math.PI * 0.92],
-      [Math.PI * 1.08, Math.PI * 1.9],
-    ] as const) {
-      context.beginPath();
-      context.arc(0, 0, radius * 1.2, from, to);
-      context.stroke();
+    // Reuse the real normal-enemy shell instead of maintaining a separate
+    // Recall body. This keeps the same wings, aura, outline and proportions,
+    // while intentionally removing the pink/cyan filled center and normal face.
+    if (baseVisual !== undefined) {
+      drawModularEnemy(
+        context,
+        baseVisual,
+        {
+          radius,
+          age: enemy.age,
+          flash: enemy.flash,
+          targeted,
+          glowScale: glow,
+          fillBody: false,
+          drawFace: false,
+        },
+        this.modularBodyCache,
+        this.dpr,
+      );
     }
-    context.restore();
 
-    // The eyes are the Recall enemy's main identity. Keep them large, rounded
-    // and unmistakably inside the circular body. The previous implementation
-    // placed them above the orb, which made them read like detached decorations.
-    const eyeY = -radius * 0.08;
-    const eyeX = radius * 0.38;
+    // Recall's only custom facial element: two large warm-gold memory eyes,
+    // centered inside the hollow normal-enemy shell.
+    const eyeY = radius * 0.02;
+    const eyeX = radius * 0.27;
+    const eyeWidth = radius * 0.34;
+    const eyeHeight = radius * 0.2;
 
-    const drawMemoryEye = (
+    const drawRecallEye = (
       centerX: number,
       direction: -1 | 1,
     ): void => {
@@ -9106,59 +9081,55 @@ export class Game {
       context.scale(direction, 1);
       context.rotate(-0.035);
 
-      const width = radius * 0.66;
-      const height = radius * 0.38;
       const eyeGlow = context.createLinearGradient(
-        -width * 0.5,
+        -eyeWidth * 0.5,
         0,
-        width * 0.5,
+        eyeWidth * 0.5,
         0,
       );
-      eyeGlow.addColorStop(0, "rgba(255, 222, 111, 0.92)");
-      eyeGlow.addColorStop(0.38, "rgba(255, 250, 218, 1)");
-      eyeGlow.addColorStop(0.72, "rgba(255, 247, 202, 1)");
-      eyeGlow.addColorStop(1, "rgba(255, 215, 93, 0.94)");
+      eyeGlow.addColorStop(0, "rgba(255, 211, 77, 0.96)");
+      eyeGlow.addColorStop(0.34, "rgba(255, 248, 194, 1)");
+      eyeGlow.addColorStop(0.68, "rgba(255, 252, 218, 1)");
+      eyeGlow.addColorStop(1, "rgba(255, 205, 66, 0.98)");
 
       context.fillStyle = eyeGlow;
-      context.strokeStyle = "rgba(255, 224, 111, 0.96)";
-      context.lineWidth = 1.25;
-      context.shadowBlur = 9 * glow;
-      context.shadowColor = "rgba(255, 221, 101, 0.68)";
+      context.strokeStyle = "rgba(255, 226, 118, 0.98)";
+      context.lineWidth = Math.max(1.1, radius * 0.045);
+      context.shadowBlur = 10 * glow;
+      context.shadowColor = "rgba(255, 218, 80, 0.74)";
 
       context.beginPath();
-      context.moveTo(-width * 0.5, height * 0.02);
+      context.moveTo(-eyeWidth * 0.5, 0);
       context.bezierCurveTo(
-        -width * 0.28,
-        -height * 0.58,
-        width * 0.24,
-        -height * 0.58,
-        width * 0.5,
-        -height * 0.04,
+        -eyeWidth * 0.26,
+        -eyeHeight * 0.58,
+        eyeWidth * 0.25,
+        -eyeHeight * 0.58,
+        eyeWidth * 0.5,
+        -eyeHeight * 0.04,
       );
       context.bezierCurveTo(
-        width * 0.25,
-        height * 0.58,
-        -width * 0.3,
-        height * 0.56,
-        -width * 0.5,
-        height * 0.02,
+        eyeWidth * 0.27,
+        eyeHeight * 0.58,
+        -eyeWidth * 0.28,
+        eyeHeight * 0.56,
+        -eyeWidth * 0.5,
+        0,
       );
       context.closePath();
       context.fill();
       context.stroke();
 
-      // A restrained highlight gives the eyes volume without turning them into
-      // busy cartoon faces or adding pupils that are absent from the reference.
       context.shadowBlur = 0;
       context.globalAlpha = 0.72;
       context.fillStyle = "#ffffff";
       context.beginPath();
       context.ellipse(
-        -width * 0.12,
-        -height * 0.18,
-        width * 0.12,
-        height * 0.13,
-        -0.18,
+        -eyeWidth * 0.12,
+        -eyeHeight * 0.17,
+        eyeWidth * 0.11,
+        eyeHeight * 0.13,
+        -0.2,
         0,
         Math.PI * 2,
       );
@@ -9166,32 +9137,8 @@ export class Game {
       context.restore();
     };
 
-    drawMemoryEye(-eyeX, -1);
-    drawMemoryEye(eyeX, 1);
-
-    // A single dim tracer keeps the old ghost-like feel without making the
-    // target read as a polished Combat orb.
-    const tracerAngle = enemy.age * 0.42 + Math.PI * 0.72;
-    context.globalAlpha = 0.24;
-    context.fillStyle = "rgba(83, 199, 214, 0.66)";
-    context.beginPath();
-    context.arc(
-      Math.cos(tracerAngle) * radius * 1.12,
-      Math.sin(tracerAngle) * radius * 0.68 + radius * 0.12,
-      Math.max(1, radius * 0.038),
-      0,
-      Math.PI * 2,
-    );
-    context.fill();
-
-    if (enemy.flash > 0) {
-      context.globalAlpha = Math.min(0.32, enemy.flash);
-      context.strokeStyle = "rgba(221, 250, 255, 0.9)";
-      context.lineWidth = 1.6;
-      context.beginPath();
-      context.arc(0, 0, radius * 1.04, 0, Math.PI * 2);
-      context.stroke();
-    }
+    drawRecallEye(-eyeX, -1);
+    drawRecallEye(eyeX, 1);
 
     context.restore();
 
