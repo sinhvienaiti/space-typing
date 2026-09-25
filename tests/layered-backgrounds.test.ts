@@ -45,6 +45,38 @@ describe("Layered authored background registry", () => {
     expect(family("world-46")).toBe("eternity");
   });
 
+  it("uses curated sourced Galaxy art instead of deprecated placeholders", () => {
+    const galaxy = layeredBackgroundForScene(
+      sceneProfileForWorld("world-01"),
+    );
+    const sources = galaxy.layers.map((layer) => layer.src);
+
+    expect(sources).toContain(
+      "/assets/space-typing/backgrounds/vendor/screaming-brain/nebula-purple-3-1024.png",
+    );
+    expect(sources).toContain(
+      "/assets/space-typing/backgrounds/vendor/screaming-brain/planet-ocean-03-512.png",
+    );
+
+    const meteorSources = sources.filter((src) =>
+      src.includes("/vendor/kenney-remastered/meteor-"),
+    );
+    expect(meteorSources.length).toBeGreaterThanOrEqual(6);
+
+    expect(
+      sources.some((src) => src.includes("/backgrounds/galaxy/")),
+    ).toBe(false);
+    expect(
+      sources.some((src) => src.includes("/vendor/wisedawn/")),
+    ).toBe(false);
+    expect(
+      sources.some((src) => src.includes("/vendor/sparklinlabs/black-hole")),
+    ).toBe(false);
+    expect(
+      sources.some((src) => src.includes("/vendor/rawdanitsu/")),
+    ).toBe(false);
+  });
+
   it("keeps authored asset ids unique inside each scene", () => {
     for (const world of WORLD_REGISTRY) {
       const layered = layeredBackgroundForScene(
