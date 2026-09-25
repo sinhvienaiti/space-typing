@@ -10,6 +10,10 @@ import {
 } from "./feedback/kill-translation";
 import { Game } from "./Game";
 import {
+  availableRageSegments,
+  RAGE_SEGMENT_COUNT,
+} from "./combat/rage-pulse";
+import {
   DEFAULT_RECALL_SETTINGS,
   buildAdaptiveRecallVocabulary,
   recallDifficultyProfile,
@@ -1239,13 +1243,27 @@ function renderStats(stats: GameStats): void {
   hudClass("playerStatusHud", "energy-low", energyPercent <= 20);
 
   hudWidth("powerFill", String(stats.power) + "%");
-  hudClass("powerFill", "ready", stats.power >= 100);
+  const rageSegments = availableRageSegments(stats.power);
+  hudClass("powerFill", "usable", rageSegments > 0);
+  hudClass("powerFill", "ready", rageSegments === RAGE_SEGMENT_COUNT);
+  const powerTrack = byId("powerTrack");
+  powerTrack.dataset.rageSegments = String(rageSegments);
+  powerTrack.classList.toggle("usable", rageSegments > 0);
+  powerTrack.classList.toggle(
+    "ready",
+    rageSegments === RAGE_SEGMENT_COUNT,
+  );
   const ultimateName = getCharacter(characters.selected).ultimateName;
   hudText(
     "powerHint",
-    stats.power >= 100
-      ? "RAGE FULL · " + ultimateName + " + NOVA"
-      : "RAGE " + Math.floor(stats.power) + "% · " + ultimateName,
+    rageSegments === RAGE_SEGMENT_COUNT
+      ? "RAGE 5/5 · FULL " + ultimateName
+      : rageSegments > 0
+        ? "RAGE " +
+          String(rageSegments) +
+          "/5 · SPACE uses all filled segments · " +
+          ultimateName
+        : "RAGE " + Math.floor(stats.power) + "% · " + ultimateName,
   );
 
   const elapsed = performance.now() - startedAt;
