@@ -751,3 +751,70 @@ The cinematic background upgrade is complete when:
 9. tests and build pass;
 10. source-of-truth docs are updated;
 11. parent repo pins the final child commit.
+
+
+---
+
+## 13. Implementation checkpoint — 2026-09-25
+
+The first production cinematic pass is implemented on child `main`.
+
+Implemented contracts:
+
+- `WorldSceneProfile` now includes cinematic motion ids and explicit densities /
+  intensities for flight, stars, mid objects, foreground objects, events,
+  vortexes, asteroids and clouds;
+- all 50 existing Worlds receive deterministic cinematic parameters through the
+  existing scene registry;
+- there is no duplicate cinematic registry.
+
+Implemented motion/runtime layers:
+
+- dense far-star forward flight;
+- faster near-star streaks;
+- slow twinkling seeded stars;
+- animated galaxy/void vortexes;
+- moving side cloud/nebula wisps;
+- multi-depth rotating asteroid/debris flow;
+- animated aurora ribbons;
+- rotating reactor-ring motion;
+- bounded comet/meteor/travel events;
+- themed foreground particles that reuse World particle identity:
+  feathers/light, embers/sparks, snow/dust, leaves/pollen, shards/debris,
+  astral motes and mechanical sparks.
+
+World 01 / Galaxy behavior now specifically combines:
+
+- high star density;
+- deep-flight motion;
+- visible spiral/vortex;
+- asteroid flow;
+- moving nebula/cloud atmosphere;
+- fast near-star streaks;
+- bounded travel/comet events.
+
+Performance behavior:
+
+- static sky and landmark layers remain cached;
+- dynamic counts come from quality budgets;
+- far/near/mid/foreground/event counts have hard caps;
+- dynamic positions are deterministic functions of scene seed + time;
+- no random object allocation or World-registry scanning is added to the frame
+  loop;
+- the existing adaptive render-resolution path remains authoritative.
+
+Quality caps now include:
+
+| Quality | Far stars | Near stars | Mid objects | Foreground | Events |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Low | 70 | 12 | 5 | 8 | 1 |
+| Medium | 110 | 18 | 7 | 12 | 1 |
+| High | 155 | 26 | 10 | 16 | 2 |
+| Ultra | 210 | 34 | 13 | 22 | 2 |
+
+Automated tests now validate cinematic motion identities, deterministic profile
+coverage and bounded quality budgets.
+
+Browser screenshot/video review remains a required perceptual QA step. CI can
+prove TypeScript/build/test correctness but cannot certify that motion speed,
+scene beauty or composition is visually final on the owner's display.
