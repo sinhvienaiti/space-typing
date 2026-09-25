@@ -3659,26 +3659,12 @@ kbd {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background:
-    linear-gradient(
-      90deg,
-      transparent calc(20% - 1px),
-      rgba(5, 14, 25, .92) calc(20% - 1px),
-      rgba(5, 14, 25, .92) calc(20% + 1px),
-      transparent calc(20% + 1px),
-      transparent calc(40% - 1px),
-      rgba(5, 14, 25, .92) calc(40% - 1px),
-      rgba(5, 14, 25, .92) calc(40% + 1px),
-      transparent calc(40% + 1px),
-      transparent calc(60% - 1px),
-      rgba(5, 14, 25, .92) calc(60% - 1px),
-      rgba(5, 14, 25, .92) calc(60% + 1px),
-      transparent calc(60% + 1px),
-      transparent calc(80% - 1px),
-      rgba(5, 14, 25, .92) calc(80% - 1px),
-      rgba(5, 14, 25, .92) calc(80% + 1px),
-      transparent calc(80% + 1px)
-    );
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 calc(20% - 1px),
+    rgba(5,14,25,.92) calc(20% - 1px) calc(20% + 1px),
+    transparent calc(20% + 1px) 20%
+  );
 }
 .player-ultimate .power-track.usable {
   border-color: rgba(119, 238, 247, .78);
