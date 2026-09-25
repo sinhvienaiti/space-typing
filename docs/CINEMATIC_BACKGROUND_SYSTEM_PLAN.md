@@ -818,3 +818,23 @@ coverage and bounded quality budgets.
 Browser screenshot/video review remains a required perceptual QA step. CI can
 prove TypeScript/build/test correctness but cannot certify that motion speed,
 scene beauty or composition is visually final on the owner's display.
+
+
+---
+
+## 14. Authored asset integration — 2026-09-26
+
+The cinematic system now uses the layered authored-asset architecture defined in
+`docs/LAYERED_BACKGROUND_ASSET_SYSTEM_PLAN.md`.
+
+Important production rule:
+
+- procedural stars/dust/events are support FX;
+- authored sky/landmark/midground assets provide the primary scenic identity.
+
+`WorldSceneRenderer` now composes local authored imagery with the existing
+bounded cinematic motion layer. The universal perspective-floor overlay is
+suppressed once authored imagery is available.
+
+This resolves the previous failure mode where motion existed but the frame still
+looked like abstract lines on a gradient.
