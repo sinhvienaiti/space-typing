@@ -1347,7 +1347,7 @@ function drawStaticScene(
   context.save();
   context.fillStyle = rgba(
     input.environment.hazeRgb,
-    input.environment.hazeIntensity * 0.72,
+    input.environment.hazeIntensity * 0.34,
   );
   context.fillRect(0, 0, input.width, input.height);
   context.restore();
@@ -1357,22 +1357,511 @@ function drawStars(
   context: CanvasRenderingContext2D,
   input: WorldSceneDrawInput,
 ): void {
-  const { width, height, time, stars, environment } = input;
+  const {
+    width,
+    height,
+    time,
+    stars,
+    environment,
+    profile,
+    quality,
+  } = input;
+  const budget = sceneQualityBudget(quality);
+  const farCount = Math.max(
+    18,
+    Math.round(budget.farStars * profile.starDensity),
+  );
+  const nearCount = Math.max(
+    0,
+    Math.round(
+      budget.nearStars *
+        profile.starDensity *
+        Math.max(0.25, profile.flightIntensity),
+    ),
+  );
+  const vanishingX = width * (0.5 + (profile.variant - 3) * 0.006);
+  const vanishingY = height * 0.34;
+  const flight = 0.45 + profile.flightIntensity * 0.85;
+
   context.save();
-  for (const star of stars) {
+
+  // Dense far-star layer. Stars expand slowly from a vanishing zone to create
+  // forward travel rather than simply scrolling down the screen.
+  for (let index = 0; index < farCount; index += 1) {
+    const angle = seededUnit(profile.seed, index, 301) * TAU;
+    const depth = 0.15 + seededUnit(profile.seed, index, 302) * 0.5;
+    const phase =
+      (seededUnit(profile.seed, index, 303) +
+        time * (0.006 + depth * 0.006) * flight) %
+      1;
+    const radial = 0.035 + Math.pow(phase, 1.35) * 0.96;
+    const x =
+      vanishingX +
+      Math.cos(angle) * radial * width * 0.72;
+    const y =
+      vanishingY +
+      Math.sin(angle) * radial * height * 0.88;
+    if (x < -4 || x > width + 4 || y < -4 || y > height + 4) {
+      continue;
+    }
+
+    const size = 0.5 + depth * 1.35;
+    const alpha = 0.16 + depth * 0.42;
+    context.fillStyle = rgba(environment.starRgb, alpha);
+    context.fillRect(x, y, size, size);
+  }
+
+  // Existing seeded stars add a slow twinkling texture behind the flight layer.
+  const legacyLimit = Math.min(stars.length, Math.max(20, farCount >> 1));
+  for (let index = 0; index < legacyLimit; index += 1) {
+    const star = stars[index]!;
     const y =
       ((star.y +
-        time * 0.016 * environment.starDrift * star.z) %
+        time * 0.01 * environment.starDrift * star.z) %
         1) *
       height;
     context.fillStyle = rgba(
       environment.starRgb,
-      0.11 + star.z * 0.42,
+      0.08 + star.z * 0.25,
     );
-    const size = Math.max(0.8, star.z * 1.65);
+    const size = Math.max(0.7, star.z * 1.3);
     context.fillRect(star.x * width, y, size, size);
   }
+
+  // Near stars move substantially faster and become short streaks. Their count
+  // is bounded by Visual Quality.
+  context.lineCap = "round";
+  for (let index = 0; index < nearCount; index += 1) {
+    const angle = seededUnit(profile.seed, index, 311) * TAU;
+    const depth = 0.65 + seededUnit(profile.seed, index, 312) * 0.35;
+    const phase =
+      (seededUnit(profile.seed, index, 313) +
+        time * (0.035 + depth * 0.035) * flight) %
+      1;
+    const radial = Math.pow(phase, 1.55);
+    const trail = Math.max(0, radial - (0.016 + depth * 0.025));
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const x = vanishingX + cos * radial * width * 0.76;
+    const y = vanishingY + sin * radial * height * 0.92;
+    const x0 = vanishingX + cos * trail * width * 0.76;
+    const y0 = vanishingY + sin * trail * height * 0.92;
+    if (x < -20 || x > width + 20 || y < -20 || y > height + 20) {
+      continue;
+    }
+
+    context.strokeStyle = rgba(
+      environment.starRgb,
+      0.08 + depth * 0.2,
+    );
+    context.lineWidth = 0.8 + depth * 1.15;
+    context.beginPath();
+    context.moveTo(x0, y0);
+    context.lineTo(x, y);
+    context.stroke();
+  }
+
   context.restore();
+}
+
+function drawCinematicVortex(
+  context: CanvasRenderingContext2D,
+  input: WorldSceneDrawInput,
+): void {
+  const { width, height, time, profile } = input;
+  if (profile.vortexStrength < 0.28) return;
+
+  const palette = sceneSkyPalette(profile);
+  const rightSide = profile.variant % 2 === 1;
+  const centerX = width * (rightSide ? 0.79 : 0.21);
+  const centerY = height * (0.17 + (profile.variant % 3) * 0.018);
+  const strength = clamp(profile.vortexStrength, 0, 1.2);
+  const arms = profile.archetype === "eternity" ? 3 : 2;
+  const points = 18 + Math.round(strength * 20);
+  const maxRadius =
+    Math.min(width, height) *
+    (profile.archetype === "abyssal" ? 0.13 : 0.17);
+
+  context.save();
+  context.globalCompositeOperation = "lighter";
+
+  for (let arm = 0; arm < arms; arm += 1) {
+    for (let index = 0; index < points; index += 1) {
+      const t = index / Math.max(1, points - 1);
+      const angle =
+        arm * (TAU / arms) +
+        t * TAU * (2.15 + strength * 0.9) +
+        time * (0.055 + strength * 0.05);
+      const radius = maxRadius * Math.pow(t, 0.78);
+      const x = centerX + Math.cos(angle) * radius;
+      const y =
+        centerY +
+        Math.sin(angle) *
+          radius *
+          (0.44 + t * 0.18);
+      const size = 0.6 + (1 - t) * 1.6;
+      const alpha =
+        (0.035 + (1 - t) * 0.1) *
+        strength;
+      context.fillStyle =
+        arm % 2 === 0
+          ? rgba(
+              palette.glowA.slice(1)
+                .match(/.{2}/g)!
+                .map((hex) => parseInt(hex, 16))
+                .join(", "),
+              alpha,
+            )
+          : rgba(
+              palette.glowB.slice(1)
+                .match(/.{2}/g)!
+                .map((hex) => parseInt(hex, 16))
+                .join(", "),
+              alpha,
+            );
+      context.beginPath();
+      context.arc(x, y, size, 0, TAU);
+      context.fill();
+    }
+  }
+
+  context.restore();
+}
+
+function drawCinematicCloudMotion(
+  context: CanvasRenderingContext2D,
+  input: WorldSceneDrawInput,
+): void {
+  const { width, height, time, profile, quality } = input;
+  if (profile.cloudDensity < 0.2) return;
+
+  const palette = sceneSkyPalette(profile);
+  const budget = sceneQualityBudget(quality);
+  const count = Math.max(
+    1,
+    Math.round(budget.midObjects * profile.cloudDensity * 0.6),
+  );
+
+  context.save();
+  for (let index = 0; index < count; index += 1) {
+    const side = seededUnit(profile.seed, index, 321) < 0.5 ? -1 : 1;
+    const depth = 0.3 + seededUnit(profile.seed, index, 322) * 0.55;
+    const speed = (0.003 + depth * 0.005) * (0.5 + profile.flightIntensity);
+    const travel =
+      (seededUnit(profile.seed, index, 323) + time * speed) % 1;
+    const baseSideX =
+      side < 0
+        ? 0.04 + travel * 0.34
+        : 0.96 - travel * 0.34;
+    const x = width * baseSideX;
+    const y =
+      height *
+      (0.11 + seededUnit(profile.seed, index, 324) * 0.32);
+    const rx = width * (0.055 + depth * 0.075);
+    const ry = height * (0.015 + depth * 0.03);
+
+    const gradient = context.createRadialGradient(
+      x,
+      y,
+      0,
+      x,
+      y,
+      rx,
+    );
+    const color =
+      index % 2 === 0 ? palette.glowA : palette.glowB;
+    gradient.addColorStop(0, color);
+    gradient.addColorStop(0.4, color);
+    gradient.addColorStop(1, "rgba(0,0,0,0)");
+
+    context.save();
+    context.translate(x, y);
+    context.scale(1, ry / Math.max(1, rx));
+    context.globalAlpha = 0.018 + depth * 0.035;
+    context.fillStyle = gradient;
+    context.beginPath();
+    context.arc(0, 0, rx, 0, TAU);
+    context.fill();
+    context.restore();
+  }
+  context.restore();
+}
+
+function asteroidColor(
+  profile: WorldSceneProfile,
+  environment: WorldEnvironmentProfile,
+): string {
+  if (profile.archetype === "infernal") {
+    return rgba(environment.gridRgb, 0.32);
+  }
+  if (profile.archetype === "frost-prism") {
+    return rgba(environment.starRgb, 0.25);
+  }
+  if (profile.archetype === "abyssal") {
+    return rgba(environment.hazeRgb, 0.24);
+  }
+  return "rgba(108, 125, 153, 0.24)";
+}
+
+function drawCinematicAsteroids(
+  context: CanvasRenderingContext2D,
+  input: WorldSceneDrawInput,
+): void {
+  const {
+    width,
+    height,
+    time,
+    profile,
+    quality,
+    environment,
+  } = input;
+  if (profile.asteroidDensity <= 0.02) return;
+
+  const budget = sceneQualityBudget(quality);
+  const count = Math.max(
+    1,
+    Math.round(budget.midObjects * profile.asteroidDensity),
+  );
+  const baseColor = asteroidColor(profile, environment);
+
+  context.save();
+  for (let index = 0; index < count; index += 1) {
+    const depth = 0.25 + seededUnit(profile.seed, index, 331) * 0.75;
+    const direction =
+      seededUnit(profile.seed, index, 332) < 0.5 ? -1 : 1;
+    const phase =
+      (seededUnit(profile.seed, index, 333) +
+        time *
+          (0.01 + depth * 0.026) *
+          (0.55 + profile.flightIntensity)) %
+      1.15;
+    const startX = seededUnit(profile.seed, index, 334);
+    let normalizedX =
+      startX +
+      direction *
+        (phase - 0.5) *
+        (0.18 + depth * 0.16);
+    normalizedX = ((normalizedX % 1.18) + 1.18) % 1.18 - 0.09;
+    const normalizedY =
+      -0.08 + phase * 1.06;
+    let x = normalizedX * width;
+    const y = normalizedY * height;
+
+    // Keep the highest-contrast large rocks outside the central word corridor.
+    if (
+      depth > 0.62 &&
+      y < height * 0.48 &&
+      x > width * 0.36 &&
+      x < width * 0.64
+    ) {
+      x += x < width * 0.5 ? -width * 0.22 : width * 0.22;
+    }
+
+    const radius =
+      Math.min(width, height) *
+      (0.006 + depth * 0.018);
+    const rotation =
+      seededUnit(profile.seed, index, 335) * TAU +
+      time * (0.08 + depth * 0.16) * direction;
+
+    context.save();
+    context.translate(x, y);
+    context.rotate(rotation);
+    context.fillStyle = baseColor;
+    context.strokeStyle = rgba(environment.starRgb, 0.08 + depth * 0.08);
+    context.lineWidth = 1;
+    context.beginPath();
+    const points = 6;
+    for (let point = 0; point < points; point += 1) {
+      const angle = (TAU * point) / points;
+      const wobble =
+        0.72 +
+        seededUnit(profile.seed + index * 97, point, 336) * 0.42;
+      const px = Math.cos(angle) * radius * wobble;
+      const py = Math.sin(angle) * radius * wobble;
+      if (point === 0) context.moveTo(px, py);
+      else context.lineTo(px, py);
+    }
+    context.closePath();
+    context.fill();
+    context.stroke();
+
+    if (depth > 0.55) {
+      context.globalAlpha = 0.18;
+      context.beginPath();
+      context.moveTo(-radius * 0.45, -radius * 0.1);
+      context.lineTo(radius * 0.38, radius * 0.24);
+      context.stroke();
+    }
+    context.restore();
+  }
+  context.restore();
+}
+
+function drawAuroraMotion(
+  context: CanvasRenderingContext2D,
+  input: WorldSceneDrawInput,
+): void {
+  const { width, height, time, profile } = input;
+  if (
+    profile.primaryMotion !== "aurora-wave" &&
+    profile.secondaryMotion !== "aurora-wave"
+  ) {
+    return;
+  }
+
+  const palette = sceneSkyPalette(profile);
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.lineCap = "round";
+
+  for (let band = 0; band < 3; band += 1) {
+    context.strokeStyle =
+      band === 0 ? palette.glowA : band === 1 ? palette.glowB : palette.glowC;
+    context.globalAlpha = 0.035 + band * 0.012;
+    context.lineWidth = Math.max(4, height * (0.008 + band * 0.002));
+    context.beginPath();
+    for (let step = 0; step <= 12; step += 1) {
+      const t = step / 12;
+      const x = width * t;
+      const y =
+        height * (0.08 + band * 0.04) +
+        Math.sin(
+          t * TAU * 1.15 +
+            time * (0.1 + band * 0.025) +
+            profile.variant,
+        ) *
+          height *
+          (0.018 + band * 0.005);
+      if (step === 0) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    }
+    context.stroke();
+  }
+  context.restore();
+}
+
+function drawReactorMotion(
+  context: CanvasRenderingContext2D,
+  input: WorldSceneDrawInput,
+): void {
+  const { width, height, time, profile, environment } = input;
+  if (
+    profile.primaryMotion !== "reactor-motion" &&
+    profile.secondaryMotion !== "reactor-motion"
+  ) {
+    return;
+  }
+
+  const centerX = width * (profile.variant % 2 === 0 ? 0.72 : 0.28);
+  const centerY = height * 0.19;
+  const baseRadius = Math.min(width, height) * 0.07;
+
+  context.save();
+  context.strokeStyle = rgba(environment.gridRgb, 0.14);
+  context.lineWidth = 1.4;
+  context.globalCompositeOperation = "lighter";
+  for (let ring = 0; ring < 3; ring += 1) {
+    const radius = baseRadius * (1 + ring * 0.36);
+    const start =
+      time * (0.14 + ring * 0.05) * (ring % 2 === 0 ? 1 : -1);
+    context.beginPath();
+    context.arc(
+      centerX,
+      centerY,
+      radius,
+      start,
+      start + Math.PI * (0.75 + ring * 0.18),
+    );
+    context.stroke();
+  }
+  context.restore();
+}
+
+function drawCinematicEvents(
+  context: CanvasRenderingContext2D,
+  input: WorldSceneDrawInput,
+): void {
+  const { width, height, time, profile, quality, environment } = input;
+  if (profile.eventFrequency < 0.12) return;
+
+  const budget = sceneQualityBudget(quality);
+  const count = Math.max(
+    0,
+    Math.min(
+      budget.eventObjects,
+      Math.ceil(profile.eventFrequency * budget.eventObjects),
+    ),
+  );
+  if (count <= 0) return;
+
+  const palette = sceneSkyPalette(profile);
+
+  context.save();
+  context.lineCap = "round";
+  context.globalCompositeOperation = "lighter";
+
+  for (let index = 0; index < count; index += 1) {
+    const period =
+      6.5 + seededUnit(profile.seed, index, 341) * 5.5;
+    const offset =
+      seededUnit(profile.seed, index, 342) * period;
+    const local = (time + offset) % period;
+    const activeDuration = 0.7 + profile.eventFrequency * 0.55;
+    if (local > activeDuration) continue;
+
+    const progress = local / activeDuration;
+    const fromLeft = seededUnit(profile.seed, index, 343) < 0.5;
+    const startX = width * (fromLeft ? 0.02 : 0.98);
+    const startY =
+      height *
+      (0.08 + seededUnit(profile.seed, index, 344) * 0.32);
+    const dx =
+      width *
+      (fromLeft ? 0.26 : -0.26) *
+      (0.72 + seededUnit(profile.seed, index, 345) * 0.45);
+    const dy =
+      height *
+      (0.13 + seededUnit(profile.seed, index, 346) * 0.14);
+    const headX = startX + dx * progress;
+    const headY = startY + dy * progress;
+    const tail = 0.28;
+    const tailX = startX + dx * Math.max(0, progress - tail);
+    const tailY = startY + dy * Math.max(0, progress - tail);
+    const fade = Math.sin(progress * Math.PI);
+
+    context.strokeStyle =
+      profile.archetype === "infernal"
+        ? palette.glowB
+        : profile.archetype === "frost-prism"
+          ? palette.glowA
+          : rgba(environment.starRgb, 0.85);
+    context.globalAlpha = 0.1 + fade * 0.22;
+    context.lineWidth = 1.3 + fade * 1.2;
+    context.beginPath();
+    context.moveTo(tailX, tailY);
+    context.lineTo(headX, headY);
+    context.stroke();
+
+    context.globalAlpha = 0.12 + fade * 0.28;
+    context.fillStyle = palette.glowC;
+    context.beginPath();
+    context.arc(headX, headY, 1.2 + fade * 1.4, 0, TAU);
+    context.fill();
+  }
+
+  context.restore();
+}
+
+function drawCinematicMotion(
+  context: CanvasRenderingContext2D,
+  input: WorldSceneDrawInput,
+): void {
+  drawCinematicVortex(context, input);
+  drawCinematicCloudMotion(context, input);
+  drawAuroraMotion(context, input);
+  drawReactorMotion(context, input);
+  drawCinematicAsteroids(context, input);
 }
 
 function particleMotionScale(profile: WorldSceneProfile): number {
@@ -1387,8 +1876,17 @@ function drawAmbientParticles(
   input: WorldSceneDrawInput,
 ): void {
   const { width, height, time, profile, environment, quality } = input;
-  const count = sceneQualityBudget(quality).ambientParticles;
-  const speed = particleMotionScale(profile);
+  const budget = sceneQualityBudget(quality);
+  const count = Math.max(
+    2,
+    Math.round(
+      budget.foregroundObjects *
+        Math.max(0.2, profile.foregroundDensity),
+    ),
+  );
+  const speed =
+    particleMotionScale(profile) *
+    (0.68 + profile.flightIntensity * 0.5);
   const archetype = profile.archetype;
   const particleStyle = profile.particleStyle;
 
@@ -2073,7 +2571,9 @@ export class WorldSceneRenderer {
     }
 
     drawStars(context, input);
+    drawCinematicMotion(context, input);
     drawFloor(context, input);
     drawAmbientParticles(context, input);
+    drawCinematicEvents(context, input);
   }
 }
