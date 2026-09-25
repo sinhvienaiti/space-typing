@@ -216,8 +216,8 @@ Completed in this implementation:
 - added critical-hull one-shot threshold warning;
 - normal stage pacing now drives calm/intense music without overriding special encounter states;
 - added CC0 attribution/provenance;
-- added an audio binary integrity + payload guard;
-- kept the existing executable bundle thresholds unchanged and separated non-executable audio media into its own 6 MiB guard.
+- added an audio binary integrity check for required local OGG assets;
+- audio file count and total payload are reported for visibility, not enforced as hard byte/count ceilings.
 
 Latest automated gate on the implementation branch:
 
@@ -225,9 +225,9 @@ Latest automated gate on the implementation branch:
 - 147 test files / 732 tests PASS;
 - TypeScript PASS;
 - production Vite build PASS;
-- audio asset guard PASS: 15 OGG files / 3.22 MiB;
-- existing M22 JS/CSS bundle thresholds PASS;
-- existing Ship V3 art budget PASS.
+- audio asset integrity PASS: 15 OGG files / 3.22 MiB reported;
+- production bundle metrics reported without a hard byte ceiling;
+- Ship V3 art integrity PASS.
 
 Remaining acceptance is intentionally manual:
 
@@ -261,7 +261,7 @@ Review findings explicitly *not* treated as removable features:
 - sampled and synthesized SFX remain enabled;
 - curriculum content and 18,000-word lexical data remain unchanged.
 
-Automated acceptance for this review is the full child CI, including unit/runtime tests, TypeScript, production build, bundle guard, Ship V3 guard and audio asset guard.
+Automated acceptance for this review is the full child CI, including unit/runtime tests, TypeScript, production build, report-only bundle metrics, Ship V3 integrity and audio asset integrity.
 
 Real browser/audio M22 acceptance remains pending and must still validate perceived motion smoothness, pronunciation priority, long-session audio lifecycle, UI readability and measured frame-time gates on actual hardware.
 
