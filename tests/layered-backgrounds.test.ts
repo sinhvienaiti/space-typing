@@ -116,7 +116,7 @@ describe("Layered authored background registry", () => {
     const productionAsteroids = galaxy.layers.filter((layer) =>
       layer.src.includes("/vendor/ohjirochan/asteroid-"),
     );
-    expect(productionAsteroids).toHaveLength(4);
+    expect(productionAsteroids).toHaveLength(5);
     expect(
       productionAsteroids.some(
         (layer) =>
@@ -127,7 +127,22 @@ describe("Layered authored background registry", () => {
     ).toBe(true);
     expect(
       productionAsteroids.filter((layer) => layer.motion === "wrap"),
-    ).toHaveLength(3);
+    ).toHaveLength(4);
+
+    const midAsteroids = productionAsteroids.filter((layer) =>
+      layer.id.includes("-mid-"),
+    );
+    expect(midAsteroids).toHaveLength(3);
+    expect(new Set(midAsteroids.map((layer) => layer.src)).size).toBe(3);
+    expect(
+      midAsteroids.reduce(
+        (total, layer) => total + (layer.instances ?? 1),
+        0,
+      ),
+    ).toBeGreaterThanOrEqual(10);
+    expect(Math.max(...midAsteroids.map((layer) => layer.scale))).toBeGreaterThan(
+      Math.min(...midAsteroids.map((layer) => layer.scale)) * 1.8,
+    );
 
     const farFragments = galaxy.layers.find(
       (layer) => layer.id === "galaxy-asteroid-far-fragments",
