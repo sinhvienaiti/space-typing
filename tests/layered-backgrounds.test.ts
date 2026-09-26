@@ -102,9 +102,6 @@ describe("Layered authored background registry", () => {
       "/assets/space-typing/backgrounds/vendor/luminousdragon/asteroid-field.png",
     );
     expect(sources).toContain(
-      "/assets/space-typing/backgrounds/vendor/screaming-brain/planet-ocean-03-512.png",
-    );
-    expect(sources).toContain(
       "/assets/space-typing/backgrounds/vendor/screaming-brain/planet-blue-giant-04-512.png",
     );
     expect(
@@ -190,7 +187,6 @@ describe("Layered authored background registry", () => {
     expect(asteroidField?.minQuality).toBe("medium");
 
     for (const id of [
-      "galaxy-planet-primary",
       "galaxy-planet-far",
       "galaxy-moon-far",
     ]) {
@@ -199,16 +195,14 @@ describe("Layered authored background registry", () => {
       );
     }
 
-    const primaryPlanet = galaxy.layers.find(
-      (layer) => layer.id === "galaxy-planet-primary",
-    )!;
+    expect(
+      galaxy.layers.find((layer) => layer.id === "galaxy-planet-primary"),
+    ).toBeUndefined();
     const farPlanet = galaxy.layers.find(
       (layer) => layer.id === "galaxy-planet-far",
     )!;
-    expect(primaryPlanet.scale).toBeGreaterThan(farPlanet.scale * 3);
-    expect(primaryPlanet.opacity - farPlanet.opacity).toBeGreaterThan(0.45);
-    expect(primaryPlanet.anchorX).toBeLessThan(0.12);
     expect(farPlanet.anchorX).toBeGreaterThan(0.8);
+    expect(farPlanet.scale).toBeLessThan(0.1);
   });
 
   it("keeps World 01 visual identity on Medium while reserving decoration for High", () => {
@@ -264,8 +258,7 @@ describe("Layered authored background registry", () => {
       (layer) => layer.id === "galaxy-nebula-depth",
     )!;
 
-    expect(sky.src).toContain("/backgrounds/galaxy/cinematic-v2.svg");
-    expect(sky.opacity).toBe(1);
+    expect(sky.opacity).toBeLessThanOrEqual(0.5);
     expect(mainNebula.blend).toBe("screen");
     expect(depthNebula.blend).toBe("screen");
     expect(mainNebula.scale).toBeGreaterThan(sky.scale);
@@ -328,7 +321,7 @@ describe("World 01 holistic authored composition contract", () => {
     const essentialIds = [
       "galaxy-sky",
       "galaxy-nebula",
-      "galaxy-planet-primary",
+      "galaxy-planet-far",
       "galaxy-luminous-orbit",
       "galaxy-authored-asteroid-field",
       "galaxy-asteroid-far-fragments",
@@ -378,7 +371,9 @@ describe("World 01 holistic authored composition contract", () => {
     expect(byId("galaxy-asteroid-near-hero").anchorX).toBeGreaterThan(0.94);
     expect(byId("galaxy-asteroid-near-secondary").anchorX).toBeLessThan(0.08);
     expect(byId("galaxy-distant-sentinel").anchorX).toBeGreaterThan(0.65);
-    expect(byId("galaxy-planet-primary").anchorX).toBeLessThan(0.1);
+    expect(
+      galaxy.layers.find((layer) => layer.id === "galaxy-planet-primary"),
+    ).toBeUndefined();
     expect(byId("galaxy-planet-far").anchorX).toBeGreaterThan(0.85);
   });
 
