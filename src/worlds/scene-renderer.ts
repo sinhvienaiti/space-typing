@@ -1381,7 +1381,7 @@ function drawStaticScene(
   context.restore();
 }
 
-export function productionGalaxyStarReadabilityEnabled(
+export function productionGalaxyPolishEnabled(
   profile: Pick<WorldSceneProfile, "worldId">,
 ): boolean {
   return profile.worldId === "world-01";
@@ -1414,17 +1414,24 @@ function drawStars(
     quality,
   } = input;
   const budget = sceneQualityBudget(quality);
+  const productionGalaxy = productionGalaxyPolishEnabled(profile);
+  const effectiveStarDensity =
+    profile.starDensity * (productionGalaxy ? 0.68 : 1);
   const farCount = Math.max(
     18,
-    Math.round(budget.farStars * profile.starDensity),
+    Math.round(budget.farStars * effectiveStarDensity),
   );
   const nearCount = Math.max(
     0,
     Math.round(
       budget.nearStars *
-        profile.starDensity *
+        effectiveStarDensity *
         Math.max(0.25, profile.flightIntensity) *
-        (profile.archetype === "celestial-rainbow" ? 0.24 : 0.34),
+        (productionGalaxy
+          ? 0.12
+          : profile.archetype === "celestial-rainbow"
+            ? 0.24
+            : 0.34),
     ),
   );
   const vanishingX = width * (0.5 + (profile.variant - 3) * 0.006);
@@ -1460,13 +1467,13 @@ function drawStars(
       y > height * 0.12 &&
       y < height * 0.62;
     const galaxyReadability =
-      productionGalaxyStarReadabilityEnabled(profile)
+      productionGalaxyPolishEnabled(profile)
         ? galaxySceneryReadabilityFactor(x / width, y / height)
         : null;
     const quietFactor =
       galaxyReadability ?? (centralQuiet ? 0.58 : 1);
     const outerThird =
-      productionGalaxyStarReadabilityEnabled(profile) &&
+      productionGalaxyPolishEnabled(profile) &&
       (x < width * 0.3 || x > width * 0.7);
     const brightThreshold = outerThird ? 0.91 : 0.94;
     const glintThreshold = outerThird ? 0.986 : 0.992;
@@ -1515,7 +1522,7 @@ function drawStars(
       height;
     const legacyX = star.x * width;
     const readability =
-      productionGalaxyStarReadabilityEnabled(profile)
+      productionGalaxyPolishEnabled(profile)
         ? galaxySceneryReadabilityFactor(star.x, y / height)
         : 1;
     context.fillStyle = rgba(
@@ -1552,7 +1559,7 @@ function drawStars(
       const xRatio = x / width;
       const yRatio = y / height;
       const productionGalaxy =
-        productionGalaxyStarReadabilityEnabled(profile);
+        productionGalaxyPolishEnabled(profile);
       const centralQuiet =
         xRatio > 0.35 &&
         xRatio < 0.65 &&
@@ -2087,7 +2094,7 @@ function drawAmbientParticles(
     const py = y * height;
     const size = 1 + depth * 2.6;
     const sceneryReadability =
-      productionGalaxyStarReadabilityEnabled(profile)
+      productionGalaxyPolishEnabled(profile)
         ? galaxySceneryReadabilityFactor(x, y)
         : 1;
     const alpha = (0.12 + depth * 0.24) * sceneryReadability;

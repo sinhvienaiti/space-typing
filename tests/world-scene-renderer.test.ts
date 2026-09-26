@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { sceneProfileForWorld } from "../src/worlds/scene-registry";
 import {
   galaxySceneryReadabilityFactor,
-  productionGalaxyStarReadabilityEnabled,
+  productionGalaxyPolishEnabled,
   worldSceneCacheKey,
   worldSceneRenderPolicy,
 } from "../src/worlds/scene-renderer";
@@ -60,20 +60,20 @@ describe("World scene renderer cache contract", () => {
 });
 
 
-describe("Galaxy scenery readability contract", () => {
+describe("Galaxy production polish contract", () => {
   it("limits the new readability bias to the accepted World 01 production scene", () => {
     expect(
-      productionGalaxyStarReadabilityEnabled(
+      productionGalaxyPolishEnabled(
         sceneProfileForWorld("world-01"),
       ),
     ).toBe(true);
     expect(
-      productionGalaxyStarReadabilityEnabled(
+      productionGalaxyPolishEnabled(
         sceneProfileForWorld("world-02"),
       ),
     ).toBe(false);
     expect(
-      productionGalaxyStarReadabilityEnabled(
+      productionGalaxyPolishEnabled(
         sceneProfileForWorld("world-03"),
       ),
     ).toBe(false);
@@ -90,5 +90,17 @@ describe("Galaxy scenery readability contract", () => {
     expect(shoulder).toBeLessThan(1);
     expect(edge).toBeGreaterThan(1);
     expect(hudBand).toBe(1);
+  });
+});
+
+
+describe("World 01 star-density cleanup", () => {
+  it("keeps production polish isolated to World 01", () => {
+    expect(productionGalaxyPolishEnabled(sceneProfileForWorld("world-01"))).toBe(
+      true,
+    );
+    expect(productionGalaxyPolishEnabled(sceneProfileForWorld("world-02"))).toBe(
+      false,
+    );
   });
 });
