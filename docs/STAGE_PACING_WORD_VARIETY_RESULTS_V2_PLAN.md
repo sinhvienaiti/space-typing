@@ -129,8 +129,7 @@ Desktop acceptance rules:
   visual focus;
 - the original metric/button ids are preserved so runtime logic is not coupled
   to the new layout;
-- regression coverage in `tests/stage-results-layout.test.ts` guards the wide
-  dashboard structure and single-scroll contract.
+- regression coverage in `tests/stage-results-layout.test.ts` guards the dashboard DOM structure and stable runtime ids; CSS sizing, scroll behavior and visual hierarchy remain browser-review gates.
 
 This UI checkpoint is not a claim that the wider Environment Art / music review
 is complete. It is the accepted direction for the Stage Clear report itself.
