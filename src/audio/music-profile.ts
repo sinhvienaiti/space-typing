@@ -72,18 +72,19 @@ export type MusicResolveContext = {
 };
 
 const SHARED = {
-  intense: asset("world-intense", "pulse.ogg", "music"),
-  miniBoss: asset("mini-boss", "pulse.ogg", "music"),
+  calm: asset("modern-space-calm", "mysterious-ambience.mp3", "music"),
+  intense: asset("modern-space-intense", "battle-theme-b.mp3", "music"),
+  miniBoss: asset("mini-boss", "battle-theme-b.mp3", "music"),
   worldBoss: asset("world-boss", "urgent.ogg", "music"),
   galaxyBoss: asset("galaxy-boss", "urgent.ogg", "music"),
   championHunt: asset("champion-hunt", "urgent.ogg", "music"),
-  hiddenChallenge: asset("hidden-challenge", "pulse.ogg", "music"),
-  hiddenWorld: asset("hidden-world", "sector.ogg", "music"),
-  shop: asset("shop", "sector.ogg", "music"),
-  station: asset("station", "sector.ogg", "music"),
+  hiddenChallenge: asset("hidden-challenge", "battle-theme-b.mp3", "music"),
+  hiddenWorld: asset("hidden-world", "mysterious-ambience.mp3", "music"),
+  shop: asset("shop", "mysterious-ambience.mp3", "music"),
+  station: asset("station", "mysterious-ambience.mp3", "music"),
   victory: asset("victory", "victory.ogg", "stingers"),
   defeat: asset("defeat", "urgent.ogg", "music"),
-  transition: asset("transition", "pulse.ogg", "music"),
+  transition: asset("transition", "battle-theme-b.mp3", "music"),
 } as const;
 
 function asset(
@@ -118,12 +119,11 @@ function worldProfile(world: WorldProfile): WorldMusicProfile {
   const worldFile = world.id + ".ogg";
   const galaxyFile =
     "galaxy-" + String(world.galaxy).padStart(2, "0") + ".ogg";
-  const baseTrack = fallbackAsset(
-    world.id + "-base",
-    worldFile,
-    "sector.ogg",
-    "music",
-  );
+  const baseTrack = {
+    ...SHARED.calm,
+    id: world.id + "-base",
+    localPath: "/local-assets/music/" + worldFile,
+  };
   const ambient = fallbackAsset(
     world.id + "-ambient",
     worldFile,
