@@ -10,7 +10,6 @@ const GALAXY_NEBULA_PURPLE_SRC =
   "vendor/screaming-brain/nebula-purple-3-1024.png";
 const GALAXY_NEBULA_BLUE_SRC =
   "vendor/screaming-brain/nebula-blue-6-1024.png";
-const GALAXY_CINEMATIC_V2_SRC = "galaxy/cinematic-v2.svg";
 
 function layer(
   id: string,
@@ -93,14 +92,14 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
   {
     ...layer(
       "galaxy-sky",
-      GALAXY_CINEMATIC_V2_SRC,
+      GALAXY_NEBULA_PURPLE_SRC,
       0.07,
-      1,
-      1,
+      0.46,
+      1.1,
       0.5,
       0.5,
-      -0.000012,
-      0.000004,
+      -0.000035,
+      0.000012,
     ),
     motion: "float",
   },
@@ -109,7 +108,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-stars-dense-sky",
       "vendor/luminousdragon/stars-dense.png",
       0.095,
-      0.02,
+      0.16 * 0.5,
       1.18,
       0.5,
       0.5,
@@ -125,7 +124,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-stars-sparse-sky",
       "vendor/luminousdragon/stars-sparse.png",
       0.12,
-      0.015,
+      0.1 * 0.55,
       1.26,
       0.5,
       0.48,
@@ -141,7 +140,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-nebula",
       GALAXY_NEBULA_BLUE_SRC,
       0.14,
-      0.12,
+      0.3 * 1.35,
       1.5,
       0.79,
       0.38,
@@ -160,7 +159,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-nebula-depth",
       GALAXY_NEBULA_PURPLE_SRC,
       0.1,
-      0.08,
+      0.16 * 1.5,
       1.92,
       0.18,
       0.68,
@@ -179,10 +178,10 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-planet-primary",
       "vendor/screaming-brain/planet-ocean-03-512.png",
       0.27,
-      0.72,
-      0.23,
+      0.84,
+      0.28,
       0.065,
-      0.24,
+      0.2,
       0.00034,
       0.00005,
       0.00038,
@@ -196,8 +195,8 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-planet-far",
       "vendor/screaming-brain/planet-blue-giant-04-512.png",
       0.18,
-      0.12,
-      0.05,
+      0.28,
+      0.07,
       0.9,
       0.29,
       -0.0002,
@@ -213,7 +212,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-moon-far",
       "vendor/screaming-brain/planet-cratered-03-512.png",
       0.21,
-      0.07,
+      0.15,
       0.036,
       0.72,
       0.15,
@@ -230,8 +229,8 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     "galaxy-sun-far",
     "vendor/screaming-brain/sun-blue-03-512.png",
     0.15,
-    0.56,
-    0.18,
+    0.13 * 3,
+    0.125,
     0.84,
     0.12,
     0.00012,
@@ -245,7 +244,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-luminous-orbit",
       "eternity/rings.svg",
       0.2,
-      0,
+      0.14 * 0.18,
       0.24,
       0.82,
       0.29,
@@ -294,7 +293,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-authored-planet-specks",
       "vendor/luminousdragon/stars-planets.png",
       0.3,
-      0.015,
+      0.12 * 0.4,
       1.16,
       0.5,
       0.48,
@@ -311,7 +310,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-authored-asteroid-field",
       "vendor/luminousdragon/asteroid-field.png",
       0.4,
-      0.025,
+      0.1,
       1.18,
       0.5,
       0.5,
@@ -329,7 +328,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-asteroid-far-fragments",
       "vendor/ohjirochan/asteroid-small.png",
       0.38,
-      0.08,
+      0.26,
       0.016,
       0.5,
       0.5,
@@ -351,7 +350,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-asteroid-mid-left",
       "vendor/ohjirochan/asteroid-medium.png",
       0.62,
-      0.2,
+      0.4,
       0.065,
       0.14,
       0.54,
@@ -362,7 +361,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     treatment: "galaxy-rock-mid",
     motion: "wrap",
     placement: "edges",
-    instances: 4,
+    instances: 2 + 2,
     spreadX: 0.46,
     spreadY: 0.52,
     scaleJitter: 0.3,
@@ -374,7 +373,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-asteroid-mid-right",
       "vendor/ohjirochan/asteroid-small.png",
       0.58,
-      0.16,
+      0.32,
       0.04,
       0.87,
       0.46,
@@ -385,7 +384,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     treatment: "galaxy-rock-mid",
     motion: "wrap",
     placement: "edges",
-    instances: 4,
+    instances: 2 + 2,
     spreadX: 0.48,
     spreadY: 0.56,
     scaleJitter: 0.32,
@@ -397,7 +396,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-asteroid-mid-heavy",
       "vendor/ohjirochan/asteroid-large.png",
       0.69,
-      0.1,
+      0.12,
       0.08,
       0.78,
       0.62,
@@ -409,7 +408,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     motion: "wrap",
     minQuality: "medium",
     placement: "edges",
-    instances: 2,
+    instances: Math.max(2, 1),
     spreadY: 0.42,
     scaleJitter: 0.24,
     opacityJitter: 0.16,
@@ -421,7 +420,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-asteroid-near-hero",
       "vendor/ohjirochan/asteroid-large.png",
       0.94,
-      0.44,
+      0.56,
       0.29,
       0.965,
       0.17,
@@ -445,7 +444,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-asteroid-near-secondary",
       "vendor/ohjirochan/asteroid-medium.png",
       0.84,
-      0.22,
+      0.44,
       0.18,
       0.045,
       0.79,
@@ -471,8 +470,8 @@ const GALAXY_RICH: readonly LayeredBackgroundLayer[] = GALAXY.map(
     if (item.id === "galaxy-nebula") {
       return {
         ...item,
-        opacity: 0.16,
-        scale: 1.62,
+        opacity: 0.46,
+        scale: 1.56,
         anchorX: 0.7,
         anchorY: 0.4,
         motion: "float",
@@ -485,6 +484,9 @@ const GALAXY_RICH: readonly LayeredBackgroundLayer[] = GALAXY.map(
     return item;
   },
 );
+
+const WORLD01_GALAXY: readonly LayeredBackgroundLayer[] =
+  GALAXY_RICH.filter((item) => item.id !== "galaxy-planet-primary");
 
 const GALAXY_PRISM: readonly LayeredBackgroundLayer[] = [
   ...GALAXY_RICH.map((item) => {
@@ -697,7 +699,10 @@ export function layeredBackgroundForScene(
       scene.worldId === "world-01"
         ? "authored-production"
         : "legacy-hybrid",
-    layers: familyLayers(scene),
+    layers:
+      scene.worldId === "world-01"
+        ? WORLD01_GALAXY
+        : familyLayers(scene),
   };
 }
 
