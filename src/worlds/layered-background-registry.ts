@@ -421,7 +421,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "vendor/ohjirochan/asteroid-large.png",
       0.94,
       0.56,
-      0.27,
+      0.29,
       0.965,
       0.17,
       -0.014,
