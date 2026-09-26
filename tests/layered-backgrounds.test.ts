@@ -90,9 +90,9 @@ describe("Layered authored background registry", () => {
   it("gives Worlds 02-05 isolated theme-specific authored layers", () => {
     const signatures: Record<string, readonly string[]> = {
       "world-02": [
-        "/backgrounds/heaven/sky.svg",
-        "/backgrounds/heaven/halo-gate.svg",
+        "/backgrounds/heaven/halo-garden-production-v1.webp",
         "/backgrounds/heaven/cloud-islands.svg",
+        "/backgrounds/heaven/halo-gate.svg",
       ],
       "world-03": [
         "/backgrounds/vendor/screaming-brain/nebula-blue-6-1024.png",
@@ -132,6 +132,20 @@ describe("Layered authored background registry", () => {
         ),
         worldId + " should not reuse the large blue planet",
       ).toBe(false);
+
+      if (worldId === "world-02") {
+        const productionArt = profile.layers.find(
+          (layer) => layer.id === "halo-garden-production-art",
+        );
+        expect(productionArt?.src).toContain(
+          "/backgrounds/heaven/halo-garden-production-v1.webp",
+        );
+        expect(productionArt?.fit).toBe("cover");
+        expect(productionArt?.opacity).toBe(1);
+        expect(
+          profile.layers.some((layer) => layer.src.includes("heaven/sky.svg")),
+        ).toBe(false);
+      }
       expect(
         profile.layers.some((layer) => layer.scale >= 1.7 && layer.depth > 0.25),
         worldId + " should keep large foreground overlays out of gameplay",

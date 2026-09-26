@@ -17,6 +17,10 @@ const PNG_FILES = [
   "public/assets/space-typing/backgrounds/vendor/ohjirochan/asteroid-large.png",
 ];
 
+const WEBP_FILES = [
+  "public/assets/space-typing/backgrounds/heaven/halo-garden-production-v1.webp",
+];
+
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
 function assertPng(relative, data) {
@@ -50,4 +54,27 @@ console.log(
   "Background asset integrity PASS:",
   dimensions.length,
   "PNG files with valid headers/dimensions.",
+);
+
+
+function assertWebp(relative, data) {
+  if (
+    data.length < 12 ||
+    data.subarray(0, 4).toString("ascii") !== "RIFF" ||
+    data.subarray(8, 12).toString("ascii") !== "WEBP"
+  ) {
+    throw new Error(relative + ": invalid WebP RIFF signature.");
+  }
+}
+
+for (const relative of WEBP_FILES) {
+  const absolute = resolve(process.cwd(), relative);
+  const data = await readFile(absolute);
+  assertWebp(relative, data);
+}
+
+console.log(
+  "Background WebP integrity PASS:",
+  WEBP_FILES.length,
+  "production WebP file(s) with valid RIFF/WEBP signatures.",
 );

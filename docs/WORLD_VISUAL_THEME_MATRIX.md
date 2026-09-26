@@ -23,7 +23,7 @@ Galaxy and the maintenance rules used by later World migrations.
 | World | Name | Family | Signature composition |
 | --- | --- | --- | --- |
 | world-01 | Rainbow Reach | galaxy | purple/blue nebula, sparse asteroid depth, no large left ocean planet |
-| world-02 | Halo Garden | heaven | heaven sky, halo gate, cloud islands, faint aurora |
+| world-02 | Halo Garden | heaven | generated production painting (celestial gateway/cloud sanctuary) + very subtle depth overlays |
 | world-03 | Prismatic Tide | prism | blue/purple nebula volume, aurora sheet, orbital prism rings |
 | world-04 | Cherub Falls | cherub | heaven sky, asymmetric cloud bank, small halo, lightfall |
 | world-05 | Aurora Gate | aurora | dark meteor sky, aurora wave, halo portal, asteroid belt/comet edge accents |
@@ -33,3 +33,11 @@ Galaxy and the maintenance rules used by later World migrations.
 World 06 and later remain `legacy-hybrid` until their own theme batch is
 implemented and reviewed. Infernal begins at World 06 in the canonical World
 registry; it is intentionally not substituted into World 03.
+
+
+## World 02 production-art rule
+
+`world-02` now uses `heaven/halo-garden-production-v1.webp` as the primary
+full-frame artwork. The older vector sky is deliberately not used in the
+production composition. Secondary vector layers are kept at very low opacity
+only for subtle parallax and must not visually overwrite the approved painting.
