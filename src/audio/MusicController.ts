@@ -59,8 +59,8 @@ type FadeState = {
   outgoingStart: number[];
 };
 
-const DEFAULT_MUSIC_VOLUME = 0.34;
-const DEFAULT_AMBIENT_VOLUME = 0.14;
+const DEFAULT_MUSIC_VOLUME = 0.26;
+const DEFAULT_AMBIENT_VOLUME = 0.08;
 const FADE_TICK_MS = 40;
 
 function browserAudioFactory(src: string): AudioLike | null {
