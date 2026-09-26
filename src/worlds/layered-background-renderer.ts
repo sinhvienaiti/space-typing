@@ -72,6 +72,7 @@ function qualityInstanceFactor(
 
 export class LayeredBackgroundRenderer {
   private readonly assets = new Map<string, LoadedBackgroundAsset>();
+  private readonly treatedAssets = new Map<string, HTMLCanvasElement>();
   private readonly instanceCache = new Map<
     string,
     readonly LayeredBackgroundInstance[]
@@ -79,6 +80,7 @@ export class LayeredBackgroundRenderer {
 
   clear(): void {
     this.assets.clear();
+    this.treatedAssets.clear();
     this.instanceCache.clear();
   }
 
@@ -105,10 +107,138 @@ export class LayeredBackgroundRenderer {
     return state;
   }
 
-  preload(profile: LayeredBackgroundProfile): void {
+  preload(
+    profile: LayeredBackgroundProfile,
+    quality: LayeredBackgroundDrawInput["quality"],
+  ): void {
     for (const layer of profile.layers) {
+      if (layer.optional && !qualityAllowsOptional(quality)) continue;
       this.asset(layer.src);
     }
+  }
+
+  private treatedAsset(
+    layer: LayeredBackgroundLayer,
+    asset: LoadedBackgroundAsset,
+  ): CanvasImageSource {
+    if (
+      layer.artTreatment !== "asteroid" ||
+      typeof document === "undefined" ||
+      !asset.loaded ||
+      asset.failed
+    ) {
+      return asset.image;
+    }
+
+    const cacheKey = layer.src + ":asteroid-v2";
+    const cached = this.treatedAssets.get(cacheKey);
+    if (cached !== undefined) return cached;
+
+    const sourceWidth = Math.max(
+      1,
+      asset.image.naturalWidth || asset.image.width,
+    );
+    const sourceHeight = Math.max(
+      1,
+      asset.image.naturalHeight || asset.image.height,
+    );
+    const longest = Math.max(sourceWidth, sourceHeight);
+    const upscale = clamp(176 / longest, 1, 4);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(sourceWidth * upscale));
+    canvas.height = Math.max(1, Math.round(sourceHeight * upscale));
+    const context = canvas.getContext("2d");
+    if (context === null) return asset.image;
+
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(
+      asset.image,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
+
+    // Enrich the very small arcade meteor sprites once, at load time. The
+    // resulting canvas is cached and becomes an ordinary drawImage source in
+    // the frame loop: no blur, crater generation or new canvas allocation per
+    // frame.
+    context.save();
+    context.globalCompositeOperation = "source-atop";
+
+    const light = context.createLinearGradient(
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
+    light.addColorStop(0, "rgba(218, 231, 255, 0.24)");
+    light.addColorStop(0.38, "rgba(117, 138, 177, 0.04)");
+    light.addColorStop(0.7, "rgba(23, 21, 38, 0.08)");
+    light.addColorStop(1, "rgba(3, 4, 10, 0.46)");
+    context.fillStyle = light;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    const seed = stringSeed(layer.src);
+    const craterCount = 4 + Math.floor(seededUnit(seed, 0, 91) * 4);
+    for (let index = 0; index < craterCount; index += 1) {
+      const x = canvas.width * (0.2 + seededUnit(seed, index, 92) * 0.6);
+      const y =
+        canvas.height * (0.2 + seededUnit(seed, index, 93) * 0.58);
+      const radius =
+        Math.min(canvas.width, canvas.height) *
+        (0.035 + seededUnit(seed, index, 94) * 0.075);
+      const squash = 0.48 + seededUnit(seed, index, 95) * 0.34;
+      const angle = seededUnit(seed, index, 96) * Math.PI;
+
+      context.save();
+      context.translate(x, y);
+      context.rotate(angle);
+      context.scale(1, squash);
+      context.fillStyle =
+        "rgba(4, 5, 12, " +
+        String(0.16 + seededUnit(seed, index, 97) * 0.14) +
+        ")";
+      context.beginPath();
+      context.arc(0, 0, radius, 0, Math.PI * 2);
+      context.fill();
+
+      context.strokeStyle =
+        "rgba(226, 234, 255, " +
+        String(0.08 + seededUnit(seed, index, 98) * 0.08) +
+        ")";
+      context.lineWidth = Math.max(0.8, radius * 0.12);
+      context.beginPath();
+      context.arc(
+        -radius * 0.08,
+        -radius * 0.14,
+        radius * 0.78,
+        Math.PI * 1.06,
+        Math.PI * 1.78,
+      );
+      context.stroke();
+      context.restore();
+    }
+
+    const specks = 8;
+    for (let index = 0; index < specks; index += 1) {
+      const x = canvas.width * seededUnit(seed, index, 101);
+      const y = canvas.height * seededUnit(seed, index, 102);
+      const radius =
+        0.6 + seededUnit(seed, index, 103) * 1.3;
+      context.fillStyle =
+        "rgba(238, 242, 255, " +
+        String(0.05 + seededUnit(seed, index, 104) * 0.07) +
+        ")";
+      context.beginPath();
+      context.arc(x, y, radius, 0, Math.PI * 2);
+      context.fill();
+    }
+
+    context.restore();
+    this.treatedAssets.set(cacheKey, canvas);
+    return canvas;
   }
 
   private instancesFor(
@@ -198,8 +328,26 @@ export class LayeredBackgroundRenderer {
     const { width, height, time, flightIntensity, variant } = input;
     const { layer, index } = instance;
     const image = asset.image;
-    const naturalWidth = Math.max(1, image.naturalWidth || image.width);
-    const naturalHeight = Math.max(1, image.naturalHeight || image.height);
+    const renderSource = this.treatedAsset(layer, asset);
+    const treatedCanvas =
+      typeof HTMLCanvasElement !== "undefined" &&
+      renderSource instanceof HTMLCanvasElement
+        ? renderSource
+        : null;
+    const naturalWidth = Math.max(
+      1,
+      layer.sourceRect?.width ??
+        treatedCanvas?.width ??
+        image.naturalWidth ??
+        image.width,
+    );
+    const naturalHeight = Math.max(
+      1,
+      layer.sourceRect?.height ??
+        treatedCanvas?.height ??
+        image.naturalHeight ??
+        image.height,
+    );
     const viewportRatio = width / Math.max(1, height);
     const imageRatio = naturalWidth / naturalHeight;
     const authoredScale = layer.scale * instance.scaleMultiplier;
@@ -281,6 +429,42 @@ export class LayeredBackgroundRenderer {
         height * (0.018 + Math.max(0.03, layer.spreadY ?? 0.06)) * depth;
       offsetX = Math.cos(angle) * radiusX;
       offsetY = Math.sin(angle) * radiusY;
+    } else if (motionKind === "flyby") {
+      travelling = true;
+      const cycle = positiveModulo(
+        time *
+          (0.0045 + dominantDrift * 0.26) *
+          motionStrength *
+          instance.speedMultiplier +
+          phase * 0.071,
+        1,
+      );
+      const visibleStart = 0.16;
+      const visibleEnd = 0.84;
+      if (cycle < visibleStart || cycle > visibleEnd) {
+        travelFade = 0;
+      } else {
+        const progress =
+          (cycle - visibleStart) / (visibleEnd - visibleStart);
+        const direction = instance.anchorX < 0.5 ? 1 : -1;
+        const eased = progress * progress * (3 - 2 * progress);
+        offsetX =
+          direction *
+          (-width * 0.9 + eased * width * 1.8);
+        offsetY =
+          Math.sin(progress * Math.PI + phase) *
+          height *
+          (0.025 + depth * 0.035);
+        motionScale =
+          0.82 +
+          Math.sin(progress * Math.PI) *
+            (0.08 + depth * 0.08);
+        travelFade = clamp(
+          Math.min(progress / 0.08, (1 - progress) / 0.08),
+          0,
+          1,
+        );
+      }
     } else if (motionKind === "approach") {
       const cycleSpeed =
         0.008 +
@@ -346,13 +530,27 @@ export class LayeredBackgroundRenderer {
       context.globalCompositeOperation = blendMode(layer.blend);
       context.translate(x, y);
       context.rotate(rotation);
-      context.drawImage(
-        image,
-        -drawWidth * 0.5,
-        -drawHeight * 0.5,
-        drawWidth,
-        drawHeight,
-      );
+      if (layer.sourceRect !== undefined && renderSource === image) {
+        context.drawImage(
+          image,
+          layer.sourceRect.x,
+          layer.sourceRect.y,
+          layer.sourceRect.width,
+          layer.sourceRect.height,
+          -drawWidth * 0.5,
+          -drawHeight * 0.5,
+          drawWidth,
+          drawHeight,
+        );
+      } else {
+        context.drawImage(
+          renderSource,
+          -drawWidth * 0.5,
+          -drawHeight * 0.5,
+          drawWidth,
+          drawHeight,
+        );
+      }
       context.restore();
     };
 
@@ -384,7 +582,7 @@ export class LayeredBackgroundRenderer {
     profile: LayeredBackgroundProfile,
     input: LayeredBackgroundDrawInput,
   ): boolean {
-    this.preload(profile);
+    this.preload(profile, input.quality);
     let drewAny = false;
 
     for (const instance of this.instancesFor(profile, input.quality)) {
