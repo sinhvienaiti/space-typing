@@ -1,4 +1,5 @@
 import type {
+  BackgroundTreatment,
   LayeredBackgroundDrawInput,
   LayeredBackgroundLayer,
   LayeredBackgroundProfile,
@@ -9,10 +10,121 @@ function positiveModulo(value: number, modulus: number): number {
   return ((value % modulus) + modulus) % modulus;
 }
 
-function qualityAllowsOptional(
+const QUALITY_RANK: Readonly<
+  Record<LayeredBackgroundDrawInput["quality"], number>
+> = {
+  low: 0,
+  medium: 1,
+  high: 2,
+  ultra: 3,
+};
+
+export function qualityAllowsLayer(
+  layer: LayeredBackgroundLayer,
   quality: LayeredBackgroundDrawInput["quality"],
 ): boolean {
-  return quality === "high" || quality === "ultra";
+  const minimum = layer.minQuality ?? (layer.optional ? "high" : "low");
+  return QUALITY_RANK[quality] >= QUALITY_RANK[minimum];
+}
+
+type BackgroundTreatmentStyle = {
+  filter: string;
+  shadowColor: string;
+  shadowBlur: number;
+};
+
+const BACKGROUND_TREATMENTS: Readonly<
+  Record<BackgroundTreatment, BackgroundTreatmentStyle>
+> = {
+  none: {
+    filter: "none",
+    shadowColor: "rgba(0, 0, 0, 0)",
+    shadowBlur: 0,
+  },
+  "galaxy-rock-far": {
+    filter:
+      "sepia(0.22) saturate(1.35) hue-rotate(165deg) brightness(0.78) contrast(0.88)",
+    shadowColor: "rgba(93, 173, 255, 0.16)",
+    shadowBlur: 5,
+  },
+  "galaxy-rock-mid": {
+    filter:
+      "sepia(0.3) saturate(1.5) hue-rotate(170deg) brightness(0.86) contrast(0.92)",
+    shadowColor: "rgba(108, 184, 255, 0.28)",
+    shadowBlur: 9,
+  },
+  "galaxy-rock-near": {
+    filter:
+      "sepia(0.45) saturate(2.1) hue-rotate(178deg) brightness(0.9) contrast(0.9)",
+    shadowColor: "rgba(137, 111, 255, 0.38)",
+    shadowBlur: 24,
+  },
+};
+
+export function backgroundTreatmentStyle(
+  treatment: BackgroundTreatment | undefined,
+): BackgroundTreatmentStyle {
+  return BACKGROUND_TREATMENTS[treatment ?? "none"];
+}
+
+
+export function backgroundLayerRotation(
+  layer: LayeredBackgroundLayer,
+  time: number,
+  speedMultiplier: number,
+  phase: number,
+): number {
+  if (Math.abs(layer.rotationSpeed) < 0.000001) return 0;
+  return (
+    time * layer.rotationSpeed * speedMultiplier +
+    phase * 0.08 +
+    Math.sin(time * 0.07 + phase) * layer.rotationSpeed * 0.3
+  );
+}
+
+export function backgroundParallaxOffset(
+  width: number,
+  height: number,
+  depth: number,
+  driftX: number,
+  driftY: number,
+  time: number,
+  speedMultiplier: number,
+  motionStrength: number,
+  phase: number,
+): { x: number; y: number } {
+  const dominantDrift = Math.max(Math.abs(driftX), Math.abs(driftY));
+  const directionX = driftX < 0 ? -1 : 1;
+  const directionY = driftY < 0 ? -1 : 1;
+  const amplitudeX =
+    width *
+    clamp(
+      0.018 + Math.abs(driftX) * 8 + depth * 0.015,
+      0.018,
+      0.075,
+    );
+  const amplitudeY =
+    height *
+    clamp(
+      0.008 + Math.abs(driftY) * 10 + depth * 0.008,
+      0.008,
+      0.038,
+    );
+  const angularSpeed =
+    (0.22 + depth * 0.16 + dominantDrift * 18) *
+    speedMultiplier *
+    Math.max(0.7, motionStrength);
+
+  return {
+    x:
+      Math.sin(time * angularSpeed + phase) *
+      amplitudeX *
+      directionX,
+    y:
+      Math.cos(time * angularSpeed * 0.72 + phase) *
+      amplitudeY *
+      directionY,
+  };
 }
 
 function blendMode(
@@ -110,7 +222,7 @@ export class LayeredBackgroundRenderer {
     quality: LayeredBackgroundDrawInput["quality"],
   ): void {
     for (const layer of profile.layers) {
-      if (layer.optional && !qualityAllowsOptional(quality)) continue;
+      if (!qualityAllowsLayer(layer, quality)) continue;
       this.asset(layer.src);
     }
   }
@@ -127,7 +239,7 @@ export class LayeredBackgroundRenderer {
     const qualityFactor = qualityInstanceFactor(quality);
 
     for (const layer of profile.layers) {
-      if (layer.optional && !qualityAllowsOptional(quality)) continue;
+      if (!qualityAllowsLayer(layer, quality)) continue;
 
       const requested = clamp(Math.round(layer.instances ?? 1), 1, 12);
       const count =
@@ -349,6 +461,22 @@ export class LayeredBackgroundRenderer {
         0,
         1,
       );
+    } else if (motionKind === "parallax") {
+      // Authored parallax must be visible over normal 5-10 second gameplay
+      // captures while remaining bounded and deterministic.
+      const parallax = backgroundParallaxOffset(
+        width,
+        height,
+        depth,
+        driftX,
+        driftY,
+        time,
+        instance.speedMultiplier,
+        motionStrength,
+        phase,
+      );
+      offsetX = parallax.x;
+      offsetY = parallax.y;
     } else if (motionKind === "float") {
       const amplitudeX =
         width * (0.008 + Math.abs(driftX) * 7) * depth;
@@ -382,15 +510,24 @@ export class LayeredBackgroundRenderer {
 
     const centerX = width * instance.anchorX + offsetX;
     const centerY = height * instance.anchorY + offsetY;
-    const rotation =
-      time * layer.rotationSpeed * instance.speedMultiplier +
-      phase * 0.08 +
-      Math.sin(time * 0.07 + phase) * layer.rotationSpeed * 0.3;
+    const rotation = backgroundLayerRotation(
+      layer,
+      time,
+      instance.speedMultiplier,
+      phase,
+    );
 
+    const treatment = backgroundTreatmentStyle(layer.treatment);
     const drawAt = (x: number, y: number): void => {
       context.save();
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "high";
       context.globalAlpha = opacity;
       context.globalCompositeOperation = blendMode(layer.blend);
+      context.filter = treatment.filter;
+      context.shadowColor = treatment.shadowColor;
+      context.shadowBlur =
+        treatment.shadowBlur * (0.72 + clamp(layer.depth, 0, 1) * 0.56);
       context.translate(x, y);
       context.rotate(rotation);
       if (layer.sourceRect !== undefined) {

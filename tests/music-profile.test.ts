@@ -101,9 +101,13 @@ describe("M08 World music profiles", () => {
     expect(candidates[1]).toBe(
       "/assets/audio/music/mysterious-ambience.mp3",
     );
+    expect(profile.ambientLayers).toHaveLength(1);
     expect(
       assetCandidates(profile.ambientLayers[0] ?? null)[1],
     ).toBe("/assets/audio/ambient/engine-loop.ogg");
+    expect(
+      profile.ambientLayers.flatMap((asset) => assetCandidates(asset)),
+    ).not.toContain("/assets/audio/ambient/computer-loop.ogg");
     const intenseCandidates = assetCandidates(
       musicAssetForState(profile, "WORLD_INTENSE"),
     );

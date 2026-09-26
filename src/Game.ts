@@ -7766,16 +7766,33 @@ export class Game {
 
   private drawProjectile(projectile: EnemyProjectile): void {
     const context = this.context;
+    const brightWorld = this.worldSceneProfile.worldId === "world-02";
 
     context.save();
     context.translate(projectile.x, projectile.y);
+
+    if (brightWorld) {
+      context.globalCompositeOperation = "source-over";
+      context.shadowBlur = 0;
+      context.fillStyle = "rgba(2, 7, 20, 0.78)";
+      context.strokeStyle = "rgba(5, 12, 31, 0.96)";
+      context.lineWidth = 3;
+      context.beginPath();
+      context.arc(0, 0, projectile.radius + 4.5, 0, Math.PI * 2);
+      context.fill();
+      context.stroke();
+    }
+
     context.globalCompositeOperation = "lighter";
     context.shadowBlur =
-      18 * qualityProfile(this.settings.visualQuality).glowScale;
-    context.shadowColor = "#ff5c89";
-    context.fillStyle = "rgba(255, 70, 118, 0.13)";
-    context.strokeStyle = "#ff7298";
-    context.lineWidth = 2;
+      (brightWorld ? 23 : 18) *
+      qualityProfile(this.settings.visualQuality).glowScale;
+    context.shadowColor = "#ff386f";
+    context.fillStyle = brightWorld
+      ? "rgba(255, 48, 108, 0.24)"
+      : "rgba(255, 70, 118, 0.13)";
+    context.strokeStyle = brightWorld ? "#ff477c" : "#ff7298";
+    context.lineWidth = brightWorld ? 3 : 2;
 
     context.beginPath();
     context.arc(0, 0, projectile.radius, 0, Math.PI * 2);
@@ -7783,10 +7800,12 @@ export class Game {
     context.stroke();
 
     context.globalCompositeOperation = "source-over";
-    context.fillStyle = "#fff4f7";
-    context.font = "800 14px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.fillStyle = "#fff8fb";
+    context.font = "900 14px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.textAlign = "center";
     context.textBaseline = "middle";
+    context.shadowBlur = brightWorld ? 4 : 0;
+    context.shadowColor = "rgba(0, 0, 0, 0.95)";
     context.fillText(projectile.char.toUpperCase(), 0, 0);
 
     context.restore();
@@ -8406,10 +8425,67 @@ export class Game {
     context.restore();
   }
 
+  private drawWorld02EnemyBackdrop(
+    enemy: Enemy,
+    targeted: boolean,
+    kick: number,
+  ): void {
+    if (this.worldSceneProfile.worldId !== "world-02") return;
+
+    const context = this.context;
+    const x = enemy.x;
+    const y = enemy.y - kick;
+
+    // Keep this allocation-free in the hot enemy loop. Two bounded dark discs
+    // create silhouette contrast without recolouring enemy families globally.
+    context.save();
+    context.globalCompositeOperation = "source-over";
+    context.fillStyle = targeted
+      ? "rgba(1, 8, 24, 0.5)"
+      : "rgba(2, 7, 20, 0.4)";
+    context.beginPath();
+    context.arc(
+      x,
+      y,
+      enemy.radius * (targeted ? 1.42 : 1.3),
+      0,
+      Math.PI * 2,
+    );
+    context.fill();
+
+    context.fillStyle = "rgba(2, 7, 20, 0.24)";
+    context.beginPath();
+    context.arc(
+      x,
+      y,
+      enemy.radius * (targeted ? 1.62 : 1.5),
+      0,
+      Math.PI * 2,
+    );
+    context.fill();
+
+    context.strokeStyle = targeted
+      ? "rgba(109, 246, 255, 0.72)"
+      : "rgba(7, 16, 38, 0.72)";
+    context.lineWidth = targeted ? 2.2 : 1.8;
+    context.beginPath();
+    context.arc(
+      x,
+      y,
+      enemy.radius * (targeted ? 1.16 : 1.08),
+      0,
+      Math.PI * 2,
+    );
+    context.stroke();
+    context.restore();
+  }
+
   private drawEnemy(enemy: Enemy): void {
     const context = this.context;
     const targeted = enemy.id === this.targetId;
     const kick = enemy.kick * 7;
+
+    this.drawWorld02EnemyBackdrop(enemy, targeted, kick);
 
     // Recall reuses the normal enemy art language. Only the filled inner orb
     // and default face are removed; the normal shell, wings and aura remain.
@@ -9090,11 +9166,22 @@ export class Game {
       : "rgba(202, 215, 229, 0.8)";
     const objectiveTarget =
       this.stageObjective?.targetEnemyId === enemy.id;
-    context.fillText(
-      (objectiveTarget ? "OBJECTIVE · " : "") + layerLabel,
-      enemy.x,
-      y - 25,
-    );
+    const layerText =
+      (objectiveTarget ? "OBJECTIVE · " : "") + layerLabel;
+    if (this.worldSceneProfile.worldId === "world-02") {
+      const metaWidth = this.measureTextWidth(layerText);
+      context.fillStyle = "rgba(1, 6, 17, 0.78)";
+      context.fillRect(
+        enemy.x - metaWidth / 2 - 5,
+        y - 32,
+        metaWidth + 10,
+        12,
+      );
+      context.fillStyle = targeted
+        ? "rgba(224, 252, 255, 0.98)"
+        : "rgba(226, 235, 246, 0.92)";
+    }
+    context.fillText(layerText, enemy.x, y - 25);
 
     if (
       enemy.pendingSkillId !== undefined &&

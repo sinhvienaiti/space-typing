@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { sceneProfileForWorld } from "../src/worlds/scene-registry";
 import {
+  galaxySceneryReadabilityFactor,
+  productionGalaxyPolishEnabled,
   worldSceneCacheKey,
   worldSceneRenderPolicy,
 } from "../src/worlds/scene-renderer";
@@ -54,5 +56,51 @@ describe("World scene renderer cache contract", () => {
       .not.toBe(base);
     expect(worldSceneCacheKey(first, 1280, 720, 1.5, "ultra"))
       .not.toBe(base);
+  });
+});
+
+
+describe("Galaxy production polish contract", () => {
+  it("limits the new readability bias to the accepted World 01 production scene", () => {
+    expect(
+      productionGalaxyPolishEnabled(
+        sceneProfileForWorld("world-01"),
+      ),
+    ).toBe(true);
+    expect(
+      productionGalaxyPolishEnabled(
+        sceneProfileForWorld("world-02"),
+      ),
+    ).toBe(false);
+    expect(
+      productionGalaxyPolishEnabled(
+        sceneProfileForWorld("world-03"),
+      ),
+    ).toBe(false);
+  });
+
+  it("suppresses the active center while preserving and slightly enriching outer thirds for stars and ambient scenery", () => {
+    const center = galaxySceneryReadabilityFactor(0.5, 0.35);
+    const shoulder = galaxySceneryReadabilityFactor(0.35, 0.35);
+    const edge = galaxySceneryReadabilityFactor(0.12, 0.35);
+    const hudBand = galaxySceneryReadabilityFactor(0.5, 0.05);
+
+    expect(center).toBeLessThan(0.4);
+    expect(shoulder).toBeGreaterThan(center);
+    expect(shoulder).toBeLessThan(1);
+    expect(edge).toBeGreaterThan(1);
+    expect(hudBand).toBe(1);
+  });
+});
+
+
+describe("World 01 star-density cleanup", () => {
+  it("keeps production polish isolated to World 01", () => {
+    expect(productionGalaxyPolishEnabled(sceneProfileForWorld("world-01"))).toBe(
+      true,
+    );
+    expect(productionGalaxyPolishEnabled(sceneProfileForWorld("world-02"))).toBe(
+      false,
+    );
   });
 });

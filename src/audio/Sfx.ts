@@ -191,8 +191,10 @@ export class Sfx {
   }
 
   projectileWarning(): void {
+    // Enemy skill telegraphs are frequent and already visible on-screen.
+    // Keep mix ducking for readability, but do not synthesize the old
+    // high-pitched warning beep on every telegraph.
     this.notifyWarning(180);
-    this.tone(680, 0.055, "triangle", 0.018, 520, "warnings");
   }
 
   shieldBreak(): void {

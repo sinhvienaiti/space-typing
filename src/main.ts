@@ -66,6 +66,10 @@ import {
   type CrashRecoveryReason,
 } from "./campaign/expansion-state";
 import {
+  canSelectCampaignStageWithTestingUnlock,
+  isTestingStagePreview,
+} from "./campaign/stage-selection-access";
+import {
   createStageConfig,
   stageRole,
   GALAXY_COUNT,
@@ -501,6 +505,7 @@ const defaultSettings: GameSettings = {
   ambientVolume: 0.08,
   screenShake: true,
   visualQuality: "high",
+  unlockAllStages: false,
   pronunciationEnabled: true,
   pronunciationRate: 1,
   pronunciationVolume: 1,
@@ -537,6 +542,10 @@ function loadSettings(): GameSettings {
         parsed.visualQuality === "ultra"
           ? parsed.visualQuality
           : defaultSettings.visualQuality,
+      unlockAllStages:
+        typeof parsed.unlockAllStages === "boolean"
+          ? parsed.unlockAllStages
+          : false,
       pronunciationEnabled:
         typeof parsed.pronunciationEnabled === "boolean"
           ? parsed.pronunciationEnabled
@@ -967,6 +976,9 @@ type AutosaveSnapshot = {
   stageEntrySnapshot: StageEntrySnapshot | null;
 };
 
+let testingStageOverride: number | null = null;
+let testingStageSnapshot: AutosaveSnapshot | null = null;
+
 const campaignAutosave = new AutosaveQueue<
   AutosaveSnapshot,
   PersistenceSource
@@ -1067,6 +1079,57 @@ function currentAutosaveSnapshot(): AutosaveSnapshot {
     stageEntrySnapshot,
   };
 }
+
+function testingStageUnlockEnabled(): boolean {
+  return settings.unlockAllStages === true && ascension.selectedTier === 0;
+}
+
+function canSelectStageFromJourney(stage: number): boolean {
+  return canSelectCampaignStageWithTestingUnlock(
+    campaign,
+    campaignExpansion,
+    stage,
+    testingStageUnlockEnabled(),
+  );
+}
+
+function testingStagePreviewActive(): boolean {
+  return (
+    testingStageOverride !== null &&
+    isTestingStagePreview(
+      campaign,
+      campaignExpansion,
+      testingStageOverride,
+      testingStageUnlockEnabled(),
+    )
+  );
+}
+
+function beginTestingStagePreview(stage: number): void {
+  testingStageSnapshot = structuredClone(currentAutosaveSnapshot());
+  testingStageOverride = stage;
+}
+
+function restoreTestingStagePersistentState(): void {
+  const snapshot = testingStageSnapshot;
+  if (snapshot === null) return;
+
+  applyRunPersistentState(snapshot);
+  hotbar = snapshot.hotbar;
+  codex = snapshot.codex;
+  campaignExpansion = snapshot.campaignExpansion;
+  checkpointSnapshot = snapshot.checkpointSnapshot;
+  crashRecoverySnapshot = snapshot.crashRecoverySnapshot;
+  stageEntrySnapshot = snapshot.stageEntrySnapshot;
+  testingStageSnapshot = null;
+  refreshPersistentStateUi();
+}
+
+function clearTestingStagePreview(): void {
+  restoreTestingStagePersistentState();
+  testingStageOverride = null;
+}
+
 
 function captureSafeCrashRecovery(
   reason: CrashRecoveryReason,
@@ -2131,6 +2194,9 @@ function renderProgression(): void {
 }
 
 function selectedGameplayStage(): number {
+  if (testingStageUnlockEnabled() && testingStageOverride !== null) {
+    return testingStageOverride;
+  }
   return currentAscensionStage(ascension) ?? campaign.selectedStage;
 }
 
@@ -2507,6 +2573,19 @@ async function resolveCheckpointDeath(
   setDeathActionPending(true);
   try {
     const failedStage = game.getStats().stage;
+
+    if (testingStagePreviewActive()) {
+      restoreTestingStagePersistentState();
+      testingStageOverride = failedStage;
+      game.backToTitle();
+      if (action === "retry") {
+        await startSelectedStage();
+      } else if (action === "stage-select") {
+        openStageSelect();
+      }
+      return;
+    }
+
     campaign = selectCampaignStage(campaign, failedStage);
     refreshPersistentStateUi();
 
@@ -2602,6 +2681,72 @@ function formatStageDuration(seconds: number): string {
   const total = Math.max(0, Math.round(seconds));
   const minutes = Math.floor(total / 60);
   return String(minutes) + ":" + String(total % 60).padStart(2, "0");
+}
+
+function renderTestingStageClearReport(
+  stats: GameStats,
+  stageSession: StageSessionSnapshot,
+  wpm: number,
+  accuracy: number,
+): void {
+  const world = worldForStage(stats.stage);
+  const objective = game.getStageObjective();
+  const rating = stageResultStars(
+    accuracy,
+    objective?.status ?? null,
+  );
+  const measuredKills =
+    stageSession.regularKills +
+    stageSession.eliteKills +
+    stageSession.bossKills;
+  const killRate =
+    stageSession.elapsedSeconds <= 0
+      ? 0
+      : (measuredKills / stageSession.elapsedSeconds) * 60;
+
+  byId("clearTitle").textContent =
+    "Stage " + String(stats.stage).padStart(3, "0") + " complete";
+  byId("clearMeta").textContent =
+    world.name +
+    " · TESTING PREVIEW · " +
+    difficultySettings.mode.toUpperCase();
+  byId("clearStars").textContent =
+    "★".repeat(rating.stars) + "☆".repeat(3 - rating.stars);
+  byId("clearStarRule").textContent =
+    "Testing preview · rating shown, campaign progression unchanged";
+  byId("clearScore").textContent = stats.score.toLocaleString();
+  byId("clearAccuracy").textContent = accuracy.toFixed(1) + "%";
+  byId("clearWpm").textContent = wpm.toFixed(0);
+  byId("clearTime").textContent =
+    formatStageDuration(stageSession.elapsedSeconds);
+  byId("clearKillRate").textContent = killRate.toFixed(1) + "/min";
+  byId("clearStreak").textContent = String(stats.maxStreak);
+
+  wordReviewFilter = "all";
+  renderMeasuredStageSession(stageSession, stats.hits, stats.misses);
+
+  replaceCurrencyChips(
+    byId("clearCredits"),
+    {
+      credits: 0,
+      alloy: 0,
+      starCrystal: 0,
+      quantumCore: 0,
+    },
+    {
+      signed: true,
+      className: "stage-reward-chips",
+    },
+  );
+
+  const progressPanel = byId("clearCharacterProgress");
+  progressPanel.replaceChildren();
+  const note = document.createElement("span");
+  note.textContent =
+    "Testing preview · XP, loot, currency, unlocks and checkpoints are not saved.";
+  progressPanel.append(note);
+  byId("clearDetails").textContent =
+    "Temporary all-stage access · disable Unlock all stages in Settings to restore normal progression locks.";
 }
 
 function appendResultMetric(
@@ -3000,9 +3145,22 @@ const game = new Game(
 
         deathActionGate.leave();
 
-        const deathAt = new Date().toISOString();
-        markCrashRecoveryDeathInvalid(deathAt);
-        renderDeathProtectionChoices(stats.stage);
+        if (testingStagePreviewActive()) {
+          restoreTestingStagePersistentState();
+          byId("againButton").textContent =
+            "Retry Testing Stage " + String(stats.stage).padStart(3, "0");
+          byId("gameOverStageSelectButton").textContent =
+            "Choose any testing stage";
+          byId("deathProtectionMeta").textContent =
+            "Testing preview · campaign progress, rewards and death state were not saved.";
+          byId("deathProtectionActions").classList.add("hidden");
+          byId("phoenixCoreButton").classList.add("hidden");
+          setDeathNavigationDisabled(false);
+        } else {
+          const deathAt = new Date().toISOString();
+          markCrashRecoveryDeathInvalid(deathAt);
+          renderDeathProtectionChoices(stats.stage);
+        }
       }
     },
     onStage: (stage) => {
@@ -3030,6 +3188,21 @@ const game = new Game(
         stageSession.correctWordKeys,
         stageSession.wrongWordKeys,
       );
+
+      if (testingStagePreviewActive()) {
+        const completedStage = stats.stage;
+        restoreTestingStagePersistentState();
+        renderTestingStageClearReport(
+          stats,
+          stageSession,
+          wpm,
+          accuracy,
+        );
+        testingStageOverride = Math.min(1000, completedStage + 1);
+        updateCampaignUi();
+        return;
+      }
+
       const activeHidden = currentHiddenEncounterState().active;
       if (activeHidden !== null) {
         handleHiddenEncounterClear(
@@ -6057,14 +6230,24 @@ async function startSelectedStage(): Promise<void> {
     stageStartPending ||
     routeChoicePending
   ) return;
-  // Do not let rapid Next clicks skip an unvisited checkpoint rest stop.
-  if (pendingRestHubStage(shops) !== null && ascension.selectedTier === 0) {
+
+  const testingPreview = testingStagePreviewActive();
+  if (testingPreview && testingStageSnapshot === null) {
+    testingStageSnapshot = structuredClone(currentAutosaveSnapshot());
+  }
+
+  // Testing preview bypasses campaign route/rest gates without modifying them.
+  if (
+    !testingPreview &&
+    pendingRestHubStage(shops) !== null &&
+    ascension.selectedTier === 0
+  ) {
     openRestHub();
     return;
   }
 
   const activeHidden = currentHiddenEncounterState().active;
-  if (activeHidden !== null) {
+  if (!testingPreview && activeHidden !== null) {
     stageStartPending = true;
     try {
       await startActiveHiddenEncounter(activeHidden);
@@ -6075,6 +6258,7 @@ async function startSelectedStage(): Promise<void> {
   }
 
   if (
+    !testingPreview &&
     ascension.selectedTier === 0 &&
     campaign.selectedStage === campaign.highestUnlockedStage
   ) {
@@ -6094,10 +6278,12 @@ async function startSelectedStage(): Promise<void> {
     game.setGameplayMode(gameplayMode, recallSettings);
     game.setCharacter(characters.selected);
     const gameplayStage = selectedGameplayStage();
-    campaign = {
-      ...campaign,
-      selectedStage: gameplayStage,
-    };
+    if (!testingPreview) {
+      campaign = {
+        ...campaign,
+        selectedStage: gameplayStage,
+      };
+    }
     const stage = createStageConfig(gameplayStage);
     const world = worldForStage(stage.stage);
     const vocabularyLevel = selectedVocabularyLevel();
@@ -6116,20 +6302,22 @@ async function startSelectedStage(): Promise<void> {
     );
     activeStageDifficulty = difficulty;
 
-    const stageEntryAt = new Date().toISOString();
-    stageEntrySnapshot = createStageEntrySnapshot(
-      currentRunPersistentState(),
-      campaignExpansion,
-      checkpointSnapshot,
-      stageEntryAt,
-    );
+    if (!testingPreview) {
+      const stageEntryAt = new Date().toISOString();
+      stageEntrySnapshot = createStageEntrySnapshot(
+        currentRunPersistentState(),
+        campaignExpansion,
+        checkpointSnapshot,
+        stageEntryAt,
+      );
 
-    const recoverySaved = await autosaveCampaign(
-      "stage-entry",
-      undefined,
-      "stage-entry",
-    );
-    if (!recoverySaved) return;
+      const recoverySaved = await autosaveCampaign(
+        "stage-entry",
+        undefined,
+        "stage-entry",
+      );
+      if (!recoverySaved) return;
+    }
 
     syncWorldMusicProfile(stage.stage);
     musicController.setBossPhase(1);
@@ -6168,6 +6356,13 @@ async function autosaveCampaign(
   successMessage?: string,
   recoveryReason?: CrashRecoveryReason,
 ): Promise<boolean> {
+  if (testingStagePreviewActive()) {
+    if (successMessage !== undefined) {
+      showNotice("Testing preview · progress/rewards are not saved");
+    }
+    return true;
+  }
+
   if (recoveryReason !== undefined) {
     captureSafeCrashRecovery(recoveryReason);
   }
@@ -6384,6 +6579,7 @@ function updateCampaignUi(): void {
     "-" +
     String(selectedWorld.stageEnd).padStart(3, "0");
   byId("campaignMeta").textContent =
+    (testingStageUnlockEnabled() ? "TEST UNLOCK · " : "") +
     "Unlocked " +
     String(campaign.highestUnlockedStage).padStart(3, "0") +
     " / 1000 · " +
@@ -6434,7 +6630,7 @@ function populateGalaxySelect(): void {
       String(firstStage).padStart(3, "0") +
       "-" +
       String(lastStage).padStart(3, "0");
-    option.disabled = firstStage > campaign.highestUnlockedStage;
+    option.disabled = !canSelectStageFromJourney(firstStage);
     select.append(option);
   }
 }
@@ -6449,7 +6645,7 @@ function populateJourneyWorldSelect(): void {
     option.value = String(number);
     option.textContent =
       "World " + String(number).padStart(2, "0") + " · " + world.name;
-    option.disabled = world.stageStart > campaign.highestUnlockedStage;
+    option.disabled = !canSelectStageFromJourney(world.stageStart);
     select.append(option);
   }
   const firstWorld = (currentGalaxy - 1) * 5 + 1;
@@ -6466,10 +6662,12 @@ function renderStagePreview(): void {
   const stage = selectedJourneyStage;
   const world = worldForStage(stage);
   const node = journeyNodesForStage(stage).find((entry) => entry.stage === stage)!;
-  const isUnlocked = canSelectCampaignStage(
+  const isUnlocked = canSelectStageFromJourney(stage);
+  const isTestingPreview = isTestingStagePreview(
     campaign,
     campaignExpansion,
     stage,
+    testingStageUnlockEnabled(),
   );
   const cleared = campaign.clearedStages.includes(stage);
   const title = byId("stagePreviewTitle");
@@ -6478,7 +6676,13 @@ function renderStagePreview(): void {
     " · " + (node.role === "normal" ? "Combat" : node.role.replace(/-/g, " "));
   byId("stagePreviewMeta").textContent =
     world.name + " · " +
-    (cleared ? "Cleared · Replay available" : isUnlocked ? "Current frontier" : "Locked") +
+    (isTestingPreview
+      ? "Testing preview · campaign progress and rewards will not be saved"
+      : cleared
+        ? "Cleared · Replay available"
+        : isUnlocked
+          ? "Current frontier"
+          : "Locked") +
     (node.checkpoint ? " · Checkpoint milestone" : "");
   const start = byId<HTMLButtonElement>("journeyStartButton");
   start.disabled = !isUnlocked || journeyStartGate.active;
@@ -6521,7 +6725,7 @@ function renderStageGrid(): void {
   const cleared = new Set(campaign.clearedStages);
   const current = campaign.highestUnlockedStage;
   for (const node of nodes) {
-    const unlocked = canSelectCampaignStage(campaign, campaignExpansion, node.stage);
+    const unlocked = canSelectStageFromJourney(node.stage);
     const isCleared = cleared.has(node.stage);
     const button = document.createElement("button");
     button.type = "button";
@@ -6580,9 +6784,14 @@ function renderStageGrid(): void {
 
 function focusJourneyFrontier(): void {
   const scroll = byId("stageGrid");
+  const targetStage = testingStageUnlockEnabled()
+    ? selectedJourneyStage
+    : Math.max(
+        (selectedJourneyWorld - 1) * 20 + 1,
+        Math.min(selectedJourneyWorld * 20, campaign.highestUnlockedStage),
+      );
   const node = scroll.querySelector<HTMLElement>(
-    '[data-stage="' + String(Math.max((selectedJourneyWorld - 1) * 20 + 1,
-      Math.min(selectedJourneyWorld * 20, campaign.highestUnlockedStage))) + '"]',
+    '[data-stage="' + String(targetStage) + '"]',
   );
   if (node !== null) {
     scroll.scrollTop = Math.max(0, node.offsetTop - scroll.clientHeight / 2);
@@ -6595,16 +6804,17 @@ function openStageSelect(): void {
     return;
   }
   populateGalaxySelect();
-  selectedJourneyStage = campaign.selectedStage;
+  selectedJourneyStage =
+    testingStageUnlockEnabled() && testingStageOverride !== null
+      ? testingStageOverride
+      : campaign.selectedStage;
   currentGalaxy = Math.ceil(selectedJourneyStage / STAGES_PER_GALAXY);
   selectedJourneyWorld = Math.ceil(selectedJourneyStage / 20);
   const select = byId<HTMLSelectElement>("galaxySelect");
 
   for (const option of Array.from(select.options)) {
     const galaxy = Number(option.value);
-    option.disabled = !canSelectCampaignStage(
-      campaign,
-      campaignExpansion,
+    option.disabled = !canSelectStageFromJourney(
       (galaxy - 1) * STAGES_PER_GALAXY + 1,
     );
   }
@@ -6739,6 +6949,8 @@ function renderSettings(): void {
     String(renderedSettings.screenShake);
   byId<HTMLSelectElement>("visualQuality").value =
     renderedSettings.visualQuality;
+  byId<HTMLSelectElement>("unlockAllStages").value =
+    String(renderedSettings.unlockAllStages === true);
 
   byId<HTMLSelectElement>("pronunciationEnabled").value =
     String(renderedSettings.pronunciationEnabled);
@@ -6858,15 +7070,30 @@ async function commitSettingsDraft(): Promise<void> {
     return;
   }
 
+  const unlockAllStagesWasEnabled = settings.unlockAllStages === true;
+  const testingPreviewWasActive = testingStagePreviewActive();
+
   settings = structuredClone(settingsDraft);
   difficultySettings = structuredClone(difficultySettingsDraft);
   recallSettings = structuredClone(recallSettingsDraft);
+
+  if (unlockAllStagesWasEnabled && settings.unlockAllStages !== true) {
+    clearTestingStagePreview();
+    if (testingPreviewWasActive && game.getPhase() !== "title") {
+      game.backToTitle();
+    }
+  }
 
   saveSettings();
   saveDifficultySettings();
   saveRecallPreferences();
   settingsDialog.close();
-  showNotice("✓ Settings saved");
+  updateCampaignUi();
+  showNotice(
+    settings.unlockAllStages === true
+      ? "✓ Settings saved · all stages available for testing"
+      : "✓ Settings saved",
+  );
 
   if (shouldReloadStage) {
     game.backToTitle();
@@ -7800,6 +8027,11 @@ for (const id of ["startButton", "nextStageButton"]) {
 }
 for (const id of ["restartButton", "clearRetryButton"]) {
   byId(id).addEventListener("click", () => {
+    if (testingStageUnlockEnabled() && testingStageOverride !== null) {
+      testingStageOverride = game.getStats().stage;
+      void startSelectedStage();
+      return;
+    }
     if (currentHiddenEncounterState().active !== null) {
       void startSelectedStage();
       return;
@@ -7873,7 +8105,12 @@ byId("phoenixCoreButton").addEventListener("click", () => {
 });
 
 for (const id of ["titleButton", "clearTitleButton"]) {
-  byId(id).addEventListener("click", () => game.backToTitle());
+  byId(id).addEventListener("click", () => {
+    if (testingStagePreviewActive()) {
+      restoreTestingStagePersistentState();
+    }
+    game.backToTitle();
+  });
 }
 
 byId("characterButton").addEventListener("click", openCharacters);
@@ -7991,7 +8228,24 @@ byId("journeyStartButton").addEventListener("click", () => {
     renderStagePreview();
 
     try {
-      if (!canSelectCampaignStage(campaign, campaignExpansion, stage)) return;
+      if (!canSelectStageFromJourney(stage)) return;
+
+      const testingPreview = isTestingStagePreview(
+        campaign,
+        campaignExpansion,
+        stage,
+        testingStageUnlockEnabled(),
+      );
+      if (testingPreview) {
+        beginTestingStagePreview(stage);
+        updateCampaignUi();
+        stageSelectDialog.close();
+        game.backToTitle();
+        await startSelectedStage();
+        return;
+      }
+
+      clearTestingStagePreview();
       const previous = campaign;
       const next = selectCampaignStage(campaign, stage);
       if (next.selectedStage !== stage) return;
@@ -8282,6 +8536,19 @@ byId<HTMLSelectElement>("visualQuality").addEventListener(
       ...current,
       visualQuality:
         (event.currentTarget as HTMLSelectElement).value as VisualQuality,
+    };
+    markSettingsDirty();
+  },
+);
+
+byId<HTMLSelectElement>("unlockAllStages").addEventListener(
+  "change",
+  (event) => {
+    const current = settingsDraft ?? settings;
+    settingsDraft = {
+      ...current,
+      unlockAllStages:
+        (event.currentTarget as HTMLSelectElement).value === "true",
     };
     markSettingsDirty();
   },
