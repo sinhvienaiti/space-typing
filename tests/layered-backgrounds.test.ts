@@ -36,12 +36,19 @@ describe("Layered authored background registry", () => {
   });
 
   it("keeps the production migration boundary explicit", () => {
-    expect(
-      layeredBackgroundForScene(sceneProfileForWorld("world-01")).renderMode,
-    ).toBe("authored-production");
+    for (const worldId of [
+      "world-01",
+      "world-02",
+      "world-03",
+      "world-04",
+      "world-05",
+    ]) {
+      expect(
+        layeredBackgroundForScene(sceneProfileForWorld(worldId)).renderMode,
+      ).toBe("authored-production");
+    }
 
     for (const worldId of [
-      "world-02",
       "world-06",
       "world-11",
       "world-16",
@@ -66,6 +73,9 @@ describe("Layered authored background registry", () => {
 
     expect(family("world-01")).toBe("galaxy");
     expect(family("world-02")).toBe("heaven");
+    expect(family("world-03")).toBe("prism");
+    expect(family("world-04")).toBe("cherub");
+    expect(family("world-05")).toBe("aurora");
     expect(family("world-06")).toBe("infernal");
     expect(family("world-11")).toBe("frost-prism");
     expect(family("world-16")).toBe("verdant");
@@ -75,6 +85,75 @@ describe("Layered authored background registry", () => {
     expect(family("world-36")).toBe("aurora-cosmic");
     expect(family("world-41")).toBe("void-cathedral");
     expect(family("world-46")).toBe("eternity");
+  });
+
+  it("gives Worlds 02-05 isolated theme-specific authored layers", () => {
+    const signatures: Record<string, readonly string[]> = {
+      "world-02": [
+        "/backgrounds/heaven/sky.svg",
+        "/backgrounds/heaven/halo-gate.svg",
+        "/backgrounds/heaven/cloud-islands.svg",
+      ],
+      "world-03": [
+        "/backgrounds/vendor/screaming-brain/nebula-blue-6-1024.png",
+        "/backgrounds/frost/aurora.svg",
+        "/backgrounds/eternity/rings.svg",
+      ],
+      "world-04": [
+        "/backgrounds/heaven/sky.svg",
+        "/backgrounds/heaven/cloud-islands.svg",
+        "/backgrounds/heaven/halo-gate.svg",
+      ],
+      "world-05": [
+        "/backgrounds/meteor/sky.svg",
+        "/backgrounds/frost/aurora.svg",
+        "/backgrounds/meteor/asteroid-belt.svg",
+      ],
+    };
+
+    const idSets: string[] = [];
+    for (const [worldId, expectedSources] of Object.entries(signatures)) {
+      const profile = layeredBackgroundForScene(
+        sceneProfileForWorld(worldId),
+      );
+      const sources = profile.layers.map((layer) => layer.src);
+      const ids = profile.layers.map((layer) => layer.id);
+
+      for (const expected of expectedSources) {
+        expect(
+          sources.some((source) => source.includes(expected)),
+          worldId + " missing " + expected,
+        ).toBe(true);
+      }
+
+      expect(
+        profile.layers.some((layer) =>
+          layer.src.includes("planet-ocean-03-512.png"),
+        ),
+        worldId + " should not reuse the large blue planet",
+      ).toBe(false);
+      expect(
+        profile.layers.some((layer) => layer.scale >= 1.7 && layer.depth > 0.25),
+        worldId + " should keep large foreground overlays out of gameplay",
+      ).toBe(false);
+
+      idSets.push(ids.join("|"));
+    }
+
+    expect(new Set(idSets).size).toBe(4);
+  });
+
+  it("keeps authored objects away from a shared cross-World mutable layer set", () => {
+    const worlds = ["world-01", "world-02", "world-03", "world-04", "world-05"];
+    const profiles = worlds.map((worldId) =>
+      layeredBackgroundForScene(sceneProfileForWorld(worldId)),
+    );
+
+    for (let index = 0; index < profiles.length; index += 1) {
+      for (let other = index + 1; other < profiles.length; other += 1) {
+        expect(profiles[index]!.layers).not.toBe(profiles[other]!.layers);
+      }
+    }
   });
 
   it("uses authored parallax Galaxy art instead of Kenney placeholder scenery", () => {
