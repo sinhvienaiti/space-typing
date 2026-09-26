@@ -497,8 +497,8 @@ type VocabularySourceTab = VocabularySource["mode"];
 
 const defaultSettings: GameSettings = {
   sfxVolume: 0.5,
-  musicVolume: 0.35,
-  ambientVolume: 0.15,
+  musicVolume: 0.26,
+  ambientVolume: 0.08,
   screenShake: true,
   visualQuality: "high",
   pronunciationEnabled: true,
