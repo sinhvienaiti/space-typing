@@ -13,9 +13,19 @@ export type BackgroundMotion =
   | "float"
   | "wrap"
   | "orbit"
+  | "flyby"
   | "approach";
 
 export type BackgroundPlacement = "anchor" | "wide" | "edges";
+
+export type BackgroundArtTreatment = "none" | "asteroid";
+
+export type BackgroundSourceRect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
 
 export type LayeredBackgroundLayer = {
   id: string;
@@ -49,6 +59,16 @@ export type LayeredBackgroundLayer = {
   opacityJitter?: number;
   speedJitter?: number;
   placement?: BackgroundPlacement;
+  /**
+   * Optional crop inside a source spritesheet. Values are authored in the
+   * source image's natural pixel coordinate space.
+   */
+  sourceRect?: BackgroundSourceRect;
+  /**
+   * One-time precomposed art treatment. Runtime animation still draws a cached
+   * CanvasImageSource so richer art does not add per-frame texture work.
+   */
+  artTreatment?: BackgroundArtTreatment;
 };
 
 export type LayeredBackgroundProfile = {
