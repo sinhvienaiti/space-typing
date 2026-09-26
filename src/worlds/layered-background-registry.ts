@@ -293,7 +293,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-authored-planet-specks",
       "vendor/luminousdragon/stars-planets.png",
       0.3,
-      0.12,
+      0.12 * 0.4,
       1.16,
       0.5,
       0.48,
