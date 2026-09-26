@@ -519,3 +519,34 @@ Do not call this pass visually complete from CI alone. CI proves contracts and
 build safety; the owner screenshot/play review decides whether the art itself
 has crossed the quality bar.
 
+---
+
+## 13. Desktop-first production pivot — 2026-09-26
+
+Owner decision: **finish desktop visual quality first. Tablet and mobile adaptation are deferred.**
+
+Production rules from this checkpoint:
+
+1. The approved 50-World demo sheets are the visual target for composition, mood, landmark scale and object quality.
+2. Placeholder-looking art must not be enlarged into mid/near-camera hero objects.
+3. Do not synthesize extra crater/shading detail in the runtime to rescue weak source art.
+4. Existing Kenney meteor sprites are allowed only as tiny distant debris until replaced.
+5. Mid/near asteroids, wreckage, crystals, ships and other readable objects must come from curated source assets with verified licensing or project-original authored production art.
+6. Desktop gameplay readability remains mandatory: foreground spectacle must stay edge-biased and the central typing/combat corridor must stay readable.
+7. No tablet/mobile asset work is required in this phase.
+8. Visual acceptance is based on real desktop screenshots, not CI alone.
+
+### Current implementation state
+
+- Branch: `feat/desktop-environment-production`
+- Removed the procedural asteroid-detail treatment contract and renderer path.
+- Removed enlarged mid/near Kenney asteroid layers from Galaxy.
+- Legacy Kenney rocks are now constrained to tiny distant debris only.
+- Source research has started for production replacements.
+- First qualified external candidate: OpenGameArt `Asteroid Tileset 01` by OhjiroChan, CC0, three size tiers with eight rotation views per tier.
+- No candidate is accepted into runtime solely because its license is valid; it must also visually match the approved cinematic demo style.
+
+### Next implementation gate
+
+Vendor the first approved production asteroid source locally, wire its frame crops into the authored layer registry, then compare a real World 01 desktop screenshot against the approved demo before expanding the same pipeline to wreckage/crystals/ships and the remaining World groups.
+
