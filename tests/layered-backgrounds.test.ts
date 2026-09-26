@@ -116,18 +116,21 @@ describe("Layered authored background registry", () => {
     const productionAsteroids = galaxy.layers.filter((layer) =>
       layer.src.includes("/vendor/ohjirochan/asteroid-"),
     );
-    expect(productionAsteroids).toHaveLength(5);
+    expect(productionAsteroids).toHaveLength(6);
     expect(
       productionAsteroids.some(
         (layer) =>
           layer.id === "galaxy-asteroid-near-hero" &&
           layer.motion === "approach" &&
-          layer.scale >= 0.1,
+          layer.scale >= 0.16,
       ),
     ).toBe(true);
     expect(
       productionAsteroids.filter((layer) => layer.motion === "wrap"),
     ).toHaveLength(4);
+    expect(
+      productionAsteroids.filter((layer) => layer.motion === "approach"),
+    ).toHaveLength(2);
 
     const midAsteroids = productionAsteroids.filter((layer) =>
       layer.id.includes("-mid-"),
@@ -143,6 +146,20 @@ describe("Layered authored background registry", () => {
     expect(Math.max(...midAsteroids.map((layer) => layer.scale))).toBeGreaterThan(
       Math.min(...midAsteroids.map((layer) => layer.scale)) * 1.8,
     );
+
+    const nearHero = productionAsteroids.find(
+      (layer) => layer.id === "galaxy-asteroid-near-hero",
+    )!;
+    const nearSecondary = productionAsteroids.find(
+      (layer) => layer.id === "galaxy-asteroid-near-secondary",
+    )!;
+    expect(nearHero.scale).toBeGreaterThan(
+      Math.max(...midAsteroids.map((layer) => layer.scale)) * 1.8,
+    );
+    expect(nearHero.placement).toBe("edges");
+    expect(nearHero.minQuality).toBe("medium");
+    expect(nearSecondary.minQuality).toBe("high");
+    expect(nearSecondary.anchorX).toBeGreaterThan(0.85);
 
     const farFragments = galaxy.layers.find(
       (layer) => layer.id === "galaxy-asteroid-far-fragments",
