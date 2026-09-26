@@ -41,3 +41,19 @@ registry; it is intentionally not substituted into World 03.
 full-frame artwork. The older vector sky is deliberately not used in the
 production composition. Secondary vector layers are kept at very low opacity
 only for subtle parallax and must not visually overwrite the approved painting.
+
+
+## World 02 2K production checkpoint — 2026-09-27
+
+Halo Garden now uses `heaven/halo-garden-production-v2.svg`, a local
+2560x1440 production wrapper containing the generated AVIF master. The wrapper
+keeps the repository transport textual while the browser still decodes the
+embedded AVIF as the full-frame raster artwork.
+
+The 2K integrity gate validates both the SVG wrapper dimensions and the embedded
+AVIF `ispe` dimensions. An 896x504 replacement can no longer pass the
+background asset check.
+
+World 02 additionally owns the stronger authored ambient pass for waterfall
+flow/spray, cloud parallax, galaxy glow, star drift/twinkle, halo/light rays and
+sparse shooting stars.
