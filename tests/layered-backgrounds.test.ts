@@ -143,9 +143,14 @@ describe("Layered authored background registry", () => {
         );
         expect(productionArt?.fit).toBe("cover");
         expect(productionArt?.opacity).toBe(1);
+        expect(productionArt?.scale).toBe(1);
+        expect(productionArt?.motion).toBe("static");
         expect(
           profile.layers.some((layer) => layer.src.includes("heaven/sky.svg")),
         ).toBe(false);
+        expect(
+          profile.layers.some((layer) => layer.id === "halo-garden-aurora-depth"),
+        ).toBe(true);
       }
       expect(
         profile.layers.some((layer) => layer.scale >= 1.7 && layer.depth > 0.25),
@@ -179,9 +184,9 @@ describe("Layered authored background registry", () => {
       (layer) => layer.id !== "halo-garden-production-art",
     );
 
-    expect(overlays.length).toBeGreaterThanOrEqual(2);
+    expect(overlays.length).toBeGreaterThanOrEqual(4);
     expect(Math.max(...overlays.map((layer) => layer.opacity))).toBeLessThanOrEqual(
-      0.08,
+      0.14,
     );
   });
 
