@@ -3680,7 +3680,7 @@ kbd {
 .stage-results-card {
   position: relative;
   width: min(1520px, calc(100vw - 48px));
-  height: min(900px, calc(100vh - 48px));
+  height: min(920px, calc(100vh - 56px));
   max-width: none;
   max-height: none;
   padding: 0;
@@ -3854,8 +3854,6 @@ kbd {
 }
 
 .stage-results-summary > div:first-child {
-  grid-column: 1 / -1;
-  min-height: 126px;
   border-color: rgba(94, 226, 244, 0.2);
   background:
     radial-gradient(circle at 16% 10%, rgba(82, 226, 241, 0.12), transparent 14rem),
@@ -3881,7 +3879,6 @@ kbd {
 }
 
 .stage-results-summary > div:first-child strong {
-  font-size: clamp(2.25rem, 3.4vw, 3.3rem);
   color: #f5fdff;
 }
 
@@ -3922,7 +3919,7 @@ kbd {
 
 .result-measured-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.62rem;
 }
 
@@ -4180,6 +4177,10 @@ kbd {
 
   .stage-results-footer {
     grid-template-columns: 1fr;
+  }
+
+  .result-measured-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
