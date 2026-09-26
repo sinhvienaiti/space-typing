@@ -6,8 +6,10 @@ import type {
 
 const ROOT = "/assets/space-typing/backgrounds";
 const PLAYER_SHIP_SHEET = "/assets/space-typing/ships/player-ships-v2.svg";
-const GALAXY_NEBULA_SRC =
+const GALAXY_NEBULA_PURPLE_SRC =
   "vendor/screaming-brain/nebula-purple-3-1024.png";
+const GALAXY_NEBULA_BLUE_SRC =
+  "vendor/screaming-brain/nebula-blue-6-1024.png";
 
 function layer(
   id: string,
@@ -90,7 +92,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
   {
     ...layer(
       "galaxy-sky",
-      GALAXY_NEBULA_SRC,
+      GALAXY_NEBULA_PURPLE_SRC,
       0.07,
       0.46,
       1.1,
@@ -136,7 +138,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
   {
     ...layer(
       "galaxy-nebula",
-      GALAXY_NEBULA_SRC,
+      GALAXY_NEBULA_BLUE_SRC,
       0.14,
       0.42,
       1.46,
@@ -155,7 +157,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
   {
     ...layer(
       "galaxy-nebula-depth",
-      GALAXY_NEBULA_SRC,
+      GALAXY_NEBULA_PURPLE_SRC,
       0.1,
       0.16,
       1.92,

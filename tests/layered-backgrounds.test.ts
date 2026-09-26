@@ -84,6 +84,9 @@ describe("Layered authored background registry", () => {
       "/assets/space-typing/backgrounds/vendor/screaming-brain/nebula-purple-3-1024.png",
     );
     expect(sources).toContain(
+      "/assets/space-typing/backgrounds/vendor/screaming-brain/nebula-blue-6-1024.png",
+    );
+    expect(sources).toContain(
       "/assets/space-typing/backgrounds/vendor/luminousdragon/stars-dense.png",
     );
     expect(sources).toContain(
@@ -241,6 +244,8 @@ describe("Layered authored background registry", () => {
       layer.id.includes("nebula") || layer.id === "galaxy-sky",
     );
     expect(nebulaLayers.length).toBeGreaterThanOrEqual(3);
+    expect(new Set(nebulaLayers.map((layer) => layer.src)).size)
+      .toBeGreaterThanOrEqual(2);
 
     const sky = galaxy.layers.find((layer) => layer.id === "galaxy-sky")!;
     const mainNebula = galaxy.layers.find(
