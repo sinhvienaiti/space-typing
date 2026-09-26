@@ -442,12 +442,12 @@ function drawLightRays(
   context.globalCompositeOperation = "screen";
 
   for (let index = 0; index < count; index += 1) {
-    const sway = Math.sin(time * (0.07 + index * 0.012) + index * 1.7);
+    const sway = Math.sin(time * (0.22 + index * 0.03) + index * 1.7);
     const endX =
       width * (0.56 + index * 0.11) + sway * width * (0.018 + index * 0.004);
     const endY = height * (0.58 + index * 0.07);
     const halfWidth = width * (0.018 + index * 0.004);
-    const alpha = 0.04 + index * 0.01;
+    const alpha = 0.048 + index * 0.012;
 
     const beam = context.createLinearGradient(
       originX,
