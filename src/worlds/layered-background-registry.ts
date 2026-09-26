@@ -361,7 +361,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     treatment: "galaxy-rock-mid",
     motion: "wrap",
     placement: "edges",
-    instances: 2 + 2,
+    instances: 4,
     spreadX: 0.46,
     spreadY: 0.52,
     scaleJitter: 0.3,
@@ -384,7 +384,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     treatment: "galaxy-rock-mid",
     motion: "wrap",
     placement: "edges",
-    instances: 2 + 2,
+    instances: 4,
     spreadX: 0.48,
     spreadY: 0.56,
     scaleJitter: 0.32,
@@ -408,7 +408,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     motion: "wrap",
     minQuality: "medium",
     placement: "edges",
-    instances: Math.max(2, 1),
+    instances: 2,
     spreadY: 0.42,
     scaleJitter: 0.24,
     opacityJitter: 0.16,
@@ -488,60 +488,341 @@ const GALAXY_RICH: readonly LayeredBackgroundLayer[] = GALAXY.map(
 const WORLD01_GALAXY: readonly LayeredBackgroundLayer[] =
   GALAXY_RICH.filter((item) => item.id !== "galaxy-planet-primary");
 
-const GALAXY_PRISM: readonly LayeredBackgroundLayer[] = [
-  ...GALAXY_RICH.map((item) => {
-    if (item.id === "galaxy-planet-primary") {
-      return {
-        ...item,
-        id: "prism-planet-primary",
-        anchorX: 0.82,
-        anchorY: 0.21,
-        scale: 0.16,
-        opacity: 0.56,
-      };
-    }
-    if (item.id === "galaxy-planet-far") {
-      return {
-        ...item,
-        id: "prism-planet-far",
-        anchorX: 0.16,
-        anchorY: 0.31,
-        scale: 0.1,
-        opacity: 0.32,
-      };
-    }
-    if (item.id.startsWith("galaxy-meteor-")) {
-      return {
-        ...item,
-        id: item.id.replace("galaxy-", "prism-"),
-        opacity: item.opacity * 0.82,
-        scale: item.scale * 0.86,
-      };
-    }
-    return {
-      ...item,
-      id: item.id.replace("galaxy-", "prism-"),
-    };
-  }),
+const WORLD02_HALO_GARDEN: readonly LayeredBackgroundLayer[] = [
   {
-    ...GALAXY_RICH.find((item) => item.id === "galaxy-nebula")!,
-    id: "prism-nebula-veil",
-    opacity: 0.18,
-    scale: 1.34,
-    anchorX: 0.42,
-    anchorY: 0.54,
-    driftX: 0.00012,
-    driftY: -0.00004,
-    rotationSpeed: 0.00008,
+    ...layer(
+      "halo-garden-sky",
+      "heaven/sky.svg",
+      0.1,
+      1,
+      1,
+      0.5,
+      0.5,
+      -0.00018,
+      0.000015,
+    ),
+    motion: "float",
+  },
+  {
+    ...layer(
+      "halo-garden-gate",
+      "heaven/halo-gate.svg",
+      0.26,
+      0.72,
+      0.34,
+      0.83,
+      0.2,
+      -0.00025,
+      0.00008,
+      0.0012,
+      0.025,
+    ),
+    motion: "float",
     blend: "screen",
+    minQuality: "medium",
+  },
+  {
+    ...layer(
+      "halo-garden-islands",
+      "heaven/cloud-islands.svg",
+      0.56,
+      0.62,
+      0.82,
+      0.18,
+      0.72,
+      0.0011,
+      0.00045,
+    ),
+    motion: "float",
+    minQuality: "medium",
+  },
+  {
+    ...layer(
+      "halo-garden-aurora",
+      "frost/aurora.svg",
+      0.18,
+      0.18,
+      0.92,
+      0.5,
+      0.18,
+      0.00022,
+      -0.00004,
+      0.00025,
+    ),
+    motion: "float",
+    blend: "screen",
+    minQuality: "high",
   },
 ];
 
-const HEAVEN: readonly LayeredBackgroundLayer[] = [
-  layer("heaven-sky", "heaven/sky.svg", 0.12, 1, 1, 0.5, 0.5, -0.0005, 0),
-  layer("heaven-gate", "heaven/halo-gate.svg", 0.28, 0.9, 0.46, 0.78, 0.2, -0.0005, 0.0003, 0.002, 0.05),
-  layer("heaven-islands", "heaven/cloud-islands.svg", 0.52, 0.85, 0.98, 0.5, 0.36, 0.002, 0.001),
+const WORLD03_PRISMATIC_TIDE: readonly LayeredBackgroundLayer[] = [
+  {
+    ...layer(
+      "prismatic-tide-sky",
+      GALAXY_NEBULA_BLUE_SRC,
+      0.08,
+      0.42,
+      1.12,
+      0.62,
+      0.46,
+      -0.00004,
+      0.000012,
+    ),
+    motion: "float",
+  },
+  {
+    ...layer(
+      "prismatic-tide-depth",
+      GALAXY_NEBULA_PURPLE_SRC,
+      0.12,
+      0.26,
+      1.5,
+      0.2,
+      0.68,
+      0.00006,
+      -0.000018,
+      -0.00002,
+    ),
+    motion: "float",
+    blend: "screen",
+  },
+  {
+    ...layer(
+      "prismatic-tide-aurora",
+      "frost/aurora.svg",
+      0.2,
+      0.54,
+      1.02,
+      0.5,
+      0.22,
+      0.00055,
+      0.00004,
+      0.0006,
+      0.018,
+    ),
+    motion: "float",
+    blend: "screen",
+  },
+  {
+    ...layer(
+      "prismatic-tide-rings",
+      "eternity/rings.svg",
+      0.34,
+      0.32,
+      0.28,
+      0.84,
+      0.22,
+      -0.00028,
+      0.00006,
+      0.0014,
+      0.012,
+    ),
+    motion: "orbit",
+    blend: "screen",
+    minQuality: "medium",
+  },
+  {
+    ...layer(
+      "prismatic-tide-crown",
+      "eternity/crown.svg",
+      0.5,
+      0.18,
+      0.3,
+      0.12,
+      0.7,
+      0.0005,
+      -0.00014,
+      -0.0008,
+    ),
+    motion: "float",
+    blend: "screen",
+    minQuality: "high",
+  },
 ];
+
+const WORLD04_CHERUB_FALLS: readonly LayeredBackgroundLayer[] = [
+  {
+    ...layer(
+      "cherub-falls-sky",
+      "heaven/sky.svg",
+      0.1,
+      1,
+      1,
+      0.5,
+      0.5,
+      -0.00012,
+      0.00002,
+    ),
+    motion: "float",
+  },
+  {
+    ...layer(
+      "cherub-falls-cloud-bank",
+      "heaven/cloud-islands.svg",
+      0.42,
+      0.54,
+      0.72,
+      0.82,
+      0.72,
+      -0.00065,
+      0.0004,
+    ),
+    motion: "float",
+    minQuality: "medium",
+  },
+  {
+    ...layer(
+      "cherub-falls-halo",
+      "heaven/halo-gate.svg",
+      0.28,
+      0.44,
+      0.24,
+      0.16,
+      0.2,
+      0.0002,
+      0.00005,
+      -0.001,
+      0.018,
+    ),
+    motion: "float",
+    blend: "screen",
+    minQuality: "medium",
+  },
+  {
+    ...layer(
+      "cherub-falls-lightfall",
+      "frost/aurora.svg",
+      0.18,
+      0.2,
+      0.9,
+      0.56,
+      0.28,
+      0.00016,
+      0.00008,
+      0.00025,
+    ),
+    motion: "float",
+    blend: "screen",
+    minQuality: "high",
+  },
+];
+
+const WORLD05_AURORA_GATE: readonly LayeredBackgroundLayer[] = [
+  {
+    ...layer(
+      "aurora-gate-sky",
+      "meteor/sky.svg",
+      0.08,
+      1,
+      1,
+      0.5,
+      0.5,
+      -0.00016,
+      0.000015,
+    ),
+    motion: "float",
+  },
+  {
+    ...layer(
+      "aurora-gate-wave",
+      "frost/aurora.svg",
+      0.2,
+      0.66,
+      1.04,
+      0.5,
+      0.2,
+      0.0007,
+      0.00008,
+      0.0005,
+      0.018,
+    ),
+    motion: "float",
+    blend: "screen",
+  },
+  {
+    ...layer(
+      "aurora-gate-portal",
+      "heaven/halo-gate.svg",
+      0.31,
+      0.48,
+      0.28,
+      0.84,
+      0.22,
+      -0.00035,
+      0.00008,
+      0.0015,
+      0.018,
+    ),
+    motion: "orbit",
+    blend: "screen",
+    minQuality: "medium",
+  },
+  {
+    ...layer(
+      "aurora-gate-belt",
+      "meteor/asteroid-belt.svg",
+      0.58,
+      0.28,
+      0.72,
+      0.12,
+      0.7,
+      -0.0024,
+      0.0012,
+      0.0018,
+    ),
+    motion: "wrap",
+    minQuality: "medium",
+  },
+  {
+    ...layer(
+      "aurora-gate-comets",
+      "meteor/comet-cluster.svg",
+      0.78,
+      0.36,
+      0.34,
+      0.92,
+      0.6,
+      -0.006,
+      0.0035,
+      0.004,
+    ),
+    motion: "flyby",
+    placement: "edges",
+    instances: 1,
+    minQuality: "high",
+    optional: true,
+  },
+];
+
+type AuthoredWorldBackgroundSpec = {
+  family: string;
+  layers: readonly LayeredBackgroundLayer[];
+};
+
+const AUTHORED_WORLD_BACKGROUNDS: Readonly<
+  Record<string, AuthoredWorldBackgroundSpec>
+> = {
+  "world-01": {
+    family: "galaxy",
+    layers: WORLD01_GALAXY,
+  },
+  "world-02": {
+    family: "heaven",
+    layers: WORLD02_HALO_GARDEN,
+  },
+  "world-03": {
+    family: "prism",
+    layers: WORLD03_PRISMATIC_TIDE,
+  },
+  "world-04": {
+    family: "cherub",
+    layers: WORLD04_CHERUB_FALLS,
+  },
+  "world-05": {
+    family: "aurora",
+    layers: WORLD05_AURORA_GATE,
+  },
+};
 
 const INFERNAL: readonly LayeredBackgroundLayer[] = [
   layer("infernal-sky", "infernal/sky.svg", 0.12, 1, 1, 0.5, 0.5, 0.0003, 0),
@@ -653,22 +934,6 @@ const ETERNITY: readonly LayeredBackgroundLayer[] = [
 
 function familyLayers(profile: WorldSceneProfile): readonly LayeredBackgroundLayer[] {
   if (profile.archetype === "celestial-rainbow") {
-    if (profile.variant === 2) return HEAVEN;
-    if (profile.variant === 3) return GALAXY_PRISM;
-    if (profile.variant === 4) {
-      return [
-        ...HEAVEN,
-        {
-          ...GALAXY_RICH.find((item) => item.id === "galaxy-sun-far")!,
-          id: "cherub-far-sun",
-          anchorX: 0.18,
-          anchorY: 0.13,
-          opacity: 0.16,
-          optional: false,
-        },
-      ];
-    }
-    if (profile.variant === 5) return METEOR_SOURCED;
     return GALAXY_RICH;
   }
   if (profile.archetype === "infernal") return INFERNAL;
@@ -685,24 +950,22 @@ function familyLayers(profile: WorldSceneProfile): readonly LayeredBackgroundLay
 export function layeredBackgroundForScene(
   scene: WorldSceneProfile,
 ): LayeredBackgroundProfile {
+  const authored = AUTHORED_WORLD_BACKGROUNDS[scene.worldId];
+
+  if (authored !== undefined) {
+    return {
+      id: scene.id + "-layered",
+      family: authored.family,
+      renderMode: "authored-production",
+      layers: authored.layers,
+    };
+  }
+
   return {
     id: scene.id + "-layered",
-    family:
-      scene.archetype === "celestial-rainbow"
-        ? scene.variant === 2 || scene.variant === 4
-          ? "heaven"
-          : scene.variant === 5
-            ? "meteor"
-            : "galaxy"
-        : scene.archetype,
-    renderMode:
-      scene.worldId === "world-01"
-        ? "authored-production"
-        : "legacy-hybrid",
-    layers:
-      scene.worldId === "world-01"
-        ? WORLD01_GALAXY
-        : familyLayers(scene),
+    family: scene.archetype,
+    renderMode: "legacy-hybrid",
+    layers: familyLayers(scene),
   };
 }
 
