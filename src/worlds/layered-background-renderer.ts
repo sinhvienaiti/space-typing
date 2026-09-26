@@ -338,15 +338,13 @@ export class LayeredBackgroundRenderer {
       1,
       layer.sourceRect?.width ??
         treatedCanvas?.width ??
-        image.naturalWidth ??
-        image.width,
+        Math.max(1, image.naturalWidth || image.width),
     );
     const naturalHeight = Math.max(
       1,
       layer.sourceRect?.height ??
         treatedCanvas?.height ??
-        image.naturalHeight ??
-        image.height,
+        Math.max(1, image.naturalHeight || image.height),
     );
     const viewportRatio = width / Math.max(1, height);
     const imageRatio = naturalWidth / naturalHeight;
@@ -430,7 +428,6 @@ export class LayeredBackgroundRenderer {
       offsetX = Math.cos(angle) * radiusX;
       offsetY = Math.sin(angle) * radiusY;
     } else if (motionKind === "flyby") {
-      travelling = true;
       const cycle = positiveModulo(
         time *
           (0.0045 + dominantDrift * 0.26) *
