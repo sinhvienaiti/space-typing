@@ -76,8 +76,8 @@ function drawGalaxyDrift(
 ): void {
   const { width, height, time } = input;
   const drift = Math.sin(time * 0.02) * width * 0.035;
-  const x = width * 0.3 + drift;
-  const y = height * 0.16 + Math.cos(time * 0.016) * height * 0.016;
+  const x = width * 0.38 + drift;
+  const y = height * 0.12 + Math.cos(time * 0.016) * height * 0.016;
   const radius = Math.max(width, height) * 0.38;
   const gradient = context.createRadialGradient(x, y, 0, x, y, radius);
   gradient.addColorStop(0, "rgba(111, 86, 255, 0.18)");
@@ -143,11 +143,14 @@ function drawCloudMist(
   }
 }
 
+// Coordinates are authored against the World 02 2560x1440 production master.
+// Strongest/clearest falls come first so reduced-quality modes preserve identity.
 const WATERFALLS = [
-  { x: 0.072, y0: 0.24, y1: 0.67, width: 0.012 },
-  { x: 0.728, y0: 0.28, y1: 0.61, width: 0.01 },
-  { x: 0.79, y0: 0.3, y1: 0.68, width: 0.008 },
-  { x: 0.92, y0: 0.4, y1: 0.74, width: 0.009 },
+  { x: 0.72, y0: 0.38, y1: 0.54, width: 0.011 },
+  { x: 0.294, y0: 0.4, y1: 0.56, width: 0.012 },
+  { x: 0.16, y0: 0.18, y1: 0.32, width: 0.01 },
+  { x: 0.765, y0: 0.38, y1: 0.53, width: 0.008 },
+  { x: 0.276, y0: 0.41, y1: 0.53, width: 0.008 },
 ] as const;
 
 function drawWaterfallShimmer(
@@ -159,9 +162,9 @@ function drawWaterfallShimmer(
     quality === "low"
       ? 1
       : quality === "medium"
-        ? 2
+        ? 3
         : quality === "high"
-          ? 3
+          ? 4
           : WATERFALLS.length;
 
   context.save();
