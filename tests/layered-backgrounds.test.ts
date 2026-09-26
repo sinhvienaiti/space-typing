@@ -77,6 +77,22 @@ describe("Layered authored background registry", () => {
     expect(meteorLayers.every((layer) => layer.scale <= 0.02)).toBe(true);
     expect(meteorLayers.every((layer) => layer.depth <= 0.42)).toBe(true);
 
+    const productionAsteroids = galaxy.layers.filter((layer) =>
+      layer.src.includes("/vendor/ohjirochan/asteroid-"),
+    );
+    expect(productionAsteroids).toHaveLength(3);
+    expect(
+      productionAsteroids.some(
+        (layer) =>
+          layer.id === "galaxy-asteroid-near-hero" &&
+          layer.motion === "approach" &&
+          layer.scale >= 0.1,
+      ),
+    ).toBe(true);
+    expect(
+      productionAsteroids.filter((layer) => layer.motion === "wrap"),
+    ).toHaveLength(2);
+
     expect(
       sources.some((src) => src.includes("/backgrounds/galaxy/")),
     ).toBe(false);
