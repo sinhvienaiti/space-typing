@@ -55,7 +55,7 @@ const BACKGROUND_TREATMENTS: Readonly<
   },
   "galaxy-rock-near": {
     filter:
-      "sepia(0.32) saturate(1.6) hue-rotate(178deg) brightness(0.9) contrast(0.9)",
+      "sepia(0.32) saturate(2.1) hue-rotate(178deg) brightness(0.9) contrast(0.9)",
     shadowColor: "rgba(137, 111, 255, 0.38)",
     shadowBlur: 24,
   },
