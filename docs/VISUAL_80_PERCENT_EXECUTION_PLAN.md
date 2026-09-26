@@ -899,3 +899,58 @@ Acceptance after this corrective batch:
 - no World 01/03+ behavior changes;
 - CI/test/build PASS;
 - owner browser video is still the final acceptance gate.
+
+
+### W02-12 — Video-driven corrective implementation checkpoint
+
+Implemented after reviewing the 31.9-second owner capture and re-reviewing the
+runtime path.
+
+Changes:
+
+- added explicit `parallax` motion semantics for authored layers;
+- World 02 far cloud, near cloud and aurora/nebula support layers now use
+  deterministic parallax with movement large enough to register within five
+  seconds;
+- cloud mist now travels in pixels/second (far 8 px/s, near -17 px/s) rather
+  than near-static normalized drift;
+- waterfall FX now clip to authored waterfall regions and combine moving darker
+  cyan channels with faster white specular streaks plus spray; this fixes the
+  previous white-on-white screen-blend failure;
+- galaxy FX now uses a moving/pulsing/rotating local nebula structure instead
+  of a multi-minute nearly static glow;
+- stars now move several pixels/second with depth-scaled drift and twinkle;
+- Medium+ shooting-star scheduling is deterministic and guarantees recurring
+  visible events on a 4.8-second cycle; Ultra may show a second offset event;
+- halo now has rotating ring accents and faster pulse; light rays sway at a
+  perceptible gameplay-timescale speed;
+- World 02 enemies receive a dark local silhouette backplate/outline so pastel
+  bodies stay readable over white/gold clouds;
+- hostile projectiles receive a dark outer disc, stronger magenta ring and
+  text shadow on World 02 only;
+- small enemy layer metadata (CORE / layer label) receives a local dark backing
+  on World 02;
+- the enemy readability helper was self-reviewed and changed from per-enemy
+  radial-gradient allocation to bounded solid-disc draws in the hot loop;
+- tests now assert World 02 parallax ownership and verify that a representative
+  authored parallax layer moves more than 12 CSS pixels over five seconds.
+
+Isolation review:
+
+- the new contrast treatment is gated to `world-02`;
+- World 01 and World 03+ enemy/projectile palettes are unchanged;
+- the existing legacy `float` behavior is unchanged;
+- `parallax` is opt-in, so existing Worlds do not silently change motion;
+- the 2K production master remains static, sharp and full-opacity.
+
+Verification:
+
+- CI #1032 passed after the main animation/readability implementation;
+- CI #1033 passed after the final light-ray motion review;
+- test step PASS;
+- TypeScript/build step PASS;
+- background asset integrity remains PASS.
+
+Status: implementation complete, browser/video owner acceptance still required.
+The previous 31.9-second capture remains the rejected baseline and must not be
+used as evidence that this corrective batch is accepted.
