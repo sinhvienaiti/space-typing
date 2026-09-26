@@ -6232,6 +6232,9 @@ async function startSelectedStage(): Promise<void> {
   ) return;
 
   const testingPreview = testingStagePreviewActive();
+  if (testingPreview && testingStageSnapshot === null) {
+    testingStageSnapshot = structuredClone(currentAutosaveSnapshot());
+  }
 
   // Testing preview bypasses campaign route/rest gates without modifying them.
   if (
@@ -7068,6 +7071,7 @@ async function commitSettingsDraft(): Promise<void> {
   }
 
   const unlockAllStagesWasEnabled = settings.unlockAllStages === true;
+  const testingPreviewWasActive = testingStagePreviewActive();
 
   settings = structuredClone(settingsDraft);
   difficultySettings = structuredClone(difficultySettingsDraft);
@@ -7075,6 +7079,9 @@ async function commitSettingsDraft(): Promise<void> {
 
   if (unlockAllStagesWasEnabled && settings.unlockAllStages !== true) {
     clearTestingStagePreview();
+    if (testingPreviewWasActive && game.getPhase() !== "title") {
+      game.backToTitle();
+    }
   }
 
   saveSettings();
@@ -8098,7 +8105,12 @@ byId("phoenixCoreButton").addEventListener("click", () => {
 });
 
 for (const id of ["titleButton", "clearTitleButton"]) {
-  byId(id).addEventListener("click", () => game.backToTitle());
+  byId(id).addEventListener("click", () => {
+    if (testingStagePreviewActive()) {
+      restoreTestingStagePersistentState();
+    }
+    game.backToTitle();
+  });
 }
 
 byId("characterButton").addEventListener("click", openCharacters);
