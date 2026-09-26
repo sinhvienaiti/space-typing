@@ -140,7 +140,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-nebula",
       GALAXY_NEBULA_BLUE_SRC,
       0.14,
-      0.3,
+      0.3 * 1.35,
       1.5,
       0.79,
       0.38,
