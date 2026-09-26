@@ -7,6 +7,21 @@ describe("Sfx lifecycle", () => {
     vi.unstubAllGlobals();
   });
 
+  it("does not synthesize the projectile warning beep", () => {
+    const sfx = new Sfx();
+    const tone = vi.fn();
+    (
+      sfx as unknown as {
+        tone: (...args: unknown[]) => void;
+      }
+    ).tone = tone;
+
+    sfx.projectileWarning();
+
+    expect(tone).not.toHaveBeenCalled();
+    sfx.destroy();
+  });
+
   it("does not recreate AudioContext from delayed tones after destroy", () => {
     vi.useFakeTimers();
 
