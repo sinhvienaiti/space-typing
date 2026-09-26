@@ -110,6 +110,16 @@ describe("Layered authored background registry", () => {
     );
     expect(asteroidField?.motion).toBe("wrap");
     expect(asteroidField?.optional).toBe(true);
+
+    for (const id of [
+      "galaxy-planet-primary",
+      "galaxy-planet-far",
+      "galaxy-moon-far",
+    ]) {
+      expect(galaxy.layers.find((layer) => layer.id === id)?.motion).toBe(
+        "orbit",
+      );
+    }
   });
 
   it("preserves multi-depth nebula volume and rare authored ship flybys", () => {
