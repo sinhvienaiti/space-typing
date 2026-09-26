@@ -492,7 +492,7 @@ const WORLD02_HALO_GARDEN: readonly LayeredBackgroundLayer[] = [
   {
     ...layer(
       "halo-garden-production-art",
-      "heaven/halo-garden-production-v1.avif",
+      "heaven/halo-garden-production-v2.svg",
       0.08,
       1,
       1,
