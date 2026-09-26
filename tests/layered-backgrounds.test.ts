@@ -6,6 +6,7 @@ import {
   validateLayeredBackgroundProfile,
 } from "../src/worlds/layered-background-registry";
 import {
+  backgroundLayerRotation,
   backgroundTreatmentStyle,
   qualityAllowsLayer,
 } from "../src/worlds/layered-background-renderer";
@@ -155,6 +156,33 @@ describe("Layered authored background registry", () => {
     }
 
     expect(new Set(idSets).size).toBe(4);
+  });
+
+  it("keeps the Halo Garden production painting level", () => {
+    const halo = layeredBackgroundForScene(
+      sceneProfileForWorld("world-02"),
+    );
+    const art = halo.layers.find(
+      (layer) => layer.id === "halo-garden-production-art",
+    );
+
+    expect(art).toBeDefined();
+    expect(art?.rotationSpeed).toBe(0);
+    expect(backgroundLayerRotation(art!, 120, 1, 4.2)).toBe(0);
+  });
+
+  it("uses only subtle image overlays above Halo Garden production art", () => {
+    const halo = layeredBackgroundForScene(
+      sceneProfileForWorld("world-02"),
+    );
+    const overlays = halo.layers.filter(
+      (layer) => layer.id !== "halo-garden-production-art",
+    );
+
+    expect(overlays.length).toBeGreaterThanOrEqual(2);
+    expect(Math.max(...overlays.map((layer) => layer.opacity))).toBeLessThanOrEqual(
+      0.08,
+    );
   });
 
   it("keeps authored objects away from a shared cross-World mutable layer set", () => {
