@@ -244,7 +244,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-luminous-orbit",
       "eternity/rings.svg",
       0.2,
-      0.14,
+      0.14 * 0.18,
       0.24,
       0.82,
       0.29,
