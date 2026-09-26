@@ -34,7 +34,7 @@ describe("Stage clear desktop report presentation", () => {
   });
 
   it("uses desktop-first width, two-column hierarchy and one report scroll region", () => {
-    expect(css).toContain("width: min(1520px, calc(100vw - 48px));");
+    expect(css).toContain("width: min(1640px, calc(100vw - 40px));");
     expect(css).toContain(
       "grid-template-columns: minmax(360px, 0.82fr) minmax(0, 1.55fr);",
     );
