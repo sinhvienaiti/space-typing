@@ -518,6 +518,7 @@ export type TestLabDifficultyOverride = {
 
 export type TestLabGameSnapshot = {
   phase: GamePhase;
+  characterId: CharacterId;
   stage: number | null;
   difficulty: DifficultyProfile | null;
   stats: GameStats;
@@ -875,6 +876,7 @@ export class Game {
     const difficulty = this.difficulty;
     return {
       phase: this.phase,
+      characterId: this.characterId,
       stage: this.stageConfig?.stage ?? null,
       difficulty: difficulty === null ? null : { ...difficulty },
       stats: this.getStats(),
