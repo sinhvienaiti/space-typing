@@ -2,6 +2,28 @@
 
 Space Typing ships a small curated set of redistributable **CC0** audio assets as default fallbacks. Local/private overrides remain supported and take priority where configured.
 
+
+## Music — Curated modern gameplay replacements
+
+Normal and standard-pressure World gameplay now prefer the following CC0
+fallbacks instead of the older `sector.ogg` / `pulse.ogg` tracks:
+
+- `music/mysterious-ambience.mp3` — **Mysterious Ambience (song21)** by
+  cynicmusic / pixelsphere.org:
+  https://opengameart.org/content/mysterious-ambience-song21
+- `music/battle-theme-b.mp3` — **Battle Theme B for RPG** by
+  cynicmusic / pixelsphere.org:
+  https://opengameart.org/content/battle-theme-b-for-rpg
+
+Both works are multi-licensed by their source and are used here under the
+**CC0** option. The vendored copies are the compact mono 96 kbps encodes from
+the documented `kiyeonjeon21/reframe` mirror. See
+`music/CURATED_CC0_SOURCE.md` for reproducible provenance.
+
+The earlier Dark Sci-Fi pack remains in the repository for boss/high-risk and
+legacy specialty states, but it is no longer the normal/pressure fallback for
+standard World play.
+
 ## Music — Dark Sci-Fi Audio Pack
 
 Creator: SRG774
@@ -18,7 +40,7 @@ Committed files:
 - `music/urgent.ogg`
 - `stingers/victory.ogg`
 
-These are used for calm exploration, pressure/intense combat, boss/high-risk combat and stage-clear feedback.
+These remain available for boss/high-risk combat, legacy specialty states and stage-clear feedback. Standard World exploration/pressure now uses the curated modern gameplay replacements above.
 
 The source page explicitly identifies the pack as CC0 and describes the music as loopable sci-fi ambient/background material.
 
