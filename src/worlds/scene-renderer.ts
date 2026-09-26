@@ -1387,7 +1387,7 @@ export function productionGalaxyStarReadabilityEnabled(
   return profile.worldId === "world-01";
 }
 
-export function galaxyStarReadabilityFactor(
+export function galaxySceneryReadabilityFactor(
   xRatio: number,
   yRatio: number,
 ): number {
@@ -1461,7 +1461,7 @@ function drawStars(
       y < height * 0.62;
     const galaxyReadability =
       productionGalaxyStarReadabilityEnabled(profile)
-        ? galaxyStarReadabilityFactor(x / width, y / height)
+        ? galaxySceneryReadabilityFactor(x / width, y / height)
         : null;
     const quietFactor =
       galaxyReadability ?? (centralQuiet ? 0.58 : 1);
@@ -1516,7 +1516,7 @@ function drawStars(
     const legacyX = star.x * width;
     const readability =
       productionGalaxyStarReadabilityEnabled(profile)
-        ? galaxyStarReadabilityFactor(star.x, y / height)
+        ? galaxySceneryReadabilityFactor(star.x, y / height)
         : 1;
     context.fillStyle = rgba(
       environment.starRgb,
@@ -1559,7 +1559,7 @@ function drawStars(
         yRatio > 0.12 &&
         yRatio < 0.62;
       const readability = productionGalaxy
-        ? galaxyStarReadabilityFactor(xRatio, yRatio)
+        ? galaxySceneryReadabilityFactor(xRatio, yRatio)
         : centralQuiet
           ? 0.5
           : 1;
@@ -2086,7 +2086,11 @@ function drawAmbientParticles(
     const px = x * width;
     const py = y * height;
     const size = 1 + depth * 2.6;
-    const alpha = 0.12 + depth * 0.24;
+    const sceneryReadability =
+      productionGalaxyStarReadabilityEnabled(profile)
+        ? galaxySceneryReadabilityFactor(x, y)
+        : 1;
+    const alpha = (0.12 + depth * 0.24) * sceneryReadability;
 
     if (
       particleStyle.includes("feather") ||

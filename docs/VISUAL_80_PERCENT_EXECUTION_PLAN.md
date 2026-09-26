@@ -452,10 +452,10 @@ A task is not “done” merely because TypeScript compiles.
 - Task: star hierarchy + typing-lane readability
 - Commits: `a91910f80a01cb06a2b19ad8dba2e7e7cd1d2449`, `9483c9b1fd096bb7a80bc7e8d63f621c53c8cd24`
 - Files changed: scene renderer, renderer tests
-- Contract changed: World 01 suppresses center star intensity and slightly enriches outer thirds
-- Tests added/updated: deterministic readability-factor and World 01 scope assertions
+- Contract changed: World 01 suppresses center star/ambient-scenery intensity and slightly enriches outer thirds
+- Tests added/updated: deterministic shared scenery-readability factor and World 01 scope assertions
 - Self-review findings: first pass was too broad for all celestial-rainbow scenes; scope was narrowed to World 01 before rollout
-- Remaining visual risk: star density still requires browser judgment at active combat speed
+- Remaining visual risk: star/ambient density still requires browser judgment at active combat speed
 - CI: PASS
 - Browser acceptance: pending
 
