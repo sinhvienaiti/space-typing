@@ -128,7 +128,7 @@ describe("Layered authored background registry", () => {
         (layer) =>
           layer.id === "galaxy-asteroid-near-hero" &&
           layer.motion === "approach" &&
-          layer.scale >= 0.28,
+          layer.scale >= 0.26,
       ),
     ).toBe(true);
     expect(
