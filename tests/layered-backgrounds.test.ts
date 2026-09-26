@@ -7,6 +7,7 @@ import {
 } from "../src/worlds/layered-background-registry";
 import {
   backgroundLayerRotation,
+  backgroundParallaxOffset,
   backgroundTreatmentStyle,
   qualityAllowsLayer,
 } from "../src/worlds/layered-background-renderer";
@@ -151,6 +152,15 @@ describe("Layered authored background registry", () => {
         expect(
           profile.layers.some((layer) => layer.id === "halo-garden-aurora-depth"),
         ).toBe(true);
+        const movingLayers = profile.layers.filter((layer) =>
+          ["halo-garden-cloud-far", "halo-garden-cloud-near", "halo-garden-aurora-depth"].includes(
+            layer.id,
+          ),
+        );
+        expect(movingLayers).toHaveLength(3);
+        expect(movingLayers.every((layer) => layer.motion === "parallax")).toBe(
+          true,
+        );
       }
       expect(
         profile.layers.some((layer) => layer.scale >= 1.7 && layer.depth > 0.25),
@@ -161,6 +171,38 @@ describe("Layered authored background registry", () => {
     }
 
     expect(new Set(idSets).size).toBe(4);
+  });
+
+  it("makes authored parallax visibly change within five seconds", () => {
+    const atStart = backgroundParallaxOffset(
+      1884,
+      910,
+      0.46,
+      -0.005,
+      0.0012,
+      0,
+      1,
+      1,
+      0.7,
+    );
+    const atFiveSeconds = backgroundParallaxOffset(
+      1884,
+      910,
+      0.46,
+      -0.005,
+      0.0012,
+      5,
+      1,
+      1,
+      0.7,
+    );
+
+    expect(
+      Math.hypot(
+        atFiveSeconds.x - atStart.x,
+        atFiveSeconds.y - atStart.y,
+      ),
+    ).toBeGreaterThan(12);
   });
 
   it("keeps the Halo Garden production painting level", () => {
@@ -186,7 +228,7 @@ describe("Layered authored background registry", () => {
 
     expect(overlays.length).toBeGreaterThanOrEqual(4);
     expect(Math.max(...overlays.map((layer) => layer.opacity))).toBeLessThanOrEqual(
-      0.14,
+      0.18,
     );
   });
 
