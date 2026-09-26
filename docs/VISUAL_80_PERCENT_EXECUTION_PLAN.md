@@ -366,7 +366,7 @@ A task is not “done” merely because TypeScript compiles.
 - Files changed: background types, renderer, registry, tests
 - Contract changed: authored layers can declare `minQuality`; legacy `optional` behavior remains compatible
 - Tests added/updated: quality visibility assertions
-- Self-review findings: one centralized quality decision is used by preload and instance generation; no duplicated gating path
+- Self-review findings: one centralized quality decision is used by preload and instance generation; no duplicated gating path. World 01 layers migrated to explicit `minQuality` no longer carry redundant `optional: true` state.
 - Remaining visual risk: composition itself was still weak
 - CI: PASS
 - Browser acceptance: pending

@@ -180,7 +180,7 @@ describe("Layered authored background registry", () => {
       (layer) => layer.id === "galaxy-authored-asteroid-field",
     );
     expect(asteroidField?.motion).toBe("wrap");
-    expect(asteroidField?.optional).toBe(true);
+    expect(asteroidField?.optional).toBe(false);
     expect(asteroidField?.minQuality).toBe("medium");
 
     for (const id of [
@@ -284,6 +284,7 @@ describe("Layered authored background registry", () => {
     const flybyShips = shipLayers.filter((layer) => layer.motion === "flyby");
 
     expect(persistentShip.motion).toBe("float");
+    expect(persistentShip.optional).toBe(false);
     expect(persistentShip.minQuality).toBe("medium");
     expect(persistentShip.placement).toBe("anchor");
     expect(persistentShip.opacity).toBeLessThanOrEqual(0.12);
