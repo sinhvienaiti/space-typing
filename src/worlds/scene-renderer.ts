@@ -623,6 +623,19 @@ function drawBaseSky(
   drawArchetypeBackdrop(context, input, palette);
 }
 
+function drawProductionLoadingSky(
+  context: CanvasRenderingContext2D,
+  input: WorldSceneDrawInput,
+): void {
+  const palette = sceneSkyPalette(input.profile);
+  const gradient = context.createLinearGradient(0, 0, 0, input.height);
+  gradient.addColorStop(0, palette.top);
+  gradient.addColorStop(0.55, palette.mid);
+  gradient.addColorStop(1, palette.edge);
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, input.width, input.height);
+}
+
 function drawCelestialLandmarks(
   context: CanvasRenderingContext2D,
   input: WorldSceneDrawInput,
@@ -2620,6 +2633,25 @@ function drawFloor(
   drawFloorSignature(context, input);
 }
 
+export type WorldSceneRenderPolicy = {
+  drawLegacyStaticScene: boolean;
+  drawLegacyCinematicMotion: boolean;
+  drawLegacyFloorFallback: boolean;
+  drawLegacyCinematicEvents: boolean;
+};
+
+export function worldSceneRenderPolicy(
+  profile: LayeredBackgroundProfile,
+): WorldSceneRenderPolicy {
+  const production = profile.renderMode === "authored-production";
+  return {
+    drawLegacyStaticScene: !production,
+    drawLegacyCinematicMotion: !production,
+    drawLegacyFloorFallback: !production,
+    drawLegacyCinematicEvents: !production,
+  };
+}
+
 export class WorldSceneRenderer {
   private cacheCanvas: HTMLCanvasElement | null = null;
   private cacheKey = "";
@@ -2685,27 +2717,35 @@ export class WorldSceneRenderer {
     context: CanvasRenderingContext2D,
     input: WorldSceneDrawInput,
   ): void {
-    this.prepareStaticCache(input);
+    const authoredProfile = this.authoredProfile(input.profile);
+    const policy = worldSceneRenderPolicy(authoredProfile);
 
-    if (this.cacheCanvas !== null) {
-      context.drawImage(
-        this.cacheCanvas,
-        0,
-        0,
-        this.cacheCanvas.width,
-        this.cacheCanvas.height,
-        0,
-        0,
-        input.width,
-        input.height,
-      );
+    if (policy.drawLegacyStaticScene) {
+      this.prepareStaticCache(input);
+      if (this.cacheCanvas !== null) {
+        context.drawImage(
+          this.cacheCanvas,
+          0,
+          0,
+          this.cacheCanvas.width,
+          this.cacheCanvas.height,
+          0,
+          0,
+          input.width,
+          input.height,
+        );
+      } else {
+        drawStaticScene(context, input);
+      }
     } else {
-      drawStaticScene(context, input);
+      // Production-authored Worlds must not inherit prototype landmarks.
+      // Keep only a neutral gradient behind assets while images decode.
+      drawProductionLoadingSky(context, input);
     }
 
     const authoredReady = this.layeredRenderer.draw(
       context,
-      this.authoredProfile(input.profile),
+      authoredProfile,
       {
         width: input.width,
         height: input.height,
@@ -2716,16 +2756,22 @@ export class WorldSceneRenderer {
       },
     );
 
+    // Stars and small ambient particles are bounded support FX. Authored
+    // object motion itself is handled by LayeredBackgroundRenderer.
     drawStars(context, input);
-    drawCinematicMotion(context, input);
 
-    // The old perspective floor is a fallback only. Once authored imagery is
-    // available it must not reintroduce debug-like rings/lines over the scene.
-    if (!authoredReady) {
+    if (policy.drawLegacyCinematicMotion) {
+      drawCinematicMotion(context, input);
+    }
+
+    if (policy.drawLegacyFloorFallback && !authoredReady) {
       drawFloor(context, input);
     }
 
     drawAmbientParticles(context, input);
-    drawCinematicEvents(context, input);
+
+    if (policy.drawLegacyCinematicEvents) {
+      drawCinematicEvents(context, input);
+    }
   }
 }

@@ -1,6 +1,38 @@
 import { describe, expect, it } from "vitest";
 import { sceneProfileForWorld } from "../src/worlds/scene-registry";
-import { worldSceneCacheKey } from "../src/worlds/scene-renderer";
+import {
+  worldSceneCacheKey,
+  worldSceneRenderPolicy,
+} from "../src/worlds/scene-renderer";
+import { layeredBackgroundForScene } from "../src/worlds/layered-background-registry";
+
+describe("World scene production rendering policy", () => {
+  it("removes legacy procedural scene passes from World 01", () => {
+    const policy = worldSceneRenderPolicy(
+      layeredBackgroundForScene(sceneProfileForWorld("world-01")),
+    );
+
+    expect(policy).toEqual({
+      drawLegacyStaticScene: false,
+      drawLegacyCinematicMotion: false,
+      drawLegacyFloorFallback: false,
+      drawLegacyCinematicEvents: false,
+    });
+  });
+
+  it("preserves the legacy pipeline for Worlds not migrated yet", () => {
+    const policy = worldSceneRenderPolicy(
+      layeredBackgroundForScene(sceneProfileForWorld("world-06")),
+    );
+
+    expect(policy).toEqual({
+      drawLegacyStaticScene: true,
+      drawLegacyCinematicMotion: true,
+      drawLegacyFloorFallback: true,
+      drawLegacyCinematicEvents: true,
+    });
+  });
+});
 
 describe("World scene renderer cache contract", () => {
   it("keeps a stable key for identical render inputs", () => {
