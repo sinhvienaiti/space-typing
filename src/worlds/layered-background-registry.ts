@@ -229,7 +229,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     "galaxy-sun-far",
     "vendor/screaming-brain/sun-blue-03-512.png",
     0.15,
-    0.13,
+    0.13 * 3,
     0.045,
     0.67,
     0.12,
