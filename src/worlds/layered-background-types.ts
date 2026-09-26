@@ -18,6 +18,10 @@ export type BackgroundMotion =
 
 export type BackgroundPlacement = "anchor" | "wide" | "edges";
 
+export type BackgroundRenderMode =
+  | "legacy-hybrid"
+  | "authored-production";
+
 export type BackgroundSourceRect = {
   x: number;
   y: number;
@@ -67,6 +71,7 @@ export type LayeredBackgroundLayer = {
 export type LayeredBackgroundProfile = {
   id: string;
   family: string;
+  renderMode: BackgroundRenderMode;
   layers: readonly LayeredBackgroundLayer[];
 };
 
