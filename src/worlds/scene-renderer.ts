@@ -7,6 +7,10 @@ import {
 import { LayeredBackgroundRenderer } from "./layered-background-renderer";
 import type { LayeredBackgroundProfile } from "./layered-background-types";
 import type { WorldSceneProfile } from "./scene-types";
+import {
+  drawWorldAmbientEffects,
+  worldUsesAuthoredAmbientEffects,
+} from "./world-ambient-effects";
 
 export type WorldSceneStar = {
   x: number;
@@ -2820,9 +2824,23 @@ export class WorldSceneRenderer {
       },
     );
 
-    // Stars and small ambient particles are bounded support FX. Authored
-    // object motion itself is handled by LayeredBackgroundRenderer.
-    drawStars(context, input);
+    const authoredAmbientFx = worldUsesAuthoredAmbientEffects(
+      input.profile.worldId,
+    );
+
+    // Production Worlds may own their ambient FX so they do not stack generic
+    // particles/stars on top of an already art-directed scene.
+    if (!authoredAmbientFx) {
+      drawStars(context, input);
+    }
+
+    drawWorldAmbientEffects(context, {
+      profile: input.profile,
+      quality: input.quality,
+      width: input.width,
+      height: input.height,
+      time: input.time,
+    });
 
     if (policy.drawLegacyCinematicMotion) {
       drawCinematicMotion(context, input);
@@ -2832,7 +2850,9 @@ export class WorldSceneRenderer {
       drawFloor(context, input);
     }
 
-    drawAmbientParticles(context, input);
+    if (!authoredAmbientFx) {
+      drawAmbientParticles(context, input);
+    }
 
     if (policy.drawLegacyCinematicEvents) {
       drawCinematicEvents(context, input);
