@@ -60,7 +60,7 @@ export type GameSettings = {
   ambientVolume: number;
   screenShake: boolean;
   visualQuality: VisualQuality;
-  unlockAllStages: boolean;
+  unlockAllStages?: boolean;
   pronunciationEnabled: boolean;
   pronunciationRate: number;
   pronunciationVolume: number;
