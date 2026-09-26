@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { sceneProfileForWorld } from "../src/worlds/scene-registry";
 import {
+  galaxyStarReadabilityFactor,
   worldSceneCacheKey,
   worldSceneRenderPolicy,
 } from "../src/worlds/scene-renderer";
@@ -54,5 +55,21 @@ describe("World scene renderer cache contract", () => {
       .not.toBe(base);
     expect(worldSceneCacheKey(first, 1280, 720, 1.5, "ultra"))
       .not.toBe(base);
+  });
+});
+
+
+describe("Galaxy star readability contract", () => {
+  it("suppresses the active center while preserving and slightly enriching outer thirds", () => {
+    const center = galaxyStarReadabilityFactor(0.5, 0.35);
+    const shoulder = galaxyStarReadabilityFactor(0.35, 0.35);
+    const edge = galaxyStarReadabilityFactor(0.12, 0.35);
+    const hudBand = galaxyStarReadabilityFactor(0.5, 0.05);
+
+    expect(center).toBeLessThan(0.4);
+    expect(shoulder).toBeGreaterThan(center);
+    expect(shoulder).toBeLessThan(1);
+    expect(edge).toBeGreaterThan(1);
+    expect(hudBand).toBe(1);
   });
 });

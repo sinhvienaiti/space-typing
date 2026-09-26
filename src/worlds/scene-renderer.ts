@@ -1381,6 +1381,19 @@ function drawStaticScene(
   context.restore();
 }
 
+export function galaxyStarReadabilityFactor(
+  xRatio: number,
+  yRatio: number,
+): number {
+  if (yRatio < 0.1 || yRatio > 0.64) return 1;
+
+  const centerDistance = Math.abs(xRatio - 0.5);
+  if (centerDistance < 0.1) return 0.34;
+  if (centerDistance < 0.18) return 0.55;
+  if (centerDistance > 0.28) return 1.08;
+  return 0.82;
+}
+
 function drawStars(
   context: CanvasRenderingContext2D,
   input: WorldSceneDrawInput,
@@ -1440,20 +1453,34 @@ function drawStars(
       x < width * 0.66 &&
       y > height * 0.12 &&
       y < height * 0.62;
-    const quietFactor = centralQuiet ? 0.58 : 1;
+    const galaxyReadability =
+      profile.archetype === "celestial-rainbow"
+        ? galaxyStarReadabilityFactor(x / width, y / height)
+        : null;
+    const quietFactor =
+      galaxyReadability ?? (centralQuiet ? 0.58 : 1);
+    const outerThird =
+      profile.archetype === "celestial-rainbow" &&
+      (x < width * 0.3 || x > width * 0.7);
+    const brightThreshold = outerThird ? 0.91 : 0.94;
+    const glintThreshold = outerThird ? 0.986 : 0.992;
     const size =
       0.45 +
       depth * 1.15 +
-      (hierarchy > 0.94 ? 0.8 : 0) +
-      (hierarchy > 0.992 ? 0.9 : 0);
+      (hierarchy > brightThreshold ? 0.8 : 0) +
+      (hierarchy > glintThreshold ? 0.9 : 0);
     const alpha =
       (0.15 +
         depth * 0.36 +
-        (hierarchy > 0.94 ? 0.16 : 0)) *
+        (hierarchy > brightThreshold ? 0.16 : 0)) *
       quietFactor;
 
     context.fillStyle = rgba(environment.starRgb, alpha);
-    if (hierarchy > 0.992 && quality !== "low") {
+    if (
+      hierarchy > glintThreshold &&
+      quality !== "low" &&
+      quietFactor >= 0.8
+    ) {
       const arm = 2.1 + depth * 2.1;
       context.fillRect(x - 0.75, y - arm, 1.5, arm * 2);
       context.fillRect(x - arm, y - 0.75, arm * 2, 1.5);
@@ -1462,7 +1489,7 @@ function drawStars(
       context.arc(x, y, 1.25 + depth * 0.8, 0, TAU);
       context.fill();
       context.globalAlpha = 1;
-    } else if (hierarchy > 0.94) {
+    } else if (hierarchy > brightThreshold) {
       context.beginPath();
       context.arc(x, y, size * 0.62, 0, TAU);
       context.fill();
@@ -1480,12 +1507,17 @@ function drawStars(
         time * 0.01 * environment.starDrift * star.z) %
         1) *
       height;
+    const legacyX = star.x * width;
+    const readability =
+      profile.archetype === "celestial-rainbow"
+        ? galaxyStarReadabilityFactor(star.x, y / height)
+        : 1;
     context.fillStyle = rgba(
       environment.starRgb,
-      0.08 + star.z * 0.25,
+      (0.08 + star.z * 0.25) * readability,
     );
     const size = Math.max(0.7, star.z * 1.3);
-    context.fillRect(star.x * width, y, size, size);
+    context.fillRect(legacyX, y, size, size);
   }
 
   // Near stars move substantially faster and become short streaks. Their count
@@ -1511,13 +1543,12 @@ function drawStars(
     }
 
     if (profile.archetype === "celestial-rainbow") {
-      const centralQuiet =
-        x > width * 0.35 &&
-        x < width * 0.65 &&
-        y > height * 0.12 &&
-        y < height * 0.62;
-      const alpha =
-        (0.22 + depth * 0.24) * (centralQuiet ? 0.5 : 1);
+      const xRatio = x / width;
+      const readability = galaxyStarReadabilityFactor(
+        xRatio,
+        y / height,
+      );
+      const alpha = (0.22 + depth * 0.24) * readability;
       context.fillStyle = rgba(environment.starRgb, alpha);
       context.beginPath();
       context.arc(x, y, 0.85 + depth * 1.05, 0, TAU);
@@ -1525,7 +1556,9 @@ function drawStars(
 
       if (
         quality !== "low" &&
-        seededUnit(profile.seed, index, 314) > 0.86
+        readability >= 0.8 &&
+        seededUnit(profile.seed, index, 314) >
+          (Math.abs(xRatio - 0.5) > 0.28 ? 0.82 : 0.9)
       ) {
         const arm = 1.8 + depth * 2.4;
         context.strokeStyle = rgba(
