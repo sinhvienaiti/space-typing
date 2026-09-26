@@ -20,9 +20,9 @@ const PNG_FILES = [
 const AVIF_FILES = [
   {
     relative:
-      "public/assets/space-typing/backgrounds/heaven/halo-garden-production-v1.avif",
-    minWidth: 896,
-    minHeight: 504,
+      "public/assets/space-typing/backgrounds/heaven/halo-garden-production-v2.avif",
+    minWidth: 2560,
+    minHeight: 1440,
   },
 ];
 
