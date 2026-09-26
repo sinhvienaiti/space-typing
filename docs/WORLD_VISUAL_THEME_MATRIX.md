@@ -37,7 +37,7 @@ registry; it is intentionally not substituted into World 03.
 
 ## World 02 production-art rule
 
-`world-02` now uses `heaven/halo-garden-production-v1.webp` as the primary
+`world-02` now uses `heaven/halo-garden-production-v1.avif` as the primary
 full-frame artwork. The older vector sky is deliberately not used in the
 production composition. Secondary vector layers are kept at very low opacity
 only for subtle parallax and must not visually overwrite the approved painting.

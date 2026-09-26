@@ -17,8 +17,13 @@ const PNG_FILES = [
   "public/assets/space-typing/backgrounds/vendor/ohjirochan/asteroid-large.png",
 ];
 
-const WEBP_FILES = [
-  "public/assets/space-typing/backgrounds/heaven/halo-garden-production-v1.webp",
+const AVIF_FILES = [
+  {
+    relative:
+      "public/assets/space-typing/backgrounds/heaven/halo-garden-production-v1.avif",
+    minWidth: 896,
+    minHeight: 504,
+  },
 ];
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
@@ -57,24 +62,52 @@ console.log(
 );
 
 
-function assertWebp(relative, data) {
+function assertAvif(relative, data, minWidth, minHeight) {
   if (
-    data.length < 12 ||
-    data.subarray(0, 4).toString("ascii") !== "RIFF" ||
-    data.subarray(8, 12).toString("ascii") !== "WEBP"
+    data.length < 24 ||
+    data.subarray(4, 8).toString("ascii") !== "ftyp" ||
+    data.subarray(8, 12).toString("ascii") !== "avif"
   ) {
-    throw new Error(relative + ": invalid WebP RIFF signature.");
+    throw new Error(relative + ": invalid AVIF ftyp signature.");
   }
+
+  const ispeOffset = data.indexOf(Buffer.from("ispe", "ascii"));
+  if (ispeOffset < 0 || ispeOffset + 16 > data.length) {
+    throw new Error(relative + ": missing AVIF ispe dimensions.");
+  }
+
+  const width = data.readUInt32BE(ispeOffset + 8);
+  const height = data.readUInt32BE(ispeOffset + 12);
+  if (width < minWidth || height < minHeight) {
+    throw new Error(
+      relative +
+        ": production artwork is unexpectedly small (" +
+        width +
+        "x" +
+        height +
+        ").",
+    );
+  }
+
+  return { width, height };
 }
 
-for (const relative of WEBP_FILES) {
-  const absolute = resolve(process.cwd(), relative);
+const avifDimensions = [];
+for (const asset of AVIF_FILES) {
+  const absolute = resolve(process.cwd(), asset.relative);
   const data = await readFile(absolute);
-  assertWebp(relative, data);
+  avifDimensions.push({
+    relative: asset.relative,
+    ...assertAvif(
+      asset.relative,
+      data,
+      asset.minWidth,
+      asset.minHeight,
+    ),
+  });
 }
 
 console.log(
-  "Background WebP integrity PASS:",
-  WEBP_FILES.length,
-  "production WebP file(s) with valid RIFF/WEBP signatures.",
+  "Background AVIF integrity PASS:",
+  avifDimensions.map((asset) => asset.relative + " " + asset.width + "x" + asset.height).join(", "),
 );

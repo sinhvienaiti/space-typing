@@ -616,3 +616,18 @@ Regression coverage asserts:
 
 Verified implementation checkpoint: CI #979 PASS, 154 test files / 797 tests.
 See `docs/WORLD_VISUAL_THEME_MATRIX.md` for the maintenance contract.
+
+
+### V80-11A — Halo Garden approved production art
+
+Browser review exposed that the first binary upload of the approved Halo Garden
+painting was truncated even though the old signature-only integrity gate passed.
+Test Lab was correctly using the production `Game` runtime; the artwork itself
+was failing to decode, so the remaining vector support layers were all that could
+be seen.
+
+The asset is now stored as an AVIF production painting at
+`heaven/halo-garden-production-v1.avif`. The integrity gate validates the AVIF
+container and its authored 896x504 dimensions, preventing a truncated binary
+from passing CI again. World 02 still owns its isolated composition and keeps
+secondary vector layers deliberately subtle.
