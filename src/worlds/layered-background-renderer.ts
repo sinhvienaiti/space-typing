@@ -1,4 +1,5 @@
 import type {
+  BackgroundTreatment,
   LayeredBackgroundDrawInput,
   LayeredBackgroundLayer,
   LayeredBackgroundProfile,
@@ -24,6 +25,46 @@ export function qualityAllowsLayer(
 ): boolean {
   const minimum = layer.minQuality ?? (layer.optional ? "high" : "low");
   return QUALITY_RANK[quality] >= QUALITY_RANK[minimum];
+}
+
+type BackgroundTreatmentStyle = {
+  filter: string;
+  shadowColor: string;
+  shadowBlur: number;
+};
+
+const BACKGROUND_TREATMENTS: Readonly<
+  Record<BackgroundTreatment, BackgroundTreatmentStyle>
+> = {
+  none: {
+    filter: "none",
+    shadowColor: "rgba(0, 0, 0, 0)",
+    shadowBlur: 0,
+  },
+  "galaxy-rock-far": {
+    filter:
+      "sepia(0.22) saturate(1.35) hue-rotate(165deg) brightness(0.78) contrast(0.88)",
+    shadowColor: "rgba(93, 173, 255, 0.16)",
+    shadowBlur: 5,
+  },
+  "galaxy-rock-mid": {
+    filter:
+      "sepia(0.3) saturate(1.5) hue-rotate(170deg) brightness(0.86) contrast(0.92)",
+    shadowColor: "rgba(108, 184, 255, 0.28)",
+    shadowBlur: 9,
+  },
+  "galaxy-rock-near": {
+    filter:
+      "sepia(0.32) saturate(1.6) hue-rotate(178deg) brightness(0.9) contrast(0.9)",
+    shadowColor: "rgba(137, 111, 255, 0.38)",
+    shadowBlur: 16,
+  },
+};
+
+export function backgroundTreatmentStyle(
+  treatment: BackgroundTreatment | undefined,
+): BackgroundTreatmentStyle {
+  return BACKGROUND_TREATMENTS[treatment ?? "none"];
 }
 
 function blendMode(
@@ -398,10 +439,15 @@ export class LayeredBackgroundRenderer {
       phase * 0.08 +
       Math.sin(time * 0.07 + phase) * layer.rotationSpeed * 0.3;
 
+    const treatment = backgroundTreatmentStyle(layer.treatment);
     const drawAt = (x: number, y: number): void => {
       context.save();
       context.globalAlpha = opacity;
       context.globalCompositeOperation = blendMode(layer.blend);
+      context.filter = treatment.filter;
+      context.shadowColor = treatment.shadowColor;
+      context.shadowBlur =
+        treatment.shadowBlur * (0.72 + clamp(layer.depth, 0, 1) * 0.56);
       context.translate(x, y);
       context.rotate(rotation);
       if (layer.sourceRect !== undefined) {

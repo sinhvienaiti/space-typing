@@ -5,7 +5,10 @@ import {
   layeredBackgroundForScene,
   validateLayeredBackgroundProfile,
 } from "../src/worlds/layered-background-registry";
-import { qualityAllowsLayer } from "../src/worlds/layered-background-renderer";
+import {
+  backgroundTreatmentStyle,
+  qualityAllowsLayer,
+} from "../src/worlds/layered-background-renderer";
 
 describe("Layered authored background registry", () => {
   it("resolves valid local asset layers for every World", () => {
@@ -378,5 +381,35 @@ describe("World 01 holistic authored composition contract", () => {
       .map((layer) => layer.src);
 
     expect(new Set(sources).size).toBeGreaterThanOrEqual(2);
+  });
+});
+
+
+describe("World 01 sourced-art integration treatments", () => {
+  it("assigns progressively stronger Galaxy lighting to far, mid and near rocks", () => {
+    const galaxy = layeredBackgroundForScene(
+      sceneProfileForWorld("world-01"),
+    );
+    const byId = (id: string) =>
+      galaxy.layers.find((layer) => layer.id === id)!;
+
+    expect(byId("galaxy-asteroid-far-fragments").treatment).toBe(
+      "galaxy-rock-far",
+    );
+    expect(byId("galaxy-asteroid-mid-heavy").treatment).toBe(
+      "galaxy-rock-mid",
+    );
+    expect(byId("galaxy-asteroid-near-hero").treatment).toBe(
+      "galaxy-rock-near",
+    );
+
+    const far = backgroundTreatmentStyle("galaxy-rock-far");
+    const mid = backgroundTreatmentStyle("galaxy-rock-mid");
+    const near = backgroundTreatmentStyle("galaxy-rock-near");
+
+    expect(far.filter).not.toBe("none");
+    expect(mid.shadowBlur).toBeGreaterThan(far.shadowBlur);
+    expect(near.shadowBlur).toBeGreaterThan(mid.shadowBlur);
+    expect(near.shadowColor).toContain("255");
   });
 });
