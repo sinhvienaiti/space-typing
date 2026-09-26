@@ -82,6 +82,51 @@ export function backgroundLayerRotation(
   );
 }
 
+export function backgroundParallaxOffset(
+  width: number,
+  height: number,
+  depth: number,
+  driftX: number,
+  driftY: number,
+  time: number,
+  speedMultiplier: number,
+  motionStrength: number,
+  phase: number,
+): { x: number; y: number } {
+  const dominantDrift = Math.max(Math.abs(driftX), Math.abs(driftY));
+  const directionX = driftX < 0 ? -1 : 1;
+  const directionY = driftY < 0 ? -1 : 1;
+  const amplitudeX =
+    width *
+    clamp(
+      0.018 + Math.abs(driftX) * 8 + depth * 0.015,
+      0.018,
+      0.075,
+    );
+  const amplitudeY =
+    height *
+    clamp(
+      0.008 + Math.abs(driftY) * 10 + depth * 0.008,
+      0.008,
+      0.038,
+    );
+  const angularSpeed =
+    (0.22 + depth * 0.16 + dominantDrift * 18) *
+    speedMultiplier *
+    Math.max(0.7, motionStrength);
+
+  return {
+    x:
+      Math.sin(time * angularSpeed + phase) *
+      amplitudeX *
+      directionX,
+    y:
+      Math.cos(time * angularSpeed * 0.72 + phase) *
+      amplitudeY *
+      directionY,
+  };
+}
+
 function blendMode(
   blend: LayeredBackgroundLayer["blend"],
 ): GlobalCompositeOperation {
@@ -418,36 +463,20 @@ export class LayeredBackgroundRenderer {
       );
     } else if (motionKind === "parallax") {
       // Authored parallax must be visible over normal 5-10 second gameplay
-      // captures while remaining bounded and deterministic. driftX/driftY
-      // control amplitude and direction, not unbounded travel.
-      const directionX = driftX < 0 ? -1 : 1;
-      const directionY = driftY < 0 ? -1 : 1;
-      const amplitudeX =
-        width *
-        clamp(
-          0.018 + Math.abs(driftX) * 8 + depth * 0.015,
-          0.018,
-          0.075,
-        );
-      const amplitudeY =
-        height *
-        clamp(
-          0.008 + Math.abs(driftY) * 10 + depth * 0.008,
-          0.008,
-          0.038,
-        );
-      const angularSpeed =
-        (0.22 + depth * 0.16 + dominantDrift * 18) *
-        instance.speedMultiplier *
-        Math.max(0.7, motionStrength);
-      offsetX =
-        Math.sin(time * angularSpeed + phase) *
-        amplitudeX *
-        directionX;
-      offsetY =
-        Math.cos(time * angularSpeed * 0.72 + phase) *
-        amplitudeY *
-        directionY;
+      // captures while remaining bounded and deterministic.
+      const parallax = backgroundParallaxOffset(
+        width,
+        height,
+        depth,
+        driftX,
+        driftY,
+        time,
+        instance.speedMultiplier,
+        motionStrength,
+        phase,
+      );
+      offsetX = parallax.x;
+      offsetY = parallax.y;
     } else if (motionKind === "float") {
       const amplitudeX =
         width * (0.008 + Math.abs(driftX) * 7) * depth;
