@@ -159,7 +159,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-nebula-depth",
       GALAXY_NEBULA_PURPLE_SRC,
       0.1,
-      0.16,
+      0.16 * 1.5,
       1.92,
       0.18,
       0.68,
