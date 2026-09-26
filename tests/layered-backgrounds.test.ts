@@ -264,7 +264,8 @@ describe("Layered authored background registry", () => {
       (layer) => layer.id === "galaxy-nebula-depth",
     )!;
 
-    expect(sky.opacity).toBeLessThanOrEqual(0.5);
+    expect(sky.src).toContain("/backgrounds/galaxy/cinematic-v2.svg");
+    expect(sky.opacity).toBe(1);
     expect(mainNebula.blend).toBe("screen");
     expect(depthNebula.blend).toBe("screen");
     expect(mainNebula.scale).toBeGreaterThan(sky.scale);
