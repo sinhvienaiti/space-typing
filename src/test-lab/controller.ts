@@ -205,6 +205,7 @@ function snapshotText(
         }
       : {
           phase: snapshot.phase,
+          character: snapshot.characterId,
           stage: snapshot.stage,
           deathMode: snapshot.deathMode,
           lethalHits: snapshot.lethalHits,
@@ -438,6 +439,9 @@ export function mountTestLab(
 
         <details>
           <summary>Player / Status</summary>
+          <p class="test-lab-effective-runtime" data-role="effective-character">
+            Effective runtime character: not started
+          </p>
           <div class="test-lab-grid">
             <label>Character<select data-field="character"></select></label>
             <label>Core Hull<input data-field="core-hull" type="number" min="0" value="100"></label>
@@ -579,11 +583,14 @@ export function mountTestLab(
 
         <details>
           <summary>Music / Audio Runtime</summary>
+          <p class="test-lab-effective-runtime" data-role="effective-music">
+            Effective music: not started
+          </p>
           <div class="test-lab-grid">
             <label>Music state<select data-field="music-state"></select></label>
             <label>Crossfade sec<input data-field="crossfade" type="number" min="0" max="10" step="0.1" value="0.8"></label>
-            <label>Music volume<input data-field="music-volume" type="number" min="0" max="1" step="0.05" value="0.34"></label>
-            <label>Ambient volume<input data-field="ambient-volume" type="number" min="0" max="1" step="0.05" value="0.14"></label>
+            <label>Music volume<input data-field="music-volume" type="number" min="0" max="1" step="0.05" value="0.26"></label>
+            <label>Ambient volume<input data-field="ambient-volume" type="number" min="0" max="1" step="0.05" value="0.08"></label>
             <label>SFX / Announcer volume<input data-field="sfx-volume" type="number" min="0" max="1" step="0.05" value="0.7"></label>
             <label>Pronunciation volume<input data-field="pronunciation-volume" type="number" min="0" max="1" step="0.05" value="1"></label>
             <label>Boss music phase<select data-field="music-boss-phase">
@@ -700,6 +707,7 @@ export function mountTestLab(
           : [
               "phase=" + snapshot.phase,
               "runtimeStage=" + String(snapshot.stage ?? "none"),
+              "character=" + snapshot.characterId,
               "enemies=" + String(snapshot.enemies.length),
               "projectiles=" + String(snapshot.projectiles),
               "particles=" + String(snapshot.particles),
@@ -1001,6 +1009,32 @@ export function mountTestLab(
       music,
       lastAction,
     );
+    const effectiveCharacter = dialog.querySelector<HTMLElement>(
+      '[data-role="effective-character"]',
+    );
+    if (effectiveCharacter !== null) {
+      effectiveCharacter.textContent =
+        snapshot === null
+          ? "Effective runtime character: not started"
+          : "Effective runtime character: " + snapshot.characterId;
+    }
+    const effectiveMusic = dialog.querySelector<HTMLElement>(
+      '[data-role="effective-music"]',
+    );
+    if (effectiveMusic !== null) {
+      const musicSnapshot = music?.getDebugSnapshot() ?? null;
+      const activeMusic = musicSnapshot?.activeMusic ?? null;
+      const candidate =
+        activeMusic === null
+          ? null
+          : activeMusic.candidates[activeMusic.candidateIndex] ?? null;
+      effectiveMusic.textContent =
+        activeMusic === null
+          ? "Effective music: not playing"
+          : "Effective music: " +
+            activeMusic.assetId +
+            (candidate === null ? "" : " · " + candidate);
+    }
     inventoryInspector.textContent =
       JSON.stringify(
         getItemDefinition(itemSelect.value as ItemId),
@@ -1073,6 +1107,7 @@ export function mountTestLab(
       true,
       inputValue(dialog, '[data-field="death-mode"]') as TestLabDeathMode,
     );
+    game.setCharacter(characterSelect.value as CharacterId);
     game.setVocabularyLevel(
       numberValue(dialog, '[data-field="vocab-level"]', 1),
     );
@@ -1302,6 +1337,16 @@ export function mountTestLab(
       String(stage);
     dialog.querySelector<HTMLInputElement>('[data-field="checkpoint"]')!.value =
       String(stage);
+  });
+
+  characterSelect.addEventListener("change", () => {
+    if (game === null) {
+      renderInspector();
+      return;
+    }
+    game.setCharacter(characterSelect.value as CharacterId);
+    renderInspector();
+    notice("character applied live · " + characterSelect.value);
   });
 
   function coreStatsFromControls(): CoreStats {

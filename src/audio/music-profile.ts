@@ -72,18 +72,59 @@ export type MusicResolveContext = {
 };
 
 const SHARED = {
-  intense: asset("world-intense", "pulse.ogg", "music"),
-  miniBoss: asset("mini-boss", "pulse.ogg", "music"),
+  calm: fallbackAsset(
+    "modern-space-calm",
+    "sector.ogg",
+    "mysterious-ambience.mp3",
+    "music",
+  ),
+  intense: fallbackAsset(
+    "modern-space-intense",
+    "pulse.ogg",
+    "battle-theme-b.mp3",
+    "music",
+  ),
+  miniBoss: fallbackAsset(
+    "mini-boss",
+    "pulse.ogg",
+    "battle-theme-b.mp3",
+    "music",
+  ),
   worldBoss: asset("world-boss", "urgent.ogg", "music"),
   galaxyBoss: asset("galaxy-boss", "urgent.ogg", "music"),
   championHunt: asset("champion-hunt", "urgent.ogg", "music"),
-  hiddenChallenge: asset("hidden-challenge", "pulse.ogg", "music"),
-  hiddenWorld: asset("hidden-world", "sector.ogg", "music"),
-  shop: asset("shop", "sector.ogg", "music"),
-  station: asset("station", "sector.ogg", "music"),
+  hiddenChallenge: fallbackAsset(
+    "hidden-challenge",
+    "pulse.ogg",
+    "battle-theme-b.mp3",
+    "music",
+  ),
+  hiddenWorld: fallbackAsset(
+    "hidden-world",
+    "sector.ogg",
+    "mysterious-ambience.mp3",
+    "music",
+  ),
+  shop: fallbackAsset(
+    "shop",
+    "sector.ogg",
+    "mysterious-ambience.mp3",
+    "music",
+  ),
+  station: fallbackAsset(
+    "station",
+    "sector.ogg",
+    "mysterious-ambience.mp3",
+    "music",
+  ),
   victory: asset("victory", "victory.ogg", "stingers"),
   defeat: asset("defeat", "urgent.ogg", "music"),
-  transition: asset("transition", "pulse.ogg", "music"),
+  transition: fallbackAsset(
+    "transition",
+    "pulse.ogg",
+    "battle-theme-b.mp3",
+    "music",
+  ),
 } as const;
 
 function asset(
@@ -118,12 +159,11 @@ function worldProfile(world: WorldProfile): WorldMusicProfile {
   const worldFile = world.id + ".ogg";
   const galaxyFile =
     "galaxy-" + String(world.galaxy).padStart(2, "0") + ".ogg";
-  const baseTrack = fallbackAsset(
-    world.id + "-base",
-    worldFile,
-    "sector.ogg",
-    "music",
-  );
+  const baseTrack = {
+    ...SHARED.calm,
+    id: world.id + "-base",
+    localPath: "/local-assets/music/" + worldFile,
+  };
   const ambient = fallbackAsset(
     world.id + "-ambient",
     worldFile,
