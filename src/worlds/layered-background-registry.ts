@@ -231,7 +231,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     0.15,
     0.13 * 3,
     0.125,
-    0.67,
+    0.84,
     0.12,
     0.00012,
     0.00002,
