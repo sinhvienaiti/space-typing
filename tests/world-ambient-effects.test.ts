@@ -15,12 +15,14 @@ describe("World authored ambient effects", () => {
     const profile = worldAmbientEffectsProfile("world-02");
 
     expect(profile).not.toBeNull();
+    expect(profile?.meteorCount).toBeLessThanOrEqual(3);
     expect(profile).toMatchObject({
       cloudMist: true,
       waterfallShimmer: true,
       starDrift: true,
       galaxyDrift: true,
       haloGlow: true,
+      lightRays: true,
       meteorCount: 3,
     });
   });
