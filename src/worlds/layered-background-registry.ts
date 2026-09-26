@@ -5,6 +5,7 @@ import type {
 } from "./layered-background-types";
 
 const ROOT = "/assets/space-typing/backgrounds";
+const PLAYER_SHIP_SHEET = "/assets/space-typing/ships/player-ships-v2.svg";
 
 function layer(
   id: string,
@@ -22,7 +23,7 @@ function layer(
 ): LayeredBackgroundLayer {
   return {
     id,
-    src: ROOT + "/" + src,
+    src: src.startsWith("/") ? src : ROOT + "/" + src,
     depth,
     opacity,
     scale,
@@ -38,6 +39,50 @@ function layer(
     pulseAmount,
     blend: "source-over",
     optional,
+    artTreatment: src.includes("/meteor-") || src.includes("meteor-")
+      ? "asteroid"
+      : undefined,
+  };
+}
+
+function distantShip(
+  id: string,
+  cropX: number,
+  cropY: number,
+  anchorX: number,
+  anchorY: number,
+  scale: number,
+  driftX: number,
+  optional = true,
+): LayeredBackgroundLayer {
+  return {
+    ...layer(
+      id,
+      PLAYER_SHIP_SHEET,
+      0.58,
+      0.13,
+      scale,
+      anchorX,
+      anchorY,
+      driftX,
+      0.0015,
+      anchorX < 0.5 ? -0.0012 : 0.0012,
+      0,
+      optional,
+    ),
+    motion: "flyby",
+    placement: "edges",
+    instances: 1,
+    spreadY: 0.24,
+    scaleJitter: 0.16,
+    opacityJitter: 0.12,
+    speedJitter: 0.18,
+    sourceRect: {
+      x: cropX,
+      y: cropY,
+      width: 120,
+      height: 120,
+    },
   };
 }
 
@@ -57,13 +102,31 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     "galaxy-nebula",
     "vendor/screaming-brain/nebula-purple-3-1024.png",
     0.14,
-    0.32,
-    1.1,
+    0.42,
+    1.13,
     0.52,
-    0.48,
+    0.46,
     -0.00016,
     0.000035,
   ),
+  {
+    ...layer(
+      "galaxy-nebula-depth",
+      "vendor/screaming-brain/nebula-purple-3-1024.png",
+      0.11,
+      0.2,
+      1.34,
+      0.31,
+      0.37,
+      0.0001,
+      -0.000025,
+      -0.000045,
+    ),
+    motion: "float",
+    blend: "screen",
+    spreadX: 0.04,
+    spreadY: 0.035,
+  },
   layer(
     "galaxy-planet-primary",
     "vendor/screaming-brain/planet-ocean-03-512.png",
@@ -115,6 +178,24 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     0.0002,
     0.02,
     true,
+  ),
+  distantShip(
+    "galaxy-distant-patrol-left",
+    0,
+    0,
+    0.08,
+    0.22,
+    0.055,
+    0.006,
+  ),
+  distantShip(
+    "galaxy-distant-patrol-right",
+    240,
+    120,
+    0.91,
+    0.42,
+    0.048,
+    -0.005,
   ),
   layer(
     "galaxy-meteor-far-left",
@@ -211,12 +292,14 @@ const GALAXY_RICH: readonly LayeredBackgroundLayer[] = GALAXY.map(
       return {
         ...item,
         motion: "wrap",
-        instances: 5,
-        spreadX: 0.78,
-        spreadY: 0.38,
-        scaleJitter: 0.42,
-        opacityJitter: 0.28,
-        speedJitter: 0.32,
+        instances: 7,
+        spreadX: 0.8,
+        spreadY: 0.46,
+        scale: item.scale * 0.78,
+        opacity: item.opacity * 0.82,
+        scaleJitter: 0.46,
+        opacityJitter: 0.3,
+        speedJitter: 0.34,
         placement: "edges",
       };
     }
@@ -225,12 +308,13 @@ const GALAXY_RICH: readonly LayeredBackgroundLayer[] = GALAXY.map(
       return {
         ...item,
         motion: "wrap",
-        instances: 4,
-        spreadX: 0.72,
-        spreadY: 0.52,
-        scaleJitter: 0.36,
-        opacityJitter: 0.24,
-        speedJitter: 0.3,
+        instances: 3,
+        spreadX: 0.74,
+        spreadY: 0.58,
+        scale: item.scale * 1.12,
+        scaleJitter: 0.34,
+        opacityJitter: 0.22,
+        speedJitter: 0.28,
         placement: "edges",
       };
     }
@@ -239,13 +323,14 @@ const GALAXY_RICH: readonly LayeredBackgroundLayer[] = GALAXY.map(
       return {
         ...item,
         motion: "approach",
-        instances: 3,
-        spreadX: 0.84,
-        spreadY: 0.56,
-        scale: item.scale * 1.34,
-        scaleJitter: 0.34,
-        opacityJitter: 0.2,
-        speedJitter: 0.26,
+        instances: 1,
+        spreadX: 0.86,
+        spreadY: 0.6,
+        scale: item.scale * 1.82,
+        opacity: Math.min(0.62, item.opacity * 1.08),
+        scaleJitter: 0.2,
+        opacityJitter: 0.12,
+        speedJitter: 0.2,
         placement: "edges",
       };
     }
@@ -473,8 +558,24 @@ export function validateLayeredBackgroundProfile(
   for (const layer of profile.layers) {
     if (ids.has(layer.id)) errors.push("duplicate layer id: " + layer.id);
     ids.add(layer.id);
-    if (!layer.src.startsWith("/assets/space-typing/backgrounds/")) {
+    if (
+      !layer.src.startsWith("/assets/space-typing/backgrounds/") &&
+      !layer.src.startsWith("/assets/space-typing/ships/")
+    ) {
       errors.push(layer.id + ": non-local background asset.");
+    }
+    if (
+      layer.sourceRect !== undefined &&
+      (!Number.isFinite(layer.sourceRect.x) ||
+        !Number.isFinite(layer.sourceRect.y) ||
+        !Number.isFinite(layer.sourceRect.width) ||
+        !Number.isFinite(layer.sourceRect.height) ||
+        layer.sourceRect.x < 0 ||
+        layer.sourceRect.y < 0 ||
+        layer.sourceRect.width <= 0 ||
+        layer.sourceRect.height <= 0)
+    ) {
+      errors.push(layer.id + ": invalid source crop.");
     }
     if (
       !Number.isFinite(layer.depth) ||
