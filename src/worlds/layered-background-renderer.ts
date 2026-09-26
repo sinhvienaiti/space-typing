@@ -72,7 +72,6 @@ function qualityInstanceFactor(
 
 export class LayeredBackgroundRenderer {
   private readonly assets = new Map<string, LoadedBackgroundAsset>();
-  private readonly treatedAssets = new Map<string, HTMLCanvasElement>();
   private readonly instanceCache = new Map<
     string,
     readonly LayeredBackgroundInstance[]
@@ -80,7 +79,6 @@ export class LayeredBackgroundRenderer {
 
   clear(): void {
     this.assets.clear();
-    this.treatedAssets.clear();
     this.instanceCache.clear();
   }
 
@@ -115,130 +113,6 @@ export class LayeredBackgroundRenderer {
       if (layer.optional && !qualityAllowsOptional(quality)) continue;
       this.asset(layer.src);
     }
-  }
-
-  private treatedAsset(
-    layer: LayeredBackgroundLayer,
-    asset: LoadedBackgroundAsset,
-  ): CanvasImageSource {
-    if (
-      layer.artTreatment !== "asteroid" ||
-      typeof document === "undefined" ||
-      !asset.loaded ||
-      asset.failed
-    ) {
-      return asset.image;
-    }
-
-    const cacheKey = layer.src + ":asteroid-v2";
-    const cached = this.treatedAssets.get(cacheKey);
-    if (cached !== undefined) return cached;
-
-    const sourceWidth = Math.max(
-      1,
-      asset.image.naturalWidth || asset.image.width,
-    );
-    const sourceHeight = Math.max(
-      1,
-      asset.image.naturalHeight || asset.image.height,
-    );
-    const longest = Math.max(sourceWidth, sourceHeight);
-    const upscale = clamp(176 / longest, 1, 4);
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(sourceWidth * upscale));
-    canvas.height = Math.max(1, Math.round(sourceHeight * upscale));
-    const context = canvas.getContext("2d");
-    if (context === null) return asset.image;
-
-    context.imageSmoothingEnabled = true;
-    context.imageSmoothingQuality = "high";
-    context.drawImage(
-      asset.image,
-      0,
-      0,
-      canvas.width,
-      canvas.height,
-    );
-
-    // Enrich the very small arcade meteor sprites once, at load time. The
-    // resulting canvas is cached and becomes an ordinary drawImage source in
-    // the frame loop: no blur, crater generation or new canvas allocation per
-    // frame.
-    context.save();
-    context.globalCompositeOperation = "source-atop";
-
-    const light = context.createLinearGradient(
-      0,
-      0,
-      canvas.width,
-      canvas.height,
-    );
-    light.addColorStop(0, "rgba(218, 231, 255, 0.24)");
-    light.addColorStop(0.38, "rgba(117, 138, 177, 0.04)");
-    light.addColorStop(0.7, "rgba(23, 21, 38, 0.08)");
-    light.addColorStop(1, "rgba(3, 4, 10, 0.46)");
-    context.fillStyle = light;
-    context.fillRect(0, 0, canvas.width, canvas.height);
-
-    const seed = stringSeed(layer.src);
-    const craterCount = 4 + Math.floor(seededUnit(seed, 0, 91) * 4);
-    for (let index = 0; index < craterCount; index += 1) {
-      const x = canvas.width * (0.2 + seededUnit(seed, index, 92) * 0.6);
-      const y =
-        canvas.height * (0.2 + seededUnit(seed, index, 93) * 0.58);
-      const radius =
-        Math.min(canvas.width, canvas.height) *
-        (0.035 + seededUnit(seed, index, 94) * 0.075);
-      const squash = 0.48 + seededUnit(seed, index, 95) * 0.34;
-      const angle = seededUnit(seed, index, 96) * Math.PI;
-
-      context.save();
-      context.translate(x, y);
-      context.rotate(angle);
-      context.scale(1, squash);
-      context.fillStyle =
-        "rgba(4, 5, 12, " +
-        String(0.16 + seededUnit(seed, index, 97) * 0.14) +
-        ")";
-      context.beginPath();
-      context.arc(0, 0, radius, 0, Math.PI * 2);
-      context.fill();
-
-      context.strokeStyle =
-        "rgba(226, 234, 255, " +
-        String(0.08 + seededUnit(seed, index, 98) * 0.08) +
-        ")";
-      context.lineWidth = Math.max(0.8, radius * 0.12);
-      context.beginPath();
-      context.arc(
-        -radius * 0.08,
-        -radius * 0.14,
-        radius * 0.78,
-        Math.PI * 1.06,
-        Math.PI * 1.78,
-      );
-      context.stroke();
-      context.restore();
-    }
-
-    const specks = 8;
-    for (let index = 0; index < specks; index += 1) {
-      const x = canvas.width * seededUnit(seed, index, 101);
-      const y = canvas.height * seededUnit(seed, index, 102);
-      const radius =
-        0.6 + seededUnit(seed, index, 103) * 1.3;
-      context.fillStyle =
-        "rgba(238, 242, 255, " +
-        String(0.05 + seededUnit(seed, index, 104) * 0.07) +
-        ")";
-      context.beginPath();
-      context.arc(x, y, radius, 0, Math.PI * 2);
-      context.fill();
-    }
-
-    context.restore();
-    this.treatedAssets.set(cacheKey, canvas);
-    return canvas;
   }
 
   private instancesFor(
@@ -328,22 +202,14 @@ export class LayeredBackgroundRenderer {
     const { width, height, time, flightIntensity, variant } = input;
     const { layer, index } = instance;
     const image = asset.image;
-    const renderSource = this.treatedAsset(layer, asset);
-    const treatedCanvas =
-      typeof HTMLCanvasElement !== "undefined" &&
-      renderSource instanceof HTMLCanvasElement
-        ? renderSource
-        : null;
     const naturalWidth = Math.max(
       1,
       layer.sourceRect?.width ??
-        treatedCanvas?.width ??
         Math.max(1, image.naturalWidth || image.width),
     );
     const naturalHeight = Math.max(
       1,
       layer.sourceRect?.height ??
-        treatedCanvas?.height ??
         Math.max(1, image.naturalHeight || image.height),
     );
     const viewportRatio = width / Math.max(1, height);
@@ -527,7 +393,7 @@ export class LayeredBackgroundRenderer {
       context.globalCompositeOperation = blendMode(layer.blend);
       context.translate(x, y);
       context.rotate(rotation);
-      if (layer.sourceRect !== undefined && renderSource === image) {
+      if (layer.sourceRect !== undefined) {
         context.drawImage(
           image,
           layer.sourceRect.x,
@@ -541,7 +407,7 @@ export class LayeredBackgroundRenderer {
         );
       } else {
         context.drawImage(
-          renderSource,
+          image,
           -drawWidth * 0.5,
           -drawHeight * 0.5,
           drawWidth,

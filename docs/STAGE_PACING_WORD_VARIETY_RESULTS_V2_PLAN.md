@@ -102,3 +102,35 @@ Replace the current five loose result cells and overgrown Rewards text with an o
 5. **Automated CI complete; manual gate pending:** complete Test/TypeScript/build/bundle checks pass on the current slices. Execute the M22 real-browser/audio/visual matrix on the final combined build, including Stage 001/010/011/051+ low/high-WPM duration evidence. Preserve the merged Campaign Map/checkpoint behavior; do not revive stale design branches over current `main`.
 
 Do not mark any of these steps COMPLETE because this document or its draft PR exists.
+
+---
+
+## Stage Results V3 desktop presentation checkpoint — 2026-09-26
+
+Owner browser review rejected the Stage Results V2 presentation because the
+1040px card, six-column KPI row and five-column detail grids made the report
+visually cramped, text-heavy and scroll-heavy on desktop.
+
+This checkpoint changes presentation only; result telemetry and reward logic stay
+authoritative.
+
+Desktop acceptance rules:
+
+- stage-clear report uses a near-full desktop card (up to 1640px wide);
+- header and action footer remain visually fixed while one dashboard region owns
+  vertical scrolling;
+- performance summary uses a balanced 2-column KPI grid instead of six squeezed
+  columns;
+- Combat and Typing/Learning metrics use four columns on wide desktop, stepping
+  down responsively at narrower widths;
+- Word Review must not introduce a second nested scrollbar;
+- gameplay behind the report is more strongly blurred, dimmed and desaturated;
+- the stage-clear overlay stays above transient save notices so the report keeps
+  visual focus;
+- the original metric/button ids are preserved so runtime logic is not coupled
+  to the new layout;
+- regression coverage in `tests/stage-results-layout.test.ts` guards the dashboard DOM structure and stable runtime ids; CSS sizing, scroll behavior and visual hierarchy remain browser-review gates.
+
+This UI checkpoint is not a claim that the wider Environment Art / music review
+is complete. It is the accepted direction for the Stage Clear report itself.
+

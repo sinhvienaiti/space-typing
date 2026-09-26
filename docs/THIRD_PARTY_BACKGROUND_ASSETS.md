@@ -252,8 +252,39 @@ Binary acquisition route:
 - extracted CC0 copies from `judaheland-dev/astrobro`.
 
 Use:
-- multiple far/mid/near moving meteor layers with different parallax, scale and
-  rotation.
+- tiny distant debris only;
+- these assets are no longer permitted for readable mid/near desktop layers
+  after owner visual review rejected their blocky arcade look when enlarged.
+
+### OhjiroChan — Asteroid Tileset 01
+
+Canonical source:
+- https://opengameart.org/content/asteroid-tileset-01
+
+License:
+- CC0
+
+Source characteristics:
+- three authored size tiers;
+- eight rotation views per tier in the original sheet;
+- cratered, shaded asteroid rendering rather than flat arcade polygons.
+
+Vendored production derivatives:
+- `vendor/ohjirochan/asteroid-small.png`;
+- `vendor/ohjirochan/asteroid-medium.png`;
+- `vendor/ohjirochan/asteroid-large.png`.
+
+Acquisition route:
+- reproducible extracted frames from
+  `lebalz/ofi-blog/docs/pgzero/A-examples/5-asteroids/images/`;
+- that example links directly back to the same OpenGameArt
+  `Asteroid Tileset 01` source;
+- a local `SOURCE.md` is stored beside the imported binaries.
+
+Use:
+- authored mid-depth asteroid drift;
+- authored near-camera hero asteroid;
+- no runtime crater/shading synthesis is allowed.
 
 ### Deprecated from active Galaxy composition
 

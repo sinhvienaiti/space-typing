@@ -18,8 +18,6 @@ export type BackgroundMotion =
 
 export type BackgroundPlacement = "anchor" | "wide" | "edges";
 
-export type BackgroundArtTreatment = "none" | "asteroid";
-
 export type BackgroundSourceRect = {
   x: number;
   y: number;
@@ -64,11 +62,6 @@ export type LayeredBackgroundLayer = {
    * source image's natural pixel coordinate space.
    */
   sourceRect?: BackgroundSourceRect;
-  /**
-   * One-time precomposed art treatment. Runtime animation still draws a cached
-   * CanvasImageSource so richer art does not add per-frame texture work.
-   */
-  artTreatment?: BackgroundArtTreatment;
 };
 
 export type LayeredBackgroundProfile = {

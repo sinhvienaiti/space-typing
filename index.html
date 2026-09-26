@@ -231,9 +231,14 @@
     </section>
 
     <section id="stageClearOverlay" class="overlay hidden">
-      <div class="pause-card stage-results-card">
+      <div
+        class="pause-card stage-results-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="clearTitle"
+      >
         <header class="stage-results-header">
-          <div>
+          <div class="stage-results-title">
             <p class="eyebrow">stage clear · measured report</p>
             <h2 id="clearTitle">Stage 001 complete</h2>
             <p id="clearMeta" class="stage-results-meta"></p>
@@ -244,51 +249,77 @@
           </div>
         </header>
 
-        <div class="results stage-results-summary">
-          <div><span>score</span><strong id="clearScore">0</strong></div>
-          <div><span>target accuracy</span><strong id="clearAccuracy">100%</strong></div>
-          <div><span>target WPM</span><strong id="clearWpm">0</strong></div>
-          <div><span>time</span><strong id="clearTime">0:00</strong></div>
-          <div><span>max key streak</span><strong id="clearStreak">0</strong></div>
-          <div><span>kill rate</span><strong id="clearKillRate">0/min</strong></div>
-        </div>
-
-        <section class="stage-result-section">
-          <h3>Combat</h3>
-          <div id="clearCombatMetrics" class="result-measured-grid"></div>
-        </section>
-
-        <section class="stage-result-section">
-          <h3>Typing & learning</h3>
-          <p class="result-denominator-note">
-            WPM/target accuracy use hostile enemy + boss word keys only. Projectile letters and bonus targets do not inflate these learning metrics. Key Streak keeps the existing gameplay semantics.
-          </p>
-          <div id="clearTypingMetrics" class="result-measured-grid"></div>
-          <details class="word-review">
-            <summary>Word review <span id="wordReviewCount"></span></summary>
-            <div id="wordReviewTabs" class="word-review-tabs" role="tablist" aria-label="Word result filter">
-              <button type="button" data-word-filter="all" class="active">All</button>
-              <button type="button" data-word-filter="perfect">Perfect</button>
-              <button type="button" data-word-filter="corrected">Corrected</button>
-              <button type="button" data-word-filter="missed">Missed</button>
+        <div class="stage-results-dashboard">
+          <aside class="stage-results-overview" aria-label="Performance overview">
+            <div class="stage-results-column-heading">
+              <span>Performance snapshot</span>
+              <small>Core metrics and earned progression</small>
             </div>
-            <div id="wordReviewList" class="word-review-list"></div>
-          </details>
-        </section>
 
-        <section class="stage-result-section">
-          <h3>Rewards</h3>
-          <div id="clearCredits" class="reward-chips stage-reward-chips" aria-label="Stage rewards"></div>
-        </section>
+            <div class="results stage-results-summary">
+              <div><span>score</span><strong id="clearScore">0</strong></div>
+              <div><span>target accuracy</span><strong id="clearAccuracy">100%</strong></div>
+              <div><span>target WPM</span><strong id="clearWpm">0</strong></div>
+              <div><span>time</span><strong id="clearTime">0:00</strong></div>
+              <div><span>max key streak</span><strong id="clearStreak">0</strong></div>
+              <div><span>kill rate</span><strong id="clearKillRate">0/min</strong></div>
+            </div>
 
-        <section id="clearCharacterProgress" class="clear-character-progress" aria-live="polite"></section>
-        <p id="clearDetails" class="result-details"></p>
-        <div class="stage-result-actions">
-          <button id="nextStageButton" class="primary">Next stage</button>
-          <button id="clearRetryButton">Replay stage</button>
-          <button id="clearStageSelectButton">Stage Select</button>
-          <button id="clearTitleButton">Back to title</button>
+            <section class="stage-result-section stage-rewards-panel">
+              <div class="stage-result-section-heading">
+                <h3>Rewards & progression</h3>
+                <small>What this clear added to your run</small>
+              </div>
+              <div id="clearCredits" class="reward-chips stage-reward-chips" aria-label="Stage rewards"></div>
+              <section id="clearCharacterProgress" class="clear-character-progress" aria-live="polite"></section>
+              <p id="clearDetails" class="result-details"></p>
+            </section>
+          </aside>
+
+          <div class="stage-results-detail-column">
+            <section class="stage-result-section">
+              <div class="stage-result-section-heading">
+                <h3>Combat</h3>
+                <small>Pressure, survival and target resolution</small>
+              </div>
+              <div id="clearCombatMetrics" class="result-measured-grid"></div>
+            </section>
+
+            <section class="stage-result-section stage-learning-panel">
+              <div class="stage-result-section-heading">
+                <h3>Typing & learning</h3>
+                <small>Accuracy, pace and vocabulary performance</small>
+              </div>
+              <p class="result-denominator-note">
+                WPM and target accuracy use hostile enemy + boss word keys only. Projectile letters and bonus targets do not inflate learning metrics. Key Streak keeps the existing gameplay semantics.
+              </p>
+              <div id="clearTypingMetrics" class="result-measured-grid"></div>
+              <details class="word-review">
+                <summary>Word review <span id="wordReviewCount"></span></summary>
+                <div id="wordReviewTabs" class="word-review-tabs" role="tablist" aria-label="Word result filter">
+                  <button type="button" data-word-filter="all" class="active">All</button>
+                  <button type="button" data-word-filter="perfect">Perfect</button>
+                  <button type="button" data-word-filter="corrected">Corrected</button>
+                  <button type="button" data-word-filter="missed">Missed</button>
+                </div>
+                <div id="wordReviewList" class="word-review-list"></div>
+              </details>
+            </section>
+          </div>
         </div>
+
+        <footer class="stage-results-footer">
+          <div class="stage-results-footer-copy">
+            <span>Report complete</span>
+            <small>Continue the campaign or inspect another stage.</small>
+          </div>
+          <div class="stage-result-actions">
+            <button id="nextStageButton" class="primary">Next stage</button>
+            <button id="clearRetryButton">Replay stage</button>
+            <button id="clearStageSelectButton">Stage Select</button>
+            <button id="clearTitleButton">Back to title</button>
+          </div>
+        </footer>
       </div>
     </section>
 
