@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { sceneProfileForWorld } from "../src/worlds/scene-registry";
 import {
   galaxyStarReadabilityFactor,
+  productionGalaxyStarReadabilityEnabled,
   worldSceneCacheKey,
   worldSceneRenderPolicy,
 } from "../src/worlds/scene-renderer";
@@ -60,6 +61,24 @@ describe("World scene renderer cache contract", () => {
 
 
 describe("Galaxy star readability contract", () => {
+  it("limits the new readability bias to the accepted World 01 production scene", () => {
+    expect(
+      productionGalaxyStarReadabilityEnabled(
+        sceneProfileForWorld("world-01"),
+      ),
+    ).toBe(true);
+    expect(
+      productionGalaxyStarReadabilityEnabled(
+        sceneProfileForWorld("world-02"),
+      ),
+    ).toBe(false);
+    expect(
+      productionGalaxyStarReadabilityEnabled(
+        sceneProfileForWorld("world-03"),
+      ),
+    ).toBe(false);
+  });
+
   it("suppresses the active center while preserving and slightly enriching outer thirds", () => {
     const center = galaxyStarReadabilityFactor(0.5, 0.35);
     const shoulder = galaxyStarReadabilityFactor(0.35, 0.35);

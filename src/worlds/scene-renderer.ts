@@ -1381,6 +1381,12 @@ function drawStaticScene(
   context.restore();
 }
 
+export function productionGalaxyStarReadabilityEnabled(
+  profile: Pick<WorldSceneProfile, "worldId">,
+): boolean {
+  return profile.worldId === "world-01";
+}
+
 export function galaxyStarReadabilityFactor(
   xRatio: number,
   yRatio: number,
@@ -1454,13 +1460,13 @@ function drawStars(
       y > height * 0.12 &&
       y < height * 0.62;
     const galaxyReadability =
-      profile.archetype === "celestial-rainbow"
+      productionGalaxyStarReadabilityEnabled(profile)
         ? galaxyStarReadabilityFactor(x / width, y / height)
         : null;
     const quietFactor =
       galaxyReadability ?? (centralQuiet ? 0.58 : 1);
     const outerThird =
-      profile.archetype === "celestial-rainbow" &&
+      productionGalaxyStarReadabilityEnabled(profile) &&
       (x < width * 0.3 || x > width * 0.7);
     const brightThreshold = outerThird ? 0.91 : 0.94;
     const glintThreshold = outerThird ? 0.986 : 0.992;
@@ -1509,7 +1515,7 @@ function drawStars(
       height;
     const legacyX = star.x * width;
     const readability =
-      profile.archetype === "celestial-rainbow"
+      productionGalaxyStarReadabilityEnabled(profile)
         ? galaxyStarReadabilityFactor(star.x, y / height)
         : 1;
     context.fillStyle = rgba(
@@ -1544,21 +1550,35 @@ function drawStars(
 
     if (profile.archetype === "celestial-rainbow") {
       const xRatio = x / width;
-      const readability = galaxyStarReadabilityFactor(
-        xRatio,
-        y / height,
-      );
+      const yRatio = y / height;
+      const productionGalaxy =
+        productionGalaxyStarReadabilityEnabled(profile);
+      const centralQuiet =
+        xRatio > 0.35 &&
+        xRatio < 0.65 &&
+        yRatio > 0.12 &&
+        yRatio < 0.62;
+      const readability = productionGalaxy
+        ? galaxyStarReadabilityFactor(xRatio, yRatio)
+        : centralQuiet
+          ? 0.5
+          : 1;
       const alpha = (0.22 + depth * 0.24) * readability;
       context.fillStyle = rgba(environment.starRgb, alpha);
       context.beginPath();
       context.arc(x, y, 0.85 + depth * 1.05, 0, TAU);
       context.fill();
 
+      const glintThreshold =
+        productionGalaxy && Math.abs(xRatio - 0.5) > 0.28
+          ? 0.82
+          : productionGalaxy
+            ? 0.9
+            : 0.86;
       if (
         quality !== "low" &&
-        readability >= 0.8 &&
-        seededUnit(profile.seed, index, 314) >
-          (Math.abs(xRatio - 0.5) > 0.28 ? 0.82 : 0.9)
+        (!productionGalaxy || readability >= 0.8) &&
+        seededUnit(profile.seed, index, 314) > glintThreshold
       ) {
         const arm = 1.8 + depth * 2.4;
         context.strokeStyle = rgba(
