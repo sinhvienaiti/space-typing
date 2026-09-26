@@ -8435,36 +8435,39 @@ export class Game {
     const context = this.context;
     const x = enemy.x;
     const y = enemy.y - kick;
-    const radius = enemy.radius * (targeted ? 1.62 : 1.46);
-    const inner = enemy.radius * 0.48;
-    const backdrop = context.createRadialGradient(
-      x,
-      y,
-      inner,
-      x,
-      y,
-      radius,
-    );
-    backdrop.addColorStop(
-      0,
-      targeted
-        ? "rgba(1, 9, 24, 0.58)"
-        : "rgba(2, 8, 22, 0.5)",
-    );
-    backdrop.addColorStop(0.58, "rgba(3, 9, 24, 0.36)");
-    backdrop.addColorStop(1, "rgba(3, 9, 24, 0)");
 
+    // Keep this allocation-free in the hot enemy loop. Two bounded dark discs
+    // create silhouette contrast without recolouring enemy families globally.
     context.save();
     context.globalCompositeOperation = "source-over";
-    context.fillStyle = backdrop;
+    context.fillStyle = targeted
+      ? "rgba(1, 8, 24, 0.5)"
+      : "rgba(2, 7, 20, 0.4)";
     context.beginPath();
-    context.arc(x, y, radius, 0, Math.PI * 2);
+    context.arc(
+      x,
+      y,
+      enemy.radius * (targeted ? 1.42 : 1.3),
+      0,
+      Math.PI * 2,
+    );
+    context.fill();
+
+    context.fillStyle = "rgba(2, 7, 20, 0.24)";
+    context.beginPath();
+    context.arc(
+      x,
+      y,
+      enemy.radius * (targeted ? 1.62 : 1.5),
+      0,
+      Math.PI * 2,
+    );
     context.fill();
 
     context.strokeStyle = targeted
       ? "rgba(109, 246, 255, 0.72)"
-      : "rgba(7, 16, 38, 0.68)";
-    context.lineWidth = targeted ? 2.2 : 1.6;
+      : "rgba(7, 16, 38, 0.72)";
+    context.lineWidth = targeted ? 2.2 : 1.8;
     context.beginPath();
     context.arc(
       x,
@@ -9163,11 +9166,22 @@ export class Game {
       : "rgba(202, 215, 229, 0.8)";
     const objectiveTarget =
       this.stageObjective?.targetEnemyId === enemy.id;
-    context.fillText(
-      (objectiveTarget ? "OBJECTIVE · " : "") + layerLabel,
-      enemy.x,
-      y - 25,
-    );
+    const layerText =
+      (objectiveTarget ? "OBJECTIVE · " : "") + layerLabel;
+    if (this.worldSceneProfile.worldId === "world-02") {
+      const metaWidth = this.measureTextWidth(layerText);
+      context.fillStyle = "rgba(1, 6, 17, 0.78)";
+      context.fillRect(
+        enemy.x - metaWidth / 2 - 5,
+        y - 32,
+        metaWidth + 10,
+        12,
+      );
+      context.fillStyle = targeted
+        ? "rgba(224, 252, 255, 0.98)"
+        : "rgba(226, 235, 246, 0.92)";
+    }
+    context.fillText(layerText, enemy.x, y - 25);
 
     if (
       enemy.pendingSkillId !== undefined &&
