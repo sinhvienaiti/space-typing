@@ -416,6 +416,38 @@ export class LayeredBackgroundRenderer {
         0,
         1,
       );
+    } else if (motionKind === "parallax") {
+      // Authored parallax must be visible over normal 5-10 second gameplay
+      // captures while remaining bounded and deterministic. driftX/driftY
+      // control amplitude and direction, not unbounded travel.
+      const directionX = driftX < 0 ? -1 : 1;
+      const directionY = driftY < 0 ? -1 : 1;
+      const amplitudeX =
+        width *
+        clamp(
+          0.018 + Math.abs(driftX) * 8 + depth * 0.015,
+          0.018,
+          0.075,
+        );
+      const amplitudeY =
+        height *
+        clamp(
+          0.008 + Math.abs(driftY) * 10 + depth * 0.008,
+          0.008,
+          0.038,
+        );
+      const angularSpeed =
+        (0.22 + depth * 0.16 + dominantDrift * 18) *
+        instance.speedMultiplier *
+        Math.max(0.7, motionStrength);
+      offsetX =
+        Math.sin(time * angularSpeed + phase) *
+        amplitudeX *
+        directionX;
+      offsetY =
+        Math.cos(time * angularSpeed * 0.72 + phase) *
+        amplitudeY *
+        directionY;
     } else if (motionKind === "float") {
       const amplitudeX =
         width * (0.008 + Math.abs(driftX) * 7) * depth;
