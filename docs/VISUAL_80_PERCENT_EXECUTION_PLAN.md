@@ -626,11 +626,9 @@ Test Lab was correctly using the production `Game` runtime; the artwork itself
 was failing to decode, so the remaining vector support layers were all that could
 be seen.
 
-The asset is now stored as an AVIF production painting at
-`heaven/halo-garden-production-v1.avif`. The integrity gate validates the AVIF
-container and its authored 896x504 dimensions, preventing a truncated binary
-from passing CI again. World 02 still owns its isolated composition and keeps
-secondary vector layers deliberately subtle.
+That 896x504 asset is now recorded only as the rejected V80-11A checkpoint.
+It has been superseded by the World 02 corrective pass below. Production World
+02 must not route back to `halo-garden-production-v1.avif`.
 
 
 ### V80-11B — Halo Garden animated scene
@@ -818,7 +816,7 @@ Implemented on `feat/visual-over-80-pass`:
 
 - W02-00 acceptance contract locked in this plan;
 - W02-01 new 2560x1440 generated production master added as
-  `heaven/halo-garden-production-v2.svg` with embedded AVIF art;
+  `heaven/halo-garden-production-v2.avif`;
 - W02-02 master layer is full-opacity, cover-fit, scale 1, static and
   zero-rotation; authored background sampling explicitly uses
   `imageSmoothingQuality = "high"`;
@@ -831,7 +829,9 @@ Implemented on `feat/visual-over-80-pass`:
   increased for High/Ultra;
 - W02-07 halo pulse and light rays strengthened;
 - W02-09 registry/ambient tests updated and the asset integrity gate now rejects
-  a master below 2560x1440.
+  a master below 2560x1440;
+- obsolete 896x504 / partial wrapper paths are removed from the production
+  routing so there is one authoritative World 02 master asset.
 
 The only remaining gate is W02-10 real-browser owner acceptance. World 03+
 should not be treated as visually accepted from this checkpoint alone.
