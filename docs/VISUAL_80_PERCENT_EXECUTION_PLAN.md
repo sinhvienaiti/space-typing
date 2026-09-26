@@ -561,3 +561,15 @@ Required next evidence:
 4. Re-score against the approved demo, using the owner's perceptual score as
    the acceptance source of truth.
 5. If still below 80%, continue World 01 correction before any broader rollout.
+
+
+### V80-10E — Composition architecture reset
+
+Owner review confirmed that repeated parameter tuning on the old collage was not
+producing a meaningful perceptual change. World 01 now uses
+`galaxy/cinematic-v2.svg` as one authored full-frame composition. The old
+full-screen star/particle support is visually suppressed for World 01, while
+planet/asteroid layers are retained only as sparse parallax depth cues. This
+pass is intentionally a composition reset rather than another opacity-only
+polish cycle. World 02+ remains blocked until a fresh browser capture is
+accepted.
