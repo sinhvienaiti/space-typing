@@ -260,15 +260,22 @@ describe("Layered authored background registry", () => {
       layer.src.startsWith("/assets/space-typing/ships/"),
     );
     expect(shipLayers.length).toBeGreaterThanOrEqual(2);
-    expect(shipLayers.every((layer) => layer.motion === "flyby")).toBe(
-      true,
-    );
     expect(
       shipLayers.every((layer) => layer.sourceRect !== undefined),
     ).toBe(true);
-    expect(shipLayers.every((layer) => layer.optional === true)).toBe(
-      true,
-    );
+
+    const persistentShip = shipLayers.find(
+      (layer) => layer.id === "galaxy-distant-sentinel",
+    )!;
+    const flybyShips = shipLayers.filter((layer) => layer.motion === "flyby");
+
+    expect(persistentShip.motion).toBe("float");
+    expect(persistentShip.minQuality).toBe("medium");
+    expect(persistentShip.placement).toBe("anchor");
+    expect(persistentShip.opacity).toBeLessThanOrEqual(0.12);
+
+    expect(flybyShips.length).toBeGreaterThanOrEqual(1);
+    expect(flybyShips.every((layer) => layer.optional === true)).toBe(true);
   });
 
   it("keeps authored asset ids unique inside each scene", () => {

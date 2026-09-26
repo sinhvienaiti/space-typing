@@ -240,15 +240,23 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     true,
   ),
   // D5 narrative accents. They remain visually subordinate to real enemies.
-  distantShip(
-    "galaxy-distant-patrol-left",
-    0,
-    0,
-    0.08,
-    0.22,
-    0.055,
-    0.006,
-  ),
+  {
+    ...distantShip(
+      "galaxy-distant-sentinel",
+      0,
+      0,
+      0.76,
+      0.16,
+      0.05,
+      -0.0015,
+    ),
+    motion: "float",
+    minQuality: "medium",
+    placement: "anchor",
+    opacity: 0.11,
+    spreadX: 0.025,
+    spreadY: 0.06,
+  },
   distantShip(
     "galaxy-distant-patrol-right",
     240,
