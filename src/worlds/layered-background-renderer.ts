@@ -67,6 +67,21 @@ export function backgroundTreatmentStyle(
   return BACKGROUND_TREATMENTS[treatment ?? "none"];
 }
 
+
+export function backgroundLayerRotation(
+  layer: LayeredBackgroundLayer,
+  time: number,
+  speedMultiplier: number,
+  phase: number,
+): number {
+  if (Math.abs(layer.rotationSpeed) < 0.000001) return 0;
+  return (
+    time * layer.rotationSpeed * speedMultiplier +
+    phase * 0.08 +
+    Math.sin(time * 0.07 + phase) * layer.rotationSpeed * 0.3
+  );
+}
+
 function blendMode(
   blend: LayeredBackgroundLayer["blend"],
 ): GlobalCompositeOperation {
@@ -434,10 +449,12 @@ export class LayeredBackgroundRenderer {
 
     const centerX = width * instance.anchorX + offsetX;
     const centerY = height * instance.anchorY + offsetY;
-    const rotation =
-      time * layer.rotationSpeed * instance.speedMultiplier +
-      phase * 0.08 +
-      Math.sin(time * 0.07 + phase) * layer.rotationSpeed * 0.3;
+    const rotation = backgroundLayerRotation(
+      layer,
+      time,
+      instance.speedMultiplier,
+      phase,
+    );
 
     const treatment = backgroundTreatmentStyle(layer.treatment);
     const drawAt = (x: number, y: number): void => {
