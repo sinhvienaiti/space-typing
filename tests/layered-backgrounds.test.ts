@@ -125,7 +125,7 @@ describe("Layered authored background registry", () => {
         (layer) =>
           layer.id === "galaxy-asteroid-near-hero" &&
           layer.motion === "approach" &&
-          layer.scale >= 0.16,
+          layer.scale >= 0.28,
       ),
     ).toBe(true);
     expect(
@@ -157,11 +157,12 @@ describe("Layered authored background registry", () => {
       (layer) => layer.id === "galaxy-asteroid-near-secondary",
     )!;
     expect(nearHero.scale).toBeGreaterThan(
-      Math.max(...midAsteroids.map((layer) => layer.scale)) * 1.8,
+      Math.max(...midAsteroids.map((layer) => layer.scale)) * 3,
     );
     expect(nearHero.placement).toBe("edges");
     expect(nearHero.minQuality).toBe("medium");
     expect(nearSecondary.minQuality).toBe("high");
+    expect(nearSecondary.scale).toBeGreaterThan(0.18);
     expect(nearSecondary.anchorX).toBeGreaterThan(0.85);
 
     const farFragments = galaxy.layers.find(
@@ -297,5 +298,82 @@ describe("Layered authored background registry", () => {
       const ids = layered.layers.map((layer) => layer.id);
       expect(new Set(ids).size).toBe(ids.length);
     }
+  });
+});
+
+
+describe("World 01 holistic authored composition contract", () => {
+  const galaxy = layeredBackgroundForScene(
+    sceneProfileForWorld("world-01"),
+  );
+  const byId = (id: string) => {
+    const found = galaxy.layers.find((layer) => layer.id === id);
+    expect(found, "missing authored layer: " + id).toBeDefined();
+    return found!;
+  };
+
+  it("keeps a complete D0-D5 visual hierarchy on Medium", () => {
+    expect(galaxy.renderMode).toBe("authored-production");
+
+    const essentialIds = [
+      "galaxy-sky",
+      "galaxy-nebula",
+      "galaxy-planet-primary",
+      "galaxy-authored-asteroid-field",
+      "galaxy-asteroid-far-fragments",
+      "galaxy-asteroid-mid-left",
+      "galaxy-asteroid-near-hero",
+      "galaxy-distant-sentinel",
+    ];
+
+    for (const id of essentialIds) {
+      expect(qualityAllowsLayer(byId(id), "medium"), id).toBe(true);
+    }
+  });
+
+  it("preserves obvious far-mid-near asteroid scale separation", () => {
+    const far = byId("galaxy-asteroid-far-fragments");
+    const mids = [
+      byId("galaxy-asteroid-mid-left"),
+      byId("galaxy-asteroid-mid-right"),
+      byId("galaxy-asteroid-mid-heavy"),
+    ];
+    const near = byId("galaxy-asteroid-near-hero");
+
+    expect(far.depth).toBeLessThan(0.5);
+    expect(Math.max(...mids.map((layer) => layer.depth))).toBeLessThan(0.8);
+    expect(Math.min(...mids.map((layer) => layer.depth))).toBeGreaterThan(0.5);
+    expect(near.depth).toBeGreaterThan(0.8);
+
+    expect(Math.min(...mids.map((layer) => layer.scale))).toBeGreaterThan(
+      far.scale * 2,
+    );
+    expect(near.scale).toBeGreaterThan(
+      Math.max(...mids.map((layer) => layer.scale)) * 3,
+    );
+  });
+
+  it("keeps authored density edge-biased around the typing corridor", () => {
+    for (const id of [
+      "galaxy-asteroid-far-fragments",
+      "galaxy-asteroid-mid-left",
+      "galaxy-asteroid-mid-right",
+      "galaxy-asteroid-mid-heavy",
+      "galaxy-asteroid-near-hero",
+    ]) {
+      expect(byId(id).placement).toBe("edges");
+    }
+
+    expect(byId("galaxy-distant-sentinel").anchorX).toBeGreaterThan(0.7);
+    expect(byId("galaxy-planet-primary").anchorX).toBeLessThan(0.12);
+    expect(byId("galaxy-planet-far").anchorX).toBeGreaterThan(0.8);
+  });
+
+  it("uses more than one authored nebula source in production", () => {
+    const sources = galaxy.layers
+      .filter((layer) => layer.id.includes("nebula") || layer.id === "galaxy-sky")
+      .map((layer) => layer.src);
+
+    expect(new Set(sources).size).toBeGreaterThanOrEqual(2);
   });
 });

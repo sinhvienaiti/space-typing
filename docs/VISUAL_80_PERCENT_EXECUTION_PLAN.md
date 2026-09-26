@@ -1,6 +1,6 @@
 # Visual >80% Execution Plan
 
-Status: ACTIVE
+Status: ACTIVE — V80-00..V80-09 code complete; V80-10 code audit active / browser acceptance pending
 Owner acceptance target: runtime visual quality >= 80% of the approved demo direction
 Branch: `feat/visual-over-80-pass`
 Created: 2026-09-26
@@ -345,3 +345,126 @@ Append a short checkpoint after each completed task:
 - Browser acceptance:
 
 A task is not “done” merely because TypeScript compiles.
+
+
+## 8. Review checkpoints
+
+### V80-00
+- Task: baseline + acceptance contract
+- Commit: `2863751d25e91c9ed3d922849d616e7732138edb`
+- Files changed: execution plan only
+- Contract changed: none at runtime
+- Tests added/updated: none
+- Self-review findings: root cause recorded as composition/depth/visibility, not a hidden World 01 legacy overwrite
+- Remaining visual risk: all runtime work still pending at this point
+- CI: documentation-only
+- Browser acceptance: baseline screenshot remained rejected at ~40%
+
+### V80-01
+- Task: explicit layer quality contract
+- Commit: `9f0e401c11a3690cdcef135ffc7b0fd0a1e3a243`
+- Files changed: background types, renderer, registry, tests
+- Contract changed: authored layers can declare `minQuality`; legacy `optional` behavior remains compatible
+- Tests added/updated: quality visibility assertions
+- Self-review findings: one centralized quality decision is used by preload and instance generation; no duplicated gating path
+- Remaining visual risk: composition itself was still weak
+- CI: PASS
+- Browser acceptance: pending
+
+### V80-02
+- Task: explicit Galaxy depth grouping
+- Commit: `504249d07bb117623fedde07098977d263abd290`
+- Files changed: layered background registry
+- Contract changed: none; source layout made auditable as D0-D5 groups
+- Tests added/updated: existing registry integrity tests remained valid
+- Self-review findings: an intermediate self-reference typo was caught during commit review and replaced before continuing
+- Remaining visual risk: source art was still repeated
+- CI: PASS
+- Browser acceptance: pending
+
+### V80-03
+- Task: deep-space volume correction
+- Commits: `78731bab37ccb9faa12bd3624c04d479d868ebf1`, `9bb66ad23d23643d169c394238f66e85ca7e7d1b`, `6cea11fac8e3bdd10f2673ba58755157b6090479`
+- Files changed: registry, tests, asset provenance, asset integrity gate, one new CC0 nebula binary
+- Contract changed: World 01 now composes distinct purple + blue nebula volumes instead of visually repeating one source
+- Tests added/updated: distinct-source assertion + PNG integrity gate
+- Self-review findings: imported source provenance/license retained; asset is local and build-checked
+- Remaining visual risk: exact blend/opacity still requires browser judgment
+- CI: PASS (#923 on latest integrity-gate head)
+- Browser acceptance: pending
+
+### V80-04
+- Task: far asteroid band
+- Commit: `70f8d2862c0c0431dd30b0ff193236793b0463e4`
+- Files changed: registry, tests
+- Contract changed: deterministic bounded far fragments become Medium-visible
+- Tests added/updated: depth/scale/count/placement assertions
+- Self-review findings: an initial count expectation failed CI and was corrected instead of weakening the feature
+- Remaining visual risk: density perception requires runtime motion review
+- CI: PASS after correction
+- Browser acceptance: pending
+
+### V80-05
+- Task: mid asteroid hierarchy
+- Commit: `3c10459dc108b66e8a15b4df4023eedb7bfb8e8e`
+- Files changed: registry, tests
+- Contract changed: three sourced silhouettes and >=10 authored mid instances before quality scaling
+- Tests added/updated: silhouette uniqueness, count and scale hierarchy
+- Self-review findings: reused existing deterministic renderer; no new spawn system or per-frame random allocation
+- Remaining visual risk: browser must confirm repetition is not noticeable
+- CI: PASS
+- Browser acceptance: pending
+
+### V80-06
+- Task: near hero asteroid band
+- Commit: `61995bc3d1d0df79941e9cd173ba0004cc6d1757` plus V80-10 scale polish
+- Files changed: registry, tests
+- Contract changed: Medium retains one near approach cue; High adds a secondary cue
+- Tests added/updated: approach count, quality threshold, near-vs-mid scale checks
+- Self-review findings: placement remains edge-biased and deterministic; no center-spawn helper was introduced
+- Remaining visual risk: final near-camera scale requires browser acceptance
+- CI: PASS before final scale polish
+- Browser acceptance: pending
+
+### V80-07
+- Task: landmark hierarchy
+- Commit: `b5f6fc5da6dba9360987c26d77d2a7bbe4d736ef`
+- Files changed: registry, tests
+- Contract changed: one dominant off-axis primary planet with a clearly subordinate far planet
+- Tests added/updated: scale/opacity/position hierarchy
+- Self-review findings: existing sourced planet family retained; no extra procedural planet geometry
+- Remaining visual risk: browser must confirm focal balance
+- CI: PASS
+- Browser acceptance: pending
+
+### V80-08
+- Task: narrative environmental object
+- Commits: `09a34a2efe6ec451a8a311b8fca587372d106a6d`, `acbfc7a77094e684c75e6b4c801bfb666bfff205`
+- Files changed: registry, tests
+- Contract changed: Medium includes a low-opacity persistent sentinel; High retains a rare flyby
+- Tests added/updated: persistent/flyby behavior and quality assertions
+- Self-review findings: CI exposed a stale renamed-layer assertion; it was fixed with an explicit missing-layer assertion rather than hidden
+- Remaining visual risk: scenery/enemy visual distinction still needs browser confirmation
+- CI: PASS after correction
+- Browser acceptance: pending
+
+### V80-09
+- Task: star hierarchy + typing-lane readability
+- Commits: `a91910f80a01cb06a2b19ad8dba2e7e7cd1d2449`, `9483c9b1fd096bb7a80bc7e8d63f621c53c8cd24`
+- Files changed: scene renderer, renderer tests
+- Contract changed: World 01 suppresses center star intensity and slightly enriches outer thirds
+- Tests added/updated: deterministic readability-factor and World 01 scope assertions
+- Self-review findings: first pass was too broad for all celestial-rainbow scenes; scope was narrowed to World 01 before rollout
+- Remaining visual risk: star density still requires browser judgment at active combat speed
+- CI: PASS
+- Browser acceptance: pending
+
+### V80-10
+- Task: holistic World 01 composition review
+- Status: CODE AUDIT ACTIVE
+- Current code review: D0-D5, two nebula sources, far/mid/near asteroid bands, focal landmark, narrative silhouette, Medium identity and center-star suppression are now guarded by tests
+- Additional polish: near-camera asteroid scale increased after reviewing the actual sourced asteroid binaries at native quality
+- Self-review finding: current asteroid binaries are detailed cratered art; the earlier “rough chunk” look was primarily runtime scale/composition, not a low-detail source image
+- Remaining visual risk: perceptual score cannot be honestly closed without a fresh owner/browser screenshot
+- CI: must pass on this checkpoint before browser acceptance
+- Browser acceptance: PENDING; do not migrate World 02 yet
