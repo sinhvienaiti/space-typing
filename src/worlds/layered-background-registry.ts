@@ -574,6 +574,10 @@ export function layeredBackgroundForScene(
             ? "meteor"
             : "galaxy"
         : scene.archetype,
+    renderMode:
+      scene.worldId === "world-01"
+        ? "authored-production"
+        : "legacy-hybrid",
     layers: familyLayers(scene),
   };
 }
