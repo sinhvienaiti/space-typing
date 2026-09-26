@@ -459,6 +459,8 @@ export class LayeredBackgroundRenderer {
     const treatment = backgroundTreatmentStyle(layer.treatment);
     const drawAt = (x: number, y: number): void => {
       context.save();
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "high";
       context.globalAlpha = opacity;
       context.globalCompositeOperation = blendMode(layer.blend);
       context.filter = treatment.filter;
