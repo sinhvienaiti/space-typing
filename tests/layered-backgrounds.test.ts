@@ -69,10 +69,13 @@ describe("Layered authored background registry", () => {
       "/assets/space-typing/backgrounds/vendor/screaming-brain/planet-blue-giant-04-512.png",
     );
 
-    const meteorSources = sources.filter((src) =>
-      src.includes("/vendor/kenney-remastered/meteor-"),
+    const meteorLayers = galaxy.layers.filter((layer) =>
+      layer.src.includes("/vendor/kenney-remastered/meteor-"),
     );
-    expect(meteorSources.length).toBeGreaterThanOrEqual(6);
+    expect(meteorLayers.length).toBeGreaterThanOrEqual(2);
+    expect(meteorLayers.length).toBeLessThanOrEqual(3);
+    expect(meteorLayers.every((layer) => layer.scale <= 0.02)).toBe(true);
+    expect(meteorLayers.every((layer) => layer.depth <= 0.42)).toBe(true);
 
     expect(
       sources.some((src) => src.includes("/backgrounds/galaxy/")),
@@ -88,7 +91,7 @@ describe("Layered authored background registry", () => {
     ).toBe(false);
   });
 
-  it("builds Galaxy depth from treated rocks, nebula volume and rare ship flybys", () => {
+  it("keeps placeholder rocks distant while preserving Galaxy depth and flybys", () => {
     const galaxy = layeredBackgroundForScene(
       sceneProfileForWorld("world-01"),
     );
@@ -98,12 +101,15 @@ describe("Layered authored background registry", () => {
     );
     expect(nebulaLayers.length).toBeGreaterThanOrEqual(2);
 
-    const asteroidLayers = galaxy.layers.filter(
-      (layer) => layer.artTreatment === "asteroid",
+    const legacyRockLayers = galaxy.layers.filter((layer) =>
+      layer.src.includes("/vendor/kenney-remastered/meteor-"),
     );
-    expect(asteroidLayers.length).toBeGreaterThanOrEqual(6);
+    expect(legacyRockLayers.length).toBeGreaterThanOrEqual(2);
+    expect(legacyRockLayers.every((layer) => layer.scale <= 0.02)).toBe(
+      true,
+    );
     expect(
-      asteroidLayers.some((layer) => layer.motion === "approach"),
+      legacyRockLayers.every((layer) => layer.motion !== "approach"),
     ).toBe(true);
 
     const shipLayers = galaxy.layers.filter((layer) =>
