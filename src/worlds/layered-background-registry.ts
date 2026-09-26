@@ -194,6 +194,115 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
   ),
 ];
 
+const GALAXY_RICH: readonly LayeredBackgroundLayer[] = GALAXY.map(
+  (item) => {
+    if (item.id === "galaxy-nebula") {
+      return {
+        ...item,
+        opacity: 0.5,
+        scale: 1.18,
+        motion: "float",
+        spreadX: 0.05,
+        spreadY: 0.03,
+      };
+    }
+
+    if (item.id.includes("meteor-far")) {
+      return {
+        ...item,
+        motion: "wrap",
+        instances: 5,
+        spreadX: 0.78,
+        spreadY: 0.38,
+        scaleJitter: 0.42,
+        opacityJitter: 0.28,
+        speedJitter: 0.32,
+        placement: "edges",
+      };
+    }
+
+    if (item.id.includes("meteor-mid")) {
+      return {
+        ...item,
+        motion: "wrap",
+        instances: 4,
+        spreadX: 0.72,
+        spreadY: 0.52,
+        scaleJitter: 0.36,
+        opacityJitter: 0.24,
+        speedJitter: 0.3,
+        placement: "edges",
+      };
+    }
+
+    if (item.id.includes("meteor-near")) {
+      return {
+        ...item,
+        motion: "approach",
+        instances: 3,
+        spreadX: 0.84,
+        spreadY: 0.56,
+        scale: item.scale * 1.34,
+        scaleJitter: 0.34,
+        opacityJitter: 0.2,
+        speedJitter: 0.26,
+        placement: "edges",
+      };
+    }
+
+    return item;
+  },
+);
+
+const GALAXY_PRISM: readonly LayeredBackgroundLayer[] = [
+  ...GALAXY_RICH.map((item) => {
+    if (item.id === "galaxy-planet-primary") {
+      return {
+        ...item,
+        id: "prism-planet-primary",
+        anchorX: 0.82,
+        anchorY: 0.21,
+        scale: 0.16,
+        opacity: 0.56,
+      };
+    }
+    if (item.id === "galaxy-planet-far") {
+      return {
+        ...item,
+        id: "prism-planet-far",
+        anchorX: 0.16,
+        anchorY: 0.31,
+        scale: 0.1,
+        opacity: 0.32,
+      };
+    }
+    if (item.id.startsWith("galaxy-meteor-")) {
+      return {
+        ...item,
+        id: item.id.replace("galaxy-", "prism-"),
+        opacity: item.opacity * 0.82,
+        scale: item.scale * 0.86,
+      };
+    }
+    return {
+      ...item,
+      id: item.id.replace("galaxy-", "prism-"),
+    };
+  }),
+  {
+    ...GALAXY_RICH.find((item) => item.id === "galaxy-nebula")!,
+    id: "prism-nebula-veil",
+    opacity: 0.18,
+    scale: 1.34,
+    anchorX: 0.42,
+    anchorY: 0.54,
+    driftX: 0.00012,
+    driftY: -0.00004,
+    rotationSpeed: 0.00008,
+    blend: "screen",
+  },
+];
+
 const HEAVEN: readonly LayeredBackgroundLayer[] = [
   layer("heaven-sky", "heaven/sky.svg", 0.12, 1, 1, 0.5, 0.5, -0.0005, 0),
   layer("heaven-gate", "heaven/halo-gate.svg", 0.28, 0.9, 0.46, 0.78, 0.2, -0.0005, 0.0003, 0.002, 0.05),
@@ -242,6 +351,60 @@ const METEOR: readonly LayeredBackgroundLayer[] = [
   layer("meteor-cluster", "meteor/comet-cluster.svg", 0.78, 0.72, 0.74, 0.72, 0.54, -0.012, 0.008, 0.01, 0, true),
 ];
 
+const METEOR_SOURCED: readonly LayeredBackgroundLayer[] = [
+  ...GALAXY_RICH.map((item) => {
+    if (item.id === "galaxy-sky") {
+      return { ...item, id: "meteor-source-sky", opacity: 0.92 };
+    }
+    if (item.id === "galaxy-nebula") {
+      return {
+        ...item,
+        id: "meteor-source-nebula",
+        opacity: 0.44,
+        anchorX: 0.46,
+      };
+    }
+    if (item.id.startsWith("galaxy-planet")) {
+      return {
+        ...item,
+        id: item.id.replace("galaxy-", "meteor-source-"),
+        opacity: item.opacity * 0.65,
+        scale: item.scale * 0.85,
+      };
+    }
+    if (item.id === "galaxy-moon-far" || item.id === "galaxy-sun-far") {
+      return {
+        ...item,
+        id: item.id.replace("galaxy-", "meteor-source-"),
+      };
+    }
+    if (item.id.startsWith("galaxy-meteor-")) {
+      const near = item.id.includes("-near-");
+      const mid = item.id.includes("-mid-");
+      return {
+        ...item,
+        id: item.id.replace("galaxy-", "meteor-source-"),
+        instances: Math.min(12, (item.instances ?? 1) + (near ? 2 : mid ? 3 : 4)),
+        opacity: Math.min(0.72, item.opacity * (near ? 1.08 : 0.92)),
+        scale: item.scale * (near ? 1.45 : mid ? 1.08 : 0.82),
+        spreadY: Math.max(0.48, item.spreadY ?? 0),
+      };
+    }
+    return {
+      ...item,
+      id: item.id.replace("galaxy-", "meteor-source-"),
+    };
+  }),
+  {
+    ...FROST[1]!,
+    id: "meteor-aurora-sheet",
+    opacity: 0.34,
+    scale: 1.12,
+    depth: 0.2,
+    optional: false,
+  },
+];
+
 const CATHEDRAL: readonly LayeredBackgroundLayer[] = [
   layer("cathedral-sky", "cathedral/sky.svg", 0.12, 1, 1, 0.5, 0.5, 0, 0),
   layer("cathedral-structure", "cathedral/cathedral.svg", 0.38, 0.88, 0.78, 0.5, 0.28, 0.0004, 0.00015),
@@ -256,9 +419,23 @@ const ETERNITY: readonly LayeredBackgroundLayer[] = [
 
 function familyLayers(profile: WorldSceneProfile): readonly LayeredBackgroundLayer[] {
   if (profile.archetype === "celestial-rainbow") {
-    if (profile.variant === 2 || profile.variant === 4) return HEAVEN;
-    if (profile.variant === 5) return METEOR;
-    return GALAXY;
+    if (profile.variant === 2) return HEAVEN;
+    if (profile.variant === 3) return GALAXY_PRISM;
+    if (profile.variant === 4) {
+      return [
+        ...HEAVEN,
+        {
+          ...GALAXY_RICH.find((item) => item.id === "galaxy-sun-far")!,
+          id: "cherub-far-sun",
+          anchorX: 0.18,
+          anchorY: 0.13,
+          opacity: 0.16,
+          optional: false,
+        },
+      ];
+    }
+    if (profile.variant === 5) return METEOR_SOURCED;
+    return GALAXY_RICH;
   }
   if (profile.archetype === "infernal") return INFERNAL;
   if (profile.archetype === "frost-prism") return FROST;
@@ -266,7 +443,7 @@ function familyLayers(profile: WorldSceneProfile): readonly LayeredBackgroundLay
   if (profile.archetype === "shadow-nature") return SHADOW;
   if (profile.archetype === "cosmic-forge") return FORGE;
   if (profile.archetype === "abyssal") return ABYSS;
-  if (profile.archetype === "aurora-cosmic") return METEOR;
+  if (profile.archetype === "aurora-cosmic") return METEOR_SOURCED;
   if (profile.archetype === "void-cathedral") return CATHEDRAL;
   return ETERNITY;
 }
