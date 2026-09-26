@@ -498,11 +498,11 @@ const WORLD02_HALO_GARDEN: readonly LayeredBackgroundLayer[] = [
       1.02,
       0.5,
       0.5,
-      -0.000035,
-      0.000008,
+      0,
+      0,
     ),
     fit: "cover",
-    motion: "float",
+    motion: "static",
   },
   {
     ...layer(
