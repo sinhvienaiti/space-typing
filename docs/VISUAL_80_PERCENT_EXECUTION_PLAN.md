@@ -835,3 +835,67 @@ Implemented on `feat/visual-over-80-pass`:
 
 The only remaining gate is W02-10 real-browser owner acceptance. World 03+
 should not be treated as visually accepted from this checkpoint alone.
+
+
+### W02-11 — Real video root-cause review
+
+Owner evidence: the 31.9-second Windows/WSL browser capture from 2026-09-27 shows
+that the new 2K art is sharp, but World 02 still reads as a static painting.
+Enemy/projectile readability also degrades over the bright cloud/gold areas.
+
+This re-opens the World 02 visual gate. The previous stronger-overlay pass is
+not accepted as "animated background".
+
+Root cause:
+
+1. The 2560x1440 master correctly fixed image sharpness, but clouds, waterfalls,
+   galaxy, stars and islands visible inside that raster are baked/static.
+2. Existing "float" parallax moves support layers only a few pixels over several
+   seconds, with very long cycles. It is technically animated but perceptually
+   static at gameplay scale.
+3. The waterfall implementation draws light shimmer over an already near-white
+   baked waterfall. Screen blending white-on-white has very little contrast, so
+   the water itself does not read as flowing.
+4. Star drift is sub-pixel/second in normal browser output; galaxy drift has a
+   multi-minute cycle; both fail the 5-10 second perceptual-motion requirement.
+5. Meteor scheduling is sparse/phase-dependent, so a normal short capture can
+   show no obvious event.
+6. Enemy/projectile art relies heavily on light/pastel additive glow, which loses
+   silhouette contrast against World 02's bright cloud and halo regions.
+7. Existing tests assert feature flags and configuration, not that render state
+   materially changes across time.
+
+Solution architecture:
+
+- Keep the 2K AVIF as the static D0/D1 master only.
+- Introduce explicit World 02 motion layers whose movement is visible within
+  seconds, not minutes.
+- Add a dedicated `parallax` motion semantic for authored cloud overlays;
+  it must have bounded, deterministic oscillation with visible amplitude.
+- Rework waterfall FX as a clipped animated flow texture: darker cyan flow
+  channels + moving bright streaks + impact spray. Do not rely on white screen
+  shimmer alone.
+- Make cloud mist move in pixels/second with separate far/near velocities.
+- Make star drift perceptible while remaining slow, and animate a separate
+  galaxy/nebula glow rather than claiming motion from the baked galaxy.
+- Use deterministic meteor slots so Medium+ shows at least one obvious shooting
+  star in a normal 10-second observation.
+- Add halo ring/ray motion that is visible against the bright gate.
+- Add World-02-only dark contrast backplates/outer strokes behind enemies and
+  hostile projectiles instead of globally recolouring enemy families.
+- Extend tests to lock the new motion semantic and World 02 readability
+  isolation. Unit tests still do not prove beauty; the browser/video gate
+  remains authoritative.
+
+Acceptance after this corrective batch:
+
+- in 5 seconds, far/near cloud motion is visually detectable;
+- waterfall texture visibly travels downward continuously;
+- star/galaxy layers visibly change over 5-10 seconds;
+- Medium+ guarantees an observable shooting-star event within 10 seconds;
+- halo motion is perceptible without washing out the gate;
+- enemy bodies and hostile projectiles remain legible over white/gold cloud
+  regions;
+- no World 01/03+ behavior changes;
+- CI/test/build PASS;
+- owner browser video is still the final acceptance gate.
