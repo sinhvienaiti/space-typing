@@ -258,9 +258,9 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     ...layer(
       "galaxy-asteroid-mid-right",
       "vendor/ohjirochan/asteroid-small.png",
-      0.7,
-      0.42,
-      0.046,
+      0.6,
+      0.38,
+      0.032,
       0.87,
       0.46,
       -0.014,
