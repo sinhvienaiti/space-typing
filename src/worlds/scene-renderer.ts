@@ -1413,10 +1413,8 @@ function drawStars(
     profile,
     quality,
   } = input;
-  if (productionGalaxyPolishEnabled(profile)) return;
-
   const budget = sceneQualityBudget(quality);
-  const productionGalaxy = false;
+  const productionGalaxy = productionGalaxyPolishEnabled(profile);
   const effectiveStarDensity =
     profile.starDensity * (productionGalaxy ? 0.68 : 1);
   const farCount = Math.max(
@@ -2065,8 +2063,6 @@ function drawAmbientParticles(
   input: WorldSceneDrawInput,
 ): void {
   const { width, height, time, profile, environment, quality } = input;
-  if (productionGalaxyPolishEnabled(profile)) return;
-
   const budget = sceneQualityBudget(quality);
   const count = Math.max(
     2,
