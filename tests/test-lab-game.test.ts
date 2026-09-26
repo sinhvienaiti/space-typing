@@ -117,6 +117,19 @@ describe("M21 gated Game Test Lab API", () => {
     vi.unstubAllGlobals();
   });
 
+  it("exposes the effective character used by the live Test Lab runtime", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+
+    expect(game.getTestLabSnapshot()?.characterId).toBe("vanguard");
+    game.setCharacter("fortune");
+    expect(game.getTestLabSnapshot()?.characterId).toBe("fortune");
+
+    start(game, 400);
+    expect(game.getTestLabSnapshot()?.characterId).toBe("fortune");
+    game.destroy();
+  });
+
   it("is dormant until Test Lab mode is explicitly enabled", () => {
     const game = createTestGame();
     start(game);
