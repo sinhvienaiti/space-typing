@@ -124,7 +124,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-stars-sparse-sky",
       "vendor/luminousdragon/stars-sparse.png",
       0.12,
-      0.1,
+      0.1 * 0.55,
       1.26,
       0.5,
       0.48,
