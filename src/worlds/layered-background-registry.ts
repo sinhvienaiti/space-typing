@@ -408,7 +408,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     motion: "wrap",
     minQuality: "medium",
     placement: "edges",
-    instances: 1,
+    instances: Math.max(2, 1),
     spreadY: 0.42,
     scaleJitter: 0.24,
     opacityJitter: 0.16,
