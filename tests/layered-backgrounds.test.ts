@@ -91,7 +91,7 @@ describe("Layered authored background registry", () => {
   it("gives Worlds 02-05 isolated theme-specific authored layers", () => {
     const signatures: Record<string, readonly string[]> = {
       "world-02": [
-        "/backgrounds/heaven/halo-garden-production-v1.avif",
+        "/backgrounds/heaven/halo-garden-production-v2.avif",
         "/backgrounds/heaven/cloud-islands.svg",
         "/backgrounds/heaven/halo-gate.svg",
       ],
@@ -139,7 +139,7 @@ describe("Layered authored background registry", () => {
           (layer) => layer.id === "halo-garden-production-art",
         );
         expect(productionArt?.src).toContain(
-          "/backgrounds/heaven/halo-garden-production-v1.avif",
+          "/backgrounds/heaven/halo-garden-production-v2.avif",
         );
         expect(productionArt?.fit).toBe("cover");
         expect(productionArt?.opacity).toBe(1);
