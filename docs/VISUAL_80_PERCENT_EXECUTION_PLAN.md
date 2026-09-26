@@ -657,3 +657,156 @@ positioning code is modified by this batch. The changes are isolated to World
 background rendering and related tests.
 
 Verified checkpoint: CI #991 PASS.
+
+
+## 9. World 02 Halo Garden corrective execution
+
+Owner browser screenshot on 2026-09-27 rejected the World 02 pass because the
+runtime image remained visibly soft on desktop and the authored motion was too
+subtle to read as a living scene.
+
+This review overrides the earlier "animated scene" completion wording. World 02
+is NOT visually accepted yet.
+
+### W02-00 — Freeze the failure and acceptance contract
+
+Root cause confirmed:
+
+- World 02 is correctly routed through `authored-production`; legacy static,
+  floor and cinematic geometry are not overwriting it.
+- The production art shipped at only 896x504 although the requested desktop
+  master was 2560x1440.
+- World 02 ambient FX code exists, but the current waterfall/cloud/star/meteor
+  intensity is too subtle in the real browser result.
+- Therefore "code exists" is not a visual acceptance criterion.
+
+World 02 is blocked from DONE until every task below passes.
+
+### W02-01 — True 2K production master
+
+Replace the current Halo Garden production painting with a genuine desktop
+master.
+
+Hard contract:
+
+- raster dimensions MUST be at least 2560x1440;
+- target aspect ratio is 16:9;
+- do not satisfy this gate by re-encoding the old 896x504 asset;
+- the image must remain sharp when covering a 2048px-wide desktop viewport;
+- composition must preserve a quieter central typing corridor;
+- visible identity: celestial sanctuary, floating structures/clouds,
+  waterfalls, luminous halo/gate and cosmic sky depth.
+
+Asset integrity CI must reject anything below 2560x1440.
+
+### W02-02 — Base composition and sampling quality
+
+The master art is the hero layer:
+
+- `opacity: 1`;
+- `fit: cover`;
+- `scale: 1` unless a measured crop requires otherwise;
+- `motion: static`;
+- zero rotation;
+- no blur/filter treatment on the master;
+- Canvas image smoothing stays enabled with high-quality sampling.
+
+Secondary image overlays remain subordinate and must not soften the master.
+
+### W02-03 — Waterfall motion pass
+
+Waterfalls must visibly read as flowing water rather than a nearly static glow.
+
+Required:
+
+- animated vertical shimmer/flow;
+- moving highlight streaks;
+- soft impact mist/spray at waterfall exits;
+- bounded count by visual quality;
+- no allocations or image creation in the per-frame path.
+
+Acceptance: in a 5-10 second browser capture, waterfall movement is obvious
+without looking like a UI beam.
+
+### W02-04 — Cloud parallax pass
+
+Use at least two perceptibly different cloud/mist motion bands:
+
+- far layer: slow, low-opacity drift;
+- near layer: faster and slightly larger;
+- preserve the center combat corridor;
+- Low may reduce density; Medium+ must retain the motion identity.
+
+Acceptance: cloud motion is visible within several seconds while remaining
+calm enough for typing.
+
+### W02-05 — Galaxy/star living-sky pass
+
+Required:
+
+- slow galaxy glow/drift;
+- star twinkle with deterministic placement;
+- gentle star drift;
+- no debug-like straight speed-line wall;
+- High/Ultra increase richness, not the existence of the effect.
+
+### W02-06 — Shooting-star / meteor pass
+
+Shooting stars must be sparse but perceptible:
+
+- deterministic bounded events;
+- brighter head + soft fading trail;
+- multiple trajectories/timings;
+- avoid the center typing corridor when possible;
+- High should normally show a visible event within a 10-15 second capture.
+
+### W02-07 — Halo and volumetric-light pass
+
+The gate is a clear visual anchor:
+
+- breathing halo glow;
+- subtle light-ray sway;
+- no full-screen white wash;
+- enemy labels and objective text remain higher contrast than scenery.
+
+### W02-08 — Desktop render-quality review
+
+Do not increase global DPR blindly. First verify the 2K master is actually
+loaded and sampled without blur.
+
+Review High and Ultra at desktop sizes including approximately 2048x1031.
+Only raise render budgets when measured render diagnostics show enough headroom.
+
+### W02-09 — Automated contracts
+
+Tests must lock:
+
+- World 02 is `authored-production`;
+- production master is static, full opacity, cover-fit and zero-rotation;
+- World 02 owns its ambient FX profile;
+- waterfall/cloud/star/galaxy/halo/light-ray/meteor features remain enabled;
+- 2K minimum dimensions are enforced by the asset-integrity script;
+- Worlds 01/03+ do not accidentally inherit the World 02 FX profile.
+
+### W02-10 — Browser acceptance gate
+
+A task is not complete because tests/build pass.
+
+Required owner review evidence:
+
+1. paused screenshot at desktop size;
+2. screenshot with enemies/typing labels present;
+3. 10-15 second capture proving waterfall, cloud, star/galaxy and shooting-star
+   motion.
+
+PASS requires:
+
+- no visible low-resolution softness from the background master;
+- waterfall movement is obvious;
+- clouds visibly drift;
+- stars/galaxy visibly but gently move;
+- at least one shooting-star event is reasonably observable in the capture;
+- halo/light rays add depth without covering gameplay;
+- HUD/enemy/readability regressions are absent.
+
+World 03+ visual rollout stays blocked until this gate is accepted.
