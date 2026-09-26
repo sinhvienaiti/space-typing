@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 
 const PNG_FILES = [
   "public/assets/space-typing/backgrounds/vendor/screaming-brain/nebula-purple-3-1024.png",
+  "public/assets/space-typing/backgrounds/vendor/screaming-brain/nebula-blue-6-1024.png",
   "public/assets/space-typing/backgrounds/vendor/screaming-brain/planet-ocean-03-512.png",
   "public/assets/space-typing/backgrounds/vendor/screaming-brain/planet-blue-giant-04-512.png",
   "public/assets/space-typing/backgrounds/vendor/screaming-brain/planet-cratered-03-512.png",
