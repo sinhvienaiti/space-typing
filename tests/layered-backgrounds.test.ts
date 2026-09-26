@@ -186,6 +186,17 @@ describe("Layered authored background registry", () => {
         "orbit",
       );
     }
+
+    const primaryPlanet = galaxy.layers.find(
+      (layer) => layer.id === "galaxy-planet-primary",
+    )!;
+    const farPlanet = galaxy.layers.find(
+      (layer) => layer.id === "galaxy-planet-far",
+    )!;
+    expect(primaryPlanet.scale).toBeGreaterThan(farPlanet.scale * 3);
+    expect(primaryPlanet.opacity - farPlanet.opacity).toBeGreaterThan(0.45);
+    expect(primaryPlanet.anchorX).toBeLessThan(0.12);
+    expect(farPlanet.anchorX).toBeGreaterThan(0.8);
   });
 
   it("keeps World 01 visual identity on Medium while reserving decoration for High", () => {
