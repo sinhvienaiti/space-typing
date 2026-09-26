@@ -16,6 +16,7 @@ export type WorldAmbientEffectsProfile = {
   starDrift: boolean;
   galaxyDrift: boolean;
   haloGlow: boolean;
+  lightRays: boolean;
   meteorCount: number;
 };
 
@@ -26,6 +27,7 @@ const HALO_GARDEN_EFFECTS: WorldAmbientEffectsProfile = {
   starDrift: true,
   galaxyDrift: true,
   haloGlow: true,
+  lightRays: true,
   meteorCount: 3,
 };
 
@@ -121,7 +123,11 @@ function drawCloudMist(
 
       context.globalAlpha =
         alpha * (0.7 + seededUnit(index, salt + 3) * 0.3);
-      context.fillStyle = "rgba(216, 236, 255, 0.48)";
+      const mist = context.createRadialGradient(x, y, 0, x, y, rx);
+      mist.addColorStop(0, "rgba(232, 244, 255, 0.38)");
+      mist.addColorStop(0.52, "rgba(196, 226, 255, 0.18)");
+      mist.addColorStop(1, "rgba(196, 226, 255, 0)");
+      context.fillStyle = mist;
       context.beginPath();
       context.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
       context.fill();
@@ -213,6 +219,51 @@ function drawHaloGlow(
   context.globalAlpha = pulse;
   context.fillStyle = gradient;
   context.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+  context.restore();
+}
+
+function drawLightRays(
+  context: CanvasRenderingContext2D,
+  input: WorldAmbientEffectsInput,
+): void {
+  if (input.quality === "low") return;
+
+  const { width, height, time, quality } = input;
+  const count = quality === "medium" ? 2 : 3;
+  const originX = width * 0.84;
+  const originY = height * 0.09;
+
+  context.save();
+  context.globalCompositeOperation = "screen";
+
+  for (let index = 0; index < count; index += 1) {
+    const sway = Math.sin(time * (0.07 + index * 0.012) + index * 1.7);
+    const endX =
+      width * (0.56 + index * 0.11) + sway * width * (0.018 + index * 0.004);
+    const endY = height * (0.58 + index * 0.07);
+    const halfWidth = width * (0.018 + index * 0.004);
+    const alpha = 0.026 + index * 0.008;
+
+    const beam = context.createLinearGradient(
+      originX,
+      originY,
+      endX,
+      endY,
+    );
+    beam.addColorStop(0, "rgba(255, 245, 190, " + String(alpha * 1.8) + ")");
+    beam.addColorStop(0.48, "rgba(197, 229, 255, " + String(alpha) + ")");
+    beam.addColorStop(1, "rgba(146, 205, 255, 0)");
+
+    context.fillStyle = beam;
+    context.beginPath();
+    context.moveTo(originX - halfWidth * 0.18, originY);
+    context.lineTo(originX + halfWidth * 0.18, originY);
+    context.lineTo(endX + halfWidth, endY);
+    context.lineTo(endX - halfWidth, endY);
+    context.closePath();
+    context.fill();
+  }
+
   context.restore();
 }
 
@@ -318,6 +369,7 @@ export function drawWorldAmbientEffects(
   if (profile.cloudMist) drawCloudMist(context, input);
   if (profile.waterfallShimmer) drawWaterfallShimmer(context, input);
   if (profile.haloGlow) drawHaloGlow(context, input);
+  if (profile.lightRays) drawLightRays(context, input);
   if (profile.starDrift) drawStarDrift(context, input);
   drawMeteors(context, input, profile.meteorCount);
 }
