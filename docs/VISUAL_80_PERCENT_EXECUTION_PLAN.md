@@ -590,3 +590,29 @@ Audio cleanup from the same review:
 - added regression tests for both behaviors.
 
 Verified checkpoint: CI #976 PASS.
+
+
+### V80-11..14 — Galaxy 01 sibling Worlds
+
+Code implementation complete; browser acceptance pending.
+
+The canonical World registry defines the next four Worlds as:
+- World 02 — Halo Garden / heaven;
+- World 03 — Prismatic Tide / prism;
+- World 04 — Cherub Falls / cherub;
+- World 05 — Aurora Gate / aurora.
+
+They now use isolated authored layer arrays registered through a single
+`AUTHORED_WORLD_BACKGROUNDS` ownership map. This replaces the previous
+variant-driven shared composition for these production Worlds and prevents a
+World-specific visual adjustment from mutating a sibling World.
+
+Regression coverage asserts:
+- Worlds 01–05 are authored-production;
+- World 06+ remains legacy-hybrid at this checkpoint;
+- each World 02–05 contains its required theme-signature assets;
+- the rejected large ocean planet is not inherited by Worlds 02–05;
+- authored World layer arrays are not shared by reference.
+
+Verified implementation checkpoint: CI #979 PASS, 154 test files / 797 tests.
+See `docs/WORLD_VISUAL_THEME_MATRIX.md` for the maintenance contract.
