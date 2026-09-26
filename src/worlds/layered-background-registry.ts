@@ -298,6 +298,28 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
   },
   {
     ...layer(
+      "galaxy-asteroid-far-fragments",
+      "vendor/ohjirochan/asteroid-small.png",
+      0.38,
+      0.26,
+      0.016,
+      0.5,
+      0.5,
+      -0.0046,
+      0.0022,
+      0.004,
+    ),
+    motion: "wrap",
+    minQuality: "medium",
+    placement: "edges",
+    instances: 9,
+    spreadY: 0.72,
+    scaleJitter: 0.35,
+    opacityJitter: 0.22,
+    speedJitter: 0.25,
+  },
+  {
+    ...layer(
       "galaxy-asteroid-mid-left",
       "vendor/ohjirochan/asteroid-medium.png",
       0.64,

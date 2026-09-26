@@ -116,7 +116,7 @@ describe("Layered authored background registry", () => {
     const productionAsteroids = galaxy.layers.filter((layer) =>
       layer.src.includes("/vendor/ohjirochan/asteroid-"),
     );
-    expect(productionAsteroids).toHaveLength(3);
+    expect(productionAsteroids).toHaveLength(4);
     expect(
       productionAsteroids.some(
         (layer) =>
@@ -127,7 +127,16 @@ describe("Layered authored background registry", () => {
     ).toBe(true);
     expect(
       productionAsteroids.filter((layer) => layer.motion === "wrap"),
-    ).toHaveLength(2);
+    ).toHaveLength(3);
+
+    const farFragments = galaxy.layers.find(
+      (layer) => layer.id === "galaxy-asteroid-far-fragments",
+    )!;
+    expect(farFragments.depth).toBeLessThan(0.5);
+    expect(farFragments.scale).toBeLessThan(0.025);
+    expect(farFragments.instances).toBeGreaterThanOrEqual(8);
+    expect(farFragments.placement).toBe("edges");
+    expect(farFragments.minQuality).toBe("medium");
 
     const asteroidField = galaxy.layers.find(
       (layer) => layer.id === "galaxy-authored-asteroid-field",
