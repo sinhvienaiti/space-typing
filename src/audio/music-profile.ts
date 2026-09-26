@@ -157,8 +157,6 @@ function fallbackAsset(
 
 function worldProfile(world: WorldProfile): WorldMusicProfile {
   const worldFile = world.id + ".ogg";
-  const galaxyFile =
-    "galaxy-" + String(world.galaxy).padStart(2, "0") + ".ogg";
   const baseTrack = {
     ...SHARED.calm,
     id: world.id + "-base",
@@ -170,18 +168,14 @@ function worldProfile(world: WorldProfile): WorldMusicProfile {
     "engine-loop.ogg",
     "ambient",
   );
-  const galaxyAmbient = fallbackAsset(
-    "galaxy-" + String(world.galaxy).padStart(2, "0") + "-ambient",
-    galaxyFile,
-    "computer-loop.ogg",
-    "ambient",
-  );
-
   return {
     id: world.musicProfile,
     worldId: world.id,
     baseTrack,
-    ambientLayers: [ambient, galaxyAmbient],
+    // Keep one neutral engine bed only. The former computer-loop layer
+    // produced the repetitive high-pitched "beep" heard throughout normal
+    // gameplay and stacked on top of the newer music mix.
+    ambientLayers: [ambient],
     intenseTrackOrLayer: {
       ...SHARED.intense,
       id: world.id + "-intense",
