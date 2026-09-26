@@ -589,6 +589,14 @@ export function validateLayeredBackgroundProfile(
     ) {
       errors.push(layer.id + ": invalid layer metrics.");
     }
+    if (
+      layer.instances !== undefined &&
+      (!Number.isInteger(layer.instances) ||
+        layer.instances < 1 ||
+        layer.instances > 12)
+    ) {
+      errors.push(layer.id + ": invalid instance count.");
+    }
   }
   return errors;
 }
