@@ -31,6 +31,29 @@ describe("Layered authored background registry", () => {
     }
   });
 
+  it("keeps the production migration boundary explicit", () => {
+    expect(
+      layeredBackgroundForScene(sceneProfileForWorld("world-01")).renderMode,
+    ).toBe("authored-production");
+
+    for (const worldId of [
+      "world-02",
+      "world-06",
+      "world-11",
+      "world-16",
+      "world-21",
+      "world-26",
+      "world-31",
+      "world-36",
+      "world-41",
+      "world-46",
+    ]) {
+      expect(
+        layeredBackgroundForScene(sceneProfileForWorld(worldId)).renderMode,
+      ).toBe("legacy-hybrid");
+    }
+  });
+
   it("gives representative Worlds distinct authored families", () => {
     const family = (worldId: string) =>
       layeredBackgroundForScene(
