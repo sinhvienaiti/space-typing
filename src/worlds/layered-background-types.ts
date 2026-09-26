@@ -11,6 +11,7 @@ export type BackgroundMotion =
   | "auto"
   | "static"
   | "float"
+  | "parallax"
   | "wrap"
   | "orbit"
   | "flyby"
