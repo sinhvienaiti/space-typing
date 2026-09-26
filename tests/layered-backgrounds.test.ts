@@ -203,8 +203,11 @@ describe("Layered authored background registry", () => {
     const galaxy = layeredBackgroundForScene(
       sceneProfileForWorld("world-01"),
     );
-    const byId = (id: string) =>
-      galaxy.layers.find((layer) => layer.id === id)!;
+    const byId = (id: string) => {
+      const found = galaxy.layers.find((layer) => layer.id === id);
+      expect(found, "missing authored layer: " + id).toBeDefined();
+      return found!;
+    };
 
     expect(qualityAllowsLayer(byId("galaxy-sky"), "low")).toBe(true);
 
@@ -219,10 +222,13 @@ describe("Layered authored background registry", () => {
     }
 
     expect(
-      qualityAllowsLayer(byId("galaxy-distant-patrol-left"), "medium"),
+      qualityAllowsLayer(byId("galaxy-distant-sentinel"), "medium"),
+    ).toBe(true);
+    expect(
+      qualityAllowsLayer(byId("galaxy-distant-patrol-right"), "medium"),
     ).toBe(false);
     expect(
-      qualityAllowsLayer(byId("galaxy-distant-patrol-left"), "high"),
+      qualityAllowsLayer(byId("galaxy-distant-patrol-right"), "high"),
     ).toBe(true);
   });
 
