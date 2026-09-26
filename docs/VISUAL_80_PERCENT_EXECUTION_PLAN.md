@@ -810,3 +810,28 @@ PASS requires:
 - HUD/enemy/readability regressions are absent.
 
 World 03+ visual rollout stays blocked until this gate is accepted.
+
+
+### W02 implementation checkpoint — 2026-09-27
+
+Implemented on `feat/visual-over-80-pass`:
+
+- W02-00 acceptance contract locked in this plan;
+- W02-01 new 2560x1440 generated production master added as
+  `heaven/halo-garden-production-v2.svg` with embedded AVIF art;
+- W02-02 master layer is full-opacity, cover-fit, scale 1, static and
+  zero-rotation; authored background sampling explicitly uses
+  `imageSmoothingQuality = "high"`;
+- W02-03 waterfall pass strengthened with brighter flowing streaks plus
+  quality-bounded impact spray;
+- W02-04 far/near cloud bands now have more visible, distinct drift rates;
+- W02-05 galaxy glow plus star drift/twinkle increased without restoring
+  legacy speed-line walls;
+- W02-06 shooting-star count, visibility window, trail length and brightness
+  increased for High/Ultra;
+- W02-07 halo pulse and light rays strengthened;
+- W02-09 registry/ambient tests updated and the asset integrity gate now rejects
+  a master below 2560x1440.
+
+The only remaining gate is W02-10 real-browser owner acceptance. World 03+
+should not be treated as visually accepted from this checkpoint alone.
