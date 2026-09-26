@@ -438,6 +438,9 @@ export function mountTestLab(
 
         <details>
           <summary>Player / Status</summary>
+          <p class="test-lab-effective-runtime" data-role="effective-character">
+            Effective runtime character: not started
+          </p>
           <div class="test-lab-grid">
             <label>Character<select data-field="character"></select></label>
             <label>Core Hull<input data-field="core-hull" type="number" min="0" value="100"></label>
@@ -1001,6 +1004,15 @@ export function mountTestLab(
       music,
       lastAction,
     );
+    const effectiveCharacter = dialog.querySelector<HTMLElement>(
+      '[data-role="effective-character"]',
+    );
+    if (effectiveCharacter !== null) {
+      effectiveCharacter.textContent =
+        snapshot === null
+          ? "Effective runtime character: not started"
+          : "Effective runtime character: " + snapshot.characterId;
+    }
     inventoryInspector.textContent =
       JSON.stringify(
         getItemDefinition(itemSelect.value as ItemId),
@@ -1073,6 +1085,7 @@ export function mountTestLab(
       true,
       inputValue(dialog, '[data-field="death-mode"]') as TestLabDeathMode,
     );
+    game.setCharacter(characterSelect.value as CharacterId);
     game.setVocabularyLevel(
       numberValue(dialog, '[data-field="vocab-level"]', 1),
     );
@@ -1302,6 +1315,16 @@ export function mountTestLab(
       String(stage);
     dialog.querySelector<HTMLInputElement>('[data-field="checkpoint"]')!.value =
       String(stage);
+  });
+
+  characterSelect.addEventListener("change", () => {
+    if (game === null) {
+      renderInspector();
+      return;
+    }
+    game.setCharacter(characterSelect.value as CharacterId);
+    renderInspector();
+    notice("character applied live · " + characterSelect.value);
   });
 
   function coreStatsFromControls(): CoreStats {
