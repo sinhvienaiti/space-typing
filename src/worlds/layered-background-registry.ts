@@ -310,7 +310,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-authored-asteroid-field",
       "vendor/luminousdragon/asteroid-field.png",
       0.4,
-      0.32,
+      0.1,
       1.18,
       0.5,
       0.5,
