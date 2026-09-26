@@ -98,10 +98,15 @@ describe("M08 World music profiles", () => {
     const candidates = assetCandidates(base);
 
     expect(candidates[0]).toContain("/local-assets/music/");
-    expect(candidates[1]).toBe("/assets/audio/music/sector.ogg");
+    expect(candidates[1]).toBe(
+      "/assets/audio/music/mysterious-ambience.mp3",
+    );
     expect(
       assetCandidates(profile.ambientLayers[0] ?? null)[1],
     ).toBe("/assets/audio/ambient/engine-loop.ogg");
+    expect(
+      assetCandidates(musicAssetForState(profile, "WORLD_INTENSE"))[1],
+    ).toBe("/assets/audio/music/battle-theme-b.mp3");
     expect(stateLoops("WORLD_NORMAL")).toBe(true);
     expect(stateLoops("WORLD_BOSS")).toBe(true);
     expect(stateLoops("VICTORY")).toBe(false);
