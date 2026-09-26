@@ -1,6 +1,6 @@
 # Visual >80% Execution Plan
 
-Status: ACTIVE — V80-00..V80-09 code complete; V80-10 code audit active / browser acceptance pending
+Status: ACTIVE — owner rejected first V80-10 screenshot (<50% perceptual match); corrective visual pass implemented, fresh browser acceptance pending
 Owner acceptance target: runtime visual quality >= 80% of the approved demo direction
 Branch: `feat/visual-over-80-pass`
 Created: 2026-09-26
@@ -468,3 +468,93 @@ A task is not “done” merely because TypeScript compiles.
 - Remaining visual risk: perceptual score cannot be honestly closed without a fresh owner/browser screenshot
 - CI: must pass on this checkpoint before browser acceptance
 - Browser acceptance: PENDING; do not migrate World 02 yet
+
+
+## 9. Owner rejection corrective pass
+
+The first post-V80 screenshot was explicitly rejected by the owner as still below
+50% of the approved demo direction. This overrides the earlier internal
+65–70% estimate. The correction target is not “more objects”; it is stronger
+art-direction similarity, scene cohesion and cinematic composition.
+
+### V80-10A — Asteroid palette integration
+
+Commit: `317e6a253589664f945fc1eb6ebee279dc97df1a`
+
+Changes:
+- added a typed sourced-art treatment contract;
+- far/mid/near asteroid bands inherit progressively stronger cool-space color
+  grading;
+- added bounded blue/violet edge glow using the existing canvas draw path;
+- no duplicate asteroid assets and no per-frame image generation.
+
+Review:
+- treatment mapping is centralized;
+- renderer state is contained by save/restore;
+- the treatment is opt-in and currently limited to authored Galaxy rocks.
+
+### V80-10B — Star/noise reduction
+
+Commit: `9a3d4e6f413ce4c08987bd677ee15f8de6581bdf`
+
+Changes:
+- reduced dense star-texture opacity;
+- reduced sparse star-texture opacity;
+- reduced embedded blue-nebula dominance while preserving the blue volume;
+- reduced planet-speck texture weight;
+- reduced World 01 procedural far-star density;
+- halved the production near-star contribution;
+- renamed the World 01 feature gate from star-specific wording to general
+  production polish wording.
+
+Review:
+- change is scoped to World 01 where behavior differs;
+- Worlds 02+ keep existing behavior until their own authored migration.
+
+### V80-10C — Art-directed frame composition
+
+Commit: `5b9838ae5bf316c1e1c9b977e8cc540cb99cdc83`
+
+Changes:
+- tightened primary/secondary celestial hierarchy;
+- anchored the hero foreground asteroid deliberately at the upper-right edge
+  instead of letting deterministic edge scattering choose either side;
+- anchored the secondary foreground rock at the lower-left edge on High+;
+- moved the distant sentinel and secondary bodies to support a left-landmark
+  -> center gameplay -> right-depth visual flow;
+- reduced the near hero scale slightly after placement was made intentional.
+
+Review:
+- foreground objects are now framing devices rather than random composition;
+- the central gameplay lane remains free of intentionally anchored hero objects.
+
+### V80-10D — Hero narrative accent
+
+Commit: `26fcc66c67f3a8a86927a28f20a022053ed8bf1d`
+
+Changes:
+- added a subtle local luminous orbital structure in the upper-right depth field;
+- uses an existing local authored asset, low opacity, screen blend and slow
+  float;
+- visible from Medium so the World has a memorable authored identity;
+- remains visually subordinate to enemies and the primary planet.
+
+### Corrective CI note
+
+Composition intentionally reduced the hero asteroid from 0.30 to 0.27 while
+anchoring it at the frame edge. One pre-existing test still required >=0.28 and
+correctly failed CI. The test was updated to the new art-directed contract in
+`0b8288757cba34ac96d00366dca6eb3c669b7227`; the holistic test still requires
+the near band to remain >3x the largest mid-band scale.
+
+### Corrective acceptance gate
+
+Do not migrate World 02–05 yet.
+
+Required next evidence:
+1. CI passes on the corrected head.
+2. Pull the branch on Windows/WSL.
+3. Capture the same Stage 004 framing.
+4. Re-score against the approved demo, using the owner's perceptual score as
+   the acceptance source of truth.
+5. If still below 80%, continue World 01 correction before any broader rollout.
