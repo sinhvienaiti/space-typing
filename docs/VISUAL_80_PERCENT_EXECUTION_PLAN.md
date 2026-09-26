@@ -397,9 +397,9 @@ A task is not “done” merely because TypeScript compiles.
 - Task: far asteroid band
 - Commit: `70f8d2862c0c0431dd30b0ff193236793b0463e4`
 - Files changed: registry, tests
-- Contract changed: deterministic bounded far fragments become Medium-visible
+- Contract changed: deterministic bounded far fragments remain visible even on Low; quality scaling reduces count instead of deleting the whole far band
 - Tests added/updated: depth/scale/count/placement assertions
-- Self-review findings: an initial count expectation failed CI and was corrected instead of weakening the feature
+- Self-review findings: an initial count expectation failed CI and was corrected instead of weakening the feature; holistic review later caught that `minQuality: medium` contradicted the task's Low-density requirement, so the far band was restored on Low and left to the existing bounded quality scaler
 - Remaining visual risk: density perception requires runtime motion review
 - CI: PASS after correction
 - Browser acceptance: pending

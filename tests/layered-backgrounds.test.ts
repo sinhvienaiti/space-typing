@@ -172,7 +172,9 @@ describe("Layered authored background registry", () => {
     expect(farFragments.scale).toBeLessThan(0.025);
     expect(farFragments.instances).toBeGreaterThanOrEqual(8);
     expect(farFragments.placement).toBe("edges");
-    expect(farFragments.minQuality).toBe("medium");
+    expect(farFragments.minQuality).toBeUndefined();
+    expect(qualityAllowsLayer(farFragments, "low")).toBe(true);
+    expect(qualityAllowsLayer(farFragments, "medium")).toBe(true);
 
     const asteroidField = galaxy.layers.find(
       (layer) => layer.id === "galaxy-authored-asteroid-field",

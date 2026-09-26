@@ -320,7 +320,6 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       0.004,
     ),
     motion: "wrap",
-    minQuality: "medium",
     placement: "edges",
     instances: 9,
     spreadY: 0.72,
