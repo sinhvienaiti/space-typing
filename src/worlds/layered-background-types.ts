@@ -43,6 +43,13 @@ export type LayeredBackgroundLayer = {
   rotationSpeed: number;
   pulseAmount: number;
   blend: BackgroundBlend;
+  /**
+   * Lowest visual quality that should render this layer. Use this for authored
+   * scene identity so Medium can keep essential depth while Low may simplify it.
+   *
+   * When omitted, legacy `optional: true` continues to mean High-or-better.
+   */
+  minQuality?: VisualQuality;
   optional?: boolean;
   /**
    * Explicit motion semantics. "auto" preserves the legacy behavior: layers

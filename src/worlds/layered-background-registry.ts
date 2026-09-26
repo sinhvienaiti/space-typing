@@ -209,6 +209,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       true,
     ),
     motion: "orbit",
+    minQuality: "medium",
     spreadX: 0.028,
     spreadY: 0.022,
   },
@@ -279,6 +280,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     fit: "cover",
     motion: "wrap",
     blend: "screen",
+    minQuality: "medium",
   },
   {
     ...layer(
@@ -340,6 +342,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       true,
     ),
     motion: "approach",
+    minQuality: "medium",
     placement: "edges",
     instances: 1,
     spreadX: 0.72,

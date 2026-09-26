@@ -9,10 +9,21 @@ function positiveModulo(value: number, modulus: number): number {
   return ((value % modulus) + modulus) % modulus;
 }
 
-function qualityAllowsOptional(
+const QUALITY_RANK: Readonly<
+  Record<LayeredBackgroundDrawInput["quality"], number>
+> = {
+  low: 0,
+  medium: 1,
+  high: 2,
+  ultra: 3,
+};
+
+export function qualityAllowsLayer(
+  layer: LayeredBackgroundLayer,
   quality: LayeredBackgroundDrawInput["quality"],
 ): boolean {
-  return quality === "high" || quality === "ultra";
+  const minimum = layer.minQuality ?? (layer.optional ? "high" : "low");
+  return QUALITY_RANK[quality] >= QUALITY_RANK[minimum];
 }
 
 function blendMode(
@@ -110,7 +121,7 @@ export class LayeredBackgroundRenderer {
     quality: LayeredBackgroundDrawInput["quality"],
   ): void {
     for (const layer of profile.layers) {
-      if (layer.optional && !qualityAllowsOptional(quality)) continue;
+      if (!qualityAllowsLayer(layer, quality)) continue;
       this.asset(layer.src);
     }
   }
@@ -127,7 +138,7 @@ export class LayeredBackgroundRenderer {
     const qualityFactor = qualityInstanceFactor(quality);
 
     for (const layer of profile.layers) {
-      if (layer.optional && !qualityAllowsOptional(quality)) continue;
+      if (!qualityAllowsLayer(layer, quality)) continue;
 
       const requested = clamp(Math.round(layer.instances ?? 1), 1, 12);
       const count =

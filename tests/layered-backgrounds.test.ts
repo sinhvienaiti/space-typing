@@ -5,6 +5,7 @@ import {
   layeredBackgroundForScene,
   validateLayeredBackgroundProfile,
 } from "../src/worlds/layered-background-registry";
+import { qualityAllowsLayer } from "../src/worlds/layered-background-renderer";
 
 describe("Layered authored background registry", () => {
   it("resolves valid local asset layers for every World", () => {
@@ -133,6 +134,7 @@ describe("Layered authored background registry", () => {
     );
     expect(asteroidField?.motion).toBe("wrap");
     expect(asteroidField?.optional).toBe(true);
+    expect(asteroidField?.minQuality).toBe("medium");
 
     for (const id of [
       "galaxy-planet-primary",
@@ -143,6 +145,33 @@ describe("Layered authored background registry", () => {
         "orbit",
       );
     }
+  });
+
+  it("keeps World 01 visual identity on Medium while reserving decoration for High", () => {
+    const galaxy = layeredBackgroundForScene(
+      sceneProfileForWorld("world-01"),
+    );
+    const byId = (id: string) =>
+      galaxy.layers.find((layer) => layer.id === id)!;
+
+    expect(qualityAllowsLayer(byId("galaxy-sky"), "low")).toBe(true);
+
+    for (const id of [
+      "galaxy-moon-far",
+      "galaxy-authored-asteroid-field",
+      "galaxy-asteroid-near-hero",
+    ]) {
+      expect(qualityAllowsLayer(byId(id), "low")).toBe(false);
+      expect(qualityAllowsLayer(byId(id), "medium")).toBe(true);
+      expect(qualityAllowsLayer(byId(id), "high")).toBe(true);
+    }
+
+    expect(
+      qualityAllowsLayer(byId("galaxy-distant-patrol-left"), "medium"),
+    ).toBe(false);
+    expect(
+      qualityAllowsLayer(byId("galaxy-distant-patrol-left"), "high"),
+    ).toBe(true);
   });
 
   it("preserves multi-depth nebula volume and rare authored ship flybys", () => {
