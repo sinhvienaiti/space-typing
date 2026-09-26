@@ -72,19 +72,59 @@ export type MusicResolveContext = {
 };
 
 const SHARED = {
-  calm: asset("modern-space-calm", "mysterious-ambience.mp3", "music"),
-  intense: asset("modern-space-intense", "battle-theme-b.mp3", "music"),
-  miniBoss: asset("mini-boss", "battle-theme-b.mp3", "music"),
+  calm: fallbackAsset(
+    "modern-space-calm",
+    "sector.ogg",
+    "mysterious-ambience.mp3",
+    "music",
+  ),
+  intense: fallbackAsset(
+    "modern-space-intense",
+    "pulse.ogg",
+    "battle-theme-b.mp3",
+    "music",
+  ),
+  miniBoss: fallbackAsset(
+    "mini-boss",
+    "pulse.ogg",
+    "battle-theme-b.mp3",
+    "music",
+  ),
   worldBoss: asset("world-boss", "urgent.ogg", "music"),
   galaxyBoss: asset("galaxy-boss", "urgent.ogg", "music"),
   championHunt: asset("champion-hunt", "urgent.ogg", "music"),
-  hiddenChallenge: asset("hidden-challenge", "battle-theme-b.mp3", "music"),
-  hiddenWorld: asset("hidden-world", "mysterious-ambience.mp3", "music"),
-  shop: asset("shop", "mysterious-ambience.mp3", "music"),
-  station: asset("station", "mysterious-ambience.mp3", "music"),
+  hiddenChallenge: fallbackAsset(
+    "hidden-challenge",
+    "pulse.ogg",
+    "battle-theme-b.mp3",
+    "music",
+  ),
+  hiddenWorld: fallbackAsset(
+    "hidden-world",
+    "sector.ogg",
+    "mysterious-ambience.mp3",
+    "music",
+  ),
+  shop: fallbackAsset(
+    "shop",
+    "sector.ogg",
+    "mysterious-ambience.mp3",
+    "music",
+  ),
+  station: fallbackAsset(
+    "station",
+    "sector.ogg",
+    "mysterious-ambience.mp3",
+    "music",
+  ),
   victory: asset("victory", "victory.ogg", "stingers"),
   defeat: asset("defeat", "urgent.ogg", "music"),
-  transition: asset("transition", "battle-theme-b.mp3", "music"),
+  transition: fallbackAsset(
+    "transition",
+    "pulse.ogg",
+    "battle-theme-b.mp3",
+    "music",
+  ),
 } as const;
 
 function asset(
