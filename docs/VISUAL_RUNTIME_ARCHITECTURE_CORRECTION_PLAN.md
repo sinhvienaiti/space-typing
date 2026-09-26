@@ -1,6 +1,6 @@
 # Visual Runtime Architecture Correction Plan
 
-Status: ACTIVE IMPLEMENTATION — World 01 production authored mode
+Status: IMPLEMENTED IN PR #126 — awaiting owner browser acceptance
 
 Date: 2026-09-26
 
@@ -62,3 +62,19 @@ CI must protect:
 - representative unmigrated Worlds remain `legacy-hybrid`;
 - production mode disables legacy static/cinematic/floor passes;
 - authored asset registry remains valid.
+
+
+## Implementation review checkpoint
+
+Verified before merge:
+
+- World 01 resolves to `authored-production`.
+- Representative unmigrated Worlds resolve to `legacy-hybrid`.
+- Production mode disables legacy static landmarks, procedural cinematic
+  motion, perspective-floor fallback and cinematic procedural events.
+- Production mode retains only a neutral loading gradient, authored image/object
+  layers, bounded stars and lightweight ambient particles.
+- Existing authored object motion remains handled by the layered renderer.
+- Test + TypeScript + Vite build pass in CI.
+- This changes runtime architecture, not the current authored asset set; owner
+  browser screenshots remain the perceptual acceptance gate.
