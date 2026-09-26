@@ -573,3 +573,20 @@ planet/asteroid layers are retained only as sparse parallax depth cues. This
 pass is intentionally a composition reset rather than another opacity-only
 polish cycle. World 02+ remains blocked until a fresh browser capture is
 accepted.
+
+
+### V80-10F — Revert rejected V3 and audio cleanup
+
+The full-frame cinematic V3 composition was rejected in browser review because
+it overcorrected and obscured gameplay. The branch has been returned to the
+last stable visual architecture, the rejected cinematic asset was removed, and
+World 01 now explicitly filters out the large left blue planet.
+
+Audio cleanup from the same review:
+- removed the secondary `computer-loop.ogg` ambient layer that caused the
+  repetitive high-pitched background beep;
+- removed the synthesized projectile-warning tone from the frequent enemy
+  telegraph path while preserving warning ducking/mix behavior;
+- added regression tests for both behaviors.
+
+Verified checkpoint: CI #976 PASS.
