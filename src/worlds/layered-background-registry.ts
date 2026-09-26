@@ -197,9 +197,9 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
   layer(
     "galaxy-meteor-far-left",
     "vendor/kenney-remastered/meteor-grey-small1.png",
-    0.48,
     0.34,
-    0.035,
+    0.18,
+    0.014,
     0.08,
     0.3,
     -0.014,
@@ -209,9 +209,9 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
   layer(
     "galaxy-meteor-far-right",
     "vendor/kenney-remastered/meteor-grey-med2.png",
-    0.55,
-    0.36,
-    0.046,
+    0.38,
+    0.2,
+    0.018,
     0.91,
     0.29,
     -0.017,
@@ -251,45 +251,12 @@ const GALAXY_RICH: readonly LayeredBackgroundLayer[] = GALAXY.map(
       return {
         ...item,
         motion: "wrap",
-        instances: 7,
-        spreadX: 0.8,
-        spreadY: 0.46,
-        scale: item.scale * 0.78,
-        opacity: item.opacity * 0.82,
-        scaleJitter: 0.46,
-        opacityJitter: 0.3,
-        speedJitter: 0.34,
-        placement: "edges",
-      };
-    }
-
-    if (item.id.includes("meteor-mid")) {
-      return {
-        ...item,
-        motion: "wrap",
-        instances: 3,
-        spreadX: 0.74,
-        spreadY: 0.58,
-        scale: item.scale * 1.12,
-        scaleJitter: 0.34,
-        opacityJitter: 0.22,
-        speedJitter: 0.28,
-        placement: "edges",
-      };
-    }
-
-    if (item.id.includes("meteor-near")) {
-      return {
-        ...item,
-        motion: "approach",
-        instances: 1,
-        spreadX: 0.86,
-        spreadY: 0.6,
-        scale: item.scale * 1.82,
-        opacity: Math.min(0.62, item.opacity * 1.08),
-        scaleJitter: 0.2,
-        opacityJitter: 0.12,
-        speedJitter: 0.2,
+        instances: 5,
+        spreadX: 0.82,
+        spreadY: 0.5,
+        scaleJitter: 0.3,
+        opacityJitter: 0.2,
+        speedJitter: 0.26,
         placement: "edges",
       };
     }
