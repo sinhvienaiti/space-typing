@@ -319,7 +319,6 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       0.00035,
     ),
     fit: "cover",
-    treatment: "galaxy-rock-far",
     motion: "wrap",
     blend: "screen",
     minQuality: "medium",

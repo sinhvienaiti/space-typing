@@ -491,7 +491,10 @@ Changes:
 Review:
 - treatment mapping is centralized;
 - renderer state is contained by save/restore;
-- the treatment is opt-in and currently limited to authored Galaxy rocks.
+- the treatment is opt-in and limited to individual authored Galaxy rocks;
+- the full-screen authored asteroid-field texture intentionally avoids the
+  filter/shadow treatment so the integration pass does not add a large
+  per-frame blur/filter cost.
 
 ### V80-10B — Star/noise reduction
 
