@@ -6,6 +6,8 @@ import type {
 
 const ROOT = "/assets/space-typing/backgrounds";
 const PLAYER_SHIP_SHEET = "/assets/space-typing/ships/player-ships-v2.svg";
+const GALAXY_NEBULA_SRC =
+  "vendor/screaming-brain/nebula-purple-3-1024.png";
 
 function layer(
   id: string,
@@ -84,10 +86,11 @@ function distantShip(
 }
 
 const GALAXY: readonly LayeredBackgroundLayer[] = [
+  // D0-D1: deep void, star texture and nebula volume.
   {
     ...layer(
       "galaxy-sky",
-      "vendor/screaming-brain/nebula-purple-3-1024.png",
+      GALAXY_NEBULA_SRC,
       0.07,
       0.82,
       1.24,
@@ -132,7 +135,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
   },
   layer(
     "galaxy-nebula",
-    "vendor/screaming-brain/nebula-purple-3-1024.png",
+    GALAXY_NEBULA_SRC,
     0.14,
     0.5,
     1.08,
@@ -144,7 +147,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
   {
     ...layer(
       "galaxy-nebula-depth",
-      "vendor/screaming-brain/nebula-purple-3-1024.png",
+      GALAXY_NEBULA_SRC,
       0.11,
       0.2,
       1.34,
@@ -159,6 +162,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     spreadX: 0.04,
     spreadY: 0.035,
   },
+  // D2: dominant and secondary celestial landmarks.
   {
     ...layer(
       "galaxy-planet-primary",
@@ -227,6 +231,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     0.02,
     true,
   ),
+  // D5 narrative accents. They remain visually subordinate to real enemies.
   distantShip(
     "galaxy-distant-patrol-left",
     0,
@@ -245,6 +250,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     0.048,
     -0.005,
   ),
+  // D3: authored environmental field and mid-depth traffic.
   {
     ...layer(
       "galaxy-authored-planet-specks",
@@ -326,6 +332,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     opacityJitter: 0.16,
     speedJitter: 0.2,
   },
+  // D4: sparse near-camera scale cue.
   {
     ...layer(
       "galaxy-asteroid-near-hero",
