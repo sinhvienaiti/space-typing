@@ -429,3 +429,93 @@ Confirmed:
 
 Implementation may replace a candidate asset whenever real-browser review shows
 that it does not meet the quality bar, even if the candidate has a valid license.
+
+---
+
+## 12. Implementation checkpoint — Environment Art V2 Pass A (2026-09-26)
+
+Status: **IMPLEMENTED ON `feat/environment-art-v2`, pending CI + browser visual acceptance.**
+
+This pass addresses the specific owner feedback that Galaxy still looked flat,
+the meteors still looked like rough arcade chunks, and the scene lacked
+environmental storytelling.
+
+### Completed in this pass
+
+- **EA01 contract extension**
+  - added explicit `flyby` motion;
+  - added source-sheet crop metadata for reusing detailed existing art;
+  - added one-time art-treatment metadata;
+  - kept authored instance counts bounded to 1–12.
+
+- **EA02 renderer V2 follow-up**
+  - optional high-detail layers are no longer eagerly decoded on Low/Medium;
+  - small meteor images receive a deterministic asteroid-detail treatment once
+    after image load;
+  - the enriched asteroid canvas is cached and normal frame rendering remains a
+    simple `drawImage`;
+  - large/sparse fly-bys have a long inactive portion, smooth entry/exit fade and
+    no per-frame object allocation;
+  - source crops allow one local sprite sheet to provide distant narrative
+    objects without loading separate images.
+
+- **EA03 star hierarchy**
+  - far stars now contain faint, normal, bright and rare glint classes;
+  - Galaxy/Celestial scenes regain faster near-depth stars as points/glints,
+    without restoring the rejected universal line-streak look;
+  - the central typing corridor receives reduced bright-star opacity.
+
+- **EA04 asteroid field corrective slice**
+  - rough Kenney meteors are no longer enlarged unchanged for near-camera use;
+  - near rocks are fewer and materially larger, while far fragments carry the
+    higher instance count;
+  - deterministic crater/shading/surface detail is precomposed once into cached
+    canvases instead of computed in the frame loop;
+  - far/mid/near scale and opacity separation is stronger.
+
+- **EA05 environmental narrative-object baseline**
+  - distant ship fly-bys reuse cropped cells from the project-original Player
+    Ship V2 sheet;
+  - these layers are High/Ultra optional, low opacity, edge-biased and slow so
+    they read as environment rather than active targets.
+
+- **Galaxy volume recomposition**
+  - the same 1024px CC0 nebula source now forms two differently scaled/depth
+    volumes instead of one flat wash;
+  - the secondary volume uses a slow independent float and screen blend;
+  - existing detailed planet/moon/sun art remains off-axis.
+
+### Performance review
+
+The implementation intentionally avoids increasing frame-loop complexity
+proportionally with visual detail:
+
+- crater/detail generation occurs once per unique asteroid source and is cached;
+- no runtime blur/filter pass was added;
+- no new registry scan was added to `WorldSceneRenderer.draw`;
+- repeated authored instances remain deterministic and bounded;
+- optional ship layers are skipped before image load on Low/Medium quality;
+- Galaxy star hierarchy reuses the existing bounded quality budgets;
+- no persistence state or migration was added.
+
+### Still open before Environment Art V2 is globally complete
+
+- EA04 still requires real-browser visual acceptance of the treated near
+  asteroids. If they still read as arcade chunks, replace their source art rather
+  than increasing treatment complexity.
+- EA06 needs screenshot review for Worlds 01–05 after this recomposition.
+- EA07 remains open: Infernal, Frost, Verdant, Shadow, Forge, Abyss, Cathedral
+  and Eternity still need the same source-quality curation discipline. Their
+  existing lightweight SVGs are not automatically considered final art.
+- EA08/EA09 require browser readability/performance review under real combat,
+  boss pressure, Recall, High/Ultra, resize/DPR and several minutes of continuous
+  motion.
+- Parent gitlink update remains blocked until the child branch passes CI and the
+  visual slice is accepted.
+
+### Review rule
+
+Do not call this pass visually complete from CI alone. CI proves contracts and
+build safety; the owner screenshot/play review decides whether the art itself
+has crossed the quality bar.
+
