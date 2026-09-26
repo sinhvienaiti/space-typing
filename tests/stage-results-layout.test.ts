@@ -1,8 +1,6 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-
-const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
-const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+import html from "../index.html?raw";
+import css from "../src/styles.css?raw";
 
 describe("Stage clear desktop report presentation", () => {
   it("keeps the measured report in one wide dashboard with stable metric ids", () => {
