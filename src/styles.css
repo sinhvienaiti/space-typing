@@ -3679,7 +3679,7 @@ kbd {
 
 .stage-results-card {
   position: relative;
-  width: min(1520px, calc(100vw - 48px));
+  width: min(1640px, calc(100vw - 40px));
   height: min(920px, calc(100vh - 56px));
   max-width: none;
   max-height: none;
@@ -3783,6 +3783,25 @@ kbd {
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+}
+
+.stage-results-dashboard {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(101, 183, 205, 0.34) rgba(4, 12, 22, 0.45);
+}
+
+.stage-results-dashboard::-webkit-scrollbar {
+  width: 9px;
+}
+
+.stage-results-dashboard::-webkit-scrollbar-track {
+  background: rgba(4, 12, 22, 0.45);
+}
+
+.stage-results-dashboard::-webkit-scrollbar-thumb {
+  border: 2px solid rgba(4, 12, 22, 0.45);
+  border-radius: 999px;
+  background: rgba(101, 183, 205, 0.34);
 }
 
 .stage-results-overview,
