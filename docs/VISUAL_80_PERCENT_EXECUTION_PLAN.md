@@ -631,3 +631,29 @@ The asset is now stored as an AVIF production painting at
 container and its authored 896x504 dimensions, preventing a truncated binary
 from passing CI again. World 02 still owns its isolated composition and keeps
 secondary vector layers deliberately subtle.
+
+
+### V80-11B — Halo Garden animated scene
+
+Implementation complete; browser art acceptance pending.
+
+World 02 now owns a lightweight authored ambient-effects module instead of
+stacking the generic star/particle pass over its production scene. The effect
+budget is deliberately bounded and quality-aware:
+
+- far/near cloud mist drift;
+- waterfall shimmer/flow streaks;
+- slow galaxy glow drift;
+- authored star drift/twinkle;
+- holy halo pulse and soft light rays;
+- sparse shooting stars, capped at three and reduced on lower quality.
+
+The production master layer is static and zero-rotation. A renderer bug that
+added phase rotation even when `rotationSpeed === 0` was fixed, preventing
+full-frame art from appearing tilted.
+
+No HUD, gameplay panel, Test Lab layout, enemy label, WPM/accuracy, or other UI
+positioning code is modified by this batch. The changes are isolated to World
+background rendering and related tests.
+
+Verified checkpoint: CI #991 PASS.
