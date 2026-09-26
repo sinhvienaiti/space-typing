@@ -1386,18 +1386,15 @@ function drawStars(
     18,
     Math.round(budget.farStars * profile.starDensity),
   );
-  const nearCount =
-    profile.archetype === "celestial-rainbow"
-      ? 0
-      : Math.max(
-          0,
-          Math.round(
-            budget.nearStars *
-              profile.starDensity *
-              Math.max(0.25, profile.flightIntensity) *
-              0.34,
-          ),
-        );
+  const nearCount = Math.max(
+    0,
+    Math.round(
+      budget.nearStars *
+        profile.starDensity *
+        Math.max(0.25, profile.flightIntensity) *
+        (profile.archetype === "celestial-rainbow" ? 0.24 : 0.34),
+    ),
+  );
   const vanishingX = width * (0.5 + (profile.variant - 3) * 0.006);
   const vanishingY = height * 0.34;
   const flight = 0.45 + profile.flightIntensity * 0.85;
@@ -1424,10 +1421,41 @@ function drawStars(
       continue;
     }
 
-    const size = 0.5 + depth * 1.35;
-    const alpha = 0.16 + depth * 0.42;
+    const hierarchy = seededUnit(profile.seed, index, 304);
+    const centralQuiet =
+      x > width * 0.34 &&
+      x < width * 0.66 &&
+      y > height * 0.12 &&
+      y < height * 0.62;
+    const quietFactor = centralQuiet ? 0.58 : 1;
+    const size =
+      0.45 +
+      depth * 1.15 +
+      (hierarchy > 0.94 ? 0.8 : 0) +
+      (hierarchy > 0.992 ? 0.9 : 0);
+    const alpha =
+      (0.15 +
+        depth * 0.36 +
+        (hierarchy > 0.94 ? 0.16 : 0)) *
+      quietFactor;
+
     context.fillStyle = rgba(environment.starRgb, alpha);
-    context.fillRect(x, y, size, size);
+    if (hierarchy > 0.992 && quality !== "low") {
+      const arm = 2.1 + depth * 2.1;
+      context.fillRect(x - 0.75, y - arm, 1.5, arm * 2);
+      context.fillRect(x - arm, y - 0.75, arm * 2, 1.5);
+      context.globalAlpha = 0.7;
+      context.beginPath();
+      context.arc(x, y, 1.25 + depth * 0.8, 0, TAU);
+      context.fill();
+      context.globalAlpha = 1;
+    } else if (hierarchy > 0.94) {
+      context.beginPath();
+      context.arc(x, y, size * 0.62, 0, TAU);
+      context.fill();
+    } else {
+      context.fillRect(x, y, size, size);
+    }
   }
 
   // Existing seeded stars add a slow twinkling texture behind the flight layer.
@@ -1466,6 +1494,39 @@ function drawStars(
     const x0 = vanishingX + cos * trail * width * 0.76;
     const y0 = vanishingY + sin * trail * height * 0.92;
     if (x < -20 || x > width + 20 || y < -20 || y > height + 20) {
+      continue;
+    }
+
+    if (profile.archetype === "celestial-rainbow") {
+      const centralQuiet =
+        x > width * 0.35 &&
+        x < width * 0.65 &&
+        y > height * 0.12 &&
+        y < height * 0.62;
+      const alpha =
+        (0.22 + depth * 0.24) * (centralQuiet ? 0.5 : 1);
+      context.fillStyle = rgba(environment.starRgb, alpha);
+      context.beginPath();
+      context.arc(x, y, 0.85 + depth * 1.05, 0, TAU);
+      context.fill();
+
+      if (
+        quality !== "low" &&
+        seededUnit(profile.seed, index, 314) > 0.86
+      ) {
+        const arm = 1.8 + depth * 2.4;
+        context.strokeStyle = rgba(
+          environment.starRgb,
+          alpha * 0.72,
+        );
+        context.lineWidth = 0.7;
+        context.beginPath();
+        context.moveTo(x - arm, y);
+        context.lineTo(x + arm, y);
+        context.moveTo(x, y - arm);
+        context.lineTo(x, y + arm);
+        context.stroke();
+      }
       continue;
     }
 

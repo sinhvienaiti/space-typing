@@ -16,12 +16,17 @@ describe("Layered authored background registry", () => {
       expect(layered.layers.length).toBeGreaterThanOrEqual(3);
 
       for (const layer of layered.layers) {
-        expect(layer.src.startsWith(
-          "/assets/space-typing/backgrounds/",
-        )).toBe(true);
+        expect(
+          layer.src.startsWith("/assets/space-typing/backgrounds/") ||
+            layer.src.startsWith("/assets/space-typing/ships/"),
+        ).toBe(true);
         expect(layer.depth).toBeGreaterThan(0);
         expect(layer.opacity).toBeGreaterThanOrEqual(0);
         expect(layer.opacity).toBeLessThanOrEqual(1);
+        if (layer.instances !== undefined) {
+          expect(layer.instances).toBeGreaterThanOrEqual(1);
+          expect(layer.instances).toBeLessThanOrEqual(12);
+        }
       }
     }
   });
@@ -81,6 +86,39 @@ describe("Layered authored background registry", () => {
     expect(
       sources.some((src) => src.includes("/vendor/rawdanitsu/")),
     ).toBe(false);
+  });
+
+  it("builds Galaxy depth from treated rocks, nebula volume and rare ship flybys", () => {
+    const galaxy = layeredBackgroundForScene(
+      sceneProfileForWorld("world-01"),
+    );
+
+    const nebulaLayers = galaxy.layers.filter((layer) =>
+      layer.id.includes("nebula"),
+    );
+    expect(nebulaLayers.length).toBeGreaterThanOrEqual(2);
+
+    const asteroidLayers = galaxy.layers.filter(
+      (layer) => layer.artTreatment === "asteroid",
+    );
+    expect(asteroidLayers.length).toBeGreaterThanOrEqual(6);
+    expect(
+      asteroidLayers.some((layer) => layer.motion === "approach"),
+    ).toBe(true);
+
+    const shipLayers = galaxy.layers.filter((layer) =>
+      layer.src.startsWith("/assets/space-typing/ships/"),
+    );
+    expect(shipLayers.length).toBeGreaterThanOrEqual(2);
+    expect(shipLayers.every((layer) => layer.motion === "flyby")).toBe(
+      true,
+    );
+    expect(
+      shipLayers.every((layer) => layer.sourceRect !== undefined),
+    ).toBe(true);
+    expect(shipLayers.every((layer) => layer.optional === true)).toBe(
+      true,
+    );
   });
 
   it("keeps authored asset ids unique inside each scene", () => {
