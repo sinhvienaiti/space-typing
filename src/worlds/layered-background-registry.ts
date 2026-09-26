@@ -239,6 +239,26 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     0.02,
     true,
   ),
+  {
+    ...layer(
+      "galaxy-luminous-orbit",
+      "eternity/rings.svg",
+      0.2,
+      0.14,
+      0.24,
+      0.82,
+      0.29,
+      -0.00004,
+      0.000015,
+      0.0007,
+      0.018,
+    ),
+    motion: "float",
+    blend: "screen",
+    minQuality: "medium",
+    spreadX: 0.015,
+    spreadY: 0.018,
+  },
   // D5 narrative accents. They remain visually subordinate to real enemies.
   {
     ...distantShip(

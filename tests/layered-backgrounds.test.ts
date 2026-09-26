@@ -328,6 +328,7 @@ describe("World 01 holistic authored composition contract", () => {
       "galaxy-sky",
       "galaxy-nebula",
       "galaxy-planet-primary",
+      "galaxy-luminous-orbit",
       "galaxy-authored-asteroid-field",
       "galaxy-asteroid-far-fragments",
       "galaxy-asteroid-mid-left",
@@ -416,5 +417,25 @@ describe("World 01 sourced-art integration treatments", () => {
     expect(mid.shadowBlur).toBeGreaterThan(far.shadowBlur);
     expect(near.shadowBlur).toBeGreaterThan(mid.shadowBlur);
     expect(near.shadowColor).toContain("255");
+  });
+});
+
+
+describe("World 01 hero narrative accent", () => {
+  it("keeps a luminous orbital structure off-axis on Medium quality", () => {
+    const galaxy = layeredBackgroundForScene(
+      sceneProfileForWorld("world-01"),
+    );
+    const orbit = galaxy.layers.find(
+      (layer) => layer.id === "galaxy-luminous-orbit",
+    );
+
+    expect(orbit).toBeDefined();
+    expect(orbit?.src).toContain("/backgrounds/eternity/rings.svg");
+    expect(orbit?.blend).toBe("screen");
+    expect(orbit?.minQuality).toBe("medium");
+    expect(orbit?.anchorX).toBeGreaterThan(0.75);
+    expect(orbit?.anchorY).toBeLessThan(0.35);
+    expect(orbit?.opacity).toBeLessThanOrEqual(0.16);
   });
 });
