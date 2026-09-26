@@ -2683,6 +2683,72 @@ function formatStageDuration(seconds: number): string {
   return String(minutes) + ":" + String(total % 60).padStart(2, "0");
 }
 
+function renderTestingStageClearReport(
+  stats: GameStats,
+  stageSession: StageSessionSnapshot,
+  wpm: number,
+  accuracy: number,
+): void {
+  const world = worldForStage(stats.stage);
+  const objective = game.getStageObjective();
+  const rating = stageResultStars(
+    accuracy,
+    objective?.status ?? null,
+  );
+  const measuredKills =
+    stageSession.regularKills +
+    stageSession.eliteKills +
+    stageSession.bossKills;
+  const killRate =
+    stageSession.elapsedSeconds <= 0
+      ? 0
+      : (measuredKills / stageSession.elapsedSeconds) * 60;
+
+  byId("clearTitle").textContent =
+    "Stage " + String(stats.stage).padStart(3, "0") + " complete";
+  byId("clearMeta").textContent =
+    world.name +
+    " · TESTING PREVIEW · " +
+    difficultySettings.mode.toUpperCase();
+  byId("clearStars").textContent =
+    "★".repeat(rating.stars) + "☆".repeat(3 - rating.stars);
+  byId("clearStarRule").textContent =
+    "Testing preview · rating shown, campaign progression unchanged";
+  byId("clearScore").textContent = stats.score.toLocaleString();
+  byId("clearAccuracy").textContent = accuracy.toFixed(1) + "%";
+  byId("clearWpm").textContent = wpm.toFixed(0);
+  byId("clearTime").textContent =
+    formatStageDuration(stageSession.elapsedSeconds);
+  byId("clearKillRate").textContent = killRate.toFixed(1) + "/min";
+  byId("clearStreak").textContent = String(stats.maxStreak);
+
+  wordReviewFilter = "all";
+  renderMeasuredStageSession(stageSession, stats.hits, stats.misses);
+
+  replaceCurrencyChips(
+    byId("clearCredits"),
+    {
+      credits: 0,
+      alloy: 0,
+      starCrystal: 0,
+      quantumCore: 0,
+    },
+    {
+      signed: true,
+      className: "stage-reward-chips",
+    },
+  );
+
+  const progressPanel = byId("clearCharacterProgress");
+  progressPanel.replaceChildren();
+  const note = document.createElement("span");
+  note.textContent =
+    "Testing preview · XP, loot, currency, unlocks and checkpoints are not saved.";
+  progressPanel.append(note);
+  byId("clearDetails").textContent =
+    "Temporary all-stage access · disable Unlock all stages in Settings to restore normal progression locks.";
+}
+
 function appendResultMetric(
   root: HTMLElement,
   label: string,
