@@ -104,9 +104,13 @@ describe("M08 World music profiles", () => {
     expect(
       assetCandidates(profile.ambientLayers[0] ?? null)[1],
     ).toBe("/assets/audio/ambient/engine-loop.ogg");
-    expect(
-      assetCandidates(musicAssetForState(profile, "WORLD_INTENSE"))[1],
-    ).toBe("/assets/audio/music/battle-theme-b.mp3");
+    const intenseCandidates = assetCandidates(
+      musicAssetForState(profile, "WORLD_INTENSE"),
+    );
+    expect(intenseCandidates[0]).toBe("/local-assets/music/pulse.ogg");
+    expect(intenseCandidates[1]).toBe(
+      "/assets/audio/music/battle-theme-b.mp3",
+    );
     expect(stateLoops("WORLD_NORMAL")).toBe(true);
     expect(stateLoops("WORLD_BOSS")).toBe(true);
     expect(stateLoops("VICTORY")).toBe(false);
