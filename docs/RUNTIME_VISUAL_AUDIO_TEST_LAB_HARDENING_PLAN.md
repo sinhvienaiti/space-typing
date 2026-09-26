@@ -1,6 +1,6 @@
 # Runtime Visual, Audio & Test Lab Hardening Plan
 
-Status: **ACTIVE IMPLEMENTATION — desktop first**
+Status: **IMPLEMENTED IN PR #125 — awaiting owner browser/audio acceptance**
 
 Date: 2026-09-26
 
@@ -131,3 +131,32 @@ Visual/audio completion requires:
 - effective object motion visible without reducing readability;
 - the old harsh/dated normal gameplay music no longer being selected;
 - Test Lab character selection verifiably changes the live runtime and survives arena restart.
+
+
+## 8. Implementation review checkpoint — 2026-09-26
+
+Implemented and self-reviewed on `feat/runtime-visual-audio-testlab-hardening`:
+
+- Test Lab Character selection applies immediately to a live sandbox and is
+  reapplied on Start / Restart Arena.
+- Runtime snapshot exposes `characterId`; the inspector shows the effective
+  live Character and effective active music candidate.
+- All 83 declared Test Lab button actions were audited against controller
+  handlers; no declared action is missing a handler.
+- All 78 declared Test Lab data fields were audited for controller use; no field
+  is present only as dead markup.
+- World 01 now layers authored CC0 dense/sparse stars, authored tiny-planet
+  detail and authored distant asteroid fields over the 1024px nebula.
+- The main planet, far planet and moon use independent slow orbital motion;
+  production asteroids retain bounded wrap/approach motion and edge-biased
+  placement.
+- Old Kenney Galaxy scenery is no longer used by World 01.
+- Standard gameplay fallback music no longer resolves to the old sector/pulse
+  repository tracks; local/private override filenames remain backward
+  compatible.
+- New-install music and ambient defaults are reduced to 0.26 / 0.08.
+- CI now validates both the curated MP3 assets and the authored PNG environment
+  assets before TypeScript/Vite build.
+- Automated tests/build are not a substitute for the final perceptual gate:
+  owner browser screenshots and listening remain required before rolling this
+  art/audio direction across all Worlds.
