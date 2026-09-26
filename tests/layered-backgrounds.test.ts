@@ -184,6 +184,26 @@ describe("Layered authored background registry", () => {
     );
     expect(nebulaLayers.length).toBeGreaterThanOrEqual(3);
 
+    const sky = galaxy.layers.find((layer) => layer.id === "galaxy-sky")!;
+    const mainNebula = galaxy.layers.find(
+      (layer) => layer.id === "galaxy-nebula",
+    )!;
+    const depthNebula = galaxy.layers.find(
+      (layer) => layer.id === "galaxy-nebula-depth",
+    )!;
+
+    expect(sky.opacity).toBeLessThanOrEqual(0.5);
+    expect(mainNebula.blend).toBe("screen");
+    expect(depthNebula.blend).toBe("screen");
+    expect(mainNebula.scale).toBeGreaterThan(sky.scale);
+    expect(depthNebula.scale - mainNebula.scale).toBeGreaterThan(0.25);
+    expect(Math.abs(mainNebula.anchorX - depthNebula.anchorX)).toBeGreaterThan(
+      0.35,
+    );
+    expect(Math.abs(mainNebula.anchorY - depthNebula.anchorY)).toBeGreaterThan(
+      0.2,
+    );
+
     const shipLayers = galaxy.layers.filter((layer) =>
       layer.src.startsWith("/assets/space-typing/ships/"),
     );
