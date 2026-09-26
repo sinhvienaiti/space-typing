@@ -50,17 +50,26 @@ describe("Layered authored background registry", () => {
     expect(family("world-46")).toBe("eternity");
   });
 
-  it("uses curated sourced Galaxy art instead of deprecated placeholders", () => {
+  it("uses authored parallax Galaxy art instead of Kenney placeholder scenery", () => {
     const galaxy = layeredBackgroundForScene(
       sceneProfileForWorld("world-01"),
     );
     const sources = galaxy.layers.map((layer) => layer.src);
 
     expect(sources).toContain(
-      "/assets/space-typing/backgrounds/vendor/kenney-remastered/bg-dark-purple.png",
+      "/assets/space-typing/backgrounds/vendor/screaming-brain/nebula-purple-3-1024.png",
     );
     expect(sources).toContain(
-      "/assets/space-typing/backgrounds/vendor/screaming-brain/nebula-purple-3-1024.png",
+      "/assets/space-typing/backgrounds/vendor/luminousdragon/stars-dense.png",
+    );
+    expect(sources).toContain(
+      "/assets/space-typing/backgrounds/vendor/luminousdragon/stars-sparse.png",
+    );
+    expect(sources).toContain(
+      "/assets/space-typing/backgrounds/vendor/luminousdragon/stars-planets.png",
+    );
+    expect(sources).toContain(
+      "/assets/space-typing/backgrounds/vendor/luminousdragon/asteroid-field.png",
     );
     expect(sources).toContain(
       "/assets/space-typing/backgrounds/vendor/screaming-brain/planet-ocean-03-512.png",
@@ -68,14 +77,17 @@ describe("Layered authored background registry", () => {
     expect(sources).toContain(
       "/assets/space-typing/backgrounds/vendor/screaming-brain/planet-blue-giant-04-512.png",
     );
+    expect(
+      sources.some((src) => src.includes("/vendor/kenney-remastered/")),
+    ).toBe(false);
 
-    const meteorLayers = galaxy.layers.filter((layer) =>
-      layer.src.includes("/vendor/kenney-remastered/meteor-"),
+    const starLayers = galaxy.layers.filter((layer) =>
+      layer.src.includes("/vendor/luminousdragon/stars-"),
     );
-    expect(meteorLayers.length).toBeGreaterThanOrEqual(2);
-    expect(meteorLayers.length).toBeLessThanOrEqual(3);
-    expect(meteorLayers.every((layer) => layer.scale <= 0.02)).toBe(true);
-    expect(meteorLayers.every((layer) => layer.depth <= 0.42)).toBe(true);
+    expect(starLayers.length).toBeGreaterThanOrEqual(3);
+    expect(starLayers.every((layer) => layer.blend === "screen")).toBe(
+      true,
+    );
 
     const productionAsteroids = galaxy.layers.filter((layer) =>
       layer.src.includes("/vendor/ohjirochan/asteroid-"),
@@ -93,40 +105,22 @@ describe("Layered authored background registry", () => {
       productionAsteroids.filter((layer) => layer.motion === "wrap"),
     ).toHaveLength(2);
 
-    expect(
-      sources.some((src) => src.includes("/backgrounds/galaxy/")),
-    ).toBe(false);
-    expect(
-      sources.some((src) => src.includes("/vendor/wisedawn/")),
-    ).toBe(false);
-    expect(
-      sources.some((src) => src.includes("/vendor/sparklinlabs/black-hole")),
-    ).toBe(false);
-    expect(
-      sources.some((src) => src.includes("/vendor/rawdanitsu/")),
-    ).toBe(false);
+    const asteroidField = galaxy.layers.find(
+      (layer) => layer.id === "galaxy-authored-asteroid-field",
+    );
+    expect(asteroidField?.motion).toBe("wrap");
+    expect(asteroidField?.optional).toBe(true);
   });
 
-  it("keeps placeholder rocks distant while preserving Galaxy depth and flybys", () => {
+  it("preserves multi-depth nebula volume and rare authored ship flybys", () => {
     const galaxy = layeredBackgroundForScene(
       sceneProfileForWorld("world-01"),
     );
 
     const nebulaLayers = galaxy.layers.filter((layer) =>
-      layer.id.includes("nebula"),
+      layer.id.includes("nebula") || layer.id === "galaxy-sky",
     );
-    expect(nebulaLayers.length).toBeGreaterThanOrEqual(2);
-
-    const legacyRockLayers = galaxy.layers.filter((layer) =>
-      layer.src.includes("/vendor/kenney-remastered/meteor-"),
-    );
-    expect(legacyRockLayers.length).toBeGreaterThanOrEqual(2);
-    expect(legacyRockLayers.every((layer) => layer.scale <= 0.02)).toBe(
-      true,
-    );
-    expect(
-      legacyRockLayers.every((layer) => layer.motion !== "approach"),
-    ).toBe(true);
+    expect(nebulaLayers.length).toBeGreaterThanOrEqual(3);
 
     const shipLayers = galaxy.layers.filter((layer) =>
       layer.src.startsWith("/assets/space-typing/ships/"),
