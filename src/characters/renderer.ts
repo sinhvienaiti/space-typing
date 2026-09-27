@@ -404,7 +404,33 @@ function drawFlightTail(
   context.lineWidth = Math.max(2.1, trail.width * 0.92);
   drawTrailCurve(context, time, length * 0.94, 0, 0.4);
 
-  if (trail.kind === "twin-star" || trail.kind === "aurora") {
+  if (trail.kind === "comet") {
+    context.strokeStyle = trail.secondary;
+    context.lineWidth = Math.max(1.5, trail.width * 0.42);
+    context.globalAlpha = 0.72;
+    for (const side of [-1, 1]) {
+      context.beginPath();
+      context.moveTo(side * 2.2, 17);
+      context.quadraticCurveTo(
+        side * (7 + Math.sin(time * 5) * 2),
+        17 + length * 0.42,
+        side * 11,
+        17 + length * 0.88,
+      );
+      context.stroke();
+    }
+    context.fillStyle = trail.secondary;
+    for (let index = 0; index < trail.detailCount; index += 1) {
+      const ratio = (index + 1) / (trail.detailCount + 1);
+      const x =
+        Math.sin(time * 8 + index * 2.4) * (4 + ratio * 8);
+      const y = 19 + length * ratio * 0.82;
+      context.globalAlpha = 0.74 - ratio * 0.32;
+      context.beginPath();
+      context.arc(x, y, 1.3 + (index % 2) * 0.55, 0, Math.PI * 2);
+      context.fill();
+    }
+  } else if (trail.kind === "twin-star" || trail.kind === "aurora") {
     const offsets = trail.kind === "aurora" ? [-4, 0, 4] : [-3.5, 3.5];
     const colors = [trail.primary, trail.secondary, trail.accent];
     for (let index = 0; index < offsets.length; index += 1) {
