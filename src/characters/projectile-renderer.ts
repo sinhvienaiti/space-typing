@@ -1332,8 +1332,7 @@ export function drawPlayerMuzzleFlash(
   context.fillStyle = profile.secondary;
   if (
     profile.styleId === "halo-burst" ||
-    profile.styleId === "tidal-pearl" ||
-    profile.styleId === "nova-pearl"
+    profile.styleId === "tidal-pearl"
   ) {
     context.strokeStyle = profile.primary;
     context.lineWidth = 1.5;
