@@ -7359,7 +7359,14 @@ export class Game {
       targetX,
       targetY,
       age: 0,
-      duration: clamp(distance / profile.presentationSpeed, 0.085, 0.31),
+      // Visual travel is deliberately slower than gameplay damage. The hit
+      // already resolved before this shot is created; this duration only keeps
+      // the energy projectile readable on a wide desktop canvas.
+      duration: clamp(
+        distance / Math.max(1, profile.presentationSpeed * 0.68),
+        0.16,
+        0.46,
+      ),
       power,
       outcome,
     };
