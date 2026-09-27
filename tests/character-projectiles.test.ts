@@ -13,6 +13,8 @@ import {
 import {
   characterFlightTrailProfile,
   playerProjectileProfile,
+  PROJECTILE_TRAIL_PROFILES,
+  projectileTrailProfile,
   RESERVED_PLAYER_PROJECTILE_STYLES,
 } from "../src/characters/projectiles";
 
@@ -74,6 +76,34 @@ describe("character projectile profiles", () => {
     }
   });
 
+  it("defines a real strong taper for all 12 approved projectile styles", () => {
+    const entries = Object.entries(PROJECTILE_TRAIL_PROFILES);
+    expect(entries).toHaveLength(12);
+
+    for (const [styleId, trail] of entries) {
+      expect(trail.headScale, styleId).toBeGreaterThanOrEqual(1);
+      expect(trail.lengthScale, styleId).toBeGreaterThanOrEqual(1);
+      expect(trail.frontWidthRatio, styleId).toBeGreaterThanOrEqual(0.55);
+      expect(trail.frontWidthRatio, styleId).toBeLessThanOrEqual(0.7);
+      expect(trail.midWidthRatio, styleId).toBeGreaterThanOrEqual(0.25);
+      expect(trail.midWidthRatio, styleId).toBeLessThanOrEqual(0.4);
+      expect(trail.endWidthRatio, styleId).toBeGreaterThanOrEqual(0.08);
+      expect(trail.endWidthRatio, styleId).toBeLessThanOrEqual(0.18);
+      expect(trail.frontWidthRatio, styleId).toBeGreaterThan(
+        trail.midWidthRatio,
+      );
+      expect(trail.midWidthRatio, styleId).toBeGreaterThan(
+        trail.endWidthRatio,
+      );
+      expect(trail.outerAlpha, styleId).toBeGreaterThan(0);
+      expect(trail.coreAlpha, styleId).toBeGreaterThan(trail.outerAlpha);
+      expect(trail.coreWidthRatio, styleId).toBeGreaterThan(0.2);
+      expect(trail.ribbonCount, styleId).toBeGreaterThanOrEqual(1);
+      expect(trail.ribbonCount, styleId).toBeLessThanOrEqual(3);
+      expect(trail.sideStreakCount, styleId).toBeGreaterThanOrEqual(2);
+    }
+  });
+
   it("maps every playable ship to one unique approved projectile and flight trail", () => {
     const projectileIds = CHARACTER_IDS.map(
       (id) => playerProjectileProfile(id).styleId,
@@ -91,7 +121,11 @@ describe("character projectile profiles", () => {
       const trail = characterFlightTrailProfile(id);
       expect(projectile.presentationSpeed).toBeGreaterThan(1000);
       expect(projectile.bodyRadius).toBeGreaterThanOrEqual(3.8);
-      expect(projectile.trailLength).toBeGreaterThanOrEqual(70);
+      expect(projectile.trailLength).toBeGreaterThanOrEqual(130);
+      expect(projectile.trail).toBe(projectileTrailProfile(projectile.styleId));
+      expect(projectile.trail.frontWidthRatio).toBeGreaterThan(
+        projectile.trail.endWidthRatio,
+      );
       expect(projectile.particleCount).toBeGreaterThan(0);
       expect(projectile.muzzleRadius).toBeGreaterThan(0);
       expect(trail.length).toBeGreaterThan(50);
