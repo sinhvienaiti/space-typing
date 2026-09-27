@@ -1051,3 +1051,69 @@ World 02 remains NOT ACCEPTED until a new 10-15 second owner capture shows all:
 7. enemy/projectile readability is materially better than the rejected video.
 
 The 2/10 capture is the new rejected baseline for this phase.
+
+
+### W02-14 — Scene-layer rebuild implementation checkpoint
+
+Implemented directly after W02-13.
+
+Scene motion:
+
+- added three explicit moving sky-current bands at different heights,
+  directions and speeds;
+- sky currents use source-over blue/white cloud bodies with darker undersides
+  so motion remains visible against the bright 2K painting instead of
+  disappearing through white-on-white screen blending;
+- removed the previous World 02 cloud-island and halo-gate image overlays from
+  the authored stack because they added washed light and low-value duplicate
+  scenery;
+- World 02 authored image stack is now the 2K master plus two low-opacity moving
+  aurora depth layers; visible cloud motion is owned by the runtime ambient
+  scene rather than static support art;
+- retained clipped waterfall flow, spray, star drift, rotating nebula structure
+  and deterministic shooting-star scheduling;
+- added sparse forward-flight particles that expand from a vanishing area toward
+  the lower side edges, creating depth without a hyperspace-line wall.
+
+Readability:
+
+- reduced halo glow and light-ray alpha from the rejected build;
+- added a final World-02-only cool readability grade before gameplay objects;
+- added additional right-side suppression over the gold/white gate region;
+- added a calmer center-lane grade;
+- existing World-02-only enemy/projectile contrast helpers remain above the
+  background grade.
+
+Ship motion:
+
+- exported a deterministic `characterFlightPose()` helper;
+- increased vertical bob to a clearly visible bounded movement;
+- added lateral drift and visible banking sway;
+- added an animated soft exhaust tail;
+- V3 illustrated ships now keep their sharp low-bloom hull but receive reduced
+  live runtime thrusters instead of relying only on painted engine light;
+- procedural/V2 ships keep stronger live thrust.
+
+Isolation / maintenance:
+
+- World 02 no longer depends on `cloud-islands.svg` or `halo-gate.svg` for
+  scene identity;
+- World 01/03+ background motion configuration is unchanged;
+- the new ship flight pose is a shared player-motion improvement and does not
+  alter combat physics or hitboxes;
+- no per-enemy gradient allocation was added;
+- the 2560x1440 AVIF master remains the production base.
+
+Automated verification:
+
+- World 02 ambient tests lock sky-current, flight-flow and readability-grade
+  ownership;
+- layered-background tests lock the simplified three-layer production stack;
+- character visual tests require the flight pose to materially change and V3
+  art to retain live thrust;
+- CI #1043 PASS on the corrective branch;
+- test PASS: 156 files / 808 tests;
+- build/type-check PASS.
+
+Status: code/CI complete. Owner browser/video acceptance is still required; the
+2/10 video remains the rejected baseline.
