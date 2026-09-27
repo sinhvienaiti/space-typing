@@ -1,8 +1,10 @@
 import type { CharacterId } from "./registry";
 import {
   playerProjectileProfile,
+  projectileHeadGlowProfile,
   projectileTrailProfile,
   type PlayerProjectileStyleId,
+  type ProjectileHeadGlowProfile,
   type ProjectileTrailProfile,
 } from "./projectiles";
 import { drawPlayerProjectileArt } from "./projectile-art";
@@ -288,6 +290,193 @@ function drawCrossFlare(
     );
     context.stroke();
   }
+  context.restore();
+}
+
+function drawProjectileHeadGlow(
+  context: CanvasRenderingContext2D,
+  styleId: PlayerProjectileStyleId,
+  radius: number,
+  primary: string,
+  secondary: string,
+  accent: string,
+  glowScale: number,
+  detailScale: number,
+  time: number,
+  id: number,
+): void {
+  const profile: Readonly<ProjectileHeadGlowProfile> =
+    projectileHeadGlowProfile(styleId);
+  const pulse = 0.96 + Math.sin(time * 8.2 + id * 1.37) * 0.04;
+  const frontX = radius * profile.frontOffset;
+  const hotX = frontX + radius * 0.14;
+  const bloomRadius = radius * profile.bloomScale * pulse;
+
+  context.save();
+  context.globalCompositeOperation = "lighter";
+
+  // Blend the generated body into the first part of the wake. The ellipse is
+  // deliberately rear-biased so brightness falls away from the nose instead
+  // of becoming a uniform beam.
+  context.globalAlpha = profile.bloomAlpha * 0.28;
+  context.fillStyle = primary;
+  context.shadowColor = primary;
+  context.shadowBlur = 18 * profile.bloomSoftness * glowScale;
+  context.beginPath();
+  context.ellipse(
+    frontX - radius * profile.trailBlendLength * 0.72,
+    0,
+    radius * profile.trailBlendLength,
+    radius * profile.bloomScale * 0.34,
+    0,
+    0,
+    Math.PI * 2,
+  );
+  context.fill();
+
+  // Wide soft bloom around the projectile head.
+  context.globalAlpha = profile.bloomAlpha * 0.42;
+  context.fillStyle = primary;
+  context.shadowColor = primary;
+  context.shadowBlur = 30 * profile.bloomSoftness * glowScale;
+  context.beginPath();
+  context.ellipse(
+    frontX,
+    0,
+    bloomRadius * 1.12,
+    bloomRadius * 0.72,
+    0,
+    0,
+    Math.PI * 2,
+  );
+  context.fill();
+
+  // Secondary coloured halo gives fantasy shots depth without washing out the
+  // authoritative atlas art.
+  context.globalAlpha = profile.bloomAlpha * 0.24;
+  context.fillStyle = accent;
+  context.shadowColor = accent;
+  context.shadowBlur = 20 * profile.bloomSoftness * glowScale;
+  context.beginPath();
+  context.ellipse(
+    frontX - radius * 0.12,
+    0,
+    bloomRadius * 0.76,
+    bloomRadius * 0.5,
+    0,
+    0,
+    Math.PI * 2,
+  );
+  context.fill();
+
+  // Broad forward flare: low-alpha outer cone, then a shorter hot inner cone.
+  context.shadowColor = secondary;
+  context.shadowBlur = 15 * glowScale;
+  context.fillStyle = secondary;
+  context.globalAlpha = profile.forwardFlareAlpha * 0.24;
+  context.beginPath();
+  context.moveTo(frontX - radius * 0.16, -radius * profile.forwardFlareWidth);
+  context.lineTo(
+    frontX + radius * profile.forwardFlareLength,
+    0,
+  );
+  context.lineTo(frontX - radius * 0.16, radius * profile.forwardFlareWidth);
+  context.closePath();
+  context.fill();
+
+  context.globalAlpha = profile.forwardFlareAlpha * 0.58;
+  context.beginPath();
+  context.moveTo(
+    frontX,
+    -radius * profile.forwardFlareWidth * 0.28,
+  );
+  context.lineTo(
+    frontX + radius * profile.forwardFlareLength * 0.72,
+    0,
+  );
+  context.lineTo(
+    frontX,
+    radius * profile.forwardFlareWidth * 0.28,
+  );
+  context.closePath();
+  context.fill();
+
+  // Tiny white-hot core at the nose. This should always be the brightest point
+  // of the projectile and is what creates the "dazzling then fading" read.
+  context.globalAlpha = profile.hotCoreAlpha;
+  context.fillStyle = "#ffffff";
+  context.shadowColor = secondary;
+  context.shadowBlur = 12 * glowScale;
+  context.beginPath();
+  context.ellipse(
+    hotX,
+    0,
+    radius * profile.hotCoreScale * 1.65,
+    radius * profile.hotCoreScale * 0.92,
+    0,
+    0,
+    Math.PI * 2,
+  );
+  context.fill();
+
+  context.globalAlpha = profile.hotCoreAlpha * 0.88;
+  context.fillStyle = secondary;
+  context.beginPath();
+  context.ellipse(
+    hotX - radius * 0.12,
+    0,
+    radius * profile.hotCoreScale,
+    radius * profile.hotCoreScale * 0.56,
+    0,
+    0,
+    Math.PI * 2,
+  );
+  context.fill();
+
+  // Fine halo ring around the head; stronger on magical/holy/aurora styles.
+  context.globalAlpha = profile.frontHaloAlpha;
+  context.strokeStyle = secondary;
+  context.lineWidth = Math.max(1, radius * 0.08);
+  context.shadowColor = primary;
+  context.shadowBlur = 10 * glowScale;
+  context.beginPath();
+  context.ellipse(
+    frontX,
+    0,
+    radius * profile.frontHaloScale,
+    radius * profile.frontHaloScale * 0.62,
+    0,
+    0,
+    Math.PI * 2,
+  );
+  context.stroke();
+
+  if (detailScale >= 0.68) {
+    const sparkleCount = profile.sparkleCount;
+    context.fillStyle = secondary;
+    context.strokeStyle = secondary;
+    context.lineCap = "round";
+    for (let index = 0; index < sparkleCount; index += 1) {
+      const angle =
+        time * 1.7 +
+        id * 0.43 +
+        (Math.PI * 2 * index) / Math.max(1, sparkleCount);
+      const distance =
+        radius * profile.sparkleSpread * (0.62 + (index % 2) * 0.24);
+      const x = frontX - radius * 0.28 + Math.cos(angle) * distance;
+      const y = Math.sin(angle) * distance * 0.72;
+      const size = radius * (0.1 + (index % 2) * 0.035);
+      context.globalAlpha = 0.52 + (index % 2) * 0.14;
+      context.shadowBlur = 7 * glowScale;
+      context.beginPath();
+      context.moveTo(x - size * 1.8, y);
+      context.lineTo(x + size * 1.8, y);
+      context.moveTo(x, y - size * 1.8);
+      context.lineTo(x, y + size * 1.8);
+      context.stroke();
+    }
+  }
+
   context.restore();
 }
 
@@ -949,24 +1138,26 @@ function drawAuroraWake(
   context.save();
   context.globalCompositeOperation = "lighter";
   context.lineCap = "round";
-  for (let band = 0; band < 3; band += 1) {
-    const color = band === 0 ? primary : band === 1 ? accent : secondary;
-    const phase = band * 2.05;
+  for (let index = 0; index < 4; index += 1) {
+    const ratio = (index + 1) / 5;
+    const x = -length * (0.12 + ratio * 0.48);
+    const y =
+      Math.sin(time * 4.2 + id * 0.7 + index * 1.8) *
+      radius *
+      (0.45 + ratio * 0.55);
+    const color =
+      index % 3 === 0 ? primary : index % 3 === 1 ? accent : secondary;
+    const size = radius * (0.12 + (index % 2) * 0.035);
     context.strokeStyle = color;
     context.shadowColor = color;
-    context.shadowBlur = 14;
-    context.globalAlpha = 0.34;
-    context.lineWidth = Math.max(1.05, radius * 0.14);
+    context.shadowBlur = 7;
+    context.globalAlpha = 0.38 - ratio * 0.12;
+    context.lineWidth = Math.max(1, radius * 0.07);
     context.beginPath();
-    context.moveTo(0, (band - 1) * radius * 0.42);
-    context.bezierCurveTo(
-      -length * 0.28,
-      Math.sin(time * 3.8 + id + phase) * radius * 1.5,
-      -length * 0.68,
-      Math.cos(time * 3.2 + id + phase) * radius * 1.7,
-      -length,
-      Math.sin(time * 2.8 + id + phase) * radius * 0.75,
-    );
+    context.moveTo(x - size * 1.9, y);
+    context.lineTo(x + size * 1.9, y);
+    context.moveTo(x, y - size * 1.9);
+    context.lineTo(x, y + size * 1.9);
     context.stroke();
   }
   context.restore();
@@ -1579,6 +1770,18 @@ export function drawPlayerProjectile(
       shot.id,
     );
   }
+  drawProjectileHeadGlow(
+    context,
+    profile.styleId,
+    radius,
+    profile.primary,
+    profile.secondary,
+    profile.accent,
+    glowScale,
+    detailScale,
+    time,
+    shot.id,
+  );
   context.restore();
 }
 
