@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   advanceKillScorePopups,
   killScorePopupOpacity,
+  scorePopupSafeY,
+  SCORE_POPUP_FLOAT_DISTANCE,
+  SCORE_POPUP_PROTECTED_TOP_Y,
   type KillScorePopup,
 } from "../src/characters/projectile-renderer";
 import { CombatSfxCadenceLimiter } from "../src/audio/Sfx";
@@ -26,6 +29,20 @@ describe("combat feedback lifetimes", () => {
 
     advanceKillScorePopups(popups, 0.81);
     expect(popups).toHaveLength(0);
+  });
+
+  it("keeps score popup travel below the protected top learning zone", () => {
+    const safeY = scorePopupSafeY(40, 720);
+    expect(safeY).toBeGreaterThanOrEqual(
+      SCORE_POPUP_PROTECTED_TOP_Y + SCORE_POPUP_FLOAT_DISTANCE,
+    );
+    expect(safeY - SCORE_POPUP_FLOAT_DISTANCE).toBeGreaterThanOrEqual(
+      SCORE_POPUP_PROTECTED_TOP_Y,
+    );
+
+    const bottomClamped = scorePopupSafeY(900, 720);
+    expect(bottomClamped).toBeLessThan(720);
+    expect(bottomClamped).toBeGreaterThanOrEqual(safeY);
   });
 
   it("keeps an audible sampled player-fire voice in the shared audio bank", () => {
