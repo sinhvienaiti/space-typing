@@ -954,3 +954,100 @@ Verification:
 Status: implementation complete, browser/video owner acceptance still required.
 The previous 31.9-second capture remains the rejected baseline and must not be
 used as evidence that this corrective batch is accepted.
+
+
+### W02-13 — Scene-layer rebuild after 2/10 owner review
+
+Owner score after the 39.9-second Windows/WSL browser capture: 2/10.
+
+The prior corrective pass is rejected. The capture confirms that the World 02
+result still reads as one static painting, the sky does not feel alive, the
+bright celestial lighting reduces enemy/word/projectile contrast, and the ship
+still reads as parked rather than flying.
+
+This checkpoint changes the implementation strategy instead of increasing the
+same overlays again.
+
+#### W02-13A — Background becomes a real motion scene
+
+Keep the 2560x1440 AVIF only as the sharp static master. Do not claim that baked
+clouds, baked waterfalls, baked stars, or baked islands are animated.
+
+Add independent runtime motion layers that are visually detectable in normal
+gameplay:
+
+- upper-sky cloud currents with source-over blue/white body and darker underside;
+- mid cloud band moving at a different velocity;
+- lower foreground haze/cloud band crossing the camera faster;
+- star field with depth-scaled pixel/second travel;
+- moving/rotating nebula structure;
+- deterministic shooting-star events;
+- clipped waterfall flow with visible dark channels + bright streaks + spray;
+- halo/gate motion that stays subordinate to gameplay.
+
+Acceptance: comparing frames 5 seconds apart must show visible displacement in
+at least two cloud bands, star positions, and waterfall flow state.
+
+#### W02-13B — Gameplay readability grade
+
+The background must lose to gameplay in the visual hierarchy.
+
+Add a World-02-only scene grade after background FX and before enemies:
+
+- cool/navy center-lane veil;
+- stronger right-side suppression over the gold halo/gate;
+- no additive full-screen wash;
+- lower halo/ray alpha than the rejected build.
+
+Enemy bodies, enemy words, CORE/layer metadata and hostile projectiles remain
+above this grade and must stay readable over the brightest region.
+
+#### W02-13C — Ship flight language
+
+The player ship must no longer look parked.
+
+Update the ship renderer with:
+
+- larger but bounded vertical bob;
+- visible banking sway;
+- small lateral drift;
+- animated engine exhaust even for V3 illustrated ships, at reduced strength;
+- a longer soft exhaust tail / pulse;
+- keep hull art sharp and do not reintroduce V2-level bloom.
+
+Add a deterministic helper for the flight pose and test that the pose materially
+changes over a short gameplay interval.
+
+#### W02-13D — Foreground forward-motion cue
+
+Add a World-02-only foreground flow pass near the lower half/edges:
+
+- sparse soft cloud wisps / motes moving toward the player;
+- avoid the enemy word corridor and center typing target area;
+- bounded count by visual quality;
+- this is a flight-depth cue, not a hyperspace speed-line wall.
+
+#### W02-13E — Quality and isolation review
+
+Self-review requirements before browser handoff:
+
+- do not add new per-enemy gradient allocations in hot loops;
+- do not change World 01/03+ scene motion;
+- do not globally recolor enemy families;
+- background FX always render before gameplay objects;
+- V3 ship art keeps low bloom while gaining actual animated thrust;
+- CI/test/build must pass.
+
+#### W02-13F — Final browser gate
+
+World 02 remains NOT ACCEPTED until a new 10-15 second owner capture shows all:
+
+1. clouds clearly change position;
+2. waterfalls visibly flow;
+3. sky/stars/nebula are alive;
+4. at least one shooting star is observable;
+5. halo/gate does not wash out words/enemies;
+6. ship visibly bobs/banks/thrusts and reads as flying;
+7. enemy/projectile readability is materially better than the rejected video.
+
+The 2/10 capture is the new rejected baseline for this phase.
