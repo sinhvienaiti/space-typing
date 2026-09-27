@@ -59,6 +59,91 @@ const BACKGROUND_TREATMENTS: Readonly<
     shadowColor: "rgba(137, 111, 255, 0.38)",
     shadowBlur: 24,
   },
+  "infernal-atmosphere": {
+    filter: "sepia(0.68) saturate(2.25) hue-rotate(315deg) brightness(0.62) contrast(1.06)",
+    shadowColor: "rgba(0, 0, 0, 0)",
+    shadowBlur: 0,
+  },
+  "infernal-rock": {
+    filter: "sepia(0.7) saturate(2.1) hue-rotate(322deg) brightness(0.72) contrast(1.16)",
+    shadowColor: "rgba(255, 86, 38, 0.42)",
+    shadowBlur: 18,
+  },
+  "frost-atmosphere": {
+    filter: "saturate(1.18) hue-rotate(168deg) brightness(0.84) contrast(1.02)",
+    shadowColor: "rgba(0, 0, 0, 0)",
+    shadowBlur: 0,
+  },
+  "frost-rock": {
+    filter: "sepia(0.12) saturate(1.5) hue-rotate(152deg) brightness(1.06) contrast(0.9)",
+    shadowColor: "rgba(155, 232, 255, 0.48)",
+    shadowBlur: 18,
+  },
+  "verdant-atmosphere": {
+    filter: "sepia(0.25) saturate(1.42) hue-rotate(58deg) brightness(0.72) contrast(1.02)",
+    shadowColor: "rgba(0, 0, 0, 0)",
+    shadowBlur: 0,
+  },
+  "verdant-rock": {
+    filter: "sepia(0.32) saturate(1.28) hue-rotate(52deg) brightness(0.72) contrast(1.02)",
+    shadowColor: "rgba(116, 236, 154, 0.26)",
+    shadowBlur: 12,
+  },
+  "shadow-atmosphere": {
+    filter: "saturate(0.82) hue-rotate(220deg) brightness(0.5) contrast(1.15)",
+    shadowColor: "rgba(0, 0, 0, 0)",
+    shadowBlur: 0,
+  },
+  "shadow-rock": {
+    filter: "sepia(0.22) saturate(1.32) hue-rotate(218deg) brightness(0.56) contrast(1.18)",
+    shadowColor: "rgba(166, 101, 255, 0.28)",
+    shadowBlur: 16,
+  },
+  "forge-atmosphere": {
+    filter: "sepia(0.22) saturate(1.2) hue-rotate(185deg) brightness(0.66) contrast(1.12)",
+    shadowColor: "rgba(0, 0, 0, 0)",
+    shadowBlur: 0,
+  },
+  "forge-rock": {
+    filter: "sepia(0.34) saturate(1.1) hue-rotate(176deg) brightness(0.76) contrast(1.22)",
+    shadowColor: "rgba(104, 178, 255, 0.3)",
+    shadowBlur: 15,
+  },
+  "abyss-atmosphere": {
+    filter: "saturate(1.35) hue-rotate(242deg) brightness(0.44) contrast(1.2)",
+    shadowColor: "rgba(0, 0, 0, 0)",
+    shadowBlur: 0,
+  },
+  "void-rock": {
+    filter: "sepia(0.28) saturate(1.7) hue-rotate(225deg) brightness(0.5) contrast(1.25)",
+    shadowColor: "rgba(214, 90, 255, 0.34)",
+    shadowBlur: 18,
+  },
+  "meteor-atmosphere": {
+    filter: "saturate(1.22) hue-rotate(154deg) brightness(0.7) contrast(1.08)",
+    shadowColor: "rgba(0, 0, 0, 0)",
+    shadowBlur: 0,
+  },
+  "cathedral-atmosphere": {
+    filter: "saturate(0.72) hue-rotate(192deg) brightness(0.58) contrast(1.12)",
+    shadowColor: "rgba(0, 0, 0, 0)",
+    shadowBlur: 0,
+  },
+  "cathedral-rock": {
+    filter: "sepia(0.16) saturate(0.72) hue-rotate(180deg) brightness(0.7) contrast(1.12)",
+    shadowColor: "rgba(194, 213, 255, 0.25)",
+    shadowBlur: 12,
+  },
+  "eternity-atmosphere": {
+    filter: "saturate(1.45) hue-rotate(205deg) brightness(0.72) contrast(1.05)",
+    shadowColor: "rgba(0, 0, 0, 0)",
+    shadowBlur: 0,
+  },
+  "prism-rock": {
+    filter: "sepia(0.18) saturate(2.05) hue-rotate(185deg) brightness(0.92) contrast(0.98)",
+    shadowColor: "rgba(225, 126, 255, 0.42)",
+    shadowBlur: 20,
+  },
 };
 
 export function backgroundTreatmentStyle(
