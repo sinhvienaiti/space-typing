@@ -188,7 +188,7 @@ export function difficultyFor(
     maxEnemies,
     projectilePressure,
     normalEnemyProjectilesDefault:
-      normalEnemyProjectilesDefaultForDefinition(definition),
+      normalEnemyProjectilesDefaultForDefinition(definition) ? 1 : 0,
     projectileSpeedScale: bulletSpeedSetting * (1 - earlyPractice * 0.18),
     bossPressure,
     targetWpm: targetWpm(input),
