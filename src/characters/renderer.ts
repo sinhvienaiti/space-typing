@@ -1,4 +1,8 @@
-import type { CharacterId } from "./registry";\nimport {\n  characterFlightTrailProfile,\n  type FlightTrailProfile,\n} from "./projectiles";
+import type { CharacterId } from "./registry";
+import {
+  characterFlightTrailProfile,
+  type FlightTrailProfile,
+} from "./projectiles";
 import {
   characterVisualProfile,
   type CharacterSilhouette,
@@ -281,7 +285,37 @@ function hullPath(
   context.closePath();
 }
 
-export const MAX_CHARACTER_AIM_RADIANS = Math.PI / 12;\n\nexport function characterAimTargetAngle(\n  playerX: number,\n  playerY: number,\n  targetX: number,\n  targetY: number,\n): number {\n  const forward = Math.max(28, playerY - targetY);\n  const raw = Math.atan2(targetX - playerX, forward);\n  return Math.max(\n    -MAX_CHARACTER_AIM_RADIANS,\n    Math.min(MAX_CHARACTER_AIM_RADIANS, raw),\n  );\n}\n\nexport function smoothCharacterAim(\n  current: number,\n  target: number,\n  dt: number,\n): number {\n  if (!Number.isFinite(dt) || dt <= 0) return current;\n  const factor = 1 - Math.exp(-Math.min(0.2, dt) * 9.5);\n  const next = current + (target - current) * factor;\n  return Math.max(\n    -MAX_CHARACTER_AIM_RADIANS,\n    Math.min(MAX_CHARACTER_AIM_RADIANS, next),\n  );\n}\n\nexport function characterFlightPose(time: number): {
+export const MAX_CHARACTER_AIM_RADIANS = Math.PI / 12;
+
+export function characterAimTargetAngle(
+  playerX: number,
+  playerY: number,
+  targetX: number,
+  targetY: number,
+): number {
+  const forward = Math.max(28, playerY - targetY);
+  const raw = Math.atan2(targetX - playerX, forward);
+  return Math.max(
+    -MAX_CHARACTER_AIM_RADIANS,
+    Math.min(MAX_CHARACTER_AIM_RADIANS, raw),
+  );
+}
+
+export function smoothCharacterAim(
+  current: number,
+  target: number,
+  dt: number,
+): number {
+  if (!Number.isFinite(dt) || dt <= 0) return current;
+  const factor = 1 - Math.exp(-Math.min(0.2, dt) * 9.5);
+  const next = current + (target - current) * factor;
+  return Math.max(
+    -MAX_CHARACTER_AIM_RADIANS,
+    Math.min(MAX_CHARACTER_AIM_RADIANS, next),
+  );
+}
+
+export function characterFlightPose(time: number): {
   bob: number;
   banking: number;
   driftX: number;
@@ -303,7 +337,182 @@ export const MAX_CHARACTER_AIM_RADIANS = Math.PI / 12;\n\nexport function charac
   };
 }
 
-function trailGradient(\n  context: CanvasRenderingContext2D,\n  trail: Readonly<FlightTrailProfile>,\n  length: number,\n): CanvasGradient {\n  const gradient = context.createLinearGradient(0, 16, 0, 16 + length);\n  gradient.addColorStop(0, trail.secondary);\n  gradient.addColorStop(0.22, trail.primary);\n  gradient.addColorStop(0.65, trail.accent);\n  gradient.addColorStop(1, "rgba(255,255,255,0)");\n  return gradient;\n}\n\nfunction drawTrailCurve(\n  context: CanvasRenderingContext2D,\n  time: number,\n  length: number,\n  startX: number,\n  phase: number,\n): void {\n  context.beginPath();\n  context.moveTo(startX, 16);\n  context.quadraticCurveTo(\n    startX + Math.sin(time * 2.8 + phase) * 7,\n    16 + length * 0.48,\n    startX + Math.sin(time * 2 + phase + 1.1) * 11,\n    16 + length,\n  );\n  context.stroke();\n}\n\nfunction drawFlightTail(\n  context: CanvasRenderingContext2D,\n  characterId: CharacterId,\n  profile: Readonly<CharacterVisualProfile>,\n  time: number,\n  glowScale: number,\n  strength: number,\n): void {\n  const trail = characterFlightTrailProfile(characterId);\n  const pulse = 0.92 + Math.sin(time * 7.2) * 0.06;\n  const length = trail.length * (0.88 + strength * 0.24) * pulse;\n  const gradient = trailGradient(context, trail, length);\n\n  context.save();\n  context.globalCompositeOperation = "lighter";\n  context.lineCap = "round";\n  context.shadowColor = trail.primary;\n  context.shadowBlur = 16 * glowScale;\n  context.globalAlpha *= 0.18 + strength * 0.16;\n  context.strokeStyle = gradient;\n  context.lineWidth = trail.width * 2.4;\n  drawTrailCurve(context, time, length, 0, 0.4);\n\n  context.globalAlpha *= 1.8;\n  context.shadowBlur = 9 * glowScale;\n  context.lineWidth = Math.max(1.4, trail.width * 0.72);\n  drawTrailCurve(context, time, length * 0.94, 0, 0.4);\n\n  if (trail.kind === "twin-star" || trail.kind === "aurora") {\n    const offsets = trail.kind === "aurora" ? [-4, 0, 4] : [-3.5, 3.5];\n    const colors = [trail.primary, trail.secondary, trail.accent];\n    for (let index = 0; index < offsets.length; index += 1) {\n      context.strokeStyle = colors[index % colors.length]!;\n      context.globalAlpha = (0.28 + strength * 0.2) * (index === 1 ? 0.9 : 1);\n      context.lineWidth = Math.max(1.2, trail.width * 0.38);\n      drawTrailCurve(\n        context,\n        time * (1 + index * 0.04),\n        length * (0.86 + index * 0.04),\n        offsets[index]!,\n        index * 2.1,\n      );\n    }\n  } else if (trail.kind === "thunder") {\n    context.strokeStyle = trail.secondary;\n    context.lineWidth = 1.5;\n    context.globalAlpha = 0.68;\n    context.beginPath();\n    context.moveTo(0, 17);\n    for (let index = 1; index <= trail.detailCount; index += 1) {\n      const ratio = index / trail.detailCount;\n      context.lineTo(\n        Math.sin(time * 15 + index * 2.4) * (3 + ratio * 7),\n        17 + length * ratio,\n      );\n    }\n    context.stroke();\n  } else if (trail.kind === "halo") {\n    context.strokeStyle = trail.secondary;\n    context.lineWidth = 1.4;\n    for (let index = 0; index < trail.detailCount; index += 1) {\n      const y = 28 + index * (length / (trail.detailCount + 1));\n      const size = 5 + index * 1.7;\n      context.globalAlpha = 0.48 - index * 0.07;\n      context.beginPath();\n      context.ellipse(\n        Math.sin(time * 2.2 + index) * 2,\n        y,\n        size,\n        Math.max(1.4, size * 0.32),\n        0,\n        0,\n        Math.PI * 2,\n      );\n      context.stroke();\n    }\n  } else if (trail.kind === "tidal") {\n    context.strokeStyle = trail.secondary;\n    context.lineWidth = 1.1;\n    for (let index = 0; index < trail.detailCount; index += 1) {\n      const ratio = (index + 1) / (trail.detailCount + 1);\n      const radius = 1.8 + index * 0.7;\n      context.globalAlpha = 0.5 - ratio * 0.18;\n      context.beginPath();\n      context.ellipse(\n        Math.sin(time * 3.2 + index * 1.7) * (5 + ratio * 4),\n        18 + length * ratio,\n        radius,\n        radius,\n        0,\n        0,\n        Math.PI * 2,\n      );\n      context.stroke();\n    }\n  } else if (trail.kind === "blossom" || trail.kind === "prism") {\n    context.fillStyle = trail.kind === "blossom" ? trail.secondary : trail.accent;\n    for (let index = 0; index < trail.detailCount; index += 1) {\n      const ratio = (index + 1) / (trail.detailCount + 1);\n      const x = Math.sin(time * 3.6 + index * 2.2) * (4 + ratio * 8);\n      const y = 18 + length * ratio;\n      context.globalAlpha = 0.42 - ratio * 0.16;\n      context.beginPath();\n      if (trail.kind === "blossom") {\n        context.ellipse(x, y, 2.8, 1.3, time + index, 0, Math.PI * 2);\n      } else {\n        context.moveTo(x, y - 3);\n        context.lineTo(x + 2.2, y);\n        context.lineTo(x, y + 3);\n        context.lineTo(x - 2.2, y);\n        context.closePath();\n      }\n      context.fill();\n    }\n  } else if (trail.kind === "solar") {\n    context.strokeStyle = trail.secondary;\n    context.lineWidth = 1.2;\n    context.globalAlpha = 0.48;\n    for (let index = 0; index < trail.detailCount; index += 1) {\n      const ratio = (index + 1) / (trail.detailCount + 1);\n      const x = Math.sin(time * 6 + index * 1.9) * (5 + ratio * 8);\n      const y = 18 + length * ratio;\n      context.beginPath();\n      context.moveTo(x - 2.5, y - 2);\n      context.lineTo(x + 2.5, y + 2);\n      context.stroke();\n    }\n  } else if (trail.kind === "crescent") {\n    context.strokeStyle = trail.secondary;\n    context.globalAlpha = 0.42;\n    context.lineWidth = Math.max(1.2, trail.width * 0.36);\n    drawTrailCurve(context, time * 0.96, length * 0.86, -4, 2.4);\n  } else if (trail.kind === "void") {\n    context.globalCompositeOperation = "source-over";\n    context.strokeStyle = "rgba(10, 0, 28, 0.48)";\n    context.globalAlpha = 0.7;\n    context.lineWidth = Math.max(1.4, trail.width * 0.44);\n    context.shadowBlur = 0;\n    drawTrailCurve(context, time, length * 0.78, 0, 0.9);\n  }\n\n  context.restore();\n}\n\nfunction drawEngine(
+function trailGradient(
+  context: CanvasRenderingContext2D,
+  trail: Readonly<FlightTrailProfile>,
+  length: number,
+): CanvasGradient {
+  const gradient = context.createLinearGradient(0, 16, 0, 16 + length);
+  gradient.addColorStop(0, trail.secondary);
+  gradient.addColorStop(0.22, trail.primary);
+  gradient.addColorStop(0.65, trail.accent);
+  gradient.addColorStop(1, "rgba(255,255,255,0)");
+  return gradient;
+}
+
+function drawTrailCurve(
+  context: CanvasRenderingContext2D,
+  time: number,
+  length: number,
+  startX: number,
+  phase: number,
+): void {
+  context.beginPath();
+  context.moveTo(startX, 16);
+  context.quadraticCurveTo(
+    startX + Math.sin(time * 2.8 + phase) * 7,
+    16 + length * 0.48,
+    startX + Math.sin(time * 2 + phase + 1.1) * 11,
+    16 + length,
+  );
+  context.stroke();
+}
+
+function drawFlightTail(
+  context: CanvasRenderingContext2D,
+  characterId: CharacterId,
+  profile: Readonly<CharacterVisualProfile>,
+  time: number,
+  glowScale: number,
+  strength: number,
+): void {
+  const trail = characterFlightTrailProfile(characterId);
+  const pulse = 0.92 + Math.sin(time * 7.2) * 0.06;
+  const length = trail.length * (0.88 + strength * 0.24) * pulse;
+  const gradient = trailGradient(context, trail, length);
+
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.lineCap = "round";
+  context.shadowColor = trail.primary;
+  context.shadowBlur = 16 * glowScale;
+  context.globalAlpha *= 0.18 + strength * 0.16;
+  context.strokeStyle = gradient;
+  context.lineWidth = trail.width * 2.4;
+  drawTrailCurve(context, time, length, 0, 0.4);
+
+  context.globalAlpha *= 1.8;
+  context.shadowBlur = 9 * glowScale;
+  context.lineWidth = Math.max(1.4, trail.width * 0.72);
+  drawTrailCurve(context, time, length * 0.94, 0, 0.4);
+
+  if (trail.kind === "twin-star" || trail.kind === "aurora") {
+    const offsets = trail.kind === "aurora" ? [-4, 0, 4] : [-3.5, 3.5];
+    const colors = [trail.primary, trail.secondary, trail.accent];
+    for (let index = 0; index < offsets.length; index += 1) {
+      context.strokeStyle = colors[index % colors.length]!;
+      context.globalAlpha = (0.28 + strength * 0.2) * (index === 1 ? 0.9 : 1);
+      context.lineWidth = Math.max(1.2, trail.width * 0.38);
+      drawTrailCurve(
+        context,
+        time * (1 + index * 0.04),
+        length * (0.86 + index * 0.04),
+        offsets[index]!,
+        index * 2.1,
+      );
+    }
+  } else if (trail.kind === "thunder") {
+    context.strokeStyle = trail.secondary;
+    context.lineWidth = 1.5;
+    context.globalAlpha = 0.68;
+    context.beginPath();
+    context.moveTo(0, 17);
+    for (let index = 1; index <= trail.detailCount; index += 1) {
+      const ratio = index / trail.detailCount;
+      context.lineTo(
+        Math.sin(time * 15 + index * 2.4) * (3 + ratio * 7),
+        17 + length * ratio,
+      );
+    }
+    context.stroke();
+  } else if (trail.kind === "halo") {
+    context.strokeStyle = trail.secondary;
+    context.lineWidth = 1.4;
+    for (let index = 0; index < trail.detailCount; index += 1) {
+      const y = 28 + index * (length / (trail.detailCount + 1));
+      const size = 5 + index * 1.7;
+      context.globalAlpha = 0.48 - index * 0.07;
+      context.beginPath();
+      context.ellipse(
+        Math.sin(time * 2.2 + index) * 2,
+        y,
+        size,
+        Math.max(1.4, size * 0.32),
+        0,
+        0,
+        Math.PI * 2,
+      );
+      context.stroke();
+    }
+  } else if (trail.kind === "tidal") {
+    context.strokeStyle = trail.secondary;
+    context.lineWidth = 1.1;
+    for (let index = 0; index < trail.detailCount; index += 1) {
+      const ratio = (index + 1) / (trail.detailCount + 1);
+      const radius = 1.8 + index * 0.7;
+      context.globalAlpha = 0.5 - ratio * 0.18;
+      context.beginPath();
+      context.ellipse(
+        Math.sin(time * 3.2 + index * 1.7) * (5 + ratio * 4),
+        18 + length * ratio,
+        radius,
+        radius,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      context.stroke();
+    }
+  } else if (trail.kind === "blossom" || trail.kind === "prism") {
+    context.fillStyle = trail.kind === "blossom" ? trail.secondary : trail.accent;
+    for (let index = 0; index < trail.detailCount; index += 1) {
+      const ratio = (index + 1) / (trail.detailCount + 1);
+      const x = Math.sin(time * 3.6 + index * 2.2) * (4 + ratio * 8);
+      const y = 18 + length * ratio;
+      context.globalAlpha = 0.42 - ratio * 0.16;
+      context.beginPath();
+      if (trail.kind === "blossom") {
+        context.ellipse(x, y, 2.8, 1.3, time + index, 0, Math.PI * 2);
+      } else {
+        context.moveTo(x, y - 3);
+        context.lineTo(x + 2.2, y);
+        context.lineTo(x, y + 3);
+        context.lineTo(x - 2.2, y);
+        context.closePath();
+      }
+      context.fill();
+    }
+  } else if (trail.kind === "solar") {
+    context.strokeStyle = trail.secondary;
+    context.lineWidth = 1.2;
+    context.globalAlpha = 0.48;
+    for (let index = 0; index < trail.detailCount; index += 1) {
+      const ratio = (index + 1) / (trail.detailCount + 1);
+      const x = Math.sin(time * 6 + index * 1.9) * (5 + ratio * 8);
+      const y = 18 + length * ratio;
+      context.beginPath();
+      context.moveTo(x - 2.5, y - 2);
+      context.lineTo(x + 2.5, y + 2);
+      context.stroke();
+    }
+  } else if (trail.kind === "crescent") {
+    context.strokeStyle = trail.secondary;
+    context.globalAlpha = 0.42;
+    context.lineWidth = Math.max(1.2, trail.width * 0.36);
+    drawTrailCurve(context, time * 0.96, length * 0.86, -4, 2.4);
+  } else if (trail.kind === "void") {
+    context.globalCompositeOperation = "source-over";
+    context.strokeStyle = "rgba(10, 0, 28, 0.48)";
+    context.globalAlpha = 0.7;
+    context.lineWidth = Math.max(1.4, trail.width * 0.44);
+    context.shadowBlur = 0;
+    drawTrailCurve(context, time, length * 0.78, 0, 0.9);
+  }
+
+  context.restore();
+}
+
+function drawEngine(
   context: CanvasRenderingContext2D,
   profile: Readonly<CharacterVisualProfile>,
   x: number,
@@ -381,6 +590,7 @@ export function drawCharacterShip(
       characterShipSource === "v3" ? 0.62 : 0.96;
     drawFlightTail(
       context,
+      characterId,
       profile,
       options.time,
       glowScale,
@@ -424,6 +634,7 @@ export function drawCharacterShip(
 
   drawFlightTail(
     context,
+    characterId,
     profile,
     options.time,
     glowScale,
