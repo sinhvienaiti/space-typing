@@ -42,7 +42,9 @@ export class Sfx {
   private volume = 0.5;
   private pronunciationActive = false;
   private destroyed = false;
-  private readonly timers = new Set<number>();\n  private readonly playerCombatCadence = new CombatSfxCadenceLimiter();\n  private playerCombatVariation = 0;
+  private readonly timers = new Set<number>();
+  private readonly playerCombatCadence = new CombatSfxCadenceLimiter();
+  private playerCombatVariation = 0;
 
   private readonly onPronunciation = (event: Event): void => {
     const detail = (event as CustomEvent<{ active?: unknown }>).detail;
