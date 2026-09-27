@@ -289,8 +289,8 @@ export function characterFlightPose(time: number): {
 } {
   return {
     bob:
-      Math.sin(time * 2.45) * 4.2 +
-      Math.sin(time * 0.78 + 0.6) * 1.5,
+      Math.sin(time * 1.8) * 5.2 +
+      Math.sin(time * 0.65 + 0.6) * 1.8,
     banking:
       Math.sin(time * 1.55) * 0.034 +
       Math.sin(time * 0.46 + 0.4) * 0.011,
