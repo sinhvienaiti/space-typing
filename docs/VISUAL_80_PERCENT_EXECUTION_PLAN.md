@@ -1501,3 +1501,98 @@ Implementation:
 - move +score popup below the killed enemy instead of above it, preventing
   collision with IPA/translation learning text while preserving its upward
   2-second float.
+
+
+### CMB-18 — Strong tapered projectile wake + score safe zone
+
+Status: IMPLEMENTED — CI/browser acceptance required.
+
+#### Root cause
+
+The generated projectile atlas was already loading and was already the authoritative
+body image, but the runtime motion layer still used constant-width Canvas
+`stroke()` paths for most wakes. Increasing line width or wake length therefore
+only produced a thicker/longer beam. It did not create the approved
+"large luminous head -> long comet/arrow body -> thin fading tail" silhouette.
+Several style-specific ribbon/arc paths also kept constant line width, so their
+color differed while their travel form still read too similarly.
+
+The score popup had been moved below the killed enemy, but its spawn position did
+not have a shared protected-top rule. An enemy killed high on the screen could
+still place the popup close to the IPA/Vietnamese learning echo.
+
+#### Tapered-trail solution
+
+- Keep the generated 3x4 projectile atlas as the normal authoritative
+  projectile body/head visual.
+- Keep procedural projectile bodies only as the deterministic fallback when the
+  atlas is unavailable.
+- Separate body art from motion:
+  - atlas image = body/head;
+  - runtime Canvas = tapered wake, front-weighted glow, secondary ribbons,
+    shards/petals/bubbles/lightning and impact/muzzle motion.
+- Replace the old uniform main wake with bounded filled tapered sections.
+  Rendering uses three overlapping geometric sections, back-to-front, instead of
+  one constant-width stroke or a newly allocated CanvasGradient every shot/frame.
+- Apply both geometry taper and alpha taper:
+  - front trail width: 55-70% of head width;
+  - mid trail width: 25-40%;
+  - far tail width: 8-18%;
+  - far section alpha is strongly reduced from the front section.
+- Keep a narrower bright inner core inside the softer outer wake.
+- Concentrate supporting glow at the projectile front/head instead of spreading
+  the strongest bloom evenly down the whole path.
+- Keep a bounded number of small secondary streaks/particles.
+- Trail profiles are data-driven for all 12 approved styles, including the
+  reserved Nova Pearl style. Every active ship references the taper profile for
+  its own projectile style.
+
+Per-style motion language remains distinct:
+
+1. Meteor Bolt — broad bright comet head, long blue taper, debris streaks.
+2. Crescent Slash — curved purple taper plus restrained crescent arc accents.
+3. Prism Dart — narrow crystal taper plus shard stream.
+4. Nova Pearl — soft pearl/halo taper plus orbit support.
+5. Twin Star Shot — two offset tapered ribbons with blue/gold identity.
+6. Halo Burst — rounded golden taper plus halo/rune support.
+7. Thunder Needle — narrowest taper plus smaller forked lightning branches.
+8. Blossom Comet — pink taper plus petal stream.
+9. Void Spike — tapered violet wake plus thin dark distortion/shards.
+10. Solar Lance — longest/broadest hot plasma taper plus embers.
+11. Tidal Pearl — paired flowing water tapers plus bubbles.
+12. Aurora Ribbon — three offset tapered ribbons plus sparkles.
+
+Runtime constraints:
+- no gameplay/damage timing changes;
+- no new per-frame image/resource loading;
+- no unbounded particle collection;
+- tapered sections are built directly into the existing Canvas path each frame
+  without allocating per-shot point arrays;
+- player projectiles remain below enemy/learning text layers.
+
+#### Score popup safe-zone rule
+
+The popup keeps its approximately 2 second lifetime, upward float, fade and dark
+outline. Its spawn Y is now clamped through one shared rule:
+
+- protected top/learning zone begins below the top HUD;
+- spawn must start at least one complete popup-float distance below that
+  protected boundary;
+- the full upward travel therefore cannot cross into the protected IPA/Vietnamese
+  zone;
+- bottom margin is also preserved.
+
+#### Regression coverage
+
+Automated coverage now verifies:
+- loaded generated atlas uses the image draw path;
+- deterministic atlas-missing fallback remains available;
+- all playable ships keep unique projectile styles;
+- all 12 approved styles have bounded taper profiles;
+- every active projectile profile references its taper profile;
+- front width > mid width > far-tail width;
+- active trail lengths remain large enough for a readable comet/arrow form;
+- score popup travel stays below the protected top zone;
+- runtime kill popup applies the same safe-zone clamp;
+- the existing normal-typing regression still proves successful player shots do
+  not repopulate the legacy long-Laser collection.
