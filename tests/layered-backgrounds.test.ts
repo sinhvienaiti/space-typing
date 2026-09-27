@@ -37,33 +37,76 @@ describe("Layered authored background registry", () => {
     }
   });
 
-  it("keeps the production migration boundary explicit", () => {
-    for (const worldId of [
-      "world-01",
-      "world-02",
-      "world-03",
-      "world-04",
-      "world-05",
-    ]) {
+  it("keeps every production World off the legacy-hybrid pipeline", () => {
+    for (const world of WORLD_REGISTRY) {
       expect(
-        layeredBackgroundForScene(sceneProfileForWorld(worldId)).renderMode,
+        layeredBackgroundForScene(sceneProfileForWorld(world)).renderMode,
+        world.id,
       ).toBe("authored-production");
     }
+  });
 
-    for (const worldId of [
-      "world-06",
-      "world-11",
-      "world-16",
-      "world-21",
-      "world-26",
-      "world-31",
-      "world-36",
-      "world-41",
-      "world-46",
-    ]) {
-      expect(
-        layeredBackgroundForScene(sceneProfileForWorld(worldId)).renderMode,
-      ).toBe("legacy-hybrid");
+  it("gives every World at least four authored depth bands", () => {
+    const band = (depth: number) =>
+      depth < 0.16 ? "far" : depth < 0.35 ? "mid-far" : depth < 0.72 ? "mid" : "near";
+
+    for (const world of WORLD_REGISTRY) {
+      const profile = layeredBackgroundForScene(
+        sceneProfileForWorld(world),
+      );
+      const bands = new Set(profile.layers.map((item) => band(item.depth)));
+      expect(bands.size, world.id + " depth hierarchy").toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it("varies composition across the five Worlds inside every generated family", () => {
+    for (let galaxy = 2; galaxy <= 10; galaxy += 1) {
+      const signatures = WORLD_REGISTRY
+        .filter((world) => world.galaxy === galaxy)
+        .map((world) => {
+          const profile = layeredBackgroundForScene(
+            sceneProfileForWorld(world),
+          );
+          return profile.layers
+            .map((item) =>
+              [
+                item.src,
+                item.depth.toFixed(3),
+                item.anchorX.toFixed(3),
+                item.anchorY.toFixed(3),
+                item.scale.toFixed(3),
+                item.treatment ?? "none",
+              ].join(":"),
+            )
+            .join("|");
+        });
+
+      expect(new Set(signatures).size, "galaxy " + galaxy).toBe(5);
+    }
+  });
+
+  it("uses detailed sourced asteroid depth bands for every Asteroid Field World", () => {
+    for (let worldNumber = 36; worldNumber <= 40; worldNumber += 1) {
+      const worldId = "world-" + String(worldNumber).padStart(2, "0");
+      const profile = layeredBackgroundForScene(
+        sceneProfileForWorld(worldId),
+      );
+      const objectLayers = profile.layers.filter((item) =>
+        item.id.startsWith(worldId + "-object-"),
+      );
+
+      expect(objectLayers).toHaveLength(3);
+      expect(objectLayers.map((item) => item.src)).toEqual([
+        "/assets/space-typing/backgrounds/vendor/ohjirochan/asteroid-small.png",
+        "/assets/space-typing/backgrounds/vendor/ohjirochan/asteroid-medium.png",
+        "/assets/space-typing/backgrounds/vendor/ohjirochan/asteroid-large.png",
+      ]);
+      expect(objectLayers[0]?.motion).toBe("wrap");
+      expect(objectLayers[1]?.motion).toBe("wrap");
+      expect(objectLayers[2]?.motion).toBe("approach");
+      expect(objectLayers[0]?.depth).toBeLessThan(objectLayers[1]!.depth);
+      expect(objectLayers[1]?.depth).toBeLessThan(objectLayers[2]!.depth);
+      expect(objectLayers.every((item) => (item.instances ?? 1) <= 12)).toBe(true);
     }
   });
 
