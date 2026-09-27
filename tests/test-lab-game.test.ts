@@ -5,7 +5,7 @@ import { difficultyFor } from "../src/campaign/difficulty";
 import {
   SCORE_POPUP_FLOAT_DISTANCE,
   SCORE_POPUP_PROTECTED_TOP_Y,
-} from "../src/characters/projectile-renderer";
+} from "../src/combat/score-popup";
 import { VANGUARD_ACTIVE_SKILL_ID } from "../src/characters/vanguard";
 import { DEFAULT_RECALL_SETTINGS } from "../src/recall/model";
 import type { GameSettings, VocabularyEntry } from "../src/types";
@@ -547,110 +547,23 @@ describe("M21 gated Game Test Lab API", () => {
     ]);
     expect(before?.scheduler.frozen).toBe(true);
 
-    const visualRuntime = game as unknown as { lasers: unknown[] };
-    expect(before?.playerShots).toBe(0);
-    expect(visualRuntime.lasers).toHaveLength(0);
-
     game.handleKey("m");
     const after = game.getTestLabSnapshot();
-    expect(after?.playerShots).toBe(1);
-    expect(visualRuntime.lasers).toHaveLength(0);
     const typed = after?.enemies.filter((enemy) => enemy.typed === 1) ?? [];
 
     expect(typed).toHaveLength(1);
     expect(typed[0]?.entry.en).toBe("month");
 
     game.handleKey("x");
-    expect(game.getTestLabSnapshot()?.playerShots).toBe(1);
 
     game.handleKey("o");
     const locked = game.getTestLabSnapshot();
-    expect(locked?.playerShots).toBe(2);
     expect(
       locked?.enemies.find((enemy) => enemy.entry.en === "month")?.typed,
     ).toBe(2);
     expect(
       locked?.enemies.find((enemy) => enemy.entry.en === "morning")?.typed,
     ).toBe(0);
-
-    game.destroy();
-  });
-
-  it("fires the player projectile for every typeable bonus target", () => {
-    const game = createTestGame();
-    game.setTestLabMode(true);
-    start(game, 50);
-    game.testLabSetSchedulerFrozen(true);
-
-    type MovingBonus = {
-      entry: VocabularyEntry;
-      typed: number;
-      x: number;
-      y: number;
-      speed: number;
-      age: number;
-      lifetime: number;
-    };
-    type BonusRuntime = {
-      typeSupplyPod(
-        target: MovingBonus & { reward: "shield" },
-        key: string,
-      ): void;
-      typeTreasureDrone(target: MovingBonus, key: string): void;
-      typeRewardChoiceCrate(target: MovingBonus, key: string): void;
-      typeAnomalyCrate(target: MovingBonus, key: string): void;
-      typeRecallBonus(
-        target: MovingBonus & { hintIndices: number[] },
-        key: string,
-      ): boolean;
-    };
-
-    const runtime = game as unknown as BonusRuntime;
-    const entry = vocabulary[0]!;
-    const makeTarget = (): MovingBonus => ({
-      entry,
-      typed: 0,
-      x: 710,
-      y: 260,
-      speed: 0,
-      age: 0,
-      lifetime: 20,
-    });
-
-    runtime.typeSupplyPod({ ...makeTarget(), reward: "shield" }, "o");
-    expect(game.getTestLabSnapshot()?.playerShots).toBe(1);
-
-    runtime.typeTreasureDrone(makeTarget(), "o");
-    expect(game.getTestLabSnapshot()?.playerShots).toBe(2);
-
-    runtime.typeRewardChoiceCrate(makeTarget(), "o");
-    expect(game.getTestLabSnapshot()?.playerShots).toBe(3);
-
-    runtime.typeAnomalyCrate(makeTarget(), "o");
-    expect(game.getTestLabSnapshot()?.playerShots).toBe(4);
-
-    expect(
-      runtime.typeRecallBonus(
-        { ...makeTarget(), hintIndices: [] },
-        "o",
-      ),
-    ).toBe(true);
-    expect(game.getTestLabSnapshot()?.playerShots).toBe(5);
-
-    game.destroy();
-  });
-
-  it("player projectile presentation expires through the real simulation loop", () => {
-    const game = createTestGame();
-    game.setTestLabMode(true);
-    start(game, 50);
-    game.testLabSpawnSamePrefixScenario();
-
-    game.handleKey("m");
-    expect(game.getTestLabSnapshot()?.playerShots).toBe(1);
-
-    expect(game.testLabAdvanceSimulation(0.65)).toBe(true);
-    expect(game.getTestLabSnapshot()?.playerShots).toBe(0);
 
     game.destroy();
   });
