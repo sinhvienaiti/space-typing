@@ -1163,3 +1163,210 @@ Acceptance:
 3. foreground particles should make forward flight readable immediately;
 4. the player ship should visibly bob/bank/thrust while remaining controllable;
 5. stronger motion must not reduce enemy/word/projectile readability.
+
+
+## 12. Combat / Projectile / Ship Feedback Overhaul
+
+Status: ACTIVE — implementation follows the World 02 motion-visibility checkpoint. World 02 base art/scene design is out of scope unless this combat work causes a regression.
+
+### Scope and audited baseline
+
+- Actual playable registry contains 11 ships: Vanguard, Aegis, Volt, Wraith, Fortune, Arsenal, Oracle, Bastion, Reaper, Celestial and Zenith.
+- The approved concept sheet contains 12 visual identities, so this batch maps 11 concepts to the 11 actual playable ships and keeps one concept reserved. It does not invent a twelfth character.
+- Normal combat typing currently uses the short-lived `Laser` presentation. Correct key damage/progress already resolves before that visual, so the replacement must preserve immediate gameplay semantics.
+- Projectile-intercept beam feedback is a distinct mechanic and may keep a tracer; the normal typing shot path must become a moving compact energy projectile.
+- V3 ship art is already protected from double hull bloom; the new trails must stay behind the sharp sprite.
+- Existing `Sfx` + `SampleSfxBank` already provide pronunciation ducking, compressor limiting and bounded sampled voices. Combat feedback must extend this architecture instead of creating another audio system.
+- Game settings are stored in `spaceTypingSettingsV1`, separate from PlayerSave v27. There is no persisted normal-enemy-projectile boolean in the current branch, so no PlayerSave schema bump is justified. Missing settings migrate to `auto`; a legacy boolean encountered in imported/local settings is mapped safely to explicit `on`/`off`.
+- Difficulty order is Relax -> Balanced -> Hard -> Extreme -> Nightmare -> Impossible. Auto normal-enemy fire therefore remains off through Extreme and starts at Nightmare. Adaptive/Custom use their effective difficulty profile rather than fragile string comparisons. Boss fire stays independent.
+
+### CMB-01 — Audit existing firing/projectile/audio/settings/save code
+
+- enumerate all normal player-shot, boss-shot and projectile-intercept paths;
+- confirm one correct combat character currently mutates gameplay before visual feedback;
+- identify all normal-enemy hostile projectile sources, including attack skills, legacy attacks and death-trait bursts;
+- preserve boss projectile path and Recall behavior;
+- record settings persistence and migration boundary.
+
+Acceptance:
+- no implementation starts from guessed architecture;
+- every modified path has an explicit owner and regression test target.
+
+### CMB-02 — Projectile profile registry and 11-ship mapping
+
+Extend the existing character projectile registry into data-driven visual profiles.
+
+Approved mapping for this batch:
+- Vanguard -> Meteor Bolt;
+- Aegis -> Halo Burst;
+- Volt -> Thunder Needle;
+- Wraith -> Void Spike;
+- Fortune -> Twin Star Shot;
+- Arsenal -> Solar Lance;
+- Oracle -> Crescent Slash;
+- Bastion -> Tidal Pearl;
+- Reaper -> Blossom Comet;
+- Celestial -> Prism Dart;
+- Zenith -> Aurora Ribbon;
+- Nova Pearl -> reserved/future concept.
+
+Each active profile owns enough data for compact projectile body, bright core, soft glow, trail language, impact language, muzzle flash, presentation speed/scale and combat-audio pitch identity.
+
+Acceptance:
+- every playable CharacterId resolves exactly one projectile profile;
+- active profile signatures are unique;
+- no copied renderer per ship.
+
+### CMB-03 — Moving player projectile presentation
+
+Replace normal correct-key Laser presentation with bounded moving visual shots.
+
+Rules:
+- exactly one successful combat character input creates exactly one player visual-shot event;
+- gameplay damage/progress remains immediate;
+- travel is presentation only and must never block the next input;
+- player shot stores spawn/target snapshot so a killed target can still receive a visual impact at the captured position;
+- active visual-shot count is bounded and expired shots compact in-place;
+- no Image/resource creation inside update/draw.
+
+Acceptance:
+- normal combat typing does not render a long beam;
+- projectile reaches the target visually and emits style-consistent hit/kill feedback;
+- projectile size/glow stays below word/translation readability thresholds.
+
+### CMB-04 — Muzzle flash + hit/kill feedback
+
+Per-shot muzzle flash is tiny and very short. Hit and kill FX reuse the same projectile profile language:
+- Meteor: comet spark;
+- Halo: radiant ring;
+- Thunder: electric crack;
+- Void: compact implosion;
+- Twin Star: dual star sparkle;
+- Solar: stellar/plasma burst;
+- Crescent: curved violet arc;
+- Tidal: water/bubble ripple;
+- Blossom: petal burst;
+- Prism: crystal fragments;
+- Aurora: flowing ribbon spark.
+
+Kill is stronger than hit but bounded; neither effect may cover neighboring words.
+
+### CMB-05 — Ship aim/bank composition
+
+Add a presentation-only aim state:
+- current target direction produces a small signed aim angle;
+- clamp to a visually safe range;
+- exponential/deterministic smoothing prevents snapping;
+- no target eases back to neutral;
+- aim composes with existing idle banking/bob/drift;
+- position, collision, hitbox and target acquisition are untouched.
+
+Acceptance:
+- left/right target signs are correct;
+- clamp is deterministic;
+- V3 sprite remains sharp.
+
+### CMB-06 — Unique flight-trail identity
+
+Extend the existing ship renderer instead of creating a parallel renderer.
+
+Per-ship trail profiles share one bounded Canvas implementation but expose different visual primitives:
+Meteor comet; Halo rings; Thunder lightning; Void distortion; Twin Star dual ribbon; Solar plasma; Crescent curved ribbon; Tidal water/bubbles; Blossom petals; Prism shards; Aurora multicolor ribbon.
+
+Rules:
+- bright inner core + softer outer glow;
+- taper/fade and pulse;
+- optional bounded style details;
+- V3 hull never receives duplicate bloom;
+- no random unbounded particle collection.
+
+### CMB-07 — Fire / hit / kill audio
+
+Reuse `Sfx`, mixer and sampled bank.
+
+- Fire: shortest/quietest typing-combat tick.
+- Hit: restrained energy contact.
+- Kill: clearer magical/bubble/crystal-style confirmation.
+- Add explicit cadence/voice limiting for rapid typing paths in addition to the existing compressor/sample-pool bounds.
+- Small deterministic pitch variation is allowed.
+- Pronunciation ducking remains authoritative; music/ambient levels are untouched.
+
+### CMB-08 — Kill score popup
+
+Add a bounded Canvas popup collection using the actual score delta awarded for the kill:
+- spawn near enemy death, offset upward from learning text;
+- lifetime about 2s;
+- small upward drift;
+- smooth fade;
+- dark outline/shadow for bright backgrounds;
+- compact expired entries in-place;
+- no DOM node per kill.
+
+### CMB-09 — Enemy projectile policy
+
+Setting:
+`enemyProjectileMode = "auto" | "off" | "on"`.
+
+Normal-enemy behavior:
+- Auto: effective difficulty below Nightmare -> off; Nightmare/Impossible or equivalent Adaptive/Custom effective pressure -> on.
+- Off: always suppress normal-enemy hostile projectiles.
+- On: always allow normal-enemy hostile projectiles.
+
+Boss behavior:
+- boss projectile system remains enabled independently in Combat;
+- Recall keeps its existing special rules.
+
+All normal-enemy projectile creation paths must consult one policy helper, including projectile attack skills, legacy attacks and volatile/death-trait bursts.
+
+### CMB-10 — Settings UI + persistence migration
+
+- add Enemy Projectiles select: Auto / Off / On;
+- description: “Auto = normal enemies start firing by default on Nightmare and above.”;
+- render draft/save flow through the existing Settings dialog;
+- missing persisted value -> `auto`;
+- legacy boolean if encountered -> true => `on`, false => `off`;
+- do not bump PlayerSave because game settings are not stored in PlayerSave.
+
+### CMB-11 — Automated tests
+
+Must prove:
+- every playable ship has a unique projectile profile;
+- every playable ship has a flight-trail profile;
+- no missing profile;
+- one correct combat key => one player visual shot;
+- wrong key => no normal successful shot;
+- normal player shot does not use the old long-Laser collection;
+- aim sign/clamp/smoothing/neutral return;
+- kill popup actual value/lifetime/fade/expiry;
+- Auto: Relax/Balanced/Hard/Extreme off, Nightmare/Impossible on;
+- explicit Off/On override Auto;
+- boss projectile path remains enabled;
+- settings mode sanitization/serialization migration contract;
+- Recall does not inherit unintended combat projectile behavior;
+- audio cadence limiter contract.
+
+### CMB-12 — Self-review and CI
+
+Before completion:
+- inspect diff for duplicate/dead Laser code;
+- preserve only special tracer/beam mechanics that still need it;
+- verify player-shot, transient-FX and score-popup bounds;
+- verify no per-frame resource loading;
+- verify no delayed damage/input;
+- verify audio spam protection;
+- verify World 01/02 and Recall rendering boundaries;
+- run full tests + TypeScript + production build + asset checks;
+- inspect GitHub Actions logs and continue fixing until PASS.
+
+### Browser acceptance
+
+Owner should validate:
+- every correct enemy/boss character launches one compact luminous projectile, never a normal long laser;
+- all 11 ships have clearly different shot/trail identities;
+- core/glow/trail/particles read as living energy, not flat icons;
+- ship aims/banks naturally toward the locked target;
+- flight trails are larger/smoother while V3 hull stays crisp;
+- fire/hit/kill audio remains comfortable under fast typing and below pronunciation;
+- actual +score popup survives about 2s then fades/removes;
+- Auto suppresses normal-enemy projectiles below Nightmare and enables them at Nightmare+ while boss fire remains;
+- no visible FPS/input-latency/readability regression on bright World 02 or darker Worlds.
