@@ -1666,3 +1666,63 @@ Regression coverage verifies:
 - higher Rank and Elite enemies are worth more;
 - the real Game kill path produces a materially larger final popup reward for a
   three-layer enemy.
+
+
+### CMB-20 — Per-style projectile head-light shapes
+
+Status: IMPLEMENTED — CI/browser acceptance required.
+
+Owner review of CMB-19 found that the generic head-light pass still looked like
+a separate round glowing ball attached in front of nearly every projectile. The
+brightness improvement was real, but the common ellipse/core/halo language made
+different projectile heads read too similarly and sometimes detached from the
+generated body art.
+
+#### Root cause
+
+- one shared head-light renderer drew a wide ellipse bloom, a second coloured
+  ellipse, an ellipse hot core and a front halo for every style;
+- configuration changed colour, alpha and size, but not the underlying shape;
+- the light anchor sat too far forward for several styles, making the effect
+  read as a separate orb instead of illumination emitted by the authored body.
+
+#### Per-style solution
+
+The generated atlas remains the authoritative body. Runtime lighting is now
+dispatched by an explicit head-light family instead of one universal round
+effect. All 12 approved concepts have their own family:
+
+- Meteor Bolt -> meteor teardrop/comet flare;
+- Crescent Slash -> curved crescent highlights;
+- Prism Dart -> faceted crystal/diamond flare;
+- Nova Pearl -> orb (the style where a round head is intentional);
+- Twin Star Shot -> paired star light;
+- Halo Burst -> holy ring/cross;
+- Thunder Needle -> narrow electric needle/spear;
+- Blossom Comet -> blossom/petal light;
+- Void Spike -> dark pointed singularity/spike;
+- Solar Lance -> long plasma lance wedge;
+- Tidal Pearl -> water droplet/vortex;
+- Aurora Ribbon -> asymmetric aurora wisps with a tiny pin-light.
+
+The generic large ellipse/hot-orb/halo stack has been removed from the common
+path. Only styles whose authored identity is actually round keep round geometry.
+
+Additional integration rules:
+- pull the light anchor back into the generated body silhouette;
+- use a rear-biased tapered blend to connect body light into the existing wake;
+- keep the brightest point small and shape-specific;
+- spear/needle/crystal/lance heads extend through pointed geometry, not circles;
+- Zenith/Aurora uses three curved light wisps and a tiny sharp pin-light, not a
+  large circular blob;
+- bounded spark accents remain optional detail and do not define the main head;
+- no gameplay timing, image loading or unbounded particle changes.
+
+Regression coverage verifies:
+- all 12 projectile head profiles declare a family;
+- every approved concept has a distinct family in the current 12-style set;
+- Zenith is Aurora, Thunder is Needle, Solar is Lance and Prism is Crystal;
+- those pointed/non-orb styles cannot silently fall back to the Orb family;
+- Zenith retains the cleaned three-ribbon trail with reduced spread/streak
+  clutter;
+- existing atlas, tapered trail and unique playable-ship mappings remain intact.
