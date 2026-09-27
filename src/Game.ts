@@ -75,26 +75,15 @@ import {
   type BackgroundPresentation,
 } from "./background/stage";
 import type { CharacterId } from "./characters/registry";
-import {
-  characterAimTargetAngle,
-  drawCharacterShip,
-  smoothCharacterAim,
-} from "./characters/renderer";
+import { drawCharacterShip } from "./characters/renderer";
 import type { EquipmentAuraProfile } from "./characters/equipment-aura";
 import { playerProjectileProfile } from "./characters/projectiles";
 import {
   advanceKillScorePopups,
   drawKillScorePopup,
-  drawPlayerCombatImpact,
-  drawPlayerMuzzleFlash,
-  drawPlayerProjectile,
   scorePopupSafeY,
   type KillScorePopup,
-  type PlayerCombatImpact,
-  type PlayerMuzzleFlash,
-  type PlayerShotOutcome,
-  type PlayerVisualShot,
-} from "./characters/projectile-renderer";
+} from "./combat/score-popup";
 import {
   bossProjectilesEnabled,
   normalEnemyProjectilesEnabled,
@@ -554,7 +543,6 @@ export type TestLabGameSnapshot = {
   statuses: ActiveStatus[];
   hardCc: HardCcState;
   projectiles: number;
-  playerShots: number;
   particles: number;
   activePressure: ActiveTypingPressureSnapshot;
   deathMode: TestLabDeathMode;
@@ -705,14 +693,7 @@ export class Game {
   private enemies: Enemy[] = [];
   private readonly stageWordLedger = new StageWordLedger();
   private projectiles: EnemyProjectile[] = [];
-  // Laser is retained only for the dedicated hostile-projectile intercept tracer.
   private lasers: Laser[] = [];
-  private nextPlayerVisualShotId = 1;
-  private playerVisualShots: PlayerVisualShot[] = [];
-  private playerMuzzleFlashes: PlayerMuzzleFlash[] = [];
-  private playerCombatImpacts: PlayerCombatImpact[] = [];
-  private killScorePopups: KillScorePopup[] = [];
-  private playerAimAngle = 0;
   private projectileImpacts: Array<{
     x: number;
     y: number;
@@ -960,7 +941,6 @@ export class Game {
         immunity: { ...this.hardCcState.immunity },
       },
       projectiles: this.projectiles.length,
-      playerShots: this.playerVisualShots.length,
       particles: this.particles.length,
       activePressure:
         difficulty === null
@@ -1542,9 +1522,6 @@ export class Game {
     if (!this.testLabEnabled) return false;
     this.projectiles = [];
     this.lasers = [];
-    this.playerVisualShots = [];
-    this.playerMuzzleFlashes = [];
-    this.playerCombatImpacts = [];
     this.projectileImpacts = [];
     return true;
   }
@@ -1624,9 +1601,6 @@ export class Game {
     this.enemies = [];
     this.projectiles = [];
     this.lasers = [];
-    this.playerVisualShots = [];
-    this.playerMuzzleFlashes = [];
-    this.playerCombatImpacts = [];
     this.projectileImpacts = [];
     this.particles = [];
     this.killScorePopups = [];
@@ -2874,9 +2848,6 @@ export class Game {
     this.recallReplayCount = 0;
     this.recallPromptStartedAtSeconds = 0;
     this.lasers = [];
-    this.playerVisualShots = [];
-    this.playerMuzzleFlashes = [];
-    this.playerCombatImpacts = [];
     this.projectileImpacts = [];
     this.particles = [];
     this.killScorePopups = [];
@@ -3040,12 +3011,8 @@ export class Game {
     this.enemies = [];
     this.projectiles = [];
     this.lasers = [];
-    this.playerVisualShots = [];
-    this.playerMuzzleFlashes = [];
-    this.playerCombatImpacts = [];
     this.projectileImpacts = [];
     this.particles = [];
-    this.killScorePopups = [];
     this.targetId = null;
     this.supplyPod = null;
     this.supplySpawnsRemaining = 0;
@@ -3621,9 +3588,7 @@ export class Game {
     }
     this.lasers.length = liveLasers;
 
-    // Player projectile presentation is visual-only, but it still needs to
-    // advance every simulation frame so shots travel, impact, fade and clean up.
-    this.updatePlayerCombatPresentation(dt);
+    advanceKillScorePopups(this.killScorePopups, dt);
 
     let liveImpacts = 0;
     for (const impact of this.projectileImpacts) {
@@ -5344,16 +5309,10 @@ export class Game {
       this.updateBossPhase(boss);
     }
 
-    const bossShotPosition = this.bossPosition();
-    const bossVisualShot = this.firePlayerVisualShot(
-      bossShotPosition.x,
-      bossShotPosition.y,
-      0.9,
-      boss.hp <= 0 ? "boss-kill" : "boss-hit",
-    );
+    this.fireBossLaser(0.9);
+    this.sfx.shot(this.stats.multiplier);
 
     if (boss.hp <= 0) {
-      if (bossVisualShot !== null) bossVisualShot.outcome = "boss-kill";
       this.defeatBoss();
       this.emitStats();
       return;
@@ -5448,10 +5407,6 @@ export class Game {
       this.updateBossPhase(boss);
 
       if (boss.hp <= 0) {
-        if (bossVisualShot !== null) {
-          bossVisualShot.outcome = "boss-kill";
-          bossVisualShot.power = Math.max(bossVisualShot.power, 1.35);
-        }
         this.defeatBoss(completedEntry);
         this.emitStats();
         return;
@@ -5694,11 +5649,10 @@ export class Game {
     this.gainPower(1.2);
     this.applyCharacterCorrectKeyPassive();
 
-    const completed = pod.typed >= word.length;
-    this.fireBonusTargetShot(pod.x, pod.y, completed, 0.94);
-    this.burst(pod.x, pod.y, completed ? 10 : 5, 48);
+    this.burst(pod.x, pod.y, 7, 48);
+    this.sfx.shot(this.stats.multiplier);
 
-    if (completed) {
+    if (pod.typed >= word.length) {
       this.collectSupplyPod(pod);
     }
 
@@ -5745,11 +5699,10 @@ export class Game {
     }
 
     target.typed += 1;
-    const completed = target.typed >= word.length;
-    this.fireBonusTargetShot(target.x, target.y, completed, 0.98);
-    this.burst(target.x, target.y, completed ? 11 : 5, 292);
+    this.burst(target.x, target.y, 7, 292);
+    this.sfx.shot(Math.max(1, this.stats.multiplier));
 
-    if (completed) {
+    if (target.typed >= word.length) {
       const score = recallBonusRewardScore(
         target.entry.en,
         target.hintIndices,
@@ -5795,11 +5748,10 @@ export class Game {
     this.addScore(12 * this.stats.multiplier);
     this.gainPower(1.5);
     this.applyCharacterCorrectKeyPassive();
-    const completed = drone.typed >= word.length;
-    this.fireBonusTargetShot(drone.x, drone.y, completed, 1.02);
-    this.burst(drone.x, drone.y, completed ? 12 : 5, 48);
+    this.burst(drone.x, drone.y, 8, 48);
+    this.sfx.shot(this.stats.multiplier);
 
-    if (completed) {
+    if (drone.typed >= word.length) {
       const drop = rollEquipmentDrop(
         "treasure",
         this.effectiveLuck(),
@@ -5842,11 +5794,10 @@ export class Game {
     this.addScore(10 * this.stats.multiplier);
     this.gainPower(1.3);
     this.applyCharacterCorrectKeyPassive();
-    const completed = crate.typed >= word.length;
-    this.fireBonusTargetShot(crate.x, crate.y, completed, 0.98);
-    this.burst(crate.x, crate.y, completed ? 11 : 5, 286);
+    this.burst(crate.x, crate.y, 7, 286);
+    this.sfx.shot(this.stats.multiplier);
 
-    if (completed) {
+    if (crate.typed >= word.length) {
       const options = createRewardChoiceOptions(this.effectiveLuck());
       this.addScore(220 * this.stats.multiplier);
       this.hooks.onWordComplete(crate.entry);
@@ -5882,11 +5833,10 @@ export class Game {
     this.addScore(12 * this.stats.multiplier);
     this.gainPower(1.4);
     this.applyCharacterCorrectKeyPassive();
-    const completed = crate.typed >= word.length;
-    this.fireBonusTargetShot(crate.x, crate.y, completed, 1.04);
-    this.burst(crate.x, crate.y, completed ? 12 : 5, 322);
+    this.burst(crate.x, crate.y, 8, 322);
+    this.sfx.shot(this.stats.multiplier);
 
-    if (completed) {
+    if (crate.typed >= word.length) {
       this.addScore(260 * this.stats.multiplier);
       this.hooks.onWordComplete(crate.entry);
       this.burst(crate.x, crate.y, 44, 322);
@@ -6049,21 +5999,10 @@ export class Game {
     this.applyCharacterCorrectKeyPassive();
     this.applyRelicCorrectKeyPassive(enemy);
 
-    const completesWord = enemy.typed >= word.length;
-    const shotOutcome: PlayerShotOutcome =
-      completesWord && enemy.layersRemaining <= 1
-        ? "kill"
-        : completesWord
-          ? "layer"
-          : "hit";
-    this.firePlayerVisualShot(
-      enemy.x,
-      enemy.y,
-      completesWord ? (shotOutcome === "kill" ? 1.35 : 1.1) : 0.8,
-      shotOutcome,
-    );
+    this.fireLaser(enemy, 0.8);
+    this.sfx.shot(this.stats.multiplier);
 
-    if (completesWord) {
+    if (enemy.typed >= word.length) {
       this.completeWord(enemy);
     }
 
@@ -6107,16 +6046,23 @@ export class Game {
       this.addScore((45 + length * 8) * this.stats.multiplier);
       this.gainPower(4);
 
+      this.fireLaser(enemy, 1.25);
+      const hitDefinition = this.visualDefinitionForEnemy(enemy);
+      const hitFx = enemyFxProfile(
+        hitDefinition?.family ?? "rainbow",
+        "hit",
+      );
+      this.burst(enemy.x, enemy.y, hitFx.count, hitFx.hue);
+      this.sfx.hit(hitFx.pitch);
       this.targetId = null;
       return;
     }
 
     this.stageResultTracker.recordEnemyKill(enemy.elite);
     this.stats.kills += 1;
-    const scoreBeforeKillReward = this.stats.score;
-    const killReward = enemyKillRewardScore({
-      wordLength: length,
-      layerCount: enemy.layerPlan?.length ?? 1,
+    this.addScore((80 + length * 14) * this.stats.multiplier);
+    this.gainPower(7);
+    if (this.gameplayMode !== "recall") {
       rank: enemy.rank ?? "I",
       elite: enemy.elite,
     });
@@ -6142,7 +6088,15 @@ export class Game {
       this.hooks.onKillTranslation?.({ ...enemy.entry });
     }
 
+    this.fireLaser(enemy, 1.45);
     const deathDefinition = this.visualDefinitionForEnemy(enemy);
+    const deathFx = enemyFxProfile(
+      deathDefinition?.family ?? "rainbow",
+      "death",
+    );
+    this.burst(enemy.x, enemy.y, deathFx.count, deathFx.hue);
+    this.sfx.hit(deathFx.pitch);
+    this.sfx.kill(deathFx.pitch);
     if (enemy.elite || deathDefinition?.rarity === "elite") {
       const announcerEvent = this.priorityKillChain.registerKill(
         this.stageElapsedSeconds,
@@ -7314,7 +7268,7 @@ export class Game {
           enemy.y = Math.max(-enemy.radius, enemy.y - 46);
         }
 
-        this.firePlayerVisualShot(enemy.x, enemy.y, 0.75, "hit");
+        this.fireLaser(enemy, 0.75);
       }
     }
 
@@ -7431,177 +7385,6 @@ export class Game {
       this.sfx.stageFail();
       this.hooks.onPhase(this.phase);
     }
-  }
-
-  private fireBonusTargetShot(
-    targetX: number,
-    targetY: number,
-    completed: boolean,
-    power = 0.92,
-  ): PlayerVisualShot | null {
-    return this.firePlayerVisualShot(
-      targetX,
-      targetY,
-      completed ? Math.max(1.28, power) : power,
-      completed ? "kill" : "hit",
-    );
-  }
-
-  private firePlayerVisualShot(
-    targetX: number,
-    targetY: number,
-    power: number,
-    outcome: PlayerShotOutcome,
-  ): PlayerVisualShot | null {
-    if (this.gameplayMode === "recall") return null;
-
-    const profile = playerProjectileProfile(this.characterId);
-    const startX = this.width / 2;
-    const startY = this.height - PLAYER_Y_OFFSET - 27;
-    const distance = Math.hypot(targetX - startX, targetY - startY);
-    const shot: PlayerVisualShot = {
-      id: this.nextPlayerVisualShotId++,
-      characterId: this.characterId,
-      startX,
-      startY,
-      targetX,
-      targetY,
-      age: 0,
-      // Visual travel is deliberately slower than gameplay damage. The hit
-      // already resolved before this shot is created; this duration only keeps
-      // the energy projectile readable on a wide desktop canvas.
-      duration: clamp(
-        distance / Math.max(1, profile.presentationSpeed * 0.68),
-        0.16,
-        0.46,
-      ),
-      power,
-      outcome,
-    };
-    this.playerVisualShots.push(shot);
-    if (this.playerVisualShots.length > 40) {
-      this.playerVisualShots.shift();
-    }
-
-    this.playerMuzzleFlashes.push({
-      characterId: this.characterId,
-      x: startX,
-      y: startY,
-      life: 0.075,
-      maxLife: 0.075,
-    });
-    if (this.playerMuzzleFlashes.length > 14) {
-      this.playerMuzzleFlashes.shift();
-    }
-
-    this.sfx.playerFire(profile.firePitch);
-    return shot;
-  }
-
-  private queuePlayerCombatImpact(shot: PlayerVisualShot): void {
-    const kill = shot.outcome === "kill" || shot.outcome === "boss-kill";
-    const profile = playerProjectileProfile(shot.characterId);
-    const duration = kill ? 0.34 : shot.outcome === "layer" ? 0.24 : 0.18;
-    this.playerCombatImpacts.push({
-      characterId: shot.characterId,
-      x: shot.targetX,
-      y: shot.targetY,
-      life: duration,
-      maxLife: duration,
-      kill,
-      power: shot.power,
-    });
-    if (this.playerCombatImpacts.length > 28) {
-      this.playerCombatImpacts.shift();
-    }
-
-    if (kill) this.sfx.playerKill(profile.killPitch);
-    else this.sfx.playerHit(profile.hitPitch);
-  }
-
-  private updatePlayerCombatPresentation(dt: number): void {
-    let liveShots = 0;
-    for (const shot of this.playerVisualShots) {
-      shot.age += dt;
-      if (shot.age >= shot.duration) {
-        this.queuePlayerCombatImpact(shot);
-      } else {
-        this.playerVisualShots[liveShots++] = shot;
-      }
-    }
-    this.playerVisualShots.length = liveShots;
-
-    let liveFlashes = 0;
-    for (const flash of this.playerMuzzleFlashes) {
-      flash.life -= dt;
-      if (flash.life > 0) this.playerMuzzleFlashes[liveFlashes++] = flash;
-    }
-    this.playerMuzzleFlashes.length = liveFlashes;
-
-    let liveCombatImpacts = 0;
-    for (const impact of this.playerCombatImpacts) {
-      impact.life -= dt;
-      if (impact.life > 0) {
-        this.playerCombatImpacts[liveCombatImpacts++] = impact;
-      }
-    }
-    this.playerCombatImpacts.length = liveCombatImpacts;
-    advanceKillScorePopups(this.killScorePopups, dt);
-
-    let aimTarget: { x: number; y: number } | null = null;
-    if (this.targetId !== null) {
-      const enemy = this.enemies.find((item) => item.id === this.targetId);
-      if (enemy !== undefined) aimTarget = enemy;
-    }
-    if (aimTarget === null && this.supplyPod !== null && this.supplyPod.typed > 0) {
-      aimTarget = this.supplyPod;
-    }
-    if (
-      aimTarget === null &&
-      this.treasureDrone !== null &&
-      this.treasureDrone.typed > 0
-    ) {
-      aimTarget = this.treasureDrone;
-    }
-    if (
-      aimTarget === null &&
-      this.rewardChoiceCrate !== null &&
-      this.rewardChoiceCrate.typed > 0
-    ) {
-      aimTarget = this.rewardChoiceCrate;
-    }
-    if (
-      aimTarget === null &&
-      this.anomalyCrate !== null &&
-      this.anomalyCrate.typed > 0
-    ) {
-      aimTarget = this.anomalyCrate;
-    }
-    if (
-      aimTarget === null &&
-      this.recallBonus !== null &&
-      this.recallBonus.typed > 0
-    ) {
-      aimTarget = this.recallBonus;
-    }
-    if (aimTarget === null && this.boss !== null) {
-      aimTarget = this.bossPosition();
-    }
-
-    const desiredAim =
-      aimTarget === null
-        ? 0
-        : characterAimTargetAngle(
-            this.width / 2,
-            this.height - PLAYER_Y_OFFSET,
-            aimTarget.x,
-            aimTarget.y,
-          );
-    this.playerAimAngle = smoothCharacterAim(
-      this.playerAimAngle,
-      desiredAim,
-      dt,
-    );
   }
 
   private spawnKillScorePopup(x: number, y: number, value: number): void {
@@ -7734,8 +7517,6 @@ export class Game {
     for (const projectile of this.projectiles) {
       this.drawProjectile(projectile);
     }
-
-    this.drawPlayerCombatVfx(time);
 
     if (this.supplyPod !== null) {
       this.drawSupplyPod(this.supplyPod);
@@ -7918,36 +7699,6 @@ export class Game {
     context.arc(centerX, centerY, 9 + progress * maxRadius * 0.75, 0, Math.PI * 2);
     context.stroke();
     context.restore();
-  }
-
-  private drawPlayerCombatVfx(time: number): void {
-    const quality = qualityProfile(this.settings.visualQuality);
-    for (const flash of this.playerMuzzleFlashes) {
-      drawPlayerMuzzleFlash(
-        this.context,
-        flash,
-        time,
-        quality.glowScale,
-      );
-    }
-    for (const shot of this.playerVisualShots) {
-      drawPlayerProjectile(
-        this.context,
-        shot,
-        time,
-        quality.glowScale,
-        quality.particleScale,
-      );
-    }
-    for (const impact of this.playerCombatImpacts) {
-      drawPlayerCombatImpact(
-        this.context,
-        impact,
-        time,
-        quality.glowScale,
-        quality.particleScale,
-      );
-    }
   }
 
   private drawKillScorePopups(): void {
@@ -9864,7 +9615,6 @@ export class Game {
         glowScale: qualityProfile(this.settings.visualQuality).glowScale,
         detailScale: qualityProfile(this.settings.visualQuality).particleScale,
         aura: this.equipmentAura,
-        aimAngle: this.playerAimAngle,
       },
     );
   }
@@ -9973,9 +9723,8 @@ export class Game {
 
     const context = this.context;
     context.save();
-    context.strokeStyle = "rgba(91, 236, 255, 0.07)";
-    context.lineWidth = 1;
-    context.setLineDash([3, 12]);
+    context.strokeStyle = "rgba(91, 236, 255, 0.18)";
+    context.setLineDash([4, 8]);
     context.beginPath();
     context.moveTo(this.width / 2, this.height - PLAYER_Y_OFFSET);
     context.lineTo(target.x, target.y);
