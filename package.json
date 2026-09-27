@@ -5,11 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 3004",
-    "build": "node scripts/check-audio-assets.mjs && node scripts/check-background-assets.mjs && tsc -p tsconfig.json --noEmit && vite build && node scripts/report-bundle-metrics.mjs && node scripts/check-ship-art-integrity.mjs",
+    "build": "node scripts/check-audio-assets.mjs && node scripts/check-background-assets.mjs && tsc -p tsconfig.json --noEmit && vite build && node scripts/report-bundle-metrics.mjs && node scripts/check-ship-art-integrity.mjs && node scripts/check-background-art.mjs",
     "test": "vitest run",
-    "check": "pnpm test && pnpm build"
+    "check": "pnpm test && pnpm build",
+    "bg:prepare": "node scripts/bg-art/prepare-kit.mjs"
   },
   "devDependencies": {
+    "sharp": "^0.34.5",
     "typescript": "^6.0.2",
     "vite": "^7.1.7",
     "vitest": "^3.2.4"
