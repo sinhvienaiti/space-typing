@@ -281,15 +281,75 @@ function hullPath(
   context.closePath();
 }
 
+export function characterFlightPose(time: number): {
+  bob: number;
+  banking: number;
+  driftX: number;
+  thrust: number;
+} {
+  return {
+    bob:
+      Math.sin(time * 2.45) * 4.2 +
+      Math.sin(time * 0.78 + 0.6) * 1.5,
+    banking:
+      Math.sin(time * 1.55) * 0.034 +
+      Math.sin(time * 0.46 + 0.4) * 0.011,
+    driftX:
+      Math.sin(time * 0.72) * 5.5,
+    thrust:
+      0.86 +
+      (Math.sin(time * 8.4) + 1) * 0.08 +
+      (Math.sin(time * 2.1 + 0.8) + 1) * 0.04,
+  };
+}
+
+function drawFlightTail(
+  context: CanvasRenderingContext2D,
+  profile: Readonly<CharacterVisualProfile>,
+  time: number,
+  glowScale: number,
+  strength: number,
+): void {
+  const pulse =
+    0.88 +
+    Math.sin(time * 7.6) * 0.08 +
+    Math.sin(time * 2.3 + 0.4) * 0.04;
+  const tailLength = (38 + pulse * 18) * strength;
+  const gradient = context.createLinearGradient(0, 16, 0, 16 + tailLength);
+  gradient.addColorStop(0, profile.engine);
+  gradient.addColorStop(0.34, profile.glow);
+  gradient.addColorStop(1, "rgba(255,255,255,0)");
+
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.globalAlpha *= 0.22 + strength * 0.22;
+  context.strokeStyle = gradient;
+  context.lineCap = "round";
+  context.lineWidth = 3.2 + strength * 2.2;
+  context.shadowBlur = 10 * glowScale;
+  context.shadowColor = profile.glow;
+  context.beginPath();
+  context.moveTo(0, 16);
+  context.quadraticCurveTo(
+    Math.sin(time * 3.1) * 3.5,
+    16 + tailLength * 0.52,
+    Math.sin(time * 2.2 + 1.4) * 5.5,
+    16 + tailLength,
+  );
+  context.stroke();
+  context.restore();
+}
+
 function drawEngine(
   context: CanvasRenderingContext2D,
   profile: Readonly<CharacterVisualProfile>,
   x: number,
   time: number,
   index: number,
+  strength = 1,
 ): void {
   const pulse = 0.88 + Math.sin(time * 13 + index * 1.7) * 0.12;
-  const length = 12 + pulse * 8;
+  const length = (12 + pulse * 8) * (0.82 + strength * 0.34);
 
   context.save();
   context.translate(x, 17);
@@ -297,7 +357,7 @@ function drawEngine(
   context.fillStyle = profile.engine;
   context.shadowBlur = 13;
   context.shadowColor = profile.glow;
-  context.globalAlpha *= 0.78;
+  context.globalAlpha *= 0.46 + strength * 0.32;
 
   context.beginPath();
   context.moveTo(-2.8, 0);
@@ -331,12 +391,14 @@ export function drawCharacterShip(
   const glowScale = options.glowScale ?? 1;
   const alpha = options.alpha ?? 1;
   const detailScale = options.detailScale ?? 1;
-  const bob = Math.sin(options.time * 3.2) * 1.3;
-  const banking = Math.sin(options.time * 1.7) * 0.012;
+  const flightPose = characterFlightPose(options.time);
 
   context.save();
-  context.translate(options.x, options.y + bob);
-  context.rotate(banking);
+  context.translate(
+    options.x + flightPose.driftX,
+    options.y + flightPose.bob,
+  );
+  context.rotate(flightPose.banking);
   context.scale(scale, scale);
   context.globalAlpha = alpha;
 
@@ -352,15 +414,29 @@ export function drawCharacterShip(
 
   const illustrated = characterShipSheet;
   if (illustrated !== null) {
-    // Preserve the animated thrusters from the procedural renderer. The
-    // illustrated sheet is the hull layer, not a replacement for motion FX.
-    if (characterShipSource !== "v3") {
-      for (const [index, x] of engineOffsets(profile.engineCount).entries()) {
-        drawEngine(context, profile, x, options.time, index);
-      }
+    const engineStrength =
+      characterShipSource === "v3" ? 0.48 : 0.92;
+    drawFlightTail(
+      context,
+      profile,
+      options.time,
+      glowScale,
+      characterShipSource === "v3" ? 0.58 : 0.86,
+    );
+    for (const [index, x] of engineOffsets(profile.engineCount).entries()) {
+      drawEngine(
+        context,
+        profile,
+        x,
+        options.time,
+        index,
+        engineStrength * flightPose.thrust,
+      );
     }
-    // V3 sprites contain painted thrusters and core lighting; using the
-    // old procedural flames as well would double the glow and hurt clarity.
+
+    // Premium V3 keeps low hull bloom, but painted thrusters are no longer
+    // treated as a substitute for real motion. Runtime exhaust supplies the
+    // flight cue while the sprite remains the sharp hull layer.
     drawIllustratedShip(
       context,
       illustrated,
@@ -383,8 +459,22 @@ export function drawCharacterShip(
   context.fill();
   context.restore();
 
+  drawFlightTail(
+    context,
+    profile,
+    options.time,
+    glowScale,
+    0.92,
+  );
   for (const [index, x] of engineOffsets(profile.engineCount).entries()) {
-    drawEngine(context, profile, x, options.time, index);
+    drawEngine(
+      context,
+      profile,
+      x,
+      options.time,
+      index,
+      flightPose.thrust,
+    );
   }
 
   const hullGradient = context.createLinearGradient(0, -30, 0, 22);
