@@ -1117,3 +1117,49 @@ Automated verification:
 
 Status: code/CI complete. Owner browser/video acceptance is still required; the
 2/10 video remains the rejected baseline.
+
+
+### W02-15 — Motion visibility tuning
+
+Owner accepted World 02 as temporarily usable but reported that the motion cues
+remain too small/subtle to notice without intentionally watching for them. This
+is a tuning pass only: do not rebuild the artwork or scene architecture again.
+
+Goal: make existing motion obvious in normal play while keeping the gameplay
+readable.
+
+Implemented tuning:
+
+- sky-current bands move substantially faster and use more visible source-over
+  bodies;
+- sky-current density increases by quality so Medium/High already show obvious
+  motion, while Ultra only enriches it;
+- far/near mist counts and pixel-per-second speeds are increased;
+- waterfall flow now uses four moving channels, faster vertical phase,
+  stronger cyan contrast and faster/brighter specular streaks;
+- waterfall spray is larger, brighter and pulses faster;
+- nebula translation/rotation/pulse speed is increased;
+- star drift and twinkle are faster while remaining background detail;
+- Medium+ shooting stars are more frequent, stay visible longer and use longer
+  trails;
+- foreground flight-flow density, speed, size and alpha are increased;
+- halo glow and light rays are reduced slightly so stronger motion does not
+  reintroduce the previous white/gold wash;
+- player flight pose receives stronger bob, banking and lateral drift;
+- V3 live thrust and exhaust tail are strengthened while the hull art remains
+  low-bloom and sharp.
+
+Non-goals:
+
+- no new World 02 base artwork;
+- no gameplay-physics/hitbox changes;
+- no global enemy recolour;
+- no World 01/03+ scene-motion changes.
+
+Acceptance:
+
+1. cloud motion should be obvious within about 2-3 seconds;
+2. waterfall flow should be perceptible without staring at it;
+3. foreground particles should make forward flight readable immediately;
+4. the player ship should visibly bob/bank/thrust while remaining controllable;
+5. stronger motion must not reduce enemy/word/projectile readability.
