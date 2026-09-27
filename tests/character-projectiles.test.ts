@@ -3,6 +3,7 @@ import { CHARACTER_IDS } from "../src/characters/registry";
 import {
   PLAYER_PROJECTILE_BODY_SCALE,
   PLAYER_PROJECTILE_RAY_COUNT,
+  PROJECTILE_VISUAL_IDENTITIES,
 } from "../src/characters/projectile-renderer";
 import {
   characterFlightTrailProfile,
@@ -30,6 +31,21 @@ describe("character projectile profiles", () => {
     expect(PLAYER_PROJECTILE_RAY_COUNT).toBeGreaterThanOrEqual(8);
   });
 
+  it("gives all 12 approved concept styles distinct visual identities", () => {
+    const entries = Object.entries(PROJECTILE_VISUAL_IDENTITIES);
+    expect(entries).toHaveLength(12);
+    const signatures = entries.map(
+      ([styleId, identity]) =>
+        styleId + ":" + identity.body + ":" + identity.wake + ":" + identity.particles,
+    );
+    expect(new Set(signatures).size).toBe(12);
+    for (const [, identity] of entries) {
+      expect(identity.body.length).toBeGreaterThan(5);
+      expect(identity.wake.length).toBeGreaterThan(5);
+      expect(identity.particles.length).toBeGreaterThan(5);
+    }
+  });
+
   it("maps every playable ship to one unique approved projectile and flight trail", () => {
     const projectileIds = CHARACTER_IDS.map(
       (id) => playerProjectileProfile(id).styleId,
@@ -47,7 +63,7 @@ describe("character projectile profiles", () => {
       const trail = characterFlightTrailProfile(id);
       expect(projectile.presentationSpeed).toBeGreaterThan(1000);
       expect(projectile.bodyRadius).toBeGreaterThanOrEqual(3.8);
-      expect(projectile.trailLength).toBeGreaterThan(20);
+      expect(projectile.trailLength).toBeGreaterThanOrEqual(70);
       expect(projectile.particleCount).toBeGreaterThan(0);
       expect(projectile.muzzleRadius).toBeGreaterThan(0);
       expect(trail.length).toBeGreaterThan(50);

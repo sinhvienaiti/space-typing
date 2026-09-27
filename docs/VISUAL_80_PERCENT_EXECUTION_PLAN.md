@@ -1438,3 +1438,39 @@ Fix:
 - add a bounded 10-ray additive starburst, long axial flare and hot center around each projectile;
 - extend the energy trail slightly while preserving word readability;
 - add regression coverage proving each of the five bonus target types creates exactly one player visual shot per correct key.
+
+
+### CMB-16 — Reference-faithful projectile identity pass
+
+Status: IMPLEMENTED — CI/browser acceptance required.
+
+Owner review confirmed that the previous visibility fix still made different ships
+look too similar because a large generic flare was applied to every projectile.
+The approved concept sheet is now the visual contract, not merely a color guide.
+
+Audit against the 12 approved concepts:
+- Meteor Bolt: comet body + long blue wake + debris;
+- Crescent Slash: thick purple crescent + curved arc wake;
+- Prism Dart: faceted cyan/pink crystal + shard stream;
+- Nova Pearl: pink energy pearl + orbiting mini pearls/halo (reserved concept,
+  no twelfth playable ship exists in the current registry);
+- Twin Star Shot: two distinct blue/gold stars + intertwined ribbons;
+- Halo Burst: holy gold orb + concentric rune/halo rings + cross flare;
+- Thunder Needle: long electric spear + forked lightning branches;
+- Blossom Comet: sakura core + visible petal stream;
+- Void Spike: dark singularity/spike + distortion wake + dark shards;
+- Solar Lance: long orange/red spear + plasma/fire wake + solar corona;
+- Tidal Pearl: water-vortex pearl + swirling wake + bubbles;
+- Aurora Ribbon: bloom tip + three cyan/green/purple aurora ribbons.
+
+Implementation changes:
+- removed the dominant generic starburst from the normal projectile draw path;
+- every style now owns a distinct body renderer and a distinct wake renderer;
+- active wake lengths increased to 70–116px so motion leaves a readable energy
+  trail behind the projectile instead of only a short glow;
+- projectile body scale raised to 2.55 while word readability remains protected
+  by drawing projectiles before enemy labels;
+- all 12 approved concept styles have explicit visual identity metadata;
+- the 11 playable ships remain mapped one-to-one to 11 unique active styles;
+  Nova Pearl remains the reserved twelfth concept until a real twelfth playable
+  character exists instead of inventing a duplicate mapping.
