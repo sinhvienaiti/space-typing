@@ -1899,6 +1899,43 @@ export class Game {
     const result = this.tryUseSkill(id);
     if (!result.ok) return result;
 
+    this.activateSkillEffect(id);
+    this.stageResultTracker.recordSkillUse();
+    this.hooks.onSkills();
+    return result;
+  }
+
+  testLabForceSkill(id: string): SkillActivationResult {
+    const state = this.skillEngine.getState(id);
+    if (
+      !this.testLabEnabled ||
+      (this.phase !== "playing" && this.phase !== "paused") ||
+      state === null
+    ) {
+      return {
+        ok: false,
+        reason: "unknown-skill",
+        energy: this.stats.energy,
+        state,
+      };
+    }
+
+    // Test Lab force activation deliberately bypasses production gates:
+    // Energy, cooldown, charges, per-stage limits, typing conditions,
+    // Silence and "effect not needed". It also does not consume those
+    // resources, so QA can repeat the same effect immediately.
+    this.activateSkillEffect(id);
+    this.stageResultTracker.recordSkillUse();
+    this.hooks.onSkills();
+
+    return {
+      ok: true,
+      energy: this.stats.energy,
+      state: this.skillEngine.getState(id) ?? state,
+    };
+  }
+
+  private activateSkillEffect(id: string): void {
     if (
       id === VANGUARD_ACTIVE_SKILL_ID &&
       this.characterId === "vanguard"
@@ -1961,10 +1998,6 @@ export class Game {
     } else if (isSupportSpellId(id)) {
       this.activateSupportSpell(id);
     }
-
-    this.stageResultTracker.recordSkillUse();
-    this.hooks.onSkills();
-    return result;
   }
 
   tryUseSkill(id: string): SkillActivationResult {
