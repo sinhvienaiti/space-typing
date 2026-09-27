@@ -2,6 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Game } from "../src/Game";
 import { createStageConfig } from "../src/campaign/stage";
 import { difficultyFor } from "../src/campaign/difficulty";
+import {
+  SCORE_POPUP_FLOAT_DISTANCE,
+  SCORE_POPUP_PROTECTED_TOP_Y,
+} from "../src/characters/projectile-renderer";
+import { VANGUARD_ACTIVE_SKILL_ID } from "../src/characters/vanguard";
 import { DEFAULT_RECALL_SETTINGS } from "../src/recall/model";
 import type { GameSettings, VocabularyEntry } from "../src/types";
 
@@ -142,6 +147,81 @@ describe("M21 gated Game Test Lab API", () => {
     game.destroy();
   });
 
+  it("force-activates Test Lab skills without energy, typing, cooldown, or cost gates", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game);
+    game.testLabSetSchedulerFrozen(true);
+    game.testLabSetResources({ energy: 0 });
+
+    const normal = game.useSkill(VANGUARD_ACTIVE_SKILL_ID);
+    expect(normal.ok).toBe(false);
+    if (normal.ok) throw new Error("Expected production activation to be blocked");
+    expect(["energy", "typing-condition"]).toContain(normal.reason);
+
+    const beforeState = game.getSkillState(VANGUARD_ACTIVE_SKILL_ID);
+    const runtime = game as unknown as { barrierTimer: number };
+    expect(runtime.barrierTimer).toBe(0);
+
+    const forced = game.testLabForceSkill(VANGUARD_ACTIVE_SKILL_ID);
+    expect(forced.ok).toBe(true);
+    expect(game.getTestLabSnapshot()?.stats.energy).toBe(0);
+    expect(runtime.barrierTimer).toBeGreaterThan(0);
+    expect(game.getSkillState(VANGUARD_ACTIVE_SKILL_ID)).toEqual(beforeState);
+
+    const repeated = game.testLabForceSkill(VANGUARD_ACTIVE_SKILL_ID);
+    expect(repeated.ok).toBe(true);
+    expect(game.getSkillState(VANGUARD_ACTIVE_SKILL_ID)).toEqual(beforeState);
+    expect(game.getTestLabSnapshot()?.stats.energy).toBe(0);
+
+    game.destroy();
+  });
+
+  it("continues typing after forced Meteor and Chain Lightning advance a word", () => {
+    for (const skillId of ["meteor", "chain-lightning"] as const) {
+      const game = createTestGame();
+      game.setTestLabMode(true);
+      start(game);
+      game.testLabSetSchedulerFrozen(true);
+      if (skillId === "meteor") {
+        game.setSupportSpells(["meteor"]);
+      }
+
+      const enemyId = game.testLabSpawnEnemies({
+        kind: "scout",
+        count: 1,
+        layers: 1,
+      })[0]!;
+      const before = game.getTestLabSnapshot()?.enemies.find(
+        (enemy) => enemy.id === enemyId,
+      );
+      expect(before).toBeDefined();
+      expect(before?.typed).toBe(0);
+
+      const forced = game.testLabForceSkill(skillId);
+      expect(forced.ok).toBe(true);
+
+      const advanced = game.getTestLabSnapshot()?.enemies.find(
+        (enemy) => enemy.id === enemyId,
+      );
+      expect(advanced).toBeDefined();
+      expect(advanced!.typed).toBeGreaterThan(0);
+
+      const typingWord = advanced!.entry.en
+        .toLocaleLowerCase("en-US")
+        .replace(/[^a-z]/g, "");
+      const nextKey = typingWord[advanced!.typed];
+      expect(nextKey).toMatch(/^[a-z]$/);
+
+      game.handleKey(nextKey!);
+      const resumed = game.getTestLabSnapshot()?.enemies.find(
+        (enemy) => enemy.id === enemyId,
+      );
+      expect(resumed?.typed).toBe(advanced!.typed + 1);
+      game.destroy();
+    }
+  });
+
   it("holds stage clear while the visible Recall bonus remains, then clears after collection", () => {
     const game = createTestGame();
     game.setTestLabMode(true);
@@ -261,8 +341,9 @@ describe("M21 gated Game Test Lab API", () => {
     game.destroy();
   });
 
-  it("preserves Splitter fragments and Volatile burst in Combat", () => {
+  it("preserves Splitter fragments and Volatile burst when enemy projectiles are explicitly On", () => {
     const game = createTestGame();
+    game.updateSettings({ ...settings, enemyProjectileMode: "on" });
     game.setTestLabMode(true);
     start(game, 900);
     game.testLabSetSchedulerFrozen(true);
@@ -466,21 +547,110 @@ describe("M21 gated Game Test Lab API", () => {
     ]);
     expect(before?.scheduler.frozen).toBe(true);
 
+    const visualRuntime = game as unknown as { lasers: unknown[] };
+    expect(before?.playerShots).toBe(0);
+    expect(visualRuntime.lasers).toHaveLength(0);
+
     game.handleKey("m");
     const after = game.getTestLabSnapshot();
+    expect(after?.playerShots).toBe(1);
+    expect(visualRuntime.lasers).toHaveLength(0);
     const typed = after?.enemies.filter((enemy) => enemy.typed === 1) ?? [];
 
     expect(typed).toHaveLength(1);
     expect(typed[0]?.entry.en).toBe("month");
 
+    game.handleKey("x");
+    expect(game.getTestLabSnapshot()?.playerShots).toBe(1);
+
     game.handleKey("o");
     const locked = game.getTestLabSnapshot();
+    expect(locked?.playerShots).toBe(2);
     expect(
       locked?.enemies.find((enemy) => enemy.entry.en === "month")?.typed,
     ).toBe(2);
     expect(
       locked?.enemies.find((enemy) => enemy.entry.en === "morning")?.typed,
     ).toBe(0);
+
+    game.destroy();
+  });
+
+  it("fires the player projectile for every typeable bonus target", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 50);
+    game.testLabSetSchedulerFrozen(true);
+
+    type MovingBonus = {
+      entry: VocabularyEntry;
+      typed: number;
+      x: number;
+      y: number;
+      speed: number;
+      age: number;
+      lifetime: number;
+    };
+    type BonusRuntime = {
+      typeSupplyPod(
+        target: MovingBonus & { reward: "shield" },
+        key: string,
+      ): void;
+      typeTreasureDrone(target: MovingBonus, key: string): void;
+      typeRewardChoiceCrate(target: MovingBonus, key: string): void;
+      typeAnomalyCrate(target: MovingBonus, key: string): void;
+      typeRecallBonus(
+        target: MovingBonus & { hintIndices: number[] },
+        key: string,
+      ): boolean;
+    };
+
+    const runtime = game as unknown as BonusRuntime;
+    const entry = vocabulary[0]!;
+    const makeTarget = (): MovingBonus => ({
+      entry,
+      typed: 0,
+      x: 710,
+      y: 260,
+      speed: 0,
+      age: 0,
+      lifetime: 20,
+    });
+
+    runtime.typeSupplyPod({ ...makeTarget(), reward: "shield" }, "o");
+    expect(game.getTestLabSnapshot()?.playerShots).toBe(1);
+
+    runtime.typeTreasureDrone(makeTarget(), "o");
+    expect(game.getTestLabSnapshot()?.playerShots).toBe(2);
+
+    runtime.typeRewardChoiceCrate(makeTarget(), "o");
+    expect(game.getTestLabSnapshot()?.playerShots).toBe(3);
+
+    runtime.typeAnomalyCrate(makeTarget(), "o");
+    expect(game.getTestLabSnapshot()?.playerShots).toBe(4);
+
+    expect(
+      runtime.typeRecallBonus(
+        { ...makeTarget(), hintIndices: [] },
+        "o",
+      ),
+    ).toBe(true);
+    expect(game.getTestLabSnapshot()?.playerShots).toBe(5);
+
+    game.destroy();
+  });
+
+  it("player projectile presentation expires through the real simulation loop", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 50);
+    game.testLabSpawnSamePrefixScenario();
+
+    game.handleKey("m");
+    expect(game.getTestLabSnapshot()?.playerShots).toBe(1);
+
+    expect(game.testLabAdvanceSimulation(0.65)).toBe(true);
+    expect(game.getTestLabSnapshot()?.playerShots).toBe(0);
 
     game.destroy();
   });
@@ -517,6 +687,74 @@ describe("M21 gated Game Test Lab API", () => {
 
     game.destroy();
   });
+  it("stores the actual kill reward in a bounded score popup", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 1);
+    game.testLabSetSchedulerFrozen(true);
+
+    const ids = game.testLabSpawnEnemies({
+      kind: "scout",
+      count: 1,
+      layers: 1,
+    });
+    const beforeScore = game.getTestLabSnapshot()?.stats.score ?? 0;
+    expect(game.testLabKillEnemy(ids[0]!)).toBe(true);
+    const afterScore = game.getTestLabSnapshot()?.stats.score ?? 0;
+    const runtime = game as unknown as {
+      killScorePopups: Array<{
+        y: number;
+        value: number;
+        life: number;
+        maxLife: number;
+      }>;
+    };
+
+    expect(runtime.killScorePopups).toHaveLength(1);
+    expect(runtime.killScorePopups[0]?.value).toBe(afterScore - beforeScore);
+    expect(runtime.killScorePopups[0]?.maxLife).toBe(2);
+    expect(runtime.killScorePopups[0]?.y).toBeGreaterThanOrEqual(
+      SCORE_POPUP_PROTECTED_TOP_Y + SCORE_POPUP_FLOAT_DISTANCE,
+    );
+    game.destroy();
+  });
+
+  it("shows a materially larger final score reward for a three-layer enemy", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 1);
+    game.testLabSetSchedulerFrozen(true);
+
+    const runtime = game as unknown as {
+      killScorePopups: Array<{ value: number }>;
+    };
+
+    const oneLayerId = game.testLabSpawnEnemies({
+      kind: "scout",
+      count: 1,
+      rank: "I",
+      layers: 1,
+    })[0]!;
+    expect(game.testLabKillEnemy(oneLayerId)).toBe(true);
+    const oneLayerReward = runtime.killScorePopups.at(-1)?.value ?? 0;
+
+    game.testLabClearEnemies();
+    game.testLabClearParticles();
+
+    const threeLayerId = game.testLabSpawnEnemies({
+      kind: "scout",
+      count: 1,
+      rank: "I",
+      layers: 3,
+    })[0]!;
+    expect(game.testLabKillEnemy(threeLayerId)).toBe(true);
+    const threeLayerReward = runtime.killScorePopups.at(-1)?.value ?? 0;
+
+    expect(oneLayerReward).toBeGreaterThan(0);
+    expect(threeLayerReward).toBeGreaterThan(oneLayerReward * 1.35);
+    game.destroy();
+  });
+
   it("reports completed-word quality once for shared learning", () => {
     const game = createTestGame();
     game.setTestLabMode(true);

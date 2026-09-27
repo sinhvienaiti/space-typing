@@ -1041,6 +1041,21 @@
       </div>
 
       <div class="settings-section">
+        <h3>combat</h3>
+        <label class="setting-row">
+          <span>
+            <strong>Enemy Projectiles</strong>
+            <small>Auto = normal enemies start firing by default on Nightmare and above. Boss projectiles stay enabled.</small>
+          </span>
+          <select id="enemyProjectileMode">
+            <option value="auto">Auto</option>
+            <option value="off">Off</option>
+            <option value="on">On</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="settings-section">
         <h3>visual</h3>
         <label class="setting-row">
           <span>
@@ -1063,6 +1078,20 @@
             <option value="medium">Medium</option>
             <option value="high">High</option>
             <option value="ultra">Ultra</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="settings-section">
+        <h3>Developer / testing</h3>
+        <label class="setting-row">
+          <span>
+            <strong>Unlock all stages</strong>
+            <small>Temporarily enables Stage Select 001–1000 without changing campaign progress. Disable to restore normal locks.</small>
+          </span>
+          <select id="unlockAllStages">
+            <option value="false">Disabled</option>
+            <option value="true">Enabled</option>
           </select>
         </label>
       </div>
