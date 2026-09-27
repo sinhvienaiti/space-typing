@@ -253,9 +253,9 @@ function drawCloudMist(
   };
 
   // Use pixels/second so motion is visible in normal gameplay captures.
-  drawBand(farCount, 0.52, 8, 0.15, 0.86, 11);
+  drawBand(farCount, 0.52, 8, 0.075, 0.86, 11);
   if (quality !== "low") {
-    drawBand(nearCount, 0.76, -17, 0.12, 1.1, 29);
+    drawBand(nearCount, 0.76, -17, 0.065, 1.1, 29);
   }
 }
 
@@ -837,8 +837,8 @@ export function drawWorldAmbientEffects(
   if (profile.lightRays) drawLightRays(context, input);
   if (profile.starDrift) drawStarDrift(context, input);
   drawMeteors(context, input, profile.meteorCount);
-  if (profile.flightFlow) drawFlightFlow(context, input);
   if (profile.readabilityGrade) {
     drawGameplayReadabilityGrade(context, input);
   }
+  if (profile.flightFlow) drawFlightFlow(context, input);
 }
