@@ -56,7 +56,7 @@ export type DifficultyProfile = {
   maxEnemies: number;
   projectilePressure: number;
   /** Auto policy for normal-enemy hostile projectiles at this effective difficulty. */
-  normalEnemyProjectilesDefault?: boolean;
+  normalEnemyProjectilesDefault?: 0 | 1;
   /** Multiplier applied only to projectile velocity, not fire frequency. */
   projectileSpeedScale?: number;
   bossPressure: number;
