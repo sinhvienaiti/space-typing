@@ -289,17 +289,17 @@ export function characterFlightPose(time: number): {
 } {
   return {
     bob:
-      Math.sin(time * 1.8) * 5.2 +
-      Math.sin(time * 0.65 + 0.6) * 1.8,
+      Math.sin(time * 2.1) * 6.4 +
+      Math.sin(time * 0.75 + 0.6) * 2.2,
     banking:
-      Math.sin(time * 1.55) * 0.034 +
-      Math.sin(time * 0.46 + 0.4) * 0.011,
+      Math.sin(time * 1.8) * 0.05 +
+      Math.sin(time * 0.52 + 0.4) * 0.015,
     driftX:
-      Math.sin(time * 0.72) * 5.5,
+      Math.sin(time * 0.82) * 7.5,
     thrust:
-      0.86 +
-      (Math.sin(time * 8.4) + 1) * 0.08 +
-      (Math.sin(time * 2.1 + 0.8) + 1) * 0.04,
+      0.92 +
+      (Math.sin(time * 9.2) + 1) * 0.1 +
+      (Math.sin(time * 2.4 + 0.8) + 1) * 0.05,
   };
 }
 
@@ -314,7 +314,7 @@ function drawFlightTail(
     0.88 +
     Math.sin(time * 7.6) * 0.08 +
     Math.sin(time * 2.3 + 0.4) * 0.04;
-  const tailLength = (38 + pulse * 18) * strength;
+  const tailLength = (48 + pulse * 24) * strength;
   const gradient = context.createLinearGradient(0, 16, 0, 16 + tailLength);
   gradient.addColorStop(0, profile.engine);
   gradient.addColorStop(0.34, profile.glow);
@@ -322,10 +322,10 @@ function drawFlightTail(
 
   context.save();
   context.globalCompositeOperation = "lighter";
-  context.globalAlpha *= 0.22 + strength * 0.22;
+  context.globalAlpha *= 0.28 + strength * 0.28;
   context.strokeStyle = gradient;
   context.lineCap = "round";
-  context.lineWidth = 3.2 + strength * 2.2;
+  context.lineWidth = 4.2 + strength * 2.8;
   context.shadowBlur = 10 * glowScale;
   context.shadowColor = profile.glow;
   context.beginPath();
@@ -415,13 +415,13 @@ export function drawCharacterShip(
   const illustrated = characterShipSheet;
   if (illustrated !== null) {
     const engineStrength =
-      characterShipSource === "v3" ? 0.48 : 0.92;
+      characterShipSource === "v3" ? 0.62 : 0.96;
     drawFlightTail(
       context,
       profile,
       options.time,
       glowScale,
-      characterShipSource === "v3" ? 0.58 : 0.86,
+      characterShipSource === "v3" ? 0.72 : 0.92,
     );
     for (const [index, x] of engineOffsets(profile.engineCount).entries()) {
       drawEngine(
