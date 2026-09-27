@@ -1575,8 +1575,13 @@ export function mountTestLab(
     if (
       target instanceof HTMLInputElement ||
       target instanceof HTMLSelectElement ||
-      target instanceof HTMLTextAreaElement ||
-      target instanceof HTMLButtonElement
+      target instanceof HTMLTextAreaElement
+    ) {
+      return;
+    }
+    if (
+      target instanceof HTMLButtonElement &&
+      !(event.key.length === 1 && /^[a-z]$/i.test(event.key))
     ) {
       return;
     }
@@ -2127,6 +2132,7 @@ export function mountTestLab(
           : "skill unavailable in current runtime · " + String(result.reason),
       );
       renderInspector();
+      canvas.focus({ preventScroll: true });
       return;
     }
     if (action === "reset-skill-cooldowns") {
