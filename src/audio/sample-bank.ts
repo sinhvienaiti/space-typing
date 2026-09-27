@@ -7,7 +7,7 @@ export const SAMPLE_SFX = {
   "player-fire": {
     path: "/assets/audio/sfx/kenney/explosion-crunch.ogg",
     group: "typing",
-    gain: 0.24,
+    gain: 0.28,
     poolSize: 6,
   },
   "player-hit": {
