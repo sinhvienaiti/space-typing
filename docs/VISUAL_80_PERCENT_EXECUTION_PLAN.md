@@ -1776,3 +1776,41 @@ Regression coverage verifies every approved projectile owns bounded directional
 aura values, outer aura is larger than its inner core, pointed families have
 longer directional halos, and Zenith retains a visible aurora aura without
 falling back to an orb.
+
+
+## 2026-09-27 — Full 50-World production scene migration
+
+### Audit baseline
+
+- Registry contains 50 Worlds across 10 scene archetypes.
+- Worlds 01-05 are already `authored-production`.
+- Worlds 06-50 still resolve `legacy-hybrid`, so the renderer mixes authored files with legacy static/cinematic/floor passes.
+- The legacy family registry reuses one small layer set across five Worlds and does not use `scene.variant` strongly enough to create World-local composition.
+- Galaxy/World 01 has the strongest curated sourced-art stack; Halo Garden/World 02 has a 2560x1440 production AVIF. Remaining families still lean on older SVG landmark packs.
+
+### Implementation contract
+
+1. Keep Worlds 01-05 approved production compositions unchanged.
+2. Promote Worlds 06-50 to `authored-production`; no silent legacy fallback.
+3. Build every migrated World from a family art stack plus deterministic World-local variation:
+   - far cosmic depth / sky;
+   - family sky and landmark;
+   - mid-depth environment object;
+   - edge-biased near object/accent;
+   - existing bounded foreground particles.
+4. Keep the central typing corridor calmer than edges and do not place large authored objects in the top learning-bar band.
+5. Meteor/Asteroid Worlds must use sourced cratered asteroid sprites at far/mid/near depth, with bounded instances, rotation/drift and different scale bands.
+6. Reuse image cache and deterministic instance cache in `LayeredBackgroundRenderer`; do not allocate assets every frame.
+7. Extend integrity/tests so all 50 Worlds:
+   - resolve a production profile;
+   - have local assets and unique layer IDs;
+   - expose at least four visual depth bands;
+   - differ between World variants;
+   - do not silently return to the legacy scene pipeline.
+
+### Acceptance
+
+- Every World is recognizable by scene family + World-local composition instead of palette alone.
+- No legacy procedural floor/static-scene fallback remains for production Worlds.
+- Ambient particles remain bounded by Visual Quality.
+- Tests, TypeScript, production build, background integrity and ship integrity must stay green.
