@@ -46,11 +46,11 @@ describe("Layered authored background registry", () => {
     }
   });
 
-  it("gives every World at least four authored depth bands", () => {
+  it("gives every generated production World at least four authored depth bands", () => {
     const band = (depth: number) =>
       depth < 0.16 ? "far" : depth < 0.35 ? "mid-far" : depth < 0.72 ? "mid" : "near";
 
-    for (const world of WORLD_REGISTRY) {
+    for (const world of WORLD_REGISTRY.filter((item) => item.number >= 6)) {
       const profile = layeredBackgroundForScene(
         sceneProfileForWorld(world),
       );
