@@ -88,15 +88,15 @@ function drawGalaxyDrift(
   const { width, height, time, quality } = input;
   const qualityScale =
     quality === "low" ? 0.72 : quality === "medium" ? 0.86 : 1;
-  const x = width * 0.38 + Math.sin(time * 0.12) * width * 0.028;
-  const y = height * 0.125 + Math.cos(time * 0.09) * height * 0.018;
+  const x = width * 0.38 + Math.sin(time * 0.18) * width * 0.04;
+  const y = height * 0.125 + Math.cos(time * 0.13) * height * 0.024;
   const radius = Math.max(width, height) * 0.34;
-  const pulse = 0.88 + Math.sin(time * 0.42) * 0.12;
+  const pulse = 0.92 + Math.sin(time * 0.58) * 0.16;
 
   context.save();
   context.globalCompositeOperation = "screen";
   context.translate(x, y);
-  context.rotate(time * 0.075);
+  context.rotate(time * 0.11);
 
   const glow = context.createRadialGradient(0, 0, 0, 0, 0, radius);
   glow.addColorStop(0, "rgba(170, 118, 255, 0.17)");
@@ -141,16 +141,23 @@ function drawSkyCurrents(
   const qualityScale =
     quality === "low" ? 0.72 : quality === "medium" ? 0.86 : 1;
   const bands = [
-    { y: 0.22, speed: 14, alpha: 0.18, scale: 0.72, salt: 101 },
-    { y: 0.39, speed: -22, alpha: 0.15, scale: 0.9, salt: 131 },
-    { y: 0.64, speed: 31, alpha: 0.12, scale: 1.08, salt: 163 },
+    { y: 0.22, speed: 22, alpha: 0.24, scale: 0.8, salt: 101 },
+    { y: 0.39, speed: -34, alpha: 0.2, scale: 0.98, salt: 131 },
+    { y: 0.64, speed: 46, alpha: 0.17, scale: 1.16, salt: 163 },
   ] as const;
 
   context.save();
   context.globalCompositeOperation = "source-over";
 
   for (const band of bands) {
-    const count = quality === "low" ? 3 : quality === "medium" ? 4 : 5;
+    const count =
+      quality === "low"
+        ? 4
+        : quality === "medium"
+          ? 6
+          : quality === "high"
+            ? 8
+            : 10;
     for (let index = 0; index < count; index += 1) {
       const phase = seededUnit(index, band.salt);
       const rx =
@@ -200,8 +207,8 @@ function drawCloudMist(
 ): void {
   const { width, height, time, quality } = input;
   const factor = qualityFactor(quality);
-  const farCount = Math.max(3, Math.round(6 * factor));
-  const nearCount = Math.max(2, Math.round(4 * factor));
+  const farCount = Math.max(4, Math.round(8 * factor));
+  const nearCount = Math.max(3, Math.round(6 * factor));
 
   const drawBand = (
     count: number,
@@ -253,9 +260,9 @@ function drawCloudMist(
   };
 
   // Use pixels/second so motion is visible in normal gameplay captures.
-  drawBand(farCount, 0.52, 8, 0.075, 0.86, 11);
+  drawBand(farCount, 0.52, 14, 0.12, 0.9, 11);
   if (quality !== "low") {
-    drawBand(nearCount, 0.76, -17, 0.065, 1.1, 29);
+    drawBand(nearCount, 0.76, -28, 0.1, 1.16, 29);
   }
 }
 
@@ -321,10 +328,10 @@ function drawWaterfallShimmer(
     // Dark cyan flow channels remain visible even over the near-white baked
     // waterfall. Moving these channels makes the water itself read as flowing.
     context.globalCompositeOperation = "multiply";
-    for (let lane = 0; lane < 3; lane += 1) {
+    for (let lane = 0; lane < 4; lane += 1) {
       const laneX =
         x +
-        (lane - 1) * fallWidth * 0.24 +
+        (lane - 1.5) * fallWidth * 0.22 +
         Math.sin(time * 1.15 + lane + index) *
           fallWidth *
           0.08;
@@ -332,14 +339,14 @@ function drawWaterfallShimmer(
         Math.max(30, fallHeight * (0.24 + lane * 0.035));
       const offset =
         positiveModulo(
-          time * (115 + lane * 24 + index * 8) + lane * 31,
+          time * (170 + lane * 32 + index * 12) + lane * 31,
           segment,
         );
 
       context.fillStyle =
-        lane === 1
-          ? "rgba(72, 164, 224, 0.2)"
-          : "rgba(84, 184, 236, 0.14)";
+        lane === 1 || lane === 2
+          ? "rgba(56, 148, 214, 0.28)"
+          : "rgba(72, 170, 228, 0.2)";
       for (
         let y = y0 - segment + offset;
         y < y1 + segment;
@@ -360,7 +367,7 @@ function drawWaterfallShimmer(
       Math.max(42, fallHeight * 0.28);
     const highlightOffset =
       positiveModulo(
-        time * (168 + index * 11),
+        time * (240 + index * 18),
         highlightSegment,
       );
     const highlight =
@@ -378,7 +385,7 @@ function drawWaterfallShimmer(
       y < y1 + highlightSegment;
       y += highlightSegment
     ) {
-      context.globalAlpha = 0.82;
+      context.globalAlpha = 0.96;
       context.fillRect(
         x - fallWidth * 0.28,
         y,
@@ -412,9 +419,9 @@ function drawWaterfallSpray(
     const fall = WATERFALLS[index]!;
     const x = width * fall.x;
     const y = height * fall.y1;
-    const radiusX = Math.max(18, width * (0.018 + index * 0.002));
-    const radiusY = Math.max(8, height * (0.011 + index * 0.0015));
-    const pulse = 0.74 + Math.sin(time * 1.45 + index * 1.1) * 0.18;
+    const radiusX = Math.max(24, width * (0.024 + index * 0.0025));
+    const radiusY = Math.max(12, height * (0.015 + index * 0.0018));
+    const pulse = 0.88 + Math.sin(time * 1.9 + index * 1.1) * 0.22;
 
     const mist = context.createRadialGradient(
       x,
@@ -424,8 +431,8 @@ function drawWaterfallSpray(
       y,
       radiusX,
     );
-    mist.addColorStop(0, "rgba(235, 252, 255, 0.38)");
-    mist.addColorStop(0.42, "rgba(174, 226, 255, 0.18)");
+    mist.addColorStop(0, "rgba(235, 252, 255, 0.52)");
+    mist.addColorStop(0.42, "rgba(174, 226, 255, 0.24)");
     mist.addColorStop(1, "rgba(174, 226, 255, 0)");
 
     context.globalAlpha = pulse;
@@ -454,8 +461,8 @@ function drawHaloGlow(
 
   const glow =
     context.createRadialGradient(x, y, 0, x, y, radius * 1.42);
-  glow.addColorStop(0, "rgba(255, 247, 198, 0.14)");
-  glow.addColorStop(0.34, "rgba(255, 215, 115, 0.07)");
+  glow.addColorStop(0, "rgba(255, 247, 198, 0.11)");
+  glow.addColorStop(0.34, "rgba(255, 215, 115, 0.05)");
   glow.addColorStop(1, "rgba(255, 226, 150, 0)");
   context.globalAlpha = pulse;
   context.fillStyle = glow;
@@ -514,7 +521,7 @@ function drawLightRays(
       width * (0.56 + index * 0.11) + sway * width * (0.018 + index * 0.004);
     const endY = height * (0.58 + index * 0.07);
     const halfWidth = width * (0.018 + index * 0.004);
-    const alpha = 0.022 + index * 0.007;
+    const alpha = 0.018 + index * 0.006;
 
     const beam = context.createLinearGradient(
       originX,
@@ -563,7 +570,7 @@ function drawStarDrift(
     const depth =
       0.35 + seededUnit(index, 56) * 0.65;
     const phase = seededUnit(index, 53) * Math.PI * 2;
-    const speed = 3 + depth * 8.5;
+    const speed = 5 + depth * 12.5;
     const x =
       positiveModulo(
         ux * width + time * speed + index * 1.7,
@@ -578,12 +585,12 @@ function drawStarDrift(
       height *
       0.58;
     const twinkle =
-      0.45 +
+      0.5 +
       (Math.sin(
-        time * (1.05 + ux * 0.7) + phase,
+        time * (1.4 + ux * 0.8) + phase,
       ) +
         1) *
-        0.25;
+        0.28;
     const radius = 0.65 + depth * 1.45;
 
     context.globalAlpha =
@@ -609,10 +616,10 @@ function drawMeteors(
   const { width, height, time, quality } = input;
   const count =
     quality === "ultra"
-      ? Math.min(maxCount, 2)
-      : Math.min(maxCount, 1);
-  const periodSeconds = 4.8;
-  const visibleSeconds = 1.05;
+      ? Math.min(maxCount, 3)
+      : Math.min(maxCount, 2);
+  const periodSeconds = 3.4;
+  const visibleSeconds = 1.25;
 
   context.save();
   context.globalCompositeOperation = "screen";
@@ -652,7 +659,7 @@ function drawMeteors(
     const y = startY + travelY * progress;
     const length =
       width *
-      (0.075 + seededUnit(seedIndex, 77) * 0.035);
+      (0.095 + seededUnit(seedIndex, 77) * 0.05);
     const alpha =
       Math.sin(progress * Math.PI) * 0.96;
 
@@ -714,12 +721,12 @@ function drawFlightFlow(
   const { width, height, time, quality } = input;
   const count =
     quality === "low"
-      ? 8
+      ? 12
       : quality === "medium"
-        ? 12
+        ? 18
         : quality === "high"
-          ? 16
-          : 20;
+          ? 24
+          : 30;
   const vanishingX = width * 0.5;
   const vanishingY = height * 0.34;
 
@@ -729,7 +736,7 @@ function drawFlightFlow(
 
   for (let index = 0; index < count; index += 1) {
     const laneRight = index % 2 === 0;
-    const cycleSeconds = 2.8 + seededUnit(index, 211) * 1.8;
+    const cycleSeconds = 1.9 + seededUnit(index, 211) * 1.1;
     const progress =
       positiveModulo(
         time / cycleSeconds + seededUnit(index, 212),
@@ -751,8 +758,8 @@ function drawFlightFlow(
       vanishingY + (targetY - vanishingY) * eased;
     const alpha =
       Math.sin(progress * Math.PI) *
-      (0.12 + eased * 0.22);
-    const radius = 0.7 + eased * 2.6;
+      (0.16 + eased * 0.28);
+    const radius = 0.9 + eased * 3.8;
 
     context.globalAlpha = alpha;
     context.fillStyle =
