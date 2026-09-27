@@ -8,7 +8,8 @@ import {
   sanitizeKillTranslationSettings,
   usesTopKillTranslation,
 } from "./feedback/kill-translation";
-import { Game } from "./Game";\nimport { sanitizeEnemyProjectileMode } from "./combat/enemy-projectile-policy";
+import { Game } from "./Game";
+import { sanitizeEnemyProjectileMode } from "./combat/enemy-projectile-policy";
 import {
   availableRageSegments,
   RAGE_SEGMENT_COUNT,
@@ -505,6 +506,7 @@ const defaultSettings: GameSettings = {
   ambientVolume: 0.08,
   screenShake: true,
   visualQuality: "high",
+  enemyProjectileMode: "auto",
   unlockAllStages: false,
   pronunciationEnabled: true,
   pronunciationRate: 1,
@@ -517,7 +519,10 @@ function loadSettings(): GameSettings {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw === null) return { ...defaultSettings };
 
-    const parsed = JSON.parse(raw) as Partial<GameSettings> & {\n      enemyProjectiles?: unknown;\n      enemyProjectilesEnabled?: unknown;\n    };
+    const parsed = JSON.parse(raw) as Partial<GameSettings> & {
+      enemyProjectiles?: unknown;
+      enemyProjectilesEnabled?: unknown;
+    };
     return {
       sfxVolume:
         typeof parsed.sfxVolume === "number"
@@ -535,6 +540,11 @@ function loadSettings(): GameSettings {
         typeof parsed.screenShake === "boolean"
           ? parsed.screenShake
           : defaultSettings.screenShake,
+      enemyProjectileMode: sanitizeEnemyProjectileMode(
+        parsed.enemyProjectileMode ??
+          parsed.enemyProjectilesEnabled ??
+          parsed.enemyProjectiles,
+      ),
       visualQuality:
         parsed.visualQuality === "low" ||
         parsed.visualQuality === "medium" ||
@@ -6949,6 +6959,8 @@ function renderSettings(): void {
     String(renderedSettings.screenShake);
   byId<HTMLSelectElement>("visualQuality").value =
     renderedSettings.visualQuality;
+  byId<HTMLSelectElement>("enemyProjectileMode").value =
+    sanitizeEnemyProjectileMode(renderedSettings.enemyProjectileMode);
   byId<HTMLSelectElement>("unlockAllStages").value =
     String(renderedSettings.unlockAllStages === true);
 
