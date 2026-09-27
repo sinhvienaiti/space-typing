@@ -2,6 +2,7 @@ import { clamp } from "../logic";
 import { createStageConfig, normalizeStage } from "./stage";
 import {
   difficultyModeDefinition,
+  normalEnemyProjectilesDefaultForDefinition,
 } from "./difficulty-modes";
 import type {
   DifficultyInput,
@@ -186,6 +187,8 @@ export function difficultyFor(
     spawnInterval,
     maxEnemies,
     projectilePressure,
+    normalEnemyProjectilesDefault:
+      normalEnemyProjectilesDefaultForDefinition(definition),
     projectileSpeedScale: bulletSpeedSetting * (1 - earlyPractice * 0.18),
     bossPressure,
     targetWpm: targetWpm(input),
