@@ -394,7 +394,31 @@ function drawFlightTail(
   context.lineCap = "round";
   context.shadowColor = trail.primary;
   context.shadowBlur = 23 * glowScale;
-  context.globalAlpha *= 0.34 + strength * 0.2;
+
+  // Broad tapered energy plume. This is deliberately a filled shape instead
+  // of another line so the runtime exhaust reads as a real thruster body.
+  const plumeHalfWidth = trail.width * 1.45;
+  const plumeWobble = Math.sin(time * 4.6) * trail.width * 0.42;
+  context.globalAlpha *= 0.2 + strength * 0.14;
+  context.fillStyle = gradient;
+  context.beginPath();
+  context.moveTo(-plumeHalfWidth, 15);
+  context.quadraticCurveTo(
+    -plumeHalfWidth * 1.18,
+    17 + length * 0.34,
+    plumeWobble - trail.width * 0.35,
+    16 + length,
+  );
+  context.quadraticCurveTo(
+    plumeHalfWidth * 1.18,
+    17 + length * 0.34,
+    plumeHalfWidth,
+    15,
+  );
+  context.closePath();
+  context.fill();
+
+  context.globalAlpha = 0.42 + strength * 0.18;
   context.strokeStyle = gradient;
   context.lineWidth = trail.width * 3.25;
   drawTrailCurve(context, time, length, 0, 0.4);

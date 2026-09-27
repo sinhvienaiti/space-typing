@@ -3542,6 +3542,10 @@ export class Game {
     }
     this.lasers.length = liveLasers;
 
+    // Player projectile presentation is visual-only, but it still needs to
+    // advance every simulation frame so shots travel, impact, fade and clean up.
+    this.updatePlayerCombatPresentation(dt);
+
     let liveImpacts = 0;
     for (const impact of this.projectileImpacts) {
       impact.life -= dt;
@@ -7582,6 +7586,8 @@ export class Game {
       this.drawProjectile(projectile);
     }
 
+    this.drawPlayerCombatVfx(time);
+
     if (this.supplyPod !== null) {
       this.drawSupplyPod(this.supplyPod);
     }
@@ -7602,6 +7608,7 @@ export class Game {
       this.drawEnemy(enemy);
     }
 
+    this.drawKillScorePopups();
     this.drawLearningEcho();
 
     if (this.boss !== null) {
@@ -9784,8 +9791,9 @@ export class Game {
 
     const context = this.context;
     context.save();
-    context.strokeStyle = "rgba(91, 236, 255, 0.18)";
-    context.setLineDash([4, 8]);
+    context.strokeStyle = "rgba(91, 236, 255, 0.07)";
+    context.lineWidth = 1;
+    context.setLineDash([3, 12]);
     context.beginPath();
     context.moveTo(this.width / 2, this.height - PLAYER_Y_OFFSET);
     context.lineTo(target.x, target.y);

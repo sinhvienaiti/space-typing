@@ -1387,3 +1387,27 @@ Hotfix:
 - compress flight-trail length into the visible bottom area while increasing width, glow and identity details;
 - add pooled sampled `player-fire` through the existing `SampleSfxBank`, preserving cadence limiting and pronunciation ducking;
 - raise hit/kill synth presence slightly without changing music/pronunciation priority.
+
+
+### CMB-14 — Missing runtime wiring root-cause fix
+
+Status: FIXED — pending/validated by CI in the same branch.
+
+Root cause found from the browser recording and direct runtime audit:
+
+- `firePlayerVisualShot()` correctly created `playerVisualShots`;
+- `drawPlayerCombatVfx()` existed, but `Game.draw()` never called it;
+- `updatePlayerCombatPresentation()` existed, but `updateEffects()` never called it;
+- `drawKillScorePopups()` also existed without being wired into the main draw loop.
+
+Therefore the new projectile objects were present in state but were literally never rendered or advanced. The faint dashed line visible in the recording was only `drawTargetLine()`, not a projectile. This is the direct reason the owner saw target direction but no luminous bullet.
+
+Fix:
+- wire player combat presentation into both simulation and render loops;
+- render moving shots before enemy art so enemy words remain readable;
+- wire score popups into the render loop;
+- reduce target-line prominence so it cannot visually masquerade as the shot;
+- add a regression test that a correct-key shot expires through `testLabAdvanceSimulation()`;
+- replace the chirpy laser-small typing sample with a short low-mid crunch/thump layer using the existing bounded audio bank;
+- add dedicated sampled hit/kill layers;
+- broaden the runtime flight plume so engine thrust reads as a filled glowing exhaust instead of one thin line.

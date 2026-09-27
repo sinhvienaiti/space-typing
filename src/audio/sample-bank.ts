@@ -5,10 +5,22 @@ import {
 
 export const SAMPLE_SFX = {
   "player-fire": {
-    path: "/assets/audio/sfx/kenney/laser-small.ogg",
+    path: "/assets/audio/sfx/kenney/explosion-crunch.ogg",
     group: "typing",
-    gain: 0.3,
+    gain: 0.24,
     poolSize: 6,
+  },
+  "player-hit": {
+    path: "/assets/audio/sfx/kenney/force-field.ogg",
+    group: "combat",
+    gain: 0.16,
+    poolSize: 4,
+  },
+  "player-kill": {
+    path: "/assets/audio/sfx/kenney/explosion-low.ogg",
+    group: "combat",
+    gain: 0.34,
+    poolSize: 3,
   },
   "projectile-intercept": {
     path: "/assets/audio/sfx/kenney/laser-small.ogg",

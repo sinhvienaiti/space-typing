@@ -496,6 +496,21 @@ describe("M21 gated Game Test Lab API", () => {
     game.destroy();
   });
 
+  it("player projectile presentation expires through the real simulation loop", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 50);
+    game.testLabSpawnSamePrefixScenario();
+
+    game.handleKey("m");
+    expect(game.getTestLabSnapshot()?.playerShots).toBe(1);
+
+    expect(game.testLabAdvanceSimulation(0.65)).toBe(true);
+    expect(game.getTestLabSnapshot()?.playerShots).toBe(0);
+
+    game.destroy();
+  });
+
   it("uses the production enemy instance for force-word and clear controls", () => {
     const game = createTestGame();
     game.setTestLabMode(true);

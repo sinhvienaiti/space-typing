@@ -116,18 +116,28 @@ export class Sfx {
     const variation = [0.985, 1.015, 1, 1.025][
       this.playerCombatVariation++ % 4
     ]!;
+    // Short low-mid impact rather than a high "pew". The sampled crunch gives
+    // the key press weight; the low synth layer keeps it readable at low volume.
     this.samples.play(
       "player-fire",
       this.volume,
       this.pronunciationActive,
-      safePitch * variation,
+      Math.min(1.35, 1.18 * safePitch * variation),
     );
     this.tone(
-      520 * safePitch * variation,
-      0.042,
+      168 * safePitch,
+      0.072,
       "triangle",
-      0.036,
-      760 * safePitch * variation,
+      0.058,
+      84 * safePitch,
+      "typing",
+    );
+    this.tone(
+      330 * safePitch,
+      0.046,
+      "sine",
+      0.026,
+      185 * safePitch,
       "typing",
     );
   }
@@ -136,12 +146,18 @@ export class Sfx {
     if (!this.playerCombatCadence.allow("hit", this.clockMs())) return;
     const safePitch = Math.max(0.68, Math.min(1.4, pitch));
     const variation = [1, 0.97, 1.03][this.playerCombatVariation++ % 3]!;
+    this.samples.play(
+      "player-hit",
+      this.volume,
+      this.pronunciationActive,
+      Math.min(1.35, 1.08 * safePitch * variation),
+    );
     this.tone(
-      245 * safePitch * variation,
-      0.052,
-      "sine",
-      0.036,
-      150 * safePitch * variation,
+      218 * safePitch,
+      0.058,
+      "triangle",
+      0.034,
+      126 * safePitch,
       "combat",
     );
   }
@@ -150,13 +166,27 @@ export class Sfx {
     if (!this.playerCombatCadence.allow("kill", this.clockMs())) return;
     const safePitch = Math.max(0.68, Math.min(1.4, pitch));
     const variation = [0.96, 1.02, 1][this.playerCombatVariation++ % 3]!;
-    this.noise(0.062, 0.024, "combat");
+    this.samples.play(
+      "player-kill",
+      this.volume,
+      this.pronunciationActive,
+      Math.max(0.78, Math.min(1.18, safePitch * variation)),
+    );
+    this.noise(0.075, 0.028, "combat");
     this.tone(
-      390 * safePitch * variation,
-      0.095,
+      142 * safePitch,
+      0.13,
+      "triangle",
+      0.05,
+      64 * safePitch,
+      "combat",
+    );
+    this.tone(
+      360 * safePitch,
+      0.09,
       "sine",
-      0.044,
-      185 * safePitch * variation,
+      0.026,
+      176 * safePitch,
       "combat",
     );
   }
