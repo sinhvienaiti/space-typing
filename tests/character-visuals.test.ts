@@ -9,8 +9,11 @@ import {
   characterVisualProfile,
 } from "../src/characters/visuals";
 import {
+  characterAimTargetAngle,
   characterFlightPose,
   characterShipArtSource,
+  MAX_CHARACTER_AIM_RADIANS,
+  smoothCharacterAim,
   drawCharacterShip,
   setCharacterShipSheet,
 } from "../src/characters/renderer";
@@ -63,6 +66,26 @@ describe("character visual profiles", () => {
     expect(Math.abs(later.banking - start.banking)).toBeGreaterThan(0.015);
     expect(Math.abs(later.driftX - start.driftX)).toBeGreaterThan(3);
     expect(later.thrust).toBeGreaterThan(0.9);
+  });
+
+  it("clamps and smooths presentation-only ship aim toward targets", () => {
+    const right = characterAimTargetAngle(500, 700, 900, 180);
+    const left = characterAimTargetAngle(500, 700, 100, 180);
+    const extreme = characterAimTargetAngle(500, 700, 5000, 690);
+
+    expect(right).toBeGreaterThan(0);
+    expect(left).toBeLessThan(0);
+    expect(Math.abs(extreme)).toBeLessThanOrEqual(MAX_CHARACTER_AIM_RADIANS);
+
+    const first = smoothCharacterAim(0, right, 1 / 60);
+    const second = smoothCharacterAim(first, right, 1 / 60);
+    expect(first).toBeGreaterThan(0);
+    expect(first).toBeLessThan(right);
+    expect(second).toBeGreaterThan(first);
+    expect(second).toBeLessThanOrEqual(right);
+
+    const returning = smoothCharacterAim(second, 0, 1 / 60);
+    expect(Math.abs(returning)).toBeLessThan(Math.abs(second));
   });
 
   it("keeps the animated engine layer behind illustrated ship art", () => {
