@@ -12,7 +12,8 @@ export type GamePhase =
   | "stageclear"
   | "gameover";
 
-export type VisualQuality = "low" | "medium" | "high" | "ultra";\nexport type EnemyProjectileMode = "auto" | "off" | "on";
+export type VisualQuality = "low" | "medium" | "high" | "ultra";
+export type EnemyProjectileMode = "auto" | "off" | "on";
 
 export type EnemyKind =
   | "scout"
@@ -60,6 +61,7 @@ export type GameSettings = {
   ambientVolume: number;
   screenShake: boolean;
   visualQuality: VisualQuality;
+  enemyProjectileMode?: EnemyProjectileMode;
   unlockAllStages?: boolean;
   pronunciationEnabled: boolean;
   pronunciationRate: number;
