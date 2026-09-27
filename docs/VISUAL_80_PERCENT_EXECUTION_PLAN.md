@@ -1167,7 +1167,7 @@ Acceptance:
 
 ## 12. Combat / Projectile / Ship Feedback Overhaul
 
-Status: ACTIVE — implementation follows the World 02 motion-visibility checkpoint. World 02 base art/scene design is out of scope unless this combat work causes a regression.
+Status: COMPLETE — implementation, automated tests and production build passed CI #1061. World 02 base art/scene design remained out of scope except regression protection.
 
 ### Scope and audited baseline
 
