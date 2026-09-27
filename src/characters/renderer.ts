@@ -379,23 +379,29 @@ function drawFlightTail(
   strength: number,
 ): void {
   const trail = characterFlightTrailProfile(characterId);
-  const pulse = 0.92 + Math.sin(time * 7.2) * 0.06;
-  const length = trail.length * (0.88 + strength * 0.24) * pulse;
+  const pulse = 0.94 + Math.sin(time * 7.2) * 0.08;
+  // The player ship sits close to the bottom edge. Long conceptual trails were
+  // being clipped, so keep the visible energy inside ~56px and spend the
+  // budget on width/glow/side motion instead of drawing off-canvas.
+  const length = Math.min(
+    56,
+    trail.length * (0.72 + strength * 0.2) * pulse,
+  );
   const gradient = trailGradient(context, trail, length);
 
   context.save();
   context.globalCompositeOperation = "lighter";
   context.lineCap = "round";
   context.shadowColor = trail.primary;
-  context.shadowBlur = 16 * glowScale;
-  context.globalAlpha *= 0.18 + strength * 0.16;
+  context.shadowBlur = 23 * glowScale;
+  context.globalAlpha *= 0.34 + strength * 0.2;
   context.strokeStyle = gradient;
-  context.lineWidth = trail.width * 2.4;
+  context.lineWidth = trail.width * 3.25;
   drawTrailCurve(context, time, length, 0, 0.4);
 
-  context.globalAlpha *= 1.8;
-  context.shadowBlur = 9 * glowScale;
-  context.lineWidth = Math.max(1.4, trail.width * 0.72);
+  context.globalAlpha = Math.min(1, context.globalAlpha * 1.45);
+  context.shadowBlur = 13 * glowScale;
+  context.lineWidth = Math.max(2.1, trail.width * 0.92);
   drawTrailCurve(context, time, length * 0.94, 0, 0.4);
 
   if (trail.kind === "twin-star" || trail.kind === "aurora") {
@@ -596,7 +602,7 @@ export function drawCharacterShip(
       profile,
       options.time,
       glowScale,
-      characterShipSource === "v3" ? 0.72 : 0.92,
+      characterShipSource === "v3" ? 1.08 : 1.0,
     );
     for (const [index, x] of engineOffsets(profile.engineCount).entries()) {
       drawEngine(
