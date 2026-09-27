@@ -6060,9 +6060,10 @@ export class Game {
 
     this.stageResultTracker.recordEnemyKill(enemy.elite);
     this.stats.kills += 1;
-    this.addScore((80 + length * 14) * this.stats.multiplier);
-    this.gainPower(7);
-    if (this.gameplayMode !== "recall") {
+    const scoreBeforeKillReward = this.stats.score;
+    const killReward = enemyKillRewardScore({
+      wordLength: length,
+      layerCount: enemy.layerPlan?.length ?? 1,
       rank: enemy.rank ?? "I",
       elite: enemy.elite,
     });
