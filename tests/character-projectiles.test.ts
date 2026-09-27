@@ -13,7 +13,9 @@ import {
 import {
   characterFlightTrailProfile,
   playerProjectileProfile,
+  PROJECTILE_HEAD_GLOW_PROFILES,
   PROJECTILE_TRAIL_PROFILES,
+  projectileHeadGlowProfile,
   projectileTrailProfile,
   RESERVED_PLAYER_PROJECTILE_STYLES,
 } from "../src/characters/projectiles";
@@ -104,6 +106,36 @@ describe("character projectile profiles", () => {
     }
   });
 
+  it("gives every approved projectile a vivid front-weighted head glow", () => {
+    const entries = Object.entries(PROJECTILE_HEAD_GLOW_PROFILES);
+    expect(entries).toHaveLength(12);
+
+    for (const [styleId, head] of entries) {
+      expect(head.frontOffset, styleId).toBeGreaterThan(2.5);
+      expect(head.hotCoreScale, styleId).toBeGreaterThan(0.2);
+      expect(head.hotCoreAlpha, styleId).toBeGreaterThanOrEqual(0.8);
+      expect(head.bloomScale, styleId).toBeGreaterThan(1.2);
+      expect(head.bloomAlpha, styleId).toBeGreaterThan(0.2);
+      expect(head.bloomSoftness, styleId).toBeGreaterThanOrEqual(1);
+      expect(head.forwardFlareLength, styleId).toBeGreaterThan(1);
+      expect(head.forwardFlareWidth, styleId).toBeGreaterThan(0.3);
+      expect(head.forwardFlareAlpha, styleId).toBeGreaterThan(0.2);
+      expect(head.trailBlendLength, styleId).toBeGreaterThan(2);
+      expect(head.sparkleCount, styleId).toBeGreaterThanOrEqual(2);
+    }
+
+    const zenith = projectileHeadGlowProfile("aurora-ribbon");
+    expect(zenith.bloomScale).toBeGreaterThanOrEqual(1.8);
+    expect(zenith.hotCoreAlpha).toBe(1);
+    expect(zenith.forwardFlareAlpha).toBeGreaterThanOrEqual(0.48);
+    expect(zenith.sparkleCount).toBeLessThanOrEqual(3);
+
+    const zenithTrail = projectileTrailProfile("aurora-ribbon");
+    expect(zenithTrail.ribbonCount).toBe(3);
+    expect(zenithTrail.ribbonSpread).toBeLessThan(0.5);
+    expect(zenithTrail.sideStreakCount).toBeLessThanOrEqual(2);
+  });
+
   it("maps every playable ship to one unique approved projectile and flight trail", () => {
     const projectileIds = CHARACTER_IDS.map(
       (id) => playerProjectileProfile(id).styleId,
@@ -123,6 +155,7 @@ describe("character projectile profiles", () => {
       expect(projectile.bodyRadius).toBeGreaterThanOrEqual(3.8);
       expect(projectile.trailLength).toBeGreaterThanOrEqual(130);
       expect(projectile.trail).toBe(projectileTrailProfile(projectile.styleId));
+      expect(projectileHeadGlowProfile(projectile.styleId)).toBeDefined();
       expect(projectile.trail.frontWidthRatio).toBeGreaterThan(
         projectile.trail.endWidthRatio,
       );
