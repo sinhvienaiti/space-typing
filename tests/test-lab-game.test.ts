@@ -643,6 +643,42 @@ describe("M21 gated Game Test Lab API", () => {
     game.destroy();
   });
 
+  it("shows a materially larger final score reward for a three-layer enemy", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 1);
+    game.testLabSetSchedulerFrozen(true);
+
+    const runtime = game as unknown as {
+      killScorePopups: Array<{ value: number }>;
+    };
+
+    const oneLayerId = game.testLabSpawnEnemies({
+      kind: "scout",
+      count: 1,
+      rank: "I",
+      layers: 1,
+    })[0]!;
+    expect(game.testLabKillEnemy(oneLayerId)).toBe(true);
+    const oneLayerReward = runtime.killScorePopups.at(-1)?.value ?? 0;
+
+    game.testLabClearEnemies();
+    game.testLabClearParticles();
+
+    const threeLayerId = game.testLabSpawnEnemies({
+      kind: "scout",
+      count: 1,
+      rank: "I",
+      layers: 3,
+    })[0]!;
+    expect(game.testLabKillEnemy(threeLayerId)).toBe(true);
+    const threeLayerReward = runtime.killScorePopups.at(-1)?.value ?? 0;
+
+    expect(oneLayerReward).toBeGreaterThan(0);
+    expect(threeLayerReward).toBeGreaterThan(oneLayerReward * 1.35);
+    game.destroy();
+  });
+
   it("reports completed-word quality once for shared learning", () => {
     const game = createTestGame();
     game.setTestLabMode(true);
