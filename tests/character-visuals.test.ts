@@ -59,10 +59,10 @@ describe("character visual profiles", () => {
     const start = characterFlightPose(0);
     const later = characterFlightPose(2.5);
 
-    expect(Math.abs(later.bob - start.bob)).toBeGreaterThan(1);
-    expect(Math.abs(later.banking - start.banking)).toBeGreaterThan(0.01);
-    expect(Math.abs(later.driftX - start.driftX)).toBeGreaterThan(2);
-    expect(later.thrust).toBeGreaterThan(0.8);
+    expect(Math.abs(later.bob - start.bob)).toBeGreaterThan(2);
+    expect(Math.abs(later.banking - start.banking)).toBeGreaterThan(0.015);
+    expect(Math.abs(later.driftX - start.driftX)).toBeGreaterThan(3);
+    expect(later.thrust).toBeGreaterThan(0.9);
   });
 
   it("keeps the animated engine layer behind illustrated ship art", () => {
