@@ -18,6 +18,9 @@ export type WorldAmbientEffectsProfile = {
   galaxyDrift: boolean;
   haloGlow: boolean;
   lightRays: boolean;
+  skyCurrents: boolean;
+  flightFlow: boolean;
+  readabilityGrade: boolean;
   meteorCount: number;
 };
 
@@ -30,6 +33,9 @@ const HALO_GARDEN_EFFECTS: WorldAmbientEffectsProfile = {
   galaxyDrift: true,
   haloGlow: true,
   lightRays: true,
+  skyCurrents: true,
+  flightFlow: true,
+  readabilityGrade: true,
   meteorCount: 2,
 };
 
@@ -126,6 +132,67 @@ function drawGalaxyDrift(
   context.restore();
 }
 
+
+function drawSkyCurrents(
+  context: CanvasRenderingContext2D,
+  input: WorldAmbientEffectsInput,
+): void {
+  const { width, height, time, quality } = input;
+  const qualityScale =
+    quality === "low" ? 0.72 : quality === "medium" ? 0.86 : 1;
+  const bands = [
+    { y: 0.22, speed: 14, alpha: 0.18, scale: 0.72, salt: 101 },
+    { y: 0.39, speed: -22, alpha: 0.15, scale: 0.9, salt: 131 },
+    { y: 0.64, speed: 31, alpha: 0.12, scale: 1.08, salt: 163 },
+  ] as const;
+
+  context.save();
+  context.globalCompositeOperation = "source-over";
+
+  for (const band of bands) {
+    const count = quality === "low" ? 3 : quality === "medium" ? 4 : 5;
+    for (let index = 0; index < count; index += 1) {
+      const phase = seededUnit(index, band.salt);
+      const rx =
+        width *
+        (0.055 + seededUnit(index, band.salt + 1) * 0.06) *
+        band.scale;
+      const ry =
+        height *
+        (0.018 + seededUnit(index, band.salt + 2) * 0.018) *
+        band.scale;
+      const travel = width + rx * 2;
+      const x =
+        positiveModulo(
+          phase * travel +
+            index * (travel / count) +
+            time * band.speed,
+          travel,
+        ) - rx;
+      const y =
+        height *
+        (band.y +
+          (seededUnit(index, band.salt + 3) - 0.5) * 0.05 +
+          Math.sin(time * 0.32 + phase * Math.PI * 2) * 0.006);
+
+      const cloud = context.createRadialGradient(x, y, 0, x, y, rx);
+      cloud.addColorStop(0, "rgba(229, 242, 255, 0.52)");
+      cloud.addColorStop(0.42, "rgba(164, 205, 242, 0.28)");
+      cloud.addColorStop(0.72, "rgba(82, 139, 203, 0.12)");
+      cloud.addColorStop(1, "rgba(52, 91, 148, 0)");
+      context.globalAlpha =
+        band.alpha *
+        qualityScale *
+        (0.82 + seededUnit(index, band.salt + 4) * 0.18);
+      context.fillStyle = cloud;
+      context.beginPath();
+      context.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+      context.fill();
+    }
+  }
+
+  context.restore();
+}
 
 function drawCloudMist(
   context: CanvasRenderingContext2D,
@@ -379,7 +446,7 @@ function drawHaloGlow(
   const { width, height, time } = input;
   const x = width * 0.855;
   const y = height * 0.165;
-  const pulse = 0.86 + Math.sin(time * 1.35) * 0.14;
+  const pulse = 0.9 + Math.sin(time * 1.2) * 0.1;
   const radius = Math.min(width, height) * 0.18;
 
   context.save();
@@ -387,8 +454,8 @@ function drawHaloGlow(
 
   const glow =
     context.createRadialGradient(x, y, 0, x, y, radius * 1.42);
-  glow.addColorStop(0, "rgba(255, 247, 198, 0.24)");
-  glow.addColorStop(0.34, "rgba(255, 215, 115, 0.12)");
+  glow.addColorStop(0, "rgba(255, 247, 198, 0.14)");
+  glow.addColorStop(0.34, "rgba(255, 215, 115, 0.07)");
   glow.addColorStop(1, "rgba(255, 226, 150, 0)");
   context.globalAlpha = pulse;
   context.fillStyle = glow;
@@ -401,7 +468,7 @@ function drawHaloGlow(
 
   context.translate(x, y);
   context.rotate(time * 0.19);
-  context.globalAlpha = 0.22 + (pulse - 0.72) * 0.35;
+  context.globalAlpha = 0.14 + (pulse - 0.8) * 0.22;
   context.strokeStyle = "#ffe7a5";
   context.lineWidth = Math.max(1.5, width * 0.00135);
   context.setLineDash([
@@ -413,7 +480,7 @@ function drawHaloGlow(
   context.stroke();
 
   context.rotate(-time * 0.31);
-  context.globalAlpha = 0.14;
+  context.globalAlpha = 0.09;
   context.strokeStyle = "#bdeaff";
   context.lineWidth = Math.max(1, width * 0.0009);
   context.setLineDash([
@@ -447,7 +514,7 @@ function drawLightRays(
       width * (0.56 + index * 0.11) + sway * width * (0.018 + index * 0.004);
     const endY = height * (0.58 + index * 0.07);
     const halfWidth = width * (0.018 + index * 0.004);
-    const alpha = 0.048 + index * 0.012;
+    const alpha = 0.022 + index * 0.007;
 
     const beam = context.createLinearGradient(
       originX,
@@ -640,6 +707,120 @@ function drawMeteors(
   context.restore();
 }
 
+function drawFlightFlow(
+  context: CanvasRenderingContext2D,
+  input: WorldAmbientEffectsInput,
+): void {
+  const { width, height, time, quality } = input;
+  const count =
+    quality === "low"
+      ? 8
+      : quality === "medium"
+        ? 12
+        : quality === "high"
+          ? 16
+          : 20;
+  const vanishingX = width * 0.5;
+  const vanishingY = height * 0.34;
+
+  context.save();
+  context.globalCompositeOperation = "screen";
+  context.lineCap = "round";
+
+  for (let index = 0; index < count; index += 1) {
+    const laneRight = index % 2 === 0;
+    const cycleSeconds = 2.8 + seededUnit(index, 211) * 1.8;
+    const progress =
+      positiveModulo(
+        time / cycleSeconds + seededUnit(index, 212),
+        1,
+      );
+    const eased = progress * progress;
+    const side = laneRight ? 1 : -1;
+    const targetX =
+      width *
+      (0.54 +
+        side *
+          (0.28 + seededUnit(index, 213) * 0.18));
+    const targetY =
+      height *
+      (0.72 + seededUnit(index, 214) * 0.24);
+    const x =
+      vanishingX + (targetX - vanishingX) * eased;
+    const y =
+      vanishingY + (targetY - vanishingY) * eased;
+    const alpha =
+      Math.sin(progress * Math.PI) *
+      (0.12 + eased * 0.22);
+    const radius = 0.7 + eased * 2.6;
+
+    context.globalAlpha = alpha;
+    context.fillStyle =
+      index % 4 === 0 ? "#fff1c9" : "#c9efff";
+    context.shadowBlur = 5 + eased * 8;
+    context.shadowColor =
+      index % 4 === 0 ? "#ffd991" : "#8edcff";
+    context.beginPath();
+    context.ellipse(
+      x,
+      y,
+      radius * (1.3 + eased),
+      radius,
+      side * 0.18,
+      0,
+      Math.PI * 2,
+    );
+    context.fill();
+  }
+
+  context.restore();
+}
+
+function drawGameplayReadabilityGrade(
+  context: CanvasRenderingContext2D,
+  input: WorldAmbientEffectsInput,
+): void {
+  const { width, height } = input;
+
+  context.save();
+  context.globalCompositeOperation = "source-over";
+
+  // A gentle cool grade pushes the painting behind gameplay without making the
+  // scene muddy.
+  context.fillStyle = "rgba(4, 10, 28, 0.08)";
+  context.fillRect(0, 0, width, height);
+
+  // Suppress the extremely bright gate/halo side where enemy labels previously
+  // disappeared into gold/white.
+  const rightGrade = context.createLinearGradient(
+    width * 0.5,
+    0,
+    width,
+    0,
+  );
+  rightGrade.addColorStop(0, "rgba(5, 11, 27, 0)");
+  rightGrade.addColorStop(0.56, "rgba(5, 11, 27, 0.05)");
+  rightGrade.addColorStop(1, "rgba(5, 11, 27, 0.24)");
+  context.fillStyle = rightGrade;
+  context.fillRect(width * 0.5, 0, width * 0.5, height);
+
+  // Keep the central typing corridor calmer than the decorative top/bottom.
+  const laneGrade = context.createLinearGradient(
+    0,
+    height * 0.12,
+    0,
+    height * 0.9,
+  );
+  laneGrade.addColorStop(0, "rgba(4, 10, 26, 0)");
+  laneGrade.addColorStop(0.34, "rgba(4, 10, 26, 0.08)");
+  laneGrade.addColorStop(0.72, "rgba(4, 10, 26, 0.1)");
+  laneGrade.addColorStop(1, "rgba(4, 10, 26, 0.03)");
+  context.fillStyle = laneGrade;
+  context.fillRect(0, height * 0.12, width, height * 0.78);
+
+  context.restore();
+}
+
 export function drawWorldAmbientEffects(
   context: CanvasRenderingContext2D,
   input: WorldAmbientEffectsInput,
@@ -648,6 +829,7 @@ export function drawWorldAmbientEffects(
   if (profile === null) return;
 
   if (profile.galaxyDrift) drawGalaxyDrift(context, input);
+  if (profile.skyCurrents) drawSkyCurrents(context, input);
   if (profile.cloudMist) drawCloudMist(context, input);
   if (profile.waterfallShimmer) drawWaterfallShimmer(context, input);
   if (profile.waterfallSpray) drawWaterfallSpray(context, input);
@@ -655,4 +837,8 @@ export function drawWorldAmbientEffects(
   if (profile.lightRays) drawLightRays(context, input);
   if (profile.starDrift) drawStarDrift(context, input);
   drawMeteors(context, input, profile.meteorCount);
+  if (profile.flightFlow) drawFlightFlow(context, input);
+  if (profile.readabilityGrade) {
+    drawGameplayReadabilityGrade(context, input);
+  }
 }
