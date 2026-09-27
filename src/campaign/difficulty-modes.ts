@@ -184,6 +184,12 @@ const FIXED: Record<
   },
 };
 
+export function normalEnemyProjectilesDefaultForDefinition(
+  definition: DifficultyModeDefinition,
+): boolean {
+  return definition.modeFactor >= FIXED.nightmare.modeFactor;
+}
+
 export function migrateDifficultyMode(value: unknown): DifficultyMode | null {
   if (typeof value !== "string") return null;
 
