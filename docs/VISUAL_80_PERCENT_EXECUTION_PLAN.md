@@ -1370,3 +1370,20 @@ Owner should validate:
 - actual +score popup survives about 2s then fades/removes;
 - Auto suppresses normal-enemy projectiles below Nightmare and enables them at Nightmare+ while boss fire remains;
 - no visible FPS/input-latency/readability regression on bright World 02 or darker Worlds.
+
+
+### CMB-13 — Browser visibility regression hotfix
+
+Status: COMPLETE.
+
+Browser recording after the first pass exposed three presentation regressions that automated logic tests did not catch:
+
+- player projectiles were technically spawning but the 3.8–5.2px cores and very fast 0.085–0.31s travel made them effectively invisible on a wide 1884px desktop canvas;
+- V3 flight trails were drawing a large part of their conceptual length below the bottom canvas edge because the player sits only 72px from the bottom;
+- the new fire cue replaced the older typing shot with a very low-gain oscillator-only tone, so it was easy to perceive as missing.
+
+Hotfix:
+- increase projectile rendered core/glow/trail scale and keep visual travel on-screen for 0.16–0.46s while damage remains instant;
+- compress flight-trail length into the visible bottom area while increasing width, glow and identity details;
+- add pooled sampled `player-fire` through the existing `SampleSfxBank`, preserving cadence limiting and pronunciation ducking;
+- raise hit/kill synth presence slightly without changing music/pronunciation priority.
