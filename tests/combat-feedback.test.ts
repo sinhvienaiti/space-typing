@@ -5,6 +5,7 @@ import {
   type KillScorePopup,
 } from "../src/characters/projectile-renderer";
 import { CombatSfxCadenceLimiter } from "../src/audio/Sfx";
+import { SAMPLE_SFX } from "../src/audio/sample-bank";
 
 describe("combat feedback lifetimes", () => {
   it("fades and removes kill score popups after about two seconds", () => {
@@ -25,6 +26,12 @@ describe("combat feedback lifetimes", () => {
 
     advanceKillScorePopups(popups, 0.81);
     expect(popups).toHaveLength(0);
+  });
+
+  it("keeps an audible sampled player-fire voice in the shared audio bank", () => {
+    expect(SAMPLE_SFX["player-fire"].poolSize).toBeGreaterThanOrEqual(4);
+    expect(SAMPLE_SFX["player-fire"].gain).toBeGreaterThanOrEqual(0.25);
+    expect(SAMPLE_SFX["player-fire"].group).toBe("typing");
   });
 
   it("bounds rapid fire/hit/kill audio cadence independently", () => {
