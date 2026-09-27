@@ -1,6 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+const REGISTRY_FILE = "src/worlds/layered-background-registry.ts";
+const BACKGROUND_PUBLIC_PREFIX = "/assets/space-typing/backgrounds/";
+
 const PNG_FILES = [
   "public/assets/space-typing/backgrounds/vendor/screaming-brain/nebula-purple-3-1024.png",
   "public/assets/space-typing/backgrounds/vendor/screaming-brain/nebula-blue-6-1024.png",
@@ -25,6 +28,42 @@ const AVIF_FILES = [
     minHeight: 1440,
   },
 ];
+
+const registrySource = await readFile(
+  resolve(process.cwd(), REGISTRY_FILE),
+  "utf8",
+);
+const referencedBackgroundFiles = [
+  ...new Set(
+    [...registrySource.matchAll(/["']([^"']+\.(?:png|avif|svg))["']/g)]
+      .map((match) => match[1])
+      .filter((source) => !source.startsWith("/assets/space-typing/ships/"))
+      .map((source) =>
+        source.startsWith(BACKGROUND_PUBLIC_PREFIX)
+          ? "public" + source
+          : "public/assets/space-typing/backgrounds/" + source,
+      ),
+  ),
+].sort();
+
+for (const relative of referencedBackgroundFiles) {
+  const data = await readFile(resolve(process.cwd(), relative));
+  if (data.length === 0) {
+    throw new Error(relative + ": referenced background asset is empty.");
+  }
+  if (relative.endsWith(".svg")) {
+    const head = data.subarray(0, Math.min(data.length, 512)).toString("utf8");
+    if (!head.includes("<svg")) {
+      throw new Error(relative + ": referenced SVG has no <svg root.");
+    }
+  }
+}
+
+console.log(
+  "Background reference integrity PASS:",
+  referencedBackgroundFiles.length,
+  "referenced local files exist and are non-empty.",
+);
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
