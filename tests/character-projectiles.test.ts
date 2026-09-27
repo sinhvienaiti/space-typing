@@ -37,6 +37,7 @@ describe("character projectile profiles", () => {
       const projectile = playerProjectileProfile(id);
       const trail = characterFlightTrailProfile(id);
       expect(projectile.presentationSpeed).toBeGreaterThan(1000);
+      expect(projectile.bodyRadius).toBeGreaterThanOrEqual(3.8);
       expect(projectile.trailLength).toBeGreaterThan(20);
       expect(projectile.particleCount).toBeGreaterThan(0);
       expect(projectile.muzzleRadius).toBeGreaterThan(0);
