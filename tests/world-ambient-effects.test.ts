@@ -24,6 +24,9 @@ describe("World authored ambient effects", () => {
       galaxyDrift: true,
       haloGlow: true,
       lightRays: true,
+      skyCurrents: true,
+      flightFlow: true,
+      readabilityGrade: true,
       meteorCount: 2,
     });
   });
