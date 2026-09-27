@@ -12,7 +12,7 @@ export type GamePhase =
   | "stageclear"
   | "gameover";
 
-export type VisualQuality = "low" | "medium" | "high" | "ultra";
+export type VisualQuality = "low" | "medium" | "high" | "ultra";\nexport type EnemyProjectileMode = "auto" | "off" | "on";
 
 export type EnemyKind =
   | "scout"
