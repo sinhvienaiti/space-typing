@@ -365,6 +365,232 @@ function drawHeadTrailBlend(
   context.restore();
 }
 
+function drawDirectionalHeadAura(
+  context: CanvasRenderingContext2D,
+  radius: number,
+  profile: Readonly<ProjectileHeadGlowProfile>,
+  primary: string,
+  secondary: string,
+  accent: string,
+  glowScale: number,
+  time: number,
+  id: number,
+): void {
+  const frontX = radius * profile.frontOffset;
+  const outerLength = radius * profile.directionalAuraLength;
+  const outerWidth = radius * profile.directionalAuraWidth;
+  const tipX = frontX + outerLength;
+  const rearX = frontX - radius * Math.min(1.1, profile.directionalAuraLength * 0.34);
+  const coreTipX = frontX + radius * profile.directionalCoreLength;
+  const coreWidth = radius * profile.directionalCoreWidth;
+
+  context.save();
+  context.globalCompositeOperation = "lighter";
+
+  // Soft rear energy connection so the aura reads as emitted by the generated
+  // body instead of being a separate decoration placed in front of it.
+  context.fillStyle = primary;
+  context.shadowColor = primary;
+  context.shadowBlur = 22 * profile.bloomSoftness * glowScale;
+  context.globalAlpha = profile.directionalRearAlpha;
+  context.beginPath();
+  context.moveTo(
+    frontX - radius * profile.directionalAuraLength * 0.72,
+    -outerWidth * 0.18,
+  );
+  context.quadraticCurveTo(
+    frontX - radius * 0.35,
+    -outerWidth * 0.34,
+    frontX + radius * 0.18,
+    0,
+  );
+  context.quadraticCurveTo(
+    frontX - radius * 0.35,
+    outerWidth * 0.34,
+    frontX - radius * profile.directionalAuraLength * 0.72,
+    outerWidth * 0.18,
+  );
+  context.closePath();
+  context.fill();
+
+  if (profile.family === "aurora") {
+    // Two broad filled wisps form a soft arrow-shaped aurora halo. They stay
+    // asymmetric and curved so Zenith never falls back to a generic orb.
+    for (let band = 0; band < 2; band += 1) {
+      const sign = band === 0 ? -1 : 1;
+      const color = band === 0 ? primary : accent;
+      const phase = time * 3.2 + id * 0.41 + band * 1.9;
+      const wave = Math.sin(phase) * outerWidth * 0.08;
+      context.fillStyle = color;
+      context.shadowColor = color;
+      context.shadowBlur = 28 * profile.bloomSoftness * glowScale;
+      context.globalAlpha = profile.directionalAuraAlpha * (band === 0 ? 0.92 : 0.72);
+      context.beginPath();
+      context.moveTo(rearX, sign * outerWidth * 0.22);
+      context.bezierCurveTo(
+        frontX - outerLength * 0.1,
+        sign * outerWidth * 0.72 + wave,
+        frontX + outerLength * 0.38,
+        -sign * outerWidth * 0.34,
+        tipX,
+        sign * outerWidth * 0.035,
+      );
+      context.bezierCurveTo(
+        frontX + outerLength * 0.35,
+        sign * outerWidth * 0.12,
+        frontX - outerLength * 0.18,
+        sign * outerWidth * 0.08,
+        rearX,
+        sign * outerWidth * 0.22,
+      );
+      context.closePath();
+      context.fill();
+    }
+  } else if (
+    profile.family === "orb" ||
+    profile.family === "halo" ||
+    profile.family === "tidal"
+  ) {
+    // Round-bodied projectiles retain their authored body silhouette, but the
+    // aura itself is still a forward teardrop/arrow rather than another circle.
+    context.fillStyle = primary;
+    context.shadowColor = primary;
+    context.shadowBlur = 28 * profile.bloomSoftness * glowScale;
+    context.globalAlpha = profile.directionalAuraAlpha;
+    context.beginPath();
+    context.moveTo(rearX, -outerWidth * 0.48);
+    context.bezierCurveTo(
+      frontX + outerLength * 0.08,
+      -outerWidth * 0.72,
+      frontX + outerLength * 0.46,
+      -outerWidth * 0.24,
+      tipX,
+      0,
+    );
+    context.bezierCurveTo(
+      frontX + outerLength * 0.46,
+      outerWidth * 0.24,
+      frontX + outerLength * 0.08,
+      outerWidth * 0.72,
+      rearX,
+      outerWidth * 0.48,
+    );
+    context.quadraticCurveTo(frontX - outerLength * 0.04, 0, rearX, -outerWidth * 0.48);
+    context.closePath();
+    context.fill();
+  } else if (
+    profile.family === "crescent" ||
+    profile.family === "blossom"
+  ) {
+    // Curved/slash projectiles use a split arrow halo so the aura follows the
+    // silhouette instead of flattening it into a straight spear.
+    for (let wing = 0; wing < 2; wing += 1) {
+      const sign = wing === 0 ? -1 : 1;
+      context.fillStyle = wing === 0 ? primary : accent;
+      context.shadowColor = wing === 0 ? primary : accent;
+      context.shadowBlur = 24 * profile.bloomSoftness * glowScale;
+      context.globalAlpha = profile.directionalAuraAlpha * 0.82;
+      context.beginPath();
+      context.moveTo(rearX, sign * outerWidth * 0.12);
+      context.quadraticCurveTo(
+        frontX + outerLength * 0.18,
+        sign * outerWidth * 0.72,
+        tipX,
+        0,
+      );
+      context.quadraticCurveTo(
+        frontX + outerLength * 0.24,
+        sign * outerWidth * 0.22,
+        rearX,
+        sign * outerWidth * 0.12,
+      );
+      context.closePath();
+      context.fill();
+    }
+  } else {
+    // Meteor, Crystal, Star, Needle, Void and Lance all need a clearly
+    // directional arrow/lance aura. Layered wedges give a soft halo around the
+    // authored shape without constructing a gradient for every shot/frame.
+    context.fillStyle = primary;
+    context.shadowColor = primary;
+    context.shadowBlur = 30 * profile.bloomSoftness * glowScale;
+    context.globalAlpha = profile.directionalAuraAlpha;
+    context.beginPath();
+    context.moveTo(rearX, -outerWidth * 0.54);
+    context.lineTo(frontX + outerLength * 0.28, -outerWidth * 0.32);
+    context.lineTo(tipX, 0);
+    context.lineTo(frontX + outerLength * 0.28, outerWidth * 0.32);
+    context.lineTo(rearX, outerWidth * 0.54);
+    context.lineTo(frontX - outerLength * 0.18, 0);
+    context.closePath();
+    context.fill();
+
+    context.fillStyle = accent;
+    context.shadowColor = accent;
+    context.shadowBlur = 18 * profile.bloomSoftness * glowScale;
+    context.globalAlpha = profile.directionalAuraAlpha * 0.38;
+    context.beginPath();
+    context.moveTo(frontX - outerLength * 0.42, -outerWidth * 0.24);
+    context.lineTo(frontX + outerLength * 0.34, -outerWidth * 0.16);
+    context.lineTo(tipX - outerLength * 0.04, 0);
+    context.lineTo(frontX + outerLength * 0.34, outerWidth * 0.16);
+    context.lineTo(frontX - outerLength * 0.42, outerWidth * 0.24);
+    context.closePath();
+    context.fill();
+  }
+
+  // Bright inner arrow is intentionally much narrower than the outer aura.
+  // This gives the "dazzling tip -> softer halo -> fading trail" hierarchy.
+  context.fillStyle = secondary;
+  context.shadowColor = secondary;
+  context.shadowBlur = 14 * glowScale;
+  context.globalAlpha = profile.directionalCoreAlpha;
+  context.beginPath();
+  context.moveTo(frontX - radius * 0.34, -coreWidth);
+  context.lineTo(
+    frontX + radius * profile.directionalCoreLength * 0.34,
+    -coreWidth * 0.52,
+  );
+  context.lineTo(coreTipX, 0);
+  context.lineTo(
+    frontX + radius * profile.directionalCoreLength * 0.34,
+    coreWidth * 0.52,
+  );
+  context.lineTo(frontX - radius * 0.34, coreWidth);
+  context.lineTo(frontX + radius * 0.08, 0);
+  context.closePath();
+  context.fill();
+
+  // A tiny axial streak and short wing flare make the nose sparkle without
+  // introducing the old round blob.
+  context.strokeStyle = "#ffffff";
+  context.shadowColor = secondary;
+  context.shadowBlur = 10 * glowScale;
+  context.globalAlpha = profile.directionalTipAlpha;
+  context.lineCap = "round";
+  context.lineWidth = Math.max(0.9, radius * 0.065);
+  context.beginPath();
+  context.moveTo(frontX + radius * 0.04, 0);
+  context.lineTo(coreTipX + radius * 0.16, 0);
+  context.stroke();
+
+  context.globalAlpha = profile.directionalTipAlpha * 0.62;
+  context.lineWidth = Math.max(0.7, radius * 0.045);
+  context.beginPath();
+  context.moveTo(
+    coreTipX - radius * 0.12,
+    -coreWidth * 1.45,
+  );
+  context.lineTo(coreTipX + radius * 0.04, 0);
+  context.lineTo(
+    coreTipX - radius * 0.12,
+    coreWidth * 1.45,
+  );
+  context.stroke();
+
+  context.restore();
+}
+
 function drawHeadSparkles(
   context: CanvasRenderingContext2D,
   frontX: number,
@@ -940,6 +1166,17 @@ function drawProjectileHeadGlow(
     profile,
     primary,
     glowScale,
+  );
+  drawDirectionalHeadAura(
+    context,
+    radius,
+    profile,
+    primary,
+    secondary,
+    accent,
+    glowScale,
+    time,
+    id,
   );
 
   switch (profile.family) {
