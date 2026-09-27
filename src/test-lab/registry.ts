@@ -24,7 +24,22 @@ import {
   EQUIPMENT_REGISTRY,
   type EquipmentDefinition,
 } from "../equipment/registry";
-import { CHARACTER_IDS } from "../characters/registry";
+import {
+  CHARACTER_IDS,
+  getCharacter,
+  type CharacterId,
+} from "../characters/registry";
+import { VANGUARD_ACTIVE_SKILL_ID } from "../characters/vanguard";
+import { AEGIS_ACTIVE_SKILL_ID } from "../characters/aegis";
+import { VOLT_ACTIVE_SKILL_ID } from "../characters/volt";
+import { WRAITH_ACTIVE_SKILL_ID } from "../characters/wraith";
+import { FORTUNE_ACTIVE_SKILL_ID } from "../characters/fortune";
+import { ARSENAL_ACTIVE_SKILL_ID } from "../characters/arsenal";
+import { ORACLE_ACTIVE_SKILL_ID } from "../characters/oracle";
+import { BASTION_ACTIVE_SKILL_ID } from "../characters/bastion";
+import { REAPER_ACTIVE_SKILL_ID } from "../characters/reaper";
+import { CELESTIAL_ACTIVE_SKILL_ID } from "../characters/celestial";
+import { ZENITH_ACTIVE_SKILL_ID } from "../characters/zenith";
 import { DEFENSIVE_SKILL_IDS } from "../skills/defensive";
 import { OFFENSIVE_SKILL_IDS } from "../skills/offensive";
 import { SUPPORT_SPELL_IDS } from "../skills/support";
@@ -38,6 +53,12 @@ import {
   validateWorldMusicProfiles,
 } from "../audio/music-profile";
 
+export type TestLabCharacterSkill = {
+  characterId: CharacterId;
+  id: string;
+  label: string;
+};
+
 export type TestLabRegistry = {
   worlds: readonly WorldProfile[];
   enemies: readonly EnemyDefinition[];
@@ -46,6 +67,7 @@ export type TestLabRegistry = {
   items: readonly ItemDefinition[];
   equipment: readonly EquipmentDefinition[];
   characters: readonly string[];
+  characterSkills: readonly TestLabCharacterSkill[];
   playerSkills: readonly string[];
   supportSpells: readonly string[];
   shopTypes: readonly string[];
@@ -65,6 +87,23 @@ export function createTestLabRegistry(): TestLabRegistry {
     items: ITEM_IDS.map((id) => ITEM_REGISTRY[id]),
     equipment: EQUIPMENT_IDS.map((id) => EQUIPMENT_REGISTRY[id]),
     characters: [...CHARACTER_IDS],
+    characterSkills: [
+      ["vanguard", VANGUARD_ACTIVE_SKILL_ID],
+      ["aegis", AEGIS_ACTIVE_SKILL_ID],
+      ["volt", VOLT_ACTIVE_SKILL_ID],
+      ["wraith", WRAITH_ACTIVE_SKILL_ID],
+      ["fortune", FORTUNE_ACTIVE_SKILL_ID],
+      ["arsenal", ARSENAL_ACTIVE_SKILL_ID],
+      ["oracle", ORACLE_ACTIVE_SKILL_ID],
+      ["bastion", BASTION_ACTIVE_SKILL_ID],
+      ["reaper", REAPER_ACTIVE_SKILL_ID],
+      ["celestial", CELESTIAL_ACTIVE_SKILL_ID],
+      ["zenith", ZENITH_ACTIVE_SKILL_ID],
+    ].map(([characterId, id]) => ({
+      characterId: characterId as CharacterId,
+      id,
+      label: getCharacter(characterId as CharacterId).activeName,
+    })),
     playerSkills: [
       ...DEFENSIVE_SKILL_IDS,
       ...OFFENSIVE_SKILL_IDS,
@@ -101,6 +140,19 @@ export function validateTestLabRegistry(
   }
   if (registry.equipment.length !== EQUIPMENT_IDS.length) {
     errors.push("Test Lab must expose every equipment definition.");
+  }
+  if (registry.characterSkills.length !== CHARACTER_IDS.length) {
+    errors.push("Test Lab must expose every character active skill.");
+  }
+  const characterSkillIds = new Set(
+    registry.characterSkills.map((entry) => entry.characterId),
+  );
+  for (const characterId of CHARACTER_IDS) {
+    if (!characterSkillIds.has(characterId)) {
+      errors.push(
+        "Missing Test Lab character active skill: " + characterId,
+      );
+    }
   }
   if (registry.musicProfileIds.length !== WORLD_REGISTRY.length) {
     errors.push("Every World must resolve a Test Lab music profile.");
