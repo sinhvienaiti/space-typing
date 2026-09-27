@@ -88,22 +88,62 @@ export function createTestLabRegistry(): TestLabRegistry {
     equipment: EQUIPMENT_IDS.map((id) => EQUIPMENT_REGISTRY[id]),
     characters: [...CHARACTER_IDS],
     characterSkills: [
-      ["vanguard", VANGUARD_ACTIVE_SKILL_ID],
-      ["aegis", AEGIS_ACTIVE_SKILL_ID],
-      ["volt", VOLT_ACTIVE_SKILL_ID],
-      ["wraith", WRAITH_ACTIVE_SKILL_ID],
-      ["fortune", FORTUNE_ACTIVE_SKILL_ID],
-      ["arsenal", ARSENAL_ACTIVE_SKILL_ID],
-      ["oracle", ORACLE_ACTIVE_SKILL_ID],
-      ["bastion", BASTION_ACTIVE_SKILL_ID],
-      ["reaper", REAPER_ACTIVE_SKILL_ID],
-      ["celestial", CELESTIAL_ACTIVE_SKILL_ID],
-      ["zenith", ZENITH_ACTIVE_SKILL_ID],
-    ].map(([characterId, id]) => ({
-      characterId: characterId as CharacterId,
-      id,
-      label: getCharacter(characterId as CharacterId).activeName,
-    })),
+      {
+        characterId: "vanguard",
+        id: VANGUARD_ACTIVE_SKILL_ID,
+        label: getCharacter("vanguard").activeName,
+      },
+      {
+        characterId: "aegis",
+        id: AEGIS_ACTIVE_SKILL_ID,
+        label: getCharacter("aegis").activeName,
+      },
+      {
+        characterId: "volt",
+        id: VOLT_ACTIVE_SKILL_ID,
+        label: getCharacter("volt").activeName,
+      },
+      {
+        characterId: "wraith",
+        id: WRAITH_ACTIVE_SKILL_ID,
+        label: getCharacter("wraith").activeName,
+      },
+      {
+        characterId: "fortune",
+        id: FORTUNE_ACTIVE_SKILL_ID,
+        label: getCharacter("fortune").activeName,
+      },
+      {
+        characterId: "arsenal",
+        id: ARSENAL_ACTIVE_SKILL_ID,
+        label: getCharacter("arsenal").activeName,
+      },
+      {
+        characterId: "oracle",
+        id: ORACLE_ACTIVE_SKILL_ID,
+        label: getCharacter("oracle").activeName,
+      },
+      {
+        characterId: "bastion",
+        id: BASTION_ACTIVE_SKILL_ID,
+        label: getCharacter("bastion").activeName,
+      },
+      {
+        characterId: "reaper",
+        id: REAPER_ACTIVE_SKILL_ID,
+        label: getCharacter("reaper").activeName,
+      },
+      {
+        characterId: "celestial",
+        id: CELESTIAL_ACTIVE_SKILL_ID,
+        label: getCharacter("celestial").activeName,
+      },
+      {
+        characterId: "zenith",
+        id: ZENITH_ACTIVE_SKILL_ID,
+        label: getCharacter("zenith").activeName,
+      },
+    ],
     playerSkills: [
       ...DEFENSIVE_SKILL_IDS,
       ...OFFENSIVE_SKILL_IDS,
