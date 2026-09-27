@@ -76,10 +76,13 @@ describe("character visual profiles", () => {
       scale: () => {},
       beginPath: () => {},
       moveTo: () => {},
+      lineTo: () => {},
       quadraticCurveTo: () => operations.push("engine"),
       closePath: () => {},
       fill: () => {},
+      stroke: () => {},
       ellipse: () => {},
+      createLinearGradient: () => ({ addColorStop: () => {} }),
       drawImage: () => operations.push("sprite"),
     } as unknown as CanvasRenderingContext2D;
 
@@ -115,10 +118,13 @@ describe("character visual profiles", () => {
       scale: () => {},
       beginPath: () => {},
       moveTo: () => {},
+      lineTo: () => {},
       quadraticCurveTo: () => operations.push("engine"),
       closePath: () => {},
       fill: () => {},
+      stroke: () => {},
       ellipse: () => {},
+      createLinearGradient: () => ({ addColorStop: () => {} }),
       drawImage: () => {
         blurs.push(context.shadowBlur);
         operations.push("sprite");
