@@ -3741,7 +3741,13 @@ export class Game {
   }
 
   private fireBossProjectiles(boss: BossState): void {
-    if (this.gameplayMode === "recall" || this.difficulty === null) return;
+    if (
+      !bossProjectilesEnabled() ||
+      this.gameplayMode === "recall" ||
+      this.difficulty === null
+    ) {
+      return;
+    }
 
     const { x, y } = this.bossPosition();
     const playerX = this.width / 2;
@@ -5122,6 +5128,14 @@ export class Game {
 
   private fireEnemyProjectile(enemy: Enemy): void {
     if (this.difficulty === null) return;
+    if (
+      !normalEnemyProjectilesEnabled(
+        this.settings.enemyProjectileMode,
+        this.difficulty,
+      )
+    ) {
+      return;
+    }
 
     const playerX = this.width / 2;
     const playerY = this.height - PLAYER_Y_OFFSET;
@@ -6243,6 +6257,14 @@ export class Game {
 
   private spawnVolatileBurst(enemy: Enemy): void {
     if (this.difficulty === null) return;
+    if (
+      !normalEnemyProjectilesEnabled(
+        this.settings.enemyProjectileMode,
+        this.difficulty,
+      )
+    ) {
+      return;
+    }
 
     const playerX = this.width / 2;
     const playerY = this.height - PLAYER_Y_OFFSET;
