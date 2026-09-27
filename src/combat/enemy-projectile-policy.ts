@@ -17,7 +17,7 @@ export function normalEnemyProjectilesEnabled(
   const mode = sanitizeEnemyProjectileMode(modeInput);
   if (mode === "off") return false;
   if (mode === "on") return true;
-  return difficulty?.normalEnemyProjectilesDefault === true;
+  return difficulty?.normalEnemyProjectilesDefault === 1;
 }
 
 export function bossProjectilesEnabled(): true {
