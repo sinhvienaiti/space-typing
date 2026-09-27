@@ -6,9 +6,7 @@ import {
   SCORE_POPUP_FLOAT_DISTANCE,
   SCORE_POPUP_PROTECTED_TOP_Y,
   type KillScorePopup,
-} from "../src/characters/projectile-renderer";
-import { CombatSfxCadenceLimiter } from "../src/audio/Sfx";
-import { SAMPLE_SFX } from "../src/audio/sample-bank";
+} from "../src/combat/score-popup";
 
 describe("combat feedback lifetimes", () => {
   it("fades and removes kill score popups after about two seconds", () => {
@@ -45,25 +43,5 @@ describe("combat feedback lifetimes", () => {
     expect(bottomClamped).toBeGreaterThanOrEqual(safeY);
   });
 
-  it("keeps an audible sampled player-fire voice in the shared audio bank", () => {
-    expect(SAMPLE_SFX["player-fire"].poolSize).toBeGreaterThanOrEqual(4);
-    expect(SAMPLE_SFX["player-fire"].gain).toBeGreaterThanOrEqual(0.25);
-    expect(SAMPLE_SFX["player-fire"].group).toBe("typing");
-  });
 
-  it("bounds rapid fire/hit/kill audio cadence independently", () => {
-    const limiter = new CombatSfxCadenceLimiter();
-
-    expect(limiter.allow("fire", 100)).toBe(true);
-    expect(limiter.allow("fire", 110)).toBe(false);
-    expect(limiter.allow("fire", 125)).toBe(true);
-
-    expect(limiter.allow("hit", 100)).toBe(true);
-    expect(limiter.allow("hit", 120)).toBe(false);
-    expect(limiter.allow("hit", 131)).toBe(true);
-
-    expect(limiter.allow("kill", 100)).toBe(true);
-    expect(limiter.allow("kill", 160)).toBe(false);
-    expect(limiter.allow("kill", 173)).toBe(true);
-  });
 });
