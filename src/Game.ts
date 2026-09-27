@@ -547,6 +547,7 @@ export type TestLabGameSnapshot = {
   statuses: ActiveStatus[];
   hardCc: HardCcState;
   projectiles: number;
+  playerShots: number;
   particles: number;
   activePressure: ActiveTypingPressureSnapshot;
   deathMode: TestLabDeathMode;
@@ -934,6 +935,7 @@ export class Game {
         immunity: { ...this.hardCcState.immunity },
       },
       projectiles: this.projectiles.length,
+      playerShots: this.playerVisualShots.length,
       particles: this.particles.length,
       activePressure:
         difficulty === null
