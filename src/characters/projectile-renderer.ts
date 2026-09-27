@@ -1,12 +1,34 @@
 import type { CharacterId } from "./registry";
 import {
   playerProjectileProfile,
+  projectileTrailProfile,
   type PlayerProjectileStyleId,
+  type ProjectileTrailProfile,
 } from "./projectiles";
 import { drawPlayerProjectileArt } from "./projectile-art";
 
 export const PLAYER_PROJECTILE_BODY_SCALE = 2.55;
 export const PLAYER_PROJECTILE_RAY_COUNT = 8;
+
+export const PROJECTILE_TAPER_SEGMENT_COUNT = 3;
+export const SCORE_POPUP_PROTECTED_TOP_Y = 148;
+export const SCORE_POPUP_FLOAT_DISTANCE = 26;
+export const SCORE_POPUP_BOTTOM_MARGIN = 72;
+
+export function scorePopupSafeY(
+  requestedY: number,
+  canvasHeight: number,
+): number {
+  const safeMax = Math.max(
+    SCORE_POPUP_PROTECTED_TOP_Y,
+    canvasHeight - SCORE_POPUP_BOTTOM_MARGIN,
+  );
+  const safeMin = Math.min(
+    safeMax,
+    SCORE_POPUP_PROTECTED_TOP_Y + SCORE_POPUP_FLOAT_DISTANCE,
+  );
+  return Math.max(safeMin, Math.min(safeMax, requestedY));
+}
 
 export const PROJECTILE_VISUAL_IDENTITIES: Record<
   PlayerProjectileStyleId,
@@ -269,52 +291,279 @@ function drawCrossFlare(
   context.restore();
 }
 
-function drawLinearWake(
-  context: CanvasRenderingContext2D,
-  length: number,
-  width: number,
-  primary: string,
-  secondary: string,
+function trailWidthRatio(
+  profile: ProjectileTrailProfile,
+  ratio: number,
+): number {
+  if (ratio <= 0.5) {
+    const t = ratio / 0.5;
+    return (
+      profile.frontWidthRatio +
+      (profile.midWidthRatio - profile.frontWidthRatio) * t
+    );
+  }
+  const t = (ratio - 0.5) / 0.5;
+  return (
+    profile.midWidthRatio +
+    (profile.endWidthRatio - profile.midWidthRatio) * t
+  );
+}
+
+function trailCenterY(
+  profile: ProjectileTrailProfile,
+  ratio: number,
   time: number,
   id: number,
-  bend = 0,
+  phase: number,
+  yOffset: number,
+): number {
+  if (profile.bend <= 0) return yOffset;
+  const envelope = ratio * (1 - ratio * 0.38);
+  return (
+    yOffset +
+    Math.sin(time * 4.1 + id * 0.67 + phase + ratio * 4.8) *
+      profile.bend *
+      envelope
+  );
+}
+
+function drawTaperedTrailSegment(
+  context: CanvasRenderingContext2D,
+  length: number,
+  headWidth: number,
+  profile: ProjectileTrailProfile,
+  startRatio: number,
+  endRatio: number,
+  widthScale: number,
+  alpha: number,
+  color: string,
+  time: number,
+  id: number,
+  phase: number,
+  yOffset: number,
 ): void {
-  const gradient = context.createLinearGradient(0, 0, -length, 0);
-  gradient.addColorStop(0, secondary);
-  gradient.addColorStop(0.18, primary);
-  gradient.addColorStop(0.62, primary);
-  gradient.addColorStop(1, "rgba(255,255,255,0)");
+  const x0 = -length * startRatio;
+  const x1 = -length * endRatio;
+  const y0 = trailCenterY(profile, startRatio, time, id, phase, yOffset);
+  const y1 = trailCenterY(profile, endRatio, time, id, phase, yOffset);
+  const half0 =
+    headWidth * trailWidthRatio(profile, startRatio) * widthScale * 0.5;
+  const half1 =
+    headWidth * trailWidthRatio(profile, endRatio) * widthScale * 0.5;
+
+  context.globalAlpha = alpha;
+  context.fillStyle = color;
+  context.beginPath();
+  context.moveTo(x0, y0 - half0);
+  context.lineTo(x1, y1 - half1);
+  context.lineTo(x1, y1 + half1);
+  context.lineTo(x0, y0 + half0);
+  context.closePath();
+  context.fill();
+}
+
+function drawTaperedRibbon(
+  context: CanvasRenderingContext2D,
+  length: number,
+  headWidth: number,
+  profile: ProjectileTrailProfile,
+  primary: string,
+  hotColor: string,
+  time: number,
+  id: number,
+  phase: number,
+  yOffset: number,
+  alphaScale: number,
+): void {
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.shadowColor = primary;
+  context.shadowBlur = Math.max(10, headWidth * 0.68);
+
+  // Back-to-front overlapping sections produce both geometric taper and a
+  // strong alpha falloff without allocating a CanvasGradient per shot/frame.
+  drawTaperedTrailSegment(
+    context,
+    length,
+    headWidth,
+    profile,
+    0.66,
+    1,
+    1,
+    profile.outerAlpha * 0.22 * alphaScale,
+    primary,
+    time,
+    id,
+    phase,
+    yOffset,
+  );
+  drawTaperedTrailSegment(
+    context,
+    length,
+    headWidth,
+    profile,
+    0.32,
+    0.72,
+    1,
+    profile.outerAlpha * 0.58 * alphaScale,
+    primary,
+    time,
+    id,
+    phase,
+    yOffset,
+  );
+  drawTaperedTrailSegment(
+    context,
+    length,
+    headWidth,
+    profile,
+    0,
+    0.4,
+    1,
+    profile.outerAlpha * alphaScale,
+    primary,
+    time,
+    id,
+    phase,
+    yOffset,
+  );
+
+  context.shadowColor = hotColor;
+  context.shadowBlur = Math.max(5, headWidth * 0.28);
+  const coreScale = profile.coreWidthRatio;
+  drawTaperedTrailSegment(
+    context,
+    length * 0.9,
+    headWidth,
+    profile,
+    0.58,
+    1,
+    coreScale,
+    profile.coreAlpha * 0.18 * alphaScale,
+    hotColor,
+    time,
+    id,
+    phase,
+    yOffset,
+  );
+  drawTaperedTrailSegment(
+    context,
+    length * 0.9,
+    headWidth,
+    profile,
+    0.25,
+    0.66,
+    coreScale,
+    profile.coreAlpha * 0.54 * alphaScale,
+    hotColor,
+    time,
+    id,
+    phase,
+    yOffset,
+  );
+  drawTaperedTrailSegment(
+    context,
+    length * 0.9,
+    headWidth,
+    profile,
+    0,
+    0.34,
+    coreScale,
+    profile.coreAlpha * alphaScale,
+    hotColor,
+    time,
+    id,
+    phase,
+    yOffset,
+  );
+
+  // Supporting glow is deliberately concentrated at the projectile front.
+  context.globalAlpha = 0.34 * alphaScale;
+  context.fillStyle = hotColor;
+  context.shadowColor = primary;
+  context.shadowBlur = Math.max(12, headWidth * 0.8);
+  context.beginPath();
+  context.ellipse(
+    headWidth * 0.08,
+    yOffset,
+    headWidth * 0.43,
+    headWidth * 0.28,
+    0,
+    0,
+    Math.PI * 2,
+  );
+  context.fill();
+  context.restore();
+}
+
+function drawConfiguredTaperedWake(
+  context: CanvasRenderingContext2D,
+  styleId: PlayerProjectileStyleId,
+  length: number,
+  radius: number,
+  primary: string,
+  secondary: string,
+  accent: string,
+  time: number,
+  id: number,
+): void {
+  const trail = projectileTrailProfile(styleId);
+  const headWidth = radius * 2.15;
+  const count = trail.ribbonCount;
+  for (let band = 0; band < count; band += 1) {
+    const centered = band - (count - 1) * 0.5;
+    const yOffset = centered * radius * trail.ribbonSpread;
+    const phase = band * 2.1;
+    const color =
+      band === 0
+        ? primary
+        : band === 1 && count === 2
+          ? accent
+          : band === 1
+            ? accent
+            : secondary;
+    const hotColor =
+      band === 0 ? secondary : band === 1 ? secondary : accent;
+    drawTaperedRibbon(
+      context,
+      length,
+      headWidth,
+      trail,
+      color,
+      hotColor,
+      time,
+      id,
+      phase,
+      yOffset,
+      band === 0 ? 1 : 0.82,
+    );
+  }
 
   context.save();
   context.globalCompositeOperation = "lighter";
-  context.lineCap = "round";
+  context.fillStyle = secondary;
   context.shadowColor = primary;
-  context.shadowBlur = 18;
-  context.strokeStyle = gradient;
-  context.globalAlpha = 0.34;
-  context.lineWidth = width * 2.4;
-  context.beginPath();
-  context.moveTo(-2, 0);
-  context.quadraticCurveTo(
-    -length * 0.45,
-    Math.sin(time * 5.2 + id) * bend,
-    -length,
-    Math.sin(time * 3.7 + id * 0.6) * bend,
-  );
-  context.stroke();
-
-  context.globalAlpha = 0.94;
-  context.shadowBlur = 8;
-  context.lineWidth = Math.max(2, width * 0.58);
-  context.beginPath();
-  context.moveTo(0, 0);
-  context.quadraticCurveTo(
-    -length * 0.48,
-    Math.sin(time * 5.2 + id) * bend * 0.55,
-    -length * 0.92,
-    Math.sin(time * 3.7 + id * 0.6) * bend * 0.55,
-  );
-  context.stroke();
+  context.shadowBlur = 7;
+  for (let index = 0; index < trail.sideStreakCount; index += 1) {
+    const ratio = (index + 1) / (trail.sideStreakCount + 1);
+    const x = -length * (0.18 + ratio * 0.68);
+    const side =
+      index % 2 === 0 ? -1 : 1;
+    const y =
+      side *
+      radius *
+      (0.58 + ratio * 0.92) +
+      Math.sin(time * 6.2 + id + index * 1.7) * radius * 0.32;
+    const streakLength = Math.max(7, length * (0.045 + ratio * 0.028));
+    const streakHalf = Math.max(0.6, radius * (0.08 + (1 - ratio) * 0.04));
+    context.globalAlpha = 0.56 * (1 - ratio * 0.54);
+    context.beginPath();
+    context.moveTo(x + streakLength * 0.16, y);
+    context.lineTo(x - streakLength, y - streakHalf);
+    context.lineTo(x - streakLength * 0.82, y + streakHalf);
+    context.closePath();
+    context.fill();
+  }
   context.restore();
 }
 
@@ -328,7 +577,6 @@ function drawMeteorWake(
   time: number,
   id: number,
 ): void {
-  drawLinearWake(context, length, radius * 0.8, primary, secondary, time, id, 4);
   context.save();
   context.globalCompositeOperation = "lighter";
   context.fillStyle = secondary;
@@ -371,8 +619,8 @@ function drawCrescentWake(
   context.shadowBlur = 16;
   for (let band = 0; band < 3; band += 1) {
     context.strokeStyle = band === 1 ? secondary : primary;
-    context.globalAlpha = 0.58 - band * 0.12;
-    context.lineWidth = Math.max(1.4, radius * (0.42 - band * 0.08));
+    context.globalAlpha = 0.3 - band * 0.055;
+    context.lineWidth = Math.max(1.05, radius * (0.2 - band * 0.025));
     context.beginPath();
     context.moveTo(-radius * 0.25, (band - 1) * radius * 0.28);
     context.bezierCurveTo(
@@ -398,7 +646,6 @@ function drawPrismWake(
   time: number,
   id: number,
 ): void {
-  drawLinearWake(context, length * 0.72, radius * 0.42, primary, secondary, time, id, 2);
   context.save();
   context.globalCompositeOperation = "lighter";
   for (let index = 1; index <= 8; index += 1) {
@@ -427,7 +674,6 @@ function drawNovaWake(
   time: number,
   id: number,
 ): void {
-  drawLinearWake(context, length * 0.62, radius * 0.56, primary, secondary, time, id, 2);
   context.save();
   context.globalCompositeOperation = "lighter";
   context.strokeStyle = primary;
@@ -461,8 +707,8 @@ function drawTwinStarWake(
     context.strokeStyle = band === 0 ? primary : accent;
     context.shadowColor = band === 0 ? primary : accent;
     context.shadowBlur = 13;
-    context.globalAlpha = 0.78;
-    context.lineWidth = Math.max(2.1, radius * 0.3);
+    context.globalAlpha = 0.44;
+    context.lineWidth = Math.max(1.1, radius * 0.14);
     context.beginPath();
     context.moveTo(0, sign * radius * 0.55);
     context.bezierCurveTo(
@@ -487,7 +733,6 @@ function drawHaloWake(
   accent: string,
   time: number,
 ): void {
-  drawLinearWake(context, length * 0.7, radius * 0.34, primary, secondary, time, 0, 1);
   context.save();
   context.globalCompositeOperation = "lighter";
   context.strokeStyle = accent;
@@ -514,7 +759,6 @@ function drawThunderWake(
   time: number,
   id: number,
 ): void {
-  drawLinearWake(context, length * 0.78, radius * 0.34, primary, secondary, time, id, 1);
   context.save();
   context.globalCompositeOperation = "lighter";
   context.strokeStyle = secondary;
@@ -549,7 +793,6 @@ function drawBlossomWake(
   time: number,
   id: number,
 ): void {
-  drawLinearWake(context, length * 0.66, radius * 0.44, primary, secondary, time, id, 4);
   context.save();
   context.globalCompositeOperation = "lighter";
   context.fillStyle = secondary;
@@ -582,8 +825,8 @@ function drawVoidWake(
   context.save();
   context.globalCompositeOperation = "source-over";
   context.lineCap = "round";
-  context.strokeStyle = "rgba(10, 0, 24, 0.78)";
-  context.lineWidth = radius * 1.5;
+  context.strokeStyle = "rgba(10, 0, 24, 0.62)";
+  context.lineWidth = Math.max(1.2, radius * 0.2);
   context.beginPath();
   context.moveTo(-radius * 0.2, 0);
   context.quadraticCurveTo(
@@ -625,7 +868,6 @@ function drawSolarWake(
   time: number,
   id: number,
 ): void {
-  drawLinearWake(context, length, radius * 0.75, primary, secondary, time, id, 5);
   context.save();
   context.globalCompositeOperation = "lighter";
   context.fillStyle = accent;
@@ -663,8 +905,8 @@ function drawTidalWake(
   context.shadowBlur = 13;
   for (let band = 0; band < 2; band += 1) {
     context.strokeStyle = band === 0 ? primary : secondary;
-    context.globalAlpha = 0.66 - band * 0.14;
-    context.lineWidth = Math.max(1.5, radius * (0.38 - band * 0.08));
+    context.globalAlpha = 0.36 - band * 0.08;
+    context.lineWidth = Math.max(1.05, radius * (0.18 - band * 0.025));
     context.beginPath();
     context.moveTo(-radius * 0.2, 0);
     context.bezierCurveTo(
@@ -713,8 +955,8 @@ function drawAuroraWake(
     context.strokeStyle = color;
     context.shadowColor = color;
     context.shadowBlur = 14;
-    context.globalAlpha = 0.64;
-    context.lineWidth = Math.max(2, radius * 0.28);
+    context.globalAlpha = 0.34;
+    context.lineWidth = Math.max(1.05, radius * 0.14);
     context.beginPath();
     context.moveTo(0, (band - 1) * radius * 0.42);
     context.bezierCurveTo(
@@ -741,6 +983,17 @@ function drawStyleWake(
   time: number,
   id: number,
 ): void {
+  drawConfiguredTaperedWake(
+    context,
+    styleId,
+    length,
+    radius,
+    primary,
+    secondary,
+    accent,
+    time,
+    id,
+  );
   switch (styleId) {
     case "meteor-bolt":
       drawMeteorWake(context, length, radius, primary, secondary, accent, time, id);
@@ -1278,14 +1531,18 @@ export function drawPlayerProjectile(
   detailScale: number,
 ): void {
   const profile = playerProjectileProfile(shot.characterId);
+  const trail = projectileTrailProfile(profile.styleId);
   const position = shotPosition(shot);
   const radius =
     profile.bodyRadius *
     PLAYER_PROJECTILE_BODY_SCALE *
+    trail.headScale *
     (0.94 + Math.min(1.5, shot.power) * 0.12);
   const wakeLength = Math.max(
-    110,
-    profile.trailLength * (detailScale >= 0.72 ? 1.38 : 1.08),
+    132,
+    profile.trailLength *
+      trail.lengthScale *
+      (detailScale >= 0.72 ? 1 : 0.9),
   );
 
   context.save();
@@ -1477,7 +1734,7 @@ export function drawKillScorePopup(
   const alpha = killScorePopupOpacity(popup);
   if (alpha <= 0) return;
   const progress = 1 - clamp01(popup.life / Math.max(0.001, popup.maxLife));
-  const y = popup.y - progress * 26;
+  const y = popup.y - progress * SCORE_POPUP_FLOAT_DISTANCE;
 
   context.save();
   context.globalAlpha = alpha;
