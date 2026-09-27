@@ -9,6 +9,7 @@ import {
   characterVisualProfile,
 } from "../src/characters/visuals";
 import {
+  characterFlightPose,
   characterShipArtSource,
   drawCharacterShip,
   setCharacterShipSheet,
@@ -54,6 +55,16 @@ describe("character visual profiles", () => {
 
     expect(new Set(signatures).size).toBe(CHARACTER_IDS.length);
   });
+  it("moves the ship visibly over normal gameplay intervals", () => {
+    const start = characterFlightPose(0);
+    const later = characterFlightPose(2.5);
+
+    expect(Math.abs(later.bob - start.bob)).toBeGreaterThan(1);
+    expect(Math.abs(later.banking - start.banking)).toBeGreaterThan(0.01);
+    expect(Math.abs(later.driftX - start.driftX)).toBeGreaterThan(2);
+    expect(later.thrust).toBeGreaterThan(0.8);
+  });
+
   it("keeps the animated engine layer behind illustrated ship art", () => {
     const operations: string[] = [];
     const context = {
@@ -92,7 +103,7 @@ describe("character visual profiles", () => {
     }
   });
 
-  it("renders painted V3 sprites without duplicate animated thrusters or expensive bloom", () => {
+  it("keeps painted V3 sprites sharp while restoring reduced live thrust", () => {
     const operations: string[] = [];
     const blurs: number[] = [];
     const context = {
@@ -124,7 +135,9 @@ describe("character visual profiles", () => {
       drawCharacterShip(context, "aegis", {
         x: 40, y: 40, time: 1.5, glowScale: 1,
       });
-      expect(operations).toEqual(["sprite"]);
+      expect(operations.filter((operation) => operation === "engine").length)
+        .toBeGreaterThanOrEqual(2);
+      expect(operations.at(-1)).toBe("sprite");
       expect(blurs).toEqual([0]);
     } finally {
       setCharacterShipSheet(null);
