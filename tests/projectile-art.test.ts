@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  drawPlayerProjectileArt,
   hasPlayerProjectileAtlas,
   PLAYER_PROJECTILE_ATLAS_INDEX,
   projectileAtlasCell,
@@ -23,6 +24,37 @@ describe("generated projectile art atlas", () => {
       sw: 256,
       sh: 128,
     });
+  });
+
+  it("uses the loaded generated atlas as the authoritative body draw path", () => {
+    const drawImage = vi.fn();
+    const context = {
+      save: vi.fn(),
+      restore: vi.fn(),
+      drawImage,
+      globalCompositeOperation: "source-over",
+      globalAlpha: 1,
+      shadowColor: "",
+      shadowBlur: 0,
+    } as unknown as CanvasRenderingContext2D;
+
+    setPlayerProjectileAtlas({
+      naturalWidth: 768,
+      naturalHeight: 512,
+    } as HTMLImageElement);
+
+    expect(
+      drawPlayerProjectileArt(
+        context,
+        "meteor-bolt",
+        12,
+        "#38bfff",
+        1,
+      ),
+    ).toBe(true);
+    expect(drawImage).toHaveBeenCalledTimes(1);
+
+    setPlayerProjectileAtlas(null);
   });
 
   it("keeps a deterministic procedural fallback when generated art is absent", () => {
