@@ -65,7 +65,22 @@ export type ProjectileTrailProfile = {
   sideStreakCount: number;
 };
 
+export type ProjectileHeadLightFamily =
+  | "meteor"
+  | "crescent"
+  | "crystal"
+  | "orb"
+  | "star"
+  | "halo"
+  | "needle"
+  | "blossom"
+  | "void"
+  | "lance"
+  | "tidal"
+  | "aurora";
+
 export type ProjectileHeadGlowProfile = {
+  family: ProjectileHeadLightFamily;
   frontOffset: number;
   hotCoreScale: number;
   hotCoreAlpha: number;
@@ -283,7 +298,8 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
   Readonly<ProjectileHeadGlowProfile>
 > = {
   "meteor-bolt": {
-    frontOffset: 3.9,
+    family: "meteor",
+    frontOffset: 2.7,
     hotCoreScale: 0.36,
     hotCoreAlpha: 1,
     bloomScale: 1.72,
@@ -299,7 +315,8 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     sparkleSpread: 0.82,
   },
   "crescent-slash": {
-    frontOffset: 3.45,
+    family: "crescent",
+    frontOffset: 2.55,
     hotCoreScale: 0.3,
     hotCoreAlpha: 0.92,
     bloomScale: 1.4,
@@ -315,7 +332,8 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     sparkleSpread: 0.72,
   },
   "prism-dart": {
-    frontOffset: 3.9,
+    family: "crystal",
+    frontOffset: 2.85,
     hotCoreScale: 0.29,
     hotCoreAlpha: 0.98,
     bloomScale: 1.42,
@@ -331,7 +349,8 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     sparkleSpread: 0.78,
   },
   "nova-pearl": {
-    frontOffset: 3.15,
+    family: "orb",
+    frontOffset: 2.35,
     hotCoreScale: 0.37,
     hotCoreAlpha: 0.96,
     bloomScale: 1.7,
@@ -347,7 +366,8 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     sparkleSpread: 0.9,
   },
   "twin-star-shot": {
-    frontOffset: 3.55,
+    family: "star",
+    frontOffset: 2.55,
     hotCoreScale: 0.32,
     hotCoreAlpha: 0.98,
     bloomScale: 1.52,
@@ -363,7 +383,8 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     sparkleSpread: 0.82,
   },
   "halo-burst": {
-    frontOffset: 3.2,
+    family: "halo",
+    frontOffset: 2.35,
     hotCoreScale: 0.38,
     hotCoreAlpha: 1,
     bloomScale: 1.76,
@@ -379,7 +400,8 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     sparkleSpread: 0.88,
   },
   "thunder-needle": {
-    frontOffset: 4.15,
+    family: "needle",
+    frontOffset: 2.95,
     hotCoreScale: 0.28,
     hotCoreAlpha: 1,
     bloomScale: 1.46,
@@ -395,7 +417,8 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     sparkleSpread: 0.7,
   },
   "blossom-comet": {
-    frontOffset: 3.25,
+    family: "blossom",
+    frontOffset: 2.4,
     hotCoreScale: 0.34,
     hotCoreAlpha: 0.95,
     bloomScale: 1.58,
@@ -411,7 +434,8 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     sparkleSpread: 0.8,
   },
   "void-spike": {
-    frontOffset: 3.85,
+    family: "void",
+    frontOffset: 2.8,
     hotCoreScale: 0.28,
     hotCoreAlpha: 0.86,
     bloomScale: 1.48,
@@ -427,7 +451,8 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     sparkleSpread: 0.75,
   },
   "solar-lance": {
-    frontOffset: 4.1,
+    family: "lance",
+    frontOffset: 3.05,
     hotCoreScale: 0.4,
     hotCoreAlpha: 1,
     bloomScale: 1.88,
@@ -443,7 +468,8 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     sparkleSpread: 0.9,
   },
   "tidal-pearl": {
-    frontOffset: 3.2,
+    family: "tidal",
+    frontOffset: 2.4,
     hotCoreScale: 0.36,
     hotCoreAlpha: 0.96,
     bloomScale: 1.68,
@@ -459,7 +485,8 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     sparkleSpread: 0.88,
   },
   "aurora-ribbon": {
-    frontOffset: 3.55,
+    family: "aurora",
+    frontOffset: 2.45,
     hotCoreScale: 0.38,
     hotCoreAlpha: 1,
     bloomScale: 1.84,
