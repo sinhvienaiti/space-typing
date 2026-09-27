@@ -83,6 +83,7 @@ import {
   drawPlayerCombatImpact,
   drawPlayerMuzzleFlash,
   drawPlayerProjectile,
+  scorePopupSafeY,
   type KillScorePopup,
   type PlayerCombatImpact,
   type PlayerMuzzleFlash,
@@ -6071,7 +6072,7 @@ export class Game {
     }
     this.spawnKillScorePopup(
       enemy.x,
-      Math.min(this.height - 92, enemy.y + enemy.radius + 30),
+      enemy.y + enemy.radius + 30,
       this.stats.score - scoreBeforeKillReward,
     );
     this.tryRollEquipmentDrop(
@@ -7524,7 +7525,7 @@ export class Game {
     if (safeValue <= 0) return;
     this.killScorePopups.push({
       x,
-      y,
+      y: scorePopupSafeY(y, this.height),
       value: safeValue,
       life: 2,
       maxLife: 2,
