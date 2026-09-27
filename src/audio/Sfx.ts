@@ -116,12 +116,18 @@ export class Sfx {
     const variation = [0.985, 1.015, 1, 1.025][
       this.playerCombatVariation++ % 4
     ]!;
+    this.samples.play(
+      "player-fire",
+      this.volume,
+      this.pronunciationActive,
+      safePitch * variation,
+    );
     this.tone(
-      470 * safePitch * variation,
-      0.032,
+      520 * safePitch * variation,
+      0.042,
       "triangle",
-      0.024,
-      690 * safePitch * variation,
+      0.036,
+      760 * safePitch * variation,
       "typing",
     );
   }
@@ -134,7 +140,7 @@ export class Sfx {
       245 * safePitch * variation,
       0.052,
       "sine",
-      0.026,
+      0.036,
       150 * safePitch * variation,
       "combat",
     );
@@ -144,12 +150,12 @@ export class Sfx {
     if (!this.playerCombatCadence.allow("kill", this.clockMs())) return;
     const safePitch = Math.max(0.68, Math.min(1.4, pitch));
     const variation = [0.96, 1.02, 1][this.playerCombatVariation++ % 3]!;
-    this.noise(0.052, 0.018, "combat");
+    this.noise(0.062, 0.024, "combat");
     this.tone(
       390 * safePitch * variation,
       0.095,
       "sine",
-      0.034,
+      0.044,
       185 * safePitch * variation,
       "combat",
     );
