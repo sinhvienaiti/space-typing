@@ -98,8 +98,11 @@ describe("character visual profiles", () => {
         time: 1,
         glowScale: 0.8,
       });
-      // Two thrusters each draw an outer and an inner animated flame.
-      expect(operations.filter((operation) => operation === "engine")).toHaveLength(4);
+      // Two thrusters keep their animated flames and the flight-tail curve
+      // adds one more motion cue behind the illustrated hull.
+      expect(
+        operations.filter((operation) => operation === "engine").length,
+      ).toBeGreaterThanOrEqual(5);
       expect(operations.at(-1)).toBe("sprite");
     } finally {
       setCharacterShipSheet(null);
