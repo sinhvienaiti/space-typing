@@ -427,7 +427,16 @@ function drawFlightTail(
       const y = 19 + length * ratio * 0.82;
       context.globalAlpha = 0.74 - ratio * 0.32;
       context.beginPath();
-      context.arc(x, y, 1.3 + (index % 2) * 0.55, 0, Math.PI * 2);
+      const sparkRadius = 1.3 + (index % 2) * 0.55;
+      context.ellipse(
+        x,
+        y,
+        sparkRadius,
+        sparkRadius,
+        0,
+        0,
+        Math.PI * 2,
+      );
       context.fill();
     }
   } else if (trail.kind === "twin-star" || trail.kind === "aurora") {
