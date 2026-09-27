@@ -73,6 +73,14 @@ describe("typing combat logic", () => {
     expect(chooseTarget(enemies, "s", 400, 700)?.id).toBe(2);
   });
 
+  it("reacquires skill-advanced partial words by their next letter", () => {
+    const partial = enemy(7, "meteor", 420, 420);
+    partial.typed = 2; // next expected letter is "t"
+    const fresh = enemy(8, "travel", 400, 500);
+
+    expect(chooseTarget([fresh, partial], "t", 400, 700)?.id).toBe(7);
+  });
+
   it("uses stable tie-breaks for same-initial targets", () => {
     const enemies = [
       enemy(9, "morning", 300, 500),
