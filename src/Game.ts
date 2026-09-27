@@ -70,9 +70,29 @@ import {
 } from "./worlds/scene-renderer";
 import type { WorldSceneProfile } from "./worlds/scene-types";
 import type { CharacterId } from "./characters/registry";
-import { drawCharacterShip } from "./characters/renderer";
+import {
+  characterAimTargetAngle,
+  drawCharacterShip,
+  smoothCharacterAim,
+} from "./characters/renderer";
 import type { EquipmentAuraProfile } from "./characters/equipment-aura";
 import { playerProjectileProfile } from "./characters/projectiles";
+import {
+  advanceKillScorePopups,
+  drawKillScorePopup,
+  drawPlayerCombatImpact,
+  drawPlayerMuzzleFlash,
+  drawPlayerProjectile,
+  type KillScorePopup,
+  type PlayerCombatImpact,
+  type PlayerMuzzleFlash,
+  type PlayerShotOutcome,
+  type PlayerVisualShot,
+} from "./characters/projectile-renderer";
+import {
+  bossProjectilesEnabled,
+  normalEnemyProjectilesEnabled,
+} from "./combat/enemy-projectile-policy";
 import {
   AEGIS_ACTIVE_SKILL,
   AEGIS_ACTIVE_SKILL_ID,
@@ -677,7 +697,14 @@ export class Game {
   private enemies: Enemy[] = [];
   private readonly stageWordLedger = new StageWordLedger();
   private projectiles: EnemyProjectile[] = [];
+  // Laser is retained only for the dedicated hostile-projectile intercept tracer.
   private lasers: Laser[] = [];
+  private nextPlayerVisualShotId = 1;
+  private playerVisualShots: PlayerVisualShot[] = [];
+  private playerMuzzleFlashes: PlayerMuzzleFlash[] = [];
+  private playerCombatImpacts: PlayerCombatImpact[] = [];
+  private killScorePopups: KillScorePopup[] = [];
+  private playerAimAngle = 0;
   private projectileImpacts: Array<{
     x: number;
     y: number;
@@ -5202,10 +5229,16 @@ export class Game {
       this.updateBossPhase(boss);
     }
 
-    this.fireBossLaser(0.9);
-    this.sfx.shot(this.stats.multiplier);
+    const bossShotPosition = this.bossPosition();
+    const bossVisualShot = this.firePlayerVisualShot(
+      bossShotPosition.x,
+      bossShotPosition.y,
+      0.9,
+      boss.hp <= 0 ? "boss-kill" : "boss-hit",
+    );
 
     if (boss.hp <= 0) {
+      if (bossVisualShot !== null) bossVisualShot.outcome = "boss-kill";
       this.defeatBoss();
       this.emitStats();
       return;
@@ -5300,6 +5333,10 @@ export class Game {
       this.updateBossPhase(boss);
 
       if (boss.hp <= 0) {
+        if (bossVisualShot !== null) {
+          bossVisualShot.outcome = "boss-kill";
+          bossVisualShot.power = Math.max(bossVisualShot.power, 1.35);
+        }
         this.defeatBoss(completedEntry);
         this.emitStats();
         return;
@@ -5892,10 +5929,21 @@ export class Game {
     this.applyCharacterCorrectKeyPassive();
     this.applyRelicCorrectKeyPassive(enemy);
 
-    this.fireLaser(enemy, 0.8);
-    this.sfx.shot(this.stats.multiplier);
+    const completesWord = enemy.typed >= word.length;
+    const shotOutcome: PlayerShotOutcome =
+      completesWord && enemy.layersRemaining <= 1
+        ? "kill"
+        : completesWord
+          ? "layer"
+          : "hit";
+    this.firePlayerVisualShot(
+      enemy.x,
+      enemy.y,
+      completesWord ? (shotOutcome === "kill" ? 1.35 : 1.1) : 0.8,
+      shotOutcome,
+    );
 
-    if (enemy.typed >= word.length) {
+    if (completesWord) {
       this.completeWord(enemy);
     }
 
@@ -5939,20 +5987,13 @@ export class Game {
       this.addScore((45 + length * 8) * this.stats.multiplier);
       this.gainPower(4);
 
-      this.fireLaser(enemy, 1.25);
-      const hitDefinition = this.visualDefinitionForEnemy(enemy);
-      const hitFx = enemyFxProfile(
-        hitDefinition?.family ?? "rainbow",
-        "hit",
-      );
-      this.burst(enemy.x, enemy.y, hitFx.count, hitFx.hue);
-      this.sfx.hit(hitFx.pitch);
       this.targetId = null;
       return;
     }
 
     this.stageResultTracker.recordEnemyKill(enemy.elite);
     this.stats.kills += 1;
+    const scoreBeforeKillReward = this.stats.score;
     this.addScore((80 + length * 14) * this.stats.multiplier);
     this.gainPower(7);
     if (this.gameplayMode !== "recall") {
@@ -5975,15 +6016,7 @@ export class Game {
       this.hooks.onKillTranslation?.({ ...enemy.entry });
     }
 
-    this.fireLaser(enemy, 1.45);
     const deathDefinition = this.visualDefinitionForEnemy(enemy);
-    const deathFx = enemyFxProfile(
-      deathDefinition?.family ?? "rainbow",
-      "death",
-    );
-    this.burst(enemy.x, enemy.y, deathFx.count, deathFx.hue);
-    this.sfx.hit(deathFx.pitch);
-    this.sfx.kill(deathFx.pitch);
     if (enemy.elite || deathDefinition?.rarity === "elite") {
       const announcerEvent = this.priorityKillChain.registerKill(
         this.stageElapsedSeconds,
@@ -5995,6 +6028,11 @@ export class Game {
     if (enemy.golden) {
       this.addScore(260 * this.stats.multiplier);
     }
+    this.spawnKillScorePopup(
+      enemy.x,
+      Math.max(42, enemy.y - enemy.radius * 0.55),
+      this.stats.score - scoreBeforeKillReward,
+    );
     this.tryRollEquipmentDrop(
       enemy.golden ? "golden" : enemy.elite ? "elite" : "normal",
     );
@@ -7261,42 +7299,138 @@ export class Game {
     }
   }
 
-  private fireBossLaser(power: number): void {
-    const { x, y } = this.bossPosition();
-    this.lasers.push({
-      x1: this.width / 2,
-      y1: this.height - PLAYER_Y_OFFSET,
-      x2: x,
-      y2: y,
-      life: 0.09,
-      maxLife: 0.09,
+  private firePlayerVisualShot(
+    targetX: number,
+    targetY: number,
+    power: number,
+    outcome: PlayerShotOutcome,
+  ): PlayerVisualShot | null {
+    if (this.gameplayMode === "recall") return null;
+
+    const profile = playerProjectileProfile(this.characterId);
+    const startX = this.width / 2;
+    const startY = this.height - PLAYER_Y_OFFSET - 27;
+    const distance = Math.hypot(targetX - startX, targetY - startY);
+    const shot: PlayerVisualShot = {
+      id: this.nextPlayerVisualShotId++,
+      characterId: this.characterId,
+      startX,
+      startY,
+      targetX,
+      targetY,
+      age: 0,
+      duration: clamp(distance / profile.presentationSpeed, 0.085, 0.31),
       power,
+      outcome,
+    };
+    this.playerVisualShots.push(shot);
+    if (this.playerVisualShots.length > 40) {
+      this.playerVisualShots.shift();
+    }
+
+    this.playerMuzzleFlashes.push({
+      characterId: this.characterId,
+      x: startX,
+      y: startY,
+      life: 0.075,
+      maxLife: 0.075,
     });
-    this.burst(
-      x,
-      y,
-      7,
-      playerProjectileProfile(this.characterId).impactHue,
+    if (this.playerMuzzleFlashes.length > 14) {
+      this.playerMuzzleFlashes.shift();
+    }
+
+    this.sfx.playerFire(profile.firePitch);
+    return shot;
+  }
+
+  private queuePlayerCombatImpact(shot: PlayerVisualShot): void {
+    const kill = shot.outcome === "kill" || shot.outcome === "boss-kill";
+    const profile = playerProjectileProfile(shot.characterId);
+    const duration = kill ? 0.34 : shot.outcome === "layer" ? 0.24 : 0.18;
+    this.playerCombatImpacts.push({
+      characterId: shot.characterId,
+      x: shot.targetX,
+      y: shot.targetY,
+      life: duration,
+      maxLife: duration,
+      kill,
+      power: shot.power,
+    });
+    if (this.playerCombatImpacts.length > 28) {
+      this.playerCombatImpacts.shift();
+    }
+
+    if (kill) this.sfx.playerKill(profile.killPitch);
+    else this.sfx.playerHit(profile.hitPitch);
+  }
+
+  private updatePlayerCombatPresentation(dt: number): void {
+    let liveShots = 0;
+    for (const shot of this.playerVisualShots) {
+      shot.age += dt;
+      if (shot.age >= shot.duration) {
+        this.queuePlayerCombatImpact(shot);
+      } else {
+        this.playerVisualShots[liveShots++] = shot;
+      }
+    }
+    this.playerVisualShots.length = liveShots;
+
+    let liveFlashes = 0;
+    for (const flash of this.playerMuzzleFlashes) {
+      flash.life -= dt;
+      if (flash.life > 0) this.playerMuzzleFlashes[liveFlashes++] = flash;
+    }
+    this.playerMuzzleFlashes.length = liveFlashes;
+
+    let liveCombatImpacts = 0;
+    for (const impact of this.playerCombatImpacts) {
+      impact.life -= dt;
+      if (impact.life > 0) {
+        this.playerCombatImpacts[liveCombatImpacts++] = impact;
+      }
+    }
+    this.playerCombatImpacts.length = liveCombatImpacts;
+    advanceKillScorePopups(this.killScorePopups, dt);
+
+    let aimTarget: { x: number; y: number } | null = null;
+    if (this.targetId !== null) {
+      const enemy = this.enemies.find((item) => item.id === this.targetId);
+      if (enemy !== undefined) aimTarget = enemy;
+    }
+    if (aimTarget === null && this.boss !== null) {
+      aimTarget = this.bossPosition();
+    }
+
+    const desiredAim =
+      aimTarget === null
+        ? 0
+        : characterAimTargetAngle(
+            this.width / 2,
+            this.height - PLAYER_Y_OFFSET,
+            aimTarget.x,
+            aimTarget.y,
+          );
+    this.playerAimAngle = smoothCharacterAim(
+      this.playerAimAngle,
+      desiredAim,
+      dt,
     );
   }
 
-  private fireLaser(enemy: Enemy, power: number): void {
-    this.lasers.push({
-      x1: this.width / 2,
-      y1: this.height - PLAYER_Y_OFFSET,
-      x2: enemy.x,
-      y2: enemy.y,
-      life: 0.085,
-      maxLife: 0.085,
-      power,
+  private spawnKillScorePopup(x: number, y: number, value: number): void {
+    const safeValue = Math.max(0, value);
+    if (safeValue <= 0) return;
+    this.killScorePopups.push({
+      x,
+      y: y - 12,
+      value: safeValue,
+      life: 2,
+      maxLife: 2,
     });
-
-    this.burst(
-      enemy.x,
-      enemy.y,
-      power > 1 ? 12 : 5,
-      playerProjectileProfile(this.characterId).impactHue,
-    );
+    if (this.killScorePopups.length > 18) {
+      this.killScorePopups.shift();
+    }
   }
 
   private triggerImpactFeedback(kind: ImpactKind): void {
@@ -7548,6 +7682,42 @@ export class Game {
     context.arc(centerX, centerY, 9 + progress * maxRadius * 0.75, 0, Math.PI * 2);
     context.stroke();
     context.restore();
+  }
+
+  private drawPlayerCombatVfx(time: number): void {
+    const quality = qualityProfile(this.settings.visualQuality);
+    for (const flash of this.playerMuzzleFlashes) {
+      drawPlayerMuzzleFlash(
+        this.context,
+        flash,
+        time,
+        quality.glowScale,
+      );
+    }
+    for (const shot of this.playerVisualShots) {
+      drawPlayerProjectile(
+        this.context,
+        shot,
+        time,
+        quality.glowScale,
+        quality.particleScale,
+      );
+    }
+    for (const impact of this.playerCombatImpacts) {
+      drawPlayerCombatImpact(
+        this.context,
+        impact,
+        time,
+        quality.glowScale,
+        quality.particleScale,
+      );
+    }
+  }
+
+  private drawKillScorePopups(): void {
+    for (const popup of this.killScorePopups) {
+      drawKillScorePopup(this.context, popup);
+    }
   }
 
   private drawLasers(time: number): void {

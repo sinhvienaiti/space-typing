@@ -8,7 +8,7 @@ import {
   sanitizeKillTranslationSettings,
   usesTopKillTranslation,
 } from "./feedback/kill-translation";
-import { Game } from "./Game";
+import { Game } from "./Game";\nimport { sanitizeEnemyProjectileMode } from "./combat/enemy-projectile-policy";
 import {
   availableRageSegments,
   RAGE_SEGMENT_COUNT,
@@ -517,7 +517,7 @@ function loadSettings(): GameSettings {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw === null) return { ...defaultSettings };
 
-    const parsed = JSON.parse(raw) as Partial<GameSettings>;
+    const parsed = JSON.parse(raw) as Partial<GameSettings> & {\n      enemyProjectiles?: unknown;\n      enemyProjectilesEnabled?: unknown;\n    };
     return {
       sfxVolume:
         typeof parsed.sfxVolume === "number"
@@ -8523,6 +8523,20 @@ byId<HTMLSelectElement>("pronunciationEnabled").addEventListener(
       ...current,
       pronunciationEnabled:
         (event.currentTarget as HTMLSelectElement).value === "true",
+    };
+    markSettingsDirty();
+  },
+);
+
+byId<HTMLSelectElement>("enemyProjectileMode").addEventListener(
+  "change",
+  (event) => {
+    const current = settingsDraft ?? settings;
+    settingsDraft = {
+      ...current,
+      enemyProjectileMode: sanitizeEnemyProjectileMode(
+        (event.currentTarget as HTMLSelectElement).value,
+      ),
     };
     markSettingsDirty();
   },

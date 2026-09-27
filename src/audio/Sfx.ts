@@ -8,6 +8,31 @@ import {
 } from "./mix";
 import { SampleSfxBank } from "./sample-bank";
 
+export type PlayerCombatSfxKind = "fire" | "hit" | "kill";
+
+const PLAYER_COMBAT_SFX_MIN_GAP_MS: Record<PlayerCombatSfxKind, number> = {
+  fire: 24,
+  hit: 30,
+  kill: 72,
+};
+
+export class CombatSfxCadenceLimiter {
+  private readonly lastAt: Record<PlayerCombatSfxKind, number> = {
+    fire: Number.NEGATIVE_INFINITY,
+    hit: Number.NEGATIVE_INFINITY,
+    kill: Number.NEGATIVE_INFINITY,
+  };
+
+  allow(kind: PlayerCombatSfxKind, nowMs: number): boolean {
+    if (!Number.isFinite(nowMs)) return false;
+    if (nowMs - this.lastAt[kind] < PLAYER_COMBAT_SFX_MIN_GAP_MS[kind]) {
+      return false;
+    }
+    this.lastAt[kind] = nowMs;
+    return true;
+  }
+}
+
 export class Sfx {
   private context: AudioContext | null = null;
   private limiter: DynamicsCompressorNode | null = null;
@@ -17,7 +42,7 @@ export class Sfx {
   private volume = 0.5;
   private pronunciationActive = false;
   private destroyed = false;
-  private readonly timers = new Set<number>();
+  private readonly timers = new Set<number>();\n  private readonly playerCombatCadence = new CombatSfxCadenceLimiter();\n  private playerCombatVariation = 0;
 
   private readonly onPronunciation = (event: Event): void => {
     const detail = (event as CustomEvent<{ active?: unknown }>).detail;
@@ -81,6 +106,51 @@ export class Sfx {
       void this.context.resume();
     }
     this.samples.preload();
+  }
+
+  playerFire(pitch = 1): void {
+    if (!this.playerCombatCadence.allow("fire", this.clockMs())) return;
+    const safePitch = Math.max(0.68, Math.min(1.4, pitch));
+    const variation = [0.985, 1.015, 1, 1.025][
+      this.playerCombatVariation++ % 4
+    ]!;
+    this.tone(
+      470 * safePitch * variation,
+      0.032,
+      "triangle",
+      0.024,
+      690 * safePitch * variation,
+      "typing",
+    );
+  }
+
+  playerHit(pitch = 1): void {
+    if (!this.playerCombatCadence.allow("hit", this.clockMs())) return;
+    const safePitch = Math.max(0.68, Math.min(1.4, pitch));
+    const variation = [1, 0.97, 1.03][this.playerCombatVariation++ % 3]!;
+    this.tone(
+      245 * safePitch * variation,
+      0.052,
+      "sine",
+      0.026,
+      150 * safePitch * variation,
+      "combat",
+    );
+  }
+
+  playerKill(pitch = 1): void {
+    if (!this.playerCombatCadence.allow("kill", this.clockMs())) return;
+    const safePitch = Math.max(0.68, Math.min(1.4, pitch));
+    const variation = [0.96, 1.02, 1][this.playerCombatVariation++ % 3]!;
+    this.noise(0.052, 0.018, "combat");
+    this.tone(
+      390 * safePitch * variation,
+      0.095,
+      "sine",
+      0.034,
+      185 * safePitch * variation,
+      "combat",
+    );
   }
 
   shot(multiplier = 1): void {
@@ -410,6 +480,16 @@ export class Sfx {
         this.pronunciationActive,
       ) * 1.08,
     );
+  }
+
+  private clockMs(): number {
+    if (
+      typeof performance !== "undefined" &&
+      typeof performance.now === "function"
+    ) {
+      return performance.now();
+    }
+    return Date.now();
   }
 
   private schedule(callback: () => void, delayMs: number): void {
