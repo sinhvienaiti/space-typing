@@ -22,6 +22,8 @@ export type CharacterDrawOptions = {
   alpha?: number;
   aura?: EquipmentAuraProfile | null;
   detailScale?: number;
+  /** Presentation-only aim offset. Does not affect position, hitbox or targeting. */
+  aimAngle?: number;
 };
 
 let characterShipSheet: HTMLImageElement | null = null;
