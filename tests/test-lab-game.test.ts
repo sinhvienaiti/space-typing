@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Game } from "../src/Game";
 import { createStageConfig } from "../src/campaign/stage";
 import { difficultyFor } from "../src/campaign/difficulty";
+import {
+  SCORE_POPUP_FLOAT_DISTANCE,
+  SCORE_POPUP_PROTECTED_TOP_Y,
+} from "../src/characters/projectile-renderer";
 import { DEFAULT_RECALL_SETTINGS } from "../src/recall/model";
 import type { GameSettings, VocabularyEntry } from "../src/types";
 
@@ -623,6 +627,7 @@ describe("M21 gated Game Test Lab API", () => {
     const afterScore = game.getTestLabSnapshot()?.stats.score ?? 0;
     const runtime = game as unknown as {
       killScorePopups: Array<{
+        y: number;
         value: number;
         life: number;
         maxLife: number;
@@ -632,6 +637,9 @@ describe("M21 gated Game Test Lab API", () => {
     expect(runtime.killScorePopups).toHaveLength(1);
     expect(runtime.killScorePopups[0]?.value).toBe(afterScore - beforeScore);
     expect(runtime.killScorePopups[0]?.maxLife).toBe(2);
+    expect(runtime.killScorePopups[0]?.y).toBeGreaterThanOrEqual(
+      SCORE_POPUP_PROTECTED_TOP_Y + SCORE_POPUP_FLOAT_DISTANCE,
+    );
     game.destroy();
   });
 
