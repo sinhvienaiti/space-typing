@@ -1515,6 +1515,9 @@ export class Game {
     if (!this.testLabEnabled) return false;
     this.projectiles = [];
     this.lasers = [];
+    this.playerVisualShots = [];
+    this.playerMuzzleFlashes = [];
+    this.playerCombatImpacts = [];
     this.projectileImpacts = [];
     return true;
   }
@@ -1522,6 +1525,7 @@ export class Game {
   testLabClearParticles(): boolean {
     if (!this.testLabEnabled) return false;
     this.particles = [];
+    this.killScorePopups = [];
     return true;
   }
 
@@ -1593,8 +1597,12 @@ export class Game {
     this.enemies = [];
     this.projectiles = [];
     this.lasers = [];
+    this.playerVisualShots = [];
+    this.playerMuzzleFlashes = [];
+    this.playerCombatImpacts = [];
     this.projectileImpacts = [];
     this.particles = [];
+    this.killScorePopups = [];
     this.targetId = null;
     this.recallBonus = null;
     this.recallBonusPending = false;
@@ -2803,8 +2811,12 @@ export class Game {
     this.recallReplayCount = 0;
     this.recallPromptStartedAtSeconds = 0;
     this.lasers = [];
+    this.playerVisualShots = [];
+    this.playerMuzzleFlashes = [];
+    this.playerCombatImpacts = [];
     this.projectileImpacts = [];
     this.particles = [];
+    this.killScorePopups = [];
     this.targetId = null;
     this.learningEcho = null;
     this.supplyPod = null;
@@ -2965,8 +2977,12 @@ export class Game {
     this.enemies = [];
     this.projectiles = [];
     this.lasers = [];
+    this.playerVisualShots = [];
+    this.playerMuzzleFlashes = [];
+    this.playerCombatImpacts = [];
     this.projectileImpacts = [];
     this.particles = [];
+    this.killScorePopups = [];
     this.targetId = null;
     this.supplyPod = null;
     this.supplySpawnsRemaining = 0;
@@ -7180,7 +7196,7 @@ export class Game {
           enemy.y = Math.max(-enemy.radius, enemy.y - 46);
         }
 
-        this.fireLaser(enemy, 0.75);
+        this.firePlayerVisualShot(enemy.x, enemy.y, 0.75, "hit");
       }
     }
 
@@ -9628,6 +9644,7 @@ export class Game {
         glowScale: qualityProfile(this.settings.visualQuality).glowScale,
         detailScale: qualityProfile(this.settings.visualQuality).particleScale,
         aura: this.equipmentAura,
+        aimAngle: this.playerAimAngle,
       },
     );
   }
