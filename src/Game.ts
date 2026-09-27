@@ -69,6 +69,11 @@ import {
   WorldSceneRenderer,
 } from "./worlds/scene-renderer";
 import type { WorldSceneProfile } from "./worlds/scene-types";
+import {
+  BackgroundStage,
+  type BackgroundDiagnostics,
+  type BackgroundPresentation,
+} from "./background/stage";
 import type { CharacterId } from "./characters/registry";
 import { drawCharacterShip } from "./characters/renderer";
 import type { EquipmentAuraProfile } from "./characters/equipment-aura";
@@ -399,6 +404,7 @@ import {
   impactFeedback,
   telegraphPulse,
   telegraphStrength,
+  type CameraShakeOffset,
   type ImpactKind,
 } from "./vfx/polish";
 import { enemyFxProfile } from "./vfx/enemy-fx";
@@ -764,6 +770,8 @@ export class Game {
   private animationFrame = 0;
   private stars: Array<{ x: number; y: number; z: number }> = [];
   private readonly worldSceneRenderer = new WorldSceneRenderer();
+  /** BGV background (docs/BACKGROUND_VISUAL_REBOOT_PLAN.md); null keeps the legacy scene only. */
+  private readonly backgroundStage: BackgroundStage | null;
   private worldEnvironment: WorldEnvironmentProfile =
     environmentForWorld("world-01");
   private worldSceneProfile: WorldSceneProfile =
@@ -779,6 +787,10 @@ export class Game {
     vocabulary: VocabularyEntry[],
     settings: GameSettings,
     hooks: GameHooks,
+    options: {
+      backgroundCanvas?: HTMLCanvasElement | null;
+      backgroundPresentation?: BackgroundPresentation;
+    } = {},
   ) {
     const context = canvas.getContext("2d");
     if (context === null) {
@@ -790,9 +802,17 @@ export class Game {
     this.vocabulary = vocabulary.length > 0 ? vocabulary : FALLBACK_ENTRIES;
     this.settings = settings;
     this.hooks = hooks;
+    this.backgroundStage =
+      options.backgroundCanvas === undefined || options.backgroundCanvas === null
+        ? null
+        : new BackgroundStage(options.backgroundCanvas, {
+            presentation: options.backgroundPresentation ?? "blit",
+            quality: settings.visualQuality,
+          });
     this.refreshSkillDefinitions();
     this.sfx.setVolume(settings.sfxVolume);
     this.resize();
+    this.backgroundStage?.setWorld(this.worldSceneProfile.worldId);
     this.animationFrame = requestAnimationFrame(this.frame);
   }
 
@@ -800,6 +820,7 @@ export class Game {
     cancelAnimationFrame(this.animationFrame);
     this.modularBodyCache.clear();
     this.worldSceneRenderer.destroy();
+    this.backgroundStage?.destroy();
     this.textWidthCache.clear();
     this.sfx.destroy();
   }
@@ -2682,6 +2703,7 @@ export class Game {
     if (qualityChanged) {
       this.adaptiveRenderBudget.reset();
       this.modularBodyCache.clear();
+      this.backgroundStage?.setQuality(settings.visualQuality);
       this.resize();
     }
   }
@@ -2713,6 +2735,7 @@ export class Game {
       this.worldSceneRenderer.invalidate();
       this.seedStars();
     }
+    this.backgroundStage?.setWorld(nextWorld.id);
 
     if (hiddenEncounterRuntime === null) {
       const hiddenRoll = rollHiddenDiscovery(
@@ -3146,6 +3169,11 @@ export class Game {
     this.canvas.height = Math.floor(this.height * this.dpr);
     this.context.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     this.worldSceneRenderer.invalidate();
+    this.backgroundStage?.resize(
+      this.width,
+      this.height,
+      window.devicePixelRatio || 1,
+    );
     this.seedStars();
   }
 
@@ -3183,7 +3211,12 @@ export class Game {
     this.drawProfiler.pushFrame(drawMs / 1000);
     if (
       this.phase === "playing" &&
-      this.adaptiveRenderBudget.observe(this.settings.visualQuality, rawDt, drawMs)
+      this.adaptiveRenderBudget.observe(
+        this.settings.visualQuality,
+        rawDt,
+        drawMs,
+        this.backgroundStage,
+      )
     ) {
       this.applyAdaptiveRenderScale();
     }
@@ -7378,15 +7411,23 @@ export class Game {
 
   private draw(time: number): void {
     const context = this.context;
+    const shake =
+      this.shake > 0 && this.settings.screenShake
+        ? cameraShakeOffset(this.shake, time)
+        : null;
+    const background = this.renderBackgroundStage(time, shake);
 
     context.save();
 
-    if (this.shake > 0 && this.settings.screenShake) {
-      const offset = cameraShakeOffset(this.shake, time);
-      context.translate(offset.x, offset.y);
+    if (shake !== null) {
+      context.translate(shake.x, shake.y);
     }
 
-    this.drawBackground(time);
+    if (background === "blit") {
+      context.drawImage(this.backgroundStage!.canvas, 0, 0, this.width, this.height);
+    } else if (background === "legacy") {
+      this.drawBackground(time);
+    }
     if (this.novaPulseRemaining > 0) this.drawNovaPulse();
     if (this.interferenceTimer > 0) {
       this.drawInterference(time);
@@ -7481,6 +7522,34 @@ export class Game {
     }
 
     context.restore();
+  }
+
+  /**
+   * Advances the BGV background and returns which background this frame
+   * shows. A layered BGV frame clears the now-transparent gameplay canvas.
+   */
+  private renderBackgroundStage(
+    time: number,
+    shake: CameraShakeOffset | null,
+  ): BackgroundPresentation | "legacy" {
+    const stage = this.backgroundStage;
+    if (stage === null) return "legacy";
+    stage.setTimeScale(
+      this.phase === "playing" ? 1 : this.phase === "paused" ? 0.25 : 0.5,
+    );
+    const layered = stage.presentation === "layered";
+    stage.render(
+      time,
+      layered ? shake?.x ?? 0 : 0,
+      layered ? shake?.y ?? 0 : 0,
+    );
+    if (!stage.active) return "legacy";
+    if (layered) this.context.clearRect(0, 0, this.width, this.height);
+    return stage.presentation;
+  }
+
+  getBackgroundDiagnostics(): BackgroundDiagnostics | null {
+    return this.backgroundStage?.diagnostics() ?? null;
   }
 
   private drawBackground(time: number): void {

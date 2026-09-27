@@ -1,2 +1,5 @@
 allowBuilds:
   esbuild: true
+  # sharp (dev-only art pipeline) ships prebuilt libvips binaries; its
+  # source-build install script is not needed.
+  sharp: false

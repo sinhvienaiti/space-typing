@@ -2952,6 +2952,26 @@ window.addEventListener("message", (event: MessageEvent<unknown>) => {
   void applySpaceReviewDataset(event.data);
 });
 
+/**
+ * BGV background (docs/BACKGROUND_VISUAL_REBOOT_PLAN.md) is on by default so
+ * the portal, which embeds the game without query parameters, shows it; Worlds
+ * without a composition keep the legacy scene. `?bg=legacy` restores the old
+ * background for A/B checks. The default blit presentation keeps gameplay
+ * additive VFX blending exactly as before; `&bgPresent=layered` stacks the
+ * canvases instead.
+ */
+function backgroundOptions(): {
+  backgroundCanvas: HTMLCanvasElement | null;
+  backgroundPresentation: "layered" | "blit";
+} {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    backgroundCanvas:
+      params.get("bg") === "legacy" ? null : byId<HTMLCanvasElement>("bgCanvas"),
+    backgroundPresentation: params.get("bgPresent") === "layered" ? "layered" : "blit",
+  };
+}
+
 const game = new Game(
   byId<HTMLCanvasElement>("gameCanvas"),
   [],
@@ -3573,6 +3593,7 @@ const game = new Game(
       );
     },
   },
+  backgroundOptions(),
 );
 game.setGameplayMode(gameplayMode, recallSettings);
 
