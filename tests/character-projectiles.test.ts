@@ -122,6 +122,20 @@ describe("character projectile profiles", () => {
       expect(head.forwardFlareAlpha, styleId).toBeGreaterThan(0.2);
       expect(head.trailBlendLength, styleId).toBeGreaterThan(2);
       expect(head.sparkleCount, styleId).toBeGreaterThanOrEqual(2);
+      expect(head.directionalAuraLength, styleId).toBeGreaterThan(1.5);
+      expect(head.directionalAuraWidth, styleId).toBeGreaterThan(0.45);
+      expect(head.directionalAuraAlpha, styleId).toBeGreaterThan(0.15);
+      expect(head.directionalCoreLength, styleId).toBeGreaterThan(1.1);
+      expect(head.directionalCoreWidth, styleId).toBeGreaterThan(0.1);
+      expect(head.directionalCoreAlpha, styleId).toBeGreaterThan(0.3);
+      expect(head.directionalTipAlpha, styleId).toBeGreaterThan(0.4);
+      expect(head.directionalRearAlpha, styleId).toBeGreaterThan(0.1);
+      expect(head.directionalAuraLength, styleId).toBeGreaterThan(
+        head.directionalCoreLength,
+      );
+      expect(head.directionalAuraWidth, styleId).toBeGreaterThan(
+        head.directionalCoreWidth,
+      );
     }
 
     const families = entries.map(([, head]) => head.family);
@@ -150,6 +164,14 @@ describe("character projectile profiles", () => {
     expect(projectileHeadGlowProfile("thunder-needle").family).not.toBe("orb");
     expect(projectileHeadGlowProfile("solar-lance").family).not.toBe("orb");
     expect(projectileHeadGlowProfile("prism-dart").family).not.toBe("orb");
+    expect(projectileHeadGlowProfile("thunder-needle").directionalAuraLength)
+      .toBeGreaterThan(3.5);
+    expect(projectileHeadGlowProfile("solar-lance").directionalAuraLength)
+      .toBeGreaterThan(4);
+    expect(projectileHeadGlowProfile("prism-dart").directionalAuraLength)
+      .toBeGreaterThan(3);
+    expect(projectileHeadGlowProfile("aurora-ribbon").directionalAuraAlpha)
+      .toBeGreaterThanOrEqual(0.3);
 
     const zenithTrail = projectileTrailProfile("aurora-ribbon");
     expect(zenithTrail.ribbonCount).toBe(3);
