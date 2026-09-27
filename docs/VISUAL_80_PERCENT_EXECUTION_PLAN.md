@@ -1726,3 +1726,53 @@ Regression coverage verifies:
 - Zenith retains the cleaned three-ribbon trail with reduced spread/streak
   clutter;
 - existing atlas, tapered trail and unique playable-ship mappings remain intact.
+
+
+### CMB-21 — Directional projectile aura polish
+
+Status: IMPLEMENTED — CI/browser acceptance required.
+
+Owner review of CMB-20 confirmed that the per-style head shapes fixed the
+"generic round blob" problem, but the shapes still looked too dry because the
+surrounding energy halo was not strong or directional enough. The remaining
+visual target is a luminous arrow-like aura around the authored head, with a
+bright inner core and a softer outer halo that fades back into the trail.
+
+#### Directional aura solution
+
+Keep the generated projectile atlas and the CMB-20 per-style head shapes. Add a
+second lighting layer behind those shapes, driven by per-style directional aura
+configuration:
+
+- outer aura length / width / alpha;
+- inner hot-core arrow length / width / alpha;
+- bright tip alpha;
+- low-alpha rear blend that connects the aura into the trail.
+
+The aura is explicitly directional rather than circular:
+- Meteor / Prism / Thunder / Void / Solar / Twin Star use layered arrow/lance
+  wedges;
+- Nova / Halo / Tidal use forward teardrop wedges so their round body identity
+  remains, but the halo is still directional;
+- Crescent / Blossom use split curved arrow wings;
+- Zenith / Aurora uses two filled curved aurora wisps that converge toward the
+  nose, plus the existing small pin-light.
+
+The renderer uses a small fixed number of filled paths and shadow blur layers;
+it does not allocate particle collections, create gradients per shot, or change
+gameplay timing. The brightness hierarchy is now:
+
+1. tiny white/hot axial tip;
+2. narrow inner directional arrow;
+3. wider soft coloured aura;
+4. generated projectile body/head;
+5. tapered wake fading behind it.
+
+This specifically avoids both previous failure modes:
+- no universal round glow ball;
+- no dry unlit shape pasted in front of the projectile.
+
+Regression coverage verifies every approved projectile owns bounded directional
+aura values, outer aura is larger than its inner core, pointed families have
+longer directional halos, and Zenith retains a visible aurora aura without
+falling back to an orb.
