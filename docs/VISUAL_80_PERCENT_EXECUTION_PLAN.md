@@ -1596,3 +1596,73 @@ Automated coverage now verifies:
 - runtime kill popup applies the same safe-zone clamp;
 - the existing normal-typing regression still proves successful player shots do
   not repopulate the legacy long-Laser collection.
+
+
+### CMB-19 — Projectile head-light polish + enemy score scaling
+
+Status: IMPLEMENTED — CI/browser acceptance required.
+
+Owner feedback after the tapered-wake pass:
+- projectile travel/form is now acceptable;
+- Zenith / Aurora Ribbon still reads too busy;
+- projectile heads need a more vivid "dazzling hot head -> fading wake" light
+  treatment closer to the approved video reference;
+- enemy score feedback does not visibly distinguish enough between a one-layer
+  enemy and a three-layer enemy.
+
+#### Head-light solution
+
+The generated projectile atlas remains the authoritative body art. Runtime Canvas
+does not replace it; it adds bounded lighting/motion layers only.
+
+All 12 approved projectile styles now own a data-driven head-light profile:
+- front/nose offset;
+- white-hot core scale/alpha;
+- broad coloured bloom scale/alpha/softness;
+- forward flare length/width/alpha;
+- front halo;
+- rear-biased blend into the first part of the tapered wake;
+- bounded sparkle count/spread.
+
+Rendering keeps the strongest brightness at the projectile nose. The broad bloom
+and rear blend use lower alpha, while the white-hot core and short forward flare
+create the bright living-energy point seen in the reference. No per-frame image
+load or particle collection is introduced.
+
+Zenith-specific cleanup:
+- keep three aurora ribbons as its identity;
+- reduce ribbon spread and bend;
+- reduce side-streak count;
+- make the far tail thinner;
+- remove the second set of long duplicate line-ribbons and replace them with a
+  few restrained aurora spark accents;
+- give Zenith a stronger hot core, bloom and forward flare so the head dominates
+  the composition instead of the trail clutter.
+
+#### Enemy score scaling
+
+Root cause:
+- normal final kill reward was previously only `80 + wordLength * 14`;
+- three-layer enemies did earn intermediate layer-completion points, but the
+  final kill reward/popup was almost the same as a one-layer enemy;
+- therefore the visible reward did not communicate the additional enemy effort.
+
+The final enemy kill reward now scales from the same word-length base by:
+- total layer-plan count: 1 layer = 1.00x, 2 layers = 1.35x,
+  3 layers = 1.75x;
+- enemy Rank: +4% per Rank above I;
+- Elite: additional 1.25x.
+
+Existing per-key score, intermediate layer-completion rewards, streak multiplier
+and Golden-enemy bonus remain intact. This makes a three-health-bar enemy
+materially more valuable without removing rewards already earned while breaking
+its earlier layers.
+
+Regression coverage verifies:
+- all 12 styles have valid head-light profiles;
+- Zenith retains three ribbons but has reduced spread/streak clutter;
+- active ship/projectile mappings and strong taper remain unchanged;
+- one/two/three-layer score rewards are strictly increasing;
+- higher Rank and Elite enemies are worth more;
+- the real Game kill path produces a materially larger final popup reward for a
+  three-layer enemy.
