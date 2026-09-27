@@ -158,8 +158,8 @@ function drawProjectileTrail(
   gradient.addColorStop(0.24, primary);
   gradient.addColorStop(1, "rgba(255,255,255,0)");
   context.strokeStyle = gradient;
-  context.globalAlpha = 0.36;
-  context.lineWidth = 7;
+  context.globalAlpha = 0.5;
+  context.lineWidth = 10;
   context.beginPath();
   context.moveTo(-2, 0);
   context.quadraticCurveTo(
@@ -170,8 +170,8 @@ function drawProjectileTrail(
   );
   context.stroke();
 
-  context.globalAlpha = 0.78;
-  context.lineWidth = 2;
+  context.globalAlpha = 0.96;
+  context.lineWidth = 3.2;
   context.beginPath();
   context.moveTo(0, 0);
   context.quadraticCurveTo(
@@ -328,7 +328,10 @@ export function drawPlayerProjectile(
 ): void {
   const profile = playerProjectileProfile(shot.characterId);
   const position = shotPosition(shot);
-  const radius = profile.bodyRadius * (0.88 + Math.min(1.5, shot.power) * 0.12);
+  const radius =
+    profile.bodyRadius *
+    1.7 *
+    (0.9 + Math.min(1.5, shot.power) * 0.12);
   const styleId = profile.styleId;
   const detail = detailScale >= 0.72;
 
@@ -348,8 +351,8 @@ export function drawPlayerProjectile(
 
   context.globalCompositeOperation = "lighter";
   context.shadowColor = profile.primary;
-  context.shadowBlur = 13 * profile.glow * glowScale;
-  context.globalAlpha = 0.62;
+  context.shadowBlur = 20 * profile.glow * glowScale;
+  context.globalAlpha = 0.78;
   context.fillStyle = profile.primary;
 
   if (styleId === "crescent-slash") {
@@ -395,8 +398,8 @@ export function drawPlayerProjectile(
     context.fill();
   }
 
-  context.globalAlpha = 0.95;
-  context.shadowBlur = 7 * glowScale;
+  context.globalAlpha = 1;
+  context.shadowBlur = 11 * glowScale;
   context.fillStyle = profile.secondary;
   if (styleId === "halo-burst") {
     context.strokeStyle = profile.secondary;
