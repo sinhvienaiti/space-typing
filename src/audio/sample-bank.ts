@@ -4,6 +4,12 @@ import {
 } from "./mix";
 
 export const SAMPLE_SFX = {
+  "player-fire": {
+    path: "/assets/audio/sfx/kenney/laser-small.ogg",
+    group: "typing",
+    gain: 0.3,
+    poolSize: 6,
+  },
   "projectile-intercept": {
     path: "/assets/audio/sfx/kenney/laser-small.ogg",
     group: "combat",
