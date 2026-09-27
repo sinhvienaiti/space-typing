@@ -93,8 +93,7 @@ describe("Layered authored background registry", () => {
     const signatures: Record<string, readonly string[]> = {
       "world-02": [
         "/backgrounds/heaven/halo-garden-production-v2.avif",
-        "/backgrounds/heaven/cloud-islands.svg",
-        "/backgrounds/heaven/halo-gate.svg",
+        "/backgrounds/frost/aurora.svg",
       ],
       "world-03": [
         "/backgrounds/vendor/screaming-brain/nebula-blue-6-1024.png",
@@ -149,18 +148,21 @@ describe("Layered authored background registry", () => {
         expect(
           profile.layers.some((layer) => layer.src.includes("heaven/sky.svg")),
         ).toBe(false);
-        expect(
-          profile.layers.some((layer) => layer.id === "halo-garden-aurora-depth"),
-        ).toBe(true);
         const movingLayers = profile.layers.filter((layer) =>
-          ["halo-garden-cloud-far", "halo-garden-cloud-near", "halo-garden-aurora-depth"].includes(
+          ["halo-garden-sky-current-far", "halo-garden-sky-current-near"].includes(
             layer.id,
           ),
         );
-        expect(movingLayers).toHaveLength(3);
+        expect(movingLayers).toHaveLength(2);
         expect(movingLayers.every((layer) => layer.motion === "parallax")).toBe(
           true,
         );
+        expect(
+          profile.layers.some((layer) => layer.src.includes("heaven/cloud-islands.svg")),
+        ).toBe(false);
+        expect(
+          profile.layers.some((layer) => layer.src.includes("heaven/halo-gate.svg")),
+        ).toBe(false);
       }
       expect(
         profile.layers.some((layer) => layer.scale >= 1.7 && layer.depth > 0.25),
@@ -226,10 +228,11 @@ describe("Layered authored background registry", () => {
       (layer) => layer.id !== "halo-garden-production-art",
     );
 
-    expect(overlays.length).toBeGreaterThanOrEqual(4);
+    expect(overlays).toHaveLength(2);
     expect(Math.max(...overlays.map((layer) => layer.opacity))).toBeLessThanOrEqual(
-      0.18,
+      0.075,
     );
+    expect(overlays.every((layer) => layer.fit === "cover")).toBe(true);
   });
 
   it("keeps authored objects away from a shared cross-World mutable layer set", () => {
