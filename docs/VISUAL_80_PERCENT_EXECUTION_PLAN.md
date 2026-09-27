@@ -1474,3 +1474,30 @@ Implementation changes:
 - the 11 playable ships remain mapped one-to-one to 11 unique active styles;
   Nova Pearl remains the reserved twelfth concept until a real twelfth playable
   character exists instead of inventing a duplicate mapping.
+
+
+### CMB-17 — Generated projectile art atlas + lower score popup
+
+Status: IMPLEMENTED — CI/browser validation required.
+
+Owner explicitly rejected hand-drawn/procedural projectile bodies and requested
+generated artwork that stays about 90% faithful to the approved 12-projectile
+concept sheet. The main projectile body is therefore no longer authored by
+Canvas geometry in the normal loaded-art path.
+
+Implementation:
+- generate/prepare one transparent 3x4 WebP projectile atlas from the approved
+  concept art, 12 cells at 256x128;
+- preload the atlas through the existing art asset pipeline;
+- map all 12 projectile style IDs one-to-one to atlas cells;
+- render the generated sprite as the authoritative projectile body;
+- retain the previous Canvas bodies only as a deterministic fallback if the
+  optional atlas cannot load;
+- retain Canvas code only for motion effects: long wake, glow, particles,
+  muzzle and impact;
+- increase runtime wake to at least 110px and up to roughly 160px so the shot
+  has a large bright head plus a visibly stretched motion tail;
+- keep projectile art below enemy text so the larger art cannot hide typing;
+- move +score popup below the killed enemy instead of above it, preventing
+  collision with IPA/translation learning text while preserving its upward
+  2-second float.

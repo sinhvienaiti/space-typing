@@ -6071,7 +6071,7 @@ export class Game {
     }
     this.spawnKillScorePopup(
       enemy.x,
-      Math.max(42, enemy.y - enemy.radius * 0.55),
+      Math.min(this.height - 92, enemy.y + enemy.radius + 30),
       this.stats.score - scoreBeforeKillReward,
     );
     this.tryRollEquipmentDrop(
@@ -7524,7 +7524,7 @@ export class Game {
     if (safeValue <= 0) return;
     this.killScorePopups.push({
       x,
-      y: y - 12,
+      y,
       value: safeValue,
       life: 2,
       maxLife: 2,

@@ -3,6 +3,7 @@ import {
   playerProjectileProfile,
   type PlayerProjectileStyleId,
 } from "./projectiles";
+import { drawPlayerProjectileArt } from "./projectile-art";
 
 export const PLAYER_PROJECTILE_BODY_SCALE = 2.55;
 export const PLAYER_PROJECTILE_RAY_COUNT = 8;
@@ -1282,8 +1283,10 @@ export function drawPlayerProjectile(
     profile.bodyRadius *
     PLAYER_PROJECTILE_BODY_SCALE *
     (0.94 + Math.min(1.5, shot.power) * 0.12);
-  const wakeLength =
-    profile.trailLength * (detailScale >= 0.72 ? 1 : 0.8);
+  const wakeLength = Math.max(
+    110,
+    profile.trailLength * (detailScale >= 0.72 ? 1.38 : 1.08),
+  );
 
   context.save();
   context.translate(position.x, position.y);
@@ -1299,17 +1302,26 @@ export function drawPlayerProjectile(
     time,
     shot.id,
   );
-  drawStyleBody(
+  const drewGeneratedArt = drawPlayerProjectileArt(
     context,
     profile.styleId,
     radius,
     profile.primary,
-    profile.secondary,
-    profile.accent,
     glowScale,
-    time,
-    shot.id,
   );
+  if (!drewGeneratedArt) {
+    drawStyleBody(
+      context,
+      profile.styleId,
+      radius,
+      profile.primary,
+      profile.secondary,
+      profile.accent,
+      glowScale,
+      time,
+      shot.id,
+    );
+  }
   context.restore();
 }
 

@@ -6,6 +6,11 @@ import {
   PROJECTILE_VISUAL_IDENTITIES,
 } from "../src/characters/projectile-renderer";
 import {
+  PLAYER_PROJECTILE_ATLAS_ASSET_ID,
+  PLAYER_PROJECTILE_ATLAS_INDEX,
+  projectileAtlasCell,
+} from "../src/characters/projectile-art";
+import {
   characterFlightTrailProfile,
   playerProjectileProfile,
   RESERVED_PLAYER_PROJECTILE_STYLES,
@@ -29,6 +34,29 @@ describe("character projectile profiles", () => {
   it("keeps runtime projectile bodies and light rays large enough to read", () => {
     expect(PLAYER_PROJECTILE_BODY_SCALE).toBeGreaterThanOrEqual(2.3);
     expect(PLAYER_PROJECTILE_RAY_COUNT).toBeGreaterThanOrEqual(8);
+  });
+
+  it("keeps the generated projectile atlas one-to-one with all 12 approved concepts", () => {
+    expect(PLAYER_PROJECTILE_ATLAS_ASSET_ID).toBe(
+      "player-projectile-atlas-v1",
+    );
+    const indices = Object.values(PLAYER_PROJECTILE_ATLAS_INDEX);
+    expect(indices).toHaveLength(12);
+    expect(new Set(indices).size).toBe(12);
+    expect(Math.min(...indices)).toBe(0);
+    expect(Math.max(...indices)).toBe(11);
+    expect(projectileAtlasCell("meteor-bolt")).toEqual({
+      sx: 0,
+      sy: 0,
+      sw: 256,
+      sh: 128,
+    });
+    expect(projectileAtlasCell("aurora-ribbon")).toEqual({
+      sx: 512,
+      sy: 384,
+      sw: 256,
+      sh: 128,
+    });
   });
 
   it("gives all 12 approved concept styles distinct visual identities", () => {

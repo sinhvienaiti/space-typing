@@ -97,6 +97,10 @@ import {
   setCharacterShipSheet,
 } from "./characters/renderer";
 import {
+  PLAYER_PROJECTILE_ATLAS_ASSET_ID,
+  setPlayerProjectileAtlas,
+} from "./characters/projectile-art";
+import {
   parseShipArtPreference,
   PREMIUM_SHIP_SHEET_ASSET_ID,
   selectCharacterShipSheet,
@@ -7890,6 +7894,9 @@ async function initializeArtPipeline(): Promise<void> {
         }
       : manifest;
     artCatalog = await preloadArtAssets(loadManifest);
+    setPlayerProjectileAtlas(
+      artCatalog.assets.get(PLAYER_PROJECTILE_ATLAS_ASSET_ID)?.image ?? null,
+    );
     const shipArt = selectCharacterShipSheet(artCatalog, artPreference);
     setCharacterShipSheet(shipArt.image, shipArt.source);
     if (shipArt.source === "v3") {
@@ -7912,6 +7919,7 @@ async function initializeArtPipeline(): Promise<void> {
   } catch (error) {
     artCatalog = null;
     setCharacterShipSheet(null);
+    setPlayerProjectileAtlas(null);
     document.documentElement.dataset.shipArt = "procedural";
     console.warn(
       "Art manifest unavailable; procedural Canvas renderer remains active.",
