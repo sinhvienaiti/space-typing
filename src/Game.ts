@@ -702,6 +702,7 @@ export class Game {
     radius: number;
   }> = [];
   private particles: Particle[] = [];
+  private killScorePopups: KillScorePopup[] = [];
   private targetId: number | null = null;
   private spawnTimer = 0;
   private spawnRemaining = 0;
@@ -7401,6 +7402,44 @@ export class Game {
     if (this.killScorePopups.length > 18) {
       this.killScorePopups.shift();
     }
+  }
+
+  private fireBossLaser(power: number): void {
+    const { x, y } = this.bossPosition();
+    this.lasers.push({
+      x1: this.width / 2,
+      y1: this.height - PLAYER_Y_OFFSET,
+      x2: x,
+      y2: y,
+      life: 0.09,
+      maxLife: 0.09,
+      power,
+    });
+    this.burst(
+      x,
+      y,
+      7,
+      playerProjectileProfile(this.characterId).impactHue,
+    );
+  }
+
+  private fireLaser(enemy: Enemy, power: number): void {
+    this.lasers.push({
+      x1: this.width / 2,
+      y1: this.height - PLAYER_Y_OFFSET,
+      x2: enemy.x,
+      y2: enemy.y,
+      life: 0.085,
+      maxLife: 0.085,
+      power,
+    });
+
+    this.burst(
+      enemy.x,
+      enemy.y,
+      power > 1 ? 12 : 5,
+      playerProjectileProfile(this.characterId).impactHue,
+    );
   }
 
   private triggerImpactFeedback(kind: ImpactKind): void {
