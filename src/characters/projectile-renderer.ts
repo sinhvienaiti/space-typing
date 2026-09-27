@@ -355,7 +355,30 @@ export function drawPlayerProjectile(
   context.globalAlpha = 0.78;
   context.fillStyle = profile.primary;
 
-  if (styleId === "crescent-slash") {
+  if (styleId === "meteor-bolt") {
+    context.beginPath();
+    context.moveTo(radius * 1.75, 0);
+    context.quadraticCurveTo(
+      radius * 0.55,
+      radius * 0.92,
+      -radius * 0.85,
+      radius * 0.48,
+    );
+    context.quadraticCurveTo(
+      -radius * 0.35,
+      0,
+      -radius * 0.85,
+      -radius * 0.48,
+    );
+    context.quadraticCurveTo(
+      radius * 0.55,
+      -radius * 0.92,
+      radius * 1.75,
+      0,
+    );
+    context.closePath();
+    context.fill();
+  } else if (styleId === "crescent-slash") {
     context.strokeStyle = profile.primary;
     context.lineWidth = Math.max(2, radius * 0.75);
     context.beginPath();
