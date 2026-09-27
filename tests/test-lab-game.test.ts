@@ -496,6 +496,70 @@ describe("M21 gated Game Test Lab API", () => {
     game.destroy();
   });
 
+  it("fires the player projectile for every typeable bonus target", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 50);
+    game.testLabSetSchedulerFrozen(true);
+
+    type MovingBonus = {
+      entry: VocabularyEntry;
+      typed: number;
+      x: number;
+      y: number;
+      speed: number;
+      age: number;
+      lifetime: number;
+    };
+    type BonusRuntime = {
+      typeSupplyPod(
+        target: MovingBonus & { reward: "shield" },
+        key: string,
+      ): void;
+      typeTreasureDrone(target: MovingBonus, key: string): void;
+      typeRewardChoiceCrate(target: MovingBonus, key: string): void;
+      typeAnomalyCrate(target: MovingBonus, key: string): void;
+      typeRecallBonus(
+        target: MovingBonus & { hintIndices: number[] },
+        key: string,
+      ): boolean;
+    };
+
+    const runtime = game as unknown as BonusRuntime;
+    const entry = vocabulary[0]!;
+    const makeTarget = (): MovingBonus => ({
+      entry,
+      typed: 0,
+      x: 710,
+      y: 260,
+      speed: 0,
+      age: 0,
+      lifetime: 20,
+    });
+
+    runtime.typeSupplyPod({ ...makeTarget(), reward: "shield" }, "o");
+    expect(game.getTestLabSnapshot()?.playerShots).toBe(1);
+
+    runtime.typeTreasureDrone(makeTarget(), "o");
+    expect(game.getTestLabSnapshot()?.playerShots).toBe(2);
+
+    runtime.typeRewardChoiceCrate(makeTarget(), "o");
+    expect(game.getTestLabSnapshot()?.playerShots).toBe(3);
+
+    runtime.typeAnomalyCrate(makeTarget(), "o");
+    expect(game.getTestLabSnapshot()?.playerShots).toBe(4);
+
+    expect(
+      runtime.typeRecallBonus(
+        { ...makeTarget(), hintIndices: [] },
+        "o",
+      ),
+    ).toBe(true);
+    expect(game.getTestLabSnapshot()?.playerShots).toBe(5);
+
+    game.destroy();
+  });
+
   it("player projectile presentation expires through the real simulation loop", () => {
     const game = createTestGame();
     game.setTestLabMode(true);

@@ -1411,3 +1411,30 @@ Fix:
 - replace the chirpy laser-small typing sample with a short low-mid crunch/thump layer using the existing bounded audio bank;
 - add dedicated sampled hit/kill layers;
 - broaden the runtime flight plume so engine thrust reads as a filled glowing exhaust instead of one thin line.
+
+
+### CMB-15 — Larger luminous projectiles + bonus-target coverage
+
+Status: IMPLEMENTED — validate through CI/browser.
+
+Owner feedback after the runtime-wiring fix:
+- projectile is now visible, but still too small;
+- projectile needs a brighter comet/star core with multiple light rays like the supplied blue reference;
+- typing a bonus target accepts letters but does not fire a projectile.
+
+Audit result:
+- normal enemies and bosses already use `firePlayerVisualShot()`;
+- Golden enemies are normal Enemy instances and are therefore already covered;
+- five typeable combat bonus targets were still on the legacy `burst() + sfx.shot()` path:
+  Supply Pod, Treasure Drone, Reward Choice Crate, Anomaly Crate and Recall Bonus;
+- hostile projectile interception intentionally keeps its distinct intercept tracer rather than masquerading as a normal player shot.
+
+Fix:
+- route all five typeable bonus-target correct-key paths through one shared `fireBonusTargetShot()` helper;
+- final bonus-target character uses kill-strength visual feedback, non-final characters use hit feedback;
+- remove legacy chirpy `sfx.shot()` calls from those bonus paths;
+- ship aim can follow an actively typed bonus target;
+- increase projectile body scale to >=2.3x;
+- add a bounded 10-ray additive starburst, long axial flare and hot center around each projectile;
+- extend the energy trail slightly while preserving word readability;
+- add regression coverage proving each of the five bonus target types creates exactly one player visual shot per correct key.

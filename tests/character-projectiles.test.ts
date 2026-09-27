@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { CHARACTER_IDS } from "../src/characters/registry";
 import {
+  PLAYER_PROJECTILE_BODY_SCALE,
+  PLAYER_PROJECTILE_RAY_COUNT,
+} from "../src/characters/projectile-renderer";
+import {
   characterFlightTrailProfile,
   playerProjectileProfile,
   RESERVED_PLAYER_PROJECTILE_STYLES,
@@ -19,6 +23,11 @@ describe("character projectile profiles", () => {
       expect(profile.impactHue).toBeGreaterThanOrEqual(0);
       expect(profile.impactHue).toBeLessThanOrEqual(360);
     }
+  });
+
+  it("keeps runtime projectile bodies and light rays large enough to read", () => {
+    expect(PLAYER_PROJECTILE_BODY_SCALE).toBeGreaterThanOrEqual(2.3);
+    expect(PLAYER_PROJECTILE_RAY_COUNT).toBeGreaterThanOrEqual(8);
   });
 
   it("maps every playable ship to one unique approved projectile and flight trail", () => {

@@ -5615,10 +5615,11 @@ export class Game {
     this.gainPower(1.2);
     this.applyCharacterCorrectKeyPassive();
 
-    this.burst(pod.x, pod.y, 7, 48);
-    this.sfx.shot(this.stats.multiplier);
+    const completed = pod.typed >= word.length;
+    this.fireBonusTargetShot(pod.x, pod.y, completed, 0.94);
+    this.burst(pod.x, pod.y, completed ? 10 : 5, 48);
 
-    if (pod.typed >= word.length) {
+    if (completed) {
       this.collectSupplyPod(pod);
     }
 
@@ -5665,10 +5666,11 @@ export class Game {
     }
 
     target.typed += 1;
-    this.burst(target.x, target.y, 7, 292);
-    this.sfx.shot(Math.max(1, this.stats.multiplier));
+    const completed = target.typed >= word.length;
+    this.fireBonusTargetShot(target.x, target.y, completed, 0.98);
+    this.burst(target.x, target.y, completed ? 11 : 5, 292);
 
-    if (target.typed >= word.length) {
+    if (completed) {
       const score = recallBonusRewardScore(
         target.entry.en,
         target.hintIndices,
@@ -5714,10 +5716,11 @@ export class Game {
     this.addScore(12 * this.stats.multiplier);
     this.gainPower(1.5);
     this.applyCharacterCorrectKeyPassive();
-    this.burst(drone.x, drone.y, 8, 48);
-    this.sfx.shot(this.stats.multiplier);
+    const completed = drone.typed >= word.length;
+    this.fireBonusTargetShot(drone.x, drone.y, completed, 1.02);
+    this.burst(drone.x, drone.y, completed ? 12 : 5, 48);
 
-    if (drone.typed >= word.length) {
+    if (completed) {
       const drop = rollEquipmentDrop(
         "treasure",
         this.effectiveLuck(),
@@ -5760,10 +5763,11 @@ export class Game {
     this.addScore(10 * this.stats.multiplier);
     this.gainPower(1.3);
     this.applyCharacterCorrectKeyPassive();
-    this.burst(crate.x, crate.y, 7, 286);
-    this.sfx.shot(this.stats.multiplier);
+    const completed = crate.typed >= word.length;
+    this.fireBonusTargetShot(crate.x, crate.y, completed, 0.98);
+    this.burst(crate.x, crate.y, completed ? 11 : 5, 286);
 
-    if (crate.typed >= word.length) {
+    if (completed) {
       const options = createRewardChoiceOptions(this.effectiveLuck());
       this.addScore(220 * this.stats.multiplier);
       this.hooks.onWordComplete(crate.entry);
@@ -5799,10 +5803,11 @@ export class Game {
     this.addScore(12 * this.stats.multiplier);
     this.gainPower(1.4);
     this.applyCharacterCorrectKeyPassive();
-    this.burst(crate.x, crate.y, 8, 322);
-    this.sfx.shot(this.stats.multiplier);
+    const completed = crate.typed >= word.length;
+    this.fireBonusTargetShot(crate.x, crate.y, completed, 1.04);
+    this.burst(crate.x, crate.y, completed ? 12 : 5, 322);
 
-    if (crate.typed >= word.length) {
+    if (completed) {
       this.addScore(260 * this.stats.multiplier);
       this.hooks.onWordComplete(crate.entry);
       this.burst(crate.x, crate.y, 44, 322);
@@ -7343,6 +7348,20 @@ export class Game {
     }
   }
 
+  private fireBonusTargetShot(
+    targetX: number,
+    targetY: number,
+    completed: boolean,
+    power = 0.92,
+  ): PlayerVisualShot | null {
+    return this.firePlayerVisualShot(
+      targetX,
+      targetY,
+      completed ? Math.max(1.28, power) : power,
+      completed ? "kill" : "hit",
+    );
+  }
+
   private firePlayerVisualShot(
     targetX: number,
     targetY: number,
@@ -7448,6 +7467,37 @@ export class Game {
     if (this.targetId !== null) {
       const enemy = this.enemies.find((item) => item.id === this.targetId);
       if (enemy !== undefined) aimTarget = enemy;
+    }
+    if (aimTarget === null && this.supplyPod !== null && this.supplyPod.typed > 0) {
+      aimTarget = this.supplyPod;
+    }
+    if (
+      aimTarget === null &&
+      this.treasureDrone !== null &&
+      this.treasureDrone.typed > 0
+    ) {
+      aimTarget = this.treasureDrone;
+    }
+    if (
+      aimTarget === null &&
+      this.rewardChoiceCrate !== null &&
+      this.rewardChoiceCrate.typed > 0
+    ) {
+      aimTarget = this.rewardChoiceCrate;
+    }
+    if (
+      aimTarget === null &&
+      this.anomalyCrate !== null &&
+      this.anomalyCrate.typed > 0
+    ) {
+      aimTarget = this.anomalyCrate;
+    }
+    if (
+      aimTarget === null &&
+      this.recallBonus !== null &&
+      this.recallBonus.typed > 0
+    ) {
+      aimTarget = this.recallBonus;
     }
     if (aimTarget === null && this.boss !== null) {
       aimTarget = this.bossPosition();

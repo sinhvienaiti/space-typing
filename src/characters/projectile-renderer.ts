@@ -4,6 +4,9 @@ import {
   type PlayerProjectileStyleId,
 } from "./projectiles";
 
+export const PLAYER_PROJECTILE_BODY_SCALE = 2.35;
+export const PLAYER_PROJECTILE_RAY_COUNT = 10;
+
 export type PlayerShotOutcome =
   | "hit"
   | "layer"
@@ -135,6 +138,72 @@ function drawDiamond(
   context.lineTo(0, -radius * 0.62);
   context.closePath();
   context.fill();
+}
+
+function drawEnergyRayBurst(
+  context: CanvasRenderingContext2D,
+  radius: number,
+  primary: string,
+  secondary: string,
+  time: number,
+  id: number,
+  glowScale: number,
+): void {
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.lineCap = "round";
+  context.shadowColor = primary;
+  context.shadowBlur = 18 * glowScale;
+
+  // Long axial flare: the bright comet-like beam visible in the reference.
+  const axialPulse = 0.94 + Math.sin(time * 12 + id) * 0.06;
+  const front = radius * 3.5 * axialPulse;
+  const back = radius * 2.5;
+  const axial = context.createLinearGradient(-back, 0, front, 0);
+  axial.addColorStop(0, "rgba(255,255,255,0)");
+  axial.addColorStop(0.42, primary);
+  axial.addColorStop(0.58, secondary);
+  axial.addColorStop(1, "rgba(255,255,255,0)");
+  context.strokeStyle = axial;
+  context.globalAlpha = 0.82;
+  context.lineWidth = Math.max(1.3, radius * 0.18);
+  context.beginPath();
+  context.moveTo(-back, 0);
+  context.lineTo(front, 0);
+  context.stroke();
+
+  // Bounded radial flare rays give the projectile a luminous star core instead
+  // of a flat 2D shape. Alternating ray lengths keep the word area readable.
+  for (let index = 0; index < PLAYER_PROJECTILE_RAY_COUNT; index += 1) {
+    const angle =
+      (Math.PI * 2 * index) / PLAYER_PROJECTILE_RAY_COUNT +
+      Math.sin(time * 2.4 + id * 0.37) * 0.045;
+    const longRay = index % 2 === 0;
+    const inner = radius * (longRay ? 0.58 : 0.72);
+    const outer = radius * (longRay ? 2.45 : 1.62);
+    context.strokeStyle = index % 3 === 0 ? secondary : primary;
+    context.globalAlpha = longRay ? 0.66 : 0.46;
+    context.lineWidth = longRay ? 1.25 : 0.9;
+    context.beginPath();
+    context.moveTo(
+      Math.cos(angle) * inner,
+      Math.sin(angle) * inner,
+    );
+    context.lineTo(
+      Math.cos(angle) * outer,
+      Math.sin(angle) * outer,
+    );
+    context.stroke();
+  }
+
+  // Hot white-blue center, separate from the style body below.
+  context.globalAlpha = 0.92;
+  context.fillStyle = secondary;
+  context.shadowBlur = 24 * glowScale;
+  context.beginPath();
+  context.arc(0, 0, Math.max(2.4, radius * 0.42), 0, Math.PI * 2);
+  context.fill();
+  context.restore();
 }
 
 function drawProjectileTrail(
@@ -330,8 +399,8 @@ export function drawPlayerProjectile(
   const position = shotPosition(shot);
   const radius =
     profile.bodyRadius *
-    1.7 *
-    (0.9 + Math.min(1.5, shot.power) * 0.12);
+    PLAYER_PROJECTILE_BODY_SCALE *
+    (0.92 + Math.min(1.5, shot.power) * 0.13);
   const styleId = profile.styleId;
   const detail = detailScale >= 0.72;
 
@@ -341,18 +410,27 @@ export function drawPlayerProjectile(
   drawProjectileTrail(
     context,
     styleId,
-    profile.trailLength * (detail ? 1 : 0.76),
+    profile.trailLength * (detail ? 1.18 : 0.9),
     profile.primary,
     profile.secondary,
     profile.accent,
     time,
     shot.id,
   );
+  drawEnergyRayBurst(
+    context,
+    radius,
+    profile.primary,
+    profile.secondary,
+    time,
+    shot.id,
+    glowScale,
+  );
 
   context.globalCompositeOperation = "lighter";
   context.shadowColor = profile.primary;
-  context.shadowBlur = 20 * profile.glow * glowScale;
-  context.globalAlpha = 0.78;
+  context.shadowBlur = 26 * profile.glow * glowScale;
+  context.globalAlpha = 0.86;
   context.fillStyle = profile.primary;
 
   if (styleId === "meteor-bolt") {
