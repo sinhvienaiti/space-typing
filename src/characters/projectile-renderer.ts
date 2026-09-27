@@ -293,6 +293,632 @@ function drawCrossFlare(
   context.restore();
 }
 
+function drawHeadHotDiamond(
+  context: CanvasRenderingContext2D,
+  x: number,
+  radius: number,
+  profile: Readonly<ProjectileHeadGlowProfile>,
+  secondary: string,
+  glowScale: number,
+  lengthScale = 1.55,
+  widthScale = 0.72,
+): void {
+  const hotRadius = radius * profile.hotCoreScale;
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.fillStyle = "#ffffff";
+  context.shadowColor = secondary;
+  context.shadowBlur = 12 * glowScale;
+  context.globalAlpha = profile.hotCoreAlpha;
+  context.beginPath();
+  context.moveTo(x + hotRadius * lengthScale, 0);
+  context.lineTo(x, hotRadius * widthScale);
+  context.lineTo(x - hotRadius * lengthScale * 0.72, 0);
+  context.lineTo(x, -hotRadius * widthScale);
+  context.closePath();
+  context.fill();
+
+  context.globalAlpha = profile.hotCoreAlpha * 0.72;
+  context.fillStyle = secondary;
+  context.shadowBlur = 7 * glowScale;
+  context.beginPath();
+  context.moveTo(x + hotRadius * lengthScale * 0.82, 0);
+  context.lineTo(x, hotRadius * widthScale * 0.42);
+  context.lineTo(x - hotRadius * lengthScale * 0.34, 0);
+  context.lineTo(x, -hotRadius * widthScale * 0.42);
+  context.closePath();
+  context.fill();
+  context.restore();
+}
+
+function drawHeadTrailBlend(
+  context: CanvasRenderingContext2D,
+  radius: number,
+  profile: Readonly<ProjectileHeadGlowProfile>,
+  primary: string,
+  glowScale: number,
+): void {
+  const frontX = radius * profile.frontOffset;
+  const rearX = frontX - radius * profile.trailBlendLength;
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.fillStyle = primary;
+  context.shadowColor = primary;
+  context.shadowBlur = 14 * profile.bloomSoftness * glowScale;
+  context.globalAlpha = profile.bloomAlpha * 0.18;
+  context.beginPath();
+  context.moveTo(rearX, -radius * 0.13);
+  context.quadraticCurveTo(
+    frontX - radius * 0.72,
+    -radius * 0.42,
+    frontX + radius * 0.08,
+    0,
+  );
+  context.quadraticCurveTo(
+    frontX - radius * 0.72,
+    radius * 0.42,
+    rearX,
+    radius * 0.13,
+  );
+  context.closePath();
+  context.fill();
+  context.restore();
+}
+
+function drawHeadSparkles(
+  context: CanvasRenderingContext2D,
+  frontX: number,
+  radius: number,
+  profile: Readonly<ProjectileHeadGlowProfile>,
+  color: string,
+  glowScale: number,
+  time: number,
+  id: number,
+  detailScale: number,
+): void {
+  if (detailScale < 0.68 || profile.sparkleCount <= 0) return;
+
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.strokeStyle = color;
+  context.shadowColor = color;
+  context.shadowBlur = 6 * glowScale;
+  context.lineCap = "round";
+  context.lineWidth = Math.max(0.8, radius * 0.055);
+
+  for (let index = 0; index < profile.sparkleCount; index += 1) {
+    const angle =
+      time * 1.45 +
+      id * 0.37 +
+      (Math.PI * 2 * index) / Math.max(1, profile.sparkleCount);
+    const distance =
+      radius * profile.sparkleSpread * (0.62 + (index % 2) * 0.22);
+    const x = frontX - radius * 0.32 + Math.cos(angle) * distance;
+    const y = Math.sin(angle) * distance * 0.68;
+    const size = radius * (0.075 + (index % 2) * 0.025);
+    context.globalAlpha = 0.4 + (index % 2) * 0.14;
+    context.beginPath();
+    context.moveTo(x - size * 1.7, y);
+    context.lineTo(x + size * 1.7, y);
+    context.moveTo(x, y - size * 1.7);
+    context.lineTo(x, y + size * 1.7);
+    context.stroke();
+  }
+  context.restore();
+}
+
+function drawMeteorHeadLight(
+  context: CanvasRenderingContext2D,
+  radius: number,
+  profile: Readonly<ProjectileHeadGlowProfile>,
+  primary: string,
+  secondary: string,
+  glowScale: number,
+): void {
+  const frontX = radius * profile.frontOffset;
+  const noseX = frontX + radius * profile.forwardFlareLength * 0.62;
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.fillStyle = primary;
+  context.shadowColor = primary;
+  context.shadowBlur = 25 * profile.bloomSoftness * glowScale;
+  context.globalAlpha = profile.bloomAlpha * 0.5;
+  context.beginPath();
+  context.moveTo(frontX - radius * 1.15, -radius * 0.72);
+  context.quadraticCurveTo(frontX + radius * 0.35, -radius * 0.58, noseX, 0);
+  context.quadraticCurveTo(frontX + radius * 0.35, radius * 0.58, frontX - radius * 1.15, radius * 0.72);
+  context.quadraticCurveTo(frontX - radius * 0.52, 0, frontX - radius * 1.15, -radius * 0.72);
+  context.closePath();
+  context.fill();
+  context.restore();
+  drawHeadHotDiamond(context, noseX - radius * 0.12, radius, profile, secondary, glowScale, 1.75, 0.62);
+}
+
+function drawCrescentHeadLight(
+  context: CanvasRenderingContext2D,
+  radius: number,
+  profile: Readonly<ProjectileHeadGlowProfile>,
+  primary: string,
+  secondary: string,
+  glowScale: number,
+): void {
+  const frontX = radius * profile.frontOffset;
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.strokeStyle = primary;
+  context.shadowColor = primary;
+  context.shadowBlur = 19 * profile.bloomSoftness * glowScale;
+  context.lineCap = "round";
+  context.globalAlpha = profile.bloomAlpha * 0.75;
+  context.lineWidth = Math.max(1.3, radius * 0.16);
+  context.beginPath();
+  context.moveTo(frontX - radius * 0.88, radius * 0.68);
+  context.quadraticCurveTo(
+    frontX + radius * 0.72,
+    0,
+    frontX - radius * 0.72,
+    -radius * 0.76,
+  );
+  context.stroke();
+
+  context.strokeStyle = secondary;
+  context.globalAlpha = profile.hotCoreAlpha * 0.72;
+  context.lineWidth = Math.max(0.9, radius * 0.07);
+  context.beginPath();
+  context.moveTo(frontX - radius * 0.44, radius * 0.46);
+  context.quadraticCurveTo(
+    frontX + radius * 0.54,
+    0,
+    frontX - radius * 0.38,
+    -radius * 0.5,
+  );
+  context.stroke();
+  context.restore();
+}
+
+function drawCrystalHeadLight(
+  context: CanvasRenderingContext2D,
+  radius: number,
+  profile: Readonly<ProjectileHeadGlowProfile>,
+  primary: string,
+  secondary: string,
+  accent: string,
+  glowScale: number,
+): void {
+  const frontX = radius * profile.frontOffset;
+  const noseX = frontX + radius * profile.forwardFlareLength * 0.58;
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.shadowColor = primary;
+  context.shadowBlur = 18 * profile.bloomSoftness * glowScale;
+  context.globalAlpha = profile.bloomAlpha * 0.62;
+  context.fillStyle = accent;
+  context.beginPath();
+  context.moveTo(noseX, 0);
+  context.lineTo(frontX + radius * 0.15, radius * 0.7);
+  context.lineTo(frontX - radius * 0.78, radius * 0.22);
+  context.lineTo(frontX - radius * 0.52, 0);
+  context.lineTo(frontX - radius * 0.78, -radius * 0.22);
+  context.lineTo(frontX + radius * 0.15, -radius * 0.7);
+  context.closePath();
+  context.fill();
+
+  context.strokeStyle = secondary;
+  context.lineWidth = Math.max(0.9, radius * 0.07);
+  context.globalAlpha = 0.82;
+  context.beginPath();
+  context.moveTo(frontX - radius * 0.5, 0);
+  context.lineTo(noseX, 0);
+  context.moveTo(frontX + radius * 0.08, -radius * 0.5);
+  context.lineTo(frontX + radius * 0.38, 0);
+  context.lineTo(frontX + radius * 0.08, radius * 0.5);
+  context.stroke();
+  context.restore();
+  drawHeadHotDiamond(context, noseX - radius * 0.16, radius, profile, secondary, glowScale, 1.45, 0.48);
+}
+
+function drawOrbHeadLight(
+  context: CanvasRenderingContext2D,
+  radius: number,
+  profile: Readonly<ProjectileHeadGlowProfile>,
+  primary: string,
+  secondary: string,
+  glowScale: number,
+): void {
+  const frontX = radius * profile.frontOffset;
+  const pulse = 0.96 + Math.sin(frontX * 0.07) * 0.025;
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.fillStyle = primary;
+  context.shadowColor = primary;
+  context.shadowBlur = 27 * profile.bloomSoftness * glowScale;
+  context.globalAlpha = profile.bloomAlpha * 0.45;
+  context.beginPath();
+  context.ellipse(
+    frontX,
+    0,
+    radius * profile.bloomScale * 0.7 * pulse,
+    radius * profile.bloomScale * 0.7 * pulse,
+    0,
+    0,
+    Math.PI * 2,
+  );
+  context.fill();
+  context.fillStyle = "#ffffff";
+  context.shadowColor = secondary;
+  context.shadowBlur = 12 * glowScale;
+  context.globalAlpha = profile.hotCoreAlpha;
+  context.beginPath();
+  context.arc(frontX + radius * 0.1, 0, radius * profile.hotCoreScale, 0, Math.PI * 2);
+  context.fill();
+  context.restore();
+}
+
+function drawStarHeadLight(
+  context: CanvasRenderingContext2D,
+  radius: number,
+  profile: Readonly<ProjectileHeadGlowProfile>,
+  primary: string,
+  secondary: string,
+  accent: string,
+  glowScale: number,
+  time: number,
+): void {
+  const frontX = radius * profile.frontOffset;
+  context.save();
+  context.translate(frontX, 0);
+  context.globalCompositeOperation = "lighter";
+  context.shadowBlur = 19 * profile.bloomSoftness * glowScale;
+  context.globalAlpha = profile.bloomAlpha * 0.78;
+  context.shadowColor = primary;
+  context.fillStyle = primary;
+  context.save();
+  context.translate(0, -radius * 0.28);
+  context.rotate(time * 1.7);
+  drawStar(context, radius * 0.78);
+  context.restore();
+
+  context.shadowColor = accent;
+  context.fillStyle = accent;
+  context.save();
+  context.translate(-radius * 0.16, radius * 0.34);
+  context.rotate(-time * 1.45);
+  drawStar(context, radius * 0.62);
+  context.restore();
+
+  context.strokeStyle = secondary;
+  context.shadowColor = secondary;
+  context.globalAlpha = profile.hotCoreAlpha * 0.82;
+  context.lineWidth = Math.max(1, radius * 0.08);
+  context.beginPath();
+  context.moveTo(-radius * 0.5, 0);
+  context.lineTo(radius * profile.forwardFlareLength * 0.72, 0);
+  context.stroke();
+  context.restore();
+}
+
+function drawHaloHeadLight(
+  context: CanvasRenderingContext2D,
+  radius: number,
+  profile: Readonly<ProjectileHeadGlowProfile>,
+  primary: string,
+  secondary: string,
+  glowScale: number,
+): void {
+  const frontX = radius * profile.frontOffset;
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.strokeStyle = primary;
+  context.shadowColor = primary;
+  context.shadowBlur = 20 * profile.bloomSoftness * glowScale;
+  context.globalAlpha = profile.frontHaloAlpha * 1.45;
+  context.lineWidth = Math.max(1.2, radius * 0.11);
+  context.beginPath();
+  context.ellipse(frontX, 0, radius * 1.05, radius * 0.56, 0, 0, Math.PI * 2);
+  context.stroke();
+  context.strokeStyle = secondary;
+  context.shadowColor = secondary;
+  context.globalAlpha = profile.hotCoreAlpha * 0.82;
+  context.lineWidth = Math.max(1, radius * 0.08);
+  context.beginPath();
+  context.moveTo(frontX - radius * 0.9, 0);
+  context.lineTo(frontX + radius * 1.2, 0);
+  context.moveTo(frontX, -radius * 0.82);
+  context.lineTo(frontX, radius * 0.82);
+  context.stroke();
+  context.restore();
+  drawHeadHotDiamond(context, frontX + radius * 0.38, radius, profile, secondary, glowScale, 1.05, 0.6);
+}
+
+function drawNeedleHeadLight(
+  context: CanvasRenderingContext2D,
+  radius: number,
+  profile: Readonly<ProjectileHeadGlowProfile>,
+  primary: string,
+  secondary: string,
+  glowScale: number,
+  time: number,
+  id: number,
+): void {
+  const frontX = radius * profile.frontOffset;
+  const tipX = frontX + radius * profile.forwardFlareLength;
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.fillStyle = primary;
+  context.shadowColor = primary;
+  context.shadowBlur = 18 * profile.bloomSoftness * glowScale;
+  context.globalAlpha = profile.bloomAlpha * 0.72;
+  context.beginPath();
+  context.moveTo(frontX - radius * 1.15, -radius * 0.2);
+  context.lineTo(tipX, 0);
+  context.lineTo(frontX - radius * 1.15, radius * 0.2);
+  context.lineTo(frontX - radius * 0.42, 0);
+  context.closePath();
+  context.fill();
+
+  context.strokeStyle = "#ffffff";
+  context.shadowColor = secondary;
+  context.shadowBlur = 10 * glowScale;
+  context.globalAlpha = profile.hotCoreAlpha;
+  context.lineWidth = Math.max(1, radius * 0.08);
+  context.beginPath();
+  context.moveTo(frontX - radius * 0.5, 0);
+  context.lineTo(tipX - radius * 0.08, 0);
+  context.stroke();
+
+  context.strokeStyle = secondary;
+  context.globalAlpha = 0.48;
+  context.lineWidth = Math.max(0.8, radius * 0.05);
+  for (let branch = 0; branch < 2; branch += 1) {
+    const sign = branch === 0 ? -1 : 1;
+    context.beginPath();
+    context.moveTo(frontX + radius * 0.1, 0);
+    context.lineTo(
+      frontX + radius * 0.5,
+      sign * radius * (0.22 + Math.sin(time * 12 + id) * 0.05),
+    );
+    context.lineTo(frontX + radius * 0.86, sign * radius * 0.08);
+    context.stroke();
+  }
+  context.restore();
+}
+
+function drawBlossomHeadLight(
+  context: CanvasRenderingContext2D,
+  radius: number,
+  profile: Readonly<ProjectileHeadGlowProfile>,
+  primary: string,
+  secondary: string,
+  glowScale: number,
+  time: number,
+  id: number,
+): void {
+  const frontX = radius * profile.frontOffset;
+  context.save();
+  context.translate(frontX, 0);
+  context.rotate(time * 0.55 + id * 0.13);
+  context.globalCompositeOperation = "lighter";
+  context.fillStyle = primary;
+  context.shadowColor = primary;
+  context.shadowBlur = 17 * profile.bloomSoftness * glowScale;
+  context.globalAlpha = profile.bloomAlpha * 0.7;
+  for (let petal = 0; petal < 5; petal += 1) {
+    context.save();
+    context.rotate((Math.PI * 2 * petal) / 5);
+    context.beginPath();
+    context.ellipse(radius * 0.48, 0, radius * 0.48, radius * 0.18, 0, 0, Math.PI * 2);
+    context.fill();
+    context.restore();
+  }
+  context.fillStyle = secondary;
+  context.shadowColor = secondary;
+  context.shadowBlur = 8 * glowScale;
+  context.globalAlpha = profile.hotCoreAlpha * 0.82;
+  context.beginPath();
+  context.arc(0, 0, radius * profile.hotCoreScale * 0.72, 0, Math.PI * 2);
+  context.fill();
+  context.restore();
+}
+
+function drawVoidHeadLight(
+  context: CanvasRenderingContext2D,
+  radius: number,
+  profile: Readonly<ProjectileHeadGlowProfile>,
+  primary: string,
+  secondary: string,
+  accent: string,
+  glowScale: number,
+): void {
+  const frontX = radius * profile.frontOffset;
+  const tipX = frontX + radius * profile.forwardFlareLength * 0.72;
+  context.save();
+  context.globalCompositeOperation = "source-over";
+  context.fillStyle = "rgba(5, 0, 18, 0.88)";
+  context.shadowColor = primary;
+  context.shadowBlur = 18 * profile.bloomSoftness * glowScale;
+  context.beginPath();
+  context.moveTo(tipX, 0);
+  context.lineTo(frontX - radius * 0.85, radius * 0.48);
+  context.lineTo(frontX - radius * 0.38, 0);
+  context.lineTo(frontX - radius * 0.85, -radius * 0.48);
+  context.closePath();
+  context.fill();
+
+  context.globalCompositeOperation = "lighter";
+  context.strokeStyle = primary;
+  context.shadowColor = primary;
+  context.globalAlpha = profile.bloomAlpha * 0.9;
+  context.lineWidth = Math.max(1, radius * 0.09);
+  context.stroke();
+
+  context.strokeStyle = secondary;
+  context.shadowColor = accent;
+  context.globalAlpha = profile.hotCoreAlpha * 0.52;
+  context.beginPath();
+  context.moveTo(frontX - radius * 0.22, 0);
+  context.lineTo(tipX - radius * 0.12, 0);
+  context.stroke();
+  context.restore();
+}
+
+function drawLanceHeadLight(
+  context: CanvasRenderingContext2D,
+  radius: number,
+  profile: Readonly<ProjectileHeadGlowProfile>,
+  primary: string,
+  secondary: string,
+  accent: string,
+  glowScale: number,
+): void {
+  const frontX = radius * profile.frontOffset;
+  const tipX = frontX + radius * profile.forwardFlareLength;
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.shadowColor = primary;
+  context.shadowBlur = 24 * profile.bloomSoftness * glowScale;
+  context.fillStyle = primary;
+  context.globalAlpha = profile.bloomAlpha * 0.76;
+  context.beginPath();
+  context.moveTo(frontX - radius * 1.2, -radius * 0.46);
+  context.lineTo(frontX + radius * 0.2, -radius * 0.26);
+  context.lineTo(tipX, 0);
+  context.lineTo(frontX + radius * 0.2, radius * 0.26);
+  context.lineTo(frontX - radius * 1.2, radius * 0.46);
+  context.lineTo(frontX - radius * 0.52, 0);
+  context.closePath();
+  context.fill();
+
+  context.fillStyle = accent;
+  context.shadowColor = accent;
+  context.globalAlpha = profile.forwardFlareAlpha * 0.56;
+  context.beginPath();
+  context.moveTo(frontX - radius * 0.35, -radius * 0.17);
+  context.lineTo(tipX - radius * 0.08, 0);
+  context.lineTo(frontX - radius * 0.35, radius * 0.17);
+  context.closePath();
+  context.fill();
+
+  context.strokeStyle = "#ffffff";
+  context.shadowColor = secondary;
+  context.shadowBlur = 11 * glowScale;
+  context.globalAlpha = profile.hotCoreAlpha;
+  context.lineWidth = Math.max(1.1, radius * 0.09);
+  context.beginPath();
+  context.moveTo(frontX - radius * 0.38, 0);
+  context.lineTo(tipX - radius * 0.1, 0);
+  context.stroke();
+  context.restore();
+}
+
+function drawTidalHeadLight(
+  context: CanvasRenderingContext2D,
+  radius: number,
+  profile: Readonly<ProjectileHeadGlowProfile>,
+  primary: string,
+  secondary: string,
+  glowScale: number,
+  time: number,
+): void {
+  const frontX = radius * profile.frontOffset;
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.fillStyle = primary;
+  context.shadowColor = primary;
+  context.shadowBlur = 22 * profile.bloomSoftness * glowScale;
+  context.globalAlpha = profile.bloomAlpha * 0.58;
+  context.beginPath();
+  context.moveTo(frontX + radius * 0.9, 0);
+  context.bezierCurveTo(
+    frontX + radius * 0.18,
+    -radius * 0.86,
+    frontX - radius * 0.86,
+    -radius * 0.46,
+    frontX - radius * 0.76,
+    0,
+  );
+  context.bezierCurveTo(
+    frontX - radius * 0.86,
+    radius * 0.46,
+    frontX + radius * 0.18,
+    radius * 0.86,
+    frontX + radius * 0.9,
+    0,
+  );
+  context.fill();
+
+  context.strokeStyle = secondary;
+  context.shadowColor = secondary;
+  context.globalAlpha = profile.hotCoreAlpha * 0.72;
+  context.lineWidth = Math.max(1, radius * 0.08);
+  context.beginPath();
+  context.arc(
+    frontX - radius * 0.08,
+    0,
+    radius * 0.48,
+    -Math.PI * 0.82 + Math.sin(time * 3.6) * 0.08,
+    Math.PI * 0.62,
+  );
+  context.stroke();
+  context.restore();
+  drawHeadHotDiamond(context, frontX + radius * 0.48, radius, profile, secondary, glowScale, 0.9, 0.5);
+}
+
+function drawAuroraHeadLight(
+  context: CanvasRenderingContext2D,
+  radius: number,
+  profile: Readonly<ProjectileHeadGlowProfile>,
+  primary: string,
+  secondary: string,
+  accent: string,
+  glowScale: number,
+  time: number,
+  id: number,
+): void {
+  const frontX = radius * profile.frontOffset;
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.lineCap = "round";
+  for (let band = 0; band < 3; band += 1) {
+    const color = band === 0 ? primary : band === 1 ? accent : secondary;
+    const sign = band - 1;
+    context.strokeStyle = color;
+    context.shadowColor = color;
+    context.shadowBlur = 16 * profile.bloomSoftness * glowScale;
+    context.globalAlpha = profile.bloomAlpha * (0.72 - band * 0.08);
+    context.lineWidth = Math.max(1.15, radius * (0.11 - band * 0.012));
+    context.beginPath();
+    context.moveTo(
+      frontX - radius * 1.3,
+      sign * radius * 0.24,
+    );
+    context.bezierCurveTo(
+      frontX - radius * 0.52,
+      sign * radius * 0.6 +
+        Math.sin(time * 3.5 + id + band) * radius * 0.08,
+      frontX + radius * 0.45,
+      -sign * radius * 0.42,
+      frontX + radius * (1.15 + band * 0.18),
+      sign * radius * 0.09,
+    );
+    context.stroke();
+  }
+
+  // A tiny sharp pin-light replaces the previous large generic round blob.
+  const pinX = frontX + radius * 0.82;
+  context.strokeStyle = "#ffffff";
+  context.shadowColor = secondary;
+  context.shadowBlur = 9 * glowScale;
+  context.globalAlpha = profile.hotCoreAlpha * 0.9;
+  context.lineWidth = Math.max(0.9, radius * 0.065);
+  context.beginPath();
+  context.moveTo(pinX - radius * 0.34, 0);
+  context.lineTo(pinX + radius * 0.46, 0);
+  context.moveTo(pinX, -radius * 0.24);
+  context.lineTo(pinX, radius * 0.24);
+  context.stroke();
+  context.restore();
+}
+
 function drawProjectileHeadGlow(
   context: CanvasRenderingContext2D,
   styleId: PlayerProjectileStyleId,
@@ -305,179 +931,67 @@ function drawProjectileHeadGlow(
   time: number,
   id: number,
 ): void {
-  const profile: Readonly<ProjectileHeadGlowProfile> =
-    projectileHeadGlowProfile(styleId);
-  const pulse = 0.96 + Math.sin(time * 8.2 + id * 1.37) * 0.04;
+  const profile = projectileHeadGlowProfile(styleId);
   const frontX = radius * profile.frontOffset;
-  const hotX = frontX + radius * 0.14;
-  const bloomRadius = radius * profile.bloomScale * pulse;
 
-  context.save();
-  context.globalCompositeOperation = "lighter";
+  drawHeadTrailBlend(
+    context,
+    radius,
+    profile,
+    primary,
+    glowScale,
+  );
 
-  // Blend the generated body into the first part of the wake. The ellipse is
-  // deliberately rear-biased so brightness falls away from the nose instead
-  // of becoming a uniform beam.
-  context.globalAlpha = profile.bloomAlpha * 0.28;
-  context.fillStyle = primary;
-  context.shadowColor = primary;
-  context.shadowBlur = 18 * profile.bloomSoftness * glowScale;
-  context.beginPath();
-  context.ellipse(
-    frontX - radius * profile.trailBlendLength * 0.72,
-    0,
-    radius * profile.trailBlendLength,
-    radius * profile.bloomScale * 0.34,
-    0,
-    0,
-    Math.PI * 2,
-  );
-  context.fill();
-
-  // Wide soft bloom around the projectile head.
-  context.globalAlpha = profile.bloomAlpha * 0.42;
-  context.fillStyle = primary;
-  context.shadowColor = primary;
-  context.shadowBlur = 30 * profile.bloomSoftness * glowScale;
-  context.beginPath();
-  context.ellipse(
-    frontX,
-    0,
-    bloomRadius * 1.12,
-    bloomRadius * 0.72,
-    0,
-    0,
-    Math.PI * 2,
-  );
-  context.fill();
-
-  // Secondary coloured halo gives fantasy shots depth without washing out the
-  // authoritative atlas art.
-  context.globalAlpha = profile.bloomAlpha * 0.24;
-  context.fillStyle = accent;
-  context.shadowColor = accent;
-  context.shadowBlur = 20 * profile.bloomSoftness * glowScale;
-  context.beginPath();
-  context.ellipse(
-    frontX - radius * 0.12,
-    0,
-    bloomRadius * 0.76,
-    bloomRadius * 0.5,
-    0,
-    0,
-    Math.PI * 2,
-  );
-  context.fill();
-
-  // Broad forward flare: low-alpha outer cone, then a shorter hot inner cone.
-  context.shadowColor = secondary;
-  context.shadowBlur = 15 * glowScale;
-  context.fillStyle = secondary;
-  context.globalAlpha = profile.forwardFlareAlpha * 0.24;
-  context.beginPath();
-  context.moveTo(frontX - radius * 0.16, -radius * profile.forwardFlareWidth);
-  context.lineTo(
-    frontX + radius * profile.forwardFlareLength,
-    0,
-  );
-  context.lineTo(frontX - radius * 0.16, radius * profile.forwardFlareWidth);
-  context.closePath();
-  context.fill();
-
-  context.globalAlpha = profile.forwardFlareAlpha * 0.58;
-  context.beginPath();
-  context.moveTo(
-    frontX,
-    -radius * profile.forwardFlareWidth * 0.28,
-  );
-  context.lineTo(
-    frontX + radius * profile.forwardFlareLength * 0.72,
-    0,
-  );
-  context.lineTo(
-    frontX,
-    radius * profile.forwardFlareWidth * 0.28,
-  );
-  context.closePath();
-  context.fill();
-
-  // Tiny white-hot core at the nose. This should always be the brightest point
-  // of the projectile and is what creates the "dazzling then fading" read.
-  context.globalAlpha = profile.hotCoreAlpha;
-  context.fillStyle = "#ffffff";
-  context.shadowColor = secondary;
-  context.shadowBlur = 12 * glowScale;
-  context.beginPath();
-  context.ellipse(
-    hotX,
-    0,
-    radius * profile.hotCoreScale * 1.65,
-    radius * profile.hotCoreScale * 0.92,
-    0,
-    0,
-    Math.PI * 2,
-  );
-  context.fill();
-
-  context.globalAlpha = profile.hotCoreAlpha * 0.88;
-  context.fillStyle = secondary;
-  context.beginPath();
-  context.ellipse(
-    hotX - radius * 0.12,
-    0,
-    radius * profile.hotCoreScale,
-    radius * profile.hotCoreScale * 0.56,
-    0,
-    0,
-    Math.PI * 2,
-  );
-  context.fill();
-
-  // Fine halo ring around the head; stronger on magical/holy/aurora styles.
-  context.globalAlpha = profile.frontHaloAlpha;
-  context.strokeStyle = secondary;
-  context.lineWidth = Math.max(1, radius * 0.08);
-  context.shadowColor = primary;
-  context.shadowBlur = 10 * glowScale;
-  context.beginPath();
-  context.ellipse(
-    frontX,
-    0,
-    radius * profile.frontHaloScale,
-    radius * profile.frontHaloScale * 0.62,
-    0,
-    0,
-    Math.PI * 2,
-  );
-  context.stroke();
-
-  if (detailScale >= 0.68) {
-    const sparkleCount = profile.sparkleCount;
-    context.fillStyle = secondary;
-    context.strokeStyle = secondary;
-    context.lineCap = "round";
-    for (let index = 0; index < sparkleCount; index += 1) {
-      const angle =
-        time * 1.7 +
-        id * 0.43 +
-        (Math.PI * 2 * index) / Math.max(1, sparkleCount);
-      const distance =
-        radius * profile.sparkleSpread * (0.62 + (index % 2) * 0.24);
-      const x = frontX - radius * 0.28 + Math.cos(angle) * distance;
-      const y = Math.sin(angle) * distance * 0.72;
-      const size = radius * (0.1 + (index % 2) * 0.035);
-      context.globalAlpha = 0.52 + (index % 2) * 0.14;
-      context.shadowBlur = 7 * glowScale;
-      context.beginPath();
-      context.moveTo(x - size * 1.8, y);
-      context.lineTo(x + size * 1.8, y);
-      context.moveTo(x, y - size * 1.8);
-      context.lineTo(x, y + size * 1.8);
-      context.stroke();
-    }
+  switch (profile.family) {
+    case "meteor":
+      drawMeteorHeadLight(context, radius, profile, primary, secondary, glowScale);
+      break;
+    case "crescent":
+      drawCrescentHeadLight(context, radius, profile, primary, secondary, glowScale);
+      break;
+    case "crystal":
+      drawCrystalHeadLight(context, radius, profile, primary, secondary, accent, glowScale);
+      break;
+    case "orb":
+      drawOrbHeadLight(context, radius, profile, primary, secondary, glowScale);
+      break;
+    case "star":
+      drawStarHeadLight(context, radius, profile, primary, secondary, accent, glowScale, time);
+      break;
+    case "halo":
+      drawHaloHeadLight(context, radius, profile, primary, secondary, glowScale);
+      break;
+    case "needle":
+      drawNeedleHeadLight(context, radius, profile, primary, secondary, glowScale, time, id);
+      break;
+    case "blossom":
+      drawBlossomHeadLight(context, radius, profile, primary, secondary, glowScale, time, id);
+      break;
+    case "void":
+      drawVoidHeadLight(context, radius, profile, primary, secondary, accent, glowScale);
+      break;
+    case "lance":
+      drawLanceHeadLight(context, radius, profile, primary, secondary, accent, glowScale);
+      break;
+    case "tidal":
+      drawTidalHeadLight(context, radius, profile, primary, secondary, glowScale, time);
+      break;
+    case "aurora":
+      drawAuroraHeadLight(context, radius, profile, primary, secondary, accent, glowScale, time, id);
+      break;
   }
 
-  context.restore();
+  drawHeadSparkles(
+    context,
+    frontX,
+    radius,
+    profile,
+    secondary,
+    glowScale,
+    time,
+    id,
+    detailScale,
+  );
 }
 
 function trailWidthRatio(
