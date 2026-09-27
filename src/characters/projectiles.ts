@@ -65,6 +65,23 @@ export type ProjectileTrailProfile = {
   sideStreakCount: number;
 };
 
+export type ProjectileHeadGlowProfile = {
+  frontOffset: number;
+  hotCoreScale: number;
+  hotCoreAlpha: number;
+  bloomScale: number;
+  bloomAlpha: number;
+  bloomSoftness: number;
+  forwardFlareLength: number;
+  forwardFlareWidth: number;
+  forwardFlareAlpha: number;
+  frontHaloScale: number;
+  frontHaloAlpha: number;
+  trailBlendLength: number;
+  sparkleCount: number;
+  sparkleSpread: number;
+};
+
 export type PlayerProjectileProfile = {
   styleId: Exclude<PlayerProjectileStyleId, "nova-pearl">;
   label: string;
@@ -247,17 +264,215 @@ export const PROJECTILE_TRAIL_PROFILES: Record<
   },
   "aurora-ribbon": {
     headScale: 1.14,
-    lengthScale: 1.12,
-    frontWidthRatio: 0.64,
-    midWidthRatio: 0.34,
-    endWidthRatio: 0.1,
-    outerAlpha: 0.35,
-    coreAlpha: 0.9,
-    coreWidthRatio: 0.3,
-    bend: 12,
+    lengthScale: 1.1,
+    frontWidthRatio: 0.62,
+    midWidthRatio: 0.32,
+    endWidthRatio: 0.08,
+    outerAlpha: 0.31,
+    coreAlpha: 0.92,
+    coreWidthRatio: 0.27,
+    bend: 9,
     ribbonCount: 3,
-    ribbonSpread: 0.56,
-    sideStreakCount: 4,
+    ribbonSpread: 0.42,
+    sideStreakCount: 2,
+  },
+};
+
+export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
+  PlayerProjectileStyleId,
+  Readonly<ProjectileHeadGlowProfile>
+> = {
+  "meteor-bolt": {
+    frontOffset: 3.9,
+    hotCoreScale: 0.36,
+    hotCoreAlpha: 1,
+    bloomScale: 1.72,
+    bloomAlpha: 0.5,
+    bloomSoftness: 1.18,
+    forwardFlareLength: 3,
+    forwardFlareWidth: 0.62,
+    forwardFlareAlpha: 0.48,
+    frontHaloScale: 1.02,
+    frontHaloAlpha: 0.22,
+    trailBlendLength: 3.2,
+    sparkleCount: 3,
+    sparkleSpread: 0.82,
+  },
+  "crescent-slash": {
+    frontOffset: 3.45,
+    hotCoreScale: 0.3,
+    hotCoreAlpha: 0.92,
+    bloomScale: 1.4,
+    bloomAlpha: 0.38,
+    bloomSoftness: 1.05,
+    forwardFlareLength: 1.65,
+    forwardFlareWidth: 0.52,
+    forwardFlareAlpha: 0.32,
+    frontHaloScale: 0.88,
+    frontHaloAlpha: 0.2,
+    trailBlendLength: 2.5,
+    sparkleCount: 2,
+    sparkleSpread: 0.72,
+  },
+  "prism-dart": {
+    frontOffset: 3.9,
+    hotCoreScale: 0.29,
+    hotCoreAlpha: 0.98,
+    bloomScale: 1.42,
+    bloomAlpha: 0.41,
+    bloomSoftness: 1.08,
+    forwardFlareLength: 2.65,
+    forwardFlareWidth: 0.48,
+    forwardFlareAlpha: 0.4,
+    frontHaloScale: 0.82,
+    frontHaloAlpha: 0.18,
+    trailBlendLength: 2.8,
+    sparkleCount: 3,
+    sparkleSpread: 0.78,
+  },
+  "nova-pearl": {
+    frontOffset: 3.15,
+    hotCoreScale: 0.37,
+    hotCoreAlpha: 0.96,
+    bloomScale: 1.7,
+    bloomAlpha: 0.46,
+    bloomSoftness: 1.2,
+    forwardFlareLength: 1.45,
+    forwardFlareWidth: 0.72,
+    forwardFlareAlpha: 0.28,
+    frontHaloScale: 1.18,
+    frontHaloAlpha: 0.3,
+    trailBlendLength: 2.8,
+    sparkleCount: 3,
+    sparkleSpread: 0.9,
+  },
+  "twin-star-shot": {
+    frontOffset: 3.55,
+    hotCoreScale: 0.32,
+    hotCoreAlpha: 0.98,
+    bloomScale: 1.52,
+    bloomAlpha: 0.43,
+    bloomSoftness: 1.12,
+    forwardFlareLength: 2.15,
+    forwardFlareWidth: 0.56,
+    forwardFlareAlpha: 0.38,
+    frontHaloScale: 0.94,
+    frontHaloAlpha: 0.2,
+    trailBlendLength: 2.9,
+    sparkleCount: 3,
+    sparkleSpread: 0.82,
+  },
+  "halo-burst": {
+    frontOffset: 3.2,
+    hotCoreScale: 0.38,
+    hotCoreAlpha: 1,
+    bloomScale: 1.76,
+    bloomAlpha: 0.5,
+    bloomSoftness: 1.2,
+    forwardFlareLength: 2.05,
+    forwardFlareWidth: 0.7,
+    forwardFlareAlpha: 0.42,
+    frontHaloScale: 1.22,
+    frontHaloAlpha: 0.34,
+    trailBlendLength: 2.8,
+    sparkleCount: 3,
+    sparkleSpread: 0.88,
+  },
+  "thunder-needle": {
+    frontOffset: 4.15,
+    hotCoreScale: 0.28,
+    hotCoreAlpha: 1,
+    bloomScale: 1.46,
+    bloomAlpha: 0.44,
+    bloomSoftness: 1.04,
+    forwardFlareLength: 3.15,
+    forwardFlareWidth: 0.42,
+    forwardFlareAlpha: 0.52,
+    frontHaloScale: 0.82,
+    frontHaloAlpha: 0.18,
+    trailBlendLength: 2.9,
+    sparkleCount: 3,
+    sparkleSpread: 0.7,
+  },
+  "blossom-comet": {
+    frontOffset: 3.25,
+    hotCoreScale: 0.34,
+    hotCoreAlpha: 0.95,
+    bloomScale: 1.58,
+    bloomAlpha: 0.43,
+    bloomSoftness: 1.15,
+    forwardFlareLength: 1.75,
+    forwardFlareWidth: 0.64,
+    forwardFlareAlpha: 0.3,
+    frontHaloScale: 0.96,
+    frontHaloAlpha: 0.22,
+    trailBlendLength: 2.7,
+    sparkleCount: 2,
+    sparkleSpread: 0.8,
+  },
+  "void-spike": {
+    frontOffset: 3.85,
+    hotCoreScale: 0.28,
+    hotCoreAlpha: 0.86,
+    bloomScale: 1.48,
+    bloomAlpha: 0.3,
+    bloomSoftness: 1.16,
+    forwardFlareLength: 2.45,
+    forwardFlareWidth: 0.5,
+    forwardFlareAlpha: 0.3,
+    frontHaloScale: 0.88,
+    frontHaloAlpha: 0.16,
+    trailBlendLength: 2.8,
+    sparkleCount: 2,
+    sparkleSpread: 0.75,
+  },
+  "solar-lance": {
+    frontOffset: 4.1,
+    hotCoreScale: 0.4,
+    hotCoreAlpha: 1,
+    bloomScale: 1.88,
+    bloomAlpha: 0.58,
+    bloomSoftness: 1.22,
+    forwardFlareLength: 3.35,
+    forwardFlareWidth: 0.66,
+    forwardFlareAlpha: 0.56,
+    frontHaloScale: 1.08,
+    frontHaloAlpha: 0.26,
+    trailBlendLength: 3.5,
+    sparkleCount: 4,
+    sparkleSpread: 0.9,
+  },
+  "tidal-pearl": {
+    frontOffset: 3.2,
+    hotCoreScale: 0.36,
+    hotCoreAlpha: 0.96,
+    bloomScale: 1.68,
+    bloomAlpha: 0.44,
+    bloomSoftness: 1.18,
+    forwardFlareLength: 1.65,
+    forwardFlareWidth: 0.7,
+    forwardFlareAlpha: 0.28,
+    frontHaloScale: 1.08,
+    frontHaloAlpha: 0.26,
+    trailBlendLength: 2.9,
+    sparkleCount: 2,
+    sparkleSpread: 0.88,
+  },
+  "aurora-ribbon": {
+    frontOffset: 3.55,
+    hotCoreScale: 0.38,
+    hotCoreAlpha: 1,
+    bloomScale: 1.84,
+    bloomAlpha: 0.54,
+    bloomSoftness: 1.24,
+    forwardFlareLength: 2.75,
+    forwardFlareWidth: 0.66,
+    forwardFlareAlpha: 0.5,
+    frontHaloScale: 1.12,
+    frontHaloAlpha: 0.32,
+    trailBlendLength: 3.55,
+    sparkleCount: 3,
+    sparkleSpread: 0.78,
   },
 };
 
@@ -603,4 +818,10 @@ export function projectileTrailProfile(
   styleId: PlayerProjectileStyleId,
 ): Readonly<ProjectileTrailProfile> {
   return PROJECTILE_TRAIL_PROFILES[styleId];
+}
+
+export function projectileHeadGlowProfile(
+  styleId: PlayerProjectileStyleId,
+): Readonly<ProjectileHeadGlowProfile> {
+  return PROJECTILE_HEAD_GLOW_PROFILES[styleId];
 }
