@@ -50,7 +50,7 @@ describe("Layered authored background registry", () => {
     const band = (depth: number) =>
       depth < 0.16 ? "far" : depth < 0.35 ? "mid-far" : depth < 0.72 ? "mid" : "near";
 
-    for (const world of WORLD_REGISTRY.filter((item) => item.number >= 6)) {
+    for (const world of WORLD_REGISTRY.slice(5)) {
       const profile = layeredBackgroundForScene(
         sceneProfileForWorld(world),
       );
