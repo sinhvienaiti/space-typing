@@ -95,6 +95,14 @@ export type ProjectileHeadGlowProfile = {
   trailBlendLength: number;
   sparkleCount: number;
   sparkleSpread: number;
+  directionalAuraLength: number;
+  directionalAuraWidth: number;
+  directionalAuraAlpha: number;
+  directionalCoreLength: number;
+  directionalCoreWidth: number;
+  directionalCoreAlpha: number;
+  directionalTipAlpha: number;
+  directionalRearAlpha: number;
 };
 
 export type PlayerProjectileProfile = {
@@ -313,6 +321,14 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     trailBlendLength: 3.2,
     sparkleCount: 3,
     sparkleSpread: 0.82,
+    directionalAuraLength: 3.6,
+    directionalAuraWidth: 1.08,
+    directionalAuraAlpha: 0.38,
+    directionalCoreLength: 2.9,
+    directionalCoreWidth: 0.36,
+    directionalCoreAlpha: 0.72,
+    directionalTipAlpha: 0.72,
+    directionalRearAlpha: 0.2,
   },
   "crescent-slash": {
     family: "crescent",
@@ -330,6 +346,14 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     trailBlendLength: 2.5,
     sparkleCount: 2,
     sparkleSpread: 0.72,
+    directionalAuraLength: 2.1,
+    directionalAuraWidth: 0.82,
+    directionalAuraAlpha: 0.24,
+    directionalCoreLength: 1.55,
+    directionalCoreWidth: 0.3,
+    directionalCoreAlpha: 0.5,
+    directionalTipAlpha: 0.5,
+    directionalRearAlpha: 0.14,
   },
   "prism-dart": {
     family: "crystal",
@@ -347,6 +371,14 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     trailBlendLength: 2.8,
     sparkleCount: 3,
     sparkleSpread: 0.78,
+    directionalAuraLength: 3.15,
+    directionalAuraWidth: 0.78,
+    directionalAuraAlpha: 0.36,
+    directionalCoreLength: 2.65,
+    directionalCoreWidth: 0.25,
+    directionalCoreAlpha: 0.74,
+    directionalTipAlpha: 0.74,
+    directionalRearAlpha: 0.18,
   },
   "nova-pearl": {
     family: "orb",
@@ -364,6 +396,14 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     trailBlendLength: 2.8,
     sparkleCount: 3,
     sparkleSpread: 0.9,
+    directionalAuraLength: 1.65,
+    directionalAuraWidth: 0.96,
+    directionalAuraAlpha: 0.18,
+    directionalCoreLength: 1.2,
+    directionalCoreWidth: 0.38,
+    directionalCoreAlpha: 0.38,
+    directionalTipAlpha: 0.42,
+    directionalRearAlpha: 0.12,
   },
   "twin-star-shot": {
     family: "star",
@@ -381,6 +421,14 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     trailBlendLength: 2.9,
     sparkleCount: 3,
     sparkleSpread: 0.82,
+    directionalAuraLength: 2.35,
+    directionalAuraWidth: 0.96,
+    directionalAuraAlpha: 0.28,
+    directionalCoreLength: 1.75,
+    directionalCoreWidth: 0.34,
+    directionalCoreAlpha: 0.56,
+    directionalTipAlpha: 0.6,
+    directionalRearAlpha: 0.16,
   },
   "halo-burst": {
     family: "halo",
@@ -398,6 +446,14 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     trailBlendLength: 2.8,
     sparkleCount: 3,
     sparkleSpread: 0.88,
+    directionalAuraLength: 1.95,
+    directionalAuraWidth: 1.08,
+    directionalAuraAlpha: 0.23,
+    directionalCoreLength: 1.4,
+    directionalCoreWidth: 0.4,
+    directionalCoreAlpha: 0.44,
+    directionalTipAlpha: 0.52,
+    directionalRearAlpha: 0.14,
   },
   "thunder-needle": {
     family: "needle",
@@ -415,6 +471,14 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     trailBlendLength: 2.9,
     sparkleCount: 3,
     sparkleSpread: 0.7,
+    directionalAuraLength: 3.85,
+    directionalAuraWidth: 0.52,
+    directionalAuraAlpha: 0.4,
+    directionalCoreLength: 3.35,
+    directionalCoreWidth: 0.15,
+    directionalCoreAlpha: 0.84,
+    directionalTipAlpha: 0.82,
+    directionalRearAlpha: 0.18,
   },
   "blossom-comet": {
     family: "blossom",
@@ -432,6 +496,14 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     trailBlendLength: 2.7,
     sparkleCount: 2,
     sparkleSpread: 0.8,
+    directionalAuraLength: 1.95,
+    directionalAuraWidth: 0.88,
+    directionalAuraAlpha: 0.22,
+    directionalCoreLength: 1.4,
+    directionalCoreWidth: 0.3,
+    directionalCoreAlpha: 0.44,
+    directionalTipAlpha: 0.5,
+    directionalRearAlpha: 0.14,
   },
   "void-spike": {
     family: "void",
@@ -449,6 +521,14 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     trailBlendLength: 2.8,
     sparkleCount: 2,
     sparkleSpread: 0.75,
+    directionalAuraLength: 3.05,
+    directionalAuraWidth: 0.68,
+    directionalAuraAlpha: 0.3,
+    directionalCoreLength: 2.45,
+    directionalCoreWidth: 0.22,
+    directionalCoreAlpha: 0.58,
+    directionalTipAlpha: 0.62,
+    directionalRearAlpha: 0.16,
   },
   "solar-lance": {
     family: "lance",
@@ -466,6 +546,14 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     trailBlendLength: 3.5,
     sparkleCount: 4,
     sparkleSpread: 0.9,
+    directionalAuraLength: 4.1,
+    directionalAuraWidth: 0.84,
+    directionalAuraAlpha: 0.44,
+    directionalCoreLength: 3.5,
+    directionalCoreWidth: 0.23,
+    directionalCoreAlpha: 0.88,
+    directionalTipAlpha: 0.88,
+    directionalRearAlpha: 0.22,
   },
   "tidal-pearl": {
     family: "tidal",
@@ -483,6 +571,14 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     trailBlendLength: 2.9,
     sparkleCount: 2,
     sparkleSpread: 0.88,
+    directionalAuraLength: 1.95,
+    directionalAuraWidth: 0.98,
+    directionalAuraAlpha: 0.21,
+    directionalCoreLength: 1.45,
+    directionalCoreWidth: 0.35,
+    directionalCoreAlpha: 0.44,
+    directionalTipAlpha: 0.5,
+    directionalRearAlpha: 0.14,
   },
   "aurora-ribbon": {
     family: "aurora",
@@ -500,6 +596,14 @@ export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
     trailBlendLength: 3.55,
     sparkleCount: 3,
     sparkleSpread: 0.78,
+    directionalAuraLength: 2.8,
+    directionalAuraWidth: 0.82,
+    directionalAuraAlpha: 0.32,
+    directionalCoreLength: 2.15,
+    directionalCoreWidth: 0.24,
+    directionalCoreAlpha: 0.64,
+    directionalTipAlpha: 0.68,
+    directionalRearAlpha: 0.18,
   },
 };
 
