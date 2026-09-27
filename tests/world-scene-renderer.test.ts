@@ -22,17 +22,29 @@ describe("World scene production rendering policy", () => {
     });
   });
 
-  it("preserves the legacy pipeline for Worlds not migrated yet", () => {
-    const policy = worldSceneRenderPolicy(
-      layeredBackgroundForScene(sceneProfileForWorld("world-06")),
-    );
+  it("removes legacy procedural passes from migrated family Worlds", () => {
+    for (const worldId of [
+      "world-06",
+      "world-11",
+      "world-16",
+      "world-21",
+      "world-26",
+      "world-31",
+      "world-36",
+      "world-41",
+      "world-46",
+    ]) {
+      const policy = worldSceneRenderPolicy(
+        layeredBackgroundForScene(sceneProfileForWorld(worldId)),
+      );
 
-    expect(policy).toEqual({
-      drawLegacyStaticScene: true,
-      drawLegacyCinematicMotion: true,
-      drawLegacyFloorFallback: true,
-      drawLegacyCinematicEvents: true,
-    });
+      expect(policy, worldId).toEqual({
+        drawLegacyStaticScene: false,
+        drawLegacyCinematicMotion: false,
+        drawLegacyFloorFallback: false,
+        drawLegacyCinematicEvents: false,
+      });
+    }
   });
 });
 
