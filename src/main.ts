@@ -3111,6 +3111,26 @@ window.addEventListener("message", (event: MessageEvent<unknown>) => {
   void applySpaceReviewDataset(event.data);
 });
 
+/**
+ * BGV is enabled by default for Worlds with a composition. `?bg=legacy`
+ * keeps the current scene renderer for A/B checks; `&bgPresent=layered`
+ * stacks the WebGL canvas instead of blitting it into gameplay.
+ */
+function backgroundOptions(): {
+  backgroundCanvas: HTMLCanvasElement | null;
+  backgroundPresentation: "layered" | "blit";
+} {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    backgroundCanvas:
+      params.get("bg") === "legacy"
+        ? null
+        : byId<HTMLCanvasElement>("bgCanvas"),
+    backgroundPresentation:
+      params.get("bgPresent") === "layered" ? "layered" : "blit",
+  };
+}
+
 const game = new Game(
   byId<HTMLCanvasElement>("gameCanvas"),
   [],
@@ -3760,6 +3780,7 @@ const game = new Game(
       );
     },
   },
+  backgroundOptions(),
 );
 game.setGameplayMode(gameplayMode, recallSettings);
 
