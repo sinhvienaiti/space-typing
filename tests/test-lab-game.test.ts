@@ -261,8 +261,9 @@ describe("M21 gated Game Test Lab API", () => {
     game.destroy();
   });
 
-  it("preserves Splitter fragments and Volatile burst in Combat", () => {
+  it("preserves Splitter fragments and Volatile burst when enemy projectiles are explicitly On", () => {
     const game = createTestGame();
+    game.updateSettings({ ...settings, enemyProjectileMode: "on" });
     game.setTestLabMode(true);
     start(game, 900);
     game.testLabSetSchedulerFrozen(true);
@@ -466,15 +467,25 @@ describe("M21 gated Game Test Lab API", () => {
     ]);
     expect(before?.scheduler.frozen).toBe(true);
 
+    const visualRuntime = game as unknown as { lasers: unknown[] };
+    expect(before?.playerShots).toBe(0);
+    expect(visualRuntime.lasers).toHaveLength(0);
+
     game.handleKey("m");
     const after = game.getTestLabSnapshot();
+    expect(after?.playerShots).toBe(1);
+    expect(visualRuntime.lasers).toHaveLength(0);
     const typed = after?.enemies.filter((enemy) => enemy.typed === 1) ?? [];
 
     expect(typed).toHaveLength(1);
     expect(typed[0]?.entry.en).toBe("month");
 
+    game.handleKey("x");
+    expect(game.getTestLabSnapshot()?.playerShots).toBe(1);
+
     game.handleKey("o");
     const locked = game.getTestLabSnapshot();
+    expect(locked?.playerShots).toBe(2);
     expect(
       locked?.enemies.find((enemy) => enemy.entry.en === "month")?.typed,
     ).toBe(2);
@@ -517,6 +528,34 @@ describe("M21 gated Game Test Lab API", () => {
 
     game.destroy();
   });
+  it("stores the actual kill reward in a bounded score popup", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 1);
+    game.testLabSetSchedulerFrozen(true);
+
+    const ids = game.testLabSpawnEnemies({
+      kind: "scout",
+      count: 1,
+      layers: 1,
+    });
+    const beforeScore = game.getTestLabSnapshot()?.stats.score ?? 0;
+    expect(game.testLabKillEnemy(ids[0]!)).toBe(true);
+    const afterScore = game.getTestLabSnapshot()?.stats.score ?? 0;
+    const runtime = game as unknown as {
+      killScorePopups: Array<{
+        value: number;
+        life: number;
+        maxLife: number;
+      }>;
+    };
+
+    expect(runtime.killScorePopups).toHaveLength(1);
+    expect(runtime.killScorePopups[0]?.value).toBe(afterScore - beforeScore);
+    expect(runtime.killScorePopups[0]?.maxLife).toBe(2);
+    game.destroy();
+  });
+
   it("reports completed-word quality once for shared learning", () => {
     const game = createTestGame();
     game.setTestLabMode(true);
