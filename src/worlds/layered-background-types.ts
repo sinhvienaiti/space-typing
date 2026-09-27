@@ -23,7 +23,24 @@ export type BackgroundTreatment =
   | "none"
   | "galaxy-rock-far"
   | "galaxy-rock-mid"
-  | "galaxy-rock-near";
+  | "galaxy-rock-near"
+  | "infernal-atmosphere"
+  | "infernal-rock"
+  | "frost-atmosphere"
+  | "frost-rock"
+  | "verdant-atmosphere"
+  | "verdant-rock"
+  | "shadow-atmosphere"
+  | "shadow-rock"
+  | "forge-atmosphere"
+  | "forge-rock"
+  | "abyss-atmosphere"
+  | "void-rock"
+  | "meteor-atmosphere"
+  | "cathedral-atmosphere"
+  | "cathedral-rock"
+  | "eternity-atmosphere"
+  | "prism-rock";
 
 export type BackgroundRenderMode =
   | "legacy-hybrid"
