@@ -50,6 +50,21 @@ export type FlightTrailProfile = {
   detailCount: number;
 };
 
+export type ProjectileTrailProfile = {
+  headScale: number;
+  lengthScale: number;
+  frontWidthRatio: number;
+  midWidthRatio: number;
+  endWidthRatio: number;
+  outerAlpha: number;
+  coreAlpha: number;
+  coreWidthRatio: number;
+  bend: number;
+  ribbonCount: 1 | 2 | 3;
+  ribbonSpread: number;
+  sideStreakCount: number;
+};
+
 export type PlayerProjectileProfile = {
   styleId: Exclude<PlayerProjectileStyleId, "nova-pearl">;
   label: string;
@@ -63,12 +78,187 @@ export type PlayerProjectileProfile = {
   bodyRadius: number;
   presentationSpeed: number;
   trailLength: number;
+  trail: ProjectileTrailProfile;
   particleCount: number;
   muzzleRadius: number;
   firePitch: number;
   hitPitch: number;
   killPitch: number;
   flightTrail: FlightTrailProfile;
+};
+
+export const PROJECTILE_TRAIL_PROFILES: Record<
+  PlayerProjectileStyleId,
+  Readonly<ProjectileTrailProfile>
+> = {
+  "meteor-bolt": {
+    headScale: 1.12,
+    lengthScale: 1.08,
+    frontWidthRatio: 0.68,
+    midWidthRatio: 0.36,
+    endWidthRatio: 0.11,
+    outerAlpha: 0.38,
+    coreAlpha: 0.92,
+    coreWidthRatio: 0.34,
+    bend: 4,
+    ribbonCount: 1,
+    ribbonSpread: 0,
+    sideStreakCount: 4,
+  },
+  "crescent-slash": {
+    headScale: 1.08,
+    lengthScale: 1.04,
+    frontWidthRatio: 0.62,
+    midWidthRatio: 0.34,
+    endWidthRatio: 0.12,
+    outerAlpha: 0.34,
+    coreAlpha: 0.88,
+    coreWidthRatio: 0.3,
+    bend: 14,
+    ribbonCount: 1,
+    ribbonSpread: 0,
+    sideStreakCount: 2,
+  },
+  "prism-dart": {
+    headScale: 1.06,
+    lengthScale: 1.06,
+    frontWidthRatio: 0.58,
+    midWidthRatio: 0.29,
+    endWidthRatio: 0.09,
+    outerAlpha: 0.32,
+    coreAlpha: 0.9,
+    coreWidthRatio: 0.28,
+    bend: 3,
+    ribbonCount: 1,
+    ribbonSpread: 0,
+    sideStreakCount: 4,
+  },
+  "nova-pearl": {
+    headScale: 1.14,
+    lengthScale: 1,
+    frontWidthRatio: 0.65,
+    midWidthRatio: 0.38,
+    endWidthRatio: 0.16,
+    outerAlpha: 0.34,
+    coreAlpha: 0.86,
+    coreWidthRatio: 0.36,
+    bend: 4,
+    ribbonCount: 1,
+    ribbonSpread: 0,
+    sideStreakCount: 3,
+  },
+  "twin-star-shot": {
+    headScale: 1.08,
+    lengthScale: 1.08,
+    frontWidthRatio: 0.58,
+    midWidthRatio: 0.31,
+    endWidthRatio: 0.1,
+    outerAlpha: 0.34,
+    coreAlpha: 0.9,
+    coreWidthRatio: 0.29,
+    bend: 8,
+    ribbonCount: 2,
+    ribbonSpread: 0.62,
+    sideStreakCount: 3,
+  },
+  "halo-burst": {
+    headScale: 1.12,
+    lengthScale: 1.02,
+    frontWidthRatio: 0.66,
+    midWidthRatio: 0.38,
+    endWidthRatio: 0.14,
+    outerAlpha: 0.36,
+    coreAlpha: 0.88,
+    coreWidthRatio: 0.35,
+    bend: 2,
+    ribbonCount: 1,
+    ribbonSpread: 0,
+    sideStreakCount: 2,
+  },
+  "thunder-needle": {
+    headScale: 1.04,
+    lengthScale: 1.1,
+    frontWidthRatio: 0.55,
+    midWidthRatio: 0.25,
+    endWidthRatio: 0.08,
+    outerAlpha: 0.3,
+    coreAlpha: 0.96,
+    coreWidthRatio: 0.24,
+    bend: 3,
+    ribbonCount: 1,
+    ribbonSpread: 0,
+    sideStreakCount: 3,
+  },
+  "blossom-comet": {
+    headScale: 1.1,
+    lengthScale: 1.06,
+    frontWidthRatio: 0.64,
+    midWidthRatio: 0.34,
+    endWidthRatio: 0.11,
+    outerAlpha: 0.34,
+    coreAlpha: 0.88,
+    coreWidthRatio: 0.31,
+    bend: 8,
+    ribbonCount: 1,
+    ribbonSpread: 0,
+    sideStreakCount: 5,
+  },
+  "void-spike": {
+    headScale: 1.08,
+    lengthScale: 1.08,
+    frontWidthRatio: 0.62,
+    midWidthRatio: 0.28,
+    endWidthRatio: 0.09,
+    outerAlpha: 0.28,
+    coreAlpha: 0.82,
+    coreWidthRatio: 0.28,
+    bend: 6,
+    ribbonCount: 1,
+    ribbonSpread: 0,
+    sideStreakCount: 4,
+  },
+  "solar-lance": {
+    headScale: 1.16,
+    lengthScale: 1.1,
+    frontWidthRatio: 0.7,
+    midWidthRatio: 0.4,
+    endWidthRatio: 0.12,
+    outerAlpha: 0.4,
+    coreAlpha: 0.96,
+    coreWidthRatio: 0.36,
+    bend: 4,
+    ribbonCount: 1,
+    ribbonSpread: 0,
+    sideStreakCount: 4,
+  },
+  "tidal-pearl": {
+    headScale: 1.12,
+    lengthScale: 1.04,
+    frontWidthRatio: 0.66,
+    midWidthRatio: 0.38,
+    endWidthRatio: 0.15,
+    outerAlpha: 0.34,
+    coreAlpha: 0.86,
+    coreWidthRatio: 0.34,
+    bend: 10,
+    ribbonCount: 2,
+    ribbonSpread: 0.42,
+    sideStreakCount: 4,
+  },
+  "aurora-ribbon": {
+    headScale: 1.14,
+    lengthScale: 1.12,
+    frontWidthRatio: 0.64,
+    midWidthRatio: 0.34,
+    endWidthRatio: 0.1,
+    outerAlpha: 0.35,
+    coreAlpha: 0.9,
+    coreWidthRatio: 0.3,
+    bend: 12,
+    ribbonCount: 3,
+    ribbonSpread: 0.56,
+    sideStreakCount: 4,
+  },
 };
 
 const PLAYER_PROJECTILES: Record<CharacterId, PlayerProjectileProfile> = {
@@ -84,7 +274,8 @@ const PLAYER_PROJECTILES: Record<CharacterId, PlayerProjectileProfile> = {
     impactHue: 202,
     bodyRadius: 4.2,
     presentationSpeed: 1780,
-    trailLength: 88,
+    trailLength: 152,
+    trail: PROJECTILE_TRAIL_PROFILES["meteor-bolt"],
     particleCount: 5,
     muzzleRadius: 5,
     firePitch: 1.08,
@@ -112,7 +303,8 @@ const PLAYER_PROJECTILES: Record<CharacterId, PlayerProjectileProfile> = {
     impactHue: 42,
     bodyRadius: 5.2,
     presentationSpeed: 1480,
-    trailLength: 72,
+    trailLength: 132,
+    trail: PROJECTILE_TRAIL_PROFILES["halo-burst"],
     particleCount: 4,
     muzzleRadius: 6,
     firePitch: 0.9,
@@ -140,7 +332,8 @@ const PLAYER_PROJECTILES: Record<CharacterId, PlayerProjectileProfile> = {
     impactHue: 205,
     bodyRadius: 3.8,
     presentationSpeed: 2100,
-    trailLength: 96,
+    trailLength: 146,
+    trail: PROJECTILE_TRAIL_PROFILES["thunder-needle"],
     particleCount: 6,
     muzzleRadius: 5,
     firePitch: 1.22,
@@ -168,7 +361,8 @@ const PLAYER_PROJECTILES: Record<CharacterId, PlayerProjectileProfile> = {
     impactHue: 274,
     bodyRadius: 4.3,
     presentationSpeed: 1720,
-    trailLength: 90,
+    trailLength: 142,
+    trail: PROJECTILE_TRAIL_PROFILES["void-spike"],
     particleCount: 5,
     muzzleRadius: 5,
     firePitch: 0.78,
@@ -196,7 +390,8 @@ const PLAYER_PROJECTILES: Record<CharacterId, PlayerProjectileProfile> = {
     impactHue: 48,
     bodyRadius: 4.3,
     presentationSpeed: 1680,
-    trailLength: 100,
+    trailLength: 148,
+    trail: PROJECTILE_TRAIL_PROFILES["twin-star-shot"],
     particleCount: 6,
     muzzleRadius: 5,
     firePitch: 1.04,
@@ -224,7 +419,8 @@ const PLAYER_PROJECTILES: Record<CharacterId, PlayerProjectileProfile> = {
     impactHue: 18,
     bodyRadius: 4.6,
     presentationSpeed: 1960,
-    trailLength: 112,
+    trailLength: 164,
+    trail: PROJECTILE_TRAIL_PROFILES["solar-lance"],
     particleCount: 6,
     muzzleRadius: 6,
     firePitch: 0.94,
@@ -252,7 +448,8 @@ const PLAYER_PROJECTILES: Record<CharacterId, PlayerProjectileProfile> = {
     impactHue: 294,
     bodyRadius: 4.4,
     presentationSpeed: 1640,
-    trailLength: 92,
+    trailLength: 142,
+    trail: PROJECTILE_TRAIL_PROFILES["crescent-slash"],
     particleCount: 5,
     muzzleRadius: 5,
     firePitch: 1.12,
@@ -280,7 +477,8 @@ const PLAYER_PROJECTILES: Record<CharacterId, PlayerProjectileProfile> = {
     impactHue: 195,
     bodyRadius: 5,
     presentationSpeed: 1510,
-    trailLength: 88,
+    trailLength: 138,
+    trail: PROJECTILE_TRAIL_PROFILES["tidal-pearl"],
     particleCount: 5,
     muzzleRadius: 6,
     firePitch: 0.92,
@@ -308,7 +506,8 @@ const PLAYER_PROJECTILES: Record<CharacterId, PlayerProjectileProfile> = {
     impactHue: 326,
     bodyRadius: 4.3,
     presentationSpeed: 1760,
-    trailLength: 96,
+    trailLength: 144,
+    trail: PROJECTILE_TRAIL_PROFILES["blossom-comet"],
     particleCount: 6,
     muzzleRadius: 5,
     firePitch: 1.14,
@@ -336,7 +535,8 @@ const PLAYER_PROJECTILES: Record<CharacterId, PlayerProjectileProfile> = {
     impactHue: 218,
     bodyRadius: 4.2,
     presentationSpeed: 1880,
-    trailLength: 86,
+    trailLength: 140,
+    trail: PROJECTILE_TRAIL_PROFILES["prism-dart"],
     particleCount: 6,
     muzzleRadius: 5,
     firePitch: 1.18,
@@ -364,7 +564,8 @@ const PLAYER_PROJECTILES: Record<CharacterId, PlayerProjectileProfile> = {
     impactHue: 174,
     bodyRadius: 4.8,
     presentationSpeed: 1830,
-    trailLength: 116,
+    trailLength: 168,
+    trail: PROJECTILE_TRAIL_PROFILES["aurora-ribbon"],
     particleCount: 6,
     muzzleRadius: 6,
     firePitch: 1.16,
@@ -396,4 +597,10 @@ export function characterFlightTrailProfile(
   id: CharacterId,
 ): Readonly<FlightTrailProfile> {
   return PLAYER_PROJECTILES[id].flightTrail;
+}
+
+export function projectileTrailProfile(
+  styleId: PlayerProjectileStyleId,
+): Readonly<ProjectileTrailProfile> {
+  return PROJECTILE_TRAIL_PROFILES[styleId];
 }
