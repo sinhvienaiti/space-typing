@@ -349,6 +349,20 @@ Riêng kit thiếu một vài ảnh vẫn vẽ được: lớp nào thiếu thì
 - Luồng chính tốn khoảng 0,2–0,3 ms/khung cho nền. Hệ nền cũ tốn 0,7–1,0 ms.
 - **Các số này đo với bộ ảnh thử**, trước khi có ảnh Gemini thật. Cần đo lại bằng kit thật (việc P2-3).
 
+**Cập nhật 27/9: GPU rời Radeon Pro 560X.**
+- Context WebGL giờ xin `powerPreference: "high-performance"`. Khi game chạy, Chrome dùng Radeon thay vì chip Intel. macOS của chủ dự án vẫn để tự chuyển GPU (`pmset gpuswitch 2`).
+- Bộ đếm `EXT_disjoint_timer_query` qua ANGLE/Metal cho số không tin được (Ultra ra ít hơn High). Vì vậy đo bằng cách vẽ nền N lần mỗi khung, rồi đọc số khung/giây. Kết quả ở khung 1642×760, DPR 2, kit thật, lúc máy đã nóng:
+
+  | Bậc (canvas nền) | GPU | Vẽ 1 lần | Vẽ 3 lần |
+  |---|---|---|---|
+  | High 1,25 (2053×950) | Intel UHD 630 | 60 | 44 |
+  | High 1,25 (2053×950) | Radeon 560X | 60 | 55 |
+  | High thử 1,5 (2463×1140) | Radeon 560X | 60 | 39 |
+  | Ultra thử 1,8 (2956×1368) | Radeon 560X | 58 | 24 |
+
+- Chi phí tăng gần theo số điểm ảnh (khoảng 5,4 ms/khung ở High 1,25 trên Radeon). Nâng DPR ăn vào phần dư của gameplay, nên **giữ nguyên ngân sách các bậc**.
+- Muốn nền nét hơn, hãy làm ảnh nền độ phân giải cao hơn (việc P1-2), hoặc giảm số lượt vẽ toàn màn hình (ví dụ: lưu sẵn lớp nền tĩnh, vài khung mới vẽ lại một lần).
+
 ---
 
 ## 5. Dữ liệu cảnh: kit và bố cục

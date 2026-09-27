@@ -80,7 +80,9 @@ export class WebGLBackgroundRenderer {
       stencil: false,
       premultipliedAlpha: true,
       preserveDrawingBuffer: false,
-      powerPreference: "default",
+      // Dual-GPU MacBooks otherwise draw WebGL on the integrated GPU; the
+      // owner's Radeon Pro 560X has several times the fill rate.
+      powerPreference: "high-performance",
     });
     if (gl === null) return null;
     try {

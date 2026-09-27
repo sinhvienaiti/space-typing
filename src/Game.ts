@@ -407,7 +407,8 @@ import {
   type CameraShakeOffset,
   type ImpactKind,
 } from "./vfx/polish";
-import { enemyFxProfile } from "./vfx/enemy-fx";
+import { enemyFxProfile, type EnemyFxProfile } from "./vfx/enemy-fx";
+import { PlayerShotSystem, type ShotAimPoint } from "./vfx/player-shots";
 import { rewardFxProfile } from "./vfx/reward-fx";
 import {
   FrameProfiler,
@@ -446,6 +447,19 @@ type EnemySpawnRequest = {
   x?: number;
   yOffset?: number;
 };
+
+/**
+ * What a player shot does to the picture when it lands. Ships with a
+ * travelling bolt apply it on arrival, so the hit flash, bursts, sounds and
+ * death blast line up with the bolt; ships on the legacy laser apply it at
+ * once. Gameplay state (score, kills, removal) never waits for it.
+ */
+type ShotImpact =
+  | { kind: "enemy-hit"; enemyId: number; power: number }
+  | { kind: "enemy-layer"; enemyId: number; fx: EnemyFxProfile }
+  | { kind: "enemy-kill"; enemy: Enemy; fx: EnemyFxProfile; shake: number }
+  | { kind: "boss-hit" }
+  | { kind: "intercept"; projectile: EnemyProjectile };
 
 type LearningEcho = {
   entry: VocabularyEntry;
@@ -683,6 +697,11 @@ export class Game {
   private readonly stageWordLedger = new StageWordLedger();
   private projectiles: EnemyProjectile[] = [];
   private lasers: Laser[] = [];
+  private readonly playerShots = new PlayerShotSystem<ShotImpact>();
+  /** Killed enemies stay on screen until the bolt that killed them lands. */
+  private dyingEnemies: Enemy[] = [];
+  /** Intercepted hostile shots stay on screen until the player's bolt reaches them. */
+  private interceptedProjectiles: EnemyProjectile[] = [];
   private projectileImpacts: Array<{
     x: number;
     y: number;
@@ -1507,6 +1526,7 @@ export class Game {
     if (!this.testLabEnabled) return false;
     this.projectiles = [];
     this.lasers = [];
+    this.clearPlayerShots();
     this.projectileImpacts = [];
     return true;
   }
@@ -1585,6 +1605,7 @@ export class Game {
     this.enemies = [];
     this.projectiles = [];
     this.lasers = [];
+    this.clearPlayerShots();
     this.projectileImpacts = [];
     this.particles = [];
     this.targetId = null;
@@ -2797,6 +2818,7 @@ export class Game {
     this.recallReplayCount = 0;
     this.recallPromptStartedAtSeconds = 0;
     this.lasers = [];
+    this.clearPlayerShots();
     this.projectileImpacts = [];
     this.particles = [];
     this.targetId = null;
@@ -2959,6 +2981,7 @@ export class Game {
     this.enemies = [];
     this.projectiles = [];
     this.lasers = [];
+    this.clearPlayerShots();
     this.projectileImpacts = [];
     this.particles = [];
     this.targetId = null;
@@ -3550,6 +3573,12 @@ export class Game {
       }
     }
     this.particles.length = liveParticles;
+
+    // After the decay passes, so rings and bursts spawned by a landing bolt
+    // start at full life.
+    for (const arrival of this.playerShots.update(dt, this.aimPlayerShot)) {
+      this.applyShotImpact(arrival.payload, arrival.x, arrival.y);
+    }
 
     if (this.learningEcho !== null) {
       this.learningEcho.remaining = Math.max(
@@ -5163,26 +5192,14 @@ export class Game {
     this.applyCharacterCorrectKeyPassive();
 
     // An intercept must read differently from a normal enemy hit: bright
-    // laser tracer plus a persistent cyan shield-break ring and sparks.
-    this.lasers.push({
-      x1: this.width / 2,
-      y1: this.height - PLAYER_Y_OFFSET,
-      x2: projectile.x,
-      y2: projectile.y,
-      life: 0.18,
-      maxLife: 0.18,
-      power: 1.35,
-    });
-    this.projectileImpacts.push({
-      x: projectile.x,
-      y: projectile.y,
-      life: 0.34,
-      maxLife: 0.34,
-      radius: Math.max(15, projectile.radius * 1.4),
-    });
-    if (this.projectileImpacts.length > 12) this.projectileImpacts.shift();
-    this.burst(projectile.x, projectile.y, 28, 190);
-    if (this.settings.screenShake) this.shake = Math.max(this.shake, 1.15);
+    // tracer (or bolt) plus a persistent cyan shield-break ring and sparks.
+    this.firePlayerShot(
+      projectile.x,
+      projectile.y,
+      1.35,
+      { kind: "intercept", projectile },
+      0.18,
+    );
     // Dedicated short laser + shatter sound; normal English pronunciation
     // and its audio priority remain untouched.
     this.sfx.projectileIntercept();
@@ -5205,8 +5222,6 @@ export class Game {
 
     boss.typed += 1;
     this.stageResultTracker.recordWordCorrectKey("boss", "boss");
-    boss.flash = 1;
-    boss.kick = 1;
 
     this.stats.hits += 1;
     this.stats.streak += 1;
@@ -5911,8 +5926,6 @@ export class Game {
 
     enemy.typed += 1;
     this.stageResultTracker.recordWordCorrectKey("enemy", enemy.id);
-    enemy.flash = 1;
-    enemy.kick = 1;
 
     this.stats.hits += 1;
     this.stats.streak += 1;
@@ -5934,7 +5947,6 @@ export class Game {
   }
 
   private completeWord(enemy: Enemy): void {
-    this.triggerImpactFeedback("word");
     const length = typingText(enemy.entry.en).length;
     const perfectWord = !enemy.wordMissed;
     if (this.gameplayMode === "recall") {
@@ -5957,8 +5969,6 @@ export class Game {
       enemy.entry = this.pickEnemyLayerEntry(enemy);
       enemy.typed = 0;
       enemy.wordMissed = false;
-      enemy.flash = 1;
-      enemy.kick = 1.45;
       if (this.gameplayMode === "recall") {
         this.activateEnemyRecallPrompt(enemy.id);
       }
@@ -5970,14 +5980,12 @@ export class Game {
       this.addScore((45 + length * 8) * this.stats.multiplier);
       this.gainPower(4);
 
-      this.fireLaser(enemy, 1.25);
       const hitDefinition = this.visualDefinitionForEnemy(enemy);
-      const hitFx = enemyFxProfile(
-        hitDefinition?.family ?? "rainbow",
-        "hit",
-      );
-      this.burst(enemy.x, enemy.y, hitFx.count, hitFx.hue);
-      this.sfx.hit(hitFx.pitch);
+      this.firePlayerShot(enemy.x, enemy.y, 1.25, {
+        kind: "enemy-layer",
+        enemyId: enemy.id,
+        fx: enemyFxProfile(hitDefinition?.family ?? "rainbow", "hit"),
+      });
       this.targetId = null;
       return;
     }
@@ -6006,15 +6014,14 @@ export class Game {
       this.hooks.onKillTranslation?.({ ...enemy.entry });
     }
 
-    this.fireLaser(enemy, 1.45);
     const deathDefinition = this.visualDefinitionForEnemy(enemy);
-    const deathFx = enemyFxProfile(
-      deathDefinition?.family ?? "rainbow",
-      "death",
-    );
-    this.burst(enemy.x, enemy.y, deathFx.count, deathFx.hue);
-    this.sfx.hit(deathFx.pitch);
-    this.sfx.kill(deathFx.pitch);
+    // The enemy leaves play now; its blast, sound and shake wait for the bolt.
+    this.firePlayerShot(enemy.x, enemy.y, 1.45, {
+      kind: "enemy-kill",
+      enemy,
+      fx: enemyFxProfile(deathDefinition?.family ?? "rainbow", "death"),
+      shake: enemy.kind === "tank" ? 6.5 : 4.5,
+    });
     if (enemy.elite || deathDefinition?.rarity === "elite") {
       const announcerEvent = this.priorityKillChain.registerKill(
         this.stageElapsedSeconds,
@@ -6032,13 +6039,6 @@ export class Game {
     this.activateEnemyReward(enemy);
 
     this.triggerEnemyDeathTraits(enemy);
-
-    if (this.settings.screenShake) {
-      this.shake = Math.max(
-        this.shake,
-        enemy.kind === "tank" ? 6.5 : 4.5,
-      );
-    }
 
     this.updateStageObjective({
       type: "enemy-kill",
@@ -7294,40 +7294,152 @@ export class Game {
 
   private fireBossLaser(power: number): void {
     const { x, y } = this.bossPosition();
+    this.firePlayerShot(x, y, power, { kind: "boss-hit" }, 0.09);
+  }
+
+  private fireLaser(enemy: Enemy, power: number): void {
+    this.firePlayerShot(enemy.x, enemy.y, power, {
+      kind: "enemy-hit",
+      enemyId: enemy.id,
+      power,
+    });
+  }
+
+  /**
+   * One player shot. Ships with a bolt recipe fire a travelling bolt and apply
+   * `impact` when it lands; the others draw the instant laser tracer and apply
+   * it at once.
+   */
+  private firePlayerShot(
+    x: number,
+    y: number,
+    power: number,
+    impact: ShotImpact,
+    laserLife = 0.085,
+  ): void {
+    const fired = this.playerShots.fire({
+      characterId: this.characterId,
+      originX: this.width / 2,
+      originY: this.height - PLAYER_Y_OFFSET,
+      targetX: x,
+      targetY: y,
+      power,
+      viewHeight: this.height,
+      payload: impact,
+    });
+    if (fired) {
+      if (impact.kind === "enemy-kill") this.dyingEnemies.push(impact.enemy);
+      if (impact.kind === "intercept") this.interceptedProjectiles.push(impact.projectile);
+      return;
+    }
     this.lasers.push({
       x1: this.width / 2,
       y1: this.height - PLAYER_Y_OFFSET,
       x2: x,
       y2: y,
-      life: 0.09,
-      maxLife: 0.09,
+      life: laserLife,
+      maxLife: laserLife,
       power,
     });
-    this.burst(
-      x,
-      y,
-      7,
-      playerProjectileProfile(this.characterId).impactHue,
-    );
+    this.applyShotImpact(impact, x, y);
   }
 
-  private fireLaser(enemy: Enemy, power: number): void {
-    this.lasers.push({
-      x1: this.width / 2,
-      y1: this.height - PLAYER_Y_OFFSET,
-      x2: enemy.x,
-      y2: enemy.y,
-      life: 0.085,
-      maxLife: 0.085,
-      power,
-    });
+  /** Follows a bolt's target while it flies; false keeps the last known point. */
+  private readonly aimPlayerShot = (impact: ShotImpact, out: ShotAimPoint): boolean => {
+    switch (impact.kind) {
+      case "enemy-hit":
+      case "enemy-layer": {
+        const enemy = this.enemies.find((item) => item.id === impact.enemyId);
+        if (enemy === undefined) return false;
+        out.x = enemy.x;
+        out.y = enemy.y;
+        return true;
+      }
+      case "enemy-kill":
+        out.x = impact.enemy.x;
+        out.y = impact.enemy.y;
+        return true;
+      case "boss-hit": {
+        if (this.boss === null) return false;
+        const { x, y } = this.bossPosition();
+        out.x = x;
+        out.y = y;
+        return true;
+      }
+      case "intercept":
+        out.x = impact.projectile.x;
+        out.y = impact.projectile.y;
+        return true;
+    }
+  };
 
-    this.burst(
-      enemy.x,
-      enemy.y,
-      power > 1 ? 12 : 5,
-      playerProjectileProfile(this.characterId).impactHue,
-    );
+  private applyShotImpact(impact: ShotImpact, x: number, y: number): void {
+    const impactHue = playerProjectileProfile(this.characterId).impactHue;
+    switch (impact.kind) {
+      case "enemy-hit": {
+        const enemy = this.enemies.find((item) => item.id === impact.enemyId);
+        if (enemy !== undefined) {
+          enemy.flash = 1;
+          enemy.kick = Math.max(enemy.kick, 1);
+        }
+        this.burst(x, y, impact.power > 1 ? 12 : 5, impactHue);
+        return;
+      }
+      case "enemy-layer": {
+        const enemy = this.enemies.find((item) => item.id === impact.enemyId);
+        if (enemy !== undefined) {
+          enemy.flash = 1;
+          enemy.kick = Math.max(enemy.kick, 1.45);
+        }
+        this.triggerImpactFeedback("word");
+        this.burst(x, y, 12, impactHue);
+        this.burst(x, y, impact.fx.count, impact.fx.hue);
+        this.sfx.hit(impact.fx.pitch);
+        return;
+      }
+      case "enemy-kill": {
+        const ghost = this.dyingEnemies.indexOf(impact.enemy);
+        if (ghost >= 0) this.dyingEnemies.splice(ghost, 1);
+        this.triggerImpactFeedback("word");
+        this.burst(x, y, 12, impactHue);
+        this.burst(x, y, impact.fx.count, impact.fx.hue);
+        this.sfx.hit(impact.fx.pitch);
+        this.sfx.kill(impact.fx.pitch);
+        if (this.settings.screenShake) {
+          this.shake = Math.max(this.shake, impact.shake);
+        }
+        return;
+      }
+      case "boss-hit": {
+        if (this.boss !== null) {
+          this.boss.flash = 1;
+          this.boss.kick = Math.max(this.boss.kick, 1);
+        }
+        this.burst(x, y, 7, impactHue);
+        return;
+      }
+      case "intercept": {
+        const ghost = this.interceptedProjectiles.indexOf(impact.projectile);
+        if (ghost >= 0) this.interceptedProjectiles.splice(ghost, 1);
+        this.projectileImpacts.push({
+          x,
+          y,
+          life: 0.34,
+          maxLife: 0.34,
+          radius: Math.max(15, impact.projectile.radius * 1.4),
+        });
+        if (this.projectileImpacts.length > 12) this.projectileImpacts.shift();
+        this.burst(x, y, 28, 190);
+        if (this.settings.screenShake) this.shake = Math.max(this.shake, 1.15);
+        return;
+      }
+    }
+  }
+
+  private clearPlayerShots(): void {
+    this.playerShots.clear();
+    this.dyingEnemies = [];
+    this.interceptedProjectiles = [];
   }
 
   private triggerImpactFeedback(kind: ImpactKind): void {
@@ -7433,10 +7545,15 @@ export class Game {
       this.drawInterference(time);
     }
     this.drawLasers(time);
+    // Bolts fly under enemies so word labels always stay readable.
+    this.playerShots.drawShots(context, this.settings.visualQuality);
     this.drawParticles();
     this.drawProjectileImpacts();
 
     for (const projectile of this.projectiles) {
+      this.drawProjectile(projectile);
+    }
+    for (const projectile of this.interceptedProjectiles) {
       this.drawProjectile(projectile);
     }
 
@@ -7459,6 +7576,9 @@ export class Game {
     for (const enemy of this.enemies) {
       this.drawEnemy(enemy);
     }
+    for (const enemy of this.dyingEnemies) {
+      this.drawEnemy(enemy);
+    }
 
     this.drawLearningEcho();
 
@@ -7466,7 +7586,9 @@ export class Game {
       this.drawBoss(time);
     }
 
+    this.playerShots.drawImpacts(context, this.settings.visualQuality);
     this.drawPlayer(time);
+    this.playerShots.drawMuzzleFlashes(context);
     this.drawDefensiveEffects(time);
     this.drawTargetLine();
     this.drawRewardNotice();

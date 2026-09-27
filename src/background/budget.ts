@@ -24,10 +24,12 @@ export type BackgroundBudget = {
 const TIER_ORDER: readonly BackgroundTier[] = ["low", "medium", "high", "ultra"];
 
 /**
- * Measured on the owner's MacBook (Intel UHD 630, EXT_disjoint_timer_query):
- * background GPU time scales with its pixel count, and full-screen passes
- * dominate. The background is softer than gameplay by design (depth), so its
- * DPR stays below the gameplay canvas.
+ * Background GPU time scales with its pixel count; full-screen passes
+ * dominate. The WebGL context asks for the high-performance GPU (the owner's
+ * Radeon Pro 560X), which gave ~25% more headroom than the integrated Intel
+ * UHD 630 at High. Raising High to DPR 1.5 cost ~45% more GPU time on it, so
+ * the caps stay here. The background is softer than gameplay by design
+ * (depth), so its DPR stays below the gameplay canvas.
  */
 const BUDGETS: Readonly<Record<BackgroundTier, BackgroundBudget>> = {
   low: {
