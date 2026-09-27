@@ -6,6 +6,7 @@ import {
   SCORE_POPUP_FLOAT_DISTANCE,
   SCORE_POPUP_PROTECTED_TOP_Y,
 } from "../src/characters/projectile-renderer";
+import { VANGUARD_ACTIVE_SKILL_ID } from "../src/characters/vanguard";
 import { DEFAULT_RECALL_SETTINGS } from "../src/recall/model";
 import type { GameSettings, VocabularyEntry } from "../src/types";
 
@@ -142,6 +143,36 @@ describe("M21 gated Game Test Lab API", () => {
     expect(game.testLabSetResources({ hull: 1 })).toBe(false);
     expect(game.testLabSpawnEnemies({ count: 1 })).toEqual([]);
     expect(game.testLabSetTimeScale(2)).toBe(false);
+
+    game.destroy();
+  });
+
+  it("force-activates Test Lab skills without energy, typing, cooldown, or cost gates", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game);
+    game.testLabSetSchedulerFrozen(true);
+    game.testLabSetResources({ energy: 0 });
+
+    const normal = game.useSkill(VANGUARD_ACTIVE_SKILL_ID);
+    expect(normal.ok).toBe(false);
+    if (normal.ok) throw new Error("Expected production activation to be blocked");
+    expect(["energy", "typing-condition"]).toContain(normal.reason);
+
+    const beforeState = game.getSkillState(VANGUARD_ACTIVE_SKILL_ID);
+    const runtime = game as unknown as { barrierTimer: number };
+    expect(runtime.barrierTimer).toBe(0);
+
+    const forced = game.testLabForceSkill(VANGUARD_ACTIVE_SKILL_ID);
+    expect(forced.ok).toBe(true);
+    expect(game.getTestLabSnapshot()?.stats.energy).toBe(0);
+    expect(runtime.barrierTimer).toBeGreaterThan(0);
+    expect(game.getSkillState(VANGUARD_ACTIVE_SKILL_ID)).toEqual(beforeState);
+
+    const repeated = game.testLabForceSkill(VANGUARD_ACTIVE_SKILL_ID);
+    expect(repeated.ok).toBe(true);
+    expect(game.getSkillState(VANGUARD_ACTIVE_SKILL_ID)).toEqual(beforeState);
+    expect(game.getTestLabSnapshot()?.stats.energy).toBe(0);
 
     game.destroy();
   });
