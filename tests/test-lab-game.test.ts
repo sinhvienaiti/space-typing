@@ -177,6 +177,51 @@ describe("M21 gated Game Test Lab API", () => {
     game.destroy();
   });
 
+  it("continues typing after forced Meteor and Chain Lightning advance a word", () => {
+    for (const skillId of ["meteor", "chain-lightning"] as const) {
+      const game = createTestGame();
+      game.setTestLabMode(true);
+      start(game);
+      game.testLabSetSchedulerFrozen(true);
+      if (skillId === "meteor") {
+        game.setSupportSpells(["meteor"]);
+      }
+
+      const enemyId = game.testLabSpawnEnemies({
+        kind: "scout",
+        count: 1,
+        layers: 1,
+      })[0]!;
+      const before = game.getTestLabSnapshot()?.enemies.find(
+        (enemy) => enemy.id === enemyId,
+      );
+      expect(before).toBeDefined();
+      expect(before?.typed).toBe(0);
+
+      const forced = game.testLabForceSkill(skillId);
+      expect(forced.ok).toBe(true);
+
+      const advanced = game.getTestLabSnapshot()?.enemies.find(
+        (enemy) => enemy.id === enemyId,
+      );
+      expect(advanced).toBeDefined();
+      expect(advanced!.typed).toBeGreaterThan(0);
+
+      const typingWord = advanced!.entry.en
+        .toLocaleLowerCase("en-US")
+        .replace(/[^a-z]/g, "");
+      const nextKey = typingWord[advanced!.typed];
+      expect(nextKey).toMatch(/^[a-z]$/);
+
+      game.handleKey(nextKey!);
+      const resumed = game.getTestLabSnapshot()?.enemies.find(
+        (enemy) => enemy.id === enemyId,
+      );
+      expect(resumed?.typed).toBe(advanced!.typed + 1);
+      game.destroy();
+    }
+  });
+
   it("holds stage clear while the visible Recall bonus remains, then clears after collection", () => {
     const game = createTestGame();
     game.setTestLabMode(true);
