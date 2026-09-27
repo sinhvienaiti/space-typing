@@ -111,7 +111,7 @@ describe("character projectile profiles", () => {
     expect(entries).toHaveLength(12);
 
     for (const [styleId, head] of entries) {
-      expect(head.frontOffset, styleId).toBeGreaterThan(2.5);
+      expect(head.frontOffset, styleId).toBeGreaterThanOrEqual(2.3);
       expect(head.hotCoreScale, styleId).toBeGreaterThan(0.2);
       expect(head.hotCoreAlpha, styleId).toBeGreaterThanOrEqual(0.8);
       expect(head.bloomScale, styleId).toBeGreaterThan(1.2);
@@ -124,11 +124,32 @@ describe("character projectile profiles", () => {
       expect(head.sparkleCount, styleId).toBeGreaterThanOrEqual(2);
     }
 
+    const families = entries.map(([, head]) => head.family);
+    expect(new Set(families).size).toBe(12);
+    expect(projectileHeadGlowProfile("meteor-bolt").family).toBe("meteor");
+    expect(projectileHeadGlowProfile("crescent-slash").family).toBe("crescent");
+    expect(projectileHeadGlowProfile("prism-dart").family).toBe("crystal");
+    expect(projectileHeadGlowProfile("nova-pearl").family).toBe("orb");
+    expect(projectileHeadGlowProfile("twin-star-shot").family).toBe("star");
+    expect(projectileHeadGlowProfile("halo-burst").family).toBe("halo");
+    expect(projectileHeadGlowProfile("thunder-needle").family).toBe("needle");
+    expect(projectileHeadGlowProfile("blossom-comet").family).toBe("blossom");
+    expect(projectileHeadGlowProfile("void-spike").family).toBe("void");
+    expect(projectileHeadGlowProfile("solar-lance").family).toBe("lance");
+    expect(projectileHeadGlowProfile("tidal-pearl").family).toBe("tidal");
+    expect(projectileHeadGlowProfile("aurora-ribbon").family).toBe("aurora");
+
     const zenith = projectileHeadGlowProfile("aurora-ribbon");
+    expect(zenith.family).toBe("aurora");
+    expect(zenith.frontOffset).toBeLessThan(2.6);
     expect(zenith.bloomScale).toBeGreaterThanOrEqual(1.8);
     expect(zenith.hotCoreAlpha).toBe(1);
     expect(zenith.forwardFlareAlpha).toBeGreaterThanOrEqual(0.48);
     expect(zenith.sparkleCount).toBeLessThanOrEqual(3);
+
+    expect(projectileHeadGlowProfile("thunder-needle").family).not.toBe("orb");
+    expect(projectileHeadGlowProfile("solar-lance").family).not.toBe("orb");
+    expect(projectileHeadGlowProfile("prism-dart").family).not.toBe("orb");
 
     const zenithTrail = projectileTrailProfile("aurora-ribbon");
     expect(zenithTrail.ribbonCount).toBe(3);
