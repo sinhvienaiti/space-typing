@@ -55,12 +55,13 @@ function grade(overrides: Partial<GradeSpec> = {}): GradeSpec {
 }
 
 function plate(
+  texture: string,
   focus: readonly [number, number],
   flipX: boolean,
   gradeSpec: GradeSpec,
 ): PlateSpec {
   return {
-    texture: "plate",
+    texture,
     flipX,
     overscan: 1.07,
     drift: [0.014, 0.012],
@@ -309,7 +310,7 @@ export const G02_COMPOSITIONS: readonly WorldComposition[] = [
   // World 06 — Ember Orchard: twisted basalt orchard on the upper-left.
   world({
     worldId: "world-06",
-    plate: plate([0.46, 0.58], false, grade({ exposure: 1, gamma: 1.02 })),
+    plate: plate("plate", [0.46, 0.58], false, grade({ exposure: 1, gamma: 1.02 })),
     hero: hero("hero-w06", [0.2, 0.3], 0.58, [1, 0.4, 0.12]),
     fieldDensity: 0.82,
     emberDensity: 0.9,
@@ -323,7 +324,7 @@ export const G02_COMPOSITIONS: readonly WorldComposition[] = [
   // World 07 — Imp Furnace: heavier iron debris and denser smoke.
   world({
     worldId: "world-07",
-    plate: plate([0.56, 0.48], true, grade({ exposure: 0.98, gamma: 1.03, saturation: 0.98 })),
+    plate: plate("plate-b", [0.56, 0.48], false, grade({ exposure: 0.98, gamma: 1.03, saturation: 0.98 })),
     hero: hero("hero-w07", [0.8, 0.34], 0.62, [1, 0.5, 0.14], [0.98, 0.96, 0.94]),
     fieldDensity: 1.08,
     emberDensity: 1.05,
@@ -338,7 +339,7 @@ export const G02_COMPOSITIONS: readonly WorldComposition[] = [
   // gameplay corridor stays darker through a lower plate exposure.
   world({
     worldId: "world-08",
-    plate: plate([0.42, 0.54], false, grade({ exposure: 1, gamma: 1.02, saturation: 1, hueShift: -2 })),
+    plate: plate("plate-c", [0.42, 0.54], false, grade({ exposure: 1, gamma: 1.02, saturation: 1, hueShift: -2 })),
     hero: hero("hero-w08", [0.19, 0.3], 0.64, [1, 0.18, 0.08]),
     fieldDensity: 0.76,
     emberDensity: 1.18,
@@ -352,7 +353,7 @@ export const G02_COMPOSITIONS: readonly WorldComposition[] = [
   // World 09 — Cinder Cathedral: darkest, smokiest World in the Galaxy.
   world({
     worldId: "world-09",
-    plate: plate([0.58, 0.5], true, grade({ exposure: 0.96, gamma: 1.04, saturation: 0.96 })),
+    plate: plate("plate-d", [0.58, 0.5], false, grade({ exposure: 0.96, gamma: 1.04, saturation: 0.96 })),
     hero: hero("hero-w09", [0.79, 0.33], 0.61, [1, 0.34, 0.1], [0.98, 0.96, 0.94]),
     fieldDensity: 0.92,
     emberDensity: 0.72,
@@ -367,7 +368,7 @@ export const G02_COMPOSITIONS: readonly WorldComposition[] = [
   // burning debris, but the landmark stays high enough to preserve word space.
   world({
     worldId: "world-10",
-    plate: plate([0.5, 0.44], false, grade({ exposure: 0.99, gamma: 1.03, saturation: 1 })),
+    plate: plate("plate-e", [0.5, 0.44], false, grade({ exposure: 0.99, gamma: 1.03, saturation: 1 })),
     hero: hero("hero-w10", [0.5, 0.19], 0.57, [1, 0.28, 0.08]),
     fieldDensity: 1.16,
     emberDensity: 1.32,
