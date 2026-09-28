@@ -193,19 +193,19 @@ function worldProfile(world: WorldProfile): WorldMusicProfile {
           defaultPath: "/assets/audio/music/" + theme.intense,
           syncGroup,
         };
-  const ambient = fallbackAsset(
-    world.id + "-ambient",
-    worldFile,
-    "engine-loop.ogg",
-    "ambient",
-  );
+  const ambient: AudioAssetRef = {
+    id: world.id + "-ambient",
+    // Keep optional per-World ambient overrides, but do not fall back to the
+    // bundled 5-second engine loop. Its audible loop seam reads like a
+    // helicopter/rotor pulse during long gameplay sessions.
+    localPath: "/local-assets/ambient/" + worldFile,
+  };
   return {
     id: world.musicProfile,
     worldId: world.id,
     baseTrack,
-    // Keep one neutral engine bed only. The former computer-loop layer
-    // produced the repetitive high-pitched "beep" heard throughout normal
-    // gameplay and stacked on top of the newer music mix.
+    // Ambient is opt-in per World. There is intentionally no bundled
+    // fallback loop: both short generic loops proved repetitive in gameplay.
     ambientLayers: [ambient],
     intenseTrackOrLayer: intenseTrack,
     miniBossTrack: SHARED.miniBoss,
