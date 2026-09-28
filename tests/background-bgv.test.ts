@@ -434,7 +434,7 @@ describe("BGV compositions", () => {
     const ids = compositionTextures(compositionForWorld("world-03")!, g01Kit());
     expect(ids).toContain("hero-w03");
     expect(ids.filter((id) => id.startsWith("hero-"))).toEqual(["hero-w03"]);
-    expect(ids).toEqual(expect.arrayContaining(["plate", "glow-b", "dust", "atlas-rocks"]));
+    expect(ids).toEqual(expect.arrayContaining(["plate-c", "glow-b", "dust", "atlas-rocks"]));
     expect(compositionTextures(compositionForWorld("world-02")!, g01Kit())).toContain("plate-b");
   });
 });
