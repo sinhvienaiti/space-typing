@@ -3817,21 +3817,19 @@ function renderCharacters(): void {
 
   CHARACTER_IDS.forEach((id, index) => {
     const definition = getCharacter(id);
-    const unlocked = characters.unlocked.includes(id);
     const selected = characters.selected === id;
 
     const card = document.createElement("button");
     card.type = "button";
     card.className = "character-card";
     card.classList.toggle("selected", selected);
-    card.classList.toggle("locked", !unlocked);
-    card.disabled = !unlocked;
+    card.disabled = false;
     card.setAttribute(
       "aria-label",
       definition.name +
         " · " +
         definition.role +
-        (selected ? " · selected" : unlocked ? " · available" : " · locked"),
+        (selected ? " · selected" : " · available"),
     );
 
     const preview = document.createElement("canvas");
@@ -3847,7 +3845,7 @@ function renderCharacters(): void {
         time: index * 0.73 + 0.8,
         scale: selected ? 1.42 : 1.3,
         glowScale: selected ? 1.15 : 0.86,
-        alpha: unlocked ? 1 : 0.48,
+        alpha: 1,
         aura: selected
           ? deriveEquipmentAura(equipment, characters.selected)
           : null,
@@ -3871,11 +3869,7 @@ function renderCharacters(): void {
 
     const state = document.createElement("span");
     state.className = "character-card-state";
-    state.textContent = selected
-      ? "Selected"
-      : unlocked
-        ? "Available"
-        : "Stage " + String(definition.unlockStage).padStart(3, "0");
+    state.textContent = selected ? "Selected" : "Available";
 
     top.append(nameWrap, state);
 
@@ -3908,7 +3902,7 @@ function renderCharacters(): void {
 
     card.append(preview, top, summary, kit, progressMeta);
 
-    if (unlocked && !selected) {
+    if (!selected) {
       card.addEventListener("click", () => {
         characters = selectCharacter(characters, id);
         applySelectedCharacter();
