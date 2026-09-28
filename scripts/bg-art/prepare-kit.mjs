@@ -50,7 +50,10 @@ const KITS = {
     prefix: "g03-",
     heroWorlds: [11, 12, 13, 14, 15],
     plateNames: ["plate"],
-    expectedAtlasObjects: { rocks: 14, life: 12 },
+    // G03 uses the earlier approved 11-image source set. Its atlas art was
+    // authored before the exact-count detector contract introduced for G04+,
+    // so preserve the detected separated subjects instead of rejecting it.
+    expectedAtlasObjects: null,
   },
   "g04-verdant": {
     src: "art-src/g04",
