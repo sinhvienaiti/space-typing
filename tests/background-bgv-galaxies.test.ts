@@ -25,7 +25,7 @@ type GalaxyFixture = {
 };
 
 const GALAXIES: readonly GalaxyFixture[] = [
-  { kitId: "g03-frost-prism", startWorld: 11, plates: ["plate"] },
+  { kitId: "g03-frost-prism", startWorld: 11, plates: ["plate", "plate-b", "plate-c", "plate-d", "plate-e"] },
   { kitId: "g04-verdant", startWorld: 16, plates: ["plate", "plate-b", "plate-c", "plate-d", "plate-e"] },
   { kitId: "g05-shadow-nature", startWorld: 21, plates: ["plate", "plate-b", "plate-c", "plate-d", "plate-e"] },
   { kitId: "g06-cosmic-forge", startWorld: 26, plates: ["plate", "plate-b", "plate-c", "plate-d", "plate-e"] },
@@ -98,13 +98,8 @@ describe("BGV G03-G10 authored Galaxy registry", () => {
     });
   }
 
-  it("keeps G03 on its completed one-plate set and G04-G10 on five unique plates", () => {
-    const g03 = Array.from({ length: 5 }, (_, index) =>
-      compositionForWorld("world-" + String(11 + index).padStart(2, "0"))!.plate.texture,
-    );
-    expect(new Set(g03)).toEqual(new Set(["plate"]));
-
-    for (const start of [16, 21, 26, 31, 36, 41, 46]) {
+  it("uses five unique authored plates for every Galaxy from G03 through G10", () => {
+    for (const start of [11, 16, 21, 26, 31, 36, 41, 46]) {
       const plates = Array.from({ length: 5 }, (_, index) =>
         compositionForWorld("world-" + String(start + index).padStart(2, "0"))!.plate.texture,
       );
