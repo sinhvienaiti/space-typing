@@ -115,6 +115,10 @@ export type Enemy = {
   radius: number;
   flash: number;
   kick: number;
+  /** Seconds a landed player bolt holds the enemy still (stagger). */
+  hitStun?: number;
+  /** Seconds of the body's sideways hit shake (the word label stays still). */
+  hitShake?: number;
   actionCooldown: number | null;
   rewardControlTimer?: number;
   rewardControlFactor?: number;

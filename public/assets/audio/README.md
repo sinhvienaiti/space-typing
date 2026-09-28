@@ -21,6 +21,19 @@ public/assets/audio/music/
 
 The game does **not** create one song per Campaign stage.
 
+World 01 has its own theme (pilot for per-World music), two stems of one song
+with the same tempo, chords and length:
+
+```text
+public/assets/audio/music/world-01/
+  calm.ogg     # WORLD_NORMAL (opening / recovery phases)
+  intense.ogg  # WORLD_INTENSE (pressure / mixed / finale phases)
+```
+
+Both carry `syncGroup: "world-01-theme"` in `src/audio/music-profile.ts`, so the
+controller crossfades between them at the same playback position. They are
+rendered by `pnpm music:world-01` (see `docs/MUSIC_WORLD_01.md`).
+
 World-specific personal overrides are still supported:
 
 ```text

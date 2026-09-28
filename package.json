@@ -10,6 +10,7 @@
     "check": "pnpm test && pnpm build",
     "bg:prepare": "node scripts/bg-art/prepare-kit.mjs",
     "fx:prepare": "node scripts/bg-art/prepare-fx.mjs",
+    "music:world-01": "node scripts/music/world-01-theme.mjs",
     "visual:shot": "node scripts/visual/shot.mjs",
     "visual:crop": "node scripts/visual/crop.mjs"
   },

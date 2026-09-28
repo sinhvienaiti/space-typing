@@ -4,7 +4,9 @@
 >
 > **Phạm vi:** hệ đạn mới của người chơi trong `games/space-typing`. Đã làm xong bản thử cho **phi thuyền đầu tiên, Vanguard**. **10 phi thuyền còn lại vẫn dùng tia laser cũ**, chờ làm tiếp theo tài liệu này.
 >
-> **Tài liệu liên quan:** hình nền BGV — [BACKGROUND_VISUAL_REBOOT_HANDOFF.md](BACKGROUND_VISUAL_REBOOT_HANDOFF.md). Hai hệ này độc lập; đạn chỉ dùng chung quy trình xử lý ảnh (`scripts/bg-art/`).
+> **Tài liệu liên quan:** hình nền BGV — [BACKGROUND_VISUAL_REBOOT_HANDOFF.md](BACKGROUND_VISUAL_REBOOT_HANDOFF.md). Hai hệ này độc lập; đạn chỉ dùng chung quy trình xử lý ảnh (`scripts/bg-art/`). Nhạc nền World 01 — [MUSIC_WORLD_01.md](MUSIC_WORLD_01.md).
+>
+> **Cập nhật 28/09 (đợt 3):** quái thưởng giờ cũng bị bắn bằng đạn thật; phi thuyền **xoay mũi về phía mục tiêu** khi bắn, nòng súng xoay theo; **bộ đèn mới cho Vanguard** (lửa phụt đúng 2 ống, lõi pha lê, đèn cánh, hào quang, tia lửa phía sau). Xem mục 2.1, 4.1, 4.3 và 8 (lỗi 13–17).
 
 ## Mục lục
 
@@ -59,10 +61,16 @@ Yêu cầu gốc: *"hiệu ứng có cảm giác không phải 2D, phải đẹp
 - **Phát hạ gục** (`power >= 1.3`): bắn từ mũi tàu (`[0, -36]`), dùng ngọn giáo lớn hơn.
 - **Đầu đạn:** ảnh vẽ tay (ngọn giáo pha lê xanh cyan có vòng xoắn năng lượng), ghim đúng mũi giáo vào vị trí đạn, xoay theo hướng bay.
 - **Đuôi:** "vệt tàn" mềm bắt đầu phía sau thân giáo, nhiều lớp sáng lồng nhau, thon dần; kèm bụi sáng rơi phía sau.
-- **Khi trúng:** loé trắng, ảnh vụ nổ hình sao vẽ tay nở ra rồi mờ dần (mỗi phát xoay một góc khác), tia lửa bắn ra.
+- **Khi trúng:** loé trắng và quầng màu, ảnh vụ nổ hình sao vẽ tay nở ra rồi mờ dần (mỗi phát xoay một góc khác), tia lửa bắn ra.
+- **Tiếng trúng pha lê** (`Sfx.boltImpact`): tiếng "tinh" cao trong, tiếng lách tách, và tiếng "bịch" trầm. Mỗi phát lệch cao độ một chút; các phát cách nhau dưới 32 ms được gộp.
+- **Quái khựng lại khi trúng:** dừng tiến 0,06 giây mỗi phát (0,16 giây khi vỡ khiên), thân bật lùi mạnh hơn và rung ngang 0,12 giây. Nhãn chữ đứng yên để dễ đọc.
 - **Loé nòng súng:** ảnh vẽ tay, ghim gốc vào nòng.
-- **Cảm giác chiều sâu:** đạn nhỏ dần khi bay lên (tới 60% ở khoảng cách lớn).
+- **Cảm giác chiều sâu:** đạn nhỏ dần khi bay lên, nhưng chỉ tới 74%, để đạn ở xa vẫn dễ nhìn.
 - **Dự phòng:** mọi phần đều có bản vẽ bằng code khi thiếu ảnh (xem `?art=0` ở trang xem thử).
+- **Quái thưởng** (hộp tiếp tế, drone kho báu, hộp chọn thưởng, hộp dị thường, mục tiêu Recall): mỗi chữ cũng bắn 1 viên thật, nhắm đúng chỗ hộp đang lắc lư. Phát cuối: phần thưởng tính ngay, còn vụ nổ và tiếng nhặt thưởng xảy ra khi đạn chạm (mục 4.1).
+- **Phi thuyền xoay về phía mục tiêu** (mọi tàu, không chỉ Vanguard): mỗi phát xoay ngay 55% góc, phần còn lại xoay dần; bám theo mục tiêu đang di chuyển trong 0,8 giây, rồi từ từ quay mũi lên. Tối đa ±55°. Nòng súng xoay theo thân tàu, nên đạn luôn ra đúng nòng đang vẽ (mục 4.3).
+- **Giật lùi và tăng lửa:** mỗi phát đẩy thân tàu lùi tối đa 2,4 px (phát hạ gục mạnh hơn); gõ càng nhanh thì lửa phụt càng dài và sáng.
+- **Bộ đèn mới của Vanguard** (ảnh `docs/player-shots/vanguard-ship-lights.jpg`: bay êm · đèn cánh nháy · đang xoay bắn): lửa phụt 3 lớp ra đúng 2 ống, có "vòng kim cương" như động cơ phản lực; lõi pha lê thở sáng và loé khi bắn; tia sáng lấp lánh trên mũi pha lê mỗi khoảng 3 giây; đèn nháy đầu cánh; hào quang mờ ôm theo viền tàu; tia lửa phụt ra phía sau và trôi tự do, nên khi tàu xoay thì vệt lửa uốn cong.
 
 ### 2.2 Ảnh chụp (`docs/player-shots/`)
 
@@ -73,6 +81,7 @@ Yêu cầu gốc: *"hiệu ứng có cảm giác không phải 2D, phải đẹp
 | `vanguard-closeup.jpg` | Phóng to: ngọn giáo, vệt đuôi, loé nòng súng, vụ nổ |
 | `vanguard-sprites-source.jpg` | 4 ảnh gốc chủ dự án gửi. Ảnh `bolt` bị nhầm (xem 9) |
 | `vanguard-sprites-processed.jpg` | 3 ảnh sau khi xử lý (nền đen tuyệt đối, đã gỡ logo) |
+| `vanguard-ship-lights.jpg` | Bộ đèn mới, phóng to: bay êm · đèn cánh trái nháy · đang xoay bắn sang trái (lửa dài hơn khi gõ nhanh) |
 
 ### 2.3 Ảnh của Vanguard
 
@@ -100,17 +109,24 @@ Yêu cầu gốc: *"hiệu ứng có cảm giác không phải 2D, phải đẹp
 | `scripts/check-background-art.mjs` | Kiểm tra khi build, gồm cả `fx/<ship>/fx.json`. |
 | `public/assets/space-typing/fx/vanguard/` | Ảnh game dùng: `finisher.webp`, `impact.webp`, `muzzle.webp`, `fx.json` (94 KiB). |
 | `art-src/fx/vanguard/` | Ảnh gốc Gemini, không lên Git (xem `art-src/README.md`). |
-| `tests/player-shots.test.ts` | 11 test: công thức, bay, bám mục tiêu, đuôi tan, chuỗi đạn gõ nhanh, `fx.json`, chọn ảnh, tích hợp `Game`. |
+| `src/characters/ship-motion.ts` | **Chuyển động tàu khi bắn:** `ShipMotion` (góc xoay `aim`, giật lùi `recoil`, tăng lửa `boost`), `shipAimAngle`. Chỉ tính số, không vẽ; `Game` và trang xem thử dùng chung. |
+| `src/characters/ship-lights.ts` | **Bộ đèn của tàu:** `ShipLightRig` (vị trí ống phụt, lõi, đầu cánh, màu), `drawShipHalo` (vẽ dưới thân), `drawShipLights` (vẽ trên thân). Hiện chỉ có Vanguard. |
+| `src/vfx/ship-exhaust.ts` | **Tia lửa phía sau tàu:** `ShipExhaust`, bể hạt `Float32Array` cố định (192 hạt), trôi trong không gian màn hình. |
+| `src/characters/renderer.ts` | Vẽ tàu. Mới: tuỳ chọn `aim`/`recoil`/`boost`; `characterShipPoint` và `characterShipAngle` (đổi điểm trên thân tàu ra toạ độ màn hình, **đúng phép biến đổi lúc vẽ**); `activeShipLightRig` (chỉ bật với ảnh tàu V3). |
+| `tests/player-shots.test.ts` | 16 test: công thức, bay, bám mục tiêu, đuôi tan, chuỗi đạn gõ nhanh, `fx.json`, chọn ảnh, tích hợp `Game` (khựng, tiếng trúng, tàu xoay, quái thưởng, laser cũ). |
+| `tests/ship-motion.test.ts` | 10 test: góc xoay và giới hạn, bám mục tiêu rồi quay về, giật lùi và tăng lửa, toạ độ nòng khi tàu xoay, bộ đèn Vanguard, tia lửa theo bậc chất lượng. |
 | `tests/projectile-intercept-sfx.test.ts` | Bắn hạ đạn địch: đạn bay tới rồi mới vỡ; tàu chưa có đạn mới vẫn dùng laser. |
 
 ### 3.2 Vòng đời một viên đạn
 
 ```
 Gõ đúng 1 chữ ──► Game.firePlayerShot(x, y, power, impact)
-                   │  tàu có công thức?  không ─► tia laser cũ + applyShotImpact() ngay
+                   │  shipMotion.fire(): tàu xoay mũi về (x, y), giật lùi, tăng lửa
+                   │  characterShipPoint(): tâm tàu và góc xoay đúng như sẽ vẽ
+                   │  tàu có công thức?  không ─► tia laser cũ (từ mũi tàu) + applyShotImpact() ngay
                    │  có
                    ▼
-PlayerShotSystem.fire()  ─ chọn nòng (luân phiên; phát hạ gục dùng mũi tàu)
+PlayerShotSystem.fire()  ─ chọn nòng (luân phiên; phát hạ gục dùng mũi tàu), xoay theo originAngle
                          ─ thời gian bay = khoảng cách / speed, kẹp 0,08–0,26 giây
                          ─ tạo loé nòng súng
 mỗi khung: Game.updateEffects(dt) ─► system.update(dt, aimPlayerShot, quality)
@@ -125,7 +141,7 @@ Game.applyShotImpact(payload)  ─ loé, giật, tia lửa, âm thanh, khựng h
 
 - **Đường bay:** đường cong bậc hai từ nòng tới mục tiêu. Điểm uốn lệch sang phía của nòng súng một đoạn `bend × khoảng cách`, nên hai luồng đạn từ hai cánh chụm lại ở mục tiêu. Mục tiêu di chuyển thì đường cong tự nắn lại mỗi khung, nên đạn luôn trúng.
 - **Đuôi:** lấy mẫu ngược trên chính đường cong, từ `s − trailS` tới `s` (s là tiến độ 0→1), nên không cần lưu lịch sử vị trí và không phụ thuộc số khung hình. `trailS = min(trailShare, trailMaxPx / khoảng cách)`. Sau khi trúng, đuôi còn chạy nốt `trailS` rồi mới tắt.
-- **Chiều sâu:** `shotDepthScale(originY, y, viewHeight)` giảm từ 1 xuống 0,6 khi đạn bay lên. Áp dụng cho bề rộng đuôi, đầu đạn và chiều dài ảnh.
+- **Chiều sâu:** `shotDepthScale(originY, y, viewHeight)` giảm từ 1 xuống `MIN_DEPTH_SCALE` (0,74) khi đạn bay lên. Áp dụng cho bề rộng đuôi, đầu đạn và chiều dài ảnh. Bản đầu cho co tới 0,6, và chủ dự án thấy đạn quá nhỏ.
 
 ### 3.3 Công thức đạn (`ShotRecipe`, trong `RECIPES` theo archetype)
 
@@ -136,13 +152,13 @@ Giá trị hiện tại của Vanguard (`spear`):
 | `speed` | 3300 | px/giây (thời gian bay còn bị kẹp 0,08–0,26 giây) |
 | `bend` | 0,07 | độ cong theo phần khoảng cách |
 | `trailShare` / `trailMaxPx` | 0,55 / 240 | độ dài đuôi |
-| `width` | 6,5 | bán kính đầu đạn và nửa bề rộng đuôi (px) khi ở gần |
+| `width` | 8 | bán kính đầu đạn và nửa bề rộng đuôi (px) khi ở gần |
 | `stretch` | 5 | độ dài lõi trắng khi vẽ bằng code |
 | `sparkleRate` | 90 | bụi sáng mỗi giây ở High (nhân hệ số theo bậc) |
-| `muzzles` / `finisherMuzzle` | `[[-21,-12],[21,-12]]` / `[0,-36]` | vị trí nòng, tính từ tâm tàu (tàu vẽ ở cỡ 78 px) |
+| `muzzles` / `finisherMuzzle` | `[[-21,-12],[21,-12]]` / `[0,-36]` | vị trí nòng khi tàu thẳng mũi, tính từ tâm tàu (tàu vẽ ở cỡ 78 px). Khi tàu xoay, `fire()` tự xoay các điểm này theo `originAngle` |
 | `fx` | `"vanguard"` | thư mục ảnh trong `public/assets/space-typing/fx/` (`null` = chỉ vẽ bằng code) |
-| `boltLength` / `finisherLength` | 92 / 150 | chiều dài ảnh đầu đạn (px, trước hệ số chiều sâu) |
-| `impactSize` / `muzzleLength` | 84 / 46 | cỡ vụ nổ (phát hạ gục ×1,35), cỡ loé nòng súng (phát hạ gục ×1,4) |
+| `boltLength` / `finisherLength` | 128 / 190 | chiều dài ảnh đầu đạn (px, trước hệ số chiều sâu). Đã tăng khoảng 40% theo góp ý ngày 28/9 |
+| `impactSize` / `muzzleLength` | 118 / 60 | cỡ vụ nổ (phát hạ gục ×1,35), cỡ loé nòng súng (phát hạ gục ×1,4) |
 
 `shotRecipeFor(characterId)` trả `null` cho tàu chưa có công thức. Khi đó `Game` dùng tia laser cũ.
 
@@ -152,7 +168,7 @@ Giá trị hiện tại của Vanguard (`spear`):
 2. Hạt, vòng vỡ khiên, đạn địch, **bóng đạn địch đã bị bắn hạ** (`interceptedProjectiles`).
 3. Kẻ địch, rồi **bóng kẻ địch chờ nổ** (`dyingEnemies`).
 4. Boss, rồi **vụ nổ khi trúng** (`drawImpacts`), vẽ trên kẻ địch.
-5. Phi thuyền, rồi **loé nòng súng** (`drawMuzzleFlashes`).
+5. **Tia lửa phía sau tàu** (`shipExhaust.draw`), rồi phi thuyền: hào quang → thân tàu → lửa phụt, lõi, đèn cánh. Cuối cùng là **loé nòng súng** (`drawMuzzleFlashes`).
 
 ### 3.5 Kỹ thuật vẽ và hiệu năng
 
@@ -181,12 +197,16 @@ Giá trị hiện tại của Vanguard (`spear`):
 
 | Kiểu | Bắn từ | Xảy ra **ngay khi gõ** (lối chơi) | Xảy ra **khi đạn chạm** (phần nhìn) |
 |---|---|---|---|
-| `enemy-hit` | `typeTarget` (mỗi chữ); phản đạn (`fireLaser(enemy, 0.75)`) | đếm chữ, điểm, chuỗi combo, năng lượng | kẻ địch loé và giật, tia lửa (5, hoặc 12 nếu `power > 1`) |
-| `enemy-layer` | `completeWord`, còn lớp khiên | đổi từ mới, điểm, năng lượng | loé, giật 1,45, khựng hình (`triggerImpactFeedback("word")`), tia lửa theo họ kẻ địch, `sfx.hit` |
-| `enemy-kill` | `completeWord`, lớp cuối | hạ gục, điểm thưởng (`enemyKillRewardScore`), số điểm bật lên, rơi đồ, phần thưởng, đặc tính khi chết, xoá khỏi `enemies` | khựng hình, tia lửa, vụ nổ theo họ kẻ địch, `sfx.hit` + `sfx.kill`, rung màn hình (6,5 với tank, 4,5 với loại khác), xoá bóng |
-| `boss-hit` | `typeBoss` (mỗi chữ) | sát thương boss, điểm | boss loé và giật, tia lửa |
+| `enemy-hit` | `typeTarget` (mỗi chữ); phản đạn (`fireLaser(enemy, 0.75)`) | đếm chữ, điểm, chuỗi combo, năng lượng | kẻ địch loé, giật (1,6), **khựng 0,06 giây và rung**, tia lửa (8, hoặc 12 nếu `power > 1`), `sfx.boltImpact(power)` |
+| `enemy-layer` | `completeWord`, còn lớp khiên | đổi từ mới, điểm, năng lượng | loé, giật 1,9, **khựng 0,16 giây và rung**, khựng hình (`triggerImpactFeedback("word")`), tia lửa theo họ kẻ địch, `sfx.hit` + `sfx.boltImpact(1.25)` |
+| `enemy-kill` | `completeWord`, lớp cuối | hạ gục, điểm thưởng (`enemyKillRewardScore`), số điểm bật lên, rơi đồ, phần thưởng, đặc tính khi chết, xoá khỏi `enemies` | khựng hình, tia lửa, vụ nổ theo họ kẻ địch, `sfx.hit` + `sfx.kill` + `sfx.boltImpact(1.45)`, rung màn hình (6,5 với tank, 4,5 với loại khác), xoá bóng |
+| `boss-hit` | `typeBoss` (mỗi chữ) | sát thương boss, điểm | boss loé và giật (1,4), tia lửa, `sfx.boltImpact(0.9)`. Boss không bị khựng. |
 | `intercept` | gõ chữ trên đạn địch | xoá đạn địch, điểm, `sfx.projectileIntercept` | vòng vỡ khiên, 28 tia lửa, rung nhẹ, xoá bóng |
+| `bonus-hit` | `typeSupplyPod`, `typeTreasureDrone`, `typeRewardChoiceCrate`, `typeAnomalyCrate`, `typeRecallBonus` (mỗi chữ trừ chữ cuối), qua `fireBonusShot` | điểm, chuỗi combo, năng lượng (như trước) | tia lửa màu của hộp (7–8 hạt), `sfx.boltImpact(0.8)` |
+| `bonus-collect` | chữ cuối của các hộp trên | **phần thưởng, điểm, rơi đồ, bảng chọn thưởng, thông báo, xoá hộp** | xoá bóng hộp, vụ nổ lớn màu của hộp (34–54 hạt), `sfx.support` + `sfx.boltImpact(1.3)` |
 
+- Cú khựng, rung và tiếng trúng pha lê **chỉ có khi đạn thật chạm** (`fromBolt = true`). Tia laser cũ giữ nguyên phản hồi cũ, và có test khoá hành vi này. Tàu nào có đạn mới thì tự có cú khựng.
+- Cú khựng là thay đổi lối chơi nhỏ: quái bị gõ tiến chậm lại. Thời lượng nằm ở các hằng số `HIT_STUN_SECONDS` (0,06), `LAYER_STUN_SECONDS` (0,16), `HIT_SHAKE_SECONDS` (0,12) trong `Game.ts`.
 - Các phần boss khác (hết từ, vỡ khiên, bị hạ) giữ nguyên, xảy ra ngay.
 - Hạ gục bằng kỹ năng (`resolveSkillEnemyKill`, ví dụ bom chữ) không đi qua đạn, vẫn nổ ngay.
 
@@ -197,10 +217,47 @@ Giá trị hiện tại của Vanguard (`spear`):
   - Nếu không: vẽ tia laser cũ và gọi `applyShotImpact` ngay. Tàu chưa làm vì vậy **y hệt trước**.
 - `fireLaser(enemy, power)` và `fireBossLaser(power)`: lớp bọc mỏng quanh `firePlayerShot`.
 - `aimPlayerShot`: tìm vị trí hiện tại của mục tiêu (kẻ địch còn sống, bóng kẻ địch, boss, đạn địch). Trả `false` thì đạn bay tới điểm cuối cùng đã biết.
-- `applyShotImpact(impact, x, y)`: phần nhìn trong bảng 4.1.
+- `applyShotImpact(impact, x, y, fromBolt)`: phần nhìn trong bảng 4.1. `fromBolt` là `true` khi đạn chạm, `false` với tia laser cũ.
+- `staggerEnemy(enemy, seconds)` đặt `enemy.hitStun` và `enemy.hitShake` (trường tuỳ chọn của `Enemy` trong `types.ts`). Vòng cập nhật kẻ địch nhân tốc độ tiến với 0 khi `hitStun > 0`. `hitShakeOffset(enemy)` chỉ dịch **thân** quái sang ngang khi vẽ (`translate` của thân trong `drawEnemy`), không dịch nhãn chữ.
 - `clearPlayerShots()`: gọi ở cả 4 chỗ đặt `this.lasers = []` (Test Lab ×2, bắt đầu màn, về tiêu đề).
 - Trong `updateEffects`, đạn được cập nhật **sau** các vòng giảm tuổi hiệu ứng. Nhờ vậy vòng vỡ khiên và tia lửa sinh ra lúc đạn chạm bắt đầu với đủ tuổi thọ.
 - `preloadShotArt(characterId)` được gọi trong constructor và `setCharacter`. Không có trình duyệt (khi test) thì bỏ qua.
+- `fireBonusShot(aim, hue, count, collect)`: đạn cho quái thưởng. `aim` là hàm ghi vị trí **đang vẽ** của hộp, gồm cả độ lắc lư (`supplyPodAim`, `treasureDroneAim`, `recallBonusAim`, `rewardCrateAim`, `anomalyCrateAim`). Công thức lắc lư dùng chung với hàm vẽ (`supplyPodBob`, `treasureDroneBob`, `recallBonusBob`, `rewardCrateSway`, `anomalyCrateSway` ở đầu `Game.ts`), nên đạn trúng đúng hộp. Phát cuối truyền `collect` (hàm vẽ lại hộp) vào `bonusGhosts`; hộp được vẽ tới khi đạn chạm.
+- Hộp đã nhặt không còn được cập nhật, nên nó đứng yên ở vị trí cuối, và `aim` trả đúng vị trí đó.
+
+### 4.3 Phi thuyền: xoay theo mục tiêu, ánh sáng, hào quang, phản lực
+
+**Chuyển động** (`ShipMotion`, `src/characters/ship-motion.ts`; góc tính bằng radian, chiều kim đồng hồ, 0 = mũi thẳng lên):
+
+| Hằng số | Giá trị | Ý nghĩa |
+|---|---|---|
+| `SHIP_AIM_LIMIT` | 0,96 (≈ 55°) | góc xoay tối đa mỗi bên, để dáng tàu vẫn dễ nhận ra |
+| `SHIP_AIM_SNAP` | 0,55 | phần góc xoay ngay lúc bấm phím; phần còn lại xoay dần |
+| `SHIP_AIM_HOLD_SECONDS` | 0,8 | thời gian giữ hướng và bám mục tiêu sau phát cuối |
+| tốc độ bám / quay về | 18 / 3,4 mỗi giây | bám nhanh, quay về từ tốn |
+| giật lùi | +0,55 mỗi phát, +1 với phát hạ gục (`power >= 1.3`), giảm 14/giây | nhân với `SHIP_RECOIL_PX` = 2,4 px |
+| tăng lửa (`boost`) | +0,28 mỗi phát, giảm 2,2/giây | khoảng 3 phím/giây thì lửa nhỏ, từ 8 phím/giây thì gần tối đa |
+
+- `Game.firePlayerShot` gọi `shipMotion.fire()` **trước khi** tính nòng, rồi lấy tâm và góc tàu bằng `characterShipPoint` / `characterShipAngle` với `shipDrawOptions(lastDrawTime)`. Nhờ vậy đạn ra đúng nòng của khung hình sắp vẽ. `lastDrawTime` là thời gian của khung vẽ gần nhất (phím bấm nằm ngoài vòng vẽ).
+- `trackShipTarget` dùng lại `aimPlayerShot` với phát bắn cuối (`shipAimImpact`), nên tàu bám được cả quái, boss, đạn địch và hộp thưởng.
+- Tia laser cũ và đường ngắm mờ (`drawTargetLine`) giờ xuất phát từ **mũi tàu** (`SHIP_NOSE_OFFSET` = 30 px phía trước tâm).
+- Tâm tàu vẽ có dao động nhẹ (`driftX` tới ±7,5 px, `bob` tới khoảng ±8,6 px). Trước đây đạn bắn ra từ tâm không dao động, nên lệch khỏi nòng. `characterShipPoint` đã tính cả phần này.
+
+**Bộ đèn** (`ShipLightRig`, `src/characters/ship-lights.ts`) — chỉ bật khi đang dùng ảnh tàu V3 (`activeShipLightRig`), vì các điểm neo đo trên ảnh đó:
+
+| Phần | Vanguard | Cách vẽ |
+|---|---|---|
+| Ống phụt `nozzles` | `[-13, 23.5]`, `[13, 23.5]` | 3 lớp lửa (lam ngoài → cyan → lõi trắng) treo từ miệng ống; 3 "vòng kim cương" chạy dọc tia lửa; đốm nóng ở miệng ống loé khi bắn. Lửa rung theo 3 nhịp lệch nhau để không đập đều |
+| Lõi `core` / `coreRadius` / `glint` | `[0, -12]` / 13 / `[0, -25]` | ánh sáng thở chậm trong pha lê, loé khi bắn; tia sáng hình sao ở mũi pha lê mỗi khoảng 3 giây |
+| Đầu cánh `tips` | `[-33, 17.5]`, `[33, 17.5]` | đốm sáng dịu cố định + nháy ngắn, trái rồi phải |
+| Hào quang | màu `halo` | chính viền tàu, tô màu và làm nhoè một lần (đóng dấu 36 lần quanh 3 vòng), vẽ to hơn thân một chút và **dưới** thân, độ đục chỉ khoảng 0,24 |
+| Tia lửa phía sau | `ShipExhaust` | bắn ra dọc trục tàu, rồi trôi tự do, chảy xuống theo không gian (70 px/giây). Số hạt mỗi ống mỗi giây: Low 10, Medium 28, High 46, Ultra 66 (tăng thêm tới 80% khi `boost` cao) |
+
+- Đổi toạ độ ảnh sang toạ độ trên thân tàu: ô ảnh V3 cỡ 256 px, tàu vẽ rộng 78 px, nên `toạ độ = (pixel − 128) × 78 / 256`. Ví dụ ngọn lửa vẽ sẵn của Vanguard nằm ở pixel x 85 và 171, rời ống ở pixel y khoảng 204.
+- Mọi lớp sáng là ảnh gradient tạo sẵn (lửa 32×128, quầng 64×64, hào quang 128×128 mỗi tàu), vẽ bằng `drawImage` với chế độ cộng sáng. **Không dùng `shadowBlur`**. Bộ cũ (`drawFlightTail`, `drawEngine`) dùng `shadowBlur`, nên bộ mới nhẹ hơn.
+- Bậc Low (`detailScale` < 0,7) bỏ vòng kim cương và tia sáng lấp lánh.
+- Màn chọn tàu (`main.ts`) cũng vẽ bằng `drawCharacterShip`, nên thẻ Vanguard có luôn bộ đèn mới (ảnh tĩnh).
+- **Các tàu khác vẫn dùng lửa cũ** cho tới khi chủ dự án duyệt Vanguard (quy tắc làm thử một cái trước). Thêm cho tàu khác: đo điểm neo trên ảnh V3 của tàu đó rồi thêm vào `RIGS`.
 
 ---
 
@@ -241,9 +298,9 @@ Khi build, `check-background-art.mjs` kiểm tra:
 
 - **Chọn ảnh đầu đạn** (`pickHeadSprite`): phát hạ gục dùng `finisher`, thiếu thì dùng `bolt`. Đạn thường dùng `bolt`, thiếu thì dùng `finisher`.
 - **Đầu đạn:** `drawAnchored` ghim điểm neo vào vị trí đạn, xoay theo hướng bay, dài `boltLength`/`finisherLength` × hệ số chiều sâu. Kèm một quầng sáng mềm (ánh sáng hắt ra xung quanh).
-- **Đuôi khi đầu đạn là ảnh ("vệt tàn"):** bề rộng chỉ còn 45%, và bắt đầu lùi sau mũi `0,7 × anchorX × chiều dài ảnh`, tức phần đuôi của thân giáo. Nếu để đuôi rộng và bắt đầu từ mũi thì thân giáo vẽ tay bị chìm, và đuôi thành cái nêm phẳng cạnh cứng.
+- **Đuôi khi đầu đạn là ảnh ("vệt tàn"):** bề rộng chỉ còn 55%, và bắt đầu lùi sau mũi `0,7 × anchorX × chiều dài ảnh`, tức phần đuôi của thân giáo. Nếu để đuôi rộng và bắt đầu từ mũi thì thân giáo vẽ tay bị chìm, và đuôi thành cái nêm phẳng cạnh cứng.
 - **Vụ nổ:**
-  - Có loé trắng trong 30% đầu tuổi thọ.
+  - Có loé trắng trong 30% đầu tuổi thọ, và một quầng màu bằng khoảng 0,6 lần cỡ vụ nổ.
   - Ảnh nở từ 0,55 lên 1,25 lần theo đường cong dịu, độ đục giảm theo `(1−k)^1,4`.
   - Mỗi phát xoay một góc riêng (`seed × 2,39` rad), để bắn liên tục không bị lặp hình.
 - **Loé nòng súng:** ghim gốc vào nòng, co dần, tắt sau 0,075 giây.
@@ -266,18 +323,20 @@ Khi build, `check-background-art.mjs` kiểm tra:
    - thêm tên tàu vào `SHIPS` trong `prepare-fx.mjs`;
    - chạy `pnpm fx:prepare <ship>`;
    - mở `public/assets/space-typing/fx/<ship>/` xem kết quả.
-5. **Thêm công thức** vào `RECIPES`, theo archetype của tàu:
+5. **Tiếng trúng:** mỗi tàu nên có tiếng riêng. Viết một hàm mới trong `Sfx` giống `boltImpact` (tổng hợp bằng `tone` và `noise`, hoặc dùng mẫu âm thanh trong `sample-bank.ts`), rồi gọi theo tàu trong `applyShotImpact`. Hiện tất cả dùng chung `boltImpact`.
+6. **Thêm công thức** vào `RECIPES`, theo archetype của tàu:
    - `fx: "<ship>"`, các cỡ ảnh, `muzzles` (đo trên ảnh tàu: tàu vẽ ở cỡ 78 px, tâm ở giữa), tốc độ, độ cong.
    - Công thức gắn với archetype, và mỗi archetype hiện chỉ thuộc đúng một tàu.
-6. **Nếu thiết kế cần cách bay hoặc cách vẽ mới** (xem 7.1: tia điện gấp khúc, đuôi xoắn, khói, vật đặc...):
+7. **Nếu thiết kế cần cách bay hoặc cách vẽ mới** (xem 7.1: tia điện gấp khúc, đuôi xoắn, khói, vật đặc...):
    - thêm trường vào `ShotRecipe` (ví dụ `trail: "ribbon" | "zigzag" | "helix" | "smoke"`, `spin`, `tumble`, `solid`);
    - rẽ nhánh trong `drawTrail`/`drawHead`/`drawImpact`;
    - **giá trị mặc định phải giữ nguyên hình ảnh Vanguard**.
-7. **Test:**
+8. **Test:**
    - sửa test "gives only Vanguard a travelling bolt" thành danh sách tàu đã có công thức;
    - thêm test cho trường mới;
    - `pnpm test`.
-8. **Trang xem thử:** thêm tham số `?ship=<id>`, hiện đang cố định Vanguard trong `shot-gallery.ts` (việc 9-4). Chụp ở 1642×799 DPR 2, cả tốc độ thường và `t=0.1`, rồi phóng to kiểm tra cạnh cứng và màu nền lem. Máy chủ dev tạm ở cổng 3098, xem [VISUAL_TESTING.md](VISUAL_TESTING.md):
+9. **Bộ đèn của tàu** (sau khi chủ dự án duyệt bộ đèn Vanguard): đo vị trí ống phụt, lõi, đầu cánh trên ảnh V3 của tàu (công thức ở 4.3), thêm một mục vào `RIGS` trong `ship-lights.ts`, chọn màu theo `characterVisualProfile`. Nòng súng trong `RECIPES` cũng đo trên cùng ảnh đó. Tàu xoay theo mục tiêu thì tự có, không cần làm gì thêm.
+10. **Trang xem thử:** thêm tham số `?ship=<id>`, hiện đang cố định Vanguard trong `shot-gallery.ts` (việc 9-4). Chụp ở 1642×799 DPR 2, cả tốc độ thường và `t=0.1`, rồi phóng to kiểm tra cạnh cứng và màu nền lem. Máy chủ dev tạm ở cổng 3098, xem [VISUAL_TESTING.md](VISUAL_TESTING.md):
 
    ```bash
    pnpm -s visual:shot "http://127.0.0.1:3098/shot-gallery.html?panel=0&cps=10" .visual/shots.png --wait=6000 --eval-file=scripts/visual/evals/shot-state.js
@@ -287,7 +346,7 @@ Khi build, `check-background-art.mjs` kiểm tra:
    ```
 
    `shot-state.js` cho biết ảnh đạn nào đã nạp. `game-assets.js` cho biết game thật đã tải `fx/<ship>/fx.json` chưa.
-9. `pnpm build` (có bước kiểm ảnh đạn), `pnpm build:space`, rồi báo chủ dự án tải lại trang và chơi bằng tàu đó.
+11. `pnpm build` (có bước kiểm ảnh đạn), `pnpm build:space`, rồi báo chủ dự án tải lại trang và chơi bằng tàu đó.
 
 ---
 
@@ -333,9 +392,21 @@ Phần đặc (thân tên lửa, lõi vật chất tối): xin ảnh **trên n�
 8. **`category` lạ trong manifest làm game từ chối cả manifest** (ảnh phi thuyền cũng mất) → dùng `"projectile"`, có ghi chú ngay trong code.
 9. **Mất phần đạn khi ghép sang nhánh `feat/bgv-integration-current`:** 4 file mới không được commit, `Game.ts` import file không tồn tại, AI kia gỡ phần đạn cho build chạy.
    - Cách xử lý: lấy phần sửa `Game.ts` từ commit `762b257` (`git diff e3ed276 762b257 -- src/Game.ts`), áp bằng `git apply --3way` lên `Game.ts` mới. Không xung đột; điểm thưởng và số điểm bật lên của AI kia vẫn giữ.
-   - Kiểm tra: kiểm tra kiểu, 864/864 test.
+   - Kiểm tra lúc đó: kiểm tra kiểu, 864/864 test.
 10. **Cũng trong lần ghép đó, `.gitignore`, `art-src/README.md` và một đoạn trong `docs/LOCAL_ASSETS_README.md` bị mất** → lấy lại từ `762b257`.
 11. **Tách hàm dùng chung ra `art-common.mjs`** có thể làm hỏng script ảnh nền → chạy lại `pnpm bg:prepare g01-celestial`, `kit.json` giống hệt từng byte.
+12. **Chủ dự án góp ý sau khi chơi (28/9): "trúng quái thiếu cảm giác, không có âm thanh hay hiệu ứng như đạn fantasy; quái nên khựng lại; đạn hơi nhỏ".**
+    - Nguyên nhân: mỗi chữ trúng đích không có tiếng nào (chỉ có tiếng "tách" rất ngắn lúc bắn); quái chỉ giật nhẹ 7 px; đạn dài 92 px và co còn 60% khi bay xa.
+    - Cách xử lý: thêm `Sfx.boltImpact`; thêm cú khựng (dừng tiến, giật mạnh hơn, rung thân); đạn to hơn khoảng 40%, chỉ co tới 74%; vụ nổ to hơn, có quầng màu, nhiều tia lửa hơn (10, hoặc 18 với phát hạ gục).
+    - **Bài học cho các tàu sau:** mỗi kiểu đạn cần có **tiếng trúng riêng** và phản ứng trúng rõ ràng, không chỉ hình ảnh.
+13. **Gõ quái thưởng không thấy đường đạn** (chủ dự án báo 28/9).
+    - Nguyên nhân: 5 hàm `typeSupplyPod`, `typeTreasureDrone`, `typeRewardChoiceCrate`, `typeAnomalyCrate`, `typeRecallBonus` chỉ gọi `burst()` tại chỗ hộp và `sfx.shot()`, **chưa từng bắn đạn**, kể cả tia laser cũ. Mọi tàu đều bị.
+    - Cách xử lý: thêm `bonus-hit` / `bonus-collect` và `fireBonusShot` (mục 4.1, 4.2). Tàu dùng laser cũ giờ cũng có tia laser tới hộp.
+    - Chú ý: hộp được vẽ lệch khỏi `x`/`y` do lắc lư (tới 18 px). Nhắm vào `x`/`y` thì đạn trượt khỏi hình hộp, nên phải nhắm vào vị trí đang vẽ.
+14. **Phi thuyền luôn chĩa mũi thẳng lên khi bắn** (chủ dự án: "nó chỉ đúng 1 hướng khi typing") → `ShipMotion` và nòng súng xoay theo (mục 4.3).
+15. **Lửa phụt trông thô:** lửa cũ vẽ ở `x = ±6`, `y = 17`, tức **giữa hai ống phụt**, trong khi ống thật của ảnh nằm ở `±13`, `23,5`; thêm một vệt đuôi ở giữa, chỗ không có động cơ nào. Đo lại trên ảnh (mục 4.3) và làm bộ đèn mới.
+16. **Hào quang bản đầu quá đậm,** trông như viền dán màu cyan quanh tàu → nhoè rộng hơn, độ đục từ khoảng 0,5–0,9 giảm còn khoảng 0,24–0,4.
+17. **Tia lửa bản đầu to và nhoè như đốm tròn mờ** → nhỏ hơn, sáng hơn, bay nhanh hơn, sống ngắn hơn.
 
 ---
 
@@ -351,6 +422,8 @@ Phần đặc (thân tên lửa, lõi vật chất tối): xin ảnh **trên n�
 4. **P1 — Tham số `?ship=`** cho trang xem thử.
 5. **P2 — Âm thanh bắn riêng từng tàu.** Hiện mọi tàu dùng `sfx.shot`. AI kia từng làm âm thanh đạn riêng, rồi gỡ trong loạt "revert"; hỏi chủ dự án trước.
 6. **P2 — Xoá tia laser cũ** (`lasers`, `drawLasers`, kiểu `Laser`) khi cả 11 tàu đã có đạn mới.
+7. **P0 — Chủ dự án duyệt bộ đèn và cách xoay của Vanguard** bằng mắt. Có thể cần chỉnh: góc tối đa (`SHIP_AIM_LIMIT`), độ giật (`SHIP_RECOIL_PX`), độ sáng hào quang (`drawShipHalo`), độ dài lửa (`plumeLength`).
+8. **P1 — Bộ đèn cho 10 tàu còn lại** (mục 6, bước 9), sau khi Vanguard được duyệt.
 
 ---
 
@@ -362,6 +435,8 @@ Phần đặc (thân tên lửa, lõi vật chất tối): xin ảnh **trên n�
 - [ ] Đã chụp bằng `pnpm visual:shot` ở 1642×799 DPR 2 (tốc độ thường và `t=0.1`) **và đã tự mở ảnh xem**; đã phóng to (`visual:crop`) kiểm tra đầu đạn rõ chi tiết, đuôi không có cạnh cứng.
 - [ ] Chơi thật bằng tàu đó: vụ nổ trùng lúc đạn chạm, kẻ địch bị hạ không biến mất trước khi nổ, nhãn chữ không bị đạn che.
 - [ ] Tàu chưa làm vẫn bắn tia laser như cũ.
+- [ ] Gõ quái thưởng (hộp tiếp tế, drone kho báu…) thấy đạn bay tới hộp; hộp nổ khi đạn chạm.
+- [ ] Tàu xoay về phía mục tiêu, đạn ra đúng nòng khi tàu đang xoay (xem ảnh phóng to).
 - [ ] `pnpm build:space`, rồi báo chủ dự án (tiếng Việt) chỉ cần tải lại trang, kèm ảnh chụp.
 - [ ] Commit **đủ file mới** cùng file dùng chúng (bài học ở 0.6).
 
@@ -384,4 +459,6 @@ Tham số của trang xem thử:
 - `art=0`: dùng bản vẽ bằng code để so sánh.
 - `panel=0`: ẩn bảng điều khiển.
 - Phím `H`: ẩn hoặc hiện bảng điều khiển.
-- `window.__shotGallery`: `{ shots, targets }`, dùng để soi trạng thái.
+- `stopAt=<giây>`: đóng băng hình ở giây đó, để chụp lặp lại được (ví dụ `stopAt=3.87` thấy tia lấp lánh trên pha lê, `stopAt=4.35` thấy đèn cánh trái nháy).
+- `idle=1`: không tự gõ, chỉ xem tàu bay êm.
+- `window.__shotGallery`: `{ shots, targets, motion, exhaust }`, dùng để soi trạng thái.

@@ -7,6 +7,8 @@ const AUDIO_FILES = [
   "public/assets/audio/music/urgent.ogg",
   "public/assets/audio/music/mysterious-ambience.mp3",
   "public/assets/audio/music/battle-theme-b.mp3",
+  "public/assets/audio/music/world-01/calm.ogg",
+  "public/assets/audio/music/world-01/intense.ogg",
   "public/assets/audio/stingers/victory.ogg",
   "public/assets/audio/ambient/engine-loop.ogg",
   "public/assets/audio/ambient/computer-loop.ogg",

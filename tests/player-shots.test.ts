@@ -13,6 +13,7 @@ import {
 } from "../src/vfx/player-shot-sprites";
 import {
   MAX_FLIGHT_SECONDS,
+  MIN_DEPTH_SCALE,
   MIN_FLIGHT_SECONDS,
   PlayerShotSystem,
   shotDepthScale,
@@ -80,10 +81,37 @@ describe("player shot recipes", () => {
   it("narrows bolts as they climb the field (depth cue)", () => {
     expect(shotDepthScale(600, 600, 720)).toBe(1);
     expect(shotDepthScale(600, 700, 720)).toBe(1);
-    const mid = shotDepthScale(600, 300, 720);
-    expect(mid).toBeLessThan(1);
-    expect(mid).toBeGreaterThan(shotDepthScale(600, 100, 720));
-    expect(shotDepthScale(600, -2000, 720)).toBe(0.6);
+    const near = shotDepthScale(600, 500, 720);
+    expect(near).toBeLessThan(1);
+    expect(near).toBeGreaterThan(shotDepthScale(600, 400, 720));
+    expect(shotDepthScale(600, -2000, 720)).toBe(MIN_DEPTH_SCALE);
+  });
+});
+
+describe("bolt impact sound", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("layers a chime, a crackle and a thud, and merges hits closer than 32 ms", () => {
+    const sfx = new Sfx();
+    const audio = sfx as unknown as { tone: () => void; noise: () => void };
+    const tone = vi.spyOn(audio, "tone").mockImplementation(() => {});
+    const noise = vi.spyOn(audio, "noise").mockImplementation(() => {});
+    let now = 1000;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+
+    sfx.boltImpact(0.8);
+    expect(tone).toHaveBeenCalledTimes(3);
+    expect(noise).toHaveBeenCalledOnce();
+    now += 10;
+    sfx.boltImpact(0.8);
+    expect(tone).toHaveBeenCalledTimes(3);
+    now += 40;
+    sfx.boltImpact(0.8);
+    expect(tone).toHaveBeenCalledTimes(6);
+    sfx.destroy();
   });
 });
 
@@ -267,7 +295,14 @@ type ShotRuntime = {
   dyingEnemies: Enemy[];
   lasers: unknown[];
   playerShots: { activeShots: number };
+  update: (dt: number) => void;
   updateEffects: (dt: number) => void;
+};
+
+type BonusRuntime = ShotRuntime & {
+  supplyPod: { x: number; y: number; entry: VocabularyEntry } | null;
+  bonusGhosts: unknown[];
+  spawnSupplyPod: () => void;
 };
 
 describe("Game player shots", () => {
@@ -306,6 +341,31 @@ describe("Game player shots", () => {
     game.destroy();
   });
 
+  it("staggers the enemy and plays the impact chime when a bolt lands", () => {
+    const chime = vi.spyOn(Sfx.prototype, "boltImpact").mockImplementation(() => {});
+    const game = createTestGame();
+    game.testLabSpawnEnemies({ kind: "scout", count: 1, layers: 1 });
+    const runtime = game as unknown as ShotRuntime;
+    const enemy = runtime.enemies[0]!;
+    const word = typingText(enemy.entry.en);
+
+    game.handleKey(word[0]!);
+    expect(chime).not.toHaveBeenCalled();
+    runtime.updateEffects(MAX_FLIGHT_SECONDS);
+    expect(chime).toHaveBeenCalledOnce();
+    expect(enemy.hitStun ?? 0).toBeGreaterThan(0);
+    expect(enemy.hitShake ?? 0).toBeGreaterThan(0);
+
+    // Held still while staggered, then it advances again.
+    const heldY = enemy.y;
+    runtime.update(0.02);
+    expect(enemy.y).toBe(heldY);
+    runtime.update(0.1);
+    runtime.update(0.1);
+    expect(enemy.y).toBeGreaterThan(heldY);
+    game.destroy();
+  });
+
   it("keeps the instant laser and immediate feedback for ships without a bolt", () => {
     const kill = vi.spyOn(Sfx.prototype, "kill").mockImplementation(() => {});
     const game = createTestGame();
@@ -315,14 +375,88 @@ describe("Game player shots", () => {
     const enemy = runtime.enemies[0]!;
     const word = typingText(enemy.entry.en);
 
+    const chime = vi.spyOn(Sfx.prototype, "boltImpact").mockImplementation(() => {});
     game.handleKey(word[0]!);
     expect(enemy.flash).toBe(1);
     expect(runtime.lasers).toHaveLength(1);
     expect(runtime.playerShots.activeShots).toBe(0);
+    // The legacy laser keeps its original feedback: no stagger, no chime.
+    expect(enemy.hitStun ?? 0).toBe(0);
+    expect(chime).not.toHaveBeenCalled();
 
     for (const key of word.slice(1)) game.handleKey(key);
     expect(runtime.dyingEnemies).toHaveLength(0);
     expect(kill).toHaveBeenCalledOnce();
+    game.destroy();
+  });
+
+  it("turns the ship toward the enemy it shoots and fires from the turned muzzles", () => {
+    const game = createTestGame();
+    game.testLabSpawnEnemies({ kind: "scout", count: 1, layers: 1 });
+    const runtime = game as unknown as ShotRuntime & {
+      shipMotion: { aim: number };
+      playerShots: { shots: Array<{ live: boolean; x0: number }> };
+    };
+    const enemy = runtime.enemies[0]!;
+    enemy.x = 1100;
+    enemy.baseX = 1100;
+    enemy.y = 200;
+    const word = typingText(enemy.entry.en);
+
+    game.handleKey(word[0]!);
+    expect(runtime.shipMotion.aim).toBeGreaterThan(0.3);
+    // First bolt: the left wing pod, swung toward the right by the turn.
+    const shot = runtime.playerShots.shots.find((item) => item.live)!;
+    expect(shot.x0).toBeGreaterThan(640 - 21 + 3);
+    game.destroy();
+  });
+
+  it("fires a real bolt at bonus targets and lands the pickup burst with the last one", () => {
+    vi.spyOn(Sfx.prototype, "supplyArrival").mockImplementation(() => {});
+    const support = vi.spyOn(Sfx.prototype, "support").mockImplementation(() => {});
+    const chime = vi.spyOn(Sfx.prototype, "boltImpact").mockImplementation(() => {});
+    const game = createTestGame();
+    const runtime = game as unknown as BonusRuntime;
+    runtime.spawnSupplyPod();
+    const pod = runtime.supplyPod!;
+    pod.x = 420;
+    const word = typingText(pod.entry.en);
+
+    game.handleKey(word[0]!);
+    expect(runtime.playerShots.activeShots).toBe(1);
+    expect(runtime.lasers).toHaveLength(0);
+    expect(chime).not.toHaveBeenCalled();
+    runtime.updateEffects(MAX_FLIGHT_SECONDS);
+    expect(chime).toHaveBeenCalledOnce();
+
+    for (const key of word.slice(1)) game.handleKey(key);
+    // Collected at once (reward applied), drawn until the final bolt lands.
+    expect(runtime.supplyPod).toBeNull();
+    expect(runtime.bonusGhosts).toHaveLength(1);
+    expect(support).not.toHaveBeenCalled();
+    runtime.updateEffects(MAX_FLIGHT_SECONDS);
+    expect(runtime.bonusGhosts).toHaveLength(0);
+    expect(support).toHaveBeenCalledOnce();
+    game.destroy();
+  });
+
+  it("draws the laser tracer at bonus targets for ships without a bolt", () => {
+    vi.spyOn(Sfx.prototype, "supplyArrival").mockImplementation(() => {});
+    const support = vi.spyOn(Sfx.prototype, "support").mockImplementation(() => {});
+    const game = createTestGame();
+    game.setCharacter("aegis");
+    const runtime = game as unknown as BonusRuntime;
+    runtime.spawnSupplyPod();
+    const pod = runtime.supplyPod!;
+    pod.x = 420;
+    const word = typingText(pod.entry.en);
+
+    game.handleKey(word[0]!);
+    expect(runtime.lasers).toHaveLength(1);
+    for (const key of word.slice(1)) game.handleKey(key);
+    expect(runtime.lasers).toHaveLength(word.length);
+    expect(runtime.bonusGhosts).toHaveLength(0);
+    expect(support).toHaveBeenCalledOnce();
     game.destroy();
   });
 });

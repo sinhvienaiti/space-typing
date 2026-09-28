@@ -12,6 +12,7 @@ export class Sfx {
   private context: AudioContext | null = null;
   private limiter: DynamicsCompressorNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
+  private lastBoltImpact = -Infinity;
   private announcerAudio: HTMLAudioElement | null = null;
   private readonly samples = new SampleSfxBank();
   private volume = 0.5;
@@ -97,6 +98,24 @@ export class Sfx {
   hit(pitch = 1): void {
     const safePitch = Math.max(0.5, Math.min(1.6, pitch));
     this.tone(190 * safePitch, 0.065, "sawtooth", 0.045, 110 * safePitch, "combat");
+  }
+
+  /**
+   * A player bolt landing (Vanguard's crystal plasma): a bright chime, a
+   * short crackle and a soft low thud for weight. Each hit is detuned a
+   * little so fast typing never sounds like one repeated sample, and hits
+   * closer than 32 ms merge into one.
+   */
+  boltImpact(power = 1): void {
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    if (now - this.lastBoltImpact < 32) return;
+    this.lastBoltImpact = now;
+    const detune = 0.94 + Math.random() * 0.12;
+    const weight = Math.max(0.8, Math.min(1.5, power));
+    this.tone(2200 * detune, 0.07, "sine", 0.03 * weight, 1300 * detune, "combat");
+    this.tone(1250 * detune, 0.09, "triangle", 0.022 * weight, 620 * detune, "combat");
+    this.noise(0.03, 0.016 * weight, "combat");
+    this.tone(170, 0.08, "sine", 0.05 * weight, 70, "combat");
   }
 
   wordComplete(perfect: boolean): void {

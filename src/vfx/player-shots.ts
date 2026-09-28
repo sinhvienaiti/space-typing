@@ -62,16 +62,17 @@ const RECIPES: Readonly<Partial<Record<PlayerShotArchetype, ShotRecipe>>> = {
     bend: 0.07,
     trailShare: 0.55,
     trailMaxPx: 240,
-    width: 6.5,
+    width: 8,
     stretch: 5,
     sparkleRate: 90,
     muzzles: [[-21, -12], [21, -12]],
     finisherMuzzle: [0, -36],
     fx: "vanguard",
-    boltLength: 92,
-    finisherLength: 150,
-    impactSize: 84,
-    muzzleLength: 46,
+    // Owner feedback (28/9): bolts read too small; sizes raised ~40%.
+    boltLength: 128,
+    finisherLength: 190,
+    impactSize: 118,
+    muzzleLength: 60,
   },
 };
 
@@ -236,9 +237,14 @@ function streak(
 
 export type ShotFireOptions<P> = {
   characterId: CharacterId;
-  /** Ship centre; the recipe's muzzle offsets are added to it. */
+  /** Ship centre as drawn; the recipe's muzzle offsets are added to it. */
   originX: number;
   originY: number;
+  /**
+   * The ship's turn as drawn (radians, clockwise, 0 = nose up). Muzzle
+   * offsets rotate with it so bolts leave the hull where its guns are.
+   */
+  originAngle?: number;
   targetX: number;
   targetY: number;
   /** 0.75 light hit … 1.45 word-finishing shot. */
@@ -326,11 +332,13 @@ function curvePoint(shot: Shot<unknown>, t: number, out: ShotAimPoint): void {
 
 /**
  * Depth cue: a bolt climbing the field is flying away from the camera, so it
- * narrows toward the top (down to 60% after a full field height of travel).
+ * narrows toward the top, but only to 74% so far bolts stay easy to follow.
  */
+export const MIN_DEPTH_SCALE = 0.74;
+
 export function shotDepthScale(originY: number, y: number, viewHeight: number): number {
   const scale = 1 - (originY - y) / (Math.max(1, viewHeight) * 1.3);
-  return scale < 0.6 ? 0.6 : scale > 1 ? 1 : scale;
+  return scale < MIN_DEPTH_SCALE ? MIN_DEPTH_SCALE : scale > 1 ? 1 : scale;
 }
 
 export class PlayerShotSystem<P> {
@@ -373,8 +381,11 @@ export class PlayerShotSystem<P> {
       muzzle = recipe.muzzles[this.muzzleCursor % recipe.muzzles.length]!;
       this.muzzleCursor += 1;
     }
-    const x0 = options.originX + muzzle[0];
-    const y0 = options.originY + muzzle[1];
+    const turn = options.originAngle ?? 0;
+    const cos = Math.cos(turn);
+    const sin = Math.sin(turn);
+    const x0 = options.originX + muzzle[0] * cos - muzzle[1] * sin;
+    const y0 = options.originY + muzzle[0] * sin + muzzle[1] * cos;
     const distance = Math.max(1, Math.hypot(options.targetX - x0, options.targetY - y0));
 
     const shot = this.claimShot();
@@ -733,7 +744,7 @@ export class PlayerShotSystem<P> {
     impact.life = IMPACT_LIFE * (shot.power >= FINISHER_POWER ? 1.3 : 1);
 
     // Radiating sparks sell the hit; finishing shots throw more.
-    const count = shot.power >= FINISHER_POWER ? 14 : 7;
+    const count = shot.power >= FINISHER_POWER ? 18 : 10;
     for (let index = 0; index < count; index += 1) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 140 + Math.random() * 260 * shot.power;
@@ -768,7 +779,7 @@ export class PlayerShotSystem<P> {
       trailHead = Math.max(tail, head - (length * sprite.anchorX * 0.7) / distance);
     }
     if (trailHead - tail > 0.002) {
-      this.drawTrail(context, shot, tail, trailHead, tuning, sprite === null ? 1 : 0.45);
+      this.drawTrail(context, shot, tail, trailHead, tuning, sprite === null ? 1 : 0.55);
     }
     if (!shot.arrived) this.drawHead(context, shot, tuning);
   }
@@ -938,6 +949,8 @@ export class PlayerShotSystem<P> {
       const grow = 1 - (1 - k) * (1 - k);
       const size =
         impact.recipe.impactSize * (impact.power >= FINISHER_POWER ? 1.35 : 1) * (0.55 + 0.7 * grow);
+      // Coloured light around the burst sells the hit on busy backgrounds.
+      glow(context, glowSprite(impact.palette.primary), x, y, size * 0.6, 0.5 * fade);
       drawAnchored(context, art, x, y, impact.seed * 2.39, size, Math.pow(1 - k, 1.4));
       return;
     }

@@ -47,6 +47,10 @@ type ManagedTrack = {
   loop: boolean;
   errorListener: EventListener | null;
   advancingFallback: boolean;
+  /** Stems of one song (see AudioAssetRef.syncGroup). */
+  syncGroup: string | null;
+  /** The stem this one takes over from, until its position is matched. */
+  syncSource: ManagedTrack | null;
 };
 
 type FadeState = {
@@ -312,6 +316,7 @@ export class MusicController {
       stateLoops(state),
       0,
     );
+    if (next !== null) this.syncWithActive(next);
     this.fadeMusicTo(next, crossfadeSeconds);
   }
 
@@ -594,6 +599,8 @@ export class MusicController {
       loop,
       errorListener: null,
       advancingFallback: false,
+      syncGroup: asset.syncGroup ?? null,
+      syncSource: null,
     };
 
     this.configureAudio(track);
@@ -610,6 +617,54 @@ export class MusicController {
     };
     track.errorListener = listener;
     track.audio.addEventListener?.("error", listener);
+    // A fallback candidate of a synced stem keeps following its source.
+    this.attachSync(track);
+  }
+
+  /**
+   * Starts the stem where its sync source is; once playback really starts,
+   * matches it again to absorb the loading delay (the fade is near silent
+   * then, so the small seek is inaudible).
+   */
+  private attachSync(track: ManagedTrack): void {
+    if (track.syncSource === null) return;
+    this.matchSyncPosition(track);
+    const audio = track.audio;
+    const onPlaying = (): void => {
+      audio.removeEventListener?.("playing", onPlaying);
+      if (track.audio !== audio) return;
+      this.matchSyncPosition(track);
+      track.syncSource = null;
+    };
+    audio.addEventListener?.("playing", onPlaying);
+  }
+
+  /**
+   * Stems of one song crossfade at the same position, so a calm ↔ intense
+   * switch sounds like one track rising and falling, not a restart.
+   */
+  private syncWithActive(track: ManagedTrack): void {
+    const active = this.activeMusic;
+    if (
+      active === null ||
+      track.syncGroup === null ||
+      active.syncGroup !== track.syncGroup
+    ) {
+      return;
+    }
+    track.syncSource = active;
+    this.attachSync(track);
+  }
+
+  private matchSyncPosition(track: ManagedTrack): void {
+    const source = track.syncSource;
+    // A stopped source has been rewound to 0: nothing to match any more.
+    if (source === null || source.audio.paused === true) return;
+    const position = source.audio.currentTime;
+    if (!Number.isFinite(position)) return;
+    if (Math.abs(track.audio.currentTime - position) > 0.02) {
+      track.audio.currentTime = position;
+    }
   }
 
   private async playTrack(track: ManagedTrack): Promise<void> {

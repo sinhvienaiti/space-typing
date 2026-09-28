@@ -75,7 +75,14 @@ import {
   type BackgroundPresentation,
 } from "./background/stage";
 import type { CharacterId } from "./characters/registry";
-import { drawCharacterShip } from "./characters/renderer";
+import {
+  activeShipLightRig,
+  characterShipAngle,
+  characterShipPoint,
+  drawCharacterShip,
+  type CharacterDrawOptions,
+} from "./characters/renderer";
+import { ShipMotion } from "./characters/ship-motion";
 import type { EquipmentAuraProfile } from "./characters/equipment-aura";
 import { playerProjectileProfile } from "./characters/projectiles";
 import {
@@ -419,6 +426,7 @@ import {
 } from "./vfx/polish";
 import { enemyFxProfile, type EnemyFxProfile } from "./vfx/enemy-fx";
 import { PlayerShotSystem, preloadShotArt, type ShotAimPoint } from "./vfx/player-shots";
+import { ShipExhaust } from "./vfx/ship-exhaust";
 import { rewardFxProfile } from "./vfx/reward-fx";
 import {
   FrameProfiler,
@@ -469,7 +477,20 @@ type ShotImpact =
   | { kind: "enemy-layer"; enemyId: number; fx: EnemyFxProfile }
   | { kind: "enemy-kill"; enemy: Enemy; fx: EnemyFxProfile; shake: number }
   | { kind: "boss-hit" }
-  | { kind: "intercept"; projectile: EnemyProjectile };
+  | { kind: "intercept"; projectile: EnemyProjectile }
+  // Bonus targets (supply pod, treasure drone, crates, Recall bonus).
+  | { kind: "bonus-hit"; aim: BonusAim; hue: number; count: number }
+  | {
+      kind: "bonus-collect";
+      aim: BonusAim;
+      hue: number;
+      count: number;
+      /** Draws the collected bonus until the bolt lands. */
+      ghost: () => void;
+    };
+
+/** Writes where a bonus target is drawn right now (its bob/sway included). */
+type BonusAim = (out: ShotAimPoint) => void;
 
 type LearningEcho = {
   entry: VocabularyEntry;
@@ -610,6 +631,21 @@ const FALLBACK_ENTRIES: VocabularyEntry[] = [
 ];
 
 const PLAYER_Y_OFFSET = 72;
+/**
+ * Stagger when a player bolt lands: the enemy stops advancing for a moment
+ * and its body shakes sideways (the word label stays still for reading).
+ */
+/** Bonus targets bob/sway on screen; drawing and bolt aim share these. */
+const supplyPodBob = (pod: SupplyPod): number => Math.sin(pod.age * 3.2) * 7;
+const treasureDroneBob = (drone: TreasureDrone): number => Math.sin(drone.age * 4) * 9;
+const recallBonusBob = (target: RecallBonusTarget): number => Math.sin(target.age * 3.8) * 7;
+const rewardCrateSway = (crate: RewardChoiceCrate): number => Math.sin(crate.age * 2.6) * 16;
+const anomalyCrateSway = (crate: AnomalyCrate): number => Math.sin(crate.age * 3.1) * 18;
+/** Nose tip ahead of the ship centre, px (legacy laser and target line start). */
+const SHIP_NOSE_OFFSET = 30;
+const HIT_STUN_SECONDS = 0.06;
+const LAYER_STUN_SECONDS = 0.16;
+const HIT_SHAKE_SECONDS = 0.12;
 
 function randomBetween(min: number, max: number): number {
   return min + Math.random() * (max - min);
@@ -713,6 +749,19 @@ export class Game {
   private dyingEnemies: Enemy[] = [];
   /** Intercepted hostile shots stay on screen until the player's bolt reaches them. */
   private interceptedProjectiles: EnemyProjectile[] = [];
+  /** Collected bonus targets stay on screen until the final bolt reaches them. */
+  private bonusGhosts: Array<() => void> = [];
+  /** Nose turn toward each shot's target, recoil and engine throttle. */
+  private readonly shipMotion = new ShipMotion();
+  private readonly shipExhaust = new ShipExhaust();
+  /** The last shot's target, which the ship keeps tracking for a moment. */
+  private shipAimImpact: ShotImpact | null = null;
+  /** Time of the last drawn frame; key presses place shots on that pose. */
+  private lastDrawTime = 0;
+  private readonly shipPoint: ShotAimPoint = { x: 0, y: 0 };
+  private readonly nozzlePoints: ShotAimPoint[] = [];
+  private readonly trackShipTarget = (out: ShotAimPoint): boolean =>
+    this.shipAimImpact !== null && this.aimPlayerShot(this.shipAimImpact, out);
   private projectileImpacts: Array<{
     x: number;
     y: number;
@@ -3502,13 +3551,16 @@ export class Game {
       enemy.age += dt;
       enemy.flash = Math.max(0, enemy.flash - dt * 7);
       enemy.kick = Math.max(0, enemy.kick - dt * 4);
+      const staggered = (enemy.hitStun ?? 0) > 0;
+      if (enemy.hitStun !== undefined) enemy.hitStun = Math.max(0, enemy.hitStun - dt);
+      if (enemy.hitShake !== undefined) enemy.hitShake = Math.max(0, enemy.hitShake - dt);
       const rewardControl = tickEnemyRewardControl(enemy, dt);
       const markedSlow =
         enemy.id === this.markedEnemyId && this.markTimer > 0
           ? 0.72
           : 1;
       enemy.y +=
-        enemy.speed * speedFactor * markedSlow * rewardControl * dt;
+        enemy.speed * speedFactor * markedSlow * rewardControl * (staggered ? 0 : 1) * dt;
 
       const desiredX =
         enemy.baseX + Math.sin(enemy.age * 1.1 + enemy.id) * enemy.drift;
@@ -3646,8 +3698,9 @@ export class Game {
       this.aimPlayerShot,
       this.settings.visualQuality,
     )) {
-      this.applyShotImpact(arrival.payload, arrival.x, arrival.y);
+      this.applyShotImpact(arrival.payload, arrival.x, arrival.y, true);
     }
+    this.updateShipMotion(dt);
 
     if (this.learningEcho !== null) {
       this.learningEcho.remaining = Math.max(
@@ -5671,7 +5724,7 @@ export class Game {
     this.gainPower(1.2);
     this.applyCharacterCorrectKeyPassive();
 
-    this.burst(pod.x, pod.y, 7, 48);
+    if (pod.typed < word.length) this.fireBonusShot(this.supplyPodAim(pod), 48, 7, null);
     this.sfx.shot(this.stats.multiplier);
 
     if (pod.typed >= word.length) {
@@ -5703,8 +5756,7 @@ export class Game {
     this.stats.power = reward.power;
     this.addScore(140 * this.stats.multiplier);
     this.hooks.onWordComplete(pod.entry);
-    this.burst(pod.x, pod.y, 34, 48);
-    this.sfx.support();
+    this.fireBonusShot(this.supplyPodAim(pod), 48, 34, () => this.drawSupplyPod(pod));
     this.stageResultTracker.recordBonusCollected();
     this.supplyPod = null;
     this.emitStats();
@@ -5721,7 +5773,7 @@ export class Game {
     }
 
     target.typed += 1;
-    this.burst(target.x, target.y, 7, 292);
+    if (target.typed < word.length) this.fireBonusShot(this.recallBonusAim(target), 292, 7, null);
     this.sfx.shot(Math.max(1, this.stats.multiplier));
 
     if (target.typed >= word.length) {
@@ -5740,8 +5792,12 @@ export class Game {
         hue: 292,
         remaining: 1.8,
       };
-      this.burst(target.x, target.y, 54, 292);
-      this.sfx.support();
+      this.fireBonusShot(
+        this.recallBonusAim(target),
+        292,
+        54,
+        () => this.drawRecallBonus(target),
+      );
       this.stageResultTracker.recordBonusCollected();
       this.recallBonus = null;
       this.emitStats();
@@ -5770,7 +5826,7 @@ export class Game {
     this.addScore(12 * this.stats.multiplier);
     this.gainPower(1.5);
     this.applyCharacterCorrectKeyPassive();
-    this.burst(drone.x, drone.y, 8, 48);
+    if (drone.typed < word.length) this.fireBonusShot(this.treasureDroneAim(drone), 48, 8, null);
     this.sfx.shot(this.stats.multiplier);
 
     if (drone.typed >= word.length) {
@@ -5784,8 +5840,12 @@ export class Game {
       }
       this.addScore(320 * this.stats.multiplier);
       this.hooks.onWordComplete(drone.entry);
-      this.burst(drone.x, drone.y, 44, 48);
-      this.sfx.support();
+      this.fireBonusShot(
+        this.treasureDroneAim(drone),
+        48,
+        44,
+        () => this.drawTreasureDrone(drone),
+      );
       this.stageResultTracker.recordBonusCollected();
       this.treasureDrone = null;
     }
@@ -5816,15 +5876,19 @@ export class Game {
     this.addScore(10 * this.stats.multiplier);
     this.gainPower(1.3);
     this.applyCharacterCorrectKeyPassive();
-    this.burst(crate.x, crate.y, 7, 286);
+    if (crate.typed < word.length) this.fireBonusShot(this.rewardCrateAim(crate), 286, 7, null);
     this.sfx.shot(this.stats.multiplier);
 
     if (crate.typed >= word.length) {
       const options = createRewardChoiceOptions(this.effectiveLuck());
       this.addScore(220 * this.stats.multiplier);
       this.hooks.onWordComplete(crate.entry);
-      this.burst(crate.x, crate.y, 40, 286);
-      this.sfx.support();
+      this.fireBonusShot(
+        this.rewardCrateAim(crate),
+        286,
+        40,
+        () => this.drawRewardChoiceCrate(crate),
+      );
       this.stageResultTracker.recordBonusCollected();
       this.rewardChoiceCrate = null;
       if (options.length > 0) {
@@ -5855,14 +5919,18 @@ export class Game {
     this.addScore(12 * this.stats.multiplier);
     this.gainPower(1.4);
     this.applyCharacterCorrectKeyPassive();
-    this.burst(crate.x, crate.y, 8, 322);
+    if (crate.typed < word.length) this.fireBonusShot(this.anomalyCrateAim(crate), 322, 8, null);
     this.sfx.shot(this.stats.multiplier);
 
     if (crate.typed >= word.length) {
       this.addScore(260 * this.stats.multiplier);
       this.hooks.onWordComplete(crate.entry);
-      this.burst(crate.x, crate.y, 44, 322);
-      this.sfx.support();
+      this.fireBonusShot(
+        this.anomalyCrateAim(crate),
+        322,
+        44,
+        () => this.drawAnomalyCrate(crate),
+      );
       this.stageResultTracker.recordBonusCollected();
       this.anomalyCrate = null;
       this.anomalyResolutionPending = true;
@@ -7435,10 +7503,17 @@ export class Game {
     impact: ShotImpact,
     laserLife = 0.085,
   ): void {
+    // Turn toward the target first, so the shot leaves the hull as it will
+    // be drawn this frame.
+    this.shipMotion.fire(this.width / 2, this.height - PLAYER_Y_OFFSET, x, y, power);
+    this.shipAimImpact = impact;
+    const pose = this.shipDrawOptions(this.lastDrawTime);
+    characterShipPoint(pose, 0, 0, this.shipPoint);
     const fired = this.playerShots.fire({
       characterId: this.characterId,
-      originX: this.width / 2,
-      originY: this.height - PLAYER_Y_OFFSET,
+      originX: this.shipPoint.x,
+      originY: this.shipPoint.y,
+      originAngle: characterShipAngle(pose),
       targetX: x,
       targetY: y,
       power,
@@ -7448,18 +7523,20 @@ export class Game {
     if (fired) {
       if (impact.kind === "enemy-kill") this.dyingEnemies.push(impact.enemy);
       if (impact.kind === "intercept") this.interceptedProjectiles.push(impact.projectile);
+      if (impact.kind === "bonus-collect") this.bonusGhosts.push(impact.ghost);
       return;
     }
+    characterShipPoint(pose, 0, -SHIP_NOSE_OFFSET, this.shipPoint);
     this.lasers.push({
-      x1: this.width / 2,
-      y1: this.height - PLAYER_Y_OFFSET,
+      x1: this.shipPoint.x,
+      y1: this.shipPoint.y,
       x2: x,
       y2: y,
       life: laserLife,
       maxLife: laserLife,
       power,
     });
-    this.applyShotImpact(impact, x, y);
+    this.applyShotImpact(impact, x, y, false);
   }
 
   /** Follows a bolt's target while it flies; false keeps the last known point. */
@@ -7488,31 +7565,44 @@ export class Game {
         out.x = impact.projectile.x;
         out.y = impact.projectile.y;
         return true;
+      case "bonus-hit":
+      case "bonus-collect":
+        // A collected bonus stops updating, so it keeps its last position.
+        impact.aim(out);
+        return true;
     }
   };
 
-  private applyShotImpact(impact: ShotImpact, x: number, y: number): void {
+  /**
+   * `fromBolt`: a travelling bolt landed (stagger + impact sound); false for
+   * the legacy laser, which keeps its original feedback.
+   */
+  private applyShotImpact(impact: ShotImpact, x: number, y: number, fromBolt: boolean): void {
     const impactHue = playerProjectileProfile(this.characterId).impactHue;
     switch (impact.kind) {
       case "enemy-hit": {
         const enemy = this.enemies.find((item) => item.id === impact.enemyId);
         if (enemy !== undefined) {
           enemy.flash = 1;
-          enemy.kick = Math.max(enemy.kick, 1);
+          enemy.kick = Math.max(enemy.kick, fromBolt ? 1.6 : 1);
+          if (fromBolt) this.staggerEnemy(enemy, HIT_STUN_SECONDS);
         }
-        this.burst(x, y, impact.power > 1 ? 12 : 5, impactHue);
+        this.burst(x, y, impact.power > 1 ? 12 : fromBolt ? 8 : 5, impactHue);
+        if (fromBolt) this.sfx.boltImpact(impact.power);
         return;
       }
       case "enemy-layer": {
         const enemy = this.enemies.find((item) => item.id === impact.enemyId);
         if (enemy !== undefined) {
           enemy.flash = 1;
-          enemy.kick = Math.max(enemy.kick, 1.45);
+          enemy.kick = Math.max(enemy.kick, fromBolt ? 1.9 : 1.45);
+          if (fromBolt) this.staggerEnemy(enemy, LAYER_STUN_SECONDS);
         }
         this.triggerImpactFeedback("word");
         this.burst(x, y, 12, impactHue);
         this.burst(x, y, impact.fx.count, impact.fx.hue);
         this.sfx.hit(impact.fx.pitch);
+        if (fromBolt) this.sfx.boltImpact(1.25);
         return;
       }
       case "enemy-kill": {
@@ -7523,6 +7613,7 @@ export class Game {
         this.burst(x, y, impact.fx.count, impact.fx.hue);
         this.sfx.hit(impact.fx.pitch);
         this.sfx.kill(impact.fx.pitch);
+        if (fromBolt) this.sfx.boltImpact(1.45);
         if (this.settings.screenShake) {
           this.shake = Math.max(this.shake, impact.shake);
         }
@@ -7531,9 +7622,10 @@ export class Game {
       case "boss-hit": {
         if (this.boss !== null) {
           this.boss.flash = 1;
-          this.boss.kick = Math.max(this.boss.kick, 1);
+          this.boss.kick = Math.max(this.boss.kick, fromBolt ? 1.4 : 1);
         }
         this.burst(x, y, 7, impactHue);
+        if (fromBolt) this.sfx.boltImpact(0.9);
         return;
       }
       case "intercept": {
@@ -7551,13 +7643,147 @@ export class Game {
         if (this.settings.screenShake) this.shake = Math.max(this.shake, 1.15);
         return;
       }
+      case "bonus-hit": {
+        this.burst(x, y, impact.count, impact.hue);
+        if (fromBolt) this.sfx.boltImpact(0.8);
+        return;
+      }
+      case "bonus-collect": {
+        const ghost = this.bonusGhosts.indexOf(impact.ghost);
+        if (ghost >= 0) this.bonusGhosts.splice(ghost, 1);
+        this.burst(x, y, impact.count, impact.hue);
+        this.sfx.support();
+        if (fromBolt) this.sfx.boltImpact(1.3);
+        return;
+      }
     }
+  }
+
+  /**
+   * Bonus targets fire a real shot like enemies do (they used to show only a
+   * spark at the target). `collect` draws the collected bonus while the final
+   * bolt flies; its burst and pickup chime land with that bolt.
+   */
+  private fireBonusShot(
+    aim: BonusAim,
+    hue: number,
+    count: number,
+    collect: (() => void) | null,
+  ): void {
+    const point = { x: 0, y: 0 };
+    aim(point);
+    if (collect === null) {
+      this.firePlayerShot(point.x, point.y, 0.8, { kind: "bonus-hit", aim, hue, count });
+      return;
+    }
+    this.firePlayerShot(point.x, point.y, 1.45, {
+      kind: "bonus-collect",
+      aim,
+      hue,
+      count,
+      ghost: collect,
+    });
+  }
+
+  private supplyPodAim(pod: SupplyPod): BonusAim {
+    return (out) => {
+      out.x = pod.x;
+      out.y = pod.y + supplyPodBob(pod);
+    };
+  }
+
+  private treasureDroneAim(drone: TreasureDrone): BonusAim {
+    return (out) => {
+      out.x = drone.x;
+      out.y = drone.y + treasureDroneBob(drone);
+    };
+  }
+
+  private recallBonusAim(target: RecallBonusTarget): BonusAim {
+    return (out) => {
+      out.x = target.x;
+      out.y = target.y + recallBonusBob(target);
+    };
+  }
+
+  private rewardCrateAim(crate: RewardChoiceCrate): BonusAim {
+    return (out) => {
+      out.x = crate.x + rewardCrateSway(crate);
+      out.y = crate.y;
+    };
+  }
+
+  private anomalyCrateAim(crate: AnomalyCrate): BonusAim {
+    return (out) => {
+      out.x = crate.x + anomalyCrateSway(crate);
+      out.y = crate.y;
+    };
+  }
+
+  private staggerEnemy(enemy: Enemy, seconds: number): void {
+    enemy.hitStun = Math.max(enemy.hitStun ?? 0, seconds);
+    enemy.hitShake = HIT_SHAKE_SECONDS;
+  }
+
+  /** Sideways body shake after a bolt lands; the word label is drawn unshaken. */
+  private hitShakeOffset(enemy: Enemy): number {
+    const shake = enemy.hitShake ?? 0;
+    if (shake <= 0) return 0;
+    return Math.sin(enemy.age * 95) * 2.8 * (shake / HIT_SHAKE_SECONDS);
+  }
+
+  /** Player ship draw options: flight pose plus aim, recoil and throttle. */
+  private shipDrawOptions(time: number): CharacterDrawOptions {
+    const quality = qualityProfile(this.settings.visualQuality);
+    return {
+      x: this.width / 2,
+      y: this.height - PLAYER_Y_OFFSET,
+      time,
+      scale: 1,
+      glowScale: quality.glowScale,
+      detailScale: quality.particleScale,
+      aura: this.equipmentAura,
+      aim: this.shipMotion.aim,
+      recoil: this.shipMotion.recoil,
+      boost: this.shipMotion.boost,
+    };
+  }
+
+  private updateShipMotion(dt: number): void {
+    this.shipMotion.update(
+      dt,
+      this.width / 2,
+      this.height - PLAYER_Y_OFFSET,
+      this.trackShipTarget,
+    );
+    const rig = activeShipLightRig(this.characterId);
+    if (rig === null) {
+      this.shipExhaust.clear();
+      return;
+    }
+    const pose = this.shipDrawOptions(this.lastDrawTime + dt);
+    rig.nozzles.forEach(([x, y], index) => {
+      const point = (this.nozzlePoints[index] ??= { x: 0, y: 0 });
+      characterShipPoint(pose, x, y, point);
+    });
+    this.nozzlePoints.length = rig.nozzles.length;
+    this.shipExhaust.update(
+      dt,
+      this.nozzlePoints,
+      characterShipAngle(pose),
+      this.shipMotion.boost,
+      this.settings.visualQuality,
+    );
   }
 
   private clearPlayerShots(): void {
     this.playerShots.clear();
     this.dyingEnemies = [];
     this.interceptedProjectiles = [];
+    this.bonusGhosts = [];
+    this.shipMotion.reset();
+    this.shipExhaust.clear();
+    this.shipAimImpact = null;
   }
 
   private triggerImpactFeedback(kind: ImpactKind): void {
@@ -7640,6 +7866,7 @@ export class Game {
   }
 
   private draw(time: number): void {
+    this.lastDrawTime = time;
     const context = this.context;
     const shake =
       this.shake > 0 && this.settings.screenShake
@@ -7696,6 +7923,7 @@ export class Game {
     if (this.anomalyCrate !== null) {
       this.drawAnomalyCrate(this.anomalyCrate);
     }
+    for (const drawGhost of this.bonusGhosts) drawGhost();
 
     for (const enemy of this.enemies) {
       this.drawEnemy(enemy);
@@ -7712,6 +7940,8 @@ export class Game {
     }
 
     this.playerShots.drawImpacts(context, this.settings.visualQuality);
+    const rig = activeShipLightRig(this.characterId);
+    if (rig !== null) this.shipExhaust.draw(context, rig);
     this.drawPlayer(time);
     this.playerShots.drawMuzzleFlashes(context);
     this.drawDefensiveEffects(time);
@@ -8362,7 +8592,7 @@ export class Game {
 
   private drawSupplyPod(pod: SupplyPod): void {
     const context = this.context;
-    const y = pod.y + Math.sin(pod.age * 3.2) * 7;
+    const y = pod.y + supplyPodBob(pod);
     const displayWord = normalizeWord(pod.entry.en);
     const split = splitDisplayByTypedLetters(displayWord, pod.typed);
 
@@ -8414,7 +8644,7 @@ export class Game {
 
   private drawTreasureDrone(drone: TreasureDrone): void {
     const context = this.context;
-    const y = drone.y + Math.sin(drone.age * 4) * 9;
+    const y = drone.y + treasureDroneBob(drone);
     const displayWord = normalizeWord(drone.entry.en);
     const split = splitDisplayByTypedLetters(displayWord, drone.typed);
 
@@ -8553,7 +8783,7 @@ export class Game {
 
   private drawRecallBonus(target: RecallBonusTarget): void {
     const context = this.context;
-    const bob = Math.sin(target.age * 3.8) * 7;
+    const bob = recallBonusBob(target);
     const x = target.x;
     const y = target.y + bob;
     const pulse = 0.92 + Math.sin(target.age * 5.2) * 0.08;
@@ -8647,7 +8877,7 @@ export class Game {
 
   private drawRewardChoiceCrate(crate: RewardChoiceCrate): void {
     const context = this.context;
-    const x = crate.x + Math.sin(crate.age * 2.6) * 16;
+    const x = crate.x + rewardCrateSway(crate);
     const displayWord = normalizeWord(crate.entry.en);
     const split = splitDisplayByTypedLetters(displayWord, crate.typed);
 
@@ -8701,7 +8931,7 @@ export class Game {
 
   private drawAnomalyCrate(crate: AnomalyCrate): void {
     const context = this.context;
-    const x = crate.x + Math.sin(crate.age * 3.1) * 18;
+    const x = crate.x + anomalyCrateSway(crate);
     const displayWord = normalizeWord(crate.entry.en);
     const split = splitDisplayByTypedLetters(displayWord, crate.typed);
 
@@ -8927,7 +9157,7 @@ export class Game {
     }
 
     context.save();
-    context.translate(enemy.x, enemy.y - kick);
+    context.translate(enemy.x + this.hitShakeOffset(enemy), enemy.y - kick);
     if (enemy.kind === "cloaker" && !targeted) {
       context.globalAlpha = 0.42;
     }
@@ -9772,19 +10002,7 @@ export class Game {
   }
 
   private drawPlayer(time: number): void {
-    drawCharacterShip(
-      this.context,
-      this.characterId,
-      {
-        x: this.width / 2,
-        y: this.height - PLAYER_Y_OFFSET,
-        time,
-        scale: 1,
-        glowScale: qualityProfile(this.settings.visualQuality).glowScale,
-        detailScale: qualityProfile(this.settings.visualQuality).particleScale,
-        aura: this.equipmentAura,
-      },
-    );
+    drawCharacterShip(this.context, this.characterId, this.shipDrawOptions(time));
   }
 
   private drawDefensiveEffects(time: number): void {
@@ -9890,11 +10108,13 @@ export class Game {
     if (target === null) return;
 
     const context = this.context;
+    // From the nose, which faces the target while the word is typed.
+    characterShipPoint(this.shipDrawOptions(this.lastDrawTime), 0, -SHIP_NOSE_OFFSET, this.shipPoint);
     context.save();
     context.strokeStyle = "rgba(91, 236, 255, 0.18)";
     context.setLineDash([4, 8]);
     context.beginPath();
-    context.moveTo(this.width / 2, this.height - PLAYER_Y_OFFSET);
+    context.moveTo(this.shipPoint.x, this.shipPoint.y);
     context.lineTo(target.x, target.y);
     context.stroke();
     context.restore();

@@ -93,7 +93,8 @@ describe("M08 World music profiles", () => {
   });
 
   it("resolves local overrides before repository defaults and loops only sustained states", () => {
-    const profile = musicProfileForWorld("world-01");
+    // World 02+ still use the shared tracks (World 01 has its own theme).
+    const profile = musicProfileForWorld("world-02");
     const base = musicAssetForState(profile, "WORLD_NORMAL");
     const candidates = assetCandidates(base);
 
@@ -120,5 +121,29 @@ describe("M08 World music profiles", () => {
     expect(stateLoops("VICTORY")).toBe(false);
     expect(stateLoops("TRANSITION")).toBe(false);
     expect(musicAssetForState(profile, "SILENT")).toBeNull();
+  });
+
+  it("gives World 01 its own theme: calm and intense stems of one song", () => {
+    const profile = musicProfileForWorld("world-01");
+    const calm = musicAssetForState(profile, "WORLD_NORMAL")!;
+    const intense = musicAssetForState(profile, "WORLD_INTENSE")!;
+
+    expect(assetCandidates(calm)).toEqual([
+      "/local-assets/music/world-01.ogg",
+      "/assets/audio/music/world-01/calm.ogg",
+    ]);
+    expect(assetCandidates(intense)).toEqual([
+      "/local-assets/music/world-01-intense.ogg",
+      "/assets/audio/music/world-01/intense.ogg",
+    ]);
+    // Same sync group: the game switches between them at the same position.
+    expect(calm.syncGroup).toBe("world-01-theme");
+    expect(intense.syncGroup).toBe(calm.syncGroup);
+    expect(calm.id).not.toBe(intense.id);
+    expect(profile.preloadHints).toContain(intense);
+
+    // Bosses and other special states keep their own tracks.
+    expect(musicAssetForState(profile, "WORLD_BOSS")?.syncGroup).toBeUndefined();
+    expect(musicAssetForState(musicProfileForWorld("world-02"), "WORLD_NORMAL")?.syncGroup).toBeUndefined();
   });
 });

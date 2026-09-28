@@ -3,6 +3,17 @@
 Space Typing ships a small curated set of redistributable **CC0** audio assets as default fallbacks. Local/private overrides remain supported and take priority where configured.
 
 
+## Music — World 01 theme "Signal in the Void" (original, generated)
+
+- `music/world-01/calm.ogg` — World 01 normal play (WORLD_NORMAL)
+- `music/world-01/intense.ogg` — World 01 pressure phases (WORLD_INTENSE)
+
+Original music made for Space Typing by `scripts/music/world-01-theme.mjs`
+with the repository's own synthesizer (`scripts/music/synth.mjs`): no
+samples, loops or third-party audio are used, so there is nothing to
+attribute. Re-render with `pnpm music:world-01`. Details:
+`docs/MUSIC_WORLD_01.md`.
+
 ## Music — Curated modern gameplay replacements
 
 Normal and standard-pressure World gameplay now prefer the following CC0
