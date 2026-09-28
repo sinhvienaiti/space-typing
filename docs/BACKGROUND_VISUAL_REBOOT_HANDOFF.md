@@ -222,6 +222,18 @@ Tham số của gallery:
 
 Khi chơi qua Portal, khu vực chơi rộng khoảng **1642×760 CSS px, tỉ lệ khoảng 2,2:1**, DPR 2. Ảnh nền 16:9 vì vậy **mất khoảng 22% chiều cao**. Luôn chụp kiểm tra ở kích thước này, ví dụ khung nhìn 1642×799 với DPR 2.
 
+### 3.4 Kiểm tra bằng mắt tự động (Codex và Claude)
+
+AI tự chụp màn hình rồi tự xem ảnh bằng `pnpm visual:shot`. Công cụ này dùng Chrome chạy ngầm qua Chrome DevTools Protocol, chụp đúng cỡ 1642×799 DPR 2. Hướng dẫn đầy đủ: [VISUAL_TESTING.md](VISUAL_TESTING.md). Ba lệnh hay dùng nhất (máy chủ dev tạm ở cổng 3098):
+
+```bash
+pnpm -s visual:shot "http://127.0.0.1:3098/bg-gallery.html?grid=1&q=high&panel=0" .visual/worlds.png --wait=4000 --eval-file=scripts/visual/evals/bg-state.js
+pnpm -s visual:shot "http://127.0.0.1:3098/" .visual/game.png --click=#startButton --wait=20000 --eval-file=scripts/visual/evals/game-assets.js
+pnpm -s visual:crop .visual/game.png .visual/zoom.jpg --rect=1300,900,900,700
+```
+
+Sau đó mở file PNG hoặc JPG để xem. Codex dùng công cụ xem ảnh cục bộ (ví dụ `view_image`) nếu có; nếu không thì nhờ chủ dự án kéo ảnh vào khung chat.
+
 ---
 
 ## 4. Kiến trúc kỹ thuật
@@ -632,6 +644,7 @@ Dạng mỗi dòng: **Triệu chứng** → nguyên nhân → cách xử lý (fi
 - **P2-2. Texture của World trước không được giải phóng** khi sang World khác cùng kit. `dropKitTextures` chỉ chạy khi đổi kit. Tệ nhất là giữ đủ 5 hero, khoảng 25 MB ở High. Có thể xoá texture không thuộc `compositionTextures` của World mới, sau khi director mới đã chạy.
 - **P2-3. Đo lại hiệu năng bằng kit thật**, trên trình duyệt thật và Test Lab (plan §7.3). Các số ở 4.7 đo bằng bộ ảnh thử.
 - **P2-4.** So `layered` với `blit` trên cùng cảnh laser, quầng sáng, nổ, khiên, nova (plan §4.2). Nếu không cần thì bỏ `layered`.
+- **P2-5. Hệ nền cũ vẫn tải ảnh khi nền mới đang bật.** Ghi nhận ngày 28/9 bằng `game-assets.js` ở World 01: game vẫn tải `backgrounds/vendor/*`, `backgrounds/eternity/rings.svg`… Chỉ nên tải ảnh của hệ cũ cho World chưa có bố cục BGV, hoặc khi dùng `?bg=legacy`. Làm vậy sẽ tiết kiệm băng thông và bộ nhớ.
 
 ### P3 — Mở rộng
 - **P3-1. Galaxy 02–10** theo plan §6 và §9 (giai đoạn E): mỗi Galaxy một bộ prompt, một kit, một file bố cục. Tên kit gợi ý có trong plan (`infernal`, `frost-prism`, `verdant`, …).
@@ -661,7 +674,7 @@ Dạng mỗi dòng: **Triệu chứng** → nguyên nhân → cách xử lý (fi
 - [ ] `pnpm test` đạt (ghi số test).
 - [ ] `pnpm build` đạt (gồm `check-background-art.mjs`).
 - [ ] Nếu ảnh đổi: đã chạy `pnpm bg:prepare …` và `pnpm build:space`.
-- [ ] Đã chụp ở 1642×799, DPR 2, qua Portal hoặc `https://space.typing-game.local/`, sau khoảng 25 giây trong trận (để có tàu hoặc cá voi bay ngang).
+- [ ] Đã chụp ở 1642×799, DPR 2 bằng `pnpm visual:shot` (mục 3.4), qua `https://space.typing-game.local/` hoặc máy chủ dev, sau khoảng 25 giây trong trận (để có tàu hoặc cá voi bay ngang), và đã tự xem ảnh.
 - [ ] Đã xem gallery 5 World (`grid=1`) và bật chữ mẫu (`labels=1`) để kiểm tra độ dễ đọc.
 - [ ] Vật thể đặc, không có viền xanh/tím. Đo độ đặc từng khung nếu có nghi ngờ (Phụ lục A).
 - [ ] Nếu đụng tới shader hoặc số lượng vật thể: đã đo GPU ở High (mục tiêu ≤ khoảng 3,5 ms trên UHD 630).
@@ -686,13 +699,14 @@ const p = d.passes.find((q) => q.spec.id === "derelict");
 d.startPass(p); p.start = d.clock - p.duration * 0.5;   // đặt xác tàu vào giữa đường bay
 ```
 
-**Chụp màn hình không cần mở trình duyệt:**
-- Chạy Chrome `--headless=new --remote-debugging-port=<cổng>`.
-- Qua CDP: `Emulation.setDeviceMetricsOverride({ width: 1642, height: 799, deviceScaleFactor: 2 })`, rồi `Page.navigate`.
-- Bấm `#startButton` để vào trận, chờ, rồi `Page.captureScreenshot`.
-- Script Claude đã dùng nằm ngoài repo; viết lại theo mô tả này là đủ.
+**Chụp màn hình không cần mở trình duyệt:** dùng `pnpm visual:shot` (`scripts/visual/shot.mjs`), xem [VISUAL_TESTING.md](VISUAL_TESTING.md).
+- Đặt khung nhìn 1642×799 DPR 2 qua CDP, bấm `--click=#startButton` để vào trận, chạy `--eval-file`, rồi chụp.
+- Đoạn đo có sẵn ở `scripts/visual/evals/`.
 
-**Đo GPU:** dùng `EXT_disjoint_timer_query_webgl2` bọc quanh `renderer.draw()`. Khởi động khoảng 60 khung, rồi lấy trung vị của 3 lần × 60 khung. Không dùng `gl.finish()`.
+**Đo GPU:** dùng `scripts/visual/evals/bg-gpu-stress.js`, vẽ nền 1, 3, 6, 10 lần mỗi khung rồi đọc số khung/giây.
+- Chạy 2–3 lần, chỉ so sánh các số đo trong cùng một đợt (máy nóng làm số tụt).
+- `EXT_disjoint_timer_query_webgl2` qua ANGLE/Metal cho số không tin được, xem 4.7.
+- Không dùng `gl.finish()`.
 
 **Đo độ đặc của từng khung atlas** (dùng sharp):
 - Đọc `kit.json` và bản WebP lớn nhất.

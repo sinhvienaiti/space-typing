@@ -9,7 +9,9 @@
     "test": "vitest run",
     "check": "pnpm test && pnpm build",
     "bg:prepare": "node scripts/bg-art/prepare-kit.mjs",
-    "fx:prepare": "node scripts/bg-art/prepare-fx.mjs"
+    "fx:prepare": "node scripts/bg-art/prepare-fx.mjs",
+    "visual:shot": "node scripts/visual/shot.mjs",
+    "visual:crop": "node scripts/visual/crop.mjs"
   },
   "devDependencies": {
     "sharp": "^0.34.5",

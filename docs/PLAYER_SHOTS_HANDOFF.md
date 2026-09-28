@@ -31,6 +31,7 @@
 4. **Hình ảnh đẹp đến từ ảnh vẽ tay do chủ dự án tạo bằng Gemini.** Code lo chuyển động, đuôi, bụi sáng, thời điểm và cách hoà màu. Thiếu ảnh thì tự vẽ bằng code (dự phòng).
 5. **Chưa commit.** Xem mục 9 và lệnh commit ở tin nhắn của Claude.
 6. **Bài học khi ghép code:** lần trước chỉ `Game.ts` được commit, còn các file mới (`src/vfx/player-shots.ts`...) thì không. `Game.ts` import file không có trong Git nên build hỏng, và AI kia đã gỡ luôn phần đạn. **Luôn commit file mới cùng với file dùng nó**, và sau khi ghép, chạy `git status` xem có file nào đang được import mà chưa được theo dõi không.
+7. **Tự nhìn trước khi báo.** `pnpm visual:shot` chụp màn hình game bằng Chrome chạy ngầm, rồi AI mở ảnh ra xem. Hướng dẫn: [VISUAL_TESTING.md](VISUAL_TESTING.md). Mọi ảnh chụp trong tài liệu này đều làm theo cách đó.
 
 ---
 
@@ -276,7 +277,16 @@ Khi build, `check-background-art.mjs` kiểm tra:
    - sửa test "gives only Vanguard a travelling bolt" thành danh sách tàu đã có công thức;
    - thêm test cho trường mới;
    - `pnpm test`.
-8. **Trang xem thử:** thêm tham số `?ship=<id>`, hiện đang cố định Vanguard trong `shot-gallery.ts` (việc 9-4). Chụp ở 1642×799 DPR 2, cả tốc độ thường và `t=0.1`, phóng to kiểm tra cạnh cứng và màu nền lem.
+8. **Trang xem thử:** thêm tham số `?ship=<id>`, hiện đang cố định Vanguard trong `shot-gallery.ts` (việc 9-4). Chụp ở 1642×799 DPR 2, cả tốc độ thường và `t=0.1`, rồi phóng to kiểm tra cạnh cứng và màu nền lem. Máy chủ dev tạm ở cổng 3098, xem [VISUAL_TESTING.md](VISUAL_TESTING.md):
+
+   ```bash
+   pnpm -s visual:shot "http://127.0.0.1:3098/shot-gallery.html?panel=0&cps=10" .visual/shots.png --wait=6000 --eval-file=scripts/visual/evals/shot-state.js
+   pnpm -s visual:shot "http://127.0.0.1:3098/shot-gallery.html?panel=0&t=0.1" .visual/shots-slow.png --wait=8000
+   pnpm -s visual:crop .visual/shots-slow.png .visual/bolt-zoom.jpg --rect=1300,900,900,700
+   pnpm -s visual:shot "http://127.0.0.1:3098/" .visual/game.png --click=#startButton --wait=20000 --eval-file=scripts/visual/evals/game-assets.js
+   ```
+
+   `shot-state.js` cho biết ảnh đạn nào đã nạp. `game-assets.js` cho biết game thật đã tải `fx/<ship>/fx.json` chưa.
 9. `pnpm build` (có bước kiểm ảnh đạn), `pnpm build:space`, rồi báo chủ dự án tải lại trang và chơi bằng tàu đó.
 
 ---
@@ -349,7 +359,7 @@ Phần đặc (thân tên lửa, lõi vật chất tối): xin ảnh **trên n�
 - [ ] `pnpm test` đạt.
 - [ ] `pnpm build` đạt, và dòng `Shot FX: … kit(s)` hiện ra.
 - [ ] Ảnh mới: đã chạy `pnpm fx:prepare <ship>`, đã xem `public/assets/space-typing/fx/<ship>/` (nền đen, không lộ khung).
-- [ ] Trang xem thử ở 1642×799 DPR 2: tốc độ thường và `t=0.1`; phóng to kiểm tra đầu đạn rõ chi tiết, đuôi không có cạnh cứng.
+- [ ] Đã chụp bằng `pnpm visual:shot` ở 1642×799 DPR 2 (tốc độ thường và `t=0.1`) **và đã tự mở ảnh xem**; đã phóng to (`visual:crop`) kiểm tra đầu đạn rõ chi tiết, đuôi không có cạnh cứng.
 - [ ] Chơi thật bằng tàu đó: vụ nổ trùng lúc đạn chạm, kẻ địch bị hạ không biến mất trước khi nổ, nhãn chữ không bị đạn che.
 - [ ] Tàu chưa làm vẫn bắn tia laser như cũ.
 - [ ] `pnpm build:space`, rồi báo chủ dự án (tiếng Việt) chỉ cần tải lại trang, kèm ảnh chụp.
@@ -365,6 +375,7 @@ Phần đặc (thân tên lửa, lõi vật chất tối): xin ảnh **trên n�
 | Xem thử (dev) | `cd /Users/jokerit/htdocs/typing-game && pnpm dev:space`, mở `http://127.0.0.1:3004/shot-gallery.html` |
 | Chơi thật | `pnpm build:space && ./play.sh` (thư mục gốc), rồi tải lại trang |
 | Test | `cd games/space-typing && pnpm test` |
+| Chụp và soi ảnh tự động | `pnpm -s visual:shot <url> .visual/<tên>.png [...]`, `pnpm -s visual:crop <png> <jpg> --rect=x,y,w,h`. Xem [VISUAL_TESTING.md](VISUAL_TESTING.md) |
 
 Tham số của trang xem thử:
 - `q=low|medium|high|ultra`: bậc chất lượng.
