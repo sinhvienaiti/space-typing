@@ -21,16 +21,18 @@ import {
  * to the game (enemy flash, bursts, sounds) through the shot payload, so the
  * hit reaction lands exactly when the bolt does.
  *
- * Pilot: only Vanguard ("spear") has a bolt so far; the other ships keep the
- * instant laser tracer until their own designs are approved.
+ * Every player ship has its own recipe. Vanguard remains the visual baseline;
+ * later recipes add motion identity without changing Vanguard's tuned look.
  */
+
+export type ShotTrailMode = "ribbon" | "zigzag" | "helix" | "smoke";
 
 export type ShotRecipe = {
   /** Travel speed in CSS px per second; flight time is clamped. */
   speed: number;
   /** Curve bulge as a share of the distance, away from the muzzle side. */
   bend: number;
-  /** Trail length as a share of the path, capped by `trailMaxPx`. */
+  /** Trail length as a share of the path, capped by trailMaxPx. */
   trailShare: number;
   trailMaxPx: number;
   /** Head radius and trail half-width at the muzzle, CSS px. */
@@ -43,40 +45,92 @@ export type ShotRecipe = {
   muzzles: readonly (readonly [number, number])[];
   /** Muzzle of the word-finishing shot (power >= FINISHER_POWER). */
   finisherMuzzle: readonly [number, number];
-  /**
-   * Painted sprites folder in public/assets/space-typing/fx/ (null = code
-   * drawn only). Sizes below are CSS px at the muzzle, before the depth cue.
-   */
+  /** Painted sprites folder in public/assets/space-typing/fx/. */
   fx: string | null;
   boltLength: number;
   finisherLength: number;
   impactSize: number;
   muzzleLength: number;
+  /** Code-drawn wake layered behind the painted head. */
+  trailMode: ShotTrailMode;
+  /** Continuous in-plane sprite rotation, radians per second. */
+  spin: number;
+  /** Oscillating in-plane roll amplitude, radians. */
+  tumble: number;
+  /** >1 accelerates through the flight; 1 keeps linear Vanguard timing. */
+  flightEase: number;
 };
 
-const RECIPES: Readonly<Partial<Record<PlayerShotArchetype, ShotRecipe>>> = {
-  // Vanguard: plasma lances from the two wing pods that converge on the
-  // target; the finishing shot is a heavier lance from the central nose.
+const RECIPES: Readonly<Record<PlayerShotArchetype, ShotRecipe>> = {
   spear: {
-    speed: 3300,
-    bend: 0.07,
-    trailShare: 0.55,
-    trailMaxPx: 240,
-    width: 8,
-    stretch: 5,
-    sparkleRate: 90,
-    muzzles: [[-21, -12], [21, -12]],
-    finisherMuzzle: [0, -36],
-    fx: "vanguard",
-    // Owner feedback (28/9): bolts read too small; sizes raised ~40%.
-    boltLength: 128,
-    finisherLength: 190,
-    impactSize: 118,
-    muzzleLength: 60,
+    speed: 3300, bend: 0.07, trailShare: 0.55, trailMaxPx: 240, width: 8, stretch: 5,
+    sparkleRate: 90, muzzles: [[-21, -12], [21, -12]], finisherMuzzle: [0, -36],
+    fx: "vanguard", boltLength: 128, finisherLength: 190, impactSize: 118, muzzleLength: 60,
+    trailMode: "ribbon", spin: 0, tumble: 0, flightEase: 1,
+  },
+  heavy: {
+    speed: 2500, bend: 0.035, trailShare: 0.4, trailMaxPx: 190, width: 11, stretch: 3.2,
+    sparkleRate: 52, muzzles: [[-22, -24], [22, -24]], finisherMuzzle: [0, -31],
+    fx: "aegis", boltLength: 126, finisherLength: 178, impactSize: 136, muzzleLength: 68,
+    trailMode: "ribbon", spin: 0, tumble: 0, flightEase: 1,
+  },
+  electric: {
+    speed: 3550, bend: 0.11, trailShare: 0.5, trailMaxPx: 230, width: 7.2, stretch: 4,
+    sparkleRate: 118, muzzles: [[-18, -12], [18, -12]], finisherMuzzle: [0, -35],
+    fx: "volt", boltLength: 120, finisherLength: 174, impactSize: 132, muzzleLength: 60,
+    trailMode: "zigzag", spin: 0, tumble: 0, flightEase: 1,
+  },
+  shadow: {
+    speed: 3650, bend: 0.16, trailShare: 0.58, trailMaxPx: 250, width: 6.5, stretch: 5.5,
+    sparkleRate: 76, muzzles: [[-20, -16], [20, -16]], finisherMuzzle: [0, -38],
+    fx: "wraith", boltLength: 126, finisherLength: 182, impactSize: 128, muzzleLength: 56,
+    trailMode: "smoke", spin: 0.5, tumble: 0.08, flightEase: 1,
+  },
+  star: {
+    speed: 3100, bend: 0.09, trailShare: 0.46, trailMaxPx: 220, width: 8, stretch: 3.8,
+    sparkleRate: 122, muzzles: [[-24, -16], [24, -16]], finisherMuzzle: [0, -35],
+    fx: "fortune", boltLength: 118, finisherLength: 172, impactSize: 138, muzzleLength: 62,
+    trailMode: "ribbon", spin: 8.5, tumble: 0.12, flightEase: 1,
+  },
+  barrage: {
+    speed: 2850, bend: 0.13, trailShare: 0.38, trailMaxPx: 185, width: 9, stretch: 4,
+    sparkleRate: 58, muzzles: [[-28, -8], [-14, -22], [14, -22], [28, -8]], finisherMuzzle: [0, -34],
+    fx: "arsenal", boltLength: 122, finisherLength: 184, impactSize: 146, muzzleLength: 66,
+    trailMode: "smoke", spin: 0, tumble: 0, flightEase: 1.28,
+  },
+  mystic: {
+    speed: 3000, bend: 0.1, trailShare: 0.54, trailMaxPx: 240, width: 8.5, stretch: 4.5,
+    sparkleRate: 98, muzzles: [[-18, -14], [18, -14]], finisherMuzzle: [0, -35],
+    fx: "oracle", boltLength: 128, finisherLength: 184, impactSize: 142, muzzleLength: 64,
+    trailMode: "helix", spin: 1.2, tumble: 0, flightEase: 1,
+  },
+  guard: {
+    speed: 2700, bend: 0.05, trailShare: 0.42, trailMaxPx: 205, width: 10, stretch: 3.4,
+    sparkleRate: 68, muzzles: [[-20, -14], [20, -14]], finisherMuzzle: [0, -31],
+    fx: "bastion", boltLength: 130, finisherLength: 180, impactSize: 140, muzzleLength: 64,
+    trailMode: "ribbon", spin: 0, tumble: 0.42, flightEase: 1,
+  },
+  slash: {
+    speed: 3900, bend: 0.18, trailShare: 0.5, trailMaxPx: 240, width: 7.5, stretch: 4.2,
+    sparkleRate: 92, muzzles: [[-30, -14], [30, -14]], finisherMuzzle: [0, -36],
+    fx: "reaper", boltLength: 124, finisherLength: 178, impactSize: 138, muzzleLength: 58,
+    trailMode: "smoke", spin: 13, tumble: 0.06, flightEase: 1,
+  },
+  radiant: {
+    speed: 3450, bend: 0.055, trailShare: 0.62, trailMaxPx: 270, width: 8.5, stretch: 5.8,
+    sparkleRate: 128, muzzles: [[-19, -15], [19, -15]], finisherMuzzle: [0, -39],
+    fx: "celestial", boltLength: 140, finisherLength: 204, impactSize: 150, muzzleLength: 68,
+    trailMode: "ribbon", spin: 0, tumble: 0, flightEase: 1,
+  },
+  cosmic: {
+    speed: 3250, bend: 0.08, trailShare: 0.64, trailMaxPx: 280, width: 10, stretch: 5,
+    sparkleRate: 142, muzzles: [[-22, -12], [22, -12]], finisherMuzzle: [0, -40],
+    fx: "zenith", boltLength: 148, finisherLength: 218, impactSize: 160, muzzleLength: 72,
+    trailMode: "helix", spin: 0.8, tumble: 0, flightEase: 1,
   },
 };
 
-/** Ships without a recipe keep the legacy laser tracer. */
+/** Unknown/future ships without a recipe can still fall back to the legacy tracer. */
 export function shotRecipeFor(characterId: CharacterId): Readonly<ShotRecipe> | null {
   return RECIPES[playerProjectileProfile(characterId).archetype] ?? null;
 }
@@ -316,6 +370,11 @@ const SPARK_STREAK = 2;
 
 const SCRATCH: ShotAimPoint = { x: 0, y: 0 };
 const SCRATCH_B: ShotAimPoint = { x: 0, y: 0 };
+
+function shotProgress(shot: Shot<unknown>, raw: number): number {
+  const t = raw <= 0 ? 0 : raw >= 1 ? 1 : raw;
+  return shot.recipe.flightEase === 1 ? t : Math.pow(t, shot.recipe.flightEase);
+}
 
 /** Point on the quadratic curve muzzle → target at parameter t. */
 function curvePoint(shot: Shot<unknown>, t: number, out: ShotAimPoint): void {
@@ -615,9 +674,10 @@ export class PlayerShotSystem<P> {
 
   /** Head position into `out`; returns the flight direction in radians. */
   private headPoint(shot: Shot<P>, out: ShotAimPoint): number {
-    const t = Math.min(1, shot.age / shot.duration);
+    const raw = Math.min(1, shot.age / shot.duration);
+    const t = shotProgress(shot, raw);
     curvePoint(shot, t, out);
-    curvePoint(shot, Math.max(0, t - 0.03), SCRATCH_B);
+    curvePoint(shot, shotProgress(shot, Math.max(0, raw - 0.03)), SCRATCH_B);
     const dx = out.x - SCRATCH_B.x;
     const dy = out.y - SCRATCH_B.y;
     return dx === 0 && dy === 0
@@ -763,8 +823,8 @@ export class PlayerShotSystem<P> {
 
   private drawShot(context: CanvasRenderingContext2D, shot: Shot<P>, tuning: QualityTuning): void {
     const s = shot.age / shot.duration;
-    const head = Math.min(1, s);
-    const tail = Math.min(1, Math.max(0, s - shot.trailS));
+    const head = shotProgress(shot, Math.min(1, s));
+    const tail = shotProgress(shot, Math.min(1, Math.max(0, s - shot.trailS)));
     let trailHead = head;
     // A painted lance carries its own glowing body: the code-drawn trail
     // becomes a slim wake that starts behind it (overlapping its tail flare)
@@ -791,20 +851,59 @@ export class PlayerShotSystem<P> {
     head: number,
     samples: number,
     widthScale: number,
+    phaseOffset = 0,
   ): void {
     const points = this.points;
     for (let index = 0; index < samples; index += 1) {
       const u = index / (samples - 1);
-      curvePoint(shot, tail + (head - tail) * u, SCRATCH);
+      const pathT = tail + (head - tail) * u;
+      curvePoint(shot, pathT, SCRATCH);
+      let x = SCRATCH.x;
+      let y = SCRATCH.y;
+
+      if (shot.recipe.trailMode !== "ribbon") {
+        const tangentT =
+          pathT < 0.99 ? Math.min(1, pathT + 0.01) : Math.max(0, pathT - 0.01);
+        curvePoint(shot, tangentT, SCRATCH_B);
+        let dx = SCRATCH_B.x - SCRATCH.x;
+        let dy = SCRATCH_B.y - SCRATCH.y;
+        if (tangentT < pathT) {
+          dx = -dx;
+          dy = -dy;
+        }
+        const length = Math.hypot(dx, dy) || 1;
+        const nx = -dy / length;
+        const ny = dx / length;
+        const phase = shot.seed * 0.173 + shot.age * 18 + phaseOffset;
+        let wave = 0;
+        if (shot.recipe.trailMode === "zigzag") {
+          const cycle = (u * 4.5 + phase / (Math.PI * 2)) % 1;
+          wave = 1 - 4 * Math.abs(cycle - 0.5);
+        } else if (shot.recipe.trailMode === "helix") {
+          wave = Math.sin(u * Math.PI * 5 + phase);
+        } else {
+          wave =
+            Math.sin(u * 7 + phase * 0.45) * 0.72 +
+            Math.sin(u * 15 - phase * 0.2) * 0.28;
+        }
+        const amplitude =
+          shot.recipe.width *
+          widthScale *
+          (shot.recipe.trailMode === "smoke" ? 0.9 : 1.25) *
+          (0.22 + 0.78 * u);
+        x += nx * wave * amplitude;
+        y += ny * wave * amplitude;
+      }
+
       const o = index * 5;
-      points[o] = SCRATCH.x;
-      points[o + 1] = SCRATCH.y;
-      // Comet taper: fine at the tail, a full body toward the head.
+      points[o] = x;
+      points[o + 1] = y;
       points[o + 2] =
         shot.recipe.width *
         widthScale *
         Math.min(1.35, shot.power) *
-        shotDepthScale(shot.y0, SCRATCH.y, shot.viewHeight) *
+        shotDepthScale(shot.y0, y, shot.viewHeight) *
+        (shot.recipe.trailMode === "smoke" ? 1.22 : 1) *
         (0.1 + 0.9 * Math.pow(u, 1.3));
     }
     for (let index = 0; index < samples; index += 1) {
@@ -863,6 +962,37 @@ export class PlayerShotSystem<P> {
     widthScale: number,
   ): void {
     const samples = tuning.samples;
+    const { primary, secondary } = shot.palette;
+
+    if (shot.recipe.trailMode === "helix") {
+      for (const [phase, color, scale] of [
+        [0, primary, 0.72],
+        [Math.PI, secondary, 0.56],
+      ] as const) {
+        this.sampleTrail(shot, tail, head, samples, widthScale, phase);
+        const points = this.points;
+        const last = (samples - 1) * 5;
+        const gradient = context.createLinearGradient(
+          points[0]!, points[1]!, points[last]!, points[last + 1]!,
+        );
+        gradient.addColorStop(0, rgba(color, 0));
+        gradient.addColorStop(0.45, rgba(color, 0.42));
+        gradient.addColorStop(1, rgba(color, 0.9));
+        this.fillRibbon(context, samples, scale, gradient);
+      }
+      this.sampleTrail(shot, tail, head, samples, widthScale * 0.72, Math.PI * 0.5);
+      const points = this.points;
+      const last = (samples - 1) * 5;
+      const core = context.createLinearGradient(
+        points[0]!, points[1]!, points[last]!, points[last + 1]!,
+      );
+      core.addColorStop(0, rgba(WHITE, 0));
+      core.addColorStop(0.7, rgba(secondary, 0.55));
+      core.addColorStop(1, rgba(WHITE, 0.95));
+      this.fillRibbon(context, samples, 0.24, core);
+      return;
+    }
+
     this.sampleTrail(shot, tail, head, samples, widthScale);
     const points = this.points;
     const last = (samples - 1) * 5;
@@ -870,16 +1000,11 @@ export class PlayerShotSystem<P> {
     const ty = points[1]!;
     const hx = points[last]!;
     const hy = points[last + 1]!;
-    const { primary, secondary } = shot.palette;
 
-    // Layers read as a lit volume, not a flat line: nested halos whose
-    // brightness steps down toward the edge (one flat halo showed a hard
-    // blade edge), a saturated body and a white-hot core, all fading toward
-    // the tail.
     if (tuning.outer) {
       for (const [scale, alpha] of [
-        [2.9, 0.13],
-        [1.95, 0.2],
+        [2.9, shot.recipe.trailMode === "smoke" ? 0.09 : 0.13],
+        [1.95, shot.recipe.trailMode === "smoke" ? 0.14 : 0.2],
       ] as const) {
         const halo = context.createLinearGradient(tx, ty, hx, hy);
         halo.addColorStop(0, rgba(primary, 0));
@@ -890,15 +1015,17 @@ export class PlayerShotSystem<P> {
     }
     const body = context.createLinearGradient(tx, ty, hx, hy);
     body.addColorStop(0, rgba(primary, 0));
-    body.addColorStop(0.45, rgba(primary, 0.4));
-    body.addColorStop(1, rgba(primary, 0.75));
+    body.addColorStop(0.45, rgba(primary, shot.recipe.trailMode === "smoke" ? 0.28 : 0.4));
+    body.addColorStop(1, rgba(primary, shot.recipe.trailMode === "smoke" ? 0.62 : 0.75));
     this.fillRibbon(context, samples, 1.15, body);
     const core = context.createLinearGradient(tx, ty, hx, hy);
     core.addColorStop(0, rgba(secondary, 0));
     core.addColorStop(0.55, rgba(secondary, 0.65));
     core.addColorStop(0.9, rgba(WHITE, 0.95));
     core.addColorStop(1, rgba(WHITE, 1));
-    this.fillRibbon(context, samples, 0.5, core);
+    this.fillRibbon(
+      context, samples, shot.recipe.trailMode === "smoke" ? 0.34 : 0.5, core,
+    );
   }
 
   /** Plasma lance: bloom, a cyan sheath, a long white-hot needle and a bright tip. */
@@ -920,8 +1047,16 @@ export class PlayerShotSystem<P> {
     if (sprite !== null) {
       // Painted lance pinned at its tip; the bloom is the light it spills.
       glow(context, glowPrimary, x, y, r * 4.6 * shimmer, 0.3 * tuning.detail);
-      const length = (finisher ? shot.recipe.finisherLength : shot.recipe.boltLength) * depth;
-      drawAnchored(context, sprite, x, y, angle, length * (0.97 + 0.03 * shimmer), 1);
+      const length =
+        (finisher ? shot.recipe.finisherLength : shot.recipe.boltLength) * depth;
+      const artAngle =
+        angle +
+        shot.recipe.spin * shot.age +
+        shot.recipe.tumble * Math.sin(shot.age * 9 + shot.seed * 0.73);
+      drawAnchored(
+        context, sprite, x, y, artAngle,
+        length * (0.97 + 0.03 * shimmer), 1,
+      );
       return;
     }
 
