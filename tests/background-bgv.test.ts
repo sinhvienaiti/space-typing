@@ -76,6 +76,9 @@ function rawG01Kit(): Record<string, unknown> {
     textures: {
       plate: texture([1280, 2048], "clamp", 16 / 9),
       "plate-b": texture([1280, 1376], "clamp", 16 / 9),
+      "plate-c": texture([1280, 1672], "clamp", 16 / 9),
+      "plate-d": texture([1280, 1672], "clamp", 16 / 9),
+      "plate-e": texture([1280, 1672], "clamp", 16 / 9),
       "glow-a": texture([1024, 2048], "repeat"),
       "glow-b": texture([1024, 2048], "repeat"),
       dust: texture([1024, 2048], "repeat"),
@@ -106,6 +109,10 @@ function rawG02Kit(): Record<string, unknown> {
     version: 2,
     textures: {
       plate: texture([1280, 1920, 2880], "clamp", 16 / 9),
+      "plate-b": texture([1280, 1672], "clamp", 16 / 9),
+      "plate-c": texture([1280, 1672], "clamp", 16 / 9),
+      "plate-d": texture([1280, 1672], "clamp", 16 / 9),
+      "plate-e": texture([1280, 1672], "clamp", 16 / 9),
       "glow-a": texture([1024, 2048], "repeat"),
       "glow-b": texture([1024, 2048], "repeat"),
       dust: texture([1024, 2048], "repeat"),
@@ -299,6 +306,9 @@ describe("BGV compositions", () => {
       heroes.add(composition!.hero!.texture);
     }
     expect(heroes.size).toBe(5);
+    expect(worlds.map((world) => compositionForWorld(world)!.plate.texture)).toEqual([
+      "plate", "plate-b", "plate-c", "plate-d", "plate-e",
+    ]);
     expect(compositionForWorld("world-06")?.kitId).toBe("g02-infernal");
   });
 
@@ -322,6 +332,9 @@ describe("BGV compositions", () => {
       }));
     }
     expect(heroes.size).toBe(5);
+    expect(worlds.map((world) => compositionForWorld(world)!.plate.texture)).toEqual([
+      "plate", "plate-b", "plate-c", "plate-d", "plate-e",
+    ]);
     expect(plateSignatures.size).toBe(5);
     expect(compositionForWorld("world-51")).toBeNull();
   });
@@ -330,7 +343,7 @@ describe("BGV compositions", () => {
     const ids = compositionTextures(compositionForWorld("world-08")!, g02Kit());
     expect(ids.filter((id) => id.startsWith("hero-"))).toEqual(["hero-w08"]);
     expect(ids).toEqual(expect.arrayContaining([
-      "plate",
+      "plate-c",
       "glow-a",
       "glow-b",
       "dust",
