@@ -2,9 +2,11 @@
 
 > **Ngày:** 28/09/2026 · **Người viết:** Claude Code · **Người nhận:** ChatGPT (hoặc AI lập trình khác) làm tiếp, và chủ dự án.
 >
-> **Phạm vi:** hệ đạn mới của người chơi trong `games/space-typing`. Đã làm xong bản thử cho **phi thuyền đầu tiên, Vanguard**. **10 phi thuyền còn lại vẫn dùng tia laser cũ**, chờ làm tiếp theo tài liệu này.
+> **Phạm vi:** hệ đạn mới của người chơi trong `games/space-typing`. Vanguard là bản chuẩn ban đầu; **code đã migrate đủ 11/11 phi thuyền sang đạn bay thật** trên `feat/bgv-integration-current`. Bộ ảnh nguồn của 10 tàu mới được chủ dự án đặt ở local và xử lý bằng `pnpm fx:prepare all`.
 >
 > **Tài liệu liên quan:** hình nền BGV — [BACKGROUND_VISUAL_REBOOT_HANDOFF.md](BACKGROUND_VISUAL_REBOOT_HANDOFF.md). Hai hệ này độc lập; đạn chỉ dùng chung quy trình xử lý ảnh (`scripts/bg-art/`). Nhạc nền World 01 — [MUSIC_WORLD_01.md](MUSIC_WORLD_01.md).
+>
+> **Cập nhật 28/09 (đợt 5):** migrate **11/11 tàu** sang travelling projectile. Thêm recipe riêng, trail `ribbon/zigzag/helix/smoke`, spin/tumble/acceleration, impact sound identity riêng, `fx:prepare all`, và `?ship=` trong gallery. Vanguard giữ nguyên các thông số đã duyệt.
 >
 > **Cập nhật 28/09 (đợt 4):** làm lại **tiếng trúng quái**: bản cũ nhỏ hơn nhạc nền khoảng 25 dB nên chủ dự án không nghe thấy, và tàu dùng laser cũ thì không có tiếng trúng. Xem 2.1, 4.1 và lỗi 18.
 >
@@ -31,9 +33,9 @@
 
 1. **Mỗi chữ gõ đúng bắn ra 1 viên đạn bay thật** (không còn là tia laser tức thì). Viên đạn bay theo đường cong ngắn tới mục tiêu. Nó có đuôi sao băng, bụi sáng, và nhỏ dần khi bay xa để tạo cảm giác chiều sâu.
 2. **Lối chơi không chờ đạn.** Điểm, số lần hạ gục, chuyển mục tiêu, phần thưởng đều tính ngay lúc gõ. Chỉ **phần nhìn** chờ đạn chạm: loé sáng, rung giật, tia lửa, khựng hình, tiếng nổ, rung màn hình. Kẻ địch bị hạ vẫn được vẽ tới khi viên cuối chạm vào mới nổ.
-3. **Làm thử một phi thuyền trước (Vanguard), duyệt xong mới làm tiếp.** Đây là quy tắc của chủ dự án. Phi thuyền chưa có thiết kế thì giữ nguyên tia laser cũ, hành vi y hệt trước.
+3. **Vanguard là baseline đã duyệt; 10 tàu còn lại đã được migrate sau đó.** Mọi tàu hiện có recipe travelling projectile riêng; fallback laser chỉ còn là đường dự phòng cho ID tương lai/không có recipe.
 4. **Hình ảnh đẹp đến từ ảnh vẽ tay do chủ dự án tạo bằng Gemini.** Code lo chuyển động, đuôi, bụi sáng, thời điểm và cách hoà màu. Thiếu ảnh thì tự vẽ bằng code (dự phòng).
-5. **Chưa commit.** Xem mục 9 và lệnh commit ở tin nhắn của Claude.
+5. **Đã commit migration 11/11 trên branch `feat/bgv-integration-current`.** Ảnh nguồn 10 tàu mới vẫn ở local của chủ dự án; chạy pipeline để tạo runtime WebP trước khi review bằng mắt.
 6. **Bài học khi ghép code:** lần trước chỉ `Game.ts` được commit, còn các file mới (`src/vfx/player-shots.ts`...) thì không. `Game.ts` import file không có trong Git nên build hỏng, và AI kia đã gỡ luôn phần đạn. **Luôn commit file mới cùng với file dùng nó**, và sau khi ghép, chạy `git status` xem có file nào đang được import mà chưa được theo dõi không.
 7. **Tự nhìn trước khi báo.** `pnpm visual:shot` chụp màn hình game bằng Chrome chạy ngầm, rồi AI mở ảnh ra xem. Hướng dẫn: [VISUAL_TESTING.md](VISUAL_TESTING.md). Mọi ảnh chụp trong tài liệu này đều làm theo cách đó.
 
@@ -111,8 +113,8 @@ Yêu cầu gốc: *"hiệu ứng có cảm giác không phải 2D, phải đẹp
 | `src/vfx/player-shots.ts` | **Hệ đạn:** công thức từng tàu (`RECIPES`), mô phỏng bay (đường cong, bám mục tiêu, đuôi), vẽ (đuôi, đầu, bụi sáng, vụ nổ, loé nòng). Không biết gì về lối chơi. |
 | `src/vfx/player-shot-sprites.ts` | **Ảnh vẽ tay:** đọc `fx.json` (kiểm tra chặt), nạp ảnh kèm `?v=<mã băm>`, chọn ảnh đầu đạn và ảnh thay thế. |
 | `src/Game.ts` | **Gắn vào lối chơi:** kiểu `ShotImpact`, `firePlayerShot`, `aimPlayerShot`, `applyShotImpact`, `clearPlayerShots`, bóng kẻ địch chờ nổ (mục 4). |
-| `src/vfx/shot-gallery.ts` + `shot-gallery.html` | Trang xem thử (chỉ ở chế độ dev): Vanguard tự gõ vào 3 mục tiêu trên nền World 01 thật. |
-| `scripts/bg-art/prepare-fx.mjs` | Xử lý ảnh đạn: `pnpm fx:prepare <ship>` (mục 5). |
+| `src/vfx/shot-gallery.ts` + `shot-gallery.html` | Trang xem thử (chỉ ở chế độ dev): chọn bất kỳ tàu nào bằng dropdown hoặc `?ship=<id>`, tự gõ vào 3 mục tiêu trên nền World 01 thật. |
+| `scripts/bg-art/prepare-fx.mjs` | Xử lý ảnh đạn: `pnpm fx:prepare <ship>` hoặc `pnpm fx:prepare all`. Chế độ `all` bỏ qua tàu không có source-art local để không xoá runtime kit hiện hữu. |
 | `scripts/bg-art/art-common.mjs` | Hàm dùng chung với script ảnh nền: đọc ảnh, gỡ logo ✦ Gemini, đo viền, cắt ảnh, tham số dòng lệnh. |
 | `scripts/check-background-art.mjs` | Kiểm tra khi build, gồm cả `fx/<ship>/fx.json`. |
 | `public/assets/space-typing/fx/vanguard/` | Ảnh game dùng: `finisher.webp`, `impact.webp`, `muzzle.webp`, `fx.json` (94 KiB). |
@@ -168,7 +170,7 @@ Giá trị hiện tại của Vanguard (`spear`):
 | `boltLength` / `finisherLength` | 128 / 190 | chiều dài ảnh đầu đạn (px, trước hệ số chiều sâu). Đã tăng khoảng 40% theo góp ý ngày 28/9 |
 | `impactSize` / `muzzleLength` | 118 / 60 | cỡ vụ nổ (phát hạ gục ×1,35), cỡ loé nòng súng (phát hạ gục ×1,4) |
 
-`shotRecipeFor(characterId)` trả `null` cho tàu chưa có công thức. Khi đó `Game` dùng tia laser cũ.
+`shotRecipeFor(characterId)` hiện có recipe cho đủ 11 `CharacterId`. Nhánh `null`/tia laser cũ được giữ làm fallback an toàn cho ID tương lai hoặc dữ liệu không có recipe.
 
 ### 3.4 Thứ tự vẽ trong `Game.draw()`
 
@@ -214,7 +216,7 @@ Giá trị hiện tại của Vanguard (`spear`):
 | `bonus-collect` | chữ cuối của các hộp trên | **phần thưởng, điểm, rơi đồ, bảng chọn thưởng, thông báo, xoá hộp** | xoá bóng hộp, vụ nổ lớn màu của hộp (34–54 hạt), `sfx.support` + `sfx.boltImpact(1.3)` |
 
 - Cú khựng và rung **chỉ có khi đạn thật chạm** (`fromBolt = true`). Tia laser cũ không có, và có test khoá hành vi này. Tàu nào có đạn mới thì tự có cú khựng.
-- **Tiếng trúng thì tàu nào cũng có:** `applyShotImpact` gọi `sfx.boltImpact(sức, pan, variant)` ở mọi kiểu trúng (trừ `intercept`, vốn đã có tiếng riêng lúc gõ). `variant` = `"crystal"` khi đạn thật chạm, `"energy"` với laser cũ. `pan` = vị trí x của mục tiêu, đổi sang −1…1, nhân 0,6. Sức: trúng thường = `power` của phát bắn; vỡ khiên 1,25; hạ gục 1,45; boss 0,9; hộp thưởng 0,8; nhặt hộp 1,3.
+- **Tiếng trúng thì tàu nào cũng có:** `applyShotImpact` gọi `sfx.boltImpact(sức, pan, variant)` ở mọi kiểu trúng (trừ `intercept`, vốn đã có tiếng riêng lúc gõ). Travelling projectile lấy `impactVariant` của từng tàu (`crystal/heavy/storm/void/star/missile/mystic/shield/slash/radiant/cosmic`); `"energy"` chỉ còn cho fallback laser. `pan` = vị trí x của mục tiêu, đổi sang −1…1, nhân 0,6.
 - Cú khựng là thay đổi lối chơi nhỏ: quái bị gõ tiến chậm lại. Thời lượng nằm ở các hằng số `HIT_STUN_SECONDS` (0,06), `LAYER_STUN_SECONDS` (0,16), `HIT_SHAKE_SECONDS` (0,12) trong `Game.ts`.
 - Các phần boss khác (hết từ, vỡ khiên, bị hạ) giữ nguyên, xảy ra ngay.
 - Hạ gục bằng kỹ năng (`resolveSkillEnemyKill`, ví dụ bom chữ) không đi qua đạn, vẫn nổ ngay.
@@ -428,18 +430,12 @@ Phần đặc (thân tên lửa, lõi vật chất tối): xin ảnh **trên n�
 
 ## 9. Việc còn lại
 
-1. **P0 — Commit** toàn bộ file (lệnh ở tin nhắn của Claude), rồi chủ dự án duyệt Vanguard bằng mắt.
-2. **P0 — Tạo lại `vanguard-bolt`.** Prompt:
-
-   > *Game VFX sprite for a top-down 2D space shooter, painted high-detail style matching a sleek white-and-blue fighter with glowing cyan crystals. One cyan plasma lance projectile flying to the RIGHT: long needle-shaped white-hot core inside a luminous cyan energy sheath with subtle crystalline facets and tiny electric filaments, a bright star glint at the tip, a short soft tail flare fading to black behind it. Horizontal, centered, about 70% of the width, wide empty margin, nothing touches the edges. Pure black background #000000, no stars, no nebula, no text, no shadow. Light only: every pixel that is not glowing must be pure black. 2:1 aspect ratio, highest resolution.*
-
-   Sau đó chạy `pnpm fx:prepare vanguard --tool="Google Gemini"` và `pnpm build:space`.
-3. **P1 — Phi thuyền tiếp theo** theo mục 6 và 7. Hỏi chủ dự án muốn tàu nào; gợi ý Aegis, vì chỉ cần thêm tuỳ chỉnh tốc độ và độ dày.
-4. **P1 — Tham số `?ship=`** cho trang xem thử.
-5. **P2 — Âm thanh bắn riêng từng tàu.** Hiện mọi tàu dùng `sfx.shot`. AI kia từng làm âm thanh đạn riêng, rồi gỡ trong loạt "revert"; hỏi chủ dự án trước.
-6. **P2 — Xoá tia laser cũ** (`lasers`, `drawLasers`, kiểu `Laser`) khi cả 11 tàu đã có đạn mới.
-7. **P0 — Chủ dự án duyệt bộ đèn và cách xoay của Vanguard** bằng mắt. Có thể cần chỉnh: góc tối đa (`SHIP_AIM_LIMIT`), độ giật (`SHIP_RECOIL_PX`), độ sáng hào quang (`drawShipHalo`), độ dài lửa (`plumeLength`).
-8. **P1 — Bộ đèn cho 10 tàu còn lại** (mục 6, bước 9), sau khi Vanguard được duyệt.
+1. **P0 — Local asset processing:** giải nén bộ 40 PNG vào `art-src/fx/`, chạy `pnpm fx:prepare all --tool="ChatGPT"`, rồi kiểm tra runtime kit của 10 tàu mới.
+2. **P0 — Visual approval:** dùng gallery `?ship=<id>` và chơi thật để chỉnh scale, anchor, độ cong và vị trí nòng nếu ảnh thực tế cần tinh chỉnh. CI không thể thay thế bước nhìn ảnh local.
+3. **P0 — `vanguard-bolt`:** nếu local vẫn chỉ có finisher fallback như batch Claude cũ thì tạo lại bolt đúng prompt cũ; pipeline vẫn hỗ trợ fallback nên không chặn build.
+4. **P1 — Bộ đèn cho 10 tàu còn lại:** `ship-lights.ts` hiện vẫn chỉ có Vanguard; cần đo nozzle/core/tip trên V3 art trước khi thêm, không đoán.
+5. **P2 — Âm thanh *bắn* riêng từng tàu:** impact sound đã có identity riêng; `sfx.shot` vẫn là âm thanh bắn chung.
+6. **P2 — Xoá legacy laser fallback:** chỉ nên xoá sau khi chủ dự án duyệt bằng mắt đủ 11 tàu và xác nhận không còn cần fallback.
 
 ---
 
@@ -450,7 +446,7 @@ Phần đặc (thân tên lửa, lõi vật chất tối): xin ảnh **trên n�
 - [ ] Ảnh mới: đã chạy `pnpm fx:prepare <ship>`, đã xem `public/assets/space-typing/fx/<ship>/` (nền đen, không lộ khung).
 - [ ] Đã chụp bằng `pnpm visual:shot` ở 1642×799 DPR 2 (tốc độ thường và `t=0.1`) **và đã tự mở ảnh xem**; đã phóng to (`visual:crop`) kiểm tra đầu đạn rõ chi tiết, đuôi không có cạnh cứng.
 - [ ] Chơi thật bằng tàu đó: vụ nổ trùng lúc đạn chạm, kẻ địch bị hạ không biến mất trước khi nổ, nhãn chữ không bị đạn che.
-- [ ] Tàu chưa làm vẫn bắn tia laser như cũ.
+- [ ] Cả 11 tàu đều bắn travelling projectile; không tàu hiện tại nào rơi về legacy laser ngoài fallback lỗi/source thiếu.
 - [ ] Gõ quái thưởng (hộp tiếp tế, drone kho báu…) thấy đạn bay tới hộp; hộp nổ khi đạn chạm.
 - [ ] Tàu xoay về phía mục tiêu, đạn ra đúng nòng khi tàu đang xoay (xem ảnh phóng to).
 - [ ] `pnpm build:space`, rồi báo chủ dự án (tiếng Việt) chỉ cần tải lại trang, kèm ảnh chụp.
@@ -462,7 +458,7 @@ Phần đặc (thân tên lửa, lõi vật chất tối): xin ảnh **trên n�
 
 | Việc | Lệnh |
 |---|---|
-| Xử lý ảnh đạn | `cd games/space-typing && pnpm fx:prepare vanguard --tool="Google Gemini"` |
+| Xử lý toàn bộ ảnh đạn local | `cd games/space-typing && pnpm fx:prepare all --tool="ChatGPT"` |
 | Xem thử (dev) | `cd /Users/jokerit/htdocs/typing-game && pnpm dev:space`, mở `http://127.0.0.1:3004/shot-gallery.html` |
 | Chơi thật | `pnpm build:space && ./play.sh` (thư mục gốc), rồi tải lại trang |
 | Test | `cd games/space-typing && pnpm test` |
@@ -470,6 +466,7 @@ Phần đặc (thân tên lửa, lõi vật chất tối): xin ảnh **trên n�
 | Đo độ to các tiếng động | `pnpm -s visual:shot "http://127.0.0.1:3098/shot-gallery.html?panel=0&idle=1" .visual/sfx.png --wait=2500 --eval-file=scripts/visual/evals/sfx-levels.js` (máy chủ dev tạm, cổng 3098). Trả về đỉnh, độ to 100 ms, độ dài và độ lệch trái/phải của từng tiếng |
 
 Tham số của trang xem thử:
+- `ship=vanguard|aegis|volt|wraith|fortune|arsenal|oracle|bastion|reaper|celestial|zenith`: tàu cần review.
 - `q=low|medium|high|ultra`: bậc chất lượng.
 - `cps=<phím/giây>`: tốc độ tự gõ, mặc định 8.
 - `t=<tốc độ thời gian>`: `0.1` là quay chậm.
