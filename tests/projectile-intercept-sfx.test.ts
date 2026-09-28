@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Sfx } from "../src/audio/Sfx";
 import { Game } from "../src/Game";
 import type { EnemyProjectile, GamePhase, GameSettings } from "../src/types";
+import { MAX_FLIGHT_SECONDS } from "../src/vfx/player-shots";
 
 const settings: GameSettings = {
   sfxVolume: 0,
@@ -92,38 +93,68 @@ describe("hostile projectile intercept SFX", () => {
     sfx.destroy();
   });
 
-  it("plays the player intercept sound once for a typed hostile bullet", () => {
-    const intercept = vi.spyOn(Sfx.prototype, "projectileIntercept").mockImplementation(() => {});
-    const genericHit = vi.spyOn(Sfx.prototype, "hit").mockImplementation(() => {});
-    const game = gameWithFakeCanvas();
-    const state = game as unknown as {
-      phase: GamePhase;
-      projectiles: EnemyProjectile[];
-      lasers: Array<{ life: number }>;
-      projectileImpacts: Array<{ life: number; radius: number }>;
-      particles: unknown[];
-      updateEffects: (dt: number) => void;
-    };
+  type InterceptState = {
+    phase: GamePhase;
+    projectiles: EnemyProjectile[];
+    interceptedProjectiles: EnemyProjectile[];
+    lasers: Array<{ life: number }>;
+    projectileImpacts: Array<{ life: number; radius: number }>;
+    particles: unknown[];
+    playerShots: { activeShots: number };
+    updateEffects: (dt: number) => void;
+  };
+
+  function typedHostileBullet(game: Game): InterceptState {
+    const state = game as unknown as InterceptState;
     state.phase = "playing";
     state.projectiles = [
       { id: 1, ownerId: -1, char: "k", x: 300, y: 350, vx: 0, vy: 90, radius: 14 },
     ];
-
     game.handleKey("k");
+    return state;
+  }
 
+  it("plays the intercept sound once and shatters the bullet when the bolt lands", () => {
+    const intercept = vi.spyOn(Sfx.prototype, "projectileIntercept").mockImplementation(() => {});
+    const genericHit = vi.spyOn(Sfx.prototype, "hit").mockImplementation(() => {});
+    const game = gameWithFakeCanvas();
+    const state = typedHostileBullet(game);
+
+    // Gameplay resolves at once; Vanguard's bolt is still on its way.
     expect(state.projectiles).toHaveLength(0);
     expect(game.getStats().hits).toBe(1);
     expect(intercept).toHaveBeenCalledOnce();
     expect(genericHit).not.toHaveBeenCalled();
-    expect(state.lasers).toHaveLength(1);
-    expect(state.lasers[0]!.life).toBe(0.18);
+    expect(state.lasers).toHaveLength(0);
+    expect(state.playerShots.activeShots).toBe(1);
+    expect(state.interceptedProjectiles).toHaveLength(1);
+    expect(state.projectileImpacts).toHaveLength(0);
+
+    state.updateEffects(MAX_FLIGHT_SECONDS);
+    expect(state.interceptedProjectiles).toHaveLength(0);
     expect(state.projectileImpacts).toHaveLength(1);
-    expect(state.projectileImpacts[0]!.life).toBe(0.34);
+    expect(state.projectileImpacts[0]!.life).toBeCloseTo(0.34);
     expect(state.particles.length).toBeGreaterThan(0);
     state.updateEffects(0.1);
     expect(state.projectileImpacts[0]!.life).toBeCloseTo(0.24);
     state.updateEffects(0.25);
     expect(state.projectileImpacts).toHaveLength(0);
+    expect(intercept).toHaveBeenCalledOnce();
+    game.destroy();
+  });
+
+  it("keeps the instant laser tracer for ships without a bolt design", () => {
+    vi.spyOn(Sfx.prototype, "projectileIntercept").mockImplementation(() => {});
+    const game = gameWithFakeCanvas();
+    game.setCharacter("aegis");
+    const state = typedHostileBullet(game);
+
+    expect(state.playerShots.activeShots).toBe(0);
+    expect(state.lasers).toHaveLength(1);
+    expect(state.lasers[0]!.life).toBe(0.18);
+    expect(state.projectileImpacts).toHaveLength(1);
+    expect(state.projectileImpacts[0]!.life).toBe(0.34);
+    expect(state.particles.length).toBeGreaterThan(0);
     game.destroy();
   });
 });

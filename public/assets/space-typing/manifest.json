@@ -182,6 +182,15 @@
       "author": "Space Typing project owner",
       "license": "Personal use only; review the image tool's terms before any public distribution",
       "attributionRequired": false
+    },
+    {
+      "id": "shot-fx-vanguard",
+      "category": "projectile",
+      "sourceType": "generated",
+      "source": "Owner-generated Google Gemini art from art-src/fx/vanguard, processed by scripts/bg-art/prepare-fx.mjs on 2026-09-27; runtime sprites /assets/space-typing/fx/vanguard/fx.json",
+      "author": "Space Typing project owner",
+      "license": "Personal use only; review the image tool's terms before any public distribution",
+      "attributionRequired": false
     }
   ]
 }
