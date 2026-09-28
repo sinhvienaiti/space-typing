@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   CHARACTER_IDS,
   CHARACTER_REGISTRY,
-  type CharacterId,
 } from "../src/characters/registry";
 import {
   createStarterCharacterState,
@@ -23,10 +22,12 @@ describe("character registry and selection", () => {
     expect(CHARACTER_REGISTRY.zenith.unlockStage).toBe(1000);
   });
 
-  it("starts with Vanguard selected and the full ship roster available", () => {
+  it("starts with Vanguard selected, unlocked and at base progression", () => {
     const state = createStarterCharacterState();
-    expect(state.selected).toBe("vanguard");
-    expect(state.unlocked).toEqual([...CHARACTER_IDS]);
+    expect(state).toMatchObject({
+      selected: "vanguard",
+      unlocked: ["vanguard"],
+    });
     expect(state.progress.vanguard).toEqual({
       level: 1,
       xp: 0,
@@ -40,17 +41,31 @@ describe("character registry and selection", () => {
     });
   });
 
-  it("selects any registered ship without Campaign gating", () => {
+  it("selects any registered ship without changing unlock progression", () => {
     const state = createStarterCharacterState();
     const changed = selectCharacter(state, "zenith");
 
     expect(changed.selected).toBe("zenith");
-    expect(changed.unlocked).toEqual([...CHARACTER_IDS]);
+    expect(changed.unlocked).toEqual(["vanguard"]);
     expect(state.selected).toBe("vanguard");
     expect(changed.progress).toBe(state.progress);
   });
 
-  it("sanitizes old/imported saves to the full ship roster", () => {
+  it("selects a historically unlocked character without mutating the previous state", () => {
+    const state = sanitizeCharacterState({
+      selected: "vanguard",
+      unlocked: ["vanguard", "aegis"],
+    });
+
+    const changed = selectCharacter(state, "aegis");
+
+    expect(changed.selected).toBe("aegis");
+    expect(changed.unlocked).toEqual(["vanguard", "aegis"]);
+    expect(state.selected).toBe("vanguard");
+    expect(changed.progress).toBe(state.progress);
+  });
+
+  it("sanitizes unknown selection and always preserves Vanguard", () => {
     expect(
       sanitizeCharacterState({
         selected: "missing",
@@ -58,42 +73,35 @@ describe("character registry and selection", () => {
       }),
     ).toMatchObject({
       selected: "vanguard",
-      unlocked: [...CHARACTER_IDS],
-    });
-
-    expect(
-      sanitizeCharacterState({
-        selected: "reaper",
-        unlocked: ["vanguard"],
-      }),
-    ).toMatchObject({
-      selected: "reaper",
-      unlocked: [...CHARACTER_IDS],
+      unlocked: ["vanguard", "aegis"],
     });
   });
 
-  it("keeps stage-clear unlock API compatible without milestone gating", () => {
-    const legacyLocked = {
-      ...createStarterCharacterState(),
-      unlocked: ["vanguard"] as CharacterId[],
-    };
-    const result = unlockCharactersForStage(legacyLocked, 1);
+  it("unlocks milestone characters permanently after their clear stage", () => {
+    const starter = createStarterCharacterState();
+    const beforeMilestone = unlockCharactersForStage(starter, 99);
+    expect(beforeMilestone.state).toBe(starter);
+    expect(beforeMilestone.unlocked).toEqual([]);
 
-    expect(result.state.unlocked).toEqual([...CHARACTER_IDS]);
-    expect(result.unlocked).toEqual([]);
+    const milestone = unlockCharactersForStage(starter, 100);
+    expect(milestone.unlocked).toEqual(["aegis"]);
+    expect(milestone.state.unlocked).toEqual(["vanguard", "aegis"]);
+
+    const replayEarlier = unlockCharactersForStage(milestone.state, 20);
+    expect(replayEarlier.state.unlocked).toEqual(["vanguard", "aegis"]);
+    expect(replayEarlier.unlocked).toEqual([]);
   });
 
-  it("synchronizes old saves to the full ship roster regardless of cleared stage", () => {
-    const legacyLocked = {
-      ...createStarterCharacterState(),
-      unlocked: ["vanguard"] as CharacterId[],
-    };
-    const synced = syncCharacterUnlocks(legacyLocked, []);
+  it("synchronizes old saves from the highest cleared milestone", () => {
+    const synced = syncCharacterUnlocks(
+      createStarterCharacterState(),
+      [1, 50, 100, 200],
+    );
 
-    expect(synced.unlocked).toEqual([...CHARACTER_IDS]);
+    expect(synced.unlocked).toEqual(["vanguard", "aegis", "volt"]);
   });
 
-  it("keeps legacy subset unlock lists valid but still rejects duplicates", () => {
+  it("strict validation allows selection before milestone but rejects duplicates", () => {
     const base = createStarterCharacterState();
 
     expect(
