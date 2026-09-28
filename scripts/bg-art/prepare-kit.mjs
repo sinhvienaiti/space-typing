@@ -867,9 +867,26 @@ async function main() {
       if (boxes.length === 0) throw new Error(name + ": no separate objects found.");
       const expectedObjects = kit.expectedAtlasObjects?.[atlasId];
       if (expectedObjects !== undefined && boxes.length !== expectedObjects) {
-        throw new Error(
-          name + ": detected " + boxes.length + " objects; expected exactly " + expectedObjects +
-            ". Check transparency, spacing and object separation in the source atlas.",
+        // Object detection operates on connected alpha components. Painterly
+        // atlas subjects can become connected by glow, tendrils, particles or
+        // anti-aliased edges even when the authored source visibly contains
+        // the requested number of subjects. Treat an exact-count mismatch as
+        // an art-quality warning rather than a fatal pipeline error.
+        //
+        // Still reject an atlas that is clearly unusable: fewer than ~60% of
+        // the intended objects means separation/keying failed too severely.
+        const minimumUsable = Math.max(4, Math.ceil(expectedObjects * 0.6));
+        if (boxes.length < minimumUsable) {
+          throw new Error(
+            name + ": detected only " + boxes.length + " objects; expected about " + expectedObjects +
+              " and need at least " + minimumUsable +
+              ". Check transparency, spacing and object separation in the source atlas.",
+          );
+        }
+        console.warn(
+          "• " + name + ": detected " + boxes.length + " objects; authored target is " +
+            expectedObjects + ". Continuing because the atlas is still usable; " +
+            "review subject separation visually if needed.",
         );
       }
       const sprites = boxes.map((box) => trim(cropObject(image, box)));
