@@ -100,6 +100,36 @@ function g01Kit(): BackgroundKit {
   return kit;
 }
 
+function rawG02Kit(): Record<string, unknown> {
+  return {
+    id: "g02-infernal",
+    version: 2,
+    textures: {
+      plate: texture([1280, 1920, 2880], "clamp", 16 / 9),
+      "glow-a": texture([1024, 2048], "repeat"),
+      "glow-b": texture([1024, 2048], "repeat"),
+      dust: texture([1024, 2048], "repeat"),
+      "hero-w06": texture([512, 1024, 2048]),
+      "hero-w07": texture([512, 1024, 2048]),
+      "hero-w08": texture([512, 1024, 2048]),
+      "hero-w09": texture([512, 1024, 2048]),
+      "hero-w10": texture([512, 1024, 2048]),
+      "atlas-rocks": texture([1024, 2048]),
+      "atlas-life": texture([1024, 2048]),
+    },
+    atlases: {
+      rocks: { texture: "atlas-rocks", frames: frames(12) },
+      life: { texture: "atlas-life", frames: frames(11) },
+    },
+  };
+}
+
+function g02Kit(): BackgroundKit {
+  const kit = parseKit(rawG02Kit(), "g02-infernal");
+  if (kit === null) throw new Error("G02 fixture kit is invalid");
+  return kit;
+}
+
 /** Sprites of `texture` currently drawn (hidden slots are all zeros). */
 function visibleSprites(scene: SceneDirector, texture: string): number {
   let visible = 0;
@@ -116,6 +146,22 @@ function director(tier: BackgroundTier = "high", seed = "world-01"): SceneDirect
   return new SceneDirector({
     composition: compositionForWorld("world-01")!,
     kit: g01Kit(),
+    tier,
+    viewW: 1440,
+    viewH: 810,
+    seed,
+    fx: FX_FRAMES,
+  });
+}
+
+function g02Director(
+  worldId = "world-06",
+  tier: BackgroundTier = "high",
+  seed = worldId,
+): SceneDirector {
+  return new SceneDirector({
+    composition: compositionForWorld(worldId)!,
+    kit: g02Kit(),
     tier,
     viewW: 1440,
     viewH: 810,
@@ -253,7 +299,44 @@ describe("BGV compositions", () => {
       heroes.add(composition!.hero!.texture);
     }
     expect(heroes.size).toBe(5);
-    expect(compositionForWorld("world-06")).toBeNull();
+    expect(compositionForWorld("world-06")?.kitId).toBe("g02-infernal");
+  });
+
+  it("covers World 06–10 with valid, distinct Galaxy 02 compositions", () => {
+    const worlds = ["world-06", "world-07", "world-08", "world-09", "world-10"];
+    const kit = g02Kit();
+    const heroes = new Set<string>();
+    const plateSignatures = new Set<string>();
+    for (const worldId of worlds) {
+      const composition = compositionForWorld(worldId);
+      expect(composition).not.toBeNull();
+      expect(composition!.kitId).toBe("g02-infernal");
+      expect(composition!.camera).toBe("over-world");
+      expect(validateComposition(composition!)).toEqual([]);
+      expect(missingKitReferences(composition!, kit)).toEqual([]);
+      heroes.add(composition!.hero!.texture);
+      plateSignatures.add(JSON.stringify({
+        focus: composition!.plate.focus,
+        flipX: composition!.plate.flipX,
+        grade: composition!.plate.grade,
+      }));
+    }
+    expect(heroes.size).toBe(5);
+    expect(plateSignatures.size).toBe(5);
+    expect(compositionForWorld("world-11")).toBeNull();
+  });
+
+  it("loads only the required Galaxy 02 hero and its own infernal atlases", () => {
+    const ids = compositionTextures(compositionForWorld("world-08")!, g02Kit());
+    expect(ids.filter((id) => id.startsWith("hero-"))).toEqual(["hero-w08"]);
+    expect(ids).toEqual(expect.arrayContaining([
+      "plate",
+      "glow-a",
+      "glow-b",
+      "dust",
+      "atlas-rocks",
+      "atlas-life",
+    ]));
   });
 
   it("validates every registered composition structurally", () => {
@@ -515,6 +598,70 @@ describe("BGV scene director", () => {
     const x = scene.sprites[0]!;
     scene.setViewport(720, 405);
     expect(scene.sprites[0]!).toBeCloseTo(x / 2, 3);
+  });
+});
+
+describe("Galaxy 02 scene director", () => {
+  it("scales quality without unbounded instances", () => {
+    const low = g02Director("world-10", "low");
+    const ultra = g02Director("world-10", "ultra");
+    expect(ultra.spriteCount).toBeGreaterThan(low.spriteCount);
+    expect(ultra.spriteCount).toBeLessThan(180);
+  });
+
+  it("is deterministic for the same World seed", () => {
+    const a = g02Director("world-07", "high", "world-07");
+    const b = g02Director("world-07", "high", "world-07");
+    for (let frame = 0; frame < 180; frame += 1) {
+      a.update(1 / 60);
+      b.update(1 / 60);
+    }
+    expect(Array.from(a.sprites)).toEqual(Array.from(b.sprites));
+  });
+
+  it("keeps infernal field respawns outside the visible play area", () => {
+    const scene = g02Director("world-10", "ultra");
+    const slots = scene.ops.flatMap((op) =>
+      op.kind === "sprites" && op.texture === "atlas-rocks"
+        ? Array.from({ length: op.count }, (_, index) => op.start + index)
+        : [],
+    );
+    const data = scene.sprites;
+    const previous = new Float32Array(slots.length * 4);
+    const snapshot = (): void => {
+      slots.forEach((slot, index) => {
+        const offset = slot * SPRITE_FLOATS;
+        previous[index * 4] = data[offset]!;
+        previous[index * 4 + 1] = data[offset + 1]!;
+        previous[index * 4 + 2] = Math.max(data[offset + 2]!, data[offset + 3]!) / 2;
+        previous[index * 4 + 3] = data[offset + 3]!;
+      });
+    };
+    snapshot();
+    const violations: string[] = [];
+    let respawns = 0;
+    for (let frame = 0; frame < 60 * 60; frame += 1) {
+      scene.update(1 / 60);
+      slots.forEach((slot, index) => {
+        const offset = slot * SPRITE_FLOATS;
+        const x = data[offset]!;
+        const y = data[offset + 1]!;
+        const beforeX = previous[index * 4]!;
+        const beforeY = previous[index * 4 + 1]!;
+        if (Math.hypot(x - beforeX, y - beforeY) <= 50) return;
+        respawns += 1;
+        const half = previous[index * 4 + 2]!;
+        const leftView =
+          beforeY - half > 809 ||
+          beforeX + half < 1 ||
+          beforeX - half > 1439;
+        const enteredAbove = y + data[offset + 3]! / 2 <= 0;
+        if (!leftView || !enteredAbove) violations.push("popped at frame " + frame);
+      });
+      snapshot();
+    }
+    expect(violations).toEqual([]);
+    expect(respawns).toBeGreaterThan(0);
   });
 });
 
