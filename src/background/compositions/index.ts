@@ -5,12 +5,14 @@ import type {
   WorldComposition,
 } from "../types";
 import { G01_COMPOSITIONS } from "./g01-celestial";
+import { G02_COMPOSITIONS } from "./g02-infernal";
 
 const TIERS: readonly BackgroundTier[] = ["low", "medium", "high", "ultra"];
 
 /** Every World that has moved to the BGV renderer. Others keep the legacy scene. */
 export const BACKGROUND_COMPOSITIONS: readonly WorldComposition[] = [
   ...G01_COMPOSITIONS,
+  ...G02_COMPOSITIONS,
 ];
 
 const BY_WORLD = new Map(
