@@ -104,8 +104,11 @@ describe("M08 World music profiles", () => {
     );
     expect(profile.ambientLayers).toHaveLength(1);
     expect(
-      assetCandidates(profile.ambientLayers[0] ?? null)[1],
-    ).toBe("/assets/audio/ambient/engine-loop.ogg");
+      assetCandidates(profile.ambientLayers[0] ?? null),
+    ).toEqual(["/local-assets/ambient/world-02.ogg"]);
+    expect(
+      profile.ambientLayers.flatMap((asset) => assetCandidates(asset)),
+    ).not.toContain("/assets/audio/ambient/engine-loop.ogg");
     expect(
       profile.ambientLayers.flatMap((asset) => assetCandidates(asset)),
     ).not.toContain("/assets/audio/ambient/computer-loop.ogg");
