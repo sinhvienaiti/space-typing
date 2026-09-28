@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CHARACTER_IDS,
   CHARACTER_REGISTRY,
+  type CharacterId,
 } from "../src/characters/registry";
 import {
   createStarterCharacterState,
@@ -74,7 +75,7 @@ describe("character registry and selection", () => {
   it("keeps stage-clear unlock API compatible without milestone gating", () => {
     const legacyLocked = {
       ...createStarterCharacterState(),
-      unlocked: ["vanguard"] as typeof CHARACTER_IDS[number][],
+      unlocked: ["vanguard"] as CharacterId[],
     };
     const result = unlockCharactersForStage(legacyLocked, 1);
 
@@ -85,23 +86,27 @@ describe("character registry and selection", () => {
   it("synchronizes old saves to the full ship roster regardless of cleared stage", () => {
     const legacyLocked = {
       ...createStarterCharacterState(),
-      unlocked: ["vanguard"] as typeof CHARACTER_IDS[number][],
+      unlocked: ["vanguard"] as CharacterId[],
     };
     const synced = syncCharacterUnlocks(legacyLocked, []);
 
     expect(synced.unlocked).toEqual([...CHARACTER_IDS]);
   });
 
-  it("strict validation rejects duplicate or locked selections", () => {
-    expect(
-      isValidCharacterState({
-        selected: "aegis",
-        unlocked: ["vanguard"],
-      }),
-    ).toBe(false);
+  it("keeps legacy subset unlock lists valid but still rejects duplicates", () => {
+    const base = createStarterCharacterState();
 
     expect(
       isValidCharacterState({
+        ...base,
+        selected: "aegis",
+        unlocked: ["vanguard"],
+      }),
+    ).toBe(true);
+
+    expect(
+      isValidCharacterState({
+        ...base,
         selected: "vanguard",
         unlocked: ["vanguard", "vanguard"],
       }),
