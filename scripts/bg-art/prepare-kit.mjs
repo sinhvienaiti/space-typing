@@ -31,7 +31,21 @@ import {
 const PUBLIC_ROOT = join(ROOT, "public/assets/space-typing/backgrounds");
 
 const KITS = {
-  "g01-celestial": { src: "art-src/g01", prefix: "g01-" },
+  "g01-celestial": {
+    src: "art-src/g01",
+    prefix: "g01-",
+    heroWorlds: [1, 2, 3, 4, 5],
+    expectedAtlasObjects: null,
+  },
+  "g02-infernal": {
+    src: "art-src/g02",
+    prefix: "g02-",
+    heroWorlds: [6, 7, 8, 9, 10],
+    // The prompt pack deliberately defines exact counts. Failing here catches
+    // merged objects, missed alpha islands and accidental extra debris before
+    // a broken atlas reaches the runtime kit.
+    expectedAtlasObjects: { rocks: 12, life: 11 },
+  },
 };
 
 const PLATE_SIZES = [2880, 1920, 1280];
@@ -761,9 +775,10 @@ async function main() {
     textures.dust = { variants, aspect: 1, wrap: "repeat", mipmaps: true };
   }
 
-  // Heroes.
-  for (let index = 1; index <= 5; index += 1) {
-    const name = "hero-w0" + index;
+  // Heroes. Each Galaxy owns its own World range (G01 = 01–05,
+  // G02 = 06–10), while the rest of the processing stays shared.
+  for (const worldNumber of kit.heroWorlds) {
+    const name = "hero-w" + String(worldNumber).padStart(2, "0");
     const file = input(name);
     if (file === null) continue;
     try {
@@ -791,6 +806,13 @@ async function main() {
       const image = ensureTransparency(await readArt(file, name, report.notes), name, report.notes);
       const boxes = detectObjects(image);
       if (boxes.length === 0) throw new Error(name + ": no separate objects found.");
+      const expectedObjects = kit.expectedAtlasObjects?.[atlasId];
+      if (expectedObjects !== undefined && boxes.length !== expectedObjects) {
+        throw new Error(
+          name + ": detected " + boxes.length + " objects; expected exactly " + expectedObjects +
+            ". Check transparency, spacing and object separation in the source atlas.",
+        );
+      }
       const sprites = boxes.map((box) => trim(cropObject(image, box)));
       const padding = 8;
       // Prefer a 1024 atlas when every sprite fits at full resolution:
