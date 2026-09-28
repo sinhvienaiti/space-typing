@@ -323,7 +323,7 @@ describe("BGV compositions", () => {
     }
     expect(heroes.size).toBe(5);
     expect(plateSignatures.size).toBe(5);
-    expect(compositionForWorld("world-11")).toBeNull();
+    expect(compositionForWorld("world-51")).toBeNull();
   });
 
   it("loads only the required Galaxy 02 hero and its own infernal atlases", () => {
