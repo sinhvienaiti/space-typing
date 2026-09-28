@@ -1,5 +1,6 @@
 import {
   CHARACTER_IDS,
+  getCharacter,
   isCharacterId,
   type CharacterId,
 } from "./registry";
@@ -30,40 +31,31 @@ export function createCharacterProgressMap(): CharacterProgressMap {
   return progress;
 }
 
-function allCharactersUnlocked(): CharacterId[] {
-  return [...CHARACTER_IDS];
-}
-
-function withAllCharactersUnlocked(
-  state: CharacterState,
-): CharacterState {
-  if (
-    state.unlocked.length === CHARACTER_IDS.length &&
-    CHARACTER_IDS.every((id) => state.unlocked.includes(id))
-  ) {
-    return state;
-  }
-
-  return {
-    selected: state.selected,
-    unlocked: allCharactersUnlocked(),
-    progress: state.progress,
-  };
-}
-
 export function createStarterCharacterState(): CharacterState {
   return {
     selected: "vanguard",
-    unlocked: allCharactersUnlocked(),
+    unlocked: ["vanguard"],
     progress: createCharacterProgressMap(),
   };
 }
 
-function sanitizeUnlocked(_value: unknown): CharacterId[] {
-  // Ship choice is no longer gated by Campaign/World progress. Keep the
-  // persisted field for save compatibility, but normalize every save to the
-  // complete roster so old/imported saves immediately gain full selection.
-  return allCharactersUnlocked();
+function sanitizeUnlocked(value: unknown): CharacterId[] {
+  const unlocked = Array.isArray(value)
+    ? Array.from(
+        new Set(
+          value.filter(
+            (id): id is CharacterId =>
+              typeof id === "string" && isCharacterId(id),
+          ),
+        ),
+      )
+    : [];
+
+  if (!unlocked.includes("vanguard")) {
+    unlocked.unshift("vanguard");
+  }
+
+  return CHARACTER_IDS.filter((id) => unlocked.includes(id));
 }
 
 function sanitizeProgressMap(value: unknown): CharacterProgressMap {
@@ -134,9 +126,8 @@ export function isValidLegacyCharacterState(value: unknown): boolean {
     seen.add(id);
   }
 
-  // Legacy saves may still carry an old milestone-based unlocked list.
-  // Selection is no longer gated by that list; sanitization/sync expands it
-  // to the complete roster.
+  // "unlocked" remains progression/discovery metadata only. A ship may be
+  // selected for gameplay before its historical milestone has been cleared.
   return seen.has("vanguard");
 }
 
@@ -243,9 +234,12 @@ export function selectCharacter(
   state: CharacterState,
   id: CharacterId,
 ): CharacterState {
+  // Ship selection is independent of Campaign unlock milestones. Keep the
+  // unlocked list unchanged because Codex/meta progression still uses it as
+  // discovery/progression data.
   return {
     selected: id,
-    unlocked: allCharactersUnlocked(),
+    unlocked: [...state.unlocked],
     progress: state.progress,
   };
 }
@@ -257,7 +251,7 @@ export function updateCharacterProgress(
 ): CharacterState {
   return {
     selected: state.selected,
-    unlocked: allCharactersUnlocked(),
+    unlocked: [...state.unlocked],
     progress: {
       ...state.progress,
       [id]: sanitizeCharacterProgress(progress),
@@ -272,20 +266,45 @@ export type CharacterUnlockResult = {
 
 export function unlockCharactersForStage(
   state: CharacterState,
-  _clearedStage: number,
+  clearedStage: number,
 ): CharacterUnlockResult {
-  // Character/ship availability is intentionally independent of Campaign
-  // progress. Preserve the old API so stage-clear/save code does not need a
-  // special path, but do not emit milestone unlock notifications anymore.
+  const newlyUnlocked = CHARACTER_IDS.filter(
+    (id) =>
+      getCharacter(id).unlockStage > 1 &&
+      getCharacter(id).unlockStage <= clearedStage &&
+      !state.unlocked.includes(id),
+  );
+
+  if (newlyUnlocked.length === 0) {
+    return {
+      state,
+      unlocked: [],
+    };
+  }
+
+  const unlocked = CHARACTER_IDS.filter(
+    (id) =>
+      state.unlocked.includes(id) ||
+      newlyUnlocked.includes(id),
+  );
+
   return {
-    state: withAllCharactersUnlocked(state),
-    unlocked: [],
+    state: {
+      selected: state.selected,
+      unlocked,
+      progress: state.progress,
+    },
+    unlocked: newlyUnlocked,
   };
 }
 
 export function syncCharacterUnlocks(
   state: CharacterState,
-  _clearedStages: readonly number[],
+  clearedStages: readonly number[],
 ): CharacterState {
-  return withAllCharactersUnlocked(state);
+  const highestCleared = clearedStages.reduce(
+    (highest, stage) => Math.max(highest, stage),
+    0,
+  );
+  return unlockCharactersForStage(state, highestCleared).state;
 }
