@@ -1,6 +1,5 @@
 import {
   CHARACTER_IDS,
-  getCharacter,
   isCharacterId,
   type CharacterId,
 } from "./registry";
@@ -31,31 +30,40 @@ export function createCharacterProgressMap(): CharacterProgressMap {
   return progress;
 }
 
+function allCharactersUnlocked(): CharacterId[] {
+  return [...CHARACTER_IDS];
+}
+
+function withAllCharactersUnlocked(
+  state: CharacterState,
+): CharacterState {
+  if (
+    state.unlocked.length === CHARACTER_IDS.length &&
+    CHARACTER_IDS.every((id) => state.unlocked.includes(id))
+  ) {
+    return state;
+  }
+
+  return {
+    selected: state.selected,
+    unlocked: allCharactersUnlocked(),
+    progress: state.progress,
+  };
+}
+
 export function createStarterCharacterState(): CharacterState {
   return {
     selected: "vanguard",
-    unlocked: ["vanguard"],
+    unlocked: allCharactersUnlocked(),
     progress: createCharacterProgressMap(),
   };
 }
 
-function sanitizeUnlocked(value: unknown): CharacterId[] {
-  const unlocked = Array.isArray(value)
-    ? Array.from(
-        new Set(
-          value.filter(
-            (id): id is CharacterId =>
-              typeof id === "string" && isCharacterId(id),
-          ),
-        ),
-      )
-    : [];
-
-  if (!unlocked.includes("vanguard")) {
-    unlocked.unshift("vanguard");
-  }
-
-  return CHARACTER_IDS.filter((id) => unlocked.includes(id));
+function sanitizeUnlocked(_value: unknown): CharacterId[] {
+  // Ship choice is no longer gated by Campaign/World progress. Keep the
+  // persisted field for save compatibility, but normalize every save to the
+  // complete roster so old/imported saves immediately gain full selection.
+  return allCharactersUnlocked();
 }
 
 function sanitizeProgressMap(value: unknown): CharacterProgressMap {
@@ -85,8 +93,7 @@ export function sanitizeCharacterState(value: unknown): CharacterState {
   const unlocked = sanitizeUnlocked(raw.unlocked);
   const selected =
     typeof raw.selected === "string" &&
-    isCharacterId(raw.selected) &&
-    unlocked.includes(raw.selected)
+    isCharacterId(raw.selected)
       ? raw.selected
       : "vanguard";
 
@@ -233,11 +240,9 @@ export function selectCharacter(
   state: CharacterState,
   id: CharacterId,
 ): CharacterState {
-  if (!state.unlocked.includes(id)) return state;
-
   return {
     selected: id,
-    unlocked: [...state.unlocked],
+    unlocked: allCharactersUnlocked(),
     progress: state.progress,
   };
 }
@@ -264,45 +269,20 @@ export type CharacterUnlockResult = {
 
 export function unlockCharactersForStage(
   state: CharacterState,
-  clearedStage: number,
+  _clearedStage: number,
 ): CharacterUnlockResult {
-  const newlyUnlocked = CHARACTER_IDS.filter(
-    (id) =>
-      getCharacter(id).unlockStage > 1 &&
-      getCharacter(id).unlockStage <= clearedStage &&
-      !state.unlocked.includes(id),
-  );
-
-  if (newlyUnlocked.length === 0) {
-    return {
-      state,
-      unlocked: [],
-    };
-  }
-
-  const unlocked = CHARACTER_IDS.filter(
-    (id) =>
-      state.unlocked.includes(id) ||
-      newlyUnlocked.includes(id),
-  );
-
+  // Character/ship availability is intentionally independent of Campaign
+  // progress. Preserve the old API so stage-clear/save code does not need a
+  // special path, but do not emit milestone unlock notifications anymore.
   return {
-    state: {
-      selected: state.selected,
-      unlocked,
-      progress: state.progress,
-    },
-    unlocked: newlyUnlocked,
+    state: withAllCharactersUnlocked(state),
+    unlocked: [],
   };
 }
 
 export function syncCharacterUnlocks(
   state: CharacterState,
-  clearedStages: readonly number[],
+  _clearedStages: readonly number[],
 ): CharacterState {
-  const highestCleared = clearedStages.reduce(
-    (highest, stage) => Math.max(highest, stage),
-    0,
-  );
-  return unlockCharactersForStage(state, highestCleared).state;
+  return withAllCharactersUnlocked(state);
 }
