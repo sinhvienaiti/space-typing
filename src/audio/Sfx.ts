@@ -1,3 +1,4 @@
+import type { PlayerImpactVariant } from "../characters/projectiles";
 import {
   announcerAsset,
   type AnnouncerEvent,
@@ -20,17 +21,41 @@ type VoiceShape = {
   q?: number;
 };
 
-/**
- * Player hit sounds. `crystal`: Vanguard's plasma lance (glassy ring).
- * `energy`: ships still on the legacy laser (zap and crack, no ring).
- */
-export type ImpactVariant = "crystal" | "energy";
+/** Player hit identities. Energy remains the legacy/failsafe tracer sound. */
+export type ImpactVariant = PlayerImpactVariant | "energy";
 
 /**
  * Pitches of the crystal ring: A minor pentatonic (G6 A6 C7 D7 E7), so a
  * stream of hits chimes in key with the World 01 theme instead of clashing.
  */
 const IMPACT_RING_HZ = [1567.98, 1760, 2093, 2349.32, 2637.02] as const;
+
+type ImpactVoiceProfile = {
+  weight: number;
+  crackHz: number;
+  bodyStart: number;
+  bodyEnd: number;
+  bodyType: OscillatorType;
+  thudStart: number;
+  thudEnd: number;
+  accentStart: number;
+  accentEnd: number;
+  accentType: OscillatorType;
+};
+
+const IMPACT_VOICES: Readonly<Record<Exclude<ImpactVariant, "crystal">, ImpactVoiceProfile>> = {
+  energy:  { weight: 2.3, crackHz: 2600, bodyStart: 330, bodyEnd: 140, bodyType: "triangle", thudStart: 110, thudEnd: 55, accentStart: 900, accentEnd: 240, accentType: "sawtooth" },
+  heavy:   { weight: 2.6, crackHz: 1850, bodyStart: 250, bodyEnd: 82, bodyType: "square", thudStart: 92, thudEnd: 42, accentStart: 420, accentEnd: 120, accentType: "triangle" },
+  storm:   { weight: 2.05, crackHz: 5200, bodyStart: 410, bodyEnd: 180, bodyType: "triangle", thudStart: 118, thudEnd: 62, accentStart: 1850, accentEnd: 360, accentType: "sawtooth" },
+  void:    { weight: 2.1, crackHz: 1450, bodyStart: 185, bodyEnd: 58, bodyType: "sawtooth", thudStart: 72, thudEnd: 34, accentStart: 640, accentEnd: 115, accentType: "sine" },
+  star:    { weight: 1.95, crackHz: 4650, bodyStart: 440, bodyEnd: 235, bodyType: "triangle", thudStart: 124, thudEnd: 70, accentStart: 2180, accentEnd: 3100, accentType: "sine" },
+  missile: { weight: 2.55, crackHz: 2250, bodyStart: 205, bodyEnd: 68, bodyType: "sawtooth", thudStart: 82, thudEnd: 38, accentStart: 510, accentEnd: 95, accentType: "square" },
+  mystic:  { weight: 2.0, crackHz: 3600, bodyStart: 320, bodyEnd: 190, bodyType: "sine", thudStart: 105, thudEnd: 56, accentStart: 880, accentEnd: 1380, accentType: "sine" },
+  shield:  { weight: 2.35, crackHz: 2850, bodyStart: 285, bodyEnd: 135, bodyType: "triangle", thudStart: 98, thudEnd: 46, accentStart: 620, accentEnd: 250, accentType: "square" },
+  slash:   { weight: 2.15, crackHz: 4950, bodyStart: 475, bodyEnd: 165, bodyType: "sawtooth", thudStart: 108, thudEnd: 52, accentStart: 1480, accentEnd: 480, accentType: "triangle" },
+  radiant: { weight: 1.95, crackHz: 4800, bodyStart: 395, bodyEnd: 215, bodyType: "sine", thudStart: 120, thudEnd: 64, accentStart: 1920, accentEnd: 2820, accentType: "sine" },
+  cosmic:  { weight: 2.2, crackHz: 3350, bodyStart: 235, bodyEnd: 92, bodyType: "triangle", thudStart: 84, thudEnd: 40, accentStart: 760, accentEnd: 1180, accentType: "sine" },
+};
 
 export class Sfx {
   private context: AudioContext | null = null;
@@ -140,43 +165,71 @@ export class Sfx {
     const now = typeof performance !== "undefined" ? performance.now() : Date.now();
     if (now - this.lastBoltImpact < 32) return;
     this.lastBoltImpact = now;
-    // Level set by measurement (offline render at default volume): a hit
-    // peaks about 5 dB under the sampled intercept zap (~-19 dBFS), a word
-    // finisher about level with it.
-    const weight = Math.max(0.8, Math.min(1.5, power)) * (variant === "crystal" ? 1.9 : 2.3);
+
+    const profile = variant === "crystal" ? null : IMPACT_VOICES[variant];
+    const weight =
+      Math.max(0.8, Math.min(1.5, power)) *
+      (variant === "crystal" ? 1.9 : profile!.weight);
     const heavy = power >= 1.3;
     const shape: VoiceShape = { pan: Math.max(-1, Math.min(1, pan)) };
     const drift = 0.97 + Math.random() * 0.06;
 
-    // Crack: the moment of contact, bright but band-limited (never a hiss).
     this.noise(0.045, 0.28 * weight, "combat", {
       ...shape,
       filter: "bandpass",
-      frequency: (variant === "crystal" ? 4200 : 2600) * drift,
+      frequency: (variant === "crystal" ? 4200 : profile!.crackHz) * drift,
       q: 0.8,
     });
-    // Body and thud: the weight, audible on laptop speakers and headphones.
-    this.tone(330 * drift, 0.1, "triangle", 0.16 * weight, 140, "combat", shape);
-    this.tone(110, 0.14, "sine", 0.13 * weight, 55, "combat", shape);
+    this.tone(
+      (variant === "crystal" ? 330 : profile!.bodyStart) * drift,
+      0.1,
+      variant === "crystal" ? "triangle" : profile!.bodyType,
+      0.16 * weight,
+      (variant === "crystal" ? 140 : profile!.bodyEnd) * drift,
+      "combat",
+      shape,
+    );
+    this.tone(
+      variant === "crystal" ? 110 : profile!.thudStart,
+      0.14,
+      "sine",
+      0.13 * weight,
+      variant === "crystal" ? 55 : profile!.thudEnd,
+      "combat",
+      shape,
+    );
 
     if (variant === "crystal") {
-      // Struck glass: inharmonic partials on a pentatonic note, never the
-      // same note twice in a row; finishers ring on the root, A6.
       let ring = heavy ? 1 : Math.floor(Math.random() * IMPACT_RING_HZ.length);
       if (!heavy && ring === this.lastRing) ring = (ring + 2) % IMPACT_RING_HZ.length;
       this.lastRing = ring;
-      const f = IMPACT_RING_HZ[ring]! * (0.997 + Math.random() * 0.006);
+      const frequency = IMPACT_RING_HZ[ring]! * (0.997 + Math.random() * 0.006);
       const ringShape: VoiceShape = { ...shape, attack: 0.002 };
-      this.tone(f, heavy ? 0.4 : 0.28, "sine", 0.1 * weight, f * 0.985, "combat", ringShape);
-      this.tone(f * 2.76, 0.16, "sine", 0.04 * weight, f * 2.73, "combat", ringShape);
-      this.tone(f * 5.4, 0.08, "sine", 0.02 * weight, f * 5.3, "combat", ringShape);
+      this.tone(frequency, heavy ? 0.4 : 0.28, "sine", 0.1 * weight, frequency * 0.985, "combat", ringShape);
+      this.tone(frequency * 2.76, 0.16, "sine", 0.04 * weight, frequency * 2.73, "combat", ringShape);
+      this.tone(frequency * 5.4, 0.08, "sine", 0.02 * weight, frequency * 5.3, "combat", ringShape);
     } else {
-      // Energy: a quick falling zap instead of the ring.
-      this.tone(900 * drift, 0.09, "sawtooth", 0.05 * weight, 240 * drift, "combat", shape);
+      this.tone(
+        profile!.accentStart * drift,
+        0.09,
+        profile!.accentType,
+        0.05 * weight,
+        profile!.accentEnd * drift,
+        "combat",
+        shape,
+      );
     }
+
     if (heavy) {
-      // Finisher shimmer: a short rising sparkle over the ring.
-      this.tone(2600, 0.14, "sine", 0.06, 4400, "combat", { ...shape, attack: 0.01 });
+      this.tone(
+        variant === "heavy" || variant === "missile" ? 1700 : 2600,
+        0.14,
+        "sine",
+        0.06,
+        variant === "void" ? 2300 : 4400,
+        "combat",
+        { ...shape, attack: 0.01 },
+      );
     }
   }
 
