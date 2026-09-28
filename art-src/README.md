@@ -23,9 +23,10 @@ Git bỏ qua mọi thứ ở đây, trừ file README này. Lý do:
 | Thư mục | Kit | File cần có (đuôi `.png`, `.webp` hoặc `.jpg`) |
 |---|---|---|
 | `g01/` | `g01-celestial` | `g01-plate`, `g01-plate-b` (không bắt buộc), `g01-glow-a`, `g01-glow-b`, `g01-dust`, `g01-hero-w01` … `g01-hero-w05`, `g01-atlas-rocks`, `g01-atlas-life` |
-| `g01/_out/` | — | Script tự tạo: ảnh xem trước atlas có đánh số, `report.json`. Không cần sao lưu. |
+| `g02/` | `g02-infernal` | `g02-plate`, `g02-glow-a`, `g02-glow-b`, `g02-dust`, `g02-hero-w06` … `g02-hero-w10`, `g02-atlas-rocks`, `g02-atlas-life` |
+| `gNN/_out/` | — | Script tự tạo: ảnh xem trước atlas có đánh số, `report.json`. Không cần sao lưu. |
 | `fx/vanguard/` | hiệu ứng đạn Vanguard (`pnpm fx:prepare vanguard`) | `vanguard-bolt` (2:1), `vanguard-impact` (1:1), `vanguard-finisher` (2:1), `vanguard-muzzle` (2:1). Tất cả nền đen tuyệt đối `#000000`. |
 
-Thêm Galaxy mới: tạo thư mục `gNN/`, rồi khai báo trong `KITS` của `scripts/bg-art/prepare-kit.mjs`.
+Thêm Galaxy mới: tạo thư mục `gNN/`, rồi khai báo trong `KITS` của `scripts/bg-art/prepare-kit.mjs` cùng dải `heroWorlds`. G02 còn kiểm tra đúng 12 object ở atlas rocks và 11 object ở atlas life để bắt lỗi tách vật thể trước khi build runtime kit.
 
-Chi tiết về tỉ lệ, loại nền và prompt: [G01_CHATGPT_PROMPT_PACK.md](../docs/background-reboot/G01_CHATGPT_PROMPT_PACK.md) (bảng tên file ở cuối) và [BACKGROUND_VISUAL_REBOOT_HANDOFF.md](../docs/BACKGROUND_VISUAL_REBOOT_HANDOFF.md) (mục 6).
+Chi tiết về tỉ lệ, loại nền và prompt: [G01_CHATGPT_PROMPT_PACK.md](../docs/background-reboot/G01_CHATGPT_PROMPT_PACK.md), bộ G02 tương ứng trong `docs/background-reboot/G02_CHATGPT_PROMPT_PACK.md`, và [BACKGROUND_VISUAL_REBOOT_HANDOFF.md](../docs/BACKGROUND_VISUAL_REBOOT_HANDOFF.md) (mục 6).
