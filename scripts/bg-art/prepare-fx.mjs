@@ -11,6 +11,7 @@
  * the muzzle or the impact). Also records provenance in manifest.json.
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { join, relative } from "node:path";
 import sharp from "sharp";
 import {
@@ -26,8 +27,20 @@ import {
 
 const PUBLIC_ROOT = join(ROOT, "public/assets/space-typing/fx");
 
-/** Ships that have shot art; every other ship keeps the legacy laser. */
-const SHIPS = ["vanguard"];
+/** Every playable ship owns a four-sprite shot kit. */
+const SHIPS = [
+  "vanguard",
+  "aegis",
+  "volt",
+  "wraith",
+  "fortune",
+  "arsenal",
+  "oracle",
+  "bastion",
+  "reaper",
+  "celestial",
+  "zenith",
+];
 
 /**
  * anchor: "tip" = right-most bright point (bolt head), "origin" = left-most
@@ -165,8 +178,43 @@ function findAnchor(image, kind) {
 
 async function main() {
   const ship = process.argv[2];
+  if (ship === "all") {
+    if (option("src") !== null || option("out") !== null) {
+      throw new Error("--src/--out can only be used with one ship, not fx:prepare all.");
+    }
+
+    let failed = false;
+    for (const id of SHIPS) {
+      const sourceDir = join(ROOT, "art-src/fx", id);
+      const hasSource =
+        existsSync(sourceDir) &&
+        readdirSync(sourceDir).some((file) =>
+          Object.keys(SPRITES).some((spriteId) =>
+            file.startsWith(id + "-" + spriteId + "."),
+          ),
+        );
+      if (!hasSource) {
+        console.log("• " + id + ": no source art found; existing runtime kit kept.");
+        continue;
+      }
+
+      const result = spawnSync(
+        process.execPath,
+        [process.argv[1], id, ...process.argv.slice(3)],
+        { stdio: "inherit" },
+      );
+      if (result.status !== 0) failed = true;
+    }
+    if (failed) process.exitCode = 1;
+    return;
+  }
+
   if (!SHIPS.includes(ship)) {
-    console.error("Usage: pnpm fx:prepare <" + SHIPS.join("|") + "> [--tool=<name>] [--src=<dir>] [--out=<dir>]");
+    console.error(
+      "Usage: pnpm fx:prepare <all|" +
+        SHIPS.join("|") +
+        "> [--tool=<name>] [--src=<dir>] [--out=<dir>]",
+    );
     process.exit(2);
   }
   // --src / --out exist for pipeline tests; normal runs use the ship folders.
