@@ -143,17 +143,20 @@ describe("hostile projectile intercept SFX", () => {
     game.destroy();
   });
 
-  it("keeps the instant laser tracer for ships without a bolt design", () => {
+  it("keeps the intercepted projectile ghost until Aegis' travelling bolt lands", () => {
     vi.spyOn(Sfx.prototype, "projectileIntercept").mockImplementation(() => {});
     const game = gameWithFakeCanvas();
     game.setCharacter("aegis");
     const state = typedHostileBullet(game);
 
-    expect(state.playerShots.activeShots).toBe(0);
-    expect(state.lasers).toHaveLength(1);
-    expect(state.lasers[0]!.life).toBe(0.18);
+    expect(state.playerShots.activeShots).toBe(1);
+    expect(state.lasers).toHaveLength(0);
+    expect(state.interceptedProjectiles).toHaveLength(1);
+    expect(state.projectileImpacts).toHaveLength(0);
+    state.updateEffects(MAX_FLIGHT_SECONDS);
+    expect(state.interceptedProjectiles).toHaveLength(0);
     expect(state.projectileImpacts).toHaveLength(1);
-    expect(state.projectileImpacts[0]!.life).toBe(0.34);
+    expect(state.projectileImpacts[0]!.life).toBeCloseTo(0.34);
     expect(state.particles.length).toBeGreaterThan(0);
     game.destroy();
   });
