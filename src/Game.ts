@@ -7578,10 +7578,13 @@ export class Game {
    * the legacy laser, which keeps its original feedback.
    */
   private applyShotImpact(impact: ShotImpact, x: number, y: number, fromBolt: boolean): void {
-    const impactHue = playerProjectileProfile(this.characterId).impactHue;
-    // Every ship's hits are heard: Vanguard's bolt rings like crystal, ships
-    // still on the legacy laser get the energy crack. Panned to the target.
-    const variant: ImpactVariant = fromBolt ? "crystal" : "energy";
+    const projectileProfile = playerProjectileProfile(this.characterId);
+    const impactHue = projectileProfile.impactHue;
+    // Travelling projectiles use their ship identity; the legacy/failsafe
+    // tracer keeps the generic energy crack. Panned to the target.
+    const variant: ImpactVariant = fromBolt
+      ? projectileProfile.impactVariant
+      : "energy";
     const pan = clamp((x / Math.max(1, this.width)) * 2 - 1, -1, 1) * 0.6;
     switch (impact.kind) {
       case "enemy-hit": {
