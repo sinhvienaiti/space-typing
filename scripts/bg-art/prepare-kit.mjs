@@ -35,18 +35,73 @@ const KITS = {
     src: "art-src/g01",
     prefix: "g01-",
     heroWorlds: [1, 2, 3, 4, 5],
+    plateNames: ["plate", "plate-b"],
     expectedAtlasObjects: null,
   },
   "g02-infernal": {
     src: "art-src/g02",
     prefix: "g02-",
     heroWorlds: [6, 7, 8, 9, 10],
-    // The prompt pack deliberately defines exact counts. Failing here catches
-    // merged objects, missed alpha islands and accidental extra debris before
-    // a broken atlas reaches the runtime kit.
+    plateNames: ["plate"],
     expectedAtlasObjects: { rocks: 12, life: 11 },
   },
-};
+  "g03-frost-prism": {
+    src: "art-src/g03",
+    prefix: "g03-",
+    heroWorlds: [11, 12, 13, 14, 15],
+    plateNames: ["plate"],
+    expectedAtlasObjects: { rocks: 14, life: 12 },
+  },
+  "g04-verdant": {
+    src: "art-src/g04",
+    prefix: "g04-",
+    heroWorlds: [16, 17, 18, 19, 20],
+    plateNames: ["plate", "plate-b", "plate-c", "plate-d", "plate-e"],
+    expectedAtlasObjects: { rocks: 14, life: 12 },
+  },
+  "g05-shadow-nature": {
+    src: "art-src/g05",
+    prefix: "g05-",
+    heroWorlds: [21, 22, 23, 24, 25],
+    plateNames: ["plate", "plate-b", "plate-c", "plate-d", "plate-e"],
+    expectedAtlasObjects: { rocks: 14, life: 12 },
+  },
+  "g06-cosmic-forge": {
+    src: "art-src/g06",
+    prefix: "g06-",
+    heroWorlds: [26, 27, 28, 29, 30],
+    plateNames: ["plate", "plate-b", "plate-c", "plate-d", "plate-e"],
+    expectedAtlasObjects: { rocks: 14, life: 12 },
+  },
+  "g07-abyssal": {
+    src: "art-src/g07",
+    prefix: "g07-",
+    heroWorlds: [31, 32, 33, 34, 35],
+    plateNames: ["plate", "plate-b", "plate-c", "plate-d", "plate-e"],
+    expectedAtlasObjects: { rocks: 14, life: 12 },
+  },
+  "g08-aurora-cosmic": {
+    src: "art-src/g08",
+    prefix: "g08-",
+    heroWorlds: [36, 37, 38, 39, 40],
+    plateNames: ["plate", "plate-b", "plate-c", "plate-d", "plate-e"],
+    expectedAtlasObjects: { rocks: 14, life: 12 },
+  },
+  "g09-void-cathedral": {
+    src: "art-src/g09",
+    prefix: "g09-",
+    heroWorlds: [41, 42, 43, 44, 45],
+    plateNames: ["plate", "plate-b", "plate-c", "plate-d", "plate-e"],
+    expectedAtlasObjects: { rocks: 14, life: 12 },
+  },
+  "g10-eternity": {
+    src: "art-src/g10",
+    prefix: "g10-",
+    heroWorlds: [46, 47, 48, 49, 50],
+    plateNames: ["plate", "plate-b", "plate-c", "plate-d", "plate-e"],
+    expectedAtlasObjects: { rocks: 14, life: 12 },
+  },
+}
 
 const PLATE_SIZES = [2880, 1920, 1280];
 const TEXTURE_SIZES = [2048, 1024, 512];
@@ -702,11 +757,12 @@ async function main() {
     return file;
   };
 
-  // Plates: the main plate, plus an optional second plate for World variety.
-  for (const plateName of ["plate", "plate-b"]) {
-  const plateFile = plateName === "plate" ? input(plateName) : findInput(srcDir, kit.prefix + plateName);
-  if (plateFile !== null) {
-    if (plateName !== "plate") report.inputs[plateName] = relative(ROOT, plateFile);
+  // Each Galaxy declares the plates that actually exist in its authored kit.
+  // G03 intentionally keeps its completed one-plate source set; G04+ uses one
+  // unique plate per World so variety comes from authored scenery, not recolor.
+  for (const plateName of kit.plateNames) {
+    const plateFile = input(plateName);
+    if (plateFile === null) continue;
     const image = await readArt(plateFile, plateName, report.notes);
     const sizes = exportSizes(Math.max(image.width, image.height), PLATE_SIZES);
     const variants = await writeVariants(
@@ -719,10 +775,12 @@ async function main() {
     variants.forEach((variant) => written.add(variant.url));
     textures[plateName] = { variants, aspect: image.width / image.height, wrap: "clamp", mipmaps: false };
     const luma = await lumaReport(image);
-    report[plateName === "plate" ? "plateLuma" : "plateBLuma"] = luma;
+    const lumaKey = (plateName === "plate"
+      ? "plate"
+      : plateName.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())) + "Luma";
+    report[lumaKey] = luma;
     for (const warning of luma.warnings) console.warn("• " + plateName + " readability: " + warning);
     if (image.width < 1920) console.warn("• " + plateName + " is " + image.width + " px wide; upscale 2x with Upscayl for sharper High/Ultra.");
-  }
   }
 
   // Glow sheets (opaque, additive).
@@ -775,8 +833,7 @@ async function main() {
     textures.dust = { variants, aspect: 1, wrap: "repeat", mipmaps: true };
   }
 
-  // Heroes. Each Galaxy owns its own World range (G01 = 01–05,
-  // G02 = 06–10), while the rest of the processing stays shared.
+  // Heroes. Each Galaxy owns a five-World range; processing stays shared.
   for (const worldNumber of kit.heroWorlds) {
     const name = "hero-w" + String(worldNumber).padStart(2, "0");
     const file = input(name);
