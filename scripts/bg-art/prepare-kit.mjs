@@ -35,24 +35,23 @@ const KITS = {
     src: "art-src/g01",
     prefix: "g01-",
     heroWorlds: [1, 2, 3, 4, 5],
-    plateNames: ["plate", "plate-b"],
+    plateNames: ["plate", "plate-b", "plate-c", "plate-d", "plate-e"],
     expectedAtlasObjects: null,
   },
   "g02-infernal": {
     src: "art-src/g02",
     prefix: "g02-",
     heroWorlds: [6, 7, 8, 9, 10],
-    plateNames: ["plate"],
+    plateNames: ["plate", "plate-b", "plate-c", "plate-d", "plate-e"],
     expectedAtlasObjects: { rocks: 12, life: 11 },
   },
   "g03-frost-prism": {
     src: "art-src/g03",
     prefix: "g03-",
     heroWorlds: [11, 12, 13, 14, 15],
-    plateNames: ["plate"],
-    // G03 uses the earlier approved 11-image source set. Its atlas art was
-    // authored before the exact-count detector contract introduced for G04+,
-    // so preserve the detected separated subjects instead of rejecting it.
+    plateNames: ["plate", "plate-b", "plate-c", "plate-d", "plate-e"],
+    // G03 keeps its earlier approved atlas layout, while its World plates are
+    // now upgraded to the same five-plate contract used by G04-G10.
     expectedAtlasObjects: null,
   },
   "g04-verdant": {
