@@ -93,6 +93,7 @@ lsof -ti tcp:3098 | xargs kill
 | `shot-state.js` | `shot-gallery.html` | Số đạn đang bay, ảnh đạn đã nạp, trạng thái các mục tiêu |
 | `game-assets.js` | trang game | Nền mới có bật không (`blit (BGV on)`), những file hình nền và ảnh đạn đã tải |
 | `bg-gpu-stress.js` | `bg-gallery.html?world=…` (một World, không lưới) | Tên GPU; số khung/giây khi vẽ nền 1, 3, 6, 10 lần mỗi khung. Dùng để ước độ dư sức |
+| `sfx-levels.js` | bất kỳ trang nào của máy chủ dev (ví dụ `shot-gallery.html?idle=1`) | **Âm thanh, không phải hình:** dựng từng tiếng động của `Sfx` ngoài thời gian thực, trả về đỉnh (dBFS), độ to 100 ms, độ dài, độ lệch trái/phải. AI không nghe được, nên dùng số này để so với một tiếng chủ dự án đã nghe rõ |
 
 Trang dev để lộ sẵn các "tay cầm" để gỡ lỗi:
 - `window.__bgGalleryCells[i].stage`: `.diagnostics()`, `.triggerPass()`, `.triggerMeteorShower()`, `.director` (trường private vẫn đọc được lúc chạy).

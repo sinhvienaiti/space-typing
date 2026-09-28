@@ -7,7 +7,7 @@ import {
   PriorityKillChain,
   type AnnouncerEvent,
 } from "./audio/announcer";
-import { Sfx } from "./audio/Sfx";
+import { Sfx, type ImpactVariant } from "./audio/Sfx";
 import {
   bossActionInterval,
   bossKeyDamage,
@@ -7579,6 +7579,10 @@ export class Game {
    */
   private applyShotImpact(impact: ShotImpact, x: number, y: number, fromBolt: boolean): void {
     const impactHue = playerProjectileProfile(this.characterId).impactHue;
+    // Every ship's hits are heard: Vanguard's bolt rings like crystal, ships
+    // still on the legacy laser get the energy crack. Panned to the target.
+    const variant: ImpactVariant = fromBolt ? "crystal" : "energy";
+    const pan = clamp((x / Math.max(1, this.width)) * 2 - 1, -1, 1) * 0.6;
     switch (impact.kind) {
       case "enemy-hit": {
         const enemy = this.enemies.find((item) => item.id === impact.enemyId);
@@ -7588,7 +7592,7 @@ export class Game {
           if (fromBolt) this.staggerEnemy(enemy, HIT_STUN_SECONDS);
         }
         this.burst(x, y, impact.power > 1 ? 12 : fromBolt ? 8 : 5, impactHue);
-        if (fromBolt) this.sfx.boltImpact(impact.power);
+        this.sfx.boltImpact(impact.power, pan, variant);
         return;
       }
       case "enemy-layer": {
@@ -7602,7 +7606,7 @@ export class Game {
         this.burst(x, y, 12, impactHue);
         this.burst(x, y, impact.fx.count, impact.fx.hue);
         this.sfx.hit(impact.fx.pitch);
-        if (fromBolt) this.sfx.boltImpact(1.25);
+        this.sfx.boltImpact(1.25, pan, variant);
         return;
       }
       case "enemy-kill": {
@@ -7613,7 +7617,7 @@ export class Game {
         this.burst(x, y, impact.fx.count, impact.fx.hue);
         this.sfx.hit(impact.fx.pitch);
         this.sfx.kill(impact.fx.pitch);
-        if (fromBolt) this.sfx.boltImpact(1.45);
+        this.sfx.boltImpact(1.45, pan, variant);
         if (this.settings.screenShake) {
           this.shake = Math.max(this.shake, impact.shake);
         }
@@ -7625,7 +7629,7 @@ export class Game {
           this.boss.kick = Math.max(this.boss.kick, fromBolt ? 1.4 : 1);
         }
         this.burst(x, y, 7, impactHue);
-        if (fromBolt) this.sfx.boltImpact(0.9);
+        this.sfx.boltImpact(0.9, pan, variant);
         return;
       }
       case "intercept": {
@@ -7645,7 +7649,7 @@ export class Game {
       }
       case "bonus-hit": {
         this.burst(x, y, impact.count, impact.hue);
-        if (fromBolt) this.sfx.boltImpact(0.8);
+        this.sfx.boltImpact(0.8, pan, variant);
         return;
       }
       case "bonus-collect": {
@@ -7653,7 +7657,7 @@ export class Game {
         if (ghost >= 0) this.bonusGhosts.splice(ghost, 1);
         this.burst(x, y, impact.count, impact.hue);
         this.sfx.support();
-        if (fromBolt) this.sfx.boltImpact(1.3);
+        this.sfx.boltImpact(1.3, pan, variant);
         return;
       }
     }

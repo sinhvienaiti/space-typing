@@ -94,23 +94,74 @@ describe("bolt impact sound", () => {
     vi.unstubAllGlobals();
   });
 
-  it("layers a chime, a crackle and a thud, and merges hits closer than 32 ms", () => {
-    const sfx = new Sfx();
+  type Voice = [number, number, string, number, number, string, { pan?: number; filter?: string }?];
+
+  function spyVoices(sfx: Sfx) {
     const audio = sfx as unknown as { tone: () => void; noise: () => void };
-    const tone = vi.spyOn(audio, "tone").mockImplementation(() => {});
-    const noise = vi.spyOn(audio, "noise").mockImplementation(() => {});
+    return {
+      tone: vi.spyOn(audio, "tone").mockImplementation(() => {}),
+      noise: vi.spyOn(audio, "noise").mockImplementation(() => {}),
+    };
+  }
+
+  it("layers a band-passed crack, a body, a thud and a crystal ring; merges hits closer than 32 ms", () => {
+    const sfx = new Sfx();
+    const { tone, noise } = spyVoices(sfx);
     let now = 1000;
     vi.spyOn(performance, "now").mockImplementation(() => now);
 
     sfx.boltImpact(0.8);
-    expect(tone).toHaveBeenCalledTimes(3);
+    // Body + thud + three ring partials.
+    expect(tone).toHaveBeenCalledTimes(5);
     expect(noise).toHaveBeenCalledOnce();
+    expect((noise.mock.calls[0] as unknown[])[3]).toMatchObject({ filter: "bandpass" });
     now += 10;
     sfx.boltImpact(0.8);
-    expect(tone).toHaveBeenCalledTimes(3);
+    expect(tone).toHaveBeenCalledTimes(5);
     now += 40;
     sfx.boltImpact(0.8);
+    expect(tone).toHaveBeenCalledTimes(10);
+    sfx.destroy();
+  });
+
+  it("rings on A minor pentatonic notes, never the same note twice in a row", () => {
+    const sfx = new Sfx();
+    const { tone } = spyVoices(sfx);
+    let now = 1000;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    const pentatonic = [1567.98, 1760, 2093, 2349.32, 2637.02];
+    const rings: number[] = [];
+    for (let hit = 0; hit < 24; hit += 1) {
+      tone.mockClear();
+      sfx.boltImpact(1);
+      now += 50;
+      // Third voice: the ring's fundamental (after body and thud).
+      rings.push((tone.mock.calls[2] as unknown as Voice)[0]);
+    }
+    for (const [index, ring] of rings.entries()) {
+      expect(pentatonic.some((note) => Math.abs(ring / note - 1) < 0.004)).toBe(true);
+      if (index > 0) expect(Math.abs(ring / rings[index - 1]! - 1)).toBeGreaterThan(0.01);
+    }
+    sfx.destroy();
+  });
+
+  it("pans to the target, adds a shimmer on finishers, and zaps without a ring on the legacy laser", () => {
+    const sfx = new Sfx();
+    const { tone, noise } = spyVoices(sfx);
+    let now = 1000;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+
+    sfx.boltImpact(1.45, 0.6);
     expect(tone).toHaveBeenCalledTimes(6);
+    for (const call of tone.mock.calls as unknown as Voice[]) expect(call[6]?.pan).toBeCloseTo(0.6);
+    expect((noise.mock.calls[0] as unknown as [number, number, string, { pan: number }])[3].pan).toBeCloseTo(0.6);
+
+    tone.mockClear();
+    now += 50;
+    sfx.boltImpact(1, -0.4, "energy");
+    // Body + thud + zap: no glass ring on ships without the crystal bolt.
+    expect(tone).toHaveBeenCalledTimes(3);
+    expect((tone.mock.calls as unknown as Voice[]).map((call) => call[2])).toContain("sawtooth");
     sfx.destroy();
   });
 });
@@ -347,12 +398,18 @@ describe("Game player shots", () => {
     game.testLabSpawnEnemies({ kind: "scout", count: 1, layers: 1 });
     const runtime = game as unknown as ShotRuntime;
     const enemy = runtime.enemies[0]!;
+    enemy.x = 1100;
+    enemy.baseX = 1100;
     const word = typingText(enemy.entry.en);
 
     game.handleKey(word[0]!);
     expect(chime).not.toHaveBeenCalled();
     runtime.updateEffects(MAX_FLIGHT_SECONDS);
     expect(chime).toHaveBeenCalledOnce();
+    // Crystal ring for Vanguard's bolt, heard from the right (enemy at x 1100 of 1280).
+    const [, pan, variant] = chime.mock.calls[0]!;
+    expect(variant).toBe("crystal");
+    expect(pan).toBeGreaterThan(0.2);
     expect(enemy.hitStun ?? 0).toBeGreaterThan(0);
     expect(enemy.hitShake ?? 0).toBeGreaterThan(0);
 
@@ -380,9 +437,11 @@ describe("Game player shots", () => {
     expect(enemy.flash).toBe(1);
     expect(runtime.lasers).toHaveLength(1);
     expect(runtime.playerShots.activeShots).toBe(0);
-    // The legacy laser keeps its original feedback: no stagger, no chime.
+    // The legacy laser hits at once: no stagger, but its hit is heard now
+    // (the energy crack, 28/9: the owner heard no hit sound on these ships).
     expect(enemy.hitStun ?? 0).toBe(0);
-    expect(chime).not.toHaveBeenCalled();
+    expect(chime).toHaveBeenCalledOnce();
+    expect(chime.mock.calls[0]![2]).toBe("energy");
 
     for (const key of word.slice(1)) game.handleKey(key);
     expect(runtime.dyingEnemies).toHaveLength(0);

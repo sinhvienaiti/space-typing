@@ -6,6 +6,8 @@
 >
 > **Tài liệu liên quan:** hình nền BGV — [BACKGROUND_VISUAL_REBOOT_HANDOFF.md](BACKGROUND_VISUAL_REBOOT_HANDOFF.md). Hai hệ này độc lập; đạn chỉ dùng chung quy trình xử lý ảnh (`scripts/bg-art/`). Nhạc nền World 01 — [MUSIC_WORLD_01.md](MUSIC_WORLD_01.md).
 >
+> **Cập nhật 28/09 (đợt 4):** làm lại **tiếng trúng quái**: bản cũ nhỏ hơn nhạc nền khoảng 25 dB nên chủ dự án không nghe thấy, và tàu dùng laser cũ thì không có tiếng trúng. Xem 2.1, 4.1 và lỗi 18.
+>
 > **Cập nhật 28/09 (đợt 3):** quái thưởng giờ cũng bị bắn bằng đạn thật; phi thuyền **xoay mũi về phía mục tiêu** khi bắn, nòng súng xoay theo; **bộ đèn mới cho Vanguard** (lửa phụt đúng 2 ống, lõi pha lê, đèn cánh, hào quang, tia lửa phía sau). Xem mục 2.1, 4.1, 4.3 và 8 (lỗi 13–17).
 
 ## Mục lục
@@ -62,7 +64,13 @@ Yêu cầu gốc: *"hiệu ứng có cảm giác không phải 2D, phải đẹp
 - **Đầu đạn:** ảnh vẽ tay (ngọn giáo pha lê xanh cyan có vòng xoắn năng lượng), ghim đúng mũi giáo vào vị trí đạn, xoay theo hướng bay.
 - **Đuôi:** "vệt tàn" mềm bắt đầu phía sau thân giáo, nhiều lớp sáng lồng nhau, thon dần; kèm bụi sáng rơi phía sau.
 - **Khi trúng:** loé trắng và quầng màu, ảnh vụ nổ hình sao vẽ tay nở ra rồi mờ dần (mỗi phát xoay một góc khác), tia lửa bắn ra.
-- **Tiếng trúng pha lê** (`Sfx.boltImpact`): tiếng "tinh" cao trong, tiếng lách tách, và tiếng "bịch" trầm. Mỗi phát lệch cao độ một chút; các phát cách nhau dưới 32 ms được gộp.
+- **Tiếng trúng** (`Sfx.boltImpact(power, pan, variant)`), gồm các lớp:
+  - tiếng "tách" sáng (nhiễu lọc dải);
+  - tiếng "bụp" giữa và tiếng trầm có lực;
+  - với Vanguard (`"crystal"`): tiếng ngân pha lê trên một nốt của thang La thứ ngũ cung (Sol, La, Đô, Rê, Mi ở quãng cao). Không lặp lại nốt vừa phát, nên gõ liên tục nghe như chuỗi chuông cùng giọng với nhạc World 01. Phát hạ gục ngân nốt La và thêm tiếng "vút" lấp lánh đi lên;
+  - với tàu còn dùng laser (`"energy"`): tiếng "xẹt" điện thay cho tiếng ngân.
+  - Tiếng lệch trái/phải theo vị trí quái (tối đa 60%). Các phát cách nhau dưới 32 ms được gộp.
+  - Độ to, đo ở âm lượng mặc định: đỉnh khoảng −23 dBFS; phát hạ gục −21; laser −25. Làm mốc: tiếng bắn hạ đạn địch khoảng −19; nhạc nền World 01 khoảng −27 LUFS. Bản đầu chỉ −41 dBFS.
 - **Quái khựng lại khi trúng:** dừng tiến 0,06 giây mỗi phát (0,16 giây khi vỡ khiên), thân bật lùi mạnh hơn và rung ngang 0,12 giây. Nhãn chữ đứng yên để dễ đọc.
 - **Loé nòng súng:** ảnh vẽ tay, ghim gốc vào nòng.
 - **Cảm giác chiều sâu:** đạn nhỏ dần khi bay lên, nhưng chỉ tới 74%, để đạn ở xa vẫn dễ nhìn.
@@ -205,7 +213,8 @@ Giá trị hiện tại của Vanguard (`spear`):
 | `bonus-hit` | `typeSupplyPod`, `typeTreasureDrone`, `typeRewardChoiceCrate`, `typeAnomalyCrate`, `typeRecallBonus` (mỗi chữ trừ chữ cuối), qua `fireBonusShot` | điểm, chuỗi combo, năng lượng (như trước) | tia lửa màu của hộp (7–8 hạt), `sfx.boltImpact(0.8)` |
 | `bonus-collect` | chữ cuối của các hộp trên | **phần thưởng, điểm, rơi đồ, bảng chọn thưởng, thông báo, xoá hộp** | xoá bóng hộp, vụ nổ lớn màu của hộp (34–54 hạt), `sfx.support` + `sfx.boltImpact(1.3)` |
 
-- Cú khựng, rung và tiếng trúng pha lê **chỉ có khi đạn thật chạm** (`fromBolt = true`). Tia laser cũ giữ nguyên phản hồi cũ, và có test khoá hành vi này. Tàu nào có đạn mới thì tự có cú khựng.
+- Cú khựng và rung **chỉ có khi đạn thật chạm** (`fromBolt = true`). Tia laser cũ không có, và có test khoá hành vi này. Tàu nào có đạn mới thì tự có cú khựng.
+- **Tiếng trúng thì tàu nào cũng có:** `applyShotImpact` gọi `sfx.boltImpact(sức, pan, variant)` ở mọi kiểu trúng (trừ `intercept`, vốn đã có tiếng riêng lúc gõ). `variant` = `"crystal"` khi đạn thật chạm, `"energy"` với laser cũ. `pan` = vị trí x của mục tiêu, đổi sang −1…1, nhân 0,6. Sức: trúng thường = `power` của phát bắn; vỡ khiên 1,25; hạ gục 1,45; boss 0,9; hộp thưởng 0,8; nhặt hộp 1,3.
 - Cú khựng là thay đổi lối chơi nhỏ: quái bị gõ tiến chậm lại. Thời lượng nằm ở các hằng số `HIT_STUN_SECONDS` (0,06), `LAYER_STUN_SECONDS` (0,16), `HIT_SHAKE_SECONDS` (0,12) trong `Game.ts`.
 - Các phần boss khác (hết từ, vỡ khiên, bị hạ) giữ nguyên, xảy ra ngay.
 - Hạ gục bằng kỹ năng (`resolveSkillEnemyKill`, ví dụ bom chữ) không đi qua đạn, vẫn nổ ngay.
@@ -323,7 +332,9 @@ Khi build, `check-background-art.mjs` kiểm tra:
    - thêm tên tàu vào `SHIPS` trong `prepare-fx.mjs`;
    - chạy `pnpm fx:prepare <ship>`;
    - mở `public/assets/space-typing/fx/<ship>/` xem kết quả.
-5. **Tiếng trúng:** mỗi tàu nên có tiếng riêng. Viết một hàm mới trong `Sfx` giống `boltImpact` (tổng hợp bằng `tone` và `noise`, hoặc dùng mẫu âm thanh trong `sample-bank.ts`), rồi gọi theo tàu trong `applyShotImpact`. Hiện tất cả dùng chung `boltImpact`.
+5. **Tiếng trúng:** mỗi tàu nên có tiếng riêng. Thêm một giá trị vào `ImpactVariant` trong `Sfx.ts` (ví dụ `"storm"` cho Volt: tiếng sét lách tách), viết nhánh riêng trong `boltImpact`, rồi chọn variant theo tàu trong `applyShotImpact` (hiện là `fromBolt ? "crystal" : "energy"`).
+   - `tone()` và `noise()` nhận thêm `VoiceShape`: `pan`, `attack` (độ vào tiếng), `filter`/`frequency`/`q` (lọc nhiễu, ví dụ `"bandpass"`).
+   - **Đo độ to trước khi báo** bằng `scripts/visual/evals/sfx-levels.js` (mục phụ lục). AI không nghe được, nên phải so bằng số: tiếng trúng thường nên có đỉnh quanh −23 dBFS ở âm lượng mặc định.
 6. **Thêm công thức** vào `RECIPES`, theo archetype của tàu:
    - `fx: "<ship>"`, các cỡ ảnh, `muzzles` (đo trên ảnh tàu: tàu vẽ ở cỡ 78 px, tâm ở giữa), tốc độ, độ cong.
    - Công thức gắn với archetype, và mỗi archetype hiện chỉ thuộc đúng một tàu.
@@ -407,6 +418,11 @@ Phần đặc (thân tên lửa, lõi vật chất tối): xin ảnh **trên n�
 15. **Lửa phụt trông thô:** lửa cũ vẽ ở `x = ±6`, `y = 17`, tức **giữa hai ống phụt**, trong khi ống thật của ảnh nằm ở `±13`, `23,5`; thêm một vệt đuôi ở giữa, chỗ không có động cơ nào. Đo lại trên ảnh (mục 4.3) và làm bộ đèn mới.
 16. **Hào quang bản đầu quá đậm,** trông như viền dán màu cyan quanh tàu → nhoè rộng hơn, độ đục từ khoảng 0,5–0,9 giảm còn khoảng 0,24–0,4.
 17. **Tia lửa bản đầu to và nhoè như đốm tròn mờ** → nhỏ hơn, sáng hơn, bay nhanh hơn, sống ngắn hơn.
+18. **Chủ dự án hỏi "đã có âm thanh khi đạn bắn vào quái chưa?"**, dù `boltImpact` đã có từ đợt 2.
+    - Đo bằng cách dựng tiếng ngoài thời gian thực trong Chrome (`OfflineAudioContext`, file `sfx-levels.js`): đỉnh chỉ −41 dBFS ở âm lượng mặc định. Các lớp tắt gần như ngay (giảm theo hàm mũ từ lúc bắt đầu), và lớp trầm nằm ở 70–170 Hz, loa laptop gần như không phát được. Tiếng này nhỏ hơn nhạc nền khoảng 25 dB, và nhỏ hơn tiếng bắn hạ đạn địch (mẫu âm thanh Kenney, đỉnh khoảng −19) khoảng 22 dB.
+    - Thêm nữa: 10 tàu dùng laser cũ không có tiếng trúng nào. Từ khi AI kia cho chọn mọi tàu ngay từ đầu, điều này dễ gặp.
+    - Cách xử lý: thiết kế lại (xem 2.1), đặt mức theo số đo, thêm biến thể `"energy"` cho tàu laser, và cho tiếng lệch trái/phải theo vị trí quái.
+    - **Bài học:** tiếng mới phải được đo và so với một tiếng mà chủ dự án đã nghe rõ, không chỉ "có gọi hàm".
 
 ---
 
@@ -451,6 +467,7 @@ Phần đặc (thân tên lửa, lõi vật chất tối): xin ảnh **trên n�
 | Chơi thật | `pnpm build:space && ./play.sh` (thư mục gốc), rồi tải lại trang |
 | Test | `cd games/space-typing && pnpm test` |
 | Chụp và soi ảnh tự động | `pnpm -s visual:shot <url> .visual/<tên>.png [...]`, `pnpm -s visual:crop <png> <jpg> --rect=x,y,w,h`. Xem [VISUAL_TESTING.md](VISUAL_TESTING.md) |
+| Đo độ to các tiếng động | `pnpm -s visual:shot "http://127.0.0.1:3098/shot-gallery.html?panel=0&idle=1" .visual/sfx.png --wait=2500 --eval-file=scripts/visual/evals/sfx-levels.js` (máy chủ dev tạm, cổng 3098). Trả về đỉnh, độ to 100 ms, độ dài và độ lệch trái/phải của từng tiếng |
 
 Tham số của trang xem thử:
 - `q=low|medium|high|ultra`: bậc chất lượng.
