@@ -379,8 +379,8 @@ export const G01_COMPOSITIONS: readonly WorldComposition[] = [
   world(
     "world-03",
     plate(
-      { focus: PLATE_A_FOCUS },
-      grade({ exposure: 0.9, gamma: 1.1, hueShift: -18, saturation: 1.08 }),
+      { texture: "plate-c", focus: [0.46, 0.52] },
+      grade({ exposure: 0.94, gamma: 1.08, hueShift: -10, saturation: 1.04 }),
     ),
     hero("hero-w03", [0.2, 0.32], 0.66, [0.45, 0.85, 1]),
     PRISM_MOTES,
@@ -389,7 +389,7 @@ export const G01_COMPOSITIONS: readonly WorldComposition[] = [
   // Cherub Falls — floating island with light waterfalls over plate B.
   world(
     "world-04",
-    plate({ texture: "plate-b" }, grade({ exposure: 1.04, hueShift: 6 })),
+    plate({ texture: "plate-d", focus: [0.54, 0.5] }, grade({ exposure: 1.01, hueShift: 4 })),
     hero("hero-w04", [0.78, 0.34], 0.64, [1, 0.94, 0.8]),
     LIGHT_DROPLETS,
   ),
@@ -397,8 +397,8 @@ export const G01_COMPOSITIONS: readonly WorldComposition[] = [
   world(
     "world-05",
     plate(
-      { flipX: true, focus: PLATE_A_FOCUS },
-      grade({ exposure: 0.9, gamma: 1.1, hueShift: -35, saturation: 0.95 }),
+      { texture: "plate-e", focus: [0.5, 0.46] },
+      grade({ exposure: 0.94, gamma: 1.08, hueShift: -20, saturation: 0.98 }),
     ),
     hero("hero-w05", [0.76, 0.27], 0.6, [0.4, 1, 0.8]),
     AURORA_MOTES,
