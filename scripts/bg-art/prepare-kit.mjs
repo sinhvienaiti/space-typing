@@ -515,12 +515,19 @@ function cropSquare(image) {
  * by bounding boxes, so a sprawling creature never swallows its neighbours.
  * Each box carries the label map so crops keep only their own pixels.
  */
-function detectObjects(image, minAreaShare = 0.0015) {
+function detectObjects(
+  image,
+  minAreaShare = 0.0015,
+  alphaThreshold = 24,
+  gapShare = 0.004,
+) {
   const { data, width, height } = image;
   const count = width * height;
   const mask = new Uint8Array(count);
-  for (let p = 0; p < count; p += 1) mask[p] = data[p * 4 + 3] > 24 ? 1 : 0;
-  const gap = Math.max(2, Math.round(Math.max(width, height) * 0.004));
+  for (let p = 0; p < count; p += 1) {
+    mask[p] = data[p * 4 + 3] > alphaThreshold ? 1 : 0;
+  }
+  const gap = Math.max(1, Math.round(Math.max(width, height) * gapShare));
   const grown = morph(mask, width, height, gap, true);
 
   const labels = new Int32Array(count).fill(-1);
@@ -562,6 +569,35 @@ function detectObjects(image, minAreaShare = 0.0015) {
       return { x: x0, y: y0, w: x1 - x0, h: y1 - y0, area: box.area, id: box.id, labels };
     })
     .sort((a, b) => b.area - a.area);
+}
+
+/**
+ * Painterly atlas subjects can be joined by translucent glow, tendrils or
+ * anti-aliased particles. Try progressively stricter alpha thresholds and
+ * smaller grouping gaps, then keep the result closest to the authored target.
+ * Prefer not to over-split when two candidates are equally close.
+ */
+function detectObjectsNearTarget(image, expectedObjects) {
+  const attempts = [
+    { alpha: 24, gap: 0.004 },
+    { alpha: 32, gap: 0.003 },
+    { alpha: 48, gap: 0.002 },
+    { alpha: 64, gap: 0.0015 },
+    { alpha: 80, gap: 0.001 },
+    { alpha: 96, gap: 0.00075 },
+  ];
+  let best = null;
+  for (const attempt of attempts) {
+    const boxes = detectObjects(image, 0.0015, attempt.alpha, attempt.gap);
+    const distance = Math.abs(boxes.length - expectedObjects);
+    const overSplit = Math.max(0, boxes.length - expectedObjects);
+    const score = distance * 100 + overSplit;
+    if (best === null || score < best.score) {
+      best = { boxes, score, alpha: attempt.alpha, gap: attempt.gap };
+    }
+    if (boxes.length === expectedObjects) break;
+  }
+  return best;
 }
 
 /** Crop of one detected object; pixels of other objects are made transparent. */
@@ -863,30 +899,22 @@ async function main() {
     if (file === null) continue;
     try {
       const image = ensureTransparency(await readArt(file, name, report.notes), name, report.notes);
-      const boxes = detectObjects(image);
-      if (boxes.length === 0) throw new Error(name + ": no separate objects found.");
       const expectedObjects = kit.expectedAtlasObjects?.[atlasId];
+      let detection = expectedObjects === undefined
+        ? { boxes: detectObjects(image), alpha: 24, gap: 0.004 }
+        : detectObjectsNearTarget(image, expectedObjects);
+      let boxes = detection.boxes;
+      if (boxes.length === 0) throw new Error(name + ": no separate objects found.");
       if (expectedObjects !== undefined && boxes.length !== expectedObjects) {
-        // Object detection operates on connected alpha components. Painterly
-        // atlas subjects can become connected by glow, tendrils, particles or
-        // anti-aliased edges even when the authored source visibly contains
-        // the requested number of subjects. Treat an exact-count mismatch as
-        // an art-quality warning rather than a fatal pipeline error.
-        //
-        // Still reject an atlas that is clearly unusable: fewer than ~60% of
-        // the intended objects means separation/keying failed too severely.
-        const minimumUsable = Math.max(4, Math.ceil(expectedObjects * 0.6));
-        if (boxes.length < minimumUsable) {
-          throw new Error(
-            name + ": detected only " + boxes.length + " objects; expected about " + expectedObjects +
-              " and need at least " + minimumUsable +
-              ". Check transparency, spacing and object separation in the source atlas.",
-          );
-        }
         console.warn(
-          "• " + name + ": detected " + boxes.length + " objects; authored target is " +
-            expectedObjects + ". Continuing because the atlas is still usable; " +
-            "review subject separation visually if needed.",
+          "• " + name + ": detected " + boxes.length + " objects after adaptive separation; " +
+            "authored target is " + expectedObjects + ". Continuing with detected sprites. " +
+            "Review the source atlas if visual variety is insufficient.",
+        );
+      } else if (expectedObjects !== undefined && (detection.alpha !== 24 || detection.gap !== 0.004)) {
+        console.warn(
+          "• " + name + ": adaptive separation recovered all " + expectedObjects +
+            " authored subjects (alpha " + detection.alpha + ", gap " + detection.gap + ").",
         );
       }
       const sprites = boxes.map((box) => trim(cropObject(image, box)));
