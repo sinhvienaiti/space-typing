@@ -14,6 +14,7 @@ describe("character projectile profiles", () => {
       expect(profile.glow).toBeLessThanOrEqual(1.5);
       expect(profile.impactHue).toBeGreaterThanOrEqual(0);
       expect(profile.impactHue).toBeLessThanOrEqual(360);
+      expect(profile.impactVariant).toBeTruthy();
     }
   });
 
@@ -22,5 +23,11 @@ describe("character projectile profiles", () => {
     expect(playerProjectileProfile("volt").archetype).toBe("electric");
     expect(playerProjectileProfile("reaper").archetype).toBe("slash");
     expect(playerProjectileProfile("zenith").archetype).toBe("cosmic");
+    expect(playerProjectileProfile("aegis").impactVariant).toBe("heavy");
+    expect(playerProjectileProfile("volt").impactVariant).toBe("storm");
+    expect(playerProjectileProfile("wraith").impactVariant).toBe("void");
+    expect(playerProjectileProfile("arsenal").impactVariant).toBe("missile");
+    expect(playerProjectileProfile("celestial").impactVariant).toBe("radiant");
+    expect(playerProjectileProfile("zenith").impactVariant).toBe("cosmic");
   });
 });
