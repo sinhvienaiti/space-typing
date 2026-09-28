@@ -13,6 +13,19 @@ export type PlayerShotArchetype =
   | "radiant"
   | "cosmic";
 
+export type PlayerImpactVariant =
+  | "crystal"
+  | "heavy"
+  | "storm"
+  | "void"
+  | "star"
+  | "missile"
+  | "mystic"
+  | "shield"
+  | "slash"
+  | "radiant"
+  | "cosmic";
+
 export type PlayerProjectileProfile = {
   archetype: PlayerShotArchetype;
   primary: string;
@@ -20,6 +33,8 @@ export type PlayerProjectileProfile = {
   width: number;
   glow: number;
   impactHue: number;
+  /** Sound identity used when this travelling projectile lands. */
+  impactVariant: PlayerImpactVariant;
 };
 
 const PLAYER_PROJECTILES: Record<
@@ -28,6 +43,7 @@ const PLAYER_PROJECTILES: Record<
 > = {
   vanguard: {
     archetype: "spear",
+    impactVariant: "crystal",
     primary: "#66efff",
     secondary: "#e9fdff",
     width: 1.8,
@@ -36,6 +52,7 @@ const PLAYER_PROJECTILES: Record<
   },
   aegis: {
     archetype: "heavy",
+    impactVariant: "heavy",
     primary: "#69eac7",
     secondary: "#dffff6",
     width: 2.5,
@@ -44,6 +61,7 @@ const PLAYER_PROJECTILES: Record<
   },
   volt: {
     archetype: "electric",
+    impactVariant: "storm",
     primary: "#59dcff",
     secondary: "#fff47e",
     width: 1.9,
@@ -52,6 +70,7 @@ const PLAYER_PROJECTILES: Record<
   },
   wraith: {
     archetype: "shadow",
+    impactVariant: "void",
     primary: "#b77cff",
     secondary: "#f0ddff",
     width: 1.55,
@@ -60,6 +79,7 @@ const PLAYER_PROJECTILES: Record<
   },
   fortune: {
     archetype: "star",
+    impactVariant: "star",
     primary: "#ffd95c",
     secondary: "#fff5b5",
     width: 1.85,
@@ -68,6 +88,7 @@ const PLAYER_PROJECTILES: Record<
   },
   arsenal: {
     archetype: "barrage",
+    impactVariant: "missile",
     primary: "#ff7658",
     secondary: "#ffd184",
     width: 2.2,
@@ -76,6 +97,7 @@ const PLAYER_PROJECTILES: Record<
   },
   oracle: {
     archetype: "mystic",
+    impactVariant: "mystic",
     primary: "#e184ff",
     secondary: "#83eaff",
     width: 1.75,
@@ -84,6 +106,7 @@ const PLAYER_PROJECTILES: Record<
   },
   bastion: {
     archetype: "guard",
+    impactVariant: "shield",
     primary: "#63e9bc",
     secondary: "#9ce8ff",
     width: 2.35,
@@ -92,6 +115,7 @@ const PLAYER_PROJECTILES: Record<
   },
   reaper: {
     archetype: "slash",
+    impactVariant: "slash",
     primary: "#ff557a",
     secondary: "#d58cff",
     width: 2.05,
@@ -100,6 +124,7 @@ const PLAYER_PROJECTILES: Record<
   },
   celestial: {
     archetype: "radiant",
+    impactVariant: "radiant",
     primary: "#9ac8ff",
     secondary: "#ffe99d",
     width: 1.95,
@@ -108,6 +133,7 @@ const PLAYER_PROJECTILES: Record<
   },
   zenith: {
     archetype: "cosmic",
+    impactVariant: "cosmic",
     primary: "#d9fcff",
     secondary: "#9b8cff",
     width: 2.25,
