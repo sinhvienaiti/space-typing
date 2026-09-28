@@ -59,23 +59,42 @@ function run(
 }
 
 describe("player shot recipes", () => {
-  it("gives only Vanguard a travelling bolt in the pilot", () => {
-    expect(shotRecipeFor("vanguard")).not.toBeNull();
-    for (const id of CHARACTER_IDS.filter((candidate) => candidate !== "vanguard")) {
-      expect(shotRecipeFor(id)).toBeNull();
+  it("gives every playable ship a travelling projectile and its own sprite folder", () => {
+    const folders = new Set<string>();
+    for (const id of CHARACTER_IDS) {
+      const recipe = shotRecipeFor(id);
+      expect(recipe).not.toBeNull();
+      expect(recipe?.fx).toBe(id);
+      folders.add(recipe!.fx!);
     }
+    expect(folders.size).toBe(CHARACTER_IDS.length);
+
     const system = new PlayerShotSystem<string>();
     expect(
       system.fire({
-        characterId: "aegis", originX: 0, originY: 0, targetX: 0, targetY: -300,
-        power: 1, viewHeight: 720, payload: "x",
+        characterId: "aegis",
+        originX: 0,
+        originY: 0,
+        targetX: 0,
+        targetY: -300,
+        power: 1,
+        viewHeight: 720,
+        payload: "x",
       }),
-    ).toBe(false);
-    expect(system.activeShots).toBe(0);
+    ).toBe(true);
+    expect(system.activeShots).toBe(1);
   });
 
-  it("points Vanguard at its painted sprite folder", () => {
-    expect(shotRecipeFor("vanguard")?.fx).toBe("vanguard");
+  it("keeps the ship-specific motion identities in recipes", () => {
+    expect(shotRecipeFor("vanguard")?.trailMode).toBe("ribbon");
+    expect(shotRecipeFor("volt")?.trailMode).toBe("zigzag");
+    expect(shotRecipeFor("oracle")?.trailMode).toBe("helix");
+    expect(shotRecipeFor("zenith")?.trailMode).toBe("helix");
+    expect(shotRecipeFor("arsenal")?.trailMode).toBe("smoke");
+    expect(shotRecipeFor("arsenal")?.flightEase).toBeGreaterThan(1);
+    expect(shotRecipeFor("fortune")?.spin).toBeGreaterThan(0);
+    expect(shotRecipeFor("bastion")?.tumble).toBeGreaterThan(0);
+    expect(shotRecipeFor("reaper")?.spin).toBeGreaterThan(0);
   });
 
   it("narrows bolts as they climb the field (depth cue)", () => {
@@ -423,8 +442,7 @@ describe("Game player shots", () => {
     game.destroy();
   });
 
-  it("keeps the instant laser and immediate feedback for ships without a bolt", () => {
-    const kill = vi.spyOn(Sfx.prototype, "kill").mockImplementation(() => {});
+  it("uses Aegis' heavy travelling projectile and lands its own impact sound", () => {
     const game = createTestGame();
     game.setCharacter("aegis");
     game.testLabSpawnEnemies({ kind: "scout", count: 1, layers: 1 });
@@ -434,18 +452,16 @@ describe("Game player shots", () => {
 
     const chime = vi.spyOn(Sfx.prototype, "boltImpact").mockImplementation(() => {});
     game.handleKey(word[0]!);
-    expect(enemy.flash).toBe(1);
-    expect(runtime.lasers).toHaveLength(1);
-    expect(runtime.playerShots.activeShots).toBe(0);
-    // The legacy laser hits at once: no stagger, but its hit is heard now
-    // (the energy crack, 28/9: the owner heard no hit sound on these ships).
-    expect(enemy.hitStun ?? 0).toBe(0);
-    expect(chime).toHaveBeenCalledOnce();
-    expect(chime.mock.calls[0]![2]).toBe("energy");
+    expect(enemy.flash).toBe(0);
+    expect(runtime.lasers).toHaveLength(0);
+    expect(runtime.playerShots.activeShots).toBe(1);
+    expect(chime).not.toHaveBeenCalled();
 
-    for (const key of word.slice(1)) game.handleKey(key);
-    expect(runtime.dyingEnemies).toHaveLength(0);
-    expect(kill).toHaveBeenCalledOnce();
+    runtime.updateEffects(MAX_FLIGHT_SECONDS);
+    expect(enemy.flash).toBe(1);
+    expect(enemy.hitStun ?? 0).toBeGreaterThan(0);
+    expect(chime).toHaveBeenCalledOnce();
+    expect(chime.mock.calls[0]![2]).toBe("heavy");
     game.destroy();
   });
 
@@ -499,7 +515,7 @@ describe("Game player shots", () => {
     game.destroy();
   });
 
-  it("draws the laser tracer at bonus targets for ships without a bolt", () => {
+  it("uses the selected ship's travelling projectile for bonus targets", () => {
     vi.spyOn(Sfx.prototype, "supplyArrival").mockImplementation(() => {});
     const support = vi.spyOn(Sfx.prototype, "support").mockImplementation(() => {});
     const game = createTestGame();
@@ -511,9 +527,12 @@ describe("Game player shots", () => {
     const word = typingText(pod.entry.en);
 
     game.handleKey(word[0]!);
-    expect(runtime.lasers).toHaveLength(1);
+    expect(runtime.lasers).toHaveLength(0);
+    expect(runtime.playerShots.activeShots).toBe(1);
     for (const key of word.slice(1)) game.handleKey(key);
-    expect(runtime.lasers).toHaveLength(word.length);
+    expect(runtime.bonusGhosts).toHaveLength(1);
+    expect(support).not.toHaveBeenCalled();
+    runtime.updateEffects(MAX_FLIGHT_SECONDS);
     expect(runtime.bonusGhosts).toHaveLength(0);
     expect(support).toHaveBeenCalledOnce();
     game.destroy();
