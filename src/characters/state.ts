@@ -134,7 +134,10 @@ export function isValidLegacyCharacterState(value: unknown): boolean {
     seen.add(id);
   }
 
-  return seen.has("vanguard") && seen.has(raw.selected);
+  // Legacy saves may still carry an old milestone-based unlocked list.
+  // Selection is no longer gated by that list; sanitization/sync expands it
+  // to the complete roster.
+  return seen.has("vanguard");
 }
 
 function isValidPreTalentProgress(value: unknown): boolean {
@@ -254,7 +257,7 @@ export function updateCharacterProgress(
 ): CharacterState {
   return {
     selected: state.selected,
-    unlocked: [...state.unlocked],
+    unlocked: allCharactersUnlocked(),
     progress: {
       ...state.progress,
       [id]: sanitizeCharacterProgress(progress),
