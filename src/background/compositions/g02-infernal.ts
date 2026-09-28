@@ -42,11 +42,14 @@ function tierCounts(
 
 function grade(overrides: Partial<GradeSpec> = {}): GradeSpec {
   return {
-    exposure: 0.9,
-    gamma: 1.12,
-    saturation: 0.95,
+    // Keep the source artwork close to its authored brightness. The BGV
+    // shader's curve darkens shadows when gamma is above 1, so G02 uses only
+    // a very small curve and lets the artwork provide its own infernal mood.
+    exposure: 1,
+    gamma: 1.02,
+    saturation: 1,
     hueShift: 0,
-    tint: [1, 0.94, 0.88],
+    tint: [1, 1, 1],
     ...overrides,
   };
 }
@@ -148,7 +151,7 @@ function fields(multiplier: number): readonly FieldSpec[] {
       size: [0.012, 0.034],
       spin: [0.5, 2.5],
       spread: 20,
-      tint: [0.52, 0.36, 0.31],
+      tint: [0.68, 0.56, 0.5],
       alpha: 1,
       blur: 0,
       avoidCenter: false,
@@ -163,7 +166,7 @@ function fields(multiplier: number): readonly FieldSpec[] {
       size: [0.038, 0.12],
       spin: [0.3, 1.6],
       spread: 16,
-      tint: [0.82, 0.62, 0.52],
+      tint: [0.94, 0.86, 0.8],
       alpha: 1,
       blur: 0,
       avoidCenter: true,
@@ -178,7 +181,7 @@ function fields(multiplier: number): readonly FieldSpec[] {
       size: [0.13, 0.21],
       spin: [0.1, 0.7],
       spread: 10,
-      tint: [0.66, 0.45, 0.39],
+      tint: [0.8, 0.68, 0.62],
       alpha: 1,
       blur: 0.2,
       avoidCenter: true,
@@ -232,7 +235,7 @@ function events(tuning: EventTuning): readonly EventSpec[] {
       mirror: true,
       size: [0.22, 0.34],
       alpha: 1,
-      tint: [0.78, 0.55, 0.45],
+      tint: [0.92, 0.82, 0.76],
       blur: 0,
       minTier: "medium",
     },
@@ -249,7 +252,7 @@ function events(tuning: EventTuning): readonly EventSpec[] {
       mirror: true,
       size: [0.09, 0.15],
       alpha: 1,
-      tint: [0.72, 0.52, 0.46],
+      tint: [0.9, 0.82, 0.78],
       blur: 0,
       minTier: "medium",
     },
@@ -266,7 +269,7 @@ function events(tuning: EventTuning): readonly EventSpec[] {
       mirror: true,
       size: [0.04, 0.072],
       alpha: 1,
-      tint: [0.88, 0.62, 0.46],
+      tint: [0.96, 0.86, 0.76],
       blur: 0,
       minTier: "low",
     },
@@ -306,72 +309,72 @@ export const G02_COMPOSITIONS: readonly WorldComposition[] = [
   // World 06 — Ember Orchard: twisted basalt orchard on the upper-left.
   world({
     worldId: "world-06",
-    plate: plate([0.46, 0.58], false, grade({ exposure: 0.9, gamma: 1.1 })),
-    hero: hero("hero-w06", [0.2, 0.3], 0.58, [1, 0.4, 0.12], [0.9, 0.82, 0.74]),
+    plate: plate([0.46, 0.58], false, grade({ exposure: 1, gamma: 1.02 })),
+    hero: hero("hero-w06", [0.2, 0.3], 0.58, [1, 0.4, 0.12]),
     fieldDensity: 0.82,
     emberDensity: 0.9,
     glowTint: [1, 0.38, 0.12],
-    dustOpacity: 0.5,
+    dustOpacity: 0.28,
     glowOpacity: 0.13,
     events: { meteor: [48, 74], large: [96, 142], medium: [62, 96], small: [34, 54] },
-    vignette: 0.64,
+    vignette: 0.42,
   }),
 
   // World 07 — Imp Furnace: heavier iron debris and denser smoke.
   world({
     worldId: "world-07",
-    plate: plate([0.56, 0.48], true, grade({ exposure: 0.85, gamma: 1.15, saturation: 0.9 })),
-    hero: hero("hero-w07", [0.8, 0.34], 0.62, [1, 0.5, 0.14], [0.84, 0.78, 0.72]),
+    plate: plate([0.56, 0.48], true, grade({ exposure: 0.98, gamma: 1.03, saturation: 0.98 })),
+    hero: hero("hero-w07", [0.8, 0.34], 0.62, [1, 0.5, 0.14], [0.98, 0.96, 0.94]),
     fieldDensity: 1.08,
     emberDensity: 1.05,
     glowTint: [1, 0.32, 0.08],
-    dustOpacity: 0.62,
+    dustOpacity: 0.32,
     glowOpacity: 0.15,
     events: { meteor: [42, 66], large: [88, 130], medium: [54, 82], small: [28, 46] },
-    vignette: 0.69,
+    vignette: 0.45,
   }),
 
   // World 08 — Scarlet Halo: the ring is the brightest landmark, while the
   // gameplay corridor stays darker through a lower plate exposure.
   world({
     worldId: "world-08",
-    plate: plate([0.42, 0.54], false, grade({ exposure: 0.8, gamma: 1.17, saturation: 0.94, hueShift: -3 })),
-    hero: hero("hero-w08", [0.19, 0.3], 0.64, [1, 0.18, 0.08], [0.9, 0.72, 0.68]),
+    plate: plate([0.42, 0.54], false, grade({ exposure: 1, gamma: 1.02, saturation: 1, hueShift: -2 })),
+    hero: hero("hero-w08", [0.19, 0.3], 0.64, [1, 0.18, 0.08]),
     fieldDensity: 0.76,
     emberDensity: 1.18,
     glowTint: [0.95, 0.18, 0.08],
-    dustOpacity: 0.46,
+    dustOpacity: 0.24,
     glowOpacity: 0.18,
     events: { meteor: [36, 58], large: [110, 158], medium: [70, 108], small: [32, 50] },
-    vignette: 0.66,
+    vignette: 0.4,
   }),
 
   // World 09 — Cinder Cathedral: darkest, smokiest World in the Galaxy.
   world({
     worldId: "world-09",
-    plate: plate([0.58, 0.5], true, grade({ exposure: 0.76, gamma: 1.2, saturation: 0.84 })),
-    hero: hero("hero-w09", [0.79, 0.33], 0.61, [1, 0.34, 0.1], [0.78, 0.72, 0.68]),
+    plate: plate([0.58, 0.5], true, grade({ exposure: 0.96, gamma: 1.04, saturation: 0.96 })),
+    hero: hero("hero-w09", [0.79, 0.33], 0.61, [1, 0.34, 0.1], [0.98, 0.96, 0.94]),
     fieldDensity: 0.92,
     emberDensity: 0.72,
     glowTint: [0.82, 0.2, 0.08],
-    dustOpacity: 0.7,
+    dustOpacity: 0.34,
     glowOpacity: 0.1,
     events: { meteor: [54, 82], large: [82, 124], medium: [58, 88], small: [38, 60] },
-    vignette: 0.74,
+    vignette: 0.46,
   }),
 
   // World 10 — Demon Crown: boss-like finale, stronger embers and more frequent
   // burning debris, but the landmark stays high enough to preserve word space.
   world({
     worldId: "world-10",
-    plate: plate([0.5, 0.44], false, grade({ exposure: 0.84, gamma: 1.14, saturation: 0.98 })),
-    hero: hero("hero-w10", [0.5, 0.19], 0.57, [1, 0.28, 0.08], [0.9, 0.76, 0.68]),
+    plate: plate([0.5, 0.44], false, grade({ exposure: 0.99, gamma: 1.03, saturation: 1 })),
+    hero: hero("hero-w10", [0.5, 0.19], 0.57, [1, 0.28, 0.08]),
     fieldDensity: 1.16,
     emberDensity: 1.32,
     glowTint: [1, 0.25, 0.07],
-    dustOpacity: 0.58,
+    dustOpacity: 0.3,
     glowOpacity: 0.17,
     events: { meteor: [30, 48], large: [74, 112], medium: [44, 70], small: [24, 40] },
-    vignette: 0.7,
+    vignette: 0.44,
   }),
 ];
