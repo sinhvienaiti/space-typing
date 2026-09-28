@@ -1,9 +1,9 @@
 /**
- * Dev-only player shot gallery (shot-gallery.html): Vanguard auto-types at
- * mock targets over the real World 01 background, so bolt designs can be
+ * Dev-only player shot gallery (shot-gallery.html): the selected ship auto-types
+ * at mock targets over the real World 01 background, so bolt designs can be
  * reviewed and screenshotted without playing a stage.
  *
- * URL: ?q=low|medium|high|ultra, ?cps=<keys per second>, ?t=<time scale>,
+ * URL: ?ship=<character>, ?q=low|medium|high|ultra, ?cps=<keys per second>, ?t=<time scale>,
  * ?art=0 (code-drawn shots, to compare with the painted sprites),
  * ?stopAt=<seconds> (freeze the picture then, for repeatable screenshots),
  * ?idle=1 (no typing: the ship's idle lights only).
@@ -19,6 +19,7 @@ import {
   type CharacterDrawOptions,
 } from "../characters/renderer";
 import { selectCharacterShipSheet } from "../characters/ship-art";
+import { isCharacterId, type CharacterId } from "../characters/registry";
 import { ShipMotion } from "../characters/ship-motion";
 import type { VisualQuality } from "../types";
 import { PlayerShotSystem, preloadShotArt, type ShotAimPoint } from "./player-shots";
@@ -47,12 +48,19 @@ const WORDS = ["galaxy", "nebula", "comet", "orbit", "photon", "quasar", "meteor
 const PLAYER_Y_OFFSET = 72;
 
 const params = new URLSearchParams(window.location.search);
+const requestedShip = params.get("ship");
+const shipId: CharacterId =
+  requestedShip !== null && isCharacterId(requestedShip)
+    ? requestedShip
+    : "vanguard";
 const view = document.getElementById("view") as HTMLCanvasElement;
 const context = view.getContext("2d")!;
 const panel = document.getElementById("panel")!;
 const qualitySelect = document.getElementById("quality") as HTMLSelectElement;
 const cpsInput = document.getElementById("cps") as HTMLInputElement;
 const timeScaleInput = document.getElementById("timeScale") as HTMLInputElement;
+const shipSelect = document.getElementById("ship") as HTMLSelectElement;
+shipSelect.value = shipId;
 qualitySelect.value = params.get("q") ?? "high";
 cpsInput.value = params.get("cps") ?? "8";
 timeScaleInput.value = params.get("t") ?? "1";
@@ -140,7 +148,7 @@ function typeKey(): void {
   const pose = shipOptions(time);
   characterShipPoint(pose, 0, 0, shipPoint);
   shots.fire({
-    characterId: "vanguard",
+    characterId: shipId,
     originX: shipPoint.x,
     originY: shipPoint.y,
     originAngle: characterShipAngle(pose),
@@ -219,7 +227,7 @@ function frame(now: number): void {
     typeKey();
   }
   motion.update(dt, width / 2, height - PLAYER_Y_OFFSET, trackTarget);
-  const rig = activeShipLightRig("vanguard");
+  const rig = activeShipLightRig(shipId);
   if (rig !== null) {
     const pose = shipOptions(time);
     rig.nozzles.forEach(([x, y], index) => {
@@ -259,12 +267,19 @@ function frame(now: number): void {
   for (const target of targets) drawTarget(target);
   shots.drawImpacts(context, quality);
   if (rig !== null) exhaust.draw(context, rig);
-  drawCharacterShip(context, "vanguard", shipOptions(time));
+  drawCharacterShip(context, shipId, shipOptions(time));
   shots.drawMuzzleFlashes(context);
   requestAnimationFrame(frame);
 }
 
-qualitySelect.addEventListener("change", () => stage.setQuality(qualitySelect.value as VisualQuality));
+qualitySelect.addEventListener("change", () =>
+  stage.setQuality(qualitySelect.value as VisualQuality),
+);
+shipSelect.addEventListener("change", () => {
+  const next = new URL(window.location.href);
+  next.searchParams.set("ship", shipSelect.value);
+  window.location.href = next.toString();
+});
 window.addEventListener("resize", resize);
 window.addEventListener("keydown", (event) => {
   if (event.key === "h" || event.key === "H") panel.classList.toggle("hidden");
@@ -274,7 +289,7 @@ window.addEventListener("keydown", (event) => {
 resize();
 requestAnimationFrame(frame);
 // ?art=0 compares against the code-drawn look.
-if (params.get("art") !== "0") preloadShotArt("vanguard");
+if (params.get("art") !== "0") preloadShotArt(shipId);
 void (async () => {
   try {
     const catalog = await preloadArtAssets(await loadArtAssetManifest());
