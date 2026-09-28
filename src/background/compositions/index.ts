@@ -6,6 +6,14 @@ import type {
 } from "../types";
 import { G01_COMPOSITIONS } from "./g01-celestial";
 import { G02_COMPOSITIONS } from "./g02-infernal";
+import { G03_COMPOSITIONS } from "./g03-frost-prism";
+import { G04_COMPOSITIONS } from "./g04-verdant";
+import { G05_COMPOSITIONS } from "./g05-shadow-nature";
+import { G06_COMPOSITIONS } from "./g06-cosmic-forge";
+import { G07_COMPOSITIONS } from "./g07-abyssal";
+import { G08_COMPOSITIONS } from "./g08-aurora-cosmic";
+import { G09_COMPOSITIONS } from "./g09-void-cathedral";
+import { G10_COMPOSITIONS } from "./g10-eternity";
 
 const TIERS: readonly BackgroundTier[] = ["low", "medium", "high", "ultra"];
 
@@ -13,6 +21,14 @@ const TIERS: readonly BackgroundTier[] = ["low", "medium", "high", "ultra"];
 export const BACKGROUND_COMPOSITIONS: readonly WorldComposition[] = [
   ...G01_COMPOSITIONS,
   ...G02_COMPOSITIONS,
+  ...G03_COMPOSITIONS,
+  ...G04_COMPOSITIONS,
+  ...G05_COMPOSITIONS,
+  ...G06_COMPOSITIONS,
+  ...G07_COMPOSITIONS,
+  ...G08_COMPOSITIONS,
+  ...G09_COMPOSITIONS,
+  ...G10_COMPOSITIONS,
 ];
 
 const BY_WORLD = new Map(
