@@ -1156,6 +1156,32 @@ Rules:
 
 ---
 
+# 14.1 ART-ASSET GOVERNANCE
+
+Companion file:
+
+```text
+SPACE_TYPING_1000_STAGE_EXPANSION_V2_IMAGE_PROMPT_PACK.md
+```
+
+is the source of truth for **new art requests** belonging to this initiative.
+
+Rules:
+
+- the prompt pack does **not** mean every named prompt must be generated immediately;
+- generate art phase-by-phase, following REQUIRED / REUSE-FIRST / DEFERRED status;
+- reuse existing enemy, boss, background, meteor, black-hole, Rage, aura and WebGL resources whenever they already solve the visual need;
+- new images are justified by mechanic readability, player-choice identity, encounter identity or progression identity;
+- do not create a second visual implementation merely because a new source image exists;
+- final runtime paths must follow existing codebase conventions discovered during implementation; the prompt pack's `art-src/expansion-v2/` path is only a source-art staging convention;
+- before requesting deferred cinematic or boss-part source art, first implement the reference renderer and document exact aspect ratio, anchor, scale, safe zone and layering requirements;
+- one generated source-art filename must correspond to one generation call;
+- asset acceptance requires gameplay-scale readability, correct alpha/background treatment, correct palette and no text/collage contamination.
+
+If implementation proves an asset unnecessary because procedural or existing art is clearer, **do not generate it**.
+
+---
+
 # 15. PERFORMANCE GATES
 
 Use the latest profiling data as the baseline, not as permanent truth.
@@ -1683,4 +1709,221 @@ Recipes:
 
 ### Prerequisite
 
-Background performance issues equivalent to P3/P4 resolve
+Background performance issues equivalent to P3/P4 resolved and re-profiled.
+
+### Scope
+
+- one reference cinematic sequence;
+- then selected milestone sequences only after reference passes;
+- deeper secrets / rare event chains;
+- selected World reactions to Awakening / boss climax.
+
+### Acceptance criteria
+
+- repeated cinematic playback is leak-free;
+- no input interruption;
+- no target obstruction;
+- quality tiers scale presentation only;
+- cinematic can be disabled independently;
+- only after reference event passes may content scale.
+
+---
+
+# 21. REJECT / MERGE / HOLD LIST
+
+## Reject for normal campaign use
+
+- Word Corruption that hides/flickers required letters;
+- reversed/mirrored typing as a generic affix;
+- absolute-WPM-gated Speed Build;
+- asynchronous global event bus;
+- a second boss-target system;
+- a second evolution tree;
+- a second adaptive director;
+- a duplicate Archive;
+- full folder-tree rewrite solely to match a proposal diagram.
+
+## Merge
+
+- Affix → existing elite system;
+- Flow → streak/combo + visual/audio layers;
+- Awakening → existing Rage;
+- Evolution → existing Mk/rarity/rank + projectile evolution;
+- Archive → Codex;
+- Director → adaptive profile + active pressure.
+
+## Hold
+
+- Lost Signal;
+- Gravity Inversion;
+- Champion with 4 affixes;
+- category-based Vocabulary Build until metadata audit;
+- cinematic scaling until performance fixes;
+- Hunter Fleet until Expedition/Nemesis design is ready;
+- Quantum Echo until a clear non-duplicative role exists.
+
+---
+
+# 22. FAILURE MODES TO PREVENT
+
+## Feature soup
+
+Mitigation:
+
+- staged unlock;
+- compatibility rules;
+- Encounter Recipes;
+- Macro Pacing;
+- HUD hierarchy.
+
+## Visual overload
+
+Mitigation:
+
+- text-safe area;
+- VFX budgets;
+- render text last;
+- quality scaling through centralized profile.
+
+## Randomness without identity
+
+Mitigation:
+
+- Encounter Recipes;
+- recent-history cooldown;
+- deterministic seeds;
+- curated milestone encounters.
+
+## Build power creep
+
+Mitigation:
+
+- sidegrades;
+- tradeoffs;
+- limited trigger budgets;
+- balance simulation;
+- small initial relic pool.
+
+## Director cheating
+
+Mitigation:
+
+- visible Threat;
+- bounded adjustment;
+- stage envelope;
+- no hidden giant HP multiplier.
+
+## Boss soft lock
+
+Mitigation:
+
+- single target owner;
+- enemy-like boss parts;
+- deterministic phase transitions;
+- integration tests around skill use and phase changes.
+
+## Test Lab divergence
+
+Mitigation:
+
+- production logic only;
+- debug configuration overrides.
+
+## Asset explosion
+
+Mitigation:
+
+- reuse-first rendering;
+- generate new source art only when a mechanic genuinely needs a new readable identity;
+- do not create art merely because a system name exists.
+
+---
+
+# 23. DEFINITION OF DONE FOR ANY NEW SYSTEM
+
+A new system is not “done” when it merely works once.
+
+It is done only when:
+
+1. ownership is explicit;
+2. existing code was reused where appropriate;
+3. no duplicate subsystem was introduced;
+4. Test Lab can force it;
+5. unit/integration/regression tests pass;
+6. compatibility rules exist;
+7. save impact is defined;
+8. visual/audio communication is clear;
+9. Low/Medium/High/Ultra behavior is logically identical;
+10. performance budget passes;
+11. pause/restart/stage transition cleanup passes;
+12. Variety Audit is updated if the system affects encounter variety;
+13. feature flag/rollback path exists during rollout;
+14. documentation is updated.
+
+---
+
+# 24. IMPLEMENTATION HANDOFF RULES FOR CLAUDE / CODEX
+
+Before starting any phase:
+
+1. pull/read the latest active branch;
+2. read this V2 document;
+3. inspect current modules referenced by the phase;
+4. report any newer implementation that makes part of this plan obsolete;
+5. preserve newer correct behavior;
+6. implement only the requested phase/subphase;
+7. do not opportunistically implement future phases;
+8. update tests and Test Lab in the same phase;
+9. run regression and relevant perf/variety audits;
+10. commit documentation updates with code.
+
+If a phase reveals architecture assumptions in this document are stale, update the document deliberately instead of silently diverging.
+
+---
+
+# 25. FINAL SUCCESS CONDITION
+
+The target is not:
+
+```text
+1000 manually unique stages
+```
+
+The target is:
+
+```text
+1000 stages whose combinations,
+typing demands,
+player decisions,
+pacing,
+boss moments,
+learning feedback,
+and long-term surprises
+continue to feel meaningfully different.
+```
+
+Space Typing should ultimately feel like:
+
+```text
+Typing
++
+Space Combat
++
+RPG Buildcraft
++
+Roguelite Variety
++
+Vocabulary Learning
++
+Cinematic Presentation
+```
+
+without losing typing as the primary interaction.
+
+The most important player-facing test is:
+
+> Hundreds of stages into the game, the player should still meet a new tactical combination, make a meaningful build decision, see a memorable presentation moment, or master something they previously struggled with.
+
+---
+
+**END — V2 FINAL SOURCE OF TRUTH**
