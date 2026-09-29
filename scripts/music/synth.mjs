@@ -4,7 +4,8 @@
  * master chain work on whole buffers. Everything is deterministic (seeded
  * noise), so the same script always renders the same track.
  *
- * Used by scripts/music/render-world-theme.mjs. See docs/MUSIC_WORLD_01.md.
+ * Used by scripts/music/song-engine.mjs (instruments.mjs adds more voices).
+ * See docs/MUSIC_SYSTEM.md.
  */
 
 export const SAMPLE_RATE = 48000;
@@ -54,7 +55,7 @@ export class Bus {
   }
 }
 
-function polyBlep(t, dt) {
+export function polyBlep(t, dt) {
   if (t < dt) {
     const x = t / dt;
     return x + x - x * x - 1;
@@ -100,7 +101,7 @@ export class Svf {
 }
 
 /** Smooth attack / hold / exponential release amplitude. */
-function envelope(t, duration, attack, release, sustain = 1, decay = 0.2) {
+export function envelope(t, duration, attack, release, sustain = 1, decay = 0.2) {
   if (t < 0) return 0;
   let level;
   if (t < attack) {
@@ -113,11 +114,11 @@ function envelope(t, duration, attack, release, sustain = 1, decay = 0.2) {
   return level;
 }
 
-function frameOf(seconds) {
+export function frameOf(seconds) {
   return Math.round(seconds * SAMPLE_RATE);
 }
 
-function pan(value) {
+export function pan(value) {
   // Constant-power pan, value -1 (left) … 1 (right).
   const angle = ((value + 1) * Math.PI) / 4;
   return [Math.cos(angle), Math.sin(angle)];
@@ -262,7 +263,8 @@ export function bell(bus, start, duration, note, options = {}) {
  * `from` = previous MIDI note (or null) for portamento.
  */
 export function lead(bus, start, duration, note, options = {}) {
-  const { gain = 0.1, from = null, glide = 0.045, cutoff = 3200, vibrato = 0.13, release = 0.16, panning = 0 } = options;
+  const { gain = 0.1, from = null, glide = 0.045, cutoff = 3200, vibrato = 0.13, release = 0.16, panning = 0, drive = 0 } = options;
+  const driveNorm = drive > 0 ? Math.tanh(1 + drive) : 1;
   const first = frameOf(start);
   const length = frameOf(duration + release);
   const filters = [new Svf("low", 0.8), new Svf("low", 0.8)];
@@ -297,8 +299,15 @@ export function lead(bus, start, duration, note, options = {}) {
     if (sub.phase >= 1) sub.phase -= 1;
     const amp = envelope(t, duration, 0.012, release, 0.82, 0.25) * gain * 0.4;
     const [pl, pr] = pan(panning);
-    bus.l[frame] += filters[0].process(left + square) * amp * pl * 1.41;
-    bus.r[frame] += filters[1].process(right + square) * amp * pr * 1.41;
+    let dl = left + square;
+    let dr = right + square;
+    if (drive > 0) {
+      // Overdrive before the filter: a hot, fiery edge that the filter tames.
+      dl = (Math.tanh((dl / 2.6) * (1 + drive)) / driveNorm) * 2.6;
+      dr = (Math.tanh((dr / 2.6) * (1 + drive)) / driveNorm) * 2.6;
+    }
+    bus.l[frame] += filters[0].process(dl) * amp * pl * 1.41;
+    bus.r[frame] += filters[1].process(dr) * amp * pr * 1.41;
   }
 }
 

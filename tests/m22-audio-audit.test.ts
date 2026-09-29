@@ -109,6 +109,13 @@ describe("M22 full World audio mapping and lifecycle audit", () => {
 
         if (state === "SILENT") {
           expect(snapshot.activeMusic).toBeNull();
+        } else if (state === "WORLD_NORMAL" || state === "WORLD_INTENSE") {
+          // World music plays the map's songs: one file each, handed over to
+          // the next song instead of looping (docs/MUSIC_SYSTEM.md).
+          expect(snapshot.activeMusic).not.toBeNull();
+          expect(snapshot.song).not.toBeNull();
+          expect(snapshot.activeMusic?.loop).toBe(false);
+          expect(snapshot.activeMusic?.candidates.length).toBe(1);
         } else {
           expect(snapshot.activeMusic).not.toBeNull();
           expect(snapshot.activeMusic?.loop).toBe(stateLoops(state));
@@ -197,7 +204,8 @@ describe("M22 full World audio mapping and lifecycle audit", () => {
       controller.getDebugSnapshot().retiringMusic.length,
     ).toBeGreaterThan(0);
 
-    vi.advanceTimersByTime(250);
+    // Calm ↔ intense switches take at least 1.2 s (STEM_MIN_CROSSFADE_SECONDS).
+    vi.advanceTimersByTime(1_300);
 
     const afterMusicFade = controller.getDebugSnapshot();
     expect(afterMusicFade.retiringMusic).toHaveLength(0);
@@ -220,6 +228,8 @@ describe("M22 full World audio mapping and lifecycle audit", () => {
 
     controller.destroy();
     expect(created.every((audio) => audio.paused)).toBe(true);
-    expect(removeEventListener).toHaveBeenCalledTimes(3);
+    // Three mix-event listeners plus the three first-gesture listeners that
+    // unlock Web Audio.
+    expect(removeEventListener).toHaveBeenCalledTimes(6);
   });
 });

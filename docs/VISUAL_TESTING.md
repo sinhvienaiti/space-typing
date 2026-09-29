@@ -63,7 +63,7 @@ lsof -ti tcp:3098 | xargs kill
 |---|---|---|
 | `--width` / `--height` / `--dpr` | 1642 / 799 / 2 | **Khu vực chơi thật của chủ dự án trong Portal** (tỉ lệ khoảng 2,2:1, màn Retina). Luôn chụp ở cỡ này khi duyệt. |
 | `--wait` | 6000 | Số mili giây chờ trước khi chụp (sau khi trang tải xong và sau khi bấm nút). |
-| `--click` | — | Bộ chọn CSS để bấm, ví dụ `#startButton` để vào trận. |
+| `--click` | — | Bộ chọn CSS để bấm, ví dụ `#startButton` để vào trận. Đây là **cú bấm chuột thật** (qua DevTools), được tính là thao tác của người dùng, nên Chrome cho phát tiếng và Web Audio bật được. Nếu nút bị ẩn thì lùi về `el.click()`. |
 | `--click-delay` | 4000 | Chờ bao lâu rồi mới bấm (để game nạp xong). |
 | `--eval` / `--eval-file` | — | Đoạn JS chạy ngay trước khi chụp; kết quả in trong JSON. Có thể trả về Promise. |
 

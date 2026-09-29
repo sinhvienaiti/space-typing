@@ -4290,3 +4290,37 @@ kbd {
 .local-item-icon{display:grid;place-items:center;height:48px;font-size:1.45rem;line-height:1}
 .equipment-card-icon.local-item-icon{height:92px;min-height:92px;font-size:3rem;line-height:1}
 .recall-assist-bar{right:12px;left:auto;width:auto;transform:none;pointer-events:auto}
+
+/* Music: a quiet "now playing" card when a new song starts. */
+.music-toast {
+  position: absolute;
+  right: 18px;
+  bottom: 96px;
+  z-index: 9;
+  max-width: min(320px, calc(100vw - 36px));
+  padding: 8px 14px;
+  border: 1px solid rgba(123, 196, 255, 0.28);
+  border-radius: 10px;
+  background: rgba(6, 12, 24, 0.78);
+  color: #dce9f7;
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+  pointer-events: none;
+}
+
+.music-toast.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.music-toast small {
+  display: block;
+  margin-top: 2px;
+  color: #7f95ad;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}

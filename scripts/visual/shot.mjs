@@ -150,13 +150,28 @@ async function main() {
 
   if (clickSelector !== null) {
     await sleep(clickDelay);
-    const clicked = await send("Runtime.evaluate", {
+    // A real mouse click through the DevTools input domain: it counts as a
+    // user gesture, so audio may start (autoplay policy) and first-gesture
+    // listeners fire. Falls back to el.click() when the target is not visible.
+    const located = await send("Runtime.evaluate", {
       expression:
         "(() => { const el = document.querySelector(" + JSON.stringify(clickSelector) +
-        "); if (!el) return false; el.click(); return true; })()",
+        "); if (!el) return null; el.scrollIntoView({ block: 'center' }); const r = el.getBoundingClientRect();" +
+        " return r.width > 0 && r.height > 0 ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : { hidden: true }; })()",
       returnByValue: true,
     });
-    if (clicked.result?.result?.value !== true) logs.push("warning: click target not found: " + clickSelector);
+    const point = located.result?.result?.value ?? null;
+    if (point === null) {
+      logs.push("warning: click target not found: " + clickSelector);
+    } else if (point.hidden === true) {
+      await send("Runtime.evaluate", {
+        expression: "document.querySelector(" + JSON.stringify(clickSelector) + ").click()",
+      });
+    } else {
+      for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
+        await send("Input.dispatchMouseEvent", { type, x: point.x, y: point.y, button: "left", clickCount: 1 });
+      }
+    }
   }
   await sleep(waitMs);
 

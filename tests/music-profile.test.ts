@@ -126,27 +126,15 @@ describe("M08 World music profiles", () => {
     expect(musicAssetForState(profile, "SILENT")).toBeNull();
   });
 
-  it("gives World 01 its own theme: calm and intense stems of one song", () => {
+  it("keeps the shared tracks as the fallback when the song library is empty", () => {
     const profile = musicProfileForWorld("world-01");
-    const calm = musicAssetForState(profile, "WORLD_NORMAL")!;
-    const intense = musicAssetForState(profile, "WORLD_INTENSE")!;
-
-    expect(assetCandidates(calm)).toEqual([
+    // World music comes from the song library (music-library.ts); these
+    // legacy assets only play if it is empty.
+    expect(assetCandidates(musicAssetForState(profile, "WORLD_NORMAL"))).toEqual([
       "/local-assets/music/world-01.ogg",
-      "/assets/audio/music/world-01/calm.ogg",
+      "/assets/audio/music/mysterious-ambience.mp3",
     ]);
-    expect(assetCandidates(intense)).toEqual([
-      "/local-assets/music/world-01-intense.ogg",
-      "/assets/audio/music/world-01/intense.ogg",
-    ]);
-    // Same sync group: the game switches between them at the same position.
-    expect(calm.syncGroup).toBe("world-01-theme");
-    expect(intense.syncGroup).toBe(calm.syncGroup);
-    expect(calm.id).not.toBe(intense.id);
-    expect(profile.preloadHints).toContain(intense);
-
-    // Bosses and other special states keep their own tracks.
+    expect(musicAssetForState(profile, "WORLD_NORMAL")?.syncGroup).toBeUndefined();
     expect(musicAssetForState(profile, "WORLD_BOSS")?.syncGroup).toBeUndefined();
-    expect(musicAssetForState(musicProfileForWorld("world-02"), "WORLD_NORMAL")?.syncGroup).toBeUndefined();
   });
 });

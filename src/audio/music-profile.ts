@@ -161,38 +161,18 @@ function fallbackAsset(
 }
 
 /**
- * Worlds with their own theme: calm (WORLD_NORMAL) and intense
- * (WORLD_INTENSE) stems of one song, same length and tempo, under
- * public/assets/audio/music/. Pilot: World 01, rendered by
- * scripts/music/world-01-theme.mjs (docs/MUSIC_WORLD_01.md).
+ * World music now comes from the song library (music-library.ts: Galaxy
+ * playlists of generated songs, see docs/MUSIC_SYSTEM.md). These base and
+ * intense assets remain the fallback when the library is empty.
  */
-const WORLD_THEMES: Readonly<
-  Partial<Record<string, { calm: string; intense: string }>>
-> = {
-  "world-01": { calm: "world-01/calm.ogg", intense: "world-01/intense.ogg" },
-};
-
 function worldProfile(world: WorldProfile): WorldMusicProfile {
   const worldFile = world.id + ".ogg";
-  const theme = WORLD_THEMES[world.id];
-  const syncGroup = world.id + "-theme";
   const baseTrack: AudioAssetRef = {
     ...SHARED.calm,
     id: world.id + "-base",
     localPath: "/local-assets/music/" + worldFile,
-    ...(theme === undefined
-      ? {}
-      : { defaultPath: "/assets/audio/music/" + theme.calm, syncGroup }),
   };
-  const intenseTrack: AudioAssetRef =
-    theme === undefined
-      ? { ...SHARED.intense, id: world.id + "-intense" }
-      : {
-          id: world.id + "-intense",
-          localPath: "/local-assets/music/" + world.id + "-intense.ogg",
-          defaultPath: "/assets/audio/music/" + theme.intense,
-          syncGroup,
-        };
+  const intenseTrack: AudioAssetRef = { ...SHARED.intense, id: world.id + "-intense" };
   const ambient: AudioAssetRef = {
     id: world.id + "-ambient",
     // Keep optional per-World ambient overrides, but do not fall back to the

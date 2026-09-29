@@ -4,7 +4,7 @@
 >
 > **Phạm vi:** hệ đạn mới của người chơi trong `games/space-typing`. Vanguard là bản chuẩn ban đầu; **code đã migrate đủ 11/11 phi thuyền sang đạn bay thật** trên `feat/bgv-integration-current`. Bộ ảnh nguồn của 10 tàu mới được chủ dự án đặt ở local và xử lý bằng `pnpm fx:prepare all`.
 >
-> **Tài liệu liên quan:** hình nền BGV — [BACKGROUND_VISUAL_REBOOT_HANDOFF.md](BACKGROUND_VISUAL_REBOOT_HANDOFF.md). Hai hệ này độc lập; đạn chỉ dùng chung quy trình xử lý ảnh (`scripts/bg-art/`). Nhạc nền World 01 — [MUSIC_WORLD_01.md](MUSIC_WORLD_01.md).
+> **Tài liệu liên quan:** hình nền BGV — [BACKGROUND_VISUAL_REBOOT_HANDOFF.md](BACKGROUND_VISUAL_REBOOT_HANDOFF.md). Hai hệ này độc lập; đạn chỉ dùng chung quy trình xử lý ảnh (`scripts/bg-art/`). Hệ thống nhạc nền — [MUSIC_SYSTEM.md](MUSIC_SYSTEM.md).
 >
 > **Cập nhật 28/09 (đợt 5):** migrate **11/11 tàu** sang travelling projectile. Thêm recipe riêng, trail `ribbon/zigzag/helix/smoke`, spin/tumble/acceleration, impact sound identity riêng, `fx:prepare all`, và `?ship=` trong gallery. Vanguard giữ nguyên các thông số đã duyệt.
 >

@@ -1,4 +1,5 @@
 import type { KillTranslationSettings } from "./feedback/kill-translation";
+import type { MusicPlaybackMode } from "./audio/music-library";
 import type { EnemyDefinitionId } from "./enemies/registry";
 import type { EnemyRank } from "./enemies/rank";
 import type { EnemyLayerId } from "./enemies/layers";
@@ -67,6 +68,8 @@ export type GameSettings = {
   pronunciationRate: number;
   pronunciationVolume: number;
   killTranslation?: KillTranslationSettings;
+  /** World music: each map's playlist, or shuffle every song. */
+  musicMode?: MusicPlaybackMode;
 };
 
 export type GameStats = {

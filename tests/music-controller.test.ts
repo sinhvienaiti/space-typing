@@ -89,7 +89,7 @@ describe("M08 MusicController", () => {
     controller.transitionTo("WORLD_NORMAL", 0);
 
     const music = created.find((audio) =>
-      audio.src.includes("/local-assets/music/world-01.ogg"),
+      audio.src.includes("/assets/audio/music/songs/"),
     );
     const ambient = created.find((audio) =>
       audio.src.includes("/local-assets/ambient/world-01.ogg"),
@@ -158,6 +158,7 @@ describe("M08 MusicController", () => {
 
   it("falls back from a missing local path to the repository default", async () => {
     const created: FakeAudio[] = [];
+    // Legacy tracks (no song library): local override first, then default.
     const controller = new MusicController((src) => {
       const audio = new FakeAudio(src);
       if (
@@ -168,7 +169,7 @@ describe("M08 MusicController", () => {
       }
       created.push(audio);
       return audio;
-    });
+    }, { tracks: [] });
 
     controller.transitionTo("WORLD_NORMAL", 0);
     await Promise.resolve();
@@ -177,7 +178,7 @@ describe("M08 MusicController", () => {
 
     expect(
       created.some((audio) =>
-        audio.src.includes("/assets/audio/music/world-01/calm.ogg"),
+        audio.src.includes("/assets/audio/music/mysterious-ambience.mp3"),
       ),
     ).toBe(true);
     controller.destroy();
@@ -193,12 +194,12 @@ describe("M08 MusicController", () => {
     controller.setWorldProfile(musicProfileForWorld("world-01"));
     controller.transitionTo("WORLD_NORMAL", 0);
     const calm = created.at(-1)!;
-    expect(calm.src).toContain("world-01.ogg");
+    expect(calm.src).toContain("/songs/signal-in-the-void/calm.ogg");
     calm.currentTime = 42.5;
 
     controller.transitionTo("WORLD_INTENSE", 0);
     const intense = created.at(-1)!;
-    expect(intense.src).toContain("world-01-intense.ogg");
+    expect(intense.src).toContain("/songs/signal-in-the-void/intense.ogg");
     expect(intense.currentTime).toBeCloseTo(42.5);
 
     // A special state is a different song: it starts from the top.

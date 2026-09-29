@@ -224,7 +224,8 @@ import {
   EQUIPMENT_AFFIX_REGISTRY,
   maxAffixesForGrade,
 } from "./equipment/affixes";
-import { MusicController } from "./audio/MusicController";
+import { MusicController, type NowPlaying } from "./audio/MusicController";
+import type { MusicPlaybackMode } from "./audio/music-library";
 import {
   musicProfileForWorld,
   musicStateForStagePhase,
@@ -512,7 +513,12 @@ const defaultSettings: GameSettings = {
   pronunciationRate: 1,
   pronunciationVolume: 1,
   killTranslation: { ...DEFAULT_KILL_TRANSLATION_SETTINGS },
+  musicMode: "map",
 };
+
+function sanitizeMusicMode(value: unknown): MusicPlaybackMode {
+  return value === "random" ? "random" : "map";
+}
 
 function loadSettings(): GameSettings {
   try {
@@ -569,6 +575,7 @@ function loadSettings(): GameSettings {
           ? Math.min(1, Math.max(0, parsed.pronunciationVolume))
           : defaultSettings.pronunciationVolume,
       killTranslation: sanitizeKillTranslationSettings(parsed.killTranslation),
+      musicMode: sanitizeMusicMode(parsed.musicMode),
     };
   } catch {
     return { ...defaultSettings };
@@ -699,9 +706,18 @@ let expansionCurrencies: ExpansionCurrencyState =
   createExpansionCurrencyState();
 let shops: ShopState = createShopState();
 let route: RouteState = createRouteState(campaign.highestUnlockedStage);
+// Declared before the controller: it reports the first song during start-up.
+let musicToastTimer: number | null = null;
+let lastToastSong: string | null = null;
 const musicController = new MusicController();
 musicController.setMusicVolume(settings.musicVolume);
 musicController.setAmbientVolume(settings.ambientVolume);
+musicController.setPlaybackMode(sanitizeMusicMode(settings.musicMode));
+musicController.onNowPlaying(showNowPlaying);
+if (import.meta.env.DEV) {
+  // Dev-only handle for scripts/visual checks (docs/MUSIC_SYSTEM.md).
+  (window as unknown as { __spaceTypingMusic?: MusicController }).__spaceTypingMusic = musicController;
+}
 musicController.setWorldProfile(
   musicProfileForWorld(worldForStage(campaign.selectedStage)),
 );
@@ -6926,11 +6942,32 @@ function selectGameplayMode(mode: GameplayMode): void {
   renderRecallSetup();
 }
 
+function nowPlayingLabel(value: NowPlaying | null): string {
+  if (value === null) return "—";
+  return value.title + " · " + value.moodLabel + (value.stem === "intense" ? " · intense" : "");
+}
+
+/** Settings label, plus a short in-game card whenever a new song starts. */
+function showNowPlaying(value: NowPlaying | null): void {
+  byId("musicNowPlaying").textContent = nowPlayingLabel(value);
+  if (value === null || value.id === lastToastSong) return;
+  lastToastSong = value.id;
+  const toast = byId("musicToast");
+  toast.replaceChildren(document.createTextNode("♪ " + value.title));
+  const mood = document.createElement("small");
+  mood.textContent = value.moodLabel + (value.mode === "random" ? " · random" : "");
+  toast.append(mood);
+  toast.classList.add("visible");
+  if (musicToastTimer !== null) window.clearTimeout(musicToastTimer);
+  musicToastTimer = window.setTimeout(() => toast.classList.remove("visible"), 4200);
+}
+
 function saveSettings(): void {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   game.updateSettings(settings);
   musicController.setMusicVolume(settings.musicVolume);
   musicController.setAmbientVolume(settings.ambientVolume);
+  musicController.setPlaybackMode(sanitizeMusicMode(settings.musicMode));
   updateKillTranslationVisibility(game.getPhase());
 }
 
@@ -6964,6 +7001,9 @@ function renderSettings(): void {
   musicVolume.value = String(renderedSettings.musicVolume);
   byId<HTMLOutputElement>("musicValue").value =
     String(Math.round(renderedSettings.musicVolume * 100)) + "%";
+
+  byId<HTMLSelectElement>("musicMode").value = sanitizeMusicMode(renderedSettings.musicMode);
+  byId("musicNowPlaying").textContent = nowPlayingLabel(musicController.getNowPlaying());
 
   const ambientVolume = byId<HTMLInputElement>("ambientVolume");
   ambientVolume.value = String(renderedSettings.ambientVolume);
@@ -8439,6 +8479,20 @@ for (const [id, field] of [
     renderSettings();
   });
 }
+
+byId<HTMLSelectElement>("musicMode").addEventListener("change", (event) => {
+  const current = settingsDraft ?? settings;
+  settingsDraft = {
+    ...current,
+    musicMode: sanitizeMusicMode((event.currentTarget as HTMLSelectElement).value),
+  };
+  markSettingsDirty();
+  renderSettings();
+});
+
+byId<HTMLButtonElement>("musicNextTrack").addEventListener("click", () => {
+  musicController.skipTrack();
+});
 
 byId<HTMLSelectElement>("screenShake").addEventListener(
   "change",

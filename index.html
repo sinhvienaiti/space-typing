@@ -19,6 +19,8 @@
     <canvas id="bgCanvas" aria-hidden="true"></canvas>
     <canvas id="gameCanvas" aria-label="Space Typing battlefield"></canvas>
 
+    <div id="musicToast" class="music-toast" aria-live="polite"></div>
+
     <header class="hud">
       <div class="hud-side">
         <div class="metric"><span>score</span><strong id="score">0</strong></div>
@@ -819,6 +821,27 @@
             <output id="musicValue">35%</output>
           </span>
         </label>
+
+        <label class="setting-row">
+          <span>
+            <strong>Music mode</strong>
+            <small>By map: each World plays its Galaxy's songs · Random: shuffle every song</small>
+          </span>
+          <select id="musicMode">
+            <option value="map">By map</option>
+            <option value="random">Random</option>
+          </select>
+        </label>
+
+        <div class="setting-row">
+          <span>
+            <strong>Now playing</strong>
+            <small id="musicNowPlaying">—</small>
+          </span>
+          <span class="setting-control">
+            <button id="musicNextTrack" type="button">Next track ⏭</button>
+          </span>
+        </div>
 
         <label class="setting-row">
           <span>
