@@ -228,8 +228,11 @@ describe("M22 full World audio mapping and lifecycle audit", () => {
 
     controller.destroy();
     expect(created.every((audio) => audio.paused)).toBe(true);
-    // Three mix-event listeners plus the three first-gesture listeners that
-    // unlock Web Audio.
-    expect(removeEventListener).toHaveBeenCalledTimes(6);
+    // Destroy must detach every global listener that this controller registered.
+    // Keep the assertion tied to registration count so adding/removing a mix
+    // event cannot leave this lifecycle test stale again.
+    expect(removeEventListener).toHaveBeenCalledTimes(
+      addEventListener.mock.calls.length,
+    );
   });
 });
