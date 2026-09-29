@@ -109,7 +109,7 @@ export function enemyVisualQa(
 
 function bossQaStage(identity: BossIdentity): number | null {
   if (identity.role === "major-boss") {
-    const match = /^tyrant-g(\\d{2})$/.exec(identity.id);
+    const match = /^tyrant-g(\d{2})$/.exec(identity.id);
     return match === null ? null : Number(match[1]) * 100;
   }
 
