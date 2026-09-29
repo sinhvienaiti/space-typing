@@ -812,7 +812,7 @@ Rules:
 
 - choices must differ mechanically, not only numerically;
 - avoid offering three items from the same exact build niche too often;
-- avoid one universally dominant dominant choice;
+- avoid one universally dominant choice;
 - show synergy hints only if already discovered, unless discovery is the purpose;
 - deterministic seed support for Expedition;
 - reroll is optional and should be limited if introduced.
