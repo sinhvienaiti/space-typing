@@ -812,4 +812,875 @@ Rules:
 
 - choices must differ mechanically, not only numerically;
 - avoid offering three items from the same exact build niche too often;
-- avoid one universally dominant 
+- avoid one universally dominant dominant choice;
+- show synergy hints only if already discovered, unless discovery is the purpose;
+- deterministic seed support for Expedition;
+- reroll is optional and should be limited if introduced.
+
+This system is what converts “the game has relics” into “the player is building a run”.
+
+---
+
+# 8. EXPEDITION — REPLAYABILITY MODE
+
+Expedition is separate from the 1000-stage campaign.
+
+Initial target:
+
+```text
+~20 encounters per run
+```
+
+Composition:
+
+- Worlds sampled from unlocked/allowed content;
+- Encounter Recipes;
+- Sector Conditions;
+- Elite Affixes;
+- bosses;
+- route events;
+- Choose-1-of-3 build rewards.
+
+Features:
+
+- run-local relic choices;
+- score;
+- personal best;
+- deterministic seed;
+- Daily Seed;
+- final run summary.
+
+Expedition must reuse production combat logic.
+
+It must **not** fork a fake duplicate combat implementation.
+
+### Expedition acceptance rules
+
+- same seed + same choices produces deterministic encounter structure where practical;
+- campaign save is not corrupted;
+- Expedition state has explicit save ownership;
+- abandoning an Expedition cannot alter campaign stage position;
+- build rewards reset as designed at end of run;
+- score is deterministic enough for personal comparison.
+
+---
+
+# 9. LEARNING PROGRESSION — MAKE VOCABULARY PART OF THE RPG
+
+## 9.1 Wanted Words
+
+Words repeatedly missed or recalled poorly may become Wanted Words.
+
+Example:
+
+```text
+environment
+→ repeated failures
+→ WANTED status
+→ appears later on a marked elite
+→ successful clears reduce weakness
+→ mastery eventually achieved
+```
+
+Rules:
+
+- never shame the player;
+- do not increase difficulty simply because a word is weak;
+- re-exposure is the learning mechanism;
+- reward improvement.
+
+## 9.2 Mastery Constellation
+
+Mastered words may light stars / nodes in a collection.
+
+This is primarily meta progression and visual motivation.
+
+## 9.3 Lexicon Boss
+
+At selected World milestones, a Lexicon Boss may draw from:
+
+- recently weak words;
+- recently improved words;
+- World thematic vocabulary;
+- Recall history.
+
+It must still follow boss readability rules and controlled sentence/phrase length.
+
+## 9.4 Vocabulary Codex
+
+Track as available:
+
+- English word;
+- IPA;
+- Vietnamese meaning;
+- part of speech when reliable;
+- times seen;
+- typing accuracy;
+- Recall accuracy;
+- mastery state;
+- last seen / review priority.
+
+---
+
+# 10. NEMESIS AND GHOST — OPTIONAL HIGH-VALUE EXTENSIONS
+
+## 10.1 Nemesis
+
+A special elite that defeats the player may become a named rival and reappear later.
+
+Use mainly in Expedition first.
+
+Rules:
+
+- max active Nemesis chain count is bounded;
+- return interval is not annoying;
+- Nemesis receives a readable identity;
+- progression adds a controlled affix / behavior, not arbitrary stat inflation;
+- defeating it grants a meaningful reward.
+
+## 10.2 Personal Ghost
+
+Replay a prior stage/run against a non-interactive ghost representing the player’s previous best timing.
+
+Purpose:
+
+- self-comparison;
+- typing improvement motivation;
+- low art cost.
+
+Ghost must never affect collision or gameplay state.
+
+---
+
+# 11. DETERMINISTIC COMBAT EVENT PIPELINE — PHASE 0 FOUNDATION
+
+A shared gameplay-event layer is approved, but it must be:
+
+- typed;
+- synchronous;
+- deterministic;
+- ordered;
+- bounded;
+- command-returning rather than state-owning.
+
+Do **not** implement an asynchronous global event bus.
+
+Representative event types:
+
+```text
+LETTER_TYPED
+WORD_STARTED
+WORD_COMPLETED
+WORD_FAILED
+PERFECT_WORD
+STREAK_CHANGED
+ENEMY_SPAWNED
+ENEMY_KILLED
+PLAYER_HIT
+SKILL_USED
+BOSS_PHASE
+RECALL_RESULT
+PROJECTILE_INTERCEPTED
+STAGE_STARTED
+STAGE_ENDED
+```
+
+Representative processing order:
+
+```text
+statistics
+→ ship passive
+→ relic
+→ perk
+→ synergy
+→ Flow
+→ Threat / Adaptive Pressure
+→ Meta / Mastery
+```
+
+Listeners do not mutate authoritative combat state directly.
+
+They return commands such as:
+
+```text
+strike(target, amount)
+restoreEnergy(value)
+blockDamage()
+applyStatus(...)
+spawnFx(...)
+playSound(...)
+modifyFlow(...)
+```
+
+`Game` applies commands and remains the authoritative combat owner.
+
+Recursive event generation must have a strict depth/budget limit.
+
+## Migration rule
+
+Do not migrate every existing trigger in one risky patch.
+
+### Phase 0B
+
+Migrate:
+
+- WORD_COMPLETED;
+- PERFECT_WORD;
+- STREAK_CHANGED.
+
+Run full regression.
+
+### Phase 0C
+
+Migrate:
+
+- ENEMY_KILLED;
+- PLAYER_HIT;
+- SKILL_USED.
+
+Run full regression.
+
+### Phase 0D
+
+Migrate:
+
+- boss;
+- Recall;
+- stage lifecycle;
+- remaining compatible triggers.
+
+Run full regression.
+
+Behavior should remain unchanged during migration.
+
+---
+
+# 12. STATE OWNERSHIP
+
+One state → one authoritative owner.
+
+| State | Owner |
+|---|---|
+| combat, targets, enemies, boss, projectiles, active skills | `Game` |
+| active Sector Condition | `Game` after configuration is resolved |
+| Elite Affixes | enemy state / elite system under `Game` |
+| Flow tier | combat state derived from existing streak/combo |
+| Threat | adaptive/pressure state consumed by `Game` |
+| boss parts | enemy-like targets owned by boss/combat state |
+| background cinematic timeline | background/stage renderer |
+| audio layers | `MusicController` / SFX layer |
+| graphics quality | settings → `qualityProfile()` |
+| persistent campaign/meta | persistence modules / main orchestration |
+| event-chain flags | persistent expansion/meta section |
+| discovered synergies | persistent expansion/meta section |
+| mastery / vocabulary progress | learning/meta persistence |
+| Expedition run state | dedicated Expedition save/run state |
+
+Rules:
+
+- `Game` must not directly parse persistent save structures;
+- main/orchestration resolves configuration and injects it through explicit setters/services;
+- no duplicate copy of state in DOM;
+- rendering reads state; rendering does not become the owner of gameplay logic.
+
+---
+
+# 13. COMPATIBILITY MODEL
+
+Every composable system should use tags/costs/constraints rather than giant scattered conditionals.
+
+Relevant dimensions:
+
+```text
+World
+Encounter Recipe
+Sector Condition
+Objective
+Enemy Kind
+Elite Affix
+Typing Pattern
+Boss Mechanic
+Route Event
+Build
+Threat Envelope
+```
+
+Compatibility examples:
+
+```text
+Cloaked enemy
++ visibility-hiding condition
+→ reject
+
+Summoning enemy
++ entity-multiplying affix
++ swarm recipe
+→ reject or heavily cost
+
+Boss sentence phase
++ text-obscuring effect
+→ reject
+
+Gravity Well
++ Anchored affix
+→ valid, because Anchored provides a readable counter-identity
+```
+
+Use data-driven compatibility where feasible.
+
+Complex runtime behavior remains code-driven.
+
+---
+
+# 14. VISUAL / AUDIO COMMUNICATION RULES
+
+Every gameplay modifier must teach itself through presentation.
+
+Examples:
+
+- Guardian → protective link / field;
+- Chrono → temporal echo;
+- Anchored → heavy stabilizer ring;
+- Solar Storm → energy pulse;
+- Gravity Well → directional pull cues;
+- Flow tier → ship/trail/audio escalation.
+
+Rules:
+
+- required text renders on top of VFX;
+- no long bright flash directly behind active text;
+- avoid expensive per-frame blur paths already known to be problematic;
+- use `qualityProfile()` for quality scaling;
+- High/Ultra can add secondary layers but not gameplay information unavailable on Low;
+- audio cue must not mask pronunciation audio.
+
+---
+
+# 15. PERFORMANCE GATES
+
+Use the latest profiling data as the baseline, not as permanent truth.
+
+From the Claude review baseline, High quality targeted approximately:
+
+- p95 frame time ≤ 20 ms in a representative heavy encounter;
+- bounded combat particles;
+- bounded smoke particles;
+- bounded skill FX particles;
+- Sector Condition particle budget;
+- at most one full-screen distortion/lensing pass;
+- bounded concurrent audio voices;
+- no DOM writes every frame;
+- HUD updates throttled rather than frame-bound.
+
+Before scaling effects:
+
+1. fix the known performance problems equivalent to P2 / P6;
+2. re-profile;
+3. fix the remaining background issues equivalent to P3 / P4 before cinematic scaling;
+4. establish current budgets in code/tests.
+
+Do not blindly preserve stale numeric budgets if hardware/test harness changes. Preserve the **budget discipline**.
+
+---
+
+# 16. TEST LAB REQUIREMENTS
+
+Every major feature must be testable without playing hundreds of stages.
+
+Required controls over time:
+
+### Sector Condition
+
+- exact condition;
+- intensity where supported;
+- enable/disable.
+
+### Elite
+
+- enemy kind;
+- elite variant;
+- exact affix set.
+
+### Typing Pattern
+
+- force pattern;
+- force length/category where deterministic.
+
+### Flow
+
+- set streak;
+- jump tier.
+
+### Threat
+
+- fake WPM;
+- fake accuracy;
+- force/freeze threat.
+
+### Build
+
+- equip relic;
+- trigger event;
+- trigger synergy.
+
+### Boss
+
+- select boss;
+- spawn part;
+- jump phase;
+- trigger ultimate.
+
+### Encounter Recipe
+
+- select recipe;
+- seed;
+- preview generated encounter.
+
+### Macro Pacing
+
+- simulate N stages;
+- inspect selected slot types.
+
+### Expedition
+
+- seed;
+- stage index;
+- reward choice;
+- boss route;
+- abandon/reload.
+
+### Cinematic
+
+- play reference sequence;
+- replay repeatedly;
+- stop/cleanup;
+- quality tier comparison.
+
+Test Lab must call production logic with configuration overrides. It must not become a separate fake implementation.
+
+---
+
+# 17. SAVE / MIGRATION RULES
+
+Persistent expansion data should go into a new tolerant section with safe defaults.
+
+Possible long-lived data:
+
+```text
+eventChainFlags
+discoveredSynergies
+mastery
+vocabularyMeta
+nemesisRecords
+expeditionRecords
+dailySeedRecord
+secrets
+```
+
+Avoid validators that require an exact fixed count of IDs.
+
+Every new persistent field must support:
+
+- old saves;
+- missing fields;
+- checkpoint;
+- crash recovery;
+- death protection where relevant;
+- export/backup;
+- migration tests.
+
+Stage-local state generally should not persist across normal reload unless current game design explicitly requires it.
+
+Expedition is the exception: it may need dedicated resumable run state.
+
+---
+
+# 18. VARIETY AUDIT — REQUIRED AUTOMATED QUALITY TOOL
+
+Create a deterministic simulation of the campaign.
+
+Minimum report windows:
+
+```text
+last 5 stages
+last 10 stages
+last 25 stages
+last 50 stages
+100-stage blocks
+full 1000 stages
+```
+
+Metrics:
+
+- exact Encounter Recipe repeat distance;
+- Sector Condition repeat distance;
+- Typing Pattern streak length;
+- enemy-role distribution;
+- Elite Affix pair repeats;
+- high-complexity encounter spacing;
+- recovery-stage spacing;
+- boss mechanic repeats;
+- objective repeats;
+- World-theme distribution;
+- reward-choice frequency;
+- milestone frequency.
+
+Example failure output:
+
+```text
+Same Sector Condition repeated within 3 stages: FAIL
+Same Typing Pattern 4 stages consecutively: FAIL
+Same boss mechanic combination within 40 stages: FAIL
+Recovery gap > configured maximum: FAIL
+```
+
+Do not optimize purely for maximum entropy. Curated rhythm is more important than random uniqueness.
+
+---
+
+# 19. 1000-STAGE COMPLEXITY CURVE
+
+The campaign should unlock complexity in layers.
+
+Suggested conceptual bands:
+
+## Stage 1–100
+
+- fundamentals;
+- visible Flow;
+- basic elite readability;
+- simple Typing Pattern variation.
+
+## 101–250
+
+- first Sector Conditions;
+- first new affixes;
+- simple Encounter Recipes;
+- Choose-1-of-3 introduction.
+
+## 251–400
+
+- build identity;
+- synergy discovery;
+- broader recipe pool;
+- early mastery hooks.
+
+## 401–600
+
+- 2–3-system combinations;
+- boss parts on selected bosses;
+- stronger Macro Pacing variation.
+
+## 601–800
+
+- advanced event chains;
+- advanced recipes;
+- selected Lexicon Boss encounters;
+- more elaborate boss combinations.
+
+## 801–950
+
+- high-complexity curated combinations;
+- rare Nemesis/champion content;
+- mastery-heavy encounters.
+
+## 951–1000
+
+- curated endgame gauntlet;
+- deliberate callbacks to prior mechanics;
+- final mastery / boss culmination.
+
+Late game must **not** mean every system active simultaneously.
+
+---
+
+# 20. ROADMAP — FINAL IMPLEMENTATION PHASES
+
+## PHASE 0A — PERFORMANCE + BASELINE AUDIT
+
+### Scope
+
+- fix the known critical performance items equivalent to P2/P6;
+- capture new performance baseline;
+- implement Variety Audit baseline against current content;
+- document current repeat behavior before gameplay changes.
+
+### Acceptance criteria
+
+- no behavior change intended;
+- current regression suite passes;
+- baseline report committed;
+- profiling script reproducible;
+- rollback is a clean commit revert.
+
+---
+
+## PHASE 0B — COMBAT EVENT PIPELINE: WORD / STREAK
+
+### Scope
+
+- typed synchronous event definitions;
+- deterministic queue/processing point;
+- migrate word/streak triggers only;
+- command-return pattern.
+
+### Acceptance criteria
+
+- no gameplay behavior regression;
+- listener ordering has tests;
+- recursion depth/budget tested;
+- old and new behavior produce equivalent results for migrated triggers;
+- no asynchronous hidden dependency.
+
+---
+
+## PHASE 0C — COMBAT EVENT PIPELINE: ENEMY / SKILL
+
+### Scope
+
+- `ENEMY_KILLED`;
+- `PLAYER_HIT`;
+- `SKILL_USED`;
+- compatible relic/perk/synergy triggers.
+
+### Acceptance criteria
+
+- no typing lock after skill use;
+- targeting regression passes;
+- reward/drop behavior unchanged;
+- full suite passes.
+
+---
+
+## PHASE 0D — COMBAT EVENT PIPELINE: BOSS / RECALL / STAGE
+
+### Scope
+
+- boss phase events;
+- Recall result;
+- stage lifecycle;
+- remaining compatible triggers.
+
+### Acceptance criteria
+
+- boss phase transition cannot soft-lock typing;
+- Recall remains behaviorally equivalent;
+- pause/restart/stage transition pass;
+- full suite passes twice on clean runs.
+
+---
+
+## PHASE 1A — MAKE EXISTING VARIETY VISIBLE
+
+### Scope
+
+- pre-stage briefing card;
+- improved visual language for existing elite variants;
+- Flow tiers;
+- Flow-driven music layer;
+- visible Threat indicator;
+- post-stage highlight summary if small enough.
+
+### Acceptance criteria
+
+- player can tell why a stage feels different without opening debug UI;
+- existing elite variants are visually distinguishable at gameplay scale;
+- Flow change is visible and audible;
+- Threat is informative, not distracting;
+- no new major gameplay logic required.
+
+---
+
+## PHASE 1B — GAMEPLAY VARIETY VERTICAL SLICE
+
+### Scope
+
+- 2 Sector Conditions first;
+- 2 new Elite Affixes first;
+- 3 Typing Patterns first;
+- Encounter Recipe framework;
+- 3 initial recipes.
+
+Suggested first slice:
+
+```text
+Conditions:
+- Solar Storm
+- Meteor Shower
+
+Affixes:
+- Chrono
+- Guardian
+
+Typing:
+- NORMAL_WORD
+- SHORT_BURST
+- LONG_WORD
+
+Recipes:
+- Swarm Assault
+- Sniper Ambush
+- Fortress Siege
+```
+
+### Acceptance criteria
+
+- every feature can be forced in Test Lab;
+- compatibility rules prevent invalid stacks;
+- Variety Audit shows measurable improvement;
+- performance remains inside budget;
+- target readability passes manual review;
+- no feature requires duplicated target/state systems.
+
+---
+
+## PHASE 1C — VARIETY EXPANSION
+
+### Scope
+
+- Gravity Well;
+- Time Fracture;
+- Berserker;
+- Phase;
+- Anchored;
+- PHRASE / SHARED_TARGET / CHAIN;
+- remaining initial Encounter Recipes;
+- anti-repeat scheduler tuning.
+
+### Acceptance criteria
+
+- no 4-stage typing-pattern monotony under normal seeded simulations;
+- no immediate Sector Condition repetition unless curated;
+- entity cap remains bounded;
+- all affix visual language is distinct;
+- learning text remains authentic.
+
+---
+
+## PHASE 2A — PLAYER CHOICE / BUILD VERTICAL SLICE
+
+### Scope
+
+- Choose 1 of 3;
+- 12 core relic target;
+- 4 build families;
+- 3–4 initial cross-system synergies;
+- discovery presentation.
+
+### Acceptance criteria
+
+- two runs with different choices feel mechanically different;
+- no build requires impossible absolute WPM;
+- no single relic dominates every family in balance simulation;
+- synergy trigger has clear explanation/feedback;
+- build choices are seedable in Expedition context.
+
+---
+
+## PHASE 2B — RAGE AWAKENING + PROJECTILE EVOLUTION
+
+### Scope
+
+- presentation upgrade for existing Rage;
+- selected projectile-evolution milestones;
+- dynamic climax audio hook;
+- High/Ultra presentation differentiation.
+
+### Acceptance criteria
+
+- no second Rage/Awakening resource;
+- target readability never drops below standard;
+- Low tier receives all gameplay information;
+- repeated activation leaks no resources;
+- cleanup passes pause/stage transition/restart.
+
+---
+
+## PHASE 3 — BOSS 2.0 REFERENCE IMPLEMENTATION
+
+### Scope
+
+- one reference Tyrant;
+- 2 targetable boss parts;
+- interruptible ultimate;
+- rage phase;
+- selected Typing Pattern variation.
+
+### Acceptance criteria
+
+- boss parts reuse target/typing pipeline;
+- boss parts cannot drop normal loot or count as unrelated objectives;
+- skill use during phase transition cannot lock input;
+- Test Lab can jump directly to each phase;
+- cleanup is deterministic.
+
+---
+
+## PHASE 3.5 — MACRO PACING
+
+### Scope
+
+- pacing slots / arcs;
+- recovery constraints;
+- milestone override;
+- integrate Encounter Recipe selection with pacing role;
+- extend Variety Audit.
+
+### Acceptance criteria
+
+- simulation shows deliberate recovery and climax spacing;
+- no sustained high-complexity wall unless curated;
+- World transitions remain coherent;
+- pacing is seed-reproducible.
+
+---
+
+## PHASE 4 — EXPEDITION + ROUTE EVENTS
+
+### Scope
+
+- ~20-stage Expedition;
+- Daily Seed;
+- scoring;
+- Choose-1-of-3 run build;
+- event route node;
+- initial event chains;
+- optional Nemesis v1.
+
+### Acceptance criteria
+
+- campaign state remains isolated;
+- save/resume works;
+- deterministic seed structure works;
+- abandoning a run is safe;
+- rewards reset correctly;
+- repeated runs reuse production systems rather than copies.
+
+---
+
+## PHASE 5 — LEARNING PROGRESSION / META
+
+### Scope
+
+- Wanted Words;
+- mastery;
+- Vocabulary Codex;
+- Mastery Constellation presentation;
+- Lexicon Boss prototype;
+- optional personal Ghost.
+
+### Acceptance criteria
+
+- weak words are reintroduced, not unfairly punished;
+- mastery calculation is deterministic;
+- old saves default safely;
+- learning information remains correct;
+- Lexicon Boss never creates unreadable typing load.
+
+---
+
+## PHASE 6 — CINEMATIC MILESTONES / DEEP SECRETS
+
+### Prerequisite
+
+Background performance issues equivalent to P3/P4 resolve
