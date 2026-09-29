@@ -5,6 +5,7 @@ import type { EnemyRank } from "./enemies/rank";
 import type { EnemyLayerId } from "./enemies/layers";
 import type { EnemySkillId } from "./enemies/skills";
 import type { ThreatBudget } from "./enemies/threat";
+import type { EnemyFamilyId } from "./enemies/families";
 
 export type GamePhase =
   | "title"
@@ -136,6 +137,8 @@ export type EnemyProjectile = {
   vx: number;
   vy: number;
   radius: number;
+  /** Shooter's family: gives the shot its look (fireball, ice shard…). */
+  family?: EnemyFamilyId;
 };
 
 export type Laser = {

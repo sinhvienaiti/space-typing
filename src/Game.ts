@@ -390,6 +390,7 @@ import {
 import {
   getSupportSpell,
   isSupportSpellId,
+  strikeTypingAdvance,
   type SupportSpellId,
 } from "./skills/support";
 import {
@@ -427,6 +428,32 @@ import {
 import { enemyFxProfile, type EnemyFxProfile } from "./vfx/enemy-fx";
 import { PlayerShotSystem, preloadShotArt, type ShotAimPoint } from "./vfx/player-shots";
 import { ShipExhaust } from "./vfx/ship-exhaust";
+import {
+  SkillFxSystem,
+  distanceToSegment,
+  nearestPoint,
+  type FxPoint,
+  type PersistentFxState,
+} from "./vfx/skill-fx";
+import { characterVisualProfile } from "./characters/visuals";
+import { NO_EQUIPMENT_PERKS, type EquipmentPerkEffects } from "./equipment/perks";
+import { drawGlow, drawRingGlow } from "./vfx/light-sprites";
+import { CombatFxSystem, drawBossAura, drawEnemyShot } from "./vfx/combat-fx";
+import { familyStyle, kindArchetype, kindMotionPose, type MotionPose } from "./enemies/identity";
+import {
+  drawPaintedSprite,
+  paintedBossSprite,
+  paintedEnemySprite,
+  preloadPaintedSprites,
+} from "./enemies/painted-sprites";
+import {
+  bossFullName,
+  bossIdentityForStage,
+  bossPatternForPhase,
+  bossShotGeometry,
+  type BossIdentity,
+  type BossPattern,
+} from "./boss/identity";
 import { rewardFxProfile } from "./vfx/reward-fx";
 import {
   FrameProfiler,
@@ -643,6 +670,41 @@ const rewardCrateSway = (crate: RewardChoiceCrate): number => Math.sin(crate.age
 const anomalyCrateSway = (crate: AnomalyCrate): number => Math.sin(crate.age * 3.1) * 18;
 /** Nose tip ahead of the ship centre, px (legacy laser and target line start). */
 const SHIP_NOSE_OFFSET = 30;
+/** Wind-up colour of an enemy skill, by its category. */
+const SKILL_CHARGE_COLORS = {
+  attack: "#ff7a3d",
+  defense: "#7ff5ff",
+  control: "#c08bff",
+  support: "#6dffb4",
+} as const;
+/** Beam colour of enemy status skills (frost lock, silence, curse…). */
+const ENEMY_STATUS_COLORS: Partial<Record<string, string>> = {
+  frozen: "#8fe8ff",
+  silenced: "#c9b8ff",
+  cursed: "#ff5ad0",
+  bound: "#ffb45a",
+  jammed: "#d8ff66",
+  slowed: "#7fb8ff",
+};
+/** Painted enemy / boss sprites, as a multiple of the hit radius. */
+const ENEMY_SPRITE_SCALE = 2.7;
+const BOSS_SPRITE_SCALE = 2.9;
+const ALL_ENEMY_KINDS: readonly EnemyKind[] = [
+  "scout", "mine", "tank", "destroyer", "oppressor", "shield", "carrier",
+  "jammer", "cloaker", "healer", "splitter", "sniper", "leech", "commander",
+];
+/** Tactical systems tuning (see src/skills/support.ts descriptions). */
+const MISSILE_SWARM_COUNT = 8;
+const MISSILE_SWARM_TARGETS = 6;
+const MISSILE_SWARM_FLIGHT = 0.46;
+const MISSILE_SWARM_STAGGER = 0.055;
+const RAILGUN_LANE_HALF_WIDTH = 46;
+const TRACTOR_PULL_SECONDS = 0.8;
+const TRACTOR_PULL_SHARE = 0.22;
+const TRACTOR_MIN_Y = 90;
+const TRACTOR_HOLD_SECONDS = 4;
+const TRACTOR_HOLD_FACTOR = 0.45;
+const TRACTOR_STALL_SECONDS = 2;
 const HIT_STUN_SECONDS = 0.06;
 const LAYER_STUN_SECONDS = 0.16;
 const HIT_SHAKE_SECONDS = 0.12;
@@ -754,6 +816,29 @@ export class Game {
   /** Nose turn toward each shot's target, recoil and engine throttle. */
   private readonly shipMotion = new ShipMotion();
   private readonly shipExhaust = new ShipExhaust();
+  /** Big skill signatures: shockwaves, lances, missiles, shields, drones. */
+  private readonly skillFx = new SkillFxSystem();
+  /** Enemy and boss effects: material hits, family deaths, boss sequences. */
+  private readonly combatFx = new CombatFxSystem();
+  /** Who the current boss is (name, look, volley patterns, voice). */
+  private bossIdentity: BossIdentity | null = null;
+  private readonly motionPose: MotionPose = { dx: 0, dy: 0, rotation: 0, scaleX: 1, scaleY: 1, alpha: 1 };
+  /** Tractor Beam: enemies being hauled back up the field. */
+  private tractorPulls: Array<{ enemyId: number; remaining: number; speed: number }> = [];
+  /** Skill hits waiting for their missiles to arrive. */
+  private pendingStrikes: Array<{ delay: number; enemyIds: number[]; letters: number; bossShare: number }> = [];
+  /** Equipment perks of the Mk.II / Mk.III parts (src/equipment/perks.ts). */
+  private perks: EquipmentPerkEffects = { ...NO_EQUIPMENT_PERKS };
+  private perkKills = 0;
+  private perkPerfectKills = 0;
+  private perkPerfectWords = 0;
+  private perkStageBlocks = 0;
+  private perkPhaseTimer = 0;
+  private perkEscortTimer = 0;
+  private perkEscortTurn = 0;
+  private perkInterceptTimer = 0;
+  /** Kill perks that fire when the killing bolt lands, keyed by enemy id. */
+  private perkKillQueue = new Map<number, { arc: boolean; pierce: boolean; plasma: boolean; missiles: boolean }>();
   /** The last shot's target, which the ship keeps tracking for a moment. */
   private shipAimImpact: ShotImpact | null = null;
   /** Time of the last drawn frame; key presses place shots on that pose. */
@@ -1780,6 +1865,13 @@ export class Game {
     this.equipmentAura = { ...profile };
   }
 
+  /** Perks of the equipped parts; applies from the next stage start. */
+  setEquipmentPerks(effects: EquipmentPerkEffects): void {
+    this.perks = { ...effects };
+    this.refreshSkillDefinitions();
+    this.hooks.onSkills();
+  }
+
   setSkills(definitions: readonly SkillDefinition[]): void {
     this.skillEngine.setDefinitions(definitions);
   }
@@ -1851,11 +1943,15 @@ export class Game {
         this.skillLevels,
       );
 
-    this.skillEngine.setDefinitions([
-      ...characterDefinitions,
-      ...coreDefinitions,
-      ...supportDefinitions,
-    ]);
+    // Low-Loss Capacitor (equipment perk) makes every skill cheaper.
+    const costScale = this.perks.skillCostMultiplier;
+    this.skillEngine.setDefinitions(
+      [...characterDefinitions, ...coreDefinitions, ...supportDefinitions].map((definition) =>
+        costScale === 1
+          ? definition
+          : { ...definition, energyCost: Math.max(0, Math.round(definition.energyCost * costScale)) },
+      ),
+    );
   }
 
   getSkillState(id: string): SkillRuntimeState | null {
@@ -1940,10 +2036,14 @@ export class Game {
     }
 
     if (
-      id === "meteor" &&
+      (id === "meteor" || id === "missile-swarm" || id === "railgun") &&
       this.enemies.length === 0 &&
       this.boss === null
     ) {
+      return "effect-not-needed";
+    }
+
+    if (id === "tractor-beam" && this.enemies.length === 0) {
       return "effect-not-needed";
     }
 
@@ -2114,6 +2214,8 @@ export class Game {
     );
 
     this.burst(playerX, playerY, 38, 188);
+    this.skillFx.pulse(playerX, playerY, "#5ce1ff", 200, 6);
+    this.skillFx.flash("#5ce1ff", 0.12, 0.3);
     this.sfx.power();
     this.emitStats();
   }
@@ -2129,6 +2231,8 @@ export class Game {
       36,
       300,
     );
+    this.skillFx.halo(() => this.shipCenter(), "#d98bff", 120, 10, 0.9);
+    this.skillFx.pulse(this.width / 2, this.height - PLAYER_Y_OFFSET, "#d98bff", 180, 5);
     this.sfx.power();
   }
 
@@ -2139,6 +2243,8 @@ export class Game {
   private activateWraithSkill(): void {
     this.cloakTimer = Math.max(this.cloakTimer, WRAITH_ACTIVE_CLOAK_DURATION);
     this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 30, 274);
+    this.skillFx.pulse(this.width / 2, this.height - PLAYER_Y_OFFSET, "#b98cff", 160, 4);
+    this.skillFx.flash("#6d4bff", 0.12, 0.35);
     this.sfx.support();
   }
 
@@ -2150,6 +2256,8 @@ export class Game {
       this.stats.maxShield,
     );
     this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 28, 48);
+    this.skillFx.halo(() => this.shipCenter(), "#ffd65a", 110, 8, 1);
+    this.skillFx.shower("#ffd65a", 1.1);
     this.sfx.support();
     this.emitStats();
   }
@@ -2160,6 +2268,8 @@ export class Game {
       ARSENAL_OVERCLOCK_DURATION,
     );
     this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 30, 18);
+    this.skillFx.halo(() => this.shipCenter(), "#ff8a3d", 100, 8, 0.8);
+    this.skillFx.pulse(this.width / 2, this.height - PLAYER_Y_OFFSET, "#ff8a3d", 140, 4);
     this.sfx.power();
   }
 
@@ -2177,6 +2287,7 @@ export class Game {
       BASTION_MATRIX_BLOCKS,
     );
     this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 30, 164);
+    this.skillFx.halo(() => this.shipCenter(), "#ffd76a", 110, 10, 1);
     this.sfx.support();
   }
 
@@ -2212,6 +2323,9 @@ export class Game {
     target.flash = 1;
     target.kick = Math.max(target.kick, 1.2);
     this.burst(target.x, target.y, 22, 350);
+    this.skillFx.slash(target.x, target.y, "#ff4d6d");
+    this.skillFx.flash("#ff2a4a", 0.1, 0.25);
+    this.shakeFor(4);
     this.sfx.power();
   }
 
@@ -2247,6 +2361,7 @@ export class Game {
     );
     this.celestialCharge = spendCelestialCharge(this.celestialCharge);
     this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 34, 220);
+    this.skillFx.halo(() => this.shipCenter(), "#cfe0ff", 140, 12, 1.2);
     this.sfx.support();
     this.emitStats();
   }
@@ -2268,6 +2383,8 @@ export class Game {
       this.stats.maxEnergy,
     );
     this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 38, 190);
+    this.skillFx.halo(() => this.shipCenter(), "#8ff4ff", 130, 12, 1);
+    this.skillFx.pulse(this.width / 2, this.height - PLAYER_Y_OFFSET, "#9d8bff", 260, 5, 1);
     this.sfx.power();
     this.emitStats();
   }
@@ -2296,6 +2413,10 @@ export class Game {
       36 + Math.min(24, clearedProjectiles * 3),
       192,
     );
+    const ship = this.shipCenter();
+    this.skillFx.shockwave(ship.x, ship.y, "#7fdcff", Math.hypot(this.width, this.height) * 0.72, this.fxTargets(10), 3);
+    this.skillFx.flash("#7fdcff", 0.22, 0.4);
+    this.shakeFor(6);
     this.sfx.power();
   }
 
@@ -2321,6 +2442,7 @@ export class Game {
         );
       }
       this.burst(playerX, playerY, 28, 188);
+      this.skillFx.pulse(playerX, playerY, "#5ce1ff", 150, 5);
       this.sfx.support();
     } else if (id === "reflect-field") {
       this.reflectTimer = Math.max(
@@ -2328,6 +2450,7 @@ export class Game {
         4.5 * effectScale,
       );
       this.burst(playerX, playerY, 30, 300);
+      this.skillFx.pulse(playerX, playerY, "#d98bff", 170, 4);
       this.sfx.power();
     } else if (id === "time-shell") {
       this.timeShellTimer = Math.max(
@@ -2335,6 +2458,8 @@ export class Game {
         5 * effectScale,
       );
       this.burst(playerX, playerY, 34, 258);
+      this.skillFx.pulse(playerX, playerY, "#9d8bff", Math.max(this.width, this.height) * 0.6, 5, 1.1);
+      this.skillFx.flash("#9d8bff", 0.18, 0.5);
       this.sfx.support();
     } else if (id === "emergency-repair") {
       const repaired = emergencyRepair(
@@ -2354,6 +2479,7 @@ export class Game {
       this.stats.shield = repaired.shield;
       this.stats.energy = repaired.energy;
       this.burst(playerX, playerY, 34, 138);
+      this.skillFx.nanite(() => this.shipCenter());
       this.sfx.support();
     } else {
       this.guardianTimer = Math.max(
@@ -2365,6 +2491,7 @@ export class Game {
         3 + (mastery ? 1 : 0),
       );
       this.burst(playerX, playerY, 26, 48);
+      this.skillFx.pulse(playerX, playerY, "#ffd76a", 120, 3);
       this.sfx.support();
     }
 
@@ -2391,6 +2518,11 @@ export class Game {
       const targets = [...this.enemies]
         .sort((a, b) => b.y - a.y)
         .slice(0, chainTargets);
+      const arcPath: FxPoint[] = [this.shipNose(), ...targets.map((enemy) => ({ x: enemy.x, y: enemy.y }))];
+      if (targets.length === 0 && this.boss !== null) arcPath.push(this.bossPosition());
+      this.skillFx.lightning(arcPath, "#9ab8ff", 2.4, 0.6);
+      this.skillFx.flash("#9ab8ff", 0.12, 0.25);
+      this.shakeFor(3.5);
 
       for (const enemy of targets) {
         const wordLength = typingText(enemy.entry.en).length;
@@ -2446,6 +2578,8 @@ export class Game {
     if (this.boss !== null) {
       this.bossMarkTimer = Math.max(this.bossMarkTimer, duration);
       this.boss.flash = 1;
+      const at = this.bossPosition();
+      this.skillFx.pulse(at.x, at.y, "#ff5a6e", 140, 3);
       this.hooks.onBossUpdate(toBossHud(this.boss));
       this.sfx.support();
       return;
@@ -2467,6 +2601,8 @@ export class Game {
       target.flash = 1;
       target.kick = Math.max(target.kick, 1);
       this.burst(target.x, target.y, 22, 326);
+      this.skillFx.pulse(target.x, target.y, "#ff5a6e", 110, 3);
+      this.skillFx.zap(this.shipNose(), { x: target.x, y: target.y }, "#ff5a6e");
       this.sfx.support();
     }
   }
@@ -2504,6 +2640,9 @@ export class Game {
         "support:sanctuary",
       );
       this.burst(playerX, playerY, 34, 164);
+      this.skillFx.halo(() => this.shipCenter(), "#ffcf6a", 150, 14, 1.3);
+      this.skillFx.pulse(playerX, playerY, "#ffcf6a", 220, 5);
+      this.skillFx.flash("#ffcf6a", 0.16, 0.45);
       this.sfx.support();
       this.emitStats();
       return;
@@ -2512,6 +2651,10 @@ export class Game {
     if (id === "gravity-well") {
       this.gravityWellTimer = Math.max(this.gravityWellTimer, 5);
       this.burst(this.width / 2, this.height * 0.42, 42, 270);
+      const core = this.singularityCenter();
+      this.skillFx.pulse(core.x, core.y, "#b36bff", 260, 6, 0.8);
+      this.skillFx.flash("#6a2bff", 0.14, 0.4);
+      this.shakeFor(4);
       this.sfx.power();
       return;
     }
@@ -2522,13 +2665,35 @@ export class Game {
       );
       this.interferenceTimer = 0;
       this.burst(playerX, playerY, 24, 176);
+      this.skillFx.purge();
+      this.skillFx.flash("#9fffe0", 0.12, 0.3);
       this.sfx.support();
+      return;
+    }
+
+    if (id === "missile-swarm") {
+      this.launchMissileSwarm();
+      return;
+    }
+
+    if (id === "railgun") {
+      this.fireRailgun();
+      return;
+    }
+
+    if (id === "tractor-beam") {
+      this.fireTractorBeam();
       return;
     }
 
     const targets = [...this.enemies]
       .sort((a, b) => b.y - a.y)
       .slice(0, 3);
+    // Orbital Strike: target circles, then lances from the sky.
+    const lanes = targets.map((enemy) => ({ x: enemy.x, y: enemy.y }));
+    if (lanes.length === 0 && this.boss !== null) lanes.push(this.bossPosition());
+    this.skillFx.orbitalStrike(lanes, "#ffe2a0", 0.38);
+    this.shakeFor(8);
 
     for (const enemy of targets) {
       const wordLength = typingText(enemy.entry.en).length;
@@ -3001,6 +3166,25 @@ export class Game {
     this.rewardCreditsMultiplierTimer = 0;
     this.rewardNotice = null;
     this.celestialCharge = 0;
+    {
+      const world = worldForStage(stage.stage);
+      preloadPaintedSprites(world.enemyFamilies, ALL_ENEMY_KINDS, [
+        bossIdentityForStage(stage.stage, "mini-boss").id,
+        bossIdentityForStage(stage.stage, "boss").id,
+        bossIdentityForStage(stage.stage, "major-boss").id,
+      ]);
+    }
+    this.perkKills = 0;
+    this.perkPerfectKills = 0;
+    this.perkPerfectWords = 0;
+    this.perkStageBlocks = this.perks.stageBlocks;
+    this.perkPhaseTimer = 0;
+    this.perkEscortTimer = 2;
+    this.perkEscortTurn = 0;
+    this.perkInterceptTimer = 0;
+    if (this.perks.startingRage > 0) {
+      this.stats.power = clamp(Math.max(this.stats.power, this.perks.startingRage), 0, 100);
+    }
     this.statusState = createStatusState();
     this.hardCcState = createHardCcState();
     this.interferenceTimer = 0;
@@ -3417,7 +3601,7 @@ export class Game {
     if (this.guardianTimer <= 0) this.guardianBlocks = 0;
     if (this.markTimer <= 0) this.markedEnemyId = null;
 
-    this.skillEngine.tick(dt);
+    this.skillEngine.tick(dt * this.perks.cooldownRate);
     this.skillHudTimer -= dt;
     if (this.skillHudTimer <= 0) {
       this.skillHudTimer = 0.15;
@@ -3449,6 +3633,9 @@ export class Game {
     this.updateRecallBonus(dt);
     this.updateRewardChoiceCrate(dt);
     this.updateAnomalyCrate(dt);
+    this.updateTractorPulls(dt);
+    this.updatePendingStrikes(dt);
+    this.updatePerkSystems(dt);
     if (!(this.testLabEnabled && this.testLabSchedulerFrozen)) {
       this.spawnTimer -= dt * hostileTimeFactor;
       this.stagePhaseBreakTimer = Math.max(
@@ -3619,8 +3806,9 @@ export class Game {
     }
     for (let index = this.projectiles.length - 1; index >= 0; index -= 1) {
       const projectile = this.projectiles[index]!;
-      projectile.x += projectile.vx * dt * hostileTimeFactor;
-      projectile.y += projectile.vy * dt * hostileTimeFactor;
+      const shotSpeed = hostileTimeFactor * this.perks.hostileShotSpeed;
+      projectile.x += projectile.vx * dt * shotSpeed;
+      projectile.y += projectile.vy * dt * shotSpeed;
 
       const dx = projectile.x - playerX;
       const dy = projectile.y - playerY;
@@ -3701,6 +3889,8 @@ export class Game {
       this.applyShotImpact(arrival.payload, arrival.x, arrival.y, true);
     }
     this.updateShipMotion(dt);
+    this.skillFx.update(dt);
+    this.combatFx.update(dt);
 
     if (this.learningEcho !== null) {
       this.learningEcho.remaining = Math.max(
@@ -3764,11 +3954,9 @@ export class Game {
     this.boss.shieldActive =
       mechanic.id === "shield-sequence" &&
       mechanic.active;
+    this.bossIdentity = bossIdentityForStage(bossVisualStage, this.boss.role);
     this.boss.name =
-      bossVisualNameForStage(
-        bossVisualStage,
-        this.boss.role,
-      ) +
+      bossFullName(this.bossIdentity) +
       (difficulty.bossMutationLabel === undefined
         ? ""
         : " · ASC " + difficulty.bossMutationLabel);
@@ -3795,6 +3983,7 @@ export class Game {
       const position = this.bossPosition();
       this.burst(position.x, position.y, fx.count, fx.hue);
       this.sfx.bossEntrance(fx.pitch);
+      this.presentBossEntrance();
     } else {
       this.sfx.bossEntrance();
     }
@@ -3905,9 +4094,14 @@ export class Game {
       (this.difficulty.projectileSpeedScale ?? 1);
     const alphabet = "asdfjklqweruiopzxcvbnm";
 
+    // Each boss has its own volley shapes (src/boss/identity.ts); the number
+    // of shots stays exactly as before, only where they come from changes.
+    const identity = this.bossIdentity;
+    const pattern: BossPattern = identity === null ? "aimed" : bossPatternForPhase(identity, boss.phase);
+    const radius = this.bossRadius(boss.role);
+    void spread;
     for (let index = 0; index < count; index += 1) {
-      const offset = (index - (count - 1) / 2) * spread;
-      const angle = baseAngle + offset;
+      const shot = bossShotGeometry(pattern, index, count, x, y, radius, playerX, playerY, this.width);
       const char =
         alphabet[Math.floor(Math.random() * alphabet.length)] ?? "a";
 
@@ -3915,12 +4109,14 @@ export class Game {
         id: this.nextProjectileId++,
         ownerId: -1,
         char,
-        x,
-        y: y + 18,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
+        x: shot.x,
+        y: shot.y,
+        vx: Math.cos(shot.angle) * speed * shot.speed,
+        vy: Math.sin(shot.angle) * speed * shot.speed,
         radius: boss.phase >= 3 ? 15 : 13,
+        family: identity?.family,
       });
+      if (identity !== null) this.combatFx.cast(shot.x, shot.y, identity.primary, 24);
     }
 
     this.sfx.enemyShot();
@@ -4889,6 +5085,7 @@ export class Game {
       true,
     );
     this.burst(jammer.x, jammer.y, 18, 74);
+    this.enemyCastFx(jammer, "#d8ff66", true);
     this.sfx.enemyShot();
   }
 
@@ -4905,6 +5102,9 @@ export class Game {
       286,
     );
     this.burst(leech.x, leech.y, 12, 286);
+    // The drain tether: Rage flows up from the ship into the leech.
+    this.skillFx.lightning([this.shipCenter(), { x: leech.x, y: leech.y }], "#bb72ff", 2.2, 0.45);
+    this.combatFx.cast(leech.x, leech.y, "#bb72ff", leech.radius * 1.8);
     this.sfx.drain();
 
     if (before !== this.stats.power) {
@@ -4929,6 +5129,9 @@ export class Game {
 
     this.spawnTimer = Math.min(this.spawnTimer, 0.12);
     this.burst(commander.x, commander.y, 24, 48);
+    // Rally: a gold pulse and a spark to each ally it orders forward.
+    this.combatFx.cast(commander.x, commander.y, "#ffd866", commander.radius * 2.4);
+    for (const ally of allies) this.skillFx.zap({ x: commander.x, y: commander.y }, { x: ally.x, y: ally.y }, "#ffd866");
     this.sfx.command();
   }
 
@@ -4958,6 +5161,10 @@ export class Game {
     ally.layersRemaining = reinforced.remaining;
     ally.flash = 1;
     this.burst(ally.x, ally.y, 20, 142);
+    // A healing beam from the mender to the ally it repairs.
+    this.skillFx.lightning([{ x: healer.x, y: healer.y }, { x: ally.x, y: ally.y }], "#6dffb4", 1.8, 0.5);
+    this.combatFx.cast(healer.x, healer.y, "#6dffb4", healer.radius * 1.9);
+    this.combatFx.cast(ally.x, ally.y, "#6dffb4", ally.radius * 1.6);
     this.sfx.support();
   }
 
@@ -5072,6 +5279,7 @@ export class Game {
       enemy.layersRemaining = reinforced.remaining;
       enemy.flash = 1;
       this.burst(enemy.x, enemy.y, 18, 185);
+      this.enemyCastFx(enemy, "#7ff5ff");
       this.sfx.support();
       return;
     }
@@ -5094,6 +5302,8 @@ export class Game {
     const duration = effect.duration *
       difficulty.hardCcDurationFactor;
     const source = "enemy-skill:" + skillId;
+    // Status skills reach the ship with a coloured beam from the caster.
+    this.enemyCastFx(enemy, ENEMY_STATUS_COLORS[effect.status] ?? "#ff5ad0", true);
 
     if (!effect.hardCc) {
       this.addStatus(effect.status, duration, source, true);
@@ -5170,6 +5380,8 @@ export class Game {
   private spawnCarrierChild(carrier: Enemy): void {
     if (this.difficulty === null) return;
     if (!this.canAdmitEnemyKind("scout", this.difficulty)) return;
+    // Hangar flash as the scout launches.
+    this.combatFx.cast(carrier.x, carrier.y + carrier.radius * 0.4, "#ffd866", carrier.radius * 1.5);
 
     const profile = enemyProfile("scout", this.stageConfig?.galaxy ?? 1);
     const baseX = clamp(
@@ -5286,6 +5498,10 @@ export class Game {
       (enemy.kind === "sniper" ? 1.72 : 1);
     const alphabet = "asdfjklqweruiopzxcvbnm";
     const count = enemy.kind === "oppressor" ? 3 : 1;
+    const shooterFamily = this.visualDefinitionForEnemy(enemy)?.family;
+    if (shooterFamily !== undefined) {
+      this.combatFx.cast(enemy.x, enemy.y + enemy.radius * 0.45, familyStyle(shooterFamily).primary, enemy.radius * 0.9);
+    }
     const spreadStep = enemy.kind === "oppressor" ? 0.13 : 0;
 
     for (let index = 0; index < count; index += 1) {
@@ -5304,6 +5520,7 @@ export class Game {
         vy: Math.sin(angle) * speed,
         radius:
           enemy.kind === "oppressor" ? 15 : enemy.kind === "sniper" ? 11 : 14,
+        family: this.visualDefinitionForEnemy(enemy)?.family,
       });
     }
 
@@ -5549,6 +5766,11 @@ export class Game {
       );
       this.burst(x, y, fx.count, fx.hue);
       this.sfx.bossPhase(fx.pitch);
+      const identity = this.bossIdentity;
+      if (identity !== null) {
+        this.combatFx.bossPhase(x, y, this.bossRadius(boss.role), identity.primary, identity.accent);
+        this.sfx.bossRoar(identity.voice * (boss.phase >= 3 ? 1.12 : 1.05), familyStyle(identity.family).material);
+      }
 
       if (this.settings.screenShake) {
         this.shake = Math.max(
@@ -5622,6 +5844,13 @@ export class Game {
     );
     this.burst(x, y, fx.count, fx.hue);
     this.sfx.bossDeath(fx.pitch);
+    const identity = this.bossIdentity;
+    if (identity !== null) {
+      const style = familyStyle(identity.family);
+      this.combatFx.bossDeath(x, y, this.bossRadius(boss.role), identity.primary, identity.accent, style.death, style);
+      this.sfx.enemyDeath(style.material, 1.6, 0);
+    }
+    this.bossIdentity = null;
     this.tryRollEquipmentDrop("boss");
     if (definition !== undefined) {
       this.activateDefinitionReward(definition, x, y);
@@ -6216,6 +6445,7 @@ export class Game {
       this.markedEnemyId = null;
       this.markTimer = 0;
     }
+    this.queuePerkKill(enemy, perfectWord);
     this.targetId = null;
   }
 
@@ -6414,6 +6644,7 @@ export class Game {
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         radius: 12,
+        family: this.visualDefinitionForEnemy(enemy)?.family,
       });
     }
 
@@ -6673,7 +6904,8 @@ export class Game {
   private gainPower(baseGain: number): void {
     this.stats.power = clamp(
       this.stats.power +
-        focusPowerGain(typedRageGain(baseGain), this.playerStats),
+        focusPowerGain(typedRageGain(baseGain), this.playerStats) *
+          this.perks.rageGainMultiplier,
       0,
       100,
     );
@@ -6700,7 +6932,20 @@ export class Game {
     this.stats.shield = next.shield;
     this.stats.energy = next.energy;
 
+    // Nanite Weave (equipment perk): the hull knits itself between hits.
+    let hullRepaired = false;
+    if (
+      this.perks.hullRegen > 0 &&
+      this.stats.hull > 0 &&
+      this.stats.hull < this.stats.maxHull &&
+      this.secondsSinceDamage >= this.perks.hullRegenDelay
+    ) {
+      this.stats.hull = Math.min(this.stats.maxHull, this.stats.hull + this.perks.hullRegen * dt);
+      hullRepaired = true;
+    }
+
     const changed =
+      hullRepaired ||
       Math.abs(beforeShield - next.shield) > 0.01 ||
       Math.abs(beforeEnergy - next.energy) > 0.01;
 
@@ -6737,6 +6982,7 @@ export class Game {
 
   private applyCharacterPerfectWordPassive(perfectWord: boolean): void {
     if (!perfectWord) return;
+    this.applyPerkPerfectWord();
 
     if (this.characterId === "aegis") {
       const nextShield = restoreAegisShield(
@@ -6829,6 +7075,10 @@ export class Game {
 
   private characterBossDamageMultiplier(): number {
     let multiplier = 1;
+
+    if (this.perks.momentumStreak > 0 && this.stats.streak >= this.perks.momentumStreak) {
+      multiplier *= 1 + this.perks.momentumDamage;
+    }
 
     if (this.characterId === "arsenal" && this.weaponOverclockTimer > 0) {
       multiplier *= 1.35;
@@ -7203,12 +7453,16 @@ export class Game {
     if (this.settings.screenShake) {
       this.shake = Math.max(this.shake, visual.shake * scale);
     }
+    this.playUltimateFx(rage.segments);
 
     this.sfx.power();
     this.emitStats();
   }
 
   private releaseNovaPulse(): void {
+    const ship = this.shipCenter();
+    this.skillFx.shockwave(ship.x, ship.y, "#91fbff", Math.hypot(this.width, this.height), this.fxTargets(12), 4);
+    this.skillFx.flash("#bff8ff", 0.4, 0.5);
     this.projectiles = [];
     const victims = [...this.enemies];
     for (const enemy of victims) {
@@ -7348,6 +7602,10 @@ export class Game {
       }
     }
 
+    this.skillFx.shieldHit(x, y, "#d98bff");
+    const owner = this.enemies.find((item) => item.id === projectile.ownerId);
+    const back = owner !== undefined ? { x: owner.x, y: owner.y } : this.boss !== null ? this.bossPosition() : null;
+    if (back !== null) this.skillFx.zap({ x, y }, back, "#e7b8ff");
     this.burst(x, y, 18, 300);
     this.sfx.hit();
   }
@@ -7369,11 +7627,35 @@ export class Game {
       return;
     }
 
+    if (this.perkStageBlocks > 0) {
+      // Ablative Plating (equipment perk): the first hit of the stage.
+      this.perkStageBlocks -= 1;
+      this.skillFx.shieldHit(x, y, "#ffb86b");
+      this.skillFx.shatter({ x, y }, 30, "#ffb86b");
+      this.burst(x, y, 16, 30);
+      this.sfx.shieldBreak();
+      return;
+    }
+
+    if (this.perks.phaseShieldInterval > 0 && this.perkPhaseTimer <= 0) {
+      // Phase Shift (equipment perk): this hit passes through.
+      this.perkPhaseTimer = this.perks.phaseShieldInterval;
+      const ship = this.shipCenter();
+      this.skillFx.pulse(ship.x, ship.y, "#b8a6ff", 110, 3, 0.55);
+      this.skillFx.shieldHit(x, y, "#b8a6ff");
+      this.sfx.support();
+      return;
+    }
+
     if (this.guardianTimer > 0 && this.guardianBlocks > 0) {
       this.guardianBlocks -= 1;
       if (this.guardianBlocks <= 0) {
         this.guardianTimer = 0;
       }
+      // The nearest escort drone shoots the threat down.
+      const drone = nearestPoint(this.skillFx.sentinelPositions, x, y) ?? this.shipCenter();
+      this.skillFx.zap(drone, { x, y }, "#ffd76a");
+      this.skillFx.blast(x, y, "#ffd76a", 34);
 
       this.burst(x, y, 22, 48);
       this.sfx.support();
@@ -7389,9 +7671,11 @@ export class Game {
       );
       this.barrierHp = barrier.barrierHp;
       damageRemaining = barrier.damageRemaining;
+      this.skillFx.shieldHit(x, y);
 
       if (this.barrierHp <= 0) {
         this.barrierTimer = 0;
+        this.skillFx.shatter(this.shipCenter(), 64);
       }
 
       this.burst(x, y, 18, 188);
@@ -7427,6 +7711,7 @@ export class Game {
     this.stats.streak = 0;
     this.stats.multiplier = 1;
     this.stats.power = clamp(this.stats.power - 30, 0, 100);
+    if (this.perks.reactivePulseRadius > 0) this.releaseReactivePulse();
 
     this.burst(x, y, 34, 2);
 
@@ -7436,6 +7721,7 @@ export class Game {
 
     if (shieldBefore > 0 && this.stats.shield <= 0) {
       this.sfx.shieldBreak();
+      if (this.perks.shieldBreakStall > 0) this.dischargeShield();
     }
     const criticalHullThreshold = this.stats.maxHull * 0.25;
     if (
@@ -7596,6 +7882,7 @@ export class Game {
         }
         this.burst(x, y, impact.power > 1 ? 12 : fromBolt ? 8 : 5, impactHue);
         this.sfx.boltImpact(impact.power, pan, variant);
+        this.enemyImpactFx(enemy, x, y, impact.power, pan, "hit");
         return;
       }
       case "enemy-layer": {
@@ -7607,19 +7894,20 @@ export class Game {
         }
         this.triggerImpactFeedback("word");
         this.burst(x, y, 12, impactHue);
-        this.burst(x, y, impact.fx.count, impact.fx.hue);
-        this.sfx.hit(impact.fx.pitch);
+        // The family's layer-break shards and sound replace the generic ones.
+        this.enemyImpactFx(enemy, x, y, 1.25, pan, "layer");
         this.sfx.boltImpact(1.25, pan, variant);
         return;
       }
       case "enemy-kill": {
         const ghost = this.dyingEnemies.indexOf(impact.enemy);
         if (ghost >= 0) this.dyingEnemies.splice(ghost, 1);
+        this.releasePerkKill(impact.enemy.id, x, y);
         this.triggerImpactFeedback("word");
         this.burst(x, y, 12, impactHue);
-        this.burst(x, y, impact.fx.count, impact.fx.hue);
-        this.sfx.hit(impact.fx.pitch);
-        this.sfx.kill(impact.fx.pitch);
+        // Family death burst + material break-up sound (bubble pop, ice
+        // shatter, ember blast…) instead of the generic burst and blip.
+        this.enemyImpactFx(impact.enemy, x, y, 1.45, pan, "kill");
         this.sfx.boltImpact(1.45, pan, variant);
         if (this.settings.screenShake) {
           this.shake = Math.max(this.shake, impact.shake);
@@ -7633,6 +7921,7 @@ export class Game {
         }
         this.burst(x, y, 7, impactHue);
         this.sfx.boltImpact(0.9, pan, variant);
+        this.bossImpactFx(x, y, pan);
         return;
       }
       case "intercept": {
@@ -7791,6 +8080,11 @@ export class Game {
     this.shipMotion.reset();
     this.shipExhaust.clear();
     this.shipAimImpact = null;
+    this.skillFx.clear();
+    this.combatFx.clear();
+    this.tractorPulls = [];
+    this.pendingStrikes = [];
+    this.perkKillQueue.clear();
   }
 
   private triggerImpactFeedback(kind: ImpactKind): void {
@@ -7902,6 +8196,9 @@ export class Game {
     if (this.interferenceTimer > 0) {
       this.drawInterference(time);
     }
+    const fxState = this.persistentFxState(time);
+    // Singularity and overdrive glow sit under the enemies and the ship.
+    this.skillFx.drawPersistentUnder(context, fxState);
     this.drawLasers(time);
     // Bolts fly under enemies so word labels always stay readable.
     this.playerShots.drawShots(context, this.settings.visualQuality);
@@ -7938,6 +8235,8 @@ export class Game {
     for (const enemy of this.dyingEnemies) {
       this.drawEnemy(enemy);
     }
+    // Family death bursts and material sparks, over the enemies.
+    this.combatFx.draw(context, this.settings.visualQuality);
 
     this.drawKillScorePopups();
     this.drawLearningEcho();
@@ -7947,22 +8246,22 @@ export class Game {
     }
 
     this.playerShots.drawImpacts(context, this.settings.visualQuality);
+    // Skill signatures (lances, missiles, arcs) over the enemies they hit.
+    this.skillFx.draw(context, this.settings.visualQuality, this.height);
     const rig = activeShipLightRig(this.characterId);
     if (rig !== null) this.shipExhaust.draw(context, rig);
     this.drawPlayer(time);
     this.playerShots.drawMuzzleFlashes(context);
+    this.skillFx.drawPersistentOver(context, fxState);
     this.drawDefensiveEffects(time);
     this.drawTargetLine();
     this.drawRewardNotice();
     this.drawEnemyControlOverlay();
 
-    if (this.overdriveTimer > 0) {
-      context.fillStyle =
-        "rgba(65, 225, 255, " +
-        String(0.035 + Math.sin(time * 10) * 0.012) +
-        ")";
-      context.fillRect(0, 0, this.width, this.height);
-    }
+    // Flashes, the purge scan and showers: screen space, drawn last.
+    this.skillFx.drawScreen(context, this.width, this.height);
+    // Boss title card.
+    this.combatFx.drawScreen(context, this.width, this.height);
 
     context.restore();
     this.drawRewardBuffTimers();
@@ -8345,21 +8644,41 @@ export class Game {
       context.stroke();
     }
 
+    context.shadowBlur = 0;
+    // The shooter's family gives the shot its look (fireball, ice shard,
+    // feather of light…); a red warning halo keeps every shot readable.
     context.globalCompositeOperation = "lighter";
-    context.shadowBlur =
-      (brightWorld ? 23 : 18) *
-      qualityProfile(this.settings.visualQuality).glowScale;
-    context.shadowColor = "#ff386f";
-    context.fillStyle = brightWorld
-      ? "rgba(255, 48, 108, 0.24)"
-      : "rgba(255, 70, 118, 0.13)";
-    context.strokeStyle = brightWorld ? "#ff477c" : "#ff7298";
-    context.lineWidth = brightWorld ? 3 : 2;
+    drawGlow(
+      context,
+      "#ff386f",
+      0,
+      0,
+      projectile.radius * 2.7,
+      (brightWorld ? 0.75 : 0.6) * qualityProfile(this.settings.visualQuality).glowScale,
+    );
+    const skinned =
+      projectile.family !== undefined &&
+      drawEnemyShot(
+        context,
+        familyStyle(projectile.family).shot,
+        familyStyle(projectile.family),
+        projectile.radius * 1.12,
+        Math.atan2(projectile.vy, projectile.vx),
+        this.lastDrawTime,
+      );
+    if (!skinned) {
+      context.globalCompositeOperation = "lighter";
+      context.fillStyle = brightWorld
+        ? "rgba(255, 48, 108, 0.24)"
+        : "rgba(255, 70, 118, 0.13)";
+      context.strokeStyle = brightWorld ? "#ff477c" : "#ff7298";
+      context.lineWidth = brightWorld ? 3 : 2;
 
-    context.beginPath();
-    context.arc(0, 0, projectile.radius, 0, Math.PI * 2);
-    context.fill();
-    context.stroke();
+      context.beginPath();
+      context.arc(0, 0, projectile.radius, 0, Math.PI * 2);
+      context.fill();
+      context.stroke();
+    }
 
     context.globalCompositeOperation = "source-over";
     context.fillStyle = "#fff8fb";
@@ -8371,6 +8690,560 @@ export class Game {
     context.fillText(projectile.char.toUpperCase(), 0, 0);
 
     context.restore();
+  }
+
+  // --- Skill signatures -------------------------------------------------------
+
+  /** Ship centre as drawn this frame. */
+  private shipCenter(): FxPoint {
+    const point = { x: 0, y: 0 };
+    characterShipPoint(this.shipDrawOptions(this.lastDrawTime), 0, 0, point);
+    return point;
+  }
+
+  /** Ship nose as drawn this frame (where lances and arcs leave the hull). */
+  private shipNose(): FxPoint {
+    const point = { x: 0, y: 0 };
+    characterShipPoint(this.shipDrawOptions(this.lastDrawTime), 0, -SHIP_NOSE_OFFSET, point);
+    return point;
+  }
+
+  private singularityCenter(): FxPoint {
+    return { x: this.width / 2, y: this.height * 0.42 };
+  }
+
+  /** Closest enemies (and the boss) for shockwave hit sparks. */
+  private fxTargets(limit: number): FxPoint[] {
+    const points = [...this.enemies]
+      .sort((a, b) => b.y - a.y)
+      .slice(0, limit)
+      .map((enemy) => ({ x: enemy.x, y: enemy.y }));
+    if (this.boss !== null) points.push(this.bossPosition());
+    return points;
+  }
+
+  private shakeFor(amount: number): void {
+    if (this.settings.screenShake) this.shake = Math.max(this.shake, amount);
+  }
+
+  /** What the shields, fields and drones around the ship look like now. */
+  private persistentFxState(time: number): PersistentFxState {
+    const markedEnemy =
+      this.markTimer > 0 ? this.enemies.find((enemy) => enemy.id === this.markedEnemyId) : undefined;
+    const lock =
+      markedEnemy !== undefined
+        ? { x: markedEnemy.x, y: markedEnemy.y }
+        : this.bossMarkTimer > 0 && this.boss !== null
+          ? this.bossPosition()
+          : null;
+    return {
+      ship: this.shipCenter(),
+      width: this.width,
+      height: this.height,
+      time,
+      quality: this.settings.visualQuality,
+      hexShield: this.barrierTimer > 0 && this.barrierHp > 0 ? Math.min(1, this.barrierTimer / 0.6) : 0,
+      mirror: Math.min(1, Math.max(0, this.reflectTimer) / 0.5),
+      stasis: Math.min(1, Math.max(0, this.timeShellTimer) / 0.6),
+      singularity: Math.min(1, Math.max(0, this.gravityWellTimer) / 0.6),
+      singularityAt: this.singularityCenter(),
+      sentinels: this.guardianTimer > 0 ? Math.max(0, this.guardianBlocks) : 0,
+      lock,
+      overdrive:
+        this.overdriveTimer > 0
+          ? Math.min(1, this.overdriveTimer / 0.8)
+          : this.weaponOverclockTimer > 0
+            ? 0.6
+            : 0,
+      overdriveColor: characterVisualProfile(this.characterId).glow,
+      cloak: Math.min(1, Math.max(0, this.cloakTimer) / 0.5),
+      escortDrones: this.phase === "playing" || this.phase === "paused" ? this.perks.escortDrones : 0,
+      interceptorDrones: this.phase === "playing" || this.phase === "paused" ? this.perks.interceptorDrones : 0,
+      phaseReady: this.perks.phaseShieldInterval > 0 && this.perkPhaseTimer <= 0 ? 1 : 0,
+      platingBlocks: this.perkStageBlocks,
+    };
+  }
+
+  /** A skill hit on one enemy: strip a shield layer or type letters for the player. */
+  private strikeEnemy(enemy: Enemy, letters: number, kick: number, hue: number): void {
+    const wordLength = typingText(enemy.entry.en).length;
+    if (enemy.layersRemaining > 1) {
+      enemy.layersRemaining -= 1;
+    } else {
+      enemy.typed = strikeTypingAdvance(enemy.typed, wordLength, letters);
+    }
+    enemy.flash = 1;
+    enemy.kick = Math.max(enemy.kick, kick);
+    this.burst(enemy.x, enemy.y, 18, hue);
+  }
+
+  private damageBossBySkill(share: number): void {
+    const boss = this.boss;
+    if (boss === null) return;
+    const damage = firepowerDamage(Math.max(1, Math.round(boss.maxHp * share)), this.playerStats);
+    boss.hp = Math.max(0, boss.hp - damage);
+    boss.flash = 1;
+    this.updateBossPhase(boss);
+    this.hooks.onBossUpdate(toBossHud(boss));
+    if (boss.hp <= 0) this.defeatBoss();
+  }
+
+  /** Missile Swarm: 8 micro-missiles from both wings into up to 6 enemies. */
+  private launchMissileSwarm(): void {
+    const targets = [...this.enemies].sort((a, b) => b.y - a.y).slice(0, MISSILE_SWARM_TARGETS);
+    const points: FxPoint[] = targets.map((enemy) => ({ x: enemy.x, y: enemy.y }));
+    if (this.boss !== null) points.push(this.bossPosition());
+    if (points.length === 0) return;
+    const ship = this.shipCenter();
+    for (let index = 0; index < MISSILE_SWARM_COUNT; index += 1) {
+      const side = index % 2 === 0 ? -1 : 1;
+      const from = { x: ship.x + side * (18 + (index % 4) * 4), y: ship.y + 6 };
+      this.skillFx.missile(from, points[index % points.length]!, "#ff9a4a", index * MISSILE_SWARM_STAGGER, MISSILE_SWARM_FLIGHT, side);
+    }
+    // The hits land when the first missiles arrive, not at launch.
+    this.pendingStrikes.push({
+      delay: MISSILE_SWARM_FLIGHT + 0.04,
+      enemyIds: targets.map((enemy) => enemy.id),
+      letters: 2,
+      bossShare: this.boss !== null ? 0.05 : 0,
+    });
+    this.sfx.support();
+  }
+
+  private updatePendingStrikes(dt: number): void {
+    if (this.pendingStrikes.length === 0) return;
+    const due = this.pendingStrikes.filter((strike) => (strike.delay -= dt) <= 0);
+    if (due.length === 0) return;
+    this.pendingStrikes = this.pendingStrikes.filter((strike) => strike.delay > 0);
+    for (const strike of due) {
+      for (const id of strike.enemyIds) {
+        const enemy = this.enemies.find((item) => item.id === id);
+        if (enemy !== undefined) this.strikeEnemy(enemy, strike.letters, 1.2, 24);
+      }
+      if (strike.bossShare > 0) this.damageBossBySkill(strike.bossShare);
+      this.shakeFor(5);
+      this.sfx.power();
+    }
+  }
+
+  /** Railgun: one slug through the whole lane of the current target. */
+  private fireRailgun(): void {
+    const nose = this.shipNose();
+    const target = this.currentTarget() ?? [...this.enemies].sort((a, b) => b.y - a.y)[0] ?? null;
+    const aim = target !== null ? { x: target.x, y: target.y } : this.boss !== null ? this.bossPosition() : { x: nose.x, y: 0 };
+    // Extend the line to the top edge so the slug leaves the screen.
+    const dx = aim.x - nose.x;
+    const dy = Math.min(-1, aim.y - nose.y);
+    const reach = (nose.y + 40) / -dy;
+    const end = { x: nose.x + dx * reach, y: nose.y + dy * reach };
+    const hits = this.enemies.filter((enemy) => enemy.y < nose.y && distanceToSegment(enemy.x, enemy.y, nose, end) <= RAILGUN_LANE_HALF_WIDTH);
+    for (const enemy of hits) {
+      this.strikeEnemy(enemy, 3, 1.6, 196);
+      this.skillFx.blast(enemy.x, enemy.y, "#8fe8ff", 46);
+    }
+    if (this.boss !== null) {
+      const boss = this.bossPosition();
+      if (distanceToSegment(boss.x, boss.y, nose, end) <= RAILGUN_LANE_HALF_WIDTH + 70) {
+        this.damageBossBySkill(0.06);
+        this.skillFx.blast(boss.x, boss.y, "#8fe8ff", 90);
+      }
+    }
+    this.skillFx.railgun(nose, end);
+    this.skillFx.flash("#bff4ff", 0.2, 0.22);
+    this.shipMotion.fire(this.width / 2, this.height - PLAYER_Y_OFFSET, aim.x, aim.y, 1);
+    this.shakeFor(7);
+    this.sfx.power();
+  }
+
+  /** Tractor Beam: haul the closest enemy back up and hold it slowed. */
+  private fireTractorBeam(): void {
+    const target = [...this.enemies].sort((a, b) => b.y - a.y)[0];
+    if (target === undefined) return;
+    const distance = Math.max(0, Math.min(this.height * TRACTOR_PULL_SHARE, target.y - TRACTOR_MIN_Y));
+    this.tractorPulls = this.tractorPulls.filter((pull) => pull.enemyId !== target.id);
+    this.tractorPulls.push({ enemyId: target.id, remaining: TRACTOR_PULL_SECONDS, speed: distance / TRACTOR_PULL_SECONDS });
+    target.rewardControlTimer = Math.max(target.rewardControlTimer ?? 0, TRACTOR_HOLD_SECONDS);
+    target.rewardControlFactor = Math.min(target.rewardControlFactor ?? 1, TRACTOR_HOLD_FACTOR);
+    if (target.actionCooldown !== null) target.actionCooldown = Math.max(target.actionCooldown, TRACTOR_STALL_SECONDS);
+    if (target.pendingSkillId !== undefined && target.pendingSkillId !== null) {
+      target.skillTelegraphRemaining = Math.max(target.skillTelegraphRemaining ?? 0, TRACTOR_STALL_SECONDS);
+    }
+    target.flash = 1;
+    const id = target.id;
+    this.skillFx.tractor(
+      () => this.shipNose(),
+      () => {
+        const enemy = this.enemies.find((item) => item.id === id);
+        return enemy === undefined ? null : { x: enemy.x, y: enemy.y };
+      },
+      TRACTOR_PULL_SECONDS + 0.35,
+    );
+    this.sfx.support();
+  }
+
+  private updateTractorPulls(dt: number): void {
+    if (this.tractorPulls.length === 0) return;
+    for (const pull of this.tractorPulls) {
+      const enemy = this.enemies.find((item) => item.id === pull.enemyId);
+      if (enemy === undefined) {
+        pull.remaining = 0;
+        continue;
+      }
+      const step = Math.min(dt, pull.remaining);
+      enemy.y = Math.max(TRACTOR_MIN_Y, enemy.y - pull.speed * step);
+      pull.remaining -= step;
+    }
+    this.tractorPulls = this.tractorPulls.filter((pull) => pull.remaining > 0);
+  }
+
+  // --- Enemy and boss identity ---------------------------------------------------
+
+  /**
+   * While an enemy winds up a skill: a charge in the skill's colour that
+   * grows until it fires (attack: muzzle glow, defense: shell, control: a
+   * rune ring, support: a soft green ring). Two sprite draws, no blur.
+   */
+  private drawSkillCharge(enemy: Enemy, dx: number, dy: number): void {
+    if (enemy.pendingSkillId === undefined || enemy.pendingSkillId === null) return;
+    const remaining = enemy.skillTelegraphRemaining ?? 0;
+    if (remaining <= 0) return;
+    const definition = enemySkillDefinition(enemy.pendingSkillId);
+    const charge = 1 - Math.min(1, remaining / Math.max(0.1, definition.telegraph));
+    const color = SKILL_CHARGE_COLORS[definition.category];
+    const x = enemy.x + dx;
+    const y = enemy.y + dy;
+    const context = this.context;
+    context.save();
+    context.globalCompositeOperation = "lighter";
+    if (definition.category === "attack") {
+      const muzzleY = y + enemy.radius * 0.7;
+      drawGlow(context, color, x, muzzleY, enemy.radius * (0.5 + charge * 0.9), 0.35 + charge * 0.55);
+      drawRingGlow(context, color, x, muzzleY, enemy.radius * (1.4 - charge * 0.9), 0.3 + charge * 0.5);
+    } else if (definition.category === "control") {
+      drawRingGlow(context, color, x, y, enemy.radius * 1.55, 0.25 + charge * 0.5);
+      context.globalAlpha = 0.45 + charge * 0.45;
+      context.strokeStyle = color;
+      context.lineWidth = 1.6;
+      context.setLineDash([3, 6]);
+      context.lineDashOffset = -enemy.age * 40;
+      context.beginPath();
+      context.arc(x, y, enemy.radius * (1.75 - charge * 0.25), 0, Math.PI * 2);
+      context.stroke();
+    } else {
+      drawRingGlow(context, color, x, y, enemy.radius * (1.9 - charge * 0.5), 0.3 + charge * 0.55);
+      drawGlow(context, color, x, y, enemy.radius * 1.4, 0.12 + charge * 0.25);
+    }
+    context.restore();
+  }
+
+  /** A readable cast pulse at an enemy; `beam` also links it to the ship. */
+  private enemyCastFx(enemy: Enemy, color: string, beam = false): void {
+    this.combatFx.cast(enemy.x, enemy.y, color, enemy.radius * 1.9);
+    if (beam) this.skillFx.zap({ x: enemy.x, y: enemy.y }, this.shipCenter(), color);
+  }
+
+  private bossRadius(role: BossState["role"]): number {
+    return role === "major-boss" ? 82 : role === "boss" ? 70 : 60;
+  }
+
+  /** Material sparks and sound when a shot hits, strips or kills an enemy. */
+  private enemyImpactFx(
+    enemy: Enemy | undefined,
+    x: number,
+    y: number,
+    power: number,
+    pan: number,
+    event: "hit" | "layer" | "kill",
+  ): void {
+    if (enemy === undefined) return;
+    const family = this.visualDefinitionForEnemy(enemy)?.family ?? "rainbow";
+    const style = familyStyle(family);
+    const weight = kindArchetype(enemy.kind).weight;
+    const quality = this.settings.visualQuality;
+    if (event === "kill") {
+      this.combatFx.death(x, y, style.death, style, enemy.radius, quality);
+      this.sfx.kill(1, style.material, weight, pan);
+      return;
+    }
+    if (event === "layer") {
+      this.combatFx.layerBreak(x, y, enemy.radius, style);
+      this.sfx.layerBreak(style.material, pan);
+      return;
+    }
+    this.combatFx.hit(x, y, style.material, style, power, quality);
+    this.sfx.enemyHit(style.material, weight, pan);
+  }
+
+  private bossImpactFx(x: number, y: number, pan: number): void {
+    const identity = this.bossIdentity;
+    if (identity === null) return;
+    const style = familyStyle(identity.family);
+    this.combatFx.bossHit(x, y, style.material, style, this.settings.visualQuality);
+    this.sfx.bossImpact(style.material, identity.voice, pan);
+  }
+
+  /** Title card, light pillar and roar when a boss arrives. */
+  private presentBossEntrance(): void {
+    const boss = this.boss;
+    const identity = this.bossIdentity;
+    if (boss === null || identity === null) return;
+    const { x, y } = this.bossPosition();
+    this.combatFx.bossEntrance(x, y, this.bossRadius(boss.role), identity.primary, identity.accent, {
+      label: identity.rank,
+      name: identity.name,
+      title: identity.title,
+      color: identity.primary,
+    });
+    this.sfx.bossRoar(identity.voice, familyStyle(identity.family).material);
+    this.shakeFor(boss.role === "major-boss" ? 12 : 8);
+  }
+
+  // --- Equipment perks ---------------------------------------------------------
+
+  private closestEnemyTo(x: number, y: number, radius = Infinity): Enemy | null {
+    let best: Enemy | null = null;
+    let bestDistance = radius;
+    for (const enemy of this.enemies) {
+      const distance = Math.hypot(enemy.x - x, enemy.y - y);
+      if (distance < bestDistance) {
+        best = enemy;
+        bestDistance = distance;
+      }
+    }
+    return best;
+  }
+
+  private applyPerkPerfectWord(): void {
+    const perks = this.perks;
+    if (perks.perfectWordShield > 0 && this.stats.shield < this.stats.maxShield) {
+      this.stats.shield = Math.min(this.stats.maxShield, this.stats.shield + perks.perfectWordShield);
+      const ship = this.shipCenter();
+      this.skillFx.pulse(ship.x, ship.y, "#5ce1ff", 54, 2, 0.4);
+    }
+    if (perks.quantumEveryPerfect > 0) {
+      this.perkPerfectWords += 1;
+      if (this.perkPerfectWords % perks.quantumEveryPerfect === 0) {
+        this.skillEngine.reduceCooldowns(perks.quantumCooldownCut);
+        const ship = this.shipCenter();
+        this.skillFx.halo(() => this.shipCenter(), "#9fe8ff", 90, 8, 0.7);
+        this.skillFx.pulse(ship.x, ship.y, "#9fe8ff", 120, 3, 0.6);
+        this.hooks.onSkills();
+      }
+    }
+  }
+
+  /** Decide the kill perks now (counters), fire them when the bolt lands. */
+  private queuePerkKill(enemy: Enemy, perfectWord: boolean): void {
+    const perks = this.perks;
+    if (perks.killEnergy > 0) {
+      this.stats.energy = clamp(this.stats.energy + perks.killEnergy, 0, this.stats.maxEnergy);
+    }
+    this.perkKills += 1;
+    if (perfectWord) this.perkPerfectKills += 1;
+    const effect = {
+      arc: perks.arcEveryKills > 0 && this.perkKills % perks.arcEveryKills === 0,
+      pierce: perks.overpenetration,
+      plasma: perfectWord && perks.plasmaEveryPerfectKills > 0 && this.perkPerfectKills % perks.plasmaEveryPerfectKills === 0,
+      missiles: perks.missileEveryKills > 0 && this.perkKills % perks.missileEveryKills === 0,
+    };
+    if (effect.arc || effect.pierce || effect.plasma || effect.missiles) this.perkKillQueue.set(enemy.id, effect);
+  }
+
+  private releasePerkKill(enemyId: number, x: number, y: number): void {
+    const effect = this.perkKillQueue.get(enemyId);
+    if (effect === undefined) return;
+    this.perkKillQueue.delete(enemyId);
+    if (effect.arc) {
+      const next = this.closestEnemyTo(x, y, 520);
+      if (next !== null) {
+        this.skillFx.lightning([{ x, y }, { x: next.x, y: next.y }], "#9ab8ff", 2, 0.45);
+        this.strikeEnemy(next, 1, 0.9, 210);
+      }
+    }
+    if (effect.pierce) {
+      // The enemy further up the same lane (ship → kill point, extended).
+      const nose = this.shipNose();
+      const reach = { x: nose.x + (x - nose.x) * 4, y: nose.y + (y - nose.y) * 4 };
+      const behind = this.enemies
+        .filter((enemy) => enemy.y < y - 10 && distanceToSegment(enemy.x, enemy.y, { x, y }, reach) <= 48)
+        .sort((a, b) => b.y - a.y)[0];
+      if (behind !== undefined) {
+        this.skillFx.zap({ x, y }, { x: behind.x, y: behind.y }, "#8fe8ff");
+        this.skillFx.blast(behind.x, behind.y, "#8fe8ff", 30);
+        this.strikeEnemy(behind, 1, 1, 196);
+      }
+    }
+    if (effect.plasma) {
+      const radius = this.perks.plasmaRadius;
+      this.skillFx.shockwave(x, y, "#ff7ad9", radius, [], 2);
+      this.skillFx.blast(x, y, "#ff7ad9", 80);
+      for (const enemy of this.enemies) {
+        if (Math.hypot(enemy.x - x, enemy.y - y) <= radius) this.strikeEnemy(enemy, 1, 1.2, 320);
+      }
+      this.shakeFor(4);
+    }
+    if (effect.missiles) this.launchPerkMissiles();
+  }
+
+  /** Hunter-Killer Pod: two micro-missiles at the closest enemies. */
+  private launchPerkMissiles(): void {
+    const targets = [...this.enemies].sort((a, b) => b.y - a.y).slice(0, 2);
+    if (targets.length === 0) return;
+    const ship = this.shipCenter();
+    targets.forEach((enemy, index) => {
+      const side = index === 0 ? -1 : 1;
+      this.skillFx.missile({ x: ship.x + side * 20, y: ship.y + 4 }, { x: enemy.x, y: enemy.y }, "#ffb45a", index * 0.06, 0.4, side);
+    });
+    this.pendingStrikes.push({ delay: 0.44, enemyIds: targets.map((enemy) => enemy.id), letters: 1, bossShare: 0 });
+  }
+
+  /** Reactive Armor: a shock pulse that destroys nearby hostile shots. */
+  private releaseReactivePulse(): void {
+    const ship = this.shipCenter();
+    const radius = this.perks.reactivePulseRadius;
+    const before = this.projectiles.length;
+    this.projectiles = this.projectiles.filter((projectile) => {
+      const inside = Math.hypot(projectile.x - ship.x, projectile.y - ship.y) <= radius;
+      if (inside) this.skillFx.blast(projectile.x, projectile.y, "#ffb86b", 22);
+      return !inside;
+    });
+    this.skillFx.pulse(ship.x, ship.y, "#ffb86b", radius, 4, 0.5);
+    if (this.projectiles.length < before) this.sfx.projectileIntercept();
+  }
+
+  /** Shield Discharge: the collapsing Shield releases an EMP. */
+  private dischargeShield(): void {
+    const stall = this.perks.shieldBreakStall;
+    for (const enemy of this.enemies) {
+      if (enemy.actionCooldown !== null) enemy.actionCooldown = Math.max(enemy.actionCooldown, stall);
+      enemy.flash = 1;
+    }
+    if (this.boss !== null) this.boss.actionCooldown = Math.max(this.boss.actionCooldown, stall);
+    const ship = this.shipCenter();
+    this.skillFx.shockwave(ship.x, ship.y, "#7fdcff", Math.hypot(this.width, this.height) * 0.5, this.fxTargets(6), 2);
+    this.skillFx.flash("#7fdcff", 0.14, 0.3);
+  }
+
+  /** Escort and interceptor drones, and the phase-shift recharge. */
+  private updatePerkSystems(dt: number): void {
+    const perks = this.perks;
+    if (this.perkPhaseTimer > 0) this.perkPhaseTimer = Math.max(0, this.perkPhaseTimer - dt);
+
+    if (perks.escortDrones > 0 && perks.escortInterval > 0) {
+      this.perkEscortTimer -= dt;
+      if (this.perkEscortTimer <= 0) {
+        const target = [...this.enemies].sort((a, b) => b.y - a.y)[0];
+        if (target === undefined) {
+          this.perkEscortTimer = 0.5;
+        } else {
+          // Several drones take turns, so the shots are evenly spaced.
+          this.perkEscortTimer = perks.escortInterval / perks.escortDrones;
+          const drones = this.skillFx.escortPositions;
+          const from = drones[this.perkEscortTurn % Math.max(1, drones.length)] ?? this.shipNose();
+          this.perkEscortTurn += 1;
+          this.skillFx.zap(from, { x: target.x, y: target.y }, "#8fe8ff");
+          this.skillFx.blast(target.x, target.y, "#8fe8ff", 26);
+          this.strikeEnemy(target, 1, 0.8, 190);
+          this.sfx.boltImpact(0.7, clamp((target.x / Math.max(1, this.width)) * 2 - 1, -1, 1) * 0.6, "energy");
+        }
+      }
+    }
+
+    if (perks.interceptorDrones > 0 && perks.interceptorInterval > 0) {
+      this.perkInterceptTimer = Math.max(0, this.perkInterceptTimer - dt);
+      if (this.perkInterceptTimer <= 0 && this.projectiles.length > 0) {
+        const ship = this.shipCenter();
+        let index = -1;
+        let best = 460;
+        this.projectiles.forEach((projectile, candidate) => {
+          const distance = Math.hypot(projectile.x - ship.x, projectile.y - ship.y);
+          if (distance < best) {
+            best = distance;
+            index = candidate;
+          }
+        });
+        if (index >= 0) {
+          const projectile = this.projectiles[index]!;
+          this.projectiles.splice(index, 1);
+          const from = this.skillFx.interceptorPositions[0] ?? ship;
+          this.skillFx.zap(from, { x: projectile.x, y: projectile.y }, "#ffb45a");
+          this.skillFx.blast(projectile.x, projectile.y, "#ffb45a", 28);
+          this.sfx.projectileIntercept();
+          this.perkInterceptTimer = perks.interceptorInterval / perks.interceptorDrones;
+        }
+      }
+    }
+  }
+
+  /** Each ship's Rage ultimate gets its own screen-filling signature. */
+  private playUltimateFx(segments: number): void {
+    const ship = this.shipCenter();
+    const big = Math.hypot(this.width, this.height);
+    const scale = 0.8 + Math.min(3, Math.max(1, segments)) * 0.2;
+    const targets = this.fxTargets(8);
+    const color = characterVisualProfile(this.characterId).glow;
+    switch (this.characterId) {
+      case "vanguard":
+        this.skillFx.shockwave(ship.x, ship.y, "#8ff4ff", big * 0.8 * scale, targets, 4);
+        this.skillFx.halo(() => this.shipCenter(), "#8ff4ff", 150, 16, 1.4);
+        this.skillFx.flash("#bff8ff", 0.3, 0.45);
+        break;
+      case "aegis":
+        this.skillFx.halo(() => this.shipCenter(), "#ffd98a", 170, 18, 1.6);
+        this.skillFx.pulse(ship.x, ship.y, "#ffd98a", 260 * scale, 6, 0.9);
+        this.skillFx.flash("#fff0c0", 0.24, 0.45);
+        break;
+      case "volt":
+        this.skillFx.lightning([this.shipNose(), ...targets], "#9fd8ff", 3, 0.8);
+        this.skillFx.lightning([this.shipNose(), ...[...targets].reverse()], "#d6f1ff", 2, 0.7);
+        this.skillFx.shockwave(ship.x, ship.y, "#7fdcff", big * 0.6 * scale, [], 2);
+        this.skillFx.flash("#9fd8ff", 0.26, 0.4);
+        break;
+      case "wraith":
+        this.skillFx.pulse(ship.x, ship.y, "#b98cff", big * 0.5, 7, 1);
+        this.skillFx.flash("#4d2a9a", 0.34, 0.6);
+        break;
+      case "fortune":
+        this.skillFx.shower("#ffd65a", 2.2);
+        this.skillFx.halo(() => this.shipCenter(), "#ffd65a", 150, 14, 1.4);
+        this.skillFx.flash("#fff0b0", 0.2, 0.4);
+        break;
+      case "arsenal":
+        for (let index = 0; index < 12 && targets.length > 0; index += 1) {
+          const side = index % 2 === 0 ? -1 : 1;
+          this.skillFx.missile({ x: ship.x + side * 22, y: ship.y }, targets[index % targets.length]!, "#ff8a3d", index * 0.045, 0.5, side);
+        }
+        this.skillFx.flash("#ffb070", 0.2, 0.35);
+        break;
+      case "oracle":
+        this.skillFx.lightning([this.shipNose(), ...targets], "#ff6b9a", 2.6, 0.8);
+        for (const point of targets) this.skillFx.pulse(point.x, point.y, "#ff6b9a", 90, 3, 0.8);
+        this.skillFx.flash("#ff6b9a", 0.18, 0.4);
+        break;
+      case "bastion":
+        this.skillFx.halo(() => this.shipCenter(), "#6dffd0", 180, 18, 1.8);
+        this.skillFx.pulse(ship.x, ship.y, "#6dffd0", 300 * scale, 7, 1);
+        this.skillFx.flash("#b8ffe8", 0.22, 0.45);
+        break;
+      case "reaper":
+        for (const point of targets.slice(0, 5)) this.skillFx.slash(point.x, point.y, "#ff4d6d");
+        this.skillFx.lightning([this.shipNose(), ...targets], "#ff2a4a", 2.2, 0.6);
+        this.skillFx.flash("#5a0014", 0.36, 0.5);
+        break;
+      case "celestial":
+        this.skillFx.starfall(targets.length > 0 ? targets : [{ x: this.width / 2, y: this.height * 0.3 }]);
+        this.skillFx.halo(() => this.shipCenter(), "#cfe0ff", 160, 16, 1.6);
+        this.skillFx.flash("#e8f0ff", 0.22, 0.45);
+        break;
+      case "zenith":
+        this.skillFx.halo(() => this.shipCenter(), "#ffffff", 190, 20, 1.6);
+        this.skillFx.shockwave(ship.x, ship.y, "#8ff4ff", big * 0.85 * scale, targets, 4);
+        this.skillFx.flash("#ffffff", 0.34, 0.5);
+        break;
+      default:
+        this.skillFx.shockwave(ship.x, ship.y, color, big * 0.7, targets, 3);
+        this.skillFx.flash(color, 0.24, 0.4);
+    }
   }
 
   private bossPosition(): { x: number; y: number } {
@@ -8391,6 +9264,22 @@ export class Game {
     const pulse = 0.88 + Math.sin(time * 4.5) * 0.12;
     const warning = telegraphStrength(boss.actionCooldown, 1.1);
     const warningPulse = telegraphPulse(warning, time);
+
+    const identity = this.bossIdentity;
+    if (identity !== null) {
+      drawBossAura(
+        context,
+        identity.aura,
+        x,
+        y - boss.kick * 8,
+        radius,
+        time,
+        identity.primary,
+        identity.accent,
+        boss.phase >= 3 ? 1.35 : boss.phase === 2 ? 1.15 : 1,
+        this.settings.visualQuality,
+      );
+    }
 
     context.save();
     context.translate(x, y - boss.kick * 8);
@@ -8426,15 +9315,19 @@ export class Game {
         boss.role,
       ),
     );
+    const paintedBoss = identity === null ? null : paintedBossSprite(identity.id);
+    const breathe = 1 + Math.sin(time * 1.6) * 0.012;
     const modularDrawn =
-      definition !== undefined &&
+      (paintedBoss !== null &&
+        drawPaintedSprite(context, paintedBoss, radius * BOSS_SPRITE_SCALE * breathe, boss.flash, this.dpr)) ||
+      (definition !== undefined &&
       drawModularEnemy(context, definition, {
         radius,
         age: time,
         flash: boss.flash,
         targeted: false,
         glowScale: qualityProfile(this.settings.visualQuality).glowScale,
-      }, this.modularBodyCache, this.dpr);
+      }, this.modularBodyCache, this.dpr));
 
     if (!modularDrawn) {
       context.shadowBlur = boss.flash > 0 ? 36 : 24;
@@ -9092,24 +9985,29 @@ export class Game {
     const targetColor = "#80f3ff";
 
     // Rank is communicated by bounded aura strength/thickness instead of
-    // another text label competing with the English typing target.
+    // another text label competing with the English typing target. The halo
+    // is a cached ring sprite: shadowBlur here cost most of the frame.
+    const qualityGlow = qualityProfile(this.settings.visualQuality).glowScale;
+    // Kind signature motion (sway, lunge, squash…): drawing only, the enemy's
+    // position, word label and hit box do not move.
+    const pose = kindMotionPose(enemy.kind, enemy.age, enemy.id, this.motionPose);
+    const auraColor = targeted ? targetColor : rankVisual.accentColor;
+    const auraRadius = enemy.radius * rankVisual.auraRadiusScale;
     context.save();
     context.globalCompositeOperation = "lighter";
-    context.globalAlpha = rankVisual.auraAlpha;
-    context.strokeStyle = targeted ? targetColor : rankVisual.accentColor;
-    context.lineWidth = 1 + rankVisual.lineWidthBoost;
-    context.shadowBlur =
-      (8 + rankVisual.intensity * 16) *
-      qualityProfile(this.settings.visualQuality).glowScale;
-    context.shadowColor = targeted ? targetColor : rankVisual.accentColor;
-    context.beginPath();
-    context.arc(
-      enemy.x,
-      enemy.y - kick,
-      enemy.radius * rankVisual.auraRadiusScale,
-      0,
-      Math.PI * 2,
+    drawRingGlow(
+      context,
+      auraColor,
+      enemy.x + pose.dx,
+      enemy.y - kick + pose.dy,
+      auraRadius,
+      rankVisual.auraAlpha * (0.45 + rankVisual.intensity * 0.9) * qualityGlow,
     );
+    context.globalAlpha = rankVisual.auraAlpha;
+    context.strokeStyle = auraColor;
+    context.lineWidth = 1 + rankVisual.lineWidthBoost;
+    context.beginPath();
+    context.arc(enemy.x + pose.dx, enemy.y - kick + pose.dy, auraRadius, 0, Math.PI * 2);
     context.stroke();
     context.restore();
 
@@ -9145,6 +10043,8 @@ export class Game {
       context.restore();
     }
 
+    this.drawSkillCharge(enemy, pose.dx, pose.dy - kick);
+
     if (enemy.id === this.markedEnemyId && this.markTimer > 0) {
       context.save();
       context.strokeStyle = "rgba(255, 105, 202, 0.62)";
@@ -9164,15 +10064,18 @@ export class Game {
     }
 
     context.save();
-    context.translate(enemy.x + this.hitShakeOffset(enemy), enemy.y - kick);
-    if (enemy.kind === "cloaker" && !targeted) {
-      context.globalAlpha = 0.42;
-    }
+    context.translate(enemy.x + this.hitShakeOffset(enemy) + pose.dx, enemy.y - kick + pose.dy);
+    context.globalAlpha = (enemy.kind === "cloaker" && !targeted ? 0.42 : 1) * (targeted ? 1 : pose.alpha);
     context.globalCompositeOperation = "lighter";
-    context.shadowBlur =
-      (targeted ? 25 : enemy.kind === "tank" ? 20 : 14) *
-      rankVisual.glowScale;
-    context.shadowColor = targeted ? "#86f8ff" : baseColor;
+    context.shadowBlur = 0;
+    drawGlow(
+      context,
+      targeted ? "#86f8ff" : baseColor,
+      0,
+      0,
+      enemy.radius * (targeted ? 2.3 : enemy.kind === "tank" ? 2.15 : 1.95),
+      (targeted ? 0.42 : 0.3) * rankVisual.glowScale * qualityGlow,
+    );
     context.strokeStyle =
       enemy.flash > 0 ? "#ffffff" : targeted ? targetColor : baseColor;
     context.fillStyle = targeted
@@ -9200,8 +10103,17 @@ export class Game {
             1,
         ),
     );
+    // Rotation and squash apply to the body only (pips and rings stay level).
+    context.save();
+    if (pose.rotation !== 0) context.rotate(pose.rotation);
+    if (pose.scaleX !== 1 || pose.scaleY !== 1) context.scale(pose.scaleX, pose.scaleY);
+    // Painted art for this family and kind when the owner has made it
+    // (src/enemies/painted-sprites.ts), else the code-drawn body.
+    const painted = visual === undefined ? null : paintedEnemySprite(visual.family, enemy.kind);
     const modularDrawn =
-      visual !== undefined &&
+      (painted !== null &&
+        drawPaintedSprite(context, painted, enemy.radius * ENEMY_SPRITE_SCALE, enemy.flash, this.dpr)) ||
+      (visual !== undefined &&
       drawModularEnemy(context, visual, {
         radius: enemy.radius,
         age: enemy.age,
@@ -9210,7 +10122,7 @@ export class Game {
         glowScale:
           qualityProfile(this.settings.visualQuality).glowScale *
           rankVisual.glowScale,
-      }, this.modularBodyCache, this.dpr);
+      }, this.modularBodyCache, this.dpr));
 
     if (!modularDrawn) {
       context.beginPath();
@@ -9333,6 +10245,7 @@ export class Game {
       context.fill();
       context.stroke();
     }
+    context.restore();
 
     if ((enemy.rewardControlTimer ?? 0) > 0) {
       const frozen = (enemy.rewardControlFactor ?? 1) <= 0.05;
@@ -9513,19 +10426,23 @@ export class Game {
     const arm = Math.max(5, radius * 0.34);
 
     context.save();
-    context.strokeStyle = "rgba(126, 244, 255, 0.78)";
-    context.lineWidth = 1.4;
-    context.shadowBlur = 8;
-    context.shadowColor = "#70eaff";
-    for (const sx of [-1, 1]) {
-      for (const sy of [-1, 1]) {
-        const x = centerX + sx * bracket;
-        const y = centerY + sy * bracket;
-        context.beginPath();
-        context.moveTo(x, y - sy * arm);
-        context.lineTo(x, y);
-        context.lineTo(x - sx * arm, y);
-        context.stroke();
+    context.lineCap = "round";
+    for (const [width, color] of [
+      [4.5, "rgba(112, 234, 255, 0.22)"],
+      [1.4, "rgba(126, 244, 255, 0.82)"],
+    ] as const) {
+      context.strokeStyle = color;
+      context.lineWidth = width;
+      for (const sx of [-1, 1]) {
+        for (const sy of [-1, 1]) {
+          const x = centerX + sx * bracket;
+          const y = centerY + sy * bracket;
+          context.beginPath();
+          context.moveTo(x, y - sy * arm);
+          context.lineTo(x, y);
+          context.lineTo(x - sx * arm, y);
+          context.stroke();
+        }
       }
     }
     context.restore();
@@ -10030,77 +10947,6 @@ export class Game {
         x,
         y,
         30 + Math.sin(time * 10) * 3,
-        0,
-        Math.PI * 2,
-      );
-      context.stroke();
-    }
-
-    if (this.barrierTimer > 0 && this.barrierHp > 0) {
-      context.strokeStyle = "rgba(92, 225, 255, 0.72)";
-      context.lineWidth = 2.2;
-      context.shadowBlur = 18;
-      context.shadowColor = "#5ce1ff";
-      context.beginPath();
-      context.arc(
-        x,
-        y,
-        34 + Math.sin(time * 6) * 2,
-        0,
-        Math.PI * 2,
-      );
-      context.stroke();
-    }
-
-    if (this.reflectTimer > 0) {
-      context.strokeStyle = "rgba(211, 121, 255, 0.66)";
-      context.lineWidth = 1.7;
-      context.setLineDash([5, 7]);
-      context.lineDashOffset = -time * 28;
-      context.beginPath();
-      context.arc(x, y, 43, 0, Math.PI * 2);
-      context.stroke();
-      context.setLineDash([]);
-    }
-
-    if (this.guardianTimer > 0 && this.guardianBlocks > 0) {
-      for (let index = 0; index < this.guardianBlocks; index += 1) {
-        const angle =
-          time * 2.2 +
-          (Math.PI * 2 * index) /
-            Math.max(1, this.guardianBlocks);
-        const droneX = x + Math.cos(angle) * 48;
-        const droneY = y + Math.sin(angle) * 18;
-
-        context.fillStyle = "rgba(255, 226, 98, 0.88)";
-        context.beginPath();
-        context.arc(droneX, droneY, 3.2, 0, Math.PI * 2);
-        context.fill();
-      }
-    }
-
-    if (this.gravityWellTimer > 0) {
-      context.strokeStyle = "rgba(191, 95, 255, 0.28)";
-      context.lineWidth = 1.2;
-      context.beginPath();
-      context.arc(
-        x,
-        y,
-        68 + Math.sin(time * 2.6) * 7,
-        0,
-        Math.PI * 2,
-      );
-      context.stroke();
-    }
-
-    if (this.timeShellTimer > 0) {
-      context.strokeStyle = "rgba(152, 117, 255, 0.34)";
-      context.lineWidth = 1.2;
-      context.beginPath();
-      context.arc(
-        x,
-        y,
-        56 + Math.sin(time * 3.5) * 5,
         0,
         Math.PI * 2,
       );

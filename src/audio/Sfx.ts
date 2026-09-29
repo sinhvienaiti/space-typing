@@ -8,6 +8,7 @@ import {
   type AudioGroup,
 } from "./mix";
 import { SampleSfxBank } from "./sample-bank";
+import type { EnemyMaterial } from "../enemies/identity";
 
 /** Optional shaping for one synthesized voice. */
 type VoiceShape = {
@@ -19,6 +20,33 @@ type VoiceShape = {
   filter?: BiquadFilterType;
   frequency?: number;
   q?: number;
+  /** Level multiplier for a whole group of voices (1 = as written). */
+  gain?: number;
+};
+
+/**
+ * Level trims (amplitude) that put each material's hit layer 3–5 dB under a
+ * ship bolt and its death layer level with a finisher (measured 29/09/2026).
+ */
+const MATERIAL_HIT_TRIM: Readonly<Record<EnemyMaterial, number>> = {
+  bubble: 6,
+  bell: 1.6,
+  ember: 7,
+  ice: 3.5,
+  crystal: 2.6,
+  wood: 7,
+  void: 3.2,
+  metal: 2.6,
+};
+const MATERIAL_DEATH_TRIM: Readonly<Record<EnemyMaterial, number>> = {
+  bubble: 5,
+  bell: 1.4,
+  ember: 2.2,
+  ice: 1.6,
+  crystal: 4,
+  wood: 2.6,
+  void: 1.8,
+  metal: 2.2,
 };
 
 /** Player hit identities. Energy remains the legacy/failsafe tracer sound. */
@@ -69,6 +97,10 @@ export class Sfx {
   private pronunciationActive = false;
   private destroyed = false;
   private readonly timers = new Set<number>();
+  private lastEnemyHit = -Infinity;
+  private lastEnemyDeath = -Infinity;
+  private lastBossImpact = -Infinity;
+  private lastBellNote = -1;
 
   private readonly onPronunciation = (event: Event): void => {
     const detail = (event as CustomEvent<{ active?: unknown }>).detail;
@@ -244,7 +276,16 @@ export class Sfx {
     );
   }
 
-  kill(pitch = 1): void {
+  /**
+   * An enemy is destroyed. With its material (src/enemies/identity.ts) it
+   * breaks apart in that material (bubble pop, ice shatter…); without, the
+   * generic blip.
+   */
+  kill(pitch = 1, material?: EnemyMaterial, weight = 1, pan = 0): void {
+    if (material !== undefined) {
+      this.enemyDeath(material, weight, pan);
+      return;
+    }
     const safePitch = Math.max(0.5, Math.min(1.6, pitch));
     this.noise(0.1, 0.055, "combat");
     this.tone(240 * safePitch, 0.12, "sawtooth", 0.045, 90 * safePitch, "combat");
@@ -512,6 +553,176 @@ export class Sfx {
     this.tone(250, 0.14, "sine", 0.03, 120, "combat");
   }
 
+  // --- Target materials -------------------------------------------------------
+  //
+  // What a shot sounds like depends on what it hits (src/enemies/identity.ts):
+  // bubble, bell, ember, ice, crystal, wood, void or metal. These layer on top
+  // of the ship's own bolt sound (boltImpact). `weight` is the enemy kind's
+  // heft: a Juggernaut (1.55) sounds lower and heavier than a Dart (0.85).
+
+  /** A shot lands on an enemy. */
+  enemyHit(material: EnemyMaterial, weight = 1, pan = 0): void {
+    const now = this.clock();
+    if (now - this.lastEnemyHit < 30) return;
+    this.lastEnemyHit = now;
+    this.materialStrike(material, weight, pan, 1);
+  }
+
+  /** A shield layer is knocked off an enemy. */
+  layerBreak(material: EnemyMaterial, pan = 0): void {
+    const shape: VoiceShape = { pan };
+    this.noise(0.12, 0.12, "combat", { ...shape, filter: "highpass", frequency: 2500, q: 0.7 });
+    this.tone(900, 0.12, "triangle", 0.05, 300, "combat", shape);
+    this.materialStrike(material, 1.2, pan, 1.1);
+  }
+
+  /** An enemy is destroyed: its material breaks apart. */
+  enemyDeath(material: EnemyMaterial, weight = 1, pan = 0): void {
+    const now = this.clock();
+    if (now - this.lastEnemyDeath < 45) return;
+    this.lastEnemyDeath = now;
+    const shape: VoiceShape = { pan, gain: MATERIAL_DEATH_TRIM[material] };
+    const pitch = 1.12 - Math.min(1.6, Math.max(0.7, weight)) * 0.12;
+    const heavy = weight >= 1.35;
+    switch (material) {
+      case "bubble":
+        [700, 930, 1240].forEach((hz, index) =>
+          this.schedule(() => this.tone(hz * pitch, 0.07, "sine", 0.1, hz * 1.5 * pitch, "combat", shape), index * 38),
+        );
+        this.noise(0.04, 0.06, "combat", { ...shape, filter: "highpass", frequency: 3200 });
+        break;
+      case "bell": {
+        const root = 660 * pitch;
+        for (const [ratio, gain, length] of [[1, 0.09, 0.7], [1.5, 0.05, 0.55], [2, 0.04, 0.45], [2.76, 0.025, 0.3]] as const) {
+          this.tone(root * ratio, length, "sine", gain, root * ratio * 0.995, "combat", { ...shape, attack: 0.003 });
+        }
+        break;
+      }
+      case "ember":
+        this.noise(0.36, 0.18, "combat", { ...shape, filter: "bandpass", frequency: 620, q: 0.6 });
+        this.tone(110 * pitch, 0.3, "sawtooth", 0.08, 40, "combat", shape);
+        for (const delay of [40, 95, 160]) {
+          this.schedule(() => this.noise(0.03, 0.07, "combat", { ...shape, filter: "bandpass", frequency: 2400, q: 1.2 }), delay);
+        }
+        break;
+      case "ice":
+        this.noise(0.25, 0.16, "combat", { ...shape, filter: "highpass", frequency: 4000, q: 0.7 });
+        [2600, 3100, 3700].forEach((hz, index) =>
+          this.schedule(() => this.tone(hz * pitch, 0.14, "sine", 0.05, hz * 0.97 * pitch, "combat", shape), index * 30),
+        );
+        break;
+      case "crystal":
+        [1320, 1760, 2350, 2640].forEach((hz, index) =>
+          this.schedule(() => this.tone(hz * pitch, 0.22, "triangle", 0.05, hz * pitch, "combat", { ...shape, attack: 0.002 }), index * 35),
+        );
+        this.noise(0.1, 0.05, "combat", { ...shape, filter: "highpass", frequency: 6000 });
+        break;
+      case "wood":
+        this.noise(0.18, 0.14, "combat", { ...shape, filter: "bandpass", frequency: 1400, q: 1 });
+        this.tone(180 * pitch, 0.15, "sine", 0.08, 90, "combat", shape);
+        this.noise(0.26, 0.04, "combat", { ...shape, filter: "highpass", frequency: 5000 });
+        break;
+      case "void":
+        this.tone(60 * pitch, 0.4, "sine", 0.14, 30, "combat", shape);
+        this.noise(0.35, 0.1, "combat", { ...shape, filter: "lowpass", frequency: 520, attack: 0.1 });
+        this.tone(200, 0.25, "sine", 0.03, 900, "combat", { ...shape, attack: 0.05 });
+        break;
+      case "metal":
+        this.noise(0.3, 0.16, "combat", { ...shape, filter: "bandpass", frequency: 900, q: 0.7 });
+        this.tone(70 * pitch, 0.3, "sine", 0.1, 35, "combat", shape);
+        this.schedule(() => this.tone(1510 * pitch, 0.25, "sine", 0.03, 1500 * pitch, "combat", shape), 40);
+        this.schedule(() => this.tone(2490 * pitch, 0.18, "sine", 0.025, 2470 * pitch, "combat", shape), 90);
+        break;
+    }
+    if (heavy) this.tone(75 * pitch, 0.26, "sine", 0.1, 38, "combat", shape);
+  }
+
+  /** A shot lands on a boss: its material, heavier, at the boss's voice. */
+  bossImpact(material: EnemyMaterial, voice = 1, pan = 0): void {
+    const now = this.clock();
+    if (now - this.lastBossImpact < 45) return;
+    this.lastBossImpact = now;
+    const shape: VoiceShape = { pan };
+    this.materialStrike(material, 1.6, pan, 0.75 * voice);
+    this.tone(72 * voice, 0.2, "sine", 0.12, 40, "combat", shape);
+    this.noise(0.1, 0.09, "combat", { ...shape, filter: "lowpass", frequency: 900 });
+  }
+
+  /** A boss roars (entrance, phase change): its voice plus its material. */
+  bossRoar(voice = 1, material: EnemyMaterial = "void"): void {
+    this.notifyWarning(700);
+    const warm: VoiceShape = { attack: 0.12 };
+    this.tone(70 * voice, 0.9, "sawtooth", 0.07, 48 * voice, "warnings", warm);
+    this.tone(104 * voice, 0.8, "sawtooth", 0.05, 70 * voice, "warnings", { attack: 0.1 });
+    this.noise(0.8, 0.08, "warnings", { filter: "bandpass", frequency: 700 * voice, q: 3, attack: 0.15 });
+    this.schedule(() => this.materialStrike(material, 1.4, 0, 0.8 * voice), 120);
+  }
+
+  /** The material's own voice, shared by hits, layer breaks and bosses. */
+  private materialStrike(material: EnemyMaterial, weight: number, pan: number, pitchScale: number): void {
+    // Per-material trim: each layer sits 3–5 dB under the ship's bolt, loud
+    // enough to tell the materials apart (scripts/visual/evals/sfx-levels.js).
+    const shape: VoiceShape = { pan, gain: MATERIAL_HIT_TRIM[material] };
+    const heft = Math.min(1.6, Math.max(0.7, weight));
+    const pitch = (1.15 - heft * 0.15) * pitchScale * (0.97 + Math.random() * 0.06);
+    const level = 0.8 + heft * 0.2;
+    switch (material) {
+      case "bubble":
+        this.tone(620 * pitch, 0.07, "sine", 0.12 * level, 980 * pitch, "combat", shape);
+        this.noise(0.02, 0.05 * level, "combat", { ...shape, filter: "highpass", frequency: 3000 });
+        break;
+      case "bell": {
+        const notes = [1320, 1480, 1760, 1980, 2220];
+        let note = Math.floor(Math.random() * notes.length);
+        if (note === this.lastBellNote) note = (note + 2) % notes.length;
+        this.lastBellNote = note;
+        const hz = notes[note]! * pitch;
+        const ring: VoiceShape = { ...shape, attack: 0.002 };
+        this.tone(hz, 0.35, "sine", 0.08 * level, hz * 0.998, "combat", ring);
+        this.tone(hz * 2.76, 0.18, "sine", 0.035 * level, hz * 2.75, "combat", ring);
+        this.tone(hz * 5.4, 0.08, "sine", 0.02 * level, hz * 5.38, "combat", ring);
+        break;
+      }
+      case "ember":
+        this.noise(0.12, 0.14 * level, "combat", { ...shape, filter: "bandpass", frequency: 1200 * pitch, q: 0.6 });
+        this.tone(140 * pitch, 0.1, "sawtooth", 0.06 * level, 70, "combat", shape);
+        this.schedule(() => this.noise(0.025, 0.06 * level, "combat", { ...shape, filter: "bandpass", frequency: 2600, q: 1.4 }), 32);
+        break;
+      case "ice":
+        this.noise(0.05, 0.12 * level, "combat", { ...shape, filter: "highpass", frequency: 5000 });
+        this.tone(2600 * pitch, 0.12, "sine", 0.06 * level, 2400 * pitch, "combat", shape);
+        this.tone(3900 * pitch, 0.06, "sine", 0.03 * level, 3800 * pitch, "combat", shape);
+        break;
+      case "crystal": {
+        const hz = [1760, 2093, 2349, 2637][Math.floor(Math.random() * 4)]! * pitch;
+        this.tone(hz, 0.2, "triangle", 0.08 * level, hz, "combat", { ...shape, attack: 0.002 });
+        this.tone(hz * 2, 0.12, "sine", 0.04 * level, hz * 2, "combat", shape);
+        this.tone(hz * 3, 0.06, "sine", 0.02 * level, hz * 3, "combat", shape);
+        break;
+      }
+      case "wood":
+        this.noise(0.05, 0.14 * level, "combat", { ...shape, filter: "bandpass", frequency: 800 * pitch, q: 2.5 });
+        this.tone(220 * pitch, 0.09, "sine", 0.08 * level, 180 * pitch, "combat", shape);
+        break;
+      case "void":
+        this.tone(90 * pitch, 0.18, "sine", 0.12 * level, 55, "combat", shape);
+        this.noise(0.14, 0.07 * level, "combat", { ...shape, filter: "lowpass", frequency: 600, attack: 0.03 });
+        this.tone(330 * pitch, 0.1, "sine", 0.03 * level, 180, "combat", shape);
+        break;
+      case "metal":
+        this.noise(0.03, 0.08 * level, "combat", { ...shape, filter: "highpass", frequency: 3000 });
+        this.tone(520 * pitch, 0.12, "square", 0.05 * level, 500 * pitch, "combat", shape);
+        this.tone(1510 * pitch, 0.25, "sine", 0.05 * level, 1500 * pitch, "combat", shape);
+        this.tone(2490 * pitch, 0.18, "sine", 0.03 * level, 2470 * pitch, "combat", shape);
+        break;
+    }
+    if (heft >= 1.4) this.tone(80 * pitch, 0.12, "sine", 0.08, 45, "combat", shape);
+  }
+
+  private clock(): number {
+    return typeof performance !== "undefined" ? performance.now() : Date.now();
+  }
+
   private notifyWarning(durationMs: number): void {
     this.dispatchMixEvent("space-typing:warning", { durationMs });
   }
@@ -569,7 +780,7 @@ export class Sfx {
     const gainLevel = mixedSfxGain(
       this.volume,
       group,
-      gainValue,
+      gainValue * (shape.gain ?? 1),
       this.pronunciationActive,
     );
     if (gainLevel <= 0) return;
@@ -613,7 +824,7 @@ export class Sfx {
     const gainLevel = mixedSfxGain(
       this.volume,
       group,
-      gainValue,
+      gainValue * (shape.gain ?? 1),
       this.pronunciationActive,
     );
     if (gainLevel <= 0) return;

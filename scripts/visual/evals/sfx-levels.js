@@ -70,5 +70,19 @@
     await measure("hit, crystal, target on the right", (s) => s.boltImpact(1, 0.6)),
     await measure("kill: hit + kill + finisher", (s) => { s.hit(); s.kill(); s.boltImpact(1.45); }),
     await measure("damage", (s) => s.damage()),
+    // Target materials (src/enemies/identity.ts) layered on the ship's bolt.
+    ...(await Promise.all(
+      ["bubble", "bell", "ember", "ice", "crystal", "wood", "void", "metal"].map((material) =>
+        measure("hit on " + material, (s) => { s.boltImpact(1); s.enemyHit(material, 1); }),
+      ),
+    )),
+    await measure("hit on metal, Juggernaut weight", (s) => { s.boltImpact(1); s.enemyHit("metal", 1.55); }),
+    ...(await Promise.all(
+      ["bubble", "ember", "ice", "void"].map((material) =>
+        measure("kill of " + material, (s) => { s.boltImpact(1.45); s.kill(1, material, 1); }),
+      ),
+    )),
+    await measure("boss hit, ember (Vorgrath)", (s) => { s.boltImpact(0.9); s.bossImpact("ember", 0.72); }),
+    await measure("boss roar (Vorgrath)", (s) => s.bossRoar(0.72, "ember")),
   ];
 })()

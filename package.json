@@ -10,6 +10,7 @@
     "check": "pnpm test && pnpm build",
     "bg:prepare": "node scripts/bg-art/prepare-kit.mjs",
     "fx:prepare": "node scripts/bg-art/prepare-fx.mjs",
+    "sprites:prepare": "node scripts/bg-art/prepare-sprites.mjs",
     "music:render": "node scripts/music/render-songs.mjs",
     "music:handovers": "node scripts/music/transition-check.mjs",
     "visual:shot": "node scripts/visual/shot.mjs",

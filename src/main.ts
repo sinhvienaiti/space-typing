@@ -143,14 +143,19 @@ import {
   createStarterEquipmentState,
   equipmentForSlot,
   equipmentStatBonus,
+  equippedPerkIds,
   equipInstance,
   unequipSlot,
 } from "./equipment/loadout";
 import type { EquipmentState } from "./equipment/loadout";
 import {
   EQUIPMENT_SLOTS,
+  EQUIPMENT_TIER_LABELS,
   getEquipmentDefinition,
 } from "./equipment/registry";
+import { EQUIPMENT_PERKS, resolveEquipmentPerks } from "./equipment/perks";
+import { equipmentStatLabel } from "./equipment/stat-labels";
+import { paintedEquipmentIcon, paintedSkillIcon, setIconContent } from "./ui/painted-icons";
 import {
   createEmptyInventory,
   inventoryTotal,
@@ -805,7 +810,7 @@ function installMenuHelp(): void {
     stageSelectButton: "Replay unlocked stages",
     characterButton: "Pilot and progression",
     equipmentButton: "Gear and combat stats",
-    supportButton: "Combat support spells",
+    supportButton: "Missiles, railgun, fields",
     hotbarButton: "Skills/items on 1-9",
     vocabularyButton: "Vocabulary source",
     progressionButton: "Missions and rewards",
@@ -1435,7 +1440,10 @@ function hotbarActionGlyph(action: HotbarAction): string {
   if (action.id === "mark-of-weakness") return "◎";
   if (action.id === "sanctuary") return "✧";
   if (action.id === "gravity-well") return "◉";
-  if (action.id === "cleanse") return "◇";
+  if (action.id === "cleanse") return "⟳";
+  if (action.id === "missile-swarm") return "➶";
+  if (action.id === "railgun") return "⇈";
+  if (action.id === "tractor-beam") return "⇊";
   return "☄";
 }
 
@@ -1571,9 +1579,12 @@ function renderHotbar(): void {
           : "skill";
     const glyph = hotbarActionGlyph(action);
     const label = hotbarActionLabel(action);
+    const skillId = action.kind === "item" ? null : hotbarSkillId(action);
+    const painted = skillId === null ? null : paintedSkillIcon(skillId);
     const renderKey = [
       hotbarActionKey(action),
       glyph,
+      painted ?? "",
       label,
       status.state,
       status.disabled ? "disabled" : "enabled",
@@ -1583,7 +1594,7 @@ function renderHotbar(): void {
     if (view.button.dataset.renderKey === renderKey) continue;
 
     view.button.dataset.renderKey = renderKey;
-    view.glyph.textContent = glyph;
+    setIconContent(view.glyph, glyph, painted);
     view.label.textContent = label;
     view.state.textContent = status.state;
     view.button.disabled = status.disabled;
@@ -3795,6 +3806,10 @@ const game = new Game(
   backgroundOptions(),
 );
 game.setGameplayMode(gameplayMode, recallSettings);
+if (import.meta.env.DEV) {
+  // Dev-only handle for scripts/visual checks (scripts/visual/evals/skill-fx.js).
+  (window as unknown as { __spaceTypingGame?: Game }).__spaceTypingGame = game;
+}
 
 const testLab = mountTestLab({
   getSettings: () => settings,
@@ -4199,9 +4214,15 @@ function renderSupportLoadout(): void {
     select.value = selected ?? "";
     metas[index]!.textContent =
       selected === null
-        ? "No spell equipped"
-        : getSupportSpell(selected).description;
+        ? "No system fitted"
+        : supportSpellSummary(getSupportSpell(selected));
   }
+}
+
+function supportSpellSummary(spell: ReturnType<typeof getSupportSpell>): string {
+  const limits = [String(spell.energyCost) + " Energy", String(spell.cooldown) + " s cooldown"];
+  if (spell.perStageLimit !== null) limits.push(String(spell.perStageLimit) + " per stage");
+  return spell.description + " (" + limits.join(" · ") + ")";
 }
 
 function canOpenBetweenStageMenu(): boolean {
@@ -4230,6 +4251,7 @@ function applyEquipmentStats(): void {
   game.setEquipmentAura(
     deriveEquipmentAura(equipment, characters.selected),
   );
+  game.setEquipmentPerks(resolveEquipmentPerks(equippedPerkIds(equipment)));
   game.setPlayerStats({
     base: DEFAULT_PLAYER_BASE_STATS,
     character: characterStatBonus(characters.selected),
@@ -4275,10 +4297,20 @@ function formatEquipmentBonuses(): string {
   const parts = Object.entries(bonus)
     .filter(([, value]) => typeof value === "number" && value !== 0)
     .map(([key, value]) =>
-      key + " +" + String(Math.round((value ?? 0) * 10) / 10),
+      equipmentStatLabel(key) + " +" + String(Math.round((value ?? 0) * 10) / 10),
     );
+  const perks = equippedPerkIds(equipment).map((id) => "★ " + EQUIPMENT_PERKS[id].name);
 
-  return parts.length > 0 ? parts.join(" · ") : "none";
+  const text = parts.length > 0 ? parts.join(" · ") : "none";
+  return perks.length > 0 ? text + " · " + perks.join(" · ") : text;
+}
+
+/** "firepower +8 · focus +2" for one part at its grade and enhancement. */
+function formatItemStats(definition: ReturnType<typeof getEquipmentDefinition>): string {
+  return Object.entries(definition.stats)
+    .filter(([, value]) => typeof value === "number" && value !== 0)
+    .map(([key, value]) => equipmentStatLabel(key) + " +" + String(value))
+    .join(" · ");
 }
 
 function renderEquipment(): void {
@@ -4309,7 +4341,8 @@ function renderEquipment(): void {
         " +" +
         String(item.enhancement) +
         "] " +
-        definition.name;
+        definition.name +
+        (definition.perk !== undefined ? " ★" : "");
       select.append(option);
     }
 
@@ -4350,6 +4383,9 @@ function renderEquipment(): void {
       definition === null ? slot + " slot" : definition.name + " icon",
       "equipment-card-icon",
     );
+    if (definition !== null) {
+      setIconContent(visual, definition.icon, paintedEquipmentIcon(definition.id));
+    }
     const identity = document.createElement("div");
     identity.className = "equipment-card-identity";
     identity.append(title);
@@ -4360,14 +4396,25 @@ function renderEquipment(): void {
 
     const detail = document.createElement("small");
     detail.textContent =
-      current === null
+      current === null || definition === null
         ? "No equipment"
-        : "+" +
+        : EQUIPMENT_TIER_LABELS[definition.tier] +
+          " · +" +
           String(current.enhancement) +
           " · " +
-          (definition?.description ?? "");
+          definition.description +
+          " (" +
+          formatItemStats(definition) +
+          ")";
 
     card.append(head, select, detail);
+    if (definition?.perk !== undefined) {
+      const perk = EQUIPMENT_PERKS[definition.perk];
+      const perkLine = document.createElement("small");
+      perkLine.className = "equipment-perk";
+      perkLine.textContent = "★ " + perk.name + ": " + perk.description;
+      card.append(perkLine);
+    }
     grid.append(card);
   }
 

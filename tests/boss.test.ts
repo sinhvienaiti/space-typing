@@ -3,7 +3,7 @@ import {
   bossActionInterval,
   bossKeyDamage,
   bossMaxHp,
-  bossName,
+  bossNameForStage,
   bossPhaseFor,
   bossProjectileCount,
   bossWordDamage,
@@ -61,7 +61,8 @@ describe("boss foundation", () => {
 
   it("creates a valid HUD snapshot", () => {
     const state = createBossState(50, 1, "boss", entry);
-    expect(state.name).toBe(bossName("boss", 1));
+    expect(state.name).toBe(bossNameForStage(50, "boss"));
+    expect(state.name).toBe("Prismarch, Archon of Refracted Light");
     expect(state.hp).toBe(state.maxHp);
     expect(toBossHud(state)).toEqual({
       name: state.name,

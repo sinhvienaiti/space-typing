@@ -78,6 +78,10 @@ lsof -ti tcp:3098 | xargs kill
 | Trong trận thật (sau 20 giây là có tàu hoặc cá voi bay ngang) | `"http://127.0.0.1:3098/" .visual/game.png --click=#startButton --wait=20000 --eval-file=scripts/visual/evals/game-assets.js` |
 | Như trên nhưng đúng bản chủ dự án chơi (chế độ Play) | `"https://space.typing-game.local/" .visual/game-play.png --click=#startButton --wait=20000 --eval-file=scripts/visual/evals/game-assets.js` |
 | Nền cũ để so sánh | thêm `?bg=legacy` vào địa chỉ game |
+| Hiệu ứng một kỹ năng trong trận (chỉ máy chủ dev) | `"http://127.0.0.1:3098/#fx=missile-swarm&at=330" .visual/fx.png --click=#startButton --wait=3000 --dpr=1 --eval-file=scripts/visual/evals/skill-fx.js` — `fx=` là mã kỹ năng hoặc `ultimate&ship=<mã tàu>`, xem `docs/SKILLS_EQUIPMENT_HANDOFF.md` |
+| Đạn và kiểu nổ của 8 họ quái (chỉ máy chủ dev) | `"http://127.0.0.1:3098/#mode=deaths&at=160" .visual/deaths.png --click=#startButton --wait=3000 --eval-file=scripts/visual/evals/enemy-fx.js` (`mode=shots&at=900` để xem đạn) |
+| Boss xuất hiện: bảng tên, hào quang, vòng ấn ký (chỉ máy chủ dev) | `"http://127.0.0.1:3098/#stage=200&at=900" .visual/boss.png --click=#startButton --wait=3000 --eval-file=scripts/visual/evals/boss-fx.js` — thêm `&attack=1&pre=2000` để xem boss bắn |
+| Tốc độ khung hình với 8 quái (chỉ máy chủ dev) | `"http://127.0.0.1:3098/" .visual/perf.png --click=#startButton --wait=3000 --eval-file=scripts/visual/evals/enemy-perf.js` |
 | Đạn Vanguard ở tốc độ thật | `"http://127.0.0.1:3098/shot-gallery.html?panel=0&cps=10" .visual/shots.png --wait=6000 --eval-file=scripts/visual/evals/shot-state.js` |
 | Đạn quay chậm, để soi hình dạng | `"http://127.0.0.1:3098/shot-gallery.html?panel=0&t=0.1" .visual/shots-slow.png --wait=8000` |
 | Đạn vẽ bằng code (không ảnh vẽ tay) | thêm `&art=0` |

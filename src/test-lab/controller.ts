@@ -58,7 +58,9 @@ import {
   addEquipmentInstance,
   equipInstance,
   equipmentStatBonus,
+  equippedPerkIds,
 } from "../equipment/loadout";
+import { resolveEquipmentPerks } from "../equipment/perks";
 import type { EquipmentId } from "../equipment/registry";
 import type { GradeId } from "../grades";
 import {
@@ -1400,6 +1402,10 @@ export function mountTestLab(
         session.state.equipment,
         characterSelect.value as CharacterId,
       ),
+    );
+    // Mk.II / Mk.III perks (drones, plating…); per-stage ones apply on restart.
+    activeGame.setEquipmentPerks(
+      resolveEquipmentPerks(equippedPerkIds(session.state.equipment)),
     );
     activeGame.setRelicEffects(
       compileRelicEffects(session.state.relics),

@@ -1,6 +1,8 @@
 import {
   EQUIPMENT_IDS,
+  equipmentIdsOfTier,
   type EquipmentId,
+  type EquipmentTier,
 } from "../equipment/registry";
 import {
   GRADE_IDS,
@@ -65,17 +67,23 @@ export const GRADE_DROP_WEIGHTS: Record<
   },
 };
 
-export const EQUIPMENT_LOOT_TABLES: Record<
+/**
+ * Chance (%) that a drop is a Mk.I, Mk.II or Mk.III part. Common enemies
+ * mostly drop Mk.I; bosses, treasure and anomalies are where perks come from.
+ */
+export const EQUIPMENT_TIER_WEIGHTS: Record<
   LootSource,
-  readonly EquipmentId[]
+  Record<EquipmentTier, number>
 > = {
-  normal: EQUIPMENT_IDS,
-  elite: EQUIPMENT_IDS,
-  golden: EQUIPMENT_IDS,
-  treasure: EQUIPMENT_IDS,
-  anomaly: EQUIPMENT_IDS,
-  boss: EQUIPMENT_IDS,
+  normal: { 1: 85, 2: 15, 3: 0 },
+  elite: { 1: 55, 2: 40, 3: 5 },
+  golden: { 1: 40, 2: 48, 3: 12 },
+  treasure: { 1: 20, 2: 55, 3: 25 },
+  anomaly: { 1: 10, 2: 50, 3: 40 },
+  boss: { 1: 15, 2: 50, 3: 35 },
 };
+
+const TIERS: readonly EquipmentTier[] = [1, 2, 3];
 
 function adjustedWeights(
   source: LootSource,
@@ -114,18 +122,28 @@ export function rollEquipmentGrade(
   return "diamond";
 }
 
+/**
+ * One random number picks the tier (by EQUIPMENT_TIER_WEIGHTS), and where it
+ * falls inside that tier's band picks the item, so results stay deterministic.
+ */
 export function rollEquipmentDefinition(
   source: LootSource,
   random = Math.random(),
 ): EquipmentId {
-  const table = EQUIPMENT_LOOT_TABLES[source];
-  const index = Math.min(
-    table.length - 1,
-    Math.floor(
-      Math.max(0, Math.min(0.999999, random)) * table.length,
-    ),
-  );
-  return table[index] ?? EQUIPMENT_IDS[0];
+  const weights = EQUIPMENT_TIER_WEIGHTS[source];
+  const tiers = TIERS.filter((tier) => weights[tier] > 0 && equipmentIdsOfTier(tier).length > 0);
+  const total = tiers.reduce((sum, tier) => sum + weights[tier], 0);
+  let cursor = Math.max(0, Math.min(0.999999, random)) * total;
+  for (const tier of tiers) {
+    const band = weights[tier];
+    if (cursor < band) {
+      const table = equipmentIdsOfTier(tier);
+      const index = Math.min(table.length - 1, Math.floor((cursor / band) * table.length));
+      return table[index] ?? EQUIPMENT_IDS[0];
+    }
+    cursor -= band;
+  }
+  return EQUIPMENT_IDS[0];
 }
 
 export function gradeChanceSummary(

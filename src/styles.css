@@ -4324,3 +4324,27 @@ kbd {
   text-transform: uppercase;
   letter-spacing: 0.12em;
 }
+
+/* Equipment perk line (Mk.II / Mk.III parts). */
+.equipment-card .equipment-perk {
+  display: block;
+  margin-top: 4px;
+  color: #ffd98a;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+/* Painted icons (src/assets/icons/…) fill their glyph box. */
+.painted-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.hotbar-glyph .painted-icon {
+  width: 26px;
+  height: 26px;
+  margin: 0 auto;
+}
