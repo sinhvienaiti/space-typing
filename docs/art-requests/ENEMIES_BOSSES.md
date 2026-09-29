@@ -18,7 +18,11 @@
    pnpm sprites:prepare devil-sniper    # hoặc chỉ vài ảnh
    ```
 
-   Lệnh này tự làm hết: xoá dấu ngôi sao của Gemini ở góc, tách nền xanh (hoặc hồng tím) thành trong suốt, cắt sát nhân vật, thu nhỏ, rồi lưu WebP vào `src/assets/enemies/` hoặc `src/assets/bosses/`. Nếu nền không đạt, lệnh báo lỗi. Khi đó tạo lại ảnh với đúng dòng nền.
+   Lệnh này tự làm hết: xoá dấu ngôi sao của Gemini ở góc, tách nền xanh (hoặc hồng tím) thành trong suốt, cắt sát nhân vật, rồi sinh **2 mức chi tiết** từ cùng một ảnh gốc:
+   - quái: `<tên>.webp` **256 px** + `<tên>@2x.webp` **512 px**;
+   - boss: `<tên>.webp` **640 px** + `<tên>@2x.webp` **1024 px**.
+
+   Low/Medium ưu tiên bản chuẩn; High/Ultra ưu tiên bản `@2x`. Nếu `@2x` chưa có, game tự fallback về bản chuẩn; nếu chưa có painted sprite thì vẫn dùng renderer cũ, nên có thể bổ sung ảnh dần mà không làm vỡ game. Nếu nền không đạt, lệnh báo lỗi. Khi đó tạo lại ảnh với đúng dòng nền.
 4. Build lại để thấy trong game: `pnpm build:space` (ở thư mục gốc `typing-game`), rồi tải lại trang.
 
 **Quy tắc bắt buộc:**
@@ -151,6 +155,8 @@ Có thể làm trước một ảnh chung cho mọi họ, đặt tên chỉ bằ
 ## 7. Kiểm tra sau khi đặt ảnh
 
 - `pnpm sprites:prepare` báo `✓` cho từng ảnh, không có `✗`.
-- File nằm trong `src/assets/enemies/` hoặc `src/assets/bosses/`, đúng tên.
+- Mỗi ảnh nguồn hợp lệ sinh đủ cặp file chuẩn + `@2x` trong `src/assets/enemies/` hoặc `src/assets/bosses/`, đúng tên.
+- Test nhanh cả **High** và **Ultra**: quái/boss phải nét hơn Low/Medium; nếu máy quá tải thì adaptive renderer được phép hạ DPR nhưng không thay đổi gameplay.
 - `pnpm build:space`, mở game qua Portal, tải lại trang.
-- Code nhận ảnh: `src/enemies/painted-sprites.ts` (không cần sửa). Bảng tên boss: `src/boss/identity.ts`.
+- Code nhận ảnh/tự chọn tier: `src/enemies/painted-sprites.ts` (không cần sửa khi thêm ảnh). Bảng tên boss: `src/boss/identity.ts`.
+- Chi tiết contract High/Ultra: `docs/HIGH_ULTRA_VISUAL_QUALITY_V2.md`.

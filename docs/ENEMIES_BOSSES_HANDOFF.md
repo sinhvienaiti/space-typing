@@ -68,11 +68,15 @@ Mỗi boss có tên, danh hiệu, hai màu, kiểu hào quang (tia sáng, than h
 ## 5. Ảnh vẽ tay cho quái và boss
 
 - Danh sách ảnh, lời nhắc, tên file: `docs/art-requests/ENEMIES_BOSSES.md`. Làm thử trước 3 quái + 1 boss.
-- Xử lý ảnh: `pnpm sprites:prepare` (`scripts/bg-art/prepare-sprites.mjs`). Lệnh tự xoá watermark của Gemini, tách nền phẳng xanh `#00FF00` (hoặc hồng tím `#FF00FF` cho họ nature), khử viền xanh, cắt sát, rồi xuất WebP có nền trong suốt: quái 256 px, boss 640 px.
+- Xử lý ảnh: `pnpm sprites:prepare` (`scripts/bg-art/prepare-sprites.mjs`). Từ **một ảnh nguồn 1024×1024**, lệnh tự xoá watermark của Gemini, tách nền phẳng xanh `#00FF00` (hoặc hồng tím `#FF00FF` cho họ nature), khử viền, cắt sát rồi xuất:
+  - quái: 256 px chuẩn + 512 px `@2x`;
+  - boss: 640 px chuẩn + 1024 px `@2x`.
 - Game tự nhận (`src/enemies/painted-sprites.ts`):
-  - quái: `src/assets/enemies/<họ>-<loại>.webp`, nếu không có thì `src/assets/enemies/<loại>.webp`;
-  - boss: `src/assets/bosses/<mã boss>.webp`.
-  Ảnh được tải trước theo World, rồi lưu bản thu nhỏ theo cỡ trên màn hình (tối đa 72 bản). Chớp trúng đòn là bóng trắng vẽ sẵn. Chuyển động, hào quang và hiệu ứng vẫn chạy bằng code.
+  - quái chuẩn: `src/assets/enemies/<họ>-<loại>.webp`, fallback chung `<loại>.webp`;
+  - quái chi tiết: cùng tên nhưng thêm `@2x`;
+  - boss chuẩn/chi tiết: `<mã boss>.webp` và `<mã boss>@2x.webp`.
+  Low/Medium ưu tiên bản chuẩn; High/Ultra ưu tiên bản chi tiết. Thiếu `@2x` tự fallback về chuẩn, thiếu painted sprite tự fallback renderer bằng code. Ảnh được tải trước theo World/quality tier rồi lưu bản theo cỡ màn hình (tối đa 72 bản). Chớp trúng đòn, chuyển động, hào quang và hiệu ứng vẫn chạy bằng code.
+- Contract và giới hạn hiệu năng High/Ultra: `docs/HIGH_ULTRA_VISUAL_QUALITY_V2.md`.
 
 ## 6. Kiểm tra
 
