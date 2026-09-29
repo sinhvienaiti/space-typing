@@ -36,7 +36,8 @@ const PROFILES: Record<VisualQuality, QualityProfile> = {
     maxCanvasPixels: 5_000_000,
   },
   // Canvas blur/shadow work scales with physical pixel count, not gameplay
-  // complexity. Avoid DPR 2+ on a fullscreen canvas with many glossy sprites.
+  // complexity. Keep High below Retina DPR and let Ultra reach it only inside
+  // a bounded pixel budget; adaptive resolution still handles sustained load.
   high: {
     // High should be visibly crisper than Medium, not merely "more particles".
     // AdaptiveRenderBudget can still step down after sustained slow frames.
