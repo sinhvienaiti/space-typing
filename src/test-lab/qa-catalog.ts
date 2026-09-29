@@ -17,6 +17,7 @@ import { CELESTIAL_ACTIVE_SKILL } from "../characters/celestial";
 import { ZENITH_ACTIVE_SKILL } from "../characters/zenith";
 import {
   allBossIdentities,
+  bossIdentityForStage,
   type BossIdentity,
 } from "../boss/identity";
 import {
@@ -112,13 +113,16 @@ function bossQaStage(identity: BossIdentity): number | null {
     return match === null ? null : Number(match[1]) * 100;
   }
 
-  const world = WORLD_REGISTRY.find(
-    (candidate) => candidate.enemyFamilies[0] === identity.family,
-  );
-  if (world === undefined) return null;
-  return identity.role === "boss"
-    ? world.stageEnd
-    : world.stageStart + 9;
+  for (const world of WORLD_REGISTRY) {
+    const stage =
+      identity.role === "boss"
+        ? world.stageEnd
+        : world.stageStart + 9;
+    if (bossIdentityForStage(stage, identity.role).id === identity.id) {
+      return stage;
+    }
+  }
+  return null;
 }
 
 export type BossQaEntry = BossIdentity & {
