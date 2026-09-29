@@ -361,19 +361,30 @@ Primary work:
 
 Do **not** jump directly to 24 new relics.
 
-Start with:
+The initial target is a **12-relic playable roster in total**, including existing relics that are retained/reclassified. It does **not** mean “create 12 brand-new relics”.
+
+Before adding any new relic:
+
+1. inventory the current relic registry on the latest branch;
+2. map retained relics into Precision / Combo / Long Word / Recall where they genuinely fit;
+3. identify behavior gaps;
+4. add only enough new relics to reach a coherent 12-relic roster.
+
+Target shape:
 
 ```text
 4 families
-× 3 core relics
-= 12 core relics
+× about 3 meaningful choices each
+≈ 12 total roster entries
 ```
 
 Then scale only if telemetry / manual play confirms real run diversity:
 
 ```text
-12 → 16 → 20 → 24
+12 → 16 → 20 → 24 total roster entries
 ```
+
+The art roster must be generated **after** this code-to-roster mapping, so existing relic identities are not accidentally replaced by invented duplicate items.
 
 ### Speed-related rules
 
@@ -1588,7 +1599,7 @@ Recipes:
 ### Scope
 
 - Choose 1 of 3;
-- 12 core relic target;
+- 12-total-relic roster target after mapping/reusing the existing registry;
 - 4 build families;
 - 3–4 initial cross-system synergies;
 - discovery presentation.
