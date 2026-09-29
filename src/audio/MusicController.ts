@@ -281,13 +281,6 @@ export class MusicController {
   private musicBus: GainNode | null = null;
   private gestureListening = false;
 
-  private readonly onPronunciation = (event: Event): void => {
-    const active =
-      (event as CustomEvent<{ active?: unknown }>).detail?.active === true;
-    if (active) this.duck("pronunciation");
-    else this.releaseDuck("pronunciation");
-  };
-
   private readonly onAnnouncer = (event: Event): void => {
     const active =
       (event as CustomEvent<{ active?: unknown }>).detail?.active === true;
@@ -321,10 +314,8 @@ export class MusicController {
     this.rebuildPlaylist(this.profile.worldId);
 
     if (typeof window !== "undefined") {
-      window.addEventListener(
-        "space-typing:pronunciation",
-        this.onPronunciation,
-      );
+      // Spoken vocabulary intentionally does not lower music. The voice mix is
+      // already clear, while warnings and announcer cues still duck for safety.
       window.addEventListener(
         "space-typing:announcer",
         this.onAnnouncer,
@@ -629,10 +620,6 @@ export class MusicController {
     this.destroyed = true;
 
     if (typeof window !== "undefined") {
-      window.removeEventListener(
-        "space-typing:pronunciation",
-        this.onPronunciation,
-      );
       window.removeEventListener(
         "space-typing:announcer",
         this.onAnnouncer,

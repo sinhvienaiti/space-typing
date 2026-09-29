@@ -1567,6 +1567,37 @@ kbd {
   color: #6c7480;
 }
 
+.anomaly-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px;
+  align-items: center;
+  gap: 1rem;
+}
+
+.anomaly-heading .dialog-head {
+  padding-bottom: 0.45rem;
+}
+
+.anomaly-hero-art {
+  width: 96px;
+  height: 96px;
+  display: grid;
+  place-items: center;
+  color: #83efff;
+  filter: drop-shadow(0 0 16px rgba(107, 218, 255, 0.25));
+  animation: anomaly-core-float 3.6s ease-in-out infinite;
+}
+
+.anomaly-hero-art svg {
+  width: 100%;
+  height: 100%;
+}
+
+.anomaly-risk-meta {
+  max-width: 620px;
+  margin-top: 0.1rem;
+}
+
 .anomaly-choice-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1575,37 +1606,116 @@ kbd {
 }
 
 .anomaly-choice {
-  min-height: 128px;
-  padding: 1rem;
+  min-height: 150px;
+  padding: 0.9rem 1rem;
   display: grid;
-  align-content: center;
-  gap: 0.5rem;
+  grid-template-columns: 74px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.85rem;
   text-align: left;
+  overflow: hidden;
+}
+
+.anomaly-choice-art {
+  width: 66px;
+  height: 66px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  color: currentColor;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.anomaly-choice-art svg {
+  width: 58px;
+  height: 58px;
+  filter: drop-shadow(0 0 10px currentColor);
+}
+
+.anomaly-choice-copy {
+  min-width: 0;
+  display: grid;
+  gap: 0.36rem;
 }
 
 .anomaly-choice strong {
-  font-size: 0.9rem;
+  color: #f2f7fb;
+  font-size: 0.94rem;
 }
 
-.anomaly-choice span {
-  color: #8796a5;
-  font-size: 0.68rem;
+.anomaly-choice-copy > span {
+  color: #91a0ae;
+  font-size: 0.69rem;
   line-height: 1.5;
 }
 
+.anomaly-choice-copy em {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem 0.42rem;
+  color: #a9bac6;
+  font-size: 0.62rem;
+  font-style: normal;
+  letter-spacing: 0.025em;
+}
+
+.anomaly-choice-copy em b {
+  color: currentColor;
+  font-weight: 900;
+}
+
 .anomaly-choice.safe {
-  border-color: rgba(100, 229, 247, 0.22);
-  background: rgba(8, 24, 31, 0.74);
+  color: #7cecff;
+  border-color: rgba(100, 229, 247, 0.28);
+  background:
+    radial-gradient(circle at 12% 50%, rgba(87, 220, 242, 0.13), transparent 34%),
+    rgba(8, 24, 31, 0.74);
 }
 
 .anomaly-choice.risk {
-  border-color: rgba(255, 101, 204, 0.3);
-  background: rgba(31, 8, 25, 0.78);
+  color: #ff73c9;
+  border-color: rgba(255, 101, 204, 0.34);
+  background:
+    radial-gradient(circle at 12% 50%, rgba(255, 79, 183, 0.13), transparent 34%),
+    rgba(31, 8, 25, 0.78);
+}
+
+.anomaly-choice:hover .anomaly-choice-art {
+  transform: translateY(-1px) scale(1.03);
+}
+
+@keyframes anomaly-core-float {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-4px) rotate(2deg); }
 }
 
 @media (max-width: 620px) {
+  .anomaly-heading {
+    grid-template-columns: minmax(0, 1fr) 72px;
+  }
+
+  .anomaly-hero-art {
+    width: 68px;
+    height: 68px;
+  }
+
   .anomaly-choice-grid {
     grid-template-columns: 1fr;
+  }
+
+  .anomaly-choice {
+    min-height: 126px;
+    grid-template-columns: 58px minmax(0, 1fr);
+  }
+
+  .anomaly-choice-art {
+    width: 52px;
+    height: 52px;
+  }
+
+  .anomaly-choice-art svg {
+    width: 46px;
+    height: 46px;
   }
 }
 
@@ -1794,14 +1904,23 @@ kbd {
   padding: 7px 12px;
   border: 1px solid rgba(239, 193, 79, 0.3);
   border-radius: 999px;
-  background: rgba(8, 12, 24, 0.82);
+  background:
+    linear-gradient(90deg, rgba(8, 12, 24, 0.34), rgba(8, 12, 24, 0.54), rgba(8, 12, 24, 0.34));
   color: var(--accent);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-align: center;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.96),
+    0 0 9px rgba(0, 0, 0, 0.7);
   text-transform: uppercase;
   pointer-events: none;
+  -webkit-backdrop-filter: blur(7px) saturate(0.82);
+  backdrop-filter: blur(7px) saturate(0.82);
+  box-shadow:
+    0 4px 18px rgba(0, 0, 0, 0.16),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.018);
 }
 
 

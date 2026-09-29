@@ -1,19 +1,13 @@
-const PARENT_ORIGIN = "https://typing-game.local";
-
 import type { GameSettings } from "./types";
 
 let speechGeneration = 0;
 let speechActive = false;
 
-function notifyParent(active: boolean): void {
-  if (window.parent === window) return;
-  window.parent.postMessage({ type: "typing-game:speech", active }, "*");
-}
-
 function setSpeechActive(active: boolean): void {
   if (speechActive === active) return;
   speechActive = active;
-  notifyParent(active);
+  // Keep speech state inside Space Typing. Local SFX can yield to vocabulary
+  // audio, but neither the game's music nor the portal's shared music should.
   window.dispatchEvent(
     new CustomEvent("space-typing:pronunciation", {
       detail: { active },

@@ -5816,7 +5816,7 @@ export class Game {
     // Only show translation if the kill completed a typed boss word.
     // Spell/Nova kills must not misrepresent untyped words as learned.
     if (completedEntry !== undefined) {
-      this.hooks.onKillTranslation?.({ ...completedEntry });
+      this.presentCombatTranslation(completedEntry, x, y - 86);
     } else {
       this.stageResultTracker.interruptWord(
         "boss",
@@ -5963,6 +5963,37 @@ export class Game {
     this.emitStats();
   }
 
+  /**
+   * Combat learning feedback shared by normal enemies, bosses and optional
+   * bonus targets. Pronunciation stays on onWordComplete; this helper only
+   * owns Vietnamese/IPA presentation so every typed target follows the same
+   * translation settings without leaking answers into Recall mode.
+   */
+  private presentCombatTranslation(
+    entry: VocabularyEntry,
+    x: number,
+    y: number,
+  ): void {
+    if (this.gameplayMode === "recall") return;
+
+    const translationSettings = sanitizeKillTranslationSettings(
+      this.settings.killTranslation,
+    );
+    if (
+      usesKillPositionTranslation(translationSettings) &&
+      hasVisibleKillTranslation(entry, translationSettings)
+    ) {
+      this.learningEcho = {
+        entry: { ...entry },
+        x,
+        y: Math.max(96, y),
+        remaining: translationSettings.durationSeconds,
+        duration: translationSettings.durationSeconds,
+      };
+    }
+    this.hooks.onKillTranslation?.({ ...entry });
+  }
+
   private collectSupplyPod(pod: SupplyPod): void {
     const reward = applySupplyReward(
       pod.reward,
@@ -5985,6 +6016,7 @@ export class Game {
     this.stats.power = reward.power;
     this.addScore(140 * this.stats.multiplier);
     this.hooks.onWordComplete(pod.entry);
+    this.presentCombatTranslation(pod.entry, pod.x, pod.y - 54);
     this.fireBonusShot(this.supplyPodAim(pod), 48, 34, () => this.drawSupplyPod(pod));
     this.stageResultTracker.recordBonusCollected();
     this.supplyPod = null;
@@ -6014,6 +6046,7 @@ export class Game {
       this.gainPower(10);
       this.tryRollEquipmentDrop("treasure");
       this.hooks.onWordComplete(target.entry);
+      this.presentCombatTranslation(target.entry, target.x, target.y - 54);
       this.rewardNotice = {
         label: "RECALL BONUS · TREASURE DROP",
         x: target.x,
@@ -6069,6 +6102,7 @@ export class Game {
       }
       this.addScore(320 * this.stats.multiplier);
       this.hooks.onWordComplete(drone.entry);
+      this.presentCombatTranslation(drone.entry, drone.x, drone.y - 54);
       this.fireBonusShot(
         this.treasureDroneAim(drone),
         48,
@@ -6112,6 +6146,7 @@ export class Game {
       const options = createRewardChoiceOptions(this.effectiveLuck());
       this.addScore(220 * this.stats.multiplier);
       this.hooks.onWordComplete(crate.entry);
+      this.presentCombatTranslation(crate.entry, crate.x, crate.y - 54);
       this.fireBonusShot(
         this.rewardCrateAim(crate),
         286,
@@ -6154,6 +6189,7 @@ export class Game {
     if (crate.typed >= word.length) {
       this.addScore(260 * this.stats.multiplier);
       this.hooks.onWordComplete(crate.entry);
+      this.presentCombatTranslation(crate.entry, crate.x, crate.y - 54);
       this.fireBonusShot(
         this.anomalyCrateAim(crate),
         322,
@@ -6381,25 +6417,11 @@ export class Game {
     });
     this.addScore(killReward * this.stats.multiplier);
     this.gainPower(7);
-    if (this.gameplayMode !== "recall") {
-      // Combat learning feedback stays separate from Recall's configurable prompt.
-      const translationSettings = sanitizeKillTranslationSettings(
-        this.settings.killTranslation,
-      );
-      if (
-        usesKillPositionTranslation(translationSettings) &&
-        hasVisibleKillTranslation(enemy.entry, translationSettings)
-      ) {
-        this.learningEcho = {
-          entry: { ...enemy.entry },
-          x: enemy.x,
-          y: Math.max(96, enemy.y - enemy.radius - 18),
-          remaining: translationSettings.durationSeconds,
-          duration: translationSettings.durationSeconds,
-        };
-      }
-      this.hooks.onKillTranslation?.({ ...enemy.entry });
-    }
+    this.presentCombatTranslation(
+      enemy.entry,
+      enemy.x,
+      enemy.y - enemy.radius - 18,
+    );
 
     const deathDefinition = this.visualDefinitionForEnemy(enemy);
     // The enemy leaves play now; its blast, sound and shake wait for the bolt.
