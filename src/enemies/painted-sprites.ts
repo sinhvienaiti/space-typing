@@ -1,18 +1,21 @@
-import type { EnemyKind } from "../types";
+import type { EnemyKind, VisualQuality } from "../types";
 import type { EnemyFamilyId } from "./families";
 
 /**
  * Painted enemy and boss art made outside the codebase (see
- * docs/art-requests/ENEMIES_BOSSES.md), prepared by `pnpm sprites:prepare`
- * into src/assets/{enemies,bosses}/<name>.webp and bundled at build time.
+ * docs/art-requests/ENEMIES_BOSSES.md), prepared by `pnpm sprites:prepare`.
  *
- *   enemies/<family>-<kind>.webp   e.g. devil-sniper.webp  (preferred)
- *   enemies/<kind>.webp            one look for every family (fallback)
- *   bosses/<boss id>.webp          e.g. tyrant-g02.webp (src/boss/identity.ts)
+ * Standard:
+ *   enemies/<family>-<kind>.webp
+ *   bosses/<boss id>.webp
  *
- * Missing art keeps the code-drawn body. Images load lazily (and are
- * preloaded per World), then are cached pre-scaled per on-screen size, so a
- * frame only copies small bitmaps.
+ * Detailed High/Ultra companion:
+ *   enemies/<family>-<kind>@2x.webp
+ *   bosses/<boss id>@2x.webp
+ *
+ * Missing detailed art falls back to the standard sprite. Missing painted art
+ * entirely keeps the code-drawn body. Images load lazily, are preloaded per
+ * World/quality tier and are cached pre-scaled per on-screen size.
  */
 const ENEMY_FILES = import.meta.glob<string>("../assets/enemies/*.webp", {
   eager: true,
@@ -25,16 +28,55 @@ const BOSS_FILES = import.meta.glob<string>("../assets/bosses/*.webp", {
   import: "default",
 });
 
-function indexByName(files: Record<string, string>): ReadonlyMap<string, string> {
-  const map = new Map<string, string>();
+type SpriteVariants = {
+  standard?: string;
+  detailed?: string;
+};
+
+function indexVariants(
+  files: Record<string, string>,
+): ReadonlyMap<string, SpriteVariants> {
+  const map = new Map<string, SpriteVariants>();
   for (const [path, url] of Object.entries(files)) {
-    map.set(path.slice(path.lastIndexOf("/") + 1).replace(/\.webp$/, ""), url);
+    const stem = path
+      .slice(path.lastIndexOf("/") + 1)
+      .replace(/\.webp$/, "");
+    const detailed = stem.endsWith("@2x");
+    const name = detailed ? stem.slice(0, -3) : stem;
+    const previous = map.get(name) ?? {};
+    map.set(
+      name,
+      detailed
+        ? { ...previous, detailed: url }
+        : { ...previous, standard: url },
+    );
   }
   return map;
 }
 
-const ENEMY_URLS = indexByName(ENEMY_FILES);
-const BOSS_URLS = indexByName(BOSS_FILES);
+const ENEMY_URLS = indexVariants(ENEMY_FILES);
+const BOSS_URLS = indexVariants(BOSS_FILES);
+
+function preferredUrl(
+  variants: SpriteVariants | undefined,
+  quality: VisualQuality,
+): string | undefined {
+  if (variants === undefined) return undefined;
+  if (quality === "high" || quality === "ultra") {
+    return variants.detailed ?? variants.standard;
+  }
+  return variants.standard ?? variants.detailed;
+}
+
+function fallbackUrl(
+  variants: SpriteVariants | undefined,
+  preferred: string | undefined,
+): string | undefined {
+  if (variants === undefined) return undefined;
+  if (preferred === variants.detailed) return variants.standard;
+  if (preferred === variants.standard) return variants.detailed;
+  return variants.standard ?? variants.detailed;
+}
 
 type Loaded = { image: HTMLImageElement; ready: boolean; failed: boolean };
 const images = new Map<string, Loaded>();
@@ -65,41 +107,77 @@ function ready(url: string | undefined): HTMLImageElement | null {
   return entry !== null && entry.ready && !entry.failed ? entry.image : null;
 }
 
-/** Sprite names this build has (tests, QA). */
-export function paintedSpriteNames(): { enemies: string[]; bosses: string[] } {
-  return { enemies: [...ENEMY_URLS.keys()].sort(), bosses: [...BOSS_URLS.keys()].sort() };
+function readyVariant(
+  variants: SpriteVariants | undefined,
+  quality: VisualQuality,
+): HTMLImageElement | null {
+  const preferred = preferredUrl(variants, quality);
+  return ready(preferred) ?? ready(fallbackUrl(variants, preferred));
 }
 
-export function hasPaintedEnemy(family: EnemyFamilyId, kind: EnemyKind): boolean {
+/** Logical sprite names this build has (tests, QA); @2x is not a new enemy. */
+export function paintedSpriteNames(): { enemies: string[]; bosses: string[] } {
+  return {
+    enemies: [...ENEMY_URLS.keys()].sort(),
+    bosses: [...BOSS_URLS.keys()].sort(),
+  };
+}
+
+export function hasPaintedEnemy(
+  family: EnemyFamilyId,
+  kind: EnemyKind,
+): boolean {
   return ENEMY_URLS.has(family + "-" + kind) || ENEMY_URLS.has(kind);
 }
 
-/** The loaded painted sprite for this family and kind, or null. */
-export function paintedEnemySprite(family: EnemyFamilyId, kind: EnemyKind): HTMLImageElement | null {
-  return ready(ENEMY_URLS.get(family + "-" + kind)) ?? ready(ENEMY_URLS.get(kind));
+/** Loaded painted sprite for this family/kind, preferring the quality tier. */
+export function paintedEnemySprite(
+  family: EnemyFamilyId,
+  kind: EnemyKind,
+  quality: VisualQuality,
+): HTMLImageElement | null {
+  return (
+    readyVariant(ENEMY_URLS.get(family + "-" + kind), quality) ??
+    readyVariant(ENEMY_URLS.get(kind), quality)
+  );
 }
 
-export function paintedBossSprite(id: string): HTMLImageElement | null {
-  return ready(BOSS_URLS.get(id));
+export function paintedBossSprite(
+  id: string,
+  quality: VisualQuality,
+): HTMLImageElement | null {
+  return readyVariant(BOSS_URLS.get(id), quality);
 }
 
-/** Starts loading the art a World will need, so enemies never pop in. */
-export function preloadPaintedSprites(families: readonly EnemyFamilyId[], kinds: readonly EnemyKind[], bossIds: readonly string[]): void {
+/** Starts loading the art a World will need before its first spawn. */
+export function preloadPaintedSprites(
+  families: readonly EnemyFamilyId[],
+  kinds: readonly EnemyKind[],
+  bossIds: readonly string[],
+  quality: VisualQuality,
+): void {
   for (const family of families) {
     for (const kind of kinds) {
-      const url = ENEMY_URLS.get(family + "-" + kind) ?? ENEMY_URLS.get(kind);
+      const variants =
+        ENEMY_URLS.get(family + "-" + kind) ??
+        ENEMY_URLS.get(kind);
+      const url = preferredUrl(variants, quality);
       if (url !== undefined) load(url);
     }
   }
   for (const id of bossIds) {
-    const url = BOSS_URLS.get(id);
+    const url = preferredUrl(BOSS_URLS.get(id), quality);
     if (url !== undefined) load(url);
   }
 }
 
 // --- Pre-scaled copies --------------------------------------------------------
 
-type Scaled = { body: HTMLCanvasElement; flash: HTMLCanvasElement; lastUsed: number };
+type Scaled = {
+  body: HTMLCanvasElement;
+  flash: HTMLCanvasElement;
+  lastUsed: number;
+};
 const scaled = new Map<string, Scaled>();
 let tick = 0;
 const SCALED_LIMIT = 72;
@@ -113,6 +191,7 @@ function scaledCopy(image: HTMLImageElement, pixels: number): Scaled | null {
     cached.lastUsed = ++tick;
     return cached;
   }
+
   const body = document.createElement("canvas");
   body.width = size;
   body.height = size;
@@ -120,11 +199,18 @@ function scaledCopy(image: HTMLImageElement, pixels: number): Scaled | null {
   if (context === null) return null;
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
+
   const aspect = image.naturalWidth / Math.max(1, image.naturalHeight);
   const width = aspect >= 1 ? size : size * aspect;
   const height = aspect >= 1 ? size / aspect : size;
-  context.drawImage(image, (size - width) / 2, (size - height) / 2, width, height);
-  // White silhouette for hit flashes (drawn additively over the body).
+  context.drawImage(
+    image,
+    (size - width) / 2,
+    (size - height) / 2,
+    width,
+    height,
+  );
+
   const flash = document.createElement("canvas");
   flash.width = size;
   flash.height = size;
@@ -135,6 +221,7 @@ function scaledCopy(image: HTMLImageElement, pixels: number): Scaled | null {
     flashContext.fillStyle = "#ffffff";
     flashContext.fillRect(0, 0, size, size);
   }
+
   if (scaled.size >= SCALED_LIMIT) {
     let oldest: string | null = null;
     let oldestTick = Infinity;
@@ -146,14 +233,16 @@ function scaledCopy(image: HTMLImageElement, pixels: number): Scaled | null {
     }
     if (oldest !== null) scaled.delete(oldest);
   }
+
   const entry = { body, flash, lastUsed: ++tick };
   scaled.set(key, entry);
   return entry;
 }
 
 /**
- * Draws a painted sprite centred on the origin, `size` px wide, with a white
- * hit flash (0–1) on top. `deviceScale` picks the cached resolution.
+ * Draws a painted sprite centred on the origin, `size` CSS px wide. DPR only
+ * controls the pre-scaled cache resolution; the source variant is selected
+ * separately from the user's quality setting.
  */
 export function drawPaintedSprite(
   context: CanvasRenderingContext2D,
@@ -164,6 +253,7 @@ export function drawPaintedSprite(
 ): boolean {
   const copy = scaledCopy(image, size * Math.max(1, deviceScale));
   if (copy === null) return false;
+
   const previous = context.globalCompositeOperation;
   context.globalCompositeOperation = "source-over";
   context.drawImage(copy.body, -size / 2, -size / 2, size, size);

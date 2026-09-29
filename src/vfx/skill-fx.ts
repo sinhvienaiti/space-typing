@@ -53,6 +53,15 @@ const TAU = Math.PI * 2;
 const easeOut = (x: number): number => 1 - (1 - x) * (1 - x);
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
 
+type FxDetailTier = 0 | 1 | 2 | 3;
+
+function fxDetailTier(quality: VisualQuality): FxDetailTier {
+  if (quality === "low") return 0;
+  if (quality === "medium") return 1;
+  if (quality === "high") return 2;
+  return 3;
+}
+
 // ---------------------------------------------------------------------------
 // Cached light sprites.
 // ---------------------------------------------------------------------------
@@ -506,7 +515,7 @@ export class SkillFxSystem {
 
   /** Transient effects (over enemies). */
   draw(context: CanvasRenderingContext2D, quality: VisualQuality, height: number): void {
-    const fine = quality !== "low";
+    const detail = fxDetailTier(quality);
     context.save();
     // Missile smoke: soft source-over puffs so it reads as smoke, not light.
     const puffSprite = smokeSprite();
@@ -527,16 +536,16 @@ export class SkillFxSystem {
     for (const effect of this.effects) {
       switch (effect.kind) {
         case "shockwave":
-          this.drawShockwave(context, effect, fine);
+          this.drawShockwave(context, effect, detail);
           break;
         case "lightning":
           this.drawLightning(context, effect);
           break;
         case "orbital":
-          this.drawOrbital(context, effect, height, fine);
+          this.drawOrbital(context, effect, height, detail);
           break;
         case "railgun":
-          this.drawRailgun(context, effect, fine);
+          this.drawRailgun(context, effect, detail);
           break;
         case "missile":
           this.drawMissile(context, effect);
@@ -545,13 +554,13 @@ export class SkillFxSystem {
           this.drawTractor(context, effect);
           break;
         case "nanite":
-          this.drawNanite(context, effect, fine);
+          this.drawNanite(context, effect, detail);
           break;
         case "ring":
           this.drawPulse(context, effect);
           break;
         case "starfall":
-          this.drawStarfall(context, effect, height);
+          this.drawStarfall(context, effect, height, detail);
           break;
         case "slash":
           this.drawSlash(context, effect);
@@ -566,10 +575,10 @@ export class SkillFxSystem {
           this.drawShieldHit(context, effect);
           break;
         case "shatter":
-          this.drawShatter(context, effect);
+          this.drawShatter(context, effect, detail);
           break;
         case "blast":
-          this.drawBlast(context, effect, fine);
+          this.drawBlast(context, effect, detail);
           break;
         case "purge":
         case "shower":
@@ -580,12 +589,22 @@ export class SkillFxSystem {
   }
 
   /** Screen-space layers drawn last: flashes, the purge scan, showers. */
-  drawScreen(context: CanvasRenderingContext2D, width: number, height: number): void {
+  drawScreen(
+    context: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    quality: VisualQuality,
+  ): void {
+    const detail = fxDetailTier(quality);
     context.save();
     context.globalCompositeOperation = "lighter";
     for (const effect of this.effects) {
-      if (effect.kind === "purge") this.drawPurge(context, effect, width, height);
-      if (effect.kind === "shower") this.drawShower(context, effect, width, height);
+      if (effect.kind === "purge") {
+        this.drawPurge(context, effect, width, height, detail);
+      }
+      if (effect.kind === "shower") {
+        this.drawShower(context, effect, width, height, detail);
+      }
     }
     for (const flash of this.flashes) {
       const k = flash.t / flash.duration;
@@ -596,7 +615,11 @@ export class SkillFxSystem {
     context.restore();
   }
 
-  private drawShockwave(context: CanvasRenderingContext2D, effect: Shockwave, fine: boolean): void {
+  private drawShockwave(
+    context: CanvasRenderingContext2D,
+    effect: Shockwave,
+    detail: FxDetailTier,
+  ): void {
     const k = effect.t / effect.duration;
     for (let index = 0; index < effect.rings; index += 1) {
       const local = clamp01((effect.t - index * 0.09) / (effect.duration * 0.75));
@@ -612,8 +635,30 @@ export class SkillFxSystem {
       const reach = Math.hypot(target.x - effect.x, target.y - effect.y) / Math.max(1, effect.radius);
       const local = k * 1.3 - reach * 0.5;
       if (local <= 0 || local >= 1) return;
-      drawBolt(context, { x: effect.x, y: effect.y }, target, effect.color, fine ? 2 : 1.4, (1 - local) * 0.9, flicker * 13 + index * 7, fine);
-      glow(context, effect.color, target.x, target.y, 34, (1 - local) * 0.8);
+      const boltWidth = 1.35 + detail * 0.24;
+      drawBolt(
+        context,
+        { x: effect.x, y: effect.y },
+        target,
+        effect.color,
+        boltWidth,
+        (1 - local) * 0.9,
+        flicker * 13 + index * 7,
+        detail >= 1,
+      );
+      if (detail >= 3) {
+        drawBolt(
+          context,
+          { x: effect.x, y: effect.y },
+          target,
+          "#dffcff",
+          boltWidth * 0.48,
+          (1 - local) * 0.24,
+          flicker * 19 + index * 11 + 97,
+          false,
+        );
+      }
+      glow(context, effect.color, target.x, target.y, 34 + detail * 3, (1 - local) * 0.8);
       glow(context, "#ffffff", target.x, target.y, 12, (1 - local));
     });
   }
@@ -636,7 +681,12 @@ export class SkillFxSystem {
     glow(context, effect.color, effect.points[0]!.x, effect.points[0]!.y, 40, (1 - k) * 0.7);
   }
 
-  private drawOrbital(context: CanvasRenderingContext2D, effect: Orbital, height: number, fine: boolean): void {
+  private drawOrbital(
+    context: CanvasRenderingContext2D,
+    effect: Orbital,
+    height: number,
+    detail: FxDetailTier,
+  ): void {
     const aim = clamp01(effect.t / effect.delay);
     for (const target of effect.targets) {
       if (effect.t < effect.delay) {
@@ -669,9 +719,10 @@ export class SkillFxSystem {
       const blast = clamp01(local / 0.8);
       lightRing(context, effect.color, "#ffffff", target.x, target.y, 16 + easeOut(blast) * 120, (1 - blast) * 8 + 0.5, (1 - blast) * 0.9);
       glow(context, "#ffffff", target.x, target.y, 60 * (1 - blast) + 10, (1 - blast));
-      if (fine) {
-        for (let piece = 0; piece < 10; piece += 1) {
-          const angle = (piece / 10) * TAU + target.x * 0.01;
+      const debrisCount = [0, 6, 11, 16][detail] ?? 0;
+      if (debrisCount > 0) {
+        for (let piece = 0; piece < debrisCount; piece += 1) {
+          const angle = (piece / debrisCount) * TAU + target.x * 0.01;
           const distance = easeOut(blast) * (60 + hash(piece + target.y) * 70);
           glow(context, effect.color, target.x + Math.cos(angle) * distance, target.y + Math.sin(angle) * distance * 0.7, 7, (1 - blast) * 0.9);
         }
@@ -680,7 +731,11 @@ export class SkillFxSystem {
     }
   }
 
-  private drawRailgun(context: CanvasRenderingContext2D, effect: Railgun, fine: boolean): void {
+  private drawRailgun(
+    context: CanvasRenderingContext2D,
+    effect: Railgun,
+    detail: FxDetailTier,
+  ): void {
     const k = effect.t / effect.duration;
     const alpha = 1 - k;
     const dx = effect.to.x - effect.from.x;
@@ -701,7 +756,7 @@ export class SkillFxSystem {
     context.fillRect(0, -width * 0.12, length, width * 0.24);
     context.restore();
     // Shock rings travelling along the beam.
-    const rings = fine ? 7 : 4;
+    const rings = [4, 6, 8, 11][detail] ?? 4;
     for (let index = 0; index < rings; index += 1) {
       const at = (index + 0.5) / rings;
       const x = effect.from.x + dx * at;
@@ -800,10 +855,14 @@ export class SkillFxSystem {
     glow(context, effect.color, from.x, from.y - 30, 30, alpha * 0.8);
   }
 
-  private drawNanite(context: CanvasRenderingContext2D, effect: Nanite, fine: boolean): void {
+  private drawNanite(
+    context: CanvasRenderingContext2D,
+    effect: Nanite,
+    detail: FxDetailTier,
+  ): void {
     const center = effect.center();
     const k = effect.t / effect.duration;
-    const count = fine ? 42 : 18;
+    const count = [18, 30, 44, 62][detail] ?? 18;
     for (let index = 0; index < count; index += 1) {
       const phase = hash(effect.seed + index);
       const local = clamp01((k - phase * 0.35) / 0.65);
@@ -818,7 +877,13 @@ export class SkillFxSystem {
     lightRing(context, effect.color, "#eafff3", center.x, center.y, 30 + Math.sin(k * Math.PI) * 18, 2, Math.sin(k * Math.PI) * 0.6);
   }
 
-  private drawPurge(context: CanvasRenderingContext2D, effect: Purge, width: number, height: number): void {
+  private drawPurge(
+    context: CanvasRenderingContext2D,
+    effect: Purge,
+    width: number,
+    height: number,
+    detail: FxDetailTier,
+  ): void {
     const k = effect.t / effect.duration;
     const y = easeOut(k) * height;
     const alpha = 1 - k * 0.6;
@@ -829,8 +894,9 @@ export class SkillFxSystem {
     context.globalAlpha = 1;
     context.fillStyle = gradient;
     context.fillRect(0, y - 90, width, 98);
-    // Glitch slivers along the scan line.
-    for (let index = 0; index < 14; index += 1) {
+    // Glitch slivers along the scan line scale with visual quality only.
+    const sliverCount = [7, 10, 14, 20][detail] ?? 7;
+    for (let index = 0; index < sliverCount; index += 1) {
       const sliver = hash(index * 7.3 + Math.floor(effect.t * 30));
       context.globalAlpha = 0.5 * alpha;
       context.fillStyle = index % 2 === 0 ? effect.color : "#ffffff";
@@ -844,9 +910,15 @@ export class SkillFxSystem {
     glow(context, effect.color, effect.x, effect.y, effect.radius * 0.5 * (1 - k), (1 - k) * 0.6);
   }
 
-  private drawStarfall(context: CanvasRenderingContext2D, effect: Starfall, height: number): void {
+  private drawStarfall(
+    context: CanvasRenderingContext2D,
+    effect: Starfall,
+    height: number,
+    detail: FxDetailTier,
+  ): void {
     const targets = effect.targets.length > 0 ? effect.targets : [];
-    const stars = Math.max(targets.length, 8);
+    const minimumStars = [6, 8, 11, 14][detail] ?? 6;
+    const stars = Math.max(targets.length, minimumStars);
     for (let index = 0; index < stars; index += 1) {
       const target = targets[index % Math.max(1, targets.length)] ?? { x: hash(effect.seed + index) * 1000, y: height * 0.5 };
       const start = hash(effect.seed + index * 3.3) * 0.7;
@@ -869,9 +941,16 @@ export class SkillFxSystem {
     }
   }
 
-  private drawShower(context: CanvasRenderingContext2D, effect: Shower, width: number, height: number): void {
+  private drawShower(
+    context: CanvasRenderingContext2D,
+    effect: Shower,
+    width: number,
+    height: number,
+    detail: FxDetailTier,
+  ): void {
     const k = effect.t / effect.duration;
-    for (let index = 0; index < 46; index += 1) {
+    const particleCount = [18, 32, 48, 68][detail] ?? 18;
+    for (let index = 0; index < particleCount; index += 1) {
       const start = hash(effect.seed + index) * 0.6;
       const local = clamp01((k - start) / 0.5);
       if (local <= 0 || local >= 1) continue;
@@ -938,10 +1017,16 @@ export class SkillFxSystem {
     glow(context, effect.color, effect.x, effect.y, 36 * (1 - k) + 6, (1 - k) * 0.9);
   }
 
-  private drawShatter(context: CanvasRenderingContext2D, effect: Shatter): void {
+  private drawShatter(
+    context: CanvasRenderingContext2D,
+    effect: Shatter,
+    detail: FxDetailTier,
+  ): void {
     const k = effect.t / effect.duration;
-    for (let piece = 0; piece < 16; piece += 1) {
-      const angle = (piece / 16) * TAU + hash(effect.seed + piece) * 0.3;
+    const pieceCount = [10, 14, 18, 24][detail] ?? 10;
+    for (let piece = 0; piece < pieceCount; piece += 1) {
+      const angle =
+        (piece / pieceCount) * TAU + hash(effect.seed + piece) * 0.3;
       const distance = effect.radius + easeOut(k) * (50 + hash(piece) * 60);
       const x = effect.center.x + Math.cos(angle) * distance;
       const y = effect.center.y + Math.sin(angle) * distance;
@@ -958,14 +1043,20 @@ export class SkillFxSystem {
     glow(context, effect.color, effect.center.x, effect.center.y, effect.radius * 1.4, (1 - k) * 0.6);
   }
 
-  private drawBlast(context: CanvasRenderingContext2D, effect: Blast, fine: boolean): void {
+  private drawBlast(
+    context: CanvasRenderingContext2D,
+    effect: Blast,
+    detail: FxDetailTier,
+  ): void {
     const k = effect.t / effect.duration;
     lightRing(context, effect.color, "#ffffff", effect.x, effect.y, 8 + easeOut(k) * effect.size, (1 - k) * 6 + 0.5, 1 - k);
     glow(context, effect.color, effect.x, effect.y, effect.size * (1 - k * 0.5), (1 - k) * 0.9);
     glow(context, "#ffffff", effect.x, effect.y, effect.size * 0.35 * (1 - k), 1 - k);
-    if (!fine) return;
-    for (let spark = 0; spark < 8; spark += 1) {
-      const angle = (spark / 8) * TAU + hash(effect.seed + spark);
+    const sparkCount = [0, 6, 10, 14][detail] ?? 0;
+    if (sparkCount <= 0) return;
+    for (let spark = 0; spark < sparkCount; spark += 1) {
+      const angle =
+        (spark / sparkCount) * TAU + hash(effect.seed + spark);
       const distance = easeOut(k) * effect.size * (0.9 + hash(spark * 3) * 0.6);
       glow(context, effect.color, effect.x + Math.cos(angle) * distance, effect.y + Math.sin(angle) * distance, 6, (1 - k));
     }

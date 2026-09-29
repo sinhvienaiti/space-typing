@@ -2983,6 +2983,20 @@ export class Game {
     );
   }
 
+  private preloadStagePaintedSprites(stageNumber: number): void {
+    const world = worldForStage(stageNumber);
+    preloadPaintedSprites(
+      world.enemyFamilies,
+      ALL_ENEMY_KINDS,
+      [
+        bossIdentityForStage(stageNumber, "mini-boss").id,
+        bossIdentityForStage(stageNumber, "boss").id,
+        bossIdentityForStage(stageNumber, "major-boss").id,
+      ],
+      this.settings.visualQuality,
+    );
+  }
+
   updateSettings(settings: GameSettings): void {
     const qualityChanged =
       this.settings.visualQuality !== settings.visualQuality;
@@ -2993,6 +3007,9 @@ export class Game {
       this.adaptiveResizePending = false;
       this.modularBodyCache.clear();
       this.backgroundStage?.setQuality(settings.visualQuality);
+      this.preloadStagePaintedSprites(
+        this.stageConfig?.stage ?? this.stats.stage,
+      );
       this.resize();
     }
   }
@@ -3166,14 +3183,7 @@ export class Game {
     this.rewardCreditsMultiplierTimer = 0;
     this.rewardNotice = null;
     this.celestialCharge = 0;
-    {
-      const world = worldForStage(stage.stage);
-      preloadPaintedSprites(world.enemyFamilies, ALL_ENEMY_KINDS, [
-        bossIdentityForStage(stage.stage, "mini-boss").id,
-        bossIdentityForStage(stage.stage, "boss").id,
-        bossIdentityForStage(stage.stage, "major-boss").id,
-      ]);
-    }
+    this.preloadStagePaintedSprites(stage.stage);
     this.perkKills = 0;
     this.perkPerfectKills = 0;
     this.perkPerfectWords = 0;
@@ -8281,7 +8291,12 @@ export class Game {
     this.drawEnemyControlOverlay();
 
     // Flashes, the purge scan and showers: screen space, drawn last.
-    this.skillFx.drawScreen(context, this.width, this.height);
+    this.skillFx.drawScreen(
+      context,
+      this.width,
+      this.height,
+      this.settings.visualQuality,
+    );
     // Boss title card.
     this.combatFx.drawScreen(context, this.width, this.height);
 
@@ -9337,7 +9352,10 @@ export class Game {
         boss.role,
       ),
     );
-    const paintedBoss = identity === null ? null : paintedBossSprite(identity.id);
+    const paintedBoss =
+      identity === null
+        ? null
+        : paintedBossSprite(identity.id, this.settings.visualQuality);
     const breathe = 1 + Math.sin(time * 1.6) * 0.012;
     const modularDrawn =
       (paintedBoss !== null &&
@@ -10131,7 +10149,14 @@ export class Game {
     if (pose.scaleX !== 1 || pose.scaleY !== 1) context.scale(pose.scaleX, pose.scaleY);
     // Painted art for this family and kind when the owner has made it
     // (src/enemies/painted-sprites.ts), else the code-drawn body.
-    const painted = visual === undefined ? null : paintedEnemySprite(visual.family, enemy.kind);
+    const painted =
+      visual === undefined
+        ? null
+        : paintedEnemySprite(
+            visual.family,
+            enemy.kind,
+            this.settings.visualQuality,
+          );
     const modularDrawn =
       (painted !== null &&
         drawPaintedSprite(context, painted, enemy.radius * ENEMY_SPRITE_SCALE, enemy.flash, this.dpr)) ||

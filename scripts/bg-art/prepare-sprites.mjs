@@ -9,8 +9,11 @@
  * #FF00FF magenta background, or real transparency), removes the image tool's
  * corner watermark, keys the background out with a despilled rim, trims to
  * the subject, centres it on a square and writes WebP with alpha:
- *   art-src/enemies/<name>.png  ->  src/assets/enemies/<name>.webp  (256 px)
- *   art-src/bosses/<name>.png   ->  src/assets/bosses/<name>.webp   (640 px)
+ *   art-src/enemies/<name>.png  ->  src/assets/enemies/<name>.webp      (256 px)
+ *                                  src/assets/enemies/<name>@2x.webp  (512 px)
+ *   art-src/bosses/<name>.png   ->  src/assets/bosses/<name>.webp       (640 px)
+ *                                  src/assets/bosses/<name>@2x.webp  (1024 px)
+ * High/Ultra prefer @2x while Low/Medium keep the lighter standard asset.
  * The game picks the files up at the next build (src/enemies/painted-sprites.ts).
  */
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
@@ -31,8 +34,20 @@ const BOSSES = [
 const ENEMY_NAMES = new Set([...KINDS, ...FAMILIES.flatMap((family) => KINDS.map((kind) => family + "-" + kind))]);
 
 const JOBS = [
-  { src: join(ROOT, "art-src/enemies"), out: join(ROOT, "src/assets/enemies"), size: 256, names: ENEMY_NAMES },
-  { src: join(ROOT, "art-src/bosses"), out: join(ROOT, "src/assets/bosses"), size: 640, names: new Set(BOSSES) },
+  {
+    src: join(ROOT, "art-src/enemies"),
+    out: join(ROOT, "src/assets/enemies"),
+    size: 256,
+    detailSize: 512,
+    names: ENEMY_NAMES,
+  },
+  {
+    src: join(ROOT, "art-src/bosses"),
+    out: join(ROOT, "src/assets/bosses"),
+    size: 640,
+    detailSize: 1024,
+    names: new Set(BOSSES),
+  },
 ];
 
 /** Alpha from a flat green / magenta screen, with the key despilled from the rim. */
@@ -137,17 +152,37 @@ async function prepare(file, job, notes) {
   const box = subjectBox(keyed);
   const side = Math.ceil(Math.max(box.w, box.h) * 1.06);
   const trimmed = await rawImage(keyed).extract({ left: box.x, top: box.y, width: box.w, height: box.h }).png().toBuffer();
-  const target = join(job.out, name + ".webp");
-  const info = await sharp({
+  const square = await sharp({
     create: { width: side, height: side, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
   })
     .composite([{ input: trimmed, left: Math.floor((side - box.w) / 2), top: Math.floor((side - box.h) / 2) }])
     .png()
-    .toBuffer()
-    .then((buffer) =>
-      sharp(buffer).resize(job.size, job.size, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).webp({ quality: 90, alphaQuality: 95 }).toFile(target),
-    );
-  return { name, bytes: info.size, from: box.w + "x" + box.h };
+    .toBuffer();
+
+  const outputs = [
+    { suffix: "", size: job.size, quality: 92, alphaQuality: 97 },
+    { suffix: "@2x", size: job.detailSize, quality: 96, alphaQuality: 100 },
+  ];
+  let bytes = 0;
+  for (const output of outputs) {
+    const target = join(job.out, name + output.suffix + ".webp");
+    const info = await sharp(square)
+      .resize(output.size, output.size, {
+        fit: "contain",
+        kernel: sharp.kernel.lanczos3,
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      })
+      .webp({ quality: output.quality, alphaQuality: output.alphaQuality })
+      .toFile(target);
+    bytes += info.size;
+  }
+
+  return {
+    name,
+    bytes,
+    from: box.w + "x" + box.h,
+    outputs: job.size + "/" + job.detailSize,
+  };
 }
 
 const only = new Set(process.argv.slice(2).filter((argument) => !argument.startsWith("--")));
@@ -165,7 +200,7 @@ for (const job of JOBS) {
       const result = await prepare(join(job.src, entry), job, notes);
       if (result !== null) {
         written += 1;
-        console.log("✓ " + result.name + " (" + result.from + " → " + job.size + " px, " + Math.round(result.bytes / 1024) + " KiB)");
+        console.log("✓ " + result.name + " (" + result.from + " → " + result.outputs + " px, " + Math.round(result.bytes / 1024) + " KiB total)");
       }
     } catch (error) {
       failed += 1;
