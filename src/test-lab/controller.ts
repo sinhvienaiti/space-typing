@@ -108,6 +108,28 @@ import {
   mountBatchFPerformanceGate,
   type BatchFPerformanceCapture,
 } from "./batch-f-performance-gate";
+import {
+  AUDIO_QA_BOSS_EVENTS,
+  AUDIO_QA_MATERIAL_EVENTS,
+  AUDIO_QA_SFX,
+  TestLabAudioQa,
+  type AudioQaBossEvent,
+  type AudioQaMaterialEvent,
+  type AudioQaSfxId,
+} from "./audio-qa";
+import {
+  TEST_LAB_ENEMY_FAMILIES,
+  TEST_LAB_ENEMY_KINDS,
+  bossQaEntries,
+  enemyVisualQa,
+  equipmentQaEntries,
+  musicTrackQaEntries,
+  projectileQaEntries,
+  skillQaEntries,
+} from "./qa-catalog";
+import type { EnemyFamilyId } from "../enemies/families";
+import type { EnemyMaterial } from "../enemies/identity";
+import type { PlayerImpactVariant } from "../characters/projectiles";
 
 const TEST_LAB_PRESET_KEY = "spaceTypingTestLabPresetV1";
 
@@ -304,9 +326,15 @@ export function mountTestLab(
   options: TestLabMountOptions,
 ): TestLabController {
   const registry = createTestLabRegistry();
+  const bossQa = bossQaEntries();
+  const skillQa = skillQaEntries();
+  const equipmentQa = equipmentQaEntries();
+  const projectileQa = projectileQaEntries();
+  const musicTrackQa = musicTrackQaEntries();
   let session = createTestLabSession(1, 1, "test-lab");
   let game: Game | null = null;
   let music: MusicController | null = null;
+  let audioQa: TestLabAudioQa | null = null;
   let inspectorTimer = 0;
   let activeShop: ShopInstance | null = null;
   let shopPurchaseSequence = 0;
@@ -420,6 +448,23 @@ export function mountTestLab(
         </details>
 
         <details>
+          <summary>Enemy Painted Art QA</summary>
+          <p class="equipment-note">
+            Chooses family + kind explicitly, then spawns through the production Game runtime.
+            No Test-Lab-only renderer is used.
+          </p>
+          <div class="test-lab-grid">
+            <label>Family<select data-field="qa-enemy-family"></select></label>
+            <label>Kind<select data-field="qa-enemy-kind"></select></label>
+          </div>
+          <div class="test-lab-row">
+            <button type="button" data-action="spawn-qa-enemy">Spawn Painted QA Enemy</button>
+            <button type="button" data-action="spawn-qa-family">Spawn All 14 Kinds</button>
+          </div>
+          <pre class="test-lab-mini-inspector" data-role="qa-enemy-visual"></pre>
+        </details>
+
+        <details>
           <summary>Boss Runtime</summary>
           <div class="test-lab-grid">
             <label>Boss<select data-field="boss-definition"></select></label>
@@ -438,6 +483,13 @@ export function mountTestLab(
             <button type="button" data-action="apply-boss">Apply Boss State</button>
             <button type="button" data-action="clear-boss">Clear Boss</button>
           </div>
+          <div class="test-lab-grid">
+            <label>Claude boss identity<select data-field="qa-boss-identity"></select></label>
+          </div>
+          <div class="test-lab-row">
+            <button type="button" data-action="spawn-qa-boss">Load + Spawn Identity via Production Stage</button>
+          </div>
+          <pre class="test-lab-mini-inspector" data-role="qa-boss"></pre>
         </details>
 
         <details>
@@ -473,7 +525,9 @@ export function mountTestLab(
             <button type="button" data-action="apply-status">Apply / Stack Status</button>
             <button type="button" data-action="clear-one-status">Clear Selected Status</button>
             <button type="button" data-action="clear-status">Clear All Statuses</button>
+            <button type="button" data-action="force-rage-ultimate">Force 100% Rage Ultimate</button>
           </div>
+          <pre class="test-lab-mini-inspector" data-role="qa-projectile"></pre>
         </details>
 
         <details>
@@ -489,6 +543,7 @@ export function mountTestLab(
             <button type="button" data-action="grant-equip-relic">Grant + Equip Relic</button>
             <button type="button" data-action="clear-relics">Clear Relics</button>
           </div>
+          <pre class="test-lab-mini-inspector" data-role="qa-equipment"></pre>
         </details>
 
         <details>
@@ -519,7 +574,9 @@ export function mountTestLab(
             <button type="button" data-action="spawn-formation">Spawn Formation Now</button>
             <button type="button" data-action="clear-projectiles">Clear Projectiles</button>
             <button type="button" data-action="clear-particles">Clear Particles</button>
+            <button type="button" data-action="auto-setup-skill">Auto Setup Selected Skill Scenario</button>
           </div>
+          <pre class="test-lab-mini-inspector" data-role="qa-skill"></pre>
         </details>
 
         <details>
@@ -617,6 +674,38 @@ export function mountTestLab(
             <button type="button" data-action="release-ducks">Release Ducks</button>
             <button type="button" data-action="stop-music">Stop / Reset Music</button>
           </div>
+        </details>
+
+        <details>
+          <summary>Audio Browser · Production SFX + Track Assets</summary>
+          <p class="equipment-note">
+            SFX buttons call the production Sfx class. Track preview auditions the same generated
+            calm/intense files while Production Music Runtime above remains the authority for
+            playlist, state, ducking and crossfade behaviour.
+          </p>
+          <div class="test-lab-grid">
+            <label>SFX event<select data-field="qa-sfx"></select></label>
+            <label>Material family<select data-field="qa-material-family"></select></label>
+            <label>Material event<select data-field="qa-material-event"></select></label>
+            <label>Projectile ship<select data-field="qa-projectile-character"></select></label>
+            <label>Boss identity<select data-field="qa-boss-audio"></select></label>
+            <label>Boss material event<select data-field="qa-boss-audio-event"></select></label>
+            <label>Music track<select data-field="qa-music-track"></select></label>
+            <label>Track stem<select data-field="qa-music-stem">
+              <option value="calm">calm</option>
+              <option value="intense">intense</option>
+            </select></label>
+          </div>
+          <div class="test-lab-row">
+            <button type="button" data-action="qa-play-sfx">Play SFX</button>
+            <button type="button" data-action="qa-play-material">Play Material Sound</button>
+            <button type="button" data-action="qa-play-projectile">Play Projectile Impact</button>
+            <button type="button" data-action="qa-play-projectile-finisher">Play Finisher Impact</button>
+            <button type="button" data-action="qa-play-boss-audio">Play Boss Material Sound</button>
+            <button type="button" data-action="qa-play-track">Preview Track Asset</button>
+            <button type="button" data-action="qa-stop-track">Stop Track Preview</button>
+          </div>
+          <pre class="test-lab-mini-inspector" data-role="qa-audio"></pre>
         </details>
 
         <details>
@@ -778,6 +867,18 @@ export function mountTestLab(
     dialog.querySelector<HTMLElement>('[data-role="shop"]')!;
   const rewardInspector =
     dialog.querySelector<HTMLElement>('[data-role="reward"]')!;
+  const enemyVisualQaInspector =
+    dialog.querySelector<HTMLElement>('[data-role="qa-enemy-visual"]')!;
+  const bossQaInspector =
+    dialog.querySelector<HTMLElement>('[data-role="qa-boss"]')!;
+  const projectileQaInspector =
+    dialog.querySelector<HTMLElement>('[data-role="qa-projectile"]')!;
+  const equipmentQaInspector =
+    dialog.querySelector<HTMLElement>('[data-role="qa-equipment"]')!;
+  const skillQaInspector =
+    dialog.querySelector<HTMLElement>('[data-role="qa-skill"]')!;
+  const audioQaInspector =
+    dialog.querySelector<HTMLElement>('[data-role="qa-audio"]')!;
 
   const builtInPresetSelect =
     dialog.querySelector<HTMLSelectElement>('[data-field="builtin-preset"]')!;
@@ -817,6 +918,28 @@ export function mountTestLab(
     dialog.querySelector<HTMLSelectElement>('[data-field="music-state"]')!;
   const announcerSelect =
     dialog.querySelector<HTMLSelectElement>('[data-field="announcer"]')!;
+  const qaEnemyFamilySelect =
+    dialog.querySelector<HTMLSelectElement>('[data-field="qa-enemy-family"]')!;
+  const qaEnemyKindSelect =
+    dialog.querySelector<HTMLSelectElement>('[data-field="qa-enemy-kind"]')!;
+  const qaBossIdentitySelect =
+    dialog.querySelector<HTMLSelectElement>('[data-field="qa-boss-identity"]')!;
+  const qaSfxSelect =
+    dialog.querySelector<HTMLSelectElement>('[data-field="qa-sfx"]')!;
+  const qaMaterialFamilySelect =
+    dialog.querySelector<HTMLSelectElement>('[data-field="qa-material-family"]')!;
+  const qaMaterialEventSelect =
+    dialog.querySelector<HTMLSelectElement>('[data-field="qa-material-event"]')!;
+  const qaProjectileCharacterSelect =
+    dialog.querySelector<HTMLSelectElement>('[data-field="qa-projectile-character"]')!;
+  const qaBossAudioSelect =
+    dialog.querySelector<HTMLSelectElement>('[data-field="qa-boss-audio"]')!;
+  const qaBossAudioEventSelect =
+    dialog.querySelector<HTMLSelectElement>('[data-field="qa-boss-audio-event"]')!;
+  const qaMusicTrackSelect =
+    dialog.querySelector<HTMLSelectElement>('[data-field="qa-music-track"]')!;
+  const qaMusicStemSelect =
+    dialog.querySelector<HTMLSelectElement>('[data-field="qa-music-stem"]')!;
 
   setOptions(
     builtInPresetSelect,
@@ -977,10 +1100,271 @@ export function mountTestLab(
       label: event,
     })),
   );
+  setOptions(
+    qaEnemyFamilySelect,
+    TEST_LAB_ENEMY_FAMILIES.map((family) => ({
+      value: family,
+      label: family,
+    })),
+  );
+  setOptions(
+    qaEnemyKindSelect,
+    TEST_LAB_ENEMY_KINDS.map((kind) => ({
+      value: kind,
+      label: kind,
+    })),
+  );
+  setOptions(
+    qaBossIdentitySelect,
+    bossQa.map((boss) => ({
+      value: boss.id,
+      label: boss.rank + " · " + boss.name + " · " + boss.id,
+    })),
+  );
+  setOptions(
+    qaSfxSelect,
+    AUDIO_QA_SFX.map((entry) => ({
+      value: entry.id,
+      label: entry.category + " · " + entry.label,
+    })),
+  );
+  setOptions(
+    qaMaterialFamilySelect,
+    TEST_LAB_ENEMY_FAMILIES.map((family) => ({
+      value: family,
+      label: family,
+    })),
+  );
+  setOptions(
+    qaMaterialEventSelect,
+    AUDIO_QA_MATERIAL_EVENTS.map((event) => ({
+      value: event,
+      label: event,
+    })),
+  );
+  setOptions(
+    qaProjectileCharacterSelect,
+    projectileQa.map((entry) => ({
+      value: entry.characterId,
+      label: entry.characterName + " · " + entry.archetype,
+    })),
+  );
+  setOptions(
+    qaBossAudioSelect,
+    bossQa.map((boss) => ({
+      value: boss.id,
+      label: boss.name + " · " + boss.family,
+    })),
+  );
+  setOptions(
+    qaBossAudioEventSelect,
+    AUDIO_QA_BOSS_EVENTS.map((event) => ({
+      value: event,
+      label: event,
+    })),
+  );
+  setOptions(
+    qaMusicTrackSelect,
+    musicTrackQa.map((track) => ({
+      value: track.id,
+      label: track.title + " · " + track.moodLabel,
+    })),
+  );
 
   function notice(message: string): void {
     lastAction = message;
     options.showNotice?.("Test Lab · " + message);
+  }
+
+  function qaAudioRuntime(): TestLabAudioQa {
+    if (audioQa === null) {
+      audioQa = new TestLabAudioQa();
+    }
+    audioQa.setVolume(
+      Math.max(
+        0,
+        Math.min(
+          1,
+          numberValue(dialog, '[data-field="sfx-volume"]', 0.7),
+        ),
+      ),
+    );
+    return audioQa;
+  }
+
+  function representativeEnemyDefinition(family: EnemyFamilyId) {
+    return registry.enemies.find((enemy) => enemy.family === family);
+  }
+
+  function selectedBossQa() {
+    return bossQa.find((boss) => boss.id === qaBossIdentitySelect.value) ?? null;
+  }
+
+  function selectedAudioBossQa() {
+    return bossQa.find((boss) => boss.id === qaBossAudioSelect.value) ?? null;
+  }
+
+  function renderQaInspectors(): void {
+    const family = qaEnemyFamilySelect.value as EnemyFamilyId;
+    const kind = qaEnemyKindSelect.value as import("../types").EnemyKind;
+    const enemyInfo = enemyVisualQa(family, kind);
+    enemyVisualQaInspector.textContent = JSON.stringify(
+      {
+        ...enemyInfo,
+        assetStatus: enemyInfo.painted ? "FOUND" : "MISSING → procedural fallback",
+        runtimePath: "Game.testLabSpawnEnemies → production renderer",
+      },
+      null,
+      2,
+    );
+
+    const selectedBoss = selectedBossQa();
+    bossQaInspector.textContent =
+      selectedBoss === null
+        ? "No boss identity selected."
+        : JSON.stringify(
+            {
+              id: selectedBoss.id,
+              name: selectedBoss.name,
+              title: selectedBoss.title,
+              rank: selectedBoss.rank,
+              family: selectedBoss.family,
+              aura: selectedBoss.aura,
+              patterns: selectedBoss.patterns,
+              voice: selectedBoss.voice,
+              qaStage: selectedBoss.qaStage,
+              sprite: selectedBoss.spriteName,
+              assetStatus: selectedBoss.painted ? "FOUND" : "MISSING → code-drawn fallback",
+              runtimePath: "production stage mapping → Game.testLabSpawnBoss",
+            },
+            null,
+            2,
+          );
+
+    const selectedSkill =
+      skillQa.find((entry) => entry.id === playerSkillSelect.value) ?? null;
+    skillQaInspector.textContent =
+      selectedSkill === null
+        ? "No production skill selected."
+        : JSON.stringify(
+            {
+              id: selectedSkill.id,
+              name: selectedSkill.name,
+              category: selectedSkill.category,
+              characterId: selectedSkill.characterId ?? null,
+              description: selectedSkill.description ?? "",
+              energyCost: selectedSkill.energyCost,
+              cooldown: selectedSkill.cooldown,
+              charges: selectedSkill.charges,
+              perStageLimit: selectedSkill.perStageLimit,
+              typingCondition: selectedSkill.typingCondition ?? null,
+              icon: selectedSkill.iconName,
+              iconStatus: selectedSkill.painted ? "FOUND" : "MISSING → glyph fallback",
+              scenarioHint: selectedSkill.scenarioHint,
+              runtimePath: "Game.testLabForceSkill → production activateSkillEffect",
+            },
+            null,
+            2,
+          );
+
+    const selectedEquipment =
+      equipmentQa.find((entry) => entry.id === equipmentSelect.value) ?? null;
+    equipmentQaInspector.textContent =
+      selectedEquipment === null
+        ? "No production equipment selected."
+        : JSON.stringify(
+            {
+              ...selectedEquipment,
+              iconStatus: selectedEquipment.painted ? "FOUND" : "MISSING → glyph fallback",
+              runtimePath: "production loadout → resolveEquipmentPerks → Game.setEquipmentPerks",
+            },
+            null,
+            2,
+          );
+
+    const selectedProjectile =
+      projectileQa.find((entry) => entry.characterId === characterSelect.value) ?? null;
+    projectileQaInspector.textContent =
+      selectedProjectile === null
+        ? "No production projectile profile selected."
+        : JSON.stringify(
+            {
+              ...selectedProjectile,
+              runtimePath: "Game.firePlayerShot → PlayerShotSystem → playerProjectileProfile",
+            },
+            null,
+            2,
+          );
+
+    const genericSfx =
+      AUDIO_QA_SFX.find((entry) => entry.id === qaSfxSelect.value) ?? null;
+    const materialInfo = enemyVisualQa(
+      qaMaterialFamilySelect.value as EnemyFamilyId,
+      "scout",
+    );
+    const audioProjectile =
+      projectileQa.find(
+        (entry) => entry.characterId === qaProjectileCharacterSelect.value,
+      ) ?? null;
+    const audioBoss = selectedAudioBossQa();
+    const audioTrack =
+      musicTrackQa.find((track) => track.id === qaMusicTrackSelect.value) ?? null;
+    audioQaInspector.textContent = JSON.stringify(
+      {
+        sfx:
+          genericSfx === null
+            ? null
+            : {
+                id: genericSfx.id,
+                label: genericSfx.label,
+                category: genericSfx.category,
+                usedWhen: genericSfx.usedWhen,
+                implementation: "production Sfx",
+              },
+        material: {
+          family: materialInfo.family,
+          material: materialInfo.material,
+          event: qaMaterialEventSelect.value,
+          usedWhen: "enemy hit / layer break / death for this production family material",
+        },
+        projectile:
+          audioProjectile === null
+            ? null
+            : {
+                ship: audioProjectile.characterName,
+                archetype: audioProjectile.archetype,
+                impactVariant: audioProjectile.impactVariant,
+                implementation: "Sfx.boltImpact with production projectile impactVariant",
+              },
+        boss:
+          audioBoss === null
+            ? null
+            : {
+                id: audioBoss.id,
+                family: audioBoss.family,
+                voice: audioBoss.voice,
+                event: qaBossAudioEventSelect.value,
+                implementation: "Sfx.bossImpact / Sfx.bossRoar with production identity",
+              },
+        track:
+          audioTrack === null
+            ? null
+            : {
+                id: audioTrack.id,
+                title: audioTrack.title,
+                mood: audioTrack.moodLabel,
+                bpm: audioTrack.bpm,
+                key: audioTrack.key,
+                meter: audioTrack.meter,
+                seconds: audioTrack.seconds,
+                galaxies: audioTrack.galaxies,
+                stem: qaMusicStemSelect.value,
+                note: "Asset audition only; production playlist/state/crossfade is tested in Music / Audio Runtime.",
+              },
+      },
+      null,
+      2,
+    );
   }
 
   function stageForBossDefinition(id: string): number | null {
@@ -1077,6 +1461,7 @@ export function mountTestLab(
         ? "No reward preview."
         : JSON.stringify(rewardPreview, null, 2);
     refreshEnemyIds(snapshot);
+    renderQaInspectors();
   }
 
   function stopInspector(): void {
@@ -1934,6 +2319,223 @@ export function mountTestLab(
       renderInspector();
       return;
     }
+    if (action === "spawn-qa-enemy") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      const family = qaEnemyFamilySelect.value as EnemyFamilyId;
+      const definition = representativeEnemyDefinition(family);
+      if (definition === undefined) {
+        notice("no production enemy definition found for family · " + family);
+        return;
+      }
+      const kind = qaEnemyKindSelect.value as import("../types").EnemyKind;
+      activeGame.testLabSpawnEnemies({
+        definitionId: definition.id as EnemyDefinitionId,
+        kind,
+        count: 1,
+        rank: rankSelect.value as EnemyRank,
+        layers: Number(inputValue(dialog, '[data-field="layers"]')) as 1 | 2 | 3,
+      });
+      notice("spawned production painted QA enemy · " + family + "-" + kind);
+      renderInspector();
+      return;
+    }
+    if (action === "spawn-qa-family") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      const family = qaEnemyFamilySelect.value as EnemyFamilyId;
+      const definition = representativeEnemyDefinition(family);
+      if (definition === undefined) {
+        notice("no production enemy definition found for family · " + family);
+        return;
+      }
+      activeGame.testLabClearEnemies();
+      for (const kind of TEST_LAB_ENEMY_KINDS) {
+        activeGame.testLabSpawnEnemies({
+          definitionId: definition.id as EnemyDefinitionId,
+          kind,
+          count: 1,
+          layers: 1,
+        });
+      }
+      notice("spawned all 14 production kinds for family · " + family);
+      renderInspector();
+      return;
+    }
+    if (action === "spawn-qa-boss") {
+      const selected = selectedBossQa();
+      if (selected === null || selected.qaStage === null) {
+        notice("selected boss identity has no production QA stage mapping");
+        return;
+      }
+      setField("stage", selected.qaStage);
+      setField(
+        "checkpoint",
+        Math.floor((selected.qaStage - 1) / 10) * 10 + 1,
+      );
+      worldSelect.value = worldForStage(selected.qaStage).id;
+      startArena();
+      window.setTimeout(() => {
+        const spawned = game?.testLabSpawnBoss() ?? false;
+        renderInspector();
+        notice(
+          spawned
+            ? "spawned production boss identity · " + selected.id
+            : "production boss spawn rejected · " + selected.id,
+        );
+      }, 0);
+      return;
+    }
+    if (action === "force-rage-ultimate") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      activeGame.testLabSetResources({ power: 100 });
+      activeGame.handleKey(" ");
+      notice(
+        "forced 100% Rage through production SPACE-key path · " +
+          characterSelect.value,
+      );
+      renderInspector();
+      canvas.focus({ preventScroll: true });
+      return;
+    }
+    if (action === "auto-setup-skill") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      const selected =
+        skillQa.find((entry) => entry.id === playerSkillSelect.value) ?? null;
+      if (selected === null) {
+        notice("selected skill is not in the production QA catalog");
+        return;
+      }
+      if (selected.characterId !== undefined) {
+        characterSelect.value = selected.characterId;
+        activeGame.setCharacter(selected.characterId);
+        refreshPlayerSkillOptions();
+        playerSkillSelect.value = selected.id;
+      }
+      activeGame.testLabClearEnemies();
+      activeGame.testLabSetSchedulerFrozen(true);
+      const family = qaEnemyFamilySelect.value as EnemyFamilyId;
+      const definition =
+        representativeEnemyDefinition(family) ?? registry.enemies[0];
+      const targetCounts: Record<string, number> = {
+        "chain-lightning": 4,
+        "mark-of-weakness": 1,
+        meteor: 3,
+        "missile-swarm": 6,
+        railgun: 4,
+        "tractor-beam": 1,
+        "emp-burst": 4,
+        "reflect-field": 3,
+        "time-shell": 4,
+        "guardian-drone": 3,
+        "reaper-execute": 1,
+      };
+      const count = targetCounts[selected.id] ?? 1;
+      if (definition !== undefined) {
+        activeGame.testLabSpawnEnemies({
+          definitionId: definition.id as EnemyDefinitionId,
+          kind: "scout",
+          count,
+          layers: 1,
+        });
+      }
+      notice(
+        "skill QA scenario prepared with production enemies · " +
+          selected.id +
+          " · " +
+          selected.scenarioHint,
+      );
+      renderInspector();
+      canvas.focus({ preventScroll: true });
+      return;
+    }
+    if (action === "qa-play-sfx") {
+      qaAudioRuntime().playSfx(qaSfxSelect.value as AudioQaSfxId);
+      notice("played production SFX · " + qaSfxSelect.value);
+      return;
+    }
+    if (action === "qa-play-material") {
+      const material = enemyVisualQa(
+        qaMaterialFamilySelect.value as EnemyFamilyId,
+        "scout",
+      ).material as EnemyMaterial;
+      qaAudioRuntime().playEnemyMaterial(
+        material,
+        qaMaterialEventSelect.value as AudioQaMaterialEvent,
+      );
+      notice(
+        "played production material sound · " +
+          qaMaterialFamilySelect.value +
+          " · " +
+          qaMaterialEventSelect.value,
+      );
+      return;
+    }
+    if (
+      action === "qa-play-projectile" ||
+      action === "qa-play-projectile-finisher"
+    ) {
+      const entry =
+        projectileQa.find(
+          (candidate) =>
+            candidate.characterId === qaProjectileCharacterSelect.value,
+        ) ?? null;
+      if (entry === null) return;
+      qaAudioRuntime().playProjectileImpact(
+        entry.impactVariant as PlayerImpactVariant,
+        action === "qa-play-projectile-finisher",
+      );
+      notice(
+        "played production projectile impact · " +
+          entry.characterId +
+          " · " +
+          entry.impactVariant,
+      );
+      return;
+    }
+    if (action === "qa-play-boss-audio") {
+      const boss = selectedAudioBossQa();
+      if (boss === null) return;
+      const material = enemyVisualQa(
+        boss.family,
+        "scout",
+      ).material as EnemyMaterial;
+      qaAudioRuntime().playBossMaterial(
+        qaBossAudioEventSelect.value as AudioQaBossEvent,
+        material,
+        boss.voice,
+      );
+      notice(
+        "played production boss material sound · " +
+          boss.id +
+          " · " +
+          qaBossAudioEventSelect.value,
+      );
+      return;
+    }
+    if (action === "qa-play-track") {
+      music?.stop(0.2);
+      const played = qaAudioRuntime().playTrack(
+        qaMusicTrackSelect.value,
+        qaMusicStemSelect.value as "calm" | "intense",
+      );
+      notice(
+        played
+          ? "previewing generated track asset · " +
+              qaMusicTrackSelect.value +
+              " · " +
+              qaMusicStemSelect.value
+          : "track preview unavailable",
+      );
+      return;
+    }
+    if (action === "qa-stop-track") {
+      audioQa?.stopTrack();
+      notice("stopped track asset preview");
+      return;
+    }
     if (action === "spawn-selected-boss") {
       const stage = stageForBossDefinition(
         bossDefinitionSelect.value,
@@ -2407,6 +3009,15 @@ export function mountTestLab(
 
     if (action === "apply-audio-levels") {
       if (music === null || game === null) createRuntime();
+      audioQa?.setVolume(
+        Math.max(
+          0,
+          Math.min(
+            1,
+            numberValue(dialog, '[data-field="sfx-volume"]', 0.7),
+          ),
+        ),
+      );
       music?.setMusicVolume(
         Math.max(
           0,
@@ -2485,6 +3096,7 @@ export function mountTestLab(
       return;
     }
     if (action === "play-music") {
+      audioQa?.stopTrack();
       if (music === null) createRuntime();
       const state = musicStateSelect.value as MusicState;
       music?.setWorldProfile(
@@ -2571,8 +3183,30 @@ export function mountTestLab(
     }
   });
 
+  const qaControls = [
+    qaEnemyFamilySelect,
+    qaEnemyKindSelect,
+    qaBossIdentitySelect,
+    qaSfxSelect,
+    qaMaterialFamilySelect,
+    qaMaterialEventSelect,
+    qaProjectileCharacterSelect,
+    qaBossAudioSelect,
+    qaBossAudioEventSelect,
+    qaMusicTrackSelect,
+    qaMusicStemSelect,
+    playerSkillSelect,
+    equipmentSelect,
+    characterSelect,
+  ];
+  for (const control of qaControls) {
+    control.addEventListener("change", renderQaInspectors);
+  }
+
   dialog.addEventListener("close", () => {
     destroyRuntime();
+    audioQa?.destroy();
+    audioQa = null;
   });
 
   button.addEventListener("click", () => {
@@ -2589,6 +3223,8 @@ export function mountTestLab(
     },
     destroy(): void {
       destroyRuntime();
+      audioQa?.destroy();
+      audioQa = null;
       manualGate.destroy();
       performanceGate.destroy();
       dialog.remove();
