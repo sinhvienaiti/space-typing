@@ -2,10 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Game } from "../src/Game";
 import { createStageConfig } from "../src/campaign/stage";
 import { difficultyFor } from "../src/campaign/difficulty";
-import {
-  SCORE_POPUP_FLOAT_DISTANCE,
-  SCORE_POPUP_PROTECTED_TOP_Y,
-} from "../src/combat/score-popup";
 import { VANGUARD_ACTIVE_SKILL_ID } from "../src/characters/vanguard";
 import { DEFAULT_RECALL_SETTINGS } from "../src/recall/model";
 import type { GameSettings, VocabularyEntry } from "../src/types";
@@ -600,7 +596,7 @@ describe("M21 gated Game Test Lab API", () => {
 
     game.destroy();
   });
-  it("stores the actual kill reward in a bounded score popup", () => {
+  it("keeps kill Score logic but creates no legacy floating score popup state", () => {
     const game = createTestGame();
     game.setTestLabMode(true);
     start(game, 1);
@@ -615,32 +611,19 @@ describe("M21 gated Game Test Lab API", () => {
     expect(game.testLabKillEnemy(ids[0]!)).toBe(true);
     const afterScore = game.getTestLabSnapshot()?.stats.score ?? 0;
     const runtime = game as unknown as {
-      killScorePopups: Array<{
-        y: number;
-        value: number;
-        life: number;
-        maxLife: number;
-      }>;
+      killScorePopups?: unknown[];
     };
 
-    expect(runtime.killScorePopups).toHaveLength(1);
-    expect(runtime.killScorePopups[0]?.value).toBe(afterScore - beforeScore);
-    expect(runtime.killScorePopups[0]?.maxLife).toBe(2);
-    expect(runtime.killScorePopups[0]?.y).toBeGreaterThanOrEqual(
-      SCORE_POPUP_PROTECTED_TOP_Y + SCORE_POPUP_FLOAT_DISTANCE,
-    );
+    expect(afterScore).toBeGreaterThan(beforeScore);
+    expect(runtime.killScorePopups).toBeUndefined();
     game.destroy();
   });
 
-  it("shows a materially larger final score reward for a three-layer enemy", () => {
+  it("keeps a materially larger Score reward for a three-layer enemy", () => {
     const game = createTestGame();
     game.setTestLabMode(true);
     start(game, 1);
     game.testLabSetSchedulerFrozen(true);
-
-    const runtime = game as unknown as {
-      killScorePopups: Array<{ value: number }>;
-    };
 
     const oneLayerId = game.testLabSpawnEnemies({
       kind: "scout",
@@ -648,8 +631,10 @@ describe("M21 gated Game Test Lab API", () => {
       rank: "I",
       layers: 1,
     })[0]!;
+    const oneBefore = game.getTestLabSnapshot()?.stats.score ?? 0;
     expect(game.testLabKillEnemy(oneLayerId)).toBe(true);
-    const oneLayerReward = runtime.killScorePopups.at(-1)?.value ?? 0;
+    const oneLayerReward =
+      (game.getTestLabSnapshot()?.stats.score ?? 0) - oneBefore;
 
     game.testLabClearEnemies();
     game.testLabClearParticles();
@@ -660,8 +645,10 @@ describe("M21 gated Game Test Lab API", () => {
       rank: "I",
       layers: 3,
     })[0]!;
+    const threeBefore = game.getTestLabSnapshot()?.stats.score ?? 0;
     expect(game.testLabKillEnemy(threeLayerId)).toBe(true);
-    const threeLayerReward = runtime.killScorePopups.at(-1)?.value ?? 0;
+    const threeLayerReward =
+      (game.getTestLabSnapshot()?.stats.score ?? 0) - threeBefore;
 
     expect(oneLayerReward).toBeGreaterThan(0);
     expect(threeLayerReward).toBeGreaterThan(oneLayerReward * 1.35);

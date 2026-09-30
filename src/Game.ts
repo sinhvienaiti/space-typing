@@ -110,12 +110,6 @@ import { ShipMotion } from "./characters/ship-motion";
 import type { EquipmentAuraProfile } from "./characters/equipment-aura";
 import { playerProjectileProfile } from "./characters/projectiles";
 import {
-  advanceKillScorePopups,
-  drawKillScorePopup,
-  scorePopupSafeY,
-  type KillScorePopup,
-} from "./combat/score-popup";
-import {
   bossProjectilesEnabled,
   normalEnemyProjectilesEnabled,
 } from "./combat/enemy-projectile-policy";
@@ -368,6 +362,10 @@ import type {
   CombatCreditRewardReceipt,
 } from "./rewards/combat-credit-drops";
 import {
+  CreditCrystalPickupSystem,
+  type CreditCrystalCollectionEvent,
+} from "./vfx/credit-crystal-pickups";
+import {
   pickVocabularyEntryForRank,
   wordDifficultyScore,
 } from "./enemies/word-difficulty";
@@ -531,7 +529,13 @@ type EnemySpawnRequest = {
 type ShotImpact =
   | { kind: "enemy-hit"; enemyId: number; power: number }
   | { kind: "enemy-layer"; enemyId: number; fx: EnemyFxProfile }
-  | { kind: "enemy-kill"; enemy: Enemy; fx: EnemyFxProfile; shake: number }
+  | {
+      kind: "enemy-kill";
+      enemy: Enemy;
+      fx: EnemyFxProfile;
+      shake: number;
+      creditReceipt: CombatCreditRewardReceipt | null;
+    }
   | { kind: "boss-hit" }
   | { kind: "intercept"; projectile: EnemyProjectile }
   // Bonus targets (supply pod, treasure drone, crates, Recall bonus).
@@ -570,6 +574,9 @@ export type GameHooks = {
   onCombatCreditReward?(
     request: CombatCreditClaimRequest,
   ): CombatCreditRewardReceipt | null;
+  onCombatCreditPickupPresented?(
+    event: CreditCrystalCollectionEvent,
+  ): void;
   onStagePhase?(phase: StagePacingPhase): void;
   onStageEvents(events: readonly StageEventDefinition[]): void;
   onObjectiveUpdate(objective: StageObjectiveState | null): void;
@@ -874,6 +881,7 @@ export class Game {
   private projectiles: EnemyProjectile[] = [];
   private lasers: Laser[] = [];
   private readonly playerShots = new PlayerShotSystem<ShotImpact>();
+  private readonly creditPickups = new CreditCrystalPickupSystem();
   /** Killed enemies stay on screen until the bolt that killed them lands. */
   private dyingEnemies: Enemy[] = [];
   /** Intercepted hostile shots stay on screen until the player's bolt reaches them. */
@@ -922,7 +930,6 @@ export class Game {
     radius: number;
   }> = [];
   private particles: Particle[] = [];
-  private killScorePopups: KillScorePopup[] = [];
   private targetId: number | null = null;
   private spawnTimer = 0;
   private spawnRemaining = 0;
@@ -1058,6 +1065,7 @@ export class Game {
   }
 
   destroy(): void {
+    this.flushCombatCreditPresentation();
     cancelAnimationFrame(this.animationFrame);
     this.modularBodyCache.clear();
     this.worldSceneRenderer.destroy();
@@ -1757,7 +1765,6 @@ export class Game {
   testLabClearParticles(): boolean {
     if (!this.testLabEnabled) return false;
     this.particles = [];
-    this.killScorePopups = [];
     return true;
   }
 
@@ -1832,7 +1839,7 @@ export class Game {
     this.clearPlayerShots();
     this.projectileImpacts = [];
     this.particles = [];
-    this.killScorePopups = [];
+    this.flushCombatCreditPresentation();
     this.targetId = null;
     this.recallBonus = null;
     this.recallBonusPending = false;
@@ -3238,6 +3245,7 @@ export class Game {
       "hull" | "shield" | "energy" | "power"
     > | null = null,
   ): void {
+    this.flushCombatCreditPresentation();
     this.sfx.unlock();
     this.stageConfig = stage;
     this.difficulty = difficulty;
@@ -3345,7 +3353,6 @@ export class Game {
     this.clearPlayerShots();
     this.projectileImpacts = [];
     this.particles = [];
-    this.killScorePopups = [];
     this.targetId = null;
     this.learningEcho = null;
     this.supplyPod = null;
@@ -3534,6 +3541,7 @@ export class Game {
   }
 
   backToTitle(): void {
+    this.flushCombatCreditPresentation();
     this.phase = "title";
     this.novaPulseRemaining = 0;
     this.enemies = [];
@@ -4124,7 +4132,6 @@ export class Game {
     }
     this.lasers.length = liveLasers;
 
-    advanceKillScorePopups(this.killScorePopups, dt);
 
     let liveImpacts = 0;
     for (const impact of this.projectileImpacts) {
@@ -4159,6 +4166,10 @@ export class Game {
       this.applyShotImpact(arrival.payload, arrival.x, arrival.y, true);
     }
     this.updateShipMotion(dt);
+    const ship = this.shipCenter();
+    for (const event of this.creditPickups.update(dt, ship)) {
+      this.presentCombatCreditCollection(event, ship);
+    }
     this.skillFx.update(dt);
     this.combatFx.update(dt);
 
@@ -6204,7 +6215,8 @@ export class Game {
         boss.role,
       ),
     );
-    this.claimCombatCreditBoss(boss);
+    const creditReceipt = this.claimCombatCreditBoss(boss);
+    this.presentCombatCreditReceipt(creditReceipt, x, y);
     const fx = enemyFxProfile(
       definition?.family ?? "devil",
       "boss-death",
@@ -6629,7 +6641,8 @@ export class Game {
       this.stageElapsedSeconds,
     );
     this.stageResultTracker.recordEnemyKill(enemy.elite);
-    this.claimCombatCreditEnemy(enemy, "skill-kill");
+    const creditReceipt =
+      this.claimCombatCreditEnemy(enemy, "skill-kill");
     this.stats.kills += 1;
     this.addScore(
       (enemy.elite ? options.eliteScore : options.normalScore) *
@@ -6661,6 +6674,12 @@ export class Game {
       this.markedEnemyId = null;
       this.markTimer = 0;
     }
+
+    this.presentCombatCreditReceipt(
+      creditReceipt,
+      enemy.x,
+      enemy.y,
+    );
 
     if (options.playDeathFx ?? true) {
       const definition = this.visualDefinitionForEnemy(enemy);
@@ -6797,7 +6816,6 @@ export class Game {
 
     this.stageResultTracker.recordEnemyKill(enemy.elite);
     this.stats.kills += 1;
-    const scoreBeforeKillReward = this.stats.score;
     const killReward = enemyKillRewardScore({
       wordLength: length,
       layerCount: enemy.layerPlan?.length ?? 1,
@@ -6813,13 +6831,16 @@ export class Game {
     );
 
     const deathDefinition = this.visualDefinitionForEnemy(enemy);
-    this.claimCombatCreditEnemy(enemy, "typed-kill");
-    // The enemy leaves play now; its blast, sound and shake wait for the bolt.
+    const creditReceipt =
+      this.claimCombatCreditEnemy(enemy, "typed-kill");
+    // The enemy leaves play now; its blast, sound and crystal drop wait for
+    // the final projectile impact so gameplay and presentation stay separate.
     this.firePlayerShot(enemy.x, enemy.y, 1.45, {
       kind: "enemy-kill",
       enemy,
       fx: enemyFxProfile(deathDefinition?.family ?? "rainbow", "death"),
       shake: enemy.kind === "tank" ? 6.5 : 4.5,
+      creditReceipt,
     });
     if (enemy.elite || deathDefinition?.rarity === "elite") {
       const announcerEvent = this.priorityKillChain.registerKill(
@@ -6832,11 +6853,6 @@ export class Game {
     if (enemy.golden) {
       this.addScore(260 * this.stats.multiplier);
     }
-    this.spawnKillScorePopup(
-      enemy.x,
-      enemy.y + enemy.radius + 30,
-      this.stats.score - scoreBeforeKillReward,
-    );
     this.tryRollEquipmentDrop(
       enemy.golden ? "golden" : enemy.elite ? "elite" : "normal",
     );
@@ -6948,6 +6964,57 @@ export class Game {
         },
       }) ?? null,
     );
+  }
+
+  private presentCombatCreditReceipt(
+    receipt: CombatCreditRewardReceipt | null,
+    x: number,
+    y: number,
+  ): void {
+    if (receipt === null) return;
+    this.creditPickups.spawn(
+      receipt,
+      x,
+      y,
+      this.settings.visualQuality,
+    );
+  }
+
+  private presentCombatCreditCollection(
+    event: CreditCrystalCollectionEvent,
+    ship: { x: number; y: number },
+  ): void {
+    this.hooks.onCombatCreditPickupPresented?.(event);
+    const hue =
+      event.variant === "golden"
+        ? 48
+        : event.hero
+          ? 292
+          : event.tier === "high"
+            ? 218
+            : 274;
+    this.burst(
+      ship.x,
+      ship.y,
+      event.hero ? 22 : 8,
+      hue,
+    );
+    if (event.hero) {
+      this.skillFx.pulse(
+        ship.x,
+        ship.y,
+        event.variant === "golden" ? "#ffd46a" : "#dca8ff",
+        event.tier === "major-boss" ? 150 : 108,
+        event.tier === "major-boss" ? 4 : 3,
+        0.48,
+      );
+    }
+  }
+
+  private flushCombatCreditPresentation(): void {
+    for (const event of this.creditPickups.flush()) {
+      this.hooks.onCombatCreditPickupPresented?.(event);
+    }
   }
 
   private activateEnemyReward(enemy: Enemy): void {
@@ -8303,21 +8370,6 @@ export class Game {
     }
   }
 
-  private spawnKillScorePopup(x: number, y: number, value: number): void {
-    const safeValue = Math.max(0, value);
-    if (safeValue <= 0) return;
-    this.killScorePopups.push({
-      x,
-      y: scorePopupSafeY(y, this.height),
-      value: safeValue,
-      life: 2,
-      maxLife: 2,
-    });
-    if (this.killScorePopups.length > 18) {
-      this.killScorePopups.shift();
-    }
-  }
-
   private fireBossLaser(power: number): void {
     const { x, y } = this.bossPosition();
     this.firePlayerShot(x, y, power, { kind: "boss-hit" }, 0.09);
@@ -8462,6 +8514,11 @@ export class Game {
         // Family death burst + material break-up sound (bubble pop, ice
         // shatter, ember blast…) instead of the generic burst and blip.
         this.enemyImpactFx(impact.enemy, x, y, 1.45, pan, "kill");
+        this.presentCombatCreditReceipt(
+          impact.creditReceipt,
+          x,
+          y,
+        );
         this.sfx.boltImpact(1.45, pan, variant);
         if (this.settings.screenShake) {
           this.shake = Math.max(this.shake, impact.shake);
@@ -8758,6 +8815,7 @@ export class Game {
     this.playerShots.drawShots(context, this.settings.visualQuality);
     this.drawParticles();
     this.drawProjectileImpacts();
+    this.creditPickups.draw(context, this.settings.visualQuality);
 
     for (const projectile of this.projectiles) {
       this.drawProjectile(projectile);
@@ -8792,7 +8850,6 @@ export class Game {
     // Family death bursts and material sparks, over the enemies.
     this.combatFx.draw(context, this.settings.visualQuality);
 
-    this.drawKillScorePopups();
     this.drawLearningEcho();
 
     if (this.boss !== null) {
@@ -8962,12 +9019,6 @@ export class Game {
     context.arc(centerX, centerY, 9 + progress * maxRadius * 0.75, 0, Math.PI * 2);
     context.stroke();
     context.restore();
-  }
-
-  private drawKillScorePopups(): void {
-    for (const popup of this.killScorePopups) {
-      drawKillScorePopup(this.context, popup);
-    }
   }
 
   private drawLasers(time: number): void {

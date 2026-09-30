@@ -4622,3 +4622,26 @@ kbd {
     animation: none;
   }
 }
+
+
+/* FINAL V3 Combat Credit pickup HUD arrival feedback. */
+#creditsHud.credit-pulse {
+  animation: credit-hud-arrival 360ms ease-out;
+}
+
+#creditsHud.credit-pulse-hero {
+  animation: credit-hud-hero-arrival 620ms cubic-bezier(0.18, 0.85, 0.24, 1);
+}
+
+@keyframes credit-hud-arrival {
+  0% { transform: scale(1); filter: brightness(1); }
+  42% { transform: scale(1.18); filter: brightness(1.55); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+@keyframes credit-hud-hero-arrival {
+  0% { transform: scale(1); filter: brightness(1); }
+  35% { transform: scale(1.28); filter: brightness(1.9); }
+  68% { transform: scale(1.12); filter: brightness(1.35); }
+  100% { transform: scale(1); filter: brightness(1); }
+}

@@ -198,6 +198,7 @@ import {
   currencyAccessibleText,
   type CurrencyAmounts,
 } from "./ui/currency";
+import { CreditHudPresentation } from "./ui/credit-hud-presentation";
 import { CORE_STAT_KEYS, type CoreStatKey } from "./stats/core";
 import {
   attributeUpgradeCost,
@@ -796,6 +797,8 @@ let luckPity: LuckPityState = createLuckPityState();
 let hiddenDiscovery: HiddenDiscoveryState = createHiddenDiscoveryState();
 let credits = 0;
 const combatCreditLedger = new CombatCreditRewardLedger();
+const creditHudPresentation = new CreditHudPresentation();
+let creditHudPulseTimer: number | null = null;
 let progression: ProgressionState = createProgressionState();
 let upgrades: UpgradeState = createUpgradeState();
 let relics: RelicState = createRelicState();
@@ -1504,7 +1507,10 @@ function renderStats(stats: GameStats): void {
   hudDomMetrics.renderCalls += 1;
 
   hudText("score", stats.score.toLocaleString());
-  hudText("creditsHud", credits.toLocaleString());
+  hudText(
+    "creditsHud",
+    creditHudPresentation.display(credits).toLocaleString(),
+  );
   hudText("streak", String(stats.streak));
   hudText("multiplier", "x" + String(stats.multiplier));
   hudText(
@@ -3621,10 +3627,33 @@ const game = new Game(
         (amount) => {
           const before = credits;
           credits = addCredits(credits, amount);
-          hudText("creditsHud", credits.toLocaleString());
+          creditHudPresentation.claimApplied(
+            Math.max(0, credits - before),
+            credits,
+          );
           return { before, after: credits };
         },
       ),
+    onCombatCreditPickupPresented: (event) => {
+      const display = creditHudPresentation.present(
+        event.walletDeltaApplied,
+        credits,
+      );
+      hudText("creditsHud", display.toLocaleString());
+      const hud = byId("creditsHud");
+      hud.classList.remove("credit-pulse", "credit-pulse-hero");
+      void hud.offsetWidth;
+      hud.classList.add(
+        event.hero ? "credit-pulse-hero" : "credit-pulse",
+      );
+      if (creditHudPulseTimer !== null) {
+        window.clearTimeout(creditHudPulseTimer);
+      }
+      creditHudPulseTimer = window.setTimeout(() => {
+        hud.classList.remove("credit-pulse", "credit-pulse-hero");
+        creditHudPulseTimer = null;
+      }, event.hero ? 620 : 360);
+    },
     onStagePhase: (phase) => {
       renderStagePhase(phase);
       syncStagePhaseMusic(phase);
