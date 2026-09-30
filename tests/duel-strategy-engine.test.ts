@@ -227,6 +227,59 @@ describe("Duel M-DUEL-08 strategy integration", () => {
     expect(snapshot.publicTrapHints["player-1"]).toEqual([]);
   });
 
+  it("routes ACTIVATE_SKILL through authoritative combo/conversion/trap handling", () => {
+    const engine = new DuelEngine({
+      startingEnergy: 100,
+      startingShield: 20,
+      maxShield: 40,
+    });
+
+    engine.enqueueIntent({
+      type: "ACTIVATE_SKILL",
+      playerId: "player-1",
+      sequence: 1,
+      skillId: "conversion:berserk",
+    });
+    let events = engine.step(0);
+    expect(events).toContainEqual({
+      type: "conversion-used",
+      playerId: "player-1",
+      conversionId: "berserk",
+    });
+    expect(
+      engine.snapshot().strategy["player-1"].attackScale,
+    ).toBeCloseTo(1.2);
+
+    engine.enqueueIntent({
+      type: "ACTIVATE_SKILL",
+      playerId: "player-1",
+      sequence: 2,
+      skillId: "trap:minefield",
+    });
+    events = engine.step(0);
+    expect(events).toContainEqual({
+      type: "trap-armed",
+      playerId: "player-1",
+      trapId: "minefield",
+      publicHint: "TRAP ARMED",
+    });
+
+    engine.enqueueIntent({
+      type: "ACTIVATE_SKILL",
+      playerId: "player-1",
+      sequence: 3,
+      skillId: "combo:not-real",
+    });
+    events = engine.step(0);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "intent-rejected",
+        playerId: "player-1",
+        reason: "skill-unavailable",
+      }),
+    );
+  });
+
   it("builds materially different adaptive strategy paths", () => {
     const engine = new DuelEngine({
       startingEnergy: 100,

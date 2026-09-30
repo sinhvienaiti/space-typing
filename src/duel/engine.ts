@@ -121,6 +121,7 @@ export type DuelEngineEvent =
         | "unknown-target"
         | "target-unavailable"
         | "item-unavailable"
+        | "skill-unavailable"
         | "insufficient-energy";
     }
   | {
@@ -719,8 +720,190 @@ export class DuelEngine {
         this.useStoredAction(player, intent.itemId, events);
         return;
       case "ACTIVATE_SKILL":
+        this.activateDuelSkill(
+          player,
+          intent.skillId,
+          events,
+        );
         return;
     }
+  }
+
+  private activateDuelSkill(
+    player: DuelPlayerState,
+    skillId: string,
+    events: DuelEngineEvent[],
+  ): void {
+    if (skillId.startsWith("combo:")) {
+      const comboId = skillId.slice(6) as DuelComboId;
+      if (
+        ![
+          "homing-barrage",
+          "mirror-barrier",
+          "gravity-bomb",
+          "repair-drone",
+          "overcharged-railgun",
+        ].includes(comboId)
+      ) {
+        this.rejectSkill(player, events);
+        return;
+      }
+      if (
+        this.strategy.consumeCombo(
+          player.id,
+          comboId,
+        ) === null
+      ) {
+        this.rejectSkill(player, events);
+        return;
+      }
+
+      const combo = duelComboEffect(comboId);
+      if (combo.damage > 0) {
+        this.pendingEffects.push({
+          type: "damage",
+          targetId: otherPlayer(player.id),
+          sourceId: player.id,
+          amount:
+            combo.damage *
+            this.strategy.attackScale(player.id),
+        });
+      }
+      if (combo.shield > 0) {
+        this.pendingEffects.push({
+          type: "shield",
+          targetId: player.id,
+          amount: combo.shield,
+        });
+      }
+      if (combo.repair > 0) {
+        this.pendingEffects.push({
+          type: "repair",
+          targetId: player.id,
+          amount: combo.repair,
+        });
+      }
+      if (combo.tacticalPressure > 0) {
+        this.tactical.apply({
+          effectId: "control-pressure",
+          sourcePlayerId: player.id,
+          targetPlayerId: otherPlayer(player.id),
+          strength: combo.tacticalPressure,
+          remainingSeconds: 6,
+        });
+      }
+      events.push({
+        type: "combo-used",
+        playerId: player.id,
+        comboId,
+      });
+      return;
+    }
+
+    if (skillId.startsWith("conversion:")) {
+      const conversionId =
+        skillId.slice(11) as DuelConversionId;
+      if (
+        ![
+          "sacrifice",
+          "overload",
+          "reactor-dump",
+          "berserk",
+        ].includes(conversionId)
+      ) {
+        this.rejectSkill(player, events);
+        return;
+      }
+      const definition =
+        duelConversionDefinition(conversionId);
+      if (
+        player.hull <= definition.hullCost ||
+        player.shield < definition.shieldCost ||
+        player.energy < definition.energyCost
+      ) {
+        this.rejectSkill(player, events);
+        return;
+      }
+      const resolution =
+        this.strategy.applyConversion(
+          player.id,
+          conversionId,
+        );
+      player.hull = Math.max(
+        1,
+        player.hull - resolution.hullCost,
+      );
+      player.shield = Math.max(
+        0,
+        Math.min(
+          player.maxShield,
+          player.shield -
+            resolution.shieldCost +
+            resolution.shieldGain,
+        ),
+      );
+      player.energy = Math.max(
+        0,
+        Math.min(
+          player.maxEnergy,
+          player.energy -
+            resolution.energyCost +
+            resolution.energyGain,
+        ),
+      );
+      events.push({
+        type: "conversion-used",
+        playerId: player.id,
+        conversionId,
+      });
+      return;
+    }
+
+    if (skillId.startsWith("trap:")) {
+      const trapId = skillId.slice(5) as DuelTrapId;
+      if (
+        ![
+          "minefield",
+          "mirror-trap",
+          "static-snare",
+          "decoy",
+          "counter-battery",
+        ].includes(trapId)
+      ) {
+        this.rejectSkill(player, events);
+        return;
+      }
+      const trap = this.strategy.armTrap(
+        player.id,
+        trapId,
+        this.tickNumber,
+      );
+      if (trap === null) {
+        this.rejectSkill(player, events);
+        return;
+      }
+      events.push({
+        type: "trap-armed",
+        playerId: player.id,
+        trapId,
+        publicHint: trap.publicHint,
+      });
+      return;
+    }
+
+    this.rejectSkill(player, events);
+  }
+
+  private rejectSkill(
+    player: DuelPlayerState,
+    events: DuelEngineEvent[],
+  ): void {
+    events.push({
+      type: "intent-rejected",
+      playerId: player.id,
+      sequence: player.lastAcceptedSequence,
+      reason: "skill-unavailable",
+    });
   }
 
   private typeCharacter(
