@@ -17,9 +17,9 @@ export type DuelTacticalMapEffect = {
 };
 
 export type DuelTacticalMapSnapshot = {
-  offerDriftScale: number;
-  projectileSpeedScale: number;
-  frozenTargetCount: number;
+  offerDriftScale: Readonly<Record<DuelPlayerId, number>>;
+  projectileSpeedScale: Readonly<Record<DuelPlayerId, number>>;
+  frozenTargetCount: Readonly<Record<DuelPlayerId, number>>;
   controlPressure: Readonly<Record<DuelPlayerId, number>>;
   bankRevealFor: Readonly<Record<DuelPlayerId, boolean>>;
 };
@@ -68,9 +68,18 @@ export class DuelTacticalMapState {
   }
 
   snapshot(): DuelTacticalMapSnapshot {
-    let offerDriftScale = 1;
-    let projectileSpeedScale = 1;
-    let frozenTargetCount = 0;
+    const offerDriftScale: Record<DuelPlayerId, number> = {
+      "player-1": 1,
+      "player-2": 1,
+    };
+    const projectileSpeedScale: Record<DuelPlayerId, number> = {
+      "player-1": 1,
+      "player-2": 1,
+    };
+    const frozenTargetCount: Record<DuelPlayerId, number> = {
+      "player-1": 0,
+      "player-2": 0,
+    };
     const controlPressure: Record<DuelPlayerId, number> = {
       "player-1": 0,
       "player-2": 0,
@@ -83,10 +92,16 @@ export class DuelTacticalMapState {
     for (const effect of this.effects) {
       switch (effect.effectId) {
         case "offer-drift":
-          offerDriftScale *= 1 - effect.strength * 0.35;
+          if (effect.targetPlayerId !== null) {
+            offerDriftScale[effect.targetPlayerId] *=
+              1 - effect.strength * 0.35;
+          }
           break;
         case "projectile-drag":
-          projectileSpeedScale *= 1 - effect.strength * 0.4;
+          if (effect.targetPlayerId !== null) {
+            projectileSpeedScale[effect.targetPlayerId] *=
+              1 - effect.strength * 0.4;
+          }
           break;
         case "bank-reveal":
           if (effect.targetPlayerId !== null) {
@@ -94,7 +109,9 @@ export class DuelTacticalMapState {
           }
           break;
         case "target-freeze":
-          frozenTargetCount += 1;
+          if (effect.targetPlayerId !== null) {
+            frozenTargetCount[effect.targetPlayerId] += 1;
+          }
           break;
         case "control-pressure":
           controlPressure[effect.sourcePlayerId] += effect.strength;
@@ -102,9 +119,20 @@ export class DuelTacticalMapState {
       }
     }
 
+    for (const playerId of ["player-1", "player-2"] as const) {
+      offerDriftScale[playerId] = Math.max(
+        0.5,
+        offerDriftScale[playerId],
+      );
+      projectileSpeedScale[playerId] = Math.max(
+        0.5,
+        projectileSpeedScale[playerId],
+      );
+    }
+
     return {
-      offerDriftScale: Math.max(0.5, offerDriftScale),
-      projectileSpeedScale: Math.max(0.5, projectileSpeedScale),
+      offerDriftScale,
+      projectileSpeedScale,
       frozenTargetCount,
       controlPressure,
       bankRevealFor,

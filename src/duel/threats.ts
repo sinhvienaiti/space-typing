@@ -134,6 +134,24 @@ export class DuelThreatSystem {
     return events;
   }
 
+  getOpenThreat(
+    playerId: DuelPlayerId,
+    threatId: string,
+  ): DuelIncomingThreat | null {
+    const threat = this.threats.find(
+      (candidate) =>
+        candidate.id === threatId &&
+        candidate.targetPlayerId === playerId &&
+        candidate.status === "open",
+    );
+    return threat === undefined
+      ? null
+      : {
+          ...threat,
+          counterTags: [...threat.counterTags],
+        };
+  }
+
   snapshotFor(
     playerId: DuelPlayerId,
   ): readonly DuelIncomingThreat[] {

@@ -1,3 +1,12 @@
+import { DUEL_ACTIONS_BY_ID } from "./actions";
+import {
+  resolveDuelAction,
+  type DuelCombatEffect,
+} from "./combat";
+import {
+  DuelCombatInventory,
+  type DuelCombatInventorySnapshot,
+} from "./inventory";
 import {
   DUEL_DEFAULT_REGULATION_SECONDS,
   DUEL_HARD_OVERTIME_SECONDS,
@@ -9,7 +18,14 @@ import {
   duelPhaseForProgress,
   duelRegulationProgress,
 } from "./model";
-import { DUEL_ACTIONS_BY_ID } from "./actions";
+import {
+  DuelTacticalMapState,
+  type DuelTacticalMapSnapshot,
+} from "./tactical";
+import {
+  DuelThreatSystem,
+  type DuelIncomingThreat,
+} from "./threats";
 import { matchingDuelOffers } from "./typing";
 
 export type DuelRoundResult =
@@ -39,30 +55,16 @@ export type DuelEngineSnapshot = {
   phase: DuelMatchPhase;
   round: DuelRoundResult;
   players: Readonly<Record<DuelPlayerId, DuelPlayerState>>;
+  inventories: Readonly<
+    Record<DuelPlayerId, DuelCombatInventorySnapshot>
+  >;
+  incomingThreats: Readonly<
+    Record<DuelPlayerId, readonly DuelIncomingThreat[]>
+  >;
+  tactical: DuelTacticalMapSnapshot;
 };
 
-export type DuelTickEffect =
-  | {
-      type: "damage";
-      targetId: DuelPlayerId;
-      amount: number;
-      sourceId?: DuelPlayerId;
-    }
-  | {
-      type: "shield";
-      targetId: DuelPlayerId;
-      amount: number;
-    }
-  | {
-      type: "repair";
-      targetId: DuelPlayerId;
-      amount: number;
-    }
-  | {
-      type: "energy";
-      targetId: DuelPlayerId;
-      amount: number;
-    };
+export type DuelTickEffect = DuelCombatEffect;
 
 export type DuelEngineEvent =
   | {
@@ -74,7 +76,9 @@ export type DuelEngineEvent =
         | "stale-sequence"
         | "invalid-char"
         | "unknown-target"
-        | "target-unavailable";
+        | "target-unavailable"
+        | "item-unavailable"
+        | "insufficient-energy";
     }
   | {
       type: "target-locked";
@@ -92,9 +96,47 @@ export type DuelEngineEvent =
       char: string;
     }
   | {
+      type: "action-blocked";
+      playerId: DuelPlayerId;
+      targetInstanceId: string;
+      actionId: string;
+      reason: "inventory-full" | "insufficient-energy";
+    }
+  | {
       type: "action-completed";
       playerId: DuelPlayerId;
       targetInstanceId: string;
+      actionId: string;
+    }
+  | {
+      type: "action-banked";
+      playerId: DuelPlayerId;
+      actionId: string;
+      storedInstanceId: string;
+      bucket: "attack" | "defense" | "tactical";
+    }
+  | {
+      type: "stored-action-used";
+      playerId: DuelPlayerId;
+      actionId: string;
+      storedInstanceId: string;
+    }
+  | {
+      type: "threat-created";
+      threat: DuelIncomingThreat;
+    }
+  | {
+      type: "threat-countered";
+      threatId: string;
+      sourcePlayerId: DuelPlayerId;
+      targetPlayerId: DuelPlayerId;
+      actionId: string;
+    }
+  | {
+      type: "threat-resolved";
+      threatId: string;
+      sourcePlayerId: DuelPlayerId;
+      targetPlayerId: DuelPlayerId;
       actionId: string;
     }
   | {
@@ -171,7 +213,21 @@ export class DuelEngine {
     >
   >;
   private readonly players: Record<DuelPlayerId, DuelPlayerState>;
+  private readonly inventories: Record<
+    DuelPlayerId,
+    DuelCombatInventory
+  > = {
+    "player-1": new DuelCombatInventory(),
+    "player-2": new DuelCombatInventory(),
+  };
+  private readonly threats = new DuelThreatSystem();
+  private readonly tactical = new DuelTacticalMapState();
   private readonly queuedIntents: DuelIntent[] = [];
+  private readonly pendingEffects: DuelCombatEffect[] = [];
+  private readonly reservedEnergyCost: Record<DuelPlayerId, number> = {
+    "player-1": 0,
+    "player-2": 0,
+  };
   private tickNumber = 0;
   private elapsedSeconds = 0;
   private roundResult: DuelRoundResult = {
@@ -207,8 +263,14 @@ export class DuelEngine {
     this.elapsedSeconds = 0;
     this.roundResult = { status: "active", winnerId: null };
     this.queuedIntents.length = 0;
+    this.pendingEffects.length = 0;
+    this.reservedEnergyCost["player-1"] = 0;
+    this.reservedEnergyCost["player-2"] = 0;
+    this.threats.clear();
+    this.tactical.clear();
     for (const playerId of PLAYER_IDS) {
       this.players[playerId] = createPlayer(playerId, this.profile);
+      this.inventories[playerId].clear();
     }
   }
 
@@ -235,11 +297,16 @@ export class DuelEngine {
       return events;
     }
 
-    this.tickNumber += 1;
-    this.elapsedSeconds += Math.max(
+    const dt = Math.max(
       0,
       Number.isFinite(dtSeconds) ? dtSeconds : 0,
     );
+    this.tickNumber += 1;
+    this.elapsedSeconds += dt;
+    this.pendingEffects.length = 0;
+    this.reservedEnergyCost["player-1"] = 0;
+    this.reservedEnergyCost["player-2"] = 0;
+    this.tactical.update(dt);
 
     const batch = this.queuedIntents
       .splice(0)
@@ -253,6 +320,49 @@ export class DuelEngine {
       this.processIntent(intent, events);
     }
 
+    for (const threatEvent of this.threats.update(dt)) {
+      const target = this.players[threatEvent.targetPlayerId];
+      if (target.targetInstanceId === threatEvent.threatId) {
+        target.targetInstanceId = null;
+        target.acquisitionPrefix = "";
+      }
+
+      if (threatEvent.outcome === "countered") {
+        events.push({
+          type: "threat-countered",
+          threatId: threatEvent.threatId,
+          sourcePlayerId: threatEvent.sourcePlayerId,
+          targetPlayerId: threatEvent.targetPlayerId,
+          actionId: threatEvent.actionId,
+        });
+        continue;
+      }
+
+      const action = this.actions.get(threatEvent.actionId);
+      if (action !== undefined) {
+        const resolution = resolveDuelAction(
+          action,
+          threatEvent.sourcePlayerId,
+        );
+        this.pendingEffects.push(
+          ...resolution.effects.filter(
+            (effect) => effect.type !== "energy-cost",
+          ),
+        );
+        for (const effect of resolution.tacticalEffects) {
+          this.tactical.apply(effect);
+        }
+      }
+      events.push({
+        type: "threat-resolved",
+        threatId: threatEvent.threatId,
+        sourcePlayerId: threatEvent.sourcePlayerId,
+        targetPlayerId: threatEvent.targetPlayerId,
+        actionId: threatEvent.actionId,
+      });
+    }
+
+    this.applyEffectsToPlayers(this.pendingEffects);
     this.resolveTerminalState(events);
     return events;
   }
@@ -262,66 +372,7 @@ export class DuelEngine {
   ): DuelEngineEvent[] {
     const events: DuelEngineEvent[] = [];
     if (this.roundResult.status !== "active") return events;
-
-    const hullDamage: Record<DuelPlayerId, number> = {
-      "player-1": 0,
-      "player-2": 0,
-    };
-    const shieldDelta: Record<DuelPlayerId, number> = {
-      "player-1": 0,
-      "player-2": 0,
-    };
-    const repairDelta: Record<DuelPlayerId, number> = {
-      "player-1": 0,
-      "player-2": 0,
-    };
-    const energyDelta: Record<DuelPlayerId, number> = {
-      "player-1": 0,
-      "player-2": 0,
-    };
-
-    for (const effect of effects) {
-      const amount = Math.max(
-        0,
-        Number.isFinite(effect.amount) ? effect.amount : 0,
-      );
-      if (effect.type === "damage") hullDamage[effect.targetId] += amount;
-      if (effect.type === "shield") shieldDelta[effect.targetId] += amount;
-      if (effect.type === "repair") repairDelta[effect.targetId] += amount;
-      if (effect.type === "energy") energyDelta[effect.targetId] += amount;
-    }
-
-    for (const playerId of PLAYER_IDS) {
-      const player = this.players[playerId];
-      let damage = hullDamage[playerId];
-      if (damage > 0 && player.shield > 0) {
-        const absorbed = Math.min(player.shield, damage);
-        player.shield -= absorbed;
-        damage -= absorbed;
-      }
-      player.hull = Math.max(
-        0,
-        Math.min(
-          player.maxHull,
-          player.hull - damage + repairDelta[playerId],
-        ),
-      );
-      player.shield = Math.max(
-        0,
-        Math.min(
-          player.maxShield,
-          player.shield + shieldDelta[playerId],
-        ),
-      );
-      player.energy = Math.max(
-        0,
-        Math.min(
-          player.maxEnergy,
-          player.energy + energyDelta[playerId],
-        ),
-      );
-    }
-
+    this.applyEffectsToPlayers(effects);
     this.resolveTerminalState(events);
     return events;
   }
@@ -349,6 +400,15 @@ export class DuelEngine {
         "player-1": this.clonePlayer(this.players["player-1"]),
         "player-2": this.clonePlayer(this.players["player-2"]),
       },
+      inventories: {
+        "player-1": this.inventories["player-1"].snapshot(),
+        "player-2": this.inventories["player-2"].snapshot(),
+      },
+      incomingThreats: {
+        "player-1": this.threats.snapshotFor("player-1"),
+        "player-2": this.threats.snapshotFor("player-2"),
+      },
+      tactical: this.tactical.snapshot(),
     };
   }
 
@@ -393,6 +453,8 @@ export class DuelEngine {
         this.selectTarget(player, intent.targetInstanceId, events);
         return;
       case "USE_ITEM":
+        this.useStoredAction(player, intent.itemId, events);
+        return;
       case "ACTIVATE_SKILL":
         return;
     }
@@ -422,6 +484,14 @@ export class DuelEngine {
       this.selectTarget(player, targetInstanceId, events);
     }
 
+    if (
+      player.targetInstanceId !== null &&
+      player.targetInstanceId.startsWith("threat:")
+    ) {
+      this.typeThreat(player, char, events);
+      return;
+    }
+
     const locked = this.lockedOffer(player);
     if (locked !== null) {
       this.typeLockedOffer(player, locked, char, events);
@@ -442,6 +512,25 @@ export class DuelEngine {
         char,
       });
       return;
+    }
+
+    if (matches.length === 1) {
+      const offer = matches[0]!;
+      const action = this.actions.get(offer.actionId);
+      if (
+        action !== undefined &&
+        nextPrefix === action.answerToken &&
+        !this.canFinalizeAction(player.id, action)
+      ) {
+        events.push({
+          type: "action-blocked",
+          playerId: player.id,
+          targetInstanceId: offer.instanceId,
+          actionId: offer.actionId,
+          reason: this.blockReason(player.id, action),
+        });
+        return;
+      }
     }
 
     player.correctChars += 1;
@@ -479,10 +568,68 @@ export class DuelEngine {
       return;
     }
 
+    const wouldComplete =
+      offer.typedPrefix.length + 1 === action.answerToken.length;
+    if (
+      wouldComplete &&
+      !this.canFinalizeAction(player.id, action)
+    ) {
+      events.push({
+        type: "action-blocked",
+        playerId: player.id,
+        targetInstanceId: offer.instanceId,
+        actionId: offer.actionId,
+        reason: this.blockReason(player.id, action),
+      });
+      return;
+    }
+
     player.correctChars += 1;
     offer.typedPrefix += char;
     player.acquisitionPrefix = offer.typedPrefix;
     this.completeIfFinished(player, offer, events);
+  }
+
+  private typeThreat(
+    player: DuelPlayerState,
+    char: string,
+    events: DuelEngineEvent[],
+  ): void {
+    const threatId = player.targetInstanceId;
+    if (threatId === null) return;
+    const result = this.threats.typeChar(
+      player.id,
+      threatId,
+      char,
+    );
+    if (result.kind === "wrong") {
+      player.wrongChars += 1;
+      events.push({
+        type: "typing-miss",
+        playerId: player.id,
+        char,
+      });
+      return;
+    }
+    if (result.kind === "unavailable") {
+      player.targetInstanceId = null;
+      player.acquisitionPrefix = "";
+      events.push({
+        type: "intent-rejected",
+        playerId: player.id,
+        sequence: player.lastAcceptedSequence,
+        reason: "target-unavailable",
+      });
+      return;
+    }
+
+    player.correctChars += 1;
+    const threat = this.threats.getOpenThreat(player.id, threatId);
+    player.acquisitionPrefix = threat?.typedPrefix ?? "";
+    if (result.completed) {
+      player.targetInstanceId = null;
+      player.acquisitionPrefix = "";
+    }
   }
 
   private completeIfFinished(
@@ -497,6 +644,56 @@ export class DuelEngine {
     ) {
       return;
     }
+
+    if (action.resolveMode === "banked") {
+      const stored = this.inventories[player.id].store(
+        action,
+        this.tickNumber,
+      );
+      if (!stored.stored) {
+        return;
+      }
+      offer.status = "completed";
+      events.push({
+        type: "action-completed",
+        playerId: player.id,
+        targetInstanceId: offer.instanceId,
+        actionId: offer.actionId,
+      });
+      events.push({
+        type: "action-banked",
+        playerId: player.id,
+        actionId: offer.actionId,
+        storedInstanceId: stored.entry.instanceId,
+        bucket: stored.bucket,
+      });
+      player.targetInstanceId = null;
+      player.acquisitionPrefix = "";
+      return;
+    }
+
+    if (action.responseOpportunity !== undefined) {
+      this.reserveEnergy(player.id, action.energyCost);
+      const threat = this.threats.create(
+        action,
+        player.id,
+        otherPlayer(player.id),
+      );
+      if (threat !== null) {
+        this.pendingEffects.push({
+          type: "energy-cost",
+          targetId: player.id,
+          amount: action.energyCost,
+        });
+        events.push({
+          type: "threat-created",
+          threat,
+        });
+      }
+    } else {
+      this.queueActionResolution(action, player.id);
+    }
+
     offer.status = "completed";
     events.push({
       type: "action-completed",
@@ -508,11 +705,134 @@ export class DuelEngine {
     player.acquisitionPrefix = "";
   }
 
+  private useStoredAction(
+    player: DuelPlayerState,
+    actionId: string,
+    events: DuelEngineEvent[],
+  ): void {
+    const action = this.actions.get(actionId);
+    if (
+      action === undefined ||
+      action.resolveMode !== "banked"
+    ) {
+      events.push({
+        type: "intent-rejected",
+        playerId: player.id,
+        sequence: player.lastAcceptedSequence,
+        reason: "item-unavailable",
+      });
+      return;
+    }
+    if (!this.hasEnergy(player.id, action.energyCost)) {
+      events.push({
+        type: "intent-rejected",
+        playerId: player.id,
+        sequence: player.lastAcceptedSequence,
+        reason: "insufficient-energy",
+      });
+      return;
+    }
+
+    const stored =
+      this.inventories[player.id].consumeFirstByAction(actionId);
+    if (stored === null) {
+      events.push({
+        type: "intent-rejected",
+        playerId: player.id,
+        sequence: player.lastAcceptedSequence,
+        reason: "item-unavailable",
+      });
+      return;
+    }
+
+    this.queueActionResolution(action, player.id);
+    events.push({
+      type: "stored-action-used",
+      playerId: player.id,
+      actionId,
+      storedInstanceId: stored.instanceId,
+    });
+  }
+
+  private queueActionResolution(
+    action: DuelActionDefinition,
+    playerId: DuelPlayerId,
+  ): void {
+    this.reserveEnergy(playerId, action.energyCost);
+    const resolution = resolveDuelAction(action, playerId);
+    this.pendingEffects.push(...resolution.effects);
+    for (const effect of resolution.tacticalEffects) {
+      this.tactical.apply(effect);
+    }
+  }
+
+  private canFinalizeAction(
+    playerId: DuelPlayerId,
+    action: DuelActionDefinition,
+  ): boolean {
+    if (action.resolveMode === "banked") {
+      return this.inventories[playerId].canStore(action);
+    }
+    return this.hasEnergy(playerId, action.energyCost);
+  }
+
+  private blockReason(
+    playerId: DuelPlayerId,
+    action: DuelActionDefinition,
+  ): "inventory-full" | "insufficient-energy" {
+    if (
+      action.resolveMode === "banked" &&
+      !this.inventories[playerId].canStore(action)
+    ) {
+      return "inventory-full";
+    }
+    return "insufficient-energy";
+  }
+
+  private hasEnergy(
+    playerId: DuelPlayerId,
+    cost: number,
+  ): boolean {
+    const needed = Math.max(0, cost);
+    return (
+      this.players[playerId].energy -
+        this.reservedEnergyCost[playerId] >=
+      needed
+    );
+  }
+
+  private reserveEnergy(
+    playerId: DuelPlayerId,
+    cost: number,
+  ): void {
+    this.reservedEnergyCost[playerId] += Math.max(0, cost);
+  }
+
   private selectTarget(
     player: DuelPlayerState,
     targetInstanceId: string,
     events: DuelEngineEvent[],
   ): void {
+    const threat = this.threats.getOpenThreat(
+      player.id,
+      targetInstanceId,
+    );
+    if (threat !== null) {
+      const previous = this.lockedOffer(player);
+      if (previous !== null) {
+        previous.status = "available";
+        previous.typedPrefix = "";
+      }
+      player.targetInstanceId = threat.id;
+      player.acquisitionPrefix = threat.typedPrefix;
+      events.push({
+        type: "target-locked",
+        playerId: player.id,
+        targetInstanceId: threat.id,
+      });
+      return;
+    }
+
     const offer = player.offers.find(
       (candidate) => candidate.instanceId === targetInstanceId,
     );
@@ -556,10 +876,12 @@ export class DuelEngine {
     events: DuelEngineEvent[],
   ): void {
     if (player.targetInstanceId !== targetInstanceId) return;
-    const offer = this.lockedOffer(player);
-    if (offer !== null) {
-      offer.status = "available";
-      offer.typedPrefix = "";
+    if (!targetInstanceId.startsWith("threat:")) {
+      const offer = this.lockedOffer(player);
+      if (offer !== null) {
+        offer.status = "available";
+        offer.typedPrefix = "";
+      }
     }
     player.targetInstanceId = null;
     player.acquisitionPrefix = "";
@@ -581,6 +903,86 @@ export class DuelEngine {
           offer.status === "locked",
       ) ?? null
     );
+  }
+
+  private applyEffectsToPlayers(
+    effects: readonly DuelCombatEffect[],
+  ): void {
+    const hullDamage: Record<DuelPlayerId, number> = {
+      "player-1": 0,
+      "player-2": 0,
+    };
+    const shieldDelta: Record<DuelPlayerId, number> = {
+      "player-1": 0,
+      "player-2": 0,
+    };
+    const repairDelta: Record<DuelPlayerId, number> = {
+      "player-1": 0,
+      "player-2": 0,
+    };
+    const energyDelta: Record<DuelPlayerId, number> = {
+      "player-1": 0,
+      "player-2": 0,
+    };
+    const energyCost: Record<DuelPlayerId, number> = {
+      "player-1": 0,
+      "player-2": 0,
+    };
+
+    for (const effect of effects) {
+      const amount = Math.max(
+        0,
+        Number.isFinite(effect.amount) ? effect.amount : 0,
+      );
+      if (effect.type === "damage") {
+        hullDamage[effect.targetId] += amount;
+      }
+      if (effect.type === "shield") {
+        shieldDelta[effect.targetId] += amount;
+      }
+      if (effect.type === "repair") {
+        repairDelta[effect.targetId] += amount;
+      }
+      if (effect.type === "energy") {
+        energyDelta[effect.targetId] += amount;
+      }
+      if (effect.type === "energy-cost") {
+        energyCost[effect.targetId] += amount;
+      }
+    }
+
+    for (const playerId of PLAYER_IDS) {
+      const player = this.players[playerId];
+      let damage = hullDamage[playerId];
+      if (damage > 0 && player.shield > 0) {
+        const absorbed = Math.min(player.shield, damage);
+        player.shield -= absorbed;
+        damage -= absorbed;
+      }
+      player.hull = Math.max(
+        0,
+        Math.min(
+          player.maxHull,
+          player.hull - damage + repairDelta[playerId],
+        ),
+      );
+      player.shield = Math.max(
+        0,
+        Math.min(
+          player.maxShield,
+          player.shield + shieldDelta[playerId],
+        ),
+      );
+      player.energy = Math.max(
+        0,
+        Math.min(
+          player.maxEnergy,
+          player.energy -
+            energyCost[playerId] +
+            energyDelta[playerId],
+        ),
+      );
+    }
   }
 
   private resolveTerminalState(

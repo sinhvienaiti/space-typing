@@ -129,13 +129,18 @@ describe("Duel M-DUEL-04 tactical contracts", () => {
     });
 
     let snapshot = state.snapshot();
-    expect(snapshot.projectileSpeedScale).toBeGreaterThanOrEqual(0.5);
-    expect(snapshot.projectileSpeedScale).toBeLessThan(1);
+    expect(
+      snapshot.projectileSpeedScale["player-2"],
+    ).toBeGreaterThanOrEqual(0.5);
+    expect(
+      snapshot.projectileSpeedScale["player-2"],
+    ).toBeLessThan(1);
+    expect(snapshot.projectileSpeedScale["player-1"]).toBe(1);
     expect(snapshot.controlPressure["player-1"]).toBeCloseTo(0.7);
 
     state.update(3.1);
     snapshot = state.snapshot();
-    expect(snapshot.projectileSpeedScale).toBe(1);
+    expect(snapshot.projectileSpeedScale["player-2"]).toBe(1);
     expect(snapshot.controlPressure["player-1"]).toBe(0);
   });
 });
