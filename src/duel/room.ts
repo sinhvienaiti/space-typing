@@ -367,6 +367,24 @@ export class DuelRoom {
     return true;
   }
 
+  hasParticipant(participantId: string): boolean {
+    return this.slots.some(
+      (slot) => slot.participantId === participantId,
+    );
+  }
+
+  leave(participantId: string): "owner" | "guest" | "missing" {
+    if (participantId === this.ownerParticipantId) return "owner";
+    const slot = this.slots.find(
+      (candidate) =>
+        candidate.kind === "human" &&
+        candidate.participantId === participantId,
+    );
+    if (slot === undefined) return "missing";
+    this.slots[slot.slotIndex] = emptySlot(slot.slotIndex);
+    return "guest";
+  }
+
   setReady(
     participantId: string,
     ready: boolean,

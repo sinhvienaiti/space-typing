@@ -161,6 +161,83 @@ describe("Duel M-DUEL-10 authoritative protocol", () => {
     ).toBe(false);
   });
 
+  it("accepts room-control messages without expanding combat intent types", () => {
+    expect(
+      parse({
+        type: "SET_LOADOUT",
+        requestId: "req-1",
+        roomId: "ROOM-1",
+        shipId: "vanguard",
+        characterId: null,
+      }).ok,
+    ).toBe(true);
+
+    expect(
+      parse({
+        type: "SET_BOT",
+        requestId: "req-2",
+        roomId: "ROOM-1",
+        bot: {
+          wpm: 75,
+          accuracy: 0.96,
+          reactionMs: 240,
+          personality: "tactician",
+        },
+      }).ok,
+    ).toBe(true);
+
+    expect(
+      parse({
+        type: "START_MATCH",
+        requestId: "req-3",
+        roomId: "ROOM-1",
+      }).ok,
+    ).toBe(true);
+
+    expect(
+      parse({
+        type: "INTENT",
+        matchId: "m",
+        roundId: "r",
+        sequence: 1,
+        intent: {
+          type: "START_MATCH",
+          roomId: "ROOM-1",
+        },
+      }).ok,
+    ).toBe(false);
+  });
+
+  it("rejects out-of-contract Bot room settings at protocol boundary", () => {
+    expect(
+      parse({
+        type: "SET_BOT",
+        requestId: "req-4",
+        roomId: "ROOM-1",
+        bot: {
+          wpm: 999,
+          accuracy: 1,
+          reactionMs: 0,
+          personality: "aggro",
+        },
+      }).ok,
+    ).toBe(false);
+
+    expect(
+      parse({
+        type: "SET_BOT",
+        requestId: "req-5",
+        roomId: "ROOM-1",
+        bot: {
+          wpm: 60,
+          accuracy: 0.2,
+          reactionMs: 200,
+          personality: "balanced",
+        },
+      }).ok,
+    ).toBe(false);
+  });
+
   it("rejects oversized payloads before JSON parsing", () => {
     const raw = JSON.stringify({
       type: "PONG",

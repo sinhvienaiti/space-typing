@@ -56,6 +56,41 @@ export type DuelClientMessage =
       ready: boolean;
     }
   | {
+      type: "SET_LOADOUT";
+      requestId: string;
+      roomId: string;
+      shipId: string | null;
+      characterId: string | null;
+    }
+  | {
+      type: "SET_BOT";
+      requestId: string;
+      roomId: string;
+      bot: {
+        wpm: number;
+        accuracy: number;
+        reactionMs: number;
+        personality:
+          | "turtle"
+          | "aggro"
+          | "tactician"
+          | "trickster"
+          | "fortune"
+          | "sniper"
+          | "balanced";
+      };
+    }
+  | {
+      type: "REMOVE_BOT";
+      requestId: string;
+      roomId: string;
+    }
+  | {
+      type: "START_MATCH";
+      requestId: string;
+      roomId: string;
+    }
+  | {
       type: "INTENT";
       matchId: string;
       roundId: string;
@@ -393,6 +428,132 @@ function parseMessageObject(
             roomId,
             ready: value.ready,
           };
+    }
+    case "SET_LOADOUT": {
+      if (
+        !exactKeys(value, [
+          "type",
+          "requestId",
+          "roomId",
+          "shipId",
+          "characterId",
+        ])
+      ) {
+        return null;
+      }
+      const requestId = stringField(value, "requestId", 64);
+      const roomId = stringField(value, "roomId", 32);
+      const shipRaw = value.shipId;
+      const characterRaw = value.characterId;
+      if (
+        requestId === null ||
+        roomId === null ||
+        (shipRaw !== null &&
+          (typeof shipRaw !== "string" ||
+            shipRaw.length === 0 ||
+            shipRaw.length > 64)) ||
+        (characterRaw !== null &&
+          (typeof characterRaw !== "string" ||
+            characterRaw.length === 0 ||
+            characterRaw.length > 64))
+      ) {
+        return null;
+      }
+      const shipId = shipRaw as string | null;
+      const characterId = characterRaw as string | null;
+      return {
+        type,
+        requestId,
+        roomId,
+        shipId,
+        characterId,
+      };
+    }
+    case "SET_BOT": {
+      if (
+        !exactKeys(value, [
+          "type",
+          "requestId",
+          "roomId",
+          "bot",
+        ])
+      ) {
+        return null;
+      }
+      const requestId = stringField(value, "requestId", 64);
+      const roomId = stringField(value, "roomId", 32);
+      if (
+        requestId === null ||
+        roomId === null ||
+        !isObject(value.bot) ||
+        !exactKeys(value.bot, [
+          "wpm",
+          "accuracy",
+          "reactionMs",
+          "personality",
+        ])
+      ) {
+        return null;
+      }
+      const wpm = value.bot.wpm;
+      const accuracy = value.bot.accuracy;
+      const reactionMs = value.bot.reactionMs;
+      const personality = value.bot.personality;
+      if (
+        typeof wpm !== "number" ||
+        !Number.isFinite(wpm) ||
+        wpm < 10 ||
+        wpm > 300 ||
+        typeof accuracy !== "number" ||
+        !Number.isFinite(accuracy) ||
+        accuracy < 0.5 ||
+        accuracy > 1 ||
+        typeof reactionMs !== "number" ||
+        !Number.isFinite(reactionMs) ||
+        reactionMs < 0 ||
+        reactionMs > 3000 ||
+        typeof personality !== "string" ||
+        ![
+          "turtle",
+          "aggro",
+          "tactician",
+          "trickster",
+          "fortune",
+          "sniper",
+          "balanced",
+        ].includes(personality)
+      ) {
+        return null;
+      }
+      return {
+        type,
+        requestId,
+        roomId,
+        bot: {
+          wpm,
+          accuracy,
+          reactionMs,
+          personality: personality as
+            | "turtle"
+            | "aggro"
+            | "tactician"
+            | "trickster"
+            | "fortune"
+            | "sniper"
+            | "balanced",
+        },
+      };
+    }
+    case "REMOVE_BOT":
+    case "START_MATCH": {
+      if (!exactKeys(value, ["type", "requestId", "roomId"])) {
+        return null;
+      }
+      const requestId = stringField(value, "requestId", 64);
+      const roomId = stringField(value, "roomId", 32);
+      return requestId === null || roomId === null
+        ? null
+        : { type, requestId, roomId };
     }
     case "INTENT": {
       if (
