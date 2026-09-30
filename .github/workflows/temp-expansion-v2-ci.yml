@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 11.21.0
@@ -24,3 +26,336 @@ jobs:
         run: pnpm test
       - name: Production build
         run: pnpm build
+
+      - name: Build Mac mini local handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="8023beac88e1cb4e5a30b22f1a95edb45b5c89ca"
+          ROOT="EXPANSION_V2_FULL_LOCAL_HANDOFF"
+          REF="$ROOT/reference-final"
+          mkdir -p "$REF"
+
+          git diff --name-only "$BASE"..HEAD > /tmp/v2-all-files.txt
+          : > "$ROOT/FILE_LIST.txt"
+
+          while IFS= read -r file; do
+            case "$file" in
+              .github/workflows/temp-expansion-v2-ci.yml|docs/PHASE_0A_BASELINE.md|src/balance/variety-audit.ts|tests/variety-audit.test.ts)
+                continue
+                ;;
+            esac
+            if [ -f "$file" ]; then
+              printf '%s\n' "$file" >> "$ROOT/FILE_LIST.txt"
+              mkdir -p "$REF/$(dirname "$file")"
+              cp -p "$file" "$REF/$file"
+            fi
+          done < /tmp/v2-all-files.txt
+
+          mapfile -t FILES < "$ROOT/FILE_LIST.txt"
+          git diff --no-ext-diff --binary "$BASE"..HEAD -- "${FILES[@]}"             > "$ROOT/EXPANSION_V2_FULL_FROM_BGV.patch"
+
+          cat > "$ROOT/SOURCE_INFO.txt" <<EOF
+          Repository: sinhvienaiti/space-typing
+          Local/base branch expected: feat/bgv-integration-current
+          Base commit: $BASE
+          Full V2 implementation branch: feat/1000-stage-expansion-v2-full
+          Packaged commit: $(git rev-parse HEAD)
+
+          The handoff intentionally excludes these inherited Phase 0A-only paths:
+          - docs/PHASE_0A_BASELINE.md
+          - src/balance/variety-audit.ts
+          - tests/variety-audit.test.ts
+          - .github/workflows/temp-expansion-v2-ci.yml
+
+          tests/m22-audio-audit.test.ts is included only because the full automated
+          regression depends on the already-reviewed stale expectation correction.
+          It is a test-only baseline correction, not Expansion V2 gameplay.
+
+          No generated source art is bundled. The owner's existing
+          art-src/expansion-v2, art-src/enemies and art-src/bosses directories stay local.
+          EOF
+
+          cat > "$ROOT/CODEX_FULL_LOCAL_UPDATE_GUIDE.md" <<'EOF'
+          # Space Typing Expansion V2 — Full Codex Local Update Guide
+
+          ## Goal
+
+          Port the completed Expansion V2 implementation into the owner's Mac mini
+          working tree without GitHub access and without changing branches.
+
+          Local project root:
+
+          `/Users/toandx7651/htdocs/typing-game/games/space-typing`
+
+          Expected local code base:
+
+          `feat/bgv-integration-current` based on
+          `8023beac88e1cb4e5a30b22f1a95edb45b5c89ca`.
+
+          The source package contains:
+
+          - `reference-final/`: complete final copies of every scoped changed file.
+          - `EXPANSION_V2_FULL_FROM_BGV.patch`: exact scoped text diff from the BGV
+            base to the final Expansion V2 implementation.
+          - `FILE_LIST.txt`: authoritative list of paths included in this handoff.
+          - `SOURCE_INFO.txt`: source commit and exclusions.
+          - `SHA256SUMS.txt`: transfer integrity.
+          - `docs/EXPANSION_V2_IMPLEMENTATION_REPORT.md`: implementation/evidence.
+
+          ## Non-negotiable rules
+
+          1. Do not fetch/pull/checkout/switch branches.
+          2. Do not require GitHub connectivity.
+          3. Do not delete the owner's local art or other local work.
+          4. Back up every existing target path before editing.
+          5. Apply only paths listed in `FILE_LIST.txt`.
+          6. Preserve unrelated local changes in `src/main.ts`, `src/Game.ts`,
+             `src/test-lab/controller.ts`, `src/styles.css`, `package.json`, and
+             all other pre-existing files.
+          7. Do not copy inherited Phase 0A-only files that are excluded from this pack.
+          8. Do not replace or regenerate source art. Only run the repository's asset
+             preparation scripts against the source art already on the Mac mini.
+          9. Do not edit the pnpm lockfile: Expansion V2 adds no new package dependency.
+          10. Do not claim browser/manual acceptance PASS unless the owner actually runs it.
+
+          ## Step 1 — Verify package
+
+          Assume this ZIP was extracted to:
+
+          `/Users/toandx7651/Downloads/EXPANSION_V2_FULL_LOCAL_HANDOFF`
+
+          Run:
+
+          ```bash
+          cd /Users/toandx7651/Downloads/EXPANSION_V2_FULL_LOCAL_HANDOFF
+          shasum -a 256 -c SHA256SUMS.txt
+          ```
+
+          Every entry must report `OK`.
+
+          ## Step 2 — Verify local project
+
+          ```bash
+          cd /Users/toandx7651/htdocs/typing-game/games/space-typing
+          pwd
+          test -f package.json
+          test -f src/main.ts
+          test -f src/Game.ts
+          ```
+
+          Stop if this is not the intended Space Typing root.
+
+          ## Step 3 — Back up all handoff targets
+
+          ```bash
+          cd /Users/toandx7651/htdocs/typing-game/games/space-typing
+
+          HANDOFF="/Users/toandx7651/Downloads/EXPANSION_V2_FULL_LOCAL_HANDOFF"
+          BACKUP="$HOME/Downloads/space-typing-v2-backup-$(date +%Y%m%d-%H%M%S)"
+          mkdir -p "$BACKUP"
+
+          while IFS= read -r file; do
+            if [ -e "$file" ]; then
+              mkdir -p "$BACKUP/$(dirname "$file")"
+              cp -p "$file" "$BACKUP/$file"
+            fi
+          done < "$HANDOFF/FILE_LIST.txt"
+
+          echo "Backup created: $BACKUP"
+          ```
+
+          ## Step 4 — Dry-run the patch
+
+          ```bash
+          cd /Users/toandx7651/htdocs/typing-game/games/space-typing
+          HANDOFF="/Users/toandx7651/Downloads/EXPANSION_V2_FULL_LOCAL_HANDOFF"
+
+          patch --dry-run -p1 < "$HANDOFF/EXPANSION_V2_FULL_FROM_BGV.patch"
+          ```
+
+          If every hunk is clean and Codex confirms the affected local files contain no
+          unrelated modifications inside those hunks, apply it:
+
+          ```bash
+          patch -p1 < "$HANDOFF/EXPANSION_V2_FULL_FROM_BGV.patch"
+          ```
+
+          If any hunk fails, **do not use force/reject-and-forget behavior**. Manually
+          port that path using both the patch and its complete version under
+          `reference-final/`.
+
+          ## Step 5 — Manual merge requirements for divergent files
+
+          For each failed/diverged path:
+
+          1. Open the local file.
+          2. Open `reference-final/<same-path>`.
+          3. Locate that path in `EXPANSION_V2_FULL_FROM_BGV.patch`.
+          4. Port only Expansion V2 behavior.
+          5. Preserve all unrelated local changes.
+          6. Re-read imports, callback ordering, persistence boundaries and early returns.
+          7. Never replace `src/main.ts` or `src/Game.ts` wholesale merely because
+             they differ.
+
+          Critical integration paths:
+
+          - `src/main.ts`: Campaign isolation, Expedition/Daily/Ghost/Nemesis,
+            learning evidence, stage 35→36 route event, feature rollback, boss HUD,
+            cinematic and Test Lab callbacks.
+          - `src/Game.ts`: production completion facts, deterministic pattern/recipe
+            runtime, Wanted Word, run Relics, boss parts and resource restoration.
+          - `src/expedition/*`: run authority, writer/revision safety, draft/rest,
+            exact safe-boundary reload, QA isolation.
+          - `src/expansion-v2/*`: recipes, patterns, Solar Storm, learning,
+            fixed challenge, Ghost, campaign audit, boss parts, asset map, feature flag.
+          - `src/relics/*`: six Campaign Relics + six run-only V2 Relics.
+          - `src/test-lab/controller.ts`: production-path QA controls.
+          - `scripts/bg-art/*expansion-v2*.mjs`: local V2 art prepare/check pipeline.
+
+          ## Step 6 — Preserve local source art
+
+          Do not overwrite these local folders:
+
+          ```text
+          art-src/enemies/
+          art-src/bosses/
+          art-src/expansion-v2/
+          ```
+
+          They contain the owner's generated source images and are intentionally not
+          bundled in this handoff.
+
+          ## Step 7 — Prepare all enemy/boss and Expansion V2 art
+
+          Run in this exact order:
+
+          ```bash
+          cd /Users/toandx7651/htdocs/typing-game/games/space-typing
+
+          pnpm sprites:prepare
+          pnpm expansion:prepare
+          pnpm expansion:check
+          ```
+
+          `sprites:prepare` processes the top-level current enemy/boss art:
+
+          ```text
+          art-src/enemies/ -> src/assets/enemies/
+          art-src/bosses/  -> src/assets/bosses/
+          ```
+
+          `expansion:prepare` processes recursively:
+
+          ```text
+          art-src/expansion-v2/** -> src/assets/expansion-v2/**
+          ```
+
+          It creates standard and `@2x` WebP outputs. High/Ultra can consume the
+          detail assets.
+
+          If `expansion:check` reports a missing output, do not hand-copy arbitrary
+          files into runtime folders. Fix the source filename/path or rerun
+          `pnpm expansion:prepare`.
+
+          ## Step 8 — Focused V2 tests
+
+          ```bash
+          pnpm exec vitest run \
+            tests/expedition-p10.test.ts \
+            tests/expedition-session.test.ts \
+            tests/expansion-v2-contracts.test.ts \
+            tests/expansion-v2-pattern-runtime.test.ts \
+            tests/expansion-v2-recipe-contribution.test.ts \
+            tests/expansion-v2-profile-persistence.test.ts \
+            tests/expansion-v2-p60-p90.test.ts \
+            tests/expansion-v2-p100.test.ts \
+            tests/relic-expansion-v2.test.ts
+          ```
+
+          ## Step 9 — Full automated regression
+
+          ```bash
+          pnpm test
+          pnpm build
+          ```
+
+          The verified GitHub implementation passed the full test suite and production
+          build before packaging. Local test totals may differ if the Mac mini has extra
+          local tests; no new failure is acceptable.
+
+          ## Step 10 — Run through the parent launcher
+
+          ```bash
+          cd /Users/toandx7651/htdocs/typing-game
+          ./play.sh
+          ```
+
+          For isolated debugging only:
+
+          ```bash
+          cd /Users/toandx7651/htdocs/typing-game/games/space-typing
+          pnpm dev
+          ```
+
+          Vite uses `127.0.0.1:3004`.
+
+          ## Step 11 — Owner manual acceptance
+
+          Test at least:
+
+          1. Campaign values before Expedition.
+          2. Expedition normal run: Draft → 8 encounters → Rest → Solar Storm → boss.
+          3. Reload during an encounter → Resume from safe boundary.
+          4. Full three-Relic replacement and salvage.
+          5. Final Cannon → Core boss-part flow.
+          6. Return to Campaign and verify Campaign economy/progression stayed unchanged.
+          7. Daily fixed seed, PB and Ghost toggle/cue.
+          8. Wanted Word and Recall evidence behavior.
+          9. Stage 035 clear → Ancient Gate → Stage 036 Risky and Stable paths.
+          10. Test Lab Fail Next Save.
+          11. Test Lab force Encounter 6 (Solar Storm) and Encounter 8 (boss).
+          12. Test Lab exact Pattern/Recipe.
+          13. Test Lab cinematic Start/Stop.
+          14. High/Ultra art, Rage evolution and boss-part readability.
+          15. Reduced-motion presentation.
+          16. Audio balance and official performance/visual baseline.
+
+          Report any failure/tuning issue back with screenshot/video and the exact
+          encounter/stage/seed.
+
+          ## Step 12 — Codex completion report
+
+          Codex must return:
+
+          - paths created
+          - paths modified
+          - paths manually merged due divergence
+          - backup path
+          - `sprites:prepare` result
+          - `expansion:prepare` result
+          - `expansion:check` result
+          - focused V2 test result
+          - full test result
+          - production build result
+          - any NOT RUN test
+          - confirmation that local source art was preserved
+          - confirmation that excluded Phase 0A-only files were not imported
+          - exact manual browser gates left for the owner
+          EOF
+
+          (
+            cd "$ROOT"
+            find reference-final -type f -print0 | sort -z | xargs -0 sha256sum
+            sha256sum EXPANSION_V2_FULL_FROM_BGV.patch FILE_LIST.txt SOURCE_INFO.txt CODEX_FULL_LOCAL_UPDATE_GUIDE.md
+          ) > "$ROOT/SHA256SUMS.txt"
+
+          zip -qr "EXPANSION_V2_FULL_LOCAL_HANDOFF.zip" "$ROOT"
+
+      - name: Upload Mac mini handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: EXPANSION_V2_FULL_LOCAL_HANDOFF
+          path: EXPANSION_V2_FULL_LOCAL_HANDOFF.zip
+          if-no-files-found: error
+          retention-days: 7
