@@ -1,4 +1,5 @@
 import type { DuelMatchPhase } from "./model";
+import type { DuelNeutralObjectiveKind } from "./objectives";
 import {
   duelMapProfile,
   duelPhaseRank,
@@ -26,8 +27,16 @@ export type DuelCataclysmEvent = {
   pressureMultiplier: number;
 };
 
+export type DuelObjectiveScheduleEvent = {
+  sequence: number;
+  mapId: DuelMapId;
+  phase: DuelMatchPhase;
+  kind: DuelNeutralObjectiveKind;
+};
+
 export type DuelDirectorEvent =
   | { type: "hazard"; hazard: DuelHazardEvent }
+  | { type: "objective"; objective: DuelObjectiveScheduleEvent }
   | { type: "cataclysm"; cataclysm: DuelCataclysmEvent };
 
 const PHASE_INTERVAL_SECONDS: Readonly<
@@ -38,6 +47,16 @@ const PHASE_INTERVAL_SECONDS: Readonly<
   war: 9,
   crisis: 6.5,
   cataclysm: 4.5,
+};
+
+const OBJECTIVE_INTERVAL_SECONDS: Readonly<
+  Record<DuelMatchPhase, number>
+> = {
+  build: 9999,
+  skirmish: 30,
+  war: 22,
+  crisis: 18,
+  cataclysm: 14,
 };
 
 const PHASE_PRESSURE: Readonly<Record<DuelMatchPhase, number>> = {
@@ -51,7 +70,9 @@ const PHASE_PRESSURE: Readonly<Record<DuelMatchPhase, number>> = {
 export class DuelMapDirector {
   private readonly mapId: DuelMapId;
   private readonly rng: ReturnType<DuelRngStreams["domain"]>;
+  private readonly objectiveRng: ReturnType<DuelRngStreams["domain"]>;
   private elapsedUntilHazard: number;
+  private elapsedUntilObjective: number;
   private lastPhase: DuelMatchPhase = "build";
   private sequence = 0;
   private cataclysmEmitted = false;
@@ -67,7 +88,9 @@ export class DuelMapDirector {
       input.contentVersion,
     );
     this.rng = streams.domain("hazards");
+    this.objectiveRng = streams.domain("word-offers");
     this.elapsedUntilHazard = PHASE_INTERVAL_SECONDS.build;
+    this.elapsedUntilObjective = OBJECTIVE_INTERVAL_SECONDS.build;
   }
 
   update(
@@ -78,12 +101,18 @@ export class DuelMapDirector {
     if (phase !== this.lastPhase) {
       if (phase === "build") {
         this.elapsedUntilHazard = PHASE_INTERVAL_SECONDS.build;
+        this.elapsedUntilObjective = OBJECTIVE_INTERVAL_SECONDS.build;
       } else if (this.lastPhase === "build") {
         this.elapsedUntilHazard = PHASE_INTERVAL_SECONDS[phase];
+        this.elapsedUntilObjective = OBJECTIVE_INTERVAL_SECONDS[phase];
       } else {
         this.elapsedUntilHazard = Math.min(
           this.elapsedUntilHazard,
           PHASE_INTERVAL_SECONDS[phase],
+        );
+        this.elapsedUntilObjective = Math.min(
+          this.elapsedUntilObjective,
+          OBJECTIVE_INTERVAL_SECONDS[phase],
         );
       }
       this.lastPhase = phase;
@@ -114,6 +143,7 @@ export class DuelMapDirector {
       Number.isFinite(dtSeconds) ? dtSeconds : 0,
     );
     this.elapsedUntilHazard -= dt;
+    this.elapsedUntilObjective -= dt;
     let guard = 0;
 
     while (this.elapsedUntilHazard <= 0 && guard < 4) {
@@ -140,6 +170,21 @@ export class DuelMapDirector {
       this.elapsedUntilHazard += base * jitter;
     }
 
+    if (this.elapsedUntilObjective <= 0) {
+      events.push({
+        type: "objective",
+        objective: {
+          sequence: ++this.sequence,
+          mapId: this.mapId,
+          phase,
+          kind: this.pickObjectiveKind(phase),
+        },
+      });
+      const base = OBJECTIVE_INTERVAL_SECONDS[phase];
+      const jitter = 0.88 + this.objectiveRng.nextFloat() * 0.24;
+      this.elapsedUntilObjective += base * jitter;
+    }
+
     return events;
   }
 
@@ -149,9 +194,34 @@ export class DuelMapDirector {
 
   resetRound(): void {
     this.elapsedUntilHazard = PHASE_INTERVAL_SECONDS.build;
+    this.elapsedUntilObjective = OBJECTIVE_INTERVAL_SECONDS.build;
     this.lastPhase = "build";
     this.sequence = 0;
     this.cataclysmEmitted = false;
+  }
+
+  private pickObjectiveKind(
+    phase: DuelMatchPhase,
+  ): DuelNeutralObjectiveKind {
+    const roll = this.objectiveRng.nextFloat();
+    if (phase === "skirmish") {
+      if (roll < 0.55) return "cache";
+      if (roll < 0.8) return "fate";
+      return "map-control";
+    }
+    if (phase === "war") {
+      if (roll < 0.35) return "cache";
+      if (roll < 0.7) return "fate";
+      return "map-control";
+    }
+    if (phase === "crisis") {
+      if (roll < 0.25) return "cache";
+      if (roll < 0.65) return "fate";
+      return "map-control";
+    }
+    if (roll < 0.2) return "cache";
+    if (roll < 0.65) return "fate";
+    return "map-control";
   }
 
   private pickHazard(
