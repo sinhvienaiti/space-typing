@@ -3,6 +3,7 @@ import "./character-progress.css";
 import "./basic-skills.css";
 import "./kill-translation.css";
 import { installDuelOnlineRoomController } from "./duel/online-room-controller";
+import { installDuelBattleUi } from "./duel/battle-ui";
 import {
   DEFAULT_KILL_TRANSLATION_SETTINGS,
   hasVisibleKillTranslation,
@@ -1067,8 +1068,36 @@ const rewardChoiceDialog =
   byId<HTMLDialogElement>("rewardChoiceDialog");
 const anomalyDialog = byId<HTMLDialogElement>("anomalyDialog");
 
-installDuelOnlineRoomController({
+let duelOnlineController:
+  | ReturnType<typeof installDuelOnlineRoomController>
+  | null = null;
+
+const duelBattle = installDuelBattleUi(
+  {
+    sendIntent(intent) {
+      return (
+        duelOnlineController?.client.sendIntent(intent) ??
+        null
+      );
+    },
+    onExit() {
+      const duelDialog =
+        byId<HTMLDialogElement>("duelRoomDialog");
+      if (!duelDialog.open) duelDialog.showModal();
+    },
+  },
+  settings.visualQuality,
+);
+
+duelOnlineController = installDuelOnlineRoomController({
   clientVersion: "0.1.0",
+  onMatchUpdate(view, events) {
+    duelBattle.setQuality(settings.visualQuality);
+    duelBattle.update(view, events);
+  },
+  onPrediction(prediction) {
+    duelBattle.setPrediction(prediction);
+  },
 });
 
 rewardChoiceDialog.addEventListener("cancel", (event) => {

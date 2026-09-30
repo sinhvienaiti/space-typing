@@ -4,6 +4,7 @@ import type {
 } from "./authority";
 import {
   DuelNetworkClient,
+  type DuelLocalPrediction,
   type DuelNetworkStatus,
 } from "./network-client";
 import {
@@ -17,6 +18,7 @@ export type DuelOnlineRoomControllerConfig = {
     view: DuelClientMatchView,
     events: readonly DuelClientEvent[],
   ): void;
+  onPrediction?(prediction: DuelLocalPrediction): void;
 };
 
 type SessionResponse = {
@@ -180,8 +182,8 @@ export function installDuelOnlineRoomController(
           events,
         );
       },
-      onPrediction() {
-        // Match renderer subscribes through DuelNetworkClient.
+      onPrediction(prediction) {
+        config.onPrediction?.(prediction);
       },
       onError(code, message) {
         ui?.setStatus(
