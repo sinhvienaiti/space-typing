@@ -241,13 +241,14 @@ function windowMetrics(
 function bossMechanicSignature(
   stage: ReturnType<typeof createStageConfig>,
 ): string | null {
-  if (!isBossStageRole(stage.role)) return null;
+  const role = stage.role;
+  if (!isBossStageRole(role)) return null;
 
-  const identity = bossIdentityForStage(stage.stage, stage.role);
+  const identity = bossIdentityForStage(stage.stage, role);
   const phaseCount =
-    stage.role === "major-boss"
+    role === "major-boss"
       ? 3
-      : stage.role === "boss"
+      : role === "boss"
         ? 2
         : 1;
 
@@ -256,7 +257,7 @@ function bossMechanicSignature(
     (_, index) =>
       bossTypingMechanicFor(
         identity.family,
-        stage.role,
+        role,
         index + 1,
       ),
   ).join("+");
