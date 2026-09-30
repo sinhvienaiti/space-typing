@@ -1064,14 +1064,6 @@ kbd {
   pointer-events: none;
 }
 
-/* Keep boss identity/HP away from the centred boss artwork. */
-.boss-hud-meta strong {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .boss-hud-meta {
   display: flex;
   justify-content: space-between;
@@ -1082,10 +1074,14 @@ kbd {
 }
 
 .boss-hud-meta strong {
+  min-width: 0;
+  overflow: hidden;
   color: #fff3ed;
   font-size: 0.72rem;
   letter-spacing: 0.1em;
+  text-overflow: ellipsis;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .boss-hud-meta span {
