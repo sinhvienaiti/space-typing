@@ -19,6 +19,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install
       - run: pnpm exec vitest run tests/expedition-p10.test.ts tests/expedition-session.test.ts tests/expansion-v2-contracts.test.ts
       - run: pnpm build
