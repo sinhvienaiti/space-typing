@@ -44,6 +44,7 @@ import {
 import { canFinishCombatStage, canSpawnFinalBoss, type StageClearGate } from "./campaign/stage-clear-gate";
 import {
   createCompletionId,
+  effortWeight,
   type CombatCompletionFact,
   type CombatCompletionTargetKind,
 } from "./combat/completion-events";
@@ -778,6 +779,8 @@ export class Game {
     gameplayState: number;
   } | null = null;
   private completionSequence = 0;
+  private relicPerfectWordCount = 0;
+  private relicRecoveryArmed = false;
 
   private characterId: CharacterId = "vanguard";
   private equipmentAura: EquipmentAuraProfile | null = null;
@@ -3203,6 +3206,8 @@ export class Game {
     this.priorityKillChain.reset();
     this.relicFirstWordTriggered = false;
     this.relicMistakeGuardsUsed = 0;
+    this.relicPerfectWordCount = 0;
+    this.relicRecoveryArmed = false;
     this.stats = this.createGameStats(stage.stage);
     this.stageResultTracker.reset();
     if (startingResources !== null) {
@@ -6989,6 +6994,62 @@ export class Game {
       );
     }
 
+    const directWeight = effortWeight(length);
+    if (perfectWord) {
+      if (this.relicEffects.perfectWordEnergy > 0) {
+        this.stats.energy = clamp(
+          this.stats.energy +
+            this.relicEffects.perfectWordEnergy * directWeight,
+          0,
+          this.stats.maxEnergy,
+        );
+      }
+      if (this.relicEffects.perfectWordPower > 0) {
+        this.gainPower(
+          this.relicEffects.perfectWordPower * directWeight,
+        );
+      }
+
+      if (this.relicEffects.perfectWordInterval > 0) {
+        this.relicPerfectWordCount += 1;
+        if (
+          this.relicPerfectWordCount %
+            this.relicEffects.perfectWordInterval ===
+          0
+        ) {
+          this.gainPower(
+            this.relicEffects.perfectWordIntervalPower,
+          );
+        }
+      }
+
+      if (
+        this.relicRecoveryArmed &&
+        this.relicEffects.recoveryPerfectEnergy > 0
+      ) {
+        this.stats.energy = clamp(
+          this.stats.energy +
+            this.relicEffects.recoveryPerfectEnergy,
+          0,
+          this.stats.maxEnergy,
+        );
+        this.relicRecoveryArmed = false;
+      }
+    }
+
+    if (length >= 8) {
+      if (this.relicEffects.longWordShield > 0) {
+        this.stats.shield = clamp(
+          this.stats.shield + this.relicEffects.longWordShield,
+          0,
+          this.stats.maxShield,
+        );
+      }
+      if (this.relicEffects.longWordPower > 0) {
+        this.gainPower(this.relicEffects.longWordPower);
+      }
+    }
+
     if (
       perfectWord &&
       source !== undefined &&
@@ -7025,6 +7086,9 @@ export class Game {
   private registerMiss(): void {
     this.stats.misses += 1;
     this.updateStageObjective({ type: "miss" });
+    if (this.relicEffects.recoveryPerfectEnergy > 0) {
+      this.relicRecoveryArmed = true;
+    }
 
     const guardAvailable =
       this.relicMistakeGuardsUsed <
