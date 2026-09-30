@@ -167,6 +167,7 @@ export type DuelClientMatchView = {
   mode: "friend" | "ranked";
   combatProfile: "normalized";
   serverSequence: number;
+  elapsedSeconds: number;
   phase: DuelEngineSnapshot["phase"];
   round: DuelEngineSnapshot["round"];
   series: DuelSeriesState;
@@ -1801,6 +1802,7 @@ export class DuelAuthorityService {
       mode: match.mode,
       combatProfile: "normalized",
       serverSequence: match.serverSequence,
+      elapsedSeconds: snapshot.elapsedSeconds,
       phase: snapshot.phase,
       round: snapshot.round,
       series: {
