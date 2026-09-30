@@ -1057,11 +1057,19 @@ kbd {
 .boss-hud {
   position: absolute;
   z-index: 9;
-  top: 76px;
-  left: 50%;
-  width: min(680px, calc(100vw - 2rem));
-  transform: translateX(-50%);
+  top: 70px;
+  left: 16px;
+  width: clamp(286px, 30vw, 420px);
+  transform: none;
   pointer-events: none;
+}
+
+/* Keep boss identity/HP away from the centred boss artwork. */
+.boss-hud-meta strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .boss-hud-meta {
@@ -1107,7 +1115,9 @@ kbd {
 @media (max-width: 760px) {
   .boss-hud {
     top: 70px;
+    left: 50%;
     width: calc(100vw - 1.5rem);
+    transform: translateX(-50%);
   }
 }
 
@@ -2572,7 +2582,9 @@ kbd {
 }
 
 .game-shell:has(#bossHud:not(.hidden)) .combat-info-stack {
-  top: 118px;
+  /* Boss HUD is side-mounted on desktop, so the centre rail no longer needs
+     to be pushed down into the boss artwork. */
+  top: 84px;
 }
 
 .combat-info-stack .stage-event-badge,
