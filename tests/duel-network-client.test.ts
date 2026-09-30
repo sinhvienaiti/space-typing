@@ -199,7 +199,7 @@ function matchView(input?: {
       neutralObjective: null,
       opponentTrapHints: [],
     },
-  } as DuelClientMatchView;
+  } as unknown as DuelClientMatchView;
 }
 
 function welcome(socket: FakeSocket): void {
