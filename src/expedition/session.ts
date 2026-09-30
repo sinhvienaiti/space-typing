@@ -216,6 +216,68 @@ export class ExpeditionSession {
     return this.envelope.run;
   }
 
+  testForcePhase(
+    phase: "draft" | "encounter" | "defeat",
+    eligibleRelicIds: readonly string[] = this.eligibleRelicIds,
+  ): ExpeditionRun | null {
+    const envelope = this.envelope;
+    if (envelope === null || envelope.run.terminal !== null) return null;
+
+    this.eligibleRelicIds = [...eligibleRelicIds];
+    let run = envelope.run;
+
+    if (phase === "draft") {
+      const boundary: ExpeditionRun = {
+        ...run,
+        phase: run.completedEncounters === 0 ? "setup" : "settlement",
+        draftOffer: null,
+        terminal: null,
+      };
+      run = openExpeditionDraft(boundary, this.eligibleRelicIds);
+    } else if (phase === "encounter") {
+      if (run.phase !== "encounter") {
+        const boundary: ExpeditionRun = {
+          ...run,
+          phase: run.completedEncounters === 0 ? "setup" : "settlement",
+          draftOffer: null,
+          terminal: null,
+        };
+        const draft = openExpeditionDraft(
+          boundary,
+          this.eligibleRelicIds,
+        );
+        const choice = draft.draftOffer?.choices[0];
+        if (choice === undefined) return null;
+        const replacementRelicId =
+          draft.relics.equipped.length >= draft.relics.maxEquipped
+            ? draft.relics.equipped[0] ?? null
+            : null;
+        const confirmed = confirmExpeditionDraft(
+          draft,
+          choice.id,
+          replacementRelicId,
+        );
+        if (!confirmed.ok) return null;
+        run = beginExpeditionEncounter(confirmed.run);
+      }
+    } else {
+      const combatBoundary: ExpeditionRun = {
+        ...run,
+        phase: "encounter",
+        draftOffer: null,
+        terminal: null,
+      };
+      run = defeatExpeditionRun(combatBoundary);
+    }
+
+    this.envelope = writeExpeditionEnvelope(this.storage, {
+      writerId: this.writerId,
+      expectedRevision: envelope.revision,
+      run,
+    });
+    return this.envelope.run;
+  }
+
   release(): void {
     this.envelope = null;
     this.eligibleRelicIds = [];
