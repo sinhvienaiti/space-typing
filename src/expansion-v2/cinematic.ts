@@ -44,9 +44,12 @@ export function tickCinematic(
   if (stateInput.phase === "idle" || stateInput.phase === "done") {
     return stateInput;
   }
-  let phase = stateInput.phase;
+
   let elapsed = stateInput.elapsed + Math.max(0, dtInput);
-  while (phase !== "done") {
+  let phase: CinematicPhase = stateInput.phase;
+
+  for (;;) {
+    if (phase === "idle" || phase === "done") break;
     const length = PHASE_LENGTHS[phase];
     if (elapsed < length) break;
     elapsed -= length;
@@ -57,7 +60,12 @@ export function tickCinematic(
           ? "resolve"
           : "done";
   }
-  return { ...stateInput, phase, elapsed };
+
+  return {
+    ...stateInput,
+    phase,
+    elapsed: phase === "done" ? 0 : elapsed,
+  };
 }
 
 export function cinematicFrame(state: CinematicState): CinematicFrame {
