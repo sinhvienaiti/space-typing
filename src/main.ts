@@ -4213,6 +4213,33 @@ function abandonCurrentExpedition(): void {
   }
 }
 
+function forceExpeditionQaPhase(
+  phase: "draft" | "encounter" | "defeat",
+): void {
+  try {
+    const run = expeditionSession.testForcePhase(phase, RELIC_IDS);
+    if (run === null) {
+      showNotice("Start or resume an Expedition before forcing its phase");
+      return;
+    }
+    if (run.phase === "draft") {
+      applyExpeditionLoaner(run);
+      expeditionUi?.setResumeAvailable(true);
+      expeditionUi?.showDraft(run);
+      return;
+    }
+    if (run.phase === "encounter") {
+      void startExpeditionEncounter(run, false);
+      return;
+    }
+    expeditionUi?.setResumeAvailable(false);
+    expeditionUi?.showSummary(run);
+  } catch (error) {
+    console.error("Unable to force Expedition QA phase.", error);
+    showNotice("Expedition QA phase override failed");
+  }
+}
+
 async function returnFromExpedition(): Promise<void> {
   const snapshot = expeditionCampaignSnapshot;
   if (snapshot === null) {
@@ -4234,6 +4261,18 @@ const testLab = mountTestLab({
   getSettings: () => settings,
   getVocabulary: () => configuredVocabulary,
   showNotice,
+  expeditionQa: {
+    startWithSeed: (seed) => void startNewExpedition(seed),
+    forcePhase: forceExpeditionQaPhase,
+    failNextSave: () => expeditionStorage.injectFailureOnce(),
+    snapshot: () => ({
+      run: expeditionSession.currentRun(),
+      revision: expeditionSession.currentRevision(),
+      ownsCampaignPersistence:
+        expeditionSession.ownsCampaignPersistence(),
+      resumable: expeditionSession.hasResumableRun(),
+    }),
+  },
 });
 
 expeditionUi = mountExpeditionUi({
