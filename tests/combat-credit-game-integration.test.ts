@@ -22,6 +22,8 @@ const settings: GameSettings = {
   pronunciationVolume: 0,
 };
 
+const ELIGIBLE_DEFINITION_ID = "rainbow-scout" as const;
+
 const vocabulary: VocabularyEntry[] = [
   { id: "credit-a", en: "orbit", vi: "quỹ đạo", ipa: "" },
   { id: "credit-b", en: "shield", vi: "lá chắn", ipa: "" },
@@ -155,6 +157,7 @@ describe("Combat Credit FINAL V3 Game integration", () => {
     const { game, reward } = createHarness();
     start(game, 50);
     const id = game.testLabSpawnEnemies({
+      definitionId: ELIGIBLE_DEFINITION_ID,
       kind: "scout",
       count: 1,
       rank: "X",
@@ -189,6 +192,7 @@ describe("Combat Credit FINAL V3 Game integration", () => {
     start(game, 100);
     game.testLabSetDifficultyOverrides({ maxEnemies: 20 });
     const carrierId = game.testLabSpawnEnemies({
+      definitionId: ELIGIBLE_DEFINITION_ID,
       kind: "carrier",
       count: 1,
       layers: 1,
@@ -215,6 +219,7 @@ describe("Combat Credit FINAL V3 Game integration", () => {
     start(game, 100);
     game.testLabSetDifficultyOverrides({ maxEnemies: 20 });
     const splitterId = game.testLabSpawnEnemies({
+      definitionId: ELIGIBLE_DEFINITION_ID,
       kind: "splitter",
       count: 1,
       layers: 1,
@@ -235,6 +240,7 @@ describe("Combat Credit FINAL V3 Game integration", () => {
     const { game, reward } = createHarness();
     start(game, 100);
     const id = game.testLabSpawnEnemies({
+      definitionId: ELIGIBLE_DEFINITION_ID,
       kind: "scout",
       count: 1,
       layers: 1,
@@ -262,6 +268,7 @@ describe("Combat Credit FINAL V3 Game integration", () => {
     game.setGameplayMode("recall");
     start(game, 1);
     const id = game.testLabSpawnEnemies({
+      definitionId: ELIGIBLE_DEFINITION_ID,
       kind: "scout",
       count: 1,
       layers: 1,
