@@ -211,6 +211,7 @@ import {
   spendBasicSkillPoint,
 } from "./progression/basic-skills";
 import {
+  RELIC_IDS,
   RELIC_REGISTRY,
   getRelicDefinition,
   type RelicId,
@@ -284,6 +285,7 @@ import {
 import {
   accuracyPercent,
   stageWordsPerMinute,
+  typingText,
 } from "./logic";
 import type { EquipmentDrop } from "./loot/equipment-loot";
 import {
@@ -413,6 +415,23 @@ type CombatSkillId = DefensiveSkillId | OffensiveSkillId;
 import { DEFAULT_PLAYER_BASE_STATS } from "./stats/player";
 import { mountTestLab } from "./test-lab/controller";
 import { AutosaveQueue } from "./persistence/autosave";
+import {
+  createExpeditionEncounterPlan,
+  createExpeditionRun,
+  currentExpeditionEncounter,
+  hashText,
+  type ExpeditionResources,
+  type ExpeditionRun,
+} from "./expedition/core";
+import { createExpeditionLoanerState } from "./expedition/loaner";
+import {
+  ExpeditionSession,
+  ExpeditionStorageAdapter,
+} from "./expedition/session";
+import {
+  mountExpeditionUi,
+  type ExpeditionUi,
+} from "./expedition/ui";
 import {
   createCheckpointSnapshot,
   type CheckpointSnapshot,
@@ -1010,6 +1029,24 @@ type AutosaveSnapshot = {
 let testingStageOverride: number | null = null;
 let testingStageSnapshot: AutosaveSnapshot | null = null;
 
+function createExpeditionWriterId(): string {
+  return (
+    "tab-" +
+    (typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : Date.now().toString(36))
+  );
+}
+
+const expeditionStorage = new ExpeditionStorageAdapter(localStorage);
+const expeditionSession = new ExpeditionSession(
+  expeditionStorage,
+  createExpeditionWriterId(),
+);
+let expeditionUi: ExpeditionUi | null = null;
+let expeditionCampaignSnapshot: AutosaveSnapshot | null = null;
+let expeditionStartPending = false;
+
 const campaignAutosave = new AutosaveQueue<
   AutosaveSnapshot,
   PersistenceSource
@@ -1083,6 +1120,16 @@ function applyRunPersistentState(state: RunPersistentState): void {
   expansionCurrencies = state.expansionCurrencies;
   shops = state.shops;
   route = state.route;
+}
+
+function applyAutosaveSnapshot(snapshot: AutosaveSnapshot): void {
+  applyRunPersistentState(snapshot);
+  hotbar = snapshot.hotbar;
+  codex = snapshot.codex;
+  campaignExpansion = snapshot.campaignExpansion;
+  checkpointSnapshot = snapshot.checkpointSnapshot;
+  crashRecoverySnapshot = snapshot.crashRecoverySnapshot;
+  stageEntrySnapshot = snapshot.stageEntrySnapshot;
 }
 
 function currentAutosaveSnapshot(): AutosaveSnapshot {
@@ -3202,6 +3249,31 @@ const game = new Game(
 
         deathActionGate.leave();
 
+        const activeExpedition = expeditionSession.currentRun();
+        if (
+          activeExpedition !== null &&
+          activeExpedition.phase === "encounter"
+        ) {
+          try {
+            const ended = expeditionSession.defeat();
+            if (ended !== null) {
+              expeditionUi?.setResumeAvailable(false);
+              expeditionUi?.showSummary(ended);
+            }
+          } catch (error) {
+            console.error("Unable to persist Expedition defeat.", error);
+            showNotice(
+              "Expedition save failed · reload resumes the previous safe boundary",
+            );
+          }
+          byId("deathProtectionMeta").textContent =
+            "Expedition · Campaign progression and economy were not changed.";
+          byId("deathProtectionActions").classList.add("hidden");
+          byId("phoenixCoreButton").classList.add("hidden");
+          setDeathNavigationDisabled(true);
+          return;
+        }
+
         if (testingStagePreviewActive()) {
           restoreTestingStagePersistentState();
           byId("againButton").textContent =
@@ -3235,7 +3307,6 @@ const game = new Game(
     onBossUpdate: renderBoss,
     onSkills: renderAllSkills,
     onStageClear: (stats) => {
-      saveRecallMemory();
       const stageSession = game.getStageSessionSnapshot();
       const wpm = stageWordsPerMinute(
         stageSession.correctWordKeys,
@@ -3245,6 +3316,45 @@ const game = new Game(
         stageSession.correctWordKeys,
         stageSession.wrongWordKeys,
       );
+
+      const activeExpedition = expeditionSession.currentRun();
+      if (
+        activeExpedition !== null &&
+        activeExpedition.phase === "encounter"
+      ) {
+        try {
+          const run = expeditionSession.settle({
+            score: stats.score,
+            accuracy,
+            resources: {
+              hull: stats.hull,
+              maxHull: stats.maxHull,
+              shield: stats.shield,
+              maxShield: stats.maxShield,
+              energy: stats.energy,
+              maxEnergy: stats.maxEnergy,
+              power: stats.power,
+            },
+          });
+          if (run !== null) {
+            if (run.terminal !== null) {
+              expeditionUi?.setResumeAvailable(false);
+              expeditionUi?.showSummary(run);
+            } else if (run.phase === "draft") {
+              expeditionUi?.setResumeAvailable(true);
+              expeditionUi?.showDraft(run);
+            }
+          }
+        } catch (error) {
+          console.error("Unable to persist Expedition settlement.", error);
+          showNotice(
+            "Expedition save failed · reload resumes the previous safe boundary",
+          );
+        }
+        return;
+      }
+
+      saveRecallMemory();
 
       if (testingStagePreviewActive()) {
         const completedStage = stats.stage;
@@ -3811,11 +3921,334 @@ if (import.meta.env.DEV) {
   (window as unknown as { __spaceTypingGame?: Game }).__spaceTypingGame = game;
 }
 
+function expeditionSeed(): number {
+  if (typeof crypto.getRandomValues === "function") {
+    const value = new Uint32Array(1);
+    crypto.getRandomValues(value);
+    return value[0] || 1;
+  }
+  return (Date.now() ^ 0x9e3779b9) >>> 0 || 1;
+}
+
+function expeditionRunId(seed: number): string {
+  return (
+    "exp-" +
+    Date.now().toString(36) +
+    "-" +
+    String(seed >>> 0) +
+    "-" +
+    (typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : "local")
+  );
+}
+
+function expeditionWordPool() {
+  const entries = configuredVocabulary.map((entry) => ({ ...entry }));
+  if (entries.length === 0) {
+    throw new Error("Expedition requires loaded vocabulary.");
+  }
+  const signature = entries
+    .map(
+      (entry) =>
+        entry.id + "\u0000" + typingText(entry.en),
+    )
+    .join("\u0001");
+  return {
+    hash: hashText(signature),
+    entries,
+  };
+}
+
+function expeditionNormalStages(): number[] {
+  return Array.from({ length: 20 }, (_value, index) => index + 1).filter(
+    (stage) => stageRole(stage) === "normal",
+  );
+}
+
+function applyExpeditionLoaner(run: ExpeditionRun): void {
+  const loaner = createExpeditionLoanerState(run);
+  applyRunPersistentState(loaner.state);
+  hotbar = loaner.hotbar;
+  codex = loaner.codex;
+  campaignExpansion = loaner.campaignExpansion;
+  checkpointSnapshot = loaner.checkpointSnapshot;
+  crashRecoverySnapshot = null;
+  stageEntrySnapshot = null;
+  refreshPersistentStateUi();
+
+  game.setGameplayMode("combat", recallSettings);
+  game.setVocabulary(run.wordPool.entries);
+  game.setVocabularyLevel(run.profile.vocabularyLevel);
+}
+
+function expeditionResourcesFromPlayerStats(): ExpeditionResources {
+  const stats = game.getPlayerStats();
+  return {
+    hull: stats.hull,
+    maxHull: stats.hull,
+    shield: stats.shield,
+    maxShield: stats.shield,
+    energy: stats.energy,
+    maxEnergy: stats.energy,
+    power: 0,
+  };
+}
+
+function buildExpeditionRun(
+  runId: string,
+  seed: number,
+  campaignFixture: AutosaveSnapshot,
+  startingResources: ExpeditionResources,
+): ExpeditionRun {
+  return createExpeditionRun({
+    runId,
+    seed,
+    wordPool: expeditionWordPool(),
+    profile: {
+      difficulty: difficultySettings.mode,
+      assist: "standard",
+      vocabularyLevel: selectedVocabularyLevel(),
+      difficultySettings: structuredClone(difficultySettings),
+      gameplayMode: "combat",
+    },
+    encounterPlan: createExpeditionEncounterPlan(
+      seed,
+      expeditionNormalStages(),
+      2,
+    ),
+    campaignFixture,
+    startingResources,
+    maxEquippedRelics: MAX_EQUIPPED_RELICS,
+  });
+}
+
+async function startExpeditionEncounter(
+  run: ExpeditionRun,
+  replay: boolean,
+): Promise<void> {
+  const encounter = currentExpeditionEncounter(run);
+  if (encounter === null) {
+    showNotice("Expedition encounter is unavailable");
+    return;
+  }
+
+  applyExpeditionLoaner(run);
+  expeditionUi?.close();
+
+  const stage = createStageConfig(encounter.sourceStage);
+  const frozenDifficulty = sanitizeDifficultySettings(
+    run.profile.difficultySettings,
+  );
+  const difficulty = difficultyFor(
+    difficultyInputFromSettings(
+      frozenDifficulty,
+      stage.stage,
+      run.profile.vocabularyLevel,
+    ),
+  );
+  activeStageDifficulty = difficulty;
+
+  syncWorldMusicProfile(stage.stage);
+  musicController.setBossPhase(1);
+  const musicState = musicStateForStageRole(stage.role);
+  musicController.transitionTo(
+    musicState,
+    musicCrossfadeSeconds(musicState),
+  );
+  musicController.setPaused(false);
+
+  const world = worldForStage(stage.stage);
+  await presentStageTransition(
+    createStageTransitionSpec({
+      stage: stage.stage,
+      galaxy: stage.galaxy,
+      stageInGalaxy: stage.stageInGalaxy,
+      stageInWorld: stageInWorld(stage.stage),
+      worldName: world.name,
+      role: stage.role,
+    }),
+  );
+
+  game.startStage(stage, difficulty, null, run.resources);
+  if (replay) {
+    showNotice("Expedition resumed from the encounter safe boundary");
+  }
+}
+
+async function startNewExpedition(
+  seedOverride?: number,
+): Promise<void> {
+  if (
+    !persistenceReady ||
+    !vocabularyReady ||
+    expeditionStartPending ||
+    game.getPhase() !== "title"
+  ) {
+    return;
+  }
+
+  expeditionStartPending = true;
+  const snapshot = structuredClone(currentAutosaveSnapshot());
+  expeditionCampaignSnapshot = snapshot;
+
+  try {
+    const seed = seedOverride ?? expeditionSeed();
+    const runId = expeditionRunId(seed);
+    const provisional = buildExpeditionRun(
+      runId,
+      seed,
+      snapshot,
+      {
+        hull: DEFAULT_PLAYER_BASE_STATS.hull,
+        maxHull: DEFAULT_PLAYER_BASE_STATS.hull,
+        shield: DEFAULT_PLAYER_BASE_STATS.shield,
+        maxShield: DEFAULT_PLAYER_BASE_STATS.shield,
+        energy: DEFAULT_PLAYER_BASE_STATS.energy,
+        maxEnergy: DEFAULT_PLAYER_BASE_STATS.energy,
+        power: 0,
+      },
+    );
+
+    applyExpeditionLoaner(provisional);
+    const run = buildExpeditionRun(
+      runId,
+      seed,
+      snapshot,
+      expeditionResourcesFromPlayerStats(),
+    );
+    const draft = expeditionSession.start(run, RELIC_IDS);
+    expeditionUi?.setResumeAvailable(true);
+    expeditionUi?.showDraft(draft);
+  } catch (error) {
+    console.error("Unable to start Expedition.", error);
+    applyAutosaveSnapshot(snapshot);
+    refreshPersistentStateUi();
+    expeditionCampaignSnapshot = null;
+    showNotice("Unable to start Expedition");
+  } finally {
+    expeditionStartPending = false;
+  }
+}
+
+async function resumeExpedition(): Promise<void> {
+  if (
+    !persistenceReady ||
+    expeditionStartPending ||
+    game.getPhase() !== "title"
+  ) {
+    return;
+  }
+
+  expeditionStartPending = true;
+  const snapshot = structuredClone(currentAutosaveSnapshot());
+  expeditionCampaignSnapshot = snapshot;
+
+  try {
+    const run = expeditionSession.resume(RELIC_IDS);
+    if (run === null) {
+      expeditionCampaignSnapshot = null;
+      expeditionUi?.setResumeAvailable(false);
+      showNotice("No active Expedition to resume");
+      return;
+    }
+
+    if (run.phase === "draft") {
+      applyExpeditionLoaner(run);
+      expeditionUi?.setResumeAvailable(true);
+      expeditionUi?.showDraft(run);
+      return;
+    }
+
+    if (run.phase === "encounter") {
+      await startExpeditionEncounter(run, true);
+      return;
+    }
+
+    throw new Error("Unsupported Expedition recovery phase: " + run.phase);
+  } catch (error) {
+    console.error("Unable to resume Expedition.", error);
+    applyAutosaveSnapshot(snapshot);
+    refreshPersistentStateUi();
+    expeditionCampaignSnapshot = null;
+    showNotice("Unable to resume Expedition");
+  } finally {
+    expeditionStartPending = false;
+  }
+}
+
+async function confirmExpeditionDraft(
+  choiceId: string,
+  replacementRelicId: string | null,
+): Promise<void> {
+  try {
+    const run = expeditionSession.confirmDraft(
+      choiceId,
+      replacementRelicId,
+    );
+    if (run === null) {
+      showNotice("Expedition draft choice was not applied");
+      return;
+    }
+    await startExpeditionEncounter(run, false);
+  } catch (error) {
+    console.error("Unable to confirm Expedition draft.", error);
+    showNotice(
+      "Expedition save failed · reload resumes the previous safe boundary",
+    );
+  }
+}
+
+function abandonCurrentExpedition(): void {
+  try {
+    const run = expeditionSession.abandon();
+    if (run === null) return;
+    expeditionUi?.setResumeAvailable(false);
+    expeditionUi?.showSummary(run);
+  } catch (error) {
+    console.error("Unable to abandon Expedition.", error);
+    showNotice(
+      "Expedition save failed · reload resumes the previous safe boundary",
+    );
+  }
+}
+
+async function returnFromExpedition(): Promise<void> {
+  const snapshot = expeditionCampaignSnapshot;
+  if (snapshot === null) {
+    showNotice("Campaign restore snapshot is unavailable");
+    return;
+  }
+
+  expeditionUi?.close();
+  game.backToTitle();
+  applyAutosaveSnapshot(snapshot);
+  refreshPersistentStateUi();
+  expeditionSession.release();
+  expeditionCampaignSnapshot = null;
+  expeditionUi?.setResumeAvailable(false);
+  showNotice("Campaign restored · Expedition did not change Campaign economy");
+}
+
 const testLab = mountTestLab({
   getSettings: () => settings,
   getVocabulary: () => configuredVocabulary,
   showNotice,
 });
+
+expeditionUi = mountExpeditionUi({
+  onStart: () => void startNewExpedition(),
+  onResume: () => void resumeExpedition(),
+  onConfirm: (choiceId, replacementRelicId) =>
+    void confirmExpeditionDraft(choiceId, replacementRelicId),
+  onAbandon: abandonCurrentExpedition,
+  onReturn: () => void returnFromExpedition(),
+  relicLabel: (id) =>
+    id in RELIC_REGISTRY
+      ? getRelicDefinition(id as RelicId).name
+      : id,
+});
+expeditionUi.setResumeAvailable(expeditionSession.hasResumableRun());
 
 byId<HTMLButtonElement>("anomalyStabilize").addEventListener(
   "click",
@@ -6312,6 +6745,7 @@ async function startActiveHiddenEncounter(
 }
 
 async function startSelectedStage(): Promise<void> {
+  if (expeditionSession.ownsCampaignPersistence()) return;
   if (
     !persistenceReady ||
     !vocabularyReady ||
@@ -6444,6 +6878,13 @@ async function autosaveCampaign(
   successMessage?: string,
   recoveryReason?: CrashRecoveryReason,
 ): Promise<boolean> {
+  if (expeditionSession.ownsCampaignPersistence()) {
+    if (successMessage !== undefined) {
+      showNotice("Expedition · Campaign save is intentionally unchanged");
+    }
+    return true;
+  }
+
   if (testingStagePreviewActive()) {
     if (successMessage !== undefined) {
       showNotice("Testing preview · progress/rewards are not saved");
@@ -8743,6 +9184,7 @@ window.addEventListener("resize", () => game.resize());
 
 function persistPageLifecycleRecovery(): void {
   saveRecallMemory();
+  if (expeditionSession.ownsCampaignPersistence()) return;
   if (!persistenceReady) return;
 
   const savedAt = new Date().toISOString();
