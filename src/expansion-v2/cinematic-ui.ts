@@ -9,6 +9,7 @@ import {
 export function playExpansionReferenceCinematic(options: {
   title: string;
   subtitle: string;
+  signal?: AbortSignal;
 }): Promise<"complete" | "skipped"> {
   return new Promise((resolve) => {
     const root = document.createElement("div");
@@ -76,14 +77,21 @@ export function playExpansionReferenceCinematic(options: {
       if (finished) return;
       finished = true;
       cancelAnimationFrame(raf);
+      options.signal?.removeEventListener("abort", abort);
       root.remove();
       resolve(result);
     };
 
-    skip.addEventListener("click", () => {
+    const abort = () => {
       state = skipCinematic(state);
       finish("skipped");
-    });
+    };
+    skip.addEventListener("click", abort);
+    if (options.signal?.aborted) {
+      abort();
+      return;
+    }
+    options.signal?.addEventListener("abort", abort, { once: true });
 
     const tick = (now: number) => {
       const dt = Math.min(0.1, Math.max(0, (now - previous) / 1000));

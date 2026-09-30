@@ -1112,6 +1112,7 @@ let campaignReferenceEventUi: CampaignReferenceEventUi | null = null;
 let expeditionCampaignSnapshot: AutosaveSnapshot | null = null;
 let expeditionStartPending = false;
 let expansionEncounterRuntime: ExpansionEncounterRuntime | null = null;
+let expansionQaCinematicAbort: AbortController | null = null;
 let expansionV2Profile: ExpansionV2Profile =
   loadExpansionV2Profile(localStorage);
 let expeditionActiveSecondsTotal = 0;
@@ -1134,6 +1135,27 @@ function persistExpansionV2Profile(
     console.error("Unable to save Expansion V2 profile.", error);
     showNotice("Expansion V2 profile save failed");
   }
+}
+
+function stopExpansionCinematicQa(): void {
+  expansionQaCinematicAbort?.abort();
+  expansionQaCinematicAbort = null;
+}
+
+function startExpansionCinematicQa(): void {
+  stopExpansionCinematicQa();
+  const controller = new AbortController();
+  expansionQaCinematicAbort = controller;
+  void playExpansionReferenceCinematic({
+    title: "Expansion V2 Reference",
+    subtitle:
+      "Test Lab greybox · start / focus / resolve / cleanup",
+    signal: controller.signal,
+  }).finally(() => {
+    if (expansionQaCinematicAbort === controller) {
+      expansionQaCinematicAbort = null;
+    }
+  });
 }
 
 function recordExpeditionTerminalProfile(run: ExpeditionRun): void {
@@ -4483,6 +4505,7 @@ async function startExpeditionEncounter(
   const isFinalEncounter =
     encounter.index === run.encounterPlan.length - 1;
   if (isFinalEncounter && !replay) {
+    stopExpansionCinematicQa();
     await playExpansionReferenceCinematic({
       title: "Final Approach",
       subtitle:
@@ -4783,6 +4806,8 @@ const testLab = mountTestLab({
     startWithSeed: (seed) => void startNewExpedition(seed),
     forcePhase: forceExpeditionQaPhase,
     failNextSave: () => expeditionStorage.injectFailureOnce(),
+    startCinematic: startExpansionCinematicQa,
+    stopCinematic: stopExpansionCinematicQa,
     snapshot: () => ({
       run: expeditionSession.currentRun(),
       revision: expeditionSession.currentRevision(),
@@ -9928,6 +9953,7 @@ window.addEventListener(
 );
 
 window.addEventListener("beforeunload", () => {
+  stopExpansionCinematicQa();
   saveRecallMemory();
   stopSpeech();
   musicController.destroy();

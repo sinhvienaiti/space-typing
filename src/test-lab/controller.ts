@@ -130,6 +130,12 @@ import {
 import type { EnemyFamilyId } from "../enemies/families";
 import type { EnemyMaterial } from "../enemies/identity";
 import type { PlayerImpactVariant } from "../characters/projectiles";
+import {
+  ENCOUNTER_RECIPE_IDS,
+  TYPING_PATTERN_IDS,
+  type EncounterRecipeId,
+  type TypingPatternId,
+} from "../expansion-v2/contracts";
 
 const TEST_LAB_PRESET_KEY = "spaceTypingTestLabPresetV1";
 
@@ -149,8 +155,10 @@ const TEST_LAB_PRESETS = [
 
 export type TestLabExpeditionQa = {
   startWithSeed(seed: number): void;
-  forcePhase(phase: "draft" | "encounter" | "defeat"): void;
+  forcePhase(phase: "draft" | "rest" | "encounter" | "defeat"): void;
   failNextSave(): void;
+  startCinematic?(): void;
+  stopCinematic?(): void;
   snapshot(): unknown;
 };
 
@@ -743,8 +751,18 @@ export function mountTestLab(
             <label>Fixed seed<input data-field="expedition-seed" type="number" min="1" value="424242"></label>
             <label>Force phase<select data-field="expedition-phase">
               <option value="draft">draft + materialized offer</option>
+              <option value="rest">rest boundary</option>
               <option value="encounter">encounter</option>
               <option value="defeat">terminal defeat</option>
+            </select></label>
+          </div>
+          <div class="test-lab-grid">
+            <label>Pattern<select data-field="expansion-v2-pattern">
+              ${TYPING_PATTERN_IDS.map((id) => `<option value="${id}">${id}</option>`).join("")}
+            </select></label>
+            <label>Recipe<select data-field="expansion-v2-recipe">
+              <option value="normal">normal</option>
+              ${ENCOUNTER_RECIPE_IDS.map((id) => `<option value="${id}">${id}</option>`).join("")}
             </select></label>
           </div>
           <div class="test-lab-row">
@@ -752,6 +770,10 @@ export function mountTestLab(
             <button type="button" data-action="expedition-force-phase">Force Phase / Offer</button>
             <button type="button" data-action="expedition-fail-save">Fail Next Save</button>
             <button type="button" data-action="expedition-refresh">Refresh Snapshot</button>
+            <button type="button" data-action="expansion-v2-runtime">Apply Pattern / Recipe</button>
+            <button type="button" data-action="expansion-v2-boss-parts">Spawn Reference Boss Parts</button>
+            <button type="button" data-action="expansion-v2-cinematic-start">Start Cinematic</button>
+            <button type="button" data-action="expansion-v2-cinematic-stop">Stop Cinematic</button>
           </div>
           <pre class="test-lab-mini-inspector" data-role="expedition-qa"></pre>
         </details>
@@ -2081,6 +2103,7 @@ export function mountTestLab(
         )?.value ?? "draft";
       if (
         phase === "draft" ||
+        phase === "rest" ||
         phase === "encounter" ||
         phase === "defeat"
       ) {
@@ -2098,6 +2121,76 @@ export function mountTestLab(
     }
     if (action === "expedition-refresh") {
       renderExpeditionQa();
+      return;
+    }
+    if (action === "expansion-v2-runtime") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      const patternValue = inputValue(
+        dialog,
+        '[data-field="expansion-v2-pattern"]',
+      );
+      const recipeValue = inputValue(
+        dialog,
+        '[data-field="expansion-v2-recipe"]',
+      );
+      const pattern = (
+        TYPING_PATTERN_IDS as readonly string[]
+      ).includes(patternValue)
+        ? patternValue as TypingPatternId
+        : "normal-word";
+      const recipe =
+        recipeValue === "normal" ||
+        (ENCOUNTER_RECIPE_IDS as readonly string[]).includes(recipeValue)
+          ? recipeValue as EncounterRecipeId | "normal"
+          : "normal";
+      activeGame.setExpansionEncounterContext({
+        encounterId: "test-lab-expansion-v2",
+        pattern,
+        recipe,
+        gameplaySeed: Math.max(
+          1,
+          Math.floor(
+            numberValue(
+              dialog,
+              '[data-field="expedition-seed"]',
+              424242,
+            ),
+          ),
+        ),
+      });
+      notice(
+        "Expansion V2 runtime applied · " +
+          recipe +
+          " · " +
+          pattern,
+      );
+      renderInspector();
+      return;
+    }
+    if (action === "expansion-v2-boss-parts") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      activeGame.setExpansionEncounterContext({
+        encounterId: "test-lab-boss-parts",
+        pattern: "long-word",
+        recipe: "boss-prelude",
+        gameplaySeed: 424242,
+        bossParts: true,
+      });
+      activeGame.testLabSpawnBoss();
+      notice("Reference boss parts spawned through production boss logic");
+      renderInspector();
+      return;
+    }
+    if (action === "expansion-v2-cinematic-start") {
+      options.expeditionQa?.startCinematic?.();
+      notice("Expansion V2 cinematic start requested");
+      return;
+    }
+    if (action === "expansion-v2-cinematic-stop") {
+      options.expeditionQa?.stopCinematic?.();
+      notice("Expansion V2 cinematic stop requested");
       return;
     }
     if (
