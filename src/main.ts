@@ -4938,10 +4938,11 @@ expeditionUi.setEvolutionTier(
   expansionEvolutionTier(expansionV2Profile),
 );
 expeditionUi.setGhostEnabled(expansionV2Profile.ghostEnabled);
-installMenuHelp();
 if (!expansionV2Enabled) {
   expeditionUi?.destroy();
   expeditionUi = null;
+} else {
+  installMenuHelp();
 }
 
 campaignReferenceEventUi = mountCampaignReferenceEventUi({
