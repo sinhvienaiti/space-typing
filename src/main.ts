@@ -2,6 +2,7 @@ import "./styles.css";
 import "./character-progress.css";
 import "./basic-skills.css";
 import "./kill-translation.css";
+import "./duel/battle.css";
 import { installDuelOnlineRoomController } from "./duel/online-room-controller";
 import { installDuelBattleUi } from "./duel/battle-ui";
 import {
