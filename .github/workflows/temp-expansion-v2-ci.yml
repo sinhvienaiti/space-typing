@@ -1,0 +1,25 @@
+name: Temporary Expansion V2 CI
+
+on:
+  push:
+    branches:
+      - "feat/1000-stage-expansion-v2-full"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.21.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vitest run tests/expedition-p10.test.ts tests/expedition-session.test.ts tests/expansion-v2-contracts.test.ts
+      - run: pnpm build
