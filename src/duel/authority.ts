@@ -678,7 +678,6 @@ export class DuelAuthorityService {
   acceptMessage(
     sessionId: string,
     now: number,
-    isTypeChar: boolean,
   ): DuelAuthorityResult<true> {
     const session = this.sessions.get(sessionId);
     if (session === undefined) {
@@ -704,23 +703,36 @@ export class DuelAuthorityService {
     }
     session.messageTimes.push(now);
 
-    if (isTypeChar) {
-      session.typeCharTimes = session.typeCharTimes.filter(
-        (time) => now - time < 1000,
-      );
-      if (
-        session.typeCharTimes.length >=
-        this.config.maxTypeCharsPerSecond
-      ) {
-        return {
-          ok: false,
-          code: "INPUT_RATE_IMPOSSIBLE",
-          message:
-            "Typing rate exceeded the competitive ceiling.",
-        };
-      }
-      session.typeCharTimes.push(now);
+    return { ok: true, value: true };
+  }
+
+  private acceptTypeChar(
+    sessionId: string,
+    now: number,
+  ): DuelAuthorityResult<true> {
+    const session = this.sessions.get(sessionId);
+    if (session === undefined) {
+      return {
+        ok: false,
+        code: "SESSION_NOT_FOUND",
+        message: "Duel session does not exist.",
+      };
     }
+    session.typeCharTimes = session.typeCharTimes.filter(
+      (time) => now - time < 1000,
+    );
+    if (
+      session.typeCharTimes.length >=
+      this.config.maxTypeCharsPerSecond
+    ) {
+      return {
+        ok: false,
+        code: "INPUT_RATE_IMPOSSIBLE",
+        message:
+          "Typing rate exceeded the competitive ceiling.",
+      };
+    }
+    session.typeCharTimes.push(now);
     return { ok: true, value: true };
   }
 
@@ -1189,7 +1201,6 @@ export class DuelAuthorityService {
     const rate = this.acceptMessage(
       sessionId,
       input.now,
-      input.intent.type === "TYPE_CHAR",
     );
     if (!rate.ok) return rate;
 
@@ -1201,6 +1212,14 @@ export class DuelAuthorityService {
         "STALE_SEQUENCE",
         "Intent sequence is stale or duplicated.",
       );
+    }
+
+    if (input.intent.type === "TYPE_CHAR") {
+      const typingRate = this.acceptTypeChar(
+        sessionId,
+        input.now,
+      );
+      if (!typingRate.ok) return typingRate;
     }
 
     match.engine.enqueueIntent(
