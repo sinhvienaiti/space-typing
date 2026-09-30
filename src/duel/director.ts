@@ -52,6 +52,7 @@ export class DuelMapDirector {
   private readonly mapId: DuelMapId;
   private readonly rng: ReturnType<DuelRngStreams["domain"]>;
   private elapsedUntilHazard: number;
+  private lastPhase: DuelMatchPhase = "build";
   private sequence = 0;
   private cataclysmEmitted = false;
 
@@ -74,6 +75,20 @@ export class DuelMapDirector {
     phase: DuelMatchPhase,
   ): DuelDirectorEvent[] {
     const events: DuelDirectorEvent[] = [];
+    if (phase !== this.lastPhase) {
+      if (phase === "build") {
+        this.elapsedUntilHazard = PHASE_INTERVAL_SECONDS.build;
+      } else if (this.lastPhase === "build") {
+        this.elapsedUntilHazard = PHASE_INTERVAL_SECONDS[phase];
+      } else {
+        this.elapsedUntilHazard = Math.min(
+          this.elapsedUntilHazard,
+          PHASE_INTERVAL_SECONDS[phase],
+        );
+      }
+      this.lastPhase = phase;
+    }
+
     if (phase === "cataclysm" && !this.cataclysmEmitted) {
       this.cataclysmEmitted = true;
       const map = duelMapProfile(this.mapId);
@@ -134,6 +149,7 @@ export class DuelMapDirector {
 
   resetRound(): void {
     this.elapsedUntilHazard = PHASE_INTERVAL_SECONDS.build;
+    this.lastPhase = "build";
     this.sequence = 0;
     this.cataclysmEmitted = false;
   }
