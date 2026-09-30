@@ -308,8 +308,7 @@ describe("Duel M-DUEL-11 authority core", () => {
         roundId,
         sequence: 1,
         intent: {
-          type: "TYPE_CHAR",
-          char: "a",
+          type: "SELECT_TARGET",
           targetInstanceId: target.instanceId,
         },
         now: 12,
@@ -327,7 +326,7 @@ describe("Duel M-DUEL-11 authority core", () => {
         roundId,
         sequence: 2,
         intent: { type: "TYPE_CHAR", char: "a" },
-        now: 20,
+        now: 1100,
       }).ok,
     ).toBe(true);
     expect(
@@ -336,7 +335,7 @@ describe("Duel M-DUEL-11 authority core", () => {
         roundId,
         sequence: 3,
         intent: { type: "TYPE_CHAR", char: "b" },
-        now: 21,
+        now: 1101,
       }).ok,
     ).toBe(true);
     expect(
@@ -345,7 +344,7 @@ describe("Duel M-DUEL-11 authority core", () => {
         roundId,
         sequence: 4,
         intent: { type: "TYPE_CHAR", char: "c" },
-        now: 22,
+        now: 1102,
       }),
     ).toEqual(
       expect.objectContaining({
