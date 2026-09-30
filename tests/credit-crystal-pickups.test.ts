@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CombatCreditRewardReceipt } from "../src/rewards/combat-credit-drops";
 import {
   CreditCrystalPickupSystem,
+  type CreditCrystalCollectionEvent,
   type CreditCrystalPoint,
 } from "../src/vfx/credit-crystal-pickups";
 
@@ -49,7 +50,7 @@ describe("CreditCrystalPickupSystem", () => {
     advance(system, 0.12, { x: 600, y: 600 });
     expect(system.phaseSnapshot()).toEqual(["magnet"]);
 
-    let events = [];
+    let events: CreditCrystalCollectionEvent[] = [];
     for (let i = 0; i < 240 && events.length === 0; i += 1) {
       events = system.update(1 / 60, { x: 600, y: 600 });
     }
