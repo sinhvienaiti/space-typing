@@ -9699,7 +9699,6 @@ export class Game {
     const { x, y } = this.bossPosition();
     const radius =
       boss.role === "major-boss" ? 82 : boss.role === "boss" ? 70 : 60;
-    const pulse = 0.88 + Math.sin(time * 4.5) * 0.12;
     const warning = telegraphStrength(boss.actionCooldown, 1.1);
     const warningPulse = telegraphPulse(warning, time);
 
