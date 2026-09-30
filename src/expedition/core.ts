@@ -1,6 +1,6 @@
 export const EXPEDITION_RUN_VERSION = 1 as const;
-export const EXPEDITION_RULESET_VERSION = "p10-v1";
-export const EXPEDITION_CONTENT_VERSION = "p10-world-01-v1";
+export const EXPEDITION_RULESET_VERSION = "expansion-v2-v1";
+export const EXPEDITION_CONTENT_VERSION = "expansion-v2-world-01-v1";
 export const EXPEDITION_START_KIT_ID = "loaner-vanguard-v1";
 
 export type ExpeditionPhase =
@@ -83,6 +83,11 @@ export type ExpeditionRun = {
   startKitId: typeof EXPEDITION_START_KIT_ID;
   wordPool: ExpeditionWordPool;
   profile: ExpeditionProfile;
+  challenge?: {
+    kind: "prototype" | "daily";
+    dayKey: string | null;
+    identityKey: string | null;
+  };
   phase: ExpeditionPhase;
   encounterPlan: ExpeditionEncounterPlanItem[];
   currentEncounterIndex: number;
@@ -256,6 +261,7 @@ export function createExpeditionRun(input: {
   campaignFixture: unknown;
   startingResources: ExpeditionResources;
   maxEquippedRelics?: number;
+  challenge?: ExpeditionRun["challenge"];
 }): ExpeditionRun {
   if (input.runId.trim().length === 0) throw new Error("Expedition runId is required.");
   if (
@@ -280,6 +286,10 @@ export function createExpeditionRun(input: {
       entries: input.wordPool.entries.map((entry) => ({ ...entry })),
     },
     profile: { ...input.profile },
+    challenge:
+      input.challenge === undefined
+        ? undefined
+        : { ...input.challenge },
     phase: "setup",
     encounterPlan: input.encounterPlan.map((item) => ({ ...item })),
     currentEncounterIndex: 0,

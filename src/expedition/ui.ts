@@ -6,6 +6,7 @@ import type {
 
 export type ExpeditionUi = {
   setResumeAvailable(available: boolean): void;
+  setEvolutionTier(tier: number): void;
   showDraft(run: ExpeditionRun): void;
   showBriefing(run: ExpeditionRun): void;
   showRest(run: ExpeditionRun): void;
@@ -16,6 +17,7 @@ export type ExpeditionUi = {
 
 export function mountExpeditionUi(options: {
   onStart(): void;
+  onDailyStart(): void;
   onResume(): void;
   onConfirm(choiceId: string, replacementRelicId: string | null): void;
   onContinue(): void;
@@ -38,7 +40,12 @@ export function mountExpeditionUi(options: {
     if (resumeAvailable) options.onResume();
     else options.onStart();
   });
-  actions.append(launch);
+  const daily = document.createElement("button");
+  daily.type = "button";
+  daily.id = "expeditionDailyButton";
+  daily.textContent = "Daily Expedition";
+  daily.addEventListener("click", options.onDailyStart);
+  actions.append(launch, daily);
 
   const dialog = document.createElement("dialog");
   dialog.id = "expeditionDialog";
@@ -288,6 +295,16 @@ export function mountExpeditionUi(options: {
       launch.textContent = available
         ? "Resume Expedition V2"
         : "Expedition V2";
+      daily.disabled = available;
+    },
+    setEvolutionTier(tier) {
+      const safe = Math.max(0, Math.min(3, Math.floor(tier)));
+      launch.dataset.evolutionTier = String(safe);
+      launch.textContent = resumeAvailable
+        ? "Resume Expedition V2"
+        : safe === 0
+          ? "Expedition V2"
+          : "Expedition V2 · E" + String(safe);
     },
     showDraft,
     showBriefing,
@@ -298,6 +315,7 @@ export function mountExpeditionUi(options: {
     },
     destroy() {
       launch.remove();
+      daily.remove();
       dialog.remove();
     },
   };

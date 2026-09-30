@@ -416,6 +416,9 @@ import { DEFAULT_PLAYER_BASE_STATS } from "./stats/player";
 import { mountTestLab } from "./test-lab/controller";
 import { AutosaveQueue } from "./persistence/autosave";
 import {
+  EXPEDITION_CONTENT_VERSION,
+  EXPEDITION_RULESET_VERSION,
+  EXPEDITION_START_KIT_ID,
   createExpeditionRun,
   currentExpeditionEncounter,
   hashText,
@@ -437,6 +440,34 @@ import type {
   SectorConditionId,
   TypingPatternId,
 } from "./expansion-v2/contracts";
+import {
+  dailySeed,
+  fixedChallengeIdentityKey,
+  utcDayKey,
+} from "./expansion-v2/challenge";
+import {
+  appendGhostPoint,
+  commitLearningToExpansionProfile,
+  expansionEvolutionTier,
+  loadExpansionV2Profile,
+  markExpansionCinematicSeen,
+  recordExpansionRun,
+  recordFixedChallengePb,
+  saveExpansionV2Profile,
+  type ExpansionV2Profile,
+} from "./expansion-v2/profile-store";
+import { evidenceFromCompletion } from "./expansion-v2/learning";
+import {
+  markNemesisReturn,
+  recordNemesisDefeat,
+  resolveNemesis,
+} from "./expansion-v2/nemesis";
+import {
+  playExpansionReferenceCinematic,
+} from "./expansion-v2/cinematic-ui";
+import {
+  campaignStageExpansionProfile,
+} from "./expansion-v2/campaign-rollout";
 import { createExpeditionLoanerState } from "./expedition/loaner";
 import {
   ExpeditionSession,
@@ -1061,6 +1092,52 @@ let expeditionUi: ExpeditionUi | null = null;
 let expeditionCampaignSnapshot: AutosaveSnapshot | null = null;
 let expeditionStartPending = false;
 let expansionEncounterRuntime: ExpansionEncounterRuntime | null = null;
+let expansionV2Profile: ExpansionV2Profile =
+  loadExpansionV2Profile(localStorage);
+let expeditionActiveSecondsTotal = 0;
+
+function persistExpansionV2Profile(
+  next: ExpansionV2Profile,
+): void {
+  try {
+    expansionV2Profile = saveExpansionV2Profile(
+      localStorage,
+      next,
+    );
+    expeditionUi?.setEvolutionTier(
+      expansionEvolutionTier(expansionV2Profile),
+    );
+  } catch (error) {
+    console.error("Unable to save Expansion V2 profile.", error);
+    showNotice("Expansion V2 profile save failed");
+  }
+}
+
+function recordExpeditionTerminalProfile(run: ExpeditionRun): void {
+  let next = recordExpansionRun(expansionV2Profile, {
+    runId: run.runId,
+    score: run.totalScore,
+    completed: run.phase === "victory",
+  });
+  const identityKey = run.challenge?.identityKey ?? null;
+  if (run.challenge?.kind === "daily" && identityKey !== null) {
+    const accuracy =
+      run.completedEncounters > 0
+        ? run.accuracySum / run.completedEncounters
+        : 0;
+    next = recordFixedChallengePb(next, {
+      identityKey,
+      runId: run.runId,
+      completedEncounters: run.completedEncounters,
+      score: run.totalScore,
+      accuracy,
+      activeSeconds: expeditionActiveSecondsTotal,
+      retried: run.retryCount > 0,
+      assisted: run.profile.assist !== "standard",
+    });
+  }
+  persistExpansionV2Profile(next);
+}
 
 const campaignAutosave = new AutosaveQueue<
   AutosaveSnapshot,
@@ -3293,6 +3370,7 @@ const game = new Game(
             if (ended !== null) {
               expansionEncounterRuntime = null;
               game.setExpansionEncounterContext(null);
+              recordExpeditionTerminalProfile(ended);
               expeditionUi?.setResumeAvailable(false);
               expeditionUi?.showSummary(ended);
             }
@@ -3322,6 +3400,14 @@ const game = new Game(
           byId("phoenixCoreButton").classList.add("hidden");
           setDeathNavigationDisabled(false);
         } else {
+          persistExpansionV2Profile({
+            ...expansionV2Profile,
+            nemesis: recordNemesisDefeat(
+              expansionV2Profile.nemesis,
+              "stage-threat-" + String(stats.stage),
+              stats.stage,
+            ),
+          });
           const deathAt = new Date().toISOString();
           markCrashRecoveryDeathInvalid(deathAt);
           renderDeathProtectionChoices(stats.stage);
@@ -3331,6 +3417,21 @@ const game = new Game(
     onStage: (stage) => {
       recallStage = { attempts: 0, perfect: 0, hints: 0, replays: 0, responseMs: 0 };
       renderStage(stage);
+      const activeNemesis = expansionV2Profile.nemesis.active;
+      if (
+        expeditionSession.currentRun() === null &&
+        activeNemesis !== null &&
+        !activeNemesis.resolved &&
+        activeNemesis.sourceStage === stage
+      ) {
+        persistExpansionV2Profile({
+          ...expansionV2Profile,
+          nemesis: markNemesisReturn(
+            expansionV2Profile.nemesis,
+          ),
+        });
+        showNotice("Nemesis signal reacquired");
+      }
       codex = discoverCodexWorld(codex, worldForStage(stage).id).state;
     },
     onStagePhase: (phase) => {
@@ -3376,7 +3477,24 @@ const game = new Game(
             const completedRuntime = expansionEncounterRuntime;
             expansionEncounterRuntime = null;
             game.setExpansionEncounterContext(null);
-            for (const fact of completedRuntime?.learningFacts ?? []) {
+            const facts = completedRuntime?.learningFacts ?? [];
+            const evidence = facts
+              .map((fact) =>
+                evidenceFromCompletion(run.runId, fact),
+              )
+              .filter(
+                (item): item is NonNullable<typeof item> =>
+                  item !== null,
+              );
+            if (evidence.length > 0) {
+              persistExpansionV2Profile(
+                commitLearningToExpansionProfile(
+                  expansionV2Profile,
+                  evidence,
+                ),
+              );
+            }
+            for (const fact of facts) {
               postLearningEvent(
                 buildCombatLearningEvent({
                   entry: fact.entry,
@@ -3384,7 +3502,31 @@ const game = new Game(
                 }),
               );
             }
+
+            expeditionActiveSecondsTotal +=
+              stageSession.elapsedSeconds;
+            const identityKey =
+              run.challenge?.identityKey ?? null;
+            if (identityKey !== null) {
+              persistExpansionV2Profile(
+                appendGhostPoint(
+                  expansionV2Profile,
+                  identityKey,
+                  {
+                    encounterIndex: Math.max(
+                      0,
+                      run.completedEncounters - 1,
+                    ),
+                    activeSeconds:
+                      expeditionActiveSecondsTotal,
+                    cumulativeScore: run.totalScore,
+                  },
+                ),
+              );
+            }
+
             if (run.terminal !== null) {
+              recordExpeditionTerminalProfile(run);
               expeditionUi?.setResumeAvailable(false);
               expeditionUi?.showSummary(run);
             } else if (run.phase === "draft") {
@@ -3405,6 +3547,33 @@ const game = new Game(
           );
         }
         return;
+      }
+
+      const activeNemesis = expansionV2Profile.nemesis.active;
+      if (
+        activeNemesis !== null &&
+        !activeNemesis.resolved &&
+        activeNemesis.sourceStage === stats.stage &&
+        activeNemesis.returns > 0
+      ) {
+        const resolved = resolveNemesis(
+          expansionV2Profile.nemesis,
+        );
+        persistExpansionV2Profile({
+          ...expansionV2Profile,
+          nemesis: resolved.state,
+          campaignEventFlags: resolved.grantReward
+            ? [
+                ...new Set([
+                  ...expansionV2Profile.campaignEventFlags,
+                  "nemesis-reward:" + activeNemesis.id,
+                ]),
+              ]
+            : expansionV2Profile.campaignEventFlags,
+        });
+        if (resolved.grantReward) {
+          showNotice("Nemesis resolved · evolution mark earned");
+        }
       }
 
       saveRecallMemory();
@@ -4086,11 +4255,29 @@ function buildExpeditionRun(
   seed: number,
   campaignFixture: AutosaveSnapshot,
   startingResources: ExpeditionResources,
+  challengeKind: "prototype" | "daily" = "prototype",
 ): ExpeditionRun {
+  const wordPool = expeditionWordPool();
+  const dayKey =
+    challengeKind === "daily" ? utcDayKey() : null;
+  const identityKey =
+    challengeKind === "daily" && dayKey !== null
+      ? fixedChallengeIdentityKey({
+          dayKey,
+          seed,
+          rulesetVersion: EXPEDITION_RULESET_VERSION,
+          contentVersion: EXPEDITION_CONTENT_VERSION,
+          wordPoolHash: wordPool.hash,
+          startKitId: EXPEDITION_START_KIT_ID,
+          difficulty: difficultySettings.mode,
+          assist: "standard",
+          adaptivePolicy: "frozen",
+        })
+      : null;
   return createExpeditionRun({
     runId,
     seed,
-    wordPool: expeditionWordPool(),
+    wordPool,
     profile: {
       difficulty: difficultySettings.mode,
       assist: "standard",
@@ -4106,6 +4293,11 @@ function buildExpeditionRun(
     campaignFixture,
     startingResources,
     maxEquippedRelics: MAX_EQUIPPED_RELICS,
+    challenge: {
+      kind: challengeKind,
+      dayKey,
+      identityKey,
+    },
   });
 }
 
@@ -4165,6 +4357,22 @@ async function startExpeditionEncounter(
     condition,
   );
 
+  const isFinalEncounter =
+    encounter.index === run.encounterPlan.length - 1;
+  if (isFinalEncounter && !replay) {
+    await playExpansionReferenceCinematic({
+      title: "Final Approach",
+      subtitle:
+        "Your run build is locked. Break the reference boss and its targetable parts.",
+    });
+    persistExpansionV2Profile(
+      markExpansionCinematicSeen(
+        expansionV2Profile,
+        "expedition-v2-final-reference",
+      ),
+    );
+  }
+
   const world = worldForStage(stage.stage);
   await presentStageTransition(
     createStageTransitionSpec({
@@ -4185,6 +4393,7 @@ async function startExpeditionEncounter(
 
 async function startNewExpedition(
   seedOverride?: number,
+  challengeKind: "prototype" | "daily" = "prototype",
 ): Promise<void> {
   if (
     !persistenceReady ||
@@ -4196,6 +4405,7 @@ async function startNewExpedition(
   }
 
   expeditionStartPending = true;
+  expeditionActiveSecondsTotal = 0;
   const snapshot = structuredClone(currentAutosaveSnapshot());
   expeditionCampaignSnapshot = snapshot;
 
@@ -4215,6 +4425,7 @@ async function startNewExpedition(
         maxEnergy: DEFAULT_PLAYER_BASE_STATS.energy,
         power: 0,
       },
+      challengeKind,
     );
 
     applyExpeditionLoaner(provisional);
@@ -4223,6 +4434,7 @@ async function startNewExpedition(
       seed,
       snapshot,
       expeditionResourcesFromPlayerStats(),
+      challengeKind,
     );
     const draft = expeditionSession.start(run, RELIC_IDS);
     expeditionUi?.setResumeAvailable(true);
@@ -4258,6 +4470,17 @@ async function resumeExpedition(): Promise<void> {
       expeditionUi?.setResumeAvailable(false);
       showNotice("No active Expedition to resume");
       return;
+    }
+
+    const resumeIdentity = run.challenge?.identityKey ?? null;
+    if (resumeIdentity !== null) {
+      const ghost =
+        expansionV2Profile.ghostByIdentity[resumeIdentity];
+      expeditionActiveSecondsTotal =
+        ghost?.points.reduce(
+          (max, point) => Math.max(max, point.activeSeconds),
+          0,
+        ) ?? 0;
     }
 
     if (run.phase === "draft") {
@@ -4365,6 +4588,7 @@ function abandonCurrentExpedition(): void {
     if (run === null) return;
     expansionEncounterRuntime = null;
     game.setExpansionEncounterContext(null);
+    recordExpeditionTerminalProfile(run);
     expeditionUi?.setResumeAvailable(false);
     expeditionUi?.showSummary(run);
   } catch (error) {
@@ -4453,6 +4677,13 @@ const testLab = mountTestLab({
 
 expeditionUi = mountExpeditionUi({
   onStart: () => void startNewExpedition(),
+  onDailyStart: () => {
+    const dayKey = utcDayKey();
+    void startNewExpedition(
+      dailySeed(dayKey, EXPEDITION_RULESET_VERSION),
+      "daily",
+    );
+  },
   onResume: () => void resumeExpedition(),
   onConfirm: (choiceId, replacementRelicId) =>
     void confirmExpeditionDraft(choiceId, replacementRelicId),
@@ -4466,6 +4697,9 @@ expeditionUi = mountExpeditionUi({
       : id,
 });
 expeditionUi.setResumeAvailable(expeditionSession.hasResumableRun());
+expeditionUi.setEvolutionTier(
+  expansionEvolutionTier(expansionV2Profile),
+);
 
 byId<HTMLButtonElement>("anomalyStabilize").addEventListener(
   "click",
@@ -7073,6 +7307,23 @@ async function startSelectedStage(): Promise<void> {
       );
     }
 
+    const expansionProfile =
+      campaignStageExpansionProfile(stage.stage);
+    if (
+      !testingPreview &&
+      stage.stage >= 11 &&
+      stage.stage <= 100
+    ) {
+      game.setExpansionEncounterContext({
+        encounterId: "campaign:" + String(stage.stage),
+        pattern: expansionProfile.pattern,
+        gameplaySeed: stage.seed,
+        bossParts: false,
+      });
+    } else {
+      game.setExpansionEncounterContext(null);
+    }
+
     await presentStageTransition(
       createStageTransitionSpec({
         stage: stage.stage,
@@ -7420,6 +7671,8 @@ function renderStagePreview(): void {
   title.textContent =
     "Stage " + String(stage).padStart(3, "0") +
     " · " + (node.role === "normal" ? "Combat" : node.role.replace(/-/g, " "));
+  const expansionProfile =
+    campaignStageExpansionProfile(stage);
   byId("stagePreviewMeta").textContent =
     world.name + " · " +
     (isTestingPreview
@@ -7429,7 +7682,11 @@ function renderStagePreview(): void {
         : isUnlocked
           ? "Current frontier"
           : "Locked") +
-    (node.checkpoint ? " · Checkpoint milestone" : "");
+    (node.checkpoint ? " · Checkpoint milestone" : "") +
+    " · V2 " +
+    expansionProfile.band.replaceAll("-", " ") +
+    " · " +
+    expansionProfile.routePreview;
   const start = byId<HTMLButtonElement>("journeyStartButton");
   start.disabled = !isUnlocked || journeyStartGate.active;
   start.textContent = journeyStartGate.active
