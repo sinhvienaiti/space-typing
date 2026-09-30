@@ -55,6 +55,8 @@ const ACTIONS = [
       mode: "attached-token",
       counterTags: ["intercept", "barrier"],
       windowSeconds: 2.8,
+      displayLabel: "INTERCEPT",
+      answerToken: "intercept",
     },
     contentVersion: DUEL_CONTENT_VERSION,
   },
@@ -234,11 +236,23 @@ export function validateDuelActionDefinitions(
           ": strong attack requires a deterministic response opportunity.",
       );
     }
-    if (
-      action.responseOpportunity !== undefined &&
-      action.responseOpportunity.windowSeconds <= 0
-    ) {
-      errors.push(action.id + ": response window must be positive.");
+    if (action.responseOpportunity !== undefined) {
+      if (action.responseOpportunity.windowSeconds <= 0) {
+        errors.push(action.id + ": response window must be positive.");
+      }
+      if (
+        !isValidDuelAnswerToken(
+          action.responseOpportunity.answerToken,
+        ) ||
+        normalizeDuelAnswerToken(
+          action.responseOpportunity.displayLabel,
+        ) !== action.responseOpportunity.answerToken
+      ) {
+        errors.push(
+          action.id +
+            ": response token must be normalized a-z and match its label.",
+        );
+      }
     }
   }
 

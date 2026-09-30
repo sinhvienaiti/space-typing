@@ -47,6 +47,8 @@ export type DuelResponseOpportunity = {
   mode: "attached-token" | "guaranteed-defense";
   counterTags: readonly string[];
   windowSeconds: number;
+  displayLabel: string;
+  answerToken: string;
 };
 
 export type DuelActionDefinition = {
