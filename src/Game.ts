@@ -3018,6 +3018,10 @@ export class Game {
     stage: StageConfig,
     difficulty: DifficultyProfile,
     hiddenEncounterRuntime: HiddenEncounterRuntime | null = null,
+    startingResources: Pick<
+      GameStats,
+      "hull" | "shield" | "energy" | "power"
+    > | null = null,
   ): void {
     this.sfx.unlock();
     this.stageConfig = stage;
@@ -3087,6 +3091,24 @@ export class Game {
     this.relicMistakeGuardsUsed = 0;
     this.stats = this.createGameStats(stage.stage);
     this.stageResultTracker.reset();
+    if (startingResources !== null) {
+      this.stats.hull = clamp(
+        startingResources.hull,
+        0,
+        this.stats.maxHull,
+      );
+      this.stats.shield = clamp(
+        startingResources.shield,
+        0,
+        this.stats.maxShield,
+      );
+      this.stats.energy = clamp(
+        startingResources.energy,
+        0,
+        this.stats.maxEnergy,
+      );
+      this.stats.power = clamp(startingResources.power, 0, 100);
+    }
     this.stats.shield = Math.min(
       this.stats.maxShield,
       this.stats.shield *
