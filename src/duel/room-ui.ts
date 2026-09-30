@@ -33,6 +33,8 @@ export type DuelRoomUiHooks = {
   onRemoveBotRequest?(roomId: string): void;
   onStartMatchRequest?(roomId: string): void;
   onLeaveRoomRequest?(roomId: string): void;
+  onQueueRankedRequest?(): void;
+  onLeaveRankedQueueRequest?(): void;
   onLocalPracticeReady?(snapshot: DuelRoomSnapshot): void;
 };
 
@@ -43,6 +45,16 @@ export type DuelRoomUiController = {
   clearRemoteRoom(reason?: string): void;
   setStatus(message: string, error?: boolean): void;
   setConnectionLabel(label: string): void;
+  setRankedQueueStatus(input: {
+    status: "idle" | "queued";
+    matchmakingRating?: number;
+  }): void;
+  setRankedProfile(input: {
+    typingRating: number;
+    duelRating: number;
+    matchmakingRating: number;
+  }): void;
+  setRankedMatchFound(matchId: string): void;
 };
 
 type RenderRoom =
@@ -244,6 +256,10 @@ export function installDuelRoomUi(
     el<HTMLButtonElement>("duelStartMatchButton");
   const leaveButton =
     el<HTMLButtonElement>("duelLeaveRoomButton");
+  const rankedQueueButton =
+    el<HTMLButtonElement>("duelRankedQueueButton");
+  const rankedLeaveButton =
+    el<HTMLButtonElement>("duelRankedLeaveButton");
 
   let localCounter = 0;
   let localRoom: DuelRoom | null = null;
@@ -593,6 +609,27 @@ export function installDuelRoomUi(
     },
   );
 
+  rankedQueueButton.addEventListener(
+    "click",
+    () => {
+      if (activeRoom() !== null) {
+        setStatus(
+          "Leave the current room before entering Ranked.",
+          true,
+        );
+        return;
+      }
+      hooks.onQueueRankedRequest?.();
+    },
+  );
+
+  rankedLeaveButton.addEventListener(
+    "click",
+    () => {
+      hooks.onLeaveRankedQueueRequest?.();
+    },
+  );
+
   el("duelJoinRoomButton").addEventListener(
     "click",
     () => {
@@ -651,5 +688,40 @@ export function installDuelRoomUi(
     },
     setStatus,
     setConnectionLabel,
+    setRankedQueueStatus(input) {
+      const queued = input.status === "queued";
+      rankedQueueButton.classList.toggle(
+        "hidden",
+        queued,
+      );
+      rankedLeaveButton.classList.toggle(
+        "hidden",
+        !queued,
+      );
+      el("duelRankedStatus").textContent = queued
+        ? "Queued" +
+          (input.matchmakingRating === undefined
+            ? ""
+            : " · MMR " +
+              String(input.matchmakingRating))
+        : "Not queued · normalized combat profile";
+    },
+    setRankedProfile(input) {
+      el("duelRankedProfile").textContent =
+        "Typing " +
+        String(Math.round(input.typingRating)) +
+        " · Duel " +
+        String(Math.round(input.duelRating)) +
+        " · Matchmaking " +
+        String(Math.round(input.matchmakingRating));
+    },
+    setRankedMatchFound(matchId) {
+      rankedQueueButton.classList.remove("hidden");
+      rankedLeaveButton.classList.add("hidden");
+      el("duelRankedStatus").textContent =
+        "Match found · " + matchId;
+      setStatus("Ranked match found. Loading Duel battlefield.");
+      if (dialog.open) dialog.close();
+    },
   };
 }

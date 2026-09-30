@@ -159,6 +159,15 @@ export function installDuelOnlineRoomController(
       onRoomClosed(_roomId, reason) {
         ui?.clearRemoteRoom(reason);
       },
+      onRankedQueueStatus(status) {
+        ui?.setRankedQueueStatus(status);
+      },
+      onRankedMatchFound(matchId) {
+        ui?.setRankedMatchFound(matchId);
+      },
+      onRankedProfile(profile) {
+        ui?.setRankedProfile(profile);
+      },
       onMatchUpdate(view, events) {
         ui?.setStatus(
           "Duel connected · " +
@@ -271,6 +280,16 @@ export function installDuelOnlineRoomController(
     onLeaveRoomRequest(roomId) {
       runOnline(() => {
         client.leaveRoom(roomId);
+      });
+    },
+    onQueueRankedRequest() {
+      runOnline(() => {
+        client.queueRanked();
+      });
+    },
+    onLeaveRankedQueueRequest() {
+      runOnline(() => {
+        client.leaveRankedQueue();
       });
     },
     onLocalPracticeReady(snapshot) {

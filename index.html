@@ -831,6 +831,18 @@
       </div>
       <p id="duelConnectionStatus" class="data-status">Friend Room · offline</p>
 
+      <div class="duel-ranked-strip">
+        <div>
+          <strong>Ranked</strong>
+          <small id="duelRankedStatus">Not queued · normalized combat profile</small>
+        </div>
+        <div class="duel-ranked-actions">
+          <button id="duelRankedQueueButton" class="primary" type="button">Find Ranked Match</button>
+          <button id="duelRankedLeaveButton" class="hidden" type="button">Leave Queue</button>
+        </div>
+      </div>
+      <p id="duelRankedProfile" class="data-status">Typing 1000 · Duel 1000 · Matchmaking 1000</p>
+
       <label class="setting-row">
         <span><strong>Pilot name</strong><small>Shown in this Duel room only</small></span>
         <input id="duelDisplayName" type="text" maxlength="32" value="Pilot" />

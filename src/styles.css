@@ -4662,6 +4662,40 @@ kbd {
   margin-bottom: 0.85rem;
 }
 
+.duel-ranked-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin: 0.65rem 0 0.85rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(132, 224, 244, 0.14);
+  border-radius: 12px;
+  background: rgba(8, 18, 30, 0.66);
+}
+
+.duel-ranked-strip > div:first-child {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.duel-ranked-strip strong {
+  color: #e8fbff;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.duel-ranked-strip small {
+  color: #829bad;
+}
+
+.duel-ranked-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  justify-content: flex-end;
+}
+
 .duel-room-panel {
   display: grid;
   gap: 0.8rem;
@@ -4771,6 +4805,20 @@ kbd {
 }
 
 @media (max-width: 720px) {
+  .duel-ranked-strip {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .duel-ranked-actions {
+    justify-content: stretch;
+  }
+
+  .duel-ranked-actions button {
+    flex: 1;
+  }
+
+
   .duel-room-grid,
   .duel-slot-grid {
     grid-template-columns: 1fr;
