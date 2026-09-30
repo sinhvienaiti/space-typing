@@ -435,7 +435,6 @@ function handleAuthenticatedMessage(
     const rate = authority.acceptMessage(
       sessionId,
       now,
-      false,
     );
     if (!rate.ok) {
       sendError(socket, rate);
