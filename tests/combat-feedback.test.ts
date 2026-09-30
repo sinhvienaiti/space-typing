@@ -1,47 +1,47 @@
 import { describe, expect, it } from "vitest";
 import {
-  advanceKillScorePopups,
-  killScorePopupOpacity,
-  scorePopupSafeY,
-  SCORE_POPUP_FLOAT_DISTANCE,
-  SCORE_POPUP_PROTECTED_TOP_Y,
-  type KillScorePopup,
-} from "../src/combat/score-popup";
+  CreditCrystalPickupSystem,
+  type CreditCrystalPoint,
+} from "../src/vfx/credit-crystal-pickups";
+import type { CombatCreditRewardReceipt } from "../src/rewards/combat-credit-drops";
 
-describe("combat feedback lifetimes", () => {
-  it("fades and removes kill score popups after about two seconds", () => {
-    const popup: KillScorePopup = {
-      x: 100,
-      y: 100,
-      value: 250,
-      life: 2,
-      maxLife: 2,
-    };
-    const popups = [popup];
-    const initial = killScorePopupOpacity(popup);
+function receipt(id: string): CombatCreditRewardReceipt {
+  return {
+    rewardId: id,
+    attemptId: "combat-feedback",
+    sourceKind: "enemy",
+    sourceInstanceId: id,
+    cause: "typed-kill",
+    mode: "campaign",
+    tier: "common",
+    variant: "standard",
+    nominalEarned: 1,
+    walletDeltaApplied: 1,
+  };
+}
 
-    advanceKillScorePopups(popups, 1.2);
-    expect(popups).toHaveLength(1);
-    expect(popups[0]?.value).toBe(250);
-    expect(killScorePopupOpacity(popups[0]!)).toBeLessThan(initial);
+function advance(
+  system: CreditCrystalPickupSystem,
+  seconds: number,
+  target: CreditCrystalPoint,
+): void {
+  let remaining = seconds;
+  while (remaining > 0) {
+    const dt = Math.min(1 / 60, remaining);
+    system.update(dt, target);
+    remaining -= dt;
+  }
+}
 
-    advanceKillScorePopups(popups, 0.81);
-    expect(popups).toHaveLength(0);
+describe("combat reward feedback", () => {
+  it("uses crystal pickup feedback instead of the removed kill-score popup", () => {
+    const system = new CreditCrystalPickupSystem();
+    system.spawn(receipt("enemy-1"), 120, 160, "high");
+
+    expect(system.liveBurstCount()).toBe(1);
+    expect(system.phaseSnapshot()).toEqual(["scatter"]);
+
+    advance(system, 0.35, { x: 640, y: 650 });
+    expect(system.phaseSnapshot()).toEqual(["magnet"]);
   });
-
-  it("keeps score popup travel below the protected top learning zone", () => {
-    const safeY = scorePopupSafeY(40, 720);
-    expect(safeY).toBeGreaterThanOrEqual(
-      SCORE_POPUP_PROTECTED_TOP_Y + SCORE_POPUP_FLOAT_DISTANCE,
-    );
-    expect(safeY - SCORE_POPUP_FLOAT_DISTANCE).toBeGreaterThanOrEqual(
-      SCORE_POPUP_PROTECTED_TOP_Y,
-    );
-
-    const bottomClamped = scorePopupSafeY(900, 720);
-    expect(bottomClamped).toBeLessThan(720);
-    expect(bottomClamped).toBeGreaterThanOrEqual(safeY);
-  });
-
-
 });

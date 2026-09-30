@@ -66,6 +66,24 @@ describe("CreditCrystalPickupSystem", () => {
     expect(system.update(1, { x: 600, y: 600 })).toEqual([]);
   });
 
+  it("removes individual pieces when they reach the ship instead of waiting for timeout", () => {
+    const system = new CreditCrystalPickupSystem();
+    system.spawn(receipt("piece-absorb", "elite", 8), 620, 500, "high");
+    const initialPieces = system.livePieceCount();
+
+    let sawPartialAbsorb = false;
+    for (let i = 0; i < 180 && system.liveBurstCount() > 0; i += 1) {
+      system.update(1 / 60, { x: 640, y: 650 });
+      const live = system.livePieceCount();
+      if (live > 0 && live < initialPieces) {
+        sawPartialAbsorb = true;
+        break;
+      }
+    }
+
+    expect(sawPartialAbsorb).toBe(true);
+  });
+
   it("follows a moving ship target instead of capturing the spawn-time target", () => {
     const system = new CreditCrystalPickupSystem();
     system.spawn(receipt("moving", "high", 4), 100, 120, "high");
