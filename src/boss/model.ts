@@ -1,6 +1,7 @@
 import type { StageRole } from "../campaign/types";
 import type { VocabularyEntry } from "../types";
 import type { BossTypingMechanicState } from "./typing-mechanics";
+import type { BossPartState } from "../expansion-v2/boss-parts";
 import { bossFullName, bossIdentityForStage } from "./identity";
 
 export type BossRole = Extract<
@@ -24,6 +25,7 @@ export type BossState = {
   flash: number;
   kick: number;
   typingMechanic?: BossTypingMechanicState;
+  parts?: BossPartState[];
 };
 
 export type BossHudState = {
@@ -36,6 +38,13 @@ export type BossHudState = {
   mechanicLabel?: string;
   mechanicTimer?: number;
   mechanicProgress?: string;
+  parts?: Array<{
+    type: BossPartState["type"];
+    hp: number;
+    maxHp: number;
+    destroyed: boolean;
+    vulnerable: boolean;
+  }>;
 };
 
 export function isBossStageRole(role: StageRole): role is BossRole {
@@ -164,6 +173,13 @@ export function toBossHud(state: BossState): BossHudState {
     phase: state.phase,
     shieldActive: state.shieldActive,
     staggered: state.staggerTimer > 0,
+    parts: state.parts?.map((part) => ({
+      type: part.type,
+      hp: part.hp,
+      maxHp: part.maxHp,
+      destroyed: part.destroyed,
+      vulnerable: part.vulnerable,
+    })),
     ...(mechanic === undefined
       ? {}
       : {

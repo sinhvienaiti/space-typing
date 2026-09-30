@@ -24,6 +24,11 @@ import type {
   BossState,
 } from "./boss/model";
 import {
+  createReferenceBossParts,
+  damageBossPart,
+  type BossPartState,
+} from "./expansion-v2/boss-parts";
+import {
   bossActionIntervalMultiplier,
   bossWordLengthPreference,
   createBossTypingMechanicState,
@@ -777,6 +782,7 @@ export class Game {
     encounterId: string;
     pattern: TypingPatternId;
     gameplayState: number;
+    bossParts: boolean;
   } | null = null;
   private completionSequence = 0;
   private relicPerfectWordCount = 0;
@@ -1925,6 +1931,7 @@ export class Game {
       encounterId: string;
       pattern: TypingPatternId;
       gameplaySeed: number;
+      bossParts?: boolean;
     } | null,
   ): void {
     if (context === null) {
@@ -1936,6 +1943,7 @@ export class Game {
       encounterId: context.encounterId,
       pattern: context.pattern,
       gameplayState: (context.gameplaySeed >>> 0) || 1,
+      bossParts: context.bossParts === true,
     };
     this.completionSequence = 0;
   }
@@ -4100,6 +4108,13 @@ export class Game {
       );
       this.boss.hp = this.boss.maxHp;
     }
+    if (this.expansionEncounterContext?.bossParts === true) {
+      this.boss.parts = createReferenceBossParts(
+        "boss:" + String(stage.stage),
+        this.boss.maxHp,
+      ).parts;
+    }
+
     this.boss.typingMechanic =
       this.gameplayMode === "recall" ? undefined : mechanic;
     this.boss.shieldActive =
@@ -5727,6 +5742,39 @@ export class Game {
     this.emitStats();
   }
 
+  private activeBossPart(boss: BossState): BossPartState | null {
+    return (
+      boss.parts?.find(
+        (part) => !part.destroyed && part.vulnerable,
+      ) ?? null
+    );
+  }
+
+  private damageBossPartTarget(
+    boss: BossState,
+    part: BossPartState,
+    damage: number,
+  ): void {
+    const currentParts = boss.parts ?? [];
+    const result = damageBossPart(
+      {
+        bossId: "boss:" + String(this.stageConfig?.stage ?? 1),
+        parts: currentParts,
+        interruptConsumed: false,
+      },
+      part.instanceId,
+      damage,
+    );
+    boss.parts = result.state.parts;
+    if (result.destroyedNow) {
+      const { x, y } = this.bossPosition();
+      this.burst(x, y, 38, part.type === "cannon" ? 18 : 190);
+      boss.staggerTimer = Math.max(boss.staggerTimer, 1.25);
+      boss.actionCooldown += 1.25;
+      this.sfx.bossStagger();
+    }
+  }
+
   private typeBoss(key: string): void {
     const boss = this.boss;
     if (boss === null) return;
@@ -5755,7 +5803,11 @@ export class Game {
     this.gainPower(2);
     this.applyCharacterCorrectKeyPassive();
 
-    if (!boss.shieldActive && this.gameplayMode !== "recall") {
+    if (
+      !boss.shieldActive &&
+      this.gameplayMode !== "recall" &&
+      this.activeBossPart(boss) === null
+    ) {
       boss.hp = Math.max(
         0,
         boss.hp -
@@ -5784,6 +5836,7 @@ export class Game {
         this.resolveRecallPrompt(boss.entry, true, !boss.wordMissed);
       }
       const perfectWord = !boss.wordMissed;
+      const completedPart = this.activeBossPart(boss);
       this.applyCharacterWordCompletePassive(word.length);
       this.stageResultTracker.completeWord(
         "boss",
@@ -5814,18 +5867,24 @@ export class Game {
       } else {
         const mechanicDamage =
           mechanicResult?.damageMultiplier ?? 1;
-        boss.hp = Math.max(
-          0,
-          boss.hp -
-            firepowerDamage(
-              bossWordDamage(boss.maxHp, boss.role),
-              this.playerStats,
-            ) *
-              mechanicDamage *
-              this.relicBossWordDamageMultiplier(word.length) *
-              markedBossDamageMultiplier(this.bossMarkTimer > 0) *
-              this.characterBossDamageMultiplier(),
-        );
+        const wordDamage =
+          firepowerDamage(
+            bossWordDamage(boss.maxHp, boss.role),
+            this.playerStats,
+          ) *
+          mechanicDamage *
+          this.relicBossWordDamageMultiplier(word.length) *
+          markedBossDamageMultiplier(this.bossMarkTimer > 0) *
+          this.characterBossDamageMultiplier();
+        if (completedPart !== null) {
+          this.damageBossPartTarget(
+            boss,
+            completedPart,
+            Math.max(1, wordDamage * 1.45),
+          );
+        } else {
+          boss.hp = Math.max(0, boss.hp - wordDamage);
+        }
       }
 
       this.sfx.wordComplete(perfectWord);
@@ -5835,7 +5894,8 @@ export class Game {
         boss.entry,
         perfectWord,
         "boss",
-        "boss:" + String(boss.stage),
+        completedPart?.instanceId ??
+          "boss:" + String(this.stageConfig?.stage ?? 1),
       );
       boss.wordsCompleted += 1;
       const completedEntry = { ...boss.entry };

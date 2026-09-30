@@ -2072,12 +2072,31 @@ function renderBoss(boss: BossHudState | null): void {
           : boss.mechanicProgress !== undefined
             ? " " + boss.mechanicProgress
             : "");
+  const partsMeta =
+    boss.parts === undefined || boss.parts.length === 0
+      ? ""
+      : " · PARTS " +
+        boss.parts
+          .map((part) => {
+            if (part.destroyed) return part.type.toUpperCase() + " ✓";
+            if (!part.vulnerable) return part.type.toUpperCase() + " LOCKED";
+            const ratio =
+              part.maxHp <= 0
+                ? 0
+                : Math.max(
+                    0,
+                    Math.min(100, (part.hp / part.maxHp) * 100),
+                  );
+            return part.type.toUpperCase() + " " + ratio.toFixed(0) + "%";
+          })
+          .join(" / ");
   hudText(
     "bossName",
     boss.name +
       " · PHASE " +
       String(boss.phase) +
       mechanicMeta +
+      partsMeta +
       (boss.shieldActive ? " · SHIELD" : boss.staggered ? " · STAGGER" : ""),
   );
   hudText(
@@ -4139,6 +4158,7 @@ async function startExpeditionEncounter(
     encounterId: encounter.id,
     pattern,
     gameplaySeed: encounter.gameplaySeed,
+    bossParts: design?.recipe === "boss-prelude",
   });
   expansionEncounterRuntime = createExpansionEncounterRuntime(
     encounter.id,
