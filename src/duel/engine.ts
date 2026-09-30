@@ -44,6 +44,15 @@ import {
   type DuelObjectiveResolution,
 } from "./objectives";
 import {
+  DuelStrategySystem,
+  duelComboEffect,
+  duelConversionDefinition,
+  type DuelComboId,
+  type DuelConversionId,
+  type DuelStrategySnapshot,
+  type DuelTrapId,
+} from "./strategy";
+import {
   DuelTacticalMapState,
   type DuelTacticalMapSnapshot,
 } from "./tactical";
@@ -71,6 +80,7 @@ export type DuelPlayerState = {
   lastAcceptedSequence: number;
   targetInstanceId: string | null;
   acquisitionPrefix: string;
+  targetMistakes: number;
   offers: DuelActionOffer[];
 };
 
@@ -93,6 +103,8 @@ export type DuelEngineSnapshot = {
   };
   map: DuelMapProfile;
   neutralObjective: DuelNeutralObjective | null;
+  strategy: DuelStrategySnapshot;
+  publicTrapHints: Readonly<Record<DuelPlayerId, readonly string[]>>;
 };
 
 export type DuelTickEffect = DuelCombatEffect;
@@ -190,6 +202,27 @@ export type DuelEngineEvent =
       outcome: DuelMysteryOutcome;
     }
   | {
+      type: "combo-ready";
+      playerId: DuelPlayerId;
+      comboId: DuelComboId;
+    }
+  | {
+      type: "combo-used";
+      playerId: DuelPlayerId;
+      comboId: DuelComboId;
+    }
+  | {
+      type: "conversion-used";
+      playerId: DuelPlayerId;
+      conversionId: DuelConversionId;
+    }
+  | {
+      type: "trap-armed";
+      playerId: DuelPlayerId;
+      trapId: DuelTrapId;
+      publicHint: string;
+    }
+  | {
       type: "objective-spawned";
       objective: DuelNeutralObjective;
     }
@@ -262,6 +295,7 @@ function createPlayer(
     lastAcceptedSequence: -1,
     targetInstanceId: null,
     acquisitionPrefix: "",
+    targetMistakes: 0,
     offers: [],
   };
 }
@@ -290,6 +324,7 @@ export class DuelEngine {
   };
   private readonly threats = new DuelThreatSystem();
   private readonly tactical = new DuelTacticalMapState();
+  private readonly strategy = new DuelStrategySystem();
   private readonly objectives = new DuelNeutralObjectiveSystem();
   private readonly chance: DuelChanceSystem;
   private readonly director: DuelMapDirector;
@@ -350,6 +385,7 @@ export class DuelEngine {
     this.reservedEnergyCost["player-2"] = 0;
     this.threats.clear();
     this.tactical.clear();
+    this.strategy.resetRound();
     this.objectives.resetRound();
     this.chance.resetRound();
     this.director.resetRound();
@@ -405,6 +441,7 @@ export class DuelEngine {
     this.reservedEnergyCost["player-1"] = 0;
     this.reservedEnergyCost["player-2"] = 0;
     this.tactical.update(dt);
+    this.strategy.update(dt);
     const directorEvents = this.director.update(dt, this.phase());
     for (const event of directorEvents) {
       if (event.type === "hazard") {
@@ -444,6 +481,10 @@ export class DuelEngine {
       }
 
       if (threatEvent.outcome === "countered") {
+        this.strategy.gainInitiative(
+          threatEvent.targetPlayerId,
+          "counter",
+        );
         events.push({
           type: "threat-countered",
           threatId: threatEvent.threatId,
@@ -626,6 +667,11 @@ export class DuelEngine {
       },
       map: duelMapProfile(this.mapId),
       neutralObjective: this.objectives.activeObjective(),
+      strategy: this.strategy.snapshot(),
+      publicTrapHints: {
+        "player-1": this.strategy.publicTrapHintsFor("player-1"),
+        "player-2": this.strategy.publicTrapHintsFor("player-2"),
+      },
     };
   }
 
@@ -731,6 +777,7 @@ export class DuelEngine {
     );
     if (matches.length === 0) {
       player.wrongChars += 1;
+      player.targetMistakes += 1;
       events.push({
         type: "typing-miss",
         playerId: player.id,
@@ -785,6 +832,7 @@ export class DuelEngine {
     const expected = action.answerToken[offer.typedPrefix.length];
     if (expected !== char) {
       player.wrongChars += 1;
+      player.targetMistakes += 1;
       events.push({
         type: "typing-miss",
         playerId: player.id,
@@ -829,6 +877,7 @@ export class DuelEngine {
     );
     if (result.kind === "wrong") {
       player.wrongChars += 1;
+      player.targetMistakes += 1;
       events.push({
         type: "typing-miss",
         playerId: player.id,
@@ -872,6 +921,7 @@ export class DuelEngine {
     );
     if (result.kind === "wrong") {
       player.wrongChars += 1;
+      player.targetMistakes += 1;
       events.push({
         type: "typing-miss",
         playerId: player.id,
@@ -928,6 +978,7 @@ export class DuelEngine {
         targetInstanceId: offer.instanceId,
         actionId: offer.actionId,
       });
+      this.recordStrategyAction(player, action, events);
       events.push({
         type: "action-banked",
         playerId: player.id,
@@ -937,6 +988,7 @@ export class DuelEngine {
       });
       player.targetInstanceId = null;
       player.acquisitionPrefix = "";
+      player.targetMistakes = 0;
       return;
     }
 
@@ -969,8 +1021,10 @@ export class DuelEngine {
       targetInstanceId: offer.instanceId,
       actionId: offer.actionId,
     });
+    this.recordStrategyAction(player, action, events);
     player.targetInstanceId = null;
     player.acquisitionPrefix = "";
+    player.targetMistakes = 0;
   }
 
   private useStoredAction(
@@ -1028,7 +1082,15 @@ export class DuelEngine {
   ): void {
     this.reserveEnergy(playerId, action.energyCost);
     const resolution = resolveDuelAction(action, playerId);
-    this.pendingEffects.push(...resolution.effects);
+    const attackScale = this.strategy.attackScale(playerId);
+    this.pendingEffects.push(
+      ...resolution.effects.map((effect) =>
+        effect.type === "damage" &&
+        effect.sourceId === playerId
+          ? { ...effect, amount: effect.amount * attackScale }
+          : effect,
+      ),
+    );
     for (const effect of resolution.tacticalEffects) {
       this.tactical.apply(effect);
     }
@@ -1090,6 +1152,7 @@ export class DuelEngine {
       player.targetInstanceId = targetInstanceId;
       player.acquisitionPrefix =
         this.objectives.progressFor(player.id, targetInstanceId) ?? "";
+      player.targetMistakes = 0;
       events.push({
         type: "target-locked",
         playerId: player.id,
@@ -1110,6 +1173,7 @@ export class DuelEngine {
       }
       player.targetInstanceId = threat.id;
       player.acquisitionPrefix = threat.typedPrefix;
+      player.targetMistakes = 0;
       events.push({
         type: "target-locked",
         playerId: player.id,
@@ -1148,6 +1212,7 @@ export class DuelEngine {
     offer.typedPrefix = "";
     player.targetInstanceId = offer.instanceId;
     player.acquisitionPrefix = "";
+    player.targetMistakes = 0;
     events.push({
       type: "target-locked",
       playerId: player.id,
@@ -1170,6 +1235,7 @@ export class DuelEngine {
     }
     player.targetInstanceId = null;
     player.acquisitionPrefix = "";
+    player.targetMistakes = 0;
     events.push({
       type: "target-cancelled",
       playerId: player.id,
@@ -1205,6 +1271,17 @@ export class DuelEngine {
     events.push({ type: "objective-resolved", resolution });
     if (resolution.winnerId === null) return;
 
+    this.strategy.gainInitiative(
+      resolution.winnerId,
+      "neutral-objective",
+    );
+    if (resolution.kind === "map-control") {
+      this.strategy.gainInitiative(
+        resolution.winnerId,
+        "map-control",
+      );
+    }
+
     if (resolution.kind === "fate") {
       const fate = this.chance.rollFate(resolution.winnerId);
       this.appendFateEffects(fate, this.pendingEffects);
@@ -1236,6 +1313,32 @@ export class DuelEngine {
     });
   }
 
+  private recordStrategyAction(
+    player: DuelPlayerState,
+    action: DuelActionDefinition,
+    events: DuelEngineEvent[],
+  ): void {
+    if (player.targetMistakes === 0) {
+      this.strategy.gainInitiative(
+        player.id,
+        "perfect-word",
+      );
+    }
+    const combo = this.strategy.recordAction(
+      player.id,
+      action,
+      this.tickNumber,
+    );
+    if (combo !== null) {
+      events.push({
+        type: "combo-ready",
+        playerId: player.id,
+        comboId: combo.id,
+      });
+    }
+    player.targetMistakes = 0;
+  }
+
   private appendFateEffects(
     resolution: DuelFateResolution,
     effects: DuelCombatEffect[],
@@ -1263,6 +1366,126 @@ export class DuelEngine {
         amount: resolution.outcome.opponentDamage,
       });
     }
+  }
+
+  useCombo(
+    playerId: DuelPlayerId,
+    comboId: DuelComboId,
+  ): DuelEngineEvent[] {
+    if (this.roundResult.status !== "active") return [];
+    if (this.strategy.consumeCombo(playerId, comboId) === null) {
+      return [];
+    }
+    const combo = duelComboEffect(comboId);
+    const effects: DuelCombatEffect[] = [];
+    if (combo.damage > 0) {
+      effects.push({
+        type: "damage",
+        targetId: otherPlayer(playerId),
+        sourceId: playerId,
+        amount: combo.damage * this.strategy.attackScale(playerId),
+      });
+    }
+    if (combo.shield > 0) {
+      effects.push({
+        type: "shield",
+        targetId: playerId,
+        amount: combo.shield,
+      });
+    }
+    if (combo.repair > 0) {
+      effects.push({
+        type: "repair",
+        targetId: playerId,
+        amount: combo.repair,
+      });
+    }
+    if (combo.tacticalPressure > 0) {
+      this.tactical.apply({
+        effectId: "control-pressure",
+        sourcePlayerId: playerId,
+        targetPlayerId: otherPlayer(playerId),
+        strength: combo.tacticalPressure,
+        remainingSeconds: 6,
+      });
+    }
+    this.applyEffectsToPlayers(effects);
+    const events: DuelEngineEvent[] = [
+      { type: "combo-used", playerId, comboId },
+    ];
+    this.resolveTerminalState(events);
+    return events;
+  }
+
+  useConversion(
+    playerId: DuelPlayerId,
+    conversionId: DuelConversionId,
+  ): DuelEngineEvent[] {
+    if (this.roundResult.status !== "active") return [];
+    const player = this.players[playerId];
+    const definition = duelConversionDefinition(conversionId);
+    if (
+      player.hull <= definition.hullCost ||
+      player.shield < definition.shieldCost ||
+      player.energy < definition.energyCost
+    ) {
+      return [];
+    }
+    const resolution = this.strategy.applyConversion(
+      playerId,
+      conversionId,
+    );
+
+    player.hull = Math.max(
+      1,
+      player.hull - resolution.hullCost,
+    );
+    player.shield = Math.max(
+      0,
+      Math.min(
+        player.maxShield,
+        player.shield -
+          resolution.shieldCost +
+          resolution.shieldGain,
+      ),
+    );
+    player.energy = Math.max(
+      0,
+      Math.min(
+        player.maxEnergy,
+        player.energy -
+          resolution.energyCost +
+          resolution.energyGain,
+      ),
+    );
+    return [
+      {
+        type: "conversion-used",
+        playerId,
+        conversionId,
+      },
+    ];
+  }
+
+  armTrap(
+    playerId: DuelPlayerId,
+    trapId: DuelTrapId,
+  ): DuelEngineEvent[] {
+    if (this.roundResult.status !== "active") return [];
+    const trap = this.strategy.armTrap(
+      playerId,
+      trapId,
+      this.tickNumber,
+    );
+    if (trap === null) return [];
+    return [
+      {
+        type: "trap-armed",
+        playerId,
+        trapId,
+        publicHint: trap.publicHint,
+      },
+    ];
   }
 
   private applyEffectsToPlayers(
@@ -1313,7 +1536,9 @@ export class DuelEngine {
 
     for (const playerId of PLAYER_IDS) {
       const player = this.players[playerId];
-      let damage = hullDamage[playerId];
+      let damage =
+        hullDamage[playerId] /
+        this.strategy.defenseScale(playerId);
       if (damage > 0 && player.shield > 0) {
         const absorbed = Math.min(player.shield, damage);
         player.shield -= absorbed;
