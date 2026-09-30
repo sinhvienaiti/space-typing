@@ -73,12 +73,49 @@ export function resolveDuelAction(
         amount: 18,
       });
       break;
+    case "heavy-railgun":
+      effects.push({
+        type: "damage",
+        targetId,
+        sourceId: playerId,
+        amount: 24,
+      });
+      break;
+    case "delayed-bomb":
+      effects.push({
+        type: "damage",
+        targetId,
+        sourceId: playerId,
+        amount: 20,
+      });
+      break;
     case "siege-lance":
       effects.push({
         type: "damage",
         targetId,
         sourceId: playerId,
         amount: 28,
+      });
+      break;
+    case "shield-charge":
+      effects.push({
+        type: "shield",
+        targetId: playerId,
+        amount: 14,
+      });
+      break;
+    case "reflect-guard":
+      effects.push({
+        type: "shield",
+        targetId: playerId,
+        amount: 10,
+      });
+      tacticalEffects.push({
+        effectId: "projectile-drag",
+        sourcePlayerId: playerId,
+        targetPlayerId: targetId,
+        strength: 0.18,
+        remainingSeconds: 4,
       });
       break;
     case "barrier-charge":
@@ -102,12 +139,42 @@ export function resolveDuelAction(
         amount: 22,
       });
       break;
+    case "amplify-field":
+      effects.push({
+        type: "energy",
+        targetId: playerId,
+        amount: 8,
+      });
+      tacticalEffects.push({
+        effectId: "control-pressure",
+        sourcePlayerId: playerId,
+        targetPlayerId: null,
+        strength: 0.12,
+        remainingSeconds: 6,
+      });
+      break;
+    case "repair-drone-charge":
+      effects.push({
+        type: "repair",
+        targetId: playerId,
+        amount: 10,
+      });
+      break;
     case "lock-on":
       tacticalEffects.push({
         effectId: "control-pressure",
         sourcePlayerId: playerId,
         targetPlayerId: targetId,
         strength: 0.25,
+        remainingSeconds: 5,
+      });
+      break;
+    case "gravity-well":
+      tacticalEffects.push({
+        effectId: "projectile-drag",
+        sourcePlayerId: playerId,
+        targetPlayerId: targetId,
+        strength: 0.3,
         remainingSeconds: 5,
       });
       break;

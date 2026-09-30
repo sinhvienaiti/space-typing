@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  DUEL_COMBO_RECIPES,
   DuelStrategySystem,
   duelComboEffect,
 } from "../src/duel/strategy";
@@ -29,6 +30,29 @@ describe("Duel M-DUEL-08 strategy core", () => {
     expect(
       strategy.snapshot()["player-1"].readyCombos,
     ).toHaveLength(1);
+  });
+
+  it("keeps every FINAL V3 combo recipe reachable from real ActionDefinitions", () => {
+    for (const recipe of DUEL_COMBO_RECIPES) {
+      const strategy = new DuelStrategySystem();
+      let ready = null;
+      for (const [index, ingredient] of recipe.ingredients.entries()) {
+        const definition = DUEL_ACTIONS_BY_ID.get(ingredient);
+        expect(
+          definition,
+          recipe.id + " missing " + ingredient,
+        ).toBeDefined();
+        ready = strategy.recordAction(
+          "player-1",
+          definition!,
+          index + 1,
+        );
+      }
+      expect(ready).toEqual({
+        id: recipe.id,
+        createdAtTick: recipe.ingredients.length,
+      });
+    }
   });
 
   it("keeps combo power independent from raw WPM", () => {

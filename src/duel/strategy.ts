@@ -93,14 +93,14 @@ type MutablePlayer = {
   modifierSeconds: number;
 };
 
-const RECIPES: readonly ComboRecipe[] = [
+export const DUEL_COMBO_RECIPES: readonly ComboRecipe[] = [
   {
     id: "homing-barrage",
     ingredients: ["energy", "missile", "lock-on"],
   },
   {
     id: "mirror-barrier",
-    ingredients: ["barrier", "reflect"],
+    ingredients: ["shield", "reflect"],
   },
   {
     id: "gravity-bomb",
@@ -199,7 +199,7 @@ export class DuelStrategySystem {
       player.pathScore[path] + 1,
     );
 
-    for (const recipe of RECIPES) {
+    for (const recipe of DUEL_COMBO_RECIPES) {
       if (!suffixMatches(player.history, recipe.ingredients)) continue;
       if (
         player.readyCombos.some((combo) => combo.id === recipe.id)
