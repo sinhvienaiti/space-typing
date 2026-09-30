@@ -141,6 +141,8 @@ export type DuelClientRoomSlot = {
 export type DuelClientRoomSnapshot = {
   roomId: string;
   ownerSlotIndex: 0;
+  selfSlotIndex: 0 | 1 | null;
+  isOwner: boolean;
   settings: DuelRoomPublicSettings;
   slots: readonly [DuelClientRoomSlot, DuelClientRoomSlot];
   canStart: boolean;
@@ -431,6 +433,7 @@ export function parseDuelRoomSettingsPayload(
 
 function clientRoomSnapshot(
   room: DuelRoom,
+  viewerSessionId: string,
 ): DuelClientRoomSnapshot {
   const snapshot = room.snapshot();
   const slot = (
@@ -449,9 +452,16 @@ function clientRoomSnapshot(
     };
   };
 
+  const selfSlot = snapshot.slots.find(
+    (candidate) =>
+      candidate.participantId === viewerSessionId,
+  );
   return {
     roomId: snapshot.roomId,
     ownerSlotIndex: 0,
+    selfSlotIndex: selfSlot?.slotIndex ?? null,
+    isOwner:
+      snapshot.ownerParticipantId === viewerSessionId,
     settings: snapshot.settings,
     slots: [slot(0), slot(1)],
     canStart: snapshot.canStart,
@@ -757,7 +767,7 @@ export class DuelAuthorityService {
     session.roomId = roomId;
     return {
       ok: true,
-      value: clientRoomSnapshot(room),
+      value: clientRoomSnapshot(room, sessionId),
     };
   }
 
@@ -818,8 +828,7 @@ export class DuelAuthorityService {
     if (
       !record.room.join({
         participantId: sessionId,
-        displayName:
-          input.displayName ?? session.displayName,
+        displayName: session.displayName,
         password: input.password,
       })
     ) {
@@ -833,7 +842,7 @@ export class DuelAuthorityService {
     record.lastActivityAt = now;
     return {
       ok: true,
-      value: clientRoomSnapshot(record.room),
+      value: clientRoomSnapshot(record.room, sessionId),
     };
   }
 
@@ -859,7 +868,7 @@ export class DuelAuthorityService {
     record.lastActivityAt = now;
     return {
       ok: true,
-      value: clientRoomSnapshot(record.room),
+      value: clientRoomSnapshot(record.room, sessionId),
     };
   }
 
@@ -888,7 +897,7 @@ export class DuelAuthorityService {
     record.lastActivityAt = now;
     return {
       ok: true,
-      value: clientRoomSnapshot(record.room),
+      value: clientRoomSnapshot(record.room, sessionId),
     };
   }
 
@@ -919,7 +928,7 @@ export class DuelAuthorityService {
     record.lastActivityAt = now;
     return {
       ok: true,
-      value: clientRoomSnapshot(record.room),
+      value: clientRoomSnapshot(record.room, sessionId),
     };
   }
 
@@ -944,7 +953,7 @@ export class DuelAuthorityService {
     record.lastActivityAt = now;
     return {
       ok: true,
-      value: clientRoomSnapshot(record.room),
+      value: clientRoomSnapshot(record.room, sessionId),
     };
   }
 
@@ -1005,7 +1014,7 @@ export class DuelAuthorityService {
     }
     return {
       ok: true,
-      value: clientRoomSnapshot(record.room),
+      value: clientRoomSnapshot(record.room, sessionId),
     };
   }
 

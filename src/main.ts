@@ -2,7 +2,7 @@ import "./styles.css";
 import "./character-progress.css";
 import "./basic-skills.css";
 import "./kill-translation.css";
-import { installDuelRoomUi } from "./duel/room-ui";
+import { installDuelOnlineRoomController } from "./duel/online-room-controller";
 import {
   DEFAULT_KILL_TRANSLATION_SETTINGS,
   hasVisibleKillTranslation,
@@ -1067,7 +1067,9 @@ const rewardChoiceDialog =
   byId<HTMLDialogElement>("rewardChoiceDialog");
 const anomalyDialog = byId<HTMLDialogElement>("anomalyDialog");
 
-installDuelRoomUi();
+installDuelOnlineRoomController({
+  clientVersion: "0.1.0",
+});
 
 rewardChoiceDialog.addEventListener("cancel", (event) => {
   event.preventDefault();

@@ -475,6 +475,12 @@ export class DuelNetworkClient {
               this.reconnectStorageKey,
             );
           }
+          if (
+            parsed.code === "AUTH_FAILED" ||
+            parsed.code === "PROTOCOL_MISMATCH"
+          ) {
+            this.manualClose = true;
+          }
           this.callbacks.onError?.(
             parsed.code,
             parsed.message,

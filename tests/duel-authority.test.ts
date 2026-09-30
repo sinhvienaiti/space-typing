@@ -169,6 +169,36 @@ describe("Duel M-DUEL-11 authority core", () => {
     expect(room.settings.fixedSeedConfigured).toBe(true);
   });
 
+  it("returns perspective-safe room identity without trusting client display name", () => {
+    const authority = new DuelAuthorityService(deps());
+    const host = open(authority, "host");
+    const guest = open(authority, "guest");
+    const room = createRoom(authority, host.sessionId);
+
+    expect(room.selfSlotIndex).toBe(0);
+    expect(room.isOwner).toBe(true);
+
+    const joined = authority.joinRoom(
+      guest.sessionId,
+      {
+        roomId: room.roomId,
+        password: "secret-room",
+        displayName: "Spoofed Host Name",
+      },
+      1,
+    );
+    if (!joined.ok) throw new Error(joined.message);
+
+    expect(joined.value.selfSlotIndex).toBe(1);
+    expect(joined.value.isOwner).toBe(false);
+    expect(joined.value.slots[1].displayName).toBe(
+      "Pilot-guest",
+    );
+    const serialized = JSON.stringify(joined.value);
+    expect(serialized).not.toContain(host.sessionId);
+    expect(serialized).not.toContain(guest.sessionId);
+  });
+
   it("supports authoritative bot, ready and match-start flow", () => {
     const authority = new DuelAuthorityService(deps());
     const host = open(authority, "host");

@@ -406,6 +406,37 @@ describe("Duel Friend Room browser transport", () => {
     });
   });
 
+  it("does not loop reconnect after a fatal authentication failure", () => {
+    vi.useFakeTimers();
+    try {
+      const created: FakeSocket[] = [];
+      const client = new DuelNetworkClient({
+        url: "wss://example.test/duel",
+        clientVersion: "0.1.0",
+        socketFactory() {
+          const socket = new FakeSocket();
+          created.push(socket);
+          return socket;
+        },
+      });
+
+      client.connect("bad-token");
+      created[0]!.open();
+      created[0]!.message({
+        type: "ERROR",
+        code: "AUTH_FAILED",
+        message: "Bad token",
+      });
+      created[0]!.drop();
+
+      vi.advanceTimersByTime(10_000);
+      expect(created).toHaveLength(1);
+      expect(client.currentStatus()).toBe("closed");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("auto-reconnects after an unexpected close without putting tokens in URL", () => {
     vi.useFakeTimers();
     try {
