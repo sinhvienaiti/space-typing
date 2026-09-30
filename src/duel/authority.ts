@@ -24,6 +24,7 @@ import {
   toEngineIntent,
   type DuelWireIntent,
 } from "./protocol";
+import { DUEL_RANKED_RULESET } from "./ranked";
 import {
   DuelRoom,
   validateDuelRoomSettings,
@@ -111,7 +112,8 @@ export type DuelAuthorityErrorCode =
   | "MATCH_FORBIDDEN"
   | "ROUND_MISMATCH"
   | "STALE_SEQUENCE"
-  | "INPUT_RATE_IMPOSSIBLE";
+  | "INPUT_RATE_IMPOSSIBLE"
+  | "RANKED_INELIGIBLE";
 
 export type DuelAuthorityResult<T> =
   | { ok: true; value: T }
@@ -162,6 +164,8 @@ export type DuelSeriesState = {
 export type DuelClientMatchView = {
   matchId: string;
   roundId: string;
+  mode: "friend" | "ranked";
+  combatProfile: "normalized";
   serverSequence: number;
   phase: DuelEngineSnapshot["phase"];
   round: DuelEngineSnapshot["round"];
@@ -249,7 +253,8 @@ type RoomRecord = {
 
 type MatchRecord = {
   matchId: string;
-  roomId: string;
+  roomId: string | null;
+  mode: "friend" | "ranked";
   roundId: string;
   roundSequence: number;
   engine: DuelEngine;
@@ -1083,6 +1088,7 @@ export class DuelAuthorityService {
     const match: MatchRecord = {
       matchId,
       roomId,
+      mode: "friend",
       roundId: matchId + ":round:1",
       roundSequence: 1,
       engine: new DuelEngine({
@@ -1143,6 +1149,146 @@ export class DuelAuthorityService {
         session.matchId = matchId;
       }
     }
+
+    return {
+      ok: true,
+      value: {
+        matchId,
+        updates: this.updatesForMatch(match, []),
+      },
+    };
+  }
+
+  rankedParticipant(
+    sessionId: string,
+  ): DuelAuthorityResult<{
+    accountId: string;
+    displayName: string;
+  }> {
+    const session = this.sessions.get(sessionId);
+    if (session === undefined) {
+      return this.error(
+        "SESSION_NOT_FOUND",
+        "Duel session does not exist.",
+      );
+    }
+    if (
+      session.roomId !== null ||
+      session.matchId !== null
+    ) {
+      return this.error(
+        "RANKED_INELIGIBLE",
+        "Leave the current room or match before entering Ranked.",
+      );
+    }
+    return {
+      ok: true,
+      value: {
+        accountId: session.accountId,
+        displayName: session.displayName,
+      },
+    };
+  }
+
+  startRankedMatch(
+    leftSessionId: string,
+    rightSessionId: string,
+    now: number,
+  ): DuelAuthorityResult<{
+    matchId: string;
+    updates: readonly DuelClientMatchUpdate[];
+  }> {
+    const left = this.sessions.get(leftSessionId);
+    const right = this.sessions.get(rightSessionId);
+    if (left === undefined || right === undefined) {
+      return this.error(
+        "SESSION_NOT_FOUND",
+        "Ranked participant session does not exist.",
+      );
+    }
+    if (
+      left.accountId === right.accountId ||
+      left.sessionId === right.sessionId ||
+      left.roomId !== null ||
+      right.roomId !== null ||
+      left.matchId !== null ||
+      right.matchId !== null
+    ) {
+      return this.error(
+        "RANKED_INELIGIBLE",
+        "Ranked participants must be distinct and free of another room or match.",
+      );
+    }
+
+    const seed = this.deps.seed();
+    const pool = DUEL_RANKED_RULESET.mapPool;
+    const mapId = pool[seed % pool.length]!;
+    const matchId = this.deps.matchId();
+    const settings: DuelRoomSettingsInput = {
+      roomName: "Ranked Duel",
+      visibility: "public",
+      matchLengthSeconds:
+        DUEL_RANKED_RULESET.matchLengthSeconds,
+      roundFormat: DUEL_RANKED_RULESET.roundFormat,
+      mapSelection: {
+        mode: "random",
+        pool: [...pool],
+      },
+      hazardLevel: DUEL_RANKED_RULESET.hazardLevel,
+      mysteryFrequency:
+        DUEL_RANKED_RULESET.mysteryFrequency,
+      fateFrequency: DUEL_RANKED_RULESET.fateFrequency,
+      botAllowed: false,
+      seedMode: "random",
+      modifier: DUEL_RANKED_RULESET.modifier,
+    };
+
+    const match: MatchRecord = {
+      matchId,
+      roomId: null,
+      mode: "ranked",
+      roundId: matchId + ":round:1",
+      roundSequence: 1,
+      engine: new DuelEngine({
+        regulationSeconds:
+          settings.matchLengthSeconds,
+        matchSeed: seed,
+        mapId,
+      }),
+      draft: {
+        "player-1": this.createDraft(seed, mapId, 1),
+        "player-2": this.createDraft(seed, mapId, 2),
+      },
+      players: {
+        "player-1": leftSessionId,
+        "player-2": rightSessionId,
+      },
+      bot: null,
+      botPlayerId: null,
+      matchSeed: seed,
+      mapId,
+      settings,
+      series: {
+        format: DUEL_RANKED_RULESET.roundFormat,
+        winsNeeded: 2,
+        roundsPlayed: 0,
+        maxRounds: 5,
+        wins: {
+          "player-1": 0,
+          "player-2": 0,
+        },
+        draws: 0,
+        status: "active",
+        winnerId: null,
+      },
+      serverSequence: 0,
+      needsRoundReset: false,
+    };
+
+    this.dealRoundOffers(match);
+    this.matches.set(matchId, match);
+    left.matchId = matchId;
+    right.matchId = matchId;
 
     return {
       ok: true,
@@ -1266,7 +1412,10 @@ export class DuelAuthorityService {
     const events = match.engine.step(dtSeconds);
     this.refillCompletedOffers(match, events);
     match.serverSequence += 1;
-    const room = this.rooms.get(match.roomId);
+    const room =
+      match.roomId === null
+        ? undefined
+        : this.rooms.get(match.roomId);
     if (room !== undefined) room.lastActivityAt = now;
 
     const ended = events.find(
@@ -1571,7 +1720,10 @@ export class DuelAuthorityService {
       ),
     };
 
-    const room = this.rooms.get(match.roomId);
+    const room =
+      match.roomId === null
+        ? undefined
+        : this.rooms.get(match.roomId);
     const botConfig =
       match.botPlayerId === "player-2"
         ? room?.room.snapshot().slots[1].bot
@@ -1646,6 +1798,8 @@ export class DuelAuthorityService {
     return {
       matchId: match.matchId,
       roundId: match.roundId,
+      mode: match.mode,
+      combatProfile: "normalized",
       serverSequence: match.serverSequence,
       phase: snapshot.phase,
       round: snapshot.round,

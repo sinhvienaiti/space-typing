@@ -491,6 +491,74 @@ describe("Duel M-DUEL-11 authority core", () => {
     expect(opponent).toContain("TRAP ARMED");
   });
 
+  it("starts Ranked directly from two eligible sessions with normalized combat", () => {
+    const authority = new DuelAuthorityService(deps());
+    const left = open(authority, "left");
+    const right = open(authority, "right");
+
+    const started = authority.startRankedMatch(
+      left.sessionId,
+      right.sessionId,
+      100,
+    );
+    if (!started.ok) throw new Error(started.message);
+
+    expect(started.value.updates).toHaveLength(2);
+    for (const update of started.value.updates) {
+      expect(update.view.mode).toBe("ranked");
+      expect(update.view.combatProfile).toBe("normalized");
+      expect(update.view.map.id).toMatch(
+        /^(frost-wastes|inferno-rift|tempest-prime|ocean-abyss|terra-core|celestial-void)$/,
+      );
+      expect(update.view.series.format).toBe(3);
+      expect(update.view.series.winsNeeded).toBe(2);
+      expect(update.view.self.offers).toHaveLength(5);
+    }
+
+    expect(
+      authority.rankedParticipant(left.sessionId),
+    ).toEqual(
+      expect.objectContaining({
+        ok: false,
+        code: "RANKED_INELIGIBLE",
+      }),
+    );
+  });
+
+  it("rejects Ranked for duplicate account identity or active room membership", () => {
+    const authority = new DuelAuthorityService(deps());
+    const first = open(authority, "same");
+    const second = open(authority, "same");
+    expect(
+      authority.startRankedMatch(
+        first.sessionId,
+        second.sessionId,
+        0,
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        ok: false,
+        code: "RANKED_INELIGIBLE",
+      }),
+    );
+
+    const host = open(authority, "host-ranked");
+    const guest = open(authority, "guest-ranked");
+    createRoom(authority, host.sessionId, 1);
+    expect(
+      authority.startRankedMatch(
+        host.sessionId,
+        guest.sessionId,
+        2,
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        ok: false,
+        code: "RANKED_INELIGIBLE",
+      }),
+    );
+  });
+
   it("cleans ghost session membership after reconnect grace", () => {
     const authority = new DuelAuthorityService(deps(), {
       reconnectGraceMs: 1000,
