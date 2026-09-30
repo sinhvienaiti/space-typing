@@ -129,6 +129,7 @@
           <div class="title-group-actions">
             <button id="combatModeButton" type="button">Combat</button>
             <button id="recallModeButton" type="button">Recall</button>
+            <button id="duelModeButton" type="button">Duel</button>
           </div>
           <small id="titleModeMeta" class="world-meta"></small>
         </section>
@@ -812,6 +813,196 @@
           <button id="saveCustom" class="primary" type="button">Save vocabulary</button>
         </div>
       </section>
+    </dialog>
+
+    <dialog id="duelRoomDialog" class="settings-dialog duel-room-dialog">
+      <form method="dialog" class="dialog-head">
+        <div>
+          <p class="eyebrow">duel mode</p>
+          <h2>1v1 Duel Lobby</h2>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+
+      <div class="duel-room-tabs" role="tablist" aria-label="Duel room flow">
+        <button id="duelCreateTab" type="button">Create Room</button>
+        <button id="duelJoinTab" type="button">Join Room</button>
+        <button id="duelPracticeButton" type="button">Practice vs Bot</button>
+      </div>
+
+      <label class="setting-row">
+        <span><strong>Pilot name</strong><small>Shown in this Duel room only</small></span>
+        <input id="duelDisplayName" type="text" maxlength="32" value="Pilot" />
+      </label>
+
+      <section id="duelCreatePanel" class="duel-room-panel">
+        <div class="duel-room-grid">
+          <label>
+            <span class="field-label">Room name</span>
+            <input id="duelRoomName" type="text" maxlength="40" value="Duel Room" />
+          </label>
+          <label>
+            <span class="field-label">Visibility</span>
+            <select id="duelVisibility">
+              <option value="private">Private</option>
+              <option value="public">Public</option>
+            </select>
+          </label>
+          <label>
+            <span class="field-label">Password</span>
+            <input id="duelPassword" type="password" maxlength="64" value="space" autocomplete="new-password" />
+          </label>
+          <label>
+            <span class="field-label">Match length</span>
+            <select id="duelMatchLength">
+              <option value="180">3 minutes</option>
+              <option value="240" selected>4 minutes</option>
+              <option value="300">5 minutes</option>
+            </select>
+          </label>
+          <label>
+            <span class="field-label">Rounds</span>
+            <select id="duelRounds">
+              <option value="1">Bo1</option>
+              <option value="3" selected>Bo3</option>
+              <option value="5">Bo5</option>
+            </select>
+          </label>
+          <label>
+            <span class="field-label">Map mode</span>
+            <select id="duelMapMode">
+              <option value="fixed">Fixed map</option>
+              <option value="random">Random map</option>
+              <option value="vote">Map vote</option>
+            </select>
+          </label>
+          <label>
+            <span class="field-label">Map</span>
+            <select id="duelMap">
+              <option value="frost-wastes">Frost Wastes</option>
+              <option value="inferno-rift">Inferno Rift</option>
+              <option value="tempest-prime">Tempest Prime</option>
+              <option value="ocean-abyss">Ocean Abyss</option>
+              <option value="terra-core">Terra Core</option>
+              <option value="celestial-void">Celestial Void</option>
+            </select>
+          </label>
+          <label>
+            <span class="field-label">Hazards</span>
+            <select id="duelHazardLevel">
+              <option value="low">Low</option>
+              <option value="standard" selected>Standard</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+          <label>
+            <span class="field-label">Mystery frequency</span>
+            <select id="duelMysteryFrequency">
+              <option value="off">Off</option>
+              <option value="low">Low</option>
+              <option value="standard" selected>Standard</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+          <label>
+            <span class="field-label">Fate frequency</span>
+            <select id="duelFateFrequency">
+              <option value="off">Off</option>
+              <option value="low">Low</option>
+              <option value="standard" selected>Standard</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+          <label>
+            <span class="field-label">Bot allowed</span>
+            <select id="duelBotAllowed">
+              <option value="true" selected>Allowed</option>
+              <option value="false">Human only</option>
+            </select>
+          </label>
+          <label>
+            <span class="field-label">Seed mode</span>
+            <select id="duelSeedMode">
+              <option value="random" selected>Random</option>
+              <option value="fixed">Fixed</option>
+            </select>
+          </label>
+          <label>
+            <span class="field-label">Fixed seed</span>
+            <input id="duelFixedSeed" type="number" min="0" max="4294967295" value="1" disabled />
+          </label>
+          <label>
+            <span class="field-label">Rules</span>
+            <select id="duelRuleModifier">
+              <option value="standard" selected>Standard</option>
+              <option value="high-hazard">High Hazard</option>
+              <option value="mystery-storm">Mystery Storm</option>
+              <option value="weapon-frenzy">Weapon Frenzy</option>
+              <option value="support-rich">Support Rich</option>
+              <option value="sudden-death">Sudden Death</option>
+              <option value="cataclysm-rush">Cataclysm Rush</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="duel-bot-settings">
+          <strong>Bot profile</strong>
+          <label><span>WPM</span><input id="duelBotWpm" type="number" min="10" max="300" value="55" /></label>
+          <label><span>Accuracy %</span><input id="duelBotAccuracy" type="number" min="50" max="100" step="1" value="94" /></label>
+          <label><span>Reaction ms</span><input id="duelBotReaction" type="number" min="0" max="3000" step="10" value="320" /></label>
+          <label>
+            <span>Personality</span>
+            <select id="duelBotPersonality">
+              <option value="balanced">Balanced</option>
+              <option value="turtle">Turtle</option>
+              <option value="aggro">Aggro</option>
+              <option value="tactician">Tactician</option>
+              <option value="trickster">Trickster</option>
+              <option value="fortune">Fortune</option>
+              <option value="sniper">Sniper</option>
+            </select>
+          </label>
+        </div>
+
+        <button id="duelCreateRoomButton" class="primary" type="button">Create Lobby</button>
+      </section>
+
+      <section id="duelJoinPanel" class="duel-room-panel hidden">
+        <label>
+          <span class="field-label">Room code</span>
+          <input id="duelJoinCode" type="text" maxlength="32" placeholder="ROOM-CODE" />
+        </label>
+        <label>
+          <span class="field-label">Password</span>
+          <input id="duelJoinPassword" type="password" maxlength="64" autocomplete="current-password" />
+        </label>
+        <button id="duelJoinRoomButton" class="primary" type="button">Join Friend Room</button>
+        <small>Join is validated by the authoritative Friend Room service; the client never trusts local completion claims.</small>
+      </section>
+
+      <section id="duelLobbyPanel" class="duel-lobby-panel hidden" aria-live="polite">
+        <div class="duel-lobby-head">
+          <div>
+            <span class="field-label">Room code</span>
+            <strong id="duelLobbyRoomCode">—</strong>
+          </div>
+          <small id="duelLobbyRules">—</small>
+        </div>
+        <div class="duel-slot-grid">
+          <article id="duelSlotOne" class="duel-slot-card"></article>
+          <article id="duelSlotTwo" class="duel-slot-card"></article>
+        </div>
+        <div class="duel-lobby-actions">
+          <button id="duelReadyButton" type="button">Ready</button>
+          <button id="duelAddBotButton" type="button">Add Bot</button>
+          <button id="duelRemoveBotButton" type="button">Remove Bot</button>
+        </div>
+        <small id="duelRoomReadyMeta">Both occupied slots must be ready.</small>
+      </section>
+
+      <p id="duelRoomStatus" class="data-status" role="status" aria-live="polite">
+        Create a local lobby, practice against a Bot, or connect to a Friend Room.
+      </p>
     </dialog>
 
     <dialog id="settingsDialog" class="settings-dialog">

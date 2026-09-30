@@ -4645,3 +4645,149 @@ kbd {
   68% { transform: scale(1.12); filter: brightness(1.35); }
   100% { transform: scale(1); filter: brightness(1); }
 }
+
+
+/* Duel lobby: isolated from PvE Game runtime. */
+.duel-room-dialog {
+  width: min(980px, calc(100vw - 1.5rem));
+  max-height: min(92vh, 900px);
+  overflow: auto;
+}
+
+.duel-room-tabs,
+.duel-lobby-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-bottom: 0.85rem;
+}
+
+.duel-room-panel {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 0.8rem;
+}
+
+.duel-room-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.duel-room-grid label,
+.duel-room-panel > label,
+.duel-bot-settings label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.duel-room-grid input,
+.duel-room-grid select,
+.duel-room-panel input,
+.duel-room-panel select,
+.duel-bot-settings input,
+.duel-bot-settings select {
+  width: 100%;
+}
+
+.duel-bot-settings {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+  padding: 0.8rem;
+  border: 1px solid rgba(126, 211, 234, 0.1);
+  border-radius: 12px;
+  background: rgba(5, 12, 21, 0.56);
+}
+
+.duel-bot-settings > strong {
+  grid-column: 1 / -1;
+  color: #ccefff;
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.duel-lobby-panel {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.9rem;
+  border: 1px solid rgba(112, 213, 235, 0.14);
+  border-radius: 14px;
+  background: rgba(5, 12, 21, 0.68);
+}
+
+.duel-lobby-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.duel-lobby-head > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.duel-lobby-head strong {
+  color: #effbff;
+  font-size: 1.1rem;
+  letter-spacing: 0.12em;
+}
+
+.duel-lobby-head small,
+#duelRoomReadyMeta,
+.duel-room-panel > small {
+  color: #8199ab;
+}
+
+.duel-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.duel-slot-card {
+  display: grid;
+  gap: 0.35rem;
+  min-height: 84px;
+  padding: 0.85rem;
+  border: 1px solid rgba(125, 225, 245, 0.1);
+  border-radius: 12px;
+  background: rgba(9, 19, 31, 0.76);
+}
+
+.duel-slot-card strong {
+  color: #e9fbff;
+}
+
+.duel-slot-card small {
+  color: #839aad;
+}
+
+#duelRoomStatus.error {
+  color: #ff9b91;
+}
+
+@media (max-width: 720px) {
+  .duel-room-grid,
+  .duel-slot-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .duel-bot-settings {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .duel-lobby-head {
+    align-items: start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .duel-bot-settings {
+    grid-template-columns: 1fr;
+  }
+}
