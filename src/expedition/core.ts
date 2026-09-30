@@ -30,6 +30,8 @@ export type ExpeditionProfile = {
   difficulty: string;
   assist: string;
   vocabularyLevel: number;
+  difficultySettings?: unknown;
+  gameplayMode?: string;
 };
 
 export type ExpeditionResources = {
