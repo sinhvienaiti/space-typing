@@ -49,7 +49,7 @@ export function tickCinematic(
   let phase: CinematicPhase = stateInput.phase;
 
   for (;;) {
-    if (phase === "idle" || phase === "done") break;
+    if (phase === "done") break;
     const length = PHASE_LENGTHS[phase];
     if (elapsed < length) break;
     elapsed -= length;
