@@ -428,6 +428,15 @@ import {
   tuneStageForExpansionEncounter,
   type ExpansionV2EncounterPlanItem,
 } from "./expansion-v2/expedition-plan";
+import {
+  createExpansionEncounterRuntime,
+  recordExpansionCompletion,
+  type ExpansionEncounterRuntime,
+} from "./expansion-v2/runtime";
+import type {
+  SectorConditionId,
+  TypingPatternId,
+} from "./expansion-v2/contracts";
 import { createExpeditionLoanerState } from "./expedition/loaner";
 import {
   ExpeditionSession,
@@ -1051,6 +1060,7 @@ const expeditionSession = new ExpeditionSession(
 let expeditionUi: ExpeditionUi | null = null;
 let expeditionCampaignSnapshot: AutosaveSnapshot | null = null;
 let expeditionStartPending = false;
+let expansionEncounterRuntime: ExpansionEncounterRuntime | null = null;
 
 const campaignAutosave = new AutosaveQueue<
   AutosaveSnapshot,
@@ -3262,6 +3272,8 @@ const game = new Game(
           try {
             const ended = expeditionSession.defeat();
             if (ended !== null) {
+              expansionEncounterRuntime = null;
+              game.setExpansionEncounterContext(null);
               expeditionUi?.setResumeAvailable(false);
               expeditionUi?.showSummary(ended);
             }
@@ -3342,6 +3354,17 @@ const game = new Game(
             },
           });
           if (run !== null) {
+            const completedRuntime = expansionEncounterRuntime;
+            expansionEncounterRuntime = null;
+            game.setExpansionEncounterContext(null);
+            for (const fact of completedRuntime?.learningFacts ?? []) {
+              postLearningEvent(
+                buildCombatLearningEvent({
+                  entry: fact.entry,
+                  perfect: fact.perfect,
+                }),
+              );
+            }
             if (run.terminal !== null) {
               expeditionUi?.setResumeAvailable(false);
               expeditionUi?.showSummary(run);
@@ -3830,15 +3853,48 @@ const game = new Game(
       updateCampaignUi();
     },
     onWordComplete: (entry, outcome) => {
-      if (gameplayMode === "combat") {
-        speakEnglish(entry.en, settings);
-        postLearningEvent(
-          buildCombatLearningEvent({
-            entry,
-            perfect: outcome?.perfect ?? true,
-          }),
+      if (gameplayMode !== "combat") return;
+      speakEnglish(entry.en, settings);
+
+      const fact = outcome?.fact;
+      const activeExpedition = expeditionSession.currentRun();
+      if (
+        fact !== undefined &&
+        activeExpedition !== null &&
+        activeExpedition.phase === "encounter"
+      ) {
+        const runtime =
+          expansionEncounterRuntime?.encounterId === fact.encounterId
+            ? expansionEncounterRuntime
+            : createExpansionEncounterRuntime(
+                fact.encounterId,
+                null,
+              );
+        const recorded = recordExpansionCompletion(
+          runtime,
+          fact,
+          game.getCombatElapsedSeconds(),
         );
+        expansionEncounterRuntime = recorded.state;
+        if (recorded.energyBonus > 0) {
+          const granted = game.grantRunEnergy(recorded.energyBonus);
+          if (granted > 0) {
+            showNotice(
+              "Solar Storm · +" +
+                granted.toFixed(0) +
+                " Energy",
+            );
+          }
+        }
+        return;
       }
+
+      postLearningEvent(
+        buildCombatLearningEvent({
+          entry,
+          perfect: outcome?.perfect ?? true,
+        }),
+      );
     },
     onRecallPrompt: (entry) => {
       if (recallSettings.autoPronounce) {
@@ -4076,6 +4132,19 @@ async function startExpeditionEncounter(
   );
   musicController.setPaused(false);
 
+  const design = encounter.design;
+  const pattern = (design?.pattern ?? "normal-word") as TypingPatternId;
+  const condition = (design?.condition ?? null) as SectorConditionId | null;
+  game.setExpansionEncounterContext({
+    encounterId: encounter.id,
+    pattern,
+    gameplaySeed: encounter.gameplaySeed,
+  });
+  expansionEncounterRuntime = createExpansionEncounterRuntime(
+    encounter.id,
+    condition,
+  );
+
   const world = worldForStage(stage.stage);
   await presentStageTransition(
     createStageTransitionSpec({
@@ -4274,6 +4343,8 @@ function abandonCurrentExpedition(): void {
   try {
     const run = expeditionSession.abandon();
     if (run === null) return;
+    expansionEncounterRuntime = null;
+    game.setExpansionEncounterContext(null);
     expeditionUi?.setResumeAvailable(false);
     expeditionUi?.showSummary(run);
   } catch (error) {
@@ -4331,6 +4402,8 @@ async function returnFromExpedition(): Promise<void> {
   }
 
   expeditionUi?.close();
+  expansionEncounterRuntime = null;
+  game.setExpansionEncounterContext(null);
   game.backToTitle();
   applyAutosaveSnapshot(snapshot);
   refreshPersistentStateUi();

@@ -43,6 +43,15 @@ import {
 } from "./campaign/stage-pacing";
 import { canFinishCombatStage, canSpawnFinalBoss, type StageClearGate } from "./campaign/stage-clear-gate";
 import {
+  createCompletionId,
+  type CombatCompletionFact,
+  type CombatCompletionTargetKind,
+} from "./combat/completion-events";
+import {
+  patternAcceptsTypedLength,
+  type TypingPatternId,
+} from "./expansion-v2/contracts";
+import {
   rageScaledCount,
   rageScaledValue,
   spendRage,
@@ -538,7 +547,10 @@ export type GameHooks = {
   onBossUpdate(boss: BossHudState | null): void;
   onWordComplete(
     entry: VocabularyEntry,
-    outcome?: { perfect: boolean },
+    outcome?: {
+      perfect: boolean;
+      fact?: CombatCompletionFact;
+    },
   ): void;
   onRecallPrompt?(entry: VocabularyEntry): void;
   onRecallResult?(result: RecallAttemptResult): void;
@@ -760,6 +772,12 @@ export class Game {
   };
   private relicFirstWordTriggered = false;
   private relicMistakeGuardsUsed = 0;
+  private expansionEncounterContext: {
+    encounterId: string;
+    pattern: TypingPatternId;
+    gameplayState: number;
+  } | null = null;
+  private completionSequence = 0;
 
   private characterId: CharacterId = "vanguard";
   private equipmentAura: EquipmentAuraProfile | null = null;
@@ -1897,6 +1915,102 @@ export class Game {
       ...EMPTY_COMPILED_RELIC_EFFECTS,
       ...effects,
     };
+  }
+
+  setExpansionEncounterContext(
+    context: {
+      encounterId: string;
+      pattern: TypingPatternId;
+      gameplaySeed: number;
+    } | null,
+  ): void {
+    if (context === null) {
+      this.expansionEncounterContext = null;
+      this.completionSequence = 0;
+      return;
+    }
+    this.expansionEncounterContext = {
+      encounterId: context.encounterId,
+      pattern: context.pattern,
+      gameplayState: (context.gameplaySeed >>> 0) || 1,
+    };
+    this.completionSequence = 0;
+  }
+
+  grantRunEnergy(amountInput: number): number {
+    const amount = Number.isFinite(amountInput)
+      ? Math.max(0, amountInput)
+      : 0;
+    if (amount <= 0) return 0;
+    const before = this.stats.energy;
+    this.stats.energy = clamp(
+      this.stats.energy + amount,
+      0,
+      this.stats.maxEnergy,
+    );
+    const granted = this.stats.energy - before;
+    if (granted > 0) this.emitStats();
+    return granted;
+  }
+
+  getCombatElapsedSeconds(): number {
+    return this.stageElapsedSeconds;
+  }
+
+  private nextExpansionGameplayRandom(): number {
+    const context = this.expansionEncounterContext;
+    if (context === null) return Math.random();
+    let state = context.gameplayState >>> 0 || 1;
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    state >>>= 0;
+    context.gameplayState = state || 1;
+    return state / 0x100000000;
+  }
+
+  private expansionVocabulary(
+    entries: readonly VocabularyEntry[] = this.vocabulary,
+  ): readonly VocabularyEntry[] {
+    const pattern = this.expansionEncounterContext?.pattern;
+    if (pattern === undefined || pattern === "normal-word") return entries;
+    const filtered = entries.filter((entry) =>
+      patternAcceptsTypedLength(
+        pattern,
+        typingText(entry.en).length,
+      ),
+    );
+    return filtered.length > 0 ? filtered : entries;
+  }
+
+  private emitTypedCompletion(
+    entry: VocabularyEntry,
+    perfect: boolean,
+    targetKind: CombatCompletionTargetKind,
+    targetId: string,
+  ): void {
+    const context = this.expansionEncounterContext;
+    if (context === null) {
+      this.hooks.onWordComplete(entry, { perfect });
+      return;
+    }
+    this.completionSequence += 1;
+    const fact: CombatCompletionFact = {
+      completionId: createCompletionId(
+        context.encounterId,
+        this.completionSequence,
+      ),
+      encounterId: context.encounterId,
+      sequence: this.completionSequence,
+      origin: "typing",
+      targetKind,
+      targetId,
+      entry: { ...entry },
+      acceptedTypedLetters: typingText(entry.en).length,
+      perfect,
+      sharedKillCount: 0,
+    };
+    this.hooks.onWordComplete(entry, { perfect, fact });
   }
 
   setSupportSpells(ids: readonly SupportSpellId[]): void {
@@ -4230,7 +4344,8 @@ export class Game {
       mechanic === undefined
         ? "normal"
         : bossWordLengthPreference(mechanic);
-    const candidates = this.vocabulary.filter((entry) => {
+    const patterned = this.expansionVocabulary();
+    const candidates = patterned.filter((entry) => {
       const length = typingText(entry.en).length;
       if (preference === "short") {
         return length >= 3 && length <= 6;
@@ -4240,9 +4355,11 @@ export class Game {
       }
       return length >= 5 && length <= 12;
     });
-    const source = candidates.length > 0 ? candidates : this.vocabulary;
+    const source = candidates.length > 0 ? candidates : patterned;
     const preferred =
-      source[Math.floor(Math.random() * source.length)] ??
+      source[
+        Math.floor(this.nextExpansionGameplayRandom() * source.length)
+      ] ??
       FALLBACK_ENTRIES[8]!;
     const varied =
       this.selectVariedEnemyEntry(preferred, undefined, source) ?? preferred;
@@ -4925,14 +5042,19 @@ export class Game {
       elite,
       minimumLayers,
       vocabularyLevel: this.vocabularyLevel,
-      entries: this.vocabulary,
+      entries: this.expansionVocabulary(),
       wordScoreOffset: difficulty.wordScoreOffset,
       rankBonus: difficulty.enemyRankBonus ?? 0,
       clarity: {
         activeWords: this.activeEnemyWords(),
       },
+      random: () => this.nextExpansionGameplayRandom(),
     });
-    const varied = this.selectVariedEnemyEntry(typingProfile.entry);
+    const varied = this.selectVariedEnemyEntry(
+      typingProfile.entry,
+      undefined,
+      this.expansionVocabulary(),
+    );
     if (varied === null) return false;
     typingProfile.entry = varied;
     typingProfile.wordDifficultyScore = wordDifficultyScore(
@@ -5057,11 +5179,13 @@ export class Game {
       preferred,
       this.vocabularyLevel,
       activeWords,
+      this.nextExpansionGameplayRandom(),
     );
   }
 
   private pickVocabularyEntry(kind: EnemyKind): VocabularyEntry {
-    const candidates = this.vocabulary.filter((entry) => {
+    const patterned = this.expansionVocabulary();
+    const candidates = patterned.filter((entry) => {
       const length = typingText(entry.en).length;
       if (length === 0) return false;
       if (kind === "mine") return length <= 6;
@@ -5071,9 +5195,11 @@ export class Game {
       return true;
     });
 
-    const source = candidates.length > 0 ? candidates : this.vocabulary;
+    const source = candidates.length > 0 ? candidates : patterned;
     return (
-      source[Math.floor(Math.random() * source.length)] ??
+      source[
+        Math.floor(this.nextExpansionGameplayRandom() * source.length)
+      ] ??
       FALLBACK_ENTRIES[0]!
     );
   }
@@ -5081,10 +5207,10 @@ export class Game {
   private pickEnemyLayerEntry(enemy: Enemy): VocabularyEntry {
     const entry =
       pickVocabularyEntryForRank(
-        this.vocabulary,
+        this.expansionVocabulary(),
         enemy.rank ?? "I",
         this.vocabularyLevel,
-        Math.random(),
+        this.nextExpansionGameplayRandom(),
         enemy.entry.id,
         this.difficulty?.wordScoreOffset ?? 0,
         {
@@ -5436,13 +5562,18 @@ export class Game {
       elite: false,
       minimumLayers: 1,
       vocabularyLevel: this.vocabularyLevel,
-      entries: this.vocabulary,
+      entries: this.expansionVocabulary(),
       wordScoreOffset: this.difficulty.wordScoreOffset,
       clarity: {
         activeWords: this.activeEnemyWords(),
       },
+      random: () => this.nextExpansionGameplayRandom(),
     });
-    const varied = this.selectVariedEnemyEntry(typingProfile.entry);
+    const varied = this.selectVariedEnemyEntry(
+      typingProfile.entry,
+      undefined,
+      this.expansionVocabulary(),
+    );
     if (varied === null) return;
     typingProfile.entry = varied;
     typingProfile.wordDifficultyScore = wordDifficultyScore(
@@ -5648,7 +5779,6 @@ export class Game {
         this.resolveRecallPrompt(boss.entry, true, !boss.wordMissed);
       }
       const perfectWord = !boss.wordMissed;
-      this.hooks.onWordComplete(boss.entry, { perfect: perfectWord });
       this.applyCharacterWordCompletePassive(word.length);
       this.stageResultTracker.completeWord(
         "boss",
@@ -5696,6 +5826,12 @@ export class Game {
       this.sfx.wordComplete(perfectWord);
       this.applyCharacterPerfectWordPassive(perfectWord);
       this.applyRelicWordComplete(word.length, perfectWord);
+      this.emitTypedCompletion(
+        boss.entry,
+        perfectWord,
+        "boss",
+        "boss:" + String(boss.stage),
+      );
       boss.wordsCompleted += 1;
       const completedEntry = { ...boss.entry };
       boss.typed = 0;
@@ -6407,10 +6543,15 @@ export class Game {
       this.stageElapsedSeconds,
     );
     this.sfx.wordComplete(perfectWord);
-    this.hooks.onWordComplete(enemy.entry, { perfect: perfectWord });
     this.applyCharacterWordCompletePassive(length);
     this.applyCharacterPerfectWordPassive(perfectWord);
     this.applyRelicWordComplete(length, perfectWord, enemy);
+    this.emitTypedCompletion(
+      enemy.entry,
+      perfectWord,
+      "enemy",
+      "enemy:" + String(enemy.id),
+    );
 
     if (enemy.layersRemaining > 1) {
       enemy.layersRemaining -= 1;
@@ -6731,13 +6872,17 @@ export class Game {
         elite: false,
         minimumLayers: 1,
         vocabularyLevel: this.vocabularyLevel,
-        entries: this.vocabulary,
+        entries: this.expansionVocabulary(),
         wordScoreOffset: this.difficulty.wordScoreOffset,
         clarity: {
           activeWords: this.activeEnemyWords(),
         },
       });
-      const varied = this.selectVariedEnemyEntry(typingProfile.entry);
+      const varied = this.selectVariedEnemyEntry(
+      typingProfile.entry,
+      undefined,
+      this.expansionVocabulary(),
+    );
       if (varied === null) continue;
       typingProfile.entry = varied;
       typingProfile.wordDifficultyScore = wordDifficultyScore(
