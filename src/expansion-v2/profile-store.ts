@@ -19,6 +19,24 @@ import {
 export const EXPANSION_V2_PROFILE_KEY =
   "spaceTypingExpansionV2ProfileV1";
 
+export class UnsupportedExpansionV2ProfileVersionError extends Error {
+  constructor(readonly version: number) {
+    super(
+      "Expansion V2 profile version " +
+        String(version) +
+        " is newer than supported version 1.",
+    );
+    this.name = "UnsupportedExpansionV2ProfileVersionError";
+  }
+}
+
+export class CorruptExpansionV2ProfileError extends Error {
+  constructor() {
+    super("Expansion V2 profile storage is corrupt.");
+    this.name = "CorruptExpansionV2ProfileError";
+  }
+}
+
 export type ExpansionV2Profile = {
   version: 1;
   learning: ExpansionLearningState;
@@ -116,13 +134,52 @@ export function sanitizeExpansionV2Profile(
   };
 }
 
+function parseStoredExpansionProfile(
+  raw: string,
+): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new CorruptExpansionV2ProfileError();
+  }
+}
+
+function assertWritableStoredExpansionProfile(
+  raw: string | null,
+): void {
+  if (raw === null) return;
+  const parsed = parseStoredExpansionProfile(raw);
+  if (
+    isRecord(parsed) &&
+    typeof parsed.version === "number" &&
+    Number.isFinite(parsed.version) &&
+    parsed.version > 1
+  ) {
+    throw new UnsupportedExpansionV2ProfileVersionError(
+      Math.floor(parsed.version),
+    );
+  }
+  if (!isRecord(parsed)) {
+    throw new CorruptExpansionV2ProfileError();
+  }
+}
+
 export function loadExpansionV2Profile(
   storage: Pick<Storage, "getItem">,
 ): ExpansionV2Profile {
   const raw = storage.getItem(EXPANSION_V2_PROFILE_KEY);
   if (raw === null) return createExpansionV2Profile();
   try {
-    return sanitizeExpansionV2Profile(JSON.parse(raw));
+    const parsed = parseStoredExpansionProfile(raw);
+    if (
+      isRecord(parsed) &&
+      typeof parsed.version === "number" &&
+      Number.isFinite(parsed.version) &&
+      parsed.version > 1
+    ) {
+      return createExpansionV2Profile();
+    }
+    return sanitizeExpansionV2Profile(parsed);
   } catch {
     return createExpansionV2Profile();
   }
@@ -132,6 +189,9 @@ export function saveExpansionV2Profile(
   storage: Pick<Storage, "setItem" | "getItem">,
   profileInput: ExpansionV2Profile,
 ): ExpansionV2Profile {
+  const existing = storage.getItem(EXPANSION_V2_PROFILE_KEY);
+  assertWritableStoredExpansionProfile(existing);
+
   const profile = sanitizeExpansionV2Profile(profileInput);
   const serialized = JSON.stringify(profile);
   storage.setItem(EXPANSION_V2_PROFILE_KEY, serialized);

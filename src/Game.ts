@@ -53,11 +53,15 @@ import {
   type CombatCompletionFact,
   type CombatCompletionTargetKind,
 } from "./combat/completion-events";
-import {
-  patternAcceptsTypedLength,
-  type EncounterRecipeId,
-  type TypingPatternId,
+import type {
+  EncounterRecipeId,
+  TypingPatternId,
 } from "./expansion-v2/contracts";
+import {
+  buildPatternVocabulary,
+  chainMinimumLayers,
+  sharedTargetEffect,
+} from "./expansion-v2/pattern-runtime";
 import {
   recipeAllowsFormation,
   recipeEnemyKind,
@@ -788,6 +792,8 @@ export class Game {
     pattern: TypingPatternId;
     recipe: EncounterRecipeId | "normal";
     gameplayState: number;
+    patternSeed: number;
+    patternVocabulary: VocabularyEntry[];
     bossParts: boolean;
     wantedWordId: string | null;
     wantedWordAssigned: boolean;
@@ -1949,11 +1955,18 @@ export class Game {
       this.completionSequence = 0;
       return;
     }
+    const patternSeed = (context.gameplaySeed >>> 0) || 1;
     this.expansionEncounterContext = {
       encounterId: context.encounterId,
       pattern: context.pattern,
       recipe: context.recipe ?? "normal",
-      gameplayState: (context.gameplaySeed >>> 0) || 1,
+      gameplayState: patternSeed,
+      patternSeed,
+      patternVocabulary: buildPatternVocabulary(
+        this.vocabulary,
+        context.pattern,
+        patternSeed,
+      ),
       bossParts: context.bossParts === true,
       wantedWordId:
         typeof context.wantedWordId === "string" &&
@@ -2017,15 +2030,19 @@ export class Game {
   private expansionVocabulary(
     entries: readonly VocabularyEntry[] = this.vocabulary,
   ): readonly VocabularyEntry[] {
-    const pattern = this.expansionEncounterContext?.pattern;
-    if (pattern === undefined || pattern === "normal-word") return entries;
-    const filtered = entries.filter((entry) =>
-      patternAcceptsTypedLength(
-        pattern,
-        typingText(entry.en).length,
-      ),
+    const context = this.expansionEncounterContext;
+    if (context === null) return entries;
+    if (entries === this.vocabulary) {
+      return context.patternVocabulary.length > 0
+        ? context.patternVocabulary
+        : entries;
+    }
+    const patterned = buildPatternVocabulary(
+      entries,
+      context.pattern,
+      context.patternSeed,
     );
-    return filtered.length > 0 ? filtered : entries;
+    return patterned.length > 0 ? patterned : entries;
   }
 
   private emitTypedCompletion(
@@ -3129,6 +3146,14 @@ export class Game {
   setVocabulary(entries: VocabularyEntry[]): void {
     if (entries.length === 0) return;
     this.vocabulary = entries;
+    const context = this.expansionEncounterContext;
+    if (context !== null) {
+      context.patternVocabulary = buildPatternVocabulary(
+        entries,
+        context.pattern,
+        context.patternSeed,
+      );
+    }
     this.enemies = [];
     this.targetId = null;
     this.spawnTimer = 0.2;
@@ -5098,10 +5123,13 @@ export class Game {
       rosterStage,
     );
     const minimumLayers = clamp(
-      eliteStats.layers +
-        (!elite && !golden
-          ? this.stageEventModifiers.extraEnemyLayers
-          : 0),
+      chainMinimumLayers(
+        this.expansionEncounterContext?.pattern ?? "normal-word",
+        eliteStats.layers +
+          (!elite && !golden
+            ? this.stageEventModifiers.extraEnemyLayers
+            : 0),
+      ),
       1,
       3,
     );
@@ -6669,6 +6697,22 @@ export class Game {
       "enemy",
       "enemy:" + String(enemy.id),
     );
+
+    const sharedEffect = sharedTargetEffect(
+      this.expansionEncounterContext?.pattern ?? "normal-word",
+      Math.max(0, this.enemies.length - 1),
+    );
+    if (sharedEffect.linkedTargets > 0) {
+      const affected = softenNearbyEnemies(
+        this.enemies,
+        enemy,
+        sharedEffect.typedProgressRatio,
+        sharedEffect.linkedTargets,
+      );
+      if (affected > 0) {
+        this.burst(enemy.x, enemy.y, 10 + affected * 3, 192);
+      }
+    }
 
     if (enemy.layersRemaining > 1) {
       enemy.layersRemaining -= 1;
