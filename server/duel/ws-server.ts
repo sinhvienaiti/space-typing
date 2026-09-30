@@ -31,6 +31,14 @@ import {
 import {
   verifyDuelSessionToken,
 } from "./auth";
+import {
+  DuelRankedService,
+  InMemoryDuelRankedProfileStore,
+  JsonFileDuelRankedProfileStore,
+} from "./ranked-service";
+import {
+  duelMatchmakingRating,
+} from "../../src/duel/ranked";
 
 type ConnectionState = {
   sessionId: string | null;
@@ -143,6 +151,18 @@ const authority = new DuelAuthorityService(
 const socketsBySession = new Map<string, WebSocket>();
 const states = new Map<WebSocket, ConnectionState>();
 const activeMatches = new Set<string>();
+const rankedStore =
+  process.env.DUEL_RANKED_DATA_PATH === undefined ||
+  process.env.DUEL_RANKED_DATA_PATH.trim() === ""
+    ? new InMemoryDuelRankedProfileStore()
+    : new JsonFileDuelRankedProfileStore(
+        process.env.DUEL_RANKED_DATA_PATH,
+      );
+const ranked = new DuelRankedService(
+  authority,
+  rankedStore,
+  () => randomBytes(18).toString("base64url"),
+);
 
 function isOriginAllowed(origin: string | undefined): boolean {
   if (origin === undefined) return ALLOW_NO_ORIGIN;
@@ -452,6 +472,12 @@ function handleAuthenticatedMessage(
       return;
 
     case "CREATE_ROOM": {
+      if (ranked.leave(sessionId)) {
+        send(socket, {
+          type: "RANKED_QUEUE_STATUS",
+          status: "idle",
+        });
+      }
       const result = authority.createRoom(
         sessionId,
         message.room,
@@ -469,6 +495,12 @@ function handleAuthenticatedMessage(
     }
 
     case "JOIN_ROOM": {
+      if (ranked.leave(sessionId)) {
+        send(socket, {
+          type: "RANKED_QUEUE_STATUS",
+          status: "idle",
+        });
+      }
       const result = authority.joinRoom(
         sessionId,
         {
@@ -586,6 +618,12 @@ function handleAuthenticatedMessage(
       return;
 
     case "START_MATCH": {
+      if (ranked.leave(sessionId)) {
+        send(socket, {
+          type: "RANKED_QUEUE_STATUS",
+          status: "idle",
+        });
+      }
       const result = authority.startMatch(
         sessionId,
         message.roomId,
@@ -597,6 +635,34 @@ function handleAuthenticatedMessage(
       }
       activeMatches.add(result.value.matchId);
       sendUpdates(result.value.updates);
+      return;
+    }
+
+    case "QUEUE_RANKED": {
+      const result = ranked.enqueue(
+        sessionId,
+        now,
+      );
+      if (!result.ok) {
+        sendError(socket, result, message.requestId);
+        return;
+      }
+      send(socket, {
+        type: "RANKED_QUEUE_STATUS",
+        status: "queued",
+        ticketId: result.value.ticketId,
+        matchmakingRating:
+          result.value.matchmakingRating,
+      });
+      return;
+    }
+
+    case "LEAVE_RANKED_QUEUE": {
+      ranked.leave(sessionId);
+      send(socket, {
+        type: "RANKED_QUEUE_STATUS",
+        status: "idle",
+      });
       return;
     }
 
@@ -710,6 +776,7 @@ wss.on("connection", (socket) => {
       socketsBySession.get(current.sessionId) === socket
     ) {
       socketsBySession.delete(current.sessionId);
+      ranked.leave(current.sessionId);
       authority.disconnect(
         current.sessionId,
         Date.now(),
@@ -777,6 +844,25 @@ const tickTimer = setInterval(() => {
     accumulatorMs -= TICK_MS;
     const now = Date.now();
 
+    for (const rankedMatch of ranked.pump(now)) {
+      activeMatches.add(rankedMatch.matchId);
+      for (const update of rankedMatch.updates) {
+        const socket = socketForSession(
+          update.sessionId,
+        );
+        if (socket === null) continue;
+        send(socket, {
+          type: "RANKED_QUEUE_STATUS",
+          status: "idle",
+        });
+        send(socket, {
+          type: "RANKED_MATCH_FOUND",
+          matchId: rankedMatch.matchId,
+        });
+      }
+      sendUpdates(rankedMatch.updates);
+    }
+
     for (const matchId of [...activeMatches]) {
       const result = authority.tick(
         matchId,
@@ -788,6 +874,34 @@ const tickTimer = setInterval(() => {
         continue;
       }
       sendUpdates(result.value.updates);
+      const completed = ranked.completeIfFinished(
+        matchId,
+        result.value.updates,
+      );
+      if (completed !== null) {
+        for (const entry of [
+          completed.left,
+          completed.right,
+        ]) {
+          const socket = socketForSession(
+            entry.sessionId,
+          );
+          if (socket === null) continue;
+          send(socket, {
+            type: "RANKED_PROFILE",
+            typingRating:
+              entry.profile.typingRating,
+            duelRating: entry.profile.duelRating,
+            matchmakingRating:
+              duelMatchmakingRating(entry.profile),
+            matchesPlayed:
+              entry.profile.matchesPlayed,
+            wins: entry.profile.wins,
+            losses: entry.profile.losses,
+            draws: entry.profile.draws,
+          });
+        }
+      }
       const active = result.value.updates.some(
         (update) =>
           update.view.series.status === "active",

@@ -91,6 +91,14 @@ export type DuelClientMessage =
       roomId: string;
     }
   | {
+      type: "QUEUE_RANKED";
+      requestId: string;
+    }
+  | {
+      type: "LEAVE_RANKED_QUEUE";
+      requestId: string;
+    }
+  | {
       type: "INTENT";
       matchId: string;
       roundId: string;
@@ -139,6 +147,26 @@ export type DuelServerMessage =
       type: "ROOM_CLOSED";
       roomId: string;
       reason: string;
+    }
+  | {
+      type: "RANKED_QUEUE_STATUS";
+      status: "idle" | "queued";
+      ticketId?: string;
+      matchmakingRating?: number;
+    }
+  | {
+      type: "RANKED_MATCH_FOUND";
+      matchId: string;
+    }
+  | {
+      type: "RANKED_PROFILE";
+      typingRating: number;
+      duelRating: number;
+      matchmakingRating: number;
+      matchesPlayed: number;
+      wins: number;
+      losses: number;
+      draws: number;
     }
   | {
       type: "PING";
@@ -567,6 +595,16 @@ function parseMessageObject(
       return requestId === null || roomId === null
         ? null
         : { type, requestId, roomId };
+    }
+    case "QUEUE_RANKED":
+    case "LEAVE_RANKED_QUEUE": {
+      if (!exactKeys(value, ["type", "requestId"])) {
+        return null;
+      }
+      const requestId = stringField(value, "requestId", 64);
+      return requestId === null
+        ? null
+        : { type, requestId };
     }
     case "INTENT": {
       if (

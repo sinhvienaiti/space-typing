@@ -27,10 +27,31 @@ export type DuelLocalPrediction = {
   pendingSequences: readonly number[];
 };
 
+export type DuelRankedQueueClientStatus = {
+  status: "idle" | "queued";
+  ticketId?: string;
+  matchmakingRating?: number;
+};
+
+export type DuelRankedClientProfile = {
+  typingRating: number;
+  duelRating: number;
+  matchmakingRating: number;
+  matchesPlayed: number;
+  wins: number;
+  losses: number;
+  draws: number;
+};
+
 export type DuelNetworkCallbacks = {
   onStatus?(status: DuelNetworkStatus): void;
   onRoomSnapshot?(room: DuelClientRoomSnapshot): void;
   onRoomClosed?(roomId: string, reason: string): void;
+  onRankedQueueStatus?(
+    status: DuelRankedQueueClientStatus,
+  ): void;
+  onRankedMatchFound?(matchId: string): void;
+  onRankedProfile?(profile: DuelRankedClientProfile): void;
   onMatchUpdate?(
     view: DuelClientMatchView,
     events: readonly DuelClientEvent[],
@@ -265,6 +286,20 @@ export class DuelNetworkClient {
     });
   }
 
+  queueRanked(): boolean {
+    return this.sendMessage({
+      type: "QUEUE_RANKED",
+      requestId: this.nextRequestId(),
+    });
+  }
+
+  leaveRankedQueue(): boolean {
+    return this.sendMessage({
+      type: "LEAVE_RANKED_QUEUE",
+      requestId: this.nextRequestId(),
+    });
+  }
+
   sendIntent(intent: DuelWireIntent): number | null {
     const view = this.view;
     if (
@@ -425,6 +460,72 @@ export class DuelNetworkClient {
           );
         }
         return;
+
+      case "RANKED_QUEUE_STATUS": {
+        if (
+          (parsed.status !== "idle" &&
+            parsed.status !== "queued") ||
+          (parsed.ticketId !== undefined &&
+            typeof parsed.ticketId !== "string") ||
+          (parsed.matchmakingRating !== undefined &&
+            typeof parsed.matchmakingRating !== "number")
+        ) {
+          return;
+        }
+        this.callbacks.onRankedQueueStatus?.({
+          status: parsed.status,
+          ...(typeof parsed.ticketId === "string"
+            ? { ticketId: parsed.ticketId }
+            : {}),
+          ...(typeof parsed.matchmakingRating === "number"
+            ? {
+                matchmakingRating:
+                  parsed.matchmakingRating,
+              }
+            : {}),
+        });
+        return;
+      }
+
+      case "RANKED_MATCH_FOUND":
+        if (typeof parsed.matchId === "string") {
+          this.callbacks.onRankedMatchFound?.(
+            parsed.matchId,
+          );
+        }
+        return;
+
+      case "RANKED_PROFILE": {
+        const keys = [
+          "typingRating",
+          "duelRating",
+          "matchmakingRating",
+          "matchesPlayed",
+          "wins",
+          "losses",
+          "draws",
+        ] as const;
+        if (
+          !keys.every(
+            (key) =>
+              typeof parsed[key] === "number" &&
+              Number.isFinite(parsed[key] as number),
+          )
+        ) {
+          return;
+        }
+        this.callbacks.onRankedProfile?.({
+          typingRating: parsed.typingRating as number,
+          duelRating: parsed.duelRating as number,
+          matchmakingRating:
+            parsed.matchmakingRating as number,
+          matchesPlayed: parsed.matchesPlayed as number,
+          wins: parsed.wins as number,
+          losses: parsed.losses as number,
+          draws: parsed.draws as number,
+        });
+        return;
+      }
 
       case "MATCH_UPDATE": {
         if (

@@ -238,6 +238,44 @@ describe("Duel M-DUEL-10 authoritative protocol", () => {
     ).toBe(false);
   });
 
+  it("accepts Ranked queue control messages outside combat intent grammar", () => {
+    expect(
+      parse({
+        type: "QUEUE_RANKED",
+        requestId: "ranked-1",
+      }),
+    ).toEqual({
+      ok: true,
+      message: {
+        type: "QUEUE_RANKED",
+        requestId: "ranked-1",
+      },
+    });
+    expect(
+      parse({
+        type: "LEAVE_RANKED_QUEUE",
+        requestId: "ranked-2",
+      }),
+    ).toEqual({
+      ok: true,
+      message: {
+        type: "LEAVE_RANKED_QUEUE",
+        requestId: "ranked-2",
+      },
+    });
+    expect(
+      parse({
+        type: "INTENT",
+        matchId: "m",
+        roundId: "r",
+        sequence: 1,
+        intent: {
+          type: "QUEUE_RANKED",
+        },
+      }).ok,
+    ).toBe(false);
+  });
+
   it("rejects oversized payloads before JSON parsing", () => {
     const raw = JSON.stringify({
       type: "PONG",

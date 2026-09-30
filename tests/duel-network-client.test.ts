@@ -406,6 +406,85 @@ describe("Duel Friend Room browser transport", () => {
     });
   });
 
+  it("sends Ranked queue control outside combat intent grammar", () => {
+    const socket = new FakeSocket();
+    const statuses: unknown[] = [];
+    const found: string[] = [];
+    const profiles: unknown[] = [];
+    const client = new DuelNetworkClient({
+      url: "wss://example.test/duel",
+      clientVersion: "0.1.0",
+      socketFactory: () => socket,
+      callbacks: {
+        onRankedQueueStatus(status) {
+          statuses.push(status);
+        },
+        onRankedMatchFound(matchId) {
+          found.push(matchId);
+        },
+        onRankedProfile(profile) {
+          profiles.push(profile);
+        },
+      },
+    });
+    client.connect("signed-token");
+    socket.open();
+    welcome(socket);
+
+    expect(client.queueRanked()).toBe(true);
+    expect(JSON.parse(socket.sent.at(-1)!)).toEqual({
+      type: "QUEUE_RANKED",
+      requestId: "req-1",
+    });
+
+    socket.message({
+      type: "RANKED_QUEUE_STATUS",
+      status: "queued",
+      ticketId: "ticket-1",
+      matchmakingRating: 1042,
+    });
+    socket.message({
+      type: "RANKED_MATCH_FOUND",
+      matchId: "ranked-1",
+    });
+    socket.message({
+      type: "RANKED_PROFILE",
+      typingRating: 1020,
+      duelRating: 1055,
+      matchmakingRating: 1041,
+      matchesPlayed: 12,
+      wins: 7,
+      losses: 4,
+      draws: 1,
+    });
+
+    expect(statuses).toEqual([
+      {
+        status: "queued",
+        ticketId: "ticket-1",
+        matchmakingRating: 1042,
+      },
+    ]);
+    expect(found).toEqual(["ranked-1"]);
+    expect(profiles).toEqual([
+      {
+        typingRating: 1020,
+        duelRating: 1055,
+        matchmakingRating: 1041,
+        matchesPlayed: 12,
+        wins: 7,
+        losses: 4,
+        draws: 1,
+      },
+    ]);
+
+    expect(client.leaveRankedQueue()).toBe(true);
+    expect(JSON.parse(socket.sent.at(-1)!)).toEqual({
+      type: "LEAVE_RANKED_QUEUE",
+      requestId: "req-2",
+    });
+  });
+
   it("does not loop reconnect after a fatal authentication failure", () => {
     vi.useFakeTimers();
     try {

@@ -171,6 +171,55 @@ function updateTypingRating(
   return clampRating(next);
 }
 
+export function createDefaultDuelRankedProfile(
+  accountId: string,
+): DuelRankedProfile {
+  return {
+    accountId: accountId.trim(),
+    typingRating: DUEL_RANKED_BASE_RATING,
+    duelRating: DUEL_RANKED_BASE_RATING,
+    matchesPlayed: 0,
+    wins: 0,
+    losses: 0,
+    draws: 0,
+  };
+}
+
+export function updateDuelRankedResultOnly(input: {
+  left: DuelRankedProfile;
+  right: DuelRankedProfile;
+  leftResult: DuelRankedResult;
+}): {
+  left: DuelRankedProfile;
+  right: DuelRankedProfile;
+} {
+  const left = sanitizeDuelRankedProfile(input.left);
+  const right = sanitizeDuelRankedProfile(input.right);
+  const rightResult = oppositeResult(input.leftResult);
+
+  const apply = (
+    own: DuelRankedProfile,
+    opponent: DuelRankedProfile,
+    result: DuelRankedResult,
+  ): DuelRankedProfile => ({
+    ...own,
+    duelRating: updateDuelRating(
+      own,
+      opponent,
+      result,
+    ),
+    matchesPlayed: own.matchesPlayed + 1,
+    wins: own.wins + (result === "win" ? 1 : 0),
+    losses: own.losses + (result === "loss" ? 1 : 0),
+    draws: own.draws + (result === "draw" ? 1 : 0),
+  });
+
+  return {
+    left: apply(left, right, input.leftResult),
+    right: apply(right, left, rightResult),
+  };
+}
+
 export function updateDuelRankedProfiles(input: {
   left: DuelRankedProfile;
   right: DuelRankedProfile;
