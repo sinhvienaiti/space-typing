@@ -4,10 +4,8 @@ import {
   createExpeditionRun,
   type ExpeditionResources,
 } from "../src/expedition/core";
-import {
-  ExpeditionSession,
-  type ExpeditionStorage,
-} from "../src/expedition/session";
+import { ExpeditionSession } from "../src/expedition/session";
+import type { ExpeditionStorage } from "../src/expedition/store";
 
 class MemoryStorage implements ExpeditionStorage {
   private values = new Map<string, string>();
