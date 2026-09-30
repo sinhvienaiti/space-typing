@@ -425,12 +425,6 @@ function handleAuthenticatedMessage(
   if (sessionId === null) return;
   const now = Date.now();
 
-  if (message.type === "PONG") {
-    authority.heartbeat(sessionId, now);
-    state.lastPongAt = now;
-    return;
-  }
-
   if (message.type !== "INTENT") {
     const rate = authority.acceptMessage(
       sessionId,
@@ -440,6 +434,12 @@ function handleAuthenticatedMessage(
       sendError(socket, rate);
       return;
     }
+  }
+
+  if (message.type === "PONG") {
+    authority.heartbeat(sessionId, now);
+    state.lastPongAt = now;
+    return;
   }
 
   switch (message.type) {
