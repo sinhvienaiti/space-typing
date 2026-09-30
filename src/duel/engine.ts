@@ -4,10 +4,19 @@ import {
   type DuelCombatEffect,
 } from "./combat";
 import {
+  DuelChanceSystem,
+  type DuelFateResolution,
+  type DuelMysteryOutcome,
+  type DuelMysteryPublic,
+  type DuelMysteryReveal,
+  type DuelMysteryRevealLevel,
+} from "./chance";
+import {
   DuelCombatInventory,
   type DuelCombatInventorySnapshot,
 } from "./inventory";
 import {
+  DUEL_CONTENT_VERSION,
   DUEL_DEFAULT_REGULATION_SECONDS,
   DUEL_HARD_OVERTIME_SECONDS,
   type DuelActionDefinition,
@@ -62,6 +71,10 @@ export type DuelEngineSnapshot = {
     Record<DuelPlayerId, readonly DuelIncomingThreat[]>
   >;
   tactical: DuelTacticalMapSnapshot;
+  chance: {
+    pity: Readonly<Record<DuelPlayerId, number>>;
+    mysteries: readonly DuelMysteryPublic[];
+  };
 };
 
 export type DuelTickEffect = DuelCombatEffect;
@@ -140,6 +153,25 @@ export type DuelEngineEvent =
       actionId: string;
     }
   | {
+      type: "fate-resolved";
+      resolution: DuelFateResolution;
+    }
+  | {
+      type: "mystery-created";
+      mystery: DuelMysteryPublic;
+    }
+  | {
+      type: "mystery-revealed";
+      playerId: DuelPlayerId;
+      reveal: DuelMysteryReveal;
+    }
+  | {
+      type: "mystery-resolved";
+      playerId: DuelPlayerId;
+      mysteryId: string;
+      outcome: DuelMysteryOutcome;
+    }
+  | {
       type: "round-ended";
       result: DuelRoundResult;
     };
@@ -152,6 +184,7 @@ export type DuelEngineConfig = {
   maxEnergy?: number;
   startingShield?: number;
   startingEnergy?: number;
+  matchSeed?: number;
   actions?: ReadonlyMap<string, DuelActionDefinition>;
 };
 
@@ -222,6 +255,7 @@ export class DuelEngine {
   };
   private readonly threats = new DuelThreatSystem();
   private readonly tactical = new DuelTacticalMapState();
+  private readonly chance: DuelChanceSystem;
   private readonly queuedIntents: DuelIntent[] = [];
   private readonly pendingEffects: DuelCombatEffect[] = [];
   private readonly reservedEnergyCost: Record<DuelPlayerId, number> = {
@@ -237,6 +271,10 @@ export class DuelEngine {
 
   constructor(config: DuelEngineConfig = {}) {
     this.actions = config.actions ?? DUEL_ACTIONS_BY_ID;
+    this.chance = new DuelChanceSystem(
+      config.matchSeed ?? 1,
+      DUEL_CONTENT_VERSION,
+    );
     this.regulationSeconds = Math.max(
       1,
       config.regulationSeconds ?? DUEL_DEFAULT_REGULATION_SECONDS,
@@ -268,6 +306,7 @@ export class DuelEngine {
     this.reservedEnergyCost["player-2"] = 0;
     this.threats.clear();
     this.tactical.clear();
+    this.chance.resetRound();
     for (const playerId of PLAYER_IDS) {
       this.players[playerId] = createPlayer(playerId, this.profile);
       this.inventories[playerId].clear();
@@ -381,6 +420,122 @@ export class DuelEngine {
     return otherPlayer(playerId);
   }
 
+  resolveFate(playerId: DuelPlayerId): DuelEngineEvent[] {
+    if (this.roundResult.status !== "active") return [];
+    const resolution = this.chance.rollFate(playerId);
+    const effects: DuelCombatEffect[] = [];
+    if (resolution.outcome.selfShield > 0) {
+      effects.push({
+        type: "shield",
+        targetId: playerId,
+        amount: resolution.outcome.selfShield,
+      });
+    }
+    if (resolution.outcome.selfEnergy > 0) {
+      effects.push({
+        type: "energy",
+        targetId: playerId,
+        amount: resolution.outcome.selfEnergy,
+      });
+    }
+    if (resolution.outcome.opponentDamage > 0) {
+      effects.push({
+        type: "damage",
+        targetId: otherPlayer(playerId),
+        sourceId: playerId,
+        amount: resolution.outcome.opponentDamage,
+      });
+    }
+    this.applyEffectsToPlayers(effects);
+    const events: DuelEngineEvent[] = [
+      { type: "fate-resolved", resolution },
+    ];
+    this.resolveTerminalState(events);
+    return events;
+  }
+
+  createMystery(): DuelEngineEvent[] {
+    if (this.roundResult.status !== "active") return [];
+    const mystery = this.chance.createMystery(this.phase());
+    return [{ type: "mystery-created", mystery }];
+  }
+
+  revealMystery(
+    playerId: DuelPlayerId,
+    mysteryId: string,
+    level: DuelMysteryRevealLevel,
+  ): DuelEngineEvent[] {
+    if (this.roundResult.status !== "active") return [];
+    const reveal = this.chance.revealMystery(mysteryId, level);
+    if (reveal === null) return [];
+    return [{ type: "mystery-revealed", playerId, reveal }];
+  }
+
+  resolveMystery(
+    playerId: DuelPlayerId,
+    mysteryId: string,
+  ): DuelEngineEvent[] {
+    if (this.roundResult.status !== "active") return [];
+    const outcome = this.chance.resolveMystery(mysteryId);
+    if (outcome === null) return [];
+
+    const effects: DuelCombatEffect[] = [];
+    switch (outcome.id) {
+      case "energy-cache":
+        effects.push({
+          type: "energy",
+          targetId: playerId,
+          amount: outcome.magnitude,
+        });
+        break;
+      case "emergency-shield":
+        effects.push({
+          type: "shield",
+          targetId: playerId,
+          amount: outcome.magnitude,
+        });
+        break;
+      case "repair-burst":
+        effects.push({
+          type: "repair",
+          targetId: playerId,
+          amount: outcome.magnitude,
+        });
+        break;
+      case "shield-overload":
+        effects.push({
+          type: "damage",
+          targetId: playerId,
+          amount: outcome.magnitude,
+        });
+        break;
+      case "energy-drain":
+        effects.push({
+          type: "energy-cost",
+          targetId: playerId,
+          amount: outcome.magnitude,
+        });
+        break;
+      case "offer-reshuffle":
+      case "gravity-shift":
+      case "hazard-surge":
+      case "world-fracture":
+        break;
+    }
+
+    this.applyEffectsToPlayers(effects);
+    const events: DuelEngineEvent[] = [
+      {
+        type: "mystery-resolved",
+        playerId,
+        mysteryId,
+        outcome,
+      },
+    ];
+    this.resolveTerminalState(events);
+    return events;
+  }
+
   phase(): DuelMatchPhase {
     return duelPhaseForProgress(
       duelRegulationProgress(
@@ -409,6 +564,10 @@ export class DuelEngine {
         "player-2": this.threats.snapshotFor("player-2"),
       },
       tactical: this.tactical.snapshot(),
+      chance: {
+        pity: this.chance.pitySnapshot(),
+        mysteries: this.chance.publicMysteries(),
+      },
     };
   }
 
