@@ -1,3 +1,4 @@
+import type { CompletionContribution } from "../combat/completion-events";
 import {
   abandonExpeditionRun,
   beginExpeditionEncounter,
@@ -204,6 +205,7 @@ export class ExpeditionSession {
     accuracy: number;
     resources: ExpeditionResources;
     activeSeconds?: number;
+    contributions?: CompletionContribution;
   }): ExpeditionRun | null {
     const envelope = this.envelope;
     if (envelope === null || envelope.run.phase !== "encounter") {

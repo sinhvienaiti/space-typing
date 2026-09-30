@@ -437,6 +437,7 @@ import {
   type ExpansionEncounterRuntime,
 } from "./expansion-v2/runtime";
 import type {
+  EncounterRecipeId,
   SectorConditionId,
   TypingPatternId,
 } from "./expansion-v2/contracts";
@@ -3563,6 +3564,8 @@ const game = new Game(
             score: stats.score,
             accuracy,
             activeSeconds: nextActiveSeconds,
+            contributions:
+              expansionEncounterRuntime?.contributions,
             resources: {
               hull: stats.hull,
               maxHull: stats.maxHull,
@@ -4462,6 +4465,8 @@ async function startExpeditionEncounter(
   game.setExpansionEncounterContext({
     encounterId: encounter.id,
     pattern,
+    recipe:
+      (design?.recipe ?? "normal") as EncounterRecipeId | "normal",
     gameplaySeed: encounter.gameplaySeed,
     bossParts: design?.recipe === "boss-prelude",
     wantedWordId:
@@ -7522,6 +7527,7 @@ async function startSelectedStage(): Promise<void> {
             stage.stage,
             expansionV2Profile.campaignEventFlags,
           ) ?? expansionProfile.pattern,
+        recipe: expansionProfile.recipe,
         gameplaySeed: stage.seed,
         bossParts: false,
       });

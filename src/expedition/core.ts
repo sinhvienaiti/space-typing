@@ -1,3 +1,4 @@
+import type { CompletionContribution } from "../combat/completion-events";
 export const EXPEDITION_RUN_VERSION = 1 as const;
 export const EXPEDITION_RULESET_VERSION = "expansion-v2-v1";
 export const EXPEDITION_CONTENT_VERSION = "expansion-v2-world-01-v1";
@@ -112,6 +113,7 @@ export type ExpeditionRun = {
   resources: ExpeditionResources;
   totalScore: number;
   accuracySum: number;
+  contributions: CompletionContribution;
   committedEncounterIds: string[];
   interrupted: boolean;
   retryCount: number;
@@ -320,6 +322,18 @@ export function createExpeditionRun(input: {
     resources: sanitizeExpeditionResources(input.startingResources),
     totalScore: 0,
     accuracySum: 0,
+    contributions: {
+      typedCompletions: 0,
+      perfectCompletions: 0,
+      acceptedTypedLetters: 0,
+      weightedEffort: 0,
+      longWordCompletions: 0,
+      solarStormBonuses: 0,
+      solarStormEnergy: 0,
+      relicProcs: 0,
+      perkProcs: 0,
+      synergyProcs: 0,
+    },
     committedEncounterIds: [],
     interrupted: false,
     retryCount: 0,
@@ -513,6 +527,7 @@ export function settleExpeditionEncounter(
     accuracy: number;
     resources: ExpeditionResources;
     activeSeconds?: number;
+    contributions?: CompletionContribution;
   },
 ): ExpeditionRun {
   if (run.phase !== "encounter" || run.terminal !== null) return run;
@@ -547,6 +562,54 @@ export function settleExpeditionEncounter(
         ]
           .sort((left, right) => left.encounterIndex - right.encounterIndex)
           .slice(-16);
+  const encounterContribution =
+    result.contributions ?? {
+      typedCompletions: 0,
+      perfectCompletions: 0,
+      acceptedTypedLetters: 0,
+      weightedEffort: 0,
+      longWordCompletions: 0,
+      solarStormBonuses: 0,
+      solarStormEnergy: 0,
+      relicProcs: 0,
+      perkProcs: 0,
+      synergyProcs: 0,
+    };
+  const nextContributions = alreadyCommitted
+    ? run.contributions
+    : {
+        typedCompletions:
+          run.contributions.typedCompletions +
+          encounterContribution.typedCompletions,
+        perfectCompletions:
+          run.contributions.perfectCompletions +
+          encounterContribution.perfectCompletions,
+        acceptedTypedLetters:
+          run.contributions.acceptedTypedLetters +
+          encounterContribution.acceptedTypedLetters,
+        weightedEffort:
+          run.contributions.weightedEffort +
+          encounterContribution.weightedEffort,
+        longWordCompletions:
+          run.contributions.longWordCompletions +
+          encounterContribution.longWordCompletions,
+        solarStormBonuses:
+          run.contributions.solarStormBonuses +
+          encounterContribution.solarStormBonuses,
+        solarStormEnergy:
+          run.contributions.solarStormEnergy +
+          encounterContribution.solarStormEnergy,
+        relicProcs:
+          run.contributions.relicProcs +
+          encounterContribution.relicProcs,
+        perkProcs:
+          run.contributions.perkProcs +
+          encounterContribution.perkProcs,
+        synergyProcs:
+          run.contributions.synergyProcs +
+          encounterContribution.synergyProcs,
+      };
+
   const next: ExpeditionRun = {
     ...run,
     phase: "settlement",
@@ -555,6 +618,7 @@ export function settleExpeditionEncounter(
     resources: sanitizeExpeditionResources(result.resources),
     totalScore: nextTotalScore,
     accuracySum: alreadyCommitted ? run.accuracySum : run.accuracySum + accuracy,
+    contributions: nextContributions,
     ghostPoints: nextGhostPoints,
     committedEncounterIds: alreadyCommitted
       ? run.committedEncounterIds

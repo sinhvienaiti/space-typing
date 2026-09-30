@@ -55,8 +55,13 @@ import {
 } from "./combat/completion-events";
 import {
   patternAcceptsTypedLength,
+  type EncounterRecipeId,
   type TypingPatternId,
 } from "./expansion-v2/contracts";
+import {
+  recipeAllowsFormation,
+  recipeEnemyKind,
+} from "./expansion-v2/recipe-runtime";
 import {
   rageScaledCount,
   rageScaledValue,
@@ -781,6 +786,7 @@ export class Game {
   private expansionEncounterContext: {
     encounterId: string;
     pattern: TypingPatternId;
+    recipe: EncounterRecipeId | "normal";
     gameplayState: number;
     bossParts: boolean;
     wantedWordId: string | null;
@@ -1932,6 +1938,7 @@ export class Game {
     context: {
       encounterId: string;
       pattern: TypingPatternId;
+      recipe?: EncounterRecipeId | "normal";
       gameplaySeed: number;
       bossParts?: boolean;
       wantedWordId?: string | null;
@@ -1945,6 +1952,7 @@ export class Game {
     this.expansionEncounterContext = {
       encounterId: context.encounterId,
       pattern: context.pattern,
+      recipe: context.recipe ?? "normal",
       gameplayState: (context.gameplaySeed >>> 0) || 1,
       bossParts: context.bossParts === true,
       wantedWordId:
@@ -4862,14 +4870,29 @@ export class Game {
     );
   }
 
+  private expansionRecipeEnemyKind(
+    stage: number,
+  ): EnemyKind {
+    const recipe = this.expansionEncounterContext?.recipe ?? "normal";
+    const roll = this.nextExpansionGameplayRandom();
+    return recipeEnemyKind(
+      recipe,
+      roll,
+      chooseEnemyKind(stage, roll),
+    );
+  }
+
   private trySpawnFormation(
     difficulty: DifficultyProfile,
     phaseBudgetRemaining = this.spawnRemaining,
   ): number {
+    const expansionRecipe =
+      this.expansionEncounterContext?.recipe ?? "normal";
     if (
       this.hiddenEncounterRuntime?.forcePriorityTargets ||
       objectiveForcesCommander(this.stageObjective) ||
-      objectiveForcesElite(this.stageObjective)
+      objectiveForcesElite(this.stageObjective) ||
+      !recipeAllowsFormation(expansionRecipe)
     ) {
       return 0;
     }
@@ -4967,7 +4990,7 @@ export class Game {
       request.kind ??
       (objectiveCommander
         ? "commander"
-        : chooseEnemyKind(stage));
+        : this.expansionRecipeEnemyKind(stage));
     if (
       !request.skipAdmission &&
       !this.canAdmitEnemyKind(kind, difficulty)

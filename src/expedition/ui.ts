@@ -399,6 +399,27 @@ export function mountExpeditionUi(options: {
     card.append(strong, small);
     grid.append(card);
 
+    const contributionCard = document.createElement("article");
+    contributionCard.className = "reward-choice-option";
+    const contributionTitle = document.createElement("strong");
+    contributionTitle.textContent = "Run contribution";
+    const contributionMeta = document.createElement("small");
+    contributionMeta.textContent =
+      String(run.contributions.typedCompletions) +
+      " typed completions · " +
+      String(run.contributions.perfectCompletions) +
+      " perfect · " +
+      String(run.contributions.acceptedTypedLetters) +
+      " typed letters · " +
+      run.contributions.weightedEffort.toFixed(1) +
+      " weighted effort · " +
+      String(run.contributions.longWordCompletions) +
+      " long-word clears · " +
+      String(run.contributions.solarStormBonuses) +
+      " Solar Storm bonuses";
+    contributionCard.append(contributionTitle, contributionMeta);
+    grid.append(contributionCard);
+
     const learningSummary = options.learningSummary(run);
     if (learningSummary !== null) {
       const learningCard = document.createElement("article");
