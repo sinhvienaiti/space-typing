@@ -1,4 +1,3 @@
-import "./battle.css";
 import { DUEL_ACTIONS_BY_ID } from "./actions";
 import type {
   DuelClientEvent,
