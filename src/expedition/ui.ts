@@ -3,6 +3,23 @@ import type {
   ExpeditionRestChoice,
   ExpeditionRun,
 } from "./core";
+import {
+  encounterRecipeIconUrl,
+  expeditionIconUrl,
+  learningIconUrl,
+  metaIconUrl,
+  relicIconUrl,
+  typingPatternIconUrl,
+} from "../expansion-v2/asset-map";
+import {
+  ENCOUNTER_RECIPE_IDS,
+  TYPING_PATTERN_IDS,
+  type EncounterRecipeId,
+  type TypingPatternId,
+} from "../expansion-v2/contracts";
+import {
+  isRelicId,
+} from "../relics/registry";
 
 export type ExpeditionUi = {
   setResumeAvailable(available: boolean): void;
@@ -40,6 +57,13 @@ export function mountExpeditionUi(options: {
   launch.type = "button";
   launch.id = "expeditionButton";
   launch.textContent = "Expedition V2";
+  const launchIcon = iconImage(
+    expeditionIconUrl("mode"),
+    "Expedition",
+  );
+  if (launchIcon !== null) {
+    decorateButton(launch, launchIcon);
+  }
   launch.addEventListener("click", () => {
     if (resumeAvailable) options.onResume();
     else options.onStart();
@@ -48,11 +72,25 @@ export function mountExpeditionUi(options: {
   daily.type = "button";
   daily.id = "expeditionDailyButton";
   daily.textContent = "Daily Expedition";
+  const dailyIcon = iconImage(
+    expeditionIconUrl("daily"),
+    "Daily Expedition",
+  );
+  if (dailyIcon !== null) {
+    decorateButton(daily, dailyIcon);
+  }
   daily.addEventListener("click", options.onDailyStart);
   const ghost = document.createElement("button");
   ghost.type = "button";
   ghost.id = "expeditionGhostButton";
   ghost.textContent = "Ghost · On";
+  const ghostIcon = iconImage(
+    metaIconUrl("ghost"),
+    "Personal Ghost",
+  );
+  if (ghostIcon !== null) {
+    decorateButton(ghost, ghostIcon);
+  }
   ghost.addEventListener("click", options.onToggleGhost);
   actions.append(launch, daily, ghost);
 
@@ -78,6 +116,32 @@ export function mountExpeditionUi(options: {
   actionsRow.className = "title-group-actions";
   dialog.append(head, meta, grid, actionsRow);
   document.body.append(dialog);
+
+  function iconImage(
+    url: string | null,
+    alt: string,
+  ): HTMLImageElement | null {
+    if (url === null) return null;
+    const image = document.createElement("img");
+    image.className = "expansion-v2-icon";
+    image.src = url;
+    image.alt = alt;
+    image.loading = "eager";
+    image.decoding = "async";
+    return image;
+  }
+
+  function decorateButton(
+    button: HTMLButtonElement,
+    image: HTMLImageElement | null,
+  ): HTMLButtonElement {
+    if (image === null) return button;
+    const label = document.createElement("span");
+    label.textContent = button.textContent ?? "";
+    button.replaceChildren(image, label);
+    button.classList.add("expansion-v2-icon-button");
+    return button;
+  }
 
   function makeButton(
     label: string,
@@ -153,23 +217,29 @@ export function mountExpeditionUi(options: {
     actionsRow.replaceChildren();
 
     for (const choice of offer.choices) {
-      grid.append(
-        makeButton(
-          choiceLabel(choice),
-          () => {
-            if (
-              choice.kind === "relic" &&
-              run.relics.equipped.length >= run.relics.maxEquipped &&
-              !run.relics.equipped.includes(choice.relicId)
-            ) {
-              showReplacement(run, choice);
-              return;
-            }
-            options.onConfirm(choice.id, null);
-          },
-          "reward-choice-option",
-        ),
+      const button = makeButton(
+        choiceLabel(choice),
+        () => {
+          if (
+            choice.kind === "relic" &&
+            run.relics.equipped.length >= run.relics.maxEquipped &&
+            !run.relics.equipped.includes(choice.relicId)
+          ) {
+            showReplacement(run, choice);
+            return;
+          }
+          options.onConfirm(choice.id, null);
+        },
+        "reward-choice-option",
       );
+      const image =
+        choice.kind === "relic" && isRelicId(choice.relicId)
+          ? iconImage(
+              relicIconUrl(choice.relicId),
+              options.relicLabel(choice.relicId),
+            )
+          : null;
+      grid.append(decorateButton(button, image));
     }
 
     actionsRow.append(
@@ -198,7 +268,36 @@ export function mountExpeditionUi(options: {
     actionsRow.replaceChildren();
 
     const card = document.createElement("article");
-    card.className = "reward-choice-option";
+    card.className = "reward-choice-option expansion-v2-briefing-card";
+    const media = document.createElement("div");
+    media.className = "expansion-v2-card-media";
+    const recipe =
+      design?.recipe !== undefined &&
+      (ENCOUNTER_RECIPE_IDS as readonly string[]).includes(design.recipe)
+        ? design.recipe as EncounterRecipeId
+        : null;
+    const pattern =
+      design?.pattern !== undefined &&
+      (TYPING_PATTERN_IDS as readonly string[]).includes(design.pattern)
+        ? design.pattern as TypingPatternId
+        : null;
+    const recipeImage =
+      recipe === null
+        ? null
+        : iconImage(
+            encounterRecipeIconUrl(recipe),
+            recipe.replaceAll("-", " "),
+          );
+    const patternImage =
+      pattern === null
+        ? null
+        : iconImage(
+            typingPatternIconUrl(pattern),
+            pattern.replaceAll("-", " "),
+          );
+    if (recipeImage !== null) media.append(recipeImage);
+    if (patternImage !== null) media.append(patternImage);
+    if (media.childElementCount > 0) card.append(media);
     const strong = document.createElement("strong");
     strong.textContent =
       (design?.recipe ?? "normal").replaceAll("-", " ") +
@@ -303,7 +402,12 @@ export function mountExpeditionUi(options: {
     const learningSummary = options.learningSummary(run);
     if (learningSummary !== null) {
       const learningCard = document.createElement("article");
-      learningCard.className = "reward-choice-option";
+      learningCard.className = "reward-choice-option expansion-v2-briefing-card";
+      const wantedIcon = iconImage(
+        learningIconUrl("wanted"),
+        "Wanted Word",
+      );
+      if (wantedIcon !== null) learningCard.append(wantedIcon);
       const learningTitle = document.createElement("strong");
       learningTitle.textContent = "Wanted Word";
       const learningMeta = document.createElement("small");
@@ -321,9 +425,12 @@ export function mountExpeditionUi(options: {
   return {
     setResumeAvailable(available) {
       resumeAvailable = available;
-      launch.textContent = available
+      const label = available
         ? "Resume Expedition V2"
         : "Expedition V2";
+      const labelNode = launch.querySelector("span");
+      if (labelNode !== null) labelNode.textContent = label;
+      else launch.textContent = label;
       daily.disabled = available;
     },
     setEvolutionTier(tier) {
@@ -332,15 +439,21 @@ export function mountExpeditionUi(options: {
       launch.classList.toggle("expedition-evolution-1", safe >= 1);
       launch.classList.toggle("expedition-evolution-2", safe >= 2);
       launch.classList.toggle("expedition-evolution-3", safe >= 3);
-      launch.textContent = resumeAvailable
+      const label = resumeAvailable
         ? "Resume Expedition V2"
         : safe === 0
           ? "Expedition V2"
           : "Expedition V2 · E" + String(safe);
+      const labelNode = launch.querySelector("span");
+      if (labelNode !== null) labelNode.textContent = label;
+      else launch.textContent = label;
     },
     setGhostEnabled(enabled) {
       ghost.dataset.enabled = String(enabled);
-      ghost.textContent = enabled ? "Ghost · On" : "Ghost · Off";
+      const label = enabled ? "Ghost · On" : "Ghost · Off";
+      const labelNode = ghost.querySelector("span");
+      if (labelNode !== null) labelNode.textContent = label;
+      else ghost.textContent = label;
       ghost.setAttribute("aria-pressed", String(enabled));
     },
     showDraft,

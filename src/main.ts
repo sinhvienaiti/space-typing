@@ -473,6 +473,9 @@ import {
   campaignStageExpansionProfile,
 } from "./expansion-v2/campaign-rollout";
 import {
+  bossPartIconUrl,
+} from "./expansion-v2/asset-map";
+import {
   campaignReferencePatternOverride,
   campaignReferenceRoutePreview,
   needsCampaignReferenceRouteChoice,
@@ -1510,6 +1513,20 @@ function renderStats(stats: GameStats): void {
   hudClass("powerFill", "ready", rageSegments === RAGE_SEGMENT_COUNT);
   const powerTrack = byId("powerTrack");
   powerTrack.dataset.rageSegments = String(rageSegments);
+  const evolutionTier = expansionEvolutionTier(expansionV2Profile);
+  powerTrack.dataset.evolutionTier = String(evolutionTier);
+  powerTrack.dataset.visualQuality = settings.visualQuality;
+  powerTrack.classList.toggle(
+    "expansion-rage-evolved",
+    evolutionTier > 0 &&
+      (settings.visualQuality === "high" ||
+        settings.visualQuality === "ultra"),
+  );
+  powerTrack.classList.toggle(
+    "expansion-rage-evolved-max",
+    evolutionTier >= 3 &&
+      settings.visualQuality === "ultra",
+  );
   powerTrack.classList.toggle("usable", rageSegments > 0);
   powerTrack.classList.toggle(
     "ready",
@@ -2153,8 +2170,19 @@ function renderStatuses(
 let lastMusicBossPhase = 0;
 
 function renderBoss(boss: BossHudState | null): void {
+  const bossHud = byId("bossHud");
+  let partsStrip =
+    bossHud.querySelector<HTMLDivElement>(".boss-parts-strip");
+  if (partsStrip === null) {
+    partsStrip = document.createElement("div");
+    partsStrip.className = "boss-parts-strip hidden";
+    bossHud.append(partsStrip);
+  }
+
   if (boss === null) {
     lastMusicBossPhase = 0;
+    partsStrip.replaceChildren();
+    partsStrip.classList.add("hidden");
     hudClass("bossHud", "hidden", true);
     return;
   }
@@ -2202,6 +2230,48 @@ function renderBoss(boss: BossHudState | null): void {
       partsMeta +
       (boss.shieldActive ? " · SHIELD" : boss.staggered ? " · STAGGER" : ""),
   );
+
+  partsStrip.replaceChildren();
+  if (boss.parts !== undefined && boss.parts.length > 0) {
+    for (const part of boss.parts) {
+      const chip = document.createElement("div");
+      chip.className =
+        "boss-part-chip" +
+        (part.destroyed ? " destroyed" : "") +
+        (!part.vulnerable ? " locked" : "");
+      const iconUrl = bossPartIconUrl(
+        part.type,
+        settings.visualQuality,
+      );
+      if (iconUrl !== null) {
+        const icon = document.createElement("img");
+        icon.src = iconUrl;
+        icon.alt = part.type + " boss part";
+        icon.className = "boss-part-icon";
+        chip.append(icon);
+      }
+      const label = document.createElement("span");
+      const ratio =
+        part.maxHp <= 0
+          ? 0
+          : Math.max(
+              0,
+              Math.min(100, (part.hp / part.maxHp) * 100),
+            );
+      label.textContent =
+        part.type.toUpperCase() +
+        (part.destroyed
+          ? " · DESTROYED"
+          : !part.vulnerable
+            ? " · LOCKED"
+            : " · " + ratio.toFixed(0) + "%");
+      chip.append(label);
+      partsStrip.append(chip);
+    }
+    partsStrip.classList.remove("hidden");
+  } else {
+    partsStrip.classList.add("hidden");
+  }
   hudText(
     "bossHpText",
     Math.max(0, Math.ceil(boss.hp)).toLocaleString() +

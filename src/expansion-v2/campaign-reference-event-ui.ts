@@ -1,3 +1,4 @@
+import { expeditionIconUrl } from "./asset-map";
 import type { CampaignReferenceRouteChoice } from "./campaign-reference-event";
 
 export type CampaignReferenceEventUi = {
@@ -22,6 +23,14 @@ export function mountCampaignReferenceEventUi(options: {
   eyebrow.textContent = "campaign route event";
   const title = document.createElement("h2");
   title.textContent = "Ancient Gate";
+  const iconUrl = expeditionIconUrl("reroll");
+  if (iconUrl !== null) {
+    const icon = document.createElement("img");
+    icon.className = "expansion-v2-icon";
+    icon.src = iconUrl;
+    icon.alt = "Ancient Gate route choice";
+    heading.append(icon);
+  }
   heading.append(eyebrow, title);
   head.append(heading);
 
