@@ -91,7 +91,7 @@ export type ExpeditionRun = {
   wordPool: ExpeditionWordPool;
   profile: ExpeditionProfile;
   challenge?: {
-    kind: "prototype" | "daily";
+    kind: "prototype" | "daily" | "qa";
     dayKey: string | null;
     identityKey: string | null;
   };

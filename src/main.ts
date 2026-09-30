@@ -1159,6 +1159,8 @@ function startExpansionCinematicQa(): void {
 }
 
 function recordExpeditionTerminalProfile(run: ExpeditionRun): void {
+  if (run.challenge?.kind === "qa") return;
+
   let next = recordExpansionRun(expansionV2Profile, {
     runId: run.runId,
     score: run.totalScore,
@@ -4379,7 +4381,7 @@ function buildExpeditionRun(
   seed: number,
   campaignFixture: AutosaveSnapshot,
   startingResources: ExpeditionResources,
-  challengeKind: "prototype" | "daily" = "prototype",
+  challengeKind: "prototype" | "daily" | "qa" = "prototype",
 ): ExpeditionRun {
   const wordPool = expeditionWordPool();
   const selectedWantedWord =
@@ -4539,7 +4541,7 @@ async function startExpeditionEncounter(
 
 async function startNewExpedition(
   seedOverride?: number,
-  challengeKind: "prototype" | "daily" = "prototype",
+  challengeKind: "prototype" | "daily" | "qa" = "prototype",
 ): Promise<void> {
   if (
     !persistenceReady ||
@@ -4740,6 +4742,20 @@ function abandonCurrentExpedition(): void {
   }
 }
 
+function forceExpeditionQaEncounter(indexInput: number): void {
+  try {
+    const run = expeditionSession.testForceEncounterIndex(indexInput);
+    if (run === null) {
+      showNotice("Start a Test Lab Expedition before forcing an encounter");
+      return;
+    }
+    void startExpeditionEncounter(run, false);
+  } catch (error) {
+    console.error("Unable to force Expedition QA encounter.", error);
+    showNotice("Expedition QA encounter override failed");
+  }
+}
+
 function forceExpeditionQaPhase(
   phase: "draft" | "rest" | "encounter" | "defeat",
 ): void {
@@ -4803,8 +4819,9 @@ const testLab = mountTestLab({
   getVocabulary: () => configuredVocabulary,
   showNotice,
   expeditionQa: {
-    startWithSeed: (seed) => void startNewExpedition(seed),
+    startWithSeed: (seed) => void startNewExpedition(seed, "qa"),
     forcePhase: forceExpeditionQaPhase,
+    forceEncounter: forceExpeditionQaEncounter,
     failNextSave: () => expeditionStorage.injectFailureOnce(),
     startCinematic: startExpansionCinematicQa,
     stopCinematic: stopExpansionCinematicQa,

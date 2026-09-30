@@ -156,6 +156,7 @@ const TEST_LAB_PRESETS = [
 export type TestLabExpeditionQa = {
   startWithSeed(seed: number): void;
   forcePhase(phase: "draft" | "rest" | "encounter" | "defeat"): void;
+  forceEncounter?(index: number): void;
   failNextSave(): void;
   startCinematic?(): void;
   stopCinematic?(): void;
@@ -749,6 +750,7 @@ export function mountTestLab(
           </p>
           <div class="test-lab-grid">
             <label>Fixed seed<input data-field="expedition-seed" type="number" min="1" value="424242"></label>
+            <label>Encounter 1–8<input data-field="expedition-encounter" type="number" min="1" max="8" value="6"></label>
             <label>Force phase<select data-field="expedition-phase">
               <option value="draft">draft + materialized offer</option>
               <option value="rest">rest boundary</option>
@@ -768,6 +770,7 @@ export function mountTestLab(
           <div class="test-lab-row">
             <button type="button" data-action="expedition-start-seed">Start Fixed Seed</button>
             <button type="button" data-action="expedition-force-phase">Force Phase / Offer</button>
+            <button type="button" data-action="expedition-force-encounter">Force Encounter 1–8</button>
             <button type="button" data-action="expedition-fail-save">Fail Next Save</button>
             <button type="button" data-action="expedition-refresh">Refresh Snapshot</button>
             <button type="button" data-action="expansion-v2-runtime">Apply Pattern / Recipe</button>
@@ -2111,6 +2114,29 @@ export function mountTestLab(
       }
       renderExpeditionQa();
       notice("Expedition phase override requested");
+      return;
+    }
+    if (action === "expedition-force-encounter") {
+      const encounter = Math.max(
+        1,
+        Math.min(
+          8,
+          Math.floor(
+            numberValue(
+              dialog,
+              '[data-field="expedition-encounter"]',
+              6,
+            ),
+          ),
+        ),
+      );
+      options.expeditionQa?.forceEncounter?.(encounter - 1);
+      renderExpeditionQa();
+      notice(
+        "Expedition encounter " +
+          String(encounter) +
+          " override requested",
+      );
       return;
     }
     if (action === "expedition-fail-save") {

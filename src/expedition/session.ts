@@ -269,6 +269,42 @@ export class ExpeditionSession {
     return this.envelope.run;
   }
 
+  testForceEncounterIndex(
+    indexInput: number,
+  ): ExpeditionRun | null {
+    const envelope = this.envelope;
+    if (envelope === null || envelope.run.terminal !== null) return null;
+
+    const index = Math.max(
+      0,
+      Math.min(
+        envelope.run.encounterPlan.length - 1,
+        Math.floor(indexInput),
+      ),
+    );
+    const boundary: ExpeditionRun = {
+      ...envelope.run,
+      currentEncounterIndex: index,
+      completedEncounters: Math.min(
+        envelope.run.completedEncounters,
+        index,
+      ),
+      phase: "setup",
+      draftOffer: null,
+      terminal: null,
+      interrupted: false,
+    };
+    const run = beginExpeditionEncounter(boundary);
+    if (run.phase !== "encounter") return null;
+
+    this.envelope = writeExpeditionEnvelope(this.storage, {
+      writerId: this.writerId,
+      expectedRevision: envelope.revision,
+      run,
+    });
+    return this.envelope.run;
+  }
+
   testForcePhase(
     phase: "draft" | "rest" | "encounter" | "defeat",
     eligibleRelicIds: readonly string[] = this.eligibleRelicIds,
