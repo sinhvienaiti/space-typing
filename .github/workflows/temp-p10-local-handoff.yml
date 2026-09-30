@@ -1,0 +1,351 @@
+name: Temporary P10 Local Handoff
+
+on:
+  push:
+    branches:
+      - "feat/1000-stage-expansion-v2-phase0a"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build handoff package
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="P10_LOCAL_HANDOFF_bcfc53fe"
+          REF="$ROOT/reference-final"
+          mkdir -p "$REF/docs" "$REF/src/expedition" "$REF/src/test-lab" "$REF/tests"
+
+          cp docs/P10_IMPLEMENTATION_REPORT.md "$REF/docs/"
+          cp src/Game.ts "$REF/src/"
+          cp src/expedition/core.ts "$REF/src/expedition/"
+          cp src/expedition/loaner.ts "$REF/src/expedition/"
+          cp src/expedition/session.ts "$REF/src/expedition/"
+          cp src/expedition/store.ts "$REF/src/expedition/"
+          cp src/expedition/ui.ts "$REF/src/expedition/"
+          cp src/main.ts "$REF/src/"
+          cp src/test-lab/controller.ts "$REF/src/test-lab/"
+          cp tests/expedition-p10.test.ts "$REF/tests/"
+          cp tests/expedition-session.test.ts "$REF/tests/"
+
+          cat > "$ROOT/SOURCE_INFO.txt" <<'EOF'
+          Repository: sinhvienaiti/space-typing
+          Local/base branch expected: feat/bgv-integration-current
+          Base commit used for the P10 diff: 8023beac88e1cb4e5a30b22f1a95edb45b5c89ca
+          P10 final verified commit: bcfc53fe390c259efe8624e9b93acd39d23c8954
+          P10 implementation branch: feat/1000-stage-expansion-v2-phase0a
+
+          Scope note:
+          This transfer package intentionally excludes unrelated Phase 0A baseline files:
+          - docs/PHASE_0A_BASELINE.md
+          - src/balance/variety-audit.ts
+          - tests/variety-audit.test.ts
+          - tests/m22-audio-audit.test.ts
+
+          No image assets are part of P10.
+          No package.json / lockfile dependency change is required for P10.
+          EOF
+
+          git diff --no-ext-diff --binary             8023beac88e1cb4e5a30b22f1a95edb45b5c89ca..bcfc53fe390c259efe8624e9b93acd39d23c8954             --             docs/P10_IMPLEMENTATION_REPORT.md             src/Game.ts             src/expedition/core.ts             src/expedition/loaner.ts             src/expedition/session.ts             src/expedition/store.ts             src/expedition/ui.ts             src/main.ts             src/test-lab/controller.ts             tests/expedition-p10.test.ts             tests/expedition-session.test.ts             > "$ROOT/P10_FROM_BGV.patch"
+
+          cat > "$ROOT/P10_CODEX_LOCAL_UPDATE_GUIDE.md" <<'EOF'
+          # P10 Expedition — Codex Local Update Handoff
+
+          ## 1. Goal
+
+          Update the existing local Mac mini copy of `space-typing` from the current
+          `feat/bgv-integration-current` codebase to include only the completed P10
+          Expedition implementation.
+
+          This handoff is designed for a machine that cannot pull from GitHub.
+          Do **not** require Git or network access to apply the changes.
+
+          ## 2. Authoritative references
+
+          - Repository: `sinhvienaiti/space-typing`
+          - Local/base branch expected: `feat/bgv-integration-current`
+          - Base commit used when producing the patch:
+            `8023beac88e1cb4e5a30b22f1a95edb45b5c89ca`
+          - Final verified P10 commit:
+            `bcfc53fe390c259efe8624e9b93acd39d23c8954`
+          - Implementation branch:
+            `feat/1000-stage-expansion-v2-phase0a`
+
+          Important: the implementation branch also contains older Phase 0A baseline
+          work. That unrelated work is deliberately excluded from this handoff.
+
+          ## 3. Exact P10 file scope
+
+          New P10 files:
+          - `docs/P10_IMPLEMENTATION_REPORT.md`
+          - `src/expedition/core.ts`
+          - `src/expedition/loaner.ts`
+          - `src/expedition/session.ts`
+          - `src/expedition/store.ts`
+          - `src/expedition/ui.ts`
+          - `tests/expedition-p10.test.ts`
+          - `tests/expedition-session.test.ts`
+
+          Existing files modified for P10:
+          - `src/Game.ts`
+          - `src/main.ts`
+          - `src/test-lab/controller.ts`
+
+          Files that MUST NOT be copied from the implementation branch as part of this
+          handoff:
+          - `docs/PHASE_0A_BASELINE.md`
+          - `src/balance/variety-audit.ts`
+          - `tests/variety-audit.test.ts`
+          - `tests/m22-audio-audit.test.ts`
+
+          No image asset, audio asset, package dependency, package.json, or lockfile
+          change belongs to P10.
+
+          ## 4. Package layout
+
+          - `reference-final/` contains the complete final P10 version of every file in
+            the P10 scope.
+          - `P10_FROM_BGV.patch` is the exact scoped diff from the base commit to the
+            final P10 commit.
+          - `SOURCE_INFO.txt` records source SHAs and exclusions.
+          - `SHA256SUMS.txt` verifies transfer integrity.
+
+          ## 5. Mandatory safety rules for Codex
+
+          1. Work only inside:
+             `/Users/toandx7651/htdocs/typing-game/games/space-typing`
+          2. Do not use GitHub, do not fetch, do not pull, and do not switch branches.
+          3. Do not delete local work.
+          4. Before editing, create a timestamped backup of the 11 P10 target paths that
+             already exist locally.
+          5. For the 8 new P10 files, copy the provided reference files unless a file
+             already exists locally; if it exists, compare before changing it.
+          6. For `src/Game.ts`, `src/main.ts`, and
+             `src/test-lab/controller.ts`, do not blindly replace the local files.
+             First compare local content with the patch/reference and preserve all
+             unrelated local changes.
+          7. Apply only P10 hunks. Do not import Phase 0A variety-audit/audio-test work.
+          8. Do not generate or replace any art assets.
+          9. Do not edit package.json or lockfiles for this task.
+          10. After implementation, inspect the final diff manually and verify that only
+              the 11 P10 paths changed.
+
+          ## 6. Preferred apply procedure
+
+          ### Step A — Verify local root
+
+          Run:
+          ```bash
+          cd /Users/toandx7651/htdocs/typing-game/games/space-typing
+          pwd
+          test -f package.json
+          test -f src/main.ts
+          test -f src/Game.ts
+          ```
+
+          Stop if this is not the intended project root.
+
+          ### Step B — Backup current local target files
+
+          Assume the extracted handoff directory is:
+          `~/Downloads/P10_LOCAL_HANDOFF_bcfc53fe`.
+
+          Create:
+          ```bash
+          cd /Users/toandx7651/htdocs/typing-game/games/space-typing
+          BACKUP="$HOME/Downloads/space-typing-p10-backup-$(date +%Y%m%d-%H%M%S)"
+          mkdir -p "$BACKUP"
+
+          for f in             docs/P10_IMPLEMENTATION_REPORT.md             src/Game.ts             src/expedition/core.ts             src/expedition/loaner.ts             src/expedition/session.ts             src/expedition/store.ts             src/expedition/ui.ts             src/main.ts             src/test-lab/controller.ts             tests/expedition-p10.test.ts             tests/expedition-session.test.ts
+          do
+            if [ -e "$f" ]; then
+              mkdir -p "$BACKUP/$(dirname "$f")"
+              cp -p "$f" "$BACKUP/$f"
+            fi
+          done
+
+          echo "Backup: $BACKUP"
+          ```
+
+          ### Step C — Dry-run the supplied patch when possible
+
+          The patch is created from the expected BGV base. Try:
+          ```bash
+          cd /Users/toandx7651/htdocs/typing-game/games/space-typing
+          patch --dry-run -p1 < "$HOME/Downloads/P10_LOCAL_HANDOFF_bcfc53fe/P10_FROM_BGV.patch"
+          ```
+
+          - If the dry-run is clean and Codex confirms there are no unrelated local edits
+            in the same hunks, the patch can be applied:
+            ```bash
+            patch -p1 < "$HOME/Downloads/P10_LOCAL_HANDOFF_bcfc53fe/P10_FROM_BGV.patch"
+            ```
+          - If any hunk fails or local files have diverged, **do not force the patch**.
+            Merge manually using `reference-final/` and the patch as the source of truth.
+
+          ### Step D — Manual merge rules when local diverged
+
+          For each modified existing file:
+          1. Read the local file.
+          2. Read its final counterpart under `reference-final/`.
+          3. Read the relevant hunk in `P10_FROM_BGV.patch`.
+          4. Port the P10 behavior into the local version without removing unrelated
+             local behavior.
+          5. Re-open the edited region and verify imports, callback ordering, state
+             ownership, and early returns.
+
+          The three modified production files require special care:
+
+          #### `src/Game.ts`
+          Preserve all existing Game behavior. Add the P10 safe-boundary starting
+          resource support to production `startStage` so Expedition may restore
+          Hull/Shield/Energy/Power while clamping against the current stage/player
+          maximums. Do not route production Expedition through Test Lab resource APIs.
+
+          #### `src/main.ts`
+          This is the critical integration file. Preserve all Campaign behavior and wire
+          Expedition so that:
+          - Campaign state is captured before entering Expedition.
+          - Loaner state is isolated from Campaign references.
+          - Expedition uses production Game/stage/difficulty/world/music paths.
+          - stage-clear is intercepted before Campaign rewards/progression mutations.
+          - gameover is intercepted before Campaign death-protection/recovery behavior.
+          - Campaign autosave, stage-entry persistence, recovery mirrors and pagehide
+            save paths cannot persist loaner Expedition state.
+          - run-local Hull/Shield/Energy/Power are carried across safe boundaries.
+          - reload/resume claims run writer ownership and resumes from the safe
+            encounter boundary.
+          - victory/defeat/abandon are terminal and idempotent.
+          - Return to Campaign restores the captured Campaign snapshot before releasing
+            Expedition ownership.
+          - the title UI exposes Start/Resume Expedition appropriately.
+          - P10 uses Combat typing mode and the frozen run vocabulary.
+          - P10 prototype uses two encounters; do not silently implement the later P30
+            eight-encounter vertical slice.
+
+          #### `src/test-lab/controller.ts`
+          Preserve all current Test Lab controls and add only the P10 Expedition QA
+          controls/hooks:
+          - fixed seed start,
+          - force/materialize draft,
+          - force encounter,
+          - force defeat,
+          - fail next Expedition save through the storage adapter,
+          - inspect run/revision/writer/resume state.
+
+          The artificial failure control must not corrupt or directly edit real storage.
+
+          ## 7. P10 behavior contract Codex must preserve
+
+          - Separate Expedition run persistence from Campaign PlayerSave.
+          - Run config/version/owner validation.
+          - Frozen vocabulary snapshot + hash.
+          - Deterministic encounter planning using existing early normal encounters.
+          - Separate stored gameplay/cosmetic seeds.
+          - Materialized deterministic Relic offer.
+          - Maximum three choices; no duplicates.
+          - 0 eligible Relics has a finite Continue fallback.
+          - Three equipped Relic slots require an explicit replacement before confirm.
+          - Confirm is idempotent and cannot double-grant.
+          - Run-local resources survive safe boundaries.
+          - Revision + writer ID checks reject stale writers.
+          - Unsupported/future/corrupt Expedition data is never silently overwritten.
+          - Storage write failure must not falsely advance authoritative in-memory state.
+          - Reload during an encounter restarts that encounter from its safe boundary and
+            records interruption/retry.
+          - Expedition defeat must not use Campaign death protection.
+          - Campaign economy/progression must not be mutated by Expedition.
+          - Feature-off/read paths must not delete stored Expedition data.
+          - Terminal state must not resurrect into a scored run.
+          - Cleanup/return is idempotent.
+
+          ## 8. Required automated checks
+
+          Run focused P10 tests first:
+          ```bash
+          cd /Users/toandx7651/htdocs/typing-game/games/space-typing
+          pnpm exec vitest run tests/expedition-p10.test.ts tests/expedition-session.test.ts
+          ```
+
+          Then full regression:
+          ```bash
+          pnpm test
+          ```
+
+          Then production build:
+          ```bash
+          pnpm build
+          ```
+
+          Expected result from the verified GitHub P10 source:
+          - 171 test files passed.
+          - 971 tests passed.
+          - production build passed, including TypeScript, Vite and asset integrity
+            checks.
+
+          A different total test count on local is acceptable if the Mac mini tree
+          contains additional newer tests; failures are not acceptable.
+
+          ## 9. Manual browser acceptance left to the owner
+
+          After the build passes:
+          1. Record Campaign credits/items/equipment/progression/pity/shop/route.
+          2. Start Expedition from title.
+          3. Confirm the Relic draft.
+          4. Complete encounter 1.
+          5. Confirm the next draft.
+          6. Enter encounter 2.
+          7. Reload the browser during encounter 2.
+          8. Use Resume Expedition.
+          9. Confirm the encounter restarts from the safe boundary rather than
+             resurrecting a partially scored encounter.
+          10. Complete the run or force defeat through Test Lab.
+          11. Return to Campaign.
+          12. Verify Campaign credits/items/equipment/progression/pity/shop/route are
+              unchanged.
+          13. Verify three-full-Relic-slot replacement requires explicit replacement and
+              cancel does not reroll the offer.
+          14. In Test Lab use Fail Next Save and verify a clear failure is shown, no fake
+              state advance occurs, and the previous safe snapshot remains resumable.
+          15. Check normal viewport for modal/HUD overlap.
+
+          ## 10. Completion report Codex should return
+
+          Codex should report:
+          - every path created,
+          - every path modified,
+          - whether patch applied cleanly or required manual merge,
+          - any local divergence found,
+          - focused test result,
+          - full test result,
+          - build result,
+          - any test not run,
+          - confirmation that excluded Phase 0A files and assets were untouched.
+
+          Do not claim browser/manual acceptance PASS unless it was actually run.
+          EOF
+
+          (
+            cd "$ROOT"
+            find reference-final -type f -print0 | sort -z | xargs -0 shasum -a 256
+            shasum -a 256 P10_FROM_BGV.patch SOURCE_INFO.txt P10_CODEX_LOCAL_UPDATE_GUIDE.md
+          ) > "$ROOT/SHA256SUMS.txt"
+
+          zip -qr "P10_LOCAL_HANDOFF_bcfc53fe.zip" "$ROOT"
+
+      - name: Upload handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: P10_LOCAL_HANDOFF_bcfc53fe
+          path: P10_LOCAL_HANDOFF_bcfc53fe.zip
+          if-no-files-found: error
+          retention-days: 7
