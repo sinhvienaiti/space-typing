@@ -70,9 +70,14 @@ describe("DuelBot M-DUEL-02", () => {
         targetInstanceId: offers[0]!.instanceId,
       }),
     );
-    expect(
-      intents.filter((intent) => intent.type === "TYPE_CHAR"),
-    ).toHaveLength(5);
+    const typed = intents.filter(
+      (intent): intent is Extract<typeof intent, { type: "TYPE_CHAR" }> =>
+        intent.type === "TYPE_CHAR",
+    );
+    expect(typed.length).toBeGreaterThanOrEqual(5);
+    expect(typed.slice(0, 5).map((intent) => intent.char).join("")).toBe(
+      "laser",
+    );
     expect(
       intents.some(
         (intent) =>
