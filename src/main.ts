@@ -5,6 +5,7 @@ import "./kill-translation.css";
 import "./duel/battle.css";
 import { installDuelOnlineRoomController } from "./duel/online-room-controller";
 import { installDuelBattleUi } from "./duel/battle-ui";
+import { DuelLocalPracticeMatch } from "./duel/local-match";
 import {
   DEFAULT_KILL_TRANSLATION_SETTINGS,
   hasVisibleKillTranslation,
@@ -1072,16 +1073,42 @@ const anomalyDialog = byId<HTMLDialogElement>("anomalyDialog");
 let duelOnlineController:
   | ReturnType<typeof installDuelOnlineRoomController>
   | null = null;
+let localDuelMatch: DuelLocalPracticeMatch | null = null;
+let localDuelTimer: number | null = null;
+
+function stopLocalDuel(): void {
+  if (localDuelTimer !== null) {
+    window.clearInterval(localDuelTimer);
+    localDuelTimer = null;
+  }
+  localDuelMatch = null;
+}
 
 const duelBattle = installDuelBattleUi(
   {
     sendIntent(intent) {
+      if (localDuelMatch !== null) {
+        const result = localDuelMatch.sendIntent(intent);
+        if (result === null) return null;
+        duelBattle.update(
+          result.update.view,
+          result.update.events,
+        );
+        if (localDuelMatch.isFinished()) {
+          if (localDuelTimer !== null) {
+            window.clearInterval(localDuelTimer);
+            localDuelTimer = null;
+          }
+        }
+        return result.sequence;
+      }
       return (
         duelOnlineController?.client.sendIntent(intent) ??
         null
       );
     },
     onExit() {
+      stopLocalDuel();
       const duelDialog =
         byId<HTMLDialogElement>("duelRoomDialog");
       if (!duelDialog.open) duelDialog.showModal();
@@ -1090,14 +1117,53 @@ const duelBattle = installDuelBattleUi(
   settings.visualQuality,
 );
 
+function startLocalDuelPractice(
+  snapshot: import("./duel/room").DuelRoomSnapshot,
+): void {
+  stopLocalDuel();
+  const seedBuffer = new Uint32Array(1);
+  window.crypto.getRandomValues(seedBuffer);
+  localDuelMatch = new DuelLocalPracticeMatch({
+    room: snapshot,
+    seed: seedBuffer[0] ?? 1,
+  });
+
+  const initial = localDuelMatch.initial();
+  duelBattle.setQuality(settings.visualQuality);
+  duelBattle.show(initial.view, initial.events);
+  const duelDialog =
+    byId<HTMLDialogElement>("duelRoomDialog");
+  if (duelDialog.open) duelDialog.close();
+
+  localDuelTimer = window.setInterval(() => {
+    if (localDuelMatch === null) return;
+    const update = localDuelMatch.tick(0.05);
+    duelBattle.update(update.view, update.events);
+    if (localDuelMatch.isFinished()) {
+      if (localDuelTimer !== null) {
+        window.clearInterval(localDuelTimer);
+        localDuelTimer = null;
+      }
+    }
+  }, 50);
+}
+
 duelOnlineController = installDuelOnlineRoomController({
   clientVersion: "0.1.0",
   onMatchUpdate(view, events) {
+    if (localDuelMatch !== null) {
+      stopLocalDuel();
+    }
     duelBattle.setQuality(settings.visualQuality);
     duelBattle.update(view, events);
   },
   onPrediction(prediction) {
-    duelBattle.setPrediction(prediction);
+    if (localDuelMatch === null) {
+      duelBattle.setPrediction(prediction);
+    }
+  },
+  onLocalPracticeReady(snapshot) {
+    startLocalDuelPractice(snapshot);
   },
 });
 

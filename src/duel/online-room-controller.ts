@@ -11,6 +11,7 @@ import {
   installDuelRoomUi,
   type DuelRoomUiController,
 } from "./room-ui";
+import type { DuelRoomSnapshot } from "./room";
 
 export type DuelOnlineRoomControllerConfig = {
   clientVersion: string;
@@ -19,6 +20,7 @@ export type DuelOnlineRoomControllerConfig = {
     events: readonly DuelClientEvent[],
   ): void;
   onPrediction?(prediction: DuelLocalPrediction): void;
+  onLocalPracticeReady?(snapshot: DuelRoomSnapshot): void;
 };
 
 type SessionResponse = {
@@ -300,6 +302,9 @@ export function installDuelOnlineRoomController(
           ? "Local practice room ready."
           : "Local practice room is not ready.",
       );
+      if (snapshot.canStart) {
+        config.onLocalPracticeReady?.(snapshot);
+      }
     },
   });
 

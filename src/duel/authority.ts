@@ -164,7 +164,7 @@ export type DuelSeriesState = {
 export type DuelClientMatchView = {
   matchId: string;
   roundId: string;
-  mode: "friend" | "ranked";
+  mode: "friend" | "ranked" | "practice";
   combatProfile: "normalized";
   serverSequence: number;
   elapsedSeconds: number;

@@ -773,7 +773,9 @@ export function installDuelBattleUi(
     nodes.mode.textContent =
       view.mode === "ranked"
         ? "RANKED · NORMALIZED"
-        : "FRIEND DUEL";
+        : view.mode === "practice"
+          ? "PRACTICE VS BOT"
+          : "FRIEND DUEL";
     nodes.map.textContent = view.map.displayName;
     nodes.phase.textContent = phaseLabel(view.phase);
     nodes.clock.textContent = formatClock(
