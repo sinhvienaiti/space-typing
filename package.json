@@ -5,9 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 3004",
-    "build": "node scripts/check-audio-assets.mjs && node scripts/check-background-assets.mjs && node scripts/bg-art/check-expansion-v2.mjs && tsc -p tsconfig.json --noEmit && vite build && node scripts/report-bundle-metrics.mjs && node scripts/check-ship-art-integrity.mjs && node scripts/check-background-art.mjs",
+    "build": "node scripts/check-audio-assets.mjs && node scripts/check-background-assets.mjs && node scripts/bg-art/check-expansion-v2.mjs && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit && vite build && node scripts/report-bundle-metrics.mjs && node scripts/check-ship-art-integrity.mjs && node scripts/check-background-art.mjs",
     "test": "vitest run",
     "check": "pnpm test && pnpm build",
+    "duel:server": "tsx server/duel/ws-server.ts",
+    "duel:server:check": "tsc -p tsconfig.server.json --noEmit",
+    "duel:token": "tsx server/duel/token-cli.ts",
     "bg:prepare": "node scripts/bg-art/prepare-kit.mjs",
     "fx:prepare": "node scripts/bg-art/prepare-fx.mjs",
     "sprites:prepare": "node scripts/bg-art/prepare-sprites.mjs",
@@ -18,8 +21,14 @@
     "visual:shot": "node scripts/visual/shot.mjs",
     "visual:crop": "node scripts/visual/crop.mjs"
   },
+  "dependencies": {
+    "ws": "^8.22.0"
+  },
   "devDependencies": {
+    "@types/node": "^24.19.0",
+    "@types/ws": "^8.18.2",
     "sharp": "^0.34.5",
+    "tsx": "^4.23.15",
     "typescript": "^6.0.2",
     "vite": "^7.1.7",
     "vitest": "^3.2.4"

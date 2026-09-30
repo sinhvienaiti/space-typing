@@ -269,6 +269,7 @@ type MatchRecord = {
     winnerId: DuelPlayerId | null;
   };
   serverSequence: number;
+  needsRoundReset: boolean;
 };
 
 type JsonObject = Record<string, unknown>;
@@ -639,6 +640,31 @@ export class DuelAuthorityService {
     return true;
   }
 
+  sessionBindings(
+    sessionId: string,
+  ): { roomId: string | null; matchId: string | null } | null {
+    const session = this.sessions.get(sessionId);
+    if (session === undefined) return null;
+    return {
+      roomId: session.roomId,
+      matchId: session.matchId,
+    };
+  }
+
+  roomSessionIds(roomId: string): readonly string[] {
+    const record = this.rooms.get(roomId);
+    if (record === undefined) return [];
+    return record.room
+      .snapshot()
+      .slots
+      .map((slot) => slot.participantId)
+      .filter(
+        (participantId): participantId is string =>
+          participantId !== null &&
+          !participantId.startsWith("bot:"),
+      );
+  }
+
   acceptMessage(
     sessionId: string,
     now: number,
@@ -757,6 +783,18 @@ export class DuelAuthorityService {
         "ROOM_NOT_FOUND",
         "Duel room was not found.",
       );
+    }
+
+    if (
+      session.roomId !== null &&
+      session.roomId !== input.roomId
+    ) {
+      const left = this.leaveRoom(
+        sessionId,
+        session.roomId,
+        now,
+      );
+      if (!left.ok) return left;
     }
 
     const duplicateAccount = record.room
@@ -1065,6 +1103,7 @@ export class DuelAuthorityService {
         winnerId: null,
       },
       serverSequence: 0,
+      needsRoundReset: false,
     };
 
     this.dealRoundOffers(match);
@@ -1128,10 +1167,13 @@ export class DuelAuthorityService {
         "Session does not own a player in this match.",
       );
     }
-    if (input.roundId !== match.roundId) {
+    if (
+      input.roundId !== match.roundId ||
+      match.needsRoundReset
+    ) {
       return this.error(
         "ROUND_MISMATCH",
-        "Intent targets a stale Duel round.",
+        "Intent targets a stale or transitioning Duel round.",
       );
     }
 
@@ -1185,6 +1227,11 @@ export class DuelAuthorityService {
           updates: this.updatesForMatch(match, []),
         },
       };
+    }
+
+    if (match.needsRoundReset) {
+      this.beginNextRound(match);
+      match.needsRoundReset = false;
     }
 
     this.enqueueBotIntents(match, dtSeconds);
@@ -1464,6 +1511,10 @@ export class DuelAuthorityService {
       return;
     }
 
+    match.needsRoundReset = true;
+  }
+
+  private beginNextRound(match: MatchRecord): void {
     match.roundSequence += 1;
     match.roundId =
       match.matchId +

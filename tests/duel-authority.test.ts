@@ -354,6 +354,61 @@ describe("Duel M-DUEL-11 authority core", () => {
     );
   });
 
+  it("publishes the ended round before advancing to the next round", () => {
+    const authority = new DuelAuthorityService(deps());
+    const host = open(authority, "host");
+    const room = createRoom(authority, host.sessionId);
+    authority.setBot(
+      host.sessionId,
+      room.roomId,
+      {
+        wpm: 55,
+        accuracy: 0.94,
+        reactionMs: 320,
+        personality: "balanced",
+      },
+      1,
+    );
+    authority.setReady(host.sessionId, room.roomId, true, 2);
+    const started = authority.startMatch(
+      host.sessionId,
+      room.roomId,
+      3,
+    );
+    if (!started.ok) throw new Error(started.message);
+
+    const firstRoundId = started.value.updates[0]!.view.roundId;
+    const ended = authority.tick(
+      started.value.matchId,
+      400,
+      4,
+    );
+    if (!ended.ok) throw new Error(ended.message);
+
+    expect(ended.value.updates[0]!.view.roundId).toBe(
+      firstRoundId,
+    );
+    expect(
+      ended.value.updates[0]!.view.round.status,
+    ).toBe("draw");
+    expect(
+      ended.value.updates[0]!.view.series.roundsPlayed,
+    ).toBe(1);
+
+    const next = authority.tick(
+      started.value.matchId,
+      0,
+      5,
+    );
+    if (!next.ok) throw new Error(next.message);
+    expect(next.value.updates[0]!.view.roundId).not.toBe(
+      firstRoundId,
+    );
+    expect(next.value.updates[0]!.view.round.status).toBe(
+      "active",
+    );
+  });
+
   it("projects banked, combo and reveal information only to its owner", () => {
     const events: DuelEngineEvent[] = [
       {

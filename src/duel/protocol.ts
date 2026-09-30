@@ -128,6 +128,19 @@ export type DuelServerMessage =
       events: readonly unknown[];
     }
   | {
+      type: "MATCH_UPDATE";
+      matchId: string;
+      roundId: string;
+      serverSequence: number;
+      events: readonly unknown[];
+      snapshot: unknown;
+    }
+  | {
+      type: "ROOM_CLOSED";
+      roomId: string;
+      reason: string;
+    }
+  | {
       type: "PING";
       nonce: string;
     }
