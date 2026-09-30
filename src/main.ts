@@ -906,11 +906,20 @@ function installMenuHelp(): void {
     shopButton: "Finite-stock shop",
     stationShopButton: "Station items",
     serviceShopButton: "Repair/upgrade",
+    expeditionButton:
+      "8-encounter run with an isolated loaner build, run-only Relics, rest choices, encounter conditions and a final boss. Campaign economy and progression stay unchanged.",
+    expeditionDailyButton:
+      "Fixed UTC daily challenge with the same seed, ruleset and word pool identity for comparable Personal Best and Personal Ghost results.",
+    expeditionGhostButton:
+      "Show or hide comparable Personal Best checkpoint cues during Daily Expedition. Ghost is guidance only and gives no gameplay bonus.",
   };
 
   const wrappers: HTMLElement[] = [];
   for (const [id, description] of Object.entries(descriptions)) {
-    const action = byId<HTMLButtonElement>(id);
+    const candidate = document.getElementById(id);
+    if (!(candidate instanceof HTMLButtonElement)) continue;
+    const action = candidate;
+    if (action.closest(".menu-help-wrap") !== null) continue;
     const title = action.textContent || id;
     const parent = action.parentElement;
     if (parent === null) continue;
@@ -4929,6 +4938,7 @@ expeditionUi.setEvolutionTier(
   expansionEvolutionTier(expansionV2Profile),
 );
 expeditionUi.setGhostEnabled(expansionV2Profile.ghostEnabled);
+installMenuHelp();
 if (!expansionV2Enabled) {
   expeditionUi?.destroy();
   expeditionUi = null;
