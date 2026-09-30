@@ -618,8 +618,6 @@ function handleAuthenticatedMessage(
       return;
     }
 
-    case "PONG":
-      return;
   }
 }
 
