@@ -147,10 +147,18 @@ const TEST_LAB_PRESETS = [
   { id: "music-transition", label: "World → Boss Music Transition" },
 ] as const;
 
+export type TestLabExpeditionQa = {
+  startWithSeed(seed: number): void;
+  forcePhase(phase: "draft" | "encounter" | "defeat"): void;
+  failNextSave(): void;
+  snapshot(): unknown;
+};
+
 export type TestLabMountOptions = {
   getSettings(): GameSettings;
   getVocabulary(): VocabularyEntry[];
   showNotice?(message: string): void;
+  expeditionQa?: TestLabExpeditionQa;
 };
 
 export type TestLabController = {
@@ -726,6 +734,29 @@ export function mountTestLab(
         </details>
 
         <details>
+          <summary>P10 Expedition QA</summary>
+          <p class="equipment-note">
+            Uses the production Expedition session owner. Storage failure injection
+            fails one adapter write without modifying browser storage directly.
+          </p>
+          <div class="test-lab-grid">
+            <label>Fixed seed<input data-field="expedition-seed" type="number" min="1" value="424242"></label>
+            <label>Force phase<select data-field="expedition-phase">
+              <option value="draft">draft + materialized offer</option>
+              <option value="encounter">encounter</option>
+              <option value="defeat">terminal defeat</option>
+            </select></label>
+          </div>
+          <div class="test-lab-row">
+            <button type="button" data-action="expedition-start-seed">Start Fixed Seed</button>
+            <button type="button" data-action="expedition-force-phase">Force Phase / Offer</button>
+            <button type="button" data-action="expedition-fail-save">Fail Next Save</button>
+            <button type="button" data-action="expedition-refresh">Refresh Snapshot</button>
+          </div>
+          <pre class="test-lab-mini-inspector" data-role="expedition-qa"></pre>
+        </details>
+
+        <details>
           <summary>M22 Manual Gate Recorder</summary>
           <div data-role="m22-manual-gate"></div>
         </details>
@@ -743,6 +774,19 @@ export function mountTestLab(
     </div>
   `;
   document.body.append(dialog);
+
+  function renderExpeditionQa(): void {
+    const root = dialog.querySelector<HTMLElement>(
+      '[data-role="expedition-qa"]',
+    );
+    if (root === null) return;
+    const snapshot = options.expeditionQa?.snapshot() ?? {
+      status: "unavailable",
+    };
+    root.textContent = JSON.stringify(snapshot, null, 2);
+  }
+
+  renderExpeditionQa();
 
   const manualGateRoot =
     dialog.querySelector<HTMLElement>('[data-role="m22-manual-gate"]')!;
@@ -2016,6 +2060,44 @@ export function mountTestLab(
       applyScenarioInputs();
       game?.testLabSetDeathMode(session.deathMode);
       notice("sandbox scenario applied");
+      return;
+    }
+    if (action === "expedition-start-seed") {
+      const seed = Math.max(
+        1,
+        Math.floor(
+          numberValue(dialog, '[data-field="expedition-seed"]', 424242),
+        ),
+      );
+      options.expeditionQa?.startWithSeed(seed);
+      renderExpeditionQa();
+      notice("Expedition fixed-seed start requested");
+      return;
+    }
+    if (action === "expedition-force-phase") {
+      const phase =
+        dialog.querySelector<HTMLSelectElement>(
+          '[data-field="expedition-phase"]',
+        )?.value ?? "draft";
+      if (
+        phase === "draft" ||
+        phase === "encounter" ||
+        phase === "defeat"
+      ) {
+        options.expeditionQa?.forcePhase(phase);
+      }
+      renderExpeditionQa();
+      notice("Expedition phase override requested");
+      return;
+    }
+    if (action === "expedition-fail-save") {
+      options.expeditionQa?.failNextSave();
+      renderExpeditionQa();
+      notice("next Expedition adapter write will fail");
+      return;
+    }
+    if (action === "expedition-refresh") {
+      renderExpeditionQa();
       return;
     }
     if (
