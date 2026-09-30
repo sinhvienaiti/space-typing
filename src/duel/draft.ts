@@ -64,6 +64,9 @@ export type DuelOfferDraftConfig = {
   seed: number;
   actions?: readonly DuelActionDefinition[];
   enabledCategories?: readonly DuelActionCategory[];
+  categoryMultiplier?: Partial<
+    Readonly<Record<DuelActionCategory, number>>
+  >;
 };
 
 type WeightedAction = {
@@ -85,11 +88,20 @@ function categoryWeight(
 export function normalizedDuelCategoryWeights(
   phase: DuelMatchPhase,
   enabledCategories: readonly DuelActionCategory[],
+  categoryMultiplier: Partial<
+    Readonly<Record<DuelActionCategory, number>>
+  > = {},
 ): Readonly<Record<DuelActionCategory, number>> {
   const enabled = new Set(enabledCategories);
   let total = 0;
   for (const category of enabled) {
-    total += Math.max(0, categoryWeight(phase, category));
+    const multiplier = Math.max(
+      0,
+      Number.isFinite(categoryMultiplier[category])
+        ? categoryMultiplier[category]!
+        : 1,
+    );
+    total += Math.max(0, categoryWeight(phase, category)) * multiplier;
   }
 
   const result: Record<DuelActionCategory, number> = {
@@ -103,8 +115,15 @@ export function normalizedDuelCategoryWeights(
   if (total <= 0) return result;
 
   for (const category of enabled) {
+    const multiplier = Math.max(
+      0,
+      Number.isFinite(categoryMultiplier[category])
+        ? categoryMultiplier[category]!
+        : 1,
+    );
     result[category] =
-      Math.max(0, categoryWeight(phase, category)) / total;
+      (Math.max(0, categoryWeight(phase, category)) * multiplier) /
+      total;
   }
   return result;
 }
@@ -113,6 +132,9 @@ export class DuelOfferDraft {
   private readonly rng: DuelRng;
   private readonly actions: readonly DuelActionDefinition[];
   private readonly enabledCategories: readonly DuelActionCategory[];
+  private readonly categoryMultiplier: Partial<
+    Readonly<Record<DuelActionCategory, number>>
+  >;
   private nextInstance = 1;
 
   constructor(config: DuelOfferDraftConfig) {
@@ -120,6 +142,7 @@ export class DuelOfferDraft {
     this.actions = config.actions ?? DUEL_ACTIONS;
     this.enabledCategories =
       config.enabledCategories ?? DUEL_CORE_DRAFT_CATEGORIES;
+    this.categoryMultiplier = config.categoryMultiplier ?? {};
   }
 
   dealPrivateOffers(
@@ -206,6 +229,7 @@ export class DuelOfferDraft {
     const normalized = normalizedDuelCategoryWeights(
       phase,
       this.enabledCategories,
+      this.categoryMultiplier,
     );
     return actions.map((action) => {
       const base = Math.max(0.0001, normalized[action.category]);

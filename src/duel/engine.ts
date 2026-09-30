@@ -16,6 +16,11 @@ import {
   type DuelCombatInventorySnapshot,
 } from "./inventory";
 import {
+  DuelMapDirector,
+  type DuelCataclysmEvent,
+  type DuelHazardEvent,
+} from "./director";
+import {
   DUEL_CONTENT_VERSION,
   DUEL_DEFAULT_REGULATION_SECONDS,
   DUEL_HARD_OVERTIME_SECONDS,
@@ -27,6 +32,11 @@ import {
   duelPhaseForProgress,
   duelRegulationProgress,
 } from "./model";
+import {
+  duelMapProfile,
+  type DuelMapId,
+  type DuelMapProfile,
+} from "./maps";
 import {
   DuelTacticalMapState,
   type DuelTacticalMapSnapshot,
@@ -75,6 +85,7 @@ export type DuelEngineSnapshot = {
     pity: Readonly<Record<DuelPlayerId, number>>;
     mysteries: readonly DuelMysteryPublic[];
   };
+  map: DuelMapProfile;
 };
 
 export type DuelTickEffect = DuelCombatEffect;
@@ -172,6 +183,14 @@ export type DuelEngineEvent =
       outcome: DuelMysteryOutcome;
     }
   | {
+      type: "map-hazard";
+      hazard: DuelHazardEvent;
+    }
+  | {
+      type: "map-cataclysm";
+      cataclysm: DuelCataclysmEvent;
+    }
+  | {
       type: "round-ended";
       result: DuelRoundResult;
     };
@@ -185,6 +204,7 @@ export type DuelEngineConfig = {
   startingShield?: number;
   startingEnergy?: number;
   matchSeed?: number;
+  mapId?: DuelMapId;
   actions?: ReadonlyMap<string, DuelActionDefinition>;
 };
 
@@ -256,6 +276,8 @@ export class DuelEngine {
   private readonly threats = new DuelThreatSystem();
   private readonly tactical = new DuelTacticalMapState();
   private readonly chance: DuelChanceSystem;
+  private readonly director: DuelMapDirector;
+  private readonly mapId: DuelMapId;
   private readonly queuedIntents: DuelIntent[] = [];
   private readonly pendingEffects: DuelCombatEffect[] = [];
   private readonly reservedEnergyCost: Record<DuelPlayerId, number> = {
@@ -271,10 +293,16 @@ export class DuelEngine {
 
   constructor(config: DuelEngineConfig = {}) {
     this.actions = config.actions ?? DUEL_ACTIONS_BY_ID;
+    this.mapId = config.mapId ?? "frost-wastes";
     this.chance = new DuelChanceSystem(
       config.matchSeed ?? 1,
       DUEL_CONTENT_VERSION,
     );
+    this.director = new DuelMapDirector({
+      mapId: this.mapId,
+      matchSeed: config.matchSeed ?? 1,
+      contentVersion: DUEL_CONTENT_VERSION,
+    });
     this.regulationSeconds = Math.max(
       1,
       config.regulationSeconds ?? DUEL_DEFAULT_REGULATION_SECONDS,
@@ -307,6 +335,7 @@ export class DuelEngine {
     this.threats.clear();
     this.tactical.clear();
     this.chance.resetRound();
+    this.director.resetRound();
     for (const playerId of PLAYER_IDS) {
       this.players[playerId] = createPlayer(playerId, this.profile);
       this.inventories[playerId].clear();
@@ -346,6 +375,17 @@ export class DuelEngine {
     this.reservedEnergyCost["player-1"] = 0;
     this.reservedEnergyCost["player-2"] = 0;
     this.tactical.update(dt);
+    const directorEvents = this.director.update(dt, this.phase());
+    for (const event of directorEvents) {
+      if (event.type === "hazard") {
+        events.push({ type: "map-hazard", hazard: event.hazard });
+      } else {
+        events.push({
+          type: "map-cataclysm",
+          cataclysm: event.cataclysm,
+        });
+      }
+    }
 
     const batch = this.queuedIntents
       .splice(0)
@@ -568,6 +608,7 @@ export class DuelEngine {
         pity: this.chance.pitySnapshot(),
         mysteries: this.chance.publicMysteries(),
       },
+      map: duelMapProfile(this.mapId),
     };
   }
 
