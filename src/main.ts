@@ -416,13 +416,18 @@ import { DEFAULT_PLAYER_BASE_STATS } from "./stats/player";
 import { mountTestLab } from "./test-lab/controller";
 import { AutosaveQueue } from "./persistence/autosave";
 import {
-  createExpeditionEncounterPlan,
   createExpeditionRun,
   currentExpeditionEncounter,
   hashText,
   type ExpeditionResources,
+  type ExpeditionRestChoice,
   type ExpeditionRun,
 } from "./expedition/core";
+import {
+  createExpansionV2EncounterPlan,
+  tuneStageForExpansionEncounter,
+  type ExpansionV2EncounterPlanItem,
+} from "./expansion-v2/expedition-plan";
 import { createExpeditionLoanerState } from "./expedition/loaner";
 import {
   ExpeditionSession,
@@ -3343,6 +3348,12 @@ const game = new Game(
             } else if (run.phase === "draft") {
               expeditionUi?.setResumeAvailable(true);
               expeditionUi?.showDraft(run);
+            } else if (run.phase === "rest") {
+              expeditionUi?.setResumeAvailable(true);
+              expeditionUi?.showRest(run);
+            } else if (run.phase === "setup") {
+              expeditionUi?.setResumeAvailable(true);
+              expeditionUi?.showBriefing(run);
             }
           }
         } catch (error) {
@@ -4012,10 +4023,10 @@ function buildExpeditionRun(
       difficultySettings: structuredClone(difficultySettings),
       gameplayMode: "combat",
     },
-    encounterPlan: createExpeditionEncounterPlan(
+    encounterPlan: createExpansionV2EncounterPlan(
       seed,
       expeditionNormalStages(),
-      2,
+      20,
     ),
     campaignFixture,
     startingResources,
@@ -4036,7 +4047,14 @@ async function startExpeditionEncounter(
   applyExpeditionLoaner(run);
   expeditionUi?.close();
 
-  const stage = createStageConfig(encounter.sourceStage);
+  const baseStage = createStageConfig(encounter.sourceStage);
+  const stage =
+    encounter.design === undefined
+      ? baseStage
+      : tuneStageForExpansionEncounter(
+          baseStage,
+          encounter as ExpansionV2EncounterPlanItem,
+        );
   const frozenDifficulty = sanitizeDifficultySettings(
     run.profile.difficultySettings,
   );
@@ -4160,6 +4178,20 @@ async function resumeExpedition(): Promise<void> {
       return;
     }
 
+    if (run.phase === "rest") {
+      applyExpeditionLoaner(run);
+      expeditionUi?.setResumeAvailable(true);
+      expeditionUi?.showRest(run);
+      return;
+    }
+
+    if (run.phase === "setup") {
+      applyExpeditionLoaner(run);
+      expeditionUi?.setResumeAvailable(true);
+      expeditionUi?.showBriefing(run);
+      return;
+    }
+
     if (run.phase === "encounter") {
       await startExpeditionEncounter(run, true);
       return;
@@ -4199,6 +4231,45 @@ async function confirmExpeditionDraft(
   }
 }
 
+async function continueExpeditionEncounter(): Promise<void> {
+  try {
+    const run = expeditionSession.continueEncounter();
+    if (run === null) {
+      showNotice("Expedition encounter is not ready");
+      return;
+    }
+    await startExpeditionEncounter(run, false);
+  } catch (error) {
+    console.error("Unable to continue Expedition.", error);
+    showNotice(
+      "Expedition save failed · reload resumes the previous safe boundary",
+    );
+  }
+}
+
+async function resolveExpeditionRestChoice(
+  choice: ExpeditionRestChoice,
+): Promise<void> {
+  try {
+    const run = expeditionSession.resolveRest(choice);
+    if (run === null) {
+      showNotice("Expedition rest choice was not applied");
+      return;
+    }
+    applyExpeditionLoaner(run);
+    if (run.phase === "draft") {
+      expeditionUi?.showDraft(run);
+    } else if (run.phase === "setup") {
+      expeditionUi?.showBriefing(run);
+    }
+  } catch (error) {
+    console.error("Unable to resolve Expedition rest.", error);
+    showNotice(
+      "Expedition save failed · reload resumes the previous safe boundary",
+    );
+  }
+}
+
 function abandonCurrentExpedition(): void {
   try {
     const run = expeditionSession.abandon();
@@ -4214,7 +4285,7 @@ function abandonCurrentExpedition(): void {
 }
 
 function forceExpeditionQaPhase(
-  phase: "draft" | "encounter" | "defeat",
+  phase: "draft" | "rest" | "encounter" | "defeat",
 ): void {
   try {
     const run = expeditionSession.testForcePhase(phase, RELIC_IDS);
@@ -4226,6 +4297,18 @@ function forceExpeditionQaPhase(
       applyExpeditionLoaner(run);
       expeditionUi?.setResumeAvailable(true);
       expeditionUi?.showDraft(run);
+      return;
+    }
+    if (run.phase === "rest") {
+      applyExpeditionLoaner(run);
+      expeditionUi?.setResumeAvailable(true);
+      expeditionUi?.showRest(run);
+      return;
+    }
+    if (run.phase === "setup") {
+      applyExpeditionLoaner(run);
+      expeditionUi?.setResumeAvailable(true);
+      expeditionUi?.showBriefing(run);
       return;
     }
     if (run.phase === "encounter") {
@@ -4280,6 +4363,8 @@ expeditionUi = mountExpeditionUi({
   onResume: () => void resumeExpedition(),
   onConfirm: (choiceId, replacementRelicId) =>
     void confirmExpeditionDraft(choiceId, replacementRelicId),
+  onContinue: () => void continueExpeditionEncounter(),
+  onRest: (choice) => void resolveExpeditionRestChoice(choice),
   onAbandon: abandonCurrentExpedition,
   onReturn: () => void returnFromExpedition(),
   relicLabel: (id) =>

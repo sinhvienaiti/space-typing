@@ -6,6 +6,7 @@ export const EXPEDITION_START_KIT_ID = "loaner-vanguard-v1";
 export type ExpeditionPhase =
   | "setup"
   | "draft"
+  | "rest"
   | "encounter"
   | "settlement"
   | "victory"
@@ -50,6 +51,16 @@ export type ExpeditionEncounterPlanItem = {
   sourceStage: number;
   gameplaySeed: number;
   cosmeticSeed: number;
+  design?: {
+    recipe: string;
+    pattern: string;
+    condition: string | null;
+    macro: string;
+    briefing: string;
+    workload: string;
+    maxConcurrentTargets: number;
+    objective: string;
+  };
 };
 
 export type ExpeditionDraftChoice =
@@ -81,6 +92,7 @@ export type ExpeditionRun = {
     owned: string[];
     equipped: string[];
     maxEquipped: number;
+    discarded?: string[];
   };
   resources: ExpeditionResources;
   totalScore: number;
@@ -213,9 +225,10 @@ export function materializeExpeditionDraft(
   offerIndex: number,
   eligibleRelicIds: readonly string[],
   ownedRelicIds: readonly string[],
+  discardedRelicIds: readonly string[] = [],
 ): ExpeditionDraftOffer {
-  const owned = new Set(ownedRelicIds);
-  const candidates = unique(eligibleRelicIds).filter((id) => !owned.has(id));
+  const unavailable = new Set([...ownedRelicIds, ...discardedRelicIds]);
+  const candidates = unique(eligibleRelicIds).filter((id) => !unavailable.has(id));
   const random = seededRandom(deriveSeed(seedInput, "offer:" + String(offerIndex)));
   for (let index = candidates.length - 1; index > 0; index -= 1) {
     const swap = Math.floor(random() * (index + 1));
@@ -276,6 +289,7 @@ export function createExpeditionRun(input: {
       owned: [],
       equipped: [],
       maxEquipped: Math.max(0, Math.floor(input.maxEquippedRelics ?? 3)),
+      discarded: [],
     },
     resources: sanitizeExpeditionResources(input.startingResources),
     totalScore: 0,
@@ -312,6 +326,7 @@ export function openExpeditionDraft(
       offerIndex,
       eligibleRelicIds,
       run.relics.owned,
+      run.relics.discarded ?? [],
     ),
   };
 }
@@ -383,10 +398,11 @@ export function confirmExpeditionDraft(
 }
 
 export function beginExpeditionEncounter(run: ExpeditionRun): ExpeditionRun {
+  if (run.terminal !== null || run.phase !== "setup") {
+    return run;
+  }
   if (
-    run.terminal !== null ||
-    run.phase !== "setup" ||
-    run.draftOffer === null ||
+    run.draftOffer !== null &&
     run.draftOffer.confirmedChoiceId === null
   ) {
     return run;
@@ -399,6 +415,59 @@ export function beginExpeditionEncounter(run: ExpeditionRun): ExpeditionRun {
     phase: "encounter",
     draftOffer: null,
     interrupted: false,
+  };
+}
+
+export type ExpeditionRestChoice =
+  | { kind: "repair"; ratio?: number }
+  | { kind: "salvage"; relicId: string };
+
+export function markExpeditionRestBoundary(
+  run: ExpeditionRun,
+): ExpeditionRun {
+  if (run.terminal !== null || run.phase !== "settlement") return run;
+  return {
+    ...run,
+    phase: "rest",
+    draftOffer: null,
+  };
+}
+
+export function resolveExpeditionRest(
+  run: ExpeditionRun,
+  choice: ExpeditionRestChoice,
+): ExpeditionRun {
+  if (run.terminal !== null || run.phase !== "rest") return run;
+
+  if (choice.kind === "repair") {
+    const ratio = Math.max(0, Math.min(0.5, choice.ratio ?? 0.25));
+    return {
+      ...run,
+      phase: "settlement",
+      resources: {
+        ...run.resources,
+        hull: Math.min(
+          run.resources.maxHull,
+          run.resources.hull + run.resources.maxHull * ratio,
+        ),
+      },
+    };
+  }
+
+  if (!run.relics.equipped.includes(choice.relicId)) return run;
+  return {
+    ...run,
+    phase: "settlement",
+    relics: {
+      ...run.relics,
+      equipped: run.relics.equipped.filter((id) => id !== choice.relicId),
+      discarded: [
+        ...new Set([
+          ...(run.relics.discarded ?? []),
+          choice.relicId,
+        ]),
+      ],
+    },
   };
 }
 

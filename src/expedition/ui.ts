@@ -1,11 +1,14 @@
 import type {
   ExpeditionDraftChoice,
+  ExpeditionRestChoice,
   ExpeditionRun,
 } from "./core";
 
 export type ExpeditionUi = {
   setResumeAvailable(available: boolean): void;
   showDraft(run: ExpeditionRun): void;
+  showBriefing(run: ExpeditionRun): void;
+  showRest(run: ExpeditionRun): void;
   showSummary(run: ExpeditionRun): void;
   close(): void;
   destroy(): void;
@@ -15,6 +18,8 @@ export function mountExpeditionUi(options: {
   onStart(): void;
   onResume(): void;
   onConfirm(choiceId: string, replacementRelicId: string | null): void;
+  onContinue(): void;
+  onRest(choice: ExpeditionRestChoice): void;
   onAbandon(): void;
   onReturn(): void;
   relicLabel(id: string): string;
@@ -28,7 +33,7 @@ export function mountExpeditionUi(options: {
   const launch = document.createElement("button");
   launch.type = "button";
   launch.id = "expeditionButton";
-  launch.textContent = "Expedition · Prototype";
+  launch.textContent = "Expedition V2";
   launch.addEventListener("click", () => {
     if (resumeAvailable) options.onResume();
     else options.onStart();
@@ -71,10 +76,26 @@ export function mountExpeditionUi(options: {
     return node;
   }
 
+  function showModal(): void {
+    if (!dialog.open) dialog.showModal();
+  }
+
   function choiceLabel(choice: ExpeditionDraftChoice): string {
     return choice.kind === "continue"
       ? "Continue without a new Relic"
       : options.relicLabel(choice.relicId);
+  }
+
+  function progressText(run: ExpeditionRun): string {
+    return (
+      "Seed " +
+      String(run.seed) +
+      " · " +
+      String(run.completedEncounters) +
+      "/" +
+      String(run.encounterPlan.length) +
+      " encounters complete"
+    );
   }
 
   function showReplacement(
@@ -82,6 +103,7 @@ export function mountExpeditionUi(options: {
     choice: Extract<ExpeditionDraftChoice, { kind: "relic" }>,
   ): void {
     grid.replaceChildren();
+    actionsRow.replaceChildren();
     const prompt = document.createElement("p");
     prompt.className = "equipment-note";
     prompt.textContent =
@@ -97,26 +119,19 @@ export function mountExpeditionUi(options: {
         ),
       );
     }
-    grid.append(makeButton("Back", () => showDraft(run)));
+    actionsRow.append(makeButton("Back", () => showDraft(run)));
   }
 
   function showDraft(run: ExpeditionRun): void {
     const offer = run.draftOffer;
     if (offer === null) return;
 
-    eyebrow.textContent = "expedition draft";
+    eyebrow.textContent = "expedition build draft";
     title.textContent =
       run.completedEncounters === 0
         ? "Choose your opening Relic"
-        : "Choose your next Relic";
-    meta.textContent =
-      "Seed " +
-      String(run.seed) +
-      " · " +
-      String(run.completedEncounters) +
-      "/" +
-      String(run.encounterPlan.length) +
-      " encounters complete";
+        : "Evolve your run build";
+    meta.textContent = progressText(run);
 
     grid.replaceChildren();
     actionsRow.replaceChildren();
@@ -144,7 +159,82 @@ export function mountExpeditionUi(options: {
     actionsRow.append(
       makeButton("Abandon Expedition", options.onAbandon),
     );
-    if (!dialog.open) dialog.showModal();
+    showModal();
+  }
+
+  function showBriefing(run: ExpeditionRun): void {
+    const encounter = run.encounterPlan[run.currentEncounterIndex];
+    if (encounter === undefined) return;
+    const design = encounter.design;
+
+    eyebrow.textContent = "encounter briefing";
+    title.textContent =
+      "Encounter " +
+      String(run.currentEncounterIndex + 1) +
+      " / " +
+      String(run.encounterPlan.length);
+    meta.textContent =
+      (design?.briefing ?? "Continue the Expedition.") +
+      " · " +
+      progressText(run);
+
+    grid.replaceChildren();
+    actionsRow.replaceChildren();
+
+    const card = document.createElement("article");
+    card.className = "reward-choice-option";
+    const strong = document.createElement("strong");
+    strong.textContent =
+      (design?.recipe ?? "normal").replaceAll("-", " ") +
+      " · " +
+      (design?.pattern ?? "normal-word").replaceAll("-", " ");
+    const small = document.createElement("small");
+    small.textContent =
+      (design?.objective ?? "Clear the encounter.") +
+      (design?.condition === null || design?.condition === undefined
+        ? ""
+        : " · Condition: " + design.condition.replaceAll("-", " "));
+    card.append(strong, small);
+    grid.append(card);
+
+    actionsRow.append(
+      makeButton("Start Encounter", options.onContinue, "primary"),
+      makeButton("Abandon Expedition", options.onAbandon),
+    );
+    showModal();
+  }
+
+  function showRest(run: ExpeditionRun): void {
+    eyebrow.textContent = "recovery boundary";
+    title.textContent = "Rest after Encounter 4";
+    meta.textContent =
+      "Choose one run-local recovery action. Campaign inventory and wallet are not used.";
+
+    grid.replaceChildren();
+    actionsRow.replaceChildren();
+
+    grid.append(
+      makeButton(
+        "Repair 25% Hull",
+        () => options.onRest({ kind: "repair", ratio: 0.25 }),
+        "reward-choice-option",
+      ),
+    );
+
+    for (const relicId of run.relics.equipped) {
+      grid.append(
+        makeButton(
+          "Salvage " + options.relicLabel(relicId),
+          () => options.onRest({ kind: "salvage", relicId }),
+          "reward-choice-option",
+        ),
+      );
+    }
+
+    actionsRow.append(
+      makeButton("Abandon Expedition", options.onAbandon),
+    );
+    showModal();
   }
 
   function showSummary(run: ExpeditionRun): void {
@@ -167,7 +257,7 @@ export function mountExpeditionUi(options: {
       run.totalScore.toLocaleString() +
       " · Accuracy " +
       accuracy.toFixed(1) +
-      "% · Campaign rewards: none";
+      "% · Campaign economy unchanged";
 
     grid.replaceChildren();
     actionsRow.replaceChildren();
@@ -176,26 +266,32 @@ export function mountExpeditionUi(options: {
     const strong = document.createElement("strong");
     strong.textContent = "Run-local build";
     const small = document.createElement("small");
+    const discarded = run.relics.discarded ?? [];
     small.textContent =
-      run.relics.equipped.length > 0
+      (run.relics.equipped.length > 0
         ? run.relics.equipped.map(options.relicLabel).join(" · ")
-        : "No equipped Relics";
+        : "No equipped Relics") +
+      (discarded.length > 0
+        ? " · Salvaged: " + discarded.map(options.relicLabel).join(", ")
+        : "");
     card.append(strong, small);
     grid.append(card);
     actionsRow.append(
       makeButton("Return to Campaign", options.onReturn, "primary"),
     );
-    if (!dialog.open) dialog.showModal();
+    showModal();
   }
 
   return {
     setResumeAvailable(available) {
       resumeAvailable = available;
       launch.textContent = available
-        ? "Resume Expedition"
-        : "Expedition · Prototype";
+        ? "Resume Expedition V2"
+        : "Expedition V2";
     },
     showDraft,
+    showBriefing,
+    showRest,
     showSummary,
     close() {
       if (dialog.open) dialog.close();

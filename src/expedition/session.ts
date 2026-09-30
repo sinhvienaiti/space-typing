@@ -3,12 +3,19 @@ import {
   beginExpeditionEncounter,
   confirmExpeditionDraft,
   defeatExpeditionRun,
+  markExpeditionRestBoundary,
   openExpeditionDraft,
   replayExpeditionBoundary,
+  resolveExpeditionRest,
   settleExpeditionEncounter,
   type ExpeditionResources,
+  type ExpeditionRestChoice,
   type ExpeditionRun,
 } from "./core";
+import {
+  shouldDraftBeforeEncounter,
+  shouldRestAfterEncounter,
+} from "../expansion-v2/expedition-plan";
 import {
   claimExpeditionEnvelope,
   loadExpeditionEnvelope,
@@ -38,6 +45,30 @@ export class ExpeditionStorageAdapter implements ExpeditionStorage {
   injectFailureOnce(): void {
     this.failNextWrite = true;
   }
+}
+
+function setupBoundary(run: ExpeditionRun): ExpeditionRun {
+  return {
+    ...run,
+    phase: "setup",
+    draftOffer: null,
+  };
+}
+
+function prepareAfterSettlement(
+  run: ExpeditionRun,
+  eligibleRelicIds: readonly string[],
+): ExpeditionRun {
+  if (run.terminal !== null || run.phase !== "settlement") return run;
+
+  const clearedEncounterIndex = Math.max(0, run.currentEncounterIndex - 1);
+  if (shouldRestAfterEncounter(clearedEncounterIndex)) {
+    return markExpeditionRestBoundary(run);
+  }
+  if (shouldDraftBeforeEncounter(run.currentEncounterIndex)) {
+    return openExpeditionDraft(run, eligibleRelicIds);
+  }
+  return setupBoundary(run);
 }
 
 export class ExpeditionSession {
@@ -74,7 +105,9 @@ export class ExpeditionSession {
     eligibleRelicIds: readonly string[],
   ): ExpeditionRun {
     this.eligibleRelicIds = [...eligibleRelicIds];
-    const run = openExpeditionDraft(runInput, this.eligibleRelicIds);
+    const run = shouldDraftBeforeEncounter(runInput.currentEncounterIndex)
+      ? openExpeditionDraft(runInput, this.eligibleRelicIds)
+      : setupBoundary(runInput);
     this.envelope = startExpeditionEnvelope(
       this.storage,
       this.writerId,
@@ -103,45 +136,23 @@ export class ExpeditionSession {
     let run = envelope.run;
 
     if (run.phase === "encounter") {
-      const replay = replayExpeditionBoundary(run);
+      run = replayExpeditionBoundary(run);
       envelope = writeExpeditionEnvelope(this.storage, {
         writerId: this.writerId,
         expectedRevision: envelope.revision,
-        run: replay,
+        run,
       });
-      run = envelope.run;
     } else if (run.phase === "settlement") {
-      const draft = openExpeditionDraft(run, this.eligibleRelicIds);
+      run = prepareAfterSettlement(run, this.eligibleRelicIds);
       envelope = writeExpeditionEnvelope(this.storage, {
         writerId: this.writerId,
         expectedRevision: envelope.revision,
-        run: draft,
+        run,
       });
-      run = envelope.run;
-    } else if (run.phase === "setup") {
-      if (
-        run.draftOffer !== null &&
-        run.draftOffer.confirmedChoiceId !== null
-      ) {
-        const started = beginExpeditionEncounter(run);
-        envelope = writeExpeditionEnvelope(this.storage, {
-          writerId: this.writerId,
-          expectedRevision: envelope.revision,
-          run: started,
-        });
-      } else {
-        const draft = openExpeditionDraft(run, this.eligibleRelicIds);
-        envelope = writeExpeditionEnvelope(this.storage, {
-          writerId: this.writerId,
-          expectedRevision: envelope.revision,
-          run: draft,
-        });
-      }
-      run = envelope.run;
     }
 
     this.envelope = envelope;
-    return run;
+    return envelope.run;
   }
 
   confirmDraft(
@@ -169,6 +180,25 @@ export class ExpeditionSession {
     return this.envelope.run;
   }
 
+  continueEncounter(): ExpeditionRun | null {
+    const envelope = this.envelope;
+    if (
+      envelope === null ||
+      envelope.run.terminal !== null ||
+      envelope.run.phase !== "setup"
+    ) {
+      return null;
+    }
+    const started = beginExpeditionEncounter(envelope.run);
+    if (started.phase !== "encounter") return null;
+    this.envelope = writeExpeditionEnvelope(this.storage, {
+      writerId: this.writerId,
+      expectedRevision: envelope.revision,
+      run: started,
+    });
+    return this.envelope.run;
+  }
+
   settle(input: {
     score: number;
     accuracy: number;
@@ -180,9 +210,29 @@ export class ExpeditionSession {
     }
 
     let run = settleExpeditionEncounter(envelope.run, input);
-    if (run.phase === "settlement") {
-      run = openExpeditionDraft(run, this.eligibleRelicIds);
+    run = prepareAfterSettlement(run, this.eligibleRelicIds);
+
+    this.envelope = writeExpeditionEnvelope(this.storage, {
+      writerId: this.writerId,
+      expectedRevision: envelope.revision,
+      run,
+    });
+    return this.envelope.run;
+  }
+
+  resolveRest(choice: ExpeditionRestChoice): ExpeditionRun | null {
+    const envelope = this.envelope;
+    if (
+      envelope === null ||
+      envelope.run.terminal !== null ||
+      envelope.run.phase !== "rest"
+    ) {
+      return null;
     }
+
+    let run = resolveExpeditionRest(envelope.run, choice);
+    if (run.phase === "rest") return null;
+    run = prepareAfterSettlement(run, this.eligibleRelicIds);
 
     this.envelope = writeExpeditionEnvelope(this.storage, {
       writerId: this.writerId,
@@ -217,7 +267,7 @@ export class ExpeditionSession {
   }
 
   testForcePhase(
-    phase: "draft" | "encounter" | "defeat",
+    phase: "draft" | "rest" | "encounter" | "defeat",
     eligibleRelicIds: readonly string[] = this.eligibleRelicIds,
   ): ExpeditionRun | null {
     const envelope = this.envelope;
@@ -234,40 +284,48 @@ export class ExpeditionSession {
         terminal: null,
       };
       run = openExpeditionDraft(boundary, this.eligibleRelicIds);
+    } else if (phase === "rest") {
+      const boundary: ExpeditionRun = {
+        ...run,
+        phase: "settlement",
+        draftOffer: null,
+        terminal: null,
+      };
+      run = markExpeditionRestBoundary(boundary);
     } else if (phase === "encounter") {
       if (run.phase !== "encounter") {
-        const boundary: ExpeditionRun = {
+        let boundary = setupBoundary({
           ...run,
-          phase: run.completedEncounters === 0 ? "setup" : "settlement",
-          draftOffer: null,
           terminal: null,
-        };
-        const draft = openExpeditionDraft(
-          boundary,
-          this.eligibleRelicIds,
-        );
-        const choice = draft.draftOffer?.choices[0];
-        if (choice === undefined) return null;
-        const replacementRelicId =
-          draft.relics.equipped.length >= draft.relics.maxEquipped
-            ? draft.relics.equipped[0] ?? null
-            : null;
-        const confirmed = confirmExpeditionDraft(
-          draft,
-          choice.id,
-          replacementRelicId,
-        );
-        if (!confirmed.ok) return null;
-        run = beginExpeditionEncounter(confirmed.run);
+        });
+        if (shouldDraftBeforeEncounter(boundary.currentEncounterIndex)) {
+          const draft = openExpeditionDraft(
+            boundary,
+            this.eligibleRelicIds,
+          );
+          const choice = draft.draftOffer?.choices[0];
+          if (choice === undefined) return null;
+          const replacementRelicId =
+            draft.relics.equipped.length >= draft.relics.maxEquipped
+              ? draft.relics.equipped[0] ?? null
+              : null;
+          const confirmed = confirmExpeditionDraft(
+            draft,
+            choice.id,
+            replacementRelicId,
+          );
+          if (!confirmed.ok) return null;
+          boundary = confirmed.run;
+        }
+        run = beginExpeditionEncounter(boundary);
       }
     } else {
-      const combatBoundary: ExpeditionRun = {
+      run = defeatExpeditionRun({
         ...run,
         phase: "encounter",
         draftOffer: null,
         terminal: null,
-      };
-      run = defeatExpeditionRun(combatBoundary);
+      });
     }
 
     this.envelope = writeExpeditionEnvelope(this.storage, {

@@ -63,7 +63,7 @@ function createRun(id: string, seed = 77) {
 }
 
 describe("P10 ExpeditionSession", () => {
-  it("persists draft -> encounter -> settlement/draft safely", () => {
+  it("persists draft -> encounter -> safe setup boundary", () => {
     const storage = new MemoryStorage();
     const session = new ExpeditionSession(storage, "tab-a");
     const run = session.start(createRun("flow"), ["a", "b", "c"]);
@@ -87,7 +87,7 @@ describe("P10 ExpeditionSession", () => {
       },
     });
 
-    expect(next?.phase).toBe("draft");
+    expect(next?.phase).toBe("setup");
     expect(next?.completedEncounters).toBe(1);
     expect(next?.resources.hull).toBe(81);
     expect(next?.resources.power).toBe(44);
