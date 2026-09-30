@@ -7,6 +7,7 @@ import type {
 export type ExpeditionUi = {
   setResumeAvailable(available: boolean): void;
   setEvolutionTier(tier: number): void;
+  setGhostEnabled(enabled: boolean): void;
   showDraft(run: ExpeditionRun): void;
   showBriefing(run: ExpeditionRun): void;
   showRest(run: ExpeditionRun): void;
@@ -18,6 +19,7 @@ export type ExpeditionUi = {
 export function mountExpeditionUi(options: {
   onStart(): void;
   onDailyStart(): void;
+  onToggleGhost(): void;
   onResume(): void;
   onConfirm(choiceId: string, replacementRelicId: string | null): void;
   onContinue(): void;
@@ -25,6 +27,8 @@ export function mountExpeditionUi(options: {
   onAbandon(): void;
   onReturn(): void;
   relicLabel(id: string): string;
+  ghostCue(run: ExpeditionRun): string | null;
+  learningSummary(run: ExpeditionRun): string | null;
 }): ExpeditionUi {
   const actions = document.querySelector(".title-play-actions");
   if (actions === null) {
@@ -45,7 +49,12 @@ export function mountExpeditionUi(options: {
   daily.id = "expeditionDailyButton";
   daily.textContent = "Daily Expedition";
   daily.addEventListener("click", options.onDailyStart);
-  actions.append(launch, daily);
+  const ghost = document.createElement("button");
+  ghost.type = "button";
+  ghost.id = "expeditionGhostButton";
+  ghost.textContent = "Ghost · On";
+  ghost.addEventListener("click", options.onToggleGhost);
+  actions.append(launch, daily, ghost);
 
   const dialog = document.createElement("dialog");
   dialog.id = "expeditionDialog";
@@ -201,7 +210,14 @@ export function mountExpeditionUi(options: {
       (design?.condition === null || design?.condition === undefined
         ? ""
         : " · Condition: " + design.condition.replaceAll("-", " "));
-    card.append(strong, small);
+    const ghostCue = options.ghostCue(run);
+    if (ghostCue !== null) {
+      const cue = document.createElement("small");
+      cue.textContent = ghostCue;
+      card.append(strong, small, cue);
+    } else {
+      card.append(strong, small);
+    }
     grid.append(card);
 
     actionsRow.append(
@@ -283,6 +299,19 @@ export function mountExpeditionUi(options: {
         : "");
     card.append(strong, small);
     grid.append(card);
+
+    const learningSummary = options.learningSummary(run);
+    if (learningSummary !== null) {
+      const learningCard = document.createElement("article");
+      learningCard.className = "reward-choice-option";
+      const learningTitle = document.createElement("strong");
+      learningTitle.textContent = "Wanted Word";
+      const learningMeta = document.createElement("small");
+      learningMeta.textContent = learningSummary;
+      learningCard.append(learningTitle, learningMeta);
+      grid.append(learningCard);
+    }
+
     actionsRow.append(
       makeButton("Return to Campaign", options.onReturn, "primary"),
     );
@@ -300,11 +329,19 @@ export function mountExpeditionUi(options: {
     setEvolutionTier(tier) {
       const safe = Math.max(0, Math.min(3, Math.floor(tier)));
       launch.dataset.evolutionTier = String(safe);
+      launch.classList.toggle("expedition-evolution-1", safe >= 1);
+      launch.classList.toggle("expedition-evolution-2", safe >= 2);
+      launch.classList.toggle("expedition-evolution-3", safe >= 3);
       launch.textContent = resumeAvailable
         ? "Resume Expedition V2"
         : safe === 0
           ? "Expedition V2"
           : "Expedition V2 · E" + String(safe);
+    },
+    setGhostEnabled(enabled) {
+      ghost.dataset.enabled = String(enabled);
+      ghost.textContent = enabled ? "Ghost · On" : "Ghost · Off";
+      ghost.setAttribute("aria-pressed", String(enabled));
     },
     showDraft,
     showBriefing,
@@ -316,6 +353,7 @@ export function mountExpeditionUi(options: {
     destroy() {
       launch.remove();
       daily.remove();
+      ghost.remove();
       dialog.remove();
     },
   };

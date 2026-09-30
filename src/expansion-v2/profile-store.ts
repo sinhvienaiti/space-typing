@@ -30,6 +30,7 @@ export type ExpansionV2Profile = {
   processedRunIds: string[];
   seenCinematics: string[];
   campaignEventFlags: string[];
+  ghostEnabled: boolean;
 };
 
 export function createExpansionV2Profile(): ExpansionV2Profile {
@@ -44,6 +45,7 @@ export function createExpansionV2Profile(): ExpansionV2Profile {
     processedRunIds: [],
     seenCinematics: [],
     campaignEventFlags: [],
+    ghostEnabled: true,
   };
 }
 
@@ -107,6 +109,10 @@ export function sanitizeExpansionV2Profile(
           (id): id is string => typeof id === "string",
         ).slice(-256)
       : [],
+    ghostEnabled:
+      typeof raw.ghostEnabled === "boolean"
+        ? raw.ghostEnabled
+        : true,
   };
 }
 
@@ -185,6 +191,44 @@ export function recordFixedChallengePb(
   };
 }
 
+export function recordFixedChallengeResult(
+  profile: ExpansionV2Profile,
+  record: ExpeditionPbRecord,
+  points: readonly PersonalGhostPoint[],
+): ExpansionV2Profile {
+  const current = profile.pbByIdentity[record.identityKey] ?? null;
+  if (!betterPb(record, current)) return profile;
+
+  const boundedPoints = [...points]
+    .filter(
+      (point) =>
+        Number.isInteger(point.encounterIndex) &&
+        point.encounterIndex >= 0 &&
+        Number.isFinite(point.activeSeconds) &&
+        point.activeSeconds >= 0 &&
+        Number.isFinite(point.cumulativeScore) &&
+        point.cumulativeScore >= 0,
+    )
+    .sort((a, b) => a.encounterIndex - b.encounterIndex)
+    .slice(-16)
+    .map((point) => ({ ...point }));
+
+  return {
+    ...profile,
+    pbByIdentity: {
+      ...profile.pbByIdentity,
+      [record.identityKey]: record,
+    },
+    ghostByIdentity: {
+      ...profile.ghostByIdentity,
+      [record.identityKey]: {
+        identityKey: record.identityKey,
+        points: boundedPoints,
+      },
+    },
+  };
+}
+
 export function appendGhostPoint(
   profile: ExpansionV2Profile,
   identityKey: string,
@@ -234,4 +278,13 @@ export function expansionEvolutionTier(
   if (profile.completedRuns >= 5) return 2;
   if (profile.completedRuns >= 1) return 1;
   return 0;
+}
+
+export function setExpansionGhostEnabled(
+  profile: ExpansionV2Profile,
+  enabled: boolean,
+): ExpansionV2Profile {
+  return profile.ghostEnabled === enabled
+    ? profile
+    : { ...profile, ghostEnabled: enabled };
 }

@@ -4467,3 +4467,30 @@ kbd {
   height: 26px;
   margin: 0 auto;
 }
+
+
+/* Expansion V2 profile evolution is presentation-only: no gameplay stats. */
+#expeditionButton.expedition-evolution-1 {
+  border-color: rgba(112, 231, 249, 0.38);
+  box-shadow: 0 0 18px rgba(112, 231, 249, 0.1);
+}
+
+#expeditionButton.expedition-evolution-2 {
+  border-color: rgba(134, 148, 255, 0.5);
+  background:
+    linear-gradient(120deg, rgba(32, 54, 78, 0.95), rgba(49, 42, 86, 0.95));
+  box-shadow: 0 0 24px rgba(134, 148, 255, 0.16);
+}
+
+#expeditionButton.expedition-evolution-3 {
+  border-color: rgba(255, 215, 128, 0.58);
+  background:
+    linear-gradient(120deg, rgba(44, 56, 77, 0.96), rgba(74, 50, 86, 0.96));
+  box-shadow:
+    0 0 18px rgba(112, 231, 249, 0.12),
+    0 0 32px rgba(255, 215, 128, 0.12);
+}
+
+#expeditionGhostButton[data-enabled="false"] {
+  opacity: 0.58;
+}

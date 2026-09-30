@@ -45,6 +45,12 @@ export type ExpeditionResources = {
   power: number;
 };
 
+export type ExpeditionGhostPoint = {
+  encounterIndex: number;
+  activeSeconds: number;
+  cumulativeScore: number;
+};
+
 export type ExpeditionEncounterPlanItem = {
   id: string;
   index: number;
@@ -88,6 +94,10 @@ export type ExpeditionRun = {
     dayKey: string | null;
     identityKey: string | null;
   };
+  learning?: {
+    wantedWordId: string | null;
+  };
+  ghostPoints?: ExpeditionGhostPoint[];
   phase: ExpeditionPhase;
   encounterPlan: ExpeditionEncounterPlanItem[];
   currentEncounterIndex: number;
@@ -262,6 +272,7 @@ export function createExpeditionRun(input: {
   startingResources: ExpeditionResources;
   maxEquippedRelics?: number;
   challenge?: ExpeditionRun["challenge"];
+  learning?: ExpeditionRun["learning"];
 }): ExpeditionRun {
   if (input.runId.trim().length === 0) throw new Error("Expedition runId is required.");
   if (
@@ -290,6 +301,11 @@ export function createExpeditionRun(input: {
       input.challenge === undefined
         ? undefined
         : { ...input.challenge },
+    learning:
+      input.learning === undefined
+        ? undefined
+        : { ...input.learning },
+    ghostPoints: [],
     phase: "setup",
     encounterPlan: input.encounterPlan.map((item) => ({ ...item })),
     currentEncounterIndex: 0,
@@ -496,6 +512,7 @@ export function settleExpeditionEncounter(
     score: number;
     accuracy: number;
     resources: ExpeditionResources;
+    activeSeconds?: number;
   },
 ): ExpeditionRun {
   if (run.phase !== "encounter" || run.terminal !== null) return run;
@@ -507,14 +524,38 @@ export function settleExpeditionEncounter(
   const accuracy = Math.max(0, Math.min(100, result.accuracy));
   const completed = Math.max(run.completedEncounters, run.currentEncounterIndex + 1);
   const nextIndex = run.currentEncounterIndex + 1;
+  const nextTotalScore = alreadyCommitted
+    ? run.totalScore
+    : run.totalScore + score;
+  const activeSeconds =
+    typeof result.activeSeconds === "number" &&
+    Number.isFinite(result.activeSeconds)
+      ? Math.max(0, result.activeSeconds)
+      : null;
+  const nextGhostPoints =
+    alreadyCommitted || activeSeconds === null
+      ? [...(run.ghostPoints ?? [])]
+      : [
+          ...(run.ghostPoints ?? []).filter(
+            (point) => point.encounterIndex !== run.currentEncounterIndex,
+          ),
+          {
+            encounterIndex: run.currentEncounterIndex,
+            activeSeconds,
+            cumulativeScore: nextTotalScore,
+          },
+        ]
+          .sort((left, right) => left.encounterIndex - right.encounterIndex)
+          .slice(-16);
   const next: ExpeditionRun = {
     ...run,
     phase: "settlement",
     currentEncounterIndex: nextIndex,
     completedEncounters: completed,
     resources: sanitizeExpeditionResources(result.resources),
-    totalScore: alreadyCommitted ? run.totalScore : run.totalScore + score,
+    totalScore: nextTotalScore,
     accuracySum: alreadyCommitted ? run.accuracySum : run.accuracySum + accuracy,
+    ghostPoints: nextGhostPoints,
     committedEncounterIds: alreadyCommitted
       ? run.committedEncounterIds
       : [...run.committedEncounterIds, encounter.id],

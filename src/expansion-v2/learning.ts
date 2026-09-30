@@ -1,4 +1,5 @@
 import type { CombatCompletionFact } from "../combat/completion-events";
+import type { RecallAttemptResult } from "../recall/model";
 
 export type ExpansionLearningEvidence = {
   evidenceId: string;
@@ -30,6 +31,31 @@ export type ExpansionLearningState = {
 
 export function createExpansionLearningState(): ExpansionLearningState {
   return { records: {}, committedEvidenceIds: [] };
+}
+
+export function evidenceFromRecallAttempt(
+  runId: string,
+  encounterId: string,
+  result: RecallAttemptResult,
+): ExpansionLearningEvidence {
+  const entityId =
+    result.entry.id || result.entry.en.toLocaleLowerCase("en-US");
+  return {
+    evidenceId:
+      runId +
+      "/recall/" +
+      entityId +
+      "/" +
+      String(Math.max(0, Math.floor(result.at))),
+    entityId,
+    activityType: "recall",
+    result: result.completed ? "correct" : "wrong",
+    hintUsed: result.hintCount > 0,
+    replayUsed: result.replayCount > 0,
+    source: "recall",
+    runId,
+    encounterId,
+  };
 }
 
 export function evidenceFromCompletion(

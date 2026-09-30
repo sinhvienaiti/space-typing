@@ -203,6 +203,7 @@ export class ExpeditionSession {
     score: number;
     accuracy: number;
     resources: ExpeditionResources;
+    activeSeconds?: number;
   }): ExpeditionRun | null {
     const envelope = this.envelope;
     if (envelope === null || envelope.run.phase !== "encounter") {

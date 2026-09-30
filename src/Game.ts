@@ -783,6 +783,8 @@ export class Game {
     pattern: TypingPatternId;
     gameplayState: number;
     bossParts: boolean;
+    wantedWordId: string | null;
+    wantedWordAssigned: boolean;
   } | null = null;
   private completionSequence = 0;
   private relicPerfectWordCount = 0;
@@ -1932,6 +1934,7 @@ export class Game {
       pattern: TypingPatternId;
       gameplaySeed: number;
       bossParts?: boolean;
+      wantedWordId?: string | null;
     } | null,
   ): void {
     if (context === null) {
@@ -1944,6 +1947,12 @@ export class Game {
       pattern: context.pattern,
       gameplayState: (context.gameplaySeed >>> 0) || 1,
       bossParts: context.bossParts === true,
+      wantedWordId:
+        typeof context.wantedWordId === "string" &&
+        context.wantedWordId.length > 0
+          ? context.wantedWordId
+          : null,
+      wantedWordAssigned: false,
     };
     this.completionSequence = 0;
   }
@@ -1978,6 +1987,23 @@ export class Game {
     state >>>= 0;
     context.gameplayState = state || 1;
     return state / 0x100000000;
+  }
+
+  private takeExpansionWantedWordEntry(): VocabularyEntry | null {
+    const context = this.expansionEncounterContext;
+    if (
+      context === null ||
+      context.wantedWordId === null ||
+      context.wantedWordAssigned
+    ) {
+      return null;
+    }
+    const entry = this.expansionVocabulary().find(
+      (candidate) => candidate.id === context.wantedWordId,
+    );
+    if (entry === undefined) return null;
+    context.wantedWordAssigned = true;
+    return entry;
   }
 
   private expansionVocabulary(
@@ -5070,11 +5096,14 @@ export class Game {
       },
       random: () => this.nextExpansionGameplayRandom(),
     });
-    const varied = this.selectVariedEnemyEntry(
-      typingProfile.entry,
-      undefined,
-      this.expansionVocabulary(),
-    );
+    const wanted = this.takeExpansionWantedWordEntry();
+    const varied =
+      wanted ??
+      this.selectVariedEnemyEntry(
+        typingProfile.entry,
+        undefined,
+        this.expansionVocabulary(),
+      );
     if (varied === null) return false;
     typingProfile.entry = varied;
     typingProfile.wordDifficultyScore = wordDifficultyScore(

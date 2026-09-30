@@ -446,17 +446,21 @@ import {
   utcDayKey,
 } from "./expansion-v2/challenge";
 import {
-  appendGhostPoint,
   commitLearningToExpansionProfile,
   expansionEvolutionTier,
   loadExpansionV2Profile,
   markExpansionCinematicSeen,
   recordExpansionRun,
-  recordFixedChallengePb,
+  recordFixedChallengeResult,
   saveExpansionV2Profile,
+  setExpansionGhostEnabled,
   type ExpansionV2Profile,
 } from "./expansion-v2/profile-store";
-import { evidenceFromCompletion } from "./expansion-v2/learning";
+import {
+  evidenceFromCompletion,
+  evidenceFromRecallAttempt,
+  selectWantedWord,
+} from "./expansion-v2/learning";
 import {
   markNemesisReturn,
   recordNemesisDefeat,
@@ -468,6 +472,17 @@ import {
 import {
   campaignStageExpansionProfile,
 } from "./expansion-v2/campaign-rollout";
+import {
+  campaignReferencePatternOverride,
+  campaignReferenceRoutePreview,
+  needsCampaignReferenceRouteChoice,
+  recordCampaignReferenceRouteChoice,
+  type CampaignReferenceRouteChoice,
+} from "./expansion-v2/campaign-reference-event";
+import {
+  mountCampaignReferenceEventUi,
+  type CampaignReferenceEventUi,
+} from "./expansion-v2/campaign-reference-event-ui";
 import { createExpeditionLoanerState } from "./expedition/loaner";
 import {
   ExpeditionSession,
@@ -1089,6 +1104,7 @@ const expeditionSession = new ExpeditionSession(
   createExpeditionWriterId(),
 );
 let expeditionUi: ExpeditionUi | null = null;
+let campaignReferenceEventUi: CampaignReferenceEventUi | null = null;
 let expeditionCampaignSnapshot: AutosaveSnapshot | null = null;
 let expeditionStartPending = false;
 let expansionEncounterRuntime: ExpansionEncounterRuntime | null = null;
@@ -1106,6 +1122,9 @@ function persistExpansionV2Profile(
     );
     expeditionUi?.setEvolutionTier(
       expansionEvolutionTier(expansionV2Profile),
+    );
+    expeditionUi?.setGhostEnabled(
+      expansionV2Profile.ghostEnabled,
     );
   } catch (error) {
     console.error("Unable to save Expansion V2 profile.", error);
@@ -1125,16 +1144,23 @@ function recordExpeditionTerminalProfile(run: ExpeditionRun): void {
       run.completedEncounters > 0
         ? run.accuracySum / run.completedEncounters
         : 0;
-    next = recordFixedChallengePb(next, {
-      identityKey,
-      runId: run.runId,
-      completedEncounters: run.completedEncounters,
-      score: run.totalScore,
-      accuracy,
-      activeSeconds: expeditionActiveSecondsTotal,
-      retried: run.retryCount > 0,
-      assisted: run.profile.assist !== "standard",
-    });
+    const lastGhostPoint = run.ghostPoints?.at(-1);
+    next = recordFixedChallengeResult(
+      next,
+      {
+        identityKey,
+        runId: run.runId,
+        completedEncounters: run.completedEncounters,
+        score: run.totalScore,
+        accuracy,
+        activeSeconds:
+          lastGhostPoint?.activeSeconds ??
+          expeditionActiveSecondsTotal,
+        retried: run.retryCount > 0,
+        assisted: run.profile.assist !== "standard",
+      },
+      run.ghostPoints ?? [],
+    );
   }
   persistExpansionV2Profile(next);
 }
@@ -3460,9 +3486,13 @@ const game = new Game(
         activeExpedition.phase === "encounter"
       ) {
         try {
+          const nextActiveSeconds =
+            expeditionActiveSecondsTotal +
+            stageSession.elapsedSeconds;
           const run = expeditionSession.settle({
             score: stats.score,
             accuracy,
+            activeSeconds: nextActiveSeconds,
             resources: {
               hull: stats.hull,
               maxHull: stats.maxHull,
@@ -3503,27 +3533,8 @@ const game = new Game(
               );
             }
 
-            expeditionActiveSecondsTotal +=
-              stageSession.elapsedSeconds;
-            const identityKey =
-              run.challenge?.identityKey ?? null;
-            if (identityKey !== null) {
-              persistExpansionV2Profile(
-                appendGhostPoint(
-                  expansionV2Profile,
-                  identityKey,
-                  {
-                    encounterIndex: Math.max(
-                      0,
-                      run.completedEncounters - 1,
-                    ),
-                    activeSeconds:
-                      expeditionActiveSecondsTotal,
-                    cumulativeScore: run.totalScore,
-                  },
-                ),
-              );
-            }
+            expeditionActiveSecondsTotal =
+              nextActiveSeconds;
 
             if (run.terminal !== null) {
               recordExpeditionTerminalProfile(run);
@@ -4098,6 +4109,24 @@ const game = new Game(
       recallStage.responseMs += result.responseMs;
       recallMemory = recordRecallAttempt(recallMemory, result);
       postLearningEvent(buildRecallLearningEvent(result));
+      if (
+        expeditionSession.currentRun() === null &&
+        !testingStagePreviewActive()
+      ) {
+        const stage = game.getStats().stage;
+        persistExpansionV2Profile(
+          commitLearningToExpansionProfile(
+            expansionV2Profile,
+            [
+              evidenceFromRecallAttempt(
+                "campaign-recall",
+                "stage:" + String(stage),
+                result,
+              ),
+            ],
+          ),
+        );
+      }
       if (recallStage.attempts % 6 === 0) saveRecallMemory();
       renderRecallAssistUi();
     },
@@ -4258,6 +4287,17 @@ function buildExpeditionRun(
   challengeKind: "prototype" | "daily" = "prototype",
 ): ExpeditionRun {
   const wordPool = expeditionWordPool();
+  const selectedWantedWord =
+    challengeKind === "prototype"
+      ? selectWantedWord(expansionV2Profile.learning)
+      : null;
+  const wantedWordId =
+    selectedWantedWord !== null &&
+    wordPool.entries.some(
+      (entry) => entry.id === selectedWantedWord,
+    )
+      ? selectedWantedWord
+      : null;
   const dayKey =
     challengeKind === "daily" ? utcDayKey() : null;
   const identityKey =
@@ -4297,6 +4337,9 @@ function buildExpeditionRun(
       kind: challengeKind,
       dayKey,
       identityKey,
+    },
+    learning: {
+      wantedWordId,
     },
   });
 }
@@ -4351,6 +4394,11 @@ async function startExpeditionEncounter(
     pattern,
     gameplaySeed: encounter.gameplaySeed,
     bossParts: design?.recipe === "boss-prelude",
+    wantedWordId:
+      encounter.index === 0 &&
+      run.challenge?.kind !== "daily"
+        ? run.learning?.wantedWordId ?? null
+        : null,
   });
   expansionEncounterRuntime = createExpansionEncounterRuntime(
     encounter.id,
@@ -4472,16 +4520,11 @@ async function resumeExpedition(): Promise<void> {
       return;
     }
 
-    const resumeIdentity = run.challenge?.identityKey ?? null;
-    if (resumeIdentity !== null) {
-      const ghost =
-        expansionV2Profile.ghostByIdentity[resumeIdentity];
-      expeditionActiveSecondsTotal =
-        ghost?.points.reduce(
-          (max, point) => Math.max(max, point.activeSeconds),
-          0,
-        ) ?? 0;
-    }
+    expeditionActiveSecondsTotal =
+      run.ghostPoints?.reduce(
+        (max, point) => Math.max(max, point.activeSeconds),
+        0,
+      ) ?? 0;
 
     if (run.phase === "draft") {
       applyExpeditionLoaner(run);
@@ -4684,6 +4727,14 @@ expeditionUi = mountExpeditionUi({
       "daily",
     );
   },
+  onToggleGhost: () => {
+    persistExpansionV2Profile(
+      setExpansionGhostEnabled(
+        expansionV2Profile,
+        !expansionV2Profile.ghostEnabled,
+      ),
+    );
+  },
   onResume: () => void resumeExpedition(),
   onConfirm: (choiceId, replacementRelicId) =>
     void confirmExpeditionDraft(choiceId, replacementRelicId),
@@ -4695,11 +4746,76 @@ expeditionUi = mountExpeditionUi({
     id in RELIC_REGISTRY
       ? getRelicDefinition(id as RelicId).name
       : id,
+  ghostCue: (run) => {
+    if (!expansionV2Profile.ghostEnabled) return null;
+    const identityKey = run.challenge?.identityKey ?? null;
+    if (identityKey === null) return null;
+    const ghost =
+      expansionV2Profile.ghostByIdentity[identityKey];
+    const point = ghost?.points.find(
+      (candidate) =>
+        candidate.encounterIndex === run.currentEncounterIndex,
+    );
+    if (point === undefined) return null;
+    return (
+      "Personal Ghost · PB checkpoint " +
+      point.activeSeconds.toFixed(1) +
+      "s · score " +
+      point.cumulativeScore.toLocaleString()
+    );
+  },
+  learningSummary: (run) => {
+    const wantedWordId = run.learning?.wantedWordId ?? null;
+    if (wantedWordId === null) return null;
+    const entry = run.wordPool.entries.find(
+      (candidate) => candidate.id === wantedWordId,
+    );
+    const record =
+      expansionV2Profile.learning.records[wantedWordId];
+    if (record === undefined) {
+      return (
+        (entry?.en ?? wantedWordId) +
+        " · selected for a low-pressure opening review"
+      );
+    }
+    return (
+      (entry?.en ?? wantedWordId) +
+      " · typing " +
+      String(record.correct) +
+      "/" +
+      String(record.seen) +
+      " correct · Recall " +
+      String(record.recallSuccess) +
+      "/" +
+      String(record.recallSuccess + record.recallFailure)
+    );
+  },
 });
 expeditionUi.setResumeAvailable(expeditionSession.hasResumableRun());
 expeditionUi.setEvolutionTier(
   expansionEvolutionTier(expansionV2Profile),
 );
+expeditionUi.setGhostEnabled(expansionV2Profile.ghostEnabled);
+
+campaignReferenceEventUi = mountCampaignReferenceEventUi({
+  onChoice: (choice: CampaignReferenceRouteChoice) => {
+    persistExpansionV2Profile({
+      ...expansionV2Profile,
+      campaignEventFlags:
+        recordCampaignReferenceRouteChoice(
+          expansionV2Profile.campaignEventFlags,
+          choice,
+        ),
+    });
+    campaignReferenceEventUi?.close();
+    showNotice(
+      choice === "risk"
+        ? "Ancient Gate · risky route locked for Stage 036"
+        : "Ancient Gate · stable route locked for Stage 036",
+    );
+    void startSelectedStage();
+  },
+});
 
 byId<HTMLButtonElement>("anomalyStabilize").addEventListener(
   "click",
@@ -7209,6 +7325,21 @@ async function startSelectedStage(): Promise<void> {
     testingStageSnapshot = structuredClone(currentAutosaveSnapshot());
   }
 
+  const pendingCampaignStage = selectedGameplayStage();
+  if (
+    !testingPreview &&
+    ascension.selectedTier === 0 &&
+    pendingCampaignStage === campaign.highestUnlockedStage &&
+    needsCampaignReferenceRouteChoice({
+      targetStage: pendingCampaignStage,
+      clearedStages: campaign.clearedStages,
+      flags: expansionV2Profile.campaignEventFlags,
+    })
+  ) {
+    campaignReferenceEventUi?.show();
+    return;
+  }
+
   // Testing preview bypasses campaign route/rest gates without modifying them.
   if (
     !testingPreview &&
@@ -7316,7 +7447,11 @@ async function startSelectedStage(): Promise<void> {
     ) {
       game.setExpansionEncounterContext({
         encounterId: "campaign:" + String(stage.stage),
-        pattern: expansionProfile.pattern,
+        pattern:
+          campaignReferencePatternOverride(
+            stage.stage,
+            expansionV2Profile.campaignEventFlags,
+          ) ?? expansionProfile.pattern,
         gameplaySeed: stage.seed,
         bossParts: false,
       });
@@ -7686,7 +7821,10 @@ function renderStagePreview(): void {
     " · V2 " +
     expansionProfile.band.replaceAll("-", " ") +
     " · " +
-    expansionProfile.routePreview;
+    (campaignReferenceRoutePreview(
+      stage,
+      expansionV2Profile.campaignEventFlags,
+    ) ?? expansionProfile.routePreview);
   const start = byId<HTMLButtonElement>("journeyStartButton");
   start.disabled = !isUnlocked || journeyStartGate.active;
   start.textContent = journeyStartGate.active
