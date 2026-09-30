@@ -474,6 +474,9 @@ import {
   campaignStageExpansionProfile,
 } from "./expansion-v2/campaign-rollout";
 import {
+  expansionV2FeatureEnabled,
+} from "./expansion-v2/feature-flags";
+import {
   bossPartIconUrl,
 } from "./expansion-v2/asset-map";
 import {
@@ -1102,6 +1105,10 @@ function createExpeditionWriterId(): string {
   );
 }
 
+const expansionV2Enabled = expansionV2FeatureEnabled(
+  localStorage,
+  window.location.search,
+);
 const expeditionStorage = new ExpeditionStorageAdapter(localStorage);
 const expeditionSession = new ExpeditionSession(
   expeditionStorage,
@@ -1159,7 +1166,7 @@ function startExpansionCinematicQa(): void {
 }
 
 function recordExpeditionTerminalProfile(run: ExpeditionRun): void {
-  if (run.challenge?.kind === "qa") return;
+  if (!expansionV2Enabled || run.challenge?.kind === "qa") return;
 
   let next = recordExpansionRun(expansionV2Profile, {
     runId: run.runId,
@@ -1538,7 +1545,9 @@ function renderStats(stats: GameStats): void {
   hudClass("powerFill", "ready", rageSegments === RAGE_SEGMENT_COUNT);
   const powerTrack = byId("powerTrack");
   powerTrack.dataset.rageSegments = String(rageSegments);
-  const evolutionTier = expansionEvolutionTier(expansionV2Profile);
+  const evolutionTier = expansionV2Enabled
+    ? expansionEvolutionTier(expansionV2Profile)
+    : 0;
   powerTrack.dataset.evolutionTier = String(evolutionTier);
   powerTrack.dataset.visualQuality = settings.visualQuality;
   powerTrack.classList.toggle(
@@ -3521,14 +3530,16 @@ const game = new Game(
           byId("phoenixCoreButton").classList.add("hidden");
           setDeathNavigationDisabled(false);
         } else {
-          persistExpansionV2Profile({
-            ...expansionV2Profile,
-            nemesis: recordNemesisDefeat(
-              expansionV2Profile.nemesis,
-              "stage-threat-" + String(stats.stage),
-              stats.stage,
-            ),
-          });
+          if (expansionV2Enabled) {
+            persistExpansionV2Profile({
+              ...expansionV2Profile,
+              nemesis: recordNemesisDefeat(
+                expansionV2Profile.nemesis,
+                "stage-threat-" + String(stats.stage),
+                stats.stage,
+              ),
+            });
+          }
           const deathAt = new Date().toISOString();
           markCrashRecoveryDeathInvalid(deathAt);
           renderDeathProtectionChoices(stats.stage);
@@ -3540,6 +3551,7 @@ const game = new Game(
       renderStage(stage);
       const activeNemesis = expansionV2Profile.nemesis.active;
       if (
+        expansionV2Enabled &&
         expeditionSession.currentRun() === null &&
         activeNemesis !== null &&
         !activeNemesis.resolved &&
@@ -3659,6 +3671,7 @@ const game = new Game(
 
       const activeNemesis = expansionV2Profile.nemesis.active;
       if (
+        expansionV2Enabled &&
         activeNemesis !== null &&
         !activeNemesis.resolved &&
         activeNemesis.sourceStage === stats.stage &&
@@ -4207,6 +4220,7 @@ const game = new Game(
       recallMemory = recordRecallAttempt(recallMemory, result);
       postLearningEvent(buildRecallLearningEvent(result));
       if (
+        expansionV2Enabled &&
         expeditionSession.currentRun() === null &&
         !testingStagePreviewActive()
       ) {
@@ -4544,6 +4558,7 @@ async function startNewExpedition(
   challengeKind: "prototype" | "daily" | "qa" = "prototype",
 ): Promise<void> {
   if (
+    (!expansionV2Enabled && challengeKind !== "qa") ||
     !persistenceReady ||
     !vocabularyReady ||
     expeditionStartPending ||
@@ -4600,6 +4615,7 @@ async function startNewExpedition(
 
 async function resumeExpedition(): Promise<void> {
   if (
+    !expansionV2Enabled ||
     !persistenceReady ||
     expeditionStartPending ||
     game.getPhase() !== "title"
@@ -4913,6 +4929,10 @@ expeditionUi.setEvolutionTier(
   expansionEvolutionTier(expansionV2Profile),
 );
 expeditionUi.setGhostEnabled(expansionV2Profile.ghostEnabled);
+if (!expansionV2Enabled) {
+  expeditionUi?.destroy();
+  expeditionUi = null;
+}
 
 campaignReferenceEventUi = mountCampaignReferenceEventUi({
   onChoice: (choice: CampaignReferenceRouteChoice) => {
@@ -4933,6 +4953,10 @@ campaignReferenceEventUi = mountCampaignReferenceEventUi({
     void startSelectedStage();
   },
 });
+if (!expansionV2Enabled) {
+  campaignReferenceEventUi?.destroy();
+  campaignReferenceEventUi = null;
+}
 
 byId<HTMLButtonElement>("anomalyStabilize").addEventListener(
   "click",
@@ -7444,6 +7468,7 @@ async function startSelectedStage(): Promise<void> {
 
   const pendingCampaignStage = selectedGameplayStage();
   if (
+    expansionV2Enabled &&
     !testingPreview &&
     ascension.selectedTier === 0 &&
     pendingCampaignStage === campaign.highestUnlockedStage &&
@@ -7558,6 +7583,7 @@ async function startSelectedStage(): Promise<void> {
     const expansionProfile =
       campaignStageExpansionProfile(stage.stage);
     if (
+      expansionV2Enabled &&
       !testingPreview &&
       stage.stage >= 11 &&
       stage.stage <= 100
@@ -7936,13 +7962,15 @@ function renderStagePreview(): void {
           ? "Current frontier"
           : "Locked") +
     (node.checkpoint ? " · Checkpoint milestone" : "") +
-    " · V2 " +
-    expansionProfile.band.replaceAll("-", " ") +
-    " · " +
-    (campaignReferenceRoutePreview(
-      stage,
-      expansionV2Profile.campaignEventFlags,
-    ) ?? expansionProfile.routePreview);
+    (expansionV2Enabled
+      ? " · V2 " +
+        expansionProfile.band.replaceAll("-", " ") +
+        " · " +
+        (campaignReferenceRoutePreview(
+          stage,
+          expansionV2Profile.campaignEventFlags,
+        ) ?? expansionProfile.routePreview)
+      : "");
   const start = byId<HTMLButtonElement>("journeyStartButton");
   start.disabled = !isUnlocked || journeyStartGate.active;
   start.textContent = journeyStartGate.active
