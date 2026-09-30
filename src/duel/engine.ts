@@ -12,6 +12,10 @@ import {
   type DuelMysteryRevealLevel,
 } from "./chance";
 import {
+  resolveDuelCataclysm,
+  resolveDuelHazard,
+} from "./hazards";
+import {
   DuelCombatInventory,
   type DuelCombatInventorySnapshot,
 } from "./inventory";
@@ -446,10 +450,25 @@ export class DuelEngine {
     const directorEvents = this.director.update(dt, this.phase());
     for (const event of directorEvents) {
       if (event.type === "hazard") {
+        const hazard = resolveDuelHazard(
+          event.hazard,
+          this.tactical.snapshot().controlPressure,
+        );
+        this.pendingEffects.push(...hazard.effects);
+        for (const effect of hazard.tacticalEffects) {
+          this.tactical.apply(effect);
+        }
         events.push({ type: "map-hazard", hazard: event.hazard });
       } else if (event.type === "objective") {
         events.push(...this.spawnNeutralObjective(event.objective.kind));
       } else {
+        const cataclysm = resolveDuelCataclysm(
+          event.cataclysm,
+        );
+        this.pendingEffects.push(...cataclysm.effects);
+        for (const effect of cataclysm.tacticalEffects) {
+          this.tactical.apply(effect);
+        }
         events.push({
           type: "map-cataclysm",
           cataclysm: event.cataclysm,
