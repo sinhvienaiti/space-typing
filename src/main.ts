@@ -173,6 +173,13 @@ import {
   stageClearCreditReward,
 } from "./economy/credits";
 import {
+  CombatCreditRewardLedger,
+  combatCreditExpectedWeight,
+  combatCreditStageBudget,
+  settleCombatCreditStageBase,
+  type CombatCreditMode,
+} from "./rewards/combat-credit-drops";
+import {
   addExpansionCurrencyReward,
   createExpansionCurrencyState,
   expansionCurrencyRewardText,
@@ -788,6 +795,7 @@ let characters: CharacterState = createStarterCharacterState();
 let luckPity: LuckPityState = createLuckPityState();
 let hiddenDiscovery: HiddenDiscoveryState = createHiddenDiscoveryState();
 let credits = 0;
+const combatCreditLedger = new CombatCreditRewardLedger();
 let progression: ProgressionState = createProgressionState();
 let upgrades: UpgradeState = createUpgradeState();
 let relics: RelicState = createRelicState();
@@ -1496,6 +1504,7 @@ function renderStats(stats: GameStats): void {
   hudDomMetrics.renderCalls += 1;
 
   hudText("score", stats.score.toLocaleString());
+  hudText("creditsHud", credits.toLocaleString());
   hudText("streak", String(stats.streak));
   hudText("multiplier", "x" + String(stats.multiplier));
   hudText(
@@ -3451,6 +3460,15 @@ function backgroundOptions(): {
   };
 }
 
+function activeCombatCreditMode(): CombatCreditMode {
+  if (expeditionSession.ownsCampaignPersistence()) return "expedition";
+  if (currentHiddenEncounterState().active !== null) return "hidden";
+  if (gameplayMode === "recall") return "recall";
+  if (testingStagePreviewActive()) return "preview";
+  if (ascension.selectedTier > 0) return "ascension";
+  return "campaign";
+}
+
 const game = new Game(
   byId<HTMLCanvasElement>("gameCanvas"),
   [],
@@ -3576,6 +3594,37 @@ const game = new Game(
       }
       codex = discoverCodexWorld(codex, worldForStage(stage).id).state;
     },
+    onCombatCreditAttemptStart: (attempt) => {
+      const mode = activeCombatCreditMode();
+      const baselineStageCredits =
+        stageClearCreditReward({
+          stage: attempt.stage,
+          accuracy: 94,
+          salvage: game.getPlayerStats().salvage,
+        }) * (activeStageDifficulty?.rewardMultiplier ?? 1);
+      combatCreditLedger.beginAttempt({
+        attemptId: attempt.attemptId,
+        mode,
+        combatCreditBudget: combatCreditStageBudget({
+          existingBaseCredits: baselineStageCredits,
+          expectedEligibleKills: attempt.expectedEligibleKills,
+        }),
+        expectedWeight: combatCreditExpectedWeight({
+          regularEnemyCount: attempt.regularEnemyCount,
+          bossRole: attempt.bossRole,
+        }),
+      });
+    },
+    onCombatCreditReward: (request) =>
+      combatCreditLedger.claimKillReward(
+        request,
+        (amount) => {
+          const before = credits;
+          credits = addCredits(credits, amount);
+          hudText("creditsHud", credits.toLocaleString());
+          return { before, after: credits };
+        },
+      ),
     onStagePhase: (phase) => {
       renderStagePhase(phase);
       syncStagePhaseMusic(phase);
@@ -3805,14 +3854,21 @@ const game = new Game(
       const combinedRewardMultiplier =
         difficultyRewardMultiplier *
         (1 + objectiveBonusFactor);
-      const baseCreditReward =
+      const stageBaseCreditTarget =
         stageClearCreditReward({
           stage: stats.stage,
           accuracy,
           salvage: game.getPlayerStats().salvage,
-        }) *
-        game.getCreditsMultiplier() *
-        combinedRewardMultiplier;
+        }) * combinedRewardMultiplier;
+      const combatCreditSettlement =
+        settleCombatCreditStageBase({
+          stageBaseCredits: stageBaseCreditTarget,
+          combatCreditsGranted:
+            game.getCombatCreditsGrantedThisStage(),
+          creditsMultiplier: game.getCreditsMultiplier(),
+        });
+      const baseCreditReward =
+        combatCreditSettlement.settlementCredits;
       const performance =
         activeStageDifficulty === null
           ? null

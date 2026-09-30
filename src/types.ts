@@ -97,6 +97,11 @@ export type Enemy = {
   definitionId?: EnemyDefinitionId;
   elite: boolean;
   golden?: boolean;
+  /**
+   * Explicit farm-control override for the FINAL V3 Combat Credit economy.
+   * Undefined means normal eligible combat target; carrier summons set false.
+   */
+  combatCreditEligible?: boolean;
   eliteModifiers: EliteModifier[];
   rank?: EnemyRank;
   wordDifficultyScore?: number;

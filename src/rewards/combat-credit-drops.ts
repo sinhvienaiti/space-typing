@@ -160,6 +160,109 @@ export function combatCreditWeight(
   return TIER_WEIGHT[tier];
 }
 
+export function combatCreditExpectedWeight(input: {
+  regularEnemyCount: number;
+  bossRole?: BossRole | null;
+}): number {
+  const regularEnemyCount = Math.max(
+    0,
+    Math.floor(
+      Number.isFinite(input.regularEnemyCount)
+        ? input.regularEnemyCount
+        : 0,
+    ),
+  );
+  // A light 1.35x average keeps room for authored rank/rarity variation.
+  // Actual payouts still consume the live remaining weight, so this is only a
+  // stage allocation estimate and never a gameplay eligibility rule.
+  let weight = regularEnemyCount * 1.35;
+  if (input.bossRole !== undefined && input.bossRole !== null) {
+    weight += combatCreditWeight(input.bossRole);
+  }
+  return Math.max(1, weight);
+}
+
+export function combatCreditStageBudget(input: {
+  existingBaseCredits: number;
+  expectedEligibleKills: number;
+}): number {
+  const existingBaseCredits = Math.max(
+    0,
+    Math.floor(
+      Number.isFinite(input.existingBaseCredits)
+        ? input.existingBaseCredits
+        : 0,
+    ),
+  );
+  const expectedEligibleKills = Math.max(
+    0,
+    Math.floor(
+      Number.isFinite(input.expectedEligibleKills)
+        ? input.expectedEligibleKills
+        : 0,
+    ),
+  );
+
+  // FINAL V3 requires >= 1 Credit per eligible kill. At later stages, move a
+  // meaningful share of the existing stage base into combat so higher tiers
+  // can read as premium without creating one VFX object per Credit.
+  return Math.max(
+    expectedEligibleKills,
+    Math.floor(existingBaseCredits * 0.7),
+  );
+}
+
+export function settleCombatCreditStageBase(input: {
+  stageBaseCredits: number;
+  combatCreditsGranted: number;
+  creditsMultiplier: number;
+}): {
+  stageBaseTarget: number;
+  combatOverlap: number;
+  unpaidBase: number;
+  multiplierBonus: number;
+  settlementCredits: number;
+} {
+  const stageBaseTarget = Math.max(
+    0,
+    Math.floor(
+      Number.isFinite(input.stageBaseCredits)
+        ? input.stageBaseCredits
+        : 0,
+    ),
+  );
+  const combatCreditsGranted = Math.max(
+    0,
+    Math.floor(
+      Number.isFinite(input.combatCreditsGranted)
+        ? input.combatCreditsGranted
+        : 0,
+    ),
+  );
+  const creditsMultiplier = Math.max(
+    1,
+    Number.isFinite(input.creditsMultiplier)
+      ? input.creditsMultiplier
+      : 1,
+  );
+  const combatOverlap = Math.min(
+    stageBaseTarget,
+    combatCreditsGranted,
+  );
+  const unpaidBase = stageBaseTarget - combatOverlap;
+  const multiplierBonus = Math.max(
+    0,
+    Math.floor(stageBaseTarget * (creditsMultiplier - 1)),
+  );
+  return {
+    stageBaseTarget,
+    combatOverlap,
+    unpaidBase,
+    multiplierBonus,
+    settlementCredits: unpaidBase + multiplierBonus,
+  };
+}
+
 /**
  * Allocate one base combat-Credit reward from a stage budget.
  *

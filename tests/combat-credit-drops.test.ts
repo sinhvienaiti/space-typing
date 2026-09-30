@@ -2,11 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import { addCredits, MAX_CREDITS } from "../src/economy/credits";
 import {
   CombatCreditRewardLedger,
+  combatCreditExpectedWeight,
   combatCreditReward,
+  combatCreditStageBudget,
   combatCreditWalletPolicy,
   combatCreditWeight,
   isCombatCreditDropEligible,
   resolveCreditCrystalTier,
+  settleCombatCreditStageBase,
 } from "../src/rewards/combat-credit-drops";
 
 describe("Combat Credit FINAL V3 contracts", () => {
@@ -129,6 +132,60 @@ describe("Combat Credit FINAL V3 contracts", () => {
       }),
     ).toBe(5);
     expect(combatCreditWeight("elite", "golden")).toBe(3.25);
+  });
+
+  it("allocates enough stage budget for minimum-one drops and boss weight", () => {
+    expect(
+      combatCreditStageBudget({
+        existingBaseCredits: 25,
+        expectedEligibleKills: 34,
+      }),
+    ).toBe(34);
+    expect(
+      combatCreditStageBudget({
+        existingBaseCredits: 800,
+        expectedEligibleKills: 150,
+      }),
+    ).toBe(560);
+    expect(
+      combatCreditExpectedWeight({
+        regularEnemyCount: 10,
+        bossRole: "major-boss",
+      }),
+    ).toBeGreaterThan(
+      combatCreditExpectedWeight({
+        regularEnemyCount: 10,
+      }),
+    );
+  });
+
+  it("settles only the unpaid stage base and keeps credits-x2 at settlement", () => {
+    expect(
+      settleCombatCreditStageBase({
+        stageBaseCredits: 100,
+        combatCreditsGranted: 70,
+        creditsMultiplier: 1,
+      }),
+    ).toEqual({
+      stageBaseTarget: 100,
+      combatOverlap: 70,
+      unpaidBase: 30,
+      multiplierBonus: 0,
+      settlementCredits: 30,
+    });
+    expect(
+      settleCombatCreditStageBase({
+        stageBaseCredits: 100,
+        combatCreditsGranted: 70,
+        creditsMultiplier: 2,
+      }),
+    ).toEqual({
+      stageBaseTarget: 100,
+      combatOverlap: 70,
+      unpaidBase: 30,
+      multiplierBonus: 100,
+      settlementCredits: 130,
+    });
   });
 
   it("claims one wallet transaction per source even when callbacks duplicate", () => {

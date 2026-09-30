@@ -362,6 +362,11 @@ import {
   enemyRankVisualProfile,
   type EnemyRank,
 } from "./enemies/rank";
+import type {
+  CombatCreditCause,
+  CombatCreditClaimRequest,
+  CombatCreditRewardReceipt,
+} from "./rewards/combat-credit-drops";
 import {
   pickVocabularyEntryForRank,
   wordDifficultyScore,
@@ -555,6 +560,16 @@ export type GameHooks = {
   onStats(stats: GameStats): void;
   onPhase(phase: GamePhase): void;
   onStage(stage: number): void;
+  onCombatCreditAttemptStart?(attempt: {
+    attemptId: string;
+    stage: number;
+    regularEnemyCount: number;
+    expectedEligibleKills: number;
+    bossRole: BossRole | null;
+  }): void;
+  onCombatCreditReward?(
+    request: CombatCreditClaimRequest,
+  ): CombatCreditRewardReceipt | null;
   onStagePhase?(phase: StagePacingPhase): void;
   onStageEvents(events: readonly StageEventDefinition[]): void;
   onObjectiveUpdate(objective: StageObjectiveState | null): void;
@@ -917,6 +932,11 @@ export class Game {
   private stagePhaseBreakTimer = 0;
   private stagePhaseBreakArmed = false;
   private stageConfig: StageConfig | null = null;
+  private combatCreditAttemptSequence = 0;
+  private combatCreditAttemptId: string | null = null;
+  private readonly combatCreditRewardIds = new Set<string>();
+  private combatCreditsGrantedThisStage = 0;
+  private combatCreditsAppliedThisStage = 0;
   private difficulty: DifficultyProfile | null = null;
   private hiddenEncounterRuntime: HiddenEncounterRuntime | null = null;
   private shake = 0;
@@ -3370,6 +3390,27 @@ export class Game {
       stage,
       runtimeEnemyBudget,
     );
+    this.combatCreditAttemptSequence += 1;
+    this.combatCreditAttemptId =
+      "stage:" +
+      String(stage.stage) +
+      ":attempt:" +
+      String(this.combatCreditAttemptSequence);
+    this.combatCreditRewardIds.clear();
+    this.combatCreditsGrantedThisStage = 0;
+    this.combatCreditsAppliedThisStage = 0;
+    const combatCreditBossRole = isBossStageRole(stage.role)
+      ? stage.role
+      : null;
+    this.hooks.onCombatCreditAttemptStart?.({
+      attemptId: this.combatCreditAttemptId,
+      stage: stage.stage,
+      regularEnemyCount: this.stagePacingPlan.totalBudget,
+      expectedEligibleKills:
+        this.stagePacingPlan.totalBudget +
+        (combatCreditBossRole === null ? 0 : 1),
+      bossRole: combatCreditBossRole,
+    });
     this.stagePhaseIndex = 0;
     this.stagePhaseSpawned = 0;
     this.stagePhaseBreakTimer = 0;
@@ -5706,6 +5747,7 @@ export class Game {
       kind: "scout",
       definitionId,
       elite: false,
+      combatCreditEligible: false,
       eliteModifiers: [],
       rank: typingProfile.rank,
       wordDifficultyScore: typingProfile.wordDifficultyScore,
@@ -6162,6 +6204,7 @@ export class Game {
         boss.role,
       ),
     );
+    this.claimCombatCreditBoss(boss);
     const fx = enemyFxProfile(
       definition?.family ?? "devil",
       "boss-death",
@@ -6586,6 +6629,7 @@ export class Game {
       this.stageElapsedSeconds,
     );
     this.stageResultTracker.recordEnemyKill(enemy.elite);
+    this.claimCombatCreditEnemy(enemy, "skill-kill");
     this.stats.kills += 1;
     this.addScore(
       (enemy.elite ? options.eliteScore : options.normalScore) *
@@ -6769,6 +6813,7 @@ export class Game {
     );
 
     const deathDefinition = this.visualDefinitionForEnemy(enemy);
+    this.claimCombatCreditEnemy(enemy, "typed-kill");
     // The enemy leaves play now; its blast, sound and shake wait for the bolt.
     this.firePlayerShot(enemy.x, enemy.y, 1.45, {
       kind: "enemy-kill",
@@ -6832,6 +6877,76 @@ export class Game {
             this.stageConfig?.stage ??
             1,
         ),
+    );
+  }
+
+  private recordCombatCreditReceipt(
+    receipt: CombatCreditRewardReceipt | null,
+  ): CombatCreditRewardReceipt | null {
+    if (
+      receipt === null ||
+      this.combatCreditRewardIds.has(receipt.rewardId)
+    ) {
+      return receipt;
+    }
+    this.combatCreditRewardIds.add(receipt.rewardId);
+    this.combatCreditsGrantedThisStage += receipt.nominalEarned;
+    this.combatCreditsAppliedThisStage += receipt.walletDeltaApplied;
+    return receipt;
+  }
+
+  private claimCombatCreditEnemy(
+    enemy: Enemy,
+    cause: Extract<CombatCreditCause, "typed-kill" | "skill-kill">,
+  ): CombatCreditRewardReceipt | null {
+    if (
+      this.combatCreditAttemptId === null ||
+      enemy.combatCreditEligible === false
+    ) {
+      return null;
+    }
+    const definition = this.visualDefinitionForEnemy(enemy);
+    return this.recordCombatCreditReceipt(
+      this.hooks.onCombatCreditReward?.({
+        attemptId: this.combatCreditAttemptId,
+        cause,
+        source: {
+          sourceKind: "enemy",
+          sourceInstanceId: String(enemy.id),
+          role: definition?.role,
+          rarity: definition?.rarity,
+          rank: enemy.rank,
+          elite: enemy.elite,
+          golden: enemy.golden,
+        },
+      }) ?? null,
+    );
+  }
+
+  private claimCombatCreditBoss(
+    boss: BossState,
+  ): CombatCreditRewardReceipt | null {
+    if (this.combatCreditAttemptId === null) return null;
+    const stage =
+      this.hiddenEncounterRuntime?.bossStageOverride ??
+      this.stageConfig?.stage ??
+      1;
+    const definition = enemyDefinition(
+      bossVisualDefinitionIdForStage(stage, boss.role),
+    );
+    return this.recordCombatCreditReceipt(
+      this.hooks.onCombatCreditReward?.({
+        attemptId: this.combatCreditAttemptId,
+        cause: "boss-kill",
+        source: {
+          sourceKind: "boss",
+          sourceInstanceId:
+            String(stage) + ":" + boss.role,
+          role: definition?.role,
+          rarity: definition?.rarity,
+          bossRole: boss.role,
+        },
+      }) ?? null,
     );
   }
 
@@ -7076,6 +7191,7 @@ export class Game {
         kind: "scout",
         definitionId,
         elite: false,
+        combatCreditEligible: true,
         eliteModifiers: [],
         rank: typingProfile.rank,
         wordDifficultyScore: typingProfile.wordDifficultyScore,
@@ -7315,6 +7431,14 @@ export class Game {
 
   getCreditsMultiplier(): number {
     return timedRewardMultiplier(this.rewardCreditsMultiplierTimer);
+  }
+
+  getCombatCreditsGrantedThisStage(): number {
+    return this.combatCreditsGrantedThisStage;
+  }
+
+  getCombatCreditsAppliedThisStage(): number {
+    return this.combatCreditsAppliedThisStage;
   }
 
   private addScore(amount: number): void {
