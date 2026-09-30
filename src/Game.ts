@@ -715,7 +715,18 @@ const ENEMY_STATUS_COLORS: Partial<Record<string, string>> = {
 };
 /** Painted enemy / boss sprites, as a multiple of the hit radius. */
 const ENEMY_SPRITE_SCALE = 2.7;
-const BOSS_SPRITE_SCALE = 2.9;
+
+/**
+ * Boss art gets a little more screen space as visual quality increases.
+ * Keep this presentation-only: hit radius and boss gameplay stay unchanged.
+ * High/Ultra also use the detailed @2x source in painted-sprites.ts.
+ */
+function bossSpriteScale(quality: GameSettings["visualQuality"]): number {
+  if (quality === "ultra") return 3.35;
+  if (quality === "high") return 3.25;
+  if (quality === "medium") return 3.08;
+  return 2.98;
+}
 const ALL_ENEMY_KINDS: readonly EnemyKind[] = [
   "scout", "mine", "tank", "destroyer", "oppressor", "shield", "carrier",
   "jammer", "cloaker", "healer", "splitter", "sniper", "leech", "commander",
@@ -9673,7 +9684,10 @@ export class Game {
   private bossPosition(): { x: number; y: number } {
     return {
       x: this.width / 2,
-      y: Math.max(190, Math.min(270, this.height * 0.31)),
+      // Keep the boss in the upper combat field so its artwork has room below
+      // for the typing prompt. This also separates it from the player's ship
+      // and lower HUD without changing any quality-dependent gameplay logic.
+      y: Math.max(178, Math.min(238, this.height * 0.285)),
     };
   }
 
@@ -9743,10 +9757,15 @@ export class Game {
       identity === null
         ? null
         : paintedBossSprite(identity.id, this.settings.visualQuality);
-    const breathe = 1 + Math.sin(time * 1.6) * 0.012;
+    const paintedScale = bossSpriteScale(this.settings.visualQuality);
+    // Keep painted boss artwork at a stable pixel size. Scaling it in/out every
+    // frame forced an additional resample and made fine armour/face detail look
+    // softer, especially on High/Ultra Retina rendering. Motion stays in the
+    // aura, telegraphs and hit kick instead.
+    const paintedSize = radius * paintedScale;
     const modularDrawn =
       (paintedBoss !== null &&
-        drawPaintedSprite(context, paintedBoss, radius * BOSS_SPRITE_SCALE * breathe, boss.flash, this.dpr)) ||
+        drawPaintedSprite(context, paintedBoss, paintedSize, boss.flash, this.dpr)) ||
       (definition !== undefined &&
       drawModularEnemy(context, definition, {
         radius,
@@ -9783,22 +9802,9 @@ export class Game {
       context.stroke();
     }
 
-    context.strokeStyle =
-      "rgba(255, 178, 105, " + String(0.35 + pulse * 0.18) + ")";
-    context.lineWidth = 1.5;
-    context.beginPath();
-    context.arc(0, 0, radius * (0.56 + pulse * 0.04), 0, Math.PI * 2);
-    context.stroke();
-
-    context.fillStyle =
-      boss.phase >= 3
-        ? "rgba(255, 112, 157, 0.86)"
-        : boss.phase === 2
-          ? "rgba(119, 239, 255, 0.84)"
-          : "rgba(255, 222, 164, 0.75)";
-    context.beginPath();
-    context.arc(0, 0, 8 + pulse * 2, 0, Math.PI * 2);
-    context.fill();
+    // Do not draw the old centre ring/dot over painted boss art. It covered
+    // faces, cores and armour details. Readable state rings remain outside the
+    // artwork below (shield, mark and stagger).
 
     if (boss.shieldActive) {
       context.strokeStyle = "rgba(112, 235, 255, 0.62)";
@@ -9835,7 +9841,11 @@ export class Game {
 
     context.restore();
 
-    this.drawBossWord(boss, x, y, radius);
+    const wordClearance =
+      paintedBoss === null
+        ? radius
+        : Math.max(radius, paintedSize * 0.5);
+    this.drawBossWord(boss, x, y, wordClearance);
   }
 
   private drawBossWord(
