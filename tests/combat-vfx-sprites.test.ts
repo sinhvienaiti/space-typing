@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
@@ -25,6 +25,17 @@ describe("painted combat VFX manifest", () => {
           spec?.blendMode === "source-over",
       ).toBe(true);
       expect(spec?.url.endsWith(".svg")).toBe(true);
+      expect(
+        existsSync(
+          fileURLToPath(
+            new URL(
+              "../public/assets/space-typing/combat-vfx/" +
+                spec!.url,
+              import.meta.url,
+            ),
+          ),
+        ),
+      ).toBe(true);
     }
     expect(runtime!.sprites["smoke-dark"]?.blendMode).toBe(
       "source-over",
