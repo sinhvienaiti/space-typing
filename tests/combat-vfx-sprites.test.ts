@@ -45,6 +45,34 @@ describe("painted combat VFX manifest", () => {
     );
   });
 
+  it("keeps runtime combat VFX vectors transparent and label-free", () => {
+    const manifestPath = fileURLToPath(
+      new URL(
+        "../public/assets/space-typing/combat-vfx/vfx.json",
+        import.meta.url,
+      ),
+    );
+    const manifest = JSON.parse(
+      readFileSync(manifestPath, "utf8"),
+    ) as { sprites: Record<string, { url: string }> };
+
+    for (const spec of Object.values(manifest.sprites)) {
+      const path = fileURLToPath(
+        new URL(
+          "../public/assets/space-typing/combat-vfx/" +
+            spec.url,
+          import.meta.url,
+        ),
+      );
+      const svg = readFileSync(path, "utf8");
+      expect(svg).toContain("<svg");
+      expect(svg).not.toContain("<text");
+      expect(svg).not.toMatch(
+        /<rect[^>]+(?:width=["']768["'][^>]+height=["']768["']|height=["']768["'][^>]+width=["']768["'])/i,
+      );
+    }
+  });
+
   it("accepts a valid generated manifest", () => {
     const manifest = parseCombatVfxManifest({
       id: "combat-vfx",
