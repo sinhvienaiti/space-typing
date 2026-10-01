@@ -90,7 +90,7 @@ const MAP_ACTIONS_BY_ID: Readonly<
         ),
       ],
     ),
-  ) as Record<
+  ) as unknown as Record<
     DuelMapId,
     ReadonlyMap<string, DuelActionDefinition>
   >,
