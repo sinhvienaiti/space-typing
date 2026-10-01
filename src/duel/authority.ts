@@ -230,6 +230,7 @@ export type DuelClientMatchView = {
     mysteries: DuelEngineSnapshot["chance"]["mysteries"];
     neutralObjective: DuelEngineSnapshot["neutralObjective"];
     opponentTrapHints: readonly string[];
+    pendingHazards: DuelEngineSnapshot["pendingHazards"];
   };
 };
 
@@ -2082,6 +2083,7 @@ export class DuelAuthorityService {
         neutralObjective: snapshot.neutralObjective,
         opponentTrapHints:
           snapshot.publicTrapHints[playerId],
+        pendingHazards: snapshot.pendingHazards,
       },
     };
   }

@@ -1326,3 +1326,17 @@
       calc(-1px * var(--duel-offer-drift-strength, 0));
   }
 }
+
+.duel-hazard-warning {
+  min-height: 1em;
+  color: #8197a8;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.duel-hazard-warning[data-active="true"] {
+  color: rgb(var(--duel-danger, 255, 112, 132));
+  text-shadow: 0 0 14px rgba(var(--duel-danger, 255, 112, 132), 0.45);
+}

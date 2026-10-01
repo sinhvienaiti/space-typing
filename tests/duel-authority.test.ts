@@ -341,6 +341,7 @@ describe("Duel M-DUEL-11 authority core", () => {
     expect("pity" in view.value.opponent).toBe(false);
     expect(serialized).not.toContain("matchSeed");
     expect(serialized).not.toContain("fixedSeed");
+    expect(Array.isArray(view.value.shared.pendingHazards)).toBe(true);
     for (const mystery of view.value.shared.mysteries) {
       expect("outcomeId" in mystery).toBe(false);
       expect("category" in mystery).toBe(false);

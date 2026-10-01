@@ -159,6 +159,54 @@ describe("Duel map hazard gameplay", () => {
     ).toBe(true);
   });
 
+  it("telegraphs Director hazards before impact and preserves warning state for reconnect", () => {
+    const engine = new DuelEngine({
+      mapId: "inferno-rift",
+      matchSeed: 18,
+      regulationSeconds: 40,
+      maxShield: 0,
+      startingShield: 0,
+    });
+
+    let telegraph:
+      | Extract<
+          ReturnType<DuelEngine["step"]>[number],
+          { type: "map-hazard-telegraph" }
+        >
+      | undefined;
+    for (let second = 0; second < 20; second += 1) {
+      const events = engine.step(1);
+      telegraph = events.find(
+        (entry) => entry.type === "map-hazard-telegraph",
+      );
+      if (telegraph !== undefined) break;
+    }
+    expect(telegraph).toBeDefined();
+    const warned = engine.snapshot();
+    expect(warned.pendingHazards).toHaveLength(1);
+    expect(
+      warned.pendingHazards[0]?.remainingSeconds,
+    ).toBeGreaterThan(0);
+
+    const beforeHull =
+      warned.players["player-1"].hull;
+    const events = engine.step(
+      telegraph!.hazard.telegraphSeconds + 0.01,
+    );
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "map-hazard",
+        hazard: expect.objectContaining({
+          sequence: telegraph!.hazard.sequence,
+        }),
+      }),
+    );
+    expect(engine.snapshot().pendingHazards).toHaveLength(0);
+    expect(
+      engine.snapshot().players["player-1"].hull,
+    ).toBeLessThanOrEqual(beforeHull);
+  });
+
   it("applies Director hazard effects through the authoritative engine batch", () => {
     const engine = new DuelEngine({
       mapId: "inferno-rift",
@@ -170,7 +218,12 @@ describe("Duel map hazard gameplay", () => {
 
     engine.step(10);
     const before = engine.snapshot();
-    const events = engine.step(2);
+    let events = engine.step(2);
+    if (
+      !events.some((entry) => entry.type === "map-hazard")
+    ) {
+      events = engine.step(3);
+    }
     const after = engine.snapshot();
 
     expect(

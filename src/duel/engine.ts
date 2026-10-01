@@ -123,6 +123,12 @@ export type DuelEngineSnapshot = {
   neutralObjective: DuelNeutralObjective | null;
   strategy: DuelStrategySnapshot;
   publicTrapHints: Readonly<Record<DuelPlayerId, readonly string[]>>;
+  pendingHazards: readonly DuelPendingHazard[];
+};
+
+export type DuelPendingHazard = {
+  hazard: DuelHazardEvent;
+  remainingSeconds: number;
 };
 
 export type DuelTickEffect = DuelCombatEffect;
@@ -268,6 +274,10 @@ export type DuelEngineEvent =
       resolution: DuelObjectiveResolution;
     }
   | {
+      type: "map-hazard-telegraph";
+      hazard: DuelHazardEvent;
+    }
+  | {
       type: "map-hazard";
       hazard: DuelHazardEvent;
     }
@@ -373,6 +383,7 @@ export class DuelEngine {
   private readonly mapId: DuelMapId;
   private readonly queuedIntents: DuelIntent[] = [];
   private readonly pendingEffects: DuelCombatEffect[] = [];
+  private readonly pendingHazards: DuelPendingHazard[] = [];
   private readonly reservedEnergyCost: Record<DuelPlayerId, number> = {
     "player-1": 0,
     "player-2": 0,
@@ -430,6 +441,7 @@ export class DuelEngine {
     this.roundResult = { status: "active", winnerId: null };
     this.queuedIntents.length = 0;
     this.pendingEffects.length = 0;
+    this.pendingHazards.length = 0;
     this.reservedEnergyCost["player-1"] = 0;
     this.reservedEnergyCost["player-2"] = 0;
     this.threats.clear();
@@ -509,19 +521,22 @@ export class DuelEngine {
     this.cooldowns.update(dt);
     this.tactical.update(dt);
     this.strategy.update(dt);
+    this.advancePendingHazards(dt, events);
     this.expirePrivateOffers(dt, events);
     const directorEvents = this.director.update(dt, this.phase());
     for (const event of directorEvents) {
       if (event.type === "hazard") {
-        const hazard = resolveDuelHazard(
-          event.hazard,
-          this.tactical.snapshot().controlPressure,
-        );
-        this.pendingEffects.push(...hazard.effects);
-        for (const effect of hazard.tacticalEffects) {
-          this.tactical.apply(effect);
-        }
-        events.push({ type: "map-hazard", hazard: event.hazard });
+        this.pendingHazards.push({
+          hazard: { ...event.hazard },
+          remainingSeconds: Math.max(
+            0,
+            event.hazard.telegraphSeconds,
+          ),
+        });
+        events.push({
+          type: "map-hazard-telegraph",
+          hazard: event.hazard,
+        });
       } else if (event.type === "objective") {
         events.push(...this.spawnNeutralObjective(event.objective.kind));
       } else {
@@ -630,6 +645,42 @@ export class DuelEngine {
     this.applyEffectsToPlayers(this.pendingEffects);
     this.resolveTerminalState(events);
     return events;
+  }
+
+  private advancePendingHazards(
+    dtSeconds: number,
+    events: DuelEngineEvent[],
+  ): void {
+    if (this.pendingHazards.length === 0) return;
+    const dt = Math.max(
+      0,
+      Number.isFinite(dtSeconds) ? dtSeconds : 0,
+    );
+    let write = 0;
+    for (const pending of this.pendingHazards) {
+      pending.remainingSeconds = Math.max(
+        0,
+        pending.remainingSeconds - dt,
+      );
+      if (pending.remainingSeconds > 0) {
+        this.pendingHazards[write++] = pending;
+        continue;
+      }
+
+      const resolution = resolveDuelHazard(
+        pending.hazard,
+        this.tactical.snapshot().controlPressure,
+      );
+      this.pendingEffects.push(...resolution.effects);
+      for (const effect of resolution.tacticalEffects) {
+        this.tactical.apply(effect);
+      }
+      events.push({
+        type: "map-hazard",
+        hazard: pending.hazard,
+      });
+    }
+    this.pendingHazards.length = write;
   }
 
   applyHazardEvent(
@@ -790,6 +841,10 @@ export class DuelEngine {
         "player-1": this.strategy.publicTrapHintsFor("player-1"),
         "player-2": this.strategy.publicTrapHintsFor("player-2"),
       },
+      pendingHazards: this.pendingHazards.map((pending) => ({
+        hazard: { ...pending.hazard },
+        remainingSeconds: pending.remainingSeconds,
+      })),
     };
   }
 

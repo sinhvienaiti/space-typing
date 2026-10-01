@@ -623,6 +623,7 @@ export class DuelLocalPracticeMatch {
         neutralObjective: snapshot.neutralObjective,
         opponentTrapHints:
           snapshot.publicTrapHints["player-1"],
+        pendingHazards: snapshot.pendingHazards,
       },
     };
   }

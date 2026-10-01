@@ -161,6 +161,7 @@ function createBattleNodes(gameShell: HTMLElement) {
       <div class="duel-phase-block">
         <span id="duelBattlePhase">BUILD</span>
         <strong id="duelBattleClock">00:00</strong>
+        <small id="duelHazardWarning" class="duel-hazard-warning">AIRSPACE CLEAR</small>
       </div>
       <div class="duel-series">
         <small id="duelBattleSeries">Bo3 · 0-0</small>
@@ -323,6 +324,7 @@ function createBattleNodes(gameShell: HTMLElement) {
     map: byId("duelBattleMap"),
     phase: byId("duelBattlePhase"),
     clock: byId("duelBattleClock"),
+    hazardWarning: byId("duelHazardWarning"),
     series: byId("duelBattleSeries"),
     exit: byId<HTMLButtonElement>("duelBattleExit"),
     selfPath: byId("duelSelfPath"),
@@ -423,6 +425,14 @@ function eventLabel(event: DuelClientEvent): string {
       return event.resolution.draw
         ? "OBJECTIVE DRAW"
         : "OBJECTIVE CLAIMED";
+    case "map-hazard-telegraph":
+      return (
+        "WARNING · " +
+        event.hazard.hazardId.replaceAll("-", " ").toUpperCase() +
+        " · " +
+        event.hazard.telegraphSeconds.toFixed(1) +
+        "s"
+      );
     case "map-hazard":
       return "HAZARD · " + event.hazard.hazardId;
     case "map-cataclysm":
@@ -444,6 +454,8 @@ function eventLabel(event: DuelClientEvent): string {
 
 function fxKind(event: DuelClientEvent): string | null {
   switch (event.type) {
+    case "map-hazard-telegraph":
+      return "hazard-warning";
     case "map-hazard":
       return "hazard";
     case "map-cataclysm":
@@ -1046,6 +1058,18 @@ export function installDuelBattleUi(
     nodes.clock.textContent = formatClock(
       view.elapsedSeconds,
     );
+    const pendingHazard = view.shared.pendingHazards[0];
+    nodes.hazardWarning.textContent =
+      pendingHazard === undefined
+        ? "AIRSPACE CLEAR"
+        : pendingHazard.hazard.hazardId
+            .replaceAll("-", " ")
+            .toUpperCase() +
+          " · " +
+          pendingHazard.remainingSeconds.toFixed(1) +
+          "s";
+    nodes.hazardWarning.dataset.active =
+      pendingHazard === undefined ? "false" : "true";
     nodes.series.textContent =
       "Bo" +
       String(view.series.format) +
