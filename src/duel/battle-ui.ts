@@ -1032,6 +1032,31 @@ export function installDuelBattleUi(
     );
   };
 
+  const spawnResourceGain = (
+    side: "self" | "opponent",
+    kind: "shield" | "repair" | "energy",
+  ): void => {
+    const frame =
+      side === "self"
+        ? nodes.selfShipFrame
+        : nodes.opponentShipFrame;
+    while (
+      frame.querySelectorAll(".duel-resource-gain").length >= 3
+    ) {
+      frame.querySelector(".duel-resource-gain")?.remove();
+    }
+    const pulse = createElement(
+      "i",
+      "duel-resource-gain duel-resource-gain-" + kind,
+    );
+    frame.append(pulse);
+    pulse.addEventListener(
+      "animationend",
+      () => pulse.remove(),
+      { once: true },
+    );
+  };
+
   const renderDelta = (
     previous: DuelClientMatchView | null,
     next: DuelClientMatchView,
@@ -1056,6 +1081,25 @@ export function installDuelBattleUi(
     }
     if (next.opponent.hull < previous.opponent.hull) {
       spawnShieldImpact("opponent", true);
+    }
+
+    if (next.self.shield > previous.self.shield) {
+      spawnResourceGain("self", "shield");
+    }
+    if (next.self.hull > previous.self.hull) {
+      spawnResourceGain("self", "repair");
+    }
+    if (next.self.energy > previous.self.energy) {
+      spawnResourceGain("self", "energy");
+    }
+    if (next.opponent.shield > previous.opponent.shield) {
+      spawnResourceGain("opponent", "shield");
+    }
+    if (next.opponent.hull > previous.opponent.hull) {
+      spawnResourceGain("opponent", "repair");
+    }
+    if (next.opponent.energy > previous.opponent.energy) {
+      spawnResourceGain("opponent", "energy");
     }
   };
 
