@@ -3,6 +3,9 @@ import type {
   DuelActionDefinition,
   DuelPlayerId,
 } from "./model";
+import type {
+  DuelPrecisionBonus,
+} from "./precision-firepower";
 
 export type DuelThreatStatus =
   | "open"
@@ -21,6 +24,7 @@ export type DuelIncomingThreat = {
   counterTags: readonly string[];
   remainingSeconds: number;
   effectScale: number;
+  precisionBonus: DuelPrecisionBonus | null;
   status: DuelThreatStatus;
 };
 
@@ -35,6 +39,7 @@ export type DuelThreatTickEvent = {
   sourcePlayerId: DuelPlayerId;
   targetPlayerId: DuelPlayerId;
   effectScale: number;
+  precisionBonus: DuelPrecisionBonus | null;
   outcome: "countered" | "expired";
 };
 
@@ -48,6 +53,7 @@ export class DuelThreatSystem {
     targetPlayerId: DuelPlayerId,
     responseWindowScale = 1,
     effectScale = 1,
+    precisionBonus: DuelPrecisionBonus | null = null,
   ): DuelIncomingThreat | null {
     const response = action.responseOpportunity;
     if (response === undefined) return null;
@@ -73,10 +79,19 @@ export class DuelThreatSystem {
           ),
         ),
       effectScale: sanitizeDuelActionQualityScale(effectScale),
+      precisionBonus:
+        precisionBonus === null ? null : { ...precisionBonus },
       status: "open",
     };
     this.threats.push(threat);
-    return { ...threat, counterTags: [...threat.counterTags] };
+    return {
+      ...threat,
+      counterTags: [...threat.counterTags],
+      precisionBonus:
+        threat.precisionBonus === null
+          ? null
+          : { ...threat.precisionBonus },
+    };
   }
 
   typeChar(
@@ -123,6 +138,10 @@ export class DuelThreatSystem {
           sourcePlayerId: threat.sourcePlayerId,
           targetPlayerId: threat.targetPlayerId,
           effectScale: threat.effectScale,
+          precisionBonus:
+            threat.precisionBonus === null
+              ? null
+              : { ...threat.precisionBonus },
           outcome: "countered",
         });
         continue;
@@ -140,6 +159,10 @@ export class DuelThreatSystem {
           sourcePlayerId: threat.sourcePlayerId,
           targetPlayerId: threat.targetPlayerId,
           effectScale: threat.effectScale,
+          precisionBonus:
+            threat.precisionBonus === null
+              ? null
+              : { ...threat.precisionBonus },
           outcome: "expired",
         });
         continue;
@@ -182,6 +205,10 @@ export class DuelThreatSystem {
       .map((threat) => ({
         ...threat,
         counterTags: [...threat.counterTags],
+        precisionBonus:
+          threat.precisionBonus === null
+            ? null
+            : { ...threat.precisionBonus },
       }));
   }
 
