@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { DUEL_ACTIONS } from "../src/duel/actions";
 import {
@@ -6,6 +8,30 @@ import {
 } from "../src/duel/target-art";
 
 describe("Duel target art manifest", () => {
+  it("ships all 18 transparent runtime world targets", () => {
+    const path = fileURLToPath(
+      new URL(
+        "../public/assets/space-typing/duel-targets/targets.json",
+        import.meta.url,
+      ),
+    );
+    const runtime = parseDuelTargetManifest(
+      JSON.parse(readFileSync(path, "utf8")),
+    );
+    expect(runtime).not.toBeNull();
+    expect(Object.keys(runtime!.sprites)).toHaveLength(
+      DUEL_TARGET_IDS.length,
+    );
+    expect(Object.keys(runtime!.sprites).sort()).toEqual(
+      [...DUEL_TARGET_IDS].sort(),
+    );
+    for (const spec of Object.values(runtime!.sprites)) {
+      expect(spec?.alphaConvention).toBe("source-alpha");
+      expect(spec?.blendMode).toBe("source-over");
+      expect(spec?.url.endsWith(".svg")).toBe(true);
+    }
+  });
+
   it("accepts true-alpha source-over target sprites", () => {
     const manifest = parseDuelTargetManifest({
       id: "duel-targets",
