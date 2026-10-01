@@ -2,7 +2,8 @@ import type {
   CreditCrystalTier,
   CreditCrystalVariant,
 } from "../rewards/combat-credit-drops";
-import type { VisualQuality } from "../types";\nimport { creditCrystalImage } from "./credit-crystal-art";
+import type { VisualQuality } from "../types";
+import { creditCrystalImage } from "./credit-crystal-art";
 
 export type CreditCrystalDrawablePiece = {
   x: number;
