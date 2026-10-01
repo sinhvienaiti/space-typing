@@ -127,6 +127,7 @@ function eventSourcePlayer(
     case "stored-action-used":
     case "combo-used":
     case "precision-firepower":
+    case "precision-firepower-fired":
       return event.playerId;
     case "threat-created":
       return event.threat.sourcePlayerId;
@@ -456,7 +457,14 @@ function eventLabel(event: DuelClientEvent): string {
       return "COMBO · " + event.comboId;
     case "precision-firepower":
       return (
-        "PRECISION " +
+        "PRECISION ARMED " +
+        String(event.streak) +
+        " · " +
+        event.ordnance.replaceAll("-", " ").toUpperCase()
+      );
+    case "precision-firepower-fired":
+      return (
+        "PRECISION FIRE " +
         String(event.streak) +
         " · " +
         event.ordnance.replaceAll("-", " ").toUpperCase()
@@ -521,6 +529,7 @@ function fxKind(event: DuelClientEvent): string | null {
     case "combo-used":
       return "combo";
     case "precision-firepower":
+    case "precision-firepower-fired":
       return "precision";
     case "trap-triggered":
       return "trap";
@@ -1901,6 +1910,14 @@ export function installDuelBattleUi(
     }
 
     if (event.type === "precision-firepower") {
+      spawnPrecisionActivation(
+        event.playerId,
+        event.accuracyTier,
+      );
+      return;
+    }
+
+    if (event.type === "precision-firepower-fired") {
       spawnPrecisionActivation(
         event.playerId,
         event.accuracyTier,
