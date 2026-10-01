@@ -2560,7 +2560,15 @@
   background-repeat: no-repeat;
   background-position: center;
   background-size: contain;
+  mix-blend-mode: normal;
+}
+
+.duel-damage-fire {
   mix-blend-mode: screen;
+}
+
+.duel-damage-smoke {
+  mix-blend-mode: normal;
 }
 
 .duel-battle[data-painted-vfx="true"]
