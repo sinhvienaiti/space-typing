@@ -152,6 +152,15 @@ function eventSourcePlayer(
   }
 }
 
+function duelPresentationHash(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
 function typedMarkup(
   token: string,
   prefix: string,
@@ -560,6 +569,19 @@ export function installDuelBattleUi(
   let projectileSequence = 0;
   let lastTypingFeedbackKey = "";
   let paintedVfxGeneration = 0;
+  const offerTargetNodes = new Map<
+    string,
+    {
+      root: HTMLButtonElement;
+      targetObject: HTMLElement;
+      category: HTMLElement;
+      label: HTMLElement;
+      typed: HTMLElement;
+      remaining: HTMLElement;
+      meta: HTMLElement;
+    }
+  >();
+  const offerLayoutAssignments = new Map<string, number>();
   const performanceMonitor =
     new DuelPerformanceMonitor();
   let performanceFrame: number | null = null;
@@ -634,9 +656,93 @@ export function installDuelBattleUi(
     return 3;
   };
 
+  const assignOfferLayout = (
+    instanceId: string,
+  ): number => {
+    const existing = offerLayoutAssignments.get(instanceId);
+    if (existing !== undefined) return existing;
+
+    const occupied = new Set(offerLayoutAssignments.values());
+    const startIndex =
+      duelPresentationHash(instanceId) %
+      DUEL_WORD_TARGET_POSITIONS.length;
+    for (
+      let offset = 0;
+      offset < DUEL_WORD_TARGET_POSITIONS.length;
+      offset += 1
+    ) {
+      const candidate =
+        (startIndex + offset) %
+        DUEL_WORD_TARGET_POSITIONS.length;
+      if (!occupied.has(candidate)) {
+        offerLayoutAssignments.set(instanceId, candidate);
+        return candidate;
+      }
+    }
+
+    // UI cap is 10. Reuse is only a defensive fallback for malformed views.
+    offerLayoutAssignments.set(instanceId, startIndex);
+    return startIndex;
+  };
+
+  const mountOfferTarget = (
+    instanceId: string,
+  ) => {
+    const card = createElement(
+      "button",
+      "duel-offer-card duel-word-target",
+    );
+    card.type = "button";
+    card.dataset.offerId = instanceId;
+    card.addEventListener("click", () => {
+      sendTarget(instanceId);
+    });
+
+    const targetObject = createElement(
+      "span",
+      "duel-target-object",
+    );
+    targetObject.setAttribute("aria-hidden", "true");
+    const category = createElement(
+      "small",
+      "duel-offer-category",
+    );
+    const label = createElement(
+      "strong",
+      "duel-offer-label",
+    );
+    const token = createElement(
+      "span",
+      "duel-offer-token",
+    );
+    const typed = createElement("b");
+    const remaining = createElement("i");
+    token.append(typed, remaining);
+    const meta = createElement("small", "duel-offer-meta");
+    card.append(
+      targetObject,
+      token,
+      label,
+      category,
+      meta,
+    );
+    nodes.offers.append(card);
+
+    const mounted = {
+      root: card,
+      targetObject,
+      category,
+      label,
+      typed,
+      remaining,
+      meta,
+    };
+    offerTargetNodes.set(instanceId, mounted);
+    return mounted;
+  };
+
   const renderOffers = (): void => {
     if (view === null) return;
-    nodes.offers.replaceChildren();
     const targetFrozen =
       view.shared.tactical.frozenTargetCount[
         view.self.playerId
@@ -666,8 +772,18 @@ export function installDuelBattleUi(
           offer.status === "locked",
       )
       .slice(0, MAX_VISIBLE_WORD_TARGETS);
+    const visibleIds = new Set(
+      visibleOffers.map((offer) => offer.instanceId),
+    );
 
-    for (const [targetIndex, offer] of visibleOffers.entries()) {
+    for (const [instanceId, mounted] of offerTargetNodes) {
+      if (visibleIds.has(instanceId)) continue;
+      mounted.root.remove();
+      offerTargetNodes.delete(instanceId);
+      offerLayoutAssignments.delete(instanceId);
+    }
+
+    for (const offer of visibleOffers) {
       const action = actionDefinition(offer.actionId);
       if (action === undefined) continue;
       const cooldown =
@@ -681,102 +797,86 @@ export function installDuelBattleUi(
         ? prediction.acquisitionPrefix ||
           offer.typedPrefix
         : offer.typedPrefix;
+      const answerToken =
+        offer.typingPrompt?.answerToken ??
+        action.answerToken;
       const progress = typedMarkup(
-        action.answerToken,
+        answerToken,
         prefix,
       );
-      const card = createElement(
-        "button",
-        "duel-offer-card duel-category-" +
-          action.category +
-          (selected ? " selected" : "") +
-          (offer.status === "completed" ? " completed" : "") +
-          (cooldown > 0 ? " cooling-down" : "") +
-          (targetFrozen && !selected
-            ? " target-frozen"
-            : "") +
-          (lifetime !== null && lifetime <= 5
-            ? " expiring-soon"
-            : ""),
-      );
-      card.type = "button";
+
+      const mounted =
+        offerTargetNodes.get(offer.instanceId) ??
+        mountOfferTarget(offer.instanceId);
+      const card = mounted.root;
+      card.className =
+        "duel-offer-card duel-word-target duel-category-" +
+        action.category +
+        (selected ? " selected" : "") +
+        (cooldown > 0 ? " cooling-down" : "") +
+        (targetFrozen && !selected
+          ? " target-frozen"
+          : "") +
+        (lifetime !== null && lifetime <= 5
+          ? " expiring-soon"
+          : "");
       card.disabled =
-        (offer.status !== "available" &&
-          offer.status !== "locked") ||
         cooldown > 0 ||
         (targetFrozen && !selected);
-      card.dataset.offerId = offer.instanceId;
-      card.classList.add("duel-word-target");
-      const targetPosition =
-        DUEL_WORD_TARGET_POSITIONS[
-          targetIndex % DUEL_WORD_TARGET_POSITIONS.length
-        ] ?? [50, 50];
-      const [targetX, targetY] = targetPosition;
-      card.style.setProperty("--duel-target-x", String(targetX) + "%");
-      card.style.setProperty("--duel-target-y", String(targetY) + "%");
+      card.dataset.actionId = action.id;
+      const targetIndex = assignOfferLayout(
+        offer.instanceId,
+      );
+      const [targetX, targetY] =
+        DUEL_WORD_TARGET_POSITIONS[targetIndex] ?? [50, 50];
+      card.style.setProperty(
+        "--duel-target-x",
+        String(targetX) + "%",
+      );
+      card.style.setProperty(
+        "--duel-target-y",
+        String(targetY) + "%",
+      );
       card.style.setProperty(
         "--duel-target-float-delay",
         String((targetIndex % 5) * -0.37) + "s",
       );
-      card.title = action.displayLabel;
+      card.title =
+        action.displayLabel +
+        " · " +
+        (action.resolveMode === "banked"
+          ? "banked"
+          : "instant");
 
-      const targetObject = createElement(
-        "span",
-        "duel-target-object",
-      );
-      targetObject.setAttribute("aria-hidden", "true");
+      mounted.targetObject.dataset.actionId = action.id;
+      mounted.category.textContent =
+        action.category.toUpperCase();
+      mounted.label.textContent = action.displayLabel;
+      mounted.typed.textContent = progress.typed;
+      mounted.remaining.textContent = progress.remaining;
 
-      const category = createElement(
-        "small",
-        "duel-offer-category",
-      );
-      category.textContent = action.category.toUpperCase();
-      const label = createElement(
-        "strong",
-        "duel-offer-label",
-      );
-      label.textContent = action.displayLabel;
-      const token = createElement(
-        "span",
-        "duel-offer-token",
-      );
-      const typed = createElement("b");
-      typed.textContent = progress.typed;
-      const remaining = createElement("i");
-      remaining.textContent = progress.remaining;
-      token.append(typed, remaining);
-
-      const meta = createElement("small", "duel-offer-meta");
       const baseMeta =
         action.resolveMode === "banked"
-          ? "BANK · " + action.typingCostBand
+          ? "BANK"
           : action.energyCost > 0
-            ? String(action.energyCost) +
-              " EN · " +
-              action.typingCostBand
-            : action.typingCostBand;
+            ? String(action.energyCost) + " EN"
+            : "INSTANT";
       const timingMeta: string[] = [];
       if (cooldown > 0) {
         timingMeta.push(cooldown.toFixed(1) + "s CD");
       }
       if (targetFrozen && !selected) {
-        timingMeta.push("TARGET FROZEN");
+        timingMeta.push("FROZEN");
       }
-      if (lifetime !== null) {
+      if (lifetime !== null && lifetime <= 6) {
         timingMeta.push(
           Math.max(0, lifetime).toFixed(1) + "s",
         );
       }
-      meta.textContent =
+      mounted.meta.textContent =
         timingMeta.length > 0
           ? timingMeta.join(" · ") + " · " + baseMeta
           : baseMeta;
-
-      card.append(targetObject, category, label, token, meta);
-      card.addEventListener("click", () => {
-        sendTarget(offer.instanceId);
-      });
-      nodes.offers.append(card);
     }
   };
 
@@ -1231,7 +1331,10 @@ export function installDuelBattleUi(
       if (offer !== undefined) {
         const action = actionDefinition(offer.actionId);
         label = action?.displayLabel ?? offer.actionId;
-        token = action?.answerToken ?? "";
+        token =
+          offer.typingPrompt?.answerToken ??
+          action?.answerToken ??
+          "";
         nodes.currentInput.dataset.category =
           action?.category ?? "unknown";
       } else if (threat !== undefined) {
