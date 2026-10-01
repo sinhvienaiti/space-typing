@@ -85,6 +85,25 @@ for (const [sourceId, kitId] of Object.entries(bgKits)) {
   prepared += 1;
 }
 
+const duelTargetsRoot = join(ROOT, "art-src/duel-targets");
+if (
+  anyNewerThanSentinel(
+    duelTargetsRoot,
+    join(
+      ROOT,
+      "public/assets/space-typing/duel-targets/targets.json",
+    ),
+  )
+) {
+  run(
+    join(
+      ROOT,
+      "scripts/bg-art/prepare-duel-targets.mjs",
+    ),
+  );
+  prepared += 1;
+}
+
 const combatVfxRoot = join(ROOT, "art-src/combat-vfx");
 if (
   anyNewerThanSentinel(
