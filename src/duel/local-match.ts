@@ -457,6 +457,14 @@ export class DuelLocalPracticeMatch {
       roundId: this.roundId,
       mode: "practice",
       combatProfile: "normalized",
+      appearance: {
+        selfCharacterId:
+          this.room.slots[0].characterId ?? "vanguard",
+        opponentCharacterId:
+          this.room.slots[1].characterId ?? "reaper",
+        selfShipId: this.room.slots[0].shipId,
+        opponentShipId: this.room.slots[1].shipId,
+      },
       serverSequence: this.serverSequence,
       elapsedSeconds: snapshot.elapsedSeconds,
       phase: snapshot.phase,

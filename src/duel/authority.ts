@@ -166,6 +166,12 @@ export type DuelClientMatchView = {
   roundId: string;
   mode: "friend" | "ranked" | "practice";
   combatProfile: "normalized";
+  appearance: {
+    selfCharacterId: string | null;
+    opponentCharacterId: string | null;
+    selfShipId: string | null;
+    opponentShipId: string | null;
+  };
   serverSequence: number;
   elapsedSeconds: number;
   phase: DuelEngineSnapshot["phase"];
@@ -261,6 +267,13 @@ type MatchRecord = {
   engine: DuelEngine;
   draft: Record<DuelPlayerId, DuelOfferDraft>;
   players: Record<DuelPlayerId, string | null>;
+  appearance: Record<
+    DuelPlayerId,
+    {
+      characterId: string | null;
+      shipId: string | null;
+    }
+  >;
   bot: DuelBot | null;
   botPlayerId: DuelPlayerId | null;
   matchSeed: number;
@@ -1103,6 +1116,18 @@ export class DuelAuthorityService {
         "player-2": this.createDraft(seed, mapId, 2),
       },
       players,
+      appearance: {
+        "player-1": {
+          characterId:
+            roomSnapshot.slots[0].characterId,
+          shipId: roomSnapshot.slots[0].shipId,
+        },
+        "player-2": {
+          characterId:
+            roomSnapshot.slots[1].characterId,
+          shipId: roomSnapshot.slots[1].shipId,
+        },
+      },
       bot:
         botPlayerId === null ||
         roomSnapshot.slots[1].bot === null
@@ -1263,6 +1288,16 @@ export class DuelAuthorityService {
       players: {
         "player-1": leftSessionId,
         "player-2": rightSessionId,
+      },
+      appearance: {
+        "player-1": {
+          characterId: "vanguard",
+          shipId: null,
+        },
+        "player-2": {
+          characterId: "reaper",
+          shipId: null,
+        },
       },
       bot: null,
       botPlayerId: null,
@@ -1887,6 +1922,16 @@ export class DuelAuthorityService {
       roundId: match.roundId,
       mode: match.mode,
       combatProfile: "normalized",
+      appearance: {
+        selfCharacterId:
+          match.appearance[playerId].characterId,
+        opponentCharacterId:
+          match.appearance[opponentId].characterId,
+        selfShipId:
+          match.appearance[playerId].shipId,
+        opponentShipId:
+          match.appearance[opponentId].shipId,
+      },
       serverSequence: match.serverSequence,
       elapsedSeconds: snapshot.elapsedSeconds,
       phase: snapshot.phase,

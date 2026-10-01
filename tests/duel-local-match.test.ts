@@ -35,6 +35,8 @@ describe("Duel local Practice runtime", () => {
 
     expect(a.mode).toBe("practice");
     expect(a.combatProfile).toBe("normalized");
+    expect(a.appearance.selfCharacterId).toBe("vanguard");
+    expect(a.appearance.opponentCharacterId).toBe("reaper");
     expect(a.map.id).toBe("tempest-prime");
     expect(a.self.offers).toHaveLength(5);
     expect(

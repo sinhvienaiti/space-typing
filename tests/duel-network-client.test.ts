@@ -91,7 +91,16 @@ function matchView(input?: {
   return {
     matchId: "match-1",
     roundId: "round-1",
+    mode: "friend",
+    combatProfile: "normalized",
+    appearance: {
+      selfCharacterId: "vanguard",
+      opponentCharacterId: "reaper",
+      selfShipId: null,
+      opponentShipId: null,
+    },
     serverSequence: input?.serverSequence ?? 0,
+    elapsedSeconds: 0,
     phase: "build",
     round: { status: "active", winnerId: null },
     series: {

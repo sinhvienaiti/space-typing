@@ -507,6 +507,12 @@ describe("Duel M-DUEL-11 authority core", () => {
     for (const update of started.value.updates) {
       expect(update.view.mode).toBe("ranked");
       expect(update.view.combatProfile).toBe("normalized");
+      expect(
+        update.view.appearance.selfCharacterId,
+      ).toMatch(/^(vanguard|reaper)$/);
+      expect(
+        update.view.appearance.opponentCharacterId,
+      ).toMatch(/^(vanguard|reaper)$/);
       expect(update.view.map.id).toMatch(
         /^(frost-wastes|inferno-rift|tempest-prime|ocean-abyss|terra-core|celestial-void)$/,
       );
