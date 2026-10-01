@@ -6,9 +6,10 @@ import {
   DuelBot,
   duelBotObservation,
 } from "./bots";
-import type {
-  DuelClientEvent,
-  DuelClientMatchView,
+import {
+  publicDuelTypingTelegraph,
+  type DuelClientEvent,
+  type DuelClientMatchView,
 } from "./authority";
 import { DuelOfferDraft } from "./draft";
 import {
@@ -612,6 +613,10 @@ export class DuelLocalPracticeMatch {
         maxEnergy: opponent.maxEnergy,
         initiative: opponentStrategy.initiative,
         strategyPath: opponentStrategy.path,
+        typingTelegraph: publicDuelTypingTelegraph(
+          snapshot,
+          "player-2",
+        ),
         revealedInventory:
           snapshot.tactical.bankRevealFor["player-1"]
             ? snapshot.inventories["player-2"]
