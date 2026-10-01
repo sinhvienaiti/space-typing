@@ -484,7 +484,18 @@ describe("DuelEngine M-DUEL-04 integration", () => {
         actionId: "siege-lance",
       }),
     );
-    expect(engine.snapshot().players["player-2"].hull).toBe(72);
+    expect(engine.snapshot().players["player-2"].hull).toBeCloseTo(
+      69.3,
+      5,
+    );
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "precision-firepower-fired",
+        playerId: "player-1",
+        actionId: "siege-lance",
+        streak: 10,
+      }),
+    );
   });
 
   it("turns saved Initiative into a real but bounded projectile tempo edge", () => {
