@@ -3906,9 +3906,15 @@ export class Game {
   }
 
   resize(): void {
+    const previousWidth = this.width;
+    const previousHeight = this.height;
     const rect = this.canvas.getBoundingClientRect();
     this.width = Math.max(640, rect.width || window.innerWidth);
     this.height = Math.max(420, rect.height || window.innerHeight);
+    this.creditPickups.reframe(
+      { width: previousWidth, height: previousHeight },
+      { width: this.width, height: this.height },
+    );
     const profile = qualityProfile(this.settings.visualQuality);
     this.dpr = Math.max(0.5, resolveRenderDpr(
       profile,

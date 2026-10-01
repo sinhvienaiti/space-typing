@@ -442,6 +442,32 @@ export class CreditCrystalPickupSystem {
     }
   }
 
+  reframe(
+    previous: { width: number; height: number },
+    next: { width: number; height: number },
+  ): void {
+    const scaleX =
+      previous.width > 0 ? next.width / previous.width : 1;
+    const scaleY =
+      previous.height > 0 ? next.height / previous.height : 1;
+    const margin = 72;
+    const clampX = (value: number): number =>
+      Math.min(next.width + margin, Math.max(-margin, value));
+    const clampY = (value: number): number =>
+      Math.min(next.height + margin, Math.max(-margin, value));
+
+    for (const burst of this.bursts) {
+      for (const piece of burst.pieces) {
+        piece.x = clampX(piece.x * scaleX);
+        piece.y = clampY(piece.y * scaleY);
+        piece.previousX = clampX(piece.previousX * scaleX);
+        piece.previousY = clampY(piece.previousY * scaleY);
+        piece.vx *= scaleX;
+        piece.vy *= scaleY;
+      }
+    }
+  }
+
   clear(): void {
     this.bursts.length = 0;
   }

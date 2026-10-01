@@ -166,6 +166,28 @@ describe("CreditCrystalPickupSystem", () => {
     ).toBe(expectedValue);
   });
 
+  it("reframes live pickups safely when the gameplay canvas is resized", () => {
+    const system = new CreditCrystalPickupSystem();
+    system.spawn(receipt("resize", "high", 5), 1100, 620, "high");
+
+    system.reframe(
+      { width: 1280, height: 720 },
+      { width: 640, height: 420 },
+    );
+
+    const pieces = system.diagnosticSnapshot()[0]?.pieces ?? [];
+    expect(pieces.length).toBeGreaterThan(0);
+    expect(
+      pieces.every(
+        (piece) =>
+          piece.x >= -72 &&
+          piece.x <= 712 &&
+          piece.y >= -72 &&
+          piece.y <= 492,
+      ),
+    ).toBe(true);
+  });
+
   it("forces existing bursts directly into magnet phase for Test Lab QA", () => {
     const system = new CreditCrystalPickupSystem();
     system.spawn(receipt("force", "boss", 20), 100, 100, "high");

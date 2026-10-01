@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Game } from "../src/Game";
 import { createBossState } from "../src/boss/model";
 import { difficultyFor } from "../src/campaign/difficulty";
+import { enemyDefinition } from "../src/enemies/registry";
 import { createStageConfig } from "../src/campaign/stage";
 import {
   CombatCreditRewardLedger,
@@ -46,6 +47,13 @@ type Runtime = {
   ): void;
   boss: ReturnType<typeof createBossState> | null;
   defeatBoss(completedEntry?: VocabularyEntry): void;
+  damagePlayer(enemyId: number, x: number, y: number): void;
+  activateDefinitionReward(
+    definition: NonNullable<ReturnType<typeof enemyDefinition>>,
+    x: number,
+    y: number,
+    sourceEnemy?: Enemy,
+  ): void;
 };
 
 function createHarness(mode: CombatCreditMode = "test-lab"): {
@@ -238,6 +246,73 @@ describe("Combat Credit FINAL V3 Game integration", () => {
     expect(fragment?.combatCreditEligible).toBe(true);
     expect(game.testLabKillEnemy(fragment!.id)).toBe(true);
     expect(reward).toHaveBeenCalledTimes(2);
+    game.destroy();
+  });
+
+  it("classifies enemy escape as a non-reward removal", () => {
+    const { game, reward } = createHarness();
+    start(game, 1);
+    const id = game.testLabSpawnEnemies({
+      definitionId: ELIGIBLE_DEFINITION_ID,
+      kind: "scout",
+      count: 1,
+      layers: 1,
+    })[0]!;
+    const runtime = game as unknown as Runtime;
+
+    runtime.damagePlayer(id, 120, 120);
+
+    expect(runtime.enemies.some((enemy) => enemy.id === id)).toBe(false);
+    expect(reward).not.toHaveBeenCalled();
+    expect(game.getCombatCreditsGrantedThisStage()).toBe(0);
+    game.destroy();
+  });
+
+  it("classifies vocabulary replacement as configuration cleanup, not a kill", () => {
+    const { game, reward } = createHarness();
+    start(game, 1);
+    expect(
+      game.testLabSpawnEnemies({
+        definitionId: ELIGIBLE_DEFINITION_ID,
+        kind: "scout",
+        count: 2,
+        layers: 1,
+      }),
+    ).toHaveLength(2);
+
+    game.setVocabulary(vocabulary.map((entry) => ({ ...entry })));
+
+    expect((game as unknown as Runtime).enemies).toHaveLength(0);
+    expect(reward).not.toHaveBeenCalled();
+    expect(game.getCombatCreditsGrantedThisStage()).toBe(0);
+    game.destroy();
+  });
+
+  it("classifies clear-normal reward conversion as a non-kill clear", () => {
+    const { game, reward } = createHarness();
+    start(game, 1);
+    const ids = game.testLabSpawnEnemies({
+      definitionId: ELIGIBLE_DEFINITION_ID,
+      kind: "scout",
+      count: 3,
+      layers: 1,
+    });
+    const runtime = game as unknown as Runtime;
+    const source = runtime.enemies.find((enemy) => enemy.id === ids[0]);
+    if (source === undefined) throw new Error("Missing source enemy");
+    const baseDefinition = enemyDefinition(ELIGIBLE_DEFINITION_ID);
+    if (baseDefinition === undefined) throw new Error("Missing enemy definition");
+
+    runtime.activateDefinitionReward(
+      { ...baseDefinition, reward: "clear-normal" },
+      source.x,
+      source.y,
+      source,
+    );
+
+    expect(runtime.enemies.map((enemy) => enemy.id)).toEqual([source.id]);
+    expect(reward).not.toHaveBeenCalled();
+    expect(game.getCombatCreditsGrantedThisStage()).toBe(0);
     game.destroy();
   });
 
