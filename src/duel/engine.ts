@@ -1,4 +1,5 @@
 import { DUEL_ACTIONS_BY_ID } from "./actions";
+import { duelActionQualityForMistakes } from "./accuracy";
 import {
   resolveDuelAction,
   type DuelCombatEffect,
@@ -564,13 +565,38 @@ export class DuelEngine {
           action,
           threatEvent.sourcePlayerId,
         );
-        this.pendingEffects.push(
-          ...resolution.effects.filter(
-            (effect) => effect.type !== "energy-cost",
+        const quality = Math.max(
+          0.75,
+          Math.min(
+            1,
+            Number.isFinite(threatEvent.effectScale)
+              ? threatEvent.effectScale
+              : 1,
           ),
         );
+        this.pendingEffects.push(
+          ...resolution.effects
+            .filter((effect) => effect.type !== "energy-cost")
+            .map((effect) =>
+              effect.type === "damage" &&
+              effect.sourceId === threatEvent.sourcePlayerId
+                ? {
+                    ...effect,
+                    amount:
+                      effect.amount *
+                      this.strategy.attackScale(
+                        threatEvent.sourcePlayerId,
+                      ) *
+                      quality,
+                  }
+                : effect,
+            ),
+        );
         for (const effect of resolution.tacticalEffects) {
-          this.tactical.apply(effect);
+          this.tactical.apply({
+            ...effect,
+            strength: effect.strength * quality,
+          });
         }
       }
       events.push({
@@ -1219,9 +1245,13 @@ export class DuelEngine {
     }
 
     if (action.resolveMode === "banked") {
+      const quality = duelActionQualityForMistakes(
+        player.targetMistakes,
+      );
       const stored = this.inventories[player.id].store(
         action,
         this.tickNumber,
+        quality.scale,
       );
       if (!stored.stored) {
         return;
@@ -1263,6 +1293,9 @@ export class DuelEngine {
               ? projectileSpeedScale
               : 1,
           ),
+        duelActionQualityForMistakes(
+          player.targetMistakes,
+        ).scale,
       );
       if (threat !== null) {
         this.pendingEffects.push({
@@ -1282,7 +1315,13 @@ export class DuelEngine {
         events,
       )
     ) {
-      this.queueActionResolution(action, player.id);
+      this.queueActionResolution(
+        action,
+        player.id,
+        duelActionQualityForMistakes(
+          player.targetMistakes,
+        ).scale,
+      );
     }
 
     this.cooldowns.activate(
@@ -1352,7 +1391,11 @@ export class DuelEngine {
       return;
     }
 
-    this.queueActionResolution(action, player.id);
+    this.queueActionResolution(
+      action,
+      player.id,
+      stored.qualityScale,
+    );
     this.cooldowns.activate(
       player.id,
       action.id,
@@ -1415,20 +1458,42 @@ export class DuelEngine {
   private queueActionResolution(
     action: DuelActionDefinition,
     playerId: DuelPlayerId,
+    qualityScale = 1,
   ): void {
     this.reserveEnergy(playerId, action.energyCost);
     const resolution = resolveDuelAction(action, playerId);
     const attackScale = this.strategy.attackScale(playerId);
+    const quality = Math.max(
+      0.75,
+      Math.min(1, Number.isFinite(qualityScale) ? qualityScale : 1),
+    );
     this.pendingEffects.push(
-      ...resolution.effects.map((effect) =>
-        effect.type === "damage" &&
-        effect.sourceId === playerId
-          ? { ...effect, amount: effect.amount * attackScale }
-          : effect,
-      ),
+      ...resolution.effects.map((effect) => {
+        if (
+          effect.type === "damage" &&
+          effect.sourceId === playerId
+        ) {
+          return {
+            ...effect,
+            amount: effect.amount * attackScale * quality,
+          };
+        }
+        if (
+          (effect.type === "shield" ||
+            effect.type === "repair" ||
+            effect.type === "energy") &&
+          effect.targetId === playerId
+        ) {
+          return { ...effect, amount: effect.amount * quality };
+        }
+        return effect;
+      }),
     );
     for (const effect of resolution.tacticalEffects) {
-      this.tactical.apply(effect);
+      this.tactical.apply({
+        ...effect,
+        strength: effect.strength * quality,
+      });
     }
   }
 

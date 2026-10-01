@@ -96,6 +96,92 @@ describe("DuelEngine M-DUEL-04 integration", () => {
     expect(engine.snapshot().players["player-1"].energy).toBe(88);
   });
 
+  it("keeps corrected words valid but reduces their deterministic effect quality", () => {
+    const engine = new DuelEngine({
+      maxShield: 0,
+      startingShield: 0,
+      startingEnergy: 100,
+    });
+    const laser = offer("player-1", 0, "laser");
+    engine.setPrivateOffers("player-1", [laser]);
+
+    engine.enqueueIntent({
+      type: "SELECT_TARGET",
+      playerId: "player-1",
+      sequence: 1,
+      targetInstanceId: laser.instanceId,
+    });
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId: "player-1",
+      sequence: 2,
+      char: "x",
+      targetInstanceId: laser.instanceId,
+    });
+    let sequence = 3;
+    for (const char of "laser") {
+      engine.enqueueIntent({
+        type: "TYPE_CHAR",
+        playerId: "player-1",
+        sequence: sequence++,
+        char,
+        targetInstanceId: laser.instanceId,
+      });
+    }
+    engine.step(0);
+
+    expect(engine.snapshot().players["player-2"].hull).toBeCloseTo(90.5);
+  });
+
+  it("preserves typing quality on banked actions until they are used", () => {
+    const engine = new DuelEngine({
+      maxShield: 0,
+      startingShield: 0,
+      startingEnergy: 100,
+    });
+    const missile = offer("player-1", 0, "missile");
+    engine.setPrivateOffers("player-1", [missile]);
+
+    engine.enqueueIntent({
+      type: "SELECT_TARGET",
+      playerId: "player-1",
+      sequence: 1,
+      targetInstanceId: missile.instanceId,
+    });
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId: "player-1",
+      sequence: 2,
+      char: "x",
+      targetInstanceId: missile.instanceId,
+    });
+    let sequence = 3;
+    for (const char of "missile") {
+      engine.enqueueIntent({
+        type: "TYPE_CHAR",
+        playerId: "player-1",
+        sequence: sequence++,
+        char,
+        targetInstanceId: missile.instanceId,
+      });
+    }
+    engine.step(0);
+
+    expect(
+      engine.snapshot().inventories["player-1"].attack[0]?.qualityScale,
+    ).toBe(0.95);
+
+    engine.enqueueIntent({
+      type: "USE_ITEM",
+      playerId: "player-1",
+      sequence,
+      itemId: "missile",
+    });
+    engine.step(0);
+
+    expect(engine.snapshot().players["player-2"].hull).toBeCloseTo(82.9);
+  });
+
   it("blocks the final character when a bank is full instead of silently deleting value", () => {
     const engine = new DuelEngine({ startingEnergy: 100 });
     const offers = [0, 1, 2, 3].map((slot) =>

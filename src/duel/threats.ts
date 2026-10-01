@@ -1,3 +1,4 @@
+import { sanitizeDuelActionQualityScale } from "./accuracy";
 import type {
   DuelActionDefinition,
   DuelPlayerId,
@@ -19,6 +20,7 @@ export type DuelIncomingThreat = {
   typedPrefix: string;
   counterTags: readonly string[];
   remainingSeconds: number;
+  effectScale: number;
   status: DuelThreatStatus;
 };
 
@@ -32,6 +34,7 @@ export type DuelThreatTickEvent = {
   actionId: string;
   sourcePlayerId: DuelPlayerId;
   targetPlayerId: DuelPlayerId;
+  effectScale: number;
   outcome: "countered" | "expired";
 };
 
@@ -44,6 +47,7 @@ export class DuelThreatSystem {
     sourcePlayerId: DuelPlayerId,
     targetPlayerId: DuelPlayerId,
     responseWindowScale = 1,
+    effectScale = 1,
   ): DuelIncomingThreat | null {
     const response = action.responseOpportunity;
     if (response === undefined) return null;
@@ -68,6 +72,7 @@ export class DuelThreatSystem {
               : 1,
           ),
         ),
+      effectScale: sanitizeDuelActionQualityScale(effectScale),
       status: "open",
     };
     this.threats.push(threat);
@@ -117,6 +122,7 @@ export class DuelThreatSystem {
           actionId: threat.actionId,
           sourcePlayerId: threat.sourcePlayerId,
           targetPlayerId: threat.targetPlayerId,
+          effectScale: threat.effectScale,
           outcome: "countered",
         });
         continue;
@@ -133,6 +139,7 @@ export class DuelThreatSystem {
           actionId: threat.actionId,
           sourcePlayerId: threat.sourcePlayerId,
           targetPlayerId: threat.targetPlayerId,
+          effectScale: threat.effectScale,
           outcome: "expired",
         });
         continue;

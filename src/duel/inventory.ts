@@ -1,3 +1,4 @@
+import { sanitizeDuelActionQualityScale } from "./accuracy";
 import {
   DUEL_INVENTORY_CAPACITY,
   duelInventoryBucketFor,
@@ -9,6 +10,7 @@ export type DuelStoredAction = {
   instanceId: string;
   actionId: string;
   storedAtTick: number;
+  qualityScale: number;
 };
 
 export type DuelCombatInventorySnapshot = Readonly<
@@ -47,6 +49,7 @@ export class DuelCombatInventory {
   store(
     action: DuelActionDefinition,
     storedAtTick: number,
+    qualityScale = 1,
   ): DuelStoreResult {
     const bucket = duelInventoryBucketFor(action);
     if (bucket === null || action.resolveMode !== "banked") {
@@ -72,6 +75,7 @@ export class DuelCombatInventory {
         String(++this.sequence),
       actionId: action.id,
       storedAtTick: Math.max(0, Math.floor(storedAtTick)),
+      qualityScale: sanitizeDuelActionQualityScale(qualityScale),
     };
     this.buckets[bucket].push(entry);
     return { stored: true, bucket, entry: { ...entry } };
