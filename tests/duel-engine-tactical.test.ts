@@ -487,6 +487,54 @@ describe("DuelEngine M-DUEL-04 integration", () => {
     expect(engine.snapshot().players["player-2"].hull).toBe(72);
   });
 
+  it("turns saved Initiative into a real but bounded projectile tempo edge", () => {
+    const engine = new DuelEngine({
+      maxShield: 0,
+      startingShield: 0,
+      startingEnergy: 100,
+    });
+
+    let sequence = 1;
+    for (let index = 0; index < 25; index += 1) {
+      const energy = offer("player-1", 0, "energy");
+      energy.instanceId += ":tempo:" + String(index);
+      engine.setPrivateOffers("player-1", [energy]);
+      sequence = typeTarget(
+        engine,
+        "player-1",
+        energy.instanceId,
+        "energy",
+        sequence,
+      );
+      engine.step(0);
+    }
+
+    expect(
+      engine.snapshot().strategy["player-1"].initiative,
+    ).toBe(100);
+
+    const siege = offer("player-1", 0, "siege-lance");
+    siege.instanceId += ":tempo";
+    engine.setPrivateOffers("player-1", [siege]);
+    typeTarget(
+      engine,
+      "player-1",
+      siege.instanceId,
+      "siegelance",
+      sequence,
+    );
+    engine.step(0);
+
+    const threat =
+      engine.snapshot().incomingThreats["player-2"][0];
+    expect(threat).toBeDefined();
+    expect(threat!.remainingSeconds).toBeLessThan(2.8);
+    expect(threat!.remainingSeconds).toBeCloseTo(
+      2.8 / 1.06,
+      6,
+    );
+  });
+
   it("turns projectile drag into a longer deterministic response window", () => {
     const engine = new DuelEngine({
       maxShield: 100,

@@ -64,7 +64,7 @@ export class DuelThreatSystem {
       remainingSeconds:
         response.windowSeconds *
         Math.max(
-          1,
+          0.85,
           Math.min(
             1.65,
             Number.isFinite(responseWindowScale)

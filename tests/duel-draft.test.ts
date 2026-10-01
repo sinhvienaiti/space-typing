@@ -58,6 +58,24 @@ describe("Duel M-DUEL-03 core word draft", () => {
     }
   });
 
+  it("returns no offer when every enabled category is explicitly disabled", () => {
+    const disabled = new DuelOfferDraft({
+      seed: 33,
+      actions: [DUEL_ACTIONS_BY_ID.get("black-hole")!],
+      enabledCategories: ["mystery"],
+      categoryMultiplier: { mystery: 0 },
+    });
+
+    expect(
+      disabled.refillPrivateOffer(
+        "player-1",
+        0,
+        "cataclysm",
+        [],
+      ),
+    ).toBeNull();
+  });
+
   it("renormalizes phase weights when only core categories are enabled", () => {
     const build = normalizedDuelCategoryWeights(
       "build",

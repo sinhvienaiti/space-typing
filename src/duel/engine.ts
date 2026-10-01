@@ -477,6 +477,10 @@ export class DuelEngine {
     offers: readonly DuelActionOffer[],
   ): void {
     const player = this.players[playerId];
+    const previousTargetId = player.targetInstanceId;
+    const previousPrefix = player.acquisitionPrefix;
+    const previousMistakes = player.targetMistakes;
+
     player.offers = offers
       .filter((offer) => !offer.shared && offer.ownerId === playerId)
       .map((offer) => {
@@ -496,8 +500,43 @@ export class DuelEngine {
           left.slotIndex - right.slotIndex ||
           left.instanceId.localeCompare(right.instanceId),
       );
+
+    if (previousTargetId === null) {
+      player.targetInstanceId = null;
+      player.acquisitionPrefix = "";
+      player.targetMistakes = 0;
+      return;
+    }
+
+    const preservedOffer = player.offers.find(
+      (offer) =>
+        offer.instanceId === previousTargetId &&
+        offer.status === "locked",
+    );
+    const preservedSpecialTarget =
+      this.objectives.isActiveTarget(previousTargetId) ||
+      this.threats.getOpenThreat(
+        playerId,
+        previousTargetId,
+      ) !== null;
+
+    if (preservedOffer !== undefined) {
+      player.targetInstanceId = previousTargetId;
+      player.acquisitionPrefix = preservedOffer.typedPrefix;
+      player.targetMistakes = previousMistakes;
+      return;
+    }
+
+    if (preservedSpecialTarget) {
+      player.targetInstanceId = previousTargetId;
+      player.acquisitionPrefix = previousPrefix;
+      player.targetMistakes = previousMistakes;
+      return;
+    }
+
     player.targetInstanceId = null;
     player.acquisitionPrefix = "";
+    player.targetMistakes = 0;
   }
 
   enqueueIntent(intent: DuelIntent): void {

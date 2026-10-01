@@ -219,6 +219,7 @@ export class DuelOfferDraft {
       runtimeCategoryMultiplier,
     );
     const action = this.pick(weighted);
+    if (action === null) return null;
 
     return {
       instanceId:
@@ -269,19 +270,21 @@ export class DuelOfferDraft {
     });
   }
 
-  private pick(weighted: readonly WeightedAction[]): DuelActionDefinition {
+  private pick(
+    weighted: readonly WeightedAction[],
+  ): DuelActionDefinition | null {
     let total = 0;
-    for (const entry of weighted) total += entry.weight;
-    let roll = this.rng.nextFloat() * total;
+    for (const entry of weighted) {
+      total += Math.max(0, entry.weight);
+    }
+    if (total <= 0) return null;
 
+    let roll = this.rng.nextFloat() * total;
     for (const entry of weighted) {
       if (entry.weight <= 0) continue;
       roll -= entry.weight;
       if (roll <= 0) return entry.action;
     }
-    return (
-      weighted.find((entry) => entry.weight > 0)?.action ??
-      weighted[0]!.action
-    );
+    return weighted.find((entry) => entry.weight > 0)?.action ?? null;
   }
 }

@@ -146,6 +146,71 @@ describe("DuelEngine M-DUEL-01 local simulation", () => {
     );
   });
 
+  it("preserves a locked target when another private-offer slot is refreshed", () => {
+    const engine = new DuelEngine();
+    const laser = offer("player-1", 0, "laser");
+    const repair = offer("player-1", 1, "repair");
+    engine.setPrivateOffers("player-1", [laser, repair]);
+
+    engine.enqueueIntent({
+      type: "SELECT_TARGET",
+      playerId: "player-1",
+      sequence: 1,
+      targetInstanceId: laser.instanceId,
+    });
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId: "player-1",
+      sequence: 2,
+      char: "l",
+      targetInstanceId: laser.instanceId,
+    });
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId: "player-1",
+      sequence: 3,
+      char: "a",
+      targetInstanceId: laser.instanceId,
+    });
+    engine.step(0);
+
+    const before = engine.snapshot().players["player-1"];
+    const locked = before.offers.find(
+      (candidate) => candidate.instanceId === laser.instanceId,
+    )!;
+    expect(before.targetInstanceId).toBe(laser.instanceId);
+    expect(before.acquisitionPrefix).toBe("la");
+    expect(locked.status).toBe("locked");
+    expect(locked.typedPrefix).toBe("la");
+
+    engine.setPrivateOffers("player-1", [
+      locked,
+      {
+        ...repair,
+        instanceId: repair.instanceId + ":refill",
+      },
+    ]);
+
+    const refreshed = engine.snapshot().players["player-1"];
+    expect(refreshed.targetInstanceId).toBe(laser.instanceId);
+    expect(refreshed.acquisitionPrefix).toBe("la");
+
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId: "player-1",
+      sequence: 4,
+      char: "s",
+      targetInstanceId: laser.instanceId,
+    });
+    engine.step(0);
+
+    expect(
+      engine.snapshot().players["player-1"].offers.find(
+        (candidate) => candidate.instanceId === laser.instanceId,
+      )?.typedPrefix,
+    ).toBe("las");
+  });
+
   it("does not advance on a wrong key and counts the miss", () => {
     const engine = new DuelEngine();
     engine.setPrivateOffers("player-1", [
