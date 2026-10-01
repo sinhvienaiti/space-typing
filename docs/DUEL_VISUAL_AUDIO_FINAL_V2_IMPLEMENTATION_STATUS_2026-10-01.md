@@ -80,19 +80,22 @@ Pipeline mới:
 - SFX volume vẫn theo settings chung.
 - Music map/phase routing hiện có được giữ.
 
-## 5. Art workflow đã chuẩn bị
+## 5. Art workflow + runtime asset pack đã hoàn thành
 
-Prompt pack 18 target:
+Đã commit sẵn runtime target vector **18/18** tại:
+`public/assets/space-typing/duel-targets/`
+
+Đã commit sẵn runtime combat VFX vector **13/13** tại:
+`public/assets/space-typing/combat-vfx/`
+
+Cả hai manifest dùng transparent alpha thật. Smoke/debris dùng source-over; fire/explosion/glow dùng blend phù hợp. Runtime decode asset trước khi đánh dấu usable và fallback an toàn nếu decode lỗi.
+
+Prompt pack 18 target vẫn được giữ tại:
 `docs/art-requests/DUEL_TARGETS_GEMINI_PROMPT_PACK_2026-10-01.md`
 
-Tên source:
-`laser.png`, `missile.png`, `railgun.png`, `bomb.png`,
-`siege-lance.png`, `shield.png`, `reflect.png`, `barrier.png`,
-`repair.png`, `energy.png`, `amplify.png`, `drone.png`,
-`lock-on.png`, `gravity.png`, `disrupt.png`, `scan.png`,
-`fate-crystal.png`, `black-hole.png`.
+Nó chỉ còn là đường nâng cấp art painted nếu sau này muốn thay vector runtime bằng ảnh Gemini/ChatGPT có chi tiết cao hơn; **không còn là blocker để Duel chạy đủ asset**.
 
-`art:prepare` đã auto-detect Duel target/VFX source bị thiếu output hoặc stale; không chỉ dựa vào timestamp manifest.
+Nếu đặt source painted mới vào `art-src/duel-targets/` hoặc `art-src/combat-vfx/`, `art:prepare` tự detect output thiếu/stale và thay runtime vector bằng WebP đã xử lý.
 
 Parent `typing-game/play.sh` và `dev.sh` hiện gọi:
 `pnpm --dir games/space-typing art:prepare`.
@@ -116,18 +119,19 @@ Parent `typing-game/play.sh` và `dev.sh` hiện gọi:
 
 CI full test + build đã PASS tại run `36885839178` trên commit `2040c78` sau các thay đổi code/test chính (random prompt, stable target DOM, alpha/target pipeline, shared presentation timing, audio routing và authority privacy/reconnect tests). HEAD sau đó chỉ thêm/cập nhật tài liệu trạng thái; vẫn phải dùng **CI của HEAD mới nhất** làm gate cuối trước khi merge.
 
-## 7. Chưa được phép báo hoàn thành production
+## 7. Gate còn lại trước khi gọi FINAL V2 production complete
 
-Các mục sau vẫn cần làm:
+Asset/code blocker đã xử lý xong. Runtime hiện có đủ 18 target + 13 combat VFX transparent.
 
-1. Tạo đủ 18 source target PNG RGBA thật bằng prompt pack và đặt vào `art-src/duel-targets/`.
-2. Chạy pipeline để tạo runtime target WebP + manifest và commit runtime output.
-3. Audit/replace 13 combat VFX source cũ bằng true-alpha source cho smoke/debris/fire nếu source hiện tại vẫn là matte cũ.
-4. Visual QA thật ở viewport mục tiêu, High/Ultra và reduced motion.
-5. Video QA typing / refill / missile / bomb / low-Hull / round-end.
-6. Nghe thật trên loa Mac + tai nghe; chỉnh mix nếu launch/impact/body/tail chưa đủ lực.
-7. Thu performance p95/p99, input-paint, live FX count và memory trên scene stress.
-8. Chỉ khi HEAD CI + visual/audio/performance gates đều đạt mới đánh dấu FINAL V2 production complete.
+Các gate còn lại là **QA trên runtime thật**, không phải code/asset bị thiếu:
+
+1. Visual QA ở viewport mục tiêu, High/Ultra và reduced motion.
+2. Video QA typing / refill / missile / bomb / low-Hull / round-end.
+3. Nghe thật trên loa Mac + tai nghe; chỉ chỉnh mix nếu launch/impact/body/tail chưa đạt.
+4. Thu performance p95/p99, input-paint, live FX count và memory trên scene stress.
+5. HEAD CI phải PASS sau mọi thay đổi cuối.
+
+Không cần tạo thêm asset để bắt đầu các gate này.
 
 ## 8. Lệnh local sau khi pull
 
