@@ -58,6 +58,24 @@ export const SAMPLE_SFX = {
     gain: 0.38,
     poolSize: 3,
   },
+  "victory-stinger": {
+    path: "/assets/audio/stingers/victory.ogg",
+    group: "ui",
+    gain: 0.52,
+    poolSize: 1,
+  },
+  "credit-drop": {
+    path: "/assets/audio/sfx/kenney/confirm.ogg",
+    group: "combat",
+    gain: 0.22,
+    poolSize: 4,
+  },
+  "credit-pickup": {
+    path: "/assets/audio/sfx/kenney/confirm.ogg",
+    group: "combat",
+    gain: 0.34,
+    poolSize: 5,
+  },
 } as const satisfies Record<
   string,
   {
