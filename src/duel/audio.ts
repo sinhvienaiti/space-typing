@@ -89,30 +89,6 @@ export type DuelTimedAudioCue = {
   side: "self" | "opponent" | "arena";
 };
 
-function eventPlayerId(
-  event: import("./authority").DuelClientEvent,
-): import("./model").DuelPlayerId | null {
-  switch (event.type) {
-    case "typing-miss":
-    case "action-completed":
-    case "action-fired":
-    case "action-banked":
-    case "stored-action-used":
-    case "precision-firepower":
-    case "precision-firepower-fired":
-    case "combo-used":
-    case "conversion-used":
-    case "trap-armed":
-    case "trap-triggered":
-      return event.playerId;
-    case "threat-countered":
-    case "threat-resolved":
-      return event.sourcePlayerId;
-    default:
-      return null;
-  }
-}
-
 function actionCues(
   mapId: DuelMapId,
   actionId: string,
@@ -196,17 +172,41 @@ export function duelCombatAudioCues(
         cues.push({
           cue: "intercept",
           delayMs: 0,
-          side: event.targetPlayerId === selfId ? "self" : "opponent",
+          side:
+            event.targetPlayerId === selfId
+              ? "self"
+              : "opponent",
         });
         break;
+      case "threat-resolved":
+        pushAction(
+          event.sourcePlayerId,
+          event.actionId,
+        );
+        break;
       case "precision-firepower":
+        cues.push({
+          cue: "precision",
+          delayMs: 0,
+          side:
+            event.playerId === selfId
+              ? "self"
+              : "opponent",
+        });
+        break;
       case "precision-firepower-fired":
         cues.push({
           cue: "precision",
           delayMs: 0,
           side:
-            event.playerId === selfId ? "self" : "opponent",
+            event.playerId === selfId
+              ? "self"
+              : "opponent",
         });
+        pushAction(
+          event.playerId,
+          event.actionId,
+        );
         break;
       case "map-cataclysm":
         cues.push({
@@ -227,10 +227,8 @@ export function duelCombatAudioCues(
           side: "arena",
         });
         break;
-      default: {
-        const playerId = eventPlayerId(event);
-        void playerId;
-      }
+      default:
+        break;
     }
   }
 
