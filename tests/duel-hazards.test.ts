@@ -89,6 +89,56 @@ describe("Duel map hazard gameplay", () => {
     expect(p1!.amount).toBeGreaterThan(0);
   });
 
+  it("uses earned map control to mitigate contest tactical hazards", () => {
+    const hazard = event("static-field", 1);
+    hazard.mapId = "tempest-prime";
+    hazard.symmetry = "contest";
+
+    const resolution = resolveDuelHazard(
+      hazard,
+      {
+        "player-1": 0.8,
+        "player-2": 0,
+      },
+    );
+    const p1 = resolution.tacticalEffects.find(
+      (effect) => effect.targetPlayerId === "player-1",
+    );
+    const p2 = resolution.tacticalEffects.find(
+      (effect) => effect.targetPlayerId === "player-2",
+    );
+
+    expect(p1).toBeDefined();
+    expect(p2).toBeDefined();
+    expect(p1!.effectId).toBe("offer-drift");
+    expect(p1!.strength).toBeLessThan(p2!.strength);
+    expect(p1!.strength).toBeGreaterThan(0);
+  });
+
+  it("keeps symmetric tactical hazards equivalent on both sides", () => {
+    const hazard = event("cyclone", 1);
+    hazard.mapId = "tempest-prime";
+    hazard.symmetry = "symmetric";
+
+    const resolution = resolveDuelHazard(
+      hazard,
+      {
+        "player-1": 0.9,
+        "player-2": 0,
+      },
+    );
+    const p1 = resolution.tacticalEffects.find(
+      (effect) => effect.targetPlayerId === "player-1",
+    );
+    const p2 = resolution.tacticalEffects.find(
+      (effect) => effect.targetPlayerId === "player-2",
+    );
+
+    expect(p1).toBeDefined();
+    expect(p2).toBeDefined();
+    expect(p1!.strength).toBeCloseTo(p2!.strength, 8);
+  });
+
   it("uses Cataclysm for battlefield pressure instead of random direct lethal damage", () => {
     const resolution = resolveDuelCataclysm({
       sequence: 1,

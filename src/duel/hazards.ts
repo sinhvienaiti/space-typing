@@ -101,6 +101,29 @@ function tacticalBoth(
   }));
 }
 
+function tacticalHazardBoth(
+  hazard: DuelHazardEvent,
+  effectId:
+    | "offer-drift"
+    | "projectile-drag"
+    | "target-freeze",
+  strength: number,
+  seconds: number,
+  controlPressure: Readonly<Record<DuelPlayerId, number>>,
+): Array<Omit<DuelTacticalMapEffect, "id">> {
+  return PLAYERS.map((playerId) => ({
+    effectId,
+    sourcePlayerId: playerId,
+    targetPlayerId: playerId,
+    strength:
+      strength *
+      (hazard.symmetry === "contest"
+        ? protectionScale(controlPressure, playerId)
+        : 1),
+    remainingSeconds: seconds,
+  }));
+}
+
 export function resolveDuelHazard(
   hazard: DuelHazardEvent,
   controlPressure: Readonly<Record<DuelPlayerId, number>>,
@@ -135,10 +158,12 @@ export function resolveDuelHazard(
     seconds: number,
   ): void => {
     tacticalEffects.push(
-      ...tacticalBoth(
+      ...tacticalHazardBoth(
+        hazard,
         "offer-drift",
         Math.min(0.65, strength * pressure),
         seconds,
+        controlPressure,
       ),
     );
   };
@@ -147,10 +172,12 @@ export function resolveDuelHazard(
     seconds: number,
   ): void => {
     tacticalEffects.push(
-      ...tacticalBoth(
+      ...tacticalHazardBoth(
+        hazard,
         "projectile-drag",
         Math.min(0.7, strength * pressure),
         seconds,
+        controlPressure,
       ),
     );
   };
@@ -168,7 +195,13 @@ export function resolveDuelHazard(
       break;
     case "freeze-lock":
       tacticalEffects.push(
-        ...tacticalBoth("target-freeze", 0.25, 2.2),
+        ...tacticalHazardBoth(
+          hazard,
+          "target-freeze",
+          0.25,
+          2.2,
+          controlPressure,
+        ),
       );
       break;
     case "frozen-meteor":
