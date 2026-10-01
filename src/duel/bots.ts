@@ -1,4 +1,5 @@
-import { DUEL_ACTIONS_BY_ID } from "./actions";
+import { duelActionDefinitionForMap } from "./map-actions";
+import type { DuelMapId } from "./maps";
 import type {
   DuelActionCategory,
   DuelActionDefinition,
@@ -35,6 +36,7 @@ export type DuelBotPublicPlayer = {
 };
 
 export type DuelBotObservation = {
+  mapId: DuelMapId;
   phase: DuelMatchPhase;
   self: DuelBotPublicPlayer;
   opponent: DuelBotPublicPlayer;
@@ -275,7 +277,10 @@ export class DuelBot {
           (observation.ownCooldowns[offer.actionId] ?? 0) <= 0,
       )
       .map((offer) => {
-        const action = DUEL_ACTIONS_BY_ID.get(offer.actionId);
+        const action = duelActionDefinitionForMap(
+          observation.mapId,
+          offer.actionId,
+        );
         return action === undefined ? null : { offer, action };
       })
       .filter(
@@ -374,6 +379,7 @@ export class DuelBot {
 }
 
 export function duelBotObservation(input: {
+  mapId?: DuelMapId;
   phase: DuelMatchPhase;
   self: {
     hull: number;
@@ -398,6 +404,7 @@ export function duelBotObservation(input: {
     max <= 0 ? 0 : clamp01(value / max);
 
   return {
+    mapId: input.mapId ?? "frost-wastes",
     phase: input.phase,
     self: {
       hullRatio: ratio(input.self.hull, input.self.maxHull),

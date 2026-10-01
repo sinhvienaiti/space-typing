@@ -1,4 +1,4 @@
-import { DUEL_ACTIONS_BY_ID } from "./actions";
+import { duelActionDefinitionForMap } from "./map-actions";
 import {
   CHARACTER_IDS,
   type CharacterId,
@@ -508,6 +508,16 @@ export function installDuelBattleUi(
     });
   };
 
+  const actionDefinition = (
+    actionId: string,
+  ) =>
+    view === null
+      ? undefined
+      : duelActionDefinitionForMap(
+          view.map.id,
+          actionId,
+        );
+
   const renderOffers = (): void => {
     if (view === null) return;
     nodes.offers.replaceChildren();
@@ -530,7 +540,7 @@ export function installDuelBattleUi(
     );
 
     for (const offer of view.self.offers) {
-      const action = DUEL_ACTIONS_BY_ID.get(offer.actionId);
+      const action = actionDefinition(offer.actionId);
       if (action === undefined) continue;
       const cooldown =
         view.self.cooldowns[action.id] ?? 0;
@@ -735,7 +745,7 @@ export function installDuelBattleUi(
       }
 
       for (const entry of entries) {
-        const action = DUEL_ACTIONS_BY_ID.get(entry.actionId);
+        const action = actionDefinition(entry.actionId);
         const chip = button(
           action?.displayLabel ?? entry.actionId,
           "duel-inventory-chip duel-category-" +
@@ -822,9 +832,7 @@ export function installDuelBattleUi(
         "tactical",
       ] as const) {
         for (const entry of revealed[bucket]) {
-          const action = DUEL_ACTIONS_BY_ID.get(
-            entry.actionId,
-          );
+          const action = actionDefinition(entry.actionId);
           const chip = createElement("span");
           chip.className =
             "duel-bank-reveal-chip duel-category-" +
@@ -964,7 +972,7 @@ export function installDuelBattleUi(
 
     if (offer !== undefined) {
       nodes.currentTarget.textContent =
-        DUEL_ACTIONS_BY_ID.get(offer.actionId)
+        actionDefinition(offer.actionId)
           ?.displayLabel ?? offer.actionId;
     } else if (threat !== undefined) {
       nodes.currentTarget.textContent =
@@ -1154,9 +1162,7 @@ export function installDuelBattleUi(
     if (source === null) return;
 
     if (event.type === "action-completed") {
-      const action = DUEL_ACTIONS_BY_ID.get(
-        event.actionId,
-      );
+      const action = actionDefinition(event.actionId);
       if (
         action?.category === "attack" &&
         action.resolveMode === "instant"
@@ -1167,9 +1173,7 @@ export function installDuelBattleUi(
     }
 
     if (event.type === "stored-action-used") {
-      const action = DUEL_ACTIONS_BY_ID.get(
-        event.actionId,
-      );
+      const action = actionDefinition(event.actionId);
       if (action?.category === "attack") {
         spawnProjectile(source, "heavy");
       }

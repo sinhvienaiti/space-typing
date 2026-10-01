@@ -115,7 +115,7 @@ export const DUEL_MAPS: Readonly<Record<DuelMapId, DuelMapProfile>> = {
       tactical: 1.18,
       attack: 0.9,
     }),
-    wordAffinity: ["ice-wall", "glacier", "frost-shield"],
+    wordAffinity: ["ice-wall", "glacier", "ice-ward"],
     hazards: [
       hazard("blizzard", { baseWeight: 1.25, minPhase: "skirmish", pressure: 0.35, telegraphSeconds: 1.5, protectionSeconds: 2, symmetry: "symmetric" }),
       hazard("ice-shatter", { baseWeight: 1, minPhase: "war", pressure: 0.48, telegraphSeconds: 1.4, protectionSeconds: 1.8, symmetry: "symmetric" }),
@@ -140,7 +140,7 @@ export const DUEL_MAPS: Readonly<Record<DuelMapId, DuelMapProfile>> = {
       tactical: 1.08,
       defense: 0.86,
     }),
-    wordAffinity: ["ashen-guard", "fire-ward", "magma-skin"],
+    wordAffinity: ["fire-ward", "ash-guard", "lava-ward"],
     hazards: [
       hazard("fire-tornado", { baseWeight: 1.2, minPhase: "skirmish", pressure: 0.38, telegraphSeconds: 1.4, protectionSeconds: 1.8, symmetry: "symmetric" }),
       hazard("lava-burst", { baseWeight: 1.1, minPhase: "war", pressure: 0.52, telegraphSeconds: 1.3, protectionSeconds: 1.8, symmetry: "symmetric" }),
@@ -165,7 +165,7 @@ export const DUEL_MAPS: Readonly<Record<DuelMapId, DuelMapProfile>> = {
       attack: 1.18,
       support: 0.9,
     }),
-    wordAffinity: ["static-guard", "storm-anchor", "lightning-ward"],
+    wordAffinity: ["arc-ward", "thunder", "sky-ward"],
     hazards: [
       hazard("lightning-storm", { baseWeight: 1.25, minPhase: "skirmish", pressure: 0.42, telegraphSeconds: 1.5, protectionSeconds: 2, symmetry: "symmetric" }),
       hazard("cyclone", { baseWeight: 1.1, minPhase: "war", pressure: 0.48, telegraphSeconds: 1.7, protectionSeconds: 2, symmetry: "symmetric" }),
@@ -191,7 +191,7 @@ export const DUEL_MAPS: Readonly<Record<DuelMapId, DuelMapProfile>> = {
       tactical: 1.1,
       attack: 0.9,
     }),
-    wordAffinity: ["tidal-shield", "water-veil", "deep-recover"],
+    wordAffinity: ["tide-ward", "wave-veil", "deep-ward"],
     hazards: [
       hazard("whirlpool", { baseWeight: 1.2, minPhase: "skirmish", pressure: 0.38, telegraphSeconds: 1.7, protectionSeconds: 2.1, symmetry: "symmetric" }),
       hazard("tidal-surge", { baseWeight: 1.1, minPhase: "war", pressure: 0.5, telegraphSeconds: 1.6, protectionSeconds: 2, symmetry: "symmetric" }),
@@ -216,7 +216,7 @@ export const DUEL_MAPS: Readonly<Record<DuelMapId, DuelMapProfile>> = {
       attack: 1.16,
       support: 0.9,
     }),
-    wordAffinity: ["stone-wall", "seismic-guard", "core-armor"],
+    wordAffinity: ["rock-wall", "stone-arm", "core-ward"],
     hazards: [
       hazard("quake", { baseWeight: 1.2, minPhase: "skirmish", pressure: 0.4, telegraphSeconds: 1.6, protectionSeconds: 2, symmetry: "symmetric" }),
       hazard("rockfall", { baseWeight: 1.05, minPhase: "war", pressure: 0.5, telegraphSeconds: 1.7, protectionSeconds: 2, symmetry: "symmetric" }),
@@ -242,7 +242,7 @@ export const DUEL_MAPS: Readonly<Record<DuelMapId, DuelMapProfile>> = {
       mystery: 1.4,
       defense: 0.88,
     }),
-    wordAffinity: ["gravity-anchor", "void-barrier", "reality-ward"],
+    wordAffinity: ["void-ward", "rift-veil", "star-ward"],
     hazards: [
       hazard("black-hole", { baseWeight: 1.15, minPhase: "war", pressure: 0.52, telegraphSeconds: 2, protectionSeconds: 2.3, symmetry: "symmetric" }),
       hazard("gravity-vortex", { baseWeight: 1.2, minPhase: "skirmish", pressure: 0.42, telegraphSeconds: 1.8, protectionSeconds: 2.1, symmetry: "symmetric" }),

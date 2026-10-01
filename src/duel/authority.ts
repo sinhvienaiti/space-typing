@@ -1,4 +1,7 @@
-import { DUEL_ACTIONS } from "./actions";
+import {
+  duelActionMapForMap,
+  duelActionsForMap,
+} from "./map-actions";
 import {
   DuelBot,
   duelBotObservation,
@@ -1114,6 +1117,7 @@ export class DuelAuthorityService {
           record.settings.matchLengthSeconds,
         matchSeed: seed,
         mapId,
+        actions: duelActionMapForMap(mapId),
       }),
       draft: {
         "player-1": this.createDraft(seed, mapId, 1),
@@ -1284,6 +1288,7 @@ export class DuelAuthorityService {
           settings.matchLengthSeconds,
         matchSeed: seed,
         mapId,
+        actions: duelActionMapForMap(mapId),
       }),
       draft: {
         "player-1": this.createDraft(seed, mapId, 1),
@@ -1644,7 +1649,7 @@ export class DuelAuthorityService {
   ): DuelOfferDraft {
     return new DuelOfferDraft({
       seed: deriveSeed(seed, offset),
-      actions: DUEL_ACTIONS,
+      actions: duelActionsForMap(mapId),
       enabledCategories: ALL_CATEGORIES,
       categoryMultiplier:
         duelMapProfile(mapId).categoryMultiplier,
@@ -1760,8 +1765,12 @@ export class DuelAuthorityService {
         ? "player-2"
         : "player-1";
     const observation = duelBotObservation({
+      mapId: match.mapId,
       phase: snapshot.phase,
-      self: snapshot.players[playerId],
+      self: {
+        ...snapshot.players[playerId],
+        cooldowns: snapshot.cooldowns[playerId],
+      },
       opponent: snapshot.players[opponentId],
     });
     for (const intent of match.bot.update(
@@ -1832,6 +1841,7 @@ export class DuelAuthorityService {
         match.settings.matchLengthSeconds,
       matchSeed: roundSeed,
       mapId: match.mapId,
+      actions: duelActionMapForMap(match.mapId),
     });
     match.draft = {
       "player-1": this.createDraft(

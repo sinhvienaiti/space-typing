@@ -1,7 +1,8 @@
 import {
-  DUEL_ACTIONS,
-  DUEL_ACTIONS_BY_ID,
-} from "../duel/actions";
+  duelActionDefinitionForMap,
+  duelActionMapForMap,
+  duelActionsForMap,
+} from "../duel/map-actions";
 import {
   DuelBot,
   duelBotObservation,
@@ -237,19 +238,20 @@ class DuelTestLabRuntime {
       startingEnergy: 60,
       matchSeed: this.seed,
       mapId: this.mapId,
+      actions: duelActionMapForMap(this.mapId),
     });
     const multiplier =
       DUEL_MAPS[this.mapId].categoryMultiplier;
     this.drafts = {
       "player-1": new DuelOfferDraft({
         seed: this.seed ^ 0x51a7,
-        actions: DUEL_ACTIONS,
+        actions: duelActionsForMap(this.mapId),
         enabledCategories: CATEGORIES,
         categoryMultiplier: multiplier,
       }),
       "player-2": new DuelOfferDraft({
         seed: this.seed ^ 0xb071,
-        actions: DUEL_ACTIONS,
+        actions: duelActionsForMap(this.mapId),
         enabledCategories: CATEGORIES,
         categoryMultiplier: multiplier,
       }),
@@ -273,7 +275,7 @@ class DuelTestLabRuntime {
   }
 
   spawnCategory(category: DuelActionCategory): void {
-    const action = DUEL_ACTIONS.find(
+    const action = duelActionsForMap(this.mapId).find(
       (candidate) => candidate.category === category,
     );
     if (action === undefined) return;
@@ -281,7 +283,12 @@ class DuelTestLabRuntime {
   }
 
   spawnAction(actionId: string): void {
-    if (!DUEL_ACTIONS_BY_ID.has(actionId)) return;
+    if (
+      duelActionDefinitionForMap(this.mapId, actionId) ===
+      undefined
+    ) {
+      return;
+    }
     this.placeManualOffer("player-1", actionId);
   }
 
@@ -515,8 +522,13 @@ class DuelTestLabRuntime {
     const intents = this.bot.update(
       dtSeconds,
       duelBotObservation({
+        mapId: this.mapId,
         phase: snapshot.phase,
-        self: snapshot.players["player-2"],
+        self: {
+          ...snapshot.players["player-2"],
+          cooldowns:
+            snapshot.cooldowns["player-2"],
+        },
         opponent: snapshot.players["player-1"],
       }),
     );
@@ -566,7 +578,10 @@ class DuelTestLabRuntime {
   }
 
   private completeAction(actionId: string): void {
-    const action = DUEL_ACTIONS_BY_ID.get(actionId);
+    const action = duelActionDefinitionForMap(
+      this.mapId,
+      actionId,
+    );
     if (action === undefined) return;
 
     const offer = this.placeManualOffer(

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DUEL_ACTIONS_BY_ID } from "../src/duel/actions";
+import { duelActionDefinitionForMap } from "../src/duel/map-actions";
 import { DuelLocalPracticeMatch } from "../src/duel/local-match";
 import { createPracticeDuelRoom } from "../src/duel/room";
 
@@ -53,7 +53,8 @@ describe("Duel local Practice runtime", () => {
     });
     const initial = match.initial().view;
     const offer = initial.self.offers.find((candidate) => {
-      const action = DUEL_ACTIONS_BY_ID.get(
+      const action = duelActionDefinitionForMap(
+        initial.map.id,
         candidate.actionId,
       );
       return (
@@ -64,7 +65,10 @@ describe("Duel local Practice runtime", () => {
     if (offer === undefined) {
       throw new Error("Missing affordable Practice offer.");
     }
-    const action = DUEL_ACTIONS_BY_ID.get(offer.actionId)!;
+    const action = duelActionDefinitionForMap(
+      initial.map.id,
+      offer.actionId,
+    )!;
 
     match.sendIntent({
       type: "SELECT_TARGET",

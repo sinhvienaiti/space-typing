@@ -1,4 +1,7 @@
-import { DUEL_ACTIONS } from "./actions";
+import {
+  duelActionMapForMap,
+  duelActionsForMap,
+} from "./map-actions";
 import {
   DuelBot,
   duelBotObservation,
@@ -237,6 +240,7 @@ export class DuelLocalPracticeMatch {
     for (const intent of this.bot.update(
       dtSeconds,
       duelBotObservation({
+        mapId: this.mapId,
         phase: snapshot.phase,
         self: {
           ...snapshot.players["player-2"],
@@ -305,6 +309,7 @@ export class DuelLocalPracticeMatch {
         this.room.settings.matchLengthSeconds,
       matchSeed: seed,
       mapId: this.mapId,
+      actions: duelActionMapForMap(this.mapId),
     });
   }
 
@@ -316,13 +321,13 @@ export class DuelLocalPracticeMatch {
     return {
       "player-1": new DuelOfferDraft({
         seed: deriveSeed(seed, 1),
-        actions: DUEL_ACTIONS,
+        actions: duelActionsForMap(this.mapId),
         enabledCategories: ALL_CATEGORIES,
         categoryMultiplier: multiplier,
       }),
       "player-2": new DuelOfferDraft({
         seed: deriveSeed(seed, 2),
-        actions: DUEL_ACTIONS,
+        actions: duelActionsForMap(this.mapId),
         enabledCategories: ALL_CATEGORIES,
         categoryMultiplier: multiplier,
       }),
