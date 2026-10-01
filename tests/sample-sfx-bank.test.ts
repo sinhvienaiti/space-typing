@@ -82,9 +82,13 @@ describe("sampled sci-fi SFX bank", () => {
   it("uses only committed local asset paths and fails soft without browser Audio", () => {
     for (const definition of Object.values(SAMPLE_SFX)) {
       expect(definition.path).toMatch(
-        /^\/assets\/audio\/sfx\/kenney\/.+\.ogg$/,
+        /^\/assets\/audio\/(?:sfx\/kenney|stingers)\/.+\.ogg$/,
       );
     }
+    expect(SAMPLE_SFX["victory-stinger"].path).toBe(
+      "/assets/audio/stingers/victory.ogg",
+    );
+    expect(SAMPLE_SFX["credit-pickup"].poolSize).toBeGreaterThan(1);
 
     const bank = new SampleSfxBank(() => null);
     expect(bank.play("warning", 1, false)).toBe(false);
