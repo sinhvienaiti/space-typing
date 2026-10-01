@@ -584,6 +584,16 @@ export function installDuelBattleUi(
   const offerLayoutAssignments = new Map<string, number>();
   const performanceMonitor =
     new DuelPerformanceMonitor();
+
+  const appendTransientFx = (node: HTMLElement): void => {
+    while (
+      nodes.fx.childElementCount >= MAX_FX_NODES
+    ) {
+      nodes.fx.firstElementChild?.remove();
+    }
+    nodes.fx.append(node);
+  };
+
   let performanceFrame: number | null = null;
   let lastPerformanceFrameAt: number | null = null;
 
@@ -1580,9 +1590,8 @@ export function installDuelBattleUi(
       () => impact.remove(),
       { once: true },
     );
-    nodes.currentInput.classList.remove("typing-hit");
-    void nodes.currentInput.offsetWidth;
-    nodes.currentInput.classList.add("typing-hit");
+    // The transient impact node provides the key feedback. Avoid forcing
+    // synchronous layout solely to restart a CSS class animation.
   };
 
   const spawnTacticalActionFx = (
@@ -1624,7 +1633,7 @@ export function installDuelBattleUi(
         "duel-tactical-field duel-tactical-" + effectId,
       );
       field.dataset.fromSelf = fromSelf ? "true" : "false";
-      nodes.fx.append(field);
+      appendTransientFx(field);
       field.addEventListener(
         "animationend",
         () => field.remove(),
@@ -1717,7 +1726,7 @@ export function installDuelBattleUi(
     if (blastArt !== null) {
       blast.style.backgroundImage = blastArt;
     }
-    nodes.fx.append(blast);
+    appendTransientFx(blast);
     blast.addEventListener(
       "animationend",
       () => blast.remove(),
@@ -1730,7 +1739,7 @@ export function installDuelBattleUi(
         "duel-map-painted-shockwave duel-map-painted-blast-" + side,
       );
       shockwave.style.backgroundImage = shockwaveArt;
-      nodes.fx.append(shockwave);
+      appendTransientFx(shockwave);
       shockwave.addEventListener(
         "animationend",
         () => shockwave.remove(),
@@ -1756,7 +1765,7 @@ export function installDuelBattleUi(
             "--duel-secondary-delay",
             String(110 + index * 90) + "ms",
           );
-          nodes.fx.append(secondary);
+          appendTransientFx(secondary);
           secondary.addEventListener(
             "animationend",
             () => secondary.remove(),
@@ -2094,7 +2103,7 @@ export function installDuelBattleUi(
       "--duel-fx-y",
       String(20 + ((fxSequence * 19) % 50)) + "%",
     );
-    nodes.fx.append(burst);
+    appendTransientFx(burst);
     burst.addEventListener(
       "animationend",
       () => burst.remove(),
@@ -2139,7 +2148,7 @@ export function installDuelBattleUi(
           "--duel-fx-delay",
           String(index * 55) + "ms",
         );
-        nodes.fx.append(spark);
+        appendTransientFx(spark);
         spark.addEventListener(
           "animationend",
           () => spark.remove(),
