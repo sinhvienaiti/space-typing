@@ -182,6 +182,162 @@ describe("DuelEngine M-DUEL-04 integration", () => {
     expect(engine.snapshot().players["player-2"].hull).toBeCloseTo(82.9);
   });
 
+  it("makes target-freeze block new private targets without turning into a full keyboard lock", () => {
+    const engine = new DuelEngine({
+      startingEnergy: 100,
+    });
+    const laser = offer("player-1", 0, "laser");
+    engine.setPrivateOffers("player-1", [laser]);
+
+    engine.applyHazardEvent({
+      sequence: 1,
+      mapId: "frost-wastes",
+      hazardId: "freeze-lock",
+      phase: "crisis",
+      pressure: 1,
+      telegraphSeconds: 1,
+      protectionSeconds: 2,
+      symmetry: "contest",
+    });
+
+    engine.enqueueIntent({
+      type: "SELECT_TARGET",
+      playerId: "player-1",
+      sequence: 1,
+      targetInstanceId: laser.instanceId,
+    });
+    let events = engine.step(0);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "intent-rejected",
+        playerId: "player-1",
+        reason: "target-frozen",
+      }),
+    );
+    expect(
+      engine.snapshot().players["player-1"].targetInstanceId,
+    ).toBeNull();
+
+    engine.step(2.3);
+    engine.enqueueIntent({
+      type: "SELECT_TARGET",
+      playerId: "player-1",
+      sequence: 2,
+      targetInstanceId: laser.instanceId,
+    });
+    events = engine.step(0);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "target-locked",
+        targetInstanceId: laser.instanceId,
+      }),
+    );
+  });
+
+  it("lets an already locked word finish during target-freeze", () => {
+    const engine = new DuelEngine({
+      startingEnergy: 100,
+    });
+    const laser = offer("player-1", 0, "laser");
+    engine.setPrivateOffers("player-1", [laser]);
+    engine.enqueueIntent({
+      type: "SELECT_TARGET",
+      playerId: "player-1",
+      sequence: 1,
+      targetInstanceId: laser.instanceId,
+    });
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId: "player-1",
+      sequence: 2,
+      char: "l",
+      targetInstanceId: laser.instanceId,
+    });
+    engine.step(0);
+
+    engine.applyHazardEvent({
+      sequence: 2,
+      mapId: "frost-wastes",
+      hazardId: "freeze-lock",
+      phase: "crisis",
+      pressure: 1,
+      telegraphSeconds: 1,
+      protectionSeconds: 2,
+      symmetry: "contest",
+    });
+
+    let sequence = 3;
+    for (const char of "aser") {
+      engine.enqueueIntent({
+        type: "TYPE_CHAR",
+        playerId: "player-1",
+        sequence: sequence++,
+        char,
+        targetInstanceId: laser.instanceId,
+      });
+    }
+    const events = engine.step(0);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "action-completed",
+        actionId: "laser",
+      }),
+    );
+  });
+
+  it("never lets target-freeze remove the guaranteed incoming-threat counter channel", () => {
+    const engine = new DuelEngine({
+      startingEnergy: 100,
+    });
+    const siege = offer("player-1", 0, "siege-lance");
+    engine.setPrivateOffers("player-1", [siege]);
+    typeTarget(
+      engine,
+      "player-1",
+      siege,
+      "siegelance",
+      1,
+    );
+    engine.step(0);
+
+    engine.applyHazardEvent({
+      sequence: 3,
+      mapId: "frost-wastes",
+      hazardId: "freeze-lock",
+      phase: "crisis",
+      pressure: 1,
+      telegraphSeconds: 1,
+      protectionSeconds: 2,
+      symmetry: "contest",
+    });
+
+    const threat =
+      engine.snapshot().incomingThreats["player-2"][0]!;
+    engine.enqueueIntent({
+      type: "SELECT_TARGET",
+      playerId: "player-2",
+      sequence: 1,
+      targetInstanceId: threat.id,
+    });
+    let sequence = 2;
+    for (const char of threat.answerToken) {
+      engine.enqueueIntent({
+        type: "TYPE_CHAR",
+        playerId: "player-2",
+        sequence: sequence++,
+        char,
+        targetInstanceId: threat.id,
+      });
+    }
+    const events = engine.step(0);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "threat-countered",
+        threatId: threat.id,
+      }),
+    );
+  });
+
   it("blocks the final character when a bank is full instead of silently deleting value", () => {
     const engine = new DuelEngine({ startingEnergy: 100 });
     const offers = [0, 1, 2, 3].map((slot) =>

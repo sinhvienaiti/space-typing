@@ -67,6 +67,15 @@ export class DuelTacticalMapState {
     this.effects.length = write;
   }
 
+  isTargetFrozen(playerId: DuelPlayerId): boolean {
+    return this.effects.some(
+      (effect) =>
+        effect.effectId === "target-freeze" &&
+        effect.targetPlayerId === playerId &&
+        effect.remainingSeconds > 0,
+    );
+  }
+
   snapshot(): DuelTacticalMapSnapshot {
     const offerDriftScale: Record<DuelPlayerId, number> = {
       "player-1": 1,

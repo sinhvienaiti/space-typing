@@ -138,6 +138,7 @@ export type DuelEngineEvent =
         | "invalid-char"
         | "unknown-target"
         | "target-unavailable"
+        | "target-frozen"
         | "item-unavailable"
         | "skill-unavailable"
         | "insufficient-energy"
@@ -1058,6 +1059,24 @@ export class DuelEngine {
       targetInstanceId !== undefined &&
       player.targetInstanceId === null
     ) {
+      const specialTarget =
+        this.objectives.isActiveTarget(targetInstanceId) ||
+        this.threats.getOpenThreat(
+          player.id,
+          targetInstanceId,
+        ) !== null;
+      if (
+        this.tactical.isTargetFrozen(player.id) &&
+        !specialTarget
+      ) {
+        events.push({
+          type: "intent-rejected",
+          playerId: player.id,
+          sequence: player.lastAcceptedSequence,
+          reason: "target-frozen",
+        });
+        return;
+      }
       this.selectTarget(player, targetInstanceId, events);
     }
 
@@ -1080,6 +1099,16 @@ export class DuelEngine {
     const locked = this.lockedOffer(player);
     if (locked !== null) {
       this.typeLockedOffer(player, locked, char, events);
+      return;
+    }
+
+    if (this.tactical.isTargetFrozen(player.id)) {
+      events.push({
+        type: "intent-rejected",
+        playerId: player.id,
+        sequence: player.lastAcceptedSequence,
+        reason: "target-frozen",
+      });
       return;
     }
 
@@ -1726,6 +1755,16 @@ export class DuelEngine {
         type: "target-locked",
         playerId: player.id,
         targetInstanceId: threat.id,
+      });
+      return;
+    }
+
+    if (this.tactical.isTargetFrozen(player.id)) {
+      events.push({
+        type: "intent-rejected",
+        playerId: player.id,
+        sequence: player.lastAcceptedSequence,
+        reason: "target-frozen",
       });
       return;
     }
