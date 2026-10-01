@@ -3219,6 +3219,7 @@ function renderStageClearCelebration(
   const overlay = byId("stageClearOverlay");
   const layer = byId("stageClearCelebration");
   overlay.dataset.celebrationLevel = String(profile.level);
+  overlay.dataset.visualQuality = settings.visualQuality;
   overlay.dataset.accuracyTier = String(profile.accuracyTier);
   overlay.dataset.speedTier = String(profile.speedTier);
   overlay.dataset.scoreTier = String(profile.scoreTier);
