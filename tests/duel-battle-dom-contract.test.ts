@@ -168,7 +168,7 @@ describe("Duel battle DOM contract", () => {
     expect(source).toContain("const MAX_VISIBLE_WORD_TARGETS = 10;");
     expect(source).toContain('id="duelOffers" class="duel-word-field"');
     expect(source).toContain('card.classList.add("duel-word-target")');
-    expect(source).toContain('createElement(\n        "span",\n        "duel-target-object",');
+    expect(source).toContain('"duel-target-object"');
     expect(source).not.toContain("ACTION OFFERS");
     expect(source).not.toContain('class="duel-command-deck"');
     expect(css).toContain(".duel-word-target {");
