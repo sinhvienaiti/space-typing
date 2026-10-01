@@ -25,7 +25,9 @@
     "pickups:prepare": "node scripts/bg-art/prepare-credit-puzzle.mjs credits",
     "puzzle:prepare": "node scripts/bg-art/prepare-credit-puzzle.mjs puzzle",
     "icons:prepare": "node scripts/bg-art/prepare-icons.mjs",
-    "reward-art:check": "node scripts/bg-art/check-credit-puzzle-art.mjs"
+    "reward-art:check": "node scripts/bg-art/check-credit-puzzle-art.mjs",
+    "predev": "pnpm art:prepare",
+    "prebuild": "pnpm art:prepare"
   },
   "dependencies": {
     "ws": "^8.22.0"
@@ -40,4 +42,4 @@
     "vitest": "^3.2.4"
   },
   "packageManager": "pnpm@11.21.0"
-}\n
+}
