@@ -693,6 +693,7 @@ export function installDuelBattleUi(
       "duel-offer-card duel-word-target",
     );
     card.type = "button";
+    card.classList.add("duel-word-target");
     card.dataset.offerId = instanceId;
     card.addEventListener("click", () => {
       sendTarget(instanceId);
