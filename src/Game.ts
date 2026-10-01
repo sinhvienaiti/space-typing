@@ -375,9 +375,11 @@ import { resolveEnemyTypingProfile } from "./enemies/typing-profile";
 import { enemyKillRewardScore } from "./enemies/scoring";
 import { StageWordLedger } from "./enemies/stage-word-variety";
 import {
+  stageResultStars,
   StageSessionTracker,
   type StageSessionSnapshot,
 } from "./results/stage-session";
+import { stageClearCelebrationProfile } from "./results/stage-clear-celebration";
 import {
   enemySkillDefinition,
   type EnemySkillId,
@@ -445,6 +447,7 @@ import {
   multiplierForStreak,
   normalizeWord,
   splitDisplayByTypedLetters,
+  stageWordsPerMinute,
   typingText,
 } from "./logic";
 import {
@@ -4645,7 +4648,33 @@ export class Game {
     this.anomalyRiskRatio = 0;
     this.boss = null;
     this.hooks.onBossUpdate(null);
-    this.sfx.stageClear();
+
+    const stageSession =
+      this.stageResultTracker.snapshot(this.stageElapsedSeconds);
+    const targetAccuracy = accuracyPercent(
+      stageSession.correctWordKeys,
+      stageSession.wrongWordKeys,
+    );
+    const targetWpm = stageWordsPerMinute(
+      stageSession.correctWordKeys,
+      stageSession.elapsedSeconds,
+    );
+    const rating = stageResultStars(
+      targetAccuracy,
+      this.stageObjective?.status ?? null,
+    );
+    const celebration = stageClearCelebrationProfile({
+      stars: rating.stars,
+      accuracy: targetAccuracy,
+      wpm: targetWpm,
+      score: this.stats.score,
+      elapsedSeconds: stageSession.elapsedSeconds,
+    });
+    this.sfx.stageClear(
+      celebration.level,
+      celebration.accuracyTier,
+      celebration.speedTier,
+    );
     this.hooks.onStageClear(this.getStats());
     this.hooks.onPhase(this.phase);
   }
@@ -7159,6 +7188,11 @@ export class Game {
       y,
       this.settings.visualQuality,
     );
+    this.sfx.creditDrop(
+      receipt.tier,
+      this.settings.visualQuality,
+      receipt.variant,
+    );
   }
 
   private presentCombatCreditCollection(
@@ -7174,27 +7208,75 @@ export class Game {
           : event.tier === "high"
             ? 218
             : 274;
+    const quality = this.settings.visualQuality;
+    const qualityScale =
+      quality === "ultra"
+        ? 1.75
+        : quality === "high"
+          ? 1.45
+          : quality === "medium"
+            ? 1.2
+            : 1;
+    const tierScale =
+      event.tier === "major-boss"
+        ? 1.8
+        : event.tier === "boss"
+          ? 1.55
+          : event.tier === "mini-boss"
+            ? 1.35
+            : event.tier === "elite"
+              ? 1.18
+              : 1;
+
     this.burst(
       ship.x,
       ship.y,
-      event.hero ? 22 : 8,
+      Math.round((event.hero ? 22 : 8) * qualityScale * tierScale),
       hue,
     );
-    if (event.hero) {
+    this.sfx.creditPickup(
+      event.tier,
+      quality,
+      event.variant,
+      event.hero,
+    );
+
+    if (quality !== "low") {
+      const color =
+        event.variant === "golden" ? "#ffd46a" : "#dca8ff";
       this.skillFx.pulse(
         ship.x,
         ship.y,
-        event.variant === "golden" ? "#ffd46a" : "#dca8ff",
-        event.tier === "major-boss" ? 150 : 108,
-        event.tier === "major-boss" ? 4 : 3,
-        0.48,
+        color,
+        (event.hero ? 118 : 74) * qualityScale * tierScale,
+        event.hero ? 4 : 2,
+        event.hero ? 0.52 : 0.32,
       );
+
+      if (quality === "high" || quality === "ultra") {
+        this.burst(
+          ship.x,
+          ship.y,
+          Math.round((event.hero ? 18 : 7) * qualityScale),
+          event.variant === "golden" ? 54 : 204,
+        );
+      }
+
+      if (event.hero && quality === "ultra") {
+        this.skillFx.flash(
+          event.variant === "golden" ? "#ffd46a" : "#dca8ff",
+          0.07,
+          0.18,
+        );
+        this.shakeFor(event.tier === "major-boss" ? 2.2 : 1.4);
+      }
     }
   }
 
   private flushCombatCreditPresentation(): void {
+    const ship = this.shipCenter();
     for (const event of this.creditPickups.flush()) {
-      this.hooks.onCombatCreditPickupPresented?.(event);
+      this.presentCombatCreditCollection(event, ship);
     }
   }
 
