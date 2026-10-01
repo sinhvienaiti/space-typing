@@ -1,7 +1,7 @@
 # SPACE TYPING — COMBAT REWARD + VICTORY CELEBRATION POLISH PLAN
 
 **Date:** 2026-10-01  
-**Status:** APPROVED IMPLEMENTATION PLAN  
+**Status:** IMPLEMENTATION IN PROGRESS — core VFX/audio/result celebration implemented; browser/audio acceptance remains  
 **Repo:** `sinhvienaiti/space-typing`  
 **Branch:** `feat/bgv-integration-current`
 
@@ -170,3 +170,28 @@ The celebration does not alter rewards unless an existing reward system already 
 13. Celebration DOM/particles remain bounded and disposable.
 14. Existing Stage Results metric IDs and progression behavior remain unchanged.
 15. Automated tests cover deterministic celebration grading and critical presentation contracts.
+
+
+---
+
+## D. Implementation checkpoint — 2026-10-01
+
+Implemented on `feat/bgv-integration-current`:
+
+- Credit spawn now triggers a tier/quality-aware crystalline drop cue.
+- Credit collection now uses a stronger tier/quality-aware pickup cue with premium Hero/Boss accents.
+- Medium+ crystal presentation now adds release rings/rays and brighter magnet trails.
+- High/Ultra add sparkle/glint treatment; Ultra Hero pickup adds a small flash/shake accent.
+- Stage-clear flush now routes pending pickups through the same collection presentation path, so HUD/VFX/audio feedback is not silently skipped.
+- Stage Complete now uses the existing local `victory.ogg` stinger plus a bright layered synth flourish instead of the previous sparse two-tone cue.
+- Celebration grading is deterministic Level 1–5 using stars as the baseline plus accuracy/WPM/score performance bonuses.
+- Stage Results now has a bounded celebration layer with quality-scaled bloom/rings/star shards/confetti and stronger 3–5 level header/star/card accents.
+- Reduced-motion remains supported.
+- Automated grading/layout/sample-bank contracts are covered by tests.
+
+Remaining acceptance work:
+
+- listen in a real browser on headphones and speakers and tune drop/pickup loudness if needed;
+- verify Medium/High/Ultra visually against Low in live combat;
+- verify dense late-stage kill streams do not become sonically tiring;
+- tune Level 4/5 victory density after real 3-star high-WPM/high-accuracy clears.
