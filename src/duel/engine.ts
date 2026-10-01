@@ -61,6 +61,7 @@ import {
 } from "./strategy";
 import {
   DuelTacticalMapState,
+  type DuelTacticalMapEffect,
   type DuelTacticalMapSnapshot,
 } from "./tactical";
 import {
@@ -389,6 +390,13 @@ export class DuelEngine {
   private readonly queuedIntents: DuelIntent[] = [];
   private readonly pendingEffects: DuelCombatEffect[] = [];
   private readonly pendingHazards: DuelPendingHazard[] = [];
+  private readonly hazardTargetProtection: Record<
+    DuelPlayerId,
+    number
+  > = {
+    "player-1": 0,
+    "player-2": 0,
+  };
   private readonly reservedEnergyCost: Record<DuelPlayerId, number> = {
     "player-1": 0,
     "player-2": 0,
@@ -447,6 +455,8 @@ export class DuelEngine {
     this.queuedIntents.length = 0;
     this.pendingEffects.length = 0;
     this.pendingHazards.length = 0;
+    this.hazardTargetProtection["player-1"] = 0;
+    this.hazardTargetProtection["player-2"] = 0;
     this.reservedEnergyCost["player-1"] = 0;
     this.reservedEnergyCost["player-2"] = 0;
     this.threats.clear();
@@ -526,6 +536,12 @@ export class DuelEngine {
     this.cooldowns.update(dt);
     this.tactical.update(dt);
     this.strategy.update(dt);
+    for (const playerId of PLAYER_IDS) {
+      this.hazardTargetProtection[playerId] = Math.max(
+        0,
+        this.hazardTargetProtection[playerId] - dt,
+      );
+    }
     this.advancePendingHazards(dt, events);
     this.expirePrivateOffers(dt, events);
     const directorEvents = this.director.update(dt, this.phase());
@@ -652,6 +668,29 @@ export class DuelEngine {
     return events;
   }
 
+  private applyHazardTacticalEffects(
+    hazard: DuelHazardEvent,
+    effects: readonly Omit<DuelTacticalMapEffect, "id">[],
+  ): void {
+    for (const effect of effects) {
+      if (
+        effect.effectId === "target-freeze" &&
+        effect.targetPlayerId !== null
+      ) {
+        const targetId = effect.targetPlayerId;
+        if (this.hazardTargetProtection[targetId] > 0) {
+          continue;
+        }
+        this.hazardTargetProtection[targetId] = Math.max(
+          this.hazardTargetProtection[targetId],
+          effect.remainingSeconds +
+            Math.max(0, hazard.protectionSeconds),
+        );
+      }
+      this.tactical.apply(effect);
+    }
+  }
+
   private advancePendingHazards(
     dtSeconds: number,
     events: DuelEngineEvent[],
@@ -677,9 +716,10 @@ export class DuelEngine {
         this.tactical.snapshot().controlPressure,
       );
       this.pendingEffects.push(...resolution.effects);
-      for (const effect of resolution.tacticalEffects) {
-        this.tactical.apply(effect);
-      }
+      this.applyHazardTacticalEffects(
+        pending.hazard,
+        resolution.tacticalEffects,
+      );
       events.push({
         type: "map-hazard",
         hazard: pending.hazard,
@@ -696,9 +736,10 @@ export class DuelEngine {
       hazard,
       this.tactical.snapshot().controlPressure,
     );
-    for (const effect of resolution.tacticalEffects) {
-      this.tactical.apply(effect);
-    }
+    this.applyHazardTacticalEffects(
+      hazard,
+      resolution.tacticalEffects,
+    );
     this.applyEffectsToPlayers(resolution.effects);
     const events: DuelEngineEvent[] = [
       { type: "map-hazard", hazard },

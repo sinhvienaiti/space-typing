@@ -111,17 +111,22 @@ function tacticalHazardBoth(
   seconds: number,
   controlPressure: Readonly<Record<DuelPlayerId, number>>,
 ): Array<Omit<DuelTacticalMapEffect, "id">> {
-  return PLAYERS.map((playerId) => ({
-    effectId,
-    sourcePlayerId: playerId,
-    targetPlayerId: playerId,
-    strength:
-      strength *
-      (hazard.symmetry === "contest"
+  return PLAYERS.map((playerId) => {
+    const protection =
+      hazard.symmetry === "contest"
         ? protectionScale(controlPressure, playerId)
-        : 1),
-    remainingSeconds: seconds,
-  }));
+        : 1;
+    return {
+      effectId,
+      sourcePlayerId: playerId,
+      targetPlayerId: playerId,
+      strength: strength * protection,
+      remainingSeconds:
+        effectId === "target-freeze"
+          ? seconds * protection
+          : seconds,
+    };
+  });
 }
 
 export function resolveDuelHazard(

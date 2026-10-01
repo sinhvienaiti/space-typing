@@ -115,6 +115,33 @@ describe("Duel map hazard gameplay", () => {
     expect(p1!.strength).toBeGreaterThan(0);
   });
 
+  it("shortens contest target-freeze duration when map control was earned", () => {
+    const hazard = event("freeze-lock", 1);
+    hazard.mapId = "frost-wastes";
+    hazard.symmetry = "contest";
+
+    const resolution = resolveDuelHazard(
+      hazard,
+      {
+        "player-1": 0.8,
+        "player-2": 0,
+      },
+    );
+    const p1 = resolution.tacticalEffects.find(
+      (effect) => effect.targetPlayerId === "player-1",
+    );
+    const p2 = resolution.tacticalEffects.find(
+      (effect) => effect.targetPlayerId === "player-2",
+    );
+
+    expect(p1?.effectId).toBe("target-freeze");
+    expect(p2?.effectId).toBe("target-freeze");
+    expect(p1!.remainingSeconds).toBeLessThan(
+      p2!.remainingSeconds,
+    );
+    expect(p1!.remainingSeconds).toBeGreaterThan(0);
+  });
+
   it("keeps symmetric tactical hazards equivalent on both sides", () => {
     const hazard = event("cyclone", 1);
     hazard.mapId = "tempest-prime";
@@ -236,6 +263,58 @@ describe("Duel map hazard gameplay", () => {
       after.players["player-1"].hull,
       8,
     );
+  });
+
+  it("enforces a target-protection window after a freeze hazard", () => {
+    const engine = new DuelEngine({
+      mapId: "frost-wastes",
+      matchSeed: 51,
+    });
+    const freeze: DuelHazardEvent = {
+      sequence: 1,
+      mapId: "frost-wastes",
+      hazardId: "freeze-lock",
+      phase: "crisis",
+      pressure: 1,
+      telegraphSeconds: 1.8,
+      protectionSeconds: 2.3,
+      symmetry: "contest",
+    };
+
+    engine.applyHazardEvent(freeze);
+    expect(
+      engine.snapshot().tactical.frozenTargetCount["player-1"],
+    ).toBe(1);
+
+    engine.applyHazardEvent({
+      ...freeze,
+      sequence: 2,
+    });
+    expect(
+      engine.snapshot().tactical.frozenTargetCount["player-1"],
+    ).toBe(1);
+
+    engine.step(2.3);
+    expect(
+      engine.snapshot().tactical.frozenTargetCount["player-1"],
+    ).toBe(0);
+
+    engine.applyHazardEvent({
+      ...freeze,
+      sequence: 3,
+    });
+    expect(
+      engine.snapshot().tactical.frozenTargetCount["player-1"],
+    ).toBe(0);
+
+    engine.step(2.3);
+    engine.applyHazardEvent({
+      ...freeze,
+      sequence: 4,
+    });
+    expect(
+      engine.snapshot().tactical.frozenTargetCount["player-1"],
+    ).toBe(1);
   });
 
   it("supports deterministic direct hazard injection for Duel Test Lab and replay QA", () => {
