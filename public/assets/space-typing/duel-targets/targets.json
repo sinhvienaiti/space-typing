@@ -1,0 +1,240 @@
+{
+  "id": "duel-targets",
+  "version": 2026100101,
+  "sprites": {
+    "laser": {
+      "url": "laser.svg",
+      "sha256": "d6f10e5c71994e774f29048cb6361a4a0993f8f592cb4c52b4b3e64b5bc2f612",
+      "width": 512,
+      "height": 512,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "estimatedDecodedBytes": 1048576
+    },
+    "missile": {
+      "url": "missile.svg",
+      "sha256": "67c469ebfba7de5ab69f36b348c17663f751d7a8ecbcfcb9c5d8486a62a8b81a",
+      "width": 512,
+      "height": 512,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "estimatedDecodedBytes": 1048576
+    },
+    "railgun": {
+      "url": "railgun.svg",
+      "sha256": "27a63d82d196721dba3ab8a726fa226cc731e38098fa77b7f9972c573de0cce8",
+      "width": 512,
+      "height": 512,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "estimatedDecodedBytes": 1048576
+    },
+    "bomb": {
+      "url": "bomb.svg",
+      "sha256": "ca4de9f95f9b3641db38f7ef62bd2637ce9bc4f5ad87e7d5df3ec1ad57e8c20c",
+      "width": 512,
+      "height": 512,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "estimatedDecodedBytes": 1048576
+    },
+    "siege-lance": {
+      "url": "siege-lance.svg",
+      "sha256": "6e96884cef4cef9abc01fe7d873df2d829c8a79cfebcd320a3d3582639b372b1",
+      "width": 512,
+      "height": 512,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "estimatedDecodedBytes": 1048576
+    },
+    "shield": {
+      "url": "shield.svg",
+      "sha256": "549bcf9635b4596c72caf8989f0dffd48ff2738b32e48c5e86e020767f11a4de",
+      "width": 512,
+      "height": 512,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "estimatedDecodedBytes": 1048576
+    },
+    "reflect": {
+      "url": "reflect.svg",
+      "sha256": "27fd75147e366eb176d0173f4fdf924789feef8799d6a0cd0f6ea1e4634ae957",
+      "width": 512,
+      "height": 512,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "estimatedDecodedBytes": 1048576
+    },
+    "barrier": {
+      "url": "barrier.svg",
+      "sha256": "c5cdb775de51e37447588be79b17bc84bb75a21afbe814c0b46f6cb3da9b0d72",
+      "width": 512,
+      "height": 512,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "estimatedDecodedBytes": 1048576
+    },
+    "repair": {
+      "url": "repair.svg",
+      "sha256": "7be2c909ed9030b86155db41797ef620f330a91818f6a1b89bbc0b0343130775",
+      "width": 512,
+      "height": 512,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "estimatedDecodedBytes": 1048576
+    },
+    "energy": {
+      "url": "energy.svg",
+      "sha256": "db7107b666e7a5cd574555b053c7569de7bf09cb75838588114183a8aa83a61b",
+      "width": 512,
+      "height": 512,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "estimatedDecodedBytes": 1048576
+    },
+    "amplify": {
+      "url": "amplify.svg",
+      "sha256": "f7554f1d265426de955ff460db3d33f51c192423aadbcbb2f8fa3298f67fc168",
+      "width": 512,
+      "height": 512,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "estimatedDecodedBytes": 1048576
+    },
+    "drone": {
+      "url": "drone.svg",
+      "sha256": "c4099ebdbe9e29fccab03962d3f2ab54a81fbdb4afd6feb88b3cb46ae10a6b55",
+      "width": 512,
+      "height": 512,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "estimatedDecodedBytes": 1048576
+    },
+    "lock-on": {
+      "url": "lock-on.svg",
+      "sha256": "0bbd8f167aa5a4322a21a034e32b50558c763fe3cbd846d89b30580a9b697ec2",
+      "width": 512,
+      "height": 512,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "estimatedDecodedBytes": 1048576
+    },
+    "gravity": {
+      "url": "gravity.svg",
+      "sha256": "da1ee1d5c8b47d8d852f1dac181e01e16ea7dd5fde617ba1f27a699988ad47e7",
+      "width": 512,
+      "height": 512,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "estimatedDecodedBytes": 1048576
+    },
+    "disrupt": {
+      "url": "disrupt.svg",
+      "sha256": "5ac58b0033353b59e244f9b45b9f2c11bd97b931c61d01c11811be439ff7f4a6",
+      "width": 512,
+      "height": 512,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "estimatedDecodedBytes": 1048576
+    },
+    "scan": {
+      "url": "scan.svg",
+      "sha256": "f1b83dd17e1d422a3ccf9da7a2484c76a41a6709d0b03a20eabf655b2069b2e7",
+      "width": 512,
+      "height": 512,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "estimatedDecodedBytes": 1048576
+    },
+    "fate-crystal": {
+      "url": "fate-crystal.svg",
+      "sha256": "fc25d3461c0040b90fc36bfe6692333ecd68393fb12c80493e9d3a3af51e6f0d",
+      "width": 512,
+      "height": 512,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "estimatedDecodedBytes": 1048576
+    },
+    "black-hole": {
+      "url": "black-hole.svg",
+      "sha256": "7273ed5c616b0a581d07380433409d2dd6f8064d1bde83e740ec702d46d3ec0b",
+      "width": 512,
+      "height": 512,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "estimatedDecodedBytes": 1048576
+    }
+  }
+}
