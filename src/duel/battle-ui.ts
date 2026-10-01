@@ -230,6 +230,12 @@ function createBattleNodes(gameShell: HTMLElement) {
             <i class="duel-arena-line"></i>
             <i class="duel-arena-reticle"></i>
           </div>
+
+          <div id="duelCurrentInput" class="duel-current-input duel-arena-input" aria-live="polite">
+            <span id="duelCurrentTarget">FREE TARGETING</span>
+            <strong id="duelCurrentPrefix" class="duel-current-token">_</strong>
+            <small>ESC cancels target · wrong keys do not advance</small>
+          </div>
         </div>
 
         <div class="duel-self-zone">
@@ -278,12 +284,6 @@ function createBattleNodes(gameShell: HTMLElement) {
           </div>
           <div id="duelOffers" class="duel-offer-grid"></div>
         </section>
-
-        <div id="duelCurrentInput" class="duel-current-input" aria-live="polite">
-          <span id="duelCurrentTarget">FREE TARGETING</span>
-          <strong id="duelCurrentPrefix" class="duel-current-token">_</strong>
-          <small>ESC cancels target · wrong keys do not advance</small>
-        </div>
       </section>
     </div>
 
