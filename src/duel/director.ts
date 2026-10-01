@@ -71,6 +71,8 @@ export class DuelMapDirector {
   private readonly mapId: DuelMapId;
   private readonly rng: ReturnType<DuelRngStreams["domain"]>;
   private readonly objectiveRng: ReturnType<DuelRngStreams["domain"]>;
+  private readonly hazardIntervalScale: number;
+  private readonly hazardPressureScale: number;
   private elapsedUntilHazard: number;
   private elapsedUntilObjective: number;
   private lastPhase: DuelMatchPhase = "build";
@@ -81,15 +83,36 @@ export class DuelMapDirector {
     mapId: DuelMapId;
     matchSeed: number;
     contentVersion: string;
+    hazardIntervalScale?: number;
+    hazardPressureScale?: number;
   }) {
     this.mapId = input.mapId;
+    this.hazardIntervalScale = Math.max(
+      0.5,
+      Math.min(
+        2,
+        Number.isFinite(input.hazardIntervalScale)
+          ? input.hazardIntervalScale!
+          : 1,
+      ),
+    );
+    this.hazardPressureScale = Math.max(
+      0.5,
+      Math.min(
+        1.5,
+        Number.isFinite(input.hazardPressureScale)
+          ? input.hazardPressureScale!
+          : 1,
+      ),
+    );
     const streams = new DuelRngStreams(
       input.matchSeed,
       input.contentVersion,
     );
     this.rng = streams.domain("hazards");
     this.objectiveRng = streams.domain("word-offers");
-    this.elapsedUntilHazard = PHASE_INTERVAL_SECONDS.build;
+    this.elapsedUntilHazard =
+      PHASE_INTERVAL_SECONDS.build * this.hazardIntervalScale;
     this.elapsedUntilObjective = OBJECTIVE_INTERVAL_SECONDS.build;
   }
 
@@ -100,15 +123,17 @@ export class DuelMapDirector {
     const events: DuelDirectorEvent[] = [];
     if (phase !== this.lastPhase) {
       if (phase === "build") {
-        this.elapsedUntilHazard = PHASE_INTERVAL_SECONDS.build;
+        this.elapsedUntilHazard =
+          PHASE_INTERVAL_SECONDS.build * this.hazardIntervalScale;
         this.elapsedUntilObjective = OBJECTIVE_INTERVAL_SECONDS.build;
       } else if (this.lastPhase === "build") {
-        this.elapsedUntilHazard = PHASE_INTERVAL_SECONDS[phase];
+        this.elapsedUntilHazard =
+          PHASE_INTERVAL_SECONDS[phase] * this.hazardIntervalScale;
         this.elapsedUntilObjective = OBJECTIVE_INTERVAL_SECONDS[phase];
       } else {
         this.elapsedUntilHazard = Math.min(
           this.elapsedUntilHazard,
-          PHASE_INTERVAL_SECONDS[phase],
+          PHASE_INTERVAL_SECONDS[phase] * this.hazardIntervalScale,
         );
         this.elapsedUntilObjective = Math.min(
           this.elapsedUntilObjective,
@@ -158,14 +183,17 @@ export class DuelMapDirector {
             hazardId: hazard.id,
             phase,
             pressure:
-              hazard.pressure * PHASE_PRESSURE[phase],
+              hazard.pressure *
+              PHASE_PRESSURE[phase] *
+              this.hazardPressureScale,
             telegraphSeconds: hazard.telegraphSeconds,
             protectionSeconds: hazard.protectionSeconds,
             symmetry: hazard.symmetry,
           },
         });
       }
-      const base = PHASE_INTERVAL_SECONDS[phase];
+      const base =
+        PHASE_INTERVAL_SECONDS[phase] * this.hazardIntervalScale;
       const jitter = 0.84 + this.rng.nextFloat() * 0.32;
       this.elapsedUntilHazard += base * jitter;
     }
@@ -193,7 +221,8 @@ export class DuelMapDirector {
   }
 
   resetRound(): void {
-    this.elapsedUntilHazard = PHASE_INTERVAL_SECONDS.build;
+    this.elapsedUntilHazard =
+      PHASE_INTERVAL_SECONDS.build * this.hazardIntervalScale;
     this.elapsedUntilObjective = OBJECTIVE_INTERVAL_SECONDS.build;
     this.lastPhase = "build";
     this.sequence = 0;

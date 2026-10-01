@@ -259,7 +259,7 @@ export class DuelOfferDraft {
       combinedMultiplier,
     );
     return actions.map((action) => {
-      const base = Math.max(0.0001, normalized[action.category]);
+      const base = Math.max(0, normalized[action.category]);
       const prefixDiversity =
         usedInitials.has(firstChar(action)) ? 0.34 : 1;
       return {
@@ -275,9 +275,13 @@ export class DuelOfferDraft {
     let roll = this.rng.nextFloat() * total;
 
     for (const entry of weighted) {
+      if (entry.weight <= 0) continue;
       roll -= entry.weight;
       if (roll <= 0) return entry.action;
     }
-    return weighted[weighted.length - 1]!.action;
+    return (
+      weighted.find((entry) => entry.weight > 0)?.action ??
+      weighted[0]!.action
+    );
   }
 }

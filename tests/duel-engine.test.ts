@@ -238,6 +238,23 @@ describe("DuelEngine M-DUEL-01 local simulation", () => {
     expect(engine.snapshot().round.status).toBe("active");
   });
 
+  it("can rush escalation without shortening regulation or overtime", () => {
+    const engine = new DuelEngine({
+      regulationSeconds: 240,
+      escalationSeconds: 168,
+      hardOvertimeSeconds: 45,
+    });
+
+    engine.step(168);
+    expect(engine.phase()).toBe("cataclysm");
+    expect(engine.snapshot().round.status).toBe("active");
+
+    engine.step(116);
+    expect(engine.snapshot().round.status).toBe("active");
+    engine.step(1);
+    expect(engine.snapshot().round.status).toBe("draw");
+  });
+
   it("enters Cataclysm after regulation and terminates at hard overtime ceiling", () => {
     const engine = new DuelEngine({
       regulationSeconds: 180,

@@ -66,6 +66,30 @@ describe("Duel M-DUEL-06 maps and director", () => {
     expect(voidWeights.fate).toBeGreaterThan(0);
   });
 
+  it("applies bounded hazard interval and pressure tuning", () => {
+    const standard = new DuelMapDirector({
+      mapId: "inferno-rift",
+      matchSeed: 77,
+      contentVersion: "v3",
+    });
+    const high = new DuelMapDirector({
+      mapId: "inferno-rift",
+      matchSeed: 77,
+      contentVersion: "v3",
+      hazardIntervalScale: 0.6,
+      hazardPressureScale: 1.2,
+    });
+
+    expect(standard.update(7, "war")).toEqual([]);
+    const events = high.update(7, "war");
+    const hazard = events.find((event) => event.type === "hazard");
+    expect(hazard?.type).toBe("hazard");
+    if (hazard?.type === "hazard") {
+      expect(hazard.hazard.mapId).toBe("inferno-rift");
+      expect(hazard.hazard.pressure).toBeGreaterThan(1);
+    }
+  });
+
   it("replays the same hazard order for the same map and seed", () => {
     const a = new DuelMapDirector({
       mapId: "tempest-prime",

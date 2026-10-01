@@ -28,6 +28,36 @@ describe("Duel M-DUEL-03 core word draft", () => {
     });
   });
 
+  it("treats a zero category multiplier as truly disabled", () => {
+    const weights = normalizedDuelCategoryWeights(
+      "cataclysm",
+      ["attack", "mystery"],
+      { attack: 1, mystery: 0 },
+    );
+    expect(weights.attack).toBe(1);
+    expect(weights.mystery).toBe(0);
+
+    const disabled = new DuelOfferDraft({
+      seed: 12,
+      actions: [
+        DUEL_ACTIONS_BY_ID.get("laser")!,
+        DUEL_ACTIONS_BY_ID.get("black-hole")!,
+      ],
+      enabledCategories: ["attack", "mystery"],
+      categoryMultiplier: { mystery: 0 },
+    });
+    for (let slot = 0; slot < 20; slot += 1) {
+      expect(
+        disabled.refillPrivateOffer(
+          "player-1",
+          slot,
+          "cataclysm",
+          [],
+        )?.actionId,
+      ).toBe("laser");
+    }
+  });
+
   it("renormalizes phase weights when only core categories are enabled", () => {
     const build = normalizedDuelCategoryWeights(
       "build",

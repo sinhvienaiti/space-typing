@@ -281,7 +281,10 @@ export type DuelEngineEvent =
 
 export type DuelEngineConfig = {
   regulationSeconds?: number;
+  escalationSeconds?: number;
   hardOvertimeSeconds?: number;
+  hazardIntervalScale?: number;
+  hazardPressureScale?: number;
   maxHull?: number;
   maxShield?: number;
   maxEnergy?: number;
@@ -339,6 +342,7 @@ function createPlayer(
 export class DuelEngine {
   private readonly actions: ReadonlyMap<string, DuelActionDefinition>;
   private readonly regulationSeconds: number;
+  private readonly escalationSeconds: number;
   private readonly hardOvertimeSeconds: number;
   private readonly profile: Required<
     Pick<
@@ -391,10 +395,16 @@ export class DuelEngine {
       mapId: this.mapId,
       matchSeed: config.matchSeed ?? 1,
       contentVersion: DUEL_CONTENT_VERSION,
+      hazardIntervalScale: config.hazardIntervalScale,
+      hazardPressureScale: config.hazardPressureScale,
     });
     this.regulationSeconds = Math.max(
       1,
       config.regulationSeconds ?? DUEL_DEFAULT_REGULATION_SECONDS,
+    );
+    this.escalationSeconds = Math.max(
+      1,
+      config.escalationSeconds ?? this.regulationSeconds,
     );
     this.hardOvertimeSeconds = Math.max(
       1,
@@ -740,7 +750,7 @@ export class DuelEngine {
     return duelPhaseForProgress(
       duelRegulationProgress(
         this.elapsedSeconds,
-        this.regulationSeconds,
+        this.escalationSeconds,
       ),
     );
   }
