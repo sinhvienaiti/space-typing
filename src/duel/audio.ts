@@ -150,8 +150,17 @@ export function duelCombatAudioCues(
       cues.push({ cue: "support", delayMs: 0, side });
       return;
     }
+    const speedScale = Math.max(
+      0.5,
+      view.shared.tactical.projectileSpeedScale[playerId] ?? 1,
+    );
+    const impactDelayMs = Math.round(720 / speedScale);
     cues.push({ cue: pair.launch, delayMs: 0, side });
-    cues.push({ cue: pair.impact, delayMs: 620, side });
+    cues.push({
+      cue: pair.impact,
+      delayMs: impactDelayMs,
+      side,
+    });
   };
 
   for (const event of events) {
