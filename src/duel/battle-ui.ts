@@ -3,6 +3,7 @@ import {
   CHARACTER_IDS,
   type CharacterId,
 } from "../characters/registry";
+import { playerProjectileProfile } from "../characters/projectiles";
 import type {
   DuelClientEvent,
   DuelClientMatchView,
@@ -1358,6 +1359,17 @@ export function installDuelBattleUi(
     projectileSequence += 1;
     const fromSelf =
       sourcePlayerId === view.self.playerId;
+    const sourceCharacter = fromSelf
+      ? characterId(
+          view.appearance.selfCharacterId,
+          SHIP_FALLBACKS.self,
+        )
+      : characterId(
+          view.appearance.opponentCharacterId,
+          SHIP_FALLBACKS.opponent,
+        );
+    const projectileProfile =
+      playerProjectileProfile(sourceCharacter);
     const speedScale = Math.max(
       0.5,
       view.shared.tactical.projectileSpeedScale[
@@ -1383,6 +1395,24 @@ export function installDuelBattleUi(
       "--duel-projectile-duration",
       String(Math.round(720 / speedScale)) + "ms",
     );
+    projectile.style.setProperty(
+      "--duel-shot-primary",
+      projectileProfile.primary,
+    );
+    projectile.style.setProperty(
+      "--duel-shot-secondary",
+      projectileProfile.secondary,
+    );
+    projectile.style.setProperty(
+      "--duel-shot-width",
+      projectileProfile.width.toFixed(2),
+    );
+    projectile.style.setProperty(
+      "--duel-shot-glow",
+      projectileProfile.glow.toFixed(2),
+    );
+    projectile.dataset.archetype =
+      projectileProfile.archetype;
     nodes.projectiles.append(projectile);
     projectile.addEventListener(
       "animationend",
