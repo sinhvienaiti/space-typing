@@ -1210,7 +1210,7 @@ export class DuelEngine {
     player: DuelPlayerState,
     events: DuelEngineEvent[],
   ): void {
-    this.recordCorrectCharacter(player, events);
+    player.correctChars += 1;
     player.precisionStreak += 1;
 
     const milestone = duelPrecisionMilestone(
@@ -1247,7 +1247,7 @@ export class DuelEngine {
   private recordWrongCharacter(
     player: DuelPlayerState,
   ): void {
-    this.recordWrongCharacter(player);
+    player.wrongChars += 1;
     player.precisionStreak = 0;
   }
 
