@@ -25,19 +25,19 @@ const OUTPUT_ROOT = join(
 );
 
 const ASSETS = {
-  "explosion-core": 896,
-  "explosion-wide": 1280,
-  "shockwave-ring": 1024,
-  "fire-small": 640,
-  "fire-medium": 768,
-  "fire-critical": 896,
-  "smoke-dark": 768,
-  "smoke-hot": 768,
-  "spark-burst": 640,
-  "debris-burst": 768,
-  "missile-salvo": 768,
-  "bomb-impact": 1024,
-  "precision-burst": 896,
+  "explosion-core": { maxSize: 896, kind: "emissive", lifetimeMs: 620 },
+  "explosion-wide": { maxSize: 1280, kind: "emissive", lifetimeMs: 820 },
+  "shockwave-ring": { maxSize: 1024, kind: "emissive", lifetimeMs: 920 },
+  "fire-small": { maxSize: 640, kind: "emissive", loop: true, lifetimeMs: 0 },
+  "fire-medium": { maxSize: 768, kind: "emissive", loop: true, lifetimeMs: 0 },
+  "fire-critical": { maxSize: 896, kind: "emissive", loop: true, lifetimeMs: 0 },
+  "smoke-dark": { maxSize: 768, kind: "occluding", loop: true, lifetimeMs: 0 },
+  "smoke-hot": { maxSize: 768, kind: "occluding", loop: true, lifetimeMs: 0 },
+  "spark-burst": { maxSize: 640, kind: "emissive", lifetimeMs: 520 },
+  "debris-burst": { maxSize: 768, kind: "occluding", lifetimeMs: 720 },
+  "missile-salvo": { maxSize: 768, kind: "world", lifetimeMs: 720 },
+  "bomb-impact": { maxSize: 1024, kind: "emissive", lifetimeMs: 980 },
+  "precision-burst": { maxSize: 896, kind: "emissive", lifetimeMs: 680 },
 };
 
 const MAX_BACKGROUND = 30;
@@ -47,16 +47,22 @@ function smoothstep(value) {
   return x * x * (3 - 2 * x);
 }
 
-function brightness(image, x, y) {
-  const offset = (y * image.width + x) * 4;
-  return Math.max(
-    image.data[offset],
-    image.data[offset + 1],
-    image.data[offset + 2],
-  );
+function hasMeaningfulAlpha(image) {
+  for (let offset = 3; offset < image.data.length; offset += 4) {
+    if (image.data[offset] < 250) return true;
+  }
+  return false;
 }
 
-function blackenBackground(image, label, notes) {
+function prepareAlpha(image, label, kind, notes) {
+  if (hasMeaningfulAlpha(image)) {
+    notes.push(label + ": preserved source alpha.");
+    return {
+      image,
+      alphaConvention: "source-alpha",
+    };
+  }
+
   const border = borderStats(image);
   const key = [0, 1, 2].map((channel) =>
     median(border.map((pixel) => pixel[channel])),
@@ -64,9 +70,9 @@ function blackenBackground(image, label, notes) {
   if (Math.max(...key) > MAX_BACKGROUND) {
     throw new Error(
       label +
-        ": source border is not near-black (" +
+        ": opaque source has no usable alpha and border is not near-black (" +
         key.join(",") +
-        "). Generate on pure black #000000.",
+        "). Export true RGBA source art.",
     );
   }
 
@@ -74,10 +80,9 @@ function blackenBackground(image, label, notes) {
     .map((pixel) => Math.max(pixel[0], pixel[1], pixel[2]))
     .sort((a, b) => a - b);
   const black = Math.max(
-    4,
-    levels[Math.floor(levels.length * 0.985)] ?? 4,
+    2,
+    levels[Math.floor(levels.length * 0.985)] ?? 2,
   );
-  const scale = 255 / Math.max(1, 255 - black);
   const feather = Math.max(
     8,
     Math.round(Math.min(image.width, image.height) * 0.035),
@@ -86,6 +91,13 @@ function blackenBackground(image, label, notes) {
 
   for (let y = 0; y < image.height; y += 1) {
     for (let x = 0; x < image.width; x += 1) {
+      const offset = (y * image.width + x) * 4;
+      const adjusted = [
+        Math.max(0, image.data[offset] - black),
+        Math.max(0, image.data[offset + 1] - black),
+        Math.max(0, image.data[offset + 2] - black),
+      ];
+      const peak = Math.max(...adjusted);
       const edge = smoothstep(
         Math.min(
           x,
@@ -94,33 +106,38 @@ function blackenBackground(image, label, notes) {
           image.height - 1 - y,
         ) / feather,
       );
-      const offset = (y * image.width + x) * 4;
-      for (let channel = 0; channel < 3; channel += 1) {
-        const value =
-          Math.max(0, image.data[offset + channel] - black) *
-          scale *
-          edge;
-        out[offset + channel] =
-          value < 2 ? 0 : Math.min(255, Math.round(value));
+      const alpha =
+        Math.pow(Math.min(1, peak / 220), 0.72) * edge;
+      out[offset + 3] = Math.round(alpha * 255);
+
+      if (kind === "emissive" && peak > 0) {
+        const scale = 255 / peak;
+        out[offset] = Math.min(255, Math.round(adjusted[0] * scale));
+        out[offset + 1] = Math.min(255, Math.round(adjusted[1] * scale));
+        out[offset + 2] = Math.min(255, Math.round(adjusted[2] * scale));
+      } else {
+        out[offset] = adjusted[0];
+        out[offset + 1] = adjusted[1];
+        out[offset + 2] = adjusted[2];
       }
-      out[offset + 3] = 255;
     }
   }
 
   notes.push(
     label +
-      ": background forced to pure black (black point " +
-      black +
-      ").",
+      ": converted legacy near-black matte to RGBA fallback; replace with true-alpha source for final art.",
   );
   return {
-    data: out,
-    width: image.width,
-    height: image.height,
+    image: {
+      data: out,
+      width: image.width,
+      height: image.height,
+    },
+    alphaConvention: "keyed-black-fallback",
   };
 }
 
-function trimToLight(image) {
+function trimToAlpha(image) {
   let x0 = image.width;
   let y0 = image.height;
   let x1 = -1;
@@ -128,7 +145,8 @@ function trimToLight(image) {
 
   for (let y = 0; y < image.height; y += 1) {
     for (let x = 0; x < image.width; x += 1) {
-      if (brightness(image, x, y) <= 5) continue;
+      const alpha = image.data[(y * image.width + x) * 4 + 3];
+      if (alpha <= 4) continue;
       x0 = Math.min(x0, x);
       y0 = Math.min(y0, y);
       x1 = Math.max(x1, x);
@@ -136,7 +154,7 @@ function trimToLight(image) {
     }
   }
 
-  if (x1 < 0) throw new Error("nothing but black found");
+  if (x1 < 0) throw new Error("nothing visible after alpha preparation");
   const span = Math.max(x1 - x0 + 1, y1 - y0 + 1);
   const pad = Math.max(8, Math.round(span * 0.055));
   const left = Math.max(0, x0 - pad);
@@ -153,12 +171,17 @@ function trimToLight(image) {
 }
 
 async function main() {
+  if (!existsSync(SOURCE_ROOT)) {
+    console.log("• combat VFX source folder missing; kept optional");
+    return;
+  }
+
   mkdirSync(OUTPUT_ROOT, { recursive: true });
   const sprites = {};
   const notes = [];
   const written = new Set(["vfx.json"]);
 
-  for (const [id, maxSize] of Object.entries(ASSETS)) {
+  for (const [id, profile] of Object.entries(ASSETS)) {
     const source = findInput(SOURCE_ROOT, id);
     if (source === null) {
       console.log("• missing " + id + " (kept optional)");
@@ -166,12 +189,17 @@ async function main() {
     }
 
     const raw = await readArt(source, id, notes);
-    const cleaned = trimToLight(
-      blackenBackground(raw, id, notes),
+    const prepared = prepareAlpha(
+      raw,
+      id,
+      profile.kind,
+      notes,
     );
+    const cleaned = trimToAlpha(prepared.image);
     const scale = Math.min(
       1,
-      maxSize / Math.max(cleaned.width, cleaned.height),
+      profile.maxSize /
+        Math.max(cleaned.width, cleaned.height),
     );
     const width = Math.max(
       1,
@@ -189,7 +217,6 @@ async function main() {
         channels: 4,
       },
     })
-      .removeAlpha()
       .resize({
         width,
         height,
@@ -198,6 +225,7 @@ async function main() {
       })
       .webp({
         quality: 92,
+        alphaQuality: 100,
         effort: 5,
       })
       .toBuffer();
@@ -210,9 +238,27 @@ async function main() {
       sha256: sha256(buffer),
       width,
       height,
+      frameCount: 1,
+      fps: 0,
+      pivot: { x: 0.5, y: 0.5 },
+      alphaConvention: prepared.alphaConvention,
+      blendMode:
+        profile.kind === "emissive"
+          ? "screen"
+          : "source-over",
+      loop: profile.loop === true,
+      lifetimeMs: profile.lifetimeMs,
+      estimatedDecodedBytes: width * height * 4,
     };
     notes.push(
-      id + ": " + width + "x" + height + ".",
+      id +
+        ": " +
+        width +
+        "x" +
+        height +
+        " RGBA · " +
+        sprites[id].blendMode +
+        ".",
     );
   }
 
@@ -240,7 +286,7 @@ async function main() {
   console.log(
     "✓ Combat VFX: " +
       Object.keys(sprites).length +
-      " painted assets -> " +
+      " alpha-aware assets -> " +
       relative(ROOT, OUTPUT_ROOT),
   );
   for (const note of notes) {
