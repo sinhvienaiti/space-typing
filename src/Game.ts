@@ -1145,61 +1145,95 @@ export class Game {
     this.sfx.unlock();
     switch (input.cue) {
       case "typing-miss":
-        this.sfx.wrong();
+        if (!this.sfx.playSample("duel-typing-miss")) {
+          this.sfx.wrong();
+        }
         return;
       case "laser-launch":
-        this.sfx.shot(1.15);
+        if (!this.sfx.playSample("duel-laser-launch")) {
+          this.sfx.shot(1.15);
+        }
         return;
       case "missile-launch":
-        this.sfx.shot(1.35);
-        this.sfx.power();
+        if (!this.sfx.playSample("duel-missile-launch")) {
+          this.sfx.shot(1.35);
+          this.sfx.power();
+        }
         return;
       case "heavy-launch":
-        this.sfx.shot(1.5);
+        if (!this.sfx.playSample("duel-heavy-launch")) {
+          this.sfx.shot(1.5);
+        }
         return;
       case "bomb-launch":
-        this.sfx.shot(1.25);
-        this.sfx.command();
+        if (!this.sfx.playSample("duel-bomb-launch")) {
+          this.sfx.shot(1.25);
+          this.sfx.command();
+        }
         return;
       case "energy-impact":
-        this.sfx.boltImpact(1, 0, "energy");
+        if (!this.sfx.playSample("duel-energy-impact")) {
+          this.sfx.boltImpact(1, 0, "energy");
+        }
         return;
       case "missile-impact":
-        this.sfx.boltImpact(1.35, 0, "missile");
+        if (!this.sfx.playSample("duel-missile-impact")) {
+          this.sfx.boltImpact(1.35, 0, "missile");
+        }
         return;
       case "heavy-impact":
-        this.sfx.boltImpact(1.45, 0, "heavy");
+        if (!this.sfx.playSample("duel-kinetic-impact")) {
+          this.sfx.boltImpact(1.45, 0, "heavy");
+        }
         return;
       case "bomb-impact":
-        this.sfx.boltImpact(1.5, 0, "heavy");
-        this.sfx.damage();
+        if (!this.sfx.playSample("duel-bomb-impact")) {
+          this.sfx.boltImpact(1.5, 0, "heavy");
+          this.sfx.damage();
+        }
         return;
       case "support":
-        this.sfx.support();
+        if (!this.sfx.playSample("duel-repair-energy")) {
+          this.sfx.support();
+        }
         return;
       case "bank":
         this.sfx.uiConfirm();
         return;
       case "warning":
-        this.sfx.projectileWarning();
+        if (!this.sfx.playSample("duel-lock-acquire")) {
+          this.sfx.projectileWarning();
+        }
         return;
       case "intercept":
-        this.sfx.projectileIntercept();
+        if (!this.sfx.playSample("duel-intercept")) {
+          this.sfx.projectileIntercept();
+        }
         return;
       case "precision":
-        this.sfx.power();
+        if (!this.sfx.playSample("duel-precision")) {
+          this.sfx.power();
+        }
         return;
       case "cataclysm":
-        this.sfx.bossEntrance(1.05);
+        if (!this.sfx.playSample("duel-cataclysm")) {
+          this.sfx.bossEntrance(1.05);
+        }
         return;
       case "round-win":
-        this.sfx.stageClear(3, 1, 1);
+        if (!this.sfx.playSample("duel-round-win")) {
+          this.sfx.stageClear(3, 1, 1);
+        }
         return;
       case "round-loss":
-        this.sfx.stageFail();
+        if (!this.sfx.playSample("duel-round-loss")) {
+          this.sfx.stageFail();
+        }
         return;
       case "round-draw":
-        this.sfx.uiConfirm();
+        if (!this.sfx.playSample("duel-round-draw")) {
+          this.sfx.uiConfirm();
+        }
         return;
     }
   }
