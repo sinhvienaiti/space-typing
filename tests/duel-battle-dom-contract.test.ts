@@ -141,4 +141,23 @@ describe("Duel battle DOM contract", () => {
     expect(css).toContain(".duel-tactical-gravity-well");
     expect(css).toContain(".duel-tactical-disrupt");
   });
+
+  it("shows positive shield repair and energy state changes on either ship", () => {
+    const source = read("../src/duel/battle-ui.ts");
+    const css = read("../src/duel/battle.css");
+
+    expect(source).toContain("spawnResourceGain");
+    expect(source).toContain(
+      'spawnResourceGain("opponent", "shield")',
+    );
+    expect(source).toContain(
+      'spawnResourceGain("opponent", "repair")',
+    );
+    expect(source).toContain(
+      'spawnResourceGain("opponent", "energy")',
+    );
+    expect(css).toContain(".duel-resource-gain-shield");
+    expect(css).toContain(".duel-resource-gain-repair");
+    expect(css).toContain(".duel-resource-gain-energy");
+  });
 });
