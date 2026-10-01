@@ -124,6 +124,9 @@ function eventSourcePlayer(
       return event.playerId;
     case "threat-created":
       return event.threat.sourcePlayerId;
+    case "threat-countered":
+    case "threat-resolved":
+      return event.sourcePlayerId;
     default:
       return null;
   }
@@ -208,6 +211,7 @@ function createBattleNodes(gameShell: HTMLElement) {
           <div id="duelOpponentShipFrame" class="duel-ship-frame duel-ship-opponent" aria-label="Rival ship">
             <div id="duelOpponentShip" class="duel-ship-sprite" data-character="reaper"></div>
           </div>
+          <div id="duelOpponentCharge" class="duel-opponent-charge hidden" aria-live="polite">RIVAL CHARGING</div>
         </div>
 
         <div class="duel-arena-center">
@@ -366,6 +370,7 @@ function createBattleNodes(gameShell: HTMLElement) {
     opponentPath: byId("duelOpponentPath"),
     opponentShipFrame: byId("duelOpponentShipFrame"),
     opponentShip: byId("duelOpponentShip"),
+    opponentCharge: byId("duelOpponentCharge"),
     opponentHullFill: byId("duelOpponentHullFill"),
     opponentShieldFill: byId("duelOpponentShieldFill"),
     opponentEnergyFill: byId("duelOpponentEnergyFill"),
@@ -973,6 +978,28 @@ export function installDuelBattleUi(
       selfShieldRatio > 0 ? "true" : "false";
     nodes.opponentShipFrame.dataset.shieldActive =
       opponentShieldRatio > 0 ? "true" : "false";
+
+    const rivalTyping = view.opponent.typingTelegraph;
+    const rivalProgress = rivalTyping.active
+      ? Math.max(0.16, rivalTyping.progress)
+      : 0;
+    nodes.opponentShipFrame.dataset.typing =
+      rivalTyping.active ? "true" : "false";
+    nodes.opponentShipFrame.style.setProperty(
+      "--duel-opponent-typing-progress",
+      rivalProgress.toFixed(2),
+    );
+    nodes.opponentCharge.classList.toggle(
+      "hidden",
+      !rivalTyping.active,
+    );
+    nodes.opponentCharge.textContent =
+      rivalTyping.kind === "counter"
+        ? "RIVAL COUNTERING"
+        : rivalTyping.kind === "objective"
+          ? "RIVAL CONTESTING"
+          : "RIVAL CHARGING";
+
     nodes.root.dataset.targetFrozen =
       view.shared.tactical.frozenTargetCount[
         view.self.playerId
@@ -1344,6 +1371,85 @@ export function installDuelBattleUi(
     );
   };
 
+  const spawnProjectileArrival = (
+    side: "self" | "opponent",
+    variant: ProjectileVariant,
+  ): void => {
+    const frame =
+      side === "self"
+        ? nodes.selfShipFrame
+        : nodes.opponentShipFrame;
+    while (
+      frame.querySelectorAll(".duel-projectile-arrival").length >= 3
+    ) {
+      frame.querySelector(".duel-projectile-arrival")?.remove();
+    }
+    const impact = createElement(
+      "i",
+      "duel-projectile-arrival duel-projectile-arrival-" + variant,
+    );
+    frame.append(impact);
+    impact.addEventListener(
+      "animationend",
+      () => impact.remove(),
+      { once: true },
+    );
+  };
+
+  const clearThreatTelegraph = (threatId: string): void => {
+    nodes.projectiles
+      .querySelectorAll<HTMLElement>(".duel-threat-telegraph")
+      .forEach((node) => {
+        if (node.dataset.threatId === threatId) node.remove();
+      });
+  };
+
+  const spawnThreatTelegraph = (
+    threat: Extract<
+      DuelClientEvent,
+      { type: "threat-created" }
+    >["threat"],
+  ): void => {
+    if (view === null) return;
+    clearThreatTelegraph(threat.id);
+    const fromSelf =
+      threat.sourcePlayerId === view.self.playerId;
+    const telegraph = createElement(
+      "i",
+      "duel-threat-telegraph " +
+        (fromSelf
+          ? "duel-threat-telegraph-from-self"
+          : "duel-threat-telegraph-from-opponent"),
+    );
+    telegraph.dataset.threatId = threat.id;
+    telegraph.style.setProperty(
+      "--duel-threat-window",
+      Math.max(0.2, threat.remainingSeconds).toFixed(2) + "s",
+    );
+    nodes.projectiles.append(telegraph);
+  };
+
+  const spawnThreatIntercept = (
+    threatId: string,
+    targetPlayerId: DuelPlayerId,
+  ): void => {
+    if (view === null) return;
+    clearThreatTelegraph(threatId);
+    const intercept = createElement(
+      "i",
+      "duel-threat-intercept " +
+        (targetPlayerId === view.self.playerId
+          ? "duel-threat-intercept-self"
+          : "duel-threat-intercept-opponent"),
+    );
+    nodes.projectiles.append(intercept);
+    intercept.addEventListener(
+      "animationend",
+      () => intercept.remove(),
+      { once: true },
+    );
+  };
+
   const spawnProjectile = (
     sourcePlayerId: DuelPlayerId,
     variant: ProjectileVariant,
@@ -1416,7 +1522,13 @@ export function installDuelBattleUi(
     nodes.projectiles.append(projectile);
     projectile.addEventListener(
       "animationend",
-      () => projectile.remove(),
+      () => {
+        spawnProjectileArrival(
+          fromSelf ? "opponent" : "self",
+          variant,
+        );
+        projectile.remove();
+      },
       { once: true },
     );
   };
@@ -1458,7 +1570,25 @@ export function installDuelBattleUi(
     }
 
     if (event.type === "threat-created") {
-      spawnProjectile(source, "lance");
+      spawnThreatTelegraph(event.threat);
+      return;
+    }
+
+    if (event.type === "threat-countered") {
+      spawnThreatIntercept(
+        event.threatId,
+        event.targetPlayerId,
+      );
+      return;
+    }
+
+    if (event.type === "threat-resolved") {
+      clearThreatTelegraph(event.threatId);
+      presentAction(
+        event.sourcePlayerId,
+        event.actionId,
+        "lance",
+      );
       return;
     }
 
