@@ -24,8 +24,11 @@ export type DuelIncomingThreat = {
   counterTags: readonly string[];
   remainingSeconds: number;
   effectScale: number;
-  precisionBonus: DuelPrecisionBonus | null;
   status: DuelThreatStatus;
+};
+
+type DuelThreatRecord = DuelIncomingThreat & {
+  precisionBonus: DuelPrecisionBonus | null;
 };
 
 export type DuelThreatTypingResult =
@@ -44,7 +47,7 @@ export type DuelThreatTickEvent = {
 };
 
 export class DuelThreatSystem {
-  private readonly threats: DuelIncomingThreat[] = [];
+  private readonly threats: DuelThreatRecord[] = [];
   private sequence = 0;
 
   create(
@@ -58,7 +61,7 @@ export class DuelThreatSystem {
     const response = action.responseOpportunity;
     if (response === undefined) return null;
 
-    const threat: DuelIncomingThreat = {
+    const threat: DuelThreatRecord = {
       id: "threat:" + String(++this.sequence),
       sourcePlayerId,
       targetPlayerId,
@@ -84,13 +87,13 @@ export class DuelThreatSystem {
       status: "open",
     };
     this.threats.push(threat);
+    const {
+      precisionBonus: _precisionBonus,
+      ...publicThreat
+    } = threat;
     return {
-      ...threat,
-      counterTags: [...threat.counterTags],
-      precisionBonus:
-        threat.precisionBonus === null
-          ? null
-          : { ...threat.precisionBonus },
+      ...publicThreat,
+      counterTags: [...publicThreat.counterTags],
     };
   }
 
@@ -185,12 +188,15 @@ export class DuelThreatSystem {
         candidate.targetPlayerId === playerId &&
         candidate.status === "open",
     );
-    return threat === undefined
-      ? null
-      : {
-          ...threat,
-          counterTags: [...threat.counterTags],
-        };
+    if (threat === undefined) return null;
+    const {
+      precisionBonus: _precisionBonus,
+      ...publicThreat
+    } = threat;
+    return {
+      ...publicThreat,
+      counterTags: [...publicThreat.counterTags],
+    };
   }
 
   snapshotFor(
@@ -202,14 +208,16 @@ export class DuelThreatSystem {
           threat.targetPlayerId === playerId &&
           threat.status === "open",
       )
-      .map((threat) => ({
-        ...threat,
-        counterTags: [...threat.counterTags],
-        precisionBonus:
-          threat.precisionBonus === null
-            ? null
-            : { ...threat.precisionBonus },
-      }));
+      .map((threat) => {
+        const {
+          precisionBonus: _precisionBonus,
+          ...publicThreat
+        } = threat;
+        return {
+          ...publicThreat,
+          counterTags: [...publicThreat.counterTags],
+        };
+      });
   }
 
   clear(): void {
