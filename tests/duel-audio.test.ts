@@ -40,8 +40,12 @@ describe("Duel map audio presentation", () => {
     for (const map of Object.values(DUEL_MAPS)) {
       const profile = duelMusicProfileForMap(map.id);
       expect(profile.id).toBe(map.audioProfileId);
-      expect(profile.worldId).toBe(
-        DUEL_AUDIO_WORLD_SOURCE[map.id],
+      expect(profile.worldId).toBe("duel-" + map.id);
+      expect(profile.baseTrack.defaultPath).toBe(
+        "/assets/audio/duel/music/duel-nebula-calm.ogg",
+      );
+      expect(profile.intenseTrackOrLayer.defaultPath).toBe(
+        "/assets/audio/duel/music/duel-combat-intense.ogg",
       );
       expect(profile.ambientLayers.length).toBeGreaterThan(0);
       expect(profile.preloadHints.length).toBeGreaterThan(0);
@@ -62,7 +66,7 @@ describe("Duel map audio presentation", () => {
       "WORLD_INTENSE",
     );
     expect(duelMusicStateForPhase("cataclysm")).toBe(
-      "WORLD_INTENSE",
+      "GALAXY_BOSS",
     );
   });
 
