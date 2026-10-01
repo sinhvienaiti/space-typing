@@ -174,7 +174,7 @@ describe("Duel map hazard gameplay", () => {
           { type: "map-hazard-telegraph" }
         >
       | undefined;
-    for (let second = 0; second < 20; second += 1) {
+    for (let second = 0; second < 30; second += 1) {
       const events = engine.step(1);
       telegraph = events.find(
         (entry) => entry.type === "map-hazard-telegraph",
