@@ -2673,6 +2673,10 @@ export class DuelEngine {
   private clonePlayer(player: DuelPlayerState): DuelPlayerState {
     return {
       ...player,
+      precisionBonus:
+        player.precisionBonus === null
+          ? null
+          : { ...player.precisionBonus },
       offers: player.offers
         .map(cloneOffer)
         .sort(
