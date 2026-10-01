@@ -57,6 +57,19 @@ const MAX_FEED_ITEMS = 8;
 const MAX_FX_NODES = 24;
 const MAX_PROJECTILE_NODES = 18;
 const MAX_TYPING_FX_NODES = 14;
+const MAX_VISIBLE_WORD_TARGETS = 10;
+const DUEL_WORD_TARGET_POSITIONS = [
+  [18, 30],
+  [35, 24],
+  [62, 27],
+  [81, 34],
+  [27, 46],
+  [48, 42],
+  [70, 48],
+  [19, 61],
+  [58, 62],
+  [80, 60],
+] as const;
 const SHIP_FALLBACKS = {
   self: "vanguard",
   opponent: "reaper",
@@ -187,7 +200,7 @@ function createBattleNodes(gameShell: HTMLElement) {
         <div id="duelTypingFx" class="duel-typing-fx" aria-hidden="true"></div>
 
         <div class="duel-rival-zone">
-          <aside class="duel-player-card duel-opponent-card">
+          <aside class="duel-player-card duel-opponent-card" aria-label="Rival combat status">
             <div class="duel-player-heading">
               <span>RIVAL</span>
               <strong id="duelOpponentPath">BALANCED</strong>
@@ -224,18 +237,20 @@ function createBattleNodes(gameShell: HTMLElement) {
           <div id="duelOpponentCharge" class="duel-opponent-charge hidden" aria-live="polite">RIVAL CHARGING</div>
         </div>
 
+        <div id="duelOffers" class="duel-word-field" aria-label="Typing targets"></div>
+
         <div class="duel-arena-center">
-          <section class="duel-threat-lane duel-context-lane">
+          <section class="duel-threat-lane duel-context-lane hidden" aria-live="polite">
             <div class="duel-lane-title">
-              <span>COUNTER WINDOW</span>
+              <span>COUNTER</span>
               <small id="duelThreatMeta">No incoming major attack</small>
             </div>
             <div id="duelThreats" class="duel-threats"></div>
           </section>
 
-          <section class="duel-objective-lane duel-context-lane">
+          <section class="duel-objective-lane duel-context-lane hidden" aria-live="polite">
             <div class="duel-lane-title">
-              <span>SHARED OBJECTIVE</span>
+              <span>OBJECTIVE</span>
               <small id="duelObjectiveMeta">Director waiting</small>
             </div>
             <div id="duelObjective" class="duel-objective-empty">No objective</div>
@@ -246,10 +261,10 @@ function createBattleNodes(gameShell: HTMLElement) {
             <i class="duel-arena-reticle"></i>
           </div>
 
-          <div id="duelCurrentInput" class="duel-current-input duel-arena-input" aria-live="polite">
-            <span id="duelCurrentTarget">FREE TARGETING</span>
+          <div id="duelCurrentInput" class="duel-current-input duel-arena-input hidden" aria-live="polite">
+            <span id="duelCurrentTarget">TARGET</span>
             <strong id="duelCurrentPrefix" class="duel-current-token">_</strong>
-            <small>ESC cancels target · wrong keys do not advance</small>
+            <small>ESC cancel</small>
           </div>
         </div>
 
@@ -261,7 +276,7 @@ function createBattleNodes(gameShell: HTMLElement) {
             <div id="duelSelfShip" class="duel-ship-sprite" data-character="vanguard"></div>
           </div>
 
-          <aside class="duel-player-card duel-self-card">
+          <aside class="duel-player-card duel-self-card" aria-label="Your combat status">
             <div class="duel-player-heading">
               <span>YOU</span>
               <strong id="duelSelfPath">BALANCED</strong>
@@ -288,64 +303,26 @@ function createBattleNodes(gameShell: HTMLElement) {
           </aside>
         </div>
       </section>
-
-      <section class="duel-command-deck" aria-label="Duel typing controls">
-        <div class="duel-context-row">
-          <section class="duel-threat-lane duel-context-copy" aria-hidden="true"></section>
-          <section class="duel-objective-lane duel-context-copy" aria-hidden="true"></section>
-        </div>
-
-        <section class="duel-offer-section">
-          <div class="duel-lane-title">
-            <span>ACTION OFFERS</span>
-            <small>Type naturally or click to lock target</small>
-          </div>
-          <div id="duelOffers" class="duel-offer-grid"></div>
-        </section>
-      </section>
     </div>
 
-    <footer class="duel-bottom">
-      <section class="duel-inventory-panel">
-        <div class="duel-lane-title">
-          <span>BANKED ACTIONS</span>
-          <small>Attack 3 · Defense 2 · Tactical 2</small>
-        </div>
-        <div id="duelInventory" class="duel-inventory"></div>
-      </section>
-
-      <section class="duel-strategy-panel">
-        <div class="duel-lane-title">
-          <span>STRATEGY</span>
-          <small id="duelStrategyMeta">No combo ready</small>
-        </div>
-        <div id="duelCombos" class="duel-strategy-actions"></div>
-        <details class="duel-strategy-tools">
-          <summary>Conversions & traps</summary>
-          <div class="duel-tool-group">
-            <button type="button" data-duel-skill="conversion:sacrifice">Sacrifice</button>
-            <button type="button" data-duel-skill="conversion:reactor-dump">Reactor Dump</button>
-            <button type="button" data-duel-skill="conversion:overload">Overload</button>
-            <button type="button" data-duel-skill="conversion:berserk">Berserk</button>
-          </div>
-          <div class="duel-tool-group">
-            <button type="button" data-duel-skill="trap:minefield">Minefield</button>
-            <button type="button" data-duel-skill="trap:mirror-trap">Mirror Trap</button>
-            <button type="button" data-duel-skill="trap:static-snare">Static Snare</button>
-            <button type="button" data-duel-skill="trap:decoy">Decoy</button>
-            <button type="button" data-duel-skill="trap:counter-battery">Counter Battery</button>
-          </div>
-        </details>
-      </section>
-
-      <section class="duel-intel-panel">
-        <div class="duel-lane-title">
-          <span>INTEL</span>
-          <small id="duelMysteryMeta">No Mystery signal</small>
-        </div>
-        <div id="duelEventFeed" class="duel-event-feed" aria-live="polite"></div>
-      </section>
-    </footer>
+    <div class="duel-hidden-systems" aria-hidden="true">
+      <div id="duelInventory" class="duel-inventory"></div>
+      <span id="duelStrategyMeta">No combo ready</span>
+      <div id="duelCombos" class="duel-strategy-actions"></div>
+      <div class="duel-tool-group">
+        <button type="button" data-duel-skill="conversion:sacrifice">Sacrifice</button>
+        <button type="button" data-duel-skill="conversion:reactor-dump">Reactor Dump</button>
+        <button type="button" data-duel-skill="conversion:overload">Overload</button>
+        <button type="button" data-duel-skill="conversion:berserk">Berserk</button>
+        <button type="button" data-duel-skill="trap:minefield">Minefield</button>
+        <button type="button" data-duel-skill="trap:mirror-trap">Mirror Trap</button>
+        <button type="button" data-duel-skill="trap:static-snare">Static Snare</button>
+        <button type="button" data-duel-skill="trap:decoy">Decoy</button>
+        <button type="button" data-duel-skill="trap:counter-battery">Counter Battery</button>
+      </div>
+      <span id="duelMysteryMeta">No Mystery signal</span>
+      <div id="duelEventFeed" class="duel-event-feed" aria-live="polite"></div>
+    </div>
   `;
 
   gameShell.append(root);
@@ -682,7 +659,15 @@ export function installDuelBattleUi(
       driftStrength.toFixed(4),
     );
 
-    for (const offer of view.self.offers) {
+    const visibleOffers = view.self.offers
+      .filter(
+        (offer) =>
+          offer.status === "available" ||
+          offer.status === "locked",
+      )
+      .slice(0, MAX_VISIBLE_WORD_TARGETS);
+
+    for (const [targetIndex, offer] of visibleOffers.entries()) {
       const action = actionDefinition(offer.actionId);
       if (action === undefined) continue;
       const cooldown =
@@ -721,6 +706,24 @@ export function installDuelBattleUi(
         cooldown > 0 ||
         (targetFrozen && !selected);
       card.dataset.offerId = offer.instanceId;
+      card.classList.add("duel-word-target");
+      const [targetX, targetY] =
+        DUEL_WORD_TARGET_POSITIONS[
+          targetIndex % DUEL_WORD_TARGET_POSITIONS.length
+        ];
+      card.style.setProperty("--duel-target-x", String(targetX) + "%");
+      card.style.setProperty("--duel-target-y", String(targetY) + "%");
+      card.style.setProperty(
+        "--duel-target-float-delay",
+        String((targetIndex % 5) * -0.37) + "s",
+      );
+      card.title = action.displayLabel;
+
+      const targetObject = createElement(
+        "span",
+        "duel-target-object",
+      );
+      targetObject.setAttribute("aria-hidden", "true");
 
       const category = createElement(
         "small",
@@ -768,7 +771,7 @@ export function installDuelBattleUi(
           ? timingMeta.join(" · ") + " · " + baseMeta
           : baseMeta;
 
-      card.append(category, label, token, meta);
+      card.append(targetObject, category, label, token, meta);
       card.addEventListener("click", () => {
         sendTarget(offer.instanceId);
       });
@@ -780,6 +783,9 @@ export function installDuelBattleUi(
     if (view === null) return;
     nodes.threats.replaceChildren();
     const threats = view.self.incomingThreats;
+    nodes.threats
+      .closest(".duel-context-lane")
+      ?.classList.toggle("hidden", threats.length === 0);
     nodes.threatMeta.textContent =
       threats.length === 0
         ? "No incoming major attack"
@@ -824,16 +830,20 @@ export function installDuelBattleUi(
     const objective = view.shared.neutralObjective;
     nodes.objective.replaceChildren();
 
+    const objectiveLane =
+      nodes.objective.closest(".duel-context-lane");
     if (
       objective === null ||
       objective.status !== "active"
     ) {
+      objectiveLane?.classList.add("hidden");
       nodes.objective.className = "duel-objective-empty";
       nodes.objective.textContent = "No objective";
       nodes.objectiveMeta.textContent = "Director waiting";
       return;
     }
 
+    objectiveLane?.classList.remove("hidden");
     nodes.objective.className = "duel-objective-card";
     nodes.objectiveMeta.textContent =
       objective.kind.toUpperCase() + " · simultaneous contest";
@@ -1239,6 +1249,10 @@ export function installDuelBattleUi(
       delete nodes.currentInput.dataset.category;
     }
 
+    nodes.currentInput.classList.toggle(
+      "hidden",
+      targetId === null && prefix === "",
+    );
     nodes.currentTarget.textContent = label;
     nodes.currentPrefix.replaceChildren();
 
