@@ -161,6 +161,57 @@ describe("Duel M-DUEL-06 maps and director", () => {
     expect(crisis).toBeGreaterThan(skirmish);
   });
 
+  it.each(["crisis", "cataclysm"] as const)(
+    "rebases overdue %s scheduling without replaying events on input-only ticks",
+    (phase) => {
+      const director = new DuelMapDirector({
+        mapId: "celestial-void",
+        matchSeed: 590168,
+        contentVersion: "duel-final-v3",
+        hazardIntervalScale: 0.72 * 0.75,
+        hazardPressureScale: 1.18 * 1.15,
+      });
+
+      const jumped = director.update(240, phase);
+      expect(
+        jumped.filter((event) => event.type === "hazard"),
+      ).toHaveLength(4);
+      expect(
+        jumped.filter((event) => event.type === "objective"),
+      ).toHaveLength(1);
+      if (phase === "cataclysm") {
+        expect(
+          jumped.filter((event) => event.type === "cataclysm"),
+        ).toHaveLength(1);
+      }
+
+      for (let inputTick = 0; inputTick < 100; inputTick += 1) {
+        expect(director.update(0, phase)).toEqual([]);
+      }
+      expect(director.update(0.01, phase)).toEqual([]);
+
+      let resumedHazards = 0;
+      let resumedObjectives = 0;
+      for (let tick = 0; tick < 300; tick += 1) {
+        const events = director.update(0.1, phase);
+        const hazards = events.filter(
+          (event) => event.type === "hazard",
+        );
+        expect(hazards.length).toBeLessThanOrEqual(1);
+        expect(
+          events.some((event) => event.type === "cataclysm"),
+        ).toBe(false);
+        resumedHazards += hazards.length;
+        resumedObjectives += events.filter(
+          (event) => event.type === "objective",
+        ).length;
+      }
+
+      expect(resumedHazards).toBeGreaterThan(0);
+      expect(resumedObjectives).toBeGreaterThan(0);
+    },
+  );
+
   it("integrates the selected map into DuelEngine snapshot and events", () => {
     const engine = new DuelEngine({
       mapId: "tempest-prime",

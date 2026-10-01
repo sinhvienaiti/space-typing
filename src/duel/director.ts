@@ -168,6 +168,10 @@ export class DuelMapDirector {
       0,
       Number.isFinite(dtSeconds) ? dtSeconds : 0,
     );
+    // Input-only ticks must not drain overdue timed schedules. Phase
+    // transitions and the one-shot Cataclysm announcement above still run.
+    if (dt === 0) return events;
+
     this.elapsedUntilHazard -= dt;
     this.elapsedUntilObjective -= dt;
     let guard = 0;
@@ -193,10 +197,17 @@ export class DuelMapDirector {
           },
         });
       }
-      const base =
-        PHASE_INTERVAL_SECONDS[phase] * this.hazardIntervalScale;
+      const base = PHASE_INTERVAL_SECONDS[phase];
       const jitter = 0.84 + this.rng.nextFloat() * 0.32;
-      this.elapsedUntilHazard += base * jitter;
+      const interval =
+        base * jitter * this.hazardIntervalScale;
+      this.elapsedUntilHazard += interval;
+      if (guard === 4 && this.elapsedUntilHazard <= 0) {
+        // A large time jump may leave more than four historical slots
+        // overdue. Keep the bounded catch-up batch, then schedule the next
+        // event from "now" instead of replaying that backlog on step(0).
+        this.elapsedUntilHazard = interval;
+      }
     }
 
     if (this.elapsedUntilObjective <= 0) {
@@ -211,7 +222,14 @@ export class DuelMapDirector {
       });
       const base = OBJECTIVE_INTERVAL_SECONDS[phase];
       const jitter = 0.88 + this.objectiveRng.nextFloat() * 0.24;
-      this.elapsedUntilObjective += base * jitter;
+      const interval = base * jitter;
+      this.elapsedUntilObjective += interval;
+      if (this.elapsedUntilObjective <= 0) {
+        // Objectives are intentionally emitted at most once per update.
+        // Rebase any remaining overdue debt so input-only ticks cannot
+        // replay skipped historical objective slots.
+        this.elapsedUntilObjective = interval;
+      }
     }
 
     return events;

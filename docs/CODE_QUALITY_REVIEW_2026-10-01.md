@@ -86,6 +86,43 @@ Fix:
 
 Regression coverage verifies a Mystery-only draft with `mystery: 0` produces no offer.
 
+### 4. Overdue Director schedules could flood input-only ticks after a large time jump
+
+Severity: high for runtime stability under Test Lab / stress time jumps.
+
+The local handoff reported that a large phase jump could leave
+`elapsedUntilHazard` and `elapsedUntilObjective` deeply overdue after the
+Director's bounded catch-up. Subsequent input-only `step(0)` calls could then
+replay more timed events even though simulation time had not advanced. Pending
+hazard telegraphs do not age during `dt = 0`, so the queue could grow much
+faster than it drained.
+
+Git inspection confirmed the same scheduling shape was still present:
+
+- hazard catch-up was capped at four events per update;
+- remaining negative timer debt was retained after the cap;
+- zero-time updates still entered the timed schedule loops;
+- objective scheduling could retain negative debt after its one-event update.
+
+Fix:
+
+- preserve phase-transition logic and the one-shot Cataclysm announcement;
+- return before timed scheduling when sanitized `dt === 0`;
+- keep the existing four-hazard catch-up batch;
+- if the fourth catch-up still leaves hazard time overdue, rebase to the next
+  seeded interval from the current time;
+- emit at most one objective per update and similarly rebase remaining
+  objective debt;
+- do not delete already-pending hazards or shorten their telegraph/effects.
+
+Regression coverage exercises both Crisis and Cataclysm with a 240-second jump,
+then verifies 100 zero-time input ticks and a small resumed time step do not
+replay backlog. Normal scheduling must resume afterward, with no duplicate
+one-shot Cataclysm.
+
+The production stress assertion remains unchanged; this fix bounds the
+scheduler instead of increasing the allowed pending-hazard count.
+
 ## Performance review
 
 ### Credit Crystal
