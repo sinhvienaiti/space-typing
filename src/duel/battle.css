@@ -3182,10 +3182,36 @@
     0 0 13px rgba(var(--duel-accent, 110, 220, 255), 0.3);
 }
 
-.duel-word-target .duel-offer-category,
-.duel-word-target .duel-offer-label,
+.duel-word-target .duel-offer-category {
+  display: none;
+}
+
+.duel-word-target .duel-offer-label {
+  display: block;
+  max-width: 92px;
+  margin-top: 1px;
+  overflow: hidden;
+  color: rgba(214, 235, 245, 0.72);
+  font-size: clamp(0.43rem, 0.52vw, 0.54rem);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .duel-word-target .duel-offer-meta {
   display: none;
+  max-width: 96px;
+  color: rgba(190, 214, 225, 0.72);
+  font-size: 0.44rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.duel-word-target.selected .duel-offer-meta,
+.duel-word-target:hover .duel-offer-meta {
+  display: block;
 }
 
 .duel-word-target .duel-offer-token {
@@ -3363,4 +3389,66 @@
   .duel-arena-input {
     max-width: 68%;
   }
+}
+
+
+/* FINAL V4: map themes provide tint only; one battle background owner prevents
+   map-specific selectors from restoring the old 0.75 dark overlay. */
+.duel-battle[data-map="frost-wastes"] { --duel-map-tint: 103, 205, 241; }
+.duel-battle[data-map="inferno-rift"] { --duel-map-tint: 255, 112, 70; }
+.duel-battle[data-map="tempest-prime"] { --duel-map-tint: 118, 157, 255; }
+.duel-battle[data-map="ocean-abyss"] { --duel-map-tint: 67, 205, 218; }
+.duel-battle[data-map="terra-core"] { --duel-map-tint: 198, 164, 102; }
+.duel-battle[data-map="celestial-void"] { --duel-map-tint: 164, 107, 244; }
+
+.duel-battle[data-map] {
+  background:
+    radial-gradient(
+      circle at 50% 42%,
+      rgba(var(--duel-map-tint, 90, 170, 220), 0.07),
+      transparent 42%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(2, 7, 14, 0.08),
+      rgba(2, 6, 13, 0.18)
+    );
+}
+
+/* Action-specific world-object fallback silhouettes. Painted alpha sprites can
+   replace these through the target-art manifest without changing labels/layout. */
+.duel-target-object[data-action-id="laser"] {
+  border-radius: 18% 58% 20% 58%;
+  transform: rotate(45deg) scale(0.78);
+}
+.duel-target-object[data-action-id="missile"] {
+  width: clamp(18px, 1.7vw, 27px);
+  aspect-ratio: 0.48;
+  border-radius: 52% 52% 28% 28%;
+  transform: rotate(18deg);
+}
+.duel-target-object[data-action-id="railgun"],
+.duel-target-object[data-action-id="siege-lance"] {
+  width: clamp(20px, 1.9vw, 30px);
+  aspect-ratio: 0.38;
+  border-radius: 50% 50% 16% 16%;
+  transform: rotate(38deg);
+}
+.duel-target-object[data-action-id="bomb"] {
+  border-radius: 50%;
+  box-shadow:
+    inset -5px -6px 9px rgba(0, 0, 0, 0.38),
+    0 0 15px rgba(var(--duel-danger, 255, 100, 140), 0.3);
+}
+.duel-target-object[data-action-id="repair"],
+.duel-target-object[data-action-id="drone"],
+.duel-target-object[data-action-id="scan"],
+.duel-target-object[data-action-id="lock-on"] {
+  border-radius: 16% 36% 16% 36%;
+}
+.duel-target-object[data-action-id="gravity"],
+.duel-target-object[data-action-id="black-hole"] {
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, #05070c 0 24%, rgba(88, 55, 140, 0.94) 28% 38%, rgba(120, 204, 255, 0.52) 44% 54%, transparent 62%);
 }
