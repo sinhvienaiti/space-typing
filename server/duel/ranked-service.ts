@@ -11,6 +11,7 @@ import type {
   DuelClientMatchUpdate,
 } from "../../src/duel/authority";
 import {
+  DuelRankedPresence,
   DuelRankedQueue,
   createDefaultDuelRankedProfile,
   duelMatchmakingRating,
@@ -154,11 +155,29 @@ export type DuelRankedMatchStart = {
   updates: readonly DuelClientMatchUpdate[];
 };
 
+export type DuelRankedCompletedProfiles = {
+  left: {
+    sessionId: string;
+    profile: DuelRankedProfile;
+  };
+  right: {
+    sessionId: string;
+    profile: DuelRankedProfile;
+  };
+};
+
+export type DuelRankedDisconnectSettlement = {
+  matchId: string;
+  updates: readonly DuelClientMatchUpdate[];
+  completed: DuelRankedCompletedProfiles | null;
+};
+
 type ActiveRankedMatch = {
   leftAccountId: string;
   rightAccountId: string;
   leftSessionId: string;
   rightSessionId: string;
+  presence: DuelRankedPresence;
 };
 
 export class DuelRankedService {
@@ -218,6 +237,74 @@ export class DuelRankedService {
     return this.queue.leave(sessionId);
   }
 
+  disconnect(
+    sessionId: string,
+    now: number,
+  ): boolean {
+    let changed = this.queue.leave(sessionId);
+    for (const active of this.active.values()) {
+      if (active.leftSessionId === sessionId) {
+        active.presence.disconnect("player-1", now);
+        changed = true;
+      }
+      if (active.rightSessionId === sessionId) {
+        active.presence.disconnect("player-2", now);
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  reconnect(sessionId: string): boolean {
+    let changed = false;
+    for (const active of this.active.values()) {
+      if (active.leftSessionId === sessionId) {
+        active.presence.reconnect("player-1");
+        changed = true;
+      }
+      if (active.rightSessionId === sessionId) {
+        active.presence.reconnect("player-2");
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  resolveDisconnects(
+    now: number,
+  ): DuelRankedDisconnectSettlement[] {
+    const settlements: DuelRankedDisconnectSettlement[] =
+      [];
+
+    for (const [matchId, active] of [
+      ...this.active.entries(),
+    ]) {
+      const presence = active.presence.resolve(now);
+      if (presence.status === "active") continue;
+
+      const result =
+        this.authority.finishRankedForfeit(
+          matchId,
+          presence.status === "forfeit"
+            ? presence.forfeitingPlayerId
+            : null,
+        );
+      if (!result.ok) continue;
+
+      const completed = this.completeIfFinished(
+        matchId,
+        result.value.updates,
+      );
+      settlements.push({
+        matchId,
+        updates: result.value.updates,
+        completed,
+      });
+    }
+
+    return settlements;
+  }
+
   pump(now: number): DuelRankedMatchStart[] {
     const started: DuelRankedMatchStart[] = [];
     let guard = 0;
@@ -240,6 +327,7 @@ export class DuelRankedService {
         rightAccountId: pair.right.accountId,
         leftSessionId: pair.left.sessionId,
         rightSessionId: pair.right.sessionId,
+        presence: new DuelRankedPresence(),
       });
       started.push(result.value);
     }
@@ -249,16 +337,7 @@ export class DuelRankedService {
   completeIfFinished(
     matchId: string,
     updates: readonly DuelClientMatchUpdate[],
-  ): {
-    left: {
-      sessionId: string;
-      profile: DuelRankedProfile;
-    };
-    right: {
-      sessionId: string;
-      profile: DuelRankedProfile;
-    };
-  } | null {
+  ): DuelRankedCompletedProfiles | null {
     const active = this.active.get(matchId);
     if (active === undefined || updates.length === 0) {
       return null;
@@ -294,6 +373,7 @@ export class DuelRankedService {
     this.store.save(updated.left);
     this.store.save(updated.right);
     this.active.delete(matchId);
+    this.authority.releaseFinishedRankedMatch(matchId);
     return {
       left: {
         sessionId: active.leftSessionId,

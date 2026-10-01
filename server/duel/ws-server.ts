@@ -35,6 +35,7 @@ import {
   DuelRankedService,
   InMemoryDuelRankedProfileStore,
   JsonFileDuelRankedProfileStore,
+  type DuelRankedCompletedProfiles,
 } from "./ranked-service";
 import {
   duelMatchmakingRating,
@@ -331,6 +332,30 @@ function sendUpdates(
   }
 }
 
+function sendRankedCompletion(
+  completed: DuelRankedCompletedProfiles | null,
+): void {
+  if (completed === null) return;
+  for (const entry of [
+    completed.left,
+    completed.right,
+  ]) {
+    const socket = socketForSession(entry.sessionId);
+    if (socket === null) continue;
+    send(socket, {
+      type: "RANKED_PROFILE",
+      typingRating: entry.profile.typingRating,
+      duelRating: entry.profile.duelRating,
+      matchmakingRating:
+        duelMatchmakingRating(entry.profile),
+      matchesPlayed: entry.profile.matchesPlayed,
+      wins: entry.profile.wins,
+      losses: entry.profile.losses,
+      draws: entry.profile.draws,
+    });
+  }
+}
+
 function closeDuplicateSession(
   sessionId: string,
   keep: WebSocket,
@@ -374,6 +399,7 @@ function handleHello(
     opened.value.sessionId,
     socket,
   );
+  ranked.reconnect(opened.value.sessionId);
 
   send(socket, {
     type: "WELCOME",
@@ -776,10 +802,14 @@ wss.on("connection", (socket) => {
       socketsBySession.get(current.sessionId) === socket
     ) {
       socketsBySession.delete(current.sessionId);
-      ranked.leave(current.sessionId);
+      const disconnectedAt = Date.now();
+      ranked.disconnect(
+        current.sessionId,
+        disconnectedAt,
+      );
       authority.disconnect(
         current.sessionId,
-        Date.now(),
+        disconnectedAt,
       );
     }
   });
@@ -863,6 +893,12 @@ const tickTimer = setInterval(() => {
       sendUpdates(rankedMatch.updates);
     }
 
+    for (const settlement of ranked.resolveDisconnects(now)) {
+      sendUpdates(settlement.updates);
+      sendRankedCompletion(settlement.completed);
+      activeMatches.delete(settlement.matchId);
+    }
+
     for (const matchId of [...activeMatches]) {
       const result = authority.tick(
         matchId,
@@ -878,30 +914,7 @@ const tickTimer = setInterval(() => {
         matchId,
         result.value.updates,
       );
-      if (completed !== null) {
-        for (const entry of [
-          completed.left,
-          completed.right,
-        ]) {
-          const socket = socketForSession(
-            entry.sessionId,
-          );
-          if (socket === null) continue;
-          send(socket, {
-            type: "RANKED_PROFILE",
-            typingRating:
-              entry.profile.typingRating,
-            duelRating: entry.profile.duelRating,
-            matchmakingRating:
-              duelMatchmakingRating(entry.profile),
-            matchesPlayed:
-              entry.profile.matchesPlayed,
-            wins: entry.profile.wins,
-            losses: entry.profile.losses,
-            draws: entry.profile.draws,
-          });
-        }
-      }
+      sendRankedCompletion(completed);
       const active = result.value.updates.some(
         (update) =>
           update.view.series.status === "active",

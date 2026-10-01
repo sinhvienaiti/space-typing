@@ -1435,6 +1435,92 @@ export class DuelAuthorityService {
     };
   }
 
+  finishRankedForfeit(
+    matchId: string,
+    forfeitingPlayerId: DuelPlayerId | null,
+  ): DuelAuthorityResult<{
+    updates: readonly DuelClientMatchUpdate[];
+  }> {
+    const match = this.matches.get(matchId);
+    if (match === undefined) {
+      return this.error(
+        "MATCH_NOT_FOUND",
+        "Ranked match does not exist.",
+      );
+    }
+    if (match.mode !== "ranked") {
+      return this.error(
+        "MATCH_FORBIDDEN",
+        "Only Ranked matches can be settled by Ranked forfeit.",
+      );
+    }
+
+    if (match.series.status === "active") {
+      match.needsRoundReset = false;
+      if (forfeitingPlayerId === null) {
+        match.series.status = "draw";
+        match.series.winnerId = null;
+      } else {
+        const winnerId =
+          forfeitingPlayerId === "player-1"
+            ? "player-2"
+            : "player-1";
+        match.series.status = "won";
+        match.series.winnerId = winnerId;
+        match.series.wins[winnerId] = Math.max(
+          match.series.wins[winnerId],
+          match.series.winsNeeded,
+        );
+      }
+      match.serverSequence += 1;
+    }
+
+    return {
+      ok: true,
+      value: {
+        updates: this.updatesForMatch(match, []),
+      },
+    };
+  }
+
+  releaseFinishedRankedMatch(
+    matchId: string,
+  ): DuelAuthorityResult<true> {
+    const match = this.matches.get(matchId);
+    if (match === undefined) {
+      return this.error(
+        "MATCH_NOT_FOUND",
+        "Ranked match does not exist.",
+      );
+    }
+    if (
+      match.mode !== "ranked" ||
+      match.series.status === "active"
+    ) {
+      return this.error(
+        "RANKED_INELIGIBLE",
+        "Ranked match is not ready for release.",
+      );
+    }
+
+    for (const playerId of [
+      "player-1",
+      "player-2",
+    ] as const) {
+      const sessionId = match.players[playerId];
+      if (sessionId === null) continue;
+      const session = this.sessions.get(sessionId);
+      if (
+        session !== undefined &&
+        session.matchId === matchId
+      ) {
+        session.matchId = null;
+      }
+    }
+    this.matches.delete(matchId);
+    return { ok: true, value: true };
+  }
+
   clientMatchView(
     sessionId: string,
     matchId: string,

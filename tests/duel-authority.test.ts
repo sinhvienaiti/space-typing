@@ -559,6 +559,89 @@ describe("Duel M-DUEL-11 authority core", () => {
     );
   });
 
+  it("settles Ranked forfeit authoritatively and releases both match bindings", () => {
+    const authority = new DuelAuthorityService(deps());
+    const left = open(authority, "ranked-left");
+    const right = open(authority, "ranked-right");
+
+    const started = authority.startRankedMatch(
+      left.sessionId,
+      right.sessionId,
+      0,
+    );
+    if (!started.ok) throw new Error(started.message);
+
+    const settled = authority.finishRankedForfeit(
+      started.value.matchId,
+      "player-1",
+    );
+    if (!settled.ok) throw new Error(settled.message);
+
+    expect(
+      settled.value.updates.every(
+        (update) =>
+          update.view.series.status === "won" &&
+          update.view.series.winnerId === "player-2" &&
+          update.view.series.wins["player-2"] >=
+            update.view.series.winsNeeded,
+      ),
+    ).toBe(true);
+
+    expect(
+      authority.rankedParticipant(left.sessionId).ok,
+    ).toBe(false);
+
+    expect(
+      authority.releaseFinishedRankedMatch(
+        started.value.matchId,
+      ),
+    ).toEqual({ ok: true, value: true });
+
+    expect(
+      authority.rankedParticipant(left.sessionId).ok,
+    ).toBe(true);
+    expect(
+      authority.rankedParticipant(right.sessionId).ok,
+    ).toBe(true);
+    expect(
+      authority.clientMatchView(
+        left.sessionId,
+        started.value.matchId,
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        ok: false,
+        code: "MATCH_NOT_FOUND",
+      }),
+    );
+  });
+
+  it("settles double Ranked disconnect as a draw rather than slot-order win", () => {
+    const authority = new DuelAuthorityService(deps());
+    const left = open(authority, "draw-left");
+    const right = open(authority, "draw-right");
+    const started = authority.startRankedMatch(
+      left.sessionId,
+      right.sessionId,
+      0,
+    );
+    if (!started.ok) throw new Error(started.message);
+
+    const settled = authority.finishRankedForfeit(
+      started.value.matchId,
+      null,
+    );
+    if (!settled.ok) throw new Error(settled.message);
+
+    expect(
+      settled.value.updates.every(
+        (update) =>
+          update.view.series.status === "draw" &&
+          update.view.series.winnerId === null,
+      ),
+    ).toBe(true);
+  });
+
   it("cleans ghost session membership after reconnect grace", () => {
     const authority = new DuelAuthorityService(deps(), {
       reconnectGraceMs: 1000,

@@ -4,6 +4,7 @@ import {
   type DuelAuthorityDependencies,
 } from "../src/duel/authority";
 import { DUEL_PROTOCOL_VERSION } from "../src/duel/protocol";
+import { DUEL_RANKED_RECONNECT_GRACE_MS } from "../src/duel/ranked";
 import {
   DuelRankedService,
   InMemoryDuelRankedProfileStore,
@@ -106,6 +107,104 @@ describe("Duel ranked server service", () => {
     );
   });
 
+  it("restores a disconnected Ranked player inside grace and does not forfeit", () => {
+    const authority = new DuelAuthorityService(deps());
+    const ranked = new DuelRankedService(
+      authority,
+      new InMemoryDuelRankedProfileStore(),
+      () => "ticket-reconnect",
+    );
+    const left = open(authority, "left-reconnect");
+    const right = open(authority, "right-reconnect");
+    ranked.enqueue(left, 0);
+    ranked.enqueue(right, 0);
+    const match = ranked.pump(0)[0];
+    if (match === undefined) throw new Error("Missing ranked match.");
+
+    ranked.disconnect(left, 1000);
+    expect(
+      ranked.resolveDisconnects(
+        1000 + DUEL_RANKED_RECONNECT_GRACE_MS - 1,
+      ),
+    ).toEqual([]);
+
+    expect(ranked.reconnect(left)).toBe(true);
+    expect(
+      ranked.resolveDisconnects(
+        1000 + DUEL_RANKED_RECONNECT_GRACE_MS + 5000,
+      ),
+    ).toEqual([]);
+    expect(
+      authority.clientMatchView(left, match.matchId).ok,
+    ).toBe(true);
+  });
+
+  it("forfeits one Ranked player after grace, saves rating, and releases both sessions", () => {
+    const authority = new DuelAuthorityService(deps());
+    const ranked = new DuelRankedService(
+      authority,
+      new InMemoryDuelRankedProfileStore(),
+      () => "ticket-forfeit",
+    );
+    const left = open(authority, "left-forfeit");
+    const right = open(authority, "right-forfeit");
+    ranked.enqueue(left, 0);
+    ranked.enqueue(right, 0);
+    const match = ranked.pump(0)[0];
+    if (match === undefined) throw new Error("Missing ranked match.");
+
+    ranked.disconnect(left, 1000);
+    const settlements = ranked.resolveDisconnects(
+      1000 + DUEL_RANKED_RECONNECT_GRACE_MS,
+    );
+
+    expect(settlements).toHaveLength(1);
+    expect(
+      settlements[0]?.updates[0]?.view.series,
+    ).toEqual(
+      expect.objectContaining({
+        status: "won",
+        winnerId: "player-2",
+      }),
+    );
+    expect(ranked.profile("left-forfeit").losses).toBe(1);
+    expect(ranked.profile("right-forfeit").wins).toBe(1);
+    expect(authority.rankedParticipant(left).ok).toBe(true);
+    expect(authority.rankedParticipant(right).ok).toBe(true);
+  });
+
+  it("resolves simultaneous Ranked disconnect as a draw", () => {
+    const authority = new DuelAuthorityService(deps());
+    const ranked = new DuelRankedService(
+      authority,
+      new InMemoryDuelRankedProfileStore(),
+      () => "ticket-double",
+    );
+    const left = open(authority, "left-double");
+    const right = open(authority, "right-double");
+    ranked.enqueue(left, 0);
+    ranked.enqueue(right, 0);
+    ranked.pump(0);
+
+    ranked.disconnect(left, 1000);
+    ranked.disconnect(right, 1000);
+    const settlements = ranked.resolveDisconnects(
+      1000 + DUEL_RANKED_RECONNECT_GRACE_MS,
+    );
+
+    expect(settlements).toHaveLength(1);
+    expect(
+      settlements[0]?.updates[0]?.view.series,
+    ).toEqual(
+      expect.objectContaining({
+        status: "draw",
+        winnerId: null,
+      }),
+    );
+    expect(ranked.profile("left-double").draws).toBe(1);
+    expect(ranked.profile("right-double").draws).toBe(1);
+  });
+
   it("persists Duel rating after an authoritative series finishes", () => {
     const authority = new DuelAuthorityService(deps());
     const store = new InMemoryDuelRankedProfileStore();
@@ -122,29 +221,21 @@ describe("Duel ranked server service", () => {
     const match = ranked.pump(0)[0];
     if (match === undefined) throw new Error("Missing ranked match.");
 
-    const fakeFinal = match.updates.map((update) => ({
-      ...update,
-      view: {
-        ...update.view,
-        series: {
-          ...update.view.series,
-          status: "won" as const,
-          winnerId: "player-1" as const,
-          wins: {
-            "player-1": 2,
-            "player-2": 0,
-          },
-        },
-      },
-    }));
+    const settled = authority.finishRankedForfeit(
+      match.matchId,
+      "player-2",
+    );
+    if (!settled.ok) throw new Error(settled.message);
     const updated = ranked.completeIfFinished(
       match.matchId,
-      fakeFinal,
+      settled.value.updates,
     );
 
     expect(updated?.left.profile.duelRating).toBeGreaterThan(1000);
     expect(updated?.right.profile.duelRating).toBeLessThan(1000);
     expect(ranked.profile("left").matchesPlayed).toBe(1);
     expect(ranked.profile("right").matchesPlayed).toBe(1);
+    expect(authority.rankedParticipant(left).ok).toBe(true);
+    expect(authority.rankedParticipant(right).ok).toBe(true);
   });
 });
