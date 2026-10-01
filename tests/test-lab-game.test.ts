@@ -687,6 +687,95 @@ describe("M21 gated Game Test Lab API", () => {
     game.destroy();
   });
 
+  it("emits pronunciation and IPA/Vietnamese learning feedback for every typed enemy layer", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 50);
+    game.testLabSetSchedulerFrozen(true);
+
+    const onWordComplete = vi.fn();
+    const onKillTranslation = vi.fn();
+    const runtime = game as unknown as {
+      hooks: {
+        onWordComplete: (
+          entry: VocabularyEntry,
+          outcome?: { perfect: boolean },
+        ) => void;
+        onKillTranslation?: (entry: VocabularyEntry) => void;
+      };
+    };
+    runtime.hooks.onWordComplete = onWordComplete;
+    runtime.hooks.onKillTranslation = onKillTranslation;
+
+    const enemyId = game.testLabSpawnEnemies({
+      kind: "scout",
+      count: 1,
+      rank: "X",
+      layers: 3,
+    })[0]!;
+
+    const completedEntries: VocabularyEntry[] = [];
+
+    for (const expectedLayers of [2, 1, 0]) {
+      const before = game
+        .getTestLabSnapshot()
+        ?.enemies.find((enemy) => enemy.id === enemyId);
+      expect(before).toBeDefined();
+      completedEntries.push({ ...before!.entry });
+
+      expect(game.testLabForceWordComplete(enemyId)).toBe(true);
+
+      const snapshot = game.getTestLabSnapshot();
+      if (expectedLayers > 0) {
+        const current = snapshot?.enemies.find(
+          (enemy) => enemy.id === enemyId,
+        );
+        expect(current?.layersRemaining).toBe(expectedLayers);
+      } else {
+        expect(
+          snapshot?.enemies.some((enemy) => enemy.id === enemyId),
+        ).toBe(false);
+      }
+
+      expect(snapshot?.learningEcho?.en).toBe(
+        completedEntries.at(-1)!.en,
+      );
+      expect(snapshot?.learningEcho?.ipa).toBe(
+        completedEntries.at(-1)!.ipa,
+      );
+      expect(snapshot?.learningEcho?.vi).toBe(
+        completedEntries.at(-1)!.vi,
+      );
+    }
+
+    expect(onWordComplete).toHaveBeenCalledTimes(3);
+    expect(onKillTranslation).toHaveBeenCalledTimes(3);
+
+    for (const [index, entry] of completedEntries.entries()) {
+      expect(onWordComplete).toHaveBeenNthCalledWith(
+        index + 1,
+        expect.objectContaining({
+          id: entry.id,
+          en: entry.en,
+          ipa: entry.ipa,
+          vi: entry.vi,
+        }),
+        expect.objectContaining({ perfect: true }),
+      );
+      expect(onKillTranslation).toHaveBeenNthCalledWith(
+        index + 1,
+        expect.objectContaining({
+          id: entry.id,
+          en: entry.en,
+          ipa: entry.ipa,
+          vi: entry.vi,
+        }),
+      );
+    }
+
+    game.destroy();
+  });
+
   it("reports completed-word quality once for shared learning", () => {
     const game = createTestGame();
     game.setTestLabMode(true);

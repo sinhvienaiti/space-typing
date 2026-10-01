@@ -6943,11 +6943,20 @@ export class Game {
     this.applyCharacterWordCompletePassive(length);
     this.applyCharacterPerfectWordPassive(perfectWord);
     this.applyRelicWordComplete(length, perfectWord, enemy);
+    const completedEntry = { ...enemy.entry };
     this.emitTypedCompletion(
-      enemy.entry,
+      completedEntry,
       perfectWord,
       "enemy",
       "enemy:" + String(enemy.id),
+    );
+    // Every typed semantic layer is a completed learning word, not only the
+    // final Core/kill layer. Keep pronunciation on onWordComplete and show
+    // the same Vietnamese/IPA feedback for shield/armor/ward layers too.
+    this.presentCombatTranslation(
+      completedEntry,
+      enemy.x,
+      enemy.y - enemy.radius - 18,
     );
 
     const sharedEffect = sharedTargetEffect(
@@ -7002,12 +7011,6 @@ export class Game {
     });
     this.addScore(killReward * this.stats.multiplier);
     this.gainPower(7);
-    this.presentCombatTranslation(
-      enemy.entry,
-      enemy.x,
-      enemy.y - enemy.radius - 18,
-    );
-
     const deathDefinition = this.visualDefinitionForEnemy(enemy);
     const creditReceipt =
       this.claimCombatCreditEnemy(enemy, "typed-kill");
