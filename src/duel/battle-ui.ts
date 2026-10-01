@@ -816,14 +816,15 @@ export function installDuelBattleUi(
         ),
       );
     }
+    const initiative = view.self.initiative;
     nodes.root
       .querySelectorAll<HTMLButtonElement>(
         '[data-duel-skill^="trap:"]',
       )
       .forEach((tool) => {
-        tool.disabled = view.self.initiative < 8;
+        tool.disabled = initiative < 8;
         tool.title =
-          view.self.initiative < 8
+          initiative < 8
             ? "Requires 8 Initiative"
             : "Spend 8 Initiative to arm";
       });
