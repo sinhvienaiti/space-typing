@@ -159,7 +159,8 @@ export class DuelMapDirector {
     }
 
     if (phase === "build") {
-      this.elapsedUntilHazard = PHASE_INTERVAL_SECONDS.build;
+      this.elapsedUntilHazard =
+        PHASE_INTERVAL_SECONDS.build * this.hazardIntervalScale;
       return events;
     }
 

@@ -80,13 +80,31 @@ describe("Duel M-DUEL-06 maps and director", () => {
       hazardPressureScale: 1.2,
     });
 
-    expect(standard.update(7, "war")).toEqual([]);
-    const events = high.update(7, "war");
-    const hazard = events.find((event) => event.type === "hazard");
-    expect(hazard?.type).toBe("hazard");
-    if (hazard?.type === "hazard") {
-      expect(hazard.hazard.mapId).toBe("inferno-rift");
-      expect(hazard.hazard.pressure).toBeGreaterThan(1);
+    expect(standard.update(5.4, "war")).toEqual([]);
+    const highEvents = high.update(5.4, "war");
+    const highHazard = highEvents.find(
+      (event) => event.type === "hazard",
+    );
+    expect(highHazard?.type).toBe("hazard");
+
+    const standardAtCadence = new DuelMapDirector({
+      mapId: "inferno-rift",
+      matchSeed: 77,
+      contentVersion: "v3",
+    });
+    const standardHazard = standardAtCadence
+      .update(9, "war")
+      .find((event) => event.type === "hazard");
+    if (
+      highHazard?.type === "hazard" &&
+      standardHazard?.type === "hazard"
+    ) {
+      expect(highHazard.hazard.hazardId).toBe(
+        standardHazard.hazard.hazardId,
+      );
+      expect(highHazard.hazard.pressure).toBeGreaterThan(
+        standardHazard.hazard.pressure,
+      );
     }
   });
 
