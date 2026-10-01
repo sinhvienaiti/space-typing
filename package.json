@@ -29,7 +29,8 @@
     "reward-art:check": "node scripts/bg-art/check-credit-puzzle-art.mjs",
     "predev": "pnpm art:prepare",
     "prebuild": "pnpm art:prepare",
-    "duel-targets:prepare": "node scripts/bg-art/prepare-duel-targets.mjs"
+    "duel-targets:prepare": "node scripts/bg-art/prepare-duel-targets.mjs",
+    "combat-vfx-sequences:prepare": "node scripts/bg-art/prepare-combat-vfx-sequences.mjs"
   },
   "dependencies": {
     "ws": "^8.22.0"
