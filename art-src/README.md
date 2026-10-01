@@ -1,8 +1,8 @@
-# art-src — ảnh gốc cho hình nền (không đưa lên Git)
+# art-src — ảnh gốc local cho Space Typing (không đưa lên Git)
 
 Thư mục này chứa **ảnh gốc** do chủ dự án tạo bằng Gemini hoặc ChatGPT Images.
 
-Game không đọc các ảnh này. Chỉ lệnh `pnpm bg:prepare` đọc chúng, rồi tạo bộ ảnh chạy trong game ở `public/assets/space-typing/backgrounds/<kit>/`. Bộ ảnh chạy trong game **có** trong Git.
+Game không đọc trực tiếp các ảnh gốc này. Các pipeline `*:prepare` đọc chúng và tạo asset runtime trong `public/assets/space-typing/` hoặc `src/assets/`. Bộ ảnh runtime đã xử lý **có** trong Git.
 
 Git bỏ qua mọi thứ ở đây, trừ file README này. Lý do:
 - ảnh gốc nặng, khoảng 22 MB cho mỗi Galaxy;
@@ -28,6 +28,8 @@ Git bỏ qua mọi thứ ở đây, trừ file README này. Lý do:
 | `fx/vanguard/` | hiệu ứng đạn Vanguard (`pnpm fx:prepare vanguard`) | `vanguard-bolt` (2:1), `vanguard-impact` (1:1), `vanguard-finisher` (2:1), `vanguard-muzzle` (2:1). Tất cả nền đen tuyệt đối `#000000`. |
 | `pickups/credits/` | Credit Crystal (`pnpm pickups:prepare`) | `common`, `refined`, `high`, `elite`, `elite-golden`, `mini-boss`, `boss`, `major-boss`. Nền trong suốt thật. |
 | `puzzle/` | Puzzle reward art (`pnpm puzzle:prepare`) | `puzzle-carrier`, `puzzle-chest-closed`, `puzzle-chest-open`. Nền trong suốt thật. |
+| `combat-vfx/` | PvP/PvE combat VFX (`pnpm combat-vfx:prepare`) | `explosion-core`, `explosion-wide`, `shockwave-ring`, `fire-small`, `fire-medium`, `fire-critical`, `smoke-dark`, `smoke-hot`, `spark-burst`, `debris-burst`, `missile-salvo`, `bomb-impact`, `precision-burst`. Ưu tiên RGBA thật; smoke/debris dùng source-over, fire/glow dùng emissive. |
+| `duel-targets/` | 18 world target PvP (`pnpm duel-targets:prepare`) | Tên file đúng action ID: `laser`, `missile`, `railgun`, `bomb`, `siege-lance`, `shield`, `reflect`, `barrier`, `repair`, `energy`, `amplify`, `drone`, `lock-on`, `gravity`, `disrupt`, `scan`, `fate-crystal`, `black-hole`. **Bắt buộc transparent alpha thật**, không nền đen/trắng, không chữ. |
 
 Thêm Galaxy mới: tạo thư mục `gNN/`, rồi khai báo trong `KITS` của `scripts/bg-art/prepare-kit.mjs` cùng dải `heroWorlds`. G02 còn kiểm tra đúng 12 object ở atlas rocks và 11 object ở atlas life để bắt lỗi tách vật thể trước khi build runtime kit.
 
@@ -37,7 +39,7 @@ Chi tiết về tỉ lệ, loại nền và prompt: [G01_CHATGPT_PROMPT_PACK.md]
 ## Tự động refresh art khi chạy local
 
 Từ 2026-10-01, không cần nhớ từng lệnh `bg:prepare`, `sprites:prepare`,
-`fx:prepare`, `pickups:prepare` hay `puzzle:prepare` cho workflow thường ngày.
+`fx:prepare`, `pickups:prepare`, `puzzle:prepare`, `combat-vfx:prepare` hay `duel-targets:prepare` cho workflow thường ngày.
 
 Parent `typing-game/play.sh` và `typing-game/dev.sh` gọi:
 
