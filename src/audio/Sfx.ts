@@ -9,6 +9,11 @@ import {
 } from "./mix";
 import { SampleSfxBank } from "./sample-bank";
 import type { EnemyMaterial } from "../enemies/identity";
+import type {
+  CreditCrystalTier,
+  CreditCrystalVariant,
+} from "../rewards/combat-credit-drops";
+import type { VisualQuality } from "../types";
 
 /** Optional shaping for one synthesized voice. */
 type VoiceShape = {
@@ -58,6 +63,29 @@ export type ImpactVariant = PlayerImpactVariant | "energy";
  */
 const IMPACT_RING_HZ = [1567.98, 1760, 2093, 2349.32, 2637.02] as const;
 
+const CREDIT_TIER_PITCH: Readonly<Record<CreditCrystalTier, number>> = {
+  common: 1,
+  refined: 1.06,
+  high: 1.12,
+  elite: 1.18,
+  "mini-boss": 1.24,
+  boss: 1.3,
+  "major-boss": 1.35,
+};
+
+function creditQualityLayers(quality: VisualQuality): number {
+  switch (quality) {
+    case "low":
+      return 0;
+    case "medium":
+      return 1;
+    case "high":
+      return 2;
+    case "ultra":
+      return 3;
+  }
+}
+
 type ImpactVoiceProfile = {
   weight: number;
   crackHz: number;
@@ -101,6 +129,9 @@ export class Sfx {
   private lastEnemyDeath = -Infinity;
   private lastBossImpact = -Infinity;
   private lastBellNote = -1;
+  private lastCreditDrop = -Infinity;
+  private lastCreditPickup = -Infinity;
+  private creditNote = 0;
 
   private readonly onPronunciation = (event: Event): void => {
     const detail = (event as CustomEvent<{ active?: unknown }>).detail;
@@ -447,12 +478,235 @@ export class Sfx {
     this.tone(540, 0.06, "sine", 0.018, 700, "ui");
   }
 
-  stageClear(): void {
-    this.tone(420, 0.18, "triangle", 0.035, 760, "ui");
-    this.schedule(
-      () => this.tone(650, 0.2, "triangle", 0.03, 1040, "ui"),
-      90,
+  creditDrop(
+    tier: CreditCrystalTier,
+    quality: VisualQuality,
+    variant: CreditCrystalVariant = "standard",
+  ): void {
+    const now = this.clock();
+    if (now - this.lastCreditDrop < 42) return;
+    this.lastCreditDrop = now;
+
+    const layers = creditQualityLayers(quality);
+    const tierPitch = CREDIT_TIER_PITCH[tier];
+    const golden = variant === "golden";
+    const pitch = Math.min(1.35, tierPitch * (golden ? 1.05 : 1));
+
+    this.samples.play(
+      "credit-drop",
+      this.volume,
+      this.pronunciationActive,
+      pitch,
     );
+
+    this.tone(
+      760 * pitch,
+      0.085,
+      "triangle",
+      0.028,
+      1120 * pitch,
+      "combat",
+      { attack: 0.002 },
+    );
+
+    if (layers >= 1) {
+      this.tone(
+        1320 * pitch,
+        0.12,
+        "sine",
+        0.022,
+        1580 * pitch,
+        "combat",
+        { attack: 0.002 },
+      );
+    }
+    if (layers >= 2) {
+      this.schedule(
+        () =>
+          this.tone(
+            1760 * pitch,
+            0.13,
+            "sine",
+            0.018,
+            2240 * pitch,
+            "combat",
+            { attack: 0.002 },
+          ),
+        34,
+      );
+    }
+    if (layers >= 3 || tier === "boss" || tier === "major-boss") {
+      this.schedule(
+        () =>
+          this.tone(
+            2350 * pitch,
+            0.14,
+            "sine",
+            0.015,
+            2940 * pitch,
+            "combat",
+            { attack: 0.002 },
+          ),
+        62,
+      );
+    }
+  }
+
+  creditPickup(
+    tier: CreditCrystalTier,
+    quality: VisualQuality,
+    variant: CreditCrystalVariant,
+    hero: boolean,
+  ): void {
+    const now = this.clock();
+    if (now - this.lastCreditPickup < 48 && !hero) return;
+    this.lastCreditPickup = now;
+
+    const layers = creditQualityLayers(quality);
+    const tierPitch = CREDIT_TIER_PITCH[tier];
+    const golden = variant === "golden";
+    const pitch = Math.min(1.35, tierPitch * (golden ? 1.04 : 1));
+    const notes = [880, 1046.5, 1318.5, 1568] as const;
+    const note = notes[this.creditNote % notes.length]!;
+    this.creditNote += 1;
+
+    this.samples.play(
+      "credit-pickup",
+      this.volume,
+      this.pronunciationActive,
+      pitch,
+    );
+    this.tone(
+      note * pitch,
+      hero ? 0.16 : 0.11,
+      "triangle",
+      hero ? 0.045 : 0.032,
+      note * pitch * 1.24,
+      "combat",
+      { attack: 0.002 },
+    );
+
+    if (layers >= 1) {
+      this.schedule(
+        () =>
+          this.tone(
+            note * 1.5 * pitch,
+            0.14,
+            "sine",
+            hero ? 0.033 : 0.022,
+            note * 1.72 * pitch,
+            "combat",
+            { attack: 0.002 },
+          ),
+        28,
+      );
+    }
+    if (layers >= 2) {
+      this.schedule(
+        () =>
+          this.tone(
+            note * 2 * pitch,
+            0.16,
+            "sine",
+            hero ? 0.026 : 0.016,
+            note * 2.2 * pitch,
+            "combat",
+            { attack: 0.002 },
+          ),
+        58,
+      );
+    }
+    if (hero) {
+      this.tone(
+        150,
+        0.16,
+        "sine",
+        0.04,
+        88,
+        "combat",
+      );
+      if (layers >= 3) {
+        this.schedule(
+          () =>
+            this.tone(
+              note * 2.5 * pitch,
+              0.2,
+              "sine",
+              0.018,
+              note * 3 * pitch,
+              "combat",
+              { attack: 0.002 },
+            ),
+          88,
+        );
+      }
+    }
+  }
+
+  stageClear(
+    level: 1 | 2 | 3 | 4 | 5 = 1,
+    accuracyTier: 0 | 1 | 2 = 0,
+    speedTier: 0 | 1 | 2 = 0,
+  ): void {
+    const safeLevel = Math.max(1, Math.min(5, level));
+    const rate = 0.94 + safeLevel * 0.035;
+    this.samples.play(
+      "victory-stinger",
+      this.volume,
+      this.pronunciationActive,
+      rate,
+    );
+
+    const root = 523.25;
+    const chord = [1, 1.25, 1.5, 2] as const;
+    const voices = Math.min(chord.length, 1 + safeLevel);
+    for (let index = 0; index < voices; index += 1) {
+      const frequency = root * chord[index]!;
+      this.schedule(
+        () =>
+          this.tone(
+            frequency,
+            0.2 + safeLevel * 0.018,
+            index % 2 === 0 ? "triangle" : "sine",
+            0.024 + safeLevel * 0.004,
+            frequency * (1.04 + safeLevel * 0.008),
+            "ui",
+            { attack: 0.004 },
+          ),
+        index * 72,
+      );
+    }
+
+    if (accuracyTier >= 1) {
+      this.schedule(
+        () =>
+          this.tone(
+            2093,
+            0.18,
+            "sine",
+            0.022 + accuracyTier * 0.006,
+            2637,
+            "ui",
+            { attack: 0.002 },
+          ),
+        180,
+      );
+    }
+    if (speedTier >= 1) {
+      this.schedule(
+        () =>
+          this.tone(
+            1318,
+            0.14,
+            "triangle",
+            0.018 + speedTier * 0.005,
+            2093,
+            "ui",
+            { attack: 0.002 },
+          ),
+        236,
+      );
+    }
   }
 
   stageFail(): void {
