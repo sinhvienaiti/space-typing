@@ -193,6 +193,34 @@ if (
   }
 }
 
+const duelAnimatedVfxRoot = join(
+  ROOT,
+  "art-src/combat-vfx-sequences/animated_webp",
+);
+if (
+  flatPipelineStale(
+    duelAnimatedVfxRoot,
+    join(
+      ROOT,
+      "public/assets/space-typing/combat-vfx",
+    ),
+    join(
+      ROOT,
+      "public/assets/space-typing/combat-vfx/vfx.json",
+    ),
+  )
+) {
+  // Animated sequences intentionally run after legacy static combat VFX,
+  // so a locally installed FINAL V2 media pack becomes the runtime source.
+  run(
+    join(
+      ROOT,
+      "scripts/bg-art/prepare-duel-vfx-sequences.mjs",
+    ),
+  );
+  prepared += 1;
+}
+
 const fxRoot = join(ROOT, "art-src/fx");
 if (existsSync(fxRoot)) {
   for (const ship of readdirSync(fxRoot).sort()) {
