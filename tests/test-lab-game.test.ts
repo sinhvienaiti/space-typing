@@ -364,6 +364,38 @@ describe("M21 gated Game Test Lab API", () => {
     game.destroy();
   });
 
+  it("provides dedicated Credit Crystal spawn, stress, magnet, collect and clear controls", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 100);
+    game.testLabSetSchedulerFrozen(true);
+
+    expect(
+      game.testLabSpawnCreditCrystals({
+        tier: "common",
+        count: 1,
+        amountEach: 3,
+      }),
+    ).toBe(1);
+    let snapshot = game.getTestLabSnapshot();
+    expect(snapshot?.creditPickups.rewards).toBe(1);
+    expect(snapshot?.creditPickups.walletDeltaApplied).toBe(3);
+
+    expect(game.testLabSpawnCreditStress(50)).toBe(50);
+    snapshot = game.getTestLabSnapshot();
+    expect(snapshot?.creditPickups.rewards).toBe(51);
+    expect(snapshot?.creditPickups.pieces ?? 999).toBeLessThanOrEqual(28);
+
+    expect(game.testLabForceCreditMagnet()).toBe(true);
+    expect(game.testLabCollectCreditPickups()).toBeGreaterThan(0);
+    expect(game.getTestLabSnapshot()?.creditPickups.bursts).toBe(0);
+
+    game.testLabSpawnCreditStress(10);
+    expect(game.testLabClearCreditPickups()).toBeGreaterThan(0);
+    expect(game.getTestLabSnapshot()?.creditPickups.bursts).toBe(0);
+    game.destroy();
+  });
+
   it("records lethal damage but keeps Immortal mode alive at one Hull", () => {
     const game = createTestGame();
     game.setTestLabMode(true, "immortal");

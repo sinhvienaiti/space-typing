@@ -145,6 +145,36 @@ describe("CreditCrystalPickupSystem", () => {
     expect(hero?.pieces.length).toBeGreaterThanOrEqual(1);
   });
 
+  it("keeps repeated premium stress inside the quality cap without losing value", () => {
+    const system = new CreditCrystalPickupSystem();
+    let expectedValue = 0;
+
+    for (let index = 0; index < 50; index += 1) {
+      const tier = index % 5 === 0 ? "major-boss" : "boss";
+      const value = 10 + index;
+      expectedValue += value;
+      system.spawn(receipt("hero-" + index, tier, value), 260, 180, "low");
+    }
+
+    expect(system.livePieceCount()).toBeLessThanOrEqual(28);
+    const events = system.flush();
+    expect(
+      events.flatMap((event) => event.rewardIds),
+    ).toHaveLength(50);
+    expect(
+      events.reduce((sum, event) => sum + event.walletDeltaApplied, 0),
+    ).toBe(expectedValue);
+  });
+
+  it("forces existing bursts directly into magnet phase for Test Lab QA", () => {
+    const system = new CreditCrystalPickupSystem();
+    system.spawn(receipt("force", "boss", 20), 100, 100, "high");
+    expect(system.phaseSnapshot()).toEqual(["scatter"]);
+
+    system.forceMagnet();
+    expect(system.phaseSnapshot()).toEqual(["magnet"]);
+  });
+
   it("keeps Golden as a visual variant without creating another currency", () => {
     const system = new CreditCrystalPickupSystem();
     system.spawn(receipt("golden", "elite", 12, "golden"), 100, 100, "ultra");

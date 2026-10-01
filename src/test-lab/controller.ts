@@ -48,6 +48,12 @@ import {
 } from "../enemies/rank";
 import type { EnemyDefinitionId } from "../enemies/registry";
 import type { EnemySkillId } from "../enemies/skills";
+import {
+  CombatCreditRewardLedger,
+  combatCreditExpectedWeight,
+  type CreditCrystalTier,
+  type CreditCrystalVariant,
+} from "../rewards/combat-credit-drops";
 import type { StatusId } from "../status/engine";
 import type { SupportSpellId } from "../skills/support";
 import type { CharacterId } from "../characters/registry";
@@ -271,6 +277,7 @@ function snapshotText(
           statuses: snapshot.statuses,
           projectiles: snapshot.projectiles,
           particles: snapshot.particles,
+          creditPickups: snapshot.creditPickups,
           activePressure: snapshot.activePressure,
           difficulty: snapshot.difficulty,
         };
@@ -356,6 +363,7 @@ export function mountTestLab(
   let session = createTestLabSession(1, 1, "test-lab");
   let game: Game | null = null;
   let music: MusicController | null = null;
+  let combatCreditLedger = new CombatCreditRewardLedger();
   let audioQa: TestLabAudioQa | null = null;
   let inspectorTimer = 0;
   let activeShop: ShopInstance | null = null;
@@ -728,6 +736,37 @@ export function mountTestLab(
             <button type="button" data-action="qa-stop-track">Stop Track Preview</button>
           </div>
           <pre class="test-lab-mini-inspector" data-role="qa-audio"></pre>
+        </details>
+
+        <details>
+          <summary>Credit Crystal Pickup QA · FINAL V3</summary>
+          <p class="equipment-note">
+            Production pickup runtime in simulated Test Lab mode. Stress controls
+            preserve logical Credit value while visual caps coalesce presentation.
+          </p>
+          <div class="test-lab-grid">
+            <label>Tier<select data-field="credit-crystal-tier">
+              <option value="common">Common</option>
+              <option value="refined">Refined</option>
+              <option value="high">High</option>
+              <option value="elite">Elite</option>
+              <option value="mini-boss">Mini Boss</option>
+              <option value="boss">Boss</option>
+              <option value="major-boss">Major Boss</option>
+            </select></label>
+            <label>Variant<select data-field="credit-crystal-variant">
+              <option value="standard">Standard</option>
+              <option value="golden">Golden</option>
+            </select></label>
+          </div>
+          <div class="test-lab-row">
+            <button type="button" data-action="spawn-credit-drop">Spawn Selected Drop</button>
+            <button type="button" data-action="spawn-credit-10">Spawn 10 Mixed</button>
+            <button type="button" data-action="spawn-credit-50">Spawn 50 Stress</button>
+            <button type="button" data-action="force-credit-magnet">Force Magnet</button>
+            <button type="button" data-action="collect-credit-all">Collect All</button>
+            <button type="button" data-action="clear-credit-fx">Clear Pickup FX</button>
+          </div>
         </details>
 
         <details>
@@ -1581,6 +1620,23 @@ export function mountTestLab(
       onStats: renderInspector,
       onPhase: renderInspector,
       onStage: renderInspector,
+      onCombatCreditAttemptStart: (attempt) => {
+        combatCreditLedger.beginAttempt({
+          attemptId: attempt.attemptId,
+          mode: "test-lab",
+          combatCreditBudget: Math.max(
+            attempt.expectedEligibleKills,
+            240,
+          ),
+          expectedWeight: combatCreditExpectedWeight({
+            regularEnemyCount: attempt.regularEnemyCount,
+            bossRole: attempt.bossRole,
+          }),
+        });
+      },
+      onCombatCreditReward: (request) =>
+        combatCreditLedger.claimKillReward(request),
+      onCombatCreditPickupPresented: () => renderInspector(),
       onStageEvents: () => renderInspector(),
       onObjectiveUpdate: () => renderInspector(),
       onStageClear: () => renderInspector(),
@@ -1600,6 +1656,7 @@ export function mountTestLab(
 
   function createRuntime(): Game {
     game?.destroy();
+    combatCreditLedger = new CombatCreditRewardLedger();
     const settings = options.getSettings();
     const entries = options.getVocabulary();
     game = new Game(canvas, entries, settings, runtimeHooks());
@@ -3228,6 +3285,68 @@ export function mountTestLab(
         1,
       ).inventory;
       renderInspector();
+      return;
+    }
+
+    if (action === "spawn-credit-drop") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      const spawned = activeGame.testLabSpawnCreditCrystals({
+        tier: inputValue(
+          dialog,
+          '[data-field="credit-crystal-tier"]',
+        ) as CreditCrystalTier,
+        variant: inputValue(
+          dialog,
+          '[data-field="credit-crystal-variant"]',
+        ) as CreditCrystalVariant,
+        count: 1,
+      });
+      renderInspector();
+      notice(
+        spawned > 0
+          ? "spawned production Credit Crystal pickup"
+          : "start a playing/paused arena first",
+      );
+      return;
+    }
+    if (action === "spawn-credit-10" || action === "spawn-credit-50") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      const count = action === "spawn-credit-50" ? 50 : 10;
+      const spawned = activeGame.testLabSpawnCreditStress(count);
+      renderInspector();
+      notice(
+        "spawned " + String(spawned) + " mixed Credit Crystal drops",
+      );
+      return;
+    }
+    if (action === "force-credit-magnet") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      const changed = activeGame.testLabForceCreditMagnet();
+      renderInspector();
+      notice(changed ? "Credit Crystal magnet forced" : "no pickup to magnet");
+      return;
+    }
+    if (action === "collect-credit-all") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      const collected = activeGame.testLabCollectCreditPickups();
+      renderInspector();
+      notice(
+        "collected " + String(collected) + " logical pickup bursts",
+      );
+      return;
+    }
+    if (action === "clear-credit-fx") {
+      const activeGame = ensureGame();
+      if (activeGame === null) return;
+      const removed = activeGame.testLabClearCreditPickups();
+      renderInspector();
+      notice(
+        "cleared " + String(removed) + " Credit Crystal VFX bursts",
+      );
       return;
     }
 

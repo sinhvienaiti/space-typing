@@ -233,18 +233,32 @@ export class CreditCrystalPickupSystem {
       }
     }
 
+    const requested = profile.satellites + 1;
     if (hero) {
-      this.freeCapacityForHero(
-        Math.min(profile.satellites + 1, 10),
-        cap,
-      );
+      this.freeCapacityForHero(requested, cap);
+      if (this.livePieceCount() >= cap) {
+        const target = this.findHeroMergeTarget(
+          receipt.tier,
+          receipt.variant,
+        );
+        if (target !== null) {
+          this.mergeReceipt(target, receipt);
+          return;
+        }
+      }
     }
 
-    const free = Math.max(1, cap - this.livePieceCount());
-    const requested = profile.satellites + 1;
-    const count = hero
-      ? Math.max(1, Math.min(requested, free + 4))
-      : Math.max(1, Math.min(requested, free));
+    const free = Math.max(0, cap - this.livePieceCount());
+    if (free <= 0) {
+      const target =
+        hero
+          ? this.findHeroMergeTarget(receipt.tier, receipt.variant)
+          : this.findMergeTarget(receipt.tier, receipt.variant) ??
+            this.findOverflowMergeTarget();
+      if (target !== null) this.mergeReceipt(target, receipt);
+      return;
+    }
+    const count = Math.max(1, Math.min(requested, free));
     const randomState = {
       value:
         hashString(receipt.rewardId) ^
@@ -415,6 +429,19 @@ export class CreditCrystalPickupSystem {
     return events;
   }
 
+  forceMagnet(): void {
+    for (const burst of this.bursts) {
+      burst.age = Math.max(
+        burst.age,
+        burst.scatterSeconds + burst.hoverSeconds,
+      );
+      burst.phase = "magnet";
+      for (const piece of burst.pieces) {
+        piece.magnetDelay = Math.min(piece.magnetDelay, burst.age);
+      }
+    }
+  }
+
   clear(): void {
     this.bursts.length = 0;
   }
@@ -476,11 +503,9 @@ export class CreditCrystalPickupSystem {
       burst.age + 1.2,
     );
 
-    if (
-      !burst.hero &&
-      TIER_PRIORITY[receipt.tier] > TIER_PRIORITY[burst.tier]
-    ) {
+    if (TIER_PRIORITY[receipt.tier] > TIER_PRIORITY[burst.tier]) {
       burst.tier = receipt.tier;
+      burst.hero = PROFILE[receipt.tier].hero;
       const profile = PROFILE[receipt.tier];
       const anchor = burst.pieces.find((piece) => piece.anchor);
       if (anchor !== undefined) {
@@ -488,6 +513,26 @@ export class CreditCrystalPickupSystem {
       }
     }
     if (receipt.variant === "golden") burst.variant = "golden";
+  }
+
+  private findHeroMergeTarget(
+    tier: CreditCrystalTier,
+    variant: CreditCrystalVariant,
+  ): CreditDropBurst | null {
+    for (let index = this.bursts.length - 1; index >= 0; index -= 1) {
+      const burst = this.bursts[index]!;
+      if (
+        burst.hero &&
+        burst.tier === tier &&
+        burst.variant === variant
+      ) {
+        return burst;
+      }
+    }
+    for (let index = this.bursts.length - 1; index >= 0; index -= 1) {
+      if (this.bursts[index]!.hero) return this.bursts[index]!;
+    }
+    return null;
   }
 
   private findMergeTarget(

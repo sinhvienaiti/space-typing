@@ -360,6 +360,8 @@ import type {
   CombatCreditCause,
   CombatCreditClaimRequest,
   CombatCreditRewardReceipt,
+  CreditCrystalTier,
+  CreditCrystalVariant,
 } from "./rewards/combat-credit-drops";
 import {
   CreditCrystalPickupSystem,
@@ -618,6 +620,13 @@ export type TestLabEnemySpawn = {
   skillIds?: readonly EnemySkillId[];
 };
 
+export type TestLabCreditCrystalSpawn = {
+  tier: CreditCrystalTier;
+  variant?: CreditCrystalVariant;
+  count?: number;
+  amountEach?: number;
+};
+
 export type TestLabBossOverride = {
   hpRatio?: number;
   phase?: 1 | 2 | 3;
@@ -655,6 +664,12 @@ export type TestLabGameSnapshot = {
   hardCc: HardCcState;
   projectiles: number;
   particles: number;
+  creditPickups: {
+    bursts: number;
+    pieces: number;
+    rewards: number;
+    walletDeltaApplied: number;
+  };
   activePressure: ActiveTypingPressureSnapshot;
   deathMode: TestLabDeathMode;
   lethalHits: number;
@@ -1033,6 +1048,7 @@ export class Game {
   private testLabLethalHits = 0;
   private testLabTimeScale = 1;
   private testLabSchedulerFrozen = false;
+  private testLabCreditSequence = 0;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -1148,6 +1164,7 @@ export class Game {
   getTestLabSnapshot(): TestLabGameSnapshot | null {
     if (!this.testLabEnabled) return null;
     const difficulty = this.difficulty;
+    const creditBursts = this.creditPickups.diagnosticSnapshot();
     return {
       phase: this.phase,
       characterId: this.characterId,
@@ -1182,6 +1199,18 @@ export class Game {
       },
       projectiles: this.projectiles.length,
       particles: this.particles.length,
+      creditPickups: {
+        bursts: creditBursts.length,
+        pieces: this.creditPickups.livePieceCount(),
+        rewards: creditBursts.reduce(
+          (total, burst) => total + burst.rewardCount,
+          0,
+        ),
+        walletDeltaApplied: creditBursts.reduce(
+          (total, burst) => total + burst.walletDeltaApplied,
+          0,
+        ),
+      },
       activePressure:
         difficulty === null
           ? emptyActivePressureSnapshot()
@@ -1773,6 +1802,131 @@ export class Game {
     return true;
   }
 
+  testLabSpawnCreditCrystals(
+    input: TestLabCreditCrystalSpawn,
+  ): number {
+    if (
+      !this.testLabEnabled ||
+      (this.phase !== "playing" && this.phase !== "paused")
+    ) {
+      return 0;
+    }
+    const count = Math.max(
+      1,
+      Math.min(
+        50,
+        Math.floor(
+          Number.isFinite(input.count) ? input.count ?? 1 : 1,
+        ),
+      ),
+    );
+    const amountEach = Math.max(
+      1,
+      Math.floor(
+        Number.isFinite(input.amountEach)
+          ? input.amountEach ?? 1
+          : 1,
+      ),
+    );
+    const variant = input.variant ?? "standard";
+
+    for (let index = 0; index < count; index += 1) {
+      const sequence = ++this.testLabCreditSequence;
+      const column = sequence % 7;
+      const row = Math.floor(sequence / 7) % 4;
+      const x =
+        this.width * (0.24 + (0.52 * column) / 6);
+      const y =
+        this.height * (0.2 + (0.34 * row) / 3);
+      const id = "test-lab-credit:" + String(sequence);
+      this.creditPickups.spawn(
+        {
+          rewardId: id,
+          attemptId: "test-lab-manual",
+          sourceKind: "enemy",
+          sourceInstanceId: id,
+          cause: "skill-kill",
+          mode: "test-lab",
+          tier: input.tier,
+          variant,
+          nominalEarned: amountEach,
+          walletDeltaApplied: amountEach,
+        },
+        x,
+        y,
+        this.settings.visualQuality,
+      );
+    }
+    return count;
+  }
+
+  testLabSpawnCreditStress(count = 50): number {
+    if (!this.testLabEnabled) return 0;
+    const requested = Math.max(
+      1,
+      Math.min(
+        50,
+        Math.floor(Number.isFinite(count) ? count : 50),
+      ),
+    );
+    const tiers: readonly CreditCrystalTier[] = [
+      "common",
+      "refined",
+      "common",
+      "high",
+      "elite",
+      "common",
+      "refined",
+      "high",
+      "common",
+      "boss",
+      "refined",
+      "elite",
+      "common",
+      "high",
+      "major-boss",
+    ];
+    let spawned = 0;
+    for (let index = 0; index < requested; index += 1) {
+      const tier = tiers[index % tiers.length]!;
+      spawned += this.testLabSpawnCreditCrystals({
+        tier,
+        variant:
+          tier === "elite" && index % 11 === 0
+            ? "golden"
+            : "standard",
+        count: 1,
+        amountEach: Math.max(1, 1 + Math.floor(index / 5)),
+      });
+    }
+    return spawned;
+  }
+
+  testLabForceCreditMagnet(): boolean {
+    if (!this.testLabEnabled || this.creditPickups.liveBurstCount() === 0) {
+      return false;
+    }
+    this.creditPickups.forceMagnet();
+    return true;
+  }
+
+  testLabCollectCreditPickups(): number {
+    if (!this.testLabEnabled) return 0;
+    const events = this.creditPickups.flush();
+    const ship = this.shipCenter();
+    for (const event of events) {
+      this.presentCombatCreditCollection(event, ship);
+    }
+    return events.length;
+  }
+
+  testLabClearCreditPickups(): number {
+    if (!this.testLabEnabled) return 0;
+    const removed = this.creditPickups.liveBurstCount();
+    this.creditPickups.clear();
+    return removed;
+  }
+
   testLabResetSkillCooldowns(): boolean {
     if (!this.testLabEnabled) return false;
     this.skillEngine.resetStage();
@@ -1853,6 +2007,7 @@ export class Game {
     this.bossDefeated = false;
     this.bossRewardPending = false;
     this.bossRewardPrompt = null;
+    this.testLabCreditSequence = 0;
     this.testLabLethalHits = 0;
     this.setStatusState(createStatusState());
     this.hardCcState = createHardCcState();
