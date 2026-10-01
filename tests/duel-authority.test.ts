@@ -461,6 +461,7 @@ describe("Duel M-DUEL-11 authority core", () => {
         playerId: "player-1",
         reveal: {
           id: "mystery:1",
+          displayLabel: "FROZEN RELIC",
           rarity: "minor",
           riskTag: "support",
           category: "beneficial",
