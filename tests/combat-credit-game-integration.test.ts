@@ -296,6 +296,7 @@ describe("Combat Credit FINAL V3 Game integration", () => {
       kind: "scout",
       count: 3,
       layers: 1,
+      elite: false,
     });
     const runtime = game as unknown as Runtime;
     const source = runtime.enemies.find((enemy) => enemy.id === ids[0]);
