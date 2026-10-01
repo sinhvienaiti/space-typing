@@ -8,6 +8,7 @@ import {
   type DuelMapId,
 } from "./maps";
 import type { DuelMatchPhase } from "./model";
+import { duelProjectileTravelMs } from "./presentation-timing";
 
 export const DUEL_AUDIO_WORLD_SOURCE: Readonly<
   Record<DuelMapId, string>
@@ -126,11 +127,9 @@ export function duelCombatAudioCues(
       cues.push({ cue: "support", delayMs: 0, side });
       return;
     }
-    const speedScale = Math.max(
-      0.5,
+    const impactDelayMs = duelProjectileTravelMs(
       view.shared.tactical.projectileSpeedScale[playerId] ?? 1,
     );
-    const impactDelayMs = Math.round(720 / speedScale);
     cues.push({ cue: pair.launch, delayMs: 0, side });
     cues.push({
       cue: pair.impact,
