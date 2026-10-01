@@ -940,9 +940,9 @@
   aspect-ratio: 1;
   transform: translateY(-50%);
   border-radius: 50%;
-  background: #ffffff;
+  background: var(--duel-shot-secondary, #ffffff);
   box-shadow:
-    0 0 11px rgba(var(--duel-accent-2, 180, 240, 255), 0.72);
+    0 0 11px var(--duel-shot-primary, #66efff);
 }
 
 .duel-projectile-from-self {
@@ -1704,22 +1704,24 @@
   left: var(--duel-projectile-x, 50%);
   top: auto;
   right: auto;
-  width: 6px;
+  width: calc(3px * var(--duel-shot-width, 1.8));
   height: clamp(48px, 8vh, 86px);
   border-radius: 999px;
   opacity: 0;
   background:
     linear-gradient(
       180deg,
-      #ffffff 0%,
-      rgba(var(--duel-accent-2, 180, 240, 255), 0.82) 16%,
-      rgba(var(--duel-accent, 110, 220, 255), 0.28) 55%,
+      var(--duel-shot-secondary, #ffffff) 0%,
+      var(--duel-shot-secondary, #dffcff) 16%,
+      var(--duel-shot-primary, #66efff) 55%,
       transparent 100%
     );
   transform: translateX(-50%);
   box-shadow:
-    0 0 9px rgba(var(--duel-accent-2, 180, 240, 255), 0.58),
-    0 0 20px rgba(var(--duel-accent, 110, 220, 255), 0.18);
+    0 0 calc(8px * var(--duel-shot-glow, 1))
+      var(--duel-shot-secondary, #dffcff),
+    0 0 calc(18px * var(--duel-shot-glow, 1))
+      var(--duel-shot-primary, #66efff);
 }
 
 .duel-arena .duel-projectile::after {
@@ -1774,8 +1776,8 @@
     linear-gradient(
       180deg,
       #ffffff 0 14%,
-      rgba(var(--duel-accent-2, 180, 240, 255), 0.96) 15% 34%,
-      rgba(var(--duel-accent, 110, 220, 255), 0.48) 35% 56%,
+      var(--duel-shot-secondary, #dffcff) 15% 34%,
+      var(--duel-shot-primary, #66efff) 35% 56%,
       transparent 100%
     );
   box-shadow:
