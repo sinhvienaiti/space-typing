@@ -152,7 +152,7 @@ function createBattleNodes(gameShell: HTMLElement) {
       <i></i><i></i><i></i><i></i>
     </div>
     <div id="duelProjectiles" class="duel-projectile-layer" aria-hidden="true"></div>
-    <div class="duel-event-fx" aria-hidden="true"></div>
+    <div id="duelEventFx" class="duel-event-fx" aria-hidden="true"></div>
 
     <header class="duel-topbar">
       <div class="duel-map-title">
