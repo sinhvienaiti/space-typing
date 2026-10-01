@@ -637,22 +637,20 @@ export function installDuelBattleUi(
     const manifest = await preloadDuelTargetSprites();
     if (!active || manifest === null) return;
 
-    let available = 0;
     for (const mounted of offerTargetNodes.values()) {
       const actionId =
         mounted.targetObject.dataset.actionId;
-      if (
-        actionId !== undefined &&
+      if (actionId !== undefined) {
         applyTargetSprite(
           mounted.targetObject,
           actionId,
-        )
-      ) {
-        available += 1;
+        );
       }
     }
     nodes.root.dataset.paintedTargets =
-      available > 0 ? "true" : "false";
+      Object.keys(manifest.sprites).length > 0
+        ? "true"
+        : "false";
   };
 
   const applyPaintedCombatVfx = async (): Promise<void> => {
@@ -2484,6 +2482,9 @@ export function installDuelBattleUi(
       nodes.fx.replaceChildren();
       nodes.projectiles.replaceChildren();
       nodes.typingFx.replaceChildren();
+      nodes.offers.replaceChildren();
+      offerTargetNodes.clear();
+      offerLayoutAssignments.clear();
       lastTypingFeedbackKey = "";
     },
     isActive() {
