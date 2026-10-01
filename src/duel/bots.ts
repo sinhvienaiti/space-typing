@@ -386,7 +386,9 @@ export class DuelBot {
           kind: "offer",
           instanceId: entry.offer.instanceId,
           actionId: entry.action.id,
-          answerToken: entry.action.answerToken,
+          answerToken:
+            entry.offer.typingPrompt?.answerToken ??
+            entry.action.answerToken,
           progressLength: entry.offer.typedPrefix.length,
         };
       }
@@ -396,7 +398,9 @@ export class DuelBot {
       kind: "offer",
       instanceId: fallback.offer.instanceId,
       actionId: fallback.action.id,
-      answerToken: fallback.action.answerToken,
+      answerToken:
+        fallback.offer.typingPrompt?.answerToken ??
+        fallback.action.answerToken,
       progressLength: fallback.offer.typedPrefix.length,
     };
   }
@@ -638,7 +642,12 @@ export function duelBotObservation(input: {
       0,
       Number.isFinite(input.self.energy) ? input.self.energy : 0,
     ),
-    ownOffers: input.self.offers.map((offer) => ({ ...offer })),
+    ownOffers: input.self.offers.map((offer) => ({
+      ...offer,
+      ...(offer.typingPrompt === undefined
+        ? {}
+        : { typingPrompt: { ...offer.typingPrompt } }),
+    })),
     ownCooldowns: { ...(input.self.cooldowns ?? {}) },
     ownInventory: input.self.inventory ?? {
       attack: [],
