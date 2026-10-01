@@ -250,6 +250,55 @@ describe("Duel M-DUEL-11 authority core", () => {
     );
   });
 
+  it("applies room modifiers through the authoritative match factory", () => {
+    const authority = new DuelAuthorityService(deps());
+    const host = open(authority, "host");
+    const settings = defaultDuelRoomSettings();
+    settings.seedMode = "fixed";
+    settings.fixedSeed = 434343;
+    settings.modifier = "sudden-death";
+    const created = authority.createRoom(
+      host.sessionId,
+      settings,
+      0,
+    );
+    if (!created.ok) throw new Error(created.message);
+
+    authority.setBot(
+      host.sessionId,
+      created.value.roomId,
+      {
+        wpm: 55,
+        accuracy: 0.94,
+        reactionMs: 320,
+        personality: "balanced",
+      },
+      1,
+    );
+    authority.setReady(
+      host.sessionId,
+      created.value.roomId,
+      true,
+      2,
+    );
+    const started = authority.startMatch(
+      host.sessionId,
+      created.value.roomId,
+      3,
+    );
+    if (!started.ok) throw new Error(started.message);
+    const view = authority.clientMatchView(
+      host.sessionId,
+      started.value.matchId,
+    );
+    if (!view.ok) throw new Error(view.message);
+
+    expect(view.value.self.maxHull).toBe(75);
+    expect(view.value.self.maxShield).toBe(20);
+    expect(view.value.self.shield).toBe(10);
+    expect(view.value.opponent.maxHull).toBe(75);
+  });
+
   it("filters hidden opponent match state from the client view", () => {
     const authority = new DuelAuthorityService(deps());
     const host = open(authority, "host");

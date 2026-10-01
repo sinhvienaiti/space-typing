@@ -11,6 +11,10 @@ import type {
   DuelClientMatchView,
 } from "./authority";
 import { DuelOfferDraft } from "./draft";
+import {
+  combineDuelCategoryMultipliers,
+  duelRuntimeTuning,
+} from "./rules";
 import { duelStrategyCategoryMultiplier } from "./strategy";
 import {
   DuelEngine,
@@ -306,9 +310,22 @@ export class DuelLocalPracticeMatch {
   }
 
   private createEngine(seed: number): DuelEngine {
+    const tuning = duelRuntimeTuning(this.room.settings);
     return new DuelEngine({
       regulationSeconds:
         this.room.settings.matchLengthSeconds,
+      escalationSeconds: tuning.escalationSeconds,
+      hazardIntervalScale: tuning.hazardIntervalScale,
+      hazardPressureScale: tuning.hazardPressureScale,
+      ...(tuning.maxHull === undefined
+        ? {}
+        : { maxHull: tuning.maxHull }),
+      ...(tuning.maxShield === undefined
+        ? {}
+        : { maxShield: tuning.maxShield }),
+      ...(tuning.startingShield === undefined
+        ? {}
+        : { startingShield: tuning.startingShield }),
       matchSeed: seed,
       mapId: this.mapId,
       actions: duelActionMapForMap(this.mapId),
@@ -318,8 +335,11 @@ export class DuelLocalPracticeMatch {
   private createDrafts(
     seed: number,
   ): Record<DuelPlayerId, DuelOfferDraft> {
-    const multiplier =
-      duelMapProfile(this.mapId).categoryMultiplier;
+    const tuning = duelRuntimeTuning(this.room.settings);
+    const multiplier = combineDuelCategoryMultipliers(
+      duelMapProfile(this.mapId).categoryMultiplier,
+      tuning.categoryMultiplier,
+    );
     return {
       "player-1": new DuelOfferDraft({
         seed: deriveSeed(seed, 1),

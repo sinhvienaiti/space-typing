@@ -46,6 +46,27 @@ describe("Duel local Practice runtime", () => {
     );
   });
 
+  it("applies room modifiers to the live Practice engine", () => {
+    const base = practiceRoom();
+    const room = {
+      ...base,
+      settings: {
+        ...base.settings,
+        modifier: "sudden-death" as const,
+      },
+    };
+    const match = new DuelLocalPracticeMatch({
+      room,
+      seed: 9191,
+    });
+    const view = match.initial().view;
+
+    expect(view.self.maxHull).toBe(75);
+    expect(view.self.maxShield).toBe(20);
+    expect(view.self.shield).toBe(10);
+    expect(view.opponent.maxHull).toBe(75);
+  });
+
   it("processes human typing immediately and refills the completed slot", () => {
     const match = new DuelLocalPracticeMatch({
       room: practiceRoom(),

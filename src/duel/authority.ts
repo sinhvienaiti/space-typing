@@ -8,6 +8,10 @@ import {
   type DuelBotConfig,
 } from "./bots";
 import { DuelOfferDraft } from "./draft";
+import {
+  combineDuelCategoryMultipliers,
+  duelRuntimeTuning,
+} from "./rules";
 import { duelStrategyCategoryMultiplier } from "./strategy";
 import {
   DuelEngine,
@@ -1114,16 +1118,24 @@ export class DuelAuthorityService {
       mode: "friend",
       roundId: matchId + ":round:1",
       roundSequence: 1,
-      engine: new DuelEngine({
-        regulationSeconds:
-          record.settings.matchLengthSeconds,
-        matchSeed: seed,
+      engine: this.createEngine(
+        seed,
         mapId,
-        actions: duelActionMapForMap(mapId),
-      }),
+        record.settings,
+      ),
       draft: {
-        "player-1": this.createDraft(seed, mapId, 1),
-        "player-2": this.createDraft(seed, mapId, 2),
+        "player-1": this.createDraft(
+          seed,
+          mapId,
+          1,
+          record.settings,
+        ),
+        "player-2": this.createDraft(
+          seed,
+          mapId,
+          2,
+          record.settings,
+        ),
       },
       players,
       appearance: {
@@ -1285,16 +1297,24 @@ export class DuelAuthorityService {
       mode: "ranked",
       roundId: matchId + ":round:1",
       roundSequence: 1,
-      engine: new DuelEngine({
-        regulationSeconds:
-          settings.matchLengthSeconds,
-        matchSeed: seed,
+      engine: this.createEngine(
+        seed,
         mapId,
-        actions: duelActionMapForMap(mapId),
-      }),
+        settings,
+      ),
       draft: {
-        "player-1": this.createDraft(seed, mapId, 1),
-        "player-2": this.createDraft(seed, mapId, 2),
+        "player-1": this.createDraft(
+          seed,
+          mapId,
+          1,
+          settings,
+        ),
+        "player-2": this.createDraft(
+          seed,
+          mapId,
+          2,
+          settings,
+        ),
       },
       players: {
         "player-1": leftSessionId,
@@ -1644,17 +1664,47 @@ export class DuelAuthorityService {
     return { expiredRooms, expiredSessions };
   }
 
+  private createEngine(
+    seed: number,
+    mapId: DuelMapId,
+    settings: DuelRoomSettingsInput,
+  ): DuelEngine {
+    const tuning = duelRuntimeTuning(settings);
+    return new DuelEngine({
+      regulationSeconds: settings.matchLengthSeconds,
+      escalationSeconds: tuning.escalationSeconds,
+      hazardIntervalScale: tuning.hazardIntervalScale,
+      hazardPressureScale: tuning.hazardPressureScale,
+      ...(tuning.maxHull === undefined
+        ? {}
+        : { maxHull: tuning.maxHull }),
+      ...(tuning.maxShield === undefined
+        ? {}
+        : { maxShield: tuning.maxShield }),
+      ...(tuning.startingShield === undefined
+        ? {}
+        : { startingShield: tuning.startingShield }),
+      matchSeed: seed,
+      mapId,
+      actions: duelActionMapForMap(mapId),
+    });
+  }
+
   private createDraft(
     seed: number,
     mapId: DuelMapId,
     offset: number,
+    settings: DuelRoomSettingsInput,
   ): DuelOfferDraft {
+    const tuning = duelRuntimeTuning(settings);
     return new DuelOfferDraft({
       seed: deriveSeed(seed, offset),
       actions: duelActionsForMap(mapId),
       enabledCategories: ALL_CATEGORIES,
-      categoryMultiplier:
+      categoryMultiplier: combineDuelCategoryMultipliers(
         duelMapProfile(mapId).categoryMultiplier,
+        tuning.categoryMultiplier,
+      ),
     });
   }
 
@@ -1849,23 +1899,23 @@ export class DuelAuthorityService {
       match.matchSeed,
       match.roundSequence,
     );
-    match.engine = new DuelEngine({
-      regulationSeconds:
-        match.settings.matchLengthSeconds,
-      matchSeed: roundSeed,
-      mapId: match.mapId,
-      actions: duelActionMapForMap(match.mapId),
-    });
+    match.engine = this.createEngine(
+      roundSeed,
+      match.mapId,
+      match.settings,
+    );
     match.draft = {
       "player-1": this.createDraft(
         roundSeed,
         match.mapId,
         1,
+        match.settings,
       ),
       "player-2": this.createDraft(
         roundSeed,
         match.mapId,
         2,
+        match.settings,
       ),
     };
 
