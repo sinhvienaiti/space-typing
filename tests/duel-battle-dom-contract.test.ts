@@ -63,7 +63,7 @@ describe("Duel battle DOM contract", () => {
       'createElement("i", "duel-typing-bolt")',
     );
     expect(source).toContain(
-      'class="duel-current-input duel-arena-input"',
+      'class="duel-current-input duel-arena-input hidden"',
     );
     expect(css).toContain(
       "@keyframes duel-typing-bolt",
@@ -160,4 +160,29 @@ describe("Duel battle DOM contract", () => {
     expect(css).toContain(".duel-resource-gain-repair");
     expect(css).toContain(".duel-resource-gain-energy");
   });
+
+  it("uses combat targets instead of a visible action-card deck", () => {
+    const source = read("../src/duel/battle-ui.ts");
+    const css = read("../src/duel/battle.css");
+
+    expect(source).toContain("const MAX_VISIBLE_WORD_TARGETS = 10;");
+    expect(source).toContain('id="duelOffers" class="duel-word-field"');
+    expect(source).toContain('card.classList.add("duel-word-target")');
+    expect(source).toContain('createElement(\n        "span",\n        "duel-target-object",');
+    expect(source).not.toContain("ACTION OFFERS");
+    expect(source).not.toContain('class="duel-command-deck"');
+    expect(css).toContain(".duel-word-target {");
+    expect(css).toContain(".duel-target-object {");
+    expect(css).toContain(".duel-hidden-systems {");
+  });
+
+  it("keeps the duel arena spacious with compact ships and HUD", () => {
+    const css = read("../src/duel/battle.css");
+
+    expect(css).toContain("width: clamp(68px, 6vw, 98px);");
+    expect(css).toContain("top: clamp(54px, 7vh, 82px);");
+    expect(css).toContain("bottom: clamp(32px, 4.5vh, 58px);");
+    expect(css).toContain("width: clamp(148px, 14vw, 205px);");
+  });
+
 });
