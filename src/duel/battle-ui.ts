@@ -545,6 +545,10 @@ export function installDuelBattleUi(
   const renderOffers = (): void => {
     if (view === null) return;
     nodes.offers.replaceChildren();
+    const targetFrozen =
+      view.shared.tactical.frozenTargetCount[
+        view.self.playerId
+      ] > 0;
     const driftScale =
       view.shared.tactical.offerDriftScale[
         view.self.playerId
@@ -588,6 +592,9 @@ export function installDuelBattleUi(
           (selected ? " selected" : "") +
           (offer.status === "completed" ? " completed" : "") +
           (cooldown > 0 ? " cooling-down" : "") +
+          (targetFrozen && !selected
+            ? " target-frozen"
+            : "") +
           (lifetime !== null && lifetime <= 5
             ? " expiring-soon"
             : ""),
@@ -596,7 +603,8 @@ export function installDuelBattleUi(
       card.disabled =
         (offer.status !== "available" &&
           offer.status !== "locked") ||
-        cooldown > 0;
+        cooldown > 0 ||
+        (targetFrozen && !selected);
       card.dataset.offerId = offer.instanceId;
 
       const category = createElement(
@@ -631,6 +639,9 @@ export function installDuelBattleUi(
       const timingMeta: string[] = [];
       if (cooldown > 0) {
         timingMeta.push(cooldown.toFixed(1) + "s CD");
+      }
+      if (targetFrozen && !selected) {
+        timingMeta.push("TARGET FROZEN");
       }
       if (lifetime !== null) {
         timingMeta.push(

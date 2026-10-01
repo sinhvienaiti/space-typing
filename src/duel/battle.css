@@ -657,6 +657,16 @@
   color: #9bc7db;
 }
 
+.duel-offer-card.target-frozen {
+  opacity: 0.48;
+  border-color: rgba(148, 221, 255, 0.22);
+  cursor: not-allowed;
+}
+
+.duel-offer-card.target-frozen .duel-offer-meta {
+  color: #bfeeff;
+}
+
 .duel-offer-card.expiring-soon:not(.selected) {
   border-color: rgba(var(--duel-danger, 255, 100, 140), 0.34);
 }
