@@ -144,7 +144,7 @@ if (
   prepared += 1;
 }
 
-const combatVfxSequenceRoot = join(
+const duelAnimatedVfxRoot = join(
   ROOT,
   "art-src/combat-vfx-sequences/animated_webp",
 );
@@ -157,20 +157,23 @@ const combatVfxSentinel = join(
   "vfx.json",
 );
 const animatedVfxSources = imageFiles(
-  combatVfxSequenceRoot,
+  duelAnimatedVfxRoot,
 );
+
 if (
   animatedVfxSources.length > 0 &&
   flatPipelineStale(
-    combatVfxSequenceRoot,
+    duelAnimatedVfxRoot,
     combatVfxOutputRoot,
     combatVfxSentinel,
   )
 ) {
+  // A locally installed FINAL V2 animated media pack is authoritative over
+  // the legacy static VFX source whenever all animated files are present.
   run(
     join(
       ROOT,
-      "scripts/bg-art/prepare-combat-vfx-sequences.mjs",
+      "scripts/bg-art/prepare-duel-vfx-sequences.mjs",
     ),
   );
   prepared += 1;
@@ -191,34 +194,6 @@ if (
     );
     prepared += 1;
   }
-}
-
-const duelAnimatedVfxRoot = join(
-  ROOT,
-  "art-src/combat-vfx-sequences/animated_webp",
-);
-if (
-  flatPipelineStale(
-    duelAnimatedVfxRoot,
-    join(
-      ROOT,
-      "public/assets/space-typing/combat-vfx",
-    ),
-    join(
-      ROOT,
-      "public/assets/space-typing/combat-vfx/vfx.json",
-    ),
-  )
-) {
-  // Animated sequences intentionally run after legacy static combat VFX,
-  // so a locally installed FINAL V2 media pack becomes the runtime source.
-  run(
-    join(
-      ROOT,
-      "scripts/bg-art/prepare-duel-vfx-sequences.mjs",
-    ),
-  );
-  prepared += 1;
 }
 
 const fxRoot = join(ROOT, "art-src/fx");
