@@ -135,6 +135,80 @@ describe("Duel map hazard gameplay", () => {
     );
   });
 
+  it("supports deterministic direct hazard injection for Duel Test Lab and replay QA", () => {
+    const engine = new DuelEngine({
+      mapId: "celestial-void",
+      matchSeed: 7,
+      startingShield: 20,
+      startingEnergy: 60,
+    });
+
+    const before = engine.snapshot();
+    const events = engine.applyHazardEvent({
+      sequence: 99,
+      mapId: "celestial-void",
+      hazardId: "black-hole",
+      phase: "war",
+      pressure: 1.2,
+      telegraphSeconds: 1.5,
+      protectionSeconds: 2,
+      symmetry: "symmetric",
+    });
+    const after = engine.snapshot();
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "map-hazard",
+        hazard: expect.objectContaining({
+          hazardId: "black-hole",
+        }),
+      }),
+    );
+    expect(
+      after.tactical.projectileSpeedScale["player-1"],
+    ).toBeLessThan(
+      before.tactical.projectileSpeedScale["player-1"],
+    );
+    expect(
+      after.tactical.projectileSpeedScale["player-1"],
+    ).toBeCloseTo(
+      after.tactical.projectileSpeedScale["player-2"],
+      8,
+    );
+  });
+
+  it("supports direct Cataclysm injection without hidden direct lethal damage", () => {
+    const engine = new DuelEngine({
+      mapId: "celestial-void",
+      matchSeed: 11,
+    });
+    const before = engine.snapshot();
+
+    const events = engine.applyCataclysmEvent({
+      sequence: 100,
+      mapId: "celestial-void",
+      cataclysmId: "reality-collapse",
+      displayLabel: "REALITY COLLAPSE",
+      pressureMultiplier: 1.7,
+    });
+    const after = engine.snapshot();
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "map-cataclysm",
+      }),
+    );
+    expect(after.players["player-1"].hull).toBe(
+      before.players["player-1"].hull,
+    );
+    expect(after.players["player-2"].hull).toBe(
+      before.players["player-2"].hull,
+    );
+    expect(
+      after.tactical.offerDriftScale["player-1"],
+    ).toBeLessThan(1);
+  });
+
   it("never changes hazard gameplay by visual quality because quality is absent from resolver", () => {
     const source = resolveDuelHazard(
       event("black-hole", 1.2),

@@ -544,6 +544,41 @@ export class DuelEngine {
     return events;
   }
 
+  applyHazardEvent(
+    hazard: DuelHazardEvent,
+  ): DuelEngineEvent[] {
+    if (this.roundResult.status !== "active") return [];
+    const resolution = resolveDuelHazard(
+      hazard,
+      this.tactical.snapshot().controlPressure,
+    );
+    for (const effect of resolution.tacticalEffects) {
+      this.tactical.apply(effect);
+    }
+    this.applyEffectsToPlayers(resolution.effects);
+    const events: DuelEngineEvent[] = [
+      { type: "map-hazard", hazard },
+    ];
+    this.resolveTerminalState(events);
+    return events;
+  }
+
+  applyCataclysmEvent(
+    cataclysm: DuelCataclysmEvent,
+  ): DuelEngineEvent[] {
+    if (this.roundResult.status !== "active") return [];
+    const resolution = resolveDuelCataclysm(cataclysm);
+    for (const effect of resolution.tacticalEffects) {
+      this.tactical.apply(effect);
+    }
+    this.applyEffectsToPlayers(resolution.effects);
+    const events: DuelEngineEvent[] = [
+      { type: "map-cataclysm", cataclysm },
+    ];
+    this.resolveTerminalState(events);
+    return events;
+  }
+
   applyTickEffects(
     effects: readonly DuelTickEffect[],
   ): DuelEngineEvent[] {

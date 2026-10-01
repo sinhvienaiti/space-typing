@@ -108,6 +108,7 @@ import {
   mountBatchFPerformanceGate,
   type BatchFPerformanceCapture,
 } from "./batch-f-performance-gate";
+import { mountDuelTestLab } from "./duel-test-lab";
 import {
   AUDIO_QA_BOSS_EVENTS,
   AUDIO_QA_MATERIAL_EVENTS,
@@ -787,6 +788,11 @@ export function mountTestLab(
         </details>
 
         <details>
+          <summary>Duel Mode QA</summary>
+          <div data-role="duel-test-lab"></div>
+        </details>
+
+        <details>
           <summary>Batch F Browser Performance Baseline</summary>
           <div data-role="batch-f-performance-gate"></div>
         </details>
@@ -819,6 +825,10 @@ export function mountTestLab(
     dialog.querySelector<HTMLElement>(
       '[data-role="batch-f-performance-gate"]',
     )!;
+  const duelTestLabRoot =
+    dialog.querySelector<HTMLElement>(
+      '[data-role="duel-test-lab"]',
+    )!;
 
   function captureBatchFPerformance(): BatchFPerformanceCapture | null {
     const activeGame = game;
@@ -844,6 +854,14 @@ export function mountTestLab(
       render,
     };
   }
+
+  const duelTestLab = mountDuelTestLab(
+    duelTestLabRoot,
+    {
+      showNotice: (message) =>
+        options.showNotice?.("Test Lab · " + message),
+    },
+  );
 
   const performanceGate = mountBatchFPerformanceGate(
     performanceGateRoot,
@@ -3428,6 +3446,7 @@ export function mountTestLab(
       audioQa = null;
       manualGate.destroy();
       performanceGate.destroy();
+      duelTestLab.destroy();
       dialog.remove();
       button.remove();
     },
