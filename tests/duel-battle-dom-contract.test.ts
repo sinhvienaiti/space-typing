@@ -92,4 +92,34 @@ describe("Duel battle DOM contract", () => {
       'spawnShipActionFx(sourcePlayerId, action.effectId);',
     );
   });
+
+  it("shows only a privacy-safe rival charge cue and resolves counter beats in the arena", () => {
+    const source = read("../src/duel/battle-ui.ts");
+    const css = read("../src/duel/battle.css");
+
+    expect(source).toContain(
+      'id="duelOpponentCharge" class="duel-opponent-charge hidden"',
+    );
+    expect(source).toContain(
+      "view.opponent.typingTelegraph",
+    );
+    expect(source).toContain(
+      "spawnThreatTelegraph(event.threat)",
+    );
+    expect(source).toContain(
+      "spawnThreatIntercept",
+    );
+    expect(source).toContain(
+      "event.type === \"threat-resolved\"",
+    );
+    expect(css).toContain(
+      ".duel-threat-telegraph",
+    );
+    expect(css).toContain(
+      ".duel-threat-intercept",
+    );
+    expect(css).toContain(
+      ".duel-projectile-arrival",
+    );
+  });
 });
