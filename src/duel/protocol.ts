@@ -1,4 +1,4 @@
-export const DUEL_PROTOCOL_VERSION = 3;
+export const DUEL_PROTOCOL_VERSION = 4;
 export const DUEL_PROTOCOL_MAX_MESSAGE_BYTES = 4096;
 
 export type DuelWireIntent =
