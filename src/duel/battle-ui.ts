@@ -707,10 +707,11 @@ export function installDuelBattleUi(
         (targetFrozen && !selected);
       card.dataset.offerId = offer.instanceId;
       card.classList.add("duel-word-target");
-      const [targetX, targetY] =
+      const targetPosition =
         DUEL_WORD_TARGET_POSITIONS[
           targetIndex % DUEL_WORD_TARGET_POSITIONS.length
-        ];
+        ] ?? [50, 50];
+      const [targetX, targetY] = targetPosition;
       card.style.setProperty("--duel-target-x", String(targetX) + "%");
       card.style.setProperty("--duel-target-y", String(targetY) + "%");
       card.style.setProperty(
