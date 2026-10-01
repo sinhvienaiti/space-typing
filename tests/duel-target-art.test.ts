@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { DUEL_ACTIONS } from "../src/duel/actions";
@@ -29,6 +29,17 @@ describe("Duel target art manifest", () => {
       expect(spec?.alphaConvention).toBe("source-alpha");
       expect(spec?.blendMode).toBe("source-over");
       expect(spec?.url.endsWith(".svg")).toBe(true);
+      expect(
+        existsSync(
+          fileURLToPath(
+            new URL(
+              "../public/assets/space-typing/duel-targets/" +
+                spec!.url,
+              import.meta.url,
+            ),
+          ),
+        ),
+      ).toBe(true);
     }
   });
 
