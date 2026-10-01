@@ -24,6 +24,10 @@ import {
   preloadCombatVfxSprites,
   type CombatVfxId,
 } from "../vfx/combat-vfx-sprites";
+import {
+  duelTargetSpriteUrl,
+  preloadDuelTargetSprites,
+} from "./target-art";
 
 export type DuelBattleUiHooks = {
   sendIntent(intent: DuelWireIntent): number | null;
@@ -614,6 +618,43 @@ export function installDuelBattleUi(
           actionId,
         );
 
+  const applyTargetSprite = (
+    node: HTMLElement,
+    actionId: string,
+  ): boolean => {
+    const url = duelTargetSpriteUrl(actionId);
+    if (url === null) {
+      node.classList.remove("duel-target-object-painted");
+      node.style.removeProperty("background-image");
+      return false;
+    }
+    node.classList.add("duel-target-object-painted");
+    node.style.backgroundImage = 'url("' + url + '")';
+    return true;
+  };
+
+  const applyPaintedTargetArt = async (): Promise<void> => {
+    const manifest = await preloadDuelTargetSprites();
+    if (!active || manifest === null) return;
+
+    let available = 0;
+    for (const mounted of offerTargetNodes.values()) {
+      const actionId =
+        mounted.targetObject.dataset.actionId;
+      if (
+        actionId !== undefined &&
+        applyTargetSprite(
+          mounted.targetObject,
+          actionId,
+        )
+      ) {
+        available += 1;
+      }
+    }
+    nodes.root.dataset.paintedTargets =
+      available > 0 ? "true" : "false";
+  };
+
   const applyPaintedCombatVfx = async (): Promise<void> => {
     const generation = ++paintedVfxGeneration;
     const manifest = await preloadCombatVfxSprites();
@@ -860,6 +901,10 @@ export function installDuelBattleUi(
           : "instant");
 
       mounted.targetObject.dataset.actionId = action.id;
+      applyTargetSprite(
+        mounted.targetObject,
+        action.id,
+      );
       mounted.category.textContent =
         action.category.toUpperCase();
       mounted.label.textContent = action.displayLabel;
@@ -2317,6 +2362,7 @@ export function installDuelBattleUi(
       view = nextView;
       active = true;
       void applyPaintedCombatVfx();
+      void applyPaintedTargetArt();
       gameShell.classList.add(
         "duel-battle-active",
       );
