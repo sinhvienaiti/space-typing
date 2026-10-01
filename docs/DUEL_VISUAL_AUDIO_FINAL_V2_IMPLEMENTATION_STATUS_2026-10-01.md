@@ -114,7 +114,7 @@ Parent `typing-game/play.sh` và `dev.sh` hiện gọi:
 - shared projectile timing;
 - DOM contract sau khi chuyển sang stable target nodes.
 
-CI đã có một full test + build PASS trong chuỗi triển khai tại run `36885344544` (commit thời điểm đó `63aa384`). Sau commit đó còn thay đổi tiếp; phải dùng **CI của HEAD mới nhất** làm gate cuối.
+CI full test + build đã PASS tại run `36885839178` trên commit `2040c78` sau các thay đổi code/test chính (random prompt, stable target DOM, alpha/target pipeline, shared presentation timing, audio routing và authority privacy/reconnect tests). HEAD sau đó chỉ thêm/cập nhật tài liệu trạng thái; vẫn phải dùng **CI của HEAD mới nhất** làm gate cuối trước khi merge.
 
 ## 7. Chưa được phép báo hoàn thành production
 
