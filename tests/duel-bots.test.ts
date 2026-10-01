@@ -132,6 +132,196 @@ describe("DuelBot M-DUEL-02", () => {
     );
   });
 
+  it("preempts normal offers to type an incoming counter token", () => {
+    const bot = new DuelBot({
+      playerId: "player-2",
+      wpm: 90,
+      accuracy: 1,
+      reactionMs: 0,
+      personality: "balanced",
+      seed: 81,
+    });
+    const obs = duelBotObservation({
+      phase: "war",
+      self: {
+        hull: 100,
+        maxHull: 100,
+        shield: 20,
+        maxShield: 40,
+        energy: 50,
+        maxEnergy: 100,
+        offers: [offer("player-2", 0, "laser")],
+        incomingThreats: [
+          {
+            id: "threat:1",
+            sourcePlayerId: "player-1",
+            targetPlayerId: "player-2",
+            actionId: "siege-lance",
+            displayLabel: "INTERCEPT",
+            answerToken: "intercept",
+            typedPrefix: "",
+            counterTags: ["intercept"],
+            remainingSeconds: 2.8,
+            effectScale: 1,
+            status: "open",
+          },
+        ],
+      },
+      opponent: {
+        hull: 100,
+        maxHull: 100,
+        shield: 20,
+        maxShield: 40,
+        energy: 50,
+        maxEnergy: 100,
+      },
+    });
+
+    const intents = bot.update(0.01, obs);
+    expect(intents[0]).toEqual(
+      expect.objectContaining({
+        type: "SELECT_TARGET",
+        targetInstanceId: "threat:1",
+      }),
+    );
+  });
+
+  it("contests an active neutral objective using the same typing intents", () => {
+    const bot = new DuelBot({
+      playerId: "player-2",
+      wpm: 90,
+      accuracy: 1,
+      reactionMs: 0,
+      personality: "fortune",
+      seed: 82,
+    });
+    const obs = duelBotObservation({
+      phase: "war",
+      self: {
+        hull: 100,
+        maxHull: 100,
+        shield: 20,
+        maxShield: 40,
+        energy: 50,
+        maxEnergy: 100,
+        offers: [offer("player-2", 0, "laser")],
+      },
+      neutralObjective: {
+        id: "objective:1",
+        kind: "fate",
+        displayLabel: "FATE CRYSTAL",
+        answerToken: "fatecrystal",
+        status: "active",
+        winnerId: null,
+        draw: false,
+        progress: {
+          "player-1": "",
+          "player-2": "",
+        },
+      },
+      opponent: {
+        hull: 100,
+        maxHull: 100,
+        shield: 20,
+        maxShield: 40,
+        energy: 50,
+        maxEnergy: 100,
+      },
+    });
+
+    expect(bot.update(0.01, obs)[0]).toEqual(
+      expect.objectContaining({
+        type: "SELECT_TARGET",
+        targetInstanceId: "objective:1",
+      }),
+    );
+  });
+
+  it("uses earned banked actions and ready combos instead of hoarding them forever", () => {
+    const comboBot = new DuelBot({
+      playerId: "player-2",
+      wpm: 60,
+      accuracy: 1,
+      reactionMs: 0,
+      personality: "aggro",
+      seed: 83,
+    });
+    const comboObs = duelBotObservation({
+      phase: "war",
+      self: {
+        hull: 100,
+        maxHull: 100,
+        shield: 20,
+        maxShield: 40,
+        energy: 50,
+        maxEnergy: 100,
+        offers: [],
+        readyCombos: [{ id: "homing-barrage" }],
+      },
+      opponent: {
+        hull: 60,
+        maxHull: 100,
+        shield: 0,
+        maxShield: 40,
+        energy: 50,
+        maxEnergy: 100,
+      },
+    });
+    expect(comboBot.update(0.01, comboObs)[0]).toEqual(
+      expect.objectContaining({
+        type: "ACTIVATE_SKILL",
+        skillId: "combo:homing-barrage",
+      }),
+    );
+
+    const itemBot = new DuelBot({
+      playerId: "player-2",
+      wpm: 60,
+      accuracy: 1,
+      reactionMs: 0,
+      personality: "sniper",
+      seed: 84,
+    });
+    const itemObs = duelBotObservation({
+      phase: "war",
+      self: {
+        hull: 100,
+        maxHull: 100,
+        shield: 20,
+        maxShield: 40,
+        energy: 50,
+        maxEnergy: 100,
+        offers: [],
+        inventory: {
+          attack: [
+            {
+              instanceId: "stored:attack:1",
+              actionId: "missile",
+              storedAtTick: 10,
+              qualityScale: 1,
+            },
+          ],
+          defense: [],
+          tactical: [],
+        },
+      },
+      opponent: {
+        hull: 60,
+        maxHull: 100,
+        shield: 0,
+        maxShield: 40,
+        energy: 50,
+        maxEnergy: 100,
+      },
+    });
+    expect(itemBot.update(0.01, itemObs)[0]).toEqual(
+      expect.objectContaining({
+        type: "USE_ITEM",
+        itemId: "missile",
+      }),
+    );
+  });
+
   it("integrates through the exact same DuelEngine intent path as a human", () => {
     const engine = new DuelEngine();
     const offers = [offer("player-2", 0, "repair")];
@@ -256,7 +446,9 @@ describe("DuelBot M-DUEL-02", () => {
         intents.every(
           (intent) =>
             intent.type === "SELECT_TARGET" ||
-            intent.type === "TYPE_CHAR",
+            intent.type === "TYPE_CHAR" ||
+            intent.type === "USE_ITEM" ||
+            intent.type === "ACTIVATE_SKILL",
         ),
       ).toBe(true);
     }

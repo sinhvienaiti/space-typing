@@ -252,7 +252,18 @@ export class DuelLocalPracticeMatch {
           ...snapshot.players["player-2"],
           cooldowns:
             snapshot.cooldowns["player-2"],
+          inventory:
+            snapshot.inventories["player-2"],
+          incomingThreats:
+            snapshot.incomingThreats["player-2"],
+          initiative:
+            snapshot.strategy["player-2"].initiative,
+          readyCombos:
+            snapshot.strategy["player-2"].readyCombos,
+          trapCount:
+            snapshot.strategy["player-2"].traps.length,
         },
+        neutralObjective: snapshot.neutralObjective,
         opponent: snapshot.players["player-1"],
       }),
     )) {

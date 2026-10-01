@@ -1833,7 +1833,16 @@ export class DuelAuthorityService {
       self: {
         ...snapshot.players[playerId],
         cooldowns: snapshot.cooldowns[playerId],
+        inventory: snapshot.inventories[playerId],
+        incomingThreats:
+          snapshot.incomingThreats[playerId],
+        initiative: snapshot.strategy[playerId].initiative,
+        readyCombos:
+          snapshot.strategy[playerId].readyCombos,
+        trapCount:
+          snapshot.strategy[playerId].traps.length,
       },
+      neutralObjective: snapshot.neutralObjective,
       opponent: snapshot.players[opponentId],
     });
     for (const intent of match.bot.update(

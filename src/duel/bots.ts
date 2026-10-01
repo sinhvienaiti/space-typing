@@ -10,6 +10,9 @@ import type {
   DuelTypingCostBand,
 } from "./model";
 import { DuelRng } from "./rng";
+import type { DuelCombatInventorySnapshot } from "./inventory";
+import type { DuelIncomingThreat } from "./threats";
+import type { DuelNeutralObjective } from "./objectives";
 
 export type DuelBotPersonality =
   | "turtle"
@@ -40,8 +43,15 @@ export type DuelBotObservation = {
   phase: DuelMatchPhase;
   self: DuelBotPublicPlayer;
   opponent: DuelBotPublicPlayer;
+  selfEnergy: number;
   ownOffers: readonly DuelActionOffer[];
   ownCooldowns: Readonly<Record<string, number>>;
+  ownInventory: DuelCombatInventorySnapshot;
+  incomingThreats: readonly DuelIncomingThreat[];
+  neutralObjective: DuelNeutralObjective | null;
+  ownInitiative: number;
+  ownReadyCombos: readonly string[];
+  ownTrapCount: number;
 };
 
 export type DuelBotMetrics = {
@@ -51,9 +61,11 @@ export type DuelBotMetrics = {
 };
 
 type BotTarget = {
+  kind: "offer" | "threat" | "objective";
   instanceId: string;
   actionId: string;
   answerToken: string;
+  progressLength: number;
 };
 
 const CATEGORY_WEIGHT: Readonly<
@@ -190,6 +202,19 @@ export class DuelBot {
     if (!this.targetStillAvailable(observation)) {
       this.resetTarget();
     }
+    const urgentThreat = this.pickThreat(observation);
+    if (
+      urgentThreat !== null &&
+      this.target?.kind !== "threat"
+    ) {
+      this.resetTarget();
+    } else if (
+      urgentThreat === null &&
+      observation.neutralObjective?.status === "active" &&
+      this.target?.kind === "offer"
+    ) {
+      this.resetTarget();
+    }
 
     let guard = 0;
     while (remaining >= 0 && guard < 16) {
@@ -202,13 +227,37 @@ export class DuelBot {
       this.timer = 0;
 
       if (this.target === null) {
-        const selected = this.chooseTarget(observation);
+        const priority = this.choosePriorityTarget(observation);
+        if (priority !== null) {
+          this.target = priority;
+          this.charIndex = priority.progressLength;
+          intents.push({
+            type: "SELECT_TARGET",
+            playerId: this.playerId,
+            sequence: this.nextSequence(),
+            targetInstanceId: priority.instanceId,
+          });
+          this.timer = this.characterInterval();
+          continue;
+        }
+
+        const strategic = this.chooseStrategicIntent(observation);
+        if (strategic !== null) {
+          intents.push(strategic);
+          this.timer = Math.max(
+            0.12,
+            this.reactionSeconds,
+          );
+          break;
+        }
+
+        const selected = this.chooseOfferTarget(observation);
         if (selected === null) {
           this.timer = Math.max(0.12, this.reactionSeconds);
           break;
         }
         this.target = selected;
-        this.charIndex = 0;
+        this.charIndex = selected.progressLength;
         intents.push({
           type: "SELECT_TARGET",
           playerId: this.playerId,
@@ -267,7 +316,7 @@ export class DuelBot {
     };
   }
 
-  private chooseTarget(
+  private chooseOfferTarget(
     observation: DuelBotObservation,
   ): BotTarget | null {
     const candidates = observation.ownOffers
@@ -334,24 +383,187 @@ export class DuelBot {
       roll -= entry.weight;
       if (roll <= 0) {
         return {
+          kind: "offer",
           instanceId: entry.offer.instanceId,
           actionId: entry.action.id,
           answerToken: entry.action.answerToken,
+          progressLength: entry.offer.typedPrefix.length,
         };
       }
     }
     const fallback = weighted[weighted.length - 1]!;
     return {
+      kind: "offer",
       instanceId: fallback.offer.instanceId,
       actionId: fallback.action.id,
       answerToken: fallback.action.answerToken,
+      progressLength: fallback.offer.typedPrefix.length,
     };
+  }
+
+  private pickThreat(
+    observation: DuelBotObservation,
+  ): DuelIncomingThreat | null {
+    const threats = observation.incomingThreats
+      .filter((threat) => threat.status === "open")
+      .sort(
+        (left, right) =>
+          left.remainingSeconds - right.remainingSeconds ||
+          left.id.localeCompare(right.id),
+      );
+    return threats[0] ?? null;
+  }
+
+  private choosePriorityTarget(
+    observation: DuelBotObservation,
+  ): BotTarget | null {
+    const threat = this.pickThreat(observation);
+    if (threat !== null) {
+      return {
+        kind: "threat",
+        instanceId: threat.id,
+        actionId: threat.actionId,
+        answerToken: threat.answerToken,
+        progressLength: threat.typedPrefix.length,
+      };
+    }
+
+    const objective = observation.neutralObjective;
+    if (objective?.status === "active") {
+      return {
+        kind: "objective",
+        instanceId: objective.id,
+        actionId: "objective:" + objective.kind,
+        answerToken: objective.answerToken,
+        progressLength:
+          objective.progress[this.playerId].length,
+      };
+    }
+    return null;
+  }
+
+  private chooseStrategicIntent(
+    observation: DuelBotObservation,
+  ): DuelIntent | null {
+    const comboId = observation.ownReadyCombos[0];
+    if (comboId !== undefined) {
+      return {
+        type: "ACTIVATE_SKILL",
+        playerId: this.playerId,
+        sequence: this.nextSequence(),
+        skillId: "combo:" + comboId,
+      };
+    }
+
+    const usable = (
+      bucket: keyof DuelCombatInventorySnapshot,
+    ): string | null => {
+      for (const entry of observation.ownInventory[bucket]) {
+        const action = duelActionDefinitionForMap(
+          observation.mapId,
+          entry.actionId,
+        );
+        if (
+          action !== undefined &&
+          action.energyCost <= observation.selfEnergy &&
+          (observation.ownCooldowns[action.id] ?? 0) <= 0
+        ) {
+          return action.id;
+        }
+      }
+      return null;
+    };
+
+    const defense = usable("defense");
+    if (
+      defense !== null &&
+      (observation.self.hullRatio < 0.55 ||
+        observation.self.shieldRatio < 0.3)
+    ) {
+      return {
+        type: "USE_ITEM",
+        playerId: this.playerId,
+        sequence: this.nextSequence(),
+        itemId: defense,
+      };
+    }
+
+    const tactical = usable("tactical");
+    if (
+      tactical !== null &&
+      (this.personality === "tactician" ||
+        this.personality === "trickster" ||
+        observation.phase === "crisis" ||
+        observation.phase === "cataclysm")
+    ) {
+      return {
+        type: "USE_ITEM",
+        playerId: this.playerId,
+        sequence: this.nextSequence(),
+        itemId: tactical,
+      };
+    }
+
+    const attack = usable("attack");
+    if (
+      attack !== null &&
+      (this.personality === "aggro" ||
+        this.personality === "sniper" ||
+        observation.opponent.hullRatio < 0.72 ||
+        observation.phase === "war" ||
+        observation.phase === "crisis" ||
+        observation.phase === "cataclysm")
+    ) {
+      return {
+        type: "USE_ITEM",
+        playerId: this.playerId,
+        sequence: this.nextSequence(),
+        itemId: attack,
+      };
+    }
+
+    if (
+      observation.ownInitiative >= 8 &&
+      observation.ownTrapCount < 2 &&
+      (this.personality === "tactician" ||
+        this.personality === "trickster" ||
+        this.personality === "turtle")
+    ) {
+      const trapId =
+        this.personality === "turtle"
+          ? "mirror-trap"
+          : this.personality === "trickster"
+            ? "decoy"
+            : "static-snare";
+      return {
+        type: "ACTIVATE_SKILL",
+        playerId: this.playerId,
+        sequence: this.nextSequence(),
+        skillId: "trap:" + trapId,
+      };
+    }
+
+    return null;
   }
 
   private targetStillAvailable(
     observation: DuelBotObservation,
   ): boolean {
     if (this.target === null) return true;
+    if (this.target.kind === "threat") {
+      return observation.incomingThreats.some(
+        (threat) =>
+          threat.id === this.target?.instanceId &&
+          threat.status === "open",
+      );
+    }
+    if (this.target.kind === "objective") {
+      return (
+        observation.neutralObjective?.id ===
+          this.target.instanceId &&
+        observation.neutralObjective.status === "active"
+      );
+    }
     const offer = observation.ownOffers.find(
       (candidate) => candidate.instanceId === this.target?.instanceId,
     );
@@ -390,7 +602,13 @@ export function duelBotObservation(input: {
     maxEnergy: number;
     offers: readonly DuelActionOffer[];
     cooldowns?: Readonly<Record<string, number>>;
+    inventory?: DuelCombatInventorySnapshot;
+    incomingThreats?: readonly DuelIncomingThreat[];
+    initiative?: number;
+    readyCombos?: readonly { id: string }[];
+    trapCount?: number;
   };
+  neutralObjective?: DuelNeutralObjective | null;
   opponent: {
     hull: number;
     maxHull: number;
@@ -416,7 +634,37 @@ export function duelBotObservation(input: {
       shieldRatio: ratio(input.opponent.shield, input.opponent.maxShield),
       energyRatio: ratio(input.opponent.energy, input.opponent.maxEnergy),
     },
+    selfEnergy: Math.max(
+      0,
+      Number.isFinite(input.self.energy) ? input.self.energy : 0,
+    ),
     ownOffers: input.self.offers.map((offer) => ({ ...offer })),
     ownCooldowns: { ...(input.self.cooldowns ?? {}) },
+    ownInventory: input.self.inventory ?? {
+      attack: [],
+      defense: [],
+      tactical: [],
+    },
+    incomingThreats:
+      input.self.incomingThreats?.map((threat) => ({
+        ...threat,
+        counterTags: [...threat.counterTags],
+      })) ?? [],
+    neutralObjective:
+      input.neutralObjective === undefined
+        ? null
+        : input.neutralObjective,
+    ownInitiative: Math.max(
+      0,
+      Number.isFinite(input.self.initiative)
+        ? input.self.initiative!
+        : 0,
+    ),
+    ownReadyCombos:
+      input.self.readyCombos?.map((combo) => combo.id) ?? [],
+    ownTrapCount: Math.max(
+      0,
+      Math.floor(input.self.trapCount ?? 0),
+    ),
   };
 }
