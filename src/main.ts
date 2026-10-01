@@ -9,6 +9,11 @@ import { DuelLocalPracticeMatch } from "./duel/local-match";
 import { createPracticeDuelRoom } from "./duel/room";
 import type { DuelMapId } from "./duel/maps";
 import {
+  duelAudioPresentationKey,
+  duelMusicProfileForMap,
+  duelMusicStateForPhase,
+} from "./duel/audio";
+import {
   DEFAULT_KILL_TRANSLATION_SETTINGS,
   hasVisibleKillTranslation,
   sanitizeKillTranslationSettings,
@@ -1086,6 +1091,32 @@ function stopLocalDuel(): void {
   localDuelMatch = null;
 }
 
+let lastDuelAudioPresentationKey: string | null =
+  null;
+
+function syncDuelAudio(
+  view: import("./duel/authority").DuelClientMatchView,
+): void {
+  const key = duelAudioPresentationKey(
+    view.map.id,
+    view.phase,
+  );
+  if (key === lastDuelAudioPresentationKey) return;
+  lastDuelAudioPresentationKey = key;
+  musicController.setWorldProfile(
+    duelMusicProfileForMap(view.map.id),
+  );
+  musicController.transitionTo(
+    duelMusicStateForPhase(view.phase),
+    view.phase === "war" ||
+      view.phase === "crisis" ||
+      view.phase === "cataclysm"
+      ? 0.7
+      : 1.1,
+  );
+  musicController.setPaused(false);
+}
+
 const duelBattle = installDuelBattleUi(
   {
     sendIntent(intent) {
@@ -1109,8 +1140,13 @@ const duelBattle = installDuelBattleUi(
         null
       );
     },
+    onPresentationState(view) {
+      syncDuelAudio(view);
+    },
     onExit() {
       stopLocalDuel();
+      lastDuelAudioPresentationKey = null;
+      restoreTitleMusic();
       const duelDialog =
         byId<HTMLDialogElement>("duelRoomDialog");
       if (!duelDialog.open) duelDialog.showModal();

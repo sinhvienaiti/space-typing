@@ -21,6 +21,10 @@ import {
 
 export type DuelBattleUiHooks = {
   sendIntent(intent: DuelWireIntent): number | null;
+  onPresentationState?(
+    view: DuelClientMatchView,
+    events: readonly DuelClientEvent[],
+  ): void;
   onExit?(): void;
 };
 
@@ -1333,6 +1337,10 @@ export function installDuelBattleUi(
       performanceMonitor.reset();
       renderCore();
       appendFeed(events);
+      hooks.onPresentationState?.(
+        nextView,
+        events,
+      );
       startPerformanceLoop();
     },
     update(nextView, events = []) {
@@ -1359,6 +1367,10 @@ export function installDuelBattleUi(
       renderCore();
       renderDelta(previousView, nextView);
       appendFeed(events);
+      hooks.onPresentationState?.(
+        nextView,
+        events,
+      );
     },
     setPrediction(nextPrediction) {
       prediction = {
