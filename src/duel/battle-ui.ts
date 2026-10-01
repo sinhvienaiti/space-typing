@@ -14,6 +14,10 @@ import type { DuelWireIntent } from "./protocol";
 import type { DuelPlayerId } from "./model";
 import { duelCharacterFromKeyboardInput } from "./typing";
 import type { VisualQuality } from "../types";
+import {
+  DuelPerformanceMonitor,
+  type DuelPerformanceDiagnostics,
+} from "./performance";
 
 export type DuelBattleUiHooks = {
   sendIntent(intent: DuelWireIntent): number | null;
@@ -31,6 +35,8 @@ export type DuelBattleUiController = {
   ): void;
   setPrediction(prediction: DuelLocalPrediction): void;
   setQuality(quality: VisualQuality): void;
+  getPerformanceDiagnostics(): DuelPerformanceDiagnostics;
+  resetPerformanceDiagnostics(): void;
   hide(): void;
   isActive(): boolean;
 };
@@ -484,6 +490,10 @@ export function installDuelBattleUi(
   let active = false;
   let fxSequence = 0;
   let projectileSequence = 0;
+  const performanceMonitor =
+    new DuelPerformanceMonitor();
+  let performanceFrame: number | null = null;
+  let lastPerformanceFrameAt: number | null = null;
 
   const sendTarget = (targetInstanceId: string): void => {
     hooks.sendIntent({
@@ -900,6 +910,11 @@ export function installDuelBattleUi(
 
   const renderCore = (): void => {
     if (view === null) return;
+    const renderStartedAt = performance.now();
+    performanceMonitor.setContext(
+      quality,
+      view.phase,
+    );
     nodes.root.dataset.map = view.map.id;
     nodes.root.dataset.phase = view.phase;
     nodes.root.dataset.mode = view.mode;
@@ -986,6 +1001,9 @@ export function installDuelBattleUi(
     renderStrategy();
     renderIntel();
     renderCurrentInput();
+    performanceMonitor.pushUiUpdateMs(
+      performance.now() - renderStartedAt,
+    );
   };
 
   const appendFeed = (
@@ -1166,6 +1184,55 @@ export function installDuelBattleUi(
     }
   };
 
+  const stopPerformanceLoop = (): void => {
+    if (performanceFrame !== null) {
+      cancelAnimationFrame(performanceFrame);
+      performanceFrame = null;
+    }
+    lastPerformanceFrameAt = null;
+  };
+
+  const startPerformanceLoop = (): void => {
+    if (performanceFrame !== null) return;
+    const frame = (now: number): void => {
+      if (!active) {
+        stopPerformanceLoop();
+        return;
+      }
+      if (lastPerformanceFrameAt !== null) {
+        performanceMonitor.pushFrameMs(
+          Math.min(
+            250,
+            Math.max(0, now - lastPerformanceFrameAt),
+          ),
+        );
+      }
+      lastPerformanceFrameAt = now;
+      performanceMonitor.setContext(
+        quality,
+        view?.phase ?? null,
+      );
+      performanceMonitor.setLiveCounts(
+        nodes.projectiles.childElementCount,
+        nodes.fx.childElementCount,
+      );
+      performanceFrame = requestAnimationFrame(frame);
+    };
+    performanceFrame = requestAnimationFrame(frame);
+  };
+
+  const measureInputPaint = (
+    startedAt: number,
+    sequence: number | null,
+  ): void => {
+    if (sequence === null) return;
+    requestAnimationFrame(() => {
+      performanceMonitor.pushInputPaintMs(
+        Math.max(0, performance.now() - startedAt),
+      );
+    });
+  };
+
   const handleKeyDown = (event: KeyboardEvent): void => {
     if (!active || view === null) return;
     const target = event.target;
@@ -1183,10 +1250,12 @@ export function installDuelBattleUi(
         view.self.targetInstanceId;
       if (targetId !== null) {
         event.preventDefault();
-        hooks.sendIntent({
+        const startedAt = performance.now();
+        const sequence = hooks.sendIntent({
           type: "CANCEL_TARGET",
           targetInstanceId: targetId,
         });
+        measureInputPaint(startedAt, sequence);
       }
       return;
     }
@@ -1202,7 +1271,8 @@ export function installDuelBattleUi(
     if (char === null) return;
 
     event.preventDefault();
-    hooks.sendIntent({
+    const startedAt = performance.now();
+    const sequence = hooks.sendIntent({
       type: "TYPE_CHAR",
       char,
       ...((prediction.targetInstanceId ??
@@ -1215,6 +1285,7 @@ export function installDuelBattleUi(
               undefined,
           }),
     });
+    measureInputPaint(startedAt, sequence);
   };
 
   document.addEventListener(
@@ -1259,8 +1330,10 @@ export function installDuelBattleUi(
           nextView.self.acquisitionPrefix,
         pendingSequences: [],
       };
+      performanceMonitor.reset();
       renderCore();
       appendFeed(events);
+      startPerformanceLoop();
     },
     update(nextView, events = []) {
       if (!active) {
@@ -1295,18 +1368,41 @@ export function installDuelBattleUi(
         ],
       };
       if (active) {
+        const renderStartedAt = performance.now();
         renderOffers();
         renderThreats();
         renderObjective();
         renderCurrentInput();
+        performanceMonitor.pushUiUpdateMs(
+          performance.now() - renderStartedAt,
+        );
       }
     },
     setQuality(nextQuality) {
       quality = nextQuality;
       nodes.root.dataset.quality = quality;
+      performanceMonitor.setContext(
+        quality,
+        view?.phase ?? null,
+      );
+    },
+    getPerformanceDiagnostics() {
+      performanceMonitor.setLiveCounts(
+        nodes.projectiles.childElementCount,
+        nodes.fx.childElementCount,
+      );
+      return performanceMonitor.diagnostics();
+    },
+    resetPerformanceDiagnostics() {
+      performanceMonitor.reset();
+      performanceMonitor.setContext(
+        quality,
+        view?.phase ?? null,
+      );
     },
     hide() {
       active = false;
+      stopPerformanceLoop();
       nodes.root.classList.add("hidden");
       gameShell.classList.remove(
         "duel-battle-active",

@@ -20,6 +20,7 @@ import {
 import type {
   DuelActionCategory,
   DuelActionOffer,
+  DuelMatchPhase,
   DuelPlayerId,
 } from "./model";
 import {
@@ -245,6 +246,43 @@ export class DuelLocalPracticeMatch {
     }
 
     const events = this.engine.step(dtSeconds);
+    this.afterEngineStep(events);
+    this.serverSequence += 1;
+    return {
+      view: this.view(),
+      events: projectEvents(events),
+    };
+  }
+
+  advanceToPhaseForTestLab(
+    phase: DuelMatchPhase,
+  ): DuelLocalPracticeUpdate {
+    if (this.series.status !== "active") {
+      return this.initial();
+    }
+    if (this.needsRoundReset) {
+      this.beginNextRound();
+    }
+
+    const duration =
+      this.room.settings.matchLengthSeconds;
+    const targetProgress: Readonly<
+      Record<DuelMatchPhase, number>
+    > = {
+      build: 0,
+      skirmish: 0.26,
+      war: 0.51,
+      crisis: 0.81,
+      cataclysm: 1.01,
+    };
+    const snapshot = this.engine.snapshot();
+    const targetSeconds =
+      duration * targetProgress[phase];
+    const dt = Math.max(
+      0,
+      targetSeconds - snapshot.elapsedSeconds,
+    );
+    const events = this.engine.step(dt);
     this.afterEngineStep(events);
     this.serverSequence += 1;
     return {

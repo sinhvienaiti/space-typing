@@ -108,7 +108,10 @@ import {
   mountBatchFPerformanceGate,
   type BatchFPerformanceCapture,
 } from "./batch-f-performance-gate";
-import { mountDuelTestLab } from "./duel-test-lab";
+import {
+  mountDuelTestLab,
+  type DuelLabVisualQa,
+} from "./duel-test-lab";
 import {
   AUDIO_QA_BOSS_EVENTS,
   AUDIO_QA_MATERIAL_EVENTS,
@@ -169,6 +172,7 @@ export type TestLabMountOptions = {
   getVocabulary(): VocabularyEntry[];
   showNotice?(message: string): void;
   expeditionQa?: TestLabExpeditionQa;
+  duelQa?: DuelLabVisualQa;
 };
 
 export type TestLabController = {
@@ -860,6 +864,7 @@ export function mountTestLab(
     {
       showNotice: (message) =>
         options.showNotice?.("Test Lab · " + message),
+      visualQa: options.duelQa,
     },
   );
 

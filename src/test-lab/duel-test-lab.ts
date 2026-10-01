@@ -31,6 +31,10 @@ import {
   DUEL_COMBO_RECIPES,
   type DuelComboId,
 } from "../duel/strategy";
+import {
+  assessDuelPerformance,
+  type DuelPerformanceDiagnostics,
+} from "../duel/performance";
 
 type DuelLabBotConfig = {
   wpm: number;
@@ -39,8 +43,18 @@ type DuelLabBotConfig = {
   personality: DuelBotPersonality;
 };
 
+export type DuelLabVisualQa = {
+  performance(): DuelPerformanceDiagnostics | null;
+  resetPerformance(): void;
+  startStress?(
+    phase: "crisis" | "cataclysm",
+    mapId: DuelMapId,
+  ): void;
+};
+
 type DuelLabOptions = {
   showNotice?(message: string): void;
+  visualQa?: DuelLabVisualQa;
 };
 
 export type DuelTestLabController = {
@@ -695,6 +709,20 @@ export function mountDuelTestLab(
       <button type="button" data-duel-action="force-combo">Force Combo</button>
     </div>
 
+    <h4>Live battle performance</h4>
+    <p class="equipment-note">
+      Measures the real Duel battle renderer. High/Ultra quality is preserved;
+      this gate never disables approved FX to make the result pass.
+    </p>
+    <div class="test-lab-row">
+      <button type="button" data-duel-action="stress-crisis">Open Crisis Stress Scene</button>
+      <button type="button" data-duel-action="stress-cataclysm">Open Cataclysm Stress Scene</button>
+      <button type="button" data-duel-action="read-performance">Read Live Performance</button>
+      <button type="button" data-duel-action="reset-performance">Reset Live Performance</button>
+    </div>
+    <pre class="test-lab-mini-inspector" data-duel-role="performance"></pre>
+
+    <h4>Engine state</h4>
     <pre class="test-lab-mini-inspector" data-duel-role="inspector"></pre>
   `;
 
@@ -802,6 +830,36 @@ export function mountDuelTestLab(
     root.querySelector<HTMLElement>(
       '[data-duel-role="inspector"]',
     )!;
+  const performanceOutput =
+    root.querySelector<HTMLElement>(
+      '[data-duel-role="performance"]',
+    )!;
+
+  const renderPerformance = (): void => {
+    const diagnostics =
+      options.visualQa?.performance() ?? null;
+    if (diagnostics === null) {
+      performanceOutput.textContent =
+        "No live Duel battle performance sample yet. " +
+        "Open a Practice/Stress scene first.";
+      return;
+    }
+    const assessment =
+      assessDuelPerformance(diagnostics);
+    performanceOutput.textContent = JSON.stringify(
+      {
+        result: assessment.ready
+          ? assessment.pass
+            ? "PASS"
+            : "FAIL"
+          : "NOT READY",
+        reasons: assessment.reasons,
+        diagnostics,
+      },
+      null,
+      2,
+    );
+  };
 
   const configure = (restart: boolean): void => {
     runtime.configure({
@@ -901,12 +959,31 @@ export function mountDuelTestLab(
           "homing-barrage",
         ) as DuelComboId,
       );
+    } else if (action === "stress-crisis") {
+      options.visualQa?.startStress?.(
+        "crisis",
+        mapSelect.value as DuelMapId,
+      );
+    } else if (action === "stress-cataclysm") {
+      options.visualQa?.startStress?.(
+        "cataclysm",
+        mapSelect.value as DuelMapId,
+      );
+    } else if (action === "read-performance") {
+      renderPerformance();
+    } else if (action === "reset-performance") {
+      options.visualQa?.resetPerformance();
+      renderPerformance();
+      options.showNotice?.(
+        "Duel live performance samples reset.",
+      );
     }
 
     render();
   });
 
   render();
+  renderPerformance();
 
   return {
     destroy(): void {

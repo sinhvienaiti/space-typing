@@ -6,6 +6,8 @@ import "./duel/battle.css";
 import { installDuelOnlineRoomController } from "./duel/online-room-controller";
 import { installDuelBattleUi } from "./duel/battle-ui";
 import { DuelLocalPracticeMatch } from "./duel/local-match";
+import { createPracticeDuelRoom } from "./duel/room";
+import type { DuelMapId } from "./duel/maps";
 import {
   DEFAULT_KILL_TRANSLATION_SETTINGS,
   hasVisibleKillTranslation,
@@ -1146,6 +1148,44 @@ function startLocalDuelPractice(
       }
     }
   }, 50);
+}
+
+function startDuelVisualStress(
+  phase: "crisis" | "cataclysm",
+  mapId: DuelMapId,
+): void {
+  const room = createPracticeDuelRoom({
+    roomId: "TEST-LAB-DUEL",
+    participantId: "test-lab-human",
+    displayName: "Test Lab Pilot",
+    mapId,
+    bot: {
+      wpm: 78,
+      accuracy: 0.96,
+      reactionMs: 220,
+      personality: "tactician",
+    },
+  });
+  startLocalDuelPractice(room.snapshot());
+
+  if (localDuelMatch !== null) {
+    const update =
+      localDuelMatch.advanceToPhaseForTestLab(phase);
+    duelBattle.update(update.view, update.events);
+    duelBattle.resetPerformanceDiagnostics();
+  }
+
+  const testLabDialog =
+    byId<HTMLDialogElement>("testLabDialog");
+  if (testLabDialog.open) testLabDialog.close();
+  showNotice(
+    "Duel " +
+      phase.toUpperCase() +
+      " stress scene · " +
+      mapId +
+      " · " +
+      settings.visualQuality.toUpperCase(),
+  );
 }
 
 duelOnlineController = installDuelOnlineRoomController({
@@ -5029,6 +5069,15 @@ const testLab = mountTestLab({
   getSettings: () => settings,
   getVocabulary: () => configuredVocabulary,
   showNotice,
+  duelQa: {
+    performance: () =>
+      duelBattle.isActive()
+        ? duelBattle.getPerformanceDiagnostics()
+        : null,
+    resetPerformance: () =>
+      duelBattle.resetPerformanceDiagnostics(),
+    startStress: startDuelVisualStress,
+  },
   expeditionQa: {
     startWithSeed: (seed) => void startNewExpedition(seed, "qa"),
     forcePhase: forceExpeditionQaPhase,

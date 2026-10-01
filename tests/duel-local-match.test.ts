@@ -95,6 +95,33 @@ describe("Duel local Practice runtime", () => {
     expect(last.view.self.offers).toHaveLength(5);
   });
 
+  it("can jump a local Practice scene to Crisis/Cataclysm for visual Test Lab without Bot fast-forward", () => {
+    const crisisMatch = new DuelLocalPracticeMatch({
+      room: practiceRoom(),
+      seed: 6060,
+    });
+    const crisis =
+      crisisMatch.advanceToPhaseForTestLab("crisis");
+    expect(crisis.view.phase).toBe("crisis");
+    expect(crisis.view.round.status).toBe("active");
+
+    const cataclysmMatch = new DuelLocalPracticeMatch({
+      room: practiceRoom(),
+      seed: 7070,
+    });
+    const cataclysm =
+      cataclysmMatch.advanceToPhaseForTestLab(
+        "cataclysm",
+      );
+    expect(cataclysm.view.phase).toBe("cataclysm");
+    expect(cataclysm.view.round.status).toBe("active");
+    expect(
+      cataclysm.events.some(
+        (event) => event.type === "map-cataclysm",
+      ),
+    ).toBe(true);
+  });
+
   it("runs the configured Bot through character-level engine intents", () => {
     const match = new DuelLocalPracticeMatch({
       room: practiceRoom(),
