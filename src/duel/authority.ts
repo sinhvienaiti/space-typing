@@ -596,7 +596,10 @@ export function publicDuelTypingTelegraph(
     const action = duelActionMapForMap(snapshot.map.id).get(
       offer.actionId,
     );
-    tokenLength = action?.answerToken.length ?? 0;
+    tokenLength =
+      offer.typingPrompt?.answerToken.length ??
+      action?.answerToken.length ??
+      0;
     kind = "action";
   } else {
     const threat = snapshot.incomingThreats[playerId].find(
@@ -1858,7 +1861,12 @@ export class DuelAuthorityService {
 
       const nextOffers =
         snapshot.players[playerId].offers.map(
-          (offer) => ({ ...offer }),
+          (offer) => ({
+            ...offer,
+            ...(offer.typingPrompt === undefined
+              ? {}
+              : { typingPrompt: { ...offer.typingPrompt } }),
+          }),
         );
       for (const slotIndex of slots) {
         const refill =
@@ -1875,6 +1883,7 @@ export class DuelAuthorityService {
             duelStrategyCategoryMultiplier(
               snapshot.strategy[playerId].path,
             ),
+            snapshot.players[playerId].acquisitionPrefix,
           );
         if (refill === null) continue;
         const index = nextOffers.findIndex(
@@ -2127,6 +2136,9 @@ export class DuelAuthorityService {
         acquisitionPrefix: self.acquisitionPrefix,
         offers: self.offers.map((offer) => ({
           ...offer,
+          ...(offer.typingPrompt === undefined
+            ? {}
+            : { typingPrompt: { ...offer.typingPrompt } }),
         })),
         inventory: snapshot.inventories[playerId],
         incomingThreats:
