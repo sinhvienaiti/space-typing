@@ -571,7 +571,7 @@ export function projectDuelEventsForPlayer(
   return projected;
 }
 
-function publicTypingTelegraph(
+export function publicDuelTypingTelegraph(
   snapshot: DuelEngineSnapshot,
   playerId: DuelPlayerId,
 ): DuelPublicTypingTelegraph {
@@ -2150,7 +2150,7 @@ export class DuelAuthorityService {
         maxEnergy: opponent.maxEnergy,
         initiative: opponentStrategy.initiative,
         strategyPath: opponentStrategy.path,
-        typingTelegraph: publicTypingTelegraph(
+        typingTelegraph: publicDuelTypingTelegraph(
           snapshot,
           opponentId,
         ),
