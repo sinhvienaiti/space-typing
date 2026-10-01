@@ -28,6 +28,7 @@ import {
   duelTargetSpriteUrl,
   preloadDuelTargetSprites,
 } from "./target-art";
+import { duelProjectileTravelMs } from "./presentation-timing";
 
 export type DuelBattleUiHooks = {
   sendIntent(intent: DuelWireIntent): number | null;
@@ -2001,7 +2002,8 @@ export function installDuelBattleUi(
       "--duel-projectile-x",
       String(lane) + "%",
     );
-    const travelMs = Math.round(720 / speedScale);
+    const travelMs =
+      duelProjectileTravelMs(speedScale);
     projectile.style.setProperty(
       "--duel-projectile-duration",
       String(travelMs) + "ms",
