@@ -77,6 +77,13 @@ import {
   DuelCooldownState,
   type DuelCooldownSnapshot,
 } from "./cooldowns";
+import {
+  duelPrecisionAccuracyTier,
+  duelPrecisionDamageScale,
+  duelPrecisionMilestone,
+  type DuelPrecisionAccuracyTier,
+  type DuelPrecisionOrdnance,
+} from "./precision-firepower";
 
 export type DuelRoundResult =
   | { status: "active"; winnerId: null }
@@ -93,6 +100,7 @@ export type DuelPlayerState = {
   maxEnergy: number;
   correctChars: number;
   wrongChars: number;
+  precisionStreak: number;
   lastAcceptedSequence: number;
   targetInstanceId: string | null;
   acquisitionPrefix: string;
@@ -186,6 +194,14 @@ export type DuelEngineEvent =
       type: "action-fired";
       playerId: DuelPlayerId;
       actionId: string;
+    }
+  | {
+      type: "precision-firepower";
+      playerId: DuelPlayerId;
+      streak: number;
+      ordnance: DuelPrecisionOrdnance;
+      accuracyTier: DuelPrecisionAccuracyTier;
+      damage: number;
     }
   | {
       type: "offer-expired";
@@ -348,6 +364,7 @@ function createPlayer(
     maxEnergy: config.maxEnergy,
     correctChars: 0,
     wrongChars: 0,
+    precisionStreak: 0,
     lastAcceptedSequence: -1,
     targetInstanceId: null,
     acquisitionPrefix: "",
@@ -1189,6 +1206,51 @@ export class DuelEngine {
     });
   }
 
+  private recordCorrectCharacter(
+    player: DuelPlayerState,
+    events: DuelEngineEvent[],
+  ): void {
+    this.recordCorrectCharacter(player, events);
+    player.precisionStreak += 1;
+
+    const milestone = duelPrecisionMilestone(
+      player.precisionStreak,
+    );
+    if (milestone === null) return;
+
+    const accuracyTier = duelPrecisionAccuracyTier(
+      player.correctChars,
+      player.wrongChars,
+    );
+    const damage =
+      milestone.baseDamage *
+      duelPrecisionDamageScale(accuracyTier);
+    const targetId =
+      player.id === "player-1" ? "player-2" : "player-1";
+
+    this.pendingEffects.push({
+      type: "damage",
+      targetId,
+      sourceId: player.id,
+      amount: damage,
+    });
+    events.push({
+      type: "precision-firepower",
+      playerId: player.id,
+      streak: milestone.streak,
+      ordnance: milestone.ordnance,
+      accuracyTier,
+      damage,
+    });
+  }
+
+  private recordWrongCharacter(
+    player: DuelPlayerState,
+  ): void {
+    this.recordWrongCharacter(player);
+    player.precisionStreak = 0;
+  }
+
   private typeCharacter(
     player: DuelPlayerState,
     rawChar: string,
@@ -1270,7 +1332,7 @@ export class DuelEngine {
       this.actions,
     );
     if (matches.length === 0) {
-      player.wrongChars += 1;
+      this.recordWrongCharacter(player);
       player.targetMistakes += 1;
       events.push({
         type: "typing-miss",
@@ -1299,7 +1361,7 @@ export class DuelEngine {
       }
     }
 
-    player.correctChars += 1;
+    this.recordCorrectCharacter(player, events);
     player.acquisitionPrefix = nextPrefix;
     if (matches.length === 1) {
       const offer = matches[0]!;
@@ -1325,7 +1387,7 @@ export class DuelEngine {
     if (action === undefined) return;
     const expected = action.answerToken[offer.typedPrefix.length];
     if (expected !== char) {
-      player.wrongChars += 1;
+      this.recordWrongCharacter(player);
       player.targetMistakes += 1;
       events.push({
         type: "typing-miss",
@@ -1351,7 +1413,7 @@ export class DuelEngine {
       return;
     }
 
-    player.correctChars += 1;
+    this.recordCorrectCharacter(player, events);
     offer.typedPrefix += char;
     player.acquisitionPrefix = offer.typedPrefix;
     this.completeIfFinished(player, offer, events);
@@ -1370,7 +1432,7 @@ export class DuelEngine {
       char,
     );
     if (result.kind === "wrong") {
-      player.wrongChars += 1;
+      this.recordWrongCharacter(player);
       player.targetMistakes += 1;
       events.push({
         type: "typing-miss",
@@ -1391,7 +1453,7 @@ export class DuelEngine {
       return;
     }
 
-    player.correctChars += 1;
+    this.recordCorrectCharacter(player, events);
     const threat = this.threats.getOpenThreat(player.id, threatId);
     player.acquisitionPrefix = threat?.typedPrefix ?? "";
     if (result.completed) {
@@ -1414,7 +1476,7 @@ export class DuelEngine {
       char,
     );
     if (result.kind === "wrong") {
-      player.wrongChars += 1;
+      this.recordWrongCharacter(player);
       player.targetMistakes += 1;
       events.push({
         type: "typing-miss",
@@ -1435,7 +1497,7 @@ export class DuelEngine {
       return;
     }
 
-    player.correctChars += 1;
+    this.recordCorrectCharacter(player, events);
     player.acquisitionPrefix =
       this.objectives.progressFor(player.id, objectiveId) ?? "";
     if (result.completed) {
