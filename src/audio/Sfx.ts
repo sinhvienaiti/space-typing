@@ -7,7 +7,10 @@ import {
   mixedSfxGain,
   type AudioGroup,
 } from "./mix";
-import { SampleSfxBank } from "./sample-bank";
+import {
+  SampleSfxBank,
+  type SampleSfxId,
+} from "./sample-bank";
 import type { EnemyMaterial } from "../enemies/identity";
 import type {
   CreditCrystalTier,
@@ -195,6 +198,20 @@ export class Sfx {
       void this.context.resume();
     }
     this.samples.preload();
+  }
+
+  playSample(
+    id: SampleSfxId,
+    playbackRate = 1,
+  ): boolean {
+    if (this.destroyed) return false;
+    this.unlock();
+    return this.samples.play(
+      id,
+      this.volume,
+      this.pronunciationActive,
+      playbackRate,
+    );
   }
 
   shot(multiplier = 1): void {
