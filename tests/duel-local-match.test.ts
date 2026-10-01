@@ -99,6 +99,31 @@ describe("Duel local Practice runtime", () => {
     expect(last.view.self.offers).toHaveLength(5);
   });
 
+  it("refills expired human offers back to five slots without creating typing misses", () => {
+    const match = new DuelLocalPracticeMatch({
+      room: practiceRoom(),
+      seed: 3030,
+    });
+    const initial = match.initial().view;
+    const initialIds = new Set(
+      initial.self.offers.map((offer) => offer.instanceId),
+    );
+
+    let view = initial;
+    for (let second = 0; second < 25; second += 1) {
+      view = match.tick(1).view;
+    }
+
+    expect(view.self.offers).toHaveLength(5);
+    expect(
+      view.self.offers.some((offer) =>
+        initialIds.has(offer.instanceId),
+      ),
+    ).toBe(false);
+    expect(view.self.correctChars).toBe(0);
+    expect(view.self.wrongChars).toBe(0);
+  });
+
   it("can jump a local Practice scene to Crisis/Cataclysm for visual Test Lab without Bot fast-forward", () => {
     const crisisMatch = new DuelLocalPracticeMatch({
       room: practiceRoom(),

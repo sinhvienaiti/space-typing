@@ -628,7 +628,8 @@ class DuelTestLabRuntime {
         );
         if (
           existing !== undefined &&
-          existing.status !== "completed"
+          (existing.status === "available" ||
+            existing.status === "locked")
         ) {
           continue;
         }
@@ -641,7 +642,8 @@ class DuelTestLabRuntime {
             offers.filter(
               (offer) =>
                 offer.slotIndex !== slotIndex &&
-                offer.status !== "completed",
+                (offer.status === "available" ||
+                  offer.status === "locked"),
             ),
           );
         if (refill === null) continue;
@@ -661,7 +663,9 @@ class DuelTestLabRuntime {
         this.engine.setPrivateOffers(
           playerId,
           offers.filter(
-            (offer) => offer.status !== "completed",
+            (offer) =>
+              offer.status === "available" ||
+              offer.status === "locked",
           ),
         );
       }

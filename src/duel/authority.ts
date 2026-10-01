@@ -526,6 +526,7 @@ export function projectDuelEventsForPlayer(
     "typing-miss",
     "action-blocked",
     "action-completed",
+    "offer-expired",
     "action-banked",
     "mystery-revealed",
     "combo-ready",
@@ -1703,9 +1704,16 @@ export class DuelAuthorityService {
       const slots = new Set<number>();
       for (const event of events) {
         if (
-          event.type !== "action-completed" ||
+          !("playerId" in event) ||
           event.playerId !== playerId
         ) {
+          continue;
+        }
+        if (event.type === "offer-expired") {
+          slots.add(event.slotIndex);
+          continue;
+        }
+        if (event.type !== "action-completed") {
           continue;
         }
         const offer =
@@ -1731,7 +1739,8 @@ export class DuelAuthorityService {
             nextOffers.filter(
               (offer) =>
                 offer.slotIndex !== slotIndex &&
-                offer.status !== "completed",
+                (offer.status === "available" ||
+                  offer.status === "locked"),
             ),
           );
         if (refill === null) continue;

@@ -8,6 +8,7 @@ import type {
 } from "./model";
 import { DUEL_PRIVATE_OFFER_COUNT } from "./model";
 import { DuelRng } from "./rng";
+import { duelOfferLifetimeSeconds } from "./offer-lifecycle";
 
 export const DUEL_PHASE_CATEGORY_WEIGHTS: Readonly<
   Record<DuelMatchPhase, Readonly<Record<DuelActionCategory, number>>>
@@ -173,11 +174,20 @@ export class DuelOfferDraft {
   ): DuelActionOffer | null {
     const existingActionIds = new Set(
       existingOffers
-        .filter((offer) => offer.status !== "completed")
+        .filter(
+          (offer) =>
+            offer.status === "available" ||
+            offer.status === "locked",
+        )
         .map((offer) => offer.actionId),
     );
     const existingInitials = new Set(
       existingOffers
+        .filter(
+          (offer) =>
+            offer.status === "available" ||
+            offer.status === "locked",
+        )
         .map((offer) =>
           this.actions.find((action) => action.id === offer.actionId),
         )
@@ -218,6 +228,8 @@ export class DuelOfferDraft {
       typedPrefix: "",
       slotIndex: Math.max(0, Math.floor(slotIndex)),
       shared: false,
+      remainingSeconds:
+        duelOfferLifetimeSeconds(action.category),
     };
   }
 

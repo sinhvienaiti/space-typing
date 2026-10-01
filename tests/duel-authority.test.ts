@@ -298,6 +298,76 @@ describe("Duel M-DUEL-11 authority core", () => {
     }
   });
 
+  it("authoritatively refills expired private offers for online Practice/Friend matches", () => {
+    const authority = new DuelAuthorityService(deps());
+    const host = open(authority, "host");
+    const room = createRoom(authority, host.sessionId);
+    authority.setBot(
+      host.sessionId,
+      room.roomId,
+      {
+        wpm: 10,
+        accuracy: 0.5,
+        reactionMs: 3000,
+        personality: "balanced",
+      },
+      1,
+    );
+    authority.setReady(
+      host.sessionId,
+      room.roomId,
+      true,
+      2,
+    );
+    const started = authority.startMatch(
+      host.sessionId,
+      room.roomId,
+      3,
+    );
+    if (!started.ok) throw new Error(started.message);
+
+    const first = started.value.updates.find(
+      (update) => update.sessionId === host.sessionId,
+    )!;
+    const initialIds = new Set(
+      first.view.self.offers.map(
+        (offer) => offer.instanceId,
+      ),
+    );
+
+    let lastView = first.view;
+    let sawOwnExpiration = false;
+    for (let second = 0; second < 25; second += 1) {
+      const tick = authority.tick(
+        started.value.matchId,
+        1,
+        10 + second,
+      );
+      if (!tick.ok) throw new Error(tick.message);
+      const update = tick.value.updates.find(
+        (candidate) =>
+          candidate.sessionId === host.sessionId,
+      )!;
+      lastView = update.view;
+      sawOwnExpiration =
+        sawOwnExpiration ||
+        update.events.some(
+          (event) =>
+            event.type === "offer-expired" &&
+            event.playerId === "player-1",
+        );
+    }
+
+    expect(sawOwnExpiration).toBe(true);
+    expect(lastView.self.offers).toHaveLength(5);
+    expect(
+      lastView.self.offers.some((offer) =>
+        initialIds.has(offer.instanceId),
+      ),
+    ).toBe(false);
+    expect(lastView.self.wrongChars).toBe(0);
+  });
+
   it("rejects stale sequence and impossible input-rate bursts", () => {
     const authority = new DuelAuthorityService(deps(), {
       maxTypeCharsPerSecond: 2,

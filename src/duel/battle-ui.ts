@@ -382,6 +382,8 @@ function eventLabel(event: DuelClientEvent): string {
       return "Typing miss · " + event.char.toUpperCase();
     case "action-completed":
       return "Action complete · " + event.actionId;
+    case "offer-expired":
+      return "Offer expired · " + event.actionId;
     case "action-banked":
       return "Banked · " + event.actionId;
     case "stored-action-used":
@@ -544,6 +546,8 @@ export function installDuelBattleUi(
       if (action === undefined) continue;
       const cooldown =
         view.self.cooldowns[action.id] ?? 0;
+      const lifetime =
+        offer.remainingSeconds ?? null;
       const selected =
         prediction.targetInstanceId === offer.instanceId ||
         view.self.targetInstanceId === offer.instanceId;
@@ -561,11 +565,15 @@ export function installDuelBattleUi(
           action.category +
           (selected ? " selected" : "") +
           (offer.status === "completed" ? " completed" : "") +
-          (cooldown > 0 ? " cooling-down" : ""),
+          (cooldown > 0 ? " cooling-down" : "") +
+          (lifetime !== null && lifetime <= 5
+            ? " expiring-soon"
+            : ""),
       );
       card.type = "button";
       card.disabled =
-        offer.status === "completed" ||
+        (offer.status !== "available" &&
+          offer.status !== "locked") ||
         cooldown > 0;
       card.dataset.offerId = offer.instanceId;
 
@@ -598,9 +606,18 @@ export function installDuelBattleUi(
               " EN · " +
               action.typingCostBand
             : action.typingCostBand;
+      const timingMeta: string[] = [];
+      if (cooldown > 0) {
+        timingMeta.push(cooldown.toFixed(1) + "s CD");
+      }
+      if (lifetime !== null) {
+        timingMeta.push(
+          Math.max(0, lifetime).toFixed(1) + "s",
+        );
+      }
       meta.textContent =
-        cooldown > 0
-          ? cooldown.toFixed(1) + "s CD · " + baseMeta
+        timingMeta.length > 0
+          ? timingMeta.join(" · ") + " · " + baseMeta
           : baseMeta;
 
       card.append(category, label, token, meta);

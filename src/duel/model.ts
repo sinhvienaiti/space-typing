@@ -92,6 +92,7 @@ export type DuelActionOffer = {
   typedPrefix: string;
   slotIndex: number;
   shared: boolean;
+  remainingSeconds?: number | null;
 };
 
 export type DuelIntent =

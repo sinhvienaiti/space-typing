@@ -66,6 +66,10 @@ import {
 } from "./threats";
 import { matchingDuelOffers } from "./typing";
 import {
+  duelOfferLifetimeSeconds,
+  sanitizeDuelOfferRemainingSeconds,
+} from "./offer-lifecycle";
+import {
   DuelCooldownState,
   type DuelCooldownSnapshot,
 } from "./cooldowns";
@@ -166,6 +170,13 @@ export type DuelEngineEvent =
       playerId: DuelPlayerId;
       targetInstanceId: string;
       actionId: string;
+    }
+  | {
+      type: "offer-expired";
+      playerId: DuelPlayerId;
+      targetInstanceId: string;
+      actionId: string;
+      slotIndex: number;
     }
   | {
       type: "action-banked";
@@ -421,7 +432,18 @@ export class DuelEngine {
     const player = this.players[playerId];
     player.offers = offers
       .filter((offer) => !offer.shared && offer.ownerId === playerId)
-      .map(cloneOffer)
+      .map((offer) => {
+        const cloned = cloneOffer(offer);
+        const action = this.actions.get(cloned.actionId);
+        cloned.remainingSeconds =
+          sanitizeDuelOfferRemainingSeconds(
+            cloned.remainingSeconds,
+            action === undefined
+              ? 20
+              : duelOfferLifetimeSeconds(action.category),
+          );
+        return cloned;
+      })
       .sort(
         (left, right) =>
           left.slotIndex - right.slotIndex ||
@@ -467,6 +489,7 @@ export class DuelEngine {
     this.cooldowns.update(dt);
     this.tactical.update(dt);
     this.strategy.update(dt);
+    this.expirePrivateOffers(dt, events);
     const directorEvents = this.director.update(dt, this.phase());
     for (const event of directorEvents) {
       if (event.type === "hazard") {
@@ -1593,6 +1616,48 @@ export class DuelEngine {
       playerId: player.id,
       targetInstanceId,
     });
+  }
+
+  private expirePrivateOffers(
+    dtSeconds: number,
+    events: DuelEngineEvent[],
+  ): void {
+    if (dtSeconds <= 0) return;
+
+    for (const playerId of PLAYER_IDS) {
+      const player = this.players[playerId];
+      for (const offer of player.offers) {
+        if (offer.status !== "available") continue;
+        const action = this.actions.get(offer.actionId);
+        const remaining =
+          sanitizeDuelOfferRemainingSeconds(
+            offer.remainingSeconds,
+            action === undefined
+              ? 20
+              : duelOfferLifetimeSeconds(action.category),
+          );
+        if (remaining === null) continue;
+
+        const next = Math.max(0, remaining - dtSeconds);
+        offer.remainingSeconds = next;
+        if (next > 0) continue;
+
+        offer.status = "expired";
+        offer.typedPrefix = "";
+        if (player.targetInstanceId === offer.instanceId) {
+          player.targetInstanceId = null;
+          player.acquisitionPrefix = "";
+          player.targetMistakes = 0;
+        }
+        events.push({
+          type: "offer-expired",
+          playerId,
+          targetInstanceId: offer.instanceId,
+          actionId: offer.actionId,
+          slotIndex: offer.slotIndex,
+        });
+      }
+    }
   }
 
   private availableOffersForTyping(
