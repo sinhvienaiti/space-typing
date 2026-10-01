@@ -50,8 +50,10 @@ import {
 } from "./objectives";
 import {
   DuelStrategySystem,
+  DUEL_TRAP_INITIATIVE_COST,
   duelComboEffect,
   duelConversionDefinition,
+  duelTrapEffect,
   type DuelComboId,
   type DuelConversionId,
   type DuelStrategySnapshot,
@@ -249,6 +251,12 @@ export type DuelEngineEvent =
       playerId: DuelPlayerId;
       trapId: DuelTrapId;
       publicHint: string;
+    }
+  | {
+      type: "trap-triggered";
+      playerId: DuelPlayerId;
+      trapId: DuelTrapId;
+      triggeredByPlayerId: DuelPlayerId;
     }
   | {
       type: "objective-spawned";
@@ -971,6 +979,13 @@ export class DuelEngine {
         this.rejectSkill(player, events);
         return;
       }
+      if (
+        this.strategy.snapshot()[player.id].initiative <
+        DUEL_TRAP_INITIATIVE_COST
+      ) {
+        this.rejectSkill(player, events);
+        return;
+      }
       const trap = this.strategy.armTrap(
         player.id,
         trapId,
@@ -979,6 +994,14 @@ export class DuelEngine {
       if (trap === null) {
         this.rejectSkill(player, events);
         return;
+      }
+      if (
+        !this.strategy.spendInitiative(
+          player.id,
+          DUEL_TRAP_INITIATIVE_COST,
+        )
+      ) {
+        throw new Error("Trap Initiative spend desynchronized.");
       }
       events.push({
         type: "trap-armed",
@@ -1289,9 +1312,10 @@ export class DuelEngine {
         1 /
           Math.max(
             0.5,
-            Number.isFinite(projectileSpeedScale)
+            (Number.isFinite(projectileSpeedScale)
               ? projectileSpeedScale
-              : 1,
+              : 1) *
+              this.strategy.projectileTempoScale(player.id),
           ),
         duelActionQualityForMistakes(
           player.targetMistakes,
@@ -1324,6 +1348,11 @@ export class DuelEngine {
       );
     }
 
+    this.triggerOpponentTrap(
+      player.id,
+      action,
+      events,
+    );
     this.cooldowns.activate(
       player.id,
       action.id,
@@ -1396,6 +1425,11 @@ export class DuelEngine {
       player.id,
       stored.qualityScale,
     );
+    this.triggerOpponentTrap(
+      player.id,
+      action,
+      events,
+    );
     this.cooldowns.activate(
       player.id,
       action.id,
@@ -1406,6 +1440,62 @@ export class DuelEngine {
       playerId: player.id,
       actionId,
       storedInstanceId: stored.instanceId,
+    });
+  }
+
+  private triggerOpponentTrap(
+    sourcePlayerId: DuelPlayerId,
+    action: DuelActionDefinition,
+    events: DuelEngineEvent[],
+  ): void {
+    if (
+      action.category !== "attack" &&
+      action.category !== "tactical"
+    ) {
+      return;
+    }
+    const ownerId = otherPlayer(sourcePlayerId);
+    const trap = this.strategy.consumeOldestTrap(ownerId);
+    if (trap === null) return;
+
+    const effect = duelTrapEffect(trap.trapId);
+    if (effect.damageToTrigger > 0) {
+      this.pendingEffects.push({
+        type: "damage",
+        targetId: sourcePlayerId,
+        amount: effect.damageToTrigger,
+        sourceId: ownerId,
+      });
+    }
+    if (effect.energyCostToTrigger > 0) {
+      this.pendingEffects.push({
+        type: "energy-cost",
+        targetId: sourcePlayerId,
+        amount: effect.energyCostToTrigger,
+      });
+    }
+    if (effect.shieldToOwner > 0) {
+      this.pendingEffects.push({
+        type: "shield",
+        targetId: ownerId,
+        amount: effect.shieldToOwner,
+      });
+    }
+    if (effect.tacticalEffect !== null) {
+      this.tactical.apply({
+        effectId: effect.tacticalEffect.effectId,
+        sourcePlayerId: ownerId,
+        targetPlayerId: sourcePlayerId,
+        strength: effect.tacticalEffect.strength,
+        remainingSeconds:
+          effect.tacticalEffect.durationSeconds,
+      });
+    }
+    events.push({
+      type: "trap-triggered",
+      playerId: ownerId,
+      trapId: trap.trapId,
+      triggeredByPlayerId: sourcePlayerId,
     });
   }
 

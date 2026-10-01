@@ -4,6 +4,8 @@ import {
   DuelStrategySystem,
   duelComboEffect,
   duelStrategyCategoryMultiplier,
+  DUEL_TRAP_INITIATIVE_COST,
+  duelTrapEffect,
 } from "../src/duel/strategy";
 import { DUEL_ACTIONS_BY_ID } from "../src/duel/actions";
 
@@ -61,7 +63,7 @@ describe("Duel M-DUEL-08 strategy core", () => {
     expect(duelComboEffect("overcharged-railgun").damage).toBe(32);
   });
 
-  it("caps traps and always exposes a readable opponent hint", () => {
+  it("caps traps, preserves generic hints and consumes them FIFO", () => {
     const strategy = new DuelStrategySystem();
     expect(
       strategy.armTrap("player-1", "minefield", 1),
@@ -76,6 +78,27 @@ describe("Duel M-DUEL-08 strategy core", () => {
       "TRAP ARMED",
       "TRAP ARMED",
     ]);
+    expect(strategy.consumeOldestTrap("player-1")?.trapId).toBe(
+      "minefield",
+    );
+    expect(strategy.consumeOldestTrap("player-1")?.trapId).toBe(
+      "counter-battery",
+    );
+    expect(strategy.consumeOldestTrap("player-1")).toBeNull();
+    expect(DUEL_TRAP_INITIATIVE_COST).toBe(8);
+    expect(duelTrapEffect("minefield").damageToTrigger).toBe(6);
+    expect(
+      duelTrapEffect("static-snare").tacticalEffect?.effectId,
+    ).toBe("projectile-drag");
+  });
+
+  it("turns saved Initiative into only a light projectile tempo edge", () => {
+    const strategy = new DuelStrategySystem();
+    expect(strategy.projectileTempoScale("player-1")).toBe(1);
+    for (let index = 0; index < 20; index += 1) {
+      strategy.gainInitiative("player-1", "counter");
+    }
+    expect(strategy.projectileTempoScale("player-1")).toBeCloseTo(1.06);
   });
 
   it("uses bounded Initiative gains rather than raw damage bonuses", () => {

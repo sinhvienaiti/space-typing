@@ -227,6 +227,34 @@ describe("Duel M-DUEL-08 strategy integration", () => {
     expect(snapshot.publicTrapHints["player-1"]).toEqual([]);
   });
 
+  it("consumes an armed trap when the opponent deploys a hostile action", () => {
+    const engine = new DuelEngine({
+      maxShield: 0,
+      startingShield: 0,
+    });
+    engine.armTrap("player-1", "minefield");
+    const laser = offer("player-2", 0, "laser");
+    engine.setPrivateOffers("player-2", [laser]);
+
+    typeTarget(
+      engine,
+      "player-2",
+      laser,
+      "laser",
+      1,
+    );
+    const events = engine.step(0);
+
+    expect(events).toContainEqual({
+      type: "trap-triggered",
+      playerId: "player-1",
+      trapId: "minefield",
+      triggeredByPlayerId: "player-2",
+    });
+    expect(engine.snapshot().players["player-2"].hull).toBe(94);
+    expect(engine.snapshot().publicTrapHints["player-2"]).toEqual([]);
+  });
+
   it("routes ACTIVATE_SKILL through authoritative combo/conversion/trap handling", () => {
     const engine = new DuelEngine({
       startingEnergy: 100,
@@ -257,17 +285,57 @@ describe("Duel M-DUEL-08 strategy integration", () => {
       skillId: "trap:minefield",
     });
     events = engine.step(0);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "intent-rejected",
+        playerId: "player-1",
+        reason: "skill-unavailable",
+      }),
+    );
+
+    let sequence = 3;
+    for (let index = 0; index < 2; index += 1) {
+      const energy = offer(
+        "player-1",
+        index,
+        "energy",
+      );
+      energy.instanceId += ":initiative:" + String(index);
+      engine.setPrivateOffers("player-1", [energy]);
+      sequence = typeTarget(
+        engine,
+        "player-1",
+        energy,
+        "energy",
+        sequence,
+      );
+      engine.step(0);
+    }
+    expect(
+      engine.snapshot().strategy["player-1"].initiative,
+    ).toBe(8);
+
+    engine.enqueueIntent({
+      type: "ACTIVATE_SKILL",
+      playerId: "player-1",
+      sequence: sequence++,
+      skillId: "trap:minefield",
+    });
+    events = engine.step(0);
     expect(events).toContainEqual({
       type: "trap-armed",
       playerId: "player-1",
       trapId: "minefield",
       publicHint: "TRAP ARMED",
     });
+    expect(
+      engine.snapshot().strategy["player-1"].initiative,
+    ).toBe(0);
 
     engine.enqueueIntent({
       type: "ACTIVATE_SKILL",
       playerId: "player-1",
-      sequence: 3,
+      sequence,
       skillId: "combo:not-real",
     });
     events = engine.step(0);

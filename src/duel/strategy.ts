@@ -51,6 +51,21 @@ export type DuelTrap = {
   armedAtTick: number;
 };
 
+export const DUEL_TRAP_INITIATIVE_COST = 8;
+
+export type DuelTrapEffect = {
+  damageToTrigger: number;
+  energyCostToTrigger: number;
+  shieldToOwner: number;
+  tacticalEffect:
+    | {
+        effectId: "offer-drift" | "projectile-drag";
+        strength: number;
+        durationSeconds: number;
+      }
+    | null;
+};
+
 export type DuelStrategyPlayerSnapshot = {
   initiative: number;
   path: DuelStrategyPath;
@@ -272,6 +287,17 @@ export class DuelStrategySystem {
     return traps.splice(index, 1)[0] ?? null;
   }
 
+  consumeOldestTrap(
+    playerId: DuelPlayerId,
+  ): DuelTrap | null {
+    return this.players[playerId].traps.shift() ?? null;
+  }
+
+  projectileTempoScale(playerId: DuelPlayerId): number {
+    const initiative = this.players[playerId].initiative;
+    return 1 + (Math.max(0, Math.min(100, initiative)) / 100) * 0.06;
+  }
+
   publicTrapHintsFor(
     observerId: DuelPlayerId,
   ): readonly string[] {
@@ -404,6 +430,56 @@ export class DuelStrategySystem {
       this.players[playerId] = createPlayer();
     }
     this.trapSequence = 0;
+  }
+}
+
+export function duelTrapEffect(
+  trapId: DuelTrapId,
+): DuelTrapEffect {
+  switch (trapId) {
+    case "minefield":
+      return {
+        damageToTrigger: 6,
+        energyCostToTrigger: 0,
+        shieldToOwner: 0,
+        tacticalEffect: null,
+      };
+    case "mirror-trap":
+      return {
+        damageToTrigger: 4,
+        energyCostToTrigger: 0,
+        shieldToOwner: 6,
+        tacticalEffect: null,
+      };
+    case "static-snare":
+      return {
+        damageToTrigger: 0,
+        energyCostToTrigger: 0,
+        shieldToOwner: 0,
+        tacticalEffect: {
+          effectId: "projectile-drag",
+          strength: 0.25,
+          durationSeconds: 3.5,
+        },
+      };
+    case "decoy":
+      return {
+        damageToTrigger: 0,
+        energyCostToTrigger: 0,
+        shieldToOwner: 0,
+        tacticalEffect: {
+          effectId: "offer-drift",
+          strength: 0.3,
+          durationSeconds: 3.5,
+        },
+      };
+    case "counter-battery":
+      return {
+        damageToTrigger: 0,
+        energyCostToTrigger: 8,
+        shieldToOwner: 0,
+        tacticalEffect: null,
+      };
   }
 }
 

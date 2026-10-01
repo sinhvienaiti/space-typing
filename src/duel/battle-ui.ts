@@ -410,6 +410,11 @@ function eventLabel(event: DuelClientEvent): string {
       return "CONVERSION · " + event.conversionId;
     case "trap-armed":
       return "TRAP ARMED";
+    case "trap-triggered":
+      return (
+        "TRAP TRIGGERED · " +
+        event.trapId.replaceAll("-", " ").toUpperCase()
+      );
     case "opponent-trap-hint":
       return event.publicHint;
     case "objective-spawned":
@@ -450,6 +455,8 @@ function fxKind(event: DuelClientEvent): string | null {
       return "mystery";
     case "combo-used":
       return "combo";
+    case "trap-triggered":
+      return "trap";
     case "threat-created":
     case "threat-countered":
     case "threat-resolved":
@@ -809,6 +816,17 @@ export function installDuelBattleUi(
         ),
       );
     }
+    nodes.root
+      .querySelectorAll<HTMLButtonElement>(
+        '[data-duel-skill^="trap:"]',
+      )
+      .forEach((tool) => {
+        tool.disabled = view.self.initiative < 8;
+        tool.title =
+          view.self.initiative < 8
+            ? "Requires 8 Initiative"
+            : "Spend 8 Initiative to arm";
+      });
   };
 
   const renderIntel = (): void => {
