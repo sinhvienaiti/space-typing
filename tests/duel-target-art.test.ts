@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DUEL_ACTIONS } from "../src/duel/actions";
 import {
   DUEL_TARGET_IDS,
   parseDuelTargetManifest,
@@ -90,6 +91,9 @@ describe("Duel target art manifest", () => {
   it("keeps a stable explicit action-id registry for all 18 production targets", () => {
     expect(DUEL_TARGET_IDS).toHaveLength(18);
     expect(new Set(DUEL_TARGET_IDS).size).toBe(18);
+    expect([...DUEL_TARGET_IDS].sort()).toEqual(
+      DUEL_ACTIONS.map((action) => action.id).sort(),
+    );
     expect(DUEL_TARGET_IDS).toContain("fate-crystal");
     expect(DUEL_TARGET_IDS).toContain("black-hole");
   });
