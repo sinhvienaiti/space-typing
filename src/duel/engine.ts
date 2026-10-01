@@ -683,77 +683,11 @@ export class DuelEngine {
     if (outcome === null) return [];
 
     const effects: DuelCombatEffect[] = [];
-    switch (outcome.id) {
-      case "energy-cache":
-        effects.push({
-          type: "energy",
-          targetId: playerId,
-          amount: outcome.magnitude,
-        });
-        break;
-      case "emergency-shield":
-        effects.push({
-          type: "shield",
-          targetId: playerId,
-          amount: outcome.magnitude,
-        });
-        break;
-      case "repair-burst":
-        effects.push({
-          type: "repair",
-          targetId: playerId,
-          amount: outcome.magnitude,
-        });
-        break;
-      case "shield-overload":
-        effects.push({
-          type: "damage",
-          targetId: playerId,
-          amount: outcome.magnitude,
-        });
-        break;
-      case "energy-drain":
-        effects.push({
-          type: "energy-cost",
-          targetId: playerId,
-          amount: outcome.magnitude,
-        });
-        break;
-      case "offer-reshuffle":
-        this.reshuffleOffersForMystery();
-        break;
-      case "gravity-shift":
-        this.applySharedMysteryTactical(
-          "projectile-drag",
-          outcome.magnitude,
-          6,
-        );
-        break;
-      case "hazard-surge":
-        this.applySharedMysteryTactical(
-          "offer-drift",
-          outcome.magnitude,
-          5,
-        );
-        this.applySharedMysteryTactical(
-          "projectile-drag",
-          outcome.magnitude * 0.55,
-          5,
-        );
-        break;
-      case "world-fracture":
-        this.applySharedMysteryTactical(
-          "offer-drift",
-          outcome.magnitude,
-          8,
-        );
-        this.applySharedMysteryTactical(
-          "projectile-drag",
-          outcome.magnitude,
-          8,
-        );
-        break;
-    }
+    this.appendMysteryOutcomeEffects(
+      playerId,
+      outcome,
+      effects,
+    );
 
     this.applyEffectsToPlayers(effects);
     const events: DuelEngineEvent[] = [
@@ -1341,7 +1275,13 @@ export class DuelEngine {
           threat,
         });
       }
-    } else {
+    } else if (
+      !this.queueSpecialActionResolution(
+        action,
+        player.id,
+        events,
+      )
+    ) {
       this.queueActionResolution(action, player.id);
     }
 
@@ -1424,6 +1364,52 @@ export class DuelEngine {
       actionId,
       storedInstanceId: stored.instanceId,
     });
+  }
+
+  private queueSpecialActionResolution(
+    action: DuelActionDefinition,
+    playerId: DuelPlayerId,
+    events: DuelEngineEvent[],
+  ): boolean {
+    if (action.effectId === "fate-crystal") {
+      const resolution = this.chance.rollFate(playerId);
+      this.appendFateEffects(
+        resolution,
+        this.pendingEffects,
+      );
+      const cooldownReduction =
+        resolution.outcome.cooldownReductionSeconds ?? 0;
+      if (cooldownReduction > 0) {
+        this.cooldowns.reduce(
+          playerId,
+          cooldownReduction,
+        );
+      }
+      events.push({ type: "fate-resolved", resolution });
+      return true;
+    }
+
+    if (action.effectId === "mystery-black-hole") {
+      const mystery = this.chance.createMystery(this.phase());
+      events.push({ type: "mystery-created", mystery });
+      const outcome = this.chance.resolveMystery(mystery.id);
+      if (outcome !== null) {
+        this.appendMysteryOutcomeEffects(
+          playerId,
+          outcome,
+          this.pendingEffects,
+        );
+        events.push({
+          type: "mystery-resolved",
+          playerId,
+          mysteryId: mystery.id,
+          outcome,
+        });
+      }
+      return true;
+    }
+
+    return false;
   }
 
   private queueActionResolution(
@@ -1770,6 +1756,84 @@ export class DuelEngine {
       });
     }
     player.targetMistakes = 0;
+  }
+
+  private appendMysteryOutcomeEffects(
+    playerId: DuelPlayerId,
+    outcome: DuelMysteryOutcome,
+    effects: DuelCombatEffect[],
+  ): void {
+    switch (outcome.id) {
+      case "energy-cache":
+        effects.push({
+          type: "energy",
+          targetId: playerId,
+          amount: outcome.magnitude,
+        });
+        break;
+      case "emergency-shield":
+        effects.push({
+          type: "shield",
+          targetId: playerId,
+          amount: outcome.magnitude,
+        });
+        break;
+      case "repair-burst":
+        effects.push({
+          type: "repair",
+          targetId: playerId,
+          amount: outcome.magnitude,
+        });
+        break;
+      case "shield-overload":
+        effects.push({
+          type: "damage",
+          targetId: playerId,
+          amount: outcome.magnitude,
+        });
+        break;
+      case "energy-drain":
+        effects.push({
+          type: "energy-cost",
+          targetId: playerId,
+          amount: outcome.magnitude,
+        });
+        break;
+      case "offer-reshuffle":
+        this.reshuffleOffersForMystery();
+        break;
+      case "gravity-shift":
+        this.applySharedMysteryTactical(
+          "projectile-drag",
+          outcome.magnitude,
+          6,
+        );
+        break;
+      case "hazard-surge":
+        this.applySharedMysteryTactical(
+          "offer-drift",
+          outcome.magnitude,
+          5,
+        );
+        this.applySharedMysteryTactical(
+          "projectile-drag",
+          outcome.magnitude * 0.55,
+          5,
+        );
+        break;
+      case "world-fracture":
+        this.applySharedMysteryTactical(
+          "offer-drift",
+          outcome.magnitude,
+          8,
+        );
+        this.applySharedMysteryTactical(
+          "projectile-drag",
+          outcome.magnitude,
+          8,
+        );
+        break;
+    }
   }
 
   private reshuffleOffersForMystery(): void {

@@ -1,5 +1,40 @@
 import { describe, expect, it } from "vitest";
 import { DuelEngine } from "../src/duel/engine";
+import type { DuelActionOffer } from "../src/duel/model";
+
+function completeOffer(
+  engine: DuelEngine,
+  actionId: string,
+  answerToken: string,
+): ReturnType<DuelEngine["step"]> {
+  const offer: DuelActionOffer = {
+    instanceId: "player-1:0:" + actionId,
+    actionId,
+    ownerId: "player-1",
+    status: "available",
+    typedPrefix: "",
+    slotIndex: 0,
+    shared: false,
+  };
+  engine.setPrivateOffers("player-1", [offer]);
+  engine.enqueueIntent({
+    type: "SELECT_TARGET",
+    playerId: "player-1",
+    sequence: 1,
+    targetInstanceId: offer.instanceId,
+  });
+  let sequence = 2;
+  for (const char of answerToken) {
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId: "player-1",
+      sequence: sequence++,
+      char,
+      targetInstanceId: offer.instanceId,
+    });
+  }
+  return engine.step(0);
+}
 
 describe("DuelEngine M-DUEL-05 chance integration", () => {
   it("keeps Fate deterministic inside the authoritative engine", () => {
@@ -276,6 +311,59 @@ describe("DuelEngine M-DUEL-05 chance integration", () => {
         engine.snapshot().players["player-2"].hull,
       ).toBeGreaterThan(0);
     }
+  });
+
+  it("routes a drafted Fate word into the authoritative Fate runtime", () => {
+    const engine = new DuelEngine({
+      matchSeed: 431,
+      maxShield: 100,
+      startingShield: 20,
+      startingEnergy: 20,
+    });
+
+    const events = completeOffer(
+      engine,
+      "fate-crystal",
+      "fatecrystal",
+    );
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "fate-resolved",
+      }),
+    );
+    expect(
+      engine.snapshot().players["player-1"].offers[0]?.status,
+    ).toBe("completed");
+  });
+
+  it("routes a drafted Mystery word through a bounded authoritative outcome", () => {
+    const engine = new DuelEngine({
+      matchSeed: 732,
+      maxHull: 100,
+      maxShield: 100,
+      maxEnergy: 100,
+      startingShield: 50,
+      startingEnergy: 50,
+    });
+
+    const events = completeOffer(
+      engine,
+      "black-hole",
+      "blackhole",
+    );
+
+    expect(events.some((event) => event.type === "mystery-created")).toBe(
+      true,
+    );
+    expect(events.some((event) => event.type === "mystery-resolved")).toBe(
+      true,
+    );
+    const mysteries = engine.snapshot().chance.mysteries;
+    expect(mysteries).toHaveLength(1);
+    expect(mysteries[0]?.resolved).toBe(true);
+    expect(engine.snapshot().players["player-1"].hull).toBeGreaterThan(0);
+    expect(engine.snapshot().players["player-2"].hull).toBeGreaterThan(0);
   });
 
   it("resetRound clears round-local pity and unresolved Mystery state", () => {
