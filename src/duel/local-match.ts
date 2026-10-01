@@ -550,6 +550,8 @@ export class DuelLocalPracticeMatch {
             id: combo.id,
             createdAtTick: combo.createdAtTick,
           })),
+        cooldowns:
+          snapshot.cooldowns["player-1"],
         ownPity: snapshot.chance.pity["player-1"],
       },
       opponent: {
