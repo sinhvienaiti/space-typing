@@ -75,6 +75,42 @@ describe("Duel M-DUEL-04 tactical contracts", () => {
     ]);
   });
 
+  it("extends the guaranteed counter window when projectile drag is active", () => {
+    const threats = new DuelThreatSystem();
+    const siege = DUEL_ACTIONS_BY_ID.get("siege-lance")!;
+    const threat = threats.create(
+      siege,
+      "player-1",
+      "player-2",
+      1.4,
+    )!;
+
+    expect(threat.remainingSeconds).toBeCloseTo(
+      2.8 * 1.4,
+      8,
+    );
+    expect(threats.update(2.81)).toEqual([]);
+    expect(
+      threats.snapshotFor("player-2")[0]?.remainingSeconds,
+    ).toBeGreaterThan(1);
+  });
+
+  it("caps projectile-drag counter-window extension instead of allowing an infinite response", () => {
+    const threats = new DuelThreatSystem();
+    const siege = DUEL_ACTIONS_BY_ID.get("siege-lance")!;
+    const threat = threats.create(
+      siege,
+      "player-1",
+      "player-2",
+      99,
+    )!;
+
+    expect(threat.remainingSeconds).toBeCloseTo(
+      2.8 * 1.65,
+      8,
+    );
+  });
+
   it("expires an unanswered threat instead of depending on random Defense offers", () => {
     const threats = new DuelThreatSystem();
     const siege = DUEL_ACTIONS_BY_ID.get("siege-lance")!;

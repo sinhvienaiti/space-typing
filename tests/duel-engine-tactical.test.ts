@@ -245,6 +245,57 @@ describe("DuelEngine M-DUEL-04 integration", () => {
     expect(engine.snapshot().players["player-2"].hull).toBe(72);
   });
 
+  it("turns projectile drag into a longer deterministic response window", () => {
+    const engine = new DuelEngine({
+      maxShield: 100,
+      startingShield: 0,
+      startingEnergy: 100,
+    });
+    const reflect = offer("player-2", 0, "reflect");
+    const siege = offer("player-1", 0, "siege-lance");
+    engine.setPrivateOffers("player-2", [reflect]);
+    engine.setPrivateOffers("player-1", [siege]);
+
+    let p2Sequence = typeTarget(
+      engine,
+      "player-2",
+      reflect.instanceId,
+      "reflect",
+      1,
+    );
+    engine.step(0);
+    engine.enqueueIntent({
+      type: "USE_ITEM",
+      playerId: "player-2",
+      sequence: p2Sequence,
+      itemId: "reflect",
+    });
+    engine.step(0);
+
+    expect(
+      engine.snapshot().tactical.projectileSpeedScale[
+        "player-1"
+      ],
+    ).toBeLessThan(1);
+
+    typeTarget(
+      engine,
+      "player-1",
+      siege.instanceId,
+      "siegelance",
+      1,
+    );
+    engine.step(0);
+
+    const threat =
+      engine.snapshot().incomingThreats["player-2"][0];
+    expect(threat).toBeDefined();
+    expect(threat!.remainingSeconds).toBeGreaterThan(2.8);
+    expect(threat!.remainingSeconds).toBeLessThanOrEqual(
+      2.8 * 1.65,
+    );
+  });
+
   it("applies banked Tactical effects without keyboard lock", () => {
     const engine = new DuelEngine({ startingEnergy: 100 });
     const disrupt = offer("player-1", 0, "disrupt");

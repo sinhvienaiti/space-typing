@@ -282,6 +282,9 @@ describe("Duel M-DUEL-11 authority core", () => {
     const serialized = JSON.stringify(view.value);
     expect("offers" in view.value.opponent).toBe(false);
     expect("inventory" in view.value.opponent).toBe(false);
+    expect(
+      view.value.opponent.revealedInventory,
+    ).toBeNull();
     expect("pity" in view.value.opponent).toBe(false);
     expect(serialized).not.toContain("matchSeed");
     expect(serialized).not.toContain("fixedSeed");

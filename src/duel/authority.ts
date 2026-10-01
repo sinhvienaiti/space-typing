@@ -212,6 +212,9 @@ export type DuelClientMatchView = {
     maxEnergy: number;
     initiative: number;
     strategyPath: string;
+    revealedInventory:
+      | DuelEngineSnapshot["inventories"][DuelPlayerId]
+      | null;
   };
   shared: {
     tactical: DuelEngineSnapshot["tactical"];
@@ -1984,6 +1987,10 @@ export class DuelAuthorityService {
         maxEnergy: opponent.maxEnergy,
         initiative: opponentStrategy.initiative,
         strategyPath: opponentStrategy.path,
+        revealedInventory:
+          snapshot.tactical.bankRevealFor[playerId]
+            ? snapshot.inventories[opponentId]
+            : null,
       },
       shared: {
         tactical: snapshot.tactical,

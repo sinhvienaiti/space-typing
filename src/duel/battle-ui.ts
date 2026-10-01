@@ -258,6 +258,7 @@ function createBattleNodes(gameShell: HTMLElement) {
           <strong id="duelOpponentInitiative">0</strong>
         </div>
         <div id="duelOpponentTrapHints" class="duel-trap-hints"></div>
+        <div id="duelOpponentBankReveal" class="duel-bank-reveal"></div>
       </aside>
     </div>
 
@@ -345,6 +346,7 @@ function createBattleNodes(gameShell: HTMLElement) {
     opponentEnergy: byId("duelOpponentEnergy"),
     opponentInitiative: byId("duelOpponentInitiative"),
     opponentTrapHints: byId("duelOpponentTrapHints"),
+    opponentBankReveal: byId("duelOpponentBankReveal"),
     threatMeta: byId("duelThreatMeta"),
     threats: byId("duelThreats"),
     objectiveMeta: byId("duelObjectiveMeta"),
@@ -509,6 +511,23 @@ export function installDuelBattleUi(
   const renderOffers = (): void => {
     if (view === null) return;
     nodes.offers.replaceChildren();
+    const driftScale =
+      view.shared.tactical.offerDriftScale[
+        view.self.playerId
+      ];
+    const driftStrength = Math.max(
+      0,
+      Math.min(
+        1,
+        (1 - driftScale) / 0.35,
+      ),
+    );
+    nodes.offers.dataset.drifting =
+      driftStrength > 0.01 ? "true" : "false";
+    nodes.offers.style.setProperty(
+      "--duel-offer-drift-strength",
+      driftStrength.toFixed(4),
+    );
 
     for (const offer of view.self.offers) {
       const action = DUEL_ACTIONS_BY_ID.get(offer.actionId);
@@ -767,6 +786,8 @@ export function installDuelBattleUi(
         : mysteries
             .map(
               (mystery) =>
+                mystery.displayLabel +
+                " · " +
                 mystery.rarity.toUpperCase() +
                 " · " +
                 mystery.riskTag.toUpperCase(),
@@ -778,6 +799,37 @@ export function installDuelBattleUi(
       const chip = createElement("span");
       chip.textContent = hint;
       nodes.opponentTrapHints.append(chip);
+    }
+
+    nodes.opponentBankReveal.replaceChildren();
+    const revealed = view.opponent.revealedInventory;
+    if (revealed !== null) {
+      const heading = createElement("small");
+      heading.textContent = "SCAN · OPPONENT BANK";
+      nodes.opponentBankReveal.append(heading);
+      for (const bucket of [
+        "attack",
+        "defense",
+        "tactical",
+      ] as const) {
+        for (const entry of revealed[bucket]) {
+          const action = DUEL_ACTIONS_BY_ID.get(
+            entry.actionId,
+          );
+          const chip = createElement("span");
+          chip.className =
+            "duel-bank-reveal-chip duel-category-" +
+            (action?.category ?? bucket);
+          chip.textContent =
+            action?.displayLabel ?? entry.actionId;
+          nodes.opponentBankReveal.append(chip);
+        }
+      }
+      if (nodes.opponentBankReveal.childElementCount === 1) {
+        const empty = createElement("span", "duel-empty-chip");
+        empty.textContent = "bank empty";
+        nodes.opponentBankReveal.append(empty);
+      }
     }
   };
 
@@ -815,6 +867,12 @@ export function installDuelBattleUi(
       selfShieldRatio > 0 ? "true" : "false";
     nodes.opponentShipFrame.dataset.shieldActive =
       opponentShieldRatio > 0 ? "true" : "false";
+    nodes.root.dataset.targetFrozen =
+      view.shared.tactical.frozenTargetCount[
+        view.self.playerId
+      ] > 0
+        ? "true"
+        : "false";
   };
 
   const spawnShieldImpact = (
@@ -1047,6 +1105,12 @@ export function installDuelBattleUi(
     projectileSequence += 1;
     const fromSelf =
       sourcePlayerId === view.self.playerId;
+    const speedScale = Math.max(
+      0.5,
+      view.shared.tactical.projectileSpeedScale[
+        sourcePlayerId
+      ] ?? 1,
+    );
     const projectile = createElement(
       "i",
       "duel-projectile " +
@@ -1061,6 +1125,10 @@ export function installDuelBattleUi(
     projectile.style.setProperty(
       "--duel-projectile-y",
       String(lane) + "%",
+    );
+    projectile.style.setProperty(
+      "--duel-projectile-duration",
+      String(Math.round(620 / speedScale)) + "ms",
     );
     nodes.projectiles.append(projectile);
     projectile.addEventListener(

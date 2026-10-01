@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DuelChanceSystem } from "../src/duel/chance";
+import { DUEL_MAPS } from "../src/duel/maps";
 
 describe("Duel M-DUEL-05 Fate + Mystery", () => {
   it("replays Fate and Mystery deterministically from the same match seed", () => {
@@ -33,6 +34,90 @@ describe("Duel M-DUEL-05 Fate + Mystery", () => {
 
     const mysteryWithoutFate = shifted.createMystery("crisis");
     expect(mysteryAfterFate).toEqual(mysteryWithoutFate);
+  });
+
+  it("uses map-specific Fate pools while preserving the declared pool identity", () => {
+    const frost = new DuelChanceSystem(
+      404,
+      "v3",
+      "frost-wastes",
+    );
+    const inferno = new DuelChanceSystem(
+      404,
+      "v3",
+      "inferno-rift",
+    );
+    const frostIds = new Set<string>();
+    const infernoIds = new Set<string>();
+
+    for (let index = 0; index < 160; index += 1) {
+      const frostRoll = frost.rollFate("player-1");
+      const infernoRoll = inferno.rollFate("player-1");
+      expect(frostRoll.poolId).toBe(
+        DUEL_MAPS["frost-wastes"].fatePoolId,
+      );
+      expect(infernoRoll.poolId).toBe(
+        DUEL_MAPS["inferno-rift"].fatePoolId,
+      );
+      frostIds.add(frostRoll.outcome.id);
+      infernoIds.add(infernoRoll.outcome.id);
+    }
+
+    expect(frostIds.has("mirror-crystal")).toBe(true);
+    expect(frostIds.has("critical-core")).toBe(false);
+    expect(infernoIds.has("critical-core")).toBe(true);
+    expect(infernoIds.has("mirror-crystal")).toBe(false);
+  });
+
+  it("uses each map Mystery labels and map-bounded outcome pool", () => {
+    const frost = new DuelChanceSystem(
+      505,
+      "v3",
+      "frost-wastes",
+    );
+    const voidSystem = new DuelChanceSystem(
+      505,
+      "v3",
+      "celestial-void",
+    );
+    const frostLabels = new Set(
+      DUEL_MAPS["frost-wastes"].mysteryLabels,
+    );
+    const voidLabels = new Set(
+      DUEL_MAPS["celestial-void"].mysteryLabels,
+    );
+
+    for (let index = 0; index < 80; index += 1) {
+      const frostMystery =
+        frost.createMystery("cataclysm");
+      const voidMystery =
+        voidSystem.createMystery("cataclysm");
+
+      expect(
+        frostLabels.has(frostMystery.displayLabel),
+      ).toBe(true);
+      expect(
+        voidLabels.has(voidMystery.displayLabel),
+      ).toBe(true);
+    }
+
+    const frostExact = frost
+      .publicMysteries()
+      .map((entry) =>
+        frost.revealMystery(entry.id, "exact"),
+      )
+      .filter((entry) => entry !== null)
+      .map((entry) => entry!.outcomeId);
+    const voidExact = voidSystem
+      .publicMysteries()
+      .map((entry) =>
+        voidSystem.revealMystery(entry.id, "exact"),
+      )
+      .filter((entry) => entry !== null)
+      .map((entry) => entry!.outcomeId);
+
+    expect(frostExact).not.toContain("hazard-surge");
+    expect(voidExact).not.toContain("emergency-shield");
   });
 
   it("keeps bounded round-local pity and resets it after stronger outcomes", () => {

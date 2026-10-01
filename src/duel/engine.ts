@@ -1231,10 +1231,20 @@ export class DuelEngine {
 
     if (action.responseOpportunity !== undefined) {
       this.reserveEnergy(player.id, action.energyCost);
+      const projectileSpeedScale =
+        this.tactical.snapshot()
+          .projectileSpeedScale[player.id];
       const threat = this.threats.create(
         action,
         player.id,
         otherPlayer(player.id),
+        1 /
+          Math.max(
+            0.5,
+            Number.isFinite(projectileSpeedScale)
+              ? projectileSpeedScale
+              : 1,
+          ),
       );
       if (threat !== null) {
         this.pendingEffects.push({

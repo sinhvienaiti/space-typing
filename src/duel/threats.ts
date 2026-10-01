@@ -43,6 +43,7 @@ export class DuelThreatSystem {
     action: DuelActionDefinition,
     sourcePlayerId: DuelPlayerId,
     targetPlayerId: DuelPlayerId,
+    responseWindowScale = 1,
   ): DuelIncomingThreat | null {
     const response = action.responseOpportunity;
     if (response === undefined) return null;
@@ -56,7 +57,17 @@ export class DuelThreatSystem {
       answerToken: response.answerToken,
       typedPrefix: "",
       counterTags: [...response.counterTags],
-      remainingSeconds: response.windowSeconds,
+      remainingSeconds:
+        response.windowSeconds *
+        Math.max(
+          1,
+          Math.min(
+            1.65,
+            Number.isFinite(responseWindowScale)
+              ? responseWindowScale
+              : 1,
+          ),
+        ),
       status: "open",
     };
     this.threats.push(threat);

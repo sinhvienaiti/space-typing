@@ -3,6 +3,10 @@ import type {
   DuelPlayerId,
 } from "./model";
 import { DuelRngStreams } from "./rng";
+import {
+  duelMapProfile,
+  type DuelMapId,
+} from "./maps";
 
 export type DuelFateTier = "common" | "strong" | "jackpot";
 
@@ -25,6 +29,7 @@ export type DuelFateOutcome = {
 
 export type DuelFateResolution = {
   playerId: DuelPlayerId;
+  poolId: string;
   outcome: DuelFateOutcome;
   pityBefore: number;
   pityAfter: number;
@@ -69,6 +74,7 @@ export type DuelMysteryOutcome = {
 
 export type DuelMysteryPublic = {
   id: string;
+  displayLabel: string;
   rarity: DuelMysteryRarity;
   riskTag: DuelMysteryRiskTag;
   resolved: boolean;
@@ -81,6 +87,7 @@ export type DuelMysteryRevealLevel =
 
 export type DuelMysteryReveal = {
   id: string;
+  displayLabel: string;
   rarity: DuelMysteryRarity;
   riskTag: DuelMysteryRiskTag;
   category?: DuelMysteryCategory;
@@ -89,6 +96,7 @@ export type DuelMysteryReveal = {
 
 type MysteryState = {
   id: string;
+  displayLabel: string;
   outcome: DuelMysteryOutcome;
   resolved: boolean;
 };
@@ -216,16 +224,131 @@ const PLAYER_IDS: readonly DuelPlayerId[] = [
   "player-2",
 ];
 
+const FATE_POOL_IDS: Readonly<
+  Record<DuelMapId, readonly DuelFateOutcomeId[]>
+> = {
+  "frost-wastes": [
+    "shield-blessing",
+    "cooldown-spark",
+    "mirror-crystal",
+    "prism-barrage",
+    "fortune-jackpot",
+  ],
+  "inferno-rift": [
+    "energy-surge",
+    "prism-barrage",
+    "critical-core",
+    "shield-blessing",
+    "fortune-jackpot",
+  ],
+  "tempest-prime": [
+    "energy-surge",
+    "cooldown-spark",
+    "critical-core",
+    "prism-barrage",
+    "fortune-jackpot",
+  ],
+  "ocean-abyss": [
+    "shield-blessing",
+    "energy-surge",
+    "cooldown-spark",
+    "mirror-crystal",
+    "fortune-jackpot",
+  ],
+  "terra-core": [
+    "shield-blessing",
+    "cooldown-spark",
+    "mirror-crystal",
+    "critical-core",
+    "fortune-jackpot",
+  ],
+  "celestial-void": [
+    "energy-surge",
+    "prism-barrage",
+    "critical-core",
+    "mirror-crystal",
+    "fortune-jackpot",
+  ],
+};
+
+const MYSTERY_POOL_IDS: Readonly<
+  Record<DuelMapId, readonly DuelMysteryOutcomeId[]>
+> = {
+  "frost-wastes": [
+    "emergency-shield",
+    "offer-reshuffle",
+    "gravity-shift",
+    "energy-drain",
+    "world-fracture",
+  ],
+  "inferno-rift": [
+    "energy-cache",
+    "shield-overload",
+    "hazard-surge",
+    "energy-drain",
+    "world-fracture",
+  ],
+  "tempest-prime": [
+    "energy-cache",
+    "offer-reshuffle",
+    "gravity-shift",
+    "hazard-surge",
+    "world-fracture",
+  ],
+  "ocean-abyss": [
+    "emergency-shield",
+    "energy-cache",
+    "repair-burst",
+    "gravity-shift",
+    "world-fracture",
+  ],
+  "terra-core": [
+    "emergency-shield",
+    "offer-reshuffle",
+    "repair-burst",
+    "hazard-surge",
+    "world-fracture",
+  ],
+  "celestial-void": [
+    "energy-cache",
+    "offer-reshuffle",
+    "energy-drain",
+    "gravity-shift",
+    "hazard-surge",
+    "world-fracture",
+  ],
+};
+
+function fatePoolForMap(
+  mapId: DuelMapId,
+): readonly DuelFateOutcome[] {
+  const allowed = new Set(FATE_POOL_IDS[mapId]);
+  return FATE_OUTCOMES.filter((outcome) =>
+    allowed.has(outcome.id),
+  );
+}
+
+function mysteryPoolForMap(
+  mapId: DuelMapId,
+): readonly DuelMysteryOutcome[] {
+  const allowed = new Set(MYSTERY_POOL_IDS[mapId]);
+  return MYSTERY_OUTCOMES.filter((outcome) =>
+    allowed.has(outcome.id),
+  );
+}
+
 function phaseMysteryPool(
   phase: DuelMatchPhase,
+  mapId: DuelMapId,
 ): readonly DuelMysteryOutcome[] {
-  if (phase === "cataclysm") return MYSTERY_OUTCOMES;
+  const pool = mysteryPoolForMap(mapId);
+  if (phase === "cataclysm") return pool;
   if (phase === "crisis") {
-    return MYSTERY_OUTCOMES.filter(
+    return pool.filter(
       (outcome) => outcome.rarity !== "cataclysm",
     );
   }
-  return MYSTERY_OUTCOMES.filter(
+  return pool.filter(
     (outcome) => outcome.rarity === "minor",
   );
 }
@@ -247,6 +370,7 @@ function fateTierWeight(
 
 export class DuelChanceSystem {
   private readonly streams: DuelRngStreams;
+  private readonly mapId: DuelMapId;
   private readonly pity: Record<DuelPlayerId, number> = {
     "player-1": 0,
     "player-2": 0,
@@ -254,15 +378,21 @@ export class DuelChanceSystem {
   private readonly mysteries: MysteryState[] = [];
   private mysterySequence = 0;
 
-  constructor(matchSeed: number, contentVersion: string) {
+  constructor(
+    matchSeed: number,
+    contentVersion: string,
+    mapId: DuelMapId = "frost-wastes",
+  ) {
     this.streams = new DuelRngStreams(matchSeed, contentVersion);
+    this.mapId = mapId;
   }
 
   rollFate(playerId: DuelPlayerId): DuelFateResolution {
     const pityBefore = this.pity[playerId];
     const rng = this.streams.domain("fate");
     let total = 0;
-    const weighted = FATE_OUTCOMES.map((outcome) => {
+    const pool = fatePoolForMap(this.mapId);
+    const weighted = pool.map((outcome) => {
       const weight = fateTierWeight(outcome.tier, pityBefore);
       total += weight;
       return { outcome, weight };
@@ -285,6 +415,7 @@ export class DuelChanceSystem {
 
     return {
       playerId,
+      poolId: duelMapProfile(this.mapId).fatePoolId,
       outcome: { ...selected },
       pityBefore,
       pityAfter: this.pity[playerId],
@@ -292,11 +423,16 @@ export class DuelChanceSystem {
   }
 
   createMystery(phase: DuelMatchPhase): DuelMysteryPublic {
-    const pool = phaseMysteryPool(phase);
+    const pool = phaseMysteryPool(phase, this.mapId);
     const rng = this.streams.domain("mystery");
     const outcome = pool[rng.nextInt(pool.length)]!;
+    const labels = duelMapProfile(this.mapId).mysteryLabels;
+    const displayLabel =
+      labels[rng.nextInt(labels.length)] ??
+      "UNKNOWN SIGNAL";
     const state: MysteryState = {
       id: "mystery:" + String(++this.mysterySequence),
+      displayLabel,
       outcome,
       resolved: false,
     };
@@ -315,6 +451,7 @@ export class DuelChanceSystem {
 
     const reveal: DuelMysteryReveal = {
       id: state.id,
+      displayLabel: state.displayLabel,
       rarity: state.outcome.rarity,
       riskTag: state.outcome.riskTag,
     };
@@ -356,6 +493,7 @@ export class DuelChanceSystem {
   private toPublic(state: MysteryState): DuelMysteryPublic {
     return {
       id: state.id,
+      displayLabel: state.displayLabel,
       rarity: state.outcome.rarity,
       riskTag: state.outcome.riskTag,
       resolved: state.resolved,

@@ -557,6 +557,10 @@ export class DuelLocalPracticeMatch {
         maxEnergy: opponent.maxEnergy,
         initiative: opponentStrategy.initiative,
         strategyPath: opponentStrategy.path,
+        revealedInventory:
+          snapshot.tactical.bankRevealFor["player-1"]
+            ? snapshot.inventories["player-2"]
+            : null,
       },
       shared: {
         tactical: snapshot.tactical,

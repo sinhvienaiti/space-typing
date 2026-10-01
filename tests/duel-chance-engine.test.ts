@@ -123,6 +123,145 @@ describe("DuelEngine M-DUEL-05 chance integration", () => {
     expect(before.hull).toBe(100);
   });
 
+  it("makes offer-reshuffle change battlefield lanes without deleting offer value", () => {
+    let exercised = false;
+
+    for (let seed = 1; seed <= 80; seed += 1) {
+      const engine = new DuelEngine({
+        matchSeed: seed,
+        mapId: "frost-wastes",
+      });
+      engine.setPrivateOffers("player-1", [
+        {
+          instanceId: "p1:0:laser",
+          actionId: "laser",
+          ownerId: "player-1",
+          status: "available",
+          typedPrefix: "",
+          slotIndex: 0,
+          shared: false,
+        },
+        {
+          instanceId: "p1:1:shield",
+          actionId: "shield",
+          ownerId: "player-1",
+          status: "available",
+          typedPrefix: "",
+          slotIndex: 1,
+          shared: false,
+        },
+        {
+          instanceId: "p1:2:energy",
+          actionId: "energy",
+          ownerId: "player-1",
+          status: "available",
+          typedPrefix: "",
+          slotIndex: 2,
+          shared: false,
+        },
+      ]);
+
+      const created = engine.createMystery()[0];
+      if (created?.type !== "mystery-created") continue;
+      const reveal = engine.revealMystery(
+        "player-1",
+        created.mystery.id,
+        "exact",
+      )[0];
+      if (
+        reveal?.type !== "mystery-revealed" ||
+        reveal.reveal.outcomeId !== "offer-reshuffle"
+      ) {
+        continue;
+      }
+
+      const before = engine
+        .snapshot()
+        .players["player-1"].offers
+        .map((offer) => offer.actionId);
+      engine.resolveMystery(
+        "player-1",
+        created.mystery.id,
+      );
+      const after = engine
+        .snapshot()
+        .players["player-1"].offers
+        .map((offer) => offer.actionId);
+
+      expect(before).toEqual([
+        "laser",
+        "shield",
+        "energy",
+      ]);
+      expect(after).toEqual([
+        "energy",
+        "shield",
+        "laser",
+      ]);
+      expect(new Set(after)).toEqual(new Set(before));
+      exercised = true;
+      break;
+    }
+
+    expect(exercised).toBe(true);
+  });
+
+  it("turns world-fracture Mystery into symmetric bounded battlefield pressure", () => {
+    let exercised = false;
+
+    for (let seed = 1; seed <= 160; seed += 1) {
+      const engine = new DuelEngine({
+        matchSeed: seed,
+        mapId: "celestial-void",
+        regulationSeconds: 1,
+      });
+      engine.step(1.01);
+      const created = engine.createMystery()[0];
+      if (created?.type !== "mystery-created") continue;
+      const reveal = engine.revealMystery(
+        "player-1",
+        created.mystery.id,
+        "exact",
+      )[0];
+      if (
+        reveal?.type !== "mystery-revealed" ||
+        reveal.reveal.outcomeId !== "world-fracture"
+      ) {
+        continue;
+      }
+
+      const before = engine.snapshot();
+      engine.resolveMystery(
+        "player-1",
+        created.mystery.id,
+      );
+      const after = engine.snapshot();
+
+      expect(after.players["player-1"].hull).toBe(
+        before.players["player-1"].hull,
+      );
+      expect(after.players["player-2"].hull).toBe(
+        before.players["player-2"].hull,
+      );
+      expect(
+        after.tactical.offerDriftScale["player-1"],
+      ).toBeLessThan(1);
+      expect(
+        after.tactical.offerDriftScale["player-1"],
+      ).toBeCloseTo(
+        after.tactical.offerDriftScale["player-2"],
+        8,
+      );
+      expect(
+        after.tactical.projectileSpeedScale["player-1"],
+      ).toBeLessThan(1);
+      exercised = true;
+      break;
+    }
+
+    expect(exercised).toBe(true);
+  });
+
   it("never lets a direct Fate roll delete a healthy player", () => {
     const engine = new DuelEngine({
       matchSeed: 991,
