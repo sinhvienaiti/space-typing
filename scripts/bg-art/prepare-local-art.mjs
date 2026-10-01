@@ -144,27 +144,53 @@ if (
   prepared += 1;
 }
 
-const combatVfxRoot = join(ROOT, "art-src/combat-vfx");
+const combatVfxSequenceRoot = join(
+  ROOT,
+  "art-src/combat-vfx-sequences/animated_webp",
+);
+const combatVfxOutputRoot = join(
+  ROOT,
+  "public/assets/space-typing/combat-vfx",
+);
+const combatVfxSentinel = join(
+  combatVfxOutputRoot,
+  "vfx.json",
+);
+const animatedVfxSources = imageFiles(
+  combatVfxSequenceRoot,
+);
 if (
+  animatedVfxSources.length > 0 &&
   flatPipelineStale(
-    combatVfxRoot,
-    join(
-      ROOT,
-      "public/assets/space-typing/combat-vfx",
-    ),
-    join(
-      ROOT,
-      "public/assets/space-typing/combat-vfx/vfx.json",
-    ),
+    combatVfxSequenceRoot,
+    combatVfxOutputRoot,
+    combatVfxSentinel,
   )
 ) {
   run(
     join(
       ROOT,
-      "scripts/bg-art/prepare-combat-vfx.mjs",
+      "scripts/bg-art/prepare-combat-vfx-sequences.mjs",
     ),
   );
   prepared += 1;
+} else if (animatedVfxSources.length === 0) {
+  const combatVfxRoot = join(ROOT, "art-src/combat-vfx");
+  if (
+    flatPipelineStale(
+      combatVfxRoot,
+      combatVfxOutputRoot,
+      combatVfxSentinel,
+    )
+  ) {
+    run(
+      join(
+        ROOT,
+        "scripts/bg-art/prepare-combat-vfx.mjs",
+      ),
+    );
+    prepared += 1;
+  }
 }
 
 const fxRoot = join(ROOT, "art-src/fx");
