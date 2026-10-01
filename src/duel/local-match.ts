@@ -452,6 +452,7 @@ export class DuelLocalPracticeMatch {
             duelStrategyCategoryMultiplier(
               snapshot.strategy[playerId].path,
             ),
+            snapshot.players[playerId].acquisitionPrefix,
           );
         if (refill === null) continue;
         const index = offers.findIndex(
@@ -588,6 +589,9 @@ export class DuelLocalPracticeMatch {
         acquisitionPrefix: self.acquisitionPrefix,
         offers: self.offers.map((offer: DuelActionOffer) => ({
           ...offer,
+          ...(offer.typingPrompt === undefined
+            ? {}
+            : { typingPrompt: { ...offer.typingPrompt } }),
         })),
         inventory:
           snapshot.inventories["player-1"],
