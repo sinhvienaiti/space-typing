@@ -8,6 +8,7 @@ import {
   type AnnouncerEvent,
 } from "./audio/announcer";
 import { Sfx, type ImpactVariant } from "./audio/Sfx";
+import type { DuelTimedAudioCue } from "./duel/audio";
 import {
   bossActionInterval,
   bossKeyDamage,
@@ -1137,6 +1138,69 @@ export class Game {
       this.testLabLethalHits = 0;
       this.testLabTimeScale = 1;
       this.testLabSchedulerFrozen = false;
+    }
+  }
+
+  playDuelCombatAudioCue(input: DuelTimedAudioCue): void {
+    this.sfx.unlock();
+    switch (input.cue) {
+      case "typing-miss":
+        this.sfx.wrong();
+        return;
+      case "laser-launch":
+        this.sfx.shot(1.15);
+        return;
+      case "missile-launch":
+        this.sfx.shot(1.35);
+        this.sfx.power();
+        return;
+      case "heavy-launch":
+        this.sfx.shot(1.5);
+        return;
+      case "bomb-launch":
+        this.sfx.shot(1.25);
+        this.sfx.command();
+        return;
+      case "energy-impact":
+        this.sfx.boltImpact(1, 0, "energy");
+        return;
+      case "missile-impact":
+        this.sfx.boltImpact(1.35, 0, "missile");
+        return;
+      case "heavy-impact":
+        this.sfx.boltImpact(1.45, 0, "heavy");
+        return;
+      case "bomb-impact":
+        this.sfx.boltImpact(1.5, 0, "heavy");
+        this.sfx.damage();
+        return;
+      case "support":
+        this.sfx.support();
+        return;
+      case "bank":
+        this.sfx.uiConfirm();
+        return;
+      case "warning":
+        this.sfx.projectileWarning();
+        return;
+      case "intercept":
+        this.sfx.projectileIntercept();
+        return;
+      case "precision":
+        this.sfx.power();
+        return;
+      case "cataclysm":
+        this.sfx.bossEntrance(1.05);
+        return;
+      case "round-win":
+        this.sfx.stageClear(3, 1, 1);
+        return;
+      case "round-loss":
+        this.sfx.stageFail();
+        return;
+      case "round-draw":
+        this.sfx.uiConfirm();
+        return;
     }
   }
 
