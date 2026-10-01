@@ -68,7 +68,10 @@ import {
   DuelThreatSystem,
   type DuelIncomingThreat,
 } from "./threats";
-import { matchingDuelOffers } from "./typing";
+import {
+  duelOfferAnswerToken,
+  matchingDuelOffers,
+} from "./typing";
 import {
   duelOfferLifetimeSeconds,
   sanitizeDuelOfferRemainingSeconds,
@@ -349,7 +352,12 @@ function otherPlayer(playerId: DuelPlayerId): DuelPlayerId {
 }
 
 function cloneOffer(offer: DuelActionOffer): DuelActionOffer {
-  return { ...offer };
+  return {
+    ...offer,
+    ...(offer.typingPrompt === undefined
+      ? {}
+      : { typingPrompt: { ...offer.typingPrompt } }),
+  };
 }
 
 function createPlayer(
@@ -1398,9 +1406,11 @@ export class DuelEngine {
     if (matches.length === 1) {
       const offer = matches[0]!;
       const action = this.actions.get(offer.actionId);
+      const token = duelOfferAnswerToken(offer, this.actions);
       if (
         action !== undefined &&
-        nextPrefix === action.answerToken &&
+        token !== null &&
+        nextPrefix === token &&
         !this.canFinalizeAction(player.id, action)
       ) {
         events.push({
@@ -1437,8 +1447,9 @@ export class DuelEngine {
     events: DuelEngineEvent[],
   ): void {
     const action = this.actions.get(offer.actionId);
-    if (action === undefined) return;
-    const expected = action.answerToken[offer.typedPrefix.length];
+    const token = duelOfferAnswerToken(offer, this.actions);
+    if (action === undefined || token === null) return;
+    const expected = token[offer.typedPrefix.length];
     if (expected !== char) {
       this.recordWrongCharacter(player);
       player.targetMistakes += 1;
@@ -1451,7 +1462,7 @@ export class DuelEngine {
     }
 
     const wouldComplete =
-      offer.typedPrefix.length + 1 === action.answerToken.length;
+      offer.typedPrefix.length + 1 === token.length;
     if (
       wouldComplete &&
       !this.canFinalizeAction(player.id, action)
@@ -1565,9 +1576,11 @@ export class DuelEngine {
     events: DuelEngineEvent[],
   ): void {
     const action = this.actions.get(offer.actionId);
+    const token = duelOfferAnswerToken(offer, this.actions);
     if (
       action === undefined ||
-      offer.typedPrefix !== action.answerToken
+      token === null ||
+      offer.typedPrefix !== token
     ) {
       return;
     }
