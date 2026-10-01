@@ -43,6 +43,25 @@ describe("Duel target art manifest", () => {
     }
   });
 
+  it("keeps runtime target vectors transparent and text-free", () => {
+    for (const id of DUEL_TARGET_IDS) {
+      const path = fileURLToPath(
+        new URL(
+          "../public/assets/space-typing/duel-targets/" +
+            id +
+            ".svg",
+          import.meta.url,
+        ),
+      );
+      const svg = readFileSync(path, "utf8");
+      expect(svg).toContain("<svg");
+      expect(svg).not.toContain("<text");
+      expect(svg).not.toMatch(
+        /<rect[^>]+(?:width=["']512["'][^>]+height=["']512["']|height=["']512["'][^>]+width=["']512["'])/i,
+      );
+    }
+  });
+
   it("accepts true-alpha source-over target sprites", () => {
     const manifest = parseDuelTargetManifest({
       id: "duel-targets",
