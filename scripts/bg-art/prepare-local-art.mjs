@@ -85,6 +85,25 @@ for (const [sourceId, kitId] of Object.entries(bgKits)) {
   prepared += 1;
 }
 
+const combatVfxRoot = join(ROOT, "art-src/combat-vfx");
+if (
+  anyNewerThanSentinel(
+    combatVfxRoot,
+    join(
+      ROOT,
+      "public/assets/space-typing/combat-vfx/vfx.json",
+    ),
+  )
+) {
+  run(
+    join(
+      ROOT,
+      "scripts/bg-art/prepare-combat-vfx.mjs",
+    ),
+  );
+  prepared += 1;
+}
+
 const fxRoot = join(ROOT, "art-src/fx");
 if (existsSync(fxRoot)) {
   for (const ship of readdirSync(fxRoot).sort()) {
