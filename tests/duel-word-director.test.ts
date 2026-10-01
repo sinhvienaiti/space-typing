@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DUEL_ACTIONS_BY_ID } from "../src/duel/actions";
 import { DuelOfferDraft } from "../src/duel/draft";
 import { DuelEngine } from "../src/duel/engine";
+import type { DuelActionOffer } from "../src/duel/model";
 import {
   DUEL_TYPING_LENGTHS,
   DUEL_TYPING_LEXICON,
@@ -65,7 +66,7 @@ describe("Duel FINAL V4 typing prompt director", () => {
     });
     const seen = new Set<string>();
 
-    let active = [];
+    let active: DuelActionOffer[] = [];
     for (let index = 0; index < 24; index += 1) {
       const offer = draft.refillPrivateOffer(
         "player-1",
