@@ -8,6 +8,7 @@ import {
   duelMusicStateForPhase,
 } from "../src/duel/audio";
 import { DUEL_MAPS } from "../src/duel/maps";
+import { duelProjectileTravelMs } from "../src/duel/presentation-timing";
 import { DuelLocalPracticeMatch } from "../src/duel/local-match";
 import { createPracticeDuelRoom } from "../src/duel/room";
 
@@ -93,6 +94,15 @@ describe("Duel map audio presentation", () => {
   });
 });
 
+
+describe("Duel projectile presentation timing", () => {
+  it("keeps one deterministic visual/audio travel clock", () => {
+    expect(duelProjectileTravelMs(1)).toBe(720);
+    expect(duelProjectileTravelMs(2)).toBe(360);
+    expect(duelProjectileTravelMs(0.25)).toBe(1440);
+    expect(duelProjectileTravelMs(Number.NaN)).toBe(720);
+  });
+});
 
 describe("Duel combat SFX routing", () => {
   it("maps confirmed attack events to launch plus impact on the projectile timeline", () => {
