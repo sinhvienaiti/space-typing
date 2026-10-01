@@ -4,6 +4,13 @@ import { DuelOfferDraft } from "../src/duel/draft";
 import { DuelEngine } from "../src/duel/engine";
 import type { DuelActionOffer } from "../src/duel/model";
 import {
+  duelActionsForMap,
+} from "../src/duel/map-actions";
+import {
+  DUEL_MAPS,
+  type DuelMapId,
+} from "../src/duel/maps";
+import {
   DUEL_TYPING_LENGTHS,
   DUEL_TYPING_LEXICON,
   validateDuelTypingLexicon,
@@ -107,6 +114,75 @@ describe("Duel FINAL V4 typing prompt director", () => {
     expect(
       refill!.typingPrompt!.answerToken.startsWith("co"),
     ).toBe(false);
+  });
+
+  it("does not exhaust safe words during deterministic multi-map refill stress", () => {
+    const mapIds = Object.keys(DUEL_MAPS) as DuelMapId[];
+
+    for (const [mapIndex, mapId] of mapIds.entries()) {
+      const draft = new DuelOfferDraft({
+        seed: 90_000 + mapIndex,
+        actions: duelActionsForMap(mapId),
+        enabledCategories: [
+          "attack",
+          "defense",
+          "support",
+          "tactical",
+          "fate",
+          "mystery",
+        ],
+      });
+      let offers = draft.dealPrivateOffers(
+        "player-1",
+        "war",
+      );
+      expect(offers).toHaveLength(5);
+
+      for (let cycle = 0; cycle < 250; cycle += 1) {
+        const slotIndex = cycle % 5;
+        const active = offers.filter(
+          (offer) => offer.slotIndex !== slotIndex,
+        );
+        const refill = draft.refillPrivateOffer(
+          "player-1",
+          slotIndex,
+          cycle > 190 ? "crisis" : "war",
+          active,
+        );
+        expect(refill).not.toBeNull();
+
+        const tokens = [
+          ...active,
+          refill!,
+        ].map(
+          (offer) =>
+            offer.typingPrompt?.answerToken ?? "",
+        );
+        expect(tokens.every((token) => token !== "")).toBe(true);
+        expect(new Set(tokens).size).toBe(tokens.length);
+        for (let left = 0; left < tokens.length; left += 1) {
+          for (
+            let right = left + 1;
+            right < tokens.length;
+            right += 1
+          ) {
+            expect(
+              tokens[left]!.startsWith(tokens[right]!) ||
+                tokens[right]!.startsWith(tokens[left]!),
+            ).toBe(false);
+          }
+        }
+
+        offers = [...active, refill!].sort(
+          (left, right) =>
+            left.slotIndex - right.slotIndex,
+        );
+      }
+
+      expect(
+        draft.wordDiagnostics().hardExhaustion,
+      ).toBe(0);
+    }
   });
 
   it("preserves the exact prompt through target lock, typing miss and cancel", () => {
