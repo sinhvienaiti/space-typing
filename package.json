@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 3004",
-    "build": "node scripts/check-audio-assets.mjs && node scripts/check-background-assets.mjs && node scripts/bg-art/check-expansion-v2.mjs && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit && vite build && node scripts/report-bundle-metrics.mjs && node scripts/check-ship-art-integrity.mjs && node scripts/check-background-art.mjs",
+    "build": "node scripts/check-audio-assets.mjs && node scripts/check-background-assets.mjs && node scripts/bg-art/check-expansion-v2.mjs && node scripts/bg-art/check-credit-puzzle-art.mjs && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit && vite build && node scripts/report-bundle-metrics.mjs && node scripts/check-ship-art-integrity.mjs && node scripts/check-background-art.mjs",
     "test": "vitest run",
     "check": "pnpm test && pnpm build",
     "duel:server": "tsx server/duel/ws-server.ts",
@@ -19,7 +19,13 @@
     "music:render": "node scripts/music/render-songs.mjs",
     "music:handovers": "node scripts/music/transition-check.mjs",
     "visual:shot": "node scripts/visual/shot.mjs",
-    "visual:crop": "node scripts/visual/crop.mjs"
+    "visual:crop": "node scripts/visual/crop.mjs",
+    "art:prepare": "node scripts/bg-art/prepare-local-art.mjs",
+    "reward-art:prepare": "node scripts/bg-art/prepare-credit-puzzle.mjs",
+    "pickups:prepare": "node scripts/bg-art/prepare-credit-puzzle.mjs credits",
+    "puzzle:prepare": "node scripts/bg-art/prepare-credit-puzzle.mjs puzzle",
+    "icons:prepare": "node scripts/bg-art/prepare-icons.mjs",
+    "reward-art:check": "node scripts/bg-art/check-credit-puzzle-art.mjs"
   },
   "dependencies": {
     "ws": "^8.22.0"
@@ -34,4 +40,4 @@
     "vitest": "^3.2.4"
   },
   "packageManager": "pnpm@11.21.0"
-}
+}\n

@@ -2,7 +2,7 @@ import type {
   CreditCrystalTier,
   CreditCrystalVariant,
 } from "../rewards/combat-credit-drops";
-import type { VisualQuality } from "../types";
+import type { VisualQuality } from "../types";\nimport { creditCrystalImage } from "./credit-crystal-art";
 
 export type CreditCrystalDrawablePiece = {
   x: number;
@@ -96,6 +96,7 @@ function drawCrystal(
   quality: VisualQuality,
   hero: boolean,
   age: number,
+  image: HTMLImageElement | null,
 ): void {
   const r = piece.radius;
   context.save();
@@ -111,8 +112,19 @@ function drawCrystal(
     context.globalAlpha = 1;
   }
 
-  context.fillStyle = colors.edge;
-  context.beginPath();
+  if (image !== null) {
+    const size = r * 2.15;
+    context.globalAlpha = 1;
+    context.drawImage(
+      image,
+      -size / 2,
+      -size / 2,
+      size,
+      size,
+    );
+  } else {
+    context.fillStyle = colors.edge;
+    context.beginPath();
   context.moveTo(0, -r);
   context.lineTo(r * 0.72, -r * 0.18);
   context.lineTo(r * 0.42, r);
@@ -131,13 +143,14 @@ function drawCrystal(
   context.closePath();
   context.fill();
 
-  context.strokeStyle = "rgba(255,255,255,.82)";
-  context.lineWidth = hero ? 1.5 : 1;
-  context.beginPath();
-  context.moveTo(-r * 0.28, -r * 0.18);
-  context.lineTo(0, -r * 0.72);
-  context.lineTo(r * 0.24, -r * 0.2);
-  context.stroke();
+    context.strokeStyle = "rgba(255,255,255,.82)";
+    context.lineWidth = hero ? 1.5 : 1;
+    context.beginPath();
+    context.moveTo(-r * 0.28, -r * 0.18);
+    context.lineTo(0, -r * 0.72);
+    context.lineTo(r * 0.24, -r * 0.2);
+    context.stroke();
+  }
 
   if (hero && (quality === "high" || quality === "ultra")) {
     const sweep = ((age * 2.6) % 1) * 2 - 1;
@@ -162,6 +175,11 @@ export function drawCreditCrystalBursts(
 
   for (const burst of bursts) {
     const colors = palette(burst.tier, burst.variant);
+    const image = creditCrystalImage(
+      burst.tier,
+      burst.variant,
+      quality,
+    );
     if (burst.phase === "magnet" && quality !== "low") {
       const trailScale =
         quality === "ultra" ? 1 : quality === "high" ? 0.78 : 0.55;
@@ -188,6 +206,7 @@ export function drawCreditCrystalBursts(
         quality,
         burst.hero && piece.anchor,
         burst.age,
+        image,
       );
     }
   }
