@@ -1,7 +1,7 @@
 # SPACE TYPING — DUEL COMBAT PRESENTATION REWORK PLAN
 
 **Date:** 2026-10-01  
-**Status:** APPROVED IMPLEMENTATION PLAN  
+**Status:** IMPLEMENTATION IN PROGRESS — Phases A/B/C/E substantially implemented; Phase D/F validation remains  
 **Repo:** `sinhvienaiti/space-typing`  
 **Branch:** `feat/bgv-integration-current`  
 **Parent spec:** `docs/SPACE_TYPING_DUEL_MODE_MASTER_PLAN_FINAL_V3.md`
@@ -371,3 +371,27 @@ Rework:
 - strategy panels that visually overpower the battlefield.
 
 The goal is **not** to rewrite Duel gameplay. The goal is to make the existing gameplay look and feel like the Space Typing combat system it was designed to be.
+
+
+---
+
+## 9. Implementation checkpoint — 2026-10-01
+
+Implemented on `feat/bgv-integration-current`:
+
+- Phase A: vertical local-perspective arena is implemented. Self is bottom, rival is top.
+- Phase B: accepted-character typing bolt, text-hit pulse and local ship charge are implemented.
+- Phase C: laser, missile, railgun, bomb and lance presentation is action-specific; shield/repair/energy actions no longer fake a generic projectile.
+- PvE projectile identity profiles are reused for Duel projectile width, glow and ship color identity.
+- Phase E: privacy-safe rival charge state, counter/contest telegraph, major-threat charge line, intercept burst and resolved-impact presentation are implemented.
+- Tactical macro presentation now includes lock-on/scan target reticles and gravity/disrupt/amplify arena fields.
+- Projectile travel now ends with a target-side arrival effect instead of disappearing silently.
+- Competitive privacy is preserved: rival typing presentation exposes only generic state plus bucketed progress, not raw private offers/tokens.
+- DOM/authority regression tests cover the above presentation/privacy contracts.
+
+Still open before marking the rework complete:
+
+- Phase D: extract more shared PvE/PvP visual primitives only where this lowers duplication without destabilizing Combat.
+- Phase F: real-browser High/Ultra tuning, performance evidence, mobile sizing and final visual/audio acceptance.
+- Final timing polish between authoritative damage-state updates and visual projectile arrival.
+- Manual two-client Friend Duel validation so both clients confirm self-bottom/rival-top orientation simultaneously.
