@@ -19,6 +19,11 @@ import {
   DuelPerformanceMonitor,
   type DuelPerformanceDiagnostics,
 } from "./performance";
+import {
+  combatVfxUrl,
+  preloadCombatVfxSprites,
+  type CombatVfxId,
+} from "../vfx/combat-vfx-sprites";
 
 export type DuelBattleUiHooks = {
   sendIntent(intent: DuelWireIntent): number | null;
@@ -121,6 +126,7 @@ function eventSourcePlayer(
     case "action-fired":
     case "stored-action-used":
     case "combo-used":
+    case "precision-firepower":
       return event.playerId;
     case "threat-created":
       return event.threat.sourcePlayerId;
@@ -209,6 +215,9 @@ function createBattleNodes(gameShell: HTMLElement) {
           </aside>
 
           <div id="duelOpponentShipFrame" class="duel-ship-frame duel-ship-opponent" aria-label="Rival ship">
+            <i class="duel-damage-vfx duel-damage-fire duel-damage-fire-a" aria-hidden="true"></i>
+            <i class="duel-damage-vfx duel-damage-fire duel-damage-fire-b" aria-hidden="true"></i>
+            <i class="duel-damage-vfx duel-damage-smoke" aria-hidden="true"></i>
             <div id="duelOpponentShip" class="duel-ship-sprite" data-character="reaper"></div>
           </div>
           <div id="duelOpponentCharge" class="duel-opponent-charge hidden" aria-live="polite">RIVAL CHARGING</div>
@@ -245,6 +254,9 @@ function createBattleNodes(gameShell: HTMLElement) {
 
         <div class="duel-self-zone">
           <div id="duelSelfShipFrame" class="duel-ship-frame duel-ship-self" aria-label="Your ship">
+            <i class="duel-damage-vfx duel-damage-fire duel-damage-fire-a" aria-hidden="true"></i>
+            <i class="duel-damage-vfx duel-damage-fire duel-damage-fire-b" aria-hidden="true"></i>
+            <i class="duel-damage-vfx duel-damage-smoke" aria-hidden="true"></i>
             <div id="duelSelfShip" class="duel-ship-sprite" data-character="vanguard"></div>
           </div>
 
@@ -442,6 +454,13 @@ function eventLabel(event: DuelClientEvent): string {
       return "COMBO READY · " + event.comboId;
     case "combo-used":
       return "COMBO · " + event.comboId;
+    case "precision-firepower":
+      return (
+        "PRECISION " +
+        String(event.streak) +
+        " · " +
+        event.ordnance.replaceAll("-", " ").toUpperCase()
+      );
     case "conversion-used":
       return "CONVERSION · " + event.conversionId;
     case "trap-armed":
@@ -501,6 +520,8 @@ function fxKind(event: DuelClientEvent): string | null {
       return "mystery";
     case "combo-used":
       return "combo";
+    case "precision-firepower":
+      return "precision";
     case "trap-triggered":
       return "trap";
     case "threat-created":
@@ -552,6 +573,7 @@ export function installDuelBattleUi(
   let fxSequence = 0;
   let projectileSequence = 0;
   let lastTypingFeedbackKey = "";
+  let paintedVfxGeneration = 0;
   const performanceMonitor =
     new DuelPerformanceMonitor();
   let performanceFrame: number | null = null;
@@ -573,6 +595,58 @@ export function installDuelBattleUi(
           view.map.id,
           actionId,
         );
+
+  const applyPaintedCombatVfx = async (): Promise<void> => {
+    const generation = ++paintedVfxGeneration;
+    const manifest = await preloadCombatVfxSprites();
+    if (
+      !active ||
+      generation !== paintedVfxGeneration ||
+      manifest === null
+    ) {
+      return;
+    }
+
+    const ids: readonly CombatVfxId[] = [
+      "explosion-core",
+      "explosion-wide",
+      "shockwave-ring",
+      "fire-small",
+      "fire-medium",
+      "fire-critical",
+      "smoke-dark",
+      "smoke-hot",
+      "spark-burst",
+      "debris-burst",
+      "missile-salvo",
+      "bomb-impact",
+      "precision-burst",
+    ];
+
+    let available = 0;
+    for (const id of ids) {
+      const url = combatVfxUrl(id);
+      if (url === null) continue;
+      available += 1;
+      nodes.root.style.setProperty(
+        "--duel-vfx-" + id,
+        'url("' + url + '")',
+      );
+    }
+    nodes.root.dataset.paintedVfx =
+      available > 0 ? "true" : "false";
+  };
+
+  const damageTier = (
+    hull: number,
+    maxHull: number,
+  ): 0 | 1 | 2 | 3 => {
+    const ratio = resourceRatio(hull, maxHull);
+    if (ratio > 0.7) return 0;
+    if (ratio > 0.45) return 1;
+    if (ratio > 0.2) return 2;
+    return 3;
+  };
 
   const renderOffers = (): void => {
     if (view === null) return;
@@ -957,6 +1031,13 @@ export function installDuelBattleUi(
     nodes.selfShip.dataset.character = selfCharacter;
     nodes.opponentShip.dataset.character =
       opponentCharacter;
+
+    nodes.selfShipFrame.dataset.damageTier = String(
+      damageTier(view.self.hull, view.self.maxHull),
+    );
+    nodes.opponentShipFrame.dataset.damageTier = String(
+      damageTier(view.opponent.hull, view.opponent.maxHull),
+    );
 
     const selfShieldRatio = resourceRatio(
       view.self.shield,
@@ -1466,6 +1547,126 @@ export function installDuelBattleUi(
     );
   };
 
+  const paintedBackground = (
+    id: CombatVfxId,
+  ): string | null => {
+    const url = combatVfxUrl(id);
+    return url === null ? null : 'url("' + url + '")';
+  };
+
+  const spawnMapBlast = (
+    side: "self" | "opponent",
+    variant: ProjectileVariant,
+  ): void => {
+    if (
+      variant !== "bomb" &&
+      variant !== "combo" &&
+      variant !== "lance" &&
+      variant !== "heavy"
+    ) {
+      return;
+    }
+
+    const blastArt =
+      variant === "bomb"
+        ? paintedBackground("bomb-impact")
+        : paintedBackground("explosion-wide");
+    const shockwaveArt = paintedBackground("shockwave-ring");
+    if (blastArt === null && shockwaveArt === null) return;
+
+    while (
+      nodes.fx.querySelectorAll(".duel-map-painted-blast").length >= 5
+    ) {
+      nodes.fx
+        .querySelector(".duel-map-painted-blast")
+        ?.remove();
+    }
+
+    const blast = createElement(
+      "i",
+      "duel-map-painted-blast duel-map-painted-blast-" + side,
+    );
+    if (blastArt !== null) {
+      blast.style.backgroundImage = blastArt;
+    }
+    nodes.fx.append(blast);
+    blast.addEventListener(
+      "animationend",
+      () => blast.remove(),
+      { once: true },
+    );
+
+    if (shockwaveArt !== null) {
+      const shockwave = createElement(
+        "i",
+        "duel-map-painted-shockwave duel-map-painted-blast-" + side,
+      );
+      shockwave.style.backgroundImage = shockwaveArt;
+      nodes.fx.append(shockwave);
+      shockwave.addEventListener(
+        "animationend",
+        () => shockwave.remove(),
+        { once: true },
+      );
+    }
+
+    if (quality === "high" || quality === "ultra") {
+      const secondaryArt = paintedBackground("explosion-core");
+      const count = quality === "ultra" ? 2 : 1;
+      if (secondaryArt !== null) {
+        for (let index = 0; index < count; index += 1) {
+          const secondary = createElement(
+            "i",
+            "duel-map-secondary-explosion duel-map-painted-blast-" + side,
+          );
+          secondary.style.backgroundImage = secondaryArt;
+          secondary.style.setProperty(
+            "--duel-secondary-x",
+            String(36 + ((projectileSequence * 17 + index * 29) % 29)) + "%",
+          );
+          secondary.style.setProperty(
+            "--duel-secondary-delay",
+            String(110 + index * 90) + "ms",
+          );
+          nodes.fx.append(secondary);
+          secondary.addEventListener(
+            "animationend",
+            () => secondary.remove(),
+            { once: true },
+          );
+        }
+      }
+    }
+  };
+
+  const spawnPrecisionActivation = (
+    sourcePlayerId: DuelPlayerId,
+    intensity: number,
+  ): void => {
+    if (view === null) return;
+    const art = paintedBackground("precision-burst");
+    if (art === null) return;
+    const frame =
+      sourcePlayerId === view.self.playerId
+        ? nodes.selfShipFrame
+        : nodes.opponentShipFrame;
+    const flare = createElement(
+      "i",
+      "duel-precision-painted-burst",
+    );
+    flare.style.backgroundImage = art;
+    flare.style.setProperty(
+      "--duel-precision-scale",
+      (0.9 + Math.max(0, intensity) * 0.14).toFixed(2),
+    );
+    frame.append(flare);
+    flare.addEventListener(
+      "animationend",
+      () => flare.remove(),
+      { once: true },
+    );
+  };
+
   const spawnProjectileArrival = (
     side: "self" | "opponent",
     variant: ProjectileVariant,
@@ -1483,7 +1684,16 @@ export function installDuelBattleUi(
       "i",
       "duel-projectile-arrival duel-projectile-arrival-" + variant,
     );
+    const impactArt =
+      variant === "bomb"
+        ? paintedBackground("bomb-impact")
+        : paintedBackground("explosion-core");
+    if (impactArt !== null) {
+      impact.classList.add("duel-projectile-arrival-painted");
+      impact.style.backgroundImage = impactArt;
+    }
     frame.append(impact);
+    spawnMapBlast(side, variant);
     impact.addEventListener(
       "animationend",
       () => impact.remove(),
@@ -1687,6 +1897,33 @@ export function installDuelBattleUi(
         event.actionId,
         "lance",
       );
+      return;
+    }
+
+    if (event.type === "precision-firepower") {
+      spawnPrecisionActivation(
+        event.playerId,
+        event.accuracyTier,
+      );
+      const variant: ProjectileVariant =
+        event.ordnance === "laser-burst"
+          ? "laser"
+          : event.ordnance === "micro-missile" ||
+              event.ordnance === "missile-salvo"
+            ? "missile"
+            : event.ordnance === "heavy-bomb"
+              ? "bomb"
+              : "combo";
+      const count =
+        event.ordnance === "missile-salvo"
+          ? 2 + Math.min(2, event.accuracyTier)
+          : event.ordnance === "precision-barrage" ||
+              event.ordnance === "major-ordnance"
+            ? 2 + Math.min(3, event.accuracyTier)
+            : 1;
+      for (let index = 0; index < count; index += 1) {
+        spawnProjectile(event.playerId, variant);
+      }
       return;
     }
 
@@ -1934,6 +2171,7 @@ export function installDuelBattleUi(
     show(nextView, events = []) {
       view = nextView;
       active = true;
+      void applyPaintedCombatVfx();
       gameShell.classList.add(
         "duel-battle-active",
       );
@@ -2046,6 +2284,7 @@ export function installDuelBattleUi(
     },
     hide() {
       active = false;
+      paintedVfxGeneration += 1;
       stopPerformanceLoop();
       nodes.root.classList.add("hidden");
       gameShell.classList.remove(
