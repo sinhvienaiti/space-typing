@@ -3465,7 +3465,7 @@
 /* Painted PvP targets are true-alpha world objects. Their source geometry
    replaces CSS placeholder silhouettes; labels remain DOM text. */
 .duel-target-object.duel-target-object-painted {
-  width: clamp(38px, 3.8vw, 58px);
+  width: clamp(48px, 4.8vw, 72px);
   aspect-ratio: 1;
   border: 0 !important;
   border-radius: 0 !important;
