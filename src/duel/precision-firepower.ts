@@ -23,6 +23,13 @@ export const DUEL_PRECISION_MILESTONES: readonly DuelPrecisionMilestone[] = [
 
 export type DuelPrecisionAccuracyTier = 0 | 1 | 2 | 3;
 
+export type DuelPrecisionBonus = {
+  streak: number;
+  ordnance: DuelPrecisionOrdnance;
+  accuracyTier: DuelPrecisionAccuracyTier;
+  bonusDamage: number;
+};
+
 export function duelPrecisionAccuracyTier(
   correctChars: number,
   wrongChars: number,
