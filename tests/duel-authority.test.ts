@@ -339,6 +339,14 @@ describe("Duel M-DUEL-11 authority core", () => {
       view.value.self.cooldowns,
     ).toEqual({});
     expect("pity" in view.value.opponent).toBe(false);
+    expect(
+      Object.keys(view.value.opponent.typingTelegraph).sort(),
+    ).toEqual(["active", "kind", "progress"]);
+    expect(view.value.opponent.typingTelegraph).toEqual({
+      active: false,
+      kind: "idle",
+      progress: 0,
+    });
     expect(serialized).not.toContain("matchSeed");
     expect(serialized).not.toContain("fixedSeed");
     expect(Array.isArray(view.value.shared.pendingHazards)).toBe(true);
