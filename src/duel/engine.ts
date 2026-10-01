@@ -353,6 +353,7 @@ export class DuelEngine {
     this.chance = new DuelChanceSystem(
       config.matchSeed ?? 1,
       DUEL_CONTENT_VERSION,
+      this.mapId,
     );
     this.director = new DuelMapDirector({
       mapId: this.mapId,
@@ -669,9 +670,38 @@ export class DuelEngine {
         });
         break;
       case "offer-reshuffle":
+        this.reshuffleOffersForMystery();
+        break;
       case "gravity-shift":
+        this.applySharedMysteryTactical(
+          "projectile-drag",
+          outcome.magnitude,
+          6,
+        );
+        break;
       case "hazard-surge":
+        this.applySharedMysteryTactical(
+          "offer-drift",
+          outcome.magnitude,
+          5,
+        );
+        this.applySharedMysteryTactical(
+          "projectile-drag",
+          outcome.magnitude * 0.55,
+          5,
+        );
+        break;
       case "world-fracture":
+        this.applySharedMysteryTactical(
+          "offer-drift",
+          outcome.magnitude,
+          8,
+        );
+        this.applySharedMysteryTactical(
+          "projectile-drag",
+          outcome.magnitude,
+          8,
+        );
         break;
     }
 
@@ -1584,6 +1614,42 @@ export class DuelEngine {
       });
     }
     player.targetMistakes = 0;
+  }
+
+  private reshuffleOffersForMystery(): void {
+    for (const playerId of PLAYER_IDS) {
+      const offers = this.players[playerId].offers;
+      if (offers.length <= 1) continue;
+      const maxSlot = offers.reduce(
+        (value, offer) =>
+          Math.max(value, offer.slotIndex),
+        0,
+      );
+      for (const offer of offers) {
+        offer.slotIndex = maxSlot - offer.slotIndex;
+      }
+      offers.sort(
+        (left, right) =>
+          left.slotIndex - right.slotIndex ||
+          left.instanceId.localeCompare(right.instanceId),
+      );
+    }
+  }
+
+  private applySharedMysteryTactical(
+    effectId: "offer-drift" | "projectile-drag",
+    strength: number,
+    seconds: number,
+  ): void {
+    for (const playerId of PLAYER_IDS) {
+      this.tactical.apply({
+        effectId,
+        sourcePlayerId: playerId,
+        targetPlayerId: playerId,
+        strength,
+        remainingSeconds: seconds,
+      });
+    }
   }
 
   private appendFateEffects(
