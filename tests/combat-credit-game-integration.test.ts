@@ -51,6 +51,8 @@ type Runtime = {
 function createHarness(mode: CombatCreditMode = "test-lab"): {
   game: Game;
   reward: ReturnType<typeof vi.fn>;
+  pickupPresented: ReturnType<typeof vi.fn>;
+  bossRewardChoice: ReturnType<typeof vi.fn>;
 } {
   vi.stubGlobal("window", {
     innerWidth: 1280,
@@ -101,6 +103,8 @@ function createHarness(mode: CombatCreditMode = "test-lab"): {
     (request: CombatCreditClaimRequest): CombatCreditRewardReceipt | null =>
       ledger.claimKillReward(request),
   );
+  const pickupPresented = vi.fn();
+  const bossRewardChoice = vi.fn();
 
   const game = new Game(canvas, vocabulary, settings, {
     onStats: vi.fn(),
@@ -115,6 +119,7 @@ function createHarness(mode: CombatCreditMode = "test-lab"): {
       });
     },
     onCombatCreditReward: reward,
+    onCombatCreditPickupPresented: pickupPresented,
     onStageEvents: vi.fn(),
     onObjectiveUpdate: vi.fn(),
     onStageClear: vi.fn(),
@@ -122,7 +127,7 @@ function createHarness(mode: CombatCreditMode = "test-lab"): {
     onWordComplete: vi.fn(),
     onEquipmentDrop: vi.fn(),
     onRewardChoice: vi.fn(),
-    onBossRewardChoice: vi.fn(),
+    onBossRewardChoice: bossRewardChoice,
     onEnemySeen: vi.fn(),
     onAnomalyReady: vi.fn(),
     onLuckPityUpdate: vi.fn(),
@@ -131,7 +136,7 @@ function createHarness(mode: CombatCreditMode = "test-lab"): {
     onSkills: vi.fn(),
   });
   game.setTestLabMode(true);
-  return { game, reward };
+  return { game, reward, pickupPresented, bossRewardChoice };
 }
 
 function start(game: Game, stage = 1): void {
@@ -278,6 +283,86 @@ describe("Combat Credit FINAL V3 Game integration", () => {
     expect(reward).toHaveBeenCalledTimes(1);
     expect(game.getCombatCreditsGrantedThisStage()).toBe(0);
     expect(game.getCombatCreditsAppliedThisStage()).toBe(0);
+    game.destroy();
+  });
+
+  it("flushes pending pickup presentation when stage clear starts", () => {
+    const { game, pickupPresented } = createHarness();
+    start(game, 1);
+    const id = game.testLabSpawnEnemies({
+      definitionId: ELIGIBLE_DEFINITION_ID,
+      kind: "scout",
+      count: 1,
+      layers: 1,
+    })[0]!;
+    const runtime = game as unknown as Runtime & {
+      spawnRemaining: number;
+    };
+    const enemy = runtime.enemies.find((item) => item.id === id);
+    if (enemy === undefined) throw new Error("Missing enemy");
+
+    runtime.resolveSkillEnemyKill(enemy, {
+      normalScore: 10,
+      eliteScore: 20,
+      rollDrop: false,
+      triggerDeathTraits: false,
+      playDeathFx: false,
+    });
+    expect(pickupPresented).not.toHaveBeenCalled();
+
+    runtime.spawnRemaining = 0;
+    game.testLabAdvanceSimulation(0.05);
+    expect(game.getPhase()).toBe("stageclear");
+    expect(pickupPresented).toHaveBeenCalledTimes(1);
+    game.destroy();
+  });
+
+  it("flushes pending pickup presentation on game-over transition", () => {
+    const { game, pickupPresented } = createHarness();
+    start(game, 1);
+    game.testLabSetDeathMode("real");
+    const id = game.testLabSpawnEnemies({
+      definitionId: ELIGIBLE_DEFINITION_ID,
+      kind: "scout",
+      count: 1,
+      layers: 1,
+    })[0]!;
+    const runtime = game as unknown as Runtime;
+    const enemy = runtime.enemies.find((item) => item.id === id);
+    if (enemy === undefined) throw new Error("Missing enemy");
+
+    runtime.resolveSkillEnemyKill(enemy, {
+      normalScore: 10,
+      eliteScore: 20,
+      rollDrop: false,
+      triggerDeathTraits: false,
+      playDeathFx: false,
+    });
+    expect(pickupPresented).not.toHaveBeenCalled();
+
+    game.testLabSetResources({ hull: 1, shield: 0 });
+    expect(game.testLabDamagePlayer(10_000)).toBe(true);
+    expect(game.getPhase()).toBe("gameover");
+    expect(pickupPresented).toHaveBeenCalledTimes(1);
+    game.destroy();
+  });
+
+  it("gives the boss crystal a battlefield beat before opening the reward modal", () => {
+    const { game, pickupPresented, bossRewardChoice } = createHarness();
+    start(game, 100);
+    const runtime = game as unknown as Runtime;
+    const entry = vocabulary[0]!;
+    runtime.boss = createBossState(100, 1, "major-boss", entry);
+
+    runtime.defeatBoss(entry);
+    expect(bossRewardChoice).not.toHaveBeenCalled();
+
+    game.testLabAdvanceSimulation(1);
+    expect(bossRewardChoice).not.toHaveBeenCalled();
+
+    game.testLabAdvanceSimulation(0.9);
+    expect(bossRewardChoice).toHaveBeenCalledTimes(1);
+    expect(pickupPresented).toHaveBeenCalledTimes(1);
     game.destroy();
   });
 

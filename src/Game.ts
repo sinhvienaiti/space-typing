@@ -875,6 +875,11 @@ export class Game {
   private bossSpawned = false;
   private bossDefeated = false;
   private bossRewardPending = false;
+  private bossRewardPrompt: {
+    stage: number;
+    role: BossRole;
+    remaining: number;
+  } | null = null;
   private seenEnemyDefinitions = new Set<EnemyDefinitionId>();
   private enemies: Enemy[] = [];
   private readonly stageWordLedger = new StageWordLedger();
@@ -1847,6 +1852,7 @@ export class Game {
     this.bossSpawned = false;
     this.bossDefeated = false;
     this.bossRewardPending = false;
+    this.bossRewardPrompt = null;
     this.testLabLethalHits = 0;
     this.setStatusState(createStatusState());
     this.hardCcState = createHardCcState();
@@ -3430,6 +3436,7 @@ export class Game {
     this.bossSpawned = false;
     this.bossDefeated = false;
     this.bossRewardPending = false;
+    this.bossRewardPrompt = null;
     this.overdriveTimer = 0;
     this.novaPulseRemaining = 0;
     this.interferenceTimer = 0;
@@ -3565,6 +3572,7 @@ export class Game {
     this.anomalyRiskRatio = 0;
     this.boss = null;
     this.bossRewardPending = false;
+    this.bossRewardPrompt = null;
     this.hooks.onBossUpdate(null);
     this.hooks.onPhase(this.phase);
   }
@@ -4170,6 +4178,7 @@ export class Game {
     for (const event of this.creditPickups.update(dt, ship)) {
       this.presentCombatCreditCollection(event, ship);
     }
+    this.updateBossRewardPrompt(dt);
     this.skillFx.update(dt);
     this.combatFx.update(dt);
 
@@ -4463,6 +4472,7 @@ export class Game {
       return;
     }
 
+    this.flushCombatCreditPresentation();
     this.phase = "stageclear";
     this.projectiles = [];
     this.supplyPod = null;
@@ -6245,10 +6255,16 @@ export class Game {
 
     if (this.hiddenEncounterRuntime === null) {
       this.bossRewardPending = true;
-      this.hooks.onBossRewardChoice(
-        this.stageConfig?.stage ?? 1,
-        boss.role,
-      );
+      this.bossRewardPrompt = {
+        stage: this.stageConfig?.stage ?? 1,
+        role: boss.role,
+        remaining:
+          boss.role === "major-boss"
+            ? 1.8
+            : boss.role === "boss"
+              ? 1.55
+              : 1.35,
+      };
       return;
     }
 
@@ -6265,6 +6281,7 @@ export class Game {
     }
 
     this.bossRewardPending = false;
+    this.bossRewardPrompt = null;
     this.finishStage();
     return true;
   }
@@ -7015,6 +7032,21 @@ export class Game {
     for (const event of this.creditPickups.flush()) {
       this.hooks.onCombatCreditPickupPresented?.(event);
     }
+  }
+
+  private updateBossRewardPrompt(dt: number): void {
+    const prompt = this.bossRewardPrompt;
+    if (!this.bossRewardPending || prompt === null) return;
+
+    prompt.remaining = Math.max(0, prompt.remaining - Math.max(0, dt));
+    if (prompt.remaining > 0) return;
+
+    // The modal pauses gameplay visually. Give the premium crystal its
+    // readable battlefield beat first, then compact-sync any remaining
+    // pickup value before the dialog can cover the canvas.
+    this.flushCombatCreditPresentation();
+    this.bossRewardPrompt = null;
+    this.hooks.onBossRewardChoice(prompt.stage, prompt.role);
   }
 
   private activateEnemyReward(enemy: Enemy): void {
@@ -8364,6 +8396,7 @@ export class Game {
     this.emitStats();
 
     if (this.stats.hull <= 0) {
+      this.flushCombatCreditPresentation();
       this.phase = "gameover";
       this.sfx.stageFail();
       this.hooks.onPhase(this.phase);
