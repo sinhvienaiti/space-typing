@@ -182,6 +182,11 @@ export type DuelEngineEvent =
       actionId: string;
     }
   | {
+      type: "action-fired";
+      playerId: DuelPlayerId;
+      actionId: string;
+    }
+  | {
       type: "offer-expired";
       playerId: DuelPlayerId;
       targetInstanceId: string;
@@ -1445,6 +1450,13 @@ export class DuelEngine {
           player.id,
           events,
         );
+      }
+      if (action.category === "attack") {
+        events.push({
+          type: "action-fired",
+          playerId: player.id,
+          actionId: action.id,
+        });
       }
     }
 

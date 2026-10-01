@@ -566,6 +566,57 @@ describe("Duel M-DUEL-11 authority core", () => {
     );
   });
 
+  it("projects instant attack fire to both players without exposing the private offer id", () => {
+    const events: DuelEngineEvent[] = [
+      {
+        type: "action-completed",
+        playerId: "player-1",
+        targetInstanceId: "private-offer:laser:7",
+        actionId: "laser",
+      },
+      {
+        type: "action-fired",
+        playerId: "player-1",
+        actionId: "laser",
+      },
+    ];
+
+    const owner = projectDuelEventsForPlayer(
+      events,
+      "player-1",
+    );
+    const opponent = projectDuelEventsForPlayer(
+      events,
+      "player-2",
+    );
+
+    expect(owner).toContainEqual(
+      expect.objectContaining({
+        type: "action-completed",
+        targetInstanceId: "private-offer:laser:7",
+      }),
+    );
+    expect(owner).toContainEqual({
+      type: "action-fired",
+      playerId: "player-1",
+      actionId: "laser",
+    });
+
+    expect(opponent).not.toContainEqual(
+      expect.objectContaining({
+        type: "action-completed",
+      }),
+    );
+    expect(opponent).toContainEqual({
+      type: "action-fired",
+      playerId: "player-1",
+      actionId: "laser",
+    });
+    expect(JSON.stringify(opponent)).not.toContain(
+      "private-offer:laser:7",
+    );
+  });
+
   it("projects banked, combo and reveal information only to its owner", () => {
     const events: DuelEngineEvent[] = [
       {

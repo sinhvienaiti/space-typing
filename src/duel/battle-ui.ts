@@ -116,6 +116,7 @@ function eventSourcePlayer(
 ): DuelPlayerId | null {
   switch (event.type) {
     case "action-completed":
+    case "action-fired":
     case "stored-action-used":
     case "combo-used":
       return event.playerId;
@@ -384,6 +385,8 @@ function eventLabel(event: DuelClientEvent): string {
       return "Typing miss · " + event.char.toUpperCase();
     case "action-completed":
       return "Action complete · " + event.actionId;
+    case "action-fired":
+      return "FIRE · " + event.actionId;
     case "offer-expired":
       return "Offer expired · " + event.actionId;
     case "action-banked":
@@ -1221,14 +1224,8 @@ export function installDuelBattleUi(
     const source = eventSourcePlayer(event);
     if (source === null) return;
 
-    if (event.type === "action-completed") {
-      const action = actionDefinition(event.actionId);
-      if (
-        action?.category === "attack" &&
-        action.resolveMode === "instant"
-      ) {
-        spawnProjectile(source, "standard");
-      }
+    if (event.type === "action-fired") {
+      spawnProjectile(source, "standard");
       return;
     }
 

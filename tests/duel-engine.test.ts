@@ -39,6 +39,47 @@ function typeWord(
   }
 }
 
+describe("DuelEngine visible action presentation", () => {
+  it("emits a public fire signal for an instant attack", () => {
+    const engine = new DuelEngine({
+      maxShield: 0,
+      startingShield: 0,
+      startingEnergy: 100,
+    });
+    engine.setPrivateOffers("player-1", [
+      offer("player-1", 0, "laser"),
+    ]);
+
+    typeWord(engine, "player-1", 1, "laser");
+    const events = engine.step(0);
+
+    expect(events).toContainEqual({
+      type: "action-fired",
+      playerId: "player-1",
+      actionId: "laser",
+    });
+  });
+
+  it("does not expose banked attacks as fired before USE_ITEM", () => {
+    const engine = new DuelEngine({
+      startingEnergy: 100,
+    });
+    engine.setPrivateOffers("player-1", [
+      offer("player-1", 0, "missile"),
+    ]);
+
+    typeWord(engine, "player-1", 1, "missile");
+    const events = engine.step(0);
+
+    expect(
+      events.some((event) => event.type === "action-fired"),
+    ).toBe(false);
+    expect(
+      events.some((event) => event.type === "action-banked"),
+    ).toBe(true);
+  });
+});
+
 describe("DuelEngine M-DUEL-01 local simulation", () => {
   it("tracks simultaneous typing for two logical players in one tick batch", () => {
     const engine = new DuelEngine();
