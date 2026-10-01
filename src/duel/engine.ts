@@ -1356,6 +1356,12 @@ export class DuelEngine {
           player.targetMistakes,
         ).scale,
       );
+      if (action.effectId === "scan") {
+        this.revealMysteryIntelForScan(
+          player.id,
+          events,
+        );
+      }
     }
 
     this.triggerOpponentTrap(
@@ -1509,6 +1515,30 @@ export class DuelEngine {
     });
   }
 
+  private revealMysteryIntelForScan(
+    playerId: DuelPlayerId,
+    events: DuelEngineEvent[],
+  ): void {
+    let mystery = this.chance
+      .publicMysteries()
+      .find((candidate) => !candidate.resolved);
+    if (mystery === undefined) {
+      mystery = this.chance.createMystery(this.phase());
+      events.push({ type: "mystery-created", mystery });
+    }
+    const reveal = this.chance.revealMystery(
+      mystery.id,
+      "category",
+    );
+    if (reveal !== null) {
+      events.push({
+        type: "mystery-revealed",
+        playerId,
+        reveal,
+      });
+    }
+  }
+
   private queueSpecialActionResolution(
     action: DuelActionDefinition,
     playerId: DuelPlayerId,
@@ -1533,8 +1563,13 @@ export class DuelEngine {
     }
 
     if (action.effectId === "mystery-black-hole") {
-      const mystery = this.chance.createMystery(this.phase());
-      events.push({ type: "mystery-created", mystery });
+      let mystery = this.chance
+        .publicMysteries()
+        .find((candidate) => !candidate.resolved);
+      if (mystery === undefined) {
+        mystery = this.chance.createMystery(this.phase());
+        events.push({ type: "mystery-created", mystery });
+      }
       const outcome = this.chance.resolveMystery(mystery.id);
       if (outcome !== null) {
         this.appendMysteryOutcomeEffects(

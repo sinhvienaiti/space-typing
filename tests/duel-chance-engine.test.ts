@@ -6,6 +6,7 @@ function completeOffer(
   engine: DuelEngine,
   actionId: string,
   answerToken: string,
+  startSequence = 1,
 ): ReturnType<DuelEngine["step"]> {
   const offer: DuelActionOffer = {
     instanceId: "player-1:0:" + actionId,
@@ -20,10 +21,10 @@ function completeOffer(
   engine.enqueueIntent({
     type: "SELECT_TARGET",
     playerId: "player-1",
-    sequence: 1,
+    sequence: startSequence,
     targetInstanceId: offer.instanceId,
   });
-  let sequence = 2;
+  let sequence = startSequence + 1;
   for (const char of answerToken) {
     engine.enqueueIntent({
       type: "TYPE_CHAR",
@@ -311,6 +312,61 @@ describe("DuelEngine M-DUEL-05 chance integration", () => {
         engine.snapshot().players["player-2"].hull,
       ).toBeGreaterThan(0);
     }
+  });
+
+  it("makes SCAN reveal Mystery category before BLACK HOLE resolves the same signal", () => {
+    const engine = new DuelEngine({
+      matchSeed: 440,
+      startingEnergy: 100,
+    });
+
+    const scanEvents = completeOffer(
+      engine,
+      "scan",
+      "scan",
+      1,
+    );
+    const created = scanEvents.find(
+      (event) => event.type === "mystery-created",
+    );
+    const revealed = scanEvents.find(
+      (event) => event.type === "mystery-revealed",
+    );
+    expect(created?.type).toBe("mystery-created");
+    expect(revealed?.type).toBe("mystery-revealed");
+    if (
+      created?.type !== "mystery-created" ||
+      revealed?.type !== "mystery-revealed"
+    ) {
+      throw new Error("SCAN did not create and reveal Mystery intel.");
+    }
+    expect(revealed.reveal.category).toBeDefined();
+    expect(revealed.reveal.outcomeId).toBeUndefined();
+    expect(
+      engine.snapshot().chance.mysteries[0]?.resolved,
+    ).toBe(false);
+
+    const mysteryId = created.mystery.id;
+    const blackHoleEvents = completeOffer(
+      engine,
+      "black-hole",
+      "blackhole",
+      6,
+    );
+    expect(blackHoleEvents).toContainEqual(
+      expect.objectContaining({
+        type: "mystery-resolved",
+        mysteryId,
+      }),
+    );
+    expect(
+      blackHoleEvents.filter(
+        (event) => event.type === "mystery-created",
+      ),
+    ).toHaveLength(0);
+    expect(
+      engine.snapshot().chance.mysteries[0]?.resolved,
+    ).toBe(true);
   });
 
   it("routes a drafted Fate word into the authoritative Fate runtime", () => {
