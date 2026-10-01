@@ -122,4 +122,23 @@ describe("Duel battle DOM contract", () => {
       ".duel-projectile-arrival",
     );
   });
+
+  it("renders tactical actions on their actual combat target or arena", () => {
+    const source = read("../src/duel/battle-ui.ts");
+    const css = read("../src/duel/battle.css");
+
+    expect(source).toContain("spawnTacticalActionFx");
+    expect(source).toContain(
+      'effectId === "lock-on" || effectId === "scan"',
+    );
+    expect(source).toContain(
+      'effectId === "gravity-well"',
+    );
+    expect(source).toContain(
+      'effectId === "disrupt"',
+    );
+    expect(css).toContain(".duel-tactical-reticle");
+    expect(css).toContain(".duel-tactical-gravity-well");
+    expect(css).toContain(".duel-tactical-disrupt");
+  });
 });
