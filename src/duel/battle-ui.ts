@@ -588,6 +588,25 @@ export function installDuelBattleUi(
   const offerLayoutAssignments = new Map<string, number>();
   const performanceMonitor =
     new DuelPerformanceMonitor();
+  const presentationTimers = new Set<number>();
+
+  const clearPresentationTimers = (): void => {
+    for (const timer of presentationTimers) {
+      window.clearTimeout(timer);
+    }
+    presentationTimers.clear();
+  };
+
+  const schedulePresentation = (
+    callback: () => void,
+    delayMs: number,
+  ): void => {
+    const timer = window.setTimeout(() => {
+      presentationTimers.delete(timer);
+      if (active) callback();
+    }, Math.max(0, delayMs));
+    presentationTimers.add(timer);
+  };
 
   const appendTransientFx = (node: HTMLElement): void => {
     while (
@@ -1982,9 +2001,10 @@ export function installDuelBattleUi(
       "--duel-projectile-x",
       String(lane) + "%",
     );
+    const travelMs = Math.round(720 / speedScale);
     projectile.style.setProperty(
       "--duel-projectile-duration",
-      String(Math.round(720 / speedScale)) + "ms",
+      String(travelMs) + "ms",
     );
     projectile.style.setProperty(
       "--duel-shot-primary",
@@ -2005,8 +2025,7 @@ export function installDuelBattleUi(
     projectile.dataset.archetype =
       projectileProfile.archetype;
     nodes.projectiles.append(projectile);
-    projectile.addEventListener(
-      "animationend",
+    schedulePresentation(
       () => {
         spawnProjectileArrival(
           fromSelf ? "opponent" : "self",
@@ -2014,6 +2033,11 @@ export function installDuelBattleUi(
         );
         projectile.remove();
       },
+      travelMs,
+    );
+    projectile.addEventListener(
+      "animationend",
+      () => projectile.remove(),
       { once: true },
     );
   };
@@ -2408,6 +2432,7 @@ export function installDuelBattleUi(
             nextView.self.acquisitionPrefix,
           pendingSequences: [],
         };
+        clearPresentationTimers();
         nodes.eventFeed.replaceChildren();
         nodes.projectiles.replaceChildren();
         nodes.typingFx.replaceChildren();
@@ -2474,6 +2499,7 @@ export function installDuelBattleUi(
     hide() {
       active = false;
       paintedVfxGeneration += 1;
+      clearPresentationTimers();
       stopPerformanceLoop();
       nodes.root.classList.add("hidden");
       gameShell.classList.remove(
