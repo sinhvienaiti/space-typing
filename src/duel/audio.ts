@@ -21,17 +21,56 @@ export const DUEL_AUDIO_WORLD_SOURCE: Readonly<
   "celestial-void": "world-09",
 });
 
+const DUEL_MUSIC_ASSETS = Object.freeze({
+  calm: {
+    id: "duel-nebula-calm",
+    defaultPath:
+      "/assets/audio/duel/music/duel-nebula-calm.ogg",
+  },
+  intense: {
+    id: "duel-combat-intense",
+    defaultPath:
+      "/assets/audio/duel/music/duel-combat-intense.ogg",
+  },
+  cataclysm: {
+    id: "duel-cataclysm",
+    defaultPath:
+      "/assets/audio/duel/music/duel-cataclysm.ogg",
+  },
+});
+
 export function duelMusicProfileForMap(
   mapId: DuelMapId,
 ): WorldMusicProfile {
   const source = musicProfileForWorld(
     DUEL_AUDIO_WORLD_SOURCE[mapId],
   );
+  const profileId = duelMapProfile(mapId).audioProfileId;
   return {
     ...source,
-    id: duelMapProfile(mapId).audioProfileId,
+    id: profileId,
+    // Duel uses its own media pack rather than inheriting a campaign
+    // playlist. An isolated world id intentionally yields no song-library
+    // playlist, so MusicController resolves the profile assets below.
+    worldId: "duel-" + mapId,
+    baseTrack: {
+      ...DUEL_MUSIC_ASSETS.calm,
+      id: profileId + ":calm",
+    },
+    intenseTrackOrLayer: {
+      ...DUEL_MUSIC_ASSETS.intense,
+      id: profileId + ":intense",
+    },
+    galaxyBossTrack: {
+      ...DUEL_MUSIC_ASSETS.cataclysm,
+      id: profileId + ":cataclysm",
+    },
     ambientLayers: [...source.ambientLayers],
-    preloadHints: [...source.preloadHints],
+    preloadHints: [
+      DUEL_MUSIC_ASSETS.calm,
+      DUEL_MUSIC_ASSETS.intense,
+      DUEL_MUSIC_ASSETS.cataclysm,
+    ],
     duckingProfile: {
       ...source.duckingProfile,
     },
@@ -47,8 +86,9 @@ export function duelMusicStateForPhase(
       return "WORLD_NORMAL";
     case "war":
     case "crisis":
-    case "cataclysm":
       return "WORLD_INTENSE";
+    case "cataclysm":
+      return "GALAXY_BOSS";
   }
 }
 
