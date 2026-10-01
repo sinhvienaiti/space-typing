@@ -3,6 +3,7 @@ import {
   DUEL_COMBO_RECIPES,
   DuelStrategySystem,
   duelComboEffect,
+  duelStrategyCategoryMultiplier,
 } from "../src/duel/strategy";
 import { DUEL_ACTIONS_BY_ID } from "../src/duel/actions";
 
@@ -111,6 +112,25 @@ describe("Duel M-DUEL-08 strategy core", () => {
     strategy.update(8.1);
     expect(strategy.attackScale("player-1")).toBe(1);
     expect(strategy.defenseScale("player-1")).toBe(1);
+  });
+
+  it("turns adaptive paths into bounded draft affinity instead of a hard lock", () => {
+    expect(duelStrategyCategoryMultiplier("balanced")).toEqual({});
+    expect(
+      duelStrategyCategoryMultiplier("arsenal").attack,
+    ).toBeGreaterThan(1);
+    expect(
+      duelStrategyCategoryMultiplier("fortress").defense,
+    ).toBeGreaterThan(1);
+    expect(
+      duelStrategyCategoryMultiplier("tactician").tactical,
+    ).toBeGreaterThan(1);
+    expect(
+      duelStrategyCategoryMultiplier("chaos").mystery,
+    ).toBeGreaterThan(1);
+    expect(
+      duelStrategyCategoryMultiplier("chaos").mystery,
+    ).toBeLessThan(1.5);
   });
 
   it("derives adaptive strategy paths from actual action choices", () => {

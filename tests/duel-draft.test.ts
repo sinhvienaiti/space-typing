@@ -93,6 +93,40 @@ describe("Duel M-DUEL-03 core word draft", () => {
     expect(new Set(initials).size).toBeGreaterThanOrEqual(4);
   });
 
+  it("lets runtime strategy affinity bias a refill without replacing phase rules", () => {
+    const actions = [
+      DUEL_ACTIONS_BY_ID.get("laser")!,
+      DUEL_ACTIONS_BY_ID.get("scan")!,
+    ];
+    const base = new DuelOfferDraft({
+      seed: 9,
+      actions,
+      enabledCategories: ["attack", "tactical"],
+    });
+    const tactical = new DuelOfferDraft({
+      seed: 9,
+      actions,
+      enabledCategories: ["attack", "tactical"],
+    });
+
+    const baseOffer = base.refillPrivateOffer(
+      "player-1",
+      0,
+      "war",
+      [],
+    );
+    const tacticalOffer = tactical.refillPrivateOffer(
+      "player-1",
+      0,
+      "war",
+      [],
+      { attack: 0, tactical: 1 },
+    );
+
+    expect(baseOffer).not.toBeNull();
+    expect(tacticalOffer?.actionId).toBe("scan");
+  });
+
   it("refills a specific slot deterministically after completion", () => {
     const draft = new DuelOfferDraft({ seed: 42 });
     const offers = draft.dealPrivateOffers("player-1", "build");

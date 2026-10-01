@@ -171,6 +171,9 @@ export class DuelOfferDraft {
     slotIndex: number,
     phase: DuelMatchPhase,
     existingOffers: readonly DuelActionOffer[],
+    runtimeCategoryMultiplier: Partial<
+      Readonly<Record<DuelActionCategory, number>>
+    > = {},
   ): DuelActionOffer | null {
     const existingActionIds = new Set(
       existingOffers
@@ -213,6 +216,7 @@ export class DuelOfferDraft {
       source,
       phase,
       existingInitials,
+      runtimeCategoryMultiplier,
     );
     const action = this.pick(weighted);
 
@@ -237,11 +241,22 @@ export class DuelOfferDraft {
     actions: readonly DuelActionDefinition[],
     phase: DuelMatchPhase,
     usedInitials: ReadonlySet<string>,
+    runtimeCategoryMultiplier: Partial<
+      Readonly<Record<DuelActionCategory, number>>
+    >,
   ): WeightedAction[] {
+    const combinedMultiplier: Partial<
+      Record<DuelActionCategory, number>
+    > = {};
+    for (const category of this.enabledCategories) {
+      combinedMultiplier[category] =
+        (this.categoryMultiplier[category] ?? 1) *
+        (runtimeCategoryMultiplier[category] ?? 1);
+    }
     const normalized = normalizedDuelCategoryWeights(
       phase,
       this.enabledCategories,
-      this.categoryMultiplier,
+      combinedMultiplier,
     );
     return actions.map((action) => {
       const base = Math.max(0.0001, normalized[action.category]);

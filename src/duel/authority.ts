@@ -8,6 +8,7 @@ import {
   type DuelBotConfig,
 } from "./bots";
 import { DuelOfferDraft } from "./draft";
+import { duelStrategyCategoryMultiplier } from "./strategy";
 import {
   DuelEngine,
   type DuelEngineEvent,
@@ -1741,6 +1742,9 @@ export class DuelAuthorityService {
                 offer.slotIndex !== slotIndex &&
                 (offer.status === "available" ||
                   offer.status === "locked"),
+            ),
+            duelStrategyCategoryMultiplier(
+              snapshot.strategy[playerId].path,
             ),
           );
         if (refill === null) continue;

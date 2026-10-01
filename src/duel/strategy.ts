@@ -93,6 +93,23 @@ type MutablePlayer = {
   modifierSeconds: number;
 };
 
+export function duelStrategyCategoryMultiplier(
+  path: DuelStrategyPath,
+): Partial<Readonly<Record<DuelActionCategory, number>>> {
+  switch (path) {
+    case "arsenal":
+      return { attack: 1.2, support: 1.05 };
+    case "fortress":
+      return { defense: 1.2, support: 1.08 };
+    case "tactician":
+      return { tactical: 1.25, support: 1.04 };
+    case "chaos":
+      return { fate: 1.22, mystery: 1.28 };
+    case "balanced":
+      return {};
+  }
+}
+
 export const DUEL_COMBO_RECIPES: readonly ComboRecipe[] = [
   {
     id: "homing-barrage",

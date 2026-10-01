@@ -11,6 +11,7 @@ import type {
   DuelClientMatchView,
 } from "./authority";
 import { DuelOfferDraft } from "./draft";
+import { duelStrategyCategoryMultiplier } from "./strategy";
 import {
   DuelEngine,
   type DuelEngineEvent,
@@ -415,6 +416,9 @@ export class DuelLocalPracticeMatch {
                 offer.slotIndex !== slotIndex &&
                 (offer.status === "available" ||
                   offer.status === "locked"),
+            ),
+            duelStrategyCategoryMultiplier(
+              snapshot.strategy[playerId].path,
             ),
           );
         if (refill === null) continue;
