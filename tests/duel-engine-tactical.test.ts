@@ -294,7 +294,7 @@ describe("DuelEngine M-DUEL-04 integration", () => {
     typeTarget(
       engine,
       "player-1",
-      siege,
+      siege.instanceId,
       "siegelance",
       1,
     );
