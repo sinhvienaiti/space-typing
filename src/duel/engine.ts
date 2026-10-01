@@ -82,6 +82,7 @@ import {
   duelPrecisionDamageScale,
   duelPrecisionMilestone,
   type DuelPrecisionAccuracyTier,
+  type DuelPrecisionBonus,
   type DuelPrecisionOrdnance,
 } from "./precision-firepower";
 
@@ -101,6 +102,7 @@ export type DuelPlayerState = {
   correctChars: number;
   wrongChars: number;
   precisionStreak: number;
+  precisionBonus: DuelPrecisionBonus | null;
   lastAcceptedSequence: number;
   targetInstanceId: string | null;
   acquisitionPrefix: string;
@@ -201,7 +203,16 @@ export type DuelEngineEvent =
       streak: number;
       ordnance: DuelPrecisionOrdnance;
       accuracyTier: DuelPrecisionAccuracyTier;
-      damage: number;
+      bonusDamage: number;
+    }
+  | {
+      type: "precision-firepower-fired";
+      playerId: DuelPlayerId;
+      actionId: string;
+      streak: number;
+      ordnance: DuelPrecisionOrdnance;
+      accuracyTier: DuelPrecisionAccuracyTier;
+      bonusDamage: number;
     }
   | {
       type: "offer-expired";
@@ -365,6 +376,7 @@ function createPlayer(
     correctChars: 0,
     wrongChars: 0,
     precisionStreak: 0,
+    precisionBonus: null,
     lastAcceptedSequence: -1,
     targetInstanceId: null,
     acquisitionPrefix: "",
@@ -685,23 +697,34 @@ export class DuelEngine {
               : 1,
           ),
         );
+        let precisionApplied = false;
         this.pendingEffects.push(
           ...resolution.effects
             .filter((effect) => effect.type !== "energy-cost")
-            .map((effect) =>
-              effect.type === "damage" &&
-              effect.sourceId === threatEvent.sourcePlayerId
-                ? {
-                    ...effect,
-                    amount:
-                      effect.amount *
+            .map((effect) => {
+              if (
+                effect.type === "damage" &&
+                effect.sourceId === threatEvent.sourcePlayerId
+              ) {
+                const bonus =
+                  threatEvent.precisionBonus !== null &&
+                  !precisionApplied
+                    ? threatEvent.precisionBonus.bonusDamage
+                    : 0;
+                if (bonus > 0) precisionApplied = true;
+                return {
+                  ...effect,
+                  amount:
+                    effect.amount *
                       this.strategy.attackScale(
                         threatEvent.sourcePlayerId,
                       ) *
-                      quality,
-                  }
-                : effect,
-            ),
+                      quality +
+                    bonus,
+                };
+              }
+              return effect;
+            }),
         );
         for (const effect of resolution.tacticalEffects) {
           this.tactical.apply({
@@ -717,6 +740,12 @@ export class DuelEngine {
         targetPlayerId: threatEvent.targetPlayerId,
         actionId: threatEvent.actionId,
       });
+      this.pushPrecisionFiredEvent(
+        events,
+        threatEvent.sourcePlayerId,
+        threatEvent.actionId,
+        threatEvent.precisionBonus,
+      );
     }
 
     this.applyEffectsToPlayers(this.pendingEffects);
@@ -1222,25 +1251,49 @@ export class DuelEngine {
       player.correctChars,
       player.wrongChars,
     );
-    const damage =
+    const bonusDamage =
       milestone.baseDamage *
       duelPrecisionDamageScale(accuracyTier);
-    const targetId =
-      player.id === "player-1" ? "player-2" : "player-1";
-
-    this.pendingEffects.push({
-      type: "damage",
-      targetId,
-      sourceId: player.id,
-      amount: damage,
-    });
+    player.precisionBonus = {
+      streak: milestone.streak,
+      ordnance: milestone.ordnance,
+      accuracyTier,
+      bonusDamage,
+    };
     events.push({
       type: "precision-firepower",
       playerId: player.id,
       streak: milestone.streak,
       ordnance: milestone.ordnance,
       accuracyTier,
-      damage,
+      bonusDamage,
+    });
+  }
+
+  private consumePrecisionBonus(
+    playerId: DuelPlayerId,
+  ): DuelPrecisionBonus | null {
+    const player = this.players[playerId];
+    const bonus = player.precisionBonus;
+    player.precisionBonus = null;
+    return bonus === null ? null : { ...bonus };
+  }
+
+  private pushPrecisionFiredEvent(
+    events: DuelEngineEvent[],
+    playerId: DuelPlayerId,
+    actionId: string,
+    bonus: DuelPrecisionBonus | null,
+  ): void {
+    if (bonus === null) return;
+    events.push({
+      type: "precision-firepower-fired",
+      playerId,
+      actionId,
+      streak: bonus.streak,
+      ordnance: bonus.ordnance,
+      accuracyTier: bonus.accuracyTier,
+      bonusDamage: bonus.bonusDamage,
     });
   }
 
@@ -1557,6 +1610,10 @@ export class DuelEngine {
       const projectileSpeedScale =
         this.tactical.snapshot()
           .projectileSpeedScale[player.id];
+      const precisionBonus =
+        action.category === "attack"
+          ? this.consumePrecisionBonus(player.id)
+          : null;
       const threat = this.threats.create(
         action,
         player.id,
@@ -1572,6 +1629,7 @@ export class DuelEngine {
         duelActionQualityForMistakes(
           player.targetMistakes,
         ).scale,
+        precisionBonus,
       );
       if (threat !== null) {
         this.pendingEffects.push({
@@ -1591,13 +1649,14 @@ export class DuelEngine {
         events,
       )
     ) {
-      this.queueActionResolution(
-        action,
-        player.id,
-        duelActionQualityForMistakes(
-          player.targetMistakes,
-        ).scale,
-      );
+      const precisionBonus =
+        this.queueActionResolution(
+          action,
+          player.id,
+          duelActionQualityForMistakes(
+            player.targetMistakes,
+          ).scale,
+        );
       if (action.effectId === "scan") {
         this.revealMysteryIntelForScan(
           player.id,
@@ -1611,6 +1670,12 @@ export class DuelEngine {
           actionId: action.id,
         });
       }
+      this.pushPrecisionFiredEvent(
+        events,
+        player.id,
+        action.id,
+        precisionBonus,
+      );
     }
 
     this.triggerOpponentTrap(
@@ -1685,11 +1750,12 @@ export class DuelEngine {
       return;
     }
 
-    this.queueActionResolution(
-      action,
-      player.id,
-      stored.qualityScale,
-    );
+    const precisionBonus =
+      this.queueActionResolution(
+        action,
+        player.id,
+        stored.qualityScale,
+      );
     this.triggerOpponentTrap(
       player.id,
       action,
@@ -1706,6 +1772,12 @@ export class DuelEngine {
       actionId,
       storedInstanceId: stored.instanceId,
     });
+    this.pushPrecisionFiredEvent(
+      events,
+      player.id,
+      action.id,
+      precisionBonus,
+    );
   }
 
   private triggerOpponentTrap(
@@ -1843,7 +1915,7 @@ export class DuelEngine {
     action: DuelActionDefinition,
     playerId: DuelPlayerId,
     qualityScale = 1,
-  ): void {
+  ): DuelPrecisionBonus | null {
     this.reserveEnergy(playerId, action.energyCost);
     const resolution = resolveDuelAction(action, playerId);
     const attackScale = this.strategy.attackScale(playerId);
@@ -1851,15 +1923,27 @@ export class DuelEngine {
       0.75,
       Math.min(1, Number.isFinite(qualityScale) ? qualityScale : 1),
     );
+    const precisionBonus =
+      action.category === "attack"
+        ? this.consumePrecisionBonus(playerId)
+        : null;
+    let precisionApplied = false;
     this.pendingEffects.push(
       ...resolution.effects.map((effect) => {
         if (
           effect.type === "damage" &&
           effect.sourceId === playerId
         ) {
+          const bonus =
+            precisionBonus !== null && !precisionApplied
+              ? precisionBonus.bonusDamage
+              : 0;
+          if (bonus > 0) precisionApplied = true;
           return {
             ...effect,
-            amount: effect.amount * attackScale * quality,
+            amount:
+              effect.amount * attackScale * quality +
+              bonus,
           };
         }
         if (
@@ -1879,6 +1963,7 @@ export class DuelEngine {
         strength: effect.strength * quality,
       });
     }
+    return precisionBonus;
   }
 
   private canFinalizeAction(
