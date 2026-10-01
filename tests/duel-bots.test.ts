@@ -163,7 +163,6 @@ describe("DuelBot M-DUEL-02", () => {
             counterTags: ["intercept"],
             remainingSeconds: 2.8,
             effectScale: 1,
-            precisionBonus: null,
             status: "open",
           },
         ],
