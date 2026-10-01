@@ -349,11 +349,87 @@ describe("Duel M-DUEL-11 authority core", () => {
     });
     expect(serialized).not.toContain("matchSeed");
     expect(serialized).not.toContain("fixedSeed");
+    expect(
+      view.value.self.offers.every(
+        (offer) => offer.typingPrompt !== undefined,
+      ),
+    ).toBe(true);
+    const privateTokens = view.value.self.offers.map(
+      (offer) => offer.typingPrompt!.answerToken,
+    );
+    const opponentJson = JSON.stringify(view.value.opponent);
+    for (const token of privateTokens) {
+      expect(opponentJson).not.toContain(token);
+    }
+
     expect(Array.isArray(view.value.shared.pendingHazards)).toBe(true);
     for (const mystery of view.value.shared.mysteries) {
       expect("outcomeId" in mystery).toBe(false);
       expect("category" in mystery).toBe(false);
     }
+  });
+
+  it("keeps authority-issued private prompts stable across reconnect", () => {
+    const authority = new DuelAuthorityService(deps(), {
+      reconnectGraceMs: 5000,
+    });
+    const host = open(authority, "prompt-owner");
+    const room = createRoom(authority, host.sessionId);
+    authority.setBot(
+      host.sessionId,
+      room.roomId,
+      {
+        wpm: 55,
+        accuracy: 0.94,
+        reactionMs: 320,
+        personality: "balanced",
+      },
+      1,
+    );
+    authority.setReady(
+      host.sessionId,
+      room.roomId,
+      true,
+      2,
+    );
+    const started = authority.startMatch(
+      host.sessionId,
+      room.roomId,
+      3,
+    );
+    if (!started.ok) throw new Error(started.message);
+
+    const before = authority.clientMatchView(
+      host.sessionId,
+      started.value.matchId,
+    );
+    if (!before.ok) throw new Error(before.message);
+    const promptsBefore = before.value.self.offers.map(
+      (offer) => offer.typingPrompt,
+    );
+
+    authority.disconnect(host.sessionId, 100);
+    const reconnected = authority.openSession({
+      protocolVersion: DUEL_PROTOCOL_VERSION,
+      sessionToken: "auth:prompt-owner",
+      reconnectToken: host.reconnectToken,
+      now: 200,
+    });
+    if (!reconnected.ok) {
+      throw new Error(reconnected.message);
+    }
+
+    const after = authority.clientMatchView(
+      reconnected.value.sessionId,
+      started.value.matchId,
+    );
+    if (!after.ok) throw new Error(after.message);
+
+    expect(
+      after.value.self.offers.map(
+        (offer) => offer.typingPrompt,
+      ),
+    ).toEqual(promptsBefore);
   });
 
   it("authoritatively refills expired private offers for online Practice/Friend matches", () => {
