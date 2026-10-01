@@ -238,7 +238,11 @@ export class DuelLocalPracticeMatch {
       dtSeconds,
       duelBotObservation({
         phase: snapshot.phase,
-        self: snapshot.players["player-2"],
+        self: {
+          ...snapshot.players["player-2"],
+          cooldowns:
+            snapshot.cooldowns["player-2"],
+        },
         opponent: snapshot.players["player-1"],
       }),
     )) {

@@ -65,6 +65,10 @@ import {
   type DuelIncomingThreat,
 } from "./threats";
 import { matchingDuelOffers } from "./typing";
+import {
+  DuelCooldownState,
+  type DuelCooldownSnapshot,
+} from "./cooldowns";
 
 export type DuelRoundResult =
   | { status: "active"; winnerId: null }
@@ -100,6 +104,9 @@ export type DuelEngineSnapshot = {
   incomingThreats: Readonly<
     Record<DuelPlayerId, readonly DuelIncomingThreat[]>
   >;
+  cooldowns: Readonly<
+    Record<DuelPlayerId, DuelCooldownSnapshot>
+  >;
   tactical: DuelTacticalMapSnapshot;
   chance: {
     pity: Readonly<Record<DuelPlayerId, number>>;
@@ -126,7 +133,8 @@ export type DuelEngineEvent =
         | "target-unavailable"
         | "item-unavailable"
         | "skill-unavailable"
-        | "insufficient-energy";
+        | "insufficient-energy"
+        | "action-cooldown";
     }
   | {
       type: "target-locked";
@@ -148,7 +156,10 @@ export type DuelEngineEvent =
       playerId: DuelPlayerId;
       targetInstanceId: string;
       actionId: string;
-      reason: "inventory-full" | "insufficient-energy";
+      reason:
+        | "inventory-full"
+        | "insufficient-energy"
+        | "cooldown";
     }
   | {
       type: "action-completed";
@@ -328,6 +339,7 @@ export class DuelEngine {
     "player-2": new DuelCombatInventory(),
   };
   private readonly threats = new DuelThreatSystem();
+  private readonly cooldowns = new DuelCooldownState();
   private readonly tactical = new DuelTacticalMapState();
   private readonly strategy = new DuelStrategySystem();
   private readonly objectives = new DuelNeutralObjectiveSystem();
@@ -390,6 +402,7 @@ export class DuelEngine {
     this.reservedEnergyCost["player-1"] = 0;
     this.reservedEnergyCost["player-2"] = 0;
     this.threats.clear();
+    this.cooldowns.clear();
     this.tactical.clear();
     this.strategy.resetRound();
     this.objectives.resetRound();
@@ -451,6 +464,7 @@ export class DuelEngine {
     this.pendingEffects.length = 0;
     this.reservedEnergyCost["player-1"] = 0;
     this.reservedEnergyCost["player-2"] = 0;
+    this.cooldowns.update(dt);
     this.tactical.update(dt);
     this.strategy.update(dt);
     const directorEvents = this.director.update(dt, this.phase());
@@ -604,6 +618,14 @@ export class DuelEngine {
     const resolution = this.chance.rollFate(playerId);
     const effects: DuelCombatEffect[] = [];
     this.appendFateEffects(resolution, effects);
+    const cooldownReduction =
+      resolution.outcome.cooldownReductionSeconds ?? 0;
+    if (cooldownReduction > 0) {
+      this.cooldowns.reduce(
+        playerId,
+        cooldownReduction,
+      );
+    }
     this.applyEffectsToPlayers(effects);
     const events: DuelEngineEvent[] = [
       { type: "fate-resolved", resolution },
@@ -749,6 +771,10 @@ export class DuelEngine {
       incomingThreats: {
         "player-1": this.threats.snapshotFor("player-1"),
         "player-2": this.threats.snapshotFor("player-2"),
+      },
+      cooldowns: {
+        "player-1": this.cooldowns.snapshotFor("player-1"),
+        "player-2": this.cooldowns.snapshotFor("player-2"),
       },
       tactical: this.tactical.snapshot(),
       chance: {
@@ -1044,7 +1070,7 @@ export class DuelEngine {
     const nextPrefix = player.acquisitionPrefix + char;
     const matches = matchingDuelOffers(
       nextPrefix,
-      player.offers,
+      this.availableOffersForTyping(player),
       this.actions,
     );
     if (matches.length === 0) {
@@ -1296,6 +1322,11 @@ export class DuelEngine {
       this.queueActionResolution(action, player.id);
     }
 
+    this.cooldowns.activate(
+      player.id,
+      action.id,
+      action.cooldownSeconds,
+    );
     offer.status = "completed";
     events.push({
       type: "action-completed",
@@ -1327,6 +1358,15 @@ export class DuelEngine {
       });
       return;
     }
+    if (!this.cooldowns.isReady(player.id, action.id)) {
+      events.push({
+        type: "intent-rejected",
+        playerId: player.id,
+        sequence: player.lastAcceptedSequence,
+        reason: "action-cooldown",
+      });
+      return;
+    }
     if (!this.hasEnergy(player.id, action.energyCost)) {
       events.push({
         type: "intent-rejected",
@@ -1350,6 +1390,11 @@ export class DuelEngine {
     }
 
     this.queueActionResolution(action, player.id);
+    this.cooldowns.activate(
+      player.id,
+      action.id,
+      action.cooldownSeconds,
+    );
     events.push({
       type: "stored-action-used",
       playerId: player.id,
@@ -1385,18 +1430,30 @@ export class DuelEngine {
     if (action.resolveMode === "banked") {
       return this.inventories[playerId].canStore(action);
     }
-    return this.hasEnergy(playerId, action.energyCost);
+    return (
+      this.cooldowns.isReady(playerId, action.id) &&
+      this.hasEnergy(playerId, action.energyCost)
+    );
   }
 
   private blockReason(
     playerId: DuelPlayerId,
     action: DuelActionDefinition,
-  ): "inventory-full" | "insufficient-energy" {
+  ):
+    | "inventory-full"
+    | "insufficient-energy"
+    | "cooldown" {
     if (
       action.resolveMode === "banked" &&
       !this.inventories[playerId].canStore(action)
     ) {
       return "inventory-full";
+    }
+    if (
+      action.resolveMode === "instant" &&
+      !this.cooldowns.isReady(playerId, action.id)
+    ) {
+      return "cooldown";
     }
     return "insufficient-energy";
   }
@@ -1485,6 +1542,19 @@ export class DuelEngine {
       });
       return;
     }
+    const action = this.actions.get(offer.actionId);
+    if (
+      action?.resolveMode === "instant" &&
+      !this.cooldowns.isReady(player.id, action.id)
+    ) {
+      events.push({
+        type: "intent-rejected",
+        playerId: player.id,
+        sequence: player.lastAcceptedSequence,
+        reason: "action-cooldown",
+      });
+      return;
+    }
     const previous = this.lockedOffer(player);
     if (previous !== null) {
       previous.status = "available";
@@ -1522,6 +1592,22 @@ export class DuelEngine {
       type: "target-cancelled",
       playerId: player.id,
       targetInstanceId,
+    });
+  }
+
+  private availableOffersForTyping(
+    player: DuelPlayerState,
+  ): readonly DuelActionOffer[] {
+    return player.offers.filter((offer) => {
+      if (offer.status !== "available") {
+        return offer.status === "locked";
+      }
+      const action = this.actions.get(offer.actionId);
+      return (
+        action === undefined ||
+        action.resolveMode === "banked" ||
+        this.cooldowns.isReady(player.id, action.id)
+      );
     });
   }
 

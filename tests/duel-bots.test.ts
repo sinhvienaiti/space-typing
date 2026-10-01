@@ -86,6 +86,52 @@ describe("DuelBot M-DUEL-02", () => {
     ).toBe(false);
   });
 
+  it("does not target an action that is on its own authoritative cooldown", () => {
+    const offers = [
+      offer("player-2", 0, "repair"),
+      offer("player-2", 1, "laser"),
+    ];
+    const bot = new DuelBot({
+      playerId: "player-2",
+      wpm: 60,
+      accuracy: 1,
+      reactionMs: 0,
+      personality: "turtle",
+      seed: 17,
+    });
+    const obs = duelBotObservation({
+      phase: "build",
+      self: {
+        hull: 30,
+        maxHull: 100,
+        shield: 0,
+        maxShield: 40,
+        energy: 100,
+        maxEnergy: 100,
+        offers,
+        cooldowns: {
+          repair: 4.5,
+        },
+      },
+      opponent: {
+        hull: 100,
+        maxHull: 100,
+        shield: 20,
+        maxShield: 40,
+        energy: 25,
+        maxEnergy: 100,
+      },
+    });
+
+    const intents = bot.update(0.1, obs);
+    expect(intents[0]).toEqual(
+      expect.objectContaining({
+        type: "SELECT_TARGET",
+        targetInstanceId: offers[1]!.instanceId,
+      }),
+    );
+  });
+
   it("integrates through the exact same DuelEngine intent path as a human", () => {
     const engine = new DuelEngine();
     const offers = [offer("player-2", 0, "repair")];

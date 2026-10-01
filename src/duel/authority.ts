@@ -201,6 +201,7 @@ export type DuelClientMatchView = {
       id: string;
       createdAtTick: number;
     }[];
+    cooldowns: DuelEngineSnapshot["cooldowns"][DuelPlayerId];
     ownPity: number;
   };
   opponent: {
@@ -1976,6 +1977,7 @@ export class DuelAuthorityService {
             id: combo.id,
             createdAtTick: combo.createdAtTick,
           })),
+        cooldowns: snapshot.cooldowns[playerId],
         ownPity: snapshot.chance.pity[playerId],
       },
       opponent: {

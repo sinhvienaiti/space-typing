@@ -39,6 +39,7 @@ export type DuelBotObservation = {
   self: DuelBotPublicPlayer;
   opponent: DuelBotPublicPlayer;
   ownOffers: readonly DuelActionOffer[];
+  ownCooldowns: Readonly<Record<string, number>>;
 };
 
 export type DuelBotMetrics = {
@@ -268,7 +269,11 @@ export class DuelBot {
     observation: DuelBotObservation,
   ): BotTarget | null {
     const candidates = observation.ownOffers
-      .filter((offer) => offer.status === "available")
+      .filter(
+        (offer) =>
+          offer.status === "available" &&
+          (observation.ownCooldowns[offer.actionId] ?? 0) <= 0,
+      )
       .map((offer) => {
         const action = DUEL_ACTIONS_BY_ID.get(offer.actionId);
         return action === undefined ? null : { offer, action };
@@ -378,6 +383,7 @@ export function duelBotObservation(input: {
     energy: number;
     maxEnergy: number;
     offers: readonly DuelActionOffer[];
+    cooldowns?: Readonly<Record<string, number>>;
   };
   opponent: {
     hull: number;
@@ -404,5 +410,6 @@ export function duelBotObservation(input: {
       energyRatio: ratio(input.opponent.energy, input.opponent.maxEnergy),
     },
     ownOffers: input.self.offers.map((offer) => ({ ...offer })),
+    ownCooldowns: { ...(input.self.cooldowns ?? {}) },
   };
 }

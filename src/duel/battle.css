@@ -648,6 +648,15 @@
   opacity: 0.35;
 }
 
+.duel-offer-card.cooling-down {
+  opacity: 0.58;
+  border-color: rgba(121, 173, 205, 0.2);
+}
+
+.duel-offer-card.cooling-down .duel-offer-meta {
+  color: #9bc7db;
+}
+
 .duel-offer-category {
   color: #758b99;
   font-size: 0.56rem;

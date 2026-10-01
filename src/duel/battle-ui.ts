@@ -532,6 +532,8 @@ export function installDuelBattleUi(
     for (const offer of view.self.offers) {
       const action = DUEL_ACTIONS_BY_ID.get(offer.actionId);
       if (action === undefined) continue;
+      const cooldown =
+        view.self.cooldowns[action.id] ?? 0;
       const selected =
         prediction.targetInstanceId === offer.instanceId ||
         view.self.targetInstanceId === offer.instanceId;
@@ -548,10 +550,13 @@ export function installDuelBattleUi(
         "duel-offer-card duel-category-" +
           action.category +
           (selected ? " selected" : "") +
-          (offer.status === "completed" ? " completed" : ""),
+          (offer.status === "completed" ? " completed" : "") +
+          (cooldown > 0 ? " cooling-down" : ""),
       );
       card.type = "button";
-      card.disabled = offer.status === "completed";
+      card.disabled =
+        offer.status === "completed" ||
+        cooldown > 0;
       card.dataset.offerId = offer.instanceId;
 
       const category = createElement(
@@ -575,7 +580,7 @@ export function installDuelBattleUi(
       token.append(typed, remaining);
 
       const meta = createElement("small", "duel-offer-meta");
-      meta.textContent =
+      const baseMeta =
         action.resolveMode === "banked"
           ? "BANK · " + action.typingCostBand
           : action.energyCost > 0
@@ -583,6 +588,10 @@ export function installDuelBattleUi(
               " EN · " +
               action.typingCostBand
             : action.typingCostBand;
+      meta.textContent =
+        cooldown > 0
+          ? cooldown.toFixed(1) + "s CD · " + baseMeta
+          : baseMeta;
 
       card.append(category, label, token, meta);
       card.addEventListener("click", () => {

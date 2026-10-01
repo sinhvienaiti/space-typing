@@ -25,6 +25,7 @@ export type DuelFateOutcome = {
   selfShield: number;
   selfEnergy: number;
   opponentDamage: number;
+  cooldownReductionSeconds?: number;
 };
 
 export type DuelFateResolution = {
@@ -122,6 +123,7 @@ const FATE_OUTCOMES: readonly DuelFateOutcome[] = [
     selfShield: 6,
     selfEnergy: 10,
     opponentDamage: 0,
+    cooldownReductionSeconds: 3,
   },
   {
     id: "prism-barrage",

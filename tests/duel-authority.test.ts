@@ -285,6 +285,10 @@ describe("Duel M-DUEL-11 authority core", () => {
     expect(
       view.value.opponent.revealedInventory,
     ).toBeNull();
+    expect("cooldowns" in view.value.opponent).toBe(false);
+    expect(
+      view.value.self.cooldowns,
+    ).toEqual({});
     expect("pity" in view.value.opponent).toBe(false);
     expect(serialized).not.toContain("matchSeed");
     expect(serialized).not.toContain("fixedSeed");
