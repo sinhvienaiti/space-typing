@@ -47,6 +47,42 @@ function anyNewerThanSentinel(dir, sentinel) {
   return files.some((file) => statSync(file).mtimeMs > outputTime);
 }
 
+function flatPipelineStale(
+  sourceDir,
+  outputDir,
+  sentinel,
+) {
+  const sources = imageFiles(sourceDir);
+  if (sources.length === 0) return false;
+  if (!existsSync(sentinel)) return true;
+
+  const sourceNames = new Set(
+    sources.map((source) =>
+      basename(source, extname(source)),
+    ),
+  );
+  for (const source of sources) {
+    const name = basename(source, extname(source));
+    const output = join(outputDir, name + ".webp");
+    if (isStale(source, [output])) return true;
+  }
+
+  if (existsSync(outputDir)) {
+    const runtimeNames = new Set(
+      readdirSync(outputDir)
+        .filter((name) => extname(name).toLowerCase() === ".webp")
+        .map((name) => basename(name, extname(name))),
+    );
+    if (
+      runtimeNames.size !== sourceNames.size ||
+      [...runtimeNames].some((name) => !sourceNames.has(name))
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function run(script, args = []) {
   const label = relative(ROOT, script);
   console.log("→ " + label + (args.length > 0 ? " " + args.join(" ") : ""));
@@ -87,8 +123,12 @@ for (const [sourceId, kitId] of Object.entries(bgKits)) {
 
 const duelTargetsRoot = join(ROOT, "art-src/duel-targets");
 if (
-  anyNewerThanSentinel(
+  flatPipelineStale(
     duelTargetsRoot,
+    join(
+      ROOT,
+      "public/assets/space-typing/duel-targets",
+    ),
     join(
       ROOT,
       "public/assets/space-typing/duel-targets/targets.json",
@@ -106,8 +146,12 @@ if (
 
 const combatVfxRoot = join(ROOT, "art-src/combat-vfx");
 if (
-  anyNewerThanSentinel(
+  flatPipelineStale(
     combatVfxRoot,
+    join(
+      ROOT,
+      "public/assets/space-typing/combat-vfx",
+    ),
     join(
       ROOT,
       "public/assets/space-typing/combat-vfx/vfx.json",
