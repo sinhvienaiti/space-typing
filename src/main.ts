@@ -9,6 +9,7 @@ import { DuelLocalPracticeMatch } from "./duel/local-match";
 import { createPracticeDuelRoom } from "./duel/room";
 import type { DuelMapId } from "./duel/maps";
 import {
+  DuelCombatAudioRouter,
   duelAudioPresentationKey,
   duelMusicProfileForMap,
   duelMusicStateForPhase,
@@ -1121,6 +1122,10 @@ function syncDuelAudio(
   musicController.setPaused(false);
 }
 
+const duelCombatAudio = new DuelCombatAudioRouter(
+  (cue) => game.playDuelCombatAudioCue(cue),
+);
+
 const duelBattle = installDuelBattleUi(
   {
     sendIntent(intent) {
@@ -1144,12 +1149,14 @@ const duelBattle = installDuelBattleUi(
         null
       );
     },
-    onPresentationState(view) {
+    onPresentationState(view, events) {
       syncDuelAudio(view);
+      duelCombatAudio.consume(view, events);
     },
     onExit() {
       stopLocalDuel();
       lastDuelAudioPresentationKey = null;
+      duelCombatAudio.reset(null);
       restoreTitleMusic();
       const duelDialog =
         byId<HTMLDialogElement>("duelRoomDialog");
