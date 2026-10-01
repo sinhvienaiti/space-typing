@@ -408,7 +408,12 @@ export class DuelEngine {
     const player = this.players[playerId];
     player.offers = offers
       .filter((offer) => !offer.shared && offer.ownerId === playerId)
-      .map(cloneOffer);
+      .map(cloneOffer)
+      .sort(
+        (left, right) =>
+          left.slotIndex - right.slotIndex ||
+          left.instanceId.localeCompare(right.instanceId),
+      );
     player.targetInstanceId = null;
     player.acquisitionPrefix = "";
   }
@@ -1913,7 +1918,13 @@ export class DuelEngine {
   private clonePlayer(player: DuelPlayerState): DuelPlayerState {
     return {
       ...player,
-      offers: player.offers.map(cloneOffer),
+      offers: player.offers
+        .map(cloneOffer)
+        .sort(
+          (left, right) =>
+            left.slotIndex - right.slotIndex ||
+            left.instanceId.localeCompare(right.instanceId),
+        ),
     };
   }
 }
