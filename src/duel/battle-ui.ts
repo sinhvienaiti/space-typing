@@ -1332,6 +1332,57 @@ export function installDuelBattleUi(
     nodes.currentInput.classList.add("typing-hit");
   };
 
+  const spawnTacticalActionFx = (
+    sourcePlayerId: DuelPlayerId,
+    effectId: string,
+  ): boolean => {
+    if (view === null) return false;
+    const fromSelf = sourcePlayerId === view.self.playerId;
+    const targetFrame = fromSelf
+      ? nodes.opponentShipFrame
+      : nodes.selfShipFrame;
+
+    if (effectId === "lock-on" || effectId === "scan") {
+      const reticle = createElement(
+        "i",
+        "duel-tactical-reticle duel-tactical-" + effectId,
+      );
+      targetFrame.append(reticle);
+      reticle.addEventListener(
+        "animationend",
+        () => reticle.remove(),
+        { once: true },
+      );
+      return true;
+    }
+
+    if (
+      effectId === "gravity-well" ||
+      effectId === "disrupt" ||
+      effectId === "amplify-field"
+    ) {
+      while (
+        nodes.fx.querySelectorAll(".duel-tactical-field").length >= 3
+      ) {
+        nodes.fx.querySelector(".duel-tactical-field")?.remove();
+      }
+      const field = createElement(
+        "i",
+        "duel-tactical-field duel-tactical-" + effectId,
+      );
+      field.dataset.fromSelf = fromSelf ? "true" : "false";
+      nodes.fx.append(field);
+      field.addEventListener(
+        "animationend",
+        () => field.remove(),
+        { once: true },
+      );
+      return true;
+    }
+
+    return false;
+  };
+
   const spawnShipActionFx = (
     sourcePlayerId: DuelPlayerId,
     effectId: string | undefined,
@@ -1548,6 +1599,9 @@ export function installDuelBattleUi(
         sourcePlayerId,
         projectileVariantFor(action.effectId),
       );
+      return;
+    }
+    if (spawnTacticalActionFx(sourcePlayerId, action.effectId)) {
       return;
     }
     spawnShipActionFx(sourcePlayerId, action.effectId);
