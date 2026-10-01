@@ -1091,29 +1091,13 @@ export class DuelEngine {
         this.rejectSkill(player, events);
         return;
       }
-      if (
-        this.strategy.snapshot()[player.id].initiative <
-        DUEL_TRAP_INITIATIVE_COST
-      ) {
-        this.rejectSkill(player, events);
-        return;
-      }
-      const trap = this.strategy.armTrap(
+      const trap = this.tryArmTrap(
         player.id,
         trapId,
-        this.tickNumber,
       );
       if (trap === null) {
         this.rejectSkill(player, events);
         return;
-      }
-      if (
-        !this.strategy.spendInitiative(
-          player.id,
-          DUEL_TRAP_INITIATIVE_COST,
-        )
-      ) {
-        throw new Error("Trap Initiative spend desynchronized.");
       }
       events.push({
         type: "trap-armed",
@@ -1125,6 +1109,33 @@ export class DuelEngine {
     }
 
     this.rejectSkill(player, events);
+  }
+
+  private tryArmTrap(
+    playerId: DuelPlayerId,
+    trapId: DuelTrapId,
+  ) {
+    if (
+      this.strategy.snapshot()[playerId].initiative <
+      DUEL_TRAP_INITIATIVE_COST
+    ) {
+      return null;
+    }
+    const trap = this.strategy.armTrap(
+      playerId,
+      trapId,
+      this.tickNumber,
+    );
+    if (trap === null) return null;
+    if (
+      !this.strategy.spendInitiative(
+        playerId,
+        DUEL_TRAP_INITIATIVE_COST,
+      )
+    ) {
+      throw new Error("Trap Initiative spend desynchronized.");
+    }
+    return trap;
   }
 
   private rejectSkill(
@@ -2352,11 +2363,7 @@ export class DuelEngine {
     trapId: DuelTrapId,
   ): DuelEngineEvent[] {
     if (this.roundResult.status !== "active") return [];
-    const trap = this.strategy.armTrap(
-      playerId,
-      trapId,
-      this.tickNumber,
-    );
+    const trap = this.tryArmTrap(playerId, trapId);
     if (trap === null) return [];
     return [
       {

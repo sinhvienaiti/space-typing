@@ -47,6 +47,33 @@ function typeTarget(
   return sequence;
 }
 
+function earnTrapInitiative(
+  engine: DuelEngine,
+): void {
+  const energy = offer("player-1", 0, "energy");
+  const repair = offer("player-1", 1, "repair");
+  engine.setPrivateOffers("player-1", [energy, repair]);
+
+  let sequence = typeTarget(
+    engine,
+    "player-1",
+    energy,
+    "energy",
+    1,
+  );
+  typeTarget(
+    engine,
+    "player-1",
+    repair,
+    "repair",
+    sequence,
+  );
+  engine.step(0);
+  expect(
+    engine.snapshot().strategy["player-1"].initiative,
+  ).toBe(8);
+}
+
 describe("Duel M-DUEL-08 strategy integration", () => {
   it("awards Initiative for a perfect completed action", () => {
     const engine = new DuelEngine();
@@ -208,8 +235,16 @@ describe("Duel M-DUEL-08 strategy integration", () => {
     expect(snapshot.strategy["player-1"].defenseScale).toBe(1);
   });
 
+  it("requires Initiative even through the direct engine trap API", () => {
+    const engine = new DuelEngine();
+
+    expect(engine.armTrap("player-1", "minefield")).toEqual([]);
+    expect(engine.snapshot().publicTrapHints["player-2"]).toEqual([]);
+  });
+
   it("shows a readable generic trap hint without exposing trap type", () => {
     const engine = new DuelEngine();
+    earnTrapInitiative(engine);
 
     expect(engine.armTrap("player-1", "minefield")).toEqual([
       {
@@ -232,6 +267,7 @@ describe("Duel M-DUEL-08 strategy integration", () => {
       maxShield: 0,
       startingShield: 0,
     });
+    earnTrapInitiative(engine);
     engine.armTrap("player-1", "minefield");
     const laser = offer("player-2", 0, "laser");
     engine.setPrivateOffers("player-2", [laser]);
