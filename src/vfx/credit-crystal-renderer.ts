@@ -90,6 +90,105 @@ function palette(
   return variant === "golden" ? GOLDEN : PALETTES[tier];
 }
 
+function qualityFxScale(quality: VisualQuality): number {
+  switch (quality) {
+    case "low":
+      return 0;
+    case "medium":
+      return 0.65;
+    case "high":
+      return 0.9;
+    case "ultra":
+      return 1.15;
+  }
+}
+
+function drawBurstRelease(
+  context: CanvasRenderingContext2D,
+  burst: CreditCrystalDrawBurst,
+  colors: Palette,
+  quality: VisualQuality,
+): void {
+  const fx = qualityFxScale(quality);
+  if (fx <= 0 || burst.pieces.length === 0) return;
+
+  const anchor =
+    burst.pieces.find((piece) => piece.anchor) ??
+    burst.pieces[0]!;
+  const releaseAge = Math.min(1, burst.age / 0.34);
+  const fade = Math.max(0, 1 - releaseAge);
+  if (fade <= 0) return;
+
+  const heroScale = burst.hero ? 1.55 : 1;
+  const radius =
+    (18 + anchor.radius * (1.7 + releaseAge * 2.3)) *
+    heroScale *
+    fx;
+
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.globalAlpha = fade * (burst.hero ? 0.72 : 0.5) * fx;
+  context.strokeStyle = colors.trail;
+  context.lineWidth =
+    Math.max(1, anchor.radius * 0.08) *
+    (quality === "ultra" ? 1.35 : 1);
+  context.beginPath();
+  context.arc(anchor.x, anchor.y, radius, 0, Math.PI * 2);
+  context.stroke();
+
+  const rayCount =
+    quality === "medium"
+      ? 4
+      : quality === "high"
+        ? 7
+        : 10;
+  const rayLength =
+    anchor.radius *
+    (burst.hero ? 2.8 : 2.1) *
+    (0.75 + releaseAge * 0.45);
+  context.lineWidth = quality === "ultra" ? 1.5 : 1;
+  for (let index = 0; index < rayCount; index += 1) {
+    const angle =
+      (index / rayCount) * Math.PI * 2 +
+      burst.age * (burst.hero ? 1.4 : 2.2);
+    const inner = anchor.radius * 0.62;
+    const outer = inner + rayLength * (0.55 + (index % 3) * 0.14);
+    context.beginPath();
+    context.moveTo(
+      anchor.x + Math.cos(angle) * inner,
+      anchor.y + Math.sin(angle) * inner,
+    );
+    context.lineTo(
+      anchor.x + Math.cos(angle) * outer,
+      anchor.y + Math.sin(angle) * outer,
+    );
+    context.stroke();
+  }
+  context.restore();
+}
+
+function drawSparkle(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  colors: Palette,
+  alpha: number,
+): void {
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.globalAlpha = alpha;
+  context.strokeStyle = colors.core;
+  context.lineWidth = 1;
+  context.beginPath();
+  context.moveTo(x - radius, y);
+  context.lineTo(x + radius, y);
+  context.moveTo(x, y - radius);
+  context.lineTo(x, y + radius);
+  context.stroke();
+  context.restore();
+}
+
 function drawCrystal(
   context: CanvasRenderingContext2D,
   piece: CreditCrystalDrawablePiece,
@@ -176,6 +275,7 @@ export function drawCreditCrystalBursts(
 
   for (const burst of bursts) {
     const colors = palette(burst.tier, burst.variant);
+    drawBurstRelease(context, burst, colors, quality);
     const image = creditCrystalImage(
       burst.tier,
       burst.variant,
@@ -183,7 +283,7 @@ export function drawCreditCrystalBursts(
     );
     if (burst.phase === "magnet" && quality !== "low") {
       const trailScale =
-        quality === "ultra" ? 1 : quality === "high" ? 0.78 : 0.55;
+        quality === "ultra" ? 1.28 : quality === "high" ? 1 : 0.7;
       for (const piece of burst.pieces) {
         context.globalAlpha = piece.anchor ? 0.62 : 0.4;
         context.strokeStyle = colors.trail;
@@ -199,7 +299,8 @@ export function drawCreditCrystalBursts(
     }
 
     context.globalAlpha = 1;
-    for (const piece of burst.pieces) {
+    for (let index = 0; index < burst.pieces.length; index += 1) {
+      const piece = burst.pieces[index]!;
       drawCrystal(
         context,
         piece,
@@ -209,6 +310,40 @@ export function drawCreditCrystalBursts(
         burst.age,
         image,
       );
+
+      if (
+        (quality === "high" || quality === "ultra") &&
+        (piece.anchor || index % 3 === 0)
+      ) {
+        const pulse =
+          0.5 +
+          0.5 *
+            Math.sin(
+              burst.age * (piece.anchor ? 10 : 14) +
+                index * 1.7,
+            );
+        const sparkleAlpha =
+          (quality === "ultra" ? 0.78 : 0.52) *
+          (piece.anchor ? 1 : 0.72) *
+          pulse;
+        if (sparkleAlpha > 0.12) {
+          const angle = piece.angle + burst.age * 1.9;
+          const offset = piece.radius * (piece.anchor ? 0.82 : 0.62);
+          drawSparkle(
+            context,
+            piece.x + Math.cos(angle) * offset,
+            piece.y + Math.sin(angle) * offset,
+            Math.max(
+              2.5,
+              piece.radius *
+                (piece.anchor ? 0.46 : 0.28) *
+                (0.7 + pulse * 0.5),
+            ),
+            colors,
+            sparkleAlpha,
+          );
+        }
+      }
     }
   }
   context.restore();

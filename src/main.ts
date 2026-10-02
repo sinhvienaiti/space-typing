@@ -9,6 +9,7 @@ import { DuelLocalPracticeMatch } from "./duel/local-match";
 import { createPracticeDuelRoom } from "./duel/room";
 import type { DuelMapId } from "./duel/maps";
 import {
+  DuelCombatAudioRouter,
   duelAudioPresentationKey,
   duelMusicProfileForMap,
   duelMusicStateForPhase,
@@ -41,6 +42,10 @@ import {
   type StageSessionSnapshot,
   type StageWordOutcome,
 } from "./results/stage-session";
+import {
+  stageClearCelebrationProfile,
+  type StageClearCelebrationProfile,
+} from "./results/stage-clear-celebration";
 import {
   loadArtAssetManifest,
   preloadArtAssets,
@@ -1120,6 +1125,10 @@ function syncDuelAudio(
   musicController.setPaused(false);
 }
 
+const duelCombatAudio = new DuelCombatAudioRouter(
+  (cue) => game.playDuelCombatAudioCue(cue),
+);
+
 const duelBattle = installDuelBattleUi(
   {
     sendIntent(intent) {
@@ -1143,12 +1152,14 @@ const duelBattle = installDuelBattleUi(
         null
       );
     },
-    onPresentationState(view) {
+    onPresentationState(view, events) {
       syncDuelAudio(view);
+      duelCombatAudio.consume(view, events);
     },
     onExit() {
       stopLocalDuel();
       lastDuelAudioPresentationKey = null;
+      duelCombatAudio.reset(null);
       restoreTitleMusic();
       const duelDialog =
         byId<HTMLDialogElement>("duelRoomDialog");
@@ -3212,6 +3223,65 @@ function formatStageDuration(seconds: number): string {
   return String(minutes) + ":" + String(total % 60).padStart(2, "0");
 }
 
+function renderStageClearCelebration(
+  profile: StageClearCelebrationProfile,
+): void {
+  const overlay = byId("stageClearOverlay");
+  const layer = byId("stageClearCelebration");
+  overlay.dataset.celebrationLevel = String(profile.level);
+  overlay.dataset.visualQuality = settings.visualQuality;
+  overlay.dataset.accuracyTier = String(profile.accuracyTier);
+  overlay.dataset.speedTier = String(profile.speedTier);
+  overlay.dataset.scoreTier = String(profile.scoreTier);
+  layer.replaceChildren();
+
+  const label = document.createElement("strong");
+  label.className = "stage-clear-celebration-label";
+  label.textContent = profile.label;
+  layer.append(label);
+
+  const baseCount =
+    settings.visualQuality === "ultra"
+      ? 22
+      : settings.visualQuality === "high"
+        ? 16
+        : settings.visualQuality === "medium"
+          ? 10
+          : 4;
+  const perLevel =
+    settings.visualQuality === "ultra"
+      ? 10
+      : settings.visualQuality === "high"
+        ? 8
+        : settings.visualQuality === "medium"
+          ? 6
+          : 2;
+  const particleCount = Math.min(
+    72,
+    baseCount + profile.level * perLevel,
+  );
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const particle = document.createElement("i");
+    particle.className =
+      "stage-clear-celebration-particle " +
+      (index % 5 === 0 ? "stage-clear-star" : "stage-clear-shard");
+    const x = 4 + ((index * 37 + profile.level * 11) % 92);
+    const drift = -80 + ((index * 53) % 160);
+    const delay = (index % 12) * 34;
+    const size =
+      3 + ((index * 7 + profile.level * 3) % (profile.level >= 4 ? 9 : 6));
+    const spin = -160 + ((index * 71) % 320);
+    particle.style.setProperty("--clear-x", String(x) + "%");
+    particle.style.setProperty("--clear-drift", String(drift) + "px");
+    particle.style.setProperty("--clear-delay", String(delay) + "ms");
+    particle.style.setProperty("--clear-size", String(size) + "px");
+    particle.style.setProperty("--clear-spin", String(spin) + "deg");
+    layer.append(particle);
+  }
+}
+
+
 function renderTestingStageClearReport(
   stats: GameStats,
   stageSession: StageSessionSnapshot,
@@ -3223,6 +3293,15 @@ function renderTestingStageClearReport(
   const rating = stageResultStars(
     accuracy,
     objective?.status ?? null,
+  );
+  renderStageClearCelebration(
+    stageClearCelebrationProfile({
+      stars: rating.stars,
+      accuracy,
+      wpm,
+      score: stats.score,
+      elapsedSeconds: stageSession.elapsedSeconds,
+    }),
   );
   const measuredKills =
     stageSession.regularKills +
@@ -4384,6 +4463,15 @@ const game = new Game(
       const rating = stageResultStars(
         accuracy,
         objective?.status ?? null,
+      );
+      renderStageClearCelebration(
+        stageClearCelebrationProfile({
+          stars: rating.stars,
+          accuracy,
+          wpm,
+          score: stats.score,
+          elapsedSeconds: stageSession.elapsedSeconds,
+        }),
       );
       const measuredKills =
         stageSession.regularKills +
@@ -7185,6 +7273,15 @@ function handleHiddenEncounterClear(
 
   const stageSession = game.getStageSessionSnapshot();
   const rating = stageResultStars(accuracy, null);
+  renderStageClearCelebration(
+    stageClearCelebrationProfile({
+      stars: rating.stars,
+      accuracy,
+      wpm,
+      score: stats.score,
+      elapsedSeconds: stageSession.elapsedSeconds,
+    }),
+  );
   const measuredKills =
     stageSession.regularKills +
     stageSession.eliteKills +

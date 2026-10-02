@@ -398,4 +398,93 @@ describe("DuelEngine M-DUEL-01 local simulation", () => {
     expect(snapshot.players["player-1"].offers).toEqual([]);
     expect(snapshot.players["player-2"].energy).toBe(25);
   });
+
+  it("fires deterministic bonus ordnance at a clean 10-character streak", () => {
+    const engine = new DuelEngine({
+      maxShield: 0,
+      startingShield: 0,
+      startingEnergy: 100,
+    });
+
+    engine.setPrivateOffers("player-1", [
+      offer("player-1", 0, "laser"),
+    ]);
+    typeWord(engine, "player-1", 1, "laser");
+    engine.step(0);
+
+    engine.setPrivateOffers("player-1", [
+      {
+        ...offer("player-1", 0, "laser"),
+        instanceId: "player-1-0-laser-second",
+      },
+    ]);
+    typeWord(engine, "player-1", 6, "laser");
+    const events = engine.step(0);
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "precision-firepower",
+        playerId: "player-1",
+        streak: 10,
+        ordnance: "laser-burst",
+        accuracyTier: 3,
+      }),
+    );
+    expect(
+      engine.snapshot().players["player-1"].precisionStreak,
+    ).toBe(10);
+    expect(
+      engine.snapshot().players["player-2"].hull,
+    ).toBeLessThan(80);
+  });
+
+  it("breaks the precision streak on a wrong key", () => {
+    const engine = new DuelEngine({
+      startingEnergy: 100,
+    });
+
+    engine.setPrivateOffers("player-1", [
+      offer("player-1", 0, "laser"),
+    ]);
+    typeWord(engine, "player-1", 1, "laser");
+    engine.step(0);
+
+    engine.setPrivateOffers("player-1", [
+      {
+        ...offer("player-1", 0, "laser"),
+        instanceId: "player-1-0-laser-second",
+      },
+    ]);
+    for (const [index, char] of [..."lase"].entries()) {
+      engine.enqueueIntent({
+        type: "TYPE_CHAR",
+        playerId: "player-1",
+        sequence: 6 + index,
+        char,
+      });
+    }
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId: "player-1",
+      sequence: 10,
+      char: "x",
+    });
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId: "player-1",
+      sequence: 11,
+      char: "r",
+    });
+    const events = engine.step(0);
+
+    expect(
+      events.some(
+        (event) => event.type === "precision-firepower",
+      ),
+    ).toBe(false);
+    expect(
+      engine.snapshot().players["player-1"].precisionStreak,
+    ).toBe(1);
+  });
+
 });

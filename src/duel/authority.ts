@@ -169,6 +169,12 @@ export type DuelSeriesState = {
   winnerId: DuelPlayerId | null;
 };
 
+export type DuelPublicTypingTelegraph = {
+  active: boolean;
+  kind: "action" | "counter" | "objective" | "idle";
+  progress: 0 | 0.25 | 0.5 | 0.75;
+};
+
 export type DuelClientMatchView = {
   matchId: string;
   roundId: string;
@@ -221,6 +227,7 @@ export type DuelClientMatchView = {
     maxEnergy: number;
     initiative: number;
     strategyPath: string;
+    typingTelegraph: DuelPublicTypingTelegraph;
     revealedInventory:
       | DuelEngineSnapshot["inventories"][DuelPlayerId]
       | null;
@@ -562,6 +569,80 @@ export function projectDuelEventsForPlayer(
     projected.push(event);
   }
   return projected;
+}
+
+export function publicDuelTypingTelegraph(
+  snapshot: DuelEngineSnapshot,
+  playerId: DuelPlayerId,
+): DuelPublicTypingTelegraph {
+  const player = snapshot.players[playerId];
+  const targetId = player.targetInstanceId;
+  const prefixLength = player.acquisitionPrefix.length;
+  if (targetId === null || prefixLength <= 0) {
+    return {
+      active: false,
+      kind: "idle",
+      progress: 0,
+    };
+  }
+
+  let tokenLength = 0;
+  let kind: DuelPublicTypingTelegraph["kind"] = "idle";
+
+  const offer = player.offers.find(
+    (candidate) => candidate.instanceId === targetId,
+  );
+  if (offer !== undefined) {
+    const action = duelActionMapForMap(snapshot.map.id).get(
+      offer.actionId,
+    );
+    tokenLength =
+      offer.typingPrompt?.answerToken.length ??
+      action?.answerToken.length ??
+      0;
+    kind = "action";
+  } else {
+    const threat = snapshot.incomingThreats[playerId].find(
+      (candidate) => candidate.id === targetId,
+    );
+    if (threat !== undefined) {
+      tokenLength = threat.answerToken.length;
+      kind = "counter";
+    } else if (
+      snapshot.neutralObjective !== null &&
+      snapshot.neutralObjective.id === targetId
+    ) {
+      tokenLength = snapshot.neutralObjective.answerToken.length;
+      kind = "objective";
+    }
+  }
+
+  if (tokenLength <= 0 || kind === "idle") {
+    return {
+      active: false,
+      kind: "idle",
+      progress: 0,
+    };
+  }
+
+  const ratio = Math.max(
+    0,
+    Math.min(0.999, prefixLength / tokenLength),
+  );
+  const progress: DuelPublicTypingTelegraph["progress"] =
+    ratio >= 0.75
+      ? 0.75
+      : ratio >= 0.5
+        ? 0.5
+        : ratio >= 0.25
+          ? 0.25
+          : 0;
+
+  return {
+    active: true,
+    kind,
+    progress,
+  };
 }
 
 export class DuelAuthorityService {
@@ -1780,7 +1861,12 @@ export class DuelAuthorityService {
 
       const nextOffers =
         snapshot.players[playerId].offers.map(
-          (offer) => ({ ...offer }),
+          (offer) => ({
+            ...offer,
+            ...(offer.typingPrompt === undefined
+              ? {}
+              : { typingPrompt: { ...offer.typingPrompt } }),
+          }),
         );
       for (const slotIndex of slots) {
         const refill =
@@ -1797,6 +1883,7 @@ export class DuelAuthorityService {
             duelStrategyCategoryMultiplier(
               snapshot.strategy[playerId].path,
             ),
+            snapshot.players[playerId].acquisitionPrefix,
           );
         if (refill === null) continue;
         const index = nextOffers.findIndex(
@@ -2049,6 +2136,9 @@ export class DuelAuthorityService {
         acquisitionPrefix: self.acquisitionPrefix,
         offers: self.offers.map((offer) => ({
           ...offer,
+          ...(offer.typingPrompt === undefined
+            ? {}
+            : { typingPrompt: { ...offer.typingPrompt } }),
         })),
         inventory: snapshot.inventories[playerId],
         incomingThreats:
@@ -2072,6 +2162,10 @@ export class DuelAuthorityService {
         maxEnergy: opponent.maxEnergy,
         initiative: opponentStrategy.initiative,
         strategyPath: opponentStrategy.path,
+        typingTelegraph: publicDuelTypingTelegraph(
+          snapshot,
+          opponentId,
+        ),
         revealedInventory:
           snapshot.tactical.bankRevealFor[playerId]
             ? snapshot.inventories[opponentId]

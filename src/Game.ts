@@ -8,6 +8,7 @@ import {
   type AnnouncerEvent,
 } from "./audio/announcer";
 import { Sfx, type ImpactVariant } from "./audio/Sfx";
+import type { DuelTimedAudioCue } from "./duel/audio";
 import {
   bossActionInterval,
   bossKeyDamage,
@@ -375,9 +376,11 @@ import { resolveEnemyTypingProfile } from "./enemies/typing-profile";
 import { enemyKillRewardScore } from "./enemies/scoring";
 import { StageWordLedger } from "./enemies/stage-word-variety";
 import {
+  stageResultStars,
   StageSessionTracker,
   type StageSessionSnapshot,
 } from "./results/stage-session";
+import { stageClearCelebrationProfile } from "./results/stage-clear-celebration";
 import {
   enemySkillDefinition,
   type EnemySkillId,
@@ -445,6 +448,7 @@ import {
   multiplierForStreak,
   normalizeWord,
   splitDisplayByTypedLetters,
+  stageWordsPerMinute,
   typingText,
 } from "./logic";
 import {
@@ -1134,6 +1138,103 @@ export class Game {
       this.testLabLethalHits = 0;
       this.testLabTimeScale = 1;
       this.testLabSchedulerFrozen = false;
+    }
+  }
+
+  playDuelCombatAudioCue(input: DuelTimedAudioCue): void {
+    this.sfx.unlock();
+    switch (input.cue) {
+      case "typing-miss":
+        if (!this.sfx.playSample("duel-typing-miss")) {
+          this.sfx.wrong();
+        }
+        return;
+      case "laser-launch":
+        if (!this.sfx.playSample("duel-laser-launch")) {
+          this.sfx.shot(1.15);
+        }
+        return;
+      case "missile-launch":
+        if (!this.sfx.playSample("duel-missile-launch")) {
+          this.sfx.shot(1.35);
+          this.sfx.power();
+        }
+        return;
+      case "heavy-launch":
+        if (!this.sfx.playSample("duel-heavy-launch")) {
+          this.sfx.shot(1.5);
+        }
+        return;
+      case "bomb-launch":
+        if (!this.sfx.playSample("duel-bomb-launch")) {
+          this.sfx.shot(1.25);
+          this.sfx.command();
+        }
+        return;
+      case "energy-impact":
+        if (!this.sfx.playSample("duel-energy-impact")) {
+          this.sfx.boltImpact(1, 0, "energy");
+        }
+        return;
+      case "missile-impact":
+        if (!this.sfx.playSample("duel-missile-impact")) {
+          this.sfx.boltImpact(1.35, 0, "missile");
+        }
+        return;
+      case "heavy-impact":
+        if (!this.sfx.playSample("duel-kinetic-impact")) {
+          this.sfx.boltImpact(1.45, 0, "heavy");
+        }
+        return;
+      case "bomb-impact":
+        if (!this.sfx.playSample("duel-bomb-impact")) {
+          this.sfx.boltImpact(1.5, 0, "heavy");
+          this.sfx.damage();
+        }
+        return;
+      case "support":
+        if (!this.sfx.playSample("duel-repair-energy")) {
+          this.sfx.support();
+        }
+        return;
+      case "bank":
+        this.sfx.uiConfirm();
+        return;
+      case "warning":
+        if (!this.sfx.playSample("duel-lock-acquire")) {
+          this.sfx.projectileWarning();
+        }
+        return;
+      case "intercept":
+        if (!this.sfx.playSample("duel-intercept")) {
+          this.sfx.projectileIntercept();
+        }
+        return;
+      case "precision":
+        if (!this.sfx.playSample("duel-precision")) {
+          this.sfx.power();
+        }
+        return;
+      case "cataclysm":
+        if (!this.sfx.playSample("duel-cataclysm")) {
+          this.sfx.bossEntrance(1.05);
+        }
+        return;
+      case "round-win":
+        if (!this.sfx.playSample("duel-round-win")) {
+          this.sfx.stageClear(3, 1, 1);
+        }
+        return;
+      case "round-loss":
+        if (!this.sfx.playSample("duel-round-loss")) {
+          this.sfx.stageFail();
+        }
+        return;
+      case "round-draw":
+        if (!this.sfx.playSample("duel-round-draw")) {
+          this.sfx.uiConfirm();
+        }
+        return;
     }
   }
 
@@ -4645,7 +4746,33 @@ export class Game {
     this.anomalyRiskRatio = 0;
     this.boss = null;
     this.hooks.onBossUpdate(null);
-    this.sfx.stageClear();
+
+    const stageSession =
+      this.stageResultTracker.snapshot(this.stageElapsedSeconds);
+    const targetAccuracy = accuracyPercent(
+      stageSession.correctWordKeys,
+      stageSession.wrongWordKeys,
+    );
+    const targetWpm = stageWordsPerMinute(
+      stageSession.correctWordKeys,
+      stageSession.elapsedSeconds,
+    );
+    const rating = stageResultStars(
+      targetAccuracy,
+      this.stageObjective?.status ?? null,
+    );
+    const celebration = stageClearCelebrationProfile({
+      stars: rating.stars,
+      accuracy: targetAccuracy,
+      wpm: targetWpm,
+      score: this.stats.score,
+      elapsedSeconds: stageSession.elapsedSeconds,
+    });
+    this.sfx.stageClear(
+      celebration.level,
+      celebration.accuracyTier,
+      celebration.speedTier,
+    );
     this.hooks.onStageClear(this.getStats());
     this.hooks.onPhase(this.phase);
   }
@@ -7159,6 +7286,11 @@ export class Game {
       y,
       this.settings.visualQuality,
     );
+    this.sfx.creditDrop(
+      receipt.tier,
+      this.settings.visualQuality,
+      receipt.variant,
+    );
   }
 
   private presentCombatCreditCollection(
@@ -7174,27 +7306,75 @@ export class Game {
           : event.tier === "high"
             ? 218
             : 274;
+    const quality = this.settings.visualQuality;
+    const qualityScale =
+      quality === "ultra"
+        ? 1.75
+        : quality === "high"
+          ? 1.45
+          : quality === "medium"
+            ? 1.2
+            : 1;
+    const tierScale =
+      event.tier === "major-boss"
+        ? 1.8
+        : event.tier === "boss"
+          ? 1.55
+          : event.tier === "mini-boss"
+            ? 1.35
+            : event.tier === "elite"
+              ? 1.18
+              : 1;
+
     this.burst(
       ship.x,
       ship.y,
-      event.hero ? 22 : 8,
+      Math.round((event.hero ? 22 : 8) * qualityScale * tierScale),
       hue,
     );
-    if (event.hero) {
+    this.sfx.creditPickup(
+      event.tier,
+      quality,
+      event.variant,
+      event.hero,
+    );
+
+    if (quality !== "low") {
+      const color =
+        event.variant === "golden" ? "#ffd46a" : "#dca8ff";
       this.skillFx.pulse(
         ship.x,
         ship.y,
-        event.variant === "golden" ? "#ffd46a" : "#dca8ff",
-        event.tier === "major-boss" ? 150 : 108,
-        event.tier === "major-boss" ? 4 : 3,
-        0.48,
+        color,
+        (event.hero ? 118 : 74) * qualityScale * tierScale,
+        event.hero ? 4 : 2,
+        event.hero ? 0.52 : 0.32,
       );
+
+      if (quality === "high" || quality === "ultra") {
+        this.burst(
+          ship.x,
+          ship.y,
+          Math.round((event.hero ? 18 : 7) * qualityScale),
+          event.variant === "golden" ? 54 : 204,
+        );
+      }
+
+      if (event.hero && quality === "ultra") {
+        this.skillFx.flash(
+          event.variant === "golden" ? "#ffd46a" : "#dca8ff",
+          0.07,
+          0.18,
+        );
+        this.shakeFor(event.tier === "major-boss" ? 2.2 : 1.4);
+      }
     }
   }
 
   private flushCombatCreditPresentation(): void {
+    const ship = this.shipCenter();
     for (const event of this.creditPickups.flush()) {
-      this.hooks.onCombatCreditPickupPresented?.(event);
+      this.presentCombatCreditCollection(event, ship);
     }
   }
 

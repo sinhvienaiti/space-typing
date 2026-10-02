@@ -1,4 +1,4 @@
-export const DUEL_CONTENT_VERSION = "duel-final-v3";
+export const DUEL_CONTENT_VERSION = "duel-final-v4";
 
 export const DUEL_PRIVATE_OFFER_COUNT = 5;
 export const DUEL_SHARED_OBJECTIVE_LANES = 1;
@@ -84,6 +84,14 @@ export type DuelOfferStatus =
   | "destroyed"
   | "cancelled";
 
+export type DuelTypingPrompt = {
+  promptId: string;
+  wordId: string;
+  answerToken: string;
+  lexiconVersion: string;
+  difficultyClass: "core";
+};
+
 export type DuelActionOffer = {
   instanceId: string;
   actionId: string;
@@ -92,6 +100,11 @@ export type DuelActionOffer = {
   typedPrefix: string;
   slotIndex: number;
   shared: boolean;
+  /**
+   * Production Duel offers carry an authority-issued immutable prompt.
+   * Optional only for legacy replay/test fixtures during FINAL V4 migration.
+   */
+  typingPrompt?: DuelTypingPrompt;
   remainingSeconds?: number | null;
 };
 

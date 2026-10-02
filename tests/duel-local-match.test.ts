@@ -90,13 +90,16 @@ describe("Duel local Practice runtime", () => {
       initial.map.id,
       offer.actionId,
     )!;
+    const answerToken =
+      offer.typingPrompt?.answerToken ??
+      action.answerToken;
 
     match.sendIntent({
       type: "SELECT_TARGET",
       targetInstanceId: offer.instanceId,
     });
     let last = match.initial();
-    for (const char of action.answerToken) {
+    for (const char of answerToken) {
       const result = match.sendIntent({
         type: "TYPE_CHAR",
         char,
@@ -109,7 +112,7 @@ describe("Duel local Practice runtime", () => {
     }
 
     expect(last.view.self.correctChars).toBe(
-      action.answerToken.length,
+      answerToken.length,
     );
     expect(
       last.view.self.offers.some(

@@ -9,6 +9,10 @@ import type {
 import { DUEL_PRIVATE_OFFER_COUNT } from "./model";
 import { DuelRng } from "./rng";
 import { duelOfferLifetimeSeconds } from "./offer-lifecycle";
+import {
+  DuelWordDirector,
+  type DuelWordDirectorDiagnostics,
+} from "./word-director";
 
 export const DUEL_PHASE_CATEGORY_WEIGHTS: Readonly<
   Record<DuelMatchPhase, Readonly<Record<DuelActionCategory, number>>>
@@ -136,6 +140,7 @@ export class DuelOfferDraft {
   private readonly categoryMultiplier: Partial<
     Readonly<Record<DuelActionCategory, number>>
   >;
+  private readonly words: DuelWordDirector;
   private nextInstance = 1;
 
   constructor(config: DuelOfferDraftConfig) {
@@ -144,6 +149,14 @@ export class DuelOfferDraft {
     this.enabledCategories =
       config.enabledCategories ?? DUEL_CORE_DRAFT_CATEGORIES;
     this.categoryMultiplier = config.categoryMultiplier ?? {};
+    this.words = new DuelWordDirector({
+      seed: config.seed,
+      actions: this.actions,
+    });
+  }
+
+  wordDiagnostics(): DuelWordDirectorDiagnostics {
+    return this.words.diagnostics();
   }
 
   dealPrivateOffers(
@@ -174,6 +187,7 @@ export class DuelOfferDraft {
     runtimeCategoryMultiplier: Partial<
       Readonly<Record<DuelActionCategory, number>>
     > = {},
+    acquisitionPrefix = "",
   ): DuelActionOffer | null {
     const existingActionIds = new Set(
       existingOffers
@@ -221,18 +235,28 @@ export class DuelOfferDraft {
     const action = this.pick(weighted);
     if (action === null) return null;
 
+    const instanceId =
+      "offer:" +
+      playerId +
+      ":" +
+      String(this.nextInstance++);
+    const typingPrompt = this.words.issuePrompt({
+      instanceId,
+      action,
+      activeOffers: existingOffers,
+      acquisitionPrefix,
+    });
+    if (typingPrompt === null) return null;
+
     return {
-      instanceId:
-        "offer:" +
-        playerId +
-        ":" +
-        String(this.nextInstance++),
+      instanceId,
       actionId: action.id,
       ownerId: playerId,
       status: "available",
       typedPrefix: "",
       slotIndex: Math.max(0, Math.floor(slotIndex)),
       shared: false,
+      typingPrompt,
       remainingSeconds:
         duelOfferLifetimeSeconds(action.category),
     };

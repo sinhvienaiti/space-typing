@@ -36,6 +36,25 @@ export function duelCharacterFromKeyboardInput(input: {
   return /^[a-z]$/.test(normalized) ? normalized : null;
 }
 
+export function duelOfferAnswerToken(
+  offer: DuelActionOffer,
+  actions: ReadonlyMap<string, DuelActionDefinition>,
+): string | null {
+  const promptToken = offer.typingPrompt?.answerToken;
+  if (
+    promptToken !== undefined &&
+    isValidDuelAnswerToken(promptToken)
+  ) {
+    return promptToken;
+  }
+
+  // FINAL V4 migration path for legacy replay/test fixtures only.
+  const legacy = actions.get(offer.actionId)?.answerToken;
+  return legacy !== undefined && isValidDuelAnswerToken(legacy)
+    ? legacy
+    : null;
+}
+
 export function matchingDuelOffers(
   prefix: string,
   offers: readonly DuelActionOffer[],
@@ -44,8 +63,8 @@ export function matchingDuelOffers(
   if (!isValidDuelAnswerToken(prefix)) return [];
   return offers.filter((offer) => {
     if (offer.status !== "available") return false;
-    const action = actions.get(offer.actionId);
-    return action?.answerToken.startsWith(prefix) === true;
+    const token = duelOfferAnswerToken(offer, actions);
+    return token?.startsWith(prefix) === true;
   });
 }
 

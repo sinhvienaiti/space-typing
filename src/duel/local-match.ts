@@ -6,9 +6,10 @@ import {
   DuelBot,
   duelBotObservation,
 } from "./bots";
-import type {
-  DuelClientEvent,
-  DuelClientMatchView,
+import {
+  publicDuelTypingTelegraph,
+  type DuelClientEvent,
+  type DuelClientMatchView,
 } from "./authority";
 import { DuelOfferDraft } from "./draft";
 import {
@@ -451,6 +452,7 @@ export class DuelLocalPracticeMatch {
             duelStrategyCategoryMultiplier(
               snapshot.strategy[playerId].path,
             ),
+            snapshot.players[playerId].acquisitionPrefix,
           );
         if (refill === null) continue;
         const index = offers.findIndex(
@@ -587,6 +589,9 @@ export class DuelLocalPracticeMatch {
         acquisitionPrefix: self.acquisitionPrefix,
         offers: self.offers.map((offer: DuelActionOffer) => ({
           ...offer,
+          ...(offer.typingPrompt === undefined
+            ? {}
+            : { typingPrompt: { ...offer.typingPrompt } }),
         })),
         inventory:
           snapshot.inventories["player-1"],
@@ -612,6 +617,10 @@ export class DuelLocalPracticeMatch {
         maxEnergy: opponent.maxEnergy,
         initiative: opponentStrategy.initiative,
         strategyPath: opponentStrategy.path,
+        typingTelegraph: publicDuelTypingTelegraph(
+          snapshot,
+          "player-2",
+        ),
         revealedInventory:
           snapshot.tactical.bankRevealFor["player-1"]
             ? snapshot.inventories["player-2"]

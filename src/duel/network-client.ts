@@ -1,4 +1,3 @@
-import { DUEL_ACTIONS_BY_ID } from "./actions";
 import type {
   DuelClientEvent,
   DuelClientMatchView,
@@ -10,7 +9,11 @@ import {
   type DuelClientMessage,
   type DuelWireIntent,
 } from "./protocol";
-import { matchingDuelOffers } from "./typing";
+import {
+  duelOfferAnswerToken,
+  matchingDuelOffers,
+} from "./typing";
+import { duelActionMapForMap } from "./map-actions";
 
 export type DuelNetworkStatus =
   | "idle"
@@ -688,7 +691,7 @@ export class DuelNetworkClient {
     const matches = matchingDuelOffers(
       nextPrefix,
       view.self.offers,
-      DUEL_ACTIONS_BY_ID,
+      duelActionMapForMap(view.map.id),
     );
     if (matches.length > 0) {
       this.prediction.acquisitionPrefix = nextPrefix;
@@ -749,9 +752,9 @@ export class DuelNetworkClient {
         candidate.instanceId === targetInstanceId,
     );
     if (offer !== undefined) {
-      return (
-        DUEL_ACTIONS_BY_ID.get(offer.actionId)
-          ?.answerToken ?? null
+      return duelOfferAnswerToken(
+        offer,
+        duelActionMapForMap(view.map.id),
       );
     }
 
