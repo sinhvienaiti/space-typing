@@ -1,4 +1,6 @@
 import { DUEL_ACTIONS_BY_ID } from "./actions";
+import { autoActivateDuelAction } from "./offer-availability";
+import { DUEL_CANNON_TRAVEL_MS, duelProjectileTravelMs } from "./presentation-timing";
 import { duelActionQualityForMistakes } from "./accuracy";
 import {
   resolveDuelAction,
@@ -148,6 +150,8 @@ export type DuelPendingHazard = {
 export type DuelTickEffect = DuelCombatEffect;
 
 export type DuelEngineEvent =
+  | { type: "cannon-fired"; playerId: DuelPlayerId; shotId: string; travelMs: number }
+  | { type: "cannon-hit"; playerId: DuelPlayerId; targetPlayerId: DuelPlayerId; shotId: string }
   | {
       type: "intent-rejected";
       playerId: DuelPlayerId;
@@ -327,6 +331,10 @@ export type DuelEngineEvent =
     };
 
 export type DuelEngineConfig = {
+  /** Live modes enable this; false retains legacy inventory simulations. */
+  autoActivateItems?: boolean;
+  /** Live combat: accurate typing powers the primary cannon, independently of skill selection. */
+  typingCannon?: boolean;
   regulationSeconds?: number;
   escalationSeconds?: number;
   hardOvertimeSeconds?: number;
@@ -394,6 +402,14 @@ function createPlayer(
 }
 
 export class DuelEngine {
+  private readonly autoActivateItems: boolean;
+  private readonly typingCannon: boolean;
+  private cannonSequence = 0;
+  private readonly cannonCharge = { "player-1": 0, "player-2": 0 };
+  private readonly cannonReadyAt = { "player-1": 0, "player-2": 0 };
+  private readonly cannonProgress = new Map<string, number>();
+  private readonly cannonShots: Array<{ id: string; source: DuelPlayerId; due: number }> = [];
+  private readonly travellingEffects: Array<{ due: number; effect: DuelCombatEffect }> = [];
   private readonly actions: ReadonlyMap<string, DuelActionDefinition>;
   private readonly regulationSeconds: number;
   private readonly escalationSeconds: number;
@@ -446,7 +462,10 @@ export class DuelEngine {
   };
 
   constructor(config: DuelEngineConfig = {}) {
-    this.actions = config.actions ?? DUEL_ACTIONS_BY_ID;
+    this.autoActivateItems = config.autoActivateItems ?? false;
+    this.typingCannon = config.typingCannon ?? false;
+    const actions = config.actions ?? DUEL_ACTIONS_BY_ID;
+    this.actions = this.autoActivateItems ? new Map([...actions].map(([id, action]) => [id, autoActivateDuelAction(action)])) : actions;
     this.mapId = config.mapId ?? "frost-wastes";
     this.chance = new DuelChanceSystem(
       config.matchSeed ?? 1,
@@ -491,6 +510,14 @@ export class DuelEngine {
     this.roundResult = { status: "active", winnerId: null };
     this.queuedIntents.length = 0;
     this.pendingEffects.length = 0;
+    this.cannonShots.length = 0;
+    this.travellingEffects.length = 0;
+    this.cannonSequence = 0;
+    this.cannonProgress.clear();
+    for (const id of PLAYER_IDS) {
+      this.cannonCharge[id] = 0;
+      this.cannonReadyAt[id] = 0;
+    }
     this.pendingHazards.length = 0;
     this.hazardTargetProtection["player-1"] = 0;
     this.hazardTargetProtection["player-2"] = 0;
@@ -607,6 +634,21 @@ export class DuelEngine {
     this.tickNumber += 1;
     this.elapsedSeconds += dt;
     this.pendingEffects.length = 0;
+    for (let index = this.travellingEffects.length - 1; index >= 0; index -= 1) {
+      const pending = this.travellingEffects[index]!;
+      if (pending.due > this.elapsedSeconds + 1e-9) continue;
+      this.travellingEffects.splice(index, 1);
+      this.pendingEffects.push(pending.effect);
+    }
+    // Resolve on the authority clock, never from a CSS animation callback.
+    for (let index = this.cannonShots.length - 1; index >= 0; index -= 1) {
+      const shot = this.cannonShots[index]!;
+      if (shot.due > this.elapsedSeconds + 1e-9) continue;
+      this.cannonShots.splice(index, 1);
+      const targetId = otherPlayer(shot.source);
+      this.pendingEffects.push({ type: "damage", sourceId: shot.source, targetId, amount: 1.5 });
+      events.push({ type: "cannon-hit", playerId: shot.source, targetPlayerId: targetId, shotId: shot.id });
+    }
     this.reservedEnergyCost["player-1"] = 0;
     this.reservedEnergyCost["player-2"] = 0;
     this.cooldowns.update(dt);
@@ -1071,14 +1113,14 @@ export class DuelEngine {
 
       const combo = duelComboEffect(comboId);
       if (combo.damage > 0) {
-        this.pendingEffects.push({
+        this.queueProjectileEffect({
           type: "damage",
           targetId: otherPlayer(player.id),
           sourceId: player.id,
           amount:
             combo.damage *
             this.strategy.attackScale(player.id),
-        });
+        }, player.id);
       }
       if (combo.shield > 0) {
         this.pendingEffects.push({
@@ -1246,9 +1288,26 @@ export class DuelEngine {
   private recordCorrectCharacter(
     player: DuelPlayerState,
     events: DuelEngineEvent[],
+    targets: readonly { id: string; progress: number }[] = [],
   ): void {
     player.correctChars += 1;
     player.precisionStreak += 1;
+    const freshProgress = targets.some(target => target.progress > (this.cannonProgress.get(player.id + ":" + target.id) ?? 0));
+    for (const target of targets) {
+      const key = player.id + ":" + target.id;
+      this.cannonProgress.set(key, Math.max(target.progress, this.cannonProgress.get(key) ?? 0));
+    }
+    if (this.typingCannon && freshProgress) {
+      this.cannonCharge[player.id] = Math.min(4, this.cannonCharge[player.id] + 1);
+      if (this.cannonCharge[player.id] >= 2 && this.elapsedSeconds >= this.cannonReadyAt[player.id]) {
+        this.cannonCharge[player.id] -= 2;
+        this.cannonReadyAt[player.id] = this.elapsedSeconds + 0.12;
+        const shotId = "cannon:" + String(++this.cannonSequence);
+        const travelMs = DUEL_CANNON_TRAVEL_MS;
+        this.cannonShots.push({ id: shotId, source: player.id, due: this.elapsedSeconds + travelMs / 1000 });
+        events.push({ type: "cannon-fired", playerId: player.id, shotId, travelMs });
+      }
+    }
 
     const milestone = duelPrecisionMilestone(
       player.precisionStreak,
@@ -1352,6 +1411,8 @@ export class DuelEngine {
         return;
       }
       this.selectTarget(player, targetInstanceId, events);
+      // A rejected explicit target must not fall through into free acquisition.
+      if (player.targetInstanceId !== targetInstanceId) return;
     }
 
     if (
@@ -1393,6 +1454,15 @@ export class DuelEngine {
       this.actions,
     );
     if (matches.length === 0) {
+      const blocked = matchingDuelOffers(nextPrefix, player.offers.filter(offer => offer.status === "available"), this.actions)
+        .find(offer => {
+          const action = this.actions.get(offer.actionId);
+          return action !== undefined && (this.autoActivateItems ? !this.canFinalizeAction(player.id, action) : action.resolveMode === "banked" && !this.inventories[player.id].canStore(action));
+        });
+      if (blocked !== undefined) {
+        events.push({ type: "action-blocked", playerId: player.id, targetInstanceId: blocked.instanceId, actionId: blocked.actionId, reason: this.blockReason(player.id, this.actions.get(blocked.actionId)!) });
+        return; // Unavailable target is not a spelling mistake or cannon charge.
+      }
       this.recordWrongCharacter(player);
       player.targetMistakes += 1;
       events.push({
@@ -1424,7 +1494,7 @@ export class DuelEngine {
       }
     }
 
-    this.recordCorrectCharacter(player, events);
+    this.recordCorrectCharacter(player, events, matches.map(offer => ({ id: offer.instanceId, progress: nextPrefix.length })));
     player.acquisitionPrefix = nextPrefix;
     if (matches.length === 1) {
       const offer = matches[0]!;
@@ -1449,6 +1519,10 @@ export class DuelEngine {
     const action = this.actions.get(offer.actionId);
     const token = duelOfferAnswerToken(offer, this.actions);
     if (action === undefined || token === null) return;
+    if ((this.autoActivateItems && !this.canFinalizeAction(player.id, action)) || (action.resolveMode === "banked" && !this.inventories[player.id].canStore(action))) {
+      events.push({ type: "action-blocked", playerId: player.id, targetInstanceId: offer.instanceId, actionId: offer.actionId, reason: this.blockReason(player.id, action) });
+      return; // Preserve an existing prefix until a slot is freed.
+    }
     const expected = token[offer.typedPrefix.length];
     if (expected !== char) {
       this.recordWrongCharacter(player);
@@ -1477,7 +1551,7 @@ export class DuelEngine {
       return;
     }
 
-    this.recordCorrectCharacter(player, events);
+    this.recordCorrectCharacter(player, events, [{ id: offer.instanceId, progress: offer.typedPrefix.length + 1 }]);
     offer.typedPrefix += char;
     player.acquisitionPrefix = offer.typedPrefix;
     this.completeIfFinished(player, offer, events);
@@ -1517,7 +1591,7 @@ export class DuelEngine {
       return;
     }
 
-    this.recordCorrectCharacter(player, events);
+    this.recordCorrectCharacter(player, events, [{ id: threatId, progress: player.acquisitionPrefix.length + 1 }]);
     const threat = this.threats.getOpenThreat(player.id, threatId);
     player.acquisitionPrefix = threat?.typedPrefix ?? "";
     if (result.completed) {
@@ -1561,7 +1635,7 @@ export class DuelEngine {
       return;
     }
 
-    this.recordCorrectCharacter(player, events);
+    this.recordCorrectCharacter(player, events, [{ id: objectiveId, progress: this.objectives.progressFor(player.id, objectiveId)?.length ?? player.acquisitionPrefix.length + 1 }]);
     player.acquisitionPrefix =
       this.objectives.progressFor(player.id, objectiveId) ?? "";
     if (result.completed) {
@@ -1702,6 +1776,9 @@ export class DuelEngine {
       action.cooldownSeconds,
     );
     offer.status = "completed";
+    if (this.autoActivateItems && action.category !== "attack") {
+      events.push({ type: "action-fired", playerId: player.id, actionId: action.id });
+    }
     events.push({
       type: "action-completed",
       playerId: player.id,
@@ -1924,6 +2001,22 @@ export class DuelEngine {
     return false;
   }
 
+  private queueProjectileEffect(
+    effect: DuelCombatEffect,
+    sourceId: DuelPlayerId,
+    immediateEffects: DuelCombatEffect[] = this.pendingEffects,
+  ): void {
+    if (this.typingCannon && effect.type === "damage") {
+      const speed = this.tactical.snapshot().projectileSpeedScale[sourceId] ?? 1;
+      this.travellingEffects.push({
+        due: this.elapsedSeconds + duelProjectileTravelMs(speed) / 1000,
+        effect,
+      });
+    } else {
+      immediateEffects.push(effect);
+    }
+  }
+
   private queueActionResolution(
     action: DuelActionDefinition,
     playerId: DuelPlayerId,
@@ -1941,8 +2034,7 @@ export class DuelEngine {
         ? this.consumePrecisionBonus(playerId)
         : null;
     let precisionApplied = false;
-    this.pendingEffects.push(
-      ...resolution.effects.map((effect) => {
+    const effects = resolution.effects.map((effect) => {
         if (
           effect.type === "damage" &&
           effect.sourceId === playerId
@@ -1968,8 +2060,14 @@ export class DuelEngine {
           return { ...effect, amount: effect.amount * quality };
         }
         return effect;
-      }),
-    );
+      });
+    for (const effect of effects) {
+      if (action.category === "attack") {
+        this.queueProjectileEffect(effect, playerId);
+      } else {
+        this.pendingEffects.push(effect);
+      }
+    }
     for (const effect of resolution.tacticalEffects) {
       this.tactical.apply({
         ...effect,
@@ -2109,6 +2207,14 @@ export class DuelEngine {
       return;
     }
     const action = this.actions.get(offer.actionId);
+    if (action && this.autoActivateItems && !this.canFinalizeAction(player.id, action)) {
+      events.push({ type: "action-blocked", playerId: player.id, targetInstanceId: offer.instanceId, actionId: offer.actionId, reason: this.blockReason(player.id, action) });
+      return;
+    }
+    if (action?.resolveMode === "banked" && !this.inventories[player.id].canStore(action)) {
+      events.push({ type: "action-blocked", playerId: player.id, targetInstanceId: offer.instanceId, actionId: offer.actionId, reason: "inventory-full" });
+      return;
+    }
     if (
       action?.resolveMode === "instant" &&
       !this.cooldowns.isReady(player.id, action.id)
@@ -2211,10 +2317,12 @@ export class DuelEngine {
         return offer.status === "locked";
       }
       const action = this.actions.get(offer.actionId);
+      if (action && this.autoActivateItems) return this.canFinalizeAction(player.id, action);
       return (
         action === undefined ||
-        action.resolveMode === "banked" ||
-        this.cooldowns.isReady(player.id, action.id)
+        (action.resolveMode === "banked"
+          ? this.inventories[player.id].canStore(action)
+          : this.cooldowns.isReady(player.id, action.id))
       );
     });
   }
@@ -2469,12 +2577,12 @@ export class DuelEngine {
     const combo = duelComboEffect(comboId);
     const effects: DuelCombatEffect[] = [];
     if (combo.damage > 0) {
-      effects.push({
+      this.queueProjectileEffect({
         type: "damage",
         targetId: otherPlayer(playerId),
         sourceId: playerId,
         amount: combo.damage * this.strategy.attackScale(playerId),
-      });
+      }, playerId, effects);
     }
     if (combo.shield > 0) {
       effects.push({
@@ -2678,6 +2786,8 @@ export class DuelEngine {
     }
 
     if (result !== null) {
+      this.cannonShots.length = 0;
+      this.travellingEffects.length = 0;
       this.roundResult = result;
       events.push({ type: "round-ended", result: { ...result } });
     }

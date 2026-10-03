@@ -100,7 +100,7 @@ describe("Duel FINAL V4 typing prompt director", () => {
       "player-1",
       "skirmish",
     );
-    expect(initial).toHaveLength(5);
+    expect(initial).toHaveLength(3);
 
     const refill = draft.refillPrivateOffer(
       "player-1",
@@ -136,10 +136,10 @@ describe("Duel FINAL V4 typing prompt director", () => {
         "player-1",
         "war",
       );
-      expect(offers).toHaveLength(5);
+      expect(offers).toHaveLength(3);
 
       for (let cycle = 0; cycle < 250; cycle += 1) {
-        const slotIndex = cycle % 5;
+        const slotIndex = cycle % offers.length;
         const active = offers.filter(
           (offer) => offer.slotIndex !== slotIndex,
         );

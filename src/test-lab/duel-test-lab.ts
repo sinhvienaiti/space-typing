@@ -229,6 +229,8 @@ class DuelTestLabRuntime {
 
   restart(): void {
     this.engine = new DuelEngine({
+      typingCannon: true,
+      autoActivateItems: true,
       regulationSeconds: 240,
       hardOvertimeSeconds: 45,
       maxHull: 100,
@@ -244,12 +246,14 @@ class DuelTestLabRuntime {
       DUEL_MAPS[this.mapId].categoryMultiplier;
     this.drafts = {
       "player-1": new DuelOfferDraft({
+        ensureEnergyOffer: true,
         seed: this.seed ^ 0x51a7,
         actions: duelActionsForMap(this.mapId),
         enabledCategories: CATEGORIES,
         categoryMultiplier: multiplier,
       }),
       "player-2": new DuelOfferDraft({
+        ensureEnergyOffer: true,
         seed: this.seed ^ 0xb071,
         actions: duelActionsForMap(this.mapId),
         enabledCategories: CATEGORIES,
@@ -522,6 +526,7 @@ class DuelTestLabRuntime {
     const intents = this.bot.update(
       dtSeconds,
       duelBotObservation({
+        autoActivateItems: true,
         mapId: this.mapId,
         phase: snapshot.phase,
         self: {

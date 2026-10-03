@@ -85,6 +85,37 @@ export function pickHeadSprite(set: ShotSpriteSet | null, finisher: boolean): Sh
 const loaded = new Map<string, ShotSpriteSet>();
 const requested = new Set<string>();
 
+/** Preserve premultiplied light energy while removing an opaque black matte.
+ * Campaign draws these with additive blending; Duel also needs them on a
+ * transparent layer. This is done once on load, never in a frame loop. */
+export function decodeLightSpriteAlpha(pixels: Uint8ClampedArray): void {
+  for (let i = 0; i < pixels.length; i += 4) {
+    const peak = Math.max(pixels[i]!, pixels[i + 1]!, pixels[i + 2]!);
+    if (peak === 0) { pixels[i + 3] = 0; continue; }
+    pixels[i + 3] = Math.round(pixels[i + 3]! * peak / 255);
+    pixels[i] = Math.round(pixels[i]! * 255 / peak);
+    pixels[i + 1] = Math.round(pixels[i + 1]! * 255 / peak);
+    pixels[i + 2] = Math.round(pixels[i + 2]! * 255 / peak);
+  }
+}
+
+async function alphaLightImage(image: HTMLImageElement): Promise<CanvasImageSource> {
+  const canvas = document.createElement("canvas");
+  canvas.width = image.naturalWidth;
+  canvas.height = image.naturalHeight;
+  const context = canvas.getContext("2d");
+  if (context === null) return image;
+  context.drawImage(image, 0, 0);
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+  decodeLightSpriteAlpha(pixels.data);
+  context.putImageData(pixels, 0, 0);
+  if (typeof createImageBitmap === "function") {
+    try { return await createImageBitmap(canvas); }
+    catch { /* Keep decoded art even if bitmap allocation is unavailable. */ }
+  }
+  return canvas;
+}
+
 /** Loaded sprites of one fx folder, or null while loading / unavailable. */
 export function shotSpriteSet(fx: string | null): ShotSpriteSet | null {
   return fx === null ? null : loaded.get(fx) ?? null;
@@ -120,7 +151,7 @@ export function preloadShotSprites(fx: string | null): void {
           try {
             const image = await loadImage(spec.url);
             set[id as ShotSpriteId] = {
-              image,
+              image: await alphaLightImage(image),
               width: spec.width,
               height: spec.height,
               anchorX: spec.anchor[0],

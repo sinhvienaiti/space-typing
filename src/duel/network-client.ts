@@ -13,7 +13,8 @@ import {
   duelOfferAnswerToken,
   matchingDuelOffers,
 } from "./typing";
-import { duelActionMapForMap } from "./map-actions";
+import { duelLiveActionMapForMap as duelActionMapForMap } from "./map-actions";
+import { duelAutoActionBlock } from "./offer-availability";
 
 export type DuelNetworkStatus =
   | "idle"
@@ -664,6 +665,10 @@ export class DuelNetworkClient {
       intent.targetInstanceId !== undefined
     ) {
       this.predictTarget(intent.targetInstanceId, view);
+      if (this.prediction.targetInstanceId !== intent.targetInstanceId) {
+        this.emitPrediction();
+        return;
+      }
     }
 
     const char = intent.char.toLocaleLowerCase("en-US");
@@ -673,6 +678,11 @@ export class DuelNetworkClient {
     }
 
     if (this.prediction.targetInstanceId !== null) {
+      const offer = view.self.offers.find(item => item.instanceId === this.prediction.targetInstanceId);
+      if (offer && duelAutoActionBlock(duelActionMapForMap(view.map.id).get(offer.actionId), view.self.energy, view.self.cooldowns[offer.actionId])) {
+        this.emitPrediction();
+        return;
+      }
       const token = this.targetToken(
         this.prediction.targetInstanceId,
         view,
@@ -690,7 +700,7 @@ export class DuelNetworkClient {
       this.prediction.acquisitionPrefix + char;
     const matches = matchingDuelOffers(
       nextPrefix,
-      view.self.offers,
+      view.self.offers.filter(offer => !duelAutoActionBlock(duelActionMapForMap(view.map.id).get(offer.actionId), view.self.energy, view.self.cooldowns[offer.actionId])),
       duelActionMapForMap(view.map.id),
     );
     if (matches.length > 0) {
@@ -712,6 +722,7 @@ export class DuelNetworkClient {
         candidate.instanceId === targetInstanceId,
     );
     if (offer !== undefined) {
+      if (duelAutoActionBlock(duelActionMapForMap(view.map.id).get(offer.actionId), view.self.energy, view.self.cooldowns[offer.actionId])) return;
       this.prediction.targetInstanceId =
         targetInstanceId;
       this.prediction.acquisitionPrefix =

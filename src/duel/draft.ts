@@ -66,6 +66,8 @@ export const DUEL_CORE_DRAFT_CATEGORIES = [
 ] as const satisfies readonly DuelActionCategory[];
 
 export type DuelOfferDraftConfig = {
+  /** Auto-use combat must always have a free recovery word, never three unaffordable skills. */
+  ensureEnergyOffer?: boolean;
   seed: number;
   actions?: readonly DuelActionDefinition[];
   enabledCategories?: readonly DuelActionCategory[];
@@ -134,6 +136,7 @@ export function normalizedDuelCategoryWeights(
 }
 
 export class DuelOfferDraft {
+  private readonly ensureEnergyOffer: boolean;
   private readonly rng: DuelRng;
   private readonly actions: readonly DuelActionDefinition[];
   private readonly enabledCategories: readonly DuelActionCategory[];
@@ -144,6 +147,7 @@ export class DuelOfferDraft {
   private nextInstance = 1;
 
   constructor(config: DuelOfferDraftConfig) {
+    this.ensureEnergyOffer = config.ensureEnergyOffer ?? false;
     this.rng = new DuelRng(config.seed);
     this.actions = config.actions ?? DUEL_ACTIONS;
     this.enabledCategories =
@@ -232,7 +236,10 @@ export class DuelOfferDraft {
       existingInitials,
       runtimeCategoryMultiplier,
     );
-    const action = this.pick(weighted);
+    const recovery = this.ensureEnergyOffer && !existingActionIds.has("energy")
+      ? source.find(action => action.id === "energy" && action.energyCost === 0 && action.cooldownSeconds === 0)
+      : undefined;
+    const action = recovery ?? this.pick(weighted);
     if (action === null) return null;
 
     const instanceId =

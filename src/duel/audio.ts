@@ -8,7 +8,11 @@ import {
   type DuelMapId,
 } from "./maps";
 import type { DuelMatchPhase } from "./model";
-import { duelProjectileTravelMs } from "./presentation-timing";
+import {
+  DUEL_KO_TIMELINE,
+  duelProjectileTravelMs,
+} from "./presentation-timing";
+import type { DuelMomentumEvent } from "./momentum";
 
 export const DUEL_AUDIO_WORLD_SOURCE: Readonly<
   Record<DuelMapId, string>
@@ -122,13 +126,41 @@ export type DuelCombatAudioCue =
   | "cataclysm"
   | "round-win"
   | "round-loss"
-  | "round-draw";
+  | "round-draw"
+  // Presentation-driven cues (2026-10-03 impact pass).
+  | "type-tick"
+  | "streak-tier"
+  | "streak-break"
+  | "shield-hit"
+  | "shield-break"
+  | "ko-blast"
+  | "ko-final"
+  | "match-win"
+  | "match-loss"
+  | "round-ready"
+  | "fight"
+  | "phase-shift";
 
 export type DuelTimedAudioCue = {
   cue: DuelCombatAudioCue;
   delayMs: number;
   side: "self" | "opponent" | "arena";
+  /** Streak length (type-tick) or chain index (ko-blast). */
+  step?: number;
+  /** Momentum tier, 0…6. */
+  tier?: number;
 };
+
+/**
+ * Moments the battle UI derives itself (they are not engine events), passed
+ * along so sound follows exactly what is drawn.
+ */
+export type DuelPresentationBeat =
+  | { type: "momentum"; event: DuelMomentumEvent }
+  | { type: "shield-hit"; side: "self" | "opponent" }
+  | { type: "shield-break"; side: "self" | "opponent" }
+  | { type: "round-start"; round: number }
+  | { type: "phase"; phase: DuelMatchPhase };
 
 function actionCues(
   mapId: DuelMapId,
@@ -180,6 +212,19 @@ export function duelCombatAudioCues(
 
   for (const event of events) {
     switch (event.type) {
+      case "cannon-fired":
+        cues.push({ cue: "laser-launch", delayMs: 0, side: event.playerId === selfId ? "self" : "opponent" });
+        break;
+      case "cannon-hit":
+        cues.push({ cue: "energy-impact", delayMs: 0, side: event.targetPlayerId === selfId ? "self" : "opponent" });
+        break;
+      case "combo-used":
+        if (["homing-barrage", "gravity-bomb", "overcharged-railgun"].includes(event.comboId)) {
+          pushAction(event.playerId, "railgun");
+        } else {
+          cues.push({ cue: "support", delayMs: 0, side: event.playerId === selfId ? "self" : "opponent" });
+        }
+        break;
       case "typing-miss":
         if (event.playerId === selfId) {
           cues.push({
@@ -218,10 +263,7 @@ export function duelCombatAudioCues(
         });
         break;
       case "threat-resolved":
-        pushAction(
-          event.sourcePlayerId,
-          event.actionId,
-        );
+        cues.push({ cue: actionCues(view.map.id, event.actionId)?.impact ?? "heavy-impact", delayMs: 0, side: event.targetPlayerId === selfId ? "self" : "opponent" });
         break;
       case "precision-firepower":
         cues.push({
@@ -254,23 +296,80 @@ export function duelCombatAudioCues(
           side: "arena",
         });
         break;
-      case "round-ended":
+      case "round-ended": {
+        // The K.O. timeline: chain blasts, the final blast, the result
+        // stinger, then the next-round call (DUEL_KO_TIMELINE).
+        const result = event.result;
+        const loserSide =
+          result.status === "won"
+            ? result.winnerId === selfId ? "opponent" : "self"
+            : null;
+        const knockedOut =
+          loserSide !== null || (view.self.hull <= 0 || view.opponent.hull <= 0);
+        if (knockedOut) {
+          const side = loserSide ?? (view.self.hull <= 0 ? "self" : "opponent");
+          DUEL_KO_TIMELINE.chainMs.forEach((delayMs, step) => {
+            cues.push({ cue: "ko-blast", delayMs, side, step });
+          });
+          cues.push({ cue: "ko-final", delayMs: DUEL_KO_TIMELINE.finalMs, side });
+        }
+        const seriesOver = view.series.status !== "active";
         cues.push({
           cue:
-            event.result.status === "draw"
+            result.status === "draw"
               ? "round-draw"
-              : event.result.winnerId === selfId
-                ? "round-win"
-                : "round-loss",
-          delayMs: 0,
+              : result.winnerId === selfId
+                ? seriesOver ? "match-win" : "round-win"
+                : seriesOver ? "match-loss" : "round-loss",
+          delayMs: knockedOut ? DUEL_KO_TIMELINE.bannerMs : 300,
           side: "arena",
         });
+        if (!seriesOver) {
+          cues.push({ cue: "round-ready", delayMs: DUEL_KO_TIMELINE.readyMs, side: "arena" });
+        }
         break;
+      }
       default:
         break;
     }
   }
 
+  return cues;
+}
+
+/** Cues for presentation beats; immediate, never deduplicated by sequence. */
+export function duelBeatAudioCues(
+  beats: readonly DuelPresentationBeat[],
+): DuelTimedAudioCue[] {
+  const cues: DuelTimedAudioCue[] = [];
+  for (const beat of beats) {
+    switch (beat.type) {
+      case "momentum":
+        if (beat.event.type === "tick") {
+          cues.push({ cue: "type-tick", delayMs: 0, side: "self", step: beat.event.streak, tier: beat.event.tier });
+        } else if (beat.event.type === "tier-up") {
+          cues.push({ cue: "streak-tier", delayMs: 0, side: "self", step: beat.event.streak, tier: beat.event.tier });
+        } else if (beat.event.lost >= 10) {
+          cues.push({ cue: "streak-break", delayMs: 0, side: "self", step: beat.event.lost, tier: beat.event.tier });
+        }
+        break;
+      case "shield-hit":
+        cues.push({ cue: "shield-hit", delayMs: 0, side: beat.side });
+        break;
+      case "shield-break":
+        cues.push({ cue: "shield-break", delayMs: 0, side: beat.side });
+        break;
+      case "round-start":
+        cues.push({ cue: "fight", delayMs: 0, side: "arena", step: beat.round });
+        break;
+      case "phase": {
+        // The map-cataclysm event already plays the cataclysm sample.
+        const tier = ["build", "skirmish", "war", "crisis", "cataclysm"].indexOf(beat.phase);
+        cues.push({ cue: "phase-shift", delayMs: 0, side: "arena", tier: Math.max(0, tier) });
+        break;
+      }
+    }
+  }
   return cues;
 }
 
@@ -286,10 +385,12 @@ export class DuelCombatAudioRouter {
   consume(
     view: import("./authority").DuelClientMatchView,
     events: readonly import("./authority").DuelClientEvent[],
+    beats: readonly DuelPresentationBeat[] = [],
   ): void {
     if (this.roundId !== view.roundId) {
       this.reset(view.roundId);
     }
+    for (const cue of duelBeatAudioCues(beats)) this.play(cue);
 
     const cues = duelCombatAudioCues(view, events);
     cues.forEach((cue, index) => {

@@ -1765,8 +1765,8 @@
 }
 
 .duel-arena .duel-projectile-laser {
-  width: 3px;
-  height: clamp(64px, 11vh, 112px);
+  width: 7px;
+  height: clamp(68px, 11vh, 112px);
 }
 
 .duel-arena .duel-projectile-missile {
@@ -2235,6 +2235,18 @@
     inset 0 0 28px rgba(var(--duel-danger, 255, 100, 140), 0.14);
 }
 
+.duel-projectile-arrival-laser {
+  inset: 8%;
+  background: radial-gradient(circle, #fff 0 7%, #80eaff 12%, transparent 57%);
+  border-color: #9aefff;
+  animation-duration: 260ms;
+}
+.duel-projectile-arrival-laser::after {
+  content: ""; position: absolute; inset: -18%;
+  background: conic-gradient(from 15deg, transparent 0 30deg, #fff4b8 32deg 34deg, transparent 36deg 145deg, #89efff 147deg 150deg, transparent 152deg 235deg, #fff1ab 237deg 239deg, transparent 241deg);
+  border-radius: 50%;
+}
+
 @keyframes duel-threat-charge {
   0%,
   100% {
@@ -2666,7 +2678,7 @@
   z-index: 11;
   left: 50%;
   top: 50%;
-  width: min(72vw, 920px);
+  width: min(32vw, 380px);
   aspect-ratio: 1;
   transform: translate(-50%, -50%) scale(0.18);
   opacity: 0;
@@ -2697,7 +2709,7 @@
 
 .duel-map-painted-shockwave {
   z-index: 10;
-  width: min(92vw, 1240px);
+  width: min(45vw, 540px);
   animation:
     duel-painted-map-shockwave
     920ms
@@ -2707,7 +2719,7 @@
 
 .duel-map-secondary-explosion {
   left: var(--duel-secondary-x, 50%);
-  width: min(28vw, 360px);
+  width: min(16vw, 190px);
   animation:
     duel-painted-secondary-blast
     680ms
@@ -2974,6 +2986,90 @@
   display: none !important;
 }
 
+/* Combat controls belong to the battlefield, not the hidden debug panels. */
+.duel-combat-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 6;
+  pointer-events: none;
+}
+.duel-ship-canvas {
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 1;
+}
+.duel-campaign-renderer .duel-ship-sprite {
+  visibility: hidden;
+}
+
+.duel-arsenal {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 22;
+  max-width: min(680px, 65vw);
+  padding: 8px 14px;
+  border: 1px solid rgba(99, 212, 255, .3);
+  border-radius: 12px;
+  background: rgba(3, 12, 24, .92);
+  box-shadow: 0 0 24px rgba(34, 135, 218, .12);
+}
+.duel-arsenal-help { color: #a9f3ff; font: 700 10px/1.4 system-ui; letter-spacing: .08em; }
+.duel-arsenal-help span { color: #c1cad4; margin-left: 12px; font-weight: 400; letter-spacing: 0; }
+.duel-arsenal .duel-inventory { display: flex; gap: 12px; margin-top: 5px; flex-wrap: wrap; }
+.duel-arsenal .duel-inventory-group { display: flex; align-items: center; gap: 5px; }
+.duel-arsenal .duel-inventory-group > small { font-size: 9px; color: #90acbc; }
+.duel-arsenal .duel-inventory-chip { padding: 5px 9px; font-size: 10px; border-color: #42788d; }
+.duel-arsenal .duel-inventory-chip:disabled { opacity: .45; }
+.duel-arsenal .duel-empty-chip { font-size: 10px; opacity: .45; }
+.duel-muzzle-flash {
+  position: absolute; top: 20%; left: 50%; width: 34px; height: 34px;
+  transform: translate(-50%, -50%); pointer-events: none;
+  background: radial-gradient(circle, #fff 0 8%, #9af3ff 20%, transparent 68%);
+  mix-blend-mode: screen; animation: duel-muzzle-pop 110ms ease-out both;
+}
+.duel-ship-opponent .duel-muzzle-flash {
+  top: auto; bottom: 20%;
+  background: radial-gradient(circle, #fff 0 8%, #ff9d66 20%, transparent 68%);
+}
+.duel-damage-number {
+  position: absolute; left: 74%; top: 10%; z-index: 15;
+  color: #aff9ff; font: 800 17px/1 system-ui; pointer-events: none;
+  text-shadow: 0 2px 4px #00101b; animation: duel-damage-rise 600ms ease-out both;
+}
+.duel-damage-number.hull-hit { color: #ffb886; }
+.duel-shield-break {
+  position: absolute; inset: -24%; border: 3px dashed #b4f7ff; border-radius: 50%;
+  box-shadow: 0 0 24px #60bfff, inset 0 0 16px #a5f8ff;
+  pointer-events: none; animation: duel-break-wave 500ms ease-out both;
+}
+#duelSelfHullFill, #duelOpponentHullFill { background: linear-gradient(90deg, #fd5d65, #ffb198); }
+#duelSelfShieldFill, #duelOpponentShieldFill { background: linear-gradient(90deg, #238efa, #8feaff); }
+#duelSelfEnergyFill, #duelOpponentEnergyFill { background: linear-gradient(90deg, #daa94e, #ffeb9b); }
+@keyframes duel-damage-rise {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-30px); }
+}
+@keyframes duel-break-wave {
+  from { opacity: 1; transform: scale(.7); }
+  to { opacity: 0; transform: scale(1.65); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .duel-damage-number { animation: none; }
+  .duel-shield-break, .duel-muzzle-flash { display: none; }
+}
+@keyframes duel-muzzle-pop {
+  from { opacity: 1; scale: 1.1; }
+  to { opacity: 0; scale: .3; }
+}
+
 .duel-arena .duel-player-card {
   width: clamp(148px, 14vw, 205px);
   gap: 0.2rem;
@@ -3037,7 +3133,7 @@
 }
 
 .duel-self-zone .duel-ship-frame {
-  bottom: clamp(32px, 4.5vh, 58px);
+  bottom: clamp(104px, 14vh, 132px);
 }
 
 .duel-arena .duel-ship-sprite {
@@ -3293,10 +3389,10 @@
 }
 
 .duel-arena-input {
-  left: 50%;
-  bottom: 18%;
+  left: 25%;
+  bottom: 12%;
   width: auto;
-  max-width: min(340px, 42%);
+  max-width: min(340px, 30%);
   grid-template-columns: auto auto auto;
   gap: 0.45rem;
   padding: 0.28rem 0.48rem;
@@ -3378,7 +3474,7 @@
   }
 
   .duel-self-zone .duel-ship-frame {
-    bottom: 42px;
+    bottom: 140px;
   }
 
   .duel-word-target {
@@ -3499,3 +3595,80 @@
 .duel-target-object.duel-target-object-painted {
   filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.38));
 }
+
+/* Energy/cooldown-blocked words stay legible, but cannot acquire input. */
+.duel-battle .duel-word-target.action-unavailable {
+  opacity: 1;
+  filter: none;
+  cursor: not-allowed;
+  animation-play-state: paused;
+}
+.duel-battle .duel-word-target.action-unavailable .duel-target-object {
+  filter: grayscale(1);
+  opacity: .38;
+}
+.duel-battle .duel-word-target.action-unavailable .duel-offer-token,
+.duel-battle .duel-word-target.action-unavailable .duel-offer-token b,
+.duel-battle .duel-word-target.action-unavailable .duel-offer-token i,
+.duel-battle .duel-word-target.action-unavailable .duel-offer-label {
+  color: #929ba5;
+  text-shadow: none;
+  border-color: #67717d;
+}
+.duel-battle .duel-word-target.action-unavailable .duel-offer-meta {
+  display: block;
+  color: #d5dbe3;
+  background: rgba(5, 10, 18, .9);
+  border-radius: 5px;
+  padding: 3px 5px;
+  font-size: 10px;
+  max-width: 190px;
+}
+.duel-battle .duel-word-target.action-unavailable::before { opacity: 0; }
+.duel-auto-combat { width: max-content; max-width: 70%; }
+.duel-auto-combat .duel-arsenal-help { flex-wrap: wrap; justify-content: center; margin: 0; }
+
+/* Container-selected layout: wide desktop, not all landscape phones. */
+.duel-battle[data-layout="horizontal"] .duel-self-zone .duel-ship-frame {
+  left: 12%; top: 50%; bottom: auto;
+  transform: translate(-50%, -50%);
+}
+.duel-battle[data-layout="horizontal"] .duel-rival-zone .duel-ship-frame {
+  left: 88%; top: 50%; bottom: auto;
+  transform: translate(-50%, -50%);
+}
+.duel-battle[data-layout="horizontal"] .duel-self-zone .duel-ship-sprite { transform: rotate(90deg); }
+.duel-battle[data-layout="horizontal"] .duel-rival-zone .duel-ship-sprite { transform: rotate(-90deg); }
+.duel-battle[data-layout="horizontal"] .duel-rival-zone .duel-player-card {
+  top: auto; bottom: 12px; left: auto; right: 12px;
+}
+.duel-battle[data-layout="horizontal"] .duel-opponent-charge {
+  top: calc(50% + 64px); left: 88%;
+}
+.duel-battle[data-layout="horizontal"] .duel-word-target {
+  left: var(--duel-target-x-horizontal);
+  top: var(--duel-target-y-horizontal);
+}
+.duel-battle[data-layout="horizontal"] .duel-arena-input {
+  left: 50%; bottom: 17%; max-width: min(580px, 60%);
+}
+.duel-battle[data-layout="horizontal"] .duel-threat-lane { top: 3%; }
+.duel-battle[data-layout="horizontal"] .duel-objective-lane { top: 12%; }
+
+.duel-battle[data-layout="horizontal"] .duel-threat-telegraph {
+  left: 12%; top: 50%; bottom: auto;
+  width: 76%; height: 2px;
+  transform: translateY(-50%);
+  background: linear-gradient(90deg, transparent, rgba(var(--duel-danger, 255, 100, 140), .92) 20%, rgba(var(--duel-accent-2, 180, 240, 255), .48) 78%, transparent);
+}
+.duel-battle[data-layout="horizontal"] .duel-threat-telegraph-from-opponent {
+  transform: translateY(-50%) rotate(180deg);
+}
+.duel-battle[data-layout="horizontal"] .duel-threat-telegraph::before,
+.duel-battle[data-layout="horizontal"] .duel-threat-telegraph::after {
+  top: 50%; bottom: auto; transform: translate(-50%, -50%);
+}
+.duel-battle[data-layout="horizontal"] .duel-threat-telegraph::before { left: 0; }
+.duel-battle[data-layout="horizontal"] .duel-threat-telegraph::after { left: 100%; }
+.duel-battle[data-layout="horizontal"] .duel-tactical-field[data-from-self="true"] { left: 41%; top: 50%; }
+.duel-battle[data-layout="horizontal"] .duel-tactical-field[data-from-self="false"] { left: 59%; top: 50%; }

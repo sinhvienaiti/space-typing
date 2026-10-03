@@ -33,6 +33,7 @@ import {
   type DuelWireIntent,
 } from "./protocol";
 import { DUEL_RANKED_RULESET } from "./ranked";
+import { DUEL_ROUND_BREAK_SECONDS } from "./presentation-timing";
 import {
   DuelRoom,
   validateDuelRoomSettings,
@@ -311,6 +312,8 @@ type MatchRecord = {
   };
   serverSequence: number;
   needsRoundReset: boolean;
+  /** Seconds left in the between-round break (K.O. and result screen). */
+  roundBreakSeconds: number;
 };
 
 type JsonObject = Record<string, unknown>;
@@ -1261,6 +1264,7 @@ export class DuelAuthorityService {
       },
       serverSequence: 0,
       needsRoundReset: false,
+      roundBreakSeconds: 0,
     };
 
     this.dealRoundOffers(match);
@@ -1432,6 +1436,7 @@ export class DuelAuthorityService {
       },
       serverSequence: 0,
       needsRoundReset: false,
+      roundBreakSeconds: 0,
     };
 
     this.dealRoundOffers(match);
@@ -1553,6 +1558,18 @@ export class DuelAuthorityService {
     }
 
     if (match.needsRoundReset) {
+      // Hold the finished round so both players see the K.O. and result.
+      match.roundBreakSeconds -= Math.max(0, Number.isFinite(dtSeconds) ? dtSeconds : 0);
+      if (match.roundBreakSeconds > 1e-9) {
+        match.serverSequence += 1;
+        return {
+          ok: true,
+          value: {
+            serverSequence: match.serverSequence,
+            updates: this.updatesForMatch(match, []),
+          },
+        };
+      }
       this.beginNextRound(match);
       match.needsRoundReset = false;
     }
@@ -1753,6 +1770,8 @@ export class DuelAuthorityService {
   ): DuelEngine {
     const tuning = duelRuntimeTuning(settings);
     return new DuelEngine({
+      typingCannon: true,
+      autoActivateItems: true,
       regulationSeconds: settings.matchLengthSeconds,
       escalationSeconds: tuning.escalationSeconds,
       hazardIntervalScale: tuning.hazardIntervalScale,
@@ -1780,6 +1799,7 @@ export class DuelAuthorityService {
   ): DuelOfferDraft {
     const tuning = duelRuntimeTuning(settings);
     return new DuelOfferDraft({
+      ensureEnergyOffer: true,
       seed: deriveSeed(seed, offset),
       actions: duelActionsForMap(mapId),
       enabledCategories: ALL_CATEGORIES,
@@ -1916,6 +1936,7 @@ export class DuelAuthorityService {
         ? "player-2"
         : "player-1";
     const observation = duelBotObservation({
+      autoActivateItems: true,
       mapId: match.mapId,
       phase: snapshot.phase,
       self: {
@@ -1984,6 +2005,7 @@ export class DuelAuthorityService {
     }
 
     match.needsRoundReset = true;
+    match.roundBreakSeconds = DUEL_ROUND_BREAK_SECONDS;
   }
 
   private beginNextRound(match: MatchRecord): void {

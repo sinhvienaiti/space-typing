@@ -2,6 +2,7 @@ import {
   DUEL_ACTIONS,
   DUEL_ACTIONS_BY_ID,
 } from "./actions";
+import { autoActivateDuelAction } from "./offer-availability";
 import {
   hasDuelTokenPrefixConflict,
   isValidDuelAnswerToken,
@@ -106,6 +107,16 @@ export function duelActionMapForMap(
   mapId: DuelMapId,
 ): ReadonlyMap<string, DuelActionDefinition> {
   return MAP_ACTIONS_BY_ID[mapId];
+}
+
+const LIVE_ACTION_MAPS = new Map<DuelMapId, ReadonlyMap<string, DuelActionDefinition>>();
+export function duelLiveActionMapForMap(mapId: DuelMapId): ReadonlyMap<string, DuelActionDefinition> {
+  let actions = LIVE_ACTION_MAPS.get(mapId);
+  if (!actions) {
+    actions = new Map([...duelActionMapForMap(mapId)].map(([id, action]) => [id, autoActivateDuelAction(action)]));
+    LIVE_ACTION_MAPS.set(mapId, actions);
+  }
+  return actions;
 }
 
 export function duelActionDefinitionForMap(

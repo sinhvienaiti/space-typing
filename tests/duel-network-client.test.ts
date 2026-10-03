@@ -177,6 +177,7 @@ function matchView(input?: {
       initiative: 0,
       strategyPath: "balanced",
       readyCombos: [],
+      cooldowns: {},
       ownPity: 0,
     },
     opponent: {
@@ -340,6 +341,41 @@ describe("Duel Friend Room browser transport", () => {
         },
       }),
     );
+  });
+
+  it("blocks auto-use prediction for insufficient energy, preserves prefix, then resumes after recharge", () => {
+    const socket = new FakeSocket();
+    const predictions: DuelLocalPrediction[] = [];
+    const client = new DuelNetworkClient({ url: "wss://example.test/duel", clientVersion: "0.1.0", socketFactory: () => socket,
+      callbacks: { onPrediction: prediction => predictions.push(prediction) } });
+    client.connect("signed-token"); socket.open(); welcome(socket);
+    const view = matchView();
+    view.self.offers[0]!.actionId = "shield";
+    view.self.offers[0]!.typingPrompt = { promptId: "p", wordId: "provide", answerToken: "provide", lexiconVersion: "test", difficultyClass: "core" };
+    view.self.inventory = { attack: [], tactical: [], defense: [1, 2].map(i => ({ instanceId: "stored:" + i, actionId: "reflect", storedAtTick: i, qualityScale: 1 })) };
+    view.self.energy = 0;
+    const update = () => socket.message({ type: "MATCH_UPDATE", matchId: "match-1", roundId: "round-1", serverSequence: view.serverSequence, events: [], snapshot: view });
+    update();
+    client.sendIntent({ type: "SELECT_TARGET", targetInstanceId: "offer:player-1:1" });
+    client.sendIntent({ type: "TYPE_CHAR", char: "p" });
+    expect(predictions.at(-1)?.targetInstanceId).toBeNull();
+    expect(predictions.at(-1)?.acquisitionPrefix).toBe("");
+    // An already-locked prefix from authority is not erased or advanced.
+    view.serverSequence = 1;
+    view.self.lastAcceptedSequence = 2;
+    view.self.targetInstanceId = "offer:player-1:1";
+    view.self.acquisitionPrefix = "provid";
+    view.self.offers[0]!.typedPrefix = "provid";
+    view.self.offers[0]!.status = "locked";
+    update();
+    client.sendIntent({ type: "TYPE_CHAR", char: "e" });
+    expect(predictions.at(-1)?.acquisitionPrefix).toBe("provid");
+    view.serverSequence = 2;
+    view.self.lastAcceptedSequence = 3;
+    view.self.energy = 20; // Legacy bank contents must not block immediate activation.
+    update();
+    client.sendIntent({ type: "TYPE_CHAR", char: "e" });
+    expect(predictions.at(-1)?.acquisitionPrefix).toBe("provide");
   });
 
   it("reconciles prediction from authority and ignores older snapshots", () => {

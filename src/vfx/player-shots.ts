@@ -299,6 +299,30 @@ export type ShotFireOptions<P> = {
    * offsets rotate with it so bolts leave the hull where its guns are.
    */
   originAngle?: number;
+  /** Scale muzzle positions with a differently sized ship (Campaign defaults to 1). */
+  originScale?: number;
+  /** Independent gun cycle when one renderer presents multiple ships. */
+  muzzleIndex?: number;
+  /** Optional authority flight clock; omitted by Campaign. */
+  flightSeconds?: number;
+  /** Duel waits for a confirmed hit before displaying the impact. */
+  deferImpact?: boolean;
+  /** Side-on Duel fire has no vertical perspective; Campaign keeps depth cues. */
+  flatDepth?: boolean;
+  /** Flight easing exponent (>1 accelerates); defaults to the recipe's. */
+  flightEase?: number;
+  /**
+   * True perspective (Duel depth view): the screen y of the vanishing line.
+   * Bolts then move evenly in depth, so on screen they race away and shrink
+   * toward a far target, or swell and speed up toward a near one; widths,
+   * bolt art and the impact scale with distance. Campaign leaves it unset.
+   */
+  horizonY?: number;
+  /**
+   * Perspective size at the muzzle relative to normal (far shooter < 1).
+   * A far rival's bolt starts small and only reaches full size at your ship.
+   */
+  depthBase?: number;
   targetX: number;
   targetY: number;
   /** 0.75 light hit … 1.45 word-finishing shot. */
@@ -313,6 +337,8 @@ export type ShotArrival<P> = {
   x: number;
   y: number;
   power: number;
+  /** Heading muzzle → target, radians (for directional hit sparks). */
+  angle: number;
 };
 
 /** Written by the aim callback: the target's current position. */
@@ -321,6 +347,12 @@ export type ShotAimPoint = { x: number; y: number };
 type Shot<P> = {
   live: boolean;
   arrived: boolean;
+  impactDeferred: boolean;
+  flatDepth: boolean;
+  ease: number;
+  /** NaN unless the shot uses true perspective. */
+  horizonY: number;
+  depthBase: number;
   recipe: ShotRecipe;
   palette: ShotPalette;
   x0: number;
@@ -346,6 +378,8 @@ type Impact = {
   y: number;
   angle: number;
   power: number;
+  /** Distance scale (1 = at the muzzle's depth; only for perspective shots). */
+  scale: number;
   age: number;
   life: number;
   seed: number;
@@ -359,6 +393,7 @@ type Muzzle = {
   y: number;
   angle: number;
   power: number;
+  scale: number;
   age: number;
 };
 
@@ -370,10 +405,30 @@ const SPARK_STREAK = 2;
 
 const SCRATCH: ShotAimPoint = { x: 0, y: 0 };
 const SCRATCH_B: ShotAimPoint = { x: 0, y: 0 };
+const SCRATCH_C: ShotAimPoint = { x: 0, y: 0 };
 
 function shotProgress(shot: Shot<unknown>, raw: number): number {
   const t = raw <= 0 ? 0 : raw >= 1 ? 1 : raw;
-  return shot.recipe.flightEase === 1 ? t : Math.pow(t, shot.recipe.flightEase);
+  const w = shot.ease === 1 ? t : Math.pow(t, shot.ease);
+  const span = shot.y0 - shot.ty;
+  if (Number.isNaN(shot.horizonY) || Math.abs(span) < 1) return w;
+  // Even motion in depth: depth ∝ 1/(y − horizon). Interpolate depth, then
+  // map back to the share of the screen path.
+  const near = shot.y0 - shot.horizonY;
+  const far = shot.ty - shot.horizonY;
+  if (near <= 0.5 || far <= 0.5) return w;
+  const depth = 1 / near + (1 / far - 1 / near) * w;
+  return (near - 1 / depth) / span;
+}
+
+/** Width/size scale at screen y: perspective when set, else the Campaign cue. */
+function depthAt(shot: Shot<unknown>, y: number): number {
+  if (shot.flatDepth) return 1;
+  if (!Number.isNaN(shot.horizonY)) {
+    const near = shot.y0 - shot.horizonY;
+    if (near > 0.5) return Math.max(0.12, Math.min(1.6, ((y - shot.horizonY) / near) * shot.depthBase));
+  }
+  return shotDepthScale(shot.y0, y, shot.viewHeight);
 }
 
 /** Point on the quadratic curve muzzle → target at parameter t. */
@@ -437,19 +492,28 @@ export class PlayerShotSystem<P> {
     const power = Math.max(0.5, options.power);
     let muzzle = recipe.finisherMuzzle;
     if (power < FINISHER_POWER) {
-      muzzle = recipe.muzzles[this.muzzleCursor % recipe.muzzles.length]!;
+      const cursor = options.muzzleIndex !== undefined && Number.isFinite(options.muzzleIndex)
+        ? Math.max(0, Math.floor(options.muzzleIndex)) : this.muzzleCursor;
+      muzzle = recipe.muzzles[cursor % recipe.muzzles.length]!;
       this.muzzleCursor += 1;
     }
     const turn = options.originAngle ?? 0;
     const cos = Math.cos(turn);
     const sin = Math.sin(turn);
-    const x0 = options.originX + muzzle[0] * cos - muzzle[1] * sin;
-    const y0 = options.originY + muzzle[0] * sin + muzzle[1] * cos;
+    const originScale = options.originScale ?? 1;
+    const x0 = options.originX + (muzzle[0] * cos - muzzle[1] * sin) * originScale;
+    const y0 = options.originY + (muzzle[0] * sin + muzzle[1] * cos) * originScale;
     const distance = Math.max(1, Math.hypot(options.targetX - x0, options.targetY - y0));
 
     const shot = this.claimShot();
     shot.live = true;
     shot.arrived = false;
+    shot.impactDeferred = options.deferImpact ?? false;
+    shot.flatDepth = options.flatDepth ?? false;
+    shot.ease = options.flightEase !== undefined && Number.isFinite(options.flightEase) && options.flightEase > 0
+      ? options.flightEase : recipe.flightEase;
+    shot.horizonY = options.horizonY !== undefined && Number.isFinite(options.horizonY) ? options.horizonY : Number.NaN;
+    shot.depthBase = options.depthBase !== undefined && Number.isFinite(options.depthBase) ? Math.max(0.15, Math.min(1.5, options.depthBase)) : 1;
     shot.recipe = recipe;
     shot.palette = palette;
     shot.x0 = x0;
@@ -463,6 +527,9 @@ export class PlayerShotSystem<P> {
       MAX_FLIGHT_SECONDS,
       Math.max(MIN_FLIGHT_SECONDS, distance / recipe.speed),
     );
+    if (options.flightSeconds !== undefined && Number.isFinite(options.flightSeconds) && options.flightSeconds > 0) {
+      shot.duration = Math.max(.04, Math.min(3, options.flightSeconds));
+    }
     shot.trailS = Math.min(recipe.trailShare, recipe.trailMaxPx / distance);
     shot.power = power;
     shot.viewHeight = options.viewHeight;
@@ -479,6 +546,8 @@ export class PlayerShotSystem<P> {
     flash.y = y0;
     flash.angle = Math.atan2(options.targetY - y0, options.targetX - x0);
     flash.power = power;
+    // A far muzzle flashes small; Campaign's ship stays at scale 1.
+    flash.scale = Number.isNaN(shot.horizonY) ? 1 : Math.max(0.3, Math.min(1.8, originScale / 1.3));
     flash.age = 0;
     return true;
   }
@@ -514,12 +583,13 @@ export class PlayerShotSystem<P> {
             x: shot.tx,
             y: shot.ty,
             power: shot.power,
+            angle: Math.atan2(shot.ty - shot.y0, shot.tx - shot.x0),
           });
-          this.spawnImpact(shot);
+          if (!shot.impactDeferred) this.spawnImpact(shot);
         }
       }
       // The tail keeps travelling after impact and disappears into the target.
-      if (shot.arrived && s - shot.trailS >= 1) {
+      if (shot.arrived && s - shot.trailS >= 1 && (!shot.impactDeferred || shot.age > shot.duration + 2)) {
         shot.live = false;
         shot.payload = null;
       }
@@ -537,6 +607,41 @@ export class PlayerShotSystem<P> {
       if (muzzle.age >= MUZZLE_LIFE) muzzle.live = false;
     }
     return this.arrivals;
+  }
+
+  /**
+   * Calls `visit` with each in-flight bolt's head: payload, position,
+   * heading and distance scale (1 when the shot has no perspective). For
+   * trail effects (Duel missile smoke); never changes the bolts.
+   */
+  visitLiveShots(visit: (payload: P, x: number, y: number, angle: number, scale: number) => void): void {
+    for (const shot of this.shots) {
+      if (!shot.live || shot.arrived || shot.payload === null) continue;
+      const angle = this.headPoint(shot, SCRATCH_C);
+      visit(shot.payload, SCRATCH_C.x, SCRATCH_C.y, angle, Number.isNaN(shot.horizonY) ? 1 : depthAt(shot, SCRATCH_C.y));
+    }
+  }
+
+  /**
+   * Authority confirmation affects presentation only, never gameplay damage.
+   * `onConfirm` receives where (and how hard, and along which heading) each
+   * confirmed bolt lands, for extra hit effects.
+   */
+  confirmArrival(
+    matches: (payload: P) => boolean,
+    onConfirm?: (payload: P, x: number, y: number, power: number, angle: number) => void,
+  ): boolean {
+    let confirmed = false;
+    for (const shot of this.shots) {
+      if (!shot.live || !shot.impactDeferred || shot.payload === null || !matches(shot.payload)) continue;
+      shot.impactDeferred = false;
+      shot.arrived = true;
+      shot.age = Math.max(shot.age, shot.duration);
+      this.spawnImpact(shot);
+      onConfirm?.(shot.payload, shot.tx, shot.ty, shot.power, Math.atan2(shot.ty - shot.y0, shot.tx - shot.x0));
+      confirmed = true;
+    }
+    return confirmed;
   }
 
   clear(): void {
@@ -597,12 +702,12 @@ export class PlayerShotSystem<P> {
       const art = shotSpriteSet(muzzle.recipe.fx)?.muzzle;
       if (art !== undefined) {
         const length =
-          muzzle.recipe.muzzleLength * (muzzle.power >= FINISHER_POWER ? 1.4 : 1) * (1.1 - 0.3 * k);
+          muzzle.recipe.muzzleLength * (muzzle.power >= FINISHER_POWER ? 1.4 : 1) * (1.1 - 0.3 * k) * muzzle.scale;
         drawAnchored(context, art, muzzle.x, muzzle.y, muzzle.angle, length, fade);
         continue;
       }
       const sprite = glowSprite(muzzle.palette.primary);
-      const size = (4 + 4 * muzzle.power) * (1 - k * 0.4);
+      const size = (4 + 4 * muzzle.power) * (1 - k * 0.4) * muzzle.scale;
       glow(context, sprite, muzzle.x, muzzle.y, size * 2.4, 0.55 * fade);
       streak(
         context,
@@ -627,7 +732,7 @@ export class PlayerShotSystem<P> {
     for (const shot of this.shots) if (!shot.live) return shot;
     if (this.shots.length < MAX_SHOTS) {
       const shot: Shot<P> = {
-        live: false, arrived: false, recipe: RECIPES.spear!, palette: paletteFor("vanguard"),
+        live: false, arrived: false, impactDeferred: false, flatDepth: false, ease: 1, horizonY: Number.NaN, depthBase: 1, recipe: RECIPES.spear!, palette: paletteFor("vanguard"),
         x0: 0, y0: 0, tx: 0, ty: 0, side: 0, age: 0, duration: 1, trailS: 0, power: 1,
         viewHeight: 1, seed: 0, sparkleDebt: 0, payload: null,
       };
@@ -647,7 +752,7 @@ export class PlayerShotSystem<P> {
     if (this.impacts.length < MAX_IMPACTS) {
       const impact: Impact = {
         live: false, recipe: RECIPES.spear!, palette: paletteFor("vanguard"), x: 0, y: 0,
-        angle: 0, power: 1, age: 0, life: IMPACT_LIFE, seed: 0,
+        angle: 0, power: 1, scale: 1, age: 0, life: IMPACT_LIFE, seed: 0,
       };
       this.impacts.push(impact);
       return impact;
@@ -662,7 +767,7 @@ export class PlayerShotSystem<P> {
     if (this.muzzleFlashes.length < MAX_MUZZLES) {
       const muzzle: Muzzle = {
         live: false, recipe: RECIPES.spear!, palette: paletteFor("vanguard"), x: 0, y: 0,
-        angle: 0, power: 1, age: 0,
+        angle: 0, power: 1, scale: 1, age: 0,
       };
       this.muzzleFlashes.push(muzzle);
       return muzzle;
@@ -800,6 +905,7 @@ export class PlayerShotSystem<P> {
     impact.y = shot.ty;
     impact.angle = this.headPoint(shot, SCRATCH_B);
     impact.power = shot.power;
+    impact.scale = Number.isNaN(shot.horizonY) ? 1 : Math.max(0.35, Math.min(2.4, depthAt(shot, shot.ty)));
     impact.age = 0;
     impact.life = IMPACT_LIFE * (shot.power >= FINISHER_POWER ? 1.3 : 1);
 
@@ -834,7 +940,7 @@ export class PlayerShotSystem<P> {
       curvePoint(shot, head, SCRATCH);
       const length =
         (shot.power >= FINISHER_POWER ? shot.recipe.finisherLength : shot.recipe.boltLength) *
-        shotDepthScale(shot.y0, SCRATCH.y, shot.viewHeight);
+        depthAt(shot, SCRATCH.y);
       const distance = Math.hypot(shot.tx - shot.x0, shot.ty - shot.y0) || 1;
       trailHead = Math.max(tail, head - (length * sprite.anchorX * 0.7) / distance);
     }
@@ -902,7 +1008,7 @@ export class PlayerShotSystem<P> {
         shot.recipe.width *
         widthScale *
         Math.min(1.35, shot.power) *
-        shotDepthScale(shot.y0, y, shot.viewHeight) *
+        depthAt(shot, y) *
         (shot.recipe.trailMode === "smoke" ? 1.22 : 1) *
         (0.1 + 0.9 * Math.pow(u, 1.3));
     }
@@ -1033,7 +1139,7 @@ export class PlayerShotSystem<P> {
     const angle = this.headPoint(shot, SCRATCH);
     const x = SCRATCH.x;
     const y = SCRATCH.y;
-    const depth = shotDepthScale(shot.y0, y, shot.viewHeight);
+    const depth = depthAt(shot, y);
     const r = shot.recipe.width * Math.min(1.4, shot.power) * depth;
     const glowPrimary = glowSprite(shot.palette.primary);
     const core = glowSprite(WHITE);
@@ -1072,7 +1178,7 @@ export class PlayerShotSystem<P> {
   private drawImpact(context: CanvasRenderingContext2D, impact: Impact, tuning: QualityTuning): void {
     const k = impact.age / impact.life;
     const fade = 1 - k;
-    const R = 9 * Math.min(1.6, impact.power) * (0.85 + 0.15 * tuning.detail);
+    const R = 9 * Math.min(1.6, impact.power) * (0.85 + 0.15 * tuning.detail) * impact.scale;
     const { x, y, angle } = impact;
     const core = glowSprite(WHITE);
 
@@ -1083,7 +1189,7 @@ export class PlayerShotSystem<P> {
       if (k < 0.3) glow(context, core, x, y, R * (1.2 + 3 * k), 1 - k / 0.3);
       const grow = 1 - (1 - k) * (1 - k);
       const size =
-        impact.recipe.impactSize * (impact.power >= FINISHER_POWER ? 1.35 : 1) * (0.55 + 0.7 * grow);
+        impact.recipe.impactSize * (impact.power >= FINISHER_POWER ? 1.35 : 1) * (0.55 + 0.7 * grow) * impact.scale;
       // Coloured light around the burst sells the hit on busy backgrounds.
       glow(context, glowSprite(impact.palette.primary), x, y, size * 0.6, 0.5 * fade);
       drawAnchored(context, art, x, y, impact.seed * 2.39, size, Math.pow(1 - k, 1.4));

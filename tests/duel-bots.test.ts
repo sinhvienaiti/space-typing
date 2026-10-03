@@ -52,6 +52,18 @@ function observation(
 }
 
 describe("DuelBot M-DUEL-02", () => {
+  it("does not acquire words for a full bank", () => {
+    const obs = observation([offer("player-2", 0, "shield")]);
+    obs.ownInventory = { ...obs.ownInventory, defense: [
+      { instanceId: "a", actionId: "reflect", storedAtTick: 0, qualityScale: 1 },
+      { instanceId: "b", actionId: "reflect", storedAtTick: 0, qualityScale: 1 },
+    ] };
+    const bot = new DuelBot({ playerId: "player-2", wpm: 60, accuracy: 1, reactionMs: 0, personality: "balanced", seed: 7 });
+    const intents = bot.update(0.05, obs);
+    expect(intents.some(intent => intent.type === "SELECT_TARGET")).toBe(false);
+    expect(intents.some(intent => intent.type === "TYPE_CHAR")).toBe(false);
+  });
+
   it("uses SELECT_TARGET and TYPE_CHAR intents instead of authoritative completion", () => {
     const offers = [offer("player-2", 0, "laser")];
     const bot = new DuelBot({

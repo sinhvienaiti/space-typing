@@ -1,0 +1,332 @@
+/* Duel impact pass (2026-10-03): round calls, K.O., result card, momentum.
+   Only transform/opacity animate; glows are static text-shadows. The combat
+   effects themselves are drawn on the Game canvas (src/duel/combat-juice.ts). */
+
+.duel-cinematic {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+/* --- Stamps: FIGHT!, K.O., phase calls, GET READY ----------------------- */
+
+.duel-stamp {
+  grid-area: 1 / 1;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  transform: translateY(-6vh);
+  animation: duel-stamp var(--duel-stamp-duration, 1000ms) cubic-bezier(.16, .9, .3, 1) both;
+}
+
+.duel-stamp small {
+  color: #dff8ff;
+  font: 800 clamp(12px, 1.1vw, 16px)/1 system-ui, sans-serif;
+  letter-spacing: .42em;
+  text-shadow: 0 0 12px rgba(120, 220, 255, .55), 0 2px 4px #000;
+}
+
+.duel-stamp strong {
+  position: relative;
+  font: italic 900 clamp(64px, 10vw, 150px)/.9 "Inter", system-ui, -apple-system, sans-serif;
+  letter-spacing: .02em;
+  color: #fff;
+  background: linear-gradient(180deg, #ffffff 8%, #bff4ff 42%, #3fb8ff 78%, #1f6bff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 18px rgba(80, 200, 255, .75)) drop-shadow(0 6px 0 rgba(0, 10, 30, .9));
+}
+
+/* A light streak behind the word, like a sword flash. */
+.duel-stamp::before {
+  content: "";
+  grid-area: 2 / 1;
+  align-self: center;
+  width: min(1100px, 92vw);
+  height: 6px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .95) 45%, rgba(120, 220, 255, .9) 55%, transparent);
+  transform: scaleX(0);
+  animation: duel-stamp-streak var(--duel-stamp-duration, 1000ms) cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.duel-stamp-ko strong {
+  font-size: clamp(90px, 14vw, 210px);
+  background: linear-gradient(180deg, #ffffff 6%, #ffe68a 36%, #ff7a2a 70%, #c3121f);
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 0 24px rgba(255, 90, 40, .85)) drop-shadow(0 7px 0 rgba(30, 0, 0, .9));
+}
+.duel-stamp-ko::before {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .95) 45%, rgba(255, 120, 60, .95) 55%, transparent);
+}
+
+.duel-stamp-phase strong,
+.duel-stamp-ready strong,
+.duel-stamp-time strong {
+  font-size: clamp(42px, 6vw, 92px);
+}
+.duel-stamp-phase strong {
+  background: linear-gradient(180deg, #fff 10%, #ffd38a 45%, #ff8a3d 85%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 0 16px rgba(255, 150, 60, .7)) drop-shadow(0 5px 0 rgba(30, 10, 0, .85));
+}
+.duel-stamp-phase { transform: translateY(-22vh); }
+.duel-stamp-phase::before {
+  background: linear-gradient(90deg, transparent, rgba(255, 220, 160, .9) 50%, transparent);
+}
+.duel-stamp-time strong {
+  background: linear-gradient(180deg, #fff 10%, #ffe9a8 50%, #d9a440);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+@keyframes duel-stamp {
+  0% { opacity: 0; scale: 2.4; }
+  10% { opacity: 1; scale: .9; }
+  17% { scale: 1.05; }
+  26% { scale: 1; }
+  78% { opacity: 1; scale: 1.02; }
+  100% { opacity: 0; scale: 1.1; }
+}
+
+@keyframes duel-stamp-streak {
+  0% { transform: scaleX(0); opacity: 0; }
+  12% { transform: scaleX(1); opacity: 1; }
+  45% { opacity: .5; }
+  100% { transform: scaleX(1.1); opacity: 0; }
+}
+
+/* --- Result card ------------------------------------------------------- */
+
+.duel-result {
+  grid-area: 1 / 1;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  min-width: min(560px, 86vw);
+  padding: 22px 32px 20px;
+  border: 1px solid rgba(140, 220, 255, .35);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(80, 190, 255, .22), transparent 60%),
+    linear-gradient(180deg, rgba(4, 10, 22, .9), rgba(2, 5, 12, .94));
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .55), 0 0 60px rgba(70, 180, 255, .18);
+  color: #eafaff;
+  text-align: center;
+  animation: duel-result-in 520ms cubic-bezier(.16, .9, .3, 1) both;
+}
+.duel-result.leaving { animation: duel-result-out 380ms ease-in both; }
+
+.duel-result-kicker {
+  font: 800 12px/1 system-ui, sans-serif;
+  letter-spacing: .46em;
+  color: #9fdcf2;
+}
+
+.duel-result-title {
+  font: italic 900 clamp(54px, 7.4vw, 108px)/.95 "Inter", system-ui, sans-serif;
+  letter-spacing: .03em;
+  background: linear-gradient(180deg, #ffffff 10%, #fff1b0 40%, #ffc23d 70%, #ff8a1f);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 22px rgba(255, 196, 60, .7)) drop-shadow(0 6px 0 rgba(40, 18, 0, .9));
+}
+.duel-result-victory { border-color: rgba(255, 210, 110, .5); box-shadow: 0 30px 90px rgba(0, 0, 0, .55), 0 0 80px rgba(255, 190, 70, .25); }
+.duel-result-defeat {
+  border-color: rgba(255, 100, 110, .45);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 70, 80, .22), transparent 60%),
+    linear-gradient(180deg, rgba(18, 4, 8, .9), rgba(8, 2, 5, .94));
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .55), 0 0 80px rgba(255, 60, 70, .2);
+}
+.duel-result-defeat .duel-result-title {
+  background: linear-gradient(180deg, #ffffff 8%, #ffb3b3 40%, #ff4b5c 72%, #9b0f22);
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 0 22px rgba(255, 60, 80, .65)) drop-shadow(0 6px 0 rgba(40, 0, 6, .9));
+}
+.duel-result-draw .duel-result-title {
+  background: linear-gradient(180deg, #ffffff 10%, #d9e6f2 50%, #8aa0b6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 0 18px rgba(180, 210, 240, .5));
+}
+
+.duel-result-score {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  font: 800 13px/1 system-ui, sans-serif;
+  letter-spacing: .3em;
+  color: #9fb6c6;
+}
+.duel-result-score b {
+  font: 900 34px/1 "Inter", system-ui, sans-serif;
+  letter-spacing: .06em;
+  color: #fff;
+}
+
+.duel-result-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(92px, 1fr));
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+}
+.duel-result-stats > div {
+  display: grid;
+  gap: 4px;
+  padding: 9px 6px;
+  border: 1px solid rgba(140, 210, 255, .16);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .035);
+}
+.duel-result-stats strong { font: 900 22px/1 "Inter", system-ui, sans-serif; color: #fff; }
+.duel-result-stats small { font: 700 9px/1.2 system-ui, sans-serif; letter-spacing: .18em; color: #8fb2c4; }
+
+.duel-result-footer {
+  margin-top: 4px;
+  font: 800 12px/1 system-ui, sans-serif;
+  letter-spacing: .32em;
+  color: #cdefff;
+}
+.duel-result-exit {
+  pointer-events: auto;
+  padding: 11px 26px;
+  border: 1px solid rgba(150, 230, 255, .6);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(60, 170, 255, .35), rgba(20, 80, 160, .45));
+  color: #fff;
+  font: 800 13px/1 system-ui, sans-serif;
+  letter-spacing: .14em;
+  cursor: pointer;
+}
+.duel-result-exit:hover { background: linear-gradient(180deg, rgba(90, 200, 255, .5), rgba(30, 110, 200, .55)); }
+
+@keyframes duel-result-in {
+  from { opacity: 0; transform: translateY(28px) scale(.92); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes duel-result-out {
+  to { opacity: 0; transform: translateY(-18px) scale(.96); }
+}
+
+/* While the K.O. and result play, the typing field steps back. */
+.duel-battle[data-cinematic="ko"] .duel-word-field,
+.duel-battle[data-cinematic="result"] .duel-word-field,
+.duel-battle[data-cinematic="ko"] .duel-arena-input,
+.duel-battle[data-cinematic="result"] .duel-arena-input {
+  opacity: .18;
+  transition: opacity 260ms ease;
+}
+
+/* --- Momentum: the input readout heats up with the streak --------------- */
+
+.duel-battle:not([data-momentum="0"]) .duel-current-input {
+  border-color: var(--duel-momentum-color, #7ff3ff);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--duel-momentum-color, #7ff3ff) 45%, transparent),
+    0 0 26px color-mix(in srgb, var(--duel-momentum-color, #7ff3ff) 40%, transparent);
+}
+.duel-battle:not([data-momentum="0"]) .duel-current-token b {
+  color: var(--duel-momentum-color, #7ff3ff);
+}
+
+/* The how-to line fades once the round is under way. */
+.duel-battle .duel-arsenal { transition: opacity 600ms ease; }
+.duel-battle[data-help-faded="true"] .duel-arsenal {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* --- Canvas renderer replaces the DOM blasts and painted damage overlays -- */
+
+.duel-campaign-renderer .duel-damage-vfx,
+.duel-campaign-renderer .duel-projectile-arrival,
+.duel-campaign-renderer .duel-ship-impact {
+  display: none;
+}
+
+/* Wide layout: larger hulls so hits, kicks and the K.O. read at a glance. */
+.duel-battle[data-layout="horizontal"] .duel-arena .duel-ship-frame {
+  width: clamp(96px, 8.2vw, 140px);
+}
+.duel-battle[data-layout="horizontal"] .duel-opponent-charge {
+  top: calc(50% + 86px);
+}
+
+/* Amplify field: a warm haze instead of a flat yellow ring. */
+.duel-tactical-amplify-field {
+  border-width: 1px;
+  border-color: rgba(255, 224, 111, .4);
+  background: radial-gradient(circle, rgba(255, 232, 119, .16), rgba(255, 196, 80, .05) 46%, transparent 66%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .duel-stamp,
+  .duel-stamp::before,
+  .duel-result {
+    animation-duration: 1ms !important;
+  }
+}
+
+/* --- Depth View (default): your ship near at the bottom, the rival far near
+   the top. Canvas positions, scale and the vanishing line come from these
+   frames (src/duel/combat-visuals.ts), so keep sizes here. ---------------- */
+
+.duel-battle[data-layout="depth"] .duel-arena .duel-ship-frame {
+  top: auto;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+}
+.duel-battle[data-layout="depth"] .duel-rival-zone .duel-ship-frame {
+  left: 50%;
+  top: 21%;
+  width: clamp(44px, 3.6vw, 62px);
+}
+.duel-battle[data-layout="depth"] .duel-self-zone .duel-ship-frame {
+  left: 50%;
+  top: 79%;
+  width: clamp(128px, 10.5vw, 176px);
+}
+.duel-battle[data-layout="depth"] .duel-opponent-charge {
+  top: calc(21% + 44px);
+  left: 50%;
+}
+.duel-battle[data-layout="depth"] .duel-word-target {
+  left: var(--duel-target-x-depth, var(--duel-target-x, 50%));
+  top: var(--duel-target-y-depth, var(--duel-target-y, 50%));
+}
+.duel-battle[data-layout="depth"] .duel-arena-input {
+  left: 50%;
+  bottom: 2.5%;
+  max-width: min(560px, 62%);
+}
+.duel-battle[data-layout="depth"] .duel-arsenal {
+  top: 12px;
+  bottom: auto;
+}
+/* The flat corridor line belonged to the old layouts. */
+.duel-battle[data-layout="depth"] .duel-arena-line {
+  opacity: 0;
+}
+
+@media (max-width: 760px) {
+  /* No room for the how-to line on phones; the lobby explains it. */
+  .duel-battle .duel-arsenal { display: none; }
+  .duel-battle[data-layout="depth"] .duel-self-zone .duel-ship-frame {
+    top: 74%;
+    width: 112px;
+  }
+  .duel-battle[data-layout="depth"] .duel-rival-zone .duel-ship-frame {
+    top: 23%;
+    width: 42px;
+  }
+}
