@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildCombatLearningEvent,
   buildRecallLearningEvent,
+  parseSpaceEnglishActivityDataset,
   parseSpaceReviewDataset,
+  spaceEnglishActivityEntries,
 } from "../src/learning/shared";
 
 describe("Space Typing shared learning contract", () => {
@@ -121,4 +123,55 @@ describe("Space Typing shared learning contract", () => {
       errorType: "spelling",
     });
   });
+  it("keeps grammar challenges in the canonical grammar mastery bucket", () => {
+    const dataset = parseSpaceEnglishActivityDataset({
+      version: 1,
+      type: "typing-game:english-content:v1:activity-dataset",
+      requestId: "space-rich-1",
+      gameId: "space-typing",
+      activity: "grammar-challenge",
+      items: [{
+        contentId: "gr.b1.second-conditional",
+        entityType: "grammar",
+        entityId: "gr.b1.second-conditional",
+        promptText: "Complete the hypothetical sentence",
+        answerText: "If I had more time, I would learn another language.",
+      }],
+    });
+    expect(dataset).not.toBeNull();
+    const entry = spaceEnglishActivityEntries(dataset!)[0]!;
+    expect(
+      buildCombatLearningEvent({
+        entry,
+        perfect: false,
+        occurredAt: "2026-10-03T00:00:00.000Z",
+      }),
+    ).toMatchObject({
+      entityType: "grammar",
+      entityId: "gr.b1.second-conditional",
+      activityType: "grammar-challenge",
+      result: "wrong",
+      errorType: "spelling",
+    });
+  });
+
+  it("rejects grammar ids outside grammar-challenge activity", () => {
+    expect(() =>
+      parseSpaceEnglishActivityDataset({
+        version: 1,
+        type: "typing-game:english-content:v1:activity-dataset",
+        requestId: "space-rich-bad",
+        gameId: "space-typing",
+        activity: "collocation",
+        items: [{
+          contentId: "col.example",
+          entityType: "grammar",
+          entityId: "gr.a1.example",
+          promptText: "example",
+          answerText: "make a decision",
+        }],
+      }),
+    ).toThrow("reserved");
+  });
+
 });
