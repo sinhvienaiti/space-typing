@@ -1,9 +1,5 @@
 import type { CharacterId } from "./registry";
 import {
-  characterFlightTrailProfile,
-  type FlightTrailProfile,
-} from "./projectiles";
-import {
   characterVisualProfile,
   type CharacterSilhouette,
   type CharacterVisualProfile,
@@ -12,6 +8,12 @@ import {
   EQUIPMENT_AURA_COLORS,
   type EquipmentAuraProfile,
 } from "./equipment-aura";
+import {
+  drawShipHalo,
+  drawShipLights,
+  shipLightRig,
+  type ShipLightRig,
+} from "./ship-lights";
 
 export type CharacterDrawOptions = {
   x: number;
@@ -22,9 +24,18 @@ export type CharacterDrawOptions = {
   alpha?: number;
   aura?: EquipmentAuraProfile | null;
   detailScale?: number;
-  /** Presentation-only aim offset. Does not affect position, hitbox or targeting. */
-  aimAngle?: number;
+  /** Turn toward the current target, radians clockwise (0 = nose up). */
+  aim?: number;
+  /** 0–1 recoil of the last shot: nudges the hull back along its axis. */
+  recoil?: number;
+  /** 0–1 engine throttle: longer, brighter plumes. */
+  boost?: number;
 };
+
+/** Hull kick-back at full recoil, px along the ship's axis. */
+export const SHIP_RECOIL_PX = 2.4;
+/** Painted hull size on screen at scale 1. */
+const ILLUSTRATED_SHIP_SIZE = 78;
 
 let characterShipSheet: HTMLImageElement | null = null;
 let characterShipSource: "v3" | "v2" | "procedural" = "procedural";
@@ -59,6 +70,42 @@ export function characterShipArtSource(): "v3" | "v2" | "procedural" {
 
 export function hasCharacterShipImage(_id: CharacterId): boolean {
   return characterShipSheet !== null;
+}
+
+/**
+ * The light rig drawn with this ship right now: only over the V3 painted
+ * sheet, whose sprite cells its anchor points were measured on.
+ */
+export function activeShipLightRig(id: CharacterId): Readonly<ShipLightRig> | null {
+  if (characterShipSheet === null || characterShipSource !== "v3") return null;
+  return shipLightRig(id);
+}
+
+/** The ship's total turn as drawn: idle banking plus its aim. */
+export function characterShipAngle(options: CharacterDrawOptions): number {
+  return characterFlightPose(options.time).banking + (options.aim ?? 0);
+}
+
+/**
+ * A ship-local point (muzzle, nozzle, nose) in canvas px, through the same
+ * transform drawCharacterShip applies, so shots and exhaust leave the hull
+ * exactly where it is drawn.
+ */
+export function characterShipPoint(
+  options: CharacterDrawOptions,
+  localX: number,
+  localY: number,
+  out: { x: number; y: number },
+): void {
+  const pose = characterFlightPose(options.time);
+  const angle = pose.banking + (options.aim ?? 0);
+  const scale = options.scale ?? 1;
+  const x = localX * scale;
+  const y = localY * scale + (options.recoil ?? 0) * SHIP_RECOIL_PX;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  out.x = options.x + pose.driftX + x * cos - y * sin;
+  out.y = options.y + pose.bob + x * sin + y * cos;
 }
 
 function drawEquipmentAura(
@@ -158,32 +205,47 @@ function drawEquipmentAura(
   context.restore();
 }
 
+/** The ship's source rect on the 4 x 3 sheet: x, y, width, height. */
+function shipCell(
+  image: HTMLImageElement,
+  characterId: CharacterId,
+): [number, number, number, number] {
+  const index = CHARACTER_SHIP_SPRITE_INDEX[characterId];
+  const columns = 4;
+  const rows = 3;
+  const cellWidth = image.naturalWidth / columns;
+  const cellHeight = image.naturalHeight / rows;
+  return [
+    (index % columns) * cellWidth,
+    Math.floor(index / columns) * cellHeight,
+    cellWidth,
+    cellHeight,
+  ];
+}
+
 function drawIllustratedShip(
   context: CanvasRenderingContext2D,
   image: HTMLImageElement,
   characterId: CharacterId,
   profile: Readonly<CharacterVisualProfile>,
   glowScale: number,
+  bloom = true,
 ): void {
-  const size = 78;
-  const index = CHARACTER_SHIP_SPRITE_INDEX[characterId];
-  const columns = 4;
-  const rows = 3;
-  const cellWidth = image.naturalWidth / columns;
-  const cellHeight = image.naturalHeight / rows;
-  const sourceX = (index % columns) * cellWidth;
-  const sourceY = Math.floor(index / columns) * cellHeight;
-  context.save();
-  context.globalCompositeOperation = "lighter";
-  context.globalAlpha *= characterShipSource === "v3" ? 0.05 : 0.12;
-  context.fillStyle = profile.glow;
-  // Premium sprites already contain painted light. Avoid double bloom.
-  context.shadowBlur = (characterShipSource === "v3" ? 4 : 24) * glowScale;
-  context.shadowColor = profile.glow;
-  context.beginPath();
-  context.ellipse(0, 2, 31, 27, 0, 0, Math.PI * 2);
-  context.fill();
-  context.restore();
+  const size = ILLUSTRATED_SHIP_SIZE;
+  const [sourceX, sourceY, cellWidth, cellHeight] = shipCell(image, characterId);
+  if (bloom) {
+    context.save();
+    context.globalCompositeOperation = "lighter";
+    context.globalAlpha *= characterShipSource === "v3" ? 0.05 : 0.12;
+    context.fillStyle = profile.glow;
+    // Premium sprites already contain painted light. Avoid double bloom.
+    context.shadowBlur = (characterShipSource === "v3" ? 4 : 24) * glowScale;
+    context.shadowColor = profile.glow;
+    context.beginPath();
+    context.ellipse(0, 2, 31, 27, 0, 0, Math.PI * 2);
+    context.fill();
+    context.restore();
+  }
 
   context.save();
   context.shadowBlur = (characterShipSource === "v3" ? 0 : 9 * glowScale);
@@ -287,36 +349,6 @@ function hullPath(
   context.closePath();
 }
 
-export const MAX_CHARACTER_AIM_RADIANS = Math.PI / 12;
-
-export function characterAimTargetAngle(
-  playerX: number,
-  playerY: number,
-  targetX: number,
-  targetY: number,
-): number {
-  const forward = Math.max(28, playerY - targetY);
-  const raw = Math.atan2(targetX - playerX, forward);
-  return Math.max(
-    -MAX_CHARACTER_AIM_RADIANS,
-    Math.min(MAX_CHARACTER_AIM_RADIANS, raw),
-  );
-}
-
-export function smoothCharacterAim(
-  current: number,
-  target: number,
-  dt: number,
-): number {
-  if (!Number.isFinite(dt) || dt <= 0) return current;
-  const factor = 1 - Math.exp(-Math.min(0.2, dt) * 9.5);
-  const next = current + (target - current) * factor;
-  return Math.max(
-    -MAX_CHARACTER_AIM_RADIANS,
-    Math.min(MAX_CHARACTER_AIM_RADIANS, next),
-  );
-}
-
 export function characterFlightPose(time: number): {
   bob: number;
   banking: number;
@@ -339,243 +371,40 @@ export function characterFlightPose(time: number): {
   };
 }
 
-function trailGradient(
-  context: CanvasRenderingContext2D,
-  trail: Readonly<FlightTrailProfile>,
-  length: number,
-): CanvasGradient {
-  const gradient = context.createLinearGradient(0, 16, 0, 16 + length);
-  gradient.addColorStop(0, trail.secondary);
-  gradient.addColorStop(0.22, trail.primary);
-  gradient.addColorStop(0.65, trail.accent);
-  gradient.addColorStop(1, "rgba(255,255,255,0)");
-  return gradient;
-}
-
-function drawTrailCurve(
-  context: CanvasRenderingContext2D,
-  time: number,
-  length: number,
-  startX: number,
-  phase: number,
-): void {
-  context.beginPath();
-  context.moveTo(startX, 16);
-  context.quadraticCurveTo(
-    startX + Math.sin(time * 2.8 + phase) * 7,
-    16 + length * 0.48,
-    startX + Math.sin(time * 2 + phase + 1.1) * 11,
-    16 + length,
-  );
-  context.stroke();
-}
-
 function drawFlightTail(
   context: CanvasRenderingContext2D,
-  characterId: CharacterId,
   profile: Readonly<CharacterVisualProfile>,
   time: number,
   glowScale: number,
   strength: number,
 ): void {
-  const trail = characterFlightTrailProfile(characterId);
-  const pulse = 0.94 + Math.sin(time * 7.2) * 0.08;
-  // The player ship sits close to the bottom edge. Long conceptual trails were
-  // being clipped, so keep the visible energy inside ~56px and spend the
-  // budget on width/glow/side motion instead of drawing off-canvas.
-  const length = Math.min(
-    56,
-    trail.length * (0.72 + strength * 0.2) * pulse,
-  );
-  const gradient = trailGradient(context, trail, length);
+  const pulse =
+    0.88 +
+    Math.sin(time * 7.6) * 0.08 +
+    Math.sin(time * 2.3 + 0.4) * 0.04;
+  const tailLength = (48 + pulse * 24) * strength;
+  const gradient = context.createLinearGradient(0, 16, 0, 16 + tailLength);
+  gradient.addColorStop(0, profile.engine);
+  gradient.addColorStop(0.34, profile.glow);
+  gradient.addColorStop(1, "rgba(255,255,255,0)");
 
   context.save();
   context.globalCompositeOperation = "lighter";
-  context.lineCap = "round";
-  context.shadowColor = trail.primary;
-  context.shadowBlur = 23 * glowScale;
-
-  // Broad tapered energy plume. This is deliberately a filled shape instead
-  // of another line so the runtime exhaust reads as a real thruster body.
-  const plumeHalfWidth = trail.width * 1.45;
-  const plumeWobble = Math.sin(time * 4.6) * trail.width * 0.42;
-  context.globalAlpha *= 0.2 + strength * 0.14;
-  context.fillStyle = gradient;
-  context.beginPath();
-  context.moveTo(-plumeHalfWidth, 15);
-  context.quadraticCurveTo(
-    -plumeHalfWidth * 1.18,
-    17 + length * 0.34,
-    plumeWobble - trail.width * 0.35,
-    16 + length,
-  );
-  context.quadraticCurveTo(
-    plumeHalfWidth * 1.18,
-    17 + length * 0.34,
-    plumeHalfWidth,
-    15,
-  );
-  context.closePath();
-  context.fill();
-
-  context.globalAlpha = 0.42 + strength * 0.18;
+  context.globalAlpha *= 0.28 + strength * 0.28;
   context.strokeStyle = gradient;
-  context.lineWidth = trail.width * 3.25;
-  drawTrailCurve(context, time, length, 0, 0.4);
-
-  context.globalAlpha = Math.min(1, context.globalAlpha * 1.45);
-  context.shadowBlur = 13 * glowScale;
-  context.lineWidth = Math.max(2.1, trail.width * 0.92);
-  drawTrailCurve(context, time, length * 0.94, 0, 0.4);
-
-  if (trail.kind === "comet") {
-    context.strokeStyle = trail.secondary;
-    context.lineWidth = Math.max(1.5, trail.width * 0.42);
-    context.globalAlpha = 0.72;
-    for (const side of [-1, 1]) {
-      context.beginPath();
-      context.moveTo(side * 2.2, 17);
-      context.quadraticCurveTo(
-        side * (7 + Math.sin(time * 5) * 2),
-        17 + length * 0.42,
-        side * 11,
-        17 + length * 0.88,
-      );
-      context.stroke();
-    }
-    context.fillStyle = trail.secondary;
-    for (let index = 0; index < trail.detailCount; index += 1) {
-      const ratio = (index + 1) / (trail.detailCount + 1);
-      const x =
-        Math.sin(time * 8 + index * 2.4) * (4 + ratio * 8);
-      const y = 19 + length * ratio * 0.82;
-      context.globalAlpha = 0.74 - ratio * 0.32;
-      context.beginPath();
-      const sparkRadius = 1.3 + (index % 2) * 0.55;
-      context.ellipse(
-        x,
-        y,
-        sparkRadius,
-        sparkRadius,
-        0,
-        0,
-        Math.PI * 2,
-      );
-      context.fill();
-    }
-  } else if (trail.kind === "twin-star" || trail.kind === "aurora") {
-    const offsets = trail.kind === "aurora" ? [-4, 0, 4] : [-3.5, 3.5];
-    const colors = [trail.primary, trail.secondary, trail.accent];
-    for (let index = 0; index < offsets.length; index += 1) {
-      context.strokeStyle = colors[index % colors.length]!;
-      context.globalAlpha = (0.28 + strength * 0.2) * (index === 1 ? 0.9 : 1);
-      context.lineWidth = Math.max(1.2, trail.width * 0.38);
-      drawTrailCurve(
-        context,
-        time * (1 + index * 0.04),
-        length * (0.86 + index * 0.04),
-        offsets[index]!,
-        index * 2.1,
-      );
-    }
-  } else if (trail.kind === "thunder") {
-    context.strokeStyle = trail.secondary;
-    context.lineWidth = 1.5;
-    context.globalAlpha = 0.68;
-    context.beginPath();
-    context.moveTo(0, 17);
-    for (let index = 1; index <= trail.detailCount; index += 1) {
-      const ratio = index / trail.detailCount;
-      context.lineTo(
-        Math.sin(time * 15 + index * 2.4) * (3 + ratio * 7),
-        17 + length * ratio,
-      );
-    }
-    context.stroke();
-  } else if (trail.kind === "halo") {
-    context.strokeStyle = trail.secondary;
-    context.lineWidth = 1.4;
-    for (let index = 0; index < trail.detailCount; index += 1) {
-      const y = 28 + index * (length / (trail.detailCount + 1));
-      const size = 5 + index * 1.7;
-      context.globalAlpha = 0.48 - index * 0.07;
-      context.beginPath();
-      context.ellipse(
-        Math.sin(time * 2.2 + index) * 2,
-        y,
-        size,
-        Math.max(1.4, size * 0.32),
-        0,
-        0,
-        Math.PI * 2,
-      );
-      context.stroke();
-    }
-  } else if (trail.kind === "tidal") {
-    context.strokeStyle = trail.secondary;
-    context.lineWidth = 1.1;
-    for (let index = 0; index < trail.detailCount; index += 1) {
-      const ratio = (index + 1) / (trail.detailCount + 1);
-      const radius = 1.8 + index * 0.7;
-      context.globalAlpha = 0.5 - ratio * 0.18;
-      context.beginPath();
-      context.ellipse(
-        Math.sin(time * 3.2 + index * 1.7) * (5 + ratio * 4),
-        18 + length * ratio,
-        radius,
-        radius,
-        0,
-        0,
-        Math.PI * 2,
-      );
-      context.stroke();
-    }
-  } else if (trail.kind === "blossom" || trail.kind === "prism") {
-    context.fillStyle = trail.kind === "blossom" ? trail.secondary : trail.accent;
-    for (let index = 0; index < trail.detailCount; index += 1) {
-      const ratio = (index + 1) / (trail.detailCount + 1);
-      const x = Math.sin(time * 3.6 + index * 2.2) * (4 + ratio * 8);
-      const y = 18 + length * ratio;
-      context.globalAlpha = 0.42 - ratio * 0.16;
-      context.beginPath();
-      if (trail.kind === "blossom") {
-        context.ellipse(x, y, 2.8, 1.3, time + index, 0, Math.PI * 2);
-      } else {
-        context.moveTo(x, y - 3);
-        context.lineTo(x + 2.2, y);
-        context.lineTo(x, y + 3);
-        context.lineTo(x - 2.2, y);
-        context.closePath();
-      }
-      context.fill();
-    }
-  } else if (trail.kind === "solar") {
-    context.strokeStyle = trail.secondary;
-    context.lineWidth = 1.2;
-    context.globalAlpha = 0.48;
-    for (let index = 0; index < trail.detailCount; index += 1) {
-      const ratio = (index + 1) / (trail.detailCount + 1);
-      const x = Math.sin(time * 6 + index * 1.9) * (5 + ratio * 8);
-      const y = 18 + length * ratio;
-      context.beginPath();
-      context.moveTo(x - 2.5, y - 2);
-      context.lineTo(x + 2.5, y + 2);
-      context.stroke();
-    }
-  } else if (trail.kind === "crescent") {
-    context.strokeStyle = trail.secondary;
-    context.globalAlpha = 0.42;
-    context.lineWidth = Math.max(1.2, trail.width * 0.36);
-    drawTrailCurve(context, time * 0.96, length * 0.86, -4, 2.4);
-  } else if (trail.kind === "void") {
-    context.globalCompositeOperation = "source-over";
-    context.strokeStyle = "rgba(10, 0, 28, 0.48)";
-    context.globalAlpha = 0.7;
-    context.lineWidth = Math.max(1.4, trail.width * 0.44);
-    context.shadowBlur = 0;
-    drawTrailCurve(context, time, length * 0.78, 0, 0.9);
-  }
-
+  context.lineCap = "round";
+  context.lineWidth = 4.2 + strength * 2.8;
+  context.shadowBlur = 10 * glowScale;
+  context.shadowColor = profile.glow;
+  context.beginPath();
+  context.moveTo(0, 16);
+  context.quadraticCurveTo(
+    Math.sin(time * 3.1) * 3.5,
+    16 + tailLength * 0.52,
+    Math.sin(time * 2.2 + 1.4) * 5.5,
+    16 + tailLength,
+  );
+  context.stroke();
   context.restore();
 }
 
@@ -637,7 +466,9 @@ export function drawCharacterShip(
     options.x + flightPose.driftX,
     options.y + flightPose.bob,
   );
-  context.rotate(flightPose.banking + (options.aimAngle ?? 0));
+  // Keep in step with characterShipPoint.
+  context.rotate(flightPose.banking + (options.aim ?? 0));
+  context.translate(0, (options.recoil ?? 0) * SHIP_RECOIL_PX);
   context.scale(scale, scale);
   context.globalAlpha = alpha;
 
@@ -652,16 +483,38 @@ export function drawCharacterShip(
   }
 
   const illustrated = characterShipSheet;
+  const rig = activeShipLightRig(characterId);
+  if (illustrated !== null && rig !== null) {
+    // Light rig: rim halo under the hull, then plumes, core and wing lights
+    // over it. Replaces the older centre tail, which sat between the nozzles.
+    const lights = {
+      time: options.time,
+      boost: options.boost ?? 0,
+      recoil: options.recoil ?? 0,
+      detail: detailScale,
+    };
+    drawShipHalo(
+      context,
+      rig,
+      illustrated,
+      shipCell(illustrated, characterId),
+      ILLUSTRATED_SHIP_SIZE,
+      lights,
+    );
+    drawIllustratedShip(context, illustrated, characterId, profile, glowScale, false);
+    drawShipLights(context, rig, lights);
+    context.restore();
+    return;
+  }
   if (illustrated !== null) {
     const engineStrength =
       characterShipSource === "v3" ? 0.62 : 0.96;
     drawFlightTail(
       context,
-      characterId,
       profile,
       options.time,
       glowScale,
-      characterShipSource === "v3" ? 1.08 : 1.0,
+      characterShipSource === "v3" ? 0.72 : 0.92,
     );
     for (const [index, x] of engineOffsets(profile.engineCount).entries()) {
       drawEngine(
@@ -701,7 +554,6 @@ export function drawCharacterShip(
 
   drawFlightTail(
     context,
-    characterId,
     profile,
     options.time,
     glowScale,

@@ -41,12 +41,17 @@ describe("character registry and selection", () => {
     });
   });
 
-  it("does not select a locked character", () => {
+  it("selects any registered ship without changing unlock progression", () => {
     const state = createStarterCharacterState();
-    expect(selectCharacter(state, "aegis")).toBe(state);
+    const changed = selectCharacter(state, "zenith");
+
+    expect(changed.selected).toBe("zenith");
+    expect(changed.unlocked).toEqual(["vanguard"]);
+    expect(state.selected).toBe("vanguard");
+    expect(changed.progress).toBe(state.progress);
   });
 
-  it("selects an unlocked character without mutating the previous state", () => {
+  it("selects a historically unlocked character without mutating the previous state", () => {
     const state = sanitizeCharacterState({
       selected: "vanguard",
       unlocked: ["vanguard", "aegis"],
@@ -55,6 +60,7 @@ describe("character registry and selection", () => {
     const changed = selectCharacter(state, "aegis");
 
     expect(changed.selected).toBe("aegis");
+    expect(changed.unlocked).toEqual(["vanguard", "aegis"]);
     expect(state.selected).toBe("vanguard");
     expect(changed.progress).toBe(state.progress);
   });
@@ -95,16 +101,20 @@ describe("character registry and selection", () => {
     expect(synced.unlocked).toEqual(["vanguard", "aegis", "volt"]);
   });
 
-  it("strict validation rejects duplicate or locked selections", () => {
-    expect(
-      isValidCharacterState({
-        selected: "aegis",
-        unlocked: ["vanguard"],
-      }),
-    ).toBe(false);
+  it("strict validation allows selection before milestone but rejects duplicates", () => {
+    const base = createStarterCharacterState();
 
     expect(
       isValidCharacterState({
+        ...base,
+        selected: "aegis",
+        unlocked: ["vanguard"],
+      }),
+    ).toBe(true);
+
+    expect(
+      isValidCharacterState({
+        ...base,
         selected: "vanguard",
         unlocked: ["vanguard", "vanguard"],
       }),

@@ -1,0 +1,70 @@
+{
+  "id": "vanguard",
+  "version": 2,
+  "aspect": 1.0503,
+  "heightScale": 0.2142,
+  "heightGrid": [
+    256,
+    244
+  ],
+  "nozzles": [
+    [
+      0.3778,
+      0.8366,
+      0.0385
+    ],
+    [
+      0.6218,
+      0.8366,
+      0.038
+    ]
+  ],
+  "anchors": {
+    "nose": [
+      0.5,
+      0.03
+    ],
+    "canopy": [
+      0.5,
+      0.35
+    ],
+    "eyes": [
+      [
+        0.258,
+        0.568
+      ],
+      [
+        0.742,
+        0.568
+      ]
+    ],
+    "guns": [
+      [
+        0.262,
+        0.375
+      ],
+      [
+        0.738,
+        0.375
+      ]
+    ],
+    "wingtips": [
+      [
+        0.045,
+        0.735
+      ],
+      [
+        0.955,
+        0.735
+      ]
+    ]
+  },
+  "color": "color.webp?v=633b27f7fac5",
+  "emissive": "emissive.webp?v=4fff4cb43ebc",
+  "height": "height.bin?v=0ca0a8fd6bbb",
+  "colors": {
+    "hot": "#effcff",
+    "plume": "#5fdcff",
+    "outer": "#3f6dff"
+  }
+}

@@ -25,14 +25,14 @@ export const BASIC_SKILL_PRESENTATION: Record<
   UpgradeableSkillId,
   { icon: string; group: "Offense" | "Defense"; summary: string }
 > = {
-  barrier: { icon: "🛡️", group: "Defense", summary: "Protect the ship with a temporary barrier." },
-  "reflect-field": { icon: "🔰", group: "Defense", summary: "Reflect hostile projectiles when timing matters." },
-  "time-shell": { icon: "⏳", group: "Defense", summary: "Create a brief defensive typing window." },
-  "emergency-repair": { icon: "💚", group: "Defense", summary: "Restore survival resources in an emergency." },
-  "guardian-drone": { icon: "🛰️", group: "Defense", summary: "Deploy an automated defensive escort." },
-  "emp-burst": { icon: "⚡", group: "Offense", summary: "Disrupt enemies with an EMP burst." },
-  "chain-lightning": { icon: "🌩️", group: "Offense", summary: "Strike nearby enemies in a chain." },
-  "mark-of-weakness": { icon: "🎯", group: "Offense", summary: "Mark a target for greater follow-up damage." },
+  barrier: { icon: "🛡️", group: "Defense", summary: "Hexagonal energy dome that soaks incoming damage." },
+  "reflect-field": { icon: "🔷", group: "Defense", summary: "Orbiting prism shards return hostile shots to sender." },
+  "time-shell": { icon: "⏳", group: "Defense", summary: "Stasis field: enemies crawl while you type at full speed." },
+  "emergency-repair": { icon: "🔧", group: "Defense", summary: "Repair nanites rebuild Hull and Shield." },
+  "guardian-drone": { icon: "🛰️", group: "Defense", summary: "Escort drones intercept hits aimed at the ship." },
+  "emp-burst": { icon: "⚡", group: "Offense", summary: "EMP shockwave: clears shots and jams enemy weapons." },
+  "chain-lightning": { icon: "🌩️", group: "Offense", summary: "A Tesla arc leaps through the closest enemies." },
+  "mark-of-weakness": { icon: "🎯", group: "Offense", summary: "Target lock: strips a layer, bosses take more damage." },
 };
 
 export function createBasicSkillRanks(

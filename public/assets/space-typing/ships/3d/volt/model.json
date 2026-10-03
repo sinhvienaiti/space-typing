@@ -1,0 +1,62 @@
+{
+  "id": "volt",
+  "version": 3,
+  "aspect": 1.098,
+  "heightScale": 0.212,
+  "heightGrid": [
+    256,
+    233
+  ],
+  "nozzles": [
+    [
+      0.3538,
+      0.8156,
+      0.0565
+    ],
+    [
+      0.6446,
+      0.8156,
+      0.0565
+    ]
+  ],
+  "anchors": {
+    "nose": [
+      0.4992,
+      0.0291
+    ],
+    "canopy": [
+      0.5003,
+      0.4806
+    ],
+    "eyes": [],
+    "guns": [
+      [
+        0.249,
+        0.3363
+      ],
+      [
+        0.7518,
+        0.3345
+      ]
+    ],
+    "wingtips": [
+      [
+        0.0276,
+        0.7347
+      ],
+      [
+        0.9716,
+        0.7352
+      ]
+    ]
+  },
+  "colors": {
+    "hot": "#def2ff",
+    "plume": "#24abff",
+    "outer": "#1a7bb8",
+    "accent": "#54afff"
+  },
+  "color": "color.webp?v=4cb91c1aa896",
+  "emissive": "emissive.webp?v=54d37aab7f3b",
+  "height": "height.bin?v=c56bf05e761d"
+}

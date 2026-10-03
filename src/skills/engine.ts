@@ -8,6 +8,8 @@ export type SkillTypingCondition = {
 export type SkillDefinition = {
   id: string;
   name: string;
+  /** What the ship system does, shown in skill lists and tooltips. */
+  description?: string;
   energyCost: number;
   cooldown: number;
   charges: number | null;

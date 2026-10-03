@@ -24,6 +24,13 @@ export type CompiledRelicEffects = {
   longBossWordDamageMultiplier: number;
   mistakeGuardCharges: number;
   mistakeGuardShieldRatio: number;
+  perfectWordEnergy: number;
+  perfectWordPower: number;
+  perfectWordInterval: number;
+  perfectWordIntervalPower: number;
+  longWordShield: number;
+  longWordPower: number;
+  recoveryPerfectEnergy: number;
 };
 
 export const EMPTY_COMPILED_RELIC_EFFECTS: CompiledRelicEffects = {
@@ -36,6 +43,13 @@ export const EMPTY_COMPILED_RELIC_EFFECTS: CompiledRelicEffects = {
   longBossWordDamageMultiplier: 1,
   mistakeGuardCharges: 0,
   mistakeGuardShieldRatio: 0,
+  perfectWordEnergy: 0,
+  perfectWordPower: 0,
+  perfectWordInterval: 0,
+  perfectWordIntervalPower: 0,
+  longWordShield: 0,
+  longWordPower: 0,
+  recoveryPerfectEnergy: 0,
 };
 
 export function createRelicState(): RelicState {
@@ -172,6 +186,13 @@ export function compileRelicEffects(
   let longBossWordDamageMultiplier = 1;
   let mistakeGuardCharges = 0;
   let mistakeGuardShieldRatio = 0;
+  let perfectWordEnergy = 0;
+  let perfectWordPower = 0;
+  let perfectWordInterval = 0;
+  let perfectWordIntervalPower = 0;
+  let longWordShield = 0;
+  let longWordPower = 0;
+  let recoveryPerfectEnergy = 0;
 
   // Compilation happens only when the loadout changes. Combat consumes the
   // resolved scalar fields directly and never scans the relic inventory.
@@ -212,6 +233,23 @@ export function compileRelicEffects(
           ? guardCost
           : Math.min(mistakeGuardShieldRatio, guardCost);
     }
+
+    perfectWordEnergy += effect.perfectWordEnergy ?? 0;
+    perfectWordPower += effect.perfectWordPower ?? 0;
+    const perfectInterval = effect.perfectWordInterval ?? 0;
+    if (perfectInterval > 0) {
+      perfectWordInterval =
+        perfectWordInterval === 0
+          ? perfectInterval
+          : Math.min(perfectWordInterval, perfectInterval);
+      perfectWordIntervalPower = Math.max(
+        perfectWordIntervalPower,
+        effect.perfectWordIntervalPower ?? 0,
+      );
+    }
+    longWordShield += effect.longWordShield ?? 0;
+    longWordPower += effect.longWordPower ?? 0;
+    recoveryPerfectEnergy += effect.recoveryPerfectEnergy ?? 0;
   }
 
   return {
@@ -244,6 +282,24 @@ export function compileRelicEffects(
       0,
       0.25,
     ),
+    perfectWordEnergy: clamp(perfectWordEnergy, 0, 8),
+    perfectWordPower: clamp(perfectWordPower, 0, 5),
+    perfectWordInterval: Math.max(
+      0,
+      Math.floor(perfectWordInterval),
+    ),
+    perfectWordIntervalPower: clamp(
+      perfectWordIntervalPower,
+      0,
+      20,
+    ),
+    longWordShield: clamp(longWordShield, 0, 20),
+    longWordPower: clamp(longWordPower, 0, 12),
+    recoveryPerfectEnergy: clamp(
+      recoveryPerfectEnergy,
+      0,
+      20,
+    ),
   };
 }
 
@@ -265,6 +321,7 @@ export function selectRelicReward(
   const available = RELIC_IDS.filter(
     (id) =>
       !state.owned.includes(id) &&
+      RELIC_REGISTRY[id].runOnly !== true &&
       RELIC_REGISTRY[id].unlockStage <= safeStage,
   );
   if (available.length === 0) return null;

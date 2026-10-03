@@ -1,0 +1,187 @@
+{
+  "generatedBy": "scripts/music/render-songs.mjs",
+  "tracks": [
+    {
+      "id": "signal-in-the-void",
+      "title": "Signal in the Void",
+      "mood": "suspense",
+      "key": "A minor",
+      "bpm": 112,
+      "meter": 4,
+      "seconds": 145.929,
+      "mixOut": 134.929,
+      "stems": {
+        "calm": "/assets/audio/music/songs/signal-in-the-void/calm.ogg?v=4b8b61b0543e0d01",
+        "intense": "/assets/audio/music/songs/signal-in-the-void/intense.ogg?v=612ef174da043388"
+      }
+    },
+    {
+      "id": "starlit-lullaby",
+      "title": "Starlit Lullaby",
+      "mood": "gentle",
+      "key": "D major",
+      "bpm": 84,
+      "meter": 3,
+      "seconds": 128.786,
+      "mixOut": 117.786,
+      "stems": {
+        "calm": "/assets/audio/music/songs/starlit-lullaby/calm.ogg?v=6670aefb80d014f5",
+        "intense": "/assets/audio/music/songs/starlit-lullaby/intense.ogg?v=aacd5751ee2a7afb"
+      }
+    },
+    {
+      "id": "ember-rush",
+      "title": "Ember Rush",
+      "mood": "fiery",
+      "key": "E Phrygian dominant",
+      "bpm": 142,
+      "meter": 4,
+      "seconds": 122.81,
+      "mixOut": 111.81,
+      "stems": {
+        "calm": "/assets/audio/music/songs/ember-rush/calm.ogg?v=89e804831e8a8280",
+        "intense": "/assets/audio/music/songs/ember-rush/intense.ogg?v=ad812b2f4ecf8968"
+      }
+    },
+    {
+      "id": "molten-crown",
+      "title": "Molten Crown",
+      "mood": "blazing",
+      "key": "C minor",
+      "bpm": 126,
+      "meter": 4,
+      "seconds": 130.214,
+      "mixOut": 119.214,
+      "stems": {
+        "calm": "/assets/audio/music/songs/molten-crown/calm.ogg?v=ba4a375898cf0542",
+        "intense": "/assets/audio/music/songs/molten-crown/intense.ogg?v=17d627fabc1eb0ab"
+      }
+    },
+    {
+      "id": "glass-solitude",
+      "title": "Glass Solitude",
+      "mood": "lonely",
+      "key": "B minor",
+      "bpm": 72,
+      "meter": 4,
+      "seconds": 144.5,
+      "mixOut": 133.5,
+      "stems": {
+        "calm": "/assets/audio/music/songs/glass-solitude/calm.ogg?v=5d980d46157c0d04",
+        "intense": "/assets/audio/music/songs/glass-solitude/intense.ogg?v=55aca490f34b1a35"
+      }
+    },
+    {
+      "id": "crystal-echoes",
+      "title": "Crystal Echoes",
+      "mood": "contemplative",
+      "key": "F# Dorian",
+      "bpm": 84,
+      "meter": 4,
+      "seconds": 141.643,
+      "mixOut": 130.643,
+      "stems": {
+        "calm": "/assets/audio/music/songs/crystal-echoes/calm.ogg?v=a140c04d1c62f0e0",
+        "intense": "/assets/audio/music/songs/crystal-echoes/intense.ogg?v=2fc53f620f2ec448"
+      }
+    },
+    {
+      "id": "canopy-breeze",
+      "title": "Canopy Breeze",
+      "mood": "relaxing",
+      "key": "F major",
+      "bpm": 88,
+      "meter": 4,
+      "seconds": 140.864,
+      "mixOut": 129.864,
+      "stems": {
+        "calm": "/assets/audio/music/songs/canopy-breeze/calm.ogg?v=60b32b3542353a1b",
+        "intense": "/assets/audio/music/songs/canopy-breeze/intense.ogg?v=2d2c469a2f9ebfb8"
+      }
+    },
+    {
+      "id": "sunseed-parade",
+      "title": "Sunseed Parade",
+      "mood": "happy",
+      "key": "G major",
+      "bpm": 120,
+      "meter": 4,
+      "seconds": 128.5,
+      "mixOut": 117.5,
+      "stems": {
+        "calm": "/assets/audio/music/songs/sunseed-parade/calm.ogg?v=d4067a2461788bcd",
+        "intense": "/assets/audio/music/songs/sunseed-parade/intense.ogg?v=2901eca6e65693ae"
+      }
+    },
+    {
+      "id": "hollow-roots",
+      "title": "Hollow Roots",
+      "mood": "gloomy",
+      "key": "D minor",
+      "bpm": 68,
+      "meter": 4,
+      "seconds": 159.794,
+      "mixOut": 148.794,
+      "stems": {
+        "calm": "/assets/audio/music/songs/hollow-roots/calm.ogg?v=b5cc5164818df0e0",
+        "intense": "/assets/audio/music/songs/hollow-roots/intense.ogg?v=891afead0d8d2430"
+      }
+    },
+    {
+      "id": "forge-of-stars",
+      "title": "Forge of Stars",
+      "mood": "climactic",
+      "key": "D minor",
+      "bpm": 128,
+      "meter": 4,
+      "seconds": 128.25,
+      "mixOut": 117.25,
+      "stems": {
+        "calm": "/assets/audio/music/songs/forge-of-stars/calm.ogg?v=260ab27aef1026b2",
+        "intense": "/assets/audio/music/songs/forge-of-stars/intense.ogg?v=edfb0c209c4559c9"
+      }
+    },
+    {
+      "id": "aurora-serenade",
+      "title": "Aurora Serenade",
+      "mood": "romantic",
+      "key": "Eb major",
+      "bpm": 76,
+      "meter": 4,
+      "seconds": 137.132,
+      "mixOut": 126.132,
+      "stems": {
+        "calm": "/assets/audio/music/songs/aurora-serenade/calm.ogg?v=4de257bfaefec31c",
+        "intense": "/assets/audio/music/songs/aurora-serenade/intense.ogg?v=e8091f27741b12d6"
+      }
+    },
+    {
+      "id": "requiem-of-light",
+      "title": "Requiem of Light",
+      "mood": "sad",
+      "key": "F minor",
+      "bpm": 66,
+      "meter": 4,
+      "seconds": 142.682,
+      "mixOut": 131.682,
+      "stems": {
+        "calm": "/assets/audio/music/songs/requiem-of-light/calm.ogg?v=d0ba5d0d97f176f6",
+        "intense": "/assets/audio/music/songs/requiem-of-light/intense.ogg?v=6b522fb8342a96dc"
+      }
+    },
+    {
+      "id": "eternity-gate",
+      "title": "Eternity Gate",
+      "mood": "triumphant",
+      "key": "C minor / Eb major",
+      "bpm": 134,
+      "meter": 4,
+      "seconds": 122.709,
+      "mixOut": 111.709,
+      "stems": {
+        "calm": "/assets/audio/music/songs/eternity-gate/calm.ogg?v=8e9301bebf659801",
+        "intense": "/assets/audio/music/songs/eternity-gate/intense.ogg?v=8306fe256405ad48"
+      }
+    }
+  ]
+}

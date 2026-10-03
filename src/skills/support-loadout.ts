@@ -1,4 +1,5 @@
 import {
+  LATER_TACTICAL_SYSTEM_IDS,
   SUPPORT_SPELL_IDS,
   isSupportSpellId,
   type SupportSpellId,
@@ -43,6 +44,11 @@ export function sanitizeSupportSpellState(
 
   if (unlocked.length === 0) {
     return createStarterSupportSpellState();
+  }
+  // Tactical systems released later are free: saves from before they
+  // existed get them unlocked (still valid for isValidSupportSpellState).
+  for (const id of LATER_TACTICAL_SYSTEM_IDS) {
+    if (!unlocked.includes(id)) unlocked.push(id);
   }
 
   const loadout: [SupportSpellId | null, SupportSpellId | null] = [

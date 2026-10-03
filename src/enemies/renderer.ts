@@ -1,4 +1,5 @@
 import type { EnemyDefinition } from "./registry";
+import { drawGlow, drawRingGlow } from "../vfx/light-sprites";
 import { isReadableVisualProfile } from "./visuals";
 
 export type EnemyVisualPalette = {
@@ -108,11 +109,12 @@ function drawAura(
   const pulse = 1.34 + Math.sin(age * 2.4) * 0.04;
 
   context.save();
+  // Soft halo from a cached ring sprite (no per-stroke shadowBlur).
+  context.shadowBlur = 0;
+  drawRingGlow(context, palette.outline, 0, 0, radius * 1.32, 0.42 * glowScale);
   context.strokeStyle = palette.aura;
   context.fillStyle = palette.outline;
   context.lineWidth = 2 + glowScale;
-  context.shadowBlur = 8 * glowScale;
-  context.shadowColor = palette.outline;
 
   if (aura.includes("shell")) {
     for (const scale of [1.22, 1.42]) {
@@ -586,21 +588,24 @@ function drawHead(
     const count = head.includes("triple") ? 3 : head.includes("double") ? 2 : 1;
     context.save();
     context.strokeStyle = palette.outline;
-    context.lineWidth = 1.5;
-    context.shadowBlur = 8 * glowScale;
-    context.shadowColor = palette.outline;
-    for (let index = 0; index < count; index += 1) {
-      context.beginPath();
-      context.ellipse(
-        0,
-        -radius * (1.08 + index * 0.16),
-        radius * (0.5 + index * 0.09),
-        radius * 0.13,
-        Math.sin(age * 0.9 + index) * 0.08,
-        0,
-        Math.PI * 2,
-      );
-      context.stroke();
+    context.shadowBlur = 0;
+    // Glow pass (wide, faint) then the crisp halo line.
+    for (const [width, alpha] of [[4.5 * Math.max(0.4, glowScale), 0.28], [1.5, 1]] as const) {
+      context.lineWidth = width;
+      context.globalAlpha = alpha;
+      for (let index = 0; index < count; index += 1) {
+        context.beginPath();
+        context.ellipse(
+          0,
+          -radius * (1.08 + index * 0.16),
+          radius * (0.5 + index * 0.09),
+          radius * 0.13,
+          Math.sin(age * 0.9 + index) * 0.08,
+          0,
+          Math.PI * 2,
+        );
+        context.stroke();
+      }
     }
     context.restore();
     return;
@@ -611,8 +616,10 @@ function drawHead(
     context.strokeStyle = palette.outline;
     context.fillStyle = palette.eye;
     context.lineWidth = 1.7;
-    context.shadowBlur = 7 * glowScale;
-    context.shadowColor = palette.outline;
+    context.shadowBlur = 0;
+    context.globalCompositeOperation = "lighter";
+    drawGlow(context, palette.outline, 0, -radius * 0.94, radius * 0.62, 0.45 * glowScale);
+    context.globalCompositeOperation = "source-over";
     context.beginPath();
     context.ellipse(0, -radius * 0.94, radius * 0.5, radius * 0.2, 0, 0, Math.PI * 2);
     context.stroke();
@@ -850,6 +857,9 @@ export function drawModularEnemy(
   const radius = Math.max(8, input.radius);
   const palette = enemyVisualPalette(definition.family);
   const glowScale = Math.max(0, input.glowScale ?? 1);
+  // Wings, orbit and head must not inherit a caller's shadowBlur: that blur
+  // was recomputed for every stroke of every enemy each frame.
+  context.shadowBlur = 0;
 
   context.save();
   context.globalCompositeOperation = "lighter";

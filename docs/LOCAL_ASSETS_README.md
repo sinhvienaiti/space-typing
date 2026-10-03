@@ -47,6 +47,16 @@ These paths are subject to the same publishing audit as announcer files. The run
 
 Do not interpret an audio file playing locally as evidence that it is licensed for redistribution.
 
+## Background source art (pipeline input, not served)
+
+```text
+art-src/
+```
+
+Original owner-generated images (ChatGPT Images / Gemini) read by `pnpm bg:prepare`. The game never loads them: the script writes runtime kits to `public/assets/space-typing/backgrounds/<kit>/`, and those kits are committed. Git ignores everything in `art-src/` except `art-src/README.md`, which lists the expected file names; back the folder up separately and copy it into place on a new machine.
+
+The folder is deliberately outside `public/`: Vite copies all of `public/` into the build, so source art there would ship roughly 22 MB of unused files per galaxy with every build.
+
 ## Future local-only folders
 
 If additional third-party or private assets are added later, register them here before use.
@@ -95,3 +105,16 @@ Before public deployment or distribution:
 ## Current intention
 
 The current Space Typing project is being developed for local/private use. This document exists so a future public release does not accidentally redistribute local-only or third-party assets.
+
+## Duel/Campaign announcer voice lines (DotA pack, added 2026-10-03)
+
+```text
+public/local-assets/announcer/<line>.ogg      (15 lines, Opus 64 kbps, loudness-normalised)
+public/local-assets/announcer/manifest.json   ({"lines": [...]}: the game only plays listed lines)
+```
+
+Converted from the owner's `~/Downloads/Dota-Sounds` (classic DotA/Unreal announcer: first-blood,
+double/triple/ultra-kill, rampage, killing-spree, dominating, mega-kill, unstoppable, wicked-sick,
+monster-kill, godlike, holy-shit, ownage, combo-whore). Third-party, **private use only**: the folder
+is gitignored and must not be published. Without the manifest the Duel and Campaign simply skip
+these call-outs (the Campaign elite chain falls back to the generic base sound).
