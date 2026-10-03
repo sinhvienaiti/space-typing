@@ -7,7 +7,7 @@ import {
   duelMusicStateForPhase,
 } from "../src/duel/audio";
 import { DUEL_MAPS } from "../src/duel/maps";
-import { duelProjectileTravelMs } from "../src/duel/presentation-timing";
+import { DUEL_KO_TIMELINE, duelProjectileTravelMs } from "../src/duel/presentation-timing";
 import { DuelLocalPracticeMatch } from "../src/duel/local-match";
 import { createPracticeDuelRoom } from "../src/duel/room";
 
@@ -100,14 +100,32 @@ describe("Duel map audio presentation", () => {
 
 describe("Duel projectile presentation timing", () => {
   it("keeps one deterministic visual/audio travel clock", () => {
-    expect(duelProjectileTravelMs(1)).toBe(720);
-    expect(duelProjectileTravelMs(2)).toBe(360);
-    expect(duelProjectileTravelMs(0.25)).toBe(1440);
-    expect(duelProjectileTravelMs(Number.NaN)).toBe(720);
+    // 860 ms since 2026-10-03: 720 ms read as a flash across the wide arena.
+    expect(duelProjectileTravelMs(1)).toBe(860);
+    expect(duelProjectileTravelMs(2)).toBe(430);
+    expect(duelProjectileTravelMs(0.25)).toBe(1720); // speed scale floors at 0.5
+    expect(duelProjectileTravelMs(Number.NaN)).toBe(860);
   });
 });
 
 describe("Duel combat SFX routing", () => {
+  it("plays primary impact only when the authority confirms the hit", () => {
+    const view = practiceView();
+    expect(duelCombatAudioCues(view, [
+      { type: "cannon-fired", playerId: "player-1", shotId: "cannon:1", travelMs: 360 },
+    ])).toEqual([{ cue: "laser-launch", delayMs: 0, side: "self" }]);
+    expect(duelCombatAudioCues(view, [
+      { type: "cannon-hit", playerId: "player-1", targetPlayerId: "player-2", shotId: "cannon:1" },
+    ])).toEqual([{ cue: "energy-impact", delayMs: 0, side: "opponent" }]);
+  });
+
+  it("does not delay a resolved incoming threat by a second projectile flight", () => {
+    expect(duelCombatAudioCues(practiceView(), [{
+      type: "threat-resolved", threatId: "threat:audio", sourcePlayerId: "player-2",
+      targetPlayerId: "player-1", actionId: "siege-lance",
+    }])).toEqual([{ cue: "heavy-impact", delayMs: 0, side: "self" }]);
+  });
+
   it("maps confirmed attack events to launch plus impact on the projectile timeline", () => {
     const view = practiceView();
     const cues = duelCombatAudioCues(view, [
@@ -126,7 +144,7 @@ describe("Duel combat SFX routing", () => {
       },
       {
         cue: "energy-impact",
-        delayMs: 720,
+        delayMs: 860,
         side: "self",
       },
     ]);
@@ -167,11 +185,18 @@ describe("Duel combat SFX routing", () => {
       },
     ]);
 
+    // A won round plays the K.O. chain, the final blast, the result
+    // stinger once the card shows, then the next-round call.
     expect(cues.map((cue) => cue.cue)).toEqual([
       "warning",
       "intercept",
+      ...DUEL_KO_TIMELINE.chainMs.map(() => "ko-blast"),
+      "ko-final",
       "round-win",
+      "round-ready",
     ]);
+    expect(cues.find((cue) => cue.cue === "ko-final")).toMatchObject({ side: "opponent", delayMs: DUEL_KO_TIMELINE.finalMs });
+    expect(cues.find((cue) => cue.cue === "round-win")?.delayMs).toBe(DUEL_KO_TIMELINE.bannerMs);
   });
 
   it("deduplicates replayed presentation updates and cancels delayed impact tails on reset", () => {

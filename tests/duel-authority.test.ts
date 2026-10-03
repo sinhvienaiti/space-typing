@@ -8,6 +8,7 @@ import {
 import { defaultDuelRoomSettings } from "../src/duel/room";
 import type { DuelEngineEvent } from "../src/duel/engine";
 import { DUEL_PROTOCOL_VERSION } from "../src/duel/protocol";
+import { DUEL_ROUND_BREAK_SECONDS } from "../src/duel/presentation-timing";
 
 function deps(): DuelAuthorityDependencies {
   let token = 0;
@@ -493,7 +494,7 @@ describe("Duel M-DUEL-11 authority core", () => {
     }
 
     expect(sawOwnExpiration).toBe(true);
-    expect(lastView.self.offers).toHaveLength(5);
+    expect(lastView.self.offers).toHaveLength(3);
     expect(
       lastView.self.offers.some((offer) =>
         initialIds.has(offer.instanceId),
@@ -636,10 +637,15 @@ describe("Duel M-DUEL-11 authority core", () => {
       ended.value.updates[0]!.view.series.roundsPlayed,
     ).toBe(1);
 
+    // The finished round holds through the K.O./result break.
+    const held = authority.tick(started.value.matchId, 0, 5);
+    if (!held.ok) throw new Error(held.message);
+    expect(held.value.updates[0]!.view.roundId).toBe(firstRoundId);
+
     const next = authority.tick(
       started.value.matchId,
-      0,
-      5,
+      DUEL_ROUND_BREAK_SECONDS,
+      6,
     );
     if (!next.ok) throw new Error(next.message);
     expect(next.value.updates[0]!.view.roundId).not.toBe(
@@ -781,7 +787,7 @@ describe("Duel M-DUEL-11 authority core", () => {
       );
       expect(update.view.series.format).toBe(3);
       expect(update.view.series.winsNeeded).toBe(2);
-      expect(update.view.self.offers).toHaveLength(5);
+      expect(update.view.self.offers).toHaveLength(3);
     }
 
     expect(

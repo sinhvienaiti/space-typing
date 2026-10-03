@@ -1,5 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
+import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { DUEL_ACTIONS } from "../src/duel/actions";
 import {
@@ -28,7 +30,7 @@ describe("Duel target art manifest", () => {
     for (const spec of Object.values(runtime!.sprites)) {
       expect(spec?.alphaConvention).toBe("source-alpha");
       expect(spec?.blendMode).toBe("source-over");
-      expect(spec?.url.endsWith(".svg")).toBe(true);
+      expect(spec?.url).toMatch(/\.(svg|webp|png)$/);
       expect(
         existsSync(
           fileURLToPath(
@@ -43,22 +45,32 @@ describe("Duel target art manifest", () => {
     }
   });
 
-  it("keeps runtime target vectors transparent and text-free", () => {
+  it("verifies actual pixels, dimensions and hashes rather than trusting the extension", async () => {
+    const manifest = JSON.parse(readFileSync(fileURLToPath(new URL("../public/assets/space-typing/duel-targets/targets.json", import.meta.url)), "utf8"));
     for (const id of DUEL_TARGET_IDS) {
+      const spec = manifest.sprites[id];
       const path = fileURLToPath(
         new URL(
           "../public/assets/space-typing/duel-targets/" +
-            id +
-            ".svg",
+            spec.url,
           import.meta.url,
         ),
       );
-      const svg = readFileSync(path, "utf8");
-      expect(svg).toContain("<svg");
-      expect(svg).not.toContain("<text");
-      expect(svg).not.toMatch(
-        /<rect[^>]+(?:width=["']512["'][^>]+height=["']512["']|height=["']512["'][^>]+width=["']512["'])/i,
-      );
+      const bytes = readFileSync(path);
+      expect(createHash("sha256").update(bytes).digest("hex")).toBe(spec.sha256);
+      const meta = await sharp(bytes).metadata();
+      expect(meta.width).toBe(spec.width);
+      expect(meta.height).toBe(spec.height);
+      const { data, info } = await sharp(bytes).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+      let transparent = 0;
+      let visible = 0;
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i]! < 8) transparent++;
+        if (data[i]! > 128) visible++;
+      }
+      expect(transparent / (info.width * info.height)).toBeGreaterThan(.05);
+      expect(visible).toBeGreaterThan(0);
+      if (spec.url.endsWith(".svg")) expect(bytes.toString("utf8")).not.toContain("<text");
     }
   });
 

@@ -3,6 +3,7 @@ import "./character-progress.css";
 import "./basic-skills.css";
 import "./kill-translation.css";
 import "./duel/battle.css";
+import "./duel/battle-juice.css";
 import { installDuelOnlineRoomController } from "./duel/online-room-controller";
 import { installDuelBattleUi } from "./duel/battle-ui";
 import { DuelLocalPracticeMatch } from "./duel/local-match";
@@ -1122,12 +1123,24 @@ function syncDuelAudio(
   musicController.setPaused(false);
 }
 
-const duelCombatAudio = new DuelCombatAudioRouter(
-  (cue) => game.playDuelCombatAudioCue(cue),
-);
+const duelCombatAudio = new DuelCombatAudioRouter((cue) => {
+  game.playDuelCombatAudioCue(cue);
+  // The K.O. and the match result own the mix for a moment.
+  if (cue.cue === "ko-final") musicController.duckFor("announcer", 2600);
+  if (cue.cue === "match-win" || cue.cue === "match-loss") musicController.duckFor("warning", 2200);
+});
 
 const duelBattle = installDuelBattleUi(
   {
+    onCombatRenderer(draw, camera) {
+      game.setDuelCombatRenderer(draw, camera ?? null);
+    },
+    onScreenShake(amount) {
+      game.duelShake(amount);
+    },
+    onLayoutChange(horizontal) {
+      game.setDuelStereoLayout(horizontal);
+    },
     sendIntent(intent) {
       if (localDuelMatch !== null) {
         const result = localDuelMatch.sendIntent(intent);
@@ -1149,11 +1162,13 @@ const duelBattle = installDuelBattleUi(
         null
       );
     },
-    onPresentationState(view, events) {
+    onPresentationState(view, events, beats) {
+      game.setDuelPresentationActive(true);
       syncDuelAudio(view);
-      duelCombatAudio.consume(view, events);
+      duelCombatAudio.consume(view, events, beats);
     },
     onExit() {
+      game.setDuelPresentationActive(false);
       stopLocalDuel();
       lastDuelAudioPresentationKey = null;
       duelCombatAudio.reset(null);
@@ -1172,8 +1187,12 @@ function startLocalDuelPractice(
   stopLocalDuel();
   const seedBuffer = new Uint32Array(1);
   window.crypto.getRandomValues(seedBuffer);
+  // Practice uses the currently selected Campaign hull unless the room has
+  // an explicit cosmetic selection. This does not import Campaign stats.
+  const practiceRoom = structuredClone(snapshot);
+  practiceRoom.slots[0].characterId ??= characters.selected;
   localDuelMatch = new DuelLocalPracticeMatch({
-    room: snapshot,
+    room: practiceRoom,
     seed: seedBuffer[0] ?? 1,
   });
 
@@ -4673,6 +4692,8 @@ game.setGameplayMode(gameplayMode, recallSettings);
 if (import.meta.env.DEV) {
   // Dev-only handle for scripts/visual checks (scripts/visual/evals/skill-fx.js).
   (window as unknown as { __spaceTypingGame?: Game }).__spaceTypingGame = game;
+  // Dev-only: the running Practice match, for K.O./round-flow screenshots.
+  (window as unknown as { __duelPractice?: () => DuelLocalPracticeMatch | null }).__duelPractice = () => localDuelMatch;
 }
 
 function expeditionSeed(): number {

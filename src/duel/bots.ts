@@ -10,6 +10,7 @@ import type {
   DuelTypingCostBand,
 } from "./model";
 import { DuelRng } from "./rng";
+import { duelFullBank } from "./offer-availability";
 import type { DuelCombatInventorySnapshot } from "./inventory";
 import type { DuelIncomingThreat } from "./threats";
 import type { DuelNeutralObjective } from "./objectives";
@@ -39,6 +40,7 @@ export type DuelBotPublicPlayer = {
 };
 
 export type DuelBotObservation = {
+  autoActivateItems?: boolean;
   mapId: DuelMapId;
   phase: DuelMatchPhase;
   self: DuelBotPublicPlayer;
@@ -338,7 +340,7 @@ export class DuelBot {
         ): entry is {
           offer: DuelActionOffer;
           action: DuelActionDefinition;
-        } => entry !== null,
+        } => entry !== null && (observation.autoActivateItems ? observation.selfEnergy >= entry.action.energyCost : duelFullBank(entry.action, observation.ownInventory) === null),
       );
     if (candidates.length === 0) return null;
 
@@ -573,6 +575,7 @@ export class DuelBot {
     );
     return (
       offer !== undefined &&
+      (observation.autoActivateItems ? observation.selfEnergy >= (duelActionDefinitionForMap(observation.mapId, offer.actionId)?.energyCost ?? 0) : duelFullBank(duelActionDefinitionForMap(observation.mapId, offer.actionId), observation.ownInventory) === null) &&
       (offer.status === "available" || offer.status === "locked")
     );
   }
@@ -595,6 +598,7 @@ export class DuelBot {
 }
 
 export function duelBotObservation(input: {
+  autoActivateItems?: boolean;
   mapId?: DuelMapId;
   phase: DuelMatchPhase;
   self: {
@@ -626,6 +630,7 @@ export function duelBotObservation(input: {
     max <= 0 ? 0 : clamp01(value / max);
 
   return {
+    autoActivateItems: input.autoActivateItems ?? false,
     mapId: input.mapId ?? "frost-wastes",
     phase: input.phase,
     self: {

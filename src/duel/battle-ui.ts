@@ -1,4 +1,4 @@
-import { duelActionDefinitionForMap } from "./map-actions";
+import { duelLiveActionMapForMap } from "./map-actions";
 import {
   CHARACTER_IDS,
   type CharacterId,
@@ -29,13 +29,33 @@ import {
   preloadDuelTargetSprites,
 } from "./target-art";
 import { duelProjectileTravelMs } from "./presentation-timing";
+import { DuelCombatVisuals } from "./combat-visuals";
+import { duelAutoActionBlock } from "./offer-availability";
+import { duelArenaLayout } from "./combat-layout";
+import { DuelMomentum, DUEL_MOMENTUM_TIERS } from "./momentum";
+import { DUEL_KO_TIMELINE } from "./presentation-timing";
+import type { DuelPresentationBeat } from "./audio";
+import type { DuelHitKind } from "./combat-juice";
 
 export type DuelBattleUiHooks = {
   sendIntent(intent: DuelWireIntent): number | null;
+  onCombatRenderer?(
+    draw: ((context: CanvasRenderingContext2D, time: number, width: number, height: number) => void) | null,
+    camera?: (() => { zoom: number; fx: number; fy: number }) | null,
+  ): void;
+  /**
+   * `beats` are presentation moments the UI derived itself (typing
+   * momentum, shield hits, round calls) so audio can follow the visuals.
+   */
   onPresentationState?(
     view: DuelClientMatchView,
     events: readonly DuelClientEvent[],
+    beats?: readonly DuelPresentationBeat[],
   ): void;
+  /** Camera shake for a hit, in px. */
+  onScreenShake?(amount: number): void;
+  /** Wide (left/right) layout on or off, for stereo placement. */
+  onLayoutChange?(horizontal: boolean): void;
   onExit?(): void;
 };
 
@@ -64,21 +84,35 @@ const MAX_PROJECTILE_NODES = 18;
 const MAX_TYPING_FX_NODES = 14;
 const MAX_VISIBLE_WORD_TARGETS = 10;
 const DUEL_WORD_TARGET_POSITIONS = [
-  [18, 30],
-  [35, 24],
-  [62, 27],
-  [81, 34],
-  [27, 46],
-  [48, 42],
-  [70, 48],
-  [19, 61],
-  [58, 62],
-  [80, 60],
+  [28, 34],
+  [73, 35],
+  [28, 65],
+  [73, 65],
+  [18, 48],
+  [82, 48],
+  [35, 49],
+  [65, 49],
+  [35, 76],
+  [65, 76],
 ] as const;
 const SHIP_FALLBACKS = {
   self: "vanguard",
   opponent: "reaper",
 } as const satisfies Record<string, CharacterId>;
+
+/**
+ * Depth View: words flank the firing lane (x 40–60% stays clear) between
+ * the far rival (top) and your ship (bottom).
+ */
+const DUEL_DEPTH_TARGET_POSITIONS = [
+  [27, 34], [73, 34], [19, 53], [81, 53], [33, 68],
+  [67, 68], [35, 47], [65, 47], [21, 74], [79, 74],
+] as const;
+
+const DUEL_HORIZONTAL_TARGET_POSITIONS = [
+  [32, 27], [68, 27], [32, 70], [68, 70], [48, 27],
+  [48, 70], [20, 27], [80, 70], [80, 27], [20, 70],
+] as const;
 
 function createElement<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -101,7 +135,7 @@ function phaseLabel(
 ): string {
   switch (phase) {
     case "build":
-      return "BUILD";
+      return "ENGAGE";
     case "skirmish":
       return "SKIRMISH";
     case "war":
@@ -140,6 +174,8 @@ function eventSourcePlayer(
   event: DuelClientEvent,
 ): DuelPlayerId | null {
   switch (event.type) {
+    case "cannon-fired":
+    case "cannon-hit":
     case "action-completed":
     case "action-fired":
     case "stored-action-used":
@@ -319,8 +355,12 @@ function createBattleNodes(gameShell: HTMLElement) {
       </section>
     </div>
 
+    <div id="duelCinematic" class="duel-cinematic" aria-live="assertive"></div>
+
+    <aside class="duel-arsenal duel-auto-combat" aria-label="Automatic combat">
+      <div class="duel-arsenal-help">GÕ ĐỂ BẮN <span>HOÀN THÀNH TỪ → TỰ KÍCH HOẠT · KHÔNG CẦN CẤT KHO</span></div>
+    </aside>
     <div class="duel-hidden-systems" aria-hidden="true">
-      <div id="duelInventory" class="duel-inventory"></div>
       <span id="duelStrategyMeta">No combo ready</span>
       <div id="duelCombos" class="duel-strategy-actions"></div>
       <div class="duel-tool-group">
@@ -352,6 +392,7 @@ function createBattleNodes(gameShell: HTMLElement) {
   return {
     root,
     fx: byId("duelEventFx"),
+    cinematic: byId("duelCinematic"),
     projectiles: byId("duelProjectiles"),
     typingFx: byId("duelTypingFx"),
     mode: byId("duelBattleMode"),
@@ -392,7 +433,6 @@ function createBattleNodes(gameShell: HTMLElement) {
     currentInput: byId("duelCurrentInput"),
     currentTarget: byId("duelCurrentTarget"),
     currentPrefix: byId("duelCurrentPrefix"),
-    inventory: byId("duelInventory"),
     strategyMeta: byId("duelStrategyMeta"),
     combos: byId("duelCombos"),
     mysteryMeta: byId("duelMysteryMeta"),
@@ -400,22 +440,10 @@ function createBattleNodes(gameShell: HTMLElement) {
   };
 }
 
-function setResource(
-  fill: HTMLElement,
-  valueNode: HTMLElement,
-  value: number,
-  max: number,
-): void {
-  fill.style.transform =
-    "scaleX(" + resourceRatio(value, max).toFixed(4) + ")";
-  valueNode.textContent =
-    String(Math.max(0, Math.round(value))) +
-    " / " +
-    String(Math.max(0, Math.round(max)));
-}
-
 function eventLabel(event: DuelClientEvent): string {
   switch (event.type) {
+    case "cannon-fired": return "CANNON · firing";
+    case "cannon-hit": return "CANNON · impact";
     case "typing-miss":
       return "Typing miss · " + event.char.toUpperCase();
     case "action-completed":
@@ -560,6 +588,26 @@ export function installDuelBattleUi(
     gameShell.querySelector<HTMLElement>("#duelBattle");
   existing?.remove();
   const nodes = createBattleNodes(gameShell);
+  const updateLayout = (): void => {
+    const bounds = nodes.projectiles.parentElement!.getBoundingClientRect();
+    const layout = duelArenaLayout(bounds.width, bounds.height);
+    if (nodes.root.dataset.layout !== layout) hooks.onLayoutChange?.(layout === "horizontal");
+    nodes.root.dataset.layout = layout;
+  };
+  const layoutObserver = new ResizeObserver(updateLayout);
+  layoutObserver.observe(nodes.root);
+  // Canvas impacts (combat-juice) replace the DOM arrival blasts whenever
+  // the shared renderer runs; the DOM path stays only as a fallback below.
+  const combatVisuals = new DuelCombatVisuals(
+    nodes.projectiles.parentElement!, nodes.selfShipFrame, nodes.opponentShipFrame,
+    () => undefined,
+    hooks.onCombatRenderer !== undefined,
+  );
+  combatVisuals.setShakeSink((amount) => hooks.onScreenShake?.(amount));
+  const juice = combatVisuals.juice;
+  if ((import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV) {
+    Object.assign(combatVisuals.canvas, { duelVisuals: combatVisuals });
+  }
 
   let quality = initialQuality;
   let view: DuelClientMatchView | null = null;
@@ -590,12 +638,84 @@ export function installDuelBattleUi(
   const performanceMonitor =
     new DuelPerformanceMonitor();
   const presentationTimers = new Set<number>();
+  const presentationAnimations = new Set<Animation>();
+  const presentedCannonEvents = new Set<string>();
+  const momentum = new DuelMomentum();
+  /** Per-round numbers for the result card. */
+  const roundStats = { dealt: 0, taken: 0 };
+  /** Hull/shield change of the current update, so a confirmed bolt knows
+   * whether it hit the shield or the hull. */
+  const lastDelta: Record<"self" | "opponent", { hull: number; shield: number }> = {
+    self: { hull: 0, shield: 0 },
+    opponent: { hull: 0, shield: 0 },
+  };
+  let pendingBeats: DuelPresentationBeat[] = [];
+  let lastPhase: DuelClientMatchView["phase"] | null = null;
+  let knockoutRoundId: string | null = null;
+  const textCache = new WeakMap<HTMLElement, string>();
+  const setText = (node: HTMLElement, value: string): void => {
+    // Rewriting identical text 20x a second still invalidates layout.
+    if (textCache.get(node) === value) return;
+    textCache.set(node, value);
+    node.textContent = value;
+  };
+  const styleCache = new WeakMap<HTMLElement, string>();
+  const setTransform = (node: HTMLElement, value: string): void => {
+    if (styleCache.get(node) === value) return;
+    styleCache.set(node, value);
+    node.style.transform = value;
+  };
+  const varCache = new WeakMap<HTMLElement, Map<string, string>>();
+  const setVar = (node: HTMLElement, name: string, value: string): void => {
+    let vars = varCache.get(node);
+    if (vars === undefined) {
+      vars = new Map();
+      varCache.set(node, vars);
+    }
+    if (vars.get(name) === value) return;
+    vars.set(name, value);
+    node.style.setProperty(name, value);
+  };
+  const classCache = new WeakMap<HTMLElement, string>();
+  const dataCache = new WeakMap<HTMLElement, Map<string, string>>();
+  const setData = (node: HTMLElement, key: string, value: string): void => {
+    let entries = dataCache.get(node);
+    if (entries === undefined) {
+      entries = new Map();
+      dataCache.set(node, entries);
+    }
+    if (entries.get(key) === value) return;
+    entries.set(key, value);
+    node.dataset[key] = value;
+  };
+  const setClass = (node: HTMLElement, value: string): void => {
+    if (classCache.get(node) === value) return;
+    classCache.set(node, value);
+    node.className = value;
+  };
+  const setResource = (
+    fill: HTMLElement,
+    valueNode: HTMLElement,
+    value: number,
+    max: number,
+  ): void => {
+    setTransform(fill, "scaleX(" + resourceRatio(value, max).toFixed(3) + ")");
+    setText(
+      valueNode,
+      String(Math.max(0, Math.round(value))) + " / " + String(Math.max(0, Math.round(max))),
+    );
+  };
 
   const clearPresentationTimers = (): void => {
     for (const timer of presentationTimers) {
       window.clearTimeout(timer);
     }
     presentationTimers.clear();
+    for (const animation of presentationAnimations) animation.cancel();
+    presentationAnimations.clear();
+    presentedCannonEvents.clear();
+    combatVisuals.clear();
+    nodes.root.querySelectorAll(".duel-muzzle-flash, .duel-projectile-arrival, .duel-damage-number, .duel-shield-break").forEach(node => node.remove());
   };
 
   const schedulePresentation = (
@@ -622,6 +742,8 @@ export function installDuelBattleUi(
   let lastPerformanceFrameAt: number | null = null;
 
   const sendTarget = (targetInstanceId: string): void => {
+    const offer = view?.self.offers.find(item => item.instanceId === targetInstanceId);
+    if (view && offer && duelAutoActionBlock(actionDefinition(offer.actionId), view.self.energy, view.self.cooldowns[offer.actionId])) return;
     hooks.sendIntent({
       type: "SELECT_TARGET",
       targetInstanceId,
@@ -633,10 +755,7 @@ export function installDuelBattleUi(
   ) =>
     view === null
       ? undefined
-      : duelActionDefinitionForMap(
-          view.map.id,
-          actionId,
-        );
+      : duelLiveActionMapForMap(view.map.id).get(actionId);
 
   const applyTargetSprite = (
     node: HTMLElement,
@@ -856,6 +975,7 @@ export function installDuelBattleUi(
     for (const offer of visibleOffers) {
       const action = actionDefinition(offer.actionId);
       if (action === undefined) continue;
+      const blockedReason = duelAutoActionBlock(action, view.self.energy, view.self.cooldowns[action.id]);
       const cooldown =
         view.self.cooldowns[action.id] ?? 0;
       const lifetime =
@@ -879,62 +999,51 @@ export function installDuelBattleUi(
         offerTargetNodes.get(offer.instanceId) ??
         mountOfferTarget(offer.instanceId);
       const card = mounted.root;
-      card.className =
+      setClass(card,
         "duel-offer-card duel-word-target duel-category-" +
         action.category +
         (selected ? " selected" : "") +
+        (blockedReason ? " action-unavailable" : "") +
         (cooldown > 0 ? " cooling-down" : "") +
         (targetFrozen && !selected
           ? " target-frozen"
           : "") +
         (lifetime !== null && lifetime <= 5
           ? " expiring-soon"
-          : "");
+          : ""));
       card.disabled =
+        blockedReason !== null ||
         cooldown > 0 ||
         (targetFrozen && !selected);
       card.dataset.actionId = action.id;
+      card.setAttribute("aria-disabled", String(card.disabled));
       const targetIndex = assignOfferLayout(
         offer.instanceId,
       );
       const [targetX, targetY] =
         DUEL_WORD_TARGET_POSITIONS[targetIndex] ?? [50, 50];
-      card.style.setProperty(
-        "--duel-target-x",
-        String(targetX) + "%",
-      );
-      card.style.setProperty(
-        "--duel-target-y",
-        String(targetY) + "%",
-      );
-      card.style.setProperty(
-        "--duel-target-float-delay",
-        String((targetIndex % 5) * -0.37) + "s",
-      );
-      card.title =
-        action.displayLabel +
-        " · " +
-        (action.resolveMode === "banked"
-          ? "banked"
-          : "instant");
+      setVar(card, "--duel-target-x", String(targetX) + "%");
+      setVar(card, "--duel-target-y", String(targetY) + "%");
+      const [horizontalX, horizontalY] = DUEL_HORIZONTAL_TARGET_POSITIONS[targetIndex] ?? [50, 27];
+      setVar(card, "--duel-target-x-horizontal", horizontalX + "%");
+      setVar(card, "--duel-target-y-horizontal", horizontalY + "%");
+      const [depthX, depthY] = DUEL_DEPTH_TARGET_POSITIONS[targetIndex] ?? [27, 34];
+      setVar(card, "--duel-target-x-depth", depthX + "%");
+      setVar(card, "--duel-target-y-depth", depthY + "%");
+      setVar(card, "--duel-target-float-delay", String((targetIndex % 5) * -0.37) + "s");
+      card.title = blockedReason ? blockedReason + " — Esc để đổi mục tiêu" : action.displayLabel + " · Tự kích hoạt khi gõ xong";
 
       mounted.targetObject.dataset.actionId = action.id;
       applyTargetSprite(
         mounted.targetObject,
         action.id,
       );
-      mounted.category.textContent =
-        action.category.toUpperCase();
-      mounted.label.textContent = action.displayLabel;
-      mounted.typed.textContent = progress.typed;
-      mounted.remaining.textContent = progress.remaining;
+      setText(mounted.category, action.category.toUpperCase());
+      setText(mounted.label, action.displayLabel);
+      setText(mounted.typed, progress.typed);
+      setText(mounted.remaining, progress.remaining);
 
-      const baseMeta =
-        action.resolveMode === "banked"
-          ? "BANK"
-          : action.energyCost > 0
-            ? String(action.energyCost) + " EN"
-            : "INSTANT";
+      const baseMeta = action.energyCost > 0 ? "AUTO · " + String(action.energyCost) + " EN" : "AUTO";
       const timingMeta: string[] = [];
       if (cooldown > 0) {
         timingMeta.push(cooldown.toFixed(1) + "s CD");
@@ -947,17 +1056,21 @@ export function installDuelBattleUi(
           Math.max(0, lifetime).toFixed(1) + "s",
         );
       }
-      mounted.meta.textContent =
-        timingMeta.length > 0
+      setText(mounted.meta,
+        blockedReason ?? (timingMeta.length > 0
           ? timingMeta.join(" · ") + " · " + baseMeta
-          : baseMeta;
+          : baseMeta));
+      card.setAttribute("aria-label", action.displayLabel + " · " + answerToken + " · " + mounted.meta.textContent);
     }
   };
 
+  let threatsShown = true;
   const renderThreats = (): void => {
     if (view === null) return;
-    nodes.threats.replaceChildren();
     const threats = view.self.incomingThreats;
+    if (threats.length === 0 && !threatsShown) return;
+    threatsShown = threats.length > 0;
+    nodes.threats.replaceChildren();
     nodes.threats
       .closest(".duel-context-lane")
       ?.classList.toggle("hidden", threats.length === 0);
@@ -1000,9 +1113,13 @@ export function installDuelBattleUi(
     }
   };
 
+  let objectiveShown = true;
   const renderObjective = (): void => {
     if (view === null) return;
     const objective = view.shared.neutralObjective;
+    const objectiveActive = objective !== null && objective.status === "active";
+    if (!objectiveActive && !objectiveShown) return;
+    objectiveShown = objectiveActive;
     nodes.objective.replaceChildren();
 
     const objectiveLane =
@@ -1070,53 +1187,14 @@ export function installDuelBattleUi(
     nodes.objective.append(title, self, rival);
   };
 
-  const renderInventory = (): void => {
-    if (view === null) return;
-    nodes.inventory.replaceChildren();
-
-    for (const bucket of [
-      "attack",
-      "defense",
-      "tactical",
-    ] as const) {
-      const group = createElement(
-        "div",
-        "duel-inventory-group",
-      );
-      const heading = createElement("small");
-      heading.textContent = bucket.toUpperCase();
-      group.append(heading);
-
-      const entries = view.self.inventory[bucket];
-      if (entries.length === 0) {
-        const empty = createElement("span", "duel-empty-chip");
-        empty.textContent = "empty";
-        group.append(empty);
-      }
-
-      for (const entry of entries) {
-        const action = actionDefinition(entry.actionId);
-        const chip = button(
-          action?.displayLabel ?? entry.actionId,
-          "duel-inventory-chip duel-category-" +
-            (action?.category ?? bucket),
-          () => {
-            hooks.sendIntent({
-              type: "USE_ITEM",
-              itemId: entry.actionId,
-            });
-          },
-        );
-        group.append(chip);
-      }
-      nodes.inventory.append(group);
-    }
-  };
-
+  let strategyKey = "";
   const renderStrategy = (): void => {
     if (view === null) return;
-    nodes.combos.replaceChildren();
     const combos = view.self.readyCombos;
+    const key = view.self.strategyPath + "|" + combos.map((combo) => combo.id).join(",") + "|" + String(view.self.initiative >= 8);
+    if (key === strategyKey) return;
+    strategyKey = key;
+    nodes.combos.replaceChildren();
     nodes.strategyMeta.textContent =
       combos.length === 0
         ? view.self.strategyPath.toUpperCase() +
@@ -1156,8 +1234,16 @@ export function installDuelBattleUi(
       });
   };
 
+  let intelKey = "";
   const renderIntel = (): void => {
     if (view === null) return;
+    const key = JSON.stringify([
+      view.shared.mysteries.map((mystery) => mystery.displayLabel + mystery.resolved),
+      view.shared.opponentTrapHints,
+      view.opponent.revealedInventory,
+    ]);
+    if (key === intelKey) return;
+    intelKey = key;
     const mysteries = view.shared.mysteries.filter(
       (mystery) => !mystery.resolved,
     );
@@ -1225,13 +1311,14 @@ export function installDuelBattleUi(
     nodes.selfShip.dataset.character = selfCharacter;
     nodes.opponentShip.dataset.character =
       opponentCharacter;
+    combatVisuals.setCharacters(selfCharacter, opponentCharacter);
 
-    nodes.selfShipFrame.dataset.damageTier = String(
+    setData(nodes.selfShipFrame, "damageTier", String(
       damageTier(view.self.hull, view.self.maxHull),
-    );
-    nodes.opponentShipFrame.dataset.damageTier = String(
+    ));
+    setData(nodes.opponentShipFrame, "damageTier", String(
       damageTier(view.opponent.hull, view.opponent.maxHull),
-    );
+    ));
 
     const selfShieldRatio = resourceRatio(
       view.self.shield,
@@ -1241,46 +1328,34 @@ export function installDuelBattleUi(
       view.opponent.shield,
       view.opponent.maxShield,
     );
-    nodes.selfShipFrame.style.setProperty(
-      "--duel-shield-ratio",
-      selfShieldRatio.toFixed(4),
-    );
-    nodes.opponentShipFrame.style.setProperty(
-      "--duel-shield-ratio",
-      opponentShieldRatio.toFixed(4),
-    );
-    nodes.selfShipFrame.dataset.shieldActive =
-      selfShieldRatio > 0 ? "true" : "false";
-    nodes.opponentShipFrame.dataset.shieldActive =
-      opponentShieldRatio > 0 ? "true" : "false";
+    setVar(nodes.selfShipFrame, "--duel-shield-ratio", selfShieldRatio.toFixed(3));
+    setVar(nodes.opponentShipFrame, "--duel-shield-ratio", opponentShieldRatio.toFixed(3));
+    setData(nodes.selfShipFrame, "shieldActive", selfShieldRatio > 0 ? "true" : "false");
+    setData(nodes.opponentShipFrame, "shieldActive", opponentShieldRatio > 0 ? "true" : "false");
 
     const rivalTyping = view.opponent.typingTelegraph;
     const rivalProgress = rivalTyping.active
       ? Math.max(0.16, rivalTyping.progress)
       : 0;
-    nodes.opponentShipFrame.dataset.typing =
-      rivalTyping.active ? "true" : "false";
-    nodes.opponentShipFrame.style.setProperty(
-      "--duel-opponent-typing-progress",
-      rivalProgress.toFixed(2),
-    );
+    setData(nodes.opponentShipFrame, "typing", rivalTyping.active ? "true" : "false");
+    setVar(nodes.opponentShipFrame, "--duel-opponent-typing-progress", rivalProgress.toFixed(2));
     nodes.opponentCharge.classList.toggle(
       "hidden",
       !rivalTyping.active,
     );
-    nodes.opponentCharge.textContent =
+    setText(nodes.opponentCharge,
       rivalTyping.kind === "counter"
         ? "RIVAL COUNTERING"
         : rivalTyping.kind === "objective"
           ? "RIVAL CONTESTING"
-          : "RIVAL CHARGING";
+          : "RIVAL CHARGING");
 
-    nodes.root.dataset.targetFrozen =
+    setData(nodes.root, "targetFrozen",
       view.shared.tactical.frozenTargetCount[
         view.self.playerId
       ] > 0
         ? "true"
-        : "false";
+        : "false");
   };
 
   const spawnShieldImpact = (
@@ -1336,12 +1411,60 @@ export function installDuelBattleUi(
     previous: DuelClientMatchView | null,
     next: DuelClientMatchView,
   ): void => {
+    lastDelta.self.hull = 0;
+    lastDelta.self.shield = 0;
+    lastDelta.opponent.hull = 0;
+    lastDelta.opponent.shield = 0;
     if (
       previous === null ||
       previous.roundId !== next.roundId
     ) {
       return;
     }
+    const canvas = combatVisuals.available;
+    for (const side of ["self", "opponent"] as const) {
+      const before = previous[side];
+      const after = next[side];
+      const hullLoss = Math.max(0, before.hull - after.hull);
+      const shieldLoss = Math.max(0, before.shield - after.shield);
+      lastDelta[side].hull = hullLoss;
+      lastDelta[side].shield = shieldLoss;
+      if (side === "opponent") roundStats.dealt += hullLoss + shieldLoss;
+      else roundStats.taken += hullLoss + shieldLoss;
+      if (hullLoss + shieldLoss > 0) {
+        if (canvas) {
+          juice.damage(side, hullLoss, shieldLoss);
+          if (before.shield > 0 && after.shield <= 0) {
+            juice.shieldBreak(side);
+            pendingBeats.push({ type: "shield-break", side });
+          } else if (shieldLoss > 0 && hullLoss <= 0) {
+            pendingBeats.push({ type: "shield-hit", side });
+          }
+        } else {
+          const frame = side === "self" ? nodes.selfShipFrame : nodes.opponentShipFrame;
+          while (frame.querySelectorAll(".duel-damage-number").length >= 3) frame.querySelector(".duel-damage-number")?.remove();
+          const label = createElement("strong", "duel-damage-number" + (hullLoss > 0 ? " hull-hit" : ""));
+          label.textContent = "−" + String(Math.round((hullLoss + shieldLoss) * 10) / 10);
+          frame.append(label);
+          schedulePresentation(() => label.remove(), 600);
+          if (before.shield > 0 && after.shield <= 0) {
+            const broken = createElement("i", "duel-shield-break");
+            frame.append(broken);
+            schedulePresentation(() => broken.remove(), 500);
+          }
+        }
+      }
+      // Gains: canvas text for meaningful amounts; passive regen stays quiet.
+      const hullGain = Math.max(0, after.hull - before.hull);
+      const shieldGain = Math.max(0, after.shield - before.shield);
+      const energyGain = Math.max(0, after.energy - before.energy);
+      if (canvas) {
+        if (hullGain >= 3) juice.heal(side, hullGain, "repair");
+        if (shieldGain >= 4) juice.heal(side, shieldGain, "shield");
+        if (energyGain >= 8) juice.heal(side, energyGain, "energy");
+      }
+    }
+    if (canvas) return;
     if (next.self.shield < previous.self.shield) {
       spawnShieldImpact("self", false);
     }
@@ -1405,6 +1528,8 @@ export function installDuelBattleUi(
       if (offer !== undefined) {
         const action = actionDefinition(offer.actionId);
         label = action?.displayLabel ?? offer.actionId;
+        const blockedReason = duelAutoActionBlock(action, view.self.energy, view.self.cooldowns[offer.actionId]);
+        if (blockedReason) label = blockedReason + " · Esc để đổi mục tiêu";
         token =
           offer.typingPrompt?.answerToken ??
           action?.answerToken ??
@@ -1472,24 +1597,23 @@ export function installDuelBattleUi(
       quality,
       view.phase,
     );
-    nodes.root.dataset.map = view.map.id;
-    nodes.root.dataset.phase = view.phase;
-    nodes.root.dataset.mode = view.mode;
-    nodes.root.dataset.quality = quality;
+    setData(nodes.root, "map", view.map.id);
+    setData(nodes.root, "phase", view.phase);
+    setData(nodes.root, "mode", view.mode);
+    setData(nodes.root, "quality", quality);
+    setData(nodes.root, "helpFaded", view.elapsedSeconds > 7 || view.series.roundsPlayed > 0 ? "true" : "false");
 
-    nodes.mode.textContent =
+    setText(nodes.mode,
       view.mode === "ranked"
         ? "RANKED · NORMALIZED"
         : view.mode === "practice"
           ? "PRACTICE VS BOT"
-          : "FRIEND DUEL";
-    nodes.map.textContent = view.map.displayName;
-    nodes.phase.textContent = phaseLabel(view.phase);
-    nodes.clock.textContent = formatClock(
-      view.elapsedSeconds,
-    );
+          : "FRIEND DUEL");
+    setText(nodes.map, view.map.displayName);
+    setText(nodes.phase, phaseLabel(view.phase));
+    setText(nodes.clock, formatClock(view.elapsedSeconds));
     const pendingHazard = view.shared.pendingHazards[0];
-    nodes.hazardWarning.textContent =
+    setText(nodes.hazardWarning,
       pendingHazard === undefined
         ? "AIRSPACE CLEAR"
         : pendingHazard.hazard.hazardId
@@ -1497,10 +1621,10 @@ export function installDuelBattleUi(
             .toUpperCase() +
           " · " +
           pendingHazard.remainingSeconds.toFixed(1) +
-          "s";
-    nodes.hazardWarning.dataset.active =
-      pendingHazard === undefined ? "false" : "true";
-    nodes.series.textContent =
+          "s");
+    setData(nodes.hazardWarning, "active",
+      pendingHazard === undefined ? "false" : "true");
+    setText(nodes.series,
       "Bo" +
       String(view.series.format) +
       " · " +
@@ -1508,7 +1632,7 @@ export function installDuelBattleUi(
       "-" +
       String(view.series.wins["player-2"]) +
       " · R" +
-      String(view.series.roundsPlayed + 1);
+      String(view.series.roundsPlayed + 1));
 
     setResource(
       nodes.selfHullFill,
@@ -1547,16 +1671,12 @@ export function installDuelBattleUi(
       view.opponent.maxEnergy,
     );
 
-    nodes.selfPath.textContent =
-      view.self.strategyPath.toUpperCase();
-    nodes.opponentPath.textContent =
-      view.opponent.strategyPath.toUpperCase();
-    nodes.selfInitiative.textContent = String(
-      Math.round(view.self.initiative),
-    );
-    nodes.opponentInitiative.textContent = String(
-      Math.round(view.opponent.initiative),
-    );
+    setText(nodes.selfPath, view.self.strategyPath.toUpperCase());
+    setText(nodes.opponentPath, view.opponent.strategyPath.toUpperCase());
+    setText(nodes.selfInitiative, String(Math.round(view.self.initiative)));
+    setText(nodes.opponentInitiative, String(Math.round(view.opponent.initiative)));
+    combatVisuals.setDefense("self", resourceRatio(view.self.hull, view.self.maxHull), resourceRatio(view.self.shield, view.self.maxShield));
+    combatVisuals.setDefense("opponent", resourceRatio(view.opponent.hull, view.opponent.maxHull), resourceRatio(view.opponent.shield, view.opponent.maxShield));
 
     const terminal =
       view.series.status !== "active";
@@ -1566,7 +1686,6 @@ export function installDuelBattleUi(
     renderOffers();
     renderThreats();
     renderObjective();
-    renderInventory();
     renderStrategy();
     renderIntel();
     renderCurrentInput();
@@ -1575,10 +1694,188 @@ export function installDuelBattleUi(
     );
   };
 
+  // --- Cinematic beats: FIGHT!, phase calls, K.O., result card --------------
+
+  const phaseCall = (
+    phase: DuelClientMatchView["phase"],
+  ): { kicker: string; title: string } | null => {
+    switch (phase) {
+      case "skirmish":
+        return { kicker: "PHASE 2", title: "SKIRMISH" };
+      case "war":
+        return { kicker: "PHASE 3 · FIREPOWER UP", title: "ALL-OUT WAR" };
+      case "crisis":
+        return { kicker: "PHASE 4 · HAZARDS RISING", title: "CRISIS" };
+      case "cataclysm":
+        return { kicker: "FINAL PHASE · FINISH IT", title: "CATACLYSM" };
+      default:
+        return null;
+    }
+  };
+
+  const showStamp = (
+    title: string,
+    kicker: string,
+    tone: "fight" | "ko" | "phase" | "ready" | "time",
+    durationMs: number,
+  ): void => {
+    nodes.cinematic.querySelectorAll(".duel-stamp").forEach((node) => node.remove());
+    const stamp = createElement("div", "duel-stamp duel-stamp-" + tone);
+    stamp.style.setProperty("--duel-stamp-duration", String(durationMs) + "ms");
+    if (kicker !== "") {
+      const small = createElement("small");
+      small.textContent = kicker;
+      stamp.append(small);
+    }
+    const strong = createElement("strong");
+    strong.textContent = title;
+    strong.dataset.text = title;
+    stamp.append(strong);
+    nodes.cinematic.append(stamp);
+    stamp.addEventListener("animationend", (event) => {
+      if (event.target === stamp) stamp.remove();
+    });
+  };
+
+  const clearCinematic = (): void => {
+    nodes.cinematic.replaceChildren();
+    nodes.root.dataset.cinematic = "none";
+  };
+
+  const showResult = (
+    outcome: "victory" | "defeat" | "draw",
+    seriesOver: boolean,
+  ): void => {
+    if (view === null) return;
+    nodes.cinematic.querySelectorAll(".duel-result").forEach((node) => node.remove());
+    const selfWins = view.series.wins[view.self.playerId];
+    const opponentWins = view.series.wins[view.self.playerId === "player-1" ? "player-2" : "player-1"];
+    const typed = view.self.correctChars + view.self.wrongChars;
+    const accuracy = typed > 0 ? Math.round((view.self.correctChars / typed) * 100) : 100;
+    const panel = createElement("section", "duel-result duel-result-" + outcome + (seriesOver ? " duel-result-final" : ""));
+    const kicker = createElement("small", "duel-result-kicker");
+    kicker.textContent = seriesOver ? "MATCH OVER" : "ROUND " + String(view.series.roundsPlayed);
+    const title = createElement("strong", "duel-result-title");
+    const word = outcome === "victory" ? "VICTORY" : outcome === "defeat" ? "DEFEAT" : "DRAW";
+    title.textContent = seriesOver && outcome !== "draw" ? "MATCH " + word : word;
+    title.dataset.text = title.textContent;
+    const score = createElement("div", "duel-result-score");
+    score.innerHTML = "<span>YOU</span><b></b><span>RIVAL</span>";
+    score.querySelector("b")!.textContent = String(selfWins) + " — " + String(opponentWins);
+    const stats = createElement("div", "duel-result-stats");
+    const stat = (label: string, value: string): void => {
+      const cell = createElement("div");
+      const strong = createElement("strong");
+      strong.textContent = value;
+      const small = createElement("small");
+      small.textContent = label;
+      cell.append(strong, small);
+      stats.append(cell);
+    };
+    stat("BEST STREAK", "×" + String(momentum.best));
+    stat("ACCURACY", String(accuracy) + "%");
+    stat("DAMAGE DEALT", String(Math.round(roundStats.dealt)));
+    stat("DAMAGE TAKEN", String(Math.round(roundStats.taken)));
+    const footer = createElement("div", "duel-result-footer");
+    if (seriesOver) {
+      const back = createElement("button", "duel-result-exit");
+      back.type = "button";
+      back.textContent = "Return to Lobby";
+      back.addEventListener("click", () => {
+        controller.hide();
+        hooks.onExit?.();
+      });
+      footer.append(back);
+    } else {
+      footer.textContent = "ROUND " + String(view.series.roundsPlayed + 1) + " · STAND BY";
+    }
+    panel.append(kicker, title, score, stats, footer);
+    nodes.cinematic.append(panel);
+    nodes.root.dataset.cinematic = "result";
+  };
+
+  const startKnockout = (
+    result: Extract<DuelClientEvent, { type: "round-ended" }>["result"],
+  ): void => {
+    if (view === null || knockoutRoundId === view.roundId) return;
+    knockoutRoundId = view.roundId;
+    const selfId = view.self.playerId;
+    const now = performance.now();
+    const losers: Array<"self" | "opponent"> =
+      result.status === "won"
+        ? [result.winnerId === selfId ? "opponent" : "self"]
+        : [
+            ...(view.self.hull <= 0 ? (["self"] as const) : []),
+            ...(view.opponent.hull <= 0 ? (["opponent"] as const) : []),
+          ];
+    const outcome = result.status === "draw" ? "draw" : result.winnerId === selfId ? "victory" : "defeat";
+    const seriesOver = view.series.status !== "active";
+    nodes.root.dataset.cinematic = "ko";
+    nodes.root.dataset.outcome = outcome;
+    if (combatVisuals.available) {
+      combatVisuals.releaseShots();
+      for (const side of losers) juice.knockout(side, now);
+    } else {
+      for (const side of losers) spawnProjectileArrival(side, "bomb");
+    }
+    showStamp(losers.length > 0 ? "K.O." : "TIME!", losers.length > 0 ? "" : "DRAW", losers.length > 0 ? "ko" : "time", 1250);
+    schedulePresentation(() => {
+      if (outcome === "victory") juice.celebrate("self");
+      if (outcome === "defeat") juice.celebrate("opponent");
+      showResult(outcome, seriesOver);
+    }, DUEL_KO_TIMELINE.bannerMs);
+    if (!seriesOver) {
+      schedulePresentation(() => {
+        nodes.cinematic.querySelectorAll(".duel-result").forEach((node) => node.classList.add("leaving"));
+        showStamp("GET READY", "ROUND " + String((view?.series.roundsPlayed ?? 0) + 1), "ready", 1300);
+      }, DUEL_KO_TIMELINE.readyMs);
+    }
+  };
+
+  const startRound = (roundNumber: number): void => {
+    clearCinematic();
+    // The next observed view sets the baseline; no spurious streak.
+    momentum.reset(null);
+    roundStats.dealt = 0;
+    roundStats.taken = 0;
+    knockoutRoundId = null;
+    lastPhase = view?.phase ?? null;
+    juice.respawn();
+    showStamp("FIGHT!", "ROUND " + String(roundNumber), "fight", 950);
+    pendingBeats.push({ type: "round-start", round: roundNumber });
+  };
+
+  /** One impact on a ship without a tracked bolt (threat results, fallbacks). */
+  const impactShip = (side: "self" | "opponent", kind: DuelHitKind): void => {
+    if (!combatVisuals.available) {
+      spawnProjectileArrival(side, kind === "bomb" ? "bomb" : "lance");
+      return;
+    }
+    const point = combatVisuals.shipPoint(side);
+    const horizontal = combatVisuals.isHorizontal;
+    const heading = side === "opponent" ? (horizontal ? 0 : -Math.PI / 2) : (horizontal ? Math.PI : Math.PI / 2);
+    juice.hit(side, kind, point.x, point.y, heading, lastDelta[side].hull <= 0 && lastDelta[side].shield > 0);
+  };
+
+  /** Shield or hull for a confirmed bolt, from this update's damage. */
+  const shieldedHit = (side: "self" | "opponent"): boolean | undefined => {
+    if (lastDelta[side].hull > 0) return false;
+    if (lastDelta[side].shield > 0) return true;
+    return undefined;
+  };
+
   const appendFeed = (
     events: readonly DuelClientEvent[],
   ): void => {
     for (const event of events) {
+      if (event.type === "cannon-fired" || event.type === "cannon-hit") {
+        const key = event.type + ":" + event.shotId;
+        if (presentedCannonEvents.has(key)) continue;
+        presentedCannonEvents.add(key);
+        if (presentedCannonEvents.size > 512) {
+          presentedCannonEvents.delete(presentedCannonEvents.values().next().value!);
+        }
+      }
       const line = createElement("div", "duel-feed-item");
       line.dataset.eventType = event.type;
       line.textContent = eventLabel(event);
@@ -1594,6 +1891,7 @@ export function installDuelBattleUi(
       const kind = fxKind(event);
       if (kind !== null) spawnFx(kind);
       spawnProjectileForEvent(event);
+      if (event.type === "round-ended") startKnockout(event.result);
     }
   };
 
@@ -1888,7 +2186,7 @@ export function installDuelBattleUi(
       variant === "bomb"
         ? paintedBackground("bomb-impact")
         : paintedBackground("explosion-core");
-    if (impactArt !== null) {
+    if (impactArt !== null && variant !== "laser" && variant !== "standard") {
       impact.classList.add("duel-projectile-arrival-painted");
       impact.style.backgroundImage = impactArt;
     }
@@ -1958,6 +2256,7 @@ export function installDuelBattleUi(
   const spawnProjectile = (
     sourcePlayerId: DuelPlayerId,
     variant: ProjectileVariant,
+    cannon?: { shotId: string; travelMs: number },
   ): void => {
     if (view === null) return;
     while (
@@ -1987,6 +2286,10 @@ export function installDuelBattleUi(
         sourcePlayerId
       ] ?? 1,
     );
+    if (combatVisuals.fire(
+      fromSelf ? "self" : "opponent",
+      cannon?.travelMs ?? duelProjectileTravelMs(speedScale), variant, cannon?.shotId,
+    )) return;
     const projectile = createElement(
       "i",
       "duel-projectile " +
@@ -2002,19 +2305,18 @@ export function installDuelBattleUi(
       "--duel-projectile-x",
       String(lane) + "%",
     );
-    const travelMs =
-      duelProjectileTravelMs(speedScale);
+    const travelMs = cannon?.travelMs ?? duelProjectileTravelMs(speedScale);
     projectile.style.setProperty(
       "--duel-projectile-duration",
       String(travelMs) + "ms",
     );
     projectile.style.setProperty(
       "--duel-shot-primary",
-      projectileProfile.primary,
+      fromSelf ? "#51dcff" : "#ff7852",
     );
     projectile.style.setProperty(
       "--duel-shot-secondary",
-      projectileProfile.secondary,
+      fromSelf ? "#e9fcff" : "#fff0cc",
     );
     projectile.style.setProperty(
       "--duel-shot-width",
@@ -2026,16 +2328,42 @@ export function installDuelBattleUi(
     );
     projectile.dataset.archetype =
       projectileProfile.archetype;
+    if (cannon !== undefined) projectile.dataset.shotId = cannon.shotId;
     nodes.projectiles.append(projectile);
+    // Compute real muzzle/target coordinates, rather than guessing with vh.
+    const source = fromSelf ? nodes.selfShipFrame : nodes.opponentShipFrame;
+    const destination = fromSelf ? nodes.opponentShipFrame : nodes.selfShipFrame;
+    const bounds = nodes.projectiles.getBoundingClientRect();
+    const start = source.getBoundingClientRect();
+    const end = destination.getBoundingClientRect();
+    const sx = start.left + start.width / 2 - bounds.left + (projectileSequence % 2 === 0 ? -9 : 9);
+    const sy = start.top + start.height / 2 - bounds.top;
+    const dx = end.left + end.width / 2 - bounds.left - sx;
+    const dy = end.top + end.height / 2 - bounds.top - sy;
+    projectile.style.animation = "none";
+    projectile.style.left = String(sx) + "px";
+    projectile.style.top = String(sy) + "px";
+    projectile.style.bottom = "auto";
+    const angle = Math.atan2(dx, -dy) * 180 / Math.PI;
+    const rotation = " rotate(" + String(angle) + "deg)";
+    const flight = projectile.animate([
+      { transform: "translate(-50%, -50%)" + rotation, opacity: 1 },
+      { transform: "translate(calc(-50% + " + String(dx) + "px), calc(-50% + " + String(dy) + "px))" + rotation, opacity: 1 },
+    ], { duration: travelMs, easing: "linear", fill: "forwards" });
+    presentationAnimations.add(flight);
+    flight.onfinish = () => {
+      if (cannon === undefined && active && projectile.isConnected) spawnProjectileArrival(fromSelf ? "opponent" : "self", variant);
+      projectile.remove();
+      presentationAnimations.delete(flight);
+      flight.cancel();
+    };
     schedulePresentation(
       () => {
-        spawnProjectileArrival(
-          fromSelf ? "opponent" : "self",
-          variant,
-        );
         projectile.remove();
+        presentationAnimations.delete(flight);
+        flight.cancel();
       },
-      travelMs,
+      travelMs + 200,
     );
     projectile.addEventListener(
       "animationend",
@@ -2073,6 +2401,27 @@ export function installDuelBattleUi(
     const source = eventSourcePlayer(event);
     if (source === null) return;
 
+    if (event.type === "cannon-fired") {
+      // A twin-barrel burst is one authoritative shot, not twice the damage.
+      spawnProjectile(source, "laser", event);
+      spawnProjectile(source, "laser", event);
+      if (combatVisuals.available) return;
+      const muzzle = createElement("i", "duel-muzzle-flash");
+      const frame = source === view?.self.playerId ? nodes.selfShipFrame : nodes.opponentShipFrame;
+      frame.append(muzzle);
+      schedulePresentation(() => muzzle.remove(), 110);
+      return;
+    }
+    if (event.type === "cannon-hit") {
+      const target = event.targetPlayerId === view?.self.playerId ? "self" : "opponent";
+      if (combatVisuals.hit(event.shotId, shieldedHit(target))) return;
+      for (const shot of nodes.projectiles.querySelectorAll<HTMLElement>("[data-shot-id]")) {
+        if (shot.dataset.shotId === event.shotId) shot.remove();
+      }
+      spawnProjectileArrival(event.targetPlayerId === view?.self.playerId ? "self" : "opponent", "laser");
+      return;
+    }
+
     if (event.type === "action-fired") {
       presentAction(source, event.actionId);
       return;
@@ -2098,11 +2447,7 @@ export function installDuelBattleUi(
 
     if (event.type === "threat-resolved") {
       clearThreatTelegraph(event.threatId);
-      presentAction(
-        event.sourcePlayerId,
-        event.actionId,
-        "lance",
-      );
+      impactShip(event.targetPlayerId === view?.self.playerId ? "self" : "opponent", "lance");
       return;
     }
 
@@ -2248,7 +2593,46 @@ export function installDuelBattleUi(
       prefix;
     if (key === lastTypingFeedbackKey) return;
     lastTypingFeedbackKey = key;
-    spawnTypingFeedback();
+    if (!combatVisuals.available) {
+      spawnTypingFeedback();
+      return;
+    }
+    // A short punch on the input readout per accepted key. WAAPI on the
+    // individual `scale` property: compositor-only, no forced layout.
+    if (typeof nodes.currentInput.animate === "function") {
+      nodes.currentInput.animate(
+        [{ scale: "1.07" }, { scale: "1" }],
+        { duration: 110, easing: "cubic-bezier(.2,.9,.3,1)" },
+      );
+    }
+  };
+
+  const observeMomentum = (next: DuelClientMatchView): void => {
+    if (next.round.status !== "active") return;
+    for (const event of momentum.observe(next.roundId, next.self.correctChars, next.self.wrongChars)) {
+      pendingBeats.push({ type: "momentum", event });
+      if (event.type === "tier-up") juice.momentumBurst(event.tier);
+      if (event.type === "break") juice.momentumLost(event.lost);
+    }
+    combatVisuals.setMomentum(momentum.streak, momentum.tier, momentum.heat);
+    const tier = DUEL_MOMENTUM_TIERS[momentum.tier]!;
+    setData(nodes.root, "momentum", String(momentum.tier));
+    setVar(nodes.root, "--duel-momentum-color", tier.color);
+  };
+
+  const observePhase = (next: DuelClientMatchView): void => {
+    if (lastPhase === null) {
+      lastPhase = next.phase;
+      return;
+    }
+    if (next.phase === lastPhase) return;
+    lastPhase = next.phase;
+    if (next.round.status !== "active") return;
+    const call = phaseCall(next.phase);
+    if (call === null) return;
+    showStamp(call.title, call.kicker, "phase", 1700);
+    pendingBeats.push({ type: "phase", phase: next.phase });
+    if (next.phase === "cataclysm") juice.screenFlash("#ff5a3d", 0.22);
   };
 
   const stopPerformanceLoop = (): void => {
@@ -2275,12 +2659,13 @@ export function installDuelBattleUi(
         );
       }
       lastPerformanceFrameAt = now;
+      if (!combatVisuals.external) combatVisuals.render(now, quality);
       performanceMonitor.setContext(
         quality,
         view?.phase ?? null,
       );
       performanceMonitor.setLiveCounts(
-        nodes.projectiles.childElementCount,
+        nodes.projectiles.childElementCount + combatVisuals.activeShots,
         nodes.fx.childElementCount,
       );
       performanceFrame = requestAnimationFrame(frame);
@@ -2311,6 +2696,10 @@ export function installDuelBattleUi(
       return;
     }
 
+    // Between rounds (K.O. and result) the authority ignores input anyway.
+    if (view.round.status !== "active") return;
+
+    // No manual item hotkeys: completion itself activates the effect.
     if (event.key === "Escape") {
       const targetId =
         prediction.targetInstanceId ??
@@ -2385,12 +2774,17 @@ export function installDuelBattleUi(
     show(nextView, events = []) {
       view = nextView;
       active = true;
+      hooks.onCombatRenderer?.(
+        (context, time, width, height) => combatVisuals.render(time * 1000, quality, context, { width, height }),
+        () => combatVisuals.camera(),
+      );
       void applyPaintedCombatVfx();
       void applyPaintedTargetArt();
       gameShell.classList.add(
         "duel-battle-active",
       );
       nodes.root.classList.remove("hidden");
+      updateLayout();
       prediction = {
         roundId: nextView.roundId,
         targetInstanceId:
@@ -2400,11 +2794,16 @@ export function installDuelBattleUi(
         pendingSequences: [],
       };
       performanceMonitor.reset();
+      combatVisuals.clear();
+      pendingBeats = [];
+      startRound(nextView.series.roundsPlayed + 1);
+      momentum.observe(nextView.roundId, nextView.self.correctChars, nextView.self.wrongChars);
       renderCore();
       appendFeed(events);
       hooks.onPresentationState?.(
         nextView,
         events,
+        pendingBeats,
       );
       startPerformanceLoop();
     },
@@ -2425,6 +2824,7 @@ export function installDuelBattleUi(
         );
       }
       view = nextView;
+      pendingBeats = [];
       if (roundChanged) {
         prediction = {
           roundId: nextView.roundId,
@@ -2439,13 +2839,17 @@ export function installDuelBattleUi(
         nodes.projectiles.replaceChildren();
         nodes.typingFx.replaceChildren();
         lastTypingFeedbackKey = "";
+        startRound(nextView.series.roundsPlayed + 1);
       }
       renderCore();
       renderDelta(previousView, nextView);
+      observeMomentum(nextView);
+      observePhase(nextView);
       appendFeed(events);
       hooks.onPresentationState?.(
         nextView,
         events,
+        pendingBeats,
       );
     },
     setPrediction(nextPrediction) {
@@ -2478,7 +2882,7 @@ export function installDuelBattleUi(
     },
     setQuality(nextQuality) {
       quality = nextQuality;
-      nodes.root.dataset.quality = quality;
+      setData(nodes.root, "quality", quality);
       performanceMonitor.setContext(
         quality,
         view?.phase ?? null,
@@ -2486,7 +2890,7 @@ export function installDuelBattleUi(
     },
     getPerformanceDiagnostics() {
       performanceMonitor.setLiveCounts(
-        nodes.projectiles.childElementCount,
+        nodes.projectiles.childElementCount + combatVisuals.activeShots,
         nodes.fx.childElementCount,
       );
       return performanceMonitor.diagnostics();
@@ -2500,6 +2904,7 @@ export function installDuelBattleUi(
     },
     hide() {
       active = false;
+      hooks.onCombatRenderer?.(null);
       paintedVfxGeneration += 1;
       clearPresentationTimers();
       stopPerformanceLoop();
@@ -2514,6 +2919,10 @@ export function installDuelBattleUi(
       offerTargetNodes.clear();
       offerLayoutAssignments.clear();
       lastTypingFeedbackKey = "";
+      clearCinematic();
+      momentum.reset(null);
+      knockoutRoundId = null;
+      lastPhase = null;
     },
     isActive() {
       return active;

@@ -12,6 +12,7 @@ import {
   type DuelClientMatchView,
 } from "./authority";
 import { DuelOfferDraft } from "./draft";
+import { DUEL_ROUND_BREAK_SECONDS } from "./presentation-timing";
 import {
   combineDuelCategoryMultipliers,
   duelRuntimeTuning,
@@ -141,6 +142,8 @@ export class DuelLocalPracticeMatch {
   private roundSequence = 1;
   private roundId = "practice:round:1";
   private needsRoundReset = false;
+  /** Seconds left in the between-round break (K.O. and result screen). */
+  private roundBreakSeconds = 0;
   private readonly series: {
     format: 1 | 3 | 5;
     winsNeeded: number;
@@ -211,9 +214,8 @@ export class DuelLocalPracticeMatch {
     update: DuelLocalPracticeUpdate;
   } | null {
     if (this.series.status !== "active") return null;
-    if (this.needsRoundReset) {
-      this.beginNextRound();
-    }
+    // Keys during the round break do nothing, like on the online authority.
+    if (this.needsRoundReset) return null;
 
     this.humanSequence += 1;
     this.engine.enqueueIntent(
@@ -240,6 +242,11 @@ export class DuelLocalPracticeMatch {
       return this.initial();
     }
     if (this.needsRoundReset) {
+      this.roundBreakSeconds -= Math.max(0, Number.isFinite(dtSeconds) ? dtSeconds : 0);
+      if (this.roundBreakSeconds > 1e-9) {
+        this.serverSequence += 1;
+        return { view: this.view(), events: [] };
+      }
       this.beginNextRound();
     }
 
@@ -247,6 +254,7 @@ export class DuelLocalPracticeMatch {
     for (const intent of this.bot.update(
       dtSeconds,
       duelBotObservation({
+        autoActivateItems: true,
         mapId: this.mapId,
         phase: snapshot.phase,
         self: {
@@ -324,6 +332,8 @@ export class DuelLocalPracticeMatch {
   private createEngine(seed: number): DuelEngine {
     const tuning = duelRuntimeTuning(this.room.settings);
     return new DuelEngine({
+      typingCannon: true,
+      autoActivateItems: true,
       regulationSeconds:
         this.room.settings.matchLengthSeconds,
       escalationSeconds: tuning.escalationSeconds,
@@ -354,12 +364,14 @@ export class DuelLocalPracticeMatch {
     );
     return {
       "player-1": new DuelOfferDraft({
+        ensureEnergyOffer: true,
         seed: deriveSeed(seed, 1),
         actions: duelActionsForMap(this.mapId),
         enabledCategories: ALL_CATEGORIES,
         categoryMultiplier: multiplier,
       }),
       "player-2": new DuelOfferDraft({
+        ensureEnergyOffer: true,
         seed: deriveSeed(seed, 2),
         actions: duelActionsForMap(this.mapId),
         enabledCategories: ALL_CATEGORIES,
@@ -507,6 +519,7 @@ export class DuelLocalPracticeMatch {
     }
 
     this.needsRoundReset = true;
+    this.roundBreakSeconds = DUEL_ROUND_BREAK_SECONDS;
   }
 
   private beginNextRound(): void {

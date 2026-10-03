@@ -10,6 +10,18 @@ function read(relativePath: string): string {
 }
 
 describe("Duel battle DOM contract", () => {
+  it("preserves the canvas for blit backgrounds and suppresses campaign-only rendering", () => {
+    const css = read("../src/duel/battle.css");
+    const game = read("../src/Game.ts");
+    const main = read("../src/main.ts");
+    expect(css).not.toContain(".game-shell.duel-battle-active > #gameCanvas");
+    expect(css).not.toContain(".game-shell.duel-battle-active > #bgCanvas");
+    expect(game).toContain("if (!this.duelPresentationActive) this.advanceSimulation(dt)");
+    expect(game.indexOf("if (this.duelPresentationActive) {", game.indexOf("private draw(time"))).toBeGreaterThan(game.indexOf("this.drawBackground(time);", game.indexOf("private draw(time")));
+    expect(main).toContain("game.setDuelPresentationActive(true)");
+    expect(main).toContain("game.setDuelPresentationActive(false)");
+  });
+
   it("declares every required static FX node before querying it", () => {
     const source = read("../src/duel/battle-ui.ts");
 
@@ -25,7 +37,7 @@ describe("Duel battle DOM contract", () => {
     );
   });
 
-  it("keeps the local player at the bottom and rival at the top", () => {
+  it("retains portrait layout and adds horizontal ship/telegraph layout on wide containers", () => {
     const source = read("../src/duel/battle-ui.ts");
     const css = read("../src/duel/battle.css");
 
@@ -50,6 +62,11 @@ describe("Duel battle DOM contract", () => {
     expect(css).toContain(
       "@keyframes duel-projectile-down",
     );
+    expect(css).toContain('.duel-battle[data-layout="horizontal"] .duel-threat-telegraph');
+    expect(source).toContain("duelArenaLayout(bounds.width, bounds.height)");
+    expect(source).not.toContain('id="duelInventory"');
+    expect(source).not.toContain("SPACE · launch attack");
+    expect(source).toContain("HOÀN THÀNH TỪ → TỰ KÍCH HOẠT");
   });
 
   it("connects accepted typing progress to micro combat feedback", () => {
@@ -181,7 +198,7 @@ describe("Duel battle DOM contract", () => {
 
     expect(css).toContain("width: clamp(68px, 6vw, 98px);");
     expect(css).toContain("top: clamp(54px, 7vh, 82px);");
-    expect(css).toContain("bottom: clamp(32px, 4.5vh, 58px);");
+    expect(css).toContain("bottom: clamp(104px, 14vh, 132px);");
     expect(css).toContain("width: clamp(148px, 14vw, 205px);");
   });
 

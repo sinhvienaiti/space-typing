@@ -200,6 +200,21 @@ export class Sfx {
     this.samples.preload();
   }
 
+  /** The unlocked AudioContext (null before unlock or after destroy). */
+  audioContext(): AudioContext | null {
+    if (this.destroyed) return null;
+    this.unlock();
+    return this.context;
+  }
+
+  masterVolume(): number {
+    return this.volume;
+  }
+
+  isPronunciationActive(): boolean {
+    return this.pronunciationActive;
+  }
+
   playSample(
     id: SampleSfxId,
     playbackRate = 1,

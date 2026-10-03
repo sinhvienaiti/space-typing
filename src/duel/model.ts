@@ -1,6 +1,6 @@
-export const DUEL_CONTENT_VERSION = "duel-final-v4";
+export const DUEL_CONTENT_VERSION = "duel-final-v7-impact";
 
-export const DUEL_PRIVATE_OFFER_COUNT = 5;
+export const DUEL_PRIVATE_OFFER_COUNT = 3;
 export const DUEL_SHARED_OBJECTIVE_LANES = 1;
 
 export const DUEL_INVENTORY_CAPACITY = Object.freeze({

@@ -19,7 +19,25 @@ function practiceRoom() {
 }
 
 describe("Duel local Practice runtime", () => {
-  it("starts the same deterministic five-offer Duel contract", () => {
+  it("uses automatic items in production Practice, with a free energy word and no inventory accumulation", () => {
+    const match = new DuelLocalPracticeMatch({ room: practiceRoom(), seed: 731 });
+    let update = match.initial();
+    let activated = 0;
+    for (let i = 0; i < 12; i++) {
+      const view = update.view;
+      expect(view.self.offers.some(o => o.actionId === "energy")).toBe(true);
+      const selected = view.self.offers.find(o => o.actionId !== "energy" && duelActionDefinitionForMap(view.map.id, o.actionId)!.energyCost <= view.self.energy && !((view.self.cooldowns[o.actionId] ?? 0) > 0)) ?? view.self.offers.find(o => o.actionId === "energy")!;
+      for (const char of selected.typingPrompt!.answerToken) {
+        update = match.sendIntent({ type: "TYPE_CHAR", targetInstanceId: selected.instanceId, char })!.update;
+        activated += update.events.filter(e => e.type === "action-fired").length;
+        expect(update.events.some(e => e.type === "action-banked")).toBe(false);
+      }
+      expect(update.view.self.inventory).toEqual({ attack: [], defense: [], tactical: [] });
+    }
+    expect(activated).toBeGreaterThan(0);
+  });
+
+  it("starts the same deterministic three-offer Duel contract", () => {
     const room = practiceRoom();
     const left = new DuelLocalPracticeMatch({
       room,
@@ -38,7 +56,7 @@ describe("Duel local Practice runtime", () => {
     expect(a.appearance.selfCharacterId).toBe("vanguard");
     expect(a.appearance.opponentCharacterId).toBe("reaper");
     expect(a.map.id).toBe("tempest-prime");
-    expect(a.self.offers).toHaveLength(5);
+    expect(a.self.offers).toHaveLength(3);
     expect(
       a.self.offers.map((offer) => offer.actionId),
     ).toEqual(
@@ -120,10 +138,10 @@ describe("Duel local Practice runtime", () => {
           candidate.instanceId === offer.instanceId,
       ),
     ).toBe(false);
-    expect(last.view.self.offers).toHaveLength(5);
+    expect(last.view.self.offers).toHaveLength(3);
   });
 
-  it("refills expired human offers back to five slots without creating typing misses", () => {
+  it("refills expired human offers back to three slots without creating typing misses", () => {
     const match = new DuelLocalPracticeMatch({
       room: practiceRoom(),
       seed: 3030,
@@ -138,7 +156,7 @@ describe("Duel local Practice runtime", () => {
       view = match.tick(1).view;
     }
 
-    expect(view.self.offers).toHaveLength(5);
+    expect(view.self.offers).toHaveLength(3);
     expect(
       view.self.offers.some((offer) =>
         initialIds.has(offer.instanceId),
@@ -222,6 +240,10 @@ describe("Duel local Practice runtime", () => {
 
     const eventsA: string[] = [];
     const eventsB: string[] = [];
+    // Exercise director activity immediately: the active cannon can now end
+    // a round against an idle player before the first build-phase hazard.
+    a.advanceToPhaseForTestLab("crisis");
+    b.advanceToPhaseForTestLab("crisis");
     for (let frame = 0; frame < 1600; frame += 1) {
       for (const event of a.tick(0.05).events) {
         if (

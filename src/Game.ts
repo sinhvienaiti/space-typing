@@ -9,6 +9,7 @@ import {
 } from "./audio/announcer";
 import { Sfx, type ImpactVariant } from "./audio/Sfx";
 import type { DuelTimedAudioCue } from "./duel/audio";
+import { DuelSoundEngine } from "./audio/duel-sound";
 import {
   bossActionInterval,
   bossKeyDamage,
@@ -875,6 +876,9 @@ export class Game {
   private recallPromptStartedAtSeconds = 0;
   private recallReplayCount = 0;
   private phase: GamePhase = "title";
+  private duelPresentationActive = false;
+  private duelCombatRenderer: ((context: CanvasRenderingContext2D, time: number, width: number, height: number) => void) | null = null;
+  private duelCamera: (() => { zoom: number; fx: number; fy: number }) | null = null;
   private playerStats: CoreStats = calculateEffectiveStats({
     base: DEFAULT_PLAYER_BASE_STATS,
   });
@@ -1141,8 +1145,44 @@ export class Game {
     }
   }
 
+  setDuelPresentationActive(active: boolean): void {
+    this.duelPresentationActive = active;
+  }
+
+  setDuelCombatRenderer(
+    draw: ((context: CanvasRenderingContext2D, time: number, width: number, height: number) => void) | null,
+    camera: (() => { zoom: number; fx: number; fy: number }) | null = null,
+  ): void {
+    this.duelCombatRenderer = draw;
+    this.duelCamera = draw === null ? null : camera;
+  }
+
+  /** Duel hit weight: camera shake (respects the Screen shake setting). */
+  duelShake(amount: number): void {
+    if (!this.duelPresentationActive || !Number.isFinite(amount)) return;
+    this.shakeFor(Math.min(20, Math.max(0, amount)));
+  }
+
+  private duelSound: DuelSoundEngine | null = null;
+
+  private duelSoundEngine(): DuelSoundEngine {
+    this.duelSound ??= new DuelSoundEngine({
+      context: () => this.sfx.audioContext(),
+      volume: () => this.sfx.masterVolume(),
+      pronunciationActive: () => this.sfx.isPronunciationActive(),
+    });
+    return this.duelSound;
+  }
+
+  /** Stereo placement for Duel: wide layout puts you left, the rival right. */
+  setDuelStereoLayout(horizontal: boolean): void {
+    this.duelSoundEngine().setHorizontal(horizontal);
+  }
+
   playDuelCombatAudioCue(input: DuelTimedAudioCue): void {
     this.sfx.unlock();
+    // Web Audio voices first; the legacy pool/synth below is the fallback.
+    if (this.duelSoundEngine().play(input)) return;
     switch (input.cue) {
       case "typing-miss":
         if (!this.sfx.playSample("duel-typing-miss")) {
@@ -4070,7 +4110,9 @@ export class Game {
     this.lastTime = now;
     this.frameProfiler.pushFrame(rawDt);
 
-    this.advanceSimulation(dt);
+    if (!this.duelPresentationActive) this.advanceSimulation(dt);
+    // Duel skips the Campaign simulation, so its camera shake decays here.
+    else this.shake = Math.max(0, this.shake - dt * 30);
 
     const drawStart = performance.now();
     this.draw(now / 1000);
@@ -9168,6 +9210,18 @@ export class Game {
     if (shake !== null) {
       context.translate(shake.x, shake.y);
     }
+    // Duel camera (K.O. push-in, heavy-hit punch): zooms the whole scene,
+    // background included, around a focus. DOM HUD and words stay put.
+    if (this.duelPresentationActive && this.duelCamera !== null) {
+      const camera = this.duelCamera();
+      if (Number.isFinite(camera.zoom) && Math.abs(camera.zoom - 1) > 0.0005) {
+        const fx = camera.fx * this.width;
+        const fy = camera.fy * this.height;
+        context.translate(fx, fy);
+        context.scale(camera.zoom, camera.zoom);
+        context.translate(-fx, -fy);
+      }
+    }
 
     if (background === "blit") {
       context.drawImage(
@@ -9179,6 +9233,13 @@ export class Game {
       );
     } else if (background === "legacy") {
       this.drawBackground(time);
+    }
+    // Duel owns ships and combat FX. Keep both background presentation modes
+    // alive without drawing the campaign ship underneath the Duel battlefield.
+    if (this.duelPresentationActive) {
+      this.duelCombatRenderer?.(context, time, this.width, this.height);
+      context.restore();
+      return;
     }
     if (this.novaPulseRemaining > 0) this.drawNovaPulse();
     if (this.interferenceTimer > 0) {

@@ -338,7 +338,7 @@ describe("DuelEngine M-DUEL-04 integration", () => {
     );
   });
 
-  it("blocks the final character when a bank is full instead of silently deleting value", () => {
+  it("blocks acquisition immediately when a bank is full instead of trapping the final character", () => {
     const engine = new DuelEngine({ startingEnergy: 100 });
     const offers = [0, 1, 2, 3].map((slot) =>
       offer("player-1", slot, "missile"),
@@ -378,8 +378,8 @@ describe("DuelEngine M-DUEL-04 integration", () => {
         reason: "inventory-full",
       }),
     );
-    expect(blocked.status).toBe("locked");
-    expect(blocked.typedPrefix).toBe("missil");
+    expect(blocked.status).toBe("available");
+    expect(blocked.typedPrefix).toBe("");
     expect(engine.snapshot().inventories["player-1"].attack).toHaveLength(3);
   });
 

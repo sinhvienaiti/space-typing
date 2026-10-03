@@ -1,4 +1,5 @@
-export const DUEL_PROTOCOL_VERSION = 4;
+// V7: 5 s round break, slower cannon/attack flight. Restart the Duel server.
+export const DUEL_PROTOCOL_VERSION = 7;
 export const DUEL_PROTOCOL_MAX_MESSAGE_BYTES = 4096;
 
 export type DuelWireIntent =

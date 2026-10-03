@@ -96,14 +96,14 @@ describe("Duel M-DUEL-03 core word draft", () => {
     expect(crisis.defense).toBeLessThan(build.defense);
   });
 
-  it("deals five deterministic private offers from Attack/Defense/Support", () => {
+  it("deals three deterministic private offers from Attack/Defense/Support", () => {
     const left = new DuelOfferDraft({ seed: 12345 });
     const right = new DuelOfferDraft({ seed: 12345 });
 
     const a = left.dealPrivateOffers("player-1", "build");
     const b = right.dealPrivateOffers("player-1", "build");
 
-    expect(a).toHaveLength(5);
+    expect(a).toHaveLength(3);
     expect(a.map((offer) => offer.actionId)).toEqual(
       b.map((offer) => offer.actionId),
     );
@@ -138,7 +138,7 @@ describe("Duel M-DUEL-03 core word draft", () => {
       (offer) =>
         DUEL_ACTIONS_BY_ID.get(offer.actionId)?.answerToken[0],
     );
-    expect(new Set(initials).size).toBeGreaterThanOrEqual(4);
+    expect(new Set(initials).size).toBeGreaterThanOrEqual(3);
   });
 
   it("lets runtime strategy affinity bias a refill without replacing phase rules", () => {
@@ -205,7 +205,7 @@ describe("Duel M-DUEL-03 core word draft", () => {
     engine.setPrivateOffers("player-1", offers);
 
     const snapshot = engine.snapshot();
-    expect(snapshot.players["player-1"].offers).toHaveLength(5);
+    expect(snapshot.players["player-1"].offers).toHaveLength(3);
     expect(
       snapshot.players["player-1"].offers.map(
         (offer) => offer.instanceId,

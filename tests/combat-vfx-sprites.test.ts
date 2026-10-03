@@ -1,5 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
+import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import {
   parseCombatVfxManifest,
@@ -24,7 +26,7 @@ describe("painted combat VFX manifest", () => {
         spec?.blendMode === "screen" ||
           spec?.blendMode === "source-over",
       ).toBe(true);
-      expect(spec?.url.endsWith(".svg")).toBe(true);
+      expect(spec?.url).toMatch(/\.(svg|webp|png)$/);
       expect(
         existsSync(
           fileURLToPath(
@@ -45,7 +47,7 @@ describe("painted combat VFX manifest", () => {
     );
   });
 
-  it("keeps runtime combat VFX vectors transparent and label-free", () => {
+  it("verifies runtime VFX transparency, dimensions and asset integrity", async () => {
     const manifestPath = fileURLToPath(
       new URL(
         "../public/assets/space-typing/combat-vfx/vfx.json",
@@ -54,7 +56,7 @@ describe("painted combat VFX manifest", () => {
     );
     const manifest = JSON.parse(
       readFileSync(manifestPath, "utf8"),
-    ) as { sprites: Record<string, { url: string }> };
+    ) as { sprites: Record<string, { url: string; sha256: string; width: number; height: number }> };
 
     for (const spec of Object.values(manifest.sprites)) {
       const path = fileURLToPath(
@@ -64,12 +66,21 @@ describe("painted combat VFX manifest", () => {
           import.meta.url,
         ),
       );
-      const svg = readFileSync(path, "utf8");
-      expect(svg).toContain("<svg");
-      expect(svg).not.toContain("<text");
-      expect(svg).not.toMatch(
-        /<rect[^>]+(?:width=["']768["'][^>]+height=["']768["']|height=["']768["'][^>]+width=["']768["'])/i,
-      );
+      const bytes = readFileSync(path);
+      expect(createHash("sha256").update(bytes).digest("hex")).toBe(spec.sha256);
+      const metadata = await sharp(bytes).metadata();
+      expect(metadata.width).toBe(spec.width);
+      expect(metadata.height).toBe(spec.height);
+      const { data, info } = await sharp(bytes).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+      let transparent = 0;
+      let visible = 0;
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i]! < 8) transparent++;
+        if (data[i]! > 128) visible++;
+      }
+      expect(transparent / (info.width * info.height)).toBeGreaterThan(.05);
+      expect(visible).toBeGreaterThan(0);
+      if (spec.url.endsWith(".svg")) expect(bytes.toString("utf8")).not.toContain("<text");
     }
   });
 

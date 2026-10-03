@@ -26,7 +26,7 @@ import {
 
 describe("Duel FINAL V3 contracts", () => {
   it("keeps the approved offer and inventory defaults", () => {
-    expect(DUEL_PRIVATE_OFFER_COUNT).toBe(5);
+    expect(DUEL_PRIVATE_OFFER_COUNT).toBe(3);
     expect(DUEL_SHARED_OBJECTIVE_LANES).toBe(1);
     expect(DUEL_INVENTORY_CAPACITY).toEqual({
       attack: 3,
