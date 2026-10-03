@@ -596,6 +596,7 @@ import {
   type VocabularyTopicIndex,
 } from "./vocabulary";
 import {
+  ENGLISH_ACTIVITY_DATASET_MESSAGE,
   LEARNING_ATTEMPT_MESSAGE,
   PARENT_ORIGIN,
   REVIEW_DATASET_MESSAGE,
@@ -603,7 +604,9 @@ import {
   REVIEW_READY_MESSAGE,
   buildCombatLearningEvent,
   buildRecallLearningEvent,
+  parseSpaceEnglishActivityDataset,
   parseSpaceReviewDataset,
+  spaceEnglishActivityEntries,
   type SpaceReviewGoal,
 } from "./learning/shared";
 import {
@@ -3770,6 +3773,77 @@ async function applySpaceReviewDataset(data: unknown): Promise<void> {
   }
 }
 
+async function applySpaceEnglishActivityDataset(data: unknown): Promise<void> {
+  const raw =
+    data !== null && typeof data === "object"
+      ? (data as Record<string, unknown>)
+      : null;
+  const fallbackRequestId =
+    raw !== null && typeof raw["requestId"] === "string"
+      ? raw["requestId"].slice(0, 100)
+      : "invalid";
+  try {
+    const dataset = parseSpaceEnglishActivityDataset(data);
+    if (dataset === null) return;
+    const entries = spaceEnglishActivityEntries(dataset);
+
+    if (gameplayModeBeforeReview === null) {
+      gameplayModeBeforeReview = gameplayMode;
+    }
+    activeReviewGoal = "mixed";
+    activeReviewVocabulary = entries;
+    activeReviewLevel = 1;
+    gameplayMode = "combat";
+
+    if (game.getPhase() !== "title") {
+      game.backToTitle();
+    }
+    game.setVocabulary(activeReviewVocabulary);
+    game.setVocabularyLevel(activeReviewLevel);
+    renderGameplayMode();
+
+    if (window.parent !== window) {
+      window.parent.postMessage(
+        {
+          type: REVIEW_READY_MESSAGE,
+          requestId: dataset.requestId,
+          result: {
+            items: entries.length,
+            activity: dataset.activity,
+            gameplayMode,
+            richContent: true,
+          },
+        },
+        PARENT_ORIGIN,
+      );
+    }
+    showNotice(
+      "English practice ready · " +
+        String(entries.length) +
+        " target" +
+        (entries.length === 1 ? "" : "s") +
+        " · " +
+        dataset.activity +
+        " · press Continue",
+    );
+  } catch (error) {
+    leaveReviewMode();
+    if (window.parent !== window) {
+      window.parent.postMessage(
+        {
+          type: REVIEW_ERROR_MESSAGE,
+          requestId: fallbackRequestId,
+          message:
+            error instanceof Error
+              ? error.message
+              : "Space English activity failed",
+        },
+        PARENT_ORIGIN,
+      );
+    }
+  }
+}
+
 window.addEventListener("message", (event: MessageEvent<unknown>) => {
   if (
     event.source !== window.parent ||
@@ -3780,8 +3854,13 @@ window.addEventListener("message", (event: MessageEvent<unknown>) => {
     return;
   }
   const data = event.data as Record<string, unknown>;
-  if (data["type"] !== REVIEW_DATASET_MESSAGE) return;
-  void applySpaceReviewDataset(event.data);
+  if (data["type"] === REVIEW_DATASET_MESSAGE) {
+    void applySpaceReviewDataset(event.data);
+    return;
+  }
+  if (data["type"] === ENGLISH_ACTIVITY_DATASET_MESSAGE) {
+    void applySpaceEnglishActivityDataset(event.data);
+  }
 });
 
 /**
