@@ -33,13 +33,17 @@
     "predev": "pnpm art:prepare",
     "prebuild": "pnpm art:prepare",
     "duel-targets:prepare": "node scripts/bg-art/prepare-duel-targets.mjs",
-    "combat-vfx-sequences:prepare": "node scripts/bg-art/prepare-duel-vfx-sequences.mjs"
+    "combat-vfx-sequences:prepare": "node scripts/bg-art/prepare-duel-vfx-sequences.mjs",
+    "chase:prepare": "node scripts/bg-art/prepare-ship-chase.mjs",
+    "ship3d:prepare": "node scripts/bg-art/prepare-ship-3d.mjs"
   },
   "dependencies": {
+    "three": "0.170.0",
     "ws": "^8.22.0"
   },
   "devDependencies": {
     "@types/node": "^24.19.0",
+    "@types/three": "0.170.0",
     "@types/ws": "^8.18.2",
     "sharp": "^0.34.5",
     "tsx": "^4.23.15",

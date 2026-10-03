@@ -30,6 +30,7 @@ import {
 } from "./target-art";
 import { duelProjectileTravelMs } from "./presentation-timing";
 import { DuelCombatVisuals } from "./combat-visuals";
+import { setShip3DCalm } from "./ship3d";
 import { duelAutoActionBlock } from "./offer-availability";
 import { duelArenaLayout } from "./combat-layout";
 import { DuelMomentum, DUEL_MOMENTUM_TIERS } from "./momentum";
@@ -70,6 +71,8 @@ export type DuelBattleUiController = {
   ): void;
   setPrediction(prediction: DuelLocalPrediction): void;
   setQuality(quality: VisualQuality): void;
+  /** Duel lobby opened: start loading heavy art (3D hull) before the fight. */
+  preload(quality: VisualQuality, self?: CharacterId, rival?: CharacterId): void;
   getPerformanceDiagnostics(): DuelPerformanceDiagnostics;
   resetPerformanceDiagnostics(): void;
   hide(): void;
@@ -635,6 +638,14 @@ export function installDuelBattleUi(
     }
   >();
   const offerLayoutAssignments = new Map<string, number>();
+  /** When each target appeared (warp-in class for its first 460 ms). */
+  const offerSpawnedAt = new Map<string, number>();
+  /** Where a target was when it left the field, for the completion burst. */
+  const removedOfferPoints = new Map<string, { x: number; y: number; rgb: string }>();
+  const CATEGORY_RGB: Readonly<Record<string, string>> = {
+    attack: "#ff7048", defense: "#56c4ff", support: "#60ffa2",
+    tactical: "#c48cff", fate: "#ffd454", mystery: "#ff56d6",
+  };
   const performanceMonitor =
     new DuelPerformanceMonitor();
   const presentationTimers = new Set<number>();
@@ -650,6 +661,25 @@ export function installDuelBattleUi(
     opponent: { hull: 0, shield: 0 },
   };
   let pendingBeats: DuelPresentationBeat[] = [];
+  /** Beats raised between updates (attack arrivals); sent with the next. */
+  let deferredBeats: DuelPresentationBeat[] = [];
+  let firstBloodDrawn = false;
+  const multiKill = { count: 0, lastAt: -Infinity };
+  const MULTI_KILL_LABELS: Readonly<Record<number, string>> = { 2: "DOUBLE KILL!", 3: "TRIPLE KILL!", 4: "ULTRA KILL!", 5: "RAMPAGE!" };
+  /**
+   * DotA multi-kills: each of YOUR attacks (one per completed word, however
+   * many bolts it fires) landing within 3.5 s of the previous one. Called
+   * when the attack's flight ends; only the 2nd–5th announce.
+   */
+  const registerAttackHit = (): void => {
+    if (!active || view?.round.status !== "active") return;
+    const now = performance.now();
+    multiKill.count = now - multiKill.lastAt <= 3500 ? multiKill.count + 1 : 1;
+    multiKill.lastAt = now;
+    if (multiKill.count < 2 || multiKill.count > 5) return;
+    deferredBeats.push({ type: "multi-kill", count: multiKill.count });
+    juice.text("opponent", MULTI_KILL_LABELS[Math.min(5, multiKill.count)]!, "callout", "#ffcf4d", 0);
+  };
   let lastPhase: DuelClientMatchView["phase"] | null = null;
   let knockoutRoundId: string | null = null;
   const textCache = new WeakMap<HTMLElement, string>();
@@ -967,9 +997,21 @@ export function installDuelBattleUi(
 
     for (const [instanceId, mounted] of offerTargetNodes) {
       if (visibleIds.has(instanceId)) continue;
+      if (combatVisuals.available) {
+        // One layout read per removed target: rare, and it anchors the burst.
+        const arena = nodes.projectiles.parentElement!.getBoundingClientRect();
+        const box = mounted.targetObject.getBoundingClientRect();
+        removedOfferPoints.set(instanceId, {
+          x: box.left + box.width / 2 - arena.left,
+          y: box.top + box.height / 2 - arena.top,
+          rgb: CATEGORY_RGB[mounted.root.dataset.category ?? ""] ?? "#8fe9ff",
+        });
+        while (removedOfferPoints.size > 12) removedOfferPoints.delete(removedOfferPoints.keys().next().value!);
+      }
       mounted.root.remove();
       offerTargetNodes.delete(instanceId);
       offerLayoutAssignments.delete(instanceId);
+      offerSpawnedAt.delete(instanceId);
     }
 
     for (const offer of visibleOffers) {
@@ -999,7 +1041,11 @@ export function installDuelBattleUi(
         offerTargetNodes.get(offer.instanceId) ??
         mountOfferTarget(offer.instanceId);
       const card = mounted.root;
+      if (!offerSpawnedAt.has(offer.instanceId)) offerSpawnedAt.set(offer.instanceId, performance.now());
+      const spawning = performance.now() - (offerSpawnedAt.get(offer.instanceId) ?? 0) < 460;
+      card.dataset.category = action.category;
       setClass(card,
+        (spawning ? "spawning " : "") +
         "duel-offer-card duel-word-target duel-category-" +
         action.category +
         (selected ? " selected" : "") +
@@ -1312,6 +1358,10 @@ export function installDuelBattleUi(
     nodes.opponentShip.dataset.character =
       opponentCharacter;
     combatVisuals.setCharacters(selfCharacter, opponentCharacter);
+    // Between rounds (and before the first): load the 3D hulls now; the
+    // rival's load pauses while a round is fought. Idempotent per ship.
+    setShip3DCalm(view.round.status !== "active" || !active);
+    if (view.round.status !== "active") combatVisuals.preload(quality, selfCharacter, opponentCharacter);
 
     setData(nodes.selfShipFrame, "damageTier", String(
       damageTier(view.self.hull, view.self.maxHull),
@@ -1431,6 +1481,11 @@ export function installDuelBattleUi(
       lastDelta[side].shield = shieldLoss;
       if (side === "opponent") roundStats.dealt += hullLoss + shieldLoss;
       else roundStats.taken += hullLoss + shieldLoss;
+      if (hullLoss > 0 && !firstBloodDrawn && next.round.status === "active") {
+        firstBloodDrawn = true;
+        pendingBeats.push({ type: "first-blood", side });
+        if (canvas) juice.text(side, "FIRST BLOOD!", "callout", "#ff4d5e", 0);
+      }
       if (hullLoss + shieldLoss > 0) {
         if (canvas) {
           juice.damage(side, hullLoss, shieldLoss);
@@ -1838,6 +1893,9 @@ export function installDuelBattleUi(
     momentum.reset(null);
     roundStats.dealt = 0;
     roundStats.taken = 0;
+    firstBloodDrawn = false;
+    multiKill.count = 0;
+    multiKill.lastAt = -Infinity;
     knockoutRoundId = null;
     lastPhase = view?.phase ?? null;
     juice.respawn();
@@ -1892,6 +1950,13 @@ export function installDuelBattleUi(
       if (kind !== null) spawnFx(kind);
       spawnProjectileForEvent(event);
       if (event.type === "round-ended") startKnockout(event.result);
+      if (event.type === "action-completed" && event.playerId === view?.self.playerId) {
+        const point = removedOfferPoints.get(event.targetInstanceId);
+        if (point !== undefined) {
+          removedOfferPoints.delete(event.targetInstanceId);
+          juice.collect(point.x, point.y, point.rgb);
+        }
+      }
     }
   };
 
@@ -2424,6 +2489,9 @@ export function installDuelBattleUi(
 
     if (event.type === "action-fired") {
       presentAction(source, event.actionId);
+      if (source === view?.self.playerId && actionDefinition(event.actionId)?.category === "attack") {
+        schedulePresentation(registerAttackHit, duelProjectileTravelMs(view.shared.tactical.projectileSpeedScale[source] ?? 1));
+      }
       return;
     }
 
@@ -2434,10 +2502,13 @@ export function installDuelBattleUi(
 
     if (event.type === "threat-created") {
       spawnThreatTelegraph(event.threat);
+      // SIEGE LANCE: the crystal spear charges at the shooter's nose.
+      combatVisuals.lanceCharge(event.threat.sourcePlayerId === view?.self.playerId ? "self" : "opponent", event.threat.id, event.threat.remainingSeconds);
       return;
     }
 
     if (event.type === "threat-countered") {
+      combatVisuals.lanceBreak(event.threatId);
       spawnThreatIntercept(
         event.threatId,
         event.targetPlayerId,
@@ -2446,6 +2517,7 @@ export function installDuelBattleUi(
     }
 
     if (event.type === "threat-resolved") {
+      combatVisuals.lanceStrike(event.threatId);
       clearThreatTelegraph(event.threatId);
       impactShip(event.targetPlayerId === view?.self.playerId ? "self" : "opponent", "lance");
       return;
@@ -2460,6 +2532,9 @@ export function installDuelBattleUi(
     }
 
     if (event.type === "precision-firepower-fired") {
+      if (event.playerId === view?.self.playerId) {
+        schedulePresentation(registerAttackHit, duelProjectileTravelMs(view.shared.tactical.projectileSpeedScale[event.playerId] ?? 1));
+      }
       spawnPrecisionActivation(
         event.playerId,
         event.accuracyTier,
@@ -2824,7 +2899,8 @@ export function installDuelBattleUi(
         );
       }
       view = nextView;
-      pendingBeats = [];
+      pendingBeats = deferredBeats;
+      deferredBeats = [];
       if (roundChanged) {
         prediction = {
           roundId: nextView.roundId,
@@ -2880,6 +2956,9 @@ export function installDuelBattleUi(
         );
       }
     },
+    preload(nextQuality, self, rival) {
+      combatVisuals.preload(nextQuality, self, rival);
+    },
     setQuality(nextQuality) {
       quality = nextQuality;
       setData(nodes.root, "quality", quality);
@@ -2904,6 +2983,7 @@ export function installDuelBattleUi(
     },
     hide() {
       active = false;
+      setShip3DCalm(true);
       hooks.onCombatRenderer?.(null);
       paintedVfxGeneration += 1;
       clearPresentationTimers();

@@ -8,11 +8,12 @@ import {
   type DuelMapId,
 } from "./maps";
 import type { DuelMatchPhase } from "./model";
+import duelMusicTracks from "../audio/duel-music-tracks.json";
 import {
   DUEL_KO_TIMELINE,
   duelProjectileTravelMs,
 } from "./presentation-timing";
-import type { DuelMomentumEvent } from "./momentum";
+import { DUEL_MOMENTUM_TIERS, type DuelMomentumEvent } from "./momentum";
 
 export const DUEL_AUDIO_WORLD_SOURCE: Readonly<
   Record<DuelMapId, string>
@@ -25,21 +26,30 @@ export const DUEL_AUDIO_WORLD_SOURCE: Readonly<
   "celestial-void": "world-09",
 });
 
+/**
+ * Duel PvP music (2026-10-03): original high-tempo songs rendered by
+ * scripts/music (`node scripts/music/render-songs.mjs --set=duel`), kept out
+ * of the Campaign playlists. The owner found the earlier Duel pack too slow
+ * and gloomy for PvP. Neon Dogfight (158 BPM) plays the early and middle
+ * phases (calm → intense stem); Afterburner Finale (168 BPM) the Cataclysm.
+ */
+function duelSongStem(id: string, stem: "calm" | "intense"): string {
+  const track = duelMusicTracks.tracks.find((entry) => entry.id === id);
+  return track?.stems[stem] ?? "/assets/audio/duel/music/songs/" + id + "/" + stem + ".ogg";
+}
+
 const DUEL_MUSIC_ASSETS = Object.freeze({
   calm: {
-    id: "duel-nebula-calm",
-    defaultPath:
-      "/assets/audio/duel/music/duel-nebula-calm.ogg",
+    id: "duel-neon-dogfight-calm",
+    defaultPath: duelSongStem("neon-dogfight", "calm"),
   },
   intense: {
-    id: "duel-combat-intense",
-    defaultPath:
-      "/assets/audio/duel/music/duel-combat-intense.ogg",
+    id: "duel-neon-dogfight-intense",
+    defaultPath: duelSongStem("neon-dogfight", "intense"),
   },
   cataclysm: {
-    id: "duel-cataclysm",
-    defaultPath:
-      "/assets/audio/duel/music/duel-cataclysm.ogg",
+    id: "duel-afterburner-finale",
+    defaultPath: duelSongStem("afterburner-finale", "intense"),
   },
 });
 
@@ -127,6 +137,14 @@ export type DuelCombatAudioCue =
   | "round-win"
   | "round-loss"
   | "round-draw"
+  // Weapons pass (2026-10-03): each typed weapon sounds like itself.
+  | "beam-launch"
+  | "beam-impact"
+  | "rail-charge"
+  | "rail-impact"
+  | "lance-charge"
+  | "lance-impact"
+  | "lance-break"
   // Presentation-driven cues (2026-10-03 impact pass).
   | "type-tick"
   | "streak-tier"
@@ -139,7 +157,9 @@ export type DuelCombatAudioCue =
   | "match-loss"
   | "round-ready"
   | "fight"
-  | "phase-shift";
+  | "phase-shift"
+  // Announcer voice (DotA lines, local assets): see `voice`.
+  | "announce";
 
 export type DuelTimedAudioCue = {
   cue: DuelCombatAudioCue;
@@ -147,9 +167,24 @@ export type DuelTimedAudioCue = {
   side: "self" | "opponent" | "arena";
   /** Streak length (type-tick) or chain index (ko-blast). */
   step?: number;
-  /** Momentum tier, 0…6. */
+  /** Momentum tier, 0…8. */
   tier?: number;
+  /** Announcer line id for "announce" (e.g. "double-kill"). */
+  voice?: string;
+  /** Announcer priority: a busy voice is cut by an equal or higher one. */
+  priority?: number;
+  /** Length of a charge (rail-charge, lance-charge), seconds. */
+  seconds?: number;
 };
+
+/** Your hits landing in a burst: DotA multi-kill lines. */
+export function duelMultiKillVoice(count: number): string | null {
+  if (count === 2) return "double-kill";
+  if (count === 3) return "triple-kill";
+  if (count === 4) return "ultra-kill";
+  if (count === 5) return "rampage";
+  return null;
+}
 
 /**
  * Moments the battle UI derives itself (they are not engine events), passed
@@ -160,7 +195,9 @@ export type DuelPresentationBeat =
   | { type: "shield-hit"; side: "self" | "opponent" }
   | { type: "shield-break"; side: "self" | "opponent" }
   | { type: "round-start"; round: number }
-  | { type: "phase"; phase: DuelMatchPhase };
+  | { type: "phase"; phase: DuelMatchPhase }
+  | { type: "first-blood"; side: "self" | "opponent" }
+  | { type: "multi-kill"; count: number };
 
 function actionCues(
   mapId: DuelMapId,
@@ -202,6 +239,27 @@ export function duelCombatAudioCues(
     const impactDelayMs = duelProjectileTravelMs(
       view.shared.tactical.projectileSpeedScale[playerId] ?? 1,
     );
+    // Timed to what flies (src/duel/ordnance.ts): three missiles 7% apart,
+    // the railgun charging for 72% of the flight, the laser beam's contact.
+    switch (actionId) {
+      case "laser":
+        cues.push({ cue: "beam-launch", delayMs: 0, side });
+        cues.push({ cue: "beam-impact", delayMs: impactDelayMs, side });
+        return;
+      case "missile":
+        for (let step = 0; step < 3; step += 1) {
+          cues.push({ cue: "missile-launch", delayMs: step * 65, side, step });
+          cues.push({ cue: "missile-impact", delayMs: impactDelayMs * (1 + step * 0.07), side, step });
+        }
+        return;
+      case "railgun":
+        cues.push({ cue: "rail-charge", delayMs: 0, side, seconds: impactDelayMs * 0.72 / 1000 });
+        cues.push({ cue: "heavy-launch", delayMs: impactDelayMs * 0.72, side });
+        cues.push({ cue: "rail-impact", delayMs: impactDelayMs, side });
+        return;
+      default:
+        break;
+    }
     cues.push({ cue: pair.launch, delayMs: 0, side });
     cues.push({
       cue: pair.impact,
@@ -219,6 +277,7 @@ export function duelCombatAudioCues(
         cues.push({ cue: "energy-impact", delayMs: 0, side: event.targetPlayerId === selfId ? "self" : "opponent" });
         break;
       case "combo-used":
+        if (event.playerId === selfId) cues.push({ cue: "announce", delayMs: 0, side: "arena", voice: "combo-whore", priority: 1 });
         if (["homing-barrage", "gravity-bomb", "overcharged-railgun"].includes(event.comboId)) {
           pushAction(event.playerId, "railgun");
         } else {
@@ -251,8 +310,11 @@ export function duelCombatAudioCues(
             side: "opponent",
           });
         }
+        // The lance charging: rises for the whole counter window.
+        cues.push({ cue: "lance-charge", delayMs: 0, side: event.threat.sourcePlayerId === selfId ? "self" : "opponent", seconds: Math.max(0.4, event.threat.remainingSeconds) });
         break;
       case "threat-countered":
+        cues.push({ cue: "lance-break", delayMs: 0, side: event.sourcePlayerId === selfId ? "self" : "opponent" });
         cues.push({
           cue: "intercept",
           delayMs: 0,
@@ -263,7 +325,7 @@ export function duelCombatAudioCues(
         });
         break;
       case "threat-resolved":
-        cues.push({ cue: actionCues(view.map.id, event.actionId)?.impact ?? "heavy-impact", delayMs: 0, side: event.targetPlayerId === selfId ? "self" : "opponent" });
+        cues.push({ cue: "lance-impact", delayMs: 0, side: event.targetPlayerId === selfId ? "self" : "opponent" });
         break;
       case "precision-firepower":
         cues.push({
@@ -314,6 +376,9 @@ export function duelCombatAudioCues(
           cues.push({ cue: "ko-final", delayMs: DUEL_KO_TIMELINE.finalMs, side });
         }
         const seriesOver = view.series.status !== "active";
+        if (result.status === "won" && result.winnerId === selfId) {
+          cues.push({ cue: "announce", delayMs: DUEL_KO_TIMELINE.finalMs + 250, side: "arena", voice: "ownage", priority: 5 });
+        }
         cues.push({
           cue:
             result.status === "draw"
@@ -349,6 +414,8 @@ export function duelBeatAudioCues(
           cues.push({ cue: "type-tick", delayMs: 0, side: "self", step: beat.event.streak, tier: beat.event.tier });
         } else if (beat.event.type === "tier-up") {
           cues.push({ cue: "streak-tier", delayMs: 0, side: "self", step: beat.event.streak, tier: beat.event.tier });
+          const voice = DUEL_MOMENTUM_TIERS[beat.event.tier]?.voice ?? "";
+          if (voice !== "") cues.push({ cue: "announce", delayMs: 0, side: "arena", voice, priority: 2 });
         } else if (beat.event.lost >= 10) {
           cues.push({ cue: "streak-break", delayMs: 0, side: "self", step: beat.event.lost, tier: beat.event.tier });
         }
@@ -362,6 +429,14 @@ export function duelBeatAudioCues(
       case "round-start":
         cues.push({ cue: "fight", delayMs: 0, side: "arena", step: beat.round });
         break;
+      case "first-blood":
+        cues.push({ cue: "announce", delayMs: 0, side: "arena", voice: "first-blood", priority: 4 });
+        break;
+      case "multi-kill": {
+        const voice = duelMultiKillVoice(beat.count);
+        if (voice !== null) cues.push({ cue: "announce", delayMs: 0, side: "arena", voice, priority: 3 });
+        break;
+      }
       case "phase": {
         // The map-cataclysm event already plays the cataclysm sample.
         const tier = ["build", "skirmish", "war", "crisis", "cataclysm"].indexOf(beat.phase);

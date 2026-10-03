@@ -1,6 +1,10 @@
 import type { PlayerImpactVariant } from "../characters/projectiles";
 import {
+  LOCAL_ANNOUNCER_ROOT,
   announcerAsset,
+  announcerHasFallback,
+  announcerPriority,
+  localAnnouncerAsset,
   type AnnouncerEvent,
 } from "./announcer";
 import {
@@ -12,6 +16,10 @@ import {
   type SampleSfxId,
 } from "./sample-bank";
 import type { EnemyMaterial } from "../enemies/identity";
+import {
+  CreditSoundEngine,
+  type CreditTickInput,
+} from "./credit-sound";
 import type {
   CreditCrystalTier,
   CreditCrystalVariant,
@@ -66,29 +74,6 @@ export type ImpactVariant = PlayerImpactVariant | "energy";
  */
 const IMPACT_RING_HZ = [1567.98, 1760, 2093, 2349.32, 2637.02] as const;
 
-const CREDIT_TIER_PITCH: Readonly<Record<CreditCrystalTier, number>> = {
-  common: 1,
-  refined: 1.06,
-  high: 1.12,
-  elite: 1.18,
-  "mini-boss": 1.24,
-  boss: 1.3,
-  "major-boss": 1.35,
-};
-
-function creditQualityLayers(quality: VisualQuality): number {
-  switch (quality) {
-    case "low":
-      return 0;
-    case "medium":
-      return 1;
-    case "high":
-      return 2;
-    case "ultra":
-      return 3;
-  }
-}
-
 type ImpactVoiceProfile = {
   weight: number;
   crackHz: number;
@@ -132,9 +117,7 @@ export class Sfx {
   private lastEnemyDeath = -Infinity;
   private lastBossImpact = -Infinity;
   private lastBellNote = -1;
-  private lastCreditDrop = -Infinity;
-  private lastCreditPickup = -Infinity;
-  private creditNote = 0;
+  private creditEngine: CreditSoundEngine | null = null;
 
   private readonly onPronunciation = (event: Event): void => {
     const detail = (event as CustomEvent<{ active?: unknown }>).detail;
@@ -198,6 +181,7 @@ export class Sfx {
       void this.context.resume();
     }
     this.samples.preload();
+    this.loadLocalAnnouncer();
   }
 
   /** The unlocked AudioContext (null before unlock or after destroy). */
@@ -354,8 +338,35 @@ export class Sfx {
     this.tone(240 * safePitch, 0.12, "sawtooth", 0.045, 90 * safePitch, "combat");
   }
 
+  private localAnnouncerLines: Set<string> | null = null;
+  private localAnnouncerLoading = false;
+  private announcerPriorityPlaying = 0;
+
+  /** Reads the optional local announcer manifest once (one request). */
+  private loadLocalAnnouncer(): void {
+    if (this.localAnnouncerLoading || typeof fetch !== "function") return;
+    this.localAnnouncerLoading = true;
+    void fetch(LOCAL_ANNOUNCER_ROOT + "manifest.json")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((manifest: { lines?: unknown } | null) => {
+        const lines = Array.isArray(manifest?.lines) ? manifest.lines.filter((line): line is string => typeof line === "string") : [];
+        this.localAnnouncerLines = new Set(lines);
+      })
+      .catch(() => {
+        this.localAnnouncerLines = new Set();
+      });
+  }
+
   announcer(event: AnnouncerEvent): void {
     if (this.destroyed || typeof Audio === "undefined") return;
+    this.loadLocalAnnouncer();
+    const local = this.localAnnouncerLines?.has(event) === true;
+    // Spree/first-blood lines exist only as local files: no generic beep.
+    if (!local && !announcerHasFallback(event)) return;
+    const priority = announcerPriority(event);
+    // A newer line of the same or higher rank cuts in (Triple Kill over
+    // Double Kill); a lower one waits its turn.
+    if (this.announcerAudio !== null && priority < this.announcerPriorityPlaying) return;
 
     if (this.announcerAudio !== null) {
       this.announcerAudio.pause();
@@ -363,14 +374,16 @@ export class Sfx {
       this.notifyAnnouncer(false);
     }
 
-    const audio = new Audio(announcerAsset(event));
+    const audio = new Audio(local ? localAnnouncerAsset(event) : announcerAsset(event));
     audio.preload = "auto";
     audio.volume = this.announcerVolume();
     this.announcerAudio = audio;
+    this.announcerPriorityPlaying = priority;
 
     const finish = (): void => {
       if (this.announcerAudio !== audio) return;
       this.announcerAudio = null;
+      this.announcerPriorityPlaying = 0;
       this.notifyAnnouncer(false);
     };
     audio.addEventListener?.("ended", finish, { once: true });
@@ -510,169 +523,59 @@ export class Sfx {
     this.tone(540, 0.06, "sine", 0.018, 700, "ui");
   }
 
+  /** A Credit crystal burst breaking out of a kill (`pan` -1 … 1). */
   creditDrop(
     tier: CreditCrystalTier,
     quality: VisualQuality,
     variant: CreditCrystalVariant = "standard",
+    pan = 0,
   ): void {
-    const now = this.clock();
-    if (now - this.lastCreditDrop < 42) return;
-    this.lastCreditDrop = now;
-
-    const layers = creditQualityLayers(quality);
-    const tierPitch = CREDIT_TIER_PITCH[tier];
-    const golden = variant === "golden";
-    const pitch = Math.min(1.35, tierPitch * (golden ? 1.05 : 1));
-
-    this.samples.play(
-      "credit-drop",
-      this.volume,
-      this.pronunciationActive,
-      pitch,
-    );
-
-    this.tone(
-      760 * pitch,
-      0.085,
-      "triangle",
-      0.028,
-      1120 * pitch,
-      "combat",
-      { attack: 0.002 },
-    );
-
-    if (layers >= 1) {
-      this.tone(
-        1320 * pitch,
-        0.12,
-        "sine",
-        0.022,
-        1580 * pitch,
-        "combat",
-        { attack: 0.002 },
-      );
-    }
-    if (layers >= 2) {
-      this.schedule(
-        () =>
-          this.tone(
-            1760 * pitch,
-            0.13,
-            "sine",
-            0.018,
-            2240 * pitch,
-            "combat",
-            { attack: 0.002 },
-          ),
-        34,
-      );
-    }
-    if (layers >= 3 || tier === "boss" || tier === "major-boss") {
-      this.schedule(
-        () =>
-          this.tone(
-            2350 * pitch,
-            0.14,
-            "sine",
-            0.015,
-            2940 * pitch,
-            "combat",
-            { attack: 0.002 },
-          ),
-        62,
-      );
-    }
+    this.creditSound()?.drop(tier, variant, quality, pan);
   }
 
+  /** One crystal reaching the ship: a clink on the chain ladder. */
+  creditTick(input: CreditTickInput): void {
+    this.creditSound()?.tick(input);
+  }
+
+  /** A whole burst home: jackpot accent for elite, golden and boss tiers. */
   creditPickup(
     tier: CreditCrystalTier,
     quality: VisualQuality,
     variant: CreditCrystalVariant,
-    hero: boolean,
+    _hero = false,
+    step = 0,
+    pan = 0,
   ): void {
-    const now = this.clock();
-    if (now - this.lastCreditPickup < 48 && !hero) return;
-    this.lastCreditPickup = now;
+    this.creditSound()?.complete(tier, variant, quality, step, pan);
+  }
 
-    const layers = creditQualityLayers(quality);
-    const tierPitch = CREDIT_TIER_PITCH[tier];
-    const golden = variant === "golden";
-    const pitch = Math.min(1.35, tierPitch * (golden ? 1.04 : 1));
-    const notes = [880, 1046.5, 1318.5, 1568] as const;
-    const note = notes[this.creditNote % notes.length]!;
-    this.creditNote += 1;
+  /** Every 5th burst collected in a row. */
+  creditMilestone(step: number, quality: VisualQuality, pan = 0): void {
+    this.creditSound()?.milestone(step, quality, pan);
+  }
 
-    this.samples.play(
-      "credit-pickup",
-      this.volume,
-      this.pronunciationActive,
-      pitch,
-    );
-    this.tone(
-      note * pitch,
-      hero ? 0.16 : 0.11,
-      "triangle",
-      hero ? 0.045 : 0.032,
-      note * pitch * 1.24,
-      "combat",
-      { attack: 0.002 },
-    );
-
-    if (layers >= 1) {
-      this.schedule(
-        () =>
-          this.tone(
-            note * 1.5 * pitch,
-            0.14,
-            "sine",
-            hero ? 0.033 : 0.022,
-            note * 1.72 * pitch,
+  private creditSound(): CreditSoundEngine | null {
+    if (this.destroyed) return null;
+    if (this.creditEngine === null) {
+      this.creditEngine = new CreditSoundEngine({
+        context: () => {
+          if (this.destroyed) return null;
+          this.unlock();
+          return this.context;
+        },
+        output: () =>
+          this.context === null ? null : this.outputNode(this.context),
+        level: (gain) =>
+          mixedSfxGain(
+            this.volume,
             "combat",
-            { attack: 0.002 },
+            gain,
+            this.pronunciationActive,
           ),
-        28,
-      );
+      });
     }
-    if (layers >= 2) {
-      this.schedule(
-        () =>
-          this.tone(
-            note * 2 * pitch,
-            0.16,
-            "sine",
-            hero ? 0.026 : 0.016,
-            note * 2.2 * pitch,
-            "combat",
-            { attack: 0.002 },
-          ),
-        58,
-      );
-    }
-    if (hero) {
-      this.tone(
-        150,
-        0.16,
-        "sine",
-        0.04,
-        88,
-        "combat",
-      );
-      if (layers >= 3) {
-        this.schedule(
-          () =>
-            this.tone(
-              note * 2.5 * pitch,
-              0.2,
-              "sine",
-              0.018,
-              note * 3 * pitch,
-              "combat",
-              { attack: 0.002 },
-            ),
-          88,
-        );
-      }
-    }
+    return this.creditEngine;
   }
 
   stageClear(

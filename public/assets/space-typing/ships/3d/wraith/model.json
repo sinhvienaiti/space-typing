@@ -1,0 +1,62 @@
+{
+  "id": "wraith",
+  "version": 3,
+  "aspect": 1.1141,
+  "heightScale": 0.2291,
+  "heightGrid": [
+    256,
+    230
+  ],
+  "nozzles": [
+    [
+      0.3105,
+      0.8224,
+      0.0644
+    ],
+    [
+      0.6557,
+      0.8316,
+      0.0619
+    ]
+  ],
+  "anchors": {
+    "nose": [
+      0.5004,
+      0.0295
+    ],
+    "canopy": [
+      0.4996,
+      0.4649
+    ],
+    "eyes": [],
+    "guns": [
+      [
+        0.2775,
+        0.2962
+      ],
+      [
+        0.7234,
+        0.2981
+      ]
+    ],
+    "wingtips": [
+      [
+        0.0277,
+        0.7815
+      ],
+      [
+        0.9723,
+        0.7783
+      ]
+    ]
+  },
+  "colors": {
+    "hot": "#f2e2ff",
+    "plume": "#a63bff",
+    "outer": "#772ab8",
+    "accent": "#aa38ff"
+  },
+  "color": "color.webp?v=80c253c3c807",
+  "emissive": "emissive.webp?v=6ffec819ed90",
+  "height": "height.bin?v=c869e1cf11d4"
+}

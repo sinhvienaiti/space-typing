@@ -521,6 +521,8 @@ export function installDuelRoomUi(
         mapId: selectValue(
           "duelMap",
         ) as DuelMapId,
+        // Honour the lobby: Random/Vote map mode, rounds, length, hazards…
+        settings: duelRoomSettingsFromUi(),
         bot: botConfigFromUi(),
       });
       remoteRoom = null;

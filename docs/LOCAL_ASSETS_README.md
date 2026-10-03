@@ -105,3 +105,16 @@ Before public deployment or distribution:
 ## Current intention
 
 The current Space Typing project is being developed for local/private use. This document exists so a future public release does not accidentally redistribute local-only or third-party assets.
+
+## Duel/Campaign announcer voice lines (DotA pack, added 2026-10-03)
+
+```text
+public/local-assets/announcer/<line>.ogg      (15 lines, Opus 64 kbps, loudness-normalised)
+public/local-assets/announcer/manifest.json   ({"lines": [...]}: the game only plays listed lines)
+```
+
+Converted from the owner's `~/Downloads/Dota-Sounds` (classic DotA/Unreal announcer: first-blood,
+double/triple/ultra-kill, rampage, killing-spree, dominating, mega-kill, unstoppable, wicked-sick,
+monster-kill, godlike, holy-shit, ownage, combo-whore). Third-party, **private use only**: the folder
+is gitignored and must not be published. Without the manifest the Duel and Campaign simply skip
+these call-outs (the Campaign elite chain falls back to the generic base sound).

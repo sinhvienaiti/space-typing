@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { CombatCreditRewardReceipt } from "../src/rewards/combat-credit-drops";
 import {
+  CREDIT_TRAIL_POINTS,
   CreditCrystalPickupSystem,
+  type CreditCrystalArrival,
   type CreditCrystalCollectionEvent,
   type CreditCrystalPoint,
 } from "../src/vfx/credit-crystal-pickups";
@@ -220,5 +222,95 @@ describe("CreditCrystalPickupSystem", () => {
       events.reduce((sum, event) => sum + event.walletDeltaApplied, 0),
     ).toBe(38);
     expect(system.flush()).toEqual([]);
+  });
+});
+
+describe("Credit crystal arrivals and chain", () => {
+  function collectAll(
+    system: CreditCrystalPickupSystem,
+    target: CreditCrystalPoint,
+    seconds = 4,
+  ): CreditCrystalArrival[] {
+    const arrivals: CreditCrystalArrival[] = [];
+    for (let t = 0; t < seconds && system.liveBurstCount() > 0; t += 1 / 60) {
+      system.update(1 / 60, target, arrivals);
+    }
+    return arrivals;
+  }
+
+  it("reports every crystal reaching the ship, in arrival order", () => {
+    const system = new CreditCrystalPickupSystem();
+    system.spawn(receipt("arrivals", "elite", 5), 400, 120, "ultra");
+    const pieces = system.livePieceCount();
+    const arrivals = collectAll(system, { x: 400, y: 640 });
+    expect(arrivals).toHaveLength(pieces);
+    expect(arrivals.map((arrival) => arrival.order)).toEqual(
+      Array.from({ length: pieces }, (_, index) => index),
+    );
+    expect(arrivals.filter((arrival) => arrival.anchor)).toHaveLength(1);
+    expect(new Set(arrivals.map((arrival) => arrival.step))).toEqual(new Set([0]));
+  });
+
+  it("climbs one ladder step per burst collected in a row", () => {
+    const system = new CreditCrystalPickupSystem();
+    const target = { x: 400, y: 640 };
+    const steps: number[] = [];
+    for (let kill = 0; kill < 6; kill += 1) {
+      system.spawn(receipt("chain-" + kill), 300 + kill * 20, 140, "high");
+      const arrivals = collectAll(system, target);
+      steps.push(arrivals[0]!.step);
+      if (kill === 4) expect(arrivals[0]!.milestone).toBe(true);
+    }
+    expect(steps).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(system.chainSnapshot()).toEqual({ step: 5, bursts: 6 });
+  });
+
+  it("dips the ladder after a short pause and restarts it after a long one", () => {
+    const system = new CreditCrystalPickupSystem();
+    const target = { x: 400, y: 640 };
+    for (let kill = 0; kill < 6; kill += 1) {
+      system.spawn(receipt("warm-" + kill), 320, 140, "high");
+      collectAll(system, target);
+    }
+    // A 1.5 s pause (≈ 2.7 s between first crystals home) loses a few steps.
+    advance(system, 1.5, target);
+    system.spawn(receipt("after-short"), 320, 140, "high");
+    const short = collectAll(system, target);
+    expect(short[0]!.step).toBeLessThan(5);
+    expect(short[0]!.step).toBeGreaterThan(0);
+    expect(short[0]!.chain).toBe(1);
+
+    advance(system, 8, target);
+    system.spawn(receipt("after-long"), 320, 140, "high");
+    expect(collectAll(system, target)[0]!.step).toBe(0);
+  });
+
+  it("samples trails on game time so frame rate does not change their length", () => {
+    const fast = new CreditCrystalPickupSystem();
+    const slow = new CreditCrystalPickupSystem();
+    fast.spawn(receipt("trail"), 300, 100, "ultra");
+    slow.spawn(receipt("trail"), 300, 100, "ultra");
+    fast.forceMagnet();
+    slow.forceMagnet();
+    for (let i = 0; i < 40; i += 1) fast.update(1 / 400, { x: 300, y: 700 });
+    for (let i = 0; i < 10; i += 1) slow.update(1 / 100, { x: 300, y: 700 });
+    const trailOf = (system: CreditCrystalPickupSystem) =>
+      (system as unknown as { bursts: Array<{ pieces: Array<{ trailLength: number }> }> })
+        .bursts[0]!.pieces[0]!.trailLength;
+    expect(Math.abs(trailOf(fast) - trailOf(slow))).toBeLessThanOrEqual(1);
+    expect(trailOf(fast)).toBeLessThanOrEqual(CREDIT_TRAIL_POINTS);
+  });
+
+  it("keeps the wallet event once per burst while crystals report one by one", () => {
+    const system = new CreditCrystalPickupSystem();
+    system.spawn(receipt("wallet", "high", 4), 300, 100, "high");
+    const events: CreditCrystalCollectionEvent[] = [];
+    const arrivals: CreditCrystalArrival[] = [];
+    for (let i = 0; i < 300 && system.liveBurstCount() > 0; i += 1) {
+      events.push(...system.update(1 / 60, { x: 300, y: 650 }, arrivals));
+    }
+    expect(events).toHaveLength(1);
+    expect(events[0]!.walletDeltaApplied).toBe(4);
+    expect(arrivals.length).toBeGreaterThan(1);
   });
 });

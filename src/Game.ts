@@ -4,12 +4,15 @@ import {
   usesKillPositionTranslation,
 } from "./feedback/kill-translation";
 import {
+  KILL_SPREE_LADDER,
   PriorityKillChain,
+  killSpreeRung,
   type AnnouncerEvent,
 } from "./audio/announcer";
 import { Sfx, type ImpactVariant } from "./audio/Sfx";
 import type { DuelTimedAudioCue } from "./duel/audio";
 import { DuelSoundEngine } from "./audio/duel-sound";
+import { FlightStreakField } from "./vfx/flight-field";
 import {
   bossActionInterval,
   bossKeyDamage,
@@ -367,6 +370,7 @@ import type {
 } from "./rewards/combat-credit-drops";
 import {
   CreditCrystalPickupSystem,
+  type CreditCrystalArrival,
   type CreditCrystalCollectionEvent,
 } from "./vfx/credit-crystal-pickups";
 import {
@@ -830,6 +834,9 @@ export class Game {
   private readonly hooks: GameHooks;
   private readonly sfx = new Sfx();
   private readonly priorityKillChain = new PriorityKillChain();
+  /** DotA announcer: first kill of the stage, and the kill-spree ladder. */
+  private firstBloodThisStage = false;
+  private announcedSpreeRung = 0;
   private readonly skillEngine = new SkillEngine();
   private skillLevels: Record<UpgradeableSkillId, number> =
     Object.fromEntries(
@@ -910,6 +917,7 @@ export class Game {
   private lasers: Laser[] = [];
   private readonly playerShots = new PlayerShotSystem<ShotImpact>();
   private readonly creditPickups = new CreditCrystalPickupSystem();
+  private readonly creditArrivals: CreditCrystalArrival[] = [];
   /** Killed enemies stay on screen until the bolt that killed them lands. */
   private dyingEnemies: Enemy[] = [];
   /** Intercepted hostile shots stay on screen until the player's bolt reaches them. */
@@ -1155,6 +1163,54 @@ export class Game {
   ): void {
     this.duelCombatRenderer = draw;
     this.duelCamera = draw === null ? null : camera;
+  }
+
+  private readonly flightField = new FlightStreakField();
+  private flightLastTime: number | null = null;
+  private readonly flightReducedMotion =
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia("(prefers-reduced-motion: reduce)")
+      : null;
+
+  /**
+   * Campaign flight motion: star streaks rushing past from ahead of the ship
+   * (the owner liked the Duel "wind, gliding" feel and asked for it here).
+   * Streaks hold still while paused and speed up with the kill streak.
+   */
+  private drawFlightStreaks(time: number): void {
+    const dt = this.flightLastTime === null ? 0 : Math.max(0, Math.min(0.1, time - this.flightLastTime));
+    this.flightLastTime = time;
+    if (this.flightReducedMotion?.matches === true) return;
+    const heat = clamp(this.stats.streak / 40, 0, 1);
+    const moving = this.phase === "playing" && this.hitStopTimer <= 0;
+    this.flightField.update(moving ? dt : 0, 2.1 + heat * 2.2 + (this.overdriveTimer > 0 ? 1.4 : 0));
+    this.flightField.draw(
+      this.context,
+      this.settings.visualQuality,
+      this.width / 2,
+      this.height * 0.06,
+      Math.min(this.width, this.height) * 0.62,
+      Math.max(0.3, heat),
+      "#cfe6ff",
+      true,
+    );
+  }
+
+  /**
+   * Kill-spree announcer (DotA lines): each rung of KILL_SPREE_LADDER once
+   * per streak; a mistake or a hit taken resets the streak and the ladder.
+   */
+  private checkKillSpreeAnnouncer(): void {
+    const rung = killSpreeRung(this.stats.streak);
+    if (rung < this.announcedSpreeRung) {
+      this.announcedSpreeRung = rung;
+      return;
+    }
+    if (rung > this.announcedSpreeRung) {
+      this.announcedSpreeRung = rung;
+      const step = KILL_SPREE_LADDER[rung - 1];
+      if (step !== undefined) this.sfx.announcer(step.event);
+    }
   }
 
   /** Duel hit weight: camera shake (respects the Screen shake setting). */
@@ -3611,6 +3667,8 @@ export class Game {
 
     this.phase = "playing";
     this.stageElapsedSeconds = 0;
+    this.firstBloodThisStage = false;
+    this.announcedSpreeRung = 0;
     this.priorityKillChain.reset();
     this.relicFirstWordTriggered = false;
     this.relicMistakeGuardsUsed = 0;
@@ -4148,6 +4206,7 @@ export class Game {
 
   private update(dt: number): void {
     this.shake = Math.max(0, this.shake - dt * 28);
+    this.checkKillSpreeAnnouncer();
     this.overdriveTimer = Math.max(0, this.overdriveTimer - dt);
     this.statusState = tickStatuses(this.statusState, dt);
     this.hardCcState = tickHardCcState(this.hardCcState, dt);
@@ -4479,8 +4538,13 @@ export class Game {
     }
     this.updateShipMotion(dt);
     const ship = this.shipCenter();
-    for (const event of this.creditPickups.update(dt, ship)) {
+    const creditArrivals = this.creditArrivals;
+    creditArrivals.length = 0;
+    for (const event of this.creditPickups.update(dt, ship, creditArrivals)) {
       this.presentCombatCreditCollection(event, ship);
+    }
+    for (const arrival of creditArrivals) {
+      this.presentCombatCreditArrival(arrival);
     }
     this.updateBossRewardPrompt(dt);
     this.skillFx.update(dt);
@@ -7192,6 +7256,10 @@ export class Game {
       shake: enemy.kind === "tank" ? 6.5 : 4.5,
       creditReceipt,
     });
+    if (!this.firstBloodThisStage) {
+      this.firstBloodThisStage = true;
+      this.sfx.announcer("first-blood");
+    }
     if (enemy.elite || deathDefinition?.rarity === "elite") {
       const announcerEvent = this.priorityKillChain.registerKill(
         this.stageElapsedSeconds,
@@ -7332,7 +7400,32 @@ export class Game {
       receipt.tier,
       this.settings.visualQuality,
       receipt.variant,
+      this.creditPan(x),
     );
+  }
+
+  private creditPan(x: number): number {
+    return clamp((x / Math.max(1, this.width)) * 2 - 1, -1, 1) * 0.6;
+  }
+
+  /** One crystal entering the hull: a clink on the chain ladder. */
+  private presentCombatCreditArrival(arrival: CreditCrystalArrival): void {
+    const quality = this.settings.visualQuality;
+    const pan = this.creditPan(arrival.x);
+    this.sfx.creditTick({
+      tier: arrival.tier,
+      variant: arrival.variant,
+      quality,
+      anchor: arrival.anchor,
+      hero: arrival.hero,
+      step: arrival.step,
+      order: arrival.order,
+      chain: arrival.chain,
+      pan,
+    });
+    if (arrival.milestone) {
+      this.sfx.creditMilestone(arrival.step, quality, pan);
+    }
   }
 
   private presentCombatCreditCollection(
@@ -7368,17 +7461,23 @@ export class Game {
               ? 1.18
               : 1;
 
-    this.burst(
-      ship.x,
-      ship.y,
-      Math.round((event.hero ? 22 : 8) * qualityScale * tierScale),
-      hue,
-    );
+    // Single crystals already flash on the hull as they land; the burst
+    // closes with a ring, and premium tiers add a particle bloom.
+    if (event.hero) {
+      this.burst(
+        ship.x,
+        ship.y,
+        Math.round(22 * qualityScale * tierScale),
+        hue,
+      );
+    }
     this.sfx.creditPickup(
       event.tier,
       quality,
       event.variant,
       event.hero,
+      this.creditPickups.chainSnapshot().step,
+      this.creditPan(ship.x),
     );
 
     if (quality !== "low") {
@@ -7388,16 +7487,16 @@ export class Game {
         ship.x,
         ship.y,
         color,
-        (event.hero ? 118 : 74) * qualityScale * tierScale,
-        event.hero ? 4 : 2,
-        event.hero ? 0.52 : 0.32,
+        (event.hero ? 118 : 58) * qualityScale * tierScale,
+        event.hero ? 4 : 1.6,
+        event.hero ? 0.52 : 0.26,
       );
 
-      if (quality === "high" || quality === "ultra") {
+      if (event.hero && (quality === "high" || quality === "ultra")) {
         this.burst(
           ship.x,
           ship.y,
-          Math.round((event.hero ? 18 : 7) * qualityScale),
+          Math.round(18 * qualityScale),
           event.variant === "golden" ? 54 : 204,
         );
       }
@@ -9241,6 +9340,7 @@ export class Game {
       context.restore();
       return;
     }
+    this.drawFlightStreaks(time);
     if (this.novaPulseRemaining > 0) this.drawNovaPulse();
     if (this.interferenceTimer > 0) {
       this.drawInterference(time);

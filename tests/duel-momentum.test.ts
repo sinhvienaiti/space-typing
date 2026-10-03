@@ -9,13 +9,16 @@ import { DUEL_PRECISION_MILESTONES } from "../src/duel/precision-firepower";
 
 describe("Duel typing momentum (presentation only)", () => {
   it("puts tiers on the engine's precision milestones", () => {
-    const tierStreaks = DUEL_MOMENTUM_TIERS.slice(1).map((tier) => tier.streak);
+    const tierStreaks = DUEL_MOMENTUM_TIERS.slice(1, 7).map((tier) => tier.streak);
     expect(tierStreaks).toEqual(DUEL_PRECISION_MILESTONES.map((milestone) => milestone.streak));
     expect(duelMomentumTier(9)).toBe(0);
     expect(duelMomentumTier(10)).toBe(1);
     expect(duelMomentumTier(100)).toBe(6);
+    expect(duelMomentumTier(200)).toBe(8);
     expect(duelMomentumProgress(15)).toBeCloseTo(0.5);
     expect(duelMomentumProgress(250)).toBe(1);
+    // Every tier names its announcer line.
+    expect(DUEL_MOMENTUM_TIERS.slice(1).every((tier) => tier.voice !== "")).toBe(true);
   });
 
   it("uses the first view of a round as a baseline, then counts correct keys", () => {

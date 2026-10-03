@@ -32,3 +32,10 @@ export const SONGS = [
   requiem,
   eternity,
 ];
+
+// Duel PvP music (rendered with --set=duel into public/assets/audio/duel/
+// music/songs; not part of the Campaign playlists or Random mode).
+import neonDogfight from "./duel/neon-dogfight.mjs";
+import afterburnerFinale from "./duel/afterburner-finale.mjs";
+
+export const DUEL_SONGS = [neonDogfight, afterburnerFinale];

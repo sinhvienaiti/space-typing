@@ -1,6 +1,7 @@
 import type {
   DuelClientEvent,
   DuelClientMatchView,
+  DuelClientRoomSnapshot,
 } from "./authority";
 import {
   DuelNetworkClient,
@@ -21,6 +22,14 @@ export type DuelOnlineRoomControllerConfig = {
   ): void;
   onPrediction?(prediction: DuelLocalPrediction): void;
   onLocalPracticeReady?(snapshot: DuelRoomSnapshot): void;
+  /**
+   * The hull this player flies (their selected ship). Sent as the room
+   * loadout and with the Ranked queue, so the other player sees it; without
+   * it everyone showed up as Vanguard vs Reaper.
+   */
+  characterId?(): string;
+  /** Room updates (e.g. to preload the opponent's 3D hull before the match). */
+  onRoomSnapshot?(room: DuelClientRoomSnapshot): void;
 };
 
 type SessionResponse = {
@@ -130,6 +139,7 @@ export function installDuelOnlineRoomController(
   let ui: DuelRoomUiController | null = null;
   let tokenPromise: Promise<string> | null = null;
   let obtainingSession = false;
+  let sentLoadout: string | null = null;
   const pending: Array<() => void> = [];
 
   const client = new DuelNetworkClient({
@@ -147,6 +157,15 @@ export function installDuelOnlineRoomController(
         }
       },
       onRoomSnapshot(room) {
+        // Tell the server which hull we fly, once per room and choice.
+        const desired = config.characterId?.() ?? null;
+        const own = room.selfSlotIndex === null ? null : room.slots[room.selfSlotIndex];
+        if (desired !== null && own !== null && own.kind === "human" && own.characterId !== desired
+          && sentLoadout !== room.roomId + ":" + desired) {
+          sentLoadout = room.roomId + ":" + desired;
+          client.setLoadout(room.roomId, { shipId: own.shipId, characterId: desired });
+        }
+        config.onRoomSnapshot?.(room);
         ui?.setRemoteRoom(room);
         ui?.setStatus(
           room.canStart
@@ -288,7 +307,7 @@ export function installDuelOnlineRoomController(
     },
     onQueueRankedRequest() {
       runOnline(() => {
-        client.queueRanked();
+        client.queueRanked(config.characterId?.() ?? null);
       });
     },
     onLeaveRankedQueueRequest() {

@@ -676,6 +676,7 @@ function handleAuthenticatedMessage(
     }
 
     case "QUEUE_RANKED": {
+      authority.setRankedCharacter(sessionId, message.characterId);
       const result = ranked.enqueue(
         sessionId,
         now,

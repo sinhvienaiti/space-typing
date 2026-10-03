@@ -4639,6 +4639,64 @@ kbd {
   100% { transform: scale(1); filter: brightness(1); }
 }
 
+.metric-credits {
+  position: relative;
+}
+
+.credit-delta {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  color: #e6c8ff;
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-shadow:
+    0 0 8px rgba(190, 120, 255, 0.85),
+    0 0 18px rgba(150, 90, 255, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transform-origin: left center;
+  transition: opacity 160ms ease-out, transform 160ms ease-out;
+}
+
+.credit-delta.credit-delta-hero {
+  color: #fff1b8;
+  text-shadow:
+    0 0 8px rgba(255, 210, 110, 0.9),
+    0 0 20px rgba(255, 170, 60, 0.5);
+}
+
+.credit-delta.credit-delta-show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.credit-delta.credit-delta-bump {
+  animation: credit-delta-bump 260ms cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+
+.credit-delta.credit-delta-out {
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 420ms ease-in, transform 420ms ease-in;
+}
+
+@keyframes credit-delta-bump {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .credit-delta.credit-delta-bump {
+    animation: none;
+  }
+}
+
 @keyframes credit-hud-hero-arrival {
   0% { transform: scale(1); filter: brightness(1); }
   35% { transform: scale(1.28); filter: brightness(1.9); }

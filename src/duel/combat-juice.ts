@@ -177,6 +177,11 @@ type ShipState = {
   sparkDebt: number;
   fireDebt: number;
   popTimer: number;
+  /** Last blast on this hull (screen px) and its light, 0…1.6, for the 3D ship. */
+  lightX: number;
+  lightY: number;
+  light: number;
+  lightColor: string;
 };
 
 type Knockout = { side: JuiceSide; startMs: number; fired: number; final: boolean; draw: boolean };
@@ -353,7 +358,7 @@ export class DuelCombatJuice {
     const ship = (primary: string): ShipState => ({
       x: 0, y: 0, scale: 1, aim: 0, primary, secondary: WHITE,
       kickX: 0, kickY: 0, flash: 0, hull: 1, shield: 0, destroyed: false, spawn: Infinity, melt: 0,
-      smokeDebt: 0, sparkDebt: 0, fireDebt: 0, popTimer: 0,
+      smokeDebt: 0, sparkDebt: 0, fireDebt: 0, popTimer: 0, lightX: 0, lightY: 0, light: 0, lightColor: HOT,
     });
     this.ships = { self: ship("#5fe2ff"), opponent: ship("#ff7a52") };
   }
@@ -445,6 +450,12 @@ export class DuelCombatJuice {
     };
   }
 
+  /** The latest blast on a hull, to light a 3D ship from that side. */
+  shipLight(side: JuiceSide): { x: number; y: number; power: number; color: string } {
+    const ship = this.ships[side];
+    return { x: ship.lightX, y: ship.lightY, power: this.reduced ? Math.min(0.6, ship.light) : ship.light, color: ship.lightColor };
+  }
+
   /** Effects clock multiplier: hit-stop and KO slow motion. */
   get timeScale(): number {
     if (this.reduced) return 1;
@@ -489,6 +500,16 @@ export class DuelCombatJuice {
       this.glowParticle(cx, cy, 34 * size, SHIELD, 0.3);
       this.spray(cx, cy, back, 1.1, Math.round((5 + 5 * size) * budget.density), 260 + 120 * size, [SHIELD, WHITE, "#b9f6ff"], 0.32);
       if (kind !== "bolt") this.ring(cx, cy, 30 * size, 2, SHIELD, 0.32);
+      // Heavy weapons still blow up on the shield: the barrier holds, but
+      // the warhead detonates against it (a ripple alone read as a dud).
+      if (kind !== "bolt" && kind !== "laser") {
+        this.glowParticle(cx, cy, 28 * size, HOT, 0.22);
+        this.glowParticle(cx, cy, 52 * size, color, 0.3);
+        this.embers(cx, cy, Math.round(profile.embers * 0.8 * budget.density), 110 * size);
+        if (budget.smoke > 0) this.smoke(cx, cy, Math.max(1, profile.smoke - 1), 20 * size);
+        if (profile.flipbook !== null && budget.painted) this.book(profile.flipbook, cx, cy, 80 * size, 0.6 + 0.05 * size);
+        if (profile.ring && budget.painted && size >= 2.2) this.book("shockwave-ring", cx, cy, 130 * size, 0.55);
+      }
     } else {
       // Hot core, coloured bloom, sparks thrown back out of the hull.
       this.glowParticle(x, y, 16 * size, WHITE, 0.12 + 0.03 * size);
@@ -508,6 +529,10 @@ export class DuelCombatJuice {
       }
       if (profile.ring) this.ring(x, y, 42 * size, 3, kind === "bomb" ? HOT : color, 0.42);
       if (profile.ring && budget.painted && size >= 2.2) this.book("shockwave-ring", x, y, 150 * size, 0.6);
+      ship.lightX = x;
+      ship.lightY = y;
+      ship.light = Math.min(1.6, Math.max(ship.light, 0.55 + size * 0.3));
+      ship.lightColor = kind === "bolt" || kind === "laser" ? color : HOT;
     }
 
     // Weight: kick the hull along the shot, flash it, shake, freeze.
@@ -543,7 +568,8 @@ export class DuelCombatJuice {
   }
 
   /** Launch flare for heavy shots; railgun and lance also draw a beam. */
-  launch(side: JuiceSide, kind: DuelHitKind, x: number, y: number, tx: number, ty: number): void {
+  /** `beams`: the old instant railgun/lance line (the ordnance pass draws its own). */
+  launch(side: JuiceSide, kind: DuelHitKind, x: number, y: number, tx: number, ty: number, beams = true): void {
     const ship = this.ships[side];
     const angle = Math.atan2(ty - y, tx - x);
     const budget = BUDGET[this.quality];
@@ -557,7 +583,7 @@ export class DuelCombatJuice {
       ship.kickY -= Math.sin(angle) * 7;
       if (side === "self") this.onShake(1.6);
     }
-    if (kind === "railgun" || kind === "lance") {
+    if (beams && (kind === "railgun" || kind === "lance")) {
       this.beams.push({ x0: x, y0: y, x1: tx, y1: ty, color: ship.primary, width: kind === "lance" ? 9 : 6, age: 0, life: 0.26 });
       if (this.beams.length > 6) this.beams.shift();
     }
@@ -602,8 +628,9 @@ export class DuelCombatJuice {
       const reach = Math.max(0.8, ship.scale);
       if (stacked) {
         if (callout) {
-          x = side === "self" ? ship.x + 128 * reach : ship.x - 130 * reach;
-          y = side === "self" ? ship.y - 70 * reach - lane * 30 : ship.y - 6 + lane * 30;
+          // Your call-outs sit in the clear firing lane above your ship.
+          x = side === "self" ? ship.x : ship.x - 130 * reach;
+          y = side === "self" ? ship.y - 150 * reach - lane * 30 : ship.y - 6 + lane * 30;
         } else if (gain) {
           x = ship.x - 104 * reach;
           y = side === "self" ? ship.y - 44 * reach - lane * 22 : ship.y + 44 + lane * 22;
@@ -654,6 +681,28 @@ export class DuelCombatJuice {
     } else {
       this.text(side, "+" + formatAmount(amount) + (kind === "shield" ? " SHIELD" : " HULL"), "heal", color, amount);
     }
+  }
+
+  /**
+   * A typing target completed: it bursts where it floated and its energy
+   * streaks into your ship.
+   */
+  collect(x: number, y: number, color: string): void {
+    const budget = BUDGET[this.quality];
+    const ship = this.ships.self;
+    this.glowParticle(x, y, 46, color, 0.28);
+    this.glowParticle(x, y, 22, WHITE, 0.16);
+    this.ring(x, y, 46, 2.5, color, 0.42);
+    this.spray(x, y, 0, Math.PI, Math.round(14 * budget.density), 260, [WHITE, color], 0.32);
+    const count = Math.max(3, Math.round(7 * budget.density));
+    for (let index = 0; index < count; index += 1) {
+      // Each mote flies straight into the hull and dies on arrival.
+      const life = 0.28 + index * 0.035;
+      const ox = (this.random() - 0.5) * 30;
+      const oy = (this.random() - 0.5) * 30;
+      this.spawn(Kind.Ember, x + ox, y + oy, (ship.x - x - ox) / life, (ship.y - y - oy) / life, life, 2.6 + this.random() * 1.6, index % 2 === 0 ? color : WHITE, 1, 0, 0);
+    }
+    ship.flash = Math.max(ship.flash, 0.25);
   }
 
   /** Tier-up: a burst around your ship plus the tier name. */
@@ -757,6 +806,7 @@ export class DuelCombatJuice {
       ship.kickX = 0;
       ship.kickY = 0;
       ship.flash = 0;
+      ship.light = 0;
       ship.destroyed = false;
       ship.melt = 0;
       ship.spawn = Infinity;
@@ -792,6 +842,7 @@ export class DuelCombatJuice {
       ship.kickX *= spring;
       ship.kickY *= spring;
       ship.flash = Math.max(0, ship.flash - raw * 5.5);
+      ship.light = Math.max(0, ship.light - raw * 3.2);
       if (ship.spawn !== Infinity) {
         ship.spawn += raw;
         if (ship.spawn > 1.2) ship.spawn = Infinity;

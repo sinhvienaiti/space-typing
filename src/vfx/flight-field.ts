@@ -1,10 +1,11 @@
 import type { VisualQuality } from "../types";
 
 /**
- * Depth View motion: star streaks that stream from the rival's vanishing
- * point toward the camera, so the arena reads as a flight through space
- * instead of two ships hanging still. Presentation only, additive, batched
- * (one stroke per brightness step), no per-frame allocation.
+ * Flight motion: star streaks that stream from a vanishing point toward the
+ * camera, so the scene reads as flying through space (the owner: "cảm giác
+ * gió, lướt"). Used by the Duel Depth View (vanishing point at the rival) and
+ * the Campaign battlefield (ahead of your ship). Presentation only, additive,
+ * batched (one stroke per brightness step), no per-frame allocation.
  */
 
 const COUNT: Readonly<Record<VisualQuality, number>> = {
@@ -19,7 +20,7 @@ const FAR = 9;
 const NEAR = 0.35;
 const STEPS = 4;
 
-export class DuelDepthField {
+export class FlightStreakField {
   private readonly x = new Float32Array(COUNT.ultra);
   private readonly y = new Float32Array(COUNT.ultra);
   private readonly z = new Float32Array(COUNT.ultra);
@@ -75,6 +76,8 @@ export class DuelDepthField {
     spread: number,
     heat: number,
     color: string,
+    /** Fold every streak below the vanishing point (it sits at the top edge). */
+    fold = false,
   ): void {
     const count = COUNT[quality];
     // Short streaks with a hot head read as stars rushing past, not scratches.
@@ -96,7 +99,7 @@ export class DuelDepthField {
         const k = spread / z;
         const tail = spread / (z + stretch * (1 + z * 0.2));
         const x = this.x[index]!;
-        const y = this.y[index]!;
+        const y = fold ? Math.abs(this.y[index]!) * 1.4 : this.y[index]!;
         const hx = vx + x * k, hy = vy + y * k * 0.62;
         // Cap the on-screen length so edge streaks never become long lines.
         let tx = vx + x * tail, ty = vy + y * tail * 0.62;

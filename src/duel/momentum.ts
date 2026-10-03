@@ -8,16 +8,25 @@ export type DuelMomentumTier = {
   streak: number;
   label: string;
   color: string;
+  /** Announcer line (public/local-assets/announcer/<voice>.ogg). */
+  voice: string;
 };
 
+/**
+ * Labels follow the classic DotA announcer lines the owner supplied, so the
+ * call-out on screen matches the voice. The first six thresholds are the
+ * engine's precision-ordnance milestones.
+ */
 export const DUEL_MOMENTUM_TIERS: readonly DuelMomentumTier[] = [
-  { streak: 0, label: "", color: "#8fe9ff" },
-  { streak: 10, label: "ON FIRE", color: "#7ff3ff" },
-  { streak: 20, label: "BLAZING", color: "#ffd166" },
-  { streak: 35, label: "INFERNO", color: "#ff8a3d" },
-  { streak: 50, label: "UNSTOPPABLE", color: "#ff4fd8" },
-  { streak: 75, label: "GODLIKE", color: "#b98bff" },
-  { streak: 100, label: "LEGENDARY", color: "#ffffff" },
+  { streak: 0, label: "", color: "#8fe9ff", voice: "" },
+  { streak: 10, label: "KILLING SPREE", color: "#7ff3ff", voice: "killing-spree" },
+  { streak: 20, label: "DOMINATING", color: "#ffd166", voice: "dominating" },
+  { streak: 35, label: "MEGA KILL", color: "#ff8a3d", voice: "mega-kill" },
+  { streak: 50, label: "UNSTOPPABLE", color: "#ff4fd8", voice: "unstoppable" },
+  { streak: 75, label: "WICKED SICK", color: "#b98bff", voice: "wicked-sick" },
+  { streak: 100, label: "MONSTER KILL", color: "#ff5a5a", voice: "monster-kill" },
+  { streak: 150, label: "GODLIKE", color: "#ffe28a", voice: "godlike" },
+  { streak: 200, label: "HOLY SHIT", color: "#ffffff", voice: "holy-shit" },
 ];
 
 export type DuelMomentumEvent =
@@ -64,9 +73,9 @@ export class DuelMomentum {
     return duelMomentumTier(this.current);
   }
 
-  /** 0 (cold) … 1 (top tier), for scaling bolt power and aura. */
+  /** 0 (cold) … 1 (UNSTOPPABLE and beyond), for bolt power and aura. */
   get heat(): number {
-    return Math.min(1, this.tier / (DUEL_MOMENTUM_TIERS.length - 1));
+    return Math.min(1, this.tier / 5);
   }
 
   reset(roundId: string | null = null): void {

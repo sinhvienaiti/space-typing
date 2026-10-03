@@ -290,10 +290,12 @@ export class DuelNetworkClient {
     });
   }
 
-  queueRanked(): boolean {
+  /** `characterId`: the hull this player flies in the Ranked match. */
+  queueRanked(characterId: string | null = null): boolean {
     return this.sendMessage({
       type: "QUEUE_RANKED",
       requestId: this.nextRequestId(),
+      ...(characterId === null ? {} : { characterId }),
     });
   }
 

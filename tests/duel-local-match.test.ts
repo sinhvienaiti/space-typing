@@ -1,3 +1,4 @@
+import { CHARACTER_IDS } from "../src/characters/registry";
 import { describe, expect, it } from "vitest";
 import { duelActionDefinitionForMap } from "../src/duel/map-actions";
 import { DuelLocalPracticeMatch } from "../src/duel/local-match";
@@ -54,7 +55,9 @@ describe("Duel local Practice runtime", () => {
     expect(a.mode).toBe("practice");
     expect(a.combatProfile).toBe("normalized");
     expect(a.appearance.selfCharacterId).toBe("vanguard");
-    expect(a.appearance.opponentCharacterId).toBe("reaper");
+    // The bot flies a random hull, stable for the same room.
+    expect(CHARACTER_IDS).toContain(a.appearance.opponentCharacterId);
+    expect(b.appearance.opponentCharacterId).toBe(a.appearance.opponentCharacterId);
     expect(a.map.id).toBe("tempest-prime");
     expect(a.self.offers).toHaveLength(3);
     expect(

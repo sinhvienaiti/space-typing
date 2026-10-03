@@ -42,6 +42,19 @@ describe("Duel combat juice (presentation only)", () => {
     expect(you.shake.mock.calls.at(-1)![0]).toBeGreaterThan(rival.shake.mock.calls.at(-1)![0]);
   });
 
+  it("lights the 3D hull from a hull blast, not from a shield hit, then fades", () => {
+    const shielded = juice();
+    shielded.fx.hit("self", "missile", 230, 380, Math.PI, true);
+    expect(shielded.fx.shipLight("self").power).toBe(0);
+    const { fx } = juice();
+    fx.hit("self", "missile", 230, 380, Math.PI, false);
+    const light = fx.shipLight("self");
+    expect(light.power).toBeGreaterThan(0.5);
+    expect([light.x, light.y]).toEqual([230, 380]);
+    for (let ms = 100; ms <= 1000; ms += 100) fx.update(ms);
+    expect(fx.shipLight("self").power).toBe(0);
+  });
+
   it("rolls rapid damage on one ship into one growing number", () => {
     const { fx } = juice();
     fx.damage("opponent", 1.5, 0);

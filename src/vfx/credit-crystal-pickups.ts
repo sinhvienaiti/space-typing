@@ -4,6 +4,7 @@ import type {
   CreditCrystalVariant,
 } from "../rewards/combat-credit-drops";
 import type { VisualQuality } from "../types";
+import { CreditCrystalFx } from "./credit-crystal-fx";
 import {
   drawCreditCrystalBursts,
   type CreditCrystalDrawablePiece,
@@ -20,11 +21,49 @@ export type CreditCrystalCollectionEvent = {
   hero: boolean;
 };
 
+/**
+ * One crystal touching the ship. Presentation only (sound, flash, ship
+ * glow): the wallet still moves once per burst through the collection event.
+ */
+export type CreditCrystalArrival = {
+  x: number;
+  y: number;
+  tier: CreditCrystalTier;
+  variant: CreditCrystalVariant;
+  hero: boolean;
+  anchor: boolean;
+  radius: number;
+  /** Chain ladder step of this crystal's burst (0 = chain start). */
+  step: number;
+  /** Arrival order inside its burst (0 = first crystal home). */
+  order: number;
+  /** Bursts collected in a row so far (1 = chain start). */
+  chain: number;
+  /** Set on the first arrival of every 5th burst in a chain. */
+  milestone: boolean;
+};
+
+/**
+ * Chain rules: a burst whose first crystal lands within CHAIN_WINDOW of the
+ * previous burst climbs one step. Longer gaps lose one step per
+ * CHAIN_DECAY_SECONDS, so a short pause dips the ladder instead of
+ * restarting it.
+ */
+export const CREDIT_CHAIN_WINDOW = 1.6;
+const CHAIN_DECAY_SECONDS = 0.5;
+const CHAIN_MILESTONE = 5;
+/** Seconds of magnet flight to reach full speed (gems accelerate home). */
+const MAGNET_RAMP_SECONDS = 0.7;
+export const CREDIT_TRAIL_POINTS = 10;
+/** Trail samples are taken on game time, so frame rate never changes the look. */
+const TRAIL_INTERVAL = 1 / 60;
+
 type CrystalPiece = CreditCrystalDrawablePiece & {
-  vx: number;
-  vy: number;
   spin: number;
+  flipSpeed: number;
   magnetDelay: number;
+  /** Seconds since the last trail sample. */
+  trailAge: number;
 };
 
 type CreditDropBurst = {
@@ -40,6 +79,9 @@ type CreditDropBurst = {
   seed: number;
   hero: boolean;
   pieces: CrystalPiece[];
+  /** Ladder step, fixed when the first crystal lands (-1 = not yet). */
+  step: number;
+  arrived: number;
 };
 
 type TierProfile = {
@@ -207,9 +249,27 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
+function wrapAngle(value: number): number {
+  return Math.atan2(Math.sin(value), Math.cos(value));
+}
+
+function pushTrail(piece: CrystalPiece): void {
+  const head = piece.trailHead;
+  piece.trail[head * 2] = piece.x;
+  piece.trail[head * 2 + 1] = piece.y;
+  piece.trailHead = (head + 1) % CREDIT_TRAIL_POINTS;
+  piece.trailLength = Math.min(CREDIT_TRAIL_POINTS, piece.trailLength + 1);
+}
+
 export class CreditCrystalPickupSystem {
   private readonly bursts: CreditDropBurst[] = [];
   private nextBurstId = 1;
+  private readonly fx = new CreditCrystalFx();
+  private quality: VisualQuality = "high";
+  private clock = 0;
+  private chainStep = 0;
+  private chainBursts = 0;
+  private lastBurstArrival = -Infinity;
 
   spawn(
     receipt: CombatCreditRewardReceipt,
@@ -222,6 +282,8 @@ export class CreditCrystalPickupSystem {
     const profile = PROFILE[receipt.tier];
     const cap = QUALITY_CAP[quality];
     const hero = profile.hero;
+    this.quality = quality;
+    this.fx.spawn(x, y, receipt.tier, receipt.variant, hero, quality);
 
     if (!hero && this.livePieceCount() >= cap) {
       const target =
@@ -278,9 +340,10 @@ export class CreditCrystalPickupSystem {
             profile.satelliteMax,
             random01(randomState),
           );
+      // Satellites burst out wide and brake hard; the anchor stays central.
       const speed =
         profile.scatterSpeed *
-        (anchor ? 0.7 : lerp(0.78, 1.18, random01(randomState)));
+        (anchor ? 0.55 : lerp(1.15, 1.75, random01(randomState)));
 
       pieces.push({
         x,
@@ -291,15 +354,26 @@ export class CreditCrystalPickupSystem {
         vy: Math.sin(angle) * speed - (anchor ? 34 : 56),
         radius,
         angle: random01(randomState) * Math.PI * 2,
+        // Tumbles hard while it flies out, then settles upright.
         spin:
-          lerp(-2.3, 2.3, random01(randomState)) *
-          (anchor ? 0.55 : 1),
+          lerp(-7, 7, random01(randomState)) *
+          (anchor ? 0.45 : 1),
         magnetDelay:
           profile.scatterSeconds +
           profile.hoverSeconds +
           (anchor && hero ? 0.18 : index * 0.018) +
           random01(randomState) * 0.08,
         anchor,
+        flip: random01(randomState) * Math.PI * 2,
+        flipSpeed:
+          (anchor ? 2.6 : lerp(3.6, 5.6, random01(randomState))) *
+          (random01(randomState) < 0.5 ? -1 : 1),
+        twinkle: random01(randomState),
+        magnetic: false,
+        trail: new Float32Array(CREDIT_TRAIL_POINTS * 2),
+        trailLength: 0,
+        trailHead: 0,
+        trailAge: 0,
       });
     }
 
@@ -316,15 +390,25 @@ export class CreditCrystalPickupSystem {
       seed: randomState.value,
       hero,
       pieces,
+      step: -1,
+      arrived: 0,
     });
   }
 
+  /**
+   * Moves every crystal. Returns the wallet events (one per finished burst);
+   * pass `arrivals` to also receive every single crystal that reached the
+   * ship this frame, for per-crystal sound and light.
+   */
   update(
     dt: number,
     shipTarget: CreditCrystalPoint,
+    arrivals?: CreditCrystalArrival[],
   ): CreditCrystalCollectionEvent[] {
     const events: CreditCrystalCollectionEvent[] = [];
     let burstWrite = 0;
+    this.clock += Math.max(0, dt);
+    this.fx.update(dt, shipTarget);
 
     for (const burst of this.bursts) {
       burst.age += Math.max(0, dt);
@@ -335,10 +419,11 @@ export class CreditCrystalPickupSystem {
       for (const piece of burst.pieces) {
         piece.previousX = piece.x;
         piece.previousY = piece.y;
-        piece.angle += piece.spin * dt;
+        piece.flip += piece.flipSpeed * dt;
         let collected = false;
 
         if (burst.phase === "scatter") {
+          piece.angle += piece.spin * dt * Math.max(0.25, 1 - burst.age / burst.scatterSeconds);
           piece.x += piece.vx * dt;
           piece.y += piece.vy * dt;
           piece.vx *= Math.pow(0.12, dt);
@@ -347,12 +432,19 @@ export class CreditCrystalPickupSystem {
           burst.phase === "hover" ||
           burst.age < piece.magnetDelay
         ) {
+          piece.angle = wrapAngle(piece.angle) * Math.exp(-14 * dt);
           const damping = Math.pow(0.025, dt);
           piece.vx *= damping;
           piece.vy *= damping;
           piece.x += piece.vx * dt;
           piece.y += piece.vy * dt;
         } else {
+          if (!piece.magnetic) {
+            piece.magnetic = true;
+            piece.trailLength = 0;
+            piece.trailAge = 0;
+            pushTrail(piece);
+          }
           const dx = shipTarget.x - piece.x;
           const dy = shipTarget.y - piece.y;
           const distance = Math.max(1, Math.hypot(dx, dy));
@@ -362,8 +454,7 @@ export class CreditCrystalPickupSystem {
             1,
             Math.max(
               0,
-              (burst.age - piece.magnetDelay) /
-                Math.max(0.2, burst.maxLifetime - piece.magnetDelay),
+              (burst.age - piece.magnetDelay) / MAGNET_RAMP_SECONDS,
             ),
           );
           const desiredSpeed =
@@ -386,6 +477,17 @@ export class CreditCrystalPickupSystem {
           piece.vy += (desiredVy - piece.vy) * steer;
           piece.x += piece.vx * dt;
           piece.y += piece.vy * dt;
+          piece.trailAge += dt;
+          if (piece.trailAge >= TRAIL_INTERVAL) {
+            piece.trailAge = 0;
+            pushTrail(piece);
+          }
+
+          // Leans into the flight a little but stays a gem, not a dart.
+          // Sideways motion tilts the long axis along the flight.
+          const lean = Math.max(-0.42, Math.min(0.42, -piece.vx / 700));
+          piece.angle +=
+            (lean - wrapAngle(piece.angle)) * Math.min(1, 10 * dt);
 
           collected =
             Math.hypot(
@@ -396,6 +498,10 @@ export class CreditCrystalPickupSystem {
 
         if (!collected) {
           burst.pieces[pieceWrite++] = piece;
+        } else if (arrivals !== undefined) {
+          arrivals.push(this.arrival(burst, piece));
+        } else {
+          this.arrival(burst, piece);
         }
       }
       burst.pieces.length = pieceWrite;
@@ -418,7 +524,10 @@ export class CreditCrystalPickupSystem {
     context: CanvasRenderingContext2D,
     quality: VisualQuality,
   ): void {
+    this.quality = quality;
+    this.fx.drawUnder(context, quality);
     drawCreditCrystalBursts(context, this.bursts, quality);
+    this.fx.drawOver(context, quality);
   }
 
   flush(): CreditCrystalCollectionEvent[] {
@@ -470,6 +579,10 @@ export class CreditCrystalPickupSystem {
 
   clear(): void {
     this.bursts.length = 0;
+    this.fx.clear();
+    this.chainStep = 0;
+    this.chainBursts = 0;
+    this.lastBurstArrival = -Infinity;
   }
 
   liveBurstCount(): number {
@@ -504,6 +617,58 @@ export class CreditCrystalPickupSystem {
         anchor: piece.anchor,
       })),
     }));
+  }
+
+  /** Current chain: ladder step and bursts collected in a row. */
+  chainSnapshot(): { step: number; bursts: number } {
+    return { step: this.chainStep, bursts: this.chainBursts };
+  }
+
+  private arrival(
+    burst: CreditDropBurst,
+    piece: CrystalPiece,
+  ): CreditCrystalArrival {
+    const arrival = this.chainArrival(burst, piece);
+    this.fx.arrive(arrival, this.quality);
+    return arrival;
+  }
+
+  private chainArrival(
+    burst: CreditDropBurst,
+    piece: CrystalPiece,
+  ): CreditCrystalArrival {
+    let milestone = false;
+    if (burst.step < 0) {
+      const gap = this.clock - this.lastBurstArrival;
+      if (gap <= CREDIT_CHAIN_WINDOW) {
+        this.chainStep += 1;
+        this.chainBursts += 1;
+      } else {
+        const lost = Number.isFinite(gap)
+          ? Math.ceil((gap - CREDIT_CHAIN_WINDOW) / CHAIN_DECAY_SECONDS)
+          : Infinity;
+        this.chainStep = Math.max(0, this.chainStep - lost);
+        this.chainBursts = 1;
+      }
+      this.lastBurstArrival = this.clock;
+      burst.step = this.chainStep;
+      milestone = this.chainBursts % CHAIN_MILESTONE === 0;
+    }
+    const order = burst.arrived;
+    burst.arrived += 1;
+    return {
+      x: piece.x,
+      y: piece.y,
+      tier: burst.tier,
+      variant: burst.variant,
+      hero: burst.hero,
+      anchor: piece.anchor,
+      radius: piece.radius,
+      step: burst.step,
+      order,
+      chain: this.chainBursts,
+      milestone,
+    };
   }
 
   private collectionEvent(

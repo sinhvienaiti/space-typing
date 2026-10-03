@@ -20,7 +20,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { wavBytes } from "./synth.mjs";
 import { STEMS, mixStem, renderStem, timeline } from "./song-engine.mjs";
-import { SONGS } from "./songs/index.mjs";
+import { DUEL_SONGS, SONGS } from "./songs/index.mjs";
 
 const SCRIPT = fileURLToPath(import.meta.url);
 const ROOT = resolve(dirname(SCRIPT), "../..");
@@ -31,8 +31,12 @@ function flag(name, fallback) {
   return match === undefined ? fallback : match.slice(prefix.length);
 }
 
-const outDir = resolve(ROOT, flag("out", "public/assets/audio/music/songs"));
-const metaPath = resolve(ROOT, flag("meta", "src/audio/music-tracks.json"));
+// --set=duel renders the Duel PvP songs into their own folder and metadata,
+// so they never join the Campaign playlists or Random mode.
+const duelSet = flag("set", "campaign") === "duel";
+const outDir = resolve(ROOT, flag("out", duelSet ? "public/assets/audio/duel/music/songs" : "public/assets/audio/music/songs"));
+const metaPath = resolve(ROOT, flag("meta", duelSet ? "src/audio/duel-music-tracks.json" : "src/audio/music-tracks.json"));
+const publicRoot = resolve(ROOT, "public");
 const bitrate = flag("bitrate", "64k");
 const previewDir = flag("preview", null);
 const fragment = flag("fragment", null);
@@ -41,7 +45,7 @@ const jobs = Math.max(1, Number(flag("jobs", "6")));
 const stemFlag = flag("stem", "both");
 const stems = stemFlag === "both" ? STEMS : [stemFlag];
 const wanted = flag("song", null)?.split(",") ?? null;
-const songs = SONGS.filter((song) => wanted === null || wanted.includes(song.id));
+const songs = (duelSet ? DUEL_SONGS : SONGS).filter((song) => wanted === null || wanted.includes(song.id));
 if (songs.length === 0) {
   console.error("No song matches --song=" + wanted?.join(","));
   process.exit(2);
@@ -102,7 +106,7 @@ function renderSong(spec) {
           "-metadata", "artist=Space Typing (generated)",
           ogg,
         ]);
-        entry.stems[stem] = "/assets/audio/music/songs/" + spec.id + "/" + stem + ".ogg?v=" + sha16(ogg);
+        entry.stems[stem] = ogg.slice(publicRoot.length).split("\\").join("/") + "?v=" + sha16(ogg);
         kib = Math.round(statSync(ogg).size / 1024);
       }
       console.log(JSON.stringify({
@@ -141,7 +145,7 @@ function writeMeta(entries) {
     byId.set(entry.id, { ...entry, stems: { ...(previous?.stems ?? {}), ...entry.stems } });
   }
   // Library order, only songs that still exist.
-  const tracks = SONGS.map((song) => byId.get(song.id)).filter((track) => track !== undefined);
+  const tracks = (duelSet ? DUEL_SONGS : SONGS).map((song) => byId.get(song.id)).filter((track) => track !== undefined);
   writeFileSync(
     metaPath,
     JSON.stringify({ generatedBy: "scripts/music/render-songs.mjs", tracks }, null, 2) + "\n",
@@ -157,6 +161,7 @@ async function runParallel() {
     new Promise((done) => {
       const args = [SCRIPT, "--song=" + song.id, "--stem=" + stemFlag, "--bitrate=" + bitrate, "--fragment=" + join(temp, song.id + ".json")];
       if (previewDir !== null) args.push("--preview=" + previewDir);
+      if (duelSet) args.push("--set=duel", "--out=" + outDir, "--meta=" + metaPath);
       const child = spawn(process.execPath, args, { stdio: ["ignore", "inherit", "inherit"] });
       child.on("exit", (code) => {
         if (code !== 0) failures.push(song.id);

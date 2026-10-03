@@ -760,6 +760,19 @@ describe("Duel M-DUEL-11 authority core", () => {
     expect(opponent).toContain("TRAP ARMED");
   });
 
+  it("flies each player's own hull in Ranked (defaults only when none was sent)", () => {
+    const authority = new DuelAuthorityService(deps());
+    const left = open(authority, "left");
+    const right = open(authority, "right");
+    authority.setRankedCharacter(left.sessionId, "oracle");
+    authority.setRankedCharacter(right.sessionId, "not-a-ship");
+    const started = authority.startRankedMatch(left.sessionId, right.sessionId, 100);
+    if (!started.ok) throw new Error(started.message);
+    const views = started.value.updates.map((update) => update.view.appearance);
+    const hulls = new Set(views.flatMap((view) => [view.selfCharacterId, view.opponentCharacterId]));
+    expect(hulls).toEqual(new Set(["oracle", "reaper"]));
+  });
+
   it("starts Ranked directly from two eligible sessions with normalized combat", () => {
     const authority = new DuelAuthorityService(deps());
     const left = open(authority, "left");

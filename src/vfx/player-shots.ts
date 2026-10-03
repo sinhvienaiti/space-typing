@@ -303,6 +303,11 @@ export type ShotFireOptions<P> = {
   originScale?: number;
   /** Independent gun cycle when one renderer presents multiple ships. */
   muzzleIndex?: number;
+  /**
+   * The origin already is the gun (the Duel 3D hull projects its muzzles):
+   * do not add the recipe's muzzle offsets.
+   */
+  exactOrigin?: boolean;
   /** Optional authority flight clock; omitted by Campaign. */
   flightSeconds?: number;
   /** Duel waits for a confirmed hit before displaying the impact. */
@@ -501,8 +506,9 @@ export class PlayerShotSystem<P> {
     const cos = Math.cos(turn);
     const sin = Math.sin(turn);
     const originScale = options.originScale ?? 1;
-    const x0 = options.originX + (muzzle[0] * cos - muzzle[1] * sin) * originScale;
-    const y0 = options.originY + (muzzle[0] * sin + muzzle[1] * cos) * originScale;
+    const exact = options.exactOrigin === true;
+    const x0 = options.originX + (exact ? 0 : (muzzle[0] * cos - muzzle[1] * sin) * originScale);
+    const y0 = options.originY + (exact ? 0 : (muzzle[0] * sin + muzzle[1] * cos) * originScale);
     const distance = Math.max(1, Math.hypot(options.targetX - x0, options.targetY - y0));
 
     const shot = this.claimShot();

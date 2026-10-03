@@ -67,6 +67,7 @@ export class ShipExhaust {
   private count = 0;
   private readonly debt: number[] = [];
   private seed = 0x2f6b1;
+  private size = 1;
 
   get activeSparks(): number {
     return this.count;
@@ -74,7 +75,8 @@ export class ShipExhaust {
 
   /**
    * Sheds sparks from each nozzle (canvas px). `heading` is the ship's turn
-   * (0 = nose up), `boost` its 0–1 throttle.
+   * (0 = nose up), `boost` its 0–1 throttle, `size` scales new sparks (a
+   * ship drawn big, like the Duel chase view, needs bigger, faster sparks).
    */
   update(
     dt: number,
@@ -82,7 +84,9 @@ export class ShipExhaust {
     heading: number,
     boost: number,
     quality: VisualQuality,
+    size = 1,
   ): void {
+    this.size = size;
     const step = Number.isFinite(dt) && dt > 0 ? Math.min(dt, 0.05) : 0;
     const sparks = this.sparks;
 
@@ -155,18 +159,19 @@ export class ShipExhaust {
   private emit(nozzle: ExhaustPoint, backX: number, backY: number, boost: number): void {
     if (this.count >= MAX_SPARKS) return;
     const at = this.count * STRIDE;
-    const speed = 190 + this.random() * 140 + boost * 110;
-    const spread = (this.random() - 0.5) * 40;
+    const k = this.size;
+    const speed = (190 + this.random() * 140 + boost * 110) * Math.sqrt(k);
+    const spread = (this.random() - 0.5) * 40 * k;
     const sparks = this.sparks;
-    sparks[at] = nozzle.x + backX * 6 + (this.random() - 0.5) * 3;
-    sparks[at + 1] = nozzle.y + backY * 6;
+    sparks[at] = nozzle.x + backX * 6 * k + (this.random() - 0.5) * 3 * k;
+    sparks[at + 1] = nozzle.y + backY * 6 * k;
     // Across the jet: (-backY, backX).
     sparks[at + 2] = backX * speed - backY * spread;
     sparks[at + 3] = backY * speed + backX * spread;
     const life = 0.16 + this.random() * 0.18 + boost * 0.08;
     sparks[at + 4] = life;
     sparks[at + 5] = life;
-    sparks[at + 6] = 0.9 + this.random() * 1.1 + boost * 0.4;
+    sparks[at + 6] = (0.9 + this.random() * 1.1 + boost * 0.4) * k;
     sparks[at + 7] = this.random() < 0.5 ? 1 : 0;
     this.count += 1;
   }

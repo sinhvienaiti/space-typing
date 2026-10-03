@@ -94,6 +94,8 @@ export type DuelClientMessage =
   | {
       type: "QUEUE_RANKED";
       requestId: string;
+      /** Optional: the hull this player flies (older clients omit it). */
+      characterId?: string;
     }
   | {
       type: "LEAVE_RANKED_QUEUE";
@@ -597,7 +599,17 @@ function parseMessageObject(
         ? null
         : { type, requestId, roomId };
     }
-    case "QUEUE_RANKED":
+    case "QUEUE_RANKED": {
+      // exactKeys only rejects unknown keys; characterId is optional.
+      if (!exactKeys(value, ["type", "requestId", "characterId"])) {
+        return null;
+      }
+      const withHull = "characterId" in value;
+      const requestId = stringField(value, "requestId", 64);
+      const characterId = withHull ? stringField(value, "characterId", 32) : null;
+      if (requestId === null || (withHull && characterId === null)) return null;
+      return characterId === null ? { type, requestId } : { type, requestId, characterId };
+    }
     case "LEAVE_RANKED_QUEUE": {
       if (!exactKeys(value, ["type", "requestId"])) {
         return null;

@@ -40,11 +40,15 @@ describe("Duel map audio presentation", () => {
       const profile = duelMusicProfileForMap(map.id);
       expect(profile.id).toBe(map.audioProfileId);
       expect(profile.worldId).toBe("duel-" + map.id);
-      expect(profile.baseTrack.defaultPath).toBe(
-        "/assets/audio/duel/music/duel-nebula-calm.ogg",
+      // Original high-tempo Duel songs (scripts/music --set=duel).
+      expect(profile.baseTrack.defaultPath).toMatch(
+        /^\/assets\/audio\/duel\/music\/songs\/neon-dogfight\/calm\.ogg/,
       );
-      expect(profile.intenseTrackOrLayer.defaultPath).toBe(
-        "/assets/audio/duel/music/duel-combat-intense.ogg",
+      expect(profile.intenseTrackOrLayer.defaultPath).toMatch(
+        /^\/assets\/audio\/duel\/music\/songs\/neon-dogfight\/intense\.ogg/,
+      );
+      expect(profile.galaxyBossTrack.defaultPath).toMatch(
+        /^\/assets\/audio\/duel\/music\/songs\/afterburner-finale\/intense\.ogg/,
       );
       expect(profile.ambientLayers.length).toBeGreaterThan(0);
       expect(profile.preloadHints.length).toBeGreaterThan(0);
@@ -123,7 +127,7 @@ describe("Duel combat SFX routing", () => {
     expect(duelCombatAudioCues(practiceView(), [{
       type: "threat-resolved", threatId: "threat:audio", sourcePlayerId: "player-2",
       targetPlayerId: "player-1", actionId: "siege-lance",
-    }])).toEqual([{ cue: "heavy-impact", delayMs: 0, side: "self" }]);
+    }])).toEqual([{ cue: "lance-impact", delayMs: 0, side: "self" }]);
   });
 
   it("maps confirmed attack events to launch plus impact on the projectile timeline", () => {
@@ -136,14 +140,15 @@ describe("Duel combat SFX routing", () => {
       },
     ]);
 
+    // The LASER weapon is an ion beam now (the typing cannon keeps laser-launch).
     expect(cues).toEqual([
       {
-        cue: "laser-launch",
+        cue: "beam-launch",
         delayMs: 0,
         side: "self",
       },
       {
-        cue: "energy-impact",
+        cue: "beam-impact",
         delayMs: 860,
         side: "self",
       },
@@ -189,14 +194,28 @@ describe("Duel combat SFX routing", () => {
     // stinger once the card shows, then the next-round call.
     expect(cues.map((cue) => cue.cue)).toEqual([
       "warning",
+      "lance-charge",
+      "lance-break",
       "intercept",
       ...DUEL_KO_TIMELINE.chainMs.map(() => "ko-blast"),
       "ko-final",
+      "announce",
       "round-win",
       "round-ready",
     ]);
+    // Your K.O. earns the "Ownage" announcer line right after the final blast.
+    expect(cues.find((cue) => cue.cue === "announce")).toMatchObject({ voice: "ownage", priority: 5 });
     expect(cues.find((cue) => cue.cue === "ko-final")).toMatchObject({ side: "opponent", delayMs: DUEL_KO_TIMELINE.finalMs });
     expect(cues.find((cue) => cue.cue === "round-win")?.delayMs).toBe(DUEL_KO_TIMELINE.bannerMs);
+  });
+
+  it("times the missile salvo and the railgun charge to what flies", () => {
+    const view = practiceView();
+    const missiles = duelCombatAudioCues(view, [{ type: "action-fired", playerId: "player-1", actionId: "missile" }]);
+    expect(missiles.filter((cue) => cue.cue === "missile-launch").map((cue) => cue.delayMs)).toEqual([0, 65, 130]);
+    expect(missiles.filter((cue) => cue.cue === "missile-impact").map((cue) => Math.round(cue.delayMs))).toEqual([860, 920, 980]);
+    const rail = duelCombatAudioCues(view, [{ type: "action-fired", playerId: "player-1", actionId: "railgun" }]);
+    expect(rail.map((cue) => [cue.cue, Math.round(cue.delayMs)])).toEqual([["rail-charge", 0], ["heavy-launch", 619], ["rail-impact", 860]]);
   });
 
   it("deduplicates replayed presentation updates and cancels delayed impact tails on reset", () => {

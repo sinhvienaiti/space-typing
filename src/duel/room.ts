@@ -3,6 +3,50 @@ import {
   type DuelMapId,
 } from "./maps";
 import type { DuelBotPersonality } from "./bots";
+import { CHARACTER_IDS, type CharacterId } from "../characters/registry";
+
+/**
+ * A random hull for a bot, so the rival does not always look the same
+ * (it used to fall back to Reaper every time). `exclude` keeps it off the
+ * player's own ship.
+ */
+export function randomDuelBotCharacter(exclude?: string | null, random: () => number = Math.random): CharacterId {
+  const pool = CHARACTER_IDS.filter((id) => id !== exclude);
+  return pool[Math.floor(random() * pool.length)] ?? "reaper";
+}
+
+/** A deterministic 0…1 generator from a string (FNV-1a, then LCG steps). */
+function seededRandom(text: string): () => number {
+  let state = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    state ^= text.charCodeAt(index);
+    state = Math.imul(state, 16777619) >>> 0;
+  }
+  return () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+}
+
+let practiceBotCharacter: CharacterId | null = null;
+
+/**
+ * The next Practice bot's hull, picked as soon as the lobby opens so its 3D
+ * model can load before the fight; the same pick is used when Practice
+ * starts (takePracticeBotCharacter), then a new one is drawn next time.
+ */
+export function peekPracticeBotCharacter(exclude?: string | null): CharacterId {
+  if (practiceBotCharacter === null || practiceBotCharacter === exclude) {
+    practiceBotCharacter = randomDuelBotCharacter(exclude);
+  }
+  return practiceBotCharacter;
+}
+
+export function takePracticeBotCharacter(exclude?: string | null): CharacterId {
+  const id = peekPracticeBotCharacter(exclude);
+  practiceBotCharacter = null;
+  return id;
+}
 
 export type DuelRoomVisibility = "public" | "private";
 export type DuelRoundFormat = 1 | 3 | 5;
@@ -338,6 +382,8 @@ export class DuelRoom {
     requesterId: string;
     config: DuelRoomBotConfig;
     displayName?: string;
+    /** The bot's hull; a new bot gets a random one, a re-configured bot keeps its own. */
+    characterId?: string | null;
   }): boolean {
     if (
       input.requesterId !== this.ownerParticipantId ||
@@ -352,6 +398,9 @@ export class DuelRoom {
     ) {
       return false;
     }
+    const keep = slot.kind === "bot" ? slot.characterId : null;
+    // Random per room (stable for the same room id, different across rooms).
+    slot.characterId = input.characterId?.trim() || keep || randomDuelBotCharacter(this.slots[0].characterId, seededRandom(this.roomId));
     slot.kind = "bot";
     slot.participantId = "bot:slot-2";
     slot.displayName =
@@ -523,15 +572,23 @@ export function createPracticeDuelRoom(input: {
   displayName: string;
   bot?: Partial<DuelRoomBotConfig>;
   mapId?: DuelMapId;
+  /**
+   * The lobby's match settings (rounds, length, hazards, map mode…). The
+   * Practice button used to drop them and always played one fixed map.
+   */
+  settings?: Partial<DuelRoomSettingsInput>;
 }): DuelRoom {
-  const settings = defaultDuelRoomSettings();
+  const settings: DuelRoomSettingsInput = { ...defaultDuelRoomSettings(), ...input.settings };
   settings.roomName = "Practice Duel";
   settings.visibility = "private";
   settings.password = "local";
-  settings.mapSelection = {
-    mode: "fixed",
-    mapId: input.mapId ?? "frost-wastes",
-  };
+  settings.botAllowed = true;
+  if (input.settings?.mapSelection === undefined) {
+    settings.mapSelection = {
+      mode: "fixed",
+      mapId: input.mapId ?? "frost-wastes",
+    };
+  }
   const room = new DuelRoom({
     roomId: input.roomId,
     ownerParticipantId: input.participantId,

@@ -7,7 +7,7 @@ import "./duel/battle-juice.css";
 import { installDuelOnlineRoomController } from "./duel/online-room-controller";
 import { installDuelBattleUi } from "./duel/battle-ui";
 import { DuelLocalPracticeMatch } from "./duel/local-match";
-import { createPracticeDuelRoom } from "./duel/room";
+import { createPracticeDuelRoom, peekPracticeBotCharacter, takePracticeBotCharacter } from "./duel/room";
 import type { DuelMapId } from "./duel/maps";
 import {
   DuelCombatAudioRouter,
@@ -108,6 +108,7 @@ import {
 import {
   CHARACTER_IDS,
   getCharacter,
+  isCharacterId,
 } from "./characters/registry";
 import {
   drawCharacterShip,
@@ -816,6 +817,15 @@ let credits = 0;
 const combatCreditLedger = new CombatCreditRewardLedger();
 const creditHudPresentation = new CreditHudPresentation();
 let creditHudPulseTimer: number | null = null;
+/** HUD count-up: the number runs to each new value instead of jumping. */
+const CREDIT_HUD_COUNT_MS = 320;
+let creditHudFrom = 0;
+let creditHudTo = 0;
+let creditHudStart = 0;
+let creditHudFrame = 0;
+/** "+N" next to Credits, summed while crystals keep landing. */
+let creditDeltaSum = 0;
+let creditDeltaTimer: number | null = null;
 let progression: ProgressionState = createProgressionState();
 let upgrades: UpgradeState = createUpgradeState();
 let relics: RelicState = createRelicState();
@@ -1180,6 +1190,11 @@ const duelBattle = installDuelBattleUi(
   },
   settings.visualQuality,
 );
+// Opening the Duel lobby starts loading the 3D hull, so the fight never waits on it.
+// (after the dialog has painted).
+byId<HTMLButtonElement>("duelModeButton").addEventListener("click", () => {
+  window.setTimeout(() => duelBattle.preload(settings.visualQuality, characters.selected, peekPracticeBotCharacter(characters.selected)), 350);
+});
 
 function startLocalDuelPractice(
   snapshot: import("./duel/room").DuelRoomSnapshot,
@@ -1191,6 +1206,9 @@ function startLocalDuelPractice(
   // an explicit cosmetic selection. This does not import Campaign stats.
   const practiceRoom = structuredClone(snapshot);
   practiceRoom.slots[0].characterId ??= characters.selected;
+  // The bot flies a random hull: the one picked when the lobby opened, so
+  // its 3D model is already loaded.
+  if (practiceRoom.slots[1].kind === "bot") practiceRoom.slots[1].characterId = takePracticeBotCharacter(practiceRoom.slots[0].characterId);
   localDuelMatch = new DuelLocalPracticeMatch({
     room: practiceRoom,
     seed: seedBuffer[0] ?? 1,
@@ -1256,10 +1274,24 @@ function startDuelVisualStress(
 
 duelOnlineController = installDuelOnlineRoomController({
   clientVersion: "0.1.0",
+  // Fly your selected hull online too; the other player sees it.
+  characterId: () => characters.selected,
+  onRoomSnapshot(room) {
+    // Opponent known in the room lobby: load their 3D hull before the match.
+    const opponent = room.selfSlotIndex === null ? null : room.slots[room.selfSlotIndex === 0 ? 1 : 0];
+    const rival = opponent?.characterId;
+    if (rival !== null && rival !== undefined && isCharacterId(rival)) {
+      duelBattle.preload(settings.visualQuality, characters.selected, rival);
+    }
+  },
   onMatchUpdate(view, events) {
     if (localDuelMatch !== null) {
       stopLocalDuel();
     }
+    // Friend Room / Ranked: the battlefield replaces the lobby, so close the
+    // room dialog once the match is live (Practice already did this).
+    const roomDialog = byId<HTMLDialogElement>("duelRoomDialog");
+    if (roomDialog.open && view.series.status === "active") roomDialog.close();
     duelBattle.setQuality(settings.visualQuality);
     duelBattle.update(view, events);
   },
@@ -1693,6 +1725,53 @@ function hudText(id: string, value: string): void {
   hudDomMetrics.appliedWrites += 1;
 }
 
+/** The Credits number on screen: mid count-up, or the target itself. */
+function creditHudValue(target: number): number {
+  if (target !== creditHudTo) {
+    // Purchases, syncs and resets snap; only pickups count up.
+    creditHudFrom = target;
+    creditHudTo = target;
+    return target;
+  }
+  const t = Math.min(1, (performance.now() - creditHudStart) / CREDIT_HUD_COUNT_MS);
+  const ease = 1 - (1 - t) * (1 - t) * (1 - t);
+  return Math.round(creditHudFrom + (creditHudTo - creditHudFrom) * ease);
+}
+
+function countCreditHudTo(target: number): void {
+  creditHudFrom = creditHudValue(creditHudTo);
+  creditHudTo = target;
+  creditHudStart = performance.now();
+  if (creditHudFrame !== 0) return;
+  const step = (): void => {
+    hudText("creditsHud", creditHudValue(creditHudTo).toLocaleString());
+    if (performance.now() - creditHudStart < CREDIT_HUD_COUNT_MS) {
+      creditHudFrame = window.requestAnimationFrame(step);
+    } else {
+      creditHudFrame = 0;
+    }
+  };
+  creditHudFrame = window.requestAnimationFrame(step);
+}
+
+function showCreditDelta(amount: number, hero: boolean): void {
+  if (amount <= 0) return;
+  creditDeltaSum += amount;
+  const badge = byId("creditsDelta");
+  badge.textContent = "+" + creditDeltaSum.toLocaleString();
+  badge.classList.remove("credit-delta-bump", "credit-delta-out");
+  void badge.offsetWidth;
+  badge.classList.add("credit-delta-show", "credit-delta-bump");
+  badge.classList.toggle("credit-delta-hero", hero);
+  if (creditDeltaTimer !== null) window.clearTimeout(creditDeltaTimer);
+  creditDeltaTimer = window.setTimeout(() => {
+    badge.classList.add("credit-delta-out");
+    badge.classList.remove("credit-delta-show");
+    creditDeltaSum = 0;
+    creditDeltaTimer = null;
+  }, hero ? 1800 : 1300);
+}
+
 function hudWidth(id: string, value: string): void {
   hudDomMetrics.attemptedWrites += 1;
   const element = byId<HTMLElement>(id);
@@ -1716,7 +1795,7 @@ function renderStats(stats: GameStats): void {
   hudText("score", stats.score.toLocaleString());
   hudText(
     "creditsHud",
-    creditHudPresentation.display(credits).toLocaleString(),
+    creditHudValue(creditHudPresentation.display(credits)).toLocaleString(),
   );
   hudText("streak", String(stats.streak));
   hudText("multiplier", "x" + String(stats.multiplier));
@@ -3914,7 +3993,8 @@ const game = new Game(
         event.walletDeltaApplied,
         credits,
       );
-      hudText("creditsHud", display.toLocaleString());
+      countCreditHudTo(display);
+      showCreditDelta(event.walletDeltaApplied, event.hero);
       const hud = byId("creditsHud");
       hud.classList.remove("credit-pulse", "credit-pulse-hero");
       void hud.offsetWidth;

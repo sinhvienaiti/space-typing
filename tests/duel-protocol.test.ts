@@ -238,6 +238,15 @@ describe("Duel M-DUEL-10 authoritative protocol", () => {
     ).toBe(false);
   });
 
+  it("accepts the player's hull with the Ranked queue, and rejects a bad one", () => {
+    expect(parse({ type: "QUEUE_RANKED", requestId: "ranked-2", characterId: "zenith" })).toEqual({
+      ok: true,
+      message: { type: "QUEUE_RANKED", requestId: "ranked-2", characterId: "zenith" },
+    });
+    expect(parse({ type: "QUEUE_RANKED", requestId: "ranked-3", characterId: 7 }).ok).toBe(false);
+    expect(parse({ type: "QUEUE_RANKED", requestId: "ranked-4", extra: true }).ok).toBe(false);
+  });
+
   it("accepts Ranked queue control messages outside combat intent grammar", () => {
     expect(
       parse({

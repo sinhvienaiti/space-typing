@@ -33,6 +33,7 @@ import {
   type DuelWireIntent,
 } from "./protocol";
 import { DUEL_RANKED_RULESET } from "./ranked";
+import { CHARACTER_IDS } from "../characters/registry";
 import { DUEL_ROUND_BREAK_SECONDS } from "./presentation-timing";
 import {
   DuelRoom,
@@ -269,6 +270,8 @@ type AuthoritySession = {
   typeCharTimes: number[];
   roomId: string | null;
   matchId: string | null;
+  /** The hull this player flies in Ranked (sent with QUEUE_RANKED). */
+  characterId?: string | null;
 };
 
 type RoomRecord = {
@@ -1324,6 +1327,16 @@ export class DuelAuthorityService {
     };
   }
 
+  /**
+   * Remembers which hull a player flies before they enter the Ranked queue
+   * (unknown ids are ignored, so the match falls back to the defaults).
+   */
+  setRankedCharacter(sessionId: string, characterId: string | null | undefined): void {
+    const session = this.sessions.get(sessionId);
+    if (session === undefined) return;
+    session.characterId = typeof characterId === "string" && (CHARACTER_IDS as readonly string[]).includes(characterId) ? characterId : null;
+  }
+
   startRankedMatch(
     leftSessionId: string,
     rightSessionId: string,
@@ -1407,12 +1420,13 @@ export class DuelAuthorityService {
         "player-2": rightSessionId,
       },
       appearance: {
+        // Each player's own hull; defaults only when a client did not send one.
         "player-1": {
-          characterId: "vanguard",
+          characterId: left.characterId ?? "vanguard",
           shipId: null,
         },
         "player-2": {
-          characterId: "reaper",
+          characterId: right.characterId ?? "reaper",
           shipId: null,
         },
       },
