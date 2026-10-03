@@ -480,10 +480,45 @@ import { CombatFxSystem, drawBossAura, drawEnemyShot } from "./vfx/combat-fx";
 import { familyStyle, kindArchetype, kindMotionPose, type MotionPose } from "./enemies/identity";
 import {
   drawPaintedSprite,
+  paintedBossArtUrl,
   paintedBossSprite,
   paintedEnemySprite,
   preloadPaintedSprites,
 } from "./enemies/painted-sprites";
+import { BossRelief, type BossReliefPose } from "./boss/boss-relief";
+import {
+  BossCallouts,
+  COUNTER_COLOR,
+  depthLaneX,
+  depthMeteorPoint,
+  depthMeteorTarget,
+  drawBossCharge,
+  drawBossSkill,
+  drawCounterPrompt,
+  drawSkillCallout,
+  drawUltimateBanner,
+  drawUltimateFrame,
+  type DepthGeometry,
+} from "./boss/depth-view";
+import {
+  bossCounterOpen,
+  bossCounterPerfect,
+  bossSkillDamage,
+  bossSkillName,
+  bossSkillProgress,
+  bossUltimatePhase,
+  chooseBossSkill,
+  interceptBossMeteor,
+  seededBossRng,
+  startBossSkill,
+  tickBossSkill,
+  typeBossCounter,
+  type BossCounterKind,
+  type BossSkillEvent,
+  type BossSkillKind,
+  type BossSkillState,
+  type Rng as BossRng,
+} from "./boss/skills";
 import {
   bossFullName,
   bossIdentityForStage,
@@ -767,6 +802,19 @@ const ENEMY_SPRITE_SCALE = 2.7;
  * Keep this presentation-only: hit radius and boss gameplay stay unchanged.
  * High/Ultra also use the detailed @2x source in painted-sprites.ts.
  */
+/** Seconds the defeated boss relief tumbles away; the ultimate banner shows. */
+const BOSS_WRECK_SECONDS = 1.8;
+const BOSS_BANNER_SECONDS = 2.2;
+
+/** What to do, under a boss skill's name while its counter is open. */
+const BOSS_COUNTER_HINT: Readonly<Record<BossCounterKind, string>> = {
+  parry: "Type it to reflect the beam",
+  dodge: "Type it to dash to the safe lane",
+  brace: "Type it to brace, then strike back",
+  break: "Type it to break the chain",
+  intercept: "Type the letters to shoot the meteors down",
+};
+
 function bossSpriteScale(quality: GameSettings["visualQuality"]): number {
   if (quality === "ultra") return 3.35;
   if (quality === "high") return 3.25;
@@ -933,6 +981,39 @@ export class Game {
   private readonly combatFx = new CombatFxSystem();
   /** Who the current boss is (name, look, volley patterns, voice). */
   private bossIdentity: BossIdentity | null = null;
+  /**
+   * Boss Depth View (campaign, not Recall): the boss far up the corridor as a
+   * lit 3D relief, skills with typed counters (src/boss/skills.ts) and their
+   * drawing (src/boss/depth-view.ts).
+   */
+  private bossSkill: BossSkillState | null = null;
+  private bossSkillCooldowns: Partial<Record<BossSkillKind, number>> = {};
+  private bossSkillLast: BossSkillKind | null = null;
+  private bossSkillRng: BossRng = seededBossRng(1);
+  private bossUltimateQueued = false;
+  private bossUltimateCast = false;
+  /** Successful counters in a row (more Rage each time; reset by a failed one). */
+  private bossCounterChain = 0;
+  /** After a braced rush: the boss takes ×1.5 damage. */
+  private bossExposedTimer = 0;
+  private bossRelief: BossRelief | null = null;
+  private bossReliefKey: string | null = null;
+  /** Fly-in from the vanishing point, 0 → 1. */
+  private bossIntro = 1;
+  /** The defeated boss tumbling away (keeps the relief on screen briefly). */
+  private bossWreck: { t: number; x: number; y: number; size: number; spin: number } | null = null;
+  private readonly bossCallouts = new BossCallouts();
+  /** Ship side-step (CSS px) for a dodged quake. */
+  private bossDodge = 0;
+  private bossDodgeTarget = 0;
+  /** Ultimate letterbox 0 … 1 and the banner clock (seconds left). */
+  private bossUltimateK = 0;
+  private bossBanner = 0;
+  private bossBannerText = "";
+  /** Rush lunge 0 … 1 (the boss comes up close, then pulls back). */
+  private bossSurge = 0;
+  /** Flight-streak vanishing point at the boss (null = the default one). */
+  private bossVanish: { x: number; y: number } | null = null;
   private readonly motionPose: MotionPose = { dx: 0, dy: 0, rotation: 0, scaleX: 1, scaleY: 1, alpha: 1 };
   /** Tractor Beam: enemies being hauled back up the field. */
   private tractorPulls: Array<{ enemyId: number; remaining: number; speed: number }> = [];
@@ -1095,6 +1176,7 @@ export class Game {
           });
     this.refreshSkillDefinitions();
     this.sfx.setVolume(settings.sfxVolume);
+    this.sfx.setCreditVolume(settings.creditVolume ?? 1);
     this.resize();
     this.backgroundStage?.setWorld(this.worldSceneProfile.worldId);
     preloadShotArt(this.characterId);
@@ -1183,16 +1265,23 @@ export class Game {
     if (this.flightReducedMotion?.matches === true) return;
     const heat = clamp(this.stats.streak / 40, 0, 1);
     const moving = this.phase === "playing" && this.hitStopTimer <= 0;
-    this.flightField.update(moving ? dt : 0, 2.1 + heat * 2.2 + (this.overdriveTimer > 0 ? 1.4 : 0));
+    this.flightField.update(
+      moving ? dt : 0,
+      2.1 + heat * 2.2 + (this.overdriveTimer > 0 ? 1.4 : 0) + this.bossUltimateK * 1.6,
+    );
+    // Boss Depth View: the corridor runs to the boss (and stays there for the
+    // rest of the stage once it is down).
+    if (this.boss !== null && this.bossDepthActive()) this.bossVanish = this.bossPosition();
+    const vanish = this.bossVanish;
     this.flightField.draw(
       this.context,
       this.settings.visualQuality,
-      this.width / 2,
-      this.height * 0.06,
+      vanish?.x ?? this.width / 2,
+      vanish?.y ?? this.height * 0.06,
       Math.min(this.width, this.height) * 0.62,
       Math.max(0.3, heat),
       "#cfe6ff",
-      true,
+      vanish === null,
     );
   }
 
@@ -1917,9 +2006,19 @@ export class Game {
     return true;
   }
 
+  /** Starts a boss skill now (Depth View), e.g. "lance", "quake", "cataclysm". */
+  testLabForceBossSkill(kind: BossSkillKind): boolean {
+    if (!this.testLabEnabled || this.boss === null || !this.bossDepthActive()) return false;
+    this.bossSkill = null;
+    this.bossIntro = 1;
+    this.startBossSkillCast(this.boss, kind);
+    return true;
+  }
+
   testLabClearBoss(): boolean {
     if (!this.testLabEnabled) return false;
     this.boss = null;
+    this.resetBossPresentation(1);
     this.bossSpawned = false;
     this.bossDefeated = false;
     this.bossRewardPending = false;
@@ -2200,6 +2299,7 @@ export class Game {
     this.recallBonus = null;
     this.recallBonusPending = false;
     this.boss = null;
+    this.resetBossPresentation(1);
     this.bossSpawned = false;
     this.bossDefeated = false;
     this.bossRewardPending = false;
@@ -3582,6 +3682,7 @@ export class Game {
       this.settings.visualQuality !== settings.visualQuality;
     this.settings = settings;
     this.sfx.setVolume(settings.sfxVolume);
+    this.sfx.setCreditVolume(settings.creditVolume ?? 1);
     if (qualityChanged) {
       this.adaptiveRenderBudget.reset();
       this.adaptiveResizePending = false;
@@ -3812,6 +3913,8 @@ export class Game {
     this.rewardNotice = null;
     this.celestialCharge = 0;
     this.preloadStagePaintedSprites(stage.stage);
+    this.resetBossPresentation(stage.stage * 7919 + 13);
+    this.prepareBossDepth(stage);
     this.perkKills = 0;
     this.perkPerfectKills = 0;
     this.perkPerfectWords = 0;
@@ -3925,6 +4028,7 @@ export class Game {
     this.anomalyResolutionPending = false;
     this.anomalyRiskRatio = 0;
     this.boss = null;
+    this.resetBossPresentation(1);
     this.bossRewardPending = false;
     this.bossRewardPrompt = null;
     this.hooks.onBossUpdate(null);
@@ -3957,6 +4061,7 @@ export class Game {
     if (!/^[a-z]$/.test(key)) return;
 
     this.sfx.unlock();
+    if (this.typeBossSkillKey(key)) return;
     const target = this.currentTarget();
 
     if (target !== null) {
@@ -4220,6 +4325,7 @@ export class Game {
     this.guardianTimer = Math.max(0, this.guardianTimer - dt);
     this.markTimer = Math.max(0, this.markTimer - dt);
     this.bossMarkTimer = Math.max(0, this.bossMarkTimer - dt);
+    this.bossExposedTimer = Math.max(0, this.bossExposedTimer - dt);
     this.gravityWellTimer = Math.max(0, this.gravityWellTimer - dt);
     this.cloakTimer = Math.max(0, this.cloakTimer - dt);
     this.phoenixGraceTimer = Math.max(
@@ -4495,6 +4601,7 @@ export class Game {
       this.boss.flash = Math.max(0, this.boss.flash - dt * 7);
       this.boss.kick = Math.max(0, this.boss.kick - dt * 4);
     }
+    this.updateBossPresentation(dt);
 
     let liveLasers = 0;
     for (const laser of this.lasers) {
@@ -4620,6 +4727,12 @@ export class Game {
       mechanic.id === "shield-sequence" &&
       mechanic.active;
     this.bossIdentity = bossIdentityForStage(bossVisualStage, this.boss.role);
+    this.resetBossPresentation(stage.stage * 7919 + 13);
+    if (this.bossDepthActive()) {
+      // Flies in from the vanishing point (the relief is usually preloaded).
+      this.bossIntro = 0;
+      this.loadBossRelief(this.bossIdentity);
+    }
     this.boss.name =
       bossFullName(this.bossIdentity) +
       (difficulty.bossMutationLabel === undefined
@@ -4705,6 +4818,11 @@ export class Game {
       }
     }
 
+    // Depth View skills (lance, quake, rush, siphon, ultimate) run first: a
+    // hit in flight still lands while the boss is staggered.
+    const skillBusy = this.updateBossSkill(boss, dt);
+    if (this.boss !== boss) return;
+
     if (boss.staggerTimer > 0) {
       const wasStaggered = boss.staggerTimer > 0;
       boss.staggerTimer = Math.max(0, boss.staggerTimer - dt);
@@ -4718,10 +4836,27 @@ export class Game {
       return;
     }
 
+    if (skillBusy) return;
+    if (this.bossUltimateQueued) {
+      this.bossUltimateQueued = false;
+      this.startBossSkillCast(boss, "cataclysm");
+      return;
+    }
+
     boss.actionCooldown -= dt;
     if (boss.actionCooldown > 0) return;
 
-    this.fireBossProjectiles(boss);
+    // Each action is a Glyph Volley (the classic letter shots) or a skill
+    // with a typed counter; the next action waits until a skill has ended.
+    const kind = chooseBossSkill(
+      boss.role,
+      boss.phase,
+      this.bossSkillCooldowns,
+      this.bossSkillLast,
+      this.bossSkillRng,
+    );
+    if (kind === "volley") this.fireBossProjectiles(boss);
+    else this.startBossSkillCast(boss, kind);
     boss.actionCooldown =
       (bossActionInterval(boss.role, boss.phase) *
         (boss.typingMechanic === undefined
@@ -4785,6 +4920,353 @@ export class Game {
     }
 
     this.sfx.enemyShot();
+  }
+
+  // --- Boss Depth View: skills and counters ----------------------------------
+
+  /** Campaign bosses use the Depth View; Recall keeps its word-card layout. */
+  private bossDepthActive(): boolean {
+    return this.gameplayMode !== "recall";
+  }
+
+  /**
+   * Box edge of the far boss (CSS px). Small enough to read as distant; the
+   * relief is rendered at this size × device pixels, so it stays sharp.
+   */
+  private bossDepthSize(role: BossState["role"]): number {
+    const factor = role === "major-boss" ? 0.3 : role === "boss" ? 0.28 : 0.25;
+    // Narrow (phone) screens: at most half the width, so it still reads as far.
+    const base = Math.min(clamp(this.height * factor, 150, 330), this.width * 0.5);
+    const intro = 1 - (1 - this.bossIntro) ** 3;
+    return base * (0.18 + 0.82 * intro) * (1 + this.bossSurge * 0.32);
+  }
+
+  private bossDepthGeometry(role: BossState["role"]): DepthGeometry {
+    const { x, y } = this.bossPosition();
+    const ship = this.shipCenter();
+    return {
+      width: this.width,
+      height: this.height,
+      bossX: x,
+      bossY: y,
+      bossSize: this.bossDepthSize(role),
+      shipX: ship.x,
+      shipY: ship.y,
+    };
+  }
+
+  /** Clears skills, fly-in, wreck and callouts (stage start, test lab). */
+  private resetBossPresentation(seed: number): void {
+    this.bossSkill = null;
+    this.bossSkillCooldowns = {};
+    this.bossSkillLast = null;
+    this.bossSkillRng = seededBossRng(seed);
+    this.bossUltimateQueued = false;
+    this.bossUltimateCast = false;
+    this.bossCounterChain = 0;
+    this.bossExposedTimer = 0;
+    this.bossIntro = 1;
+    this.bossWreck = null;
+    this.bossCallouts.clear();
+    this.bossDodge = 0;
+    this.bossDodgeTarget = 0;
+    this.bossUltimateK = 0;
+    this.bossBanner = 0;
+    this.bossSurge = 0;
+    this.bossVanish = null;
+  }
+
+  /** Builds this stage's boss relief ahead of the fight (not on Low). */
+  private prepareBossDepth(stage: StageConfig): void {
+    if (!isBossStageRole(stage.role) || !this.bossDepthActive()) return;
+    const visualStage = this.hiddenEncounterRuntime?.bossStageOverride ?? stage.stage;
+    this.loadBossRelief(bossIdentityForStage(visualStage, stage.role));
+  }
+
+  private loadBossRelief(identity: BossIdentity): void {
+    if (this.settings.visualQuality === "low" || !BossRelief.supported()) return;
+    const url = paintedBossArtUrl(identity.id);
+    if (url === undefined) return;
+    const key = identity.id + "|" + url;
+    if (this.bossReliefKey === key) return;
+    this.bossReliefKey = key;
+    this.bossRelief?.dispose();
+    this.bossRelief = null;
+    void BossRelief.load(url, identity.primary, identity.accent).then((relief) => {
+      if (this.bossReliefKey !== key) {
+        relief?.dispose();
+        return;
+      }
+      this.bossRelief = relief;
+    });
+  }
+
+  /** Telegraph length scales with the stage's pace, never below a typeable window. */
+  private startBossSkillCast(boss: BossState, kind: BossSkillKind): void {
+    const difficulty = this.difficulty;
+    const windup =
+      difficulty === null
+        ? 1
+        : clamp(
+            difficulty.attackIntervalFactor / Math.max(0.75, difficulty.bossPressure),
+            0.65,
+            1.2,
+          );
+    const skill = startBossSkill(kind, boss.role, boss.phase, this.bossSkillRng, windup);
+    this.bossSkill = skill;
+    this.bossSkillCooldowns[kind] = skill.spec.cooldown;
+    if (kind !== "cataclysm") this.bossSkillLast = kind;
+    const identity = this.bossIdentity;
+    this.sfx.bossSkillCharge(kind, identity?.voice ?? 1);
+    if (kind === "cataclysm") {
+      this.bossBannerText =
+        "ULTIMATE · " + bossSkillName(kind, identity?.family ?? "devil").toUpperCase();
+      this.bossBanner = BOSS_BANNER_SECONDS;
+      if (identity !== null) {
+        this.sfx.bossRoar(identity.voice * 0.95, familyStyle(identity.family).material);
+      }
+      if (this.settings.screenShake) this.shake = Math.max(this.shake, 6);
+    }
+  }
+
+  /**
+   * Runs the active skill and the cooldowns. True while a skill plays (the
+   * boss takes no other action). A staggered boss holds its wind-up, which
+   * gives more time to counter; a hit already in flight still lands.
+   */
+  private updateBossSkill(boss: BossState, dt: number): boolean {
+    for (const kind of Object.keys(this.bossSkillCooldowns) as BossSkillKind[]) {
+      this.bossSkillCooldowns[kind] = Math.max(0, (this.bossSkillCooldowns[kind] ?? 0) - dt);
+    }
+    const skill = this.bossSkill;
+    if (skill === null) return false;
+    if (skill.stage === "telegraph" && boss.staggerTimer > 0) return true;
+    for (const event of tickBossSkill(skill, dt)) {
+      this.onBossSkillEvent(boss, skill, event);
+      // A reflected beam can finish the boss.
+      if (this.bossSkill !== skill) return false;
+    }
+    if (skill.ended) {
+      this.bossSkill = null;
+      this.bossDodgeTarget = 0;
+      return false;
+    }
+    return true;
+  }
+
+  private onBossSkillEvent(boss: BossState, skill: BossSkillState, event: BossSkillEvent): void {
+    const ship = this.shipCenter();
+    switch (event.type) {
+      case "release":
+        this.sfx.bossSkillRelease(skill.kind);
+        if (skill.kind === "tether" && event.countered) {
+          // Broken before it attached.
+          this.resolveBossCounter(boss, skill);
+        }
+        if (skill.kind === "surge" && this.settings.screenShake) {
+          this.shake = Math.max(this.shake, 4);
+        }
+        return;
+      case "impact": {
+        if (event.countered) {
+          this.resolveBossCounter(boss, skill);
+          return;
+        }
+        this.applyPlayerDamage(ship.x, ship.y - 24, bossSkillDamage(skill.spec, event.typedRatio));
+        this.sfx.bossSkillHit(skill.kind);
+        const color = this.bossIdentity?.primary ?? "#ff5d8f";
+        this.skillFx.flash(color, 0.22, 0.35);
+        if (this.settings.screenShake) {
+          this.shake = Math.max(this.shake, skill.kind === "quake" ? 12 : 9);
+        }
+        return;
+      }
+      case "drain": {
+        // Siphon: hull flows up the chain to the boss.
+        this.applyPlayerDamage(ship.x, ship.y - 24, skill.spec.damage);
+        boss.hp = Math.min(boss.maxHp, boss.hp + boss.maxHp * 0.006);
+        this.hooks.onBossUpdate(toBossHud(boss));
+        return;
+      }
+      case "meteor-land": {
+        const geometry = this.bossDepthGeometry(boss.role);
+        const target = depthMeteorTarget(geometry, event.meteor);
+        this.burst(target.x, target.y, 26, 24);
+        this.applyPlayerDamage(ship.x, ship.y - 24, skill.spec.damage);
+        this.sfx.bossSkillHit("cataclysm");
+        if (this.settings.screenShake) this.shake = Math.max(this.shake, 8);
+        return;
+      }
+      case "end":
+        if (skill.result === "failed") this.bossCounterChain = 0;
+        if (
+          skill.kind === "cataclysm" &&
+          skill.meteors.length > 0 &&
+          skill.meteors.every((meteor) => meteor.state === "destroyed")
+        ) {
+          // Every meteor shot down: the boss reels.
+          this.bossCallouts.add("FLAWLESS!", COUNTER_COLOR.intercept, ship.x, ship.y - 130);
+          this.sfx.bossCounter("parry", true);
+          this.hitBossWithCounter(boss, 0.04, 1.6);
+        }
+        return;
+    }
+  }
+
+  /** A counter landed: the reward depends on the skill. */
+  private resolveBossCounter(boss: BossState, skill: BossSkillState): void {
+    const perfect = bossCounterPerfect(skill);
+    this.bossCounterChain += 1;
+    this.gainPower(6 + Math.min(4, this.bossCounterChain) * 3 + (perfect ? 6 : 0));
+    this.addScore((perfect ? 260 : 160) * this.stats.multiplier);
+    switch (skill.kind) {
+      case "lance": {
+        // The beam goes back up the corridor into the boss.
+        const share =
+          (boss.role === "mini-boss" ? 0.07 : boss.role === "boss" ? 0.055 : 0.045) *
+          (perfect ? 1.5 : 1);
+        this.hitBossWithCounter(boss, share, perfect ? 1.6 : 1.1);
+        break;
+      }
+      case "surge":
+        this.bossExposedTimer = perfect ? 5 : 3.5;
+        boss.staggerTimer = Math.max(boss.staggerTimer, 0.8);
+        this.hooks.onBossUpdate(toBossHud(boss));
+        break;
+      case "tether":
+        this.hitBossWithCounter(boss, 0.03, perfect ? 1.8 : 1.3);
+        break;
+      default:
+        break;
+    }
+    this.emitStats();
+  }
+
+  /**
+   * Counter damage follows the typing rules: a shield or an armour part takes
+   * no damage (the boss is still staggered).
+   */
+  private hitBossWithCounter(boss: BossState, share: number, stagger: number): void {
+    if (!boss.shieldActive && this.activeBossPart(boss) === null) {
+      boss.hp = Math.max(0, boss.hp - boss.maxHp * share * this.characterBossDamageMultiplier());
+    }
+    boss.flash = 1;
+    boss.kick = 1.5;
+    boss.staggerTimer = Math.max(boss.staggerTimer, stagger);
+    const { x, y } = this.bossPosition();
+    this.burst(x, y, 30, 190);
+    this.sfx.bossStagger();
+    if (this.settings.screenShake) this.shake = Math.max(this.shake, 7);
+    this.hooks.onBossUpdate(toBossHud(boss));
+    if (boss.hp <= 0) {
+      this.defeatBoss();
+      return;
+    }
+    this.updateBossPhase(boss);
+  }
+
+  /**
+   * Boss skill keys come first: a counter word in its window, or a falling
+   * meteor's letter. A key that continues a word already in progress (an
+   * enemy, or the boss word) stays there until the counter has started.
+   */
+  private typeBossSkillKey(key: string): boolean {
+    const boss = this.boss;
+    const skill = this.bossSkill;
+    if (boss === null || skill === null) return false;
+    const target = this.currentTarget();
+    const targetWants =
+      target !== null && typingText(target.entry.en)[target.typed] === key;
+
+    if (skill.kind === "cataclysm") {
+      if (targetWants) return false;
+      const meteor = skill.meteors.find(
+        (item) => item.state === "falling" && item.char === key,
+      );
+      if (meteor === undefined) return false;
+      const point = depthMeteorPoint(this.bossDepthGeometry(boss.role), skill, meteor);
+      // Only meteors already on their way (their letter is visible).
+      if (point === null || interceptBossMeteor(skill, key) === null) return false;
+      this.shootBossMeteor(point);
+      return true;
+    }
+
+    if (!bossCounterOpen(skill) || skill.word === null || skill.word[skill.typed] !== key) {
+      return false;
+    }
+    if (skill.typed === 0) {
+      if (targetWants) return false;
+      if (boss.typed > 0 && typingText(boss.entry.en)[boss.typed] === key) return false;
+    }
+    const result = typeBossCounter(skill, key);
+    if (result === "ignored") return false;
+    this.countBossSkillKey();
+    this.sfx.bossCounterKey(skill.typed / skill.word.length);
+    if (result === "complete") this.completeBossCounter(skill);
+    this.emitStats();
+    return true;
+  }
+
+  /** Counter letters and meteor shots are correct keys (streak, accuracy). */
+  private countBossSkillKey(): void {
+    this.stats.hits += 1;
+    this.stats.streak += 1;
+    this.stats.maxStreak = Math.max(this.stats.maxStreak, this.stats.streak);
+    this.stats.multiplier = multiplierForStreak(this.stats.streak);
+    this.applyCharacterCorrectKeyPassive();
+  }
+
+  /** The counter word is in: instant feedback (rewards land with the hit). */
+  private completeBossCounter(skill: BossSkillState): void {
+    const counter = skill.spec.counter;
+    if (counter === "intercept") return;
+    const ship = this.shipCenter();
+    const perfect = bossCounterPerfect(skill);
+    const color = COUNTER_COLOR[counter];
+    const label =
+      counter === "parry"
+        ? "PARRY!"
+        : counter === "dodge"
+          ? "DODGE!"
+          : counter === "brace"
+            ? "BRACED!"
+            : "CHAIN BROKEN!";
+    this.bossCallouts.add((perfect ? "PERFECT " : "") + label, color, ship.x, ship.y - 130);
+    this.sfx.bossCounter(counter, perfect);
+    this.skillFx.pulse(ship.x, ship.y, color, 120, 3, 0.5);
+    if (counter === "dodge" && this.boss !== null) {
+      const geometry = this.bossDepthGeometry(this.boss.role);
+      this.bossDodgeTarget = depthLaneX(geometry, skill.safeLane - 1) - this.width / 2;
+    } else if (counter === "brace" || counter === "parry") {
+      this.skillFx.halo(() => this.shipCenter(), color, 110, 10, 1.1);
+    }
+  }
+
+  private shootBossMeteor(point: { x: number; y: number }): void {
+    this.countBossSkillKey();
+    this.addScore(45 * this.stats.multiplier);
+    this.gainPower(3);
+    const x = point.x;
+    const y = point.y;
+    this.firePlayerShot(
+      x,
+      y,
+      1.2,
+      {
+        kind: "bonus-hit",
+        aim: (out) => {
+          out.x = x;
+          out.y = y;
+        },
+        hue: 24,
+        count: 22,
+      },
+      0.16,
+    );
+    this.projectileImpacts.push({ x, y, life: 0.34, maxLife: 0.34, radius: 26 });
+    if (this.projectileImpacts.length > 12) this.projectileImpacts.shift();
+    if (!this.sfx.playSample("duel-intercept")) this.sfx.projectileIntercept();
+    this.emitStats();
   }
 
   private updateStageObjective(
@@ -4851,6 +5333,7 @@ export class Game {
     this.anomalyResolutionPending = false;
     this.anomalyRiskRatio = 0;
     this.boss = null;
+    this.resetBossPresentation(1);
     this.hooks.onBossUpdate(null);
 
     const stageSession =
@@ -6539,6 +7022,20 @@ export class Game {
       Math.max(0.75, this.difficulty?.bossPressure ?? 1) /
       Math.max(1, this.difficulty?.bossActionRateMultiplier ?? 1);
 
+    const ultimatePhase = bossUltimatePhase(boss.role);
+    if (
+      presentation &&
+      this.bossDepthActive() &&
+      !this.bossUltimateCast &&
+      ultimatePhase !== null &&
+      boss.phase >= ultimatePhase
+    ) {
+      // The ultimate opens the new phase once the current skill is done
+      // (once per fight, even when a big hit skips a phase).
+      this.bossUltimateQueued = true;
+      this.bossUltimateCast = true;
+    }
+
     if (presentation) {
       const { x, y } = this.bossPosition();
       const fx = enemyFxProfile(
@@ -6633,6 +7130,20 @@ export class Game {
       this.combatFx.bossDeath(x, y, this.bossRadius(boss.role), identity.primary, identity.accent, style.death, style);
       this.sfx.enemyDeath(style.material, 1.6, 0);
     }
+    if (this.bossDepthActive() && this.bossRelief !== null) {
+      // The relief tumbles away behind the explosion.
+      this.bossWreck = {
+        t: 0,
+        x,
+        y,
+        size: this.bossDepthSize(boss.role),
+        spin: Math.random() < 0.5 ? -1 : 1,
+      };
+    }
+    this.bossSkill = null;
+    this.bossUltimateQueued = false;
+    this.bossExposedTimer = 0;
+    this.bossDodgeTarget = 0;
     this.bossIdentity = null;
     this.tryRollEquipmentDrop("boss");
     if (definition !== undefined) {
@@ -8214,6 +8725,9 @@ export class Game {
   private characterBossDamageMultiplier(): number {
     let multiplier = 1;
 
+    // Braced a rush: the boss is open for a moment.
+    if (this.bossExposedTimer > 0) multiplier *= 1.5;
+
     if (this.perks.momentumStreak > 0 && this.stats.streak >= this.perks.momentumStreak) {
       multiplier *= 1 + this.perks.momentumDamage;
     }
@@ -9161,7 +9675,8 @@ export class Game {
   private shipDrawOptions(time: number): CharacterDrawOptions {
     const quality = qualityProfile(this.settings.visualQuality);
     return {
-      x: this.width / 2,
+      // A dodged boss quake side-steps the ship into the safe lane.
+      x: this.width / 2 + this.bossDodge,
       y: this.height - PLAYER_Y_OFFSET,
       time,
       scale: 1,
@@ -9341,6 +9856,10 @@ export class Game {
       return;
     }
     this.drawFlightStreaks(time);
+    // Boss ultimate: tint and cinematic bars under the combat layer.
+    if (this.bossUltimateK > 0.001) {
+      drawUltimateFrame(context, this.width, this.height, this.bossUltimateK);
+    }
     if (this.novaPulseRemaining > 0) this.drawNovaPulse();
     if (this.interferenceTimer > 0) {
       this.drawInterference(time);
@@ -9355,7 +9874,10 @@ export class Game {
     this.drawProjectileImpacts();
     this.creditPickups.draw(context, this.settings.visualQuality);
 
+    // Depth View: boss shots fly toward the camera, so they draw over the boss.
+    const bossShotsLate = this.boss !== null && this.bossDepthActive();
     for (const projectile of this.projectiles) {
+      if (bossShotsLate && projectile.ownerId === -1) continue;
       this.drawProjectile(projectile);
     }
     for (const projectile of this.interceptedProjectiles) {
@@ -9392,6 +9914,13 @@ export class Game {
 
     if (this.boss !== null) {
       this.drawBoss(time);
+      if (bossShotsLate) {
+        for (const projectile of this.projectiles) {
+          if (projectile.ownerId === -1) this.drawProjectile(projectile);
+        }
+      }
+    } else if (this.bossWreck !== null) {
+      this.drawBossWreck();
     }
 
     this.playerShots.drawImpacts(context, this.settings.visualQuality);
@@ -9404,6 +9933,7 @@ export class Game {
     this.skillFx.drawPersistentOver(context, fxState);
     this.drawDefensiveEffects(time);
     this.drawTargetLine();
+    this.drawBossSkillLayer(time);
     this.drawRewardNotice();
     this.drawEnemyControlOverlay();
 
@@ -9779,6 +10309,16 @@ export class Game {
 
     context.save();
     context.translate(projectile.x, projectile.y);
+    // Depth View: a boss shot starts small far away and grows as it nears
+    // (the letter keeps its size so it stays readable).
+    const depth =
+      projectile.ownerId === -1 && this.boss !== null && this.bossDepthActive()
+        ? this.bossShotDepthScale(projectile.y)
+        : 1;
+    if (depth !== 1) {
+      context.save();
+      context.scale(depth, depth);
+    }
 
     if (brightWorld) {
       context.globalCompositeOperation = "source-over";
@@ -9827,6 +10367,7 @@ export class Game {
       context.fill();
       context.stroke();
     }
+    if (depth !== 1) context.restore();
 
     context.globalCompositeOperation = "source-over";
     context.fillStyle = "#fff8fb";
@@ -9838,6 +10379,14 @@ export class Game {
     context.fillText(projectile.char.toUpperCase(), 0, 0);
 
     context.restore();
+  }
+
+  /** 0.6 at the boss … 1.05 at the ship row (perspective, far shrinks fast). */
+  private bossShotDepthScale(y: number): number {
+    const bossY = this.bossPosition().y;
+    const shipY = this.height - PLAYER_Y_OFFSET;
+    const u = clamp((y - bossY) / Math.max(1, shipY - bossY), 0, 1);
+    return 0.6 + 0.45 * u * u;
   }
 
   // --- Skill signatures -------------------------------------------------------
@@ -10395,6 +10944,21 @@ export class Game {
   }
 
   private bossPosition(): { x: number; y: number } {
+    if (this.bossDepthActive()) {
+      // Depth View: far up the corridor, drifting slowly across it; flies in
+      // from the vanishing point and lunges closer during a rush.
+      const intro = 1 - (1 - this.bossIntro) ** 3;
+      const restY = clamp(this.height * 0.25, 140, 250);
+      const farY = this.height * 0.08;
+      const sway =
+        Math.sin(this.lastDrawTime * 0.38) *
+        Math.min(this.width * 0.06, 96) *
+        (1 - this.bossSurge);
+      return {
+        x: this.width / 2 + sway * intro,
+        y: farY + (restY - farY) * intro + this.bossSurge * this.height * 0.06,
+      };
+    }
     return {
       x: this.width / 2,
       // Keep the boss in the upper combat field so its artwork has room below
@@ -10407,6 +10971,10 @@ export class Game {
   private drawBoss(time: number): void {
     const boss = this.boss;
     if (boss === null) return;
+    if (this.bossDepthActive()) {
+      this.drawBossDepth(boss, time);
+      return;
+    }
 
     const context = this.context;
     const { x, y } = this.bossPosition();
@@ -10558,6 +11126,284 @@ export class Game {
         ? radius
         : Math.max(radius, paintedSize * 0.5);
     this.drawBossWord(boss, x, y, wordClearance);
+  }
+
+  /** Depth View clocks: fly-in, dodge, rush lunge, ultimate frame, wreck. */
+  private updateBossPresentation(dt: number): void {
+    this.bossCallouts.update(dt);
+    this.bossIntro = Math.min(1, this.bossIntro + dt / 1.3);
+    this.bossDodge += (this.bossDodgeTarget - this.bossDodge) * Math.min(1, dt * 12);
+    const skill = this.bossSkill;
+    const ultimate =
+      skill !== null && skill.kind === "cataclysm" && skill.stage !== "recovery";
+    this.bossUltimateK = clamp(this.bossUltimateK + (ultimate ? dt * 3 : -dt * 2), 0, 1);
+    this.bossBanner = Math.max(0, this.bossBanner - dt);
+    let surge = 0;
+    if (skill !== null && skill.kind === "surge") {
+      // Pulls back while it winds up, then rushes the camera.
+      surge =
+        skill.stage === "release"
+          ? Math.sin(Math.PI * bossSkillProgress(skill))
+          : skill.stage === "telegraph"
+            ? -0.12 * bossSkillProgress(skill)
+            : 0;
+    }
+    this.bossSurge += (surge - this.bossSurge) * Math.min(1, dt * 14);
+    // The ship slides back once the quake has rolled past.
+    if (skill !== null && skill.kind === "quake" && skill.stage === "recovery") {
+      this.bossDodgeTarget = 0;
+    }
+    if (this.bossWreck !== null) {
+      this.bossWreck.t += dt;
+      if (this.bossWreck.t >= BOSS_WRECK_SECONDS) this.bossWreck = null;
+    }
+  }
+
+  /** Depth View boss: aura, 3D relief (the painting on Low), state rings, word. */
+  private drawBossDepth(boss: BossState, time: number): void {
+    const context = this.context;
+    const { x, y } = this.bossPosition();
+    const size = this.bossDepthSize(boss.role);
+    const lift = boss.kick * 6;
+    const identity = this.bossIdentity;
+    const quality = this.settings.visualQuality;
+    const skill = this.bossSkill;
+    const charging =
+      skill !== null && skill.kind !== "volley" && skill.stage === "telegraph"
+        ? bossSkillProgress(skill)
+        : 0;
+    // The siphon's long release keeps only a faint light.
+    const casting =
+      skill !== null && skill.kind !== "volley" && skill.stage === "release"
+        ? (1 - bossSkillProgress(skill)) * (skill.kind === "tether" ? 0.3 : 1)
+        : 0;
+
+    if (identity !== null) {
+      drawBossAura(
+        context,
+        identity.aura,
+        x,
+        y - lift,
+        size * 0.24,
+        time,
+        identity.primary,
+        identity.accent,
+        boss.phase >= 3 ? 1.3 : boss.phase === 2 ? 1.12 : 1,
+        quality,
+      );
+      if (skill !== null) {
+        drawBossCharge(
+          context,
+          skill,
+          this.bossDepthGeometry(boss.role),
+          { primary: identity.primary, accent: identity.accent },
+          time,
+          quality,
+        );
+      }
+    }
+
+    let drawn = false;
+    const relief = this.bossRelief;
+    if (relief !== null && relief.available && identity !== null) {
+      const lean =
+        skill !== null && skill.kind === "surge"
+          ? charging * 0.16 - Math.max(0, this.bossSurge) * 0.22
+          : 0;
+      const pose: BossReliefPose = {
+        size,
+        dpr: this.dpr,
+        quality,
+        // Turns toward the middle of the corridor as it drifts.
+        yaw: Math.sin(time * 0.5) * 0.18 - ((x - this.width / 2) / Math.max(1, this.width)) * 0.9,
+        pitch: Math.sin(time * 0.8) * 0.04 - boss.kick * 0.07 + lean,
+        roll:
+          Math.sin(time * 0.37) * 0.05 +
+          (boss.staggerTimer > 0 ? Math.sin(time * 34) * 0.035 : 0),
+        swell: Math.sin(time * 1.6) * 0.04 + charging * 0.3,
+        glow: Math.max(charging, casting * 0.8, this.bossExposedTimer > 0 ? 0.3 : 0),
+        flash: boss.flash,
+        light:
+          skill === null || skill.kind === "volley"
+            ? null
+            : skill.kind === "tether"
+              ? identity.accent
+              : identity.primary,
+        lightPower: Math.max(charging, casting),
+      };
+      const frame = relief.render(pose);
+      if (frame !== null) {
+        context.drawImage(frame, x - size / 2, y - size / 2 - lift, size, size);
+        drawn = true;
+      }
+    }
+    if (!drawn) {
+      // Low quality, no WebGL or still loading: the painting in the same box.
+      const painted =
+        identity === null ? null : paintedBossSprite(identity.id, quality);
+      const definition = enemyDefinition(
+        bossVisualDefinitionIdForStage(
+          this.hiddenEncounterRuntime?.bossStageOverride ??
+            this.stageConfig?.stage ??
+            1,
+          boss.role,
+        ),
+      );
+      context.save();
+      context.translate(x, y - lift);
+      if (painted === null || !drawPaintedSprite(context, painted, size * 0.92, boss.flash, this.dpr)) {
+        if (definition !== undefined) {
+          drawModularEnemy(context, definition, {
+            radius: size * 0.3,
+            age: time,
+            flash: boss.flash,
+            targeted: false,
+            glowScale: qualityProfile(quality).glowScale,
+          }, this.modularBodyCache, this.dpr);
+        }
+      }
+      context.restore();
+    }
+
+    // State rings outside the artwork (warning, shield, mark, stagger, exposed).
+    const ring = size * 0.42;
+    context.save();
+    context.translate(x, y - lift);
+    const warning =
+      skill === null
+        ? telegraphPulse(telegraphStrength(boss.actionCooldown, 1.1), time)
+        : 0;
+    if (warning > 0.02 && boss.staggerTimer <= 0) {
+      context.strokeStyle = "rgba(255, 83, 106, " + String(0.18 + warning * 0.62) + ")";
+      context.lineWidth = 1.4 + warning * 2.2;
+      context.setLineDash([7, 8]);
+      context.lineDashOffset = -time * 28;
+      context.beginPath();
+      context.arc(0, 0, ring * (1.05 + warning * 0.08), 0, Math.PI * 2);
+      context.stroke();
+      context.setLineDash([]);
+    }
+    if (boss.shieldActive) {
+      context.strokeStyle = "rgba(112, 235, 255, 0.62)";
+      context.lineWidth = 2.4;
+      context.beginPath();
+      context.arc(0, 0, ring * 0.98, 0, Math.PI * 2);
+      context.stroke();
+      context.strokeStyle = "rgba(112, 235, 255, 0.22)";
+      context.beginPath();
+      context.arc(0, 0, ring * 1.14, 0, Math.PI * 2);
+      context.stroke();
+    }
+    if (this.bossMarkTimer > 0) {
+      context.strokeStyle = "rgba(255, 103, 204, 0.62)";
+      context.lineWidth = 1.8;
+      context.setLineDash([5, 6]);
+      context.lineDashOffset = -time * 24;
+      context.beginPath();
+      context.arc(0, 0, ring * 1.18, 0, Math.PI * 2);
+      context.stroke();
+      context.setLineDash([]);
+    }
+    if (boss.staggerTimer > 0) {
+      context.strokeStyle = "rgba(255, 245, 178, 0.72)";
+      context.setLineDash([4, 5]);
+      context.lineWidth = 2;
+      context.beginPath();
+      context.arc(0, 0, ring * 0.88, 0, Math.PI * 2);
+      context.stroke();
+      context.setLineDash([]);
+    }
+    if (this.bossExposedTimer > 0) {
+      const pulse = 0.6 + 0.4 * Math.sin(time * 12);
+      context.strokeStyle = "rgba(255, 209, 102, " + String(0.5 + pulse * 0.4) + ")";
+      context.lineWidth = 2.6;
+      context.beginPath();
+      context.arc(0, 0, ring * 1.02, 0, Math.PI * 2);
+      context.stroke();
+      context.font = "800 13px 'Exo 2', ui-sans-serif, system-ui, sans-serif";
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.fillStyle = "#ffd166";
+      context.shadowColor = "#ffb020";
+      context.shadowBlur = 10;
+      context.fillText("EXPOSED ×1.5", 0, -ring * 1.02 - 12);
+    }
+    context.restore();
+
+    this.drawBossWord(boss, x, y, size * 0.4);
+  }
+
+  /** The defeated boss tumbling away behind its explosion (relief only). */
+  private drawBossWreck(): void {
+    const wreck = this.bossWreck;
+    const relief = this.bossRelief;
+    if (wreck === null || relief === null || !relief.available) return;
+    const k = Math.min(1, wreck.t / BOSS_WRECK_SECONDS);
+    const size = wreck.size * (1 - 0.4 * k);
+    const frame = relief.render({
+      size,
+      dpr: this.dpr,
+      quality: this.settings.visualQuality,
+      yaw: wreck.spin * k * 1.1,
+      pitch: -k * 0.7,
+      roll: wreck.spin * k * 2.4,
+      swell: -0.4 * k,
+      glow: 1 - k,
+      flash: Math.max(0, 1 - k * 4),
+      light: "#ffb066",
+      lightPower: 1 - k,
+    });
+    if (frame === null) return;
+    const context = this.context;
+    context.save();
+    context.globalAlpha = 1 - k * k;
+    context.drawImage(
+      frame,
+      wreck.x - size / 2,
+      wreck.y - size / 2 + k * k * this.height * 0.1,
+      size,
+      size,
+    );
+    context.restore();
+  }
+
+  /** Skill telegraphs and hits, counter prompt, callouts, banner: over the ship. */
+  private drawBossSkillLayer(time: number): void {
+    const context = this.context;
+    const boss = this.boss;
+    const skill = this.bossSkill;
+    if (boss !== null && skill !== null && skill.kind !== "volley") {
+      const geometry = this.bossDepthGeometry(boss.role);
+      const identity = this.bossIdentity;
+      const colors = {
+        primary: identity?.primary ?? "#ff5d8f",
+        accent: identity?.accent ?? "#ffd166",
+      };
+      drawBossSkill(context, skill, geometry, colors, time, this.settings.visualQuality);
+      const promptY = Math.min(this.height * 0.6, geometry.shipY - 150);
+      const open = bossCounterOpen(skill);
+      // The ultimate's banner names it during the wind-up.
+      const callout =
+        skill.result !== "countered" &&
+        (skill.kind === "cataclysm" ? skill.stage === "release" : open);
+      if (callout) {
+        drawSkillCallout(
+          context,
+          bossSkillName(skill.kind, identity?.family ?? "devil"),
+          BOSS_COUNTER_HINT[skill.spec.counter],
+          this.width / 2,
+          open ? promptY - 84 : promptY,
+          COUNTER_COLOR[skill.spec.counter],
+        );
+      }
+      drawCounterPrompt(context, skill, this.width / 2, promptY, time);
+    }
+    this.bossCallouts.draw(context);
+    if (this.bossBanner > 0) {
+      const elapsed = BOSS_BANNER_SECONDS - this.bossBanner;
+      const k = Math.min(1, elapsed / 0.35) * Math.min(1, this.bossBanner / 0.4);
+      drawUltimateBanner(context, this.width, this.height, this.bossBannerText, k);
+    }
   }
 
   private drawBossWord(

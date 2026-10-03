@@ -142,6 +142,12 @@ export function paintedEnemySprite(
   );
 }
 
+/** URL of the sharpest boss painting (for the 3D relief, src/boss/boss-relief.ts). */
+export function paintedBossArtUrl(id: string): string | undefined {
+  const variants = BOSS_URLS.get(id);
+  return variants?.detailed ?? variants?.standard;
+}
+
 export function paintedBossSprite(
   id: string,
   quality: VisualQuality,

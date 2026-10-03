@@ -10,7 +10,15 @@ import type {
 } from "./contracts";
 import type { RelicId } from "../relics/registry";
 
+// Campaign relics have no art yet (docs/art-requests/RELIC_ICONS_2026-10-04.md);
+// a missing file returns null and the card shows its glyph.
 const RELIC_FILES: Partial<Record<RelicId, string>> = {
+  "first-light-seed": "relic-first-light-seed.webp",
+  "storm-script": "relic-storm-script.webp",
+  "frost-rhythm": "relic-frost-rhythm.webp",
+  "giant-word-lens": "relic-giant-word-lens.webp",
+  "mirror-vow": "relic-mirror-vow.webp",
+  "cosmic-conductor": "relic-cosmic-conductor.webp",
   "precision-lens": "relic-precision-lens.webp",
   "perfect-capacitor": "relic-perfect-capacitor.webp",
   "combo-coil": "relic-combo-coil.webp",

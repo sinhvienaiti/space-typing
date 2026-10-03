@@ -605,4 +605,110 @@ describe("Duel Friend Room browser transport", () => {
       vi.useRealTimers();
     }
   });
+
+  it("watches the public room list, delivers ROOM_LIST and drops a bad one", () => {
+    const socket = new FakeSocket();
+    const lists: unknown[] = [];
+    const client = new DuelNetworkClient({
+      url: "wss://example.test/duel",
+      clientVersion: "0.1.0",
+      socketFactory: () => socket,
+      callbacks: {
+        onRoomList(rooms) {
+          lists.push(rooms);
+        },
+      },
+    });
+
+    // Not connected yet: remembered, sent right after WELCOME.
+    expect(client.watchRooms(true)).toBe(false);
+    expect(client.isWatchingRooms()).toBe(true);
+    client.connect("signed-token");
+    socket.open();
+    welcome(socket);
+    expect(JSON.parse(socket.sent.at(-1)!)).toEqual({
+      type: "WATCH_ROOMS",
+      requestId: "req-1",
+      watch: true,
+    });
+
+    const room = {
+      roomId: "A1B2C3D4E5",
+      roomName: "Open Duel",
+      hostDisplayName: "Pilot-host",
+      hostCharacterId: null,
+      mapSelection: { mode: "random", pool: ["terra-core"] },
+      roundFormat: 3,
+      matchLengthSeconds: 240,
+      hazardLevel: "standard",
+      modifier: "standard",
+      playerCount: 1,
+      capacity: 2,
+      hasBot: false,
+      hasPassword: true,
+      status: "waiting",
+      createdAt: 5,
+    };
+    socket.message({ type: "ROOM_LIST", rooms: [room] });
+    socket.message({
+      type: "ROOM_LIST",
+      rooms: [{ ...room, password: "leak" }],
+    });
+    expect(lists).toEqual([[room]]);
+
+    expect(client.watchRooms(false)).toBe(true);
+    expect(JSON.parse(socket.sent.at(-1)!)).toEqual({
+      type: "WATCH_ROOMS",
+      requestId: "req-2",
+      watch: false,
+    });
+  });
+
+  it("re-subscribes to the room list after a reconnect", () => {
+    vi.useFakeTimers();
+    try {
+      const created: FakeSocket[] = [];
+      const client = new DuelNetworkClient({
+        url: "wss://example.test/duel",
+        clientVersion: "0.1.0",
+        socketFactory() {
+          const socket = new FakeSocket();
+          created.push(socket);
+          return socket;
+        },
+      });
+
+      client.connect("signed-token");
+      created[0]!.open();
+      welcome(created[0]!);
+      expect(client.watchRooms(true)).toBe(true);
+      created[0]!.drop();
+
+      vi.advanceTimersByTime(250);
+      created[1]!.open();
+      expect(
+        created[1]!.sent.some(
+          (raw) => JSON.parse(raw).type === "WATCH_ROOMS",
+        ),
+      ).toBe(false);
+      welcome(created[1]!);
+      expect(JSON.parse(created[1]!.sent.at(-1)!)).toEqual(
+        expect.objectContaining({ type: "WATCH_ROOMS", watch: true }),
+      );
+
+      // Once off, the next reconnect stays unsubscribed.
+      client.watchRooms(false);
+      created[1]!.drop();
+      vi.advanceTimersByTime(250);
+      created[2]!.open();
+      welcome(created[2]!);
+      expect(
+        created[2]!.sent.some(
+          (raw) => JSON.parse(raw).type === "WATCH_ROOMS",
+        ),
+      ).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

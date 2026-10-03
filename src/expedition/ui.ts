@@ -47,22 +47,28 @@ export function mountExpeditionUi(options: {
   ghostCue(run: ExpeditionRun): string | null;
   learningSummary(run: ExpeditionRun): string | null;
 }): ExpeditionUi {
-  const actions = document.querySelector(".title-play-actions");
+  // The title hub's Expedition card; older layouts used .title-play-actions.
+  const actions =
+    document.querySelector("#titleExpeditionActions") ??
+    document.querySelector(".title-play-actions");
   if (actions === null) {
-    throw new Error("Expedition UI requires .title-play-actions.");
+    throw new Error("Expedition UI requires #titleExpeditionActions.");
   }
 
   let resumeAvailable = false;
   const launch = document.createElement("button");
   launch.type = "button";
   launch.id = "expeditionButton";
-  launch.textContent = "Expedition V2";
+  launch.className = "primary holo-cta";
+  launch.textContent = "Launch";
   const launchIcon = iconImage(
     expeditionIconUrl("mode"),
     "Expedition",
   );
   if (launchIcon !== null) {
     decorateButton(launch, launchIcon);
+  } else {
+    launch.dataset.icon = "rocket";
   }
   launch.addEventListener("click", () => {
     if (resumeAvailable) options.onResume();
@@ -71,18 +77,22 @@ export function mountExpeditionUi(options: {
   const daily = document.createElement("button");
   daily.type = "button";
   daily.id = "expeditionDailyButton";
-  daily.textContent = "Daily Expedition";
+  daily.className = "holo-ghost";
+  daily.textContent = "Daily";
   const dailyIcon = iconImage(
     expeditionIconUrl("daily"),
     "Daily Expedition",
   );
   if (dailyIcon !== null) {
     decorateButton(daily, dailyIcon);
+  } else {
+    daily.dataset.icon = "calendar";
   }
   daily.addEventListener("click", options.onDailyStart);
   const ghost = document.createElement("button");
   ghost.type = "button";
   ghost.id = "expeditionGhostButton";
+  ghost.className = "holo-ghost";
   ghost.textContent = "Ghost · On";
   const ghostIcon = iconImage(
     metaIconUrl("ghost"),
@@ -90,6 +100,8 @@ export function mountExpeditionUi(options: {
   );
   if (ghostIcon !== null) {
     decorateButton(ghost, ghostIcon);
+  } else {
+    ghost.dataset.icon = "ghost";
   }
   ghost.addEventListener("click", options.onToggleGhost);
   actions.append(launch, daily, ghost);
@@ -446,9 +458,7 @@ export function mountExpeditionUi(options: {
   return {
     setResumeAvailable(available) {
       resumeAvailable = available;
-      const label = available
-        ? "Resume Expedition V2"
-        : "Expedition V2";
+      const label = available ? "Resume run" : "Launch";
       const labelNode = launch.querySelector("span");
       if (labelNode !== null) labelNode.textContent = label;
       else launch.textContent = label;
@@ -461,10 +471,10 @@ export function mountExpeditionUi(options: {
       launch.classList.toggle("expedition-evolution-2", safe >= 2);
       launch.classList.toggle("expedition-evolution-3", safe >= 3);
       const label = resumeAvailable
-        ? "Resume Expedition V2"
+        ? "Resume run"
         : safe === 0
-          ? "Expedition V2"
-          : "Expedition V2 · E" + String(safe);
+          ? "Launch"
+          : "Launch · E" + String(safe);
       const labelNode = launch.querySelector("span");
       if (labelNode !== null) labelNode.textContent = label;
       else launch.textContent = label;

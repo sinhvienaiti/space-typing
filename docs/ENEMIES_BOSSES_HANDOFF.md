@@ -65,6 +65,10 @@ Mỗi boss có tên, danh hiệu, hai màu, kiểu hào quang (tia sáng, than h
 - **Tử trận**: chuỗi 6 vụ nổ trên thân boss rồi một vụ nổ lớn cuối, cộng kiểu nổ của họ và tiếng vỡ nặng.
 - Mọi hiệu ứng nằm trong `src/vfx/combat-fx.ts` (`CombatFxSystem`, tối đa 360 hạt và 48 vòng; `drawBossAura`; `drawEnemyShot`).
 
+### 4.1 Trùm Depth View và kỹ năng có phản đòn (04/10/2026)
+
+Ở chế độ chiến dịch, trùm nằm xa cuối hành lang như đối thủ PvP, dựng thành khối 3D từ ảnh vẽ. Trùm có thêm kỹ năng Lance, Quake, Rush, Siphon và tuyệt chiêu Cataclysm. Mỗi kỹ năng có chữ phản đòn để gõ trong lúc trùm tích chiêu. Kiểu bắn ở trên vẫn là kỹ năng Glyph Volley. Chế độ Recall giữ nguyên cách cũ. Chi tiết: `docs/BOSS_DEPTH_VIEW_HANDOFF_2026-10-04.md`.
+
 ## 5. Ảnh vẽ tay cho quái và boss
 
 - Danh sách ảnh, lời nhắc, tên file: `docs/art-requests/ENEMIES_BOSSES.md`. Làm thử trước 3 quái + 1 boss.
@@ -91,4 +95,4 @@ Mỗi boss có tên, danh hiệu, hai màu, kiểu hào quang (tia sáng, than h
 
 ## 7. Các file chính
 
-`src/vfx/light-sprites.ts`, `src/vfx/combat-fx.ts`, `src/enemies/identity.ts`, `src/enemies/painted-sprites.ts`, `src/enemies/renderer.ts`, `src/boss/identity.ts`, `src/boss/model.ts`, `src/audio/Sfx.ts` (khối "Target materials"), `src/types.ts` (`EnemyProjectile.family`), `src/Game.ts` (vẽ quái, `applyShotImpact`, boss xuất hiện / đổi pha / tử trận / bắn, khối "Enemy and boss identity"), `scripts/bg-art/prepare-sprites.mjs`, `scripts/visual/evals/{enemy-fx,boss-fx,enemy-perf,sfx-levels}.js`.
+`src/boss/skills.ts`, `src/boss/depth-view.ts`, `src/boss/boss-relief.ts` (trùm Depth View, mục 4.1), `src/vfx/light-sprites.ts`, `src/vfx/combat-fx.ts`, `src/enemies/identity.ts`, `src/enemies/painted-sprites.ts`, `src/enemies/renderer.ts`, `src/boss/identity.ts`, `src/boss/model.ts`, `src/audio/Sfx.ts` (khối "Target materials"), `src/types.ts` (`EnemyProjectile.family`), `src/Game.ts` (vẽ quái, `applyShotImpact`, boss xuất hiện / đổi pha / tử trận / bắn, khối "Enemy and boss identity"), `scripts/bg-art/prepare-sprites.mjs`, `scripts/visual/evals/{enemy-fx,boss-fx,enemy-perf,sfx-levels}.js`.

@@ -26,6 +26,9 @@ import type {
 } from "../rewards/combat-credit-drops";
 import type { VisualQuality } from "../types";
 
+/** Boss skill ids (src/boss/skills.ts BossSkillKind) for the skill sounds. */
+type BossSkillSoundKind = "volley" | "lance" | "quake" | "surge" | "tether" | "cataclysm";
+
 /** Optional shaping for one synthesized voice. */
 type VoiceShape = {
   /** Stereo position, -1 (left) … 1 (right). */
@@ -118,6 +121,8 @@ export class Sfx {
   private lastBossImpact = -Infinity;
   private lastBellNote = -1;
   private creditEngine: CreditSoundEngine | null = null;
+  /** Credit sound level on top of SFX volume (Settings, 0–2, 1 = default). */
+  private creditVolume = 1;
 
   private readonly onPronunciation = (event: Event): void => {
     const detail = (event as CustomEvent<{ active?: unknown }>).detail;
@@ -163,6 +168,13 @@ export class Sfx {
       void this.context.close();
       this.context = null;
     }
+  }
+
+  /** Credit crystal sounds, relative to SFX volume (0 = off, 2 = double). */
+  setCreditVolume(volume: number): void {
+    this.creditVolume = Number.isFinite(volume)
+      ? Math.min(2, Math.max(0, volume))
+      : 1;
   }
 
   setVolume(volume: number): void {
@@ -567,11 +579,14 @@ export class Sfx {
         output: () =>
           this.context === null ? null : this.outputNode(this.context),
         level: (gain) =>
-          mixedSfxGain(
-            this.volume,
-            "combat",
-            gain,
-            this.pronunciationActive,
+          Math.min(
+            1,
+            mixedSfxGain(
+              this.volume,
+              "rewards",
+              gain,
+              this.pronunciationActive,
+            ) * this.creditVolume,
           ),
       });
     }
@@ -740,6 +755,107 @@ export class Sfx {
 
   bossStagger(): void {
     this.tone(250, 0.14, "sine", 0.03, 120, "combat");
+  }
+
+  // --- Boss skills (Depth View, src/boss/skills.ts) ---------------------------
+  //
+  // War-film weight like the Duel: wind-ups are low rumbles and lock tones,
+  // hits are heavy impacts, counters are clangs, whooshes and snaps. No bright
+  // pitched chimes.
+
+  /** A boss skill starts winding up. */
+  bossSkillCharge(kind: BossSkillSoundKind, voice = 1): void {
+    const v = Math.max(0.6, Math.min(1.3, voice));
+    switch (kind) {
+      case "lance":
+        if (!this.playSample("duel-lock-acquire", 0.82)) this.projectileWarning();
+        this.tone(62 * v, 1.6, "sawtooth", 0.034, 150 * v, "warnings", { attack: 1.1 });
+        return;
+      case "quake":
+        this.playSample("boss-thruster", 0.62);
+        this.noise(1.2, 0.05, "combat", { filter: "lowpass", frequency: 170, q: 0.7 });
+        this.tone(44 * v, 1.5, "sine", 0.05, 70 * v, "combat", { attack: 0.9 });
+        return;
+      case "surge":
+        this.playSample("boss-thruster", 0.86);
+        this.tone(52 * v, 1.3, "sawtooth", 0.03, 118 * v, "warnings", { attack: 0.8 });
+        return;
+      case "tether":
+        if (!this.playSample("duel-scan-pulse", 0.78)) this.tone(160 * v, 0.4, "square", 0.02, 90 * v, "warnings");
+        this.tone(70 * v, 1.0, "sawtooth", 0.026, 96 * v, "warnings", { attack: 0.6 });
+        return;
+      case "cataclysm":
+        if (!this.playSample("duel-cataclysm", 0.9)) this.bossEntrance(1.05);
+        this.tone(38, 2.2, "sawtooth", 0.04, 76, "warnings", { attack: 1.2 });
+        return;
+      case "volley":
+        return;
+    }
+  }
+
+  /** The skill fires. */
+  bossSkillRelease(kind: BossSkillSoundKind): void {
+    switch (kind) {
+      case "lance":
+        if (!this.playSample("duel-heavy-launch", 0.78)) this.tone(150, 0.3, "sawtooth", 0.05, 50, "combat");
+        this.noise(0.32, 0.05, "combat", { filter: "bandpass", frequency: 700, q: 0.6 });
+        return;
+      case "quake":
+        if (!this.playSample("duel-bomb-impact", 0.66)) this.tone(70, 0.6, "sine", 0.06, 32, "combat");
+        this.noise(0.7, 0.07, "combat", { filter: "lowpass", frequency: 260, q: 0.6 });
+        return;
+      case "surge":
+        this.playSample("boss-thruster", 1.18);
+        this.noise(0.45, 0.06, "combat", { filter: "bandpass", frequency: 420, q: 0.5 });
+        return;
+      case "tether":
+        if (!this.playSample("duel-disrupt-emp", 0.8)) this.tone(240, 0.3, "square", 0.025, 110, "combat");
+        return;
+      case "cataclysm":
+        if (!this.playSample("duel-bomb-launch", 0.74)) this.tone(110, 0.5, "sawtooth", 0.04, 40, "combat");
+        return;
+      case "volley":
+        return;
+    }
+  }
+
+  /** A boss skill lands on the ship (each meteor too). */
+  bossSkillHit(kind: BossSkillSoundKind): void {
+    if (kind === "lance") {
+      if (!this.playSample("duel-energy-impact", 0.78)) this.bossHit();
+    } else if (kind === "surge") {
+      if (!this.playSample("duel-kinetic-impact", 0.8)) this.bossHit();
+    } else if (kind === "quake" || kind === "cataclysm") {
+      if (!this.playSample("duel-bomb-impact", kind === "quake" ? 0.86 : 1)) this.bossHit();
+    }
+  }
+
+  /** One counter letter: a dry mechanical tick. */
+  bossCounterKey(progress: number): void {
+    const p = Math.max(0, Math.min(1, progress));
+    this.noise(0.035, 0.034, "typing", { filter: "bandpass", frequency: 1600 + p * 900, q: 1.2 });
+  }
+
+  /** A counter word finished: parry clang, dodge whoosh, brace thud, chain snap. */
+  bossCounter(counter: "parry" | "dodge" | "brace" | "break", perfect: boolean): void {
+    switch (counter) {
+      case "parry":
+        if (!this.playSample("duel-shield-hit", 0.92)) this.bossShieldBreak();
+        this.tone(110, 0.32, "sawtooth", 0.04, 60, "combat");
+        break;
+      case "dodge":
+        this.noise(0.3, 0.06, "combat", { filter: "bandpass", frequency: 820, q: 0.6 });
+        this.tone(180, 0.24, "sine", 0.024, 70, "combat");
+        break;
+      case "brace":
+        if (!this.playSample("duel-shield-hit", 0.72)) this.bossStagger();
+        this.tone(78, 0.36, "sine", 0.06, 50, "combat");
+        break;
+      case "break":
+        if (!this.playSample("duel-shield-break", 1.04)) this.bossShieldBreak();
+        break;
+    }
+    if (perfect) this.playSample("duel-precision", 0.94);
   }
 
   // --- Target materials -------------------------------------------------------

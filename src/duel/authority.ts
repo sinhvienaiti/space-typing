@@ -29,7 +29,9 @@ import type {
 } from "./model";
 import {
   DUEL_PROTOCOL_VERSION,
+  DUEL_ROOM_LIST_MAX_ROOMS,
   toEngineIntent,
+  type DuelRoomListing,
   type DuelWireIntent,
 } from "./protocol";
 import { DUEL_RANKED_RULESET } from "./ranked";
@@ -278,6 +280,8 @@ type RoomRecord = {
   room: DuelRoom;
   settings: DuelRoomSettingsInput;
   ownerSessionId: string;
+  /** Server time the room was created (orders the public room list). */
+  createdAt: number;
   lastActivityAt: number;
   matchId: string | null;
 };
@@ -893,6 +897,7 @@ export class DuelAuthorityService {
       room,
       settings: parsed.value,
       ownerSessionId: sessionId,
+      createdAt: now,
       lastActivityAt: now,
       matchId: null,
     });
@@ -1148,6 +1153,60 @@ export class DuelAuthorityService {
       ok: true,
       value: clientRoomSnapshot(record.room, sessionId),
     };
+  }
+
+  /**
+   * The public waiting-room list: Friend Rooms that are waiting or mid-match,
+   * waiting first, then newest, capped at DUEL_ROOM_LIST_MAX_ROOMS. Ranked
+   * matches have no room and Practice runs in the browser, so neither is
+   * listed; a room whose match has finished drops out. Private rooms show
+   * hasPassword and never the password.
+   */
+  roomListings(): DuelRoomListing[] {
+    const listings: DuelRoomListing[] = [];
+    for (const record of this.rooms.values()) {
+      let status: DuelRoomListing["status"] = "waiting";
+      if (record.matchId !== null) {
+        const match = this.matches.get(record.matchId);
+        if (
+          match === undefined ||
+          match.mode !== "friend" ||
+          match.series.status !== "active"
+        ) {
+          continue;
+        }
+        status = "in-match";
+      }
+      const snapshot = record.room.snapshot();
+      const host = snapshot.slots[0];
+      listings.push({
+        roomId: snapshot.roomId,
+        roomName: snapshot.settings.roomName,
+        hostDisplayName: host.displayName,
+        hostCharacterId: host.characterId,
+        mapSelection: snapshot.settings.mapSelection,
+        roundFormat: snapshot.settings.roundFormat,
+        matchLengthSeconds: snapshot.settings.matchLengthSeconds,
+        hazardLevel: snapshot.settings.hazardLevel,
+        modifier: snapshot.settings.modifier,
+        playerCount: snapshot.slots.filter(
+          (slot) => slot.kind !== "empty",
+        ).length,
+        capacity: snapshot.slots.length,
+        hasBot: snapshot.slots.some((slot) => slot.kind === "bot"),
+        hasPassword: snapshot.settings.passwordRequired,
+        status,
+        createdAt: record.createdAt,
+      });
+    }
+    listings.sort(
+      (left, right) =>
+        Number(left.status !== "waiting") -
+          Number(right.status !== "waiting") ||
+        right.createdAt - left.createdAt ||
+        (left.roomId < right.roomId ? -1 : 1),
+    );
+    return listings.slice(0, DUEL_ROOM_LIST_MAX_ROOMS);
   }
 
   startMatch(

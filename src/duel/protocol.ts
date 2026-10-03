@@ -1,6 +1,48 @@
+import type { DuelMapId } from "./maps";
+import type {
+  DuelHazardLevel,
+  DuelMatchLengthSeconds,
+  DuelRoomMapSelection,
+  DuelRoomModifier,
+  DuelRoundFormat,
+} from "./room";
+
 // V7: 5 s round break, slower cannon/attack flight. Restart the Duel server.
 export const DUEL_PROTOCOL_VERSION = 7;
 export const DUEL_PROTOCOL_MAX_MESSAGE_BYTES = 4096;
+/** ROOM_LIST never carries more rooms than this (waiting rooms first, newest first). */
+export const DUEL_ROOM_LIST_MAX_ROOMS = 50;
+
+/**
+ * One room in the public waiting-room list (server → client ROOM_LIST).
+ * Field names follow the room settings. Never carries the password, the
+ * fixed seed or participant ids.
+ */
+export type DuelRoomListing = {
+  /** What JOIN_ROOM needs. */
+  roomId: string;
+  roomName: string;
+  hostDisplayName: string;
+  /** The host's hull; null until their loadout reaches the server. */
+  hostCharacterId: string | null;
+  /** "fixed" names the map; "random"/"vote" carry the pool the server draws from. */
+  mapSelection: DuelRoomMapSelection;
+  /** Best of 1, 3 or 5. */
+  roundFormat: DuelRoundFormat;
+  matchLengthSeconds: DuelMatchLengthSeconds;
+  hazardLevel: DuelHazardLevel;
+  /** The rules preset. */
+  modifier: DuelRoomModifier;
+  /** Occupied slots, humans and bot together. */
+  playerCount: number;
+  capacity: number;
+  hasBot: boolean;
+  /** True for private rooms: JOIN_ROOM must carry the password. */
+  hasPassword: boolean;
+  status: "waiting" | "in-match";
+  /** Server time (ms since epoch) the room was created. */
+  createdAt: number;
+};
 
 export type DuelWireIntent =
   | {
@@ -102,6 +144,12 @@ export type DuelClientMessage =
       requestId: string;
     }
   | {
+      /** true: reply with ROOM_LIST now and on every change; false: stop. */
+      type: "WATCH_ROOMS";
+      requestId: string;
+      watch: boolean;
+    }
+  | {
       type: "INTENT";
       matchId: string;
       roundId: string;
@@ -150,6 +198,10 @@ export type DuelServerMessage =
       type: "ROOM_CLOSED";
       roomId: string;
       reason: string;
+    }
+  | {
+      type: "ROOM_LIST";
+      rooms: readonly DuelRoomListing[];
     }
   | {
       type: "RANKED_QUEUE_STATUS";
@@ -619,6 +671,18 @@ function parseMessageObject(
         ? null
         : { type, requestId };
     }
+    case "WATCH_ROOMS": {
+      if (
+        !exactKeys(value, ["type", "requestId", "watch"]) ||
+        typeof value.watch !== "boolean"
+      ) {
+        return null;
+      }
+      const requestId = stringField(value, "requestId", 64);
+      return requestId === null
+        ? null
+        : { type, requestId, watch: value.watch };
+    }
     case "INTENT": {
       if (
         !exactKeys(value, [
@@ -691,6 +755,184 @@ export function parseDuelClientMessage(
   return message === null
     ? { ok: false, error: "Message schema is invalid." }
     : { ok: true, message };
+}
+
+const ROOM_LIST_MAP_IDS: readonly DuelMapId[] = [
+  "frost-wastes",
+  "inferno-rift",
+  "tempest-prime",
+  "ocean-abyss",
+  "terra-core",
+  "celestial-void",
+];
+
+const ROOM_LISTING_KEYS = [
+  "roomId",
+  "roomName",
+  "hostDisplayName",
+  "hostCharacterId",
+  "mapSelection",
+  "roundFormat",
+  "matchLengthSeconds",
+  "hazardLevel",
+  "modifier",
+  "playerCount",
+  "capacity",
+  "hasBot",
+  "hasPassword",
+  "status",
+  "createdAt",
+] as const;
+
+function oneOf<T extends string | number>(
+  value: unknown,
+  allowed: readonly T[],
+): T | null {
+  return allowed.includes(value as T) ? (value as T) : null;
+}
+
+function parseListingMapSelection(
+  value: unknown,
+): DuelRoomMapSelection | null {
+  if (!isObject(value)) return null;
+  if (value.mode === "fixed") {
+    if (!exactKeys(value, ["mode", "mapId"])) return null;
+    const mapId = oneOf(value.mapId, ROOM_LIST_MAP_IDS);
+    return mapId === null ? null : { mode: "fixed", mapId };
+  }
+  if (value.mode !== "random" && value.mode !== "vote") {
+    return null;
+  }
+  if (
+    !exactKeys(value, ["mode", "pool"]) ||
+    !Array.isArray(value.pool) ||
+    value.pool.length === 0 ||
+    value.pool.length > ROOM_LIST_MAP_IDS.length
+  ) {
+    return null;
+  }
+  const pool: DuelMapId[] = [];
+  for (const entry of value.pool) {
+    const mapId = oneOf(entry, ROOM_LIST_MAP_IDS);
+    if (mapId === null || pool.includes(mapId)) return null;
+    pool.push(mapId);
+  }
+  return { mode: value.mode, pool };
+}
+
+function parseRoomListing(value: unknown): DuelRoomListing | null {
+  if (!isObject(value) || !exactKeys(value, ROOM_LISTING_KEYS)) {
+    return null;
+  }
+  const roomId = stringField(value, "roomId", 32);
+  const roomName = stringField(value, "roomName", 40);
+  const hostDisplayName = stringField(value, "hostDisplayName", 32);
+  const characterRaw = value.hostCharacterId;
+  const mapSelection = parseListingMapSelection(value.mapSelection);
+  const roundFormat = oneOf(value.roundFormat, [1, 3, 5] as const);
+  const matchLengthSeconds = oneOf(value.matchLengthSeconds, [
+    180,
+    240,
+    300,
+  ] as const);
+  const hazardLevel = oneOf(value.hazardLevel, [
+    "low",
+    "standard",
+    "high",
+  ] as const);
+  const modifier = oneOf(value.modifier, [
+    "standard",
+    "high-hazard",
+    "mystery-storm",
+    "weapon-frenzy",
+    "support-rich",
+    "sudden-death",
+    "cataclysm-rush",
+  ] as const);
+  const capacity = integerField(value, "capacity", 1, 8);
+  const playerCount = integerField(
+    value,
+    "playerCount",
+    0,
+    capacity ?? 0,
+  );
+  const status = oneOf(value.status, [
+    "waiting",
+    "in-match",
+  ] as const);
+  const createdAt = integerField(
+    value,
+    "createdAt",
+    0,
+    Number.MAX_SAFE_INTEGER,
+  );
+  if (
+    roomId === null ||
+    roomName === null ||
+    hostDisplayName === null ||
+    (characterRaw !== null &&
+      (typeof characterRaw !== "string" ||
+        characterRaw.length === 0 ||
+        characterRaw.length > 64)) ||
+    mapSelection === null ||
+    roundFormat === null ||
+    matchLengthSeconds === null ||
+    hazardLevel === null ||
+    modifier === null ||
+    capacity === null ||
+    playerCount === null ||
+    typeof value.hasBot !== "boolean" ||
+    typeof value.hasPassword !== "boolean" ||
+    status === null ||
+    createdAt === null
+  ) {
+    return null;
+  }
+  return {
+    roomId,
+    roomName,
+    hostDisplayName,
+    hostCharacterId: characterRaw as string | null,
+    mapSelection,
+    roundFormat,
+    matchLengthSeconds,
+    hazardLevel,
+    modifier,
+    playerCount,
+    capacity,
+    hasBot: value.hasBot,
+    hasPassword: value.hasPassword,
+    status,
+    createdAt,
+  };
+}
+
+/**
+ * Strictly validates a ROOM_LIST server message (already JSON-parsed).
+ * Rejects the whole list on any bad entry, a duplicate room id or more than
+ * DUEL_ROOM_LIST_MAX_ROOMS rooms.
+ */
+export function parseDuelRoomListMessage(
+  value: unknown,
+): Extract<DuelServerMessage, { type: "ROOM_LIST" }> | null {
+  if (
+    !isObject(value) ||
+    value.type !== "ROOM_LIST" ||
+    !exactKeys(value, ["type", "rooms"]) ||
+    !Array.isArray(value.rooms) ||
+    value.rooms.length > DUEL_ROOM_LIST_MAX_ROOMS
+  ) {
+    return null;
+  }
+  const rooms: DuelRoomListing[] = [];
+  const seen = new Set<string>();
+  for (const entry of value.rooms) {
+    const listing = parseRoomListing(entry);
+    if (listing === null || seen.has(listing.roomId)) return null;
+    seen.add(listing.roomId);
+    rooms.push(listing);
+  }
+  return { type: "ROOM_LIST", rooms };
 }
 
 export function toEngineIntent(input: {

@@ -2,12 +2,45 @@ import { describe, expect, it } from "vitest";
 import {
   DUEL_PROTOCOL_MAX_MESSAGE_BYTES,
   DUEL_PROTOCOL_VERSION,
+  DUEL_ROOM_LIST_MAX_ROOMS,
   parseDuelClientMessage,
+  parseDuelRoomListMessage,
   toEngineIntent,
+  type DuelRoomListing,
 } from "../src/duel/protocol";
 
 function parse(value: unknown) {
   return parseDuelClientMessage(JSON.stringify(value));
+}
+
+function listing(
+  overrides: Partial<DuelRoomListing> = {},
+): DuelRoomListing {
+  return {
+    roomId: "A1B2C3D4E5",
+    roomName: "Late Night Duel",
+    hostDisplayName: "Pilot-host",
+    hostCharacterId: "vanguard",
+    mapSelection: { mode: "fixed", mapId: "inferno-rift" },
+    roundFormat: 3,
+    matchLengthSeconds: 240,
+    hazardLevel: "standard",
+    modifier: "standard",
+    playerCount: 1,
+    capacity: 2,
+    hasBot: false,
+    hasPassword: false,
+    status: "waiting",
+    createdAt: 1_790_000_000_000,
+    ...overrides,
+  };
+}
+
+/** Serialize like the server, parse like the browser. */
+function roundTrip(value: unknown) {
+  return parseDuelRoomListMessage(
+    JSON.parse(JSON.stringify(value)),
+  );
 }
 
 describe("Duel M-DUEL-10 authoritative protocol", () => {
@@ -310,5 +343,114 @@ describe("Duel M-DUEL-10 authoritative protocol", () => {
         },
       }).ok,
     ).toBe(false);
+  });
+
+  it("accepts WATCH_ROOMS on and off, and rejects bad shapes", () => {
+    expect(
+      parse({ type: "WATCH_ROOMS", requestId: "req-9", watch: true }),
+    ).toEqual({
+      ok: true,
+      message: { type: "WATCH_ROOMS", requestId: "req-9", watch: true },
+    });
+    expect(
+      parse({ type: "WATCH_ROOMS", requestId: "req-10", watch: false }),
+    ).toEqual({
+      ok: true,
+      message: { type: "WATCH_ROOMS", requestId: "req-10", watch: false },
+    });
+    expect(parse({ type: "WATCH_ROOMS", requestId: "req-11" }).ok).toBe(false);
+    expect(
+      parse({ type: "WATCH_ROOMS", requestId: "req-12", watch: "yes" }).ok,
+    ).toBe(false);
+    expect(parse({ type: "WATCH_ROOMS", watch: true }).ok).toBe(false);
+    expect(
+      parse({
+        type: "WATCH_ROOMS",
+        requestId: "x".repeat(65),
+        watch: true,
+      }).ok,
+    ).toBe(false);
+    expect(
+      parse({
+        type: "WATCH_ROOMS",
+        requestId: "req-13",
+        watch: true,
+        filter: "public",
+      }).ok,
+    ).toBe(false);
+  });
+
+  it("round-trips a ROOM_LIST with fixed, random and vote maps", () => {
+    const message = {
+      type: "ROOM_LIST",
+      rooms: [
+        listing(),
+        listing({
+          roomId: "PRIVATE001",
+          hasPassword: true,
+          hostCharacterId: null,
+          mapSelection: {
+            mode: "random",
+            pool: ["frost-wastes", "terra-core"],
+          },
+          roundFormat: 5,
+          matchLengthSeconds: 300,
+          hazardLevel: "high",
+          modifier: "sudden-death",
+        }),
+        listing({
+          roomId: "INMATCH001",
+          status: "in-match",
+          playerCount: 2,
+          hasBot: true,
+          mapSelection: { mode: "vote", pool: ["celestial-void"] },
+        }),
+      ],
+    };
+    expect(roundTrip(message)).toEqual(message);
+    expect(roundTrip({ type: "ROOM_LIST", rooms: [] })).toEqual({
+      type: "ROOM_LIST",
+      rooms: [],
+    });
+  });
+
+  it.each([
+    ["wrong message type", { type: "ROOM_SNAPSHOT", rooms: [] }],
+    ["extra envelope field", { type: "ROOM_LIST", rooms: [], total: 9 }],
+    ["rooms not an array", { type: "ROOM_LIST", rooms: {} }],
+    ["password leak", { type: "ROOM_LIST", rooms: [{ ...listing(), password: "space" }] }],
+    ["missing field", { type: "ROOM_LIST", rooms: [{ ...listing(), roomId: undefined }] }],
+    ["unknown map", { type: "ROOM_LIST", rooms: [listing({ mapSelection: { mode: "fixed", mapId: "moon" as never } })] }],
+    ["fixed map with pool", { type: "ROOM_LIST", rooms: [listing({ mapSelection: { mode: "fixed", mapId: "terra-core", pool: [] } as never })] }],
+    ["empty pool", { type: "ROOM_LIST", rooms: [listing({ mapSelection: { mode: "random", pool: [] } })] }],
+    ["duplicate pool map", { type: "ROOM_LIST", rooms: [listing({ mapSelection: { mode: "random", pool: ["terra-core", "terra-core"] } })] }],
+    ["bad round format", { type: "ROOM_LIST", rooms: [listing({ roundFormat: 2 as never })] }],
+    ["bad status", { type: "ROOM_LIST", rooms: [listing({ status: "ended" as never })] }],
+    ["bad modifier", { type: "ROOM_LIST", rooms: [listing({ modifier: "god-mode" as never })] }],
+    ["more players than capacity", { type: "ROOM_LIST", rooms: [listing({ playerCount: 3 })] }],
+    ["fractional time", { type: "ROOM_LIST", rooms: [listing({ createdAt: 1.5 })] }],
+    ["long room name", { type: "ROOM_LIST", rooms: [listing({ roomName: "x".repeat(41) })] }],
+    ["non-boolean flag", { type: "ROOM_LIST", rooms: [listing({ hasPassword: 1 as never })] }],
+    ["empty hull id", { type: "ROOM_LIST", rooms: [listing({ hostCharacterId: "" })] }],
+    ["duplicate room id", { type: "ROOM_LIST", rooms: [listing(), listing()] }],
+  ])("rejects a ROOM_LIST with %s", (_label, message) => {
+    expect(roundTrip(message)).toBeNull();
+  });
+
+  it("caps ROOM_LIST at the room limit", () => {
+    const rooms = (count: number) =>
+      Array.from({ length: count }, (_, index) =>
+        listing({ roomId: "ROOM-" + String(index) }),
+      );
+    expect(
+      roundTrip({ type: "ROOM_LIST", rooms: rooms(DUEL_ROOM_LIST_MAX_ROOMS) })
+        ?.rooms.length,
+    ).toBe(DUEL_ROOM_LIST_MAX_ROOMS);
+    expect(
+      roundTrip({
+        type: "ROOM_LIST",
+        rooms: rooms(DUEL_ROOM_LIST_MAX_ROOMS + 1),
+      }),
+    ).toBeNull();
   });
 });

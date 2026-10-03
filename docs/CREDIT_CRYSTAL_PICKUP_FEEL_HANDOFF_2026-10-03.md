@@ -1,6 +1,6 @@
 # Bàn giao: hiệu ứng và âm thanh credit rơi ra, bay về tàu (2026-10-03)
 
-Người làm: Claude. Trạng thái: **đã làm xong trong mã nguồn, có demo, đang chờ chủ dự án duyệt rồi mới build.** Portal (bản build tĩnh) chưa đổi.
+Người làm: Claude. Trạng thái: chủ dự án đã commit (`d36a44d`) và build. Sau đó có thêm đợt chỉnh độ to (mục 10).
 
 ## 1. Yêu cầu
 
@@ -157,3 +157,38 @@ Máy chủ dev: `pnpm dev` (cổng 3004). Tất cả nằm trong `.visual/`, th�
   - cho chuỗi làm tiếng sáng hơn thay vì cao hơn (tăng `heat`).
 - Ảnh golden (CC05) có thân tím, viền vàng. Ở cỡ nhỏ trông gần như tím, chỉ cột sáng và quầng sáng là vàng. Nếu muốn vàng rõ hơn, cần nhờ AI vẽ lại CC05.
 - Một số quái có hình pha lê tím (ví dụ prism sprite), dễ lẫn với credit. Có thể đổi màu quầng credit nếu chủ dự án thấy rối.
+
+## 10. Đợt 2: tiếng credit quá nhỏ, thêm thanh chỉnh riêng (2026-10-03)
+
+**Chủ dự án:** "chúng ta có setting cho phần âm thanh của credit hay k, vì hiện tại tôi thấy âm thanh khá bé, khiến nó nghe khá khó".
+
+**Nguyên nhân (đo bằng `.visual/credit-levels.js`, K-weighted, 100 ms to nhất, SFX 50 %):**
+- Một tiếng pha lê −39, trong khi tiếng đạn trúng là −31,5 và tiếng hạ địch là −26,6. Tức là nhỏ hơn tiếng trúng 8 dB.
+- Pha lê bay về đúng lúc game đọc phát âm từ vừa gõ. Nhóm `combat` khi đó bị hạ còn 38 %, nên tiếng pha lê còn −46, gần như không nghe thấy.
+
+**Đã sửa:**
+- **Nhóm âm mới `rewards`** (`src/audio/mix.ts`): hệ số 0,86 (combat 0,72, warnings 0,9). Khi đọc phát âm chỉ hạ còn 70 % (combat 38 %). Giọng đọc vẫn to nhất, cảnh báo vẫn trên credit; có bài kiểm tra trong `tests/audio-mix.test.ts`.
+- **Tăng độ to** (`src/audio/credit-sound.ts`):
+  - tiếng từng viên: 0,2 → 0,48;
+  - hợp âm viên chính giảm tỉ lệ (0,6 / 0,4 / 0,34 × tiếng viên) để không quá chói;
+  - tiếng rơi tăng khoảng 1,33 lần;
+  - mốc chuỗi 0,11 → 0,18.
+- **Thanh chỉnh "Credit sound volume"** trong Settings → sound, ngay dưới SFX volume:
+  - từ 0 đến 200 %, bước 10 %, mặc định 100 %;
+  - nhân thêm lên trên SFX volume;
+  - lưu ở `GameSettings.creditVolume` (không bắt buộc; bản lưu cũ tự lấy 1);
+  - đường đi: `Game.updateSettings` → `Sfx.setCreditVolume`.
+
+**Số đo sau khi sửa (cùng cách đo):**
+
+| Tiếng | Trước | Sau |
+|---|---|---|
+| Một viên | −39 | −32 (ngang tiếng đạn trúng) |
+| Một viên lúc đang đọc phát âm | −46 | −35 |
+| Hợp âm viên chính | −31,8 | −29,1 |
+| Rơi ra (common) | −34,1 | −30,4 |
+| Elite về đủ | −27,3 | −25,9 |
+
+Trong cảnh hạ 12 địch liên tục, tiếng trung bình to hơn khoảng 6 dB. Lúc nhiều tiếng chồng nhau (trùm, Nova), đỉnh chạm bộ giới hạn chung −6 dBFS, nên không bị vỡ tiếng.
+
+Tệp WAV mới (`B-*`, `AB-*` trong `.visual/credit-audio/`) đã xuất lại theo mức mới. Trang tạo âm thanh nhận thêm `&pron=1` (giả lập đang đọc phát âm) và `&credit=1.5` (thanh chỉnh 150 %).

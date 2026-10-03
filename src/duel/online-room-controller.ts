@@ -13,6 +13,7 @@ import {
   type DuelRoomUiController,
 } from "./room-ui";
 import type { DuelRoomSnapshot } from "./room";
+import type { DuelRoomListing } from "./protocol";
 
 export type DuelOnlineRoomControllerConfig = {
   clientVersion: string;
@@ -30,6 +31,24 @@ export type DuelOnlineRoomControllerConfig = {
   characterId?(): string;
   /** Room updates (e.g. to preload the opponent's 3D hull before the match). */
   onRoomSnapshot?(room: DuelClientRoomSnapshot): void;
+  /**
+   * The public room list while watchRoomList(true) is on: once right away,
+   * then on every change (at most ~4 per second). Replace the whole list.
+   */
+  onRoomList?(rooms: readonly DuelRoomListing[]): void;
+  /** Connection changes; the room list is only live while "connected". */
+  onConnectionStatus?(status: DuelNetworkStatus): void;
+  /** "Change ship" on the lobby pilot card. */
+  onChangeShip?(): void;
+};
+
+export type DuelOnlineJoinRequest = {
+  /** DuelRoomListing.roomId. */
+  roomId: string;
+  /** Needed when DuelRoomListing.hasPassword is true. */
+  password?: string;
+  /** Required by JOIN_ROOM; the server shows the signed-in pilot name instead. */
+  displayName: string;
 };
 
 type SessionResponse = {
@@ -135,11 +154,19 @@ export function installDuelOnlineRoomController(
 ): {
   client: DuelNetworkClient;
   ui: DuelRoomUiController;
+  /**
+   * Starts (true) or stops (false) the public room list. Connects if
+   * needed; re-subscribes by itself after a reconnect while on.
+   */
+  watchRoomList(watch: boolean): void;
+  /** Joins a room (e.g. from the list), connecting first if needed. */
+  joinRoom(request: DuelOnlineJoinRequest): void;
 } {
   let ui: DuelRoomUiController | null = null;
   let tokenPromise: Promise<string> | null = null;
   let obtainingSession = false;
   let sentLoadout: string | null = null;
+  let roomListReceived = false;
   const pending: Array<() => void> = [];
 
   const client = new DuelNetworkClient({
@@ -151,6 +178,8 @@ export function installDuelOnlineRoomController(
         ui?.setConnectionLabel(
           statusLabel(status),
         );
+        ui?.setConnectionState(status);
+        config.onConnectionStatus?.(status);
         if (status === "connected") {
           const queued = pending.splice(0);
           for (const action of queued) action();
@@ -175,6 +204,11 @@ export function installDuelOnlineRoomController(
       },
       onRoomClosed(_roomId, reason) {
         ui?.clearRemoteRoom(reason);
+      },
+      onRoomList(rooms) {
+        roomListReceived = true;
+        ui?.setRoomList(rooms);
+        config.onRoomList?.(rooms);
       },
       onRankedQueueStatus(status) {
         ui?.setRankedQueueStatus(status);
@@ -201,6 +235,18 @@ export function installDuelOnlineRoomController(
         config.onPrediction?.(prediction);
       },
       onError(code, message) {
+        if (
+          code === "BAD_MESSAGE" &&
+          client.isWatchingRooms() &&
+          !roomListReceived
+        ) {
+          // A server from before the room list rejects WATCH_ROOMS.
+          ui?.setStatus(
+            "This Duel server is older and has no room list yet. Restart it (pnpm duel:local:restart). Rooms by code, Ranked and Practice still work.",
+            true,
+          );
+          return;
+        }
         ui?.setStatus(
           code + " · " + message,
           true,
@@ -262,23 +308,38 @@ export function installDuelOnlineRoomController(
     void ensureConnected();
   };
 
+  const watchRoomList = (watch: boolean): void => {
+    // Remembered by the client and sent after each WELCOME, so no queueing here.
+    client.watchRooms(watch);
+    if (watch) void ensureConnected();
+  };
+
+  const joinRoom = (request: DuelOnlineJoinRequest): void => {
+    runOnline(() => {
+      client.joinRoom({
+        roomId: request.roomId,
+        password: request.password,
+        displayName: request.displayName,
+      });
+    });
+  };
+
   ui = installDuelRoomUi({
     onOpen() {
       void ensureConnected();
     },
+    onRoomListWatch(watch) {
+      watchRoomList(watch);
+    },
+    selfShipId: config.characterId,
+    onChangeShip: config.onChangeShip,
     onCreateRequest(request) {
       runOnline(() => {
         client.createRoom(request.settings);
       });
     },
     onJoinRequest(request) {
-      runOnline(() => {
-        client.joinRoom({
-          roomId: request.roomId,
-          password: request.password,
-          displayName: request.displayName,
-        });
-      });
+      joinRoom(request);
     },
     onReadyRequest(roomId, ready) {
       runOnline(() => {
@@ -330,6 +391,7 @@ export function installDuelOnlineRoomController(
   ui.setConnectionLabel(
     statusLabel(client.currentStatus()),
   );
+  ui.setConnectionState(client.currentStatus());
 
-  return { client, ui };
+  return { client, ui, watchRoomList, joinRoom };
 }

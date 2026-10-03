@@ -5,6 +5,7 @@ export const AUDIO_GROUPS = [
   "combat",
   "warnings",
   "ui",
+  "rewards",
 ] as const;
 
 export type AudioGroup = (typeof AUDIO_GROUPS)[number];
@@ -14,6 +15,9 @@ export const AUDIO_GROUP_GAIN: Record<AudioGroup, number> = {
   combat: 0.72,
   warnings: 0.9,
   ui: 0.62,
+  // Credit crystal drops and pickups: above combat so the gem stream reads
+  // through explosions, below warnings.
+  rewards: 0.86,
 };
 
 export const PRONUNCIATION_DUCK: Record<AudioGroup, number> = {
@@ -21,6 +25,9 @@ export const PRONUNCIATION_DUCK: Record<AudioGroup, number> = {
   combat: 0.38,
   warnings: 0.68,
   ui: 0.45,
+  // Crystals fly home while the word is being spoken; a light dip keeps the
+  // voice on top without losing the pickup stream.
+  rewards: 0.7,
 };
 
 export function mixedSfxGain(

@@ -123,7 +123,7 @@ export class CreditSoundEngine {
             kit,
             now + 0.02 + this.random() * 0.12,
             CREDIT_LADDER_HZ[5 + Math.floor(this.random() * 7)]!,
-            0.08,
+            0.11,
             0.12,
             this.spread(pan, 0.5),
             0.2,
@@ -140,11 +140,11 @@ export class CreditSoundEngine {
     if (out === null) return false;
 
     // Pop: the crystal cracking free.
-    this.sweep(context, out, now, "sine", 260, 72, 0.11, 0.36 * weight);
+    this.sweep(context, out, now, "sine", 260, 72, 0.11, 0.48 * weight);
     // Glass crack and a short bright fizz.
-    this.burst(context, kit, out, now, 0.05, 0.2 * weight, "bandpass", 3800, 0.9);
+    this.burst(context, kit, out, now, 0.05, 0.27 * weight, "bandpass", 3800, 0.9);
     if (quality !== "low") {
-      this.burst(context, kit, out, now + 0.005, 0.16, 0.06, "highpass", 7000, 0.7);
+      this.burst(context, kit, out, now + 0.005, 0.16, 0.08, "highpass", 7000, 0.7);
     }
 
     // Gems scattering: tinkles bunched at the start, thinning out.
@@ -157,7 +157,7 @@ export class CreditSoundEngine {
         kit,
         t,
         CREDIT_LADDER_HZ[index]!,
-        0.11 * (1 - (0.5 * k) / count),
+        0.15 * (1 - (0.5 * k) / count),
         0.13,
         this.spread(pan, 0.5),
         0.25,
@@ -195,7 +195,7 @@ export class CreditSoundEngine {
 
     const rank = TIER_RANK[input.tier];
     const heat = Math.min(1, Math.max(0, input.chain - 1) / 10);
-    const gain = (0.2 + rank * 0.01) * crowd;
+    const gain = (0.48 + rank * 0.02) * crowd;
     const index = creditLadderIndex(input.step, creditOrderOffset(input.order));
     const pan = this.spread(input.pan, 0.18);
     const wet = 0.2 + heat * 0.14;
@@ -203,9 +203,9 @@ export class CreditSoundEngine {
     if (input.anchor) {
       // The big crystal closes its burst with a little chord.
       const root = creditLadderIndex(input.step);
-      this.gem(context, kit, when, CREDIT_LADDER_HZ[root]!, gain * 1.05, 0.26, pan, wet, heat, true);
-      this.gem(context, kit, when + 0.012, CREDIT_LADDER_HZ[Math.min(TOP, root + 2)]!, gain * 0.7, 0.24, pan, wet, heat);
-      this.gem(context, kit, when + 0.024, CREDIT_LADDER_HZ[Math.min(TOP, root + 4)]!, gain * 0.6, 0.28, pan, wet, heat);
+      this.gem(context, kit, when, CREDIT_LADDER_HZ[root]!, gain * 0.6, 0.26, pan, wet, heat, true);
+      this.gem(context, kit, when + 0.012, CREDIT_LADDER_HZ[Math.min(TOP, root + 2)]!, gain * 0.4, 0.24, pan, wet, heat);
+      this.gem(context, kit, when + 0.024, CREDIT_LADDER_HZ[Math.min(TOP, root + 4)]!, gain * 0.34, 0.28, pan, wet, heat);
       return true;
     }
     this.gem(context, kit, when, CREDIT_LADDER_HZ[index]!, gain, 0.2, pan, wet, heat);
@@ -264,7 +264,7 @@ export class CreditSoundEngine {
         kit,
         now + k * 0.028,
         CREDIT_LADDER_HZ[Math.min(TOP, root + 3 + k)]!,
-        0.11 + k * 0.008,
+        0.18 + k * 0.012,
         0.22,
         this.spread(pan, 0.3),
         0.4,

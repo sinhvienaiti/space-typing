@@ -6,7 +6,9 @@ import type {
 import type { DuelRoomBotConfig, DuelRoomSettingsInput } from "./room";
 import {
   DUEL_PROTOCOL_VERSION,
+  parseDuelRoomListMessage,
   type DuelClientMessage,
+  type DuelRoomListing,
   type DuelWireIntent,
 } from "./protocol";
 import {
@@ -51,6 +53,8 @@ export type DuelNetworkCallbacks = {
   onStatus?(status: DuelNetworkStatus): void;
   onRoomSnapshot?(room: DuelClientRoomSnapshot): void;
   onRoomClosed?(roomId: string, reason: string): void;
+  /** The public room list, after watchRooms(true) and on every change. */
+  onRoomList?(rooms: readonly DuelRoomListing[]): void;
   onRankedQueueStatus?(
     status: DuelRankedQueueClientStatus,
   ): void;
@@ -140,6 +144,7 @@ export class DuelNetworkClient {
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private manualClose = false;
+  private watchingRooms = false;
   private requestSequence = 0;
   private intentSequence = 0;
   private lastServerSequence = -1;
@@ -306,6 +311,21 @@ export class DuelNetworkClient {
     });
   }
 
+  /**
+   * Subscribes to (or stops) the public room list. The choice is remembered
+   * and re-sent after every WELCOME, so a reconnect re-subscribes by itself.
+   * Returns whether it went out now (false while not connected).
+   */
+  watchRooms(watch: boolean): boolean {
+    this.watchingRooms = watch;
+    if (this.status !== "connected") return false;
+    return this.sendWatchRooms(watch);
+  }
+
+  isWatchingRooms(): boolean {
+    return this.watchingRooms;
+  }
+
   sendIntent(intent: DuelWireIntent): number | null {
     const view = this.view;
     if (
@@ -443,6 +463,8 @@ export class DuelNetworkClient {
           parsed.reconnectToken,
         );
         this.reconnectAttempt = 0;
+        // A new socket starts unsubscribed on the server.
+        if (this.watchingRooms) this.sendWatchRooms(true);
         this.setStatus("connected");
         return;
       }
@@ -466,6 +488,12 @@ export class DuelNetworkClient {
           );
         }
         return;
+
+      case "ROOM_LIST": {
+        const list = parseDuelRoomListMessage(parsed);
+        if (list !== null) this.callbacks.onRoomList?.(list.rooms);
+        return;
+      }
 
       case "RANKED_QUEUE_STATUS": {
         if (
@@ -798,6 +826,14 @@ export class DuelNetworkClient {
     }
     socket.send(JSON.stringify(message));
     return true;
+  }
+
+  private sendWatchRooms(watch: boolean): boolean {
+    return this.sendMessage({
+      type: "WATCH_ROOMS",
+      requestId: this.nextRequestId(),
+      watch,
+    });
   }
 
   private nextRequestId(): string {

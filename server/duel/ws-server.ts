@@ -41,6 +41,7 @@ import {
 import {
   duelMatchmakingRating,
 } from "../../src/duel/ranked";
+import { DuelRoomListWatchers } from "./room-list-watchers";
 
 type ConnectionState = {
   sessionId: string | null;
@@ -171,6 +172,13 @@ const ranked = new DuelRankedService(
   rankedStore,
   () => randomBytes(18).toString("base64url"),
 );
+
+const roomList = new DuelRoomListWatchers<WebSocket>({
+  listings: () => authority.roomListings(),
+  push(socket, rooms) {
+    send(socket, { type: "ROOM_LIST", rooms });
+  },
+});
 
 function isOriginAllowed(origin: string | undefined): boolean {
   if (origin === undefined) return ALLOW_NO_ORIGIN;
@@ -470,6 +478,7 @@ function roomMutation<T>(
     return false;
   }
   broadcastRoom(roomId);
+  roomList.notifyChanged();
   return true;
 }
 
@@ -528,6 +537,7 @@ function handleAuthenticatedMessage(
         type: "ROOM_SNAPSHOT",
         room: result.value,
       });
+      roomList.notifyChanged();
       return;
     }
 
@@ -593,6 +603,7 @@ function handleAuthenticatedMessage(
           });
         }
       }
+      roomList.notifyChanged();
       return;
     }
 
@@ -672,6 +683,7 @@ function handleAuthenticatedMessage(
       }
       activeMatches.add(result.value.matchId);
       sendUpdates(result.value.updates);
+      roomList.notifyChanged();
       return;
     }
 
@@ -703,6 +715,15 @@ function handleAuthenticatedMessage(
       });
       return;
     }
+
+    case "WATCH_ROOMS":
+      // Per socket and separate from room membership: a player in a room may watch too.
+      if (message.watch) {
+        roomList.watch(socket);
+      } else {
+        roomList.unwatch(socket);
+      }
+      return;
 
     case "INTENT": {
       const result = authority.submitIntent(
@@ -805,6 +826,7 @@ wss.on("connection", (socket) => {
 
   socket.on("close", () => {
     clearTimeout(helloTimer);
+    roomList.unwatch(socket);
     const current = states.get(socket);
     states.delete(socket);
     if (current?.sessionId === null || current === undefined) {
@@ -919,6 +941,7 @@ const tickTimer = setInterval(() => {
       );
       if (!result.ok) {
         activeMatches.delete(matchId);
+        roomList.notifyChanged();
         continue;
       }
       sendUpdates(result.value.updates);
@@ -931,7 +954,11 @@ const tickTimer = setInterval(() => {
         (update) =>
           update.view.series.status === "active",
       );
-      if (!active) activeMatches.delete(matchId);
+      if (!active) {
+        activeMatches.delete(matchId);
+        // A finished Friend match leaves the public room list.
+        roomList.notifyChanged();
+      }
     }
   }
 }, 25);
@@ -960,12 +987,15 @@ const heartbeatTimer = setInterval(() => {
 
 const cleanupTimer = setInterval(() => {
   authority.cleanup(Date.now());
+  // Expiry can close rooms; watchers only get a push if the list differs.
+  roomList.notifyChanged();
 }, 5000);
 
 function shutdown(): void {
   clearInterval(tickTimer);
   clearInterval(heartbeatTimer);
   clearInterval(cleanupTimer);
+  roomList.dispose();
   for (const socket of states.keys()) {
     socket.close(1001, "Server shutting down.");
   }

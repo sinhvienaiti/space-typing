@@ -1,9 +1,31 @@
+import "@fontsource/exo-2/600.css";
+import "@fontsource/exo-2/700.css";
+import "@fontsource/exo-2/800.css";
+import "@fontsource/exo-2/800-italic.css";
+import "@fontsource/be-vietnam-pro/400.css";
+import "@fontsource/be-vietnam-pro/500.css";
+import "@fontsource/be-vietnam-pro/600.css";
+import "@fontsource/be-vietnam-pro/700.css";
+import "@fontsource/spectral/700.css";
 import "./styles.css";
 import "./character-progress.css";
 import "./basic-skills.css";
 import "./kill-translation.css";
 import "./duel/battle.css";
 import "./duel/battle-juice.css";
+import "./ui/holo.css";
+import "./ui/holo-lobby.css";
+import "./ui/reward-cards.css";
+import {
+  installRewardCardKeys,
+  renderRewardCards,
+  rewardTierForGrade,
+  rewardTierLabel,
+  type RewardCardInput,
+} from "./ui/reward-card";
+import { installIconStyles } from "./ui/icons";
+import { installHoloTooltips } from "./ui/holo-tooltip";
+import { installTitleHub, type TitleHub, type TitleHubPilot } from "./ui/title-hub";
 import { installDuelOnlineRoomController } from "./duel/online-room-controller";
 import { installDuelBattleUi } from "./duel/battle-ui";
 import { DuelLocalPracticeMatch } from "./duel/local-match";
@@ -91,6 +113,7 @@ import {
   createStageConfig,
   stageRole,
   GALAXY_COUNT,
+  MAX_CAMPAIGN_STAGE,
   STAGES_PER_GALAXY,
 } from "./campaign/stage";
 import {
@@ -504,6 +527,7 @@ import {
 } from "./expansion-v2/feature-flags";
 import {
   bossPartIconUrl,
+  relicIconUrl,
 } from "./expansion-v2/asset-map";
 import {
   campaignReferencePatternOverride,
@@ -620,6 +644,7 @@ type VocabularySourceTab = VocabularySource["mode"];
 
 const defaultSettings: GameSettings = {
   sfxVolume: 0.5,
+  creditVolume: 1,
   musicVolume: 0.26,
   ambientVolume: 0.08,
   screenShake: true,
@@ -651,6 +676,10 @@ function loadSettings(): GameSettings {
         typeof parsed.sfxVolume === "number"
           ? Math.min(1, Math.max(0, parsed.sfxVolume))
           : defaultSettings.sfxVolume,
+      creditVolume:
+        typeof parsed.creditVolume === "number" && Number.isFinite(parsed.creditVolume)
+          ? Math.min(2, Math.max(0, parsed.creditVolume))
+          : defaultSettings.creditVolume,
       musicVolume:
         typeof parsed.musicVolume === "number"
           ? Math.min(1, Math.max(0, parsed.musicVolume))
@@ -803,6 +832,8 @@ function byId<T extends HTMLElement = HTMLElement>(id: string): T {
 
 
 let settings = loadSettings();
+/** Title hub controls (src/ui/title-hub.ts), installed once the game exists. */
+let titleHub: TitleHub | null = null;
 let difficultySettings = loadDifficultySettings();
 let activeStageDifficulty: DifficultyProfile | null = null;
 let campaign = createDefaultCampaignProgress();
@@ -926,24 +957,29 @@ let currentGalaxy = Math.ceil(campaign.selectedStage / STAGES_PER_GALAXY);
 let selectedJourneyWorld = Math.ceil(campaign.selectedStage / 20);
 let selectedJourneyStage = campaign.selectedStage;
 
-/** Keyboard-, mouse- and touch-accessible help on existing menu actions.
+/** Short help on hub actions, shown by the shared tooltip (data-tip).
  * Existing button IDs and their action listeners remain unchanged. */
 function installMenuHelp(): void {
   const descriptions: Record<string, string> = {
-    routeButton: "Sector, boss, checkpoint",
-    stageSelectButton: "Replay unlocked stages",
-    characterButton: "Pilot and progression",
+    routeButton: "Sector briefing: bosses, checkpoints and route",
+    stageSelectButton: "Replay any unlocked stage",
+    startButton: "Continue the Campaign from your current stage",
+    combatModeButton: "Combat: see the word, type it, shoot",
+    recallModeButton: "Recall: hear the word, recall and type it",
+    characterButton: "Pilots, ships and their progression",
     equipmentButton: "Gear and combat stats",
-    supportButton: "Missiles, railgun, fields",
-    hotbarButton: "Skills/items on 1-9",
-    vocabularyButton: "Vocabulary source",
+    supportButton: "Missiles, railgun and fields",
+    hotbarButton: "Skills and items on keys 1-9",
+    vocabularyButton: "Choose the vocabulary source",
     progressionButton: "Missions and rewards",
-    codexButton: "Codex entries",
-    settingsButton: "Audio/display/Recall",
-    dataButton: "Save/performance info",
+    codexButton: "Enemies, worlds and lore you discovered",
+    ascensionButton: "Harder replays for bigger rewards",
+    dataButton: "Save, backup and performance info",
     shopButton: "Finite-stock shop",
     stationShopButton: "Station items",
-    serviceShopButton: "Repair/upgrade",
+    serviceShopButton: "Repair and upgrade",
+    duelModeButton: "1v1 online rooms, ranked matches or a bot",
+    titleRecallStartButton: "Start the Campaign stage in Recall mode",
     expeditionButton:
       "8-encounter run with an isolated loaner build, run-only Relics, rest choices, encounter conditions and a final boss. Campaign economy and progression stay unchanged.",
     expeditionDailyButton:
@@ -952,64 +988,16 @@ function installMenuHelp(): void {
       "Show or hide comparable Personal Best checkpoint cues during Daily Expedition. Ghost is guidance only and gives no gameplay bonus.",
   };
 
-  const wrappers: HTMLElement[] = [];
   for (const [id, description] of Object.entries(descriptions)) {
-    const candidate = document.getElementById(id);
-    if (!(candidate instanceof HTMLButtonElement)) continue;
-    const action = candidate;
-    if (action.closest(".menu-help-wrap") !== null) continue;
-    const title = action.textContent || id;
-    const parent = action.parentElement;
-    if (parent === null) continue;
-    const wrap = document.createElement("div");
-    wrap.className = "menu-help-wrap";
-    const tip = document.createElement("span");
-    tip.className = "menu-help-popup";
-    tip.id = "help-" + id;
-    tip.setAttribute("role", "tooltip");
-    tip.textContent = description;
-
-    const trigger = document.createElement("button");
-    trigger.type = "button";
-    trigger.className = "menu-help-trigger";
-    trigger.setAttribute("aria-label", "About " + title);
-    trigger.setAttribute("aria-describedby", tip.id);
-    trigger.setAttribute("aria-expanded", "false");
-    trigger.textContent = "ⓘ";
-    trigger.addEventListener("click", (event) => {
-      event.stopPropagation();
-      const wasOpen = wrap.dataset.open === "true";
-      for (const other of wrappers) {
-        other.dataset.open = "false";
-        other.querySelector(".menu-help-trigger")?.setAttribute("aria-expanded", "false");
-      }
-      wrap.dataset.open = String(!wasOpen);
-      trigger.setAttribute("aria-expanded", String(!wasOpen));
-    });
-    parent.insertBefore(wrap, action);
-    wrap.append(action, trigger, tip);
-    wrappers.push(wrap);
-    // The dedicated info trigger owns help. Avoid a second native tooltip on
-    // the action text itself, which otherwise produces duplicate hover UI.
-    action.removeAttribute("title");
+    const element = document.getElementById(id);
+    if (element === null || element.dataset.tip !== undefined) continue;
+    element.dataset.tip = description;
+    element.removeAttribute("title");
   }
-
-  document.addEventListener("click", (event) => {
-    if ((event.target as Element).closest(".menu-help-wrap") !== null) return;
-    for (const wrap of wrappers) {
-      wrap.dataset.open = "false";
-      wrap.querySelector(".menu-help-trigger")?.setAttribute("aria-expanded", "false");
-    }
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") return;
-    for (const wrap of wrappers) {
-      wrap.dataset.open = "false";
-      wrap.querySelector(".menu-help-trigger")?.setAttribute("aria-expanded", "false");
-    }
-  });
 }
 
+installIconStyles();
+installHoloTooltips();
 installMenuHelp();
 
 let latestKillTranslation: VocabularyEntry | null = null;
@@ -1276,6 +1264,8 @@ duelOnlineController = installDuelOnlineRoomController({
   clientVersion: "0.1.0",
   // Fly your selected hull online too; the other player sees it.
   characterId: () => characters.selected,
+  // The hangar opens over the lobby; the pilot card refreshes on close.
+  onChangeShip: () => byId<HTMLButtonElement>("characterButton").click(),
   onRoomSnapshot(room) {
     // Opponent known in the room lobby: load their 3D hull before the match.
     const opponent = room.selfSlotIndex === null ? null : room.slots[room.selfSlotIndex === 0 ? 1 : 0];
@@ -1305,6 +1295,12 @@ duelOnlineController = installDuelOnlineRoomController({
   },
 });
 
+// Back from the hangar: the Duel lobby pilot card shows the new ship.
+byId<HTMLDialogElement>("characterDialog").addEventListener("close", () => {
+  duelOnlineController?.ui.refreshSelf();
+});
+
+installRewardCardKeys(rewardChoiceDialog, byId("rewardChoiceGrid"));
 rewardChoiceDialog.addEventListener("cancel", (event) => {
   event.preventDefault();
 });
@@ -2318,6 +2314,7 @@ function renderPlayerStatusIdentity(): void {
   const progress = characters.progress[characters.selected];
   byId("playerStatusName").textContent = character.name;
   byId("playerStatusLevel").textContent = "Lv " + String(progress.level);
+  titleHub?.render();
 }
 
 function showNotice(message: string): void {
@@ -2333,6 +2330,8 @@ function showNotice(message: string): void {
 
 function renderPhase(phase: GamePhase): void {
   titleOverlay.classList.toggle("hidden", phase !== "title");
+  if (phase === "title") titleHub?.render();
+  else titleHub?.closePopovers();
   pauseOverlay.classList.toggle("hidden", phase !== "paused");
   gameOverOverlay.classList.toggle("hidden", phase !== "gameover");
   stageClearOverlay.classList.toggle("hidden", phase !== "stageclear");
@@ -2976,143 +2975,128 @@ function renderAnomalyDecision(riskHullRatio: number): void {
     "% max Hull (cannot reduce Hull below 1) for a stronger reward table.";
 }
 
+/** Painted crystal art for currency cards (Vite resolves the URL). */
+const BOSS_CACHE_ART = new URL("./assets/pickups/credits/elite@2x.webp", import.meta.url).href;
+const PREMIUM_CACHE_ART = new URL("./assets/pickups/credits/elite-golden@2x.webp", import.meta.url).href;
+
+function equipmentRewardCard(
+  definitionId: Parameters<typeof getEquipmentDefinition>[0],
+  grade: EquipmentDrop["grade"],
+  onPick: () => void,
+): RewardCardInput {
+  const definition = getEquipmentDefinition(definitionId);
+  const tier = rewardTierForGrade(grade);
+  return {
+    tier,
+    tag: "Equipment · " + gradeLabel(grade),
+    title: definition.name,
+    description: definition.description,
+    iconUrl: paintedEquipmentIcon(definition.id),
+    iconDark: true,
+    glyph: definition.icon,
+    onPick,
+  };
+}
+
 function renderRewardChoiceOptions(
   options: readonly EquipmentDrop[],
 ): void {
-  const grid = byId("rewardChoiceGrid");
-  grid.replaceChildren();
-
-  for (const option of options) {
-    const definition = getEquipmentDefinition(option.definitionId);
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "reward-choice-option";
-
-    const grade = document.createElement("span");
-    grade.textContent = gradeLabel(option.grade).toUpperCase();
-
-    const name = document.createElement("strong");
-    name.textContent = definition.name;
-
-    const description = document.createElement("small");
-    description.textContent = definition.description;
-
-    button.append(grade, name, description);
-    button.addEventListener("click", () => {
-      equipment = addEquipmentInstance(equipment, {
-        instanceId: createEquipmentDropInstanceId(),
-        definitionId: option.definitionId,
-        grade: option.grade,
-        enhancement: 0,
-      });
-      progression = recordProgressionEvent(progression, {
-        type: "equipment-drop",
-      });
-      renderEquipment();
-      renderProgression();
-      void autosaveCampaign(
-        "equipment",
-        "✓ Reward selected · " + definition.name,
-      );
-      rewardChoiceDialog.close();
-      game.resume();
-    });
-
-    grid.append(button);
-  }
-}
-
-function renderBossRewardChoiceOptions(
-  options: readonly BossRewardChoiceOption[],
-): void {
-  const grid = byId("rewardChoiceGrid");
-  grid.replaceChildren();
-
-  for (const option of options) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "reward-choice-option";
-
-    const kind = document.createElement("span");
-    kind.textContent = option.kind.toUpperCase();
-
-    const name = document.createElement("strong");
-    const description = document.createElement("small");
-    const extra = document.createElement("div");
-    extra.className = "reward-choice-extra";
-
-    if (option.kind === "equipment") {
-      const definition = getEquipmentDefinition(option.drop.definitionId);
-      applyGradeFrame(button, option.drop.grade);
-      extra.append(
-        createLocalIcon(
-          definition.icon,
-          definition.name + " icon",
-          "reward-choice-icon",
-        ),
-        createGradeBadge(option.drop.grade),
-      );
-      name.textContent = definition.name;
-      description.textContent = definition.description;
-    } else if (option.kind === "relic") {
-      const definition = getRelicDefinition(option.relicId);
-      applyGradeFrame(button, definition.grade);
-      extra.append(createGradeBadge(definition.grade));
-      name.textContent = definition.name;
-      description.textContent = definition.description;
-    } else {
-      name.textContent = option.id === "premium-currency"
-        ? "Premium Cache"
-        : "Boss Cache";
-      description.textContent = "Currency reward";
-      replaceCurrencyChips(
-        extra,
-        {
-          credits: option.credits,
-          alloy: option.currencies.alloy,
-          starCrystal: option.currencies.starCrystal,
-          quantumCore: option.currencies.quantumCore,
-        },
-        { signed: true },
-      );
-    }
-
-    button.classList.add("visual-card");
-    button.append(kind, extra, name, description);
-    button.addEventListener("click", () => {
-      if (option.kind === "equipment") {
+  renderRewardCards(
+    byId("rewardChoiceGrid"),
+    options.map((option) =>
+      equipmentRewardCard(option.definitionId, option.grade, () => {
+        const definition = getEquipmentDefinition(option.definitionId);
         equipment = addEquipmentInstance(equipment, {
           instanceId: createEquipmentDropInstanceId(),
-          definitionId: option.drop.definitionId,
-          grade: option.drop.grade,
+          definitionId: option.definitionId,
+          grade: option.grade,
           enhancement: 0,
         });
         progression = recordProgressionEvent(progression, {
           type: "equipment-drop",
         });
-      } else if (option.kind === "relic") {
-        relics = grantRelic(relics, option.relicId).state;
-        applyRelicEffects();
-      } else {
-        credits = addCredits(credits, option.credits);
-        expansionCurrencies = addExpansionCurrencyReward(
-          expansionCurrencies,
-          option.currencies,
+        renderEquipment();
+        renderProgression();
+        void autosaveCampaign(
+          "equipment",
+          "✓ Reward selected · " + definition.name,
         );
+        rewardChoiceDialog.close();
+        game.resume();
+      }),
+    ),
+  );
+}
+
+function renderBossRewardChoiceOptions(
+  options: readonly BossRewardChoiceOption[],
+): void {
+  const pick = (option: BossRewardChoiceOption): void => {
+    if (option.kind === "equipment") {
+      equipment = addEquipmentInstance(equipment, {
+        instanceId: createEquipmentDropInstanceId(),
+        definitionId: option.drop.definitionId,
+        grade: option.drop.grade,
+        enhancement: 0,
+      });
+      progression = recordProgressionEvent(progression, {
+        type: "equipment-drop",
+      });
+    } else if (option.kind === "relic") {
+      relics = grantRelic(relics, option.relicId).state;
+      applyRelicEffects();
+    } else {
+      credits = addCredits(credits, option.credits);
+      expansionCurrencies = addExpansionCurrencyReward(
+        expansionCurrencies,
+        option.currencies,
+      );
+    }
+
+    codex = discoverCodexReward(codex, "boss-choice").state;
+    renderEquipment();
+    renderProgression();
+    renderCodex();
+    updateDataSummary();
+    rewardChoiceDialog.close();
+    game.resume();
+    game.resolveBossRewardChoice();
+  };
+
+  renderRewardCards(
+    byId("rewardChoiceGrid"),
+    options.map((option): RewardCardInput => {
+      if (option.kind === "equipment") {
+        return equipmentRewardCard(option.drop.definitionId, option.drop.grade, () => pick(option));
       }
-
-      codex = discoverCodexReward(codex, "boss-choice").state;
-      renderEquipment();
-      renderProgression();
-      renderCodex();
-      updateDataSummary();
-      rewardChoiceDialog.close();
-      game.resume();
-      game.resolveBossRewardChoice();
-    });
-
-    grid.append(button);
-  }
+      if (option.kind === "relic") {
+        const definition = getRelicDefinition(option.relicId);
+        const tier = rewardTierForGrade(definition.grade);
+        return {
+          tier,
+          tag: "Relic · " + rewardTierLabel(tier),
+          title: definition.name,
+          description: definition.description,
+          iconUrl: relicIconUrl(option.relicId),
+          glyph: "✧",
+          onPick: () => pick(option),
+        };
+      }
+      const premium = option.id === "premium-currency";
+      const bullets = ["+" + option.credits.toLocaleString() + " Credits"];
+      if (option.currencies.alloy > 0) bullets.push("+" + String(option.currencies.alloy) + " Alloy");
+      if (option.currencies.starCrystal > 0) bullets.push("+" + String(option.currencies.starCrystal) + " Star Crystal");
+      if (option.currencies.quantumCore > 0) bullets.push("+" + String(option.currencies.quantumCore) + " Quantum Core");
+      return {
+        tier: premium ? "prismatic" : "gold",
+        tag: premium ? "Supply · Prismatic" : "Supply · Gold",
+        title: premium ? "Premium Cache" : "Boss Cache",
+        bullets,
+        iconUrl: premium ? PREMIUM_CACHE_ART : BOSS_CACHE_ART,
+        onPick: () => pick(option),
+      };
+    }),
+  );
 }
 
 function clearDeathRecoveryMarker(): void {
@@ -4774,6 +4758,8 @@ if (import.meta.env.DEV) {
   (window as unknown as { __spaceTypingGame?: Game }).__spaceTypingGame = game;
   // Dev-only: the running Practice match, for K.O./round-flow screenshots.
   (window as unknown as { __duelPractice?: () => DuelLocalPracticeMatch | null }).__duelPractice = () => localDuelMatch;
+  // Dev-only: the online room controller, for lobby screenshots with sample rooms.
+  (window as unknown as { __duelOnline?: typeof duelOnlineController }).__duelOnline = duelOnlineController;
 }
 
 function expeditionSeed(): number {
@@ -5404,6 +5390,40 @@ if (!expansionV2Enabled) {
 } else {
   installMenuHelp();
 }
+byId("titleExpeditionCard").classList.toggle("hidden", expeditionUi === null);
+byId("titleOverlay").classList.toggle("holo-three-modes", expeditionUi === null);
+
+function titlePilot(): TitleHubPilot {
+  const character = getCharacter(characters.selected);
+  return {
+    shipId: characters.selected,
+    shipName: character.name,
+    level: characters.progress[characters.selected].level,
+    credits,
+    selectedStage: selectedGameplayStage(),
+    highestStage: campaign.highestUnlockedStage,
+    maxStage: MAX_CAMPAIGN_STAGE,
+    shipsUnlocked: characters.unlocked.length,
+    shipsTotal: CHARACTER_IDS.length,
+    clearedStages: campaign.clearedStages.length,
+  };
+}
+
+titleHub = installTitleHub({
+  getSettings: () => settings,
+  applySettings: (next) => {
+    settings = next;
+    saveSettings();
+  },
+  getPilot: titlePilot,
+  openSettings,
+  openDuel: () => byId<HTMLButtonElement>("duelModeButton").click(),
+  startRecall: () => {
+    selectGameplayMode("recall");
+    byId<HTMLButtonElement>("startButton").click();
+  },
+});
+titleHub.render();
 
 campaignReferenceEventUi = mountCampaignReferenceEventUi({
   onChoice: (choice: CampaignReferenceRouteChoice) => {
@@ -8328,6 +8348,7 @@ function updateCampaignUi(): void {
   musicController.setWorldProfile(
     musicProfileForWorld(selectedWorld),
   );
+  titleHub?.render();
   byId("titleWorldMeta").textContent =
     worldLabel(selectedWorld) +
     " · Stage " +
@@ -8722,6 +8743,11 @@ function renderSettings(): void {
   volume.value = String(renderedSettings.sfxVolume);
   byId<HTMLOutputElement>("sfxValue").value =
     String(Math.round(renderedSettings.sfxVolume * 100)) + "%";
+
+  const creditVolume = renderedSettings.creditVolume ?? 1;
+  byId<HTMLInputElement>("creditVolume").value = String(creditVolume);
+  byId<HTMLOutputElement>("creditVolumeValue").value =
+    String(Math.round(creditVolume * 100)) + "%";
 
   const musicVolume = byId<HTMLInputElement>("musicVolume");
   musicVolume.value = String(renderedSettings.musicVolume);
@@ -10192,6 +10218,7 @@ for (const [id, field] of [
   ["musicVolume", "musicVolume"],
   ["ambientVolume", "ambientVolume"],
   ["sfxVolume", "sfxVolume"],
+  ["creditVolume", "creditVolume"],
   ["pronunciationRate", "pronunciationRate"],
   ["pronunciationVolume", "pronunciationVolume"],
 ] as const) {
@@ -10386,6 +10413,9 @@ byId("settingsSaveButton").addEventListener("click", () => {
 settingsDialog.addEventListener("close", discardSettingsDraft);
 
 window.addEventListener("keydown", (event) => {
+  // Any open dialog owns the keyboard (R09: Esc behind the reward or anomaly
+  // dialog used to toggle pause and resume combat behind the modal).
+  if (document.querySelector("dialog[open]") !== null) return;
   if (
     settingsDialog.open ||
     vocabularyDialog.open ||

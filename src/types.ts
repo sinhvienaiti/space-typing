@@ -59,6 +59,8 @@ export type VocabularyIndex = {
 
 export type GameSettings = {
   sfxVolume: number;
+  /** Credit crystal drop/pickup sounds on top of SFX volume (0–2, 1 = default). */
+  creditVolume?: number;
   musicVolume: number;
   ambientVolume: number;
   screenShake: boolean;
