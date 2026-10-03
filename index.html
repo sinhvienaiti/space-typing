@@ -831,6 +831,9 @@
         <button id="duelPracticeButton" type="button">Practice vs Bot</button>
       </div>
       <p id="duelConnectionStatus" class="data-status">Friend Room · offline</p>
+      <p id="duelRoomStatus" class="data-status" role="status" aria-live="polite">
+        Practice works offline. Friend Rooms and Ranked require the Duel server.
+      </p>
 
       <div class="duel-ranked-strip">
         <div>
@@ -845,7 +848,7 @@
       <p id="duelRankedProfile" class="data-status">Typing 1000 · Duel 1000 · Matchmaking 1000</p>
 
       <label class="setting-row">
-        <span><strong>Pilot name</strong><small>Shown in this Duel room only</small></span>
+        <span><strong>Pilot name</strong><small>Practice name · Friend Rooms use your session identity</small></span>
         <input id="duelDisplayName" type="text" maxlength="32" value="Pilot" />
       </label>
 
@@ -1016,9 +1019,6 @@
         <small id="duelRoomReadyMeta">Both occupied slots must be ready.</small>
       </section>
 
-      <p id="duelRoomStatus" class="data-status" role="status" aria-live="polite">
-        Create a local lobby, practice against a Bot, or connect to a Friend Room.
-      </p>
     </dialog>
 
     <dialog id="settingsDialog" class="settings-dialog">

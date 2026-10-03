@@ -9,3 +9,4 @@ art-src/*
 !art-src/README.md
 # Screenshots from pnpm visual:shot (docs/VISUAL_TESTING.md).
 .visual/
+.duel-local/

@@ -4800,6 +4800,25 @@ kbd {
   color: #839aad;
 }
 
+#duelRoomStatus {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 10px 12px;
+  background: #0b121c;
+  border: 1px solid #254655;
+  border-radius: 8px;
+}
+
+.duel-lobby-panel {
+  scroll-margin-top: 80px;
+}
+
+.duel-lobby-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 #duelRoomStatus.error {
   color: #ff9b91;
 }

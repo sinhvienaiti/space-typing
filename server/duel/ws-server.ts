@@ -31,6 +31,7 @@ import {
 import {
   verifyDuelSessionToken,
 } from "./auth";
+import { createLocalSessionHandler } from "./local-session";
 import {
   DuelRankedService,
   InMemoryDuelRankedProfileStore,
@@ -68,6 +69,7 @@ const defaultDevOrigins = [
   "http://127.0.0.1:3004",
   "http://localhost:3004",
   "https://typing-game.local",
+  "https://space.typing-game.local",
 ];
 
 function envOrigins(): Set<string> {
@@ -85,6 +87,11 @@ function envOrigins(): Set<string> {
 }
 
 const allowedOrigins = envOrigins();
+const localSessions = process.env.DUEL_LOCAL_SESSIONS === "1";
+const handleLocalSession = createLocalSessionHandler({
+  enabled: localSessions, nodeEnv: NODE_ENV, host: HOST,
+  secret: AUTH_SECRET, allowedOrigins,
+});
 
 if (AUTH_SECRET.length < 32) {
   throw new Error(
@@ -216,6 +223,7 @@ function createHttpListener(): HttpServer {
     request: IncomingMessage,
     response: import("node:http").ServerResponse,
   ): void => {
+    if (handleLocalSession(request, response)) return;
     if (request.url === "/healthz") {
       response.writeHead(200, {
         "content-type": "application/json",
@@ -226,6 +234,9 @@ function createHttpListener(): HttpServer {
           ok: true,
           service: "space-typing-duel",
           protocolVersion: DUEL_PROTOCOL_VERSION,
+          localSessions,
+          localInstance: localSessions ? process.env.DUEL_LOCAL_INSTANCE : undefined,
+          pid: localSessions ? process.pid : undefined,
         }),
       );
       return;

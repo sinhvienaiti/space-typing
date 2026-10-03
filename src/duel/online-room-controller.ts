@@ -46,19 +46,6 @@ export function defaultDuelWebSocketUrl(): string {
     window.location.protocol === "https:"
       ? "wss:"
       : "ws:";
-  const localVite =
-    (window.location.hostname === "127.0.0.1" ||
-      window.location.hostname === "localhost") &&
-    window.location.port === "3004";
-
-  if (localVite) {
-    return (
-      scheme +
-      "//" +
-      window.location.hostname +
-      ":3014/duel"
-    );
-  }
   return (
     scheme +
     "//" +
@@ -83,19 +70,25 @@ async function fetchSessionToken(): Promise<string> {
     metaContent("duel-session-endpoint") ??
     "/api/duel/session";
   const response = await fetch(endpoint, {
+    signal: AbortSignal.timeout(8000),
     method: "GET",
     credentials: "same-origin",
     cache: "no-store",
     headers: {
       accept: "application/json",
     },
+  }).catch(() => {
+    throw new Error("Cannot reach the Duel session API. Start the local Duel server (pnpm duel:local), check the proxy, then retry. Practice vs Bot works offline.");
   });
   if (!response.ok) {
     throw new Error(
-      "Duel session endpoint returned HTTP " +
+      "Duel server unavailable (HTTP " +
         String(response.status) +
-        ".",
+        "). Local setup: run pnpm duel:local and check the /api/duel/session proxy. Practice vs Bot works offline.",
     );
+  }
+  if (!response.headers.get("content-type")?.includes("application/json")) {
+    throw new Error("Duel session API is serving a web page instead of JSON. Configure the /api/duel/session and /duel proxies, then start the local Duel server. Practice vs Bot works offline.");
   }
   const body = (await response.json()) as Partial<SessionResponse>;
   if (
@@ -136,6 +129,7 @@ export function installDuelOnlineRoomController(
 } {
   let ui: DuelRoomUiController | null = null;
   let tokenPromise: Promise<string> | null = null;
+  let obtainingSession = false;
   const pending: Array<() => void> = [];
 
   const client = new DuelNetworkClient({
@@ -203,6 +197,7 @@ export function installDuelOnlineRoomController(
   });
 
   const ensureConnected = async (): Promise<void> => {
+    if (obtainingSession) return;
     const status = client.currentStatus();
     if (
       status === "connected" ||
@@ -213,6 +208,8 @@ export function installDuelOnlineRoomController(
       return;
     }
 
+    obtainingSession = true;
+    ui?.setConnectionLabel("Friend Room · requesting session");
     try {
       tokenPromise ??= fetchSessionToken();
       const token = await tokenPromise;
@@ -229,6 +226,8 @@ export function installDuelOnlineRoomController(
           : "Unable to obtain Duel session.",
         true,
       );
+    } finally {
+      obtainingSession = false;
     }
   };
 
@@ -240,6 +239,7 @@ export function installDuelOnlineRoomController(
       return;
     }
     pending.push(action);
+    ui?.setStatus("Connecting to Duel server…");
     void ensureConnected();
   };
 

@@ -266,6 +266,7 @@ export function installDuelRoomUi(
   let remoteRoom: DuelClientRoomSnapshot | null =
     null;
   let localReady = false;
+  let rankedQueued = false;
 
   const setStatus = (
     message: string,
@@ -310,6 +311,7 @@ export function installDuelRoomUi(
       return;
     }
 
+    const newlyVisible = lobby.classList.contains("hidden");
     lobby.classList.remove("hidden");
     el("duelLobbyRoomCode").textContent =
       snapshot.roomId;
@@ -357,16 +359,10 @@ export function installDuelRoomUi(
       !isOwner ||
       snapshot.slots[1].kind !== "bot";
 
-    startButton.classList.toggle(
-      "hidden",
-      !isRemote(),
-    );
+    startButton.classList.remove("hidden");
     startButton.disabled =
       !isOwner || !snapshot.canStart;
-    leaveButton.classList.toggle(
-      "hidden",
-      !isRemote(),
-    );
+    leaveButton.classList.remove("hidden");
 
     el("duelRoomReadyMeta").textContent =
       snapshot.canStart
@@ -376,6 +372,7 @@ export function installDuelRoomUi(
             : "Room ready · waiting for host to start."
           : "Practice room ready."
         : "Both occupied slots must be ready.";
+    if (newlyVisible && dialog.open) lobby.scrollIntoView({ block: "nearest" });
   };
 
   const syncConditionalFields = (): void => {
@@ -505,6 +502,14 @@ export function installDuelRoomUi(
   el("duelPracticeButton").addEventListener(
     "click",
     () => {
+      if (remoteRoom !== null) {
+        setStatus("Leave the Friend Room before starting local practice.", true);
+        return;
+      }
+      if (rankedQueued) {
+        setStatus("Leave the Ranked queue before starting local practice.", true);
+        return;
+      }
       localCounter += 1;
       localRoom = createPracticeDuelRoom({
         roomId: roomCode(localCounter),
@@ -592,7 +597,11 @@ export function installDuelRoomUi(
   startButton.addEventListener(
     "click",
     () => {
-      if (remoteRoom === null) return;
+      if (remoteRoom === null) {
+        const snapshot = localRoom?.snapshot();
+        if (snapshot?.canStart) hooks.onLocalPracticeReady?.(snapshot);
+        return;
+      }
       hooks.onStartMatchRequest?.(
         remoteRoom.roomId,
       );
@@ -602,7 +611,13 @@ export function installDuelRoomUi(
   leaveButton.addEventListener(
     "click",
     () => {
-      if (remoteRoom === null) return;
+      if (remoteRoom === null) {
+        localRoom = null;
+        localReady = false;
+        renderRoom();
+        setStatus("Left local practice. You can create/join a Friend Room or enter Ranked.");
+        return;
+      }
       hooks.onLeaveRoomRequest?.(
         remoteRoom.roomId,
       );
@@ -690,6 +705,7 @@ export function installDuelRoomUi(
     setConnectionLabel,
     setRankedQueueStatus(input) {
       const queued = input.status === "queued";
+      rankedQueued = queued;
       rankedQueueButton.classList.toggle(
         "hidden",
         queued,
@@ -716,6 +732,7 @@ export function installDuelRoomUi(
         String(Math.round(input.matchmakingRating));
     },
     setRankedMatchFound(matchId) {
+      rankedQueued = false;
       rankedQueueButton.classList.remove("hidden");
       rankedLeaveButton.classList.add("hidden");
       el("duelRankedStatus").textContent =
