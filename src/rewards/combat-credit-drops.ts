@@ -28,6 +28,7 @@ export type CombatCreditWalletPolicy = "real" | "simulated" | "disabled";
 
 export type CombatCreditCause =
   | "typed-kill"
+  | "voice-kill"
   | "skill-kill"
   | "boss-kill";
 

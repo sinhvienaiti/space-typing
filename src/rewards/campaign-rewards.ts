@@ -37,20 +37,21 @@ export function performanceReward(input: {
   wpm: number;
   difficulty: DifficultyProfile;
   objectiveComplete: boolean;
+  typingEvidence?: boolean;
 }): PerformanceReward {
   const stage = safeStage(input.stats.stage);
   const accuracy = Math.max(0, Math.min(100, input.accuracy));
   const wpm = Math.max(0, Number.isFinite(input.wpm) ? input.wpm : 0);
   const earned: PerformanceRewardId[] = [];
 
-  if (accuracy >= 99) earned.push("precision");
-  if (input.stats.misses === 0) earned.push("flawless");
-  if (input.stats.maxStreak >= 25) earned.push("streak");
+  if (input.typingEvidence !== false && accuracy >= 99) earned.push("precision");
+  if (input.typingEvidence !== false && input.stats.misses === 0) earned.push("flawless");
+  if (input.typingEvidence !== false && input.stats.maxStreak >= 25) earned.push("streak");
 
   // Speed is measured against the selected/adaptive target instead of one
   // global WPM gate, so Relax/Adaptive players are not asked for Impossible
   // typing speed to receive the same reward layer.
-  if (wpm >= Math.max(10, input.difficulty.targetWpm) * 1.05) {
+  if (input.typingEvidence !== false && wpm >= Math.max(10, input.difficulty.targetWpm) * 1.05) {
     earned.push("tempo");
   }
   if (input.objectiveComplete) earned.push("objective");

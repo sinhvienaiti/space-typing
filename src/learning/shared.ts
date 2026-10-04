@@ -22,7 +22,7 @@ export type SpaceLearningEvent = {
   entityType: "vocabulary";
   entityId: string;
   gameId: "space-typing";
-  activityType: "typing" | "recall";
+  activityType: "typing" | "recall" | "speaking" | "speaking-recall";
   result: "correct" | "wrong";
   occurredAt: string;
   responseMs?: number;
@@ -110,34 +110,37 @@ export function parseSpaceReviewDataset(
 export function buildCombatLearningEvent(options: {
   entry: VocabularyEntry;
   perfect: boolean;
+  inputSource?: "typing" | "voice";
   occurredAt?: string;
 }): SpaceLearningEvent {
+  const correct = options.inputSource === "voice" || options.perfect;
   return {
     version: 1,
     entityType: "vocabulary",
     entityId: normalizeLearningEntityId(options.entry.en),
     gameId: "space-typing",
-    activityType: "typing",
-    result: options.perfect ? "correct" : "wrong",
+    activityType: options.inputSource === "voice" ? "speaking" : "typing",
+    result: correct ? "correct" : "wrong",
     occurredAt: options.occurredAt ?? new Date().toISOString(),
     hintUsed: false,
     replayUsed: false,
     expectedAnswer: options.entry.en,
-    ...(options.perfect ? {} : { errorType: "spelling" as const }),
+    ...(correct ? {} : { errorType: "spelling" as const }),
   };
 }
 
 export function buildRecallLearningEvent(
   result: RecallAttemptResult,
   occurredAt = new Date().toISOString(),
+  inputSource: "typing" | "voice" = "typing",
 ): SpaceLearningEvent {
-  const correct = result.completed && result.perfect;
+  const correct = result.completed && (inputSource === "voice" || result.perfect);
   return {
     version: 1,
     entityType: "vocabulary",
     entityId: normalizeLearningEntityId(result.entry.en),
     gameId: "space-typing",
-    activityType: "recall",
+    activityType: inputSource === "voice" ? "speaking-recall" : "recall",
     result: correct ? "correct" : "wrong",
     occurredAt,
     responseMs: Math.max(0, Math.round(result.responseMs)),

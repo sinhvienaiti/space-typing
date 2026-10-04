@@ -1,110 +1,108 @@
-# Voice Final V2 — đánh giá và checkpoint triển khai
+# Voice Final V2 — implementation and verification
 
-Ngày: 2026-10-04. Baseline: `ff8c17a7fb7873d8b11ee24775c528ff3ea4c729`.
-Branch child: `feat/bgv-integration-current`. Phần Portal/canonical contract ở parent
-`typing-game`, branch `feat/space-voice-platform`; parent cần pin đúng commit child.
+Updated: 2026-10-04. Child branch: `feat/bgv-integration-current`.
+Portal and canonical Voice contract: `typing-game`, branch `feat/space-voice-platform`.
+This replaces the earlier foundation-only checkpoint in this file.
 
-## Kết luận
+## Current behavior
 
-Final V2 là đặc tả đủ rõ để bắt đầu triển khai. Bản checkpoint này triển khai các
-bất biến có thể kiểm chứng độc lập với nhận diện: ownership theo unit, keyboard
-seam, conditional lock release, contract và policy chống stale/replay, transactional
-admission, lifecycle với runtime được inject trong test.
+Voice and Hybrid are implemented and available for local acceptance testing through
+Portal. The bottom-right control contains Typing / Voice / Hybrid and a Mic button.
+Select Voice or Hybrid, enable Mic, allow microphone access, and wait for Listening.
+The existing pronunciation button controls speech output; the new Mic button controls
+recognition. Deploy requires input preparation before charging Warp. Practice is free.
 
-**Chưa sẵn sàng bật Voice/Hybrid để chơi.** Engine offline, model/tokenizer,
-capture/worker/resampler, gameplay completion theo nguồn, reward/passive/learning,
-save/profile và nghiệm thu qua mic vẫn cần hoàn tất. Không có mode selector mới
-hoặc voice damage trong checkpoint này. Portal trả `offlineEngineAvailable=false`.
+A compact feedback panel above the bottom-right controls shows what was heard,
+Checking, Accepted, No match, Retry, or a technical error. Only a successful game
+resolution shows Accepted. Text is rendered with `textContent`, is not persisted,
+and returns to Listening after four seconds. ResizeObserver positions it above the
+hotbar/player HUD; maximum width is 224 px.
 
-## Đã thay đổi
+Recognition uses pinned English streaming ASR on the device. Typing loads neither
+weights nor inference Worker and requests no microphone. Portal owns audio capture;
+raw PCM stays out of iframe messages. Use the Portal route, not the child origin
+alone, to test Voice.
 
-| Phần | Đã có | Giới hạn hiện tại |
-| --- | --- | --- |
-| Keyboard | Controller sau modal/hotbar/control checks; bỏ key đang composition | Default luôn Typing, chưa có UI chọn Voice |
-| Ownership | Accepted-key path claim trước progress/passive; enemy, boss word, counter, bonus targets | Không suy owner từ `typed` hoặc `targetId`; meteor chưa có mapping Voice |
-| Unit generation | Encounter, enemy layer, boss word/phase và Test Lab replacement tạo identity mới | Unit/runtime không được ghi vào save |
-| Enemy lock | Complete B giữ lock/progress A; tự clear khi A chết hoặc complete A | Đây là sửa semantic seam; chưa phải end-to-end Hybrid |
-| Admission | Exact/full prefix hai chiều, alias/homophone group; owned và pending vẫn reservation; prepare/commit/cancel | Registry chưa nối vào mọi spawn route. Typing vẫn dùng chính sách cũ |
-| Variety | Predicate lọc hard constraint trước unseen/ranking; không có safe candidate trả null | Caller mặc định không bật predicate mới; spawn fallback/wanted/batch còn cần chuyển sang transaction |
-| Contract | Bounds, normalized spoken forms, epochs, identity, ACK; bản child được generate từ parent kèm SHA-256 | Protocol v1 hiện là draft nội bộ; không dùng raw PCM trong iframe message |
-| Result policy | ACK/window/eligibility/source guards; registry revision mới không tự loại B; terminal receipt; overlapping-audio dedupe | Caller phải revalidate gameplay, claim unit và mutation đồng bộ; duplicate receipt không được thực hiện effect lần hai |
-| Host foundation | Permission/cancel/late worker, suspend/resume, gate-before-TTS, tail/flush, route fencing | Dùng injected test runtime; chưa có AudioWorklet/worker/model-cache production |
-| Portal | Lazy import chỉ khi nhận voice metadata từ đúng iframe/origin; capability gate đóng | Không xin mic, fetch weights hoặc tạo inference worker trong Typing |
-| Voice feedback HUD | Ô nhỏ tối đa 224 px ở mép dưới phải; tránh hotbar/player HUD, tự thu sau 4 giây; hiển thị từ nghe được, đang kiểm tra, đã nhận, chưa khớp, đọc lại, mic lỗi | Đã mount vào game và nối adapter; mặc định Typing vẫn ẩn. Chưa có decoder để phát feedback qua mic thật |
+## Implemented coverage
 
-`react/reactor` bị cấm bởi hard policy; `red/robot` vẫn được phép, dùng soft
-prefix ranking và keyboard lock. Spoken form giữ khoảng trắng, Unicode và dấu
-câu; không dùng `typingText()` làm transcript matcher. Phonetic conflicts cần
-metadata đã xác minh, không tự suy homophone từ chữ đầu.
-
-Ô phản hồi dùng metadata `feedback` cuối utterance của decoder để hiển thị cả
-trường hợp không khớp target. Không đoán từ khi engine không nhận ra: transcript
-là `null`, báo đọc lại. Từ nhận diện có candidate chỉ hiện `Checking…`; chỉ
-`resolution` do game gửi mới đổi sang `Accepted`. Phản hồi không làm damage,
-không tính learning miss và không lưu transcript vào save. Bỏ event trùng/cũ,
-kiểm tra session/input/audio epoch và engine/model, xóa từ khi pause/stop hoặc
-đổi mode. Transcript render bằng `textContent`, có live region polite.
-
-Panel tối đa 224 px, không bắt chuột hoặc keyboard focus. ResizeObserver tính
-khoảng trống ở góc dưới phải, đưa panel lên trên hotbar/player HUD nếu màn hình
-hẹp; music toast được đặt phía trên panel. Sau 4 giây trở lại chỉ báo Listening.
-Đây là UI sẵn cho adapter; chưa phải bằng chứng Voice đã chơi được qua mic.
-
-## V01: engine gate còn thiếu bằng chứng
-
-Đã kiểm tra source Sherpa ONNX **v1.13.8**, commit
-`11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf`:
-
-- [WASM KWS wrapper](https://github.com/k2-fsa/sherpa-onnx/blob/11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf/wasm/kws/sherpa-onnx-kws.js): `createStream()` gọi API tạo stream thông thường, không nhận keyword list động.
-- [WASM export list](https://github.com/k2-fsa/sherpa-onnx/blob/11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf/wasm/kws/CMakeLists.txt): chưa export API tạo keyword stream với keywords; cấu hình initial memory là 512 MB.
-- [Native C API](https://github.com/k2-fsa/sherpa-onnx/blob/11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf/sherpa-onnx/c-api/c-api.h): có `SherpaOnnxCreateKeywordStreamWithKeywords`.
-
-Điều này xác nhận cần build/binding riêng hoặc baseline ASR khác; không chứng
-minh KWS chậm hay không thể đáp ứng. Chưa chạy recognition benchmark và chưa
-chọn engine production. Không dùng native API làm bằng chứng WASM đã hỗ trợ.
-
-Trước khi nối voice damage cần:
-
-1. Chốt một engine bằng benchmark KWS/streaming-ASR; pin build, model, tokenizer,
-   license, byte size, SHA-256 và artifact phân phối offline.
-2. Chứng minh keyword churn không mất lời nói B, disposal không leak và sample
-   clock do capture sở hữu. Hoàn thiện clock anchors qua iframe, bounded PCM,
-   resampler chống aliasing, backpressure và device-loss behavior.
-3. Nối registry vào normal/carrier/splitter/formation/wanted/layer/bonus/counter,
-   commit admission trước history/objective/hooks. Đóng unsafe fallback và bảo
-   đảm deferral có giới hạn, không deadlock stage hoặc boss.
-4. Nối semantic completion, policy U/reward/passive, speaking aggregation riêng,
-   run metadata và best/profile riêng trước khi mở mode cho người chơi.
-5. Qua corpus ít nhất 1.000 readings, negative audio ít nhất 3 giờ, ngưỡng
-   false-trigger/latency của V2, browser/device matrix và game-under-load/soak.
-
-Không chặn normal Voice vì chưa quyết định projectile/puzzle; normal có thể đi
-tiếp sau engine gate và các điều kiện normal ở trên. Không tuyên bố cả campaign
-đã hỗ trợ trước khi có coverage matrix.
-
-## Kiểm chứng checkpoint
-
-- Space Typing: full Vitest, **247 files / 1.532 tests PASS**; có test ordering,
-  session fences, pending/accepted, không nhận ra từ, text an toàn, timer và tránh controls.
-- Space Typing: build PASS, gồm asset checks và TypeScript client/server.
-- Portal: build PASS.
-- Shared Voice: `node --test shared/voice/*.test.mjs` — **31 tests PASS**.
-- Canonical contract: `node scripts/sync-space-voice-contract.mjs --check --target <space-typing>` PASS.
-
-Test runtime là fixture trong test. Kết quả này không chứng minh nhận diện, audio
-continuity, latency, offline cold start, GPU/frame performance hoặc TTS echo thực
-tế. Chưa có screenshot/manual Voice qua Portal vì chưa có engine để chạy;
-browser kiểm thử trong môi trường này cũng chặn URL local. Test geometry/DOM
-không thay thế kiểm tra trực quan. Còn cần nghiệm thu desktop/narrow viewport,
-long transcript, music toast và trạng thái không nhận ra lời nói qua mic thật.
-
-## Milestone thực tế
-
-| Milestone V2 | Trạng thái |
+| Area | Behavior |
 | --- | --- |
-| V00 audit | Đã làm; mechanic decisions và coverage release còn mở |
-| V01 engine harness/benchmark | Chưa đủ bằng chứng GO |
-| V02 contract/lifecycle | Foundation có test; capture/cache/worker/mic UI chưa xong |
-| V03 keyboard/semantic seam | Ownership/controller/lock fix có test; source-aware voice completion chưa nối |
-| V04 registry/shadow | Policy và transaction có test; real-engine/live-route shadow chưa chạy |
-| V05–V08 | Chưa hoàn tất |
+| Recognition | Continuous Vosk WASM Worker; no recognizer restart when targets change; final word confidence and timestamps matched against the capture-time snapshot. |
+| Capture | AudioWorklet, 16 kHz anti-aliasing resampler, 100 ms blocks, bounded credits/backpressure and technical failure on overflow. |
+| Lifecycle | Permission cancellation, late stream/decoder disposal, single-origin mic lock, abortable preparation, ready ACK, session/epoch fences, pause, route exit, reconnect and timeout feedback. |
+| Speech output | Recognition gated before TTS; fresh audio epoch and resume ACK required after output. Voice world pauses until ready; Hybrid retains keyboard play. |
+| Targets | Normal/layered/carrier/splitter/formation/wanted/bonus targets, boss words and counters, projectiles and meteors. Projectile/meteor voice forms use NATO words. |
+| Admission | Exact/full-prefix, explicit homophone metadata and alias conflicts checked globally, including keyboard-owned and pending reservations. Unsafe spawns defer without spending their resources. Variety selection remains in place. |
+| Hybrid ownership | Typing A can continue while speaking B. Accepted keyboard input latches ownership even if typed progress later resets; completing B preserves A's keyboard lock. |
+| Completion | Semantic completion by input source. Voice uses remaining `U = min(8, remaining)` for score `10U` and power `1.8U`, with multiplier 1; no fabricated key presses, hits, WPM or typing streak. |
+| Passives | At most one proc per passive per utterance; bounded remainder, reset at encounter/missed-target boundaries rather than mic retry. |
+| Learning | Speaking and Recall speaking recorded separately, including assists. Speaking events do not enter spelling Mixed Review segments. |
+| Profiles | Typing / Voice / Hybrid bests, adaptive difficulty history and run metadata separated; restored Expedition input mode must match its run. |
+| Performance | Worker/weights lazy-loaded; one persistent model cache; conflict pairs recomputed only when reservation words change; bounded history, queues and receipts. High/Ultra graphics preserved. |
+
+Voice-only boss counters use a 3.5 s window and meteors use 2.8 s flight / 1.2 s
+stagger as candidate balance settings. They have automated coverage but have not
+been calibrated with human microphone sessions. Typing/Hybrid timings are preserved.
+
+## Pinned artifacts
+
+The complete checksums, byte sizes and Apache-2.0 attribution are versioned in
+`typing-game/shared/voice/model-manifest.json` and `shared/voice/vendor/`.
+
+- Engine: `vosk-browser-0.0.8-memoryfs-v1-asr`, package `vosk-browser@0.0.8`.
+- Model: `vosk-small-en-us-0.15-space-endpoint-v1`; English, 16 kHz,
+  confidence floor 0.85, primary endpoint silence 0.25 s.
+- Prepared model: 41,116,554 bytes, SHA-256
+  `45237278eca199c8d4d3040e95b59cf2d9c0cc388727f65bcd0b2352719057f6`.
+- Prepared vocabulary: 1,613,636 bytes, 152,211 lexical symbols, SHA-256
+  `49868bed00de849088524e97fa1f674cf5903273ebc34b09b182b3ffbd48950c`.
+- `pnpm voice:prepare` verifies the upstream ZIP, deterministically repacks the
+  endpoint configuration, verifies the browser artifacts and publishes the manifest
+  last. Generated model files are ignored by Git. `dev.sh space` and `play.sh`
+  prepare them automatically. First preparation requires network and Python 3.
+- The Vite plugin emits the pinned Worker separately, uses MEMFS instead of a
+  second model store in IDBFS, and adds a recognizer-ready ACK.
+
+## Verification completed
+
+Final checks on 2026-10-04:
+
+| Check | Result |
+| --- | --- |
+| Space Typing `pnpm test` | 253 files / 1,623 tests passed. Includes Voice, Warp and existing gameplay regressions. |
+| Space Typing `pnpm build` | Passed: TypeScript client/server, Vite and asset integrity checks. |
+| Parent shared Voice + Learning | 105 tests passed. Includes actual host-factory permission cancellation/ownership tests. |
+| Portal build | Passed. |
+| Canonical six-file Voice contract | Verified against the child copy. |
+| Real Worker/WASM/model smoke | Decoded the pinned official WAV fixture into final timed word results. |
+
+The final Node smoke reported decoder-block median 2.50 ms / p95 132.24 ms. These
+are Node inference-block measurements with a file, excluding microphone, browser,
+endpoint delay, iframe messaging and game frames. They are not end-to-end latency.
+Run it with `node scripts/voice-worker-smoke.mjs /absolute/path/to/16khz-mono.wav`
+in the parent after model preparation.
+
+## Acceptance still required on a real browser
+
+Automated tests and real WASM decoding pass. This environment blocked local browser
+access, so no real microphone session, screenshot acceptance, device matrix, full
+recognition corpus or game-under-load benchmark has been completed. Do not mark the
+Final V2 release gates passed from the smoke results.
+
+Outstanding measured gates: at least 95% acceptance across at least 1,000 human
+readings, zero false gameplay commits across at least 3 h of negative audio,
+end-to-end median <= 250 ms / p95 <= 450 ms, frame p95 increase <= 2 ms,
+plus browser/device, reconnect and soak coverage.
+
+Local acceptance should cover:
+
+1. Mic permission granted, denied and cancelled while loading; Mic off before ready;
+   device unplug, reconnect, route exit and a second tab competing for the mic.
+2. Voice targets of every listed type, wrong/quiet words, TTS echo isolation,
+   pause/resume and long speech across target churn.
+3. Hybrid typing A / speaking B; old audio cannot hit a later same-word target;
+   feedback Accepted only when the game accepted the completion.
+4. Separate results/learning and assists; Voice reward/passive limits; no WPM or
+   typing-streak credit from speech; reloads and Expedition mode guards.
+5. Desktop and narrow viewport placement, long transcript, music toast, hotbar
+   overlap and High/Ultra game load.

@@ -1,10 +1,11 @@
+import { createTestGame } from "./helpers/game-harness";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Game } from "../src/Game";
 import { createBossState, type BossState } from "../src/boss/model";
 import { createStageConfig } from "../src/campaign/stage";
 import { difficultyFor } from "../src/campaign/difficulty";
 import type { SupplyPod } from "../src/supply/pod";
-import type { GamePhase, GameSettings, VocabularyEntry } from "../src/types";
+import type { GamePhase, VocabularyEntry } from "../src/types";
 import { TargetOwnership } from "../src/input/target-ownership";
 import type { Enemy } from "../src/types";
 
@@ -15,17 +16,6 @@ type GameInternals = {
   targetId: number | null;
   enemies: Array<{ id: number; entry: VocabularyEntry; typed: number }>;
   recallBonus: { entry: VocabularyEntry; typed: number } | null;
-};
-
-const settings: GameSettings = {
-  sfxVolume: 0,
-  musicVolume: 0,
-  ambientVolume: 0,
-  screenShake: false,
-  visualQuality: "low",
-  pronunciationEnabled: false,
-  pronunciationRate: 1,
-  pronunciationVolume: 0,
 };
 
 const bossEntry: VocabularyEntry = {
@@ -46,72 +36,6 @@ function liveScenario(): { game: Game; state: OwnershipInternals } {
   game.startStage(createStageConfig(1), difficultyFor({ stage: 1, vocabularyLevel: 1, mode: "balanced", recentWpm: 60, recentAccuracy: 96 }));
   game.testLabSpawnSamePrefixScenario();
   return { game, state: game as unknown as OwnershipInternals };
-}
-
-function createTestGame(vocabulary: VocabularyEntry[] = [bossEntry]): Game {
-  vi.stubGlobal("window", {
-    innerWidth: 1280,
-    innerHeight: 720,
-    devicePixelRatio: 1,
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    setTimeout: globalThis.setTimeout,
-    clearTimeout: globalThis.clearTimeout,
-  });
-  vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
-  vi.stubGlobal("cancelAnimationFrame", vi.fn());
-  vi.stubGlobal(
-    "AudioContext",
-    class {
-      state = "running";
-      close(): Promise<void> {
-        return Promise.resolve();
-      }
-      resume(): Promise<void> {
-        return Promise.resolve();
-      }
-    },
-  );
-
-  const context = {
-    setTransform: vi.fn(),
-  };
-  const canvas = {
-    width: 0,
-    height: 0,
-    getContext: vi.fn(() => context),
-    getBoundingClientRect: vi.fn(() => ({
-      width: 1280,
-      height: 720,
-      top: 0,
-      left: 0,
-      right: 1280,
-      bottom: 720,
-      x: 0,
-      y: 0,
-      toJSON: () => ({}),
-    })),
-  } as unknown as HTMLCanvasElement;
-
-  return new Game(canvas, vocabulary, settings, {
-    onStats: vi.fn(),
-    onPhase: vi.fn(),
-    onStage: vi.fn(),
-    onStageEvents: vi.fn(),
-    onObjectiveUpdate: vi.fn(),
-    onStageClear: vi.fn(),
-    onBossUpdate: vi.fn(),
-    onWordComplete: vi.fn(),
-    onEquipmentDrop: vi.fn(),
-    onRewardChoice: vi.fn(),
-    onBossRewardChoice: vi.fn(),
-    onEnemySeen: vi.fn(),
-    onAnomalyReady: vi.fn(),
-    onLuckPityUpdate: vi.fn(),
-    onHiddenDiscoveryUpdate: vi.fn(),
-    onStatuses: vi.fn(),
-    onSkills: vi.fn(),
-  });
 }
 
 function supply(word: string): SupplyPod {

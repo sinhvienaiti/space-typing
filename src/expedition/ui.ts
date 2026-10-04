@@ -417,6 +417,7 @@ export function mountExpeditionUi(options: {
     contributionTitle.textContent = "Run contribution";
     const contributionMeta = document.createElement("small");
     contributionMeta.textContent =
+      (run.profile.inputMode ?? "typing") + " · " + String(run.contributions.voiceCompletions ?? 0) + " spoken completions · " +
       String(run.contributions.typedCompletions) +
       " typed completions · " +
       String(run.contributions.perfectCompletions) +

@@ -1,0 +1,39 @@
+.metric-warp strong {
+  font-size: 14px;
+}
+.metric-warp small {
+  display: block;
+  font-size: 9px;
+  color: #93c4da;
+}
+.warp-depot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 9px;
+}
+.warp-depot small {
+  flex-basis: 100%;
+  color: #b0c9da;
+  font-size: 11px;
+}
+.warp-depot button {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+.practice-banner {
+  position: absolute;
+  right: 12px;
+  top: 92px;
+  z-index: 8;
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: #092134e6;
+  color: #8fe4d5;
+  font-size: 10px;
+  pointer-events: none;
+}
+.practice-banner[hidden] {
+  display: none;
+}

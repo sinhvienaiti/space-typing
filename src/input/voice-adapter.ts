@@ -1,6 +1,7 @@
 import { VOICE_NAMESPACE, parseVoiceMessage, type VoiceMessage } from "./platform/protocol.mjs";
 import type { InputMode } from "./mode";
 import type { VoiceFeedbackSink } from "./voice-feedback";
+import { VOICE_COMBAT_POLICY } from "./voice-combat-policy";
 
 /** Metadata transport only. The game keeps authority over eligibility, ownership and completion. */
 export class VoiceAdapter {
@@ -29,7 +30,7 @@ export class VoiceAdapter {
     if (!this.available || mode === "typing" || !Number.isSafeInteger(inputEpoch) || inputEpoch < this.inputEpoch || (this.startedBefore && inputEpoch === this.inputEpoch)) return false;
     this.sessionId = null; this.inputEpoch = inputEpoch; this.audioEpoch = 0; this.starting = true; this.startedBefore = true;
     this.feedback?.setMode(mode);
-    this.post("configure", { mode, inputEpoch, language: "en", policyVersion: "space-voice-v2-draft1" });
+    this.post("configure", { mode, inputEpoch, language: "en", policyVersion: VOICE_COMBAT_POLICY.version });
     this.post("start", { inputEpoch }); return true;
   }
   handleMessage(event: MessageEvent<unknown>): boolean {
@@ -37,7 +38,7 @@ export class VoiceAdapter {
     let message: VoiceMessage; try { message = parseVoiceMessage(event.data); } catch { return false; }
     if (message.gameId !== "space-typing" || message.gameInstanceId !== this.gameInstanceId) return false;
     const op = message.type.slice(VOICE_NAMESPACE.length + 1);
-    if (!["capabilities", "ready", "targets-applied", "detection", "feedback", "stopped", "listening", "listening-resumed", "gate-closed", "error"].includes(op)) return false;
+    if (!["capabilities", "ready", "targets-applied", "vocabulary-checked", "clock", "detection", "feedback", "stopped", "listening", "listening-resumed", "gate-closed", "error"].includes(op)) return false;
     if (op === "capabilities") this.available = message.offlineEngineAvailable === true;
     else if (op === "ready") {
       if (message.inputEpoch !== this.inputEpoch || (!this.starting && message.sessionId !== this.sessionId) || typeof message.audioEpoch !== "number" || (this.starting ? message.audioEpoch < this.audioEpoch : message.audioEpoch <= this.audioEpoch)) return false;
@@ -60,7 +61,14 @@ export class VoiceAdapter {
     if (!Number.isSafeInteger(inputEpoch) || inputEpoch <= this.inputEpoch) return false;
     this.inputEpoch = inputEpoch; this.feedback?.suspend(); return this.sendSession("suspend");
   }
+  resume(inputEpoch: number): boolean {
+    if (!Number.isSafeInteger(inputEpoch) || inputEpoch <= this.inputEpoch) return false;
+    this.inputEpoch = inputEpoch; return this.sendSession("resume");
+  }
   stop(): void {
+    // During permission/model preparation the child does not know the session ID yet.
+    // Configure is the instance-scoped cancellation path and fences a late ready reply.
+    if (this.starting) this.post("configure", { mode: "typing", inputEpoch: this.inputEpoch + 1, language: "en", policyVersion: VOICE_COMBAT_POLICY.version });
     this.sendSession("stop"); this.sessionId = null; this.available = false; this.starting = false; this.inputEpoch += 1;
     this.feedback?.stop();
   }

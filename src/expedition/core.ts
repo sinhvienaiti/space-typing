@@ -29,6 +29,8 @@ export type ExpeditionWordPool = {
 };
 
 export type ExpeditionProfile = {
+  inputMode?: "typing" | "voice" | "hybrid";
+  voicePolicy?: string;
   difficulty: string;
   assist: string;
   vocabularyLevel: number;
@@ -578,6 +580,7 @@ export function settleExpeditionEncounter(
   const nextContributions = alreadyCommitted
     ? run.contributions
     : {
+        ...(run.contributions.voiceCompletions || encounterContribution.voiceCompletions ? { voiceCompletions: (run.contributions.voiceCompletions ?? 0) + (encounterContribution.voiceCompletions ?? 0), voiceEffort: (run.contributions.voiceEffort ?? 0) + (encounterContribution.voiceEffort ?? 0) } : {}),
         typedCompletions:
           run.contributions.typedCompletions +
           encounterContribution.typedCompletions,

@@ -2,6 +2,7 @@ import type { VocabularyEntry } from "../types";
 
 export type CombatCompletionOrigin =
   | "typing"
+  | "voice"
   | "skill"
   | "proc"
   | "environment"
@@ -26,11 +27,15 @@ export type CombatCompletionFact = {
   targetId: string;
   entry: VocabularyEntry;
   acceptedTypedLetters: number;
+  acceptedVoiceWords?: number;
+  voiceEffort?: number;
   perfect: boolean;
   sharedKillCount: number;
 };
 
 export type CompletionContribution = {
+  voiceCompletions?: number;
+  voiceEffort?: number;
   typedCompletions: number;
   perfectCompletions: number;
   acceptedTypedLetters: number;
@@ -73,6 +78,7 @@ export function appendCompletionContribution(
   current: CompletionContribution,
   fact: CombatCompletionFact,
 ): CompletionContribution {
+  if (fact.origin === "voice" && fact.acceptedVoiceWords === 1 && (fact.voiceEffort ?? 0) > 0) return { ...current, voiceCompletions: (current.voiceCompletions ?? 0) + 1, voiceEffort: (current.voiceEffort ?? 0) + Math.min(8, Math.max(0, fact.voiceEffort ?? 0)) };
   if (!completionEligibleForTypedReward(fact)) return { ...current };
   return {
     ...current,

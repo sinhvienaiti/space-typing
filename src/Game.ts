@@ -1,4 +1,10 @@
+import { phoneticGroups } from "./input/phonetic-groups";
+import { VOICE_COMBAT_POLICY, voiceEffort, VoicePassiveCredit, NATO_LETTERS } from "./input/voice-combat-policy";
+import type { InputMode } from "./input/mode";
+import type { VoiceTarget } from "./input/platform/protocol.mjs";
+import { wordConflict } from "./input/word-conflict";
 import { TargetOwnership } from "./input/target-ownership";
+import { admissionConflict } from "./input/target-registry";
 import {
   hasVisibleKillTranslation,
   sanitizeKillTranslationSettings,
@@ -515,6 +521,7 @@ import {
   interceptBossMeteor,
   seededBossRng,
   startBossSkill,
+  COUNTER_WORDS,
   tickBossSkill,
   typeBossCounter,
   type BossCounterKind,
@@ -638,6 +645,7 @@ export type GameHooks = {
     entry: VocabularyEntry,
     outcome?: {
       perfect: boolean;
+      inputSource?: "typing" | "voice";
       fact?: CombatCompletionFact;
     },
   ): void;
@@ -1024,6 +1032,33 @@ export class Game {
   private enemies: Enemy[] = [];
   private readonly stageWordLedger = new StageWordLedger();
   private readonly targetOwnership = new TargetOwnership();
+  private inputMode: InputMode = "typing";
+  private voiceReadiness: () => boolean = () => false;
+  setVoiceReadiness(ready: () => boolean): void {
+    this.voiceReadiness = ready;
+  }
+  private voiceWorldReady: () => boolean = () => true;
+  setVoiceWorldReadiness(ready: () => boolean): void {
+    this.voiceWorldReady = ready;
+  }
+  private voiceCompletionActive = false;
+  private readonly voicePassiveCredit = new VoicePassiveCredit();
+  private voiceWordsCompleted = 0;
+  private voiceActionsCompleted = 0;
+  private voiceEffortStreak = 0;
+  private voiceCurrentEffort = 0;
+  private voiceVocabularyRevision = 0;
+  private readonly voiceRecallAssist = new WeakMap<object, { startedAt: number; replays: number }>();
+  getVoiceVocabularyRevision(): number {
+    return this.voiceVocabularyRevision;
+  }
+  private readonly voiceUnitWords = new WeakMap<object, string>();
+  private readonly voiceUnitEligibility = new WeakMap<object, boolean>();
+  private voiceConflictWords: string[] = [];
+  private voiceSafeRows: boolean[] = [];
+  private readonly voiceUnitSamples = new WeakMap<object, number>();
+  private readonly voiceUnitKnownIds = new WeakMap<object, string>();
+  private readonly voiceActionForms = new WeakMap<object, string>();
   private projectiles: EnemyProjectile[] = [];
   private lasers: Laser[] = [];
   private readonly playerShots = new PlayerShotSystem<ShotImpact>();
@@ -2451,6 +2486,8 @@ export class Game {
     const profile = recallDifficultyProfile(this.recallSettings.difficulty);
     if (!canReplayRecall(profile, this.recallReplayCount)) return null;
     this.recallReplayCount += 1;
+    const target = this.boss ?? this.currentTarget() ?? this.enemies[0];
+    if (target) { const assist = this.voiceRecallAssist.get(target); if (assist) assist.replays++; }
     return prompt.entry;
   }
 
@@ -2606,7 +2643,7 @@ export class Game {
       (candidate) => candidate.id === context.wantedWordId,
     );
     if (entry === undefined) return null;
-    context.wantedWordAssigned = true;
+    if (!this.voiceCandidateAllowed(entry)) return null;
     return entry;
   }
 
@@ -2636,7 +2673,7 @@ export class Game {
   ): void {
     const context = this.expansionEncounterContext;
     if (context === null) {
-      this.hooks.onWordComplete(entry, { perfect });
+      this.hooks.onWordComplete(entry, { perfect, ...(this.voiceCompletionActive ? { inputSource: "voice" as const } : {}) });
       return;
     }
     this.completionSequence += 1;
@@ -2647,15 +2684,16 @@ export class Game {
       ),
       encounterId: context.encounterId,
       sequence: this.completionSequence,
-      origin: "typing",
+      origin: this.voiceCompletionActive ? "voice" : "typing",
       targetKind,
       targetId,
       entry: { ...entry },
-      acceptedTypedLetters: typingText(entry.en).length,
+      acceptedTypedLetters: this.voiceCompletionActive ? 0 : typingText(entry.en).length,
+      ...(this.voiceCompletionActive ? { acceptedVoiceWords: 1, voiceEffort: this.voiceCurrentEffort } : {}),
       perfect,
       sharedKillCount: 0,
     };
-    this.hooks.onWordComplete(entry, { perfect, fact });
+    this.hooks.onWordComplete(entry, { perfect, fact, ...(this.voiceCompletionActive ? { inputSource: "voice" as const } : {}) });
   }
 
   setSupportSpells(ids: readonly SupportSpellId[]): void {
@@ -2807,10 +2845,7 @@ export class Game {
     }
 
     return this.skillEngine.canActivate(id, {
-      energy: this.stats.energy,
-      streak: this.stats.streak,
-      hits: this.stats.hits,
-      misses: this.stats.misses,
+      ...this.skillInputContext(),
     });
   }
 
@@ -2940,10 +2975,7 @@ export class Game {
     }
 
     const result = this.skillEngine.activate(id, {
-      energy: this.stats.energy,
-      streak: this.stats.streak,
-      hits: this.stats.hits,
-      misses: this.stats.misses,
+      ...this.skillInputContext(),
     });
 
     if (result.ok) {
@@ -3058,7 +3090,7 @@ export class Game {
           Math.round(this.boss.maxHp * REAPER_EXECUTE_BOSS_RATIO),
         ),
         this.playerStats,
-      ) * reaperStreakDamageMultiplier(this.stats.streak);
+      ) * reaperStreakDamageMultiplier(this.inputMode === "voice" ? this.voiceEffortStreak : this.stats.streak);
       this.boss.hp = Math.max(0, this.boss.hp - damage);
       this.boss.flash = 1;
       this.updateBossPhase(this.boss);
@@ -3728,6 +3760,7 @@ export class Game {
 
   setVocabulary(entries: VocabularyEntry[]): void {
     if (entries.length === 0) return;
+    this.voiceVocabularyRevision++;
     this.vocabulary = entries;
     const context = this.expansionEncounterContext;
     if (context !== null) {
@@ -3791,8 +3824,10 @@ export class Game {
       "hull" | "shield" | "energy" | "power"
     > | null = null,
   ): void {
+    if (this.inputMode !== "typing" && !this.voiceReadiness()) return;
     this.flushCombatCreditPresentation();
     this.targetOwnership.beginEncounter();
+    this.voicePassiveCredit.reset(); this.voiceWordsCompleted = 0; this.voiceActionsCompleted = 0; this.voiceEffortStreak = 0;
     this.sfx.unlock();
     this.stageConfig = stage;
     this.difficulty = difficulty;
@@ -4126,7 +4161,431 @@ export class Game {
     this.hooks.onPhase(this.phase);
   }
 
+  getInputMode(): InputMode {
+    return this.inputMode;
+  }
+  setInputMode(mode: InputMode): boolean {
+    if (this.phase === "playing" || this.phase === "paused")
+      return mode === this.inputMode;
+    this.inputMode = mode;
+    return true;
+  }
+  isVoiceCompletion(): boolean {
+    return this.voiceCompletionActive;
+  }
+  getVoiceMetrics() {
+    return {
+      words: this.voiceWordsCompleted,
+      actions: this.voiceActionsCompleted,
+      policyVersion: VOICE_COMBAT_POLICY.version,
+    };
+  }
+  getVoiceVocabularyForms(): string[] {
+    return [
+      ...new Set(
+        [
+          ...this.vocabulary.map((entry) => entry.en),
+          ...FALLBACK_ENTRIES.map((entry) => entry.en),
+          ...Object.values(COUNTER_WORDS).flat(),
+          ...Object.values(NATO_LETTERS).flatMap((code) => [
+            code,
+            "letter " + code,
+            "code " + code,
+          ]),
+        ].map((text) =>
+          text.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase(),
+        ),
+      ),
+    ];
+  }
+  private completionMultiplier(): number {
+    return this.voiceCompletionActive ? 1 : this.stats.multiplier;
+  }
+  private skillInputContext() {
+    return {
+      energy: this.stats.energy,
+      streak: this.stats.streak,
+      hits: this.stats.hits,
+      misses: this.stats.misses,
+      ...(this.inputMode === "typing"
+        ? {}
+        : {
+            inputMode: this.inputMode,
+            voiceEffortStreak: this.voiceEffortStreak,
+            voiceWords: this.voiceWordsCompleted,
+          }),
+    };
+  }
+  private resetVoiceCreditForMiss(target: object): void {
+    if (
+      this.inputMode !== "typing" &&
+      this.targetOwnership.current(target).owner === "available"
+    ) {
+      this.voicePassiveCredit.reset();
+      this.voiceEffortStreak = 0;
+    }
+  }
+  private voiceRows(): Array<{
+    object: object;
+    entry: VocabularyEntry;
+    kind: string;
+    remaining: number;
+    eligible: boolean;
+  }> {
+    const rows: Array<{
+      object: object;
+      entry: VocabularyEntry;
+      kind: string;
+      remaining: number;
+      eligible: boolean;
+    }> = [];
+    const add = (
+      object: object,
+      entry: VocabularyEntry,
+      kind: string,
+      typed: number,
+      eligible = true,
+    ) =>
+      rows.push({
+        object,
+        entry,
+        kind,
+        remaining: Math.max(0, typingText(entry.en).length - typed),
+        eligible,
+      });
+    for (const enemy of this.enemies)
+      add(
+        enemy,
+        enemy.entry,
+        "enemy",
+        enemy.typed,
+        enemy.y + enemy.radius >= 0 && enemy.y - enemy.radius < this.height,
+      );
+    if (this.boss) add(this.boss, this.boss.entry, "boss", this.boss.typed);
+    if (this.supplyPod)
+      add(this.supplyPod, this.supplyPod.entry, "supply", this.supplyPod.typed);
+    if (this.treasureDrone)
+      add(
+        this.treasureDrone,
+        this.treasureDrone.entry,
+        "treasure",
+        this.treasureDrone.typed,
+      );
+    if (this.recallBonus)
+      add(
+        this.recallBonus,
+        this.recallBonus.entry,
+        "recall-bonus",
+        this.recallBonus.typed,
+      );
+    if (this.rewardChoiceCrate)
+      add(
+        this.rewardChoiceCrate,
+        this.rewardChoiceCrate.entry,
+        "choice",
+        this.rewardChoiceCrate.typed,
+      );
+    if (this.anomalyCrate)
+      add(
+        this.anomalyCrate,
+        this.anomalyCrate.entry,
+        "anomaly",
+        this.anomalyCrate.typed,
+      );
+    if (this.bossSkill?.word)
+      add(
+        this.bossSkill,
+        { id: "counter", en: this.bossSkill.word, vi: "", ipa: "" },
+        "counter",
+        this.bossSkill.typed,
+        bossCounterOpen(this.bossSkill),
+      );
+    const addAction = (object: object, char: string, kind: string) => {
+      const code = NATO_LETTERS[char.toLowerCase()];
+      if (!code) return;
+      let form = this.voiceActionForms.get(object);
+      if (!form) {
+        const reserved = rows.map((row, i) => ({
+          unitId: String(i),
+          contextId: "combat",
+          text: row.entry.en,
+          phoneticGroups: phoneticGroups(row.entry.en),
+        }));
+        form = [code, "letter " + code, "code " + code].find(
+          (text) =>
+            wordConflict(
+              { unitId: "action", contextId: "combat", text },
+              reserved,
+            ) === null,
+        );
+        if (!form) return;
+        this.voiceActionForms.set(object, form);
+      }
+      add(object, { id: `action:${char}`, en: form, vi: "", ipa: "" }, kind, 0);
+    };
+    for (const projectile of this.projectiles)
+      addAction(projectile, projectile.char, "projectile");
+    if (this.bossSkill?.kind === "cataclysm" && this.boss)
+      for (const meteor of this.bossSkill.meteors) {
+        if (meteor.state === "falling") {
+          addAction(meteor, meteor.char, "meteor");
+          const row = rows.at(-1);
+          if (row?.object === meteor)
+            row.eligible =
+              this.bossSkill.stage !== "recovery" &&
+              depthMeteorPoint(
+                this.bossDepthGeometry(this.boss.role),
+                this.bossSkill,
+                meteor,
+              ) !== null;
+        }
+      }
+    return rows;
+  }
+  private voiceCandidateFilter(
+    exclude?: object,
+  ): (entry: VocabularyEntry) => boolean {
+    if (this.inputMode === "typing") return () => true;
+    const reservations = this.voiceRows()
+      .filter((row) => row.object !== exclude)
+      .map((row, i) => ({
+        unitId: String(i),
+        contextId: "combat",
+        text: row.entry.en,
+        phoneticGroups: phoneticGroups(row.entry.en),
+      }));
+    return (entry) =>
+      admissionConflict(this.inputMode, reservations, [
+        {
+          unitId: "candidate",
+          contextId: "combat",
+          text: entry.en,
+          phoneticGroups: phoneticGroups(entry.en),
+        },
+      ]) === null;
+  }
+  private voiceCandidateAllowed(
+    entry: VocabularyEntry,
+    exclude?: object,
+  ): boolean {
+    return this.voiceCandidateFilter(exclude)(entry);
+  }
+  private admitVoiceProjectile(projectile: EnemyProjectile): boolean {
+    if (this.inputMode === "typing") return true;
+    const allowed = this.voiceCandidateFilter();
+    const chars = [
+      projectile.char,
+      ...Object.keys(NATO_LETTERS).filter((char) => char !== projectile.char),
+    ];
+    for (const char of chars)
+      for (const form of [
+        NATO_LETTERS[char]!,
+        "letter " + NATO_LETTERS[char],
+        "code " + NATO_LETTERS[char],
+      ]) {
+        if (allowed({ id: "action", en: form, vi: "", ipa: "" })) {
+          projectile.char = char;
+          this.voiceActionForms.set(projectile, form);
+          return true;
+        }
+      }
+    return false;
+  }
+  getVoiceTargets(fromSample = 0): Array<
+    VoiceTarget & {
+      keyboardOwned: boolean;
+      terminal: boolean;
+      resolving: boolean;
+    }
+  > {
+    if (this.inputMode === "typing") return [];
+    const rows = this.voiceRows();
+    if (rows.length > 64) throw new Error("Voice target capacity exceeded");
+    // Readiness is checked each frame. Recompute pairwise admission only when
+    // the reservation words change, rather than normalizing every pair per frame.
+    if (
+      rows.length !== this.voiceConflictWords.length ||
+      rows.some((row, i) => row.entry.en !== this.voiceConflictWords[i])
+    ) {
+      this.voiceConflictWords = rows.map((row) => row.entry.en);
+      const reservations = rows.map((row, i) => ({
+        unitId: String(i),
+        contextId: "combat",
+        text: row.entry.en,
+        phoneticGroups: phoneticGroups(row.entry.en),
+      }));
+      this.voiceSafeRows = reservations.map(
+        (reservation, i) =>
+          wordConflict(reservation, reservations, String(i)) === null,
+      );
+    }
+    return rows.map((row, i) => {
+      const safe = this.voiceSafeRows[i] === true;
+      const priorWord = this.voiceUnitWords.get(row.object);
+      const current = this.targetOwnership.current(row.object);
+      if (
+        priorWord !== undefined &&
+        priorWord !== row.entry.en &&
+        this.voiceUnitKnownIds.get(row.object) === current.unitId
+      )
+        this.targetOwnership.beginUnit(row.object);
+      const unit = this.targetOwnership.current(row.object);
+      if (this.voiceUnitKnownIds.get(row.object) !== unit.unitId) {
+        this.voiceUnitEligibility.delete(row.object);
+        this.voiceUnitSamples.delete(row.object);
+      }
+      this.voiceUnitWords.set(row.object, row.entry.en);
+      this.voiceUnitKnownIds.set(row.object, unit.unitId);
+      const eligible =
+        this.phase === "playing" &&
+        safe &&
+        row.eligible &&
+        row.remaining > 0 &&
+        statusRemaining(this.statusState, "frozen") === 0 &&
+        unit.owner === "available";
+      const previous = this.voiceUnitEligibility.get(row.object);
+      if (previous !== undefined && previous !== eligible)
+        unit.eligibilityVersion++;
+      this.voiceUnitEligibility.set(row.object, eligible);
+      if (
+        eligible &&
+        (previous !== true || !this.voiceUnitSamples.has(row.object))
+      )
+        this.voiceUnitSamples.set(row.object, fromSample);
+      return {
+        unitId: unit.unitId,
+        unitVersion: unit.unitVersion,
+        eligibilityVersion: unit.eligibilityVersion,
+        capability:
+          row.kind === "projectile" || row.kind === "meteor"
+            ? ("action" as const)
+            : row.entry.en.includes(" ")
+              ? ("phrase" as const)
+              : ("word" as const),
+        forms: [
+          row.entry.en
+            .normalize("NFKC")
+            .trim()
+            .replace(/\s+/g, " ")
+            .toLowerCase(),
+        ],
+        eligible,
+        eligibleFromSample: this.voiceUnitSamples.get(row.object) ?? fromSample,
+        keyboardOwned: unit.owner === "keyboard",
+        terminal: unit.owner === "completed" || unit.owner === "invalidated",
+        resolving: unit.owner === "resolving",
+      };
+    });
+  }
+  completeVoiceUnit(
+    unitId: string,
+    unitVersion: number,
+    eligibilityVersion: number,
+  ): boolean {
+    if (
+      this.inputMode === "typing" ||
+      this.phase !== "playing" ||
+      statusRemaining(this.statusState, "frozen") > 0
+    )
+      return false;
+    const live = this.getVoiceTargets();
+    if (!live.some((target) => target.unitId === unitId && target.eligible))
+      return false;
+    const row = this.voiceRows().find(
+      (row) => this.targetOwnership.current(row.object).unitId === unitId,
+    );
+    if (!row || !row.eligible || row.remaining <= 0) return false;
+    const unit = this.targetOwnership.current(row.object);
+    if (
+      unit.unitVersion !== unitVersion ||
+      unit.eligibilityVersion !== eligibilityVersion ||
+      !this.targetOwnership.claimVoice(row.object)
+    )
+      return false;
+    this.voiceCompletionActive = true;
+    try {
+      const effort = voiceEffort(row.remaining);
+      this.voiceCurrentEffort = effort;
+      this.voiceEffortStreak = Math.min(10000, this.voiceEffortStreak + effort);
+      this.addScore(VOICE_COMBAT_POLICY.scorePerEffort * effort);
+      this.gainPower(VOICE_COMBAT_POLICY.powerPerEffort * effort);
+      const triggers = new Set<string>();
+      for (const [key, threshold] of [
+        ["vanguard", 20],
+        ["wraith", 30],
+        ["zenith", 25],
+      ] as const)
+        if (this.voicePassiveCredit.add(key, effort, threshold))
+          triggers.add(key);
+      this.applyCharacterCorrectKeyPassive(triggers);
+      if (
+        row.kind === "enemy" &&
+        this.voicePassiveCredit.add(
+          "relic-freeze",
+          effort,
+          this.relicEffects.streakFreezeInterval,
+        )
+      )
+        this.applyRelicCorrectKeyPassive(row.object as Enemy, true);
+      if (row.kind === "enemy") this.completeWord(row.object as Enemy);
+      else if (row.kind === "boss" && this.boss === row.object)
+        this.completeBossWord(this.boss);
+      else if (row.kind === "supply" && this.supplyPod === row.object)
+        this.collectSupplyPod(this.supplyPod);
+      else if (row.kind === "treasure" && this.treasureDrone === row.object)
+        this.completeTreasureDroneWord(this.treasureDrone);
+      else if (row.kind === "recall-bonus" && this.recallBonus === row.object)
+        this.completeRecallBonusWord(this.recallBonus);
+      else if (row.kind === "choice" && this.rewardChoiceCrate === row.object)
+        this.completeRewardChoiceWord(this.rewardChoiceCrate);
+      else if (row.kind === "anomaly" && this.anomalyCrate === row.object)
+        this.completeAnomalyWord(this.anomalyCrate);
+      else if (row.kind === "counter" && this.bossSkill === row.object) {
+        this.bossSkill.counterInputSource = "voice";
+        this.bossSkill.typed = this.bossSkill.word!.length;
+        this.bossSkill.result = "countered";
+        this.bossSkill.counteredWithLeft =
+          this.bossSkill.stage === "telegraph"
+            ? Math.max(0, this.bossSkill.spec.telegraph - this.bossSkill.t)
+            : 0;
+        this.completeBossCounter(this.bossSkill);
+      } else if (row.kind === "projectile") {
+        this.destroyProjectile(row.object as EnemyProjectile);
+        this.voiceActionsCompleted++;
+      } else if (
+        row.kind === "meteor" &&
+        this.bossSkill?.kind === "cataclysm" &&
+        this.boss
+      ) {
+        const meteor = this.bossSkill.meteors.find(
+          (item) => item === row.object,
+        );
+        if (!meteor) return false;
+        const point = depthMeteorPoint(
+          this.bossDepthGeometry(this.boss.role),
+          this.bossSkill,
+          meteor,
+        );
+        if (!point || this.bossSkill.stage === "recovery") return false;
+        meteor.state = "destroyed";
+        this.shootBossMeteor(point);
+        this.voiceActionsCompleted++;
+      } else return false;
+      if (row.kind !== "projectile" && row.kind !== "meteor")
+        this.voiceWordsCompleted++;
+      // A layer change has already replaced the ownership unit; do not finish its new word.
+      if (this.targetOwnership.current(row.object) === unit)
+        this.targetOwnership.finish(row.object, "completed");
+      this.emitStats();
+      return true;
+    } finally {
+      this.voiceCompletionActive = false;
+      this.voiceCurrentEffort = 0;
+    }
+  }
+
   handleKey(rawKey: string): void {
+    if (this.inputMode === "voice" && /^[a-z]$/i.test(rawKey)) return;
     if (rawKey === "Escape") {
       this.togglePause();
       return;
@@ -4390,7 +4849,7 @@ export class Game {
   };
 
   private advanceSimulation(dt: number): void {
-    if (this.phase === "playing") {
+    if (this.phase === "playing" && (this.inputMode !== "voice" || this.voiceWorldReady())) {
       this.stageElapsedSeconds += dt;
       if (this.hitStopTimer > 0) {
         this.hitStopTimer = Math.max(0, this.hitStopTimer - dt);
@@ -4795,6 +5254,7 @@ export class Game {
       difficulty,
     );
     const entry = this.pickBossEntry(mechanic);
+    if (entry === null) return;
     this.boss = createBossState(
       stage.stage,
       stage.galaxy,
@@ -5003,7 +5463,7 @@ export class Game {
       const char =
         alphabet[Math.floor(Math.random() * alphabet.length)] ?? "a";
 
-      this.projectiles.push({
+      const projectile: EnemyProjectile = {
         id: this.nextProjectileId++,
         ownerId: -1,
         char,
@@ -5013,7 +5473,8 @@ export class Game {
         vy: Math.sin(shot.angle) * speed * shot.speed,
         radius: boss.phase >= 3 ? 15 : 13,
         family: identity?.family,
-      });
+      };
+      if (this.admitVoiceProjectile(projectile)) this.projectiles.push(projectile);
       if (identity !== null) this.combatFx.cast(shot.x, shot.y, identity.primary, 24);
     }
 
@@ -5110,7 +5571,23 @@ export class Game {
             0.65,
             1.2,
           );
-    const skill = startBossSkill(kind, boss.role, boss.phase, this.bossSkillRng, windup);
+    const skill = startBossSkill(kind, boss.role, boss.phase, this.bossSkillRng, windup, this.inputMode === "voice");
+    if (this.inputMode !== "typing") {
+      if (skill.word) {
+        const words = COUNTER_WORDS[skill.spec.counter as Exclude<BossCounterKind, "intercept">];
+        const safe = [skill.word, ...words].find(word => this.voiceCandidateAllowed({ id: "counter", en: word, vi: "", ipa: "" }, this.bossSkill ?? undefined));
+        if (!safe) return;
+        skill.word = safe;
+      }
+      const reservations = this.voiceRows().map((row, i) => ({ unitId: String(i), contextId: "combat", text: row.entry.en, phoneticGroups: phoneticGroups(row.entry.en) }));
+      if (skill.word) reservations.push({ unitId: "counter", contextId: "combat", text: skill.word, phoneticGroups: phoneticGroups(skill.word) });
+      for (const meteor of skill.meteors) {
+        const choice = Object.keys(NATO_LETTERS).flatMap(char => [NATO_LETTERS[char]!, "letter " + NATO_LETTERS[char], "code " + NATO_LETTERS[char]].map(form => ({ char, form }))).find(({ form }) => wordConflict({ unitId: "meteor", contextId: "combat", text: form, phoneticGroups: phoneticGroups(form) }, reservations) === null);
+        if (!choice || reservations.length >= 64) return;
+        meteor.char = choice.char; this.voiceActionForms.set(meteor, choice.form);
+        reservations.push({ unitId: "meteor:" + meteor.id, contextId: "combat", text: choice.form, phoneticGroups: phoneticGroups(choice.form) });
+      }
+    }
     this.bossSkill = skill;
     this.bossSkillCooldowns[kind] = skill.spec.cooldown;
     if (kind !== "cataclysm") this.bossSkillLast = kind;
@@ -5216,7 +5693,7 @@ export class Game {
     const perfect = bossCounterPerfect(skill);
     this.bossCounterChain += 1;
     this.gainPower(6 + Math.min(4, this.bossCounterChain) * 3 + (perfect ? 6 : 0));
-    this.addScore((perfect ? 260 : 160) * this.stats.multiplier);
+    this.addScore((perfect ? 260 : 160) * (skill.counterInputSource === "voice" ? 1 : this.stats.multiplier));
     switch (skill.kind) {
       case "lance": {
         // The beam goes back up the corridor into the boss.
@@ -5246,7 +5723,7 @@ export class Game {
    */
   private hitBossWithCounter(boss: BossState, share: number, stagger: number): void {
     if (!boss.shieldActive && this.activeBossPart(boss) === null) {
-      boss.hp = Math.max(0, boss.hp - boss.maxHp * share * this.characterBossDamageMultiplier());
+      boss.hp = Math.max(0, boss.hp - boss.maxHp * share * this.characterBossDamageMultiplier(this.bossSkill?.counterInputSource === "voice"));
     }
     boss.flash = 1;
     boss.kick = 1.5;
@@ -5311,6 +5788,7 @@ export class Game {
 
   /** Counter letters and meteor shots are correct keys (streak, accuracy). */
   private countBossSkillKey(): void {
+    if (this.voiceCompletionActive) return;
     this.stats.hits += 1;
     this.stats.streak += 1;
     this.stats.maxStreak = Math.max(this.stats.maxStreak, this.stats.streak);
@@ -5470,7 +5948,7 @@ export class Game {
 
   private pickBossEntry(
     mechanic?: BossTypingMechanicState,
-  ): VocabularyEntry {
+  ): VocabularyEntry | null {
     const preference =
       mechanic === undefined
         ? "normal"
@@ -5492,21 +5970,28 @@ export class Game {
         Math.floor(this.nextExpansionGameplayRandom() * source.length)
       ] ??
       FALLBACK_ENTRIES[8]!;
+    const allowed = this.voiceCandidateFilter(this.boss ?? undefined);
     const varied =
-      this.selectVariedEnemyEntry(preferred, undefined, source) ?? preferred;
+      this.inputMode === "typing"
+        ? this.selectVariedEnemyEntry(preferred, undefined, source) ?? preferred
+        : this.selectVariedEnemyEntry(preferred, undefined, source.filter(allowed), this.boss ?? undefined) ?? source.find(allowed) ?? (this.boss && allowed(this.boss.entry) ? this.boss.entry : null);
+    if (varied === null) return null;
     this.stageWordLedger.record(varied);
     return varied;
   }
 
   private spawnSupplyPod(): void {
+    const allowed = this.voiceCandidateFilter();
     const candidates = this.vocabulary.filter((entry) => {
+      if (!allowed(entry)) return false;
       const length = typingText(entry.en).length;
       return length >= 4 && length <= 9;
     });
-    const source = candidates.length > 0 ? candidates : this.vocabulary;
+    const source = candidates.length > 0 ? candidates : this.vocabulary.filter(entry => allowed(entry));
     const entry =
       source[Math.floor(Math.random() * source.length)] ??
-      FALLBACK_ENTRIES[1]!;
+      null;
+    if (!entry) return;
 
     this.supplyPod = {
       entry,
@@ -5532,20 +6017,24 @@ export class Game {
       this.supplyPod.age >= this.supplyPod.lifetime ||
       this.supplyPod.x > this.width + 60
     ) {
+      if (this.supplyPod) this.resetVoiceCreditForMiss(this.supplyPod);
       this.stageResultTracker.recordBonusMissed();
       this.supplyPod = null;
     }
   }
 
   private spawnTreasureDrone(): void {
+    const allowed = this.voiceCandidateFilter();
     const candidates = this.vocabulary.filter((entry) => {
+      if (!allowed(entry)) return false;
       const length = typingText(entry.en).length;
       return length >= 5 && length <= 10;
     });
-    const source = candidates.length > 0 ? candidates : this.vocabulary;
+    const source = candidates.length > 0 ? candidates : this.vocabulary.filter(entry => allowed(entry));
     const entry =
       source[Math.floor(Math.random() * source.length)] ??
-      FALLBACK_ENTRIES[5]!;
+      null;
+    if (!entry) return;
 
     this.treasureDrone = {
       entry,
@@ -5570,6 +6059,7 @@ export class Game {
       this.treasureDrone.age >= this.treasureDrone.lifetime ||
       this.treasureDrone.x < -70
     ) {
+      if (this.treasureDrone) this.resetVoiceCreditForMiss(this.treasureDrone);
       this.stageResultTracker.recordBonusMissed();
       this.treasureDrone = null;
     }
@@ -5578,8 +6068,8 @@ export class Game {
   private createRecallBonusTarget(
     entry?: VocabularyEntry,
   ): RecallBonusTarget | null {
-    const candidates = this.vocabulary.filter(eligibleRecallBonusEntry);
-    const source = entry !== undefined && eligibleRecallBonusEntry(entry)
+    const candidates = this.vocabulary.filter(candidate => eligibleRecallBonusEntry(candidate) && this.voiceCandidateAllowed(candidate));
+    const source = entry !== undefined && eligibleRecallBonusEntry(entry) && this.voiceCandidateAllowed(entry)
       ? [entry]
       : candidates;
     const selected =
@@ -5621,13 +6111,15 @@ export class Game {
       target.age >= target.lifetime ||
       target.x < -86
     ) {
+      if (this.recallBonus) this.resetVoiceCreditForMiss(this.recallBonus);
       this.stageResultTracker.recordBonusMissed();
       this.recallBonus = null;
     }
   }
 
   private spawnRewardChoiceCrate(): void {
-    const entry = rewardChoiceWord(this.vocabulary);
+    const allowed = this.voiceCandidateFilter();
+    const entry = rewardChoiceWord(this.vocabulary.filter(entry => allowed(entry)));
     if (entry === null) {
       this.rewardChoicePending = false;
       return;
@@ -5656,13 +6148,15 @@ export class Game {
       this.rewardChoiceCrate.age >= this.rewardChoiceCrate.lifetime ||
       this.rewardChoiceCrate.y > this.height * 0.63
     ) {
+      if (this.rewardChoiceCrate) this.resetVoiceCreditForMiss(this.rewardChoiceCrate);
       this.stageResultTracker.recordBonusMissed();
       this.rewardChoiceCrate = null;
     }
   }
 
   private spawnAnomalyCrate(): void {
-    const entry = anomalyWord(this.vocabulary);
+    const allowed = this.voiceCandidateFilter();
+    const entry = anomalyWord(this.vocabulary.filter(entry => allowed(entry)));
     if (entry === null) {
       this.anomalyPending = false;
       return;
@@ -5691,6 +6185,7 @@ export class Game {
       this.anomalyCrate.age >= this.anomalyCrate.lifetime ||
       this.anomalyCrate.y > this.height * 0.62
     ) {
+      if (this.anomalyCrate) this.resetVoiceCreditForMiss(this.anomalyCrate);
       this.stageResultTracker.recordBonusMissed();
       this.anomalyCrate = null;
     }
@@ -6275,6 +6770,7 @@ export class Game {
       actionCooldown: resolvedActionCooldown,
     });
 
+    if (wanted !== null && this.expansionEncounterContext) this.expansionEncounterContext.wantedWordAssigned = true;
     this.stageWordLedger.record(typingProfile.entry);
     this.stageResultTracker.recordEnemySpawn();
     this.notifyEnemySeen(definitionId);
@@ -6321,9 +6817,10 @@ export class Game {
     preferred: VocabularyEntry,
     excludeEnemyId?: number,
     entries: readonly VocabularyEntry[] = this.vocabulary,
+    excludeObject?: object,
   ): VocabularyEntry | null {
     // Intentional same-prefix Test Lab scenarios must remain reproducible.
-    if (this.testLabEnabled) return preferred;
+    if (this.testLabEnabled && this.inputMode === "typing") return preferred;
     const activeWords = this.activeEnemyWords(excludeEnemyId);
     if (this.boss !== null) activeWords.push(this.boss.entry.en);
     return this.stageWordLedger.pick(
@@ -6332,6 +6829,7 @@ export class Game {
       this.vocabularyLevel,
       activeWords,
       this.nextExpansionGameplayRandom(),
+      this.voiceCandidateFilter(excludeObject ?? this.enemies.find(enemy => enemy.id === excludeEnemyId)),
     );
   }
 
@@ -6370,7 +6868,7 @@ export class Game {
         },
       ) ?? this.pickVocabularyEntry(enemy.kind);
 
-    const varied = this.selectVariedEnemyEntry(entry, enemy.id) ?? entry;
+    const varied = this.selectVariedEnemyEntry(entry, enemy.id) ?? (this.inputMode === "typing" ? entry : enemy.entry);
     enemy.wordDifficultyScore = wordDifficultyScore(
       varied,
       this.vocabularyLevel,
@@ -6826,7 +7324,7 @@ export class Game {
       const char =
         alphabet[Math.floor(Math.random() * alphabet.length)] ?? "a";
 
-      this.projectiles.push({
+      const projectile: EnemyProjectile = {
         id: this.nextProjectileId++,
         ownerId: enemy.id,
         char,
@@ -6837,7 +7335,8 @@ export class Game {
         radius:
           enemy.kind === "oppressor" ? 15 : enemy.kind === "sniper" ? 11 : 14,
         family: this.visualDefinitionForEnemy(enemy)?.family,
-      });
+      };
+      if (this.admitVoiceProjectile(projectile)) this.projectiles.push(projectile);
     }
 
     this.sfx.enemyShot();
@@ -6849,6 +7348,7 @@ export class Game {
       (item) => item.id !== projectile.id,
     );
 
+    if (!this.voiceCompletionActive) {
     this.stats.hits += 1;
     this.stats.streak += 1;
     this.stats.maxStreak = Math.max(
@@ -6859,6 +7359,8 @@ export class Game {
     this.addScore(35 * this.stats.multiplier);
     this.gainPower(2.5);
     this.applyCharacterCorrectKeyPassive();
+
+    } else { this.addScore(35); this.gainPower(2.5); }
 
     // An intercept must read differently from a normal enemy hit: bright
     // tracer (or bolt) plus a persistent cyan shield-break ring and sparks.
@@ -7043,117 +7545,118 @@ export class Game {
       return;
     }
 
-    if (boss.typed >= word.length) {
-      this.triggerImpactFeedback("boss-word");
-      if (this.gameplayMode === "recall") {
-        this.resolveRecallPrompt(boss.entry, true, !boss.wordMissed);
-      }
-      const perfectWord = !boss.wordMissed;
-      const completedPart = this.activeBossPart(boss);
-      this.applyCharacterWordCompletePassive(word.length);
+    if (boss.typed >= word.length) this.completeBossWord(boss);
+
+    this.hooks.onBossUpdate(toBossHud(boss));
+    this.emitStats();
+  }
+
+  private completeBossWord(boss: BossState): void {
+    const word = typingText(boss.entry.en);
+    this.triggerImpactFeedback("boss-word");
+    if (this.gameplayMode === "recall") {
+      this.resolveRecallPrompt(boss.entry, true, !boss.wordMissed, boss);
+    }
+    const perfectWord =
+      !boss.wordMissed &&
+      (!this.voiceCompletionActive || this.voiceRecallUnassisted(boss));
+    const completedPart = this.activeBossPart(boss);
+    this.applyCharacterWordCompletePassive(word.length);
+    if (this.voiceCompletionActive) {
+      this.stageResultTracker.completeVoiceWord(
+        "boss",
+        "boss",
+        boss.entry,
+        this.stageElapsedSeconds,
+      );
+    } else {
       this.stageResultTracker.completeWord(
         "boss",
         "boss",
         boss.entry,
         this.stageElapsedSeconds,
       );
-      const mechanicResult =
-        boss.typingMechanic === undefined
-          ? null
-          : resolveBossWordMechanic(
-              boss.typingMechanic,
-              perfectWord,
-            );
-      if (mechanicResult !== null) {
-        boss.typingMechanic = mechanicResult.state;
+    }
+    const mechanicResult =
+      boss.typingMechanic === undefined
+        ? null
+        : resolveBossWordMechanic(boss.typingMechanic, perfectWord);
+    if (mechanicResult !== null) {
+      boss.typingMechanic = mechanicResult.state;
+    }
+
+    if (boss.shieldActive) {
+      const shieldBroken = mechanicResult?.shieldBroken ?? true;
+      if (shieldBroken) {
+        boss.shieldActive = false;
+        this.sfx.bossShieldBreak();
+        const { x, y } = this.bossPosition();
+        this.burst(x, y, 36, 176);
       }
-
-      if (boss.shieldActive) {
-        const shieldBroken =
-          mechanicResult?.shieldBroken ?? true;
-        if (shieldBroken) {
-          boss.shieldActive = false;
-          this.sfx.bossShieldBreak();
-          const { x, y } = this.bossPosition();
-          this.burst(x, y, 36, 176);
-        }
-      } else {
-        const mechanicDamage =
-          mechanicResult?.damageMultiplier ?? 1;
-        const wordDamage =
-          firepowerDamage(
-            bossWordDamage(boss.maxHp, boss.role),
-            this.playerStats,
-          ) *
-          mechanicDamage *
-          this.relicBossWordDamageMultiplier(word.length) *
-          markedBossDamageMultiplier(this.bossMarkTimer > 0) *
-          this.characterBossDamageMultiplier();
-        if (completedPart !== null) {
-          this.damageBossPartTarget(
-            boss,
-            completedPart,
-            Math.max(1, wordDamage * 1.45),
-          );
-        } else {
-          boss.hp = Math.max(0, boss.hp - wordDamage);
-        }
-      }
-
-      this.sfx.wordComplete(perfectWord);
-      this.applyCharacterPerfectWordPassive(perfectWord);
-      this.applyRelicWordComplete(word.length, perfectWord);
-      this.emitTypedCompletion(
-        boss.entry,
-        perfectWord,
-        "boss",
-        completedPart?.instanceId ??
-          "boss:" + String(this.stageConfig?.stage ?? 1),
-      );
-      boss.wordsCompleted += 1;
-      const completedEntry = { ...boss.entry };
-      boss.typed = 0;
-      boss.entry = this.pickBossEntry(
-        boss.typingMechanic,
-      );
-      this.targetOwnership.beginUnit(boss);
-      boss.flash = 1;
-      if (this.gameplayMode === "recall" && boss.hp > 0) {
-        this.activateBossRecallPrompt();
-      }
-      boss.kick = 1.5;
-      boss.wordMissed = false;
-
-      this.addScore(
-        (140 + word.length * 18) * this.stats.multiplier,
-      );
-      this.gainPower(perfectWord ? 11 : 8);
-
-      const staggerSeconds =
-        mechanicResult?.staggerSeconds ??
-        (perfectWord ? 1.05 : 0);
-      if (staggerSeconds > 0) {
-        boss.staggerTimer = Math.max(
-          boss.staggerTimer,
-          staggerSeconds,
+    } else {
+      const mechanicDamage = mechanicResult?.damageMultiplier ?? 1;
+      const wordDamage =
+        firepowerDamage(
+          bossWordDamage(boss.maxHp, boss.role),
+          this.playerStats,
+        ) *
+        mechanicDamage *
+        this.relicBossWordDamageMultiplier(word.length) *
+        markedBossDamageMultiplier(this.bossMarkTimer > 0) *
+        this.characterBossDamageMultiplier();
+      if (completedPart !== null) {
+        this.damageBossPartTarget(
+          boss,
+          completedPart,
+          Math.max(1, wordDamage * 1.45),
         );
-        this.sfx.bossStagger();
-      }
-
-      const { x, y } = this.bossPosition();
-      this.burst(x, y, perfectWord ? 34 : 28, 18);
-      this.sfx.bossHit();
-      this.updateBossPhase(boss);
-
-      if (boss.hp <= 0) {
-        this.defeatBoss(completedEntry);
-        this.emitStats();
-        return;
+      } else {
+        boss.hp = Math.max(0, boss.hp - wordDamage);
       }
     }
 
-    this.hooks.onBossUpdate(toBossHud(boss));
-    this.emitStats();
+    this.sfx.wordComplete(perfectWord);
+    this.applyCharacterPerfectWordPassive(perfectWord);
+    this.applyRelicWordComplete(word.length, perfectWord);
+    this.emitTypedCompletion(
+      boss.entry,
+      perfectWord,
+      "boss",
+      completedPart?.instanceId ??
+        "boss:" + String(this.stageConfig?.stage ?? 1),
+    );
+    boss.wordsCompleted += 1;
+    const completedEntry = { ...boss.entry };
+    boss.typed = 0;
+    boss.entry = this.pickBossEntry(boss.typingMechanic) ?? boss.entry;
+    this.targetOwnership.beginUnit(boss);
+    boss.flash = 1;
+    if (this.gameplayMode === "recall" && boss.hp > 0) {
+      this.activateBossRecallPrompt();
+    }
+    boss.kick = 1.5;
+    boss.wordMissed = false;
+
+    this.addScore((140 + word.length * 18) * this.completionMultiplier());
+    this.gainPower(perfectWord ? 11 : 8);
+
+    const staggerSeconds =
+      mechanicResult?.staggerSeconds ?? (perfectWord ? 1.05 : 0);
+    if (staggerSeconds > 0) {
+      boss.staggerTimer = Math.max(boss.staggerTimer, staggerSeconds);
+      this.sfx.bossStagger();
+    }
+
+    const { x, y } = this.bossPosition();
+    this.burst(x, y, perfectWord ? 34 : 28, 18);
+    this.sfx.bossHit();
+    this.updateBossPhase(boss);
+
+    if (boss.hp <= 0) {
+      this.defeatBoss(completedEntry);
+      this.emitStats();
+      return;
+    }
   }
 
   private applyBossPhase(
@@ -7192,7 +7695,7 @@ export class Game {
     }
     boss.entry = this.pickBossEntry(
       boss.typingMechanic,
-    );
+    ) ?? boss.entry;
     boss.typed = 0;
     this.targetOwnership.beginUnit(boss);
     boss.wordMissed = false;
@@ -7510,8 +8013,8 @@ export class Game {
     this.stats.shield = reward.resources.shield;
     this.stats.energy = reward.resources.energy;
     this.stats.power = reward.power;
-    this.addScore(140 * this.stats.multiplier);
-    this.hooks.onWordComplete(pod.entry);
+    this.addScore(140 * this.completionMultiplier());
+    this.emitTypedCompletion(pod.entry, true, "bonus", "bonus:" + pod.entry.id);
     this.presentCombatTranslation(pod.entry, pod.x, pod.y - 54);
     this.fireBonusShot(this.supplyPodAim(pod), 48, 34, () => this.drawSupplyPod(pod), {
       icon: supplyRewardIcon(pod.reward),
@@ -7543,37 +8046,49 @@ export class Game {
     if (target.typed < word.length) this.fireBonusShot(this.recallBonusAim(target), 292, 7, null);
     this.sfx.shot(Math.max(1, this.stats.multiplier));
 
-    if (target.typed >= word.length) {
-      this.targetOwnership.finish(target, "completed");
-      const score = recallBonusRewardScore(
-        target.entry.en,
-        target.hintIndices,
-      );
-      this.addScore(score * this.stats.multiplier);
-      this.gainPower(10);
-      this.tryRollEquipmentDrop("treasure");
-      this.hooks.onWordComplete(target.entry);
-      this.presentCombatTranslation(target.entry, target.x, target.y - 54);
-      this.rewardNotice = {
-        label: "RECALL BONUS · TREASURE DROP",
-        x: target.x,
-        y: target.y,
-        hue: 292,
-        remaining: 1.8,
-      };
-      this.fireBonusShot(
-        this.recallBonusAim(target),
-        292,
-        54,
-        () => this.drawRecallBonus(target),
-        { icon: TREASURE_DROP_ART, color: "#c08bff", label: "RECALL BONUS", pieces: 3, size: 42, sound: "treasure" },
-      );
-      this.stageResultTracker.recordBonusCollected();
-      this.recallBonus = null;
-      this.emitStats();
-    }
+    if (target.typed >= word.length) this.completeRecallBonusWord(target);
 
     return true;
+  }
+
+  private completeRecallBonusWord(target: RecallBonusTarget): void {
+    const word = typingText(target.entry.en);
+    this.targetOwnership.finish(target, "completed");
+    const score = recallBonusRewardScore(target.entry.en, target.hintIndices);
+    this.addScore(score * this.completionMultiplier());
+    this.gainPower(10);
+    this.tryRollEquipmentDrop("treasure");
+    this.emitTypedCompletion(
+      target.entry,
+      true,
+      "bonus",
+      "bonus:" + target.entry.id,
+    );
+    this.presentCombatTranslation(target.entry, target.x, target.y - 54);
+    this.rewardNotice = {
+      label: "RECALL BONUS · TREASURE DROP",
+      x: target.x,
+      y: target.y,
+      hue: 292,
+      remaining: 1.8,
+    };
+    this.fireBonusShot(
+      this.recallBonusAim(target),
+      292,
+      54,
+      () => this.drawRecallBonus(target),
+      {
+        icon: TREASURE_DROP_ART,
+        color: "#c08bff",
+        label: "RECALL BONUS",
+        pieces: 3,
+        size: 42,
+        sound: "treasure",
+      },
+    );
+    this.stageResultTracker.recordBonusCollected();
+    this.recallBonus = null;
+    this.emitStats();
   }
 
   private typeTreasureDrone(drone: TreasureDrone, key: string): void {
@@ -7600,39 +8115,50 @@ export class Game {
     if (drone.typed < word.length) this.fireBonusShot(this.treasureDroneAim(drone), 48, 8, null);
     this.sfx.shot(this.stats.multiplier);
 
-    if (drone.typed >= word.length) {
-      this.targetOwnership.finish(drone, "completed");
-      const drop = rollEquipmentDrop(
-        "treasure",
-        this.effectiveLuck(),
-        this.playerStats.salvage,
-      );
-      if (drop !== null) {
-        this.hooks.onEquipmentDrop(drop);
-      }
-      const treasureScore = 320 * this.stats.multiplier;
-      this.addScore(treasureScore);
-      this.hooks.onWordComplete(drone.entry);
-      this.presentCombatTranslation(drone.entry, drone.x, drone.y - 54);
-      this.fireBonusShot(
-        this.treasureDroneAim(drone),
-        48,
-        44,
-        () => this.drawTreasureDrone(drone),
-        {
-          icon: TREASURE_DROP_ART,
-          color: "#ffd34d",
-          label: drop !== null ? "TREASURE · NEW GEAR" : "+" + treasureScore.toLocaleString() + " TREASURE",
-          pieces: 4,
-          size: 44,
-          sound: "treasure",
-        },
-      );
-      this.stageResultTracker.recordBonusCollected();
-      this.treasureDrone = null;
-    }
+    if (drone.typed >= word.length) this.completeTreasureDroneWord(drone);
 
     this.emitStats();
+  }
+
+  private completeTreasureDroneWord(drone: TreasureDrone): void {
+    const word = typingText(drone.entry.en);
+    this.targetOwnership.finish(drone, "completed");
+    const drop = rollEquipmentDrop(
+      "treasure",
+      this.effectiveLuck(),
+      this.playerStats.salvage,
+    );
+    if (drop !== null) {
+      this.hooks.onEquipmentDrop(drop);
+    }
+    const treasureScore = 320 * this.completionMultiplier();
+    this.addScore(treasureScore);
+    this.emitTypedCompletion(
+      drone.entry,
+      true,
+      "bonus",
+      "bonus:" + drone.entry.id,
+    );
+    this.presentCombatTranslation(drone.entry, drone.x, drone.y - 54);
+    this.fireBonusShot(
+      this.treasureDroneAim(drone),
+      48,
+      44,
+      () => this.drawTreasureDrone(drone),
+      {
+        icon: TREASURE_DROP_ART,
+        color: "#ffd34d",
+        label:
+          drop !== null
+            ? "TREASURE · NEW GEAR"
+            : "+" + treasureScore.toLocaleString() + " TREASURE",
+        pieces: 4,
+        size: 44,
+        sound: "treasure",
+      },
+    );
+    this.stageResultTracker.recordBonusCollected();
+    this.treasureDrone = null;
   }
 
   private typeRewardChoiceCrate(
@@ -7662,27 +8188,42 @@ export class Game {
     if (crate.typed < word.length) this.fireBonusShot(this.rewardCrateAim(crate), 286, 7, null);
     this.sfx.shot(this.stats.multiplier);
 
-    if (crate.typed >= word.length) {
-      this.targetOwnership.finish(crate, "completed");
-      const options = createRewardChoiceOptions(this.effectiveLuck());
-      this.addScore(220 * this.stats.multiplier);
-      this.hooks.onWordComplete(crate.entry);
-      this.presentCombatTranslation(crate.entry, crate.x, crate.y - 54);
-      this.fireBonusShot(
-        this.rewardCrateAim(crate),
-        286,
-        40,
-        () => this.drawRewardChoiceCrate(crate),
-        { icon: null, color: "#b787ff", label: "CHOICE CRATE OPEN", pieces: 4, size: 40, sound: "crate" },
-      );
-      this.stageResultTracker.recordBonusCollected();
-      this.rewardChoiceCrate = null;
-      if (options.length > 0) {
-        this.hooks.onRewardChoice(options);
-      }
-    }
+    if (crate.typed >= word.length) this.completeRewardChoiceWord(crate);
 
     this.emitStats();
+  }
+
+  private completeRewardChoiceWord(crate: RewardChoiceCrate): void {
+    const word = typingText(crate.entry.en);
+    this.targetOwnership.finish(crate, "completed");
+    const options = createRewardChoiceOptions(this.effectiveLuck());
+    this.addScore(220 * this.completionMultiplier());
+    this.emitTypedCompletion(
+      crate.entry,
+      true,
+      "bonus",
+      "bonus:" + crate.entry.id,
+    );
+    this.presentCombatTranslation(crate.entry, crate.x, crate.y - 54);
+    this.fireBonusShot(
+      this.rewardCrateAim(crate),
+      286,
+      40,
+      () => this.drawRewardChoiceCrate(crate),
+      {
+        icon: null,
+        color: "#b787ff",
+        label: "CHOICE CRATE OPEN",
+        pieces: 4,
+        size: 40,
+        sound: "crate",
+      },
+    );
+    this.stageResultTracker.recordBonusCollected();
+    this.rewardChoiceCrate = null;
+    if (options.length > 0) {
+      this.hooks.onRewardChoice(options);
+    }
   }
 
   private typeAnomalyCrate(crate: AnomalyCrate, key: string): void {
@@ -7709,26 +8250,7 @@ export class Game {
     if (crate.typed < word.length) this.fireBonusShot(this.anomalyCrateAim(crate), 322, 8, null);
     this.sfx.shot(this.stats.multiplier);
 
-    if (crate.typed >= word.length) {
-      this.targetOwnership.finish(crate, "completed");
-      this.addScore(260 * this.stats.multiplier);
-      this.hooks.onWordComplete(crate.entry);
-      this.presentCombatTranslation(crate.entry, crate.x, crate.y - 54);
-      this.fireBonusShot(
-        this.anomalyCrateAim(crate),
-        322,
-        44,
-        () => this.drawAnomalyCrate(crate),
-        { icon: null, color: "#ff65cc", label: "ANOMALY CAPTURED", pieces: 4, size: 40, sound: "crate" },
-      );
-      this.stageResultTracker.recordBonusCollected();
-      this.anomalyCrate = null;
-      this.anomalyResolutionPending = true;
-      this.anomalyRiskRatio = anomalyRiskHullRatio(
-        this.stageConfig?.stage ?? 1,
-      );
-      this.hooks.onAnomalyReady(this.anomalyRiskRatio);
-    }
+    if (crate.typed >= word.length) this.completeAnomalyWord(crate);
 
     this.emitStats();
   }
@@ -7764,6 +8286,38 @@ export class Game {
     this.anomalyRiskRatio = 0;
     this.emitStats();
     return true;
+  }
+
+  private completeAnomalyWord(crate: AnomalyCrate): void {
+    const word = typingText(crate.entry.en);
+    this.targetOwnership.finish(crate, "completed");
+    this.addScore(260 * this.completionMultiplier());
+    this.emitTypedCompletion(
+      crate.entry,
+      true,
+      "bonus",
+      "bonus:" + crate.entry.id,
+    );
+    this.presentCombatTranslation(crate.entry, crate.x, crate.y - 54);
+    this.fireBonusShot(
+      this.anomalyCrateAim(crate),
+      322,
+      44,
+      () => this.drawAnomalyCrate(crate),
+      {
+        icon: null,
+        color: "#ff65cc",
+        label: "ANOMALY CAPTURED",
+        pieces: 4,
+        size: 40,
+        sound: "crate",
+      },
+    );
+    this.stageResultTracker.recordBonusCollected();
+    this.anomalyCrate = null;
+    this.anomalyResolutionPending = true;
+    this.anomalyRiskRatio = anomalyRiskHullRatio(this.stageConfig?.stage ?? 1);
+    this.hooks.onAnomalyReady(this.anomalyRiskRatio);
   }
 
   private resolveSkillEnemyKill(
@@ -7898,16 +8452,21 @@ export class Game {
 
   private completeWord(enemy: Enemy): void {
     const length = typingText(enemy.entry.en).length;
-    const perfectWord = !enemy.wordMissed;
+    const perfectWord = !enemy.wordMissed && (!this.voiceCompletionActive || this.voiceRecallUnassisted(enemy));
     if (this.gameplayMode === "recall") {
-      this.resolveRecallPrompt(enemy.entry, true, perfectWord);
+      this.resolveRecallPrompt(enemy.entry, true, perfectWord, enemy);
     }
-    this.stageResultTracker.completeWord(
+    if (this.voiceCompletionActive) { this.stageResultTracker.completeVoiceWord(
       "enemy",
       enemy.id,
       enemy.entry,
       this.stageElapsedSeconds,
-    );
+    ); } else { this.stageResultTracker.completeWord(
+      "enemy",
+      enemy.id,
+      enemy.entry,
+      this.stageElapsedSeconds,
+    ); }
     this.sfx.wordComplete(perfectWord);
     this.applyCharacterWordCompletePassive(length);
     this.applyCharacterPerfectWordPassive(perfectWord);
@@ -7934,7 +8493,7 @@ export class Game {
     );
     if (sharedEffect.linkedTargets > 0) {
       const affected = softenNearbyEnemies(
-        this.enemies,
+        this.voiceCompletionActive ? this.enemies.filter(target => !this.targetOwnership.isKeyboardOwned(target)) : this.enemies,
         enemy,
         sharedEffect.typedProgressRatio,
         sharedEffect.linkedTargets,
@@ -7958,7 +8517,7 @@ export class Game {
         enemy.speed *= 1.2;
       }
 
-      this.addScore((45 + length * 8) * this.stats.multiplier);
+      this.addScore((45 + length * 8) * this.completionMultiplier());
       this.gainPower(4);
 
       const hitDefinition = this.visualDefinitionForEnemy(enemy);
@@ -7979,11 +8538,11 @@ export class Game {
       rank: enemy.rank ?? "I",
       elite: enemy.elite,
     });
-    this.addScore(killReward * this.stats.multiplier);
+    this.addScore(killReward * this.completionMultiplier());
     this.gainPower(7);
     const deathDefinition = this.visualDefinitionForEnemy(enemy);
     const creditReceipt =
-      this.claimCombatCreditEnemy(enemy, "typed-kill");
+      this.claimCombatCreditEnemy(enemy, this.voiceCompletionActive ? "voice-kill" : "typed-kill");
     // The enemy leaves play now; its blast, sound and crystal drop wait for
     // the final projectile impact so gameplay and presentation stay separate.
     this.firePlayerShot(enemy.x, enemy.y, 1.45, {
@@ -8006,7 +8565,7 @@ export class Game {
       }
     }
     if (enemy.golden) {
-      this.addScore(260 * this.stats.multiplier);
+      this.addScore(260 * this.completionMultiplier());
     }
     this.tryRollEquipmentDrop(
       enemy.golden ? "golden" : enemy.elite ? "elite" : "normal",
@@ -8075,7 +8634,7 @@ export class Game {
 
   private claimCombatCreditEnemy(
     enemy: Enemy,
-    cause: Extract<CombatCreditCause, "typed-kill" | "skill-kill">,
+    cause: Extract<CombatCreditCause, "typed-kill" | "voice-kill" | "skill-kill">,
   ): CombatCreditRewardReceipt | null {
     if (
       this.combatCreditAttemptId === null ||
@@ -8445,7 +9004,7 @@ export class Game {
         alphabet[Math.floor(Math.random() * alphabet.length)] ?? "a";
       const angle = baseAngle + offset;
 
-      this.projectiles.push({
+      const projectile: EnemyProjectile = {
         id: this.nextProjectileId++,
         ownerId: enemy.id,
         char,
@@ -8455,7 +9014,8 @@ export class Game {
         vy: Math.sin(angle) * speed,
         radius: 12,
         family: this.visualDefinitionForEnemy(enemy)?.family,
-      });
+      };
+      if (this.admitVoiceProjectile(projectile)) this.projectiles.push(projectile);
     }
 
     this.burst(enemy.x, enemy.y, 26, 48);
@@ -8558,12 +9118,12 @@ export class Game {
     this.burst(splitter.x, splitter.y, 30, 318);
   }
 
-  private applyRelicCorrectKeyPassive(source: Enemy): void {
+  private applyRelicCorrectKeyPassive(source: Enemy, voiceTrigger = false): void {
     const interval = this.relicEffects.streakFreezeInterval;
     if (
       interval <= 0 ||
-      this.stats.streak <= 0 ||
-      this.stats.streak % interval !== 0
+      (!voiceTrigger && (this.stats.streak <= 0 ||
+      this.stats.streak % interval !== 0))
     ) {
       return;
     }
@@ -8605,7 +9165,7 @@ export class Game {
       );
     }
 
-    const directWeight = effortWeight(length);
+    const directWeight = effortWeight(this.voiceCompletionActive ? this.voiceCurrentEffort : length);
     if (perfectWord) {
       if (this.relicEffects.perfectWordEnergy > 0) {
         this.stats.energy = clamp(
@@ -8909,10 +9469,10 @@ export class Game {
     }
   }
 
-  private applyCharacterCorrectKeyPassive(): void {
+  private applyCharacterCorrectKeyPassive(voiceTriggers?: ReadonlySet<string>): void {
     if (
       this.characterId === "vanguard" &&
-      shouldTriggerVanguardShieldRhythm(this.stats.streak)
+      (voiceTriggers ? voiceTriggers.has("vanguard") : shouldTriggerVanguardShieldRhythm(this.stats.streak))
     ) {
       const nextShield = restoreVanguardShield(this.stats.shield, this.stats.maxShield);
       if (nextShield > this.stats.shield) {
@@ -8924,7 +9484,7 @@ export class Game {
 
     if (
       this.characterId === "wraith" &&
-      shouldTriggerWraithCloak(this.stats.streak)
+      (voiceTriggers ? voiceTriggers.has("wraith") : shouldTriggerWraithCloak(this.stats.streak))
     ) {
       this.cloakTimer = Math.max(this.cloakTimer, WRAITH_PASSIVE_CLOAK_DURATION);
       this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 12, 274);
@@ -8933,7 +9493,7 @@ export class Game {
 
     if (
       this.characterId === "zenith" &&
-      shouldTriggerZenithCore(this.stats.streak)
+      (voiceTriggers ? voiceTriggers.has("zenith") : shouldTriggerZenithCore(this.stats.streak))
     ) {
       this.stats.shield = clamp(
         this.stats.shield + this.stats.maxShield * 0.08,
@@ -8955,13 +9515,13 @@ export class Game {
     }
   }
 
-  private characterBossDamageMultiplier(): number {
+  private characterBossDamageMultiplier(voiceSource = this.voiceCompletionActive): number {
     let multiplier = 1;
 
     // Braced a rush: the boss is open for a moment.
     if (this.bossExposedTimer > 0) multiplier *= 1.5;
 
-    if (this.perks.momentumStreak > 0 && this.stats.streak >= this.perks.momentumStreak) {
+    if (this.perks.momentumStreak > 0 && (voiceSource ? this.voiceEffortStreak : this.stats.streak) >= this.perks.momentumStreak) {
       multiplier *= 1 + this.perks.momentumDamage;
     }
 
@@ -8972,7 +9532,7 @@ export class Game {
       multiplier *= 1.2;
     }
     if (this.characterId === "reaper") {
-      multiplier *= reaperStreakDamageMultiplier(this.stats.streak);
+      multiplier *= reaperStreakDamageMultiplier(voiceSource ? this.voiceEffortStreak : this.stats.streak);
     }
     if (
       (this.characterId === "celestial" ||
@@ -9233,7 +9793,7 @@ export class Game {
               ),
             ),
             this.playerStats,
-          ) * reaperStreakDamageMultiplier(this.stats.streak);
+          ) * reaperStreakDamageMultiplier(this.inputMode === "voice" ? this.voiceEffortStreak : this.stats.streak);
         this.boss.hp = Math.max(0, this.boss.hp - damage);
         this.boss.flash = 1;
         this.updateBossPhase(this.boss);
@@ -9390,8 +9950,9 @@ export class Game {
       (enemy) => enemy.id === enemyId,
     );
     if (escaped !== undefined) {
+      this.resetVoiceCreditForMiss(escaped);
       if (this.gameplayMode === "recall") {
-        this.resolveRecallPrompt(escaped.entry, false, false);
+        this.resolveRecallPrompt(escaped.entry, false, false, escaped);
         this.recallHintIndices.delete(escaped.id);
       }
       this.stageResultTracker.missWord(
@@ -10614,6 +11175,7 @@ export class Game {
     context.shadowBlur = brightWorld ? 4 : 0;
     context.shadowColor = "rgba(0, 0, 0, 0.95)";
     context.fillText(projectile.char.toUpperCase(), 0, 0);
+    if (this.inputMode !== "typing") { context.font = "bold 10px monospace"; context.fillText(this.voiceActionForms.get(projectile) ?? NATO_LETTERS[projectile.char.toLowerCase()] ?? "", 0, 25); }
 
     context.restore();
   }
@@ -11617,6 +12179,12 @@ export class Game {
         accent: identity?.accent ?? "#ffd166",
       };
       drawBossSkill(context, skill, geometry, colors, time, this.settings.visualQuality);
+      if (this.inputMode !== "typing") for (const meteor of skill.meteors) {
+        if (meteor.state !== "falling") continue;
+        const point = depthMeteorPoint(geometry, skill, meteor); if (!point) continue;
+        context.save(); context.font = "bold 10px sans-serif"; context.textAlign = "center"; context.fillStyle = "#e6fffb";
+        context.fillText(this.voiceActionForms.get(meteor) ?? NATO_LETTERS[meteor.char] ?? "", point.x, point.y + 25); context.restore();
+      }
       const promptY = Math.min(this.height * 0.6, geometry.shipY - 150);
       const open = bossCounterOpen(skill);
       // The ultimate's banner names it during the wind-up.
@@ -12739,6 +13307,7 @@ export class Game {
     );
     this.recallReplayCount = 0;
     this.recallPromptStartedAtSeconds = this.stageElapsedSeconds;
+    this.voiceRecallAssist.set(enemy, { startedAt: this.stageElapsedSeconds, replays: 0 });
     this.hooks.onRecallPrompt?.({ ...enemy.entry });
   }
 
@@ -12753,16 +13322,31 @@ export class Game {
     );
     this.recallReplayCount = 0;
     this.recallPromptStartedAtSeconds = this.stageElapsedSeconds;
+    this.voiceRecallAssist.set(this.boss, { startedAt: this.stageElapsedSeconds, replays: 0 });
     this.hooks.onRecallPrompt?.({ ...this.boss.entry });
   }
 
+  private voiceRecallUnassisted(target: Enemy | BossState): boolean {
+    if (this.gameplayMode !== "recall") return true;
+    const hints =
+      target === this.boss
+        ? this.recallBossHintIndices.size
+        : (this.recallHintIndices.get((target as Enemy).id)?.size ?? 0);
+    return (
+      hints === 0 && (this.voiceRecallAssist.get(target)?.replays ?? 0) === 0
+    );
+  }
   private resolveRecallPrompt(
     entry: VocabularyEntry,
     completed: boolean,
     noTypingMiss: boolean,
+    source?: Enemy | BossState,
   ): void {
     if (this.gameplayMode !== "recall") return;
-    const hintCount =
+    const voiceSource = this.voiceCompletionActive || this.inputMode === "voice" || this.inputMode === "hybrid" && source !== undefined && !this.targetOwnership.isKeyboardOwned(source);
+    const hintCount = voiceSource && source
+      ? source === this.boss ? this.recallBossHintIndices.size : this.recallHintIndices.get((source as Enemy).id)?.size ?? 0
+      :
       this.boss !== null
         ? this.recallBossHintIndices.size
         : this.targetId === null
@@ -12770,18 +13354,20 @@ export class Game {
           : this.recallHintIndices.get(this.targetId)?.size ?? 0;
     const responseMs = Math.max(
       0,
-      (this.stageElapsedSeconds - this.recallPromptStartedAtSeconds) * 1_000,
+      (this.stageElapsedSeconds - (voiceSource && source ? this.voiceRecallAssist.get(source)?.startedAt ?? this.recallPromptStartedAtSeconds : this.recallPromptStartedAtSeconds)) * 1_000,
     );
+    const replayCount = voiceSource && source ? this.voiceRecallAssist.get(source)?.replays ?? 0 : this.recallReplayCount;
     this.hooks.onRecallResult?.({
       entry: { ...entry },
       completed,
+      ...(voiceSource ? { inputSource: "voice" as const } : {}),
       perfect:
         completed &&
         noTypingMiss &&
         hintCount === 0 &&
-        this.recallReplayCount === 0,
+        replayCount === 0,
       hintCount,
-      replayCount: this.recallReplayCount,
+      replayCount,
       responseMs,
       at: Date.now(),
     });

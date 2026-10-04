@@ -105,8 +105,8 @@ export function recordExpansionCompletion(
   if (
     solarStorm !== null &&
     fact.perfect &&
-    completionEligibleForTypedReward(fact) &&
-    effortWeight(fact.acceptedTypedLetters) >= 0.6
+    (completionEligibleForTypedReward(fact) || fact.origin === "voice" && fact.acceptedVoiceWords === 1) &&
+    effortWeight(fact.origin === "voice" ? fact.voiceEffort ?? 0 : fact.acceptedTypedLetters) >= 0.6
   ) {
     const window = solarStormWindowAt(solarStorm, activeSeconds);
     if (window.active && solarStorm.claimedPulse !== window.pulse) {
@@ -151,6 +151,7 @@ export function mergeContributions(
   right: CompletionContribution,
 ): CompletionContribution {
   return {
+    ...(left.voiceCompletions || right.voiceCompletions ? { voiceCompletions: (left.voiceCompletions ?? 0) + (right.voiceCompletions ?? 0), voiceEffort: (left.voiceEffort ?? 0) + (right.voiceEffort ?? 0) } : {}),
     typedCompletions: left.typedCompletions + right.typedCompletions,
     perfectCompletions: left.perfectCompletions + right.perfectCompletions,
     acceptedTypedLetters: left.acceptedTypedLetters + right.acceptedTypedLetters,

@@ -10,6 +10,20 @@ export type Admission =
   | { status: "prepared"; token: number }
   | { status: "deferred"; reason: WordConflictReason | "capacity" | "invalid-identity" | "stale-admission" };
 
+/** Pure admission check also used by synchronous gameplay birth/replacement selectors. */
+export function admissionConflict(mode: InputMode, current: readonly WordReservation[], units: readonly WordReservation[], capacity = 64): WordConflictReason | "capacity" | null {
+  if (current.length + units.length > capacity) return "capacity";
+  const other = [...current];
+  for (const unit of units) {
+    if (mode !== "typing") {
+      const reason = wordConflict(unit, other);
+      if (reason !== null) return reason;
+    }
+    other.push(unit);
+  }
+  return null;
+}
+
 /** One inventory includes owned units and pending batches. Transactions have no gameplay side effects. */
 export class TargetRegistry {
   private readonly live = new Map<string, LiveReservation>();
@@ -26,14 +40,8 @@ export class TargetRegistry {
     if (!units.length || new Set(units.map((u) => u.unitId)).size !== units.length || units.some((u) => !u.unitId || !u.contextId || this.issued.has(u.unitId))) return { status: "deferred", reason: "invalid-identity" };
     if (replaceUnitId !== undefined && (!this.live.has(replaceUnitId) || units.length !== 1)) return { status: "deferred", reason: "invalid-identity" };
     const other = this.reservations().filter((u) => u.unitId !== replaceUnitId);
-    if (other.length + units.length > this.capacity) return { status: "deferred", reason: "capacity" };
-    for (const unit of units) {
-      if (this.mode !== "typing") {
-        const reason = wordConflict(unit, other);
-        if (reason !== null) return { status: "deferred", reason };
-      }
-      other.push(unit);
-    }
+    const reason = admissionConflict(this.mode, other, units, this.capacity);
+    if (reason !== null) return { status: "deferred", reason };
     const token = ++this.serial;
     const copied = units.map(copyUnit);
     copied.forEach((u) => this.issued.add(u.unitId));
@@ -45,13 +53,8 @@ export class TargetRegistry {
     if (!batch || (batch.replaceUnitId !== undefined && !this.live.has(batch.replaceUnitId))) { this.cancel(token); return { status: "deferred", reason: "stale-admission" }; }
     // Revalidate against all current reservations, including batches prepared since this one.
     const other = [...this.live.values(), ...[...this.pending.values()].filter((p) => p.token !== token).flatMap((p) => p.units)].filter((u) => u.unitId !== batch.replaceUnitId);
-    for (const unit of batch.units) {
-      if (this.mode !== "typing") {
-        const reason = wordConflict(unit, other);
-        if (reason !== null) { this.cancel(token); return { status: "deferred", reason }; }
-      }
-      other.push(unit as LiveReservation);
-    }
+    const reason = admissionConflict(this.mode, other, batch.units, this.capacity);
+    if (reason !== null) { this.cancel(token); return { status: "deferred", reason }; }
     if (batch.replaceUnitId !== undefined) this.live.delete(batch.replaceUnitId);
     for (const unit of batch.units) this.live.set(unit.unitId, { ...unit, keyboardOwned: false });
     this.pending.delete(token);

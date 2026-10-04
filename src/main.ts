@@ -1,7 +1,12 @@
+import { AccountTransactions, type AccountView } from "./persistence/account-transactions";
+import { WARP_POLICY, reconcileWarp, warpEtaMs } from "./economy/warp-charge";
+import type { AccountState, SortieContext, WriteTicket } from "./persistence/account-state";
 import { compositionForWorld } from "./background/compositions";
 import { InputController } from "./input/input-controller";
-import { VoiceAdapter } from "./input/voice-adapter";
+import { VoiceSession } from "./input/voice-session";
+import { sanitizeInputMode, type InputMode } from "./input/mode";
 import { mountVoiceFeedback } from "./ui/voice-feedback";
+import { installWarpControls } from "./ui/warp-controls";
 import { paintedBossArtUrl } from "./enemies/painted-sprites";
 import { bossIdentityForStage } from "./boss/identity";
 import type { BossRole } from "./boss/model";
@@ -18,6 +23,7 @@ import "@fontsource/be-vietnam-pro/600.css";
 import "@fontsource/be-vietnam-pro/700.css";
 import "@fontsource/spectral/700.css";
 import "./styles.css";
+import "./ui/warp-charge.css";
 import "./character-progress.css";
 import "./basic-skills.css";
 import "./kill-translation.css";
@@ -111,6 +117,7 @@ import {
 } from "./campaign/difficulty-settings";
 import {
   createDefaultCampaignProgress,
+  inputProfileKey,
   recordStageClear,
   selectCampaignStage,
 } from "./campaign/progress";
@@ -518,7 +525,7 @@ import {
   markExpansionCinematicSeen,
   recordExpansionRun,
   recordFixedChallengeResult,
-  saveExpansionV2Profile,
+  sanitizeExpansionV2Profile,
   setExpansionGhostEnabled,
   type ExpansionV2Profile,
 } from "./expansion-v2/profile-store";
@@ -581,21 +588,18 @@ import {
   type CrashRecoverySnapshot,
 } from "./persistence/crash-recovery";
 import {
-  exportPlayerSaveJson,
   parsePlayerSaveJson,
 } from "./persistence/backup";
 import {
-  createPlayerSave,
   loadPlayerSave,
-  savePlayerProgress,
-  savePlayerRecoveryMirrorSync,
+  PLAYER_SAVE_VERSION,
   UnsupportedPlayerSaveVersionError,
 } from "./persistence/player-save";
 import type {
   PersistenceSource,
   SaveReason,
 } from "./persistence/player-save";
-import { speakEnglish, stopSpeech } from "./speech";
+import { speakEnglish, stopSpeech, setSpeechGate } from "./speech";
 import {
   loadVocabularyGrammarIndex,
   loadVocabularyGrammarModule,
@@ -787,10 +791,15 @@ function loadDifficultySettings(): DifficultySettings {
 }
 
 function saveDifficultySettings(): void {
-  localStorage.setItem(
-    DIFFICULTY_KEY,
-    JSON.stringify(difficultySettings),
-  );
+  if (
+    !persistenceReady ||
+    testingStagePreviewActive() ||
+    practiceRestorePending ||
+    clearSettlementPending ||
+    !accountTransactions.canWrite()
+  )
+    return;
+  void autosaveCampaign("manual");
 }
 
 function loadSource(): VocabularySource {
@@ -1078,9 +1087,29 @@ const stageClearOverlay = byId("stageClearOverlay");
 const voiceFeedback = mountVoiceFeedback(byId("voiceFeedback"));
 // Construction is inert: probing/start remain behind the offline engine + gameplay gates.
 const voiceInstanceId = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `space-voice-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-const voiceAdapter = new VoiceAdapter(window.parent, PARENT_ORIGIN, voiceInstanceId, () => {}, voiceFeedback.state);
-window.addEventListener("message", (event: MessageEvent<unknown>) => voiceAdapter.handleMessage(event));
-window.addEventListener("pagehide", () => voiceAdapter.stop());
+const voiceSession = new VoiceSession(window.parent, PARENT_ORIGIN, voiceInstanceId, () => ({
+  getPhase: () => document.querySelector("dialog[open]") ? "paused" : game.getPhase(),
+  getVoiceTargets: sample => game.getVoiceTargets(sample),
+  getVoiceVocabularyForms: () => game.getVoiceVocabularyForms(),
+  getVoiceVocabularyRevision: () => game.getVoiceVocabularyRevision(),
+  completeVoiceUnit: (id, version, eligibility) => game.completeVoiceUnit(id, version, eligibility),
+  togglePause: () => game.togglePause(),
+}), voiceFeedback.state, (state, detail) => {
+  const status = byId("voiceInputStatus"); status.textContent = detail;
+  byId("voiceMicToggle").setAttribute("aria-pressed", String(state === "listening"));
+  byId("voiceMicToggle").textContent = state === "listening" || state === "suspended" ? "■ Mic" : state === "preparing" ? "… Mic" : "🎙 Mic";
+  byId("voiceInputControls").dataset.state = state;
+});
+window.addEventListener("message", (event: MessageEvent<unknown>) => voiceSession.handleMessage(event));
+window.addEventListener("pagehide", () => voiceSession.stop());
+new MutationObserver(() => voiceSession.phaseChanged()).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["open"] });
+setSpeechGate(async play => {
+  const pausedForVoice = game.getInputMode() === "voice" && game.getPhase() === "playing";
+  if (pausedForVoice) game.pause();
+  try { await voiceSession.withAudioOutput(play); }
+  catch (error) { voiceSession.stop(); showNotice(error instanceof Error ? error.message : "Pronunciation unavailable"); }
+  finally { if (pausedForVoice && game.getPhase() === "paused") game.resume(); }
+});
 const settingsDialog = byId<HTMLDialogElement>("settingsDialog");
 const vocabularyDialog = byId<HTMLDialogElement>("vocabularyDialog");
 const stageSelectDialog = byId<HTMLDialogElement>("stageSelectDialog");
@@ -1350,6 +1379,11 @@ for (const dialog of [
 }
 
 type AutosaveSnapshot = {
+  ticket?: WriteTicket;
+  attemptId?: string | null;
+  transition?: "cleared" | "defeat-pending";
+  grants?: string[];
+  auxiliary?: AccountView["auxiliary"];
   campaign: typeof campaign;
   inventory: Inventory;
   equipment: EquipmentState;
@@ -1373,6 +1407,161 @@ type AutosaveSnapshot = {
   stageEntrySnapshot: StageEntrySnapshot | null;
 };
 
+let warpAccount: AccountState | null = null;
+let practiceActive = false;
+let practiceRestorePending = false;
+let practiceReload: Promise<void> = Promise.resolve();
+let encounterWasFree = false;
+let clearSettlementPending = false;
+let currentEncounterToken = "";
+let settledEncounterToken = "";
+let pendingMilestoneGrants: string[] = [];
+let committedCredits = 0;
+const accountTransactions = new AccountTransactions((save) => {
+  warpAccount = save.account;
+  committedCredits = save.credits;
+  if (
+    !accountTransactions.canWrite() &&
+    !testingStagePreviewActive() &&
+    !practiceRestorePending &&
+    game.getPhase() === "title"
+  ) {
+    applyAutosaveSnapshot(save);
+    if (save.auxiliary?.expansionV2)
+      expansionV2Profile = sanitizeExpansionV2Profile(
+        save.auxiliary.expansionV2,
+      );
+    if (save.auxiliary?.difficulty)
+      difficultySettings = sanitizeDifficultySettings(
+        save.auxiliary.difficulty,
+      );
+    refreshPersistentStateUi();
+  }
+  try {
+    if (save.auxiliary?.expansionV2)
+      localStorage.setItem(
+        "spaceTypingExpansionV2ProfileV1",
+        JSON.stringify(save.auxiliary.expansionV2),
+      );
+    if (save.auxiliary?.difficulty)
+      localStorage.setItem(
+        DIFFICULTY_KEY,
+        JSON.stringify(save.auxiliary.difficulty),
+      );
+  } catch {
+    /* Auxiliary mirrors are rebuildable from the committed account. */
+  }
+  renderWarpHud();
+});
+function renderWarpHud(): void {
+  if (!warpAccount) return;
+  const warp = reconcileWarp(warpAccount.warp, accountTransactions.now());
+  byId("warpBalance").textContent = `${warp.current}/100`;
+  byId("warpReserve").textContent = `Reserve ${warp.reserve}/300`;
+  const eta = Math.ceil(warpEtaMs(warp, accountTransactions.now()) / 1000);
+  byId("warpStatus").textContent = !accountTransactions.canWrite()
+    ? "Read-only tab · Practice is free"
+    : practiceActive
+      ? "Practice · learning saved, rewards simulated"
+      : `${warp.current}/100 Warp · Reserve ${warp.reserve}/300 · ${warp.refills}/3 refills${eta > 0 ? ` · Deploy in ${Math.floor(eta / 60)}m ${eta % 60}s` : " · Deploy costs 10"}`;
+  byId("practiceBanner").hidden =
+    !practiceActive && activeReviewGoal === undefined;
+  const busy =
+    accountTransactions.busy() ||
+    clearSettlementPending ||
+    stageStartPending ||
+    practiceRestorePending;
+  byId<HTMLButtonElement>("warpRefuelButton").disabled =
+    busy ||
+    !accountTransactions.canWrite() ||
+    !!warpAccount.attempt ||
+    testingStagePreviewActive() ||
+    warp.refills >= 3 ||
+    warp.current + warp.reserve > 380;
+  const reserve = byId<HTMLButtonElement>("warpReserveToggle");
+  reserve.textContent = `Reserve: ${warp.reserveConsent ? "on" : "off"}`;
+  reserve.setAttribute("aria-pressed", String(warp.reserveConsent));
+  reserve.disabled =
+    busy ||
+    !accountTransactions.canWrite() ||
+    !!warpAccount.attempt ||
+    testingStagePreviewActive();
+  byId<HTMLButtonElement>("warpAbandonButton").hidden =
+    !accountTransactions.canWrite() ||
+    warpAccount.attempt?.phase !== "prepared";
+  byId<HTMLButtonElement>("warpClockButton").hidden =
+    warp.watermarkMs < Date.now() + 300_000;
+}
+async function finishManagedSortie(
+  kind: "failed" | "abandoned",
+): Promise<boolean> {
+  if (testingStagePreviewActive()) return true;
+  if (!warpAccount?.attempt) return true;
+  try {
+    if (game.getPhase() === "playing") game.togglePause();
+    if (
+      game.getPhase() === "stageclear" &&
+      warpAccount.attempt.phase === "active"
+    ) {
+      return autosaveCampaign("stage-clear", "✓ Clear and rewards committed");
+    }
+    if (
+      warpAccount.attempt.phase !== "prepared" &&
+      !(await autosaveCampaign("manual"))
+    )
+      return false;
+    await accountTransactions.finish(kind, warpAccount.attempt!.id);
+    return true;
+  } catch (error) {
+    showNotice(
+      error instanceof Error ? error.message : "Unable to close the sortie",
+    );
+    return false;
+  }
+}
+async function deploySortie(
+  stage: number,
+  activity: "campaign" | "hidden",
+  seed: number,
+  difficulty: unknown,
+  simulated: boolean,
+): Promise<void> {
+  if (simulated) {
+    renderWarpHud();
+    return;
+  }
+  if (!accountTransactions.canWrite())
+    throw new Error("Account is read-only. Choose Practice · Free.");
+  if (game.getInputMode() !== "typing" && !voiceSession.isReady())
+    throw new Error("Microphone is not ready; no Warp charged.");
+  const context: SortieContext = {
+    stage,
+    tier: ascension.selectedTier,
+    activity,
+    inputMode: game.getInputMode(),
+    gameplayMode,
+    difficulty: JSON.stringify(difficulty),
+    vocabulary: `${sourceState.mode}:${selectedVocabularyLevel()}:${hashText(game.getVoiceVocabularyForms().sort().join("\n"))}`,
+    contentVersion: "space-sortie-v1",
+    seed,
+  };
+  const warp = reconcileWarp(warpAccount!.warp, accountTransactions.now());
+  if (
+    warp.current < WARP_POLICY.cost &&
+    !warp.reserveConsent &&
+    warp.current + warp.reserve >= WARP_POLICY.cost
+  ) {
+    if (
+      !window.confirm(
+        `Use ${WARP_POLICY.cost - warp.current} Reserve Warp for this sortie and allow Reserve to cover future shortages? No Star Crystals will be spent.`,
+      )
+    )
+      throw new Error("Deploy cancelled · Practice is free");
+    await accountTransactions.reserveConsent(true);
+  }
+  const prepared = await accountTransactions.admit(context);
+  await accountTransactions.activate(prepared.account.attempt!.id, context);
+}
 let testingStageOverride: number | null = null;
 let testingStageSnapshot: AutosaveSnapshot | null = null;
 
@@ -1404,20 +1593,25 @@ let expansionV2Profile: ExpansionV2Profile =
   loadExpansionV2Profile(localStorage);
 let expeditionActiveSecondsTotal = 0;
 
-function persistExpansionV2Profile(
-  next: ExpansionV2Profile,
-): void {
+function persistExpansionV2Profile(next: ExpansionV2Profile): void {
+  if (
+    practiceActive ||
+    activeReviewGoal !== undefined ||
+    testingStagePreviewActive() ||
+    !accountTransactions.canWrite()
+  )
+    return;
   try {
-    expansionV2Profile = saveExpansionV2Profile(
-      localStorage,
-      next,
-    );
-    expeditionUi?.setEvolutionTier(
-      expansionEvolutionTier(expansionV2Profile),
-    );
-    expeditionUi?.setGhostEnabled(
-      expansionV2Profile.ghostEnabled,
-    );
+    expansionV2Profile = next;
+    if (persistenceReady && !clearSettlementPending) {
+      if (expeditionSession.ownsCampaignPersistence())
+        void accountTransactions
+          .updateAuxiliary({ expansionV2: next })
+          .catch((error) => showNotice(String(error)));
+      else void autosaveCampaign("progression");
+    }
+    expeditionUi?.setEvolutionTier(expansionEvolutionTier(expansionV2Profile));
+    expeditionUi?.setGhostEnabled(expansionV2Profile.ghostEnabled);
   } catch (error) {
     console.error("Unable to save Expansion V2 profile.", error);
     showNotice("Expansion V2 profile save failed");
@@ -1480,35 +1674,13 @@ function recordExpeditionTerminalProfile(run: ExpeditionRun): void {
   persistExpansionV2Profile(next);
 }
 
-const campaignAutosave = new AutosaveQueue<
-  AutosaveSnapshot,
-  PersistenceSource
->((snapshot, reason) =>
-  savePlayerProgress(
-    snapshot.campaign,
-    snapshot.inventory,
-    snapshot.equipment,
-    snapshot.supportSpells,
-    snapshot.characters,
-    reason as SaveReason,
-    snapshot.luckPity,
-    snapshot.hiddenDiscovery,
-    snapshot.credits,
-    snapshot.progression,
-    snapshot.expansionCurrencies,
-    snapshot.campaignExpansion,
-    snapshot.checkpointSnapshot,
-    snapshot.crashRecoverySnapshot,
-    snapshot.stageEntrySnapshot,
-    snapshot.shops,
-    snapshot.route,
-    snapshot.upgrades,
-    snapshot.relics,
-    snapshot.codex,
-    snapshot.ascension,
-    snapshot.hotbar,
-  ),
-);
+const campaignAutosave = new AutosaveQueue<AutosaveSnapshot, PersistenceSource>(async (snapshot, reason) => {
+  const { ticket, attemptId, transition, grants, auxiliary, ...fields } = snapshot;
+  if (!ticket) throw new Error("Canonical account unavailable");
+  await accountTransactions.save({ ...fields, version: PLAYER_SAVE_VERSION, updatedAt: new Date().toISOString(), lastSaveReason: reason as SaveReason, auxiliary }, ticket, attemptId ?? null, transition, grants);
+  if (transition === "cleared") pendingMilestoneGrants = [];
+  return "indexeddb";
+});
 
 function currentRunPersistentState(): RunPersistentState {
   return {
@@ -1565,8 +1737,32 @@ function applyAutosaveSnapshot(snapshot: AutosaveSnapshot): void {
   stageEntrySnapshot = snapshot.stageEntrySnapshot;
 }
 
-function currentAutosaveSnapshot(): AutosaveSnapshot {
+function currentAutosaveSnapshot(terminalClear = false): AutosaveSnapshot {
+  const attempt = warpAccount?.attempt;
   return {
+    ticket: warpAccount
+      ? accountTransactions.ticket(
+          testingStagePreviewActive()
+            ? "practice"
+            : expeditionSession.ownsCampaignPersistence()
+              ? "expedition"
+              : warpAccount.attempt
+                ? "rewarded"
+                : "account",
+        )
+      : undefined,
+    attemptId: attempt?.id ?? null,
+    ...(terminalClear && attempt?.phase === "active"
+      ? { transition: "cleared" as const }
+      : {}),
+    ...(attempt && game.getPhase() === "gameover"
+      ? { transition: "defeat-pending" as const }
+      : {}),
+    grants: terminalClear ? [...pendingMilestoneGrants] : [],
+    auxiliary: {
+      expansionV2: expansionV2Profile,
+      difficulty: difficultySettings,
+    },
     campaign,
     inventory,
     equipment,
@@ -1605,6 +1801,7 @@ function canSelectStageFromJourney(stage: number): boolean {
 }
 
 function testingStagePreviewActive(): boolean {
+  if (practiceActive || activeReviewGoal !== undefined) return true;
   return (
     testingStageOverride !== null &&
     isTestingStagePreview(
@@ -1633,6 +1830,32 @@ function restoreTestingStagePersistentState(): void {
   crashRecoverySnapshot = snapshot.crashRecoverySnapshot;
   stageEntrySnapshot = snapshot.stageEntrySnapshot;
   testingStageSnapshot = null;
+  if (practiceActive || activeReviewGoal !== undefined) {
+    practiceActive = false;
+    practiceRestorePending = true;
+    practiceReload = loadPlayerSave()
+      .then((loaded) => {
+        applyAutosaveSnapshot(loaded.save);
+        warpAccount = loaded.save.account;
+        if (loaded.save.auxiliary?.expansionV2)
+          expansionV2Profile = sanitizeExpansionV2Profile(
+            loaded.save.auxiliary.expansionV2,
+          );
+        if (loaded.save.auxiliary?.difficulty)
+          difficultySettings = sanitizeDifficultySettings(
+            loaded.save.auxiliary.difficulty,
+          );
+        practiceRestorePending = false;
+        refreshPersistentStateUi();
+      })
+      .catch((error) => {
+        console.error(error);
+        showNotice(
+          "Cannot reload the committed account. Reload before deploying.",
+        );
+      })
+      .finally(renderWarpHud);
+  }
   refreshPersistentStateUi();
 }
 
@@ -1657,38 +1880,6 @@ function captureSafeCrashRecovery(
   crashRecoverySnapshot = captured.snapshot;
 }
 
-function persistRecoveryMirrorSync(
-  reason: SaveReason,
-  timestamp = new Date().toISOString(),
-): void {
-  savePlayerRecoveryMirrorSync(
-    createPlayerSave(
-      campaign,
-      timestamp,
-      reason,
-      inventory,
-      equipment,
-      supportSpells,
-      characters,
-      luckPity,
-      hiddenDiscovery,
-      credits,
-      progression,
-      expansionCurrencies,
-      campaignExpansion,
-      checkpointSnapshot,
-      crashRecoverySnapshot,
-      stageEntrySnapshot,
-      shops,
-      route,
-      upgrades,
-      relics,
-      codex,
-      ascension,
-      hotbar,
-    ),
-  );
-}
 
 function markCrashRecoveryDeathInvalid(
   timestamp = new Date().toISOString(),
@@ -1703,20 +1894,15 @@ function markCrashRecoveryDeathInvalid(
   campaignExpansion = invalidated.campaignExpansion;
   crashRecoverySnapshot = invalidated.snapshot;
 
-  try {
-    persistRecoveryMirrorSync("gameover", timestamp);
-  } catch (error) {
-    console.warn(
-      "Unable to write synchronous death recovery marker.",
-      error,
-    );
-  }
 
   campaignAutosave.schedule(
     currentAutosaveSnapshot(),
     "gameover",
   );
-  void campaignAutosave.flush("gameover");
+  void campaignAutosave.flush("gameover").catch(error => {
+    console.error("Defeat save failed.", error);
+    showNotice("Defeat save pending · retry an action to save before leaving");
+  });
 }
 
 function refreshPersistentStateUi(): void {
@@ -3036,6 +3222,7 @@ function renderAscension(): void {
 function openAscension(): void {
   if (
     !persistenceReady ||
+    !canOpenBetweenStageMenu() ||
     game.getPhase() !== "title" ||
     ascension.highestUnlockedTier < 1
   ) {
@@ -3052,7 +3239,7 @@ function openAscension(): void {
 }
 
 function openProgression(): void {
-  if (!persistenceReady || game.getPhase() !== "title") return;
+  if (!persistenceReady || !canOpenBetweenStageMenu() || game.getPhase() !== "title") return;
   syncProgressionAchievements();
   renderProgression();
   progressionDialog.showModal();
@@ -3243,7 +3430,7 @@ function renderDeathProtectionChoices(failedStage: number): boolean {
   const validStageEntry =
     stageEntrySnapshot !== null &&
     stageEntrySnapshot.stage === failedStage;
-  const canRevive = phoenixCount > 0 && validStageEntry;
+  const canRevive = accountTransactions.canWrite() && !!warpAccount?.attempt && phoenixCount > 0 && validStageEntry;
 
   // Legacy checkpoint-rollback consumables remain readable in old saves for
   // compatibility, but they are no longer offered or consumed by Game Over.
@@ -3256,7 +3443,7 @@ function renderDeathProtectionChoices(failedStage: number): boolean {
   byId<HTMLButtonElement>("phoenixCoreButton").disabled = !canRevive;
 
   byId("againButton").textContent =
-    "Retry Stage " + String(failedStage).padStart(3, "0");
+    "Retry Rewarded · 10 Warp · Stage " + String(failedStage).padStart(3, "0");
   byId("gameOverStageSelectButton").textContent = "Choose unlocked stage";
   byId("resultTitleButton").textContent = "Main menu";
   setDeathNavigationDisabled(false);
@@ -3283,22 +3470,26 @@ async function persistResolvedDeath(
 }
 
 async function resolveCheckpointDeath(
-  action: "retry" | "stage-select" | "title",
+  action: "retry" | "practice" | "stage-select" | "title",
 ): Promise<void> {
   if (
     game.getPhase() !== "gameover" ||
+    practiceRestorePending ||
     !deathActionGate.tryEnter()
-  ) return;
+  )
+    return;
 
   setDeathActionPending(true);
   try {
     const failedStage = game.getStats().stage;
 
-    if (testingStagePreviewActive()) {
+    if (testingStagePreviewActive() || encounterWasFree) {
       restoreTestingStagePersistentState();
-      testingStageOverride = failedStage;
       game.backToTitle();
-      if (action === "retry") {
+      await practiceReload;
+      if (action === "practice") {
+        await startSelectedStage(true);
+      } else if (action === "retry") {
         await startSelectedStage();
       } else if (action === "stage-select") {
         openStageSelect();
@@ -3314,8 +3505,11 @@ async function resolveCheckpointDeath(
     );
     if (!saved) return;
 
+    if (!(await finishManagedSortie("failed"))) return;
     game.backToTitle();
-    if (action === "retry") {
+    if (action === "practice") {
+      await startSelectedStage(true);
+    } else if (action === "retry") {
       await startSelectedStage();
       if (routeDialog.open) {
         showNotice("Choose a route, then press Start Encounter");
@@ -3334,61 +3528,25 @@ async function resolveCheckpointDeath(
 async function resolvePhoenixDeath(): Promise<void> {
   if (
     game.getPhase() !== "gameover" ||
-    stageEntrySnapshot === null ||
-    itemCount(inventory, "phoenix-core") <= 0 ||
+    !warpAccount?.attempt ||
     !deathActionGate.tryEnter()
-  ) {
+  )
     return;
-  }
-
   setDeathActionPending(true);
   try {
-    if (!game.reviveCurrentEncounter()) return;
-
-    const activeResult = consumePhoenixCore(
-      currentRunPersistentState(),
-    );
-    if (!activeResult.applied) return;
-    applyRunPersistentState(activeResult.state);
-
-    const entryResult = consumePhoenixCore(
-      stageEntrySnapshot.state,
-    );
-    const safeEntryState = entryResult.applied
-      ? entryResult.state
-      : stageEntrySnapshot.state;
-    const safeEntry = createStageEntrySnapshot(
-      safeEntryState,
-      stageEntrySnapshot.campaignExpansion,
-      stageEntrySnapshot.checkpointSnapshot,
-      stageEntrySnapshot.capturedAt,
-    );
-    stageEntrySnapshot = safeEntry;
-
-    const captured = captureCrashRecoverySnapshot(
-      safeEntry.state,
-      safeEntry.campaignExpansion,
-      safeEntry.checkpointSnapshot,
-      "stage-entry",
-      new Date().toISOString(),
-    );
-    crashRecoverySnapshot = captured.snapshot;
-    campaignExpansion = {
-      ...campaignExpansion,
-      crashRecovery: captured.campaignExpansion.crashRecovery,
-    };
-
+    await campaignAutosave.flush();
+    const id = warpAccount.attempt!.id;
+    const saved = await accountTransactions.revive(id);
+    inventory = saved.inventory;
+    if (!game.reviveCurrentEncounter())
+      throw new Error("Encounter cannot resume. Return to the menu.");
     renderInventory();
     updateDataSummary();
-    await autosaveCampaign(
-      "gameover",
-      "✓ Phoenix Core consumed · encounter resumed",
-    );
+    showNotice("Phoenix consumed · same sortie resumed");
+  } catch (error) {
+    showNotice(error instanceof Error ? error.message : "Phoenix save failed");
   } finally {
     deathActionGate.leave();
-    if (game.getPhase() === "gameover") {
-      renderDeathProtectionChoices(game.getStats().stage);
-    }
   }
 }
 
@@ -3553,7 +3711,7 @@ function renderTestingStageClearReport(
   byId("clearStarRule").textContent =
     "Testing preview · rating shown, campaign progression unchanged";
   countUpNumber(byId("clearScore"), stats.score);
-  byId("clearAccuracy").textContent = accuracy.toFixed(1) + "%";
+  byId("clearAccuracy").textContent = game.getInputMode() === "voice" ? "Speaking · " + game.getVoiceMetrics().words + " words" : accuracy.toFixed(1) + "%";
   byId("clearWpm").textContent = wpm.toFixed(0);
   byId("clearTime").textContent =
     formatStageDuration(stageSession.elapsedSeconds);
@@ -3699,6 +3857,7 @@ function renderWordReview(snapshot: StageSessionSnapshot): void {
     const outcomes = document.createElement("div");
     outcomes.className = "word-review-outcomes";
     const chips: Array<[string, number, StageWordOutcome]> = [
+      ["Spoken", group.spoken ?? 0, "spoken"],
       ["Perfect", group.perfect, "perfect"],
       ["Corrected", group.corrected, "corrected"],
       ["Missed", group.missed, "missed"],
@@ -3889,6 +4048,12 @@ async function applySpaceReviewDataset(data: unknown): Promise<void> {
   try {
     const dataset = parseSpaceReviewDataset(data);
     if (dataset === null) return;
+    if (warpAccount?.attempt && !await finishManagedSortie("abandoned")) return;
+    if (testingStagePreviewActive()) {
+      restoreTestingStagePersistentState();
+      await practiceReload;
+      if (practiceRestorePending) throw new Error("Reload the account before switching Review sessions");
+    }
 
     const index = vocabularyIndex ?? (await loadVocabularyIndex());
     vocabularyIndex = index;
@@ -3988,10 +4153,10 @@ function backgroundOptions(): {
 }
 
 function activeCombatCreditMode(): CombatCreditMode {
+  if (testingStagePreviewActive()) return "preview";
   if (expeditionSession.ownsCampaignPersistence()) return "expedition";
   if (currentHiddenEncounterState().active !== null) return "hidden";
   if (gameplayMode === "recall") return "recall";
-  if (testingStagePreviewActive()) return "preview";
   if (ascension.selectedTier > 0) return "ascension";
   return "campaign";
 }
@@ -4003,6 +4168,7 @@ const game = new Game(
   {
     onStats: renderStats,
     onPhase: (phase) => {
+      voiceSession.phaseChanged();
       renderPhase(phase);
 
       renderRecallAssistUi();
@@ -4035,11 +4201,11 @@ const game = new Game(
         byId("resultWave").textContent =
           String(stats.stage).padStart(3, "0");
         byId("resultAccuracy").textContent =
-          accuracyPercent(
+          game.getInputMode() === "voice" ? `Speaking · ${game.getVoiceMetrics().words} words` : accuracyPercent(
             stageSession.correctWordKeys,
             stageSession.wrongWordKeys,
           ).toFixed(1) + "%";
-        byId("resultStreak").textContent = String(stats.maxStreak);
+        byId("resultStreak").textContent = game.getInputMode() === "voice" ? "—" : String(stats.maxStreak);
         renderGameOverMeasured(stageSession);
 
         deathActionGate.leave();
@@ -4073,9 +4239,10 @@ const game = new Game(
         }
 
         if (testingStagePreviewActive()) {
+          const wasPractice = practiceActive || activeReviewGoal !== undefined;
           restoreTestingStagePersistentState();
           byId("againButton").textContent =
-            "Retry Testing Stage " + String(stats.stage).padStart(3, "0");
+            wasPractice ? "Retry Rewarded · 10 Warp" : "Retry Testing Stage " + String(stats.stage).padStart(3, "0");
           byId("gameOverStageSelectButton").textContent =
             "Choose any testing stage";
           byId("deathProtectionMeta").textContent =
@@ -4122,6 +4289,8 @@ const game = new Game(
       codex = discoverCodexWorld(codex, worldForStage(stage).id).state;
     },
     onCombatCreditAttemptStart: (attempt) => {
+      currentEncounterToken = attempt.attemptId;
+      encounterWasFree = testingStagePreviewActive();
       const mode = activeCombatCreditMode();
       const baselineStageCredits =
         stageClearCreditReward({
@@ -4185,13 +4354,16 @@ const game = new Game(
     onStatuses: renderStatuses,
     onBossUpdate: renderBoss,
     onSkills: renderAllSkills,
-    onStageClear: (stats) => {
+    onStageClear: async (stats) => {
+      if (currentEncounterToken === settledEncounterToken || clearSettlementPending) return;
+      settledEncounterToken = currentEncounterToken; clearSettlementPending = true;
+      try {
       const stageSession = game.getStageSessionSnapshot();
       const wpm = stageWordsPerMinute(
         stageSession.correctWordKeys,
         stageSession.elapsedSeconds,
       );
-      const accuracy = accuracyPercent(
+      const accuracy = game.getInputMode() === "voice" || game.getInputMode() === "hybrid" && stageSession.correctWordKeys === 0 ? 0 : accuracyPercent(
         stageSession.correctWordKeys,
         stageSession.wrongWordKeys,
       );
@@ -4243,6 +4415,7 @@ const game = new Game(
               );
             }
             for (const fact of facts) {
+              if (fact.origin === "voice") continue; // Speaking was recorded at semantic completion.
               postLearningEvent(
                 buildCombatLearningEvent({
                   entry: fact.entry,
@@ -4309,6 +4482,7 @@ const game = new Game(
       saveRecallMemory();
 
       if (testingStagePreviewActive()) {
+        const wasPractice = practiceActive || activeReviewGoal !== undefined;
         const completedStage = stats.stage;
         restoreTestingStagePersistentState();
         renderTestingStageClearReport(
@@ -4317,14 +4491,15 @@ const game = new Game(
           wpm,
           accuracy,
         );
-        testingStageOverride = Math.min(1000, completedStage + 1);
+        if (wasPractice) { byId("clearTitle").textContent = `Practice Stage ${completedStage} complete`; byId("clearMeta").textContent = "Learning saved · simulated rewards · no Campaign unlock"; }
+        if (testingStageOverride !== null) testingStageOverride = Math.min(1000, completedStage + 1);
         updateCampaignUi();
         return;
       }
 
       const activeHidden = currentHiddenEncounterState().active;
       if (activeHidden !== null) {
-        handleHiddenEncounterClear(
+        await handleHiddenEncounterClear(
           activeHidden,
           stats,
           wpm,
@@ -4337,6 +4512,7 @@ const game = new Game(
         difficultySettings,
         wpm,
         accuracy,
+        { mode: game.getInputMode(), voiceWords: game.getVoiceMetrics().words, elapsedSeconds: stageSession.elapsedSeconds },
       );
       saveDifficultySettings();
 
@@ -4346,7 +4522,8 @@ const game = new Game(
         accuracy,
         wpm,
         clearedAt,
-      });
+        inputMode: game.getInputMode(), voiceWords: game.getVoiceMetrics().words, voicePolicy: game.getVoiceMetrics().policyVersion,
+      }, inputProfileKey(game.getInputMode(), gameplayMode, difficultySettings.mode, ascension.selectedTier, selectedVocabularyLevel()));
       if (ascension.selectedTier === 0) {
         route = syncRouteStateForStage(
           route,
@@ -4429,6 +4606,7 @@ const game = new Game(
               wpm,
               difficulty: activeStageDifficulty,
               objectiveComplete: objective?.status === "complete",
+              typingEvidence: game.getInputMode() !== "voice" && stageSession.correctWordKeys > 0,
             });
       const performanceCredits =
         performance === null
@@ -4558,7 +4736,10 @@ const game = new Game(
         };
       }
 
-      const sectorRelic = checkpointCommitted
+      const milestoneKey = `${WARP_POLICY.version}:sector:${completedTier}:${stats.stage}`;
+      const sectorRewardEligible = checkpointCommitted && !warpAccount?.milestoneGrants.includes(milestoneKey);
+      if (sectorRewardEligible) pendingMilestoneGrants.push(milestoneKey);
+      const sectorRelic = sectorRewardEligible
         ? grantRelicReward(
             stats.stage,
             completedTier > 0
@@ -4570,7 +4751,7 @@ const game = new Game(
           )
         : null;
       let sectorRewardText = "";
-      if (checkpointCommitted) {
+      if (sectorRewardEligible) {
         if (completedTier === 0) {
           shops = markRestHubPending(shops, stats.stage);
         }
@@ -4623,7 +4804,7 @@ const game = new Game(
             relicRewardText(sectorRelic)
         : "";
 
-      void autosaveCampaign(
+      await autosaveCampaign(
         "stage-clear",
         "✓ Saved · Stage " +
           String(stats.stage).padStart(3, "0") +
@@ -4684,7 +4865,7 @@ const game = new Game(
         "1★ clear · 2★ ≥90% target accuracy · 3★ " +
         rating.thirdStarRule;
       countUpNumber(byId("clearScore"), stats.score);
-      byId("clearAccuracy").textContent = accuracy.toFixed(1) + "%";
+      byId("clearAccuracy").textContent = game.getInputMode() === "voice" ? "Speaking · " + game.getVoiceMetrics().words + " words" : accuracy.toFixed(1) + "%";
       byId("clearWpm").textContent = wpm.toFixed(0);
       byId("clearTime").textContent =
         formatStageDuration(stageSession.elapsedSeconds);
@@ -4784,10 +4965,15 @@ const game = new Game(
         applyEquipmentStats();
       }
       updateCampaignUi();
+      } finally { clearSettlementPending = false; renderWarpHud(); }
     },
     onWordComplete: (entry, outcome) => {
+      if (outcome?.inputSource === "voice" && gameplayMode === "combat") {
+        postLearningEvent(buildCombatLearningEvent({ entry, perfect: true, inputSource: "voice" }));
+        renderActiveKillTranslation();
+      }
       if (gameplayMode !== "combat") return;
-      speakEnglish(entry.en, settings);
+      if (game.getInputMode() === "typing") speakEnglish(entry.en, settings);
 
       const fact = outcome?.fact;
       const activeExpedition = expeditionSession.currentRun();
@@ -4822,20 +5008,18 @@ const game = new Game(
         return;
       }
 
-      postLearningEvent(
-        buildCombatLearningEvent({
-          entry,
-          perfect: outcome?.perfect ?? true,
-        }),
+      if (outcome?.inputSource !== "voice") postLearningEvent(
+        buildCombatLearningEvent({ entry, perfect: outcome?.perfect ?? true }),
       );
     },
     onRecallPrompt: (entry) => {
-      if (recallSettings.autoPronounce) {
+      if (game.getInputMode() === "typing" && recallSettings.autoPronounce) {
         speakEnglish(entry.en, { ...settings, pronunciationEnabled: true });
       }
       renderRecallAssistUi();
     },
     onRecallResult: (result) => {
+      if (result.inputSource === "voice") { postLearningEvent(buildRecallLearningEvent(result, new Date().toISOString(), "voice")); renderRecallAssistUi(); return; }
       recallStage.attempts += 1;
       recallStage.perfect += result.perfect ? 1 : 0;
       recallStage.hints += result.hintCount;
@@ -5059,6 +5243,7 @@ function buildExpeditionRun(
     wordPool,
     profile: {
       difficulty: difficultySettings.mode,
+      inputMode: game.getInputMode(), voicePolicy: game.getVoiceMetrics().policyVersion,
       assist: "standard",
       vocabularyLevel: selectedVocabularyLevel(),
       difficultySettings: structuredClone(difficultySettings),
@@ -5094,6 +5279,7 @@ async function startExpeditionEncounter(
   }
 
   applyExpeditionLoaner(run);
+  await voiceSession.ensureVocabularyReady();
   expeditionUi?.close();
 
   const baseStage = createStageConfig(encounter.sourceStage);
@@ -5112,6 +5298,7 @@ async function startExpeditionEncounter(
       frozenDifficulty,
       stage.stage,
       run.profile.vocabularyLevel,
+      game.getInputMode(),
     ),
   );
   activeStageDifficulty = difficulty;
@@ -5188,6 +5375,11 @@ async function startNewExpedition(
   if (
     (!expansionV2Enabled && challengeKind !== "qa") ||
     !persistenceReady ||
+    practiceRestorePending ||
+    clearSettlementPending ||
+    accountTransactions.busy() ||
+    testingStagePreviewActive() ||
+    !!warpAccount?.attempt ||
     !vocabularyReady ||
     expeditionStartPending ||
     game.getPhase() !== "title"
@@ -5245,6 +5437,11 @@ async function resumeExpedition(): Promise<void> {
   if (
     !expansionV2Enabled ||
     !persistenceReady ||
+    practiceRestorePending ||
+    clearSettlementPending ||
+    accountTransactions.busy() ||
+    testingStagePreviewActive() ||
+    !!warpAccount?.attempt ||
     expeditionStartPending ||
     game.getPhase() !== "title"
   ) {
@@ -5264,6 +5461,15 @@ async function resumeExpedition(): Promise<void> {
       return;
     }
 
+    const runMode = run.profile.inputMode ?? "typing";
+    if (game.getInputMode() !== runMode) {
+      expeditionSession.release();
+      expeditionCampaignSnapshot = null;
+      showNotice(
+        `This Expedition uses ${runMode}. Select that input mode, then resume.`,
+      );
+      return;
+    }
     expeditionActiveSecondsTotal =
       run.ghostPoints?.reduce(
         (max, point) => Math.max(max, point.activeSeconds),
@@ -5978,7 +6184,7 @@ function renderBasicSkillPanel(): void {
 }
 
 function openCharacters(): void {
-  if (!persistenceReady || game.getPhase() !== "title") return;
+  if (!persistenceReady || !canOpenBetweenStageMenu() || game.getPhase() !== "title") return;
   renderCharacters();
   characterDialog.showModal();
 }
@@ -6035,7 +6241,17 @@ function supportSpellSummary(spell: ReturnType<typeof getSupportSpell>): string 
 
 function canOpenBetweenStageMenu(): boolean {
   const phase = game.getPhase();
-  return phase === "title" || phase === "stageclear";
+  return (
+    (phase === "title" || phase === "stageclear") &&
+    accountTransactions.canWrite() &&
+    !warpAccount?.attempt &&
+    !testingStagePreviewActive() &&
+    !practiceRestorePending &&
+    !clearSettlementPending &&
+    !accountTransactions.busy() &&
+    !stageStartPending &&
+    !expeditionStartPending
+  );
 }
 
 function openSupportSpells(): void {
@@ -6232,7 +6448,7 @@ function renderEquipment(): void {
 }
 
 function openEquipment(): void {
-  if (!persistenceReady || game.getPhase() !== "title") return;
+  if (!persistenceReady || !canOpenBetweenStageMenu() || game.getPhase() !== "title") return;
   renderEquipment();
   equipmentDialog.showModal();
 }
@@ -7434,16 +7650,14 @@ function routeNodeDescription(node: RouteNode): string {
     : "Direct combat route · no service detour before the encounter.";
 }
 
-function handleHiddenEncounterClear(
+async function handleHiddenEncounterClear(
   active: ActiveHiddenEncounter,
   stats: ReturnType<Game["getStats"]>,
   wpm: number,
   accuracy: number,
-): void {
+): Promise<void> {
   const label = hiddenEncounterLabel(active);
-  const result = advanceHiddenEncounter(
-    currentHiddenEncounterState(),
-  );
+  const result = advanceHiddenEncounter(currentHiddenEncounterState());
   setHiddenEncounterState(result.state);
   stageEntrySnapshot = null;
 
@@ -7453,10 +7667,7 @@ function handleHiddenEncounterClear(
   let rewardRelic: RelicId | null = null;
 
   if (result.completed) {
-    const reward = hiddenEncounterReward(
-      active,
-      accuracy,
-    );
+    const reward = hiddenEncounterReward(active, accuracy);
     rewardCredits = reward.credits;
     rewardCurrencies = reward.currencies;
     credits = addCredits(credits, reward.credits);
@@ -7482,8 +7693,7 @@ function handleHiddenEncounterClear(
           quantumCore: reward.currencies.quantumCore,
         },
         { signed: true },
-      ) +
-      relicRewardText(rewardRelic);
+      ) + relicRewardText(rewardRelic);
   } else {
     rewardText =
       "Hidden World progress · " +
@@ -7492,7 +7702,7 @@ function handleHiddenEncounterClear(
       String(active.totalSteps);
   }
 
-  void autosaveCampaign(
+  await autosaveCampaign(
     "hidden-transition",
     result.completed
       ? "✓ " + label + " complete · premium reward secured"
@@ -7518,28 +7728,27 @@ function handleHiddenEncounterClear(
   const killRate =
     stageSession.elapsedSeconds <= 0
       ? 0
-      : measuredKills / stageSession.elapsedSeconds * 60;
+      : (measuredKills / stageSession.elapsedSeconds) * 60;
 
-  byId("clearTitle").textContent =
-    result.completed
-      ? label + " complete"
-      : hiddenEncounterLabel(result.state.active!);
+  byId("clearTitle").textContent = result.completed
+    ? label + " complete"
+    : hiddenEncounterLabel(result.state.active!);
   byId("clearMeta").textContent =
-    "Hidden encounter · Tier " + String(active.tier) +
-    " · Campaign Stage " + String(active.sourceStage).padStart(3, "0");
+    "Hidden encounter · Tier " +
+    String(active.tier) +
+    " · Campaign Stage " +
+    String(active.sourceStage).padStart(3, "0");
   renderClearStars(rating.stars);
   byId("clearStarRule").textContent =
     "1★ clear · 2★ ≥90% target accuracy · 3★ " + rating.thirdStarRule;
   countUpNumber(byId("clearScore"), stats.score);
-  byId("clearAccuracy").textContent =
-    accuracy.toFixed(1) + "%";
+  byId("clearAccuracy").textContent = accuracy.toFixed(1) + "%";
   byId("clearWpm").textContent = wpm.toFixed(0);
-  byId("clearTime").textContent =
-    formatStageDuration(stageSession.elapsedSeconds);
-  byId("clearKillRate").textContent =
-    killRate.toFixed(1) + "/min";
-  byId("clearStreak").textContent =
-    String(stats.maxStreak);
+  byId("clearTime").textContent = formatStageDuration(
+    stageSession.elapsedSeconds,
+  );
+  byId("clearKillRate").textContent = killRate.toFixed(1) + "/min";
+  byId("clearStreak").textContent = String(stats.maxStreak);
 
   wordReviewFilter = "all";
   renderMeasuredStageSession(stageSession, stats.hits, stats.misses);
@@ -7577,12 +7786,12 @@ function handleHiddenEncounterClear(
     "Character XP is not awarded by the current Hidden Encounter reward path.";
   hiddenProgress.append(hiddenProgressNote);
 
-  byId("clearDetails").textContent = "Hidden encounter reward · no Campaign checkpoint advancement";
+  byId("clearDetails").textContent =
+    "Hidden encounter reward · no Campaign checkpoint advancement";
   updateCampaignUi();
-  byId<HTMLButtonElement>("nextStageButton").textContent =
-    result.completed
-      ? "Continue Campaign"
-      : "Next Hidden Encounter";
+  byId<HTMLButtonElement>("nextStageButton").textContent = result.completed
+    ? "Continue Campaign"
+    : "Next Hidden Encounter";
 
   if (rewardCredits > 0) {
     updateDataSummary();
@@ -8067,12 +8276,14 @@ async function startActiveHiddenEncounter(
   const vocabularyLevel = selectedVocabularyLevel();
   game.setVocabularyLevel(vocabularyLevel);
   await prepareStageVocabulary(stage);
+  await voiceSession.ensureVocabularyReady();
 
   const baseDifficulty = difficultyFor(
     difficultyInputFromSettings(
       difficultySettings,
       active.sourceStage,
       vocabularyLevel,
+      game.getInputMode(),
     ),
   );
   const difficulty = applyAscensionDifficulty(
@@ -8098,7 +8309,7 @@ async function startActiveHiddenEncounter(
     stageEntryAt,
   );
 
-  const recoverySaved = await autosaveCampaign(
+  const recoverySaved = warpAccount?.attempt?.phase === "prepared" || await autosaveCampaign(
     "hidden-transition",
     undefined,
     "hidden-transition",
@@ -8126,6 +8337,7 @@ async function startActiveHiddenEncounter(
     ),
   );
 
+  await deploySortie(stage.stage, "hidden", stage.seed, difficulty, testingStagePreviewActive());
   game.startStage(
     stage,
     difficulty,
@@ -8133,15 +8345,37 @@ async function startActiveHiddenEncounter(
   );
 }
 
-async function startSelectedStage(): Promise<void> {
+async function startSelectedStage(practice = false): Promise<void> {
   if (expeditionSession.ownsCampaignPersistence()) return;
   if (
     !persistenceReady ||
+    practiceRestorePending ||
+    clearSettlementPending ||
+    accountTransactions.busy() ||
     !vocabularyReady ||
+    (game.getInputMode() !== "typing" && !voiceSession.isReady()) ||
     stageStartPending ||
     routeChoicePending
-  ) return;
+  )
+    return;
 
+  if (practice) {
+    if (
+      accountTransactions.canWrite() &&
+      warpAccount?.attempt &&
+      !(await finishManagedSortie("failed"))
+    )
+      return;
+    practiceActive = true;
+  }
+  if (
+    !practice &&
+    accountTransactions.canWrite() &&
+    warpAccount?.attempt &&
+    warpAccount.attempt.phase !== "prepared" &&
+    !(await finishManagedSortie("abandoned"))
+  )
+    return;
   const testingPreview = testingStagePreviewActive();
   if (testingPreview && testingStageSnapshot === null) {
     testingStageSnapshot = structuredClone(currentAutosaveSnapshot());
@@ -8174,10 +8408,16 @@ async function startSelectedStage(): Promise<void> {
   }
 
   const activeHidden = currentHiddenEncounterState().active;
-  if (!testingPreview && activeHidden !== null) {
+  if (activeHidden !== null && testingStageOverride === null) {
     stageStartPending = true;
     try {
       await startActiveHiddenEncounter(activeHidden);
+    } catch (error) {
+      showNotice(
+        error instanceof Error
+          ? error.message
+          : "Unable to deploy hidden sortie",
+      );
     } finally {
       stageStartPending = false;
     }
@@ -8189,10 +8429,7 @@ async function startSelectedStage(): Promise<void> {
     ascension.selectedTier === 0 &&
     campaign.selectedStage === campaign.highestUnlockedStage
   ) {
-    route = syncRouteStateForStage(
-      route,
-      campaign.highestUnlockedStage,
-    );
+    route = syncRouteStateForStage(route, campaign.highestUnlockedStage);
     if (routeNeedsChoice(route, campaign.selectedStage)) {
       openRouteMap();
       return;
@@ -8216,12 +8453,14 @@ async function startSelectedStage(): Promise<void> {
     const vocabularyLevel = selectedVocabularyLevel();
     game.setVocabularyLevel(vocabularyLevel);
     await prepareStageVocabulary(stage);
+    await voiceSession.ensureVocabularyReady();
     const difficulty = applyAscensionDifficulty(
       difficultyFor(
         difficultyInputFromSettings(
           difficultySettings,
           stage.stage,
           vocabularyLevel,
+          game.getInputMode(),
         ),
       ),
       ascension.selectedTier,
@@ -8238,21 +8477,16 @@ async function startSelectedStage(): Promise<void> {
         stageEntryAt,
       );
 
-      const recoverySaved = await autosaveCampaign(
-        "stage-entry",
-        undefined,
-        "stage-entry",
-      );
+      const recoverySaved =
+        warpAccount?.attempt?.phase === "prepared" ||
+        (await autosaveCampaign("stage-entry", undefined, "stage-entry"));
       if (!recoverySaved) return;
     }
 
     syncWorldMusicProfile(stage.stage);
     musicController.setBossPhase(1);
     const musicState = musicStateForStageRole(stage.role);
-    musicController.transitionTo(
-      musicState,
-      musicCrossfadeSeconds(musicState),
-    );
+    musicController.transitionTo(musicState, musicCrossfadeSeconds(musicState));
     musicController.setPaused(false);
 
     if (world.stageEnd < 1000 && stageInWorld(stage.stage) >= 18) {
@@ -8261,8 +8495,7 @@ async function startSelectedStage(): Promise<void> {
       );
     }
 
-    const expansionProfile =
-      campaignStageExpansionProfile(stage.stage);
+    const expansionProfile = campaignStageExpansionProfile(stage.stage);
     if (
       expansionV2Enabled &&
       !testingPreview &&
@@ -8295,7 +8528,18 @@ async function startSelectedStage(): Promise<void> {
       }),
     );
 
+    await deploySortie(
+      stage.stage,
+      "campaign",
+      stage.seed,
+      difficulty,
+      testingPreview,
+    );
     game.startStage(stage, difficulty);
+  } catch (error) {
+    showNotice(
+      error instanceof Error ? error.message : "Unable to deploy sortie",
+    );
   } finally {
     stageStartPending = false;
   }
@@ -8306,6 +8550,19 @@ async function autosaveCampaign(
   successMessage?: string,
   recoveryReason?: CrashRecoveryReason,
 ): Promise<boolean> {
+  if (
+    clearSettlementPending &&
+    reason !== "stage-clear" &&
+    reason !== "hidden-transition"
+  )
+    return true;
+  if (
+    game.getPhase() === "stageclear" &&
+    warpAccount?.attempt?.phase === "active" &&
+    reason !== "stage-clear" &&
+    reason !== "hidden-transition"
+  )
+    return false;
   if (expeditionSession.ownsCampaignPersistence()) {
     if (successMessage !== undefined) {
       showNotice("Expedition · Campaign save is intentionally unchanged");
@@ -8313,19 +8570,26 @@ async function autosaveCampaign(
     return true;
   }
 
-  if (testingStagePreviewActive()) {
+  if (testingStagePreviewActive() || practiceRestorePending) {
     if (successMessage !== undefined) {
       showNotice("Testing preview · progress/rewards are not saved");
     }
     return true;
   }
 
+  if (!accountTransactions.canWrite()) {
+    showNotice("Read-only account · Practice is free in this tab");
+    return false;
+  }
   if (recoveryReason !== undefined) {
     captureSafeCrashRecovery(recoveryReason);
   }
 
   campaignAutosave.schedule(
-    currentAutosaveSnapshot(),
+    currentAutosaveSnapshot(
+      (reason === "stage-clear" || reason === "hidden-transition") &&
+        game.getPhase() === "stageclear",
+    ),
     reason,
   );
 
@@ -8348,36 +8612,25 @@ async function autosaveCampaign(
 
 async function initializePlayerProgress(): Promise<void> {
   const startButton = byId<HTMLButtonElement>("startButton");
-  const stageSelectButton =
-    byId<HTMLButtonElement>("stageSelectButton");
+  const stageSelectButton = byId<HTMLButtonElement>("stageSelectButton");
   const routeButton = byId<HTMLButtonElement>("routeButton");
   const dataButtons = [
     byId<HTMLButtonElement>("dataButton"),
     byId<HTMLButtonElement>("pauseDataButton"),
   ];
-  const equipmentButton =
-    byId<HTMLButtonElement>("equipmentButton");
+  const equipmentButton = byId<HTMLButtonElement>("equipmentButton");
   const shopButton = byId<HTMLButtonElement>("shopButton");
-  const stationShopButton =
-    byId<HTMLButtonElement>("stationShopButton");
-  const travelingShopButton =
-    byId<HTMLButtonElement>("travelingShopButton");
-  const serviceShopButton =
-    byId<HTMLButtonElement>("serviceShopButton");
-  const blackMarketButton =
-    byId<HTMLButtonElement>("blackMarketButton");
-  const hiddenShopButton =
-    byId<HTMLButtonElement>("hiddenShopButton");
-  const eventShopButton =
-    byId<HTMLButtonElement>("eventShopButton");
-  const supportButton =
-    byId<HTMLButtonElement>("supportButton");
-  const characterButton =
-    byId<HTMLButtonElement>("characterButton");
+  const stationShopButton = byId<HTMLButtonElement>("stationShopButton");
+  const travelingShopButton = byId<HTMLButtonElement>("travelingShopButton");
+  const serviceShopButton = byId<HTMLButtonElement>("serviceShopButton");
+  const blackMarketButton = byId<HTMLButtonElement>("blackMarketButton");
+  const hiddenShopButton = byId<HTMLButtonElement>("hiddenShopButton");
+  const eventShopButton = byId<HTMLButtonElement>("eventShopButton");
+  const supportButton = byId<HTMLButtonElement>("supportButton");
+  const characterButton = byId<HTMLButtonElement>("characterButton");
   const codexButton = byId<HTMLButtonElement>("codexButton");
   const ascensionButton = byId<HTMLButtonElement>("ascensionButton");
-  const progressionButton =
-    byId<HTMLButtonElement>("progressionButton");
+  const progressionButton = byId<HTMLButtonElement>("progressionButton");
 
   startButton.disabled = true;
   stageSelectButton.disabled = true;
@@ -8398,7 +8651,15 @@ async function initializePlayerProgress(): Promise<void> {
   for (const button of dataButtons) button.disabled = true;
 
   try {
-    const loaded = await loadPlayerSave();
+    const loaded = await accountTransactions.initialize();
+    if (loaded.save.auxiliary?.expansionV2)
+      expansionV2Profile = sanitizeExpansionV2Profile(
+        loaded.save.auxiliary.expansionV2,
+      );
+    if (loaded.save.auxiliary?.difficulty)
+      difficultySettings = sanitizeDifficultySettings(
+        loaded.save.auxiliary.difficulty,
+      );
     campaign = loaded.save.campaign;
     inventory = loaded.save.inventory;
     equipment = loaded.save.equipment;
@@ -8439,9 +8700,7 @@ async function initializePlayerProgress(): Promise<void> {
     applyEquipmentStats();
     applySupportSpells();
     applyRelicEffects();
-    currentGalaxy = Math.ceil(
-      campaign.selectedStage / STAGES_PER_GALAXY,
-    );
+    currentGalaxy = Math.ceil(campaign.selectedStage / STAGES_PER_GALAXY);
     persistenceReady = true;
 
     syncWorldMusicProfile(campaign.selectedStage);
@@ -8481,7 +8740,14 @@ async function initializePlayerProgress(): Promise<void> {
       );
     }
 
-    if (loaded.recoveryMode === "death-rollback") {
+    renderWarpHud();
+    if (loaded.interrupted) {
+      showNotice(
+        "Interrupted sortie closed · Warp was already spent. Retry rewarded costs 10; Practice is free.",
+      );
+    } else if (!accountTransactions.canWrite()) {
+      showNotice("Read-only account in this tab · Practice remains free");
+    } else if (loaded.recoveryMode === "death-rollback") {
       showNotice(
         "Death record enforced · returned to checkpoint " +
           checkpointDisplayLabel(),
@@ -8490,9 +8756,7 @@ async function initializePlayerProgress(): Promise<void> {
       showNotice(
         "✓ Recovered last safe transition · " +
           (ascension.selectedTier > 0
-            ? "A" +
-              String(ascension.selectedTier) +
-              " Stage "
+            ? "A" + String(ascension.selectedTier) + " Stage "
             : "Stage ") +
           String(campaign.selectedStage).padStart(3, "0"),
       );
@@ -8510,15 +8774,19 @@ async function initializePlayerProgress(): Promise<void> {
       return;
     }
 
-    showNotice("Unable to load player progress");
+    persistenceReady = true;
+    for (const button of dataButtons) button.disabled = false;
+    showNotice(
+      "Account storage needs recovery · Practice is free. Open Save data to import a valid backup; paid Deploy remains blocked.",
+    );
   }
 }
 
 function updateCampaignUi(): void {
   const gameplayStage = selectedGameplayStage();
-  byId<HTMLButtonElement>("nextStageButton").textContent = "Next stage";
+  byId<HTMLButtonElement>("nextStageButton").textContent = "Next stage · 10 Warp";
   byId("startButton").textContent =
-    "Continue · Stage " +
+    "Deploy · 10 Warp · Stage " +
     String(gameplayStage).padStart(3, "0") +
     (ascension.selectedTier > 0
       ? " · A" + String(ascension.selectedTier)
@@ -8680,7 +8948,8 @@ function worldPlateUrl(worldNumber: number): string {
 
 /** Best rating kept for a cleared stage (from its best accuracy). */
 function journeyStageStars(stage: number): number {
-  const best = campaign.bestByStage[String(stage)];
+  const profile = inputProfileKey(game.getInputMode(), gameplayMode, difficultySettings.mode, ascension.selectedTier, selectedVocabularyLevel());
+  const best = campaign.bestByInputProfile?.[profile]?.[String(stage)] ?? (game.getInputMode() === "typing" ? campaign.bestByStage[String(stage)] : undefined);
   if (best === undefined) return campaign.clearedStages.includes(stage) ? 1 : 0;
   return stageResultStars(best.accuracy, null).stars;
 }
@@ -9188,7 +9457,9 @@ async function commitSettingsDraft(): Promise<void> {
   if (
     shouldReloadStage &&
     !window.confirm(
-      "Difficulty changed. Saving will reload the current stage so the new difficulty is applied consistently. Save and reload now?",
+      testingStagePreviewActive()
+        ? "Difficulty changed. Save and reload this free Practice stage?"
+        : "Difficulty changed. The current sortie ends without refund; a new Deploy costs 10 Warp. Save and reload?",
     )
   ) {
     byId("settingsSaveStatus").textContent =
@@ -9530,232 +9801,80 @@ function openData(): void {
 }
 
 async function exportSave(): Promise<void> {
-  if (!persistenceReady) return;
-
-  const saved = await autosaveCampaign(
-    "manual",
-    undefined,
-    "manual",
-  );
-  const json = exportPlayerSaveJson(
-    campaign,
-    undefined,
-    inventory,
-    equipment,
-    supportSpells,
-    characters,
-    luckPity,
-    hiddenDiscovery,
-    credits,
-    progression,
-    expansionCurrencies,
-    campaignExpansion,
-    checkpointSnapshot,
-    crashRecoverySnapshot,
-    stageEntrySnapshot,
-    shops,
-    route,
-    upgrades,
-    relics,
-    codex,
-    ascension,
-    hotbar,
-  );
-  const blob = new Blob([json], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  const stamp = new Date()
-    .toISOString()
-    .replace(/[:.]/g, "-");
-
-  link.href = url;
-  link.download = "space-typing-save-" + stamp + ".json";
-  document.body.append(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
-
-  byId("dataStatus").textContent =
-    (saved ? "✓ Backup exported" : "Backup exported from current session") +
-    " · Stage " +
-    String(campaign.highestUnlockedStage).padStart(3, "0");
+  const status = byId("dataStatus");
+  if (
+    !persistenceReady ||
+    warpAccount?.attempt ||
+    accountTransactions.busy() ||
+    clearSettlementPending
+  ) {
+    status.textContent = "End the sortie before exporting a committed backup.";
+    return;
+  }
+  try {
+    if (accountTransactions.canWrite() && !(await autosaveCampaign("manual")))
+      return;
+    const loaded = await loadPlayerSave();
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(loaded.save, null, 2)], {
+        type: "application/json",
+      }),
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download =
+      "space-typing-save-" +
+      new Date().toISOString().replace(/[:.]/g, "-") +
+      ".json";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    status.textContent = loaded.mirrorRescue
+      ? "Recovery backup exported · importing it may roll back spending."
+      : "✓ Committed backup exported";
+  } catch (error) {
+    status.textContent =
+      "Export failed · " +
+      (error instanceof Error ? error.message : "Storage unavailable");
+  }
 }
 
 async function importSaveFile(file: File): Promise<void> {
   const status = byId("dataStatus");
-
+  if (
+    warpAccount?.attempt ||
+    accountTransactions.busy() ||
+    testingStagePreviewActive() ||
+    practiceRestorePending ||
+    clearSettlementPending
+  ) {
+    status.textContent = "End the current session before restoring a backup.";
+    return;
+  }
   try {
     const result = parsePlayerSaveJson(await file.text());
     if (!result.ok) {
       status.textContent = "Import failed · " + result.error;
       return;
     }
-
-    const imported = result.save.campaign;
-    const importedInventory = result.save.inventory;
-    const importedEquipment = result.save.equipment;
-    const importedSupportSpells = result.save.supportSpells;
-    const importedHotbar = result.save.hotbar;
-    const importedCharacters = syncCharacterUnlocks(
-      result.save.characters,
-      imported.clearedStages,
-    );
-    const importedLuckPity = result.save.luckPity;
-    const importedHiddenDiscovery = result.save.hiddenDiscovery;
-    const importedCredits = result.save.credits;
-    const importedProgression = result.save.progression;
-    const importedUpgrades = result.save.upgrades;
-    const importedRelics = result.save.relics;
-    const importedCodex = result.save.codex;
-    const importedAscension = result.save.ascension;
-    const importedExpansionCurrencies =
-      result.save.expansionCurrencies;
-    const importedShops = result.save.shops;
-    const importedRoute = result.save.route;
-    const importedCampaignExpansion =
-      result.save.campaignExpansion;
-    const importedCheckpointSnapshot =
-      result.save.checkpointSnapshot;
-    const importedCrashRecoverySnapshot =
-      result.save.crashRecoverySnapshot;
-    const importedStageEntrySnapshot =
-      result.save.stageEntrySnapshot;
-    const message =
-      "Import Stage " +
-      String(imported.highestUnlockedStage).padStart(3, "0") +
-      " progress?\n\n" +
-      "Current Stage " +
-      String(campaign.highestUnlockedStage).padStart(3, "0") +
-      " progress will be replaced.";
-
-    if (!window.confirm(message)) {
+    const stage = result.save.campaign.highestUnlockedStage;
+    if (
+      !window.confirm(
+        `Restore the whole profile at Stage ${String(stage).padStart(3, "0")}? Current progress will be replaced. This may undo spending. A new save generation will be created and the game will reload.`,
+      )
+    ) {
       status.textContent = "Import cancelled.";
       return;
     }
-
-    const previousCampaign = campaign;
-    const previousInventory = inventory;
-    const previousEquipment = equipment;
-    const previousSupportSpells = supportSpells;
-    const previousHotbar = hotbar;
-    const previousCharacters = characters;
-    const previousLuckPity = luckPity;
-    const previousHiddenDiscovery = hiddenDiscovery;
-    const previousCredits = credits;
-    const previousProgression = progression;
-    const previousUpgrades = upgrades;
-    const previousRelics = relics;
-    const previousCodex = codex;
-    const previousAscension = ascension;
-    const previousExpansionCurrencies = expansionCurrencies;
-    const previousShops = shops;
-    const previousRoute = route;
-    const previousCampaignExpansion = campaignExpansion;
-    const previousCheckpointSnapshot = checkpointSnapshot;
-    const previousCrashRecoverySnapshot = crashRecoverySnapshot;
-    const previousStageEntrySnapshot = stageEntrySnapshot;
-    campaign = imported;
-    inventory = importedInventory;
-    equipment = importedEquipment;
-    supportSpells = importedSupportSpells;
-    hotbar = importedHotbar;
-    characters = importedCharacters;
-    luckPity = importedLuckPity;
-    hiddenDiscovery = importedHiddenDiscovery;
-    credits = importedCredits;
-    progression = importedProgression;
-    upgrades = importedUpgrades;
-    relics = importedRelics;
-    codex = importedCodex;
-    ascension = importedAscension;
-    const importedAscensionStage = currentAscensionStage(ascension);
-    if (importedAscensionStage !== null) {
-      campaign = {
-        ...campaign,
-        selectedStage: importedAscensionStage,
-      };
-    }
-    expansionCurrencies = importedExpansionCurrencies;
-    shops = importedShops;
-    route = importedRoute;
-    campaignExpansion = importedCampaignExpansion;
-    checkpointSnapshot = importedCheckpointSnapshot;
-    crashRecoverySnapshot = importedCrashRecoverySnapshot;
-    stageEntrySnapshot = importedStageEntrySnapshot;
-    syncProgressionAchievements();
-    game.setLuckPityState(luckPity);
-    game.setHiddenDiscoveryState(hiddenDiscovery);
-    updateShopAccess();
-    applySelectedCharacter();
-    renderInventory();
-    applyEquipmentStats();
-    applySupportSpells();
-    currentGalaxy = Math.ceil(
-      campaign.selectedStage / STAGES_PER_GALAXY,
-    );
-
-    const saved = await autosaveCampaign(
-      "manual",
-      undefined,
-      "manual",
-    );
-    if (!saved) {
-      campaign = previousCampaign;
-      inventory = previousInventory;
-      equipment = previousEquipment;
-      supportSpells = previousSupportSpells;
-      hotbar = previousHotbar;
-      characters = previousCharacters;
-      luckPity = previousLuckPity;
-      hiddenDiscovery = previousHiddenDiscovery;
-      credits = previousCredits;
-      progression = previousProgression;
-      upgrades = previousUpgrades;
-      relics = previousRelics;
-      codex = previousCodex;
-      ascension = previousAscension;
-      const previousAscensionStage = currentAscensionStage(ascension);
-      if (previousAscensionStage !== null) {
-        campaign = {
-          ...campaign,
-          selectedStage: previousAscensionStage,
-        };
-      }
-      expansionCurrencies = previousExpansionCurrencies;
-      shops = previousShops;
-      route = previousRoute;
-      campaignExpansion = previousCampaignExpansion;
-      checkpointSnapshot = previousCheckpointSnapshot;
-      crashRecoverySnapshot = previousCrashRecoverySnapshot;
-      stageEntrySnapshot = previousStageEntrySnapshot;
-      game.setLuckPityState(luckPity);
-      game.setHiddenDiscoveryState(hiddenDiscovery);
-      updateShopAccess();
-      applySelectedCharacter();
-      renderInventory();
-      applyEquipmentStats();
-      applySupportSpells();
-      applyRelicEffects();
-      currentGalaxy = Math.ceil(
-        campaign.selectedStage / STAGES_PER_GALAXY,
-      );
-      updateCampaignUi();
-      updateDataSummary();
-      status.textContent =
-        "Import validated, but storage write failed. Previous progress was restored.";
-      return;
-    }
-
-    updateCampaignUi();
-    updateDataSummary();
-    dataDialog.close();
-
-    showNotice(
-      "✓ Save imported" +
-        (result.migrated ? " · migrated to current schema" : ""),
-    );
-  } catch {
-    status.textContent = "Import failed · Unable to read this file.";
+    if (accountTransactions.canWrite())
+      await accountTransactions.restore(result.save, result.migrated);
+    else await accountTransactions.recover(result.save, result.migrated);
+    window.location.reload();
+  } catch (error) {
+    status.textContent =
+      "Import failed · " +
+      (error instanceof Error ? error.message : "Unable to read this file");
   }
 }
 
@@ -9804,6 +9923,10 @@ function selectVocabularySourceTab(tab: VocabularySourceTab): void {
 }
 
 async function openVocabulary(): Promise<void> {
+  if (warpAccount?.attempt && !testingStagePreviewActive()) {
+    showNotice("End the sortie before changing its vocabulary");
+    return;
+  }
   sourceTab = sourceState.mode;
   renderSourceTabs();
   await populateVocabularySourceTabSafely(sourceTab);
@@ -10237,7 +10360,8 @@ byId("phoenixCoreButton").addEventListener("click", () => {
 });
 
 for (const id of ["titleButton", "clearTitleButton"]) {
-  byId(id).addEventListener("click", () => {
+  byId(id).addEventListener("click", async () => {
+    if (!await finishManagedSortie("abandoned")) return;
     if (testingStagePreviewActive()) {
       restoreTestingStagePersistentState();
     }
@@ -10726,6 +10850,33 @@ byId("settingsSaveButton").addEventListener("click", () => {
 settingsDialog.addEventListener("close", discardSettingsDraft);
 
 const inputController = new InputController((key) => game.handleKey(key));
+let preferredInputMode: InputMode = "typing";
+try { preferredInputMode = sanitizeInputMode(localStorage.getItem("spaceTypingInputMode")); } catch { /* Private storage may be unavailable. */ }
+const voiceModeSelect = byId<HTMLSelectElement>("voiceInputMode");
+voiceModeSelect.value = preferredInputMode;
+game.setInputMode(preferredInputMode); inputController.setMode(preferredInputMode); voiceSession.setMode(preferredInputMode);
+voiceModeSelect.addEventListener("change", () => {
+  const mode = sanitizeInputMode(voiceModeSelect.value);
+  if (stageStartPending || warpAccount?.attempt?.phase === "prepared") {
+    voiceModeSelect.value = game.getInputMode();
+    showNotice("Continue or abandon the prepared sortie before changing input mode");
+    return;
+  }
+  const run = expeditionSession.currentRun();
+  if (run && !run.terminal && mode !== (run.profile.inputMode ?? "typing")) { voiceModeSelect.value = game.getInputMode(); showNotice("Change input mode after finishing or abandoning this Expedition"); return; }
+  if (!game.setInputMode(mode)) { voiceModeSelect.value = game.getInputMode(); showNotice("Change input mode between encounters"); return; }
+  preferredInputMode = mode; inputController.setMode(mode); voiceSession.setMode(mode);
+  try { localStorage.setItem("spaceTypingInputMode", mode); } catch { /* Mode remains available for this session. */ }
+});
+byId("voiceMicToggle").addEventListener("click", () => {
+  if (voiceSession.isRunning()) { if (game.getInputMode() === "voice" && game.getPhase() === "playing") game.pause(); voiceSession.stop(); }
+  else if (!vocabularyReady) showNotice("Wait for vocabulary to load before enabling the microphone");
+  else voiceSession.start();
+});
+window.addEventListener("blur", () => { if (game.getInputMode() !== "typing" && game.getPhase() === "playing") game.togglePause(); });
+game.setVoiceReadiness(() => voiceSession.isReady());
+game.setVoiceWorldReadiness(() => voiceSession.isWorldReady());
+
 window.addEventListener("keydown", (event) => {
   if (event.isComposing || event.key === "Process") return;
   // Any open dialog owns the keyboard (R09: Esc behind the reward or anomaly
@@ -10768,33 +10919,28 @@ window.addEventListener("resize", () => game.resize());
 function persistPageLifecycleRecovery(): void {
   saveRecallMemory();
   if (expeditionSession.ownsCampaignPersistence()) return;
-  if (!persistenceReady) return;
+  if (
+    !persistenceReady ||
+    clearSettlementPending ||
+    testingStagePreviewActive() ||
+    practiceRestorePending ||
+    !accountTransactions.canWrite()
+  )
+    return;
 
   const savedAt = new Date().toISOString();
   const phase = game.getPhase();
 
-  // Mid-encounter page lifecycle events must not promote equipment drops,
-  // item consumption or other unsafe combat mutations into a new recovery
-  // point. The mirror still writes the current top-level state, but load
-  // resolution restores the previous safe snapshot.
+  // Only a committed, fenced batch can become the recovery mirror.
+  // An activated crash never restarts the encounter as a free attempt.
   if (phase === "title" || phase === "stageclear") {
     captureSafeCrashRecovery("pagehide", savedAt);
   }
 
-  try {
-    persistRecoveryMirrorSync("pagehide", savedAt);
-  } catch (error) {
-    console.warn(
-      "Unable to write synchronous page recovery mirror.",
-      error,
-    );
-  }
-
-  campaignAutosave.schedule(
-    currentAutosaveSnapshot(),
-    "pagehide",
-  );
-  void campaignAutosave.flush("pagehide");
+  campaignAutosave.schedule(currentAutosaveSnapshot(), "pagehide");
+  void campaignAutosave
+    .flush("pagehide")
+    .catch((error) => console.error("Lifecycle save failed.", error));
 }
 
 document.addEventListener("visibilitychange", () => {
@@ -10810,7 +10956,11 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-window.addEventListener("pagehide", persistPageLifecycleRecovery);
+window.addEventListener("pagehide", () => {
+  persistPageLifecycleRecovery();
+  void campaignAutosave.flush().catch(() => {}).finally(() => accountTransactions.close());
+});
+window.addEventListener("pageshow", event => { if (event.persisted) window.location.reload(); });
 
 window.addEventListener(
   "pointerdown",
@@ -10829,6 +10979,84 @@ window.addEventListener("beforeunload", () => {
   musicController.destroy();
   game.destroy();
 });
+
+installWarpControls(
+  (id) => byId<HTMLButtonElement>(id),
+  {
+    practice: async () => {
+      await practiceReload;
+      await startSelectedStage(true);
+    },
+    retryPractice: async () => {
+      await practiceReload;
+      await resolveCheckpointDeath("practice");
+    },
+    refuel: async () => {
+      if (!canOpenBetweenStageMenu())
+        throw new Error("Refuel is available between rewarded sorties");
+      if (!(await autosaveCampaign("manual"))) return;
+      const quote = accountTransactions.quote();
+      if (
+        !window.confirm(
+          `Spend ${quote.price} Star Crystals for +20 Warp now? Refill ${quote.index + 1}/3. Daily reset: 04:00 Vietnam.`,
+        )
+      )
+        return;
+      const saved = await accountTransactions.refuel(quote);
+      expansionCurrencies = saved.expansionCurrencies;
+      refreshPersistentStateUi();
+      showNotice(`+20 Warp · ${quote.price} Star Crystals spent`);
+    },
+    reserve: async () => {
+      if (!canOpenBetweenStageMenu())
+        throw new Error("Change Reserve consent between rewarded sorties");
+      const consent = !warpAccount!.warp.reserveConsent;
+      if (
+        consent &&
+        !window.confirm(
+          "Allow Reserve Warp to cover Active Warp shortages? No Star Crystals are spent automatically.",
+        )
+      )
+        return;
+      await accountTransactions.reserveConsent(consent);
+    },
+    abandon: async () => {
+      if (
+        practiceRestorePending ||
+        clearSettlementPending ||
+        stageStartPending ||
+        accountTransactions.busy() ||
+        warpAccount?.attempt?.phase !== "prepared"
+      )
+        return;
+      if (!window.confirm("Abandon the prepared sortie without a Warp refund?"))
+        return;
+      await accountTransactions.finish("abandoned", warpAccount.attempt.id);
+      showNotice("Prepared sortie abandoned · no refund");
+    },
+    clock: async () => {
+      if (!canOpenBetweenStageMenu())
+        throw new Error("Correct the clock between rewarded sorties");
+      if (
+        !window.confirm(
+          "Re-anchor to this device's current clock? Balances and used refill quota stay unchanged; no retrospective Warp is granted.",
+        )
+      )
+        return;
+      await accountTransactions.reanchor();
+    },
+  },
+  showNotice,
+  renderWarpHud,
+);
+window.setInterval(() => {
+  renderWarpHud();
+  if (persistenceReady && accountTransactions.canWrite() && !accountTransactions.busy()
+    && !testingStagePreviewActive() && !practiceRestorePending && !clearSettlementPending
+    && warpAccount?.attempt?.phase === "active" && game.getPhase() === "playing" && credits !== committedCredits) {
+    void autosaveCampaign("manual");
+  }
+}, 5_000);
 
 renderSettings();
 renderGameplayMode();

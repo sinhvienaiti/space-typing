@@ -10,7 +10,7 @@ function mount(width = 1642) {
   const hotbar = { getBoundingClientRect: () => ({ left: (width - 760) / 2, right: (width + 760) / 2, width: 760, height: 64, top: 725 }) };
   const player = { getBoundingClientRect: () => ({ left: 8, right: 276, width: 268, height: 180, top: 611 }) };
   const style = { setProperty: vi.fn() };
-  const root = { hidden: true, dataset: {} as Record<string, string>, style: { bottom: "" }, querySelector: (selector: string) => selector.includes("transcript") ? transcript : detail, parentElement: { style, getBoundingClientRect: () => ({ right: width, bottom: 799, width }), querySelectorAll: () => [hotbar, player] } };
+  const root = { hidden: true, dataset: {} as Record<string, string>, style: { bottom: "" }, querySelector: (selector: string) => selector.includes("transcript") ? transcript : detail, parentElement: { style, getBoundingClientRect: () => ({ right: width, bottom: 799, width }), querySelector: () => null, querySelectorAll: () => [hotbar, player] } };
   const mounted = mountVoiceFeedback(root as unknown as HTMLElement);
   mounted.state.setGameplayActive(true); mounted.state.setMode("hybrid");
   mounted.state.handleMessage(message("ready", { sampleRate: 16000 }));

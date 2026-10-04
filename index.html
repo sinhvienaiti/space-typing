@@ -20,7 +20,12 @@
     <canvas id="gameCanvas" aria-label="Space Typing battlefield"></canvas>
 
     <div id="musicToast" class="music-toast" aria-live="polite"></div>
+    <aside id="practiceBanner" class="practice-banner" hidden>Practice · learning only · simulated rewards</aside>
 
+    <section id="voiceInputControls" class="voice-input-controls" aria-label="Input mode and microphone">
+      <div><select id="voiceInputMode" aria-label="Input mode"><option value="typing">⌨ Typing</option><option value="voice">🎙 Voice</option><option value="hybrid">⌨ + 🎙 Hybrid</option></select><button id="voiceMicToggle" type="button" aria-label="Enable or stop microphone" aria-pressed="false">🎙 Mic</button></div>
+      <small id="voiceInputStatus" role="status" aria-live="polite">Microphone off</small>
+    </section>
     <aside id="voiceFeedback" class="voice-feedback" role="status" aria-live="polite" aria-atomic="true" aria-label="Voice input feedback" hidden>
       <div class="voice-feedback-head">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5v2M5.5 14.5h5"/></svg>
@@ -45,6 +50,7 @@
         <div class="metric metric-credits"><span>credits</span><strong id="creditsHud">0</strong><em id="creditsDelta" class="credit-delta" aria-hidden="true"></em></div>
         <div class="metric"><span>accuracy</span><strong id="accuracy">100%</strong></div>
         <div class="metric"><span>kills</span><strong id="kills">0</strong></div>
+        <div class="metric metric-warp"><span>Warp Charge</span><strong id="warpBalance">—</strong><small id="warpReserve">Reserve —</small></div>
       </div>
     </header>
 
@@ -222,9 +228,11 @@
               </div>
               <div class="holo-actions title-play-actions">
                 <button id="startButton" class="primary holo-cta" data-icon="play">Continue · Stage 001</button>
+                <button id="practiceButton" class="holo-ghost" type="button">Practice · Free</button>
                 <button id="stageSelectButton" class="holo-ghost" data-icon="map">Stage select</button>
                 <button id="routeButton" class="holo-ghost" data-icon="compass">Briefing</button>
               </div>
+              <div class="warp-depot"><small id="warpStatus" role="status">Loading Warp Charge…</small><button id="warpRefuelButton" type="button">Refuel +20</button><button id="warpReserveToggle" type="button" aria-pressed="false">Reserve: off</button><button id="warpAbandonButton" type="button" hidden>Abandon prepared sortie</button><button id="warpClockButton" type="button" hidden>Correct clock</button></div>
             </div>
           </article>
 
@@ -366,6 +374,7 @@
         </div>
         <footer class="game-over-footer">
           <button id="againButton" class="primary">Replay checkpoint stage</button>
+          <button id="retryPracticeButton" type="button">Retry Practice · Free</button>
           <button id="gameOverStageSelectButton">Choose unlocked stage</button>
           <button id="resultTitleButton">Main menu</button>
         </footer>

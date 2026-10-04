@@ -31,6 +31,9 @@ export type SkillCombatContext = {
   streak: number;
   hits: number;
   misses: number;
+  inputMode?: "voice" | "hybrid";
+  voiceEffortStreak?: number;
+  voiceWords?: number;
 };
 
 export type SkillBlockReason =
@@ -187,20 +190,14 @@ export class SkillEngine {
 
     const condition = definition.typingCondition;
     if (condition !== undefined) {
-      if (
-        condition.minStreak !== undefined &&
-        context.streak < condition.minStreak
-      ) {
-        return "typing-condition";
-      }
-
-      if (
-        condition.minAccuracy !== undefined &&
-        accuracyPercent(context.hits, context.misses) <
-          condition.minAccuracy
-      ) {
-        return "typing-condition";
-      }
+      const typingReady = context.inputMode !== "voice" &&
+        (condition.minStreak === undefined || context.streak >= condition.minStreak) &&
+        (condition.minAccuracy === undefined || accuracyPercent(context.hits, context.misses) >= condition.minAccuracy);
+      // Voice uses its own accepted effort and at least one accepted word.
+      // Recognition confidence is never substituted for typing accuracy.
+      const voiceReady = context.inputMode !== undefined && (context.voiceWords ?? 0) > 0 &&
+        (context.voiceEffortStreak ?? 0) >= (condition.minStreak ?? 0);
+      if (!typingReady && !voiceReady) return "typing-condition";
     }
 
     return null;

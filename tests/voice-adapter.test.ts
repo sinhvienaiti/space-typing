@@ -24,4 +24,13 @@ describe("child voice metadata adapter", () => {
     expect(() => new VoiceAdapter({} as Window, "https://typing-game.local/path", "instance", vi.fn())).toThrow();
     expect(() => parseSnapshot({ targets: [] })).toThrow(); expect(() => new VoiceResultPolicy({ retentionSeconds: 1 })).toThrow();
   });
+  it("stopping while permission is pending cancels the parent by instance and rejects late readiness", () => {
+    const postMessage = vi.fn(), parent = { postMessage } as unknown as Window;
+    const adapter = new VoiceAdapter(parent, "https://typing-game.local", "instance", vi.fn());
+    const event = (op: string, fields = {}) => ({ source: parent, origin: "https://typing-game.local", data: envelope(op, fields) }) as MessageEvent;
+    adapter.handleMessage(event("capabilities", { offlineEngineAvailable: true, reason: "test" }));
+    adapter.start("voice", 1); adapter.stop();
+    expect(postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ type: "typing-game:voice:v1:configure", mode: "typing", inputEpoch: 2 }), "https://typing-game.local");
+    expect(adapter.handleMessage(event("ready", { sessionId: "late", inputEpoch: 1, audioEpoch: 0, engineId: "test", modelId: "test", sampleRate: 16000, fromSample: 0 }))).toBe(false);
+  });
 });

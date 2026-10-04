@@ -125,8 +125,10 @@ export function parseVoiceMessage(value) {
     case "configure": return { ...base, mode: oneOf(v.mode, "mode", ["typing", "voice", "hybrid"]), language: oneOf(v.language, "language", ["en"]), policyVersion: text(v.policyVersion, "policyVersion", 64), inputEpoch: integer(v.inputEpoch, "inputEpoch") };
     case "start": return { ...base, inputEpoch: integer(v.inputEpoch, "inputEpoch") };
     case "capabilities": return { ...base, offlineEngineAvailable: boolean(v.offlineEngineAvailable, "offlineEngineAvailable"), reason: text(v.reason, "reason", 300) };
-    case "ready": return { ...base, ...session(), audioEpoch: integer(v.audioEpoch, "audioEpoch"), engineId: text(v.engineId, "engineId"), modelId: text(v.modelId, "modelId"), sampleRate: integer(v.sampleRate, "sampleRate", 8000, 192000) };
+    case "ready": return { ...base, ...session(), audioEpoch: integer(v.audioEpoch, "audioEpoch"), engineId: text(v.engineId, "engineId"), modelId: text(v.modelId, "modelId"), sampleRate: integer(v.sampleRate, "sampleRate", 8000, 192000), ...(v.fromSample === undefined ? {} : { fromSample: integer(v.fromSample, "fromSample") }) };
     case "targets": return { ...base, ...parseSnapshot(v) };
+    case "vocabulary-check": case "vocabulary-checked": return { ...base, ...session(), audioEpoch: integer(v.audioEpoch, "audioEpoch"), requestId: text(v.requestId, "requestId"), [op === "vocabulary-check" ? "forms" : "unsupported"]: list(v[op === "vocabulary-check" ? "forms" : "unsupported"], "forms", 256, normalizeSpokenForm) };
+    case "clock": return { ...base, ...session(), audioEpoch: integer(v.audioEpoch, "audioEpoch"), sample: integer(v.sample, "sample") };
     case "targets-applied": {
       const ready = list(v.ready, "ready", VOICE_LIMITS.targets, (x) => text(x, "unitId"));
       const unsupported = list(v.unsupported, "unsupported", VOICE_LIMITS.targets, (x) => text(x, "unitId"));

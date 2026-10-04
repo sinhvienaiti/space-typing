@@ -15,6 +15,7 @@ export function mountVoiceFeedback(root: HTMLElement): { state: VoiceFeedbackSta
     if (view.visible && ["heard", "accepted", "unmatched", "unrecognized"].includes(view.status)) timer = setTimeout(() => state.expire(), 4000);
   });
   const shell = root.parentElement;
+  const controls = shell?.querySelector<HTMLElement>("#voiceInputControls");
   const obstacles = shell ? Array.from(shell.querySelectorAll<HTMLElement>("#combatHotbar, #playerStatusHud")) : [];
   const position = (): void => {
     if (!shell) return;
@@ -26,11 +27,14 @@ export function mountVoiceFeedback(root: HTMLElement): { state: VoiceFeedbackSta
       const rect = obstacle.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0 && rect.right > left && rect.left < bounds.right - 12) bottom = Math.max(bottom, bounds.bottom - rect.top + 8);
     }
-    root.style.bottom = `${Math.ceil(bottom)}px`;
-    shell.style.setProperty("--voice-feedback-clearance", `${Math.ceil(bottom) + 76}px`);
+    if (controls) controls.style.bottom = `${Math.ceil(bottom)}px`;
+    const feedbackBottom = bottom + (controls ? controls.getBoundingClientRect().height + 8 : 0);
+    root.style.bottom = `${Math.ceil(feedbackBottom)}px`;
+    shell.style.setProperty("--voice-feedback-clearance", `${Math.ceil(feedbackBottom) + 76}px`);
   };
   const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(position);
   if (shell) observer?.observe(shell);
+  if (controls) observer?.observe(controls);
   for (const obstacle of obstacles) observer?.observe(obstacle);
   position();
   return { state, dispose: () => { clearTimeout(timer); observer?.disconnect(); state.stop(); } };

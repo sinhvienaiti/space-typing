@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 3004",
     "build": "node scripts/check-audio-assets.mjs && node scripts/check-background-assets.mjs && node scripts/bg-art/check-expansion-v2.mjs && node scripts/bg-art/check-credit-puzzle-art.mjs && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit && vite build && node scripts/report-bundle-metrics.mjs && node scripts/check-ship-art-integrity.mjs && node scripts/check-background-art.mjs",
-    "test": "vitest run",
+    "test": "vitest run tests",
+    "stamina:audit": "node --import tsx scripts/audit-warp-economy.ts",
     "check": "pnpm test && pnpm build",
     "duel:server": "tsx server/duel/ws-server.ts",
     "duel:local": "node scripts/local-duel.mjs start",
@@ -48,6 +49,7 @@
     "@types/node": "^24.19.0",
     "@types/three": "0.170.0",
     "@types/ws": "^8.18.2",
+    "fake-indexeddb": "6.2.4",
     "sharp": "^0.34.5",
     "tsx": "^4.23.15",
     "typescript": "^6.0.2",

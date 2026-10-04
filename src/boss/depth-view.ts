@@ -218,7 +218,7 @@ export function depthMeteorPoint(
   meteor: BossMeteor,
 ): { x: number; y: number; s: number } | null {
   if (state.stage !== "release" || meteor.state !== "falling") return null;
-  const u = Math.min(1, Math.max(0, (state.t - (meteor.landsAt - METEOR_FALL)) / METEOR_FALL));
+  const u = Math.min(1, Math.max(0, (state.t - (meteor.landsAt - (state.voiceMeteorFlightSeconds ?? METEOR_FALL))) / (state.voiceMeteorFlightSeconds ?? METEOR_FALL)));
   if (u <= 0) return null;
   return depthFlight(u * u, meteorStart(geometry, meteor), depthMeteorTarget(geometry, meteor));
 }
@@ -442,7 +442,7 @@ export function drawBossSkill(
         const ringAlpha = state.stage === "telegraph" ? progress : 1;
         ellipseRing(context, target.x, target.y, 58, 20, 2, "#ff5050", ringAlpha * (0.45 + pulse * 0.4));
         if (state.stage === "release") {
-          const u = Math.min(1, Math.max(0, (state.t - (meteor.landsAt - METEOR_FALL)) / METEOR_FALL));
+          const u = Math.min(1, Math.max(0, (state.t - (meteor.landsAt - (state.voiceMeteorFlightSeconds ?? METEOR_FALL))) / (state.voiceMeteorFlightSeconds ?? METEOR_FALL)));
           if (u > 0) {
             const from = meteorStart(geometry, meteor);
             const p = depthFlight(u * u, from, target);

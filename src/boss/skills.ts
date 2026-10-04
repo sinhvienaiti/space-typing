@@ -71,7 +71,7 @@ export function bossUltimatePhase(role: BossRole): number | null {
 }
 
 /** Themed prompt words: short, common English verbs (also good vocabulary). */
-const COUNTER_WORDS: Readonly<Record<Exclude<BossCounterKind, "intercept">, readonly string[]>> = {
+export const COUNTER_WORDS: Readonly<Record<Exclude<BossCounterKind, "intercept">, readonly string[]>> = {
   parry: ["parry", "guard", "block", "ward", "shield", "deflect", "repel"],
   dodge: ["dash", "dodge", "evade", "shift", "slide", "veer", "drift"],
   brace: ["brace", "hold", "stand", "anchor", "steady", "endure"],
@@ -111,6 +111,8 @@ export type BossMeteor = {
 };
 
 export type BossSkillState = {
+  counterInputSource?: "typing" | "voice";
+  voiceMeteorFlightSeconds?: number;
   kind: BossSkillKind;
   spec: BossSkillSpec;
   stage: BossSkillStage;
@@ -187,11 +189,12 @@ export function startBossSkill(
   phase: number,
   rng: Rng,
   windup = 1,
+  voiceWindow = false,
 ): BossSkillState {
   const base = BOSS_SKILLS[kind];
   const spec: BossSkillSpec = {
     ...base,
-    telegraph: Math.max(base.kind === "volley" ? 0.5 : 1.6, base.telegraph * windup),
+    telegraph: Math.max(base.kind === "volley" ? 0.5 : voiceWindow ? 3.5 : 1.6, base.telegraph * windup),
   };
   let word: string | null = null;
   if (spec.counter !== "intercept") {
@@ -217,14 +220,16 @@ export function startBossSkill(
         char,
         lane: -0.85 + (1.7 * index) / Math.max(1, count - 1) + (rng() - 0.5) * 0.12,
         // Staggered landings across the release, the first after 0.9 s.
-        landsAt: 0.9 + (index / count) * (spec.release - 1.1) + rng() * 0.15,
+        landsAt: voiceWindow ? 2.8 + index * 1.2 : 0.9 + (index / count) * (spec.release - 1.1) + rng() * 0.15,
         state: "falling",
       });
     }
     meteors.sort((a, b) => a.landsAt - b.landsAt);
+    if (voiceWindow) spec.release = meteors.at(-1)!.landsAt + 0.4;
   }
   return {
     kind,
+    ...(voiceWindow ? { voiceMeteorFlightSeconds: 2.8 } : {}),
     spec,
     stage: "telegraph",
     t: 0,
