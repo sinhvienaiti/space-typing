@@ -595,21 +595,18 @@ kbd {
 .holo-meta b { color: var(--holo-text); font-weight: 600; }
 .holo-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .holo-meta-small { color: var(--holo-faint); font-size: 0.72rem; font-weight: 600; margin-left: 4px; }
+/* Every mode card: the main action across the top, two smaller ones below. */
 .holo-actions {
   margin-top: auto;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
-.holo-actions > .holo-cta { flex: 1 1 auto; }
-.holo-mode-featured .holo-actions > .holo-cta { flex: 0 0 auto; padding: 0 1.8rem; }
+.holo-actions > .holo-cta { grid-column: 1 / -1; width: 100%; }
+.holo-actions > .holo-ghost { justify-content: center; min-height: 38px; padding: 0 0.6rem; white-space: nowrap; }
+.holo-actions > .hidden { display: none; }
 /* Expedition buttons are built by src/expedition/ui.ts. */
-.holo-actions-expedition #expeditionButton { flex: 1 1 100%; }
-.holo-actions-expedition #expeditionDailyButton,
-.holo-actions-expedition #expeditionGhostButton { flex: 1 1 0; }
 .holo-actions-expedition .expansion-v2-icon { width: 20px; height: 20px; }
-.holo-actions-expedition .holo-ghost { justify-content: center; padding: 0 0.6rem; white-space: nowrap; }
 
 /* The dock draws its glass in ::before so the Shops menu can rise above it
    without being cut by the chamfer. */

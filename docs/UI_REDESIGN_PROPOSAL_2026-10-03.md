@@ -195,3 +195,7 @@ Sẽ dùng thứ đã có: tàu đang chọn, credit, tiến độ Campaign, đi
 - Bảng xếp hạng toàn cầu, danh sách người online, trò chuyện, bạn bè: cần máy chủ có tài khoản.
 - Cấp và kinh nghiệm phi công, chuỗi ngày đăng nhập: chưa có dữ liệu.
 - Tên phi công dùng chung giữa Campaign và Duel.
+
+## 8. Đợt 2 (04/10/2026)
+
+Sửa lỗi chọn map Duel, quái bonus ở Recall; thêm hiệu ứng rê chuột và bấm, thanh điểm "bốc cháy", hàng phím tắt mới, Hangar, Shop, Missions, bản đồ chiến dịch, màn hoàn thành. Chi tiết: `docs/UI_POLISH_ROUND2_2026-10-04.md`.

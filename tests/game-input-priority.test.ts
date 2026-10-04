@@ -147,6 +147,65 @@ describe("boss-stage input priority", () => {
   });
 });
 
+describe("Recall mode bonus targets", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("lets a supply pod take a key the Recall enemy does not want", () => {
+    const game = createTestGame();
+    const state = game as unknown as GameInternals & { gameplayMode: string };
+    state.phase = "playing";
+    state.gameplayMode = "recall";
+    state.enemies = [{ id: 7, entry: { id: "sister", en: "sister", vi: "chị gái", ipa: "" }, typed: 0 }];
+    state.supplyPod = supply("right");
+
+    game.handleKey("r");
+    expect(state.supplyPod?.typed).toBe(1);
+    expect(state.enemies[0]!.typed).toBe(0);
+
+    // Started: the pod keeps its letters.
+    game.handleKey("i");
+    expect(state.supplyPod?.typed).toBe(2);
+    game.destroy();
+  });
+
+  it("still reaches the supply pod once the Recall word is locked and half typed", () => {
+    const game = createTestGame();
+    const state = game as unknown as GameInternals & { gameplayMode: string };
+    state.phase = "playing";
+    state.gameplayMode = "recall";
+    // "s" already typed: the Recall word is the locked target and wants "i".
+    state.enemies = [{ id: 7, entry: { id: "sister", en: "sister", vi: "chị gái", ipa: "" }, typed: 1 }];
+    state.targetId = 7;
+    state.supplyPod = supply("right");
+
+    game.handleKey("r");
+    expect(state.supplyPod?.typed).toBe(1);
+    expect(state.enemies[0]!.typed).toBe(1);
+
+    // "i" is wanted by both: the started pod keeps its own next letter.
+    game.handleKey("i");
+    expect(state.supplyPod?.typed).toBe(2);
+    expect(state.enemies[0]!.typed).toBe(1);
+    game.destroy();
+  });
+
+  it("lets a bonus target take a key the Recall boss word does not want", () => {
+    const game = createTestGame();
+    const state = game as unknown as GameInternals & { gameplayMode: string };
+    state.phase = "playing";
+    state.gameplayMode = "recall";
+    state.boss = createBossState(50, 1, "boss", bossEntry);
+    state.supplyPod = supply("solar");
+
+    game.handleKey("s");
+    expect(state.supplyPod?.typed).toBe(1);
+    expect(state.boss.typed).toBe(0);
+    game.destroy();
+  });
+});
+
 describe("Recall Bonus input priority", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

@@ -1,0 +1,410 @@
+/*
+ * In-run HUD in the Holo Command style: score panels with "heat" (they catch
+ * fire on a long accurate streak and on fast typing), and the 1–9 hotbar with
+ * ready / just-ready feedback. Heat levels and hotbar states are set by
+ * src/main.ts (renderStats, renderHotbar). Loaded after styles.css.
+ */
+
+/* ---------- Top score panels ---------- */
+.hud {
+  padding: 0.7rem 1rem;
+  background: linear-gradient(to bottom, rgba(3, 7, 16, 0.82), rgba(3, 7, 16, 0.35) 70%, transparent);
+}
+.hud-side {
+  position: relative;
+  isolation: isolate;
+  align-self: start;
+  justify-self: start;
+  width: max-content;
+  gap: 1.1rem;
+  padding: 0.5rem 1rem 0.55rem;
+}
+.hud-side-right { justify-self: end; }
+/* Glass panel (in ::before so the flames can sit behind the numbers). */
+.hud-side::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  border: 1px solid rgba(111, 231, 255, 0.18);
+  background: linear-gradient(180deg, rgba(10, 22, 44, 0.78), rgba(5, 11, 26, 0.7));
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  box-shadow: inset 0 1px 0 rgba(160, 240, 255, 0.14);
+  transition: border-color 0.3s, background 0.4s;
+}
+.metric { min-width: 58px; gap: 0.05rem; }
+.metric span {
+  color: #7f9cb4;
+  font-family: var(--holo-display);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.metric strong {
+  font-family: var(--holo-display);
+  font-size: 1.3rem;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  color: #eef8ff;
+  text-shadow: 0 0 12px rgba(95, 227, 255, 0.25);
+}
+.hud-side:not(.hud-side-right) .metric:first-child strong { font-size: 1.55rem; }
+.metric-credits strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #f1dcff;
+}
+.metric-credits strong::before {
+  content: "";
+  width: 1em;
+  height: 1em;
+  background: url("../assets/pickups/credits/common.webp") center / contain no-repeat;
+  filter: drop-shadow(0 0 4px rgba(190, 120, 255, 0.8));
+}
+.wave-badge {
+  font-family: var(--holo-display);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: #8ff1ff;
+  border-color: rgba(111, 231, 255, 0.3);
+  background: rgba(6, 16, 32, 0.82);
+  box-shadow: 0 0 18px rgba(95, 227, 255, 0.12);
+}
+
+/* ---------- Heat: the panels catch fire ---------- */
+/* Flames rise from the bottom edge through the panel, behind the numbers. */
+.hud-flame {
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  bottom: -8px;
+  height: 175%;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  transform-origin: 50% 100%;
+  transform: scaleY(0.6);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  background:
+    radial-gradient(ellipse 22% 60% at 18% 100%, rgba(255, 196, 80, 0.75), transparent 70%),
+    radial-gradient(ellipse 26% 75% at 50% 100%, rgba(255, 120, 40, 0.8), transparent 72%),
+    radial-gradient(ellipse 22% 55% at 82% 100%, rgba(255, 70, 40, 0.7), transparent 70%);
+  animation: hud-flicker 0.42s ease-in-out infinite alternate;
+}
+/* Embers rising from the panel. */
+.hud-flame::before,
+.hud-flame::after {
+  content: "";
+  position: absolute;
+  bottom: 18%;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #ffd27a;
+  box-shadow:
+    18px 0 0 #ffb347, 46px -8px 0 #ffe29a, 80px 4px 0 #ff9a3c,
+    112px -4px 0 #ffd27a, 150px 2px 0 #ff7a3c, 186px -6px 0 #ffe29a;
+  opacity: 0;
+  animation: hud-embers 1.4s linear infinite;
+}
+.hud-flame::after {
+  left: 9%;
+  animation-delay: 0.7s;
+  animation-duration: 1.7s;
+}
+@keyframes hud-flicker {
+  from { transform: scaleY(var(--flame-scale, 0.9)) scaleX(1); filter: hue-rotate(0deg); }
+  to { transform: scaleY(calc(var(--flame-scale, 0.9) * 1.12)) scaleX(1.03); filter: hue-rotate(-12deg); }
+}
+@keyframes hud-embers {
+  0% { transform: translateY(0); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translateY(-46px); opacity: 0; }
+}
+.hud-side[data-heat="1"] .hud-flame { opacity: 0.45; --flame-scale: 0.8; }
+.hud-side[data-heat="2"] .hud-flame { opacity: 0.8; --flame-scale: 1; }
+.hud-side[data-heat="3"] .hud-flame { opacity: 1; --flame-scale: 1.25; }
+.hud-side[data-heat="3"] .hud-flame::before,
+.hud-side[data-heat="3"] .hud-flame::after { background: #fff1c4; }
+.hud-side[data-heat]:not([data-heat="0"])::before {
+  border-color: rgba(255, 150, 60, 0.6);
+  background: linear-gradient(180deg, rgba(48, 16, 8, 0.82), rgba(20, 8, 12, 0.78));
+  box-shadow: inset 0 1px 0 rgba(255, 210, 150, 0.3), 0 0 22px rgba(255, 110, 40, 0.25);
+}
+/* Burning numbers. */
+.hud-side[data-heat]:not([data-heat="0"]) .metric strong {
+  color: transparent;
+  background: linear-gradient(0deg, #ff4a1c 0%, #ffae2b 45%, #fff4c8 100%);
+  background-size: 100% 180%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow: none;
+  filter: drop-shadow(0 0 6px rgba(255, 120, 40, 0.75));
+  animation: hud-burn 0.9s ease-in-out infinite alternate;
+}
+.hud-side[data-heat]:not([data-heat="0"]) .metric span { color: #ffc58a; }
+@keyframes hud-burn {
+  from { background-position: 0 100%; }
+  to { background-position: 0 0; }
+}
+.metric-credits strong::before { -webkit-text-fill-color: initial; }
+/* Heat label under the panel: HOT STREAK, ON FIRE, INFERNO… */
+.hud-side[data-heat-label]:not([data-heat="0"])::after {
+  content: attr(data-heat-label);
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 4px);
+  transform: translateX(-50%);
+  padding: 2px 10px;
+  white-space: nowrap;
+  font-family: var(--holo-display);
+  font-size: 0.66rem;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0.18em;
+  color: #fff3d6;
+  background: linear-gradient(90deg, rgba(255, 90, 30, 0.85), rgba(255, 170, 40, 0.85));
+  clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+  text-shadow: 0 0 8px rgba(255, 220, 160, 0.9);
+}
+/* A burst when the heat level goes up. */
+.hud-side.heat-up { animation: hud-heat-up 0.6s ease-out; }
+@keyframes hud-heat-up {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.06); filter: brightness(1.5); }
+  100% { transform: scale(1); filter: none; }
+}
+
+/* ---------- 1–9 hotbar ---------- */
+.combat-hotbar {
+  width: min(760px, calc(100vw - 24px));
+  gap: 0.4rem;
+  bottom: 10px;
+}
+.hotbar-slot {
+  --slot-accent: 127, 232, 255;
+  height: 64px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 1px solid rgba(var(--slot-accent), 0.22);
+  border-radius: 0;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(var(--slot-accent), 0.14), transparent 70%),
+    linear-gradient(180deg, rgba(12, 24, 46, 0.92), rgba(5, 10, 22, 0.94));
+  clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px);
+  box-shadow: inset 0 1px 0 rgba(200, 245, 255, 0.12), 0 6px 18px rgba(0, 0, 0, 0.35);
+  transition: transform 0.16s var(--holo-ease, ease), border-color 0.2s, box-shadow 0.25s, filter 0.2s;
+}
+.hotbar-slot.item { --slot-accent: 94, 234, 200; }
+.hotbar-slot.skill { --slot-accent: 186, 140, 255; }
+.hotbar-slot.character { --slot-accent: 255, 210, 110; }
+.hotbar-slot kbd {
+  position: absolute;
+  top: 3px;
+  left: 4px;
+  padding: 0 4px;
+  min-width: 15px;
+  font-family: var(--holo-display);
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 15px;
+  color: #04121c;
+  border: 0;
+  border-radius: 0;
+  background: rgba(var(--slot-accent), 0.9);
+  clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
+}
+.hotbar-glyph {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-top: 4px;
+  font-size: 1.25rem;
+  color: rgb(var(--slot-accent));
+  text-shadow: 0 0 10px rgba(var(--slot-accent), 0.8);
+}
+/* Painted icons sit on a dark square: blend it away and soften the edge,
+   so the object reads as glowing inside the tile. */
+.hotbar-glyph .painted-icon {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  mix-blend-mode: screen;
+  -webkit-mask: radial-gradient(circle, #000 58%, transparent 72%);
+  mask: radial-gradient(circle, #000 58%, transparent 72%);
+}
+.hotbar-label {
+  max-width: 100%;
+  padding: 0 4px;
+  font-family: var(--holo-display);
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #a9c4d8;
+}
+.hotbar-state {
+  position: absolute;
+  top: 3px;
+  right: 5px;
+  font-family: var(--holo-display);
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: #eaf8ff;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.9);
+}
+.hotbar-slot:disabled {
+  opacity: 1;
+  filter: grayscale(0.85) brightness(0.62);
+}
+.hotbar-slot:disabled .hotbar-glyph { text-shadow: none; }
+/* Cooldown: dark veil with the seconds left in the middle. */
+.hotbar-slot.cooldown::after {
+  background: linear-gradient(0deg, rgba(3, 6, 14, 0.72), rgba(3, 6, 14, 0.5));
+}
+.hotbar-slot.cooldown .hotbar-state {
+  top: 50%;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  transform: translateY(-62%);
+  text-align: center;
+  font-size: 0.9rem;
+}
+/* Ready to use: lit edge and a slow light sweep across the tile. */
+.hotbar-slot.ready {
+  border-color: rgba(var(--slot-accent), 0.7);
+  box-shadow: inset 0 1px 0 rgba(220, 250, 255, 0.2), 0 0 16px rgba(var(--slot-accent), 0.32);
+}
+.hotbar-slot.ready::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.22) 50%, transparent 65%);
+  background-size: 260% 100%;
+  animation: hotbar-shine 2.8s ease-in-out infinite;
+}
+@keyframes hotbar-shine {
+  0%, 55% { background-position: 130% 0; }
+  100% { background-position: -130% 0; }
+}
+/* Just became usable: a bright pop and a ring that grows out. */
+.hotbar-slot.just-ready { animation: hotbar-pop 0.9s ease-out; }
+.hotbar-slot.just-ready .hotbar-glyph { animation: hotbar-icon-pop 0.9s ease-out; }
+@keyframes hotbar-pop {
+  0% { box-shadow: 0 0 0 0 rgba(var(--slot-accent), 0.9), 0 0 30px rgba(var(--slot-accent), 0.9); filter: brightness(1.8); transform: translateY(-4px); }
+  60% { box-shadow: 0 0 0 10px rgba(var(--slot-accent), 0), 0 0 22px rgba(var(--slot-accent), 0.5); filter: brightness(1.15); transform: translateY(-1px); }
+  100% { transform: none; filter: none; }
+}
+@keyframes hotbar-icon-pop {
+  0% { transform: scale(0.6); }
+  45% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+.hotbar-slot:not(:disabled):hover {
+  transform: translateY(-3px);
+  border-color: rgba(var(--slot-accent), 0.9);
+  box-shadow: 0 0 22px rgba(var(--slot-accent), 0.45);
+}
+.hotbar-slot:not(:disabled):active { transform: translateY(1px) scale(0.96); }
+
+@media (max-width: 760px) {
+  .metric strong { font-size: 1.05rem; }
+  .hud-side:not(.hud-side-right) .metric:first-child strong { font-size: 1.2rem; }
+  .hud-side { gap: 0.7rem; padding: 0.4rem 0.7rem; }
+  .hotbar-slot { height: 54px; }
+  .hotbar-glyph, .hotbar-glyph .painted-icon { width: 26px; height: 26px; }
+  .hotbar-label { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hud-flame, .hud-flame::before, .hud-flame::after,
+  .hotbar-slot.ready::before { animation: none; }
+}
+
+/* ---------- Rage (SPACE) full: the bar and panel burn ---------- */
+.player-ultimate { position: relative; isolation: isolate; }
+.rage-flames {
+  position: absolute;
+  left: -6px;
+  right: -6px;
+  bottom: -10px;
+  height: 64px;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  transform-origin: 50% 100%;
+  background:
+    radial-gradient(ellipse 18% 70% at 15% 100%, rgba(255, 200, 80, 0.85), transparent 70%),
+    radial-gradient(ellipse 22% 85% at 42% 100%, rgba(255, 120, 40, 0.9), transparent 72%),
+    radial-gradient(ellipse 20% 75% at 68% 100%, rgba(255, 80, 50, 0.85), transparent 70%),
+    radial-gradient(ellipse 16% 60% at 90% 100%, rgba(255, 190, 90, 0.8), transparent 70%);
+  transition: opacity 0.35s;
+}
+.rage-flames::before,
+.rage-flames::after {
+  content: "";
+  position: absolute;
+  bottom: 30%;
+  left: 8%;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #ffe29a;
+  box-shadow: 22px 0 0 #ffb347, 54px -6px 0 #fff1c4, 90px 3px 0 #ff9a3c, 128px -4px 0 #ffd27a, 166px 2px 0 #ff7a3c, 204px -5px 0 #ffe29a;
+  opacity: 0;
+}
+.player-status-hud.rage-ready .rage-flames {
+  opacity: 1;
+  animation: hud-flicker 0.38s ease-in-out infinite alternate;
+}
+.player-status-hud.rage-ready .rage-flames::before { animation: hud-embers 1.2s linear infinite; }
+.player-status-hud.rage-ready .rage-flames::after { left: 14%; animation: hud-embers 1.5s linear 0.6s infinite; }
+/* Molten fill that flows along the bar. */
+.player-ultimate .power-fill.ready {
+  background:
+    linear-gradient(90deg, transparent calc(100% - 1px), #2a0a04 0) 0 / 20% 100%,
+    linear-gradient(90deg, #ff3d1f, #ffae2b, #fff1b0, #ffae2b, #ff3d1f) 0 0 / 200% 100%;
+  box-shadow: 0 0 14px rgba(255, 140, 40, 0.9), 0 0 28px rgba(255, 80, 30, 0.55);
+  animation: rage-molten 1.1s linear infinite;
+}
+@keyframes rage-molten {
+  from { background-position: 0 0, 0 0; }
+  to { background-position: 0 0, -200% 0; }
+}
+/* Panel edge glows and the hint and SPACE key call for the press. */
+.player-status-hud.rage-ready {
+  box-shadow: 0 0 0 1px rgba(255, 150, 60, 0.75), 0 0 26px rgba(255, 110, 40, 0.45);
+  animation: rage-panel 1s ease-in-out infinite alternate;
+}
+@keyframes rage-panel {
+  to { box-shadow: 0 0 0 1px rgba(255, 210, 120, 0.95), 0 0 40px rgba(255, 120, 40, 0.7); }
+}
+.player-status-hud.rage-ready #powerHint {
+  color: #fff3d6;
+  font-weight: 800;
+  text-shadow: 0 0 10px rgba(255, 150, 60, 0.95);
+}
+.player-status-hud.rage-ready .player-ultimate kbd {
+  color: #2a1000;
+  border-color: transparent;
+  background: linear-gradient(180deg, #ffe29a, #ff9a3c);
+  box-shadow: 0 0 14px rgba(255, 160, 60, 0.9);
+  animation: rage-key 0.7s ease-in-out infinite alternate;
+}
+@keyframes rage-key {
+  from { transform: scale(1); }
+  to { transform: scale(1.12); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .player-status-hud.rage-ready, .player-status-hud.rage-ready .rage-flames,
+  .player-ultimate .power-fill.ready, .player-status-hud.rage-ready .player-ultimate kbd { animation: none; }
+}

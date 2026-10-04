@@ -14,6 +14,12 @@ const SKILL_FILES = import.meta.glob<string>("../assets/icons/skills/*.webp", {
   query: "?url",
   import: "default",
 });
+// Consumables (Repair Kit, Shield Cell…): docs/art-requests/UI_ROUND2_ART_AND_AUDIO_2026-10-04.md.
+const ITEM_FILES = import.meta.glob<string>("../assets/icons/items/*.webp", {
+  eager: true,
+  query: "?url",
+  import: "default",
+});
 
 function indexByName(files: Record<string, string>): ReadonlyMap<string, string> {
   const map = new Map<string, string>();
@@ -25,6 +31,7 @@ function indexByName(files: Record<string, string>): ReadonlyMap<string, string>
 
 const EQUIPMENT_ICONS = indexByName(EQUIPMENT_FILES);
 const SKILL_ICONS = indexByName(SKILL_FILES);
+const ITEM_ICONS = indexByName(ITEM_FILES);
 
 export function paintedEquipmentIcon(id: string): string | null {
   return EQUIPMENT_ICONS.get(id) ?? null;
@@ -32,6 +39,10 @@ export function paintedEquipmentIcon(id: string): string | null {
 
 export function paintedSkillIcon(id: string): string | null {
   return SKILL_ICONS.get(id) ?? null;
+}
+
+export function paintedItemIcon(id: string): string | null {
+  return ITEM_ICONS.get(id) ?? null;
 }
 
 /** The painted icon when there is one, else the glyph text. */

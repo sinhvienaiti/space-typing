@@ -204,6 +204,23 @@ export function installTitleHub(deps: TitleHubDeps): TitleHub {
     deps.openSettings();
   });
   byId("titleRecallStartButton")?.addEventListener("click", deps.startRecall);
+  // Secondary card buttons (every mode card: one main action, two below).
+  byId("titleRecallWordsButton")?.addEventListener("click", () => byId("vocabularyButton")?.click());
+  byId("titleRecallSettingsButton")?.addEventListener("click", () => {
+    deps.openSettings();
+    // Scroll to the Recall section once the dialog has opened.
+    window.requestAnimationFrame(() =>
+      byId("recallDifficulty")?.closest(".settings-section")?.scrollIntoView({ block: "start", behavior: "smooth" }),
+    );
+  });
+  byId("titleDuelPracticeButton")?.addEventListener("click", () => {
+    deps.openDuel();
+    window.setTimeout(() => byId("duelPracticeButton")?.click(), 60);
+  });
+  byId("titleDuelJoinButton")?.addEventListener("click", () => {
+    deps.openDuel();
+    window.setTimeout(() => byId<HTMLInputElement>("duelJoinCode")?.focus(), 60);
+  });
   // A shop button opening its dialog closes the menu.
   byId("titleShopsMenu")?.addEventListener("click", (event) => {
     if ((event.target as Element).closest("button") !== null) closePopovers();

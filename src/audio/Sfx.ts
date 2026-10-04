@@ -757,6 +757,44 @@ export class Sfx {
     this.tone(250, 0.14, "sine", 0.03, 120, "combat");
   }
 
+  // --- HUD cues -----------------------------------------------------------------
+
+  private lastHudCue = 0;
+
+  /** The score panels catch fire (level 1–3): an ignition whoosh, deeper each level. */
+  heatUp(level: number): void {
+    const now = this.clock();
+    if (now - this.lastHudCue < 250) return;
+    this.lastHudCue = now;
+    const k = Math.max(1, Math.min(3, level));
+    this.noise(0.42 + k * 0.1, 0.035 + k * 0.012, "combat", { filter: "bandpass", frequency: 520 + k * 180, q: 0.6, attack: 0.08 });
+    this.tone(70 - k * 8, 0.32, "sine", 0.03 + k * 0.01, 46, "combat");
+  }
+
+  /**
+   * A bonus reward reaches the ship. Items: a warm absorb (whoosh + low
+   * rising pair). Treasure: the Credit gem pickup. Crates: a deeper swell.
+   */
+  rewardPickup(kind: "item" | "treasure" | "crate"): void {
+    if (kind === "treasure" && this.playSample("credit-pickup", 1.05)) {
+      this.noise(0.2, 0.02, "rewards", { filter: "bandpass", frequency: 3200, q: 0.9 });
+      return;
+    }
+    const base = kind === "crate" ? 165 : 220;
+    this.noise(0.26, 0.03, "rewards", { filter: "bandpass", frequency: kind === "crate" ? 900 : 1500, q: 0.7 });
+    this.tone(base, 0.3, "triangle", 0.032, base * 1.5, "rewards", { attack: 0.02 });
+    this.schedule(() => this.tone(base * 1.5, 0.34, "sine", 0.026, base * 2, "rewards"), 60);
+  }
+
+  /** A hotbar slot is ready again: a short low charge-up, not a chime. */
+  hotbarReady(): void {
+    const now = this.clock();
+    if (now - this.lastHudCue < 400) return;
+    this.lastHudCue = now;
+    this.noise(0.06, 0.022, "ui", { filter: "bandpass", frequency: 1400, q: 1.1 });
+    this.tone(150, 0.16, "triangle", 0.022, 230, "ui", { attack: 0.03 });
+  }
+
   // --- Boss skills (Depth View, src/boss/skills.ts) ---------------------------
   //
   // War-film weight like the Duel: wind-ups are low rumbles and lock tones,

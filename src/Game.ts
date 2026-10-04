@@ -486,6 +486,9 @@ import {
   preloadPaintedSprites,
 } from "./enemies/painted-sprites";
 import { BossRelief, type BossReliefPose } from "./boss/boss-relief";
+import { drawBonusTarget, preloadBonusSprites } from "./vfx/bonus-sprites";
+import { RewardDrops, type RewardDropSpec } from "./vfx/reward-drops";
+import { paintedItemIcon } from "./ui/painted-icons";
 import {
   BossCallouts,
   COUNTER_COLOR,
@@ -593,6 +596,8 @@ type ShotImpact =
       count: number;
       /** Draws the collected bonus until the bolt lands. */
       ghost: () => void;
+      /** What drops out and flies to the ship when the bolt lands. */
+      drop?: RewardDropSpec;
     };
 
 /** Writes where a bonus target is drawn right now (its bob/sway included). */
@@ -802,6 +807,62 @@ const ENEMY_SPRITE_SCALE = 2.7;
  * Keep this presentation-only: hit radius and boss gameplay stay unchanged.
  * High/Ultra also use the detailed @2x source in painted-sprites.ts.
  */
+/** Vietnamese meanings and IPA: a font with full Vietnamese diacritics. */
+const VIETNAMESE_FONT = "'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, sans-serif";
+
+/**
+ * Meaning / IPA under a word: large enough to read at a glance, on a dark pill
+ * so it stays legible over bright backgrounds.
+ */
+function drawMeaningPill(
+  context: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  size: number,
+  accent = "#7fe8ff",
+): void {
+  context.save();
+  context.shadowBlur = 0;
+  context.font = "600 " + String(size) + "px " + VIETNAMESE_FONT;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  const width = context.measureText(text).width + size * 1.2;
+  const height = size * 1.7;
+  context.fillStyle = "rgba(4, 9, 20, 0.84)";
+  context.strokeStyle = accent;
+  context.globalAlpha = 0.96;
+  context.lineWidth = 1;
+  context.beginPath();
+  context.roundRect(x - width / 2, y - height / 2, width, height, height / 2);
+  context.fill();
+  context.globalAlpha = 0.45;
+  context.stroke();
+  context.globalAlpha = 1;
+  context.fillStyle = "#f2fbff";
+  context.fillText(text, x, y + size * 0.04);
+  context.restore();
+}
+
+/** Treasure pieces: the golden Credit crystal art. */
+const TREASURE_DROP_ART = new URL("./assets/pickups/credits/elite-golden.webp", import.meta.url).href;
+
+/** Item icon a supply chest drops for its reward. */
+function supplyRewardIcon(reward: string): string | null {
+  if (reward === "hull") return paintedItemIcon("repair-kit");
+  if (reward === "shield") return paintedItemIcon("shield-cell");
+  if (reward === "energy") return paintedItemIcon("energy-cell");
+  return paintedItemIcon("phoenix-core");
+}
+
+/** Glow colour of a supply chest by what it gives. */
+function supplyRewardGlow(reward: string): string {
+  if (reward === "shield") return "#5fb0ff";
+  if (reward === "hull" || reward === "repair") return "#5dffaa";
+  if (reward === "energy") return "#b48bff";
+  return "#ffd866";
+}
+
 /** Seconds the defeated boss relief tumbles away; the ultimate banner shows. */
 const BOSS_WRECK_SECONDS = 1.8;
 const BOSS_BANNER_SECONDS = 2.2;
@@ -1003,6 +1064,8 @@ export class Game {
   /** The defeated boss tumbling away (keeps the relief on screen briefly). */
   private bossWreck: { t: number; x: number; y: number; size: number; spin: number } | null = null;
   private readonly bossCallouts = new BossCallouts();
+  /** Visible rewards from bonus targets flying to the ship. */
+  private readonly rewardDrops = new RewardDrops();
   /** Ship side-step (CSS px) for a dodged quake. */
   private bossDodge = 0;
   private bossDodgeTarget = 0;
@@ -1237,6 +1300,20 @@ export class Game {
 
   setDuelPresentationActive(active: boolean): void {
     this.duelPresentationActive = active;
+    // Leaving the Duel brings back the Campaign World's scene.
+    if (!active) this.setDuelBackdrop(null);
+  }
+
+  private duelBackdropWorld: string | null = null;
+
+  /**
+   * Shows a Duel map's scene behind the battle (src/duel/map-backdrop.ts);
+   * null returns to the Campaign World.
+   */
+  setDuelBackdrop(worldId: string | null): void {
+    if (worldId === this.duelBackdropWorld) return;
+    this.duelBackdropWorld = worldId;
+    this.backgroundStage?.setWorld(worldId ?? this.worldSceneProfile.worldId);
   }
 
   setDuelCombatRenderer(
@@ -1421,6 +1498,12 @@ export class Game {
         }
         return;
     }
+  }
+
+  /** Small HUD sounds triggered by the DOM layer (src/main.ts). */
+  playHudCue(cue: "heat-up" | "hotbar-ready", level = 1): void {
+    if (cue === "heat-up") this.sfx.heatUp(level);
+    else this.sfx.hotbarReady();
   }
 
   testLabSetSfxVolume(volume: number): boolean {
@@ -3913,6 +3996,9 @@ export class Game {
     this.rewardNotice = null;
     this.celestialCharge = 0;
     this.preloadStagePaintedSprites(stage.stage);
+    preloadBonusSprites();
+    this.rewardDrops.clear();
+    this.rewardDrops.preload(TREASURE_DROP_ART);
     this.resetBossPresentation(stage.stage * 7919 + 13);
     this.prepareBossDepth(stage);
     this.perkKills = 0;
@@ -4063,6 +4149,9 @@ export class Game {
     this.sfx.unlock();
     if (this.typeBossSkillKey(key)) return;
     const target = this.currentTarget();
+    // Recall locks onto its word from the first key, so bonus targets are
+    // checked before the locked-target branch below.
+    if (this.gameplayMode === "recall" && this.typeRecallBonusTargetKey(key, target)) return;
 
     if (target !== null) {
       const enemyExpected = typingText(target.entry.en)[target.typed];
@@ -4652,6 +4741,10 @@ export class Game {
     }
     for (const arrival of creditArrivals) {
       this.presentCombatCreditArrival(arrival);
+    }
+    for (const drop of this.rewardDrops.update(dt, ship)) {
+      this.sfx.rewardPickup(drop.sound);
+      this.skillFx.pulse(ship.x, ship.y, drop.color, 96, 3, 0.5);
     }
     this.updateBossRewardPrompt(dt);
     this.skillFx.update(dt);
@@ -6806,6 +6899,85 @@ export class Game {
     }
   }
 
+  /**
+   * Recall: bonus targets (supply pod, drone, crates) stay typeable. The
+   * Recall word keeps every key it wants; any other key goes to a bonus
+   * target already being typed, or starts one whose word begins with it.
+   */
+  private typeRecallBonusTargetKey(key: string, target: Enemy | null): boolean {
+    const recallWord =
+      target ?? (this.boss === null ? (this.enemies[0] ?? null) : null);
+    const recallExpected =
+      recallWord !== null
+        ? typingText(recallWord.entry.en)[recallWord.typed]
+        : this.boss !== null
+          ? typingText(this.boss.entry.en)[this.boss.typed]
+          : undefined;
+    const started = this.startedBonusTargetExpected();
+    // A started bonus word keeps its own next letter even if Recall wants it too.
+    if (started !== null && started === key) return this.typeStartedBonusTarget(key);
+    if (recallExpected === key) return false;
+    if (started !== null) return this.typeStartedBonusTarget(key);
+    return this.typeNewBonusTarget(key);
+  }
+
+  /** Next letter of the bonus target being typed, or null when none is started. */
+  private startedBonusTargetExpected(): string | null {
+    const started =
+      this.supplyPod !== null && this.supplyPod.typed > 0
+        ? this.supplyPod
+        : this.treasureDrone !== null && this.treasureDrone.typed > 0
+          ? this.treasureDrone
+          : this.rewardChoiceCrate !== null && this.rewardChoiceCrate.typed > 0
+            ? this.rewardChoiceCrate
+            : this.anomalyCrate !== null && this.anomalyCrate.typed > 0
+              ? this.anomalyCrate
+              : null;
+    return started === null ? null : (typingText(started.entry.en)[started.typed] ?? null);
+  }
+
+  /** A bonus target that is already being typed takes the key. */
+  private typeStartedBonusTarget(key: string): boolean {
+    if (this.supplyPod !== null && this.supplyPod.typed > 0) {
+      this.typeSupplyPod(this.supplyPod, key);
+      return true;
+    }
+    if (this.treasureDrone !== null && this.treasureDrone.typed > 0) {
+      this.typeTreasureDrone(this.treasureDrone, key);
+      return true;
+    }
+    if (this.rewardChoiceCrate !== null && this.rewardChoiceCrate.typed > 0) {
+      this.typeRewardChoiceCrate(this.rewardChoiceCrate, key);
+      return true;
+    }
+    if (this.anomalyCrate !== null && this.anomalyCrate.typed > 0) {
+      this.typeAnomalyCrate(this.anomalyCrate, key);
+      return true;
+    }
+    return false;
+  }
+
+  /** An untouched bonus target whose word starts with `key`. */
+  private typeNewBonusTarget(key: string): boolean {
+    if (this.supplyPod !== null && typingText(this.supplyPod.entry.en)[0] === key) {
+      this.typeSupplyPod(this.supplyPod, key);
+      return true;
+    }
+    if (this.treasureDrone !== null && typingText(this.treasureDrone.entry.en)[0] === key) {
+      this.typeTreasureDrone(this.treasureDrone, key);
+      return true;
+    }
+    if (this.rewardChoiceCrate !== null && typingText(this.rewardChoiceCrate.entry.en)[0] === key) {
+      this.typeRewardChoiceCrate(this.rewardChoiceCrate, key);
+      return true;
+    }
+    if (this.anomalyCrate !== null && typingText(this.anomalyCrate.entry.en)[0] === key) {
+      this.typeAnomalyCrate(this.anomalyCrate, key);
+      return true;
+    }
+    return false;
+  }
+
   private typeBoss(key: string): void {
     const boss = this.boss;
     if (boss === null) return;
@@ -7311,6 +7483,14 @@ export class Game {
       this.stats.power,
     );
 
+    const gained =
+      pod.reward === "hull"
+        ? reward.resources.hull - this.stats.hull
+        : pod.reward === "shield"
+          ? reward.resources.shield - this.stats.shield
+          : pod.reward === "energy"
+            ? reward.resources.energy - this.stats.energy
+            : reward.power - this.stats.power;
     this.stats.hull = reward.resources.hull;
     this.stats.shield = reward.resources.shield;
     this.stats.energy = reward.resources.energy;
@@ -7318,7 +7498,16 @@ export class Game {
     this.addScore(140 * this.stats.multiplier);
     this.hooks.onWordComplete(pod.entry);
     this.presentCombatTranslation(pod.entry, pod.x, pod.y - 54);
-    this.fireBonusShot(this.supplyPodAim(pod), 48, 34, () => this.drawSupplyPod(pod));
+    this.fireBonusShot(this.supplyPodAim(pod), 48, 34, () => this.drawSupplyPod(pod), {
+      icon: supplyRewardIcon(pod.reward),
+      color: supplyRewardGlow(pod.reward),
+      label:
+        (gained > 0 ? "+" + String(Math.round(gained)) + " " : "") +
+        (pod.reward === "power" ? "RAGE" : pod.reward.toUpperCase()),
+      pieces: 1,
+      size: 64,
+      sound: "item",
+    });
     this.stageResultTracker.recordBonusCollected();
     this.supplyPod = null;
     this.emitStats();
@@ -7360,6 +7549,7 @@ export class Game {
         292,
         54,
         () => this.drawRecallBonus(target),
+        { icon: TREASURE_DROP_ART, color: "#c08bff", label: "RECALL BONUS", pieces: 3, size: 42, sound: "treasure" },
       );
       this.stageResultTracker.recordBonusCollected();
       this.recallBonus = null;
@@ -7401,7 +7591,8 @@ export class Game {
       if (drop !== null) {
         this.hooks.onEquipmentDrop(drop);
       }
-      this.addScore(320 * this.stats.multiplier);
+      const treasureScore = 320 * this.stats.multiplier;
+      this.addScore(treasureScore);
       this.hooks.onWordComplete(drone.entry);
       this.presentCombatTranslation(drone.entry, drone.x, drone.y - 54);
       this.fireBonusShot(
@@ -7409,6 +7600,14 @@ export class Game {
         48,
         44,
         () => this.drawTreasureDrone(drone),
+        {
+          icon: TREASURE_DROP_ART,
+          color: "#ffd34d",
+          label: drop !== null ? "TREASURE · NEW GEAR" : "+" + treasureScore.toLocaleString() + " TREASURE",
+          pieces: 4,
+          size: 44,
+          sound: "treasure",
+        },
       );
       this.stageResultTracker.recordBonusCollected();
       this.treasureDrone = null;
@@ -7453,6 +7652,7 @@ export class Game {
         286,
         40,
         () => this.drawRewardChoiceCrate(crate),
+        { icon: null, color: "#b787ff", label: "CHOICE CRATE OPEN", pieces: 4, size: 40, sound: "crate" },
       );
       this.stageResultTracker.recordBonusCollected();
       this.rewardChoiceCrate = null;
@@ -7496,6 +7696,7 @@ export class Game {
         322,
         44,
         () => this.drawAnomalyCrate(crate),
+        { icon: null, color: "#ff65cc", label: "ANOMALY CAPTURED", pieces: 4, size: 40, sound: "crate" },
       );
       this.stageResultTracker.recordBonusCollected();
       this.anomalyCrate = null;
@@ -9593,6 +9794,7 @@ export class Game {
         this.burst(x, y, impact.count, impact.hue);
         this.sfx.support();
         this.sfx.boltImpact(1.3, pan, variant);
+        if (impact.drop !== undefined) this.rewardDrops.spawn(x, y, impact.drop);
         return;
       }
     }
@@ -9608,6 +9810,7 @@ export class Game {
     hue: number,
     count: number,
     collect: (() => void) | null,
+    drop: RewardDropSpec | null = null,
   ): void {
     const point = { x: 0, y: 0 };
     aim(point);
@@ -9621,6 +9824,7 @@ export class Game {
       hue,
       count,
       ghost: collect,
+      ...(drop === null ? {} : { drop }),
     });
   }
 
@@ -9873,6 +10077,7 @@ export class Game {
     this.drawParticles();
     this.drawProjectileImpacts();
     this.creditPickups.draw(context, this.settings.visualQuality);
+    this.rewardDrops.draw(context, this.settings.visualQuality, this.shipCenter());
 
     // Depth View: boss shots fly toward the camera, so they draw over the boss.
     const bossShotsLate = this.boss !== null && this.bossDepthActive();
@@ -11446,10 +11651,7 @@ export class Game {
       }
       if (meaningParts.length > 0) {
         context.shadowBlur = 0;
-        context.font =
-          "650 13px ui-sans-serif, system-ui, -apple-system, sans-serif";
-        context.fillStyle = "rgba(255, 226, 213, 0.9)";
-        context.fillText(meaningParts.join(" · "), x, wordY + 31);
+        drawMeaningPill(context, meaningParts.join(" · "), x, wordY + 36, 16, "#ff9d7d");
       }
       context.restore();
       return;
@@ -11491,30 +11693,36 @@ export class Game {
     const displayWord = normalizeWord(pod.entry.en);
     const split = splitDisplayByTypedLetters(displayWord, pod.typed);
 
-    context.save();
-    context.translate(pod.x, y);
-    context.globalCompositeOperation = "lighter";
-    context.shadowBlur = 20;
-    context.shadowColor = "#ffd866";
-
-    context.fillStyle = "rgba(255, 216, 102, 0.12)";
-    context.strokeStyle = "rgba(255, 225, 130, 0.9)";
-    context.lineWidth = 1.6;
-    context.beginPath();
-    context.roundRect(-31, -18, 62, 36, 8);
-    context.fill();
-    context.stroke();
-
-    context.fillStyle = "#fff1b0";
-    context.font =
-      "800 9px ui-monospace, SFMono-Regular, Menlo, monospace";
-    context.textAlign = "center";
-    context.fillText(
-      "SUPPLY · " + supplyRewardLabel(pod.reward),
-      0,
-      3,
-    );
-    context.restore();
+    // The painted supply chest (code box until the art has loaded).
+    const painted = drawBonusTarget(context, {
+      kind: "chest",
+      x: pod.x,
+      y,
+      size: 92,
+      glow: supplyRewardGlow(pod.reward),
+      tag: "Supply · " + supplyRewardLabel(pod.reward),
+      time: this.lastDrawTime,
+      progress: pod.typed / Math.max(1, displayWord.length),
+    });
+    if (!painted) {
+      context.save();
+      context.translate(pod.x, y);
+      context.globalCompositeOperation = "lighter";
+      context.shadowBlur = 20;
+      context.shadowColor = "#ffd866";
+      context.fillStyle = "rgba(255, 216, 102, 0.12)";
+      context.strokeStyle = "rgba(255, 225, 130, 0.9)";
+      context.lineWidth = 1.6;
+      context.beginPath();
+      context.roundRect(-31, -18, 62, 36, 8);
+      context.fill();
+      context.stroke();
+      context.fillStyle = "#fff1b0";
+      context.font = "800 9px ui-monospace, SFMono-Regular, Menlo, monospace";
+      context.textAlign = "center";
+      context.fillText("SUPPLY · " + supplyRewardLabel(pod.reward), 0, 3);
+      context.restore();
+    }
 
     context.save();
     context.font =
@@ -11523,7 +11731,7 @@ export class Game {
     const fullWidth = this.measureTextWidth(displayWord);
     const typedWidth = this.measureTextWidth(split.typed);
     const left = pod.x - fullWidth / 2;
-    const wordY = y - 36;
+    const wordY = y - (painted ? 48 : 36);
 
     context.fillStyle = "rgba(4, 8, 14, 0.88)";
     context.fillRect(left - 9, wordY - 14, fullWidth + 18, 28);
@@ -11543,31 +11751,41 @@ export class Game {
     const displayWord = normalizeWord(drone.entry.en);
     const split = splitDisplayByTypedLetters(displayWord, drone.typed);
 
-    context.save();
-    context.translate(drone.x, y);
-    context.globalCompositeOperation = "lighter";
-    context.shadowBlur = 26;
-    context.shadowColor = "#ffe066";
-    context.fillStyle = "rgba(255, 224, 102, 0.18)";
-    context.strokeStyle = "#ffe98a";
-    context.lineWidth = 2;
-    context.beginPath();
-    context.moveTo(-28, 0);
-    context.lineTo(-12, -14);
-    context.lineTo(20, -10);
-    context.lineTo(31, 0);
-    context.lineTo(20, 10);
-    context.lineTo(-12, 14);
-    context.closePath();
-    context.fill();
-    context.stroke();
-
-    context.fillStyle = "#fff4bd";
-    context.font =
-      "850 9px ui-monospace, SFMono-Regular, Menlo, monospace";
-    context.textAlign = "center";
-    context.fillText("TREASURE DRONE", 0, 3);
-    context.restore();
+    const painted = drawBonusTarget(context, {
+      kind: "carrier",
+      x: drone.x,
+      y,
+      size: 96,
+      glow: "#ffd34d",
+      tag: "Treasure drone",
+      time: this.lastDrawTime,
+      progress: drone.typed / Math.max(1, displayWord.length),
+    });
+    if (!painted) {
+      context.save();
+      context.translate(drone.x, y);
+      context.globalCompositeOperation = "lighter";
+      context.shadowBlur = 26;
+      context.shadowColor = "#ffe066";
+      context.fillStyle = "rgba(255, 224, 102, 0.18)";
+      context.strokeStyle = "#ffe98a";
+      context.lineWidth = 2;
+      context.beginPath();
+      context.moveTo(-28, 0);
+      context.lineTo(-12, -14);
+      context.lineTo(20, -10);
+      context.lineTo(31, 0);
+      context.lineTo(20, 10);
+      context.lineTo(-12, 14);
+      context.closePath();
+      context.fill();
+      context.stroke();
+      context.fillStyle = "#fff4bd";
+      context.font = "850 9px ui-monospace, SFMono-Regular, Menlo, monospace";
+      context.textAlign = "center";
+      context.fillText("TREASURE DRONE", 0, 3);
+      context.restore();
+    }
 
     context.save();
     context.font =
@@ -11576,7 +11794,7 @@ export class Game {
     const fullWidth = this.measureTextWidth(displayWord);
     const typedWidth = this.measureTextWidth(split.typed);
     const left = drone.x - fullWidth / 2;
-    const wordY = y - 34;
+    const wordY = y - (painted ? 40 : 34);
     context.fillStyle = "rgba(4, 8, 14, 0.9)";
     context.fillRect(left - 9, wordY - 14, fullWidth + 18, 28);
     context.textAlign = "left";
@@ -11764,8 +11982,7 @@ export class Game {
     context.fillStyle = "rgba(5, 9, 17, 0.86)";
     context.fillRect(x - meaningWidth / 2, y + 35, meaningWidth, 25);
     context.fillStyle = "#d9f8ff";
-    context.font =
-      "700 12px ui-sans-serif, system-ui, -apple-system, sans-serif";
+    context.font = "600 14px " + VIETNAMESE_FONT;
     context.fillText(meaning, x, y + 48);
     context.restore();
   }
@@ -11776,33 +11993,45 @@ export class Game {
     const displayWord = normalizeWord(crate.entry.en);
     const split = splitDisplayByTypedLetters(displayWord, crate.typed);
 
-    context.save();
-    context.translate(x, crate.y);
-    context.globalCompositeOperation = "lighter";
-    context.shadowBlur = 22;
-    context.shadowColor = "#b787ff";
-    context.fillStyle = "rgba(151, 105, 255, 0.16)";
-    context.strokeStyle = "#d7bbff";
-    context.lineWidth = 2;
-    context.beginPath();
-    context.roundRect(-28, -22, 56, 44, 6);
-    context.fill();
-    context.stroke();
+    const painted = drawBonusTarget(context, {
+      kind: "chest",
+      x,
+      y: crate.y,
+      size: 84,
+      glow: "#b787ff",
+      tag: "Choice crate",
+      time: this.lastDrawTime,
+      progress: crate.typed / Math.max(1, displayWord.length),
+    });
+    if (!painted) {
+      context.save();
+      context.translate(x, crate.y);
+      context.globalCompositeOperation = "lighter";
+      context.shadowBlur = 22;
+      context.shadowColor = "#b787ff";
+      context.fillStyle = "rgba(151, 105, 255, 0.16)";
+      context.strokeStyle = "#d7bbff";
+      context.lineWidth = 2;
+      context.beginPath();
+      context.roundRect(-28, -22, 56, 44, 6);
+      context.fill();
+      context.stroke();
 
-    context.strokeStyle = "rgba(255, 236, 167, 0.8)";
-    context.beginPath();
-    context.moveTo(-18, -6);
-    context.lineTo(18, -6);
-    context.moveTo(0, -17);
-    context.lineTo(0, 17);
-    context.stroke();
+      context.strokeStyle = "rgba(255, 236, 167, 0.8)";
+      context.beginPath();
+      context.moveTo(-18, -6);
+      context.lineTo(18, -6);
+      context.moveTo(0, -17);
+      context.lineTo(0, 17);
+      context.stroke();
 
-    context.fillStyle = "#f0e4ff";
-    context.font =
-      "850 8px ui-monospace, SFMono-Regular, Menlo, monospace";
-    context.textAlign = "center";
-    context.fillText("CHOICE CRATE", 0, 34);
-    context.restore();
+      context.fillStyle = "#f0e4ff";
+      context.font =
+        "850 8px ui-monospace, SFMono-Regular, Menlo, monospace";
+      context.textAlign = "center";
+      context.fillText("CHOICE CRATE", 0, 34);
+      context.restore();
+    }
 
     context.save();
     context.font =
@@ -11811,7 +12040,7 @@ export class Game {
     const fullWidth = this.measureTextWidth(displayWord);
     const typedWidth = this.measureTextWidth(split.typed);
     const left = x - fullWidth / 2;
-    const wordY = crate.y - 38;
+    const wordY = crate.y - (painted ? 46 : 38);
     context.fillStyle = "rgba(4, 8, 14, 0.9)";
     context.fillRect(left - 9, wordY - 14, fullWidth + 18, 28);
     context.textAlign = "left";
@@ -11830,30 +12059,42 @@ export class Game {
     const displayWord = normalizeWord(crate.entry.en);
     const split = splitDisplayByTypedLetters(displayWord, crate.typed);
 
-    context.save();
-    context.translate(x, crate.y);
-    context.rotate(Math.sin(crate.age * 2.2) * 0.08);
-    context.globalCompositeOperation = "lighter";
-    context.shadowBlur = 28;
-    context.shadowColor = "#ff65cc";
-    context.fillStyle = "rgba(255, 83, 193, 0.15)";
-    context.strokeStyle = "#ff9bdd";
-    context.lineWidth = 2;
-    context.beginPath();
-    context.moveTo(0, -27);
-    context.lineTo(26, 0);
-    context.lineTo(0, 27);
-    context.lineTo(-26, 0);
-    context.closePath();
-    context.fill();
-    context.stroke();
+    const painted = drawBonusTarget(context, {
+      kind: "chest-open",
+      x,
+      y: crate.y,
+      size: 84,
+      glow: "#ff65cc",
+      tag: "Anomaly",
+      time: this.lastDrawTime,
+      progress: crate.typed / Math.max(1, displayWord.length),
+    });
+    if (!painted) {
+      context.save();
+      context.translate(x, crate.y);
+      context.rotate(Math.sin(crate.age * 2.2) * 0.08);
+      context.globalCompositeOperation = "lighter";
+      context.shadowBlur = 28;
+      context.shadowColor = "#ff65cc";
+      context.fillStyle = "rgba(255, 83, 193, 0.15)";
+      context.strokeStyle = "#ff9bdd";
+      context.lineWidth = 2;
+      context.beginPath();
+      context.moveTo(0, -27);
+      context.lineTo(26, 0);
+      context.lineTo(0, 27);
+      context.lineTo(-26, 0);
+      context.closePath();
+      context.fill();
+      context.stroke();
 
-    context.fillStyle = "#ffe0f5";
-    context.font =
-      "850 8px ui-monospace, SFMono-Regular, Menlo, monospace";
-    context.textAlign = "center";
-    context.fillText("ANOMALY", 0, 3);
-    context.restore();
+      context.fillStyle = "#ffe0f5";
+      context.font =
+        "850 8px ui-monospace, SFMono-Regular, Menlo, monospace";
+      context.textAlign = "center";
+      context.fillText("ANOMALY", 0, 3);
+      context.restore();
+    }
 
     context.save();
     context.font =
@@ -11862,7 +12103,7 @@ export class Game {
     const fullWidth = this.measureTextWidth(displayWord);
     const typedWidth = this.measureTextWidth(split.typed);
     const left = x - fullWidth / 2;
-    const wordY = crate.y - 40;
+    const wordY = crate.y - (painted ? 48 : 40);
     context.fillStyle = "rgba(4, 8, 14, 0.9)";
     context.fillRect(left - 9, wordY - 14, fullWidth + 18, 28);
     context.textAlign = "left";
@@ -12834,16 +13075,7 @@ export class Game {
       meaningParts.push(enemy.entry.ipa.trim());
     }
     if (meaningParts.length > 0) {
-      context.shadowBlur = 0;
-      context.font =
-        "650 12px ui-sans-serif, system-ui, -apple-system, sans-serif";
-      context.fillStyle = "rgba(208, 232, 244, 0.88)";
-      context.textAlign = "center";
-      context.fillText(
-        meaningParts.join(" · "),
-        enemy.x,
-        enemy.y + enemy.radius + 23,
-      );
+      drawMeaningPill(context, meaningParts.join(" · "), enemy.x, enemy.y + enemy.radius + 25, 15);
     }
 
     context.shadowBlur = 0;

@@ -1,3 +1,10 @@
+import { compositionForWorld } from "./background/compositions";
+import { paintedBossArtUrl } from "./enemies/painted-sprites";
+import { bossIdentityForStage } from "./boss/identity";
+import type { BossRole } from "./boss/model";
+import { characterVisualProfile } from "./characters/visuals";
+import { installHoloMotion } from "./ui/holo-motion";
+import { duelMapBackdrop } from "./duel/map-backdrop";
 import "@fontsource/exo-2/600.css";
 import "@fontsource/exo-2/700.css";
 import "@fontsource/exo-2/800.css";
@@ -13,8 +20,13 @@ import "./basic-skills.css";
 import "./kill-translation.css";
 import "./duel/battle.css";
 import "./duel/battle-juice.css";
+import "./duel/battle-holo.css";
 import "./ui/holo.css";
 import "./ui/holo-lobby.css";
+import "./ui/holo-motion.css";
+import "./ui/holo-hud.css";
+import "./ui/holo-dialogs.css";
+import "./ui/holo-results.css";
 import "./ui/reward-cards.css";
 import {
   installRewardCardKeys,
@@ -25,7 +37,7 @@ import {
 } from "./ui/reward-card";
 import { installIconStyles } from "./ui/icons";
 import { installHoloTooltips } from "./ui/holo-tooltip";
-import { installTitleHub, type TitleHub, type TitleHubPilot } from "./ui/title-hub";
+import { installTitleHub, type TitleHub, type TitleHubPilot, shipArtUrl, galaxyPlateUrl } from "./ui/title-hub";
 import { installDuelOnlineRoomController } from "./duel/online-room-controller";
 import { installDuelBattleUi } from "./duel/battle-ui";
 import { DuelLocalPracticeMatch } from "./duel/local-match";
@@ -196,7 +208,7 @@ import {
 } from "./equipment/registry";
 import { EQUIPMENT_PERKS, resolveEquipmentPerks } from "./equipment/perks";
 import { equipmentStatLabel } from "./equipment/stat-labels";
-import { paintedEquipmentIcon, paintedSkillIcon, setIconContent } from "./ui/painted-icons";
+import { paintedEquipmentIcon, paintedItemIcon, paintedSkillIcon, setIconContent } from "./ui/painted-icons";
 import {
   createEmptyInventory,
   inventoryTotal,
@@ -998,6 +1010,7 @@ function installMenuHelp(): void {
 
 installIconStyles();
 installHoloTooltips();
+installHoloMotion();
 installMenuHelp();
 
 let latestKillTranslation: VocabularyEntry | null = null;
@@ -1162,6 +1175,8 @@ const duelBattle = installDuelBattleUi(
     },
     onPresentationState(view, events, beats) {
       game.setDuelPresentationActive(true);
+      // The match plays on the chosen map's scene (Practice and online).
+      game.setDuelBackdrop(duelMapBackdrop(view.map.id).worldId);
       syncDuelAudio(view);
       duelCombatAudio.consume(view, events, beats);
     },
@@ -1784,6 +1799,53 @@ function hudClass(id: string, className: string, enabled: boolean): void {
   hudDomMetrics.appliedWrites += 1;
 }
 
+/**
+ * Score panels catch fire: the left one on a long accurate streak, the right
+ * one on fast, accurate typing (correct keys over the last 8 seconds).
+ */
+const typingSpeedSamples: Array<{ t: number; hits: number }> = [];
+let hudHeatCoolTimer: number | null = null;
+let lastRageReady = false;
+const HEAT_LEFT_LABELS = ["", "HOT STREAK", "ON FIRE", "INFERNO"] as const;
+const HEAT_RIGHT_LABELS = ["", "FAST", "BLAZING", "LIGHTSPEED"] as const;
+
+function setHudHeat(id: string, level: number, label: string): void {
+  const side = document.getElementById(id);
+  if (side === null) return;
+  const previous = Number(side.dataset.heat ?? "0");
+  if (previous !== level) {
+    side.dataset.heat = String(level);
+    if (level > previous) {
+      game.playHudCue("heat-up", level);
+      side.classList.remove("heat-up");
+      void side.offsetWidth;
+      side.classList.add("heat-up");
+      window.setTimeout(() => side.classList.remove("heat-up"), 650);
+    }
+  }
+  if (side.dataset.heatLabel !== label) side.dataset.heatLabel = label;
+}
+
+function renderHudHeat(stats: GameStats): void {
+  const now = performance.now();
+  const last = typingSpeedSamples.at(-1);
+  if (last !== undefined && stats.hits < last.hits) typingSpeedSamples.length = 0;
+  if (last === undefined || last.hits !== stats.hits) typingSpeedSamples.push({ t: now, hits: stats.hits });
+  while (typingSpeedSamples.length > 2 && now - typingSpeedSamples[0]!.t > 8000) typingSpeedSamples.shift();
+  const first = typingSpeedSamples[0];
+  const seconds = first === undefined ? 0 : Math.max(2, (now - first.t) / 1000);
+  const wpm = first === undefined ? 0 : ((stats.hits - first.hits) / 5) / (seconds / 60);
+  const accuracy = accuracyPercent(stats.hits, stats.misses);
+
+  const left = stats.streak >= 70 ? 3 : stats.streak >= 35 ? 2 : stats.streak >= 15 ? 1 : 0;
+  setHudHeat("hudLeft", left, HEAT_LEFT_LABELS[left] + (left > 0 ? " · " + String(stats.streak) : ""));
+  const fast = accuracy < 92 || now - (last?.t ?? 0) > 2500 ? 0 : wpm >= 80 ? 3 : wpm >= 60 ? 2 : wpm >= 40 ? 1 : 0;
+  setHudHeat("hudRight", fast, HEAT_RIGHT_LABELS[fast] + (fast > 0 ? " · " + String(Math.round(wpm)) + " WPM" : ""));
+  // Typing stops → the speed flames die down even without a new stats event.
+  if (hudHeatCoolTimer !== null) window.clearTimeout(hudHeatCoolTimer);
+  hudHeatCoolTimer = fast > 0 ? window.setTimeout(() => setHudHeat("hudRight", 0, ""), 2600) : null;
+}
+
 function renderStats(stats: GameStats): void {
   const startedAt = performance.now();
   hudDomMetrics.renderCalls += 1;
@@ -1801,6 +1863,7 @@ function renderStats(stats: GameStats): void {
   );
   hudText("kills", String(stats.kills));
   hudText("waveBadge", stageBadgeText(stats.stage));
+  renderHudHeat(stats);
 
   hudText(
     "hull",
@@ -1849,6 +1912,11 @@ function renderStats(stats: GameStats): void {
   const rageSegments = availableRageSegments(stats.power);
   hudClass("powerFill", "usable", rageSegments > 0);
   hudClass("powerFill", "ready", rageSegments === RAGE_SEGMENT_COUNT);
+  // Full Rage: the whole panel catches fire until SPACE is pressed.
+  const rageReady = rageSegments === RAGE_SEGMENT_COUNT;
+  hudClass("playerStatusHud", "rage-ready", rageReady);
+  if (rageReady && !lastRageReady) game.playHudCue("heat-up", 3);
+  lastRageReady = rageReady;
   const powerTrack = byId("powerTrack");
   powerTrack.dataset.rageSegments = String(rageSegments);
   const evolutionTier = expansionV2Enabled
@@ -2089,6 +2157,7 @@ function renderHotbar(): void {
       view.button.title = "Unassigned hotbar slot";
       view.button.className =
         "hotbar-slot hotbar-" + hotbarPlacementForSlot(index);
+      view.button.dataset.ready = "0";
       continue;
     }
 
@@ -2102,7 +2171,12 @@ function renderHotbar(): void {
     const glyph = hotbarActionGlyph(action);
     const label = hotbarActionLabel(action);
     const skillId = action.kind === "item" ? null : hotbarSkillId(action);
-    const painted = skillId === null ? null : paintedSkillIcon(skillId);
+    const painted =
+      action.kind === "item"
+        ? paintedItemIcon(action.id)
+        : skillId === null
+          ? null
+          : paintedSkillIcon(skillId);
     const renderKey = [
       hotbarActionKey(action),
       glyph,
@@ -2121,12 +2195,23 @@ function renderHotbar(): void {
     view.state.textContent = status.state;
     view.button.disabled = status.disabled;
     view.button.title = status.title;
+    const ready = !status.disabled && !status.cooldown;
+    // A slot that just became usable pops once to catch the eye.
+    const justReady = ready && view.button.dataset.ready === "0";
+    view.button.dataset.ready = ready ? "1" : "0";
     view.button.className =
       "hotbar-slot hotbar-" +
       hotbarPlacementForSlot(index) +
       " " +
       kindClass +
-      (status.cooldown ? " cooldown" : "");
+      (status.cooldown ? " cooldown" : "") +
+      (ready ? " ready" : "") +
+      (justReady ? " just-ready" : "");
+    if (justReady) {
+      game.playHudCue("hotbar-ready");
+      const button = view.button;
+      window.setTimeout(() => button.classList.remove("just-ready"), 950);
+    }
   }
 }
 
@@ -2761,6 +2846,11 @@ function renderProgression(): void {
       String(progress) +
       " / " +
       String(mission.target);
+    card.classList.toggle("claimable", claimable);
+    const bar = document.createElement("div");
+    bar.className = "progression-bar";
+    bar.style.setProperty("--p", String(Math.min(1, progress / Math.max(1, mission.target))));
+    bar.append(document.createElement("i"));
 
     const reward = document.createElement("div");
     reward.className = "progression-reward";
@@ -2792,7 +2882,7 @@ function renderProgression(): void {
 
     card.title =
       presentation.label + " · " + presentation.stateLabel;
-    card.append(importance, title, description, meta, reward, claim);
+    card.append(importance, title, description, meta, bar, reward, claim);
     missionGrid.append(card);
   }
 
@@ -3302,6 +3392,38 @@ function formatStageDuration(seconds: number): string {
   return String(minutes) + ":" + String(total % 60).padStart(2, "0");
 }
 
+/** Three stars that pop in one by one; earned ones burn gold. */
+function renderClearStars(stars: number): void {
+  const root = byId("clearStars");
+  root.replaceChildren();
+  root.setAttribute("aria-label", String(stars) + " of 3 stars");
+  for (let index = 0; index < 3; index += 1) {
+    const star = document.createElement("span");
+    star.className = "clear-star" + (index < stars ? " earned" : "");
+    star.style.setProperty("--i", String(index));
+    star.textContent = "★";
+    root.append(star);
+  }
+}
+
+/** Counts a number up from 0 (score on the results card). */
+function countUpNumber(element: HTMLElement, value: number, durationMs = 1100): void {
+  const target = Math.max(0, Math.round(value));
+  const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+  if (reduced || target === 0) {
+    element.textContent = target.toLocaleString();
+    return;
+  }
+  const started = performance.now();
+  const step = (now: number): void => {
+    const k = Math.min(1, (now - started) / durationMs);
+    const eased = 1 - (1 - k) ** 3;
+    element.textContent = Math.round(target * eased).toLocaleString();
+    if (k < 1) window.requestAnimationFrame(step);
+  };
+  window.requestAnimationFrame(step);
+}
+
 function renderStageClearCelebration(
   profile: StageClearCelebrationProfile,
 ): void {
@@ -3358,6 +3480,25 @@ function renderStageClearCelebration(
     particle.style.setProperty("--clear-spin", String(spin) + "deg");
     layer.append(particle);
   }
+
+  // Light rays turning behind the card, then a confetti shower.
+  const rays = document.createElement("i");
+  rays.className = "stage-clear-rays";
+  layer.append(rays);
+  const confettiCount =
+    settings.visualQuality === "ultra" ? 64 : settings.visualQuality === "high" ? 48 : settings.visualQuality === "medium" ? 30 : 10;
+  const colors = ["#5fe3ff", "#a07bff", "#ffd166", "#ff6fae", "#7dffb5", "#fff4c8"];
+  for (let index = 0; index < confettiCount; index += 1) {
+    const piece = document.createElement("i");
+    piece.className = "stage-clear-confetti";
+    piece.style.setProperty("--x", String((index * 61) % 100) + "%");
+    piece.style.setProperty("--delay", String((index * 97) % 1500) + "ms");
+    piece.style.setProperty("--dur", String(2400 + ((index * 137) % 1800)) + "ms");
+    piece.style.setProperty("--sway", String(-60 + ((index * 41) % 120)) + "px");
+    piece.style.setProperty("--spin", String(360 + ((index * 83) % 720)) + "deg");
+    piece.style.setProperty("--c", colors[index % colors.length]!);
+    layer.append(piece);
+  }
 }
 
 
@@ -3397,11 +3538,10 @@ function renderTestingStageClearReport(
     world.name +
     " · TESTING PREVIEW · " +
     difficultySettings.mode.toUpperCase();
-  byId("clearStars").textContent =
-    "★".repeat(rating.stars) + "☆".repeat(3 - rating.stars);
+  renderClearStars(rating.stars);
   byId("clearStarRule").textContent =
     "Testing preview · rating shown, campaign progression unchanged";
-  byId("clearScore").textContent = stats.score.toLocaleString();
+  countUpNumber(byId("clearScore"), stats.score);
   byId("clearAccuracy").textContent = accuracy.toFixed(1) + "%";
   byId("clearWpm").textContent = wpm.toFixed(0);
   byId("clearTime").textContent =
@@ -3436,6 +3576,37 @@ function renderTestingStageClearReport(
     "Temporary all-stage access · disable Unlock all stages in Settings to restore normal progression locks.";
 }
 
+/** Small icon for each result stat (results card and Run over). */
+function resultMetricIcon(label: string): string {
+  const text = label.toLowerCase();
+  const rules: ReadonlyArray<readonly [RegExp, string]> = [
+    [/score/, "trophy"],
+    [/wpm|speed/, "gauge"],
+    [/accuracy/, "target"],
+    [/time/, "clock"],
+    [/chain|streak/, "flame"],
+    [/kill rate/, "swords"],
+    [/boss/, "skull"],
+    [/elite/, "crown"],
+    [/measured kills|regular kills/, "swords"],
+    [/enemies/, "target"],
+    [/projectile/, "shield"],
+    [/damage|hits taken/, "heart"],
+    [/skills/, "cpu"],
+    [/consumable/, "plus"],
+    [/nova|ultimate/, "zap"],
+    [/bonus/, "sparkle"],
+    [/wrong/, "x"],
+    [/corrected/, "refresh"],
+    [/inputs|keys/, "keyboard"],
+    [/perfect/, "star"],
+    [/words/, "book"],
+    [/recall/, "headphones"],
+    [/stage/, "flag"],
+  ];
+  return rules.find(([pattern]) => pattern.test(text))?.[1] ?? "hash";
+}
+
 function appendResultMetric(
   root: HTMLElement,
   label: string,
@@ -3445,6 +3616,7 @@ function appendResultMetric(
   const card = document.createElement("div");
   const name = document.createElement("span");
   name.textContent = label;
+  name.dataset.icon = resultMetricIcon(label);
   const amount = document.createElement("strong");
   amount.textContent = value;
   card.append(name, amount);
@@ -4496,12 +4668,11 @@ const game = new Game(
         world.name + " · " +
         stageRole(stats.stage).replaceAll("-", " ") + " · " +
         difficultySettings.mode.toUpperCase();
-      byId("clearStars").textContent =
-        "★".repeat(rating.stars) + "☆".repeat(3 - rating.stars);
+      renderClearStars(rating.stars);
       byId("clearStarRule").textContent =
         "1★ clear · 2★ ≥90% target accuracy · 3★ " +
         rating.thirdStarRule;
-      byId("clearScore").textContent = stats.score.toLocaleString();
+      countUpNumber(byId("clearScore"), stats.score);
       byId("clearAccuracy").textContent = accuracy.toFixed(1) + "%";
       byId("clearWpm").textContent = wpm.toFixed(0);
       byId("clearTime").textContent =
@@ -5419,6 +5590,7 @@ titleHub = installTitleHub({
   openSettings,
   openDuel: () => byId<HTMLButtonElement>("duelModeButton").click(),
   startRecall: () => {
+    recallLaunchPending = true;
     selectGameplayMode("recall");
     byId<HTMLButtonElement>("startButton").click();
   },
@@ -5495,25 +5667,18 @@ function renderCharacters(): void {
         (selected ? " · selected" : " · available"),
     );
 
-    const preview = document.createElement("canvas");
-    preview.className = "character-card-preview";
-    preview.width = 240;
-    preview.height = 132;
+    // The painted hull (same art as the title cards) on a stage lit in the
+    // ship's own colour; the card frame takes that colour too.
+    card.style.setProperty("--ship-accent", characterVisualProfile(id).glow);
+    const preview = document.createElement("div");
+    preview.className = "character-card-portrait";
     preview.setAttribute("aria-hidden", "true");
-    const previewContext = preview.getContext("2d");
-    if (previewContext !== null) {
-      drawCharacterShip(previewContext, id, {
-        x: preview.width / 2,
-        y: 76,
-        time: index * 0.73 + 0.8,
-        scale: selected ? 1.42 : 1.3,
-        glowScale: selected ? 1.15 : 0.86,
-        alpha: 1,
-        aura: selected
-          ? deriveEquipmentAura(equipment, characters.selected)
-          : null,
-      });
-    }
+    const portrait = document.createElement("img");
+    portrait.src = shipArtUrl(id);
+    portrait.alt = "";
+    portrait.decoding = "async";
+    portrait.loading = index < 6 ? "eager" : "lazy";
+    preview.append(portrait);
 
     const top = document.createElement("div");
     top.className = "character-card-top";
@@ -6381,6 +6546,13 @@ function appendShopStockCards(
       shopStockIcon(entry),
       shopStockName(entry) + " icon",
       "item-card-icon",
+    );
+    setIconContent(
+      visual,
+      shopStockIcon(entry),
+      entry.kind === "equipment"
+        ? paintedEquipmentIcon(entry.definitionId)
+        : paintedItemIcon(entry.itemId),
     );
 
     const body = document.createElement("div");
@@ -7344,12 +7516,10 @@ function handleHiddenEncounterClear(
   byId("clearMeta").textContent =
     "Hidden encounter · Tier " + String(active.tier) +
     " · Campaign Stage " + String(active.sourceStage).padStart(3, "0");
-  byId("clearStars").textContent =
-    "★".repeat(rating.stars) + "☆".repeat(3 - rating.stars);
+  renderClearStars(rating.stars);
   byId("clearStarRule").textContent =
     "1★ clear · 2★ ≥90% target accuracy · 3★ " + rating.thirdStarRule;
-  byId("clearScore").textContent =
-    stats.score.toLocaleString();
+  countUpNumber(byId("clearScore"), stats.score);
   byId("clearAccuracy").textContent =
     accuracy.toFixed(1) + "%";
   byId("clearWpm").textContent = wpm.toFixed(0);
@@ -8342,7 +8512,7 @@ function updateCampaignUi(): void {
     (ascension.selectedTier > 0
       ? " · A" + String(ascension.selectedTier)
       : "") +
-    (gameplayMode === "recall" ? " · Recall" : "");
+    "";
   renderAscension();
   const selectedWorld = worldForStage(gameplayStage);
   musicController.setWorldProfile(
@@ -8481,6 +8651,78 @@ function renderStagePreview(): void {
       : "Start Stage";
 }
 
+const JOURNEY_KITS = ["g01-celestial", "g02-infernal", "g03-frost-prism", "g04-verdant", "g05-shadow-nature", "g06-cosmic-forge", "g07-abyssal", "g08-aurora-cosmic", "g09-void-cathedral", "g10-eternity"] as const;
+
+function worldKitId(worldNumber: number): string {
+  return JOURNEY_KITS[Math.floor((Math.max(1, Math.min(50, worldNumber)) - 1) / 5)]!;
+}
+
+/** The World's own background plate (the one its stages are played on). */
+function worldPlateUrl(worldNumber: number): string {
+  const composition = compositionForWorld("world-" + String(Math.max(1, Math.min(50, worldNumber))).padStart(2, "0"));
+  if (composition === null) return galaxyPlateUrl((worldNumber - 1) * 20 + 1);
+  const texture = composition.plate.texture;
+  // Only G01's second plate has a different size.
+  const size = composition.kitId === "g01-celestial" && texture === "plate-b" ? "1376" : "1280";
+  return "/assets/space-typing/backgrounds/" + composition.kitId + "/" + texture + "." + size + ".webp";
+}
+
+/** Best rating kept for a cleared stage (from its best accuracy). */
+function journeyStageStars(stage: number): number {
+  const best = campaign.bestByStage[String(stage)];
+  if (best === undefined) return campaign.clearedStages.includes(stage) ? 1 : 0;
+  return stageResultStars(best.accuracy, null).stars;
+}
+
+/** World progress chips: stages cleared and stars earned. */
+function renderJourneyProgress(stageStart: number): void {
+  const heading = document.querySelector<HTMLElement>(".journey-map-heading");
+  if (heading === null) return;
+  let progress = heading.querySelector<HTMLElement>(".journey-progress");
+  if (progress === null) {
+    progress = document.createElement("span");
+    progress.className = "journey-progress";
+    heading.querySelector("strong")?.after(progress);
+  }
+  let cleared = 0;
+  let stars = 0;
+  for (let stage = stageStart; stage < stageStart + 20; stage += 1) {
+    if (campaign.clearedStages.includes(stage)) cleared += 1;
+    stars += journeyStageStars(stage);
+  }
+  progress.replaceChildren();
+  for (const [icon, text] of [["flag", String(cleared) + " / 20"], ["sparkle", "★ " + String(stars) + " / 60"]] as const) {
+    const chip = document.createElement("span");
+    chip.dataset.icon = icon;
+    chip.textContent = text;
+    progress.append(chip);
+  }
+}
+
+/** Drifting particles themed by the Galaxy (embers, snow, petals, bubbles…). */
+function journeyAmbientLayer(): HTMLElement {
+  const layer = document.createElement("div");
+  layer.className = "journey-fx";
+  layer.setAttribute("aria-hidden", "true");
+  const count = settings.visualQuality === "low" ? 8 : settings.visualQuality === "medium" ? 16 : 26;
+  for (let index = 0; index < count; index += 1) {
+    const mote = document.createElement("i");
+    mote.style.setProperty("--x", String((index * 37) % 100) + "%");
+    mote.style.setProperty("--delay", "-" + String((index * 0.83) % 12) + "s");
+    mote.style.setProperty("--dur", String(8 + ((index * 1.7) % 7)) + "s");
+    mote.style.setProperty("--size", String(3 + (index % 4) * 1.5) + "px");
+    mote.style.setProperty("--sway", String(-30 + ((index * 23) % 60)) + "px");
+    layer.append(mote);
+  }
+  return layer;
+}
+
+/** A World's landmark art (planet, portal, crystal…) from its background kit. */
+function worldHeroUrl(worldNumber: number): string {
+  const world = Math.max(1, Math.min(50, worldNumber));
+  return "/assets/space-typing/backgrounds/" + worldKitId(world) + "/hero-w" + String(world).padStart(2, "0") + ".512.webp";
+}
+
 function renderStageGrid(): void {
   const scroll = byId("stageGrid");
   scroll.replaceChildren();
@@ -8490,9 +8732,22 @@ function renderStageGrid(): void {
   byId("journeyWorldTitle").textContent =
     "World " + String(selectedJourneyWorld).padStart(2, "0") +
     " · " + world.name;
+  renderJourneyProgress(world.stageStart);
 
   const board = document.createElement("div");
   board.className = "stage-journey";
+  // The World's own scene behind the route: the Galaxy plate, and the
+  // World's landmark (its hero object) floating beside the boss node.
+  scroll.style.setProperty("--journey-plate", "url(\"" + worldPlateUrl(selectedJourneyWorld) + "\")");
+  scroll.dataset.theme = worldKitId(selectedJourneyWorld);
+  scroll.append(journeyAmbientLayer());
+  const landmark = document.createElement("img");
+  landmark.className = "journey-landmark";
+  landmark.src = worldHeroUrl(selectedJourneyWorld);
+  landmark.alt = "";
+  landmark.decoding = "async";
+  landmark.setAttribute("aria-hidden", "true");
+  board.append(landmark);
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("class", "stage-journey-path");
   svg.setAttribute("viewBox", "0 0 1000 1780");
@@ -8510,6 +8765,12 @@ function renderStageGrid(): void {
   svg.append(base, active);
   board.append(svg);
 
+  // Landmark beside the World's boss node.
+  const bossNode = nodes.find((node) => node.role.includes("boss") && node.stage % 20 === 0) ?? nodes[nodes.length - 1];
+  if (bossNode !== undefined) {
+    landmark.style.left = String(bossNode.x > 50 ? bossNode.x - 36 : bossNode.x + 36) + "%";
+    landmark.style.top = String(bossNode.y - 120) + "px";
+  }
   const cleared = new Set(campaign.clearedStages);
   const current = campaign.highestUnlockedStage;
   for (const node of nodes) {
@@ -8533,6 +8794,18 @@ function renderStageGrid(): void {
     button.setAttribute("aria-pressed", String(node.stage === selectedJourneyStage));
     const label = document.createElement("strong");
     label.textContent = String(node.stage).padStart(3, "0");
+    // Boss stages show the boss itself.
+    if (node.role.includes("boss")) {
+      const bossArt = paintedBossArtUrl(bossIdentityForStage(node.stage, node.role as BossRole).id);
+      if (bossArt !== undefined) {
+        const portrait = document.createElement("img");
+        portrait.className = "journey-boss-art";
+        portrait.src = bossArt;
+        portrait.alt = "";
+        portrait.decoding = "async";
+        button.append(portrait);
+      }
+    }
     button.append(label);
     if (node.role !== "normal" || node.checkpoint) {
       const badge = document.createElement("span");
@@ -8542,17 +8815,42 @@ function renderStageGrid(): void {
         node.role === "elite" ? "✦" : node.checkpoint ? "⚑" : "★";
       button.append(badge);
     }
+    const stars = journeyStageStars(node.stage);
+    if (isCleared && stars > 0) {
+      const row = document.createElement("span");
+      row.className = "journey-stars";
+      row.setAttribute("aria-hidden", "true");
+      for (let star = 0; star < 3; star += 1) {
+        const icon = document.createElement("i");
+        if (star < stars) icon.className = "earned";
+        icon.textContent = "★";
+        row.append(icon);
+      }
+      button.append(row);
+    } else if (!unlocked) {
+      const lock = document.createElement("span");
+      lock.className = "journey-lock";
+      lock.dataset.icon = "lock";
+      lock.setAttribute("aria-hidden", "true");
+      button.append(lock);
+    }
     const roleLabel = node.role.replace(/-/g, " ");
     button.setAttribute("aria-label",
       "Stage " + node.stage + ", " + roleLabel +
       (node.checkpoint ? ", checkpoint" : "") +
       (isCleared ? ", cleared" : !unlocked ? ", locked" : ", playable"));
     if (node.stage === current) {
-      const ship = document.createElement("span");
-      ship.className = "journey-ship";
-      ship.setAttribute("aria-hidden", "true");
-      ship.textContent = "◆";
-      button.append(ship);
+      // "You are here": the pilot's ship in a glowing badge with a pin.
+      const avatar = document.createElement("span");
+      avatar.className = "journey-avatar";
+      avatar.setAttribute("aria-hidden", "true");
+      const ship = document.createElement("img");
+      ship.src = shipArtUrl(characters.selected);
+      ship.alt = "";
+      const tag = document.createElement("b");
+      tag.textContent = "YOU";
+      avatar.append(ship, tag);
+      button.append(avatar);
     }
     button.addEventListener("click", () => {
       if (journeyStartGate.active) return;
@@ -8657,9 +8955,7 @@ function renderGameplayMode(): void {
   byId<HTMLButtonElement>("recallModeButton").classList.toggle("primary", recall);
   byId("titleModeMeta").textContent =
     activeReviewGoal === undefined
-      ? recall
-        ? "Recall · hear, remember, type"
-        : "Combat · see, type, shoot"
+      ? "Combat · see, type, shoot"
       : "Smart Review · " +
         activeReviewGoal.replaceAll("-", " ") +
         " · " +
@@ -9841,9 +10137,15 @@ byId("recallHintButton").addEventListener("click", () => {
   renderRecallAssistUi();
 });
 
-for (const id of ["startButton", "nextStageButton"]) {
-  byId(id).addEventListener("click", () => void startSelectedStage());
-}
+// The Campaign card always flies Combat; Recall has its own card
+// ("Start recall" sets recallLaunchPending). "Next stage" keeps the mode.
+let recallLaunchPending = false;
+byId("startButton").addEventListener("click", () => {
+  if (!recallLaunchPending && gameplayMode !== "combat") selectGameplayMode("combat");
+  recallLaunchPending = false;
+  void startSelectedStage();
+});
+byId("nextStageButton").addEventListener("click", () => void startSelectedStage());
 for (const id of ["restartButton", "clearRetryButton"]) {
   byId(id).addEventListener("click", () => {
     if (testingStageUnlockEnabled() && testingStageOverride !== null) {

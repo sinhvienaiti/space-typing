@@ -1,5 +1,7 @@
 # Yêu cầu ảnh: biểu tượng cổ vật (Relic) nền trong suốt
 
+> **Trạng thái (04/10/2026): đã xong.** Đủ 12 ảnh ở `src/assets/expansion-v2/icons/`, bản 256 và 512 (`@2x`). Đã kiểm tra: có nền trong suốt thật, góc trong suốt, không còn điểm xanh sót viền. Thẻ phần thưởng cổ vật và màn Expedition tự dùng ảnh này.
+
 > **Dành cho:** chủ dự án và AI tạo ảnh (Gemini, ChatGPT Images…) được giao làm ảnh.
 >
 > **Vì sao cần:** thẻ phần thưởng mới (kiểu thẻ ARAM, `src/ui/reward-card.ts`) có một ô biểu tượng lớn ở trên.

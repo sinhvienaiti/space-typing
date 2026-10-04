@@ -1,3 +1,4 @@
+import { DUEL_MAP_BACKDROPS } from "./map-backdrop";
 import type {
   DuelClientRoomSnapshot,
 } from "./authority";
@@ -86,14 +87,7 @@ const ALL_MAPS: readonly DuelMapId[] = [
   "celestial-void",
 ];
 
-const MAP_ART: Readonly<Record<DuelMapId, { name: string; kit: string }>> = {
-  "frost-wastes": { name: "Frost Wastes", kit: "g03-frost-prism" },
-  "inferno-rift": { name: "Inferno Rift", kit: "g02-infernal" },
-  "tempest-prime": { name: "Tempest Prime", kit: "g08-aurora-cosmic" },
-  "ocean-abyss": { name: "Ocean Abyss", kit: "g07-abyssal" },
-  "terra-core": { name: "Terra Core", kit: "g04-verdant" },
-  "celestial-void": { name: "Celestial Void", kit: "g01-celestial" },
-};
+const MAP_ART = DUEL_MAP_BACKDROPS;
 
 function mapLabel(selection: DuelRoomMapSelection): string {
   if (selection.mode === "fixed") return MAP_ART[selection.mapId].name;

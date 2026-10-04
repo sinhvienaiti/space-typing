@@ -255,6 +255,7 @@ function createBattleNodes(gameShell: HTMLElement) {
         <div class="duel-rival-zone">
           <aside class="duel-player-card duel-opponent-card" aria-label="Rival combat status">
             <div class="duel-player-heading">
+              <i class="duel-card-portrait" aria-hidden="true"></i>
               <span>RIVAL</span>
               <strong id="duelOpponentPath">BALANCED</strong>
             </div>
@@ -331,6 +332,7 @@ function createBattleNodes(gameShell: HTMLElement) {
 
           <aside class="duel-player-card duel-self-card" aria-label="Your combat status">
             <div class="duel-player-heading">
+              <i class="duel-card-portrait" aria-hidden="true"></i>
               <span>YOU</span>
               <strong id="duelSelfPath">BALANCED</strong>
             </div>
@@ -1357,6 +1359,14 @@ export function installDuelBattleUi(
     nodes.selfShip.dataset.character = selfCharacter;
     nodes.opponentShip.dataset.character =
       opponentCharacter;
+    // Status cards show each pilot's hull (style: src/duel/battle-holo.css).
+    for (const [selector, id] of [[".duel-self-card", selfCharacter], [".duel-opponent-card", opponentCharacter]] as const) {
+      const card = nodes.selfShip.ownerDocument.querySelector<HTMLElement>(selector);
+      if (card !== null && card.dataset.character !== id) {
+        card.dataset.character = id;
+        card.style.setProperty("--ship-art", "url(\"/assets/space-typing/ships/3d/" + id + "/color.webp\")");
+      }
+    }
     combatVisuals.setCharacters(selfCharacter, opponentCharacter);
     // Between rounds (and before the first): load the 3D hulls now; the
     // rival's load pauses while a round is fought. Idempotent per ship.
