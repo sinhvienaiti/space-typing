@@ -1,4 +1,5 @@
 import { compositionForWorld } from "./background/compositions";
+import { InputController } from "./input/input-controller";
 import { paintedBossArtUrl } from "./enemies/painted-sprites";
 import { bossIdentityForStage } from "./boss/identity";
 import type { BossRole } from "./boss/model";
@@ -10714,7 +10715,9 @@ byId("settingsSaveButton").addEventListener("click", () => {
 
 settingsDialog.addEventListener("close", discardSettingsDraft);
 
+const inputController = new InputController((key) => game.handleKey(key));
 window.addEventListener("keydown", (event) => {
+  if (event.isComposing || event.key === "Process") return;
   // Any open dialog owns the keyboard (R09: Esc behind the reward or anomaly
   // dialog used to toggle pause and resume combat behind the modal).
   if (document.querySelector("dialog[open]") !== null) return;
@@ -10747,7 +10750,7 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault();
   }
 
-  game.handleKey(event.key);
+  inputController.handleKey(event.key);
 });
 
 window.addEventListener("resize", () => game.resize());

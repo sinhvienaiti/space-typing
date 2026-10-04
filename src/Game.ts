@@ -1,3 +1,4 @@
+import { TargetOwnership } from "./input/target-ownership";
 import {
   hasVisibleKillTranslation,
   sanitizeKillTranslationSettings,
@@ -1022,6 +1023,7 @@ export class Game {
   private seenEnemyDefinitions = new Set<EnemyDefinitionId>();
   private enemies: Enemy[] = [];
   private readonly stageWordLedger = new StageWordLedger();
+  private readonly targetOwnership = new TargetOwnership();
   private projectiles: EnemyProjectile[] = [];
   private lasers: Laser[] = [];
   private readonly playerShots = new PlayerShotSystem<ShotImpact>();
@@ -1717,6 +1719,7 @@ export class Game {
         ipa: "",
       };
       enemy.typed = 0;
+      this.targetOwnership.beginUnit(enemy);
       enemy.wordMissed = false;
       enemy.x = position.x;
       enemy.baseX = position.x;
@@ -1779,6 +1782,7 @@ export class Game {
     enemy.rank = rank;
     enemy.entry = entry;
     enemy.typed = 0;
+    this.targetOwnership.beginUnit(enemy);
     enemy.wordMissed = false;
     enemy.wordDifficultyScore = score;
     enemy.layersRemaining = layers;
@@ -3788,6 +3792,7 @@ export class Game {
     > | null = null,
   ): void {
     this.flushCombatCreditPresentation();
+    this.targetOwnership.beginEncounter();
     this.sfx.unlock();
     this.stageConfig = stage;
     this.difficulty = difficulty;
@@ -5291,11 +5296,15 @@ export class Game {
       if (targetWants) return false;
       if (boss.typed > 0 && typingText(boss.entry.en)[boss.typed] === key) return false;
     }
+    if (!this.targetOwnership.claimKeyboard(skill)) return true;
     const result = typeBossCounter(skill, key);
     if (result === "ignored") return false;
     this.countBossSkillKey();
     this.sfx.bossCounterKey(skill.typed / skill.word.length);
-    if (result === "complete") this.completeBossCounter(skill);
+    if (result === "complete") {
+      this.targetOwnership.finish(skill, "completed");
+      this.completeBossCounter(skill);
+    }
     this.emitStats();
     return true;
   }
@@ -6992,6 +7001,7 @@ export class Game {
       return;
     }
 
+    if (!this.targetOwnership.claimKeyboard(boss)) return;
     boss.typed += 1;
     this.stageResultTracker.recordWordCorrectKey("boss", "boss");
 
@@ -7106,6 +7116,7 @@ export class Game {
       boss.entry = this.pickBossEntry(
         boss.typingMechanic,
       );
+      this.targetOwnership.beginUnit(boss);
       boss.flash = 1;
       if (this.gameplayMode === "recall" && boss.hp > 0) {
         this.activateBossRecallPrompt();
@@ -7183,6 +7194,7 @@ export class Game {
       boss.typingMechanic,
     );
     boss.typed = 0;
+    this.targetOwnership.beginUnit(boss);
     boss.wordMissed = false;
     boss.actionCooldown =
       (bossActionInterval(boss.role, boss.phase) *
@@ -7260,6 +7272,7 @@ export class Game {
   private defeatBoss(completedEntry?: VocabularyEntry): void {
     const boss = this.boss;
     if (boss === null) return;
+    this.targetOwnership.finish(boss, "invalidated");
 
     const { x, y } = this.bossPosition();
     this.triggerImpactFeedback("boss-defeat");
@@ -7414,6 +7427,7 @@ export class Game {
       return;
     }
 
+    if (!this.targetOwnership.claimKeyboard(pod)) return;
     pod.typed += 1;
     this.stats.hits += 1;
     this.stats.streak += 1;
@@ -7430,6 +7444,7 @@ export class Game {
     this.sfx.shot(this.stats.multiplier);
 
     if (pod.typed >= word.length) {
+      this.targetOwnership.finish(pod, "completed");
       this.collectSupplyPod(pod);
     }
 
@@ -7523,11 +7538,13 @@ export class Game {
       return false;
     }
 
+    if (!this.targetOwnership.claimKeyboard(target)) return false;
     target.typed += 1;
     if (target.typed < word.length) this.fireBonusShot(this.recallBonusAim(target), 292, 7, null);
     this.sfx.shot(Math.max(1, this.stats.multiplier));
 
     if (target.typed >= word.length) {
+      this.targetOwnership.finish(target, "completed");
       const score = recallBonusRewardScore(
         target.entry.en,
         target.hintIndices,
@@ -7568,6 +7585,7 @@ export class Game {
       return;
     }
 
+    if (!this.targetOwnership.claimKeyboard(drone)) return;
     drone.typed += 1;
     this.stats.hits += 1;
     this.stats.streak += 1;
@@ -7583,6 +7601,7 @@ export class Game {
     this.sfx.shot(this.stats.multiplier);
 
     if (drone.typed >= word.length) {
+      this.targetOwnership.finish(drone, "completed");
       const drop = rollEquipmentDrop(
         "treasure",
         this.effectiveLuck(),
@@ -7628,6 +7647,7 @@ export class Game {
       return;
     }
 
+    if (!this.targetOwnership.claimKeyboard(crate)) return;
     crate.typed += 1;
     this.stats.hits += 1;
     this.stats.streak += 1;
@@ -7643,6 +7663,7 @@ export class Game {
     this.sfx.shot(this.stats.multiplier);
 
     if (crate.typed >= word.length) {
+      this.targetOwnership.finish(crate, "completed");
       const options = createRewardChoiceOptions(this.effectiveLuck());
       this.addScore(220 * this.stats.multiplier);
       this.hooks.onWordComplete(crate.entry);
@@ -7673,6 +7694,7 @@ export class Game {
       return;
     }
 
+    if (!this.targetOwnership.claimKeyboard(crate)) return;
     crate.typed += 1;
     this.stats.hits += 1;
     this.stats.streak += 1;
@@ -7688,6 +7710,7 @@ export class Game {
     this.sfx.shot(this.stats.multiplier);
 
     if (crate.typed >= word.length) {
+      this.targetOwnership.finish(crate, "completed");
       this.addScore(260 * this.stats.multiplier);
       this.hooks.onWordComplete(crate.entry);
       this.presentCombatTranslation(crate.entry, crate.x, crate.y - 54);
@@ -7850,6 +7873,7 @@ export class Game {
       return;
     }
 
+    if (!this.targetOwnership.claimKeyboard(enemy)) return;
     enemy.typed += 1;
     this.stageResultTracker.recordWordCorrectKey("enemy", enemy.id);
 
@@ -7924,6 +7948,7 @@ export class Game {
       enemy.layersRemaining -= 1;
       enemy.entry = this.pickEnemyLayerEntry(enemy);
       enemy.typed = 0;
+      this.targetOwnership.beginUnit(enemy);
       enemy.wordMissed = false;
       if (this.gameplayMode === "recall") {
         this.activateEnemyRecallPrompt(enemy.id);
@@ -7942,7 +7967,7 @@ export class Game {
         enemyId: enemy.id,
         fx: enemyFxProfile(hitDefinition?.family ?? "rainbow", "hit"),
       });
-      this.targetId = null;
+      this.releaseCompletedEnemyLock(enemy.id);
       return;
     }
 
@@ -8004,7 +8029,14 @@ export class Game {
       this.markTimer = 0;
     }
     this.queuePerkKill(enemy, perfectWord);
-    this.targetId = null;
+    this.targetOwnership.finish(enemy, "completed");
+    this.releaseCompletedEnemyLock(enemy.id);
+  }
+
+  /** Completing another unit preserves an existing keyboard lock, unless gameplay removed it. */
+  private releaseCompletedEnemyLock(completedId: number): void {
+    if (this.targetId === completedId) this.targetId = null;
+    this.currentTarget();
   }
 
   private notifyEnemySeen(definitionId: EnemyDefinitionId): void {

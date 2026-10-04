@@ -5,6 +5,8 @@ import { createStageConfig } from "../src/campaign/stage";
 import { difficultyFor } from "../src/campaign/difficulty";
 import type { SupplyPod } from "../src/supply/pod";
 import type { GamePhase, GameSettings, VocabularyEntry } from "../src/types";
+import { TargetOwnership } from "../src/input/target-ownership";
+import type { Enemy } from "../src/types";
 
 type GameInternals = {
   phase: GamePhase;
@@ -32,6 +34,19 @@ const bossEntry: VocabularyEntry = {
   vi: "",
   ipa: "",
 };
+
+type OwnershipInternals = Omit<GameInternals, "enemies"> & {
+  targetOwnership: TargetOwnership;
+  completeWord(enemy: Enemy): void;
+  pickEnemyLayerEntry(enemy: Enemy): VocabularyEntry;
+  enemies: Enemy[];
+};
+function liveScenario(): { game: Game; state: OwnershipInternals } {
+  const game = createTestGame(); game.setTestLabMode(true);
+  game.startStage(createStageConfig(1), difficultyFor({ stage: 1, vocabularyLevel: 1, mode: "balanced", recentWpm: 60, recentAccuracy: 96 }));
+  game.testLabSpawnSamePrefixScenario();
+  return { game, state: game as unknown as OwnershipInternals };
+}
 
 function createTestGame(vocabulary: VocabularyEntry[] = [bossEntry]): Game {
   vi.stubGlobal("window", {
@@ -252,3 +267,41 @@ describe("Recall Bonus input priority", () => {
   });
 });
 
+describe("keyboard ownership in real game routes", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("claims only an accepted key on the receiving unit", () => {
+    const game = createTestGame(), state = game as unknown as OwnershipInternals;
+    state.phase = "playing"; state.boss = createBossState(50, 1, "boss", bossEntry);
+    state.supplyPod = supply("solar");
+    game.handleKey("x"); expect(state.targetOwnership.isKeyboardOwned(state.boss)).toBe(false);
+    game.handleKey("s"); expect(state.targetOwnership.isKeyboardOwned(state.supplyPod)).toBe(true);
+    expect(state.targetOwnership.isKeyboardOwned(state.boss)).toBe(false);
+    state.supplyPod!.typed = 0; game.handleKey("Escape");
+    expect(state.targetOwnership.isKeyboardOwned(state.supplyPod)).toBe(true); game.destroy();
+  });
+  it("system progress is available until a real accepted keyboard key claims it", () => {
+    const { game, state } = liveScenario(), enemy = state.enemies[0]!; enemy.typed = 1; state.targetId = enemy.id;
+    expect(state.targetOwnership.current(enemy).owner).toBe("available");
+    game.handleKey(enemy.entry.en[1]!); expect(state.targetOwnership.current(enemy).owner).toBe("keyboard"); game.destroy();
+  });
+  it.each([1, 2])("completing B with %s layer(s) keeps A's lock, progress and keyboard ownership", (layers) => {
+    const { game, state } = liveScenario(); game.handleKey("m");
+    const a = state.enemies.find((e) => e.id === state.targetId)!; const b = state.enemies.find((e) => e.id !== a.id)!;
+    b.layersRemaining = layers; b.typed = b.entry.en.length;
+    const aProgress = a.typed; const aUnit = state.targetOwnership.current(a);
+    state.completeWord(b);
+    expect(state.targetId).toBe(a.id); expect(a.typed).toBe(aProgress); expect(aUnit.owner).toBe("keyboard"); game.destroy();
+  });
+  it("completing its own layer releases the lock and gives even the same word a new available unit", () => {
+    const { game, state } = liveScenario(); game.handleKey("m"); const enemy = state.enemies.find((e) => e.id === state.targetId)!;
+    const oldUnit = state.targetOwnership.current(enemy); enemy.layersRemaining = 2;
+    vi.spyOn(state, "pickEnemyLayerEntry").mockReturnValue(enemy.entry); state.completeWord(enemy);
+    expect(state.targetId).toBeNull(); expect(enemy.typed).toBe(0); expect(oldUnit.owner).toBe("invalidated");
+    expect(state.targetOwnership.current(enemy).owner).toBe("available"); expect(state.targetOwnership.current(enemy).unitId).not.toBe(oldUnit.unitId); game.destroy();
+  });
+  it("does not restore a lock whose target has already been removed by gameplay", () => {
+    const { game, state } = liveScenario(); game.handleKey("m"); const oldId = state.targetId; const b = state.enemies.find((e) => e.id !== oldId)!;
+    state.enemies = state.enemies.filter((e) => e.id !== oldId); state.completeWord(b);
+    expect(state.targetId).toBeNull(); game.destroy();
+  });
+});
