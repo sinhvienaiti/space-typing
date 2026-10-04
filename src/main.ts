@@ -1,5 +1,7 @@
 import { compositionForWorld } from "./background/compositions";
 import { InputController } from "./input/input-controller";
+import { VoiceAdapter } from "./input/voice-adapter";
+import { mountVoiceFeedback } from "./ui/voice-feedback";
 import { paintedBossArtUrl } from "./enemies/painted-sprites";
 import { bossIdentityForStage } from "./boss/identity";
 import type { BossRole } from "./boss/model";
@@ -26,6 +28,7 @@ import "./ui/holo.css";
 import "./ui/holo-lobby.css";
 import "./ui/holo-motion.css";
 import "./ui/holo-hud.css";
+import "./ui/voice-feedback.css";
 import "./ui/holo-dialogs.css";
 import "./ui/holo-results.css";
 import "./ui/reward-cards.css";
@@ -1072,6 +1075,12 @@ const titleOverlay = byId("titleOverlay");
 const pauseOverlay = byId("pauseOverlay");
 const gameOverOverlay = byId("gameOverOverlay");
 const stageClearOverlay = byId("stageClearOverlay");
+const voiceFeedback = mountVoiceFeedback(byId("voiceFeedback"));
+// Construction is inert: probing/start remain behind the offline engine + gameplay gates.
+const voiceInstanceId = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `space-voice-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const voiceAdapter = new VoiceAdapter(window.parent, PARENT_ORIGIN, voiceInstanceId, () => {}, voiceFeedback.state);
+window.addEventListener("message", (event: MessageEvent<unknown>) => voiceAdapter.handleMessage(event));
+window.addEventListener("pagehide", () => voiceAdapter.stop());
 const settingsDialog = byId<HTMLDialogElement>("settingsDialog");
 const vocabularyDialog = byId<HTMLDialogElement>("vocabularyDialog");
 const stageSelectDialog = byId<HTMLDialogElement>("stageSelectDialog");
@@ -2423,6 +2432,7 @@ function renderPhase(phase: GamePhase): void {
   stageClearOverlay.classList.toggle("hidden", phase !== "stageclear");
   byId("playerStatusHud").classList.toggle("hidden", phase !== "playing");
   byId("combatHotbar").classList.toggle("hidden", phase !== "playing");
+  voiceFeedback.state.setGameplayActive(phase === "playing");
 
   if (phase !== "playing" && phase !== "paused") {
     renderStageEvents([]);

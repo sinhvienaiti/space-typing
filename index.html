@@ -21,6 +21,15 @@
 
     <div id="musicToast" class="music-toast" aria-live="polite"></div>
 
+    <aside id="voiceFeedback" class="voice-feedback" role="status" aria-live="polite" aria-atomic="true" aria-label="Voice input feedback" hidden>
+      <div class="voice-feedback-head">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5v2M5.5 14.5h5"/></svg>
+        <small>VOICE</small>
+        <span class="voice-feedback-detail" data-voice-detail></span>
+      </div>
+      <strong class="voice-feedback-transcript" data-voice-transcript hidden></strong>
+    </aside>
+
     <header class="hud">
       <div id="hudLeft" class="hud-side" data-heat="0">
         <i class="hud-flame" aria-hidden="true"></i>

@@ -30,11 +30,25 @@ hoặc voice damage trong checkpoint này. Portal trả `offlineEngineAvailable=
 | Result policy | ACK/window/eligibility/source guards; registry revision mới không tự loại B; terminal receipt; overlapping-audio dedupe | Caller phải revalidate gameplay, claim unit và mutation đồng bộ; duplicate receipt không được thực hiện effect lần hai |
 | Host foundation | Permission/cancel/late worker, suspend/resume, gate-before-TTS, tail/flush, route fencing | Dùng injected test runtime; chưa có AudioWorklet/worker/model-cache production |
 | Portal | Lazy import chỉ khi nhận voice metadata từ đúng iframe/origin; capability gate đóng | Không xin mic, fetch weights hoặc tạo inference worker trong Typing |
+| Voice feedback HUD | Ô nhỏ tối đa 224 px ở mép dưới phải; tránh hotbar/player HUD, tự thu sau 4 giây; hiển thị từ nghe được, đang kiểm tra, đã nhận, chưa khớp, đọc lại, mic lỗi | Đã mount vào game và nối adapter; mặc định Typing vẫn ẩn. Chưa có decoder để phát feedback qua mic thật |
 
 `react/reactor` bị cấm bởi hard policy; `red/robot` vẫn được phép, dùng soft
 prefix ranking và keyboard lock. Spoken form giữ khoảng trắng, Unicode và dấu
 câu; không dùng `typingText()` làm transcript matcher. Phonetic conflicts cần
 metadata đã xác minh, không tự suy homophone từ chữ đầu.
+
+Ô phản hồi dùng metadata `feedback` cuối utterance của decoder để hiển thị cả
+trường hợp không khớp target. Không đoán từ khi engine không nhận ra: transcript
+là `null`, báo đọc lại. Từ nhận diện có candidate chỉ hiện `Checking…`; chỉ
+`resolution` do game gửi mới đổi sang `Accepted`. Phản hồi không làm damage,
+không tính learning miss và không lưu transcript vào save. Bỏ event trùng/cũ,
+kiểm tra session/input/audio epoch và engine/model, xóa từ khi pause/stop hoặc
+đổi mode. Transcript render bằng `textContent`, có live region polite.
+
+Panel tối đa 224 px, không bắt chuột hoặc keyboard focus. ResizeObserver tính
+khoảng trống ở góc dưới phải, đưa panel lên trên hotbar/player HUD nếu màn hình
+hẹp; music toast được đặt phía trên panel. Sau 4 giây trở lại chỉ báo Listening.
+Đây là UI sẵn cho adapter; chưa phải bằng chứng Voice đã chơi được qua mic.
 
 ## V01: engine gate còn thiếu bằng chứng
 
@@ -70,15 +84,19 @@ tiếp sau engine gate và các điều kiện normal ở trên. Không tuyên b
 
 ## Kiểm chứng checkpoint
 
-- Space Typing: full Vitest, **245 files / 1.523 tests PASS**.
-- Space Typing: `pnpm build` PASS, gồm asset checks và TypeScript client/server.
-- Portal: `pnpm --dir portal build` PASS.
-- Shared Voice: `node --test shared/voice/*.test.mjs` — **28 tests PASS**.
+- Space Typing: full Vitest, **247 files / 1.532 tests PASS**; có test ordering,
+  session fences, pending/accepted, không nhận ra từ, text an toàn, timer và tránh controls.
+- Space Typing: build PASS, gồm asset checks và TypeScript client/server.
+- Portal: build PASS.
+- Shared Voice: `node --test shared/voice/*.test.mjs` — **31 tests PASS**.
 - Canonical contract: `node scripts/sync-space-voice-contract.mjs --check --target <space-typing>` PASS.
 
 Test runtime là fixture trong test. Kết quả này không chứng minh nhận diện, audio
 continuity, latency, offline cold start, GPU/frame performance hoặc TTS echo thực
-tế. Chưa có screenshot/manual Voice qua Portal vì chưa có engine để chạy.
+tế. Chưa có screenshot/manual Voice qua Portal vì chưa có engine để chạy;
+browser kiểm thử trong môi trường này cũng chặn URL local. Test geometry/DOM
+không thay thế kiểm tra trực quan. Còn cần nghiệm thu desktop/narrow viewport,
+long transcript, music toast và trạng thái không nhận ra lời nói qua mic thật.
 
 ## Milestone thực tế
 

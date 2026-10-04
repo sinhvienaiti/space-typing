@@ -2,8 +2,8 @@
   "source": "typing-game/shared/voice",
   "protocolVersion": 1,
   "files": {
-    "protocol.mjs": "6bef57c777419f3080d666ab2d03f4ab9aee90bf4ebc103d35dca7594b6c97ab",
-    "protocol.d.mts": "7b1da173a77ddccd74360a44ef8a6326288a9cf095171ca8858c2dd70a2c6707",
+    "protocol.mjs": "a97b7109d53a430a9c4dd7ec5e0d028f3ab5931d7613363febcac544510437e8",
+    "protocol.d.mts": "c86d39404f922e7ecbd678f22a25a57028a32949085554ec327ef6bde23815d1",
     "target-snapshot.mjs": "1ad9f43555f7f5b8a576ca1934b424d0deed57d35d7ff4c4820d28f017f8e33e",
     "target-snapshot.d.mts": "a23ab994fccc51e87c81f8cf77e2595372432b3a6d92787525b4b9f041e519e7",
     "result-policy.mjs": "5d447be93a9f88fdc8b541a1b437088032a607703db69806e686273eb3ba0a22",

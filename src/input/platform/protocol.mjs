@@ -86,6 +86,25 @@ export function parseDetection(value) {
   } else if (v.scoreKind !== undefined) throw new TypeError("scoreKind without score");
   return result;
 }
+/** Final decoder feedback is diagnostic; it does not authorize gameplay completion. */
+export function parseFeedback(value) {
+  const v = object(value, "feedback");
+  const start = integer(v.audioStartSample, "audioStartSample");
+  const result = oneOf(v.result, "result", ["recognized", "unrecognized"]);
+  const evidence = oneOf(v.evidence, "evidence", ["final-utterance", "validated-keyword"]);
+  const transcript = result === "recognized" ? text(v.transcript, "transcript", VOICE_LIMITS.text).trim().replace(/\s+/g, " ") : null;
+  if (result === "unrecognized" && (v.transcript !== null || v.detectionId !== undefined)) throw new TypeError("unrecognized feedback cannot invent a transcript or detection");
+  if (result === "unrecognized" && evidence !== "final-utterance") throw new TypeError("unrecognized feedback requires a completed utterance");
+  return {
+    sessionId: text(v.sessionId, "sessionId"), inputEpoch: integer(v.inputEpoch, "inputEpoch"),
+    audioEpoch: integer(v.audioEpoch, "audioEpoch"), feedbackId: text(v.feedbackId, "feedbackId"),
+    streamEpoch: integer(v.streamEpoch, "streamEpoch"), result, evidence, transcript,
+    ...(v.detectionId === undefined ? {} : { detectionId: text(v.detectionId, "detectionId") }),
+    audioStartSample: start, audioEndSample: integer(v.audioEndSample, "audioEndSample", start + 1),
+    engineId: text(v.engineId, "engineId"), modelId: text(v.modelId, "modelId"),
+    emittedAtMs: milliseconds(v.emittedAtMs, "emittedAtMs"),
+  };
+}
 export function isVoiceMessage(value) {
   return value !== null && typeof value === "object" && typeof value.type === "string" && value.type.startsWith("typing-game:voice:");
 }
@@ -116,6 +135,7 @@ export function parseVoiceMessage(value) {
       return { ...base, ...session(), audioEpoch: integer(v.audioEpoch, "audioEpoch"), snapshotId: text(v.snapshotId, "snapshotId"), ready, unsupported, appliedAtSample: integer(v.appliedAtSample, "appliedAtSample") };
     }
     case "detection": return { ...base, ...parseDetection(v) };
+    case "feedback": return { ...base, ...parseFeedback(v) };
     case "resolution": return { ...base, ...session(), detectionId: text(v.detectionId, "detectionId"), accepted: boolean(v.accepted, "accepted"), reason: text(v.reason, "reason", 64) };
     case "suspend": case "resume": case "stop": case "stopped": return { ...base, ...session() };
     case "listening": case "listening-resumed": return { ...base, ...session(), audioEpoch: integer(v.audioEpoch, "audioEpoch"), fromSample: integer(v.fromSample, "fromSample") };
