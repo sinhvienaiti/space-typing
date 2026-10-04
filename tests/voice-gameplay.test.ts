@@ -13,6 +13,13 @@ import type { Game } from "../src/Game";
 import type { SupplyPod } from "../src/supply/pod";
 import { startBossSkill, type BossSkillState } from "../src/boss/skills";
 
+it("built-in counter vocabulary does not poison offline preflight with unbind", () => {
+  const game = createTestGame([]);
+  expect(game.getVoiceVocabularyForms()).not.toContain("unbind");
+  expect(game.getVoiceVocabularyForms()).toContain("unlock");
+  game.destroy();
+});
+
 const entry = (en: string): VocabularyEntry => ({
   id: en,
   en,

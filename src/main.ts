@@ -7,6 +7,7 @@ import { VoiceSession } from "./input/voice-session";
 import { sanitizeInputMode, type InputMode } from "./input/mode";
 import { mountVoiceFeedback } from "./ui/voice-feedback";
 import { installWarpControls } from "./ui/warp-controls";
+import { warpHudView, warpRefuelView } from "./ui/warp-hud";
 import { paintedBossArtUrl } from "./enemies/painted-sprites";
 import { bossIdentityForStage } from "./boss/identity";
 import type { BossRole } from "./boss/model";
@@ -1456,6 +1457,14 @@ const accountTransactions = new AccountTransactions((save) => {
 function renderWarpHud(): void {
   if (!warpAccount) return;
   const warp = reconcileWarp(warpAccount.warp, accountTransactions.now());
+  const hud = warpHudView(warp);
+  byId("titleWarpBalance").textContent = hud.balance;
+  byId("titleWarpReserve").textContent = hud.reserve;
+  byId("titleWarpRegen").textContent = hud.regen;
+  const bar = byId<HTMLProgressElement>("titleWarpBar");
+  bar.value = hud.value;
+  bar.parentElement!.dataset.low = String(hud.low);
+  bar.title = `${hud.balance} Warp · ${hud.reserve} · ${hud.regen} · Deploy costs 10`;
   byId("warpBalance").textContent = `${warp.current}/100`;
   byId("warpReserve").textContent = `Reserve ${warp.reserve}/300`;
   const eta = Math.ceil(warpEtaMs(warp, accountTransactions.now()) / 1000);
@@ -1471,13 +1480,17 @@ function renderWarpHud(): void {
     clearSettlementPending ||
     stageStartPending ||
     practiceRestorePending;
-  byId<HTMLButtonElement>("warpRefuelButton").disabled =
+  const refuel = warpRefuelView(warp, expansionCurrencies.starCrystal);
+  const refuelButton = byId<HTMLButtonElement>("warpRefuelButton");
+  refuelButton.textContent = refuel.label;
+  refuelButton.title = refuel.detail;
+  byId("warpRefuelDetail").textContent = refuel.detail;
+  refuelButton.disabled =
     busy ||
     !accountTransactions.canWrite() ||
     !!warpAccount.attempt ||
     testingStagePreviewActive() ||
-    warp.refills >= 3 ||
-    warp.current + warp.reserve > 380;
+    refuel.disabled;
   const reserve = byId<HTMLButtonElement>("warpReserveToggle");
   reserve.textContent = `Reserve: ${warp.reserveConsent ? "on" : "off"}`;
   reserve.setAttribute("aria-pressed", String(warp.reserveConsent));
@@ -10980,6 +10993,12 @@ window.addEventListener("beforeunload", () => {
   game.destroy();
 });
 
+byId("titleWarpManage").addEventListener("click", () => {
+  renderWarpHud();
+  byId("warpActionNotice").textContent = "";
+  const dialog = byId<HTMLDialogElement>("warpDialog");
+  if (!dialog.open) dialog.showModal();
+});
 installWarpControls(
   (id) => byId<HTMLButtonElement>(id),
   {
@@ -11005,7 +11024,9 @@ installWarpControls(
       const saved = await accountTransactions.refuel(quote);
       expansionCurrencies = saved.expansionCurrencies;
       refreshPersistentStateUi();
-      showNotice(`+20 Warp · ${quote.price} Star Crystals spent`);
+      const message = `+20 Warp · ${quote.price} Star Crystals spent`;
+      byId("warpActionNotice").textContent = message;
+      showNotice(message);
     },
     reserve: async () => {
       if (!canOpenBetweenStageMenu())
@@ -11046,7 +11067,10 @@ installWarpControls(
       await accountTransactions.reanchor();
     },
   },
-  showNotice,
+  (message) => {
+    byId("warpActionNotice").textContent = message;
+    showNotice(message);
+  },
   renderWarpHud,
 );
 window.setInterval(() => {

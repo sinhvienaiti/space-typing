@@ -3955,3 +3955,27 @@ audio soak and end-to-end/frame benchmarks remain unverified in this environment
 Do not infer release certification from automated results. The current detailed
 sources are [Voice status](./VOICE_FINAL_V2_IMPLEMENTATION_STATUS.md) and
 [Warp Charge status](./WARP_CHARGE_IMPLEMENTATION_STATUS.md).
+
+### Local browser follow-up — 2026-10-04 (working tree)
+
+See [Voice/Warp fix review](./VOICE_WARP_FIX_REVIEW_2026-10-04.md).
+Parent Vite HTTP archive encoding caused the confirmed checksum failure; fixed in
+parent middleware/cache verification, not by disabling hashes. Built-in boss
+counter `unbind` blocked all Voice preflight and is replaced with supported
+`unlock`. Title pilot card now has Warp balance/bar/Reserve/regen and a `+` depot
+dialog; real temporary-profile deploy verified 100→90, Practice stayed 100.
+108 targeted game tests and 69 parent Voice tests passed. Browser Voice connects
+and standalone speech fixture decoding passes, but real Portal + gameplay still
+reproduced audio overload on this loaded Mac. This is **partial acceptance**, not
+full Voice release certification. No real user's save or microphone was used.
+
+Second local review: bounded FIR coefficient cache, generation-fenced runtime
+errors (including paused), single-flight recognizer preparation and close fencing
+are added in parent. Game transactions now snapshot mutable intent/context/quote
+before queued work, and Refuel shows cost, affordability and Active/Reserve gains.
+Latest: 77 parent Voice tests, 134 targeted game tests, both tsc/direct Vite builds
+pass. Full game suite: 1,632 pass / 3 fail; the two simulation timeouts pass when
+rerun with one worker, VFX alpha integrity still fails on existing media.
+Two synthetic-speech Portal+combat runs still overflow; standalone speech passes.
+Voice combat remains NOT ACCEPTED. Detailed evidence and next profiling gate are
+in `VOICE_WARP_FIX_REVIEW_2026-10-04.md`. No save reset, media edits, commit or push.

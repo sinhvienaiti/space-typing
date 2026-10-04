@@ -56,6 +56,12 @@ const waitMs = Number(flag("wait", "6000"));
 const clickSelector = flag("click", null);
 const clickDelay = Number(flag("click-delay", "4000"));
 const evalFile = flag("eval-file", null);
+const evalOrigin = flag("eval-origin", null);
+const setupEvalFile = flag("setup-eval-file", null);
+// Opt-in synthetic capture for Voice startup checks; never opens the user's mic.
+const fakeMic = flag("fake-mic", "0") === "1";
+const fakeMicFile = flag("fake-mic-file", null);
+const audioFixture = flag("audio-fixture", null);
 const expression = evalFile !== null ? readFileSync(resolve(evalFile), "utf8") : flag("eval", "null");
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
@@ -72,6 +78,8 @@ const browser = spawn(
     "--ignore-gpu-blocklist",
     "--no-first-run",
     "--no-default-browser-check",
+    ...(fakeMic ? ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] : []),
+    ...(fakeMic && fakeMicFile ? ["--use-file-for-fake-audio-capture=" + resolve(fakeMicFile)] : []),
     "--user-data-dir=" + profile,
     "about:blank",
   ],
@@ -111,6 +119,7 @@ async function main() {
   const logs = [];
   const exceptions = [];
   let loaded = false;
+  const contexts = new Map();
   socket.addEventListener("message", (event) => {
     const message = JSON.parse(event.data);
     if (message.id !== undefined && pending.has(message.id)) {
@@ -119,6 +128,12 @@ async function main() {
       return;
     }
     if (message.method === "Page.loadEventFired") loaded = true;
+    if (message.method === "Runtime.executionContextCreated") {
+      const context = message.params.context;
+      if (context.auxData?.isDefault) contexts.set(context.id, context.origin);
+    }
+    if (message.method === "Runtime.executionContextDestroyed") contexts.delete(message.params.executionContextId);
+    if (message.method === "Runtime.executionContextsCleared") contexts.clear();
     if (message.method === "Runtime.consoleAPICalled" && ["warning", "error"].includes(message.params.type)) {
       logs.push(
         message.params.type + ": " +
@@ -174,9 +189,32 @@ async function main() {
     }
   }
   await sleep(waitMs);
+  if (audioFixture !== null && setupEvalFile !== null) {
+    if (!fakeMic) throw new Error("Audio fixture setup requires --fake-mic=1");
+    await send("Runtime.evaluate", {
+      expression: "window.__voiceFixtureBase64=" + JSON.stringify(readFileSync(resolve(audioFixture)).toString("base64")),
+    });
+  }
+  if (setupEvalFile !== null) {
+    const setup = await send("Runtime.evaluate", {
+      expression: readFileSync(resolve(setupEvalFile), "utf8"), awaitPromise: true, returnByValue: true, userGesture: true,
+    });
+    if (setup.result?.exceptionDetails) throw new Error(setup.result.exceptionDetails.exception?.description ?? "Setup failed");
+  }
+
+  const contextId = evalOrigin === null ? undefined : [...contexts].find(([, origin]) => origin === evalOrigin)?.[0];
+  if (evalOrigin !== null && contextId === undefined) throw new Error("Frame context not found: " + evalOrigin);
+  if (audioFixture !== null) {
+    await send("Runtime.evaluate", {
+      expression: "window.__voiceFixtureBase64=" + JSON.stringify(readFileSync(resolve(audioFixture)).toString("base64")),
+      ...(contextId === undefined ? {} : { contextId }),
+    });
+  }
 
   const evaluated = await send("Runtime.evaluate", {
     expression,
+    ...(contextId === undefined ? {} : { contextId }),
+    userGesture: true,
     returnByValue: true,
     awaitPromise: true,
   });
@@ -184,6 +222,9 @@ async function main() {
     evaluated.result?.exceptionDetails !== undefined
       ? { evalError: evaluated.result.exceptionDetails.exception?.description ?? evaluated.result.exceptionDetails.text }
       : evaluated.result?.result?.value ?? null;
+  const diagnostics = setupEvalFile === null ? null : (await send("Runtime.evaluate", {
+    expression: "window.__voiceDiagnostics?.() ?? null", returnByValue: true,
+  })).result?.result?.value;
 
   const shot = await send("Page.captureScreenshot", { format: "png" });
   mkdirSync(dirname(resolve(out)), { recursive: true });
@@ -195,6 +236,7 @@ async function main() {
       viewport: width + "x" + height + "@" + dpr,
       png: width * dpr + "x" + height * dpr,
       eval: result,
+      ...(diagnostics ? { diagnostics } : {}),
       logs,
       exceptions,
     }),

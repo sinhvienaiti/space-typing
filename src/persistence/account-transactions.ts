@@ -234,6 +234,8 @@ export class AccountTransactions {
     payload: unknown,
     mutate: (save: PlayerSave) => void,
   ): Promise<PlayerSave> {
+    // Snapshot caller-owned identity before the queue/digest yields.
+    intent = structuredClone(intent);
     const serialized = new TextEncoder().encode(
       JSON.stringify({ kind, payload }),
     );
@@ -340,6 +342,7 @@ export class AccountTransactions {
     );
   }
   admit(context: SortieContext, intent = this.intent()): Promise<PlayerSave> {
+    context = structuredClone(context);
     return this.transaction(intent, "admit", context, (s) => {
       if (!isValidSortieContext(context))
         throw new Error("Invalid sortie context");
@@ -385,6 +388,7 @@ export class AccountTransactions {
     context: SortieContext,
     intent = this.intent(),
   ): Promise<PlayerSave> {
+    context = structuredClone(context);
     return this.transaction(intent, "activate", { id, context }, (s) => {
       const a = s.account.attempt;
       if (
@@ -427,6 +431,7 @@ export class AccountTransactions {
     return refuelQuote(this.state.warp, this.now());
   }
   refuel(quote: RefuelQuote, intent = this.intent()): Promise<PlayerSave> {
+    quote = { ...quote };
     return this.transaction(intent, "refuel", quote, (s) => {
       if (s.account.attempt)
         throw new Error("Refuel is available after the sortie ends");

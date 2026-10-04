@@ -133,6 +133,15 @@
       <button id="recallHintButton" type="button">✦ Reveal letter</button>
     </div>
 
+    <dialog id="warpDialog" class="settings-dialog warp-dialog" aria-labelledby="warpDialogTitle">
+      <h2 id="warpDialogTitle">Warp Charge · Stamina</h2>
+      <p>Rewarded deployment costs 10 Warp. Practice is always free.</p>
+      <div class="warp-depot"><small id="warpStatus" role="status">Loading Warp Charge…</small><button id="warpRefuelButton" type="button">Refuel +20</button><button id="warpReserveToggle" type="button" aria-pressed="false">Reserve: off</button><button id="warpAbandonButton" type="button" hidden>Abandon prepared sortie</button><button id="warpClockButton" type="button" hidden>Correct clock</button></div>
+      <p id="warpActionNotice" role="alert"></p>
+      <p id="warpRefuelDetail"></p>
+      <p>Active: +1 / 6 min. When full, Reserve: +1 / 12 min. Refuel spends Star Crystals only after confirmation.</p>
+      <form method="dialog"><button type="submit">Close</button></form>
+    </dialog>
     <section id="titleOverlay" class="overlay holo-title-overlay">
       <div class="holo-title">
         <header class="holo-topbar">
@@ -146,6 +155,11 @@
               <div class="holo-pilot-progress">
                 <span class="holo-bar"><i id="titlePilotBar"></i></span>
                 <span id="titlePilotProgress">Stage 001</span>
+              </div>
+              <div class="pilot-warp" aria-label="Warp Charge stamina">
+                <div class="pilot-warp-heading"><span>⚡ WARP</span><strong id="titleWarpBalance">— / 100</strong><button id="titleWarpManage" type="button" aria-label="Manage Warp Charge" title="Refuel and Reserve settings">+</button></div>
+                <progress id="titleWarpBar" max="100" value="0" aria-label="Active Warp Charge"></progress>
+                <div class="pilot-warp-detail"><span id="titleWarpReserve">Reserve — / 300</span><span id="titleWarpRegen">Loading…</span></div>
               </div>
             </div>
             <span class="holo-stat" data-tip="Credits" data-tip-side="below">
@@ -232,7 +246,6 @@
                 <button id="stageSelectButton" class="holo-ghost" data-icon="map">Stage select</button>
                 <button id="routeButton" class="holo-ghost" data-icon="compass">Briefing</button>
               </div>
-              <div class="warp-depot"><small id="warpStatus" role="status">Loading Warp Charge…</small><button id="warpRefuelButton" type="button">Refuel +20</button><button id="warpReserveToggle" type="button" aria-pressed="false">Reserve: off</button><button id="warpAbandonButton" type="button" hidden>Abandon prepared sortie</button><button id="warpClockButton" type="button" hidden>Correct clock</button></div>
             </div>
           </article>
 

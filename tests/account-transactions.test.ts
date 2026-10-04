@@ -108,6 +108,24 @@ async function raw(value: unknown) {
   db.close();
 }
 describe("canonical admission and fenced writer", () => {
+  it("snapshots caller context and intent before queued admission and activation", async () => {
+    await seed();
+    const { s } = await store();
+    const requested = { ...context }, intent = s.intent(), originalIntent = { ...intent };
+    const pending = s.admit(requested, intent);
+    requested.stage = 999;
+    intent.id = "changed-after-call";
+    intent.fence++;
+    await pending;
+    expect(s.account()!.warp.current).toBe(90);
+    await s.admit(context, originalIntent);
+    expect(s.account()!.warp.current).toBe(90);
+    const activationContext = { ...context };
+    const activating = s.activate(s.account()!.attempt!.id, activationContext);
+    activationContext.stage = 999;
+    await activating;
+    expect(s.account()!.attempt!.phase).toBe("active");
+  });
   it.each([
     { ...context, stage: 2 },
     { ...context, tier: 1 },
@@ -305,6 +323,17 @@ describe("canonical admission and fenced writer", () => {
   });
 });
 describe("settlement, Phoenix, refuel and migration", () => {
+  it("snapshots a refuel quote before queued work and keeps its retry identity", async () => {
+    await seed((save) => { save.account.warp.current = 0; save.expansionCurrencies.starCrystal = 100; });
+    const { s } = await store(), quote = s.quote(), original = { ...quote }, intent = s.intent();
+    const pending = s.refuel(quote, intent);
+    quote.price = 1;
+    quote.amount = 200;
+    await pending;
+    await s.refuel(original, intent);
+    expect(s.account()!.warp).toMatchObject({ current: 20, refills: 1 });
+    expect((await loadPlayerSave()).save.expansionCurrencies.starCrystal).toBe(92);
+  });
   it("clear reward, terminal receipt and milestone commit once; duplicate and late callbacks cannot pay again", async () => {
     await seed();
     const { s, loaded } = await store();

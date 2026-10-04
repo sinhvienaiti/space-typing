@@ -75,7 +75,9 @@ export const COUNTER_WORDS: Readonly<Record<Exclude<BossCounterKind, "intercept"
   parry: ["parry", "guard", "block", "ward", "shield", "deflect", "repel"],
   dodge: ["dash", "dodge", "evade", "shift", "slide", "veer", "drift"],
   brace: ["brace", "hold", "stand", "anchor", "steady", "endure"],
-  break: ["break", "snap", "sever", "cut", "unbind", "free", "release"],
+  // Built-in counters are preflighted even before a boss spawns. "unbind" is
+  // absent from the pinned offline recognizer and used to block every session.
+  break: ["break", "snap", "sever", "cut", "unlock", "free", "release"],
 };
 
 const SKILL_NAMES: Readonly<Record<Exclude<BossSkillKind, "volley">, Readonly<Record<EnemyFamilyId, string>>>> = {
