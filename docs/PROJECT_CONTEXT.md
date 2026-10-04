@@ -1172,7 +1172,9 @@ Character-specific resource
 
 Energy is tactical in-stage Energy.
 
-There is no mobile-style stamina that blocks play.
+Campaign deployment now uses Warp Charge under the owner-approved V3 policy.
+Free Practice and Smart Review remain available without Warp. See the 2026-10-04
+implementation checkpoint below; in-stage Energy remains a separate tactical resource.
 
 ## System 13 — Buff / Debuff / Status
 
@@ -3921,3 +3923,35 @@ No recovery rules, item counts, Campaign progression, checkpoint semantics or ga
 - No other child gitlink was changed by M25.
 - Expansion roadmap M00-M25 is complete.
 - M22 closure remains intentionally evidence-honest: owner acceptance closes the roadmap gate, while untouched manual recorder rows remain PENDING regression checks and are not retroactively claimed PASS.
+
+
+## 2026-10-04 — Voice and Warp Charge implementation checkpoint
+
+Current feature branches: child `feat/bgv-integration-current`, parent
+`sinhvienaiti/typing-game` `feat/space-voice-platform`. The parent pins the tested
+child implementation; main-branch/older roadmap history above remains historical.
+
+- English offline streaming Vosk Worker, AudioWorklet capture/resampling, bounded
+  queues, timestamped target snapshots and lifecycle cancellation/ACK timeouts.
+- Bottom-right Typing/Voice/Hybrid selector, Mic control and compact heard-word
+  feedback. Portal owns the microphone; use its Space route.
+- Source-aware semantic completion, global target reservations, Hybrid keyboard
+  ownership, separate speaking/profile credit and no fake typing statistics.
+- Warp Charge V3: Active 100, Reserve 300, Campaign/Hidden deployment 10, regeneration
+  every 6/12 minutes sequentially; Reserve opt-in. Refuel +20 costs 8/12/18 SC,
+  max three per 04:00 UTC+7 day. Free Practice/Review preserve learning only.
+- Canonical IndexedDB transactions, Web Lock writer, generation/fence/sequence and
+  receipt barriers; atomic clear/Phoenix, prepared/crash semantics, schema 28
+  migration and explicit whole-profile recovery. Expedition/Duel stay isolated.
+- Self-review removed obsolete save/import paths and repeated hot-path work;
+  High/Ultra graphics are retained.
+- Final automated evidence: 253 files / 1,623 game tests, 105 parent Voice/Learning
+  tests, both builds, canonical contract and real Worker/WASM WAV decoding passed.
+- The 104-scenario production-formula economy audit preserves refills as daily
+  limited acceleration, not a proven SC sink or measured human pacing.
+
+Real microphone/browser, visual/device acceptance, recognition corpus, negative
+audio soak and end-to-end/frame benchmarks remain unverified in this environment.
+Do not infer release certification from automated results. The current detailed
+sources are [Voice status](./VOICE_FINAL_V2_IMPLEMENTATION_STATUS.md) and
+[Warp Charge status](./WARP_CHARGE_IMPLEMENTATION_STATUS.md).
