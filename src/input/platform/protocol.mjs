@@ -33,9 +33,13 @@ function list(value, name, max, parse) {
   if (!Array.isArray(value) || value.length > max) throw new TypeError(`${name}: oversized or invalid array`);
   return value.map((item) => parse(item, name));
 }
+function spokenForm(value) {
+  // NFKC can expand ligatures: enforce the cap on both input and normalized output.
+  return text(normalizeSpokenForm(text(value, "form", VOICE_LIMITS.text)), "form", VOICE_LIMITS.text);
+}
 export function parseTarget(value) {
   const v = object(value, "target");
-  const forms = list(v.forms, "forms", VOICE_LIMITS.forms, (f) => normalizeSpokenForm(text(f, "form", VOICE_LIMITS.text)));
+  const forms = list(v.forms, "forms", VOICE_LIMITS.forms, spokenForm);
   if (!forms.length || new Set(forms).size !== forms.length) throw new TypeError("forms: empty or duplicate");
   return {
     unitId: text(v.unitId, "unitId"),
@@ -69,7 +73,7 @@ export function parseDetection(value) {
     detectionId: text(v.detectionId, "detectionId"), streamEpoch: integer(v.streamEpoch, "streamEpoch"),
     unitId: text(v.unitId, "unitId"), unitVersion: integer(v.unitVersion, "unitVersion", 1),
     eligibilityVersion: integer(v.eligibilityVersion, "eligibilityVersion", 1),
-    form: normalizeSpokenForm(text(v.form, "form", VOICE_LIMITS.text)),
+    form: spokenForm(v.form),
     audioStartSample: start, audioEndSample: end,
     engineId: text(v.engineId, "engineId"), modelId: text(v.modelId, "modelId"),
     evidence: oneOf(v.evidence, "evidence", ["final-utterance", "validated-keyword"]),
