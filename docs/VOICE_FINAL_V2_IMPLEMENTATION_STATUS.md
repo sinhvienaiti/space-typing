@@ -69,9 +69,9 @@ Final checks on 2026-10-04:
 
 | Check | Result |
 | --- | --- |
-| Space Typing `pnpm test` | 253 files / 1,623 tests passed. Includes Voice, Warp and existing gameplay regressions. |
+| Space Typing `pnpm test` | 253 files / 1,626 tests passed. Includes Voice, Warp and existing gameplay regressions. |
 | Space Typing `pnpm build` | Passed: TypeScript client/server, Vite and asset integrity checks. |
-| Parent shared Voice + Learning | 105 tests passed. Includes actual host-factory permission cancellation/ownership tests. |
+| Parent shared Voice + Learning | 115 tests passed. Includes actual host-factory permission cancellation/ownership tests. |
 | Portal build | Passed. |
 | Canonical six-file Voice contract | Verified against the child copy. |
 | Real Worker/WASM/model smoke | Decoded the pinned official WAV fixture into final timed word results. |
@@ -106,3 +106,23 @@ Local acceptance should cover:
    typing-streak credit from speech; reloads and Expedition mode guards.
 5. Desktop and narrow viewport placement, long transcript, music toast, hotbar
    overlap and High/Ultra game load.
+
+## Connection-timeout correction (2026-10-04)
+
+The earlier generic timeout conflated a missing Portal service, pending permission,
+model preparation and audio activation. The child now checks the service handshake
+in 8 s, shows validated input-epoch-bound preparation stages, gives recognizer
+startup its own 15 s window and rejects duplicate capability replies. The parent
+reports lazy-load failures and forwards actual preparation progress. Native audio
+resume is abortable and bounded to 10 s; suspended audio cannot report readiness.
+The Vosk plugin no longer attempts build-only asset emission in Dev mode.
+
+The current parent main branch does not contain the Voice host. Updating only the
+child while running that Portal can reproduce the pictured timeout before any mic
+request. The exact stage on the reported Mac was not observed; this is a confirmed
+compatibility case, not proof that every timeout has this cause. Use parent
+`feat/space-voice-platform` and restart/reload Portal with the matching child pin.
+
+Latest full checks: 1,626 game tests / 115 shared Voice-Learning tests, both builds,
+real WASM file decode, and Vite Dev/production worklet scope simulation passed.
+The scope simulation uses Node VM and excludes native microphone/browser behavior.

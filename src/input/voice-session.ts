@@ -21,6 +21,13 @@ type GamePort = {
   completeVoiceUnit(id: string, version: number, eligibility: number): boolean;
   togglePause(): void;
 };
+type PreparationStage =
+  | "service"
+  | "startup"
+  | "permission"
+  | "model"
+  | "audio"
+  | "recognizer";
 export class VoiceSession {
   private adapter: VoiceAdapter;
   private policy = new VoiceResultPolicy();
@@ -41,6 +48,7 @@ export class VoiceSession {
   private lastPhase = "title";
   private timer: ReturnType<typeof setInterval> | null = null;
   private preparationTimer: ReturnType<typeof setTimeout> | null = null;
+  private preparationStage: PreparationStage = "service";
   private acknowledgementTimer: ReturnType<typeof setTimeout> | null = null;
   private targetUpdatePending = false;
   private pendingSnapshotId = "";
@@ -129,8 +137,8 @@ export class VoiceSession {
     }
     this.stop();
     this.state = "preparing";
-    this.onState(this.state, "Preparing microphone and offline model…");
-    this.preparationDeadline(90_000);
+    this.onState(this.state, "Connecting to Portal Voice service…");
+    this.preparationDeadline(8_000);
     this.adapter.probe();
   }
   stop(): void {
@@ -156,6 +164,7 @@ export class VoiceSession {
     this.signature = "";
     this.targetUpdatePending = false;
     this.state = "off";
+    this.preparationStage = "service";
     this.outputActive = false;
     this.vocabularyQueue = [];
     this.vocabularyRequest = "";
@@ -254,13 +263,23 @@ export class VoiceSession {
       return;
     }
     if (op === "capabilities") {
-      if (this.state !== "preparing") return;
+      if (this.state !== "preparing" || this.preparationStage !== "service")
+        return;
       if (message.offlineEngineAvailable !== true) {
         this.fail("Offline voice engine unavailable");
         return;
       }
       this.epoch += 1;
-      this.adapter.start(this.mode, this.epoch);
+      this.preparationStage = "startup";
+      this.preparationDeadline(90_000);
+      if (!this.adapter.start(this.mode, this.epoch))
+        this.fail("Voice session could not start. Reconnect the microphone.");
+      return;
+    }
+    if (op === "preparing") {
+      if (this.state !== "preparing" || this.context) return;
+      this.preparationStage = message.stage as PreparationStage;
+      this.onState("preparing", String(message.message));
       return;
     }
     if (op === "ready") {
@@ -283,6 +302,8 @@ export class VoiceSession {
       this.targetUpdatePending = false;
       this.readyUnits.clear();
       this.state = "preparing";
+      this.preparationStage = "recognizer";
+      this.preparationDeadline(15_000);
       const forms = [...new Set(this.game().getVoiceVocabularyForms())];
       this.preparingVocabulary = this.game().getVoiceVocabularyRevision();
       this.vocabularyQueue = [];
@@ -421,13 +442,23 @@ export class VoiceSession {
   }
   private preparationDeadline(ms: number): void {
     if (this.preparationTimer) clearTimeout(this.preparationTimer);
-    this.preparationTimer = setTimeout(
-      () =>
-        this.fail(
-          "Microphone preparation timed out. Allow access and reconnect.",
-        ),
-      ms,
-    );
+    this.preparationTimer = setTimeout(() => {
+      const details: Record<PreparationStage, string> = {
+        service:
+          "Portal Voice service did not respond. Update or restart the Portal, then reload this tab.",
+        startup:
+          "Voice startup timed out. Restart the Portal and reconnect the microphone.",
+        permission:
+          "Microphone permission is still pending. Allow microphone access in your browser and system settings, then reconnect.",
+        model:
+          "Offline speech model preparation timed out. Restart the local launcher and reconnect the microphone.",
+        audio:
+          "Browser audio capture did not start. Enable sound for this website and reconnect the microphone.",
+        recognizer:
+          "Speech recognition did not become ready. Reconnect the microphone.",
+      };
+      this.fail(details[this.preparationStage]);
+    }, ms);
   }
   private clearAcknowledgement(): void {
     if (this.acknowledgementTimer) clearTimeout(this.acknowledgementTimer);

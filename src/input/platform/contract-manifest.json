@@ -2,7 +2,7 @@
   "source": "typing-game/shared/voice",
   "protocolVersion": 1,
   "files": {
-    "protocol.mjs": "9766fed986ca559dcbd451d918ff5e06d6365bb980e393d00b412855074c0803",
+    "protocol.mjs": "3ff093d2771490a70c7ec88fe17cc560bb54ffdaabab0b40b310e21f25b2a443",
     "protocol.d.mts": "c86d39404f922e7ecbd678f22a25a57028a32949085554ec327ef6bde23815d1",
     "target-snapshot.mjs": "1ad9f43555f7f5b8a576ca1934b424d0deed57d35d7ff4c4820d28f017f8e33e",
     "target-snapshot.d.mts": "a23ab994fccc51e87c81f8cf77e2595372432b3a6d92787525b4b9f041e519e7",

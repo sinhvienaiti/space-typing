@@ -38,8 +38,11 @@ export class VoiceAdapter {
     let message: VoiceMessage; try { message = parseVoiceMessage(event.data); } catch { return false; }
     if (message.gameId !== "space-typing" || message.gameInstanceId !== this.gameInstanceId) return false;
     const op = message.type.slice(VOICE_NAMESPACE.length + 1);
-    if (!["capabilities", "ready", "targets-applied", "vocabulary-checked", "clock", "detection", "feedback", "stopped", "listening", "listening-resumed", "gate-closed", "error"].includes(op)) return false;
+    if (!["capabilities", "preparing", "ready", "targets-applied", "vocabulary-checked", "clock", "detection", "feedback", "stopped", "listening", "listening-resumed", "gate-closed", "error"].includes(op)) return false;
     if (op === "capabilities") this.available = message.offlineEngineAvailable === true;
+    else if (op === "preparing") {
+      if (!this.starting || message.inputEpoch !== this.inputEpoch) return false;
+    }
     else if (op === "ready") {
       if (message.inputEpoch !== this.inputEpoch || (!this.starting && message.sessionId !== this.sessionId) || typeof message.audioEpoch !== "number" || (this.starting ? message.audioEpoch < this.audioEpoch : message.audioEpoch <= this.audioEpoch)) return false;
       this.sessionId = message.sessionId as string;

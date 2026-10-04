@@ -63,7 +63,7 @@ IndexedDB writes were added.
 
 ## Verification completed
 
-- Full game suite: **253 files / 1,623 tests passed**; TypeScript, Vite build and
+- Full game suite: **253 files / 1,626 tests passed**; TypeScript, Vite build and
   asset checks passed on 2026-10-04.
 - Warp arithmetic: 18 tests, including carry boundaries, sequential pools, full
   caps, Reserve consent, 04:00 reset, backward clock, sleep and 500 randomized

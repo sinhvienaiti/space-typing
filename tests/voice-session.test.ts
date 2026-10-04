@@ -270,17 +270,117 @@ it("changed vocabulary is revalidated before the next encounter is allowed to ru
   expect(s.session.isReady()).toBe(true);
   s.session.stop();
 });
-it("a missing parent/start response fails visibly and leaves no readiness after the preparation deadline", () => {
+it("an old or missing Portal fails at the service handshake without blaming microphone permission", () => {
   const s = setup("voice");
   s.session.setMode("voice");
   s.session.start();
-  vi.advanceTimersByTime(90_000);
+  vi.advanceTimersByTime(8_000);
   expect(s.onState).toHaveBeenLastCalledWith(
     "error",
-    expect.stringContaining("timed out"),
+    expect.stringContaining("Portal Voice service did not respond"),
   );
   expect(s.session.isReady()).toBe(false);
   expect(s.game.togglePause).toHaveBeenCalledOnce();
+  s.session.stop();
+});
+
+it("model progress distinguishes granted permission from a stalled model and old epochs cannot replace it", () => {
+  const s = setup("voice");
+  s.session.setMode("voice");
+  s.session.start();
+  s.send("capabilities", { offlineEngineAvailable: true, reason: "test" });
+  const epoch = s.last("start").inputEpoch;
+  s.send("preparing", {
+    inputEpoch: epoch,
+    stage: "permission",
+    message: "Waiting for microphone permission…",
+  });
+  vi.advanceTimersByTime(8_000);
+  expect(s.session.isRunning()).toBe(true);
+  s.send("preparing", {
+    inputEpoch: epoch,
+    stage: "model",
+    message: "Loading offline model…",
+  });
+  s.send("preparing", {
+    inputEpoch: epoch - 1,
+    stage: "permission",
+    message: "Old permission",
+  });
+  expect(s.onState).toHaveBeenLastCalledWith(
+    "preparing",
+    "Loading offline model…",
+  );
+  vi.advanceTimersByTime(82_000);
+  expect(s.onState).toHaveBeenLastCalledWith(
+    "error",
+    expect.stringContaining("model preparation timed out"),
+  );
+  s.send("preparing", {
+    inputEpoch: epoch,
+    stage: "audio",
+    message: "Late activation",
+  });
+  expect(s.onState).toHaveBeenLastCalledWith(
+    "error",
+    expect.stringContaining("model preparation timed out"),
+  );
+  s.session.stop();
+});
+
+it("duplicate capabilities cannot restart a pending microphone session", () => {
+  const s = setup();
+  s.session.setMode("hybrid");
+  s.session.start();
+  s.send("capabilities", { offlineEngineAvailable: true, reason: "test" });
+  const start = s.last("start");
+  s.send("capabilities", { offlineEngineAvailable: true, reason: "duplicate" });
+  expect(s.last("start")).toBe(start);
+  s.session.stop();
+});
+
+it("a slow model gets its own subsequent recognizer window instead of timing out during final startup", () => {
+  const s = setup("voice");
+  s.session.setMode("voice");
+  s.session.start();
+  s.send("capabilities", { offlineEngineAvailable: true, reason: "test" });
+  const epoch = s.last("start").inputEpoch;
+  vi.advanceTimersByTime(89_000);
+  s.send("ready", {
+    sessionId: "s",
+    inputEpoch: epoch,
+    audioEpoch: 0,
+    engineId: "test",
+    modelId: "test",
+    sampleRate: 16000,
+    fromSample: 0,
+  });
+  s.send("vocabulary-checked", {
+    sessionId: "s",
+    inputEpoch: epoch,
+    audioEpoch: 0,
+    requestId: s.last("vocabulary-check").requestId,
+    unsupported: [],
+  });
+  const snapshot = s.last("targets");
+  s.send("targets-applied", {
+    sessionId: "s",
+    inputEpoch: epoch,
+    audioEpoch: 0,
+    snapshotId: snapshot.snapshotId,
+    ready: snapshot.targets.map((t: VoiceTarget) => t.unitId),
+    unsupported: [],
+    appliedAtSample: 0,
+  });
+  vi.advanceTimersByTime(6_000);
+  expect(s.game.togglePause).not.toHaveBeenCalled();
+  s.send("listening", {
+    sessionId: "s",
+    inputEpoch: epoch,
+    audioEpoch: 0,
+    fromSample: 0,
+  });
+  expect(s.session.isReady()).toBe(true);
   s.session.stop();
 });
 it("lost target ACK pauses Voice instead of leaving the world frozen indefinitely", () => {
