@@ -397,7 +397,11 @@ function ensureAlternativeRuntime(
     botDueAtMs:
       context.value.bot === null
         ? null
-        : nowMs + context.value.bot.reactionMs,
+        : nowMs + runtime.botTurnDelayMs(
+            context.value.bot.playerId,
+            context.value.bot.wpm,
+            context.value.bot.reactionMs,
+          ),
   };
   alternativeMatches.set(matchId, record);
   return record;
@@ -471,11 +475,39 @@ function runAlternativeBotIfDue(
   }
   if (record.botTurnKey !== key) {
     record.botTurnKey = key;
-    record.botDueAtMs = nowMs + context.value.bot.reactionMs;
+    record.botDueAtMs = nowMs + record.runtime.botTurnDelayMs(
+      context.value.bot.playerId,
+      context.value.bot.wpm,
+      context.value.bot.reactionMs,
+    );
   }
   if (record.botDueAtMs === null || nowMs < record.botDueAtMs) return [];
-  record.botDueAtMs = null;
-  return record.runtime.runBotTurn(context.value.bot.playerId, nowMs);
+
+  const events = record.runtime.runBotTurn(
+    context.value.bot.playerId,
+    nowMs,
+    context.value.bot.accuracy,
+  );
+  const nextKey = botTurnKey(record.runtime, context.value.bot.playerId);
+  if (nextKey === key) {
+    // A miss stays on the same public challenge/beat and retries after the
+    // same reaction + WPM completion window. No direct bot damage shortcut.
+    record.botDueAtMs = nowMs + record.runtime.botTurnDelayMs(
+      context.value.bot.playerId,
+      context.value.bot.wpm,
+      context.value.bot.reactionMs,
+    );
+  } else {
+    record.botTurnKey = nextKey;
+    record.botDueAtMs = nextKey === null
+      ? null
+      : nowMs + record.runtime.botTurnDelayMs(
+          context.value.bot.playerId,
+          context.value.bot.wpm,
+          context.value.bot.reactionMs,
+        );
+  }
+  return events;
 }
 
 function sendRankedCompletion(

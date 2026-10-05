@@ -406,6 +406,32 @@
   color: var(--holo-dim);
 }
 .duel-slot-state[data-ready="true"] { color: #6dffb0; border-color: rgba(61, 255, 149, 0.35); background: rgba(61, 255, 149, 0.08); }
+.duel-lobby-mode {
+  width: min(520px, 100%);
+  margin: 2px auto 0;
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr);
+  align-items: center;
+  gap: 6px 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(111, 231, 255, 0.16);
+  background: rgba(4, 13, 28, 0.55);
+}
+.duel-lobby-mode label {
+  color: var(--holo-accent);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.duel-lobby-mode select { height: 36px; }
+.duel-lobby-mode small {
+  grid-column: 1 / -1;
+  color: var(--holo-dim);
+  font-size: 0.7rem;
+  text-align: center;
+}
+.duel-lobby-mode select:disabled { opacity: 0.55; }
 .duel-lobby-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; margin: 0; }
 .duel-lobby-actions button:disabled { opacity: 0.45; cursor: not-allowed; }
 #duelRoomReadyMeta { text-align: center; }

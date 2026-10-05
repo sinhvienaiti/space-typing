@@ -1704,7 +1704,12 @@ export class DuelAuthorityService {
     channel: Exclude<DuelMatchChannel, "ranked">;
     engine: DuelEngine;
     players: Readonly<Record<DuelPlayerId, string | null>>;
-    bot: null | { playerId: DuelPlayerId; reactionMs: number };
+    bot: null | {
+      playerId: DuelPlayerId;
+      wpm: number;
+      accuracy: number;
+      reactionMs: number;
+    };
   }> {
     const match = this.matches.get(matchId);
     if (match === undefined) {
@@ -1731,7 +1736,12 @@ export class DuelAuthorityService {
         players: { ...match.players },
         bot: match.botPlayerId === null || botConfig == null
           ? null
-          : { playerId: match.botPlayerId, reactionMs: botConfig.reactionMs },
+          : {
+              playerId: match.botPlayerId,
+              wpm: botConfig.wpm,
+              accuracy: botConfig.accuracy,
+              reactionMs: botConfig.reactionMs,
+            },
       },
     };
   }

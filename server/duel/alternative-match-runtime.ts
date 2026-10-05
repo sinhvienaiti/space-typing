@@ -72,6 +72,15 @@ export type AlternativeModeTickResult = Readonly<{
 
 const PLAYER_IDS: readonly DuelPlayerId[] = ["player-1", "player-2"];
 
+function deterministicUnit(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash / 4294967296;
+}
+
 /**
  * One server-owned runtime per live alternative Duel match/round.
  *
@@ -87,6 +96,10 @@ export class AlternativeMatchRuntime {
   private reflexChallengeIndex: number;
   private reflexBotToken: string | null = null;
   private readonly botSequence: Record<DuelPlayerId, number> = {
+    "player-1": 0,
+    "player-2": 0,
+  };
+  private readonly botAttemptSequence: Record<DuelPlayerId, number> = {
     "player-1": 0,
     "player-2": 0,
   };
@@ -218,12 +231,37 @@ export class AlternativeMatchRuntime {
   }
 
   /**
+   * Completion delay for a server bot. The room's WPM now affects alternative
+   * modes too: one word is estimated with the conventional 5 chars/word.
+   * Reaction time stays additive and bounded by the normalized room config.
+   */
+  botTurnDelayMs(
+    playerId: DuelPlayerId,
+    wpm: number,
+    reactionMs: number,
+  ): number {
+    const token = this.reflex !== null
+      ? this.reflexBotToken
+      : this.chooseWordChainBotToken(playerId);
+    const chars = Math.max(1, token?.length ?? 1);
+    const safeWpm = Math.max(10, Math.min(300, Number.isFinite(wpm) ? wpm : 60));
+    const safeReaction = Math.max(
+      0,
+      Math.min(3000, Number.isFinite(reactionMs) ? reactionMs : 250),
+    );
+    return Math.round(safeReaction + (chars * 12_000) / safeWpm);
+  }
+
+  /**
    * Server bot helper. It intentionally feeds the same public mode envelope
    * accepted from a human client. It never calls the combat port or engine.
+   * Accuracy is modeled as a failed typing/submission attempt followed by a
+   * later retry, instead of silently scaling damage.
    */
   runBotTurn(
     playerId: DuelPlayerId,
     nowMs: number,
+    accuracy = 1,
   ): readonly DuelEngineEvent[] {
     const current = this.reconnectSnapshot(playerId);
     if (
@@ -238,7 +276,63 @@ export class AlternativeMatchRuntime {
         : this.chooseWordChainBotToken(playerId);
     if (token === null || token.length === 0) return [];
 
+    const safeAccuracy = Math.max(
+      0,
+      Math.min(1, Number.isFinite(accuracy) ? accuracy : 0.95),
+    );
+    const attempt = ++this.botAttemptSequence[playerId];
+    const roll = deterministicUnit(
+      this.gameMode + ":" + this.modeRuntime.snapshot().modeEpoch + ":" + playerId + ":" + attempt,
+    );
     const events: DuelEngineEvent[] = [];
+
+    if (roll >= safeAccuracy) {
+      if (this.reflex !== null) {
+        const challenge = current.gameMode === "reflex" ? current.challenge : null;
+        const starts = new Set(
+          challenge?.candidates.map((candidate) => candidate.token.slice(0, 1)) ?? [],
+        );
+        const wrongChar = "abcdefghijklmnopqrstuvwxyz"
+          .split("")
+          .find((char) => !starts.has(char)) ?? "z";
+        const result = this.receive(
+          playerId,
+          this.botEnvelope(playerId, { type: "TYPE_CHAR", char: wrongChar }),
+          nowMs,
+        );
+        events.push(...result.combatEvents);
+        return events;
+      }
+
+      const beat = current.gameMode === "word-chain" ? current.beat : null;
+      const required = beat?.requiredInitial[playerId] ?? "a";
+      const wrongChar = required === "z" ? "a" : "z";
+      for (const payload of [
+        { type: "CLEAR" },
+        { type: "TYPE_CHAR", char: wrongChar },
+        { type: "SUBMIT" },
+      ]) {
+        const result = this.receive(
+          playerId,
+          this.botEnvelope(playerId, payload),
+          nowMs,
+        );
+        events.push(...result.combatEvents);
+        if (!result.ok) return events;
+      }
+      return events;
+    }
+
+    if (this.wordChain !== null) {
+      const cleared = this.receive(
+        playerId,
+        this.botEnvelope(playerId, { type: "CLEAR" }),
+        nowMs,
+      );
+      events.push(...cleared.combatEvents);
+      if (!cleared.ok) return events;
+    }
+
     for (const char of token) {
       const result = this.receive(
         playerId,
