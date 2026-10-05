@@ -135,10 +135,17 @@ export class AudioFocusManager {
     const safeOwner = owner.trim() || "anonymous";
     const safeGeneration = generation ?? this.nextGeneration(safeOwner);
     const current = this.ownerGeneration.get(safeOwner) ?? 0;
-    if (safeGeneration < current) {
-      return [...this.tokens.values()].find(
-        (token) => token.owner === safeOwner && token.reason === reason && token.generation === current,
-      ) ?? null;
+    const existing = [...this.tokens.values()].find(
+      (token) =>
+        token.owner === safeOwner &&
+        token.reason === reason &&
+        token.generation === safeGeneration,
+    );
+    if (safeGeneration <= current) {
+      // Duplicate activation is idempotent while its token is alive. Once a
+      // generation has released, neither that generation nor an older one may
+      // resurrect focus after newer state has already been observed.
+      return existing ?? null;
     }
     this.releaseOwnerReason(safeOwner, reason, safeGeneration, true);
     return this.acquire(reason, safeOwner, safeGeneration);
@@ -146,12 +153,10 @@ export class AudioFocusManager {
 
   acquireTimed(reason: AudioFocusReason, owner: string, durationMs: number): AudioFocusToken {
     const generation = this.nextGeneration(owner);
-    const token = this.replace(owner, reason, generation);
-    if (token === null) {
-      // nextGeneration() is strictly newer than the current owner generation,
-      // so this is defensive only and must never turn a stale event into focus.
-      return this.acquire(reason, owner, generation);
-    }
+    // nextGeneration() advances ownerGeneration first, so acquire directly;
+    // replace() intentionally treats an already-observed generation as
+    // idempotent/stale and would return null when no token exists yet.
+    const token = this.acquire(reason, owner, generation);
     const bridge = this.currentWindow();
     if (bridge !== null) {
       const timer = bridge.setTimeout(() => {
