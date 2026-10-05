@@ -14,10 +14,10 @@ describe("DuelSoundEngine lifecycle", () => {
       volume: () => 1,
       categoryVolume: () => 1,
     });
-    const internals = engine as unknown as { applyFocusGain: () => void };
-    const original = internals.applyFocusGain.bind(engine);
+    const internals = engine as unknown as { applyMixGains: () => void };
+    const original = internals.applyMixGains.bind(engine);
     const focusSpy = vi.fn(original);
-    internals.applyFocusGain = focusSpy;
+    internals.applyMixGains = focusSpy;
 
     const token = sharedAudioFocus.acquire(
       "pronunciation",
