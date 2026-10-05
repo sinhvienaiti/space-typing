@@ -10,11 +10,25 @@ describe("AudioFocusManager", () => {
     const manager = new AudioFocusManager();
     const first = manager.replace("speech", "pronunciation", 1);
     const newer = manager.replace("speech", "pronunciation", 2);
+    expect(first).not.toBeNull();
+    expect(newer).not.toBeNull();
     expect(manager.snapshot().tokens).toEqual([newer]);
     expect(manager.release(first)).toBe(false);
     expect(manager.isActive("pronunciation")).toBe(true);
     manager.release(newer);
     expect(manager.isActive("pronunciation")).toBe(false);
+  });
+
+  it("does not resurrect focus from a stale activation after the current generation released", () => {
+    const manager = new AudioFocusManager();
+    const current = manager.replace("speech", "pronunciation", 2);
+    expect(current).not.toBeNull();
+    manager.release(current);
+    expect(manager.isActive("pronunciation")).toBe(false);
+
+    expect(manager.replace("speech", "pronunciation", 1)).toBeNull();
+    expect(manager.isActive("pronunciation")).toBe(false);
+    expect(manager.snapshot().tokens).toEqual([]);
   });
 
   it("uses the strongest focus target instead of multiplying ducks", () => {
