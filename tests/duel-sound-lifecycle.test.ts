@@ -29,7 +29,7 @@ describe("DuelSoundEngine lifecycle", () => {
     engine.destroy();
     sharedAudioFocus.release(token);
     expect(focusSpy).toHaveBeenCalledTimes(1);
-    expect(engine.play({ cue: "typing-miss", side: "self", atMs: 0 })).toBe(false);
+    expect(engine.play({ cue: "typing-miss", side: "self", delayMs: 0 })).toBe(false);
 
     expect(() => engine.destroy()).not.toThrow();
   });
