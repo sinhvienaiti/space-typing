@@ -245,6 +245,7 @@ export class SampleSfxBank {
 
   private mixMaster = 1;
   private mixPronunciationActive = false;
+  private mixCategories: Partial<Record<AudioGroup, number>> = {};
 
   constructor(
     private readonly audioFactory: SampleAudioFactory =
@@ -252,9 +253,14 @@ export class SampleSfxBank {
   ) {}
 
   /** Re-levels pooled media immediately so already-playing tails follow focus/mute. */
-  setMix(masterVolume: number, pronunciationActive: boolean): void {
+  setMix(
+    masterVolume: number,
+    pronunciationActive: boolean,
+    categories: Partial<Record<AudioGroup, number>> = this.mixCategories,
+  ): void {
     this.mixMaster = Number.isFinite(masterVolume) ? Math.min(1, Math.max(0, masterVolume)) : 0;
     this.mixPronunciationActive = pronunciationActive;
+    this.mixCategories = { ...categories };
     for (const [id, pool] of this.pools) {
       const definition = SAMPLE_SFX[id];
       const gain = mixedSfxGain(
@@ -262,6 +268,7 @@ export class SampleSfxBank {
         definition.group,
         definition.gain,
         this.mixPronunciationActive,
+        this.mixCategories[definition.group] ?? 1,
       );
       for (const voice of pool.voices) {
         try { voice.volume = gain; } catch { /* media element may be tearing down */ }
@@ -283,9 +290,11 @@ export class SampleSfxBank {
     masterVolume: number,
     pronunciationActive: boolean,
     playbackRate = 1,
+    categories: Partial<Record<AudioGroup, number>> = this.mixCategories,
   ): boolean {
     this.mixMaster = Number.isFinite(masterVolume) ? Math.min(1, Math.max(0, masterVolume)) : 0;
     this.mixPronunciationActive = pronunciationActive;
+    this.mixCategories = { ...categories };
     const definition = SAMPLE_SFX[id];
     const pool = this.ensurePool(id, definition.poolSize);
     if (pool === null || pool.voices.length === 0) return false;
@@ -298,6 +307,7 @@ export class SampleSfxBank {
       definition.group,
       definition.gain,
       pronunciationActive,
+      this.mixCategories[definition.group] ?? 1,
     );
     if (gain <= 0) return false;
 

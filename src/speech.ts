@@ -53,7 +53,10 @@ function playEnglish(text: string, settings: GameSettings): Promise<void> {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "en-US";
     utterance.rate = settings.pronunciationRate;
-    utterance.volume = settings.pronunciationVolume;
+    utterance.volume = Math.min(
+      1,
+      Math.max(0, (settings.masterVolume ?? 1) * settings.pronunciationVolume),
+    );
 
     const voice = englishVoice();
     if (voice !== null) utterance.voice = voice;

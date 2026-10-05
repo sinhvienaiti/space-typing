@@ -41,8 +41,14 @@ export function sfxGroupBusGain(
   master: number,
   group: AudioGroup,
   pronunciationActive = false,
+  categoryPreference = 1,
 ): number {
-  return clamp(master, 0, 1) * AUDIO_GROUP_GAIN[group] * sfxFocusGain(group, pronunciationActive);
+  return (
+    clamp(master, 0, 1) *
+    AUDIO_GROUP_GAIN[group] *
+    sfxFocusGain(group, pronunciationActive) *
+    clamp(categoryPreference, 0, 1)
+  );
 }
 
 export function baseSfxEventGain(eventGain: number): number {
@@ -54,6 +60,10 @@ export function mixedSfxGain(
   group: AudioGroup,
   eventGain: number,
   pronunciationActive = false,
+  categoryPreference = 1,
 ): number {
-  return sfxGroupBusGain(master, group, pronunciationActive) * baseSfxEventGain(eventGain);
+  return (
+    sfxGroupBusGain(master, group, pronunciationActive, categoryPreference) *
+    baseSfxEventGain(eventGain)
+  );
 }

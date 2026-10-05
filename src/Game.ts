@@ -1275,8 +1275,7 @@ export class Game {
             quality: settings.visualQuality,
           });
     this.refreshSkillDefinitions();
-    this.sfx.setVolume(settings.sfxVolume);
-    this.sfx.setCreditVolume(settings.creditVolume ?? 1);
+    this.applyPlayerAudioSettings(settings);
     this.resize();
     this.backgroundStage?.setWorld(this.worldSceneProfile.worldId);
     preloadShotArt(this.characterId);
@@ -3801,8 +3800,7 @@ export class Game {
     const qualityChanged =
       this.settings.visualQuality !== settings.visualQuality;
     this.settings = settings;
-    this.sfx.setVolume(settings.sfxVolume);
-    this.sfx.setCreditVolume(settings.creditVolume ?? 1);
+    this.applyPlayerAudioSettings(settings);
     if (qualityChanged) {
       this.adaptiveRenderBudget.reset();
       this.adaptiveResizePending = false;
@@ -3813,6 +3811,14 @@ export class Game {
       );
       this.resize();
     }
+  }
+
+  private applyPlayerAudioSettings(settings: GameSettings): void {
+    this.sfx.setMasterVolume(settings.masterVolume ?? 1);
+    this.sfx.setVolume(settings.sfxVolume);
+    this.sfx.setCreditVolume(settings.creditVolume ?? 1);
+    this.sfx.setAnnouncerVolume(settings.announcerVolume ?? 1);
+    this.sfx.setCategoryVolumes(settings.audioCategoryVolumes ?? {});
   }
 
   startStage(

@@ -122,7 +122,13 @@ export class Sfx {
   private lastRing = -1;
   private announcerAudio: HTMLAudioElement | null = null;
   private readonly samples = new SampleSfxBank();
+  /** SFX parent preference; Master is stored independently. */
   private volume = 0.5;
+  private masterPreference = 1;
+  private announcerPreference = 1;
+  private groupPreferences: Record<AudioGroup, number> = {
+    typing: 1, combat: 1, warnings: 1, ui: 1, rewards: 1,
+  };
   private pronunciationActive = false;
   private destroyed = false;
   private readonly timers = new Set<number>();
@@ -148,7 +154,11 @@ export class Sfx {
     const changed = pronunciationActive !== this.pronunciationActive;
     this.pronunciationActive = pronunciationActive;
     this.applyGroupBusGains();
-    this.samples.setMix(this.volume, this.pronunciationActive);
+    this.samples.setMix(
+      this.effectiveSfxVolume(),
+      this.pronunciationActive,
+      this.groupPreferences,
+    );
     if (this.announcerAudio !== null) {
       this.announcerAudio.volume = this.announcerVolume();
     }
@@ -200,8 +210,47 @@ export class Sfx {
 
   setVolume(volume: number): void {
     this.volume = Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : 0.5;
+    this.refreshPlayerMix();
+  }
+
+  setMasterVolume(volume: number): void {
+    this.masterPreference = Number.isFinite(volume)
+      ? Math.min(1, Math.max(0, volume))
+      : 1;
+    this.refreshPlayerMix();
+  }
+
+  setAnnouncerVolume(volume: number): void {
+    this.announcerPreference = Number.isFinite(volume)
+      ? Math.min(1, Math.max(0, volume))
+      : 1;
+    if (this.announcerAudio !== null) {
+      this.announcerAudio.volume = this.announcerVolume();
+    }
+  }
+
+  setCategoryVolumes(volumes: Partial<Record<AudioGroup, number>>): void {
+    for (const group of AUDIO_GROUPS) {
+      const value = volumes[group];
+      this.groupPreferences[group] =
+        typeof value === "number" && Number.isFinite(value)
+          ? Math.min(1, Math.max(0, value))
+          : 1;
+    }
+    this.refreshPlayerMix();
+  }
+
+  private effectiveSfxVolume(): number {
+    return Math.min(1, Math.max(0, this.masterPreference * this.volume));
+  }
+
+  private refreshPlayerMix(): void {
     this.applyGroupBusGains();
-    this.samples.setMix(this.volume, this.pronunciationActive);
+    this.samples.setMix(
+      this.effectiveSfxVolume(),
+      this.pronunciationActive,
+      this.groupPreferences,
+    );
     if (this.announcerAudio !== null) {
       this.announcerAudio.volume = this.announcerVolume();
     }
@@ -227,7 +276,7 @@ export class Sfx {
   }
 
   masterVolume(): number {
-    return this.volume;
+    return this.effectiveSfxVolume();
   }
 
   isPronunciationActive(): boolean {
@@ -242,9 +291,10 @@ export class Sfx {
     this.unlock();
     return this.samples.play(
       id,
-      this.volume,
+      this.effectiveSfxVolume(),
       this.pronunciationActive,
       playbackRate,
+      this.groupPreferences,
     );
   }
 
@@ -1132,9 +1182,9 @@ export class Sfx {
     return Math.min(
       1,
       mixedSfxGain(
-        this.volume,
+        this.masterPreference,
         "warnings",
-        1,
+        this.announcerPreference,
         this.pronunciationActive,
       ) * 1.08,
     );
@@ -1161,7 +1211,7 @@ export class Sfx {
   ): void {
     if (this.destroyed) return;
     const gainLevel = baseSfxEventGain(gainValue * (shape.gain ?? 1));
-    if (gainLevel <= 0 || this.volume <= 0) return;
+    if (gainLevel <= 0 || this.effectiveSfxVolume() <= 0) return;
 
     this.unlock();
     const context = this.context;
@@ -1200,7 +1250,7 @@ export class Sfx {
   ): void {
     if (this.destroyed) return;
     const gainLevel = baseSfxEventGain(gainValue * (shape.gain ?? 1));
-    if (gainLevel <= 0 || this.volume <= 0) return;
+    if (gainLevel <= 0 || this.effectiveSfxVolume() <= 0) return;
 
     this.unlock();
     const context = this.context;
@@ -1269,7 +1319,12 @@ export class Sfx {
     let bus = this.groupBuses.get(group);
     if (bus !== undefined) return bus;
     bus = context.createGain();
-    bus.gain.value = sfxGroupBusGain(this.volume, group, this.pronunciationActive);
+    bus.gain.value = sfxGroupBusGain(
+      this.effectiveSfxVolume(),
+      group,
+      this.pronunciationActive,
+      this.groupPreferences[group],
+    );
     bus.connect(this.outputNode(context));
     this.groupBuses.set(group, bus);
     return bus;
@@ -1281,7 +1336,12 @@ export class Sfx {
     for (const group of AUDIO_GROUPS) {
       const bus = this.groupBuses.get(group);
       if (bus === undefined) continue;
-      const target = sfxGroupBusGain(this.volume, group, this.pronunciationActive);
+      const target = sfxGroupBusGain(
+        this.effectiveSfxVolume(),
+        group,
+        this.pronunciationActive,
+        this.groupPreferences[group],
+      );
       if (typeof bus.gain.setTargetAtTime === "function") {
         bus.gain.setTargetAtTime(target, context.currentTime, this.pronunciationActive ? 0.012 : 0.055);
       } else {
