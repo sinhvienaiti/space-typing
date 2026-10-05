@@ -26,13 +26,19 @@ replace_once(
 replace_once(
     "tests/pronunciation-mix-focus.test.ts",
     '''    controller.destroy();\n    expect(events.removeEventListener).toHaveBeenCalledWith(\n      "space-typing:pronunciation",\n      expect.any(Function),\n    );\n''',
-    '''    controller.destroy();\n    // The shared focus manager owns the pronunciation bridge. A controller\n    // only owns and removes its three gesture listeners.\n    expect(events.removeEventListener).not.toHaveBeenCalledWith(\n      "space-typing:pronunciation",\n      expect.any(Function),\n    );\n    for (const type of ["pointerdown", "keydown", "touchstart"]) {\n      expect(events.removeEventListener).toHaveBeenCalledWith(\n        type,\n        expect.any(Function),\n        true,\n      );\n    }\n''',
+    '''    controller.destroy();\n    // The shared focus manager owns the pronunciation bridge. A controller\n    // only owns and removes its three gesture listeners.\n    expect(events.removeEventListener).not.toHaveBeenCalledWith(\n      "space-typing:pronunciation",\n      expect.any(Function),\n    );\n    for (const type of ["pointerdown", "keydown", "touchstart"]) {\n      expect(events.removeEventListener).toHaveBeenCalledWith(\n        type,\n        expect.any(Function),\n        { capture: true },\n      );\n    }\n''',
 )
 
 replace_once(
     "tests/m22-audio-audit.test.ts",
     '''    // Destroy must detach every global listener that this controller registered.\n    // Keep the assertion tied to registration count so adding/removing a mix\n    // event cannot leave this lifecycle test stale again.\n    expect(removeEventListener).toHaveBeenCalledTimes(\n      addEventListener.mock.calls.length,\n    );\n''',
-    '''    // The shared focus manager owns its long-lived bridge listeners. The\n    // controller itself owns only the three gesture listeners and must detach\n    // those on destroy.\n    expect(removeEventListener).toHaveBeenCalledTimes(3);\n    for (const type of ["pointerdown", "keydown", "touchstart"]) {\n      expect(removeEventListener).toHaveBeenCalledWith(\n        type,\n        expect.any(Function),\n        true,\n      );\n    }\n''',
+    '''    // The shared focus manager owns its long-lived bridge listeners. The\n    // controller itself owns only the three gesture listeners and must detach\n    // those on destroy.\n    expect(removeEventListener).toHaveBeenCalledTimes(3);\n    for (const type of ["pointerdown", "keydown", "touchstart"]) {\n      expect(removeEventListener).toHaveBeenCalledWith(\n        type,\n        expect.any(Function),\n        { capture: true },\n      );\n    }\n''',
+)
+
+replace_once(
+    "tests/sfx-lifecycle.test.ts",
+    '''    expect(contextsCreated).toBe(1);\n    expect(removeEventListener).toHaveBeenCalledOnce();\n''',
+    '''    expect(contextsCreated).toBe(1);\n    // Pronunciation/warning/announcer bridge listeners are owned by the shared\n    // audio-focus runtime, not by each Sfx instance. Destroy must therefore not\n    // detach a listener it never registered.\n    expect(removeEventListener).not.toHaveBeenCalled();\n''',
 )
 
 p = Path("tests/announcer-sfx.test.ts")
