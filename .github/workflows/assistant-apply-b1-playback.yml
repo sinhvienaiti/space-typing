@@ -9,38 +9,7 @@ permissions:
 
 jobs:
   playback:
-    if: github.actor != 'github-actions[bot]' && github.event.pull_request.head.ref == 'feat/audio-a1-pronunciation-audibility'
+    if: false
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.21.0
-          run_install: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - name: Install
-        run: pnpm install --no-frozen-lockfile
-      - name: Apply guarded B1 playback patch
-        run: python scripts/assistant/apply-b1-playback-lifecycle.py
-      - name: B1 playback regression tests
-        run: pnpm exec vitest run tests/music-playback-failure.test.ts tests/music-controller-failure-taxonomy.test.ts tests/music-controller.test.ts tests/music-library.test.ts tests/world-music-model.test.ts
-      - name: Type check
-        run: pnpm exec tsc -p tsconfig.json --noEmit
-      - name: Diff safety
-        run: git diff --check
-      - name: Commit verified playback lifecycle
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/audio/MusicController.ts
-          if git diff --cached --quiet; then
-            echo "No production changes to commit"
-            exit 0
-          fi
-          git commit -m "fix(music): classify failures and fence stale playback"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+      - run: echo "B1 patch workflow paused while the guarded helper is upgraded."
