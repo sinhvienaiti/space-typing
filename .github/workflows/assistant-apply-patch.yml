@@ -6,6 +6,7 @@ on:
       - feat/audio-a1-pronunciation-audibility
     paths:
       - 'automation-patches/*.patch'
+      - 'automation-patches/*.mjs'
 
 permissions:
   contents: write
@@ -22,21 +23,32 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Locate patch from triggering commit
+      - name: Locate transform from triggering commit
         id: patch
         shell: bash
         run: |
           set -euo pipefail
-          patch_file="$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep '^automation-patches/.*\.patch$' | head -n 1)"
+          patch_file="$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep -E '^automation-patches/.*\.(patch|mjs)$' | head -n 1)"
           test -n "$patch_file"
           echo "file=$patch_file" >> "$GITHUB_OUTPUT"
 
-      - name: Verify and apply patch
+      - name: Verify and apply transform
         shell: bash
         run: |
           set -euo pipefail
-          git apply --check "${{ steps.patch.outputs.file }}"
-          git apply "${{ steps.patch.outputs.file }}"
+          case "${{ steps.patch.outputs.file }}" in
+            *.patch)
+              git apply --check "${{ steps.patch.outputs.file }}"
+              git apply "${{ steps.patch.outputs.file }}"
+              ;;
+            *.mjs)
+              node "${{ steps.patch.outputs.file }}"
+              ;;
+            *)
+              echo 'Unsupported transform type.' >&2
+              exit 1
+              ;;
+          esac
 
       - name: Commit source changes
         shell: bash
@@ -47,7 +59,7 @@ jobs:
           git add -A -- ':!automation-patches'
           git diff --cached --check
           if git diff --cached --quiet; then
-            echo 'Patch produced no source changes.' >&2
+            echo 'Transform produced no source changes.' >&2
             exit 1
           fi
           git commit -m 'feat(duel): wire alternative modes into live authority path'
