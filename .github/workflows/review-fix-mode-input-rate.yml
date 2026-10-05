@@ -1,0 +1,33 @@
+name: Review mode input rate-limit applier
+
+on:
+  push:
+    branches:
+      - feat/audio-a1-pronunciation-audibility
+    paths:
+      - 'review-fixes/mode-input-rate.mjs'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply reviewed transform
+        run: node review-fixes/mode-input-rate.mjs
+      - name: Commit source and remove one-shot tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f review-fixes/mode-input-rate.mjs .github/workflows/review-fix-mode-input-rate.yml
+          rmdir review-fixes 2>/dev/null || true
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'fix(duel): rate-limit rejected mode input'
+          git push origin HEAD:"$GITHUB_REF_NAME"
