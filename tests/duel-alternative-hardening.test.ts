@@ -34,6 +34,14 @@ describe("Alternative mode boundary hardening", () => {
     }
   });
 
+  it("sanitizes non-finite challenge indexes before the reviewed bank is selected", () => {
+    const source = readFileSync(
+      new URL("../server/duel/alternative-match-runtime.ts", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain("Number.isFinite(input.challengeIndex)");
+  });
+
   it("disposes alternative runtime when the authoritative tick fails", () => {
     const source = readFileSync(
       new URL("../server/duel/ws-server.ts", import.meta.url),
