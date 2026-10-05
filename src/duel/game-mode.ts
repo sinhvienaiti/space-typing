@@ -98,6 +98,7 @@ const INPUT_KEYS = [
   "kind",
   "payload",
 ] as const;
+const INPUT_KEY_SET: ReadonlySet<string> = new Set(INPUT_KEYS);
 
 function asObject(value: unknown): JsonObject | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -106,10 +107,9 @@ function asObject(value: unknown): JsonObject | null {
 }
 
 function hasExactKeys(value: JsonObject): boolean {
-  const allowed = new Set<string>(INPUT_KEYS);
   const keys = Object.keys(value);
   return INPUT_KEYS.every((key) => key in value) &&
-    keys.every((key) => allowed.has(key));
+    keys.every((key) => INPUT_KEY_SET.has(key));
 }
 
 export function parseDuelModeInputEnvelope(
