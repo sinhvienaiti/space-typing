@@ -229,7 +229,7 @@ function resolved(
 }
 
 function resolveFirst(
-  candidates: readonly Array<{
+  candidates: ReadonlyArray<{
     source: string;
     ids: readonly string[];
     mode?: PlaylistSelectionMode;
