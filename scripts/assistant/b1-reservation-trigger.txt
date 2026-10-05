@@ -1,0 +1,1 @@
+Temporary gate trigger for the B1 shuffle reservation verification workflow.
