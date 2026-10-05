@@ -77,9 +77,30 @@ export class DuelSoundEngine {
   private activeVoices = 0;
   private selfTier = 0;
   private readonly lastPlayed = new Map<string, number>();
+  private focusUnsubscribe: (() => void) | null = null;
+  private destroyed = false;
 
   constructor(private readonly host: DuelSoundHost) {
-    sharedAudioFocus.subscribe(() => this.applyFocusGain());
+    this.focusUnsubscribe = sharedAudioFocus.subscribe(() => this.applyFocusGain());
+  }
+
+  destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    this.focusUnsubscribe?.();
+    this.focusUnsubscribe = null;
+    try { this.bus?.disconnect(); } catch { /* fail-soft teardown */ }
+    try { this.focusBus?.disconnect(); } catch { /* fail-soft teardown */ }
+    try { this.reverbIn?.disconnect(); } catch { /* fail-soft teardown */ }
+    this.bus = null;
+    this.focusBus = null;
+    this.reverbIn = null;
+    this.white = null;
+    this.brown = null;
+    this.buffers.clear();
+    this.curves.clear();
+    this.lastPlayed.clear();
+    this.activeVoices = 0;
   }
 
   setHorizontal(horizontal: boolean): void {
@@ -88,6 +109,7 @@ export class DuelSoundEngine {
 
   /** Fetch and decode the layers once (no-op until audio is unlocked). */
   preload(): void {
+    if (this.destroyed) return;
     const context = this.host.context();
     if (context === null || this.loadStarted || typeof fetch !== "function") return;
     this.loadStarted = true;
@@ -120,6 +142,7 @@ export class DuelSoundEngine {
 
   /** Returns false when Web Audio is unavailable, so the caller can fall back. */
   play(cue: DuelTimedAudioCue): boolean {
+    if (this.destroyed) return false;
     const context = this.host.context();
     if (context === null || this.ensureGraph(context) === null) return false;
     this.preload();
@@ -586,6 +609,7 @@ export class DuelSoundEngine {
   }
 
   private applyFocusGain(): void {
+    if (this.destroyed) return;
     const context = this.host.context();
     const bus = this.focusBus;
     if (context === null || bus === null) return;

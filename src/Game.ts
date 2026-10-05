@@ -1289,6 +1289,8 @@ export class Game {
     this.worldSceneRenderer.destroy();
     this.backgroundStage?.destroy();
     this.textWidthCache.clear();
+    this.duelSound?.destroy();
+    this.duelSound = null;
     this.sfx.destroy();
   }
 
