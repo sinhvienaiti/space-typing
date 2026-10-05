@@ -9,8 +9,8 @@ if text.count(anchor) != 1:
     raise SystemExit(f'import anchor count={text.count(anchor)}')
 text = text.replace(anchor, replacement, 1)
 
-old = '''  advancingFallback: boolean;\n  syncGroup: string | null;\n'''
-new = '''  advancingFallback: boolean;\n  disposed: boolean;\n  playRequestGeneration: number;\n  networkRetryCount: number;\n  syncGroup: string | null;\n'''
+old = '''  advancingFallback: boolean;\n'''
+new = '''  advancingFallback: boolean;\n  disposed: boolean;\n  playRequestGeneration: number;\n  networkRetryCount: number;\n'''
 if text.count(old) != 1:
     raise SystemExit(f'ManagedTrack anchor count={text.count(old)}')
 text = text.replace(old, new, 1)
