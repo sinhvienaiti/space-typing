@@ -1,0 +1,409 @@
+{
+  "schemaVersion": 1,
+  "manifestRevision": "sha256:bc2925ffce3c940fed5be9177272ffbdef2805d1312c76908640793f80a4c57a",
+  "worldIds": [
+    "world-01",
+    "world-02",
+    "world-03",
+    "world-04",
+    "world-05",
+    "world-06",
+    "world-07",
+    "world-08",
+    "world-09",
+    "world-10",
+    "world-11",
+    "world-12",
+    "world-13",
+    "world-14",
+    "world-15",
+    "world-16",
+    "world-17",
+    "world-18",
+    "world-19",
+    "world-20",
+    "world-21",
+    "world-22",
+    "world-23",
+    "world-24",
+    "world-25",
+    "world-26",
+    "world-27",
+    "world-28",
+    "world-29",
+    "world-30",
+    "world-31",
+    "world-32",
+    "world-33",
+    "world-34",
+    "world-35",
+    "world-36",
+    "world-37",
+    "world-38",
+    "world-39",
+    "world-40",
+    "world-41",
+    "world-42",
+    "world-43",
+    "world-44",
+    "world-45",
+    "world-46",
+    "world-47",
+    "world-48",
+    "world-49",
+    "world-50"
+  ],
+  "tracks": [
+    {
+      "id": "aurora-serenade",
+      "title": "Aurora Serenade",
+      "playback": {
+        "kind": "stems",
+        "calm": [
+          {
+            "src": "/assets/audio/music/songs/aurora-serenade/calm.ogg?v=4de257bfaefec31c"
+          }
+        ],
+        "intense": [
+          {
+            "src": "/assets/audio/music/songs/aurora-serenade/intense.ogg?v=e8091f27741b12d6"
+          }
+        ],
+        "syncGroup": "aurora-serenade"
+      },
+      "durationSeconds": 137.132,
+      "mixOutSeconds": 126.132,
+      "loop": true,
+      "metadata": {
+        "bpm": 76,
+        "key": "Eb major",
+        "mood": "romantic",
+        "provenance": "legacy-generated-music-library"
+      }
+    },
+    {
+      "id": "canopy-breeze",
+      "title": "Canopy Breeze",
+      "playback": {
+        "kind": "stems",
+        "calm": [
+          {
+            "src": "/assets/audio/music/songs/canopy-breeze/calm.ogg?v=60b32b3542353a1b"
+          }
+        ],
+        "intense": [
+          {
+            "src": "/assets/audio/music/songs/canopy-breeze/intense.ogg?v=2d2c469a2f9ebfb8"
+          }
+        ],
+        "syncGroup": "canopy-breeze"
+      },
+      "durationSeconds": 140.864,
+      "mixOutSeconds": 129.864,
+      "loop": true,
+      "metadata": {
+        "bpm": 88,
+        "key": "F major",
+        "mood": "relaxing",
+        "provenance": "legacy-generated-music-library"
+      }
+    },
+    {
+      "id": "crystal-echoes",
+      "title": "Crystal Echoes",
+      "playback": {
+        "kind": "stems",
+        "calm": [
+          {
+            "src": "/assets/audio/music/songs/crystal-echoes/calm.ogg?v=a140c04d1c62f0e0"
+          }
+        ],
+        "intense": [
+          {
+            "src": "/assets/audio/music/songs/crystal-echoes/intense.ogg?v=2fc53f620f2ec448"
+          }
+        ],
+        "syncGroup": "crystal-echoes"
+      },
+      "durationSeconds": 141.643,
+      "mixOutSeconds": 130.643,
+      "loop": true,
+      "metadata": {
+        "bpm": 84,
+        "key": "F# Dorian",
+        "mood": "contemplative",
+        "provenance": "legacy-generated-music-library"
+      }
+    },
+    {
+      "id": "ember-rush",
+      "title": "Ember Rush",
+      "playback": {
+        "kind": "stems",
+        "calm": [
+          {
+            "src": "/assets/audio/music/songs/ember-rush/calm.ogg?v=89e804831e8a8280"
+          }
+        ],
+        "intense": [
+          {
+            "src": "/assets/audio/music/songs/ember-rush/intense.ogg?v=ad812b2f4ecf8968"
+          }
+        ],
+        "syncGroup": "ember-rush"
+      },
+      "durationSeconds": 122.81,
+      "mixOutSeconds": 111.81,
+      "loop": true,
+      "metadata": {
+        "bpm": 142,
+        "key": "E Phrygian dominant",
+        "mood": "fiery",
+        "provenance": "legacy-generated-music-library"
+      }
+    },
+    {
+      "id": "eternity-gate",
+      "title": "Eternity Gate",
+      "playback": {
+        "kind": "stems",
+        "calm": [
+          {
+            "src": "/assets/audio/music/songs/eternity-gate/calm.ogg?v=8e9301bebf659801"
+          }
+        ],
+        "intense": [
+          {
+            "src": "/assets/audio/music/songs/eternity-gate/intense.ogg?v=8306fe256405ad48"
+          }
+        ],
+        "syncGroup": "eternity-gate"
+      },
+      "durationSeconds": 122.709,
+      "mixOutSeconds": 111.709,
+      "loop": true,
+      "metadata": {
+        "bpm": 134,
+        "key": "C minor / Eb major",
+        "mood": "triumphant",
+        "provenance": "legacy-generated-music-library"
+      }
+    },
+    {
+      "id": "forge-of-stars",
+      "title": "Forge of Stars",
+      "playback": {
+        "kind": "stems",
+        "calm": [
+          {
+            "src": "/assets/audio/music/songs/forge-of-stars/calm.ogg?v=260ab27aef1026b2"
+          }
+        ],
+        "intense": [
+          {
+            "src": "/assets/audio/music/songs/forge-of-stars/intense.ogg?v=edfb0c209c4559c9"
+          }
+        ],
+        "syncGroup": "forge-of-stars"
+      },
+      "durationSeconds": 128.25,
+      "mixOutSeconds": 117.25,
+      "loop": true,
+      "metadata": {
+        "bpm": 128,
+        "key": "D minor",
+        "mood": "climactic",
+        "provenance": "legacy-generated-music-library"
+      }
+    },
+    {
+      "id": "glass-solitude",
+      "title": "Glass Solitude",
+      "playback": {
+        "kind": "stems",
+        "calm": [
+          {
+            "src": "/assets/audio/music/songs/glass-solitude/calm.ogg?v=5d980d46157c0d04"
+          }
+        ],
+        "intense": [
+          {
+            "src": "/assets/audio/music/songs/glass-solitude/intense.ogg?v=55aca490f34b1a35"
+          }
+        ],
+        "syncGroup": "glass-solitude"
+      },
+      "durationSeconds": 144.5,
+      "mixOutSeconds": 133.5,
+      "loop": true,
+      "metadata": {
+        "bpm": 72,
+        "key": "B minor",
+        "mood": "lonely",
+        "provenance": "legacy-generated-music-library"
+      }
+    },
+    {
+      "id": "hollow-roots",
+      "title": "Hollow Roots",
+      "playback": {
+        "kind": "stems",
+        "calm": [
+          {
+            "src": "/assets/audio/music/songs/hollow-roots/calm.ogg?v=b5cc5164818df0e0"
+          }
+        ],
+        "intense": [
+          {
+            "src": "/assets/audio/music/songs/hollow-roots/intense.ogg?v=891afead0d8d2430"
+          }
+        ],
+        "syncGroup": "hollow-roots"
+      },
+      "durationSeconds": 159.794,
+      "mixOutSeconds": 148.794,
+      "loop": true,
+      "metadata": {
+        "bpm": 68,
+        "key": "D minor",
+        "mood": "gloomy",
+        "provenance": "legacy-generated-music-library"
+      }
+    },
+    {
+      "id": "molten-crown",
+      "title": "Molten Crown",
+      "playback": {
+        "kind": "stems",
+        "calm": [
+          {
+            "src": "/assets/audio/music/songs/molten-crown/calm.ogg?v=ba4a375898cf0542"
+          }
+        ],
+        "intense": [
+          {
+            "src": "/assets/audio/music/songs/molten-crown/intense.ogg?v=17d627fabc1eb0ab"
+          }
+        ],
+        "syncGroup": "molten-crown"
+      },
+      "durationSeconds": 130.214,
+      "mixOutSeconds": 119.214,
+      "loop": true,
+      "metadata": {
+        "bpm": 126,
+        "key": "C minor",
+        "mood": "blazing",
+        "provenance": "legacy-generated-music-library"
+      }
+    },
+    {
+      "id": "requiem-of-light",
+      "title": "Requiem of Light",
+      "playback": {
+        "kind": "stems",
+        "calm": [
+          {
+            "src": "/assets/audio/music/songs/requiem-of-light/calm.ogg?v=d0ba5d0d97f176f6"
+          }
+        ],
+        "intense": [
+          {
+            "src": "/assets/audio/music/songs/requiem-of-light/intense.ogg?v=6b522fb8342a96dc"
+          }
+        ],
+        "syncGroup": "requiem-of-light"
+      },
+      "durationSeconds": 142.682,
+      "mixOutSeconds": 131.682,
+      "loop": true,
+      "metadata": {
+        "bpm": 66,
+        "key": "F minor",
+        "mood": "sad",
+        "provenance": "legacy-generated-music-library"
+      }
+    },
+    {
+      "id": "signal-in-the-void",
+      "title": "Signal in the Void",
+      "playback": {
+        "kind": "stems",
+        "calm": [
+          {
+            "src": "/assets/audio/music/songs/signal-in-the-void/calm.ogg?v=4b8b61b0543e0d01"
+          }
+        ],
+        "intense": [
+          {
+            "src": "/assets/audio/music/songs/signal-in-the-void/intense.ogg?v=612ef174da043388"
+          }
+        ],
+        "syncGroup": "signal-in-the-void"
+      },
+      "durationSeconds": 145.929,
+      "mixOutSeconds": 134.929,
+      "loop": true,
+      "metadata": {
+        "bpm": 112,
+        "key": "A minor",
+        "mood": "suspense",
+        "provenance": "legacy-generated-music-library"
+      }
+    },
+    {
+      "id": "starlit-lullaby",
+      "title": "Starlit Lullaby",
+      "playback": {
+        "kind": "stems",
+        "calm": [
+          {
+            "src": "/assets/audio/music/songs/starlit-lullaby/calm.ogg?v=6670aefb80d014f5"
+          }
+        ],
+        "intense": [
+          {
+            "src": "/assets/audio/music/songs/starlit-lullaby/intense.ogg?v=aacd5751ee2a7afb"
+          }
+        ],
+        "syncGroup": "starlit-lullaby"
+      },
+      "durationSeconds": 128.786,
+      "mixOutSeconds": 117.786,
+      "loop": true,
+      "metadata": {
+        "bpm": 84,
+        "key": "D major",
+        "mood": "gentle",
+        "provenance": "legacy-generated-music-library"
+      }
+    },
+    {
+      "id": "sunseed-parade",
+      "title": "Sunseed Parade",
+      "playback": {
+        "kind": "stems",
+        "calm": [
+          {
+            "src": "/assets/audio/music/songs/sunseed-parade/calm.ogg?v=d4067a2461788bcd"
+          }
+        ],
+        "intense": [
+          {
+            "src": "/assets/audio/music/songs/sunseed-parade/intense.ogg?v=2901eca6e65693ae"
+          }
+        ],
+        "syncGroup": "sunseed-parade"
+      },
+      "durationSeconds": 128.5,
+      "mixOutSeconds": 117.5,
+      "loop": true,
+      "metadata": {
+        "bpm": 120,
+        "key": "G major",
+        "mood": "happy",
+        "provenance": "legacy-generated-music-library"
+      }
+    }
+  ]
+}
