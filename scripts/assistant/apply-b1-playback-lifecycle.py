@@ -1,72 +1,75 @@
 from pathlib import Path
 
-path = Path('src/audio/MusicController.ts')
-text = path.read_text()
 
-anchor = '''import {\n  sharedAudioFocus,\n  type AudioFocusReason,\n} from "./focus-manager";\n'''
-replacement = anchor + '''import {\n  classifyMusicPlaybackFailure,\n  type MusicPlaybackFailureKind,\n} from "./music-playback-failure";\n'''
-if text.count(anchor) != 1:
-    raise SystemExit(f'import anchor count={text.count(anchor)}')
-text = text.replace(anchor, replacement, 1)
+def replace_once(text: str, old: str, new: str, label: str) -> str:
+    if new in text:
+        return text
+    count = text.count(old)
+    if count != 1:
+        raise SystemExit(f"{label} anchor count={count}")
+    return text.replace(old, new, 1)
 
-old = '''  advancingFallback: boolean;\n'''
-new = '''  advancingFallback: boolean;\n  disposed: boolean;\n  playRequestGeneration: number;\n  networkRetryCount: number;\n'''
-if text.count(old) != 1:
-    raise SystemExit(f'ManagedTrack anchor count={text.count(old)}')
-text = text.replace(old, new, 1)
 
-old = '''function stopTrack(track: ManagedTrack): void {\n  detachListeners(track);\n  track.audio.pause();\n  track.audio.currentTime = 0;\n  track.output.dispose();\n}\n'''
-new = '''function stopTrack(track: ManagedTrack): void {\n  track.disposed = true;\n  track.playRequestGeneration += 1;\n  detachListeners(track);\n  track.audio.pause();\n  track.audio.currentTime = 0;\n  track.output.dispose();\n}\n'''
-if text.count(old) != 1:
-    raise SystemExit(f'stopTrack anchor count={text.count(old)}')
-text = text.replace(old, new, 1)
+# ---------------------------------------------------------------------------
+# ShuffleBag: reserve/peek without consuming, then commit only after playback.
+# ---------------------------------------------------------------------------
+library_path = Path("src/audio/music-library.ts")
+library = library_path.read_text()
+old_class = '''export class ShuffleBag {\n  private bag: string[] = [];\n\n  constructor(\n    private readonly ids: readonly string[],\n    private readonly random: () => number = Math.random,\n  ) {}\n\n  next(avoid: string | null): string | null {\n    if (this.ids.length === 0) return null;\n    if (this.bag.length === 0) {\n      this.bag = [...this.ids];\n      for (let index = this.bag.length - 1; index > 0; index -= 1) {\n        const swap = Math.floor(this.random() * (index + 1));\n        [this.bag[index], this.bag[swap]] = [this.bag[swap]!, this.bag[index]!];\n      }\n    }\n    // Drawn from the end; move the avoided song away from the top.\n    if (this.bag.length > 1 && this.bag[this.bag.length - 1] === avoid) {\n      [this.bag[0], this.bag[this.bag.length - 1]] = [this.bag[this.bag.length - 1]!, this.bag[0]!];\n    }\n    const id = this.bag.pop()!;\n    if (id === avoid && this.ids.length > 1) return this.next(avoid);\n    return id;\n  }\n}\n'''
+new_class = '''export class ShuffleBag {\n  private bag: string[] = [];\n  private reserved: string | null = null;\n\n  constructor(\n    private readonly ids: readonly string[],\n    private readonly random: () => number = Math.random,\n  ) {}\n\n  private refill(): void {\n    this.bag = [...this.ids];\n    for (let index = this.bag.length - 1; index > 0; index -= 1) {\n      const swap = Math.floor(this.random() * (index + 1));\n      [this.bag[index], this.bag[swap]] = [this.bag[swap]!, this.bag[index]!];\n    }\n  }\n\n  /**\n   * Reserves the next id without consuming it. Repeated peeks are stable, so\n   * preload/warm-up can inspect the next song without advancing the shuffle.\n   */\n  peek(avoid: string | null): string | null {\n    if (this.ids.length === 0) return null;\n\n    if (this.reserved !== null) {\n      if (this.reserved !== avoid || this.ids.length === 1) return this.reserved;\n      this.reserved = null;\n    }\n\n    if (this.bag.length === 0) this.refill();\n\n    // Drawn from the end; move the avoided song away from the top. This also\n    // prevents an immediate repeat across bag refills.\n    if (this.bag.length > 1 && this.bag[this.bag.length - 1] === avoid) {\n      [this.bag[0], this.bag[this.bag.length - 1]] = [\n        this.bag[this.bag.length - 1]!,\n        this.bag[0]!,\n      ];\n    } else if (\n      this.bag.length === 1 &&\n      this.bag[0] === avoid &&\n      this.ids.length > 1\n    ) {\n      // Defensive edge case when the caller's avoid id came from outside this\n      // bag. Start a fresh cycle rather than returning an immediate repeat.\n      this.refill();\n      if (this.bag.length > 1 && this.bag[this.bag.length - 1] === avoid) {\n        [this.bag[0], this.bag[this.bag.length - 1]] = [\n          this.bag[this.bag.length - 1]!,\n          this.bag[0]!,\n        ];\n      }\n    }\n\n    this.reserved = this.bag[this.bag.length - 1] ?? null;\n    return this.reserved;\n  }\n\n  /** Consumes the current reservation only when the expected id still owns it. */\n  commit(expectedId: string | null = null): string | null {\n    const reserved = this.reserved;\n    if (reserved === null) return null;\n    if (expectedId !== null && expectedId !== reserved) return null;\n    if (this.bag[this.bag.length - 1] !== reserved) {\n      throw new Error("ShuffleBag reservation drifted from the queue.");\n    }\n    this.bag.pop();\n    this.reserved = null;\n    return reserved;\n  }\n\n  /** Releases a preload reservation without consuming the queued id. */\n  cancelReservation(expectedId: string | null = null): void {\n    if (\n      this.reserved !== null &&\n      (expectedId === null || expectedId === this.reserved)\n    ) {\n      this.reserved = null;\n    }\n  }\n\n  /** Legacy draw API: reserve and commit in one operation. */\n  next(avoid: string | null): string | null {\n    const id = this.peek(avoid);\n    return id === null ? null : this.commit(id);\n  }\n}\n'''
+if new_class not in library:
+    count = library.count(old_class)
+    if count != 1:
+        raise SystemExit(f"ShuffleBag class anchor count={count}")
+    library = library.replace(old_class, new_class, 1)
+    library_path.write_text(library)
 
-old = '''function safePlay(audio: AudioLike): Promise<void> {\n  try {\n    const result = audio.play();\n    if (\n      result !== undefined &&\n      typeof (result as Promise<void>).catch === "function"\n    ) {\n      return result as Promise<void>;\n    }\n    return Promise.resolve();\n  } catch {\n    return Promise.reject(new Error("Audio playback failed."));\n  }\n}\n'''
-new = '''function safePlay(audio: AudioLike): Promise<void> {\n  try {\n    const result = audio.play();\n    if (\n      result !== undefined &&\n      typeof (result as Promise<void>).catch === "function"\n    ) {\n      return result as Promise<void>;\n    }\n    return Promise.resolve();\n  } catch (error) {\n    return Promise.reject(error);\n  }\n}\n'''
-if text.count(old) != 1:
-    raise SystemExit(f'safePlay anchor count={text.count(old)}')
-text = text.replace(old, new, 1)
 
-old = '''  playbackMode: MusicPlaybackMode;\n  song: null | {\n'''
-new = '''  playbackMode: MusicPlaybackMode;\n  lastPlaybackFailure: null | {\n    assetId: string;\n    kind: MusicPlaybackFailureKind;\n  };\n  song: null | {\n'''
-if text.count(old) != 1:
-    raise SystemExit(f'debug type anchor count={text.count(old)}')
-text = text.replace(old, new, 1)
+# ---------------------------------------------------------------------------
+# MusicController: random selection peeks; successful playback commits.
+# ---------------------------------------------------------------------------
+controller_path = Path("src/audio/MusicController.ts")
+controller = controller_path.read_text()
+controller = replace_once(
+    controller,
+    '''  private firstSong(): MusicTrack | null {\n    if (this.mode === "random") return this.trackById(this.shuffle.next(null) ?? undefined);\n''',
+    '''  private firstSong(): MusicTrack | null {\n    if (this.mode === "random") return this.trackById(this.shuffle.peek(null) ?? undefined);\n''',
+    "firstSong random reservation",
+)
+controller = replace_once(
+    controller,
+    '''    if (this.mode === "random") {\n      this.upcoming = this.trackById(this.shuffle.next(this.currentSong?.id ?? null) ?? undefined);\n''',
+    '''    if (this.mode === "random") {\n      this.upcoming = this.trackById(this.shuffle.peek(this.currentSong?.id ?? null) ?? undefined);\n''',
+    "peekNextSong random reservation",
+)
+controller = replace_once(
+    controller,
+    '''  private async playTrack(track: ManagedTrack): Promise<void> {\n''',
+    '''  private commitRandomSongReservation(track: ManagedTrack): void {\n    if (this.mode !== "random" || track.songId === null) return;\n    this.shuffle.commit(track.songId);\n  }\n\n  private async playTrack(track: ManagedTrack): Promise<void> {\n''',
+    "random reservation commit helper",
+)
+controller = replace_once(
+    controller,
+    '''      track.networkRetryCount = 0;\n      if (this.lastPlaybackFailure?.assetId === track.assetId) {\n''',
+    '''      this.commitRandomSongReservation(track);\n      track.networkRetryCount = 0;\n      if (this.lastPlaybackFailure?.assetId === track.assetId) {\n''',
+    "primary playback reservation commit",
+)
+controller = replace_once(
+    controller,
+    '''          track.networkRetryCount = 0;\n          this.lastPlaybackFailure = null;\n          return;\n''',
+    '''          this.commitRandomSongReservation(track);\n          track.networkRetryCount = 0;\n          this.lastPlaybackFailure = null;\n          return;\n''',
+    "retry playback reservation commit",
+)
+controller_path.write_text(controller)
 
-old = '''  private focusUnsubscribe: (() => void) | null = null;\n\n  private syncSharedFocus'''
-new = '''  private focusUnsubscribe: (() => void) | null = null;\n  private lastPlaybackFailure: {\n    assetId: string;\n    kind: MusicPlaybackFailureKind;\n  } | null = null;\n\n  private syncSharedFocus'''
-if text.count(old) != 1:
-    raise SystemExit(f'failure property anchor count={text.count(old)}')
-text = text.replace(old, new, 1)
 
-old = '''  private readonly onUserGesture = (): void => {\n    this.unlockAudioGraph();\n  };\n'''
-new = '''  private readonly onUserGesture = (): void => {\n    this.unlockAudioGraph();\n    if (this.lastPlaybackFailure?.kind !== "autoplay-permission") return;\n    this.lastPlaybackFailure = null;\n    if (this.activeMusic !== null) void this.playTrack(this.activeMusic);\n    for (const track of this.activeAmbient) void this.playTrack(track);\n  };\n'''
-if text.count(old) != 1:
-    raise SystemExit(f'gesture anchor count={text.count(old)}')
-text = text.replace(old, new, 1)
-
-old = '''      playbackMode: this.mode,\n      song:\n'''
-new = '''      playbackMode: this.mode,\n      lastPlaybackFailure:\n        this.lastPlaybackFailure === null\n          ? null\n          : { ...this.lastPlaybackFailure },\n      song:\n'''
-if text.count(old) != 1:
-    raise SystemExit(f'debug snapshot anchor count={text.count(old)}')
-text = text.replace(old, new, 1)
-
-old = '''      endedListener: null,\n      advancingFallback: false,\n      syncGroup: asset.syncGroup ?? null,\n'''
-new = '''      endedListener: null,\n      advancingFallback: false,\n      disposed: false,\n      playRequestGeneration: 0,\n      networkRetryCount: 0,\n      syncGroup: asset.syncGroup ?? null,\n'''
-if text.count(old) != 1:
-    raise SystemExit(f'createTrack fields anchor count={text.count(old)}')
-text = text.replace(old, new, 1)
-
-old = '''  private async playTrack(track: ManagedTrack): Promise<void> {\n    if (this.paused || this.destroyed) return;\n\n    try {\n      await safePlay(track.audio);\n    } catch {\n      await this.tryNextCandidate(track);\n    }\n  }\n'''
-new = '''  private async playTrack(track: ManagedTrack): Promise<void> {\n    if (this.paused || this.destroyed || track.disposed) return;\n\n    const generation = ++track.playRequestGeneration;\n    const audio = track.audio;\n    try {\n      await safePlay(audio);\n      if (\n        track.disposed ||\n        track.audio !== audio ||\n        track.playRequestGeneration !== generation\n      ) {\n        return;\n      }\n      track.networkRetryCount = 0;\n      if (this.lastPlaybackFailure?.assetId === track.assetId) {\n        this.lastPlaybackFailure = null;\n      }\n      return;\n    } catch (error) {\n      if (\n        track.disposed ||\n        track.audio !== audio ||\n        track.playRequestGeneration !== generation\n      ) {\n        return;\n      }\n\n      let failure = classifyMusicPlaybackFailure(error);\n      this.lastPlaybackFailure = { assetId: track.assetId, kind: failure.kind };\n      if (\n        failure.kind === "autoplay-permission" ||\n        failure.kind === "stale-cancelled"\n      ) {\n        return;\n      }\n\n      if (failure.kind === "temporary-network" && track.networkRetryCount < 1) {\n        track.networkRetryCount += 1;\n        try {\n          await safePlay(audio);\n          if (\n            track.disposed ||\n            track.audio !== audio ||\n            track.playRequestGeneration !== generation\n          ) {\n            return;\n          }\n          track.networkRetryCount = 0;\n          this.lastPlaybackFailure = null;\n          return;\n        } catch (retryError) {\n          if (\n            track.disposed ||\n            track.audio !== audio ||\n            track.playRequestGeneration !== generation\n          ) {\n            return;\n          }\n          failure = classifyMusicPlaybackFailure(retryError);\n          this.lastPlaybackFailure = { assetId: track.assetId, kind: failure.kind };\n          if (\n            failure.kind === "autoplay-permission" ||\n            failure.kind === "stale-cancelled"\n          ) {\n            return;\n          }\n        }\n      }\n\n      await this.tryNextCandidate(track);\n    }\n  }\n'''
-if text.count(old) != 1:
-    raise SystemExit(f'playTrack anchor count={text.count(old)}')
-text = text.replace(old, new, 1)
-
-old = '''  private async tryNextCandidate(\n    track: ManagedTrack,\n  ): Promise<void> {\n    if (track.advancingFallback) return;\n    if (\n      this.destroyed ||\n      track.candidateIndex + 1 >= track.candidates.length\n    ) {\n      track.audio.pause();\n      return;\n    }\n\n    track.advancingFallback = true;\n    detachListeners(track);\n    track.audio.pause();\n    track.output.dispose();\n\n    track.candidateIndex += 1;\n    const next = this.audioFactory(\n      track.candidates[track.candidateIndex]!,\n    );\n    if (next === null) {\n      track.advancingFallback = false;\n      return;\n    }\n\n    track.audio = next;\n    track.output = this.createOutput(next);\n    track.errorListener = null;\n    track.endedListener = null;\n    this.configureAudio(track);\n    this.attachEnded(track);\n    this.applyVolumes();\n\n    if (!this.paused) {\n      try {\n        await safePlay(track.audio);\n      } catch {\n        track.advancingFallback = false;\n        await this.tryNextCandidate(track);\n        return;\n      }\n    }\n    track.advancingFallback = false;\n  }\n'''
-new = '''  private async tryNextCandidate(\n    track: ManagedTrack,\n  ): Promise<void> {\n    if (track.advancingFallback || track.disposed) return;\n    if (\n      this.destroyed ||\n      track.candidateIndex + 1 >= track.candidates.length\n    ) {\n      track.audio.pause();\n      return;\n    }\n\n    track.advancingFallback = true;\n    track.playRequestGeneration += 1;\n    detachListeners(track);\n    track.audio.pause();\n    track.output.dispose();\n\n    track.candidateIndex += 1;\n    const next = this.audioFactory(\n      track.candidates[track.candidateIndex]!,\n    );\n    if (next === null) {\n      track.advancingFallback = false;\n      return;\n    }\n\n    track.audio = next;\n    track.output = this.createOutput(next);\n    track.errorListener = null;\n    track.endedListener = null;\n    track.networkRetryCount = 0;\n    this.configureAudio(track);\n    this.attachEnded(track);\n    this.applyVolumes();\n\n    track.advancingFallback = false;\n    if (!this.paused) await this.playTrack(track);\n  }\n'''
-if text.count(old) != 1:
-    raise SystemExit(f'tryNextCandidate anchor count={text.count(old)}')
-text = text.replace(old, new, 1)
-
-path.write_text(text)
+# ---------------------------------------------------------------------------
+# Focused regression tests for reservation semantics.
+# ---------------------------------------------------------------------------
+test_path = Path("tests/music-shuffle-reservation.test.ts")
+test_content = '''import { describe, expect, it } from "vitest";\nimport { ShuffleBag } from "../src/audio/music-library";\n\ndescribe("B1 ShuffleBag reservation", () => {\n  it("keeps repeated preload peeks stable until playback commits", () => {\n    const bag = new ShuffleBag(["alpha", "beta", "gamma"], () => 0);\n    const reserved = bag.peek(null);\n\n    expect(reserved).not.toBeNull();\n    expect(bag.peek(null)).toBe(reserved);\n    expect(bag.commit(reserved)).toBe(reserved);\n    expect(bag.peek(reserved)).not.toBe(reserved);\n  });\n\n  it("can cancel a preload without consuming the queued song", () => {\n    const bag = new ShuffleBag(["alpha", "beta", "gamma"], () => 0);\n    const reserved = bag.peek(null);\n\n    bag.cancelReservation(reserved);\n\n    expect(bag.peek(null)).toBe(reserved);\n  });\n\n  it("preserves the legacy draw API and avoids immediate repeats", () => {\n    const bag = new ShuffleBag(["alpha", "beta", "gamma"], () => 0);\n    const first = bag.next(null);\n    const second = bag.next(first);\n    const third = bag.next(second);\n    const fourth = bag.next(third);\n\n    expect(new Set([first, second, third]).size).toBe(3);\n    expect(fourth).not.toBe(third);\n  });\n\n  it("does not commit a mismatched reservation", () => {\n    const bag = new ShuffleBag(["alpha", "beta"], () => 0);\n    const reserved = bag.peek(null);\n\n    expect(bag.commit(reserved === "alpha" ? "beta" : "alpha")).toBeNull();\n    expect(bag.peek(null)).toBe(reserved);\n  });\n});\n'''
+if test_path.exists():
+    if test_path.read_text() != test_content:
+        raise SystemExit(f"{test_path}: unexpected existing content")
+else:
+    test_path.write_text(test_content)
