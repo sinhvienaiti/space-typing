@@ -4,6 +4,11 @@ import type {
   DuelClientRoomSnapshot,
 } from "./authority";
 import type { DuelRoomBotConfig, DuelRoomSettingsInput } from "./room";
+import type { DuelGameMode } from "./game-mode";
+import {
+  isDuelAlternativeModePlayerView,
+  type DuelAlternativeModePlayerView,
+} from "./alternative-mode-view";
 import {
   DUEL_PROTOCOL_VERSION,
   parseDuelRoomListMessage,
@@ -64,6 +69,8 @@ export type DuelNetworkCallbacks = {
     view: DuelClientMatchView,
     events: readonly DuelClientEvent[],
   ): void;
+  /** Player-scoped alternative-mode state; null when leaving that round/mode. */
+  onAlternativeModeState?(view: DuelAlternativeModePlayerView | null): void;
   onPrediction?(prediction: DuelLocalPrediction): void;
   onError?(code: string, message: string): void;
 };
@@ -147,8 +154,10 @@ export class DuelNetworkClient {
   private watchingRooms = false;
   private requestSequence = 0;
   private intentSequence = 0;
+  private modeInputSequence = 0;
   private lastServerSequence = -1;
   private view: DuelClientMatchView | null = null;
+  private alternativeView: DuelAlternativeModePlayerView | null = null;
   private prediction = {
     roundId: null as string | null,
     targetInstanceId: null as string | null,
@@ -204,6 +213,10 @@ export class DuelNetworkClient {
 
   currentView(): DuelClientMatchView | null {
     return this.view;
+  }
+
+  currentAlternativeModeView(): DuelAlternativeModePlayerView | null {
+    return this.alternativeView;
   }
 
   currentPrediction(): DuelLocalPrediction {
@@ -287,11 +300,15 @@ export class DuelNetworkClient {
     });
   }
 
-  startMatch(roomId: string): boolean {
+  startMatch(
+    roomId: string,
+    gameMode: DuelGameMode = "standard",
+  ): boolean {
     return this.sendMessage({
       type: "START_MATCH",
       requestId: this.nextRequestId(),
       roomId,
+      ...(gameMode === "standard" ? {} : { gameMode }),
     });
   }
 
@@ -330,6 +347,7 @@ export class DuelNetworkClient {
     const view = this.view;
     if (
       view === null ||
+      view.gameMode !== "standard" ||
       this.socket === null ||
       this.socket.readyState !== SOCKET_OPEN ||
       this.status !== "connected"
@@ -349,6 +367,42 @@ export class DuelNetworkClient {
       roundId: view.roundId,
       sequence,
       intent,
+    });
+    return sent ? sequence : null;
+  }
+
+  sendModeInput(payload: unknown): number | null {
+    const view = this.view;
+    const alternative = this.alternativeView;
+    if (
+      view === null ||
+      alternative === null ||
+      view.gameMode === "standard" ||
+      alternative.gameMode !== view.gameMode ||
+      this.socket === null ||
+      this.socket.readyState !== SOCKET_OPEN ||
+      this.status !== "connected"
+    ) {
+      return null;
+    }
+
+    this.modeInputSequence = Math.max(
+      this.modeInputSequence + 1,
+      alternative.player.lastAcceptedSequence + 1,
+    );
+    const sequence = this.modeInputSequence;
+    const sent = this.sendMessage({
+      type: "MODE_INPUT",
+      matchId: view.matchId,
+      roundId: view.roundId,
+      envelope: {
+        gameMode: alternative.gameMode,
+        modeEpoch: alternative.modeEpoch,
+        inputId: "mode:" + view.roundId + ":" + String(sequence),
+        clientSequence: sequence,
+        kind: "mode-input",
+        payload,
+      },
     });
     return sent ? sequence : null;
   }
@@ -587,6 +641,33 @@ export class DuelNetworkClient {
         return;
       }
 
+      case "MODE_STATE": {
+        if (
+          typeof parsed.matchId !== "string" ||
+          typeof parsed.roundId !== "string" ||
+          !isDuelAlternativeModePlayerView(parsed.view)
+        ) {
+          return;
+        }
+        const current = this.view;
+        if (
+          current === null ||
+          current.matchId !== parsed.matchId ||
+          current.roundId !== parsed.roundId ||
+          current.gameMode === "standard" ||
+          current.gameMode !== parsed.view.gameMode
+        ) {
+          return;
+        }
+        this.alternativeView = parsed.view;
+        this.modeInputSequence = Math.max(
+          this.modeInputSequence,
+          parsed.view.player.lastAcceptedSequence,
+        );
+        this.callbacks.onAlternativeModeState?.(parsed.view);
+        return;
+      }
+
       case "PING":
         if (typeof parsed.nonce === "string") {
           this.sendMessage({
@@ -630,6 +711,18 @@ export class DuelNetworkClient {
       this.prediction.roundId !== null &&
       this.prediction.roundId !== view.roundId;
     this.view = view;
+    if (
+      roundChanged ||
+      view.gameMode === "standard" ||
+      (this.alternativeView !== null &&
+        this.alternativeView.gameMode !== view.gameMode)
+    ) {
+      this.modeInputSequence = 0;
+      if (this.alternativeView !== null) {
+        this.alternativeView = null;
+        this.callbacks.onAlternativeModeState?.(null);
+      }
+    }
     if (roundChanged) {
       this.intentSequence = 0;
       this.prediction.pendingSequences.clear();
