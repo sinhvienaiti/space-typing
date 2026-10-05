@@ -1703,6 +1703,7 @@ export class DuelAuthorityService {
     gameMode: Exclude<DuelGameMode, "standard">;
     channel: Exclude<DuelMatchChannel, "ranked">;
     engine: DuelEngine;
+    players: Readonly<Record<DuelPlayerId, string | null>>;
     bot: null | { playerId: DuelPlayerId; reactionMs: number };
   }> {
     const match = this.matches.get(matchId);
@@ -1727,6 +1728,7 @@ export class DuelAuthorityService {
         gameMode: match.gameMode,
         channel: match.channel,
         engine: match.engine,
+        players: { ...match.players },
         bot: match.botPlayerId === null || botConfig == null
           ? null
           : { playerId: match.botPlayerId, reactionMs: botConfig.reactionMs },

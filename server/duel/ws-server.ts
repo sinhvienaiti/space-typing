@@ -42,6 +42,9 @@ import {
   duelMatchmakingRating,
 } from "../../src/duel/ranked";
 import { DuelRoomListWatchers } from "./room-list-watchers";
+import { AlternativeMatchRuntime } from "./alternative-match-runtime";
+import type { DuelEngineEvent } from "../../src/duel/engine";
+import type { DuelPlayerId } from "../../src/duel/model";
 
 type ConnectionState = {
   sessionId: string | null;
@@ -160,6 +163,15 @@ const authority = new DuelAuthorityService(
 const socketsBySession = new Map<string, WebSocket>();
 const states = new Map<WebSocket, ConnectionState>();
 const activeMatches = new Set<string>();
+
+type AlternativeRuntimeRecord = {
+  roundId: string;
+  runtime: AlternativeMatchRuntime;
+  botTurnKey: string | null;
+  botDueAtMs: number | null;
+};
+
+const alternativeMatches = new Map<string, AlternativeRuntimeRecord>();
 const rankedStore =
   process.env.DUEL_RANKED_DATA_PATH === undefined ||
   process.env.DUEL_RANKED_DATA_PATH.trim() === ""
@@ -351,6 +363,121 @@ function sendUpdates(
   }
 }
 
+function disposeAlternativeMatch(matchId: string): void {
+  const record = alternativeMatches.get(matchId);
+  if (record === undefined) return;
+  record.runtime.dispose();
+  alternativeMatches.delete(matchId);
+}
+
+function ensureAlternativeRuntime(
+  matchId: string,
+  nowMs: number,
+): AlternativeRuntimeRecord | null {
+  const context = authority.alternativeMatchContext(matchId);
+  if (!context.ok) {
+    disposeAlternativeMatch(matchId);
+    return null;
+  }
+
+  const existing = alternativeMatches.get(matchId);
+  if (existing?.roundId === context.value.roundId) return existing;
+  if (existing !== undefined) existing.runtime.dispose();
+
+  const runtime = new AlternativeMatchRuntime(
+    context.value.engine,
+    context.value.gameMode,
+    context.value.channel,
+    { nowMs },
+  );
+  const record: AlternativeRuntimeRecord = {
+    roundId: context.value.roundId,
+    runtime,
+    botTurnKey: null,
+    botDueAtMs:
+      context.value.bot === null
+        ? null
+        : nowMs + context.value.bot.reactionMs,
+  };
+  alternativeMatches.set(matchId, record);
+  return record;
+}
+
+function playerIdForAlternativeSession(
+  players: Readonly<Record<DuelPlayerId, string | null>>,
+  sessionId: string,
+): DuelPlayerId | null {
+  if (players["player-1"] === sessionId) return "player-1";
+  if (players["player-2"] === sessionId) return "player-2";
+  return null;
+}
+
+function sendAlternativeStateToSession(
+  sessionId: string,
+  matchId: string,
+  record: AlternativeRuntimeRecord,
+): void {
+  const context = authority.alternativeMatchContext(matchId);
+  if (!context.ok || context.value.roundId !== record.roundId) return;
+  const playerId = playerIdForAlternativeSession(context.value.players, sessionId);
+  if (playerId === null) return;
+  const socket = socketForSession(sessionId);
+  if (socket === null) return;
+  send(socket, {
+    type: "MODE_STATE",
+    matchId,
+    roundId: record.roundId,
+    view: record.runtime.reconnectSnapshot(playerId),
+  });
+}
+
+function sendAlternativeStates(
+  matchId: string,
+  record: AlternativeRuntimeRecord,
+): void {
+  const context = authority.alternativeMatchContext(matchId);
+  if (!context.ok || context.value.roundId !== record.roundId) return;
+  for (const sessionId of Object.values(context.value.players)) {
+    if (sessionId !== null) {
+      sendAlternativeStateToSession(sessionId, matchId, record);
+    }
+  }
+}
+
+function botTurnKey(
+  runtime: AlternativeMatchRuntime,
+  playerId: DuelPlayerId,
+): string | null {
+  const view = runtime.reconnectSnapshot(playerId);
+  if (view.gameMode === "reflex") {
+    if (view.challenge === null || view.player.completed) return null;
+    return "reflex:" + view.challenge.challengeId;
+  }
+  if (view.beat === null || view.player.accepted) return null;
+  return "word-chain:" + view.beat.beatId;
+}
+
+function runAlternativeBotIfDue(
+  matchId: string,
+  record: AlternativeRuntimeRecord,
+  nowMs: number,
+): readonly DuelEngineEvent[] {
+  const context = authority.alternativeMatchContext(matchId);
+  if (!context.ok || context.value.bot === null) return [];
+  const key = botTurnKey(record.runtime, context.value.bot.playerId);
+  if (key === null) {
+    record.botDueAtMs = null;
+    return [];
+  }
+  if (record.botTurnKey !== key) {
+    record.botTurnKey = key;
+    record.botDueAtMs = nowMs + context.value.bot.reactionMs;
+  }
+  if (record.botDueAtMs === null || nowMs < record.botDueAtMs) return [];
+  record.botDueAtMs = null;
+  return record.runtime.runBotTurn(context.value.bot.playerId, nowMs);
+}
+
 function sendRankedCompletion(
   completed: DuelRankedCompletedProfiles | null,
 ): void {
@@ -462,6 +589,14 @@ function handleHello(
       });
       if (view.value.series.status === "active") {
         activeMatches.add(view.value.matchId);
+        const alternative = ensureAlternativeRuntime(view.value.matchId, Date.now());
+        if (alternative !== null) {
+          sendAlternativeStateToSession(
+            opened.value.sessionId,
+            view.value.matchId,
+            alternative,
+          );
+        }
       }
     }
   }
@@ -491,7 +626,7 @@ function handleAuthenticatedMessage(
   if (sessionId === null) return;
   const now = Date.now();
 
-  if (message.type !== "INTENT") {
+  if (message.type !== "INTENT" && message.type !== "MODE_INPUT") {
     const rate = authority.acceptMessage(
       sessionId,
       now,
@@ -676,6 +811,7 @@ function handleAuthenticatedMessage(
         sessionId,
         message.roomId,
         now,
+        message.gameMode ?? "standard",
       );
       if (!result.ok) {
         sendError(socket, result, message.requestId);
@@ -683,6 +819,8 @@ function handleAuthenticatedMessage(
       }
       activeMatches.add(result.value.matchId);
       sendUpdates(result.value.updates);
+      const alternative = ensureAlternativeRuntime(result.value.matchId, now);
+      if (alternative !== null) sendAlternativeStates(result.value.matchId, alternative);
       roomList.notifyChanged();
       return;
     }
@@ -724,6 +862,55 @@ function handleAuthenticatedMessage(
         roomList.unwatch(socket);
       }
       return;
+
+    case "MODE_INPUT": {
+      const accepted = authority.submitModeInput(
+        sessionId,
+        {
+          matchId: message.matchId,
+          roundId: message.roundId,
+          envelope: message.envelope,
+          now,
+        },
+      );
+      if (!accepted.ok) {
+        sendError(socket, accepted);
+        return;
+      }
+      const record = ensureAlternativeRuntime(message.matchId, now);
+      if (record === null || record.roundId !== message.roundId) {
+        send(socket, {
+          type: "ERROR",
+          code: "MODE_RUNTIME_UNAVAILABLE",
+          message: "Alternative Duel runtime is unavailable for this round.",
+        });
+        return;
+      }
+      const received = record.runtime.receive(
+        accepted.value.playerId,
+        accepted.value.envelope,
+        now,
+      );
+      if (!received.ok) {
+        send(socket, {
+          type: "ERROR",
+          code: "MODE_INPUT_REJECTED",
+          message: "Alternative Duel input was rejected.",
+        });
+        return;
+      }
+      if (received.combatEvents.length > 0) {
+        const updated = authority.tick(
+          message.matchId,
+          0,
+          now,
+          received.combatEvents,
+        );
+        if (updated.ok) sendUpdates(updated.value.updates);
+      }
+      sendAlternativeStates(message.matchId, record);
+      return;
+    }
 
     case "INTENT": {
       const result = authority.submitIntent(
@@ -934,10 +1121,23 @@ const tickTimer = setInterval(() => {
     }
 
     for (const matchId of [...activeMatches]) {
+      const alternative = ensureAlternativeRuntime(matchId, now);
+      const alternativeEvents: DuelEngineEvent[] = [];
+      let alternativeStateChanged = false;
+      if (alternative !== null) {
+        alternativeEvents.push(
+          ...runAlternativeBotIfDue(matchId, alternative, now),
+        );
+        const modeTick = alternative.runtime.tick(now);
+        alternativeEvents.push(...modeTick.combatEvents);
+        alternativeStateChanged = modeTick.stateChanged;
+      }
+
       const result = authority.tick(
         matchId,
         TICK_MS / 1000,
         now,
+        alternativeEvents,
       );
       if (!result.ok) {
         activeMatches.delete(matchId);
@@ -945,6 +1145,16 @@ const tickTimer = setInterval(() => {
         continue;
       }
       sendUpdates(result.value.updates);
+      if (alternative !== null) {
+        const nextRoundId = result.value.updates[0]?.view.roundId;
+        if (nextRoundId !== undefined && nextRoundId !== alternative.roundId) {
+          disposeAlternativeMatch(matchId);
+          const nextAlternative = ensureAlternativeRuntime(matchId, now);
+          if (nextAlternative !== null) sendAlternativeStates(matchId, nextAlternative);
+        } else if (alternativeStateChanged || alternativeEvents.length > 0) {
+          sendAlternativeStates(matchId, alternative);
+        }
+      }
       const completed = ranked.completeIfFinished(
         matchId,
         result.value.updates,
@@ -956,6 +1166,7 @@ const tickTimer = setInterval(() => {
       );
       if (!active) {
         activeMatches.delete(matchId);
+        disposeAlternativeMatch(matchId);
         // A finished Friend match leaves the public room list.
         roomList.notifyChanged();
       }
@@ -996,6 +1207,9 @@ function shutdown(): void {
   clearInterval(heartbeatTimer);
   clearInterval(cleanupTimer);
   roomList.dispose();
+  for (const matchId of [...alternativeMatches.keys()]) {
+    disposeAlternativeMatch(matchId);
+  }
   for (const socket of states.keys()) {
     socket.close(1001, "Server shutting down.");
   }

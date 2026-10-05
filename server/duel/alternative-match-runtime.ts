@@ -225,6 +225,13 @@ export class AlternativeMatchRuntime {
     playerId: DuelPlayerId,
     nowMs: number,
   ): readonly DuelEngineEvent[] {
+    const current = this.reconnectSnapshot(playerId);
+    if (
+      (current.gameMode === "reflex" && current.player.completed) ||
+      (current.gameMode === "word-chain" && current.player.accepted)
+    ) {
+      return [];
+    }
     const token =
       this.reflex !== null
         ? this.reflexBotToken
