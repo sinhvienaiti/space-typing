@@ -1,0 +1,46 @@
+name: Assistant Apply A3
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]' && github.event.pull_request.head.ref == 'feat/audio-a1-pronunciation-audibility'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.21.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install
+        run: pnpm install --no-frozen-lockfile
+      - name: Apply guarded A3 patch
+        run: python scripts/assistant/apply-a3-audio-settings.py
+      - name: A3 focused tests
+        run: pnpm exec vitest run tests/player-audio-settings.test.ts tests/audio-settings-ui-contract.test.ts tests/audio-mix.test.ts tests/sample-sfx-bank.test.ts tests/pronunciation-mix-focus.test.ts tests/announcer-sfx.test.ts tests/sfx-lifecycle.test.ts tests/duel-audio.test.ts tests/title-hub.test.ts
+      - name: Type check
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+      - name: Diff safety
+        run: git diff --check
+      - name: Commit verified A3 production changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html src/types.ts src/audio/player-settings.ts src/audio/mix.ts src/audio/sample-bank.ts src/audio/Sfx.ts src/Game.ts src/speech.ts src/main.ts src/ui/title-hub.ts src/ui/audio-settings.css tests/player-audio-settings.test.ts tests/audio-settings-ui-contract.test.ts
+          if git diff --cached --quiet; then
+            echo "No A3 changes to commit"
+            exit 0
+          fi
+          git commit -m "feat(audio): add quick and advanced player mix controls"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
