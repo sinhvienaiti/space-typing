@@ -562,6 +562,7 @@ export class DuelLocalPracticeMatch {
       matchId: "practice",
       roundId: this.roundId,
       mode: "practice",
+      gameMode: "standard",
       combatProfile: "normalized",
       appearance: {
         selfCharacterId:
