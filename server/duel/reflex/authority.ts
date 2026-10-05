@@ -97,7 +97,11 @@ export class ReflexAuthority {
     nowMs: number;
     durationMs?: number;
   }): ReflexPublicChallenge {
-    const mode = this.modeRuntime.switchMode("reflex");
+    const currentMode = this.modeRuntime.snapshot();
+    const mode =
+      currentMode.gameMode === "reflex" && this.challenge !== null
+        ? this.modeRuntime.rotateEpoch()
+        : this.modeRuntime.switchMode("reflex");
     const source = createReviewedReflexChallenge({
       index: input.index,
       modeEpoch: mode.modeEpoch,
