@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { createWorldMusicAdminPreview } from "../../src/admin/world-music-preview";
 import type { MusicPlaybackMode } from "../../src/audio/music-library";
 import type { WorldMusicPolicy } from "../../src/audio/world-music-model";
@@ -10,7 +9,11 @@ type PreviewRequest = {
 
 async function readRequest(): Promise<PreviewRequest> {
   if (process.stdin.isTTY) return {};
-  const input = await readFile(0, "utf8");
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  const input = Buffer.concat(chunks).toString("utf8");
   if (input.trim().length === 0) return {};
   const value = JSON.parse(input) as PreviewRequest;
   if (value.musicMode !== undefined && value.musicMode !== "map" && value.musicMode !== "random") {
