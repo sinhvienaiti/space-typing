@@ -2,7 +2,12 @@ import type { DuelModeEpoch } from "./game-mode";
 
 export const REFLEX_CANDIDATE_COUNT = 3;
 
-export type ReflexChallengeKind = "translation-vn-en";
+export type ReflexChallengeKind =
+  | "translation-vn-en"
+  | "definition"
+  | "synonym"
+  | "antonym"
+  | "cloze-one-token";
 
 export type ReflexCandidate = Readonly<{
   candidateId: string;
