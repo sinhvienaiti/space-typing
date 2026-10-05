@@ -22,6 +22,10 @@ import {
   sharedAudioFocus,
   type AudioFocusReason,
 } from "./focus-manager";
+import {
+  classifyMusicPlaybackFailure,
+  type MusicPlaybackFailureKind,
+} from "./music-playback-failure";
 
 export type MusicDuckReason =
   | "pronunciation"
@@ -93,6 +97,9 @@ type ManagedTrack = {
   errorListener: EventListener | null;
   endedListener: EventListener | null;
   advancingFallback: boolean;
+  disposed: boolean;
+  playRequestGeneration: number;
+  networkRetryCount: number;
   /** Stems of one song (see AudioAssetRef.syncGroup). */
   syncGroup: string | null;
   /** The stem this one takes over from, until its position is matched. */
@@ -178,8 +185,8 @@ function safePlay(audio: AudioLike): Promise<void> {
       return result as Promise<void>;
     }
     return Promise.resolve();
-  } catch {
-    return Promise.reject(new Error("Audio playback failed."));
+  } catch (error) {
+    return Promise.reject(error);
   }
 }
 
@@ -190,6 +197,8 @@ function detachListeners(track: ManagedTrack): void {
 }
 
 function stopTrack(track: ManagedTrack): void {
+  track.disposed = true;
+  track.playRequestGeneration += 1;
   detachListeners(track);
   track.audio.pause();
   track.audio.currentTime = 0;
@@ -206,6 +215,10 @@ export type MusicDebugSnapshot = {
   duckReasons: string[];
   duckMultiplier: number;
   playbackMode: MusicPlaybackMode;
+  lastPlaybackFailure: null | {
+    assetId: string;
+    kind: MusicPlaybackFailureKind;
+  };
   song: null | {
     id: string;
     title: string;
@@ -286,6 +299,10 @@ export class MusicController {
   private gestureListening = false;
 
   private focusUnsubscribe: (() => void) | null = null;
+  private lastPlaybackFailure: {
+    assetId: string;
+    kind: MusicPlaybackFailureKind;
+  } | null = null;
 
   private syncSharedFocus(reasons: readonly AudioFocusReason[]): void {
     for (const reason of ["pronunciation", "announcer", "warning"] as const) {
@@ -297,6 +314,10 @@ export class MusicController {
 
   private readonly onUserGesture = (): void => {
     this.unlockAudioGraph();
+    if (this.lastPlaybackFailure?.kind !== "autoplay-permission") return;
+    this.lastPlaybackFailure = null;
+    if (this.activeMusic !== null) void this.playTrack(this.activeMusic);
+    for (const track of this.activeAmbient) void this.playTrack(track);
   };
 
   constructor(
@@ -365,6 +386,10 @@ export class MusicController {
       duckReasons: [...this.duckReasons].map(String).sort(),
       duckMultiplier: this.duckMultiplier(),
       playbackMode: this.mode,
+      lastPlaybackFailure:
+        this.lastPlaybackFailure === null
+          ? null
+          : { ...this.lastPlaybackFailure },
       song:
         this.currentSong === null
           ? null
@@ -1146,6 +1171,9 @@ export class MusicController {
       errorListener: null,
       endedListener: null,
       advancingFallback: false,
+      disposed: false,
+      playRequestGeneration: 0,
+      networkRetryCount: 0,
       syncGroup: asset.syncGroup ?? null,
       syncSource: null,
       songId: null,
@@ -1217,11 +1245,75 @@ export class MusicController {
   }
 
   private async playTrack(track: ManagedTrack): Promise<void> {
-    if (this.paused || this.destroyed) return;
+    if (this.paused || this.destroyed || track.disposed) return;
 
+    const generation = ++track.playRequestGeneration;
+    const audio = track.audio;
     try {
-      await safePlay(track.audio);
-    } catch {
+      await safePlay(audio);
+      if (
+        track.disposed ||
+        track.audio !== audio ||
+        track.playRequestGeneration !== generation
+      ) {
+        return;
+      }
+      track.networkRetryCount = 0;
+      if (this.lastPlaybackFailure?.assetId === track.assetId) {
+        this.lastPlaybackFailure = null;
+      }
+      return;
+    } catch (error) {
+      if (
+        track.disposed ||
+        track.audio !== audio ||
+        track.playRequestGeneration !== generation
+      ) {
+        return;
+      }
+
+      let failure = classifyMusicPlaybackFailure(error);
+      this.lastPlaybackFailure = { assetId: track.assetId, kind: failure.kind };
+      if (
+        failure.kind === "autoplay-permission" ||
+        failure.kind === "stale-cancelled"
+      ) {
+        return;
+      }
+
+      if (failure.kind === "temporary-network" && track.networkRetryCount < 1) {
+        track.networkRetryCount += 1;
+        try {
+          await safePlay(audio);
+          if (
+            track.disposed ||
+            track.audio !== audio ||
+            track.playRequestGeneration !== generation
+          ) {
+            return;
+          }
+          track.networkRetryCount = 0;
+          this.lastPlaybackFailure = null;
+          return;
+        } catch (retryError) {
+          if (
+            track.disposed ||
+            track.audio !== audio ||
+            track.playRequestGeneration !== generation
+          ) {
+            return;
+          }
+          failure = classifyMusicPlaybackFailure(retryError);
+          this.lastPlaybackFailure = { assetId: track.assetId, kind: failure.kind };
+          if (
+            failure.kind === "autoplay-permission" ||
+            failure.kind === "stale-cancelled"
+          ) {
+            return;
+          }
+        }
+      }
+
       await this.tryNextCandidate(track);
     }
   }
@@ -1229,7 +1321,7 @@ export class MusicController {
   private async tryNextCandidate(
     track: ManagedTrack,
   ): Promise<void> {
-    if (track.advancingFallback) return;
+    if (track.advancingFallback || track.disposed) return;
     if (
       this.destroyed ||
       track.candidateIndex + 1 >= track.candidates.length
@@ -1239,6 +1331,7 @@ export class MusicController {
     }
 
     track.advancingFallback = true;
+    track.playRequestGeneration += 1;
     detachListeners(track);
     track.audio.pause();
     track.output.dispose();
@@ -1256,20 +1349,13 @@ export class MusicController {
     track.output = this.createOutput(next);
     track.errorListener = null;
     track.endedListener = null;
+    track.networkRetryCount = 0;
     this.configureAudio(track);
     this.attachEnded(track);
     this.applyVolumes();
 
-    if (!this.paused) {
-      try {
-        await safePlay(track.audio);
-      } catch {
-        track.advancingFallback = false;
-        await this.tryNextCandidate(track);
-        return;
-      }
-    }
     track.advancingFallback = false;
+    if (!this.paused) await this.playTrack(track);
   }
 
   private duckMultiplier(): number {
