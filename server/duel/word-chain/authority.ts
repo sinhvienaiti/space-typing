@@ -274,11 +274,15 @@ export class WordChainAuthority {
       this.resetChain(nowMs);
       return;
     }
-    this.active = this.createBeat(this.active.publicBeat.modeEpoch, next, nowMs);
+    const epoch = this.modeRuntime.rotateEpoch().modeEpoch;
+    this.active = this.createBeat(epoch, next, nowMs);
   }
 
   private resetChain(nowMs: number): void {
-    const epoch = this.active?.publicBeat.modeEpoch ?? this.modeRuntime.snapshot().modeEpoch;
+    const epoch =
+      this.active === null
+        ? this.modeRuntime.switchMode("word-chain").modeEpoch
+        : this.modeRuntime.rotateEpoch().modeEpoch;
     this.resetCount += 1;
     this.usedWords.clear();
     const seeds = RESET_SEEDS[this.resetCount % RESET_SEEDS.length]!;
