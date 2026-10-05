@@ -82,6 +82,15 @@ function createNode<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
+const INTERACTIVE_KEY_TARGET =
+  'input, textarea, select, button, a[href], [contenteditable]:not([contenteditable="false"]), [role="button"]';
+
+function interactiveKeyTarget(target: EventTarget | null): boolean {
+  return target instanceof Element &&
+    (target.matches(INTERACTIVE_KEY_TARGET) ||
+      target.closest(INTERACTIVE_KEY_TARGET) !== null);
+}
+
 export function installDuelAlternativeBattleUi(
   hooks: DuelAlternativeBattleUiHooks,
 ): DuelAlternativeBattleUiController {
@@ -222,9 +231,7 @@ export function installDuelAlternativeBattleUi(
     }
     const target = event.target;
     if (
-      target instanceof HTMLInputElement ||
-      target instanceof HTMLTextAreaElement ||
-      target instanceof HTMLSelectElement ||
+      interactiveKeyTarget(target) ||
       event.ctrlKey ||
       event.altKey ||
       event.metaKey ||
