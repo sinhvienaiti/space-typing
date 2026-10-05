@@ -347,7 +347,7 @@ export class DuelNetworkClient {
     const view = this.view;
     if (
       view === null ||
-      view.gameMode !== "standard" ||
+      (view.gameMode !== undefined && view.gameMode !== "standard") ||
       this.socket === null ||
       this.socket.readyState !== SOCKET_OPEN ||
       this.status !== "connected"
@@ -713,7 +713,7 @@ export class DuelNetworkClient {
     this.view = view;
     if (
       roundChanged ||
-      view.gameMode === "standard" ||
+      (view.gameMode ?? "standard") === "standard" ||
       (this.alternativeView !== null &&
         this.alternativeView.gameMode !== view.gameMode)
     ) {
