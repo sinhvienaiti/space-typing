@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const samplePlay = vi.hoisted(() => vi.fn(() => true));
+const samplePlay = vi.hoisted(() => vi.fn((_id: string) => true));
 const samplePreload = vi.hoisted(() => vi.fn());
 
 vi.mock("../src/audio/sample-bank", () => ({
@@ -8,7 +8,15 @@ vi.mock("../src/audio/sample-bank", () => ({
     setMix(): void {}
     preload(): void { samplePreload(); }
     destroy(): void {}
-    play(...args: unknown[]): boolean { return samplePlay(...args); }
+    play(
+      id: string,
+      _masterVolume: number,
+      _pronunciationActive: boolean,
+      _playbackRate = 1,
+      _groupPreferences?: unknown,
+    ): boolean {
+      return samplePlay(id);
+    }
   },
 }));
 
