@@ -1259,6 +1259,13 @@ export class Sfx {
   }
 
   private groupOutput(context: AudioContext, group: AudioGroup): AudioNode {
+    // Browsers provide createGain(), but several isolated QA/test harnesses use
+    // a deliberately minimal AudioContext. Keep those paths functional by
+    // falling back to the shared output rather than crashing before audio can
+    // be skipped/simulated. Production Web Audio still gets per-group buses.
+    if (typeof context.createGain !== "function") {
+      return this.outputNode(context);
+    }
     let bus = this.groupBuses.get(group);
     if (bus !== undefined) return bus;
     bus = context.createGain();
