@@ -1,4 +1,11 @@
 import type { DuelMapId } from "./maps";
+import {
+  isDuelGameMode,
+  parseDuelModeInputEnvelope,
+  type DuelGameMode,
+  type DuelModeInputEnvelope,
+} from "./game-mode";
+import type { DuelAlternativeModePlayerView } from "./alternative-mode-view";
 import type {
   DuelHazardLevel,
   DuelMatchLengthSeconds,
@@ -7,8 +14,8 @@ import type {
   DuelRoundFormat,
 } from "./room";
 
-// V7: 5 s round break, slower cannon/attack flight. Restart the Duel server.
-export const DUEL_PROTOCOL_VERSION = 7;
+// V8: authoritative alternative Duel mode input/state. Restart the Duel server.
+export const DUEL_PROTOCOL_VERSION = 8;
 export const DUEL_PROTOCOL_MAX_MESSAGE_BYTES = 4096;
 /** ROOM_LIST never carries more rooms than this (waiting rooms first, newest first). */
 export const DUEL_ROOM_LIST_MAX_ROOMS = 50;
@@ -132,6 +139,8 @@ export type DuelClientMessage =
       type: "START_MATCH";
       requestId: string;
       roomId: string;
+      /** Omitted by older callers; authority defaults to Standard. */
+      gameMode?: DuelGameMode;
     }
   | {
       type: "QUEUE_RANKED";
@@ -155,6 +164,12 @@ export type DuelClientMessage =
       roundId: string;
       sequence: number;
       intent: DuelWireIntent;
+    }
+  | {
+      type: "MODE_INPUT";
+      matchId: string;
+      roundId: string;
+      envelope: DuelModeInputEnvelope;
     }
   | {
       type: "PONG";
@@ -193,6 +208,13 @@ export type DuelServerMessage =
       serverSequence: number;
       events: readonly unknown[];
       snapshot: unknown;
+    }
+  | {
+      /** Player-scoped; never broadcast a rival private buffer. */
+      type: "MODE_STATE";
+      matchId: string;
+      roundId: string;
+      view: DuelAlternativeModePlayerView;
     }
   | {
       type: "ROOM_CLOSED";
@@ -640,8 +662,7 @@ function parseMessageObject(
         },
       };
     }
-    case "REMOVE_BOT":
-    case "START_MATCH": {
+    case "REMOVE_BOT": {
       if (!exactKeys(value, ["type", "requestId", "roomId"])) {
         return null;
       }
@@ -650,6 +671,27 @@ function parseMessageObject(
       return requestId === null || roomId === null
         ? null
         : { type, requestId, roomId };
+    }
+    case "START_MATCH": {
+      if (!exactKeys(value, ["type", "requestId", "roomId", "gameMode"])) {
+        return null;
+      }
+      const requestId = stringField(value, "requestId", 64);
+      const roomId = stringField(value, "roomId", 32);
+      const gameMode = value.gameMode;
+      if (
+        requestId === null ||
+        roomId === null ||
+        (gameMode !== undefined && !isDuelGameMode(gameMode))
+      ) {
+        return null;
+      }
+      return {
+        type,
+        requestId,
+        roomId,
+        ...(gameMode === undefined ? {} : { gameMode }),
+      };
     }
     case "QUEUE_RANKED": {
       // exactKeys only rejects unknown keys; characterId is optional.
@@ -719,6 +761,16 @@ function parseMessageObject(
         sequence,
         intent,
       };
+    }
+    case "MODE_INPUT": {
+      if (!exactKeys(value, ["type", "matchId", "roundId", "envelope"])) {
+        return null;
+      }
+      const matchId = stringField(value, "matchId", 64);
+      const roundId = stringField(value, "roundId", 64);
+      const envelope = parseDuelModeInputEnvelope(value.envelope);
+      if (matchId === null || roundId === null || !envelope.ok) return null;
+      return { type, matchId, roundId, envelope: envelope.value };
     }
     case "PONG": {
       if (!exactKeys(value, ["type", "nonce"])) return null;

@@ -17,6 +17,8 @@ export type WordChainPublicBeat = Readonly<{
 export type WordChainPlayerPublicState = Readonly<{
   buffer: string;
   accepted: boolean;
+  /** Sequence floor a reconnecting client must continue above. */
+  lastAcceptedSequence: number;
 }>;
 
 export type WordChainModeInput =

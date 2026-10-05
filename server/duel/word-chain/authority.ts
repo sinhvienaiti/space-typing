@@ -69,7 +69,11 @@ function playerState(): MutablePlayerBeatState {
 }
 
 function publicPlayerState(state: MutablePlayerBeatState): WordChainPlayerPublicState {
-  return { buffer: state.buffer, accepted: state.acceptedWord !== null };
+  return {
+    buffer: state.buffer,
+    accepted: state.acceptedWord !== null,
+    lastAcceptedSequence: state.lastClientSequence,
+  };
 }
 
 function cloneBeat(beat: WordChainPublicBeat): WordChainPublicBeat {
@@ -122,7 +126,7 @@ export class WordChainAuthority {
       beat: this.active === null ? null : this.publicBeat(),
       player:
         this.active === null
-          ? { buffer: "", accepted: false }
+          ? { buffer: "", accepted: false, lastAcceptedSequence: -1 }
           : publicPlayerState(this.active.player[playerId]),
     };
   }

@@ -30,6 +30,8 @@ export type ReflexPlayerPublicState = Readonly<{
   semanticMistakes: number;
   retries: number;
   completed: boolean;
+  /** Sequence floor a reconnecting client must continue above. */
+  lastAcceptedSequence: number;
 }>;
 
 export type ReflexModeInput =

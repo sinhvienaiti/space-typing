@@ -69,6 +69,7 @@ function publicState(state: MutablePlayerState): ReflexPlayerPublicState {
     semanticMistakes: state.semanticMistakes,
     retries: state.retries,
     completed: state.completed,
+    lastAcceptedSequence: state.lastClientSequence,
   };
 }
 
