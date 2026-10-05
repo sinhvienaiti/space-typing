@@ -1,1 +1,2 @@
 Temporary trigger for the guarded B1 catalog playback workflow.
+Regression gate revision 2.
