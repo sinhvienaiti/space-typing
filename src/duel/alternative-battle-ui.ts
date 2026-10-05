@@ -110,6 +110,7 @@ export function installDuelAlternativeBattleUi(
   const head = createNode("header", "duel-alternative-head");
   const kicker = createNode("span", "duel-alternative-kicker");
   const clock = createNode("strong", "duel-alternative-clock");
+  clock.setAttribute("aria-hidden", "true");
   head.append(kicker, clock);
 
   const prompt = createNode("h2", "duel-alternative-prompt");
@@ -136,6 +137,7 @@ export function installDuelAlternativeBattleUi(
     );
     if (presentation.deadlineAtMs === null) {
       clock.textContent = "";
+      delete root.dataset.urgent;
       return;
     }
     const remainingMs = Math.max(0, presentation.deadlineAtMs - Date.now());
@@ -162,6 +164,7 @@ export function installDuelAlternativeBattleUi(
     if (!compatible || matchView === null || modeView === null) {
       root.classList.add("hidden");
       delete battle.dataset.alternativeMode;
+      delete root.dataset.urgent;
       stopTimer();
       return;
     }

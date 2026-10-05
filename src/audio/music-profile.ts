@@ -366,10 +366,13 @@ export function validateWorldMusicProfiles(): string[] {
       errors.push(world.id + ": invalid music/ambient runtime contract.");
     }
     if (
+      !Number.isFinite(profile.duckingProfile.pronunciation) ||
       profile.duckingProfile.pronunciation <= 0 ||
       profile.duckingProfile.pronunciation > 1 ||
+      !Number.isFinite(profile.duckingProfile.announcer) ||
       profile.duckingProfile.announcer <= 0 ||
       profile.duckingProfile.announcer > 1 ||
+      !Number.isFinite(profile.duckingProfile.warning) ||
       profile.duckingProfile.warning <= 0 ||
       profile.duckingProfile.warning > 1
     ) {
