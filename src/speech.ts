@@ -4,13 +4,16 @@ let speechGeneration = 0;
 let speechActive = false;
 let speechGate: (play: () => Promise<void>) => Promise<void> = play => play();
 let cancelPlayback: (() => void) | null = null;
+const PRONUNCIATION_WATCHDOG_MS = 20_000;
+
 export function setSpeechGate(gate: (play: () => Promise<void>) => Promise<void>): void { speechGate = gate; }
 
 function setSpeechActive(active: boolean): void {
   if (speechActive === active) return;
   speechActive = active;
-  // Keep speech state inside Space Typing. Local SFX can yield to vocabulary
-  // audio, but neither the game's music nor the portal's shared music should.
+  // This is the production pronunciation-focus lifecycle signal. Audio owners
+  // may yield while native TTS is actually speaking; the output gate still
+  // runs before playback/focus begins.
   window.dispatchEvent(
     new CustomEvent("space-typing:pronunciation", {
       detail: { active },
@@ -40,41 +43,60 @@ export function speakEnglish(text: string, settings: GameSettings): void {
 
 function playEnglish(text: string, settings: GameSettings): Promise<void> {
   return new Promise(resolve => {
+    speechGeneration += 1;
+    const generation = speechGeneration;
 
-  speechGeneration += 1;
-  const generation = speechGeneration;
+    // Latest pronunciation wins. Fast typing must not build a stale TTS queue.
+    speechSynthesis.cancel();
+    cancelPlayback?.();
 
-  // Latest pronunciation wins. Fast typing must not build a stale TTS queue.
-  speechSynthesis.cancel();
-  cancelPlayback?.();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "en-US";
+    utterance.rate = settings.pronunciationRate;
+    utterance.volume = settings.pronunciationVolume;
 
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "en-US";
-  utterance.rate = settings.pronunciationRate;
-  utterance.volume = settings.pronunciationVolume;
+    const voice = englishVoice();
+    if (voice !== null) utterance.voice = voice;
 
-  const voice = englishVoice();
-  if (voice !== null) utterance.voice = voice;
+    setSpeechActive(true);
 
-  setSpeechActive(true);
+    let finished = false;
+    let watchdog: ReturnType<typeof setTimeout> | null = null;
+    const finish = (): void => {
+      if (finished) return;
+      finished = true;
+      if (watchdog !== null) {
+        clearTimeout(watchdog);
+        watchdog = null;
+      }
+      resolve();
+      if (generation === speechGeneration) {
+        setSpeechActive(false);
+        cancelPlayback = null;
+      }
+    };
+    cancelPlayback = finish;
 
-  let finished = false;
-  const finish = (): void => {
-    if (finished) return;
-    finished = true;
-    resolve();
-    if (generation === speechGeneration) { setSpeechActive(false); cancelPlayback = null; }
-  };
-  cancelPlayback = finish;
+    utterance.onend = finish;
+    utterance.onerror = finish;
+    watchdog = setTimeout(() => {
+      if (generation === speechGeneration) {
+        try { speechSynthesis.cancel(); } catch { /* focus cleanup must still run */ }
+      }
+      finish();
+    }, PRONUNCIATION_WATCHDOG_MS);
 
-  utterance.onend = finish;
-  utterance.onerror = finish;
-  speechSynthesis.speak(utterance);
+    try {
+      speechSynthesis.speak(utterance);
+    } catch {
+      finish();
+    }
   });
 }
 
 export function stopSpeech(): void {
-  cancelPlayback?.(); cancelPlayback = null;
+  cancelPlayback?.();
+  cancelPlayback = null;
   speechGeneration += 1;
   setSpeechActive(false);
   if ("speechSynthesis" in window) speechSynthesis.cancel();
