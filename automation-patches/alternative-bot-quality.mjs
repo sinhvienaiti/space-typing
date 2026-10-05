@@ -148,7 +148,7 @@ edit("server/duel/alternative-match-runtime.ts", [
     );
     const attempt = ++this.botAttemptSequence[playerId];
     const roll = deterministicUnit(
-      `${this.gameMode}:${this.modeRuntime.snapshot().modeEpoch}:${playerId}:${attempt}`,
+      this.gameMode + ":" + this.modeRuntime.snapshot().modeEpoch + ":" + playerId + ":" + attempt,
     );
     const events: DuelEngineEvent[] = [];
 
