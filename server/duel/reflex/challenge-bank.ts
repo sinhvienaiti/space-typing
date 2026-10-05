@@ -98,7 +98,11 @@ export function createReviewedReflexChallenge(input: {
   if (correct === undefined) {
     throw new Error(`Correct answer missing from Reflex challenge ${entry.id}.`);
   }
-  const durationMs = Math.max(2_000, Math.min(60_000, input.durationMs ?? 12_000));
+  const requestedDurationMs = input.durationMs;
+  const durationMs =
+    typeof requestedDurationMs === "number" && Number.isFinite(requestedDurationMs)
+      ? Math.max(2_000, Math.min(60_000, requestedDurationMs))
+      : 12_000;
   const issuedAtMs = Number.isFinite(input.issuedAtMs)
     ? Math.max(0, Math.trunc(input.issuedAtMs))
     : 0;

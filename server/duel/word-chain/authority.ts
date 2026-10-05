@@ -231,7 +231,9 @@ export class WordChainAuthority {
   ): ActiveBeat {
     this.beatSequence += 1;
     const issuedAtMs = Number.isFinite(nowMs) ? Math.max(0, Math.trunc(nowMs)) : 0;
-    const duration = Math.max(2_000, Math.min(60_000, this.beatDurationMs));
+    const duration = Number.isFinite(this.beatDurationMs)
+      ? Math.max(2_000, Math.min(60_000, this.beatDurationMs))
+      : 12_000;
     const requiredInitial = {
       "player-1": required[0],
       "player-2": required[1],

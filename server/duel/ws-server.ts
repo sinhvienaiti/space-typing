@@ -1173,6 +1173,7 @@ const tickTimer = setInterval(() => {
       );
       if (!result.ok) {
         activeMatches.delete(matchId);
+        disposeAlternativeMatch(matchId);
         roomList.notifyChanged();
         continue;
       }

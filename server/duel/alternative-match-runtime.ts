@@ -118,10 +118,10 @@ export class AlternativeMatchRuntime {
   ) {
     this.combat = new DuelModeEngineCombatPort(engine);
     this.modeRuntime = new DuelModeRuntime(this.combat);
-    this.reflexChallengeIndex = Math.max(
-      0,
-      Math.trunc(input.challengeIndex ?? 0),
-    );
+    this.reflexChallengeIndex =
+      typeof input.challengeIndex === "number" && Number.isFinite(input.challengeIndex)
+        ? Math.max(0, Math.trunc(input.challengeIndex))
+        : 0;
     const travelMs = input.attackTravelMs ?? 600;
 
     if (gameMode === "reflex") {

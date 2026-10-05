@@ -39,9 +39,11 @@ function asObject(value: unknown): JsonObject | null {
     : null;
 }
 
-function exactKeys(value: JsonObject, allowed: readonly string[]): boolean {
-  const set = new Set(allowed);
-  return Object.keys(value).every((key) => set.has(key));
+const TYPE_CHAR_KEYS: ReadonlySet<string> = new Set(["type", "char"]);
+const TYPE_ONLY_KEYS: ReadonlySet<string> = new Set(["type"]);
+
+function exactKeys(value: JsonObject, allowed: ReadonlySet<string>): boolean {
+  return Object.keys(value).every((key) => allowed.has(key));
 }
 
 export function normalizeWordChainWord(value: string): string {
@@ -54,7 +56,7 @@ export function parseWordChainModeInput(raw: unknown): WordChainInputParseResult
     return { ok: false, reason: "schema" };
   }
   if (value.type === "TYPE_CHAR") {
-    if (!exactKeys(value, ["type", "char"])) return { ok: false, reason: "schema" };
+    if (!exactKeys(value, TYPE_CHAR_KEYS)) return { ok: false, reason: "schema" };
     if (typeof value.char !== "string" || !/^[a-zA-Z]$/.test(value.char)) {
       return { ok: false, reason: "schema" };
     }
@@ -64,7 +66,7 @@ export function parseWordChainModeInput(raw: unknown): WordChainInputParseResult
     };
   }
   if (value.type === "BACKSPACE" || value.type === "CLEAR" || value.type === "SUBMIT") {
-    if (!exactKeys(value, ["type"])) return { ok: false, reason: "schema" };
+    if (!exactKeys(value, TYPE_ONLY_KEYS)) return { ok: false, reason: "schema" };
     return { ok: true, value: { type: value.type } };
   }
   return { ok: false, reason: "schema" };
