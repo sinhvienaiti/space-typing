@@ -1,5 +1,5 @@
 {
-  "contractRevision": "space-typing-admin-v1",
+  "contractRevision": "space-typing-admin-v2",
   "schemaVersion": 1,
   "gameId": "space-typing",
   "label": "Space Typing",
@@ -14,13 +14,17 @@
     "world-music.write",
     "world-music.preview",
     "history.read",
-    "publish.write"
+    "publish.write",
+    "qa.session.read",
+    "qa.session.issue",
+    "qa.session.revoke"
   ],
   "routes": [
     { "id": "overview", "path": "/admin/space-typing", "label": "Overview" },
     { "id": "audio-mix", "path": "/admin/space-typing/audio", "label": "Audio & Mix" },
     { "id": "world-music", "path": "/admin/space-typing/world-music", "label": "World Music" },
-    { "id": "history-publish", "path": "/admin/space-typing/history", "label": "History / Publish" }
+    { "id": "history-publish", "path": "/admin/space-typing/history", "label": "History / Publish" },
+    { "id": "qa-session", "path": "/admin/space-typing/qa", "label": "QA Session" }
   ],
   "worldMusic": {
     "galaxyCount": 10,
@@ -43,6 +47,15 @@
       "version": 1,
       "command": "pnpm music:admin-preview"
     }
+  },
+  "qa": {
+    "protocolVersion": 1,
+    "target": "runtime-session",
+    "environments": ["local", "development", "preview", "test"],
+    "productionAllowed": false,
+    "persistenceTarget": "qa-sandbox",
+    "rewardEligibility": "none",
+    "applyBoundary": "new-qa-run"
   },
   "applyBoundaries": {
     "playerVolume": "immediate",
