@@ -109,14 +109,19 @@ describe("M22 full World audio mapping and lifecycle audit", () => {
 
         if (state === "SILENT") {
           expect(snapshot.activeMusic).toBeNull();
-        } else if (state === "WORLD_NORMAL" || state === "WORLD_INTENSE") {
-          // World music plays the map's songs: one file each, handed over to
-          // the next song instead of looping (docs/MUSIC_SYSTEM.md).
-          expect(snapshot.activeMusic).not.toBeNull();
-          expect(snapshot.song).not.toBeNull();
-          expect(snapshot.activeMusic?.loop).toBe(false);
-          expect(snapshot.activeMusic?.candidates.length).toBe(1);
+        } else if (
+          snapshot.activeMusic !== null &&
+          snapshot.activeMusic.songId !== null
+        ) {
+          // Canonical campaign playlists (including same-World boss fallback)
+          // use song lifecycle semantics: hand over instead of looping. Source
+          // candidate count is a transport detail and may grow with codecs.
+          expect(snapshot.song?.id).toBe(snapshot.activeMusic.songId);
+          expect(snapshot.activeMusic.loop).toBe(false);
+          expect(snapshot.activeMusic.candidates.length).toBeGreaterThanOrEqual(1);
         } else {
+          // Non-catalog legacy profile assets retain their state-specific loop
+          // contract and local/default source fallback pair.
           expect(snapshot.activeMusic).not.toBeNull();
           expect(snapshot.activeMusic?.loop).toBe(stateLoops(state));
           expect(snapshot.activeMusic?.candidates.length).toBe(2);

@@ -11,7 +11,7 @@ describe("generated World music migration policy", () => {
       expect(GENERATED_WORLD_MUSIC_POLICY.worlds?.[worldId]?.normal).toEqual({
         kind: "replace",
         trackIds: worldPlaylist(worldId),
-        selectionMode: "shuffle-bag",
+        selectionMode: "ordered",
       });
     }
   });

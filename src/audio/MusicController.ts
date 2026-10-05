@@ -248,6 +248,7 @@ export type MusicDebugSnapshot = {
   };
   activeMusic: null | {
     assetId: string;
+    songId: string | null;
     candidates: string[];
     candidateIndex: number;
     mix: number;
@@ -441,6 +442,7 @@ export class MusicController {
           ? null
           : {
               assetId: active.assetId,
+              songId: active.songId,
               candidates: [...active.candidates],
               candidateIndex: active.candidateIndex,
               mix: active.mix,
@@ -854,6 +856,7 @@ export class MusicController {
     this.releaseWarmNext();
     if (next === null) next = this.createSongTrack(song, stem);
     if (next === null) return;
+    this.commitShuffleReservation(next);
     this.currentSong = song;
     this.releaseWarmStem();
     this.fadeMusicTo(next, seconds, style);
@@ -1341,7 +1344,6 @@ export class MusicController {
       ) {
         return;
       }
-      this.commitShuffleReservation(track);
       track.networkRetryCount = 0;
       if (this.lastPlaybackFailure?.assetId === track.assetId) {
         this.lastPlaybackFailure = null;
@@ -1376,7 +1378,6 @@ export class MusicController {
           ) {
             return;
           }
-          this.commitShuffleReservation(track);
           track.networkRetryCount = 0;
           this.lastPlaybackFailure = null;
           return;
