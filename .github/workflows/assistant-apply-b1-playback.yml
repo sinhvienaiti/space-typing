@@ -29,6 +29,7 @@ jobs:
         run: |
           python scripts/assistant/apply-b1-playback-lifecycle.py
           python scripts/assistant/apply-b1-canonical-runtime.py
+          python scripts/assistant/apply-b1-canonical-regressions.py
       - name: B1 music regression tests
         run: pnpm exec vitest run tests/music-shuffle-reservation.test.ts tests/music-playback-failure.test.ts tests/music-controller-failure-taxonomy.test.ts tests/music-controller.test.ts tests/music-library.test.ts tests/world-music-model.test.ts tests/world-music-runtime.test.ts
       - name: Type check
@@ -41,7 +42,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/audio/music-library.ts src/audio/MusicController.ts tests/music-shuffle-reservation.test.ts
+          git add src/audio/music-library.ts src/audio/MusicController.ts src/audio/world-music-default-policy.ts tests/music-shuffle-reservation.test.ts tests/music-controller.test.ts
           if git diff --cached --quiet; then
             echo "No generated runtime changes to commit"
             exit 0
