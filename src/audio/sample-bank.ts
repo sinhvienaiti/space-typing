@@ -294,7 +294,9 @@ export class SampleSfxBank {
   ): boolean {
     this.mixMaster = Number.isFinite(masterVolume) ? Math.min(1, Math.max(0, masterVolume)) : 0;
     this.mixPronunciationActive = pronunciationActive;
-    this.mixCategories = { ...categories };
+    // Play is a hot path. Keep the caller-owned category object by reference;
+    // setMix() is the settings/focus boundary that snapshots category values.
+    this.mixCategories = categories;
     const definition = SAMPLE_SFX[id];
     const pool = this.ensurePool(id, definition.poolSize);
     if (pool === null || pool.voices.length === 0) return false;
