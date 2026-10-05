@@ -18,7 +18,7 @@ export const GENERATED_WORLD_MUSIC_POLICY: WorldMusicPolicy = {
         normal: {
           kind: "replace" as const,
           trackIds: worldPlaylist(worldId),
-          selectionMode: "shuffle-bag" as const,
+          selectionMode: "ordered" as const,
         },
       },
     ]),

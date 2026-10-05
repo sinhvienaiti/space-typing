@@ -202,10 +202,14 @@ describe("M08 MusicController", () => {
     expect(intense.src).toContain("/songs/signal-in-the-void/intense.ogg");
     expect(intense.currentTime).toBeCloseTo(42.5);
 
-    // A special state is a different song: it starts from the top.
+    // With no dedicated World boss playlist, V2 resolves boss music back
+    // to the same World's normal playlist before any global boss fallback.
     intense.currentTime = 12;
     controller.transitionTo("WORLD_BOSS", 0);
-    expect(created.at(-1)!.currentTime).toBe(0);
+    const bossSnapshot = controller.getDebugSnapshot();
+    expect(bossSnapshot.song?.id).toBe("signal-in-the-void");
+    expect(bossSnapshot.playlistResolvedFrom).toContain("normal");
+    expect(created.at(-1)!.currentTime).toBeCloseTo(12);
     controller.destroy();
   });
 
@@ -248,7 +252,7 @@ describe("M08 MusicController", () => {
     }
   });
 
-  it("switches state without leaving the retired track playing", () => {
+  it("keeps same-World music continuous when boss resolves to normal fallback", () => {
     const created: FakeAudio[] = [];
     const controller = new MusicController((src) => {
       const audio = new FakeAudio(src);
@@ -258,14 +262,15 @@ describe("M08 MusicController", () => {
 
     controller.transitionTo("WORLD_NORMAL", 0);
     const normal = created.at(-1)!;
+    const count = created.length;
     controller.transitionTo("WORLD_BOSS", 0);
-    const boss = created.at(-1)!;
 
     expect(controller.getState()).toBe("WORLD_BOSS");
-    expect(normal.pauseCount).toBeGreaterThan(0);
-    expect(boss.loop).toBe(true);
+    expect(controller.getDebugSnapshot().playlistResolvedFrom).toContain("normal");
+    expect(created).toHaveLength(count);
+    expect(normal.pauseCount).toBe(0);
 
     controller.destroy();
-    expect(boss.pauseCount).toBeGreaterThan(0);
+    expect(normal.pauseCount).toBeGreaterThan(0);
   });
 });
