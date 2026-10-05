@@ -26,7 +26,9 @@ jobs:
       - name: Install
         run: pnpm install --no-frozen-lockfile
       - name: Apply guarded B1 catalog playback patch
-        run: python scripts/assistant/apply-b1-catalog-playback.py
+        run: |
+          python scripts/assistant/apply-b1-catalog-playback.py
+          python scripts/assistant/fix-b1-catalog-playback-regressions.py
       - name: Full tests
         run: pnpm test
       - name: Type check
