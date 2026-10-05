@@ -1,6 +1,5 @@
 import { clamp } from "../logic";
 import type { AudioCategoryVolumes, GameSettings } from "../types";
-import type { AudioGroup } from "./mix";
 
 export const DEFAULT_AUDIO_CATEGORY_VOLUMES: AudioCategoryVolumes = {
   typing: 1,
@@ -39,13 +38,6 @@ export function sanitizeAudioCategoryVolumes(value: unknown): AudioCategoryVolum
     ui: sanitizeAudioLevel(source.ui, 1),
     rewards: sanitizeAudioLevel(source.rewards, 1),
   };
-}
-
-export function audioCategoryVolume(
-  settings: Pick<GameSettings, "audioCategoryVolumes">,
-  group: AudioGroup,
-): number {
-  return sanitizeAudioCategoryVolumes(settings.audioCategoryVolumes)[group];
 }
 
 export function recommendedAudioSettings(settings: GameSettings): GameSettings {
