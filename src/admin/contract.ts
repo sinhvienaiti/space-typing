@@ -28,6 +28,15 @@ export type SpaceTypingAdminContract = {
       command: string;
     };
   };
+  qa: {
+    protocolVersion: number;
+    target: "runtime-session";
+    environments: readonly ("local" | "development" | "preview" | "test")[];
+    productionAllowed: false;
+    persistenceTarget: "qa-sandbox";
+    rewardEligibility: "none";
+    applyBoundary: "new-qa-run";
+  };
   applyBoundaries: Readonly<Record<string, string>>;
 };
 
