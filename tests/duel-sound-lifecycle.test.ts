@@ -12,7 +12,7 @@ describe("DuelSoundEngine lifecycle", () => {
     const engine = new DuelSoundEngine({
       context: () => null,
       volume: () => 1,
-      pronunciationActive: () => false,
+      categoryVolume: () => 1,
     });
     const internals = engine as unknown as { applyFocusGain: () => void };
     const original = internals.applyFocusGain.bind(engine);

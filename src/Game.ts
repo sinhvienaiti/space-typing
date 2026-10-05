@@ -1429,7 +1429,7 @@ export class Game {
     this.duelSound ??= new DuelSoundEngine({
       context: () => this.sfx.audioContext(),
       volume: () => this.sfx.masterVolume(),
-      pronunciationActive: () => this.sfx.isPronunciationActive(),
+      categoryVolume: (group) => this.sfx.categoryVolume(group),
     });
     return this.duelSound;
   }
@@ -3821,6 +3821,7 @@ export class Game {
     this.sfx.setCreditVolume(settings.creditVolume ?? 1);
     this.sfx.setAnnouncerVolume(settings.announcerVolume ?? 1);
     this.sfx.setCategoryVolumes(settings.audioCategoryVolumes ?? {});
+    this.duelSound?.refreshMix();
   }
 
   startStage(

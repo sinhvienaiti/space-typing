@@ -240,6 +240,10 @@ export class Sfx {
     this.refreshPlayerMix();
   }
 
+  categoryVolume(group: AudioGroup): number {
+    return this.groupPreferences[group];
+  }
+
   private effectiveSfxVolume(): number {
     return Math.min(1, Math.max(0, this.masterPreference * this.volume));
   }
