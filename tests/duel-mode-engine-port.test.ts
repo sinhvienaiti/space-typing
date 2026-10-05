@@ -83,6 +83,47 @@ describe("DuelModeEngineCombatPort", () => {
     expect(target.hull).toBe(95);
   });
 
+  it("drops remaining same-tick projectiles after the shared engine ends the round", () => {
+    const engine = new DuelEngine({
+      maxHull: 8,
+      maxShield: 0,
+      startingShield: 0,
+    });
+    const combat = new DuelModeEngineCombatPort(engine);
+    const runtime = new DuelModeRuntime(combat);
+    const mode = runtime.switchMode("reflex");
+
+    combat.setAuthorityClock(3_000);
+    runtime.scheduleServerAttack({
+      modeEpoch: mode.modeEpoch,
+      attackId: "reflex:ko-first:p1",
+      sourcePlayerId: "player-1",
+      damage: 8,
+      travelMs: 600,
+      presentation: "primary-cannon",
+    });
+    runtime.scheduleServerAttack({
+      modeEpoch: mode.modeEpoch,
+      attackId: "reflex:late-return:p2",
+      sourcePlayerId: "player-2",
+      damage: 8,
+      travelMs: 600,
+      presentation: "primary-cannon",
+    });
+    combat.drainEvents();
+
+    const events = combat.advanceAuthorityClock(3_600);
+    expect(events.filter((event) => event.type === "round-ended")).toHaveLength(1);
+    expect(events.filter((event) => event.type === "cannon-hit")).toHaveLength(1);
+    expect(combat.pendingCount()).toBe(0);
+    expect(engine.snapshot().round).toEqual({
+      status: "won",
+      winnerId: "player-1",
+    });
+    expect(engine.snapshot().players["player-1"].hull).toBe(8);
+    expect(engine.snapshot().players["player-2"].hull).toBe(0);
+  });
+
   it("drops pending alternative projectiles when a round runtime is disposed", () => {
     const engine = new DuelEngine();
     const combat = new DuelModeEngineCombatPort(engine);
