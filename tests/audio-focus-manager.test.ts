@@ -33,6 +33,22 @@ describe("AudioFocusManager", () => {
     expect(manager.snapshot().tokens).toEqual([]);
   });
 
+  it("advances implicit generations and replaces prior timed focus", () => {
+    const manager = new AudioFocusManager();
+    const implicit = manager.replace("speech", "pronunciation");
+    expect(implicit?.generation).toBe(1);
+    manager.release(implicit);
+    expect(manager.replace("speech", "pronunciation")?.generation).toBe(2);
+
+    const firstWarning = manager.acquireTimed("warning", "warning-owner", 500);
+    const secondWarning = manager.acquireTimed("warning", "warning-owner", 500);
+    expect(secondWarning.generation).toBe(firstWarning.generation + 1);
+    expect(manager.release(firstWarning)).toBe(false);
+    expect(
+      manager.snapshot().tokens.filter((token) => token.reason === "warning"),
+    ).toEqual([secondWarning]);
+  });
+
   it("uses the strongest focus target instead of multiplying ducks", () => {
     expect(resolveFocusGain(["pronunciation", "warning"], {
       pronunciation: 0.22,
