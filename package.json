@@ -36,7 +36,8 @@
     "duel-targets:prepare": "node scripts/bg-art/prepare-duel-targets.mjs",
     "combat-vfx-sequences:prepare": "node scripts/bg-art/prepare-duel-vfx-sequences.mjs",
     "chase:prepare": "node scripts/bg-art/prepare-ship-chase.mjs",
-    "ship3d:prepare": "node scripts/bg-art/prepare-ship-3d.mjs"
+    "ship3d:prepare": "node scripts/bg-art/prepare-ship-3d.mjs",
+    "music:catalog": "node scripts/music/build-world-music-catalog.mjs"
   },
   "dependencies": {
     "@fontsource/be-vietnam-pro": "^5.3.0",

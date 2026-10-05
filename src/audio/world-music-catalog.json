@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "manifestRevision": "sha256:bc2925ffce3c940fed5be9177272ffbdef2805d1312c76908640793f80a4c57a",
+  "manifestRevision": "sha256:36976e443ab851ec0c97750dae9d014efbcb6dcc0fbfeadfb6dc9e2a66efa9e6",
   "worldIds": [
     "world-01",
     "world-02",
@@ -403,6 +403,25 @@
         "key": "G major",
         "mood": "happy",
         "provenance": "legacy-generated-music-library"
+      }
+    },
+    {
+      "id": "world-10-boss-battle-theme-b",
+      "title": "Battle Theme B",
+      "playback": {
+        "kind": "single",
+        "sources": [
+          {
+            "src": "/assets/audio/music/battle-theme-b.mp3",
+            "codec": "audio/mpeg"
+          }
+        ]
+      },
+      "durationSeconds": 66,
+      "loop": true,
+      "metadata": {
+        "mood": "climactic",
+        "provenance": "Battle Theme B for RPG — cynicmusic/pixelsphere — CC0"
       }
     }
   ]
