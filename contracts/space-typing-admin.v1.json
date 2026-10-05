@@ -1,0 +1,50 @@
+{
+  "contractRevision": "space-typing-admin-v1",
+  "schemaVersion": 1,
+  "gameId": "space-typing",
+  "label": "Space Typing",
+  "themeId": "space-cosmic",
+  "configSchemaVersion": 1,
+  "worldMusicCatalogSchemaVersion": 1,
+  "capabilities": [
+    "overview.read",
+    "audio.mix.read",
+    "audio.mix.write",
+    "world-music.read",
+    "world-music.write",
+    "world-music.preview",
+    "history.read",
+    "publish.write"
+  ],
+  "routes": [
+    { "id": "overview", "path": "/admin/space-typing", "label": "Overview" },
+    { "id": "audio-mix", "path": "/admin/space-typing/audio", "label": "Audio & Mix" },
+    { "id": "world-music", "path": "/admin/space-typing/world-music", "label": "World Music" },
+    { "id": "history-publish", "path": "/admin/space-typing/history", "label": "History / Publish" }
+  ],
+  "worldMusic": {
+    "galaxyCount": 10,
+    "worldsPerGalaxy": 5,
+    "worldCount": 50,
+    "assignmentSlots": ["normal", "boss-common", "mini", "world", "major"],
+    "assignmentModes": ["inherit", "replace"],
+    "validationBadges": [
+      "READY",
+      "INHERIT",
+      "REPLACED",
+      "BOSS FALLBACK TO WORLD",
+      "LEGACY FALLBACK",
+      "GLOBAL FALLBACK",
+      "MISSING STEM",
+      "UNSUPPORTED ASSET",
+      "EMPTY / SILENCE FAIL-SAFE"
+    ]
+  },
+  "applyBoundaries": {
+    "playerVolume": "immediate",
+    "mixPolicy": "safe-boundary",
+    "playlistAssignment": "next-track-or-state",
+    "competitiveFeature": "new-session",
+    "qaCapability": "new-qa-run"
+  }
+}
