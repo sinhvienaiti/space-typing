@@ -5,6 +5,7 @@ import {
   type TestLabGameSnapshot,
 } from "../Game";
 import { MusicController } from "../audio/MusicController";
+import { sharedAudioFocus, type AudioFocusToken } from "../audio/focus-manager";
 import {
   ANNOUNCER_EVENTS,
   type AnnouncerEvent,
@@ -365,6 +366,7 @@ export function mountTestLab(
   let music: MusicController | null = null;
   let combatCreditLedger = new CombatCreditRewardLedger();
   let audioQa: TestLabAudioQa | null = null;
+  const testLabFocusTokens: Partial<Record<"pronunciation" | "announcer" | "warning", AudioFocusToken>> = {};
   let inspectorTimer = 0;
   let activeShop: ShopInstance | null = null;
   let shopPurchaseSequence = 0;
@@ -1477,6 +1479,11 @@ export function mountTestLab(
                 event: qaBossAudioEventSelect.value,
                 implementation: "Sfx.bossImpact / Sfx.bossRoar with production identity",
               },
+        runtimeFocus: sharedAudioFocus.snapshot(),
+        mix: {
+          sfxMaster: qaAudioRuntime().sfxMasterVolume(),
+          pronunciationActive: qaAudioRuntime().pronunciationFocusActive(),
+        },
         track:
           audioTrack === null
             ? null
@@ -3456,24 +3463,27 @@ export function mountTestLab(
       return;
     }
     if (action === "duck-announcer") {
-      music?.duck("announcer");
+      testLabFocusTokens.announcer ??= sharedAudioFocus.acquire("announcer", "test-lab");
       renderInspector();
       return;
     }
     if (action === "duck-pronunciation") {
-      music?.duck("pronunciation");
+      testLabFocusTokens.pronunciation ??= sharedAudioFocus.acquire("pronunciation", "test-lab");
       renderInspector();
       return;
     }
     if (action === "duck-warning") {
-      music?.duck("warning");
+      testLabFocusTokens.warning ??= sharedAudioFocus.acquire("warning", "test-lab");
       renderInspector();
       return;
     }
     if (action === "release-ducks") {
-      music?.releaseDuck("announcer");
-      music?.releaseDuck("pronunciation");
-      music?.releaseDuck("warning");
+      for (const token of Object.values(testLabFocusTokens)) {
+        if (token !== undefined) sharedAudioFocus.release(token);
+      }
+      delete testLabFocusTokens.announcer;
+      delete testLabFocusTokens.pronunciation;
+      delete testLabFocusTokens.warning;
       renderInspector();
       return;
     }

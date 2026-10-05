@@ -8,9 +8,17 @@ import {
   type AnnouncerEvent,
 } from "./announcer";
 import {
+  AUDIO_GROUPS,
+  baseSfxEventGain,
   mixedSfxGain,
+  sfxGroupBusGain,
   type AudioGroup,
 } from "./mix";
+import {
+  sharedAudioFocus,
+  type AudioFocusSnapshot,
+} from "./focus-manager";
+import { AnnouncerScheduler } from "./announcer-scheduler";
 import {
   SampleSfxBank,
   type SampleSfxId,
@@ -107,6 +115,8 @@ const IMPACT_VOICES: Readonly<Record<Exclude<ImpactVariant, "crystal">, ImpactVo
 export class Sfx {
   private context: AudioContext | null = null;
   private limiter: DynamicsCompressorNode | null = null;
+  private readonly groupBuses = new Map<AudioGroup, GainNode>();
+  private focusUnsubscribe: (() => void) | null = null;
   private noiseBuffer: AudioBuffer | null = null;
   private lastBoltImpact = -Infinity;
   private lastRing = -1;
@@ -124,40 +134,46 @@ export class Sfx {
   /** Credit sound level on top of SFX volume (Settings, 0–2, 1 = default). */
   private creditVolume = 1;
 
-  private readonly onPronunciation = (event: Event): void => {
-    const detail = (event as CustomEvent<{ active?: unknown }>).detail;
-    this.pronunciationActive = detail?.active === true;
-    // An announcer line may already be playing when TTS begins. Re-apply the
-    // warning-bus gain immediately so its tail cannot mask pronunciation.
+  private readonly announcerScheduler = new AnnouncerScheduler<AnnouncerEvent>();
+  private announcerSequence = 0;
+
+  constructor() {
+    this.focusUnsubscribe = sharedAudioFocus.subscribe((snapshot) => {
+      this.onFocusSnapshot(snapshot);
+    });
+  }
+
+  private onFocusSnapshot(snapshot: AudioFocusSnapshot): void {
+    const pronunciationActive = snapshot.reasons.includes("pronunciation");
+    const changed = pronunciationActive !== this.pronunciationActive;
+    this.pronunciationActive = pronunciationActive;
+    this.applyGroupBusGains();
+    this.samples.setMix(this.volume, this.pronunciationActive);
     if (this.announcerAudio !== null) {
       this.announcerAudio.volume = this.announcerVolume();
     }
-  };
-
-  constructor() {
-    if (typeof window !== "undefined") {
-      window.addEventListener(
-        "space-typing:pronunciation",
-        this.onPronunciation,
-      );
-    }
+    if (changed && !pronunciationActive) this.pumpAnnouncer();
   }
 
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
 
+    this.focusUnsubscribe?.();
+    this.focusUnsubscribe = null;
+    this.announcerScheduler.clear();
+
     if (typeof window !== "undefined") {
-      window.removeEventListener(
-        "space-typing:pronunciation",
-        this.onPronunciation,
-      );
       for (const timer of this.timers) {
         window.clearTimeout(timer);
       }
     }
     this.timers.clear();
 
+    for (const bus of this.groupBuses.values()) {
+      (bus as GainNode & { disconnect?: () => void }).disconnect?.();
+    }
+    this.groupBuses.clear();
     if (this.limiter !== null) {
       this.limiter.disconnect();
       this.limiter = null;
@@ -183,7 +199,9 @@ export class Sfx {
   }
 
   setVolume(volume: number): void {
-    this.volume = Math.min(1, Math.max(0, volume));
+    this.volume = Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : 0.5;
+    this.applyGroupBusGains();
+    this.samples.setMix(this.volume, this.pronunciationActive);
     if (this.announcerAudio !== null) {
       this.announcerAudio.volume = this.announcerVolume();
     }
@@ -378,42 +396,67 @@ export class Sfx {
     if (this.destroyed || typeof Audio === "undefined") return;
     this.loadLocalAnnouncer();
     const local = this.localAnnouncerLines?.has(event) === true;
-    // Spree/first-blood lines exist only as local files: no generic beep.
     if (!local && !announcerHasFallback(event)) return;
-    const priority = announcerPriority(event);
-    // A newer line of the same or higher rank cuts in (Triple Kill over
-    // Double Kill); a lower one waits its turn.
-    if (this.announcerAudio !== null && priority < this.announcerPriorityPlaying) return;
 
-    if (this.announcerAudio !== null) {
+    const rank = announcerPriority(event);
+    const now = this.monotonicNow();
+    this.announcerScheduler.enqueue({
+      eventId: `announcer-${++this.announcerSequence}`,
+      event,
+      priority: rank >= 4 ? "critical" : rank >= 3 ? "normal" : "flavor",
+      rank,
+      sessionId: "game",
+      createdAtMonotonicMs: now,
+      ttlMs: rank >= 4 ? 8_000 : 5_000,
+      coalesceKey: announcerHasFallback(event) ? "kill-chain" : undefined,
+    }, now);
+
+    if (this.announcerAudio !== null && rank > this.announcerPriorityPlaying) {
       this.announcerAudio.pause();
       this.announcerAudio.currentTime = 0;
+      this.announcerAudio = null;
+      this.announcerPriorityPlaying = 0;
       this.notifyAnnouncer(false);
     }
+    this.pumpAnnouncer();
+  }
 
+  private pumpAnnouncer(): void {
+    if (this.destroyed || this.announcerAudio !== null || typeof Audio === "undefined") return;
+    const next = this.announcerScheduler.takeNext(this.monotonicNow(), this.pronunciationActive);
+    if (next === null) return;
+
+    const event = next.event;
+    const local = this.localAnnouncerLines?.has(event) === true;
+    if (!local && !announcerHasFallback(event)) {
+      this.pumpAnnouncer();
+      return;
+    }
     const audio = new Audio(local ? localAnnouncerAsset(event) : announcerAsset(event));
     audio.preload = "auto";
     audio.volume = this.announcerVolume();
     this.announcerAudio = audio;
-    this.announcerPriorityPlaying = priority;
+    this.announcerPriorityPlaying = next.rank;
 
     const finish = (): void => {
       if (this.announcerAudio !== audio) return;
       this.announcerAudio = null;
       this.announcerPriorityPlaying = 0;
       this.notifyAnnouncer(false);
+      this.pumpAnnouncer();
     };
     audio.addEventListener?.("ended", finish, { once: true });
     audio.addEventListener?.("error", finish, { once: true });
 
-    void audio
-      .play()
-      .then(() => {
-        if (this.announcerAudio === audio) {
-          this.notifyAnnouncer(true);
-        }
-      })
-      .catch(finish);
+    void audio.play().then(() => {
+      if (this.announcerAudio === audio) this.notifyAnnouncer(true);
+    }).catch(finish);
+  }
+
+  private monotonicNow(): number {
+    return typeof performance !== "undefined" && typeof performance.now === "function"
+      ? performance.now()
+      : Date.now();
   }
 
   wrong(): void {
@@ -582,17 +625,9 @@ export class Sfx {
           return this.context;
         },
         output: () =>
-          this.context === null ? null : this.outputNode(this.context),
+          this.context === null ? null : this.groupOutput(this.context, "rewards"),
         level: (gain) =>
-          Math.min(
-            1,
-            mixedSfxGain(
-              this.volume,
-              "rewards",
-              gain,
-              this.pronunciationActive,
-            ) * this.creditVolume,
-          ),
+          Math.min(1, baseSfxEventGain(gain) * this.creditVolume),
       });
     }
     return this.creditEngine;
@@ -1125,13 +1160,8 @@ export class Sfx {
     shape: VoiceShape = {},
   ): void {
     if (this.destroyed) return;
-    const gainLevel = mixedSfxGain(
-      this.volume,
-      group,
-      gainValue * (shape.gain ?? 1),
-      this.pronunciationActive,
-    );
-    if (gainLevel <= 0) return;
+    const gainLevel = baseSfxEventGain(gainValue * (shape.gain ?? 1));
+    if (gainLevel <= 0 || this.volume <= 0) return;
 
     this.unlock();
     const context = this.context;
@@ -1157,7 +1187,7 @@ export class Sfx {
     }
     gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
-    oscillator.connect(gain).connect(this.voiceOutput(context, shape));
+    oscillator.connect(gain).connect(this.voiceOutput(context, shape, group));
     oscillator.start(now);
     oscillator.stop(now + duration + 0.02);
   }
@@ -1169,13 +1199,8 @@ export class Sfx {
     shape: VoiceShape = {},
   ): void {
     if (this.destroyed) return;
-    const gainLevel = mixedSfxGain(
-      this.volume,
-      group,
-      gainValue * (shape.gain ?? 1),
-      this.pronunciationActive,
-    );
-    if (gainLevel <= 0) return;
+    const gainLevel = baseSfxEventGain(gainValue * (shape.gain ?? 1));
+    if (gainLevel <= 0 || this.volume <= 0) return;
 
     this.unlock();
     const context = this.context;
@@ -1213,16 +1238,16 @@ export class Sfx {
       filter.Q.value = shape.q ?? 0.8;
       head = source.connect(filter);
     }
-    head.connect(gain).connect(this.voiceOutput(context, shape));
+    head.connect(gain).connect(this.voiceOutput(context, shape, group));
     // Random offset into the shared noise, so repeated cracks never match.
     const room = Math.max(0, this.noiseBuffer.duration - duration);
     source.start(context.currentTime, Math.random() * room, duration);
     source.stop(context.currentTime + duration + 0.02);
   }
 
-  /** The shared output, through a stereo panner when the voice is placed. */
-  private voiceOutput(context: AudioContext, shape: VoiceShape): AudioNode {
-    const output = this.outputNode(context);
+  /** The shared group output, through a stereo panner when the voice is placed. */
+  private voiceOutput(context: AudioContext, shape: VoiceShape, group: AudioGroup): AudioNode {
+    const output = this.groupOutput(context, group);
     const pan = shape.pan ?? 0;
     if (Math.abs(pan) < 0.01 || typeof context.createStereoPanner !== "function") {
       return output;
@@ -1231,6 +1256,31 @@ export class Sfx {
     panner.pan.value = Math.max(-1, Math.min(1, pan));
     panner.connect(output);
     return panner;
+  }
+
+  private groupOutput(context: AudioContext, group: AudioGroup): AudioNode {
+    let bus = this.groupBuses.get(group);
+    if (bus !== undefined) return bus;
+    bus = context.createGain();
+    bus.gain.value = sfxGroupBusGain(this.volume, group, this.pronunciationActive);
+    bus.connect(this.outputNode(context));
+    this.groupBuses.set(group, bus);
+    return bus;
+  }
+
+  private applyGroupBusGains(): void {
+    const context = this.context;
+    if (context === null) return;
+    for (const group of AUDIO_GROUPS) {
+      const bus = this.groupBuses.get(group);
+      if (bus === undefined) continue;
+      const target = sfxGroupBusGain(this.volume, group, this.pronunciationActive);
+      if (typeof bus.gain.setTargetAtTime === "function") {
+        bus.gain.setTargetAtTime(target, context.currentTime, this.pronunciationActive ? 0.012 : 0.055);
+      } else {
+        bus.gain.value = target;
+      }
+    }
   }
 
   private outputNode(context: AudioContext): AudioNode {

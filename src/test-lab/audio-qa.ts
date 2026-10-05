@@ -206,6 +206,14 @@ export class TestLabAudioQa {
     this.sfx.unlock();
   }
 
+  sfxMasterVolume(): number {
+    return this.sfx.masterVolume();
+  }
+
+  pronunciationFocusActive(): boolean {
+    return this.sfx.isPronunciationActive();
+  }
+
   playSfx(id: AudioQaSfxId): void {
     this.unlock();
     switch (id) {

@@ -18,6 +18,10 @@ import {
   type MusicState,
   type WorldMusicProfile,
 } from "./music-profile";
+import {
+  sharedAudioFocus,
+  type AudioFocusReason,
+} from "./focus-manager";
 
 export type MusicDuckReason =
   | "pronunciation"
@@ -281,30 +285,15 @@ export class MusicController {
   private musicBus: GainNode | null = null;
   private gestureListening = false;
 
-  private readonly onPronunciation = (event: Event): void => {
-    const active =
-      (event as CustomEvent<{ active?: unknown }>).detail?.active === true;
-    if (active) this.duck("pronunciation");
-    else this.releaseDuck("pronunciation");
-  };
+  private focusUnsubscribe: (() => void) | null = null;
 
-  private readonly onAnnouncer = (event: Event): void => {
-    const active =
-      (event as CustomEvent<{ active?: unknown }>).detail?.active === true;
-    if (active) this.duck("announcer");
-    else this.releaseDuck("announcer");
-  };
-
-  private readonly onWarning = (event: Event): void => {
-    const duration =
-      (event as CustomEvent<{ durationMs?: unknown }>).detail?.durationMs;
-    this.duckFor(
-      "warning",
-      typeof duration === "number" && Number.isFinite(duration)
-        ? duration
-        : 350,
-    );
-  };
+  private syncSharedFocus(reasons: readonly AudioFocusReason[]): void {
+    for (const reason of ["pronunciation", "announcer", "warning"] as const) {
+      this.duckReasons.delete(reason);
+    }
+    for (const reason of reasons) this.duckReasons.add(reason);
+    this.applyVolumes();
+  }
 
   private readonly onUserGesture = (): void => {
     this.unlockAudioGraph();
@@ -320,21 +309,11 @@ export class MusicController {
     this.shuffle = new ShuffleBag(this.tracks.map((track) => track.id), this.random);
     this.rebuildPlaylist(this.profile.worldId);
 
+    this.focusUnsubscribe = sharedAudioFocus.subscribe((snapshot) => {
+      this.syncSharedFocus(snapshot.reasons);
+    });
+
     if (typeof window !== "undefined") {
-      // Pronunciation owns its own focus reason so it composes safely with an
-      // announcer or warning instead of releasing another cue's duck early.
-      window.addEventListener(
-        "space-typing:pronunciation",
-        this.onPronunciation,
-      );
-      window.addEventListener(
-        "space-typing:announcer",
-        this.onAnnouncer,
-      );
-      window.addEventListener(
-        "space-typing:warning",
-        this.onWarning,
-      );
       for (const type of ["pointerdown", "keydown", "touchstart"]) {
         window.addEventListener(type, this.onUserGesture, { capture: true, passive: true });
       }
@@ -630,19 +609,10 @@ export class MusicController {
     if (this.destroyed) return;
     this.destroyed = true;
 
+    this.focusUnsubscribe?.();
+    this.focusUnsubscribe = null;
+
     if (typeof window !== "undefined") {
-      window.removeEventListener(
-        "space-typing:pronunciation",
-        this.onPronunciation,
-      );
-      window.removeEventListener(
-        "space-typing:announcer",
-        this.onAnnouncer,
-      );
-      window.removeEventListener(
-        "space-typing:warning",
-        this.onWarning,
-      );
       for (const timer of this.warningTimers.values()) {
         window.clearTimeout(timer);
       }

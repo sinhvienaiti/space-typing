@@ -8,7 +8,7 @@ const PRONUNCIATION_WATCHDOG_MS = 20_000;
 
 export function setSpeechGate(gate: (play: () => Promise<void>) => Promise<void>): void { speechGate = gate; }
 
-function setSpeechActive(active: boolean): void {
+function setSpeechActive(active: boolean, generation = speechGeneration): void {
   if (speechActive === active) return;
   speechActive = active;
   // This is the production pronunciation-focus lifecycle signal. Audio owners
@@ -16,7 +16,7 @@ function setSpeechActive(active: boolean): void {
   // runs before playback/focus begins.
   window.dispatchEvent(
     new CustomEvent("space-typing:pronunciation", {
-      detail: { active },
+      detail: { active, owner: "speech", generation },
     }),
   );
 }
@@ -58,7 +58,7 @@ function playEnglish(text: string, settings: GameSettings): Promise<void> {
     const voice = englishVoice();
     if (voice !== null) utterance.voice = voice;
 
-    setSpeechActive(true);
+    setSpeechActive(true, generation);
 
     let finished = false;
     let watchdog: ReturnType<typeof setTimeout> | null = null;
@@ -71,7 +71,7 @@ function playEnglish(text: string, settings: GameSettings): Promise<void> {
       }
       resolve();
       if (generation === speechGeneration) {
-        setSpeechActive(false);
+        setSpeechActive(false, generation);
         cancelPlayback = null;
       }
     };

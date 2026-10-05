@@ -228,11 +228,16 @@ describe("M22 full World audio mapping and lifecycle audit", () => {
 
     controller.destroy();
     expect(created.every((audio) => audio.paused)).toBe(true);
-    // Destroy must detach every global listener that this controller registered.
-    // Keep the assertion tied to registration count so adding/removing a mix
-    // event cannot leave this lifecycle test stale again.
-    expect(removeEventListener).toHaveBeenCalledTimes(
-      addEventListener.mock.calls.length,
-    );
+    // The shared focus manager owns its long-lived bridge listeners. The
+    // controller itself owns only the three gesture listeners and must detach
+    // those on destroy.
+    expect(removeEventListener).toHaveBeenCalledTimes(3);
+    for (const type of ["pointerdown", "keydown", "touchstart"]) {
+      expect(removeEventListener).toHaveBeenCalledWith(
+        type,
+        expect.any(Function),
+        { capture: true },
+      );
+    }
   });
 });

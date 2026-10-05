@@ -97,10 +97,19 @@ describe("pronunciation mix focus", () => {
     expect(controller.getDebugSnapshot().duckMultiplier).toBe(1);
 
     controller.destroy();
-    expect(events.removeEventListener).toHaveBeenCalledWith(
+    // The shared focus manager owns the pronunciation bridge. A controller
+    // only owns and removes its three gesture listeners.
+    expect(events.removeEventListener).not.toHaveBeenCalledWith(
       "space-typing:pronunciation",
       expect.any(Function),
     );
+    for (const type of ["pointerdown", "keydown", "touchstart"]) {
+      expect(events.removeEventListener).toHaveBeenCalledWith(
+        type,
+        expect.any(Function),
+        { capture: true },
+      );
+    }
   });
 
   it("re-levels an announcer that was already playing when pronunciation starts", async () => {

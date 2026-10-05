@@ -7,7 +7,7 @@ describe("announcer SFX playback", () => {
     vi.unstubAllGlobals();
   });
 
-  it("plays the mapped announcer asset and interrupts the previous call", async () => {
+  it("queues an equal-priority milestone and plays it after the current call ends", async () => {
     const instances: FakeAudio[] = [];
 
     class FakeAudio {
@@ -16,9 +16,22 @@ describe("announcer SFX playback", () => {
       currentTime = 0;
       readonly pause = vi.fn();
       readonly play = vi.fn(() => Promise.resolve());
+      private readonly listeners = new Map<string, Set<EventListener>>();
 
       constructor(readonly src: string) {
         instances.push(this);
+      }
+
+      addEventListener(type: string, listener: EventListener): void {
+        const set = this.listeners.get(type) ?? new Set<EventListener>();
+        set.add(listener);
+        this.listeners.set(type, set);
+      }
+
+      emit(type: string): void {
+        for (const listener of [...(this.listeners.get(type) ?? [])]) {
+          listener(new Event(type));
+        }
       }
     }
 
@@ -29,10 +42,15 @@ describe("announcer SFX playback", () => {
     sfx.announcer("double-kill");
     sfx.announcer("triple-kill");
 
-    expect(instances).toHaveLength(2);
+    expect(instances).toHaveLength(1);
     expect(instances[0]!.src).toBe(DEFAULT_ANNOUNCER_ASSET);
+    expect(instances[0]!.pause).not.toHaveBeenCalled();
+
+    instances[0]!.emit("ended");
+    await Promise.resolve();
+
+    expect(instances).toHaveLength(2);
     expect(instances[1]!.src).toBe(DEFAULT_ANNOUNCER_ASSET);
-    expect(instances[0]!.pause).toHaveBeenCalledOnce();
     expect(instances[1]!.play).toHaveBeenCalledOnce();
     expect(instances[1]!.volume).toBeGreaterThan(0);
 

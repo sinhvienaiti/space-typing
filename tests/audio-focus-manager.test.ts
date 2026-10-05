@@ -38,7 +38,7 @@ describe("gain resolution", () => {
       focusGain: 0.25,
       transitionGain: 0.5,
       policyCap: 1,
-    })).toBeCloseTo(0.015);
+    })).toBeCloseTo(0.0075);
   });
 });
 

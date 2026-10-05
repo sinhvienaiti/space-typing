@@ -1,4 +1,5 @@
-import { mixedSfxGain, type AudioGroup } from "./mix";
+import { mixedSfxGain, sfxFocusGain, type AudioGroup } from "./mix";
+import { sharedAudioFocus } from "./focus-manager";
 import type { DuelTimedAudioCue } from "../duel/audio";
 
 /**
@@ -65,6 +66,7 @@ const MAX_VOICES = 64;
 
 export class DuelSoundEngine {
   private bus: GainNode | null = null;
+  private focusBus: GainNode | null = null;
   private reverbIn: GainNode | null = null;
   private white: AudioBuffer | null = null;
   private brown: AudioBuffer | null = null;
@@ -76,7 +78,9 @@ export class DuelSoundEngine {
   private selfTier = 0;
   private readonly lastPlayed = new Map<string, number>();
 
-  constructor(private readonly host: DuelSoundHost) {}
+  constructor(private readonly host: DuelSoundHost) {
+    sharedAudioFocus.subscribe(() => this.applyFocusGain());
+  }
 
   setHorizontal(horizontal: boolean): void {
     this.horizontal = horizontal;
@@ -536,7 +540,10 @@ export class DuelSoundEngine {
     limiter.ratio.value = 20;
     limiter.attack.value = 0.001;
     limiter.release.value = 0.09;
-    bus.connect(glue).connect(limiter).connect(context.destination);
+    const focusBus = context.createGain();
+    focusBus.gain.value = this.focusGain();
+    bus.connect(glue).connect(limiter).connect(focusBus).connect(context.destination);
+    this.focusBus = focusBus;
     if (typeof context.createConvolver === "function") {
       const reverb = context.createConvolver();
       reverb.buffer = this.impulse(context, 2.2);
@@ -569,7 +576,25 @@ export class DuelSoundEngine {
   }
 
   private level(gain: number, group: AudioGroup = "combat"): number {
-    return mixedSfxGain(this.host.volume(), group, Math.min(1, gain), this.host.pronunciationActive());
+    // Focus is applied once at the stable post-wet bus so already-playing dry
+    // voices and reverb tails move together. Spawn gain keeps only user/group/event.
+    return mixedSfxGain(this.host.volume(), group, Math.min(1, gain), false);
+  }
+
+  private focusGain(): number {
+    return sfxFocusGain("combat", sharedAudioFocus.isActive("pronunciation"));
+  }
+
+  private applyFocusGain(): void {
+    const context = this.host.context();
+    const bus = this.focusBus;
+    if (context === null || bus === null) return;
+    const target = this.focusGain();
+    if (typeof bus.gain.setTargetAtTime === "function") {
+      bus.gain.setTargetAtTime(target, context.currentTime, target < 1 ? 0.012 : 0.055);
+    } else {
+      bus.gain.value = target;
+    }
   }
 
   private curve(drive: number): Float32Array<ArrayBuffer> {
