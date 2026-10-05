@@ -86,6 +86,14 @@ export class DuelModeEngineCombatPort implements DuelModeCombatPort {
         shotId: pending.attack.attackId,
       });
       this.events.push(...engineEvents);
+
+      // Once the shared engine closes the round, every still-flying
+      // alternative projectile belongs to the old round. Drop it here so a
+      // same-tick or late callback cannot mutate terminal combat state.
+      if (engineEvents.some((event) => event.type === "round-ended")) {
+        this.pending.length = 0;
+        break;
+      }
     }
 
     return this.drainEvents();
