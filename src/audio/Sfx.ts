@@ -527,10 +527,8 @@ export class Sfx {
   }
 
   enemyShot(): void {
-    this.samples.play(
+    this.playSample(
       "enemy-shot",
-      this.volume,
-      this.pronunciationActive,
       0.96,
     );
     this.tone(310, 0.09, "triangle", 0.032, 190, "combat");
@@ -540,10 +538,8 @@ export class Sfx {
   projectileIntercept(): void {
     // Audible paired zap and shatter. Both remain in the COMBAT bus so spoken
     // English still takes priority when pronunciation is active.
-    this.samples.play(
+    this.playSample(
       "projectile-intercept",
-      this.volume,
-      this.pronunciationActive,
       1.08,
     );
     this.tone(1160, 0.11, "sawtooth", 0.09, 310, "combat");
@@ -560,10 +556,8 @@ export class Sfx {
 
   shieldBreak(): void {
     this.notifyWarning(260);
-    this.samples.play(
+    this.playSample(
       "shield-break",
-      this.volume,
-      this.pronunciationActive,
       1,
     );
     this.tone(820, 0.09, "triangle", 0.03, 220, "warnings");
@@ -592,10 +586,8 @@ export class Sfx {
 
   eliteWarning(): void {
     this.notifyWarning(520);
-    this.samples.play(
+    this.playSample(
       "warning",
-      this.volume,
-      this.pronunciationActive,
       1.05,
     );
     this.tone(360, 0.11, "triangle", 0.028, 620, "warnings");
@@ -614,20 +606,16 @@ export class Sfx {
   }
 
   supplyArrival(): void {
-    this.samples.play(
+    this.playSample(
       "confirm",
-      this.volume,
-      this.pronunciationActive,
       0.94,
     );
     this.tone(470, 0.1, "triangle", 0.025, 740, "ui");
   }
 
   uiConfirm(): void {
-    this.samples.play(
+    this.playSample(
       "confirm",
-      this.volume,
-      this.pronunciationActive,
       1.05,
     );
     this.tone(540, 0.06, "sine", 0.018, 700, "ui");
@@ -690,10 +678,8 @@ export class Sfx {
   ): void {
     const safeLevel = Math.max(1, Math.min(5, level));
     const rate = 0.94 + safeLevel * 0.035;
-    this.samples.play(
+    this.playSample(
       "victory-stinger",
-      this.volume,
-      this.pronunciationActive,
       rate,
     );
 
@@ -750,10 +736,8 @@ export class Sfx {
   }
 
   stageFail(): void {
-    this.samples.play(
+    this.playSample(
       "warning",
-      this.volume,
-      this.pronunciationActive,
       0.82,
     );
     this.tone(180, 0.2, "sawtooth", 0.03, 82, "ui");
@@ -761,10 +745,8 @@ export class Sfx {
 
   criticalHull(): void {
     this.notifyWarning(720);
-    this.samples.play(
+    this.playSample(
       "warning",
-      this.volume,
-      this.pronunciationActive,
       0.9,
     );
     this.tone(235, 0.14, "square", 0.026, 155, "warnings");
@@ -777,16 +759,12 @@ export class Sfx {
   bossEntrance(pitch = 1): void {
     this.notifyWarning(900);
     const safePitch = Math.max(0.5, Math.min(1.6, pitch));
-    this.samples.play(
+    this.playSample(
       "boss-entrance",
-      this.volume,
-      this.pronunciationActive,
       Math.min(1.2, safePitch),
     );
-    this.samples.play(
+    this.playSample(
       "boss-thruster",
-      this.volume,
-      this.pronunciationActive,
       0.92,
     );
     this.tone(95 * safePitch, 0.28, "sawtooth", 0.045, 58 * safePitch, "warnings");
@@ -802,16 +780,12 @@ export class Sfx {
 
   bossDeath(pitch = 1): void {
     const safePitch = Math.max(0.5, Math.min(1.6, pitch));
-    this.samples.play(
+    this.playSample(
       "boss-death",
-      this.volume,
-      this.pronunciationActive,
       Math.max(0.78, Math.min(1.12, safePitch)),
     );
-    this.samples.play(
+    this.playSample(
       "explosion-accent",
-      this.volume,
-      this.pronunciationActive,
       0.9,
     );
     this.noise(0.24, 0.075, "combat");
@@ -833,10 +807,8 @@ export class Sfx {
   }
 
   bossShieldBreak(): void {
-    this.samples.play(
+    this.playSample(
       "shield-break",
-      this.volume,
-      this.pronunciationActive,
       0.86,
     );
     this.tone(760, 0.12, "triangle", 0.036, 240, "warnings");

@@ -699,6 +699,8 @@ export function mountTestLab(
             <button type="button" data-action="set-music-boss-phase">Apply Boss Music Phase</button>
             <button type="button" data-action="trigger-announcer">Trigger Announcer</button>
             <button type="button" data-action="trigger-pronunciation">Trigger Pronunciation</button>
+            <button type="button" data-action="pronunciation-stress">Pronunciation Stress Mix</button>
+            <button type="button" data-action="rapid-pronunciation">Rapid Pronunciation ×3</button>
             <button type="button" data-action="trigger-warning">Trigger Warning</button>
             <button type="button" data-action="duck-announcer">Duck Announcer</button>
             <button type="button" data-action="duck-pronunciation">Duck Pronunciation</button>
@@ -3437,6 +3439,53 @@ export function mountTestLab(
         inputValue(dialog, '[data-field="pronunciation-text"]'),
         settings,
       );
+      renderInspector();
+      return;
+    }
+    if (action === "pronunciation-stress") {
+      if (music === null || game === null) createRuntime();
+      audioQa?.stopTrack();
+      const settings = {
+        ...options.getSettings(),
+        pronunciationEnabled: true,
+        pronunciationVolume: Math.max(
+          0,
+          Math.min(
+            1,
+            numberValue(dialog, '[data-field="pronunciation-volume"]', 1),
+          ),
+        ),
+      };
+      music?.setWorldProfile(musicProfileForWorld(worldForStage(session.stage)));
+      music?.transitionTo(musicStateSelect.value as MusicState, 0.12);
+      ensureGame()?.testLabTriggerWarning();
+      ensureGame()?.testLabTriggerAnnouncer(announcerSelect.value as AnnouncerEvent);
+      qaAudioRuntime().playSfx("enemy-shot");
+      speakEnglish(
+        inputValue(dialog, '[data-field="pronunciation-text"]'),
+        settings,
+      );
+      notice("A4 production pronunciation stress · music + warning + announcer + combat SFX");
+      renderInspector();
+      return;
+    }
+    if (action === "rapid-pronunciation") {
+      const settings = {
+        ...options.getSettings(),
+        pronunciationEnabled: true,
+        pronunciationVolume: Math.max(
+          0,
+          Math.min(
+            1,
+            numberValue(dialog, '[data-field="pronunciation-volume"]', 1),
+          ),
+        ),
+      };
+      const first = inputValue(dialog, '[data-field="pronunciation-text"]') || "checkpoint";
+      [first, "shield", "reactor"].forEach((text, index) => {
+        window.setTimeout(() => speakEnglish(text, settings), index * 120);
+      });
+      notice("A4 rapid pronunciation ×3 · latest speech must win without stale focus release");
       renderInspector();
       return;
     }
