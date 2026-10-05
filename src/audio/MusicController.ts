@@ -730,7 +730,7 @@ export class MusicController {
   }
 
   private firstSong(): MusicTrack | null {
-    if (this.mode === "random") return this.trackById(this.shuffle.next(null) ?? undefined);
+    if (this.mode === "random") return this.trackById(this.shuffle.peek(null) ?? undefined);
     this.playlistIndex = 0;
     return this.trackById(this.playlist[0]);
   }
@@ -739,7 +739,7 @@ export class MusicController {
   private peekNextSong(): MusicTrack | null {
     if (this.upcoming !== null) return this.upcoming;
     if (this.mode === "random") {
-      this.upcoming = this.trackById(this.shuffle.next(this.currentSong?.id ?? null) ?? undefined);
+      this.upcoming = this.trackById(this.shuffle.peek(this.currentSong?.id ?? null) ?? undefined);
     } else if (this.playlist.length > 0) {
       this.upcoming = this.trackById(this.playlist[(this.playlistIndex + 1) % this.playlist.length]);
     }
@@ -1244,6 +1244,11 @@ export class MusicController {
     }
   }
 
+  private commitRandomSongReservation(track: ManagedTrack): void {
+    if (this.mode !== "random" || track.songId === null) return;
+    this.shuffle.commit(track.songId);
+  }
+
   private async playTrack(track: ManagedTrack): Promise<void> {
     if (this.paused || this.destroyed || track.disposed) return;
 
@@ -1258,6 +1263,7 @@ export class MusicController {
       ) {
         return;
       }
+      this.commitRandomSongReservation(track);
       track.networkRetryCount = 0;
       if (this.lastPlaybackFailure?.assetId === track.assetId) {
         this.lastPlaybackFailure = null;
@@ -1292,6 +1298,7 @@ export class MusicController {
           ) {
             return;
           }
+          this.commitRandomSongReservation(track);
           track.networkRetryCount = 0;
           this.lastPlaybackFailure = null;
           return;
