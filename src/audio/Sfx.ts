@@ -127,6 +127,11 @@ export class Sfx {
   private readonly onPronunciation = (event: Event): void => {
     const detail = (event as CustomEvent<{ active?: unknown }>).detail;
     this.pronunciationActive = detail?.active === true;
+    // An announcer line may already be playing when TTS begins. Re-apply the
+    // warning-bus gain immediately so its tail cannot mask pronunciation.
+    if (this.announcerAudio !== null) {
+      this.announcerAudio.volume = this.announcerVolume();
+    }
   };
 
   constructor() {
