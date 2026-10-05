@@ -84,6 +84,14 @@ export type AlternativeRankedGateResult = Readonly<{
   reasons: readonly AlternativeRankedGateReason[];
 }>;
 
+function countAtLeast(value: number, minimum: number): boolean {
+  return Number.isSafeInteger(value) && value >= minimum;
+}
+
+function nonNegativeAtMost(value: number, maximum: number): boolean {
+  return Number.isFinite(value) && value >= 0 && value <= maximum;
+}
+
 export function expectedAlternativeRatingNamespace(
   mode: AlternativeRankedMode,
 ): AlternativeRatingNamespace {
@@ -114,25 +122,37 @@ export function evaluateAlternativeRankedGate(input: {
 
   if (
     !evidence.population.measured ||
-    evidence.population.peakConcurrentCandidates < thresholds.minPeakConcurrentCandidates ||
-    evidence.population.offPeakConcurrentCandidates < thresholds.minOffPeakConcurrentCandidates ||
-    evidence.population.projectedP95WaitSeconds > thresholds.maxProjectedP95WaitSeconds
+    !countAtLeast(
+      evidence.population.peakConcurrentCandidates,
+      thresholds.minPeakConcurrentCandidates,
+    ) ||
+    !countAtLeast(
+      evidence.population.offPeakConcurrentCandidates,
+      thresholds.minOffPeakConcurrentCandidates,
+    ) ||
+    !nonNegativeAtMost(
+      evidence.population.projectedP95WaitSeconds,
+      thresholds.maxProjectedP95WaitSeconds,
+    )
   ) {
     reasons.push("population");
   }
 
   if (
     !evidence.network.measured ||
-    evidence.network.sampleCount < thresholds.minNetworkSamples ||
-    evidence.network.p95RttMs > thresholds.maxP95RttMs ||
-    evidence.network.p95JitterMs > thresholds.maxP95JitterMs ||
+    !countAtLeast(evidence.network.sampleCount, thresholds.minNetworkSamples) ||
+    !nonNegativeAtMost(evidence.network.p95RttMs, thresholds.maxP95RttMs) ||
+    !nonNegativeAtMost(evidence.network.p95JitterMs, thresholds.maxP95JitterMs) ||
     !evidence.network.reconnectSimulationPassed
   ) {
     reasons.push("network");
   }
 
   if (
-    evidence.content.reviewedItems < thresholds.minReviewedContent[input.mode] ||
+    !countAtLeast(
+      evidence.content.reviewedItems,
+      thresholds.minReviewedContent[input.mode],
+    ) ||
     !evidence.content.minimumVarietyPassed ||
     !evidence.content.repetitionSimulationPassed
   ) {
@@ -190,7 +210,9 @@ export function unavailableAlternativeRankedEvidence(
       reconnectSimulationPassed: false,
     },
     content: {
-      reviewedItems: Math.max(0, Math.trunc(reviewedItems)),
+      reviewedItems: Number.isFinite(reviewedItems)
+        ? Math.max(0, Math.trunc(reviewedItems))
+        : 0,
       minimumVarietyPassed: false,
       repetitionSimulationPassed: false,
     },
