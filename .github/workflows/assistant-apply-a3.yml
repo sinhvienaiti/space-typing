@@ -52,6 +52,19 @@ jobs:
           p.write_text(text)
           PY
           python scripts/assistant/apply-a3-audio-settings.py
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/types.ts')
+          text = p.read_text()
+          for old, new in [
+              ('  masterVolume: number;\n', '  masterVolume?: number;\n'),
+              ('  announcerVolume: number;\n', '  announcerVolume?: number;\n'),
+          ]:
+              if text.count(old) != 1:
+                  raise SystemExit(f'GameSettings compatibility anchor count={text.count(old)}: {old!r}')
+              text = text.replace(old, new, 1)
+          p.write_text(text)
+          PY
       - name: A3 focused tests
         run: pnpm exec vitest run tests/player-audio-settings.test.ts tests/audio-settings-ui-contract.test.ts tests/audio-mix.test.ts tests/sample-sfx-bank.test.ts tests/pronunciation-mix-focus.test.ts tests/announcer-sfx.test.ts tests/sfx-lifecycle.test.ts tests/duel-audio.test.ts tests/title-hub.test.ts
       - name: Type check
