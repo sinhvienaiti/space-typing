@@ -147,6 +147,7 @@ export function parseQaCapability(
     !timestamp(nowMs) ||
     !generation(raw.generation) ||
     raw.expiresAtMs <= raw.issuedAtMs ||
+    nowMs < raw.issuedAtMs ||
     nowMs >= raw.expiresAtMs
   ) {
     throw new Error("QA capability is invalid, expired, or out of scope");
