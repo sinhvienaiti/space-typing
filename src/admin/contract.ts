@@ -23,6 +23,10 @@ export type SpaceTypingAdminContract = {
     assignmentSlots: readonly string[];
     assignmentModes: readonly string[];
     validationBadges: readonly string[];
+    previewProtocol: {
+      version: number;
+      command: string;
+    };
   };
   applyBoundaries: Readonly<Record<string, string>>;
 };

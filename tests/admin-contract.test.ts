@@ -36,6 +36,10 @@ describe("Space Typing Admin contract V1", () => {
       worldsPerGalaxy: 5,
       worldCount: 50,
       assignmentModes: ["inherit", "replace"],
+      previewProtocol: {
+        version: 1,
+        command: "pnpm music:admin-preview",
+      },
     });
     expect(SPACE_TYPING_ADMIN_CONTRACT.worldMusic.validationBadges).toContain(
       "BOSS FALLBACK TO WORLD",

@@ -38,7 +38,11 @@
       "MISSING STEM",
       "UNSUPPORTED ASSET",
       "EMPTY / SILENCE FAIL-SAFE"
-    ]
+    ],
+    "previewProtocol": {
+      "version": 1,
+      "command": "pnpm music:admin-preview"
+    }
   },
   "applyBoundaries": {
     "playerVolume": "immediate",
