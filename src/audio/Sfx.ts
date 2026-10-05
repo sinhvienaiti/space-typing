@@ -258,11 +258,17 @@ export class Sfx {
 
   unlock(): void {
     if (this.destroyed) return;
-    if (this.context === null) {
-      this.context = new AudioContext();
-    }
-    if (this.context.state === "suspended") {
-      void this.context.resume();
+    // Sample-backed HTMLAudio cues remain usable in environments where the
+    // Web Audio API is unavailable (tests, restricted browsers, fail-soft
+    // runtime). Synthesized voices simply remain disabled until AudioContext
+    // becomes available.
+    if (typeof AudioContext !== "undefined") {
+      if (this.context === null) {
+        this.context = new AudioContext();
+      }
+      if (this.context.state === "suspended") {
+        void this.context.resume();
+      }
     }
     this.samples.preload();
     this.loadLocalAnnouncer();
