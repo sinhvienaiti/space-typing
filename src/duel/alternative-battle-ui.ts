@@ -265,8 +265,12 @@ export function installDuelAlternativeBattleUi(
 
   const controller: DuelAlternativeBattleUiController = {
     setMatchView(view) {
+      const roundChanged =
+        matchView !== null &&
+        view !== null &&
+        matchView.roundId !== view.roundId;
       matchView = view;
-      if (view?.gameMode === "standard") modeView = null;
+      if (roundChanged || view?.gameMode === "standard") modeView = null;
       render();
     },
     setModeState(view) {

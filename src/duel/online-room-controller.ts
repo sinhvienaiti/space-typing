@@ -14,6 +14,8 @@ import {
 } from "./room-ui";
 import type { DuelRoomSnapshot } from "./room";
 import type { DuelRoomListing } from "./protocol";
+import type { DuelAlternativeModePlayerView } from "./alternative-mode-view";
+import type { DuelGameMode } from "./game-mode";
 
 export type DuelOnlineRoomControllerConfig = {
   clientVersion: string;
@@ -22,6 +24,7 @@ export type DuelOnlineRoomControllerConfig = {
     events: readonly DuelClientEvent[],
   ): void;
   onPrediction?(prediction: DuelLocalPrediction): void;
+  onAlternativeModeState?(view: DuelAlternativeModePlayerView | null): void;
   onLocalPracticeReady?(snapshot: DuelRoomSnapshot): void;
   /**
    * The hull this player flies (their selected ship). Sent as the room
@@ -234,6 +237,9 @@ export function installDuelOnlineRoomController(
       onPrediction(prediction) {
         config.onPrediction?.(prediction);
       },
+      onAlternativeModeState(view) {
+        config.onAlternativeModeState?.(view);
+      },
       onError(code, message) {
         if (
           code === "BAD_MESSAGE" &&
@@ -356,9 +362,9 @@ export function installDuelOnlineRoomController(
         client.removeBot(roomId);
       });
     },
-    onStartMatchRequest(roomId) {
+    onStartMatchRequest(roomId, gameMode: DuelGameMode) {
       runOnline(() => {
-        client.startMatch(roomId);
+        client.startMatch(roomId, gameMode);
       });
     },
     onLeaveRoomRequest(roomId) {

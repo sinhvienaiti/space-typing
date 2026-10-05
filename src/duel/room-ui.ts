@@ -6,6 +6,7 @@ import type { DuelBotPersonality } from "./bots";
 import type { DuelMapId } from "./maps";
 import type { DuelNetworkStatus } from "./network-client";
 import type { DuelRoomListing } from "./protocol";
+import type { DuelGameMode } from "./game-mode";
 import { iconSvg } from "../ui/icons";
 import { shipArtUrl } from "../ui/title-hub";
 import {
@@ -36,7 +37,7 @@ export type DuelRoomUiHooks = {
   onReadyRequest?(roomId: string, ready: boolean): void;
   onBotRequest?(roomId: string, bot: DuelRoomBotConfig): void;
   onRemoveBotRequest?(roomId: string): void;
-  onStartMatchRequest?(roomId: string): void;
+  onStartMatchRequest?(roomId: string, gameMode: DuelGameMode): void;
   onLeaveRoomRequest?(roomId: string): void;
   onQueueRankedRequest?(): void;
   onLeaveRankedQueueRequest?(): void;
@@ -124,6 +125,11 @@ function selectValue(id: string): string {
 
 function inputValue(id: string): string {
   return el<HTMLInputElement>(id).value;
+}
+
+function gameModeFromUi(): DuelGameMode {
+  const value = selectValue("duelGameMode");
+  return value === "reflex" || value === "word-chain" ? value : "standard";
 }
 
 function numberValue(
@@ -722,6 +728,11 @@ export function installDuelRoomUi(
 
     const isOwner =
       remoteRoom?.isOwner ?? true;
+    const gameModeSelect = el<HTMLSelectElement>("duelGameMode");
+    gameModeSelect.disabled = !isRemote() || !isOwner;
+    gameModeSelect.title = isRemote() && isOwner
+      ? "Host chooses the gameplay mode when the match starts."
+      : "Friend Room host chooses the gameplay mode. Offline Practice remains Standard.";
     addBotButton.disabled =
       !isOwner ||
       !snapshot.settings.botAllowed ||
@@ -992,6 +1003,7 @@ export function installDuelRoomUi(
       }
       hooks.onStartMatchRequest?.(
         remoteRoom.roomId,
+        gameModeFromUi(),
       );
     },
   );

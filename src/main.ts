@@ -31,6 +31,7 @@ import "./kill-translation.css";
 import "./duel/battle.css";
 import "./duel/battle-juice.css";
 import "./duel/battle-holo.css";
+import "./duel/alternative-battle.css";
 import "./ui/holo.css";
 import "./ui/holo-lobby.css";
 import "./ui/holo-motion.css";
@@ -52,6 +53,7 @@ import { installHoloTooltips } from "./ui/holo-tooltip";
 import { installTitleHub, type TitleHub, type TitleHubPilot, shipArtUrl, galaxyPlateUrl } from "./ui/title-hub";
 import { installDuelOnlineRoomController } from "./duel/online-room-controller";
 import { installDuelBattleUi } from "./duel/battle-ui";
+import { installDuelAlternativeBattleUi } from "./duel/alternative-battle-ui";
 import { DuelLocalPracticeMatch } from "./duel/local-match";
 import { createPracticeDuelRoom, peekPracticeBotCharacter, takePracticeBotCharacter } from "./duel/room";
 import type { DuelMapId } from "./duel/maps";
@@ -1243,6 +1245,7 @@ const duelBattle = installDuelBattleUi(
     onExit() {
       game.setDuelPresentationActive(false);
       stopLocalDuel();
+      duelAlternativeBattle.clear();
       lastDuelAudioPresentationKey = null;
       duelCombatAudio.reset(null);
       restoreTitleMusic();
@@ -1253,6 +1256,12 @@ const duelBattle = installDuelBattleUi(
   },
   settings.visualQuality,
 );
+const duelAlternativeBattle = installDuelAlternativeBattleUi({
+  sendModeInput(payload) {
+    return duelOnlineController?.client.sendModeInput(payload) ?? null;
+  },
+});
+
 // Opening the Duel lobby starts loading the 3D hull, so the fight never waits on it.
 // (after the dialog has painted).
 byId<HTMLButtonElement>("duelModeButton").addEventListener("click", () => {
@@ -1278,6 +1287,8 @@ function startLocalDuelPractice(
   });
 
   const initial = localDuelMatch.initial();
+  duelAlternativeBattle.setModeState(null);
+  duelAlternativeBattle.setMatchView(initial.view);
   duelBattle.setQuality(settings.visualQuality);
   duelBattle.show(initial.view, initial.events);
   const duelDialog =
@@ -1357,8 +1368,12 @@ duelOnlineController = installDuelOnlineRoomController({
     // room dialog once the match is live (Practice already did this).
     const roomDialog = byId<HTMLDialogElement>("duelRoomDialog");
     if (roomDialog.open && view.series.status === "active") roomDialog.close();
+    duelAlternativeBattle.setMatchView(view);
     duelBattle.setQuality(settings.visualQuality);
     duelBattle.update(view, events);
+  },
+  onAlternativeModeState(view) {
+    duelAlternativeBattle.setModeState(view);
   },
   onPrediction(prediction) {
     if (localDuelMatch === null) {
