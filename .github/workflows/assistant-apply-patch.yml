@@ -1,0 +1,54 @@
+name: Assistant reviewed patch applier
+
+on:
+  push:
+    branches:
+      - feat/audio-a1-pronunciation-audibility
+    paths:
+      - 'automation-patches/*.patch'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: assistant-reviewed-patch-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apply-reviewed-patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Locate patch from triggering commit
+        id: patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          patch_file="$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep '^automation-patches/.*\.patch$' | head -n 1)"
+          test -n "$patch_file"
+          echo "file=$patch_file" >> "$GITHUB_OUTPUT"
+
+      - name: Verify and apply patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --check "${{ steps.patch.outputs.file }}"
+          git apply "${{ steps.patch.outputs.file }}"
+
+      - name: Commit source changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A -- ':!automation-patches'
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'Patch produced no source changes.' >&2
+            exit 1
+          fi
+          git commit -m 'feat(duel): wire alternative modes into live authority path'
+          git push origin HEAD:"$GITHUB_REF_NAME"
