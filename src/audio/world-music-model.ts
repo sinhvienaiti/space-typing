@@ -396,7 +396,13 @@ export function resolveWorldMusicPlaylist(
   input: ResolveWorldMusicInput,
 ): ResolvedPlaylist {
   const catalogIds = new Set(input.catalog.tracks.map((track) => track.id));
-  const disabled = new Set(input.publishedPolicy?.disabledTrackIds ?? []);
+  // A generated safety disable is a lower-bound kill switch. A published
+  // policy may add disables but must never silently resurrect a generated
+  // disabled asset.
+  const disabled = new Set([
+    ...(input.generatedPolicy?.disabledTrackIds ?? []),
+    ...(input.publishedPolicy?.disabledTrackIds ?? []),
+  ]);
   const bossRole = bossRoleForStage(input.stageRole);
   if (bossRole !== null) {
     // Random mode intentionally keeps dedicated boss identity in V2.
@@ -445,12 +451,22 @@ export function validateWorldMusicCatalog(
     if (track.id.trim().length === 0) errors.push("track id must not be empty");
     if (ids.has(track.id)) errors.push(`duplicate track id: ${track.id}`);
     ids.add(track.id);
-    if (!(track.durationSeconds > 0)) errors.push(`${track.id}: invalid duration`);
+    if (!Number.isFinite(track.durationSeconds) || !(track.durationSeconds > 0)) {
+      errors.push(`${track.id}: invalid duration`);
+    }
     if (
       track.mixOutSeconds !== undefined &&
-      (!(track.mixOutSeconds > 0) || track.mixOutSeconds >= track.durationSeconds)
+      (!Number.isFinite(track.mixOutSeconds) ||
+        !(track.mixOutSeconds > 0) ||
+        track.mixOutSeconds >= track.durationSeconds)
     ) {
       errors.push(`${track.id}: invalid mixOutSeconds`);
+    }
+    if (
+      track.trimGain !== undefined &&
+      (!Number.isFinite(track.trimGain) || track.trimGain < 0)
+    ) {
+      errors.push(`${track.id}: invalid trimGain`);
     }
 
     const sourceGroups = track.playback.kind === "single"

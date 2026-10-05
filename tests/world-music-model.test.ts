@@ -204,6 +204,47 @@ describe("World music catalog/model", () => {
     expect(result.resolvedFrom).toBe("silence");
   });
 
+  it("never lets a published policy resurrect a generated disabled track", () => {
+    const generatedDisabled: WorldMusicPolicy = {
+      ...generated,
+      disabledTrackIds: [ids[0]],
+    };
+    const published: WorldMusicPolicy = {
+      configRevision: "published-no-disabled-override",
+      worlds: {
+        "world-01": {
+          normal: { kind: "replace", trackIds: [ids[0], ids[1]] },
+        },
+      },
+    };
+    const result = resolveWorldMusicPlaylist({
+      worldId: "world-01",
+      stageRole: "normal",
+      musicMode: "map",
+      catalog,
+      generatedPolicy: generatedDisabled,
+      publishedPolicy: published,
+    });
+    expect(result.trackIds).toEqual([ids[1]]);
+  });
+
+  it("rejects non-finite duration, mix-out and trim values", () => {
+    const invalid: WorldMusicCatalog = {
+      ...catalog,
+      tracks: [
+        { ...catalog.tracks[0]!, durationSeconds: Number.POSITIVE_INFINITY },
+        { ...catalog.tracks[1]!, mixOutSeconds: Number.NaN },
+        { ...catalog.tracks[2]!, trimGain: Number.POSITIVE_INFINITY },
+      ],
+    };
+    const errors = validateWorldMusicCatalog(invalid);
+    expect(errors).toEqual(expect.arrayContaining([
+      `${ids[0]}: invalid duration`,
+      `${ids[1]}: invalid mixOutSeconds`,
+      `${ids[2]}: invalid trimGain`,
+    ]));
+  });
+
   it("playlist identity changes with policy revision or effective ids", () => {
     const first = resolveWorldMusicPlaylist({
       worldId: "world-01",
