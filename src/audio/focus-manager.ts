@@ -57,26 +57,36 @@ export class AudioFocusManager {
   private readonly onPronunciation = (event: Event): void => {
     const detail = eventDetail(event);
     const owner = typeof detail.owner === "string" ? detail.owner : "speech";
-    const generation = typeof detail.generation === "number" && Number.isFinite(detail.generation)
-      ? finiteGeneration(detail.generation, 0)
-      : this.nextGeneration(owner);
+    const suppliedGeneration =
+      typeof detail.generation === "number" && Number.isFinite(detail.generation)
+        ? finiteGeneration(detail.generation, 0)
+        : undefined;
     if (detail.active === true) {
-      this.replace(owner, "pronunciation", generation);
+      this.replace(owner, "pronunciation", suppliedGeneration);
     } else {
-      this.releaseOwnerReason(owner, "pronunciation", generation);
+      this.releaseOwnerReason(
+        owner,
+        "pronunciation",
+        suppliedGeneration ?? this.currentGeneration(owner),
+      );
     }
   };
 
   private readonly onAnnouncer = (event: Event): void => {
     const detail = eventDetail(event);
     const owner = typeof detail.owner === "string" ? detail.owner : "announcer";
-    const generation = typeof detail.generation === "number" && Number.isFinite(detail.generation)
-      ? finiteGeneration(detail.generation, 0)
-      : this.nextGeneration(owner);
+    const suppliedGeneration =
+      typeof detail.generation === "number" && Number.isFinite(detail.generation)
+        ? finiteGeneration(detail.generation, 0)
+        : undefined;
     if (detail.active === true) {
-      this.replace(owner, "announcer", generation);
+      this.replace(owner, "announcer", suppliedGeneration);
     } else {
-      this.releaseOwnerReason(owner, "announcer", generation);
+      this.releaseOwnerReason(
+        owner,
+        "announcer",
+        suppliedGeneration ?? this.currentGeneration(owner),
+      );
     }
   };
 
@@ -114,7 +124,7 @@ export class AudioFocusManager {
   acquire(reason: AudioFocusReason, owner: string, generation?: number): AudioFocusToken {
     this.ensureBrowserBridge();
     const safeOwner = owner.trim() || "anonymous";
-    const safeGeneration = generation ?? this.nextGeneration(safeOwner);
+    const safeGeneration = generation ?? this.currentGeneration(safeOwner) + 1;
     const token: AudioFocusToken = Object.freeze({
       tokenId: `${safeOwner}:${reason}:${safeGeneration}:${++this.sequence}`,
       reason,
@@ -122,7 +132,7 @@ export class AudioFocusManager {
       generation: safeGeneration,
     });
     this.tokens.set(token.tokenId, token);
-    this.ownerGeneration.set(safeOwner, Math.max(this.ownerGeneration.get(safeOwner) ?? 0, safeGeneration));
+    this.ownerGeneration.set(safeOwner, Math.max(this.currentGeneration(safeOwner), safeGeneration));
     this.publish();
     return token;
   }
@@ -133,8 +143,8 @@ export class AudioFocusManager {
     generation?: number,
   ): AudioFocusToken | null {
     const safeOwner = owner.trim() || "anonymous";
-    const safeGeneration = generation ?? this.nextGeneration(safeOwner);
-    const current = this.ownerGeneration.get(safeOwner) ?? 0;
+    const current = this.currentGeneration(safeOwner);
+    const safeGeneration = generation ?? current + 1;
     const existing = [...this.tokens.values()].find(
       (token) =>
         token.owner === safeOwner &&
@@ -152,11 +162,12 @@ export class AudioFocusManager {
   }
 
   acquireTimed(reason: AudioFocusReason, owner: string, durationMs: number): AudioFocusToken {
-    const generation = this.nextGeneration(owner);
-    // nextGeneration() advances ownerGeneration first, so acquire directly;
-    // replace() intentionally treats an already-observed generation as
-    // idempotent/stale and would return null when no token exists yet.
-    const token = this.acquire(reason, owner, generation);
+    const safeOwner = owner.trim() || "anonymous";
+    const generation = this.currentGeneration(safeOwner) + 1;
+    const token = this.replace(safeOwner, reason, generation);
+    if (token === null) {
+      throw new Error("Audio focus generation failed to advance");
+    }
     const bridge = this.currentWindow();
     if (bridge !== null) {
       const timer = bridge.setTimeout(() => {
@@ -203,24 +214,24 @@ export class AudioFocusManager {
     generation: number,
     replacing = false,
   ): void {
-    const current = this.ownerGeneration.get(owner) ?? 0;
+    const safeOwner = owner.trim() || "anonymous";
+    const current = this.currentGeneration(safeOwner);
     if (!replacing && generation < current) return;
     let changed = false;
     for (const token of [...this.tokens.values()]) {
-      if (token.owner !== owner || token.reason !== reason) continue;
+      if (token.owner !== safeOwner || token.reason !== reason) continue;
       if (!replacing && token.generation > generation) continue;
       this.tokens.delete(token.tokenId);
       this.cancelTimer(token.tokenId);
       changed = true;
     }
-    if (generation >= current) this.ownerGeneration.set(owner, generation);
+    if (generation >= current) this.ownerGeneration.set(safeOwner, generation);
     if (changed) this.publish();
   }
 
-  private nextGeneration(owner: string): number {
-    const next = (this.ownerGeneration.get(owner) ?? 0) + 1;
-    this.ownerGeneration.set(owner, next);
-    return next;
+  private currentGeneration(owner: string): number {
+    const safeOwner = owner.trim() || "anonymous";
+    return this.ownerGeneration.get(safeOwner) ?? 0;
   }
 
   private cancelTimer(tokenId: string): void {
