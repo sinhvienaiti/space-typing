@@ -3,9 +3,15 @@ import { GENERATED_WORLD_MUSIC_POLICY } from "./world-music-default-policy";
 import { WORLD_IDS } from "../worlds/registry";
 import type { StageRole } from "../campaign/types";
 import type { MusicState } from "./music-profile";
-import type { MusicTrack } from "./music-library";
+import {
+  MOOD_LABELS,
+  type MusicMood,
+  type MusicTrack,
+  type SongStem,
+} from "./music-library";
 import {
   resolveWorldMusicPlaylist,
+  type CatalogTrack,
   type ResolvedPlaylist,
   type WorldMusicCatalog,
   type WorldMusicPolicy,
@@ -55,6 +61,79 @@ export function catalogFromMusicTracks(
       },
     })),
   };
+}
+
+export type RuntimeMusicTrack = MusicTrack & {
+  playbackKind: "single" | "stems";
+  sourceCandidates: Readonly<Record<SongStem, readonly string[]>>;
+  syncGroup: string | null;
+};
+
+function sourceUrls(values: readonly { src: string }[]): string[] {
+  return [...new Set(values.map((value) => value.src).filter((src) => src.length > 0))];
+}
+
+function catalogMood(value: string | undefined, fallback: MusicTrack | undefined): MusicMood {
+  if (value !== undefined && value in MOOD_LABELS) return value as MusicMood;
+  return fallback?.mood ?? "suspense";
+}
+
+function catalogMixOut(track: CatalogTrack, fallback: MusicTrack | undefined): number {
+  const duration = Math.max(0.1, track.durationSeconds);
+  const requested = track.mixOutSeconds ?? fallback?.mixOut;
+  if (requested !== undefined && Number.isFinite(requested) && requested > 0 && requested < duration) {
+    return requested;
+  }
+  const tail = Math.min(8, Math.max(0.25, duration * 0.1));
+  return Math.max(0.05, duration - tail);
+}
+
+function materializeCatalogTrack(
+  track: CatalogTrack,
+  fallback: MusicTrack | undefined,
+): RuntimeMusicTrack | null {
+  const playback = track.playback;
+  const calm = playback.kind === "single"
+    ? sourceUrls(playback.sources)
+    : sourceUrls(playback.calm);
+  const intense = playback.kind === "single"
+    ? calm
+    : sourceUrls(playback.intense);
+  if (calm.length === 0 || intense.length === 0) return null;
+
+  return {
+    id: track.id,
+    title: track.title,
+    mood: catalogMood(track.metadata?.mood, fallback),
+    key: track.metadata?.key ?? fallback?.key ?? "Unknown",
+    bpm: track.metadata?.bpm ?? fallback?.bpm ?? 0,
+    meter: fallback?.meter ?? 4,
+    seconds: Math.max(0.1, track.durationSeconds),
+    mixOut: catalogMixOut(track, fallback),
+    stems: {
+      calm: calm[0]!,
+      intense: intense[0]!,
+    },
+    playbackKind: playback.kind,
+    sourceCandidates: { calm, intense },
+    syncGroup: playback.kind === "stems" ? playback.syncGroup : null,
+  };
+}
+
+/**
+ * Materializes the authoritative catalog into the legacy MusicTrack-shaped
+ * runtime metadata used by MusicController. Codec URLs stay attached to one
+ * track identity, and catalog-only tracks are therefore fully playable.
+ */
+export function materializeRuntimeMusicTracks(
+  catalog: WorldMusicCatalog,
+  legacyTracks: readonly MusicTrack[] = [],
+): readonly RuntimeMusicTrack[] {
+  const legacyById = new Map(legacyTracks.map((track) => [track.id, track]));
+  return catalog.tracks.flatMap((track) => {
+    const materialized = materializeCatalogTrack(track, legacyById.get(track.id));
+    return materialized === null ? [] : [materialized];
+  });
 }
 
 export type ResolveRuntimeWorldPlaylistInput = {

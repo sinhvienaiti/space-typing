@@ -29,8 +29,10 @@ import {
 import {
   catalogFromMusicTracks,
   BUNDLED_WORLD_MUSIC_CATALOG,
+  materializeRuntimeMusicTracks,
   resolveRuntimeWorldPlaylist,
   stageRoleForMusicState,
+  type RuntimeMusicTrack,
 } from "./world-music-runtime";
 import type {
   PlaylistSelectionMode,
@@ -296,7 +298,7 @@ export class MusicController {
   private readonly audioFactory: AudioFactory;
 
   // World songs.
-  private readonly tracks: readonly MusicTrack[];
+  private readonly tracks: readonly RuntimeMusicTrack[];
   private readonly random: () => number;
   private readonly catalog: WorldMusicCatalog;
   private readonly generatedPolicy: WorldMusicPolicy | undefined;
@@ -308,9 +310,9 @@ export class MusicController {
   private playlistResolvedFrom = "unresolved";
   private playlistIndex = 0;
   private shuffle: ShuffleBag;
-  private currentSong: MusicTrack | null = null;
+  private currentSong: RuntimeMusicTrack | null = null;
   /** The next song, decided early so it can be preloaded. */
-  private upcoming: MusicTrack | null = null;
+  private upcoming: RuntimeMusicTrack | null = null;
   /** Next song's element, loading before the handover. */
   private warmNext: ManagedTrack | null = null;
   /** The current song's other stem, loaded and paused for instant switches. */
@@ -350,13 +352,14 @@ export class MusicController {
     options: MusicControllerOptions = {},
   ) {
     this.audioFactory = audioFactory;
-    this.tracks = options.tracks ?? MUSIC_TRACKS;
+    const legacyTracks = options.tracks ?? MUSIC_TRACKS;
     this.random = options.random ?? Math.random;
     this.catalog = options.catalog ?? (
       options.tracks === undefined
         ? BUNDLED_WORLD_MUSIC_CATALOG
-        : catalogFromMusicTracks(this.tracks)
+        : catalogFromMusicTracks(legacyTracks)
     );
+    this.tracks = materializeRuntimeMusicTracks(this.catalog, legacyTracks);
     this.generatedPolicy = options.generatedPolicy;
     this.publishedPolicy = options.publishedPolicy;
     this.shuffle = new ShuffleBag([], this.random);
@@ -529,8 +532,9 @@ export class MusicController {
     this.notifyNowPlaying();
   }
 
-  /** Hands over to the next song now. False when no world song is playing. */
+  /** Hands over to the next normal/intense song now. Boss music is not skippable. */
   skipTrack(): boolean {
+    if (!this.isWorldState(this.state)) return false;
     return this.advanceSong(SONG_CROSSFADE_SECONDS.skip);
   }
 
@@ -737,7 +741,7 @@ export class MusicController {
     return state === "WORLD_INTENSE" ? "intense" : "calm";
   }
 
-  private trackById(id: string | undefined): MusicTrack | null {
+  private trackById(id: string | undefined): RuntimeMusicTrack | null {
     if (id === undefined) return null;
     return this.tracks.find((track) => track.id === id) ?? null;
   }
@@ -807,7 +811,7 @@ export class MusicController {
     this.startSong(next, stem, Math.max(SONG_CROSSFADE_SECONDS.resume, seconds), "state");
   }
 
-  private firstSong(): MusicTrack | null {
+  private firstSong(): RuntimeMusicTrack | null {
     if (this.playlistSelectionMode === "shuffle-bag") {
       return this.trackById(this.shuffle.peek(null) ?? undefined);
     }
@@ -816,7 +820,7 @@ export class MusicController {
   }
 
   /** The next song, without moving the queue (so it can be preloaded). */
-  private peekNextSong(): MusicTrack | null {
+  private peekNextSong(): RuntimeMusicTrack | null {
     if (this.upcoming !== null) return this.upcoming;
     if (this.playlistSelectionMode === "shuffle-bag") {
       this.upcoming = this.trackById(this.shuffle.peek(this.currentSong?.id ?? null) ?? undefined);
@@ -827,7 +831,7 @@ export class MusicController {
   }
 
   /** Moves the queue on and returns the song to play now. */
-  private takeNextSong(): MusicTrack | null {
+  private takeNextSong(): RuntimeMusicTrack | null {
     const next = this.peekNextSong();
     this.upcoming = null;
     if (next !== null && this.playlistSelectionMode === "ordered") {
@@ -838,7 +842,7 @@ export class MusicController {
   }
 
   private advanceSong(seconds: number): boolean {
-    if (this.destroyed || !this.isWorldState(this.state) || this.currentSong === null || !this.hasSongs()) {
+    if (this.destroyed || !this.isCampaignPlaylistState(this.state) || this.currentSong === null || !this.hasSongs()) {
       return false;
     }
     const next = this.takeNextSong();
@@ -847,10 +851,15 @@ export class MusicController {
     return true;
   }
 
-  private startSong(song: MusicTrack, stem: SongStem, seconds: number, style: FadeStyle): void {
+  private startSong(song: RuntimeMusicTrack, stem: SongStem, seconds: number, style: FadeStyle): void {
     let next: ManagedTrack | null = null;
-    if (this.warmNext !== null && this.warmNext.songId === song.id && this.warmNext.stem === stem) {
+    if (
+      this.warmNext !== null &&
+      this.warmNext.songId === song.id &&
+      (song.playbackKind === "single" || this.warmNext.stem === stem)
+    ) {
       next = this.warmNext;
+      next.stem = stem;
       this.warmNext = null;
     }
     this.releaseWarmNext();
@@ -865,9 +874,19 @@ export class MusicController {
   }
 
   /** Calm ↔ intense at the same position of the same song. */
-  private switchStem(song: MusicTrack, stem: SongStem, seconds: number): void {
+  private switchStem(song: RuntimeMusicTrack, stem: SongStem, seconds: number): void {
     const active = this.activeMusic;
     if (active === null) return;
+    if (song.playbackKind === "single") {
+      // V2 contract: intensity is semantic for a single-file recording. Keep
+      // the existing voice and position instead of playing a duplicate copy.
+      active.stem = stem;
+      this.releaseWarmStem();
+      this.applyVolumes();
+      void this.playTrack(active);
+      this.notifyNowPlaying();
+      return;
+    }
     // Switching back mid-fade: reuse the stem that is still fading out.
     let next: ManagedTrack | null = null;
     const retiring = this.retiringMusic.findIndex((track) => track.songId === song.id && track.stem === stem);
@@ -886,9 +905,13 @@ export class MusicController {
     this.notifyNowPlaying();
   }
 
-  private createSongTrack(song: MusicTrack, stem: SongStem): ManagedTrack | null {
+  private createSongTrack(song: RuntimeMusicTrack, stem: SongStem): ManagedTrack | null {
     const track = this.createTrack(
-      { id: song.id + ":" + stem, defaultPath: song.stems[stem], syncGroup: song.id },
+      {
+        id: song.id + ":" + (song.playbackKind === "single" ? "single" : stem),
+        sources: song.sourceCandidates[stem],
+        syncGroup: song.playbackKind === "stems" ? (song.syncGroup ?? song.id) : undefined,
+      },
       false,
       0,
     );
@@ -924,7 +947,12 @@ export class MusicController {
     if (this.destroyed || this.paused || active === null || song === null || active.songId !== song.id) return;
     const position = active.audio.currentTime;
     if (!Number.isFinite(position)) return;
-    if (this.warmStem === null && position > 3 && this.musicFade === null) {
+    if (
+      song.playbackKind === "stems" &&
+      this.warmStem === null &&
+      position > 3 &&
+      this.musicFade === null
+    ) {
       this.warmStem = this.createSongTrack(song, active.stem === "intense" ? "calm" : "intense");
     }
     if (this.warmNext === null && position >= song.mixOut - PRELOAD_LEAD_SECONDS) {
