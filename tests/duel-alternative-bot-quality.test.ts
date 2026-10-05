@@ -37,7 +37,10 @@ describe("alternative Duel bot quality", () => {
 
     const retry = runtime.runBotTurn("player-2", 1_950, 1);
     expect(retry.some((event) => event.type === "cannon-fired")).toBe(true);
-    expect(runtime.reconnectSnapshot("player-2").player.completed).toBe(true);
+    const afterRetry = runtime.reconnectSnapshot("player-2");
+    expect(afterRetry.gameMode).toBe("reflex");
+    if (afterRetry.gameMode !== "reflex") throw new Error("Expected Reflex view.");
+    expect(afterRetry.player.completed).toBe(true);
     expect(engine.snapshot().players["player-1"].hull).toBe(100);
 
     runtime.tick(2_550);
@@ -62,6 +65,8 @@ describe("alternative Duel bot quality", () => {
     const retry = runtime.runBotTurn("player-2", 6_000, 1);
     expect(retry.some((event) => event.type === "cannon-fired")).toBe(true);
     const afterRetry = runtime.reconnectSnapshot("player-2");
-    expect(afterRetry.gameMode === "word-chain" && afterRetry.player.accepted).toBe(true);
+    expect(afterRetry.gameMode).toBe("word-chain");
+    if (afterRetry.gameMode !== "word-chain") throw new Error("Expected Word Chain view.");
+    expect(afterRetry.player.accepted).toBe(true);
   });
 });
