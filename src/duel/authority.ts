@@ -1653,6 +1653,11 @@ export class DuelAuthorityService {
     if (session === undefined) {
       return this.error("SESSION_NOT_FOUND", "Duel session does not exist.");
     }
+    // MODE_INPUT intentionally bypasses the WebSocket-level message limiter so
+    // it is charged exactly once here. Charge immediately after authentication
+    // so malformed/stale/unknown-match packets cannot bypass anti-abuse limits.
+    const rate = this.acceptMessage(sessionId, input.now);
+    if (!rate.ok) return rate;
     if (match === undefined) {
       return this.error("MATCH_NOT_FOUND", "Duel match does not exist.");
     }
@@ -1682,8 +1687,6 @@ export class DuelAuthorityService {
         "Mode input does not match the authoritative gameplay mode.",
       );
     }
-    const rate = this.acceptMessage(sessionId, input.now);
-    if (!rate.ok) return rate;
     const payload = parsed.value.payload;
     if (
       typeof payload === "object" &&
