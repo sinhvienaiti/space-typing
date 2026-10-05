@@ -32,6 +32,22 @@ if old_retry in text:
     text = text.replace(old_retry, "          track.networkRetryCount = 0;", 1)
 path.write_text(text)
 
+# Expose the actual active song identity in the QA snapshot. `currentSong`
+# describes playlist state and can legitimately stay populated while a special
+# looping asset is active, so M22 must inspect ManagedTrack.songId instead.
+replace_once(
+    "src/audio/MusicController.ts",
+    '''  activeMusic: null | {\n    assetId: string;\n    candidates: string[];\n''',
+    '''  activeMusic: null | {\n    assetId: string;\n    songId: string | null;\n    candidates: string[];\n''',
+    "debug activeMusic songId type",
+)
+replace_once(
+    "src/audio/MusicController.ts",
+    '''          : {\n              assetId: active.assetId,\n              candidates: [...active.candidates],\n''',
+    '''          : {\n              assetId: active.assetId,\n              songId: active.songId,\n              candidates: [...active.candidates],\n''',
+    "debug activeMusic songId value",
+)
+
 # V2 boss fallback intentionally keeps same-World normal music when no
 # dedicated boss assignment exists. Update the legacy playlist regression to
 # assert continuity instead of an artificial silent/special-track detour.
@@ -48,7 +64,7 @@ replace_once(
 replace_once(
     "tests/m22-audio-audit.test.ts",
     '''        } else if (state === "WORLD_NORMAL" || state === "WORLD_INTENSE") {\n          // World music plays the map's songs: one file each, handed over to\n          // the next song instead of looping (docs/MUSIC_SYSTEM.md).\n          expect(snapshot.activeMusic).not.toBeNull();\n          expect(snapshot.song).not.toBeNull();\n          expect(snapshot.activeMusic?.loop).toBe(false);\n          expect(snapshot.activeMusic?.candidates.length).toBe(1);\n        } else {\n          expect(snapshot.activeMusic).not.toBeNull();\n          expect(snapshot.activeMusic?.loop).toBe(stateLoops(state));\n          expect(snapshot.activeMusic?.candidates.length).toBe(2);\n        }\n''',
-    '''        } else if (snapshot.song !== null) {\n          // Canonical campaign playlists (including same-World boss fallback)\n          // use song lifecycle semantics: hand over instead of looping. Source\n          // candidate count is a transport detail and may grow with codecs.\n          expect(snapshot.activeMusic).not.toBeNull();\n          expect(snapshot.activeMusic?.loop).toBe(false);\n          expect(snapshot.activeMusic?.candidates.length ?? 0).toBeGreaterThanOrEqual(1);\n        } else {\n          // Non-catalog legacy profile assets retain their state-specific loop\n          // contract and local/default source fallback pair.\n          expect(snapshot.activeMusic).not.toBeNull();\n          expect(snapshot.activeMusic?.loop).toBe(stateLoops(state));\n          expect(snapshot.activeMusic?.candidates.length).toBe(2);\n        }\n''',
+    '''        } else if (\n          snapshot.activeMusic !== null &&\n          snapshot.activeMusic.songId !== null\n        ) {\n          // Canonical campaign playlists (including same-World boss fallback)\n          // use song lifecycle semantics: hand over instead of looping. Source\n          // candidate count is a transport detail and may grow with codecs.\n          expect(snapshot.song?.id).toBe(snapshot.activeMusic.songId);\n          expect(snapshot.activeMusic.loop).toBe(false);\n          expect(snapshot.activeMusic.candidates.length).toBeGreaterThanOrEqual(1);\n        } else {\n          // Non-catalog legacy profile assets retain their state-specific loop\n          // contract and local/default source fallback pair.\n          expect(snapshot.activeMusic).not.toBeNull();\n          expect(snapshot.activeMusic?.loop).toBe(stateLoops(state));\n          expect(snapshot.activeMusic?.candidates.length).toBe(2);\n        }\n''',
     "M22 canonical playlist lifecycle",
 )
 
