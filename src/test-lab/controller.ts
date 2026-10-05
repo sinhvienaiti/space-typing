@@ -367,6 +367,27 @@ export function mountTestLab(
   let combatCreditLedger = new CombatCreditRewardLedger();
   let audioQa: TestLabAudioQa | null = null;
   const testLabFocusTokens: Partial<Record<"pronunciation" | "announcer" | "warning", AudioFocusToken>> = {};
+  let rapidPronunciationTimers: number[] = [];
+
+  function clearRapidPronunciationTimers(): void {
+    for (const timer of rapidPronunciationTimers) window.clearTimeout(timer);
+    rapidPronunciationTimers = [];
+  }
+
+  function releaseTestLabFocus(): void {
+    for (const token of Object.values(testLabFocusTokens)) {
+      if (token !== undefined) sharedAudioFocus.release(token);
+    }
+    delete testLabFocusTokens.announcer;
+    delete testLabFocusTokens.pronunciation;
+    delete testLabFocusTokens.warning;
+  }
+
+  function cleanupTransientAudioQa(): void {
+    clearRapidPronunciationTimers();
+    releaseTestLabFocus();
+  }
+
   let inspectorTimer = 0;
   let activeShop: ShopInstance | null = null;
   let shopPurchaseSequence = 0;
@@ -3482,9 +3503,10 @@ export function mountTestLab(
         ),
       };
       const first = inputValue(dialog, '[data-field="pronunciation-text"]') || "checkpoint";
-      [first, "shield", "reactor"].forEach((text, index) => {
-        window.setTimeout(() => speakEnglish(text, settings), index * 120);
-      });
+      clearRapidPronunciationTimers();
+      rapidPronunciationTimers = [first, "shield", "reactor"].map((text, index) =>
+        window.setTimeout(() => speakEnglish(text, settings), index * 120),
+      );
       notice("A4 rapid pronunciation ×3 · latest speech must win without stale focus release");
       renderInspector();
       return;
@@ -3527,12 +3549,7 @@ export function mountTestLab(
       return;
     }
     if (action === "release-ducks") {
-      for (const token of Object.values(testLabFocusTokens)) {
-        if (token !== undefined) sharedAudioFocus.release(token);
-      }
-      delete testLabFocusTokens.announcer;
-      delete testLabFocusTokens.pronunciation;
-      delete testLabFocusTokens.warning;
+      releaseTestLabFocus();
       renderInspector();
       return;
     }
@@ -3606,6 +3623,7 @@ export function mountTestLab(
   }
 
   dialog.addEventListener("close", () => {
+    cleanupTransientAudioQa();
     destroyRuntime();
     audioQa?.destroy();
     audioQa = null;
@@ -3624,6 +3642,7 @@ export function mountTestLab(
       dialog.showModal();
     },
     destroy(): void {
+      cleanupTransientAudioQa();
       destroyRuntime();
       audioQa?.destroy();
       audioQa = null;
