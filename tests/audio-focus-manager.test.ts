@@ -19,13 +19,15 @@ describe("AudioFocusManager", () => {
     expect(manager.isActive("pronunciation")).toBe(false);
   });
 
-  it("does not resurrect focus from a stale activation after the current generation released", () => {
+  it("does not resurrect focus from stale or duplicate activation after release", () => {
     const manager = new AudioFocusManager();
     const current = manager.replace("speech", "pronunciation", 2);
     expect(current).not.toBeNull();
+    expect(manager.replace("speech", "pronunciation", 2)).toBe(current);
     manager.release(current);
     expect(manager.isActive("pronunciation")).toBe(false);
 
+    expect(manager.replace("speech", "pronunciation", 2)).toBeNull();
     expect(manager.replace("speech", "pronunciation", 1)).toBeNull();
     expect(manager.isActive("pronunciation")).toBe(false);
     expect(manager.snapshot().tokens).toEqual([]);
