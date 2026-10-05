@@ -26,7 +26,23 @@ jobs:
       - name: Install
         run: pnpm install --no-frozen-lockfile
       - name: Apply guarded A3 patch
-        run: python scripts/assistant/apply-a3-audio-settings.py
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/assistant/apply-a3-audio-settings.py')
+          text = p.read_text()
+          anchor = """def write_new(path: str, content: str) -> None:\n"""
+          helper = """def replace_first(path: str, old: str, new: str) -> None:\n    p = ROOT / path\n    text = p.read_text()\n    if old not in text:\n        raise SystemExit(f\"{path}: first-match anchor missing for {old[:120]!r}\")\n    p.write_text(text.replace(old, new, 1))\n\n\n"""
+          if anchor not in text:
+              raise SystemExit('A3 helper insertion anchor missing')
+          text = text.replace(anchor, helper + anchor, 1)
+          call = """replace_once(\n    'src/audio/Sfx.ts',\n    '''    this.applyGroupBusGains();\\n    this.samples.setMix(this.volume, this.pronunciationActive);\\n''',\n"""
+          replacement = call.replace('replace_once(', 'replace_first(', 1)
+          if call not in text:
+              raise SystemExit('A3 Sfx focus anchor call missing')
+          p.write_text(text.replace(call, replacement, 1))
+          PY
+          python scripts/assistant/apply-a3-audio-settings.py
       - name: A3 focused tests
         run: pnpm exec vitest run tests/player-audio-settings.test.ts tests/audio-settings-ui-contract.test.ts tests/audio-mix.test.ts tests/sample-sfx-bank.test.ts tests/pronunciation-mix-focus.test.ts tests/announcer-sfx.test.ts tests/sfx-lifecycle.test.ts tests/duel-audio.test.ts tests/title-hub.test.ts
       - name: Type check
