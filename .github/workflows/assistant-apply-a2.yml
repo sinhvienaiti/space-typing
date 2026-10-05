@@ -26,7 +26,9 @@ jobs:
       - name: Install
         run: pnpm install --no-frozen-lockfile
       - name: Apply guarded A2 runtime patch
-        run: bash scripts/assistant/apply-a2-runtime.sh
+        run: |
+          bash scripts/assistant/apply-a2-runtime.sh
+          python scripts/assistant/fix-a2-gate.py
       - name: A2 regression tests
         run: pnpm exec vitest run tests/audio-focus-manager.test.ts tests/speech-focus.test.ts tests/pronunciation-mix-focus.test.ts tests/music-controller.test.ts tests/m22-audio-audit.test.ts tests/announcer-sfx.test.ts tests/sample-sfx-bank.test.ts tests/sfx-lifecycle.test.ts tests/test-lab-production-qa.test.ts
       - name: Type check
@@ -37,7 +39,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/audio src/speech.ts src/test-lab
+          git add src/audio src/speech.ts src/test-lab tests/audio-focus-manager.test.ts tests/pronunciation-mix-focus.test.ts tests/m22-audio-audit.test.ts tests/announcer-sfx.test.ts
           if git diff --cached --quiet; then
             echo "No A2 production changes to commit"
             exit 0
