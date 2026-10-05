@@ -127,15 +127,18 @@ export class AudioFocusManager {
     return token;
   }
 
-  replace(owner: string, reason: AudioFocusReason, generation?: number): AudioFocusToken {
+  replace(
+    owner: string,
+    reason: AudioFocusReason,
+    generation?: number,
+  ): AudioFocusToken | null {
     const safeOwner = owner.trim() || "anonymous";
     const safeGeneration = generation ?? this.nextGeneration(safeOwner);
     const current = this.ownerGeneration.get(safeOwner) ?? 0;
     if (safeGeneration < current) {
-      const existing = [...this.tokens.values()].find(
+      return [...this.tokens.values()].find(
         (token) => token.owner === safeOwner && token.reason === reason && token.generation === current,
-      );
-      return existing ?? this.acquire(reason, safeOwner, current);
+      ) ?? null;
     }
     this.releaseOwnerReason(safeOwner, reason, safeGeneration, true);
     return this.acquire(reason, safeOwner, safeGeneration);
@@ -144,6 +147,11 @@ export class AudioFocusManager {
   acquireTimed(reason: AudioFocusReason, owner: string, durationMs: number): AudioFocusToken {
     const generation = this.nextGeneration(owner);
     const token = this.replace(owner, reason, generation);
+    if (token === null) {
+      // nextGeneration() is strictly newer than the current owner generation,
+      // so this is defensive only and must never turn a stale event into focus.
+      return this.acquire(reason, owner, generation);
+    }
     const bridge = this.currentWindow();
     if (bridge !== null) {
       const timer = bridge.setTimeout(() => {
@@ -155,7 +163,8 @@ export class AudioFocusManager {
     return token;
   }
 
-  release(token: AudioFocusToken | string): boolean {
+  release(token: AudioFocusToken | string | null): boolean {
+    if (token === null) return false;
     const tokenId = typeof token === "string" ? token : token.tokenId;
     const existing = this.tokens.get(tokenId);
     if (existing === undefined) return false;
