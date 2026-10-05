@@ -25,24 +25,27 @@ jobs:
           node-version: 24
       - name: Install
         run: pnpm install --no-frozen-lockfile
-      - name: Apply guarded B1 reservation patch
-        run: python scripts/assistant/apply-b1-playback-lifecycle.py
-      - name: B1 reservation and playback regression tests
-        run: pnpm exec vitest run tests/music-shuffle-reservation.test.ts tests/music-playback-failure.test.ts tests/music-controller-failure-taxonomy.test.ts tests/music-controller.test.ts tests/music-library.test.ts tests/world-music-model.test.ts
+      - name: Apply guarded B1 runtime patches
+        run: |
+          python scripts/assistant/apply-b1-playback-lifecycle.py
+          python scripts/assistant/apply-b1-canonical-runtime.py
+      - name: B1 music regression tests
+        run: pnpm exec vitest run tests/music-shuffle-reservation.test.ts tests/music-playback-failure.test.ts tests/music-controller-failure-taxonomy.test.ts tests/music-controller.test.ts tests/music-library.test.ts tests/world-music-model.test.ts tests/world-music-runtime.test.ts
       - name: Type check
         run: pnpm exec tsc -p tsconfig.json --noEmit
       - name: Build
         run: pnpm run build
       - name: Diff safety
         run: git diff --check
-      - name: Commit verified reservation lifecycle
+      - name: Commit verified B1 runtime changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/audio/music-library.ts src/audio/MusicController.ts tests/music-shuffle-reservation.test.ts
           if git diff --cached --quiet; then
-            echo "No production changes to commit"
+            echo "No generated runtime changes to commit"
             exit 0
           fi
-          git commit -m "fix(music): reserve shuffle tracks until playback"
+          git commit -m "feat(music): route runtime through canonical resolver"
+          git pull --rebase origin ${{ github.event.pull_request.head.ref }}
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
