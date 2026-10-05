@@ -1,0 +1,49 @@
+name: Assistant Fix B1 Full CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  full-regression:
+    if: github.actor != 'github-actions[bot]' && github.event.pull_request.head.ref == 'feat/audio-a1-pronunciation-audibility'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.21.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install
+        run: pnpm install --no-frozen-lockfile
+      - name: Apply guarded B1 full CI correction
+        run: python scripts/assistant/fix-b1-full-ci.py
+      - name: Full tests
+        run: pnpm test
+      - name: Type check
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+      - name: Build
+        run: pnpm run build
+      - name: Diff safety
+        run: git diff --check
+      - name: Commit verified B1 correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/audio/MusicController.ts tests/music-playlist.test.ts tests/m22-audio-audit.test.ts tests/world-music-default-policy.test.ts
+          if git diff --cached --quiet; then
+            echo "No production/test changes to commit"
+            exit 0
+          fi
+          git commit -m "fix(music): align canonical runtime with full regressions"
+          git pull --rebase origin ${{ github.event.pull_request.head.ref }}
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
