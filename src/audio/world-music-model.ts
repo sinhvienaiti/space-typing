@@ -7,10 +7,7 @@ export type AudioSourceRef = {
 };
 
 export type TrackPlayback =
-  | {
-      kind: "single";
-      sources: readonly AudioSourceRef[];
-    }
+  | { kind: "single"; sources: readonly AudioSourceRef[] }
   | {
       kind: "stems";
       calm: readonly AudioSourceRef[];
@@ -61,20 +58,20 @@ export type WorldMusicPolicyEntry = {
   };
 };
 
-export type GlobalMusicPolicy = {
-  normal?: PlaylistAssignment;
-  boss?: {
-    common?: PlaylistAssignment;
-    mini?: PlaylistAssignment;
-    world?: PlaylistAssignment;
-    major?: PlaylistAssignment;
-  };
-};
+export type GlobalMusicPolicy = WorldMusicPolicyEntry;
 
+/**
+ * Canonical Admin/runtime policy hierarchy. Object keys for galaxies/stages are
+ * their numeric ids serialized by JSON (for example "2" and "47"). Keeping
+ * the id separate from presentation labels avoids baking an Admin-only naming
+ * convention into persistence.
+ */
 export type WorldMusicPolicy = {
   configRevision: string;
   disabledTrackIds?: readonly string[];
+  stages?: Readonly<Record<string, WorldMusicPolicyEntry>>;
   worlds?: Readonly<Record<string, WorldMusicPolicyEntry>>;
+  galaxies?: Readonly<Record<string, WorldMusicPolicyEntry>>;
   global?: GlobalMusicPolicy;
 };
 
@@ -92,6 +89,10 @@ export type ResolvedPlaylist = {
 
 export type ResolveWorldMusicInput = {
   worldId: string;
+  /** Global 1-based stage number. Optional for backward-compatible callers. */
+  stageNumber?: number;
+  /** 1-based galaxy id. Runtime can infer this from world identity. */
+  galaxyId?: number;
   stageRole: StageRole;
   musicMode: MusicPlaybackMode;
   catalog: WorldMusicCatalog;
@@ -104,6 +105,12 @@ export type ResolveWorldMusicInput = {
 };
 
 type Slot = "normal" | "boss-common" | WorldMusicBossRole;
+type ScopeKind = "stage" | "world" | "galaxy" | "global";
+type ScopeRef = {
+  kind: ScopeKind;
+  key: string | null;
+  label: string;
+};
 
 type EffectiveAssignment = {
   assignment: PlaylistAssignment | undefined;
@@ -117,15 +124,36 @@ function bossRoleForStage(role: StageRole): WorldMusicBossRole | null {
   return null;
 }
 
+function scopeRefs(input: ResolveWorldMusicInput): ScopeRef[] {
+  const scopes: ScopeRef[] = [];
+  if (input.stageNumber !== undefined) {
+    scopes.push({ kind: "stage", key: String(input.stageNumber), label: `stage-${input.stageNumber}` });
+  }
+  scopes.push({ kind: "world", key: input.worldId, label: input.worldId });
+  if (input.galaxyId !== undefined) {
+    scopes.push({ kind: "galaxy", key: String(input.galaxyId), label: `galaxy-${input.galaxyId}` });
+  }
+  scopes.push({ kind: "global", key: null, label: "global" });
+  return scopes;
+}
+
+function policyEntry(
+  policy: WorldMusicPolicy | undefined,
+  scope: ScopeRef,
+): WorldMusicPolicyEntry | undefined {
+  if (policy === undefined) return undefined;
+  if (scope.kind === "global") return policy.global;
+  if (scope.kind === "world") return policy.worlds?.[scope.key!];
+  if (scope.kind === "galaxy") return policy.galaxies?.[scope.key!];
+  return policy.stages?.[scope.key!];
+}
+
 function assignmentAt(
   policy: WorldMusicPolicy | undefined,
-  worldId: string | null,
+  scope: ScopeRef,
   slot: Slot,
 ): PlaylistAssignment | undefined {
-  const root =
-    worldId === null
-      ? policy?.global
-      : policy?.worlds?.[worldId];
+  const root = policyEntry(policy, scope);
   if (root === undefined) return undefined;
   if (slot === "normal") return root.normal;
   if (slot === "boss-common") return root.boss?.common;
@@ -134,29 +162,20 @@ function assignmentAt(
 
 function effectiveAssignment(
   input: ResolveWorldMusicInput,
-  worldId: string | null,
+  scope: ScopeRef,
   slot: Slot,
 ): EffectiveAssignment {
-  const published = assignmentAt(input.publishedPolicy, worldId, slot);
+  const published = assignmentAt(input.publishedPolicy, scope, slot);
   if (published?.kind === "replace") {
-    return {
-      assignment: published,
-      source: `${worldId ?? "global"}.published.${slot}`,
-    };
+    return { assignment: published, source: `${scope.label}.published.${slot}` };
   }
 
-  const generated = assignmentAt(input.generatedPolicy, worldId, slot);
+  const generated = assignmentAt(input.generatedPolicy, scope, slot);
   if (generated !== undefined && generated.kind !== "inherit") {
-    return {
-      assignment: generated,
-      source: `${worldId ?? "global"}.generated.${slot}`,
-    };
+    return { assignment: generated, source: `${scope.label}.generated.${slot}` };
   }
 
-  return {
-    assignment: undefined,
-    source: `${worldId ?? "global"}.none.${slot}`,
-  };
+  return { assignment: undefined, source: `${scope.label}.none.${slot}` };
 }
 
 function unique(ids: readonly string[]): string[] {
@@ -168,9 +187,7 @@ function eligibleIds(
   catalogIds: ReadonlySet<string>,
   disabled: ReadonlySet<string>,
 ): string[] {
-  return unique(ids).filter(
-    (id) => catalogIds.has(id) && !disabled.has(id),
-  );
+  return unique(ids).filter((id) => catalogIds.has(id) && !disabled.has(id));
 }
 
 function assignmentIds(
@@ -243,13 +260,7 @@ function resolveFirst(
     const ids = eligibleIds(candidate.ids, catalogIds, disabled);
     trace.push(`${candidate.source}:${ids.length}`);
     if (ids.length > 0) {
-      return resolved(
-        ids,
-        candidate.mode ?? "shuffle-bag",
-        candidate.source,
-        trace,
-        input,
-      );
+      return resolved(ids, candidate.mode ?? "shuffle-bag", candidate.source, trace, input);
     }
   }
   return resolved([], "shuffle-bag", "silence", trace, input);
@@ -261,11 +272,32 @@ function assignmentCandidate(
   disabled: ReadonlySet<string>,
 ): { source: string; ids: readonly string[]; mode: PlaylistSelectionMode } {
   const materialized = assignmentIds(value, catalogIds, disabled);
-  return {
-    source: materialized.source,
-    ids: materialized.ids,
-    mode: materialized.mode,
-  };
+  return { source: materialized.source, ids: materialized.ids, mode: materialized.mode };
+}
+
+function normalScopeCandidates(
+  input: ResolveWorldMusicInput,
+  catalogIds: ReadonlySet<string>,
+  disabled: ReadonlySet<string>,
+): Array<{ source: string; ids: readonly string[]; mode?: PlaylistSelectionMode }> {
+  const scopes = scopeRefs(input);
+  const globalIndex = scopes.findIndex((scope) => scope.kind === "global");
+  const beforeGlobal = scopes.slice(0, globalIndex);
+  const global = scopes[globalIndex]!;
+  const candidates = beforeGlobal.map((scope) =>
+    assignmentCandidate(effectiveAssignment(input, scope, "normal"), catalogIds, disabled));
+
+  // Legacy World identity belongs below the explicit Galaxy policy and above
+  // Global. This preserves old authored playlists without masking new Galaxy
+  // configuration.
+  candidates.push({
+    source: `${input.worldId}.legacy.normal`,
+    ids: input.legacyWorldTrackIds ?? [],
+  });
+  candidates.push(
+    assignmentCandidate(effectiveAssignment(input, global, "normal"), catalogIds, disabled),
+  );
+  return candidates;
 }
 
 function resolveMapNormal(
@@ -273,29 +305,7 @@ function resolveMapNormal(
   catalogIds: ReadonlySet<string>,
   disabled: ReadonlySet<string>,
 ): ResolvedPlaylist {
-  const worldNormal = assignmentCandidate(
-    effectiveAssignment(input, input.worldId, "normal"),
-    catalogIds,
-    disabled,
-  );
-  const globalNormal = assignmentCandidate(
-    effectiveAssignment(input, null, "normal"),
-    catalogIds,
-    disabled,
-  );
-  return resolveFirst(
-    [
-      worldNormal,
-      {
-        source: `${input.worldId}.legacy.normal`,
-        ids: input.legacyWorldTrackIds ?? [],
-      },
-      globalNormal,
-    ],
-    input,
-    catalogIds,
-    disabled,
-  );
+  return resolveFirst(normalScopeCandidates(input, catalogIds, disabled), input, catalogIds, disabled);
 }
 
 function resolveRandomNormal(
@@ -303,32 +313,33 @@ function resolveRandomNormal(
   catalogIds: ReadonlySet<string>,
   disabled: ReadonlySet<string>,
 ): ResolvedPlaylist {
-  const globalNormal = assignmentCandidate(
-    effectiveAssignment(input, null, "normal"),
-    catalogIds,
-    disabled,
-  );
-  const candidates: Array<{
-    source: string;
-    ids: readonly string[];
-    mode?: PlaylistSelectionMode;
-  }> = [globalNormal];
-
-  const migrationRandom = input.randomNormalTrackIds ?? [];
+  const candidates = normalScopeCandidates(input, catalogIds, disabled);
   candidates.push({
     source: "migration.random-normal-library",
-    ids: migrationRandom,
+    ids: input.randomNormalTrackIds ?? [],
     mode: "shuffle-bag",
   });
-
-  // A newly generated catalog remains a valid final random-mode normal pool.
   candidates.push({
     source: "catalog.random-normal-library",
     ids: input.catalog.tracks.map((track) => track.id),
     mode: "shuffle-bag",
   });
-
   return resolveFirst(candidates, input, catalogIds, disabled);
+}
+
+function bossCandidatesForScope(
+  input: ResolveWorldMusicInput,
+  scope: ScopeRef,
+  role: WorldMusicBossRole,
+  catalogIds: ReadonlySet<string>,
+  disabled: ReadonlySet<string>,
+) {
+  return [role, "boss-common", "normal"].map((slot) =>
+    assignmentCandidate(
+      effectiveAssignment(input, scope, slot as Slot),
+      catalogIds,
+      disabled,
+    ));
 }
 
 function resolveBoss(
@@ -337,60 +348,27 @@ function resolveBoss(
   catalogIds: ReadonlySet<string>,
   disabled: ReadonlySet<string>,
 ): ResolvedPlaylist {
-  const worldRole = assignmentCandidate(
-    effectiveAssignment(input, input.worldId, role),
-    catalogIds,
-    disabled,
-  );
-  const worldCommon = assignmentCandidate(
-    effectiveAssignment(input, input.worldId, "boss-common"),
-    catalogIds,
-    disabled,
-  );
-  const worldNormal = assignmentCandidate(
-    effectiveAssignment(input, input.worldId, "normal"),
-    catalogIds,
-    disabled,
-  );
-  const globalRole = assignmentCandidate(
-    effectiveAssignment(input, null, role),
-    catalogIds,
-    disabled,
-  );
-  const globalCommon = assignmentCandidate(
-    effectiveAssignment(input, null, "boss-common"),
-    catalogIds,
-    disabled,
-  );
-  const globalNormal = assignmentCandidate(
-    effectiveAssignment(input, null, "normal"),
-    catalogIds,
-    disabled,
+  const scopes = scopeRefs(input);
+  const globalIndex = scopes.findIndex((scope) => scope.kind === "global");
+  const candidates = scopes
+    .slice(0, globalIndex)
+    .flatMap((scope) => bossCandidatesForScope(input, scope, role, catalogIds, disabled));
+
+  candidates.push({
+    source: `${input.worldId}.legacy.normal`,
+    ids: input.legacyWorldTrackIds ?? [],
+  });
+  candidates.push(
+    ...bossCandidatesForScope(input, scopes[globalIndex]!, role, catalogIds, disabled),
   );
 
-  return resolveFirst(
-    [
-      worldRole,
-      worldCommon,
-      // Same-World identity is deliberately ahead of every global boss fallback.
-      worldNormal,
-      {
-        source: `${input.worldId}.legacy.normal`,
-        ids: input.legacyWorldTrackIds ?? [],
-      },
-      globalRole,
-      globalCommon,
-      globalNormal,
-    ],
-    input,
-    catalogIds,
-    disabled,
-  );
+  return resolveFirst(candidates, input, catalogIds, disabled);
 }
 
 /**
  * The one pure resolver shared by runtime, Admin preview and validation.
- * Folder/catalog discovery never decides runtime policy by itself.
+ * Scope precedence is Stage -> World -> Galaxy -> Global; the legacy World
+ * migration pool is intentionally inserted between Galaxy and Global.
  */
 export function resolveWorldMusicPlaylist(
   input: ResolveWorldMusicInput,
@@ -399,7 +377,6 @@ export function resolveWorldMusicPlaylist(
   const disabled = new Set(input.publishedPolicy?.disabledTrackIds ?? []);
   const bossRole = bossRoleForStage(input.stageRole);
   if (bossRole !== null) {
-    // Random mode intentionally keeps dedicated boss identity in V2.
     return resolveBoss(input, bossRole, catalogIds, disabled);
   }
   return input.musicMode === "random"
@@ -459,10 +436,7 @@ export function validateWorldMusicCatalog(
     if (sourceGroups.some((sources) => sources.length === 0)) {
       errors.push(`${track.id}: missing playback sources`);
     }
-    if (
-      track.playback.kind === "stems" &&
-      track.playback.syncGroup.trim().length === 0
-    ) {
+    if (track.playback.kind === "stems" && track.playback.syncGroup.trim().length === 0) {
       errors.push(`${track.id}: missing stem syncGroup`);
     }
     for (const sources of sourceGroups) {

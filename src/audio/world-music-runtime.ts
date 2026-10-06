@@ -1,6 +1,6 @@
 import catalogData from "./world-music-catalog.json";
 import { GENERATED_WORLD_MUSIC_POLICY } from "./world-music-default-policy";
-import { WORLD_IDS } from "../worlds/registry";
+import { WORLD_IDS, WORLD_REGISTRY } from "../worlds/registry";
 import type { StageRole } from "../campaign/types";
 import type { MusicState } from "./music-profile";
 import {
@@ -26,6 +26,10 @@ export function stageRoleForMusicState(state: MusicState): StageRole | null {
   if (state === "WORLD_INTENSE") return "elite";
   if (state === "WORLD_NORMAL") return "normal";
   return null;
+}
+
+export function galaxyIdForWorld(worldId: string): number | undefined {
+  return WORLD_REGISTRY.find((world) => world.id === worldId)?.galaxy;
 }
 
 /**
@@ -96,9 +100,7 @@ function materializeCatalogTrack(
   const calm = playback.kind === "single"
     ? sourceUrls(playback.sources)
     : sourceUrls(playback.calm);
-  const intense = playback.kind === "single"
-    ? calm
-    : sourceUrls(playback.intense);
+  const intense = playback.kind === "single" ? calm : sourceUrls(playback.intense);
   if (calm.length === 0 || intense.length === 0) return null;
 
   return {
@@ -110,21 +112,13 @@ function materializeCatalogTrack(
     meter: fallback?.meter ?? 4,
     seconds: Math.max(0.1, track.durationSeconds),
     mixOut: catalogMixOut(track, fallback),
-    stems: {
-      calm: calm[0]!,
-      intense: intense[0]!,
-    },
+    stems: { calm: calm[0]!, intense: intense[0]! },
     playbackKind: playback.kind,
     sourceCandidates: { calm, intense },
     syncGroup: playback.kind === "stems" ? playback.syncGroup : null,
   };
 }
 
-/**
- * Materializes the authoritative catalog into the legacy MusicTrack-shaped
- * runtime metadata used by MusicController. Codec URLs stay attached to one
- * track identity, and catalog-only tracks are therefore fully playable.
- */
 export function materializeRuntimeMusicTracks(
   catalog: WorldMusicCatalog,
   legacyTracks: readonly MusicTrack[] = [],
@@ -138,6 +132,8 @@ export function materializeRuntimeMusicTracks(
 
 export type ResolveRuntimeWorldPlaylistInput = {
   worldId: string;
+  stageNumber?: number;
+  galaxyId?: number;
   state: MusicState;
   musicMode: "map" | "random";
   catalog?: WorldMusicCatalog;
@@ -147,11 +143,7 @@ export type ResolveRuntimeWorldPlaylistInput = {
   randomNormalTrackIds: readonly string[];
 };
 
-/**
- * Runtime entrypoint for the same pure resolver used by Admin preview and
- * validation. Special/non-campaign states intentionally stay on their own
- * MusicController route.
- */
+/** Runtime entrypoint shared with Admin preview/validation. */
 export function resolveRuntimeWorldPlaylist(
   input: ResolveRuntimeWorldPlaylistInput,
 ): ResolvedPlaylist | null {
@@ -160,6 +152,8 @@ export function resolveRuntimeWorldPlaylist(
 
   return resolveWorldMusicPlaylist({
     worldId: input.worldId,
+    stageNumber: input.stageNumber,
+    galaxyId: input.galaxyId ?? galaxyIdForWorld(input.worldId),
     stageRole,
     musicMode: input.musicMode,
     catalog: input.catalog ?? BUNDLED_WORLD_MUSIC_CATALOG,

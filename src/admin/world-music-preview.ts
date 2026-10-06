@@ -16,6 +16,8 @@ export type WorldMusicAdminPreviewBadge =
   | "READY"
   | "INHERIT"
   | "REPLACED"
+  | "STAGE OVERRIDE"
+  | "GALAXY FALLBACK"
   | "BOSS FALLBACK TO WORLD"
   | "LEGACY FALLBACK"
   | "GLOBAL FALLBACK"
@@ -53,6 +55,7 @@ export type WorldMusicAdminPreview = {
   configRevision: string;
   manifestRevision: string;
   musicMode: MusicPlaybackMode;
+  stageNumber?: number;
   worlds: readonly WorldMusicAdminWorldPreview[];
 };
 
@@ -73,6 +76,8 @@ function badgesFor(
   const firstTrace = resolved.fallbackTrace[0] ?? "";
   if (firstTrace.includes(".none.")) badges.push("INHERIT");
   if (resolved.resolvedFrom.includes(".published.")) badges.push("REPLACED");
+  if (resolved.resolvedFrom.startsWith("stage-")) badges.push("STAGE OVERRIDE");
+  if (resolved.resolvedFrom.startsWith("galaxy-")) badges.push("GALAXY FALLBACK");
   if (resolved.resolvedFrom.includes(".legacy.")) badges.push("LEGACY FALLBACK");
   if (resolved.resolvedFrom.startsWith("global.")) badges.push("GLOBAL FALLBACK");
   if (
@@ -89,12 +94,16 @@ function badgesFor(
 
 function resolveState(
   worldId: string,
+  galaxyId: number,
+  stageNumber: number | undefined,
   state: WorldMusicAdminPreviewState,
   musicMode: MusicPlaybackMode,
   publishedPolicy: WorldMusicPolicy | undefined,
 ): WorldMusicAdminResolvedState {
   const resolved = resolveWorldMusicPlaylist({
     worldId,
+    galaxyId,
+    stageNumber,
     stageRole: STATE_ROLES[state],
     musicMode,
     catalog: BUNDLED_WORLD_MUSIC_CATALOG,
@@ -124,6 +133,8 @@ function resolveState(
 export function createWorldMusicAdminPreview(input: {
   publishedPolicy?: WorldMusicPolicy;
   musicMode?: MusicPlaybackMode;
+  /** Optional selected campaign stage; only its owning World receives Stage scope. */
+  stageNumber?: number;
 } = {}): WorldMusicAdminPreview {
   const musicMode = input.musicMode ?? "map";
   const configRevision =
@@ -134,17 +145,24 @@ export function createWorldMusicAdminPreview(input: {
     configRevision,
     manifestRevision: BUNDLED_WORLD_MUSIC_CATALOG.manifestRevision,
     musicMode,
-    worlds: WORLD_REGISTRY.map((world) => ({
-      worldId: world.id,
-      name: world.name,
-      galaxy: world.galaxy,
-      stageRange: [world.stageStart, world.stageEnd] as const,
-      states: {
-        normal: resolveState(world.id, "normal", musicMode, input.publishedPolicy),
-        mini: resolveState(world.id, "mini", musicMode, input.publishedPolicy),
-        world: resolveState(world.id, "world", musicMode, input.publishedPolicy),
-        major: resolveState(world.id, "major", musicMode, input.publishedPolicy),
-      },
-    })),
+    ...(input.stageNumber === undefined ? {} : { stageNumber: input.stageNumber }),
+    worlds: WORLD_REGISTRY.map((world) => {
+      const stageNumber = input.stageNumber !== undefined &&
+        input.stageNumber >= world.stageStart && input.stageNumber <= world.stageEnd
+        ? input.stageNumber
+        : undefined;
+      return {
+        worldId: world.id,
+        name: world.name,
+        galaxy: world.galaxy,
+        stageRange: [world.stageStart, world.stageEnd] as const,
+        states: {
+          normal: resolveState(world.id, world.galaxy, stageNumber, "normal", musicMode, input.publishedPolicy),
+          mini: resolveState(world.id, world.galaxy, stageNumber, "mini", musicMode, input.publishedPolicy),
+          world: resolveState(world.id, world.galaxy, stageNumber, "world", musicMode, input.publishedPolicy),
+          major: resolveState(world.id, world.galaxy, stageNumber, "major", musicMode, input.publishedPolicy),
+        },
+      };
+    }),
   };
 }
