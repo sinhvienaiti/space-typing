@@ -1,3 +1,4 @@
+import { applySkillRuntimeOverride } from "../admin/skill-runtime-policy";
 import type { SkillDefinition } from "./engine";
 
 export const SUPPORT_SPELL_IDS = [
@@ -27,7 +28,7 @@ export type SupportSpellDefinition = SkillDefinition & {
   description: string;
 };
 
-export const SUPPORT_SPELLS: Record<
+export const BUNDLED_SUPPORT_SPELLS: Record<
   SupportSpellId,
   SupportSpellDefinition
 > = {
@@ -107,6 +108,10 @@ export const SUPPORT_SPELLS: Record<
     perStageLimit: 3,
   },
 };
+
+export const SUPPORT_SPELLS = Object.fromEntries(
+  SUPPORT_SPELL_IDS.map((id) => [id, applySkillRuntimeOverride(BUNDLED_SUPPORT_SPELLS[id])]),
+) as Record<SupportSpellId, SupportSpellDefinition>;
 
 /**
  * A tactical hit on a word: types `letters` more for the player, but never the

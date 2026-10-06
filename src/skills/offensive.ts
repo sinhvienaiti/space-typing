@@ -1,3 +1,4 @@
+import { applySkillRuntimeOverride } from "../admin/skill-runtime-policy";
 import type { SkillDefinition } from "./engine";
 
 export const OFFENSIVE_SKILL_IDS = [
@@ -9,7 +10,7 @@ export const OFFENSIVE_SKILL_IDS = [
 export type OffensiveSkillId =
   (typeof OFFENSIVE_SKILL_IDS)[number];
 
-export const OFFENSIVE_SKILLS: readonly SkillDefinition[] = [
+export const BUNDLED_OFFENSIVE_SKILLS: readonly SkillDefinition[] = [
   {
     id: "emp-burst",
     name: "EMP Shockwave",
@@ -44,6 +45,9 @@ export const OFFENSIVE_SKILLS: readonly SkillDefinition[] = [
     typingCondition: { minAccuracy: 95 },
   },
 ];
+
+export const OFFENSIVE_SKILLS: readonly SkillDefinition[] =
+  BUNDLED_OFFENSIVE_SKILLS.map((definition) => applySkillRuntimeOverride(definition));
 
 export function isOffensiveSkillId(
   value: string,

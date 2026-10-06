@@ -1,7 +1,7 @@
 import type { SkillDefinition, SkillTypingCondition } from "../skills/engine";
-import { DEFENSIVE_SKILLS } from "../skills/defensive";
-import { OFFENSIVE_SKILLS } from "../skills/offensive";
-import { SUPPORT_SPELLS } from "../skills/support";
+import { BUNDLED_DEFENSIVE_SKILLS } from "../skills/defensive";
+import { BUNDLED_OFFENSIVE_SKILLS } from "../skills/offensive";
+import { BUNDLED_SUPPORT_SPELLS } from "../skills/support";
 
 export const SKILL_ADMIN_PREVIEW_PROTOCOL_VERSION = 1 as const;
 
@@ -40,9 +40,9 @@ type CanonicalSkill = {
 };
 
 const CANONICAL_SKILLS: readonly CanonicalSkill[] = [
-  ...OFFENSIVE_SKILLS.map((definition) => ({ definition, category: "offensive" as const })),
-  ...DEFENSIVE_SKILLS.map((definition) => ({ definition, category: "defensive" as const })),
-  ...Object.values(SUPPORT_SPELLS).map((definition) => ({ definition, category: "support" as const })),
+  ...BUNDLED_OFFENSIVE_SKILLS.map((definition) => ({ definition, category: "offensive" as const })),
+  ...BUNDLED_DEFENSIVE_SKILLS.map((definition) => ({ definition, category: "defensive" as const })),
+  ...Object.values(BUNDLED_SUPPORT_SPELLS).map((definition) => ({ definition, category: "support" as const })),
 ];
 
 export const SKILL_ADMIN_IDS = CANONICAL_SKILLS.map(({ definition }) => definition.id);

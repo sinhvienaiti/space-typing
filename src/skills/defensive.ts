@@ -1,3 +1,4 @@
+import { applySkillRuntimeOverride } from "../admin/skill-runtime-policy";
 import { clamp } from "../logic";
 import type { PlayerResources } from "../stats/player";
 import type { SkillDefinition } from "./engine";
@@ -13,7 +14,7 @@ export const DEFENSIVE_SKILL_IDS = [
 export type DefensiveSkillId =
   (typeof DEFENSIVE_SKILL_IDS)[number];
 
-export const DEFENSIVE_SKILLS: readonly SkillDefinition[] = [
+export const BUNDLED_DEFENSIVE_SKILLS: readonly SkillDefinition[] = [
   {
     id: "barrier",
     name: "Hex Shield",
@@ -69,6 +70,9 @@ export const DEFENSIVE_SKILLS: readonly SkillDefinition[] = [
     typingCondition: { minAccuracy: 90 },
   },
 ];
+
+export const DEFENSIVE_SKILLS: readonly SkillDefinition[] =
+  BUNDLED_DEFENSIVE_SKILLS.map((definition) => applySkillRuntimeOverride(definition));
 
 export function isDefensiveSkillId(
   value: string,
