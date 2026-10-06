@@ -42,7 +42,8 @@
     "ships:admin-preview": "tsx scripts/admin/ship-registry-preview.ts",
     "equipment:admin-preview": "tsx scripts/admin/equipment-registry-preview.ts",
     "skills:admin-preview": "tsx scripts/admin/skill-registry-preview.ts",
-    "enemies:admin-preview": "tsx scripts/admin/enemy-registry-preview.ts"
+    "enemies:admin-preview": "tsx scripts/admin/enemy-registry-preview.ts",
+    "bosses:admin-preview": "tsx scripts/admin/boss-registry-preview.ts"
   },
   "dependencies": {
     "@fontsource/be-vietnam-pro": "^5.3.0",
