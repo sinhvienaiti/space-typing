@@ -13,7 +13,7 @@ describe("Space Typing Admin contract V1", () => {
     expect(SPACE_TYPING_ADMIN_CONTRACT.worldMusicCatalogSchemaVersion).toBe(1);
   });
 
-  it("exposes the B06 Admin routes including canonical Ships, Equipment and Skills editors", () => {
+  it("exposes the B06 Admin routes including canonical Ships, Equipment, Skills and Enemies editors", () => {
     expect(SPACE_TYPING_ADMIN_CONTRACT.routes).toEqual([
       { id: "overview", path: "/admin/space-typing", label: "Overview" },
       { id: "audio-mix", path: "/admin/space-typing/audio", label: "Audio & Mix" },
@@ -25,6 +25,7 @@ describe("Space Typing Admin contract V1", () => {
       { id: "ships", path: "/admin/space-typing/ships", label: "Ships" },
       { id: "equipment", path: "/admin/space-typing/equipment", label: "Equipment" },
       { id: "skills", path: "/admin/space-typing/skills", label: "Skills" },
+      { id: "enemies", path: "/admin/space-typing/enemies", label: "Enemies" },
       {
         id: "history-publish",
         path: "/admin/space-typing/history",
@@ -108,6 +109,21 @@ describe("Space Typing Admin contract V1", () => {
     expect(SPACE_TYPING_ADMIN_CONTRACT.skills.authorableFields).not.toContain("masteryUnlocked");
   });
 
+  it("publishes the B06.4 Enemy stage-admission contract without inventing unsupported combat tuning fields", () => {
+    expect(SPACE_TYPING_ADMIN_CONTRACT.capabilities).toEqual(expect.arrayContaining(["enemies.read", "enemies.write", "enemies.preview"]));
+    expect(SPACE_TYPING_ADMIN_CONTRACT.enemies.ids).toHaveLength(35);
+    expect(SPACE_TYPING_ADMIN_CONTRACT.enemies).toMatchObject({
+      authorableFields: ["minStage"],
+      constraints: {
+        minStage: { min: 1, max: 1000, integer: true },
+      },
+      previewProtocol: { version: 1, command: "pnpm enemies:admin-preview" },
+    });
+    for (const unsupported of ["id", "name", "family", "role", "rarity", "hp", "shield", "armor", "speed", "damage", "ai", "spawnWeight", "skills", "projectiles", "vfx", "sfx", "dropTable", "enabled"]) {
+      expect(SPACE_TYPING_ADMIN_CONTRACT.enemies.authorableFields).not.toContain(unsupported);
+    }
+  });
+
   it("keeps content, competitive and QA policy changes outside immediate client-side apply", () => {
     expect(SPACE_TYPING_ADMIN_CONTRACT.applyBoundaries).toMatchObject({
       playerVolume: "immediate",
@@ -116,6 +132,7 @@ describe("Space Typing Admin contract V1", () => {
       shipPolicy: "new-session",
       equipmentPolicy: "new-session",
       skillPolicy: "new-session",
+      enemyPolicy: "new-session",
       competitiveFeature: "new-session",
       qaCapability: "new-qa-run",
     });
