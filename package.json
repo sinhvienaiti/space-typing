@@ -38,7 +38,8 @@
     "chase:prepare": "node scripts/bg-art/prepare-ship-chase.mjs",
     "ship3d:prepare": "node scripts/bg-art/prepare-ship-3d.mjs",
     "music:catalog": "node scripts/music/build-world-music-catalog.mjs",
-    "music:admin-preview": "tsx scripts/music/admin-world-music-preview.ts"
+    "music:admin-preview": "tsx scripts/music/admin-world-music-preview.ts",
+    "ships:admin-preview": "tsx scripts/admin/ship-registry-preview.ts"
   },
   "dependencies": {
     "@fontsource/be-vietnam-pro": "^5.3.0",
