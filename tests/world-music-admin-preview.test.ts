@@ -79,4 +79,27 @@ describe("World Music Admin preview V1", () => {
     expect(resolved.trackIds).toEqual(["signal-in-the-void"]);
     expect(resolved.badges).toEqual(["REPLACED"]);
   });
+
+  it("applies Stage scope only to the selected stage's owning World", () => {
+    const policy: WorldMusicPolicy = {
+      configRevision: "admin-stage-preview-test-v1",
+      stages: {
+        "101": {
+          normal: {
+            kind: "replace",
+            trackIds: ["signal-in-the-void"],
+            selectionMode: "ordered",
+          },
+        },
+      },
+    };
+    const preview = createWorldMusicAdminPreview({ publishedPolicy: policy, stageNumber: 101 });
+    expect(preview.stageNumber).toBe(101);
+    expect(world(preview, "world-06").states.normal).toMatchObject({
+      resolvedFrom: "stage-101.published.normal",
+      trackIds: ["signal-in-the-void"],
+      badges: expect.arrayContaining(["STAGE OVERRIDE"]),
+    });
+    expect(world(preview, "world-07").states.normal.resolvedFrom).not.toContain("stage-101");
+  });
 });

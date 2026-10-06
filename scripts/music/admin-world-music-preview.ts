@@ -5,6 +5,7 @@ import type { WorldMusicPolicy } from "../../src/audio/world-music-model";
 type PreviewRequest = {
   musicMode?: MusicPlaybackMode;
   publishedPolicy?: WorldMusicPolicy;
+  stageNumber?: number;
 };
 
 async function readRequest(): Promise<PreviewRequest> {
@@ -18,6 +19,12 @@ async function readRequest(): Promise<PreviewRequest> {
   const value = JSON.parse(input) as PreviewRequest;
   if (value.musicMode !== undefined && value.musicMode !== "map" && value.musicMode !== "random") {
     throw new Error("musicMode must be map or random");
+  }
+  if (
+    value.stageNumber !== undefined &&
+    (!Number.isInteger(value.stageNumber) || value.stageNumber < 1 || value.stageNumber > 1000)
+  ) {
+    throw new Error("stageNumber must be an integer from 1 to 1000");
   }
   return value;
 }
