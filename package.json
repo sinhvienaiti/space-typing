@@ -26,7 +26,7 @@
     "visual:shot": "node scripts/visual/shot.mjs",
     "visual:crop": "node scripts/visual/crop.mjs",
     "art:prepare": "node scripts/bg-art/prepare-local-art.mjs",
-    "reward-art:prepare": "node scripts/bg-art/prepare-credit-puzzle.mjs credits",
+    "reward-art:prepare": "node scripts/bg-art/prepare-credit-puzzle.mjs",
     "pickups:prepare": "node scripts/bg-art/prepare-credit-puzzle.mjs credits",
     "puzzle:prepare": "node scripts/bg-art/prepare-credit-puzzle.mjs puzzle",
     "icons:prepare": "node scripts/bg-art/prepare-icons.mjs",
