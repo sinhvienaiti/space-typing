@@ -22,6 +22,9 @@
     "skills.read",
     "skills.write",
     "skills.preview",
+    "enemies.read",
+    "enemies.write",
+    "enemies.preview",
     "history.read",
     "publish.write"
   ],
@@ -32,6 +35,7 @@
     { "id": "ships", "path": "/admin/space-typing/ships", "label": "Ships" },
     { "id": "equipment", "path": "/admin/space-typing/equipment", "label": "Equipment" },
     { "id": "skills", "path": "/admin/space-typing/skills", "label": "Skills" },
+    { "id": "enemies", "path": "/admin/space-typing/enemies", "label": "Enemies" },
     { "id": "history-publish", "path": "/admin/space-typing/history", "label": "History / Publish" }
   ],
   "worldMusic": {
@@ -244,6 +248,53 @@
       "command": "pnpm skills:admin-preview"
     }
   },
+  "enemies": {
+    "ids": [
+      "rainbow-scout",
+      "rainbow-dart",
+      "rainbow-bubble",
+      "imp-spark",
+      "snow-wisp",
+      "lucky-rainbow",
+      "angel-healer",
+      "angel-guard",
+      "angel-blesser",
+      "bomb-imp",
+      "freeze-burst-sprite",
+      "seraph-elite",
+      "berserk-devil",
+      "frost-keeper",
+      "fortune-prism",
+      "prism-sprite",
+      "treasure-prism",
+      "leaf-puff",
+      "bloom-puff",
+      "shade-wisp",
+      "night-wisp",
+      "umbra-elite",
+      "star-core",
+      "nova-core",
+      "nebula-elite",
+      "halo-seraph",
+      "crown-demon",
+      "glacier-oracle",
+      "prism-sentinel",
+      "archangel-core",
+      "demon-lord-orb",
+      "glacier-queen",
+      "prism-archon",
+      "void-eye",
+      "cosmic-emperor"
+    ],
+    "authorableFields": ["minStage"],
+    "constraints": {
+      "minStage": { "min": 1, "max": 1000, "integer": true }
+    },
+    "previewProtocol": {
+      "version": 1,
+      "command": "pnpm enemies:admin-preview"
+    }
+  },
   "applyBoundaries": {
     "playerVolume": "immediate",
     "mixPolicy": "safe-boundary",
@@ -251,6 +302,7 @@
     "shipPolicy": "new-session",
     "equipmentPolicy": "new-session",
     "skillPolicy": "new-session",
+    "enemyPolicy": "new-session",
     "competitiveFeature": "new-session",
     "qaCapability": "new-qa-run"
   }
