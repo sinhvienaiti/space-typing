@@ -13,7 +13,7 @@ describe("Space Typing Admin contract V1", () => {
     expect(SPACE_TYPING_ADMIN_CONTRACT.worldMusicCatalogSchemaVersion).toBe(1);
   });
 
-  it("exposes the B06.1 Admin routes including the canonical Ships editor", () => {
+  it("exposes the B06 Admin routes including canonical Ships and Equipment editors", () => {
     expect(SPACE_TYPING_ADMIN_CONTRACT.routes).toEqual([
       { id: "overview", path: "/admin/space-typing", label: "Overview" },
       { id: "audio-mix", path: "/admin/space-typing/audio", label: "Audio & Mix" },
@@ -23,6 +23,7 @@ describe("Space Typing Admin contract V1", () => {
         label: "World Music",
       },
       { id: "ships", path: "/admin/space-typing/ships", label: "Ships" },
+      { id: "equipment", path: "/admin/space-typing/equipment", label: "Equipment" },
       {
         id: "history-publish",
         path: "/admin/space-typing/history",
@@ -107,12 +108,45 @@ describe("Space Typing Admin contract V1", () => {
     expect(SPACE_TYPING_ADMIN_CONTRACT.ships.authorableFields).not.toContain("progress");
   });
 
-  it("keeps ship, competitive and QA changes outside immediate client-side apply", () => {
+  it("publishes the runtime-backed B06.2 Equipment contract with immutable identity fields", () => {
+    expect(SPACE_TYPING_ADMIN_CONTRACT.capabilities).toEqual(
+      expect.arrayContaining(["equipment.read", "equipment.write", "equipment.preview"]),
+    );
+    expect(SPACE_TYPING_ADMIN_CONTRACT.equipment).toMatchObject({
+      authorableFields: ["name", "description", "stats", "perk"],
+      coreStatKeys: [
+        "hull",
+        "shield",
+        "firepower",
+        "armor",
+        "energy",
+        "reactor",
+        "focus",
+        "ward",
+        "luck",
+        "salvage",
+      ],
+      constraints: {
+        nameMax: 100,
+        descriptionMax: 320,
+        statBonus: { min: -100, max: 100 },
+      },
+      previewProtocol: { version: 1, command: "pnpm equipment:admin-preview" },
+    });
+    expect(SPACE_TYPING_ADMIN_CONTRACT.equipment.ids.length).toBeGreaterThan(40);
+    expect(SPACE_TYPING_ADMIN_CONTRACT.equipment.authorableFields).not.toContain("id");
+    expect(SPACE_TYPING_ADMIN_CONTRACT.equipment.authorableFields).not.toContain("slot");
+    expect(SPACE_TYPING_ADMIN_CONTRACT.equipment.authorableFields).not.toContain("tier");
+    expect(SPACE_TYPING_ADMIN_CONTRACT.equipment.authorableFields).not.toContain("icon");
+  });
+
+  it("keeps ship, equipment, competitive and QA changes outside immediate client-side apply", () => {
     expect(SPACE_TYPING_ADMIN_CONTRACT.applyBoundaries).toMatchObject({
       playerVolume: "immediate",
       mixPolicy: "safe-boundary",
       playlistAssignment: "next-track-or-state",
       shipPolicy: "new-session",
+      equipmentPolicy: "new-session",
       competitiveFeature: "new-session",
       qaCapability: "new-qa-run",
     });
