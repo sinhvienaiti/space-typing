@@ -293,6 +293,7 @@ function normalScopeCandidates(
   candidates.push({
     source: `${input.worldId}.legacy.normal`,
     ids: input.legacyWorldTrackIds ?? [],
+    mode: "shuffle-bag",
   });
   candidates.push(
     assignmentCandidate(effectiveAssignment(input, global, "normal"), catalogIds, disabled),
@@ -360,6 +361,7 @@ function resolveBoss(
   candidates.push({
     source: `${input.worldId}.legacy.normal`,
     ids: input.legacyWorldTrackIds ?? [],
+    mode: "shuffle-bag",
   });
   candidates.push(
     ...bossCandidatesForScope(input, scopes[globalIndex]!, role, catalogIds, disabled),
