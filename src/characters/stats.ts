@@ -1,3 +1,4 @@
+import { activeShipRuntimeStatOverride } from "../admin/ship-runtime-policy";
 import type { CharacterId } from "./registry";
 import type { StatBonus } from "../stats/core";
 
@@ -16,5 +17,8 @@ const CHARACTER_STAT_BONUS: Record<CharacterId, StatBonus> = {
 };
 
 export function characterStatBonus(id: CharacterId): StatBonus {
-  return { ...CHARACTER_STAT_BONUS[id] };
+  return {
+    ...CHARACTER_STAT_BONUS[id],
+    ...(activeShipRuntimeStatOverride(id) ?? {}),
+  };
 }
