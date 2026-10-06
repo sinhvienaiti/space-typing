@@ -313,17 +313,20 @@ function resolveRandomNormal(
   catalogIds: ReadonlySet<string>,
   disabled: ReadonlySet<string>,
 ): ResolvedPlaylist {
-  const candidates = normalScopeCandidates(input, catalogIds, disabled);
-  candidates.push({
-    source: "migration.random-normal-library",
-    ids: input.randomNormalTrackIds ?? [],
-    mode: "shuffle-bag",
-  });
-  candidates.push({
-    source: "catalog.random-normal-library",
-    ids: input.catalog.tracks.map((track) => track.id),
-    mode: "shuffle-bag",
-  });
+  const global = scopeRefs(input).find((scope) => scope.kind === "global")!;
+  const candidates = [
+    assignmentCandidate(effectiveAssignment(input, global, "normal"), catalogIds, disabled),
+    {
+      source: "migration.random-normal-library",
+      ids: input.randomNormalTrackIds ?? [],
+      mode: "shuffle-bag" as const,
+    },
+    {
+      source: "catalog.random-normal-library",
+      ids: input.catalog.tracks.map((track) => track.id),
+      mode: "shuffle-bag" as const,
+    },
+  ];
   return resolveFirst(candidates, input, catalogIds, disabled);
 }
 
@@ -367,8 +370,9 @@ function resolveBoss(
 
 /**
  * The one pure resolver shared by runtime, Admin preview and validation.
- * Scope precedence is Stage -> World -> Galaxy -> Global; the legacy World
- * migration pool is intentionally inserted between Galaxy and Global.
+ * Map/boss scope precedence is Stage -> World -> Galaxy -> Global; legacy
+ * World migration sits between Galaxy and Global. Random-normal intentionally
+ * keeps its pre-B04.2 global/random-library semantics.
  */
 export function resolveWorldMusicPlaylist(
   input: ResolveWorldMusicInput,
