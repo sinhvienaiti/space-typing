@@ -11,9 +11,10 @@ for (const id of EQUIPMENT_IDS) {
   if (override === undefined) continue;
 
   const base = EQUIPMENT_REGISTRY[id];
+  const { perk: overridePerk, ...safeOverride } = override;
   const merged: EquipmentDefinition = {
     ...base,
-    ...override,
+    ...safeOverride,
     id,
     slot: base.slot,
     tier: base.tier,
@@ -24,10 +25,10 @@ for (const id of EQUIPMENT_IDS) {
     },
   };
 
-  if (override.perk === null) {
+  if (overridePerk === null) {
     delete merged.perk;
-  } else if (override.perk !== undefined) {
-    merged.perk = override.perk as EquipmentPerkId;
+  } else if (overridePerk !== undefined) {
+    merged.perk = overridePerk as EquipmentPerkId;
   }
 
   EQUIPMENT_REGISTRY[id] = merged;

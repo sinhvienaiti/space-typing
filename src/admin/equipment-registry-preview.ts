@@ -94,9 +94,10 @@ function mergedEquipment(
   override: EquipmentAdminOverride | undefined,
 ): EquipmentAdminPreviewItem {
   const base = EQUIPMENT_REGISTRY[id];
+  const { perk: overridePerk, ...safeOverride } = override ?? {};
   const merged: EquipmentAdminPreviewItem = {
     ...base,
-    ...override,
+    ...safeOverride,
     id,
     slot: base.slot,
     tier: base.tier,
@@ -104,7 +105,11 @@ function mergedEquipment(
     stats: { ...base.stats, ...(override?.stats ?? {}) } as StatBonus,
     overridden: override !== undefined && Object.keys(override).length > 0,
   };
-  if (override?.perk === null) delete merged.perk;
+  if (overridePerk === null) {
+    delete merged.perk;
+  } else if (overridePerk !== undefined) {
+    merged.perk = overridePerk;
+  }
   return merged;
 }
 
