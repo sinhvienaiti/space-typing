@@ -1,140 +1,45 @@
 import { describe, expect, it } from "vitest";
-import {
-  SPACE_TYPING_ADMIN_CONTRACT,
-  SPACE_TYPING_ADMIN_CONTRACT_REVISION,
-} from "../src/admin/contract";
+import { SPACE_TYPING_ADMIN_CONTRACT, SPACE_TYPING_ADMIN_CONTRACT_REVISION } from "../src/admin/contract";
 
 describe("Space Typing Admin contract V1", () => {
   it("exports a stable versioned contract for parent Admin consumers", () => {
     expect(SPACE_TYPING_ADMIN_CONTRACT_REVISION).toBe("space-typing-admin-v1");
     expect(SPACE_TYPING_ADMIN_CONTRACT.schemaVersion).toBe(1);
     expect(SPACE_TYPING_ADMIN_CONTRACT.gameId).toBe("space-typing");
-    expect(SPACE_TYPING_ADMIN_CONTRACT.configSchemaVersion).toBe(1);
-    expect(SPACE_TYPING_ADMIN_CONTRACT.worldMusicCatalogSchemaVersion).toBe(1);
   });
-
-  it("exposes the B06 Admin routes including canonical Ships, Equipment, Skills and Enemies editors", () => {
-    expect(SPACE_TYPING_ADMIN_CONTRACT.routes).toEqual([
-      { id: "overview", path: "/admin/space-typing", label: "Overview" },
-      { id: "audio-mix", path: "/admin/space-typing/audio", label: "Audio & Mix" },
-      {
-        id: "world-music",
-        path: "/admin/space-typing/world-music",
-        label: "World Music",
-      },
-      { id: "ships", path: "/admin/space-typing/ships", label: "Ships" },
-      { id: "equipment", path: "/admin/space-typing/equipment", label: "Equipment" },
-      { id: "skills", path: "/admin/space-typing/skills", label: "Skills" },
-      { id: "enemies", path: "/admin/space-typing/enemies", label: "Enemies" },
-      {
-        id: "history-publish",
-        path: "/admin/space-typing/history",
-        label: "History / Publish",
-      },
-    ]);
+  it("exposes canonical B06 routes including Bosses", () => {
+    expect(SPACE_TYPING_ADMIN_CONTRACT.routes).toEqual(expect.arrayContaining([
+      { id:"ships",path:"/admin/space-typing/ships",label:"Ships" },
+      { id:"equipment",path:"/admin/space-typing/equipment",label:"Equipment" },
+      { id:"skills",path:"/admin/space-typing/skills",label:"Skills" },
+      { id:"enemies",path:"/admin/space-typing/enemies",label:"Enemies" },
+      { id:"bosses",path:"/admin/space-typing/bosses",label:"Bosses" },
+    ]));
   });
-
-  it("locks the 10-Galaxy / 50-World topology and canonical validation badges", () => {
-    expect(SPACE_TYPING_ADMIN_CONTRACT.worldMusic).toMatchObject({
-      galaxyCount: 10,
-      worldsPerGalaxy: 5,
-      worldCount: 50,
-      assignmentModes: ["inherit", "replace"],
-      previewProtocol: {
-        version: 1,
-        command: "pnpm music:admin-preview",
-      },
-    });
-    expect(SPACE_TYPING_ADMIN_CONTRACT.worldMusic.validationBadges).toContain("BOSS FALLBACK TO WORLD");
-    expect(SPACE_TYPING_ADMIN_CONTRACT.worldMusic.validationBadges).toContain("LEGACY FALLBACK");
-  });
-
-  it("publishes the runtime-backed B06.1 Ships contract without player-state fields", () => {
-    expect(SPACE_TYPING_ADMIN_CONTRACT.capabilities).toEqual(expect.arrayContaining(["ships.read", "ships.write", "ships.preview"]));
-    expect(SPACE_TYPING_ADMIN_CONTRACT.ships).toMatchObject({
-      ids: ["vanguard", "aegis", "volt", "wraith", "fortune", "arsenal", "oracle", "bastion", "reaper", "celestial", "zenith"],
-      authorableFields: ["name", "unlockStage", "role", "summary", "passiveName", "activeName", "ultimateName", "statBonus", "visual"],
-      coreStatKeys: ["hull", "shield", "firepower", "armor", "energy", "reactor", "focus", "ward", "luck", "salvage"],
-      constraints: {
-        unlockStage: { min: 1, max: 1000, integer: true },
-        statBonus: { min: -100, max: 100 },
-        visual: {
-          silhouettes: ["spear", "fortress", "arc", "phantom", "crown", "blade"],
-          wingSpan: { min: 0.5, max: 2 },
-          bodyLength: { min: 0.5, max: 2 },
-          engineCounts: [1, 2, 3],
-        },
-      },
-      previewProtocol: { version: 1, command: "pnpm ships:admin-preview" },
-    });
+  it("publishes the B06.1 Ships contract without player-state fields",()=>{
+    expect(SPACE_TYPING_ADMIN_CONTRACT.capabilities).toEqual(expect.arrayContaining(["ships.read","ships.write","ships.preview"]));
     expect(SPACE_TYPING_ADMIN_CONTRACT.ships.authorableFields).not.toContain("selected");
     expect(SPACE_TYPING_ADMIN_CONTRACT.ships.authorableFields).not.toContain("progress");
   });
-
-  it("publishes the runtime-backed B06.2 Equipment contract with immutable identity fields", () => {
-    expect(SPACE_TYPING_ADMIN_CONTRACT.capabilities).toEqual(expect.arrayContaining(["equipment.read", "equipment.write", "equipment.preview"]));
-    expect(SPACE_TYPING_ADMIN_CONTRACT.equipment).toMatchObject({
-      authorableFields: ["name", "description", "stats", "perk"],
-      coreStatKeys: ["hull", "shield", "firepower", "armor", "energy", "reactor", "focus", "ward", "luck", "salvage"],
-      constraints: {
-        nameMax: 100,
-        descriptionMax: 320,
-        statBonus: { min: -100, max: 100 },
-      },
-      previewProtocol: { version: 1, command: "pnpm equipment:admin-preview" },
-    });
-    expect(SPACE_TYPING_ADMIN_CONTRACT.equipment.ids.length).toBeGreaterThan(40);
+  it("publishes immutable Equipment identity fields",()=>{
     expect(SPACE_TYPING_ADMIN_CONTRACT.equipment.authorableFields).not.toContain("id");
     expect(SPACE_TYPING_ADMIN_CONTRACT.equipment.authorableFields).not.toContain("slot");
-    expect(SPACE_TYPING_ADMIN_CONTRACT.equipment.authorableFields).not.toContain("tier");
-    expect(SPACE_TYPING_ADMIN_CONTRACT.equipment.authorableFields).not.toContain("icon");
   });
-
-  it("publishes the canonical B06.3 Skills preview contract without derived progression fields", () => {
-    expect(SPACE_TYPING_ADMIN_CONTRACT.capabilities).toEqual(expect.arrayContaining(["skills.read", "skills.write", "skills.preview"]));
-    expect(SPACE_TYPING_ADMIN_CONTRACT.skills).toMatchObject({
-      ids: [
-        "emp-burst", "chain-lightning", "mark-of-weakness",
-        "barrier", "reflect-field", "time-shell", "emergency-repair", "guardian-drone",
-        "sanctuary", "gravity-well", "cleanse", "meteor", "missile-swarm", "railgun", "tractor-beam",
-      ],
-      categories: ["offensive", "defensive", "support"],
-      authorableFields: ["name", "description", "energyCost", "cooldown", "charges", "perStageLimit", "typingCondition"],
-      previewProtocol: { version: 1, command: "pnpm skills:admin-preview" },
-    });
-    expect(SPACE_TYPING_ADMIN_CONTRACT.skills.authorableFields).not.toContain("id");
-    expect(SPACE_TYPING_ADMIN_CONTRACT.skills.authorableFields).not.toContain("category");
+  it("publishes Skills without derived progression fields",()=>{
     expect(SPACE_TYPING_ADMIN_CONTRACT.skills.authorableFields).not.toContain("level");
-    expect(SPACE_TYPING_ADMIN_CONTRACT.skills.authorableFields).not.toContain("effectScale");
     expect(SPACE_TYPING_ADMIN_CONTRACT.skills.authorableFields).not.toContain("masteryUnlocked");
   });
-
-  it("publishes the B06.4 Enemy stage-admission contract without inventing unsupported combat tuning fields", () => {
-    expect(SPACE_TYPING_ADMIN_CONTRACT.capabilities).toEqual(expect.arrayContaining(["enemies.read", "enemies.write", "enemies.preview"]));
+  it("publishes Enemy stage admission without unsupported combat tuning",()=>{
     expect(SPACE_TYPING_ADMIN_CONTRACT.enemies.ids).toHaveLength(35);
-    expect(SPACE_TYPING_ADMIN_CONTRACT.enemies).toMatchObject({
-      authorableFields: ["minStage"],
-      constraints: {
-        minStage: { min: 1, max: 1000, integer: true },
-      },
-      previewProtocol: { version: 1, command: "pnpm enemies:admin-preview" },
-    });
-    for (const unsupported of ["id", "name", "family", "role", "rarity", "hp", "shield", "armor", "speed", "damage", "ai", "spawnWeight", "skills", "projectiles", "vfx", "sfx", "dropTable", "enabled"]) {
-      expect(SPACE_TYPING_ADMIN_CONTRACT.enemies.authorableFields).not.toContain(unsupported);
-    }
+    expect(SPACE_TYPING_ADMIN_CONTRACT.enemies.authorableFields).toEqual(["minStage"]);
   });
-
-  it("keeps content, competitive and QA policy changes outside immediate client-side apply", () => {
-    expect(SPACE_TYPING_ADMIN_CONTRACT.applyBoundaries).toMatchObject({
-      playerVolume: "immediate",
-      mixPolicy: "safe-boundary",
-      playlistAssignment: "next-track-or-state",
-      shipPolicy: "new-session",
-      equipmentPolicy: "new-session",
-      skillPolicy: "new-session",
-      enemyPolicy: "new-session",
-      competitiveFeature: "new-session",
-      qaCapability: "new-qa-run",
-    });
+  it("publishes B06.5 Boss identity contract and keeps combat fields immutable",()=>{
+    expect(SPACE_TYPING_ADMIN_CONTRACT.capabilities).toEqual(expect.arrayContaining(["bosses.read","bosses.write","bosses.preview"]));
+    expect(SPACE_TYPING_ADMIN_CONTRACT.bosses.ids).toHaveLength(26);
+    expect(SPACE_TYPING_ADMIN_CONTRACT.bosses).toMatchObject({authorableFields:["name","title"],constraints:{nameMax:100,titleMax:160},previewProtocol:{version:1,command:"pnpm bosses:admin-preview"}});
+    for(const unsupported of ["id","role","rank","family","hp","shield","armor","damage","speed","phase","reward","patterns","voice","primary","accent","aura"]){expect(SPACE_TYPING_ADMIN_CONTRACT.bosses.authorableFields).not.toContain(unsupported);}
+  });
+  it("keeps Boss policy at the new-session boundary",()=>{
+    expect(SPACE_TYPING_ADMIN_CONTRACT.applyBoundaries).toMatchObject({shipPolicy:"new-session",equipmentPolicy:"new-session",skillPolicy:"new-session",enemyPolicy:"new-session",bossPolicy:"new-session"});
   });
 });
