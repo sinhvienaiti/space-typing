@@ -6,6 +6,11 @@ export type AdminRouteRegistration = {
   label: string;
 };
 
+type NumericRange = {
+  min: number;
+  max: number;
+};
+
 export type SpaceTypingAdminContract = {
   contractRevision: string;
   schemaVersion: number;
@@ -23,6 +28,25 @@ export type SpaceTypingAdminContract = {
     assignmentSlots: readonly string[];
     assignmentModes: readonly string[];
     validationBadges: readonly string[];
+    previewProtocol: {
+      version: number;
+      command: string;
+    };
+  };
+  ships: {
+    ids: readonly string[];
+    authorableFields: readonly string[];
+    coreStatKeys: readonly string[];
+    constraints: {
+      unlockStage: NumericRange & { integer: boolean };
+      statBonus: NumericRange;
+      visual: {
+        silhouettes: readonly string[];
+        wingSpan: NumericRange;
+        bodyLength: NumericRange;
+        engineCounts: readonly number[];
+      };
+    };
     previewProtocol: {
       version: number;
       command: string;

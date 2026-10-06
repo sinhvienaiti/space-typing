@@ -13,7 +13,7 @@ describe("Space Typing Admin contract V1", () => {
     expect(SPACE_TYPING_ADMIN_CONTRACT.worldMusicCatalogSchemaVersion).toBe(1);
   });
 
-  it("exposes only the four B3 Admin MVP routes", () => {
+  it("exposes the B06.1 Admin routes including the canonical Ships editor", () => {
     expect(SPACE_TYPING_ADMIN_CONTRACT.routes).toEqual([
       { id: "overview", path: "/admin/space-typing", label: "Overview" },
       { id: "audio-mix", path: "/admin/space-typing/audio", label: "Audio & Mix" },
@@ -22,6 +22,7 @@ describe("Space Typing Admin contract V1", () => {
         path: "/admin/space-typing/world-music",
         label: "World Music",
       },
+      { id: "ships", path: "/admin/space-typing/ships", label: "Ships" },
       {
         id: "history-publish",
         path: "/admin/space-typing/history",
@@ -49,11 +50,69 @@ describe("Space Typing Admin contract V1", () => {
     );
   });
 
-  it("keeps competitive and QA changes outside immediate client-side apply", () => {
+  it("publishes the runtime-backed B06.1 Ships contract without player-state fields", () => {
+    expect(SPACE_TYPING_ADMIN_CONTRACT.capabilities).toEqual(
+      expect.arrayContaining(["ships.read", "ships.write", "ships.preview"]),
+    );
+    expect(SPACE_TYPING_ADMIN_CONTRACT.ships).toMatchObject({
+      ids: [
+        "vanguard",
+        "aegis",
+        "volt",
+        "wraith",
+        "fortune",
+        "arsenal",
+        "oracle",
+        "bastion",
+        "reaper",
+        "celestial",
+        "zenith",
+      ],
+      authorableFields: [
+        "name",
+        "unlockStage",
+        "role",
+        "summary",
+        "passiveName",
+        "activeName",
+        "ultimateName",
+        "statBonus",
+        "visual",
+      ],
+      coreStatKeys: [
+        "hull",
+        "shield",
+        "firepower",
+        "armor",
+        "energy",
+        "reactor",
+        "focus",
+        "ward",
+        "luck",
+        "salvage",
+      ],
+      constraints: {
+        unlockStage: { min: 1, max: 1000, integer: true },
+        statBonus: { min: -100, max: 100 },
+        visual: {
+          silhouettes: ["spear", "fortress", "arc", "phantom", "crown", "blade"],
+          wingSpan: { min: 0.5, max: 2 },
+          bodyLength: { min: 0.5, max: 2 },
+          engineCounts: [1, 2, 3],
+        },
+      },
+      previewProtocol: { version: 1, command: "pnpm ships:admin-preview" },
+    });
+    expect(SPACE_TYPING_ADMIN_CONTRACT.ships.authorableFields).not.toContain("selected");
+    expect(SPACE_TYPING_ADMIN_CONTRACT.ships.authorableFields).not.toContain("progress");
+  });
+
+  it("keeps ship, competitive and QA changes outside immediate client-side apply", () => {
     expect(SPACE_TYPING_ADMIN_CONTRACT.applyBoundaries).toMatchObject({
       playerVolume: "immediate",
       mixPolicy: "safe-boundary",
       playlistAssignment: "next-track-or-state",
+      shipPolicy: "new-session",
       competitiveFeature: "new-session",
       qaCapability: "new-qa-run",
     });

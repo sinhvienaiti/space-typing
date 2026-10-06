@@ -13,6 +13,9 @@
     "world-music.read",
     "world-music.write",
     "world-music.preview",
+    "ships.read",
+    "ships.write",
+    "ships.preview",
     "history.read",
     "publish.write"
   ],
@@ -20,6 +23,7 @@
     { "id": "overview", "path": "/admin/space-typing", "label": "Overview" },
     { "id": "audio-mix", "path": "/admin/space-typing/audio", "label": "Audio & Mix" },
     { "id": "world-music", "path": "/admin/space-typing/world-music", "label": "World Music" },
+    { "id": "ships", "path": "/admin/space-typing/ships", "label": "Ships" },
     { "id": "history-publish", "path": "/admin/space-typing/history", "label": "History / Publish" }
   ],
   "worldMusic": {
@@ -44,10 +48,63 @@
       "command": "pnpm music:admin-preview"
     }
   },
+  "ships": {
+    "ids": [
+      "vanguard",
+      "aegis",
+      "volt",
+      "wraith",
+      "fortune",
+      "arsenal",
+      "oracle",
+      "bastion",
+      "reaper",
+      "celestial",
+      "zenith"
+    ],
+    "authorableFields": [
+      "name",
+      "unlockStage",
+      "role",
+      "summary",
+      "passiveName",
+      "activeName",
+      "ultimateName",
+      "statBonus",
+      "visual"
+    ],
+    "coreStatKeys": [
+      "hull",
+      "shield",
+      "firepower",
+      "armor",
+      "energy",
+      "reactor",
+      "focus",
+      "ward",
+      "luck",
+      "salvage"
+    ],
+    "constraints": {
+      "unlockStage": { "min": 1, "max": 1000, "integer": true },
+      "statBonus": { "min": -100, "max": 100 },
+      "visual": {
+        "silhouettes": ["spear", "fortress", "arc", "phantom", "crown", "blade"],
+        "wingSpan": { "min": 0.5, "max": 2 },
+        "bodyLength": { "min": 0.5, "max": 2 },
+        "engineCounts": [1, 2, 3]
+      }
+    },
+    "previewProtocol": {
+      "version": 1,
+      "command": "pnpm ships:admin-preview"
+    }
+  },
   "applyBoundaries": {
     "playerVolume": "immediate",
     "mixPolicy": "safe-boundary",
     "playlistAssignment": "next-track-or-state",
+    "shipPolicy": "new-session",
     "competitiveFeature": "new-session",
     "qaCapability": "new-qa-run"
   }
