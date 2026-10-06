@@ -19,6 +19,9 @@
     "equipment.read",
     "equipment.write",
     "equipment.preview",
+    "skills.read",
+    "skills.write",
+    "skills.preview",
     "history.read",
     "publish.write"
   ],
@@ -28,6 +31,7 @@
     { "id": "world-music", "path": "/admin/space-typing/world-music", "label": "World Music" },
     { "id": "ships", "path": "/admin/space-typing/ships", "label": "Ships" },
     { "id": "equipment", "path": "/admin/space-typing/equipment", "label": "Equipment" },
+    { "id": "skills", "path": "/admin/space-typing/skills", "label": "Skills" },
     { "id": "history-publish", "path": "/admin/space-typing/history", "label": "History / Publish" }
   ],
   "worldMusic": {
@@ -195,12 +199,58 @@
       "command": "pnpm equipment:admin-preview"
     }
   },
+  "skills": {
+    "ids": [
+      "emp-burst",
+      "chain-lightning",
+      "mark-of-weakness",
+      "barrier",
+      "reflect-field",
+      "time-shell",
+      "emergency-repair",
+      "guardian-drone",
+      "sanctuary",
+      "gravity-well",
+      "cleanse",
+      "meteor",
+      "missile-swarm",
+      "railgun",
+      "tractor-beam"
+    ],
+    "categories": ["offensive", "defensive", "support"],
+    "authorableFields": [
+      "name",
+      "description",
+      "energyCost",
+      "cooldown",
+      "charges",
+      "perStageLimit",
+      "typingCondition"
+    ],
+    "constraints": {
+      "nameMax": 100,
+      "descriptionMax": 320,
+      "energyCost": { "min": 0, "max": 200 },
+      "cooldown": { "min": 0, "max": 300 },
+      "charges": { "min": 0, "max": 99, "integer": true, "nullable": true },
+      "perStageLimit": { "min": 0, "max": 99, "integer": true, "nullable": true },
+      "typingCondition": {
+        "minStreak": { "min": 0, "max": 999, "integer": true },
+        "minAccuracy": { "min": 0, "max": 100 }
+      }
+    },
+    "previewProtocol": {
+      "version": 1,
+      "command": "pnpm skills:admin-preview"
+    }
+  },
   "applyBoundaries": {
     "playerVolume": "immediate",
     "mixPolicy": "safe-boundary",
     "playlistAssignment": "next-track-or-state",
     "shipPolicy": "new-session",
     "equipmentPolicy": "new-session",
+    "skillPolicy": "new-session",
     "competitiveFeature": "new-session",
     "qaCapability": "new-qa-run"
   }

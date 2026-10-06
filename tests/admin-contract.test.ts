@@ -13,7 +13,7 @@ describe("Space Typing Admin contract V1", () => {
     expect(SPACE_TYPING_ADMIN_CONTRACT.worldMusicCatalogSchemaVersion).toBe(1);
   });
 
-  it("exposes the B06 Admin routes including canonical Ships and Equipment editors", () => {
+  it("exposes the B06 Admin routes including canonical Ships, Equipment and Skills editors", () => {
     expect(SPACE_TYPING_ADMIN_CONTRACT.routes).toEqual([
       { id: "overview", path: "/admin/space-typing", label: "Overview" },
       { id: "audio-mix", path: "/admin/space-typing/audio", label: "Audio & Mix" },
@@ -24,6 +24,7 @@ describe("Space Typing Admin contract V1", () => {
       },
       { id: "ships", path: "/admin/space-typing/ships", label: "Ships" },
       { id: "equipment", path: "/admin/space-typing/equipment", label: "Equipment" },
+      { id: "skills", path: "/admin/space-typing/skills", label: "Skills" },
       {
         id: "history-publish",
         path: "/admin/space-typing/history",
@@ -43,55 +44,16 @@ describe("Space Typing Admin contract V1", () => {
         command: "pnpm music:admin-preview",
       },
     });
-    expect(SPACE_TYPING_ADMIN_CONTRACT.worldMusic.validationBadges).toContain(
-      "BOSS FALLBACK TO WORLD",
-    );
-    expect(SPACE_TYPING_ADMIN_CONTRACT.worldMusic.validationBadges).toContain(
-      "LEGACY FALLBACK",
-    );
+    expect(SPACE_TYPING_ADMIN_CONTRACT.worldMusic.validationBadges).toContain("BOSS FALLBACK TO WORLD");
+    expect(SPACE_TYPING_ADMIN_CONTRACT.worldMusic.validationBadges).toContain("LEGACY FALLBACK");
   });
 
   it("publishes the runtime-backed B06.1 Ships contract without player-state fields", () => {
-    expect(SPACE_TYPING_ADMIN_CONTRACT.capabilities).toEqual(
-      expect.arrayContaining(["ships.read", "ships.write", "ships.preview"]),
-    );
+    expect(SPACE_TYPING_ADMIN_CONTRACT.capabilities).toEqual(expect.arrayContaining(["ships.read", "ships.write", "ships.preview"]));
     expect(SPACE_TYPING_ADMIN_CONTRACT.ships).toMatchObject({
-      ids: [
-        "vanguard",
-        "aegis",
-        "volt",
-        "wraith",
-        "fortune",
-        "arsenal",
-        "oracle",
-        "bastion",
-        "reaper",
-        "celestial",
-        "zenith",
-      ],
-      authorableFields: [
-        "name",
-        "unlockStage",
-        "role",
-        "summary",
-        "passiveName",
-        "activeName",
-        "ultimateName",
-        "statBonus",
-        "visual",
-      ],
-      coreStatKeys: [
-        "hull",
-        "shield",
-        "firepower",
-        "armor",
-        "energy",
-        "reactor",
-        "focus",
-        "ward",
-        "luck",
-        "salvage",
-      ],
+      ids: ["vanguard", "aegis", "volt", "wraith", "fortune", "arsenal", "oracle", "bastion", "reaper", "celestial", "zenith"],
+      authorableFields: ["name", "unlockStage", "role", "summary", "passiveName", "activeName", "ultimateName", "statBonus", "visual"],
+      coreStatKeys: ["hull", "shield", "firepower", "armor", "energy", "reactor", "focus", "ward", "luck", "salvage"],
       constraints: {
         unlockStage: { min: 1, max: 1000, integer: true },
         statBonus: { min: -100, max: 100 },
@@ -109,23 +71,10 @@ describe("Space Typing Admin contract V1", () => {
   });
 
   it("publishes the runtime-backed B06.2 Equipment contract with immutable identity fields", () => {
-    expect(SPACE_TYPING_ADMIN_CONTRACT.capabilities).toEqual(
-      expect.arrayContaining(["equipment.read", "equipment.write", "equipment.preview"]),
-    );
+    expect(SPACE_TYPING_ADMIN_CONTRACT.capabilities).toEqual(expect.arrayContaining(["equipment.read", "equipment.write", "equipment.preview"]));
     expect(SPACE_TYPING_ADMIN_CONTRACT.equipment).toMatchObject({
       authorableFields: ["name", "description", "stats", "perk"],
-      coreStatKeys: [
-        "hull",
-        "shield",
-        "firepower",
-        "armor",
-        "energy",
-        "reactor",
-        "focus",
-        "ward",
-        "luck",
-        "salvage",
-      ],
+      coreStatKeys: ["hull", "shield", "firepower", "armor", "energy", "reactor", "focus", "ward", "luck", "salvage"],
       constraints: {
         nameMax: 100,
         descriptionMax: 320,
@@ -140,13 +89,33 @@ describe("Space Typing Admin contract V1", () => {
     expect(SPACE_TYPING_ADMIN_CONTRACT.equipment.authorableFields).not.toContain("icon");
   });
 
-  it("keeps ship, equipment, competitive and QA changes outside immediate client-side apply", () => {
+  it("publishes the canonical B06.3 Skills preview contract without derived progression fields", () => {
+    expect(SPACE_TYPING_ADMIN_CONTRACT.capabilities).toEqual(expect.arrayContaining(["skills.read", "skills.write", "skills.preview"]));
+    expect(SPACE_TYPING_ADMIN_CONTRACT.skills).toMatchObject({
+      ids: [
+        "emp-burst", "chain-lightning", "mark-of-weakness",
+        "barrier", "reflect-field", "time-shell", "emergency-repair", "guardian-drone",
+        "sanctuary", "gravity-well", "cleanse", "meteor", "missile-swarm", "railgun", "tractor-beam",
+      ],
+      categories: ["offensive", "defensive", "support"],
+      authorableFields: ["name", "description", "energyCost", "cooldown", "charges", "perStageLimit", "typingCondition"],
+      previewProtocol: { version: 1, command: "pnpm skills:admin-preview" },
+    });
+    expect(SPACE_TYPING_ADMIN_CONTRACT.skills.authorableFields).not.toContain("id");
+    expect(SPACE_TYPING_ADMIN_CONTRACT.skills.authorableFields).not.toContain("category");
+    expect(SPACE_TYPING_ADMIN_CONTRACT.skills.authorableFields).not.toContain("level");
+    expect(SPACE_TYPING_ADMIN_CONTRACT.skills.authorableFields).not.toContain("effectScale");
+    expect(SPACE_TYPING_ADMIN_CONTRACT.skills.authorableFields).not.toContain("masteryUnlocked");
+  });
+
+  it("keeps content, competitive and QA policy changes outside immediate client-side apply", () => {
     expect(SPACE_TYPING_ADMIN_CONTRACT.applyBoundaries).toMatchObject({
       playerVolume: "immediate",
       mixPolicy: "safe-boundary",
       playlistAssignment: "next-track-or-state",
       shipPolicy: "new-session",
       equipmentPolicy: "new-session",
+      skillPolicy: "new-session",
       competitiveFeature: "new-session",
       qaCapability: "new-qa-run",
     });
