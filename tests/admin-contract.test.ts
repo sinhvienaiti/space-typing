@@ -71,6 +71,48 @@ describe("Space Typing Admin contract V1", () => {
     expect(SPACE_TYPING_ADMIN_CONTRACT.shop.priceStateKeys).toEqual(["credits","alloy","starCrystal","quantumCore"]);
     for(const unsupported of ["icon","color","enabled"]){expect(SPACE_TYPING_ADMIN_CONTRACT.currencies.unsupportedMasterPlanFields).toContain(unsupported);}
   });
+  it("publishes runtime-backed Rewards & Drops without inventing an authoring seam",()=>{
+    expect(SPACE_TYPING_ADMIN_CONTRACT.capabilities).toContain("rewards.read");
+    expect(SPACE_TYPING_ADMIN_CONTRACT.capabilities).not.toContain("rewards.write");
+    expect(SPACE_TYPING_ADMIN_CONTRACT.capabilities).not.toContain("rewards.preview");
+    expect(SPACE_TYPING_ADMIN_CONTRACT.routes).toContainEqual({id:"rewards",path:"/admin/space-typing/rewards",label:"Rewards & Drops"});
+    expect(SPACE_TYPING_ADMIN_CONTRACT.rewards).toMatchObject({
+      mode:"runtime-derived-readonly",
+      domains:["performance","sector-checkpoint","combat-credit","equipment-loot","luck-pity"],
+      authorableFields:[],
+      performanceRewardIds:["precision","flawless","streak","tempo","objective"],
+      campaignFunctions:["performanceReward","sectorCheckpointReward"],
+      gameplayConsumer:"src/Game.ts",
+      writeCapability:false,
+      previewCapability:false,
+    });
+    expect(SPACE_TYPING_ADMIN_CONTRACT.rewards.combatCredit).toMatchObject({
+      modes:["campaign","ascension","hidden","recall","expedition","preview","test-lab","duel"],
+      walletPolicies:{campaign:"real",ascension:"real",preview:"simulated","test-lab":"simulated",hidden:"disabled",recall:"disabled",expedition:"disabled",duel:"disabled"},
+      causes:["typed-kill","voice-kill","skill-kill","boss-kill"],
+      tiers:["common","refined","high","elite","mini-boss","boss","major-boss"],
+      variants:["standard","golden"],
+      canonicalWalletCommitRequiredForRealModes:true,
+    });
+    expect(SPACE_TYPING_ADMIN_CONTRACT.rewards.equipmentLoot).toMatchObject({
+      sources:["normal","elite","golden","treasure","anomaly","boss"],
+      gradeIds:["aluminum","copper","silver","gold","diamond"],
+      equipmentTiers:[1,2,3],
+      weightTables:["GRADE_DROP_WEIGHTS","EQUIPMENT_TIER_WEIGHTS"],
+      mutationHook:"onEquipmentDrop",
+    });
+    expect(SPACE_TYPING_ADMIN_CONTRACT.rewards.pity).toMatchObject({
+      keys:["golden","treasure","choice","anomaly"],
+      counterRange:{min:0,max:50,integer:true},
+      mutationHook:"onLuckPityUpdate",
+    });
+    for(const source of ["src/rewards/campaign-rewards.ts","src/rewards/combat-credit-drops.ts","src/loot/equipment-loot.ts","src/loot/pity.ts","src/Game.ts"]){
+      expect(SPACE_TYPING_ADMIN_CONTRACT.rewards.runtimeSources).toContain(source);
+    }
+    for(const policy of ["performanceRewardFormula","sectorCheckpointFormula","combatCreditWeights","combatCreditBudgetFormula","equipmentDropChance","gradeDropWeights","equipmentTierWeights","pityFormula"]){
+      expect(SPACE_TYPING_ADMIN_CONTRACT.rewards.codeOwnedPolicyFields).toContain(policy);
+    }
+  });
   it("keeps Boss and Stage policy at the new-session boundary",()=>{
     expect(SPACE_TYPING_ADMIN_CONTRACT.applyBoundaries).toMatchObject({shipPolicy:"new-session",equipmentPolicy:"new-session",skillPolicy:"new-session",enemyPolicy:"new-session",bossPolicy:"new-session",stagePolicy:"new-session"});
   });
