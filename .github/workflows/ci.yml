@@ -47,5 +47,8 @@ jobs:
       - name: Audit Alternative Modes contract
         run: pnpm alternative-modes:audit
 
+      - name: Audit Backgrounds contract
+        run: pnpm backgrounds:audit
+
       - name: Build
         run: pnpm build
