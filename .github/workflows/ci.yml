@@ -26,5 +26,8 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Audit Warp economy
+        run: pnpm stamina:audit
+
       - name: Build
         run: pnpm build
