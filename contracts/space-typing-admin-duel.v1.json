@@ -1,0 +1,109 @@
+{
+  "contractRevision": "space-typing-admin-duel-v1",
+  "schemaVersion": 1,
+  "gameId": "space-typing",
+  "capability": "duel.read",
+  "route": {
+    "id": "duel",
+    "path": "/admin/space-typing/duel",
+    "label": "Duel Settings"
+  },
+  "duel": {
+    "mode": "runtime-derived-readonly",
+    "runtimeSources": [
+      "src/duel/room.ts",
+      "src/duel/rules.ts",
+      "src/duel/model.ts",
+      "src/duel/bots.ts",
+      "src/duel/local-match.ts",
+      "src/duel/presentation-timing.ts"
+    ],
+    "authorableFields": [],
+    "roomOwnerMutableFields": [
+      "roomName",
+      "visibility",
+      "password",
+      "matchLengthSeconds",
+      "roundFormat",
+      "mapSelection",
+      "hazardLevel",
+      "mysteryFrequency",
+      "fateFrequency",
+      "botAllowed",
+      "seedMode",
+      "fixedSeed",
+      "modifier"
+    ],
+    "roomSettings": {
+      "visibilities": ["public", "private"],
+      "matchLengthSeconds": [180, 240, 300],
+      "roundFormats": [1, 3, 5],
+      "mapSelectionModes": ["fixed", "random", "vote"],
+      "mapIds": [
+        "frost-wastes",
+        "inferno-rift",
+        "tempest-prime",
+        "ocean-abyss",
+        "terra-core",
+        "celestial-void"
+      ],
+      "hazardLevels": ["low", "standard", "high"],
+      "specialFrequencies": ["off", "low", "standard", "high"],
+      "seedModes": ["random", "fixed"],
+      "modifiers": [
+        "standard",
+        "high-hazard",
+        "mystery-storm",
+        "weapon-frenzy",
+        "support-rich",
+        "sudden-death",
+        "cataclysm-rush"
+      ],
+      "roomNameLength": {"min": 2, "max": 40},
+      "privatePasswordLength": {"min": 4, "max": 64},
+      "fixedSeed": {"min": 0, "max": 4294967295, "integer": true}
+    },
+    "safeDefaults": {
+      "visibility": "private",
+      "matchLengthSeconds": 240,
+      "roundFormat": 3,
+      "mapSelection": {"mode": "fixed", "mapId": "frost-wastes"},
+      "hazardLevel": "standard",
+      "mysteryFrequency": "standard",
+      "fateFrequency": "standard",
+      "botAllowed": true,
+      "seedMode": "random",
+      "modifier": "standard"
+    },
+    "bot": {
+      "wpm": {"min": 10, "max": 300, "practiceDefault": 55},
+      "accuracy": {"min": 0.5, "max": 1, "practiceDefault": 0.94},
+      "reactionMs": {"min": 0, "max": 3000, "practiceDefault": 320},
+      "personalities": ["turtle", "aggro", "tactician", "trickster", "fortune", "sniper", "balanced"],
+      "practiceDefaultPersonality": "balanced"
+    },
+    "combat": {
+      "contentVersion": "duel-final-v7-impact",
+      "defaultRegulationSeconds": 240,
+      "hardOvertimeSeconds": 45,
+      "combatProfile": "normalized",
+      "projectileBaseTravelMs": 860,
+      "typingCannonTravelMs": 600,
+      "roundBreakSeconds": 5,
+      "damageResolvesOnAuthorityClock": true
+    },
+    "persistenceOwner": "duel-room-session-runtime",
+    "roomOwnerWriteCapability": true,
+    "writeCapability": false,
+    "previewCapability": false,
+    "unsupportedAdminMockFields": [
+      "lives",
+      "globalMatchTimeMinutes",
+      "roundWindowSeconds",
+      "manualProjectileImpactDelayMs",
+      "burnFxToggle",
+      "largeKoExplosionToggle",
+      "announcerMilestonesToggle"
+    ]
+  }
+}
