@@ -32,5 +32,8 @@ jobs:
       - name: Audit Missions contract
         run: pnpm missions:audit
 
+      - name: Audit Feature Gates contract
+        run: pnpm feature-gates:audit
+
       - name: Build
         run: pnpm build
