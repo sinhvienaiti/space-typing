@@ -38,5 +38,8 @@ jobs:
       - name: Audit Events contract
         run: pnpm events:audit
 
+      - name: Audit Duel contract
+        run: pnpm duel:audit
+
       - name: Build
         run: pnpm build
