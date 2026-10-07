@@ -44,7 +44,8 @@
     "skills:admin-preview": "tsx scripts/admin/skill-registry-preview.ts",
     "enemies:admin-preview": "tsx scripts/admin/enemy-registry-preview.ts",
     "bosses:admin-preview": "tsx scripts/admin/boss-registry-preview.ts",
-    "stages:admin-preview": "tsx scripts/admin/stage-config-preview.ts"
+    "stages:admin-preview": "tsx scripts/admin/stage-config-preview.ts",
+    "worlds:admin-preview": "tsx scripts/admin/world-registry-preview.ts"
   },
   "dependencies": {
     "@fontsource/be-vietnam-pro": "^5.3.0",
