@@ -35,5 +35,8 @@ jobs:
       - name: Audit Feature Gates contract
         run: pnpm feature-gates:audit
 
+      - name: Audit Events contract
+        run: pnpm events:audit
+
       - name: Build
         run: pnpm build
