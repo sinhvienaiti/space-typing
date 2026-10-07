@@ -44,14 +44,19 @@ assert.equal(backgrounds.preview.available, true);
 assert.equal(backgrounds.preview.path, "/bg-gallery.html");
 assert.equal(backgrounds.preview.renderer, "BackgroundStage");
 assert.equal(backgrounds.preview.productionRenderer, true);
+assert(backgrounds.runtimeSources.includes("src/background/loader.ts"));
 
 const gallerySource = await read("src/background/gallery.ts");
 for (const evidence of ["BACKGROUND_COMPOSITIONS", "new BackgroundStage", "stage.setWorld", "stage.setQuality", "bg-gallery.html"]) {
   assert(gallerySource.includes(evidence), `Background gallery evidence missing: ${evidence}`);
 }
 const stageSource = await read("src/background/stage.ts");
-for (const evidence of ["compositionForWorld", "validateComposition", "missingKitReferences", "backgroundBudget", "resolveBackgroundDpr", "parseKit", "BackgroundPresentation = \"layered\" | \"blit\""]) {
+for (const evidence of ["compositionForWorld", "validateComposition", "missingKitReferences", "backgroundBudget", "resolveBackgroundDpr", "fetchKit", "BackgroundPresentation = \"layered\" | \"blit\""]) {
   assert(stageSource.includes(evidence), `Background stage evidence missing: ${evidence}`);
+}
+const loaderSource = await read("src/background/loader.ts");
+for (const evidence of ["fetchKit", "kitManifestUrl", "parseKit"]) {
+  assert(loaderSource.includes(evidence), `Background loader evidence missing: ${evidence}`);
 }
 const gameSource = await read("src/Game.ts");
 assert(gameSource.includes("BackgroundStage"), "Game.ts must consume BackgroundStage");

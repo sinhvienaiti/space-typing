@@ -13,6 +13,7 @@
     "runtimeSources": [
       "src/background/types.ts",
       "src/background/kit.ts",
+      "src/background/loader.ts",
       "src/background/budget.ts",
       "src/background/compositions/index.ts",
       "src/background/stage.ts",
