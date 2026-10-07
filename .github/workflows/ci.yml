@@ -29,5 +29,8 @@ jobs:
       - name: Audit Warp economy
         run: pnpm stamina:audit
 
+      - name: Audit Missions contract
+        run: pnpm missions:audit
+
       - name: Build
         run: pnpm build
