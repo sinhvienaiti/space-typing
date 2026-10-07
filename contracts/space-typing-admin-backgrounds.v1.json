@@ -1,0 +1,55 @@
+{
+  "contractRevision": "space-typing-admin-backgrounds-v1",
+  "schemaVersion": 1,
+  "gameId": "space-typing",
+  "capability": "backgrounds.read",
+  "route": {
+    "id": "backgrounds",
+    "path": "/admin/space-typing/backgrounds",
+    "label": "Backgrounds"
+  },
+  "backgrounds": {
+    "mode": "runtime-derived-readonly",
+    "runtimeSources": [
+      "src/background/types.ts",
+      "src/background/kit.ts",
+      "src/background/budget.ts",
+      "src/background/compositions/index.ts",
+      "src/background/stage.ts",
+      "src/background/gallery.ts",
+      "src/Game.ts"
+    ],
+    "compositionCount": 50,
+    "galaxyKitCount": 10,
+    "qualityTiers": ["low", "medium", "high", "ultra"],
+    "presentationModes": ["layered", "blit"],
+    "qualityBudgets": {
+      "low": {"dprCap": 0.75, "pixelBudget": 900000, "plateSize": 1280, "sheetSize": 1024, "heroSize": 512, "atlasSize": 1024, "flowSheets": 0, "frameInterval": 2},
+      "medium": {"dprCap": 1, "pixelBudget": 1600000, "plateSize": 1920, "sheetSize": 1024, "heroSize": 1024, "atlasSize": 1024, "flowSheets": 0, "frameInterval": 1},
+      "high": {"dprCap": 1.25, "pixelBudget": 2600000, "plateSize": 1920, "sheetSize": 1024, "heroSize": 1024, "atlasSize": 2048, "flowSheets": 1, "frameInterval": 1},
+      "ultra": {"dprCap": 1.5, "pixelBudget": 4000000, "plateSize": 2880, "sheetSize": 2048, "heroSize": 2048, "atlasSize": 2048, "flowSheets": 2, "frameInterval": 1}
+    },
+    "compositionDomains": ["plate", "sheets", "hero", "fields", "stars", "particles", "events", "post"],
+    "assetManifest": {
+      "root": "/assets/space-typing/backgrounds",
+      "file": "kit.json",
+      "strictParser": "parseKit",
+      "contentAddressedVariants": true
+    },
+    "preview": {
+      "available": true,
+      "owner": "src/background/gallery.ts",
+      "path": "/bg-gallery.html",
+      "queryParameters": ["world", "q", "grid", "labels", "t", "panel"],
+      "renderer": "BackgroundStage",
+      "productionRenderer": true
+    },
+    "runtimeFunctions": ["compositionForWorld", "validateComposition", "missingKitReferences", "backgroundBudget", "resolveBackgroundDpr", "parseKit"],
+    "persistenceOwner": "source-owned-compositions-and-generated-kit-manifests",
+    "authorableFields": [],
+    "writeCapability": false,
+    "adminPreviewWriteCapability": false,
+    "applyBoundary": "none",
+    "unsupportedAdminMockFields": ["brightnessSlider", "parallaxSlider", "motionSlider", "inlineQualityOverrides"]
+  }
+}
