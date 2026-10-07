@@ -1,3 +1,4 @@
+import { activeStageRuntimeOverride, type StageRuntimeOverride } from "../admin/stage-runtime-policy";
 import type { StageConfig, StageRole } from "./types";
 
 export const MAX_CAMPAIGN_STAGE = 1000;
@@ -48,7 +49,7 @@ export function stageSeed(stage: number): number {
   return Math.imul(value, 0x9e3779b1) >>> 0;
 }
 
-export function createStageConfig(stage: number): StageConfig {
+export function createBundledStageConfig(stage: number): StageConfig {
   const safeStage = normalizeStage(stage);
   const galaxy = galaxyForStage(safeStage);
   const local = stageInGalaxy(safeStage);
@@ -106,6 +107,23 @@ export function createStageConfig(stage: number): StageConfig {
     eliteChance,
     modifierSlots,
   };
+}
+
+export function resolveStageConfig(
+  bundled: StageConfig,
+  override: StageRuntimeOverride | undefined = activeStageRuntimeOverride(bundled.stage),
+): StageConfig {
+  if (override === undefined) return bundled;
+  return {
+    ...bundled,
+    ...(override.enemyBudget === undefined ? {} : { enemyBudget: override.enemyBudget }),
+    ...(override.eliteChance === undefined ? {} : { eliteChance: override.eliteChance }),
+    ...(override.modifierSlots === undefined ? {} : { modifierSlots: override.modifierSlots }),
+  };
+}
+
+export function createStageConfig(stage: number): StageConfig {
+  return resolveStageConfig(createBundledStageConfig(stage));
 }
 
 export function createCampaignStages(): StageConfig[] {

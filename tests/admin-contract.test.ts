@@ -7,13 +7,14 @@ describe("Space Typing Admin contract V1", () => {
     expect(SPACE_TYPING_ADMIN_CONTRACT.schemaVersion).toBe(1);
     expect(SPACE_TYPING_ADMIN_CONTRACT.gameId).toBe("space-typing");
   });
-  it("exposes canonical B06 routes including Bosses", () => {
+  it("exposes canonical B06 routes including Bosses and Worlds & Stages", () => {
     expect(SPACE_TYPING_ADMIN_CONTRACT.routes).toEqual(expect.arrayContaining([
       { id:"ships",path:"/admin/space-typing/ships",label:"Ships" },
       { id:"equipment",path:"/admin/space-typing/equipment",label:"Equipment" },
       { id:"skills",path:"/admin/space-typing/skills",label:"Skills" },
       { id:"enemies",path:"/admin/space-typing/enemies",label:"Enemies" },
       { id:"bosses",path:"/admin/space-typing/bosses",label:"Bosses" },
+      { id:"worlds-stages",path:"/admin/space-typing/worlds-stages",label:"Worlds & Stages" },
     ]));
   });
   it("publishes the B06.1 Ships contract without player-state fields",()=>{
@@ -39,7 +40,25 @@ describe("Space Typing Admin contract V1", () => {
     expect(SPACE_TYPING_ADMIN_CONTRACT.bosses).toMatchObject({authorableFields:["name","title"],constraints:{nameMax:100,titleMax:160},previewProtocol:{version:1,command:"pnpm bosses:admin-preview"}});
     for(const unsupported of ["id","role","rank","family","hp","shield","armor","damage","speed","phase","reward","patterns","voice","primary","accent","aura"]){expect(SPACE_TYPING_ADMIN_CONTRACT.bosses.authorableFields).not.toContain(unsupported);}
   });
-  it("keeps Boss policy at the new-session boundary",()=>{
-    expect(SPACE_TYPING_ADMIN_CONTRACT.applyBoundaries).toMatchObject({shipPolicy:"new-session",equipmentPolicy:"new-session",skillPolicy:"new-session",enemyPolicy:"new-session",bossPolicy:"new-session"});
+  it("publishes B06.6 Stage gameplay overrides while keeping structural fields immutable",()=>{
+    expect(SPACE_TYPING_ADMIN_CONTRACT.capabilities).toEqual(expect.arrayContaining(["stages.read","stages.write","stages.preview"]));
+    expect(SPACE_TYPING_ADMIN_CONTRACT.stages).toMatchObject({
+      count:1000,
+      authorableFields:["enemyBudget","eliteChance","modifierSlots"],
+      structuralFields:["stage","galaxy","stageInGalaxy","role","seed"],
+      constraints:{
+        stage:{min:1,max:1000,integer:true},
+        enemyBudget:{minExclusive:0},
+        eliteChance:{min:0,max:1},
+        modifierSlots:{min:0,max:4,integer:true},
+      },
+      previewProtocol:{version:1,command:"pnpm stages:admin-preview"},
+    });
+    for(const immutable of ["stage","galaxy","stageInGalaxy","role","seed"]){
+      expect(SPACE_TYPING_ADMIN_CONTRACT.stages.authorableFields).not.toContain(immutable);
+    }
+  });
+  it("keeps Boss and Stage policy at the new-session boundary",()=>{
+    expect(SPACE_TYPING_ADMIN_CONTRACT.applyBoundaries).toMatchObject({shipPolicy:"new-session",equipmentPolicy:"new-session",skillPolicy:"new-session",enemyPolicy:"new-session",bossPolicy:"new-session",stagePolicy:"new-session"});
   });
 });
