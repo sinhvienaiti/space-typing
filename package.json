@@ -8,6 +8,7 @@
     "build": "node scripts/check-audio-assets.mjs && node scripts/check-background-assets.mjs && node scripts/bg-art/check-expansion-v2.mjs && node scripts/bg-art/check-credit-puzzle-art.mjs && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit && vite build && node scripts/report-bundle-metrics.mjs && node scripts/check-ship-art-integrity.mjs && node scripts/check-background-art.mjs",
     "test": "vitest run tests",
     "stamina:audit": "node --import tsx scripts/audit-warp-economy.ts",
+    "missions:audit": "node --import tsx scripts/audit-admin-missions.ts",
     "check": "pnpm test && pnpm build",
     "duel:server": "tsx server/duel/ws-server.ts",
     "duel:local": "node scripts/local-duel.mjs start",
