@@ -58,6 +58,26 @@ describe("Space Typing Admin contract V1", () => {
       expect(SPACE_TYPING_ADMIN_CONTRACT.stages.authorableFields).not.toContain(immutable);
     }
   });
+  it("publishes runtime-backed read-only Currencies with canonical runtime IDs",()=>{
+    expect(SPACE_TYPING_ADMIN_CONTRACT.capabilities).toContain("currencies.read");
+    expect(SPACE_TYPING_ADMIN_CONTRACT.capabilities).not.toContain("currencies.write");
+    expect(SPACE_TYPING_ADMIN_CONTRACT.routes).toContainEqual({id:"currencies",path:"/admin/space-typing/currencies",label:"Currencies"});
+    expect(SPACE_TYPING_ADMIN_CONTRACT.currencies).toMatchObject({
+      mode:"runtime-derived-readonly",
+      ids:["credits","alloy","starCrystal","quantumCore"],
+      authorableFields:[],
+      caps:{credits:999999999,alloy:999999999,starCrystal:999999999,quantumCore:999999999},
+      displayPrecision:0,
+      sourceFunctions:["stageClearCreditReward","rewardExpansionCurrenciesOnStageClear"],
+      sinkFunctions:["buyShopStockEntry"],
+      analytics:{available:false,reason:"no-runtime-transaction-ledger"},
+      writeCapability:false,
+    });
+    expect(SPACE_TYPING_ADMIN_CONTRACT.shop.currencies).toEqual(["credits","alloy","starCrystal","quantumCore"]);
+    for(const unsupported of ["icon","color","enabled"]){
+      expect(SPACE_TYPING_ADMIN_CONTRACT.currencies.unsupportedMasterPlanFields).toContain(unsupported);
+    }
+  });
   it("keeps Boss and Stage policy at the new-session boundary",()=>{
     expect(SPACE_TYPING_ADMIN_CONTRACT.applyBoundaries).toMatchObject({shipPolicy:"new-session",equipmentPolicy:"new-session",skillPolicy:"new-session",enemyPolicy:"new-session",bossPolicy:"new-session",stagePolicy:"new-session"});
   });
