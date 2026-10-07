@@ -41,5 +41,8 @@ jobs:
       - name: Audit Duel contract
         run: pnpm duel:audit
 
+      - name: Audit Ranked contract
+        run: pnpm ranked:audit
+
       - name: Build
         run: pnpm build
