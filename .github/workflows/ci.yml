@@ -66,9 +66,22 @@ jobs:
           pnpm exec tsc -p tsconfig.ci-src.json --noEmit
 
       - name: Diagnose TypeScript tests
+        id: ts_tests
         run: |
           node -e "const fs=require('fs'); const c=JSON.parse(fs.readFileSync('tsconfig.json','utf8')); c.include=['tests']; fs.writeFileSync('tsconfig.ci-tests.json', JSON.stringify(c));"
-          pnpm exec tsc -p tsconfig.ci-tests.json --noEmit
+          set +e
+          output="$(pnpm exec tsc -p tsconfig.ci-tests.json --noEmit 2>&1)"
+          code=$?
+          printf '%s\n' "$output"
+          first="$(printf '%s\n' "$output" | grep -m1 'error TS' | tr '\r\n' ' ' | cut -c1-220)"
+          if [ -z "$first" ]; then first="no-compiler-error-line"; fi
+          echo "first=$first" >> "$GITHUB_OUTPUT"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: "TypeScript tests diagnostic — ${{ steps.ts_tests.outputs.first }}"
+        if: steps.ts_tests.outputs.code != '0'
+        run: exit 1
 
       - name: Diagnose TypeScript Vite config
         run: |
