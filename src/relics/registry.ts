@@ -7,6 +7,12 @@ export const RELIC_IDS = [
   "giant-word-lens",
   "mirror-vow",
   "cosmic-conductor",
+  "precision-lens",
+  "perfect-capacitor",
+  "combo-coil",
+  "heavy-core",
+  "syllable-forge",
+  "echo-core",
 ] as const;
 
 export type RelicId = (typeof RELIC_IDS)[number];
@@ -21,6 +27,13 @@ export type RelicEffectContribution = {
   longBossWordDamageMultiplier?: number;
   mistakeGuardCharges?: number;
   mistakeGuardShieldRatio?: number;
+  perfectWordEnergy?: number;
+  perfectWordPower?: number;
+  perfectWordInterval?: number;
+  perfectWordIntervalPower?: number;
+  longWordShield?: number;
+  longWordPower?: number;
+  recoveryPerfectEnergy?: number;
 };
 
 export type RelicDefinition = {
@@ -29,6 +42,8 @@ export type RelicDefinition = {
   description: string;
   grade: GradeId;
   unlockStage: number;
+  runOnly?: boolean;
+  artFile?: string;
   effects: RelicEffectContribution;
 };
 
@@ -104,6 +119,85 @@ export const RELIC_REGISTRY: Record<RelicId, RelicDefinition> = {
       perfectWordChainTargets: 1,
       longBossWordMinLength: 8,
       longBossWordDamageMultiplier: 1.12,
+    },
+  },
+  "precision-lens": {
+    id: "precision-lens",
+    name: "Precision Lens",
+    description:
+      "Perfect direct-typed words restore up to 2 Energy, scaled by meaningful typed length.",
+    grade: "silver",
+    unlockStage: 1,
+    runOnly: true,
+    artFile: "icons/relics/relic-precision-lens.webp",
+    effects: {
+      perfectWordEnergy: 2,
+    },
+  },
+  "perfect-capacitor": {
+    id: "perfect-capacitor",
+    name: "Perfect Capacitor",
+    description:
+      "Perfect direct-typed words add up to 1.2 Power, scaled by meaningful typed length.",
+    grade: "silver",
+    unlockStage: 1,
+    runOnly: true,
+    artFile: "icons/relics/relic-perfect-capacitor.webp",
+    effects: {
+      perfectWordPower: 1.2,
+    },
+  },
+  "combo-coil": {
+    id: "combo-coil",
+    name: "Combo Coil",
+    description:
+      "Every 5 perfect completed words releases a controlled +6 Power pulse.",
+    grade: "gold",
+    unlockStage: 1,
+    runOnly: true,
+    artFile: "icons/relics/relic-combo-coil.webp",
+    effects: {
+      perfectWordInterval: 5,
+      perfectWordIntervalPower: 6,
+    },
+  },
+  "heavy-core": {
+    id: "heavy-core",
+    name: "Heavy Core",
+    description:
+      "Words with 8+ meaningful typed letters restore 4 Shield.",
+    grade: "gold",
+    unlockStage: 1,
+    runOnly: true,
+    artFile: "icons/relics/relic-heavy-core.webp",
+    effects: {
+      longWordShield: 4,
+    },
+  },
+  "syllable-forge": {
+    id: "syllable-forge",
+    name: "Syllable Forge",
+    description:
+      "Words with 8+ meaningful typed letters forge +3 Power.",
+    grade: "gold",
+    unlockStage: 1,
+    runOnly: true,
+    artFile: "icons/relics/relic-syllable-forge.webp",
+    effects: {
+      longWordPower: 3,
+    },
+  },
+  "echo-core": {
+    id: "echo-core",
+    name: "Echo Core",
+    description:
+      "After a typing mistake, the next perfect completed word restores 5 Energy.",
+    grade: "diamond",
+    unlockStage: 1,
+    runOnly: true,
+    artFile: "icons/relics/relic-echo-core.webp",
+    effects: {
+      recoveryPerfectEnergy: 5,
     },
   },
 };

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Game } from "../src/Game";
 import { createStageConfig } from "../src/campaign/stage";
 import { difficultyFor } from "../src/campaign/difficulty";
+import { VANGUARD_ACTIVE_SKILL_ID } from "../src/characters/vanguard";
 import { DEFAULT_RECALL_SETTINGS } from "../src/recall/model";
 import type { GameSettings, VocabularyEntry } from "../src/types";
 
@@ -142,6 +143,81 @@ describe("M21 gated Game Test Lab API", () => {
     game.destroy();
   });
 
+  it("force-activates Test Lab skills without energy, typing, cooldown, or cost gates", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game);
+    game.testLabSetSchedulerFrozen(true);
+    game.testLabSetResources({ energy: 0 });
+
+    const normal = game.useSkill(VANGUARD_ACTIVE_SKILL_ID);
+    expect(normal.ok).toBe(false);
+    if (normal.ok) throw new Error("Expected production activation to be blocked");
+    expect(["energy", "typing-condition"]).toContain(normal.reason);
+
+    const beforeState = game.getSkillState(VANGUARD_ACTIVE_SKILL_ID);
+    const runtime = game as unknown as { barrierTimer: number };
+    expect(runtime.barrierTimer).toBe(0);
+
+    const forced = game.testLabForceSkill(VANGUARD_ACTIVE_SKILL_ID);
+    expect(forced.ok).toBe(true);
+    expect(game.getTestLabSnapshot()?.stats.energy).toBe(0);
+    expect(runtime.barrierTimer).toBeGreaterThan(0);
+    expect(game.getSkillState(VANGUARD_ACTIVE_SKILL_ID)).toEqual(beforeState);
+
+    const repeated = game.testLabForceSkill(VANGUARD_ACTIVE_SKILL_ID);
+    expect(repeated.ok).toBe(true);
+    expect(game.getSkillState(VANGUARD_ACTIVE_SKILL_ID)).toEqual(beforeState);
+    expect(game.getTestLabSnapshot()?.stats.energy).toBe(0);
+
+    game.destroy();
+  });
+
+  it("continues typing after forced Meteor and Chain Lightning advance a word", () => {
+    for (const skillId of ["meteor", "chain-lightning"] as const) {
+      const game = createTestGame();
+      game.setTestLabMode(true);
+      start(game);
+      game.testLabSetSchedulerFrozen(true);
+      if (skillId === "meteor") {
+        game.setSupportSpells(["meteor"]);
+      }
+
+      const enemyId = game.testLabSpawnEnemies({
+        kind: "scout",
+        count: 1,
+        layers: 1,
+      })[0]!;
+      const before = game.getTestLabSnapshot()?.enemies.find(
+        (enemy) => enemy.id === enemyId,
+      );
+      expect(before).toBeDefined();
+      expect(before?.typed).toBe(0);
+
+      const forced = game.testLabForceSkill(skillId);
+      expect(forced.ok).toBe(true);
+
+      const advanced = game.getTestLabSnapshot()?.enemies.find(
+        (enemy) => enemy.id === enemyId,
+      );
+      expect(advanced).toBeDefined();
+      expect(advanced!.typed).toBeGreaterThan(0);
+
+      const typingWord = advanced!.entry.en
+        .toLocaleLowerCase("en-US")
+        .replace(/[^a-z]/g, "");
+      const nextKey = typingWord[advanced!.typed];
+      expect(nextKey).toMatch(/^[a-z]$/);
+
+      game.handleKey(nextKey!);
+      const resumed = game.getTestLabSnapshot()?.enemies.find(
+        (enemy) => enemy.id === enemyId,
+      );
+      expect(resumed?.typed).toBe(advanced!.typed + 1);
+      game.destroy();
+    }
+  });
+
   it("holds stage clear while the visible Recall bonus remains, then clears after collection", () => {
     const game = createTestGame();
     game.setTestLabMode(true);
@@ -261,8 +337,9 @@ describe("M21 gated Game Test Lab API", () => {
     game.destroy();
   });
 
-  it("preserves Splitter fragments and Volatile burst in Combat", () => {
+  it("preserves Splitter fragments and Volatile burst when enemy projectiles are explicitly On", () => {
     const game = createTestGame();
+    game.updateSettings({ ...settings, enemyProjectileMode: "on" });
     game.setTestLabMode(true);
     start(game, 900);
     game.testLabSetSchedulerFrozen(true);
@@ -284,6 +361,38 @@ describe("M21 gated Game Test Lab API", () => {
 
     expect(snapshot?.enemies.length).toBeGreaterThan(0);
     expect(snapshot?.projectiles).toBeGreaterThan(0);
+    game.destroy();
+  });
+
+  it("provides dedicated Credit Crystal spawn, stress, magnet, collect and clear controls", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 100);
+    game.testLabSetSchedulerFrozen(true);
+
+    expect(
+      game.testLabSpawnCreditCrystals({
+        tier: "common",
+        count: 1,
+        amountEach: 3,
+      }),
+    ).toBe(1);
+    let snapshot = game.getTestLabSnapshot();
+    expect(snapshot?.creditPickups.rewards).toBe(1);
+    expect(snapshot?.creditPickups.walletDeltaApplied).toBe(3);
+
+    expect(game.testLabSpawnCreditStress(50)).toBe(50);
+    snapshot = game.getTestLabSnapshot();
+    expect(snapshot?.creditPickups.rewards).toBe(51);
+    expect(snapshot?.creditPickups.pieces ?? 999).toBeLessThanOrEqual(28);
+
+    expect(game.testLabForceCreditMagnet()).toBe(true);
+    expect(game.testLabCollectCreditPickups()).toBeGreaterThan(0);
+    expect(game.getTestLabSnapshot()?.creditPickups.bursts).toBe(0);
+
+    game.testLabSpawnCreditStress(10);
+    expect(game.testLabClearCreditPickups()).toBeGreaterThan(0);
+    expect(game.getTestLabSnapshot()?.creditPickups.bursts).toBe(0);
     game.destroy();
   });
 
@@ -473,6 +582,8 @@ describe("M21 gated Game Test Lab API", () => {
     expect(typed).toHaveLength(1);
     expect(typed[0]?.entry.en).toBe("month");
 
+    game.handleKey("x");
+
     game.handleKey("o");
     const locked = game.getTestLabSnapshot();
     expect(
@@ -517,6 +628,154 @@ describe("M21 gated Game Test Lab API", () => {
 
     game.destroy();
   });
+  it("keeps kill Score logic but creates no legacy floating score popup state", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 1);
+    game.testLabSetSchedulerFrozen(true);
+
+    const ids = game.testLabSpawnEnemies({
+      kind: "scout",
+      count: 1,
+      layers: 1,
+    });
+    const beforeScore = game.getTestLabSnapshot()?.stats.score ?? 0;
+    expect(game.testLabKillEnemy(ids[0]!)).toBe(true);
+    const afterScore = game.getTestLabSnapshot()?.stats.score ?? 0;
+    const runtime = game as unknown as {
+      killScorePopups?: unknown[];
+    };
+
+    expect(afterScore).toBeGreaterThan(beforeScore);
+    expect(runtime.killScorePopups).toBeUndefined();
+    game.destroy();
+  });
+
+  it("keeps a materially larger Score reward for a three-layer enemy", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 1);
+    game.testLabSetSchedulerFrozen(true);
+
+    const oneLayerId = game.testLabSpawnEnemies({
+      kind: "scout",
+      count: 1,
+      rank: "I",
+      layers: 1,
+    })[0]!;
+    const oneBefore = game.getTestLabSnapshot()?.stats.score ?? 0;
+    expect(game.testLabKillEnemy(oneLayerId)).toBe(true);
+    const oneLayerReward =
+      (game.getTestLabSnapshot()?.stats.score ?? 0) - oneBefore;
+
+    game.testLabClearEnemies();
+    game.testLabClearParticles();
+
+    const threeLayerId = game.testLabSpawnEnemies({
+      kind: "scout",
+      count: 1,
+      rank: "I",
+      layers: 3,
+    })[0]!;
+    const threeBefore = game.getTestLabSnapshot()?.stats.score ?? 0;
+    expect(game.testLabKillEnemy(threeLayerId)).toBe(true);
+    const threeLayerReward =
+      (game.getTestLabSnapshot()?.stats.score ?? 0) - threeBefore;
+
+    expect(oneLayerReward).toBeGreaterThan(0);
+    expect(threeLayerReward).toBeGreaterThan(oneLayerReward * 1.35);
+    game.destroy();
+  });
+
+  it("emits pronunciation and IPA/Vietnamese learning feedback for every typed enemy layer", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 50);
+    game.testLabSetSchedulerFrozen(true);
+
+    const onWordComplete = vi.fn();
+    const onKillTranslation = vi.fn();
+    const runtime = game as unknown as {
+      hooks: {
+        onWordComplete: (
+          entry: VocabularyEntry,
+          outcome?: { perfect: boolean },
+        ) => void;
+        onKillTranslation?: (entry: VocabularyEntry) => void;
+      };
+    };
+    runtime.hooks.onWordComplete = onWordComplete;
+    runtime.hooks.onKillTranslation = onKillTranslation;
+
+    const enemyId = game.testLabSpawnEnemies({
+      kind: "scout",
+      count: 1,
+      rank: "X",
+      layers: 3,
+    })[0]!;
+
+    const completedEntries: VocabularyEntry[] = [];
+
+    for (const expectedLayers of [2, 1, 0]) {
+      const before = game
+        .getTestLabSnapshot()
+        ?.enemies.find((enemy) => enemy.id === enemyId);
+      expect(before).toBeDefined();
+      completedEntries.push({ ...before!.entry });
+
+      expect(game.testLabForceWordComplete(enemyId)).toBe(true);
+
+      const snapshot = game.getTestLabSnapshot();
+      if (expectedLayers > 0) {
+        const current = snapshot?.enemies.find(
+          (enemy) => enemy.id === enemyId,
+        );
+        expect(current?.layersRemaining).toBe(expectedLayers);
+      } else {
+        expect(
+          snapshot?.enemies.some((enemy) => enemy.id === enemyId),
+        ).toBe(false);
+      }
+
+      expect(snapshot?.learningEcho?.en).toBe(
+        completedEntries.at(-1)!.en,
+      );
+      expect(snapshot?.learningEcho?.ipa).toBe(
+        completedEntries.at(-1)!.ipa,
+      );
+      expect(snapshot?.learningEcho?.vi).toBe(
+        completedEntries.at(-1)!.vi,
+      );
+    }
+
+    expect(onWordComplete).toHaveBeenCalledTimes(3);
+    expect(onKillTranslation).toHaveBeenCalledTimes(3);
+
+    for (const [index, entry] of completedEntries.entries()) {
+      expect(onWordComplete).toHaveBeenNthCalledWith(
+        index + 1,
+        expect.objectContaining({
+          id: entry.id,
+          en: entry.en,
+          ipa: entry.ipa,
+          vi: entry.vi,
+        }),
+        expect.objectContaining({ perfect: true }),
+      );
+      expect(onKillTranslation).toHaveBeenNthCalledWith(
+        index + 1,
+        expect.objectContaining({
+          id: entry.id,
+          en: entry.en,
+          ipa: entry.ipa,
+          vi: entry.vi,
+        }),
+      );
+    }
+
+    game.destroy();
+  });
+
   it("reports completed-word quality once for shared learning", () => {
     const game = createTestGame();
     game.setTestLabMode(true);

@@ -25,6 +25,13 @@ export type AudioAssetRef = {
   id: string;
   localPath?: string;
   defaultPath?: string;
+  /** Ordered transport fallbacks for one recording (for example webm/ogg). */
+  sources?: readonly string[];
+  /**
+   * Stems of one song share a group: switching between them keeps the
+   * playback position, so the music rises and falls instead of restarting.
+   */
+  syncGroup?: string;
 };
 
 export type DuckingProfile = {
@@ -155,37 +162,34 @@ function fallbackAsset(
   };
 }
 
+/**
+ * World music now comes from the song library (music-library.ts: Galaxy
+ * playlists of generated songs, see docs/MUSIC_SYSTEM.md). These base and
+ * intense assets remain the fallback when the library is empty.
+ */
 function worldProfile(world: WorldProfile): WorldMusicProfile {
   const worldFile = world.id + ".ogg";
-  const galaxyFile =
-    "galaxy-" + String(world.galaxy).padStart(2, "0") + ".ogg";
-  const baseTrack = {
+  const baseTrack: AudioAssetRef = {
     ...SHARED.calm,
     id: world.id + "-base",
     localPath: "/local-assets/music/" + worldFile,
   };
-  const ambient = fallbackAsset(
-    world.id + "-ambient",
-    worldFile,
-    "engine-loop.ogg",
-    "ambient",
-  );
-  const galaxyAmbient = fallbackAsset(
-    "galaxy-" + String(world.galaxy).padStart(2, "0") + "-ambient",
-    galaxyFile,
-    "computer-loop.ogg",
-    "ambient",
-  );
-
+  const intenseTrack: AudioAssetRef = { ...SHARED.intense, id: world.id + "-intense" };
+  const ambient: AudioAssetRef = {
+    id: world.id + "-ambient",
+    // Keep optional per-World ambient overrides, but do not fall back to the
+    // bundled 5-second engine loop. Its audible loop seam reads like a
+    // helicopter/rotor pulse during long gameplay sessions.
+    localPath: "/local-assets/ambient/" + worldFile,
+  };
   return {
     id: world.musicProfile,
     worldId: world.id,
     baseTrack,
-    ambientLayers: [ambient, galaxyAmbient],
-    intenseTrackOrLayer: {
-      ...SHARED.intense,
-      id: world.id + "-intense",
-    },
+    // Ambient is opt-in per World. There is intentionally no bundled
+    // fallback loop: both short generic loops proved repetitive in gameplay.
+    ambientLayers: [ambient],
+    intenseTrackOrLayer: intenseTrack,
     miniBossTrack: SHARED.miniBoss,
     worldBossTrack: SHARED.worldBoss,
     galaxyBossTrack: SHARED.galaxyBoss,
@@ -205,7 +209,7 @@ function worldProfile(world: WorldProfile): WorldMusicProfile {
     },
     preloadHints: [
       baseTrack,
-      SHARED.intense,
+      intenseTrack,
       SHARED.miniBoss,
       SHARED.worldBoss,
     ],
@@ -320,13 +324,14 @@ export function assetCandidates(
   assetRef: AudioAssetRef | null,
 ): string[] {
   if (assetRef === null) return [];
-  return [
+  return [...new Set([
+    ...(assetRef.sources ?? []),
     assetRef.localPath,
     assetRef.defaultPath,
   ].filter(
     (value): value is string =>
       typeof value === "string" && value.length > 0,
-  );
+  ))];
 }
 
 export function stateLoops(state: MusicState): boolean {

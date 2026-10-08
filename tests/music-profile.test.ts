@@ -93,7 +93,8 @@ describe("M08 World music profiles", () => {
   });
 
   it("resolves local overrides before repository defaults and loops only sustained states", () => {
-    const profile = musicProfileForWorld("world-01");
+    // World 02+ still use the shared tracks (World 01 has its own theme).
+    const profile = musicProfileForWorld("world-02");
     const base = musicAssetForState(profile, "WORLD_NORMAL");
     const candidates = assetCandidates(base);
 
@@ -101,9 +102,16 @@ describe("M08 World music profiles", () => {
     expect(candidates[1]).toBe(
       "/assets/audio/music/mysterious-ambience.mp3",
     );
+    expect(profile.ambientLayers).toHaveLength(1);
     expect(
-      assetCandidates(profile.ambientLayers[0] ?? null)[1],
-    ).toBe("/assets/audio/ambient/engine-loop.ogg");
+      assetCandidates(profile.ambientLayers[0] ?? null),
+    ).toEqual(["/local-assets/ambient/world-02.ogg"]);
+    expect(
+      profile.ambientLayers.flatMap((asset) => assetCandidates(asset)),
+    ).not.toContain("/assets/audio/ambient/engine-loop.ogg");
+    expect(
+      profile.ambientLayers.flatMap((asset) => assetCandidates(asset)),
+    ).not.toContain("/assets/audio/ambient/computer-loop.ogg");
     const intenseCandidates = assetCandidates(
       musicAssetForState(profile, "WORLD_INTENSE"),
     );
@@ -116,5 +124,17 @@ describe("M08 World music profiles", () => {
     expect(stateLoops("VICTORY")).toBe(false);
     expect(stateLoops("TRANSITION")).toBe(false);
     expect(musicAssetForState(profile, "SILENT")).toBeNull();
+  });
+
+  it("keeps the shared tracks as the fallback when the song library is empty", () => {
+    const profile = musicProfileForWorld("world-01");
+    // World music comes from the song library (music-library.ts); these
+    // legacy assets only play if it is empty.
+    expect(assetCandidates(musicAssetForState(profile, "WORLD_NORMAL"))).toEqual([
+      "/local-assets/music/world-01.ogg",
+      "/assets/audio/music/mysterious-ambience.mp3",
+    ]);
+    expect(musicAssetForState(profile, "WORLD_NORMAL")?.syncGroup).toBeUndefined();
+    expect(musicAssetForState(profile, "WORLD_BOSS")?.syncGroup).toBeUndefined();
   });
 });

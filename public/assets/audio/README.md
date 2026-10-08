@@ -21,6 +21,21 @@ public/assets/audio/music/
 
 The game does **not** create one song per Campaign stage.
 
+World music (WORLD_NORMAL / WORLD_INTENSE) comes from the generated song
+library: 13 songs, each with a calm and an intense stem of the same length.
+
+```text
+public/assets/audio/music/songs/<song>/
+  calm.ogg     # WORLD_NORMAL (opening / recovery phases)
+  intense.ogg  # WORLD_INTENSE (pressure / mixed / finale phases)
+```
+
+`src/audio/music-tracks.json` (written by `pnpm music:render`) lists them with
+their mix-out points and cache-busting `?v=` hashes; `src/audio/music-library.ts`
+maps them to Galaxy playlists. Songs hand over to each other with a 7 s
+equal-power crossfade and a low-pass sweep (docs/MUSIC_SYSTEM.md). The shared
+tracks below remain the fallback when the library is empty.
+
 World-specific personal overrides are still supported:
 
 ```text

@@ -7,6 +7,21 @@ describe("Sfx lifecycle", () => {
     vi.unstubAllGlobals();
   });
 
+  it("does not synthesize the projectile warning beep", () => {
+    const sfx = new Sfx();
+    const tone = vi.fn();
+    (
+      sfx as unknown as {
+        tone: (...args: unknown[]) => void;
+      }
+    ).tone = tone;
+
+    sfx.projectileWarning();
+
+    expect(tone).not.toHaveBeenCalled();
+    sfx.destroy();
+  });
+
   it("does not recreate AudioContext from delayed tones after destroy", () => {
     vi.useFakeTimers();
 
@@ -68,6 +83,9 @@ describe("Sfx lifecycle", () => {
     vi.advanceTimersByTime(500);
 
     expect(contextsCreated).toBe(1);
-    expect(removeEventListener).toHaveBeenCalledOnce();
+    // A2 moved pronunciation/warning/announcer bridge ownership into the
+    // shared focus runtime, so individual Sfx instances no longer register or
+    // remove that global listener.
+    expect(removeEventListener).not.toHaveBeenCalled();
   });
 });

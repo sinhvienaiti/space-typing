@@ -10,6 +10,7 @@ import {
 } from "../equipment/loadout";
 import {
   EQUIPMENT_IDS,
+  EQUIPMENT_REGISTRY,
   type EquipmentId,
 } from "../equipment/registry";
 import { GRADE_IDS, type GradeId } from "../grades";
@@ -448,6 +449,27 @@ function itemEntry(
   };
 }
 
+/** Mk.II and Mk.III parts carry perks, so they cost more than Mk.I. */
+const EQUIPMENT_TIER_PRICE = { 1: 1, 2: 1.5, 3: 2.2 } as const;
+
+function tierPrice(price: ShopPrice, definitionId: EquipmentId): ShopPrice {
+  const tier = EQUIPMENT_REGISTRY[definitionId].tier;
+  if (tier === 1) return price;
+  const factor = EQUIPMENT_TIER_PRICE[tier];
+  return {
+    ...price,
+    credits: Math.floor(price.credits * factor),
+    alloy: Math.ceil(price.alloy * factor),
+    starCrystal: price.starCrystal + (tier === 3 && price.starCrystal > 0 ? 1 : 0),
+  };
+}
+
+/** Mk.III parts only turn up in hidden and black-market shops. */
+function shopEquipmentPool(type: ShopType): readonly EquipmentId[] {
+  if (type === "hidden" || type === "black-market") return EQUIPMENT_IDS;
+  return EQUIPMENT_IDS.filter((id) => EQUIPMENT_REGISTRY[id].tier < 3);
+}
+
 function equipmentEntry(
   type: ShopType,
   definitionId: EquipmentId,
@@ -466,7 +488,7 @@ function equipmentEntry(
     definitionId,
     grade,
     remaining: 1,
-    price: priceForEquipment(type, grade),
+    price: tierPrice(priceForEquipment(type, grade), definitionId),
   };
 }
 
@@ -484,7 +506,7 @@ function generateStock(
       stock.push(itemEntry(type, itemId, 2));
     }
     for (const [index, definitionId] of pickDistinct(
-      EQUIPMENT_IDS,
+      shopEquipmentPool(type),
       3,
       random,
     ).entries()) {
@@ -512,7 +534,7 @@ function generateStock(
     const equipmentCount =
       type === "hidden" || type === "black-market" ? 3 : 2;
     for (const [index, definitionId] of pickDistinct(
-      EQUIPMENT_IDS,
+      shopEquipmentPool(type),
       equipmentCount,
       random,
     ).entries()) {

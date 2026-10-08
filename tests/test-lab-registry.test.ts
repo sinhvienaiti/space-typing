@@ -37,6 +37,12 @@ describe("M21 Test Lab production registry", () => {
       [...EQUIPMENT_IDS],
     );
     expect(registry.characters).toEqual([...CHARACTER_IDS]);
+    expect(registry.characterSkills).toHaveLength(CHARACTER_IDS.length);
+    expect(
+      registry.characterSkills.map((entry) => entry.characterId),
+    ).toEqual([...CHARACTER_IDS]);
+    expect(new Set(registry.characterSkills.map((entry) => entry.id)).size)
+      .toBe(CHARACTER_IDS.length);
     expect(registry.shopTypes).toEqual([...SHOP_TYPES]);
     expect(registry.musicStates).toEqual([...MUSIC_STATES]);
     const enemyIds = new Set(
@@ -57,5 +63,6 @@ describe("M21 Test Lab production registry", () => {
     expect(first.worlds).not.toBe(second.worlds);
     expect(first.enemies).not.toBe(second.enemies);
     expect(first.items).not.toBe(second.items);
+    expect(first.characterSkills).not.toBe(second.characterSkills);
   });
 });

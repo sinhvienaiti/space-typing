@@ -1,3 +1,4 @@
+import { activeEnemyRuntimeOverride } from "../admin/enemy-runtime-policy";
 import { clamp } from "../logic";
 import type { EnemyKind } from "../types";
 import { enemyDefinition, type EnemyDefinitionId } from "./registry";
@@ -7,7 +8,9 @@ function availableDefinition(
   stage: number,
 ): boolean {
   const definition = enemyDefinition(id);
-  return definition !== undefined && stage >= definition.minStage;
+  if (definition === undefined) return false;
+  const minStage = activeEnemyRuntimeOverride(id)?.minStage ?? definition.minStage;
+  return stage >= minStage;
 }
 
 export function runtimeEnemyDefinitionId(

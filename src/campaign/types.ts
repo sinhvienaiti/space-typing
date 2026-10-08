@@ -55,6 +55,8 @@ export type DifficultyProfile = {
   spawnInterval: number;
   maxEnemies: number;
   projectilePressure: number;
+  /** Auto policy for normal-enemy hostile projectiles at this effective difficulty. */
+  normalEnemyProjectilesDefault?: 0 | 1;
   /** Multiplier applied only to projectile velocity, not fire frequency. */
   projectileSpeedScale?: number;
   bossPressure: number;
@@ -84,6 +86,9 @@ export type StageBest = {
   accuracy: number;
   wpm: number;
   clearedAt: string;
+  inputMode?: "typing" | "voice" | "hybrid";
+  voiceWords?: number;
+  voicePolicy?: string;
 };
 
 export type CampaignProgress = {
@@ -92,4 +97,5 @@ export type CampaignProgress = {
   selectedStage: number;
   clearedStages: number[];
   bestByStage: Record<string, StageBest>;
+  bestByInputProfile?: Record<string, Record<string, StageBest>>;
 };

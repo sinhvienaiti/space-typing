@@ -1,3 +1,4 @@
+import { applySkillRuntimeOverride } from "../admin/skill-runtime-policy";
 import type { SkillDefinition } from "./engine";
 
 export const SUPPORT_SPELL_IDS = [
@@ -5,6 +6,19 @@ export const SUPPORT_SPELL_IDS = [
   "gravity-well",
   "cleanse",
   "meteor",
+  "missile-swarm",
+  "railgun",
+  "tractor-beam",
+] as const;
+
+/**
+ * Tactical systems added after the first release. Existing saves unlock them
+ * automatically (they are not earned), see sanitizeSupportSpellState.
+ */
+export const LATER_TACTICAL_SYSTEM_IDS = [
+  "missile-swarm",
+  "railgun",
+  "tractor-beam",
 ] as const;
 
 export type SupportSpellId =
@@ -14,14 +28,15 @@ export type SupportSpellDefinition = SkillDefinition & {
   description: string;
 };
 
-export const SUPPORT_SPELLS: Record<
+export const BUNDLED_SUPPORT_SPELLS: Record<
   SupportSpellId,
   SupportSpellDefinition
 > = {
   sanctuary: {
     id: "sanctuary",
-    name: "Sanctuary",
-    description: "Restore Shield and create a short protective barrier.",
+    name: "Fortress Dome",
+    description:
+      "Deploys a golden fortress dome: restores 35% Shield and adds a 6 s barrier that soaks damage.",
     energyCost: 44,
     cooldown: 26,
     charges: 2,
@@ -30,8 +45,9 @@ export const SUPPORT_SPELLS: Record<
   },
   "gravity-well": {
     id: "gravity-well",
-    name: "Gravity Well",
-    description: "Slow hostile movement and projectile pressure briefly.",
+    name: "Singularity",
+    description:
+      "Opens a micro black hole mid-field for 5 s: every enemy and hostile shot is dragged to 68% speed.",
     energyCost: 38,
     cooldown: 20,
     charges: 2,
@@ -40,8 +56,9 @@ export const SUPPORT_SPELLS: Record<
   },
   cleanse: {
     id: "cleanse",
-    name: "Cleanse",
-    description: "Remove active Jammer interference.",
+    name: "System Purge",
+    description:
+      "Reboots the ship's systems with a full-screen scan: removes every negative status and Jammer interference.",
     energyCost: 20,
     cooldown: 14,
     charges: 3,
@@ -49,15 +66,67 @@ export const SUPPORT_SPELLS: Record<
   },
   meteor: {
     id: "meteor",
-    name: "Meteor",
-    description: "Soften several enemies or damage a lone boss.",
+    name: "Orbital Strike",
+    description:
+      "Calls lances from orbit onto the 3 closest enemies: each loses a shield layer or a letter. A lone boss takes 3% of its hull.",
     energyCost: 42,
     cooldown: 18,
     charges: 2,
     perStageLimit: 2,
     typingCondition: { minStreak: 12 },
   },
+  "missile-swarm": {
+    id: "missile-swarm",
+    name: "Missile Swarm",
+    description:
+      "Fires 8 homing micro-missiles from the wing pods into up to 6 enemies: each target loses a shield layer or 2 letters. A boss takes 5% of its hull.",
+    energyCost: 40,
+    cooldown: 18,
+    charges: 2,
+    perStageLimit: 2,
+    typingCondition: { minStreak: 10 },
+  },
+  railgun: {
+    id: "railgun",
+    name: "Railgun",
+    description:
+      "A hyper-velocity slug pierces the whole lane of your target: every enemy in it loses a shield layer or 3 letters, and a boss in the lane takes 6% of its hull.",
+    energyCost: 36,
+    cooldown: 16,
+    charges: 2,
+    perStageLimit: 2,
+    typingCondition: { minAccuracy: 92 },
+  },
+  "tractor-beam": {
+    id: "tractor-beam",
+    name: "Tractor Beam",
+    description:
+      "Locks onto the closest enemy, hauls it back up the field and holds it at 45% speed for 4 s (its weapons stall for 2 s).",
+    energyCost: 24,
+    cooldown: 12,
+    charges: 3,
+    perStageLimit: 3,
+  },
 };
+
+export const SUPPORT_SPELLS = Object.fromEntries(
+  SUPPORT_SPELL_IDS.map((id) => [id, applySkillRuntimeOverride(BUNDLED_SUPPORT_SPELLS[id])]),
+) as Record<SupportSpellId, SupportSpellDefinition>;
+
+/**
+ * A tactical hit on a word: types `letters` more for the player, but never the
+ * last letter, so the player always finishes the word themselves.
+ */
+export function strikeTypingAdvance(
+  typed: number,
+  wordLength: number,
+  letters: number,
+): number {
+  const done = Math.max(0, Math.floor(typed));
+  const length = Math.max(0, Math.floor(wordLength));
+  if (length <= 1) return Math.min(done, Math.max(0, length - 1));
+  return Math.min(length - 1, done + Math.max(0, Math.floor(letters)));
+}
 
 export function isSupportSpellId(
   value: string,

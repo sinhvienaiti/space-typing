@@ -1,0 +1,1816 @@
+# Visual >80% Execution Plan
+
+Status: ACTIVE — owner rejected first V80-10 screenshot (<50% perceptual match); corrective visual pass implemented, fresh browser acceptance pending
+Owner acceptance target: runtime visual quality >= 80% of the approved demo direction
+Branch: `feat/visual-over-80-pass`
+Created: 2026-09-26
+
+## 1. Purpose
+
+The current World 01 runtime is structurally correct but visually around 40% of the approved target.
+The remaining gap is primarily authored composition, depth hierarchy, asset visibility, and per-World production migration—not a hidden legacy overwrite in World 01.
+
+This plan converts the visual work into small, reviewable tasks. Every task must be implemented, code-reviewed, test-reviewed, and visually reasoned about before the next task starts.
+
+## 2. Non-negotiable engineering rules
+
+1. Keep one background runtime path. Do not introduce a second game loop.
+2. Keep `WorldSceneRenderer` as the scene composition owner.
+3. Do not restore legacy procedural landmarks/floors/cinematic geometry inside an authored-production World.
+4. Do not add arbitrary file-size limits. Optimize runtime work, allocations, decoding, and draw count instead.
+5. Reuse existing helpers and types before adding new abstractions.
+6. Remove obsolete code when a replacement makes it unreachable.
+7. No per-frame random allocation for authored scenery.
+8. Instance generation must remain deterministic and bounded.
+9. Essential visual-identity layers must not disappear merely because quality is Medium.
+10. Low quality may reduce density; it must not destroy the scene identity.
+11. Central typing/readability corridor must remain quieter than outer thirds.
+12. Every new asset requires local path + provenance/license record.
+13. Unit tests prove contracts, not beauty. Browser screenshots remain the perceptual acceptance gate.
+
+## 3. Definition of >80%
+
+A production World passes only when a paused gameplay frame has all of these:
+
+- clear D0-D5 depth hierarchy;
+- structured deep-space background, not a uniform color wash;
+- one strong off-axis landmark;
+- obvious far/mid/near object scale separation;
+- detailed near objects that do not look like placeholder chunks;
+- bright-star hierarchy without debug-like speed lines;
+- meaningful environmental storytelling object(s);
+- composition density concentrated away from the typing corridor;
+- no legacy geometry leaking into the authored scene;
+- Medium quality keeps the visual identity;
+- High/Ultra enrich the scene rather than revealing the scene for the first time;
+- stable motion with no obvious wrap pop;
+- no scenery mistaken for an active enemy;
+- no IPA/Recall/HUD overlap regression.
+
+The practical target is >= 8/10 in owner browser review for World 01 before rollout.
+
+## 4. Task workflow
+
+For every task:
+
+1. Re-read the exact files affected.
+2. Write the smallest coherent change.
+3. Update/add tests for the contract changed.
+4. Self-review for:
+   - accidental legacy-path reintroduction;
+   - duplicate helpers/data;
+   - unnecessary branching;
+   - per-frame allocation;
+   - quality/readability regression;
+   - dead code;
+   - naming/type clarity.
+5. Commit one task as one logical commit.
+6. Check CI when available.
+7. Do not mark visual acceptance complete without owner/browser evidence.
+
+## 5. Detailed task breakdown
+
+### V80-00 — Baseline + acceptance contract
+
+Goal: freeze the current root cause and acceptance rules so later work cannot drift.
+
+Deliverables:
+- this execution plan;
+- current World 01 architecture recorded as `authored-production`;
+- current non-migrated Worlds recorded as `legacy-hybrid`;
+- current known visual failure: flat reused nebula, weak scale hierarchy, too few asteroids, quality-gated identity layers.
+
+Acceptance:
+- no runtime behavior change;
+- plan is committed before visual refactor work.
+
+### V80-01 — Explicit layer quality contract
+
+Problem:
+`optional: true` currently means High/Ultra only. That is too coarse and hides identity-defining layers on Medium.
+
+Implementation:
+- add an explicit minimum visual quality field to authored layers;
+- centralize quality ordering/check logic;
+- preserve backward compatibility for old `optional` declarations during migration;
+- move World 01 identity-critical layers to Medium-or-better visibility;
+- keep only truly decorative density on High/Ultra.
+
+World 01 Medium must include:
+- asteroid field;
+- at least one secondary celestial body;
+- near scale cue;
+- enough far/mid depth to read as a layered scene.
+
+Tests:
+- quality contract unit tests;
+- World 01 identity layer assertions.
+
+### V80-02 — Composition helpers, no duplicated magic data
+
+Goal:
+prepare clean, readable composition data before increasing density.
+
+Implementation:
+- extract small authoring helpers only where repeated configuration is genuinely duplicated;
+- group Galaxy layers by D0-D5 purpose in source order/comments;
+- avoid a generic abstraction that hides actual art direction;
+- keep layer declarations easy to inspect.
+
+Acceptance:
+- output behavior equivalent except for intentional composition changes in later tasks;
+- registry becomes easier to audit.
+
+### V80-03 — D0/D1 deep-space volume correction
+
+Problem:
+the same purple nebula source is reused in a way that reads as one flat purple wash.
+
+Implementation:
+- create visibly distinct deep-void and nebula-volume treatments from available authored sources;
+- reduce equal-weight fullscreen repetition;
+- keep a darker base, one main luminous structure, and a lower-opacity secondary volume;
+- use blend/anchor/scale/motion differences only when they create perceptible depth;
+- source additional licensed local nebula art if current sources cannot satisfy the visual bar.
+
+Acceptance:
+- screenshot no longer reads as one uniform purple sheet;
+- black/deep navy negative space remains visible;
+- nebula structure has a clear dominant region and secondary depth.
+
+### V80-04 — Far asteroid/debris band
+
+Goal:
+create many small distant fragments without clutter.
+
+Implementation:
+- bounded deterministic instances;
+- small scale, low opacity, slow relative motion;
+- wide spread biased away from center where possible;
+- no expensive per-frame treatment.
+
+Acceptance:
+- far field is visible but subordinate;
+- no central typing noise;
+- Low reduces count, Medium still preserves the field identity.
+
+### V80-05 — Mid asteroid band
+
+Goal:
+make asteroid depth obvious.
+
+Implementation:
+- multiple silhouettes/sources;
+- stronger size variance;
+- rotation and lateral/depth motion;
+- enough instances to form a field without reading as repetition.
+
+Acceptance:
+- at least 3 visibly different asteroid silhouettes in normal play;
+- mid band is clearly larger/faster than far band.
+
+### V80-06 — Near hero asteroid band
+
+Goal:
+replace the current occasional small chunk with convincing near-camera scale cues.
+
+Implementation:
+- 1–3 sparse near objects depending on quality;
+- substantially larger scale than mid band;
+- edge-biased placement;
+- approach/fly-through movement with smooth entry/exit;
+- never cover the central word corridor for long;
+- reject any source that becomes visibly rough when enlarged.
+
+Acceptance:
+- a paused frame can contain a convincing foreground object;
+- near art no longer looks like a placeholder rock.
+
+### V80-07 — Landmark hierarchy
+
+Goal:
+make the scene composition intentional rather than evenly scattered.
+
+Implementation:
+- one dominant off-axis celestial landmark;
+- one secondary body;
+- tune relative size/opacity/position;
+- avoid equal visual weight among all planets.
+
+Acceptance:
+- the eye has a clear first focal environmental object;
+- landmark supports gameplay rather than competing with targets.
+
+### V80-08 — Narrative environmental objects
+
+Goal:
+make the world feel inhabited/alive.
+
+Implementation:
+- retain distant ship/wreck/structure silhouettes as scenery;
+- at least one narrative object visible on Medium when safe;
+- optional extra fly-bys on High/Ultra;
+- keep opacity/scale distinct from enemies.
+
+Acceptance:
+- scene tells a small environmental story;
+- no scenery is confused with an enemy.
+
+### V80-09 — Star hierarchy + atmosphere polish
+
+Implementation:
+- faint/normal/bright/rare-glint balance;
+- outer-third bias;
+- corridor suppression;
+- subtle atmospheric particles only;
+- no universal streak-line effect.
+
+Acceptance:
+- stars contribute depth, not noise.
+
+### V80-10 — World 01 holistic composition review
+
+Review together:
+- D0-D5 layering;
+- motion;
+- scale hierarchy;
+- center readability;
+- paused-frame composition;
+- quality Low/Medium/High/Ultra.
+
+Acceptance:
+- owner browser review >= 8/10;
+- no known blocker hidden behind “tests pass”.
+
+Do not migrate further Worlds before this gate.
+
+### V80-11 — World 02 authored-production migration
+
+Curate its own asset manifest first, then switch its render mode.
+Do not reuse World 01 as a simple palette swap.
+
+### V80-12 — World 03 authored-production migration
+
+Prism/cosmic-shard identity, distinct landmark and motion mix.
+
+### V80-13 — World 04 authored-production migration
+
+Luminous/celestial identity, distinct composition and narrative objects.
+
+### V80-14 — World 05 authored-production migration
+
+Aurora/meteor emphasis with stronger rock/comet depth.
+
+### V80-15 — Galaxy 01 five-World acceptance
+
+Acceptance:
+- Worlds 01–05 are materially distinct in paused screenshots;
+- all five are authored-production;
+- no legacy landmark/floor/cinematic geometry.
+
+### V80-16 — Remaining family production rollout
+
+Migrate family-by-family only after curated manifests exist:
+Infernal -> Frost -> Verdant -> Shadow -> Cosmic Forge -> Abyss -> Aurora Cosmic -> Cathedral -> Eternity.
+
+Each family gets a separate review checkpoint; do not mass-toggle renderMode first.
+
+### V80-17 — Cross-mode readability regression
+
+Explicit review:
+- normal combat;
+- boss;
+- Recall;
+- IPA/translation UI;
+- resize/DPR;
+- Low/Medium/High/Ultra.
+
+### V80-18 — Performance + continuous-motion QA
+
+Review:
+- no per-frame image creation;
+- no per-frame registry scans;
+- bounded instances;
+- decode/preload behavior;
+- visible wrap/approach popping over 3–5 minutes;
+- worst case boss + particles + rich background.
+
+### V80-19 — Audio pass after visual acceptance
+
+Audio is intentionally separate:
+- ambience/music;
+- combat SFX;
+- warning/boss cues;
+- per-family mood.
+
+Do not use audio work to mask an unfinished visual scene.
+
+### V80-20 — Final docs + parent integration
+
+- update production docs to match actual runtime;
+- record final asset provenance;
+- confirm tests/build/CI;
+- update parent repository gitlink only after child acceptance.
+
+## 6. Immediate execution order
+
+The implementation starts now in this exact order:
+
+1. V80-00 plan commit.
+2. V80-01 quality contract.
+3. V80-02 composition cleanup.
+4. V80-03 deep-space volume.
+5. V80-04 far asteroid band.
+6. V80-05 mid asteroid band.
+7. V80-06 near asteroid band.
+8. V80-07 landmark hierarchy.
+9. V80-08 narrative objects.
+10. V80-09 atmosphere.
+11. V80-10 owner/browser acceptance gate.
+
+Only after V80-10 passes do Worlds 02–05 migrate.
+
+## 7. Review record format
+
+Append a short checkpoint after each completed task:
+
+- Task:
+- Commit:
+- Files changed:
+- Contract changed:
+- Tests added/updated:
+- Self-review findings:
+- Remaining visual risk:
+- CI:
+- Browser acceptance:
+
+A task is not “done” merely because TypeScript compiles.
+
+
+## 8. Review checkpoints
+
+### V80-00
+- Task: baseline + acceptance contract
+- Commit: `2863751d25e91c9ed3d922849d616e7732138edb`
+- Files changed: execution plan only
+- Contract changed: none at runtime
+- Tests added/updated: none
+- Self-review findings: root cause recorded as composition/depth/visibility, not a hidden World 01 legacy overwrite
+- Remaining visual risk: all runtime work still pending at this point
+- CI: documentation-only
+- Browser acceptance: baseline screenshot remained rejected at ~40%
+
+### V80-01
+- Task: explicit layer quality contract
+- Commit: `9f0e401c11a3690cdcef135ffc7b0fd0a1e3a243`
+- Files changed: background types, renderer, registry, tests
+- Contract changed: authored layers can declare `minQuality`; legacy `optional` behavior remains compatible
+- Tests added/updated: quality visibility assertions
+- Self-review findings: one centralized quality decision is used by preload and instance generation; no duplicated gating path. World 01 layers migrated to explicit `minQuality` no longer carry redundant `optional: true` state.
+- Remaining visual risk: composition itself was still weak
+- CI: PASS
+- Browser acceptance: pending
+
+### V80-02
+- Task: explicit Galaxy depth grouping
+- Commit: `504249d07bb117623fedde07098977d263abd290`
+- Files changed: layered background registry
+- Contract changed: none; source layout made auditable as D0-D5 groups
+- Tests added/updated: existing registry integrity tests remained valid
+- Self-review findings: an intermediate self-reference typo was caught during commit review and replaced before continuing
+- Remaining visual risk: source art was still repeated
+- CI: PASS
+- Browser acceptance: pending
+
+### V80-03
+- Task: deep-space volume correction
+- Commits: `78731bab37ccb9faa12bd3624c04d479d868ebf1`, `9bb66ad23d23643d169c394238f66e85ca7e7d1b`, `6cea11fac8e3bdd10f2673ba58755157b6090479`
+- Files changed: registry, tests, asset provenance, asset integrity gate, one new CC0 nebula binary
+- Contract changed: World 01 now composes distinct purple + blue nebula volumes instead of visually repeating one source
+- Tests added/updated: distinct-source assertion + PNG integrity gate
+- Self-review findings: imported source provenance/license retained; asset is local and build-checked
+- Remaining visual risk: exact blend/opacity still requires browser judgment
+- CI: PASS (#923 on latest integrity-gate head)
+- Browser acceptance: pending
+
+### V80-04
+- Task: far asteroid band
+- Commit: `70f8d2862c0c0431dd30b0ff193236793b0463e4`
+- Files changed: registry, tests
+- Contract changed: deterministic bounded far fragments remain visible even on Low; quality scaling reduces count instead of deleting the whole far band
+- Tests added/updated: depth/scale/count/placement assertions
+- Self-review findings: an initial count expectation failed CI and was corrected instead of weakening the feature; holistic review later caught that `minQuality: medium` contradicted the task's Low-density requirement, so the far band was restored on Low and left to the existing bounded quality scaler
+- Remaining visual risk: density perception requires runtime motion review
+- CI: PASS after correction
+- Browser acceptance: pending
+
+### V80-05
+- Task: mid asteroid hierarchy
+- Commit: `3c10459dc108b66e8a15b4df4023eedb7bfb8e8e`
+- Files changed: registry, tests
+- Contract changed: three sourced silhouettes and >=10 authored mid instances before quality scaling
+- Tests added/updated: silhouette uniqueness, count and scale hierarchy
+- Self-review findings: reused existing deterministic renderer; no new spawn system or per-frame random allocation
+- Remaining visual risk: browser must confirm repetition is not noticeable
+- CI: PASS
+- Browser acceptance: pending
+
+### V80-06
+- Task: near hero asteroid band
+- Commit: `61995bc3d1d0df79941e9cd173ba0004cc6d1757` plus V80-10 scale polish
+- Files changed: registry, tests
+- Contract changed: Medium retains one near approach cue; High adds a secondary cue
+- Tests added/updated: approach count, quality threshold, near-vs-mid scale checks
+- Self-review findings: placement remains edge-biased and deterministic; no center-spawn helper was introduced
+- Remaining visual risk: final near-camera scale requires browser acceptance
+- CI: PASS before final scale polish
+- Browser acceptance: pending
+
+### V80-07
+- Task: landmark hierarchy
+- Commit: `b5f6fc5da6dba9360987c26d77d2a7bbe4d736ef`
+- Files changed: registry, tests
+- Contract changed: one dominant off-axis primary planet with a clearly subordinate far planet
+- Tests added/updated: scale/opacity/position hierarchy
+- Self-review findings: existing sourced planet family retained; no extra procedural planet geometry
+- Remaining visual risk: browser must confirm focal balance
+- CI: PASS
+- Browser acceptance: pending
+
+### V80-08
+- Task: narrative environmental object
+- Commits: `09a34a2efe6ec451a8a311b8fca587372d106a6d`, `acbfc7a77094e684c75e6b4c801bfb666bfff205`
+- Files changed: registry, tests
+- Contract changed: Medium includes a low-opacity persistent sentinel; High retains a rare flyby
+- Tests added/updated: persistent/flyby behavior and quality assertions
+- Self-review findings: CI exposed a stale renamed-layer assertion; it was fixed with an explicit missing-layer assertion rather than hidden
+- Remaining visual risk: scenery/enemy visual distinction still needs browser confirmation
+- CI: PASS after correction
+- Browser acceptance: pending
+
+### V80-09
+- Task: star hierarchy + typing-lane readability
+- Commits: `a91910f80a01cb06a2b19ad8dba2e7e7cd1d2449`, `9483c9b1fd096bb7a80bc7e8d63f621c53c8cd24`
+- Files changed: scene renderer, renderer tests
+- Contract changed: World 01 suppresses center star/ambient-scenery intensity and slightly enriches outer thirds
+- Tests added/updated: deterministic shared scenery-readability factor and World 01 scope assertions
+- Self-review findings: first pass was too broad for all celestial-rainbow scenes; scope was narrowed to World 01 before rollout
+- Remaining visual risk: star/ambient density still requires browser judgment at active combat speed
+- CI: PASS
+- Browser acceptance: pending
+
+### V80-10
+- Task: holistic World 01 composition review
+- Status: CODE AUDIT ACTIVE
+- Current code review: D0-D5, two nebula sources, far/mid/near asteroid bands, focal landmark, narrative silhouette, Medium identity and center-star suppression are now guarded by tests
+- Additional polish: near-camera asteroid scale increased after reviewing the actual sourced asteroid binaries at native quality
+- Self-review finding: current asteroid binaries are detailed cratered art; the earlier “rough chunk” look was primarily runtime scale/composition, not a low-detail source image
+- Remaining visual risk: perceptual score cannot be honestly closed without a fresh owner/browser screenshot
+- CI: must pass on this checkpoint before browser acceptance
+- Browser acceptance: PENDING; do not migrate World 02 yet
+
+
+## 9. Owner rejection corrective pass
+
+The first post-V80 screenshot was explicitly rejected by the owner as still below
+50% of the approved demo direction. This overrides the earlier internal
+65–70% estimate. The correction target is not “more objects”; it is stronger
+art-direction similarity, scene cohesion and cinematic composition.
+
+### V80-10A — Asteroid palette integration
+
+Commit: `317e6a253589664f945fc1eb6ebee279dc97df1a`
+
+Changes:
+- added a typed sourced-art treatment contract;
+- far/mid/near asteroid bands inherit progressively stronger cool-space color
+  grading;
+- added bounded blue/violet edge glow using the existing canvas draw path;
+- no duplicate asteroid assets and no per-frame image generation.
+
+Review:
+- treatment mapping is centralized;
+- renderer state is contained by save/restore;
+- the treatment is opt-in and limited to individual authored Galaxy rocks;
+- the full-screen authored asteroid-field texture intentionally avoids the
+  filter/shadow treatment so the integration pass does not add a large
+  per-frame blur/filter cost.
+
+### V80-10B — Star/noise reduction
+
+Commit: `9a3d4e6f413ce4c08987bd677ee15f8de6581bdf`
+
+Changes:
+- reduced dense star-texture opacity;
+- reduced sparse star-texture opacity;
+- reduced embedded blue-nebula dominance while preserving the blue volume;
+- reduced planet-speck texture weight;
+- reduced World 01 procedural far-star density;
+- halved the production near-star contribution;
+- renamed the World 01 feature gate from star-specific wording to general
+  production polish wording.
+
+Review:
+- change is scoped to World 01 where behavior differs;
+- Worlds 02+ keep existing behavior until their own authored migration.
+
+### V80-10C — Art-directed frame composition
+
+Commit: `5b9838ae5bf316c1e1c9b977e8cc540cb99cdc83`
+
+Changes:
+- tightened primary/secondary celestial hierarchy;
+- anchored the hero foreground asteroid deliberately at the upper-right edge
+  instead of letting deterministic edge scattering choose either side;
+- anchored the secondary foreground rock at the lower-left edge on High+;
+- moved the distant sentinel and secondary bodies to support a left-landmark
+  -> center gameplay -> right-depth visual flow;
+- reduced the near hero scale slightly after placement was made intentional.
+
+Review:
+- foreground objects are now framing devices rather than random composition;
+- the central gameplay lane remains free of intentionally anchored hero objects.
+
+### V80-10D — Hero narrative accent
+
+Commit: `26fcc66c67f3a8a86927a28f20a022053ed8bf1d`
+
+Changes:
+- added a subtle local luminous orbital structure in the upper-right depth field;
+- uses an existing local authored asset, low opacity, screen blend and slow
+  float;
+- visible from Medium so the World has a memorable authored identity;
+- remains visually subordinate to enemies and the primary planet.
+
+### Corrective CI note
+
+Composition intentionally reduced the hero asteroid from 0.30 to 0.27 while
+anchoring it at the frame edge. One pre-existing test still required >=0.28 and
+correctly failed CI. The test was updated to the new art-directed contract in
+`0b8288757cba34ac96d00366dca6eb3c669b7227`; the holistic test still requires
+the near band to remain >3x the largest mid-band scale.
+
+### Corrective acceptance gate
+
+Do not migrate World 02–05 yet.
+
+Required next evidence:
+1. CI passes on the corrected head.
+2. Pull the branch on Windows/WSL.
+3. Capture the same Stage 004 framing.
+4. Re-score against the approved demo, using the owner's perceptual score as
+   the acceptance source of truth.
+5. If still below 80%, continue World 01 correction before any broader rollout.
+
+
+### V80-10E — Composition architecture reset
+
+Owner review confirmed that repeated parameter tuning on the old collage was not
+producing a meaningful perceptual change. World 01 now uses
+`galaxy/cinematic-v2.svg` as one authored full-frame composition. The old
+full-screen star/particle support is visually suppressed for World 01, while
+planet/asteroid layers are retained only as sparse parallax depth cues. This
+pass is intentionally a composition reset rather than another opacity-only
+polish cycle. World 02+ remains blocked until a fresh browser capture is
+accepted.
+
+
+### V80-10F — Revert rejected V3 and audio cleanup
+
+The full-frame cinematic V3 composition was rejected in browser review because
+it overcorrected and obscured gameplay. The branch has been returned to the
+last stable visual architecture, the rejected cinematic asset was removed, and
+World 01 now explicitly filters out the large left blue planet.
+
+Audio cleanup from the same review:
+- removed the secondary `computer-loop.ogg` ambient layer that caused the
+  repetitive high-pitched background beep;
+- removed the synthesized projectile-warning tone from the frequent enemy
+  telegraph path while preserving warning ducking/mix behavior;
+- added regression tests for both behaviors.
+
+Verified checkpoint: CI #976 PASS.
+
+
+### V80-11..14 — Galaxy 01 sibling Worlds
+
+Code implementation complete; browser acceptance pending.
+
+The canonical World registry defines the next four Worlds as:
+- World 02 — Halo Garden / heaven;
+- World 03 — Prismatic Tide / prism;
+- World 04 — Cherub Falls / cherub;
+- World 05 — Aurora Gate / aurora.
+
+They now use isolated authored layer arrays registered through a single
+`AUTHORED_WORLD_BACKGROUNDS` ownership map. This replaces the previous
+variant-driven shared composition for these production Worlds and prevents a
+World-specific visual adjustment from mutating a sibling World.
+
+Regression coverage asserts:
+- Worlds 01–05 are authored-production;
+- World 06+ remains legacy-hybrid at this checkpoint;
+- each World 02–05 contains its required theme-signature assets;
+- the rejected large ocean planet is not inherited by Worlds 02–05;
+- authored World layer arrays are not shared by reference.
+
+Verified implementation checkpoint: CI #979 PASS, 154 test files / 797 tests.
+See `docs/WORLD_VISUAL_THEME_MATRIX.md` for the maintenance contract.
+
+
+### V80-11A — Halo Garden approved production art
+
+Browser review exposed that the first binary upload of the approved Halo Garden
+painting was truncated even though the old signature-only integrity gate passed.
+Test Lab was correctly using the production `Game` runtime; the artwork itself
+was failing to decode, so the remaining vector support layers were all that could
+be seen.
+
+That 896x504 asset is now recorded only as the rejected V80-11A checkpoint.
+It has been superseded by the World 02 corrective pass below. Production World
+02 must not route back to `halo-garden-production-v1.avif`.
+
+
+### V80-11B — Halo Garden animated scene
+
+Implementation complete; browser art acceptance pending.
+
+World 02 now owns a lightweight authored ambient-effects module instead of
+stacking the generic star/particle pass over its production scene. The effect
+budget is deliberately bounded and quality-aware:
+
+- far/near cloud mist drift;
+- waterfall shimmer/flow streaks;
+- slow galaxy glow drift;
+- authored star drift/twinkle;
+- holy halo pulse and soft light rays;
+- sparse shooting stars, capped at three and reduced on lower quality.
+
+The production master layer is static and zero-rotation. A renderer bug that
+added phase rotation even when `rotationSpeed === 0` was fixed, preventing
+full-frame art from appearing tilted.
+
+No HUD, gameplay panel, Test Lab layout, enemy label, WPM/accuracy, or other UI
+positioning code is modified by this batch. The changes are isolated to World
+background rendering and related tests.
+
+Verified checkpoint: CI #991 PASS.
+
+
+## 9. World 02 Halo Garden corrective execution
+
+Owner browser screenshot on 2026-09-27 rejected the World 02 pass because the
+runtime image remained visibly soft on desktop and the authored motion was too
+subtle to read as a living scene.
+
+This review overrides the earlier "animated scene" completion wording. World 02
+is NOT visually accepted yet.
+
+### W02-00 — Freeze the failure and acceptance contract
+
+Root cause confirmed:
+
+- World 02 is correctly routed through `authored-production`; legacy static,
+  floor and cinematic geometry are not overwriting it.
+- The production art shipped at only 896x504 although the requested desktop
+  master was 2560x1440.
+- World 02 ambient FX code exists, but the current waterfall/cloud/star/meteor
+  intensity is too subtle in the real browser result.
+- Therefore "code exists" is not a visual acceptance criterion.
+
+World 02 is blocked from DONE until every task below passes.
+
+### W02-01 — True 2K production master
+
+Replace the current Halo Garden production painting with a genuine desktop
+master.
+
+Hard contract:
+
+- raster dimensions MUST be at least 2560x1440;
+- target aspect ratio is 16:9;
+- do not satisfy this gate by re-encoding the old 896x504 asset;
+- the image must remain sharp when covering a 2048px-wide desktop viewport;
+- composition must preserve a quieter central typing corridor;
+- visible identity: celestial sanctuary, floating structures/clouds,
+  waterfalls, luminous halo/gate and cosmic sky depth.
+
+Asset integrity CI must reject anything below 2560x1440.
+
+### W02-02 — Base composition and sampling quality
+
+The master art is the hero layer:
+
+- `opacity: 1`;
+- `fit: cover`;
+- `scale: 1` unless a measured crop requires otherwise;
+- `motion: static`;
+- zero rotation;
+- no blur/filter treatment on the master;
+- Canvas image smoothing stays enabled with high-quality sampling.
+
+Secondary image overlays remain subordinate and must not soften the master.
+
+### W02-03 — Waterfall motion pass
+
+Waterfalls must visibly read as flowing water rather than a nearly static glow.
+
+Required:
+
+- animated vertical shimmer/flow;
+- moving highlight streaks;
+- soft impact mist/spray at waterfall exits;
+- bounded count by visual quality;
+- no allocations or image creation in the per-frame path.
+
+Acceptance: in a 5-10 second browser capture, waterfall movement is obvious
+without looking like a UI beam.
+
+### W02-04 — Cloud parallax pass
+
+Use at least two perceptibly different cloud/mist motion bands:
+
+- far layer: slow, low-opacity drift;
+- near layer: faster and slightly larger;
+- preserve the center combat corridor;
+- Low may reduce density; Medium+ must retain the motion identity.
+
+Acceptance: cloud motion is visible within several seconds while remaining
+calm enough for typing.
+
+### W02-05 — Galaxy/star living-sky pass
+
+Required:
+
+- slow galaxy glow/drift;
+- star twinkle with deterministic placement;
+- gentle star drift;
+- no debug-like straight speed-line wall;
+- High/Ultra increase richness, not the existence of the effect.
+
+### W02-06 — Shooting-star / meteor pass
+
+Shooting stars must be sparse but perceptible:
+
+- deterministic bounded events;
+- brighter head + soft fading trail;
+- multiple trajectories/timings;
+- avoid the center typing corridor when possible;
+- High should normally show a visible event within a 10-15 second capture.
+
+### W02-07 — Halo and volumetric-light pass
+
+The gate is a clear visual anchor:
+
+- breathing halo glow;
+- subtle light-ray sway;
+- no full-screen white wash;
+- enemy labels and objective text remain higher contrast than scenery.
+
+### W02-08 — Desktop render-quality review
+
+Do not increase global DPR blindly. First verify the 2K master is actually
+loaded and sampled without blur.
+
+Review High and Ultra at desktop sizes including approximately 2048x1031.
+Only raise render budgets when measured render diagnostics show enough headroom.
+
+### W02-09 — Automated contracts
+
+Tests must lock:
+
+- World 02 is `authored-production`;
+- production master is static, full opacity, cover-fit and zero-rotation;
+- World 02 owns its ambient FX profile;
+- waterfall/cloud/star/galaxy/halo/light-ray/meteor features remain enabled;
+- 2K minimum dimensions are enforced by the asset-integrity script;
+- Worlds 01/03+ do not accidentally inherit the World 02 FX profile.
+
+### W02-10 — Browser acceptance gate
+
+A task is not complete because tests/build pass.
+
+Required owner review evidence:
+
+1. paused screenshot at desktop size;
+2. screenshot with enemies/typing labels present;
+3. 10-15 second capture proving waterfall, cloud, star/galaxy and shooting-star
+   motion.
+
+PASS requires:
+
+- no visible low-resolution softness from the background master;
+- waterfall movement is obvious;
+- clouds visibly drift;
+- stars/galaxy visibly but gently move;
+- at least one shooting-star event is reasonably observable in the capture;
+- halo/light rays add depth without covering gameplay;
+- HUD/enemy/readability regressions are absent.
+
+World 03+ visual rollout stays blocked until this gate is accepted.
+
+
+### W02 implementation checkpoint — 2026-09-27
+
+Implemented on `feat/visual-over-80-pass`:
+
+- W02-00 acceptance contract locked in this plan;
+- W02-01 new 2560x1440 generated production master added as
+  `heaven/halo-garden-production-v2.avif`;
+- W02-02 master layer is full-opacity, cover-fit, scale 1, static and
+  zero-rotation; authored background sampling explicitly uses
+  `imageSmoothingQuality = "high"`;
+- W02-03 waterfall pass strengthened with brighter flowing streaks plus
+  quality-bounded impact spray;
+- W02-04 far/near cloud bands now have more visible, distinct drift rates;
+- W02-05 galaxy glow plus star drift/twinkle increased without restoring
+  legacy speed-line walls;
+- W02-06 shooting-star count, visibility window, trail length and brightness
+  increased for High/Ultra;
+- W02-07 halo pulse and light rays strengthened;
+- W02-09 registry/ambient tests updated and the asset integrity gate now rejects
+  a master below 2560x1440;
+- obsolete 896x504 / partial wrapper paths are removed from the production
+  routing so there is one authoritative World 02 master asset.
+
+The only remaining gate is W02-10 real-browser owner acceptance. World 03+
+should not be treated as visually accepted from this checkpoint alone.
+
+
+### W02-11 — Real video root-cause review
+
+Owner evidence: the 31.9-second Windows/WSL browser capture from 2026-09-27 shows
+that the new 2K art is sharp, but World 02 still reads as a static painting.
+Enemy/projectile readability also degrades over the bright cloud/gold areas.
+
+This re-opens the World 02 visual gate. The previous stronger-overlay pass is
+not accepted as "animated background".
+
+Root cause:
+
+1. The 2560x1440 master correctly fixed image sharpness, but clouds, waterfalls,
+   galaxy, stars and islands visible inside that raster are baked/static.
+2. Existing "float" parallax moves support layers only a few pixels over several
+   seconds, with very long cycles. It is technically animated but perceptually
+   static at gameplay scale.
+3. The waterfall implementation draws light shimmer over an already near-white
+   baked waterfall. Screen blending white-on-white has very little contrast, so
+   the water itself does not read as flowing.
+4. Star drift is sub-pixel/second in normal browser output; galaxy drift has a
+   multi-minute cycle; both fail the 5-10 second perceptual-motion requirement.
+5. Meteor scheduling is sparse/phase-dependent, so a normal short capture can
+   show no obvious event.
+6. Enemy/projectile art relies heavily on light/pastel additive glow, which loses
+   silhouette contrast against World 02's bright cloud and halo regions.
+7. Existing tests assert feature flags and configuration, not that render state
+   materially changes across time.
+
+Solution architecture:
+
+- Keep the 2K AVIF as the static D0/D1 master only.
+- Introduce explicit World 02 motion layers whose movement is visible within
+  seconds, not minutes.
+- Add a dedicated `parallax` motion semantic for authored cloud overlays;
+  it must have bounded, deterministic oscillation with visible amplitude.
+- Rework waterfall FX as a clipped animated flow texture: darker cyan flow
+  channels + moving bright streaks + impact spray. Do not rely on white screen
+  shimmer alone.
+- Make cloud mist move in pixels/second with separate far/near velocities.
+- Make star drift perceptible while remaining slow, and animate a separate
+  galaxy/nebula glow rather than claiming motion from the baked galaxy.
+- Use deterministic meteor slots so Medium+ shows at least one obvious shooting
+  star in a normal 10-second observation.
+- Add halo ring/ray motion that is visible against the bright gate.
+- Add World-02-only dark contrast backplates/outer strokes behind enemies and
+  hostile projectiles instead of globally recolouring enemy families.
+- Extend tests to lock the new motion semantic and World 02 readability
+  isolation. Unit tests still do not prove beauty; the browser/video gate
+  remains authoritative.
+
+Acceptance after this corrective batch:
+
+- in 5 seconds, far/near cloud motion is visually detectable;
+- waterfall texture visibly travels downward continuously;
+- star/galaxy layers visibly change over 5-10 seconds;
+- Medium+ guarantees an observable shooting-star event within 10 seconds;
+- halo motion is perceptible without washing out the gate;
+- enemy bodies and hostile projectiles remain legible over white/gold cloud
+  regions;
+- no World 01/03+ behavior changes;
+- CI/test/build PASS;
+- owner browser video is still the final acceptance gate.
+
+
+### W02-12 — Video-driven corrective implementation checkpoint
+
+Implemented after reviewing the 31.9-second owner capture and re-reviewing the
+runtime path.
+
+Changes:
+
+- added explicit `parallax` motion semantics for authored layers;
+- World 02 far cloud, near cloud and aurora/nebula support layers now use
+  deterministic parallax with movement large enough to register within five
+  seconds;
+- cloud mist now travels in pixels/second (far 8 px/s, near -17 px/s) rather
+  than near-static normalized drift;
+- waterfall FX now clip to authored waterfall regions and combine moving darker
+  cyan channels with faster white specular streaks plus spray; this fixes the
+  previous white-on-white screen-blend failure;
+- galaxy FX now uses a moving/pulsing/rotating local nebula structure instead
+  of a multi-minute nearly static glow;
+- stars now move several pixels/second with depth-scaled drift and twinkle;
+- Medium+ shooting-star scheduling is deterministic and guarantees recurring
+  visible events on a 4.8-second cycle; Ultra may show a second offset event;
+- halo now has rotating ring accents and faster pulse; light rays sway at a
+  perceptible gameplay-timescale speed;
+- World 02 enemies receive a dark local silhouette backplate/outline so pastel
+  bodies stay readable over white/gold clouds;
+- hostile projectiles receive a dark outer disc, stronger magenta ring and
+  text shadow on World 02 only;
+- small enemy layer metadata (CORE / layer label) receives a local dark backing
+  on World 02;
+- the enemy readability helper was self-reviewed and changed from per-enemy
+  radial-gradient allocation to bounded solid-disc draws in the hot loop;
+- tests now assert World 02 parallax ownership and verify that a representative
+  authored parallax layer moves more than 12 CSS pixels over five seconds.
+
+Isolation review:
+
+- the new contrast treatment is gated to `world-02`;
+- World 01 and World 03+ enemy/projectile palettes are unchanged;
+- the existing legacy `float` behavior is unchanged;
+- `parallax` is opt-in, so existing Worlds do not silently change motion;
+- the 2K production master remains static, sharp and full-opacity.
+
+Verification:
+
+- CI #1032 passed after the main animation/readability implementation;
+- CI #1033 passed after the final light-ray motion review;
+- test step PASS;
+- TypeScript/build step PASS;
+- background asset integrity remains PASS.
+
+Status: implementation complete, browser/video owner acceptance still required.
+The previous 31.9-second capture remains the rejected baseline and must not be
+used as evidence that this corrective batch is accepted.
+
+
+### W02-13 — Scene-layer rebuild after 2/10 owner review
+
+Owner score after the 39.9-second Windows/WSL browser capture: 2/10.
+
+The prior corrective pass is rejected. The capture confirms that the World 02
+result still reads as one static painting, the sky does not feel alive, the
+bright celestial lighting reduces enemy/word/projectile contrast, and the ship
+still reads as parked rather than flying.
+
+This checkpoint changes the implementation strategy instead of increasing the
+same overlays again.
+
+#### W02-13A — Background becomes a real motion scene
+
+Keep the 2560x1440 AVIF only as the sharp static master. Do not claim that baked
+clouds, baked waterfalls, baked stars, or baked islands are animated.
+
+Add independent runtime motion layers that are visually detectable in normal
+gameplay:
+
+- upper-sky cloud currents with source-over blue/white body and darker underside;
+- mid cloud band moving at a different velocity;
+- lower foreground haze/cloud band crossing the camera faster;
+- star field with depth-scaled pixel/second travel;
+- moving/rotating nebula structure;
+- deterministic shooting-star events;
+- clipped waterfall flow with visible dark channels + bright streaks + spray;
+- halo/gate motion that stays subordinate to gameplay.
+
+Acceptance: comparing frames 5 seconds apart must show visible displacement in
+at least two cloud bands, star positions, and waterfall flow state.
+
+#### W02-13B — Gameplay readability grade
+
+The background must lose to gameplay in the visual hierarchy.
+
+Add a World-02-only scene grade after background FX and before enemies:
+
+- cool/navy center-lane veil;
+- stronger right-side suppression over the gold halo/gate;
+- no additive full-screen wash;
+- lower halo/ray alpha than the rejected build.
+
+Enemy bodies, enemy words, CORE/layer metadata and hostile projectiles remain
+above this grade and must stay readable over the brightest region.
+
+#### W02-13C — Ship flight language
+
+The player ship must no longer look parked.
+
+Update the ship renderer with:
+
+- larger but bounded vertical bob;
+- visible banking sway;
+- small lateral drift;
+- animated engine exhaust even for V3 illustrated ships, at reduced strength;
+- a longer soft exhaust tail / pulse;
+- keep hull art sharp and do not reintroduce V2-level bloom.
+
+Add a deterministic helper for the flight pose and test that the pose materially
+changes over a short gameplay interval.
+
+#### W02-13D — Foreground forward-motion cue
+
+Add a World-02-only foreground flow pass near the lower half/edges:
+
+- sparse soft cloud wisps / motes moving toward the player;
+- avoid the enemy word corridor and center typing target area;
+- bounded count by visual quality;
+- this is a flight-depth cue, not a hyperspace speed-line wall.
+
+#### W02-13E — Quality and isolation review
+
+Self-review requirements before browser handoff:
+
+- do not add new per-enemy gradient allocations in hot loops;
+- do not change World 01/03+ scene motion;
+- do not globally recolor enemy families;
+- background FX always render before gameplay objects;
+- V3 ship art keeps low bloom while gaining actual animated thrust;
+- CI/test/build must pass.
+
+#### W02-13F — Final browser gate
+
+World 02 remains NOT ACCEPTED until a new 10-15 second owner capture shows all:
+
+1. clouds clearly change position;
+2. waterfalls visibly flow;
+3. sky/stars/nebula are alive;
+4. at least one shooting star is observable;
+5. halo/gate does not wash out words/enemies;
+6. ship visibly bobs/banks/thrusts and reads as flying;
+7. enemy/projectile readability is materially better than the rejected video.
+
+The 2/10 capture is the new rejected baseline for this phase.
+
+
+### W02-14 — Scene-layer rebuild implementation checkpoint
+
+Implemented directly after W02-13.
+
+Scene motion:
+
+- added three explicit moving sky-current bands at different heights,
+  directions and speeds;
+- sky currents use source-over blue/white cloud bodies with darker undersides
+  so motion remains visible against the bright 2K painting instead of
+  disappearing through white-on-white screen blending;
+- removed the previous World 02 cloud-island and halo-gate image overlays from
+  the authored stack because they added washed light and low-value duplicate
+  scenery;
+- World 02 authored image stack is now the 2K master plus two low-opacity moving
+  aurora depth layers; visible cloud motion is owned by the runtime ambient
+  scene rather than static support art;
+- retained clipped waterfall flow, spray, star drift, rotating nebula structure
+  and deterministic shooting-star scheduling;
+- added sparse forward-flight particles that expand from a vanishing area toward
+  the lower side edges, creating depth without a hyperspace-line wall.
+
+Readability:
+
+- reduced halo glow and light-ray alpha from the rejected build;
+- added a final World-02-only cool readability grade before gameplay objects;
+- added additional right-side suppression over the gold/white gate region;
+- added a calmer center-lane grade;
+- existing World-02-only enemy/projectile contrast helpers remain above the
+  background grade.
+
+Ship motion:
+
+- exported a deterministic `characterFlightPose()` helper;
+- increased vertical bob to a clearly visible bounded movement;
+- added lateral drift and visible banking sway;
+- added an animated soft exhaust tail;
+- V3 illustrated ships now keep their sharp low-bloom hull but receive reduced
+  live runtime thrusters instead of relying only on painted engine light;
+- procedural/V2 ships keep stronger live thrust.
+
+Isolation / maintenance:
+
+- World 02 no longer depends on `cloud-islands.svg` or `halo-gate.svg` for
+  scene identity;
+- World 01/03+ background motion configuration is unchanged;
+- the new ship flight pose is a shared player-motion improvement and does not
+  alter combat physics or hitboxes;
+- no per-enemy gradient allocation was added;
+- the 2560x1440 AVIF master remains the production base.
+
+Automated verification:
+
+- World 02 ambient tests lock sky-current, flight-flow and readability-grade
+  ownership;
+- layered-background tests lock the simplified three-layer production stack;
+- character visual tests require the flight pose to materially change and V3
+  art to retain live thrust;
+- CI #1043 PASS on the corrective branch;
+- test PASS: 156 files / 808 tests;
+- build/type-check PASS.
+
+Status: code/CI complete. Owner browser/video acceptance is still required; the
+2/10 video remains the rejected baseline.
+
+
+### W02-15 — Motion visibility tuning
+
+Owner accepted World 02 as temporarily usable but reported that the motion cues
+remain too small/subtle to notice without intentionally watching for them. This
+is a tuning pass only: do not rebuild the artwork or scene architecture again.
+
+Goal: make existing motion obvious in normal play while keeping the gameplay
+readable.
+
+Implemented tuning:
+
+- sky-current bands move substantially faster and use more visible source-over
+  bodies;
+- sky-current density increases by quality so Medium/High already show obvious
+  motion, while Ultra only enriches it;
+- far/near mist counts and pixel-per-second speeds are increased;
+- waterfall flow now uses four moving channels, faster vertical phase,
+  stronger cyan contrast and faster/brighter specular streaks;
+- waterfall spray is larger, brighter and pulses faster;
+- nebula translation/rotation/pulse speed is increased;
+- star drift and twinkle are faster while remaining background detail;
+- Medium+ shooting stars are more frequent, stay visible longer and use longer
+  trails;
+- foreground flight-flow density, speed, size and alpha are increased;
+- halo glow and light rays are reduced slightly so stronger motion does not
+  reintroduce the previous white/gold wash;
+- player flight pose receives stronger bob, banking and lateral drift;
+- V3 live thrust and exhaust tail are strengthened while the hull art remains
+  low-bloom and sharp.
+
+Non-goals:
+
+- no new World 02 base artwork;
+- no gameplay-physics/hitbox changes;
+- no global enemy recolour;
+- no World 01/03+ scene-motion changes.
+
+Acceptance:
+
+1. cloud motion should be obvious within about 2-3 seconds;
+2. waterfall flow should be perceptible without staring at it;
+3. foreground particles should make forward flight readable immediately;
+4. the player ship should visibly bob/bank/thrust while remaining controllable;
+5. stronger motion must not reduce enemy/word/projectile readability.
+
+
+## 12. Combat / Projectile / Ship Feedback Overhaul
+
+Status: COMPLETE — implementation, automated tests and production build passed CI #1061. World 02 base art/scene design remained out of scope except regression protection.
+
+### Scope and audited baseline
+
+- Actual playable registry contains 11 ships: Vanguard, Aegis, Volt, Wraith, Fortune, Arsenal, Oracle, Bastion, Reaper, Celestial and Zenith.
+- The approved concept sheet contains 12 visual identities, so this batch maps 11 concepts to the 11 actual playable ships and keeps one concept reserved. It does not invent a twelfth character.
+- Normal combat typing currently uses the short-lived `Laser` presentation. Correct key damage/progress already resolves before that visual, so the replacement must preserve immediate gameplay semantics.
+- Projectile-intercept beam feedback is a distinct mechanic and may keep a tracer; the normal typing shot path must become a moving compact energy projectile.
+- V3 ship art is already protected from double hull bloom; the new trails must stay behind the sharp sprite.
+- Existing `Sfx` + `SampleSfxBank` already provide pronunciation ducking, compressor limiting and bounded sampled voices. Combat feedback must extend this architecture instead of creating another audio system.
+- Game settings are stored in `spaceTypingSettingsV1`, separate from PlayerSave v27. There is no persisted normal-enemy-projectile boolean in the current branch, so no PlayerSave schema bump is justified. Missing settings migrate to `auto`; a legacy boolean encountered in imported/local settings is mapped safely to explicit `on`/`off`.
+- Difficulty order is Relax -> Balanced -> Hard -> Extreme -> Nightmare -> Impossible. Auto normal-enemy fire therefore remains off through Extreme and starts at Nightmare. Adaptive/Custom use their effective difficulty profile rather than fragile string comparisons. Boss fire stays independent.
+
+### CMB-01 — Audit existing firing/projectile/audio/settings/save code
+
+- enumerate all normal player-shot, boss-shot and projectile-intercept paths;
+- confirm one correct combat character currently mutates gameplay before visual feedback;
+- identify all normal-enemy hostile projectile sources, including attack skills, legacy attacks and death-trait bursts;
+- preserve boss projectile path and Recall behavior;
+- record settings persistence and migration boundary.
+
+Acceptance:
+- no implementation starts from guessed architecture;
+- every modified path has an explicit owner and regression test target.
+
+### CMB-02 — Projectile profile registry and 11-ship mapping
+
+Extend the existing character projectile registry into data-driven visual profiles.
+
+Approved mapping for this batch:
+- Vanguard -> Meteor Bolt;
+- Aegis -> Halo Burst;
+- Volt -> Thunder Needle;
+- Wraith -> Void Spike;
+- Fortune -> Twin Star Shot;
+- Arsenal -> Solar Lance;
+- Oracle -> Crescent Slash;
+- Bastion -> Tidal Pearl;
+- Reaper -> Blossom Comet;
+- Celestial -> Prism Dart;
+- Zenith -> Aurora Ribbon;
+- Nova Pearl -> reserved/future concept.
+
+Each active profile owns enough data for compact projectile body, bright core, soft glow, trail language, impact language, muzzle flash, presentation speed/scale and combat-audio pitch identity.
+
+Acceptance:
+- every playable CharacterId resolves exactly one projectile profile;
+- active profile signatures are unique;
+- no copied renderer per ship.
+
+### CMB-03 — Moving player projectile presentation
+
+Replace normal correct-key Laser presentation with bounded moving visual shots.
+
+Rules:
+- exactly one successful combat character input creates exactly one player visual-shot event;
+- gameplay damage/progress remains immediate;
+- travel is presentation only and must never block the next input;
+- player shot stores spawn/target snapshot so a killed target can still receive a visual impact at the captured position;
+- active visual-shot count is bounded and expired shots compact in-place;
+- no Image/resource creation inside update/draw.
+
+Acceptance:
+- normal combat typing does not render a long beam;
+- projectile reaches the target visually and emits style-consistent hit/kill feedback;
+- projectile size/glow stays below word/translation readability thresholds.
+
+### CMB-04 — Muzzle flash + hit/kill feedback
+
+Per-shot muzzle flash is tiny and very short. Hit and kill FX reuse the same projectile profile language:
+- Meteor: comet spark;
+- Halo: radiant ring;
+- Thunder: electric crack;
+- Void: compact implosion;
+- Twin Star: dual star sparkle;
+- Solar: stellar/plasma burst;
+- Crescent: curved violet arc;
+- Tidal: water/bubble ripple;
+- Blossom: petal burst;
+- Prism: crystal fragments;
+- Aurora: flowing ribbon spark.
+
+Kill is stronger than hit but bounded; neither effect may cover neighboring words.
+
+### CMB-05 — Ship aim/bank composition
+
+Add a presentation-only aim state:
+- current target direction produces a small signed aim angle;
+- clamp to a visually safe range;
+- exponential/deterministic smoothing prevents snapping;
+- no target eases back to neutral;
+- aim composes with existing idle banking/bob/drift;
+- position, collision, hitbox and target acquisition are untouched.
+
+Acceptance:
+- left/right target signs are correct;
+- clamp is deterministic;
+- V3 sprite remains sharp.
+
+### CMB-06 — Unique flight-trail identity
+
+Extend the existing ship renderer instead of creating a parallel renderer.
+
+Per-ship trail profiles share one bounded Canvas implementation but expose different visual primitives:
+Meteor comet; Halo rings; Thunder lightning; Void distortion; Twin Star dual ribbon; Solar plasma; Crescent curved ribbon; Tidal water/bubbles; Blossom petals; Prism shards; Aurora multicolor ribbon.
+
+Rules:
+- bright inner core + softer outer glow;
+- taper/fade and pulse;
+- optional bounded style details;
+- V3 hull never receives duplicate bloom;
+- no random unbounded particle collection.
+
+### CMB-07 — Fire / hit / kill audio
+
+Reuse `Sfx`, mixer and sampled bank.
+
+- Fire: shortest/quietest typing-combat tick.
+- Hit: restrained energy contact.
+- Kill: clearer magical/bubble/crystal-style confirmation.
+- Add explicit cadence/voice limiting for rapid typing paths in addition to the existing compressor/sample-pool bounds.
+- Small deterministic pitch variation is allowed.
+- Pronunciation ducking remains authoritative; music/ambient levels are untouched.
+
+### CMB-08 — Kill score popup
+
+Add a bounded Canvas popup collection using the actual score delta awarded for the kill:
+- spawn near enemy death, offset upward from learning text;
+- lifetime about 2s;
+- small upward drift;
+- smooth fade;
+- dark outline/shadow for bright backgrounds;
+- compact expired entries in-place;
+- no DOM node per kill.
+
+### CMB-09 — Enemy projectile policy
+
+Setting:
+`enemyProjectileMode = "auto" | "off" | "on"`.
+
+Normal-enemy behavior:
+- Auto: effective difficulty below Nightmare -> off; Nightmare/Impossible or equivalent Adaptive/Custom effective pressure -> on.
+- Off: always suppress normal-enemy hostile projectiles.
+- On: always allow normal-enemy hostile projectiles.
+
+Boss behavior:
+- boss projectile system remains enabled independently in Combat;
+- Recall keeps its existing special rules.
+
+All normal-enemy projectile creation paths must consult one policy helper, including projectile attack skills, legacy attacks and volatile/death-trait bursts.
+
+### CMB-10 — Settings UI + persistence migration
+
+- add Enemy Projectiles select: Auto / Off / On;
+- description: “Auto = normal enemies start firing by default on Nightmare and above.”;
+- render draft/save flow through the existing Settings dialog;
+- missing persisted value -> `auto`;
+- legacy boolean if encountered -> true => `on`, false => `off`;
+- do not bump PlayerSave because game settings are not stored in PlayerSave.
+
+### CMB-11 — Automated tests
+
+Must prove:
+- every playable ship has a unique projectile profile;
+- every playable ship has a flight-trail profile;
+- no missing profile;
+- one correct combat key => one player visual shot;
+- wrong key => no normal successful shot;
+- normal player shot does not use the old long-Laser collection;
+- aim sign/clamp/smoothing/neutral return;
+- kill popup actual value/lifetime/fade/expiry;
+- Auto: Relax/Balanced/Hard/Extreme off, Nightmare/Impossible on;
+- explicit Off/On override Auto;
+- boss projectile path remains enabled;
+- settings mode sanitization/serialization migration contract;
+- Recall does not inherit unintended combat projectile behavior;
+- audio cadence limiter contract.
+
+### CMB-12 — Self-review and CI
+
+Before completion:
+- inspect diff for duplicate/dead Laser code;
+- preserve only special tracer/beam mechanics that still need it;
+- verify player-shot, transient-FX and score-popup bounds;
+- verify no per-frame resource loading;
+- verify no delayed damage/input;
+- verify audio spam protection;
+- verify World 01/02 and Recall rendering boundaries;
+- run full tests + TypeScript + production build + asset checks;
+- inspect GitHub Actions logs and continue fixing until PASS.
+
+### Browser acceptance
+
+Owner should validate:
+- every correct enemy/boss character launches one compact luminous projectile, never a normal long laser;
+- all 11 ships have clearly different shot/trail identities;
+- core/glow/trail/particles read as living energy, not flat icons;
+- ship aims/banks naturally toward the locked target;
+- flight trails are larger/smoother while V3 hull stays crisp;
+- fire/hit/kill audio remains comfortable under fast typing and below pronunciation;
+- actual +score popup survives about 2s then fades/removes;
+- Auto suppresses normal-enemy projectiles below Nightmare and enables them at Nightmare+ while boss fire remains;
+- no visible FPS/input-latency/readability regression on bright World 02 or darker Worlds.
+
+
+### CMB-13 — Browser visibility regression hotfix
+
+Status: COMPLETE.
+
+Browser recording after the first pass exposed three presentation regressions that automated logic tests did not catch:
+
+- player projectiles were technically spawning but the 3.8–5.2px cores and very fast 0.085–0.31s travel made them effectively invisible on a wide 1884px desktop canvas;
+- V3 flight trails were drawing a large part of their conceptual length below the bottom canvas edge because the player sits only 72px from the bottom;
+- the new fire cue replaced the older typing shot with a very low-gain oscillator-only tone, so it was easy to perceive as missing.
+
+Hotfix:
+- increase projectile rendered core/glow/trail scale and keep visual travel on-screen for 0.16–0.46s while damage remains instant;
+- compress flight-trail length into the visible bottom area while increasing width, glow and identity details;
+- add pooled sampled `player-fire` through the existing `SampleSfxBank`, preserving cadence limiting and pronunciation ducking;
+- raise hit/kill synth presence slightly without changing music/pronunciation priority.
+
+
+### CMB-14 — Missing runtime wiring root-cause fix
+
+Status: FIXED — pending/validated by CI in the same branch.
+
+Root cause found from the browser recording and direct runtime audit:
+
+- `firePlayerVisualShot()` correctly created `playerVisualShots`;
+- `drawPlayerCombatVfx()` existed, but `Game.draw()` never called it;
+- `updatePlayerCombatPresentation()` existed, but `updateEffects()` never called it;
+- `drawKillScorePopups()` also existed without being wired into the main draw loop.
+
+Therefore the new projectile objects were present in state but were literally never rendered or advanced. The faint dashed line visible in the recording was only `drawTargetLine()`, not a projectile. This is the direct reason the owner saw target direction but no luminous bullet.
+
+Fix:
+- wire player combat presentation into both simulation and render loops;
+- render moving shots before enemy art so enemy words remain readable;
+- wire score popups into the render loop;
+- reduce target-line prominence so it cannot visually masquerade as the shot;
+- add a regression test that a correct-key shot expires through `testLabAdvanceSimulation()`;
+- replace the chirpy laser-small typing sample with a short low-mid crunch/thump layer using the existing bounded audio bank;
+- add dedicated sampled hit/kill layers;
+- broaden the runtime flight plume so engine thrust reads as a filled glowing exhaust instead of one thin line.
+
+
+### CMB-15 — Larger luminous projectiles + bonus-target coverage
+
+Status: IMPLEMENTED — validate through CI/browser.
+
+Owner feedback after the runtime-wiring fix:
+- projectile is now visible, but still too small;
+- projectile needs a brighter comet/star core with multiple light rays like the supplied blue reference;
+- typing a bonus target accepts letters but does not fire a projectile.
+
+Audit result:
+- normal enemies and bosses already use `firePlayerVisualShot()`;
+- Golden enemies are normal Enemy instances and are therefore already covered;
+- five typeable combat bonus targets were still on the legacy `burst() + sfx.shot()` path:
+  Supply Pod, Treasure Drone, Reward Choice Crate, Anomaly Crate and Recall Bonus;
+- hostile projectile interception intentionally keeps its distinct intercept tracer rather than masquerading as a normal player shot.
+
+Fix:
+- route all five typeable bonus-target correct-key paths through one shared `fireBonusTargetShot()` helper;
+- final bonus-target character uses kill-strength visual feedback, non-final characters use hit feedback;
+- remove legacy chirpy `sfx.shot()` calls from those bonus paths;
+- ship aim can follow an actively typed bonus target;
+- increase projectile body scale to >=2.3x;
+- add a bounded 10-ray additive starburst, long axial flare and hot center around each projectile;
+- extend the energy trail slightly while preserving word readability;
+- add regression coverage proving each of the five bonus target types creates exactly one player visual shot per correct key.
+
+
+### CMB-16 — Reference-faithful projectile identity pass
+
+Status: IMPLEMENTED — CI/browser acceptance required.
+
+Owner review confirmed that the previous visibility fix still made different ships
+look too similar because a large generic flare was applied to every projectile.
+The approved concept sheet is now the visual contract, not merely a color guide.
+
+Audit against the 12 approved concepts:
+- Meteor Bolt: comet body + long blue wake + debris;
+- Crescent Slash: thick purple crescent + curved arc wake;
+- Prism Dart: faceted cyan/pink crystal + shard stream;
+- Nova Pearl: pink energy pearl + orbiting mini pearls/halo (reserved concept,
+  no twelfth playable ship exists in the current registry);
+- Twin Star Shot: two distinct blue/gold stars + intertwined ribbons;
+- Halo Burst: holy gold orb + concentric rune/halo rings + cross flare;
+- Thunder Needle: long electric spear + forked lightning branches;
+- Blossom Comet: sakura core + visible petal stream;
+- Void Spike: dark singularity/spike + distortion wake + dark shards;
+- Solar Lance: long orange/red spear + plasma/fire wake + solar corona;
+- Tidal Pearl: water-vortex pearl + swirling wake + bubbles;
+- Aurora Ribbon: bloom tip + three cyan/green/purple aurora ribbons.
+
+Implementation changes:
+- removed the dominant generic starburst from the normal projectile draw path;
+- every style now owns a distinct body renderer and a distinct wake renderer;
+- active wake lengths increased to 70–116px so motion leaves a readable energy
+  trail behind the projectile instead of only a short glow;
+- projectile body scale raised to 2.55 while word readability remains protected
+  by drawing projectiles before enemy labels;
+- all 12 approved concept styles have explicit visual identity metadata;
+- the 11 playable ships remain mapped one-to-one to 11 unique active styles;
+  Nova Pearl remains the reserved twelfth concept until a real twelfth playable
+  character exists instead of inventing a duplicate mapping.
+
+
+### CMB-17 — Generated projectile art atlas + lower score popup
+
+Status: IMPLEMENTED — CI/browser validation required.
+
+Owner explicitly rejected hand-drawn/procedural projectile bodies and requested
+generated artwork that stays about 90% faithful to the approved 12-projectile
+concept sheet. The main projectile body is therefore no longer authored by
+Canvas geometry in the normal loaded-art path.
+
+Implementation:
+- generate/prepare one transparent 3x4 WebP projectile atlas from the approved
+  concept art, 12 cells at 256x128;
+- preload the atlas through the existing art asset pipeline;
+- map all 12 projectile style IDs one-to-one to atlas cells;
+- render the generated sprite as the authoritative projectile body;
+- retain the previous Canvas bodies only as a deterministic fallback if the
+  optional atlas cannot load;
+- retain Canvas code only for motion effects: long wake, glow, particles,
+  muzzle and impact;
+- increase runtime wake to at least 110px and up to roughly 160px so the shot
+  has a large bright head plus a visibly stretched motion tail;
+- keep projectile art below enemy text so the larger art cannot hide typing;
+- move +score popup below the killed enemy instead of above it, preventing
+  collision with IPA/translation learning text while preserving its upward
+  2-second float.
+
+
+### CMB-18 — Strong tapered projectile wake + score safe zone
+
+Status: IMPLEMENTED — CI/browser acceptance required.
+
+#### Root cause
+
+The generated projectile atlas was already loading and was already the authoritative
+body image, but the runtime motion layer still used constant-width Canvas
+`stroke()` paths for most wakes. Increasing line width or wake length therefore
+only produced a thicker/longer beam. It did not create the approved
+"large luminous head -> long comet/arrow body -> thin fading tail" silhouette.
+Several style-specific ribbon/arc paths also kept constant line width, so their
+color differed while their travel form still read too similarly.
+
+The score popup had been moved below the killed enemy, but its spawn position did
+not have a shared protected-top rule. An enemy killed high on the screen could
+still place the popup close to the IPA/Vietnamese learning echo.
+
+#### Tapered-trail solution
+
+- Keep the generated 3x4 projectile atlas as the normal authoritative
+  projectile body/head visual.
+- Keep procedural projectile bodies only as the deterministic fallback when the
+  atlas is unavailable.
+- Separate body art from motion:
+  - atlas image = body/head;
+  - runtime Canvas = tapered wake, front-weighted glow, secondary ribbons,
+    shards/petals/bubbles/lightning and impact/muzzle motion.
+- Replace the old uniform main wake with bounded filled tapered sections.
+  Rendering uses three overlapping geometric sections, back-to-front, instead of
+  one constant-width stroke or a newly allocated CanvasGradient every shot/frame.
+- Apply both geometry taper and alpha taper:
+  - front trail width: 55-70% of head width;
+  - mid trail width: 25-40%;
+  - far tail width: 8-18%;
+  - far section alpha is strongly reduced from the front section.
+- Keep a narrower bright inner core inside the softer outer wake.
+- Concentrate supporting glow at the projectile front/head instead of spreading
+  the strongest bloom evenly down the whole path.
+- Keep a bounded number of small secondary streaks/particles.
+- Trail profiles are data-driven for all 12 approved styles, including the
+  reserved Nova Pearl style. Every active ship references the taper profile for
+  its own projectile style.
+
+Per-style motion language remains distinct:
+
+1. Meteor Bolt — broad bright comet head, long blue taper, debris streaks.
+2. Crescent Slash — curved purple taper plus restrained crescent arc accents.
+3. Prism Dart — narrow crystal taper plus shard stream.
+4. Nova Pearl — soft pearl/halo taper plus orbit support.
+5. Twin Star Shot — two offset tapered ribbons with blue/gold identity.
+6. Halo Burst — rounded golden taper plus halo/rune support.
+7. Thunder Needle — narrowest taper plus smaller forked lightning branches.
+8. Blossom Comet — pink taper plus petal stream.
+9. Void Spike — tapered violet wake plus thin dark distortion/shards.
+10. Solar Lance — longest/broadest hot plasma taper plus embers.
+11. Tidal Pearl — paired flowing water tapers plus bubbles.
+12. Aurora Ribbon — three offset tapered ribbons plus sparkles.
+
+Runtime constraints:
+- no gameplay/damage timing changes;
+- no new per-frame image/resource loading;
+- no unbounded particle collection;
+- tapered sections are built directly into the existing Canvas path each frame
+  without allocating per-shot point arrays;
+- player projectiles remain below enemy/learning text layers.
+
+#### Score popup safe-zone rule
+
+The popup keeps its approximately 2 second lifetime, upward float, fade and dark
+outline. Its spawn Y is now clamped through one shared rule:
+
+- protected top/learning zone begins below the top HUD;
+- spawn must start at least one complete popup-float distance below that
+  protected boundary;
+- the full upward travel therefore cannot cross into the protected IPA/Vietnamese
+  zone;
+- bottom margin is also preserved.
+
+#### Regression coverage
+
+Automated coverage now verifies:
+- loaded generated atlas uses the image draw path;
+- deterministic atlas-missing fallback remains available;
+- all playable ships keep unique projectile styles;
+- all 12 approved styles have bounded taper profiles;
+- every active projectile profile references its taper profile;
+- front width > mid width > far-tail width;
+- active trail lengths remain large enough for a readable comet/arrow form;
+- score popup travel stays below the protected top zone;
+- runtime kill popup applies the same safe-zone clamp;
+- the existing normal-typing regression still proves successful player shots do
+  not repopulate the legacy long-Laser collection.
+
+
+### CMB-19 — Projectile head-light polish + enemy score scaling
+
+Status: IMPLEMENTED — CI/browser acceptance required.
+
+Owner feedback after the tapered-wake pass:
+- projectile travel/form is now acceptable;
+- Zenith / Aurora Ribbon still reads too busy;
+- projectile heads need a more vivid "dazzling hot head -> fading wake" light
+  treatment closer to the approved video reference;
+- enemy score feedback does not visibly distinguish enough between a one-layer
+  enemy and a three-layer enemy.
+
+#### Head-light solution
+
+The generated projectile atlas remains the authoritative body art. Runtime Canvas
+does not replace it; it adds bounded lighting/motion layers only.
+
+All 12 approved projectile styles now own a data-driven head-light profile:
+- front/nose offset;
+- white-hot core scale/alpha;
+- broad coloured bloom scale/alpha/softness;
+- forward flare length/width/alpha;
+- front halo;
+- rear-biased blend into the first part of the tapered wake;
+- bounded sparkle count/spread.
+
+Rendering keeps the strongest brightness at the projectile nose. The broad bloom
+and rear blend use lower alpha, while the white-hot core and short forward flare
+create the bright living-energy point seen in the reference. No per-frame image
+load or particle collection is introduced.
+
+Zenith-specific cleanup:
+- keep three aurora ribbons as its identity;
+- reduce ribbon spread and bend;
+- reduce side-streak count;
+- make the far tail thinner;
+- remove the second set of long duplicate line-ribbons and replace them with a
+  few restrained aurora spark accents;
+- give Zenith a stronger hot core, bloom and forward flare so the head dominates
+  the composition instead of the trail clutter.
+
+#### Enemy score scaling
+
+Root cause:
+- normal final kill reward was previously only `80 + wordLength * 14`;
+- three-layer enemies did earn intermediate layer-completion points, but the
+  final kill reward/popup was almost the same as a one-layer enemy;
+- therefore the visible reward did not communicate the additional enemy effort.
+
+The final enemy kill reward now scales from the same word-length base by:
+- total layer-plan count: 1 layer = 1.00x, 2 layers = 1.35x,
+  3 layers = 1.75x;
+- enemy Rank: +4% per Rank above I;
+- Elite: additional 1.25x.
+
+Existing per-key score, intermediate layer-completion rewards, streak multiplier
+and Golden-enemy bonus remain intact. This makes a three-health-bar enemy
+materially more valuable without removing rewards already earned while breaking
+its earlier layers.
+
+Regression coverage verifies:
+- all 12 styles have valid head-light profiles;
+- Zenith retains three ribbons but has reduced spread/streak clutter;
+- active ship/projectile mappings and strong taper remain unchanged;
+- one/two/three-layer score rewards are strictly increasing;
+- higher Rank and Elite enemies are worth more;
+- the real Game kill path produces a materially larger final popup reward for a
+  three-layer enemy.
+
+
+### CMB-20 — Per-style projectile head-light shapes
+
+Status: IMPLEMENTED — CI/browser acceptance required.
+
+Owner review of CMB-19 found that the generic head-light pass still looked like
+a separate round glowing ball attached in front of nearly every projectile. The
+brightness improvement was real, but the common ellipse/core/halo language made
+different projectile heads read too similarly and sometimes detached from the
+generated body art.
+
+#### Root cause
+
+- one shared head-light renderer drew a wide ellipse bloom, a second coloured
+  ellipse, an ellipse hot core and a front halo for every style;
+- configuration changed colour, alpha and size, but not the underlying shape;
+- the light anchor sat too far forward for several styles, making the effect
+  read as a separate orb instead of illumination emitted by the authored body.
+
+#### Per-style solution
+
+The generated atlas remains the authoritative body. Runtime lighting is now
+dispatched by an explicit head-light family instead of one universal round
+effect. All 12 approved concepts have their own family:
+
+- Meteor Bolt -> meteor teardrop/comet flare;
+- Crescent Slash -> curved crescent highlights;
+- Prism Dart -> faceted crystal/diamond flare;
+- Nova Pearl -> orb (the style where a round head is intentional);
+- Twin Star Shot -> paired star light;
+- Halo Burst -> holy ring/cross;
+- Thunder Needle -> narrow electric needle/spear;
+- Blossom Comet -> blossom/petal light;
+- Void Spike -> dark pointed singularity/spike;
+- Solar Lance -> long plasma lance wedge;
+- Tidal Pearl -> water droplet/vortex;
+- Aurora Ribbon -> asymmetric aurora wisps with a tiny pin-light.
+
+The generic large ellipse/hot-orb/halo stack has been removed from the common
+path. Only styles whose authored identity is actually round keep round geometry.
+
+Additional integration rules:
+- pull the light anchor back into the generated body silhouette;
+- use a rear-biased tapered blend to connect body light into the existing wake;
+- keep the brightest point small and shape-specific;
+- spear/needle/crystal/lance heads extend through pointed geometry, not circles;
+- Zenith/Aurora uses three curved light wisps and a tiny sharp pin-light, not a
+  large circular blob;
+- bounded spark accents remain optional detail and do not define the main head;
+- no gameplay timing, image loading or unbounded particle changes.
+
+Regression coverage verifies:
+- all 12 projectile head profiles declare a family;
+- every approved concept has a distinct family in the current 12-style set;
+- Zenith is Aurora, Thunder is Needle, Solar is Lance and Prism is Crystal;
+- those pointed/non-orb styles cannot silently fall back to the Orb family;
+- Zenith retains the cleaned three-ribbon trail with reduced spread/streak
+  clutter;
+- existing atlas, tapered trail and unique playable-ship mappings remain intact.
+
+
+### CMB-21 — Directional projectile aura polish
+
+Status: IMPLEMENTED — CI/browser acceptance required.
+
+Owner review of CMB-20 confirmed that the per-style head shapes fixed the
+"generic round blob" problem, but the shapes still looked too dry because the
+surrounding energy halo was not strong or directional enough. The remaining
+visual target is a luminous arrow-like aura around the authored head, with a
+bright inner core and a softer outer halo that fades back into the trail.
+
+#### Directional aura solution
+
+Keep the generated projectile atlas and the CMB-20 per-style head shapes. Add a
+second lighting layer behind those shapes, driven by per-style directional aura
+configuration:
+
+- outer aura length / width / alpha;
+- inner hot-core arrow length / width / alpha;
+- bright tip alpha;
+- low-alpha rear blend that connects the aura into the trail.
+
+The aura is explicitly directional rather than circular:
+- Meteor / Prism / Thunder / Void / Solar / Twin Star use layered arrow/lance
+  wedges;
+- Nova / Halo / Tidal use forward teardrop wedges so their round body identity
+  remains, but the halo is still directional;
+- Crescent / Blossom use split curved arrow wings;
+- Zenith / Aurora uses two filled curved aurora wisps that converge toward the
+  nose, plus the existing small pin-light.
+
+The renderer uses a small fixed number of filled paths and shadow blur layers;
+it does not allocate particle collections, create gradients per shot, or change
+gameplay timing. The brightness hierarchy is now:
+
+1. tiny white/hot axial tip;
+2. narrow inner directional arrow;
+3. wider soft coloured aura;
+4. generated projectile body/head;
+5. tapered wake fading behind it.
+
+This specifically avoids both previous failure modes:
+- no universal round glow ball;
+- no dry unlit shape pasted in front of the projectile.
+
+Regression coverage verifies every approved projectile owns bounded directional
+aura values, outer aura is larger than its inner core, pointed families have
+longer directional halos, and Zenith retains a visible aurora aura without
+falling back to an orb.
+
+
+## 2026-09-27 — Full 50-World production scene migration
+
+### Audit baseline
+
+- Registry contains 50 Worlds across 10 scene archetypes.
+- Worlds 01-05 are already `authored-production`.
+- Worlds 06-50 still resolve `legacy-hybrid`, so the renderer mixes authored files with legacy static/cinematic/floor passes.
+- The legacy family registry reuses one small layer set across five Worlds and does not use `scene.variant` strongly enough to create World-local composition.
+- Galaxy/World 01 has the strongest curated sourced-art stack; Halo Garden/World 02 has a 2560x1440 production AVIF. Remaining families still lean on older SVG landmark packs.
+
+### Implementation contract
+
+1. Keep Worlds 01-05 approved production compositions unchanged.
+2. Promote Worlds 06-50 to `authored-production`; no silent legacy fallback.
+3. Build every migrated World from a family art stack plus deterministic World-local variation:
+   - far cosmic depth / sky;
+   - family sky and landmark;
+   - mid-depth environment object;
+   - edge-biased near object/accent;
+   - existing bounded foreground particles.
+4. Keep the central typing corridor calmer than edges and do not place large authored objects in the top learning-bar band.
+5. Meteor/Asteroid Worlds must use sourced cratered asteroid sprites at far/mid/near depth, with bounded instances, rotation/drift and different scale bands.
+6. Reuse image cache and deterministic instance cache in `LayeredBackgroundRenderer`; do not allocate assets every frame.
+7. Extend integrity/tests so all 50 Worlds:
+   - resolve a production profile;
+   - have local assets and unique layer IDs;
+   - expose at least four visual depth bands;
+   - differ between World variants;
+   - do not silently return to the legacy scene pipeline.
+
+### Acceptance
+
+- Every World is recognizable by scene family + World-local composition instead of palette alone.
+- No legacy procedural floor/static-scene fallback remains for production Worlds.
+- Ambient particles remain bounded by Visual Quality.
+- Tests, TypeScript, production build, background integrity and ship integrity must stay green.

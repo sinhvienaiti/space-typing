@@ -1,0 +1,752 @@
+/*
+ * Holo Command look for the inside of the older dialogs: Hangar (character
+ * select), Shops, Missions & Achievements, Tactical, Hotbar, Vocabulary.
+ * The dialog shell itself is in holo.css; motion in holo-motion.css.
+ */
+
+/* ---------- Shared text and fields ---------- */
+.settings-dialog .equipment-note,
+.settings-dialog .data-status {
+  color: var(--holo-dim);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.settings-dialog .equipment-note strong { color: var(--holo-text); }
+.settings-dialog .field-label,
+.equipment-slot-name {
+  color: var(--holo-accent);
+  font-family: var(--holo-display);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.settings-dialog select {
+  min-height: 46px;
+  padding: 0 2.4rem 0 0.95rem;
+  font-family: var(--holo-body);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--holo-text);
+  border: 1px solid rgba(111, 231, 255, 0.26);
+  border-radius: 0;
+  background:
+    linear-gradient(45deg, transparent 50%, var(--holo-accent) 50%) right 1.1rem center / 6px 6px no-repeat,
+    linear-gradient(-45deg, transparent 50%, var(--holo-accent) 50%) right calc(1.1rem - 6px) center / 6px 6px no-repeat,
+    linear-gradient(180deg, rgba(12, 26, 50, 0.95), rgba(5, 11, 24, 0.95));
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  appearance: none;
+  -webkit-appearance: none;
+}
+.settings-dialog select:hover { border-color: var(--holo-line-strong); }
+.settings-dialog select option { background: #08142a; color: var(--holo-text); }
+
+/* ---------- Shop and service cards ---------- */
+.shop-grid,
+.upgrade-shop-grid,
+.special-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+.visual-card.item-card,
+.service-shop-card.visual-card {
+  --grade-accent: #8fb0c8;
+  position: relative;
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  gap: 14px;
+  align-items: start;
+  padding: 14px;
+  border: 1px solid rgba(111, 231, 255, 0.14) !important;
+  border-left: 1px solid rgba(111, 231, 255, 0.14) !important;
+  border-radius: 0;
+  background:
+    radial-gradient(ellipse at 0% 0%, color-mix(in srgb, var(--grade-accent) 16%, transparent), transparent 55%),
+    linear-gradient(180deg, rgba(12, 24, 46, 0.9), rgba(6, 12, 26, 0.92));
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+  transition: transform 0.2s var(--holo-ease, ease), box-shadow 0.25s, border-color 0.2s;
+}
+.visual-card.item-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  background: var(--grade-accent);
+  box-shadow: 0 0 10px var(--grade-accent);
+}
+.visual-card.item-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--grade-accent) 60%, transparent) !important;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4), 0 0 18px color-mix(in srgb, var(--grade-accent) 28%, transparent);
+}
+.item-card-icon.local-item-icon {
+  width: 76px;
+  height: 76px;
+  display: grid;
+  place-items: center;
+  font-size: 2rem;
+  color: var(--grade-accent);
+  text-shadow: 0 0 14px var(--grade-accent);
+  border: 1px solid color-mix(in srgb, var(--grade-accent) 45%, transparent);
+  background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--grade-accent) 22%, transparent), rgba(4, 9, 20, 0.9) 70%);
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  overflow: hidden;
+}
+.item-card-icon .painted-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.item-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.item-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.item-card-meta .grade-badge {
+  padding: 1px 7px;
+  font-family: var(--holo-display);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--grade-accent);
+  border: 1px solid color-mix(in srgb, var(--grade-accent) 55%, transparent);
+  border-radius: 99px;
+}
+.shop-offer-type {
+  color: var(--holo-faint);
+  font-family: var(--holo-display);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+.item-card-title {
+  font-family: var(--holo-display);
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--holo-text);
+}
+.item-card-description {
+  color: var(--holo-dim);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+.shop-buy {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  margin-top: 4px;
+  padding: 0 14px;
+  font-family: var(--holo-display);
+  font-weight: 800;
+  color: var(--holo-ink);
+  border: 0;
+  border-radius: 0;
+  background: var(--holo-gradient);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+.shop-buy:disabled { color: #9fb3c4; background: rgba(40, 56, 80, 0.6); }
+.shop-buy .currency-chip { font-size: 0.82rem; font-weight: 800; padding: 0; }
+.shop-buy .currency-icon { color: inherit !important; }
+
+/* ---------- Hangar: character cards ---------- */
+.character-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+.character-card {
+  --ship-accent: #5fe3ff;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  text-align: left;
+  border: 1px solid color-mix(in srgb, var(--ship-accent) 30%, transparent) !important;
+  border-radius: 0 !important;
+  background:
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--ship-accent) 18%, transparent), transparent 60%),
+    linear-gradient(180deg, rgba(12, 24, 46, 0.92), rgba(6, 12, 26, 0.94)) !important;
+  clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+  transition: transform 0.22s var(--holo-ease, ease), box-shadow 0.25s, border-color 0.2s;
+}
+.character-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--ship-accent) 75%, transparent) !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45), 0 0 22px color-mix(in srgb, var(--ship-accent) 30%, transparent);
+}
+.character-card.selected {
+  border-color: var(--ship-accent) !important;
+  box-shadow: 0 0 0 1px var(--ship-accent) inset, 0 0 26px color-mix(in srgb, var(--ship-accent) 35%, transparent);
+}
+/* Ship portrait: the painted hull on its own stage with a role-coloured rim. */
+.character-card-portrait {
+  position: relative;
+  height: 150px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--ship-accent) 35%, transparent);
+  background:
+    radial-gradient(ellipse at 50% 62%, color-mix(in srgb, var(--ship-accent) 30%, transparent), transparent 62%),
+    linear-gradient(180deg, rgba(4, 10, 24, 0.95), rgba(10, 20, 40, 0.9));
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+.character-card-portrait::before {
+  content: "";
+  position: absolute;
+  inset: auto 15% 10px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, color-mix(in srgb, var(--ship-accent) 55%, transparent), transparent 70%);
+}
+.character-card-portrait img {
+  position: relative;
+  height: 128px;
+  max-width: 92%;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 10px color-mix(in srgb, var(--ship-accent) 45%, transparent));
+  transition: transform 0.5s var(--holo-ease, ease);
+}
+.character-card:hover .character-card-portrait img { transform: translateY(-6px) scale(1.05); }
+.character-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.character-card-name strong {
+  display: block;
+  font-family: var(--holo-display);
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.character-role {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  font-family: var(--holo-display);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ship-accent);
+  border: 1px solid color-mix(in srgb, var(--ship-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--ship-accent) 10%, transparent);
+}
+.character-card-state {
+  padding: 3px 9px;
+  font-family: var(--holo-display);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--holo-dim);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 99px;
+}
+.character-card.selected .character-card-state {
+  color: var(--holo-ink);
+  border-color: transparent;
+  background: var(--ship-accent);
+}
+.character-card > p { margin: 0; color: var(--holo-dim); font-size: 0.86rem; line-height: 1.45; }
+.character-card-kit { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.character-card-kit small {
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+.character-card-kit b {
+  color: var(--ship-accent);
+  font-family: var(--holo-display);
+  font-size: 0.6rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.character-card-kit span { color: var(--holo-text); font-size: 0.82rem; font-weight: 600; }
+.character-card-progress {
+  color: var(--holo-faint);
+  font-family: var(--holo-display);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* ---------- Missions & Achievements ---------- */
+.progression-columns h3 {
+  color: var(--holo-accent);
+  font-family: var(--holo-display);
+  font-size: 0.78rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+.progression-card {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 0 !important;
+  background: linear-gradient(180deg, rgba(12, 24, 46, 0.9), rgba(6, 12, 26, 0.92)) !important;
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+  transition: transform 0.2s var(--holo-ease, ease), box-shadow 0.25s;
+}
+.progression-card:hover { transform: translateY(-2px); }
+.progression-card > strong { font-family: var(--holo-display); font-size: 1.05rem; font-weight: 800; letter-spacing: 0.02em; }
+.progression-card > small { color: var(--holo-dim); font-size: 0.86rem; }
+.progression-card > span { font-family: var(--holo-display); font-weight: 700; color: var(--holo-text); }
+.progression-bar {
+  height: 6px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.07);
+}
+.progression-bar i {
+  display: block;
+  height: 100%;
+  width: calc(var(--p, 0) * 100%);
+  background: var(--holo-gradient);
+  box-shadow: 0 0 10px rgba(95, 227, 255, 0.6);
+}
+.progression-card.locked { opacity: 0.55; filter: grayscale(0.6); }
+/* A reward waiting to be claimed glows until it is taken. */
+.progression-card.claimable {
+  box-shadow: 0 0 0 1px rgba(255, 209, 102, 0.7) inset, 0 0 22px rgba(255, 190, 70, 0.22);
+  animation: holo-claim 2.2s ease-in-out infinite;
+}
+@keyframes holo-claim {
+  50% { box-shadow: 0 0 0 1px rgba(255, 209, 102, 1) inset, 0 0 32px rgba(255, 190, 70, 0.4); }
+}
+.progression-card.claimable button:not(:disabled) {
+  color: #2a1600;
+  border: 0;
+  background: linear-gradient(100deg, #ffd166, #ff9f43);
+  font-family: var(--holo-display);
+  font-weight: 800;
+}
+
+/* ---------- Tactical and Hotbar loadouts ---------- */
+.support-loadout-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.support-loadout-grid .equipment-slot,
+.hotbar-loadout-slot {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid rgba(111, 231, 255, 0.16);
+  border-radius: 0;
+  background: linear-gradient(180deg, rgba(12, 24, 46, 0.85), rgba(6, 12, 26, 0.9));
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+}
+.support-loadout-grid .equipment-slot small { color: var(--holo-dim); font-size: 0.84rem; line-height: 1.45; }
+.hotbar-loadout-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.hotbar-loadout-slot { grid-template-columns: auto 1fr; align-items: center; padding: 10px; }
+.hotbar-loadout-slot kbd {
+  min-width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--holo-ink);
+  border: 0;
+  background: var(--holo-gradient);
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+}
+.hotbar-loadout-slot select { min-height: 40px; font-size: 0.92rem; }
+
+/* ---------- Vocabulary ---------- */
+.source-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.source-tabs button {
+  min-height: 46px;
+  font-family: var(--holo-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border-radius: 0;
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+.source-tabs button.active {
+  color: var(--holo-ink);
+  border-color: transparent;
+  background: var(--holo-gradient);
+  box-shadow: 0 0 18px rgba(95, 227, 255, 0.3);
+}
+.source-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 16px;
+  border: 1px solid rgba(111, 231, 255, 0.14);
+  background: linear-gradient(180deg, rgba(12, 24, 46, 0.7), rgba(6, 12, 26, 0.8));
+}
+.source-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.source-footer small { color: var(--holo-dim); font-size: 0.86rem; }
+
+@media (max-width: 760px) {
+  .support-loadout-grid, .hotbar-loadout-grid { grid-template-columns: 1fr; }
+  .source-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* ---------- Campaign map (stage select) ---------- */
+/* The World's scene stays put while the route scrolls over it (parallax). */
+.stage-journey-scroll {
+  border-radius: 0;
+  border-color: rgba(111, 231, 255, 0.24);
+  background:
+    radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(2, 5, 14, 0.72) 100%),
+    linear-gradient(180deg, rgba(4, 9, 22, 0.35), rgba(4, 9, 22, 0.6)),
+    var(--journey-plate, none) center / cover no-repeat,
+    #081320;
+  clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+}
+/* Drifting star dust over the scene. */
+.stage-journey::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(220, 245, 255, 0.85) 1px, transparent 2px),
+    radial-gradient(circle at 68% 42%, rgba(220, 245, 255, 0.7) 1px, transparent 2px),
+    radial-gradient(circle at 34% 77%, rgba(255, 230, 200, 0.7) 1.5px, transparent 2.5px),
+    radial-gradient(circle at 88% 8%, rgba(200, 220, 255, 0.8) 1px, transparent 2px);
+  background-size: 140px 150px, 220px 190px, 260px 240px, 180px 210px;
+  animation: journey-dust 60s linear infinite;
+  opacity: 0.8;
+}
+@keyframes journey-dust { to { background-position: 0 300px, 0 -380px, 0 480px, 0 -420px; } }
+.journey-landmark {
+  position: absolute;
+  z-index: 0;
+  width: 300px;
+  max-width: 42%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0.92;
+  filter: drop-shadow(0 18px 30px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 26px rgba(160, 200, 255, 0.25));
+  animation: journey-float 7s ease-in-out infinite;
+}
+@keyframes journey-float {
+  0%, 100% { transform: translate(-50%, -50%) rotate(-2deg); }
+  50% { transform: translate(-50%, calc(-50% - 12px)) rotate(2deg); }
+}
+.stage-journey-track {
+  stroke: rgba(140, 180, 230, 0.28);
+  stroke-width: 10px;
+  stroke-dasharray: 2 14;
+}
+/* The cleared route glows and the light flows forward along it. */
+.stage-journey-progress {
+  stroke: rgba(110, 236, 255, 0.95);
+  stroke-width: 6px;
+  stroke-dasharray: 22 12;
+  filter: drop-shadow(0 0 8px rgba(80, 225, 255, 0.8));
+  animation: journey-flow 1.6s linear infinite;
+}
+@keyframes journey-flow { to { stroke-dashoffset: -34; } }
+.journey-node {
+  width: 60px;
+  height: 60px;
+  font-family: var(--holo-display);
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #d8e8f6;
+  border: 2px solid rgba(111, 231, 255, 0.4);
+  background: radial-gradient(circle at 35% 25%, rgba(40, 70, 110, 0.95), rgba(8, 16, 34, 0.96) 70%);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55), inset 0 0 12px rgba(95, 227, 255, 0.15);
+  transition: transform 0.2s var(--holo-ease, ease), box-shadow 0.25s, border-color 0.2s;
+}
+.journey-node:not(:disabled):hover { transform: translate(-50%, -50%) scale(1.12); }
+.journey-node.cleared {
+  color: #fff6d8;
+  border-color: #ffd166;
+  background: radial-gradient(circle at 35% 25%, rgba(120, 90, 30, 0.95), rgba(30, 20, 10, 0.96) 72%);
+  box-shadow: 0 0 16px rgba(255, 200, 80, 0.35), inset 0 0 12px rgba(255, 210, 120, 0.25);
+}
+.journey-node.cleared::after {
+  display: none;
+  content: "✓";
+  position: absolute;
+  bottom: -6px;
+  right: -4px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  font-size: 0.72rem;
+  color: #1a1200;
+  border-radius: 50%;
+  background: #ffd166;
+}
+.journey-node.frontier {
+  border-color: #9ff6ff;
+  animation: journey-pulse 1.8s ease-out infinite;
+}
+@keyframes journey-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(95, 227, 255, 0.55), 0 0 18px rgba(95, 227, 255, 0.5); }
+  100% { box-shadow: 0 0 0 18px rgba(95, 227, 255, 0), 0 0 18px rgba(95, 227, 255, 0.5); }
+}
+.journey-node.selected {
+  border-color: #ffe4a3;
+  box-shadow: 0 0 0 4px rgba(255, 213, 131, 0.3), 0 0 28px rgba(255, 210, 120, 0.55);
+}
+/* Boss stages: a big round portrait of the boss inside a turning rune ring. */
+.journey-node-boss {
+  width: 92px;
+  height: 92px;
+  overflow: visible;
+  border: 2px solid #c48cff;
+  background: radial-gradient(circle, rgba(70, 30, 110, 0.95), rgba(20, 8, 36, 0.98) 72%);
+  box-shadow: 0 0 26px rgba(190, 120, 255, 0.45);
+}
+.journey-node-boss::before {
+  content: "";
+  position: absolute;
+  inset: -9px;
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 140, 200, 0.6);
+  animation: journey-ring 14s linear infinite;
+  pointer-events: none;
+}
+@keyframes journey-ring { to { transform: rotate(360deg); } }
+.journey-boss-art {
+  position: absolute;
+  inset: 4px;
+  width: calc(100% - 8px);
+  height: calc(100% - 8px);
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: 50% 35%;
+  transform: scale(1.18);
+  clip-path: circle(42% at 50% 50%);
+  pointer-events: none;
+}
+.journey-node-boss strong {
+  position: absolute;
+  bottom: -12px;
+  padding: 1px 8px;
+  font-size: 0.72rem;
+  color: #fff;
+  background: linear-gradient(90deg, #8a4dff, #ff5d9e);
+  clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+}
+.journey-node-boss .journey-node-badge { top: -18px; right: -6px; }
+.journey-node-badge {
+  border-color: rgba(255, 210, 120, 0.8);
+  background: radial-gradient(circle, #3a2a10, #1a1206);
+  box-shadow: 0 0 10px rgba(255, 200, 90, 0.45);
+}
+/* Your ship hovers over the stage you are up to. */
+img.journey-ship {
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 10px rgba(95, 227, 255, 0.7));
+  animation: journey-ship 2.4s ease-in-out infinite;
+}
+@keyframes journey-ship {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(-6px); }
+}
+.stage-preview {
+  padding: 12px 16px;
+  border: 1px solid rgba(111, 231, 255, 0.18);
+  background: linear-gradient(90deg, rgba(14, 30, 56, 0.9), rgba(8, 16, 32, 0.85));
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+#stagePreviewTitle { font-family: var(--holo-display); font-size: 1.15rem; font-weight: 800; letter-spacing: 0.03em; }
+#stagePreviewMeta { color: var(--holo-dim); font-size: 0.88rem; }
+.journey-map-heading strong { font-family: var(--holo-display); font-size: 1.15rem; font-weight: 800; letter-spacing: 0.04em; }
+.journey-map-heading span { color: var(--holo-dim); font-size: 0.8rem; }
+/* Room above stage 1 for the pilot badge. */
+.stage-journey { margin-top: 80px; margin-bottom: 40px; }
+
+/* ---------- Saga-style map details (04/10/2026, round 2b) ---------- */
+.stage-journey-scroll {
+  position: relative;
+  height: min(54vh, 560px);
+  max-height: none;
+}
+/* World particles: a layer that stays in view while the route scrolls. */
+.journey-fx {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: min(54vh, 560px);
+  margin-bottom: calc(-1 * min(54vh, 560px));
+  overflow: hidden;
+  pointer-events: none;
+  --mote: #fff3c4;
+  --mote-glow: rgba(255, 230, 170, 0.8);
+  --mote-shape: 50%;
+  --mote-anim: journey-rise;
+}
+.journey-fx i {
+  position: absolute;
+  left: var(--x);
+  bottom: -12px;
+  width: var(--size);
+  height: var(--size);
+  border-radius: var(--mote-shape);
+  background: var(--mote);
+  box-shadow: 0 0 8px var(--mote-glow);
+  opacity: 0;
+  animation: var(--mote-anim) var(--dur) linear var(--delay) infinite;
+}
+.journey-fx i:nth-child(3n) { background: var(--mote-2, var(--mote)); }
+@keyframes journey-rise {
+  0% { transform: translate(0, 0); opacity: 0; }
+  12% { opacity: 0.9; }
+  85% { opacity: 0.7; }
+  100% { transform: translate(var(--sway), calc(-1 * min(58vh, 600px))); opacity: 0; }
+}
+@keyframes journey-fall {
+  0% { transform: translate(0, calc(-1 * min(58vh, 600px))) rotate(0); opacity: 0; }
+  12% { opacity: 0.9; }
+  85% { opacity: 0.8; }
+  100% { transform: translate(var(--sway), 0) rotate(300deg); opacity: 0; }
+}
+.stage-journey-scroll[data-theme="g01-celestial"] .journey-fx { --mote: #ffd6f6; --mote-2: #9ff4ff; --mote-glow: rgba(255, 170, 240, 0.8); }
+.stage-journey-scroll[data-theme="g02-infernal"] .journey-fx { --mote: #ffb347; --mote-2: #ff6a2a; --mote-glow: rgba(255, 120, 40, 0.9); }
+.stage-journey-scroll[data-theme="g03-frost-prism"] .journey-fx { --mote: #f4fbff; --mote-2: #bfeaff; --mote-glow: rgba(200, 240, 255, 0.8); --mote-anim: journey-fall; }
+.stage-journey-scroll[data-theme="g04-verdant"] .journey-fx { --mote: #ffc1e0; --mote-2: #9fe870; --mote-glow: rgba(255, 190, 220, 0.6); --mote-shape: 0 100% 0 100%; --mote-anim: journey-fall; }
+.stage-journey-scroll[data-theme="g05-shadow-nature"] .journey-fx { --mote: #b48bff; --mote-2: #ff5ad0; --mote-glow: rgba(160, 100, 255, 0.8); }
+.stage-journey-scroll[data-theme="g06-cosmic-forge"] .journey-fx { --mote: #ffd66a; --mote-2: #5fb0ff; --mote-glow: rgba(255, 210, 100, 0.9); }
+.stage-journey-scroll[data-theme="g07-abyssal"] .journey-fx { --mote: transparent; --mote-glow: rgba(120, 220, 255, 0.5); }
+.stage-journey-scroll[data-theme="g07-abyssal"] .journey-fx i { border: 1.5px solid rgba(170, 235, 255, 0.8); width: calc(var(--size) * 1.8); height: calc(var(--size) * 1.8); }
+.stage-journey-scroll[data-theme="g08-aurora-cosmic"] .journey-fx { --mote: #9ff4d0; --mote-2: #8fb8ff; --mote-glow: rgba(140, 255, 210, 0.8); }
+.stage-journey-scroll[data-theme="g09-void-cathedral"] .journey-fx { --mote: #ffd98a; --mote-2: #b89cff; --mote-glow: rgba(255, 220, 140, 0.7); --mote-anim: journey-fall; }
+.stage-journey-scroll[data-theme="g10-eternity"] .journey-fx { --mote: #fff1b8; --mote-2: #d38bff; --mote-glow: rgba(255, 240, 180, 0.9); }
+
+/* "You are here": the pilot's ship in a glowing badge with a pin. */
+.journey-avatar {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 12px);
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 3px solid #9ff6ff;
+  background: radial-gradient(circle at 50% 40%, rgba(60, 120, 170, 0.95), rgba(8, 18, 40, 0.98) 70%);
+  box-shadow: 0 0 0 4px rgba(95, 227, 255, 0.25), 0 0 26px rgba(95, 227, 255, 0.7), 0 10px 20px rgba(0, 0, 0, 0.55);
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: journey-avatar 2.2s ease-in-out infinite;
+}
+.journey-avatar::after {
+  content: "";
+  position: absolute;
+  top: calc(100% - 1px);
+  left: 50%;
+  border: 9px solid transparent;
+  border-top: 11px solid #9ff6ff;
+  transform: translateX(-50%);
+}
+.journey-avatar img {
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 6px rgba(95, 227, 255, 0.8));
+}
+.journey-avatar b {
+  position: absolute;
+  top: -12px;
+  padding: 1px 8px;
+  font-family: var(--holo-display);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--holo-ink);
+  background: var(--holo-gradient);
+  clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+}
+@keyframes journey-avatar {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(-7px); }
+}
+/* Stars earned under cleared stages. */
+.journey-stars {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 50%;
+  display: flex;
+  gap: 1px;
+  transform: translateX(-50%);
+  font-size: 0.9rem;
+  line-height: 1;
+  pointer-events: none;
+}
+.journey-stars i { font-style: normal; color: rgba(150, 165, 185, 0.45); }
+.journey-stars i.earned { color: #ffd34d; text-shadow: 0 0 6px rgba(255, 190, 60, 0.9); }
+.journey-stars i:nth-child(2) { transform: translateY(4px) scale(1.15); }
+/* Locked stages: a small padlock. */
+.journey-lock {
+  position: absolute;
+  bottom: -6px;
+  right: -4px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  color: #c9d6e4;
+  border-radius: 50%;
+  background: #1a2436;
+  border: 1px solid rgba(200, 215, 235, 0.35);
+}
+/* World progress chips in the heading. */
+.journey-map-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.journey-progress { display: inline-flex; gap: 6px; margin-right: auto; }
+.journey-progress span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  font-family: var(--holo-display);
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #ffe9a8;
+  border: 1px solid rgba(255, 209, 102, 0.4);
+  background: rgba(255, 209, 102, 0.08);
+}
+.journey-progress span::before { width: 0.95em; height: 0.95em; color: #ffd166; }
+@media (prefers-reduced-motion: reduce) {
+  .journey-fx, .journey-avatar, .stage-journey::before, .journey-landmark, .stage-journey-progress { animation: none; }
+  .journey-fx { display: none; }
+}
+
+/* ---------- Currency chips (shops, missions, rewards) ---------- */
+.currency-chip {
+  align-items: center;
+  font-family: var(--holo-display);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.currency-icon { filter: drop-shadow(0 0 4px currentColor); }
+/* Credits use the crystal art instead of the ₵ glyph. */
+.currency-credits .currency-icon {
+  display: inline-block;
+  width: 1.1em;
+  height: 1.1em;
+  font-size: 0;
+  background: url("../assets/pickups/credits/common.webp") center / contain no-repeat;
+  filter: drop-shadow(0 0 4px rgba(190, 120, 255, 0.8));
+}

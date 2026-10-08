@@ -26,5 +26,47 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Audit Warp economy
+        run: pnpm stamina:audit
+
+      - name: Audit Missions contract
+        run: pnpm missions:audit
+
+      - name: Audit Feature Gates contract
+        run: pnpm feature-gates:audit
+
+      - name: Audit Events contract
+        run: pnpm events:audit
+
+      - name: Audit Duel contract
+        run: pnpm duel:audit
+
+      - name: Audit Ranked contract
+        run: pnpm ranked:audit
+
+      - name: Audit Alternative Modes contract
+        run: pnpm alternative-modes:audit
+
+      - name: Audit Backgrounds contract
+        run: pnpm backgrounds:audit
+
+      - name: Audit VFX contract
+        run: pnpm vfx:audit
+
+      - name: Audit UI Assets contract
+        run: pnpm ui-assets:audit
+
+      - name: Audit QA Sandbox contract
+        run: pnpm qa:audit
+
+      - name: Audit Telemetry contract
+        run: pnpm telemetry:audit
+
+      - name: Audit Expedition contract
+        run: pnpm expedition:audit
+
+      - name: Audit Daily / Weekly contract
+        run: pnpm daily-weekly:audit
+
       - name: Build
         run: pnpm build

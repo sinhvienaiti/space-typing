@@ -1,0 +1,79 @@
+{
+  "contractRevision": "space-typing-admin-qa-v1",
+  "schemaVersion": 1,
+  "gameId": "space-typing",
+  "capability": "qa.execute",
+  "route": {
+    "id": "qa",
+    "path": "/admin/space-typing/qa",
+    "label": "QA Sandbox"
+  },
+  "qa": {
+    "mode": "runtime-backed-ephemeral-sandbox",
+    "runtimeSources": [
+      "src/test-lab/controller.ts",
+      "src/test-lab/session.ts",
+      "src/test-lab/registry.ts",
+      "src/test-lab/qa-catalog.ts",
+      "src/Game.ts",
+      "src/main.ts"
+    ],
+    "runtimeOwner": "production Test Lab controller + isolated TestLabSession + production Game runtime",
+    "persistence": {
+      "session": "isolated-in-memory",
+      "preset": "test-lab-only-browser-local-storage",
+      "presetKey": "spaceTypingTestLabPresetV1",
+      "productionCampaign": "no-write"
+    },
+    "applyBoundary": "new-qa-run",
+    "sandboxMutationCapability": true,
+    "presetWriteCapability": true,
+    "productionPersistenceWriteCapability": false,
+    "publishCapability": false,
+    "lifecycleActions": [
+      "start-or-restart-arena",
+      "pause-or-resume",
+      "reset-arena",
+      "destroy-runtime"
+    ],
+    "inspection": [
+      "game-snapshot",
+      "sandbox-session",
+      "music-debug-snapshot",
+      "runtime-registry",
+      "qa-catalog"
+    ],
+    "catalogDomains": [
+      "worlds",
+      "enemies",
+      "enemy-skills",
+      "statuses",
+      "items",
+      "equipment",
+      "characters",
+      "player-skills",
+      "support-spells",
+      "shops",
+      "currencies",
+      "grades",
+      "relics",
+      "music",
+      "bosses",
+      "projectiles"
+    ],
+    "safety": {
+      "usesProductionGameRuntime": true,
+      "isolatedSessionState": true,
+      "neverAutosavesCampaignProgression": true,
+      "gameMethodsGuardedByTestLabEnabled": true,
+      "productionSaveMutation": false
+    },
+    "unsupportedAdminOperations": [
+      "save sandbox state into Campaign progression",
+      "publish sandbox state as production config",
+      "overwrite player saves",
+      "persist Test Lab rewards into production wallets",
+      "bypass testLabEnabled runtime guards"
+    ]
+  }
+}

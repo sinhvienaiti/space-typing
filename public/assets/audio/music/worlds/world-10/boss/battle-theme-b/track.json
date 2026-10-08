@@ -1,0 +1,19 @@
+{
+  "id": "world-10-boss-battle-theme-b",
+  "title": "Battle Theme B",
+  "playback": {
+    "kind": "single",
+    "sources": [
+      {
+        "src": "/assets/audio/music/battle-theme-b.mp3",
+        "codec": "audio/mpeg"
+      }
+    ]
+  },
+  "durationSeconds": 66,
+  "loop": true,
+  "metadata": {
+    "mood": "climactic",
+    "provenance": "Battle Theme B for RPG — cynicmusic/pixelsphere — CC0"
+  }
+}

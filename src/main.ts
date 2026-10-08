@@ -1,7 +1,66 @@
+import { AccountTransactions, type AccountView } from "./persistence/account-transactions";
+import { WARP_POLICY, reconcileWarp, warpEtaMs } from "./economy/warp-charge";
+import type { AccountState, SortieContext, WriteTicket } from "./persistence/account-state";
+import { compositionForWorld } from "./background/compositions";
+import { InputController } from "./input/input-controller";
+import { VoiceSession } from "./input/voice-session";
+import { sanitizeInputMode, type InputMode } from "./input/mode";
+import { mountVoiceFeedback } from "./ui/voice-feedback";
+import { installWarpControls } from "./ui/warp-controls";
+import { warpHudView, warpRefuelView } from "./ui/warp-hud";
+import { paintedBossArtUrl } from "./enemies/painted-sprites";
+import { bossIdentityForStage } from "./boss/identity";
+import type { BossRole } from "./boss/model";
+import { characterVisualProfile } from "./characters/visuals";
+import { installHoloMotion } from "./ui/holo-motion";
+import { duelMapBackdrop } from "./duel/map-backdrop";
+import "@fontsource/exo-2/600.css";
+import "@fontsource/exo-2/700.css";
+import "@fontsource/exo-2/800.css";
+import "@fontsource/exo-2/800-italic.css";
+import "@fontsource/be-vietnam-pro/400.css";
+import "@fontsource/be-vietnam-pro/500.css";
+import "@fontsource/be-vietnam-pro/600.css";
+import "@fontsource/be-vietnam-pro/700.css";
+import "@fontsource/spectral/700.css";
 import "./styles.css";
+import "./ui/warp-charge.css";
 import "./character-progress.css";
 import "./basic-skills.css";
 import "./kill-translation.css";
+import "./duel/battle.css";
+import "./duel/battle-juice.css";
+import "./duel/battle-holo.css";
+import "./ui/holo.css";
+import "./ui/holo-lobby.css";
+import "./ui/holo-motion.css";
+import "./ui/holo-hud.css";
+import "./ui/voice-feedback.css";
+import "./ui/audio-settings.css";
+import "./ui/holo-dialogs.css";
+import "./ui/holo-results.css";
+import "./ui/reward-cards.css";
+import {
+  installRewardCardKeys,
+  renderRewardCards,
+  rewardTierForGrade,
+  rewardTierLabel,
+  type RewardCardInput,
+} from "./ui/reward-card";
+import { installIconStyles } from "./ui/icons";
+import { installHoloTooltips } from "./ui/holo-tooltip";
+import { installTitleHub, type TitleHub, type TitleHubPilot, shipArtUrl, galaxyPlateUrl } from "./ui/title-hub";
+import { installDuelOnlineRoomController } from "./duel/online-room-controller";
+import { installDuelBattleUi } from "./duel/battle-ui";
+import { DuelLocalPracticeMatch } from "./duel/local-match";
+import { createPracticeDuelRoom, peekPracticeBotCharacter, takePracticeBotCharacter } from "./duel/room";
+import type { DuelMapId } from "./duel/maps";
+import {
+  DuelCombatAudioRouter,
+  duelAudioPresentationKey,
+  duelMusicProfileForMap,
+  duelMusicStateForPhase,
+} from "./duel/audio";
 import {
   DEFAULT_KILL_TRANSLATION_SETTINGS,
   hasVisibleKillTranslation,
@@ -9,6 +68,7 @@ import {
   usesTopKillTranslation,
 } from "./feedback/kill-translation";
 import { Game } from "./Game";
+import { sanitizeEnemyProjectileMode } from "./combat/enemy-projectile-policy";
 import {
   availableRageSegments,
   RAGE_SEGMENT_COUNT,
@@ -29,6 +89,10 @@ import {
   type StageSessionSnapshot,
   type StageWordOutcome,
 } from "./results/stage-session";
+import {
+  stageClearCelebrationProfile,
+  type StageClearCelebrationProfile,
+} from "./results/stage-clear-celebration";
 import {
   loadArtAssetManifest,
   preloadArtAssets,
@@ -55,6 +119,7 @@ import {
 } from "./campaign/difficulty-settings";
 import {
   createDefaultCampaignProgress,
+  inputProfileKey,
   recordStageClear,
   selectCampaignStage,
 } from "./campaign/progress";
@@ -66,9 +131,14 @@ import {
   type CrashRecoveryReason,
 } from "./campaign/expansion-state";
 import {
+  canSelectCampaignStageWithTestingUnlock,
+  isTestingStagePreview,
+} from "./campaign/stage-selection-access";
+import {
   createStageConfig,
   stageRole,
   GALAXY_COUNT,
+  MAX_CAMPAIGN_STAGE,
   STAGES_PER_GALAXY,
 } from "./campaign/stage";
 import {
@@ -86,6 +156,7 @@ import {
 import {
   CHARACTER_IDS,
   getCharacter,
+  isCharacterId,
 } from "./characters/registry";
 import {
   drawCharacterShip,
@@ -138,14 +209,19 @@ import {
   createStarterEquipmentState,
   equipmentForSlot,
   equipmentStatBonus,
+  equippedPerkIds,
   equipInstance,
   unequipSlot,
 } from "./equipment/loadout";
 import type { EquipmentState } from "./equipment/loadout";
 import {
   EQUIPMENT_SLOTS,
+  EQUIPMENT_TIER_LABELS,
   getEquipmentDefinition,
 } from "./equipment/registry";
+import { EQUIPMENT_PERKS, resolveEquipmentPerks } from "./equipment/perks";
+import { equipmentStatLabel } from "./equipment/stat-labels";
+import { paintedEquipmentIcon, paintedItemIcon, paintedSkillIcon, setIconContent } from "./ui/painted-icons";
 import {
   createEmptyInventory,
   inventoryTotal,
@@ -162,6 +238,13 @@ import {
   addCredits,
   stageClearCreditReward,
 } from "./economy/credits";
+import {
+  CombatCreditRewardLedger,
+  combatCreditExpectedWeight,
+  combatCreditStageBudget,
+  settleCombatCreditStageBase,
+  type CombatCreditMode,
+} from "./rewards/combat-credit-drops";
 import {
   addExpansionCurrencyReward,
   createExpansionCurrencyState,
@@ -181,6 +264,7 @@ import {
   currencyAccessibleText,
   type CurrencyAmounts,
 } from "./ui/currency";
+import { CreditHudPresentation } from "./ui/credit-hud-presentation";
 import { CORE_STAT_KEYS, type CoreStatKey } from "./stats/core";
 import {
   attributeUpgradeCost,
@@ -201,6 +285,7 @@ import {
   spendBasicSkillPoint,
 } from "./progression/basic-skills";
 import {
+  RELIC_IDS,
   RELIC_REGISTRY,
   getRelicDefinition,
   type RelicId,
@@ -219,7 +304,8 @@ import {
   EQUIPMENT_AFFIX_REGISTRY,
   maxAffixesForGrade,
 } from "./equipment/affixes";
-import { MusicController } from "./audio/MusicController";
+import { MusicController, type NowPlaying } from "./audio/MusicController";
+import type { MusicPlaybackMode } from "./audio/music-library";
 import {
   musicProfileForWorld,
   musicStateForStagePhase,
@@ -273,6 +359,7 @@ import {
 import {
   accuracyPercent,
   stageWordsPerMinute,
+  typingText,
 } from "./logic";
 import type { EquipmentDrop } from "./loot/equipment-loot";
 import {
@@ -403,6 +490,91 @@ import { DEFAULT_PLAYER_BASE_STATS } from "./stats/player";
 import { mountTestLab } from "./test-lab/controller";
 import { AutosaveQueue } from "./persistence/autosave";
 import {
+  EXPEDITION_CONTENT_VERSION,
+  EXPEDITION_RULESET_VERSION,
+  EXPEDITION_START_KIT_ID,
+  createExpeditionRun,
+  currentExpeditionEncounter,
+  hashText,
+  type ExpeditionResources,
+  type ExpeditionRestChoice,
+  type ExpeditionRun,
+} from "./expedition/core";
+import {
+  createExpansionV2EncounterPlan,
+  tuneStageForExpansionEncounter,
+  type ExpansionV2EncounterPlanItem,
+} from "./expansion-v2/expedition-plan";
+import {
+  createExpansionEncounterRuntime,
+  recordExpansionCompletion,
+  type ExpansionEncounterRuntime,
+} from "./expansion-v2/runtime";
+import type {
+  EncounterRecipeId,
+  SectorConditionId,
+  TypingPatternId,
+} from "./expansion-v2/contracts";
+import {
+  dailySeed,
+  fixedChallengeIdentityKey,
+  utcDayKey,
+} from "./expansion-v2/challenge";
+import {
+  commitLearningToExpansionProfile,
+  expansionEvolutionTier,
+  loadExpansionV2Profile,
+  markExpansionCinematicSeen,
+  recordExpansionRun,
+  recordFixedChallengeResult,
+  sanitizeExpansionV2Profile,
+  setExpansionGhostEnabled,
+  type ExpansionV2Profile,
+} from "./expansion-v2/profile-store";
+import {
+  evidenceFromCompletion,
+  evidenceFromRecallAttempt,
+  selectWantedWord,
+} from "./expansion-v2/learning";
+import {
+  markNemesisReturn,
+  recordNemesisDefeat,
+  resolveNemesis,
+} from "./expansion-v2/nemesis";
+import {
+  playExpansionReferenceCinematic,
+} from "./expansion-v2/cinematic-ui";
+import {
+  campaignStageExpansionProfile,
+} from "./expansion-v2/campaign-rollout";
+import {
+  expansionV2FeatureEnabled,
+} from "./expansion-v2/feature-flags";
+import {
+  bossPartIconUrl,
+  relicIconUrl,
+} from "./expansion-v2/asset-map";
+import {
+  campaignReferencePatternOverride,
+  campaignReferenceRoutePreview,
+  needsCampaignReferenceRouteChoice,
+  recordCampaignReferenceRouteChoice,
+  type CampaignReferenceRouteChoice,
+} from "./expansion-v2/campaign-reference-event";
+import {
+  mountCampaignReferenceEventUi,
+  type CampaignReferenceEventUi,
+} from "./expansion-v2/campaign-reference-event-ui";
+import { createExpeditionLoanerState } from "./expedition/loaner";
+import {
+  ExpeditionSession,
+  ExpeditionStorageAdapter,
+} from "./expedition/session";
+import {
+  mountExpeditionUi,
+  type ExpeditionUi,
+} from "./expedition/ui";
+import {
   createCheckpointSnapshot,
   type CheckpointSnapshot,
   type RunPersistentState,
@@ -418,21 +590,25 @@ import {
   type CrashRecoverySnapshot,
 } from "./persistence/crash-recovery";
 import {
-  exportPlayerSaveJson,
   parsePlayerSaveJson,
 } from "./persistence/backup";
 import {
-  createPlayerSave,
   loadPlayerSave,
-  savePlayerProgress,
-  savePlayerRecoveryMirrorSync,
+  PLAYER_SAVE_VERSION,
   UnsupportedPlayerSaveVersionError,
 } from "./persistence/player-save";
 import type {
   PersistenceSource,
   SaveReason,
 } from "./persistence/player-save";
-import { speakEnglish, stopSpeech } from "./speech";
+import { speakEnglish, stopSpeech, setSpeechGate } from "./speech";
+import {
+  DEFAULT_AUDIO_CATEGORY_VOLUMES,
+  RECOMMENDED_AUDIO,
+  recommendedAudioSettings,
+  sanitizeAudioCategoryVolumes,
+  sanitizeAudioLevel,
+} from "./audio/player-settings";
 import {
   loadVocabularyGrammarIndex,
   loadVocabularyGrammarModule,
@@ -496,28 +672,50 @@ type VocabularySource =
 type VocabularySourceTab = VocabularySource["mode"];
 
 const defaultSettings: GameSettings = {
-  sfxVolume: 0.5,
+  masterVolume: RECOMMENDED_AUDIO.masterVolume,
+  sfxVolume: RECOMMENDED_AUDIO.sfxVolume,
+  creditVolume: 1,
   musicVolume: 0.26,
   ambientVolume: 0.08,
   screenShake: true,
   visualQuality: "high",
+  enemyProjectileMode: "auto",
+  unlockAllStages: false,
   pronunciationEnabled: true,
   pronunciationRate: 1,
-  pronunciationVolume: 1,
+  pronunciationVolume: RECOMMENDED_AUDIO.pronunciationVolume,
+  announcerVolume: RECOMMENDED_AUDIO.announcerVolume,
+  audioCategoryVolumes: { ...DEFAULT_AUDIO_CATEGORY_VOLUMES },
   killTranslation: { ...DEFAULT_KILL_TRANSLATION_SETTINGS },
+  musicMode: "map",
 };
+
+function sanitizeMusicMode(value: unknown): MusicPlaybackMode {
+  return value === "random" ? "random" : "map";
+}
 
 function loadSettings(): GameSettings {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw === null) return { ...defaultSettings };
 
-    const parsed = JSON.parse(raw) as Partial<GameSettings>;
+    const parsed = JSON.parse(raw) as Partial<GameSettings> & {
+      enemyProjectiles?: unknown;
+      enemyProjectilesEnabled?: unknown;
+    };
     return {
+      // Existing saves predate Master/Announcer/category controls. Missing
+      // fields intentionally resolve to neutral 1.0 so migration never changes
+      // a returning player's established mix. Fresh installs use Recommended.
+      masterVolume: sanitizeAudioLevel(parsed.masterVolume, 1),
       sfxVolume:
         typeof parsed.sfxVolume === "number"
           ? Math.min(1, Math.max(0, parsed.sfxVolume))
           : defaultSettings.sfxVolume,
+      creditVolume:
+        typeof parsed.creditVolume === "number" && Number.isFinite(parsed.creditVolume)
+          ? Math.min(2, Math.max(0, parsed.creditVolume))
+          : defaultSettings.creditVolume,
       musicVolume:
         typeof parsed.musicVolume === "number"
           ? Math.min(1, Math.max(0, parsed.musicVolume))
@@ -530,6 +728,11 @@ function loadSettings(): GameSettings {
         typeof parsed.screenShake === "boolean"
           ? parsed.screenShake
           : defaultSettings.screenShake,
+      enemyProjectileMode: sanitizeEnemyProjectileMode(
+        parsed.enemyProjectileMode ??
+          parsed.enemyProjectilesEnabled ??
+          parsed.enemyProjectiles,
+      ),
       visualQuality:
         parsed.visualQuality === "low" ||
         parsed.visualQuality === "medium" ||
@@ -537,6 +740,10 @@ function loadSettings(): GameSettings {
         parsed.visualQuality === "ultra"
           ? parsed.visualQuality
           : defaultSettings.visualQuality,
+      unlockAllStages:
+        typeof parsed.unlockAllStages === "boolean"
+          ? parsed.unlockAllStages
+          : false,
       pronunciationEnabled:
         typeof parsed.pronunciationEnabled === "boolean"
           ? parsed.pronunciationEnabled
@@ -549,7 +756,10 @@ function loadSettings(): GameSettings {
         typeof parsed.pronunciationVolume === "number"
           ? Math.min(1, Math.max(0, parsed.pronunciationVolume))
           : defaultSettings.pronunciationVolume,
+      announcerVolume: sanitizeAudioLevel(parsed.announcerVolume, 1),
+      audioCategoryVolumes: sanitizeAudioCategoryVolumes(parsed.audioCategoryVolumes),
       killTranslation: sanitizeKillTranslationSettings(parsed.killTranslation),
+      musicMode: sanitizeMusicMode(parsed.musicMode),
     };
   } catch {
     return { ...defaultSettings };
@@ -599,10 +809,15 @@ function loadDifficultySettings(): DifficultySettings {
 }
 
 function saveDifficultySettings(): void {
-  localStorage.setItem(
-    DIFFICULTY_KEY,
-    JSON.stringify(difficultySettings),
-  );
+  if (
+    !persistenceReady ||
+    testingStagePreviewActive() ||
+    practiceRestorePending ||
+    clearSettlementPending ||
+    !accountTransactions.canWrite()
+  )
+    return;
+  void autosaveCampaign("manual");
 }
 
 function loadSource(): VocabularySource {
@@ -660,6 +875,8 @@ function byId<T extends HTMLElement = HTMLElement>(id: string): T {
 
 
 let settings = loadSettings();
+/** Title hub controls (src/ui/title-hub.ts), installed once the game exists. */
+let titleHub: TitleHub | null = null;
 let difficultySettings = loadDifficultySettings();
 let activeStageDifficulty: DifficultyProfile | null = null;
 let campaign = createDefaultCampaignProgress();
@@ -671,6 +888,18 @@ let characters: CharacterState = createStarterCharacterState();
 let luckPity: LuckPityState = createLuckPityState();
 let hiddenDiscovery: HiddenDiscoveryState = createHiddenDiscoveryState();
 let credits = 0;
+const combatCreditLedger = new CombatCreditRewardLedger();
+const creditHudPresentation = new CreditHudPresentation();
+let creditHudPulseTimer: number | null = null;
+/** HUD count-up: the number runs to each new value instead of jumping. */
+const CREDIT_HUD_COUNT_MS = 320;
+let creditHudFrom = 0;
+let creditHudTo = 0;
+let creditHudStart = 0;
+let creditHudFrame = 0;
+/** "+N" next to Credits, summed while crystals keep landing. */
+let creditDeltaSum = 0;
+let creditDeltaTimer: number | null = null;
 let progression: ProgressionState = createProgressionState();
 let upgrades: UpgradeState = createUpgradeState();
 let relics: RelicState = createRelicState();
@@ -680,9 +909,18 @@ let expansionCurrencies: ExpansionCurrencyState =
   createExpansionCurrencyState();
 let shops: ShopState = createShopState();
 let route: RouteState = createRouteState(campaign.highestUnlockedStage);
+// Declared before the controller: it reports the first song during start-up.
+let musicToastTimer: number | null = null;
+let lastToastSong: string | null = null;
 const musicController = new MusicController();
 musicController.setMusicVolume(settings.musicVolume);
 musicController.setAmbientVolume(settings.ambientVolume);
+musicController.setPlaybackMode(sanitizeMusicMode(settings.musicMode));
+musicController.onNowPlaying(showNowPlaying);
+if (import.meta.env.DEV) {
+  // Dev-only handle for scripts/visual checks (docs/MUSIC_SYSTEM.md).
+  (window as unknown as { __spaceTypingMusic?: MusicController }).__spaceTypingMusic = musicController;
+}
 musicController.setWorldProfile(
   musicProfileForWorld(worldForStage(campaign.selectedStage)),
 );
@@ -730,6 +968,8 @@ const hudDomMetrics = {
 let gameplayMode: GameplayMode = loadGameplayMode();
 let recallSettings: RecallSettings = loadRecallSettings();
 let settingsDraft: GameSettings | null = null;
+let quickAudioDraft: GameSettings | null = null;
+let quickAudioCommitted = false;
 let difficultySettingsDraft: DifficultySettings | null = null;
 let recallSettingsDraft: RecallSettings | null = null;
 let settingsOpenPhase: GamePhase | null = null;
@@ -762,81 +1002,48 @@ let currentGalaxy = Math.ceil(campaign.selectedStage / STAGES_PER_GALAXY);
 let selectedJourneyWorld = Math.ceil(campaign.selectedStage / 20);
 let selectedJourneyStage = campaign.selectedStage;
 
-/** Keyboard-, mouse- and touch-accessible help on existing menu actions.
+/** Short help on hub actions, shown by the shared tooltip (data-tip).
  * Existing button IDs and their action listeners remain unchanged. */
 function installMenuHelp(): void {
   const descriptions: Record<string, string> = {
-    routeButton: "Sector, boss, checkpoint",
-    stageSelectButton: "Replay unlocked stages",
-    characterButton: "Pilot and progression",
+    routeButton: "Sector briefing: bosses, checkpoints and route",
+    stageSelectButton: "Replay any unlocked stage",
+    startButton: "Continue the Campaign from your current stage",
+    combatModeButton: "Combat: see the word, type it, shoot",
+    recallModeButton: "Recall: hear the word, recall and type it",
+    characterButton: "Pilots, ships and their progression",
     equipmentButton: "Gear and combat stats",
-    supportButton: "Combat support spells",
-    hotbarButton: "Skills/items on 1-9",
-    vocabularyButton: "Vocabulary source",
+    supportButton: "Missiles, railgun and fields",
+    hotbarButton: "Skills and items on keys 1-9",
+    vocabularyButton: "Choose the vocabulary source",
     progressionButton: "Missions and rewards",
-    codexButton: "Codex entries",
-    settingsButton: "Audio/display/Recall",
-    dataButton: "Save/performance info",
+    codexButton: "Enemies, worlds and lore you discovered",
+    ascensionButton: "Harder replays for bigger rewards",
+    dataButton: "Save, backup and performance info",
     shopButton: "Finite-stock shop",
     stationShopButton: "Station items",
-    serviceShopButton: "Repair/upgrade",
+    serviceShopButton: "Repair and upgrade",
+    duelModeButton: "1v1 online rooms, ranked matches or a bot",
+    titleRecallStartButton: "Start the Campaign stage in Recall mode",
+    expeditionButton:
+      "8-encounter run with an isolated loaner build, run-only Relics, rest choices, encounter conditions and a final boss. Campaign economy and progression stay unchanged.",
+    expeditionDailyButton:
+      "Fixed UTC daily challenge with the same seed, ruleset and word pool identity for comparable Personal Best and Personal Ghost results.",
+    expeditionGhostButton:
+      "Show or hide comparable Personal Best checkpoint cues during Daily Expedition. Ghost is guidance only and gives no gameplay bonus.",
   };
 
-  const wrappers: HTMLElement[] = [];
   for (const [id, description] of Object.entries(descriptions)) {
-    const action = byId<HTMLButtonElement>(id);
-    const title = action.textContent || id;
-    const parent = action.parentElement;
-    if (parent === null) continue;
-    const wrap = document.createElement("div");
-    wrap.className = "menu-help-wrap";
-    const tip = document.createElement("span");
-    tip.className = "menu-help-popup";
-    tip.id = "help-" + id;
-    tip.setAttribute("role", "tooltip");
-    tip.textContent = description;
-
-    const trigger = document.createElement("button");
-    trigger.type = "button";
-    trigger.className = "menu-help-trigger";
-    trigger.setAttribute("aria-label", "About " + title);
-    trigger.setAttribute("aria-describedby", tip.id);
-    trigger.setAttribute("aria-expanded", "false");
-    trigger.textContent = "ⓘ";
-    trigger.addEventListener("click", (event) => {
-      event.stopPropagation();
-      const wasOpen = wrap.dataset.open === "true";
-      for (const other of wrappers) {
-        other.dataset.open = "false";
-        other.querySelector(".menu-help-trigger")?.setAttribute("aria-expanded", "false");
-      }
-      wrap.dataset.open = String(!wasOpen);
-      trigger.setAttribute("aria-expanded", String(!wasOpen));
-    });
-    parent.insertBefore(wrap, action);
-    wrap.append(action, trigger, tip);
-    wrappers.push(wrap);
-    // The dedicated info trigger owns help. Avoid a second native tooltip on
-    // the action text itself, which otherwise produces duplicate hover UI.
-    action.removeAttribute("title");
+    const element = document.getElementById(id);
+    if (element === null || element.dataset.tip !== undefined) continue;
+    element.dataset.tip = description;
+    element.removeAttribute("title");
   }
-
-  document.addEventListener("click", (event) => {
-    if ((event.target as Element).closest(".menu-help-wrap") !== null) return;
-    for (const wrap of wrappers) {
-      wrap.dataset.open = "false";
-      wrap.querySelector(".menu-help-trigger")?.setAttribute("aria-expanded", "false");
-    }
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") return;
-    for (const wrap of wrappers) {
-      wrap.dataset.open = "false";
-      wrap.querySelector(".menu-help-trigger")?.setAttribute("aria-expanded", "false");
-    }
-  });
 }
 
+installIconStyles();
+installHoloTooltips();
+installHoloMotion();
 installMenuHelp();
 
 let latestKillTranslation: VocabularyEntry | null = null;
@@ -897,7 +1104,34 @@ const titleOverlay = byId("titleOverlay");
 const pauseOverlay = byId("pauseOverlay");
 const gameOverOverlay = byId("gameOverOverlay");
 const stageClearOverlay = byId("stageClearOverlay");
+const voiceFeedback = mountVoiceFeedback(byId("voiceFeedback"));
+// Construction is inert: probing/start remain behind the offline engine + gameplay gates.
+const voiceInstanceId = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `space-voice-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const voiceSession = new VoiceSession(window.parent, PARENT_ORIGIN, voiceInstanceId, () => ({
+  getPhase: () => document.querySelector("dialog[open]") ? "paused" : game.getPhase(),
+  getVoiceTargets: sample => game.getVoiceTargets(sample),
+  getVoiceVocabularyForms: () => game.getVoiceVocabularyForms(),
+  getVoiceVocabularyRevision: () => game.getVoiceVocabularyRevision(),
+  completeVoiceUnit: (id, version, eligibility) => game.completeVoiceUnit(id, version, eligibility),
+  togglePause: () => game.togglePause(),
+}), voiceFeedback.state, (state, detail) => {
+  const status = byId("voiceInputStatus"); status.textContent = detail;
+  byId("voiceMicToggle").setAttribute("aria-pressed", String(state === "listening"));
+  byId("voiceMicToggle").textContent = state === "listening" || state === "suspended" ? "■ Mic" : state === "preparing" ? "… Mic" : "🎙 Mic";
+  byId("voiceInputControls").dataset.state = state;
+});
+window.addEventListener("message", (event: MessageEvent<unknown>) => voiceSession.handleMessage(event));
+window.addEventListener("pagehide", () => voiceSession.stop());
+new MutationObserver(() => voiceSession.phaseChanged()).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["open"] });
+setSpeechGate(async play => {
+  const pausedForVoice = game.getInputMode() === "voice" && game.getPhase() === "playing";
+  if (pausedForVoice) game.pause();
+  try { await voiceSession.withAudioOutput(play); }
+  catch (error) { voiceSession.stop(); showNotice(error instanceof Error ? error.message : "Pronunciation unavailable"); }
+  finally { if (pausedForVoice && game.getPhase() === "paused") game.resume(); }
+});
 const settingsDialog = byId<HTMLDialogElement>("settingsDialog");
+const quickAudioDialog = byId<HTMLDialogElement>("quickAudioDialog");
 const vocabularyDialog = byId<HTMLDialogElement>("vocabularyDialog");
 const stageSelectDialog = byId<HTMLDialogElement>("stageSelectDialog");
 const routeDialog = byId<HTMLDialogElement>("routeDialog");
@@ -920,6 +1154,228 @@ const rewardChoiceDialog =
   byId<HTMLDialogElement>("rewardChoiceDialog");
 const anomalyDialog = byId<HTMLDialogElement>("anomalyDialog");
 
+let duelOnlineController:
+  | ReturnType<typeof installDuelOnlineRoomController>
+  | null = null;
+let localDuelMatch: DuelLocalPracticeMatch | null = null;
+let localDuelTimer: number | null = null;
+
+function stopLocalDuel(): void {
+  if (localDuelTimer !== null) {
+    window.clearInterval(localDuelTimer);
+    localDuelTimer = null;
+  }
+  localDuelMatch = null;
+}
+
+let lastDuelAudioPresentationKey: string | null =
+  null;
+
+function syncDuelAudio(
+  view: import("./duel/authority").DuelClientMatchView,
+): void {
+  const key = duelAudioPresentationKey(
+    view.map.id,
+    view.phase,
+  );
+  if (key === lastDuelAudioPresentationKey) return;
+  lastDuelAudioPresentationKey = key;
+  musicController.setWorldProfile(
+    duelMusicProfileForMap(view.map.id),
+  );
+  musicController.transitionTo(
+    duelMusicStateForPhase(view.phase),
+    view.phase === "war" ||
+      view.phase === "crisis" ||
+      view.phase === "cataclysm"
+      ? 0.7
+      : 1.1,
+  );
+  musicController.setPaused(false);
+}
+
+const duelCombatAudio = new DuelCombatAudioRouter((cue) => {
+  game.playDuelCombatAudioCue(cue);
+  // The K.O. and the match result own the mix for a moment.
+  if (cue.cue === "ko-final") musicController.duckFor("announcer", 2600);
+  if (cue.cue === "match-win" || cue.cue === "match-loss") musicController.duckFor("warning", 2200);
+});
+
+const duelBattle = installDuelBattleUi(
+  {
+    onCombatRenderer(draw, camera) {
+      game.setDuelCombatRenderer(draw, camera ?? null);
+    },
+    onScreenShake(amount) {
+      game.duelShake(amount);
+    },
+    onLayoutChange(horizontal) {
+      game.setDuelStereoLayout(horizontal);
+    },
+    sendIntent(intent) {
+      if (localDuelMatch !== null) {
+        const result = localDuelMatch.sendIntent(intent);
+        if (result === null) return null;
+        duelBattle.update(
+          result.update.view,
+          result.update.events,
+        );
+        if (localDuelMatch.isFinished()) {
+          if (localDuelTimer !== null) {
+            window.clearInterval(localDuelTimer);
+            localDuelTimer = null;
+          }
+        }
+        return result.sequence;
+      }
+      return (
+        duelOnlineController?.client.sendIntent(intent) ??
+        null
+      );
+    },
+    onPresentationState(view, events, beats) {
+      game.setDuelPresentationActive(true);
+      // The match plays on the chosen map's scene (Practice and online).
+      game.setDuelBackdrop(duelMapBackdrop(view.map.id).worldId);
+      syncDuelAudio(view);
+      duelCombatAudio.consume(view, events, beats);
+    },
+    onExit() {
+      game.setDuelPresentationActive(false);
+      stopLocalDuel();
+      lastDuelAudioPresentationKey = null;
+      duelCombatAudio.reset(null);
+      restoreTitleMusic();
+      const duelDialog =
+        byId<HTMLDialogElement>("duelRoomDialog");
+      if (!duelDialog.open) duelDialog.showModal();
+    },
+  },
+  settings.visualQuality,
+);
+// Opening the Duel lobby starts loading the 3D hull, so the fight never waits on it.
+// (after the dialog has painted).
+byId<HTMLButtonElement>("duelModeButton").addEventListener("click", () => {
+  window.setTimeout(() => duelBattle.preload(settings.visualQuality, characters.selected, peekPracticeBotCharacter(characters.selected)), 350);
+});
+
+function startLocalDuelPractice(
+  snapshot: import("./duel/room").DuelRoomSnapshot,
+): void {
+  stopLocalDuel();
+  const seedBuffer = new Uint32Array(1);
+  window.crypto.getRandomValues(seedBuffer);
+  // Practice uses the currently selected Campaign hull unless the room has
+  // an explicit cosmetic selection. This does not import Campaign stats.
+  const practiceRoom = structuredClone(snapshot);
+  practiceRoom.slots[0].characterId ??= characters.selected;
+  // The bot flies a random hull: the one picked when the lobby opened, so
+  // its 3D model is already loaded.
+  if (practiceRoom.slots[1].kind === "bot") practiceRoom.slots[1].characterId = takePracticeBotCharacter(practiceRoom.slots[0].characterId);
+  localDuelMatch = new DuelLocalPracticeMatch({
+    room: practiceRoom,
+    seed: seedBuffer[0] ?? 1,
+  });
+
+  const initial = localDuelMatch.initial();
+  duelBattle.setQuality(settings.visualQuality);
+  duelBattle.show(initial.view, initial.events);
+  const duelDialog =
+    byId<HTMLDialogElement>("duelRoomDialog");
+  if (duelDialog.open) duelDialog.close();
+
+  localDuelTimer = window.setInterval(() => {
+    if (localDuelMatch === null) return;
+    const update = localDuelMatch.tick(0.05);
+    duelBattle.update(update.view, update.events);
+    if (localDuelMatch.isFinished()) {
+      if (localDuelTimer !== null) {
+        window.clearInterval(localDuelTimer);
+        localDuelTimer = null;
+      }
+    }
+  }, 50);
+}
+
+function startDuelVisualStress(
+  phase: "crisis" | "cataclysm",
+  mapId: DuelMapId,
+): void {
+  const room = createPracticeDuelRoom({
+    roomId: "TEST-LAB-DUEL",
+    participantId: "test-lab-human",
+    displayName: "Test Lab Pilot",
+    mapId,
+    bot: {
+      wpm: 78,
+      accuracy: 0.96,
+      reactionMs: 220,
+      personality: "tactician",
+    },
+  });
+  startLocalDuelPractice(room.snapshot());
+
+  if (localDuelMatch !== null) {
+    const update =
+      localDuelMatch.advanceToPhaseForTestLab(phase);
+    duelBattle.update(update.view, update.events);
+    duelBattle.resetPerformanceDiagnostics();
+  }
+
+  const testLabDialog =
+    byId<HTMLDialogElement>("testLabDialog");
+  if (testLabDialog.open) testLabDialog.close();
+  showNotice(
+    "Duel " +
+      phase.toUpperCase() +
+      " stress scene · " +
+      mapId +
+      " · " +
+      settings.visualQuality.toUpperCase(),
+  );
+}
+
+duelOnlineController = installDuelOnlineRoomController({
+  clientVersion: "0.1.0",
+  // Fly your selected hull online too; the other player sees it.
+  characterId: () => characters.selected,
+  // The hangar opens over the lobby; the pilot card refreshes on close.
+  onChangeShip: () => byId<HTMLButtonElement>("characterButton").click(),
+  onRoomSnapshot(room) {
+    // Opponent known in the room lobby: load their 3D hull before the match.
+    const opponent = room.selfSlotIndex === null ? null : room.slots[room.selfSlotIndex === 0 ? 1 : 0];
+    const rival = opponent?.characterId;
+    if (rival !== null && rival !== undefined && isCharacterId(rival)) {
+      duelBattle.preload(settings.visualQuality, characters.selected, rival);
+    }
+  },
+  onMatchUpdate(view, events) {
+    if (localDuelMatch !== null) {
+      stopLocalDuel();
+    }
+    // Friend Room / Ranked: the battlefield replaces the lobby, so close the
+    // room dialog once the match is live (Practice already did this).
+    const roomDialog = byId<HTMLDialogElement>("duelRoomDialog");
+    if (roomDialog.open && view.series.status === "active") roomDialog.close();
+    duelBattle.setQuality(settings.visualQuality);
+    duelBattle.update(view, events);
+  },
+  onPrediction(prediction) {
+    if (localDuelMatch === null) {
+      duelBattle.setPrediction(prediction);
+    }
+  },
+  onLocalPracticeReady(snapshot) {
+    startLocalDuelPractice(snapshot);
+  },
+});
+
+// Back from the hangar: the Duel lobby pilot card shows the new ship.
+byId<HTMLDialogElement>("characterDialog").addEventListener("close", () => {
+  duelOnlineController?.ui.refreshSelf();
+});
+
+installRewardCardKeys(rewardChoiceDialog, byId("rewardChoiceGrid"));
 rewardChoiceDialog.addEventListener("cancel", (event) => {
   event.preventDefault();
 });
@@ -944,6 +1400,11 @@ for (const dialog of [
 }
 
 type AutosaveSnapshot = {
+  ticket?: WriteTicket;
+  attemptId?: string | null;
+  transition?: "cleared" | "defeat-pending";
+  grants?: string[];
+  auxiliary?: AccountView["auxiliary"];
   campaign: typeof campaign;
   inventory: Inventory;
   equipment: EquipmentState;
@@ -967,35 +1428,292 @@ type AutosaveSnapshot = {
   stageEntrySnapshot: StageEntrySnapshot | null;
 };
 
-const campaignAutosave = new AutosaveQueue<
-  AutosaveSnapshot,
-  PersistenceSource
->((snapshot, reason) =>
-  savePlayerProgress(
-    snapshot.campaign,
-    snapshot.inventory,
-    snapshot.equipment,
-    snapshot.supportSpells,
-    snapshot.characters,
-    reason as SaveReason,
-    snapshot.luckPity,
-    snapshot.hiddenDiscovery,
-    snapshot.credits,
-    snapshot.progression,
-    snapshot.expansionCurrencies,
-    snapshot.campaignExpansion,
-    snapshot.checkpointSnapshot,
-    snapshot.crashRecoverySnapshot,
-    snapshot.stageEntrySnapshot,
-    snapshot.shops,
-    snapshot.route,
-    snapshot.upgrades,
-    snapshot.relics,
-    snapshot.codex,
-    snapshot.ascension,
-    snapshot.hotbar,
-  ),
+let warpAccount: AccountState | null = null;
+let practiceActive = false;
+let practiceRestorePending = false;
+let practiceReload: Promise<void> = Promise.resolve();
+let encounterWasFree = false;
+let clearSettlementPending = false;
+let currentEncounterToken = "";
+let settledEncounterToken = "";
+let pendingMilestoneGrants: string[] = [];
+let committedCredits = 0;
+const accountTransactions = new AccountTransactions((save) => {
+  warpAccount = save.account;
+  committedCredits = save.credits;
+  if (
+    !accountTransactions.canWrite() &&
+    !testingStagePreviewActive() &&
+    !practiceRestorePending &&
+    game.getPhase() === "title"
+  ) {
+    applyAutosaveSnapshot(save);
+    if (save.auxiliary?.expansionV2)
+      expansionV2Profile = sanitizeExpansionV2Profile(
+        save.auxiliary.expansionV2,
+      );
+    if (save.auxiliary?.difficulty)
+      difficultySettings = sanitizeDifficultySettings(
+        save.auxiliary.difficulty,
+      );
+    refreshPersistentStateUi();
+  }
+  try {
+    if (save.auxiliary?.expansionV2)
+      localStorage.setItem(
+        "spaceTypingExpansionV2ProfileV1",
+        JSON.stringify(save.auxiliary.expansionV2),
+      );
+    if (save.auxiliary?.difficulty)
+      localStorage.setItem(
+        DIFFICULTY_KEY,
+        JSON.stringify(save.auxiliary.difficulty),
+      );
+  } catch {
+    /* Auxiliary mirrors are rebuildable from the committed account. */
+  }
+  renderWarpHud();
+});
+function renderWarpHud(): void {
+  if (!warpAccount) return;
+  const warp = reconcileWarp(warpAccount.warp, accountTransactions.now());
+  const hud = warpHudView(warp);
+  byId("titleWarpBalance").textContent = hud.balance;
+  byId("titleWarpReserve").textContent = hud.reserve;
+  byId("titleWarpRegen").textContent = hud.regen;
+  const bar = byId<HTMLProgressElement>("titleWarpBar");
+  bar.value = hud.value;
+  bar.parentElement!.dataset.low = String(hud.low);
+  bar.title = `${hud.balance} Warp · ${hud.reserve} · ${hud.regen} · Deploy costs 10`;
+  byId("warpBalance").textContent = `${warp.current}/100`;
+  byId("warpReserve").textContent = `Reserve ${warp.reserve}/300`;
+  const eta = Math.ceil(warpEtaMs(warp, accountTransactions.now()) / 1000);
+  byId("warpStatus").textContent = !accountTransactions.canWrite()
+    ? "Read-only tab · Practice is free"
+    : practiceActive
+      ? "Practice · learning saved, rewards simulated"
+      : `${warp.current}/100 Warp · Reserve ${warp.reserve}/300 · ${warp.refills}/3 refills${eta > 0 ? ` · Deploy in ${Math.floor(eta / 60)}m ${eta % 60}s` : " · Deploy costs 10"}`;
+  byId("practiceBanner").hidden =
+    !practiceActive && activeReviewGoal === undefined;
+  const busy =
+    accountTransactions.busy() ||
+    clearSettlementPending ||
+    stageStartPending ||
+    practiceRestorePending;
+  const refuel = warpRefuelView(warp, expansionCurrencies.starCrystal);
+  const refuelButton = byId<HTMLButtonElement>("warpRefuelButton");
+  refuelButton.textContent = refuel.label;
+  refuelButton.title = refuel.detail;
+  byId("warpRefuelDetail").textContent = refuel.detail;
+  refuelButton.disabled =
+    busy ||
+    !accountTransactions.canWrite() ||
+    !!warpAccount.attempt ||
+    testingStagePreviewActive() ||
+    refuel.disabled;
+  const reserve = byId<HTMLButtonElement>("warpReserveToggle");
+  reserve.textContent = `Reserve: ${warp.reserveConsent ? "on" : "off"}`;
+  reserve.setAttribute("aria-pressed", String(warp.reserveConsent));
+  reserve.disabled =
+    busy ||
+    !accountTransactions.canWrite() ||
+    !!warpAccount.attempt ||
+    testingStagePreviewActive();
+  byId<HTMLButtonElement>("warpAbandonButton").hidden =
+    !accountTransactions.canWrite() ||
+    warpAccount.attempt?.phase !== "prepared";
+  byId<HTMLButtonElement>("warpClockButton").hidden =
+    warp.watermarkMs < Date.now() + 300_000;
+}
+async function finishManagedSortie(
+  kind: "failed" | "abandoned",
+): Promise<boolean> {
+  if (testingStagePreviewActive()) return true;
+  if (!warpAccount?.attempt) return true;
+  try {
+    if (game.getPhase() === "playing") game.togglePause();
+    if (
+      game.getPhase() === "stageclear" &&
+      warpAccount.attempt.phase === "active"
+    ) {
+      return autosaveCampaign("stage-clear", "✓ Clear and rewards committed");
+    }
+    if (
+      warpAccount.attempt.phase !== "prepared" &&
+      !(await autosaveCampaign("manual"))
+    )
+      return false;
+    await accountTransactions.finish(kind, warpAccount.attempt!.id);
+    return true;
+  } catch (error) {
+    showNotice(
+      error instanceof Error ? error.message : "Unable to close the sortie",
+    );
+    return false;
+  }
+}
+async function deploySortie(
+  stage: number,
+  activity: "campaign" | "hidden",
+  seed: number,
+  difficulty: unknown,
+  simulated: boolean,
+): Promise<void> {
+  if (simulated) {
+    renderWarpHud();
+    return;
+  }
+  if (!accountTransactions.canWrite())
+    throw new Error("Account is read-only. Choose Practice · Free.");
+  if (game.getInputMode() !== "typing" && !voiceSession.isReady())
+    throw new Error("Microphone is not ready; no Warp charged.");
+  const context: SortieContext = {
+    stage,
+    tier: ascension.selectedTier,
+    activity,
+    inputMode: game.getInputMode(),
+    gameplayMode,
+    difficulty: JSON.stringify(difficulty),
+    vocabulary: `${sourceState.mode}:${selectedVocabularyLevel()}:${hashText(game.getVoiceVocabularyForms().sort().join("\n"))}`,
+    contentVersion: "space-sortie-v1",
+    seed,
+  };
+  const warp = reconcileWarp(warpAccount!.warp, accountTransactions.now());
+  if (
+    warp.current < WARP_POLICY.cost &&
+    !warp.reserveConsent &&
+    warp.current + warp.reserve >= WARP_POLICY.cost
+  ) {
+    if (
+      !window.confirm(
+        `Use ${WARP_POLICY.cost - warp.current} Reserve Warp for this sortie and allow Reserve to cover future shortages? No Star Crystals will be spent.`,
+      )
+    )
+      throw new Error("Deploy cancelled · Practice is free");
+    await accountTransactions.reserveConsent(true);
+  }
+  const prepared = await accountTransactions.admit(context);
+  await accountTransactions.activate(prepared.account.attempt!.id, context);
+}
+let testingStageOverride: number | null = null;
+let testingStageSnapshot: AutosaveSnapshot | null = null;
+
+function createExpeditionWriterId(): string {
+  return (
+    "tab-" +
+    (typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : Date.now().toString(36))
+  );
+}
+
+const expansionV2Enabled = expansionV2FeatureEnabled(
+  localStorage,
+  window.location.search,
 );
+const expeditionStorage = new ExpeditionStorageAdapter(localStorage);
+const expeditionSession = new ExpeditionSession(
+  expeditionStorage,
+  createExpeditionWriterId(),
+);
+let expeditionUi: ExpeditionUi | null = null;
+let campaignReferenceEventUi: CampaignReferenceEventUi | null = null;
+let expeditionCampaignSnapshot: AutosaveSnapshot | null = null;
+let expeditionStartPending = false;
+let expansionEncounterRuntime: ExpansionEncounterRuntime | null = null;
+let expansionQaCinematicAbort: AbortController | null = null;
+let expansionV2Profile: ExpansionV2Profile =
+  loadExpansionV2Profile(localStorage);
+let expeditionActiveSecondsTotal = 0;
+
+function persistExpansionV2Profile(next: ExpansionV2Profile): void {
+  if (
+    practiceActive ||
+    activeReviewGoal !== undefined ||
+    testingStagePreviewActive() ||
+    !accountTransactions.canWrite()
+  )
+    return;
+  try {
+    expansionV2Profile = next;
+    if (persistenceReady && !clearSettlementPending) {
+      if (expeditionSession.ownsCampaignPersistence())
+        void accountTransactions
+          .updateAuxiliary({ expansionV2: next })
+          .catch((error) => showNotice(String(error)));
+      else void autosaveCampaign("progression");
+    }
+    expeditionUi?.setEvolutionTier(expansionEvolutionTier(expansionV2Profile));
+    expeditionUi?.setGhostEnabled(expansionV2Profile.ghostEnabled);
+  } catch (error) {
+    console.error("Unable to save Expansion V2 profile.", error);
+    showNotice("Expansion V2 profile save failed");
+  }
+}
+
+function stopExpansionCinematicQa(): void {
+  expansionQaCinematicAbort?.abort();
+  expansionQaCinematicAbort = null;
+}
+
+function startExpansionCinematicQa(): void {
+  stopExpansionCinematicQa();
+  const controller = new AbortController();
+  expansionQaCinematicAbort = controller;
+  void playExpansionReferenceCinematic({
+    title: "Expansion V2 Reference",
+    subtitle:
+      "Test Lab greybox · start / focus / resolve / cleanup",
+    signal: controller.signal,
+  }).finally(() => {
+    if (expansionQaCinematicAbort === controller) {
+      expansionQaCinematicAbort = null;
+    }
+  });
+}
+
+function recordExpeditionTerminalProfile(run: ExpeditionRun): void {
+  if (!expansionV2Enabled || run.challenge?.kind === "qa") return;
+
+  let next = recordExpansionRun(expansionV2Profile, {
+    runId: run.runId,
+    score: run.totalScore,
+    completed: run.phase === "victory",
+  });
+  const identityKey = run.challenge?.identityKey ?? null;
+  if (run.challenge?.kind === "daily" && identityKey !== null) {
+    const accuracy =
+      run.completedEncounters > 0
+        ? run.accuracySum / run.completedEncounters
+        : 0;
+    const lastGhostPoint = run.ghostPoints?.at(-1);
+    next = recordFixedChallengeResult(
+      next,
+      {
+        identityKey,
+        runId: run.runId,
+        completedEncounters: run.completedEncounters,
+        score: run.totalScore,
+        accuracy,
+        activeSeconds:
+          lastGhostPoint?.activeSeconds ??
+          expeditionActiveSecondsTotal,
+        retried: run.retryCount > 0,
+        assisted: run.profile.assist !== "standard",
+      },
+      run.ghostPoints ?? [],
+    );
+  }
+  persistExpansionV2Profile(next);
+}
+
+const campaignAutosave = new AutosaveQueue<AutosaveSnapshot, PersistenceSource>(async (snapshot, reason) => {
+  const { ticket, attemptId, transition, grants, auxiliary, ...fields } = snapshot;
+  if (!ticket) throw new Error("Canonical account unavailable");
+  await accountTransactions.save({ ...fields, version: PLAYER_SAVE_VERSION, updatedAt: new Date().toISOString(), lastSaveReason: reason as SaveReason, auxiliary }, ticket, attemptId ?? null, transition, grants);
+  if (transition === "cleared") pendingMilestoneGrants = [];
+  return "indexeddb";
+});
 
 function currentRunPersistentState(): RunPersistentState {
   return {
@@ -1042,8 +1760,42 @@ function applyRunPersistentState(state: RunPersistentState): void {
   route = state.route;
 }
 
-function currentAutosaveSnapshot(): AutosaveSnapshot {
+function applyAutosaveSnapshot(snapshot: AutosaveSnapshot): void {
+  applyRunPersistentState(snapshot);
+  hotbar = snapshot.hotbar;
+  codex = snapshot.codex;
+  campaignExpansion = snapshot.campaignExpansion;
+  checkpointSnapshot = snapshot.checkpointSnapshot;
+  crashRecoverySnapshot = snapshot.crashRecoverySnapshot;
+  stageEntrySnapshot = snapshot.stageEntrySnapshot;
+}
+
+function currentAutosaveSnapshot(terminalClear = false): AutosaveSnapshot {
+  const attempt = warpAccount?.attempt;
   return {
+    ticket: warpAccount
+      ? accountTransactions.ticket(
+          testingStagePreviewActive()
+            ? "practice"
+            : expeditionSession.ownsCampaignPersistence()
+              ? "expedition"
+              : warpAccount.attempt
+                ? "rewarded"
+                : "account",
+        )
+      : undefined,
+    attemptId: attempt?.id ?? null,
+    ...(terminalClear && attempt?.phase === "active"
+      ? { transition: "cleared" as const }
+      : {}),
+    ...(attempt && game.getPhase() === "gameover"
+      ? { transition: "defeat-pending" as const }
+      : {}),
+    grants: terminalClear ? [...pendingMilestoneGrants] : [],
+    auxiliary: {
+      expansionV2: expansionV2Profile,
+      difficulty: difficultySettings,
+    },
     campaign,
     inventory,
     equipment,
@@ -1068,6 +1820,84 @@ function currentAutosaveSnapshot(): AutosaveSnapshot {
   };
 }
 
+function testingStageUnlockEnabled(): boolean {
+  return settings.unlockAllStages === true && ascension.selectedTier === 0;
+}
+
+function canSelectStageFromJourney(stage: number): boolean {
+  return canSelectCampaignStageWithTestingUnlock(
+    campaign,
+    campaignExpansion,
+    stage,
+    testingStageUnlockEnabled(),
+  );
+}
+
+function testingStagePreviewActive(): boolean {
+  if (practiceActive || activeReviewGoal !== undefined) return true;
+  return (
+    testingStageOverride !== null &&
+    isTestingStagePreview(
+      campaign,
+      campaignExpansion,
+      testingStageOverride,
+      testingStageUnlockEnabled(),
+    )
+  );
+}
+
+function beginTestingStagePreview(stage: number): void {
+  testingStageSnapshot = structuredClone(currentAutosaveSnapshot());
+  testingStageOverride = stage;
+}
+
+function restoreTestingStagePersistentState(): void {
+  const snapshot = testingStageSnapshot;
+  if (snapshot === null) return;
+
+  applyRunPersistentState(snapshot);
+  hotbar = snapshot.hotbar;
+  codex = snapshot.codex;
+  campaignExpansion = snapshot.campaignExpansion;
+  checkpointSnapshot = snapshot.checkpointSnapshot;
+  crashRecoverySnapshot = snapshot.crashRecoverySnapshot;
+  stageEntrySnapshot = snapshot.stageEntrySnapshot;
+  testingStageSnapshot = null;
+  if (practiceActive || activeReviewGoal !== undefined) {
+    practiceActive = false;
+    practiceRestorePending = true;
+    practiceReload = loadPlayerSave()
+      .then((loaded) => {
+        applyAutosaveSnapshot(loaded.save);
+        warpAccount = loaded.save.account;
+        if (loaded.save.auxiliary?.expansionV2)
+          expansionV2Profile = sanitizeExpansionV2Profile(
+            loaded.save.auxiliary.expansionV2,
+          );
+        if (loaded.save.auxiliary?.difficulty)
+          difficultySettings = sanitizeDifficultySettings(
+            loaded.save.auxiliary.difficulty,
+          );
+        practiceRestorePending = false;
+        refreshPersistentStateUi();
+      })
+      .catch((error) => {
+        console.error(error);
+        showNotice(
+          "Cannot reload the committed account. Reload before deploying.",
+        );
+      })
+      .finally(renderWarpHud);
+  }
+  refreshPersistentStateUi();
+}
+
+function clearTestingStagePreview(): void {
+  restoreTestingStagePersistentState();
+  testingStageOverride = null;
+}
+
+
 function captureSafeCrashRecovery(
   reason: CrashRecoveryReason,
   savedAt = new Date().toISOString(),
@@ -1083,38 +1913,6 @@ function captureSafeCrashRecovery(
   crashRecoverySnapshot = captured.snapshot;
 }
 
-function persistRecoveryMirrorSync(
-  reason: SaveReason,
-  timestamp = new Date().toISOString(),
-): void {
-  savePlayerRecoveryMirrorSync(
-    createPlayerSave(
-      campaign,
-      timestamp,
-      reason,
-      inventory,
-      equipment,
-      supportSpells,
-      characters,
-      luckPity,
-      hiddenDiscovery,
-      credits,
-      progression,
-      expansionCurrencies,
-      campaignExpansion,
-      checkpointSnapshot,
-      crashRecoverySnapshot,
-      stageEntrySnapshot,
-      shops,
-      route,
-      upgrades,
-      relics,
-      codex,
-      ascension,
-      hotbar,
-    ),
-  );
-}
 
 function markCrashRecoveryDeathInvalid(
   timestamp = new Date().toISOString(),
@@ -1129,20 +1927,15 @@ function markCrashRecoveryDeathInvalid(
   campaignExpansion = invalidated.campaignExpansion;
   crashRecoverySnapshot = invalidated.snapshot;
 
-  try {
-    persistRecoveryMirrorSync("gameover", timestamp);
-  } catch (error) {
-    console.warn(
-      "Unable to write synchronous death recovery marker.",
-      error,
-    );
-  }
 
   campaignAutosave.schedule(
     currentAutosaveSnapshot(),
     "gameover",
   );
-  void campaignAutosave.flush("gameover");
+  void campaignAutosave.flush("gameover").catch(error => {
+    console.error("Defeat save failed.", error);
+    showNotice("Defeat save pending · retry an action to save before leaving");
+  });
 }
 
 function refreshPersistentStateUi(): void {
@@ -1172,6 +1965,53 @@ function hudText(id: string, value: string): void {
   hudDomMetrics.appliedWrites += 1;
 }
 
+/** The Credits number on screen: mid count-up, or the target itself. */
+function creditHudValue(target: number): number {
+  if (target !== creditHudTo) {
+    // Purchases, syncs and resets snap; only pickups count up.
+    creditHudFrom = target;
+    creditHudTo = target;
+    return target;
+  }
+  const t = Math.min(1, (performance.now() - creditHudStart) / CREDIT_HUD_COUNT_MS);
+  const ease = 1 - (1 - t) * (1 - t) * (1 - t);
+  return Math.round(creditHudFrom + (creditHudTo - creditHudFrom) * ease);
+}
+
+function countCreditHudTo(target: number): void {
+  creditHudFrom = creditHudValue(creditHudTo);
+  creditHudTo = target;
+  creditHudStart = performance.now();
+  if (creditHudFrame !== 0) return;
+  const step = (): void => {
+    hudText("creditsHud", creditHudValue(creditHudTo).toLocaleString());
+    if (performance.now() - creditHudStart < CREDIT_HUD_COUNT_MS) {
+      creditHudFrame = window.requestAnimationFrame(step);
+    } else {
+      creditHudFrame = 0;
+    }
+  };
+  creditHudFrame = window.requestAnimationFrame(step);
+}
+
+function showCreditDelta(amount: number, hero: boolean): void {
+  if (amount <= 0) return;
+  creditDeltaSum += amount;
+  const badge = byId("creditsDelta");
+  badge.textContent = "+" + creditDeltaSum.toLocaleString();
+  badge.classList.remove("credit-delta-bump", "credit-delta-out");
+  void badge.offsetWidth;
+  badge.classList.add("credit-delta-show", "credit-delta-bump");
+  badge.classList.toggle("credit-delta-hero", hero);
+  if (creditDeltaTimer !== null) window.clearTimeout(creditDeltaTimer);
+  creditDeltaTimer = window.setTimeout(() => {
+    badge.classList.add("credit-delta-out");
+    badge.classList.remove("credit-delta-show");
+    creditDeltaSum = 0;
+    creditDeltaTimer = null;
+  }, hero ? 1800 : 1300);
+}
+
 function hudWidth(id: string, value: string): void {
   hudDomMetrics.attemptedWrites += 1;
   const element = byId<HTMLElement>(id);
@@ -1188,11 +2028,62 @@ function hudClass(id: string, className: string, enabled: boolean): void {
   hudDomMetrics.appliedWrites += 1;
 }
 
+/**
+ * Score panels catch fire: the left one on a long accurate streak, the right
+ * one on fast, accurate typing (correct keys over the last 8 seconds).
+ */
+const typingSpeedSamples: Array<{ t: number; hits: number }> = [];
+let hudHeatCoolTimer: number | null = null;
+let lastRageReady = false;
+const HEAT_LEFT_LABELS = ["", "HOT STREAK", "ON FIRE", "INFERNO"] as const;
+const HEAT_RIGHT_LABELS = ["", "FAST", "BLAZING", "LIGHTSPEED"] as const;
+
+function setHudHeat(id: string, level: number, label: string): void {
+  const side = document.getElementById(id);
+  if (side === null) return;
+  const previous = Number(side.dataset.heat ?? "0");
+  if (previous !== level) {
+    side.dataset.heat = String(level);
+    if (level > previous) {
+      game.playHudCue("heat-up", level);
+      side.classList.remove("heat-up");
+      void side.offsetWidth;
+      side.classList.add("heat-up");
+      window.setTimeout(() => side.classList.remove("heat-up"), 650);
+    }
+  }
+  if (side.dataset.heatLabel !== label) side.dataset.heatLabel = label;
+}
+
+function renderHudHeat(stats: GameStats): void {
+  const now = performance.now();
+  const last = typingSpeedSamples.at(-1);
+  if (last !== undefined && stats.hits < last.hits) typingSpeedSamples.length = 0;
+  if (last === undefined || last.hits !== stats.hits) typingSpeedSamples.push({ t: now, hits: stats.hits });
+  while (typingSpeedSamples.length > 2 && now - typingSpeedSamples[0]!.t > 8000) typingSpeedSamples.shift();
+  const first = typingSpeedSamples[0];
+  const seconds = first === undefined ? 0 : Math.max(2, (now - first.t) / 1000);
+  const wpm = first === undefined ? 0 : ((stats.hits - first.hits) / 5) / (seconds / 60);
+  const accuracy = accuracyPercent(stats.hits, stats.misses);
+
+  const left = stats.streak >= 70 ? 3 : stats.streak >= 35 ? 2 : stats.streak >= 15 ? 1 : 0;
+  setHudHeat("hudLeft", left, HEAT_LEFT_LABELS[left] + (left > 0 ? " · " + String(stats.streak) : ""));
+  const fast = accuracy < 92 || now - (last?.t ?? 0) > 2500 ? 0 : wpm >= 80 ? 3 : wpm >= 60 ? 2 : wpm >= 40 ? 1 : 0;
+  setHudHeat("hudRight", fast, HEAT_RIGHT_LABELS[fast] + (fast > 0 ? " · " + String(Math.round(wpm)) + " WPM" : ""));
+  // Typing stops → the speed flames die down even without a new stats event.
+  if (hudHeatCoolTimer !== null) window.clearTimeout(hudHeatCoolTimer);
+  hudHeatCoolTimer = fast > 0 ? window.setTimeout(() => setHudHeat("hudRight", 0, ""), 2600) : null;
+}
+
 function renderStats(stats: GameStats): void {
   const startedAt = performance.now();
   hudDomMetrics.renderCalls += 1;
 
   hudText("score", stats.score.toLocaleString());
+  hudText(
+    "creditsHud",
+    creditHudValue(creditHudPresentation.display(credits)).toLocaleString(),
+  );
   hudText("streak", String(stats.streak));
   hudText("multiplier", "x" + String(stats.multiplier));
   hudText(
@@ -1201,6 +2092,7 @@ function renderStats(stats: GameStats): void {
   );
   hudText("kills", String(stats.kills));
   hudText("waveBadge", stageBadgeText(stats.stage));
+  renderHudHeat(stats);
 
   hudText(
     "hull",
@@ -1249,8 +2141,29 @@ function renderStats(stats: GameStats): void {
   const rageSegments = availableRageSegments(stats.power);
   hudClass("powerFill", "usable", rageSegments > 0);
   hudClass("powerFill", "ready", rageSegments === RAGE_SEGMENT_COUNT);
+  // Full Rage: the whole panel catches fire until SPACE is pressed.
+  const rageReady = rageSegments === RAGE_SEGMENT_COUNT;
+  hudClass("playerStatusHud", "rage-ready", rageReady);
+  if (rageReady && !lastRageReady) game.playHudCue("heat-up", 3);
+  lastRageReady = rageReady;
   const powerTrack = byId("powerTrack");
   powerTrack.dataset.rageSegments = String(rageSegments);
+  const evolutionTier = expansionV2Enabled
+    ? expansionEvolutionTier(expansionV2Profile)
+    : 0;
+  powerTrack.dataset.evolutionTier = String(evolutionTier);
+  powerTrack.dataset.visualQuality = settings.visualQuality;
+  powerTrack.classList.toggle(
+    "expansion-rage-evolved",
+    evolutionTier > 0 &&
+      (settings.visualQuality === "high" ||
+        settings.visualQuality === "ultra"),
+  );
+  powerTrack.classList.toggle(
+    "expansion-rage-evolved-max",
+    evolutionTier >= 3 &&
+      settings.visualQuality === "ultra",
+  );
   powerTrack.classList.toggle("usable", rageSegments > 0);
   powerTrack.classList.toggle(
     "ready",
@@ -1346,7 +2259,10 @@ function hotbarActionGlyph(action: HotbarAction): string {
   if (action.id === "mark-of-weakness") return "◎";
   if (action.id === "sanctuary") return "✧";
   if (action.id === "gravity-well") return "◉";
-  if (action.id === "cleanse") return "◇";
+  if (action.id === "cleanse") return "⟳";
+  if (action.id === "missile-swarm") return "➶";
+  if (action.id === "railgun") return "⇈";
+  if (action.id === "tractor-beam") return "⇊";
   return "☄";
 }
 
@@ -1470,6 +2386,7 @@ function renderHotbar(): void {
       view.button.title = "Unassigned hotbar slot";
       view.button.className =
         "hotbar-slot hotbar-" + hotbarPlacementForSlot(index);
+      view.button.dataset.ready = "0";
       continue;
     }
 
@@ -1482,9 +2399,17 @@ function renderHotbar(): void {
           : "skill";
     const glyph = hotbarActionGlyph(action);
     const label = hotbarActionLabel(action);
+    const skillId = action.kind === "item" ? null : hotbarSkillId(action);
+    const painted =
+      action.kind === "item"
+        ? paintedItemIcon(action.id)
+        : skillId === null
+          ? null
+          : paintedSkillIcon(skillId);
     const renderKey = [
       hotbarActionKey(action),
       glyph,
+      painted ?? "",
       label,
       status.state,
       status.disabled ? "disabled" : "enabled",
@@ -1494,17 +2419,28 @@ function renderHotbar(): void {
     if (view.button.dataset.renderKey === renderKey) continue;
 
     view.button.dataset.renderKey = renderKey;
-    view.glyph.textContent = glyph;
+    setIconContent(view.glyph, glyph, painted);
     view.label.textContent = label;
     view.state.textContent = status.state;
     view.button.disabled = status.disabled;
     view.button.title = status.title;
+    const ready = !status.disabled && !status.cooldown;
+    // A slot that just became usable pops once to catch the eye.
+    const justReady = ready && view.button.dataset.ready === "0";
+    view.button.dataset.ready = ready ? "1" : "0";
     view.button.className =
       "hotbar-slot hotbar-" +
       hotbarPlacementForSlot(index) +
       " " +
       kindClass +
-      (status.cooldown ? " cooldown" : "");
+      (status.cooldown ? " cooldown" : "") +
+      (ready ? " ready" : "") +
+      (justReady ? " just-ready" : "");
+    if (justReady) {
+      game.playHudCue("hotbar-ready");
+      const button = view.button;
+      window.setTimeout(() => button.classList.remove("just-ready"), 950);
+    }
   }
 }
 
@@ -1692,6 +2628,7 @@ function renderPlayerStatusIdentity(): void {
   const progress = characters.progress[characters.selected];
   byId("playerStatusName").textContent = character.name;
   byId("playerStatusLevel").textContent = "Lv " + String(progress.level);
+  titleHub?.render();
 }
 
 function showNotice(message: string): void {
@@ -1707,11 +2644,14 @@ function showNotice(message: string): void {
 
 function renderPhase(phase: GamePhase): void {
   titleOverlay.classList.toggle("hidden", phase !== "title");
+  if (phase === "title") titleHub?.render();
+  else titleHub?.closePopovers();
   pauseOverlay.classList.toggle("hidden", phase !== "paused");
   gameOverOverlay.classList.toggle("hidden", phase !== "gameover");
   stageClearOverlay.classList.toggle("hidden", phase !== "stageclear");
   byId("playerStatusHud").classList.toggle("hidden", phase !== "playing");
   byId("combatHotbar").classList.toggle("hidden", phase !== "playing");
+  voiceFeedback.state.setGameplayActive(phase === "playing");
 
   if (phase !== "playing" && phase !== "paused") {
     renderStageEvents([]);
@@ -1888,8 +2828,19 @@ function renderStatuses(
 let lastMusicBossPhase = 0;
 
 function renderBoss(boss: BossHudState | null): void {
+  const bossHud = byId("bossHud");
+  let partsStrip =
+    bossHud.querySelector<HTMLDivElement>(".boss-parts-strip");
+  if (partsStrip === null) {
+    partsStrip = document.createElement("div");
+    partsStrip.className = "boss-parts-strip hidden";
+    bossHud.append(partsStrip);
+  }
+
   if (boss === null) {
     lastMusicBossPhase = 0;
+    partsStrip.replaceChildren();
+    partsStrip.classList.add("hidden");
     hudClass("bossHud", "hidden", true);
     return;
   }
@@ -1910,14 +2861,75 @@ function renderBoss(boss: BossHudState | null): void {
           : boss.mechanicProgress !== undefined
             ? " " + boss.mechanicProgress
             : "");
+  const partsMeta =
+    boss.parts === undefined || boss.parts.length === 0
+      ? ""
+      : " · PARTS " +
+        boss.parts
+          .map((part) => {
+            if (part.destroyed) return part.type.toUpperCase() + " ✓";
+            if (!part.vulnerable) return part.type.toUpperCase() + " LOCKED";
+            const ratio =
+              part.maxHp <= 0
+                ? 0
+                : Math.max(
+                    0,
+                    Math.min(100, (part.hp / part.maxHp) * 100),
+                  );
+            return part.type.toUpperCase() + " " + ratio.toFixed(0) + "%";
+          })
+          .join(" / ");
   hudText(
     "bossName",
     boss.name +
       " · PHASE " +
       String(boss.phase) +
       mechanicMeta +
+      partsMeta +
       (boss.shieldActive ? " · SHIELD" : boss.staggered ? " · STAGGER" : ""),
   );
+
+  partsStrip.replaceChildren();
+  if (boss.parts !== undefined && boss.parts.length > 0) {
+    for (const part of boss.parts) {
+      const chip = document.createElement("div");
+      chip.className =
+        "boss-part-chip" +
+        (part.destroyed ? " destroyed" : "") +
+        (!part.vulnerable ? " locked" : "");
+      const iconUrl = bossPartIconUrl(
+        part.type,
+        settings.visualQuality,
+      );
+      if (iconUrl !== null) {
+        const icon = document.createElement("img");
+        icon.src = iconUrl;
+        icon.alt = part.type + " boss part";
+        icon.className = "boss-part-icon";
+        chip.append(icon);
+      }
+      const label = document.createElement("span");
+      const ratio =
+        part.maxHp <= 0
+          ? 0
+          : Math.max(
+              0,
+              Math.min(100, (part.hp / part.maxHp) * 100),
+            );
+      label.textContent =
+        part.type.toUpperCase() +
+        (part.destroyed
+          ? " · DESTROYED"
+          : !part.vulnerable
+            ? " · LOCKED"
+            : " · " + ratio.toFixed(0) + "%");
+      chip.append(label);
+      partsStrip.append(chip);
+    }
+    partsStrip.classList.remove("hidden");
+  } else {
+    partsStrip.classList.add("hidden");
+  }
   hudText(
     "bossHpText",
     Math.max(0, Math.ceil(boss.hp)).toLocaleString() +
@@ -2064,6 +3076,11 @@ function renderProgression(): void {
       String(progress) +
       " / " +
       String(mission.target);
+    card.classList.toggle("claimable", claimable);
+    const bar = document.createElement("div");
+    bar.className = "progression-bar";
+    bar.style.setProperty("--p", String(Math.min(1, progress / Math.max(1, mission.target))));
+    bar.append(document.createElement("i"));
 
     const reward = document.createElement("div");
     reward.className = "progression-reward";
@@ -2095,7 +3112,7 @@ function renderProgression(): void {
 
     card.title =
       presentation.label + " · " + presentation.stateLabel;
-    card.append(importance, title, description, meta, reward, claim);
+    card.append(importance, title, description, meta, bar, reward, claim);
     missionGrid.append(card);
   }
 
@@ -2131,6 +3148,9 @@ function renderProgression(): void {
 }
 
 function selectedGameplayStage(): number {
+  if (testingStageUnlockEnabled() && testingStageOverride !== null) {
+    return testingStageOverride;
+  }
   return currentAscensionStage(ascension) ?? campaign.selectedStage;
 }
 
@@ -2235,6 +3255,7 @@ function renderAscension(): void {
 function openAscension(): void {
   if (
     !persistenceReady ||
+    !canOpenBetweenStageMenu() ||
     game.getPhase() !== "title" ||
     ascension.highestUnlockedTier < 1
   ) {
@@ -2251,7 +3272,7 @@ function openAscension(): void {
 }
 
 function openProgression(): void {
-  if (!persistenceReady || game.getPhase() !== "title") return;
+  if (!persistenceReady || !canOpenBetweenStageMenu() || game.getPhase() !== "title") return;
   syncProgressionAchievements();
   renderProgression();
   progressionDialog.showModal();
@@ -2275,143 +3296,128 @@ function renderAnomalyDecision(riskHullRatio: number): void {
     "% max Hull (cannot reduce Hull below 1) for a stronger reward table.";
 }
 
+/** Painted crystal art for currency cards (Vite resolves the URL). */
+const BOSS_CACHE_ART = new URL("./assets/pickups/credits/elite@2x.webp", import.meta.url).href;
+const PREMIUM_CACHE_ART = new URL("./assets/pickups/credits/elite-golden@2x.webp", import.meta.url).href;
+
+function equipmentRewardCard(
+  definitionId: Parameters<typeof getEquipmentDefinition>[0],
+  grade: EquipmentDrop["grade"],
+  onPick: () => void,
+): RewardCardInput {
+  const definition = getEquipmentDefinition(definitionId);
+  const tier = rewardTierForGrade(grade);
+  return {
+    tier,
+    tag: "Equipment · " + gradeLabel(grade),
+    title: definition.name,
+    description: definition.description,
+    iconUrl: paintedEquipmentIcon(definition.id),
+    iconDark: true,
+    glyph: definition.icon,
+    onPick,
+  };
+}
+
 function renderRewardChoiceOptions(
   options: readonly EquipmentDrop[],
 ): void {
-  const grid = byId("rewardChoiceGrid");
-  grid.replaceChildren();
-
-  for (const option of options) {
-    const definition = getEquipmentDefinition(option.definitionId);
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "reward-choice-option";
-
-    const grade = document.createElement("span");
-    grade.textContent = gradeLabel(option.grade).toUpperCase();
-
-    const name = document.createElement("strong");
-    name.textContent = definition.name;
-
-    const description = document.createElement("small");
-    description.textContent = definition.description;
-
-    button.append(grade, name, description);
-    button.addEventListener("click", () => {
-      equipment = addEquipmentInstance(equipment, {
-        instanceId: createEquipmentDropInstanceId(),
-        definitionId: option.definitionId,
-        grade: option.grade,
-        enhancement: 0,
-      });
-      progression = recordProgressionEvent(progression, {
-        type: "equipment-drop",
-      });
-      renderEquipment();
-      renderProgression();
-      void autosaveCampaign(
-        "equipment",
-        "✓ Reward selected · " + definition.name,
-      );
-      rewardChoiceDialog.close();
-      game.resume();
-    });
-
-    grid.append(button);
-  }
-}
-
-function renderBossRewardChoiceOptions(
-  options: readonly BossRewardChoiceOption[],
-): void {
-  const grid = byId("rewardChoiceGrid");
-  grid.replaceChildren();
-
-  for (const option of options) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "reward-choice-option";
-
-    const kind = document.createElement("span");
-    kind.textContent = option.kind.toUpperCase();
-
-    const name = document.createElement("strong");
-    const description = document.createElement("small");
-    const extra = document.createElement("div");
-    extra.className = "reward-choice-extra";
-
-    if (option.kind === "equipment") {
-      const definition = getEquipmentDefinition(option.drop.definitionId);
-      applyGradeFrame(button, option.drop.grade);
-      extra.append(
-        createLocalIcon(
-          definition.icon,
-          definition.name + " icon",
-          "reward-choice-icon",
-        ),
-        createGradeBadge(option.drop.grade),
-      );
-      name.textContent = definition.name;
-      description.textContent = definition.description;
-    } else if (option.kind === "relic") {
-      const definition = getRelicDefinition(option.relicId);
-      applyGradeFrame(button, definition.grade);
-      extra.append(createGradeBadge(definition.grade));
-      name.textContent = definition.name;
-      description.textContent = definition.description;
-    } else {
-      name.textContent = option.id === "premium-currency"
-        ? "Premium Cache"
-        : "Boss Cache";
-      description.textContent = "Currency reward";
-      replaceCurrencyChips(
-        extra,
-        {
-          credits: option.credits,
-          alloy: option.currencies.alloy,
-          starCrystal: option.currencies.starCrystal,
-          quantumCore: option.currencies.quantumCore,
-        },
-        { signed: true },
-      );
-    }
-
-    button.classList.add("visual-card");
-    button.append(kind, extra, name, description);
-    button.addEventListener("click", () => {
-      if (option.kind === "equipment") {
+  renderRewardCards(
+    byId("rewardChoiceGrid"),
+    options.map((option) =>
+      equipmentRewardCard(option.definitionId, option.grade, () => {
+        const definition = getEquipmentDefinition(option.definitionId);
         equipment = addEquipmentInstance(equipment, {
           instanceId: createEquipmentDropInstanceId(),
-          definitionId: option.drop.definitionId,
-          grade: option.drop.grade,
+          definitionId: option.definitionId,
+          grade: option.grade,
           enhancement: 0,
         });
         progression = recordProgressionEvent(progression, {
           type: "equipment-drop",
         });
-      } else if (option.kind === "relic") {
-        relics = grantRelic(relics, option.relicId).state;
-        applyRelicEffects();
-      } else {
-        credits = addCredits(credits, option.credits);
-        expansionCurrencies = addExpansionCurrencyReward(
-          expansionCurrencies,
-          option.currencies,
+        renderEquipment();
+        renderProgression();
+        void autosaveCampaign(
+          "equipment",
+          "✓ Reward selected · " + definition.name,
         );
+        rewardChoiceDialog.close();
+        game.resume();
+      }),
+    ),
+  );
+}
+
+function renderBossRewardChoiceOptions(
+  options: readonly BossRewardChoiceOption[],
+): void {
+  const pick = (option: BossRewardChoiceOption): void => {
+    if (option.kind === "equipment") {
+      equipment = addEquipmentInstance(equipment, {
+        instanceId: createEquipmentDropInstanceId(),
+        definitionId: option.drop.definitionId,
+        grade: option.drop.grade,
+        enhancement: 0,
+      });
+      progression = recordProgressionEvent(progression, {
+        type: "equipment-drop",
+      });
+    } else if (option.kind === "relic") {
+      relics = grantRelic(relics, option.relicId).state;
+      applyRelicEffects();
+    } else {
+      credits = addCredits(credits, option.credits);
+      expansionCurrencies = addExpansionCurrencyReward(
+        expansionCurrencies,
+        option.currencies,
+      );
+    }
+
+    codex = discoverCodexReward(codex, "boss-choice").state;
+    renderEquipment();
+    renderProgression();
+    renderCodex();
+    updateDataSummary();
+    rewardChoiceDialog.close();
+    game.resume();
+    game.resolveBossRewardChoice();
+  };
+
+  renderRewardCards(
+    byId("rewardChoiceGrid"),
+    options.map((option): RewardCardInput => {
+      if (option.kind === "equipment") {
+        return equipmentRewardCard(option.drop.definitionId, option.drop.grade, () => pick(option));
       }
-
-      codex = discoverCodexReward(codex, "boss-choice").state;
-      renderEquipment();
-      renderProgression();
-      renderCodex();
-      updateDataSummary();
-      rewardChoiceDialog.close();
-      game.resume();
-      game.resolveBossRewardChoice();
-    });
-
-    grid.append(button);
-  }
+      if (option.kind === "relic") {
+        const definition = getRelicDefinition(option.relicId);
+        const tier = rewardTierForGrade(definition.grade);
+        return {
+          tier,
+          tag: "Relic · " + rewardTierLabel(tier),
+          title: definition.name,
+          description: definition.description,
+          iconUrl: relicIconUrl(option.relicId),
+          glyph: "✧",
+          onPick: () => pick(option),
+        };
+      }
+      const premium = option.id === "premium-currency";
+      const bullets = ["+" + option.credits.toLocaleString() + " Credits"];
+      if (option.currencies.alloy > 0) bullets.push("+" + String(option.currencies.alloy) + " Alloy");
+      if (option.currencies.starCrystal > 0) bullets.push("+" + String(option.currencies.starCrystal) + " Star Crystal");
+      if (option.currencies.quantumCore > 0) bullets.push("+" + String(option.currencies.quantumCore) + " Quantum Core");
+      return {
+        tier: premium ? "prismatic" : "gold",
+        tag: premium ? "Supply · Prismatic" : "Supply · Gold",
+        title: premium ? "Premium Cache" : "Boss Cache",
+        bullets,
+        iconUrl: premium ? PREMIUM_CACHE_ART : BOSS_CACHE_ART,
+        onPick: () => pick(option),
+      };
+    }),
+  );
 }
 
 function clearDeathRecoveryMarker(): void {
@@ -2457,7 +3463,7 @@ function renderDeathProtectionChoices(failedStage: number): boolean {
   const validStageEntry =
     stageEntrySnapshot !== null &&
     stageEntrySnapshot.stage === failedStage;
-  const canRevive = phoenixCount > 0 && validStageEntry;
+  const canRevive = accountTransactions.canWrite() && !!warpAccount?.attempt && phoenixCount > 0 && validStageEntry;
 
   // Legacy checkpoint-rollback consumables remain readable in old saves for
   // compatibility, but they are no longer offered or consumed by Game Over.
@@ -2470,7 +3476,7 @@ function renderDeathProtectionChoices(failedStage: number): boolean {
   byId<HTMLButtonElement>("phoenixCoreButton").disabled = !canRevive;
 
   byId("againButton").textContent =
-    "Retry Stage " + String(failedStage).padStart(3, "0");
+    "Retry Rewarded · 10 Warp · Stage " + String(failedStage).padStart(3, "0");
   byId("gameOverStageSelectButton").textContent = "Choose unlocked stage";
   byId("resultTitleButton").textContent = "Main menu";
   setDeathNavigationDisabled(false);
@@ -2497,16 +3503,33 @@ async function persistResolvedDeath(
 }
 
 async function resolveCheckpointDeath(
-  action: "retry" | "stage-select" | "title",
+  action: "retry" | "practice" | "stage-select" | "title",
 ): Promise<void> {
   if (
     game.getPhase() !== "gameover" ||
+    practiceRestorePending ||
     !deathActionGate.tryEnter()
-  ) return;
+  )
+    return;
 
   setDeathActionPending(true);
   try {
     const failedStage = game.getStats().stage;
+
+    if (testingStagePreviewActive() || encounterWasFree) {
+      restoreTestingStagePersistentState();
+      game.backToTitle();
+      await practiceReload;
+      if (action === "practice") {
+        await startSelectedStage(true);
+      } else if (action === "retry") {
+        await startSelectedStage();
+      } else if (action === "stage-select") {
+        openStageSelect();
+      }
+      return;
+    }
+
     campaign = selectCampaignStage(campaign, failedStage);
     refreshPersistentStateUi();
 
@@ -2515,8 +3538,11 @@ async function resolveCheckpointDeath(
     );
     if (!saved) return;
 
+    if (!(await finishManagedSortie("failed"))) return;
     game.backToTitle();
-    if (action === "retry") {
+    if (action === "practice") {
+      await startSelectedStage(true);
+    } else if (action === "retry") {
       await startSelectedStage();
       if (routeDialog.open) {
         showNotice("Choose a route, then press Start Encounter");
@@ -2535,61 +3561,25 @@ async function resolveCheckpointDeath(
 async function resolvePhoenixDeath(): Promise<void> {
   if (
     game.getPhase() !== "gameover" ||
-    stageEntrySnapshot === null ||
-    itemCount(inventory, "phoenix-core") <= 0 ||
+    !warpAccount?.attempt ||
     !deathActionGate.tryEnter()
-  ) {
+  )
     return;
-  }
-
   setDeathActionPending(true);
   try {
-    if (!game.reviveCurrentEncounter()) return;
-
-    const activeResult = consumePhoenixCore(
-      currentRunPersistentState(),
-    );
-    if (!activeResult.applied) return;
-    applyRunPersistentState(activeResult.state);
-
-    const entryResult = consumePhoenixCore(
-      stageEntrySnapshot.state,
-    );
-    const safeEntryState = entryResult.applied
-      ? entryResult.state
-      : stageEntrySnapshot.state;
-    const safeEntry = createStageEntrySnapshot(
-      safeEntryState,
-      stageEntrySnapshot.campaignExpansion,
-      stageEntrySnapshot.checkpointSnapshot,
-      stageEntrySnapshot.capturedAt,
-    );
-    stageEntrySnapshot = safeEntry;
-
-    const captured = captureCrashRecoverySnapshot(
-      safeEntry.state,
-      safeEntry.campaignExpansion,
-      safeEntry.checkpointSnapshot,
-      "stage-entry",
-      new Date().toISOString(),
-    );
-    crashRecoverySnapshot = captured.snapshot;
-    campaignExpansion = {
-      ...campaignExpansion,
-      crashRecovery: captured.campaignExpansion.crashRecovery,
-    };
-
+    await campaignAutosave.flush();
+    const id = warpAccount.attempt!.id;
+    const saved = await accountTransactions.revive(id);
+    inventory = saved.inventory;
+    if (!game.reviveCurrentEncounter())
+      throw new Error("Encounter cannot resume. Return to the menu.");
     renderInventory();
     updateDataSummary();
-    await autosaveCampaign(
-      "gameover",
-      "✓ Phoenix Core consumed · encounter resumed",
-    );
+    showNotice("Phoenix consumed · same sortie resumed");
+  } catch (error) {
+    showNotice(error instanceof Error ? error.message : "Phoenix save failed");
   } finally {
     deathActionGate.leave();
-    if (game.getPhase() === "gameover") {
-      renderDeathProtectionChoices(game.getStats().stage);
-    }
   }
 }
 
@@ -2604,6 +3594,221 @@ function formatStageDuration(seconds: number): string {
   return String(minutes) + ":" + String(total % 60).padStart(2, "0");
 }
 
+/** Three stars that pop in one by one; earned ones burn gold. */
+function renderClearStars(stars: number): void {
+  const root = byId("clearStars");
+  root.replaceChildren();
+  root.setAttribute("aria-label", String(stars) + " of 3 stars");
+  for (let index = 0; index < 3; index += 1) {
+    const star = document.createElement("span");
+    star.className = "clear-star" + (index < stars ? " earned" : "");
+    star.style.setProperty("--i", String(index));
+    star.textContent = "★";
+    root.append(star);
+  }
+}
+
+/** Counts a number up from 0 (score on the results card). */
+function countUpNumber(element: HTMLElement, value: number, durationMs = 1100): void {
+  const target = Math.max(0, Math.round(value));
+  const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+  if (reduced || target === 0) {
+    element.textContent = target.toLocaleString();
+    return;
+  }
+  const started = performance.now();
+  const step = (now: number): void => {
+    const k = Math.min(1, (now - started) / durationMs);
+    const eased = 1 - (1 - k) ** 3;
+    element.textContent = Math.round(target * eased).toLocaleString();
+    if (k < 1) window.requestAnimationFrame(step);
+  };
+  window.requestAnimationFrame(step);
+}
+
+function renderStageClearCelebration(
+  profile: StageClearCelebrationProfile,
+): void {
+  const overlay = byId("stageClearOverlay");
+  const layer = byId("stageClearCelebration");
+  overlay.dataset.celebrationLevel = String(profile.level);
+  overlay.dataset.visualQuality = settings.visualQuality;
+  overlay.dataset.accuracyTier = String(profile.accuracyTier);
+  overlay.dataset.speedTier = String(profile.speedTier);
+  overlay.dataset.scoreTier = String(profile.scoreTier);
+  layer.replaceChildren();
+
+  const label = document.createElement("strong");
+  label.className = "stage-clear-celebration-label";
+  label.textContent = profile.label;
+  layer.append(label);
+
+  const baseCount =
+    settings.visualQuality === "ultra"
+      ? 22
+      : settings.visualQuality === "high"
+        ? 16
+        : settings.visualQuality === "medium"
+          ? 10
+          : 4;
+  const perLevel =
+    settings.visualQuality === "ultra"
+      ? 10
+      : settings.visualQuality === "high"
+        ? 8
+        : settings.visualQuality === "medium"
+          ? 6
+          : 2;
+  const particleCount = Math.min(
+    72,
+    baseCount + profile.level * perLevel,
+  );
+
+  for (let index = 0; index < particleCount; index += 1) {
+    const particle = document.createElement("i");
+    particle.className =
+      "stage-clear-celebration-particle " +
+      (index % 5 === 0 ? "stage-clear-star" : "stage-clear-shard");
+    const x = 4 + ((index * 37 + profile.level * 11) % 92);
+    const drift = -80 + ((index * 53) % 160);
+    const delay = (index % 12) * 34;
+    const size =
+      3 + ((index * 7 + profile.level * 3) % (profile.level >= 4 ? 9 : 6));
+    const spin = -160 + ((index * 71) % 320);
+    particle.style.setProperty("--clear-x", String(x) + "%");
+    particle.style.setProperty("--clear-drift", String(drift) + "px");
+    particle.style.setProperty("--clear-delay", String(delay) + "ms");
+    particle.style.setProperty("--clear-size", String(size) + "px");
+    particle.style.setProperty("--clear-spin", String(spin) + "deg");
+    layer.append(particle);
+  }
+
+  // Light rays turning behind the card, then a confetti shower.
+  const rays = document.createElement("i");
+  rays.className = "stage-clear-rays";
+  layer.append(rays);
+  const confettiCount =
+    settings.visualQuality === "ultra" ? 64 : settings.visualQuality === "high" ? 48 : settings.visualQuality === "medium" ? 30 : 10;
+  const colors = ["#5fe3ff", "#a07bff", "#ffd166", "#ff6fae", "#7dffb5", "#fff4c8"];
+  for (let index = 0; index < confettiCount; index += 1) {
+    const piece = document.createElement("i");
+    piece.className = "stage-clear-confetti";
+    piece.style.setProperty("--x", String((index * 61) % 100) + "%");
+    piece.style.setProperty("--delay", String((index * 97) % 1500) + "ms");
+    piece.style.setProperty("--dur", String(2400 + ((index * 137) % 1800)) + "ms");
+    piece.style.setProperty("--sway", String(-60 + ((index * 41) % 120)) + "px");
+    piece.style.setProperty("--spin", String(360 + ((index * 83) % 720)) + "deg");
+    piece.style.setProperty("--c", colors[index % colors.length]!);
+    layer.append(piece);
+  }
+}
+
+
+function renderTestingStageClearReport(
+  stats: GameStats,
+  stageSession: StageSessionSnapshot,
+  wpm: number,
+  accuracy: number,
+): void {
+  const world = worldForStage(stats.stage);
+  const objective = game.getStageObjective();
+  const rating = stageResultStars(
+    accuracy,
+    objective?.status ?? null,
+  );
+  renderStageClearCelebration(
+    stageClearCelebrationProfile({
+      stars: rating.stars,
+      accuracy,
+      wpm,
+      score: stats.score,
+      elapsedSeconds: stageSession.elapsedSeconds,
+    }),
+  );
+  const measuredKills =
+    stageSession.regularKills +
+    stageSession.eliteKills +
+    stageSession.bossKills;
+  const killRate =
+    stageSession.elapsedSeconds <= 0
+      ? 0
+      : (measuredKills / stageSession.elapsedSeconds) * 60;
+
+  byId("clearTitle").textContent =
+    "Stage " + String(stats.stage).padStart(3, "0") + " complete";
+  byId("clearMeta").textContent =
+    world.name +
+    " · TESTING PREVIEW · " +
+    difficultySettings.mode.toUpperCase();
+  renderClearStars(rating.stars);
+  byId("clearStarRule").textContent =
+    "Testing preview · rating shown, campaign progression unchanged";
+  countUpNumber(byId("clearScore"), stats.score);
+  byId("clearAccuracy").textContent = game.getInputMode() === "voice" ? "Speaking · " + game.getVoiceMetrics().words + " words" : accuracy.toFixed(1) + "%";
+  byId("clearWpm").textContent = wpm.toFixed(0);
+  byId("clearTime").textContent =
+    formatStageDuration(stageSession.elapsedSeconds);
+  byId("clearKillRate").textContent = killRate.toFixed(1) + "/min";
+  byId("clearStreak").textContent = String(stats.maxStreak);
+
+  wordReviewFilter = "all";
+  renderMeasuredStageSession(stageSession, stats.hits, stats.misses);
+
+  replaceCurrencyChips(
+    byId("clearCredits"),
+    {
+      credits: 0,
+      alloy: 0,
+      starCrystal: 0,
+      quantumCore: 0,
+    },
+    {
+      signed: true,
+      className: "stage-reward-chips",
+    },
+  );
+
+  const progressPanel = byId("clearCharacterProgress");
+  progressPanel.replaceChildren();
+  const note = document.createElement("span");
+  note.textContent =
+    "Testing preview · XP, loot, currency, unlocks and checkpoints are not saved.";
+  progressPanel.append(note);
+  byId("clearDetails").textContent =
+    "Temporary all-stage access · disable Unlock all stages in Settings to restore normal progression locks.";
+}
+
+/** Small icon for each result stat (results card and Run over). */
+function resultMetricIcon(label: string): string {
+  const text = label.toLowerCase();
+  const rules: ReadonlyArray<readonly [RegExp, string]> = [
+    [/score/, "trophy"],
+    [/wpm|speed/, "gauge"],
+    [/accuracy/, "target"],
+    [/time/, "clock"],
+    [/chain|streak/, "flame"],
+    [/kill rate/, "swords"],
+    [/boss/, "skull"],
+    [/elite/, "crown"],
+    [/measured kills|regular kills/, "swords"],
+    [/enemies/, "target"],
+    [/projectile/, "shield"],
+    [/damage|hits taken/, "heart"],
+    [/skills/, "cpu"],
+    [/consumable/, "plus"],
+    [/nova|ultimate/, "zap"],
+    [/bonus/, "sparkle"],
+    [/wrong/, "x"],
+    [/corrected/, "refresh"],
+    [/inputs|keys/, "keyboard"],
+    [/perfect/, "star"],
+    [/words/, "book"],
+    [/recall/, "headphones"],
+    [/stage/, "flag"],
+  ];
+  return rules.find(([pattern]) => pattern.test(text))?.[1] ?? "hash";
+}
+
 function appendResultMetric(
   root: HTMLElement,
   label: string,
@@ -2613,6 +3818,7 @@ function appendResultMetric(
   const card = document.createElement("div");
   const name = document.createElement("span");
   name.textContent = label;
+  name.dataset.icon = resultMetricIcon(label);
   const amount = document.createElement("strong");
   amount.textContent = value;
   card.append(name, amount);
@@ -2684,6 +3890,7 @@ function renderWordReview(snapshot: StageSessionSnapshot): void {
     const outcomes = document.createElement("div");
     outcomes.className = "word-review-outcomes";
     const chips: Array<[string, number, StageWordOutcome]> = [
+      ["Spoken", group.spoken ?? 0, "spoken"],
       ["Perfect", group.perfect, "perfect"],
       ["Corrected", group.corrected, "corrected"],
       ["Missed", group.missed, "missed"],
@@ -2874,6 +4081,12 @@ async function applySpaceReviewDataset(data: unknown): Promise<void> {
   try {
     const dataset = parseSpaceReviewDataset(data);
     if (dataset === null) return;
+    if (warpAccount?.attempt && !await finishManagedSortie("abandoned")) return;
+    if (testingStagePreviewActive()) {
+      restoreTestingStagePersistentState();
+      await practiceReload;
+      if (practiceRestorePending) throw new Error("Reload the account before switching Review sessions");
+    }
 
     const index = vocabularyIndex ?? (await loadVocabularyIndex());
     vocabularyIndex = index;
@@ -2952,6 +4165,35 @@ window.addEventListener("message", (event: MessageEvent<unknown>) => {
   void applySpaceReviewDataset(event.data);
 });
 
+/**
+ * BGV is enabled by default for Worlds with a composition. `?bg=legacy`
+ * keeps the current scene renderer for A/B checks; `&bgPresent=layered`
+ * stacks the WebGL canvas instead of blitting it into gameplay.
+ */
+function backgroundOptions(): {
+  backgroundCanvas: HTMLCanvasElement | null;
+  backgroundPresentation: "layered" | "blit";
+} {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    backgroundCanvas:
+      params.get("bg") === "legacy"
+        ? null
+        : byId<HTMLCanvasElement>("bgCanvas"),
+    backgroundPresentation:
+      params.get("bgPresent") === "layered" ? "layered" : "blit",
+  };
+}
+
+function activeCombatCreditMode(): CombatCreditMode {
+  if (testingStagePreviewActive()) return "preview";
+  if (expeditionSession.ownsCampaignPersistence()) return "expedition";
+  if (currentHiddenEncounterState().active !== null) return "hidden";
+  if (gameplayMode === "recall") return "recall";
+  if (ascension.selectedTier > 0) return "ascension";
+  return "campaign";
+}
+
 const game = new Game(
   byId<HTMLCanvasElement>("gameCanvas"),
   [],
@@ -2959,6 +4201,7 @@ const game = new Game(
   {
     onStats: renderStats,
     onPhase: (phase) => {
+      voiceSession.phaseChanged();
       renderPhase(phase);
 
       renderRecallAssistUi();
@@ -2991,24 +4234,149 @@ const game = new Game(
         byId("resultWave").textContent =
           String(stats.stage).padStart(3, "0");
         byId("resultAccuracy").textContent =
-          accuracyPercent(
+          game.getInputMode() === "voice" ? `Speaking · ${game.getVoiceMetrics().words} words` : accuracyPercent(
             stageSession.correctWordKeys,
             stageSession.wrongWordKeys,
           ).toFixed(1) + "%";
-        byId("resultStreak").textContent = String(stats.maxStreak);
+        byId("resultStreak").textContent = game.getInputMode() === "voice" ? "—" : String(stats.maxStreak);
         renderGameOverMeasured(stageSession);
 
         deathActionGate.leave();
 
-        const deathAt = new Date().toISOString();
-        markCrashRecoveryDeathInvalid(deathAt);
-        renderDeathProtectionChoices(stats.stage);
+        const activeExpedition = expeditionSession.currentRun();
+        if (
+          activeExpedition !== null &&
+          activeExpedition.phase === "encounter"
+        ) {
+          try {
+            const ended = expeditionSession.defeat();
+            if (ended !== null) {
+              expansionEncounterRuntime = null;
+              game.setExpansionEncounterContext(null);
+              recordExpeditionTerminalProfile(ended);
+              expeditionUi?.setResumeAvailable(false);
+              expeditionUi?.showSummary(ended);
+            }
+          } catch (error) {
+            console.error("Unable to persist Expedition defeat.", error);
+            showNotice(
+              "Expedition save failed · reload resumes the previous safe boundary",
+            );
+          }
+          byId("deathProtectionMeta").textContent =
+            "Expedition · Campaign progression and economy were not changed.";
+          byId("deathProtectionActions").classList.add("hidden");
+          byId("phoenixCoreButton").classList.add("hidden");
+          setDeathNavigationDisabled(true);
+          return;
+        }
+
+        if (testingStagePreviewActive()) {
+          const wasPractice = practiceActive || activeReviewGoal !== undefined;
+          restoreTestingStagePersistentState();
+          byId("againButton").textContent =
+            wasPractice ? "Retry Rewarded · 10 Warp" : "Retry Testing Stage " + String(stats.stage).padStart(3, "0");
+          byId("gameOverStageSelectButton").textContent =
+            "Choose any testing stage";
+          byId("deathProtectionMeta").textContent =
+            "Testing preview · campaign progress, rewards and death state were not saved.";
+          byId("deathProtectionActions").classList.add("hidden");
+          byId("phoenixCoreButton").classList.add("hidden");
+          setDeathNavigationDisabled(false);
+        } else {
+          if (expansionV2Enabled) {
+            persistExpansionV2Profile({
+              ...expansionV2Profile,
+              nemesis: recordNemesisDefeat(
+                expansionV2Profile.nemesis,
+                "stage-threat-" + String(stats.stage),
+                stats.stage,
+              ),
+            });
+          }
+          const deathAt = new Date().toISOString();
+          markCrashRecoveryDeathInvalid(deathAt);
+          renderDeathProtectionChoices(stats.stage);
+        }
       }
     },
     onStage: (stage) => {
       recallStage = { attempts: 0, perfect: 0, hints: 0, replays: 0, responseMs: 0 };
       renderStage(stage);
+      const activeNemesis = expansionV2Profile.nemesis.active;
+      if (
+        expansionV2Enabled &&
+        expeditionSession.currentRun() === null &&
+        activeNemesis !== null &&
+        !activeNemesis.resolved &&
+        activeNemesis.sourceStage === stage
+      ) {
+        persistExpansionV2Profile({
+          ...expansionV2Profile,
+          nemesis: markNemesisReturn(
+            expansionV2Profile.nemesis,
+          ),
+        });
+        showNotice("Nemesis signal reacquired");
+      }
       codex = discoverCodexWorld(codex, worldForStage(stage).id).state;
+    },
+    onCombatCreditAttemptStart: (attempt) => {
+      currentEncounterToken = attempt.attemptId;
+      encounterWasFree = testingStagePreviewActive();
+      const mode = activeCombatCreditMode();
+      const baselineStageCredits =
+        stageClearCreditReward({
+          stage: attempt.stage,
+          accuracy: 94,
+          salvage: game.getPlayerStats().salvage,
+        }) * (activeStageDifficulty?.rewardMultiplier ?? 1);
+      combatCreditLedger.beginAttempt({
+        attemptId: attempt.attemptId,
+        mode,
+        combatCreditBudget: combatCreditStageBudget({
+          existingBaseCredits: baselineStageCredits,
+          expectedEligibleKills: attempt.expectedEligibleKills,
+        }),
+        expectedWeight: combatCreditExpectedWeight({
+          regularEnemyCount: attempt.regularEnemyCount,
+          bossRole: attempt.bossRole,
+        }),
+      });
+    },
+    onCombatCreditReward: (request) =>
+      combatCreditLedger.claimKillReward(
+        request,
+        (amount) => {
+          const before = credits;
+          credits = addCredits(credits, amount);
+          creditHudPresentation.claimApplied(
+            Math.max(0, credits - before),
+            credits,
+          );
+          return { before, after: credits };
+        },
+      ),
+    onCombatCreditPickupPresented: (event) => {
+      const display = creditHudPresentation.present(
+        event.walletDeltaApplied,
+        credits,
+      );
+      countCreditHudTo(display);
+      showCreditDelta(event.walletDeltaApplied, event.hero);
+      const hud = byId("creditsHud");
+      hud.classList.remove("credit-pulse", "credit-pulse-hero");
+      void hud.offsetWidth;
+      hud.classList.add(
+        event.hero ? "credit-pulse-hero" : "credit-pulse",
+      );
+      if (creditHudPulseTimer !== null) {
+        window.clearTimeout(creditHudPulseTimer);
+      }
+      creditHudPulseTimer = window.setTimeout(() => {
+        hud.classList.remove("credit-pulse", "credit-pulse-hero");
+        creditHudPulseTimer = null;
+      }, event.hero ? 620 : 360);
     },
     onStagePhase: (phase) => {
       renderStagePhase(phase);
@@ -3019,20 +4387,152 @@ const game = new Game(
     onStatuses: renderStatuses,
     onBossUpdate: renderBoss,
     onSkills: renderAllSkills,
-    onStageClear: (stats) => {
-      saveRecallMemory();
+    onStageClear: async (stats) => {
+      if (currentEncounterToken === settledEncounterToken || clearSettlementPending) return;
+      settledEncounterToken = currentEncounterToken; clearSettlementPending = true;
+      try {
       const stageSession = game.getStageSessionSnapshot();
       const wpm = stageWordsPerMinute(
         stageSession.correctWordKeys,
         stageSession.elapsedSeconds,
       );
-      const accuracy = accuracyPercent(
+      const accuracy = game.getInputMode() === "voice" || game.getInputMode() === "hybrid" && stageSession.correctWordKeys === 0 ? 0 : accuracyPercent(
         stageSession.correctWordKeys,
         stageSession.wrongWordKeys,
       );
+
+      const activeExpedition = expeditionSession.currentRun();
+      if (
+        activeExpedition !== null &&
+        activeExpedition.phase === "encounter"
+      ) {
+        try {
+          const nextActiveSeconds =
+            expeditionActiveSecondsTotal +
+            stageSession.elapsedSeconds;
+          const run = expeditionSession.settle({
+            score: stats.score,
+            accuracy,
+            activeSeconds: nextActiveSeconds,
+            contributions:
+              expansionEncounterRuntime?.contributions,
+            resources: {
+              hull: stats.hull,
+              maxHull: stats.maxHull,
+              shield: stats.shield,
+              maxShield: stats.maxShield,
+              energy: stats.energy,
+              maxEnergy: stats.maxEnergy,
+              power: stats.power,
+            },
+          });
+          if (run !== null) {
+            const completedRuntime = expansionEncounterRuntime;
+            expansionEncounterRuntime = null;
+            game.setExpansionEncounterContext(null);
+            const facts = completedRuntime?.learningFacts ?? [];
+            const evidence = facts
+              .map((fact) =>
+                evidenceFromCompletion(run.runId, fact),
+              )
+              .filter(
+                (item): item is NonNullable<typeof item> =>
+                  item !== null,
+              );
+            if (evidence.length > 0) {
+              persistExpansionV2Profile(
+                commitLearningToExpansionProfile(
+                  expansionV2Profile,
+                  evidence,
+                ),
+              );
+            }
+            for (const fact of facts) {
+              if (fact.origin === "voice") continue; // Speaking was recorded at semantic completion.
+              postLearningEvent(
+                buildCombatLearningEvent({
+                  entry: fact.entry,
+                  perfect: fact.perfect,
+                }),
+              );
+            }
+
+            expeditionActiveSecondsTotal =
+              nextActiveSeconds;
+
+            if (run.terminal !== null) {
+              recordExpeditionTerminalProfile(run);
+              expeditionUi?.setResumeAvailable(false);
+              expeditionUi?.showSummary(run);
+            } else if (run.phase === "draft") {
+              expeditionUi?.setResumeAvailable(true);
+              expeditionUi?.showDraft(run);
+            } else if (run.phase === "rest") {
+              expeditionUi?.setResumeAvailable(true);
+              expeditionUi?.showRest(run);
+            } else if (run.phase === "setup") {
+              expeditionUi?.setResumeAvailable(true);
+              expeditionUi?.showBriefing(run);
+            }
+          }
+        } catch (error) {
+          console.error("Unable to persist Expedition settlement.", error);
+          showNotice(
+            "Expedition save failed · reload resumes the previous safe boundary",
+          );
+        }
+        return;
+      }
+
+      const activeNemesis = expansionV2Profile.nemesis.active;
+      if (
+        expansionV2Enabled &&
+        activeNemesis !== null &&
+        !activeNemesis.resolved &&
+        activeNemesis.sourceStage === stats.stage &&
+        activeNemesis.returns > 0
+      ) {
+        const resolved = resolveNemesis(
+          expansionV2Profile.nemesis,
+        );
+        persistExpansionV2Profile({
+          ...expansionV2Profile,
+          nemesis: resolved.state,
+          campaignEventFlags: resolved.grantReward
+            ? [
+                ...new Set([
+                  ...expansionV2Profile.campaignEventFlags,
+                  "nemesis-reward:" + activeNemesis.id,
+                ]),
+              ]
+            : expansionV2Profile.campaignEventFlags,
+        });
+        if (resolved.grantReward) {
+          showNotice("Nemesis resolved · evolution mark earned");
+        }
+      }
+
+      saveRecallMemory();
+
+      if (testingStagePreviewActive()) {
+        const wasPractice = practiceActive || activeReviewGoal !== undefined;
+        const completedStage = stats.stage;
+        restoreTestingStagePersistentState();
+        renderTestingStageClearReport(
+          stats,
+          stageSession,
+          wpm,
+          accuracy,
+        );
+        if (wasPractice) { byId("clearTitle").textContent = `Practice Stage ${completedStage} complete`; byId("clearMeta").textContent = "Learning saved · simulated rewards · no Campaign unlock"; }
+        if (testingStageOverride !== null) testingStageOverride = Math.min(1000, completedStage + 1);
+        updateCampaignUi();
+        return;
+      }
+
       const activeHidden = currentHiddenEncounterState().active;
       if (activeHidden !== null) {
-        handleHiddenEncounterClear(
+        await handleHiddenEncounterClear(
           activeHidden,
           stats,
           wpm,
@@ -3045,6 +4545,7 @@ const game = new Game(
         difficultySettings,
         wpm,
         accuracy,
+        { mode: game.getInputMode(), voiceWords: game.getVoiceMetrics().words, elapsedSeconds: stageSession.elapsedSeconds },
       );
       saveDifficultySettings();
 
@@ -3054,7 +4555,8 @@ const game = new Game(
         accuracy,
         wpm,
         clearedAt,
-      });
+        inputMode: game.getInputMode(), voiceWords: game.getVoiceMetrics().words, voicePolicy: game.getVoiceMetrics().policyVersion,
+      }, inputProfileKey(game.getInputMode(), gameplayMode, difficultySettings.mode, ascension.selectedTier, selectedVocabularyLevel()));
       if (ascension.selectedTier === 0) {
         route = syncRouteStateForStage(
           route,
@@ -3113,14 +4615,21 @@ const game = new Game(
       const combinedRewardMultiplier =
         difficultyRewardMultiplier *
         (1 + objectiveBonusFactor);
-      const baseCreditReward =
+      const stageBaseCreditTarget =
         stageClearCreditReward({
           stage: stats.stage,
           accuracy,
           salvage: game.getPlayerStats().salvage,
-        }) *
-        game.getCreditsMultiplier() *
-        combinedRewardMultiplier;
+        }) * combinedRewardMultiplier;
+      const combatCreditSettlement =
+        settleCombatCreditStageBase({
+          stageBaseCredits: stageBaseCreditTarget,
+          combatCreditsGranted:
+            game.getCombatCreditsGrantedThisStage(),
+          creditsMultiplier: game.getCreditsMultiplier(),
+        });
+      const baseCreditReward =
+        combatCreditSettlement.settlementCredits;
       const performance =
         activeStageDifficulty === null
           ? null
@@ -3130,6 +4639,7 @@ const game = new Game(
               wpm,
               difficulty: activeStageDifficulty,
               objectiveComplete: objective?.status === "complete",
+              typingEvidence: game.getInputMode() !== "voice" && stageSession.correctWordKeys > 0,
             });
       const performanceCredits =
         performance === null
@@ -3259,7 +4769,10 @@ const game = new Game(
         };
       }
 
-      const sectorRelic = checkpointCommitted
+      const milestoneKey = `${WARP_POLICY.version}:sector:${completedTier}:${stats.stage}`;
+      const sectorRewardEligible = checkpointCommitted && !warpAccount?.milestoneGrants.includes(milestoneKey);
+      if (sectorRewardEligible) pendingMilestoneGrants.push(milestoneKey);
+      const sectorRelic = sectorRewardEligible
         ? grantRelicReward(
             stats.stage,
             completedTier > 0
@@ -3271,7 +4784,7 @@ const game = new Game(
           )
         : null;
       let sectorRewardText = "";
-      if (checkpointCommitted) {
+      if (sectorRewardEligible) {
         if (completedTier === 0) {
           shops = markRestHubPending(shops, stats.stage);
         }
@@ -3324,7 +4837,7 @@ const game = new Game(
             relicRewardText(sectorRelic)
         : "";
 
-      void autosaveCampaign(
+      await autosaveCampaign(
         "stage-clear",
         "✓ Saved · Stage " +
           String(stats.stage).padStart(3, "0") +
@@ -3356,6 +4869,15 @@ const game = new Game(
         accuracy,
         objective?.status ?? null,
       );
+      renderStageClearCelebration(
+        stageClearCelebrationProfile({
+          stars: rating.stars,
+          accuracy,
+          wpm,
+          score: stats.score,
+          elapsedSeconds: stageSession.elapsedSeconds,
+        }),
+      );
       const measuredKills =
         stageSession.regularKills +
         stageSession.eliteKills +
@@ -3371,13 +4893,12 @@ const game = new Game(
         world.name + " · " +
         stageRole(stats.stage).replaceAll("-", " ") + " · " +
         difficultySettings.mode.toUpperCase();
-      byId("clearStars").textContent =
-        "★".repeat(rating.stars) + "☆".repeat(3 - rating.stars);
+      renderClearStars(rating.stars);
       byId("clearStarRule").textContent =
         "1★ clear · 2★ ≥90% target accuracy · 3★ " +
         rating.thirdStarRule;
-      byId("clearScore").textContent = stats.score.toLocaleString();
-      byId("clearAccuracy").textContent = accuracy.toFixed(1) + "%";
+      countUpNumber(byId("clearScore"), stats.score);
+      byId("clearAccuracy").textContent = game.getInputMode() === "voice" ? "Speaking · " + game.getVoiceMetrics().words + " words" : accuracy.toFixed(1) + "%";
       byId("clearWpm").textContent = wpm.toFixed(0);
       byId("clearTime").textContent =
         formatStageDuration(stageSession.elapsedSeconds);
@@ -3477,25 +4998,61 @@ const game = new Game(
         applyEquipmentStats();
       }
       updateCampaignUi();
+      } finally { clearSettlementPending = false; renderWarpHud(); }
     },
     onWordComplete: (entry, outcome) => {
-      if (gameplayMode === "combat") {
-        speakEnglish(entry.en, settings);
-        postLearningEvent(
-          buildCombatLearningEvent({
-            entry,
-            perfect: outcome?.perfect ?? true,
-          }),
-        );
+      if (outcome?.inputSource === "voice" && gameplayMode === "combat") {
+        postLearningEvent(buildCombatLearningEvent({ entry, perfect: true, inputSource: "voice" }));
+        renderActiveKillTranslation();
       }
+      if (gameplayMode !== "combat") return;
+      if (game.getInputMode() === "typing") speakEnglish(entry.en, settings);
+
+      const fact = outcome?.fact;
+      const activeExpedition = expeditionSession.currentRun();
+      if (
+        fact !== undefined &&
+        activeExpedition !== null &&
+        activeExpedition.phase === "encounter"
+      ) {
+        const runtime =
+          expansionEncounterRuntime?.encounterId === fact.encounterId
+            ? expansionEncounterRuntime
+            : createExpansionEncounterRuntime(
+                fact.encounterId,
+                null,
+              );
+        const recorded = recordExpansionCompletion(
+          runtime,
+          fact,
+          game.getCombatElapsedSeconds(),
+        );
+        expansionEncounterRuntime = recorded.state;
+        if (recorded.energyBonus > 0) {
+          const granted = game.grantRunEnergy(recorded.energyBonus);
+          if (granted > 0) {
+            showNotice(
+              "Solar Storm · +" +
+                granted.toFixed(0) +
+                " Energy",
+            );
+          }
+        }
+        return;
+      }
+
+      if (outcome?.inputSource !== "voice") postLearningEvent(
+        buildCombatLearningEvent({ entry, perfect: outcome?.perfect ?? true }),
+      );
     },
     onRecallPrompt: (entry) => {
-      if (recallSettings.autoPronounce) {
+      if (game.getInputMode() === "typing" && recallSettings.autoPronounce) {
         speakEnglish(entry.en, { ...settings, pronunciationEnabled: true });
       }
       renderRecallAssistUi();
     },
     onRecallResult: (result) => {
+      if (result.inputSource === "voice") { postLearningEvent(buildRecallLearningEvent(result, new Date().toISOString(), "voice")); renderRecallAssistUi(); return; }
       recallStage.attempts += 1;
       recallStage.perfect += result.perfect ? 1 : 0;
       recallStage.hints += result.hintCount;
@@ -3503,6 +5060,25 @@ const game = new Game(
       recallStage.responseMs += result.responseMs;
       recallMemory = recordRecallAttempt(recallMemory, result);
       postLearningEvent(buildRecallLearningEvent(result));
+      if (
+        expansionV2Enabled &&
+        expeditionSession.currentRun() === null &&
+        !testingStagePreviewActive()
+      ) {
+        const stage = game.getStats().stage;
+        persistExpansionV2Profile(
+          commitLearningToExpansionProfile(
+            expansionV2Profile,
+            [
+              evidenceFromRecallAttempt(
+                "campaign-recall",
+                "stage:" + String(stage),
+                result,
+              ),
+            ],
+          ),
+        );
+      }
       if (recallStage.attempts % 6 === 0) saveRecallMemory();
       renderRecallAssistUi();
     },
@@ -3573,14 +5149,727 @@ const game = new Game(
       );
     },
   },
+  backgroundOptions(),
 );
 game.setGameplayMode(gameplayMode, recallSettings);
+if (import.meta.env.DEV) {
+  // Dev-only handle for scripts/visual checks (scripts/visual/evals/skill-fx.js).
+  (window as unknown as { __spaceTypingGame?: Game }).__spaceTypingGame = game;
+  // Dev-only: the running Practice match, for K.O./round-flow screenshots.
+  (window as unknown as { __duelPractice?: () => DuelLocalPracticeMatch | null }).__duelPractice = () => localDuelMatch;
+  // Dev-only: the online room controller, for lobby screenshots with sample rooms.
+  (window as unknown as { __duelOnline?: typeof duelOnlineController }).__duelOnline = duelOnlineController;
+}
+
+function expeditionSeed(): number {
+  if (typeof crypto.getRandomValues === "function") {
+    const value = new Uint32Array(1);
+    crypto.getRandomValues(value);
+    return value[0] || 1;
+  }
+  return (Date.now() ^ 0x9e3779b9) >>> 0 || 1;
+}
+
+function expeditionRunId(seed: number): string {
+  return (
+    "exp-" +
+    Date.now().toString(36) +
+    "-" +
+    String(seed >>> 0) +
+    "-" +
+    (typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : "local")
+  );
+}
+
+function expeditionWordPool() {
+  const entries = configuredVocabulary.map((entry) => ({ ...entry }));
+  if (entries.length === 0) {
+    throw new Error("Expedition requires loaded vocabulary.");
+  }
+  const signature = entries
+    .map(
+      (entry) =>
+        entry.id + "\u0000" + typingText(entry.en),
+    )
+    .join("\u0001");
+  return {
+    hash: hashText(signature),
+    entries,
+  };
+}
+
+function expeditionNormalStages(): number[] {
+  return Array.from({ length: 20 }, (_value, index) => index + 1).filter(
+    (stage) => stageRole(stage) === "normal",
+  );
+}
+
+function applyExpeditionLoaner(run: ExpeditionRun): void {
+  const loaner = createExpeditionLoanerState(run);
+  applyRunPersistentState(loaner.state);
+  hotbar = loaner.hotbar;
+  codex = loaner.codex;
+  campaignExpansion = loaner.campaignExpansion;
+  checkpointSnapshot = loaner.checkpointSnapshot;
+  crashRecoverySnapshot = null;
+  stageEntrySnapshot = null;
+  refreshPersistentStateUi();
+
+  game.setGameplayMode("combat", recallSettings);
+  game.setVocabulary(run.wordPool.entries);
+  game.setVocabularyLevel(run.profile.vocabularyLevel);
+}
+
+function expeditionResourcesFromPlayerStats(): ExpeditionResources {
+  const stats = game.getPlayerStats();
+  return {
+    hull: stats.hull,
+    maxHull: stats.hull,
+    shield: stats.shield,
+    maxShield: stats.shield,
+    energy: stats.energy,
+    maxEnergy: stats.energy,
+    power: 0,
+  };
+}
+
+function buildExpeditionRun(
+  runId: string,
+  seed: number,
+  campaignFixture: AutosaveSnapshot,
+  startingResources: ExpeditionResources,
+  challengeKind: "prototype" | "daily" | "qa" = "prototype",
+): ExpeditionRun {
+  const wordPool = expeditionWordPool();
+  const selectedWantedWord =
+    challengeKind === "prototype"
+      ? selectWantedWord(expansionV2Profile.learning)
+      : null;
+  const wantedWordId =
+    selectedWantedWord !== null &&
+    wordPool.entries.some(
+      (entry) => entry.id === selectedWantedWord,
+    )
+      ? selectedWantedWord
+      : null;
+  const dayKey =
+    challengeKind === "daily" ? utcDayKey() : null;
+  const identityKey =
+    challengeKind === "daily" && dayKey !== null
+      ? fixedChallengeIdentityKey({
+          dayKey,
+          seed,
+          rulesetVersion: EXPEDITION_RULESET_VERSION,
+          contentVersion: EXPEDITION_CONTENT_VERSION,
+          wordPoolHash: wordPool.hash,
+          startKitId: EXPEDITION_START_KIT_ID,
+          difficulty: difficultySettings.mode,
+          assist: "standard",
+          adaptivePolicy: "frozen",
+        })
+      : null;
+  return createExpeditionRun({
+    runId,
+    seed,
+    wordPool,
+    profile: {
+      difficulty: difficultySettings.mode,
+      inputMode: game.getInputMode(), voicePolicy: game.getVoiceMetrics().policyVersion,
+      assist: "standard",
+      vocabularyLevel: selectedVocabularyLevel(),
+      difficultySettings: structuredClone(difficultySettings),
+      gameplayMode: "combat",
+    },
+    encounterPlan: createExpansionV2EncounterPlan(
+      seed,
+      expeditionNormalStages(),
+      20,
+    ),
+    campaignFixture,
+    startingResources,
+    maxEquippedRelics: MAX_EQUIPPED_RELICS,
+    challenge: {
+      kind: challengeKind,
+      dayKey,
+      identityKey,
+    },
+    learning: {
+      wantedWordId,
+    },
+  });
+}
+
+async function startExpeditionEncounter(
+  run: ExpeditionRun,
+  replay: boolean,
+): Promise<void> {
+  const encounter = currentExpeditionEncounter(run);
+  if (encounter === null) {
+    showNotice("Expedition encounter is unavailable");
+    return;
+  }
+
+  applyExpeditionLoaner(run);
+  await voiceSession.ensureVocabularyReady();
+  expeditionUi?.close();
+
+  const baseStage = createStageConfig(encounter.sourceStage);
+  const stage =
+    encounter.design === undefined
+      ? baseStage
+      : tuneStageForExpansionEncounter(
+          baseStage,
+          encounter as ExpansionV2EncounterPlanItem,
+        );
+  const frozenDifficulty = sanitizeDifficultySettings(
+    run.profile.difficultySettings,
+  );
+  const difficulty = difficultyFor(
+    difficultyInputFromSettings(
+      frozenDifficulty,
+      stage.stage,
+      run.profile.vocabularyLevel,
+      game.getInputMode(),
+    ),
+  );
+  activeStageDifficulty = difficulty;
+
+  syncWorldMusicProfile(stage.stage);
+  musicController.setBossPhase(1);
+  const musicState = musicStateForStageRole(stage.role);
+  musicController.transitionTo(
+    musicState,
+    musicCrossfadeSeconds(musicState),
+  );
+  musicController.setPaused(false);
+
+  const design = encounter.design;
+  const pattern = (design?.pattern ?? "normal-word") as TypingPatternId;
+  const condition = (design?.condition ?? null) as SectorConditionId | null;
+  game.setExpansionEncounterContext({
+    encounterId: encounter.id,
+    pattern,
+    recipe:
+      (design?.recipe ?? "normal") as EncounterRecipeId | "normal",
+    gameplaySeed: encounter.gameplaySeed,
+    bossParts: design?.recipe === "boss-prelude",
+    wantedWordId:
+      encounter.index === 0 &&
+      run.challenge?.kind !== "daily"
+        ? run.learning?.wantedWordId ?? null
+        : null,
+  });
+  expansionEncounterRuntime = createExpansionEncounterRuntime(
+    encounter.id,
+    condition,
+  );
+
+  const isFinalEncounter =
+    encounter.index === run.encounterPlan.length - 1;
+  if (isFinalEncounter && !replay) {
+    stopExpansionCinematicQa();
+    await playExpansionReferenceCinematic({
+      title: "Final Approach",
+      subtitle:
+        "Your run build is locked. Break the reference boss and its targetable parts.",
+    });
+    persistExpansionV2Profile(
+      markExpansionCinematicSeen(
+        expansionV2Profile,
+        "expedition-v2-final-reference",
+      ),
+    );
+  }
+
+  const world = worldForStage(stage.stage);
+  await presentStageTransition(
+    createStageTransitionSpec({
+      stage: stage.stage,
+      galaxy: stage.galaxy,
+      stageInGalaxy: stage.stageInGalaxy,
+      stageInWorld: stageInWorld(stage.stage),
+      worldName: world.name,
+      role: stage.role,
+    }),
+  );
+
+  game.startStage(stage, difficulty, null, run.resources);
+  if (replay) {
+    showNotice("Expedition resumed from the encounter safe boundary");
+  }
+}
+
+async function startNewExpedition(
+  seedOverride?: number,
+  challengeKind: "prototype" | "daily" | "qa" = "prototype",
+): Promise<void> {
+  if (
+    (!expansionV2Enabled && challengeKind !== "qa") ||
+    !persistenceReady ||
+    practiceRestorePending ||
+    clearSettlementPending ||
+    accountTransactions.busy() ||
+    testingStagePreviewActive() ||
+    !!warpAccount?.attempt ||
+    !vocabularyReady ||
+    expeditionStartPending ||
+    game.getPhase() !== "title"
+  ) {
+    return;
+  }
+
+  expeditionStartPending = true;
+  expeditionActiveSecondsTotal = 0;
+  const snapshot = structuredClone(currentAutosaveSnapshot());
+  expeditionCampaignSnapshot = snapshot;
+
+  try {
+    const seed = seedOverride ?? expeditionSeed();
+    const runId = expeditionRunId(seed);
+    const provisional = buildExpeditionRun(
+      runId,
+      seed,
+      snapshot,
+      {
+        hull: DEFAULT_PLAYER_BASE_STATS.hull,
+        maxHull: DEFAULT_PLAYER_BASE_STATS.hull,
+        shield: DEFAULT_PLAYER_BASE_STATS.shield,
+        maxShield: DEFAULT_PLAYER_BASE_STATS.shield,
+        energy: DEFAULT_PLAYER_BASE_STATS.energy,
+        maxEnergy: DEFAULT_PLAYER_BASE_STATS.energy,
+        power: 0,
+      },
+      challengeKind,
+    );
+
+    applyExpeditionLoaner(provisional);
+    const run = buildExpeditionRun(
+      runId,
+      seed,
+      snapshot,
+      expeditionResourcesFromPlayerStats(),
+      challengeKind,
+    );
+    const draft = expeditionSession.start(run, RELIC_IDS);
+    expeditionUi?.setResumeAvailable(true);
+    expeditionUi?.showDraft(draft);
+  } catch (error) {
+    console.error("Unable to start Expedition.", error);
+    applyAutosaveSnapshot(snapshot);
+    refreshPersistentStateUi();
+    expeditionCampaignSnapshot = null;
+    showNotice("Unable to start Expedition");
+  } finally {
+    expeditionStartPending = false;
+  }
+}
+
+async function resumeExpedition(): Promise<void> {
+  if (
+    !expansionV2Enabled ||
+    !persistenceReady ||
+    practiceRestorePending ||
+    clearSettlementPending ||
+    accountTransactions.busy() ||
+    testingStagePreviewActive() ||
+    !!warpAccount?.attempt ||
+    expeditionStartPending ||
+    game.getPhase() !== "title"
+  ) {
+    return;
+  }
+
+  expeditionStartPending = true;
+  const snapshot = structuredClone(currentAutosaveSnapshot());
+  expeditionCampaignSnapshot = snapshot;
+
+  try {
+    const run = expeditionSession.resume(RELIC_IDS);
+    if (run === null) {
+      expeditionCampaignSnapshot = null;
+      expeditionUi?.setResumeAvailable(false);
+      showNotice("No active Expedition to resume");
+      return;
+    }
+
+    const runMode = run.profile.inputMode ?? "typing";
+    if (game.getInputMode() !== runMode) {
+      expeditionSession.release();
+      expeditionCampaignSnapshot = null;
+      showNotice(
+        `This Expedition uses ${runMode}. Select that input mode, then resume.`,
+      );
+      return;
+    }
+    expeditionActiveSecondsTotal =
+      run.ghostPoints?.reduce(
+        (max, point) => Math.max(max, point.activeSeconds),
+        0,
+      ) ?? 0;
+
+    if (run.phase === "draft") {
+      applyExpeditionLoaner(run);
+      expeditionUi?.setResumeAvailable(true);
+      expeditionUi?.showDraft(run);
+      return;
+    }
+
+    if (run.phase === "rest") {
+      applyExpeditionLoaner(run);
+      expeditionUi?.setResumeAvailable(true);
+      expeditionUi?.showRest(run);
+      return;
+    }
+
+    if (run.phase === "setup") {
+      applyExpeditionLoaner(run);
+      expeditionUi?.setResumeAvailable(true);
+      expeditionUi?.showBriefing(run);
+      return;
+    }
+
+    if (run.phase === "encounter") {
+      await startExpeditionEncounter(run, true);
+      return;
+    }
+
+    throw new Error("Unsupported Expedition recovery phase: " + run.phase);
+  } catch (error) {
+    console.error("Unable to resume Expedition.", error);
+    applyAutosaveSnapshot(snapshot);
+    refreshPersistentStateUi();
+    expeditionCampaignSnapshot = null;
+    showNotice("Unable to resume Expedition");
+  } finally {
+    expeditionStartPending = false;
+  }
+}
+
+async function confirmExpeditionDraft(
+  choiceId: string,
+  replacementRelicId: string | null,
+): Promise<void> {
+  try {
+    const run = expeditionSession.confirmDraft(
+      choiceId,
+      replacementRelicId,
+    );
+    if (run === null) {
+      showNotice("Expedition draft choice was not applied");
+      return;
+    }
+    await startExpeditionEncounter(run, false);
+  } catch (error) {
+    console.error("Unable to confirm Expedition draft.", error);
+    showNotice(
+      "Expedition save failed · reload resumes the previous safe boundary",
+    );
+  }
+}
+
+async function continueExpeditionEncounter(): Promise<void> {
+  try {
+    const run = expeditionSession.continueEncounter();
+    if (run === null) {
+      showNotice("Expedition encounter is not ready");
+      return;
+    }
+    await startExpeditionEncounter(run, false);
+  } catch (error) {
+    console.error("Unable to continue Expedition.", error);
+    showNotice(
+      "Expedition save failed · reload resumes the previous safe boundary",
+    );
+  }
+}
+
+async function resolveExpeditionRestChoice(
+  choice: ExpeditionRestChoice,
+): Promise<void> {
+  try {
+    const run = expeditionSession.resolveRest(choice);
+    if (run === null) {
+      showNotice("Expedition rest choice was not applied");
+      return;
+    }
+    applyExpeditionLoaner(run);
+    if (run.phase === "draft") {
+      expeditionUi?.showDraft(run);
+    } else if (run.phase === "setup") {
+      expeditionUi?.showBriefing(run);
+    }
+  } catch (error) {
+    console.error("Unable to resolve Expedition rest.", error);
+    showNotice(
+      "Expedition save failed · reload resumes the previous safe boundary",
+    );
+  }
+}
+
+function abandonCurrentExpedition(): void {
+  try {
+    const run = expeditionSession.abandon();
+    if (run === null) return;
+    expansionEncounterRuntime = null;
+    game.setExpansionEncounterContext(null);
+    recordExpeditionTerminalProfile(run);
+    expeditionUi?.setResumeAvailable(false);
+    expeditionUi?.showSummary(run);
+  } catch (error) {
+    console.error("Unable to abandon Expedition.", error);
+    showNotice(
+      "Expedition save failed · reload resumes the previous safe boundary",
+    );
+  }
+}
+
+function forceExpeditionQaEncounter(indexInput: number): void {
+  try {
+    const run = expeditionSession.testForceEncounterIndex(indexInput);
+    if (run === null) {
+      showNotice("Start a Test Lab Expedition before forcing an encounter");
+      return;
+    }
+    void startExpeditionEncounter(run, false);
+  } catch (error) {
+    console.error("Unable to force Expedition QA encounter.", error);
+    showNotice("Expedition QA encounter override failed");
+  }
+}
+
+function forceExpeditionQaPhase(
+  phase: "draft" | "rest" | "encounter" | "defeat",
+): void {
+  try {
+    const run = expeditionSession.testForcePhase(phase, RELIC_IDS);
+    if (run === null) {
+      showNotice("Start or resume an Expedition before forcing its phase");
+      return;
+    }
+    if (run.phase === "draft") {
+      applyExpeditionLoaner(run);
+      expeditionUi?.setResumeAvailable(true);
+      expeditionUi?.showDraft(run);
+      return;
+    }
+    if (run.phase === "rest") {
+      applyExpeditionLoaner(run);
+      expeditionUi?.setResumeAvailable(true);
+      expeditionUi?.showRest(run);
+      return;
+    }
+    if (run.phase === "setup") {
+      applyExpeditionLoaner(run);
+      expeditionUi?.setResumeAvailable(true);
+      expeditionUi?.showBriefing(run);
+      return;
+    }
+    if (run.phase === "encounter") {
+      void startExpeditionEncounter(run, false);
+      return;
+    }
+    expeditionUi?.setResumeAvailable(false);
+    expeditionUi?.showSummary(run);
+  } catch (error) {
+    console.error("Unable to force Expedition QA phase.", error);
+    showNotice("Expedition QA phase override failed");
+  }
+}
+
+async function returnFromExpedition(): Promise<void> {
+  const snapshot = expeditionCampaignSnapshot;
+  if (snapshot === null) {
+    showNotice("Campaign restore snapshot is unavailable");
+    return;
+  }
+
+  expeditionUi?.close();
+  expansionEncounterRuntime = null;
+  game.setExpansionEncounterContext(null);
+  game.backToTitle();
+  applyAutosaveSnapshot(snapshot);
+  refreshPersistentStateUi();
+  expeditionSession.release();
+  expeditionCampaignSnapshot = null;
+  expeditionUi?.setResumeAvailable(false);
+  showNotice("Campaign restored · Expedition did not change Campaign economy");
+}
 
 const testLab = mountTestLab({
   getSettings: () => settings,
   getVocabulary: () => configuredVocabulary,
   showNotice,
+  duelQa: {
+    performance: () =>
+      duelBattle.isActive()
+        ? duelBattle.getPerformanceDiagnostics()
+        : null,
+    resetPerformance: () =>
+      duelBattle.resetPerformanceDiagnostics(),
+    startStress: startDuelVisualStress,
+  },
+  expeditionQa: {
+    startWithSeed: (seed) => void startNewExpedition(seed, "qa"),
+    forcePhase: forceExpeditionQaPhase,
+    forceEncounter: forceExpeditionQaEncounter,
+    failNextSave: () => expeditionStorage.injectFailureOnce(),
+    startCinematic: startExpansionCinematicQa,
+    stopCinematic: stopExpansionCinematicQa,
+    snapshot: () => ({
+      run: expeditionSession.currentRun(),
+      revision: expeditionSession.currentRevision(),
+      ownsCampaignPersistence:
+        expeditionSession.ownsCampaignPersistence(),
+      resumable: expeditionSession.hasResumableRun(),
+    }),
+  },
 });
+
+expeditionUi = mountExpeditionUi({
+  onStart: () => void startNewExpedition(),
+  onDailyStart: () => {
+    const dayKey = utcDayKey();
+    void startNewExpedition(
+      dailySeed(dayKey, EXPEDITION_RULESET_VERSION),
+      "daily",
+    );
+  },
+  onToggleGhost: () => {
+    persistExpansionV2Profile(
+      setExpansionGhostEnabled(
+        expansionV2Profile,
+        !expansionV2Profile.ghostEnabled,
+      ),
+    );
+  },
+  onResume: () => void resumeExpedition(),
+  onConfirm: (choiceId, replacementRelicId) =>
+    void confirmExpeditionDraft(choiceId, replacementRelicId),
+  onContinue: () => void continueExpeditionEncounter(),
+  onRest: (choice) => void resolveExpeditionRestChoice(choice),
+  onAbandon: abandonCurrentExpedition,
+  onReturn: () => void returnFromExpedition(),
+  relicLabel: (id) =>
+    id in RELIC_REGISTRY
+      ? getRelicDefinition(id as RelicId).name
+      : id,
+  ghostCue: (run) => {
+    if (!expansionV2Profile.ghostEnabled) return null;
+    const identityKey = run.challenge?.identityKey ?? null;
+    if (identityKey === null) return null;
+    const ghost =
+      expansionV2Profile.ghostByIdentity[identityKey];
+    const point = ghost?.points.find(
+      (candidate) =>
+        candidate.encounterIndex === run.currentEncounterIndex,
+    );
+    if (point === undefined) return null;
+    return (
+      "Personal Ghost · PB checkpoint " +
+      point.activeSeconds.toFixed(1) +
+      "s · score " +
+      point.cumulativeScore.toLocaleString()
+    );
+  },
+  learningSummary: (run) => {
+    const wantedWordId = run.learning?.wantedWordId ?? null;
+    if (wantedWordId === null) return null;
+    const entry = run.wordPool.entries.find(
+      (candidate) => candidate.id === wantedWordId,
+    );
+    const record =
+      expansionV2Profile.learning.records[wantedWordId];
+    if (record === undefined) {
+      return (
+        (entry?.en ?? wantedWordId) +
+        " · selected for a low-pressure opening review"
+      );
+    }
+    return (
+      (entry?.en ?? wantedWordId) +
+      " · typing " +
+      String(record.correct) +
+      "/" +
+      String(record.seen) +
+      " correct · Recall " +
+      String(record.recallSuccess) +
+      "/" +
+      String(record.recallSuccess + record.recallFailure)
+    );
+  },
+});
+expeditionUi.setResumeAvailable(expeditionSession.hasResumableRun());
+expeditionUi.setEvolutionTier(
+  expansionEvolutionTier(expansionV2Profile),
+);
+expeditionUi.setGhostEnabled(expansionV2Profile.ghostEnabled);
+if (!expansionV2Enabled) {
+  expeditionUi?.destroy();
+  expeditionUi = null;
+} else {
+  installMenuHelp();
+}
+byId("titleExpeditionCard").classList.toggle("hidden", expeditionUi === null);
+byId("titleOverlay").classList.toggle("holo-three-modes", expeditionUi === null);
+
+function titlePilot(): TitleHubPilot {
+  const character = getCharacter(characters.selected);
+  return {
+    shipId: characters.selected,
+    shipName: character.name,
+    level: characters.progress[characters.selected].level,
+    credits,
+    selectedStage: selectedGameplayStage(),
+    highestStage: campaign.highestUnlockedStage,
+    maxStage: MAX_CAMPAIGN_STAGE,
+    shipsUnlocked: characters.unlocked.length,
+    shipsTotal: CHARACTER_IDS.length,
+    clearedStages: campaign.clearedStages.length,
+  };
+}
+
+titleHub = installTitleHub({
+  getSettings: () => settings,
+  applySettings: (next) => {
+    settings = next;
+    saveSettings();
+  },
+  getPilot: titlePilot,
+  openSettings,
+  openDuel: () => byId<HTMLButtonElement>("duelModeButton").click(),
+  startRecall: () => {
+    recallLaunchPending = true;
+    selectGameplayMode("recall");
+    byId<HTMLButtonElement>("startButton").click();
+  },
+});
+titleHub.render();
+
+campaignReferenceEventUi = mountCampaignReferenceEventUi({
+  onChoice: (choice: CampaignReferenceRouteChoice) => {
+    persistExpansionV2Profile({
+      ...expansionV2Profile,
+      campaignEventFlags:
+        recordCampaignReferenceRouteChoice(
+          expansionV2Profile.campaignEventFlags,
+          choice,
+        ),
+    });
+    campaignReferenceEventUi?.close();
+    showNotice(
+      choice === "risk"
+        ? "Ancient Gate · risky route locked for Stage 036"
+        : "Ancient Gate · stable route locked for Stage 036",
+    );
+    void startSelectedStage();
+  },
+});
+if (!expansionV2Enabled) {
+  campaignReferenceEventUi?.destroy();
+  campaignReferenceEventUi = null;
+}
 
 byId<HTMLButtonElement>("anomalyStabilize").addEventListener(
   "click",
@@ -3613,42 +5902,33 @@ function renderCharacters(): void {
 
   CHARACTER_IDS.forEach((id, index) => {
     const definition = getCharacter(id);
-    const unlocked = characters.unlocked.includes(id);
     const selected = characters.selected === id;
 
     const card = document.createElement("button");
     card.type = "button";
     card.className = "character-card";
     card.classList.toggle("selected", selected);
-    card.classList.toggle("locked", !unlocked);
-    card.disabled = !unlocked;
+    card.disabled = false;
     card.setAttribute(
       "aria-label",
       definition.name +
         " · " +
         definition.role +
-        (selected ? " · selected" : unlocked ? " · available" : " · locked"),
+        (selected ? " · selected" : " · available"),
     );
 
-    const preview = document.createElement("canvas");
-    preview.className = "character-card-preview";
-    preview.width = 240;
-    preview.height = 132;
+    // The painted hull (same art as the title cards) on a stage lit in the
+    // ship's own colour; the card frame takes that colour too.
+    card.style.setProperty("--ship-accent", characterVisualProfile(id).glow);
+    const preview = document.createElement("div");
+    preview.className = "character-card-portrait";
     preview.setAttribute("aria-hidden", "true");
-    const previewContext = preview.getContext("2d");
-    if (previewContext !== null) {
-      drawCharacterShip(previewContext, id, {
-        x: preview.width / 2,
-        y: 76,
-        time: index * 0.73 + 0.8,
-        scale: selected ? 1.42 : 1.3,
-        glowScale: selected ? 1.15 : 0.86,
-        alpha: unlocked ? 1 : 0.48,
-        aura: selected
-          ? deriveEquipmentAura(equipment, characters.selected)
-          : null,
-      });
-    }
+    const portrait = document.createElement("img");
+    portrait.src = shipArtUrl(id);
+    portrait.alt = "";
+    portrait.decoding = "async";
+    portrait.loading = index < 6 ? "eager" : "lazy";
+    preview.append(portrait);
 
     const top = document.createElement("div");
     top.className = "character-card-top";
@@ -3667,11 +5947,7 @@ function renderCharacters(): void {
 
     const state = document.createElement("span");
     state.className = "character-card-state";
-    state.textContent = selected
-      ? "Selected"
-      : unlocked
-        ? "Available"
-        : "Stage " + String(definition.unlockStage).padStart(3, "0");
+    state.textContent = selected ? "Selected" : "Available";
 
     top.append(nameWrap, state);
 
@@ -3704,7 +5980,7 @@ function renderCharacters(): void {
 
     card.append(preview, top, summary, kit, progressMeta);
 
-    if (unlocked && !selected) {
+    if (!selected) {
       card.addEventListener("click", () => {
         characters = selectCharacter(characters, id);
         applySelectedCharacter();
@@ -3941,7 +6217,7 @@ function renderBasicSkillPanel(): void {
 }
 
 function openCharacters(): void {
-  if (!persistenceReady || game.getPhase() !== "title") return;
+  if (!persistenceReady || !canOpenBetweenStageMenu() || game.getPhase() !== "title") return;
   renderCharacters();
   characterDialog.showModal();
 }
@@ -3985,14 +6261,30 @@ function renderSupportLoadout(): void {
     select.value = selected ?? "";
     metas[index]!.textContent =
       selected === null
-        ? "No spell equipped"
-        : getSupportSpell(selected).description;
+        ? "No system fitted"
+        : supportSpellSummary(getSupportSpell(selected));
   }
+}
+
+function supportSpellSummary(spell: ReturnType<typeof getSupportSpell>): string {
+  const limits = [String(spell.energyCost) + " Energy", String(spell.cooldown) + " s cooldown"];
+  if (spell.perStageLimit !== null) limits.push(String(spell.perStageLimit) + " per stage");
+  return spell.description + " (" + limits.join(" · ") + ")";
 }
 
 function canOpenBetweenStageMenu(): boolean {
   const phase = game.getPhase();
-  return phase === "title" || phase === "stageclear";
+  return (
+    (phase === "title" || phase === "stageclear") &&
+    accountTransactions.canWrite() &&
+    !warpAccount?.attempt &&
+    !testingStagePreviewActive() &&
+    !practiceRestorePending &&
+    !clearSettlementPending &&
+    !accountTransactions.busy() &&
+    !stageStartPending &&
+    !expeditionStartPending
+  );
 }
 
 function openSupportSpells(): void {
@@ -4016,6 +6308,7 @@ function applyEquipmentStats(): void {
   game.setEquipmentAura(
     deriveEquipmentAura(equipment, characters.selected),
   );
+  game.setEquipmentPerks(resolveEquipmentPerks(equippedPerkIds(equipment)));
   game.setPlayerStats({
     base: DEFAULT_PLAYER_BASE_STATS,
     character: characterStatBonus(characters.selected),
@@ -4061,10 +6354,20 @@ function formatEquipmentBonuses(): string {
   const parts = Object.entries(bonus)
     .filter(([, value]) => typeof value === "number" && value !== 0)
     .map(([key, value]) =>
-      key + " +" + String(Math.round((value ?? 0) * 10) / 10),
+      equipmentStatLabel(key) + " +" + String(Math.round((value ?? 0) * 10) / 10),
     );
+  const perks = equippedPerkIds(equipment).map((id) => "★ " + EQUIPMENT_PERKS[id].name);
 
-  return parts.length > 0 ? parts.join(" · ") : "none";
+  const text = parts.length > 0 ? parts.join(" · ") : "none";
+  return perks.length > 0 ? text + " · " + perks.join(" · ") : text;
+}
+
+/** "firepower +8 · focus +2" for one part at its grade and enhancement. */
+function formatItemStats(definition: ReturnType<typeof getEquipmentDefinition>): string {
+  return Object.entries(definition.stats)
+    .filter(([, value]) => typeof value === "number" && value !== 0)
+    .map(([key, value]) => equipmentStatLabel(key) + " +" + String(value))
+    .join(" · ");
 }
 
 function renderEquipment(): void {
@@ -4095,7 +6398,8 @@ function renderEquipment(): void {
         " +" +
         String(item.enhancement) +
         "] " +
-        definition.name;
+        definition.name +
+        (definition.perk !== undefined ? " ★" : "");
       select.append(option);
     }
 
@@ -4136,6 +6440,9 @@ function renderEquipment(): void {
       definition === null ? slot + " slot" : definition.name + " icon",
       "equipment-card-icon",
     );
+    if (definition !== null) {
+      setIconContent(visual, definition.icon, paintedEquipmentIcon(definition.id));
+    }
     const identity = document.createElement("div");
     identity.className = "equipment-card-identity";
     identity.append(title);
@@ -4146,14 +6453,25 @@ function renderEquipment(): void {
 
     const detail = document.createElement("small");
     detail.textContent =
-      current === null
+      current === null || definition === null
         ? "No equipment"
-        : "+" +
+        : EQUIPMENT_TIER_LABELS[definition.tier] +
+          " · +" +
           String(current.enhancement) +
           " · " +
-          (definition?.description ?? "");
+          definition.description +
+          " (" +
+          formatItemStats(definition) +
+          ")";
 
     card.append(head, select, detail);
+    if (definition?.perk !== undefined) {
+      const perk = EQUIPMENT_PERKS[definition.perk];
+      const perkLine = document.createElement("small");
+      perkLine.className = "equipment-perk";
+      perkLine.textContent = "★ " + perk.name + ": " + perk.description;
+      card.append(perkLine);
+    }
     grid.append(card);
   }
 
@@ -4163,7 +6481,7 @@ function renderEquipment(): void {
 }
 
 function openEquipment(): void {
-  if (!persistenceReady || game.getPhase() !== "title") return;
+  if (!persistenceReady || !canOpenBetweenStageMenu() || game.getPhase() !== "title") return;
   renderEquipment();
   equipmentDialog.showModal();
 }
@@ -4488,6 +6806,13 @@ function appendShopStockCards(
       shopStockIcon(entry),
       shopStockName(entry) + " icon",
       "item-card-icon",
+    );
+    setIconContent(
+      visual,
+      shopStockIcon(entry),
+      entry.kind === "equipment"
+        ? paintedEquipmentIcon(entry.definitionId)
+        : paintedItemIcon(entry.itemId),
     );
 
     const body = document.createElement("div");
@@ -5358,16 +7683,14 @@ function routeNodeDescription(node: RouteNode): string {
     : "Direct combat route · no service detour before the encounter.";
 }
 
-function handleHiddenEncounterClear(
+async function handleHiddenEncounterClear(
   active: ActiveHiddenEncounter,
   stats: ReturnType<Game["getStats"]>,
   wpm: number,
   accuracy: number,
-): void {
+): Promise<void> {
   const label = hiddenEncounterLabel(active);
-  const result = advanceHiddenEncounter(
-    currentHiddenEncounterState(),
-  );
+  const result = advanceHiddenEncounter(currentHiddenEncounterState());
   setHiddenEncounterState(result.state);
   stageEntrySnapshot = null;
 
@@ -5377,10 +7700,7 @@ function handleHiddenEncounterClear(
   let rewardRelic: RelicId | null = null;
 
   if (result.completed) {
-    const reward = hiddenEncounterReward(
-      active,
-      accuracy,
-    );
+    const reward = hiddenEncounterReward(active, accuracy);
     rewardCredits = reward.credits;
     rewardCurrencies = reward.currencies;
     credits = addCredits(credits, reward.credits);
@@ -5406,8 +7726,7 @@ function handleHiddenEncounterClear(
           quantumCore: reward.currencies.quantumCore,
         },
         { signed: true },
-      ) +
-      relicRewardText(rewardRelic);
+      ) + relicRewardText(rewardRelic);
   } else {
     rewardText =
       "Hidden World progress · " +
@@ -5416,7 +7735,7 @@ function handleHiddenEncounterClear(
       String(active.totalSteps);
   }
 
-  void autosaveCampaign(
+  await autosaveCampaign(
     "hidden-transition",
     result.completed
       ? "✓ " + label + " complete · premium reward secured"
@@ -5426,6 +7745,15 @@ function handleHiddenEncounterClear(
 
   const stageSession = game.getStageSessionSnapshot();
   const rating = stageResultStars(accuracy, null);
+  renderStageClearCelebration(
+    stageClearCelebrationProfile({
+      stars: rating.stars,
+      accuracy,
+      wpm,
+      score: stats.score,
+      elapsedSeconds: stageSession.elapsedSeconds,
+    }),
+  );
   const measuredKills =
     stageSession.regularKills +
     stageSession.eliteKills +
@@ -5433,30 +7761,27 @@ function handleHiddenEncounterClear(
   const killRate =
     stageSession.elapsedSeconds <= 0
       ? 0
-      : measuredKills / stageSession.elapsedSeconds * 60;
+      : (measuredKills / stageSession.elapsedSeconds) * 60;
 
-  byId("clearTitle").textContent =
-    result.completed
-      ? label + " complete"
-      : hiddenEncounterLabel(result.state.active!);
+  byId("clearTitle").textContent = result.completed
+    ? label + " complete"
+    : hiddenEncounterLabel(result.state.active!);
   byId("clearMeta").textContent =
-    "Hidden encounter · Tier " + String(active.tier) +
-    " · Campaign Stage " + String(active.sourceStage).padStart(3, "0");
-  byId("clearStars").textContent =
-    "★".repeat(rating.stars) + "☆".repeat(3 - rating.stars);
+    "Hidden encounter · Tier " +
+    String(active.tier) +
+    " · Campaign Stage " +
+    String(active.sourceStage).padStart(3, "0");
+  renderClearStars(rating.stars);
   byId("clearStarRule").textContent =
     "1★ clear · 2★ ≥90% target accuracy · 3★ " + rating.thirdStarRule;
-  byId("clearScore").textContent =
-    stats.score.toLocaleString();
-  byId("clearAccuracy").textContent =
-    accuracy.toFixed(1) + "%";
+  countUpNumber(byId("clearScore"), stats.score);
+  byId("clearAccuracy").textContent = accuracy.toFixed(1) + "%";
   byId("clearWpm").textContent = wpm.toFixed(0);
-  byId("clearTime").textContent =
-    formatStageDuration(stageSession.elapsedSeconds);
-  byId("clearKillRate").textContent =
-    killRate.toFixed(1) + "/min";
-  byId("clearStreak").textContent =
-    String(stats.maxStreak);
+  byId("clearTime").textContent = formatStageDuration(
+    stageSession.elapsedSeconds,
+  );
+  byId("clearKillRate").textContent = killRate.toFixed(1) + "/min";
+  byId("clearStreak").textContent = String(stats.maxStreak);
 
   wordReviewFilter = "all";
   renderMeasuredStageSession(stageSession, stats.hits, stats.misses);
@@ -5494,12 +7819,12 @@ function handleHiddenEncounterClear(
     "Character XP is not awarded by the current Hidden Encounter reward path.";
   hiddenProgress.append(hiddenProgressNote);
 
-  byId("clearDetails").textContent = "Hidden encounter reward · no Campaign checkpoint advancement";
+  byId("clearDetails").textContent =
+    "Hidden encounter reward · no Campaign checkpoint advancement";
   updateCampaignUi();
-  byId<HTMLButtonElement>("nextStageButton").textContent =
-    result.completed
-      ? "Continue Campaign"
-      : "Next Hidden Encounter";
+  byId<HTMLButtonElement>("nextStageButton").textContent = result.completed
+    ? "Continue Campaign"
+    : "Next Hidden Encounter";
 
   if (rewardCredits > 0) {
     updateDataSummary();
@@ -5984,12 +8309,14 @@ async function startActiveHiddenEncounter(
   const vocabularyLevel = selectedVocabularyLevel();
   game.setVocabularyLevel(vocabularyLevel);
   await prepareStageVocabulary(stage);
+  await voiceSession.ensureVocabularyReady();
 
   const baseDifficulty = difficultyFor(
     difficultyInputFromSettings(
       difficultySettings,
       active.sourceStage,
       vocabularyLevel,
+      game.getInputMode(),
     ),
   );
   const difficulty = applyAscensionDifficulty(
@@ -6015,7 +8342,7 @@ async function startActiveHiddenEncounter(
     stageEntryAt,
   );
 
-  const recoverySaved = await autosaveCampaign(
+  const recoverySaved = warpAccount?.attempt?.phase === "prepared" || await autosaveCampaign(
     "hidden-transition",
     undefined,
     "hidden-transition",
@@ -6043,6 +8370,7 @@ async function startActiveHiddenEncounter(
     ),
   );
 
+  await deploySortie(stage.stage, "hidden", stage.seed, difficulty, testingStagePreviewActive());
   game.startStage(
     stage,
     difficulty,
@@ -6050,24 +8378,79 @@ async function startActiveHiddenEncounter(
   );
 }
 
-async function startSelectedStage(): Promise<void> {
+async function startSelectedStage(practice = false): Promise<void> {
+  if (expeditionSession.ownsCampaignPersistence()) return;
   if (
     !persistenceReady ||
+    practiceRestorePending ||
+    clearSettlementPending ||
+    accountTransactions.busy() ||
     !vocabularyReady ||
+    (game.getInputMode() !== "typing" && !voiceSession.isReady()) ||
     stageStartPending ||
     routeChoicePending
-  ) return;
-  // Do not let rapid Next clicks skip an unvisited checkpoint rest stop.
-  if (pendingRestHubStage(shops) !== null && ascension.selectedTier === 0) {
+  )
+    return;
+
+  if (practice) {
+    if (
+      accountTransactions.canWrite() &&
+      warpAccount?.attempt &&
+      !(await finishManagedSortie("failed"))
+    )
+      return;
+    practiceActive = true;
+  }
+  if (
+    !practice &&
+    accountTransactions.canWrite() &&
+    warpAccount?.attempt &&
+    warpAccount.attempt.phase !== "prepared" &&
+    !(await finishManagedSortie("abandoned"))
+  )
+    return;
+  const testingPreview = testingStagePreviewActive();
+  if (testingPreview && testingStageSnapshot === null) {
+    testingStageSnapshot = structuredClone(currentAutosaveSnapshot());
+  }
+
+  const pendingCampaignStage = selectedGameplayStage();
+  if (
+    expansionV2Enabled &&
+    !testingPreview &&
+    ascension.selectedTier === 0 &&
+    pendingCampaignStage === campaign.highestUnlockedStage &&
+    needsCampaignReferenceRouteChoice({
+      targetStage: pendingCampaignStage,
+      clearedStages: campaign.clearedStages,
+      flags: expansionV2Profile.campaignEventFlags,
+    })
+  ) {
+    campaignReferenceEventUi?.show();
+    return;
+  }
+
+  // Testing preview bypasses campaign route/rest gates without modifying them.
+  if (
+    !testingPreview &&
+    pendingRestHubStage(shops) !== null &&
+    ascension.selectedTier === 0
+  ) {
     openRestHub();
     return;
   }
 
   const activeHidden = currentHiddenEncounterState().active;
-  if (activeHidden !== null) {
+  if (activeHidden !== null && testingStageOverride === null) {
     stageStartPending = true;
     try {
       await startActiveHiddenEncounter(activeHidden);
+    } catch (error) {
+      showNotice(
+        error instanceof Error
+          ? error.message
+          : "Unable to deploy hidden sortie",
+      );
     } finally {
       stageStartPending = false;
     }
@@ -6075,13 +8458,11 @@ async function startSelectedStage(): Promise<void> {
   }
 
   if (
+    !testingPreview &&
     ascension.selectedTier === 0 &&
     campaign.selectedStage === campaign.highestUnlockedStage
   ) {
-    route = syncRouteStateForStage(
-      route,
-      campaign.highestUnlockedStage,
-    );
+    route = syncRouteStateForStage(route, campaign.highestUnlockedStage);
     if (routeNeedsChoice(route, campaign.selectedStage)) {
       openRouteMap();
       return;
@@ -6094,21 +8475,25 @@ async function startSelectedStage(): Promise<void> {
     game.setGameplayMode(gameplayMode, recallSettings);
     game.setCharacter(characters.selected);
     const gameplayStage = selectedGameplayStage();
-    campaign = {
-      ...campaign,
-      selectedStage: gameplayStage,
-    };
+    if (!testingPreview) {
+      campaign = {
+        ...campaign,
+        selectedStage: gameplayStage,
+      };
+    }
     const stage = createStageConfig(gameplayStage);
     const world = worldForStage(stage.stage);
     const vocabularyLevel = selectedVocabularyLevel();
     game.setVocabularyLevel(vocabularyLevel);
     await prepareStageVocabulary(stage);
+    await voiceSession.ensureVocabularyReady();
     const difficulty = applyAscensionDifficulty(
       difficultyFor(
         difficultyInputFromSettings(
           difficultySettings,
           stage.stage,
           vocabularyLevel,
+          game.getInputMode(),
         ),
       ),
       ascension.selectedTier,
@@ -6116,34 +8501,53 @@ async function startSelectedStage(): Promise<void> {
     );
     activeStageDifficulty = difficulty;
 
-    const stageEntryAt = new Date().toISOString();
-    stageEntrySnapshot = createStageEntrySnapshot(
-      currentRunPersistentState(),
-      campaignExpansion,
-      checkpointSnapshot,
-      stageEntryAt,
-    );
+    if (!testingPreview) {
+      const stageEntryAt = new Date().toISOString();
+      stageEntrySnapshot = createStageEntrySnapshot(
+        currentRunPersistentState(),
+        campaignExpansion,
+        checkpointSnapshot,
+        stageEntryAt,
+      );
 
-    const recoverySaved = await autosaveCampaign(
-      "stage-entry",
-      undefined,
-      "stage-entry",
-    );
-    if (!recoverySaved) return;
+      const recoverySaved =
+        warpAccount?.attempt?.phase === "prepared" ||
+        (await autosaveCampaign("stage-entry", undefined, "stage-entry"));
+      if (!recoverySaved) return;
+    }
 
     syncWorldMusicProfile(stage.stage);
     musicController.setBossPhase(1);
     const musicState = musicStateForStageRole(stage.role);
-    musicController.transitionTo(
-      musicState,
-      musicCrossfadeSeconds(musicState),
-    );
+    musicController.transitionTo(musicState, musicCrossfadeSeconds(musicState));
     musicController.setPaused(false);
 
     if (world.stageEnd < 1000 && stageInWorld(stage.stage) >= 18) {
       musicController.preloadNext(
         musicProfileForWorld(worldForStage(world.stageEnd + 1)),
       );
+    }
+
+    const expansionProfile = campaignStageExpansionProfile(stage.stage);
+    if (
+      expansionV2Enabled &&
+      !testingPreview &&
+      stage.stage >= 11 &&
+      stage.stage <= 100
+    ) {
+      game.setExpansionEncounterContext({
+        encounterId: "campaign:" + String(stage.stage),
+        pattern:
+          campaignReferencePatternOverride(
+            stage.stage,
+            expansionV2Profile.campaignEventFlags,
+          ) ?? expansionProfile.pattern,
+        recipe: expansionProfile.recipe,
+        gameplaySeed: stage.seed,
+        bossParts: false,
+      });
+    } else {
+      game.setExpansionEncounterContext(null);
     }
 
     await presentStageTransition(
@@ -6157,7 +8561,18 @@ async function startSelectedStage(): Promise<void> {
       }),
     );
 
+    await deploySortie(
+      stage.stage,
+      "campaign",
+      stage.seed,
+      difficulty,
+      testingPreview,
+    );
     game.startStage(stage, difficulty);
+  } catch (error) {
+    showNotice(
+      error instanceof Error ? error.message : "Unable to deploy sortie",
+    );
   } finally {
     stageStartPending = false;
   }
@@ -6168,12 +8583,46 @@ async function autosaveCampaign(
   successMessage?: string,
   recoveryReason?: CrashRecoveryReason,
 ): Promise<boolean> {
+  if (
+    clearSettlementPending &&
+    reason !== "stage-clear" &&
+    reason !== "hidden-transition"
+  )
+    return true;
+  if (
+    game.getPhase() === "stageclear" &&
+    warpAccount?.attempt?.phase === "active" &&
+    reason !== "stage-clear" &&
+    reason !== "hidden-transition"
+  )
+    return false;
+  if (expeditionSession.ownsCampaignPersistence()) {
+    if (successMessage !== undefined) {
+      showNotice("Expedition · Campaign save is intentionally unchanged");
+    }
+    return true;
+  }
+
+  if (testingStagePreviewActive() || practiceRestorePending) {
+    if (successMessage !== undefined) {
+      showNotice("Testing preview · progress/rewards are not saved");
+    }
+    return true;
+  }
+
+  if (!accountTransactions.canWrite()) {
+    showNotice("Read-only account · Practice is free in this tab");
+    return false;
+  }
   if (recoveryReason !== undefined) {
     captureSafeCrashRecovery(recoveryReason);
   }
 
   campaignAutosave.schedule(
-    currentAutosaveSnapshot(),
+    currentAutosaveSnapshot(
+      (reason === "stage-clear" || reason === "hidden-transition") &&
+        game.getPhase() === "stageclear",
+    ),
     reason,
   );
 
@@ -6196,36 +8645,25 @@ async function autosaveCampaign(
 
 async function initializePlayerProgress(): Promise<void> {
   const startButton = byId<HTMLButtonElement>("startButton");
-  const stageSelectButton =
-    byId<HTMLButtonElement>("stageSelectButton");
+  const stageSelectButton = byId<HTMLButtonElement>("stageSelectButton");
   const routeButton = byId<HTMLButtonElement>("routeButton");
   const dataButtons = [
     byId<HTMLButtonElement>("dataButton"),
     byId<HTMLButtonElement>("pauseDataButton"),
   ];
-  const equipmentButton =
-    byId<HTMLButtonElement>("equipmentButton");
+  const equipmentButton = byId<HTMLButtonElement>("equipmentButton");
   const shopButton = byId<HTMLButtonElement>("shopButton");
-  const stationShopButton =
-    byId<HTMLButtonElement>("stationShopButton");
-  const travelingShopButton =
-    byId<HTMLButtonElement>("travelingShopButton");
-  const serviceShopButton =
-    byId<HTMLButtonElement>("serviceShopButton");
-  const blackMarketButton =
-    byId<HTMLButtonElement>("blackMarketButton");
-  const hiddenShopButton =
-    byId<HTMLButtonElement>("hiddenShopButton");
-  const eventShopButton =
-    byId<HTMLButtonElement>("eventShopButton");
-  const supportButton =
-    byId<HTMLButtonElement>("supportButton");
-  const characterButton =
-    byId<HTMLButtonElement>("characterButton");
+  const stationShopButton = byId<HTMLButtonElement>("stationShopButton");
+  const travelingShopButton = byId<HTMLButtonElement>("travelingShopButton");
+  const serviceShopButton = byId<HTMLButtonElement>("serviceShopButton");
+  const blackMarketButton = byId<HTMLButtonElement>("blackMarketButton");
+  const hiddenShopButton = byId<HTMLButtonElement>("hiddenShopButton");
+  const eventShopButton = byId<HTMLButtonElement>("eventShopButton");
+  const supportButton = byId<HTMLButtonElement>("supportButton");
+  const characterButton = byId<HTMLButtonElement>("characterButton");
   const codexButton = byId<HTMLButtonElement>("codexButton");
   const ascensionButton = byId<HTMLButtonElement>("ascensionButton");
-  const progressionButton =
-    byId<HTMLButtonElement>("progressionButton");
+  const progressionButton = byId<HTMLButtonElement>("progressionButton");
 
   startButton.disabled = true;
   stageSelectButton.disabled = true;
@@ -6246,7 +8684,15 @@ async function initializePlayerProgress(): Promise<void> {
   for (const button of dataButtons) button.disabled = true;
 
   try {
-    const loaded = await loadPlayerSave();
+    const loaded = await accountTransactions.initialize();
+    if (loaded.save.auxiliary?.expansionV2)
+      expansionV2Profile = sanitizeExpansionV2Profile(
+        loaded.save.auxiliary.expansionV2,
+      );
+    if (loaded.save.auxiliary?.difficulty)
+      difficultySettings = sanitizeDifficultySettings(
+        loaded.save.auxiliary.difficulty,
+      );
     campaign = loaded.save.campaign;
     inventory = loaded.save.inventory;
     equipment = loaded.save.equipment;
@@ -6287,9 +8733,7 @@ async function initializePlayerProgress(): Promise<void> {
     applyEquipmentStats();
     applySupportSpells();
     applyRelicEffects();
-    currentGalaxy = Math.ceil(
-      campaign.selectedStage / STAGES_PER_GALAXY,
-    );
+    currentGalaxy = Math.ceil(campaign.selectedStage / STAGES_PER_GALAXY);
     persistenceReady = true;
 
     syncWorldMusicProfile(campaign.selectedStage);
@@ -6329,7 +8773,14 @@ async function initializePlayerProgress(): Promise<void> {
       );
     }
 
-    if (loaded.recoveryMode === "death-rollback") {
+    renderWarpHud();
+    if (loaded.interrupted) {
+      showNotice(
+        "Interrupted sortie closed · Warp was already spent. Retry rewarded costs 10; Practice is free.",
+      );
+    } else if (!accountTransactions.canWrite()) {
+      showNotice("Read-only account in this tab · Practice remains free");
+    } else if (loaded.recoveryMode === "death-rollback") {
       showNotice(
         "Death record enforced · returned to checkpoint " +
           checkpointDisplayLabel(),
@@ -6338,9 +8789,7 @@ async function initializePlayerProgress(): Promise<void> {
       showNotice(
         "✓ Recovered last safe transition · " +
           (ascension.selectedTier > 0
-            ? "A" +
-              String(ascension.selectedTier) +
-              " Stage "
+            ? "A" + String(ascension.selectedTier) + " Stage "
             : "Stage ") +
           String(campaign.selectedStage).padStart(3, "0"),
       );
@@ -6358,25 +8807,30 @@ async function initializePlayerProgress(): Promise<void> {
       return;
     }
 
-    showNotice("Unable to load player progress");
+    persistenceReady = true;
+    for (const button of dataButtons) button.disabled = false;
+    showNotice(
+      "Account storage needs recovery · Practice is free. Open Save data to import a valid backup; paid Deploy remains blocked.",
+    );
   }
 }
 
 function updateCampaignUi(): void {
   const gameplayStage = selectedGameplayStage();
-  byId<HTMLButtonElement>("nextStageButton").textContent = "Next stage";
+  byId<HTMLButtonElement>("nextStageButton").textContent = "Next stage · 10 Warp";
   byId("startButton").textContent =
-    "Continue · Stage " +
+    "Deploy · 10 Warp · Stage " +
     String(gameplayStage).padStart(3, "0") +
     (ascension.selectedTier > 0
       ? " · A" + String(ascension.selectedTier)
       : "") +
-    (gameplayMode === "recall" ? " · Recall" : "");
+    "";
   renderAscension();
   const selectedWorld = worldForStage(gameplayStage);
   musicController.setWorldProfile(
     musicProfileForWorld(selectedWorld),
   );
+  titleHub?.render();
   byId("titleWorldMeta").textContent =
     worldLabel(selectedWorld) +
     " · Stage " +
@@ -6384,6 +8838,7 @@ function updateCampaignUi(): void {
     "-" +
     String(selectedWorld.stageEnd).padStart(3, "0");
   byId("campaignMeta").textContent =
+    (testingStageUnlockEnabled() ? "TEST UNLOCK · " : "") +
     "Unlocked " +
     String(campaign.highestUnlockedStage).padStart(3, "0") +
     " / 1000 · " +
@@ -6434,7 +8889,7 @@ function populateGalaxySelect(): void {
       String(firstStage).padStart(3, "0") +
       "-" +
       String(lastStage).padStart(3, "0");
-    option.disabled = firstStage > campaign.highestUnlockedStage;
+    option.disabled = !canSelectStageFromJourney(firstStage);
     select.append(option);
   }
 }
@@ -6449,7 +8904,7 @@ function populateJourneyWorldSelect(): void {
     option.value = String(number);
     option.textContent =
       "World " + String(number).padStart(2, "0") + " · " + world.name;
-    option.disabled = world.stageStart > campaign.highestUnlockedStage;
+    option.disabled = !canSelectStageFromJourney(world.stageStart);
     select.append(option);
   }
   const firstWorld = (currentGalaxy - 1) * 5 + 1;
@@ -6466,20 +8921,39 @@ function renderStagePreview(): void {
   const stage = selectedJourneyStage;
   const world = worldForStage(stage);
   const node = journeyNodesForStage(stage).find((entry) => entry.stage === stage)!;
-  const isUnlocked = canSelectCampaignStage(
+  const isUnlocked = canSelectStageFromJourney(stage);
+  const isTestingPreview = isTestingStagePreview(
     campaign,
     campaignExpansion,
     stage,
+    testingStageUnlockEnabled(),
   );
   const cleared = campaign.clearedStages.includes(stage);
   const title = byId("stagePreviewTitle");
   title.textContent =
     "Stage " + String(stage).padStart(3, "0") +
     " · " + (node.role === "normal" ? "Combat" : node.role.replace(/-/g, " "));
+  const expansionProfile =
+    campaignStageExpansionProfile(stage);
   byId("stagePreviewMeta").textContent =
     world.name + " · " +
-    (cleared ? "Cleared · Replay available" : isUnlocked ? "Current frontier" : "Locked") +
-    (node.checkpoint ? " · Checkpoint milestone" : "");
+    (isTestingPreview
+      ? "Testing preview · campaign progress and rewards will not be saved"
+      : cleared
+        ? "Cleared · Replay available"
+        : isUnlocked
+          ? "Current frontier"
+          : "Locked") +
+    (node.checkpoint ? " · Checkpoint milestone" : "") +
+    (expansionV2Enabled
+      ? " · V2 " +
+        expansionProfile.band.replaceAll("-", " ") +
+        " · " +
+        (campaignReferenceRoutePreview(
+          stage,
+          expansionV2Profile.campaignEventFlags,
+        ) ?? expansionProfile.routePreview)
+      : "");
   const start = byId<HTMLButtonElement>("journeyStartButton");
   start.disabled = !isUnlocked || journeyStartGate.active;
   start.textContent = journeyStartGate.active
@@ -6487,6 +8961,79 @@ function renderStagePreview(): void {
     : cleared
       ? "Replay Stage"
       : "Start Stage";
+}
+
+const JOURNEY_KITS = ["g01-celestial", "g02-infernal", "g03-frost-prism", "g04-verdant", "g05-shadow-nature", "g06-cosmic-forge", "g07-abyssal", "g08-aurora-cosmic", "g09-void-cathedral", "g10-eternity"] as const;
+
+function worldKitId(worldNumber: number): string {
+  return JOURNEY_KITS[Math.floor((Math.max(1, Math.min(50, worldNumber)) - 1) / 5)]!;
+}
+
+/** The World's own background plate (the one its stages are played on). */
+function worldPlateUrl(worldNumber: number): string {
+  const composition = compositionForWorld("world-" + String(Math.max(1, Math.min(50, worldNumber))).padStart(2, "0"));
+  if (composition === null) return galaxyPlateUrl((worldNumber - 1) * 20 + 1);
+  const texture = composition.plate.texture;
+  // Only G01's second plate has a different size.
+  const size = composition.kitId === "g01-celestial" && texture === "plate-b" ? "1376" : "1280";
+  return "/assets/space-typing/backgrounds/" + composition.kitId + "/" + texture + "." + size + ".webp";
+}
+
+/** Best rating kept for a cleared stage (from its best accuracy). */
+function journeyStageStars(stage: number): number {
+  const profile = inputProfileKey(game.getInputMode(), gameplayMode, difficultySettings.mode, ascension.selectedTier, selectedVocabularyLevel());
+  const best = campaign.bestByInputProfile?.[profile]?.[String(stage)] ?? (game.getInputMode() === "typing" ? campaign.bestByStage[String(stage)] : undefined);
+  if (best === undefined) return campaign.clearedStages.includes(stage) ? 1 : 0;
+  return stageResultStars(best.accuracy, null).stars;
+}
+
+/** World progress chips: stages cleared and stars earned. */
+function renderJourneyProgress(stageStart: number): void {
+  const heading = document.querySelector<HTMLElement>(".journey-map-heading");
+  if (heading === null) return;
+  let progress = heading.querySelector<HTMLElement>(".journey-progress");
+  if (progress === null) {
+    progress = document.createElement("span");
+    progress.className = "journey-progress";
+    heading.querySelector("strong")?.after(progress);
+  }
+  let cleared = 0;
+  let stars = 0;
+  for (let stage = stageStart; stage < stageStart + 20; stage += 1) {
+    if (campaign.clearedStages.includes(stage)) cleared += 1;
+    stars += journeyStageStars(stage);
+  }
+  progress.replaceChildren();
+  for (const [icon, text] of [["flag", String(cleared) + " / 20"], ["sparkle", "★ " + String(stars) + " / 60"]] as const) {
+    const chip = document.createElement("span");
+    chip.dataset.icon = icon;
+    chip.textContent = text;
+    progress.append(chip);
+  }
+}
+
+/** Drifting particles themed by the Galaxy (embers, snow, petals, bubbles…). */
+function journeyAmbientLayer(): HTMLElement {
+  const layer = document.createElement("div");
+  layer.className = "journey-fx";
+  layer.setAttribute("aria-hidden", "true");
+  const count = settings.visualQuality === "low" ? 8 : settings.visualQuality === "medium" ? 16 : 26;
+  for (let index = 0; index < count; index += 1) {
+    const mote = document.createElement("i");
+    mote.style.setProperty("--x", String((index * 37) % 100) + "%");
+    mote.style.setProperty("--delay", "-" + String((index * 0.83) % 12) + "s");
+    mote.style.setProperty("--dur", String(8 + ((index * 1.7) % 7)) + "s");
+    mote.style.setProperty("--size", String(3 + (index % 4) * 1.5) + "px");
+    mote.style.setProperty("--sway", String(-30 + ((index * 23) % 60)) + "px");
+    layer.append(mote);
+  }
+  return layer;
+}
+
+/** A World's landmark art (planet, portal, crystal…) from its background kit. */
+function worldHeroUrl(worldNumber: number): string {
+  const world = Math.max(1, Math.min(50, worldNumber));
+  return "/assets/space-typing/backgrounds/" + worldKitId(world) + "/hero-w" + String(world).padStart(2, "0") + ".512.webp";
 }
 
 function renderStageGrid(): void {
@@ -6498,9 +9045,22 @@ function renderStageGrid(): void {
   byId("journeyWorldTitle").textContent =
     "World " + String(selectedJourneyWorld).padStart(2, "0") +
     " · " + world.name;
+  renderJourneyProgress(world.stageStart);
 
   const board = document.createElement("div");
   board.className = "stage-journey";
+  // The World's own scene behind the route: the Galaxy plate, and the
+  // World's landmark (its hero object) floating beside the boss node.
+  scroll.style.setProperty("--journey-plate", "url(\"" + worldPlateUrl(selectedJourneyWorld) + "\")");
+  scroll.dataset.theme = worldKitId(selectedJourneyWorld);
+  scroll.append(journeyAmbientLayer());
+  const landmark = document.createElement("img");
+  landmark.className = "journey-landmark";
+  landmark.src = worldHeroUrl(selectedJourneyWorld);
+  landmark.alt = "";
+  landmark.decoding = "async";
+  landmark.setAttribute("aria-hidden", "true");
+  board.append(landmark);
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("class", "stage-journey-path");
   svg.setAttribute("viewBox", "0 0 1000 1780");
@@ -6518,10 +9078,16 @@ function renderStageGrid(): void {
   svg.append(base, active);
   board.append(svg);
 
+  // Landmark beside the World's boss node.
+  const bossNode = nodes.find((node) => node.role.includes("boss") && node.stage % 20 === 0) ?? nodes[nodes.length - 1];
+  if (bossNode !== undefined) {
+    landmark.style.left = String(bossNode.x > 50 ? bossNode.x - 36 : bossNode.x + 36) + "%";
+    landmark.style.top = String(bossNode.y - 120) + "px";
+  }
   const cleared = new Set(campaign.clearedStages);
   const current = campaign.highestUnlockedStage;
   for (const node of nodes) {
-    const unlocked = canSelectCampaignStage(campaign, campaignExpansion, node.stage);
+    const unlocked = canSelectStageFromJourney(node.stage);
     const isCleared = cleared.has(node.stage);
     const button = document.createElement("button");
     button.type = "button";
@@ -6541,6 +9107,18 @@ function renderStageGrid(): void {
     button.setAttribute("aria-pressed", String(node.stage === selectedJourneyStage));
     const label = document.createElement("strong");
     label.textContent = String(node.stage).padStart(3, "0");
+    // Boss stages show the boss itself.
+    if (node.role.includes("boss")) {
+      const bossArt = paintedBossArtUrl(bossIdentityForStage(node.stage, node.role as BossRole).id);
+      if (bossArt !== undefined) {
+        const portrait = document.createElement("img");
+        portrait.className = "journey-boss-art";
+        portrait.src = bossArt;
+        portrait.alt = "";
+        portrait.decoding = "async";
+        button.append(portrait);
+      }
+    }
     button.append(label);
     if (node.role !== "normal" || node.checkpoint) {
       const badge = document.createElement("span");
@@ -6550,17 +9128,42 @@ function renderStageGrid(): void {
         node.role === "elite" ? "✦" : node.checkpoint ? "⚑" : "★";
       button.append(badge);
     }
+    const stars = journeyStageStars(node.stage);
+    if (isCleared && stars > 0) {
+      const row = document.createElement("span");
+      row.className = "journey-stars";
+      row.setAttribute("aria-hidden", "true");
+      for (let star = 0; star < 3; star += 1) {
+        const icon = document.createElement("i");
+        if (star < stars) icon.className = "earned";
+        icon.textContent = "★";
+        row.append(icon);
+      }
+      button.append(row);
+    } else if (!unlocked) {
+      const lock = document.createElement("span");
+      lock.className = "journey-lock";
+      lock.dataset.icon = "lock";
+      lock.setAttribute("aria-hidden", "true");
+      button.append(lock);
+    }
     const roleLabel = node.role.replace(/-/g, " ");
     button.setAttribute("aria-label",
       "Stage " + node.stage + ", " + roleLabel +
       (node.checkpoint ? ", checkpoint" : "") +
       (isCleared ? ", cleared" : !unlocked ? ", locked" : ", playable"));
     if (node.stage === current) {
-      const ship = document.createElement("span");
-      ship.className = "journey-ship";
-      ship.setAttribute("aria-hidden", "true");
-      ship.textContent = "◆";
-      button.append(ship);
+      // "You are here": the pilot's ship in a glowing badge with a pin.
+      const avatar = document.createElement("span");
+      avatar.className = "journey-avatar";
+      avatar.setAttribute("aria-hidden", "true");
+      const ship = document.createElement("img");
+      ship.src = shipArtUrl(characters.selected);
+      ship.alt = "";
+      const tag = document.createElement("b");
+      tag.textContent = "YOU";
+      avatar.append(ship, tag);
+      button.append(avatar);
     }
     button.addEventListener("click", () => {
       if (journeyStartGate.active) return;
@@ -6580,9 +9183,14 @@ function renderStageGrid(): void {
 
 function focusJourneyFrontier(): void {
   const scroll = byId("stageGrid");
+  const targetStage = testingStageUnlockEnabled()
+    ? selectedJourneyStage
+    : Math.max(
+        (selectedJourneyWorld - 1) * 20 + 1,
+        Math.min(selectedJourneyWorld * 20, campaign.highestUnlockedStage),
+      );
   const node = scroll.querySelector<HTMLElement>(
-    '[data-stage="' + String(Math.max((selectedJourneyWorld - 1) * 20 + 1,
-      Math.min(selectedJourneyWorld * 20, campaign.highestUnlockedStage))) + '"]',
+    '[data-stage="' + String(targetStage) + '"]',
   );
   if (node !== null) {
     scroll.scrollTop = Math.max(0, node.offsetTop - scroll.clientHeight / 2);
@@ -6595,16 +9203,17 @@ function openStageSelect(): void {
     return;
   }
   populateGalaxySelect();
-  selectedJourneyStage = campaign.selectedStage;
+  selectedJourneyStage =
+    testingStageUnlockEnabled() && testingStageOverride !== null
+      ? testingStageOverride
+      : campaign.selectedStage;
   currentGalaxy = Math.ceil(selectedJourneyStage / STAGES_PER_GALAXY);
   selectedJourneyWorld = Math.ceil(selectedJourneyStage / 20);
   const select = byId<HTMLSelectElement>("galaxySelect");
 
   for (const option of Array.from(select.options)) {
     const galaxy = Number(option.value);
-    option.disabled = !canSelectCampaignStage(
-      campaign,
-      campaignExpansion,
+    option.disabled = !canSelectStageFromJourney(
       (galaxy - 1) * STAGES_PER_GALAXY + 1,
     );
   }
@@ -6659,9 +9268,7 @@ function renderGameplayMode(): void {
   byId<HTMLButtonElement>("recallModeButton").classList.toggle("primary", recall);
   byId("titleModeMeta").textContent =
     activeReviewGoal === undefined
-      ? recall
-        ? "Recall · hear, remember, type"
-        : "Combat · see, type, shoot"
+      ? "Combat · see, type, shoot"
       : "Smart Review · " +
         activeReviewGoal.replaceAll("-", " ") +
         " · " +
@@ -6691,11 +9298,37 @@ function selectGameplayMode(mode: GameplayMode): void {
   renderRecallSetup();
 }
 
+function nowPlayingLabel(value: NowPlaying | null): string {
+  if (value === null) return "—";
+  return value.title + " · " + value.moodLabel + (value.stem === "intense" ? " · intense" : "");
+}
+
+/** Settings label, plus a short in-game card whenever a new song starts. */
+function showNowPlaying(value: NowPlaying | null): void {
+  byId("musicNowPlaying").textContent = nowPlayingLabel(value);
+  if (value === null || value.id === lastToastSong) return;
+  lastToastSong = value.id;
+  const toast = byId("musicToast");
+  toast.replaceChildren(document.createTextNode("♪ " + value.title));
+  const mood = document.createElement("small");
+  mood.textContent = value.moodLabel + (value.mode === "random" ? " · random" : "");
+  toast.append(mood);
+  toast.classList.add("visible");
+  if (musicToastTimer !== null) window.clearTimeout(musicToastTimer);
+  musicToastTimer = window.setTimeout(() => toast.classList.remove("visible"), 4200);
+}
+
+function applyRuntimeAudio(next: GameSettings): void {
+  game.updateSettings(next);
+  const master = sanitizeAudioLevel(next.masterVolume, 1);
+  musicController.setMusicVolume(master * next.musicVolume);
+  musicController.setAmbientVolume(master * next.ambientVolume);
+}
+
 function saveSettings(): void {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-  game.updateSettings(settings);
-  musicController.setMusicVolume(settings.musicVolume);
-  musicController.setAmbientVolume(settings.ambientVolume);
+  applyRuntimeAudio(settings);
+  musicController.setPlaybackMode(sanitizeMusicMode(settings.musicMode));
   updateKillTranslationVisibility(game.getPhase());
 }
 
@@ -6720,15 +9353,28 @@ function renderSettings(): void {
       ? "∞ replays"
       : String(recallProfile.replayLimit) + " replays");
 
+  const masterVolume = sanitizeAudioLevel(renderedSettings.masterVolume, 1);
+  byId<HTMLInputElement>("masterVolume").value = String(masterVolume);
+  byId<HTMLOutputElement>("masterVolumeValue").value =
+    String(Math.round(masterVolume * 100)) + "%";
+
   const volume = byId<HTMLInputElement>("sfxVolume");
   volume.value = String(renderedSettings.sfxVolume);
   byId<HTMLOutputElement>("sfxValue").value =
     String(Math.round(renderedSettings.sfxVolume * 100)) + "%";
 
+  const creditVolume = renderedSettings.creditVolume ?? 1;
+  byId<HTMLInputElement>("creditVolume").value = String(creditVolume);
+  byId<HTMLOutputElement>("creditVolumeValue").value =
+    String(Math.round(creditVolume * 100)) + "%";
+
   const musicVolume = byId<HTMLInputElement>("musicVolume");
   musicVolume.value = String(renderedSettings.musicVolume);
   byId<HTMLOutputElement>("musicValue").value =
     String(Math.round(renderedSettings.musicVolume * 100)) + "%";
+
+  byId<HTMLSelectElement>("musicMode").value = sanitizeMusicMode(renderedSettings.musicMode);
+  byId("musicNowPlaying").textContent = nowPlayingLabel(musicController.getNowPlaying());
 
   const ambientVolume = byId<HTMLInputElement>("ambientVolume");
   ambientVolume.value = String(renderedSettings.ambientVolume);
@@ -6739,6 +9385,10 @@ function renderSettings(): void {
     String(renderedSettings.screenShake);
   byId<HTMLSelectElement>("visualQuality").value =
     renderedSettings.visualQuality;
+  byId<HTMLSelectElement>("enemyProjectileMode").value =
+    sanitizeEnemyProjectileMode(renderedSettings.enemyProjectileMode);
+  byId<HTMLSelectElement>("unlockAllStages").value =
+    String(renderedSettings.unlockAllStages === true);
 
   byId<HTMLSelectElement>("pronunciationEnabled").value =
     String(renderedSettings.pronunciationEnabled);
@@ -6764,6 +9414,18 @@ function renderSettings(): void {
   voiceVolume.value = String(renderedSettings.pronunciationVolume);
   byId<HTMLOutputElement>("pronunciationVolumeValue").value =
     String(Math.round(renderedSettings.pronunciationVolume * 100)) + "%";
+
+  const announcerVolume = sanitizeAudioLevel(renderedSettings.announcerVolume, 1);
+  byId<HTMLInputElement>("announcerVolume").value = String(announcerVolume);
+  byId<HTMLOutputElement>("announcerVolumeValue").value =
+    String(Math.round(announcerVolume * 100)) + "%";
+
+  const categories = sanitizeAudioCategoryVolumes(renderedSettings.audioCategoryVolumes);
+  for (const group of ["typing", "combat", "warnings", "ui", "rewards"] as const) {
+    byId<HTMLInputElement>("audioCategory-" + group).value = String(categories[group]);
+    byId<HTMLOutputElement>("audioCategory-" + group + "Value").value =
+      String(Math.round(categories[group] * 100)) + "%";
+  }
 
   const difficultyMode = byId<HTMLSelectElement>("difficultyMode");
   difficultyMode.value = renderedDifficulty.mode;
@@ -6821,6 +9483,48 @@ function markSettingsDirty(difficultyChanged = false): void {
     : "Unsaved changes.";
 }
 
+const QUICK_AUDIO_FIELDS = [
+  ["quickMaster", "masterVolume"],
+  ["quickPronunciation", "pronunciationVolume"],
+  ["quickMusicParent", "musicVolume"],
+  ["quickSfxParent", "sfxVolume"],
+  ["quickAnnouncer", "announcerVolume"],
+] as const;
+
+function renderQuickAudio(): void {
+  const draft = quickAudioDraft ?? settings;
+  for (const [id, field] of QUICK_AUDIO_FIELDS) {
+    const fallback = field === "announcerVolume" || field === "masterVolume" ? 1 : 0;
+    const value = sanitizeAudioLevel(draft[field], fallback);
+    byId<HTMLInputElement>(id).value = String(value);
+    byId<HTMLOutputElement>(id + "Value").value =
+      String(Math.round(value * 100)) + "%";
+  }
+}
+
+function openQuickAudio(): void {
+  if (quickAudioDialog.open) return;
+  quickAudioDraft = structuredClone(settings);
+  quickAudioCommitted = false;
+  renderQuickAudio();
+  byId("quickAudioStatus").textContent =
+    "Preview is local only · the Duel opponent and match clock keep running.";
+  quickAudioDialog.show();
+}
+
+function closeQuickAudio(commit: boolean): void {
+  if (commit && quickAudioDraft !== null) {
+    settings = structuredClone(quickAudioDraft);
+    quickAudioCommitted = true;
+    saveSettings();
+    titleHub?.render();
+    showNotice("✓ Audio settings applied");
+  } else {
+    applyRuntimeAudio(settings);
+  }
+  quickAudioDialog.close();
+}
+
 function openSettings(): void {
   settingsDraft = structuredClone(settings);
   difficultySettingsDraft = structuredClone(difficultySettings);
@@ -6850,7 +9554,9 @@ async function commitSettingsDraft(): Promise<void> {
   if (
     shouldReloadStage &&
     !window.confirm(
-      "Difficulty changed. Saving will reload the current stage so the new difficulty is applied consistently. Save and reload now?",
+      testingStagePreviewActive()
+        ? "Difficulty changed. Save and reload this free Practice stage?"
+        : "Difficulty changed. The current sortie ends without refund; a new Deploy costs 10 Warp. Save and reload?",
     )
   ) {
     byId("settingsSaveStatus").textContent =
@@ -6858,15 +9564,30 @@ async function commitSettingsDraft(): Promise<void> {
     return;
   }
 
+  const unlockAllStagesWasEnabled = settings.unlockAllStages === true;
+  const testingPreviewWasActive = testingStagePreviewActive();
+
   settings = structuredClone(settingsDraft);
   difficultySettings = structuredClone(difficultySettingsDraft);
   recallSettings = structuredClone(recallSettingsDraft);
+
+  if (unlockAllStagesWasEnabled && settings.unlockAllStages !== true) {
+    clearTestingStagePreview();
+    if (testingPreviewWasActive && game.getPhase() !== "title") {
+      game.backToTitle();
+    }
+  }
 
   saveSettings();
   saveDifficultySettings();
   saveRecallPreferences();
   settingsDialog.close();
-  showNotice("✓ Settings saved");
+  updateCampaignUi();
+  showNotice(
+    settings.unlockAllStages === true
+      ? "✓ Settings saved · all stages available for testing"
+      : "✓ Settings saved",
+  );
 
   if (shouldReloadStage) {
     game.backToTitle();
@@ -7177,232 +9898,80 @@ function openData(): void {
 }
 
 async function exportSave(): Promise<void> {
-  if (!persistenceReady) return;
-
-  const saved = await autosaveCampaign(
-    "manual",
-    undefined,
-    "manual",
-  );
-  const json = exportPlayerSaveJson(
-    campaign,
-    undefined,
-    inventory,
-    equipment,
-    supportSpells,
-    characters,
-    luckPity,
-    hiddenDiscovery,
-    credits,
-    progression,
-    expansionCurrencies,
-    campaignExpansion,
-    checkpointSnapshot,
-    crashRecoverySnapshot,
-    stageEntrySnapshot,
-    shops,
-    route,
-    upgrades,
-    relics,
-    codex,
-    ascension,
-    hotbar,
-  );
-  const blob = new Blob([json], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  const stamp = new Date()
-    .toISOString()
-    .replace(/[:.]/g, "-");
-
-  link.href = url;
-  link.download = "space-typing-save-" + stamp + ".json";
-  document.body.append(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
-
-  byId("dataStatus").textContent =
-    (saved ? "✓ Backup exported" : "Backup exported from current session") +
-    " · Stage " +
-    String(campaign.highestUnlockedStage).padStart(3, "0");
+  const status = byId("dataStatus");
+  if (
+    !persistenceReady ||
+    warpAccount?.attempt ||
+    accountTransactions.busy() ||
+    clearSettlementPending
+  ) {
+    status.textContent = "End the sortie before exporting a committed backup.";
+    return;
+  }
+  try {
+    if (accountTransactions.canWrite() && !(await autosaveCampaign("manual")))
+      return;
+    const loaded = await loadPlayerSave();
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(loaded.save, null, 2)], {
+        type: "application/json",
+      }),
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download =
+      "space-typing-save-" +
+      new Date().toISOString().replace(/[:.]/g, "-") +
+      ".json";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    status.textContent = loaded.mirrorRescue
+      ? "Recovery backup exported · importing it may roll back spending."
+      : "✓ Committed backup exported";
+  } catch (error) {
+    status.textContent =
+      "Export failed · " +
+      (error instanceof Error ? error.message : "Storage unavailable");
+  }
 }
 
 async function importSaveFile(file: File): Promise<void> {
   const status = byId("dataStatus");
-
+  if (
+    warpAccount?.attempt ||
+    accountTransactions.busy() ||
+    testingStagePreviewActive() ||
+    practiceRestorePending ||
+    clearSettlementPending
+  ) {
+    status.textContent = "End the current session before restoring a backup.";
+    return;
+  }
   try {
     const result = parsePlayerSaveJson(await file.text());
     if (!result.ok) {
       status.textContent = "Import failed · " + result.error;
       return;
     }
-
-    const imported = result.save.campaign;
-    const importedInventory = result.save.inventory;
-    const importedEquipment = result.save.equipment;
-    const importedSupportSpells = result.save.supportSpells;
-    const importedHotbar = result.save.hotbar;
-    const importedCharacters = syncCharacterUnlocks(
-      result.save.characters,
-      imported.clearedStages,
-    );
-    const importedLuckPity = result.save.luckPity;
-    const importedHiddenDiscovery = result.save.hiddenDiscovery;
-    const importedCredits = result.save.credits;
-    const importedProgression = result.save.progression;
-    const importedUpgrades = result.save.upgrades;
-    const importedRelics = result.save.relics;
-    const importedCodex = result.save.codex;
-    const importedAscension = result.save.ascension;
-    const importedExpansionCurrencies =
-      result.save.expansionCurrencies;
-    const importedShops = result.save.shops;
-    const importedRoute = result.save.route;
-    const importedCampaignExpansion =
-      result.save.campaignExpansion;
-    const importedCheckpointSnapshot =
-      result.save.checkpointSnapshot;
-    const importedCrashRecoverySnapshot =
-      result.save.crashRecoverySnapshot;
-    const importedStageEntrySnapshot =
-      result.save.stageEntrySnapshot;
-    const message =
-      "Import Stage " +
-      String(imported.highestUnlockedStage).padStart(3, "0") +
-      " progress?\n\n" +
-      "Current Stage " +
-      String(campaign.highestUnlockedStage).padStart(3, "0") +
-      " progress will be replaced.";
-
-    if (!window.confirm(message)) {
+    const stage = result.save.campaign.highestUnlockedStage;
+    if (
+      !window.confirm(
+        `Restore the whole profile at Stage ${String(stage).padStart(3, "0")}? Current progress will be replaced. This may undo spending. A new save generation will be created and the game will reload.`,
+      )
+    ) {
       status.textContent = "Import cancelled.";
       return;
     }
-
-    const previousCampaign = campaign;
-    const previousInventory = inventory;
-    const previousEquipment = equipment;
-    const previousSupportSpells = supportSpells;
-    const previousHotbar = hotbar;
-    const previousCharacters = characters;
-    const previousLuckPity = luckPity;
-    const previousHiddenDiscovery = hiddenDiscovery;
-    const previousCredits = credits;
-    const previousProgression = progression;
-    const previousUpgrades = upgrades;
-    const previousRelics = relics;
-    const previousCodex = codex;
-    const previousAscension = ascension;
-    const previousExpansionCurrencies = expansionCurrencies;
-    const previousShops = shops;
-    const previousRoute = route;
-    const previousCampaignExpansion = campaignExpansion;
-    const previousCheckpointSnapshot = checkpointSnapshot;
-    const previousCrashRecoverySnapshot = crashRecoverySnapshot;
-    const previousStageEntrySnapshot = stageEntrySnapshot;
-    campaign = imported;
-    inventory = importedInventory;
-    equipment = importedEquipment;
-    supportSpells = importedSupportSpells;
-    hotbar = importedHotbar;
-    characters = importedCharacters;
-    luckPity = importedLuckPity;
-    hiddenDiscovery = importedHiddenDiscovery;
-    credits = importedCredits;
-    progression = importedProgression;
-    upgrades = importedUpgrades;
-    relics = importedRelics;
-    codex = importedCodex;
-    ascension = importedAscension;
-    const importedAscensionStage = currentAscensionStage(ascension);
-    if (importedAscensionStage !== null) {
-      campaign = {
-        ...campaign,
-        selectedStage: importedAscensionStage,
-      };
-    }
-    expansionCurrencies = importedExpansionCurrencies;
-    shops = importedShops;
-    route = importedRoute;
-    campaignExpansion = importedCampaignExpansion;
-    checkpointSnapshot = importedCheckpointSnapshot;
-    crashRecoverySnapshot = importedCrashRecoverySnapshot;
-    stageEntrySnapshot = importedStageEntrySnapshot;
-    syncProgressionAchievements();
-    game.setLuckPityState(luckPity);
-    game.setHiddenDiscoveryState(hiddenDiscovery);
-    updateShopAccess();
-    applySelectedCharacter();
-    renderInventory();
-    applyEquipmentStats();
-    applySupportSpells();
-    currentGalaxy = Math.ceil(
-      campaign.selectedStage / STAGES_PER_GALAXY,
-    );
-
-    const saved = await autosaveCampaign(
-      "manual",
-      undefined,
-      "manual",
-    );
-    if (!saved) {
-      campaign = previousCampaign;
-      inventory = previousInventory;
-      equipment = previousEquipment;
-      supportSpells = previousSupportSpells;
-      hotbar = previousHotbar;
-      characters = previousCharacters;
-      luckPity = previousLuckPity;
-      hiddenDiscovery = previousHiddenDiscovery;
-      credits = previousCredits;
-      progression = previousProgression;
-      upgrades = previousUpgrades;
-      relics = previousRelics;
-      codex = previousCodex;
-      ascension = previousAscension;
-      const previousAscensionStage = currentAscensionStage(ascension);
-      if (previousAscensionStage !== null) {
-        campaign = {
-          ...campaign,
-          selectedStage: previousAscensionStage,
-        };
-      }
-      expansionCurrencies = previousExpansionCurrencies;
-      shops = previousShops;
-      route = previousRoute;
-      campaignExpansion = previousCampaignExpansion;
-      checkpointSnapshot = previousCheckpointSnapshot;
-      crashRecoverySnapshot = previousCrashRecoverySnapshot;
-      stageEntrySnapshot = previousStageEntrySnapshot;
-      game.setLuckPityState(luckPity);
-      game.setHiddenDiscoveryState(hiddenDiscovery);
-      updateShopAccess();
-      applySelectedCharacter();
-      renderInventory();
-      applyEquipmentStats();
-      applySupportSpells();
-      applyRelicEffects();
-      currentGalaxy = Math.ceil(
-        campaign.selectedStage / STAGES_PER_GALAXY,
-      );
-      updateCampaignUi();
-      updateDataSummary();
-      status.textContent =
-        "Import validated, but storage write failed. Previous progress was restored.";
-      return;
-    }
-
-    updateCampaignUi();
-    updateDataSummary();
-    dataDialog.close();
-
-    showNotice(
-      "✓ Save imported" +
-        (result.migrated ? " · migrated to current schema" : ""),
-    );
-  } catch {
-    status.textContent = "Import failed · Unable to read this file.";
+    if (accountTransactions.canWrite())
+      await accountTransactions.restore(result.save, result.migrated);
+    else await accountTransactions.recover(result.save, result.migrated);
+    window.location.reload();
+  } catch (error) {
+    status.textContent =
+      "Import failed · " +
+      (error instanceof Error ? error.message : "Unable to read this file");
   }
 }
 
@@ -7451,6 +10020,10 @@ function selectVocabularySourceTab(tab: VocabularySourceTab): void {
 }
 
 async function openVocabulary(): Promise<void> {
+  if (warpAccount?.attempt && !testingStagePreviewActive()) {
+    showNotice("End the sortie before changing its vocabulary");
+    return;
+  }
   sourceTab = sourceState.mode;
   renderSourceTabs();
   await populateVocabularySourceTabSafely(sourceTab);
@@ -7795,11 +10368,22 @@ byId("recallHintButton").addEventListener("click", () => {
   renderRecallAssistUi();
 });
 
-for (const id of ["startButton", "nextStageButton"]) {
-  byId(id).addEventListener("click", () => void startSelectedStage());
-}
+// The Campaign card always flies Combat; Recall has its own card
+// ("Start recall" sets recallLaunchPending). "Next stage" keeps the mode.
+let recallLaunchPending = false;
+byId("startButton").addEventListener("click", () => {
+  if (!recallLaunchPending && gameplayMode !== "combat") selectGameplayMode("combat");
+  recallLaunchPending = false;
+  void startSelectedStage();
+});
+byId("nextStageButton").addEventListener("click", () => void startSelectedStage());
 for (const id of ["restartButton", "clearRetryButton"]) {
   byId(id).addEventListener("click", () => {
+    if (testingStageUnlockEnabled() && testingStageOverride !== null) {
+      testingStageOverride = game.getStats().stage;
+      void startSelectedStage();
+      return;
+    }
     if (currentHiddenEncounterState().active !== null) {
       void startSelectedStage();
       return;
@@ -7873,7 +10457,13 @@ byId("phoenixCoreButton").addEventListener("click", () => {
 });
 
 for (const id of ["titleButton", "clearTitleButton"]) {
-  byId(id).addEventListener("click", () => game.backToTitle());
+  byId(id).addEventListener("click", async () => {
+    if (!await finishManagedSortie("abandoned")) return;
+    if (testingStagePreviewActive()) {
+      restoreTestingStagePersistentState();
+    }
+    game.backToTitle();
+  });
 }
 
 byId("characterButton").addEventListener("click", openCharacters);
@@ -7991,7 +10581,24 @@ byId("journeyStartButton").addEventListener("click", () => {
     renderStagePreview();
 
     try {
-      if (!canSelectCampaignStage(campaign, campaignExpansion, stage)) return;
+      if (!canSelectStageFromJourney(stage)) return;
+
+      const testingPreview = isTestingStagePreview(
+        campaign,
+        campaignExpansion,
+        stage,
+        testingStageUnlockEnabled(),
+      );
+      if (testingPreview) {
+        beginTestingStagePreview(stage);
+        updateCampaignUi();
+        stageSelectDialog.close();
+        game.backToTitle();
+        await startSelectedStage();
+        return;
+      }
+
+      clearTestingStagePreview();
       const previous = campaign;
       const next = selectCampaignStage(campaign, stage);
       if (next.selectedStage !== stage) return;
@@ -8142,11 +10749,14 @@ for (const id of ["customEnemySpeed", "customBulletSpeed", "customFireRate", "cu
 }
 
 for (const [id, field] of [
+  ["masterVolume", "masterVolume"],
   ["musicVolume", "musicVolume"],
   ["ambientVolume", "ambientVolume"],
   ["sfxVolume", "sfxVolume"],
+  ["creditVolume", "creditVolume"],
   ["pronunciationRate", "pronunciationRate"],
   ["pronunciationVolume", "pronunciationVolume"],
+  ["announcerVolume", "announcerVolume"],
 ] as const) {
   byId<HTMLInputElement>(id).addEventListener("input", (event) => {
     const current = settingsDraft ?? settings;
@@ -8158,6 +10768,42 @@ for (const [id, field] of [
     renderSettings();
   });
 }
+
+for (const group of ["typing", "combat", "warnings", "ui", "rewards"] as const) {
+  byId<HTMLInputElement>("audioCategory-" + group).addEventListener("input", (event) => {
+    const current = settingsDraft ?? settings;
+    const categories = sanitizeAudioCategoryVolumes(current.audioCategoryVolumes);
+    settingsDraft = {
+      ...current,
+      audioCategoryVolumes: {
+        ...categories,
+        [group]: sanitizeAudioLevel(Number((event.currentTarget as HTMLInputElement).value), 1),
+      },
+    };
+    markSettingsDirty();
+    renderSettings();
+  });
+}
+
+byId("recommendedAudioButton").addEventListener("click", () => {
+  settingsDraft = recommendedAudioSettings(settingsDraft ?? settings);
+  markSettingsDirty();
+  renderSettings();
+});
+
+byId<HTMLSelectElement>("musicMode").addEventListener("change", (event) => {
+  const current = settingsDraft ?? settings;
+  settingsDraft = {
+    ...current,
+    musicMode: sanitizeMusicMode((event.currentTarget as HTMLSelectElement).value),
+  };
+  markSettingsDirty();
+  renderSettings();
+});
+
+byId<HTMLButtonElement>("musicNextTrack").addEventListener("click", () => {
+  musicController.skipTrack();
+});
 
 byId<HTMLSelectElement>("screenShake").addEventListener(
   "change",
@@ -8274,6 +10920,20 @@ byId<HTMLSelectElement>("pronunciationEnabled").addEventListener(
   },
 );
 
+byId<HTMLSelectElement>("enemyProjectileMode").addEventListener(
+  "change",
+  (event) => {
+    const current = settingsDraft ?? settings;
+    settingsDraft = {
+      ...current,
+      enemyProjectileMode: sanitizeEnemyProjectileMode(
+        (event.currentTarget as HTMLSelectElement).value,
+      ),
+    };
+    markSettingsDirty();
+  },
+);
+
 byId<HTMLSelectElement>("visualQuality").addEventListener(
   "change",
   (event) => {
@@ -8287,6 +10947,53 @@ byId<HTMLSelectElement>("visualQuality").addEventListener(
   },
 );
 
+byId<HTMLSelectElement>("unlockAllStages").addEventListener(
+  "change",
+  (event) => {
+    const current = settingsDraft ?? settings;
+    settingsDraft = {
+      ...current,
+      unlockAllStages:
+        (event.currentTarget as HTMLSelectElement).value === "true",
+    };
+    markSettingsDirty();
+  },
+);
+
+byId("quickAudioButton").addEventListener("click", openQuickAudio);
+for (const [id, field] of QUICK_AUDIO_FIELDS) {
+  byId<HTMLInputElement>(id).addEventListener("input", (event) => {
+    const current = quickAudioDraft ?? structuredClone(settings);
+    quickAudioDraft = {
+      ...current,
+      [field]: sanitizeAudioLevel(Number((event.currentTarget as HTMLInputElement).value), 1),
+    };
+    applyRuntimeAudio(quickAudioDraft);
+    renderQuickAudio();
+    byId("quickAudioStatus").textContent = "Previewing · Apply to save or Cancel to restore.";
+  });
+}
+byId("quickAudioRecommended").addEventListener("click", () => {
+  quickAudioDraft = recommendedAudioSettings(quickAudioDraft ?? settings);
+  applyRuntimeAudio(quickAudioDraft);
+  renderQuickAudio();
+  byId("quickAudioStatus").textContent = "Recommended mix previewing.";
+});
+byId("quickAudioCancel").addEventListener("click", () => closeQuickAudio(false));
+byId("quickAudioApply").addEventListener("click", () => closeQuickAudio(true));
+byId("quickAudioMore").addEventListener("click", () => {
+  closeQuickAudio(false);
+  openSettings();
+  window.requestAnimationFrame(() =>
+    byId("masterVolume").closest(".settings-section")?.scrollIntoView({ block: "start" }),
+  );
+});
+quickAudioDialog.addEventListener("close", () => {
+  if (!quickAudioCommitted) applyRuntimeAudio(settings);
+  quickAudioDraft = null;
+  quickAudioCommitted = false;
+});
+
 byId("settingsCancelButton").addEventListener("click", () => {
   settingsDialog.close();
 });
@@ -8297,7 +11004,39 @@ byId("settingsSaveButton").addEventListener("click", () => {
 
 settingsDialog.addEventListener("close", discardSettingsDraft);
 
+const inputController = new InputController((key) => game.handleKey(key));
+let preferredInputMode: InputMode = "typing";
+try { preferredInputMode = sanitizeInputMode(localStorage.getItem("spaceTypingInputMode")); } catch { /* Private storage may be unavailable. */ }
+const voiceModeSelect = byId<HTMLSelectElement>("voiceInputMode");
+voiceModeSelect.value = preferredInputMode;
+game.setInputMode(preferredInputMode); inputController.setMode(preferredInputMode); voiceSession.setMode(preferredInputMode);
+voiceModeSelect.addEventListener("change", () => {
+  const mode = sanitizeInputMode(voiceModeSelect.value);
+  if (stageStartPending || warpAccount?.attempt?.phase === "prepared") {
+    voiceModeSelect.value = game.getInputMode();
+    showNotice("Continue or abandon the prepared sortie before changing input mode");
+    return;
+  }
+  const run = expeditionSession.currentRun();
+  if (run && !run.terminal && mode !== (run.profile.inputMode ?? "typing")) { voiceModeSelect.value = game.getInputMode(); showNotice("Change input mode after finishing or abandoning this Expedition"); return; }
+  if (!game.setInputMode(mode)) { voiceModeSelect.value = game.getInputMode(); showNotice("Change input mode between encounters"); return; }
+  preferredInputMode = mode; inputController.setMode(mode); voiceSession.setMode(mode);
+  try { localStorage.setItem("spaceTypingInputMode", mode); } catch { /* Mode remains available for this session. */ }
+});
+byId("voiceMicToggle").addEventListener("click", () => {
+  if (voiceSession.isRunning()) { if (game.getInputMode() === "voice" && game.getPhase() === "playing") game.pause(); voiceSession.stop(); }
+  else if (!vocabularyReady) showNotice("Wait for vocabulary to load before enabling the microphone");
+  else voiceSession.start();
+});
+window.addEventListener("blur", () => { if (game.getInputMode() !== "typing" && game.getPhase() === "playing") game.togglePause(); });
+game.setVoiceReadiness(() => voiceSession.isReady());
+game.setVoiceWorldReadiness(() => voiceSession.isWorldReady());
+
 window.addEventListener("keydown", (event) => {
+  if (event.isComposing || event.key === "Process") return;
+  // Any open dialog owns the keyboard (R09: Esc behind the reward or anomaly
+  // dialog used to toggle pause and resume combat behind the modal).
+  if (document.querySelector("dialog[open]") !== null) return;
   if (
     settingsDialog.open ||
     vocabularyDialog.open ||
@@ -8327,40 +11066,36 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault();
   }
 
-  game.handleKey(event.key);
+  inputController.handleKey(event.key);
 });
 
 window.addEventListener("resize", () => game.resize());
 
 function persistPageLifecycleRecovery(): void {
   saveRecallMemory();
-  if (!persistenceReady) return;
+  if (expeditionSession.ownsCampaignPersistence()) return;
+  if (
+    !persistenceReady ||
+    clearSettlementPending ||
+    testingStagePreviewActive() ||
+    practiceRestorePending ||
+    !accountTransactions.canWrite()
+  )
+    return;
 
   const savedAt = new Date().toISOString();
   const phase = game.getPhase();
 
-  // Mid-encounter page lifecycle events must not promote equipment drops,
-  // item consumption or other unsafe combat mutations into a new recovery
-  // point. The mirror still writes the current top-level state, but load
-  // resolution restores the previous safe snapshot.
+  // Only a committed, fenced batch can become the recovery mirror.
+  // An activated crash never restarts the encounter as a free attempt.
   if (phase === "title" || phase === "stageclear") {
     captureSafeCrashRecovery("pagehide", savedAt);
   }
 
-  try {
-    persistRecoveryMirrorSync("pagehide", savedAt);
-  } catch (error) {
-    console.warn(
-      "Unable to write synchronous page recovery mirror.",
-      error,
-    );
-  }
-
-  campaignAutosave.schedule(
-    currentAutosaveSnapshot(),
-    "pagehide",
-  );
-  void campaignAutosave.flush("pagehide");
+  campaignAutosave.schedule(currentAutosaveSnapshot(), "pagehide");
+  void campaignAutosave
+    .flush("pagehide")
+    .catch((error) => console.error("Lifecycle save failed.", error));
 }
 
 document.addEventListener("visibilitychange", () => {
@@ -8376,7 +11111,11 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-window.addEventListener("pagehide", persistPageLifecycleRecovery);
+window.addEventListener("pagehide", () => {
+  persistPageLifecycleRecovery();
+  void campaignAutosave.flush().catch(() => {}).finally(() => accountTransactions.close());
+});
+window.addEventListener("pageshow", event => { if (event.persisted) window.location.reload(); });
 
 window.addEventListener(
   "pointerdown",
@@ -8389,11 +11128,101 @@ window.addEventListener(
 );
 
 window.addEventListener("beforeunload", () => {
+  stopExpansionCinematicQa();
   saveRecallMemory();
   stopSpeech();
   musicController.destroy();
   game.destroy();
 });
+
+byId("titleWarpManage").addEventListener("click", () => {
+  renderWarpHud();
+  byId("warpActionNotice").textContent = "";
+  const dialog = byId<HTMLDialogElement>("warpDialog");
+  if (!dialog.open) dialog.showModal();
+});
+installWarpControls(
+  (id) => byId<HTMLButtonElement>(id),
+  {
+    practice: async () => {
+      await practiceReload;
+      await startSelectedStage(true);
+    },
+    retryPractice: async () => {
+      await practiceReload;
+      await resolveCheckpointDeath("practice");
+    },
+    refuel: async () => {
+      if (!canOpenBetweenStageMenu())
+        throw new Error("Refuel is available between rewarded sorties");
+      if (!(await autosaveCampaign("manual"))) return;
+      const quote = accountTransactions.quote();
+      if (
+        !window.confirm(
+          `Spend ${quote.price} Star Crystals for +20 Warp now? Refill ${quote.index + 1}/3. Daily reset: 04:00 Vietnam.`,
+        )
+      )
+        return;
+      const saved = await accountTransactions.refuel(quote);
+      expansionCurrencies = saved.expansionCurrencies;
+      refreshPersistentStateUi();
+      const message = `+20 Warp · ${quote.price} Star Crystals spent`;
+      byId("warpActionNotice").textContent = message;
+      showNotice(message);
+    },
+    reserve: async () => {
+      if (!canOpenBetweenStageMenu())
+        throw new Error("Change Reserve consent between rewarded sorties");
+      const consent = !warpAccount!.warp.reserveConsent;
+      if (
+        consent &&
+        !window.confirm(
+          "Allow Reserve Warp to cover Active Warp shortages? No Star Crystals are spent automatically.",
+        )
+      )
+        return;
+      await accountTransactions.reserveConsent(consent);
+    },
+    abandon: async () => {
+      if (
+        practiceRestorePending ||
+        clearSettlementPending ||
+        stageStartPending ||
+        accountTransactions.busy() ||
+        warpAccount?.attempt?.phase !== "prepared"
+      )
+        return;
+      if (!window.confirm("Abandon the prepared sortie without a Warp refund?"))
+        return;
+      await accountTransactions.finish("abandoned", warpAccount.attempt.id);
+      showNotice("Prepared sortie abandoned · no refund");
+    },
+    clock: async () => {
+      if (!canOpenBetweenStageMenu())
+        throw new Error("Correct the clock between rewarded sorties");
+      if (
+        !window.confirm(
+          "Re-anchor to this device's current clock? Balances and used refill quota stay unchanged; no retrospective Warp is granted.",
+        )
+      )
+        return;
+      await accountTransactions.reanchor();
+    },
+  },
+  (message) => {
+    byId("warpActionNotice").textContent = message;
+    showNotice(message);
+  },
+  renderWarpHud,
+);
+window.setInterval(() => {
+  renderWarpHud();
+  if (persistenceReady && accountTransactions.canWrite() && !accountTransactions.busy()
+    && !testingStagePreviewActive() && !practiceRestorePending && !clearSettlementPending
+    && warpAccount?.attempt?.phase === "active" && game.getPhase() === "playing" && credits !== committedCredits) {
+    void autosaveCampaign("manual");
+  }
+}, 5_000);
 
 renderSettings();
 renderGameplayMode();

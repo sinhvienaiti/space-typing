@@ -16,7 +16,13 @@ describe("performance quality profiles", () => {
     expect(medium.maxParticles).toBeLessThan(high.maxParticles);
     expect(high.maxParticles).toBeLessThan(ultra.maxParticles);
     expect(low.dprCap).toBeLessThan(high.dprCap);
+    expect(high.dprCap).toBeLessThan(ultra.dprCap);
+    expect(medium.particleScale).toBeLessThan(high.particleScale);
+    expect(high.particleScale).toBeLessThan(ultra.particleScale);
     expect(ultra.glowScale).toBeGreaterThan(high.glowScale);
+    expect(ultra.maxCanvasPixels).toBeGreaterThan(
+      high.maxCanvasPixels * 1.4,
+    );
   });
 
   it("caps large high-DPI canvases by pixel budget", () => {
@@ -31,6 +37,17 @@ describe("performance quality profiles", () => {
       high.maxCanvasPixels + 1,
     );
     expect(ultraDpr).toBeGreaterThan(highDpr);
+  });
+
+  it("gives Ultra a clearly higher Retina-class budget on common viewports", () => {
+    const high = qualityProfile("high");
+    const ultra = qualityProfile("ultra");
+    const highDpr = resolveRenderDpr(high, 2.5, 1440, 900);
+    const ultraDpr = resolveRenderDpr(ultra, 2.5, 1440, 900);
+
+    expect(highDpr).toBeGreaterThanOrEqual(1.7);
+    expect(ultraDpr).toBeGreaterThan(highDpr);
+    expect(ultraDpr).toBeGreaterThanOrEqual(2);
   });
 
   it("reports rolling frame performance and p95", () => {

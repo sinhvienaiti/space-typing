@@ -1,3 +1,4 @@
+import { activeShipRuntimeVisualOverride } from "../admin/ship-runtime-policy";
 import type { CharacterId } from "./registry";
 
 export const CHARACTER_SHIP_SHEET_ASSET_ID = "player-ship-sheet-v2";
@@ -161,7 +162,12 @@ const CHARACTER_VISUALS: Record<CharacterId, CharacterVisualProfile> = {
 export function characterVisualProfile(
   id: CharacterId,
 ): Readonly<CharacterVisualProfile> {
-  return CHARACTER_VISUALS[id];
+  const override = activeShipRuntimeVisualOverride(id);
+  if (override === undefined) return CHARACTER_VISUALS[id];
+  return {
+    ...CHARACTER_VISUALS[id],
+    ...override,
+  };
 }
 
 export function characterShipAssetId(id: CharacterId): string {

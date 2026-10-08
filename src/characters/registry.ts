@@ -1,3 +1,5 @@
+import { activeShipRuntimeDefinitionOverride } from "../admin/ship-runtime-policy";
+
 export const CHARACTER_IDS = [
   "vanguard",
   "aegis",
@@ -46,7 +48,7 @@ export const CHARACTER_REGISTRY: Record<
     role: "Defense / tank",
     summary: "Turns precise typing into layered protection.",
     passiveName: "Perfect Reinforcement",
-    activeName: "Reflect Field",
+    activeName: "Aegis Mirror",
     ultimateName: "Fortress Protocol",
   },
   volt: {
@@ -56,7 +58,7 @@ export const CHARACTER_REGISTRY: Record<
     role: "Energy caster",
     summary: "Converts long words into faster Energy cycling.",
     passiveName: "Longword Dynamo",
-    activeName: "EMP Burst",
+    activeName: "Storm Coil",
     ultimateName: "Thunder Grid",
   },
   wraith: {
@@ -96,7 +98,7 @@ export const CHARACTER_REGISTRY: Record<
     role: "Precision typing",
     summary: "Rewards perfect words with stronger boss pressure.",
     passiveName: "Perfect Insight",
-    activeName: "Mark of Weakness",
+    activeName: "Deep Scan",
     ultimateName: "Perfect Sentence",
   },
   bastion: {
@@ -107,7 +109,7 @@ export const CHARACTER_REGISTRY: Record<
     summary: "Builds defense by controlling hostile projectiles.",
     passiveName: "Shield Recycler",
     activeName: "Guardian Matrix",
-    ultimateName: "Sanctuary",
+    ultimateName: "Citadel Protocol",
   },
   reaper: {
     id: "reaper",
@@ -140,6 +142,16 @@ export const CHARACTER_REGISTRY: Record<
     ultimateName: "Zenith Protocol",
   },
 };
+
+for (const id of CHARACTER_IDS) {
+  const override = activeShipRuntimeDefinitionOverride(id);
+  if (override === undefined) continue;
+  CHARACTER_REGISTRY[id] = {
+    ...CHARACTER_REGISTRY[id],
+    ...override,
+    id,
+  };
+}
 
 export function isCharacterId(value: string): value is CharacterId {
   return Object.hasOwn(CHARACTER_REGISTRY, value);

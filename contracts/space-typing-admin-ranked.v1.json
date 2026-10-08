@@ -1,0 +1,91 @@
+{
+  "contractRevision": "space-typing-admin-ranked-v1",
+  "schemaVersion": 1,
+  "gameId": "space-typing",
+  "capability": "ranked.read",
+  "route": {
+    "id": "ranked",
+    "path": "/admin/space-typing/ranked",
+    "label": "Ranked"
+  },
+  "ranked": {
+    "mode": "runtime-derived-readonly",
+    "runtimeSources": [
+      "src/duel/ranked.ts",
+      "src/duel/authority.ts",
+      "server/duel/ranked-service.ts",
+      "server/duel/ws-server.ts"
+    ],
+    "authorableFields": [],
+    "ruleset": {
+      "id": "ranked-standard-v1",
+      "combatProfile": "normalized",
+      "matchLengthSeconds": 240,
+      "roundFormat": 3,
+      "hazardLevel": "standard",
+      "mysteryFrequency": "standard",
+      "fateFrequency": "standard",
+      "modifier": "standard",
+      "allowPveStatScaling": false,
+      "allowPveLuckPity": false,
+      "allowCampaignCreditMinting": false,
+      "normalizedLoadoutBudget": 3,
+      "mapPool": [
+        "frost-wastes",
+        "inferno-rift",
+        "tempest-prime",
+        "ocean-abyss",
+        "terra-core",
+        "celestial-void"
+      ]
+    },
+    "rating": {
+      "base": 1000,
+      "min": 400,
+      "max": 2600,
+      "typingWeight": 0.4,
+      "duelWeight": 0.6,
+      "provisionalMatches": 20,
+      "experiencedMatches": 80,
+      "kFactors": [40, 28, 20]
+    },
+    "matchmaking": {
+      "initialAllowedGap": 90,
+      "gapIncreaseEverySeconds": 10,
+      "gapIncrease": 35,
+      "maxAllowedGap": 450,
+      "reconnectGraceMs": 30000
+    },
+    "profile": {
+      "fields": ["accountId", "typingRating", "duelRating", "matchesPlayed", "wins", "losses", "draws"],
+      "persistenceOwner": "server-duel-ranked-profile-store",
+      "defaultStore": "in-memory",
+      "optionalStore": "json-file",
+      "jsonStoreEnv": "DUEL_RANKED_DATA_PATH"
+    },
+    "runtimeServices": [
+      "DuelRankedQueue",
+      "DuelRankedPresence",
+      "DuelRankedService",
+      "InMemoryDuelRankedProfileStore",
+      "JsonFileDuelRankedProfileStore"
+    ],
+    "writeCapability": false,
+    "previewCapability": false,
+    "seasonService": false,
+    "rewardTableService": false,
+    "unsupportedAdminMockFields": [
+      "seasonId",
+      "seasonName",
+      "seasonStartsAt",
+      "seasonEndsAt",
+      "placementMatches",
+      "manualMatchmakingSpread",
+      "rankedEnabled",
+      "modeEnableToggles",
+      "tierThresholds",
+      "seasonRewards",
+      "playerDistribution"
+    ]
+  }
+}

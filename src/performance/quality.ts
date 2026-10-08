@@ -36,28 +36,33 @@ const PROFILES: Record<VisualQuality, QualityProfile> = {
     maxCanvasPixels: 5_000_000,
   },
   // Canvas blur/shadow work scales with physical pixel count, not gameplay
-  // complexity. Avoid DPR 2+ on a fullscreen canvas with many glossy sprites.
+  // complexity. Keep High below Retina DPR and let Ultra reach it only inside
+  // a bounded pixel budget; adaptive resolution still handles sustained load.
   high: {
-    dprCap: 1.65,
-    particleScale: 0.87,
-    maxParticles: 290,
-    minStars: 72,
-    maxStars: 180,
-    starAreaDivisor: 10500,
-    glowScale: 0.88,
-    gridStep: 52,
-    maxCanvasPixels: 4_600_000,
+    // High should be visibly crisper than Medium, not merely "more particles".
+    // AdaptiveRenderBudget can still step down after sustained slow frames.
+    dprCap: 1.8,
+    particleScale: 1,
+    maxParticles: 340,
+    minStars: 80,
+    maxStars: 205,
+    starAreaDivisor: 9400,
+    glowScale: 1,
+    gridStep: 50,
+    maxCanvasPixels: 5_900_000,
   },
   ultra: {
-    dprCap: 2,
-    particleScale: 1.1,
-    maxParticles: 390,
-    minStars: 95,
-    maxStars: 245,
-    starAreaDivisor: 8200,
-    glowScale: 1.08,
-    gridStep: 46,
-    maxCanvasPixels: 6_800_000,
+    // Ultra targets native Retina-class rendering on common laptop/game
+    // viewports, with a larger safety ceiling rather than unbounded DPR.
+    dprCap: 2.1,
+    particleScale: 1.3,
+    maxParticles: 500,
+    minStars: 112,
+    maxStars: 300,
+    starAreaDivisor: 7100,
+    glowScale: 1.18,
+    gridStep: 42,
+    maxCanvasPixels: 8_800_000,
   },
 };
 

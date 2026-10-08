@@ -1,0 +1,66 @@
+{
+  "contractRevision": "space-typing-admin-ui-assets-v1",
+  "schemaVersion": 1,
+  "gameId": "space-typing",
+  "capability": "ui-assets.read",
+  "route": {
+    "id": "ui-assets",
+    "path": "/admin/space-typing/ui-assets",
+    "label": "UI Assets"
+  },
+  "uiAssets": {
+    "mode": "runtime-derived-readonly",
+    "runtimeSources": [
+      "src/ui/components.ts",
+      "src/hud/hotbar.ts",
+      "src/duel/battle-ui.ts",
+      "src/duel/ranked.ts",
+      "src/Game.ts",
+      "src/styles.css"
+    ],
+    "runtimeOwner": "DOM/CSS/runtime presentation code",
+    "surfaces": [
+      {
+        "id": "shared-components",
+        "owner": "src/ui/components.ts",
+        "kind": "dom-runtime",
+        "examples": ["currency chips", "local item icons", "grade frames", "grade badges"]
+      },
+      {
+        "id": "game-hud",
+        "owner": "src/Game.ts + src/hud/hotbar.ts + src/styles.css",
+        "kind": "dom-css-runtime",
+        "examples": ["HUD", "hotbar", "stage presentation", "mission/objective presentation", "combat overlays"]
+      },
+      {
+        "id": "duel-battle",
+        "owner": "src/duel/battle-ui.ts",
+        "kind": "dom-runtime",
+        "examples": ["battle topbar", "player status cards", "typing targets", "objective lane", "combat feedback"]
+      },
+      {
+        "id": "ranked",
+        "owner": "src/duel/ranked.ts + Duel battle/lobby presentation",
+        "kind": "shared-runtime-presentation",
+        "examples": ["ranked rules and profile state reuse Duel presentation surfaces"]
+      }
+    ],
+    "assetCatalogOwnership": "runtime art registries and public asset manifest are consumed by presentation code; there is no independent UI-asset authoring repository",
+    "dataFlow": "runtime state + code-owned presentation -> DOM/CSS/canvas UI",
+    "persistenceOwner": "code-owned-runtime-ui",
+    "authorableFields": [],
+    "writeCapability": false,
+    "previewWriteCapability": false,
+    "applyBoundary": "none",
+    "unsupportedAdminMockFields": [
+      "HUD asset upload",
+      "button skin CRUD",
+      "panel skin CRUD",
+      "mission widget asset CRUD",
+      "duel widget asset CRUD",
+      "ranked widget asset CRUD",
+      "layout position editor",
+      "runtime CSS variable writer"
+    ]
+  }
+}

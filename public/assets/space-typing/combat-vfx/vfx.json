@@ -1,0 +1,227 @@
+{
+  "id": "combat-vfx",
+  "version": 2026100101,
+  "sprites": {
+    "explosion-core": {
+      "url": "explosion-core.svg",
+      "sha256": "75b33531219f8fa0f8a85e55d17d3e1a09973fc01563e29572e35acfc5a0e6a8",
+      "width": 768,
+      "height": 768,
+      "frameCount": 1,
+      "fps": 0,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "screen",
+      "loop": false,
+      "lifetimeMs": 620,
+      "estimatedDecodedBytes": 2359296
+    },
+    "explosion-wide": {
+      "url": "explosion-wide.svg",
+      "sha256": "36b3fb9a4f856a96c5b1d8778fc1c5388517155e659fa2477bfd75ce36389011",
+      "width": 768,
+      "height": 768,
+      "frameCount": 1,
+      "fps": 0,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "screen",
+      "loop": false,
+      "lifetimeMs": 820,
+      "estimatedDecodedBytes": 2359296
+    },
+    "shockwave-ring": {
+      "url": "shockwave-ring.svg",
+      "sha256": "a01089b3f5d16fe94a7345d68ea831797270800e26f66f0950626dd1ffe51f43",
+      "width": 768,
+      "height": 768,
+      "frameCount": 1,
+      "fps": 0,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "screen",
+      "loop": false,
+      "lifetimeMs": 920,
+      "estimatedDecodedBytes": 2359296
+    },
+    "fire-small": {
+      "url": "fire-small.svg",
+      "sha256": "b4f712fe2bd4ac04b7f5a59d90a6966f67d5282ffbb77c7d85d77dbb5622f30a",
+      "width": 768,
+      "height": 768,
+      "frameCount": 1,
+      "fps": 0,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "screen",
+      "loop": true,
+      "lifetimeMs": 0,
+      "estimatedDecodedBytes": 2359296
+    },
+    "fire-medium": {
+      "url": "fire-medium.svg",
+      "sha256": "84f063d4be346bdc641f603eb1d77f2d888c560d86d7a9f978f3820e10f0d607",
+      "width": 768,
+      "height": 768,
+      "frameCount": 1,
+      "fps": 0,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "screen",
+      "loop": true,
+      "lifetimeMs": 0,
+      "estimatedDecodedBytes": 2359296
+    },
+    "fire-critical": {
+      "url": "fire-critical.svg",
+      "sha256": "88c30ccdf91757dcbd6d774facbcd95081c02457d553020b53053401318e5ec8",
+      "width": 768,
+      "height": 768,
+      "frameCount": 1,
+      "fps": 0,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "screen",
+      "loop": true,
+      "lifetimeMs": 0,
+      "estimatedDecodedBytes": 2359296
+    },
+    "smoke-dark": {
+      "url": "smoke-dark.svg",
+      "sha256": "8fdbede394cb8452a6ea59ceec39b451389318735da553cb828250160e6b20a4",
+      "width": 768,
+      "height": 768,
+      "frameCount": 1,
+      "fps": 0,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "loop": true,
+      "lifetimeMs": 0,
+      "estimatedDecodedBytes": 2359296
+    },
+    "smoke-hot": {
+      "url": "smoke-hot.svg",
+      "sha256": "991a2f088e3d053deba372968eaf1b23e04daf979872285e3111b5131fec1979",
+      "width": 768,
+      "height": 768,
+      "frameCount": 1,
+      "fps": 0,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "loop": true,
+      "lifetimeMs": 0,
+      "estimatedDecodedBytes": 2359296
+    },
+    "spark-burst": {
+      "url": "spark-burst.svg",
+      "sha256": "3b72af53fb5b25729b34e5ad093f6489ef2e8f57d3bb6236167a03d77a4e8eef",
+      "width": 768,
+      "height": 768,
+      "frameCount": 1,
+      "fps": 0,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "screen",
+      "loop": false,
+      "lifetimeMs": 520,
+      "estimatedDecodedBytes": 2359296
+    },
+    "debris-burst": {
+      "url": "debris-burst.svg",
+      "sha256": "7114c6cd8432b236c69e1caf3f3637886892ae99263d8857520beed10de29a62",
+      "width": 768,
+      "height": 768,
+      "frameCount": 1,
+      "fps": 0,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "loop": false,
+      "lifetimeMs": 720,
+      "estimatedDecodedBytes": 2359296
+    },
+    "missile-salvo": {
+      "url": "missile-salvo.svg",
+      "sha256": "7d311969b14c8996f44b5f96671b8af11046194ec65cca616d029d7a604f6115",
+      "width": 768,
+      "height": 768,
+      "frameCount": 1,
+      "fps": 0,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "source-over",
+      "loop": false,
+      "lifetimeMs": 720,
+      "estimatedDecodedBytes": 2359296
+    },
+    "bomb-impact": {
+      "url": "bomb-impact.svg",
+      "sha256": "d79e443abf1da9bae694ebe6073a45fccf7174a955e64b8ea62cad9782125274",
+      "width": 768,
+      "height": 768,
+      "frameCount": 1,
+      "fps": 0,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "screen",
+      "loop": false,
+      "lifetimeMs": 980,
+      "estimatedDecodedBytes": 2359296
+    },
+    "precision-burst": {
+      "url": "precision-burst.svg",
+      "sha256": "7c27107dda9cbba994ffa94cfc36319f76055c701ed3a6470405a81fd033e3a8",
+      "width": 768,
+      "height": 768,
+      "frameCount": 1,
+      "fps": 0,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "alphaConvention": "source-alpha",
+      "blendMode": "screen",
+      "loop": false,
+      "lifetimeMs": 680,
+      "estimatedDecodedBytes": 2359296
+    }
+  }
+}

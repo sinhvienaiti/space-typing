@@ -9,6 +9,7 @@ import {
   characterVisualProfile,
 } from "../src/characters/visuals";
 import {
+  characterFlightPose,
   characterShipArtSource,
   drawCharacterShip,
   setCharacterShipSheet,
@@ -54,6 +55,16 @@ describe("character visual profiles", () => {
 
     expect(new Set(signatures).size).toBe(CHARACTER_IDS.length);
   });
+  it("moves the ship visibly over normal gameplay intervals", () => {
+    const start = characterFlightPose(0);
+    const later = characterFlightPose(2.5);
+
+    expect(Math.abs(later.bob - start.bob)).toBeGreaterThan(2);
+    expect(Math.abs(later.banking - start.banking)).toBeGreaterThan(0.015);
+    expect(Math.abs(later.driftX - start.driftX)).toBeGreaterThan(3);
+    expect(later.thrust).toBeGreaterThan(0.9);
+  });
+
   it("keeps the animated engine layer behind illustrated ship art", () => {
     const operations: string[] = [];
     const context = {
@@ -65,10 +76,13 @@ describe("character visual profiles", () => {
       scale: () => {},
       beginPath: () => {},
       moveTo: () => {},
+      lineTo: () => {},
       quadraticCurveTo: () => operations.push("engine"),
       closePath: () => {},
       fill: () => {},
+      stroke: () => {},
       ellipse: () => {},
+      createLinearGradient: () => ({ addColorStop: () => {} }),
       drawImage: () => operations.push("sprite"),
     } as unknown as CanvasRenderingContext2D;
 
@@ -84,15 +98,18 @@ describe("character visual profiles", () => {
         time: 1,
         glowScale: 0.8,
       });
-      // Two thrusters each draw an outer and an inner animated flame.
-      expect(operations.filter((operation) => operation === "engine")).toHaveLength(4);
+      // Two thrusters keep their animated flames and the flight-tail curve
+      // adds one more motion cue behind the illustrated hull.
+      expect(
+        operations.filter((operation) => operation === "engine").length,
+      ).toBeGreaterThanOrEqual(5);
       expect(operations.at(-1)).toBe("sprite");
     } finally {
       setCharacterShipSheet(null);
     }
   });
 
-  it("renders painted V3 sprites without duplicate animated thrusters or expensive bloom", () => {
+  it("keeps painted V3 sprites sharp while restoring reduced live thrust", () => {
     const operations: string[] = [];
     const blurs: number[] = [];
     const context = {
@@ -104,10 +121,13 @@ describe("character visual profiles", () => {
       scale: () => {},
       beginPath: () => {},
       moveTo: () => {},
+      lineTo: () => {},
       quadraticCurveTo: () => operations.push("engine"),
       closePath: () => {},
       fill: () => {},
+      stroke: () => {},
       ellipse: () => {},
+      createLinearGradient: () => ({ addColorStop: () => {} }),
       drawImage: () => {
         blurs.push(context.shadowBlur);
         operations.push("sprite");
@@ -124,7 +144,9 @@ describe("character visual profiles", () => {
       drawCharacterShip(context, "aegis", {
         x: 40, y: 40, time: 1.5, glowScale: 1,
       });
-      expect(operations).toEqual(["sprite"]);
+      expect(operations.filter((operation) => operation === "engine").length)
+        .toBeGreaterThanOrEqual(2);
+      expect(operations.at(-1)).toBe("sprite");
       expect(blurs).toEqual([0]);
     } finally {
       setCharacterShipSheet(null);

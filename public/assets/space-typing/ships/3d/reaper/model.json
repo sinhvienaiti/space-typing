@@ -1,0 +1,62 @@
+{
+  "id": "reaper",
+  "version": 3,
+  "aspect": 1.1773,
+  "heightScale": 0.1852,
+  "heightGrid": [
+    256,
+    217
+  ],
+  "nozzles": [
+    [
+      0.3502,
+      0.7242,
+      0.0604
+    ],
+    [
+      0.6494,
+      0.7261,
+      0.0598
+    ]
+  ],
+  "anchors": {
+    "nose": [
+      0.5016,
+      0.0291
+    ],
+    "canopy": [
+      0.5,
+      0.504
+    ],
+    "eyes": [],
+    "guns": [
+      [
+        0.1329,
+        0.2995
+      ],
+      [
+        0.868,
+        0.3014
+      ]
+    ],
+    "wingtips": [
+      [
+        0.0273,
+        0.6801
+      ],
+      [
+        0.9727,
+        0.6678
+      ]
+    ]
+  },
+  "colors": {
+    "hot": "#ffe1f1",
+    "plume": "#ff36a4",
+    "outer": "#b82776",
+    "accent": "#ff2179"
+  },
+  "color": "color.webp?v=4290ecf9300c",
+  "emissive": "emissive.webp?v=ad2e741c123a",
+  "height": "height.bin?v=fc712a0f75a7"
+}
