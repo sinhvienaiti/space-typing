@@ -56,5 +56,8 @@ jobs:
       - name: Audit UI Assets contract
         run: pnpm ui-assets:audit
 
+      - name: Audit QA Sandbox contract
+        run: pnpm qa:audit
+
       - name: Build
         run: pnpm build

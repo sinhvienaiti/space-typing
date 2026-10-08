@@ -17,6 +17,7 @@
     "backgrounds:audit": "node --import tsx scripts/audit-admin-backgrounds.ts",
     "vfx:audit": "node --import tsx scripts/audit-admin-vfx.ts",
     "ui-assets:audit": "node --import tsx scripts/audit-admin-ui-assets.ts",
+    "qa:audit": "node --import tsx scripts/audit-admin-qa.ts",
     "check": "pnpm test && pnpm build",
     "duel:server": "tsx server/duel/ws-server.ts",
     "duel:local": "node scripts/local-duel.mjs start",
