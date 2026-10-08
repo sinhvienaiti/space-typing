@@ -60,6 +60,21 @@ jobs:
           node scripts/bg-art/check-expansion-v2.mjs
           node scripts/bg-art/check-credit-puzzle-art.mjs
 
+      - name: Diagnose TypeScript src
+        run: |
+          node -e "const fs=require('fs'); const c=JSON.parse(fs.readFileSync('tsconfig.json','utf8')); c.include=['src']; fs.writeFileSync('tsconfig.ci-src.json', JSON.stringify(c));"
+          pnpm exec tsc -p tsconfig.ci-src.json --noEmit
+
+      - name: Diagnose TypeScript tests
+        run: |
+          node -e "const fs=require('fs'); const c=JSON.parse(fs.readFileSync('tsconfig.json','utf8')); c.include=['tests']; fs.writeFileSync('tsconfig.ci-tests.json', JSON.stringify(c));"
+          pnpm exec tsc -p tsconfig.ci-tests.json --noEmit
+
+      - name: Diagnose TypeScript Vite config
+        run: |
+          node -e "const fs=require('fs'); const c=JSON.parse(fs.readFileSync('tsconfig.json','utf8')); c.include=['vite.config.ts']; fs.writeFileSync('tsconfig.ci-vite.json', JSON.stringify(c));"
+          pnpm exec tsc -p tsconfig.ci-vite.json --noEmit
+
       - name: Build TypeScript app
         run: tsc -p tsconfig.json --noEmit
 
