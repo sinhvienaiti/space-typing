@@ -50,5 +50,8 @@ jobs:
       - name: Audit Backgrounds contract
         run: pnpm backgrounds:audit
 
+      - name: Audit VFX contract
+        run: pnpm vfx:audit
+
       - name: Build
         run: pnpm build

@@ -15,6 +15,7 @@
     "ranked:audit": "node --import tsx scripts/audit-admin-ranked.ts",
     "alternative-modes:audit": "node --import tsx scripts/audit-admin-alternative-modes.ts",
     "backgrounds:audit": "node --import tsx scripts/audit-admin-backgrounds.ts",
+    "vfx:audit": "node --import tsx scripts/audit-admin-vfx.ts",
     "check": "pnpm test && pnpm build",
     "duel:server": "tsx server/duel/ws-server.ts",
     "duel:local": "node scripts/local-duel.mjs start",
