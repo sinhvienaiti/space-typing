@@ -95,7 +95,21 @@ jobs:
         run: tsc -p tsconfig.server.json --noEmit
 
       - name: Build Vite
-        run: vite build
+        id: vite_build
+        run: |
+          set +e
+          output="$(vite build 2>&1)"
+          code=$?
+          printf '%s\n' "$output"
+          first="$(printf '%s\n' "$output" | grep -m1 -E 'error|Error|failed|Could not|Cannot|ENOENT' | tr '\r\n' ' ' | cut -c1-220)"
+          if [ -z "$first" ]; then first="vite-build-failed-without-matched-error-line"; fi
+          echo "first=$first" >> "$GITHUB_OUTPUT"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: "Vite diagnostic — ${{ steps.vite_build.outputs.first }}"
+        if: steps.vite_build.outputs.code != '0'
+        run: exit 1
 
       - name: Build postflight
         run: |
