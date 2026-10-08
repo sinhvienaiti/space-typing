@@ -19,6 +19,7 @@
     "ui-assets:audit": "node --import tsx scripts/audit-admin-ui-assets.ts",
     "qa:audit": "node --import tsx scripts/audit-admin-qa.ts",
     "telemetry:audit": "node --import tsx scripts/audit-admin-telemetry.ts",
+    "expedition:audit": "node --import tsx scripts/audit-admin-expedition.ts",
     "check": "pnpm test && pnpm build",
     "duel:server": "tsx server/duel/ws-server.ts",
     "duel:local": "node scripts/local-duel.mjs start",

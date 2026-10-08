@@ -62,5 +62,8 @@ jobs:
       - name: Audit Telemetry contract
         run: pnpm telemetry:audit
 
+      - name: Audit Expedition contract
+        run: pnpm expedition:audit
+
       - name: Build
         run: pnpm build
