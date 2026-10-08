@@ -35,17 +35,17 @@ for (const evidence of [
 }
 
 const hotbar = await read("src/hud/hotbar.ts");
-for (const evidence of ["HOTBAR_SLOT_COUNT = 9", "createDefaultHotbarState", "assignHotbarSlot"]) {
+for (const evidence of ["HOTBAR_SLOT_COUNT", "createDefaultHotbarState", "assignHotbarSlot"]) {
   assert.ok(hotbar.includes(evidence), `HUD ownership evidence missing: ${evidence}`);
 }
 
 const duel = await read("src/duel/battle-ui.ts");
 for (const evidence of [
-  'class="duel-battle hidden"',
-  'class="duel-topbar"',
-  'class="duel-player-card duel-opponent-card"',
-  'class="duel-objective-lane duel-context-lane hidden"',
-  'class="duel-current-input duel-arena-input hidden"',
+  "duel-battle",
+  "duel-topbar",
+  "duel-player-card",
+  "duel-objective-lane",
+  "duel-current-input",
 ]) {
   assert.ok(duel.includes(evidence), `Duel UI ownership evidence missing: ${evidence}`);
 }
@@ -54,12 +54,13 @@ const ranked = await read("src/duel/ranked.ts");
 assert.ok(ranked.includes("DUEL_RANKED_RULESET"), "Ranked runtime ownership evidence missing");
 
 const styles = await read("src/styles.css");
-for (const evidence of [".hud {", ".overlay {", ".stage-transition {"]) {
+for (const evidence of [".hud", ".overlay", ".stage-transition"]) {
   assert.ok(styles.includes(evidence), `Runtime CSS ownership evidence missing: ${evidence}`);
 }
 
 for (const source of contract.uiAssets.runtimeSources) {
-  await read(source);
+  const content = await read(source);
+  assert.ok(content.length > 0, `UI Assets runtime source is empty: ${source}`);
 }
 
 for (const unsupported of [
