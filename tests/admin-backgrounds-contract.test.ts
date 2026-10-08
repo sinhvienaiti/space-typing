@@ -3,6 +3,8 @@ import backgroundsContract from "../contracts/space-typing-admin-backgrounds.v1.
 import { BACKGROUND_COMPOSITIONS, validateComposition } from "../src/background/compositions";
 import { backgroundBudget } from "../src/background/budget";
 
+const BACKGROUND_QUALITY_TIERS = ["low", "medium", "high", "ultra"] as const;
+
 describe("Space Typing Admin Backgrounds contract", () => {
   it("tracks the canonical world composition catalog", () => {
     expect(backgroundsContract.capability).toBe("backgrounds.read");
@@ -14,7 +16,8 @@ describe("Space Typing Admin Backgrounds contract", () => {
   });
 
   it("keeps quality budgets aligned with runtime", () => {
-    for (const tier of backgroundsContract.backgrounds.qualityTiers) {
+    expect(backgroundsContract.backgrounds.qualityTiers).toEqual(BACKGROUND_QUALITY_TIERS);
+    for (const tier of BACKGROUND_QUALITY_TIERS) {
       expect(backgroundsContract.backgrounds.qualityBudgets[tier]).toEqual(backgroundBudget(tier));
     }
   });
