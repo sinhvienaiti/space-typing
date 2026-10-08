@@ -32,7 +32,13 @@ for (const evidence of ["CombatFxSystem", "SkillFxSystem", "PlayerShotSystem", "
 for (const evidence of ["MAX_PARTICLES = 360", "MAX_RINGS = 48", "hit(", "death(", "layerBreak(", "cast(", "bossEntrance(", "bossPhase(", "bossDeath(", "bossHit("]) {
   assert.ok(combat.includes(evidence), `combat-fx.ts missing contract evidence: ${evidence}`);
 }
-for (const evidence of ["quality === \"low\" ? 0", "quality === \"medium\" ? 1", "quality === \"high\" ? 2 : 3"]) {
+for (const evidence of [
+  "function fxDetailTier(quality: VisualQuality): FxDetailTier",
+  'if (quality === "low") return 0;',
+  'if (quality === "medium") return 1;',
+  'if (quality === "high") return 2;',
+  "return 3;",
+]) {
   assert.ok(skill.includes(evidence), `skill-fx.ts missing quality evidence: ${evidence}`);
 }
 for (const evidence of ["Game.ts decides what an arrival does", "VisualQuality"]) {
