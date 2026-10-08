@@ -65,5 +65,8 @@ jobs:
       - name: Audit Expedition contract
         run: pnpm expedition:audit
 
+      - name: Audit Daily / Weekly contract
+        run: pnpm daily-weekly:audit
+
       - name: Build
         run: pnpm build
