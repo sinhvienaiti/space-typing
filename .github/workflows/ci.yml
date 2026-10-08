@@ -50,5 +50,27 @@ jobs:
       - name: Audit Backgrounds contract
         run: pnpm backgrounds:audit
 
-      - name: Build
-        run: pnpm build
+      - name: Build prepare local art
+        run: pnpm run prebuild
+
+      - name: Build asset preflight
+        run: |
+          node scripts/check-audio-assets.mjs
+          node scripts/check-background-assets.mjs
+          node scripts/bg-art/check-expansion-v2.mjs
+          node scripts/bg-art/check-credit-puzzle-art.mjs
+
+      - name: Build TypeScript app
+        run: tsc -p tsconfig.json --noEmit
+
+      - name: Build TypeScript server
+        run: tsc -p tsconfig.server.json --noEmit
+
+      - name: Build Vite
+        run: vite build
+
+      - name: Build postflight
+        run: |
+          node scripts/report-bundle-metrics.mjs
+          node scripts/check-ship-art-integrity.mjs
+          node scripts/check-background-art.mjs
