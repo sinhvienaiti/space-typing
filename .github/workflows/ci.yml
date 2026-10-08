@@ -53,5 +53,8 @@ jobs:
       - name: Audit VFX contract
         run: pnpm vfx:audit
 
+      - name: Audit UI Assets contract
+        run: pnpm ui-assets:audit
+
       - name: Build
         run: pnpm build
