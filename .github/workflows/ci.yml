@@ -59,5 +59,8 @@ jobs:
       - name: Audit QA Sandbox contract
         run: pnpm qa:audit
 
+      - name: Audit Telemetry contract
+        run: pnpm telemetry:audit
+
       - name: Build
         run: pnpm build
