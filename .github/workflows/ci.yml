@@ -68,7 +68,7 @@ jobs:
       - name: Diagnose TypeScript tests
         id: ts_tests
         run: |
-          node -e "const fs=require('fs'); const c=JSON.parse(fs.readFileSync('tsconfig.json','utf8')); c.include=['tests']; fs.writeFileSync('tsconfig.ci-tests.json', JSON.stringify(c));"
+          node -e "const fs=require('fs'); const c=JSON.parse(fs.readFileSync('tsconfig.json','utf8')); c.include=['tests','src/vite-env.d.ts']; fs.writeFileSync('tsconfig.ci-tests.json', JSON.stringify(c));"
           set +e
           output="$(pnpm exec tsc -p tsconfig.ci-tests.json --noEmit 2>&1)"
           code=$?
