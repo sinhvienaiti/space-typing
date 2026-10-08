@@ -70,9 +70,30 @@ import {
 } from "./worlds/scene-renderer";
 import type { WorldSceneProfile } from "./worlds/scene-types";
 import type { CharacterId } from "./characters/registry";
-import { drawCharacterShip } from "./characters/renderer";
+import {
+  characterAimTargetAngle,
+  drawCharacterShip,
+  smoothCharacterAim,
+} from "./characters/renderer";
 import type { EquipmentAuraProfile } from "./characters/equipment-aura";
 import { playerProjectileProfile } from "./characters/projectiles";
+import {
+  advanceKillScorePopups,
+  drawKillScorePopup,
+  drawPlayerCombatImpact,
+  drawPlayerMuzzleFlash,
+  drawPlayerProjectile,
+  scorePopupSafeY,
+  type KillScorePopup,
+  type PlayerCombatImpact,
+  type PlayerMuzzleFlash,
+  type PlayerShotOutcome,
+  type PlayerVisualShot,
+} from "./characters/projectile-renderer";
+import {
+  bossProjectilesEnabled,
+  normalEnemyProjectilesEnabled,
+} from "./combat/enemy-projectile-policy";
 import {
   AEGIS_ACTIVE_SKILL,
   AEGIS_ACTIVE_SKILL_ID,
@@ -321,6 +342,7 @@ import {
   wordDifficultyScore,
 } from "./enemies/word-difficulty";
 import { resolveEnemyTypingProfile } from "./enemies/typing-profile";
+import { enemyKillRewardScore } from "./enemies/scoring";
 import { StageWordLedger } from "./enemies/stage-word-variety";
 import {
   StageSessionTracker,
@@ -527,6 +549,7 @@ export type TestLabGameSnapshot = {
   statuses: ActiveStatus[];
   hardCc: HardCcState;
   projectiles: number;
+  playerShots: number;
   particles: number;
   activePressure: ActiveTypingPressureSnapshot;
   deathMode: TestLabDeathMode;
@@ -677,7 +700,14 @@ export class Game {
   private enemies: Enemy[] = [];
   private readonly stageWordLedger = new StageWordLedger();
   private projectiles: EnemyProjectile[] = [];
+  // Laser is retained only for the dedicated hostile-projectile intercept tracer.
   private lasers: Laser[] = [];
+  private nextPlayerVisualShotId = 1;
+  private playerVisualShots: PlayerVisualShot[] = [];
+  private playerMuzzleFlashes: PlayerMuzzleFlash[] = [];
+  private playerCombatImpacts: PlayerCombatImpact[] = [];
+  private killScorePopups: KillScorePopup[] = [];
+  private playerAimAngle = 0;
   private projectileImpacts: Array<{
     x: number;
     y: number;
@@ -907,6 +937,7 @@ export class Game {
         immunity: { ...this.hardCcState.immunity },
       },
       projectiles: this.projectiles.length,
+      playerShots: this.playerVisualShots.length,
       particles: this.particles.length,
       activePressure:
         difficulty === null
@@ -1488,6 +1519,9 @@ export class Game {
     if (!this.testLabEnabled) return false;
     this.projectiles = [];
     this.lasers = [];
+    this.playerVisualShots = [];
+    this.playerMuzzleFlashes = [];
+    this.playerCombatImpacts = [];
     this.projectileImpacts = [];
     return true;
   }
@@ -1495,6 +1529,7 @@ export class Game {
   testLabClearParticles(): boolean {
     if (!this.testLabEnabled) return false;
     this.particles = [];
+    this.killScorePopups = [];
     return true;
   }
 
@@ -1566,8 +1601,12 @@ export class Game {
     this.enemies = [];
     this.projectiles = [];
     this.lasers = [];
+    this.playerVisualShots = [];
+    this.playerMuzzleFlashes = [];
+    this.playerCombatImpacts = [];
     this.projectileImpacts = [];
     this.particles = [];
+    this.killScorePopups = [];
     this.targetId = null;
     this.recallBonus = null;
     this.recallBonusPending = false;
@@ -1860,6 +1899,43 @@ export class Game {
     const result = this.tryUseSkill(id);
     if (!result.ok) return result;
 
+    this.activateSkillEffect(id);
+    this.stageResultTracker.recordSkillUse();
+    this.hooks.onSkills();
+    return result;
+  }
+
+  testLabForceSkill(id: string): SkillActivationResult {
+    const state = this.skillEngine.getState(id);
+    if (
+      !this.testLabEnabled ||
+      (this.phase !== "playing" && this.phase !== "paused") ||
+      state === null
+    ) {
+      return {
+        ok: false,
+        reason: "unknown-skill",
+        energy: this.stats.energy,
+        state,
+      };
+    }
+
+    // Test Lab force activation deliberately bypasses production gates:
+    // Energy, cooldown, charges, per-stage limits, typing conditions,
+    // Silence and "effect not needed". It also does not consume those
+    // resources, so QA can repeat the same effect immediately.
+    this.activateSkillEffect(id);
+    this.stageResultTracker.recordSkillUse();
+    this.hooks.onSkills();
+
+    return {
+      ok: true,
+      energy: this.stats.energy,
+      state: this.skillEngine.getState(id) ?? state,
+    };
+  }
+
+  private activateSkillEffect(id: string): void {
     if (
       id === VANGUARD_ACTIVE_SKILL_ID &&
       this.characterId === "vanguard"
@@ -1922,10 +1998,6 @@ export class Game {
     } else if (isSupportSpellId(id)) {
       this.activateSupportSpell(id);
     }
-
-    this.stageResultTracker.recordSkillUse();
-    this.hooks.onSkills();
-    return result;
   }
 
   tryUseSkill(id: string): SkillActivationResult {
@@ -2776,8 +2848,12 @@ export class Game {
     this.recallReplayCount = 0;
     this.recallPromptStartedAtSeconds = 0;
     this.lasers = [];
+    this.playerVisualShots = [];
+    this.playerMuzzleFlashes = [];
+    this.playerCombatImpacts = [];
     this.projectileImpacts = [];
     this.particles = [];
+    this.killScorePopups = [];
     this.targetId = null;
     this.learningEcho = null;
     this.supplyPod = null;
@@ -2938,8 +3014,12 @@ export class Game {
     this.enemies = [];
     this.projectiles = [];
     this.lasers = [];
+    this.playerVisualShots = [];
+    this.playerMuzzleFlashes = [];
+    this.playerCombatImpacts = [];
     this.projectileImpacts = [];
     this.particles = [];
+    this.killScorePopups = [];
     this.targetId = null;
     this.supplyPod = null;
     this.supplySpawnsRemaining = 0;
@@ -3497,6 +3577,10 @@ export class Game {
     }
     this.lasers.length = liveLasers;
 
+    // Player projectile presentation is visual-only, but it still needs to
+    // advance every simulation frame so shots travel, impact, fade and clean up.
+    this.updatePlayerCombatPresentation(dt);
+
     let liveImpacts = 0;
     for (const impact of this.projectileImpacts) {
       impact.life -= dt;
@@ -3698,7 +3782,13 @@ export class Game {
   }
 
   private fireBossProjectiles(boss: BossState): void {
-    if (this.gameplayMode === "recall" || this.difficulty === null) return;
+    if (
+      !bossProjectilesEnabled() ||
+      this.gameplayMode === "recall" ||
+      this.difficulty === null
+    ) {
+      return;
+    }
 
     const { x, y } = this.bossPosition();
     const playerX = this.width / 2;
@@ -5079,6 +5169,14 @@ export class Game {
 
   private fireEnemyProjectile(enemy: Enemy): void {
     if (this.difficulty === null) return;
+    if (
+      !normalEnemyProjectilesEnabled(
+        this.settings.enemyProjectileMode,
+        this.difficulty,
+      )
+    ) {
+      return;
+    }
 
     const playerX = this.width / 2;
     const playerY = this.height - PLAYER_Y_OFFSET;
@@ -5202,10 +5300,16 @@ export class Game {
       this.updateBossPhase(boss);
     }
 
-    this.fireBossLaser(0.9);
-    this.sfx.shot(this.stats.multiplier);
+    const bossShotPosition = this.bossPosition();
+    const bossVisualShot = this.firePlayerVisualShot(
+      bossShotPosition.x,
+      bossShotPosition.y,
+      0.9,
+      boss.hp <= 0 ? "boss-kill" : "boss-hit",
+    );
 
     if (boss.hp <= 0) {
+      if (bossVisualShot !== null) bossVisualShot.outcome = "boss-kill";
       this.defeatBoss();
       this.emitStats();
       return;
@@ -5300,6 +5404,10 @@ export class Game {
       this.updateBossPhase(boss);
 
       if (boss.hp <= 0) {
+        if (bossVisualShot !== null) {
+          bossVisualShot.outcome = "boss-kill";
+          bossVisualShot.power = Math.max(bossVisualShot.power, 1.35);
+        }
         this.defeatBoss(completedEntry);
         this.emitStats();
         return;
@@ -5542,10 +5650,11 @@ export class Game {
     this.gainPower(1.2);
     this.applyCharacterCorrectKeyPassive();
 
-    this.burst(pod.x, pod.y, 7, 48);
-    this.sfx.shot(this.stats.multiplier);
+    const completed = pod.typed >= word.length;
+    this.fireBonusTargetShot(pod.x, pod.y, completed, 0.94);
+    this.burst(pod.x, pod.y, completed ? 10 : 5, 48);
 
-    if (pod.typed >= word.length) {
+    if (completed) {
       this.collectSupplyPod(pod);
     }
 
@@ -5592,10 +5701,11 @@ export class Game {
     }
 
     target.typed += 1;
-    this.burst(target.x, target.y, 7, 292);
-    this.sfx.shot(Math.max(1, this.stats.multiplier));
+    const completed = target.typed >= word.length;
+    this.fireBonusTargetShot(target.x, target.y, completed, 0.98);
+    this.burst(target.x, target.y, completed ? 11 : 5, 292);
 
-    if (target.typed >= word.length) {
+    if (completed) {
       const score = recallBonusRewardScore(
         target.entry.en,
         target.hintIndices,
@@ -5641,10 +5751,11 @@ export class Game {
     this.addScore(12 * this.stats.multiplier);
     this.gainPower(1.5);
     this.applyCharacterCorrectKeyPassive();
-    this.burst(drone.x, drone.y, 8, 48);
-    this.sfx.shot(this.stats.multiplier);
+    const completed = drone.typed >= word.length;
+    this.fireBonusTargetShot(drone.x, drone.y, completed, 1.02);
+    this.burst(drone.x, drone.y, completed ? 12 : 5, 48);
 
-    if (drone.typed >= word.length) {
+    if (completed) {
       const drop = rollEquipmentDrop(
         "treasure",
         this.effectiveLuck(),
@@ -5687,10 +5798,11 @@ export class Game {
     this.addScore(10 * this.stats.multiplier);
     this.gainPower(1.3);
     this.applyCharacterCorrectKeyPassive();
-    this.burst(crate.x, crate.y, 7, 286);
-    this.sfx.shot(this.stats.multiplier);
+    const completed = crate.typed >= word.length;
+    this.fireBonusTargetShot(crate.x, crate.y, completed, 0.98);
+    this.burst(crate.x, crate.y, completed ? 11 : 5, 286);
 
-    if (crate.typed >= word.length) {
+    if (completed) {
       const options = createRewardChoiceOptions(this.effectiveLuck());
       this.addScore(220 * this.stats.multiplier);
       this.hooks.onWordComplete(crate.entry);
@@ -5726,10 +5838,11 @@ export class Game {
     this.addScore(12 * this.stats.multiplier);
     this.gainPower(1.4);
     this.applyCharacterCorrectKeyPassive();
-    this.burst(crate.x, crate.y, 8, 322);
-    this.sfx.shot(this.stats.multiplier);
+    const completed = crate.typed >= word.length;
+    this.fireBonusTargetShot(crate.x, crate.y, completed, 1.04);
+    this.burst(crate.x, crate.y, completed ? 12 : 5, 322);
 
-    if (crate.typed >= word.length) {
+    if (completed) {
       this.addScore(260 * this.stats.multiplier);
       this.hooks.onWordComplete(crate.entry);
       this.burst(crate.x, crate.y, 44, 322);
@@ -5892,10 +6005,21 @@ export class Game {
     this.applyCharacterCorrectKeyPassive();
     this.applyRelicCorrectKeyPassive(enemy);
 
-    this.fireLaser(enemy, 0.8);
-    this.sfx.shot(this.stats.multiplier);
+    const completesWord = enemy.typed >= word.length;
+    const shotOutcome: PlayerShotOutcome =
+      completesWord && enemy.layersRemaining <= 1
+        ? "kill"
+        : completesWord
+          ? "layer"
+          : "hit";
+    this.firePlayerVisualShot(
+      enemy.x,
+      enemy.y,
+      completesWord ? (shotOutcome === "kill" ? 1.35 : 1.1) : 0.8,
+      shotOutcome,
+    );
 
-    if (enemy.typed >= word.length) {
+    if (completesWord) {
       this.completeWord(enemy);
     }
 
@@ -5939,21 +6063,20 @@ export class Game {
       this.addScore((45 + length * 8) * this.stats.multiplier);
       this.gainPower(4);
 
-      this.fireLaser(enemy, 1.25);
-      const hitDefinition = this.visualDefinitionForEnemy(enemy);
-      const hitFx = enemyFxProfile(
-        hitDefinition?.family ?? "rainbow",
-        "hit",
-      );
-      this.burst(enemy.x, enemy.y, hitFx.count, hitFx.hue);
-      this.sfx.hit(hitFx.pitch);
       this.targetId = null;
       return;
     }
 
     this.stageResultTracker.recordEnemyKill(enemy.elite);
     this.stats.kills += 1;
-    this.addScore((80 + length * 14) * this.stats.multiplier);
+    const scoreBeforeKillReward = this.stats.score;
+    const killReward = enemyKillRewardScore({
+      wordLength: length,
+      layerCount: enemy.layerPlan?.length ?? 1,
+      rank: enemy.rank ?? "I",
+      elite: enemy.elite,
+    });
+    this.addScore(killReward * this.stats.multiplier);
     this.gainPower(7);
     if (this.gameplayMode !== "recall") {
       // Combat learning feedback stays separate from Recall's configurable prompt.
@@ -5975,15 +6098,7 @@ export class Game {
       this.hooks.onKillTranslation?.({ ...enemy.entry });
     }
 
-    this.fireLaser(enemy, 1.45);
     const deathDefinition = this.visualDefinitionForEnemy(enemy);
-    const deathFx = enemyFxProfile(
-      deathDefinition?.family ?? "rainbow",
-      "death",
-    );
-    this.burst(enemy.x, enemy.y, deathFx.count, deathFx.hue);
-    this.sfx.hit(deathFx.pitch);
-    this.sfx.kill(deathFx.pitch);
     if (enemy.elite || deathDefinition?.rarity === "elite") {
       const announcerEvent = this.priorityKillChain.registerKill(
         this.stageElapsedSeconds,
@@ -5995,6 +6110,11 @@ export class Game {
     if (enemy.golden) {
       this.addScore(260 * this.stats.multiplier);
     }
+    this.spawnKillScorePopup(
+      enemy.x,
+      enemy.y + enemy.radius + 30,
+      this.stats.score - scoreBeforeKillReward,
+    );
     this.tryRollEquipmentDrop(
       enemy.golden ? "golden" : enemy.elite ? "elite" : "normal",
     );
@@ -6189,6 +6309,14 @@ export class Game {
 
   private spawnVolatileBurst(enemy: Enemy): void {
     if (this.difficulty === null) return;
+    if (
+      !normalEnemyProjectilesEnabled(
+        this.settings.enemyProjectileMode,
+        this.difficulty,
+      )
+    ) {
+      return;
+    }
 
     const playerX = this.width / 2;
     const playerY = this.height - PLAYER_Y_OFFSET;
@@ -7142,7 +7270,7 @@ export class Game {
           enemy.y = Math.max(-enemy.radius, enemy.y - 46);
         }
 
-        this.fireLaser(enemy, 0.75);
+        this.firePlayerVisualShot(enemy.x, enemy.y, 0.75, "hit");
       }
     }
 
@@ -7261,42 +7389,190 @@ export class Game {
     }
   }
 
-  private fireBossLaser(power: number): void {
-    const { x, y } = this.bossPosition();
-    this.lasers.push({
-      x1: this.width / 2,
-      y1: this.height - PLAYER_Y_OFFSET,
-      x2: x,
-      y2: y,
-      life: 0.09,
-      maxLife: 0.09,
-      power,
-    });
-    this.burst(
-      x,
-      y,
-      7,
-      playerProjectileProfile(this.characterId).impactHue,
+  private fireBonusTargetShot(
+    targetX: number,
+    targetY: number,
+    completed: boolean,
+    power = 0.92,
+  ): PlayerVisualShot | null {
+    return this.firePlayerVisualShot(
+      targetX,
+      targetY,
+      completed ? Math.max(1.28, power) : power,
+      completed ? "kill" : "hit",
     );
   }
 
-  private fireLaser(enemy: Enemy, power: number): void {
-    this.lasers.push({
-      x1: this.width / 2,
-      y1: this.height - PLAYER_Y_OFFSET,
-      x2: enemy.x,
-      y2: enemy.y,
-      life: 0.085,
-      maxLife: 0.085,
-      power,
-    });
+  private firePlayerVisualShot(
+    targetX: number,
+    targetY: number,
+    power: number,
+    outcome: PlayerShotOutcome,
+  ): PlayerVisualShot | null {
+    if (this.gameplayMode === "recall") return null;
 
-    this.burst(
-      enemy.x,
-      enemy.y,
-      power > 1 ? 12 : 5,
-      playerProjectileProfile(this.characterId).impactHue,
+    const profile = playerProjectileProfile(this.characterId);
+    const startX = this.width / 2;
+    const startY = this.height - PLAYER_Y_OFFSET - 27;
+    const distance = Math.hypot(targetX - startX, targetY - startY);
+    const shot: PlayerVisualShot = {
+      id: this.nextPlayerVisualShotId++,
+      characterId: this.characterId,
+      startX,
+      startY,
+      targetX,
+      targetY,
+      age: 0,
+      // Visual travel is deliberately slower than gameplay damage. The hit
+      // already resolved before this shot is created; this duration only keeps
+      // the energy projectile readable on a wide desktop canvas.
+      duration: clamp(
+        distance / Math.max(1, profile.presentationSpeed * 0.68),
+        0.16,
+        0.46,
+      ),
+      power,
+      outcome,
+    };
+    this.playerVisualShots.push(shot);
+    if (this.playerVisualShots.length > 40) {
+      this.playerVisualShots.shift();
+    }
+
+    this.playerMuzzleFlashes.push({
+      characterId: this.characterId,
+      x: startX,
+      y: startY,
+      life: 0.075,
+      maxLife: 0.075,
+    });
+    if (this.playerMuzzleFlashes.length > 14) {
+      this.playerMuzzleFlashes.shift();
+    }
+
+    this.sfx.playerFire(profile.firePitch);
+    return shot;
+  }
+
+  private queuePlayerCombatImpact(shot: PlayerVisualShot): void {
+    const kill = shot.outcome === "kill" || shot.outcome === "boss-kill";
+    const profile = playerProjectileProfile(shot.characterId);
+    const duration = kill ? 0.34 : shot.outcome === "layer" ? 0.24 : 0.18;
+    this.playerCombatImpacts.push({
+      characterId: shot.characterId,
+      x: shot.targetX,
+      y: shot.targetY,
+      life: duration,
+      maxLife: duration,
+      kill,
+      power: shot.power,
+    });
+    if (this.playerCombatImpacts.length > 28) {
+      this.playerCombatImpacts.shift();
+    }
+
+    if (kill) this.sfx.playerKill(profile.killPitch);
+    else this.sfx.playerHit(profile.hitPitch);
+  }
+
+  private updatePlayerCombatPresentation(dt: number): void {
+    let liveShots = 0;
+    for (const shot of this.playerVisualShots) {
+      shot.age += dt;
+      if (shot.age >= shot.duration) {
+        this.queuePlayerCombatImpact(shot);
+      } else {
+        this.playerVisualShots[liveShots++] = shot;
+      }
+    }
+    this.playerVisualShots.length = liveShots;
+
+    let liveFlashes = 0;
+    for (const flash of this.playerMuzzleFlashes) {
+      flash.life -= dt;
+      if (flash.life > 0) this.playerMuzzleFlashes[liveFlashes++] = flash;
+    }
+    this.playerMuzzleFlashes.length = liveFlashes;
+
+    let liveCombatImpacts = 0;
+    for (const impact of this.playerCombatImpacts) {
+      impact.life -= dt;
+      if (impact.life > 0) {
+        this.playerCombatImpacts[liveCombatImpacts++] = impact;
+      }
+    }
+    this.playerCombatImpacts.length = liveCombatImpacts;
+    advanceKillScorePopups(this.killScorePopups, dt);
+
+    let aimTarget: { x: number; y: number } | null = null;
+    if (this.targetId !== null) {
+      const enemy = this.enemies.find((item) => item.id === this.targetId);
+      if (enemy !== undefined) aimTarget = enemy;
+    }
+    if (aimTarget === null && this.supplyPod !== null && this.supplyPod.typed > 0) {
+      aimTarget = this.supplyPod;
+    }
+    if (
+      aimTarget === null &&
+      this.treasureDrone !== null &&
+      this.treasureDrone.typed > 0
+    ) {
+      aimTarget = this.treasureDrone;
+    }
+    if (
+      aimTarget === null &&
+      this.rewardChoiceCrate !== null &&
+      this.rewardChoiceCrate.typed > 0
+    ) {
+      aimTarget = this.rewardChoiceCrate;
+    }
+    if (
+      aimTarget === null &&
+      this.anomalyCrate !== null &&
+      this.anomalyCrate.typed > 0
+    ) {
+      aimTarget = this.anomalyCrate;
+    }
+    if (
+      aimTarget === null &&
+      this.recallBonus !== null &&
+      this.recallBonus.typed > 0
+    ) {
+      aimTarget = this.recallBonus;
+    }
+    if (aimTarget === null && this.boss !== null) {
+      aimTarget = this.bossPosition();
+    }
+
+    const desiredAim =
+      aimTarget === null
+        ? 0
+        : characterAimTargetAngle(
+            this.width / 2,
+            this.height - PLAYER_Y_OFFSET,
+            aimTarget.x,
+            aimTarget.y,
+          );
+    this.playerAimAngle = smoothCharacterAim(
+      this.playerAimAngle,
+      desiredAim,
+      dt,
     );
+  }
+
+  private spawnKillScorePopup(x: number, y: number, value: number): void {
+    const safeValue = Math.max(0, value);
+    if (safeValue <= 0) return;
+    this.killScorePopups.push({
+      x,
+      y: scorePopupSafeY(y, this.height),
+      value: safeValue,
+      life: 2,
+      maxLife: 2,
+    });
+    if (this.killScorePopups.length > 18) {
+      this.killScorePopups.shift();
+    }
   }
 
   private triggerImpactFeedback(kind: ImpactKind): void {
@@ -7401,6 +7677,8 @@ export class Game {
       this.drawProjectile(projectile);
     }
 
+    this.drawPlayerCombatVfx(time);
+
     if (this.supplyPod !== null) {
       this.drawSupplyPod(this.supplyPod);
     }
@@ -7421,6 +7699,7 @@ export class Game {
       this.drawEnemy(enemy);
     }
 
+    this.drawKillScorePopups();
     this.drawLearningEcho();
 
     if (this.boss !== null) {
@@ -7548,6 +7827,42 @@ export class Game {
     context.arc(centerX, centerY, 9 + progress * maxRadius * 0.75, 0, Math.PI * 2);
     context.stroke();
     context.restore();
+  }
+
+  private drawPlayerCombatVfx(time: number): void {
+    const quality = qualityProfile(this.settings.visualQuality);
+    for (const flash of this.playerMuzzleFlashes) {
+      drawPlayerMuzzleFlash(
+        this.context,
+        flash,
+        time,
+        quality.glowScale,
+      );
+    }
+    for (const shot of this.playerVisualShots) {
+      drawPlayerProjectile(
+        this.context,
+        shot,
+        time,
+        quality.glowScale,
+        quality.particleScale,
+      );
+    }
+    for (const impact of this.playerCombatImpacts) {
+      drawPlayerCombatImpact(
+        this.context,
+        impact,
+        time,
+        quality.glowScale,
+        quality.particleScale,
+      );
+    }
+  }
+
+  private drawKillScorePopups(): void {
+    for (const popup of this.killScorePopups) {
+      drawKillScorePopup(this.context, popup);
+    }
   }
 
   private drawLasers(time: number): void {
@@ -7766,16 +8081,33 @@ export class Game {
 
   private drawProjectile(projectile: EnemyProjectile): void {
     const context = this.context;
+    const brightWorld = this.worldSceneProfile.worldId === "world-02";
 
     context.save();
     context.translate(projectile.x, projectile.y);
+
+    if (brightWorld) {
+      context.globalCompositeOperation = "source-over";
+      context.shadowBlur = 0;
+      context.fillStyle = "rgba(2, 7, 20, 0.78)";
+      context.strokeStyle = "rgba(5, 12, 31, 0.96)";
+      context.lineWidth = 3;
+      context.beginPath();
+      context.arc(0, 0, projectile.radius + 4.5, 0, Math.PI * 2);
+      context.fill();
+      context.stroke();
+    }
+
     context.globalCompositeOperation = "lighter";
     context.shadowBlur =
-      18 * qualityProfile(this.settings.visualQuality).glowScale;
-    context.shadowColor = "#ff5c89";
-    context.fillStyle = "rgba(255, 70, 118, 0.13)";
-    context.strokeStyle = "#ff7298";
-    context.lineWidth = 2;
+      (brightWorld ? 23 : 18) *
+      qualityProfile(this.settings.visualQuality).glowScale;
+    context.shadowColor = "#ff386f";
+    context.fillStyle = brightWorld
+      ? "rgba(255, 48, 108, 0.24)"
+      : "rgba(255, 70, 118, 0.13)";
+    context.strokeStyle = brightWorld ? "#ff477c" : "#ff7298";
+    context.lineWidth = brightWorld ? 3 : 2;
 
     context.beginPath();
     context.arc(0, 0, projectile.radius, 0, Math.PI * 2);
@@ -7783,10 +8115,12 @@ export class Game {
     context.stroke();
 
     context.globalCompositeOperation = "source-over";
-    context.fillStyle = "#fff4f7";
-    context.font = "800 14px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.fillStyle = "#fff8fb";
+    context.font = "900 14px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.textAlign = "center";
     context.textBaseline = "middle";
+    context.shadowBlur = brightWorld ? 4 : 0;
+    context.shadowColor = "rgba(0, 0, 0, 0.95)";
     context.fillText(projectile.char.toUpperCase(), 0, 0);
 
     context.restore();
@@ -8406,10 +8740,67 @@ export class Game {
     context.restore();
   }
 
+  private drawWorld02EnemyBackdrop(
+    enemy: Enemy,
+    targeted: boolean,
+    kick: number,
+  ): void {
+    if (this.worldSceneProfile.worldId !== "world-02") return;
+
+    const context = this.context;
+    const x = enemy.x;
+    const y = enemy.y - kick;
+
+    // Keep this allocation-free in the hot enemy loop. Two bounded dark discs
+    // create silhouette contrast without recolouring enemy families globally.
+    context.save();
+    context.globalCompositeOperation = "source-over";
+    context.fillStyle = targeted
+      ? "rgba(1, 8, 24, 0.5)"
+      : "rgba(2, 7, 20, 0.4)";
+    context.beginPath();
+    context.arc(
+      x,
+      y,
+      enemy.radius * (targeted ? 1.42 : 1.3),
+      0,
+      Math.PI * 2,
+    );
+    context.fill();
+
+    context.fillStyle = "rgba(2, 7, 20, 0.24)";
+    context.beginPath();
+    context.arc(
+      x,
+      y,
+      enemy.radius * (targeted ? 1.62 : 1.5),
+      0,
+      Math.PI * 2,
+    );
+    context.fill();
+
+    context.strokeStyle = targeted
+      ? "rgba(109, 246, 255, 0.72)"
+      : "rgba(7, 16, 38, 0.72)";
+    context.lineWidth = targeted ? 2.2 : 1.8;
+    context.beginPath();
+    context.arc(
+      x,
+      y,
+      enemy.radius * (targeted ? 1.16 : 1.08),
+      0,
+      Math.PI * 2,
+    );
+    context.stroke();
+    context.restore();
+  }
+
   private drawEnemy(enemy: Enemy): void {
     const context = this.context;
     const targeted = enemy.id === this.targetId;
     const kick = enemy.kick * 7;
+
+    this.drawWorld02EnemyBackdrop(enemy, targeted, kick);
 
     // Recall reuses the normal enemy art language. Only the filled inner orb
     // and default face are removed; the normal shell, wings and aura remain.
@@ -9090,11 +9481,22 @@ export class Game {
       : "rgba(202, 215, 229, 0.8)";
     const objectiveTarget =
       this.stageObjective?.targetEnemyId === enemy.id;
-    context.fillText(
-      (objectiveTarget ? "OBJECTIVE · " : "") + layerLabel,
-      enemy.x,
-      y - 25,
-    );
+    const layerText =
+      (objectiveTarget ? "OBJECTIVE · " : "") + layerLabel;
+    if (this.worldSceneProfile.worldId === "world-02") {
+      const metaWidth = this.measureTextWidth(layerText);
+      context.fillStyle = "rgba(1, 6, 17, 0.78)";
+      context.fillRect(
+        enemy.x - metaWidth / 2 - 5,
+        y - 32,
+        metaWidth + 10,
+        12,
+      );
+      context.fillStyle = targeted
+        ? "rgba(224, 252, 255, 0.98)"
+        : "rgba(226, 235, 246, 0.92)";
+    }
+    context.fillText(layerText, enemy.x, y - 25);
 
     if (
       enemy.pendingSkillId !== undefined &&
@@ -9371,6 +9773,7 @@ export class Game {
         glowScale: qualityProfile(this.settings.visualQuality).glowScale,
         detailScale: qualityProfile(this.settings.visualQuality).particleScale,
         aura: this.equipmentAura,
+        aimAngle: this.playerAimAngle,
       },
     );
   }
@@ -9479,8 +9882,9 @@ export class Game {
 
     const context = this.context;
     context.save();
-    context.strokeStyle = "rgba(91, 236, 255, 0.18)";
-    context.setLineDash([4, 8]);
+    context.strokeStyle = "rgba(91, 236, 255, 0.07)";
+    context.lineWidth = 1;
+    context.setLineDash([3, 12]);
     context.beginPath();
     context.moveTo(this.width / 2, this.height - PLAYER_Y_OFFSET);
     context.lineTo(target.x, target.y);

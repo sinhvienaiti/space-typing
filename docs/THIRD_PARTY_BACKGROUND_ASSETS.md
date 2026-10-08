@@ -171,18 +171,22 @@ Curation signal at review time:
 - 6,633 downloads for the 1024x1024 pack;
 - 32 coordinated seamless backgrounds in the same family.
 
-Selected source asset:
+Selected source assets:
 - `Purple Nebula 3 - 1024x1024.png`
+- `Blue Nebula 6 - 1024x1024.png`
 
-Vendored project path:
+Vendored project paths:
 - `public/assets/space-typing/backgrounds/vendor/screaming-brain/nebula-purple-3-1024.png`
+- `public/assets/space-typing/backgrounds/vendor/screaming-brain/nebula-blue-6-1024.png`
 
 Binary acquisition route:
-- curated CC0 copy from
+- curated CC0 copies from
   `EamonnMR/galactic-night`.
 
 Use:
-- restrained Galaxy sky/nebula layer at reduced opacity.
+- Purple Nebula 3 provides the restrained deep-violet base/depth volume;
+- Blue Nebula 6 provides a distinct luminous blue structure so World 01 no
+  longer depends on repeating one nebula image for every full-screen volume.
 
 ### Screaming Brain Studios — 2D Planet Pack 2
 

@@ -1,11 +1,16 @@
 import type { WorldSceneProfile } from "./scene-types";
 import type {
+  BackgroundTreatment,
   LayeredBackgroundLayer,
   LayeredBackgroundProfile,
 } from "./layered-background-types";
 
 const ROOT = "/assets/space-typing/backgrounds";
 const PLAYER_SHIP_SHEET = "/assets/space-typing/ships/player-ships-v2.svg";
+const GALAXY_NEBULA_PURPLE_SRC =
+  "vendor/screaming-brain/nebula-purple-3-1024.png";
+const GALAXY_NEBULA_BLUE_SRC =
+  "vendor/screaming-brain/nebula-blue-6-1024.png";
 
 function layer(
   id: string,
@@ -84,17 +89,18 @@ function distantShip(
 }
 
 const GALAXY: readonly LayeredBackgroundLayer[] = [
+  // D0-D1: deep void, star texture and nebula volume.
   {
     ...layer(
       "galaxy-sky",
-      "vendor/screaming-brain/nebula-purple-3-1024.png",
+      GALAXY_NEBULA_PURPLE_SRC,
       0.07,
-      0.82,
-      1.24,
+      0.46,
+      1.1,
       0.5,
       0.5,
-      -0.00005,
-      0.000015,
+      -0.000035,
+      0.000012,
     ),
     motion: "float",
   },
@@ -103,7 +109,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-stars-dense-sky",
       "vendor/luminousdragon/stars-dense.png",
       0.095,
-      0.34,
+      0.16 * 0.5,
       1.18,
       0.5,
       0.5,
@@ -119,7 +125,7 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-stars-sparse-sky",
       "vendor/luminousdragon/stars-sparse.png",
       0.12,
-      0.24,
+      0.1 * 0.55,
       1.26,
       0.5,
       0.48,
@@ -130,44 +136,53 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     motion: "float",
     blend: "screen",
   },
-  layer(
-    "galaxy-nebula",
-    "vendor/screaming-brain/nebula-purple-3-1024.png",
-    0.14,
-    0.5,
-    1.08,
-    0.58,
-    0.42,
-    -0.00016,
-    0.000035,
-  ),
+  {
+    ...layer(
+      "galaxy-nebula",
+      GALAXY_NEBULA_BLUE_SRC,
+      0.14,
+      0.3 * 1.35,
+      1.5,
+      0.79,
+      0.38,
+      -0.00011,
+      0.00003,
+      0.000025,
+      0.012,
+    ),
+    motion: "float",
+    blend: "screen",
+    spreadX: 0.025,
+    spreadY: 0.018,
+  },
   {
     ...layer(
       "galaxy-nebula-depth",
-      "vendor/screaming-brain/nebula-purple-3-1024.png",
-      0.11,
-      0.2,
-      1.34,
-      0.31,
-      0.37,
-      0.0001,
-      -0.000025,
-      -0.000045,
+      GALAXY_NEBULA_PURPLE_SRC,
+      0.1,
+      0.16 * 1.5,
+      1.92,
+      0.18,
+      0.68,
+      0.00008,
+      -0.00002,
+      -0.000035,
     ),
     motion: "float",
     blend: "screen",
     spreadX: 0.04,
     spreadY: 0.035,
   },
+  // D2: dominant and secondary celestial landmarks.
   {
     ...layer(
       "galaxy-planet-primary",
       "vendor/screaming-brain/planet-ocean-03-512.png",
-      0.26,
-      0.78,
-      0.215,
-      0.12,
-      0.24,
+      0.27,
+      0.84,
+      0.28,
+      0.065,
+      0.2,
       0.00034,
       0.00005,
       0.00038,
@@ -180,11 +195,11 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     ...layer(
       "galaxy-planet-far",
       "vendor/screaming-brain/planet-blue-giant-04-512.png",
-      0.19,
-      0.38,
-      0.095,
-      0.88,
-      0.33,
+      0.18,
+      0.28,
+      0.07,
+      0.9,
+      0.29,
       -0.0002,
       0.00003,
       -0.00028,
@@ -197,18 +212,17 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     ...layer(
       "galaxy-moon-far",
       "vendor/screaming-brain/planet-cratered-03-512.png",
-      0.22,
-      0.22,
-      0.045,
-      0.76,
-      0.2,
+      0.21,
+      0.15,
+      0.036,
+      0.72,
+      0.15,
       0.00018,
       0.000025,
       0.00022,
-      0,
-      true,
     ),
     motion: "orbit",
+    minQuality: "medium",
     spreadX: 0.028,
     spreadY: 0.022,
   },
@@ -216,9 +230,9 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     "galaxy-sun-far",
     "vendor/screaming-brain/sun-blue-03-512.png",
     0.15,
-    0.13,
-    0.045,
-    0.67,
+    0.13 * 3,
+    0.125,
+    0.84,
     0.12,
     0.00012,
     0.00002,
@@ -226,15 +240,45 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     0.02,
     true,
   ),
-  distantShip(
-    "galaxy-distant-patrol-left",
-    0,
-    0,
-    0.08,
-    0.22,
-    0.055,
-    0.006,
-  ),
+  {
+    ...layer(
+      "galaxy-luminous-orbit",
+      "eternity/rings.svg",
+      0.2,
+      0.14 * 0.18,
+      0.24,
+      0.82,
+      0.29,
+      -0.00004,
+      0.000015,
+      0.0007,
+      0.018,
+    ),
+    motion: "float",
+    blend: "screen",
+    minQuality: "medium",
+    spreadX: 0.015,
+    spreadY: 0.018,
+  },
+  // D5 narrative accents. They remain visually subordinate to real enemies.
+  {
+    ...distantShip(
+      "galaxy-distant-sentinel",
+      0,
+      0,
+      0.69,
+      0.13,
+      0.046,
+      -0.0012,
+      false,
+    ),
+    motion: "float",
+    minQuality: "medium",
+    placement: "anchor",
+    opacity: 0.11,
+    spreadX: 0.025,
+    spreadY: 0.06,
+  },
   distantShip(
     "galaxy-distant-patrol-right",
     240,
@@ -244,12 +288,13 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
     0.048,
     -0.005,
   ),
+  // D3: authored environmental field and mid-depth traffic.
   {
     ...layer(
       "galaxy-authored-planet-specks",
       "vendor/luminousdragon/stars-planets.png",
       0.3,
-      0.22,
+      0.12 * 0.4,
       1.16,
       0.5,
       0.48,
@@ -266,87 +311,158 @@ const GALAXY: readonly LayeredBackgroundLayer[] = [
       "galaxy-authored-asteroid-field",
       "vendor/luminousdragon/asteroid-field.png",
       0.4,
-      0.32,
+      0.1,
       1.18,
       0.5,
       0.5,
       -0.0032,
       0.0015,
       0.00035,
-      0,
-      true,
     ),
     fit: "cover",
     motion: "wrap",
     blend: "screen",
+    minQuality: "medium",
+  },
+  {
+    ...layer(
+      "galaxy-asteroid-far-fragments",
+      "vendor/ohjirochan/asteroid-small.png",
+      0.38,
+      0.26,
+      0.016,
+      0.5,
+      0.5,
+      -0.0046,
+      0.0022,
+      0.004,
+    ),
+    treatment: "galaxy-rock-far",
+    motion: "wrap",
+    placement: "edges",
+    instances: 8,
+    spreadY: 0.68,
+    scaleJitter: 0.35,
+    opacityJitter: 0.22,
+    speedJitter: 0.25,
   },
   {
     ...layer(
       "galaxy-asteroid-mid-left",
       "vendor/ohjirochan/asteroid-medium.png",
-      0.64,
-      0.48,
-      0.058,
+      0.62,
+      0.4,
+      0.065,
       0.14,
       0.54,
-      -0.012,
-      0.007,
+      -0.0105,
+      0.006,
       0.006,
     ),
+    treatment: "galaxy-rock-mid",
     motion: "wrap",
     placement: "edges",
-    instances: 2,
-    spreadX: 0.54,
-    spreadY: 0.42,
-    scaleJitter: 0.22,
-    opacityJitter: 0.14,
-    speedJitter: 0.18,
+    instances: 4,
+    spreadX: 0.46,
+    spreadY: 0.52,
+    scaleJitter: 0.3,
+    opacityJitter: 0.18,
+    speedJitter: 0.2,
   },
   {
     ...layer(
       "galaxy-asteroid-mid-right",
       "vendor/ohjirochan/asteroid-small.png",
-      0.6,
-      0.38,
-      0.032,
+      0.58,
+      0.32,
+      0.04,
       0.87,
       0.46,
-      -0.014,
-      0.008,
+      -0.0125,
+      0.007,
       -0.007,
     ),
+    treatment: "galaxy-rock-mid",
     motion: "wrap",
     placement: "edges",
+    instances: 4,
+    spreadX: 0.48,
+    spreadY: 0.56,
+    scaleJitter: 0.32,
+    opacityJitter: 0.18,
+    speedJitter: 0.22,
+  },
+  {
+    ...layer(
+      "galaxy-asteroid-mid-heavy",
+      "vendor/ohjirochan/asteroid-large.png",
+      0.69,
+      0.12,
+      0.08,
+      0.78,
+      0.62,
+      -0.0085,
+      0.0055,
+      -0.005,
+    ),
+    treatment: "galaxy-rock-mid",
+    motion: "wrap",
+    minQuality: "medium",
+    placement: "edges",
     instances: 2,
-    spreadX: 0.58,
-    spreadY: 0.46,
+    spreadY: 0.42,
     scaleJitter: 0.24,
     opacityJitter: 0.16,
-    speedJitter: 0.2,
+    speedJitter: 0.18,
   },
+  // D4: sparse near-camera scale cue.
   {
     ...layer(
       "galaxy-asteroid-near-hero",
       "vendor/ohjirochan/asteroid-large.png",
-      0.9,
-      0.62,
-      0.105,
-      0.07,
-      0.76,
-      -0.018,
-      0.011,
-      0.0045,
-      0,
-      true,
+      0.94,
+      0.56,
+      0.29,
+      0.965,
+      0.17,
+      -0.014,
+      0.009,
+      0.005,
     ),
+    treatment: "galaxy-rock-near",
     motion: "approach",
-    placement: "edges",
+    minQuality: "medium",
+    placement: "anchor",
     instances: 1,
-    spreadX: 0.72,
-    spreadY: 0.48,
-    scaleJitter: 0.16,
+    spreadX: 0.02,
+    spreadY: 0.1,
+    scaleJitter: 0.18,
     opacityJitter: 0.1,
     speedJitter: 0.12,
+  },
+  {
+    ...layer(
+      "galaxy-asteroid-near-secondary",
+      "vendor/ohjirochan/asteroid-medium.png",
+      0.84,
+      0.44,
+      0.18,
+      0.045,
+      0.79,
+      -0.011,
+      0.0065,
+      -0.006,
+    ),
+    treatment: "galaxy-rock-near",
+    motion: "approach",
+    minQuality: "high",
+    placement: "anchor",
+    instances: 1,
+    spreadX: 0.018,
+    spreadY: 0.1,
+    scaleJitter: 0.14,
+    opacityJitter: 0.1,
+    speedJitter: 0.1,
   },
 ];
 
@@ -355,11 +471,14 @@ const GALAXY_RICH: readonly LayeredBackgroundLayer[] = GALAXY.map(
     if (item.id === "galaxy-nebula") {
       return {
         ...item,
-        opacity: 0.5,
-        scale: 1.18,
+        opacity: 0.46,
+        scale: 1.56,
+        anchorX: 0.7,
+        anchorY: 0.4,
         motion: "float",
-        spreadX: 0.05,
-        spreadY: 0.03,
+        blend: "screen",
+        spreadX: 0.035,
+        spreadY: 0.024,
       };
     }
 
@@ -367,60 +486,334 @@ const GALAXY_RICH: readonly LayeredBackgroundLayer[] = GALAXY.map(
   },
 );
 
-const GALAXY_PRISM: readonly LayeredBackgroundLayer[] = [
-  ...GALAXY_RICH.map((item) => {
-    if (item.id === "galaxy-planet-primary") {
-      return {
-        ...item,
-        id: "prism-planet-primary",
-        anchorX: 0.82,
-        anchorY: 0.21,
-        scale: 0.16,
-        opacity: 0.56,
-      };
-    }
-    if (item.id === "galaxy-planet-far") {
-      return {
-        ...item,
-        id: "prism-planet-far",
-        anchorX: 0.16,
-        anchorY: 0.31,
-        scale: 0.1,
-        opacity: 0.32,
-      };
-    }
-    if (item.id.startsWith("galaxy-meteor-")) {
-      return {
-        ...item,
-        id: item.id.replace("galaxy-", "prism-"),
-        opacity: item.opacity * 0.82,
-        scale: item.scale * 0.86,
-      };
-    }
-    return {
-      ...item,
-      id: item.id.replace("galaxy-", "prism-"),
-    };
-  }),
+const WORLD01_GALAXY: readonly LayeredBackgroundLayer[] =
+  GALAXY_RICH.filter((item) => item.id !== "galaxy-planet-primary");
+
+const WORLD02_HALO_GARDEN: readonly LayeredBackgroundLayer[] = [
   {
-    ...GALAXY_RICH.find((item) => item.id === "galaxy-nebula")!,
-    id: "prism-nebula-veil",
-    opacity: 0.18,
-    scale: 1.34,
-    anchorX: 0.42,
-    anchorY: 0.54,
-    driftX: 0.00012,
-    driftY: -0.00004,
-    rotationSpeed: 0.00008,
+    ...layer(
+      "halo-garden-production-art",
+      "heaven/halo-garden-production-v2.avif",
+      0.08,
+      1,
+      1,
+      0.5,
+      0.5,
+      0,
+      0,
+    ),
+    fit: "cover",
+    motion: "static",
+  },
+  {
+    ...layer(
+      "halo-garden-sky-current-far",
+      "frost/aurora.svg",
+      0.16,
+      0.075,
+      1.16,
+      0.38,
+      0.18,
+      0.0034,
+      -0.0007,
+      0.00012,
+      0.01,
+    ),
+    fit: "cover",
+    motion: "parallax",
     blend: "screen",
+    minQuality: "medium",
+  },
+  {
+    ...layer(
+      "halo-garden-sky-current-near",
+      "frost/aurora.svg",
+      0.24,
+      0.055,
+      1.32,
+      0.72,
+      0.26,
+      -0.0048,
+      0.001,
+      -0.00014,
+      0.012,
+    ),
+    fit: "cover",
+    motion: "parallax",
+    blend: "screen",
+    minQuality: "high",
   },
 ];
 
-const HEAVEN: readonly LayeredBackgroundLayer[] = [
-  layer("heaven-sky", "heaven/sky.svg", 0.12, 1, 1, 0.5, 0.5, -0.0005, 0),
-  layer("heaven-gate", "heaven/halo-gate.svg", 0.28, 0.9, 0.46, 0.78, 0.2, -0.0005, 0.0003, 0.002, 0.05),
-  layer("heaven-islands", "heaven/cloud-islands.svg", 0.52, 0.85, 0.98, 0.5, 0.36, 0.002, 0.001),
+
+const WORLD03_PRISMATIC_TIDE: readonly LayeredBackgroundLayer[] = [
+  {
+    ...layer(
+      "prismatic-tide-sky",
+      GALAXY_NEBULA_BLUE_SRC,
+      0.08,
+      0.42,
+      1.12,
+      0.62,
+      0.46,
+      -0.00004,
+      0.000012,
+    ),
+    motion: "float",
+  },
+  {
+    ...layer(
+      "prismatic-tide-depth",
+      GALAXY_NEBULA_PURPLE_SRC,
+      0.12,
+      0.26,
+      1.5,
+      0.2,
+      0.68,
+      0.00006,
+      -0.000018,
+      -0.00002,
+    ),
+    motion: "float",
+    blend: "screen",
+  },
+  {
+    ...layer(
+      "prismatic-tide-aurora",
+      "frost/aurora.svg",
+      0.2,
+      0.54,
+      1.02,
+      0.5,
+      0.22,
+      0.00055,
+      0.00004,
+      0.0006,
+      0.018,
+    ),
+    motion: "float",
+    blend: "screen",
+  },
+  {
+    ...layer(
+      "prismatic-tide-rings",
+      "eternity/rings.svg",
+      0.34,
+      0.32,
+      0.28,
+      0.84,
+      0.22,
+      -0.00028,
+      0.00006,
+      0.0014,
+      0.012,
+    ),
+    motion: "orbit",
+    blend: "screen",
+    minQuality: "medium",
+  },
+  {
+    ...layer(
+      "prismatic-tide-crown",
+      "eternity/crown.svg",
+      0.5,
+      0.18,
+      0.3,
+      0.12,
+      0.7,
+      0.0005,
+      -0.00014,
+      -0.0008,
+    ),
+    motion: "float",
+    blend: "screen",
+    minQuality: "high",
+  },
 ];
+
+const WORLD04_CHERUB_FALLS: readonly LayeredBackgroundLayer[] = [
+  {
+    ...layer(
+      "cherub-falls-sky",
+      "heaven/sky.svg",
+      0.1,
+      1,
+      1,
+      0.5,
+      0.5,
+      -0.00012,
+      0.00002,
+    ),
+    motion: "float",
+  },
+  {
+    ...layer(
+      "cherub-falls-cloud-bank",
+      "heaven/cloud-islands.svg",
+      0.42,
+      0.54,
+      0.72,
+      0.82,
+      0.72,
+      -0.00065,
+      0.0004,
+    ),
+    motion: "float",
+    minQuality: "medium",
+  },
+  {
+    ...layer(
+      "cherub-falls-halo",
+      "heaven/halo-gate.svg",
+      0.28,
+      0.44,
+      0.24,
+      0.16,
+      0.2,
+      0.0002,
+      0.00005,
+      -0.001,
+      0.018,
+    ),
+    motion: "float",
+    blend: "screen",
+    minQuality: "medium",
+  },
+  {
+    ...layer(
+      "cherub-falls-lightfall",
+      "frost/aurora.svg",
+      0.18,
+      0.2,
+      0.9,
+      0.56,
+      0.28,
+      0.00016,
+      0.00008,
+      0.00025,
+    ),
+    motion: "float",
+    blend: "screen",
+    minQuality: "high",
+  },
+];
+
+const WORLD05_AURORA_GATE: readonly LayeredBackgroundLayer[] = [
+  {
+    ...layer(
+      "aurora-gate-sky",
+      "meteor/sky.svg",
+      0.08,
+      1,
+      1,
+      0.5,
+      0.5,
+      -0.00016,
+      0.000015,
+    ),
+    motion: "float",
+  },
+  {
+    ...layer(
+      "aurora-gate-wave",
+      "frost/aurora.svg",
+      0.2,
+      0.66,
+      1.04,
+      0.5,
+      0.2,
+      0.0007,
+      0.00008,
+      0.0005,
+      0.018,
+    ),
+    motion: "float",
+    blend: "screen",
+  },
+  {
+    ...layer(
+      "aurora-gate-portal",
+      "heaven/halo-gate.svg",
+      0.31,
+      0.48,
+      0.28,
+      0.84,
+      0.22,
+      -0.00035,
+      0.00008,
+      0.0015,
+      0.018,
+    ),
+    motion: "orbit",
+    blend: "screen",
+    minQuality: "medium",
+  },
+  {
+    ...layer(
+      "aurora-gate-belt",
+      "meteor/asteroid-belt.svg",
+      0.58,
+      0.28,
+      0.72,
+      0.12,
+      0.7,
+      -0.0024,
+      0.0012,
+      0.0018,
+    ),
+    motion: "wrap",
+    minQuality: "medium",
+  },
+  {
+    ...layer(
+      "aurora-gate-comets",
+      "meteor/comet-cluster.svg",
+      0.78,
+      0.36,
+      0.34,
+      0.92,
+      0.6,
+      -0.006,
+      0.0035,
+      0.004,
+    ),
+    motion: "flyby",
+    placement: "edges",
+    instances: 1,
+    minQuality: "high",
+    optional: true,
+  },
+];
+
+type AuthoredWorldBackgroundSpec = {
+  family: string;
+  layers: readonly LayeredBackgroundLayer[];
+};
+
+const AUTHORED_WORLD_BACKGROUNDS: Readonly<
+  Record<string, AuthoredWorldBackgroundSpec>
+> = {
+  "world-01": {
+    family: "galaxy",
+    layers: WORLD01_GALAXY,
+  },
+  "world-02": {
+    family: "heaven",
+    layers: WORLD02_HALO_GARDEN,
+  },
+  "world-03": {
+    family: "prism",
+    layers: WORLD03_PRISMATIC_TIDE,
+  },
+  "world-04": {
+    family: "cherub",
+    layers: WORLD04_CHERUB_FALLS,
+  },
+  "world-05": {
+    family: "aurora",
+    layers: WORLD05_AURORA_GATE,
+  },
+};
 
 const INFERNAL: readonly LayeredBackgroundLayer[] = [
   layer("infernal-sky", "infernal/sky.svg", 0.12, 1, 1, 0.5, 0.5, 0.0003, 0),
@@ -464,60 +857,6 @@ const METEOR: readonly LayeredBackgroundLayer[] = [
   layer("meteor-cluster", "meteor/comet-cluster.svg", 0.78, 0.72, 0.74, 0.72, 0.54, -0.012, 0.008, 0.01, 0, true),
 ];
 
-const METEOR_SOURCED: readonly LayeredBackgroundLayer[] = [
-  ...GALAXY_RICH.map((item) => {
-    if (item.id === "galaxy-sky") {
-      return { ...item, id: "meteor-source-sky", opacity: 0.92 };
-    }
-    if (item.id === "galaxy-nebula") {
-      return {
-        ...item,
-        id: "meteor-source-nebula",
-        opacity: 0.44,
-        anchorX: 0.46,
-      };
-    }
-    if (item.id.startsWith("galaxy-planet")) {
-      return {
-        ...item,
-        id: item.id.replace("galaxy-", "meteor-source-"),
-        opacity: item.opacity * 0.65,
-        scale: item.scale * 0.85,
-      };
-    }
-    if (item.id === "galaxy-moon-far" || item.id === "galaxy-sun-far") {
-      return {
-        ...item,
-        id: item.id.replace("galaxy-", "meteor-source-"),
-      };
-    }
-    if (item.id.startsWith("galaxy-meteor-")) {
-      const near = item.id.includes("-near-");
-      const mid = item.id.includes("-mid-");
-      return {
-        ...item,
-        id: item.id.replace("galaxy-", "meteor-source-"),
-        instances: Math.min(12, (item.instances ?? 1) + (near ? 2 : mid ? 3 : 4)),
-        opacity: Math.min(0.72, item.opacity * (near ? 1.08 : 0.92)),
-        scale: item.scale * (near ? 1.45 : mid ? 1.08 : 0.82),
-        spreadY: Math.max(0.48, item.spreadY ?? 0),
-      };
-    }
-    return {
-      ...item,
-      id: item.id.replace("galaxy-", "meteor-source-"),
-    };
-  }),
-  {
-    ...FROST[1]!,
-    id: "meteor-aurora-sheet",
-    opacity: 0.34,
-    scale: 1.12,
-    depth: 0.2,
-    optional: false,
-  },
-];
-
 const CATHEDRAL: readonly LayeredBackgroundLayer[] = [
   layer("cathedral-sky", "cathedral/sky.svg", 0.12, 1, 1, 0.5, 0.5, 0, 0),
   layer("cathedral-structure", "cathedral/cathedral.svg", 0.38, 0.88, 0.78, 0.5, 0.28, 0.0004, 0.00015),
@@ -530,55 +869,380 @@ const ETERNITY: readonly LayeredBackgroundLayer[] = [
   layer("eternity-crown", "eternity/crown.svg", 0.46, 0.84, 0.66, 0.24, 0.3, 0.0007, 0.0004),
 ];
 
-function familyLayers(profile: WorldSceneProfile): readonly LayeredBackgroundLayer[] {
-  if (profile.archetype === "celestial-rainbow") {
-    if (profile.variant === 2) return HEAVEN;
-    if (profile.variant === 3) return GALAXY_PRISM;
-    if (profile.variant === 4) {
-      return [
-        ...HEAVEN,
-        {
-          ...GALAXY_RICH.find((item) => item.id === "galaxy-sun-far")!,
-          id: "cherub-far-sun",
-          anchorX: 0.18,
-          anchorY: 0.13,
-          opacity: 0.16,
-          optional: false,
-        },
-      ];
-    }
-    if (profile.variant === 5) return METEOR_SOURCED;
-    return GALAXY_RICH;
-  }
+const SOURCED_STAR_DENSE =
+  "vendor/luminousdragon/stars-dense.png";
+const SOURCED_STAR_SPARSE =
+  "vendor/luminousdragon/stars-sparse.png";
+const SOURCED_STAR_PLANETS =
+  "vendor/luminousdragon/stars-planets.png";
+const SOURCED_PLANETS = [
+  "vendor/screaming-brain/planet-ocean-03-512.png",
+  "vendor/screaming-brain/planet-blue-giant-04-512.png",
+  "vendor/screaming-brain/planet-cratered-03-512.png",
+] as const;
+const SOURCED_ASTEROIDS = {
+  small: "vendor/ohjirochan/asteroid-small.png",
+  medium: "vendor/ohjirochan/asteroid-medium.png",
+  large: "vendor/ohjirochan/asteroid-large.png",
+} as const;
+
+function familyLayers(
+  profile: WorldSceneProfile,
+): readonly LayeredBackgroundLayer[] {
+  if (profile.archetype === "celestial-rainbow") return GALAXY_RICH;
   if (profile.archetype === "infernal") return INFERNAL;
   if (profile.archetype === "frost-prism") return FROST;
   if (profile.archetype === "verdant") return VERDANT;
   if (profile.archetype === "shadow-nature") return SHADOW;
   if (profile.archetype === "cosmic-forge") return FORGE;
   if (profile.archetype === "abyssal") return ABYSS;
-  if (profile.archetype === "aurora-cosmic") return METEOR_SOURCED;
+  if (profile.archetype === "aurora-cosmic") return METEOR;
   if (profile.archetype === "void-cathedral") return CATHEDRAL;
   return ETERNITY;
+}
+
+function atmosphereTreatment(
+  profile: WorldSceneProfile,
+): BackgroundTreatment {
+  if (profile.archetype === "infernal") return "infernal-atmosphere";
+  if (profile.archetype === "frost-prism") return "frost-atmosphere";
+  if (profile.archetype === "verdant") return "verdant-atmosphere";
+  if (profile.archetype === "shadow-nature") return "shadow-atmosphere";
+  if (profile.archetype === "cosmic-forge") return "forge-atmosphere";
+  if (profile.archetype === "abyssal") return "abyss-atmosphere";
+  if (profile.archetype === "aurora-cosmic") return "meteor-atmosphere";
+  if (profile.archetype === "void-cathedral") {
+    return "cathedral-atmosphere";
+  }
+  if (profile.archetype === "eternity") return "eternity-atmosphere";
+  return "none";
+}
+
+function rockTreatment(
+  profile: WorldSceneProfile,
+): BackgroundTreatment {
+  if (profile.archetype === "infernal") return "infernal-rock";
+  if (profile.archetype === "frost-prism") return "frost-rock";
+  if (profile.archetype === "verdant") return "verdant-rock";
+  if (profile.archetype === "shadow-nature") return "shadow-rock";
+  if (profile.archetype === "cosmic-forge") return "forge-rock";
+  if (
+    profile.archetype === "abyssal" ||
+    profile.archetype === "aurora-cosmic"
+  ) {
+    return "void-rock";
+  }
+  if (profile.archetype === "void-cathedral") {
+    return "cathedral-rock";
+  }
+  if (profile.archetype === "eternity") return "prism-rock";
+  return "galaxy-rock-mid";
+}
+
+function clampAnchor(value: number): number {
+  return Math.max(0.04, Math.min(0.96, value));
+}
+
+function sourcedFarLayers(
+  profile: WorldSceneProfile,
+): LayeredBackgroundLayer[] {
+  const variant = profile.variant;
+  const even = variant % 2 === 0;
+  const primaryNebula =
+    (variant + profile.worldId.charCodeAt(profile.worldId.length - 1)) % 2 === 0
+      ? GALAXY_NEBULA_PURPLE_SRC
+      : GALAXY_NEBULA_BLUE_SRC;
+  const secondaryNebula =
+    primaryNebula === GALAXY_NEBULA_PURPLE_SRC
+      ? GALAXY_NEBULA_BLUE_SRC
+      : GALAXY_NEBULA_PURPLE_SRC;
+  const treatment = atmosphereTreatment(profile);
+  const edgeX = even ? 0.14 : 0.86;
+  const otherEdgeX = 1 - edgeX;
+  const planetSrc = SOURCED_PLANETS[(variant - 1) % SOURCED_PLANETS.length]!;
+  const variantScale = 0.96 + variant * 0.025;
+
+  return [
+    {
+      ...layer(
+        profile.worldId + "-production-sky",
+        primaryNebula,
+        0.06,
+        0.7,
+        1.22 * variantScale,
+        0.5,
+        0.5,
+        even ? 0.00005 : -0.00005,
+        0.000012,
+      ),
+      fit: "cover",
+      motion: "parallax",
+      treatment,
+    },
+    {
+      ...layer(
+        profile.worldId + "-stars-far",
+        SOURCED_STAR_DENSE,
+        0.1,
+        0.085,
+        1.18,
+        0.5,
+        0.5,
+        even ? -0.00009 : 0.00009,
+        0.000018,
+      ),
+      fit: "cover",
+      motion: "float",
+      blend: "screen",
+    },
+    {
+      ...layer(
+        profile.worldId + "-stars-near",
+        SOURCED_STAR_SPARSE,
+        0.15,
+        0.065,
+        1.28,
+        0.5,
+        0.48,
+        even ? 0.00013 : -0.00013,
+        -0.000018,
+      ),
+      fit: "cover",
+      motion: "parallax",
+      blend: "screen",
+      minQuality: "medium",
+    },
+    {
+      ...layer(
+        profile.worldId + "-nebula-depth",
+        secondaryNebula,
+        0.18,
+        0.24,
+        1.48 + variant * 0.055,
+        edgeX,
+        0.34 + variant * 0.055,
+        even ? 0.00012 : -0.00012,
+        -0.000025,
+        even ? 0.00003 : -0.00003,
+        0.012,
+      ),
+      fit: "cover",
+      motion: "parallax",
+      blend: "screen",
+      treatment,
+    },
+    {
+      ...layer(
+        profile.worldId + "-distant-specks",
+        SOURCED_STAR_PLANETS,
+        0.21,
+        0.055,
+        1.16,
+        0.5,
+        0.46,
+        even ? -0.0007 : 0.0007,
+        0.00018,
+      ),
+      fit: "cover",
+      motion: "wrap",
+      blend: "screen",
+      minQuality: "medium",
+    },
+    {
+      ...layer(
+        profile.worldId + "-distant-body",
+        planetSrc,
+        0.25,
+        profile.archetype === "infernal" ? 0.16 : 0.22,
+        0.065 + variant * 0.008,
+        otherEdgeX,
+        0.14 + ((variant * 7) % 4) * 0.055,
+        even ? 0.00018 : -0.00018,
+        0.00002,
+        even ? -0.00022 : 0.00022,
+      ),
+      motion: "orbit",
+      treatment,
+      minQuality: "medium",
+      spreadX: 0.018,
+      spreadY: 0.016,
+    },
+  ];
+}
+
+function authoredFamilyAccents(
+  profile: WorldSceneProfile,
+): LayeredBackgroundLayer[] {
+  const variant = profile.variant;
+  const even = variant % 2 === 0;
+  const source = familyLayers(profile);
+
+  return source.map((item, index) => {
+    const isSky = index === 0;
+    const isNear = index >= 2;
+    const baseAnchorX =
+      isSky ? 0.5 : even ? 1 - item.anchorX : item.anchorX;
+    const xShift =
+      isSky ? 0 : (variant - 3) * (isNear ? 0.022 : 0.035);
+    const yShift = isSky ? 0 : (variant - 3) * 0.012;
+    const opacityScale =
+      profile.archetype === "aurora-cosmic"
+        ? isSky
+          ? 0.28
+          : 0.22
+        : isSky
+          ? 0.32
+          : isNear
+            ? 0.44
+            : 0.52;
+
+    return {
+      ...item,
+      id: profile.worldId + "-" + item.id,
+      depth: isSky ? 0.13 : isNear ? Math.max(0.56, item.depth) : item.depth,
+      opacity: Math.min(0.66, item.opacity * opacityScale),
+      scale:
+        item.scale *
+        (isSky ? 1.08 : isNear ? 0.78 + variant * 0.018 : 0.86 + variant * 0.025),
+      anchorX: clampAnchor(baseAnchorX + xShift),
+      anchorY: isNear
+        ? Math.max(0.7, item.anchorY + yShift)
+        : clampAnchor(item.anchorY + yShift),
+      driftX: even ? -item.driftX : item.driftX,
+      driftY: item.driftY * (0.82 + variant * 0.045),
+      rotationSpeed: item.rotationSpeed * (even ? -1 : 1),
+      blend: isSky ? "screen" : item.blend,
+      motion: isSky
+        ? "parallax"
+        : Math.abs(item.rotationSpeed) > 0.002
+          ? "orbit"
+          : "float",
+      minQuality: isSky ? "low" : index === 1 ? "medium" : "high",
+      optional: false,
+      placement: isSky ? undefined : "anchor",
+      instances: 1,
+      spreadX: isSky ? undefined : 0.018,
+      spreadY: isSky ? undefined : 0.025,
+    };
+  });
+}
+
+function sourcedEnvironmentObjects(
+  profile: WorldSceneProfile,
+): LayeredBackgroundLayer[] {
+  const variant = profile.variant;
+  const even = variant % 2 === 0;
+  const dense = profile.archetype === "aurora-cosmic";
+  const subtle =
+    profile.archetype === "verdant" ||
+    profile.archetype === "void-cathedral";
+  const treatment = rockTreatment(profile);
+  const sign = even ? 1 : -1;
+  const edgeX = even ? 0.84 : 0.16;
+
+  return [
+    {
+      ...layer(
+        profile.worldId + "-object-far",
+        SOURCED_ASTEROIDS.small,
+        0.4,
+        subtle ? 0.13 : dense ? 0.3 : 0.18,
+        0.014 + variant * 0.0014,
+        0.5,
+        0.48,
+        -0.0038 * sign,
+        0.0018,
+        0.0035 * sign,
+      ),
+      treatment,
+      motion: "wrap",
+      placement: "edges",
+      instances: Math.min(12, (dense ? 9 : 5) + (variant % 2)),
+      spreadY: 0.68,
+      scaleJitter: 0.34,
+      opacityJitter: 0.2,
+      speedJitter: 0.24,
+    },
+    {
+      ...layer(
+        profile.worldId + "-object-mid",
+        SOURCED_ASTEROIDS.medium,
+        0.64,
+        subtle ? 0.18 : dense ? 0.46 : 0.3,
+        0.048 + variant * 0.004,
+        edgeX,
+        0.52,
+        -0.0085 * sign,
+        0.0048,
+        0.0055 * sign,
+      ),
+      treatment,
+      motion: "wrap",
+      placement: "edges",
+      instances: Math.min(12, (dense ? 6 : 3) + (variant % 2)),
+      spreadX: 0.42,
+      spreadY: 0.52,
+      scaleJitter: 0.3,
+      opacityJitter: 0.17,
+      speedJitter: 0.2,
+      minQuality: "medium",
+    },
+    {
+      ...layer(
+        profile.worldId + "-object-near",
+        SOURCED_ASTEROIDS.large,
+        0.9,
+        subtle ? 0.2 : dense ? 0.56 : 0.36,
+        0.13 + variant * 0.014,
+        even ? 0.955 : 0.045,
+        0.74 - (variant % 2) * 0.48,
+        -0.012 * sign,
+        0.0065,
+        0.0045 * sign,
+      ),
+      treatment,
+      motion: "approach",
+      placement: "anchor",
+      instances: dense && variant >= 4 ? 2 : 1,
+      spreadX: 0.018,
+      spreadY: 0.09,
+      scaleJitter: 0.14,
+      opacityJitter: 0.1,
+      speedJitter: 0.12,
+      minQuality: "medium",
+    },
+  ];
+}
+
+function generatedProductionLayers(
+  profile: WorldSceneProfile,
+): readonly LayeredBackgroundLayer[] {
+  return [
+    ...sourcedFarLayers(profile),
+    ...authoredFamilyAccents(profile),
+    ...sourcedEnvironmentObjects(profile),
+  ];
 }
 
 export function layeredBackgroundForScene(
   scene: WorldSceneProfile,
 ): LayeredBackgroundProfile {
+  const authored = AUTHORED_WORLD_BACKGROUNDS[scene.worldId];
+
+  if (authored !== undefined) {
+    return {
+      id: scene.id + "-layered",
+      family: authored.family,
+      renderMode: "authored-production",
+      layers: authored.layers,
+    };
+  }
+
   return {
     id: scene.id + "-layered",
-    family:
-      scene.archetype === "celestial-rainbow"
-        ? scene.variant === 2 || scene.variant === 4
-          ? "heaven"
-          : scene.variant === 5
-            ? "meteor"
-            : "galaxy"
-        : scene.archetype,
-    renderMode:
-      scene.worldId === "world-01"
-        ? "authored-production"
-        : "legacy-hybrid",
-    layers: familyLayers(scene),
+    family: scene.archetype,
+    renderMode: "authored-production",
+    layers: generatedProductionLayers(scene),
   };
 }
 

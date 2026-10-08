@@ -53,10 +53,18 @@ export function chooseTarget(
 ): Enemy | null {
   const candidates = enemies.filter((enemy) => {
     const word = typingText(enemy.entry.en);
-    return enemy.typed === 0 && word[0] === key;
+    const typed = Math.max(0, Math.floor(enemy.typed));
+    return typed < word.length && word[typed] === key;
   });
 
   candidates.sort((a, b) => {
+    // Skills such as Chain Lightning and Meteor can advance a word without
+    // owning the typing lock. Prefer resuming that partial word so the skill
+    // can never leave an enemy permanently untypeable.
+    const partialDelta =
+      Number(b.typed > 0) - Number(a.typed > 0);
+    if (partialDelta !== 0) return partialDelta;
+
     const distanceA = Math.hypot(a.x - playerX, a.y - playerY);
     const distanceB = Math.hypot(b.x - playerX, b.y - playerY);
     const distanceDelta = distanceA - distanceB;

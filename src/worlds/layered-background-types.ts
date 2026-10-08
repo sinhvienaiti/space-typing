@@ -11,12 +11,36 @@ export type BackgroundMotion =
   | "auto"
   | "static"
   | "float"
+  | "parallax"
   | "wrap"
   | "orbit"
   | "flyby"
   | "approach";
 
 export type BackgroundPlacement = "anchor" | "wide" | "edges";
+
+export type BackgroundTreatment =
+  | "none"
+  | "galaxy-rock-far"
+  | "galaxy-rock-mid"
+  | "galaxy-rock-near"
+  | "infernal-atmosphere"
+  | "infernal-rock"
+  | "frost-atmosphere"
+  | "frost-rock"
+  | "verdant-atmosphere"
+  | "verdant-rock"
+  | "shadow-atmosphere"
+  | "shadow-rock"
+  | "forge-atmosphere"
+  | "forge-rock"
+  | "abyss-atmosphere"
+  | "void-rock"
+  | "meteor-atmosphere"
+  | "cathedral-atmosphere"
+  | "cathedral-rock"
+  | "eternity-atmosphere"
+  | "prism-rock";
 
 export type BackgroundRenderMode =
   | "legacy-hybrid"
@@ -43,6 +67,18 @@ export type LayeredBackgroundLayer = {
   rotationSpeed: number;
   pulseAmount: number;
   blend: BackgroundBlend;
+  /**
+   * Optional color/lighting treatment for sourced art that must inherit the
+   * scene palette without baking a second copy of the asset.
+   */
+  treatment?: BackgroundTreatment;
+  /**
+   * Lowest visual quality that should render this layer. Use this for authored
+   * scene identity so Medium can keep essential depth while Low may simplify it.
+   *
+   * When omitted, legacy `optional: true` continues to mean High-or-better.
+   */
+  minQuality?: VisualQuality;
   optional?: boolean;
   /**
    * Explicit motion semantics. "auto" preserves the legacy behavior: layers

@@ -58,6 +58,16 @@
       "attributionRequired": false
     },
     {
+      "id": "player-projectile-atlas-v1",
+      "category": "projectile",
+      "sourceType": "generated",
+      "source": "Approved projectile concept art converted into a 3x4 runtime atlas",
+      "author": "Space Typing project with OpenAI image generation",
+      "license": "Project-original generated asset; review provenance before public distribution",
+      "attributionRequired": false,
+      "url": "/assets/space-typing/projectiles/player-projectiles-v1.webp"
+    },
+    {
       "id": "reward-crates",
       "category": "crate",
       "sourceType": "procedural",

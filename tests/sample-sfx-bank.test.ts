@@ -43,9 +43,13 @@ describe("sampled sci-fi SFX bank", () => {
       (item) =>
         item.src === SAMPLE_SFX["projectile-intercept"].path,
     );
-    expect(projectileVoices).toHaveLength(
-      SAMPLE_SFX["projectile-intercept"].poolSize,
-    );
+    const sharedPathPoolSize = Object.values(SAMPLE_SFX)
+      .filter(
+        (definition) =>
+          definition.path === SAMPLE_SFX["projectile-intercept"].path,
+      )
+      .reduce((sum, definition) => sum + definition.poolSize, 0);
+    expect(projectileVoices).toHaveLength(sharedPathPoolSize);
 
     bank.destroy();
     expect(

@@ -51,6 +51,7 @@ import type { EnemySkillId } from "../enemies/skills";
 import type { StatusId } from "../status/engine";
 import type { SupportSpellId } from "../skills/support";
 import type { CharacterId } from "../characters/registry";
+import { deriveEquipmentAura } from "../characters/equipment-aura";
 import { DEFAULT_PLAYER_BASE_STATS } from "../stats/player";
 import type { CoreStats } from "../stats/core";
 import {
@@ -920,9 +921,23 @@ export function mountTestLab(
       label: id,
     })),
   );
-  setOptions(
-    playerSkillSelect,
-    [
+  function refreshPlayerSkillOptions(): void {
+    const selected = playerSkillSelect.value;
+    const characterId = characterSelect.value as CharacterId;
+    const characterSkill = registry.characterSkills.find(
+      (entry) => entry.characterId === characterId,
+    );
+    const values = [
+      ...(characterSkill === undefined
+        ? []
+        : [{
+            value: characterSkill.id,
+            label:
+              "Character · " +
+              characterSkill.label +
+              " · " +
+              characterSkill.id,
+          }]),
       ...registry.playerSkills.map((id) => ({
         value: id,
         label: "Core · " + id,
@@ -931,8 +946,14 @@ export function mountTestLab(
         value: id,
         label: "Support · " + id,
       })),
-    ],
-  );
+    ];
+    setOptions(playerSkillSelect, values);
+    if (values.some((entry) => entry.value === selected)) {
+      playerSkillSelect.value = selected;
+    }
+  }
+
+  refreshPlayerSkillOptions();
   setOptions(
     shopTypeSelect,
     SHOP_TYPES.map((type) => ({
@@ -1221,6 +1242,7 @@ export function mountTestLab(
       ),
     });
     activeGame.startStage(stage, difficulty);
+    applyResolvedBuildStats();
     canvas.focus();
     music?.setWorldProfile(musicProfileForWorld(worldForStage(stage.stage)));
     music?.transitionTo("WORLD_NORMAL", 0.25);
@@ -1340,11 +1362,13 @@ export function mountTestLab(
   });
 
   characterSelect.addEventListener("change", () => {
+    refreshPlayerSkillOptions();
     if (game === null) {
       renderInspector();
       return;
     }
     game.setCharacter(characterSelect.value as CharacterId);
+    applyResolvedBuildStats();
     renderInspector();
     notice("character applied live · " + characterSelect.value);
   });
@@ -1371,6 +1395,12 @@ export function mountTestLab(
       base: coreStatsFromControls(),
       equipment: equipmentStatBonus(session.state.equipment),
     });
+    activeGame.setEquipmentAura(
+      deriveEquipmentAura(
+        session.state.equipment,
+        characterSelect.value as CharacterId,
+      ),
+    );
     activeGame.setRelicEffects(
       compileRelicEffects(session.state.relics),
     );
@@ -1545,8 +1575,13 @@ export function mountTestLab(
     if (
       target instanceof HTMLInputElement ||
       target instanceof HTMLSelectElement ||
-      target instanceof HTMLTextAreaElement ||
-      target instanceof HTMLButtonElement
+      target instanceof HTMLTextAreaElement
+    ) {
+      return;
+    }
+    if (
+      target instanceof HTMLButtonElement &&
+      !(event.key.length === 1 && /^[a-z]$/i.test(event.key))
     ) {
       return;
     }
@@ -2090,13 +2125,14 @@ export function mountTestLab(
       if (registry.supportSpells.includes(id)) {
         activeGame.setSupportSpells([id as SupportSpellId]);
       }
-      const result = activeGame.useSkill(id);
+      const result = activeGame.testLabForceSkill(id);
       notice(
         result.ok
-          ? "skill activated · " + id
-          : "skill blocked · " + String(result.reason),
+          ? "skill force-activated · requirements/cost/cooldown ignored · " + id
+          : "skill unavailable in current runtime · " + String(result.reason),
       );
       renderInspector();
+      canvas.focus({ preventScroll: true });
       return;
     }
     if (action === "reset-skill-cooldowns") {

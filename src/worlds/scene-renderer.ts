@@ -7,6 +7,10 @@ import {
 import { LayeredBackgroundRenderer } from "./layered-background-renderer";
 import type { LayeredBackgroundProfile } from "./layered-background-types";
 import type { WorldSceneProfile } from "./scene-types";
+import {
+  drawWorldAmbientEffects,
+  worldUsesAuthoredAmbientEffects,
+} from "./world-ambient-effects";
 
 export type WorldSceneStar = {
   x: number;
@@ -1381,6 +1385,25 @@ function drawStaticScene(
   context.restore();
 }
 
+export function productionGalaxyPolishEnabled(
+  profile: Pick<WorldSceneProfile, "worldId">,
+): boolean {
+  return profile.worldId === "world-01";
+}
+
+export function galaxySceneryReadabilityFactor(
+  xRatio: number,
+  yRatio: number,
+): number {
+  if (yRatio < 0.1 || yRatio > 0.64) return 1;
+
+  const centerDistance = Math.abs(xRatio - 0.5);
+  if (centerDistance < 0.1) return 0.34;
+  if (centerDistance < 0.18) return 0.55;
+  if (centerDistance > 0.28) return 1.08;
+  return 0.82;
+}
+
 function drawStars(
   context: CanvasRenderingContext2D,
   input: WorldSceneDrawInput,
@@ -1395,17 +1418,24 @@ function drawStars(
     quality,
   } = input;
   const budget = sceneQualityBudget(quality);
+  const productionGalaxy = productionGalaxyPolishEnabled(profile);
+  const effectiveStarDensity =
+    profile.starDensity * (productionGalaxy ? 0.68 : 1);
   const farCount = Math.max(
     18,
-    Math.round(budget.farStars * profile.starDensity),
+    Math.round(budget.farStars * effectiveStarDensity),
   );
   const nearCount = Math.max(
     0,
     Math.round(
       budget.nearStars *
-        profile.starDensity *
+        effectiveStarDensity *
         Math.max(0.25, profile.flightIntensity) *
-        (profile.archetype === "celestial-rainbow" ? 0.24 : 0.34),
+        (productionGalaxy
+          ? 0.12
+          : profile.archetype === "celestial-rainbow"
+            ? 0.24
+            : 0.34),
     ),
   );
   const vanishingX = width * (0.5 + (profile.variant - 3) * 0.006);
@@ -1440,20 +1470,34 @@ function drawStars(
       x < width * 0.66 &&
       y > height * 0.12 &&
       y < height * 0.62;
-    const quietFactor = centralQuiet ? 0.58 : 1;
+    const galaxyReadability =
+      productionGalaxyPolishEnabled(profile)
+        ? galaxySceneryReadabilityFactor(x / width, y / height)
+        : null;
+    const quietFactor =
+      galaxyReadability ?? (centralQuiet ? 0.58 : 1);
+    const outerThird =
+      productionGalaxyPolishEnabled(profile) &&
+      (x < width * 0.3 || x > width * 0.7);
+    const brightThreshold = outerThird ? 0.91 : 0.94;
+    const glintThreshold = outerThird ? 0.986 : 0.992;
     const size =
       0.45 +
       depth * 1.15 +
-      (hierarchy > 0.94 ? 0.8 : 0) +
-      (hierarchy > 0.992 ? 0.9 : 0);
+      (hierarchy > brightThreshold ? 0.8 : 0) +
+      (hierarchy > glintThreshold ? 0.9 : 0);
     const alpha =
       (0.15 +
         depth * 0.36 +
-        (hierarchy > 0.94 ? 0.16 : 0)) *
+        (hierarchy > brightThreshold ? 0.16 : 0)) *
       quietFactor;
 
     context.fillStyle = rgba(environment.starRgb, alpha);
-    if (hierarchy > 0.992 && quality !== "low") {
+    if (
+      hierarchy > glintThreshold &&
+      quality !== "low" &&
+      quietFactor >= 0.8
+    ) {
       const arm = 2.1 + depth * 2.1;
       context.fillRect(x - 0.75, y - arm, 1.5, arm * 2);
       context.fillRect(x - arm, y - 0.75, arm * 2, 1.5);
@@ -1462,7 +1506,7 @@ function drawStars(
       context.arc(x, y, 1.25 + depth * 0.8, 0, TAU);
       context.fill();
       context.globalAlpha = 1;
-    } else if (hierarchy > 0.94) {
+    } else if (hierarchy > brightThreshold) {
       context.beginPath();
       context.arc(x, y, size * 0.62, 0, TAU);
       context.fill();
@@ -1480,12 +1524,17 @@ function drawStars(
         time * 0.01 * environment.starDrift * star.z) %
         1) *
       height;
+    const legacyX = star.x * width;
+    const readability =
+      productionGalaxyPolishEnabled(profile)
+        ? galaxySceneryReadabilityFactor(star.x, y / height)
+        : 1;
     context.fillStyle = rgba(
       environment.starRgb,
-      0.08 + star.z * 0.25,
+      (0.08 + star.z * 0.25) * readability,
     );
     const size = Math.max(0.7, star.z * 1.3);
-    context.fillRect(star.x * width, y, size, size);
+    context.fillRect(legacyX, y, size, size);
   }
 
   // Near stars move substantially faster and become short streaks. Their count
@@ -1511,21 +1560,36 @@ function drawStars(
     }
 
     if (profile.archetype === "celestial-rainbow") {
+      const xRatio = x / width;
+      const yRatio = y / height;
+      const productionGalaxy =
+        productionGalaxyPolishEnabled(profile);
       const centralQuiet =
-        x > width * 0.35 &&
-        x < width * 0.65 &&
-        y > height * 0.12 &&
-        y < height * 0.62;
-      const alpha =
-        (0.22 + depth * 0.24) * (centralQuiet ? 0.5 : 1);
+        xRatio > 0.35 &&
+        xRatio < 0.65 &&
+        yRatio > 0.12 &&
+        yRatio < 0.62;
+      const readability = productionGalaxy
+        ? galaxySceneryReadabilityFactor(xRatio, yRatio)
+        : centralQuiet
+          ? 0.5
+          : 1;
+      const alpha = (0.22 + depth * 0.24) * readability;
       context.fillStyle = rgba(environment.starRgb, alpha);
       context.beginPath();
       context.arc(x, y, 0.85 + depth * 1.05, 0, TAU);
       context.fill();
 
+      const glintThreshold =
+        productionGalaxy && Math.abs(xRatio - 0.5) > 0.28
+          ? 0.82
+          : productionGalaxy
+            ? 0.9
+            : 0.86;
       if (
         quality !== "low" &&
-        seededUnit(profile.seed, index, 314) > 0.86
+        (!productionGalaxy || readability >= 0.8) &&
+        seededUnit(profile.seed, index, 314) > glintThreshold
       ) {
         const arm = 1.8 + depth * 2.4;
         context.strokeStyle = rgba(
@@ -2033,7 +2097,11 @@ function drawAmbientParticles(
     const px = x * width;
     const py = y * height;
     const size = 1 + depth * 2.6;
-    const alpha = 0.12 + depth * 0.24;
+    const sceneryReadability =
+      productionGalaxyPolishEnabled(profile)
+        ? galaxySceneryReadabilityFactor(x, y)
+        : 1;
+    const alpha = (0.12 + depth * 0.24) * sceneryReadability;
 
     if (
       particleStyle.includes("feather") ||
@@ -2756,9 +2824,23 @@ export class WorldSceneRenderer {
       },
     );
 
-    // Stars and small ambient particles are bounded support FX. Authored
-    // object motion itself is handled by LayeredBackgroundRenderer.
-    drawStars(context, input);
+    const authoredAmbientFx = worldUsesAuthoredAmbientEffects(
+      input.profile.worldId,
+    );
+
+    // Production Worlds may own their ambient FX so they do not stack generic
+    // particles/stars on top of an already art-directed scene.
+    if (!authoredAmbientFx) {
+      drawStars(context, input);
+    }
+
+    drawWorldAmbientEffects(context, {
+      profile: input.profile,
+      quality: input.quality,
+      width: input.width,
+      height: input.height,
+      time: input.time,
+    });
 
     if (policy.drawLegacyCinematicMotion) {
       drawCinematicMotion(context, input);
@@ -2768,7 +2850,9 @@ export class WorldSceneRenderer {
       drawFloor(context, input);
     }
 
-    drawAmbientParticles(context, input);
+    if (!authoredAmbientFx) {
+      drawAmbientParticles(context, input);
+    }
 
     if (policy.drawLegacyCinematicEvents) {
       drawCinematicEvents(context, input);
