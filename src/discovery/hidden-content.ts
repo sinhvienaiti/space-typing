@@ -235,11 +235,6 @@ function legacySeedIdentity(state: Pick<
   return `legacy-${hash.toString(16).padStart(8, "0")}`;
 }
 
-function publishState(state: HiddenDiscoveryState): HiddenDiscoveryState {
-  publishHiddenDiscoveryPresentation(state);
-  return state;
-}
-
 export function hiddenDiscoveryRollIdentity(
   seedIdentity: string,
   stage: number,
@@ -266,7 +261,7 @@ export function sanitizeHiddenDiscoveryState(
 ): HiddenDiscoveryState {
   const result = createHiddenDiscoveryState();
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    return publishState(result);
+    return result;
   }
 
   const raw = value as {
@@ -339,7 +334,7 @@ export function sanitizeHiddenDiscoveryState(
   result.discoveryStages = discoveryStages;
 
   result.encounter = sanitizeHiddenEncounterState(raw.encounter);
-  return publishState(result);
+  return result;
 }
 
 export function isValidHiddenDiscoveryState(
@@ -590,6 +585,7 @@ export function hiddenCodexEntries(
   input: HiddenDiscoveryState,
 ): HiddenCodexEntry[] {
   const state = sanitizeHiddenDiscoveryState(input);
+  publishHiddenDiscoveryPresentation(state);
   const discovered = new Set(state.discovered);
 
   return HIDDEN_CONTENT_IDS.map((id) => {
