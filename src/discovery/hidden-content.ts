@@ -195,6 +195,10 @@ function createDroughtState(): Record<HiddenContentId, number> {
 }
 
 function randomSeedIdentity(): string {
+  if (typeof window === "undefined") {
+    return "campaign-headless-simulation";
+  }
+
   const cryptoSource = globalThis.crypto;
   if (cryptoSource !== undefined && typeof cryptoSource.randomUUID === "function") {
     return `campaign-${cryptoSource.randomUUID()}`;
