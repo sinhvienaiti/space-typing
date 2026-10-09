@@ -261,6 +261,7 @@ export function sanitizeHiddenDiscoveryState(
 ): HiddenDiscoveryState {
   const result = createHiddenDiscoveryState();
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    publishHiddenDiscoveryPresentation(result);
     return result;
   }
 
@@ -334,6 +335,7 @@ export function sanitizeHiddenDiscoveryState(
   result.discoveryStages = discoveryStages;
 
   result.encounter = sanitizeHiddenEncounterState(raw.encounter);
+  publishHiddenDiscoveryPresentation(result);
   return result;
 }
 
