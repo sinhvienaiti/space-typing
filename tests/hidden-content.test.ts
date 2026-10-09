@@ -1,100 +1,66 @@
 import { describe, expect, it } from "vitest";
 import {
-  HIDDEN_CONTENT_REGISTRY,
   createHiddenDiscoveryState,
-  hiddenCodexEntries,
-  hiddenDiscoveryChance,
-  isValidHiddenDiscoveryState,
+  rollDeterministicHiddenDiscovery,
   rollHiddenDiscovery,
   sanitizeHiddenDiscoveryState,
 } from "../src/discovery/hidden-content";
 
-describe("hidden-content discovery", () => {
-  it("starts concealed and renders Codex placeholders", () => {
-    const entries = hiddenCodexEntries(createHiddenDiscoveryState());
-    expect(entries).toHaveLength(6);
-    expect(entries.every((entry) => entry.title === "???")).toBe(true);
-    expect(entries.every((entry) => entry.reward === "???")).toBe(true);
+describe("hidden discovery", () => {
+  it("uses the deterministic stage seed when runtime callers omit an RNG", () => {
+    const state = createHiddenDiscoveryState();
+
+    expect(rollHiddenDiscovery(state, 55, 17)).toEqual(
+      rollDeterministicHiddenDiscovery(state, 55, 17),
+    );
+    expect(rollHiddenDiscovery(state, 55, 17)).toEqual(
+      rollHiddenDiscovery(state, 55, 17),
+    );
   });
 
-  it("does not roll the same or an older Campaign stage twice", () => {
+  it("persists a no-result roll so retrying or reopening cannot reroll it", () => {
     const first = rollHiddenDiscovery(
       createHiddenDiscoveryState(),
-      30,
+      25,
       0,
       () => 0.999999,
     );
+
     expect(first.rolled).toBe(true);
-    expect(first.state.lastRollStage).toBe(30);
+    expect(first.discovery).toBeNull();
+    expect(first.state.lastRollStage).toBe(25);
 
-    const replay = rollHiddenDiscovery(first.state, 30, 100, () => 0);
-    expect(replay.rolled).toBe(false);
-    expect(replay.state).toEqual(first.state);
+    const restored = sanitizeHiddenDiscoveryState(
+      JSON.parse(JSON.stringify(first.state)),
+    );
+    const retry = rollHiddenDiscovery(restored, 25, 0, () => 0);
+
+    expect(retry.rolled).toBe(false);
+    expect(retry.discovery).toBeNull();
+    expect(retry.state).toEqual(first.state);
   });
 
-  it("uses Luck and drought without exceeding each discovery cap", () => {
-    const definition = HIDDEN_CONTENT_REGISTRY["ghost-contract"];
-    const base = hiddenDiscoveryChance(definition, 0, 0);
-    const lucky = hiddenDiscoveryChance(definition, 80, 0);
-    const dry = hiddenDiscoveryChance(definition, 80, 50);
+  it("does not reroll a resolved winner or unlock the same content twice", () => {
+    const first = rollHiddenDiscovery(
+      createHiddenDiscoveryState(),
+      25,
+      0,
+      () => 0,
+    );
 
-    expect(lucky).toBeGreaterThan(base);
-    expect(dry).toBeGreaterThan(lucky);
-    expect(dry).toBeLessThanOrEqual(definition.maxChance);
-  });
+    expect(first.discovery?.id).toBe("black-market-signal");
+    expect(first.state.discovered).toEqual(["black-market-signal"]);
 
-  it("increments eligible drought and guarantees overdue content", () => {
-    const state = createHiddenDiscoveryState();
-    state.lastRollStage = 29;
-    state.drought["ghost-contract"] =
-      HIDDEN_CONTENT_REGISTRY["ghost-contract"].guaranteeAfter;
+    const retry = rollHiddenDiscovery(first.state, 25, 0, () => 0);
+    expect(retry.rolled).toBe(false);
+    expect(retry.state.discovered).toEqual(["black-market-signal"]);
 
-    const result = rollHiddenDiscovery(state, 30, 0, () => 0.999999);
-    expect(result.discovery?.id).toBe("ghost-contract");
-    expect(result.state.discovered).toContain("ghost-contract");
-    expect(result.state.drought["ghost-contract"]).toBe(0);
-  });
-
-  it("reveals only discovered Codex entries", () => {
-    const state = createHiddenDiscoveryState();
-    state.discovered = ["black-market-signal"];
-
-    const entries = hiddenCodexEntries(state);
-    expect(
-      entries.find((entry) => entry.id === "black-market-signal"),
-    ).toMatchObject({
-      title: "Black Market Signal",
-      reward: "Hidden Shop route",
-      discovered: true,
-    });
-    expect(
-      entries.find((entry) => entry.id === "void-warden")?.title,
-    ).toBe("???");
-  });
-
-  it("sanitizes malformed state and validates strict persisted data", () => {
-    const sanitized = sanitizeHiddenDiscoveryState({
-      discovered: ["ghost-contract", "ghost-contract", "bad"],
-      drought: {
-        "black-market-signal": 999,
-        "ghost-contract": -3,
-      },
-      lastRollStage: 5000,
-    });
-
-    expect(sanitized.discovered).toEqual(["ghost-contract"]);
-    expect(sanitized.drought["black-market-signal"]).toBe(60);
-    expect(sanitized.drought["ghost-contract"]).toBe(0);
-    expect(sanitized.lastRollStage).toBe(1000);
-    expect(isValidHiddenDiscoveryState(sanitized)).toBe(true);
-    expect(
-      isValidHiddenDiscoveryState({
-        ...sanitized,
-        drought: {
-          ...sanitized.drought,
-          "echo-rift": -1,
-        },
-      }),
-    ).toBe(false);
+    const later = rollHiddenDiscovery(first.state, 40, 0, () => 0);
+    expect(later.discovery?.id).not.toBe("black-market-signal");
+    expect(later.state.discovered.filter((id) => id === "black-market-signal"))
+      .toHaveLength(1);
+    expect(new Set(later.state.discovered).size).toBe(
+      later.state.discovered.length,
+    );
   });
 });

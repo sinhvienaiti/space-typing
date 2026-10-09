@@ -352,10 +352,11 @@ export function rollHiddenDiscovery(
   input: HiddenDiscoveryState,
   stage: number,
   luck: number,
-  random: () => number = Math.random,
+  random?: () => number,
 ): HiddenDiscoveryRoll {
   const state = sanitizeHiddenDiscoveryState(input);
   const safeStage = Math.floor(clamp(stage, 1, 1000));
+  const randomSource = random ?? hiddenDiscoveryRandom(safeStage);
 
   if (safeStage <= state.lastRollStage) {
     return { state, discovery: null, rolled: false };
@@ -389,7 +390,7 @@ export function rollHiddenDiscovery(
   } else {
     for (const definition of eligible) {
       if (
-        clamp(random(), 0, 0.999999) <
+        clamp(randomSource(), 0, 0.999999) <
         hiddenDiscoveryChance(
           definition,
           luck,
