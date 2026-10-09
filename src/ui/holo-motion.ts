@@ -1,3 +1,5 @@
+import { installSecretRouteMap } from "./secret-route-map";
+
 /**
  * Holo Command motion helpers (styles: src/ui/holo-motion.css):
  * - a light ripple from the pointer on every button press;
@@ -8,6 +10,7 @@ const RIPPLE_SKIP = ".rc-card, .icon-button, input, select";
 
 export function installHoloMotion(root: Document = document): void {
   if (typeof window === "undefined") return;
+  installSecretRouteMap(root);
   const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)");
 
   root.addEventListener(
