@@ -165,8 +165,11 @@ export const HIDDEN_CONTENT_REGISTRY: Record<
 
 export type HiddenDiscoveryState = {
   discovered: HiddenContentId[];
+  discoveryStages: Partial<Record<HiddenContentId, number>>;
   drought: Record<HiddenContentId, number>;
+  seedIdentity: string;
   lastRollStage: number;
+  lastRollIdentity: string | null;
   encounter?: HiddenEncounterState;
 };
 
@@ -191,11 +194,59 @@ function createDroughtState(): Record<HiddenContentId, number> {
   ) as Record<HiddenContentId, number>;
 }
 
-export function createHiddenDiscoveryState(): HiddenDiscoveryState {
+function randomSeedIdentity(): string {
+  const cryptoSource = globalThis.crypto;
+  if (cryptoSource !== undefined && typeof cryptoSource.randomUUID === "function") {
+    return `campaign-${cryptoSource.randomUUID()}`;
+  }
+
+  return `campaign-${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 12)}`;
+}
+
+function isSeedIdentity(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.trim().length > 0 &&
+    value.trim().length <= 96
+  );
+}
+
+function legacySeedIdentity(state: Pick<
+  HiddenDiscoveryState,
+  "discovered" | "drought" | "lastRollStage"
+>): string {
+  let hash = (stageSeed(Math.max(1, state.lastRollStage)) ^ 0x4c454741) >>> 0;
+  for (let index = 0; index < HIDDEN_CONTENT_IDS.length; index += 1) {
+    const id = HIDDEN_CONTENT_IDS[index]!;
+    const discovered = state.discovered.includes(id) ? 1 : 0;
+    hash ^= Math.imul(
+      (index + 1) * 131 + discovered * 17 + state.drought[id],
+      0x45d9f3b,
+    );
+    hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b) >>> 0;
+  }
+  return `legacy-${hash.toString(16).padStart(8, "0")}`;
+}
+
+export function hiddenDiscoveryRollIdentity(
+  seedIdentity: string,
+  stage: number,
+): string {
+  return `${seedIdentity}:stage-${Math.floor(clamp(stage, 1, 1000))}`;
+}
+
+export function createHiddenDiscoveryState(
+  seedIdentity = randomSeedIdentity(),
+): HiddenDiscoveryState {
   return {
     discovered: [],
+    discoveryStages: {},
     drought: createDroughtState(),
+    seedIdentity,
     lastRollStage: 0,
+    lastRollIdentity: null,
     encounter: createHiddenEncounterState(),
   };
 }
@@ -210,8 +261,11 @@ export function sanitizeHiddenDiscoveryState(
 
   const raw = value as {
     discovered?: unknown;
+    discoveryStages?: unknown;
     drought?: unknown;
+    seedIdentity?: unknown;
     lastRollStage?: unknown;
+    lastRollIdentity?: unknown;
     encounter?: unknown;
   };
 
@@ -248,6 +302,31 @@ export function sanitizeHiddenDiscoveryState(
   ) {
     result.lastRollStage = Math.floor(clamp(raw.lastRollStage, 0, 1000));
   }
+
+  result.seedIdentity = isSeedIdentity(raw.seedIdentity)
+    ? raw.seedIdentity.trim()
+    : legacySeedIdentity(result);
+  result.lastRollIdentity =
+    result.lastRollStage > 0
+      ? hiddenDiscoveryRollIdentity(result.seedIdentity, result.lastRollStage)
+      : null;
+
+  const rawDiscoveryStages =
+    raw.discoveryStages !== null &&
+    typeof raw.discoveryStages === "object" &&
+    !Array.isArray(raw.discoveryStages)
+      ? (raw.discoveryStages as Partial<Record<HiddenContentId, unknown>>)
+      : {};
+  const discoveryStages: Partial<Record<HiddenContentId, number>> = {};
+  for (const id of result.discovered) {
+    const definition = HIDDEN_CONTENT_REGISTRY[id];
+    const value = rawDiscoveryStages[id];
+    discoveryStages[id] =
+      typeof value === "number" && Number.isFinite(value)
+        ? Math.floor(clamp(value, definition.minStage, 1000))
+        : definition.minStage;
+  }
+  result.discoveryStages = discoveryStages;
 
   result.encounter = sanitizeHiddenEncounterState(raw.encounter);
   return result;
@@ -296,10 +375,45 @@ export function isValidHiddenDiscoveryState(
     return false;
   }
 
+  if (
+    raw.discoveryStages === null ||
+    typeof raw.discoveryStages !== "object" ||
+    Array.isArray(raw.discoveryStages)
+  ) {
+    return false;
+  }
+
+  const discoveryStageKeys = Object.keys(raw.discoveryStages);
+  if (
+    discoveryStageKeys.length !== raw.discovered.length ||
+    !raw.discovered.every((id) => {
+      const stage = raw.discoveryStages[id];
+      return (
+        discoveryStageKeys.includes(id) &&
+        Number.isInteger(stage) &&
+        stage! >= HIDDEN_CONTENT_REGISTRY[id].minStage &&
+        stage! <= 1000
+      );
+    })
+  ) {
+    return false;
+  }
+
+  if (!isSeedIdentity(raw.seedIdentity)) {
+    return false;
+  }
+
+  const validRollIdentity =
+    raw.lastRollStage === 0
+      ? raw.lastRollIdentity === null
+      : raw.lastRollIdentity ===
+        hiddenDiscoveryRollIdentity(raw.seedIdentity, raw.lastRollStage);
+
   return (
     Number.isInteger(raw.lastRollStage) &&
     raw.lastRollStage >= 0 &&
     raw.lastRollStage <= 1000 &&
+    validRollIdentity &&
     (raw.encounter === undefined ||
       isValidHiddenEncounterState(raw.encounter))
   );
@@ -322,8 +436,24 @@ export function hiddenDiscoveryChance(
   );
 }
 
-function hiddenDiscoveryRandom(stage: number): () => number {
-  let value = (stageSeed(stage) ^ 0x48494444) >>> 0;
+function hashSeedIdentity(seedIdentity: string): number {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < seedIdentity.length; index += 1) {
+    hash ^= seedIdentity.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash >>> 0;
+}
+
+function hiddenDiscoveryRandom(
+  seedIdentity: string,
+  stage: number,
+): () => number {
+  let value = (
+    stageSeed(stage) ^
+    hashSeedIdentity(seedIdentity) ^
+    0x48494444
+  ) >>> 0;
 
   return () => {
     value = (value + 0x6d2b79f5) >>> 0;
@@ -339,12 +469,13 @@ export function rollDeterministicHiddenDiscovery(
   stage: number,
   luck: number,
 ): HiddenDiscoveryRoll {
+  const state = sanitizeHiddenDiscoveryState(input);
   const safeStage = Math.floor(clamp(stage, 1, 1000));
   return rollHiddenDiscovery(
-    input,
+    state,
     safeStage,
     luck,
-    hiddenDiscoveryRandom(safeStage),
+    hiddenDiscoveryRandom(state.seedIdentity, safeStage),
   );
 }
 
@@ -356,7 +487,8 @@ export function rollHiddenDiscovery(
 ): HiddenDiscoveryRoll {
   const state = sanitizeHiddenDiscoveryState(input);
   const safeStage = Math.floor(clamp(stage, 1, 1000));
-  const randomSource = random ?? hiddenDiscoveryRandom(safeStage);
+  const randomSource =
+    random ?? hiddenDiscoveryRandom(state.seedIdentity, safeStage);
 
   if (safeStage <= state.lastRollStage) {
     return { state, discovery: null, rolled: false };
@@ -416,12 +548,22 @@ export function rollHiddenDiscovery(
       : HIDDEN_CONTENT_IDS.filter(
           (id) => discovered.has(id) || id === discovery?.id,
         );
+  const discoveryStages = { ...state.discoveryStages };
+  if (discovery !== null) {
+    discoveryStages[discovery.id] = safeStage;
+  }
 
   return {
     state: {
       discovered: nextDiscovered,
+      discoveryStages,
       drought,
+      seedIdentity: state.seedIdentity,
       lastRollStage: safeStage,
+      lastRollIdentity: hiddenDiscoveryRollIdentity(
+        state.seedIdentity,
+        safeStage,
+      ),
       encounter: state.encounter,
     },
     discovery,
