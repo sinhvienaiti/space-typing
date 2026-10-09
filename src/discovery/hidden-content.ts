@@ -390,9 +390,10 @@ export function isValidHiddenDiscoveryState(
       const stage = raw.discoveryStages[id];
       return (
         discoveryStageKeys.includes(id) &&
+        typeof stage === "number" &&
         Number.isInteger(stage) &&
-        stage! >= HIDDEN_CONTENT_REGISTRY[id].minStage &&
-        stage! <= 1000
+        stage >= HIDDEN_CONTENT_REGISTRY[id].minStage &&
+        stage <= 1000
       );
     })
   ) {
