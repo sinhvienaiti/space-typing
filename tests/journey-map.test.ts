@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { journeyNodesForStage, journeyPath } from "../src/campaign/journey-map";
+import {
+  journeyNodesForStage,
+  journeyPath,
+  journeySecretNodesForStage,
+} from "../src/campaign/journey-map";
+import { createHiddenDiscoveryState } from "../src/discovery/hidden-content";
 
 describe("world journey map", () => {
   it("shows exactly the selected World's 20 consecutive stages", () => {
@@ -27,5 +32,45 @@ describe("world journey map", () => {
     expect(journeyPath(nodes)).toContain(" C ");
     expect(journeyPath([])).toBe("");
     expect(nodes.every((node) => node.x >= 0 && node.x <= 100)).toBe(true);
+  });
+
+  it("shows only persisted Hidden Shop and Hidden Station discoveries in their World", () => {
+    const hidden = createHiddenDiscoveryState("campaign-secret-map");
+    hidden.discovered = ["black-market-signal", "hidden-station-signal"];
+    hidden.discoveryStages = {
+      "black-market-signal": 25,
+      "hidden-station-signal": 40,
+    };
+
+    expect(journeySecretNodesForStage(1, hidden)).toEqual([]);
+
+    const secretNodes = journeySecretNodesForStage(35, hidden);
+    expect(secretNodes).toHaveLength(2);
+    expect(secretNodes.map((node) => node.id)).toEqual([
+      "black-market-signal",
+      "hidden-station-signal",
+    ]);
+    expect(secretNodes[0]).toMatchObject({
+      stage: 25,
+      kind: "hidden-shop",
+      destinationId: "black-market",
+      selectable: true,
+    });
+    expect(secretNodes[1]).toMatchObject({
+      stage: 40,
+      kind: "hidden-station",
+      destinationId: "hidden-station",
+      selectable: true,
+    });
+  });
+
+  it("does not leak undiscovered secret destinations into the map", () => {
+    const hidden = createHiddenDiscoveryState("campaign-undiscovered");
+    hidden.discoveryStages = {
+      "black-market-signal": 25,
+      "hidden-station-signal": 40,
+    };
+
+    expect(journeySecretNodesForStage(35, hidden)).toEqual([]);
   });
 });
