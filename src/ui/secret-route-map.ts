@@ -32,9 +32,10 @@ function clearSecretPreview(root: Document): void {
   byId<HTMLButtonElement>(root, "journeyStartButton")?.classList.remove(
     "secret-route-hidden",
   );
-  root
-    .querySelectorAll<HTMLElement>(SECRET_NODE_SELECTOR + ".selected")
-    .forEach((node) => node.classList.remove("selected"));
+  root.querySelectorAll<HTMLElement>(SECRET_NODE_SELECTOR).forEach((node) => {
+    node.classList.remove("selected");
+    node.setAttribute("aria-pressed", "false");
+  });
 }
 
 function openCanonicalAction(root: Document, buttonId: string): void {
@@ -66,10 +67,9 @@ function renderSecretPreview(
   presentation: SecretRoutePresentation,
   selected: HTMLButtonElement,
 ): void {
-  root
-    .querySelectorAll<HTMLElement>(SECRET_NODE_SELECTOR + ".selected")
-    .forEach((node) => node.classList.remove("selected"));
+  clearSecretPreview(root);
   selected.classList.add("selected");
+  selected.setAttribute("aria-pressed", "true");
 
   const title = byId(root, "stagePreviewTitle");
   const meta = byId(root, "stagePreviewMeta");
@@ -85,7 +85,6 @@ function renderSecretPreview(
     presentation.meta + " · " + presentation.node.description;
   start.classList.add("secret-route-hidden");
 
-  byId(root, SECRET_ACTIONS_ID)?.remove();
   const actions = root.createElement("div");
   actions.id = SECRET_ACTIONS_ID;
   actions.className =
@@ -138,7 +137,6 @@ function createSecretButton(
   button.append(glyph, label);
   button.addEventListener("click", () => {
     renderSecretPreview(root, presentation, button);
-    button.setAttribute("aria-pressed", "true");
   });
   return button;
 }
@@ -170,8 +168,11 @@ export function installSecretRouteMap(root: Document = document): () => void {
 
   const onDiscovery = () => renderSecretNodes(root);
   const onClick = (event: Event) => {
-    const element = event.target as Element | null;
-    if (element?.closest(".journey-node[data-stage]") !== null) {
+    const target = event.target;
+    if (
+      target instanceof Element &&
+      target.closest(".journey-node[data-stage]") !== null
+    ) {
       clearSecretPreview(root);
     }
   };
