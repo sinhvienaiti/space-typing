@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   secretRoutePresentation,
   secretRoutePresentationsForStage,
@@ -10,6 +10,7 @@ import {
   sanitizeHiddenDiscoveryState,
 } from "../src/discovery/hidden-content";
 import { currentHiddenDiscoveryPresentation } from "../src/discovery/hidden-discovery-presentation";
+import { activateSecretRoutePresentation } from "../src/ui/secret-route-map";
 
 describe("secret Campaign route", () => {
   it("restores the same secret nodes after a serialized save/load round trip", () => {
@@ -152,5 +153,49 @@ describe("secret Campaign route", () => {
       "black-market-signal",
       "hidden-station-signal",
     ]);
+  });
+
+  it("routes a discovered Rest Stop directly to the station flow exactly once", () => {
+    const state = createHiddenDiscoveryState("campaign-rest-stop-activation");
+    state.discovered = ["hidden-station-signal"];
+    state.discoveryStages = { "hidden-station-signal": 40 };
+    const station = secretRoutePresentation(
+      35,
+      state,
+      "hidden-station-signal",
+    );
+    expect(station?.node.kind).toBe("hidden-station");
+    expect(station?.action).toBe("open-hidden-station");
+
+    const onOpenStation = vi.fn();
+    const onPreviewRoute = vi.fn();
+    expect(
+      activateSecretRoutePresentation(station!, {
+        onOpenStation,
+        onPreviewRoute,
+      }),
+    ).toBe("station");
+    expect(onOpenStation).toHaveBeenCalledTimes(1);
+    expect(onPreviewRoute).not.toHaveBeenCalled();
+  });
+
+  it("keeps the secret-shop preview path separate from Rest Stop activation", () => {
+    const state = createHiddenDiscoveryState("campaign-secret-shop-activation");
+    state.discovered = ["black-market-signal"];
+    state.discoveryStages = { "black-market-signal": 25 };
+    const shop = secretRoutePresentation(35, state, "black-market-signal");
+    expect(shop?.node.kind).toBe("hidden-shop");
+
+    const onOpenStation = vi.fn();
+    const onPreviewRoute = vi.fn();
+    expect(
+      activateSecretRoutePresentation(shop!, {
+        onOpenStation,
+        onPreviewRoute,
+      }),
+    ).toBe("preview");
+    expect(onOpenStation).not.toHaveBeenCalled();
+    expect(onPreviewRoute).toHaveBeenCalledTimes(1);
+    expect(onPreviewRoute).toHaveBeenCalledWith(shop);
   });
 });

@@ -11,6 +11,31 @@ import {
 const SECRET_NODE_SELECTOR = ".journey-secret-node";
 const SECRET_ACTIONS_ID = "journeySecretActions";
 
+export type SecretRouteActivationHandlers = {
+  onOpenStation: () => void;
+  onPreviewRoute: (presentation: SecretRoutePresentation) => void;
+};
+
+/**
+ * Keep Rest Stop activation on the station flow and away from Campaign stage
+ * launch. Secret shops still use the existing preview/action affordance.
+ */
+export function activateSecretRoutePresentation(
+  presentation: SecretRoutePresentation,
+  handlers: SecretRouteActivationHandlers,
+): "station" | "preview" {
+  if (
+    presentation.action === "open-hidden-station" &&
+    presentation.node.kind === "hidden-station"
+  ) {
+    handlers.onOpenStation();
+    return "station";
+  }
+
+  handlers.onPreviewRoute(presentation);
+  return "preview";
+}
+
 function byId<T extends HTMLElement>(root: Document, id: string): T | null {
   return root.getElementById(id) as T | null;
 }
@@ -123,9 +148,18 @@ function createSecretButton(
   button.style.top = String(node.y) + "px";
   button.dataset.hiddenDiscoveryId = node.id;
   button.dataset.discoveryStage = String(node.stage);
-  button.setAttribute("aria-label", presentation.eyebrow + " · " + node.name);
+  button.setAttribute(
+    "aria-label",
+    (node.kind === "hidden-station" ? "Rest Stop · " : "") +
+      presentation.eyebrow +
+      " · " +
+      node.name,
+  );
   button.setAttribute("aria-pressed", "false");
-  button.title = presentation.eyebrow + " · " + node.name;
+  button.title =
+    node.kind === "hidden-station"
+      ? "Rest Stop · Dock at " + node.name
+      : presentation.eyebrow + " · " + node.name;
 
   const glyph = root.createElement("span");
   glyph.className = "journey-secret-glyph";
@@ -133,10 +167,13 @@ function createSecretButton(
   glyph.textContent = node.kind === "hidden-shop" ? "◆" : "⌂";
 
   const label = root.createElement("strong");
-  label.textContent = node.kind === "hidden-shop" ? "SECRET" : "STATION";
+  label.textContent = node.kind === "hidden-shop" ? "SECRET" : "REST STOP";
   button.append(glyph, label);
   button.addEventListener("click", () => {
-    renderSecretPreview(root, presentation, button);
+    activateSecretRoutePresentation(presentation, {
+      onOpenStation: () => openCanonicalAction(root, "stationShopButton"),
+      onPreviewRoute: (entry) => renderSecretPreview(root, entry, button),
+    });
   });
   return button;
 }
