@@ -5,8 +5,11 @@ import {
 } from "../src/campaign/secret-route";
 import {
   createHiddenDiscoveryState,
+  hiddenCodexEntries,
+  rollHiddenDiscovery,
   sanitizeHiddenDiscoveryState,
 } from "../src/discovery/hidden-content";
+import { currentHiddenDiscoveryPresentation } from "../src/discovery/hidden-discovery-presentation";
 
 describe("secret Campaign route", () => {
   it("restores the same secret nodes after a serialized save/load round trip", () => {
@@ -28,6 +31,44 @@ describe("secret Campaign route", () => {
       "open-black-market",
       "open-hidden-station",
     ]);
+  });
+
+  it("publishes a cloned presentation snapshot from the canonical Codex/load path", () => {
+    const state = createHiddenDiscoveryState("campaign-secret-bridge");
+    state.discovered = ["black-market-signal", "hidden-station-signal"];
+    state.discoveryStages = {
+      "black-market-signal": 25,
+      "hidden-station-signal": 40,
+    };
+
+    hiddenCodexEntries(state);
+    const first = currentHiddenDiscoveryPresentation();
+    expect(first?.seedIdentity).toBe("campaign-secret-bridge");
+    expect(first?.discovered).toEqual([
+      "black-market-signal",
+      "hidden-station-signal",
+    ]);
+
+    first?.discovered.pop();
+    expect(currentHiddenDiscoveryPresentation()?.discovered).toEqual([
+      "black-market-signal",
+      "hidden-station-signal",
+    ]);
+  });
+
+  it("publishes the resolved roll instead of the pre-roll state", () => {
+    const state = createHiddenDiscoveryState("campaign-secret-roll-bridge");
+    const result = rollHiddenDiscovery(state, 25, 0, () => 0);
+
+    expect(result.discovery?.id).toBe("black-market-signal");
+    expect(currentHiddenDiscoveryPresentation()?.discovered).toEqual([
+      "black-market-signal",
+    ]);
+    expect(
+      currentHiddenDiscoveryPresentation()?.discoveryStages[
+        "black-market-signal"
+      ],
+    ).toBe(25);
   });
 
   it("does not expose or select a secret location before it is discovered", () => {
