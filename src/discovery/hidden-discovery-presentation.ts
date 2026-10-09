@@ -4,6 +4,7 @@ export const HIDDEN_DISCOVERY_PRESENTATION_EVENT =
   "space-typing:hidden-discovery";
 
 let currentState: HiddenDiscoveryState | null = null;
+let currentRouteKey = "";
 
 function cloneState(state: HiddenDiscoveryState): HiddenDiscoveryState {
   return {
@@ -26,6 +27,20 @@ function cloneState(state: HiddenDiscoveryState): HiddenDiscoveryState {
   };
 }
 
+function routeKey(state: HiddenDiscoveryState): string {
+  return [
+    state.seedIdentity,
+    String(state.lastRollStage),
+    state.lastRollIdentity ?? "",
+    state.discovered
+      .map(
+        (id) =>
+          id + "@" + String(state.discoveryStages[id] ?? 0),
+      )
+      .join(","),
+  ].join("|");
+}
+
 /**
  * Read-only bridge for presentation-only consumers that cannot own Campaign
  * persistence. The canonical discovery owner still lives in HiddenDiscoveryState;
@@ -34,7 +49,10 @@ function cloneState(state: HiddenDiscoveryState): HiddenDiscoveryState {
 export function publishHiddenDiscoveryPresentation(
   state: HiddenDiscoveryState,
 ): void {
+  const nextRouteKey = routeKey(state);
   currentState = cloneState(state);
+  if (nextRouteKey === currentRouteKey) return;
+  currentRouteKey = nextRouteKey;
   if (typeof window === "undefined") return;
   window.dispatchEvent(
     new CustomEvent(HIDDEN_DISCOVERY_PRESENTATION_EVENT),
