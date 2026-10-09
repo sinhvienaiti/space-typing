@@ -1,3 +1,4 @@
+import { stageSeed } from "../campaign/stage";
 import { clamp } from "../logic";
 import {
   createHiddenEncounterState,
@@ -8,6 +9,7 @@ import {
 
 export const HIDDEN_CONTENT_IDS = [
   "black-market-signal",
+  "hidden-station-signal",
   "echo-rift",
   "void-warden",
   "phase-lance",
@@ -18,6 +20,7 @@ export const HIDDEN_CONTENT_IDS = [
 export type HiddenContentId = (typeof HIDDEN_CONTENT_IDS)[number];
 export type HiddenContentKind =
   | "shop"
+  | "station"
   | "event"
   | "boss"
   | "skill"
@@ -61,6 +64,22 @@ export const HIDDEN_CONTENT_REGISTRY: Record<
     baseChance: 0.012,
     maxChance: 0.1,
     guaranteeAfter: 26,
+  },
+  "hidden-station-signal": {
+    id: "hidden-station-signal",
+    kind: "station",
+    name: "Hidden Station Signal",
+    description:
+      "A low-power navigation beacon reveals a concealed rest station outside the numbered route.",
+    unlock: {
+      type: "station",
+      id: "hidden-station",
+      label: "Hidden Station route",
+    },
+    minStage: 40,
+    baseChance: 0.01,
+    maxChance: 0.085,
+    guaranteeAfter: 28,
   },
   "echo-rift": {
     id: "echo-rift",
@@ -300,6 +319,32 @@ export function hiddenDiscoveryChance(
     definition.baseChance * luckMultiplier + droughtBonus,
     definition.baseChance,
     definition.maxChance,
+  );
+}
+
+function hiddenDiscoveryRandom(stage: number): () => number {
+  let value = (stageSeed(stage) ^ 0x48494444) >>> 0;
+
+  return () => {
+    value = (value + 0x6d2b79f5) >>> 0;
+    let next = value;
+    next = Math.imul(next ^ (next >>> 15), next | 1);
+    next ^= next + Math.imul(next ^ (next >>> 7), next | 61);
+    return ((next ^ (next >>> 14)) >>> 0) / 0x100000000;
+  };
+}
+
+export function rollDeterministicHiddenDiscovery(
+  input: HiddenDiscoveryState,
+  stage: number,
+  luck: number,
+): HiddenDiscoveryRoll {
+  const safeStage = Math.floor(clamp(stage, 1, 1000));
+  return rollHiddenDiscovery(
+    input,
+    safeStage,
+    luck,
+    hiddenDiscoveryRandom(safeStage),
   );
 }
 
