@@ -6,6 +6,7 @@ import {
   sanitizeHiddenEncounterState,
   type HiddenEncounterState,
 } from "./hidden-encounter";
+import { publishHiddenDiscoveryPresentation } from "./hidden-discovery-presentation";
 
 export const HIDDEN_CONTENT_IDS = [
   "black-market-signal",
@@ -234,6 +235,11 @@ function legacySeedIdentity(state: Pick<
   return `legacy-${hash.toString(16).padStart(8, "0")}`;
 }
 
+function publishState(state: HiddenDiscoveryState): HiddenDiscoveryState {
+  publishHiddenDiscoveryPresentation(state);
+  return state;
+}
+
 export function hiddenDiscoveryRollIdentity(
   seedIdentity: string,
   stage: number,
@@ -260,7 +266,7 @@ export function sanitizeHiddenDiscoveryState(
 ): HiddenDiscoveryState {
   const result = createHiddenDiscoveryState();
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    return result;
+    return publishState(result);
   }
 
   const raw = value as {
@@ -333,7 +339,7 @@ export function sanitizeHiddenDiscoveryState(
   result.discoveryStages = discoveryStages;
 
   result.encounter = sanitizeHiddenEncounterState(raw.encounter);
-  return result;
+  return publishState(result);
 }
 
 export function isValidHiddenDiscoveryState(
@@ -496,6 +502,7 @@ export function rollHiddenDiscovery(
     random ?? hiddenDiscoveryRandom(state.seedIdentity, safeStage);
 
   if (safeStage <= state.lastRollStage) {
+    publishHiddenDiscoveryPresentation(state);
     return { state, discovery: null, rolled: false };
   }
 
@@ -558,19 +565,22 @@ export function rollHiddenDiscovery(
     discoveryStages[discovery.id] = safeStage;
   }
 
+  const nextState: HiddenDiscoveryState = {
+    discovered: nextDiscovered,
+    discoveryStages,
+    drought,
+    seedIdentity: state.seedIdentity,
+    lastRollStage: safeStage,
+    lastRollIdentity: hiddenDiscoveryRollIdentity(
+      state.seedIdentity,
+      safeStage,
+    ),
+    encounter: state.encounter,
+  };
+  publishHiddenDiscoveryPresentation(nextState);
+
   return {
-    state: {
-      discovered: nextDiscovered,
-      discoveryStages,
-      drought,
-      seedIdentity: state.seedIdentity,
-      lastRollStage: safeStage,
-      lastRollIdentity: hiddenDiscoveryRollIdentity(
-        state.seedIdentity,
-        safeStage,
-      ),
-      encounter: state.encounter,
-    },
+    state: nextState,
     discovery,
     rolled: true,
   };
