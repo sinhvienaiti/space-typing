@@ -8,6 +8,7 @@ import {
 import {
   createHistoricalAnalyticsState,
   sanitizeHistoricalAnalyticsState,
+  sanitizeHistoricalEvent,
   upsertHistoricalRunEvent,
   type HistoricalAnalyticsState,
 } from "./historical-analytics";
@@ -242,39 +243,35 @@ export function recordExpansionRun(
 ): ExpansionV2Profile {
   if (profile.processedRunIds.includes(input.runId)) return profile;
 
-  const score = Math.max(0, Number.isFinite(input.score) ? input.score : 0);
-  const base: ExpansionV2Profile = {
+  const now = input.occurredAtMs ?? Date.now();
+  const event = sanitizeHistoricalEvent({
+    version: 1,
+    eventId: "expedition-run:" + input.runId + ":terminal",
+    occurredAtMs: now,
+    kind: "run-settled",
+    runId: input.runId,
+    outcome: input.completed ? "completed" : "unknown",
+    score: input.score,
+    accuracyPercent: null,
+    activeSeconds: null,
+    challengeKind: null,
+    retryCount: null,
+    retried: null,
+    assisted: null,
+    leaderboardEligible: null,
+  });
+  if (event === null) return profile;
+
+  return {
     ...profile,
     completedRuns:
       profile.completedRuns + (input.completed ? 1 : 0),
-    bestScore: Math.max(profile.bestScore, score),
+    bestScore: Math.max(profile.bestScore, event.score),
     processedRunIds: [
       ...profile.processedRunIds,
       input.runId,
     ].slice(-256),
-  };
-
-  const now = input.occurredAtMs ?? Date.now();
-  if (!Number.isSafeInteger(now) || now < 0) return base;
-
-  return {
-    ...base,
-    history: upsertHistoricalRunEvent(base.history, {
-      version: 1,
-      eventId: "expedition-run:" + input.runId + ":terminal",
-      occurredAtMs: now,
-      kind: "run-settled",
-      runId: input.runId,
-      outcome: input.completed ? "completed" : "unknown",
-      score,
-      accuracyPercent: null,
-      activeSeconds: null,
-      challengeKind: null,
-      retryCount: null,
-      retried: null,
-      assisted: null,
-      leaderboardEligible: null,
-    }),
+    history: upsertHistoricalRunEvent(profile.history, event),
   };
 }
 
