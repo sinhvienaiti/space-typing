@@ -3852,21 +3852,6 @@ export class Game {
     }
     this.backgroundStage?.setWorld(nextWorld.id);
 
-    if (hiddenEncounterRuntime === null) {
-      const hiddenRoll = rollHiddenDiscovery(
-        this.hiddenDiscovery,
-        stage.stage,
-        this.playerStats.luck,
-      );
-      if (hiddenRoll.rolled) {
-        this.hiddenDiscovery = hiddenRoll.state;
-        this.hooks.onHiddenDiscoveryUpdate(
-          hiddenRoll.state,
-          hiddenRoll.discovery,
-        );
-      }
-    }
-
     this.stageEvents = [
       ...galaxyStageModifiers(stage),
       ...scheduleStageRandomEvents(
@@ -5900,6 +5885,21 @@ export class Game {
     });
     if (!requiredObjectiveAllowsFinish(this.stageObjective)) {
       return;
+    }
+
+    if (this.hiddenEncounterRuntime === null && this.stageConfig !== null) {
+      const hiddenRoll = rollHiddenDiscovery(
+        this.hiddenDiscovery,
+        this.stageConfig.stage,
+        this.playerStats.luck,
+      );
+      if (hiddenRoll.rolled) {
+        this.hiddenDiscovery = hiddenRoll.state;
+        this.hooks.onHiddenDiscoveryUpdate(
+          hiddenRoll.state,
+          hiddenRoll.discovery,
+        );
+      }
     }
 
     this.flushCombatCreditPresentation();
