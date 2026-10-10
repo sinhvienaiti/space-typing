@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   MusicController,
   type AudioLike,
@@ -36,6 +36,12 @@ class FakeAudio implements AudioLike {
   }
 
   load(): void {}
+
+  emit(type: string): void {
+    for (const listener of [...(this.listeners.get(type) ?? [])]) {
+      listener(new Event(type));
+    }
+  }
 
   addEventListener(type: string, listener: EventListener): void {
     const set = this.listeners.get(type) ?? new Set<EventListener>();
@@ -83,7 +89,7 @@ describe("M08 MusicController", () => {
     controller.transitionTo("WORLD_NORMAL", 0);
 
     const music = created.find((audio) =>
-      audio.src.includes("/local-assets/music/world-01.ogg"),
+      audio.src.includes("/assets/audio/music/songs/"),
     );
     const ambient = created.find((audio) =>
       audio.src.includes("/local-assets/ambient/world-01.ogg"),
@@ -152,6 +158,7 @@ describe("M08 MusicController", () => {
 
   it("falls back from a missing local path to the repository default", async () => {
     const created: FakeAudio[] = [];
+    // Legacy tracks (no song library): local override first, then default.
     const controller = new MusicController((src) => {
       const audio = new FakeAudio(src);
       if (
@@ -162,7 +169,7 @@ describe("M08 MusicController", () => {
       }
       created.push(audio);
       return audio;
-    });
+    }, { tracks: [] });
 
     controller.transitionTo("WORLD_NORMAL", 0);
     await Promise.resolve();
@@ -175,6 +182,70 @@ describe("M08 MusicController", () => {
       ),
     ).toBe(true);
     controller.destroy();
+  });
+
+  it("switches World 01 between its calm and intense stems at the same position", () => {
+    const created: FakeAudio[] = [];
+    const controller = new MusicController((src) => {
+      const audio = new FakeAudio(src);
+      created.push(audio);
+      return audio;
+    });
+    controller.setWorldProfile(musicProfileForWorld("world-01"));
+    controller.transitionTo("WORLD_NORMAL", 0);
+    const calm = created.at(-1)!;
+    expect(calm.src).toContain("/songs/signal-in-the-void/calm.ogg");
+    calm.currentTime = 42.5;
+
+    controller.transitionTo("WORLD_INTENSE", 0);
+    const intense = created.at(-1)!;
+    expect(intense.src).toContain("/songs/signal-in-the-void/intense.ogg");
+    expect(intense.currentTime).toBeCloseTo(42.5);
+
+    // A special state is a different song: it starts from the top.
+    intense.currentTime = 12;
+    controller.transitionTo("WORLD_BOSS", 0);
+    expect(created.at(-1)!.currentTime).toBe(0);
+    controller.destroy();
+  });
+
+  it("re-matches the stem position once playback really starts", () => {
+    vi.stubGlobal("window", {
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      setInterval: vi.fn(() => 1),
+      clearInterval: vi.fn(),
+      setTimeout: vi.fn(() => 1),
+      clearTimeout: vi.fn(),
+    });
+    try {
+      const created: FakeAudio[] = [];
+      const controller = new MusicController((src) => {
+        const audio = new FakeAudio(src);
+        created.push(audio);
+        return audio;
+      });
+      controller.setWorldProfile(musicProfileForWorld("world-01"));
+      controller.transitionTo("WORLD_NORMAL", 0);
+      const calm = created.at(-1)!;
+      calm.currentTime = 30;
+
+      // A real crossfade: the calm stem keeps playing while the intense one loads.
+      controller.transitionTo("WORLD_INTENSE", 1.8);
+      const intense = created.at(-1)!;
+      expect(intense.currentTime).toBeCloseTo(30);
+      calm.currentTime = 30.4;
+      intense.emit("playing");
+      expect(intense.currentTime).toBeCloseTo(30.4);
+
+      // Only once: a later seek or loop is left alone.
+      calm.currentTime = 55;
+      intense.emit("playing");
+      expect(intense.currentTime).toBeCloseTo(30.4);
+      controller.destroy();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("switches state without leaving the retired track playing", () => {

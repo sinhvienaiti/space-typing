@@ -1,6 +1,6 @@
 # Campaign Map, Checkpoint Services and Auto-Discovered Hidden Stops
 
-Status: **partially implemented**. The World journey/map and contextual title-menu icons were implemented in PR #85. This PR implements new combat-only sectors, old-route transition, and guaranteed checkpoint rest hubs. **Rare automatic Hidden Shop/Station discovery, full sector detail merging, contextual HUD resource help and real-browser QA remain pending.** Do not mark the complete redesign finished until all acceptance checks pass.
+Status: **COMPLETE / ACCEPTED (R01).** The World journey/map and contextual title-menu icons were implemented in PR #85. This branch completes combat-only sectors, old-route transition, guaranteed checkpoint rest hubs, seeded automatic Hidden Shop/Station discovery and arrival, the merged ten-stage sector detail, and contextual HUD/resource help. Unit/integration coverage protects the persistence and interaction contracts. `pnpm visual:r01-qa` now performs real-Chrome desktop/mobile structural captures and fails on R01 DOM/accessibility/page-error regressions. CI #1819 passes Test, Build and the browser gate at commit `e48194bbc72fdf055805e472bf5c862204ced44a`; the CI-generated desktop/mobile captures were also reviewed for hierarchy/readability and accepted. No horizontal clipping or control overlap was observed; the mobile sector collapses cleanly to a 5 × 2 rail while the desktop keeps the full ten-stage rail.
 
 Existing in-progress sectors with recorded Combat/Shop/Station choices continue in legacy compatibility mode until the next ten-stage checkpoint; untouched legacy graphs migrate to combat-only.
 
@@ -55,4 +55,34 @@ Existing in-progress sectors with recorded Combat/Shop/Station choices continue 
 6. The 20-stage World journey map has numbered path nodes, player/ship position, visually distinct state, Boss and checkpoint landmarks, keyboard navigation and responsive layout.
 7. The Route detail panel no longer implies 2-3 shop/station alternatives at ordinary stages or places unexplained Shop/Station/Start actions beneath unrelated map rows.
 8. Tooltip help works with mouse, keyboard and touch and does not overlap gameplay text.
-9. Child Test/TypeScript/Build/CI pass; final real-browser desktop/mobile manual QA confirms the flow and readable visual hierarchy.
+9. Child Test/TypeScript/Build/CI pass; final real-browser desktop/mobile QA confirms the structural flow and readable visual hierarchy.
+
+All nine acceptance areas are covered by the current implementation, focused unit/integration tests, CI #1819 and the real-browser capture review. The browser probe is structural rather than a replacement for future exploratory player testing; later device-specific visual findings should be treated as normal regressions.
+
+## 7. R01 real-browser QA
+
+Run the dedicated browser gate from `games/space-typing` after `pnpm install`:
+
+```bash
+pnpm visual:r01-qa
+```
+
+The command starts an isolated Vite server on `127.0.0.1:3098`, waits for application initialization, opens the Campaign Map in real headless Chrome, and captures both target layouts:
+
+- `.visual/r01-desktop.png` — `1642 × 799` CSS px at DPR 2.
+- `.visual/r01-mobile.png` — `390 × 844` CSS px at DPR 2.
+
+The probe fails when the Campaign Map is not open, the World does not contain 20 stage nodes, the current sector does not contain ten combat stages plus Boss/Rest Hub landmarks, normal Shop/Station buttons leak back into the sector detail, keyboard focus contracts disappear, the contextual resource help targets disappear, the desktop/mobile sector rail uses the wrong responsive column count, the document overflows horizontally, or Chrome reports a page/console error.
+
+### Accepted evidence — CI #1819
+
+At commit `e48194bbc72fdf055805e472bf5c862204ced44a`:
+
+- 257 / 257 test files passed; 1659 / 1659 tests passed;
+- TypeScript and production Build passed;
+- desktop browser probe: 20 World nodes, 10 sector stages, 10-column sector rail, Boss landmark present, Rest Hub landmark present, 8 contextual resource-help targets, keyboard node focus working, horizontal overflow `0`;
+- mobile browser probe: 20 World nodes, 10 sector stages, 5-column sector rail, Boss landmark present, Rest Hub landmark present, 8 contextual resource-help targets, keyboard node focus working, horizontal overflow `0`;
+- artifact `r01-campaign-map-38034688724` (artifact id `11663324773`) contains both screenshots plus the Vite log;
+- AI screenshot review accepted both layouts: hierarchy is readable, controls do not overlap, desktop preserves the full Campaign/sector hierarchy, and mobile wraps into a usable single-column scroll without horizontal clipping.
+
+The isolated Vite browser run logs a fallback-vocabulary warning because the parent shared vocabulary endpoint is not mounted there. The bundled vocabulary fallback succeeds; this warning is outside the R01 Campaign Map contract and does not fail the browser gate.

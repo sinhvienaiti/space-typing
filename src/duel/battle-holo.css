@@ -1,0 +1,243 @@
+/*
+ * Duel HUD in the Holo Command style (all Duel modes: Practice, rooms,
+ * Ranked). A fighting-game "versus" bar: YOU top-left, RIVAL top-right
+ * (mirrored), the match clock in the middle. Each card shows the pilot's
+ * hull art (--ship-art, set in battle-ui.ts), a thick Hull bar, Shield,
+ * Energy and Initiative. Loaded after battle.css and battle-juice.css.
+ */
+
+/* ---------- Clock in the middle ---------- */
+.duel-battle .duel-topbar {
+  top: clamp(8px, 1vw, 14px);
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  gap: 0.9rem;
+  padding: 0.45rem 1rem;
+  border: 1px solid rgba(111, 231, 255, 0.24);
+  border-radius: 0;
+  background: linear-gradient(180deg, rgba(10, 22, 44, 0.86), rgba(5, 11, 26, 0.8));
+  clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0 50%);
+  box-shadow: inset 0 1px 0 rgba(160, 240, 255, 0.16);
+}
+.duel-battle .duel-topbar .duel-phase-block { text-align: center; min-width: 92px; }
+.duel-battle .duel-topbar .duel-phase-block span {
+  color: var(--holo-accent, #5fe3ff);
+  font-family: var(--holo-display);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+}
+.duel-battle .duel-topbar .duel-phase-block strong {
+  font-family: var(--holo-display);
+  font-size: clamp(1.15rem, 1.6vw, 1.45rem);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #fff;
+  text-shadow: 0 0 12px rgba(95, 227, 255, 0.45);
+}
+.duel-battle .duel-topbar .duel-hazard-warning {
+  max-width: 140px;
+  font-family: var(--holo-display);
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #9fb8cc;
+}
+.duel-battle .duel-topbar .duel-series small {
+  font-family: var(--holo-display);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #ffe9a8;
+}
+
+/* ---------- Status cards ---------- */
+.duel-battle .duel-arena .duel-player-card {
+  --card-accent: 95, 227, 255;
+  position: absolute;
+  z-index: 25;
+  width: clamp(230px, 21vw, 320px);
+  display: grid;
+  gap: 0.32rem;
+  padding: 0.55rem 0.75rem 0.6rem;
+  border: 1px solid rgba(var(--card-accent), 0.32);
+  border-radius: 0;
+  background:
+    radial-gradient(ellipse at 0% 0%, rgba(var(--card-accent), 0.14), transparent 60%),
+    linear-gradient(180deg, rgba(10, 22, 44, 0.86), rgba(5, 11, 26, 0.82));
+  backdrop-filter: blur(8px) saturate(1.2);
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+  box-shadow: inset 0 1px 0 rgba(200, 245, 255, 0.14);
+}
+.duel-battle .duel-arena .duel-opponent-card {
+  --card-accent: 255, 93, 143;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+}
+/* Versus layout: YOU top-left, RIVAL top-right. */
+.duel-battle .duel-self-zone .duel-player-card {
+  top: clamp(8px, 1vw, 14px);
+  bottom: auto;
+  left: clamp(8px, 1vw, 14px);
+}
+.duel-battle .duel-rival-zone .duel-player-card {
+  top: clamp(8px, 1vw, 14px);
+  left: auto;
+  right: clamp(8px, 1vw, 14px);
+}
+
+/* Heading: portrait, side label, play style. */
+.duel-battle .duel-arena .duel-player-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 0;
+  margin: 0 0 0.1rem;
+}
+.duel-battle .duel-arena .duel-opponent-card .duel-player-heading { flex-direction: row-reverse; }
+.duel-card-portrait {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 2px solid rgba(var(--card-accent), 0.85);
+  background:
+    var(--ship-art, none) center / 82% no-repeat,
+    radial-gradient(circle at 50% 40%, rgba(var(--card-accent), 0.35), rgba(4, 10, 24, 0.95) 70%);
+  box-shadow: 0 0 12px rgba(var(--card-accent), 0.55);
+}
+.duel-opponent-card .duel-card-portrait { transform: scaleY(-1); }
+.duel-battle .duel-arena .duel-player-heading span {
+  font-family: var(--holo-display);
+  font-size: 1rem;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0.12em;
+  color: #fff;
+  text-shadow: 0 0 10px rgba(var(--card-accent), 0.7);
+}
+.duel-battle .duel-arena .duel-player-heading strong {
+  margin-left: auto;
+  padding: 2px 8px;
+  font-family: var(--holo-display);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: rgb(var(--card-accent));
+  border: 1px solid rgba(var(--card-accent), 0.5);
+  background: rgba(var(--card-accent), 0.1);
+}
+.duel-battle .duel-arena .duel-opponent-card .duel-player-heading strong { margin-left: 0; margin-right: auto; }
+
+/* Bars: Hull thick, Shield medium, Energy thin. */
+.duel-battle .duel-arena .duel-resource-row {
+  grid-template-columns: 50px minmax(0, 1fr) 76px;
+  gap: 0.4rem;
+  align-items: center;
+  font-family: var(--holo-display);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9fb8cc;
+}
+.duel-battle .duel-arena .duel-resource-row > strong {
+  min-width: 0;
+  font-family: var(--holo-display);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-align: right;
+  color: #eef8ff;
+}
+.duel-battle .duel-arena .duel-opponent-card .duel-resource-row { grid-template-columns: 76px minmax(0, 1fr) 50px; }
+.duel-battle .duel-arena .duel-resource-row > strong { white-space: nowrap; }
+.duel-battle .duel-arena .duel-opponent-card .duel-resource-row > span { order: 3; text-align: right; }
+.duel-battle .duel-arena .duel-opponent-card .duel-resource-row > strong { order: 1; text-align: left; }
+.duel-battle .duel-arena .duel-opponent-card .duel-resource-row > .duel-resource-track { order: 2; }
+.duel-battle .duel-arena .duel-resource-track {
+  height: 7px;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%);
+}
+.duel-battle .duel-arena .duel-resource-row:first-of-type .duel-resource-track { height: 12px; }
+.duel-battle .duel-arena .duel-resource-row:nth-of-type(3) .duel-resource-track { height: 5px; }
+#duelSelfHullFill,
+#duelOpponentHullFill {
+  background: linear-gradient(90deg, #ff4d6d, #ff9a76 70%, #ffd2b8);
+  box-shadow: 0 0 12px rgba(255, 90, 110, 0.6);
+}
+#duelSelfShieldFill,
+#duelOpponentShieldFill {
+  background: linear-gradient(90deg, #3d8bff, #7fe8ff);
+  box-shadow: 0 0 10px rgba(95, 200, 255, 0.6);
+}
+#duelSelfEnergyFill,
+#duelOpponentEnergyFill {
+  background: linear-gradient(90deg, #ffb347, #ffe29a);
+  box-shadow: 0 0 8px rgba(255, 200, 90, 0.55);
+}
+#duelOpponentHullFill { background: linear-gradient(270deg, #ff4d6d, #ff9a76 70%, #ffd2b8); }
+#duelOpponentShieldFill { background: linear-gradient(270deg, #3d8bff, #7fe8ff); }
+#duelOpponentEnergyFill { background: linear-gradient(270deg, #ffb347, #ffe29a); }
+
+/* Initiative chip. */
+.duel-battle .duel-arena .duel-initiative {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.1rem;
+  padding: 3px 8px;
+  font-family: var(--holo-display);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #b9a3ff;
+  border: 1px solid rgba(160, 123, 255, 0.35);
+  background: rgba(160, 123, 255, 0.08);
+}
+.duel-battle .duel-arena .duel-initiative strong {
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow: 0 0 8px rgba(160, 123, 255, 0.9);
+}
+
+/* "Type to fire" help: a slim strip at the bottom, out of the clock's way. */
+.duel-battle .duel-auto-combat {
+  position: absolute;
+  top: auto;
+  bottom: clamp(8px, 1vw, 14px);
+  left: 50%;
+  right: auto;
+  z-index: 24;
+  width: auto;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.duel-battle .duel-auto-combat .duel-arsenal-help {
+  padding: 4px 14px;
+  font-family: var(--holo-display);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--holo-accent, #5fe3ff);
+  border: 1px solid rgba(111, 231, 255, 0.22);
+  background: rgba(5, 11, 26, 0.72);
+  clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 8px 100%, 0 50%);
+  white-space: nowrap;
+}
+.duel-battle .duel-auto-combat .duel-arsenal-help span { color: #9fb8cc; margin-left: 6px; }
+
+/* Narrow screens: compact cards, still on the top corners. */
+@media (max-width: 760px) {
+  .duel-battle .duel-arena .duel-player-card { width: min(46vw, 210px); padding: 0.4rem 0.5rem; }
+  .duel-card-portrait { width: 30px; height: 30px; }
+  .duel-battle .duel-arena .duel-player-heading span { font-size: 0.8rem; }
+  .duel-battle .duel-arena .duel-resource-row { grid-template-columns: 40px minmax(0, 1fr) 46px; font-size: 0.56rem; }
+  .duel-battle .duel-arena .duel-opponent-card .duel-resource-row { grid-template-columns: 46px minmax(0, 1fr) 40px; }
+  .duel-battle .duel-topbar { top: auto; bottom: 8px; }
+}
+.duel-battle .duel-arsenal.duel-auto-combat { padding: 0; border: 0; background: none; box-shadow: none; }

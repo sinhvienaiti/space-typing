@@ -1,0 +1,273 @@
+import { describe, expect, it, vi } from "vitest";
+import {
+  secretRoutePresentation,
+  secretRoutePresentationsForStage,
+} from "../src/campaign/secret-route";
+import {
+  createHiddenDiscoveryState,
+  hiddenCodexEntries,
+  rollHiddenDiscovery,
+  sanitizeHiddenDiscoveryState,
+} from "../src/discovery/hidden-content";
+import {
+  currentHiddenDiscoveryPresentation,
+  hiddenStopArrivalBetween,
+} from "../src/discovery/hidden-discovery-presentation";
+import {
+  activateSecretRoutePresentation,
+  hiddenStopArrivalButtonId,
+  hiddenStopArrivalCanPresent,
+} from "../src/ui/secret-route-map";
+
+describe("secret Campaign route", () => {
+  it("restores the same secret nodes after a serialized save/load round trip", () => {
+    const state = createHiddenDiscoveryState("campaign-secret-restore");
+    state.discovered = ["black-market-signal", "hidden-station-signal"];
+    state.discoveryStages = {
+      "black-market-signal": 25,
+      "hidden-station-signal": 40,
+    };
+
+    const before = secretRoutePresentationsForStage(35, state);
+    const restored = sanitizeHiddenDiscoveryState(
+      JSON.parse(JSON.stringify(state)),
+    );
+    const after = secretRoutePresentationsForStage(35, restored);
+
+    expect(after).toEqual(before);
+    expect(after.map((entry) => entry.action)).toEqual([
+      "open-black-market",
+      "open-hidden-station",
+    ]);
+  });
+
+  it("publishes a cloned presentation snapshot from the canonical Codex/load path", () => {
+    const state = createHiddenDiscoveryState("campaign-secret-bridge");
+    state.discovered = ["black-market-signal", "hidden-station-signal"];
+    state.discoveryStages = {
+      "black-market-signal": 25,
+      "hidden-station-signal": 40,
+    };
+
+    hiddenCodexEntries(state);
+    const first = currentHiddenDiscoveryPresentation();
+    expect(first?.seedIdentity).toBe("campaign-secret-bridge");
+    expect(first?.discovered).toEqual([
+      "black-market-signal",
+      "hidden-station-signal",
+    ]);
+
+    first?.discovered.pop();
+    expect(currentHiddenDiscoveryPresentation()?.discovered).toEqual([
+      "black-market-signal",
+      "hidden-station-signal",
+    ]);
+  });
+
+  it("publishes the resolved roll instead of the pre-roll state", () => {
+    const state = createHiddenDiscoveryState("campaign-secret-roll-bridge");
+    const result = rollHiddenDiscovery(state, 25, 0, () => 0);
+
+    expect(result.discovery?.id).toBe("black-market-signal");
+    expect(currentHiddenDiscoveryPresentation()?.discovered).toEqual([
+      "black-market-signal",
+    ]);
+    expect(
+      currentHiddenDiscoveryPresentation()?.discoveryStages[
+        "black-market-signal"
+      ],
+    ).toBe(25);
+  });
+
+  it("does not expose or select a secret location before it is discovered", () => {
+    const state = createHiddenDiscoveryState("campaign-secret-locked");
+    state.discoveryStages = {
+      "black-market-signal": 25,
+      "hidden-station-signal": 40,
+    };
+
+    expect(secretRoutePresentationsForStage(35, state)).toEqual([]);
+    expect(
+      secretRoutePresentation(35, state, "black-market-signal"),
+    ).toBeNull();
+    expect(
+      secretRoutePresentation(35, state, "hidden-station-signal"),
+    ).toBeNull();
+  });
+
+  it("rejects stale selection IDs outside the displayed World", () => {
+    const state = createHiddenDiscoveryState("campaign-secret-world");
+    state.discovered = ["black-market-signal", "hidden-station-signal"];
+    state.discoveryStages = {
+      "black-market-signal": 25,
+      "hidden-station-signal": 40,
+    };
+
+    expect(
+      secretRoutePresentation(1, state, "black-market-signal"),
+    ).toBeNull();
+    expect(
+      secretRoutePresentation(41, state, "hidden-station-signal"),
+    ).toBeNull();
+  });
+
+  it("is read-only: repeated rendering/selection cannot reroll or mutate discovery", () => {
+    const state = createHiddenDiscoveryState("campaign-secret-readonly");
+    state.discovered = ["black-market-signal", "hidden-station-signal"];
+    state.discoveryStages = {
+      "black-market-signal": 25,
+      "hidden-station-signal": 40,
+    };
+    state.lastRollStage = 40;
+    state.lastRollIdentity = "campaign-secret-readonly:stage-40";
+    const snapshot = JSON.stringify(state);
+
+    const first = secretRoutePresentationsForStage(35, state);
+    const second = secretRoutePresentationsForStage(35, state);
+    const shop = secretRoutePresentation(35, state, "black-market-signal");
+    const station = secretRoutePresentation(
+      35,
+      state,
+      "hidden-station-signal",
+    );
+
+    expect(first).toEqual(second);
+    expect(shop?.actionLabel).toBe("Enter Black Market");
+    expect(station?.actionLabel).toBe("Dock at Hidden Station");
+    expect(JSON.stringify(state)).toBe(snapshot);
+  });
+
+  it("keeps malformed duplicate discovery input from producing duplicate route nodes", () => {
+    const state = sanitizeHiddenDiscoveryState({
+      discovered: [
+        "black-market-signal",
+        "black-market-signal",
+        "hidden-station-signal",
+        "hidden-station-signal",
+      ],
+      discoveryStages: {
+        "black-market-signal": 25,
+        "hidden-station-signal": 40,
+      },
+      drought: {},
+      seedIdentity: "campaign-secret-dedupe",
+      lastRollStage: 40,
+      encounter: null,
+    });
+
+    const nodes = secretRoutePresentationsForStage(35, state);
+    expect(nodes.map((entry) => entry.node.id)).toEqual([
+      "black-market-signal",
+      "hidden-station-signal",
+    ]);
+  });
+
+  it("routes a discovered Rest Stop directly to the station flow exactly once", () => {
+    const state = createHiddenDiscoveryState("campaign-rest-stop-activation");
+    state.discovered = ["hidden-station-signal"];
+    state.discoveryStages = { "hidden-station-signal": 40 };
+    const station = secretRoutePresentation(
+      35,
+      state,
+      "hidden-station-signal",
+    );
+    expect(station?.node.kind).toBe("hidden-station");
+    expect(station?.action).toBe("open-hidden-station");
+
+    const onOpenStation = vi.fn();
+    const onPreviewRoute = vi.fn();
+    expect(
+      activateSecretRoutePresentation(station!, {
+        onOpenStation,
+        onPreviewRoute,
+      }),
+    ).toBe("station");
+    expect(onOpenStation).toHaveBeenCalledTimes(1);
+    expect(onPreviewRoute).not.toHaveBeenCalled();
+  });
+
+  it("keeps the secret-shop preview path separate from Rest Stop activation", () => {
+    const state = createHiddenDiscoveryState("campaign-secret-shop-activation");
+    state.discovered = ["black-market-signal"];
+    state.discoveryStages = { "black-market-signal": 25 };
+    const shop = secretRoutePresentation(35, state, "black-market-signal");
+    expect(shop?.node.kind).toBe("hidden-shop");
+
+    const onOpenStation = vi.fn();
+    const onPreviewRoute = vi.fn();
+    expect(
+      activateSecretRoutePresentation(shop!, {
+        onOpenStation,
+        onPreviewRoute,
+      }),
+    ).toBe("preview");
+    expect(onOpenStation).not.toHaveBeenCalled();
+    expect(onPreviewRoute).toHaveBeenCalledTimes(1);
+    expect(onPreviewRoute).toHaveBeenCalledWith(shop);
+  });
+
+  it("presents hidden-stop arrival only after clear and after checkpoint hub", () => {
+  expect(hiddenStopArrivalCanPresent(false, false)).toBe(false);
+  expect(hiddenStopArrivalCanPresent(true, true)).toBe(false);
+  expect(hiddenStopArrivalCanPresent(true, false)).toBe(true);
+});
+
+  it("does not replay a hidden-stop arrival while hydrating an existing save", () => {
+    const loaded = createHiddenDiscoveryState("campaign-arrival-hydrate");
+    loaded.discovered = ["black-market-signal"];
+    loaded.discoveryStages = { "black-market-signal": 25 };
+    loaded.lastRollStage = 25;
+    loaded.lastRollIdentity = "campaign-arrival-hydrate:stage-25";
+
+    expect(hiddenStopArrivalBetween(null, loaded)).toBeNull();
+  });
+
+  it("publishes a Rest Stop arrival only for a newly discovered station roll", () => {
+    const previous = createHiddenDiscoveryState("campaign-arrival-station");
+    previous.lastRollStage = 39;
+    previous.lastRollIdentity = "campaign-arrival-station:stage-39";
+    const next = createHiddenDiscoveryState("campaign-arrival-station");
+    next.discovered = ["hidden-station-signal"];
+    next.discoveryStages = { "hidden-station-signal": 40 };
+    next.lastRollStage = 40;
+    next.lastRollIdentity = "campaign-arrival-station:stage-40";
+
+    const arrival = hiddenStopArrivalBetween(previous, next);
+    expect(arrival).toEqual({
+      discoveryId: "hidden-station-signal",
+      stage: 40,
+      kind: "hidden-station",
+      title: "Hidden Station",
+    });
+    expect(hiddenStopArrivalButtonId(arrival!)).toBe("stationShopButton");
+    expect(hiddenStopArrivalBetween(next, next)).toBeNull();
+  });
+
+  it("routes a newly discovered hidden shop to the canonical Black Market action", () => {
+    const previous = createHiddenDiscoveryState("campaign-arrival-shop");
+    previous.lastRollStage = 24;
+    previous.lastRollIdentity = "campaign-arrival-shop:stage-24";
+    const next = createHiddenDiscoveryState("campaign-arrival-shop");
+    next.discovered = ["black-market-signal"];
+    next.discoveryStages = { "black-market-signal": 25 };
+    next.lastRollStage = 25;
+    next.lastRollIdentity = "campaign-arrival-shop:stage-25";
+
+    const arrival = hiddenStopArrivalBetween(previous, next);
+    expect(arrival?.kind).toBe("hidden-shop");
+    expect(hiddenStopArrivalButtonId(arrival!)).toBe("blackMarketButton");
+  });
+
+  it("does not create an arrival card for non-stop hidden discoveries", () => {
+    const previous = createHiddenDiscoveryState("campaign-arrival-other");
+    previous.lastRollStage = 49;
+    previous.lastRollIdentity = "campaign-arrival-other:stage-49";
+    const next = createHiddenDiscoveryState("campaign-arrival-other");
+    next.discovered = ["echo-rift"];
+    next.discoveryStages = { "echo-rift": 50 };
+    next.lastRollStage = 50;
+    next.lastRollIdentity = "campaign-arrival-other:stage-50";
+
+    expect(hiddenStopArrivalBetween(previous, next)).toBeNull();
+  });
+});

@@ -4,24 +4,6 @@ import {
 } from "./mix";
 
 export const SAMPLE_SFX = {
-  "player-fire": {
-    path: "/assets/audio/sfx/kenney/explosion-crunch.ogg",
-    group: "typing",
-    gain: 0.28,
-    poolSize: 6,
-  },
-  "player-hit": {
-    path: "/assets/audio/sfx/kenney/force-field.ogg",
-    group: "combat",
-    gain: 0.16,
-    poolSize: 4,
-  },
-  "player-kill": {
-    path: "/assets/audio/sfx/kenney/explosion-low.ogg",
-    group: "combat",
-    gain: 0.34,
-    poolSize: 3,
-  },
   "projectile-intercept": {
     path: "/assets/audio/sfx/kenney/laser-small.ogg",
     group: "combat",
@@ -75,6 +57,159 @@ export const SAMPLE_SFX = {
     group: "warnings",
     gain: 0.38,
     poolSize: 3,
+  },
+  "victory-stinger": {
+    path: "/assets/audio/stingers/victory.ogg",
+    group: "ui",
+    gain: 0.52,
+    poolSize: 1,
+  },
+  "credit-drop": {
+    path: "/assets/audio/sfx/kenney/confirm.ogg",
+    group: "combat",
+    gain: 0.22,
+    poolSize: 4,
+  },
+  "credit-pickup": {
+    path: "/assets/audio/sfx/kenney/confirm.ogg",
+    group: "combat",
+    gain: 0.34,
+    poolSize: 5,
+  },
+
+  // Duel FINAL V2 media pack. These files are installed under
+  // public/assets/audio/duel/sfx by the media package.
+  "duel-typing-miss": {
+    path: "/assets/audio/duel/sfx/typing-miss.ogg",
+    group: "typing",
+    gain: 0.5,
+    poolSize: 3,
+  },
+  "duel-laser-launch": {
+    path: "/assets/audio/duel/sfx/laser-launch.ogg",
+    group: "combat",
+    gain: 0.55,
+    poolSize: 4,
+  },
+  "duel-missile-launch": {
+    path: "/assets/audio/duel/sfx/missile-launch.ogg",
+    group: "combat",
+    gain: 0.58,
+    poolSize: 3,
+  },
+  "duel-heavy-launch": {
+    path: "/assets/audio/duel/sfx/heavy-launch.ogg",
+    group: "combat",
+    gain: 0.62,
+    poolSize: 3,
+  },
+  "duel-bomb-launch": {
+    path: "/assets/audio/duel/sfx/bomb-launch.ogg",
+    group: "combat",
+    gain: 0.62,
+    poolSize: 3,
+  },
+  "duel-energy-impact": {
+    path: "/assets/audio/duel/sfx/energy-impact.ogg",
+    group: "combat",
+    gain: 0.58,
+    poolSize: 4,
+  },
+  "duel-kinetic-impact": {
+    path: "/assets/audio/duel/sfx/kinetic-impact.ogg",
+    group: "combat",
+    gain: 0.62,
+    poolSize: 4,
+  },
+  "duel-missile-impact": {
+    path: "/assets/audio/duel/sfx/missile-impact.ogg",
+    group: "combat",
+    gain: 0.66,
+    poolSize: 4,
+  },
+  "duel-bomb-impact": {
+    path: "/assets/audio/duel/sfx/bomb-impact.ogg",
+    group: "combat",
+    gain: 0.7,
+    poolSize: 3,
+  },
+  "duel-shield-hit": {
+    path: "/assets/audio/duel/sfx/shield-hit.ogg",
+    group: "combat",
+    gain: 0.55,
+    poolSize: 4,
+  },
+  "duel-shield-break": {
+    path: "/assets/audio/duel/sfx/shield-break.ogg",
+    group: "warnings",
+    gain: 0.7,
+    poolSize: 3,
+  },
+  "duel-repair-energy": {
+    path: "/assets/audio/duel/sfx/repair-energy.ogg",
+    group: "combat",
+    gain: 0.48,
+    poolSize: 3,
+  },
+  "duel-lock-acquire": {
+    path: "/assets/audio/duel/sfx/lock-acquire.ogg",
+    group: "warnings",
+    gain: 0.52,
+    poolSize: 3,
+  },
+  "duel-scan-pulse": {
+    path: "/assets/audio/duel/sfx/scan-pulse.ogg",
+    group: "combat",
+    gain: 0.45,
+    poolSize: 3,
+  },
+  "duel-disrupt-emp": {
+    path: "/assets/audio/duel/sfx/disrupt-emp.ogg",
+    group: "combat",
+    gain: 0.58,
+    poolSize: 3,
+  },
+  "duel-intercept": {
+    path: "/assets/audio/duel/sfx/intercept.ogg",
+    group: "combat",
+    gain: 0.56,
+    poolSize: 4,
+  },
+  "duel-precision": {
+    path: "/assets/audio/duel/sfx/precision.ogg",
+    group: "combat",
+    gain: 0.5,
+    poolSize: 3,
+  },
+  "duel-ship-destruction": {
+    path: "/assets/audio/duel/sfx/ship-destruction.ogg",
+    group: "combat",
+    gain: 0.72,
+    poolSize: 2,
+  },
+  "duel-cataclysm": {
+    path: "/assets/audio/duel/sfx/cataclysm.ogg",
+    group: "warnings",
+    gain: 0.72,
+    poolSize: 2,
+  },
+  "duel-round-win": {
+    path: "/assets/audio/duel/sfx/round-win.ogg",
+    group: "ui",
+    gain: 0.6,
+    poolSize: 2,
+  },
+  "duel-round-loss": {
+    path: "/assets/audio/duel/sfx/round-loss.ogg",
+    group: "ui",
+    gain: 0.58,
+    poolSize: 2,
+  },
+  "duel-round-draw": {
+    path: "/assets/audio/duel/sfx/round-draw.ogg",
+    group: "ui",
+    gain: 0.55,
+    poolSize: 2,
   },
 } as const satisfies Record<
   string,

@@ -4,6 +4,15 @@ const SAMPLE_COUNT = 120;
 const MIN_SCALE = 0.72;
 
 /**
+ * Optional cheaper-first layer (the BGV background): it is degraded before
+ * gameplay resolution and restored only after gameplay is back to full scale.
+ */
+export type AdaptiveYieldLayer = {
+  stepDown(): boolean;
+  stepUp(): boolean;
+};
+
+/**
  * Adaptive *render-only* resolution. Preserve Canvas drawing complexity and
  * gameplay simulation timing; react to sustained slow frames instead of
  * permanently degrading High/Ultra on every machine.
@@ -25,7 +34,12 @@ export class AdaptiveRenderBudget {
     this.value = 1;
   }
 
-  observe(quality: VisualQuality, frameSeconds: number, drawMilliseconds: number): boolean {
+  observe(
+    quality: VisualQuality,
+    frameSeconds: number,
+    drawMilliseconds: number,
+    yieldLayer: AdaptiveYieldLayer | null = null,
+  ): boolean {
     if (quality !== "high" && quality !== "ultra") return false;
     if (!Number.isFinite(frameSeconds) || frameSeconds <= 0 || frameSeconds > 0.15 ||
         !Number.isFinite(drawMilliseconds) || drawMilliseconds < 0) {
@@ -55,6 +69,13 @@ export class AdaptiveRenderBudget {
     // main thread (draw P95) or the compositor (frame P95).
     if (frameP95 > 24 || drawP95 > 11.5) {
       this.stableSeconds = 0;
+      if (yieldLayer !== null && yieldLayer.stepDown()) {
+        // The background absorbed this step; measure again before touching
+        // gameplay resolution.
+        this.clearSamples();
+        this.timeToReview = 3.5;
+        return false;
+      }
       const next = Math.max(MIN_SCALE, Math.round((this.value - 0.12) * 100) / 100);
       if (next === this.value) return false;
       this.value = next;
@@ -73,6 +94,12 @@ export class AdaptiveRenderBudget {
         this.drawMs.length = 0;
         this.timeToReview = 3.5;
         return true;
+      }
+      if (this.stableSeconds >= 7 && yieldLayer !== null && yieldLayer.stepUp()) {
+        this.stableSeconds = 0;
+        this.clearSamples();
+        this.timeToReview = 3.5;
+        return false;
       }
     } else {
       this.stableSeconds = 0;

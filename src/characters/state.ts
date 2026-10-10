@@ -85,8 +85,7 @@ export function sanitizeCharacterState(value: unknown): CharacterState {
   const unlocked = sanitizeUnlocked(raw.unlocked);
   const selected =
     typeof raw.selected === "string" &&
-    isCharacterId(raw.selected) &&
-    unlocked.includes(raw.selected)
+    isCharacterId(raw.selected)
       ? raw.selected
       : "vanguard";
 
@@ -127,7 +126,9 @@ export function isValidLegacyCharacterState(value: unknown): boolean {
     seen.add(id);
   }
 
-  return seen.has("vanguard") && seen.has(raw.selected);
+  // "unlocked" remains progression/discovery metadata only. A ship may be
+  // selected for gameplay before its historical milestone has been cleared.
+  return seen.has("vanguard");
 }
 
 function isValidPreTalentProgress(value: unknown): boolean {
@@ -233,8 +234,9 @@ export function selectCharacter(
   state: CharacterState,
   id: CharacterId,
 ): CharacterState {
-  if (!state.unlocked.includes(id)) return state;
-
+  // Ship selection is independent of Campaign unlock milestones. Keep the
+  // unlocked list unchanged because Codex/meta progression still uses it as
+  // discovery/progression data.
   return {
     selected: id,
     unlocked: [...state.unlocked],

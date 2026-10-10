@@ -58,16 +58,6 @@
       "attributionRequired": false
     },
     {
-      "id": "player-projectile-atlas-v1",
-      "category": "projectile",
-      "sourceType": "generated",
-      "source": "Approved projectile concept art converted into a 3x4 runtime atlas",
-      "author": "Space Typing project with OpenAI image generation",
-      "license": "Project-original generated asset; review provenance before public distribution",
-      "attributionRequired": false,
-      "url": "/assets/space-typing/projectiles/player-projectiles-v1.webp"
-    },
-    {
       "id": "reward-crates",
       "category": "crate",
       "sourceType": "procedural",
@@ -182,6 +172,24 @@
       "source": "src/enemies/renderer.ts + src/boss/visual-profile.ts",
       "author": "Space Typing project",
       "license": "Project original",
+      "attributionRequired": false
+    },
+    {
+      "id": "background-kit-g01-celestial",
+      "category": "galaxy-theme",
+      "sourceType": "generated",
+      "source": "Owner-generated Google Gemini art from art-src/g01, processed by scripts/bg-art/prepare-kit.mjs on 2026-09-27; runtime kit /assets/space-typing/backgrounds/g01-celestial/kit.json",
+      "author": "Space Typing project owner",
+      "license": "Personal use only; review the image tool's terms before any public distribution",
+      "attributionRequired": false
+    },
+    {
+      "id": "shot-fx-vanguard",
+      "category": "projectile",
+      "sourceType": "generated",
+      "source": "Owner-generated Google Gemini art from art-src/fx/vanguard, processed by scripts/bg-art/prepare-fx.mjs on 2026-09-27; runtime sprites /assets/space-typing/fx/vanguard/fx.json",
+      "author": "Space Typing project owner",
+      "license": "Personal use only; review the image tool's terms before any public distribution",
       "attributionRequired": false
     }
   ]

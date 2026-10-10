@@ -13,946 +13,137 @@ export type PlayerShotArchetype =
   | "radiant"
   | "cosmic";
 
-export type PlayerProjectileStyleId =
-  | "meteor-bolt"
-  | "crescent-slash"
-  | "prism-dart"
-  | "nova-pearl"
-  | "twin-star-shot"
-  | "halo-burst"
-  | "thunder-needle"
-  | "blossom-comet"
-  | "void-spike"
-  | "solar-lance"
-  | "tidal-pearl"
-  | "aurora-ribbon";
-
-export type FlightTrailKind =
-  | "comet"
-  | "crescent"
-  | "prism"
-  | "twin-star"
-  | "halo"
-  | "thunder"
-  | "blossom"
-  | "void"
-  | "solar"
-  | "tidal"
-  | "aurora";
-
-export type FlightTrailProfile = {
-  kind: FlightTrailKind;
-  primary: string;
-  secondary: string;
-  accent: string;
-  width: number;
-  length: number;
-  detailCount: number;
-};
-
-export type ProjectileTrailProfile = {
-  headScale: number;
-  lengthScale: number;
-  frontWidthRatio: number;
-  midWidthRatio: number;
-  endWidthRatio: number;
-  outerAlpha: number;
-  coreAlpha: number;
-  coreWidthRatio: number;
-  bend: number;
-  ribbonCount: 1 | 2 | 3;
-  ribbonSpread: number;
-  sideStreakCount: number;
-};
-
-export type ProjectileHeadLightFamily =
-  | "meteor"
-  | "crescent"
+export type PlayerImpactVariant =
   | "crystal"
-  | "orb"
-  | "star"
-  | "halo"
-  | "needle"
-  | "blossom"
+  | "heavy"
+  | "storm"
   | "void"
-  | "lance"
-  | "tidal"
-  | "aurora";
-
-export type ProjectileHeadGlowProfile = {
-  family: ProjectileHeadLightFamily;
-  frontOffset: number;
-  hotCoreScale: number;
-  hotCoreAlpha: number;
-  bloomScale: number;
-  bloomAlpha: number;
-  bloomSoftness: number;
-  forwardFlareLength: number;
-  forwardFlareWidth: number;
-  forwardFlareAlpha: number;
-  frontHaloScale: number;
-  frontHaloAlpha: number;
-  trailBlendLength: number;
-  sparkleCount: number;
-  sparkleSpread: number;
-  directionalAuraLength: number;
-  directionalAuraWidth: number;
-  directionalAuraAlpha: number;
-  directionalCoreLength: number;
-  directionalCoreWidth: number;
-  directionalCoreAlpha: number;
-  directionalTipAlpha: number;
-  directionalRearAlpha: number;
-};
+  | "star"
+  | "missile"
+  | "mystic"
+  | "shield"
+  | "slash"
+  | "radiant"
+  | "cosmic";
 
 export type PlayerProjectileProfile = {
-  styleId: Exclude<PlayerProjectileStyleId, "nova-pearl">;
-  label: string;
   archetype: PlayerShotArchetype;
   primary: string;
   secondary: string;
-  accent: string;
   width: number;
   glow: number;
   impactHue: number;
-  bodyRadius: number;
-  presentationSpeed: number;
-  trailLength: number;
-  trail: ProjectileTrailProfile;
-  particleCount: number;
-  muzzleRadius: number;
-  firePitch: number;
-  hitPitch: number;
-  killPitch: number;
-  flightTrail: FlightTrailProfile;
+  /** Sound identity used when this travelling projectile lands. */
+  impactVariant: PlayerImpactVariant;
 };
 
-export const PROJECTILE_TRAIL_PROFILES: Record<
-  PlayerProjectileStyleId,
-  Readonly<ProjectileTrailProfile>
+const PLAYER_PROJECTILES: Record<
+  CharacterId,
+  PlayerProjectileProfile
 > = {
-  "meteor-bolt": {
-    headScale: 1.12,
-    lengthScale: 1.08,
-    frontWidthRatio: 0.68,
-    midWidthRatio: 0.36,
-    endWidthRatio: 0.11,
-    outerAlpha: 0.38,
-    coreAlpha: 0.92,
-    coreWidthRatio: 0.34,
-    bend: 4,
-    ribbonCount: 1,
-    ribbonSpread: 0,
-    sideStreakCount: 4,
-  },
-  "crescent-slash": {
-    headScale: 1.08,
-    lengthScale: 1.04,
-    frontWidthRatio: 0.62,
-    midWidthRatio: 0.34,
-    endWidthRatio: 0.12,
-    outerAlpha: 0.34,
-    coreAlpha: 0.88,
-    coreWidthRatio: 0.3,
-    bend: 14,
-    ribbonCount: 1,
-    ribbonSpread: 0,
-    sideStreakCount: 2,
-  },
-  "prism-dart": {
-    headScale: 1.06,
-    lengthScale: 1.06,
-    frontWidthRatio: 0.58,
-    midWidthRatio: 0.29,
-    endWidthRatio: 0.09,
-    outerAlpha: 0.32,
-    coreAlpha: 0.9,
-    coreWidthRatio: 0.28,
-    bend: 3,
-    ribbonCount: 1,
-    ribbonSpread: 0,
-    sideStreakCount: 4,
-  },
-  "nova-pearl": {
-    headScale: 1.14,
-    lengthScale: 1,
-    frontWidthRatio: 0.65,
-    midWidthRatio: 0.38,
-    endWidthRatio: 0.16,
-    outerAlpha: 0.34,
-    coreAlpha: 0.86,
-    coreWidthRatio: 0.36,
-    bend: 4,
-    ribbonCount: 1,
-    ribbonSpread: 0,
-    sideStreakCount: 3,
-  },
-  "twin-star-shot": {
-    headScale: 1.08,
-    lengthScale: 1.08,
-    frontWidthRatio: 0.58,
-    midWidthRatio: 0.31,
-    endWidthRatio: 0.1,
-    outerAlpha: 0.34,
-    coreAlpha: 0.9,
-    coreWidthRatio: 0.29,
-    bend: 8,
-    ribbonCount: 2,
-    ribbonSpread: 0.62,
-    sideStreakCount: 3,
-  },
-  "halo-burst": {
-    headScale: 1.12,
-    lengthScale: 1.02,
-    frontWidthRatio: 0.66,
-    midWidthRatio: 0.38,
-    endWidthRatio: 0.14,
-    outerAlpha: 0.36,
-    coreAlpha: 0.88,
-    coreWidthRatio: 0.35,
-    bend: 2,
-    ribbonCount: 1,
-    ribbonSpread: 0,
-    sideStreakCount: 2,
-  },
-  "thunder-needle": {
-    headScale: 1.04,
-    lengthScale: 1.1,
-    frontWidthRatio: 0.55,
-    midWidthRatio: 0.25,
-    endWidthRatio: 0.08,
-    outerAlpha: 0.3,
-    coreAlpha: 0.96,
-    coreWidthRatio: 0.24,
-    bend: 3,
-    ribbonCount: 1,
-    ribbonSpread: 0,
-    sideStreakCount: 3,
-  },
-  "blossom-comet": {
-    headScale: 1.1,
-    lengthScale: 1.06,
-    frontWidthRatio: 0.64,
-    midWidthRatio: 0.34,
-    endWidthRatio: 0.11,
-    outerAlpha: 0.34,
-    coreAlpha: 0.88,
-    coreWidthRatio: 0.31,
-    bend: 8,
-    ribbonCount: 1,
-    ribbonSpread: 0,
-    sideStreakCount: 5,
-  },
-  "void-spike": {
-    headScale: 1.08,
-    lengthScale: 1.08,
-    frontWidthRatio: 0.62,
-    midWidthRatio: 0.28,
-    endWidthRatio: 0.09,
-    outerAlpha: 0.28,
-    coreAlpha: 0.82,
-    coreWidthRatio: 0.28,
-    bend: 6,
-    ribbonCount: 1,
-    ribbonSpread: 0,
-    sideStreakCount: 4,
-  },
-  "solar-lance": {
-    headScale: 1.16,
-    lengthScale: 1.1,
-    frontWidthRatio: 0.7,
-    midWidthRatio: 0.4,
-    endWidthRatio: 0.12,
-    outerAlpha: 0.4,
-    coreAlpha: 0.96,
-    coreWidthRatio: 0.36,
-    bend: 4,
-    ribbonCount: 1,
-    ribbonSpread: 0,
-    sideStreakCount: 4,
-  },
-  "tidal-pearl": {
-    headScale: 1.12,
-    lengthScale: 1.04,
-    frontWidthRatio: 0.66,
-    midWidthRatio: 0.38,
-    endWidthRatio: 0.15,
-    outerAlpha: 0.34,
-    coreAlpha: 0.86,
-    coreWidthRatio: 0.34,
-    bend: 10,
-    ribbonCount: 2,
-    ribbonSpread: 0.42,
-    sideStreakCount: 4,
-  },
-  "aurora-ribbon": {
-    headScale: 1.14,
-    lengthScale: 1.1,
-    frontWidthRatio: 0.62,
-    midWidthRatio: 0.32,
-    endWidthRatio: 0.08,
-    outerAlpha: 0.31,
-    coreAlpha: 0.92,
-    coreWidthRatio: 0.27,
-    bend: 9,
-    ribbonCount: 3,
-    ribbonSpread: 0.42,
-    sideStreakCount: 2,
-  },
-};
-
-export const PROJECTILE_HEAD_GLOW_PROFILES: Record<
-  PlayerProjectileStyleId,
-  Readonly<ProjectileHeadGlowProfile>
-> = {
-  "meteor-bolt": {
-    family: "meteor",
-    frontOffset: 2.7,
-    hotCoreScale: 0.36,
-    hotCoreAlpha: 1,
-    bloomScale: 1.72,
-    bloomAlpha: 0.5,
-    bloomSoftness: 1.18,
-    forwardFlareLength: 3,
-    forwardFlareWidth: 0.62,
-    forwardFlareAlpha: 0.48,
-    frontHaloScale: 1.02,
-    frontHaloAlpha: 0.22,
-    trailBlendLength: 3.2,
-    sparkleCount: 3,
-    sparkleSpread: 0.82,
-    directionalAuraLength: 3.6,
-    directionalAuraWidth: 1.08,
-    directionalAuraAlpha: 0.38,
-    directionalCoreLength: 2.9,
-    directionalCoreWidth: 0.36,
-    directionalCoreAlpha: 0.72,
-    directionalTipAlpha: 0.72,
-    directionalRearAlpha: 0.2,
-  },
-  "crescent-slash": {
-    family: "crescent",
-    frontOffset: 2.55,
-    hotCoreScale: 0.3,
-    hotCoreAlpha: 0.92,
-    bloomScale: 1.4,
-    bloomAlpha: 0.38,
-    bloomSoftness: 1.05,
-    forwardFlareLength: 1.65,
-    forwardFlareWidth: 0.52,
-    forwardFlareAlpha: 0.32,
-    frontHaloScale: 0.88,
-    frontHaloAlpha: 0.2,
-    trailBlendLength: 2.5,
-    sparkleCount: 2,
-    sparkleSpread: 0.72,
-    directionalAuraLength: 2.1,
-    directionalAuraWidth: 0.82,
-    directionalAuraAlpha: 0.24,
-    directionalCoreLength: 1.55,
-    directionalCoreWidth: 0.3,
-    directionalCoreAlpha: 0.5,
-    directionalTipAlpha: 0.5,
-    directionalRearAlpha: 0.14,
-  },
-  "prism-dart": {
-    family: "crystal",
-    frontOffset: 2.85,
-    hotCoreScale: 0.29,
-    hotCoreAlpha: 0.98,
-    bloomScale: 1.42,
-    bloomAlpha: 0.41,
-    bloomSoftness: 1.08,
-    forwardFlareLength: 2.65,
-    forwardFlareWidth: 0.48,
-    forwardFlareAlpha: 0.4,
-    frontHaloScale: 0.82,
-    frontHaloAlpha: 0.18,
-    trailBlendLength: 2.8,
-    sparkleCount: 3,
-    sparkleSpread: 0.78,
-    directionalAuraLength: 3.15,
-    directionalAuraWidth: 0.78,
-    directionalAuraAlpha: 0.36,
-    directionalCoreLength: 2.65,
-    directionalCoreWidth: 0.25,
-    directionalCoreAlpha: 0.74,
-    directionalTipAlpha: 0.74,
-    directionalRearAlpha: 0.18,
-  },
-  "nova-pearl": {
-    family: "orb",
-    frontOffset: 2.35,
-    hotCoreScale: 0.37,
-    hotCoreAlpha: 0.96,
-    bloomScale: 1.7,
-    bloomAlpha: 0.46,
-    bloomSoftness: 1.2,
-    forwardFlareLength: 1.45,
-    forwardFlareWidth: 0.72,
-    forwardFlareAlpha: 0.28,
-    frontHaloScale: 1.18,
-    frontHaloAlpha: 0.3,
-    trailBlendLength: 2.8,
-    sparkleCount: 3,
-    sparkleSpread: 0.9,
-    directionalAuraLength: 1.65,
-    directionalAuraWidth: 0.96,
-    directionalAuraAlpha: 0.18,
-    directionalCoreLength: 1.2,
-    directionalCoreWidth: 0.38,
-    directionalCoreAlpha: 0.38,
-    directionalTipAlpha: 0.42,
-    directionalRearAlpha: 0.12,
-  },
-  "twin-star-shot": {
-    family: "star",
-    frontOffset: 2.55,
-    hotCoreScale: 0.32,
-    hotCoreAlpha: 0.98,
-    bloomScale: 1.52,
-    bloomAlpha: 0.43,
-    bloomSoftness: 1.12,
-    forwardFlareLength: 2.15,
-    forwardFlareWidth: 0.56,
-    forwardFlareAlpha: 0.38,
-    frontHaloScale: 0.94,
-    frontHaloAlpha: 0.2,
-    trailBlendLength: 2.9,
-    sparkleCount: 3,
-    sparkleSpread: 0.82,
-    directionalAuraLength: 2.35,
-    directionalAuraWidth: 0.96,
-    directionalAuraAlpha: 0.28,
-    directionalCoreLength: 1.75,
-    directionalCoreWidth: 0.34,
-    directionalCoreAlpha: 0.56,
-    directionalTipAlpha: 0.6,
-    directionalRearAlpha: 0.16,
-  },
-  "halo-burst": {
-    family: "halo",
-    frontOffset: 2.35,
-    hotCoreScale: 0.38,
-    hotCoreAlpha: 1,
-    bloomScale: 1.76,
-    bloomAlpha: 0.5,
-    bloomSoftness: 1.2,
-    forwardFlareLength: 2.05,
-    forwardFlareWidth: 0.7,
-    forwardFlareAlpha: 0.42,
-    frontHaloScale: 1.22,
-    frontHaloAlpha: 0.34,
-    trailBlendLength: 2.8,
-    sparkleCount: 3,
-    sparkleSpread: 0.88,
-    directionalAuraLength: 1.95,
-    directionalAuraWidth: 1.08,
-    directionalAuraAlpha: 0.23,
-    directionalCoreLength: 1.4,
-    directionalCoreWidth: 0.4,
-    directionalCoreAlpha: 0.44,
-    directionalTipAlpha: 0.52,
-    directionalRearAlpha: 0.14,
-  },
-  "thunder-needle": {
-    family: "needle",
-    frontOffset: 2.95,
-    hotCoreScale: 0.28,
-    hotCoreAlpha: 1,
-    bloomScale: 1.46,
-    bloomAlpha: 0.44,
-    bloomSoftness: 1.04,
-    forwardFlareLength: 3.15,
-    forwardFlareWidth: 0.42,
-    forwardFlareAlpha: 0.52,
-    frontHaloScale: 0.82,
-    frontHaloAlpha: 0.18,
-    trailBlendLength: 2.9,
-    sparkleCount: 3,
-    sparkleSpread: 0.7,
-    directionalAuraLength: 3.85,
-    directionalAuraWidth: 0.52,
-    directionalAuraAlpha: 0.4,
-    directionalCoreLength: 3.35,
-    directionalCoreWidth: 0.15,
-    directionalCoreAlpha: 0.84,
-    directionalTipAlpha: 0.82,
-    directionalRearAlpha: 0.18,
-  },
-  "blossom-comet": {
-    family: "blossom",
-    frontOffset: 2.4,
-    hotCoreScale: 0.34,
-    hotCoreAlpha: 0.95,
-    bloomScale: 1.58,
-    bloomAlpha: 0.43,
-    bloomSoftness: 1.15,
-    forwardFlareLength: 1.75,
-    forwardFlareWidth: 0.64,
-    forwardFlareAlpha: 0.3,
-    frontHaloScale: 0.96,
-    frontHaloAlpha: 0.22,
-    trailBlendLength: 2.7,
-    sparkleCount: 2,
-    sparkleSpread: 0.8,
-    directionalAuraLength: 1.95,
-    directionalAuraWidth: 0.88,
-    directionalAuraAlpha: 0.22,
-    directionalCoreLength: 1.4,
-    directionalCoreWidth: 0.3,
-    directionalCoreAlpha: 0.44,
-    directionalTipAlpha: 0.5,
-    directionalRearAlpha: 0.14,
-  },
-  "void-spike": {
-    family: "void",
-    frontOffset: 2.8,
-    hotCoreScale: 0.28,
-    hotCoreAlpha: 0.86,
-    bloomScale: 1.48,
-    bloomAlpha: 0.3,
-    bloomSoftness: 1.16,
-    forwardFlareLength: 2.45,
-    forwardFlareWidth: 0.5,
-    forwardFlareAlpha: 0.3,
-    frontHaloScale: 0.88,
-    frontHaloAlpha: 0.16,
-    trailBlendLength: 2.8,
-    sparkleCount: 2,
-    sparkleSpread: 0.75,
-    directionalAuraLength: 3.05,
-    directionalAuraWidth: 0.68,
-    directionalAuraAlpha: 0.3,
-    directionalCoreLength: 2.45,
-    directionalCoreWidth: 0.22,
-    directionalCoreAlpha: 0.58,
-    directionalTipAlpha: 0.62,
-    directionalRearAlpha: 0.16,
-  },
-  "solar-lance": {
-    family: "lance",
-    frontOffset: 3.05,
-    hotCoreScale: 0.4,
-    hotCoreAlpha: 1,
-    bloomScale: 1.88,
-    bloomAlpha: 0.58,
-    bloomSoftness: 1.22,
-    forwardFlareLength: 3.35,
-    forwardFlareWidth: 0.66,
-    forwardFlareAlpha: 0.56,
-    frontHaloScale: 1.08,
-    frontHaloAlpha: 0.26,
-    trailBlendLength: 3.5,
-    sparkleCount: 4,
-    sparkleSpread: 0.9,
-    directionalAuraLength: 4.1,
-    directionalAuraWidth: 0.84,
-    directionalAuraAlpha: 0.44,
-    directionalCoreLength: 3.5,
-    directionalCoreWidth: 0.23,
-    directionalCoreAlpha: 0.88,
-    directionalTipAlpha: 0.88,
-    directionalRearAlpha: 0.22,
-  },
-  "tidal-pearl": {
-    family: "tidal",
-    frontOffset: 2.4,
-    hotCoreScale: 0.36,
-    hotCoreAlpha: 0.96,
-    bloomScale: 1.68,
-    bloomAlpha: 0.44,
-    bloomSoftness: 1.18,
-    forwardFlareLength: 1.65,
-    forwardFlareWidth: 0.7,
-    forwardFlareAlpha: 0.28,
-    frontHaloScale: 1.08,
-    frontHaloAlpha: 0.26,
-    trailBlendLength: 2.9,
-    sparkleCount: 2,
-    sparkleSpread: 0.88,
-    directionalAuraLength: 1.95,
-    directionalAuraWidth: 0.98,
-    directionalAuraAlpha: 0.21,
-    directionalCoreLength: 1.45,
-    directionalCoreWidth: 0.35,
-    directionalCoreAlpha: 0.44,
-    directionalTipAlpha: 0.5,
-    directionalRearAlpha: 0.14,
-  },
-  "aurora-ribbon": {
-    family: "aurora",
-    frontOffset: 2.45,
-    hotCoreScale: 0.38,
-    hotCoreAlpha: 1,
-    bloomScale: 1.84,
-    bloomAlpha: 0.54,
-    bloomSoftness: 1.24,
-    forwardFlareLength: 2.75,
-    forwardFlareWidth: 0.66,
-    forwardFlareAlpha: 0.5,
-    frontHaloScale: 1.12,
-    frontHaloAlpha: 0.32,
-    trailBlendLength: 3.55,
-    sparkleCount: 3,
-    sparkleSpread: 0.78,
-    directionalAuraLength: 2.8,
-    directionalAuraWidth: 0.82,
-    directionalAuraAlpha: 0.32,
-    directionalCoreLength: 2.15,
-    directionalCoreWidth: 0.24,
-    directionalCoreAlpha: 0.64,
-    directionalTipAlpha: 0.68,
-    directionalRearAlpha: 0.18,
-  },
-};
-
-const PLAYER_PROJECTILES: Record<CharacterId, PlayerProjectileProfile> = {
   vanguard: {
-    styleId: "meteor-bolt",
-    label: "Meteor Bolt",
     archetype: "spear",
-    primary: "#38bfff",
+    impactVariant: "crystal",
+    primary: "#66efff",
     secondary: "#e9fdff",
-    accent: "#2468ff",
     width: 1.8,
-    glow: 1.08,
-    impactHue: 202,
-    bodyRadius: 4.2,
-    presentationSpeed: 1780,
-    trailLength: 152,
-    trail: PROJECTILE_TRAIL_PROFILES["meteor-bolt"],
-    particleCount: 5,
-    muzzleRadius: 5,
-    firePitch: 1.08,
-    hitPitch: 1.02,
-    killPitch: 1,
-    flightTrail: {
-      kind: "comet",
-      primary: "#65dcff",
-      secondary: "#eefeff",
-      accent: "#3178ff",
-      width: 5.6,
-      length: 78,
-      detailCount: 4,
-    },
+    glow: 1,
+    impactHue: 188,
   },
   aegis: {
-    styleId: "halo-burst",
-    label: "Halo Burst",
     archetype: "heavy",
-    primary: "#ffc95c",
-    secondary: "#fff6c9",
-    accent: "#ff9b38",
-    width: 2.45,
-    glow: 1,
-    impactHue: 42,
-    bodyRadius: 5.2,
-    presentationSpeed: 1480,
-    trailLength: 132,
-    trail: PROJECTILE_TRAIL_PROFILES["halo-burst"],
-    particleCount: 4,
-    muzzleRadius: 6,
-    firePitch: 0.9,
-    hitPitch: 0.92,
-    killPitch: 0.88,
-    flightTrail: {
-      kind: "halo",
-      primary: "#ffd36a",
-      secondary: "#fff8d8",
-      accent: "#ff9f43",
-      width: 5.4,
-      length: 68,
-      detailCount: 3,
-    },
+    impactVariant: "heavy",
+    primary: "#69eac7",
+    secondary: "#dffff6",
+    width: 2.5,
+    glow: 0.92,
+    impactHue: 160,
   },
   volt: {
-    styleId: "thunder-needle",
-    label: "Thunder Needle",
     archetype: "electric",
-    primary: "#4bdfff",
-    secondary: "#f2ffff",
-    accent: "#3887ff",
-    width: 1.7,
-    glow: 1.22,
-    impactHue: 205,
-    bodyRadius: 3.8,
-    presentationSpeed: 2100,
-    trailLength: 146,
-    trail: PROJECTILE_TRAIL_PROFILES["thunder-needle"],
-    particleCount: 6,
-    muzzleRadius: 5,
-    firePitch: 1.22,
-    hitPitch: 1.16,
-    killPitch: 1.1,
-    flightTrail: {
-      kind: "thunder",
-      primary: "#53e5ff",
-      secondary: "#f3ffff",
-      accent: "#3978ff",
-      width: 4.8,
-      length: 75,
-      detailCount: 5,
-    },
+    impactVariant: "storm",
+    primary: "#59dcff",
+    secondary: "#fff47e",
+    width: 1.9,
+    glow: 1.18,
+    impactHue: 204,
   },
   wraith: {
-    styleId: "void-spike",
-    label: "Void Spike",
     archetype: "shadow",
-    primary: "#a44dff",
-    secondary: "#e7c8ff",
-    accent: "#45108f",
-    width: 1.65,
-    glow: 1,
-    impactHue: 274,
-    bodyRadius: 4.3,
-    presentationSpeed: 1720,
-    trailLength: 142,
-    trail: PROJECTILE_TRAIL_PROFILES["void-spike"],
-    particleCount: 5,
-    muzzleRadius: 5,
-    firePitch: 0.78,
-    hitPitch: 0.76,
-    killPitch: 0.7,
-    flightTrail: {
-      kind: "void",
-      primary: "#aa58ff",
-      secondary: "#e3c1ff",
-      accent: "#30005f",
-      width: 5.2,
-      length: 72,
-      detailCount: 4,
-    },
+    impactVariant: "void",
+    primary: "#b77cff",
+    secondary: "#f0ddff",
+    width: 1.55,
+    glow: 0.92,
+    impactHue: 272,
   },
   fortune: {
-    styleId: "twin-star-shot",
-    label: "Twin Star Shot",
     archetype: "star",
-    primary: "#5fc8ff",
-    secondary: "#ffd66a",
-    accent: "#ffffff",
+    impactVariant: "star",
+    primary: "#ffd95c",
+    secondary: "#fff5b5",
     width: 1.85,
-    glow: 1.12,
+    glow: 1.08,
     impactHue: 48,
-    bodyRadius: 4.3,
-    presentationSpeed: 1680,
-    trailLength: 148,
-    trail: PROJECTILE_TRAIL_PROFILES["twin-star-shot"],
-    particleCount: 6,
-    muzzleRadius: 5,
-    firePitch: 1.04,
-    hitPitch: 1.08,
-    killPitch: 1.12,
-    flightTrail: {
-      kind: "twin-star",
-      primary: "#59d7ff",
-      secondary: "#ffd05a",
-      accent: "#f8ffff",
-      width: 4.6,
-      length: 82,
-      detailCount: 5,
-    },
   },
   arsenal: {
-    styleId: "solar-lance",
-    label: "Solar Lance",
     archetype: "barrage",
-    primary: "#ff7b35",
-    secondary: "#fff1b0",
-    accent: "#ff3424",
-    width: 2.15,
-    glow: 1.12,
+    impactVariant: "missile",
+    primary: "#ff7658",
+    secondary: "#ffd184",
+    width: 2.2,
+    glow: 1,
     impactHue: 18,
-    bodyRadius: 4.6,
-    presentationSpeed: 1960,
-    trailLength: 164,
-    trail: PROJECTILE_TRAIL_PROFILES["solar-lance"],
-    particleCount: 6,
-    muzzleRadius: 6,
-    firePitch: 0.94,
-    hitPitch: 0.88,
-    killPitch: 0.82,
-    flightTrail: {
-      kind: "solar",
-      primary: "#ff8b35",
-      secondary: "#fff2b0",
-      accent: "#ff3525",
-      width: 6,
-      length: 88,
-      detailCount: 5,
-    },
   },
   oracle: {
-    styleId: "crescent-slash",
-    label: "Crescent Slash",
     archetype: "mystic",
-    primary: "#d761ff",
-    secondary: "#fff0ff",
-    accent: "#7e44ff",
+    impactVariant: "mystic",
+    primary: "#e184ff",
+    secondary: "#83eaff",
     width: 1.75,
-    glow: 1.16,
-    impactHue: 294,
-    bodyRadius: 4.4,
-    presentationSpeed: 1640,
-    trailLength: 142,
-    trail: PROJECTILE_TRAIL_PROFILES["crescent-slash"],
-    particleCount: 5,
-    muzzleRadius: 5,
-    firePitch: 1.12,
-    hitPitch: 1.05,
-    killPitch: 1.02,
-    flightTrail: {
-      kind: "crescent",
-      primary: "#d95cff",
-      secondary: "#f9e8ff",
-      accent: "#7444ff",
-      width: 5.2,
-      length: 80,
-      detailCount: 4,
-    },
+    glow: 1.12,
+    impactHue: 303,
   },
   bastion: {
-    styleId: "tidal-pearl",
-    label: "Tidal Pearl",
     archetype: "guard",
-    primary: "#3bc8ff",
-    secondary: "#e9ffff",
-    accent: "#2b78ff",
-    width: 2.25,
-    glow: 1.04,
-    impactHue: 195,
-    bodyRadius: 5,
-    presentationSpeed: 1510,
-    trailLength: 138,
-    trail: PROJECTILE_TRAIL_PROFILES["tidal-pearl"],
-    particleCount: 5,
-    muzzleRadius: 6,
-    firePitch: 0.92,
-    hitPitch: 0.95,
-    killPitch: 0.98,
-    flightTrail: {
-      kind: "tidal",
-      primary: "#47d7ff",
-      secondary: "#eaffff",
-      accent: "#3577ff",
-      width: 5.8,
-      length: 76,
-      detailCount: 4,
-    },
+    impactVariant: "shield",
+    primary: "#63e9bc",
+    secondary: "#9ce8ff",
+    width: 2.35,
+    glow: 0.96,
+    impactHue: 168,
   },
   reaper: {
-    styleId: "blossom-comet",
-    label: "Blossom Comet",
     archetype: "slash",
-    primary: "#ff67c8",
-    secondary: "#fff0fb",
-    accent: "#ff3d87",
-    width: 1.95,
-    glow: 1.12,
-    impactHue: 326,
-    bodyRadius: 4.3,
-    presentationSpeed: 1760,
-    trailLength: 144,
-    trail: PROJECTILE_TRAIL_PROFILES["blossom-comet"],
-    particleCount: 6,
-    muzzleRadius: 5,
-    firePitch: 1.14,
-    hitPitch: 1.08,
-    killPitch: 1.04,
-    flightTrail: {
-      kind: "blossom",
-      primary: "#ff70cd",
-      secondary: "#fff2fb",
-      accent: "#ff468e",
-      width: 5,
-      length: 78,
-      detailCount: 5,
-    },
+    impactVariant: "slash",
+    primary: "#ff557a",
+    secondary: "#d58cff",
+    width: 2.05,
+    glow: 1.08,
+    impactHue: 344,
   },
   celestial: {
-    styleId: "prism-dart",
-    label: "Prism Dart",
     archetype: "radiant",
-    primary: "#63eaff",
-    secondary: "#ff77e8",
-    accent: "#b081ff",
-    width: 1.8,
-    glow: 1.18,
+    impactVariant: "radiant",
+    primary: "#9ac8ff",
+    secondary: "#ffe99d",
+    width: 1.95,
+    glow: 1.16,
     impactHue: 218,
-    bodyRadius: 4.2,
-    presentationSpeed: 1880,
-    trailLength: 140,
-    trail: PROJECTILE_TRAIL_PROFILES["prism-dart"],
-    particleCount: 6,
-    muzzleRadius: 5,
-    firePitch: 1.18,
-    hitPitch: 1.12,
-    killPitch: 1.08,
-    flightTrail: {
-      kind: "prism",
-      primary: "#68efff",
-      secondary: "#ff7ce7",
-      accent: "#9f7cff",
-      width: 5.2,
-      length: 78,
-      detailCount: 5,
-    },
   },
   zenith: {
-    styleId: "aurora-ribbon",
-    label: "Aurora Ribbon",
     archetype: "cosmic",
-    primary: "#65fff2",
-    secondary: "#a176ff",
-    accent: "#56ff9c",
-    width: 2.1,
+    impactVariant: "cosmic",
+    primary: "#d9fcff",
+    secondary: "#9b8cff",
+    width: 2.25,
     glow: 1.25,
-    impactHue: 174,
-    bodyRadius: 4.8,
-    presentationSpeed: 1830,
-    trailLength: 168,
-    trail: PROJECTILE_TRAIL_PROFILES["aurora-ribbon"],
-    particleCount: 6,
-    muzzleRadius: 6,
-    firePitch: 1.16,
-    hitPitch: 1.1,
-    killPitch: 1.06,
-    flightTrail: {
-      kind: "aurora",
-      primary: "#62fff3",
-      secondary: "#9d70ff",
-      accent: "#55ff9d",
-      width: 5.6,
-      length: 92,
-      detailCount: 5,
-    },
+    impactHue: 190,
   },
 };
-
-export const RESERVED_PLAYER_PROJECTILE_STYLES = [
-  "nova-pearl",
-] as const satisfies readonly PlayerProjectileStyleId[];
 
 export function playerProjectileProfile(
   id: CharacterId,
 ): Readonly<PlayerProjectileProfile> {
   return PLAYER_PROJECTILES[id];
-}
-
-export function characterFlightTrailProfile(
-  id: CharacterId,
-): Readonly<FlightTrailProfile> {
-  return PLAYER_PROJECTILES[id].flightTrail;
-}
-
-export function projectileTrailProfile(
-  styleId: PlayerProjectileStyleId,
-): Readonly<ProjectileTrailProfile> {
-  return PROJECTILE_TRAIL_PROFILES[styleId];
-}
-
-export function projectileHeadGlowProfile(
-  styleId: PlayerProjectileStyleId,
-): Readonly<ProjectileHeadGlowProfile> {
-  return PROJECTILE_HEAD_GLOW_PROFILES[styleId];
 }

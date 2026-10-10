@@ -24,6 +24,7 @@ export type RecallDifficultyProfile = {
 };
 
 export type RecallAttemptResult = {
+  inputSource?: "typing" | "voice";
   entry: VocabularyEntry;
   completed: boolean;
   perfect: boolean;

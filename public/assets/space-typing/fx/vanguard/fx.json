@@ -1,0 +1,36 @@
+{
+  "id": "vanguard",
+  "version": 296149725,
+  "sprites": {
+    "finisher": {
+      "url": "finisher.webp",
+      "sha256": "23b381f1ec96b881b13d7df615c09b6c24f6600954b9c01c2879ce5e0349bad3",
+      "width": 768,
+      "height": 157,
+      "anchor": [
+        0.9392,
+        0.4971
+      ]
+    },
+    "impact": {
+      "url": "impact.webp",
+      "sha256": "a582fc002d5b497d804aca6b0885fd8b37d0b1c822929d6435d63e1d8575fcc5",
+      "width": 640,
+      "height": 634,
+      "anchor": [
+        0.497,
+        0.4913
+      ]
+    },
+    "muzzle": {
+      "url": "muzzle.webp",
+      "sha256": "542f569e0b90a55351893e35768fe1e0c62afb610e1f219f094ac48c17f36a42",
+      "width": 512,
+      "height": 344,
+      "anchor": [
+        0.1011,
+        0.4866
+      ]
+    }
+  }
+}

@@ -16,10 +16,28 @@
     </div>
   </section>
   <div class="game-shell">
+    <canvas id="bgCanvas" aria-hidden="true"></canvas>
     <canvas id="gameCanvas" aria-label="Space Typing battlefield"></canvas>
 
+    <div id="musicToast" class="music-toast" aria-live="polite"></div>
+    <aside id="practiceBanner" class="practice-banner" hidden>Practice · learning only · simulated rewards</aside>
+
+    <section id="voiceInputControls" class="voice-input-controls" aria-label="Input mode and microphone">
+      <div><select id="voiceInputMode" aria-label="Input mode"><option value="typing">⌨ Typing</option><option value="voice">🎙 Voice</option><option value="hybrid">⌨ + 🎙 Hybrid</option></select><button id="voiceMicToggle" type="button" aria-label="Enable or stop microphone" aria-pressed="false">🎙 Mic</button></div>
+      <small id="voiceInputStatus" role="status" aria-live="polite">Microphone off</small>
+    </section>
+    <aside id="voiceFeedback" class="voice-feedback" role="status" aria-live="polite" aria-atomic="true" aria-label="Voice input feedback" hidden>
+      <div class="voice-feedback-head">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5v2M5.5 14.5h5"/></svg>
+        <small>VOICE</small>
+        <span class="voice-feedback-detail" data-voice-detail></span>
+      </div>
+      <strong class="voice-feedback-transcript" data-voice-transcript hidden></strong>
+    </aside>
+
     <header class="hud">
-      <div class="hud-side">
+      <div id="hudLeft" class="hud-side" data-heat="0">
+        <i class="hud-flame" aria-hidden="true"></i>
         <div class="metric"><span>score</span><strong id="score">0</strong></div>
         <div class="metric"><span>streak</span><strong id="streak">0</strong></div>
         <div class="metric"><span>multi</span><strong id="multiplier">x1</strong></div>
@@ -27,9 +45,12 @@
 
       <div id="waveBadge" class="wave-badge">stage 001</div>
 
-      <div class="hud-side hud-side-right">
+      <div id="hudRight" class="hud-side hud-side-right" data-heat="0">
+        <i class="hud-flame" aria-hidden="true"></i>
+        <div class="metric metric-credits"><span>credits</span><strong id="creditsHud">0</strong><em id="creditsDelta" class="credit-delta" aria-hidden="true"></em></div>
         <div class="metric"><span>accuracy</span><strong id="accuracy">100%</strong></div>
         <div class="metric"><span>kills</span><strong id="kills">0</strong></div>
+        <div class="metric metric-warp"><span>Warp Charge</span><strong id="warpBalance">—</strong><small id="warpReserve">Reserve —</small></div>
       </div>
     </header>
 
@@ -91,6 +112,7 @@
           <strong id="energyText">100 / 100</strong>
         </div>
         <div class="player-ultimate">
+          <i class="rage-flames" aria-hidden="true"></i>
           <span id="powerHint" title="Correct typing fills five 20% Rage segments. SPACE activates your ship signature Rage using all currently filled segments; five segments gives the full ultimate. Nova Bomb remains a separate consumable.">Rage · charging</span>
           <div id="powerTrack" class="power-track" data-rage-segments="0">
             <div id="powerFill" class="power-fill"></div>
@@ -111,82 +133,208 @@
       <button id="recallHintButton" type="button">✦ Reveal letter</button>
     </div>
 
-    <section id="titleOverlay" class="overlay">
-      <div class="main-card title-main-card">
-        <p class="eyebrow">typing combat // campaign</p>
-        <h1>SPACE <span>TYPE</span></h1>
-        <p id="titleModeIntro" class="intro"></p>
-        <p id="titleWorldMeta" class="world-meta">
-          World 01 · Rainbow Reach · Stage 001-020
-        </p>
-
-        <section class="title-nav-group" aria-label="Game mode">
-          <span class="title-group-label">Game mode</span>
-          <div class="title-group-actions">
-            <button id="combatModeButton" type="button">Combat</button>
-            <button id="recallModeButton" type="button">Recall</button>
+    <dialog id="warpDialog" class="settings-dialog warp-dialog" aria-labelledby="warpDialogTitle">
+      <h2 id="warpDialogTitle">Warp Charge · Stamina</h2>
+      <p>Rewarded deployment costs 10 Warp. Practice is always free.</p>
+      <div class="warp-depot"><small id="warpStatus" role="status">Loading Warp Charge…</small><button id="warpRefuelButton" type="button">Refuel +20</button><button id="warpReserveToggle" type="button" aria-pressed="false">Reserve: off</button><button id="warpAbandonButton" type="button" hidden>Abandon prepared sortie</button><button id="warpClockButton" type="button" hidden>Correct clock</button></div>
+      <p id="warpActionNotice" role="alert"></p>
+      <p id="warpRefuelDetail"></p>
+      <p>Active: +1 / 6 min. When full, Reserve: +1 / 12 min. Refuel spends Star Crystals only after confirmation.</p>
+      <form method="dialog"><button type="submit">Close</button></form>
+    </dialog>
+    <section id="titleOverlay" class="overlay holo-title-overlay">
+      <div class="holo-title">
+        <header class="holo-topbar">
+          <div id="titlePilotCard" class="holo-pilot holo-panel">
+            <div class="holo-avatar"><img id="titlePilotShip" alt="" /></div>
+            <div class="holo-pilot-text">
+              <div class="holo-pilot-name">
+                <strong id="titlePilotName">Vanguard</strong>
+                <span id="titlePilotLevel" class="holo-rank">Lv 1</span>
+              </div>
+              <div class="holo-pilot-progress">
+                <span class="holo-bar"><i id="titlePilotBar"></i></span>
+                <span id="titlePilotProgress">Stage 001</span>
+              </div>
+              <div class="pilot-warp" aria-label="Warp Charge stamina">
+                <div class="pilot-warp-heading"><span>⚡ WARP</span><strong id="titleWarpBalance">— / 100</strong><button id="titleWarpManage" type="button" aria-label="Manage Warp Charge" title="Refuel and Reserve settings">+</button></div>
+                <progress id="titleWarpBar" max="100" value="0" aria-label="Active Warp Charge"></progress>
+                <div class="pilot-warp-detail"><span id="titleWarpReserve">Reserve — / 300</span><span id="titleWarpRegen">Loading…</span></div>
+              </div>
+            </div>
+            <span class="holo-stat" data-tip="Credits" data-tip-side="below">
+              <img src="/src/assets/pickups/credits/common.webp" alt="" />
+              <b id="titlePilotCredits">0</b>
+            </span>
           </div>
-          <small id="titleModeMeta" class="world-meta"></small>
+
+          <div class="holo-strip holo-panel" aria-label="Status">
+            <span class="holo-strip-item" data-icon="calendar">Daily Expedition resets in <b id="titleDailyReset">--:--</b></span>
+            <span class="holo-strip-item" data-icon="flag">Best stage <b id="titleBestStage">001</b></span>
+            <span class="holo-strip-item" data-icon="ship">Ships <b id="titleShipCount">1 / 11</b></span>
+          </div>
+
+          <nav class="holo-tools" aria-label="Quick controls">
+            <button id="titleRecordsButton" class="holo-tool" type="button" data-icon="trophy" data-tip="Records" data-tip-side="below" aria-label="Records" aria-expanded="false"></button>
+            <button id="titleOnlineButton" class="holo-tool" type="button" data-icon="users" data-tip="Duel lobby · play online" data-tip-side="below" aria-label="Duel lobby"></button>
+            <button id="titleMusicButton" class="holo-tool" type="button" data-icon="music" data-tip="Music on / off" data-tip-side="below" aria-label="Music on or off" aria-pressed="true"></button>
+            <button id="titleSoundButton" class="holo-tool" type="button" data-icon="volume" data-tip="Sound levels" data-tip-side="below" aria-label="Sound levels" aria-expanded="false"></button>
+            <button id="titleVoiceButton" class="holo-tool" type="button" data-icon="voice" data-tip="Pronunciation voice on / off" data-tip-side="below" aria-label="Pronunciation voice on or off" aria-pressed="true"></button>
+            <button id="settingsButton" class="holo-tool" type="button" data-icon="gear" data-tip="Settings" data-tip-side="below" aria-label="Settings"></button>
+
+            <div id="titleSoundPopover" class="holo-popover hidden" role="dialog" aria-label="Sound levels">
+              <h4 data-icon="sliders">Sound</h4>
+              <div class="holo-slider">
+                <button type="button" class="holo-slider-icon" data-icon="music" data-mute="musicVolume" aria-label="Mute music"></button>
+                <span><small>Music</small><input id="quickMusicVolume" type="range" min="0" max="1" step="0.05" /></span>
+                <output id="quickMusicVolumeValue">26%</output>
+              </div>
+              <div class="holo-slider">
+                <button type="button" class="holo-slider-icon" data-icon="volume" data-mute="sfxVolume" aria-label="Mute effects"></button>
+                <span><small>Effects</small><input id="quickSfxVolume" type="range" min="0" max="1" step="0.05" /></span>
+                <output id="quickSfxVolumeValue">50%</output>
+              </div>
+              <div class="holo-slider">
+                <button type="button" class="holo-slider-icon" data-icon="sparkle" data-mute="creditVolume" aria-label="Mute credit sounds"></button>
+                <span><small>Credits</small><input id="quickCreditVolume" type="range" min="0" max="2" step="0.1" /></span>
+                <output id="quickCreditVolumeValue">100%</output>
+              </div>
+              <div class="holo-slider">
+                <button type="button" class="holo-slider-icon" data-icon="voice" data-mute="pronunciationVolume" aria-label="Mute pronunciation voice"></button>
+                <span><small>Voice (pronunciation)</small><input id="quickVoiceVolume" type="range" min="0" max="1" step="0.05" /></span>
+                <output id="quickVoiceVolumeValue">100%</output>
+              </div>
+              <div class="holo-popover-foot">
+                <span>Tap an icon to mute</span>
+                <button id="titleAllSettingsButton" type="button" class="holo-link">All settings ›</button>
+              </div>
+            </div>
+
+            <div id="titleRecordsPopover" class="holo-popover hidden" role="dialog" aria-label="Records">
+              <h4 data-icon="trophy">Records</h4>
+              <dl id="titleRecordsList" class="holo-records"></dl>
+              <p class="holo-popover-note">Global leaderboards arrive with online accounts.</p>
+            </div>
+          </nav>
+        </header>
+
+        <section class="holo-brand">
+          <p class="eyebrow">Typing combat · learn English</p>
+          <h1>Space <span>Type</span></h1>
+          <p id="titleModeIntro" class="holo-tagline"></p>
         </section>
 
-        <div class="title-play-actions">
-          <button id="startButton" class="primary">Continue · Stage 001</button>
-          <button id="routeButton">Sector Briefing</button>
-          <button id="stageSelectButton">Stage Select</button>
-        </div>
-
-        <div class="title-navigation-grid">
-          <section class="title-nav-group" aria-label="Build">
-            <span class="title-group-label">Build</span>
-            <div class="title-group-actions">
-              <button id="characterButton">Characters</button>
-              <button id="equipmentButton">Equipment</button>
-              <button id="supportButton">Support Spells</button>
-              <button id="hotbarButton">Hotbar</button>
-              <button id="vocabularyButton">Vocabulary</button>
+        <main class="holo-modes">
+          <article class="holo-mode holo-mode-featured holo-panel">
+            <div class="holo-mode-art">
+              <img id="titleCampaignPlate" class="holo-plate" src="/assets/space-typing/backgrounds/g01-celestial/plate-c.1280.webp" alt="" />
+              <img id="titleCampaignShip" class="holo-hero holo-hero-ship" alt="" />
+              <span class="holo-tag" data-icon="rocket">Campaign</span>
             </div>
-          </section>
-
-          <section class="title-nav-group" aria-label="Progress">
-            <span class="title-group-label">Progress</span>
-            <div class="title-group-actions">
-              <button id="progressionButton">Missions</button>
-              <button id="codexButton">Codex</button>
-              <button id="ascensionButton" class="hidden">Ascension</button>
+            <div class="holo-mode-body">
+              <h2>Campaign</h2>
+              <p class="holo-meta"><b id="titleWorldMeta">World 01 · Rainbow Reach · Stage 001-020</b></p>
+              <div class="holo-chips" role="group" aria-label="Game mode">
+                <!-- Recall has its own card; the mode chips stay for code paths only. -->
+                <button id="combatModeButton" class="holo-chip hidden" type="button" data-icon="swords">Combat</button>
+                <button id="recallModeButton" class="holo-chip hidden" type="button" data-icon="headphones">Recall</button>
+                <small id="titleModeMeta" class="holo-meta-small"></small>
+              </div>
+              <div class="holo-actions title-play-actions">
+                <button id="startButton" class="primary holo-cta" data-icon="play">Continue · Stage 001</button>
+                <button id="practiceButton" class="holo-ghost" type="button">Practice · Free</button>
+                <button id="stageSelectButton" class="holo-ghost" data-icon="map">Stage select</button>
+                <button id="routeButton" class="holo-ghost" data-icon="compass">Briefing</button>
+              </div>
             </div>
-          </section>
+          </article>
 
-          <section class="title-nav-group" aria-label="System">
-            <span class="title-group-label">System</span>
-            <div class="title-group-actions">
-              <button id="settingsButton">Settings</button>
-              <button id="dataButton">Data</button>
+          <article id="titleExpeditionCard" class="holo-mode holo-panel">
+            <div class="holo-mode-art">
+              <img class="holo-plate" src="/assets/space-typing/backgrounds/g08-aurora-cosmic/plate-c.1280.webp" alt="" />
+              <img class="holo-hero holo-hero-portal" src="/assets/space-typing/backgrounds/g01-celestial/hero-w02.512.webp" alt="" />
+              <span class="holo-tag" data-icon="compass">Expedition</span>
             </div>
-          </section>
-        </div>
+            <div class="holo-mode-body">
+              <h2>Expedition</h2>
+              <p>Roguelike run through 8 encounters with a loaner build. Campaign progress stays safe.</p>
+              <div id="titleExpeditionActions" class="holo-actions holo-actions-expedition"></div>
+            </div>
+          </article>
 
-        <details class="title-more">
-          <summary>Shops &amp; Services</summary>
-          <div class="title-more-actions">
-            <button id="shopButton">Normal Shop</button>
-            <button id="stationShopButton">Station Shop</button>
-            <button id="serviceShopButton">Repair / Upgrade</button>
-            <button id="travelingShopButton" class="hidden">Traveling Merchant</button>
-            <button id="blackMarketButton" class="hidden">Black Market</button>
-            <button id="hiddenShopButton" class="hidden">Hidden Shop</button>
-            <button id="eventShopButton" class="hidden">Event Shop</button>
+          <article class="holo-mode holo-panel">
+            <div class="holo-mode-art">
+              <img class="holo-plate" src="/assets/space-typing/backgrounds/g04-verdant/plate-c.1280.webp" alt="" />
+              <img class="holo-hero holo-hero-crystal" src="/assets/space-typing/backgrounds/g01-celestial/hero-w03.512.webp" alt="" />
+              <span class="holo-tag" data-icon="headphones">Recall</span>
+            </div>
+            <div class="holo-mode-body">
+              <h2>Recall</h2>
+              <p>Hear the word, recall the spelling and type it from memory before contact.</p>
+              <div class="holo-actions">
+                <button id="titleRecallStartButton" class="primary holo-cta" type="button" data-icon="headphones">Start recall</button>
+                <button id="titleRecallWordsButton" class="holo-ghost" type="button" data-icon="book">Word list</button>
+                <button id="titleRecallSettingsButton" class="holo-ghost" type="button" data-icon="sliders">Recall settings</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="holo-mode holo-panel">
+            <div class="holo-mode-art">
+              <img class="holo-plate" src="/assets/space-typing/backgrounds/g02-infernal/plate-c.1280.webp" alt="" />
+              <img class="holo-hero holo-hero-rival" src="/assets/space-typing/ships/3d/reaper/color.webp" alt="" />
+              <img class="holo-hero holo-hero-self" src="/assets/space-typing/ships/3d/vanguard/color.webp" alt="" />
+              <span class="holo-tag" data-icon="swords">Duel</span>
+            </div>
+            <div class="holo-mode-body">
+              <h2>Duel 1v1</h2>
+              <p>Online rooms, ranked matches, or practice against a bot.</p>
+              <div class="holo-actions">
+                <button id="duelModeButton" class="primary holo-cta" type="button" data-icon="swords">Play duel</button>
+                <button id="titleDuelPracticeButton" class="holo-ghost" type="button" data-icon="bot">Practice</button>
+                <button id="titleDuelJoinButton" class="holo-ghost" type="button" data-icon="door">Join code</button>
+              </div>
+            </div>
+          </article>
+        </main>
+
+        <footer class="holo-dock holo-panel" aria-label="Hangar and progress">
+          <button id="characterButton" class="holo-dock-btn" data-icon="ship">Hangar</button>
+          <button id="equipmentButton" class="holo-dock-btn" data-icon="shield">Equipment</button>
+          <button id="supportButton" class="holo-dock-btn" data-icon="cpu">Tactical</button>
+          <button id="hotbarButton" class="holo-dock-btn" data-icon="grid">Hotbar</button>
+          <span class="holo-dock-sep" aria-hidden="true"></span>
+          <button id="vocabularyButton" class="holo-dock-btn" data-icon="book">Vocabulary</button>
+          <button id="progressionButton" class="holo-dock-btn" data-icon="target">Missions</button>
+          <button id="codexButton" class="holo-dock-btn" data-icon="library">Codex</button>
+          <button id="ascensionButton" class="holo-dock-btn hidden" data-icon="crown">Ascension</button>
+          <span class="holo-dock-sep" aria-hidden="true"></span>
+          <div class="holo-dock-menu">
+            <button id="titleShopsButton" class="holo-dock-btn" type="button" data-icon="store" aria-expanded="false" aria-controls="titleShopsMenu">Shops</button>
+            <div id="titleShopsMenu" class="holo-popover holo-popover-up hidden" role="menu" aria-label="Shops and services">
+              <h4 data-icon="store">Shops &amp; services</h4>
+              <div class="holo-menu-list title-more-actions">
+                <button id="shopButton" data-icon="store">Normal Shop</button>
+                <button id="stationShopButton" data-icon="rocket">Station Shop</button>
+                <button id="serviceShopButton" data-icon="shield">Repair / Upgrade</button>
+                <button id="travelingShopButton" class="hidden" data-icon="compass">Traveling Merchant</button>
+                <button id="blackMarketButton" class="hidden" data-icon="eye">Black Market</button>
+                <button id="hiddenShopButton" class="hidden" data-icon="sparkle">Hidden Shop</button>
+                <button id="eventShopButton" class="hidden" data-icon="calendar">Event Shop</button>
+              </div>
+            </div>
           </div>
-        </details>
+          <button id="dataButton" class="holo-dock-btn" data-icon="database">Data</button>
+        </footer>
 
-        <details class="title-more title-developer">
+        <div class="holo-corner holo-corner-left hints">
+          <span><kbd>ESC</kbd> pause</span>
+          <span><kbd>SPACE</kbd> ship Rage</span>
+        </div>
+        <details class="holo-corner holo-corner-right title-more title-developer">
           <summary>Developer</summary>
           <div class="title-dev-actions"></div>
         </details>
-
-        <div class="hints">
-          <span><kbd>ESC</kbd> pause</span>
-          <span><kbd>SPACE</kbd> ship Rage · usable from 1 filled segment · 5/5 = full ultimate</span>
-        </div>
       </div>
     </section>
 
@@ -206,31 +354,48 @@
     </section>
 
     <section id="gameOverOverlay" class="overlay hidden">
-      <div class="pause-card">
-        <p class="eyebrow">signal lost</p>
-        <h2>Run over</h2>
-        <div class="results">
-          <div><span>score</span><strong id="resultScore">0</strong></div>
-          <div><span>stage</span><strong id="resultWave">001</strong></div>
-          <div><span>accuracy</span><strong id="resultAccuracy">100%</strong></div>
-          <div><span>max key streak</span><strong id="resultStreak">0</strong></div>
+      <div id="gameOverEmbers" class="game-over-embers" aria-hidden="true"></div>
+      <div class="pause-card game-over-card" role="dialog" aria-modal="true" aria-labelledby="gameOverTitle">
+        <header class="game-over-header">
+          <div>
+            <p class="eyebrow">signal lost</p>
+            <h2 id="gameOverTitle">Run over</h2>
+          </div>
+          <span class="game-over-badge" data-icon="skull">Defeated</span>
+        </header>
+        <div class="game-over-body">
+          <section class="game-over-summary">
+            <div class="results">
+              <div><span data-icon="trophy">score</span><strong id="resultScore">0</strong></div>
+              <div><span data-icon="flag">stage</span><strong id="resultWave">001</strong></div>
+              <div><span data-icon="target">accuracy</span><strong id="resultAccuracy">100%</strong></div>
+              <div><span data-icon="flame">max key streak</span><strong id="resultStreak">0</strong></div>
+            </div>
+          </section>
+          <section class="game-over-detail">
+            <h3>Run report</h3>
+            <div id="gameOverMeasured" class="result-measured-grid" aria-label="Measured run statistics"></div>
+            <p id="deathProtectionMeta" class="death-protection-meta" role="status" aria-live="polite">
+              Checkpoint recovery is available.
+            </p>
+            <div id="deathProtectionActions" class="death-protection-actions">
+              <button id="salvageAnchorButton">Salvage Anchor · 0</button>
+              <button id="stageRevivalButton">Stage Revival Core · 0</button>
+              <button id="phoenixCoreButton">Phoenix Core · 0</button>
+            </div>
+          </section>
         </div>
-        <div id="gameOverMeasured" class="result-measured-grid" aria-label="Measured run statistics"></div>
-        <p id="deathProtectionMeta" class="death-protection-meta" role="status" aria-live="polite">
-          Checkpoint recovery is available.
-        </p>
-        <div id="deathProtectionActions" class="death-protection-actions">
-          <button id="salvageAnchorButton">Salvage Anchor · 0</button>
-          <button id="stageRevivalButton">Stage Revival Core · 0</button>
-          <button id="phoenixCoreButton">Phoenix Core · 0</button>
-        </div>
-        <button id="againButton" class="primary">Replay checkpoint stage</button>
-        <button id="gameOverStageSelectButton">Choose unlocked stage</button>
-        <button id="resultTitleButton">Main menu</button>
+        <footer class="game-over-footer">
+          <button id="againButton" class="primary">Replay checkpoint stage</button>
+          <button id="retryPracticeButton" type="button">Retry Practice · Free</button>
+          <button id="gameOverStageSelectButton">Choose unlocked stage</button>
+          <button id="resultTitleButton">Main menu</button>
+        </footer>
       </div>
     </section>
 
-    <section id="stageClearOverlay" class="overlay hidden">
+    <section id="stageClearOverlay" class="overlay hidden" data-celebration-level="1">
+      <div id="stageClearCelebration" class="stage-clear-celebration" aria-hidden="true"></div>
       <div
         class="pause-card stage-results-card"
         role="dialog"
@@ -257,12 +422,12 @@
             </div>
 
             <div class="results stage-results-summary">
-              <div><span>score</span><strong id="clearScore">0</strong></div>
-              <div><span>target accuracy</span><strong id="clearAccuracy">100%</strong></div>
-              <div><span>target WPM</span><strong id="clearWpm">0</strong></div>
-              <div><span>time</span><strong id="clearTime">0:00</strong></div>
-              <div><span>max key streak</span><strong id="clearStreak">0</strong></div>
-              <div><span>kill rate</span><strong id="clearKillRate">0/min</strong></div>
+              <div><span data-icon="trophy">score</span><strong id="clearScore">0</strong></div>
+              <div><span data-icon="target">target accuracy</span><strong id="clearAccuracy">100%</strong></div>
+              <div><span data-icon="gauge">target WPM</span><strong id="clearWpm">0</strong></div>
+              <div><span data-icon="clock">time</span><strong id="clearTime">0:00</strong></div>
+              <div><span data-icon="flame">max key streak</span><strong id="clearStreak">0</strong></div>
+              <div><span data-icon="swords">kill rate</span><strong id="clearKillRate">0/min</strong></div>
             </div>
 
             <section class="stage-result-section stage-rewards-panel">
@@ -361,7 +526,7 @@
       </div>
       <div class="journey-map-heading">
         <strong id="journeyWorldTitle">World 01</strong>
-        <span>✦ Cleared · ◆ Current ship · ♛ Boss · ⚑ Checkpoint</span>
+        <span class="journey-legend">★ Stars earned · YOU = your ship · ♛ Boss · ⚑ Checkpoint</span>
       </div>
       <div id="stageGrid" class="stage-journey-scroll" role="region" tabindex="0" aria-label="Campaign journey map"></div>
       <div id="stagePreview" class="stage-preview" aria-live="polite">
@@ -515,33 +680,72 @@
       <div class="dialog-head">
         <div>
           <p class="eyebrow">rare reward</p>
-          <h2>Choose one reward</h2>
+          <h2>Choose one card</h2>
         </div>
       </div>
       <p class="equipment-note">
-        Combat is paused. Pick one reward to continue.
+        Combat is paused. Pick one card to continue · press 1, 2 or 3.
       </p>
       <div id="rewardChoiceGrid" class="reward-choice-grid"></div>
     </dialog>
 
     <dialog id="anomalyDialog" class="settings-dialog anomaly-dialog">
-      <div class="dialog-head">
-        <div>
-          <p class="eyebrow">anomaly detected</p>
-          <h2>Choose the risk</h2>
+      <div class="anomaly-heading">
+        <div class="dialog-head">
+          <div>
+            <p class="eyebrow">anomaly detected</p>
+            <h2>Choose the risk</h2>
+          </div>
+        </div>
+        <div class="anomaly-hero-art" aria-hidden="true">
+          <svg viewBox="0 0 120 120" role="presentation">
+            <defs>
+              <radialGradient id="anomalyCoreGlow" cx="50%" cy="48%" r="52%">
+                <stop offset="0%" stop-color="#ffffff"/>
+                <stop offset="24%" stop-color="#81f7ff"/>
+                <stop offset="58%" stop-color="#886dff"/>
+                <stop offset="100%" stop-color="#ff5ab3" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <circle cx="60" cy="60" r="48" fill="none" stroke="currentColor" stroke-opacity=".2" stroke-width="2"/>
+            <path d="M60 7 69 35 97 28 81 51 108 61 79 69 94 95 68 81 58 111 51 81 22 97 37 70 8 61 38 52 22 27 51 36Z" fill="none" stroke="currentColor" stroke-opacity=".55" stroke-width="2"/>
+            <circle cx="60" cy="60" r="29" fill="url(#anomalyCoreGlow)" opacity=".78"/>
+            <circle cx="60" cy="60" r="11" fill="#ecffff"/>
+            <circle cx="60" cy="60" r="4" fill="#8d78ff"/>
+          </svg>
         </div>
       </div>
-      <p id="anomalyRiskMeta" class="equipment-note">
+      <p id="anomalyRiskMeta" class="equipment-note anomaly-risk-meta">
         Overload trades Hull for a stronger reward table.
       </p>
       <div class="anomaly-choice-grid">
         <button id="anomalyStabilize" type="button" class="anomaly-choice safe">
-          <strong>Stabilize</strong>
-          <span>Safe reward · small Shield recovery</span>
+          <span class="anomaly-choice-art" aria-hidden="true">
+            <svg viewBox="0 0 72 72" role="presentation">
+              <path d="M36 7 56 15v17c0 14-8 25-20 33C24 57 16 46 16 32V15Z" fill="none" stroke="currentColor" stroke-width="4"/>
+              <path d="m25 35 7 7 16-18" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="5"/>
+              <circle cx="36" cy="36" r="29" fill="none" stroke="currentColor" stroke-opacity=".2" stroke-width="2"/>
+            </svg>
+          </span>
+          <span class="anomaly-choice-copy">
+            <strong>Stabilize</strong>
+            <span>Safe reward · small Shield recovery</span>
+            <em><b>◆</b> Keep Hull intact <b>＋</b> Recover Shield</em>
+          </span>
         </button>
         <button id="anomalyOverload" type="button" class="anomaly-choice risk">
-          <strong>Overload</strong>
-          <span>Lose Hull · Epic/Legendary-biased reward</span>
+          <span class="anomaly-choice-art" aria-hidden="true">
+            <svg viewBox="0 0 72 72" role="presentation">
+              <path d="M39 5 16 39h18l-3 28 25-38H38Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/>
+              <circle cx="36" cy="36" r="29" fill="none" stroke="currentColor" stroke-opacity=".2" stroke-width="2"/>
+              <path d="M9 36h8M55 36h8M36 9v8M36 55v8" stroke="currentColor" stroke-linecap="round" stroke-opacity=".5" stroke-width="2"/>
+            </svg>
+          </span>
+          <span class="anomaly-choice-copy">
+            <strong>Overload</strong>
+            <span>Lose Hull · Epic/Legendary-biased reward</span>
+            <em><b>−</b> Max Hull <b>↑</b> Rare reward bias</em>
+          </span>
         </button>
       </div>
     </dialog>
@@ -564,21 +768,22 @@
       <form method="dialog" class="dialog-head">
         <div>
           <p class="eyebrow">pre-stage loadout</p>
-          <h2>Support Spells</h2>
+          <h2>Tactical Systems</h2>
         </div>
         <button class="icon-button" aria-label="Close">×</button>
       </form>
       <p class="equipment-note">
-        Equip up to two support spells. Changes apply from the next stage.
+        Fit up to two tactical systems: missiles, railgun, tractor beam, fields and
+        orbital strikes. Changes apply from the next stage.
       </p>
       <div class="support-loadout-grid">
         <label class="equipment-slot">
-          <span class="equipment-slot-name">support slot 1</span>
+          <span class="equipment-slot-name">tactical slot 1</span>
           <select id="supportSlot0"></select>
           <small id="supportSlot0Meta">Empty</small>
         </label>
         <label class="equipment-slot">
-          <span class="equipment-slot-name">support slot 2</span>
+          <span class="equipment-slot-name">tactical slot 2</span>
           <select id="supportSlot1"></select>
           <small id="supportSlot1Meta">Empty</small>
         </label>
@@ -770,6 +975,257 @@
       </section>
     </dialog>
 
+    <dialog id="duelRoomDialog" class="settings-dialog duel-room-dialog holo-lobby">
+      <header class="holo-lobby-head">
+        <form method="dialog" class="holo-lobby-back">
+          <button class="holo-back" data-icon="back" aria-label="Back to the main menu">Home</button>
+        </form>
+        <div class="holo-lobby-title holo-panel">
+          <span class="holo-lobby-mark" data-icon="swords" aria-hidden="true"></span>
+          <div>
+            <p class="eyebrow">duel mode</p>
+            <h2>1v1 Duel lobby</h2>
+          </div>
+          <span id="duelConnectionStatus" class="holo-status-chip">Friend Room · offline</span>
+        </div>
+        <p id="duelRoomStatus" class="holo-lobby-status data-status" role="status" aria-live="polite">
+          Practice works offline. Friend Rooms and Ranked require the Duel server.
+        </p>
+      </header>
+
+      <div class="holo-lobby-grid">
+        <aside class="holo-lobby-side">
+          <section class="holo-box holo-panel holo-me">
+            <div class="holo-me-ship"><img id="duelSelfShip" alt="" /></div>
+            <div class="holo-me-text">
+              <label class="holo-field-label" for="duelDisplayName">Pilot name</label>
+              <input id="duelDisplayName" type="text" maxlength="32" value="Pilot" />
+              <p id="duelRankedProfile" class="holo-me-ratings">Typing 1000 · Duel 1000 · Matchmaking 1000</p>
+            </div>
+            <button id="duelChangeShipButton" type="button" class="holo-link holo-me-change" data-icon="ship">Change ship</button>
+          </section>
+
+          <section class="holo-box holo-panel holo-ranked duel-ranked-strip">
+            <h3 data-icon="zap">Ranked match</h3>
+            <small id="duelRankedStatus">Not queued · normalized combat profile</small>
+            <div class="duel-ranked-actions">
+              <button id="duelRankedQueueButton" class="primary holo-cta" type="button" data-icon="zap">Find match</button>
+              <button id="duelRankedLeaveButton" class="hidden holo-ghost" type="button" data-icon="x">Leave queue</button>
+            </div>
+          </section>
+
+          <section class="holo-box holo-panel holo-lobby-actions-box">
+            <div class="duel-room-tabs" role="group" aria-label="Duel room flow">
+              <button id="duelCreateTab" type="button" class="holo-cta holo-cta-alt" data-icon="plus">Create room</button>
+              <button id="duelPracticeButton" type="button" class="holo-ghost" data-icon="bot">Practice vs bot · offline</button>
+              <button id="duelJoinTab" type="button" class="hidden" tabindex="-1">Join Room</button>
+            </div>
+            <section id="duelJoinPanel" class="duel-room-panel holo-join">
+              <span class="holo-field-label">Have a room code?</span>
+              <div class="holo-join-row">
+                <input id="duelJoinCode" type="text" maxlength="32" placeholder="ROOM-CODE" />
+                <button id="duelJoinRoomButton" class="holo-ghost" type="button" data-icon="door">Join</button>
+              </div>
+              <input id="duelJoinPassword" type="password" maxlength="64" autocomplete="current-password" placeholder="Password (private rooms)" />
+            </section>
+          </section>
+        </aside>
+
+        <section class="holo-lobby-main holo-panel">
+          <div id="duelRoomBrowser" class="holo-browser">
+            <div class="holo-browser-head">
+              <h3>Waiting rooms</h3>
+              <span id="duelRoomListMeta" class="holo-dim">Connecting to the Duel server…</span>
+              <span class="holo-grow"></span>
+              <div class="holo-seg holo-seg-inline" role="group" aria-label="Filter rooms">
+                <button type="button" class="on" data-room-filter="all" aria-pressed="true">All</button>
+                <button type="button" data-room-filter="open" aria-pressed="false">Open</button>
+                <button type="button" data-room-filter="unlocked" aria-pressed="false">No password</button>
+              </div>
+              <input id="duelRoomSearch" type="search" placeholder="Search rooms" aria-label="Search rooms" />
+              <button id="duelRoomRefresh" type="button" class="holo-icon-btn" data-icon="refresh" data-tip="Refresh the list" aria-label="Refresh the list"></button>
+            </div>
+            <div class="holo-browser-cols" aria-hidden="true"><span>Map</span><span>Room</span><span>Host</span><span>Players</span><span></span></div>
+            <div id="duelRoomList" class="holo-room-list" role="list"></div>
+            <div id="duelRoomListEmpty" class="holo-room-empty">
+              <span data-icon="swords" aria-hidden="true"></span>
+              <strong id="duelRoomListEmptyTitle">No open rooms yet</strong>
+              <small id="duelRoomListEmptyText">Create a room for a friend, queue for Ranked, or practice against a bot.</small>
+            </div>
+          </div>
+
+          <section id="duelLobbyPanel" class="duel-lobby-panel hidden" aria-live="polite">
+            <div class="duel-lobby-head">
+              <div>
+                <span class="holo-field-label">Room code</span>
+                <strong id="duelLobbyRoomCode">—</strong>
+              </div>
+              <small id="duelLobbyRules">—</small>
+            </div>
+            <div class="duel-slot-grid">
+              <article id="duelSlotOne" class="duel-slot-card"></article>
+              <span class="holo-vs" aria-hidden="true">VS</span>
+              <article id="duelSlotTwo" class="duel-slot-card"></article>
+            </div>
+            <div class="duel-lobby-actions">
+              <button id="duelReadyButton" type="button" class="holo-ghost" data-icon="check">Ready</button>
+              <button id="duelAddBotButton" type="button" class="holo-ghost" data-icon="bot">Add Bot</button>
+              <button id="duelRemoveBotButton" type="button" class="holo-ghost" data-icon="x">Remove Bot</button>
+              <button id="duelLeaveRoomButton" class="hidden holo-ghost" type="button" data-icon="door">Leave Room</button>
+              <button id="duelStartMatchButton" class="primary holo-cta hidden" type="button" data-icon="swords">Start Duel</button>
+            </div>
+            <small id="duelRoomReadyMeta">Both occupied slots must be ready.</small>
+          </section>
+        </section>
+      </div>
+
+      <div id="duelCreateScrim" class="holo-scrim hidden"></div>
+      <section id="duelCreatePanel" class="duel-room-panel holo-sheet hidden" role="dialog" aria-label="Create room">
+        <div class="holo-sheet-head">
+          <span data-icon="plus" aria-hidden="true"></span>
+          <h3>Create room</h3>
+          <button id="duelCreateClose" type="button" class="icon-button" aria-label="Close">×</button>
+        </div>
+        <div class="holo-form">
+          <label class="holo-form-field" data-field="duelRoomName">
+            <span class="field-label">Room name</span>
+            <input id="duelRoomName" type="text" maxlength="40" value="Duel Room" />
+          </label>
+          <label class="holo-form-field" data-field="duelVisibility">
+            <span class="field-label">Who can join</span>
+            <select id="duelVisibility">
+              <option value="private">Private</option>
+              <option value="public">Public</option>
+            </select>
+          </label>
+          <label class="holo-form-field" data-field="duelRounds">
+            <span class="field-label">Rounds</span>
+            <select id="duelRounds">
+              <option value="1">Bo1</option>
+              <option value="3" selected>Bo3</option>
+              <option value="5">Bo5</option>
+            </select>
+          </label>
+          <label class="holo-form-field" data-field="duelPassword">
+            <span class="field-label">Password</span>
+            <input id="duelPassword" type="password" maxlength="64" value="space" autocomplete="new-password" />
+          </label>
+          <label class="holo-form-field" data-field="duelMatchLength">
+            <span class="field-label">Match length</span>
+            <select id="duelMatchLength">
+              <option value="180">3 minutes</option>
+              <option value="240" selected>4 minutes</option>
+              <option value="300">5 minutes</option>
+            </select>
+          </label>
+          <label class="holo-form-field" data-field="duelMapMode">
+            <span class="field-label">Map order</span>
+            <select id="duelMapMode">
+              <option value="fixed">Fixed map</option>
+              <option value="random">Random map</option>
+              <option value="vote">Map vote</option>
+            </select>
+          </label>
+          <label class="holo-form-field" data-field="duelMap">
+            <span class="field-label">Map</span>
+            <select id="duelMap">
+              <option value="frost-wastes">Frost Wastes</option>
+              <option value="inferno-rift">Inferno Rift</option>
+              <option value="tempest-prime">Tempest Prime</option>
+              <option value="ocean-abyss">Ocean Abyss</option>
+              <option value="terra-core">Terra Core</option>
+              <option value="celestial-void">Celestial Void</option>
+            </select>
+          </label>
+        </div>
+        <details class="holo-advanced">
+          <summary data-icon="sliders"><span>Advanced</span><small id="duelAdvancedSummary">Hazards, specials, bots and seed</small></summary>
+          <div class="holo-form holo-form-advanced">
+          <label class="holo-form-field" data-field="duelHazardLevel">
+            <span class="field-label">Hazards</span>
+            <select id="duelHazardLevel">
+              <option value="low">Low</option>
+              <option value="standard" selected>Standard</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+          <label class="holo-form-field" data-field="duelMysteryFrequency">
+            <span class="field-label">Mystery frequency</span>
+            <select id="duelMysteryFrequency">
+              <option value="off">Off</option>
+              <option value="low">Low</option>
+              <option value="standard" selected>Standard</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+          <label class="holo-form-field" data-field="duelFateFrequency">
+            <span class="field-label">Fate frequency</span>
+            <select id="duelFateFrequency">
+              <option value="off">Off</option>
+              <option value="low">Low</option>
+              <option value="standard" selected>Standard</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+          <label class="holo-form-field" data-field="duelBotAllowed">
+            <span class="field-label">Bot allowed</span>
+            <select id="duelBotAllowed">
+              <option value="true" selected>Allowed</option>
+              <option value="false">Human only</option>
+            </select>
+          </label>
+          <label class="holo-form-field" data-field="duelSeedMode">
+            <span class="field-label">Seed mode</span>
+            <select id="duelSeedMode">
+              <option value="random" selected>Random</option>
+              <option value="fixed">Fixed</option>
+            </select>
+          </label>
+          <label class="holo-form-field" data-field="duelFixedSeed">
+            <span class="field-label">Fixed seed</span>
+            <input id="duelFixedSeed" type="number" min="0" max="4294967295" value="1" disabled />
+          </label>
+          <label class="holo-form-field" data-field="duelRuleModifier">
+            <span class="field-label">Rules</span>
+            <select id="duelRuleModifier">
+              <option value="standard" selected>Standard</option>
+              <option value="high-hazard">High Hazard</option>
+              <option value="mystery-storm">Mystery Storm</option>
+              <option value="weapon-frenzy">Weapon Frenzy</option>
+              <option value="support-rich">Support Rich</option>
+              <option value="sudden-death">Sudden Death</option>
+              <option value="cataclysm-rush">Cataclysm Rush</option>
+            </select>
+          </label>
+          </div>
+          <div class="duel-bot-settings">
+          <strong>Bot profile</strong>
+          <label><span>WPM</span><input id="duelBotWpm" type="number" min="10" max="300" value="55" /></label>
+          <label><span>Accuracy %</span><input id="duelBotAccuracy" type="number" min="50" max="100" step="1" value="94" /></label>
+          <label><span>Reaction ms</span><input id="duelBotReaction" type="number" min="0" max="3000" step="10" value="320" /></label>
+          <label>
+            <span>Personality</span>
+            <select id="duelBotPersonality">
+              <option value="balanced">Balanced</option>
+              <option value="turtle">Turtle</option>
+              <option value="aggro">Aggro</option>
+              <option value="tactician">Tactician</option>
+              <option value="trickster">Trickster</option>
+              <option value="fortune">Fortune</option>
+              <option value="sniper">Sniper</option>
+            </select>
+          </label>
+        </div>
+
+        </details>
+        <div class="holo-sheet-foot">
+          <span class="holo-dim">Public rooms appear in the waiting list. Private rooms need the password.</span>
+          <button id="duelCreateCancel" type="button" class="holo-ghost">Cancel</button>
+          <button id="duelCreateRoomButton" class="primary holo-cta" type="button" data-icon="plus">Create room</button>
+        </div>
+      </section>
+    </dialog>
+
     <dialog id="settingsDialog" class="settings-dialog">
       <form method="dialog" class="dialog-head">
         <div>
@@ -821,6 +1277,27 @@
 
         <label class="setting-row">
           <span>
+            <strong>Music mode</strong>
+            <small>By map: each World plays its Galaxy's songs · Random: shuffle every song</small>
+          </span>
+          <select id="musicMode">
+            <option value="map">By map</option>
+            <option value="random">Random</option>
+          </select>
+        </label>
+
+        <div class="setting-row">
+          <span>
+            <strong>Now playing</strong>
+            <small id="musicNowPlaying">—</small>
+          </span>
+          <span class="setting-control">
+            <button id="musicNextTrack" type="button">Next track ⏭</button>
+          </span>
+        </div>
+
+        <label class="setting-row">
+          <span>
             <strong>Ambient volume</strong>
             <small>World environmental layer; ducks below important audio</small>
           </span>
@@ -838,6 +1315,17 @@
           <span class="setting-control range-control">
             <input id="sfxVolume" type="range" min="0" max="1" step="0.05" />
             <output id="sfxValue">50%</output>
+          </span>
+        </label>
+
+        <label class="setting-row">
+          <span>
+            <strong>Credit sound volume</strong>
+            <small>Crystal drops and pickups, on top of SFX volume · 100% = default</small>
+          </span>
+          <span class="setting-control range-control">
+            <input id="creditVolume" type="range" min="0" max="2" step="0.1" />
+            <output id="creditVolumeValue">100%</output>
           </span>
         </label>
 

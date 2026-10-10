@@ -1172,7 +1172,9 @@ Character-specific resource
 
 Energy is tactical in-stage Energy.
 
-There is no mobile-style stamina that blocks play.
+Campaign deployment now uses Warp Charge under the owner-approved V3 policy.
+Free Practice and Smart Review remain available without Warp. See the 2026-10-04
+implementation checkpoint below; in-stage Energy remains a separate tactical resource.
 
 ## System 13 — Buff / Debuff / Status
 
@@ -3921,3 +3923,59 @@ No recovery rules, item counts, Campaign progression, checkpoint semantics or ga
 - No other child gitlink was changed by M25.
 - Expansion roadmap M00-M25 is complete.
 - M22 closure remains intentionally evidence-honest: owner acceptance closes the roadmap gate, while untouched manual recorder rows remain PENDING regression checks and are not retroactively claimed PASS.
+
+
+## 2026-10-04 — Voice and Warp Charge implementation checkpoint
+
+Current feature branches: child `feat/bgv-integration-current`, parent
+`sinhvienaiti/typing-game` `feat/space-voice-platform`. The parent pins the tested
+child implementation; main-branch/older roadmap history above remains historical.
+
+- English offline streaming Vosk Worker, AudioWorklet capture/resampling, bounded
+  queues, timestamped target snapshots and lifecycle cancellation/ACK timeouts.
+- Bottom-right Typing/Voice/Hybrid selector, Mic control and compact heard-word
+  feedback. Portal owns the microphone; use its Space route.
+- Source-aware semantic completion, global target reservations, Hybrid keyboard
+  ownership, separate speaking/profile credit and no fake typing statistics.
+- Warp Charge V3: Active 100, Reserve 300, Campaign/Hidden deployment 10, regeneration
+  every 6/12 minutes sequentially; Reserve opt-in. Refuel +20 costs 8/12/18 SC,
+  max three per 04:00 UTC+7 day. Free Practice/Review preserve learning only.
+- Canonical IndexedDB transactions, Web Lock writer, generation/fence/sequence and
+  receipt barriers; atomic clear/Phoenix, prepared/crash semantics, schema 28
+  migration and explicit whole-profile recovery. Expedition/Duel stay isolated.
+- Self-review removed obsolete save/import paths and repeated hot-path work;
+  High/Ultra graphics are retained.
+- Final automated evidence: 253 files / 1,623 game tests, 105 parent Voice/Learning
+  tests, both builds, canonical contract and real Worker/WASM WAV decoding passed.
+- The 104-scenario production-formula economy audit preserves refills as daily
+  limited acceleration, not a proven SC sink or measured human pacing.
+
+Real microphone/browser, visual/device acceptance, recognition corpus, negative
+audio soak and end-to-end/frame benchmarks remain unverified in this environment.
+Do not infer release certification from automated results. The current detailed
+sources are [Voice status](./VOICE_FINAL_V2_IMPLEMENTATION_STATUS.md) and
+[Warp Charge status](./WARP_CHARGE_IMPLEMENTATION_STATUS.md).
+
+### Local browser follow-up — 2026-10-04 (working tree)
+
+See [Voice/Warp fix review](./VOICE_WARP_FIX_REVIEW_2026-10-04.md).
+Parent Vite HTTP archive encoding caused the confirmed checksum failure; fixed in
+parent middleware/cache verification, not by disabling hashes. Built-in boss
+counter `unbind` blocked all Voice preflight and is replaced with supported
+`unlock`. Title pilot card now has Warp balance/bar/Reserve/regen and a `+` depot
+dialog; real temporary-profile deploy verified 100→90, Practice stayed 100.
+108 targeted game tests and 69 parent Voice tests passed. Browser Voice connects
+and standalone speech fixture decoding passes, but real Portal + gameplay still
+reproduced audio overload on this loaded Mac. This is **partial acceptance**, not
+full Voice release certification. No real user's save or microphone was used.
+
+Second local review: bounded FIR coefficient cache, generation-fenced runtime
+errors (including paused), single-flight recognizer preparation and close fencing
+are added in parent. Game transactions now snapshot mutable intent/context/quote
+before queued work, and Refuel shows cost, affordability and Active/Reserve gains.
+Latest: 77 parent Voice tests, 134 targeted game tests, both tsc/direct Vite builds
+pass. Full game suite: 1,632 pass / 3 fail; the two simulation timeouts pass when
+rerun with one worker, VFX alpha integrity still fails on existing media.
+Two synthetic-speech Portal+combat runs still overflow; standalone speech passes.
+Voice combat remains NOT ACCEPTED. Detailed evidence and next profiling gate are
+in `VOICE_WARP_FIX_REVIEW_2026-10-04.md`. No save reset, media edits, commit or push.

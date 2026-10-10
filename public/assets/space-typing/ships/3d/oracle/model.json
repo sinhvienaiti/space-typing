@@ -1,0 +1,67 @@
+{
+  "id": "oracle",
+  "version": 3,
+  "aspect": 0.9983,
+  "heightScale": 0.1606,
+  "heightGrid": [
+    256,
+    256
+  ],
+  "nozzles": [
+    [
+      0.2677,
+      0.7348,
+      0.0561
+    ],
+    [
+      0.4996,
+      0.7643,
+      0.0594
+    ],
+    [
+      0.731,
+      0.7348,
+      0.0565
+    ]
+  ],
+  "anchors": {
+    "nose": [
+      0.5013,
+      0.0272
+    ],
+    "canopy": [
+      0.5003,
+      0.4502
+    ],
+    "eyes": [],
+    "guns": [
+      [
+        0.2465,
+        0.298
+      ],
+      [
+        0.7369,
+        0.298
+      ]
+    ],
+    "wingtips": [
+      [
+        0.0272,
+        0.7875
+      ],
+      [
+        0.972,
+        0.7866
+      ]
+    ]
+  },
+  "colors": {
+    "hot": "#ffe6fb",
+    "plume": "#ff58e3",
+    "outer": "#b840a4",
+    "accent": "#ff69cd"
+  },
+  "color": "color.webp?v=a78a851740fb",
+  "emissive": "emissive.webp?v=0af638aaaacf",
+  "height": "height.bin?v=fbd42a201d71"
+}

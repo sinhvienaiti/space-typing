@@ -25,6 +25,11 @@ export type AudioAssetRef = {
   id: string;
   localPath?: string;
   defaultPath?: string;
+  /**
+   * Stems of one song share a group: switching between them keeps the
+   * playback position, so the music rises and falls instead of restarting.
+   */
+  syncGroup?: string;
 };
 
 export type DuckingProfile = {
@@ -155,31 +160,34 @@ function fallbackAsset(
   };
 }
 
+/**
+ * World music now comes from the song library (music-library.ts: Galaxy
+ * playlists of generated songs, see docs/MUSIC_SYSTEM.md). These base and
+ * intense assets remain the fallback when the library is empty.
+ */
 function worldProfile(world: WorldProfile): WorldMusicProfile {
   const worldFile = world.id + ".ogg";
-  const baseTrack = {
+  const baseTrack: AudioAssetRef = {
     ...SHARED.calm,
     id: world.id + "-base",
     localPath: "/local-assets/music/" + worldFile,
   };
-  const ambient = fallbackAsset(
-    world.id + "-ambient",
-    worldFile,
-    "engine-loop.ogg",
-    "ambient",
-  );
+  const intenseTrack: AudioAssetRef = { ...SHARED.intense, id: world.id + "-intense" };
+  const ambient: AudioAssetRef = {
+    id: world.id + "-ambient",
+    // Keep optional per-World ambient overrides, but do not fall back to the
+    // bundled 5-second engine loop. Its audible loop seam reads like a
+    // helicopter/rotor pulse during long gameplay sessions.
+    localPath: "/local-assets/ambient/" + worldFile,
+  };
   return {
     id: world.musicProfile,
     worldId: world.id,
     baseTrack,
-    // Keep one neutral engine bed only. The former computer-loop layer
-    // produced the repetitive high-pitched "beep" heard throughout normal
-    // gameplay and stacked on top of the newer music mix.
+    // Ambient is opt-in per World. There is intentionally no bundled
+    // fallback loop: both short generic loops proved repetitive in gameplay.
     ambientLayers: [ambient],
-    intenseTrackOrLayer: {
-      ...SHARED.intense,
-      id: world.id + "-intense",
-    },
+    intenseTrackOrLayer: intenseTrack,
     miniBossTrack: SHARED.miniBoss,
     worldBossTrack: SHARED.worldBoss,
     galaxyBossTrack: SHARED.galaxyBoss,
@@ -199,7 +207,7 @@ function worldProfile(world: WorldProfile): WorldMusicProfile {
     },
     preloadHints: [
       baseTrack,
-      SHARED.intense,
+      intenseTrack,
       SHARED.miniBoss,
       SHARED.worldBoss,
     ],

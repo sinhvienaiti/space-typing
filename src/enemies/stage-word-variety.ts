@@ -62,6 +62,7 @@ export class StageWordLedger {
     vocabularyLevel: number,
     activeWords: readonly string[],
     random = Math.random(),
+    admitCandidate: (entry: VocabularyEntry) => boolean = () => true,
   ): VocabularyEntry | null {
     // The selected vocabulary and level stay constant through a stage.
     // Cache expensive score calculation; only score distances and sorting
@@ -124,7 +125,7 @@ export class StageWordLedger {
     const wide = all;
 
     const available = (pool: Candidate[]): Candidate[] =>
-      pool.filter((candidate) => !active.has(candidate.key));
+      pool.filter((candidate) => !active.has(candidate.key) && admitCandidate(candidate.entry));
     const unseen = (pool: Candidate[]): Candidate[] =>
       pool.filter((candidate) => this.count(candidate.key) === 0);
 

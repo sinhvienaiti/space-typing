@@ -25,6 +25,7 @@ export type DifficultySettings = {
   customFireRate: number;
   customSpawnRate: number;
   profile: AdaptiveProfile;
+  inputProfiles?: Partial<Record<"voice" | "hybrid", { encounters: number; voiceWords: number; elapsedSeconds: number; keyboardProfile?: AdaptiveProfile }>>;
 };
 
 export function createDifficultySettings(): DifficultySettings {
@@ -63,6 +64,7 @@ export function sanitizeDifficultySettings(
     customFireRate?: unknown;
     customSpawnRate?: unknown;
     profile?: unknown;
+    inputProfiles?: DifficultySettings["inputProfiles"];
   };
 
   return {
@@ -86,6 +88,11 @@ export function sanitizeDifficultySettings(
     customSpawnRate: typeof raw.customSpawnRate === "number" && Number.isFinite(raw.customSpawnRate)
       ? clamp(raw.customSpawnRate, 0.1, 1.45) : fallback.customSpawnRate,
     profile: sanitizeAdaptiveProfile(raw.profile),
+    ...(raw.inputProfiles && typeof raw.inputProfiles === "object" ? { inputProfiles: Object.fromEntries((["voice", "hybrid"] as const).flatMap(mode => {
+      const p = raw.inputProfiles?.[mode];
+      if (!p || ![p.encounters, p.voiceWords, p.elapsedSeconds].every(n => typeof n === "number" && Number.isFinite(n) && n >= 0)) return [];
+      return [[mode, { encounters: Math.min(10000, Math.floor(p.encounters)), voiceWords: Math.min(1e7, Math.floor(p.voiceWords)), elapsedSeconds: Math.min(1e9, p.elapsedSeconds), ...(p.keyboardProfile ? { keyboardProfile: sanitizeAdaptiveProfile(p.keyboardProfile) } : {}) }]];
+    })) } : {}),
   };
 }
 
@@ -93,8 +100,16 @@ export function recordDifficultyResult(
   input: DifficultySettings,
   wpm: number,
   accuracy: number,
+  source?: { mode: "typing" | "voice" | "hybrid"; voiceWords: number; elapsedSeconds: number },
 ): DifficultySettings {
   const state = sanitizeDifficultySettings(input);
+  if (source && source.mode !== "typing") {
+    const previous = state.inputProfiles?.[source.mode] ?? { encounters: 0, voiceWords: 0, elapsedSeconds: 0 };
+    return { ...state, inputProfiles: { ...state.inputProfiles, [source.mode]: {
+      encounters: Math.min(10000, previous.encounters + 1), voiceWords: Math.min(1e7, previous.voiceWords + Math.max(0, source.voiceWords)), elapsedSeconds: Math.min(1e9, previous.elapsedSeconds + Math.max(0, source.elapsedSeconds)),
+      ...(source.mode === "hybrid" ? { keyboardProfile: recordAdaptiveResult(previous.keyboardProfile ?? createAdaptiveProfile(), wpm, accuracy) } : {}),
+    } } };
+  }
   return {
     ...state,
     profile: recordAdaptiveResult(state.profile, wpm, accuracy),
@@ -105,14 +120,16 @@ export function difficultyInputFromSettings(
   input: DifficultySettings,
   stage: number,
   vocabularyLevel: number,
+  mode: "typing" | "voice" | "hybrid" = "typing",
 ): DifficultyInput {
   const state = sanitizeDifficultySettings(input);
+  const profile = mode === "typing" ? state.profile : mode === "hybrid" ? state.inputProfiles?.hybrid?.keyboardProfile ?? createAdaptiveProfile() : createAdaptiveProfile();
   return {
     stage,
     mode: state.mode,
     vocabularyLevel,
-    recentWpm: state.profile.smoothedWpm,
-    recentAccuracy: state.profile.smoothedAccuracy,
+    recentWpm: profile.smoothedWpm,
+    recentAccuracy: profile.smoothedAccuracy,
     customTargetWpm: state.customTargetWpm,
     customPressure: state.customPressure,
     customEnemySpeed: state.customEnemySpeed,

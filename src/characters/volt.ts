@@ -5,7 +5,7 @@ export const VOLT_ACTIVE_SKILL_ID = "volt-emp-burst" as const;
 
 export const VOLT_ACTIVE_SKILL: SkillDefinition = {
   id: VOLT_ACTIVE_SKILL_ID,
-  name: "EMP Burst",
+  name: "Storm Coil",
   energyCost: 30,
   cooldown: 12,
   charges: null,
