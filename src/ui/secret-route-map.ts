@@ -52,6 +52,13 @@ export function hiddenStopArrivalButtonId(
     : "blackMarketButton";
 }
 
+
+export function hiddenStopArrivalCanPresent(
+  stageCleared: boolean,
+  checkpointHubOpen: boolean,
+): boolean {
+  return stageCleared && !checkpointHubOpen;
+}
 function byId<T extends HTMLElement>(root: Document, id: string): T | null {
   return root.getElementById(id) as T | null;
 }
@@ -339,18 +346,30 @@ function renderHiddenStopArrival(
   arrival: HiddenStopArrival,
   onDismiss: () => void,
 ): void {
-  clearSecretArrival(root);
   const dialog = byId<HTMLDialogElement>(root, "stageSelectDialog");
+  const restHubDialog = byId<HTMLDialogElement>(root, "restHubDialog");
   const grid = byId(root, "stageGrid");
   const parent = grid?.parentElement ?? null;
   if (
-    dialog?.open !== true ||
+    dialog === null ||
     grid === null ||
     parent === null ||
-    !hiddenStopStageIsCleared(root, arrival)
+    !hiddenStopArrivalCanPresent(
+      hiddenStopStageIsCleared(root, arrival),
+      restHubDialog?.open === true,
+    )
   ) {
     return;
   }
+
+  if (!dialog.open) {
+    if (typeof dialog.showModal === "function") {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute("open", "");
+    }
+  }
+  clearSecretArrival(root);
 
   const panel = root.createElement("section");
   panel.id = SECRET_ARRIVAL_ID;
@@ -426,9 +445,11 @@ export function installSecretRouteMap(root: Document = document): () => void {
 
   const onDiscovery = () => renderMap();
   const onArrival = (event: Event) => {
-    const detail = (event as CustomEvent<unknown>).detail;
-    if (isHiddenStopArrival(detail)) pendingArrival = detail;
-  };
+  const detail = (event as CustomEvent<unknown>).detail;
+  if (!isHiddenStopArrival(detail)) return;
+  pendingArrival = detail;
+  renderMap();
+};
   const onClick = (event: Event) => {
     const target = event.target;
     if (
@@ -439,8 +460,23 @@ export function installSecretRouteMap(root: Document = document): () => void {
       renderSectorDetail(root);
     }
   };
+  const restHubDialog = byId<HTMLDialogElement>(root, "restHubDialog");
+  const stageSelectDialog = byId<HTMLDialogElement>(root, "stageSelectDialog");
+  const onRestHubClose = () => renderMap();
+  const onStageSelectClose = () => {
+    if (
+      pendingArrival !== null &&
+      byId(root, SECRET_ARRIVAL_ID) !== null
+    ) {
+      pendingArrival = null;
+      clearSecretArrival(root);
+    }
+  };
+
   window.addEventListener(HIDDEN_DISCOVERY_PRESENTATION_EVENT, onDiscovery);
   window.addEventListener(HIDDEN_STOP_ARRIVAL_EVENT, onArrival);
+  restHubDialog?.addEventListener("close", onRestHubClose);
+  stageSelectDialog?.addEventListener("close", onStageSelectClose);
   root.addEventListener("click", onClick);
   renderMap();
 
@@ -448,6 +484,8 @@ export function installSecretRouteMap(root: Document = document): () => void {
     observer.disconnect();
     window.removeEventListener(HIDDEN_DISCOVERY_PRESENTATION_EVENT, onDiscovery);
     window.removeEventListener(HIDDEN_STOP_ARRIVAL_EVENT, onArrival);
+    restHubDialog?.removeEventListener("close", onRestHubClose);
+    stageSelectDialog?.removeEventListener("close", onStageSelectClose);
     root.removeEventListener("click", onClick);
     clearSecretPreview(root);
     clearSecretArrival(root);

@@ -16,6 +16,7 @@ import {
 import {
   activateSecretRoutePresentation,
   hiddenStopArrivalButtonId,
+  hiddenStopArrivalCanPresent,
 } from "../src/ui/secret-route-map";
 
 describe("secret Campaign route", () => {
@@ -204,6 +205,12 @@ describe("secret Campaign route", () => {
     expect(onPreviewRoute).toHaveBeenCalledTimes(1);
     expect(onPreviewRoute).toHaveBeenCalledWith(shop);
   });
+
+  it("presents hidden-stop arrival only after clear and after checkpoint hub", () => {
+  expect(hiddenStopArrivalCanPresent(false, false)).toBe(false);
+  expect(hiddenStopArrivalCanPresent(true, true)).toBe(false);
+  expect(hiddenStopArrivalCanPresent(true, false)).toBe(true);
+});
 
   it("does not replay a hidden-stop arrival while hydrating an existing save", () => {
     const loaded = createHiddenDiscoveryState("campaign-arrival-hydrate");
