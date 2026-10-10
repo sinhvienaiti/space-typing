@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   CorruptExpansionV2ProfileError,
   EXPANSION_V2_PROFILE_KEY,
@@ -6,6 +6,7 @@ import {
   createExpansionV2Profile,
   loadExpansionV2Profile,
   recordExpansionRun,
+  recordFixedChallengeResult,
   saveExpansionV2Profile,
 } from "../src/expansion-v2/profile-store";
 
@@ -100,24 +101,30 @@ describe("Expansion V2 profile persistence", () => {
     expect(loaded.bestScore).toBe(13000);
     expect(loaded.history.events).toHaveLength(1);
     expect(loaded.history.events[0]).toMatchObject({
-      eventId: "expedition-run:history-run:completed",
+      eventId: "expedition-run:history-run:terminal",
       runId: "history-run",
       outcome: "completed",
       score: 13000,
     });
   });
 
-  it("records a completed run once but never fabricates incomplete terminal history", () => {
+  it("records unresolved terminal outcomes explicitly instead of fabricating defeat or abandon", () => {
     const base = createExpansionV2Profile();
-    const incomplete = recordExpansionRun(base, {
-      runId: "incomplete-run",
+    const unresolved = recordExpansionRun(base, {
+      runId: "unresolved-run",
       score: 5,
       completed: false,
       occurredAtMs: 100,
     });
-    expect(incomplete.history.events).toEqual([]);
 
-    const completed = recordExpansionRun(incomplete, {
+    expect(unresolved.history.events).toHaveLength(1);
+    expect(unresolved.history.events[0]).toMatchObject({
+      runId: "unresolved-run",
+      outcome: "unknown",
+      score: 5,
+    });
+
+    const completed = recordExpansionRun(unresolved, {
       runId: "complete-run",
       score: 10,
       completed: true,
@@ -130,9 +137,109 @@ describe("Expansion V2 profile persistence", () => {
       occurredAtMs: 300,
     });
 
-    expect(completed.history.events).toHaveLength(1);
+    expect(completed.history.events).toHaveLength(2);
     expect(replay).toBe(completed);
-    expect(replay.history.events).toHaveLength(1);
-    expect(replay.history.events[0]?.occurredAtMs).toBe(200);
+    expect(replay.history.events).toHaveLength(2);
+    expect(replay.history.events[1]?.occurredAtMs).toBe(200);
+  });
+
+  it("enriches challenge metrics by run id while keeping non-PB attempts in history", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-10T12:30:00.000Z"));
+    try {
+      const identityKey = "2026-10-10|123|rules|content|words|kit|normal|standard|frozen";
+      let profile = recordExpansionRun(createExpansionV2Profile(), {
+        runId: "daily-best",
+        score: 100,
+        completed: true,
+        occurredAtMs: 100,
+      });
+      profile = recordFixedChallengeResult(profile, {
+        identityKey,
+        runId: "daily-best",
+        completedEncounters: 2,
+        score: 100,
+        accuracy: 93,
+        activeSeconds: 50,
+        retried: false,
+        assisted: false,
+      }, []);
+
+      expect(profile.history.events).toHaveLength(1);
+      expect(profile.history.events[0]).toMatchObject({
+        eventId: "expedition-run:daily-best:terminal",
+        occurredAtMs: 100,
+        outcome: "completed",
+        challengeKind: "daily",
+        accuracyPercent: 93,
+        activeSeconds: 50,
+        retried: false,
+        assisted: false,
+      });
+      expect(profile.pbByIdentity[identityKey]?.runId).toBe("daily-best");
+
+      profile = recordExpansionRun(profile, {
+        runId: "daily-worse",
+        score: 50,
+        completed: false,
+        occurredAtMs: 200,
+      });
+      profile = recordFixedChallengeResult(profile, {
+        identityKey,
+        runId: "daily-worse",
+        completedEncounters: 2,
+        score: 50,
+        accuracy: 80,
+        activeSeconds: 70,
+        retried: true,
+        assisted: true,
+      }, []);
+
+      expect(profile.history.events).toHaveLength(2);
+      expect(profile.history.events[1]).toMatchObject({
+        runId: "daily-worse",
+        outcome: "unknown",
+        challengeKind: "daily",
+        accuracyPercent: 80,
+        activeSeconds: 70,
+        retried: true,
+        assisted: true,
+      });
+      expect(profile.pbByIdentity[identityKey]?.runId).toBe("daily-best");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("recognizes canonical weekly challenge identity during historical enrichment", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-10T12:30:00.000Z"));
+    try {
+      const profile = recordFixedChallengeResult(
+        createExpansionV2Profile(),
+        {
+          identityKey: "weekly|2026-W41|123|rules|content|words|kit|normal|standard|frozen",
+          runId: "weekly-run",
+          completedEncounters: 1,
+          score: 42,
+          accuracy: 88,
+          activeSeconds: 30,
+          retried: false,
+          assisted: false,
+        },
+        [],
+      );
+
+      expect(profile.history.events).toHaveLength(1);
+      expect(profile.history.events[0]).toMatchObject({
+        runId: "weekly-run",
+        outcome: "unknown",
+        challengeKind: "weekly",
+        accuracyPercent: 88,
+        activeSeconds: 30,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

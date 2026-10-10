@@ -6,6 +6,7 @@ import {
   createHistoricalAnalyticsState,
   sanitizeHistoricalAnalyticsState,
   type HistoricalRunSettledEventV1,
+  upsertHistoricalRunEvent,
   utcDayKey,
   utcWeekKey,
 } from "../src/expansion-v2/historical-analytics";
@@ -27,6 +28,7 @@ function event(
     activeSeconds: 60,
     challengeKind: null,
     retryCount: 0,
+    retried: false,
     assisted: false,
     leaderboardEligible: true,
     ...overrides,
@@ -34,28 +36,83 @@ function event(
 }
 
 describe("historical analytics store", () => {
-  it("appends valid events and ignores duplicate event ids idempotently", () => {
+  it("appends valid events and ignores duplicate event ids or run ids idempotently", () => {
     const initial = createHistoricalAnalyticsState();
     const first = appendHistoricalEvent(initial, event("a", 1_000));
-    const duplicate = appendHistoricalEvent(first, event("a", 2_000, { score: 999 }));
+    const duplicateId = appendHistoricalEvent(first, event("a", 2_000, { score: 999 }));
+    const duplicateRun = appendHistoricalEvent(first, event("other", 3_000, {
+      runId: "run-a",
+      score: 777,
+    }));
 
     expect(first.events).toHaveLength(1);
-    expect(duplicate.events).toEqual(first.events);
-    expect(duplicate.events[0]?.score).toBe(100);
+    expect(duplicateId.events).toEqual(first.events);
+    expect(duplicateRun.events).toEqual(first.events);
+    expect(duplicateId.events[0]?.score).toBe(100);
+  });
+
+  it("upserts authoritative enrichment by run id without downgrading a known outcome", () => {
+    let state = appendHistoricalEvent(
+      createHistoricalAnalyticsState(),
+      event("base", 2_000, {
+        runId: "shared-run",
+        outcome: "completed",
+        accuracyPercent: null,
+        activeSeconds: null,
+        challengeKind: null,
+        retryCount: null,
+        retried: null,
+        assisted: null,
+        leaderboardEligible: null,
+      }),
+    );
+
+    state = upsertHistoricalRunEvent(state, event("enrichment", 3_000, {
+      runId: "shared-run",
+      outcome: "unknown",
+      score: 125,
+      accuracyPercent: 92,
+      activeSeconds: 55,
+      challengeKind: "weekly",
+      retryCount: null,
+      retried: true,
+      assisted: false,
+      leaderboardEligible: null,
+    }));
+
+    expect(state.events).toHaveLength(1);
+    expect(state.events[0]).toMatchObject({
+      eventId: "base",
+      occurredAtMs: 2_000,
+      runId: "shared-run",
+      outcome: "completed",
+      score: 125,
+      accuracyPercent: 92,
+      activeSeconds: 55,
+      challengeKind: "weekly",
+      retried: true,
+      assisted: false,
+    });
   });
 
   it("sanitizes malformed and version-skewed rows without poisoning valid history", () => {
+    const legacyWithoutRetried = {
+      ...event("legacy", 1_500),
+    } as Record<string, unknown>;
+    delete legacyWithoutRetried.retried;
     const state = sanitizeHistoricalAnalyticsState({
       version: 1,
       events: [
         event("valid", 1_000),
+        legacyWithoutRetried,
         { ...event("future", 2_000), version: 9 },
         { ...event("bad-accuracy", 3_000), accuracyPercent: 101 },
         null,
       ],
     });
 
-    expect(state.events.map((row) => row.eventId)).toEqual(["valid"]);
+    expect(state.events.map((row) => row.eventId)).toEqual(["valid", "legacy"]);
+    expect(state.events[1]?.retried).toBeNull();
     expect(sanitizeHistoricalAnalyticsState({ version: 9, events: [event("x", 1)] }))
       .toEqual(createHistoricalAnalyticsState());
   });
@@ -96,8 +153,18 @@ describe("historical analytics store", () => {
       score: 50,
       accuracyPercent: 80,
       assisted: true,
-      retryCount: 2,
+      retryCount: null,
+      retried: true,
       leaderboardEligible: false,
+    }));
+    state = appendHistoricalEvent(state, event("unknown", start + 2, {
+      outcome: "unknown",
+      score: 25,
+      accuracyPercent: null,
+      retryCount: null,
+      retried: null,
+      assisted: null,
+      leaderboardEligible: null,
     }));
     state = appendHistoricalEvent(state, event("next-day", end));
 
@@ -106,12 +173,13 @@ describe("historical analytics store", () => {
 
     expect(second).toEqual(first);
     expect(first).toMatchObject({
-      runCount: 2,
+      runCount: 3,
       completedRuns: 1,
       defeatedRuns: 1,
       abandonedRuns: 0,
+      unknownRuns: 1,
       invalidRuns: 0,
-      averageScore: 75,
+      averageScore: 175 / 3,
       averageAccuracyPercent: 85,
       assistedRuns: 1,
       retriedRuns: 1,
@@ -125,6 +193,7 @@ describe("historical analytics store", () => {
       endMs: 10,
     })).toMatchObject({
       runCount: 0,
+      unknownRuns: 0,
       averageScore: null,
       averageAccuracyPercent: null,
     });

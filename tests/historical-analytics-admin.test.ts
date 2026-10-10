@@ -36,6 +36,7 @@ describe("Historical Analytics admin surface", () => {
       activeSeconds: 40,
       challengeKind: "weekly",
       retryCount: 0,
+      retried: false,
       assisted: false,
       leaderboardEligible: true,
     });
@@ -51,6 +52,7 @@ describe("Historical Analytics admin surface", () => {
       activeSeconds: 10,
       challengeKind: null,
       retryCount: null,
+      retried: null,
       assisted: null,
       leaderboardEligible: null,
     });
@@ -65,10 +67,43 @@ describe("Historical Analytics admin surface", () => {
       runCount: 1,
       completedRuns: 1,
       defeatedRuns: 0,
+      unknownRuns: 0,
       averageScore: 120,
       averageAccuracyPercent: 96,
       leaderboardEligibleRuns: 1,
     });
     expect(surface.diagnostics.join(" ")).toContain("current player profile");
+  });
+
+  it("surfaces unresolved terminal outcomes instead of silently classifying them", () => {
+    const profile = createExpansionV2Profile();
+    profile.history = appendHistoricalEvent(profile.history, {
+      version: 1,
+      eventId: "unknown-run",
+      occurredAtMs: DAY_START + 1,
+      kind: "run-settled",
+      runId: "unknown",
+      outcome: "unknown",
+      score: 10,
+      accuracyPercent: 90,
+      activeSeconds: 20,
+      challengeKind: "daily",
+      retryCount: null,
+      retried: true,
+      assisted: false,
+      leaderboardEligible: null,
+    });
+
+    const surface = buildHistoricalAnalyticsAdminSurface(
+      profile,
+      { startMs: DAY_START, endMs: DAY_END },
+    );
+    const outcomes = surface.rows.find((row) => row.id === "outcomes");
+
+    expect(surface.aggregate.unknownRuns).toBe(1);
+    expect(outcomes?.label).toContain("Unknown");
+    expect(outcomes?.value).toBe("0 / 0 / 0 / 1 / 0");
+    expect(outcomes?.status).toBe("warning");
+    expect(surface.diagnostics.join(" ")).toContain("intentionally unknown");
   });
 });

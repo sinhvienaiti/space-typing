@@ -6,9 +6,9 @@ import {
   type PersonalGhostRecord,
 } from "./challenge";
 import {
-  appendHistoricalEvent,
   createHistoricalAnalyticsState,
   sanitizeHistoricalAnalyticsState,
+  upsertHistoricalRunEvent,
   type HistoricalAnalyticsState,
 } from "./historical-analytics";
 import {
@@ -254,24 +254,24 @@ export function recordExpansionRun(
     ].slice(-256),
   };
 
-  if (!input.completed) return base;
   const now = input.occurredAtMs ?? Date.now();
   if (!Number.isSafeInteger(now) || now < 0) return base;
 
   return {
     ...base,
-    history: appendHistoricalEvent(base.history, {
+    history: upsertHistoricalRunEvent(base.history, {
       version: 1,
-      eventId: "expedition-run:" + input.runId + ":completed",
+      eventId: "expedition-run:" + input.runId + ":terminal",
       occurredAtMs: now,
       kind: "run-settled",
       runId: input.runId,
-      outcome: "completed",
+      outcome: input.completed ? "completed" : "unknown",
       score,
       accuracyPercent: null,
       activeSeconds: null,
       challengeKind: null,
       retryCount: null,
+      retried: null,
       assisted: null,
       leaderboardEligible: null,
     }),
@@ -298,8 +298,31 @@ export function recordFixedChallengeResult(
   record: ExpeditionPbRecord,
   points: readonly PersonalGhostPoint[],
 ): ExpansionV2Profile {
-  const current = profile.pbByIdentity[record.identityKey] ?? null;
-  if (!betterPb(record, current)) return profile;
+  const challengeKind = record.identityKey.startsWith("weekly|")
+    ? "weekly"
+    : "daily";
+  const withHistory: ExpansionV2Profile = {
+    ...profile,
+    history: upsertHistoricalRunEvent(profile.history, {
+      version: 1,
+      eventId: "challenge-run:" + record.runId + ":terminal",
+      occurredAtMs: Date.now(),
+      kind: "run-settled",
+      runId: record.runId,
+      outcome: "unknown",
+      score: record.score,
+      accuracyPercent: record.accuracy,
+      activeSeconds: record.activeSeconds,
+      challengeKind,
+      retryCount: null,
+      retried: record.retried,
+      assisted: record.assisted,
+      leaderboardEligible: null,
+    }),
+  };
+
+  const current = withHistory.pbByIdentity[record.identityKey] ?? null;
+  if (!betterPb(record, current)) return withHistory;
 
   const boundedPoints = [...points]
     .filter(
@@ -316,13 +339,13 @@ export function recordFixedChallengeResult(
     .map((point) => ({ ...point }));
 
   return {
-    ...profile,
+    ...withHistory,
     pbByIdentity: {
-      ...profile.pbByIdentity,
+      ...withHistory.pbByIdentity,
       [record.identityKey]: record,
     },
     ghostByIdentity: {
-      ...profile.ghostByIdentity,
+      ...withHistory.ghostByIdentity,
       [record.identityKey]: {
         identityKey: record.identityKey,
         points: boundedPoints,

@@ -5,6 +5,7 @@ export type HistoricalRunOutcome =
   | "completed"
   | "defeated"
   | "abandoned"
+  | "unknown"
   | "invalid";
 
 export type HistoricalChallengeKind =
@@ -25,6 +26,7 @@ export type HistoricalRunSettledEventV1 = {
   activeSeconds: number | null;
   challengeKind: HistoricalChallengeKind | null;
   retryCount: number | null;
+  retried: boolean | null;
   assisted: boolean | null;
   leaderboardEligible: boolean | null;
 };
@@ -47,6 +49,7 @@ export type HistoricalAggregate = {
   completedRuns: number;
   defeatedRuns: number;
   abandonedRuns: number;
+  unknownRuns: number;
   invalidRuns: number;
   averageScore: number | null;
   averageAccuracyPercent: number | null;
@@ -71,6 +74,7 @@ function validOutcome(value: unknown): value is HistoricalRunOutcome {
   return value === "completed" ||
     value === "defeated" ||
     value === "abandoned" ||
+    value === "unknown" ||
     value === "invalid";
 }
 
@@ -79,6 +83,30 @@ function validChallengeKind(value: unknown): value is HistoricalChallengeKind {
     value === "daily" ||
     value === "weekly" ||
     value === "qa";
+}
+
+function mergeHistoricalRunEvents(
+  existing: HistoricalEventV1,
+  incoming: HistoricalEventV1,
+): HistoricalEventV1 {
+  const outcome =
+    incoming.outcome === "unknown" && existing.outcome !== "unknown"
+      ? existing.outcome
+      : incoming.outcome;
+  return {
+    ...existing,
+    occurredAtMs: Math.min(existing.occurredAtMs, incoming.occurredAtMs),
+    outcome,
+    score: incoming.score,
+    accuracyPercent: incoming.accuracyPercent ?? existing.accuracyPercent,
+    activeSeconds: incoming.activeSeconds ?? existing.activeSeconds,
+    challengeKind: incoming.challengeKind ?? existing.challengeKind,
+    retryCount: incoming.retryCount ?? existing.retryCount,
+    retried: incoming.retried ?? existing.retried,
+    assisted: incoming.assisted ?? existing.assisted,
+    leaderboardEligible:
+      incoming.leaderboardEligible ?? existing.leaderboardEligible,
+  };
 }
 
 export function createHistoricalAnalyticsState(): HistoricalAnalyticsState {
@@ -127,6 +155,9 @@ export function sanitizeHistoricalEvent(
   const retryCount = value.retryCount;
   if (retryCount !== null && !nonNegativeInteger(retryCount)) return null;
 
+  const retried = value.retried === undefined ? null : value.retried;
+  if (retried !== null && typeof retried !== "boolean") return null;
+
   const assisted = value.assisted;
   if (assisted !== null && typeof assisted !== "boolean") return null;
 
@@ -147,6 +178,7 @@ export function sanitizeHistoricalEvent(
     activeSeconds,
     challengeKind,
     retryCount,
+    retried,
     assisted,
     leaderboardEligible,
   };
@@ -163,8 +195,14 @@ export function sanitizeHistoricalAnalyticsState(
   const deduped = new Map<string, HistoricalEventV1>();
   for (const row of rows) {
     const event = sanitizeHistoricalEvent(row);
-    if (event === null || deduped.has(event.eventId)) continue;
-    deduped.set(event.eventId, event);
+    if (event === null) continue;
+    const existing = deduped.get(event.runId);
+    deduped.set(
+      event.runId,
+      existing === undefined
+        ? event
+        : mergeHistoricalRunEvents(existing, event),
+    );
   }
 
   return {
@@ -179,12 +217,41 @@ export function appendHistoricalEvent(
 ): HistoricalAnalyticsState {
   const state = sanitizeHistoricalAnalyticsState(stateInput);
   const event = sanitizeHistoricalEvent(eventInput);
-  if (event === null || state.events.some((row) => row.eventId === event.eventId)) {
+  if (
+    event === null ||
+    state.events.some(
+      (row) => row.eventId === event.eventId || row.runId === event.runId,
+    )
+  ) {
     return state;
   }
   return {
     version: HISTORICAL_ANALYTICS_VERSION,
     events: [...state.events, event].slice(-HISTORICAL_ANALYTICS_MAX_EVENTS),
+  };
+}
+
+export function upsertHistoricalRunEvent(
+  stateInput: HistoricalAnalyticsState,
+  eventInput: HistoricalRunSettledEventV1,
+): HistoricalAnalyticsState {
+  const state = sanitizeHistoricalAnalyticsState(stateInput);
+  const event = sanitizeHistoricalEvent(eventInput);
+  if (event === null) return state;
+
+  const index = state.events.findIndex((row) => row.runId === event.runId);
+  if (index < 0) {
+    return {
+      version: HISTORICAL_ANALYTICS_VERSION,
+      events: [...state.events, event].slice(-HISTORICAL_ANALYTICS_MAX_EVENTS),
+    };
+  }
+
+  const events = [...state.events];
+  events[index] = mergeHistoricalRunEvents(events[index]!, event);
+  return {
+    version: HISTORICAL_ANALYTICS_VERSION,
+    events,
   };
 }
 
@@ -226,6 +293,7 @@ export function aggregateHistoricalRuns(
   let completedRuns = 0;
   let defeatedRuns = 0;
   let abandonedRuns = 0;
+  let unknownRuns = 0;
   let invalidRuns = 0;
   let assistedRuns = 0;
   let retriedRuns = 0;
@@ -240,9 +308,13 @@ export function aggregateHistoricalRuns(
     if (event.outcome === "completed") completedRuns += 1;
     else if (event.outcome === "defeated") defeatedRuns += 1;
     else if (event.outcome === "abandoned") abandonedRuns += 1;
+    else if (event.outcome === "unknown") unknownRuns += 1;
     else invalidRuns += 1;
     if (event.assisted === true) assistedRuns += 1;
-    if (event.retryCount !== null && event.retryCount > 0) retriedRuns += 1;
+    if (
+      event.retried === true ||
+      (event.retryCount !== null && event.retryCount > 0)
+    ) retriedRuns += 1;
     if (event.leaderboardEligible === true) leaderboardEligibleRuns += 1;
   }
 
@@ -252,6 +324,7 @@ export function aggregateHistoricalRuns(
     completedRuns,
     defeatedRuns,
     abandonedRuns,
+    unknownRuns,
     invalidRuns,
     averageScore: events.length > 0 ? scoreTotal / events.length : null,
     averageAccuracyPercent: accuracyCount > 0 ? accuracyTotal / accuracyCount : null,

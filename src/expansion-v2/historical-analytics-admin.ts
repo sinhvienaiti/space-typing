@@ -48,6 +48,11 @@ export function buildHistoricalAnalyticsAdminSurface(
   const diagnostics = hasHistory
     ? ["Metrics are derived only from persisted historical events in the current player profile."]
     : ["No historical records exist for this period; live telemetry is not substituted."];
+  if (aggregate.unknownRuns > 0) {
+    diagnostics.push(
+      "Some persisted terminal outcomes are intentionally unknown because the source did not distinguish defeat from abandon.",
+    );
+  }
   diagnostics.push("Cross-player analytics are unsupported without a canonical backend identity/store.");
 
   return {
@@ -66,14 +71,18 @@ export function buildHistoricalAnalyticsAdminSurface(
       },
       {
         id: "outcomes",
-        label: "Completed / Defeated / Abandoned / Invalid",
+        label: "Completed / Defeated / Abandoned / Unknown / Invalid",
         value: [
           aggregate.completedRuns,
           aggregate.defeatedRuns,
           aggregate.abandonedRuns,
+          aggregate.unknownRuns,
           aggregate.invalidRuns,
         ].join(" / "),
-        status: "neutral",
+        status:
+          aggregate.unknownRuns > 0 || aggregate.invalidRuns > 0
+            ? "warning"
+            : "neutral",
       },
       {
         id: "score",
