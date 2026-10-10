@@ -25,6 +25,7 @@
     "music:handovers": "node scripts/music/transition-check.mjs",
     "visual:shot": "node scripts/visual/shot.mjs",
     "visual:crop": "node scripts/visual/crop.mjs",
+    "visual:r01-qa": "node scripts/visual/r01-campaign-qa.mjs",
     "art:prepare": "node scripts/bg-art/prepare-local-art.mjs",
     "reward-art:prepare": "node scripts/bg-art/prepare-credit-puzzle.mjs",
     "pickups:prepare": "node scripts/bg-art/prepare-credit-puzzle.mjs credits",
