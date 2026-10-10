@@ -51,6 +51,12 @@ export type AlternativeMatchSnapshotV1 = {
   scoreByPlayer: Record<AlternativePlayerId, number>;
   pendingImpacts: AlternativeImpact[];
   result: AlternativeMatchResult;
+  rules: {
+    reflexWindowMs: number;
+    impactDelayMs: number;
+    damagePerHit: number;
+  };
+  contentFingerprint: string;
   reflex: {
     prompt: string;
     round: number;
@@ -127,6 +133,8 @@ function cloneSnapshot(snapshot: AlternativeMatchSnapshotV1): AlternativeMatchSn
     scoreByPlayer: { ...snapshot.scoreByPlayer },
     pendingImpacts: snapshot.pendingImpacts.map((impact) => ({ ...impact })),
     result: { ...snapshot.result },
+    rules: { ...snapshot.rules },
+    contentFingerprint: snapshot.contentFingerprint,
     reflex: snapshot.reflex === null ? null : { ...snapshot.reflex },
     wordChain:
       snapshot.wordChain === null
@@ -137,6 +145,33 @@ function cloneSnapshot(snapshot: AlternativeMatchSnapshotV1): AlternativeMatchSn
             usedWords: [...snapshot.wordChain.usedWords],
           },
   };
+}
+
+function fingerprintParts(parts: readonly string[]): string {
+  let hash = 2166136261;
+  for (const part of parts) {
+    for (let index = 0; index < part.length; index += 1) {
+      hash ^= part.charCodeAt(index);
+      hash = Math.imul(hash, 16777619) >>> 0;
+    }
+    hash ^= 0xff;
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
+function runtimeContentFingerprint(input: {
+  mode: AlternativeModeId;
+  reflexPrompts: readonly string[];
+  wordChainLexicon: ReadonlySet<string> | null;
+}): string {
+  if (input.mode === "reflex") {
+    return `reflex:${fingerprintParts(input.reflexPrompts)}`;
+  }
+  const words = input.wordChainLexicon === null
+    ? ["<open-lexicon>"]
+    : [...input.wordChainLexicon].sort();
+  return `word-chain:${fingerprintParts(words)}`;
 }
 
 function deterministicPrompt(
@@ -174,7 +209,9 @@ export class AlternativeMatchRuntime {
 
     this.reflexPrompts = prompts;
     this.reflexWindowMs = Math.max(250, Math.round(options.reflexWindowMs ?? DEFAULT_REFLEX_WINDOW_MS));
-    this.wordChainLexicon = options.wordChainLexicon ?? null;
+    this.wordChainLexicon = options.wordChainLexicon === undefined
+      ? null
+      : new Set([...options.wordChainLexicon].map(normalizeToken));
     this.impactDelayMs = Math.max(0, Math.round(options.impactDelayMs ?? DEFAULT_IMPACT_DELAY_MS));
     this.damagePerHit = Math.max(1, Math.round(options.damagePerHit ?? DEFAULT_DAMAGE));
 
@@ -205,6 +242,16 @@ export class AlternativeMatchRuntime {
       },
       pendingImpacts: [],
       result: { status: "active", winnerId: null },
+      rules: {
+        reflexWindowMs: this.reflexWindowMs,
+        impactDelayMs: this.impactDelayMs,
+        damagePerHit: this.damagePerHit,
+      },
+      contentFingerprint: runtimeContentFingerprint({
+        mode: options.mode,
+        reflexPrompts: this.reflexPrompts,
+        wordChainLexicon: this.wordChainLexicon,
+      }),
       reflex:
         options.mode === "reflex"
           ? {
@@ -243,7 +290,13 @@ export class AlternativeMatchRuntime {
       matchId: snapshot.matchId,
       seed: snapshot.seed,
       startedAtMs: snapshot.startedAtMs,
+      reflexWindowMs: snapshot.rules.reflexWindowMs,
+      impactDelayMs: snapshot.rules.impactDelayMs,
+      damagePerHit: snapshot.rules.damagePerHit,
     });
+    if (runtime.state.contentFingerprint !== snapshot.contentFingerprint) {
+      throw new Error("Alternative match content fingerprint mismatch.");
+    }
     runtime.state = cloneSnapshot(snapshot);
     return runtime;
   }
@@ -262,11 +315,18 @@ export class AlternativeMatchRuntime {
     ) {
       return this.reject("duplicate-sequence");
     }
+    const expiredReflex =
+      input.mode === "reflex" &&
+      this.state.reflex !== null &&
+      input.receivedAtMs > this.state.reflex.roundDeadlineAtMs;
     this.advance(input.receivedAtMs);
     if (this.state.result.status !== "active") {
       return this.reject("finished");
     }
     this.state.lastSequenceByPlayer[input.playerId] = input.sequence;
+    if (expiredReflex) {
+      return this.reject("expired");
+    }
 
     if (input.mode === "reflex") {
       return this.submitReflex(input);

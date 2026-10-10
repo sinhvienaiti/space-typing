@@ -165,6 +165,45 @@ describe("R03 alternative modes runtime", () => {
     })).toMatchObject({ accepted: false, reason: "duplicate-word" });
   });
 
+  it("rejects a stale Reflex answer instead of applying it to the next round", () => {
+    const runtime = new AlternativeMatchRuntime({
+      mode: "reflex",
+      matchType: "friend",
+      matchId: "reflex-stale",
+      seed: 2,
+      startedAtMs: 0,
+      reflexPrompts: ["nova"],
+      reflexWindowMs: 500,
+    });
+    const stale = runtime.submit({
+      type: "MODE_INPUT",
+      mode: "reflex",
+      playerId: "player-1",
+      sequence: 1,
+      text: "nova",
+      receivedAtMs: 501,
+    });
+    expect(stale).toMatchObject({ accepted: false, reason: "expired" });
+    expect(stale.snapshot.scoreByPlayer["player-1"]).toBe(0);
+    expect(stale.snapshot.reflex?.round).toBe(2);
+  });
+
+  it("fails reconnect closed when canonical mode content changed", () => {
+    const runtime = new AlternativeMatchRuntime({
+      mode: "word-chain",
+      matchType: "practice",
+      matchId: "chain-content",
+      seed: 9,
+      startedAtMs: 0,
+      wordChainLexicon: new Set(["nova", "aster"]),
+    });
+    expect(() =>
+      AlternativeMatchRuntime.restore(runtime.snapshot(), {
+        wordChainLexicon: new Set(["nova", "atlas"]),
+      }),
+    ).toThrow(/content fingerprint mismatch/i);
+  });
+
   it("restores Word Chain state without replaying applied impacts", () => {
     const runtime = new AlternativeMatchRuntime({
       mode: "word-chain",
