@@ -1,7 +1,9 @@
 import "./secret-route-map.css";
 import {
   HIDDEN_DISCOVERY_PRESENTATION_EVENT,
+  HIDDEN_STOP_ARRIVAL_EVENT,
   currentHiddenDiscoveryPresentation,
+  type HiddenStopArrival,
 } from "../discovery/hidden-discovery-presentation";
 import {
   secretRoutePresentationsForStage,
@@ -10,6 +12,7 @@ import {
 
 const SECRET_NODE_SELECTOR = ".journey-secret-node";
 const SECRET_ACTIONS_ID = "journeySecretActions";
+const SECRET_ARRIVAL_ID = "journeySecretArrival";
 
 export type SecretRouteActivationHandlers = {
   onOpenStation: () => void;
@@ -34,6 +37,14 @@ export function activateSecretRoutePresentation(
 
   handlers.onPreviewRoute(presentation);
   return "preview";
+}
+
+export function hiddenStopArrivalButtonId(
+  arrival: HiddenStopArrival,
+): "blackMarketButton" | "stationShopButton" {
+  return arrival.kind === "hidden-station"
+    ? "stationShopButton"
+    : "blackMarketButton";
 }
 
 function byId<T extends HTMLElement>(root: Document, id: string): T | null {
@@ -61,6 +72,10 @@ function clearSecretPreview(root: Document): void {
     node.classList.remove("selected");
     node.setAttribute("aria-pressed", "false");
   });
+}
+
+function clearSecretArrival(root: Document): void {
+  byId(root, SECRET_ARRIVAL_ID)?.remove();
 }
 
 function openCanonicalAction(root: Document, buttonId: string): void {
@@ -195,15 +210,112 @@ function renderSecretNodes(root: Document): void {
   }
 }
 
+function isHiddenStopArrival(value: unknown): value is HiddenStopArrival {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const arrival = value as Partial<HiddenStopArrival>;
+  return (
+    Number.isInteger(arrival.stage) &&
+    typeof arrival.stage === "number" &&
+    arrival.stage >= 1 &&
+    arrival.stage <= 1000 &&
+    ((arrival.discoveryId === "black-market-signal" &&
+      arrival.kind === "hidden-shop" &&
+      arrival.title === "Hidden Shop") ||
+      (arrival.discoveryId === "hidden-station-signal" &&
+        arrival.kind === "hidden-station" &&
+        arrival.title === "Hidden Station"))
+  );
+}
+
+function renderHiddenStopArrival(
+  root: Document,
+  arrival: HiddenStopArrival,
+  onDismiss: () => void,
+): void {
+  clearSecretArrival(root);
+  const dialog = byId<HTMLDialogElement>(root, "stageSelectDialog");
+  const grid = byId(root, "stageGrid");
+  const parent = grid?.parentElement ?? null;
+  if (dialog?.open !== true || grid === null || parent === null) return;
+
+  const panel = root.createElement("section");
+  panel.id = SECRET_ARRIVAL_ID;
+  panel.className = "journey-secret-arrival journey-secret-arrival-" + arrival.kind;
+  panel.tabIndex = -1;
+  panel.setAttribute("role", "region");
+  panel.setAttribute("aria-live", "polite");
+  panel.setAttribute("aria-labelledby", SECRET_ARRIVAL_ID + "Title");
+
+  const copy = root.createElement("div");
+  const eyebrow = root.createElement("small");
+  eyebrow.className = "journey-secret-arrival-eyebrow";
+  eyebrow.textContent =
+    arrival.kind === "hidden-station"
+      ? "REST STOP DISCOVERED"
+      : "SECRET SIGNAL DISCOVERED";
+  const title = root.createElement("strong");
+  title.id = SECRET_ARRIVAL_ID + "Title";
+  title.textContent = arrival.title + " · Stage " + String(arrival.stage);
+  const detail = root.createElement("span");
+  detail.textContent =
+    arrival.kind === "hidden-station"
+      ? "Safe dock acquired. Enter the existing Station Shop flow or continue the Campaign; no combat launches from this stop."
+      : "A hidden trader signal is now available in this sector. Enter the existing Black Market flow or continue the Campaign.";
+  copy.append(eyebrow, title, detail);
+
+  const actions = root.createElement("div");
+  actions.className = "journey-secret-arrival-actions";
+  const enter = root.createElement("button");
+  enter.type = "button";
+  enter.className = "primary";
+  enter.textContent =
+    arrival.kind === "hidden-station"
+      ? "Dock at Hidden Station"
+      : "Enter Black Market";
+  enter.addEventListener("click", () => {
+    onDismiss();
+    clearSecretArrival(root);
+    openCanonicalAction(root, hiddenStopArrivalButtonId(arrival));
+  });
+
+  const leave = root.createElement("button");
+  leave.type = "button";
+  leave.textContent = "Continue Journey";
+  leave.addEventListener("click", () => {
+    onDismiss();
+    clearSecretArrival(root);
+  });
+  actions.append(enter, leave);
+  panel.append(copy, actions);
+  parent.insertBefore(panel, grid);
+  panel.focus({ preventScroll: true });
+}
+
 export function installSecretRouteMap(root: Document = document): () => void {
   if (typeof window === "undefined") return () => undefined;
   const grid = byId(root, "stageGrid");
   if (grid === null) return () => undefined;
 
-  const observer = new MutationObserver(() => renderSecretNodes(root));
+  let pendingArrival: HiddenStopArrival | null = null;
+  const renderMap = () => {
+    renderSecretNodes(root);
+    if (pendingArrival !== null) {
+      renderHiddenStopArrival(root, pendingArrival, () => {
+        pendingArrival = null;
+      });
+    }
+  };
+
+  const observer = new MutationObserver(renderMap);
   observer.observe(grid, { childList: true });
 
   const onDiscovery = () => renderSecretNodes(root);
+  const onArrival = (event: Event) => {
+    const detail = (event as CustomEvent<unknown>).detail;
+    if (isHiddenStopArrival(detail)) pendingArrival = detail;
+  };
   const onClick = (event: Event) => {
     const target = event.target;
     if (
@@ -214,13 +326,16 @@ export function installSecretRouteMap(root: Document = document): () => void {
     }
   };
   window.addEventListener(HIDDEN_DISCOVERY_PRESENTATION_EVENT, onDiscovery);
+  window.addEventListener(HIDDEN_STOP_ARRIVAL_EVENT, onArrival);
   root.addEventListener("click", onClick);
   renderSecretNodes(root);
 
   return () => {
     observer.disconnect();
     window.removeEventListener(HIDDEN_DISCOVERY_PRESENTATION_EVENT, onDiscovery);
+    window.removeEventListener(HIDDEN_STOP_ARRIVAL_EVENT, onArrival);
     root.removeEventListener("click", onClick);
     clearSecretPreview(root);
+    clearSecretArrival(root);
   };
 }
