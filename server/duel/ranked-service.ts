@@ -42,6 +42,17 @@ export interface DuelRankedProfileStore {
   savePair(left: DuelRankedProfile, right: DuelRankedProfile): void;
 }
 
+export class CorruptDuelRankedProfileStoreError extends Error {
+  constructor() {
+    super("Ranked Duel profile storage is corrupt.");
+    this.name = "CorruptDuelRankedProfileStoreError";
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 function assertDistinctRankedProfiles(
   left: DuelRankedProfile,
   right: DuelRankedProfile,
@@ -53,6 +64,49 @@ function assertDistinctRankedProfiles(
   ) {
     throw new Error("Ranked profile pair requires two distinct accounts.");
   }
+}
+
+function parsePersistedRankedProfile(
+  accountIdInput: string,
+  value: unknown,
+): DuelRankedProfile {
+  const accountId = accountIdInput.trim().slice(0, 160);
+  if (
+    accountId.length === 0 ||
+    accountId !== accountIdInput ||
+    !isRecord(value) ||
+    value.accountId !== accountId ||
+    typeof value.typingRating !== "number" ||
+    typeof value.duelRating !== "number" ||
+    typeof value.matchesPlayed !== "number" ||
+    typeof value.wins !== "number" ||
+    typeof value.losses !== "number" ||
+    typeof value.draws !== "number"
+  ) {
+    throw new CorruptDuelRankedProfileStoreError();
+  }
+
+  const safe = sanitizeDuelRankedProfile({
+    accountId,
+    typingRating: value.typingRating,
+    duelRating: value.duelRating,
+    matchesPlayed: value.matchesPlayed,
+    wins: value.wins,
+    losses: value.losses,
+    draws: value.draws,
+  });
+  if (
+    safe.accountId !== accountId ||
+    safe.typingRating !== value.typingRating ||
+    safe.duelRating !== value.duelRating ||
+    safe.matchesPlayed !== value.matchesPlayed ||
+    safe.wins !== value.wins ||
+    safe.losses !== value.losses ||
+    safe.draws !== value.draws
+  ) {
+    throw new CorruptDuelRankedProfileStoreError();
+  }
+  return safe;
 }
 
 export class InMemoryDuelRankedProfileStore
@@ -153,57 +207,36 @@ export class JsonFileDuelRankedProfileStore
     let raw: string;
     try {
       raw = readFileSync(this.filePath, "utf8");
-    } catch {
-      return;
+    } catch (error) {
+      if (
+        isRecord(error) &&
+        "code" in error &&
+        error.code === "ENOENT"
+      ) {
+        return;
+      }
+      throw error;
     }
 
     let parsed: unknown;
     try {
       parsed = JSON.parse(raw);
     } catch {
-      return;
+      throw new CorruptDuelRankedProfileStoreError();
     }
-    if (
-      typeof parsed !== "object" ||
-      parsed === null ||
-      Array.isArray(parsed)
-    ) {
-      return;
+    if (!isRecord(parsed)) {
+      throw new CorruptDuelRankedProfileStoreError();
     }
 
-    for (const [accountId, value] of Object.entries(
-      parsed as Record<string, unknown>,
-    )) {
-      if (
-        typeof value !== "object" ||
-        value === null ||
-        Array.isArray(value)
-      ) {
-        continue;
-      }
-      const profile = value as Partial<DuelRankedProfile>;
-      if (
-        typeof profile.typingRating !== "number" ||
-        typeof profile.duelRating !== "number" ||
-        typeof profile.matchesPlayed !== "number" ||
-        typeof profile.wins !== "number" ||
-        typeof profile.losses !== "number" ||
-        typeof profile.draws !== "number"
-      ) {
-        continue;
-      }
-      this.profiles.set(
+    const loaded = new Map<string, DuelRankedProfile>();
+    for (const [accountId, value] of Object.entries(parsed)) {
+      loaded.set(
         accountId,
-        sanitizeDuelRankedProfile({
-          accountId,
-          typingRating: profile.typingRating,
-          duelRating: profile.duelRating,
-          matchesPlayed: profile.matchesPlayed,
-          wins: profile.wins,
-          losses: profile.losses,
-          draws: profile.draws,
-        }),
+        parsePersistedRankedProfile(accountId, value),
       );
+    }
+    for (const [accountId, profile] of loaded) {
+      this.profiles.set(accountId, profile);
     }
   }
 
