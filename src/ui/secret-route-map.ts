@@ -229,6 +229,16 @@ function isHiddenStopArrival(value: unknown): value is HiddenStopArrival {
   );
 }
 
+function hiddenStopStageIsCleared(
+  root: Document,
+  arrival: HiddenStopArrival,
+): boolean {
+  const stageNode = root.querySelector<HTMLElement>(
+    `.journey-node[data-stage="${String(arrival.stage)}"]`,
+  );
+  return stageNode?.classList.contains("cleared") === true;
+}
+
 function renderHiddenStopArrival(
   root: Document,
   arrival: HiddenStopArrival,
@@ -238,7 +248,14 @@ function renderHiddenStopArrival(
   const dialog = byId<HTMLDialogElement>(root, "stageSelectDialog");
   const grid = byId(root, "stageGrid");
   const parent = grid?.parentElement ?? null;
-  if (dialog?.open !== true || grid === null || parent === null) return;
+  if (
+    dialog?.open !== true ||
+    grid === null ||
+    parent === null ||
+    !hiddenStopStageIsCleared(root, arrival)
+  ) {
+    return;
+  }
 
   const panel = root.createElement("section");
   panel.id = SECRET_ARRIVAL_ID;
