@@ -27,6 +27,13 @@ export type DuelRankedHistoryPeriod = {
   endMs: number;
 };
 
+export type DuelRankedHistoryQuery = {
+  startMs?: number;
+  endMs?: number;
+  result?: DuelRankedHistoricalResult;
+  limit?: number;
+};
+
 export type DuelRankedHistoryAggregate = {
   accountId: string;
   period: DuelRankedHistoryPeriod;
@@ -53,6 +60,17 @@ function cleanIdentity(value: string): string {
 
 function validResult(value: unknown): value is DuelRankedHistoricalResult {
   return value === "win" || value === "loss" || value === "draw";
+}
+
+function eventOrder(
+  left: DuelRankedHistoricalEventV1,
+  right: DuelRankedHistoricalEventV1,
+): number {
+  return (
+    left.occurredAtMs - right.occurredAtMs ||
+    left.matchId.localeCompare(right.matchId) ||
+    left.eventId.localeCompare(right.eventId)
+  );
 }
 
 export function createDuelRankedHistoryState(
@@ -171,6 +189,43 @@ export function appendDuelRankedHistoricalEvent(
   };
 }
 
+export function queryDuelRankedHistory(
+  stateInput: DuelRankedHistoryState,
+  query: DuelRankedHistoryQuery = {},
+): readonly DuelRankedHistoricalEventV1[] {
+  const state = sanitizeDuelRankedHistoryState(
+    stateInput,
+    stateInput.accountId,
+  );
+  const startMs = Number.isFinite(query.startMs)
+    ? Math.max(0, Math.floor(query.startMs as number))
+    : 0;
+  const endMs = Number.isFinite(query.endMs)
+    ? Math.max(startMs, Math.floor(query.endMs as number))
+    : Number.MAX_SAFE_INTEGER;
+  const limit = Number.isFinite(query.limit)
+    ? Math.max(
+        0,
+        Math.min(
+          DUEL_RANKED_HISTORY_MAX_EVENTS,
+          Math.floor(query.limit as number),
+        ),
+      )
+    : 50;
+  if (limit === 0) return [];
+  if (query.result !== undefined && !validResult(query.result)) return [];
+
+  return state.events
+    .filter(
+      (event) =>
+        event.occurredAtMs >= startMs &&
+        event.occurredAtMs < endMs &&
+        (query.result === undefined || event.result === query.result),
+    )
+    .sort((left, right) => eventOrder(right, left))
+    .slice(0, limit);
+}
+
 export function aggregateDuelRankedHistory(
   stateInput: DuelRankedHistoryState,
   period: DuelRankedHistoryPeriod,
@@ -191,11 +246,7 @@ export function aggregateDuelRankedHistory(
         event.occurredAtMs >= startMs &&
         event.occurredAtMs < endMs,
     )
-    .sort(
-      (left, right) =>
-        left.occurredAtMs - right.occurredAtMs ||
-        left.matchId.localeCompare(right.matchId),
-    );
+    .sort(eventOrder);
 
   let wins = 0;
   let losses = 0;
