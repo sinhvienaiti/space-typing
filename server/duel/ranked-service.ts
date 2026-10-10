@@ -685,7 +685,10 @@ export class DuelRankedService {
       this.settlementJournal.remove(matchId);
       this.clearHistoryDiagnosticIfRecovered();
     } catch (error) {
-      this.lastSettlementRetryAt = pending.left.history.occurredAtMs;
+      const rawRetryAt = this.now();
+      this.lastSettlementRetryAt = Number.isFinite(rawRetryAt)
+        ? Math.max(0, Math.floor(rawRetryAt))
+        : 0;
       this.historyWriteError =
         "Ranked history settlement pending replay: " + errorText(error);
     }
