@@ -14,6 +14,22 @@ export type HistoricalChallengeKind =
   | "weekly"
   | "qa";
 
+export type HistoricalInputMode = "typing" | "voice" | "hybrid";
+
+export type HistoricalUsageCountV1 = {
+  id: string;
+  count: number;
+};
+
+export type HistoricalBossAttemptV1 = {
+  bossId: string;
+  stage: number;
+  completed: boolean;
+  activeSeconds: number | null;
+  damageDealt: number | null;
+  damageTaken: number | null;
+};
+
 export type HistoricalRunSettledEventV1 = {
   version: 1;
   eventId: string;
@@ -29,6 +45,17 @@ export type HistoricalRunSettledEventV1 = {
   retried: boolean | null;
   assisted: boolean | null;
   leaderboardEligible: boolean | null;
+  difficulty?: string | null;
+  inputMode?: HistoricalInputMode | null;
+  gameplayMode?: string | null;
+  sourceStages?: number[];
+  bossAttempts?: HistoricalBossAttemptV1[];
+  equippedRelicIds?: string[];
+  equipmentIds?: string[];
+  skillUsage?: HistoricalUsageCountV1[];
+  wordsPerMinute?: number | null;
+  acceptedTypedLetters?: number | null;
+  voiceCompletions?: number | null;
 };
 
 export type HistoricalEventV1 = HistoricalRunSettledEventV1;
@@ -85,6 +112,105 @@ function validChallengeKind(value: unknown): value is HistoricalChallengeKind {
     value === "qa";
 }
 
+function validInputMode(value: unknown): value is HistoricalInputMode {
+  return value === "typing" || value === "voice" || value === "hybrid";
+}
+
+function boundedOptionalString(value: unknown, maxLength = 80): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 && trimmed.length <= maxLength ? trimmed : null;
+}
+
+function boundedStringArray(
+  value: unknown,
+  maxItems = 32,
+  maxLength = 80,
+): string[] {
+  if (!Array.isArray(value)) return [];
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const candidate of value) {
+    const safe = boundedOptionalString(candidate, maxLength);
+    if (safe === null || seen.has(safe)) continue;
+    seen.add(safe);
+    result.push(safe);
+    if (result.length >= maxItems) break;
+  }
+  return result;
+}
+
+function boundedStageArray(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  const result: number[] = [];
+  const seen = new Set<number>();
+  for (const candidate of value) {
+    if (!Number.isSafeInteger(candidate) || (candidate as number) <= 0) continue;
+    const stage = candidate as number;
+    if (seen.has(stage)) continue;
+    seen.add(stage);
+    result.push(stage);
+    if (result.length >= 32) break;
+  }
+  return result;
+}
+
+function nullableNonNegativeNumber(value: unknown): number | null {
+  return finiteNumber(value) && value >= 0 ? value : null;
+}
+
+function nullableNonNegativeInteger(value: unknown): number | null {
+  return nonNegativeInteger(value) ? value : null;
+}
+
+function sanitizeUsageCounts(value: unknown): HistoricalUsageCountV1[] {
+  if (!Array.isArray(value)) return [];
+  const counts = new Map<string, number>();
+  for (const candidate of value) {
+    if (!isRecord(candidate)) continue;
+    const id = boundedOptionalString(candidate.id);
+    if (id === null || !nonNegativeInteger(candidate.count)) continue;
+    counts.set(id, (counts.get(id) ?? 0) + candidate.count);
+    if (counts.size >= 32) break;
+  }
+  return [...counts.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([id, count]) => ({ id, count }));
+}
+
+function sanitizeBossAttempts(value: unknown): HistoricalBossAttemptV1[] {
+  if (!Array.isArray(value)) return [];
+  const result: HistoricalBossAttemptV1[] = [];
+  const seen = new Set<string>();
+  for (const candidate of value) {
+    if (!isRecord(candidate)) continue;
+    const bossId = boundedOptionalString(candidate.bossId);
+    if (
+      bossId === null ||
+      !Number.isSafeInteger(candidate.stage) ||
+      (candidate.stage as number) <= 0 ||
+      typeof candidate.completed !== "boolean"
+    ) {
+      continue;
+    }
+    const key = bossId + "@" + String(candidate.stage);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push({
+      bossId,
+      stage: candidate.stage as number,
+      completed: candidate.completed,
+      activeSeconds: nullableNonNegativeNumber(candidate.activeSeconds),
+      damageDealt: nullableNonNegativeNumber(candidate.damageDealt),
+      damageTaken: nullableNonNegativeNumber(candidate.damageTaken),
+    });
+    if (result.length >= 32) break;
+  }
+  return result.sort(
+    (left, right) => left.stage - right.stage || left.bossId.localeCompare(right.bossId),
+  );
+}
+
 function eventOrder(
   left: HistoricalEventV1,
   right: HistoricalEventV1,
@@ -125,6 +251,34 @@ function mergeHistoricalRunEvents(
     assisted: incoming.assisted ?? existing.assisted,
     leaderboardEligible:
       incoming.leaderboardEligible ?? existing.leaderboardEligible,
+    difficulty: incoming.difficulty ?? existing.difficulty ?? null,
+    inputMode: incoming.inputMode ?? existing.inputMode ?? null,
+    gameplayMode: incoming.gameplayMode ?? existing.gameplayMode ?? null,
+    sourceStages:
+      (incoming.sourceStages?.length ?? 0) > 0
+        ? incoming.sourceStages
+        : existing.sourceStages ?? [],
+    bossAttempts:
+      (incoming.bossAttempts?.length ?? 0) > 0
+        ? incoming.bossAttempts
+        : existing.bossAttempts ?? [],
+    equippedRelicIds:
+      (incoming.equippedRelicIds?.length ?? 0) > 0
+        ? incoming.equippedRelicIds
+        : existing.equippedRelicIds ?? [],
+    equipmentIds:
+      (incoming.equipmentIds?.length ?? 0) > 0
+        ? incoming.equipmentIds
+        : existing.equipmentIds ?? [],
+    skillUsage:
+      (incoming.skillUsage?.length ?? 0) > 0
+        ? incoming.skillUsage
+        : existing.skillUsage ?? [],
+    wordsPerMinute: incoming.wordsPerMinute ?? existing.wordsPerMinute ?? null,
+    acceptedTypedLetters:
+      incoming.acceptedTypedLetters ?? existing.acceptedTypedLetters ?? null,
+    voiceCompletions:
+      incoming.voiceCompletions ?? existing.voiceCompletions ?? null,
   };
 }
 
@@ -185,6 +339,13 @@ export function sanitizeHistoricalEvent(
     return null;
   }
 
+  const difficulty = boundedOptionalString(value.difficulty);
+  const inputMode = validInputMode(value.inputMode) ? value.inputMode : null;
+  const gameplayMode = boundedOptionalString(value.gameplayMode);
+  const wordsPerMinute = nullableNonNegativeNumber(value.wordsPerMinute);
+  const acceptedTypedLetters = nullableNonNegativeInteger(value.acceptedTypedLetters);
+  const voiceCompletions = nullableNonNegativeInteger(value.voiceCompletions);
+
   return {
     version: 1,
     eventId: value.eventId,
@@ -200,6 +361,17 @@ export function sanitizeHistoricalEvent(
     retried,
     assisted,
     leaderboardEligible,
+    difficulty,
+    inputMode,
+    gameplayMode,
+    sourceStages: boundedStageArray(value.sourceStages),
+    bossAttempts: sanitizeBossAttempts(value.bossAttempts),
+    equippedRelicIds: boundedStringArray(value.equippedRelicIds),
+    equipmentIds: boundedStringArray(value.equipmentIds),
+    skillUsage: sanitizeUsageCounts(value.skillUsage),
+    wordsPerMinute,
+    acceptedTypedLetters,
+    voiceCompletions,
   };
 }
 
