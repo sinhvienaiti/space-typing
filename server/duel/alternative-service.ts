@@ -87,6 +87,10 @@ export class AlternativeMatchService {
     };
   }
 
+  delete(matchId: string): boolean {
+    return this.matches.delete(matchId);
+  }
+
   snapshotForSession(
     sessionId: string,
     matchId: string,

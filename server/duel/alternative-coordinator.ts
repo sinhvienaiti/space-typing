@@ -144,6 +144,29 @@ export class AlternativeDuelCoordinator {
     return this.matchBySession.get(sessionId) ?? null;
   }
 
+  private releaseTerminalMatch(matchId: string): boolean {
+    const record = this.matches.get(matchId);
+    const saved = this.service.export(matchId);
+    if (
+      record === undefined ||
+      saved === null ||
+      saved.snapshot.result.status === "active"
+    ) {
+      return false;
+    }
+    if (this.matchByRoom.get(record.roomId) === matchId) {
+      this.matchByRoom.delete(record.roomId);
+    }
+    for (const sessionId of record.sessions) {
+      if (this.matchBySession.get(sessionId) === matchId) {
+        this.matchBySession.delete(sessionId);
+      }
+    }
+    this.matches.delete(matchId);
+    this.service.delete(matchId);
+    return true;
+  }
+
   private startFriend(
     sessionId: string,
     message: Extract<AlternativeTransportClientMessage, { type: "START_ALTERNATIVE_MATCH" }>,
@@ -174,14 +197,17 @@ export class AlternativeDuelCoordinator {
         requestId: message.requestId,
       };
     }
-    if (this.matchByRoom.has(message.roomId)) {
+
+    const roomMatch = this.matchByRoom.get(message.roomId);
+    if (roomMatch !== undefined && !this.releaseTerminalMatch(roomMatch)) {
       return {
         ok: false,
         code: "ALTERNATIVE_MATCH_ACTIVE",
-        message: "This room already owns an alternative match.",
+        message: "This room already owns an active alternative match.",
         requestId: message.requestId,
       };
     }
+
     const participants = this.authority.roomSessionIds(message.roomId);
     if (participants.length !== 2) {
       return {
@@ -193,11 +219,15 @@ export class AlternativeDuelCoordinator {
     }
     const left = participants[0]!;
     const right = participants[1]!;
+    for (const participant of [left, right]) {
+      const bound = this.matchBySession.get(participant);
+      if (bound !== undefined) this.releaseTerminalMatch(bound);
+    }
     if (this.matchBySession.has(left) || this.matchBySession.has(right)) {
       return {
         ok: false,
         code: "ALTERNATIVE_MATCH_ACTIVE",
-        message: "A participant is already bound to an alternative match.",
+        message: "A participant is already bound to an active alternative match.",
         requestId: message.requestId,
       };
     }

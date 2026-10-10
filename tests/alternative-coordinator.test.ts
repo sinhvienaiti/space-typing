@@ -7,6 +7,8 @@ import {
   AlternativeDuelCoordinator,
   type AlternativeRoomAuthority,
 } from "../server/duel/alternative-coordinator";
+import { parseAlternativeTransportClientMessage } from "../src/duel/alternative-wire";
+import type { AlternativeTransportDelivery } from "../server/duel/alternative-coordinator";
 
 function roomSnapshot(input: {
   roomId: string;
@@ -90,6 +92,16 @@ function authority(): AlternativeRoomAuthority {
       return roomId === "ROOM-1" ? ["left", "right"] : [];
     },
   };
+}
+
+function leftReflexUpdate(deliveries: readonly AlternativeTransportDelivery[]) {
+  const message = deliveries.find((entry) =>
+    entry.sessionId === "left" && entry.message.type === "ALTERNATIVE_MATCH_UPDATE"
+  )?.message;
+  if (message?.type !== "ALTERNATIVE_MATCH_UPDATE" || message.view.challenge.kind !== "reflex") {
+    throw new Error("Expected left Reflex update");
+  }
+  return message;
 }
 
 describe("R03 alternative transport coordinator", () => {
@@ -204,6 +216,70 @@ describe("R03 alternative transport coordinator", () => {
       type: "ALTERNATIVE_MATCH_UPDATE",
       matchId: "alt-clock",
     });
+  });
+
+  it("retains terminal state for reconnect, then releases it when the room starts again", () => {
+    let matchCounter = 0;
+    const coordinator = new AlternativeDuelCoordinator(
+      authority(),
+      () => `restart-${++matchCounter}`,
+      () => 17,
+    );
+    const started = coordinator.handle("left", {
+      type: "START_ALTERNATIVE_MATCH",
+      requestId: "start-1",
+      roomId: "ROOM-1",
+      mode: "reflex",
+    }, 0);
+    if (started === null || !started.ok) throw new Error("Expected first match");
+    let update = leftReflexUpdate(started.deliveries);
+
+    for (let hit = 1; hit <= 5; hit += 1) {
+      const at = 10 + (hit - 1) * 190;
+      const result = coordinator.handle("left", {
+        type: "MODE_INPUT",
+        matchId: "restart-1",
+        sequence: hit,
+        mode: "reflex",
+        input: { text: update.view.challenge.prompt },
+      }, at);
+      if (result === null || !result.ok) throw new Error("Expected accepted Reflex hit");
+      update = leftReflexUpdate(result.deliveries);
+      coordinator.advance(at + 180);
+    }
+
+    const terminal = coordinator.reconnect("left");
+    expect(terminal).toHaveLength(1);
+    expect(terminal[0]?.message).toMatchObject({
+      type: "ALTERNATIVE_MATCH_UPDATE",
+      matchId: "restart-1",
+      view: { status: "won", opponent: { hull: 0 } },
+    });
+
+    const restarted = coordinator.handle("left", {
+      type: "START_ALTERNATIVE_MATCH",
+      requestId: "start-2",
+      roomId: "ROOM-1",
+      mode: "word-chain",
+    }, 1000);
+    expect(restarted).not.toBeNull();
+    if (restarted === null || !restarted.ok) throw new Error("Expected restart");
+    expect(restarted.deliveries[0]?.message).toMatchObject({
+      type: "ALTERNATIVE_MATCH_UPDATE",
+      matchId: "restart-2",
+      view: { mode: "word-chain", status: "active" },
+    });
+    expect(coordinator.matchIdForSession("left")).toBe("restart-2");
+  });
+
+  it("keeps alternative Ranked fail-closed at the wire boundary", () => {
+    expect(parseAlternativeTransportClientMessage({
+      type: "START_ALTERNATIVE_MATCH",
+      requestId: "ranked-attempt",
+      roomId: "ROOM-1",
+      mode: "reflex",
+      matchType: "ranked",
+    })).toBeNull();
   });
 
   it("does not claim unrelated Duel protocol messages", () => {
