@@ -17,7 +17,7 @@ The boundary is intentional:
 - the Journey Map may present discovered hidden landmarks, but knowledge presentation does not own discovery rolls, rewards, stock or save mutation;
 - when a hidden service discovery and an x10 checkpoint coincide, both transitions are preserved in deterministic order rather than one deleting the other.
 
-R01 real-browser structural QA is available through `pnpm visual:r01-qa`; final desktop/mobile screenshot hierarchy review remains a separate visual sign-off gate.
+R01 real-browser structural QA is enforced by `pnpm visual:r01-qa`; CI #1819 and the CI-generated desktop/mobile screenshot review are accepted.
 
 ## Discovery and route integration
 
@@ -271,6 +271,6 @@ Automated coverage verifies:
 - R01 hidden Shop/Station discovery presentation cannot own/reroll canonical discovery state;
 - automatic hidden service arrival remains compatible with checkpoint/rest-hub sequencing.
 
-Historical M15 integration passed CI #262. The R01 redesign branch passes the normal Test + Build gate on CI #1813 at commit `6f58a80259ef480a84e27324c13f79fe341ee0d3`; subsequent documentation-only commits must remain green. Final desktop/mobile screenshot hierarchy review is still required before declaring the Campaign presentation fully signed off.
+Historical M15 integration passed CI #262. The R01 redesign validation is now accepted on CI #1819 at commit `e48194bbc72fdf055805e472bf5c862204ced44a`: 257 / 257 test files and 1659 / 1659 tests passed, production Build passed, and the real-Chrome desktop/mobile Campaign Map gate passed. The uploaded captures were reviewed and accepted for hierarchy/readability. Later device-specific findings remain normal regressions rather than an open R01 milestone.
 
 M16 owns Stage Objectives and World-specific boss typing mechanics. It must extend the existing StageConfig/BossState typing runtime rather than create parallel objective or boss combat engines.
