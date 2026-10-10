@@ -2,6 +2,17 @@
 
 M14 originally added a persisted route layer to the 1000-stage Campaign. The approved Campaign redesign now creates **combat-only new ten-stage sectors** and a **guaranteed rest hub after Stage 010, 020, ...**. Existing in-progress route graphs with visited/selected lanes retain the M14 legacy interface until the next checkpoint. The original historical M14 implementation details below describe that compatibility path, not new-sector behavior.
 
+## R01 redesign status
+
+The current Campaign presentation keeps M14 persistence as the compatibility foundation while changing the player-facing route model:
+
+- untouched/new ten-stage sectors contain one Combat node per numbered stage;
+- an already-started legacy branching sector remains playable with its recorded Combat/Shop/Station choices until the next checkpoint instead of being destructively migrated;
+- the current ten-stage sector is rendered as detail inside the unified Journey Map rather than as a competing normal-route grid;
+- the x10 mandatory encounter/boss is cleared first, then the guaranteed Rest Hub becomes available with Shop, Repair/Upgrade and Support Loadout together;
+- opening services does not create a numbered stage, reroll stock or advance Campaign progression;
+- R01 real-browser structural QA is available through `pnpm visual:r01-qa`; final screenshot hierarchy review remains a separate sign-off gate.
+
 ## Route model
 
 Each committed ten-stage checkpoint sector has one deterministic route graph generated from the existing Campaign stage seed contract.
@@ -45,7 +56,7 @@ Interim Route Map UX (before the approved Campaign Map redesign): the player may
 
 The underlying `selectRouteNode` helper defaults to immutable first-selection behavior for legacy callers and snapshots. Only the between-encounter UI explicitly opts into reselection. Mandatory single-node stages auto-resolve and do not require an unnecessary click.
 
-The ability to change selected lanes now applies only to a recorded in-progress **legacy** branching sector. Fresh sectors use combat-only nodes; optional Shop and Station services are available together in the guaranteed checkpoint rest hub. Hidden combat remains accessible through the legacy sector-detail dialog until unified map integration is completed.
+The ability to change selected lanes now applies only to a recorded in-progress **legacy** branching sector. Fresh sectors use combat-only nodes; optional Shop and Station services are available together in the guaranteed checkpoint Rest Hub. The Journey Map embeds the current ten-stage sector detail and discovered hidden-stop landmarks without reintroducing ordinary Shop/Station alternatives at numbered stages.
 
 ## Shop and Station reuse
 
@@ -101,6 +112,8 @@ A safely captured route choice is restored after a technical crash.
 
 When a sector-end clear advances the Campaign frontier, the next sector RouteState is created before the new checkpoint snapshot is committed, so checkpoint and route sector cannot drift apart.
 
+The R01 Rest Hub is a post-clear service state: checkpoint progression remains authoritative before Rest Hub inventory/service mutations occur, and closing/reopening the hub does not manufacture another sector clear or another stock roll.
+
 ## Audio lifecycle
 
 Opening Shop/Station services uses the existing SHOP/STATION music states.
@@ -128,8 +141,10 @@ Automated coverage verifies:
 - route choice crash recovery;
 - PlayerSave v20 -> v21 migration;
 - v20 backup import compatibility;
+- combat-only fresh-sector behavior and legacy-sector transition;
+- guaranteed checkpoint Rest Hub behavior;
 - all existing persistence/checkpoint/death/shop regressions.
 
-CI #251 passes Test + Build on the complete runtime integration.
+Historical M14 integration passed CI #251. The R01 redesign branch additionally passes the normal Test + Build gate on CI #1813 at commit `6f58a80259ef480a84e27324c13f79fe341ee0d3`; subsequent documentation-only commits must remain green. Final desktop/mobile screenshot hierarchy review is still required before declaring the visual redesign fully signed off.
 
-M15 owns Hidden Challenge / Hidden World / Champion Hunt and must extend this route contract rather than create a second navigation/save layer.
+M15 owns Hidden Challenge / Hidden World / Champion Hunt and must extend this persistence contract rather than create a second navigation/save layer. Hidden Shop/Station post-stage discovery uses the shared discovery/shop persistence but is not a replacement for those M15 optional combat activities.
