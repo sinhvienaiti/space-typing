@@ -85,6 +85,25 @@ function validChallengeKind(value: unknown): value is HistoricalChallengeKind {
     value === "qa";
 }
 
+function eventOrder(
+  left: HistoricalEventV1,
+  right: HistoricalEventV1,
+): number {
+  return (
+    left.occurredAtMs - right.occurredAtMs ||
+    left.runId.localeCompare(right.runId) ||
+    left.eventId.localeCompare(right.eventId)
+  );
+}
+
+function boundedChronologicalEvents(
+  events: readonly HistoricalEventV1[],
+): HistoricalEventV1[] {
+  return [...events]
+    .sort(eventOrder)
+    .slice(-HISTORICAL_ANALYTICS_MAX_EVENTS);
+}
+
 function mergeHistoricalRunEvents(
   existing: HistoricalEventV1,
   incoming: HistoricalEventV1,
@@ -207,7 +226,7 @@ export function sanitizeHistoricalAnalyticsState(
 
   return {
     version: HISTORICAL_ANALYTICS_VERSION,
-    events: [...deduped.values()].slice(-HISTORICAL_ANALYTICS_MAX_EVENTS),
+    events: boundedChronologicalEvents([...deduped.values()]),
   };
 }
 
@@ -227,7 +246,7 @@ export function appendHistoricalEvent(
   }
   return {
     version: HISTORICAL_ANALYTICS_VERSION,
-    events: [...state.events, event].slice(-HISTORICAL_ANALYTICS_MAX_EVENTS),
+    events: boundedChronologicalEvents([...state.events, event]),
   };
 }
 
@@ -243,7 +262,7 @@ export function upsertHistoricalRunEvent(
   if (index < 0) {
     return {
       version: HISTORICAL_ANALYTICS_VERSION,
-      events: [...state.events, event].slice(-HISTORICAL_ANALYTICS_MAX_EVENTS),
+      events: boundedChronologicalEvents([...state.events, event]),
     };
   }
 
@@ -251,7 +270,7 @@ export function upsertHistoricalRunEvent(
   events[index] = mergeHistoricalRunEvents(events[index]!, event);
   return {
     version: HISTORICAL_ANALYTICS_VERSION,
-    events,
+    events: boundedChronologicalEvents(events),
   };
 }
 

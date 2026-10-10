@@ -95,6 +95,23 @@ describe("historical analytics store", () => {
     });
   });
 
+  it("reorders an enriched run when canonical occurrence time moves earlier", () => {
+    let state = createHistoricalAnalyticsState();
+    state = appendHistoricalEvent(state, event("later", 2_000));
+    state = appendHistoricalEvent(state, event("other", 1_500));
+
+    state = upsertHistoricalRunEvent(state, event("later-enrichment", 1_000, {
+      runId: "run-later",
+      score: 150,
+    }));
+
+    expect(state.events.map((row) => row.runId)).toEqual([
+      "run-later",
+      "run-other",
+    ]);
+    expect(state.events[0]?.occurredAtMs).toBe(1_000);
+  });
+
   it("sanitizes malformed and version-skewed rows without poisoning valid history", () => {
     const legacyWithoutRetried = {
       ...event("legacy", 1_500),
@@ -117,7 +134,24 @@ describe("historical analytics store", () => {
       .toEqual(createHistoricalAnalyticsState());
   });
 
-  it("retains a deterministic bounded tail", () => {
+  it("canonicalizes unordered persisted rows by occurrence time", () => {
+    const state = sanitizeHistoricalAnalyticsState({
+      version: 1,
+      events: [
+        event("newest", 3_000),
+        event("oldest", 1_000),
+        event("middle", 2_000),
+      ],
+    });
+
+    expect(state.events.map((row) => row.eventId)).toEqual([
+      "oldest",
+      "middle",
+      "newest",
+    ]);
+  });
+
+  it("retains a deterministic bounded chronological tail", () => {
     let state = createHistoricalAnalyticsState();
     for (let index = 0; index < HISTORICAL_ANALYTICS_MAX_EVENTS + 7; index += 1) {
       state = appendHistoricalEvent(state, event(String(index), index));
@@ -127,6 +161,25 @@ describe("historical analytics store", () => {
     expect(state.events[0]?.eventId).toBe("7");
     expect(state.events.at(-1)?.eventId).toBe(
       String(HISTORICAL_ANALYTICS_MAX_EVENTS + 6),
+    );
+  });
+
+  it("does not let a late old event evict newer retained history", () => {
+    let state = createHistoricalAnalyticsState();
+    for (let index = 0; index < HISTORICAL_ANALYTICS_MAX_EVENTS; index += 1) {
+      state = appendHistoricalEvent(
+        state,
+        event("kept-" + String(index), 10_000 + index),
+      );
+    }
+
+    state = appendHistoricalEvent(state, event("late-old", 1));
+
+    expect(state.events).toHaveLength(HISTORICAL_ANALYTICS_MAX_EVENTS);
+    expect(state.events.some((row) => row.eventId === "late-old")).toBe(false);
+    expect(state.events[0]?.eventId).toBe("kept-0");
+    expect(state.events.at(-1)?.eventId).toBe(
+      "kept-" + String(HISTORICAL_ANALYTICS_MAX_EVENTS - 1),
     );
   });
 
