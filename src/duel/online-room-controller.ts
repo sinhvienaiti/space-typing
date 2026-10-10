@@ -16,6 +16,8 @@ import {
   installAlternativeDuelRoomUi,
   type AlternativeDuelRoomUiController,
 } from "./alternative-room-ui";
+import { AlternativePracticeMatch } from "./alternative-practice";
+import { DUEL_TYPING_LEXICON } from "./word-lexicon";
 import type { AlternativeMatchView } from "./alternative-presentation";
 import type { DuelRoomSnapshot } from "./room";
 import type { DuelRoomListing } from "./protocol";
@@ -72,6 +74,13 @@ type SessionResponse = {
 
 const DEV_SESSION_TOKEN_KEY =
   "space-typing:duel-session-token";
+const ALTERNATIVE_PRACTICE_WORDS = Object.freeze(
+  DUEL_TYPING_LEXICON.map((entry) => entry.token),
+);
+const ALTERNATIVE_PRACTICE_WORD_SET = new Set(ALTERNATIVE_PRACTICE_WORDS);
+const ALTERNATIVE_PRACTICE_REFLEX_PROMPTS = Object.freeze(
+  ALTERNATIVE_PRACTICE_WORDS.filter((word) => word.length >= 4 && word.length <= 7),
+);
 
 function metaContent(name: string): string | null {
   const node = document.querySelector<HTMLMetaElement>(
@@ -184,6 +193,34 @@ export function installDuelOnlineRoomController(
   let sentLoadout: string | null = null;
   let roomListReceived = false;
   const pending: Array<() => void> = [];
+  let alternativePractice: AlternativePracticeMatch | null = null;
+  let alternativePracticeTimer: ReturnType<typeof setInterval> | null = null;
+  let alternativePracticeRevision = "";
+  let alternativePracticeCounter = 0;
+
+  const clearAlternativePractice = (): void => {
+    if (alternativePracticeTimer !== null) clearInterval(alternativePracticeTimer);
+    alternativePracticeTimer = null;
+    alternativePractice = null;
+    alternativePracticeRevision = "";
+  };
+
+  const publishAlternativePractice = (nowMs = Date.now()): void => {
+    const practice = alternativePractice;
+    if (practice === null) return;
+    const snapshot = practice.advance(nowMs);
+    const view = practice.view();
+    const revision = JSON.stringify(view);
+    if (revision !== alternativePracticeRevision) {
+      alternativePracticeRevision = revision;
+      alternativeUi?.setMatch(view);
+    }
+    if (snapshot.result.status !== "active") {
+      if (alternativePracticeTimer !== null) clearInterval(alternativePracticeTimer);
+      alternativePracticeTimer = null;
+      alternativePractice = null;
+    }
+  };
 
   const client = new DuelNetworkClient({
     url: defaultDuelWebSocketUrl(),
@@ -250,6 +287,7 @@ export function installDuelOnlineRoomController(
         );
       },
       onAlternativeMatchUpdate(view, serverSequence) {
+        clearAlternativePractice();
         alternativeUi?.setMatch(view, serverSequence);
         ui?.setStatus(
           "Alternative Duel · " +
@@ -431,7 +469,53 @@ export function installDuelOnlineRoomController(
         client.startAlternativeMatch(room.roomId, mode);
       });
     },
+    onPracticeStart(mode) {
+      clearAlternativePractice();
+      const nowMs = Date.now();
+      alternativePracticeCounter += 1;
+      const seed = (nowMs ^ Math.imul(alternativePracticeCounter, 0x9e3779b9)) >>> 0 || 1;
+      alternativePractice = new AlternativePracticeMatch({
+        mode,
+        matchId: `practice-${mode}-${nowMs.toString(36)}-${String(alternativePracticeCounter)}`,
+        seed,
+        startedAtMs: nowMs,
+        ...(mode === "reflex"
+          ? { reflexPrompts: ALTERNATIVE_PRACTICE_REFLEX_PROMPTS }
+          : { wordChainLexicon: ALTERNATIVE_PRACTICE_WORD_SET }),
+      });
+      alternativePracticeRevision = "";
+      publishAlternativePractice(nowMs);
+      alternativePracticeTimer = setInterval(() => publishAlternativePractice(), 50);
+      ui?.setStatus(
+        "Alternative Practice · " +
+          (mode === "reflex" ? "Reflex" : "Word Chain") +
+          " · local/offline",
+      );
+    },
     onInput(value) {
+      const practice = alternativePractice;
+      if (practice !== null) {
+        const nowMs = Date.now();
+        const before = practice.snapshot();
+        const decision = before.mode === "reflex"
+          ? practice.submitReflex(value, nowMs)
+          : practice.submitWord(value, nowMs);
+        practice.advance(nowMs);
+        const view = practice.view();
+        alternativePracticeRevision = JSON.stringify(view);
+        alternativeUi?.setMatch(view);
+        alternativeUi?.setInputResult({
+          sequence: decision.snapshot.lastSequenceByPlayer["player-1"],
+          accepted: decision.accepted,
+          reason: decision.reason,
+        });
+        if (practice.snapshot().result.status !== "active") {
+          if (alternativePracticeTimer !== null) clearInterval(alternativePracticeTimer);
+          alternativePracticeTimer = null;
+          alternativePractice = null;
+        }
+        return true;
+      }
       const sequence = client.sendAlternativeModeInput(value);
       if (sequence === null) {
         ui?.setStatus("Alternative input requires an active connected match.", true);

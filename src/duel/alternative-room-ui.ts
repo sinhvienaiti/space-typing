@@ -31,6 +31,7 @@ export type AlternativeDuelRoomUiController = {
 
 export type AlternativeDuelRoomUiConfig = {
   onStart(mode: AlternativeModeId): void;
+  onPracticeStart(mode: AlternativeModeId): void;
   onInput(value: string): boolean;
 };
 
@@ -116,8 +117,10 @@ export function installAlternativeDuelRoomUi(
         <div data-alt-capability></div>
       </div>
       <div data-alt-start-actions>
-        <button type="button" data-alt-start="reflex">Reflex</button>
-        <button type="button" data-alt-start="word-chain">Word Chain</button>
+        <button type="button" data-alt-start="reflex">Friend Reflex</button>
+        <button type="button" data-alt-start="word-chain">Friend Word Chain</button>
+        <button type="button" data-alt-practice-start="reflex">Practice Reflex</button>
+        <button type="button" data-alt-practice-start="word-chain">Practice Word Chain</button>
       </div>
     </div>
     <div data-alt-ranked-note>Ranked: disabled · separate rating policy required</div>
@@ -138,6 +141,7 @@ export function installAlternativeDuelRoomUi(
 
   const capability = root.querySelector<HTMLElement>("[data-alt-capability]")!;
   const startButtons = [...root.querySelectorAll<HTMLButtonElement>("[data-alt-start]")];
+  const practiceButtons = [...root.querySelectorAll<HTMLButtonElement>("[data-alt-practice-start]")];
   const matchPanel = root.querySelector<HTMLElement>("[data-alt-match]")!;
   const title = root.querySelector<HTMLElement>("[data-alt-title]")!;
   const score = root.querySelector<HTMLElement>("[data-alt-score]")!;
@@ -155,15 +159,21 @@ export function installAlternativeDuelRoomUi(
 
   const render = (): void => {
     const startState = alternativeRoomStartState(room);
-    capability.textContent = `Friend: ${startState.reason} · Practice runtime: local`;
+    const active = match?.status === "active";
+    capability.textContent = `Friend: ${startState.reason} · Practice: local/offline`;
     for (const button of startButtons) {
-      button.disabled = !startState.canStart || match?.status === "active";
+      button.disabled = !startState.canStart || active;
+    }
+    for (const button of practiceButtons) {
+      button.disabled = active;
     }
 
     matchPanel.hidden = match === null;
     if (match === null) return;
     const state = alternativeMatchUiState(match);
-    title.textContent = `${state.title} · server #${String(serverSequence)}`;
+    title.textContent = match.matchType === "practice"
+      ? `${state.title} · local`
+      : `${state.title} · server #${String(serverSequence)}`;
     score.textContent = state.score;
     hull.textContent = state.hull;
     challenge.textContent = state.challenge;
@@ -180,16 +190,26 @@ export function installAlternativeDuelRoomUi(
       if (mode === "reflex" || mode === "word-chain") config.onStart(mode);
     });
   }
+  for (const button of practiceButtons) {
+    button.addEventListener("click", () => {
+      const mode = button.dataset.altPracticeStart;
+      if (mode === "reflex" || mode === "word-chain") config.onPracticeStart(mode);
+    });
+  }
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     const value = input.value.trim();
     if (value === "" || input.disabled) return;
     if (config.onInput(value)) {
-      result.textContent = "Input sent · awaiting authority";
+      result.textContent = match?.matchType === "practice"
+        ? "Input applied · local practice"
+        : "Input sent · awaiting authority";
       input.value = "";
     } else {
-      result.textContent = "Input not sent · Duel connection unavailable";
+      result.textContent = match?.matchType === "practice"
+        ? "Input not applied · practice inactive"
+        : "Input not sent · Duel connection unavailable";
     }
   });
 
@@ -197,7 +217,7 @@ export function installAlternativeDuelRoomUi(
   return {
     setRoom(nextRoom) {
       room = nextRoom;
-      if (nextRoom === null) {
+      if (nextRoom === null && match?.matchType !== "practice") {
         match = null;
         serverSequence = -1;
         result.textContent = "";
@@ -207,7 +227,11 @@ export function installAlternativeDuelRoomUi(
     setMatch(nextMatch, nextServerSequence = -1) {
       match = nextMatch;
       serverSequence = nextServerSequence;
-      result.textContent = nextMatch === null ? "" : "Authoritative state synchronized";
+      result.textContent = nextMatch === null
+        ? ""
+        : nextMatch.matchType === "practice"
+          ? "Local practice state synchronized"
+          : "Authoritative state synchronized";
       render();
     },
     setInputResult(nextResult) {
