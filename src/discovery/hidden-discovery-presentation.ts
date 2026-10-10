@@ -53,7 +53,13 @@ export function publishHiddenDiscoveryPresentation(
   currentState = cloneState(state);
   if (nextRouteKey === currentRouteKey) return;
   currentRouteKey = nextRouteKey;
-  if (typeof window === "undefined") return;
+  if (
+    typeof window === "undefined" ||
+    typeof window.dispatchEvent !== "function" ||
+    typeof CustomEvent === "undefined"
+  ) {
+    return;
+  }
   window.dispatchEvent(
     new CustomEvent(HIDDEN_DISCOVERY_PRESENTATION_EVENT),
   );
