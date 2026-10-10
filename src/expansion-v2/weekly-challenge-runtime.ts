@@ -1,3 +1,4 @@
+import type { ExpeditionRun } from "../expedition/core";
 import {
   weeklyChallengeIdentityKey,
   type ExpeditionPbRecord,
@@ -17,11 +18,24 @@ export type WeeklyChallengeRunBinding = {
   weekKey: string;
   identityKey: string;
   seed: number;
+  rulesetVersion: string;
+  contentVersion: string;
+  wordPoolHash: string;
+  startKitId: string;
+  difficulty: string;
+  assist: string;
+  adaptivePolicy: "frozen";
 };
 
 export type WeeklyChallengeRunLike = {
   runId: string;
   seed: number;
+  rulesetVersion: string;
+  contentVersion: string;
+  startKitId: string;
+  wordPool: {
+    hash: string;
+  };
   phase: string;
   completedEncounters: number;
   totalScore: number;
@@ -29,6 +43,7 @@ export type WeeklyChallengeRunLike = {
   retryCount: number;
   encounterPlan: readonly unknown[];
   profile: {
+    difficulty: string;
     assist: string;
   };
   challenge?: {
@@ -89,6 +104,13 @@ export function weeklyChallengeRunBinding(
     weekKey: identity.weekKey,
     identityKey: weeklyChallengeIdentityKey(identity),
     seed: identity.seed,
+    rulesetVersion: identity.rulesetVersion,
+    contentVersion: identity.contentVersion,
+    wordPoolHash: identity.wordPoolHash,
+    startKitId: identity.startKitId,
+    difficulty: identity.difficulty,
+    assist: identity.assist,
+    adaptivePolicy: identity.adaptivePolicy,
   };
 }
 
@@ -112,7 +134,44 @@ export function weeklyChallengeBindingStatus(
   ) {
     return "stale";
   }
-  return run.seed === binding.seed ? "match" : "invalid";
+  if (
+    run.seed !== binding.seed ||
+    run.rulesetVersion !== binding.rulesetVersion ||
+    run.contentVersion !== binding.contentVersion ||
+    run.startKitId !== binding.startKitId ||
+    run.wordPool.hash !== binding.wordPoolHash ||
+    run.profile.difficulty !== binding.difficulty ||
+    run.profile.assist !== binding.assist
+  ) {
+    return "invalid";
+  }
+  return "match";
+}
+
+export function bindWeeklyChallengeRun(
+  run: ExpeditionRun,
+  identity: WeeklyChallengeIdentity,
+): ExpeditionRun {
+  const binding = weeklyChallengeRunBinding(identity);
+  const candidate: ExpeditionRun = {
+    ...run,
+    challenge: {
+      kind: "weekly",
+      dayKey: null,
+      weekKey: binding.weekKey,
+      identityKey: binding.identityKey,
+    },
+    learning: {
+      ...(run.learning ?? { wantedWordId: null }),
+      wantedWordId: null,
+    },
+  };
+  if (weeklyChallengeBindingStatus(candidate, binding) !== "match") {
+    throw new Error(
+      "Weekly Challenge identity does not match the frozen Expedition run.",
+    );
+  }
+  return candidate;
 }
 
 export function weeklyChallengeResumeStatus(

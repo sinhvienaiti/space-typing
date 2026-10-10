@@ -49,13 +49,20 @@ function run(
   return {
     runId: "weekly-run-1",
     seed,
+    rulesetVersion: config.rulesetVersion,
+    contentVersion: config.contentVersion,
+    startKitId: config.startKitId,
+    wordPool: { hash: config.wordPoolHash },
     phase: "victory",
     completedEncounters: 2,
     totalScore: 900,
     accuracySum: 196,
     retryCount: 0,
     encounterPlan: [{}, {}],
-    profile: { assist: "standard" },
+    profile: {
+      difficulty: config.difficulty,
+      assist: "standard",
+    },
     challenge: {
       kind: "weekly",
       identityKey,
@@ -142,6 +149,24 @@ describe("R02 weekly challenge runtime", () => {
     expect(result.profile.weeklyRewardClaimIds).toEqual([]);
   });
 
+  it("rejects a run whose frozen content contract differs from the identity", () => {
+    const binding = weeklyChallengeRunBinding(
+      identity("2026-10-08T12:00:00.000Z"),
+    );
+    const mismatched = run(binding.identityKey, binding.seed, {
+      wordPool: { hash: "different-pool" },
+    });
+
+    expect(weeklyChallengeBindingStatus(mismatched, binding)).toBe("invalid");
+    expect(
+      settleWeeklyChallengeProfile(
+        createExpansionV2Profile(),
+        mismatched,
+        binding,
+      ).reason,
+    ).toBe("invalid-binding");
+  });
+
   it("settles PB, ghost and the completion reward exactly once", () => {
     const binding = weeklyChallengeRunBinding(
       identity("2026-10-08T12:00:00.000Z"),
@@ -184,7 +209,39 @@ describe("R02 weekly challenge runtime", () => {
     );
     const assisted = run(binding.identityKey, binding.seed, {
       retryCount: 1,
-      profile: { assist: "assisted" },
+      profile: {
+        difficulty: config.difficulty,
+        assist: "assisted",
+      },
+    });
+
+    expect(weeklyChallengeLeaderboardEligible(assisted, binding)).toBe(false);
+    const result = settleWeeklyChallengeProfile(
+      createExpansionV2Profile(),
+      assisted,
+      binding,
+    );
+    expect(result.rewardEligible).toBe(false);
+    expect(result.rewardGranted).toBe(false);
+    expect(result.reason).toBe("invalid-binding");
+  });
+
+  it("allows assist only when it is part of the canonical weekly identity and keeps it off the leaderboard", () => {
+    const assistedIdentity = weeklyChallengeIdentity(
+      { ...config, assist: "assisted" },
+      new Date("2026-10-08T12:00:00.000Z"),
+    );
+    const binding = weeklyChallengeRunBinding(assistedIdentity);
+    const assisted = run(binding.identityKey, binding.seed, {
+      profile: {
+        difficulty: config.difficulty,
+        assist: "assisted",
+      },
+      challenge: {
+        kind: "weekly",
+        identityKey: binding.identityKey,
+        weekKey: binding.weekKey,
+      },
     });
 
     expect(weeklyChallengeLeaderboardEligible(assisted, binding)).toBe(false);
@@ -197,7 +254,6 @@ describe("R02 weekly challenge runtime", () => {
     expect(result.rewardGranted).toBe(true);
     expect(result.leaderboardEligible).toBe(false);
     expect(result.profile.pbByIdentity[binding.identityKey]).toMatchObject({
-      retried: true,
       assisted: true,
     });
   });
