@@ -29,10 +29,22 @@ export type JourneySecretNode = {
   selectable: true;
 };
 
+export type JourneySectorStage = {
+  stage: number;
+  role: ReturnType<typeof stageRole>;
+  checkpoint: boolean;
+};
+
 export type JourneySectorDetail = {
   startStage: number;
   endStage: number;
   checkpointStage: number;
+  stages: JourneySectorStage[];
+  milestone: JourneySectorStage;
+  restHub: {
+    afterStage: number;
+    label: "Checkpoint Rest Hub";
+  };
   hiddenStops: JourneySecretNode[];
 };
 
@@ -124,10 +136,32 @@ export function journeySectorDetailForStage(
           (node) => node.stage >= startStage && node.stage <= endStage,
         );
 
+  const stages = Array.from(
+    { length: endStage - startStage + 1 },
+    (_value, index): JourneySectorStage => {
+      const current = startStage + index;
+      return {
+        stage: current,
+        role: stageRole(current),
+        checkpoint: current === endStage,
+      };
+    },
+  );
+  const milestone = stages.at(-1);
+  if (milestone === undefined) {
+    throw new Error("Campaign sector must contain at least one stage.");
+  }
+
   return {
     startStage,
     endStage,
     checkpointStage: endStage,
+    stages,
+    milestone,
+    restHub: {
+      afterStage: endStage,
+      label: "Checkpoint Rest Hub",
+    },
     hiddenStops,
   };
 }

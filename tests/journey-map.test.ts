@@ -99,6 +99,33 @@ describe("world journey map", () => {
     });
   });
 
+  it("merges the ten-stage combat path, milestone boss and guaranteed Rest Hub", () => {
+  const first = journeySectorDetailForStage(1, null);
+  expect(first.stages.map((node) => node.stage)).toEqual(
+    Array.from({ length: 10 }, (_value, index) => index + 1),
+  );
+  expect(first.stages.filter((node) => node.checkpoint)).toEqual([
+    { stage: 10, role: "mini-boss", checkpoint: true },
+  ]);
+  expect(first.milestone).toEqual({
+    stage: 10,
+    role: "mini-boss",
+    checkpoint: true,
+  });
+  expect(first.restHub).toEqual({
+    afterStage: 10,
+    label: "Checkpoint Rest Hub",
+  });
+  expect(journeySectorDetailForStage(20, null).milestone).toMatchObject({
+    stage: 20,
+    role: "boss",
+  });
+  expect(journeySectorDetailForStage(1000, null).milestone).toMatchObject({
+    stage: 1000,
+    role: "major-boss",
+  });
+});
+
   it("merges only discovered hidden stops from the selected sector", () => {
     const hidden = createHiddenDiscoveryState("campaign-sector-detail");
     hidden.discovered = ["black-market-signal", "hidden-station-signal"];

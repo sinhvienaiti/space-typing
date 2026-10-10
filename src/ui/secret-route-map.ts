@@ -52,7 +52,6 @@ export function hiddenStopArrivalButtonId(
     : "blackMarketButton";
 }
 
-
 export function hiddenStopArrivalCanPresent(
   stageCleared: boolean,
   checkpointHubOpen: boolean,
@@ -292,8 +291,51 @@ function renderSectorDetail(root: Document): void {
   title.textContent =
     "Stages " + String(detail.startStage) + "–" + String(detail.endStage);
   const checkpoint = root.createElement("span");
-  checkpoint.textContent = "Checkpoint · Stage " + String(detail.checkpointStage);
+  checkpoint.textContent =
+    "Checkpoint · Stage " + String(detail.checkpointStage).padStart(3, "0");
   heading.append(eyebrow, title, checkpoint);
+
+  const pathRail = root.createElement("div");
+  pathRail.className = "journey-sector-path";
+  pathRail.setAttribute(
+    "aria-label",
+    "Combat path · Stages " +
+      String(detail.startStage) +
+      " through " +
+      String(detail.endStage),
+  );
+  for (const node of detail.stages) {
+    const chip = root.createElement("span");
+    chip.className = "journey-sector-stage journey-sector-stage-" + node.role;
+    if (node.checkpoint) chip.classList.add("checkpoint");
+    if (node.stage === stage) chip.classList.add("selected");
+    const stageLabel = String(node.stage).padStart(3, "0");
+    const roleLabel = node.role.replaceAll("-", " ");
+    chip.textContent = stageLabel;
+    chip.title = "Stage " + stageLabel + " · " + roleLabel;
+    pathRail.append(chip);
+  }
+
+  const landmarks = root.createElement("div");
+  landmarks.className = "journey-sector-landmarks";
+  const milestone = root.createElement("span");
+  milestone.className =
+    "journey-sector-landmark journey-sector-landmark-boss";
+  milestone.textContent =
+    "MILESTONE · " +
+    detail.milestone.role.replaceAll("-", " ").toUpperCase() +
+    " · Stage " +
+    String(detail.milestone.stage).padStart(3, "0");
+  const restHub = root.createElement("span");
+  restHub.className =
+    "journey-sector-landmark journey-sector-landmark-rest";
+  restHub.textContent =
+    "REST HUB · after Stage " +
+    String(detail.restHub.afterStage).padStart(3, "0");
+  restHub.title =
+    detail.restHub.label +
+    " · Shop, Repair / Upgrade and Support Loadout after the checkpoint is saved.";
+  landmarks.append(milestone, restHub);
 
   const stops = root.createElement("div");
   stops.className = "journey-sector-stops";
@@ -308,10 +350,9 @@ function renderSectorDetail(root: Document): void {
     }
   }
 
-  panel.append(heading, stops);
+  panel.append(heading, pathRail, landmarks, stops);
   parent.insertBefore(panel, grid);
 }
-
 function isHiddenStopArrival(value: unknown): value is HiddenStopArrival {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return false;
