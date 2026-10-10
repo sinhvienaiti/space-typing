@@ -9,8 +9,14 @@ import {
   rollHiddenDiscovery,
   sanitizeHiddenDiscoveryState,
 } from "../src/discovery/hidden-content";
-import { currentHiddenDiscoveryPresentation } from "../src/discovery/hidden-discovery-presentation";
-import { activateSecretRoutePresentation } from "../src/ui/secret-route-map";
+import {
+  currentHiddenDiscoveryPresentation,
+  hiddenStopArrivalBetween,
+} from "../src/discovery/hidden-discovery-presentation";
+import {
+  activateSecretRoutePresentation,
+  hiddenStopArrivalButtonId,
+} from "../src/ui/secret-route-map";
 
 describe("secret Campaign route", () => {
   it("restores the same secret nodes after a serialized save/load round trip", () => {
@@ -197,5 +203,64 @@ describe("secret Campaign route", () => {
     expect(onOpenStation).not.toHaveBeenCalled();
     expect(onPreviewRoute).toHaveBeenCalledTimes(1);
     expect(onPreviewRoute).toHaveBeenCalledWith(shop);
+  });
+
+  it("does not replay a hidden-stop arrival while hydrating an existing save", () => {
+    const loaded = createHiddenDiscoveryState("campaign-arrival-hydrate");
+    loaded.discovered = ["black-market-signal"];
+    loaded.discoveryStages = { "black-market-signal": 25 };
+    loaded.lastRollStage = 25;
+    loaded.lastRollIdentity = "campaign-arrival-hydrate:stage-25";
+
+    expect(hiddenStopArrivalBetween(null, loaded)).toBeNull();
+  });
+
+  it("publishes a Rest Stop arrival only for a newly discovered station roll", () => {
+    const previous = createHiddenDiscoveryState("campaign-arrival-station");
+    previous.lastRollStage = 39;
+    previous.lastRollIdentity = "campaign-arrival-station:stage-39";
+    const next = createHiddenDiscoveryState("campaign-arrival-station");
+    next.discovered = ["hidden-station-signal"];
+    next.discoveryStages = { "hidden-station-signal": 40 };
+    next.lastRollStage = 40;
+    next.lastRollIdentity = "campaign-arrival-station:stage-40";
+
+    const arrival = hiddenStopArrivalBetween(previous, next);
+    expect(arrival).toEqual({
+      discoveryId: "hidden-station-signal",
+      stage: 40,
+      kind: "hidden-station",
+      title: "Hidden Station",
+    });
+    expect(hiddenStopArrivalButtonId(arrival!)).toBe("stationShopButton");
+    expect(hiddenStopArrivalBetween(next, next)).toBeNull();
+  });
+
+  it("routes a newly discovered hidden shop to the canonical Black Market action", () => {
+    const previous = createHiddenDiscoveryState("campaign-arrival-shop");
+    previous.lastRollStage = 24;
+    previous.lastRollIdentity = "campaign-arrival-shop:stage-24";
+    const next = createHiddenDiscoveryState("campaign-arrival-shop");
+    next.discovered = ["black-market-signal"];
+    next.discoveryStages = { "black-market-signal": 25 };
+    next.lastRollStage = 25;
+    next.lastRollIdentity = "campaign-arrival-shop:stage-25";
+
+    const arrival = hiddenStopArrivalBetween(previous, next);
+    expect(arrival?.kind).toBe("hidden-shop");
+    expect(hiddenStopArrivalButtonId(arrival!)).toBe("blackMarketButton");
+  });
+
+  it("does not create an arrival card for non-stop hidden discoveries", () => {
+    const previous = createHiddenDiscoveryState("campaign-arrival-other");
+    previous.lastRollStage = 49;
+    previous.lastRollIdentity = "campaign-arrival-other:stage-49";
+    const next = createHiddenDiscoveryState("campaign-arrival-other");
+    next.discovered = ["echo-rift"];
+    next.discoveryStages = { "echo-rift": 50 };
+    next.lastRollStage = 50;
+    next.lastRollIdentity = "campaign-arrival-other:stage-50";
+
+    expect(hiddenStopArrivalBetween(previous, next)).toBeNull();
   });
 });
