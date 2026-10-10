@@ -117,19 +117,94 @@ Exact R02 code checkpoint validation:
 
 R02 is the Weekly Runtime/Admin surface milestone. A new player-facing Weekly launcher/button is not part of this R02 acceptance and was not added here.
 
+## R03 — Alternative Duel Modes Runtime
+
+Status: **COMPLETE**
+
+Locked code checkpoint:
+
+- `7c97bdec15f5aaaa72173a59eaaa36394eb50e75` — `test(duel): align empty alternative room slot fixture`
+- Exact checkpoint CI #1842: PASS.
+
+### Acceptance checklist
+
+1. **Canonical runtime capabilities — COMPLETE**
+   - `reflex` and `word-chain` are registered in `ALTERNATIVE_MODE_REGISTRY`.
+   - Both modes bind to the real `AlternativeMatchRuntime` owner.
+   - Friend and Practice are explicitly supported; Ranked remains fail-closed rather than silently borrowing Standard Duel MMR/ranked semantics.
+
+2. **Authoritative match runtime — COMPLETE**
+   - Reflex and Word Chain resolve score, hull damage and terminal results in the authority runtime.
+   - Projectile damage lands on the authority impact clock rather than a presentation timer.
+   - Duplicate/stale sequence handling prevents repeated or late input from mutating authoritative state.
+
+3. **Persistence / reconnect — COMPLETE**
+   - Runtime snapshots include mode/rules/content identity needed to resume safely.
+   - Reconnect republishes personalized authoritative state instead of reconstructing combat from client-local state.
+   - Terminal snapshots remain reconnectable while a later owner-started match can release the old terminal binding idempotently.
+
+4. **Protocol / identity / transport — COMPLETE**
+   - `MODE_INPUT` is parsed through a dedicated alternative protocol boundary.
+   - The server binds authenticated session identity and authority time; the client cannot claim authoritative `playerId`, damage or timestamps.
+   - Friend Alternative Duel reuses the existing Duel WebSocket authentication, room lifecycle, reconnect and tick loop; no second networking stack was introduced.
+
+5. **Practice + presentation — COMPLETE**
+   - Practice has a deterministic local owner using the same runtime rules.
+   - Friend lobby exposes Reflex / Word Chain activation through the existing Duel flow.
+   - UI consumes authoritative score, hull, challenge, turn and projectile-impact state; it does not simulate authoritative damage locally.
+
+6. **Canonical content handling — COMPLETE**
+   - Word Chain uses the canonical `DUEL_TYPING_LEXICON` rather than an open client dictionary/regex acceptance path.
+   - Invalid words / invalid chain transitions are rejected by the authoritative runtime.
+
+7. **Admin/runtime-availability truthfulness — COMPLETE for this child branch**
+   - This branch has no standalone `src/admin` Alternative Modes owner or Admin-only runtime declaration to patch.
+   - Runtime availability is represented by the canonical `ALTERNATIVE_MODE_REGISTRY`, whose descriptors now point to `AlternativeMatchRuntime`.
+   - R03 intentionally does not invent a parallel child Admin framework merely to duplicate that source of truth.
+
+### R03 implementation/test evidence
+
+Primary runtime files:
+
+- `src/duel/alternative-modes.ts`
+- `src/duel/alternative-match-runtime.ts`
+- `src/duel/alternative-practice.ts`
+- `src/duel/alternative-presentation.ts`
+- `src/duel/alternative-protocol.ts`
+- `src/duel/alternative-wire.ts`
+- `src/duel/alternative-room-ui.ts`
+- existing Duel server/network-client integration files
+
+Focused tests include:
+
+- `tests/alternative-match-runtime.test.ts`
+- `tests/alternative-coordinator.test.ts`
+- `tests/alternative-protocol-service.test.ts`
+- `tests/alternative-network-client.test.ts`
+- `tests/alternative-practice-presentation.test.ts`
+- `tests/alternative-room-ui-model.test.ts`
+
+Exact R03 checkpoint validation:
+
+- CI #1842 on `7c97bdec15f5aaaa72173a59eaaa36394eb50e75`: PASS.
+- Earlier locked slices include CI #1832, #1833, #1834 and live-transport CI #1838.
+
+Do not return to R03 unless R04/R05 work causes a real regression.
+
 ## First unfinished unit
 
-### R03 — Alternative Modes Runtime
+### R04 — Voice / Hybrid Final Acceptance
 
-Status: **NOT STARTED in this checkpoint**
+Status: **NOT STARTED from this handoff checkpoint**
 
 Resume order:
 
 1. Fetch the latest remote HEAD and reconcile any newer commits first.
-2. Identify the canonical alternative-mode registry already present in the latest code.
-3. Bind each declared mode to a real runtime owner rather than an Admin-only/runtime-unavailable declaration.
-4. Complete lifecycle + persistence + focused tests for the first unfinished mode/runtime slice.
-5. Replace the corresponding Admin runtime-absence diagnostic only after a real runtime owner exists.
-6. Continue the next unfinished R03 slice; do not redo R01/R02.
+2. Audit the existing `VoiceSession`, input-mode normalization and Duel authority/network path before changing architecture.
+3. Keep Typing / Voice / Hybrid mutually explicit and reuse the existing authoritative Duel input pipeline instead of creating a parallel transport/runtime.
+4. Complete the smallest unfinished authority slice first: normalized voice/hybrid input identity, stale/duplicate protection, reconnect behavior and deterministic tests.
+5. Keep unsupported ranked combinations fail-closed until they satisfy the same authority/validation contract as Typing.
+6. Finish final UI/microphone acceptance only after the runtime path is real and testable.
+7. After R04 is locked by exact-SHA CI, continue R05 — Historical Analytics Backend.
 
-Do not start R03 from the historical SHAs above if GitHub has a newer HEAD. The latest remote HEAD is always the source of truth.
+Do not restart R01-R03 from their historical SHAs. The latest remote HEAD is always the source of truth.
