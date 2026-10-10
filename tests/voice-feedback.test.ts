@@ -66,11 +66,24 @@ describe("voice feedback presentation", () => {
     expect(state.getView()).toMatchObject({ status: "paused", transcript: null });
     state.setMode("typing"); expect(state.getView().visible).toBe(false);
   });
-  it("shows an explicit unavailable state without displaying an earlier transcript", () => {
+  it("gives permission-denied errors actionable recovery guidance and clears old speech", () => {
     const { state } = listening(); state.handleMessage(detection());
-    state.handleMessage(message("error", { code: "local-runtime-failed", message: "permission denied" }));
-    expect(state.getView()).toMatchObject({ status: "error", transcript: null, detail: "Microphone unavailable · retry" });
+    state.handleMessage(message("error", { code: "local-runtime-failed", message: "NotAllowedError: permission denied" }));
+    expect(state.getView()).toMatchObject({
+      status: "error",
+      transcript: null,
+      detail: "Microphone permission denied · allow access in browser/system settings, then retry",
+    });
     state.expire(); expect(state.getView().status).toBe("error");
+  });
+  it("keeps non-permission microphone failures on the generic retry path", () => {
+    const { state } = listening();
+    state.handleMessage(message("error", { code: "local-runtime-failed", message: "Audio device disconnected" }));
+    expect(state.getView()).toMatchObject({
+      status: "error",
+      transcript: null,
+      detail: "Microphone unavailable · retry",
+    });
   });
 });
 

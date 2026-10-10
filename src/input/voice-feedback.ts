@@ -16,6 +16,29 @@ export interface VoiceFeedbackSink {
   resolve(detectionId: string, accepted: boolean, reason: string): void;
 }
 
+function voiceErrorDetail(message: VoiceMessage, op: string): string {
+  const fields = message as VoiceMessage & {
+    code?: unknown;
+    message?: unknown;
+  };
+  const code = typeof fields.code === "string" ? fields.code.toLowerCase() : "";
+  const detail = typeof fields.message === "string" ? fields.message.toLowerCase() : "";
+  const reason = `${code} ${detail}`;
+  if (code === "offline-engine-not-validated" || op === "capabilities") {
+    return "Voice unavailable";
+  }
+  const permissionDenied =
+    reason.includes("notallowed") ||
+    reason.includes("not-allowed") ||
+    reason.includes("permission-denied") ||
+    reason.includes("permission denied") ||
+    (reason.includes("permission") &&
+      (reason.includes("denied") || reason.includes("blocked")));
+  return permissionDenied
+    ? "Microphone permission denied · allow access in browser/system settings, then retry"
+    : "Microphone unavailable · retry";
+}
+
 /** Presentation only. Recognition is never an accepted hit until the game resolves it. */
 export class VoiceFeedbackState implements VoiceFeedbackSink {
   private mode: InputMode = "typing";
@@ -65,7 +88,7 @@ export class VoiceFeedbackState implements VoiceFeedbackSink {
     const op = message.type.slice(VOICE_NAMESPACE.length + 1);
     if (op === "error" || (op === "capabilities" && message.offlineEngineAvailable === false)) {
       this.reset();
-      this.render("error", message.code === "offline-engine-not-validated" || op === "capabilities" ? "Voice unavailable" : "Microphone unavailable · retry");
+      this.render("error", voiceErrorDetail(message, op));
       return;
     }
     if (op === "ready") {
