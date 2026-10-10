@@ -1,0 +1,169 @@
+name: R01 hidden discovery patch
+
+on:
+  push:
+    branches:
+      - feat/bgv-integration-current
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/bgv-integration-current
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.21.0
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Move hidden discovery roll to successful stage clear
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/Game.ts")
+          text = path.read_text()
+
+          start_block = '''    if (hiddenEncounterRuntime === null) {
+            const hiddenRoll = rollHiddenDiscovery(
+              this.hiddenDiscovery,
+              stage.stage,
+              this.playerStats.luck,
+            );
+            if (hiddenRoll.rolled) {
+              this.hiddenDiscovery = hiddenRoll.state;
+              this.hooks.onHiddenDiscoveryUpdate(
+                hiddenRoll.state,
+                hiddenRoll.discovery,
+              );
+            }
+          }
+
+          '''
+
+          finish_anchor = '''    if (!requiredObjectiveAllowsFinish(this.stageObjective)) {
+            return;
+          }
+
+          '''
+
+          clear_block = '''    if (this.hiddenEncounterRuntime === null && this.stageConfig !== null) {
+            const hiddenRoll = rollHiddenDiscovery(
+              this.hiddenDiscovery,
+              this.stageConfig.stage,
+              this.playerStats.luck,
+            );
+            if (hiddenRoll.rolled) {
+              this.hiddenDiscovery = hiddenRoll.state;
+              this.hooks.onHiddenDiscoveryUpdate(
+                hiddenRoll.state,
+                hiddenRoll.discovery,
+              );
+            }
+          }
+
+          '''
+
+          if clear_block in text and start_block not in text:
+              print("Game.ts already has the intended stage-clear timing")
+          else:
+              assert text.count(start_block) == 1, f"expected one start-stage discovery block, found {text.count(start_block)}"
+              assert text.count(finish_anchor) == 1, f"expected one finish-stage anchor, found {text.count(finish_anchor)}"
+              text = text.replace(start_block, "", 1)
+              text = text.replace(finish_anchor, finish_anchor + clear_block, 1)
+              path.write_text(text)
+
+          final = path.read_text()
+          start_index = final.index("  startStage(")
+          finish_index = final.index("  private finishStage(): void {")
+          pick_index = final.index("  private pickBossEntry(", finish_index)
+          start_slice = final[start_index:finish_index]
+          finish_slice = final[finish_index:pick_index]
+          assert "rollHiddenDiscovery(" not in start_slice
+          assert finish_slice.count("rollHiddenDiscovery(") == 1
+          assert finish_slice.index("requiredObjectiveAllowsFinish") < finish_slice.index("rollHiddenDiscovery(")
+          assert finish_slice.index("rollHiddenDiscovery(") < finish_slice.index('this.phase = "stageclear";')
+          PY
+
+      - name: Add lifecycle regression test
+        shell: bash
+        run: |
+          cat > tests/hidden-discovery-timing.test.ts <<'EOF'
+          import { readFileSync } from "node:fs";
+          import { describe, expect, it } from "vitest";
+
+          const source = readFileSync(new URL("../src/Game.ts", import.meta.url), "utf8");
+
+          describe("hidden discovery lifecycle timing", () => {
+            it("rolls only after a normal stage satisfies its clear gates", () => {
+              const startIndex = source.indexOf("  startStage(");
+              const finishIndex = source.indexOf("  private finishStage(): void {");
+              const finishEnd = source.indexOf("  private pickBossEntry(", finishIndex);
+
+              expect(startIndex).toBeGreaterThanOrEqual(0);
+              expect(finishIndex).toBeGreaterThan(startIndex);
+              expect(finishEnd).toBeGreaterThan(finishIndex);
+
+              const startStage = source.slice(startIndex, finishIndex);
+              const finishStage = source.slice(finishIndex, finishEnd);
+
+              expect(startStage).not.toContain("rollHiddenDiscovery(");
+              expect(source.match(/rollHiddenDiscovery\(/g)).toHaveLength(1);
+
+              const objectiveGate = finishStage.indexOf(
+                "requiredObjectiveAllowsFinish(this.stageObjective)",
+              );
+              const hiddenEncounterGuard = finishStage.indexOf(
+                "this.hiddenEncounterRuntime === null && this.stageConfig !== null",
+              );
+              const roll = finishStage.indexOf("rollHiddenDiscovery(");
+              const stageClear = finishStage.indexOf('this.phase = "stageclear";');
+
+              expect(objectiveGate).toBeGreaterThanOrEqual(0);
+              expect(hiddenEncounterGuard).toBeGreaterThan(objectiveGate);
+              expect(roll).toBeGreaterThan(hiddenEncounterGuard);
+              expect(stageClear).toBeGreaterThan(roll);
+            });
+          });
+          EOF
+
+      - name: Check patch diff
+        run: |
+          git diff --check
+          git diff -- src/Game.ts tests/hidden-discovery-timing.test.ts
+
+      - name: Targeted R01 test
+        run: pnpm exec vitest run tests/hidden-discovery-timing.test.ts
+
+      - name: Full test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Commit and push R01 fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/Game.ts tests/hidden-discovery-timing.test.ts
+          if git diff --cached --quiet; then
+            echo "No source changes to commit"
+            exit 0
+          fi
+          git commit -m "fix(campaign): roll hidden discoveries on stage clear"
+          git push origin HEAD:feat/bgv-integration-current
