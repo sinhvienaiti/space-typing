@@ -24,6 +24,20 @@ import {
 export interface DuelRankedProfileStore {
   load(accountId: string): DuelRankedProfile | null;
   save(profile: DuelRankedProfile): void;
+  savePair(left: DuelRankedProfile, right: DuelRankedProfile): void;
+}
+
+function assertDistinctRankedProfiles(
+  left: DuelRankedProfile,
+  right: DuelRankedProfile,
+): void {
+  if (
+    left.accountId === "" ||
+    right.accountId === "" ||
+    left.accountId === right.accountId
+  ) {
+    throw new Error("Ranked profile pair requires two distinct accounts.");
+  }
 }
 
 export class InMemoryDuelRankedProfileStore
@@ -42,6 +56,17 @@ export class InMemoryDuelRankedProfileStore
   save(profile: DuelRankedProfile): void {
     const safe = sanitizeDuelRankedProfile(profile);
     this.profiles.set(safe.accountId, safe);
+  }
+
+  savePair(
+    leftInput: DuelRankedProfile,
+    rightInput: DuelRankedProfile,
+  ): void {
+    const left = sanitizeDuelRankedProfile(leftInput);
+    const right = sanitizeDuelRankedProfile(rightInput);
+    assertDistinctRankedProfiles(left, right);
+    this.profiles.set(left.accountId, left);
+    this.profiles.set(right.accountId, right);
   }
 }
 
@@ -64,8 +89,41 @@ export class JsonFileDuelRankedProfileStore
 
   save(profile: DuelRankedProfile): void {
     const safe = sanitizeDuelRankedProfile(profile);
+    const previous = new Map(this.profiles);
     this.profiles.set(safe.accountId, safe);
-    this.flush();
+    try {
+      this.flush();
+    } catch (error) {
+      this.restore(previous);
+      throw error;
+    }
+  }
+
+  savePair(
+    leftInput: DuelRankedProfile,
+    rightInput: DuelRankedProfile,
+  ): void {
+    const left = sanitizeDuelRankedProfile(leftInput);
+    const right = sanitizeDuelRankedProfile(rightInput);
+    assertDistinctRankedProfiles(left, right);
+    const previous = new Map(this.profiles);
+    this.profiles.set(left.accountId, left);
+    this.profiles.set(right.accountId, right);
+    try {
+      this.flush();
+    } catch (error) {
+      this.restore(previous);
+      throw error;
+    }
+  }
+
+  private restore(
+    previous: Map<string, DuelRankedProfile>,
+  ): void {
+    this.profiles.clear();
+    for (const [accountId, profile] of previous) {
+      this.profiles.set(accountId, profile);
+    }
   }
 
   private loadFile(): void {
@@ -370,8 +428,7 @@ export class DuelRankedService {
       right,
       leftResult,
     });
-    this.store.save(updated.left);
-    this.store.save(updated.right);
+    this.store.savePair(updated.left, updated.right);
     this.active.delete(matchId);
     this.authority.releaseFinishedRankedMatch(matchId);
     return {
