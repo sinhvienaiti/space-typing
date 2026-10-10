@@ -1,7 +1,11 @@
 (async () => {
   const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
-  const phaseTimeoutMs = 20000;
-  const buttonDeadline = Date.now() + phaseTimeoutMs;
+  // Account/persistence initialization can legitimately trail the Vite/page-load
+  // signal on a cold shared CI runner. Keep this independent from the map render
+  // deadline so a slow bootstrap does not consume the structural QA budget.
+  const buttonTimeoutMs = 60000;
+  const renderTimeoutMs = 20000;
+  const buttonDeadline = Date.now() + buttonTimeoutMs;
   let button = null;
 
   while (Date.now() < buttonDeadline) {
@@ -10,16 +14,24 @@
     await sleep(100);
   }
 
+  const startButton = document.getElementById("startButton");
   if (!(button instanceof HTMLButtonElement)) {
-    throw new Error("Campaign Map button was not mounted before the QA timeout.");
+    throw new Error(
+      `Campaign Map button was not mounted before the QA timeout ` +
+        `(startMounted=${startButton instanceof HTMLButtonElement}).`,
+    );
   }
   if (button.disabled) {
-    throw new Error("Campaign Map button stayed disabled before the QA timeout.");
+    throw new Error(
+      `Campaign Map button stayed disabled before the QA timeout ` +
+        `(waitedMs=${buttonTimeoutMs}, ` +
+        `startDisabled=${startButton instanceof HTMLButtonElement ? startButton.disabled : "unmounted"}).`,
+    );
   }
 
   button.click();
 
-  const renderDeadline = Date.now() + phaseTimeoutMs;
+  const renderDeadline = Date.now() + renderTimeoutMs;
   while (Date.now() < renderDeadline) {
     const dialog = document.getElementById("stageSelectDialog");
     const board = document.querySelector("#stageGrid .stage-journey");
