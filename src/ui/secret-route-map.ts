@@ -6,6 +6,10 @@ import {
   type HiddenStopArrival,
 } from "../discovery/hidden-discovery-presentation";
 import {
+  journeySectorDetailForStage,
+  type JourneySectorDetail,
+} from "../campaign/journey-map";
+import {
   secretRoutePresentationsForStage,
   type SecretRoutePresentation,
 } from "../campaign/secret-route";
@@ -13,6 +17,7 @@ import {
 const SECRET_NODE_SELECTOR = ".journey-secret-node";
 const SECRET_ACTIONS_ID = "journeySecretActions";
 const SECRET_ARRIVAL_ID = "journeySecretArrival";
+const SECTOR_DETAIL_ID = "journeySectorDetail";
 
 export type SecretRouteActivationHandlers = {
   onOpenStation: () => void;
@@ -62,6 +67,24 @@ function displayedWorldStage(board: HTMLElement): number | null {
     : null;
 }
 
+function selectedJourneyStage(board: HTMLElement): number | null {
+  const selectors = [
+    ".journey-node.selected[data-stage]",
+    ".journey-node.current[data-stage]",
+    ".journey-node.frontier[data-stage]",
+    ".journey-node[data-stage]",
+  ] as const;
+  for (const selector of selectors) {
+    const node = board.querySelector<HTMLElement>(selector);
+    if (node === null) continue;
+    const stage = Number(node.dataset.stage);
+    if (Number.isInteger(stage) && stage >= 1 && stage <= 1000) {
+      return stage;
+    }
+  }
+  return null;
+}
+
 function clearSecretPreview(root: Document): void {
   const actions = byId(root, SECRET_ACTIONS_ID);
   actions?.remove();
@@ -76,6 +99,10 @@ function clearSecretPreview(root: Document): void {
 
 function clearSecretArrival(root: Document): void {
   byId(root, SECRET_ARRIVAL_ID)?.remove();
+}
+
+function clearSectorDetail(root: Document): void {
+  byId(root, SECTOR_DETAIL_ID)?.remove();
 }
 
 function openCanonicalAction(root: Document, buttonId: string): void {
@@ -210,6 +237,74 @@ function renderSecretNodes(root: Document): void {
   }
 }
 
+function createSectorStopChip(
+  root: Document,
+  stop: JourneySectorDetail["hiddenStops"][number],
+): HTMLElement {
+  const chip = root.createElement("span");
+  chip.className = "journey-sector-stop journey-sector-stop-" + stop.kind;
+  chip.dataset.hiddenDiscoveryId = stop.id;
+  chip.textContent =
+    (stop.kind === "hidden-station" ? "REST STOP" : "SECRET") +
+    " · Stage " +
+    String(stop.stage) +
+    " · " +
+    stop.name;
+  return chip;
+}
+
+function renderSectorDetail(root: Document): void {
+  clearSectorDetail(root);
+  const dialog = byId<HTMLDialogElement>(root, "stageSelectDialog");
+  const grid = byId(root, "stageGrid");
+  const parent = grid?.parentElement ?? null;
+  const board = grid?.querySelector<HTMLElement>(".stage-journey") ?? null;
+  if (dialog?.open !== true || grid === null || parent === null || board === null) {
+    return;
+  }
+
+  const stage = selectedJourneyStage(board);
+  if (stage === null) return;
+  const detail = journeySectorDetailForStage(
+    stage,
+    currentHiddenDiscoveryPresentation(),
+  );
+
+  const panel = root.createElement("section");
+  panel.id = SECTOR_DETAIL_ID;
+  panel.className = "journey-sector-detail";
+  panel.setAttribute("role", "region");
+  panel.setAttribute("aria-labelledby", SECTOR_DETAIL_ID + "Title");
+
+  const heading = root.createElement("div");
+  heading.className = "journey-sector-heading";
+  const eyebrow = root.createElement("small");
+  eyebrow.textContent = "SECTOR DETAIL";
+  const title = root.createElement("strong");
+  title.id = SECTOR_DETAIL_ID + "Title";
+  title.textContent =
+    "Stages " + String(detail.startStage) + "–" + String(detail.endStage);
+  const checkpoint = root.createElement("span");
+  checkpoint.textContent = "Checkpoint · Stage " + String(detail.checkpointStage);
+  heading.append(eyebrow, title, checkpoint);
+
+  const stops = root.createElement("div");
+  stops.className = "journey-sector-stops";
+  if (detail.hiddenStops.length === 0) {
+    const empty = root.createElement("span");
+    empty.className = "journey-sector-empty";
+    empty.textContent = "No hidden stops discovered in this sector.";
+    stops.append(empty);
+  } else {
+    for (const stop of detail.hiddenStops) {
+      stops.append(createSectorStopChip(root, stop));
+    }
+  }
+
+  panel.append(heading, stops);
+  parent.insertBefore(panel, grid);
+}
+
 function isHiddenStopArrival(value: unknown): value is HiddenStopArrival {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return false;
@@ -318,6 +413,7 @@ export function installSecretRouteMap(root: Document = document): () => void {
   let pendingArrival: HiddenStopArrival | null = null;
   const renderMap = () => {
     renderSecretNodes(root);
+    renderSectorDetail(root);
     if (pendingArrival !== null) {
       renderHiddenStopArrival(root, pendingArrival, () => {
         pendingArrival = null;
@@ -328,7 +424,7 @@ export function installSecretRouteMap(root: Document = document): () => void {
   const observer = new MutationObserver(renderMap);
   observer.observe(grid, { childList: true });
 
-  const onDiscovery = () => renderSecretNodes(root);
+  const onDiscovery = () => renderMap();
   const onArrival = (event: Event) => {
     const detail = (event as CustomEvent<unknown>).detail;
     if (isHiddenStopArrival(detail)) pendingArrival = detail;
@@ -340,12 +436,13 @@ export function installSecretRouteMap(root: Document = document): () => void {
       target.closest(".journey-node[data-stage]") !== null
     ) {
       clearSecretPreview(root);
+      renderSectorDetail(root);
     }
   };
   window.addEventListener(HIDDEN_DISCOVERY_PRESENTATION_EVENT, onDiscovery);
   window.addEventListener(HIDDEN_STOP_ARRIVAL_EVENT, onArrival);
   root.addEventListener("click", onClick);
-  renderSecretNodes(root);
+  renderMap();
 
   return () => {
     observer.disconnect();
@@ -354,5 +451,6 @@ export function installSecretRouteMap(root: Document = document): () => void {
     root.removeEventListener("click", onClick);
     clearSecretPreview(root);
     clearSecretArrival(root);
+    clearSectorDetail(root);
   };
 }
