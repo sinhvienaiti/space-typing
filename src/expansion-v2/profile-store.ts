@@ -48,6 +48,7 @@ export type ExpansionV2Profile = {
   processedRunIds: string[];
   seenCinematics: string[];
   campaignEventFlags: string[];
+  weeklyRewardClaimIds: string[];
   ghostEnabled: boolean;
 };
 
@@ -63,6 +64,7 @@ export function createExpansionV2Profile(): ExpansionV2Profile {
     processedRunIds: [],
     seenCinematics: [],
     campaignEventFlags: [],
+    weeklyRewardClaimIds: [],
     ghostEnabled: true,
   };
 }
@@ -126,6 +128,11 @@ export function sanitizeExpansionV2Profile(
       ? raw.campaignEventFlags.filter(
           (id): id is string => typeof id === "string",
         ).slice(-256)
+      : [],
+    weeklyRewardClaimIds: Array.isArray(raw.weeklyRewardClaimIds)
+      ? [...new Set(raw.weeklyRewardClaimIds.filter(
+          (id): id is string => typeof id === "string" && id.length > 0,
+        ))].slice(-256)
       : [],
     ghostEnabled:
       typeof raw.ghostEnabled === "boolean"
@@ -314,6 +321,32 @@ export function appendGhostPoint(
           .slice(-16),
       },
     },
+  };
+}
+
+export function weeklyChallengeRewardClaimed(
+  profile: ExpansionV2Profile,
+  identityKey: string,
+): boolean {
+  return profile.weeklyRewardClaimIds.includes(identityKey);
+}
+
+export function claimWeeklyChallengeReward(
+  profile: ExpansionV2Profile,
+  identityKey: string,
+): ExpansionV2Profile {
+  if (
+    identityKey.length === 0 ||
+    weeklyChallengeRewardClaimed(profile, identityKey)
+  ) {
+    return profile;
+  }
+  return {
+    ...profile,
+    weeklyRewardClaimIds: [
+      ...profile.weeklyRewardClaimIds,
+      identityKey,
+    ].slice(-256),
   };
 }
 
