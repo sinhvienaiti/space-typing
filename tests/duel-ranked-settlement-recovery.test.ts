@@ -249,7 +249,7 @@ describe("Ranked Duel settlement recovery", () => {
     expect(ranked.historyDiagnostic()).toBeNull();
   });
 
-  it("keeps the active settlement retryable when profile persistence fails after journaling", () => {
+  it("does not let background recovery consume a pending settlement for a still-active match", () => {
     const authority = new DuelAuthorityService(deps());
     const profiles = new FailOnceProfileStore();
     const history = new InMemoryDuelRankedHistoryStore();
@@ -273,6 +273,11 @@ describe("Ranked Duel settlement recovery", () => {
     expect(history.load("left").events).toEqual([]);
 
     profiles.failPair = false;
+    expect(ranked.pump(10_000)).toEqual([]);
+    expect(journal.list()).toHaveLength(1);
+    expect(ranked.profile("left").matchesPlayed).toBe(0);
+    expect(history.load("left").events).toEqual([]);
+
     const completed = ranked.completeIfFinished(
       finished.matchId,
       finished.updates,
