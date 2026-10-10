@@ -11,6 +11,7 @@ import {
   sanitizeHistoricalEvent,
   upsertHistoricalRunEvent,
   type HistoricalAnalyticsState,
+  type HistoricalRunSettledEventV1,
 } from "./historical-analytics";
 import {
   commitExpansionLearningEvidence,
@@ -59,6 +60,29 @@ export type ExpansionV2Profile = {
   weeklyRewardClaimIds: string[];
   ghostEnabled: boolean;
 };
+
+export type ExpansionRunHistoricalMetadata = Partial<Pick<
+  HistoricalRunSettledEventV1,
+  | "outcome"
+  | "accuracyPercent"
+  | "activeSeconds"
+  | "challengeKind"
+  | "retryCount"
+  | "retried"
+  | "assisted"
+  | "leaderboardEligible"
+  | "difficulty"
+  | "inputMode"
+  | "gameplayMode"
+  | "sourceStages"
+  | "bossAttempts"
+  | "equippedRelicIds"
+  | "equipmentIds"
+  | "skillUsage"
+  | "wordsPerMinute"
+  | "acceptedTypedLetters"
+  | "voiceCompletions"
+>>;
 
 export function createExpansionV2Profile(): ExpansionV2Profile {
   return {
@@ -239,33 +263,46 @@ export function recordExpansionRun(
     score: number;
     completed: boolean;
     occurredAtMs?: number;
+    historical?: ExpansionRunHistoricalMetadata;
   },
 ): ExpansionV2Profile {
   if (profile.processedRunIds.includes(input.runId)) return profile;
 
   const now = input.occurredAtMs ?? Date.now();
+  const historical = input.historical ?? {};
   const event = sanitizeHistoricalEvent({
     version: 1,
     eventId: "expedition-run:" + input.runId + ":terminal",
     occurredAtMs: now,
     kind: "run-settled",
     runId: input.runId,
-    outcome: input.completed ? "completed" : "unknown",
+    outcome: historical.outcome ?? (input.completed ? "completed" : "unknown"),
     score: input.score,
-    accuracyPercent: null,
-    activeSeconds: null,
-    challengeKind: null,
-    retryCount: null,
-    retried: null,
-    assisted: null,
-    leaderboardEligible: null,
+    accuracyPercent: historical.accuracyPercent ?? null,
+    activeSeconds: historical.activeSeconds ?? null,
+    challengeKind: historical.challengeKind ?? null,
+    retryCount: historical.retryCount ?? null,
+    retried: historical.retried ?? null,
+    assisted: historical.assisted ?? null,
+    leaderboardEligible: historical.leaderboardEligible ?? null,
+    difficulty: historical.difficulty ?? null,
+    inputMode: historical.inputMode ?? null,
+    gameplayMode: historical.gameplayMode ?? null,
+    sourceStages: historical.sourceStages ?? [],
+    bossAttempts: historical.bossAttempts ?? [],
+    equippedRelicIds: historical.equippedRelicIds ?? [],
+    equipmentIds: historical.equipmentIds ?? [],
+    skillUsage: historical.skillUsage ?? [],
+    wordsPerMinute: historical.wordsPerMinute ?? null,
+    acceptedTypedLetters: historical.acceptedTypedLetters ?? null,
+    voiceCompletions: historical.voiceCompletions ?? null,
   });
   if (event === null) return profile;
 
   return {
     ...profile,
     completedRuns:
-      profile.completedRuns + (input.completed ? 1 : 0),
+      profile.completedRuns + (event.outcome === "completed" ? 1 : 0),
     bestScore: Math.max(profile.bestScore, event.score),
     processedRunIds: [
       ...profile.processedRunIds,
