@@ -298,24 +298,27 @@ export function recordFixedChallengeResult(
   const challengeKind = record.identityKey.startsWith("weekly|")
     ? "weekly"
     : "daily";
+  const event = sanitizeHistoricalEvent({
+    version: 1,
+    eventId: "challenge-run:" + record.runId + ":terminal",
+    occurredAtMs: Date.now(),
+    kind: "run-settled",
+    runId: record.runId,
+    outcome: "unknown",
+    score: record.score,
+    accuracyPercent: record.accuracy,
+    activeSeconds: record.activeSeconds,
+    challengeKind,
+    retryCount: null,
+    retried: record.retried,
+    assisted: record.assisted,
+    leaderboardEligible: null,
+  });
+  if (event === null) return profile;
+
   const withHistory: ExpansionV2Profile = {
     ...profile,
-    history: upsertHistoricalRunEvent(profile.history, {
-      version: 1,
-      eventId: "challenge-run:" + record.runId + ":terminal",
-      occurredAtMs: Date.now(),
-      kind: "run-settled",
-      runId: record.runId,
-      outcome: "unknown",
-      score: record.score,
-      accuracyPercent: record.accuracy,
-      activeSeconds: record.activeSeconds,
-      challengeKind,
-      retryCount: null,
-      retried: record.retried,
-      assisted: record.assisted,
-      leaderboardEligible: null,
-    }),
+    history: upsertHistoricalRunEvent(profile.history, event),
   };
 
   const current = withHistory.pbByIdentity[record.identityKey] ?? null;
