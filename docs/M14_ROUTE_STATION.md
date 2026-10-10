@@ -11,7 +11,7 @@ The current Campaign presentation keeps M14 persistence as the compatibility fou
 - the current ten-stage sector is rendered as detail inside the unified Journey Map rather than as a competing normal-route grid;
 - the x10 mandatory encounter/boss is cleared first, then the guaranteed Rest Hub becomes available with Shop, Repair/Upgrade and Support Loadout together;
 - opening services does not create a numbered stage, reroll stock or advance Campaign progression;
-- R01 real-browser structural QA is available through `pnpm visual:r01-qa`; final screenshot hierarchy review remains a separate sign-off gate.
+- R01 real-browser QA is enforced by `pnpm visual:r01-qa`; CI #1819 and the CI-generated desktop/mobile screenshot review are accepted.
 
 ## Route model
 
@@ -145,6 +145,6 @@ Automated coverage verifies:
 - guaranteed checkpoint Rest Hub behavior;
 - all existing persistence/checkpoint/death/shop regressions.
 
-Historical M14 integration passed CI #251. The R01 redesign branch additionally passes the normal Test + Build gate on CI #1813 at commit `6f58a80259ef480a84e27324c13f79fe341ee0d3`; subsequent documentation-only commits must remain green. Final desktop/mobile screenshot hierarchy review is still required before declaring the visual redesign fully signed off.
+Historical M14 integration passed CI #251. The R01 redesign validation is now accepted on CI #1819 at commit `e48194bbc72fdf055805e472bf5c862204ced44a`: 257 / 257 test files and 1659 / 1659 tests passed, production Build passed, and the real-Chrome desktop/mobile Campaign Map gate passed with zero horizontal overflow. The uploaded captures were reviewed and accepted for hierarchy/readability. Later device-specific findings remain normal regressions rather than an open R01 milestone.
 
 M15 owns Hidden Challenge / Hidden World / Champion Hunt and must extend this persistence contract rather than create a second navigation/save layer. Hidden Shop/Station post-stage discovery uses the shared discovery/shop persistence but is not a replacement for those M15 optional combat activities.
