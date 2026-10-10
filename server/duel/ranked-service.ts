@@ -20,6 +20,12 @@ import {
   type DuelRankedProfile,
   type DuelRankedResult,
 } from "../../src/duel/ranked";
+import type { DuelRankedHistoryState } from "../../src/duel/ranked-history";
+import {
+  InMemoryDuelRankedHistoryStore,
+  JsonFileDuelRankedHistoryStore,
+  type DuelRankedHistoryStore,
+} from "./ranked-history-store";
 
 export interface DuelRankedProfileStore {
   load(accountId: string): DuelRankedProfile | null;
@@ -115,6 +121,10 @@ export class JsonFileDuelRankedProfileStore
       this.restore(previous);
       throw error;
     }
+  }
+
+  historyFilePath(): string {
+    return this.filePath + ".history.json";
   }
 
   private restore(
@@ -238,18 +248,46 @@ type ActiveRankedMatch = {
   presence: DuelRankedPresence;
 };
 
+function oppositeRankedResult(
+  result: DuelRankedResult,
+): DuelRankedResult {
+  if (result === "win") return "loss";
+  if (result === "loss") return "win";
+  return "draw";
+}
+
+function defaultRankedHistoryStore(
+  store: DuelRankedProfileStore,
+): DuelRankedHistoryStore {
+  return store instanceof JsonFileDuelRankedProfileStore
+    ? new JsonFileDuelRankedHistoryStore(store.historyFilePath())
+    : new InMemoryDuelRankedHistoryStore();
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export class DuelRankedService {
   private readonly queue = new DuelRankedQueue();
   private readonly active = new Map<
     string,
     ActiveRankedMatch
   >();
+  private readonly historyStore: DuelRankedHistoryStore;
+  private readonly now: () => number;
+  private historyWriteError: string | null = null;
 
   constructor(
     private readonly authority: DuelAuthorityService,
     private readonly store: DuelRankedProfileStore,
     private readonly nextTicketId: () => string,
-  ) {}
+    historyStore?: DuelRankedHistoryStore,
+    now: () => number = Date.now,
+  ) {
+    this.historyStore = historyStore ?? defaultRankedHistoryStore(store);
+    this.now = now;
+  }
 
   enqueue(
     sessionId: string,
@@ -422,6 +460,7 @@ export class DuelRankedService {
           ? "win"
           : "loss";
     }
+    const rightResult = oppositeRankedResult(leftResult);
 
     const updated = updateDuelRankedResultOnly({
       left,
@@ -429,6 +468,40 @@ export class DuelRankedService {
       leftResult,
     });
     this.store.savePair(updated.left, updated.right);
+
+    const occurredAtMs = Math.max(0, Math.floor(this.now()));
+    try {
+      this.historyStore.appendPair(
+        {
+          version: 1,
+          eventId: "ranked:" + matchId + ":" + left.accountId,
+          occurredAtMs,
+          kind: "duel-settled",
+          matchId,
+          accountId: left.accountId,
+          opponentAccountId: right.accountId,
+          result: leftResult,
+          duelRatingBefore: left.duelRating,
+          duelRatingAfter: updated.left.duelRating,
+        },
+        {
+          version: 1,
+          eventId: "ranked:" + matchId + ":" + right.accountId,
+          occurredAtMs,
+          kind: "duel-settled",
+          matchId,
+          accountId: right.accountId,
+          opponentAccountId: left.accountId,
+          result: rightResult,
+          duelRatingBefore: right.duelRating,
+          duelRatingAfter: updated.right.duelRating,
+        },
+      );
+      this.historyWriteError = null;
+    } catch (error) {
+      this.historyWriteError = errorText(error);
+    }
+
     this.active.delete(matchId);
     this.authority.releaseFinishedRankedMatch(matchId);
     return {
@@ -448,6 +521,14 @@ export class DuelRankedService {
       this.store.load(accountId) ??
       createDefaultDuelRankedProfile(accountId)
     );
+  }
+
+  history(accountId: string): DuelRankedHistoryState {
+    return this.historyStore.load(accountId);
+  }
+
+  historyDiagnostic(): string | null {
+    return this.historyWriteError;
   }
 
   queuedSessionIds(): readonly string[] {
