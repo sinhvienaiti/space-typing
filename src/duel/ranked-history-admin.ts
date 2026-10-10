@@ -12,7 +12,7 @@ export type DuelRankedHistoryAdminSurface = {
   canMutate: false;
   source: "historical-persisted" | "no-historical-records";
   accountId: string;
-  crossPlayerSupported: false;
+  crossPlayerSupported: boolean;
   rows: readonly {
     id: "matches" | "record" | "rating" | "rating-delta";
     label: string;
@@ -22,12 +22,18 @@ export type DuelRankedHistoryAdminSurface = {
   diagnostics: readonly string[];
 };
 
+export type DuelRankedHistoryAdminSurfaceOptions = {
+  crossPlayerSupported?: boolean;
+};
+
 export function buildDuelRankedHistoryAdminSurface(
   state: DuelRankedHistoryState,
   period: DuelRankedHistoryPeriod,
+  options: DuelRankedHistoryAdminSurfaceOptions = {},
 ): DuelRankedHistoryAdminSurface {
   const aggregate = aggregateDuelRankedHistory(state, period);
   const hasHistory = aggregate.matchCount > 0;
+  const crossPlayerSupported = options.crossPlayerSupported === true;
   const diagnostics = hasHistory
     ? [
         "Metrics are derived only from persisted authoritative Ranked settlements for this account.",
@@ -36,7 +42,9 @@ export function buildDuelRankedHistoryAdminSurface(
         "No persisted Ranked settlements exist for this period; live rating/profile values are not substituted.",
       ];
   diagnostics.push(
-    "Cross-player lookup remains disabled until an authenticated admin authorization boundary is wired.",
+    crossPlayerSupported
+      ? "Cross-player lookup is available only through the authenticated server authorization boundary."
+      : "Cross-player lookup remains disabled until an authenticated server authorization boundary is configured.",
   );
 
   const rating = aggregate.ratingStart === null || aggregate.ratingEnd === null
@@ -52,7 +60,7 @@ export function buildDuelRankedHistoryAdminSurface(
     canMutate: false,
     source: hasHistory ? "historical-persisted" : "no-historical-records",
     accountId: aggregate.accountId,
-    crossPlayerSupported: false,
+    crossPlayerSupported,
     rows: [
       {
         id: "matches",
