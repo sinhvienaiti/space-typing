@@ -21,7 +21,8 @@ export type DuelRankedHistoryReadErrorCode =
   | "INVALID_TARGET"
   | "INVALID_PERIOD"
   | "INVALID_QUERY"
-  | "FORBIDDEN";
+  | "FORBIDDEN"
+  | "UNAVAILABLE";
 
 export type DuelRankedHistoryEventQueryInput = {
   result?: DuelRankedHistoricalResult;
@@ -200,7 +201,17 @@ export class DuelRankedHistoryQueryService {
       scope = "authorized-cross-player";
     }
 
-    const state = this.reader.history(targetAccountId);
+    let state: DuelRankedHistoryState;
+    try {
+      state = this.reader.history(targetAccountId);
+    } catch {
+      return {
+        ok: false,
+        code: "UNAVAILABLE",
+        message: "Ranked history storage is temporarily unavailable.",
+      };
+    }
+
     return {
       ok: true,
       scope,

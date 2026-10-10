@@ -250,6 +250,26 @@ describe("Ranked Duel historical query authorization", () => {
     expect(source.history).not.toHaveBeenCalled();
   });
 
+  it("fails closed when authorized history storage is unavailable", () => {
+    const history = vi.fn((): DuelRankedHistoryState => {
+      throw new Error("/private/data/ranked-history.json permission denied");
+    });
+    const service = new DuelRankedHistoryQueryService(
+      { history },
+      () => identity("pilot-a"),
+    );
+
+    expect(service.read({
+      credential: "token-a",
+      period: { startMs: START, endMs: END },
+    })).toEqual({
+      ok: false,
+      code: "UNAVAILABLE",
+      message: "Ranked history storage is temporarily unavailable.",
+    });
+    expect(history).toHaveBeenCalledWith("pilot-a");
+  });
+
   it("hard-caps oversized event limits while keeping the query authorized", () => {
     let historyState = createDuelRankedHistoryState("pilot-a");
     for (let index = 0; index < 80; index += 1) {
