@@ -3,6 +3,26 @@ import type { InputMode } from "./mode";
 import type { VoiceFeedbackSink } from "./voice-feedback";
 import { VOICE_COMBAT_POLICY } from "./voice-combat-policy";
 
+function actionableVoiceError(message: VoiceMessage): VoiceMessage {
+  if (!message.type.endsWith(":error")) return message;
+  const fields = message as VoiceMessage & { code?: unknown; message?: unknown };
+  const code = typeof fields.code === "string" ? fields.code.toLowerCase() : "";
+  const detail = typeof fields.message === "string" ? fields.message.toLowerCase() : "";
+  const reason = `${code} ${detail}`;
+  const permissionDenied =
+    reason.includes("notallowed") ||
+    reason.includes("not-allowed") ||
+    reason.includes("permission-denied") ||
+    reason.includes("permission denied") ||
+    (reason.includes("permission") &&
+      (reason.includes("denied") || reason.includes("blocked")));
+  if (!permissionDenied) return message;
+  return {
+    ...message,
+    message: "Microphone permission denied. Allow microphone access in browser and system settings, then retry.",
+  } as VoiceMessage;
+}
+
 /** Metadata transport only. The game keeps authority over eligibility, ownership and completion. */
 export class VoiceAdapter {
   private available = false;
@@ -49,8 +69,9 @@ export class VoiceAdapter {
       this.audioEpoch = message.audioEpoch; this.starting = false;
     } else if ("sessionId" in message && (message.sessionId !== this.sessionId || message.inputEpoch !== this.inputEpoch)) return false;
     if ("audioEpoch" in message && message.audioEpoch !== this.audioEpoch) return false;
-    this.feedback?.handleMessage(message);
-    this.onMessage(message); return true;
+    const delivered = actionableVoiceError(message);
+    this.feedback?.handleMessage(delivered);
+    this.onMessage(delivered); return true;
   }
   sendSession(op: string, fields: Record<string, unknown> = {}): boolean {
     if (!this.sessionId) return false;

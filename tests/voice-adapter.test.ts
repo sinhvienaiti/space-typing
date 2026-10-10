@@ -33,4 +33,22 @@ describe("child voice metadata adapter", () => {
     expect(postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ type: "typing-game:voice:v1:configure", mode: "typing", inputEpoch: 2 }), "https://typing-game.local");
     expect(adapter.handleMessage(event("ready", { sessionId: "late", inputEpoch: 1, audioEpoch: 0, engineId: "test", modelId: "test", sampleRate: 16000, fromSample: 0 }))).toBe(false);
   });
+  it("normalizes permission-denied failures before gameplay and feedback consume them", () => {
+    const postMessage = vi.fn(), parent = { postMessage } as unknown as Window, receive = vi.fn();
+    const feedback = { setMode: vi.fn(), handleMessage: vi.fn(), suspend: vi.fn(), stop: vi.fn(), resolve: vi.fn() };
+    const adapter = new VoiceAdapter(parent, "https://typing-game.local", "instance", receive, feedback);
+    const event = (op: string, fields = {}) => ({ source: parent, origin: "https://typing-game.local", data: envelope(op, fields) }) as MessageEvent;
+
+    expect(adapter.handleMessage(event("error", {
+      code: "local-runtime-failed",
+      message: "NotAllowedError: permission denied",
+    }))).toBe(true);
+
+    const actionable = expect.objectContaining({
+      code: "local-runtime-failed",
+      message: "Microphone permission denied. Allow microphone access in browser and system settings, then retry.",
+    });
+    expect(feedback.handleMessage).toHaveBeenLastCalledWith(actionable);
+    expect(receive).toHaveBeenLastCalledWith(actionable);
+  });
 });
