@@ -46,7 +46,7 @@ function room(input: {
         ? {
             slotIndex: 1,
             kind: "empty",
-            displayName: null,
+            displayName: "",
             ready: false,
             shipId: null,
             characterId: null,
