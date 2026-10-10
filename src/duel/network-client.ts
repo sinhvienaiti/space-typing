@@ -11,6 +11,12 @@ import {
   type DuelRoomListing,
   type DuelWireIntent,
 } from "./protocol";
+import type { AlternativeMatchView } from "./alternative-presentation";
+import type { AlternativeModeId } from "./alternative-modes";
+import {
+  isAlternativeServerMessage,
+  type AlternativeTransportClientMessage,
+} from "./alternative-wire";
 import {
   duelOfferAnswerToken,
   matchingDuelOffers,
@@ -64,6 +70,16 @@ export type DuelNetworkCallbacks = {
     view: DuelClientMatchView,
     events: readonly DuelClientEvent[],
   ): void;
+  onAlternativeMatchUpdate?(
+    view: AlternativeMatchView,
+    serverSequence: number,
+  ): void;
+  onAlternativeInputResult?(result: {
+    matchId: string;
+    sequence: number;
+    accepted: boolean;
+    reason: string;
+  }): void;
   onPrediction?(prediction: DuelLocalPrediction): void;
   onError?(code: string, message: string): void;
 };
@@ -149,6 +165,9 @@ export class DuelNetworkClient {
   private intentSequence = 0;
   private lastServerSequence = -1;
   private view: DuelClientMatchView | null = null;
+  private alternativeView: AlternativeMatchView | null = null;
+  private alternativeInputSequence = 0;
+  private alternativeLastServerSequence = -1;
   private prediction = {
     roundId: null as string | null,
     targetInstanceId: null as string | null,
@@ -204,6 +223,10 @@ export class DuelNetworkClient {
 
   currentView(): DuelClientMatchView | null {
     return this.view;
+  }
+
+  currentAlternativeView(): AlternativeMatchView | null {
+    return this.alternativeView;
   }
 
   currentPrediction(): DuelLocalPrediction {
@@ -293,6 +316,53 @@ export class DuelNetworkClient {
       requestId: this.nextRequestId(),
       roomId,
     });
+  }
+
+  startAlternativeMatch(
+    roomId: string,
+    mode: AlternativeModeId,
+  ): boolean {
+    this.alternativeInputSequence = 0;
+    return this.sendAlternativeMessage({
+      type: "START_ALTERNATIVE_MATCH",
+      requestId: this.nextRequestId(),
+      roomId,
+      mode,
+    });
+  }
+
+  sendAlternativeModeInput(value: string): number | null {
+    const view = this.alternativeView;
+    if (
+      view === null ||
+      this.status !== "connected" ||
+      this.socket === null ||
+      this.socket.readyState !== SOCKET_OPEN
+    ) {
+      return null;
+    }
+    this.alternativeInputSequence = Math.max(
+      this.alternativeInputSequence + 1,
+      view.self.lastAcceptedSequence + 1,
+    );
+    const sequence = this.alternativeInputSequence;
+    const message: AlternativeTransportClientMessage =
+      view.mode === "reflex"
+        ? {
+            type: "MODE_INPUT",
+            matchId: view.matchId,
+            sequence,
+            mode: "reflex",
+            input: { text: value },
+          }
+        : {
+            type: "MODE_INPUT",
+            matchId: view.matchId,
+            sequence,
+            mode: "word-chain",
+            input: { word: value },
+          };
+    return this.sendAlternativeMessage(message) ? sequence : null;
   }
 
   /** `characterId`: the hull this player flies in the Ranked match. */
@@ -446,6 +516,35 @@ export class DuelNetworkClient {
       return;
     }
     if (!isRecord(parsed) || typeof parsed.type !== "string") {
+      return;
+    }
+
+    if (isAlternativeServerMessage(parsed)) {
+      if (parsed.type === "ALTERNATIVE_MATCH_UPDATE") {
+        if (
+          this.alternativeView?.matchId === parsed.matchId &&
+          parsed.serverSequence < this.alternativeLastServerSequence
+        ) {
+          return;
+        }
+        this.alternativeLastServerSequence = parsed.serverSequence;
+        this.alternativeView = parsed.view;
+        this.alternativeInputSequence = Math.max(
+          this.alternativeInputSequence,
+          parsed.view.self.lastAcceptedSequence,
+        );
+        this.callbacks.onAlternativeMatchUpdate?.(
+          parsed.view,
+          parsed.serverSequence,
+        );
+        return;
+      }
+      this.callbacks.onAlternativeInputResult?.({
+        matchId: parsed.matchId,
+        sequence: parsed.sequence,
+        accepted: parsed.accepted,
+        reason: parsed.reason,
+      });
       return;
     }
 
@@ -821,6 +920,21 @@ export class DuelNetworkClient {
     if (
       socket === null ||
       socket.readyState !== SOCKET_OPEN
+    ) {
+      return false;
+    }
+    socket.send(JSON.stringify(message));
+    return true;
+  }
+
+  private sendAlternativeMessage(
+    message: AlternativeTransportClientMessage,
+  ): boolean {
+    const socket = this.socket;
+    if (
+      socket === null ||
+      socket.readyState !== SOCKET_OPEN ||
+      this.status !== "connected"
     ) {
       return false;
     }

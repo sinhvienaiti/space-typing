@@ -29,6 +29,10 @@ import {
   type DuelServerMessage,
 } from "../../src/duel/protocol";
 import {
+  parseAlternativeTransportClientMessage,
+  type AlternativeTransportServerMessage,
+} from "../../src/duel/alternative-wire";
+import {
   verifyDuelSessionToken,
 } from "./auth";
 import { createLocalSessionHandler } from "./local-session";
@@ -42,6 +46,10 @@ import {
   duelMatchmakingRating,
 } from "../../src/duel/ranked";
 import { DuelRoomListWatchers } from "./room-list-watchers";
+import {
+  AlternativeDuelCoordinator,
+  type AlternativeTransportDelivery,
+} from "./alternative-coordinator";
 
 type ConnectionState = {
   sessionId: string | null;
@@ -49,6 +57,18 @@ type ConnectionState = {
   lastPongAt: number;
   helloTimer: ReturnType<typeof setTimeout>;
 };
+
+type AlternativeErrorEnvelope = {
+  type: "ERROR";
+  code: string;
+  message: string;
+  requestId?: string;
+};
+
+type ServerEnvelope =
+  | DuelServerMessage
+  | AlternativeTransportServerMessage
+  | AlternativeErrorEnvelope;
 
 const PORT = Number(process.env.DUEL_PORT ?? "3014");
 const HOST = process.env.DUEL_HOST ?? "127.0.0.1";
@@ -157,6 +177,11 @@ const authority = new DuelAuthorityService(
   },
 );
 
+const alternative = new AlternativeDuelCoordinator(
+  authority,
+  () => randomUUID(),
+  () => randomSeed(),
+);
 const socketsBySession = new Map<string, WebSocket>();
 const states = new Map<WebSocket, ConnectionState>();
 const activeMatches = new Set<string>();
@@ -281,7 +306,7 @@ const wss = new WebSocketServer({
 
 function send(
   socket: WebSocket,
-  message: DuelServerMessage,
+  message: ServerEnvelope,
 ): void {
   if (socket.readyState !== WebSocket.OPEN) return;
   socket.send(JSON.stringify(message));
@@ -312,6 +337,15 @@ function socketForSession(
   return socket?.readyState === WebSocket.OPEN
     ? socket
     : null;
+}
+
+function sendAlternativeDeliveries(
+  deliveries: readonly AlternativeTransportDelivery[],
+): void {
+  for (const delivery of deliveries) {
+    const socket = socketForSession(delivery.sessionId);
+    if (socket !== null) send(socket, delivery.message);
+  }
 }
 
 function broadcastRoom(roomId: string): void {
@@ -465,6 +499,9 @@ function handleHello(
       }
     }
   }
+  sendAlternativeDeliveries(
+    alternative.reconnect(opened.value.sessionId),
+  );
 }
 
 function roomMutation<T>(
@@ -745,6 +782,43 @@ function handleAuthenticatedMessage(
   }
 }
 
+function handleAlternativeRaw(
+  socket: WebSocket,
+  state: ConnectionState,
+  raw: string,
+): boolean {
+  if (!state.authenticated || state.sessionId === null) return false;
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    return false;
+  }
+  const message = parseAlternativeTransportClientMessage(value);
+  if (message === null) return false;
+  const now = Date.now();
+  const rate = authority.acceptMessage(state.sessionId, now);
+  if (!rate.ok) {
+    sendError(socket, rate);
+    return true;
+  }
+  const result = alternative.handle(state.sessionId, message, now);
+  if (result === null) return false;
+  if (!result.ok) {
+    send(socket, {
+      type: "ERROR",
+      code: result.code,
+      message: result.message,
+      ...(result.requestId === undefined
+        ? {}
+        : { requestId: result.requestId }),
+    });
+    return true;
+  }
+  sendAlternativeDeliveries(result.deliveries);
+  return true;
+}
+
 function handleRawMessage(
   socket: WebSocket,
   data: RawData,
@@ -762,7 +836,10 @@ function handleRawMessage(
     return;
   }
 
-  const parsed = parseDuelClientMessage(data.toString());
+  const raw = data.toString();
+  if (handleAlternativeRaw(socket, state, raw)) return;
+
+  const parsed = parseDuelClientMessage(raw);
   if (!parsed.ok) {
     send(socket, {
       type: "ERROR",
@@ -932,6 +1009,8 @@ const tickTimer = setInterval(() => {
       sendRankedCompletion(settlement.completed);
       activeMatches.delete(settlement.matchId);
     }
+
+    sendAlternativeDeliveries(alternative.advance(now));
 
     for (const matchId of [...activeMatches]) {
       const result = authority.tick(
