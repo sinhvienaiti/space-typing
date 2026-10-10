@@ -93,8 +93,9 @@ export type ExpeditionRun = {
   wordPool: ExpeditionWordPool;
   profile: ExpeditionProfile;
   challenge?: {
-    kind: "prototype" | "daily" | "qa";
+    kind: "prototype" | "daily" | "weekly" | "qa";
     dayKey: string | null;
+    weekKey?: string | null;
     identityKey: string | null;
   };
   learning?: {

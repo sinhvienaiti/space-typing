@@ -18,6 +18,11 @@ import {
   shouldRestAfterEncounter,
 } from "../expansion-v2/expedition-plan";
 import {
+  weeklyChallengeResumeStatus,
+  type WeeklyChallengeResumeStatus,
+  type WeeklyChallengeRunBinding,
+} from "../expansion-v2/weekly-challenge-runtime";
+import {
   claimExpeditionEnvelope,
   loadExpeditionEnvelope,
   startExpeditionEnvelope,
@@ -97,8 +102,23 @@ export class ExpeditionSession {
     const loaded = loadExpeditionEnvelope(this.storage);
     return (
       loaded.status === "supported" &&
-      loaded.envelope.run.terminal === null
+      loaded.envelope.run.terminal === null &&
+      loaded.envelope.run.challenge?.kind !== "weekly"
     );
+  }
+
+  weeklyResumeStatus(
+    binding: WeeklyChallengeRunBinding,
+  ): WeeklyChallengeResumeStatus {
+    const loaded = loadExpeditionEnvelope(this.storage);
+    if (loaded.status !== "supported") return "none";
+    return weeklyChallengeResumeStatus(loaded.envelope.run, binding);
+  }
+
+  hasResumableWeeklyRun(
+    binding: WeeklyChallengeRunBinding,
+  ): boolean {
+    return this.weeklyResumeStatus(binding) === "available";
   }
 
   start(
@@ -117,22 +137,15 @@ export class ExpeditionSession {
     return this.envelope.run;
   }
 
-  resume(
+  private claimResume(
+    envelopeInput: ExpeditionEnvelope,
     eligibleRelicIds: readonly string[],
-  ): ExpeditionRun | null {
-    const loaded = loadExpeditionEnvelope(this.storage);
-    if (
-      loaded.status !== "supported" ||
-      loaded.envelope.run.terminal !== null
-    ) {
-      return null;
-    }
-
+  ): ExpeditionRun {
     this.eligibleRelicIds = [...eligibleRelicIds];
     let envelope = claimExpeditionEnvelope(
       this.storage,
       this.writerId,
-      loaded.envelope.revision,
+      envelopeInput.revision,
     );
     let run = envelope.run;
 
@@ -154,6 +167,35 @@ export class ExpeditionSession {
 
     this.envelope = envelope;
     return envelope.run;
+  }
+
+  resume(
+    eligibleRelicIds: readonly string[],
+  ): ExpeditionRun | null {
+    const loaded = loadExpeditionEnvelope(this.storage);
+    if (
+      loaded.status !== "supported" ||
+      loaded.envelope.run.terminal !== null ||
+      loaded.envelope.run.challenge?.kind === "weekly"
+    ) {
+      return null;
+    }
+
+    return this.claimResume(loaded.envelope, eligibleRelicIds);
+  }
+
+  resumeWeekly(
+    binding: WeeklyChallengeRunBinding,
+    eligibleRelicIds: readonly string[],
+  ): ExpeditionRun | null {
+    const loaded = loadExpeditionEnvelope(this.storage);
+    if (
+      loaded.status !== "supported" ||
+      weeklyChallengeResumeStatus(loaded.envelope.run, binding) !== "available"
+    ) {
+      return null;
+    }
+    return this.claimResume(loaded.envelope, eligibleRelicIds);
   }
 
   confirmDraft(
