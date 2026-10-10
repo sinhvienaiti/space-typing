@@ -6,6 +6,12 @@ import {
   type PersonalGhostRecord,
 } from "./challenge";
 import {
+  appendHistoricalEvent,
+  createHistoricalAnalyticsState,
+  sanitizeHistoricalAnalyticsState,
+  type HistoricalAnalyticsState,
+} from "./historical-analytics";
+import {
   commitExpansionLearningEvidence,
   createExpansionLearningState,
   type ExpansionLearningEvidence,
@@ -43,6 +49,7 @@ export type ExpansionV2Profile = {
   pbByIdentity: Record<string, ExpeditionPbRecord>;
   ghostByIdentity: Record<string, PersonalGhostRecord>;
   nemesis: NemesisState;
+  history: HistoricalAnalyticsState;
   completedRuns: number;
   bestScore: number;
   processedRunIds: string[];
@@ -59,6 +66,7 @@ export function createExpansionV2Profile(): ExpansionV2Profile {
     pbByIdentity: {},
     ghostByIdentity: {},
     nemesis: createNemesisState(),
+    history: createHistoricalAnalyticsState(),
     completedRuns: 0,
     bestScore: 0,
     processedRunIds: [],
@@ -105,6 +113,7 @@ export function sanitizeExpansionV2Profile(
     nemesis: isRecord(raw.nemesis)
       ? raw.nemesis as NemesisState
       : fresh.nemesis,
+    history: sanitizeHistoricalAnalyticsState(raw.history),
     completedRuns:
       typeof raw.completedRuns === "number" &&
       Number.isFinite(raw.completedRuns)
@@ -228,18 +237,44 @@ export function recordExpansionRun(
     runId: string;
     score: number;
     completed: boolean;
+    occurredAtMs?: number;
   },
 ): ExpansionV2Profile {
   if (profile.processedRunIds.includes(input.runId)) return profile;
-  return {
+
+  const score = Math.max(0, Number.isFinite(input.score) ? input.score : 0);
+  const base: ExpansionV2Profile = {
     ...profile,
     completedRuns:
       profile.completedRuns + (input.completed ? 1 : 0),
-    bestScore: Math.max(profile.bestScore, Math.max(0, input.score)),
+    bestScore: Math.max(profile.bestScore, score),
     processedRunIds: [
       ...profile.processedRunIds,
       input.runId,
     ].slice(-256),
+  };
+
+  if (!input.completed) return base;
+  const now = input.occurredAtMs ?? Date.now();
+  if (!Number.isSafeInteger(now) || now < 0) return base;
+
+  return {
+    ...base,
+    history: appendHistoricalEvent(base.history, {
+      version: 1,
+      eventId: "expedition-run:" + input.runId + ":completed",
+      occurredAtMs: now,
+      kind: "run-settled",
+      runId: input.runId,
+      outcome: "completed",
+      score,
+      accuracyPercent: null,
+      activeSeconds: null,
+      challengeKind: null,
+      retryCount: null,
+      assisted: null,
+      leaderboardEligible: null,
+    }),
   };
 }
 

@@ -5,6 +5,7 @@ import {
   UnsupportedExpansionV2ProfileVersionError,
   createExpansionV2Profile,
   loadExpansionV2Profile,
+  recordExpansionRun,
   saveExpansionV2Profile,
 } from "../src/expansion-v2/profile-store";
 
@@ -39,6 +40,7 @@ describe("Expansion V2 profile persistence", () => {
     expect(loaded.completedRuns).toBe(4);
     expect(loaded.ghostEnabled).toBe(false);
     expect(loaded.learning.records).toEqual({});
+    expect(loaded.history).toEqual({ version: 1, events: [] });
   });
 
   it("never overwrites a future-version profile", () => {
@@ -77,15 +79,60 @@ describe("Expansion V2 profile persistence", () => {
     expect(storage.getItem(EXPANSION_V2_PROFILE_KEY)).toBe("{broken");
   });
 
-  it("writes and read-verifies supported v1 data", () => {
+  it("writes and read-verifies supported v1 data including bounded history", () => {
     const storage = new MemoryStorage();
-    const profile = {
-      ...createExpansionV2Profile(),
-      completedRuns: 7,
-      bestScore: 12345,
-    };
+    const profile = recordExpansionRun(
+      {
+        ...createExpansionV2Profile(),
+        completedRuns: 7,
+        bestScore: 12345,
+      },
+      {
+        runId: "history-run",
+        score: 13000,
+        completed: true,
+        occurredAtMs: Date.parse("2026-10-10T12:00:00.000Z"),
+      },
+    );
     const saved = saveExpansionV2Profile(storage, profile);
-    expect(saved.completedRuns).toBe(7);
-    expect(loadExpansionV2Profile(storage).bestScore).toBe(12345);
+    expect(saved.completedRuns).toBe(8);
+    const loaded = loadExpansionV2Profile(storage);
+    expect(loaded.bestScore).toBe(13000);
+    expect(loaded.history.events).toHaveLength(1);
+    expect(loaded.history.events[0]).toMatchObject({
+      eventId: "expedition-run:history-run:completed",
+      runId: "history-run",
+      outcome: "completed",
+      score: 13000,
+    });
+  });
+
+  it("records a completed run once but never fabricates incomplete terminal history", () => {
+    const base = createExpansionV2Profile();
+    const incomplete = recordExpansionRun(base, {
+      runId: "incomplete-run",
+      score: 5,
+      completed: false,
+      occurredAtMs: 100,
+    });
+    expect(incomplete.history.events).toEqual([]);
+
+    const completed = recordExpansionRun(incomplete, {
+      runId: "complete-run",
+      score: 10,
+      completed: true,
+      occurredAtMs: 200,
+    });
+    const replay = recordExpansionRun(completed, {
+      runId: "complete-run",
+      score: 999,
+      completed: true,
+      occurredAtMs: 300,
+    });
+
+    expect(completed.history.events).toHaveLength(1);
+    expect(replay).toBe(completed);
+    expect(replay.history.events).toHaveLength(1);
+    expect(replay.history.events[0]?.occurredAtMs).toBe(200);
   });
 });

@@ -24,8 +24,8 @@ export type HistoricalRunSettledEventV1 = {
   accuracyPercent: number | null;
   activeSeconds: number | null;
   challengeKind: HistoricalChallengeKind | null;
-  retryCount: number;
-  assisted: boolean;
+  retryCount: number | null;
+  assisted: boolean | null;
   leaderboardEligible: boolean | null;
 };
 
@@ -104,9 +104,7 @@ export function sanitizeHistoricalEvent(
     !nonNegativeInteger(value.occurredAtMs) ||
     !validOutcome(value.outcome) ||
     !finiteNumber(value.score) ||
-    value.score < 0 ||
-    !nonNegativeInteger(value.retryCount) ||
-    typeof value.assisted !== "boolean"
+    value.score < 0
   ) {
     return null;
   }
@@ -115,22 +113,22 @@ export function sanitizeHistoricalEvent(
   if (
     accuracyPercent !== null &&
     (!finiteNumber(accuracyPercent) || accuracyPercent < 0 || accuracyPercent > 100)
-  ) {
-    return null;
-  }
+  ) return null;
 
   const activeSeconds = value.activeSeconds;
   if (
     activeSeconds !== null &&
     (!finiteNumber(activeSeconds) || activeSeconds < 0)
-  ) {
-    return null;
-  }
+  ) return null;
 
   const challengeKind = value.challengeKind;
-  if (challengeKind !== null && !validChallengeKind(challengeKind)) {
-    return null;
-  }
+  if (challengeKind !== null && !validChallengeKind(challengeKind)) return null;
+
+  const retryCount = value.retryCount;
+  if (retryCount !== null && !nonNegativeInteger(retryCount)) return null;
+
+  const assisted = value.assisted;
+  if (assisted !== null && typeof assisted !== "boolean") return null;
 
   const leaderboardEligible = value.leaderboardEligible;
   if (leaderboardEligible !== null && typeof leaderboardEligible !== "boolean") {
@@ -148,8 +146,8 @@ export function sanitizeHistoricalEvent(
     accuracyPercent,
     activeSeconds,
     challengeKind,
-    retryCount: value.retryCount,
-    assisted: value.assisted,
+    retryCount,
+    assisted,
     leaderboardEligible,
   };
 }
@@ -243,8 +241,8 @@ export function aggregateHistoricalRuns(
     else if (event.outcome === "defeated") defeatedRuns += 1;
     else if (event.outcome === "abandoned") abandonedRuns += 1;
     else invalidRuns += 1;
-    if (event.assisted) assistedRuns += 1;
-    if (event.retryCount > 0) retriedRuns += 1;
+    if (event.assisted === true) assistedRuns += 1;
+    if (event.retryCount !== null && event.retryCount > 0) retriedRuns += 1;
     if (event.leaderboardEligible === true) leaderboardEligibleRuns += 1;
   }
 
