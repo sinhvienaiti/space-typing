@@ -26,6 +26,15 @@ import {
   JsonFileDuelRankedHistoryStore,
   type DuelRankedHistoryStore,
 } from "./ranked-history-store";
+import {
+  InMemoryDuelRankedSettlementJournal,
+  JsonFileDuelRankedSettlementJournal,
+  type DuelRankedPendingSettlementV1,
+  type DuelRankedPendingSettlementSideV1,
+  type DuelRankedSettlementJournal,
+} from "./ranked-settlement-journal";
+
+const DUEL_RANKED_SETTLEMENT_RETRY_MS = 5000;
 
 export interface DuelRankedProfileStore {
   load(accountId: string): DuelRankedProfile | null;
@@ -125,6 +134,10 @@ export class JsonFileDuelRankedProfileStore
 
   historyFilePath(): string {
     return this.filePath + ".history.json";
+  }
+
+  settlementJournalFilePath(): string {
+    return this.filePath + ".settlements.json";
   }
 
   private restore(
@@ -248,6 +261,12 @@ type ActiveRankedMatch = {
   presence: DuelRankedPresence;
 };
 
+type PendingProfilePosition =
+  | "before"
+  | "after"
+  | "advanced"
+  | "conflict";
+
 function oppositeRankedResult(
   result: DuelRankedResult,
 ): DuelRankedResult {
@@ -264,8 +283,43 @@ function defaultRankedHistoryStore(
     : new InMemoryDuelRankedHistoryStore();
 }
 
+function defaultRankedSettlementJournal(
+  store: DuelRankedProfileStore,
+): DuelRankedSettlementJournal {
+  return store instanceof JsonFileDuelRankedProfileStore
+    ? new JsonFileDuelRankedSettlementJournal(
+        store.settlementJournalFilePath(),
+      )
+    : new InMemoryDuelRankedSettlementJournal();
+}
+
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function sameRankedProfile(
+  left: DuelRankedProfile,
+  right: DuelRankedProfile,
+): boolean {
+  return (
+    left.accountId === right.accountId &&
+    left.typingRating === right.typingRating &&
+    left.duelRating === right.duelRating &&
+    left.matchesPlayed === right.matchesPlayed &&
+    left.wins === right.wins &&
+    left.losses === right.losses &&
+    left.draws === right.draws
+  );
+}
+
+function pendingProfilePosition(
+  current: DuelRankedProfile,
+  side: DuelRankedPendingSettlementSideV1,
+): PendingProfilePosition {
+  if (sameRankedProfile(current, side.after)) return "after";
+  if (sameRankedProfile(current, side.before)) return "before";
+  if (current.matchesPlayed > side.after.matchesPlayed) return "advanced";
+  return "conflict";
 }
 
 export class DuelRankedService {
@@ -276,7 +330,9 @@ export class DuelRankedService {
   >();
   private readonly historyStore: DuelRankedHistoryStore;
   private readonly now: () => number;
+  private readonly settlementJournal: DuelRankedSettlementJournal;
   private historyWriteError: string | null = null;
+  private lastSettlementRetryAt = Number.NEGATIVE_INFINITY;
 
   constructor(
     private readonly authority: DuelAuthorityService,
@@ -284,9 +340,13 @@ export class DuelRankedService {
     private readonly nextTicketId: () => string,
     historyStore?: DuelRankedHistoryStore,
     now: () => number = Date.now,
+    settlementJournal?: DuelRankedSettlementJournal,
   ) {
     this.historyStore = historyStore ?? defaultRankedHistoryStore(store);
     this.now = now;
+    this.settlementJournal =
+      settlementJournal ?? defaultRankedSettlementJournal(store);
+    this.retryPendingSettlements(this.now(), true);
   }
 
   enqueue(
@@ -402,6 +462,7 @@ export class DuelRankedService {
   }
 
   pump(now: number): DuelRankedMatchStart[] {
+    this.retryPendingSettlements(now);
     const started: DuelRankedMatchStart[] = [];
     let guard = 0;
 
@@ -442,6 +503,22 @@ export class DuelRankedService {
     const view = updates[0]!.view;
     if (view.series.status === "active") return null;
 
+    let existingPending: DuelRankedPendingSettlementV1 | null;
+    try {
+      existingPending = this.settlementJournal.get(matchId);
+    } catch (error) {
+      this.historyWriteError =
+        "Ranked settlement journal unavailable: " + errorText(error);
+      return null;
+    }
+    if (existingPending !== null) {
+      return this.completePendingActiveMatch(
+        matchId,
+        active,
+        existingPending,
+      );
+    }
+
     const left =
       this.store.load(active.leftAccountId) ??
       createDefaultDuelRankedProfile(
@@ -467,12 +544,17 @@ export class DuelRankedService {
       right,
       leftResult,
     });
-    this.store.savePair(updated.left, updated.right);
-
-    const occurredAtMs = Math.max(0, Math.floor(this.now()));
-    try {
-      this.historyStore.appendPair(
-        {
+    const rawNow = this.now();
+    const occurredAtMs = Number.isFinite(rawNow)
+      ? Math.max(0, Math.floor(rawNow))
+      : 0;
+    const pending: DuelRankedPendingSettlementV1 = {
+      version: 1,
+      matchId,
+      left: {
+        before: left,
+        after: updated.left,
+        history: {
           version: 1,
           eventId: "ranked:" + matchId + ":" + left.accountId,
           occurredAtMs,
@@ -484,7 +566,11 @@ export class DuelRankedService {
           duelRatingBefore: left.duelRating,
           duelRatingAfter: updated.left.duelRating,
         },
-        {
+      },
+      right: {
+        before: right,
+        after: updated.right,
+        history: {
           version: 1,
           eventId: "ranked:" + matchId + ":" + right.accountId,
           occurredAtMs,
@@ -496,24 +582,22 @@ export class DuelRankedService {
           duelRatingBefore: right.duelRating,
           duelRatingAfter: updated.right.duelRating,
         },
-      );
-      this.historyWriteError = null;
-    } catch (error) {
-      this.historyWriteError = errorText(error);
-    }
-
-    this.active.delete(matchId);
-    this.authority.releaseFinishedRankedMatch(matchId);
-    return {
-      left: {
-        sessionId: active.leftSessionId,
-        profile: updated.left,
-      },
-      right: {
-        sessionId: active.rightSessionId,
-        profile: updated.right,
       },
     };
+
+    try {
+      this.settlementJournal.put(pending);
+    } catch (error) {
+      this.historyWriteError =
+        "Ranked settlement journal write failed: " + errorText(error);
+      return null;
+    }
+
+    return this.completePendingActiveMatch(
+      matchId,
+      active,
+      pending,
+    );
   }
 
   profile(accountId: string): DuelRankedProfile {
@@ -535,5 +619,154 @@ export class DuelRankedService {
     return this.queue
       .snapshot()
       .map((ticket) => ticket.sessionId);
+  }
+
+  private completePendingActiveMatch(
+    matchId: string,
+    active: ActiveRankedMatch,
+    pending: DuelRankedPendingSettlementV1,
+  ): DuelRankedCompletedProfiles | null {
+    if (
+      pending.matchId !== matchId ||
+      pending.left.after.accountId !== active.leftAccountId ||
+      pending.right.after.accountId !== active.rightAccountId
+    ) {
+      this.historyWriteError =
+        "Ranked settlement journal does not match the active authority participants.";
+      return null;
+    }
+
+    try {
+      this.applyPendingProfiles(pending);
+    } catch (error) {
+      this.historyWriteError =
+        "Ranked profile settlement recovery failed: " + errorText(error);
+      return null;
+    }
+
+    try {
+      this.historyStore.appendPair(
+        pending.left.history,
+        pending.right.history,
+      );
+      this.settlementJournal.remove(matchId);
+      this.clearHistoryDiagnosticIfRecovered();
+    } catch (error) {
+      this.historyWriteError =
+        "Ranked history settlement pending replay: " + errorText(error);
+    }
+
+    const leftProfile =
+      this.store.load(active.leftAccountId) ?? pending.left.after;
+    const rightProfile =
+      this.store.load(active.rightAccountId) ?? pending.right.after;
+    this.active.delete(matchId);
+    this.authority.releaseFinishedRankedMatch(matchId);
+    return {
+      left: {
+        sessionId: active.leftSessionId,
+        profile: leftProfile,
+      },
+      right: {
+        sessionId: active.rightSessionId,
+        profile: rightProfile,
+      },
+    };
+  }
+
+  private applyPendingProfiles(
+    pending: DuelRankedPendingSettlementV1,
+  ): void {
+    const leftCurrent =
+      this.store.load(pending.left.after.accountId) ??
+      createDefaultDuelRankedProfile(pending.left.after.accountId);
+    const rightCurrent =
+      this.store.load(pending.right.after.accountId) ??
+      createDefaultDuelRankedProfile(pending.right.after.accountId);
+    const leftPosition = pendingProfilePosition(
+      leftCurrent,
+      pending.left,
+    );
+    const rightPosition = pendingProfilePosition(
+      rightCurrent,
+      pending.right,
+    );
+    if (leftPosition === "conflict" || rightPosition === "conflict") {
+      throw new Error(
+        "Ranked profile state conflicts with pending settlement " +
+          pending.matchId +
+          ".",
+      );
+    }
+
+    const leftNeedsWrite = leftPosition === "before";
+    const rightNeedsWrite = rightPosition === "before";
+    if (leftNeedsWrite && rightNeedsWrite) {
+      this.store.savePair(pending.left.after, pending.right.after);
+      return;
+    }
+    if (leftNeedsWrite) {
+      this.store.save(pending.left.after);
+    }
+    if (rightNeedsWrite) {
+      this.store.save(pending.right.after);
+    }
+  }
+
+  private retryPendingSettlements(
+    nowInput: number,
+    force = false,
+  ): void {
+    let pending: readonly DuelRankedPendingSettlementV1[];
+    try {
+      pending = this.settlementJournal.list();
+    } catch (error) {
+      this.historyWriteError =
+        "Ranked settlement journal read failed: " + errorText(error);
+      return;
+    }
+    if (pending.length === 0) return;
+
+    const now = Number.isFinite(nowInput)
+      ? Math.max(0, Math.floor(nowInput))
+      : 0;
+    if (
+      !force &&
+      now - this.lastSettlementRetryAt < DUEL_RANKED_SETTLEMENT_RETRY_MS
+    ) {
+      return;
+    }
+    this.lastSettlementRetryAt = now;
+
+    let lastError: string | null = null;
+    for (const settlement of pending) {
+      try {
+        this.applyPendingProfiles(settlement);
+        this.historyStore.appendPair(
+          settlement.left.history,
+          settlement.right.history,
+        );
+        this.settlementJournal.remove(settlement.matchId);
+      } catch (error) {
+        lastError = errorText(error);
+      }
+    }
+    if (lastError !== null) {
+      this.historyWriteError =
+        "Ranked settlement recovery pending: " + lastError;
+      return;
+    }
+    this.clearHistoryDiagnosticIfRecovered();
+  }
+
+  private clearHistoryDiagnosticIfRecovered(): void {
+    try {
+      if (this.settlementJournal.list().length === 0) {
+        this.historyWriteError = null;
+      }
+    } catch (error) {
+      this.historyWriteError =
+        "Ranked settlement journal read failed: " + errorText(error);
+    }
   }
 }
