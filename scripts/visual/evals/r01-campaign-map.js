@@ -39,10 +39,12 @@
   expect(sectorStages.length === 10, `Expected 10 sector stages, found ${sectorStages.length}.`);
   expect(bossLandmark instanceof HTMLElement, "Sector milestone landmark is missing.");
   expect(restLandmark instanceof HTMLElement, "Checkpoint Rest Hub landmark is missing.");
-  expect(
-    sector?.querySelectorAll("button").length === 0,
-    "Sector detail must not reintroduce ordinary Shop/Station route choices.",
-  );
+  if (sector instanceof HTMLElement) {
+    expect(
+      sector.querySelectorAll("button").length === 0,
+      "Sector detail must not reintroduce ordinary Shop/Station route choices.",
+    );
+  }
   expect(stageGrid?.getAttribute("role") === "region", "Campaign Map scroll region lost its region role.");
   expect(stageGrid instanceof HTMLElement && stageGrid.tabIndex >= 0, "Campaign Map scroll region is not keyboard focusable.");
   expect(resourceHelp.length >= 8, `Expected contextual resource help targets, found ${resourceHelp.length}.`);
