@@ -94,14 +94,14 @@ function authority(): AlternativeRoomAuthority {
   };
 }
 
-function leftReflexUpdate(deliveries: readonly AlternativeTransportDelivery[]) {
+function leftReflexPrompt(deliveries: readonly AlternativeTransportDelivery[]): string {
   const message = deliveries.find((entry) =>
     entry.sessionId === "left" && entry.message.type === "ALTERNATIVE_MATCH_UPDATE"
   )?.message;
   if (message?.type !== "ALTERNATIVE_MATCH_UPDATE" || message.view.challenge.kind !== "reflex") {
     throw new Error("Expected left Reflex update");
   }
-  return message;
+  return message.view.challenge.prompt;
 }
 
 describe("R03 alternative transport coordinator", () => {
@@ -232,7 +232,7 @@ describe("R03 alternative transport coordinator", () => {
       mode: "reflex",
     }, 0);
     if (started === null || !started.ok) throw new Error("Expected first match");
-    let update = leftReflexUpdate(started.deliveries);
+    let prompt = leftReflexPrompt(started.deliveries);
 
     for (let hit = 1; hit <= 5; hit += 1) {
       const at = 10 + (hit - 1) * 190;
@@ -241,10 +241,10 @@ describe("R03 alternative transport coordinator", () => {
         matchId: "restart-1",
         sequence: hit,
         mode: "reflex",
-        input: { text: update.view.challenge.prompt },
+        input: { text: prompt },
       }, at);
       if (result === null || !result.ok) throw new Error("Expected accepted Reflex hit");
-      update = leftReflexUpdate(result.deliveries);
+      prompt = leftReflexPrompt(result.deliveries);
       coordinator.advance(at + 180);
     }
 
