@@ -29,6 +29,13 @@ export type JourneySecretNode = {
   selectable: true;
 };
 
+export type JourneySectorDetail = {
+  startStage: number;
+  endStage: number;
+  checkpointStage: number;
+  hiddenStops: JourneySecretNode[];
+};
+
 /** Twenty fixed DOM/SVG nodes per World; the map never runs a render loop. */
 const LANE_X = [50, 69, 78, 63, 40, 22, 32, 53, 75, 55, 30, 20, 40, 62, 80, 65, 43, 23, 38, 51] as const;
 const STEP_Y = 88;
@@ -37,6 +44,11 @@ const SECRET_ROUTE_IDS = [
   "black-market-signal",
   "hidden-station-signal",
 ] as const;
+
+function normalizeCampaignStage(stage: number): number {
+  if (!Number.isFinite(stage)) return 1;
+  return Math.max(1, Math.min(1000, Math.floor(stage)));
+}
 
 export function journeyNodesForStage(stage: number): JourneyNode[] {
   const world = worldForStage(stage);
@@ -91,6 +103,33 @@ export function journeySecretNodesForStage(
       },
     ];
   });
+}
+
+/**
+ * Compact ten-stage sector summary for the Journey Map detail rail. Hidden
+ * stops come only from persisted discovery state; undiscovered destinations
+ * are deliberately absent so presentation cannot leak route information.
+ */
+export function journeySectorDetailForStage(
+  stage: number,
+  discovery: HiddenDiscoveryState | null,
+): JourneySectorDetail {
+  const safeStage = normalizeCampaignStage(stage);
+  const startStage = Math.floor((safeStage - 1) / 10) * 10 + 1;
+  const endStage = Math.min(1000, startStage + 9);
+  const hiddenStops =
+    discovery === null
+      ? []
+      : journeySecretNodesForStage(safeStage, discovery).filter(
+          (node) => node.stage >= startStage && node.stage <= endStage,
+        );
+
+  return {
+    startStage,
+    endStage,
+    checkpointStage: endStage,
+    hiddenStops,
+  };
 }
 
 export function journeyPath(nodes: readonly JourneyNode[]): string {
