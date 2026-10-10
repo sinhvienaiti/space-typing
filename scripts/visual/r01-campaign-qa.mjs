@@ -8,6 +8,7 @@ const visualDir = resolve(root, ".visual");
 const viteEntry = resolve(root, "node_modules/vite/bin/vite.js");
 const shotEntry = resolve(root, "scripts/visual/shot.mjs");
 const evalFile = resolve(root, "scripts/visual/evals/r01-campaign-map.js");
+const setupEvalFile = resolve(root, "scripts/visual/evals/r01-open-campaign-map.js");
 const port = 3098;
 const url = `http://127.0.0.1:${port}/`;
 
@@ -15,7 +16,7 @@ if (!existsSync(viteEntry)) {
   console.error("Vite is not installed. Run pnpm install before pnpm visual:r01-qa.");
   process.exit(2);
 }
-if (!existsSync(shotEntry) || !existsSync(evalFile)) {
+if (!existsSync(shotEntry) || !existsSync(evalFile) || !existsSync(setupEvalFile)) {
   console.error("R01 visual QA files are missing from scripts/visual.");
   process.exit(2);
 }
@@ -56,12 +57,11 @@ function runShot(name, width, height) {
     shotEntry,
     url,
     out,
-    "--click=#stageSelectButton",
-    "--click-delay=1200",
-    "--wait=1600",
+    "--wait=750",
     `--width=${width}`,
     `--height=${height}`,
     "--dpr=2",
+    `--setup-eval-file=${setupEvalFile}`,
     `--eval-file=${evalFile}`,
   ];
 
