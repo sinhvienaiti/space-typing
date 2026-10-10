@@ -73,6 +73,14 @@ function eventOrder(
   );
 }
 
+function retainNewestHistoricalEvents(
+  events: readonly DuelRankedHistoricalEventV1[],
+): DuelRankedHistoricalEventV1[] {
+  return [...events]
+    .sort(eventOrder)
+    .slice(-DUEL_RANKED_HISTORY_MAX_EVENTS);
+}
+
 export function createDuelRankedHistoryState(
   accountIdInput: string,
 ): DuelRankedHistoryState {
@@ -162,7 +170,7 @@ export function sanitizeDuelRankedHistoryState(
   return {
     version: DUEL_RANKED_HISTORY_VERSION,
     accountId,
-    events: [...deduped.values()].slice(-DUEL_RANKED_HISTORY_MAX_EVENTS),
+    events: retainNewestHistoricalEvents([...deduped.values()]),
   };
 }
 
@@ -185,7 +193,7 @@ export function appendDuelRankedHistoricalEvent(
   return {
     version: DUEL_RANKED_HISTORY_VERSION,
     accountId,
-    events: [...state.events, event].slice(-DUEL_RANKED_HISTORY_MAX_EVENTS),
+    events: retainNewestHistoricalEvents([...state.events, event]),
   };
 }
 
