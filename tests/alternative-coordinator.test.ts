@@ -31,7 +31,6 @@ function roomSnapshot(input: {
       fateFrequency: "standard",
       botAllowed: false,
       seedMode: "fixed",
-      fixedSeed: 1,
       modifier: "standard",
     },
     slots: [
