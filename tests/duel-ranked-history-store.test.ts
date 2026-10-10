@@ -1,11 +1,12 @@
 import {
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { DuelRankedHistoricalEventV1 } from "../src/duel/ranked-history";
 import {
@@ -25,7 +26,9 @@ afterEach(() => {
 function filePath(): string {
   const root = mkdtempSync(join(tmpdir(), "space-typing-ranked-history-"));
   roots.push(root);
-  return join(root, "nested", "history.json");
+  const path = join(root, "nested", "history.json");
+  mkdirSync(dirname(path), { recursive: true });
+  return path;
 }
 
 function event(
