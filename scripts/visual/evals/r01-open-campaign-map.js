@@ -1,9 +1,10 @@
 (async () => {
   const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
-  const deadline = Date.now() + 20000;
+  const phaseTimeoutMs = 20000;
+  const buttonDeadline = Date.now() + phaseTimeoutMs;
   let button = null;
 
-  while (Date.now() < deadline) {
+  while (Date.now() < buttonDeadline) {
     button = document.getElementById("stageSelectButton");
     if (button instanceof HTMLButtonElement && !button.disabled) break;
     await sleep(100);
@@ -18,7 +19,8 @@
 
   button.click();
 
-  while (Date.now() < deadline) {
+  const renderDeadline = Date.now() + phaseTimeoutMs;
+  while (Date.now() < renderDeadline) {
     const dialog = document.getElementById("stageSelectDialog");
     const board = document.querySelector("#stageGrid .stage-journey");
     const sector = document.getElementById("journeySectorDetail");
@@ -39,5 +41,12 @@
     await sleep(100);
   }
 
-  throw new Error("Campaign Map did not finish rendering before the QA timeout.");
+  const dialog = document.getElementById("stageSelectDialog");
+  const board = document.querySelector("#stageGrid .stage-journey");
+  const sector = document.getElementById("journeySectorDetail");
+  throw new Error(
+    `Campaign Map did not finish rendering before the QA timeout ` +
+      `(dialogOpen=${dialog instanceof HTMLDialogElement && dialog.open}, ` +
+      `boardMounted=${board instanceof HTMLElement}, sectorMounted=${sector instanceof HTMLElement}).`,
+  );
 })()
