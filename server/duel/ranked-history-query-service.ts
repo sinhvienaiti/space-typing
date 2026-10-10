@@ -3,9 +3,13 @@ import {
   buildDuelRankedHistoryAdminSurface,
   type DuelRankedHistoryAdminSurface,
 } from "../../src/duel/ranked-history-admin";
-import type {
-  DuelRankedHistoryPeriod,
-  DuelRankedHistoryState,
+import {
+  DUEL_RANKED_HISTORY_MAX_EVENTS,
+  queryDuelRankedHistory,
+  type DuelRankedHistoricalEventV1,
+  type DuelRankedHistoricalResult,
+  type DuelRankedHistoryPeriod,
+  type DuelRankedHistoryState,
 } from "../../src/duel/ranked-history";
 
 export type DuelRankedHistoryReadScope =
@@ -16,7 +20,13 @@ export type DuelRankedHistoryReadErrorCode =
   | "UNAUTHENTICATED"
   | "INVALID_TARGET"
   | "INVALID_PERIOD"
+  | "INVALID_QUERY"
   | "FORBIDDEN";
+
+export type DuelRankedHistoryEventQueryInput = {
+  result?: DuelRankedHistoricalResult;
+  limit?: number;
+};
 
 export type DuelRankedHistoryReadResult =
   | {
@@ -25,6 +35,7 @@ export type DuelRankedHistoryReadResult =
       requesterAccountId: string;
       targetAccountId: string;
       surface: DuelRankedHistoryAdminSurface;
+      events: readonly DuelRankedHistoricalEventV1[];
     }
   | {
       ok: false;
@@ -78,6 +89,32 @@ function validPeriod(
   };
 }
 
+function validEventQuery(
+  query: DuelRankedHistoryEventQueryInput | undefined,
+): DuelRankedHistoryEventQueryInput | null {
+  if (query === undefined) return {};
+  if (
+    query.result !== undefined &&
+    query.result !== "win" &&
+    query.result !== "loss" &&
+    query.result !== "draw"
+  ) {
+    return null;
+  }
+  if (
+    query.limit !== undefined &&
+    (!Number.isSafeInteger(query.limit) || query.limit < 0)
+  ) {
+    return null;
+  }
+  return {
+    ...(query.result === undefined ? {} : { result: query.result }),
+    ...(query.limit === undefined
+      ? {}
+      : { limit: Math.min(query.limit, DUEL_RANKED_HISTORY_MAX_EVENTS) }),
+  };
+}
+
 export class DuelRankedHistoryQueryService {
   constructor(
     private readonly reader: DuelRankedHistoryReader,
@@ -89,6 +126,7 @@ export class DuelRankedHistoryQueryService {
     credential: string;
     targetAccountId?: string;
     period: DuelRankedHistoryPeriod;
+    events?: DuelRankedHistoryEventQueryInput;
   }): DuelRankedHistoryReadResult {
     const requester = this.authenticate(input.credential);
     if (requester === null) {
@@ -123,6 +161,14 @@ export class DuelRankedHistoryQueryService {
         ok: false,
         code: "INVALID_PERIOD",
         message: "Ranked history period must be a valid non-empty time range.",
+      };
+    }
+    const eventQuery = validEventQuery(input.events);
+    if (eventQuery === null) {
+      return {
+        ok: false,
+        code: "INVALID_QUERY",
+        message: "Ranked history event query is invalid.",
       };
     }
 
@@ -168,6 +214,11 @@ export class DuelRankedHistoryQueryService {
             this.authorizeCrossPlayer !== null,
         },
       ),
+      events: queryDuelRankedHistory(state, {
+        startMs: period.startMs,
+        endMs: period.endMs,
+        ...eventQuery,
+      }),
     };
   }
 }

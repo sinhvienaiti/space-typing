@@ -14,21 +14,31 @@ const START = 1000;
 const END = 2000;
 
 function state(accountId: string): DuelRankedHistoryState {
-  return appendDuelRankedHistoricalEvent(
-    createDuelRankedHistoryState(accountId),
-    {
-      version: 1,
-      eventId: "ranked:m1:" + accountId,
-      occurredAtMs: 1500,
-      kind: "duel-settled",
-      matchId: "m1",
-      accountId,
-      opponentAccountId: accountId === "pilot-a" ? "pilot-b" : "pilot-a",
-      result: "win",
-      duelRatingBefore: 1000,
-      duelRatingAfter: 1020,
-    },
-  );
+  let value = createDuelRankedHistoryState(accountId);
+  value = appendDuelRankedHistoricalEvent(value, {
+    version: 1,
+    eventId: "ranked:m1:" + accountId,
+    occurredAtMs: 1400,
+    kind: "duel-settled",
+    matchId: "m1",
+    accountId,
+    opponentAccountId: accountId === "pilot-a" ? "pilot-b" : "pilot-a",
+    result: "win",
+    duelRatingBefore: 1000,
+    duelRatingAfter: 1020,
+  });
+  return appendDuelRankedHistoricalEvent(value, {
+    version: 1,
+    eventId: "ranked:m2:" + accountId,
+    occurredAtMs: 1500,
+    kind: "duel-settled",
+    matchId: "m2",
+    accountId,
+    opponentAccountId: accountId === "pilot-a" ? "pilot-b" : "pilot-a",
+    result: "loss",
+    duelRatingBefore: 1020,
+    duelRatingAfter: 1005,
+  });
 }
 
 function identity(accountId: string): DuelAuthenticatedIdentity {
@@ -70,7 +80,7 @@ describe("Ranked Duel historical query authorization", () => {
     expect(source.history).not.toHaveBeenCalled();
   });
 
-  it("allows authenticated self history and keeps cross-player disabled by default", () => {
+  it("allows authenticated self history and returns bounded newest-first events", () => {
     const source = reader({ "pilot-a": state("pilot-a") });
     const service = new DuelRankedHistoryQueryService(
       source.reader,
@@ -80,6 +90,7 @@ describe("Ranked Duel historical query authorization", () => {
     const result = service.read({
       credential: "token-a",
       period: { startMs: START, endMs: END },
+      events: { result: "win", limit: 1 },
     });
     expect(result).toEqual(
       expect.objectContaining({
@@ -93,7 +104,25 @@ describe("Ranked Duel historical query authorization", () => {
     expect(result.surface.crossPlayerSupported).toBe(false);
     expect(result.surface.accountId).toBe("pilot-a");
     expect(result.surface.rows.find((row) => row.id === "matches")?.value)
+      .toBe("2");
+    expect(result.events.map((event) => event.matchId)).toEqual(["m1"]);
+  });
+
+  it("uses the requested period for both aggregate and event rows", () => {
+    const source = reader({ "pilot-a": state("pilot-a") });
+    const service = new DuelRankedHistoryQueryService(
+      source.reader,
+      () => identity("pilot-a"),
+    );
+
+    const result = service.read({
+      credential: "token-a",
+      period: { startMs: 1450, endMs: END },
+    });
+    if (!result.ok) throw new Error(result.message);
+    expect(result.surface.rows.find((row) => row.id === "matches")?.value)
       .toBe("1");
+    expect(result.events.map((event) => event.matchId)).toEqual(["m2"]);
   });
 
   it("denies cross-player lookup by default without loading the target account", () => {
@@ -133,6 +162,7 @@ describe("Ranked Duel historical query authorization", () => {
       credential: "admin-token",
       targetAccountId: "pilot-b",
       period: { startMs: START, endMs: END },
+      events: { limit: 1 },
     });
     expect(authorize).toHaveBeenCalledWith({
       requester: identity("admin-account"),
@@ -149,6 +179,8 @@ describe("Ranked Duel historical query authorization", () => {
     if (!result.ok) throw new Error(result.message);
     expect(result.surface.crossPlayerSupported).toBe(true);
     expect(result.surface.accountId).toBe("pilot-b");
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0]?.matchId).toBe("m2");
     expect(result.surface.diagnostics.join(" "))
       .toContain("authenticated server authorization boundary");
   });
@@ -181,7 +213,7 @@ describe("Ranked Duel historical query authorization", () => {
     expect(source.history).not.toHaveBeenCalled();
   });
 
-  it("validates target identity and period before querying storage", () => {
+  it("validates target, period, and event query before querying storage", () => {
     const source = reader({});
     const service = new DuelRankedHistoryQueryService(
       source.reader,
@@ -201,6 +233,50 @@ describe("Ranked Duel historical query authorization", () => {
     })).toEqual(
       expect.objectContaining({ ok: false, code: "INVALID_PERIOD" }),
     );
+    expect(service.read({
+      credential: "token-a",
+      period: { startMs: START, endMs: END },
+      events: { limit: -1 },
+    })).toEqual(
+      expect.objectContaining({ ok: false, code: "INVALID_QUERY" }),
+    );
+    expect(service.read({
+      credential: "token-a",
+      period: { startMs: START, endMs: END },
+      events: { result: "victory" as "win" },
+    })).toEqual(
+      expect.objectContaining({ ok: false, code: "INVALID_QUERY" }),
+    );
     expect(source.history).not.toHaveBeenCalled();
+  });
+
+  it("hard-caps oversized event limits while keeping the query authorized", () => {
+    let historyState = createDuelRankedHistoryState("pilot-a");
+    for (let index = 0; index < 80; index += 1) {
+      historyState = appendDuelRankedHistoricalEvent(historyState, {
+        version: 1,
+        eventId: "ranked:m" + String(index) + ":pilot-a",
+        occurredAtMs: START + index,
+        kind: "duel-settled",
+        matchId: "m" + String(index),
+        accountId: "pilot-a",
+        opponentAccountId: "pilot-b",
+        result: "win",
+        duelRatingBefore: 1000,
+        duelRatingAfter: 1001,
+      });
+    }
+    const source = reader({ "pilot-a": historyState });
+    const service = new DuelRankedHistoryQueryService(
+      source.reader,
+      () => identity("pilot-a"),
+    );
+    const result = service.read({
+      credential: "token-a",
+      period: { startMs: START, endMs: END },
+      events: { limit: 99999 },
+    });
+    if (!result.ok) throw new Error(result.message);
+    expect(result.events).toHaveLength(80);
   });
 });
