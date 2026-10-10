@@ -10,6 +10,16 @@ export type FixedChallengeIdentity = {
   adaptivePolicy: "frozen";
 };
 
+export type WeeklyChallengeConfig = Omit<
+  FixedChallengeIdentity,
+  "dayKey" | "seed"
+>;
+
+export type WeeklyChallengeIdentity = WeeklyChallengeConfig & {
+  weekKey: string;
+  seed: number;
+};
+
 export type ExpeditionPbRecord = {
   identityKey: string;
   runId: string;
@@ -46,11 +56,68 @@ export function dailySeed(dayKey: string, rulesetVersion: string): number {
   return hash(dayKey + "|" + rulesetVersion);
 }
 
+export function weeklyChallengeWeekKey(date = new Date()): string {
+  const target = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  );
+  const dayFromMonday = (target.getUTCDay() + 6) % 7;
+  target.setUTCDate(target.getUTCDate() - dayFromMonday + 3);
+
+  const weekYear = target.getUTCFullYear();
+  const firstThursday = new Date(Date.UTC(weekYear, 0, 4));
+  const firstDayFromMonday = (firstThursday.getUTCDay() + 6) % 7;
+  firstThursday.setUTCDate(
+    firstThursday.getUTCDate() - firstDayFromMonday + 3,
+  );
+
+  const week =
+    1 +
+    Math.round(
+      (target.getTime() - firstThursday.getTime()) /
+        (7 * 24 * 60 * 60 * 1000),
+    );
+
+  return `${weekYear}-W${String(week).padStart(2, "0")}`;
+}
+
+export function weeklySeed(weekKey: string, rulesetVersion: string): number {
+  return hash("weekly|" + weekKey + "|" + rulesetVersion);
+}
+
+export function weeklyChallengeIdentity(
+  config: WeeklyChallengeConfig,
+  date = new Date(),
+): WeeklyChallengeIdentity {
+  const weekKey = weeklyChallengeWeekKey(date);
+  return {
+    ...config,
+    weekKey,
+    seed: weeklySeed(weekKey, config.rulesetVersion),
+  };
+}
+
 export function fixedChallengeIdentityKey(
   identity: FixedChallengeIdentity,
 ): string {
   return [
     identity.dayKey,
+    identity.seed,
+    identity.rulesetVersion,
+    identity.contentVersion,
+    identity.wordPoolHash,
+    identity.startKitId,
+    identity.difficulty,
+    identity.assist,
+    identity.adaptivePolicy,
+  ].join("|");
+}
+
+export function weeklyChallengeIdentityKey(
+  identity: WeeklyChallengeIdentity,
+): string {
+  return [
+    "weekly",
+    identity.weekKey,
     identity.seed,
     identity.rulesetVersion,
     identity.contentVersion,
