@@ -23,6 +23,8 @@ function roomSnapshot(input: {
       roomName: "Alternative QA",
       visibility: "public",
       passwordRequired: false,
+      fixedSeedConfigured: true,
+      combatProfile: "normalized",
       matchLengthSeconds: 180,
       roundFormat: 1,
       mapSelection: { mode: "fixed", mapId: "frost-wastes" },
