@@ -11,6 +11,7 @@ import {
   sanitizeDuelRankedHistoricalEvent,
   sanitizeDuelRankedHistoryState,
   type DuelRankedHistoricalEventV1,
+  type DuelRankedHistoricalResult,
   type DuelRankedHistoryState,
 } from "../../src/duel/ranked-history";
 
@@ -61,6 +62,52 @@ function cloneState(state: DuelRankedHistoryState): DuelRankedHistoryState {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function sameHistoricalEvent(
+  left: DuelRankedHistoricalEventV1,
+  right: DuelRankedHistoricalEventV1,
+): boolean {
+  return (
+    left.version === right.version &&
+    left.eventId === right.eventId &&
+    left.occurredAtMs === right.occurredAtMs &&
+    left.kind === right.kind &&
+    left.matchId === right.matchId &&
+    left.accountId === right.accountId &&
+    left.opponentAccountId === right.opponentAccountId &&
+    left.result === right.result &&
+    left.duelRatingBefore === right.duelRatingBefore &&
+    left.duelRatingAfter === right.duelRatingAfter
+  );
+}
+
+function oppositeResult(
+  result: DuelRankedHistoricalResult,
+): DuelRankedHistoricalResult {
+  if (result === "win") return "loss";
+  if (result === "loss") return "win";
+  return "draw";
+}
+
+function appendVerifiedEvent(
+  state: DuelRankedHistoryState,
+  event: DuelRankedHistoricalEventV1,
+): DuelRankedHistoryState {
+  const collision = state.events.find(
+    (row) => row.matchId === event.matchId || row.eventId === event.eventId,
+  );
+  if (collision !== undefined) {
+    if (sameHistoricalEvent(collision, event)) {
+      return cloneState(state);
+    }
+    throw new Error(
+      "Conflicting Ranked Duel historical event identity for match " +
+        event.matchId +
+        ".",
+    );
+  }
+  return appendDuelRankedHistoricalEvent(state, event);
 }
 
 function parseHistoryFile(raw: string): DuelRankedHistoryFileV1 {
@@ -147,7 +194,7 @@ export class InMemoryDuelRankedHistoryStore
     if (event === null) {
       throw new Error("Invalid Ranked Duel historical event.");
     }
-    const next = appendDuelRankedHistoricalEvent(
+    const next = appendVerifiedEvent(
       this.load(event.accountId),
       event,
     );
@@ -167,16 +214,18 @@ export class InMemoryDuelRankedHistoryStore
       left.matchId !== right.matchId ||
       left.accountId !== right.opponentAccountId ||
       right.accountId !== left.opponentAccountId ||
-      left.accountId === right.accountId
+      left.accountId === right.accountId ||
+      left.occurredAtMs !== right.occurredAtMs ||
+      right.result !== oppositeResult(left.result)
     ) {
       throw new Error("Invalid Ranked Duel historical settlement pair.");
     }
 
-    const leftNext = appendDuelRankedHistoricalEvent(
+    const leftNext = appendVerifiedEvent(
       this.load(left.accountId),
       left,
     );
-    const rightNext = appendDuelRankedHistoricalEvent(
+    const rightNext = appendVerifiedEvent(
       this.load(right.accountId),
       right,
     );

@@ -52,6 +52,20 @@ function event(
   };
 }
 
+function settlement(matchId = "m1"): readonly [
+  DuelRankedHistoricalEventV1,
+  DuelRankedHistoricalEventV1,
+] {
+  return [
+    event("left", "right", matchId, { result: "win" }),
+    event("right", "left", matchId, {
+      result: "loss",
+      duelRatingBefore: 1000,
+      duelRatingAfter: 980,
+    }),
+  ];
+}
+
 describe("Ranked Duel history file store", () => {
   it("treats a missing file as empty and persists account-scoped history", () => {
     const path = filePath();
@@ -74,42 +88,109 @@ describe("Ranked Duel history file store", () => {
   it("persists both sides of one settlement with one atomic file flush", () => {
     const path = filePath();
     const store = new JsonFileDuelRankedHistoryStore(path);
+    const [left, right] = settlement();
 
-    store.appendPair(
-      event("left", "right", "m1", { result: "win" }),
-      event("right", "left", "m1", {
-        result: "loss",
-        duelRatingBefore: 1000,
-        duelRatingAfter: 980,
-      }),
-    );
+    store.appendPair(left, right);
 
     const reloaded = new JsonFileDuelRankedHistoryStore(path);
     expect(reloaded.load("left").events[0]?.result).toBe("win");
     expect(reloaded.load("right").events[0]?.result).toBe("loss");
   });
 
-  it("is idempotent when the same match settlement is appended again", () => {
+  it("is idempotent only when the exact same settlement is replayed", () => {
     const path = filePath();
     const store = new JsonFileDuelRankedHistoryStore(path);
-    const left = event("left", "right", "m1", { result: "win" });
-    const right = event("right", "left", "m1", {
-      result: "loss",
-      duelRatingBefore: 1000,
-      duelRatingAfter: 980,
-    });
+    const [left, right] = settlement();
 
     store.appendPair(left, right);
-    store.appendPair(
+    const before = readFileSync(path, "utf8");
+    store.appendPair(left, right);
+
+    expect(readFileSync(path, "utf8")).toBe(before);
+    const reloaded = new JsonFileDuelRankedHistoryStore(path);
+    expect(reloaded.load("left").events).toEqual([left]);
+    expect(reloaded.load("right").events).toEqual([right]);
+  });
+
+  it("rejects a conflicting replay that reuses persisted match identities", () => {
+    const path = filePath();
+    const store = new JsonFileDuelRankedHistoryStore(path);
+    const [left, right] = settlement();
+    store.appendPair(left, right);
+    const before = readFileSync(path, "utf8");
+
+    expect(() => store.appendPair(
       { ...left, duelRatingAfter: 2000 },
       { ...right, duelRatingAfter: 400 },
+    )).toThrow("Conflicting Ranked Duel historical event identity");
+
+    expect(readFileSync(path, "utf8")).toBe(before);
+    expect(store.load("left").events).toEqual([left]);
+    expect(store.load("right").events).toEqual([right]);
+  });
+
+  it("rejects a conflicting single-event replay instead of treating identity reuse as idempotent", () => {
+    const path = filePath();
+    const store = new JsonFileDuelRankedHistoryStore(path);
+    const original = event("left", "right", "m1", { result: "win" });
+    store.append(original);
+    const before = readFileSync(path, "utf8");
+
+    expect(() => store.append({
+      ...original,
+      result: "loss",
+      duelRatingAfter: 980,
+    })).toThrow("Conflicting Ranked Duel historical event identity");
+
+    expect(readFileSync(path, "utf8")).toBe(before);
+    expect(store.load("left").events).toEqual([original]);
+  });
+
+  it("rejects settlement pairs with inconsistent timestamps or outcomes", () => {
+    const path = filePath();
+    const store = new JsonFileDuelRankedHistoryStore(path);
+
+    expect(() => store.appendPair(
+      event("left", "right", "time-mismatch", {
+        result: "win",
+        occurredAtMs: 100,
+      }),
+      event("right", "left", "time-mismatch", {
+        result: "loss",
+        occurredAtMs: 101,
+        duelRatingAfter: 980,
+      }),
+    )).toThrow("Invalid Ranked Duel historical settlement pair");
+
+    expect(() => store.appendPair(
+      event("left", "right", "result-mismatch", { result: "win" }),
+      event("right", "left", "result-mismatch", {
+        result: "win",
+        duelRatingAfter: 1020,
+      }),
+    )).toThrow("Invalid Ranked Duel historical settlement pair");
+
+    expect(store.load("left").events).toEqual([]);
+    expect(store.load("right").events).toEqual([]);
+  });
+
+  it("accepts draw settlements only when both authority outcomes are draw", () => {
+    const path = filePath();
+    const store = new JsonFileDuelRankedHistoryStore(path);
+
+    store.appendPair(
+      event("left", "right", "draw", {
+        result: "draw",
+        duelRatingAfter: 1000,
+      }),
+      event("right", "left", "draw", {
+        result: "draw",
+        duelRatingAfter: 1000,
+      }),
     );
 
-    const reloaded = new JsonFileDuelRankedHistoryStore(path);
-    expect(reloaded.load("left").events).toHaveLength(1);
-    expect(reloaded.load("right").events).toHaveLength(1);
-    expect(reloaded.load("left").events[0]?.duelRatingAfter).toBe(1020);
-    expect(reloaded.load("right").events[0]?.duelRatingAfter).toBe(980);
+    expect(store.load("left").events[0]?.result).toBe("draw");
+    expect(store.load("right").events[0]?.result).toBe("draw");
   });
 
   it("rejects mismatched settlement pairs without mutating persisted history", () => {
