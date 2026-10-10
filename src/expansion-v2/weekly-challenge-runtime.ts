@@ -42,16 +42,23 @@ export type WeeklyChallengeRunLike = {
   } | null;
 };
 
+export type WeeklyChallengeBindingStatus =
+  | "match"
+  | "stale"
+  | "invalid";
+
 export type WeeklyChallengeResumeStatus =
   | "none"
   | "available"
   | "stale"
+  | "invalid"
   | "terminal";
 
 export type WeeklyChallengeSettlementReason =
   | "settled"
   | "not-weekly"
   | "stale-identity"
+  | "invalid-binding"
   | "not-terminal";
 
 export type WeeklyChallengeSettlement = {
@@ -85,36 +92,46 @@ export function weeklyChallengeRunBinding(
   };
 }
 
-function runIdentityKey(run: WeeklyChallengeRunLike): string | null {
-  return run.challenge?.kind === "weekly"
-    ? run.challenge.identityKey
-    : null;
-}
-
 function runIsTerminal(run: WeeklyChallengeRunLike): boolean {
   return (
-    run.terminal !== null && run.terminal !== undefined ||
+    (run.terminal !== null && run.terminal !== undefined) ||
     run.phase === "victory" ||
     run.phase === "defeat" ||
     run.phase === "abandoned"
   );
 }
 
+export function weeklyChallengeBindingStatus(
+  run: WeeklyChallengeRunLike,
+  binding: WeeklyChallengeRunBinding,
+): WeeklyChallengeBindingStatus {
+  if (run.challenge?.kind !== "weekly") return "invalid";
+  if (
+    run.challenge.identityKey !== binding.identityKey ||
+    run.challenge.weekKey !== binding.weekKey
+  ) {
+    return "stale";
+  }
+  return run.seed === binding.seed ? "match" : "invalid";
+}
+
 export function weeklyChallengeResumeStatus(
   run: WeeklyChallengeRunLike | null,
-  currentIdentityKey: string,
+  binding: WeeklyChallengeRunBinding,
 ): WeeklyChallengeResumeStatus {
   if (run === null || run.challenge?.kind !== "weekly") return "none";
-  if (run.challenge.identityKey !== currentIdentityKey) return "stale";
+  const status = weeklyChallengeBindingStatus(run, binding);
+  if (status === "stale") return "stale";
+  if (status === "invalid") return "invalid";
   return runIsTerminal(run) ? "terminal" : "available";
 }
 
 export function weeklyChallengeRewardEligible(
   run: WeeklyChallengeRunLike,
-  currentIdentityKey: string,
+  binding: WeeklyChallengeRunBinding,
 ): boolean {
   return (
-    runIdentityKey(run) === currentIdentityKey &&
+    weeklyChallengeBindingStatus(run, binding) === "match" &&
     run.phase === "victory" &&
     run.completedEncounters >= run.encounterPlan.length &&
     run.encounterPlan.length > 0
@@ -123,10 +140,10 @@ export function weeklyChallengeRewardEligible(
 
 export function weeklyChallengeLeaderboardEligible(
   run: WeeklyChallengeRunLike,
-  currentIdentityKey: string,
+  binding: WeeklyChallengeRunBinding,
 ): boolean {
   return (
-    weeklyChallengeRewardEligible(run, currentIdentityKey) &&
+    weeklyChallengeRewardEligible(run, binding) &&
     run.retryCount === 0 &&
     run.profile.assist === "standard"
   );
@@ -134,12 +151,12 @@ export function weeklyChallengeLeaderboardEligible(
 
 export function weeklyChallengePbRecord(
   run: WeeklyChallengeRunLike,
-  currentIdentityKey: string,
+  binding: WeeklyChallengeRunBinding,
 ): ExpeditionPbRecord | null {
-  if (runIdentityKey(run) !== currentIdentityKey) return null;
+  if (weeklyChallengeBindingStatus(run, binding) !== "match") return null;
   const lastGhostPoint = run.ghostPoints?.at(-1);
   return {
-    identityKey: currentIdentityKey,
+    identityKey: binding.identityKey,
     runId: run.runId,
     completedEncounters: Math.max(0, Math.floor(run.completedEncounters)),
     score: Math.max(0, Math.floor(run.totalScore)),
@@ -159,7 +176,7 @@ export function weeklyChallengePbRecord(
 export function settleWeeklyChallengeProfile(
   profile: ExpansionV2Profile,
   run: WeeklyChallengeRunLike,
-  currentIdentityKey: string,
+  binding: WeeklyChallengeRunBinding,
 ): WeeklyChallengeSettlement {
   if (run.challenge?.kind !== "weekly") {
     return {
@@ -171,10 +188,22 @@ export function settleWeeklyChallengeProfile(
       personalBestUpdated: false,
     };
   }
-  if (run.challenge.identityKey !== currentIdentityKey) {
+
+  const bindingStatus = weeklyChallengeBindingStatus(run, binding);
+  if (bindingStatus === "stale") {
     return {
       profile,
       reason: "stale-identity",
+      rewardEligible: false,
+      rewardGranted: false,
+      leaderboardEligible: false,
+      personalBestUpdated: false,
+    };
+  }
+  if (bindingStatus === "invalid") {
+    return {
+      profile,
+      reason: "invalid-binding",
       rewardEligible: false,
       rewardGranted: false,
       leaderboardEligible: false,
@@ -197,8 +226,8 @@ export function settleWeeklyChallengeProfile(
     score: run.totalScore,
     completed: run.phase === "victory",
   });
-  const beforePb = next.pbByIdentity[currentIdentityKey] ?? null;
-  const record = weeklyChallengePbRecord(run, currentIdentityKey);
+  const beforePb = next.pbByIdentity[binding.identityKey] ?? null;
+  const record = weeklyChallengePbRecord(run, binding);
   if (record !== null) {
     next = recordFixedChallengeResult(
       next,
@@ -206,18 +235,15 @@ export function settleWeeklyChallengeProfile(
       run.ghostPoints ?? [],
     );
   }
-  const afterPb = next.pbByIdentity[currentIdentityKey] ?? null;
+  const afterPb = next.pbByIdentity[binding.identityKey] ?? null;
 
-  const rewardEligible = weeklyChallengeRewardEligible(
-    run,
-    currentIdentityKey,
-  );
+  const rewardEligible = weeklyChallengeRewardEligible(run, binding);
   const alreadyClaimed = weeklyChallengeRewardClaimed(
     next,
-    currentIdentityKey,
+    binding.identityKey,
   );
   if (rewardEligible && !alreadyClaimed) {
-    next = claimWeeklyChallengeReward(next, currentIdentityKey);
+    next = claimWeeklyChallengeReward(next, binding.identityKey);
   }
 
   return {
@@ -225,10 +251,7 @@ export function settleWeeklyChallengeProfile(
     reason: "settled",
     rewardEligible,
     rewardGranted: rewardEligible && !alreadyClaimed,
-    leaderboardEligible: weeklyChallengeLeaderboardEligible(
-      run,
-      currentIdentityKey,
-    ),
+    leaderboardEligible: weeklyChallengeLeaderboardEligible(run, binding),
     personalBestUpdated: beforePb !== afterPb,
   };
 }
@@ -238,20 +261,23 @@ export function buildWeeklyChallengeAdminSnapshot(
   profile: ExpansionV2Profile,
   activeRun: WeeklyChallengeRunLike | null = null,
 ): WeeklyChallengeAdminSnapshot {
-  const identityKey = weeklyChallengeIdentityKey(identity);
-  const personalBest = profile.pbByIdentity[identityKey] ?? null;
+  const binding = weeklyChallengeRunBinding(identity);
+  const personalBest = profile.pbByIdentity[binding.identityKey] ?? null;
   return {
-    weekKey: identity.weekKey,
-    seed: identity.seed,
-    identityKey,
-    rewardClaimed: weeklyChallengeRewardClaimed(profile, identityKey),
+    weekKey: binding.weekKey,
+    seed: binding.seed,
+    identityKey: binding.identityKey,
+    rewardClaimed: weeklyChallengeRewardClaimed(
+      profile,
+      binding.identityKey,
+    ),
     personalBest,
     ghostPointCount:
-      profile.ghostByIdentity[identityKey]?.points.length ?? 0,
+      profile.ghostByIdentity[binding.identityKey]?.points.length ?? 0,
     leaderboardEligible:
       personalBest !== null &&
       !personalBest.retried &&
       !personalBest.assisted,
-    resumeStatus: weeklyChallengeResumeStatus(activeRun, identityKey),
+    resumeStatus: weeklyChallengeResumeStatus(activeRun, binding),
   };
 }
