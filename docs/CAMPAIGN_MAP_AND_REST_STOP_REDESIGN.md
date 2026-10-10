@@ -1,6 +1,6 @@
 # Campaign Map, Checkpoint Services and Auto-Discovered Hidden Stops
 
-Status: **partially implemented**. The World journey/map and contextual title-menu icons were implemented in PR #85. This PR implements new combat-only sectors, old-route transition, and guaranteed checkpoint rest hubs. **Rare automatic Hidden Shop/Station discovery, full sector detail merging, contextual HUD resource help and real-browser QA remain pending.** Do not mark the complete redesign finished until all acceptance checks pass.
+Status: **implementation complete; final visual sign-off pending**. The World journey/map and contextual title-menu icons were implemented in PR #85. This branch now also implements combat-only sectors, old-route transition, guaranteed checkpoint rest hubs, seeded automatic Hidden Shop/Station discovery and arrival, the merged ten-stage sector detail, and contextual HUD/resource help. Unit/integration coverage protects the persistence and interaction contracts. `pnpm visual:r01-qa` now performs real-Chrome desktop/mobile structural captures and fails on R01 DOM/accessibility/page-error regressions. **Do not mark the complete redesign finished until the generated desktop/mobile screenshots receive the final human/AI visual hierarchy review and the normal Test/TypeScript/Build/CI gate is green.**
 
 Existing in-progress sectors with recorded Combat/Shop/Station choices continue in legacy compatibility mode until the next ten-stage checkpoint; untouched legacy graphs migrate to combat-only.
 
@@ -56,3 +56,18 @@ Existing in-progress sectors with recorded Combat/Shop/Station choices continue 
 7. The Route detail panel no longer implies 2-3 shop/station alternatives at ordinary stages or places unexplained Shop/Station/Start actions beneath unrelated map rows.
 8. Tooltip help works with mouse, keyboard and touch and does not overlap gameplay text.
 9. Child Test/TypeScript/Build/CI pass; final real-browser desktop/mobile manual QA confirms the flow and readable visual hierarchy.
+
+## 7. R01 real-browser QA
+
+Run the dedicated browser gate from `games/space-typing` after `pnpm install`:
+
+```bash
+pnpm visual:r01-qa
+```
+
+The command starts an isolated Vite server on `127.0.0.1:3098`, opens the Campaign Map in real headless Chrome, and captures both target layouts:
+
+- `.visual/r01-desktop.png` — `1642 × 799` CSS px at DPR 2.
+- `.visual/r01-mobile.png` — `390 × 844` CSS px at DPR 2.
+
+The probe fails when the Campaign Map is not open, the World does not contain 20 stage nodes, the current sector does not contain ten combat stages plus Boss/Rest Hub landmarks, normal Shop/Station buttons leak back into the sector detail, keyboard focus contracts disappear, the contextual resource help targets disappear, the desktop/mobile sector rail uses the wrong responsive column count, the document overflows horizontally, or Chrome reports a page/console error. The screenshots must still be opened and reviewed before final sign-off because structural checks cannot decide whether the hierarchy is visually polished enough.
