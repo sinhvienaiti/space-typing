@@ -12,6 +12,11 @@ import {
   installDuelRoomUi,
   type DuelRoomUiController,
 } from "./room-ui";
+import {
+  installAlternativeDuelRoomUi,
+  type AlternativeDuelRoomUiController,
+} from "./alternative-room-ui";
+import type { AlternativeMatchView } from "./alternative-presentation";
 import type { DuelRoomSnapshot } from "./room";
 import type { DuelRoomListing } from "./protocol";
 
@@ -21,6 +26,16 @@ export type DuelOnlineRoomControllerConfig = {
     view: DuelClientMatchView,
     events: readonly DuelClientEvent[],
   ): void;
+  onAlternativeMatchUpdate?(
+    view: AlternativeMatchView,
+    serverSequence: number,
+  ): void;
+  onAlternativeInputResult?(result: {
+    matchId: string;
+    sequence: number;
+    accepted: boolean;
+    reason: string;
+  }): void;
   onPrediction?(prediction: DuelLocalPrediction): void;
   onLocalPracticeReady?(snapshot: DuelRoomSnapshot): void;
   /**
@@ -163,6 +178,7 @@ export function installDuelOnlineRoomController(
   joinRoom(request: DuelOnlineJoinRequest): void;
 } {
   let ui: DuelRoomUiController | null = null;
+  let alternativeUi: AlternativeDuelRoomUiController | null = null;
   let tokenPromise: Promise<string> | null = null;
   let obtainingSession = false;
   let sentLoadout: string | null = null;
@@ -196,6 +212,7 @@ export function installDuelOnlineRoomController(
         }
         config.onRoomSnapshot?.(room);
         ui?.setRemoteRoom(room);
+        alternativeUi?.setRoom(room);
         ui?.setStatus(
           room.canStart
             ? "Friend Room ready."
@@ -204,6 +221,7 @@ export function installDuelOnlineRoomController(
       },
       onRoomClosed(_roomId, reason) {
         ui?.clearRemoteRoom(reason);
+        alternativeUi?.setRoom(null);
       },
       onRoomList(rooms) {
         roomListReceived = true;
@@ -230,6 +248,20 @@ export function installDuelOnlineRoomController(
           view,
           events,
         );
+      },
+      onAlternativeMatchUpdate(view, serverSequence) {
+        alternativeUi?.setMatch(view, serverSequence);
+        ui?.setStatus(
+          "Alternative Duel · " +
+            (view.mode === "reflex" ? "Reflex" : "Word Chain") +
+            " · " +
+            view.status.toUpperCase(),
+        );
+        config.onAlternativeMatchUpdate?.(view, serverSequence);
+      },
+      onAlternativeInputResult(result) {
+        alternativeUi?.setInputResult(result);
+        config.onAlternativeInputResult?.(result);
       },
       onPrediction(prediction) {
         config.onPrediction?.(prediction);
@@ -387,6 +419,28 @@ export function installDuelOnlineRoomController(
       }
     },
   });
+
+  alternativeUi = installAlternativeDuelRoomUi({
+    onStart(mode) {
+      const room = ui?.currentRemoteRoom() ?? null;
+      if (room === null) {
+        ui?.setStatus("Create or join a Friend Room before starting Alternative Duel.", true);
+        return;
+      }
+      runOnline(() => {
+        client.startAlternativeMatch(room.roomId, mode);
+      });
+    },
+    onInput(value) {
+      const sequence = client.sendAlternativeModeInput(value);
+      if (sequence === null) {
+        ui?.setStatus("Alternative input requires an active connected match.", true);
+        return false;
+      }
+      return true;
+    },
+  });
+  alternativeUi.setRoom(ui.currentRemoteRoom());
 
   ui.setConnectionLabel(
     statusLabel(client.currentStatus()),
