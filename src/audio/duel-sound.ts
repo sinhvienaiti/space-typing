@@ -1,4 +1,5 @@
-import { mixedSfxGain, type AudioGroup } from "./mix";
+import { mixedSfxGain, sfxFocusGain, type AudioGroup } from "./mix";
+import { sharedAudioFocus } from "./focus-manager";
 import type { DuelTimedAudioCue } from "../duel/audio";
 
 /**
@@ -47,7 +48,7 @@ const ANNOUNCER_ROOT = "/local-assets/announcer/";
 export type DuelSoundHost = {
   context(): AudioContext | null;
   volume(): number;
-  pronunciationActive(): boolean;
+  categoryVolume(group: AudioGroup): number;
 };
 
 type Voice = {
@@ -66,6 +67,10 @@ const MAX_VOICES = 64;
 export class DuelSoundEngine {
   private bus: GainNode | null = null;
   private reverbIn: GainNode | null = null;
+  private readonly focusBuses = new Map<AudioGroup, {
+    dry: GainNode;
+    wet: GainNode | null;
+  }>();
   private white: AudioBuffer | null = null;
   private brown: AudioBuffer | null = null;
   private readonly buffers = new Map<SampleName, AudioBuffer>();
@@ -75,8 +80,38 @@ export class DuelSoundEngine {
   private activeVoices = 0;
   private selfTier = 0;
   private readonly lastPlayed = new Map<string, number>();
+  private focusUnsubscribe: (() => void) | null = null;
+  private destroyed = false;
 
-  constructor(private readonly host: DuelSoundHost) {}
+  constructor(private readonly host: DuelSoundHost) {
+    this.focusUnsubscribe = sharedAudioFocus.subscribe(() => this.applyMixGains());
+  }
+
+  refreshMix(): void {
+    this.applyMixGains();
+  }
+
+  destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    this.focusUnsubscribe?.();
+    this.focusUnsubscribe = null;
+    try { this.bus?.disconnect(); } catch { /* fail-soft teardown */ }
+    try { this.reverbIn?.disconnect(); } catch { /* fail-soft teardown */ }
+    for (const buses of this.focusBuses.values()) {
+      try { buses.dry.disconnect(); } catch { /* fail-soft teardown */ }
+      try { buses.wet?.disconnect(); } catch { /* fail-soft teardown */ }
+    }
+    this.focusBuses.clear();
+    this.bus = null;
+    this.reverbIn = null;
+    this.white = null;
+    this.brown = null;
+    this.buffers.clear();
+    this.curves.clear();
+    this.lastPlayed.clear();
+    this.activeVoices = 0;
+  }
 
   setHorizontal(horizontal: boolean): void {
     this.horizontal = horizontal;
@@ -84,6 +119,7 @@ export class DuelSoundEngine {
 
   /** Fetch and decode the layers once (no-op until audio is unlocked). */
   preload(): void {
+    if (this.destroyed) return;
     const context = this.host.context();
     if (context === null || this.loadStarted || typeof fetch !== "function") return;
     this.loadStarted = true;
@@ -116,6 +152,7 @@ export class DuelSoundEngine {
 
   /** Returns false when Web Audio is unavailable, so the caller can fall back. */
   play(cue: DuelTimedAudioCue): boolean {
+    if (this.destroyed) return false;
     const context = this.host.context();
     if (context === null || this.ensureGraph(context) === null) return false;
     this.preload();
@@ -569,7 +606,65 @@ export class DuelSoundEngine {
   }
 
   private level(gain: number, group: AudioGroup = "combat"): number {
-    return mixedSfxGain(this.host.volume(), group, Math.min(1, gain), this.host.pronunciationActive());
+    // Runtime player/category/focus gain lives on stable group buses so active
+    // dry voices and reverb sends react immediately to mix changes.
+    return mixedSfxGain(1, group, Math.min(1, gain), false);
+  }
+
+  private runtimeGroupGain(group: AudioGroup): number {
+    const master = this.host.volume();
+    const category = this.host.categoryVolume(group);
+    const safeMaster = Number.isFinite(master) ? Math.max(0, Math.min(1, master)) : 0;
+    const safeCategory = Number.isFinite(category) ? Math.max(0, Math.min(1, category)) : 1;
+    return (
+      safeMaster *
+      safeCategory *
+      sfxFocusGain(group, sharedAudioFocus.isActive("pronunciation"))
+    );
+  }
+
+  private focusBusFor(
+    context: AudioContext,
+    group: AudioGroup,
+    wet: boolean,
+  ): GainNode {
+    let buses = this.focusBuses.get(group);
+    if (buses === undefined) {
+      const dry = context.createGain();
+      dry.gain.value = this.runtimeGroupGain(group);
+      dry.connect(this.bus!);
+      buses = { dry, wet: null };
+      this.focusBuses.set(group, buses);
+    }
+    if (!wet) return buses.dry;
+    if (buses.wet === null) {
+      const wetBus = context.createGain();
+      wetBus.gain.value = this.runtimeGroupGain(group);
+      if (this.reverbIn !== null) wetBus.connect(this.reverbIn);
+      buses.wet = wetBus;
+    }
+    return buses.wet;
+  }
+
+  private applyMixGains(): void {
+    if (this.destroyed) return;
+    const context = this.host.context();
+    if (context === null) return;
+    for (const [group, buses] of this.focusBuses) {
+      const target = this.runtimeGroupGain(group);
+      for (const bus of [buses.dry, buses.wet]) {
+        if (bus === null) continue;
+        if (typeof bus.gain.setTargetAtTime === "function") {
+          bus.gain.setTargetAtTime(
+            target,
+            context.currentTime,
+            sharedAudioFocus.isActive("pronunciation") ? 0.012 : 0.055,
+          );
+        } else {
+          bus.gain.value = target;
+        }
+      }
+    }
   }
 
   private curve(drive: number): Float32Array<ArrayBuffer> {
@@ -615,12 +710,13 @@ export class DuelSoundEngine {
       gain.connect(panner);
       head = panner;
     }
-    head.connect(this.bus!);
+    const group = voice.group ?? "combat";
+    head.connect(this.focusBusFor(context, group, false));
     const send = voice.send ?? 0;
     if (send > 0 && this.reverbIn !== null) {
       const sendGain = context.createGain();
       sendGain.gain.value = send;
-      head.connect(sendGain).connect(this.reverbIn);
+      head.connect(sendGain).connect(this.focusBusFor(context, group, true));
     }
     return input;
   }

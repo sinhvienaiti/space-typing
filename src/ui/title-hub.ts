@@ -30,20 +30,24 @@ export type TitleHubDeps = {
 };
 
 type VolumeField =
+  | "masterVolume"
   | "musicVolume"
   | "sfxVolume"
   | "creditVolume"
-  | "pronunciationVolume";
+  | "pronunciationVolume"
+  | "announcerVolume";
 
 const QUICK_SLIDERS: ReadonlyArray<{
   field: VolumeField;
   input: string;
   fallback: number;
 }> = [
+  { field: "masterVolume", input: "quickMasterVolume", fallback: 1 },
   { field: "musicVolume", input: "quickMusicVolume", fallback: 0.26 },
   { field: "sfxVolume", input: "quickSfxVolume", fallback: 0.5 },
   { field: "creditVolume", input: "quickCreditVolume", fallback: 1 },
   { field: "pronunciationVolume", input: "quickVoiceVolume", fallback: 1 },
+  { field: "announcerVolume", input: "quickAnnouncerVolume", fallback: 1 },
 ];
 
 /** Galaxy background kits, one per 100 stages (public/assets/.../backgrounds). */
@@ -282,7 +286,10 @@ export function installTitleHub(deps: TitleHubDeps): TitleHub {
     const music = byId("titleMusicButton");
     music?.classList.toggle("is-off", !musicOn);
     music?.setAttribute("aria-pressed", String(musicOn));
-    byId("titleSoundButton")?.classList.toggle("is-off", settings.sfxVolume <= 0);
+    byId("titleSoundButton")?.classList.toggle(
+      "is-off",
+      (settings.masterVolume ?? 1) <= 0 || settings.sfxVolume <= 0,
+    );
     const voice = byId("titleVoiceButton");
     voice?.classList.toggle("is-off", !settings.pronunciationEnabled);
     voice?.setAttribute("aria-pressed", String(settings.pronunciationEnabled));

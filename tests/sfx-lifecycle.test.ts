@@ -83,6 +83,9 @@ describe("Sfx lifecycle", () => {
     vi.advanceTimersByTime(500);
 
     expect(contextsCreated).toBe(1);
-    expect(removeEventListener).toHaveBeenCalledOnce();
+    // A2 moved pronunciation/warning/announcer bridge ownership into the
+    // shared focus runtime, so individual Sfx instances no longer register or
+    // remove that global listener.
+    expect(removeEventListener).not.toHaveBeenCalled();
   });
 });

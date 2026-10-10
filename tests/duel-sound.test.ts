@@ -85,7 +85,11 @@ function stubFetch() {
 async function engine() {
   const calls = stubFetch();
   const fake = fakeContext();
-  const sound = new DuelSoundEngine({ context: () => fake.context, volume: () => 0.5, pronunciationActive: () => false });
+  const sound = new DuelSoundEngine({
+    context: () => fake.context,
+    volume: () => 0.5,
+    categoryVolume: () => 1,
+  });
   sound.preload();
   await new Promise((resolve) => setTimeout(resolve, 0));
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -98,7 +102,11 @@ afterEach(() => { vi.unstubAllGlobals(); });
 
 describe("Duel firepower sound engine", () => {
   it("reports no Web Audio so the caller can fall back", () => {
-    const sound = new DuelSoundEngine({ context: () => null, volume: () => 0.5, pronunciationActive: () => false });
+    const sound = new DuelSoundEngine({
+      context: () => null,
+      volume: () => 0.5,
+      categoryVolume: () => 1,
+    });
     expect(sound.play(cue("laser-launch"))).toBe(false);
   });
 

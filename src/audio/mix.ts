@@ -30,14 +30,40 @@ export const PRONUNCIATION_DUCK: Record<AudioGroup, number> = {
   rewards: 0.7,
 };
 
+export function sfxFocusGain(
+  group: AudioGroup,
+  pronunciationActive = false,
+): number {
+  return pronunciationActive ? PRONUNCIATION_DUCK[group] : 1;
+}
+
+export function sfxGroupBusGain(
+  master: number,
+  group: AudioGroup,
+  pronunciationActive = false,
+  categoryPreference = 1,
+): number {
+  return (
+    clamp(master, 0, 1) *
+    AUDIO_GROUP_GAIN[group] *
+    sfxFocusGain(group, pronunciationActive) *
+    clamp(categoryPreference, 0, 1)
+  );
+}
+
+export function baseSfxEventGain(eventGain: number): number {
+  return clamp(eventGain, 0, 1);
+}
+
 export function mixedSfxGain(
   master: number,
   group: AudioGroup,
   eventGain: number,
   pronunciationActive = false,
+  categoryPreference = 1,
 ): number {
-  const safeMaster = clamp(master, 0, 1);
-  const safeEvent = clamp(eventGain, 0, 1);
-  const duck = pronunciationActive ? PRONUNCIATION_DUCK[group] : 1;
-  return safeMaster * AUDIO_GROUP_GAIN[group] * safeEvent * duck;
+  return (
+    sfxGroupBusGain(master, group, pronunciationActive, categoryPreference) *
+    baseSfxEventGain(eventGain)
+  );
 }

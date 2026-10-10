@@ -1,0 +1,19 @@
+.voice-input-controls > div { flex-wrap: wrap; }
+.voice-input-controls #quickAudioButton { flex: 0 0 auto; }
+.quick-audio-dialog[open] {
+  position: fixed;
+  z-index: 90;
+  inset: auto 18px 18px auto;
+  width: min(470px, calc(100vw - 36px));
+  max-height: min(78vh, 680px);
+  margin: 0;
+  overflow: auto;
+}
+.quick-audio-grid { display: grid; gap: 0.35rem; }
+.quick-audio-dialog .setting-row { padding-block: 0.55rem; }
+.quick-audio-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; margin-top: 0.8rem; }
+.audio-advanced { margin-top: 0.8rem; border-top: 1px solid rgba(111, 231, 255, 0.12); padding-top: 0.7rem; }
+.audio-advanced > summary { cursor: pointer; color: var(--holo-accent); font-weight: 700; letter-spacing: 0.04em; }
+@media (max-width: 640px) {
+  .quick-audio-dialog[open] { inset: auto 8px 8px 8px; width: auto; }
+}

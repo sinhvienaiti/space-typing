@@ -25,6 +25,8 @@ export type AudioAssetRef = {
   id: string;
   localPath?: string;
   defaultPath?: string;
+  /** Ordered transport fallbacks for one recording (for example webm/ogg). */
+  sources?: readonly string[];
   /**
    * Stems of one song share a group: switching between them keeps the
    * playback position, so the music rises and falls instead of restarting.
@@ -322,13 +324,14 @@ export function assetCandidates(
   assetRef: AudioAssetRef | null,
 ): string[] {
   if (assetRef === null) return [];
-  return [
+  return [...new Set([
+    ...(assetRef.sources ?? []),
     assetRef.localPath,
     assetRef.defaultPath,
   ].filter(
     (value): value is string =>
       typeof value === "string" && value.length > 0,
-  );
+  ))];
 }
 
 export function stateLoops(state: MusicState): boolean {
@@ -363,10 +366,13 @@ export function validateWorldMusicProfiles(): string[] {
       errors.push(world.id + ": invalid music/ambient runtime contract.");
     }
     if (
+      !Number.isFinite(profile.duckingProfile.pronunciation) ||
       profile.duckingProfile.pronunciation <= 0 ||
       profile.duckingProfile.pronunciation > 1 ||
+      !Number.isFinite(profile.duckingProfile.announcer) ||
       profile.duckingProfile.announcer <= 0 ||
       profile.duckingProfile.announcer > 1 ||
+      !Number.isFinite(profile.duckingProfile.warning) ||
       profile.duckingProfile.warning <= 0 ||
       profile.duckingProfile.warning > 1
     ) {

@@ -5,6 +5,7 @@ import {
   type TestLabGameSnapshot,
 } from "../Game";
 import { MusicController } from "../audio/MusicController";
+import { sharedAudioFocus, type AudioFocusToken } from "../audio/focus-manager";
 import {
   ANNOUNCER_EVENTS,
   type AnnouncerEvent,
@@ -365,6 +366,28 @@ export function mountTestLab(
   let music: MusicController | null = null;
   let combatCreditLedger = new CombatCreditRewardLedger();
   let audioQa: TestLabAudioQa | null = null;
+  const testLabFocusTokens: Partial<Record<"pronunciation" | "announcer" | "warning", AudioFocusToken>> = {};
+  let rapidPronunciationTimers: number[] = [];
+
+  function clearRapidPronunciationTimers(): void {
+    for (const timer of rapidPronunciationTimers) window.clearTimeout(timer);
+    rapidPronunciationTimers = [];
+  }
+
+  function releaseTestLabFocus(): void {
+    for (const token of Object.values(testLabFocusTokens)) {
+      if (token !== undefined) sharedAudioFocus.release(token);
+    }
+    delete testLabFocusTokens.announcer;
+    delete testLabFocusTokens.pronunciation;
+    delete testLabFocusTokens.warning;
+  }
+
+  function cleanupTransientAudioQa(): void {
+    clearRapidPronunciationTimers();
+    releaseTestLabFocus();
+  }
+
   let inspectorTimer = 0;
   let activeShop: ShopInstance | null = null;
   let shopPurchaseSequence = 0;
@@ -697,6 +720,8 @@ export function mountTestLab(
             <button type="button" data-action="set-music-boss-phase">Apply Boss Music Phase</button>
             <button type="button" data-action="trigger-announcer">Trigger Announcer</button>
             <button type="button" data-action="trigger-pronunciation">Trigger Pronunciation</button>
+            <button type="button" data-action="pronunciation-stress">Pronunciation Stress Mix</button>
+            <button type="button" data-action="rapid-pronunciation">Rapid Pronunciation ×3</button>
             <button type="button" data-action="trigger-warning">Trigger Warning</button>
             <button type="button" data-action="duck-announcer">Duck Announcer</button>
             <button type="button" data-action="duck-pronunciation">Duck Pronunciation</button>
@@ -1477,6 +1502,11 @@ export function mountTestLab(
                 event: qaBossAudioEventSelect.value,
                 implementation: "Sfx.bossImpact / Sfx.bossRoar with production identity",
               },
+        runtimeFocus: sharedAudioFocus.snapshot(),
+        mix: {
+          sfxMaster: qaAudioRuntime().sfxMasterVolume(),
+          pronunciationActive: qaAudioRuntime().pronunciationFocusActive(),
+        },
         track:
           audioTrack === null
             ? null
@@ -3433,6 +3463,54 @@ export function mountTestLab(
       renderInspector();
       return;
     }
+    if (action === "pronunciation-stress") {
+      if (music === null || game === null) createRuntime();
+      audioQa?.stopTrack();
+      const settings = {
+        ...options.getSettings(),
+        pronunciationEnabled: true,
+        pronunciationVolume: Math.max(
+          0,
+          Math.min(
+            1,
+            numberValue(dialog, '[data-field="pronunciation-volume"]', 1),
+          ),
+        ),
+      };
+      music?.setWorldProfile(musicProfileForWorld(worldForStage(session.stage)));
+      music?.transitionTo(musicStateSelect.value as MusicState, 0.12);
+      ensureGame()?.testLabTriggerWarning();
+      ensureGame()?.testLabTriggerAnnouncer(announcerSelect.value as AnnouncerEvent);
+      qaAudioRuntime().playSfx("enemy-shot");
+      speakEnglish(
+        inputValue(dialog, '[data-field="pronunciation-text"]'),
+        settings,
+      );
+      notice("A4 production pronunciation stress · music + warning + announcer + combat SFX");
+      renderInspector();
+      return;
+    }
+    if (action === "rapid-pronunciation") {
+      const settings = {
+        ...options.getSettings(),
+        pronunciationEnabled: true,
+        pronunciationVolume: Math.max(
+          0,
+          Math.min(
+            1,
+            numberValue(dialog, '[data-field="pronunciation-volume"]', 1),
+          ),
+        ),
+      };
+      const first = inputValue(dialog, '[data-field="pronunciation-text"]') || "checkpoint";
+      clearRapidPronunciationTimers();
+      rapidPronunciationTimers = [first, "shield", "reactor"].map((text, index) =>
+        window.setTimeout(() => speakEnglish(text, settings), index * 120),
+      );
+      notice("A4 rapid pronunciation ×3 · latest speech must win without stale focus release");
+      renderInspector();
+      return;
+    }
     if (action === "trigger-warning") {
       ensureGame()?.testLabTriggerWarning();
       renderInspector();
@@ -3456,24 +3534,22 @@ export function mountTestLab(
       return;
     }
     if (action === "duck-announcer") {
-      music?.duck("announcer");
+      testLabFocusTokens.announcer ??= sharedAudioFocus.acquire("announcer", "test-lab");
       renderInspector();
       return;
     }
     if (action === "duck-pronunciation") {
-      music?.duck("pronunciation");
+      testLabFocusTokens.pronunciation ??= sharedAudioFocus.acquire("pronunciation", "test-lab");
       renderInspector();
       return;
     }
     if (action === "duck-warning") {
-      music?.duck("warning");
+      testLabFocusTokens.warning ??= sharedAudioFocus.acquire("warning", "test-lab");
       renderInspector();
       return;
     }
     if (action === "release-ducks") {
-      music?.releaseDuck("announcer");
-      music?.releaseDuck("pronunciation");
-      music?.releaseDuck("warning");
+      releaseTestLabFocus();
       renderInspector();
       return;
     }
@@ -3547,6 +3623,7 @@ export function mountTestLab(
   }
 
   dialog.addEventListener("close", () => {
+    cleanupTransientAudioQa();
     destroyRuntime();
     audioQa?.destroy();
     audioQa = null;
@@ -3565,6 +3642,7 @@ export function mountTestLab(
       dialog.showModal();
     },
     destroy(): void {
+      cleanupTransientAudioQa();
       destroyRuntime();
       audioQa?.destroy();
       audioQa = null;

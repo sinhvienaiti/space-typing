@@ -1665,15 +1665,20 @@ export function installDuelBattleUi(
     setData(nodes.root, "map", view.map.id);
     setData(nodes.root, "phase", view.phase);
     setData(nodes.root, "mode", view.mode);
+    setData(nodes.root, "gameMode", view.gameMode);
     setData(nodes.root, "quality", quality);
     setData(nodes.root, "helpFaded", view.elapsedSeconds > 7 || view.series.roundsPlayed > 0 ? "true" : "false");
 
     setText(nodes.mode,
-      view.mode === "ranked"
-        ? "RANKED · NORMALIZED"
-        : view.mode === "practice"
-          ? "PRACTICE VS BOT"
-          : "FRIEND DUEL");
+      view.gameMode === "reflex"
+        ? "REFLEX DUEL"
+        : view.gameMode === "word-chain"
+          ? "WORD CHAIN"
+          : view.mode === "ranked"
+            ? "RANKED · NORMALIZED"
+            : view.mode === "practice"
+              ? "PRACTICE VS BOT"
+              : "FRIEND DUEL");
     setText(nodes.map, view.map.displayName);
     setText(nodes.phase, phaseLabel(view.phase));
     setText(nodes.clock, formatClock(view.elapsedSeconds));
@@ -2783,6 +2788,11 @@ export function installDuelBattleUi(
 
     // Between rounds (K.O. and result) the authority ignores input anyway.
     if (view.round.status !== "active") return;
+
+    // Reflex and Word Chain own their keyboard contract. The separate
+    // alternative overlay feeds MODE_INPUT; never leak those keys into the
+    // Standard target/action intent path.
+    if (view.gameMode !== "standard") return;
 
     // No manual item hotkeys: completion itself activates the effect.
     if (event.key === "Escape") {

@@ -31,11 +31,13 @@ import "./kill-translation.css";
 import "./duel/battle.css";
 import "./duel/battle-juice.css";
 import "./duel/battle-holo.css";
+import "./duel/alternative-battle.css";
 import "./ui/holo.css";
 import "./ui/holo-lobby.css";
 import "./ui/holo-motion.css";
 import "./ui/holo-hud.css";
 import "./ui/voice-feedback.css";
+import "./ui/audio-settings.css";
 import "./ui/holo-dialogs.css";
 import "./ui/holo-results.css";
 import "./ui/reward-cards.css";
@@ -51,6 +53,7 @@ import { installHoloTooltips } from "./ui/holo-tooltip";
 import { installTitleHub, type TitleHub, type TitleHubPilot, shipArtUrl, galaxyPlateUrl } from "./ui/title-hub";
 import { installDuelOnlineRoomController } from "./duel/online-room-controller";
 import { installDuelBattleUi } from "./duel/battle-ui";
+import { installDuelAlternativeBattleUi } from "./duel/alternative-battle-ui";
 import { DuelLocalPracticeMatch } from "./duel/local-match";
 import { createPracticeDuelRoom, peekPracticeBotCharacter, takePracticeBotCharacter } from "./duel/room";
 import type { DuelMapId } from "./duel/maps";
@@ -602,6 +605,13 @@ import type {
 } from "./persistence/player-save";
 import { speakEnglish, stopSpeech, setSpeechGate } from "./speech";
 import {
+  DEFAULT_AUDIO_CATEGORY_VOLUMES,
+  RECOMMENDED_AUDIO,
+  recommendedAudioSettings,
+  sanitizeAudioCategoryVolumes,
+  sanitizeAudioLevel,
+} from "./audio/player-settings";
+import {
   loadVocabularyGrammarIndex,
   loadVocabularyGrammarModule,
   loadVocabularyIndex,
@@ -664,7 +674,8 @@ type VocabularySource =
 type VocabularySourceTab = VocabularySource["mode"];
 
 const defaultSettings: GameSettings = {
-  sfxVolume: 0.5,
+  masterVolume: RECOMMENDED_AUDIO.masterVolume,
+  sfxVolume: RECOMMENDED_AUDIO.sfxVolume,
   creditVolume: 1,
   musicVolume: 0.26,
   ambientVolume: 0.08,
@@ -674,7 +685,9 @@ const defaultSettings: GameSettings = {
   unlockAllStages: false,
   pronunciationEnabled: true,
   pronunciationRate: 1,
-  pronunciationVolume: 1,
+  pronunciationVolume: RECOMMENDED_AUDIO.pronunciationVolume,
+  announcerVolume: RECOMMENDED_AUDIO.announcerVolume,
+  audioCategoryVolumes: { ...DEFAULT_AUDIO_CATEGORY_VOLUMES },
   killTranslation: { ...DEFAULT_KILL_TRANSLATION_SETTINGS },
   musicMode: "map",
 };
@@ -693,6 +706,10 @@ function loadSettings(): GameSettings {
       enemyProjectilesEnabled?: unknown;
     };
     return {
+      // Existing saves predate Master/Announcer/category controls. Missing
+      // fields intentionally resolve to neutral 1.0 so migration never changes
+      // a returning player's established mix. Fresh installs use Recommended.
+      masterVolume: sanitizeAudioLevel(parsed.masterVolume, 1),
       sfxVolume:
         typeof parsed.sfxVolume === "number"
           ? Math.min(1, Math.max(0, parsed.sfxVolume))
@@ -741,6 +758,8 @@ function loadSettings(): GameSettings {
         typeof parsed.pronunciationVolume === "number"
           ? Math.min(1, Math.max(0, parsed.pronunciationVolume))
           : defaultSettings.pronunciationVolume,
+      announcerVolume: sanitizeAudioLevel(parsed.announcerVolume, 1),
+      audioCategoryVolumes: sanitizeAudioCategoryVolumes(parsed.audioCategoryVolumes),
       killTranslation: sanitizeKillTranslationSettings(parsed.killTranslation),
       musicMode: sanitizeMusicMode(parsed.musicMode),
     };
@@ -951,6 +970,8 @@ const hudDomMetrics = {
 let gameplayMode: GameplayMode = loadGameplayMode();
 let recallSettings: RecallSettings = loadRecallSettings();
 let settingsDraft: GameSettings | null = null;
+let quickAudioDraft: GameSettings | null = null;
+let quickAudioCommitted = false;
 let difficultySettingsDraft: DifficultySettings | null = null;
 let recallSettingsDraft: RecallSettings | null = null;
 let settingsOpenPhase: GamePhase | null = null;
@@ -1112,6 +1133,7 @@ setSpeechGate(async play => {
   finally { if (pausedForVoice && game.getPhase() === "paused") game.resume(); }
 });
 const settingsDialog = byId<HTMLDialogElement>("settingsDialog");
+const quickAudioDialog = byId<HTMLDialogElement>("quickAudioDialog");
 const vocabularyDialog = byId<HTMLDialogElement>("vocabularyDialog");
 const stageSelectDialog = byId<HTMLDialogElement>("stageSelectDialog");
 const routeDialog = byId<HTMLDialogElement>("routeDialog");
@@ -1223,6 +1245,7 @@ const duelBattle = installDuelBattleUi(
     onExit() {
       game.setDuelPresentationActive(false);
       stopLocalDuel();
+      duelAlternativeBattle.clear();
       lastDuelAudioPresentationKey = null;
       duelCombatAudio.reset(null);
       restoreTitleMusic();
@@ -1233,6 +1256,12 @@ const duelBattle = installDuelBattleUi(
   },
   settings.visualQuality,
 );
+const duelAlternativeBattle = installDuelAlternativeBattleUi({
+  sendModeInput(payload) {
+    return duelOnlineController?.client.sendModeInput(payload) ?? null;
+  },
+});
+
 // Opening the Duel lobby starts loading the 3D hull, so the fight never waits on it.
 // (after the dialog has painted).
 byId<HTMLButtonElement>("duelModeButton").addEventListener("click", () => {
@@ -1258,6 +1287,8 @@ function startLocalDuelPractice(
   });
 
   const initial = localDuelMatch.initial();
+  duelAlternativeBattle.setModeState(null);
+  duelAlternativeBattle.setMatchView(initial.view);
   duelBattle.setQuality(settings.visualQuality);
   duelBattle.show(initial.view, initial.events);
   const duelDialog =
@@ -1337,8 +1368,12 @@ duelOnlineController = installDuelOnlineRoomController({
     // room dialog once the match is live (Practice already did this).
     const roomDialog = byId<HTMLDialogElement>("duelRoomDialog");
     if (roomDialog.open && view.series.status === "active") roomDialog.close();
+    duelAlternativeBattle.setMatchView(view);
     duelBattle.setQuality(settings.visualQuality);
     duelBattle.update(view, events);
+  },
+  onAlternativeModeState(view) {
+    duelAlternativeBattle.setModeState(view);
   },
   onPrediction(prediction) {
     if (localDuelMatch === null) {
@@ -9298,11 +9333,16 @@ function showNowPlaying(value: NowPlaying | null): void {
   musicToastTimer = window.setTimeout(() => toast.classList.remove("visible"), 4200);
 }
 
+function applyRuntimeAudio(next: GameSettings): void {
+  game.updateSettings(next);
+  const master = sanitizeAudioLevel(next.masterVolume, 1);
+  musicController.setMusicVolume(master * next.musicVolume);
+  musicController.setAmbientVolume(master * next.ambientVolume);
+}
+
 function saveSettings(): void {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-  game.updateSettings(settings);
-  musicController.setMusicVolume(settings.musicVolume);
-  musicController.setAmbientVolume(settings.ambientVolume);
+  applyRuntimeAudio(settings);
   musicController.setPlaybackMode(sanitizeMusicMode(settings.musicMode));
   updateKillTranslationVisibility(game.getPhase());
 }
@@ -9327,6 +9367,11 @@ function renderSettings(): void {
     (recallProfile.replayLimit === null
       ? "∞ replays"
       : String(recallProfile.replayLimit) + " replays");
+
+  const masterVolume = sanitizeAudioLevel(renderedSettings.masterVolume, 1);
+  byId<HTMLInputElement>("masterVolume").value = String(masterVolume);
+  byId<HTMLOutputElement>("masterVolumeValue").value =
+    String(Math.round(masterVolume * 100)) + "%";
 
   const volume = byId<HTMLInputElement>("sfxVolume");
   volume.value = String(renderedSettings.sfxVolume);
@@ -9385,6 +9430,18 @@ function renderSettings(): void {
   byId<HTMLOutputElement>("pronunciationVolumeValue").value =
     String(Math.round(renderedSettings.pronunciationVolume * 100)) + "%";
 
+  const announcerVolume = sanitizeAudioLevel(renderedSettings.announcerVolume, 1);
+  byId<HTMLInputElement>("announcerVolume").value = String(announcerVolume);
+  byId<HTMLOutputElement>("announcerVolumeValue").value =
+    String(Math.round(announcerVolume * 100)) + "%";
+
+  const categories = sanitizeAudioCategoryVolumes(renderedSettings.audioCategoryVolumes);
+  for (const group of ["typing", "combat", "warnings", "ui", "rewards"] as const) {
+    byId<HTMLInputElement>("audioCategory-" + group).value = String(categories[group]);
+    byId<HTMLOutputElement>("audioCategory-" + group + "Value").value =
+      String(Math.round(categories[group] * 100)) + "%";
+  }
+
   const difficultyMode = byId<HTMLSelectElement>("difficultyMode");
   difficultyMode.value = renderedDifficulty.mode;
 
@@ -9439,6 +9496,48 @@ function markSettingsDirty(difficultyChanged = false): void {
   status.textContent = difficultyChanged
     ? "Unsaved difficulty change · saving while paused will reload this stage."
     : "Unsaved changes.";
+}
+
+const QUICK_AUDIO_FIELDS = [
+  ["quickMaster", "masterVolume"],
+  ["quickPronunciation", "pronunciationVolume"],
+  ["quickMusicParent", "musicVolume"],
+  ["quickSfxParent", "sfxVolume"],
+  ["quickAnnouncer", "announcerVolume"],
+] as const;
+
+function renderQuickAudio(): void {
+  const draft = quickAudioDraft ?? settings;
+  for (const [id, field] of QUICK_AUDIO_FIELDS) {
+    const fallback = field === "announcerVolume" || field === "masterVolume" ? 1 : 0;
+    const value = sanitizeAudioLevel(draft[field], fallback);
+    byId<HTMLInputElement>(id).value = String(value);
+    byId<HTMLOutputElement>(id + "Value").value =
+      String(Math.round(value * 100)) + "%";
+  }
+}
+
+function openQuickAudio(): void {
+  if (quickAudioDialog.open) return;
+  quickAudioDraft = structuredClone(settings);
+  quickAudioCommitted = false;
+  renderQuickAudio();
+  byId("quickAudioStatus").textContent =
+    "Preview is local only · the Duel opponent and match clock keep running.";
+  quickAudioDialog.show();
+}
+
+function closeQuickAudio(commit: boolean): void {
+  if (commit && quickAudioDraft !== null) {
+    settings = structuredClone(quickAudioDraft);
+    quickAudioCommitted = true;
+    saveSettings();
+    titleHub?.render();
+    showNotice("✓ Audio settings applied");
+  } else {
+    applyRuntimeAudio(settings);
+  }
+  quickAudioDialog.close();
 }
 
 function openSettings(): void {
@@ -10665,12 +10764,14 @@ for (const id of ["customEnemySpeed", "customBulletSpeed", "customFireRate", "cu
 }
 
 for (const [id, field] of [
+  ["masterVolume", "masterVolume"],
   ["musicVolume", "musicVolume"],
   ["ambientVolume", "ambientVolume"],
   ["sfxVolume", "sfxVolume"],
   ["creditVolume", "creditVolume"],
   ["pronunciationRate", "pronunciationRate"],
   ["pronunciationVolume", "pronunciationVolume"],
+  ["announcerVolume", "announcerVolume"],
 ] as const) {
   byId<HTMLInputElement>(id).addEventListener("input", (event) => {
     const current = settingsDraft ?? settings;
@@ -10682,6 +10783,28 @@ for (const [id, field] of [
     renderSettings();
   });
 }
+
+for (const group of ["typing", "combat", "warnings", "ui", "rewards"] as const) {
+  byId<HTMLInputElement>("audioCategory-" + group).addEventListener("input", (event) => {
+    const current = settingsDraft ?? settings;
+    const categories = sanitizeAudioCategoryVolumes(current.audioCategoryVolumes);
+    settingsDraft = {
+      ...current,
+      audioCategoryVolumes: {
+        ...categories,
+        [group]: sanitizeAudioLevel(Number((event.currentTarget as HTMLInputElement).value), 1),
+      },
+    };
+    markSettingsDirty();
+    renderSettings();
+  });
+}
+
+byId("recommendedAudioButton").addEventListener("click", () => {
+  settingsDraft = recommendedAudioSettings(settingsDraft ?? settings);
+  markSettingsDirty();
+  renderSettings();
+});
 
 byId<HTMLSelectElement>("musicMode").addEventListener("change", (event) => {
   const current = settingsDraft ?? settings;
@@ -10851,6 +10974,40 @@ byId<HTMLSelectElement>("unlockAllStages").addEventListener(
     markSettingsDirty();
   },
 );
+
+byId("quickAudioButton").addEventListener("click", openQuickAudio);
+for (const [id, field] of QUICK_AUDIO_FIELDS) {
+  byId<HTMLInputElement>(id).addEventListener("input", (event) => {
+    const current = quickAudioDraft ?? structuredClone(settings);
+    quickAudioDraft = {
+      ...current,
+      [field]: sanitizeAudioLevel(Number((event.currentTarget as HTMLInputElement).value), 1),
+    };
+    applyRuntimeAudio(quickAudioDraft);
+    renderQuickAudio();
+    byId("quickAudioStatus").textContent = "Previewing · Apply to save or Cancel to restore.";
+  });
+}
+byId("quickAudioRecommended").addEventListener("click", () => {
+  quickAudioDraft = recommendedAudioSettings(quickAudioDraft ?? settings);
+  applyRuntimeAudio(quickAudioDraft);
+  renderQuickAudio();
+  byId("quickAudioStatus").textContent = "Recommended mix previewing.";
+});
+byId("quickAudioCancel").addEventListener("click", () => closeQuickAudio(false));
+byId("quickAudioApply").addEventListener("click", () => closeQuickAudio(true));
+byId("quickAudioMore").addEventListener("click", () => {
+  closeQuickAudio(false);
+  openSettings();
+  window.requestAnimationFrame(() =>
+    byId("masterVolume").closest(".settings-section")?.scrollIntoView({ block: "start" }),
+  );
+});
+quickAudioDialog.addEventListener("close", () => {
+  if (!quickAudioCommitted) applyRuntimeAudio(settings);
+  quickAudioDraft = null;
+  quickAudioCommitted = false;
+});
 
 byId("settingsCancelButton").addEventListener("click", () => {
   settingsDialog.close();

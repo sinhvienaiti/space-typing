@@ -128,27 +128,88 @@ export function worldPlaylist(worldId: string): string[] {
  */
 export class ShuffleBag {
   private bag: string[] = [];
+  private reserved: string | null = null;
 
   constructor(
     private readonly ids: readonly string[],
     private readonly random: () => number = Math.random,
   ) {}
 
-  next(avoid: string | null): string | null {
+  private refill(): void {
+    this.bag = [...this.ids];
+    for (let index = this.bag.length - 1; index > 0; index -= 1) {
+      const swap = Math.floor(this.random() * (index + 1));
+      [this.bag[index], this.bag[swap]] = [this.bag[swap]!, this.bag[index]!];
+    }
+  }
+
+  /**
+   * Reserves the next id without consuming it. Repeated peeks are stable, so
+   * preload/warm-up can inspect the next song without advancing the shuffle.
+   */
+  peek(avoid: string | null): string | null {
     if (this.ids.length === 0) return null;
-    if (this.bag.length === 0) {
-      this.bag = [...this.ids];
-      for (let index = this.bag.length - 1; index > 0; index -= 1) {
-        const swap = Math.floor(this.random() * (index + 1));
-        [this.bag[index], this.bag[swap]] = [this.bag[swap]!, this.bag[index]!];
+
+    if (this.reserved !== null) {
+      if (this.reserved !== avoid || this.ids.length === 1) return this.reserved;
+      this.reserved = null;
+    }
+
+    if (this.bag.length === 0) this.refill();
+
+    // Drawn from the end; move the avoided song away from the top. This also
+    // prevents an immediate repeat across bag refills.
+    if (this.bag.length > 1 && this.bag[this.bag.length - 1] === avoid) {
+      [this.bag[0], this.bag[this.bag.length - 1]] = [
+        this.bag[this.bag.length - 1]!,
+        this.bag[0]!,
+      ];
+    } else if (
+      this.bag.length === 1 &&
+      this.bag[0] === avoid &&
+      this.ids.length > 1
+    ) {
+      // Defensive edge case when the caller's avoid id came from outside this
+      // bag. Start a fresh cycle rather than returning an immediate repeat.
+      this.refill();
+      if (this.bag.length > 1 && this.bag[this.bag.length - 1] === avoid) {
+        [this.bag[0], this.bag[this.bag.length - 1]] = [
+          this.bag[this.bag.length - 1]!,
+          this.bag[0]!,
+        ];
       }
     }
-    // Drawn from the end; move the avoided song away from the top.
-    if (this.bag.length > 1 && this.bag[this.bag.length - 1] === avoid) {
-      [this.bag[0], this.bag[this.bag.length - 1]] = [this.bag[this.bag.length - 1]!, this.bag[0]!];
+
+    this.reserved = this.bag[this.bag.length - 1] ?? null;
+    return this.reserved;
+  }
+
+  /** Consumes the current reservation only when the expected id still owns it. */
+  commit(expectedId: string | null = null): string | null {
+    const reserved = this.reserved;
+    if (reserved === null) return null;
+    if (expectedId !== null && expectedId !== reserved) return null;
+    if (this.bag[this.bag.length - 1] !== reserved) {
+      throw new Error("ShuffleBag reservation drifted from the queue.");
     }
-    const id = this.bag.pop()!;
-    if (id === avoid && this.ids.length > 1) return this.next(avoid);
-    return id;
+    this.bag.pop();
+    this.reserved = null;
+    return reserved;
+  }
+
+  /** Releases a preload reservation without consuming the queued id. */
+  cancelReservation(expectedId: string | null = null): void {
+    if (
+      this.reserved !== null &&
+      (expectedId === null || expectedId === this.reserved)
+    ) {
+      this.reserved = null;
+    }
+  }
+
+  /** Legacy draw API: reserve and commit in one operation. */
+  next(avoid: string | null): string | null {
+    const id = this.peek(avoid);
+    return id === null ? null : this.commit(id);
   }
 }

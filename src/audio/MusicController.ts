@@ -18,6 +18,27 @@ import {
   type MusicState,
   type WorldMusicProfile,
 } from "./music-profile";
+import {
+  sharedAudioFocus,
+  type AudioFocusReason,
+} from "./focus-manager";
+import {
+  classifyMusicPlaybackFailure,
+  type MusicPlaybackFailureKind,
+} from "./music-playback-failure";
+import {
+  catalogFromMusicTracks,
+  BUNDLED_WORLD_MUSIC_CATALOG,
+  materializeRuntimeMusicTracks,
+  resolveRuntimeWorldPlaylist,
+  stageRoleForMusicState,
+  type RuntimeMusicTrack,
+} from "./world-music-runtime";
+import type {
+  PlaylistSelectionMode,
+  WorldMusicCatalog,
+  WorldMusicPolicy,
+} from "./world-music-model";
 
 export type MusicDuckReason =
   | "pronunciation"
@@ -62,6 +83,10 @@ export type MusicControllerOptions = {
   /** Song library (defaults to the generated one). Tests pass their own. */
   tracks?: readonly MusicTrack[];
   random?: () => number;
+  /** Canonical B1 manifest/policy inputs. Admin preview supplies the same shape. */
+  catalog?: WorldMusicCatalog;
+  generatedPolicy?: WorldMusicPolicy;
+  publishedPolicy?: WorldMusicPolicy;
 };
 
 /**
@@ -89,6 +114,9 @@ type ManagedTrack = {
   errorListener: EventListener | null;
   endedListener: EventListener | null;
   advancingFallback: boolean;
+  disposed: boolean;
+  playRequestGeneration: number;
+  networkRetryCount: number;
   /** Stems of one song (see AudioAssetRef.syncGroup). */
   syncGroup: string | null;
   /** The stem this one takes over from, until its position is matched. */
@@ -174,8 +202,8 @@ function safePlay(audio: AudioLike): Promise<void> {
       return result as Promise<void>;
     }
     return Promise.resolve();
-  } catch {
-    return Promise.reject(new Error("Audio playback failed."));
+  } catch (error) {
+    return Promise.reject(error);
   }
 }
 
@@ -186,6 +214,8 @@ function detachListeners(track: ManagedTrack): void {
 }
 
 function stopTrack(track: ManagedTrack): void {
+  track.disposed = true;
+  track.playRequestGeneration += 1;
   detachListeners(track);
   track.audio.pause();
   track.audio.currentTime = 0;
@@ -202,6 +232,13 @@ export type MusicDebugSnapshot = {
   duckReasons: string[];
   duckMultiplier: number;
   playbackMode: MusicPlaybackMode;
+  playlistKey: string;
+  playlistSelectionMode: PlaylistSelectionMode;
+  playlistResolvedFrom: string;
+  lastPlaybackFailure: null | {
+    assetId: string;
+    kind: MusicPlaybackFailureKind;
+  };
   song: null | {
     id: string;
     title: string;
@@ -213,6 +250,7 @@ export type MusicDebugSnapshot = {
   };
   activeMusic: null | {
     assetId: string;
+    songId: string | null;
     candidates: string[];
     candidateIndex: number;
     mix: number;
@@ -260,15 +298,21 @@ export class MusicController {
   private readonly audioFactory: AudioFactory;
 
   // World songs.
-  private readonly tracks: readonly MusicTrack[];
+  private readonly tracks: readonly RuntimeMusicTrack[];
   private readonly random: () => number;
+  private readonly catalog: WorldMusicCatalog;
+  private readonly generatedPolicy: WorldMusicPolicy | undefined;
+  private readonly publishedPolicy: WorldMusicPolicy | undefined;
   private mode: MusicPlaybackMode = "map";
   private playlist: string[] = [];
+  private playlistKey = "";
+  private playlistSelectionMode: PlaylistSelectionMode = "ordered";
+  private playlistResolvedFrom = "unresolved";
   private playlistIndex = 0;
   private shuffle: ShuffleBag;
-  private currentSong: MusicTrack | null = null;
+  private currentSong: RuntimeMusicTrack | null = null;
   /** The next song, decided early so it can be preloaded. */
-  private upcoming: MusicTrack | null = null;
+  private upcoming: RuntimeMusicTrack | null = null;
   /** Next song's element, loading before the handover. */
   private warmNext: ManagedTrack | null = null;
   /** The current song's other stem, loaded and paused for instant switches. */
@@ -281,26 +325,26 @@ export class MusicController {
   private musicBus: GainNode | null = null;
   private gestureListening = false;
 
-  private readonly onAnnouncer = (event: Event): void => {
-    const active =
-      (event as CustomEvent<{ active?: unknown }>).detail?.active === true;
-    if (active) this.duck("announcer");
-    else this.releaseDuck("announcer");
-  };
+  private focusUnsubscribe: (() => void) | null = null;
+  private lastPlaybackFailure: {
+    assetId: string;
+    kind: MusicPlaybackFailureKind;
+  } | null = null;
 
-  private readonly onWarning = (event: Event): void => {
-    const duration =
-      (event as CustomEvent<{ durationMs?: unknown }>).detail?.durationMs;
-    this.duckFor(
-      "warning",
-      typeof duration === "number" && Number.isFinite(duration)
-        ? duration
-        : 350,
-    );
-  };
+  private syncSharedFocus(reasons: readonly AudioFocusReason[]): void {
+    for (const reason of ["pronunciation", "announcer", "warning"] as const) {
+      this.duckReasons.delete(reason);
+    }
+    for (const reason of reasons) this.duckReasons.add(reason);
+    this.applyVolumes();
+  }
 
   private readonly onUserGesture = (): void => {
     this.unlockAudioGraph();
+    if (this.lastPlaybackFailure?.kind !== "autoplay-permission") return;
+    this.lastPlaybackFailure = null;
+    if (this.activeMusic !== null) void this.playTrack(this.activeMusic);
+    for (const track of this.activeAmbient) void this.playTrack(track);
   };
 
   constructor(
@@ -308,22 +352,24 @@ export class MusicController {
     options: MusicControllerOptions = {},
   ) {
     this.audioFactory = audioFactory;
-    this.tracks = options.tracks ?? MUSIC_TRACKS;
+    const legacyTracks = options.tracks ?? MUSIC_TRACKS;
     this.random = options.random ?? Math.random;
-    this.shuffle = new ShuffleBag(this.tracks.map((track) => track.id), this.random);
-    this.rebuildPlaylist(this.profile.worldId);
+    this.catalog = options.catalog ?? (
+      options.tracks === undefined
+        ? BUNDLED_WORLD_MUSIC_CATALOG
+        : catalogFromMusicTracks(legacyTracks)
+    );
+    this.tracks = materializeRuntimeMusicTracks(this.catalog, legacyTracks);
+    this.generatedPolicy = options.generatedPolicy;
+    this.publishedPolicy = options.publishedPolicy;
+    this.shuffle = new ShuffleBag([], this.random);
+    this.rebuildPlaylist(this.profile.worldId, "WORLD_NORMAL");
+
+    this.focusUnsubscribe = sharedAudioFocus.subscribe((snapshot) => {
+      this.syncSharedFocus(snapshot.reasons);
+    });
 
     if (typeof window !== "undefined") {
-      // Spoken vocabulary intentionally does not lower music. The voice mix is
-      // already clear, while warnings and announcer cues still duck for safety.
-      window.addEventListener(
-        "space-typing:announcer",
-        this.onAnnouncer,
-      );
-      window.addEventListener(
-        "space-typing:warning",
-        this.onWarning,
-      );
       for (const type of ["pointerdown", "keydown", "touchstart"]) {
         window.addEventListener(type, this.onUserGesture, { capture: true, passive: true });
       }
@@ -375,6 +421,13 @@ export class MusicController {
       duckReasons: [...this.duckReasons].map(String).sort(),
       duckMultiplier: this.duckMultiplier(),
       playbackMode: this.mode,
+      playlistKey: this.playlistKey,
+      playlistSelectionMode: this.playlistSelectionMode,
+      playlistResolvedFrom: this.playlistResolvedFrom,
+      lastPlaybackFailure:
+        this.lastPlaybackFailure === null
+          ? null
+          : { ...this.lastPlaybackFailure },
       song:
         this.currentSong === null
           ? null
@@ -392,6 +445,7 @@ export class MusicController {
           ? null
           : {
               assetId: active.assetId,
+              songId: active.songId,
               candidates: [...active.candidates],
               candidateIndex: active.candidateIndex,
               mix: active.mix,
@@ -433,45 +487,43 @@ export class MusicController {
     }
 
     this.transitionAmbient(profile.ambientLayers);
-    if (this.hasSongs()) {
-      this.rebuildPlaylist(profile.worldId);
-      // A new map brings its own music (random mode keeps its shuffle going).
-      if (this.mode === "map" && this.currentSong !== null) {
-        const first = this.trackById(this.playlist[0]);
-        if (first !== null && this.isWorldState(this.state)) {
-          if (first.id !== this.currentSong.id) {
-            this.startSong(first, this.stemFor(this.state), SONG_CROSSFADE_SECONDS.world, "song");
-          }
-        } else if (first !== null) {
-          // Boss, shop or stinger now: the new World's first song comes next.
-          this.upcoming = first;
+    const playlistState = this.isCampaignPlaylistState(this.state)
+      ? this.state
+      : "WORLD_NORMAL";
+    const playlistChanged = this.rebuildPlaylist(profile.worldId, playlistState);
+    if (this.isCampaignPlaylistState(this.state)) {
+      if (!this.hasSongs()) {
+        // Keep the pre-B1 profile fallback alive when no catalog/library song
+        // can be resolved during migration.
+        this.transitionTo(this.state, SONG_CROSSFADE_SECONDS.world);
+        return;
+      }
+      if (playlistChanged && this.currentSong === null) {
+        const first = this.firstSong();
+        if (first !== null) {
+          this.startSong(first, this.stemFor(this.state), SONG_CROSSFADE_SECONDS.world, "song");
         }
       }
       return;
     }
-    if (this.isWorldState(this.state)) {
-      this.transitionTo(this.state);
-    }
   }
 
-  /** Map playlists or shuffle; the current song keeps playing where it fits. */
+  /** Map playlists or shuffle; the canonical resolver owns the effective pool. */
   setPlaybackMode(mode: MusicPlaybackMode): void {
     if (this.destroyed || mode === this.mode) return;
     this.mode = mode;
-    this.upcoming = null;
-    this.releaseWarmNext();
-    if (mode === "random") {
-      this.shuffle = new ShuffleBag(this.tracks.map((track) => track.id), this.random);
-    } else {
-      this.rebuildPlaylist(this.profile.worldId);
-      const song = this.currentSong;
-      const position = song === null ? -1 : this.playlist.indexOf(song.id);
-      if (position >= 0) {
-        this.playlistIndex = position;
-      } else if (song !== null && this.isWorldState(this.state) && this.hasSongs()) {
-        const first = this.trackById(this.playlist[0]);
+    const playlistState = this.isCampaignPlaylistState(this.state)
+      ? this.state
+      : "WORLD_NORMAL";
+    const playlistChanged = this.rebuildPlaylist(this.profile.worldId, playlistState);
+    if (playlistChanged && this.isCampaignPlaylistState(this.state)) {
+      if (!this.hasSongs()) {
+        this.transitionTo(this.state, SONG_CROSSFADE_SECONDS.mode);
+        return;
+      }
+      if (this.currentSong === null) {
+        const first = this.firstSong();
         if (first !== null) {
-          this.playlistIndex = 0;
           this.startSong(first, this.stemFor(this.state), SONG_CROSSFADE_SECONDS.mode, "song");
           return;
         }
@@ -480,8 +532,9 @@ export class MusicController {
     this.notifyNowPlaying();
   }
 
-  /** Hands over to the next song now. False when no world song is playing. */
+  /** Hands over to the next normal/intense song now. Boss music is not skippable. */
   skipTrack(): boolean {
+    if (!this.isWorldState(this.state)) return false;
     return this.advanceSong(SONG_CROSSFADE_SECONDS.skip);
   }
 
@@ -507,9 +560,15 @@ export class MusicController {
     if (this.destroyed) return;
     this.state = state;
 
-    if (this.isWorldState(state) && this.hasSongs()) {
-      this.playWorldSong(this.stemFor(state), crossfadeSeconds);
-      return;
+    if (this.isCampaignPlaylistState(state)) {
+      this.rebuildPlaylist(this.profile.worldId, state);
+      if (this.hasSongs()) {
+        this.playWorldSong(this.stemFor(state), crossfadeSeconds);
+        return;
+      }
+      // No usable catalog/library candidate: migration keeps the existing
+      // profile asset path rather than turning a previously audible state into
+      // silence.
     }
 
     const asset = musicAssetForState(this.profile, state);
@@ -619,15 +678,10 @@ export class MusicController {
     if (this.destroyed) return;
     this.destroyed = true;
 
+    this.focusUnsubscribe?.();
+    this.focusUnsubscribe = null;
+
     if (typeof window !== "undefined") {
-      window.removeEventListener(
-        "space-typing:announcer",
-        this.onAnnouncer,
-      );
-      window.removeEventListener(
-        "space-typing:warning",
-        this.onWarning,
-      );
       for (const timer of this.warningTimers.values()) {
         window.clearTimeout(timer);
       }
@@ -672,31 +726,69 @@ export class MusicController {
   // -------------------------------------------------------------------------
 
   private hasSongs(): boolean {
-    return this.tracks.length > 0;
+    return this.playlist.length > 0;
   }
 
   private isWorldState(state: MusicState): boolean {
     return state === "WORLD_NORMAL" || state === "WORLD_INTENSE";
   }
 
+  private isCampaignPlaylistState(state: MusicState): boolean {
+    return stageRoleForMusicState(state) !== null;
+  }
+
   private stemFor(state: MusicState): SongStem {
     return state === "WORLD_INTENSE" ? "intense" : "calm";
   }
 
-  private trackById(id: string | undefined): MusicTrack | null {
+  private trackById(id: string | undefined): RuntimeMusicTrack | null {
     if (id === undefined) return null;
     return this.tracks.find((track) => track.id === id) ?? null;
   }
 
-  private rebuildPlaylist(worldId: string): void {
+  private rebuildPlaylist(
+    worldId: string,
+    state: MusicState = "WORLD_NORMAL",
+  ): boolean {
     const known = new Set(this.tracks.map((track) => track.id));
-    const list = worldPlaylist(worldId).filter((id) => known.has(id));
-    this.playlist = list.length > 0 ? list : this.tracks.map((track) => track.id);
-    this.playlistIndex = 0;
-    if (this.mode === "map") {
-      this.upcoming = null;
-      this.releaseWarmNext();
+    const authoredLegacy = worldPlaylist(worldId).filter((id) => known.has(id));
+    const legacyWorldTrackIds = authoredLegacy.length > 0
+      ? authoredLegacy
+      : this.tracks.map((track) => track.id);
+    const resolved = resolveRuntimeWorldPlaylist({
+      worldId,
+      state,
+      musicMode: this.mode,
+      catalog: this.catalog,
+      generatedPolicy: this.generatedPolicy,
+      publishedPolicy: this.publishedPolicy,
+      legacyWorldTrackIds,
+      randomNormalTrackIds: this.tracks.map((track) => track.id),
+    });
+    if (resolved === null) return false;
+
+    const nextPlaylist = resolved.trackIds.filter((id) => known.has(id));
+    if (resolved.playlistKey === this.playlistKey) {
+      this.playlistResolvedFrom = resolved.resolvedFrom;
+      return false;
     }
+
+    const currentId = this.currentSong?.id ?? null;
+    this.playlist = nextPlaylist;
+    this.playlistKey = resolved.playlistKey;
+    this.playlistSelectionMode = resolved.selectionMode;
+    this.playlistResolvedFrom = resolved.resolvedFrom;
+    this.playlistIndex = currentId === null ? 0 : Math.max(0, this.playlist.indexOf(currentId));
+    this.shuffle = new ShuffleBag(this.playlist, this.random);
+    this.upcoming = null;
+    this.releaseWarmNext();
+
+    if (currentId !== null && !this.playlist.includes(currentId)) {
+      // Keep the outgoing audio alive for the crossfade, but the new playlist
+      // must select its own first candidate rather than treating it as current.
+      this.currentSong = null;
+    }
+    return true;
   }
 
   /** World music requested: same song keeps going, otherwise a song starts. */
@@ -719,17 +811,19 @@ export class MusicController {
     this.startSong(next, stem, Math.max(SONG_CROSSFADE_SECONDS.resume, seconds), "state");
   }
 
-  private firstSong(): MusicTrack | null {
-    if (this.mode === "random") return this.trackById(this.shuffle.next(null) ?? undefined);
+  private firstSong(): RuntimeMusicTrack | null {
+    if (this.playlistSelectionMode === "shuffle-bag") {
+      return this.trackById(this.shuffle.peek(null) ?? undefined);
+    }
     this.playlistIndex = 0;
     return this.trackById(this.playlist[0]);
   }
 
   /** The next song, without moving the queue (so it can be preloaded). */
-  private peekNextSong(): MusicTrack | null {
+  private peekNextSong(): RuntimeMusicTrack | null {
     if (this.upcoming !== null) return this.upcoming;
-    if (this.mode === "random") {
-      this.upcoming = this.trackById(this.shuffle.next(this.currentSong?.id ?? null) ?? undefined);
+    if (this.playlistSelectionMode === "shuffle-bag") {
+      this.upcoming = this.trackById(this.shuffle.peek(this.currentSong?.id ?? null) ?? undefined);
     } else if (this.playlist.length > 0) {
       this.upcoming = this.trackById(this.playlist[(this.playlistIndex + 1) % this.playlist.length]);
     }
@@ -737,10 +831,10 @@ export class MusicController {
   }
 
   /** Moves the queue on and returns the song to play now. */
-  private takeNextSong(): MusicTrack | null {
+  private takeNextSong(): RuntimeMusicTrack | null {
     const next = this.peekNextSong();
     this.upcoming = null;
-    if (next !== null && this.mode === "map") {
+    if (next !== null && this.playlistSelectionMode === "ordered") {
       const index = this.playlist.indexOf(next.id);
       if (index >= 0) this.playlistIndex = index;
     }
@@ -748,7 +842,7 @@ export class MusicController {
   }
 
   private advanceSong(seconds: number): boolean {
-    if (this.destroyed || !this.isWorldState(this.state) || this.currentSong === null || !this.hasSongs()) {
+    if (this.destroyed || !this.isCampaignPlaylistState(this.state) || this.currentSong === null || !this.hasSongs()) {
       return false;
     }
     const next = this.takeNextSong();
@@ -757,15 +851,21 @@ export class MusicController {
     return true;
   }
 
-  private startSong(song: MusicTrack, stem: SongStem, seconds: number, style: FadeStyle): void {
+  private startSong(song: RuntimeMusicTrack, stem: SongStem, seconds: number, style: FadeStyle): void {
     let next: ManagedTrack | null = null;
-    if (this.warmNext !== null && this.warmNext.songId === song.id && this.warmNext.stem === stem) {
+    if (
+      this.warmNext !== null &&
+      this.warmNext.songId === song.id &&
+      (song.playbackKind === "single" || this.warmNext.stem === stem)
+    ) {
       next = this.warmNext;
+      next.stem = stem;
       this.warmNext = null;
     }
     this.releaseWarmNext();
     if (next === null) next = this.createSongTrack(song, stem);
     if (next === null) return;
+    this.commitShuffleReservation(next);
     this.currentSong = song;
     this.releaseWarmStem();
     this.fadeMusicTo(next, seconds, style);
@@ -774,9 +874,19 @@ export class MusicController {
   }
 
   /** Calm ↔ intense at the same position of the same song. */
-  private switchStem(song: MusicTrack, stem: SongStem, seconds: number): void {
+  private switchStem(song: RuntimeMusicTrack, stem: SongStem, seconds: number): void {
     const active = this.activeMusic;
     if (active === null) return;
+    if (song.playbackKind === "single") {
+      // V2 contract: intensity is semantic for a single-file recording. Keep
+      // the existing voice and position instead of playing a duplicate copy.
+      active.stem = stem;
+      this.releaseWarmStem();
+      this.applyVolumes();
+      void this.playTrack(active);
+      this.notifyNowPlaying();
+      return;
+    }
     // Switching back mid-fade: reuse the stem that is still fading out.
     let next: ManagedTrack | null = null;
     const retiring = this.retiringMusic.findIndex((track) => track.songId === song.id && track.stem === stem);
@@ -795,9 +905,13 @@ export class MusicController {
     this.notifyNowPlaying();
   }
 
-  private createSongTrack(song: MusicTrack, stem: SongStem): ManagedTrack | null {
+  private createSongTrack(song: RuntimeMusicTrack, stem: SongStem): ManagedTrack | null {
     const track = this.createTrack(
-      { id: song.id + ":" + stem, defaultPath: song.stems[stem], syncGroup: song.id },
+      {
+        id: song.id + ":" + (song.playbackKind === "single" ? "single" : stem),
+        sources: song.sourceCandidates[stem],
+        syncGroup: song.playbackKind === "stems" ? (song.syncGroup ?? song.id) : undefined,
+      },
       false,
       0,
     );
@@ -833,7 +947,12 @@ export class MusicController {
     if (this.destroyed || this.paused || active === null || song === null || active.songId !== song.id) return;
     const position = active.audio.currentTime;
     if (!Number.isFinite(position)) return;
-    if (this.warmStem === null && position > 3 && this.musicFade === null) {
+    if (
+      song.playbackKind === "stems" &&
+      this.warmStem === null &&
+      position > 3 &&
+      this.musicFade === null
+    ) {
       this.warmStem = this.createSongTrack(song, active.stem === "intense" ? "calm" : "intense");
     }
     if (this.warmNext === null && position >= song.mixOut - PRELOAD_LEAD_SECONDS) {
@@ -1161,6 +1280,9 @@ export class MusicController {
       errorListener: null,
       endedListener: null,
       advancingFallback: false,
+      disposed: false,
+      playRequestGeneration: 0,
+      networkRetryCount: 0,
       syncGroup: asset.syncGroup ?? null,
       syncSource: null,
       songId: null,
@@ -1231,12 +1353,81 @@ export class MusicController {
     }
   }
 
-  private async playTrack(track: ManagedTrack): Promise<void> {
-    if (this.paused || this.destroyed) return;
+  private commitShuffleReservation(track: ManagedTrack): void {
+    if (this.playlistSelectionMode !== "shuffle-bag" || track.songId === null) return;
+    this.shuffle.commit(track.songId);
+  }
 
+  private async playTrack(track: ManagedTrack): Promise<void> {
+    if (this.paused || this.destroyed || track.disposed) return;
+
+    const generation = ++track.playRequestGeneration;
+    const audio = track.audio;
     try {
-      await safePlay(track.audio);
-    } catch {
+      await safePlay(audio);
+      if (
+        track.disposed ||
+        track.audio !== audio ||
+        track.playRequestGeneration !== generation
+      ) {
+        return;
+      }
+      track.networkRetryCount = 0;
+      if (this.lastPlaybackFailure?.assetId === track.assetId) {
+        this.lastPlaybackFailure = null;
+      }
+      return;
+    } catch (error) {
+      if (
+        track.disposed ||
+        track.audio !== audio ||
+        track.playRequestGeneration !== generation
+      ) {
+        return;
+      }
+
+      let failure = classifyMusicPlaybackFailure(error);
+      this.lastPlaybackFailure = { assetId: track.assetId, kind: failure.kind };
+      if (
+        failure.kind === "autoplay-permission" ||
+        failure.kind === "stale-cancelled"
+      ) {
+        return;
+      }
+
+      if (failure.kind === "temporary-network" && track.networkRetryCount < 1) {
+        track.networkRetryCount += 1;
+        try {
+          await safePlay(audio);
+          if (
+            track.disposed ||
+            track.audio !== audio ||
+            track.playRequestGeneration !== generation
+          ) {
+            return;
+          }
+          track.networkRetryCount = 0;
+          this.lastPlaybackFailure = null;
+          return;
+        } catch (retryError) {
+          if (
+            track.disposed ||
+            track.audio !== audio ||
+            track.playRequestGeneration !== generation
+          ) {
+            return;
+          }
+          failure = classifyMusicPlaybackFailure(retryError);
+          this.lastPlaybackFailure = { assetId: track.assetId, kind: failure.kind };
+          if (
+            failure.kind === "autoplay-permission" ||
+            failure.kind === "stale-cancelled"
+          ) {
+            return;
+          }
+        }
+      }
+
       await this.tryNextCandidate(track);
     }
   }
@@ -1244,7 +1435,7 @@ export class MusicController {
   private async tryNextCandidate(
     track: ManagedTrack,
   ): Promise<void> {
-    if (track.advancingFallback) return;
+    if (track.advancingFallback || track.disposed) return;
     if (
       this.destroyed ||
       track.candidateIndex + 1 >= track.candidates.length
@@ -1254,6 +1445,7 @@ export class MusicController {
     }
 
     track.advancingFallback = true;
+    track.playRequestGeneration += 1;
     detachListeners(track);
     track.audio.pause();
     track.output.dispose();
@@ -1271,20 +1463,13 @@ export class MusicController {
     track.output = this.createOutput(next);
     track.errorListener = null;
     track.endedListener = null;
+    track.networkRetryCount = 0;
     this.configureAudio(track);
     this.attachEnded(track);
     this.applyVolumes();
 
-    if (!this.paused) {
-      try {
-        await safePlay(track.audio);
-      } catch {
-        track.advancingFallback = false;
-        await this.tryNextCandidate(track);
-        return;
-      }
-    }
     track.advancingFallback = false;
+    if (!this.paused) await this.playTrack(track);
   }
 
   private duckMultiplier(): number {

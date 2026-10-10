@@ -23,7 +23,7 @@
     <aside id="practiceBanner" class="practice-banner" hidden>Practice · learning only · simulated rewards</aside>
 
     <section id="voiceInputControls" class="voice-input-controls" aria-label="Input mode and microphone">
-      <div><select id="voiceInputMode" aria-label="Input mode"><option value="typing">⌨ Typing</option><option value="voice">🎙 Voice</option><option value="hybrid">⌨ + 🎙 Hybrid</option></select><button id="voiceMicToggle" type="button" aria-label="Enable or stop microphone" aria-pressed="false">🎙 Mic</button></div>
+      <div><select id="voiceInputMode" aria-label="Input mode"><option value="typing">⌨ Typing</option><option value="voice">🎙 Voice</option><option value="hybrid">⌨ + 🎙 Hybrid</option></select><button id="voiceMicToggle" type="button" aria-label="Enable or stop microphone" aria-pressed="false">🎙 Mic</button><button id="quickAudioButton" type="button" aria-label="Quick audio settings">♫ Audio</button></div>
       <small id="voiceInputStatus" role="status" aria-live="polite">Microphone off</small>
     </section>
     <aside id="voiceFeedback" class="voice-feedback" role="status" aria-live="polite" aria-atomic="true" aria-label="Voice input feedback" hidden>
@@ -133,6 +133,26 @@
       <button id="recallHintButton" type="button">✦ Reveal letter</button>
     </div>
 
+    <dialog id="quickAudioDialog" class="settings-dialog quick-audio-dialog" aria-labelledby="quickAudioTitle">
+      <div class="dialog-head">
+        <div><p class="eyebrow">live mix</p><h2 id="quickAudioTitle">Quick Audio</h2></div>
+        <button id="quickAudioCancel" class="icon-button" type="button" aria-label="Cancel audio changes">×</button>
+      </div>
+      <p id="quickAudioStatus" class="data-status" aria-live="polite"></p>
+      <div class="quick-audio-grid">
+        <label class="setting-row"><span><strong>Master</strong><small>All game audio</small></span><span class="setting-control range-control"><input id="quickMaster" type="range" min="0" max="1" step="0.05"/><output id="quickMasterValue">100%</output></span></label>
+        <label class="setting-row"><span><strong>Pronunciation</strong><small>Learning voice stays highest priority</small></span><span class="setting-control range-control"><input id="quickPronunciation" type="range" min="0" max="1" step="0.05"/><output id="quickPronunciationValue">100%</output></span></label>
+        <label class="setting-row"><span><strong>Music Parent</strong><small>World, boss, shop and station music</small></span><span class="setting-control range-control"><input id="quickMusicParent" type="range" min="0" max="1" step="0.05"/><output id="quickMusicParentValue">26%</output></span></label>
+        <label class="setting-row"><span><strong>SFX Parent</strong><small>Typing and combat effects</small></span><span class="setting-control range-control"><input id="quickSfxParent" type="range" min="0" max="1" step="0.05"/><output id="quickSfxParentValue">50%</output></span></label>
+        <label class="setting-row"><span><strong>Announcer</strong><small>Milestones and combat calls</small></span><span class="setting-control range-control"><input id="quickAnnouncer" type="range" min="0" max="1" step="0.05"/><output id="quickAnnouncerValue">85%</output></span></label>
+      </div>
+      <div class="dialog-actions quick-audio-actions">
+        <button id="quickAudioRecommended" type="button">Recommended</button>
+        <button id="quickAudioMore" type="button">More Audio Settings</button>
+        <button id="quickAudioApply" class="primary" type="button">Apply</button>
+      </div>
+    </dialog>
+
     <dialog id="warpDialog" class="settings-dialog warp-dialog" aria-labelledby="warpDialogTitle">
       <h2 id="warpDialogTitle">Warp Charge · Stamina</h2>
       <p>Rewarded deployment costs 10 Warp. Practice is always free.</p>
@@ -185,6 +205,11 @@
             <div id="titleSoundPopover" class="holo-popover hidden" role="dialog" aria-label="Sound levels">
               <h4 data-icon="sliders">Sound</h4>
               <div class="holo-slider">
+                <button type="button" class="holo-slider-icon" data-icon="volume" data-mute="masterVolume" aria-label="Mute all audio"></button>
+                <span><small>Master</small><input id="quickMasterVolume" type="range" min="0" max="1" step="0.05" /></span>
+                <output id="quickMasterVolumeValue">100%</output>
+              </div>
+              <div class="holo-slider">
                 <button type="button" class="holo-slider-icon" data-icon="music" data-mute="musicVolume" aria-label="Mute music"></button>
                 <span><small>Music</small><input id="quickMusicVolume" type="range" min="0" max="1" step="0.05" /></span>
                 <output id="quickMusicVolumeValue">26%</output>
@@ -203,6 +228,11 @@
                 <button type="button" class="holo-slider-icon" data-icon="voice" data-mute="pronunciationVolume" aria-label="Mute pronunciation voice"></button>
                 <span><small>Voice (pronunciation)</small><input id="quickVoiceVolume" type="range" min="0" max="1" step="0.05" /></span>
                 <output id="quickVoiceVolumeValue">100%</output>
+              </div>
+              <div class="holo-slider">
+                <button type="button" class="holo-slider-icon" data-icon="voice" data-mute="announcerVolume" aria-label="Mute announcer"></button>
+                <span><small>Announcer</small><input id="quickAnnouncerVolume" type="range" min="0" max="1" step="0.05" /></span>
+                <output id="quickAnnouncerVolumeValue">100%</output>
               </div>
               <div class="holo-popover-foot">
                 <span>Tap an icon to mute</span>
@@ -1067,6 +1097,15 @@
               <span class="holo-vs" aria-hidden="true">VS</span>
               <article id="duelSlotTwo" class="duel-slot-card"></article>
             </div>
+            <div class="duel-lobby-mode">
+              <label for="duelGameMode">Gameplay</label>
+              <select id="duelGameMode" aria-label="Friend Duel gameplay mode">
+                <option value="standard" selected>Standard Combat</option>
+                <option value="reflex">Reflex Challenge</option>
+                <option value="word-chain">Word Chain</option>
+              </select>
+              <small>Host choice · Ranked and offline Practice stay Standard.</small>
+            </div>
             <div class="duel-lobby-actions">
               <button id="duelReadyButton" type="button" class="holo-ghost" data-icon="check">Ready</button>
               <button id="duelAddBotButton" type="button" class="holo-ghost" data-icon="bot">Add Bot</button>
@@ -1263,7 +1302,15 @@
       </div>
 
       <div class="settings-section">
-        <h3>sound</h3>
+        <h3>audio</h3>
+        <div class="setting-row">
+          <span><strong>Recommended mix</strong><small>Quality baseline tuned so pronunciation stays clear without manual repair.</small></span>
+          <span class="setting-control"><button id="recommendedAudioButton" type="button">Use Recommended</button></span>
+        </div>
+        <label class="setting-row">
+          <span><strong>Master volume</strong><small>Top-level gain for music, SFX, announcer and pronunciation</small></span>
+          <span class="setting-control range-control"><input id="masterVolume" type="range" min="0" max="1" step="0.05"/><output id="masterVolumeValue">100%</output></span>
+        </label>
         <label class="setting-row">
           <span>
             <strong>Music volume</strong>
@@ -1361,6 +1408,20 @@
             <output id="pronunciationVolumeValue">100%</output>
           </span>
         </label>
+        <label class="setting-row">
+          <span><strong>Announcer volume</strong><small>Independent voice/learning control; still yields to pronunciation focus</small></span>
+          <span class="setting-control range-control"><input id="announcerVolume" type="range" min="0" max="1" step="0.05"/><output id="announcerVolumeValue">85%</output></span>
+        </label>
+
+        <details class="audio-advanced">
+          <summary>More Audio Settings · Advanced categories</summary>
+          <p class="equipment-note">These are the real A2 runtime buses: no decorative sliders. UI includes shop purchase/confirm; Rewards includes Credits.</p>
+          <label class="setting-row"><span><strong>Typing / Word Feedback</strong><small>Keystrokes, misses and word completion</small></span><span class="setting-control range-control"><input id="audioCategory-typing" type="range" min="0" max="1" step="0.05"/><output id="audioCategory-typingValue">100%</output></span></label>
+          <label class="setting-row"><span><strong>Combat</strong><small>Weapons, skills, enemy attacks, explosions, damage and shields</small></span><span class="setting-control range-control"><input id="audioCategory-combat" type="range" min="0" max="1" step="0.05"/><output id="audioCategory-combatValue">100%</output></span></label>
+          <label class="setting-row"><span><strong>Warnings</strong><small>Telegraphs and critical combat cues</small></span><span class="setting-control range-control"><input id="audioCategory-warnings" type="range" min="0" max="1" step="0.05"/><output id="audioCategory-warningsValue">100%</output></span></label>
+          <label class="setting-row"><span><strong>UI / Shop Confirm</strong><small>Interface, purchase and confirmation cues</small></span><span class="setting-control range-control"><input id="audioCategory-ui" type="range" min="0" max="1" step="0.05"/><output id="audioCategory-uiValue">100%</output></span></label>
+          <label class="setting-row"><span><strong>Rewards / Credits</strong><small>Reward drops, pickups and economy feedback</small></span><span class="setting-control range-control"><input id="audioCategory-rewards" type="range" min="0" max="1" step="0.05"/><output id="audioCategory-rewardsValue">100%</output></span></label>
+        </details>
       </div>
 
       <div class="settings-section">

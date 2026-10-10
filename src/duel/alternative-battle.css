@@ -1,0 +1,160 @@
+.duel-alternative-mode {
+  position: absolute;
+  z-index: 28;
+  left: 50%;
+  top: 48%;
+  width: min(720px, calc(100% - 32px));
+  transform: translate(-50%, -50%);
+  display: grid;
+  gap: 12px;
+  padding: 20px 22px;
+  border: 1px solid rgba(117, 229, 255, 0.38);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(4, 18, 34, 0.88), rgba(3, 11, 24, 0.94));
+  box-shadow: 0 18px 70px rgba(0, 0, 0, 0.4), inset 0 0 28px rgba(81, 205, 255, 0.08);
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+}
+
+.duel-alternative-mode.hidden {
+  display: none;
+}
+
+.duel-alternative-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.duel-alternative-kicker {
+  font-size: 0.76rem;
+  letter-spacing: 0.18em;
+  font-weight: 800;
+  color: #8fe9ff;
+}
+
+.duel-alternative-clock {
+  min-width: 4.6rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #d8f8ff;
+}
+
+.duel-alternative-mode[data-urgent="true"] .duel-alternative-clock {
+  color: #ffcf72;
+  animation: duel-alt-urgent 0.55s ease-in-out infinite alternate;
+}
+
+.duel-alternative-prompt {
+  margin: 0;
+  text-align: center;
+  font-size: clamp(1.2rem, 2.4vw, 2rem);
+  line-height: 1.22;
+  color: #f4fbff;
+  text-wrap: balance;
+}
+
+.duel-alternative-choices {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  min-height: 28px;
+}
+
+.duel-alternative-choice {
+  padding: 7px 12px;
+  border: 1px solid rgba(143, 233, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(37, 103, 132, 0.16);
+  color: rgba(219, 246, 255, 0.62);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.duel-alternative-choice[data-match="true"] {
+  border-color: rgba(108, 241, 255, 0.72);
+  background: rgba(44, 199, 222, 0.16);
+  color: #effdff;
+  box-shadow: 0 0 18px rgba(73, 224, 255, 0.1);
+}
+
+.duel-alternative-input {
+  min-height: 58px;
+  display: grid;
+  place-items: center;
+  padding: 8px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(104, 237, 255, 0.38);
+  background: rgba(3, 10, 20, 0.72);
+  color: #ffffff;
+  font-size: clamp(1.55rem, 3vw, 2.45rem);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+}
+
+.duel-alternative-mode[data-accepted="true"] .duel-alternative-input {
+  border-color: rgba(107, 255, 174, 0.7);
+  box-shadow: 0 0 24px rgba(71, 255, 163, 0.13);
+}
+
+.duel-alternative-instruction {
+  text-align: center;
+  color: rgba(219, 241, 250, 0.68);
+}
+
+.duel-alternative-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.duel-alternative-meta span {
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(128, 195, 220, 0.08);
+  color: rgba(218, 242, 250, 0.75);
+  font-size: 0.74rem;
+}
+
+/* Alternative modes keep the shared battlefield, ships, projectiles, damage,
+   phase/series HUD and announcer. Standard target/action controls are hidden. */
+#duelBattle[data-game-mode="reflex"] .duel-word-field,
+#duelBattle[data-game-mode="word-chain"] .duel-word-field,
+#duelBattle[data-game-mode="reflex"] .duel-context-lane,
+#duelBattle[data-game-mode="word-chain"] .duel-context-lane,
+#duelBattle[data-game-mode="reflex"] .duel-current-input,
+#duelBattle[data-game-mode="word-chain"] .duel-current-input,
+#duelBattle[data-game-mode="reflex"] .duel-auto-combat,
+#duelBattle[data-game-mode="word-chain"] .duel-auto-combat,
+#duelBattle[data-game-mode="reflex"] .duel-hidden-systems,
+#duelBattle[data-game-mode="word-chain"] .duel-hidden-systems {
+  display: none !important;
+}
+
+@keyframes duel-alt-urgent {
+  from { opacity: 0.72; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1.04); }
+}
+
+@media (max-width: 720px) {
+  .duel-alternative-mode {
+    top: 50%;
+    width: calc(100% - 20px);
+    padding: 15px;
+    gap: 9px;
+  }
+
+  .duel-alternative-meta span {
+    font-size: 0.68rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .duel-alternative-mode[data-urgent="true"] .duel-alternative-clock {
+    animation: none;
+  }
+}

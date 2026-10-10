@@ -109,14 +109,19 @@ describe("M22 full World audio mapping and lifecycle audit", () => {
 
         if (state === "SILENT") {
           expect(snapshot.activeMusic).toBeNull();
-        } else if (state === "WORLD_NORMAL" || state === "WORLD_INTENSE") {
-          // World music plays the map's songs: one file each, handed over to
-          // the next song instead of looping (docs/MUSIC_SYSTEM.md).
-          expect(snapshot.activeMusic).not.toBeNull();
-          expect(snapshot.song).not.toBeNull();
-          expect(snapshot.activeMusic?.loop).toBe(false);
-          expect(snapshot.activeMusic?.candidates.length).toBe(1);
+        } else if (
+          snapshot.activeMusic !== null &&
+          snapshot.activeMusic.songId !== null
+        ) {
+          // Canonical campaign playlists (including same-World boss fallback)
+          // use song lifecycle semantics: hand over instead of looping. Source
+          // candidate count is a transport detail and may grow with codecs.
+          expect(snapshot.song?.id).toBe(snapshot.activeMusic.songId);
+          expect(snapshot.activeMusic.loop).toBe(false);
+          expect(snapshot.activeMusic.candidates.length).toBeGreaterThanOrEqual(1);
         } else {
+          // Non-catalog legacy profile assets retain their state-specific loop
+          // contract and local/default source fallback pair.
           expect(snapshot.activeMusic).not.toBeNull();
           expect(snapshot.activeMusic?.loop).toBe(stateLoops(state));
           expect(snapshot.activeMusic?.candidates.length).toBe(2);
@@ -228,11 +233,16 @@ describe("M22 full World audio mapping and lifecycle audit", () => {
 
     controller.destroy();
     expect(created.every((audio) => audio.paused)).toBe(true);
-    // Destroy must detach every global listener that this controller registered.
-    // Keep the assertion tied to registration count so adding/removing a mix
-    // event cannot leave this lifecycle test stale again.
-    expect(removeEventListener).toHaveBeenCalledTimes(
-      addEventListener.mock.calls.length,
-    );
+    // The shared focus manager owns its long-lived bridge listeners. The
+    // controller itself owns only the three gesture listeners and must detach
+    // those on destroy.
+    expect(removeEventListener).toHaveBeenCalledTimes(3);
+    for (const type of ["pointerdown", "keydown", "touchstart"]) {
+      expect(removeEventListener).toHaveBeenCalledWith(
+        type,
+        expect.any(Function),
+        { capture: true },
+      );
+    }
   });
 });

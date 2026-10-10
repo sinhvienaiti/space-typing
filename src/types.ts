@@ -57,7 +57,17 @@ export type VocabularyIndex = {
   levels: VocabularyLevel[];
 };
 
+export type AudioCategoryVolumes = {
+  typing: number;
+  combat: number;
+  warnings: number;
+  ui: number;
+  rewards: number;
+};
+
 export type GameSettings = {
+  /** Top-level player audio gain. 1 preserves the legacy mix. */
+  masterVolume?: number;
   sfxVolume: number;
   /** Credit crystal drop/pickup sounds on top of SFX volume (0–2, 1 = default). */
   creditVolume?: number;
@@ -70,6 +80,10 @@ export type GameSettings = {
   pronunciationEnabled: boolean;
   pronunciationRate: number;
   pronunciationVolume: number;
+  /** Announcer is independent of the SFX parent but still follows Master/focus. */
+  announcerVolume?: number;
+  /** Advanced player-facing category trims. Missing legacy values resolve to 1. */
+  audioCategoryVolumes?: AudioCategoryVolumes;
   killTranslation?: KillTranslationSettings;
   /** World music: each map's playlist, or shuffle every song. */
   musicMode?: MusicPlaybackMode;

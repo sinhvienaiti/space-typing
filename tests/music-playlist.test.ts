@@ -221,16 +221,21 @@ describe("world music playlists", () => {
     controller.destroy();
   });
 
-  it("resumes with a fresh song after a boss, and the next World's first song after a boss there", () => {
+  it("keeps same-World normal music through boss fallback and follows a new World's identity", () => {
     const { controller, playing } = setup("world-01");
     controller.transitionTo("WORLD_NORMAL", 0);
+    expect(playing()).toBe("signal-in-the-void");
+
     controller.transitionTo("WORLD_BOSS", 0);
-    expect(playing()).toBeNull();
+    expect(playing()).toBe("signal-in-the-void");
+    expect(controller.getDebugSnapshot().playlistResolvedFrom).toContain("normal");
+
     controller.transitionTo("WORLD_NORMAL", 0);
-    expect(playing()).toBe("starlit-lullaby");
+    expect(playing()).toBe("signal-in-the-void");
 
     controller.transitionTo("WORLD_BOSS", 0);
     controller.setWorldProfile(musicProfileForWorld("world-06"));
+    expect(playing()).toBe("ember-rush");
     controller.transitionTo("WORLD_NORMAL", 0);
     expect(playing()).toBe("ember-rush");
     controller.destroy();
