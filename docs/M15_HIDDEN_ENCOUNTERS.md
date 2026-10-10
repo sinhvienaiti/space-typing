@@ -4,6 +4,21 @@ M15 extends the existing M14 route/persistence contract with optional secret enc
 
 It does not create a second Campaign, navigation layer, combat runtime, status system, announcer, music controller, or save domain.
 
+## R01 discovery boundary
+
+The Campaign Map/Rest Stop redesign adds **Hidden Shop** and **Hidden Station** as deterministic seeded post-stage discoveries with automatic arrival. Those service discoveries share the existing `HiddenDiscoveryState`, persistence and finite-stock/service systems, but they do **not** replace the optional combat activities defined by M15.
+
+The boundary is intentional:
+
+- Hidden Shop/Station are rare post-stage service arrivals; the player does not choose them as ordinary route lanes;
+- each eligible discovery context is rolled/persisted once, so reload, replay or dialog churn cannot reroll the same discovery;
+- service arrival may be left without buying/using anything, and finite stock/purchases remain persisted through the existing save path;
+- Hidden Challenge, Hidden World and Champion Hunt keep their own discovered offer, Tier I-III and Skip semantics;
+- the Journey Map may present discovered hidden landmarks, but knowledge presentation does not own discovery rolls, rewards, stock or save mutation;
+- when a hidden service discovery and an x10 checkpoint coincide, both transitions are preserved in deterministic order rather than one deleting the other.
+
+R01 real-browser structural QA is available through `pnpm visual:r01-qa`; final desktop/mobile screenshot hierarchy review remains a separate visual sign-off gate.
+
 ## Discovery and route integration
 
 Existing HiddenDiscoveryState remains the source of discovery knowledge.
@@ -14,7 +29,7 @@ Discovered entries unlock optional encounter offers:
 - Ghost Contract -> Champion Hunt on deterministic eligible sectors;
 - Void Warden -> Hidden World on deterministic eligible sectors.
 
-Offers are rendered inside the existing Route Map after the normal route choice is locked.
+Offers use the existing persisted Campaign/route transition layer rather than creating a second navigation or save domain.
 
 The player may:
 
@@ -228,7 +243,7 @@ Backup export now passes the actual RouteState into createPlayerSave.
 
 ## Performance
 
-Hidden offer generation is a small deterministic calculation at Route Map render.
+Hidden offer generation is a small deterministic calculation at Campaign/route presentation time.
 
 Hidden runtime profile resolution occurs at encounter start.
 
@@ -252,8 +267,10 @@ Automated coverage verifies:
 - Champion Hunt priority-only runtime;
 - bounded kill-chain window;
 - premium reward production;
-- Hidden discovery rolls preserve active encounter state.
+- Hidden discovery rolls preserve active encounter state;
+- R01 hidden Shop/Station discovery presentation cannot own/reroll canonical discovery state;
+- automatic hidden service arrival remains compatible with checkpoint/rest-hub sequencing.
 
-CI #262 passes Test + Build on the implementation head.
+Historical M15 integration passed CI #262. The R01 redesign branch passes the normal Test + Build gate on CI #1813 at commit `6f58a80259ef480a84e27324c13f79fe341ee0d3`; subsequent documentation-only commits must remain green. Final desktop/mobile screenshot hierarchy review is still required before declaring the Campaign presentation fully signed off.
 
 M16 owns Stage Objectives and World-specific boss typing mechanics. It must extend the existing StageConfig/BossState typing runtime rather than create parallel objective or boss combat engines.
