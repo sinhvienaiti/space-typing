@@ -28,3 +28,18 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: R01 browser QA
+        run: pnpm visual:r01-qa
+
+      - name: Upload R01 browser captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r01-campaign-map-${{ github.run_id }}
+          path: |
+            .visual/r01-desktop.png
+            .visual/r01-mobile.png
+            .visual/r01-vite.log
+          if-no-files-found: warn
+          retention-days: 7
