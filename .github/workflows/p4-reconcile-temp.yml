@@ -1,0 +1,144 @@
+name: P4 English reconciliation helper
+
+on:
+  push:
+    branches:
+      - tmp/p4-english-reconcile-20261012
+    paths:
+      - .github/workflows/p4-reconcile-temp.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+      - name: Forward-port PR 129 onto current integration state
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected exactly one anchor, found {count}")
+              return text.replace(old, new, 1)
+
+          shared_path = Path("src/learning/shared.ts")
+          shared = shared_path.read_text()
+          shared = replace_once(
+              shared,
+              'export const REVIEW_ERROR_MESSAGE = "typing-game:learning:v1:review-error";\nexport const PARENT_ORIGIN = "https://typing-game.local";',
+              'export const REVIEW_ERROR_MESSAGE = "typing-game:learning:v1:review-error";\nexport const ENGLISH_ACTIVITY_DATASET_MESSAGE =\n  "typing-game:english-content:v1:activity-dataset";\nexport const PARENT_ORIGIN = "https://typing-game.local";',
+              "shared constant",
+          )
+          shared = replace_once(
+              shared,
+              '''export type SpaceReviewDataset = {\n  version: 1;\n  type: typeof REVIEW_DATASET_MESSAGE;\n  requestId: string;\n  goal: SpaceReviewGoal;\n  entityIds: string[];\n};\n\nexport type SpaceLearningEvent = {''',
+              '''export type SpaceReviewDataset = {\n  version: 1;\n  type: typeof REVIEW_DATASET_MESSAGE;\n  requestId: string;\n  goal: SpaceReviewGoal;\n  entityIds: string[];\n};\n\nexport type SpaceEnglishActivity =\n  | "vocabulary"\n  | "collocation"\n  | "phrasal-verb"\n  | "chunk"\n  | "grammar-challenge"\n  | "contextual-usage";\n\nexport type SpaceEnglishActivityDataset = {\n  version: 1;\n  type: typeof ENGLISH_ACTIVITY_DATASET_MESSAGE;\n  requestId: string;\n  gameId: "space-typing";\n  activity: SpaceEnglishActivity;\n  items: Array<{\n    contentId: string;\n    entityType: "vocabulary" | "grammar" | "sentence";\n    entityId: string;\n    promptText: string;\n    answerText: string;\n    meaningVi?: string;\n    ipa?: string;\n  }>;\n};\n\nexport type SpaceLearningEvent = {''',
+              "shared English types",
+          )
+          shared = replace_once(
+              shared,
+              '  entityType: "vocabulary";\n  entityId: string;\n  gameId: "space-typing";\n  activityType: "typing" | "recall" | "speaking" | "speaking-recall";',
+              '  entityType: "vocabulary" | "grammar" | "sentence";\n  entityId: string;\n  gameId: "space-typing";\n  activityType: string;',
+              "shared event shape",
+          )
+          shared = replace_once(
+              shared,
+              '''const GOALS = new Set<SpaceReviewGoal>([\n  "remember-words",\n  "spelling",\n  "mixed",\n]);''',
+              '''const GOALS = new Set<SpaceReviewGoal>([\n  "remember-words",\n  "spelling",\n  "mixed",\n]);\nconst ENGLISH_ACTIVITIES = new Set<SpaceEnglishActivity>([\n  "vocabulary",\n  "collocation",\n  "phrasal-verb",\n  "chunk",\n  "grammar-challenge",\n  "contextual-usage",\n]);''',
+              "shared activity set",
+          )
+          english_parser = r'''export function parseSpaceEnglishActivityDataset(\n  value: unknown,\n): SpaceEnglishActivityDataset | null {\n  if (!plainObject(value) || value["type"] !== ENGLISH_ACTIVITY_DATASET_MESSAGE) {\n    return null;\n  }\n  if (value["version"] !== 1 || value["gameId"] !== "space-typing") {\n    throw new TypeError("Space English activity dataset identity is invalid");\n  }\n  const requestId = value["requestId"];\n  if (typeof requestId !== "string" || !REQUEST_ID_PATTERN.test(requestId)) {\n    throw new TypeError("Space English activity requestId is invalid");\n  }\n  const activity = value["activity"];\n  if (\n    typeof activity !== "string" ||\n    !ENGLISH_ACTIVITIES.has(activity as SpaceEnglishActivity)\n  ) {\n    throw new TypeError("Space English activity is invalid");\n  }\n  const items = value["items"];\n  if (!Array.isArray(items) || items.length === 0 || items.length > 100) {\n    throw new TypeError("Space English activity items must contain 1 to 100 items");\n  }\n  const parsed: SpaceEnglishActivityDataset["items"] = [];\n  const seen = new Set<string>();\n  for (const item of items) {\n    if (!plainObject(item)) {\n      throw new TypeError("Space English activity item is invalid");\n    }\n    const contentId = item["contentId"];\n    const entityType = item["entityType"];\n    const entityId = item["entityId"];\n    const promptText = item["promptText"];\n    const answerText = item["answerText"];\n    if (\n      typeof contentId !== "string" ||\n      (entityType !== "vocabulary" &&\n        entityType !== "grammar" &&\n        entityType !== "sentence") ||\n      typeof entityId !== "string" ||\n      typeof promptText !== "string" ||\n      typeof answerText !== "string"\n    ) {\n      throw new TypeError("Space English activity item fields are invalid");\n    }\n    const cleanContentId = contentId.normalize("NFC").trim();\n    const cleanEntityId = entityId.normalize("NFC").trim();\n    const cleanPrompt = promptText.normalize("NFC").trim().replace(/\\s+/g, " ");\n    const cleanAnswer = answerText.normalize("NFC").trim().replace(/\\s+/g, " ");\n    if (\n      cleanContentId === "" ||\n      cleanEntityId === "" ||\n      cleanPrompt === "" ||\n      cleanAnswer === "" ||\n      cleanAnswer.length > 240\n    ) {\n      throw new TypeError("Space English activity item text is invalid");\n    }\n    if (activity === "grammar-challenge") {\n      if (entityType !== "grammar" || !cleanEntityId.startsWith("gr.")) {\n        throw new TypeError("Space grammar challenge requires a stable gr.* entity");\n      }\n    } else if (entityType === "grammar") {\n      throw new TypeError("Space grammar entity is reserved for grammar-challenge");\n    }\n    if (seen.has(cleanContentId)) {\n      throw new TypeError("Space English activity contentId is duplicated");\n    }\n    seen.add(cleanContentId);\n    parsed.push({\n      contentId: cleanContentId,\n      entityType,\n      entityId: cleanEntityId,\n      promptText: cleanPrompt,\n      answerText: cleanAnswer,\n      ...(typeof item["meaningVi"] === "string" && item["meaningVi"].trim() !== ""\n        ? { meaningVi: item["meaningVi"].normalize("NFC").trim() }\n        : {}),\n      ...(typeof item["ipa"] === "string" && item["ipa"].trim() !== ""\n        ? { ipa: item["ipa"].normalize("NFC").trim() }\n        : {}),\n    });\n  }\n  return {\n    version: 1,\n    type: ENGLISH_ACTIVITY_DATASET_MESSAGE,\n    requestId,\n    gameId: "space-typing",\n    activity: activity as SpaceEnglishActivity,\n    items: parsed,\n  };\n}\n\nexport function spaceEnglishActivityEntries(\n  dataset: SpaceEnglishActivityDataset,\n): VocabularyEntry[] {\n  return dataset.items.map((item) => ({\n    id: "english-content:" + item.contentId,\n    en: item.answerText,\n    vi: item.meaningVi ?? item.promptText,\n    ipa: item.ipa ?? "",\n    learning: {\n      entityType: item.entityType,\n      entityId: item.entityId,\n      activityType: dataset.activity,\n    },\n  }));\n}\n\n'''
+          english_parser = english_parser.replace('\\n', '\n')
+          shared = replace_once(
+              shared,
+              "export function buildCombatLearningEvent(options: {",
+              english_parser + "export function buildCombatLearningEvent(options: {",
+              "shared parser insertion",
+          )
+          shared = replace_once(
+              shared,
+              '''}): SpaceLearningEvent {\n  const correct = options.inputSource === "voice" || options.perfect;\n  return {\n    version: 1,\n    entityType: "vocabulary",\n    entityId: normalizeLearningEntityId(options.entry.en),\n    gameId: "space-typing",\n    activityType: options.inputSource === "voice" ? "speaking" : "typing",''',
+              '''}): SpaceLearningEvent {\n  const voice = options.inputSource === "voice";\n  const correct = voice || options.perfect;\n  const learning = options.entry.learning;\n  return {\n    version: 1,\n    entityType: learning?.entityType ?? "vocabulary",\n    entityId: learning?.entityId ?? normalizeLearningEntityId(options.entry.en),\n    gameId: "space-typing",\n    activityType: voice ? "speaking" : learning?.activityType ?? "typing",''',
+              "combat learning metadata",
+          )
+          shared = replace_once(
+              shared,
+              '''  const correct = result.completed && (inputSource === "voice" || result.perfect);\n  return {\n    version: 1,\n    entityType: "vocabulary",\n    entityId: normalizeLearningEntityId(result.entry.en),\n    gameId: "space-typing",\n    activityType: inputSource === "voice" ? "speaking-recall" : "recall",''',
+              '''  const voice = inputSource === "voice";\n  const correct = result.completed && (voice || result.perfect);\n  const learning = result.entry.learning;\n  return {\n    version: 1,\n    entityType: learning?.entityType ?? "vocabulary",\n    entityId: learning?.entityId ?? normalizeLearningEntityId(result.entry.en),\n    gameId: "space-typing",\n    activityType: voice ? "speaking-recall" : learning?.activityType ?? "recall",''',
+              "recall learning metadata",
+          )
+          shared_path.write_text(shared)
+
+          types_path = Path("src/types.ts")
+          types = types_path.read_text()
+          types = replace_once(
+              types,
+              '''export type EliteModifier = "swift" | "armored" | "frenzy" | "volatile";\n\nexport type VocabularyEntry = {\n  id: string;\n  en: string;\n  vi: string;\n  ipa: string;\n};''',
+              '''export type EliteModifier = "swift" | "armored" | "frenzy" | "volatile";\n\nexport type LearningEntityType = "vocabulary" | "grammar" | "sentence";\n\nexport type LearningMetadata = {\n  entityType: LearningEntityType;\n  entityId: string;\n  activityType: string;\n};\n\nexport type VocabularyEntry = {\n  id: string;\n  en: string;\n  vi: string;\n  ipa: string;\n  learning?: LearningMetadata;\n};''',
+              "types learning metadata",
+          )
+          types_path.write_text(types)
+
+          tests_path = Path("tests/shared-learning.test.ts")
+          tests = tests_path.read_text()
+          tests = replace_once(
+              tests,
+              '''  buildCombatLearningEvent,\n  buildRecallLearningEvent,\n  parseSpaceReviewDataset,''',
+              '''  buildCombatLearningEvent,\n  buildRecallLearningEvent,\n  parseSpaceEnglishActivityDataset,\n  parseSpaceReviewDataset,\n  spaceEnglishActivityEntries,''',
+              "test imports",
+          )
+          closing = "\n});\n"
+          if not tests.endswith(closing):
+              raise SystemExit("tests closing anchor missing")
+          english_tests = r'''\n  it("keeps grammar challenges in the canonical grammar mastery bucket", () => {\n    const dataset = parseSpaceEnglishActivityDataset({\n      version: 1,\n      type: "typing-game:english-content:v1:activity-dataset",\n      requestId: "space-rich-1",\n      gameId: "space-typing",\n      activity: "grammar-challenge",\n      items: [{\n        contentId: "gr.b1.second-conditional",\n        entityType: "grammar",\n        entityId: "gr.b1.second-conditional",\n        promptText: "Complete the hypothetical sentence",\n        answerText: "If I had more time, I would learn another language.",\n      }],\n    });\n    expect(dataset).not.toBeNull();\n    const entry = spaceEnglishActivityEntries(dataset!)[0]!;\n    expect(\n      buildCombatLearningEvent({\n        entry,\n        perfect: false,\n        occurredAt: "2026-10-03T00:00:00.000Z",\n      }),\n    ).toMatchObject({\n      entityType: "grammar",\n      entityId: "gr.b1.second-conditional",\n      activityType: "grammar-challenge",\n      result: "wrong",\n      errorType: "spelling",\n    });\n  });\n\n  it("rejects grammar ids outside grammar-challenge activity", () => {\n    expect(() =>\n      parseSpaceEnglishActivityDataset({\n        version: 1,\n        type: "typing-game:english-content:v1:activity-dataset",\n        requestId: "space-rich-bad",\n        gameId: "space-typing",\n        activity: "collocation",\n        items: [{\n          contentId: "col.example",\n          entityType: "grammar",\n          entityId: "gr.a1.example",\n          promptText: "example",\n          answerText: "make a decision",\n        }],\n      }),\n    ).toThrow("reserved");\n  });\n\n  it("preserves speaking modality while keeping canonical rich-content identity", () => {\n    const dataset = parseSpaceEnglishActivityDataset({\n      version: 1,\n      type: "typing-game:english-content:v1:activity-dataset",\n      requestId: "space-rich-voice",\n      gameId: "space-typing",\n      activity: "grammar-challenge",\n      items: [{\n        contentId: "gr.b1.voice",\n        entityType: "grammar",\n        entityId: "gr.b1.voice",\n        promptText: "Say the answer",\n        answerText: "If I knew, I would tell you.",\n      }],\n    });\n    const entry = spaceEnglishActivityEntries(dataset!)[0]!;\n    expect(\n      buildCombatLearningEvent({\n        entry,\n        perfect: false,\n        inputSource: "voice",\n        occurredAt: "2026-10-03T00:00:00.000Z",\n      }),\n    ).toMatchObject({\n      entityType: "grammar",\n      entityId: "gr.b1.voice",\n      activityType: "speaking",\n      result: "correct",\n    });\n  });\n'''.replace('\\n', '\n')
+          tests = tests[:-len(closing)] + english_tests + closing
+          tests_path.write_text(tests)
+
+          main_path = Path("src/main.ts")
+          main = main_path.read_text()
+          main = replace_once(
+              main,
+              '''import {\n  LEARNING_ATTEMPT_MESSAGE,\n  PARENT_ORIGIN,\n  REVIEW_DATASET_MESSAGE,\n  REVIEW_ERROR_MESSAGE,\n  REVIEW_READY_MESSAGE,\n  buildCombatLearningEvent,\n  buildRecallLearningEvent,\n  parseSpaceReviewDataset,\n  type SpaceReviewGoal,\n} from "./learning/shared";''',
+              '''import {\n  ENGLISH_ACTIVITY_DATASET_MESSAGE,\n  LEARNING_ATTEMPT_MESSAGE,\n  PARENT_ORIGIN,\n  REVIEW_DATASET_MESSAGE,\n  REVIEW_ERROR_MESSAGE,\n  REVIEW_READY_MESSAGE,\n  buildCombatLearningEvent,\n  buildRecallLearningEvent,\n  parseSpaceEnglishActivityDataset,\n  parseSpaceReviewDataset,\n  spaceEnglishActivityEntries,\n  type SpaceReviewGoal,\n} from "./learning/shared";''',
+              "main learning imports",
+          )
+          english_runtime = r'''async function applySpaceEnglishActivityDataset(data: unknown): Promise<void> {\n  const raw =\n    data !== null && typeof data === "object"\n      ? (data as Record<string, unknown>)\n      : null;\n  const fallbackRequestId =\n    raw !== null && typeof raw["requestId"] === "string"\n      ? raw["requestId"].slice(0, 100)\n      : "invalid";\n\n  try {\n    const dataset = parseSpaceEnglishActivityDataset(data);\n    if (dataset === null) return;\n    if (warpAccount?.attempt && !await finishManagedSortie("abandoned")) return;\n    if (testingStagePreviewActive()) {\n      restoreTestingStagePersistentState();\n      await practiceReload;\n      if (practiceRestorePending) {\n        throw new Error("Reload the account before switching English Practice sessions");\n      }\n    }\n\n    const entries = spaceEnglishActivityEntries(dataset);\n    if (gameplayModeBeforeReview === null) {\n      gameplayModeBeforeReview = gameplayMode;\n    }\n    activeReviewGoal = "mixed";\n    activeReviewVocabulary = entries;\n    activeReviewLevel = 1;\n    gameplayMode = "combat";\n\n    if (game.getPhase() !== "title") {\n      game.backToTitle();\n    }\n    game.setVocabulary(activeReviewVocabulary);\n    game.setVocabularyLevel(activeReviewLevel);\n    renderGameplayMode();\n\n    if (window.parent !== window) {\n      window.parent.postMessage(\n        {\n          type: REVIEW_READY_MESSAGE,\n          requestId: dataset.requestId,\n          result: {\n            items: entries.length,\n            activity: dataset.activity,\n            gameplayMode,\n            richContent: true,\n          },\n        },\n        PARENT_ORIGIN,\n      );\n    }\n    showNotice(\n      "English practice ready · " +\n        String(entries.length) +\n        " target" +\n        (entries.length === 1 ? "" : "s") +\n        " · " +\n        dataset.activity +\n        " · press Continue",\n    );\n  } catch (error) {\n    leaveReviewMode();\n    if (window.parent !== window) {\n      window.parent.postMessage(\n        {\n          type: REVIEW_ERROR_MESSAGE,\n          requestId: fallbackRequestId,\n          message:\n            error instanceof Error\n              ? error.message\n              : "Space English activity failed",\n        },\n        PARENT_ORIGIN,\n      );\n    }\n  }\n}\n\n'''.replace('\\n', '\n')
+          main = replace_once(
+              main,
+              'window.addEventListener("message", (event: MessageEvent<unknown>) => {',
+              english_runtime + 'window.addEventListener("message", (event: MessageEvent<unknown>) => {',
+              "main English runtime insertion",
+          )
+          main = replace_once(
+              main,
+              '''  const data = event.data as Record<string, unknown>;\n  if (data["type"] !== REVIEW_DATASET_MESSAGE) return;\n  void applySpaceReviewDataset(event.data);\n});''',
+              '''  const data = event.data as Record<string, unknown>;\n  if (data["type"] === REVIEW_DATASET_MESSAGE) {\n    void applySpaceReviewDataset(event.data);\n    return;\n  }\n  if (data["type"] === ENGLISH_ACTIVITY_DATASET_MESSAGE) {\n    void applySpaceEnglishActivityDataset(event.data);\n  }\n});''',
+              "main message routing",
+          )
+          main_path.write_text(main)
+          PY
+      - name: Verify narrow P4 delta
+        shell: bash
+        run: |
+          git diff --check
+          actual="$(git diff --name-only | sort)"
+          expected="$(printf '%s\n' src/learning/shared.ts src/main.ts src/types.ts tests/shared-learning.test.ts | sort)"
+          test "$actual" = "$expected" || { echo "Unexpected files:"; echo "$actual"; exit 1; }
+      - name: Commit isolated reconciled files
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/learning/shared.ts src/main.ts src/types.ts tests/shared-learning.test.ts
+          git commit -m "feat: reconcile rich English learning integration"
+          git push origin HEAD:"$GITHUB_REF_NAME"
