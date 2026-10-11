@@ -1,6 +1,7 @@
 {
   "contractRevision": "space-typing-admin-daily-weekly-v1",
   "schemaVersion": 1,
+  "gameId": "space-typing",
   "capability": "daily-weekly.read",
   "route": {
     "id": "daily-weekly",
@@ -8,42 +9,43 @@
     "label": "Daily / Weekly"
   },
   "liveOps": {
-    "mode": "runtime-partial-readonly",
+    "mode": "runtime-readonly",
     "runtimeSources": [
       "src/expansion-v2/challenge.ts",
       "src/expansion-v2/profile-store.ts",
-      "src/expedition/core.ts",
-      "src/expedition/ui.ts",
-      "src/main.ts"
+      "src/expansion-v2/weekly-challenge-runtime.ts",
+      "src/expansion-v2/weekly-challenge-admin.ts",
+      "src/expedition/session.ts"
     ],
     "daily": {
       "available": true,
-      "owner": "Expansion V2 Daily Expedition fixed challenge",
-      "challengeKind": "daily",
-      "cadence": "utc-day",
-      "dayKeyFormat": "YYYY-MM-DD",
-      "seedPolicy": "hash(dayKey|rulesetVersion)",
-      "identityFields": [
-        "dayKey",
-        "seed",
-        "rulesetVersion",
-        "contentVersion",
-        "wordPoolHash",
-        "startKitId",
-        "difficulty",
-        "assist",
-        "adaptivePolicy"
-      ],
-      "adaptivePolicy": "frozen",
-      "personalBest": true,
-      "personalGhost": true,
-      "profileStorageKey": "spaceTypingExpansionV2ProfileV1",
-      "remoteScheduler": false,
-      "remoteLeaderboard": false
+      "identity": "canonical-utc-day-expedition-challenge",
+      "resetBoundary": "UTC-day",
+      "seedOwner": "dailySeed(dayKey, rulesetVersion)",
+      "adminMode": "read-only",
+      "writeCapability": false
     },
     "weekly": {
-      "available": false,
-      "reason": "No canonical weekly challenge identity, weekly seed policy, weekly reset scheduler or weekly reward track exists in the current Space Typing runtime."
+      "available": true,
+      "identity": "canonical-utc-iso-week-expedition-challenge",
+      "weekKeyOwner": "weeklyChallengeWeekKey(date)",
+      "seedOwner": "weeklySeed(weekKey, rulesetVersion)",
+      "runtimeOwner": "weekly-challenge-runtime + weekly-challenge-admin",
+      "adminMode": "read-only",
+      "readableState": [
+        "weekKey",
+        "seed",
+        "identityKey",
+        "resumeStatus",
+        "rewardClaimed",
+        "personalBest",
+        "ghostPointCount",
+        "leaderboardEligible"
+      ],
+      "writeCapability": false,
+      "schedulerControlCapability": false,
+      "rewardAuthoringCapability": false,
+      "seedOverrideCapability": false
     },
     "adminWriteCapability": false,
     "scheduleAuthoringCapability": false,
@@ -51,12 +53,12 @@
     "publishCapability": false,
     "applyBoundary": "none",
     "unsupportedAdminOperations": [
-      "creating or editing daily schedules",
-      "creating a synthetic weekly challenge",
-      "changing the deterministic daily seed",
-      "editing player Personal Best or Personal Ghost records",
-      "claiming a remote leaderboard or scheduler backend",
-      "publishing daily or weekly rewards"
+      "override canonical Daily or Weekly seed",
+      "change UTC Daily or ISO-week reset identity",
+      "author Weekly rewards",
+      "schedule Weekly challenges from Admin",
+      "mutate browser-local player challenge progress",
+      "fabricate remote leaderboard data"
     ]
   }
 }
