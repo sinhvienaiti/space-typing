@@ -29,6 +29,16 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Smoke canonical Admin preview bridges
+        run: |
+          pnpm ships:admin-preview </dev/null >/dev/null
+          pnpm equipment:admin-preview </dev/null >/dev/null
+          pnpm skills:admin-preview </dev/null >/dev/null
+          pnpm enemies:admin-preview </dev/null >/dev/null
+          pnpm bosses:admin-preview </dev/null >/dev/null
+          pnpm worlds:admin-preview </dev/null >/dev/null
+          pnpm stages:admin-preview </dev/null >/dev/null
+
       - name: Audit Warp economy
         run: pnpm stamina:audit
 
