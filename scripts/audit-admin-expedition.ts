@@ -22,7 +22,7 @@ assert.equal(contract.expedition.startKitId, "loaner-vanguard-v1");
 assert.equal(contract.expedition.encounterCount, 8);
 assert.deepEqual(contract.expedition.draftBeforeEncounterIndexes, [0, 2, 4, 6]);
 assert.equal(contract.expedition.restAfterEncounterIndex, 3);
-assert.deepEqual(contract.expedition.challengeKinds, ["prototype", "daily", "qa"]);
+assert.deepEqual(contract.expedition.challengeKinds, ["prototype", "daily", "weekly", "qa"]);
 assert.equal(contract.expedition.persistence.storageKey, "spaceTypingExpeditionRunV1");
 assert.equal(contract.expedition.persistence.revisionedEnvelope, true);
 assert.equal(contract.expedition.persistence.writerOwnership, true);
@@ -40,7 +40,7 @@ for (const evidence of [
   'EXPEDITION_RULESET_VERSION = "expansion-v2-v1"',
   'EXPEDITION_CONTENT_VERSION = "expansion-v2-world-01-v1"',
   'EXPEDITION_START_KIT_ID = "loaner-vanguard-v1"',
-  'kind: "prototype" | "daily" | "qa"',
+  'kind: "prototype" | "daily" | "weekly" | "qa"',
   "campaignFixtureHash",
   "campaignFixtureUnchanged",
 ]) {
@@ -103,4 +103,4 @@ for (const unsupported of [
   assert.ok(contract.expedition.unsupportedAdminOperations.includes(unsupported));
 }
 
-console.log("Admin Expedition audit passed: deterministic browser-persisted runtime is mapped read-only without fabricating remote run control.");
+console.log("Admin Expedition audit passed: deterministic browser-persisted runtime, including Weekly challenge binding, is mapped read-only without fabricating remote run control.");
