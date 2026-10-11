@@ -80,6 +80,9 @@
       "mode": "persisted-authoritative-readonly",
       "adminSurfaceOwner": "buildDuelRankedHistoryAdminSurface",
       "queryServiceOwner": "DuelRankedHistoryQueryService",
+      "queryServiceAvailable": true,
+      "productionTransportExposed": false,
+      "parentAdminQueryBridge": false,
       "defaultScope": "self",
       "crossPlayerScope": "authorized-cross-player",
       "authenticationRequired": true,
@@ -110,6 +113,7 @@
       "query another player without explicit server authorization",
       "bypass authenticated identity",
       "rewrite persisted Ranked history",
+      "claim Ranked history data is queryable through the current Parent Admin transport",
       "enable Alternative Modes in Ranked when canonical admission rejects them"
     ]
   }
