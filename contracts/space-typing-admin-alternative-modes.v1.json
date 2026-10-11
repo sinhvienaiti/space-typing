@@ -18,6 +18,12 @@
       "server/duel/alternative-coordinator.ts"
     ],
     "runtimeOwner": "AlternativeMatchRuntime",
+    "supportedDuelMatchModes": ["friend", "ranked", "practice"],
+    "requestedPrototypeModes": ["reflex", "word-chain"],
+    "runtimeImplementations": {
+      "reflex": true,
+      "word-chain": true
+    },
     "implementations": [
       {
         "id": "reflex",
@@ -38,9 +44,24 @@
     ],
     "authorableFields": [],
     "writeCapability": false,
-    "publishCapability": false,
+    "previewCapability": false,
     "rankedAdmissionCapability": false,
+    "persistenceOwner": "AlternativeMatchRuntime snapshot-v1",
     "applyBoundary": "none",
+    "unsupportedAdminMockFields": [
+      "reactionWindowMs",
+      "roundDamage",
+      "challengePool",
+      "botReactionMs",
+      "practiceEnabled",
+      "friendRoomEnabled",
+      "rankedEnabled",
+      "beatWindowMs",
+      "penaltyDamage",
+      "lexicon",
+      "chainRule"
+    ],
+    "diagnostic": "Reflex and Word Chain now have canonical friend/practice runtime owners. Ranked admission remains fail-closed and Admin authoring remains unavailable.",
     "unsupportedAdminOperations": [
       "enable Reflex or Word Chain in Ranked",
       "author new alternative mode rules from Admin",
