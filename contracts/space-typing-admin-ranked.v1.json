@@ -12,80 +12,38 @@
     "mode": "runtime-derived-readonly",
     "runtimeSources": [
       "src/duel/ranked.ts",
-      "src/duel/authority.ts",
+      "src/duel/ranked-history.ts",
+      "src/duel/ranked-history-admin.ts",
       "server/duel/ranked-service.ts",
-      "server/duel/ws-server.ts"
+      "server/duel/ranked-history-query-service.ts",
+      "server/duel/ranked-history-store.ts"
     ],
-    "authorableFields": [],
-    "ruleset": {
-      "id": "ranked-standard-v1",
-      "combatProfile": "normalized",
-      "matchLengthSeconds": 240,
-      "roundFormat": 3,
-      "hazardLevel": "standard",
-      "mysteryFrequency": "standard",
-      "fateFrequency": "standard",
-      "modifier": "standard",
-      "allowPveStatScaling": false,
-      "allowPveLuckPity": false,
-      "allowCampaignCreditMinting": false,
-      "normalizedLoadoutBudget": 3,
-      "mapPool": [
-        "frost-wastes",
-        "inferno-rift",
-        "tempest-prime",
-        "ocean-abyss",
-        "terra-core",
-        "celestial-void"
-      ]
+    "liveSummary": {
+      "available": true,
+      "writeCapability": false
     },
-    "rating": {
-      "base": 1000,
-      "min": 400,
-      "max": 2600,
-      "typingWeight": 0.4,
-      "duelWeight": 0.6,
-      "provisionalMatches": 20,
-      "experiencedMatches": 80,
-      "kFactors": [40, 28, 20]
+    "history": {
+      "available": true,
+      "mode": "persisted-authoritative-readonly",
+      "adminSurfaceOwner": "buildDuelRankedHistoryAdminSurface",
+      "queryServiceOwner": "DuelRankedHistoryQueryService",
+      "defaultScope": "self",
+      "crossPlayerScope": "authorized-cross-player",
+      "authenticationRequired": true,
+      "crossPlayerAuthorizationRequired": true,
+      "crossPlayerFailClosedWhenUnconfigured": true,
+      "eventFilters": ["result", "limit"],
+      "writeCapability": false
     },
-    "matchmaking": {
-      "initialAllowedGap": 90,
-      "gapIncreaseEverySeconds": 10,
-      "gapIncrease": 35,
-      "maxAllowedGap": 450,
-      "reconnectGraceMs": 30000
-    },
-    "profile": {
-      "fields": ["accountId", "typingRating", "duelRating", "matchesPlayed", "wins", "losses", "draws"],
-      "persistenceOwner": "server-duel-ranked-profile-store",
-      "defaultStore": "in-memory",
-      "optionalStore": "json-file",
-      "jsonStoreEnv": "DUEL_RANKED_DATA_PATH"
-    },
-    "runtimeServices": [
-      "DuelRankedQueue",
-      "DuelRankedPresence",
-      "DuelRankedService",
-      "InMemoryDuelRankedProfileStore",
-      "JsonFileDuelRankedProfileStore"
-    ],
-    "writeCapability": false,
-    "previewCapability": false,
-    "seasonService": false,
-    "rewardTableService": false,
-    "unsupportedAdminMockFields": [
-      "seasonId",
-      "seasonName",
-      "seasonStartsAt",
-      "seasonEndsAt",
-      "placementMatches",
-      "manualMatchmakingSpread",
-      "rankedEnabled",
-      "modeEnableToggles",
-      "tierThresholds",
-      "seasonRewards",
-      "playerDistribution"
+    "adminWriteCapability": false,
+    "publishCapability": false,
+    "applyBoundary": "none",
+    "unsupportedAdminOperations": [
+      "change Ranked rating or settlements from Admin",
+      "query another player without explicit server authorization",
+      "bypass authenticated identity",
+      "rewrite persisted Ranked history",
+      "enable Alternative Modes in Ranked when canonical admission rejects them"
     ]
   }
 }
