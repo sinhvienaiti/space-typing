@@ -20,6 +20,7 @@ jobs:
         shell: bash
         run: |
           python3 - <<'PY'
+          import re
           from pathlib import Path
 
           path = Path("src/main.ts")
@@ -39,20 +40,25 @@ jobs:
               1,
           )
 
-          old_call = '''  let next = recordExpansionRun(expansionV2Profile, {
-            runId: run.runId,
-            score: run.totalScore,
-            completed: run.phase === "victory",
-          });'''
-          new_call = '  let next = recordExpeditionHistoricalRun(expansionV2Profile, run);'
-          if text.count(old_call) != 1:
-              raise SystemExit(f"expected exactly one legacy terminal history call, found {text.count(old_call)}")
-          text = text.replace(old_call, new_call, 1)
+          pattern = re.compile(
+              r'  let next = recordExpansionRun\(expansionV2Profile, \{\n'
+              r'\s+runId: run\.runId,\n'
+              r'\s+score: run\.totalScore,\n'
+              r'\s+completed: run\.phase === "victory",\n'
+              r'\s+\}\);'
+          )
+          text, count = pattern.subn(
+              '  let next = recordExpeditionHistoricalRun(expansionV2Profile, run);',
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit(f"expected exactly one legacy terminal history call, found {count}")
 
           path.write_text(text)
           PY
           git diff --check
-          test "$(git diff --numstat -- src/main.ts | awk '{print $3}')" = "src/main.ts"
+          test "$(git diff --name-only)" = "src/main.ts"
           grep -F 'import { recordExpeditionHistoricalRun } from "./expansion-v2/expedition-history";' src/main.ts
           grep -F 'let next = recordExpeditionHistoricalRun(expansionV2Profile, run);' src/main.ts
           if grep -Fq '  recordExpansionRun,' src/main.ts; then
