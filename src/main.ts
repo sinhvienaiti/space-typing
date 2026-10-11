@@ -524,12 +524,12 @@ import {
   expansionEvolutionTier,
   loadExpansionV2Profile,
   markExpansionCinematicSeen,
-  recordExpansionRun,
   recordFixedChallengeResult,
   sanitizeExpansionV2Profile,
   setExpansionGhostEnabled,
   type ExpansionV2Profile,
 } from "./expansion-v2/profile-store";
+import { recordExpeditionHistoricalRun } from "./expansion-v2/expedition-history";
 import {
   evidenceFromCompletion,
   evidenceFromRecallAttempt,
@@ -1655,11 +1655,7 @@ function startExpansionCinematicQa(): void {
 function recordExpeditionTerminalProfile(run: ExpeditionRun): void {
   if (!expansionV2Enabled || run.challenge?.kind === "qa") return;
 
-  let next = recordExpansionRun(expansionV2Profile, {
-    runId: run.runId,
-    score: run.totalScore,
-    completed: run.phase === "victory",
-  });
+  let next = recordExpeditionHistoricalRun(expansionV2Profile, run);
   const identityKey = run.challenge?.identityKey ?? null;
   if (run.challenge?.kind === "daily" && identityKey !== null) {
     const accuracy =
