@@ -4,6 +4,7 @@ import alternativeModesContract from "../contracts/space-typing-admin-alternativ
 import telemetryContract from "../contracts/space-typing-admin-telemetry.v1.json";
 import rankedContract from "../contracts/space-typing-admin-ranked.v1.json";
 import qaContract from "../contracts/space-typing-admin-qa.v1.json";
+import expeditionContract from "../contracts/space-typing-admin-expedition.v1.json";
 import { WEEKLY_CHALLENGE_ADMIN_MODE } from "../src/expansion-v2/weekly-challenge-admin";
 import { ALTERNATIVE_MODE_REGISTRY } from "../src/duel/alternative-modes";
 import { HISTORICAL_ANALYTICS_ADMIN_MODE } from "../src/expansion-v2/historical-analytics-admin";
@@ -20,6 +21,21 @@ describe("current Admin contracts follow canonical runtime owners", () => {
       seedOverrideCapability: false,
     });
     expect(dailyWeeklyContract.liveOps.adminWriteCapability).toBe(false);
+  });
+
+  it("keeps the Expedition sidecar aligned with the runtime's Weekly challenge kind", () => {
+    expect(expeditionContract.expedition.challengeKinds).toEqual([
+      "prototype",
+      "daily",
+      "weekly",
+      "qa",
+    ]);
+    expect(expeditionContract.expedition.safety).toMatchObject({
+      adminWriteCapability: false,
+      adminPublishCapability: false,
+      adminRunMutationCapability: false,
+      adminStorageMutationCapability: false,
+    });
   });
 
   it("publishes only the real Reflex and Word Chain admission surface", () => {
