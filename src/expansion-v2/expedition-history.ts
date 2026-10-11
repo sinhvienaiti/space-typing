@@ -59,12 +59,15 @@ export function buildExpeditionHistoricalMetadata(
     challengeKind: run.challenge?.kind ?? null,
     retryCount: Math.max(0, Math.floor(run.retryCount)),
     retried: run.retryCount > 0,
-    assisted: null,
+    assisted: run.profile.assist !== "standard",
     leaderboardEligible: null,
     difficulty: run.profile.difficulty,
     inputMode,
     gameplayMode: run.profile.gameplayMode ?? null,
     sourceStages,
+    // ExpeditionRun v1 has no canonical boss/equipment/skill identity ledger.
+    // Keep those dimensions explicitly unknown instead of reconstructing them
+    // from presentation/runtime state after the fact.
     bossAttempts: [],
     equippedRelicIds: [...run.relics.equipped],
     equipmentIds: [],
