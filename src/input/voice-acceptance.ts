@@ -145,6 +145,8 @@ export class VoiceAcceptanceMonitor {
   }
 
   reset(): void {
+    this.barrierKey = "";
+    this.sessionId = "";
     this.received = 0;
     this.accepted = 0;
     this.rejected = 0;
