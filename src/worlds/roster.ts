@@ -147,14 +147,12 @@ function rewardCandidates(
   return bestFamilyCandidates(world, source);
 }
 
-export function worldRuntimeEnemyDefinitionId(
+export function worldRuntimeEnemyDefinitionIdForWorld(
+  world: WorldProfile,
   kind: EnemyKind,
   elite: boolean,
-  stage: number,
   rosterRandom = Math.random(),
 ): EnemyDefinitionId {
-  const world = worldForStage(stage);
-
   if (elite) {
     const eliteDefinition = pickDefinition(
       eliteCandidates(world),
@@ -171,10 +169,21 @@ export function worldRuntimeEnemyDefinitionId(
   );
   if (regular !== undefined) return regular.id;
 
-  // Every validated World has a non-empty roster. This fallback protects
-  // gameplay from a future malformed authored profile without introducing
-  // a second roster system.
   return world.enemyRoster[0] ?? "rainbow-scout";
+}
+
+export function worldRuntimeEnemyDefinitionId(
+  kind: EnemyKind,
+  elite: boolean,
+  stage: number,
+  rosterRandom = Math.random(),
+): EnemyDefinitionId {
+  return worldRuntimeEnemyDefinitionIdForWorld(
+    worldForStage(stage),
+    kind,
+    elite,
+    rosterRandom,
+  );
 }
 
 export function spawnWorldEnemyDefinitionId(
