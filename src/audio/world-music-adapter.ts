@@ -31,6 +31,12 @@ function stageRoleForState(state: MusicState): StageRole | null {
   return null;
 }
 
+function localCandidateForBundledSource(source: string): string | undefined {
+  const prefix = "/assets/audio/music/";
+  if (!source.startsWith(prefix)) return undefined;
+  return "/local-assets/music/" + source.slice(prefix.length);
+}
+
 export type PublishedWorldMusicResolveInput = {
   worldId: string;
   stageRole: StageRole;
@@ -97,9 +103,11 @@ export function publishedMusicAssetForState(
   const sources = playbackSources(track, intensity);
   const first = sources[0]?.src;
   if (first === undefined || first.length === 0) return null;
+  const localPath = localCandidateForBundledSource(first);
 
   return {
     id: `published-world-music:${worldId}:${id}:${state}`,
+    ...(localPath === undefined ? {} : { localPath }),
     defaultPath: first,
     ...(track.playback.kind === "stems"
       ? { syncGroup: track.playback.syncGroup }
