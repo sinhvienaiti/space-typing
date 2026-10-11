@@ -43,6 +43,31 @@
       "runtime-registry",
       "qa-catalog"
     ],
+    "currentRuntimeCoverage": {
+      "weeklyChallenge": {
+        "owner": "src/expansion-v2/weekly-challenge-admin.ts",
+        "mode": "read-only"
+      },
+      "alternativeModes": {
+        "owner": "src/duel/alternative-modes.ts",
+        "modes": ["reflex", "word-chain"],
+        "rankedEligible": false
+      },
+      "historicalAnalytics": {
+        "owner": "src/expansion-v2/historical-analytics-admin.ts",
+        "scope": "current-local-profile",
+        "crossPlayerSupported": false
+      },
+      "rankedHistory": {
+        "owner": "server/duel/ranked-history-query-service.ts",
+        "authenticationRequired": true,
+        "crossPlayerAuthorizationRequired": true
+      },
+      "voiceHybrid": {
+        "owner": "src/input/voice-adapter.ts",
+        "hardwareAcceptance": "manual"
+      }
+    },
     "catalogDomains": [
       "worlds",
       "enemies",
@@ -73,7 +98,8 @@
       "publish sandbox state as production config",
       "overwrite player saves",
       "persist Test Lab rewards into production wallets",
-      "bypass testLabEnabled runtime guards"
+      "bypass testLabEnabled runtime guards",
+      "claim real microphone hardware acceptance from automated QA"
     ]
   }
 }
