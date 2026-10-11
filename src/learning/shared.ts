@@ -190,8 +190,8 @@ export function parseSpaceEnglishActivityDataset(
     }
     const cleanContentId = contentId.normalize("NFC").trim();
     const cleanEntityId = entityId.normalize("NFC").trim();
-    const cleanPrompt = promptText.normalize("NFC").trim().replace(/\\s+/g, " ");
-    const cleanAnswer = answerText.normalize("NFC").trim().replace(/\\s+/g, " ");
+    const cleanPrompt = promptText.normalize("NFC").trim().replace(/\s+/g, " ");
+    const cleanAnswer = answerText.normalize("NFC").trim().replace(/\s+/g, " ");
     if (
       cleanContentId === "" ||
       cleanEntityId === "" ||
