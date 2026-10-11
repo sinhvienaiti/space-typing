@@ -14,6 +14,7 @@ import {
   musicTrack,
   worldPlaylist,
 } from "../src/audio/music-library";
+import { MUSIC_TRACKS as LEGACY_MUSIC_TRACKS } from "../src/audio/music-library-legacy";
 import { musicProfileForWorld } from "../src/audio/music-profile";
 
 class FakeAudio implements AudioLike {
@@ -77,13 +78,13 @@ function setup(world = "world-01") {
 }
 
 describe("song library", () => {
-  it("covers every mood the owner asked for, each song with two ready stems", () => {
-    expect(MUSIC_TRACKS.length).toBeGreaterThanOrEqual(13);
-    const moods = new Set(MUSIC_TRACKS.map((track) => track.mood));
+  it("keeps the authored stem library's mood coverage and ready two-stem assets", () => {
+    expect(LEGACY_MUSIC_TRACKS.length).toBeGreaterThanOrEqual(13);
+    const moods = new Set(LEGACY_MUSIC_TRACKS.map((track) => track.mood));
     for (const mood of ["sad", "happy", "relaxing", "romantic", "contemplative", "climactic", "lonely", "gloomy", "fiery", "blazing", "gentle"]) {
       expect(moods.has(mood as never)).toBe(true);
     }
-    for (const track of MUSIC_TRACKS) {
+    for (const track of LEGACY_MUSIC_TRACKS) {
       expect(MOOD_LABELS[track.mood]).toBeTruthy();
       expect(track.mixOut).toBeLessThan(track.seconds);
       expect(track.seconds - track.mixOut).toBeGreaterThan(6);
@@ -94,7 +95,7 @@ describe("song library", () => {
     }
   });
 
-  it("gives every Galaxy three songs and plays every song somewhere", () => {
+  it("gives every Galaxy three songs and plays every authored stem song somewhere", () => {
     const used = new Set<string>();
     for (let galaxy = 1; galaxy <= 10; galaxy += 1) {
       const list = GALAXY_PLAYLISTS[galaxy]!;
@@ -104,7 +105,7 @@ describe("song library", () => {
         used.add(id);
       }
     }
-    expect([...used].sort()).toEqual(MUSIC_TRACKS.map((track) => track.id).sort());
+    expect([...used].sort()).toEqual(LEGACY_MUSIC_TRACKS.map((track) => track.id).sort());
   });
 
   it("rotates a Galaxy's playlist so neighbouring Worlds open with different songs", () => {
