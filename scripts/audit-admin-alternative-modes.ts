@@ -15,22 +15,64 @@ assert.deepEqual(contract.route, {
   path: "/admin/space-typing/alternative-modes",
   label: "Alternative Modes",
 });
-assert.equal(alternative.mode, "runtime-absence-diagnostic");
+assert.equal(alternative.mode, "runtime-backed-readonly");
+assert.equal(alternative.runtimeOwner, "AlternativeMatchRuntime");
+assert.deepEqual(alternative.runtimeSources, [
+  "src/duel/alternative-modes.ts",
+  "src/duel/alternative-match-runtime.ts",
+  "src/duel/alternative-protocol.ts",
+  "server/duel/alternative-service.ts",
+  "server/duel/alternative-coordinator.ts",
+]);
 assert.deepEqual(alternative.supportedDuelMatchModes, ["friend", "ranked", "practice"]);
 assert.deepEqual(alternative.requestedPrototypeModes, ["reflex", "word-chain"]);
-assert.deepEqual(alternative.runtimeImplementations, { reflex: false, "word-chain": false });
+assert.deepEqual(alternative.runtimeImplementations, { reflex: true, "word-chain": true });
+assert.deepEqual(alternative.implementations, [
+  {
+    id: "reflex",
+    available: true,
+    supportedMatchTypes: ["friend", "practice"],
+    rankedEligible: false,
+    persistence: "snapshot-v1",
+    reconnect: true,
+  },
+  {
+    id: "word-chain",
+    available: true,
+    supportedMatchTypes: ["friend", "practice"],
+    rankedEligible: false,
+    persistence: "snapshot-v1",
+    reconnect: true,
+  },
+]);
 assert.deepEqual(alternative.authorableFields, []);
 assert.equal(alternative.writeCapability, false);
 assert.equal(alternative.previewCapability, false);
 assert.equal(alternative.rankedAdmissionCapability, false);
-assert.equal(alternative.persistenceOwner, "none");
+assert.equal(alternative.persistenceOwner, "AlternativeMatchRuntime snapshot-v1");
 assert.equal(alternative.applyBoundary, "none");
 
 const sources = await Promise.all(alternative.runtimeSources.map((path: string) => read(path)));
-const combined = sources.join("\n").toLowerCase();
-for (const token of ["reflex", "word-chain", "word chain"]) {
-  assert(!combined.includes(token), `Unexpected canonical Alternative Mode runtime evidence found: ${token}`);
+const combined = sources.join("\n");
+for (const token of ["reflex", "word-chain", "AlternativeMatchRuntime", "snapshot-v1"]) {
+  assert(combined.includes(token), `Expected canonical Alternative Mode runtime evidence missing: ${token}`);
 }
+
+const registry = sources[0];
+assert(registry.includes('const FRIEND_PRACTICE = ["friend", "practice"] as const'));
+assert(registry.includes("rankedEligible: false"), "Alternative modes must remain fail-closed for Ranked.");
+assert(registry.includes('runtimeOwner: "AlternativeMatchRuntime"'));
+
+const runtime = sources[1];
+assert(runtime.includes("export class AlternativeMatchRuntime"), "Canonical AlternativeMatchRuntime owner is missing.");
+assert(runtime.includes("static restore("), "Alternative mode reconnect/restore support is missing.");
+assert(runtime.includes("snapshot(): AlternativeMatchSnapshotV1"), "Alternative mode snapshot persistence is missing.");
+
+const alternativeProtocol = sources[2];
+assert(alternativeProtocol.includes('type: "MODE_INPUT"'), "Alternative mode wire input is missing.");
+assert(alternativeProtocol.includes('mode: "reflex"'), "Reflex protocol support is missing.");
+assert(alternativeProtocol.includes('mode: "word-chain"'), "Word Chain protocol support is missing.");
+
 const authority = await read("src/duel/authority.ts");
 assert(authority.includes('mode: "friend" | "ranked" | "practice"'), "Canonical Duel match modes changed; re-audit Alternative Modes ownership.");
 const protocol = await read("src/duel/protocol.ts");
@@ -53,4 +95,4 @@ for (const unsupported of [
   assert(alternative.unsupportedAdminMockFields.includes(unsupported));
 }
 
-console.log("Space Typing Admin Alternative Modes audit OK: Reflex/Word Chain have no canonical runtime owner; Admin authoring stays closed.");
+console.log("Space Typing Admin Alternative Modes audit OK: Reflex/Word Chain are runtime-backed for Friend/Practice, Ranked remains fail-closed, and Admin authoring stays closed.");
