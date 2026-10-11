@@ -71,11 +71,14 @@ describe("current Admin contracts follow canonical runtime owners", () => {
     });
   });
 
-  it("keeps Ranked history authenticated, read-only and fail-closed for cross-player access", () => {
+  it("keeps Ranked history service auth real without claiming a production Admin query bridge", () => {
     expect(DUEL_RANKED_HISTORY_ADMIN_MODE).toBe("read-only");
     expect(rankedContract.ranked.history).toMatchObject({
       available: true,
       mode: "persisted-authoritative-readonly",
+      queryServiceAvailable: true,
+      productionTransportExposed: false,
+      parentAdminQueryBridge: false,
       defaultScope: "self",
       crossPlayerScope: "authorized-cross-player",
       authenticationRequired: true,
@@ -85,12 +88,18 @@ describe("current Admin contracts follow canonical runtime owners", () => {
     });
   });
 
-  it("records new QA coverage without claiming automated microphone hardware acceptance", () => {
+  it("records new QA coverage without claiming unexposed Ranked transport or microphone hardware acceptance", () => {
     expect(qaContract.qa.currentRuntimeCoverage).toMatchObject({
       weeklyChallenge: { mode: WEEKLY_CHALLENGE_ADMIN_MODE },
       alternativeModes: { modes: ["reflex", "word-chain"], rankedEligible: false },
       historicalAnalytics: { scope: "current-local-profile", crossPlayerSupported: false },
-      rankedHistory: { authenticationRequired: true, crossPlayerAuthorizationRequired: true },
+      rankedHistory: {
+        queryServiceAvailable: true,
+        productionTransportExposed: false,
+        parentAdminQueryBridge: false,
+        authenticationRequired: true,
+        crossPlayerAuthorizationRequired: true,
+      },
       voiceHybrid: { hardwareAcceptance: "manual" },
     });
     expect(qaContract.qa.productionPersistenceWriteCapability).toBe(false);
