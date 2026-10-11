@@ -24,6 +24,7 @@
     "music:render": "node scripts/music/render-songs.mjs",
     "music:handovers": "node scripts/music/transition-check.mjs",
     "music:catalog": "node scripts/music/build-world-music-catalog.mjs",
+    "music:catalog:check": "node scripts/music/build-world-music-catalog.mjs --check",
     "music:admin-preview": "tsx scripts/music/admin-world-music-preview.ts",
     "visual:shot": "node scripts/visual/shot.mjs",
     "visual:crop": "node scripts/visual/crop.mjs",
