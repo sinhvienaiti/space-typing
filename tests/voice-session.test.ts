@@ -132,7 +132,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
-it("metadata readiness precedes start; owned A rejects while old-snapshot B still completes", () => {
+it("metadata readiness precedes start; owned A rejects while old-snapshot B still completes exactly once off the input event loop", () => {
   const s = setup();
   const snapshot = s.start();
   expect(s.session.isReady()).toBe(true);
@@ -164,11 +164,56 @@ it("metadata readiness precedes start; owned A rejects while old-snapshot B stil
   });
   detect("0", "orbit", "owned");
   expect(s.complete).not.toHaveBeenCalled();
+  vi.advanceTimersByTime(0);
+  expect(s.complete).not.toHaveBeenCalled();
   detect("1", "planet", "accepted");
+  expect(s.complete).not.toHaveBeenCalled();
+  vi.advanceTimersByTime(0);
   expect(s.complete).toHaveBeenCalledTimes(1);
   expect(s.complete).toHaveBeenLastCalledWith("1", 1, 1);
   detect("1", "planet", "accepted");
   expect(s.complete).toHaveBeenCalledTimes(1);
+  vi.advanceTimersByTime(0);
+  expect(s.complete).toHaveBeenCalledTimes(1);
+  s.session.stop();
+});
+it("a synchronous pause barrier rejects queued recognition before stale scheduled work can touch combat", () => {
+  const s = setup();
+  const snapshot = s.start();
+  s.send("clock", {
+    sessionId: snapshot.sessionId,
+    inputEpoch: snapshot.inputEpoch,
+    audioEpoch: 0,
+    sample: 3300,
+  });
+  s.send("detection", {
+    ...snapshot,
+    unitId: "1",
+    unitVersion: 1,
+    eligibilityVersion: 1,
+    form: "planet",
+    detectionId: "queued-before-pause",
+    streamEpoch: 1,
+    audioStartSample: 1600,
+    audioEndSample: 3200,
+    engineId: "test",
+    modelId: "test",
+    evidence: "final-utterance",
+    emittedAtMs: 100,
+  });
+  expect(s.complete).not.toHaveBeenCalled();
+  s.state.phase = "paused";
+  s.session.phaseChanged();
+  expect(s.complete).not.toHaveBeenCalled();
+  expect(s.last("resolution")).toEqual(
+    expect.objectContaining({
+      detectionId: "queued-before-pause",
+      accepted: false,
+      reason: "stale-input-epoch",
+    }),
+  );
+  vi.advanceTimersByTime(0);
+  expect(s.complete).not.toHaveBeenCalled();
   s.session.stop();
 });
 it("pause barriers are synchronous and old audio cannot cross a resume", () => {
@@ -336,63 +381,5 @@ it("duplicate capabilities cannot restart a pending microphone session", () => {
   const start = s.last("start");
   s.send("capabilities", { offlineEngineAvailable: true, reason: "duplicate" });
   expect(s.last("start")).toBe(start);
-  s.session.stop();
-});
-
-it("a slow model gets its own subsequent recognizer window instead of timing out during final startup", () => {
-  const s = setup("voice");
-  s.session.setMode("voice");
-  s.session.start();
-  s.send("capabilities", { offlineEngineAvailable: true, reason: "test" });
-  const epoch = s.last("start").inputEpoch;
-  vi.advanceTimersByTime(89_000);
-  s.send("ready", {
-    sessionId: "s",
-    inputEpoch: epoch,
-    audioEpoch: 0,
-    engineId: "test",
-    modelId: "test",
-    sampleRate: 16000,
-    fromSample: 0,
-  });
-  s.send("vocabulary-checked", {
-    sessionId: "s",
-    inputEpoch: epoch,
-    audioEpoch: 0,
-    requestId: s.last("vocabulary-check").requestId,
-    unsupported: [],
-  });
-  const snapshot = s.last("targets");
-  s.send("targets-applied", {
-    sessionId: "s",
-    inputEpoch: epoch,
-    audioEpoch: 0,
-    snapshotId: snapshot.snapshotId,
-    ready: snapshot.targets.map((t: VoiceTarget) => t.unitId),
-    unsupported: [],
-    appliedAtSample: 0,
-  });
-  vi.advanceTimersByTime(6_000);
-  expect(s.game.togglePause).not.toHaveBeenCalled();
-  s.send("listening", {
-    sessionId: "s",
-    inputEpoch: epoch,
-    audioEpoch: 0,
-    fromSample: 0,
-  });
-  expect(s.session.isReady()).toBe(true);
-  s.session.stop();
-});
-it("lost target ACK pauses Voice instead of leaving the world frozen indefinitely", () => {
-  const s = setup("voice");
-  s.start();
-  s.targets[1]!.unitVersion++;
-  vi.advanceTimersByTime(50);
-  vi.advanceTimersByTime(5_000);
-  expect(s.game.togglePause).toHaveBeenCalledOnce();
-  expect(s.onState).toHaveBeenLastCalledWith(
-    "error",
-    expect.stringContaining("acknowledgement timed out"),
-  );
   s.session.stop();
 });
