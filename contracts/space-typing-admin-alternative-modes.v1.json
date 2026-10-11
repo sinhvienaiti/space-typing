@@ -9,40 +9,44 @@
     "label": "Alternative Modes"
   },
   "alternativeModes": {
-    "mode": "runtime-absence-diagnostic",
+    "mode": "runtime-backed-readonly",
     "runtimeSources": [
-      "src/duel/protocol.ts",
-      "src/duel/room.ts",
-      "src/duel/room-ui.ts",
-      "src/duel/authority.ts",
-      "src/duel/local-match.ts",
-      "src/Game.ts"
+      "src/duel/alternative-modes.ts",
+      "src/duel/alternative-match-runtime.ts",
+      "src/duel/alternative-protocol.ts",
+      "server/duel/alternative-service.ts",
+      "server/duel/alternative-coordinator.ts"
     ],
-    "supportedDuelMatchModes": ["friend", "ranked", "practice"],
-    "requestedPrototypeModes": ["reflex", "word-chain"],
-    "runtimeImplementations": {
-      "reflex": false,
-      "word-chain": false
-    },
+    "runtimeOwner": "AlternativeMatchRuntime",
+    "implementations": [
+      {
+        "id": "reflex",
+        "available": true,
+        "supportedMatchTypes": ["friend", "practice"],
+        "rankedEligible": false,
+        "persistence": "snapshot-v1",
+        "reconnect": true
+      },
+      {
+        "id": "word-chain",
+        "available": true,
+        "supportedMatchTypes": ["friend", "practice"],
+        "rankedEligible": false,
+        "persistence": "snapshot-v1",
+        "reconnect": true
+      }
+    ],
     "authorableFields": [],
     "writeCapability": false,
-    "previewCapability": false,
+    "publishCapability": false,
     "rankedAdmissionCapability": false,
-    "persistenceOwner": "none",
     "applyBoundary": "none",
-    "unsupportedAdminMockFields": [
-      "reactionWindowMs",
-      "roundDamage",
-      "challengePool",
-      "botReactionMs",
-      "practiceEnabled",
-      "friendRoomEnabled",
-      "rankedEnabled",
-      "beatWindowMs",
-      "penaltyDamage",
-      "lexicon",
-      "chainRule"
-    ],
-    "diagnostic": "Reflex and Word Chain are UI prototype concepts only on this branch. No canonical Duel protocol message, room setting, authority match mode, local match consumer, or gameplay consumer owns them."
+    "unsupportedAdminOperations": [
+      "enable Reflex or Word Chain in Ranked",
+      "author new alternative mode rules from Admin",
+      "mutate active alternative matches",
+      "bypass canonical Duel admission checks",
+      "claim unsupported alternative modes are available"
+    ]
   }
 }
