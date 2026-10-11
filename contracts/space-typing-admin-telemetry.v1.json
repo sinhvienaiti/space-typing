@@ -4,37 +4,71 @@
   "gameId": "space-typing",
   "capability": "telemetry.read",
   "routes": [
-    {
-      "id": "overview",
-      "path": "/admin/space-typing",
-      "label": "Overview"
-    },
-    {
-      "id": "analytics",
-      "path": "/admin/space-typing/analytics",
-      "label": "Analytics"
-    }
+    { "id": "overview", "path": "/admin/space-typing", "label": "Overview" },
+    { "id": "analytics", "path": "/admin/space-typing/analytics", "label": "Analytics" }
   ],
   "telemetry": {
     "mode": "runtime-derived-readonly",
-    "live": {
-      "runtimeSources": [
-        "src/telemetry/stage-telemetry.ts",
-        "src/Game.ts"
+    "runtimeSources": [
+      "src/results/stage-session.ts",
+      "src/Game.ts",
+      "src/logic.ts",
+      "src/performance/adaptive-resolution.ts",
+      "src/expansion-v2/profile-store.ts",
+      "src/expansion-v2/expedition-history.ts",
+      "src/expansion-v2/historical-analytics.ts",
+      "src/expansion-v2/historical-analytics-summary.ts",
+      "src/expansion-v2/historical-analytics-admin.ts"
+    ],
+    "runtimeOwner": "StageSessionTracker + production Game session runtime + ExpansionV2Profile.history",
+    "persistence": "session-memory-plus-local-profile-history",
+    "applyBoundary": "none",
+    "writeCapability": false,
+    "publishCapability": false,
+    "historicalAggregationCapability": true,
+    "centralTelemetryBackendCapability": false,
+    "overviewSignals": [
+      "elapsed-seconds",
+      "words-completed",
+      "typing-accuracy-inputs",
+      "stage-words-per-minute-inputs",
+      "regular-kills",
+      "elite-kills",
+      "boss-kills",
+      "enemy-escapes",
+      "damage-taken",
+      "shield-absorbed",
+      "skills-used",
+      "consumables-used"
+    ],
+    "analyticsSignals": [
+      "word-attempts",
+      "word-groups",
+      "perfect-words",
+      "corrected-words",
+      "corrected-errors",
+      "missed-words",
+      "skill-killed-words",
+      "interrupted-words",
+      "max-perfect-word-chain",
+      "hostile-bullets-intercepted",
+      "hostile-bullets-hit",
+      "bonus-collected",
+      "bonus-missed"
+    ],
+    "performanceDiagnostics": {
+      "available": true,
+      "scope": "adaptive-render-budget-internal",
+      "signals": [
+        "frame-duration-samples",
+        "draw-duration-samples",
+        "adaptive-render-scale"
       ],
-      "persistence": "session-memory-only",
-      "historicalAggregationCapability": false
+      "adminReadableSnapshot": false
     },
     "historical": {
       "available": true,
       "mode": "local-profile-persisted-readonly",
-      "runtimeSources": [
-        "src/expansion-v2/profile-store.ts",
-        "src/expansion-v2/expedition-history.ts",
-        "src/expansion-v2/historical-analytics.ts",
-        "src/expansion-v2/historical-analytics-summary.ts",
-        "src/expansion-v2/historical-analytics-admin.ts"
-      ],
       "persistenceOwner": "ExpansionV2Profile.history",
       "scope": "current-local-profile",
       "crossPlayerSupported": false,
@@ -42,19 +76,20 @@
       "writeCapability": false,
       "liveTelemetryFallbackWhenEmpty": false
     },
-    "adminWriteCapability": false,
-    "publishCapability": false,
     "privacy": {
-      "localProfileHistoryOnly": true,
-      "crossPlayerAggregation": false,
-      "remotePlayerStore": false
+      "playerIdentityCollectedByContract": false,
+      "networkTransportOwnedByContract": false,
+      "crossSessionRetentionOwnedByContract": true,
+      "crossSessionRetentionScope": "browser-local-current-profile-only",
+      "crossPlayerAggregation": false
     },
     "unsupportedAdminOperations": [
-      "mutate historical telemetry",
-      "fabricate historical rows from live telemetry",
-      "query global or cross-player Expansion analytics",
-      "clear player history remotely",
-      "publish telemetry policy from Admin"
+      "query global or cross-player historical analytics",
+      "export server-side telemetry events without a backend owner",
+      "mutate gameplay through analytics controls",
+      "publish telemetry-derived gameplay configuration",
+      "claim adaptive render internals are an Admin-readable live feed",
+      "fabricate historical rows from live telemetry"
     ]
   }
 }
