@@ -60,6 +60,9 @@
       },
       "rankedHistory": {
         "owner": "server/duel/ranked-history-query-service.ts",
+        "queryServiceAvailable": true,
+        "productionTransportExposed": false,
+        "parentAdminQueryBridge": false,
         "authenticationRequired": true,
         "crossPlayerAuthorizationRequired": true
       },
@@ -99,6 +102,7 @@
       "overwrite player saves",
       "persist Test Lab rewards into production wallets",
       "bypass testLabEnabled runtime guards",
+      "claim Ranked history is exposed through the current Parent Admin transport",
       "claim real microphone hardware acceptance from automated QA"
     ]
   }
