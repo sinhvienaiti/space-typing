@@ -108,6 +108,35 @@ export function createStageConfig(stage: number): StageConfig {
   };
 }
 
+/**
+ * Canonical bundled stage factory used by Admin previews. Runtime gameplay in
+ * this branch is still bundled-only, so this intentionally delegates to the
+ * current production stage formula rather than maintaining a second formula.
+ */
+export function createBundledStageConfig(stage: number): StageConfig {
+  return createStageConfig(stage);
+}
+
+export type StageConfigOverride = Readonly<{
+  enemyBudget?: number;
+  eliteChance?: number;
+  modifierSlots?: number;
+}>;
+
+/** Apply an already-validated Admin override without changing structural fields. */
+export function resolveStageConfig(
+  bundled: StageConfig,
+  override?: StageConfigOverride,
+): StageConfig {
+  if (override === undefined) return bundled;
+  return {
+    ...bundled,
+    ...(override.enemyBudget === undefined ? {} : { enemyBudget: override.enemyBudget }),
+    ...(override.eliteChance === undefined ? {} : { eliteChance: override.eliteChance }),
+    ...(override.modifierSlots === undefined ? {} : { modifierSlots: override.modifierSlots }),
+  };
+}
+
 export function createCampaignStages(): StageConfig[] {
   return Array.from(
     { length: MAX_CAMPAIGN_STAGE },
