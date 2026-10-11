@@ -1,6 +1,6 @@
 # Space Typing Remaining Implementation Progress
 
-Updated: 2026-10-10
+Updated: 2026-10-11
 
 ## Source of truth
 
@@ -9,6 +9,13 @@ Updated: 2026-10-10
 - Always fetch the latest remote HEAD before making changes.
 - Never reset/revert the branch to an older checkpoint and never overwrite newer worker/tab work.
 - Treat this file as a resumable handoff, not as a reason to redo completed units.
+- Code/commit state on the branch is authoritative if this document ever lags behind.
+
+## Roadmap status
+
+The bounded **R01-R05 Remaining Implementation roadmap is COMPLETE**.
+
+There is intentionally **no R06** in this roadmap. Further work is tracked in `docs/SPACE_TYPING_POST_R05_MASTER_ROADMAP.md` and must begin from the latest remote HEAD, not from an older R01-R05 checkpoint.
 
 ## R01 — Secret Route / Hidden Discovery / Journey Map / Rest Stop UX
 
@@ -17,19 +24,11 @@ Status: **COMPLETE**
 Locked implementation checkpoint:
 
 - `471a71171e7d9222b3417d448abc8e677a7704ae` — `test(campaign): isolate R01 browser QA phase deadlines`
+- Browser-QA reliability follow-up: `fdd7909baea99ec7488e1c602df9347206840283`
 
-Browser-QA reliability follow-up:
+Validation:
 
-- `fdd7909baea99ec7488e1c602df9347206840283` — `test(campaign): harden R01 persistence readiness wait`
-
-The follow-up keeps the real Campaign Map readiness requirement intact. It does not bypass the disabled button or remove structural assertions; it only gives cold persistence/UI bootstrap a separate 60-second readiness budget while keeping the map-render deadline independent.
-
-Validation on CI #1830 / run `38044396808`:
-
-- Test: PASS
-- Build: PASS
-- R01 browser QA: PASS
-- R01 browser captures upload: PASS
+- CI #1830 / run `38044396808`: Test PASS, Build PASS, R01 browser QA PASS, browser captures PASS.
 
 Do not return to R01 unless a later change causes a real regression.
 
@@ -37,174 +36,146 @@ Do not return to R01 unless a later change causes a real regression.
 
 Status: **COMPLETE**
 
-R02 code checkpoint:
+Locked code checkpoint:
 
 - `e07537d344d13cafcd463d6b7acf59add01c1d8f` — `feat(challenge): bind weekly runs to frozen expedition inputs`
 
-Implementation commits:
+Acceptance locked:
 
-- `45d4cf3f5f1b664c8bc11f611cf6c22aa1979388` — `feat(challenge): add weekly lifecycle persistence contract`
-- `f463b17d7ea9d7aa8b6ade59d99ef4f65e4560d8` — `feat(challenge): harden weekly binding and admin diagnostics`
-- `92a6579e81e2639f07c1fa4fd004e28df7b6adc6` — `feat(expedition): gate weekly challenge resume by canonical binding`
-- `e07537d344d13cafcd463d6b7acf59add01c1d8f` — `feat(challenge): bind weekly runs to frozen expedition inputs`
+- canonical UTC week identity and deterministic weekly seed;
+- weekly lifecycle/reset and stale-run rejection;
+- reward eligibility/claim idempotency;
+- PB/ghost persistence and leaderboard eligibility;
+- deterministic frozen-content binding and replay protection;
+- safe save/load/resume contract;
+- read-only Weekly admin/QA surface backed by canonical runtime state.
 
-### Acceptance checklist
+Focused coverage includes `weekly-challenge*`, Expedition session/binding tests and Expansion V2 profile persistence tests.
 
-1. **Canonical UTC week identity — COMPLETE**
-   - ISO UTC Monday week key.
-   - Canonical weekly identity namespace remains distinct from daily challenge identity.
+Exact R02 code validation completed on CI #1829, followed by the R01 harness reliability follow-up on CI #1830.
 
-2. **Deterministic weekly seed — COMPLETE**
-   - Same canonical week/ruleset produces the same seed.
-   - Week rollover produces a new deterministic seed.
-
-3. **Weekly lifecycle / reset — COMPLETE**
-   - Weekly runs are a first-class Expedition challenge kind.
-   - Previous-week runs are classified as stale and cannot resume as the current week.
-
-4. **Reward eligibility + idempotency — COMPLETE**
-   - Weekly completion claims are fenced by canonical identity key.
-   - Duplicate settlement cannot grant the weekly completion claim twice.
-   - Claim history is bounded and backward-compatible inside Expansion V2 profile version 1.
-
-5. **Personal Best / Ghost — COMPLETE**
-   - PB and ghost records reuse the existing fixed-challenge profile storage.
-   - Later attempts may improve PB/ghost without granting the weekly completion claim again.
-   - Leaderboard eligibility is derived from canonical run conditions, retry state and assist state.
-
-6. **Persistence / save-load / resume — COMPLETE**
-   - Weekly reward claims survive the existing profile sanitize/save/load path without a schema bump.
-   - Generic Expedition resume intentionally excludes weekly runs.
-   - `resumeWeekly(...)` requires the current canonical weekly binding before claiming the persisted envelope.
-   - A rejected stale/invalid run is not mutated merely by the resume check.
-
-7. **Deterministic replay / duplicate-roll protection — COMPLETE**
-   - Canonical binding validates week, identity key, seed, ruleset version, content version, word-pool hash, start kit, difficulty and assist.
-   - Weekly binding freezes adaptive wanted-word selection for fixed-run comparability.
-   - A forged seed or mismatched frozen content contract is rejected instead of being relabeled/rerolled.
-   - Resume reuses the existing Expedition replay boundary, preserving the encounter plan and incrementing retry state.
-
-8. **Admin Weekly surface — COMPLETE**
-   - Read-only `Weekly Challenge` admin/QA view-model exposes week, seed, identity, resume state, reward claim, PB, ghost count and leaderboard eligibility.
-   - Stale/invalid/retried/assisted diagnostics are exposed from the same canonical state.
-   - `canMutate` is intentionally false on this child branch; R02 does not invent a second admin write owner.
-
-### R02 implementation/test evidence
-
-Primary runtime files:
-
-- `src/expansion-v2/challenge.ts`
-- `src/expansion-v2/weekly-challenge-runtime.ts`
-- `src/expansion-v2/weekly-challenge-admin.ts`
-- `src/expansion-v2/profile-store.ts`
-- `src/expedition/core.ts`
-- `src/expedition/session.ts`
-
-Focused tests:
-
-- `tests/weekly-challenge.test.ts`
-- `tests/weekly-challenge-runtime.test.ts`
-- `tests/weekly-challenge-session.test.ts`
-- `tests/weekly-challenge-bind.test.ts`
-- `tests/expansion-v2-profile-persistence.test.ts`
-
-Exact R02 code checkpoint validation:
-
-- CI #1829: Test PASS, Build PASS; R01 browser QA hit a pre-existing readiness-timeout flake.
-- The R01 harness-only follow-up at `fdd7909...` then passed the complete gate on CI #1830 / run `38044396808`.
-
-### Scope note
-
-R02 is the Weekly Runtime/Admin surface milestone. A new player-facing Weekly launcher/button is not part of this R02 acceptance and was not added here.
+Do not return to R02 unless a later change causes a real regression.
 
 ## R03 — Alternative Duel Modes Runtime
 
 Status: **COMPLETE**
 
-Locked code checkpoint:
+Locked checkpoint:
 
 - `7c97bdec15f5aaaa72173a59eaaa36394eb50e75` — `test(duel): align empty alternative room slot fixture`
 - Exact checkpoint CI #1842: PASS.
 
-### Acceptance checklist
+Acceptance locked:
 
-1. **Canonical runtime capabilities — COMPLETE**
-   - `reflex` and `word-chain` are registered in `ALTERNATIVE_MODE_REGISTRY`.
-   - Both modes bind to the real `AlternativeMatchRuntime` owner.
-   - Friend and Practice are explicitly supported; Ranked remains fail-closed rather than silently borrowing Standard Duel MMR/ranked semantics.
+- Reflex and Word Chain canonical runtime registration;
+- authoritative score/hull/projectile-impact resolution;
+- stale/duplicate sequence protection;
+- reconnect/persistence of authoritative match state;
+- authenticated protocol identity and existing Duel transport reuse;
+- deterministic local Practice using the same rules;
+- canonical Word Chain lexicon validation;
+- Ranked remains fail-closed where authority/ranking semantics are unsupported.
 
-2. **Authoritative match runtime — COMPLETE**
-   - Reflex and Word Chain resolve score, hull damage and terminal results in the authority runtime.
-   - Projectile damage lands on the authority impact clock rather than a presentation timer.
-   - Duplicate/stale sequence handling prevents repeated or late input from mutating authoritative state.
+Alternative Local Practice is part of the existing Duel lobby/runtime and is not a separate game shell.
 
-3. **Persistence / reconnect — COMPLETE**
-   - Runtime snapshots include mode/rules/content identity needed to resume safely.
-   - Reconnect republishes personalized authoritative state instead of reconstructing combat from client-local state.
-   - Terminal snapshots remain reconnectable while a later owner-started match can release the old terminal binding idempotently.
+Do not return to R03 unless a later change causes a real regression.
 
-4. **Protocol / identity / transport — COMPLETE**
-   - `MODE_INPUT` is parsed through a dedicated alternative protocol boundary.
-   - The server binds authenticated session identity and authority time; the client cannot claim authoritative `playerId`, damage or timestamps.
-   - Friend Alternative Duel reuses the existing Duel WebSocket authentication, room lifecycle, reconnect and tick loop; no second networking stack was introduced.
+## R04 — Voice / Hybrid Final Acceptance
 
-5. **Practice + presentation — COMPLETE**
-   - Practice has a deterministic local owner using the same runtime rules.
-   - Friend lobby exposes Reflex / Word Chain activation through the existing Duel flow.
-   - UI consumes authoritative score, hull, challenge, turn and projectile-impact state; it does not simulate authoritative damage locally.
+Status: **COMPLETE**
 
-6. **Canonical content handling — COMPLETE**
-   - Word Chain uses the canonical `DUEL_TYPING_LEXICON` rather than an open client dictionary/regex acceptance path.
-   - Invalid words / invalid chain transitions are rejected by the authoritative runtime.
+Locked checkpoint:
 
-7. **Admin/runtime-availability truthfulness — COMPLETE for this child branch**
-   - This branch has no standalone `src/admin` Alternative Modes owner or Admin-only runtime declaration to patch.
-   - Runtime availability is represented by the canonical `ALTERNATIVE_MODE_REGISTRY`, whose descriptors now point to `AlternativeMatchRuntime`.
-   - R03 intentionally does not invent a parallel child Admin framework merely to duplicate that source of truth.
+- `938a6cd8c28c57bb02d5a923125511652f7efbd2` — `feat(voice): bound and observe recognition acceptance`
+- Exact checkpoint CI #1876 / run `38124521206`: PASS.
 
-### R03 implementation/test evidence
+Acceptance locked:
 
-Primary runtime files:
+1. **Detection latency observability**
+   - deterministic recognition-to-game-acceptance telemetry;
+   - audio-end-to-acceptance timing where source timing is available;
+   - current/max latency surfaces are testable without a real microphone.
 
-- `src/duel/alternative-modes.ts`
-- `src/duel/alternative-match-runtime.ts`
-- `src/duel/alternative-practice.ts`
-- `src/duel/alternative-presentation.ts`
-- `src/duel/alternative-protocol.ts`
-- `src/duel/alternative-wire.ts`
-- `src/duel/alternative-room-ui.ts`
-- existing Duel server/network-client integration files
+2. **Queue/backlog control**
+   - bounded pending recognition queue;
+   - deterministic overflow rejection;
+   - small batch draining with event-loop yielding rather than unbounded synchronous processing.
 
-Focused tests include:
+3. **Stale rejection**
+   - session/input/audio generation fencing;
+   - late callbacks from a previous generation cannot mutate gameplay after pause/resume or session changes.
 
-- `tests/alternative-match-runtime.test.ts`
-- `tests/alternative-coordinator.test.ts`
-- `tests/alternative-protocol-service.test.ts`
-- `tests/alternative-network-client.test.ts`
-- `tests/alternative-practice-presentation.test.ts`
-- `tests/alternative-room-ui-model.test.ts`
+4. **Event-loop/combat interaction**
+   - inbound recognition does not synchronously complete combat on the message call stack;
+   - duplicate results remain fenced by the existing Voice result policy;
+   - deterministic tests verify that one recognition cannot double-complete combat.
 
-Exact R03 checkpoint validation:
+Typing / Voice / Hybrid remain explicit modes and the implementation reuses the existing game/input authority boundaries rather than introducing a parallel combat runtime.
 
-- CI #1842 on `7c97bdec15f5aaaa72173a59eaaa36394eb50e75`: PASS.
-- Earlier locked slices include CI #1832, #1833, #1834 and live-transport CI #1838.
+Real browser permission prompts, real microphone capture and macOS/Windows hardware behavior remain **manual hardware QA**, not fabricated automated coverage. These are not implementation blockers for R04 completion.
 
-Do not return to R03 unless R04/R05 work causes a real regression.
+## R05 — Historical Analytics Backend
 
-## First unfinished unit
+Status: **COMPLETE**
 
-### R04 — Voice / Hybrid Final Acceptance
+Locked implementation chain:
 
-Status: **NOT STARTED from this handoff checkpoint**
+- `181722ee8a2718cedf95a1af0eb88ce0e0bb31e1` — `fix(analytics): align retained run replay fence`
+- `cbaf4e55ab0970022ff85ce90c66b7676addfeaf` — `feat(analytics): record canonical expedition assist coverage`
+- `46e336dc3ab1556be80fd5592389bc8c75249cb3` — `test(analytics): lock R05 producer replay acceptance`
 
-Resume order:
+Exact checkpoint validation:
 
-1. Fetch the latest remote HEAD and reconcile any newer commits first.
-2. Audit the existing `VoiceSession`, input-mode normalization and Duel authority/network path before changing architecture.
-3. Keep Typing / Voice / Hybrid mutually explicit and reuse the existing authoritative Duel input pipeline instead of creating a parallel transport/runtime.
-4. Complete the smallest unfinished authority slice first: normalized voice/hybrid input identity, stale/duplicate protection, reconnect behavior and deterministic tests.
-5. Keep unsupported ranked combinations fail-closed until they satisfy the same authority/validation contract as Typing.
-6. Finish final UI/microphone acceptance only after the runtime path is real and testable.
-7. After R04 is locked by exact-SHA CI, continue R05 — Historical Analytics Backend.
+- CI #1879 / run `38125396701`: Test PASS, Build PASS, R01 browser QA PASS, browser captures PASS.
 
-Do not restart R01-R03 from their historical SHAs. The latest remote HEAD is always the source of truth.
+Acceptance locked:
+
+1. **Persistent versioned historical store**
+   - terminal historical events live in Expansion V2 persisted profile state;
+   - deterministic sanitization/version handling remains in the existing profile boundary.
+
+2. **Idempotent replay protection**
+   - `processedRunIds` retention is aligned with historical event retention (`512`);
+   - a retained historical row also acts as a durable replay receipt;
+   - reload/migration with retained history but a missing older journal cannot double-count a run.
+
+3. **Canonical Expedition producer**
+   - one terminal run produces one enriched historical record;
+   - outcome, score, accuracy, active time, challenge, retry, difficulty, input mode, gameplay mode, source stages, relic loadout, typed letters, voice completions and WPM are recorded only when canonically derivable;
+   - `assisted` is derived from persisted Expedition profile assist mode.
+
+4. **No fabricated dimensions**
+   - ExpeditionRun v1 has no canonical boss/equipment/skill identity ledger;
+   - boss attempts, equipment and skill usage remain empty/unknown rather than reconstructed from presentation state.
+
+5. **Historical aggregation/admin truthfulness**
+   - deterministic period/UTC aggregation remains backed only by persisted events;
+   - Admin Historical Analytics is read-only;
+   - current child scope is `local-profile` only and `crossPlayerSupported: false` remains fail-closed without an authoritative backend identity/store.
+
+Focused R05 regression coverage includes terminal producer enrichment, replay after reload, migration replay receipts, pure Voice WPM semantics and unknown-dimension behavior.
+
+## Final R01-R05 integration audit
+
+Audit checkpoint before closure documentation: `46e336dc3ab1556be80fd5592389bc8c75249cb3`.
+
+Findings:
+
+- R05 is only three commits ahead of the locked R04 checkpoint and changes exactly:
+  - `src/expansion-v2/expedition-history.ts`
+  - `src/expansion-v2/profile-store.ts`
+  - `tests/expedition-history.test.ts`
+- R05 does not alter Voice transport/session/combat code introduced/locked by R04.
+- The shared Expansion V2 profile boundary used by R02 Weekly was reviewed: R05 hardens historical replay state while leaving weekly reward claims, PB/ghost and weekly identity semantics intact.
+- Full repository tests, TypeScript/build and the R01 browser regression gate are green on the exact R05 code checkpoint.
+- No code-level R01-R05 blocker remains from this audit.
+
+## Closure rule
+
+R01-R05 are closed. Do not invent an R06 or reopen a completed unit without a concrete regression.
+
+Continue from:
+
+- `docs/SPACE_TYPING_POST_R05_MASTER_ROADMAP.md`
+
+Future integration work must still re-fetch the latest remote HEAD and reconcile newer worker/tab commits before editing.
