@@ -21,9 +21,13 @@ import { DUEL_TYPING_LEXICON } from "./word-lexicon";
 import type { AlternativeMatchView } from "./alternative-presentation";
 import type { DuelRoomSnapshot } from "./room";
 import type { DuelRoomListing } from "./protocol";
+import type { InputMode } from "../input/mode";
+import { rankedDuelInputAdmission } from "../input/duel-input-policy";
 
 export type DuelOnlineRoomControllerConfig = {
   clientVersion: string;
+  /** Current global input preference; Ranked remains fail-closed unless Typing. */
+  inputMode?(): InputMode;
   onMatchUpdate?(
     view: DuelClientMatchView,
     events: readonly DuelClientEvent[],
@@ -437,6 +441,11 @@ export function installDuelOnlineRoomController(
       });
     },
     onQueueRankedRequest() {
+      const admission = rankedDuelInputAdmission(config.inputMode?.() ?? "typing");
+      if (!admission.allowed) {
+        ui?.setStatus(admission.reason, true);
+        return;
+      }
       runOnline(() => {
         client.queueRanked(config.characterId?.() ?? null);
       });

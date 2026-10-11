@@ -1317,6 +1317,7 @@ function startDuelVisualStress(
 
 duelOnlineController = installDuelOnlineRoomController({
   clientVersion: "0.1.0",
+  inputMode: () => game.getInputMode(),
   // Fly your selected hull online too; the other player sees it.
   characterId: () => characters.selected,
   // The hangar opens over the lobby; the pilot card refreshes on close.

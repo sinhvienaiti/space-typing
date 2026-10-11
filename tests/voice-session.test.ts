@@ -396,3 +396,46 @@ it("lost target ACK pauses Voice instead of leaving the world frozen indefinitel
   );
   s.session.stop();
 });
+
+
+it("R04 diagnostics report accepted/duplicate delivery and reconnect barriers", () => {
+  vi.setSystemTime(1_000);
+  const s = setup("hybrid");
+  const snapshot = s.start();
+  const detection = {
+    ...snapshot,
+    unitId: "0",
+    unitVersion: 1,
+    eligibilityVersion: 1,
+    form: "orbit",
+    detectionId: "diag-1",
+    streamEpoch: 1,
+    audioStartSample: 100,
+    audioEndSample: 200,
+    engineId: "test",
+    modelId: "test",
+    evidence: "final-utterance",
+    emittedAtMs: 980,
+  };
+  s.send("detection", detection);
+  s.send("detection", detection);
+
+  expect(s.complete).toHaveBeenCalledTimes(1);
+  expect(s.session.getAcceptanceDiagnostics()).toMatchObject({
+    received: 2,
+    accepted: 1,
+    rejected: 1,
+    duplicateRejected: 1,
+    maxDeliveryLagMs: 20,
+    maxInFlight: 1,
+    currentInFlight: 0,
+  });
+
+  s.session.stop();
+  s.start(0, "next-session");
+  expect(s.session.getAcceptanceDiagnostics()).toMatchObject({
+    barrierChanges: 1,
+    sessionChanges: 1,
+  });
+  s.session.stop();
+});

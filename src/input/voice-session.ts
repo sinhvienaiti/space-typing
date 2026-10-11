@@ -7,6 +7,10 @@ import {
 } from "./platform/protocol.mjs";
 import type { VoiceFeedbackSink } from "./voice-feedback";
 import type { InputMode } from "./mode";
+import {
+  VoiceAcceptanceMonitor,
+  type VoiceAcceptanceDiagnostics,
+} from "./voice-acceptance";
 
 type LiveTarget = VoiceTarget & {
   keyboardOwned: boolean;
@@ -31,6 +35,7 @@ type PreparationStage =
 export class VoiceSession {
   private adapter: VoiceAdapter;
   private policy = new VoiceResultPolicy();
+  private acceptance = new VoiceAcceptanceMonitor();
   private mode: InputMode = "typing";
   private epoch = 0;
   private state = "off";
@@ -109,6 +114,12 @@ export class VoiceSession {
   }
   handleMessage(event: MessageEvent<unknown>): void {
     this.adapter.handleMessage(event);
+  }
+  getAcceptanceDiagnostics(): VoiceAcceptanceDiagnostics {
+    return this.acceptance.snapshot();
+  }
+  resetAcceptanceDiagnostics(): void {
+    this.acceptance.reset();
   }
   setMode(mode: InputMode): void {
     this.stop();
@@ -297,6 +308,7 @@ export class VoiceSession {
         engineId: String(message.engineId),
         modelId: String(message.modelId),
       };
+      this.acceptance.barrier(this.context);
       this.policy.barrier({ ...this.context, fromSample: this.sample });
       this.signature = "";
       this.targetUpdatePending = false;
@@ -373,6 +385,13 @@ export class VoiceSession {
       return;
     }
     if (op === "detection" && this.context && this.state === "listening") {
+      const acceptanceTicket = this.acceptance.begin({
+        sessionId: String(message.sessionId),
+        inputEpoch: Number(message.inputEpoch),
+        audioEpoch: Number(message.audioEpoch),
+        detectionId: String(message.detectionId),
+        emittedAtMs: Number(message.emittedAtMs),
+      });
       this.sample = Math.max(this.sample, Number(message.audioEndSample));
       const now = this.sample;
       let outcome;
@@ -383,6 +402,11 @@ export class VoiceSession {
           now,
         );
       } catch {
+        this.acceptance.finish(acceptanceTicket, {
+          accepted: false,
+          duplicate: false,
+          reason: "policy-error",
+        });
         return;
       }
       let accepted =
@@ -395,14 +419,22 @@ export class VoiceSession {
           Number(message.unitVersion),
           Number(message.eligibilityVersion),
         );
+      const reason = accepted
+        ? "accepted"
+        : outcome.duplicate
+          ? "duplicate"
+          : outcome.accepted
+            ? "unit-unavailable"
+            : outcome.reason;
+      this.acceptance.finish(acceptanceTicket, {
+        accepted,
+        duplicate: Boolean(outcome.duplicate),
+        reason,
+      });
       this.adapter.sendSession("resolution", {
         detectionId: message.detectionId,
         accepted,
-        reason: accepted
-          ? "accepted"
-          : outcome.accepted
-            ? "unit-unavailable"
-            : outcome.reason,
+        reason,
       });
       if (accepted) {
         this.signature = "";
