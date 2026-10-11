@@ -1,0 +1,219 @@
+from pathlib import Path
+
+
+def replace_once(path: str, old: str, new: str) -> None:
+    target = Path(path)
+    text = target.read_text()
+    if new in text:
+        return
+    count = text.count(old)
+    if count != 1:
+        raise SystemExit(f"{path}: expected one replacement, found {count}")
+    target.write_text(text.replace(old, new, 1))
+
+
+replace_once(
+    "src/input/voice-session.ts",
+    'import type { InputMode } from "./mode";\n',
+    'import type { InputMode } from "./mode";\nimport {\n  VoiceAcceptanceMonitor,\n  type VoiceAcceptanceDiagnostics,\n} from "./voice-acceptance";\n',
+)
+replace_once(
+    "src/input/voice-session.ts",
+    "  private policy = new VoiceResultPolicy();\n",
+    "  private policy = new VoiceResultPolicy();\n  private acceptance = new VoiceAcceptanceMonitor();\n",
+)
+replace_once(
+    "src/input/voice-session.ts",
+    '  handleMessage(event: MessageEvent<unknown>): void {\n    this.adapter.handleMessage(event);\n  }\n',
+    '  handleMessage(event: MessageEvent<unknown>): void {\n    this.adapter.handleMessage(event);\n  }\n  getAcceptanceDiagnostics(): VoiceAcceptanceDiagnostics {\n    return this.acceptance.snapshot();\n  }\n  resetAcceptanceDiagnostics(): void {\n    this.acceptance.reset();\n  }\n',
+)
+replace_once(
+    "src/input/voice-session.ts",
+    "      this.policy.barrier({ ...this.context, fromSample: this.sample });\n",
+    "      this.acceptance.barrier(this.context);\n      this.policy.barrier({ ...this.context, fromSample: this.sample });\n",
+)
+
+old_detection = '''    if (op === "detection" && this.context && this.state === "listening") {
+      this.sample = Math.max(this.sample, Number(message.audioEndSample));
+      const now = this.sample;
+      let outcome;
+      try {
+        outcome = this.policy.resolve(
+          message,
+          this.game().getVoiceTargets(now),
+          now,
+        );
+      } catch {
+        return;
+      }
+      let accepted =
+        outcome.accepted &&
+        !outcome.duplicate &&
+        this.game().getPhase() === "playing";
+      if (accepted)
+        accepted = this.game().completeVoiceUnit(
+          outcome.unitId,
+          Number(message.unitVersion),
+          Number(message.eligibilityVersion),
+        );
+      this.adapter.sendSession("resolution", {
+        detectionId: message.detectionId,
+        accepted,
+        reason: accepted
+          ? "accepted"
+          : outcome.accepted
+            ? "unit-unavailable"
+            : outcome.reason,
+      });
+      if (accepted) {
+        this.signature = "";
+        this.publish();
+      }
+      return;
+    }
+'''
+new_detection = '''    if (op === "detection" && this.context && this.state === "listening") {
+      const acceptanceTicket = this.acceptance.begin({
+        sessionId: String(message.sessionId),
+        inputEpoch: Number(message.inputEpoch),
+        audioEpoch: Number(message.audioEpoch),
+        detectionId: String(message.detectionId),
+        emittedAtMs: Number(message.emittedAtMs),
+      });
+      this.sample = Math.max(this.sample, Number(message.audioEndSample));
+      const now = this.sample;
+      let outcome;
+      try {
+        outcome = this.policy.resolve(
+          message,
+          this.game().getVoiceTargets(now),
+          now,
+        );
+      } catch {
+        this.acceptance.finish(acceptanceTicket, {
+          accepted: false,
+          duplicate: false,
+          reason: "policy-error",
+        });
+        return;
+      }
+      let accepted =
+        outcome.accepted &&
+        !outcome.duplicate &&
+        this.game().getPhase() === "playing";
+      if (accepted)
+        accepted = this.game().completeVoiceUnit(
+          outcome.unitId,
+          Number(message.unitVersion),
+          Number(message.eligibilityVersion),
+        );
+      const reason = accepted
+        ? "accepted"
+        : outcome.duplicate
+          ? "duplicate"
+          : outcome.accepted
+            ? "unit-unavailable"
+            : outcome.reason;
+      this.acceptance.finish(acceptanceTicket, {
+        accepted,
+        duplicate: Boolean(outcome.duplicate),
+        reason,
+      });
+      this.adapter.sendSession("resolution", {
+        detectionId: message.detectionId,
+        accepted,
+        reason,
+      });
+      if (accepted) {
+        this.signature = "";
+        this.publish();
+      }
+      return;
+    }
+'''
+replace_once("src/input/voice-session.ts", old_detection, new_detection)
+
+replace_once(
+    "src/duel/online-room-controller.ts",
+    'import type { DuelRoomListing } from "./protocol";\n',
+    'import type { DuelRoomListing } from "./protocol";\nimport type { InputMode } from "../input/mode";\nimport { rankedDuelInputAdmission } from "../input/duel-input-policy";\n',
+)
+replace_once(
+    "src/duel/online-room-controller.ts",
+    'export type DuelOnlineRoomControllerConfig = {\n  clientVersion: string;\n',
+    'export type DuelOnlineRoomControllerConfig = {\n  clientVersion: string;\n  /** Current global input preference; Ranked remains fail-closed unless Typing. */\n  inputMode?(): InputMode;\n',
+)
+replace_once(
+    "src/duel/online-room-controller.ts",
+    '''    onQueueRankedRequest() {
+      runOnline(() => {
+        client.queueRanked(config.characterId?.() ?? null);
+      });
+    },
+''',
+    '''    onQueueRankedRequest() {
+      const admission = rankedDuelInputAdmission(config.inputMode?.() ?? "typing");
+      if (!admission.allowed) {
+        ui?.setStatus(admission.reason, true);
+        return;
+      }
+      runOnline(() => {
+        client.queueRanked(config.characterId?.() ?? null);
+      });
+    },
+''',
+)
+
+replace_once(
+    "src/main.ts",
+    'duelOnlineController = installDuelOnlineRoomController({\n  clientVersion: "0.1.0",\n',
+    'duelOnlineController = installDuelOnlineRoomController({\n  clientVersion: "0.1.0",\n  inputMode: () => game.getInputMode(),\n',
+)
+
+test_path = Path("tests/voice-session.test.ts")
+test_text = test_path.read_text()
+marker = 'it("R04 diagnostics report accepted/duplicate delivery and reconnect barriers", () => {'
+if marker not in test_text:
+    test_text += '''\n\nit("R04 diagnostics report accepted/duplicate delivery and reconnect barriers", () => {
+  vi.setSystemTime(1_000);
+  const s = setup("hybrid");
+  const snapshot = s.start();
+  const detection = {
+    ...snapshot,
+    unitId: "0",
+    unitVersion: 1,
+    eligibilityVersion: 1,
+    form: "orbit",
+    detectionId: "diag-1",
+    streamEpoch: 1,
+    audioStartSample: 100,
+    audioEndSample: 200,
+    engineId: "test",
+    modelId: "test",
+    evidence: "final-utterance",
+    emittedAtMs: 980,
+  };
+  s.send("detection", detection);
+  s.send("detection", detection);
+
+  expect(s.complete).toHaveBeenCalledTimes(1);
+  expect(s.session.getAcceptanceDiagnostics()).toMatchObject({
+    received: 2,
+    accepted: 1,
+    rejected: 1,
+    duplicateRejected: 1,
+    maxDeliveryLagMs: 20,
+    maxInFlight: 1,
+    currentInFlight: 0,
+  });
+
+  s.session.stop();
+  s.start(0, "next-session");
+  expect(s.session.getAcceptanceDiagnostics()).toMatchObject({
+    barrierChanges: 1,
+    sessionChanges: 1,
+  });
+  s.session.stop();
+});
+'''
+    test_path.write_text(test_text)
