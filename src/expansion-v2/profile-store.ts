@@ -6,6 +6,7 @@ import {
   type PersonalGhostRecord,
 } from "./challenge";
 import {
+  HISTORICAL_ANALYTICS_MAX_EVENTS,
   createHistoricalAnalyticsState,
   sanitizeHistoricalAnalyticsState,
   sanitizeHistoricalEvent,
@@ -26,6 +27,14 @@ import {
 
 export const EXPANSION_V2_PROFILE_KEY =
   "spaceTypingExpansionV2ProfileV1";
+
+/**
+ * The replay fence must cover every run that can still exist in historical
+ * analytics. Keeping a shorter journal would allow a retained event to be
+ * counted twice after its run id fell out of processedRunIds.
+ */
+export const EXPANSION_V2_PROCESSED_RUN_RETENTION =
+  HISTORICAL_ANALYTICS_MAX_EVENTS;
 
 export class UnsupportedExpansionV2ProfileVersionError extends Error {
   constructor(readonly version: number) {
@@ -106,6 +115,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+function boundedProcessedRunIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter(
+    (id): id is string => typeof id === "string" && id.length > 0,
+  ))].slice(-EXPANSION_V2_PROCESSED_RUN_RETENTION);
+}
+
 export function sanitizeExpansionV2Profile(
   value: unknown,
 ): ExpansionV2Profile {
@@ -148,11 +164,7 @@ export function sanitizeExpansionV2Profile(
       typeof raw.bestScore === "number" && Number.isFinite(raw.bestScore)
         ? Math.max(0, Math.floor(raw.bestScore))
         : 0,
-    processedRunIds: Array.isArray(raw.processedRunIds)
-      ? raw.processedRunIds.filter(
-          (id): id is string => typeof id === "string",
-        ).slice(-256)
-      : [],
+    processedRunIds: boundedProcessedRunIds(raw.processedRunIds),
     seenCinematics: Array.isArray(raw.seenCinematics)
       ? raw.seenCinematics.filter(
           (id): id is string => typeof id === "string",
@@ -266,7 +278,15 @@ export function recordExpansionRun(
     historical?: ExpansionRunHistoricalMetadata;
   },
 ): ExpansionV2Profile {
-  if (profile.processedRunIds.includes(input.runId)) return profile;
+  // A retained historical row is also a durable replay receipt. This covers
+  // migrated profiles where history survived but an older processed-run
+  // journal did not.
+  if (
+    profile.processedRunIds.includes(input.runId) ||
+    profile.history.events.some((event) => event.runId === input.runId)
+  ) {
+    return profile;
+  }
 
   const now = input.occurredAtMs ?? Date.now();
   const historical = input.historical ?? {};
@@ -307,7 +327,7 @@ export function recordExpansionRun(
     processedRunIds: [
       ...profile.processedRunIds,
       input.runId,
-    ].slice(-256),
+    ].slice(-EXPANSION_V2_PROCESSED_RUN_RETENTION),
     history: upsertHistoricalRunEvent(profile.history, event),
   };
 }
