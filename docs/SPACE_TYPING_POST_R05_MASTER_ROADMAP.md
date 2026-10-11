@@ -1,6 +1,6 @@
 # Space Typing Post-R05 Master Roadmap
 
-Updated: 2026-10-11
+Updated: 2026-10-12
 
 ## Purpose
 
@@ -8,12 +8,19 @@ This document begins **after** completion of the bounded R01-R05 Remaining Imple
 
 It is intentionally **not R06**. R01-R05 are closed implementation milestones; this roadmap coordinates integration, cleanup, open workstreams and final product acceptance without reopening completed units by default.
 
+Manual/product checks that automation cannot replace are tracked separately in:
+
+- `docs/SPACE_TYPING_MANUAL_ACCEPTANCE_CHECKLIST.md`
+
+Pending manual acceptance is **not a global implementation blocker**. Independent work may continue while manual items remain pending. A manual item blocks only the affected subsystem, a merge/release decision that depends on it, or a step that would make the pending evidence ambiguous/obsolete.
+
 ## Source of truth
 
 - Repository: `sinhvienaiti/space-typing`
 - Active integration branch at roadmap creation: `feat/bgv-integration-current`
 - R01-R05 code checkpoint: `46e336dc3ab1556be80fd5592389bc8c75249cb3`
 - R01-R05 closure document: `docs/SPACE_TYPING_REMAINING_IMPLEMENTATION_PROGRESS.md`
+- Manual acceptance backlog: `docs/SPACE_TYPING_MANUAL_ACCEPTANCE_CHECKLIST.md`
 - Always fetch the latest remote HEAD before changing code.
 - Never reset/revert newer worker/tab work to a historical SHA.
 - If this document and Git disagree, current Git state wins.
@@ -80,6 +87,17 @@ This branch overlaps areas already implemented on the current integration branch
 
 Its declared feature scope is much smaller than its apparent PR diff. Treat it as a stacked/history-topology problem and reconstruct or selectively transplant the canonical Admin policy work rather than merging the 846-file diff blindly.
 
+## Manual acceptance deferral policy
+
+The gate numbers below describe dependency/order, but a pending manual gate does not automatically freeze the whole roadmap.
+
+- Record manual checks in `docs/SPACE_TYPING_MANUAL_ACCEPTANCE_CHECKLIST.md` as `PENDING`, `PASS`, `FAIL`, `STALE`, or `N/A`.
+- Continue automated/integration work that does not depend on the unresolved manual result.
+- Stop only when the next unit directly modifies the same subsystem and would make attribution unsafe, or when merge/release eligibility requires that acceptance.
+- CI, screenshots, static inspection and code review must never be used to fabricate a manual `PASS`.
+- If later work touches a manually accepted subsystem, mark the affected acceptance evidence `STALE` and retest it before release.
+- Before final merge/release, all release-required manual items must be resolved.
+
 ## Post-R05 execution order
 
 ### Gate P0 — R01-R05 closure and exact-SHA regression
@@ -117,13 +135,15 @@ Exit condition: the chosen integration checkpoint contains the required mirror b
 
 Goal: decide whether the visual base is acceptable for mainline integration.
 
-Required manual evidence:
+Required manual evidence is tracked in `docs/SPACE_TYPING_MANUAL_ACCEPTANCE_CHECKLIST.md`, including:
 
 - current browser capture/video on the actual accepted branch state;
 - owner review for World 01/02 visual quality and visible motion;
 - verify no regression in gameplay readability and audio noise fixes.
 
 Automated CI cannot substitute for this perceptual acceptance.
+
+**Deferral rule:** P2 may remain `PENDING` while unrelated technical/integration work continues on stacked branches. It blocks declaring the visual base accepted for mainline merge/release. If subsequent work touches visual/audio presentation covered by P2, the affected checklist items must be tested before that subsystem is considered stable, and any prior evidence may become `STALE`.
 
 If accepted, #127 becomes eligible for integration after P1 reconciliation. If rejected, make visual-only corrections without reopening R01-R05 runtime work.
 
@@ -133,12 +153,13 @@ Goal: move the current BGV/gameplay/R01-R05 integration toward the stable target
 
 Rules:
 
+- Technical reconciliation/preparation may proceed while P2 manual acceptance is pending, provided it does not claim the visual base is accepted and does not perform a final mainline merge that depends on that acceptance.
 - Keep #128 based on the visual stack until #127/main relationship is resolved.
 - Do not retarget #128 directly to a stale `main` while it is 770 commits ahead / 3 behind.
 - Do not squash/rewrite history merely to make the PR look smaller unless a separate clean integration branch is intentionally created.
 - Prefer a reviewed integration checkpoint/branch if a clean mainline PR is needed later.
 
-Exit condition: #128's content is represented on a target branch that already includes the accepted visual base and current `main` CI semantics, with CI green.
+Exit condition: #128's content is represented on a target branch that already includes the required visual base and current `main` CI semantics, with CI green. Final mainline merge eligibility still respects any unresolved P2 acceptance item.
 
 ### Gate P4 — Reconcile PR #129 English integration
 
@@ -184,7 +205,9 @@ Exit condition: Admin policy is represented as a small reviewed delta on the cur
 
 ### Gate P7 — Final manual product acceptance
 
-This gate contains checks that automation cannot honestly claim:
+This gate contains checks that automation cannot honestly claim. The canonical checklist and evidence fields live in `docs/SPACE_TYPING_MANUAL_ACCEPTANCE_CHECKLIST.md`.
+
+It covers:
 
 - real microphone + browser permission on macOS;
 - real microphone + browser permission on Windows;
@@ -193,7 +216,7 @@ This gate contains checks that automation cannot honestly claim:
 - audio/music subjective balance and repeated-loop fatigue;
 - GPU/performance spot checks on representative machines.
 
-These manual checks do not invalidate already-complete automated R01-R05 implementation acceptance; they are product-release evidence.
+These checks may remain pending while independent implementation continues, but they must be completed before final product/release acceptance. They do not invalidate already-complete automated R01-R05 implementation acceptance.
 
 ## Integration principles
 
@@ -203,13 +226,12 @@ These manual checks do not invalidate already-complete automated R01-R05 impleme
 4. **One canonical runtime owner** for Duel, Voice, analytics, music policy and Admin resolution.
 5. **Fail closed** where authoritative backend/ranked/cross-player semantics do not exist.
 6. **No fabricated analytics data** for unavailable boss/equipment/skill identity.
-7. **Manual evidence stays manual** for microphone hardware and perceptual visual/audio acceptance.
-8. **Exact-SHA CI after integration checkpoints** before advancing to the next gate.
+7. **Manual evidence stays manual** for microphone hardware and perceptual visual/audio acceptance; use `docs/SPACE_TYPING_MANUAL_ACCEPTANCE_CHECKLIST.md`.
+8. **Exact-SHA CI after integration checkpoints** before advancing to the next technical gate.
+9. **Pending manual acceptance is not a global blocker** — continue independent work, but never claim merge/release acceptance without the required manual evidence.
 
 ## Immediate first unfinished gate
 
-At roadmap creation, the first unfinished gate is:
+At roadmap creation, the first unfinished gate was P0. Always determine the current first unfinished **technical** unit from latest Git/CI state rather than blindly stopping at a deferred manual item.
 
-**P0 — R01-R05 closure and exact-SHA regression.**
-
-After P0 passes, continue directly to **P1 — stabilize the integration trunk against current `main`**.
+If P2 remains pending but the next work does not directly depend on visual/audio acceptance, keep P2 in the manual backlog and continue with the next safe technical integration unit. Before final mainline merge/release, return to the manual checklist and resolve all required items.
