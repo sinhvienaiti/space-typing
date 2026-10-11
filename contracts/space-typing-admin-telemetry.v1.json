@@ -1,0 +1,86 @@
+{
+  "contractRevision": "space-typing-admin-telemetry-v1",
+  "schemaVersion": 1,
+  "gameId": "space-typing",
+  "capability": "telemetry.read",
+  "routes": [
+    {
+      "id": "overview",
+      "path": "/admin/space-typing",
+      "label": "Overview"
+    },
+    {
+      "id": "analytics",
+      "path": "/admin/space-typing/analytics",
+      "label": "Analytics"
+    }
+  ],
+  "telemetry": {
+    "mode": "runtime-derived-session-readonly",
+    "runtimeSources": [
+      "src/results/stage-session.ts",
+      "src/Game.ts",
+      "src/logic.ts",
+      "src/performance/adaptive-resolution.ts"
+    ],
+    "runtimeOwner": "StageSessionTracker + production Game session runtime",
+    "persistence": "session-memory-only",
+    "applyBoundary": "none",
+    "writeCapability": false,
+    "publishCapability": false,
+    "historicalAggregationCapability": false,
+    "centralTelemetryBackendCapability": false,
+    "overviewSignals": [
+      "elapsed-seconds",
+      "words-completed",
+      "typing-accuracy-inputs",
+      "stage-words-per-minute-inputs",
+      "regular-kills",
+      "elite-kills",
+      "boss-kills",
+      "enemy-escapes",
+      "damage-taken",
+      "shield-absorbed",
+      "skills-used",
+      "consumables-used"
+    ],
+    "analyticsSignals": [
+      "word-attempts",
+      "word-groups",
+      "perfect-words",
+      "corrected-words",
+      "corrected-errors",
+      "missed-words",
+      "skill-killed-words",
+      "interrupted-words",
+      "max-perfect-word-chain",
+      "hostile-bullets-intercepted",
+      "hostile-bullets-hit",
+      "bonus-collected",
+      "bonus-missed"
+    ],
+    "performanceDiagnostics": {
+      "available": true,
+      "scope": "adaptive-render-budget-internal",
+      "signals": [
+        "frame-duration-samples",
+        "draw-duration-samples",
+        "adaptive-render-scale"
+      ],
+      "adminReadableSnapshot": false
+    },
+    "privacy": {
+      "playerIdentityCollectedByContract": false,
+      "networkTransportOwnedByContract": false,
+      "crossSessionRetentionOwnedByContract": false
+    },
+    "unsupportedAdminOperations": [
+      "query historical player analytics",
+      "query cross-session aggregates",
+      "export server-side telemetry events",
+      "mutate gameplay through analytics controls",
+      "publish telemetry-derived gameplay configuration",
+      "claim adaptive render internals are an Admin-readable live feed"
+    ]
+  }
+}

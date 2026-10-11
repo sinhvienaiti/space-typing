@@ -1,0 +1,62 @@
+{
+  "contractRevision": "space-typing-admin-daily-weekly-v1",
+  "schemaVersion": 1,
+  "capability": "daily-weekly.read",
+  "route": {
+    "id": "daily-weekly",
+    "path": "/admin/space-typing/daily-weekly",
+    "label": "Daily / Weekly"
+  },
+  "liveOps": {
+    "mode": "runtime-partial-readonly",
+    "runtimeSources": [
+      "src/expansion-v2/challenge.ts",
+      "src/expansion-v2/profile-store.ts",
+      "src/expedition/core.ts",
+      "src/expedition/ui.ts",
+      "src/main.ts"
+    ],
+    "daily": {
+      "available": true,
+      "owner": "Expansion V2 Daily Expedition fixed challenge",
+      "challengeKind": "daily",
+      "cadence": "utc-day",
+      "dayKeyFormat": "YYYY-MM-DD",
+      "seedPolicy": "hash(dayKey|rulesetVersion)",
+      "identityFields": [
+        "dayKey",
+        "seed",
+        "rulesetVersion",
+        "contentVersion",
+        "wordPoolHash",
+        "startKitId",
+        "difficulty",
+        "assist",
+        "adaptivePolicy"
+      ],
+      "adaptivePolicy": "frozen",
+      "personalBest": true,
+      "personalGhost": true,
+      "profileStorageKey": "spaceTypingExpansionV2ProfileV1",
+      "remoteScheduler": false,
+      "remoteLeaderboard": false
+    },
+    "weekly": {
+      "available": false,
+      "reason": "No canonical weekly challenge identity, weekly seed policy, weekly reset scheduler or weekly reward track exists in the current Space Typing runtime."
+    },
+    "adminWriteCapability": false,
+    "scheduleAuthoringCapability": false,
+    "rewardAuthoringCapability": false,
+    "publishCapability": false,
+    "applyBoundary": "none",
+    "unsupportedAdminOperations": [
+      "creating or editing daily schedules",
+      "creating a synthetic weekly challenge",
+      "changing the deterministic daily seed",
+      "editing player Personal Best or Personal Ghost records",
+      "claiming a remote leaderboard or scheduler backend",
+      "publishing daily or weekly rewards"
+    ]
+  }
+}

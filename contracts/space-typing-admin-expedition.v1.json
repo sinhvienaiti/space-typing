@@ -1,0 +1,64 @@
+{
+  "contractRevision": "space-typing-admin-expedition-v1",
+  "schemaVersion": 1,
+  "gameId": "space-typing",
+  "capability": "expedition.read",
+  "route": {
+    "id": "expedition",
+    "path": "/admin/space-typing/expedition",
+    "label": "Expedition"
+  },
+  "expedition": {
+    "mode": "runtime-backed-browser-persisted-run-readonly",
+    "runtimeSources": [
+      "src/expedition/core.ts",
+      "src/expedition/session.ts",
+      "src/expedition/store.ts",
+      "src/expedition/ui.ts",
+      "src/expansion-v2/expedition-plan.ts"
+    ],
+    "runtimeOwner": "ExpeditionRun + ExpeditionSession",
+    "runVersion": 1,
+    "rulesetVersion": "expansion-v2-v1",
+    "contentVersion": "expansion-v2-world-01-v1",
+    "startKitId": "loaner-vanguard-v1",
+    "encounterCount": 8,
+    "draftBeforeEncounterIndexes": [0, 2, 4, 6],
+    "restAfterEncounterIndex": 3,
+    "phases": ["setup", "draft", "rest", "encounter", "settlement", "victory", "defeat", "abandoned"],
+    "challengeKinds": ["prototype", "daily", "qa"],
+    "persistence": {
+      "owner": "browser-local-storage",
+      "storageKey": "spaceTypingExpeditionRunV1",
+      "revisionedEnvelope": true,
+      "writerOwnership": true,
+      "writeVerification": true,
+      "resumableNonTerminalRun": true
+    },
+    "safety": {
+      "campaignFixtureFrozenInRun": true,
+      "campaignFixtureHashChecked": true,
+      "adminWriteCapability": false,
+      "adminPublishCapability": false,
+      "adminRunMutationCapability": false,
+      "adminStorageMutationCapability": false
+    },
+    "adminReadableSignals": [
+      "run-and-ruleset-version",
+      "encounter-count-and-boundaries",
+      "phase-model",
+      "challenge-kinds",
+      "browser-persistence-owner",
+      "resume-and-conflict-semantics",
+      "campaign-fixture-isolation"
+    ],
+    "unsupportedAdminOperations": [
+      "create or mutate Expedition runs",
+      "edit Expedition encounter rules",
+      "publish Expedition configuration",
+      "read a player's browser-local Expedition save remotely",
+      "clear or overwrite Expedition browser storage",
+      "claim a centralized Expedition backend exists"
+    ]
+  }
+}
