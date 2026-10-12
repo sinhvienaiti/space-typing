@@ -221,11 +221,10 @@ export function installBlockingNoticeBridge(): void {
   const notice = byId("notice");
   if (notice === null || typeof MutationObserver === "undefined") return;
 
-  let previous = "";
   const inspect = (): void => {
+    if (!notice.classList.contains("visible")) return;
     const message = notice.textContent?.trim() ?? "";
-    if (message.length === 0 || message === previous) return;
-    previous = message;
+    if (message.length === 0) return;
     escalate(message);
   };
 
