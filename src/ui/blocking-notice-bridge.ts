@@ -1,3 +1,4 @@
+import "./player-settings-policy.css";
 import { showUserMessage, type UserMessageAction } from "./user-message-dialog";
 
 let installed = false;
