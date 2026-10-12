@@ -1,6 +1,8 @@
 import { VoiceFeedbackState } from "../input/voice-feedback";
+import { installVoiceEntryGuard } from "./voice-entry-guard";
 
 export function mountVoiceFeedback(root: HTMLElement): { state: VoiceFeedbackState; dispose(): void } {
+  installVoiceEntryGuard();
   const transcript = root.querySelector<HTMLElement>("[data-voice-transcript]");
   const detail = root.querySelector<HTMLElement>("[data-voice-detail]");
   if (!transcript || !detail) throw new Error("Voice feedback elements are missing");
