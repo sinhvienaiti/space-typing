@@ -10,6 +10,10 @@ import {
 } from "./adaptive-profile";
 import { clamp } from "../logic";
 import {
+  ACTIVE_STAGE_RUNTIME_SESSION,
+  type AdminDifficultyPreset,
+} from "../admin/stage-runtime-policy";
+import {
   DIFFICULTY_MODES,
   migrateDifficultyMode,
 } from "./difficulty-modes";
@@ -45,6 +49,24 @@ function sanitizeDifficultyMode(
   value: unknown,
 ): DifficultyMode | null {
   return migrateDifficultyMode(value);
+}
+
+/**
+ * Admin exposes a deliberately small product-facing difficulty vocabulary.
+ * Keep the mapping here at the gameplay boundary so the Admin contract does
+ * not need to know the child game's internal difficulty identifiers.
+ *
+ * A null preset means no authoritative platform policy was available (for
+ * example standalone/offline child development), so callers preserve the
+ * legacy persisted player setting instead of changing existing behaviour.
+ */
+export function difficultyModeForAdminPreset(
+  preset: AdminDifficultyPreset | null,
+): DifficultyMode | null {
+  if (preset === "easy") return "relax";
+  if (preset === "normal") return "balanced";
+  if (preset === "hard") return "hard";
+  return null;
 }
 
 export function sanitizeDifficultySettings(
@@ -91,7 +113,7 @@ export function sanitizeDifficultySettings(
     ...(raw.inputProfiles && typeof raw.inputProfiles === "object" ? { inputProfiles: Object.fromEntries((["voice", "hybrid"] as const).flatMap(mode => {
       const p = raw.inputProfiles?.[mode];
       if (!p || ![p.encounters, p.voiceWords, p.elapsedSeconds].every(n => typeof n === "number" && Number.isFinite(n) && n >= 0)) return [];
-      return [[mode, { encounters: Math.min(10000, Math.floor(p.encounters)), voiceWords: Math.min(1e7, Math.floor(p.voiceWords)), elapsedSeconds: Math.min(1e9, p.elapsedSeconds), ...(p.keyboardProfile ? { keyboardProfile: sanitizeAdaptiveProfile(p.keyboardProfile) } : {}) }]];
+      return [[mode, { encounters: Math.min(10000, Math.floor(p.encounters)), voiceWords: Math.min(1e7, Math.floor(p.voiceWords)), elapsedSeconds: Math.min(1e9, p.elapsedSeconds + Math.max(0, 0)), ...(p.keyboardProfile ? { keyboardProfile: sanitizeAdaptiveProfile(p.keyboardProfile) } : {}) }]];
     })) } : {}),
   };
 }
@@ -124,9 +146,12 @@ export function difficultyInputFromSettings(
 ): DifficultyInput {
   const state = sanitizeDifficultySettings(input);
   const profile = mode === "typing" ? state.profile : mode === "hybrid" ? state.inputProfiles?.hybrid?.keyboardProfile ?? createAdaptiveProfile() : createAdaptiveProfile();
+  const authoritativeMode = difficultyModeForAdminPreset(
+    ACTIVE_STAGE_RUNTIME_SESSION.difficultyPreset,
+  );
   return {
     stage,
-    mode: state.mode,
+    mode: authoritativeMode ?? state.mode,
     vocabularyLevel,
     recentWpm: profile.smoothedWpm,
     recentAccuracy: profile.smoothedAccuracy,
