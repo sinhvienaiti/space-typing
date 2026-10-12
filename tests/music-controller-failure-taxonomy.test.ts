@@ -13,6 +13,7 @@ class FailureAudio implements AudioLike {
   playCount = 0;
   pauseCount = 0;
   error: unknown = null;
+  errors: unknown[] = [];
   deferredReject: ((reason?: unknown) => void) | null = null;
   private listeners = new Map<string, Set<EventListener>>();
 
@@ -20,6 +21,7 @@ class FailureAudio implements AudioLike {
 
   play(): Promise<void> {
     this.playCount += 1;
+    if (this.errors.length > 0) return Promise.reject(this.errors.shift());
     if (this.error !== null) return Promise.reject(this.error);
     if (this.deferredReject !== null) {
       return new Promise<void>((_resolve, reject) => {
@@ -71,6 +73,31 @@ describe("MusicController playback failure taxonomy", () => {
       audio.src.includes("/assets/audio/music/mysterious-ambience.mp3"),
     )).toBe(false);
     expect(controller.getDebugSnapshot().lastPlaybackFailure?.kind).toBe("autoplay-permission");
+    controller.destroy();
+  });
+
+  it("retries one temporary network failure on the same candidate", async () => {
+    const created: FailureAudio[] = [];
+    let primary: FailureAudio | null = null;
+    const controller = new MusicController((src) => {
+      const audio = new FailureAudio(src);
+      if (src.includes("/local-assets/music/world-01.ogg")) {
+        audio.errors.push({ name: "NetworkError", message: "temporary network failure" });
+        primary = audio;
+      }
+      created.push(audio);
+      return audio;
+    }, { tracks: [] });
+
+    controller.transitionTo("WORLD_NORMAL", 0);
+    await flush();
+
+    expect(primary).not.toBeNull();
+    expect(primary!.playCount).toBe(2);
+    expect(created.some((audio) =>
+      audio.src.includes("/assets/audio/music/mysterious-ambience.mp3"),
+    )).toBe(false);
+    expect(controller.getDebugSnapshot().lastPlaybackFailure).toBeNull();
     controller.destroy();
   });
 
