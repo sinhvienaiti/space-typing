@@ -64,5 +64,12 @@ window.addEventListener("pagehide", () => {
 
 """
 
-HELPER.write_text(text[:start] + replacement + text[end:])
-print("assistant integration helper repaired for current WARP runtime")
+patched = text[:start] + replacement + text[end:]
+legacy_credit_mode = '  latestCreditMode = "campaign";\n'
+if patched.count(legacy_credit_mode) != 1:
+    raise SystemExit(
+        "assistant-integration-polish.py: expected exactly one stale latestCreditMode assignment"
+    )
+patched = patched.replace(legacy_credit_mode, "", 1)
+HELPER.write_text(patched)
+print("assistant integration helper repaired for current WARP runtime and typecheck")
