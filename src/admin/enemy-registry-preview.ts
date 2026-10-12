@@ -13,6 +13,7 @@ export type EnemyAdminOverride = {
 
 export type EnemyAdminPolicy = {
   configRevision: string;
+  projectileMode?: "auto" | "off" | "on";
   enemies?: Record<string, EnemyAdminOverride>;
 };
 
@@ -50,8 +51,15 @@ function stageNumber(value: unknown, label: string): number {
   return value;
 }
 
+function projectileMode(value: unknown): void {
+  if (value !== "auto" && value !== "off" && value !== "on") {
+    throw new Error("projectileMode must be auto, off, or on");
+  }
+}
+
 export function validateEnemyAdminPolicy(policy: EnemyAdminPolicy): void {
   nonEmptyString(policy.configRevision, "configRevision", 120);
+  if (policy.projectileMode !== undefined) projectileMode(policy.projectileMode);
   if (policy.enemies === undefined) return;
   const enemies = object(policy.enemies, "enemies");
   for (const [id, rawOverride] of Object.entries(enemies)) {
