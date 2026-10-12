@@ -2,10 +2,13 @@ export type EnemyRuntimeOverride = Readonly<{
   minStage?: number;
 }>;
 
+export type AdminEnemyProjectileMode = "auto" | "off" | "on";
+
 export type EnemyRuntimeSession = Readonly<{
   source: "bundled" | "published";
   activeRevision: string | null;
   configRevision: string;
+  projectileMode: AdminEnemyProjectileMode | null;
   enemies: Readonly<Record<string, EnemyRuntimeOverride>>;
 }>;
 
@@ -49,6 +52,7 @@ const ENEMY_IDS = new Set([
   "cosmic-emperor",
 ]);
 const AUTHORABLE_KEYS = new Set(["minStage"]);
+const POLICY_KEYS = new Set(["configRevision", "projectileMode", "enemies"]);
 
 function object(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -58,6 +62,10 @@ function object(value: unknown): Record<string, unknown> | null {
 
 function validText(value: unknown, max: number): value is string {
   return typeof value === "string" && value.trim().length > 0 && value.length <= max;
+}
+
+function sanitizeProjectileMode(value: unknown): AdminEnemyProjectileMode | null {
+  return value === "auto" || value === "off" || value === "on" ? value : null;
 }
 
 function sanitizeOverride(value: unknown): EnemyRuntimeOverride | null {
@@ -76,6 +84,7 @@ function bundledSession(activeRevision: string | null = null): EnemyRuntimeSessi
     source: "bundled" as const,
     activeRevision,
     configRevision: "bundled-enemy-registry",
+    projectileMode: null,
     enemies: Object.freeze({}),
   });
 }
@@ -86,9 +95,10 @@ export function materializeEnemyRuntimeSession(envelope: unknown): EnemyRuntimeS
   const activeRevision = typeof runtime.activeRevision === "string" ? runtime.activeRevision : null;
   const policy = object(runtime.policy);
   if (policy === null || !validText(policy.configRevision, 120)) return bundledSession(activeRevision);
-  if (Object.keys(policy).some((key) => key !== "configRevision" && key !== "enemies")) return bundledSession(activeRevision);
-  if (policy.enemies === undefined) return bundledSession(activeRevision);
-  const rawEnemies = object(policy.enemies);
+  if (Object.keys(policy).some((key) => !POLICY_KEYS.has(key))) return bundledSession(activeRevision);
+
+  const projectileMode = sanitizeProjectileMode(policy.projectileMode);
+  const rawEnemies = policy.enemies === undefined ? {} : object(policy.enemies);
   if (rawEnemies === null) return bundledSession(activeRevision);
 
   const enemies: Record<string, EnemyRuntimeOverride> = {};
@@ -102,6 +112,7 @@ export function materializeEnemyRuntimeSession(envelope: unknown): EnemyRuntimeS
     source: "published" as const,
     activeRevision,
     configRevision: policy.configRevision,
+    projectileMode,
     enemies: Object.freeze(enemies),
   });
 }
