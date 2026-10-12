@@ -113,7 +113,7 @@ export function sanitizeDifficultySettings(
     ...(raw.inputProfiles && typeof raw.inputProfiles === "object" ? { inputProfiles: Object.fromEntries((["voice", "hybrid"] as const).flatMap(mode => {
       const p = raw.inputProfiles?.[mode];
       if (!p || ![p.encounters, p.voiceWords, p.elapsedSeconds].every(n => typeof n === "number" && Number.isFinite(n) && n >= 0)) return [];
-      return [[mode, { encounters: Math.min(10000, Math.floor(p.encounters)), voiceWords: Math.min(1e7, Math.floor(p.voiceWords)), elapsedSeconds: Math.min(1e9, p.elapsedSeconds + Math.max(0, 0)), ...(p.keyboardProfile ? { keyboardProfile: sanitizeAdaptiveProfile(p.keyboardProfile) } : {}) }]];
+      return [[mode, { encounters: Math.min(10000, Math.floor(p.encounters)), voiceWords: Math.min(1e7, Math.floor(p.voiceWords)), elapsedSeconds: Math.min(1e9, p.elapsedSeconds), ...(p.keyboardProfile ? { keyboardProfile: sanitizeAdaptiveProfile(p.keyboardProfile) } : {}) }]];
     })) } : {}),
   };
 }
