@@ -145,7 +145,7 @@ function showVoiceFailure(): void {
 }
 
 export function installVoiceEntryGuard(): void {
-  if (installed) return;
+  if (installed || typeof document === "undefined") return;
   installed = true;
 
   document.addEventListener(
@@ -165,7 +165,7 @@ export function installVoiceEntryGuard(): void {
   );
 
   const controls = byId("voiceInputControls");
-  if (controls !== null) {
+  if (controls !== null && typeof MutationObserver !== "undefined") {
     const observer = new MutationObserver(() => {
       if (microphoneState() !== "error") {
         if (microphoneState() !== "preparing") lastVoiceError = "";
