@@ -4,10 +4,13 @@ export type StageRuntimeOverride = Readonly<{
   modifierSlots?: number;
 }>;
 
+export type AdminDifficultyPreset = "easy" | "normal" | "hard";
+
 export type StageRuntimeSession = Readonly<{
   source: "bundled" | "published";
   activeRevision: string | null;
   configRevision: string;
+  difficultyPreset: AdminDifficultyPreset | null;
   stages: Readonly<Record<number, StageRuntimeOverride>>;
 }>;
 
@@ -29,6 +32,10 @@ function validRevision(value: unknown): value is string {
 
 function validStage(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= MIN_STAGE && value <= MAX_STAGE;
+}
+
+function sanitizeDifficultyPreset(value: unknown): AdminDifficultyPreset | null {
+  return value === "easy" || value === "normal" || value === "hard" ? value : null;
 }
 
 function sanitizeRecord(value: unknown): { stage: number; override: StageRuntimeOverride } | null {
@@ -73,6 +80,7 @@ function bundledSession(activeRevision: string | null = null): StageRuntimeSessi
     source: "bundled" as const,
     activeRevision,
     configRevision: "bundled-stage-config",
+    difficultyPreset: null,
     stages: Object.freeze({}),
   });
 }
@@ -98,10 +106,14 @@ export function materializeStageRuntimeSession(envelope: unknown): StageRuntimeS
     stages[record.stage] = record.override;
   }
 
+  const gameDefaults = object(runtime.gameDefaults);
+  const difficultyPreset = sanitizeDifficultyPreset(gameDefaults?.difficulty);
+
   return Object.freeze({
     source: "published" as const,
     activeRevision,
     configRevision: policy.configRevision.trim(),
+    difficultyPreset,
     stages: Object.freeze(stages),
   });
 }
