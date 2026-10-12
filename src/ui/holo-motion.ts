@@ -1,3 +1,4 @@
+import { installRuntimeQuickControls } from "./runtime-quick-controls";
 import { installSecretRouteMap } from "./secret-route-map";
 
 /**
@@ -11,6 +12,7 @@ const RIPPLE_SKIP = ".rc-card, .icon-button, input, select";
 export function installHoloMotion(root: Document = document): void {
   if (typeof window === "undefined") return;
   installSecretRouteMap(root);
+  installRuntimeQuickControls(root);
   const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)");
 
   root.addEventListener(
