@@ -397,11 +397,13 @@ export function resolveShopEquipmentGrade(
   const entries = Object.entries(band.weights) as [GradeId, number][];
   const total = entries.reduce((sum, [, weight]) => sum + Math.max(0, weight), 0);
   if (total <= 0) return "aluminum";
-  let cursor = safeRoll * total;
+  let cumulative = 0;
+  const target = safeRoll * total;
   for (const [grade, rawWeight] of entries) {
-    const weight = Math.max(0, rawWeight);
-    if (cursor < weight) return grade;
-    cursor -= weight;
+    cumulative += Math.max(0, rawWeight);
+    // Existing Shop code used `roll > threshold`, so equality stays in the
+    // lower grade band. `<=` preserves that behavior at exact boundaries.
+    if (target <= cumulative) return grade;
   }
   return entries[entries.length - 1]?.[0] ?? "aluminum";
 }
