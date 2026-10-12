@@ -4,15 +4,7 @@ export const ANNOUNCER_EVENTS = [
   "ultra-kill",
   "rampage",
   "monster-kill",
-  // Spree ladder and first blood (DotA lines; local files only).
   "first-blood",
-  "killing-spree",
-  "dominating",
-  "mega-kill",
-  "unstoppable",
-  "wicked-sick",
-  "godlike",
-  "holy-shit",
 ] as const;
 
 export type AnnouncerEvent = (typeof ANNOUNCER_EVENTS)[number];
@@ -29,39 +21,33 @@ export function announcerAsset(event: AnnouncerEvent): string {
 }
 
 /**
- * Owner-supplied voice lines (DotA pack) live in the gitignored
- * public/local-assets/announcer/ with a manifest.json listing them. When a
- * line is there it replaces the generic base sound.
+ * Announcer overrides are intentionally sourced only from the committed game
+ * asset tree. The manifest is empty by default, so the built-in generic cue
+ * remains the only runtime announcer audio unless we add owned/licensed lines.
  */
-export const LOCAL_ANNOUNCER_ROOT = "/local-assets/announcer/";
+export const LOCAL_ANNOUNCER_ROOT = "/assets/audio/announcer/";
 
 export function localAnnouncerAsset(event: AnnouncerEvent): string {
   return LOCAL_ANNOUNCER_ROOT + event + ".ogg";
 }
 
-/** Only the original chain events fall back to the generic base sound. */
-export function announcerHasFallback(event: AnnouncerEvent): boolean {
-  return event === "double-kill" || event === "triple-kill" || event === "ultra-kill" ||
-    event === "rampage" || event === "monster-kill";
+/** Every supported event has the in-repo generic cue as a safe fallback. */
+export function announcerHasFallback(_event: AnnouncerEvent): boolean {
+  return true;
 }
 
 /** Higher interrupts lower; equal or lower waits for the current line. */
 export function announcerPriority(event: AnnouncerEvent): number {
   if (event === "first-blood") return 4;
-  if (announcerHasFallback(event)) return 3;
-  return 2;
+  return 3;
 }
 
-/** Kills (typed words) in a row without a mistake or a hit taken. */
-export const KILL_SPREE_LADDER: readonly { streak: number; event: AnnouncerEvent }[] = [
-  { streak: 10, event: "killing-spree" },
-  { streak: 20, event: "dominating" },
-  { streak: 30, event: "mega-kill" },
-  { streak: 45, event: "unstoppable" },
-  { streak: 60, event: "wicked-sick" },
-  { streak: 80, event: "godlike" },
-  { streak: 100, event: "holy-shit" },
-];
+/**
+ * Voice-pack-specific spree lines were removed. Keep an empty ladder so the
+ * existing gameplay integration remains source-compatible without scheduling
+ * any external announcer clips.
+ */
+export const KILL_SPREE_LADDER: readonly { streak: number; event: AnnouncerEvent }[] = [];
 
 /** Index+1 of the highest spree rung reached (0 = none). */
 export function killSpreeRung(streak: number): number {
