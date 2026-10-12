@@ -172,7 +172,10 @@ describe("bundled Shop policy parity", () => {
     expect(resolveShopAvailability(BUNDLED_SHOP_POLICY, "traveling", { luck: 0, roll: 0.279999, discovered: [] })).toBe(true);
     expect(resolveShopAvailability(BUNDLED_SHOP_POLICY, "traveling", { luck: 0, roll: 0.28, discovered: [] })).toBe(false);
     expect(resolveShopAvailability(BUNDLED_SHOP_POLICY, "traveling", { luck: 100, roll: 0.429999, discovered: [] })).toBe(true);
-    expect(resolveShopAvailability(BUNDLED_SHOP_POLICY, "traveling", { luck: 100, roll: 0.43, discovered: [] })).toBe(false);
+    // Preserve the current Number result: 0.28 + 100 * 0.0015 is
+    // 0.43000000000000005, so the legacy `roll < chance` admits 0.43.
+    expect(resolveShopAvailability(BUNDLED_SHOP_POLICY, "traveling", { luck: 100, roll: 0.43, discovered: [] })).toBe(true);
+    expect(resolveShopAvailability(BUNDLED_SHOP_POLICY, "traveling", { luck: 100, roll: 0.430001, discovered: [] })).toBe(false);
 
     expect(resolveShopRareItemChance(BUNDLED_SHOP_POLICY, "hidden", "phoenix-core", 0)).toBeCloseTo(0.025);
     expect(resolveShopRareItemChance(BUNDLED_SHOP_POLICY, "hidden", "phoenix-core", 100)).toBeCloseTo(0.035);
