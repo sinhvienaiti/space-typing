@@ -1,9 +1,14 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 import { createWarpCharge } from "../src/economy/warp-charge";
-import { warpHudView, warpRefuelView } from "../src/ui/warp-hud";
+import { warpCountdownTickDelay, warpHudView, warpRefuelView } from "../src/ui/warp-hud";
 
 describe("pilot-card Warp HUD", () => {
+  it("aligns countdown rendering to whole-second boundaries without drift", () => {
+    expect(warpCountdownTickDelay(10_000)).toBe(1000);
+    expect(warpCountdownTickDelay(10_001)).toBe(999);
+    expect(warpCountdownTickDelay(10_999)).toBe(1);
+  });
   it("shows refuel price and disables unaffordable purchases", () => {
     const warp = createWarpCharge(0);
     expect(warpRefuelView(warp, 0)).toMatchObject({ disabled: true, label: "Refuel +20 · 8 SC", detail: "Need 8 Star Crystals · you have 0" });

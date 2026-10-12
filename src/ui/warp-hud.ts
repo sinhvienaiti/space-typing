@@ -1,5 +1,12 @@
 import { WARP_POLICY, type WarpCharge } from "../economy/warp-charge";
 
+/** Milliseconds until the next whole-second boundary. */
+export function warpCountdownTickDelay(nowMs: number): number {
+  const normalized = Math.max(0, Math.floor(nowMs));
+  const remainder = normalized % 1000;
+  return remainder === 0 ? 1000 : 1000 - remainder;
+}
+
 /** Pure display projection of already-reconciled account state, never a second wallet. */
 export function warpHudView(warp: WarpCharge) {
   const activeFull = warp.current === WARP_POLICY.activeCap;

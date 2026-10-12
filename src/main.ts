@@ -7,7 +7,7 @@ import { VoiceSession } from "./input/voice-session";
 import { sanitizeInputMode, type InputMode } from "./input/mode";
 import { mountVoiceFeedback } from "./ui/voice-feedback";
 import { installWarpControls } from "./ui/warp-controls";
-import { warpHudView, warpRefuelView } from "./ui/warp-hud";
+import { warpCountdownTickDelay, warpHudView, warpRefuelView } from "./ui/warp-hud";
 import { paintedBossArtUrl } from "./enemies/painted-sprites";
 import { bossIdentityForStage } from "./boss/identity";
 import type { BossRole } from "./boss/model";
@@ -8292,6 +8292,54 @@ function openRouteMap(): void {
   if (!routeDialog.open) routeDialog.showModal();
 }
 
+function openStageBriefing(): void {
+  if (
+    ascension.selectedTier > 0 ||
+    !persistenceReady ||
+    !canOpenBetweenStageMenu()
+  ) {
+    showNotice("Mission Briefing is available between Campaign stages.");
+    return;
+  }
+
+  const targetStage = routeTargetStage();
+  route = syncRouteStateForStage(route, targetStage);
+  const progress = routeProgress(route);
+  const selected = selectedRouteNode(route, targetStage);
+  const role = String(stageRole(targetStage));
+  const stageLabel = String(targetStage).padStart(3, "0");
+  byId("routeTitle").textContent = "Stage " + stageLabel + " · Mission Briefing";
+  byId("routeMeta").textContent =
+    "Sector " + String(route.graph.sectorStart).padStart(3, "0") + "-" +
+    String(route.graph.sectorEnd).padStart(3, "0") + " · " +
+    String(progress.chosen) + "/" + String(progress.total) + " route choices committed";
+
+  const map = byId("routeMap");
+  map.replaceChildren();
+  map.classList.remove("route-sector-briefing");
+  const summary = document.createElement("section");
+  summary.className = "route-selected";
+  const title = document.createElement("strong");
+  title.textContent = selected === null
+    ? "Mission route pending"
+    : routeNodeLabel(selected.type) + " · Stage " + stageLabel;
+  const detail = document.createElement("span");
+  detail.textContent = selected === null
+    ? "No route choice is committed yet. Starting the stage will open the route chooser when a branch decision is required."
+    : routeNodeDescription(selected);
+  const objective = document.createElement("small");
+  objective.textContent = role.includes("boss")
+    ? "Objective · defeat the sector boss and secure the checkpoint."
+    : targetStage % 10 === 0
+      ? "Objective · clear the checkpoint encounter and unlock rest services."
+      : "Objective · clear the combat encounter and preserve the Campaign run.";
+  summary.append(title, detail, objective);
+  map.append(summary);
+  byId("routeSelectedPanel").classList.add("hidden");
+  byId("hiddenEncounterPanel").classList.add("hidden");
+  if (!routeDialog.open) routeDialog.showModal();
+}
+
 function openRestHub(): void {
   const stage = pendingRestHubStage(shops);
   if (
@@ -8443,7 +8491,10 @@ async function startActiveHiddenEncounter(
 }
 
 async function startSelectedStage(practice = false): Promise<void> {
-  if (expeditionSession.ownsCampaignPersistence()) return;
+  if (expeditionSession.ownsCampaignPersistence()) {
+    showNotice("Expedition is still active · use Back to leave it, or Resume Expedition to continue.");
+    return;
+  }
   if (
     !persistenceReady ||
     practiceRestorePending ||
@@ -10398,7 +10449,7 @@ for (const id of ["restartButton", "clearRetryButton"]) {
     void startSelectedStage();
   });
 }
-byId("routeButton").addEventListener("click", openRouteMap);
+byId("routeButton").addEventListener("click", openStageBriefing);
 byId("routeCampaignButton").addEventListener("click", () => {
   if (routeDialog.open) routeDialog.close();
   openStageSelect();
@@ -10456,6 +10507,20 @@ byId("phoenixCoreButton").addEventListener("click", () => {
   void resolvePhoenixDeath();
 });
 
+function releaseExpeditionOwnershipForTitle(): void {
+  if (!expeditionSession.ownsCampaignPersistence()) return;
+  const campaignSnapshot = expeditionCampaignSnapshot;
+  expansionEncounterRuntime = null;
+  game.setExpansionEncounterContext(null);
+  if (campaignSnapshot !== null) {
+    applyAutosaveSnapshot(campaignSnapshot);
+    refreshPersistentStateUi();
+  }
+  expeditionSession.release();
+  expeditionCampaignSnapshot = null;
+  expeditionUi?.setResumeAvailable(expeditionSession.hasResumableRun());
+}
+
 for (const id of ["titleButton", "clearTitleButton"]) {
   byId(id).addEventListener("click", async () => {
     if (!await finishManagedSortie("abandoned")) return;
@@ -10463,6 +10528,7 @@ for (const id of ["titleButton", "clearTitleButton"]) {
       restoreTestingStagePersistentState();
     }
     game.backToTitle();
+    releaseExpeditionOwnershipForTitle();
   });
 }
 
@@ -11157,14 +11223,31 @@ installWarpControls(
   },
   renderWarpHud,
 );
-window.setInterval(() => {
-  renderWarpHud();
+const warpPersistenceInterval = window.setInterval(() => {
   if (persistenceReady && accountTransactions.canWrite() && !accountTransactions.busy()
     && !testingStagePreviewActive() && !practiceRestorePending && !clearSettlementPending
     && warpAccount?.attempt?.phase === "active" && game.getPhase() === "playing" && credits !== committedCredits) {
     void autosaveCampaign("manual");
   }
 }, 5_000);
+
+let warpCountdownTimer: number | null = null;
+let warpCountdownStopped = false;
+function scheduleWarpCountdownTick(): void {
+  if (warpCountdownStopped) return;
+  warpCountdownTimer = window.setTimeout(() => {
+    if (warpCountdownStopped) return;
+    renderWarpHud();
+    scheduleWarpCountdownTick();
+  }, warpCountdownTickDelay(Date.now()));
+}
+scheduleWarpCountdownTick();
+
+window.addEventListener("pagehide", () => {
+  warpCountdownStopped = true;
+  if (warpCountdownTimer !== null) window.clearTimeout(warpCountdownTimer);
+  window.clearInterval(warpPersistenceInterval);
+}, { once: true });
 
 renderSettings();
 renderGameplayMode();

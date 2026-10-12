@@ -27,13 +27,41 @@ function setSpeechActive(active: boolean): void {
   );
 }
 
+const PREFERRED_ENGLISH_VOICE_NAMES = [
+  "google us english",
+  "microsoft aria",
+  "microsoft jenny",
+  "samantha",
+  "alex",
+] as const;
+
+export function selectEnglishVoice(
+  voices: readonly SpeechSynthesisVoice[],
+): SpeechSynthesisVoice | null {
+  let best: SpeechSynthesisVoice | null = null;
+  let bestScore = Number.NEGATIVE_INFINITY;
+  voices.forEach((voice, index) => {
+    const lang = voice.lang.toLowerCase();
+    if (!lang.startsWith("en")) return;
+    const name = voice.name.toLowerCase();
+    const preferred = PREFERRED_ENGLISH_VOICE_NAMES.findIndex(
+      (candidate) => name.includes(candidate),
+    );
+    let score = lang == "en-us" ? 100 : 50;
+    if (voice.localService) score += 40;
+    if (voice.default) score += 5;
+    if (preferred >= 0) score += 200 - preferred * 10;
+    score -= index / 1000;
+    if (score > bestScore) {
+      best = voice;
+      bestScore = score;
+    }
+  });
+  return best;
+}
+
 function englishVoice(): SpeechSynthesisVoice | null {
-  const voices = speechSynthesis.getVoices();
-  return (
-    voices.find((voice) => voice.lang.toLowerCase() === "en-us") ??
-    voices.find((voice) => voice.lang.toLowerCase().startsWith("en")) ??
-    null
-  );
+  return selectEnglishVoice(speechSynthesis.getVoices());
 }
 
 export function speakEnglish(text: string, settings: GameSettings): void {

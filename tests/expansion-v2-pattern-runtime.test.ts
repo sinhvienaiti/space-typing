@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildPatternVocabulary,
+  LONG_WORD_MIN_DIVERSITY,
   chainMinimumLayers,
   sharedTargetEffect,
 } from "../src/expansion-v2/pattern-runtime";
@@ -37,6 +38,9 @@ describe("Expansion V2 pattern runtime", () => {
 
     const long = buildPatternVocabulary(words, "long-word", 5);
     expect(long.some((entry) => entry.en.length >= 8)).toBe(true);
+    expect(new Set(long.map((entry) => entry.en)).size).toBe(
+      Math.min(LONG_WORD_MIN_DIVERSITY, words.length),
+    );
 
     const noLong = buildPatternVocabulary(
       [{ id: "x", en: "cat", vi: "", ipa: "" }],

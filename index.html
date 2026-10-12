@@ -177,31 +177,24 @@
           <nav class="holo-tools" aria-label="Quick controls">
             <button id="titleRecordsButton" class="holo-tool" type="button" data-icon="trophy" data-tip="Records" data-tip-side="below" aria-label="Records" aria-expanded="false"></button>
             <button id="titleOnlineButton" class="holo-tool" type="button" data-icon="users" data-tip="Duel lobby · play online" data-tip-side="below" aria-label="Duel lobby"></button>
-            <button id="titleMusicButton" class="holo-tool" type="button" data-icon="music" data-tip="Music on / off" data-tip-side="below" aria-label="Music on or off" aria-pressed="true"></button>
             <button id="titleSoundButton" class="holo-tool" type="button" data-icon="volume" data-tip="Sound levels" data-tip-side="below" aria-label="Sound levels" aria-expanded="false"></button>
-            <button id="titleVoiceButton" class="holo-tool" type="button" data-icon="voice" data-tip="Pronunciation voice on / off" data-tip-side="below" aria-label="Pronunciation voice on or off" aria-pressed="true"></button>
             <button id="settingsButton" class="holo-tool" type="button" data-icon="gear" data-tip="Settings" data-tip-side="below" aria-label="Settings"></button>
 
             <div id="titleSoundPopover" class="holo-popover hidden" role="dialog" aria-label="Sound levels">
               <h4 data-icon="sliders">Sound</h4>
               <div class="holo-slider">
                 <button type="button" class="holo-slider-icon" data-icon="music" data-mute="musicVolume" aria-label="Mute music"></button>
-                <span><small>Music</small><input id="quickMusicVolume" type="range" min="0" max="1" step="0.05" /></span>
+                <span><small>BGM</small><input id="quickMusicVolume" type="range" min="0" max="1" step="0.05" /></span>
                 <output id="quickMusicVolumeValue">26%</output>
               </div>
               <div class="holo-slider">
                 <button type="button" class="holo-slider-icon" data-icon="volume" data-mute="sfxVolume" aria-label="Mute effects"></button>
-                <span><small>Effects</small><input id="quickSfxVolume" type="range" min="0" max="1" step="0.05" /></span>
+                <span><small>SFX</small><input id="quickSfxVolume" type="range" min="0" max="1" step="0.05" /></span>
                 <output id="quickSfxVolumeValue">50%</output>
               </div>
               <div class="holo-slider">
-                <button type="button" class="holo-slider-icon" data-icon="sparkle" data-mute="creditVolume" aria-label="Mute credit sounds"></button>
-                <span><small>Credits</small><input id="quickCreditVolume" type="range" min="0" max="2" step="0.1" /></span>
-                <output id="quickCreditVolumeValue">100%</output>
-              </div>
-              <div class="holo-slider">
                 <button type="button" class="holo-slider-icon" data-icon="voice" data-mute="pronunciationVolume" aria-label="Mute pronunciation voice"></button>
-                <span><small>Voice (pronunciation)</small><input id="quickVoiceVolume" type="range" min="0" max="1" step="0.05" /></span>
+                <span><small>Voice / Pronunciation</small><input id="quickVoiceVolume" type="range" min="0" max="1" step="0.05" /></span>
                 <output id="quickVoiceVolumeValue">100%</output>
               </div>
               <div class="holo-popover-foot">

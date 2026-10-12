@@ -122,6 +122,18 @@ describe("P10 ExpeditionSession", () => {
     expect(session.currentRun()?.phase).toBe("draft");
   });
 
+  it("release clears Expedition ownership but preserves a resumable run", () => {
+    const storage = new MemoryStorage();
+    const session = new ExpeditionSession(storage, "tab-a");
+    session.start(createRun("leave-and-resume"), ["a", "b"]);
+
+    expect(session.ownsCampaignPersistence()).toBe(true);
+    session.release();
+    expect(session.ownsCampaignPersistence()).toBe(false);
+    expect(session.hasResumableRun()).toBe(true);
+    expect(session.resume(["a", "b"])?.runId).toBe("leave-and-resume");
+  });
+
   it("QA phase forcing stays inside Expedition storage", () => {
     const storage = new MemoryStorage();
     const session = new ExpeditionSession(storage, "tab-a");

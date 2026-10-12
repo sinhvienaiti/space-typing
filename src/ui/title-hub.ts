@@ -42,7 +42,6 @@ const QUICK_SLIDERS: ReadonlyArray<{
 }> = [
   { field: "musicVolume", input: "quickMusicVolume", fallback: 0.26 },
   { field: "sfxVolume", input: "quickSfxVolume", fallback: 0.5 },
-  { field: "creditVolume", input: "quickCreditVolume", fallback: 1 },
   { field: "pronunciationVolume", input: "quickVoiceVolume", fallback: 1 },
 ];
 

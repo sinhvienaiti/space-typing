@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameSettings } from "../src/types";
-import { setSpeechGate, speakEnglish, stopSpeech } from "../src/speech";
+import { selectEnglishVoice, setSpeechGate, speakEnglish, stopSpeech } from "../src/speech";
 
 type FakeUtterance = {
   lang: string;
@@ -84,6 +84,13 @@ afterEach(() => {
 });
 
 describe("pronunciation lifecycle hardening", () => {
+  it("prefers a clear local English voice at the native volume ceiling", () => {
+    const voices = [
+      { name: "Cloud English", lang: "en-US", localService: false, default: true, voiceURI: "cloud" },
+      { name: "Samantha", lang: "en-US", localService: true, default: false, voiceURI: "local" },
+    ] as SpeechSynthesisVoice[];
+    expect(selectEnglishVoice(voices)?.name).toBe("Samantha");
+  });
   it("activates only for playback and releases on end", async () => {
     speakEnglish("orbit", settings);
     await Promise.resolve();
