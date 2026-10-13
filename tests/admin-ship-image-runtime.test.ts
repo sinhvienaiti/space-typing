@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createShipAdminPreview } from "../src/admin/ship-registry-preview";
 import { materializeShipRuntimeSession } from "../src/admin/ship-runtime-policy";
 import {
   characterShipRuntimeImage,
@@ -70,6 +71,30 @@ describe("A5.2 exact-version Ship image runtime", () => {
 
     const rawPath = sessionWithImage("/assets/ship.webp");
     expect(rawPath.ships.vanguard).toBeUndefined();
+  });
+
+  it("carries the canonical Media V2 version through the Admin preview bridge", () => {
+    const preview = createShipAdminPreview({
+      configRevision: "ships-image-preview-test",
+      ships: {
+        vanguard: { imageAssetVersionId: VERSION_ID },
+      },
+    });
+
+    expect(preview.ships.find((ship) => ship.id === "vanguard")?.imageAssetVersionId).toBe(VERSION_ID);
+    expect(preview.ships.find((ship) => ship.id === "aegis")?.imageAssetVersionId).toBeUndefined();
+  });
+
+  it("rejects raw paths and URLs at the Admin preview boundary", () => {
+    expect(() => createShipAdminPreview({
+      configRevision: "ships-image-preview-test",
+      ships: { vanguard: { imageAssetVersionId: "/assets/ship.webp" } },
+    })).toThrow("canonical Media V2 version id");
+
+    expect(() => createShipAdminPreview({
+      configRevision: "ships-image-preview-test",
+      ships: { vanguard: { imageAssetVersionId: "https://example.test/ship.webp" } },
+    })).toThrow("canonical Media V2 version id");
   });
 
   it("resolves the exact version through the public runtime Media boundary", async () => {
