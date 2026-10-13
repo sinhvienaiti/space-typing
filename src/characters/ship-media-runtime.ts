@@ -55,6 +55,12 @@ function optionalPositiveInteger(value: unknown): number | undefined {
   return Number.isInteger(value) && (value as number) > 0 ? value as number : undefined;
 }
 
+function isPrimaryComponent(
+  value: Record<string, unknown> | null,
+): value is Record<string, unknown> {
+  return value !== null && value.role === "primary";
+}
+
 export async function resolveExactShipImageComponent(
   fetchImpl: typeof fetch,
   assetVersionId: string,
@@ -84,7 +90,7 @@ export async function resolveExactShipImageComponent(
 
   const primary = input.components
     .map(object)
-    .find((component) => component?.role === "primary");
+    .find(isPrimaryComponent);
   if (primary === undefined) {
     throw new ShipRuntimeMediaError("Ship image version has no primary component.");
   }
@@ -92,16 +98,14 @@ export async function resolveExactShipImageComponent(
     throw new ShipRuntimeMediaError("Ship image primary component has an unsupported image MIME type.");
   }
 
+  const width = optionalPositiveInteger(primary.width);
+  const height = optionalPositiveInteger(primary.height);
   return Object.freeze({
     role: "primary" as const,
     mimeType: primary.mimeType,
     runtimeUrl: safeRuntimeUrl(primary.runtimeUrl),
-    ...(optionalPositiveInteger(primary.width) === undefined
-      ? {}
-      : { width: optionalPositiveInteger(primary.width) }),
-    ...(optionalPositiveInteger(primary.height) === undefined
-      ? {}
-      : { height: optionalPositiveInteger(primary.height) }),
+    ...(width === undefined ? {} : { width }),
+    ...(height === undefined ? {} : { height }),
   });
 }
 
