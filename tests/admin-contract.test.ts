@@ -19,6 +19,9 @@ describe("Space Typing Admin contract V1", () => {
   });
   it("publishes the B06.1 Ships contract without player-state fields",()=>{
     expect(SPACE_TYPING_ADMIN_CONTRACT.capabilities).toEqual(expect.arrayContaining(["ships.read","ships.write","ships.preview"]));
+    expect(SPACE_TYPING_ADMIN_CONTRACT.ships.authorableFields).toContain("imageAssetVersionId");
+    expect(SPACE_TYPING_ADMIN_CONTRACT.ships.authorableFields).not.toContain("imagePath");
+    expect(SPACE_TYPING_ADMIN_CONTRACT.ships.authorableFields).not.toContain("runtimeUrl");
     expect(SPACE_TYPING_ADMIN_CONTRACT.ships.authorableFields).not.toContain("selected");
     expect(SPACE_TYPING_ADMIN_CONTRACT.ships.authorableFields).not.toContain("progress");
   });
@@ -58,7 +61,7 @@ describe("Space Typing Admin contract V1", () => {
     expect(SPACE_TYPING_ADMIN_CONTRACT.currencies).toMatchObject({
       mode:"runtime-derived-readonly",
       ids:["credits","alloy","star-crystal","quantum-core"],
-      balanceKeys:{credits:"credits",alloy:"alloy","star-crystal":"starCrystal","quantum-core":"quantumCore"},
+      balanceKeys:{credits:"credits",alloy:"alloy","star-crystal":"starCrystal", "quantum-core":"quantumCore"},
       authorableFields:[],
       caps:{credits:999999999,alloy:999999999,"star-crystal":999999999,"quantum-core":999999999},
       displayPrecision:0,
