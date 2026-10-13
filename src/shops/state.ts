@@ -34,6 +34,7 @@ import {
   resolveShopItemPrice,
   resolveShopRareItemChance,
   type ShopAdminPolicyV1,
+  type ShopPolicyPrice,
   type ShopPolicyType,
 } from "./policy";
 
@@ -41,11 +42,21 @@ export const SHOP_TYPES = SHOP_POLICY_TYPES;
 
 export type ShopType = ShopPolicyType;
 
-export type ShopPrice = {
+export type ShopBasePrice = {
   credits: number;
   alloy: number;
   starCrystal: number;
   quantumCore: number;
+};
+
+/**
+ * Merchandising is snapshotted with the generated offer price. Existing
+ * ShopInstance records therefore keep the exact badge/compare-at presentation
+ * that was active when the sector shop was first materialized.
+ */
+export type ShopPrice = ShopBasePrice & {
+  compareAtPrice?: ShopBasePrice | null;
+  badge?: string | null;
 };
 
 export type ShopItemStock = {
@@ -115,7 +126,7 @@ export type ShopPurchaseResult = {
     | null;
 };
 
-function emptyPrice(): ShopPrice {
+function emptyPrice(): ShopBasePrice {
   return {
     credits: 0,
     alloy: 0,
@@ -129,7 +140,7 @@ function sanitizeAmount(value: unknown): number {
   return Math.max(0, Math.floor(value));
 }
 
-export function sanitizeShopPrice(value: unknown): ShopPrice {
+function sanitizeBasePrice(value: unknown): ShopBasePrice {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return emptyPrice();
   }
@@ -142,11 +153,11 @@ export function sanitizeShopPrice(value: unknown): ShopPrice {
   };
 }
 
-export function isValidShopPrice(value: unknown): value is ShopPrice {
+function isValidBasePrice(value: unknown): value is ShopBasePrice {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return false;
   }
-  const raw = value as ShopPrice;
+  const raw = value as ShopBasePrice;
   return [
     raw.credits,
     raw.alloy,
@@ -158,6 +169,55 @@ export function isValidShopPrice(value: unknown): value is ShopPrice {
       Number.isInteger(amount) &&
       amount >= 0,
   );
+}
+
+function isValidBadge(value: unknown): value is string | null {
+  return value === null ||
+    (typeof value === "string" && value.trim().length > 0 && value.length <= 28);
+}
+
+export function sanitizeShopPrice(value: unknown): ShopPrice {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return emptyPrice();
+  }
+  const raw = value as Record<string, unknown>;
+  const price: ShopPrice = sanitizeBasePrice(raw);
+  if (Object.hasOwn(raw, "compareAtPrice")) {
+    price.compareAtPrice = raw.compareAtPrice === null
+      ? null
+      : sanitizeBasePrice(raw.compareAtPrice);
+  }
+  if (Object.hasOwn(raw, "badge")) {
+    price.badge = typeof raw.badge === "string" ? raw.badge : null;
+  }
+  return price;
+}
+
+export function isValidShopPrice(value: unknown): value is ShopPrice {
+  if (!isValidBasePrice(value)) return false;
+  const raw = value as Record<string, unknown>;
+  if (
+    Object.hasOwn(raw, "compareAtPrice") &&
+    raw.compareAtPrice !== null &&
+    !isValidBasePrice(raw.compareAtPrice)
+  ) {
+    return false;
+  }
+  if (Object.hasOwn(raw, "badge") && !isValidBadge(raw.badge)) return false;
+  return true;
+}
+
+function snapshotOfferPrice(
+  price: ShopPolicyPrice,
+  compareAtPrice: ShopPolicyPrice | undefined,
+  badge: string | null | undefined,
+): ShopPrice {
+  const snapshot: ShopPrice = { ...price };
+  if (compareAtPrice !== undefined) {
+    snapshot.compareAtPrice = { ...compareAtPrice };
+  }
+  if (badge !== undefined) snapshot.badge = badge;
+  return snapshot;
 }
 
 function hashString(value: string): number {
@@ -271,12 +331,17 @@ function itemEntry(
   suffix = "",
 ): ShopItemStock {
   const grade = getItemDefinition(itemId).grade ?? "aluminum";
+  const offer = policy.offers.items[itemId];
   return {
     key: "item-" + itemId + suffix,
     kind: "item",
     itemId,
     remaining,
-    price: { ...resolveShopItemPrice(policy, type, itemId, grade) },
+    price: snapshotOfferPrice(
+      resolveShopItemPrice(policy, type, itemId, grade),
+      offer?.compareAtPriceByShopType?.[type],
+      offer?.badge,
+    ),
   };
 }
 
@@ -302,6 +367,7 @@ function equipmentEntry(
   grade: GradeId,
   index: number,
 ): ShopEquipmentStock {
+  const offer = policy.offers.equipment[definitionId];
   return {
     key:
       "equipment-" +
@@ -314,15 +380,17 @@ function equipmentEntry(
     definitionId,
     grade,
     remaining: 1,
-    price: {
-      ...resolveShopEquipmentPrice(
+    price: snapshotOfferPrice(
+      resolveShopEquipmentPrice(
         policy,
         type,
         definitionId,
         grade,
         EQUIPMENT_REGISTRY[definitionId].tier,
       ),
-    },
+      offer?.compareAtPriceByShopTypeAndGrade?.[type]?.[grade],
+      offer?.badge,
+    ),
   };
 }
 
@@ -643,8 +711,7 @@ export function shopAvailable(
   });
 }
 
-export function formatShopPrice(priceInput: ShopPrice): string {
-  const price = sanitizeShopPrice(priceInput);
+function formatBaseShopPrice(price: ShopBasePrice): string {
   const parts: string[] = [];
   if (price.credits > 0) parts.push(price.credits.toLocaleString() + " Credits");
   if (price.alloy > 0) parts.push(price.alloy.toLocaleString() + " Alloy");
@@ -655,6 +722,16 @@ export function formatShopPrice(priceInput: ShopPrice): string {
     parts.push(price.quantumCore.toLocaleString() + " Quantum Core");
   }
   return parts.length > 0 ? parts.join(" + ") : "Free";
+}
+
+export function formatShopPrice(priceInput: ShopPrice): string {
+  const price = sanitizeShopPrice(priceInput);
+  const current = formatBaseShopPrice(price);
+  const compareAt = price.compareAtPrice === undefined || price.compareAtPrice === null
+    ? ""
+    : " · was " + formatBaseShopPrice(price.compareAtPrice);
+  const badge = typeof price.badge === "string" ? " · " + price.badge : "";
+  return current + compareAt + badge;
 }
 
 export function canAffordShopPrice(

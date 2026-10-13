@@ -19,6 +19,20 @@ function revisionPolicy(configRevision: string, creditDelta: number) {
   for (const price of Object.values(policy.pricing.equipmentGradePrices.normal) as Array<{ credits: number }>) {
     price.credits += creditDelta;
   }
+
+  for (const itemId of policy.generation.shopTypes.normal.itemPool as string[]) {
+    policy.offers.items[itemId] = {
+      badge: configRevision,
+      compareAtPriceByShopType: {
+        normal: {
+          credits: 20_000 + creditDelta,
+          alloy: 0,
+          starCrystal: 0,
+          quantumCore: 0,
+        },
+      },
+    };
+  }
   return policy;
 }
 
@@ -33,7 +47,7 @@ function runtimeSession(activeRevision: string, policy: unknown) {
 }
 
 describe("Shop revision lifecycle", () => {
-  it("keeps persisted ShopInstance pricing frozen while a new session consumes the published revision", () => {
+  it("keeps persisted ShopInstance pricing and merchandising frozen while a new session consumes the published revision", () => {
     const revisionA = runtimeSession(
       "revision-a",
       revisionPolicy("shop-policy-a", 0),
@@ -60,6 +74,9 @@ describe("Shop revision lifecycle", () => {
     );
     expect(first.created).toBe(true);
     expect(first.instance.stock.length).toBeGreaterThan(0);
+    const firstItem = first.instance.stock.find((entry) => entry.kind === "item");
+    expect(firstItem?.price.badge).toBe("shop-policy-a");
+    expect(firstItem?.price.compareAtPrice?.credits).toBe(20_000);
 
     const persistedAfterPublish = resolveShopInstance(
       first.state,
@@ -69,6 +86,9 @@ describe("Shop revision lifecycle", () => {
     );
     expect(persistedAfterPublish.created).toBe(false);
     expect(persistedAfterPublish.instance).toEqual(first.instance);
+    const persistedItem = persistedAfterPublish.instance.stock.find((entry) => entry.kind === "item");
+    expect(persistedItem?.price.badge).toBe("shop-policy-a");
+    expect(persistedItem?.price.compareAtPrice?.credits).toBe(20_000);
 
     const freshSessionInstance = resolveShopInstance(
       createShopState(),
@@ -81,5 +101,8 @@ describe("Shop revision lifecycle", () => {
     expect(freshSessionInstance.created).toBe(true);
     expect(freshSessionInstance.instance.id).toBe(first.instance.id);
     expect(freshSessionInstance.instance.stock).not.toEqual(first.instance.stock);
+    const freshItem = freshSessionInstance.instance.stock.find((entry) => entry.kind === "item");
+    expect(freshItem?.price.badge).toBe("shop-policy-b");
+    expect(freshItem?.price.compareAtPrice?.credits).toBe(30_000);
   });
 });
