@@ -67,10 +67,13 @@ describe("runtime media exact-version resolution", () => {
       RuntimeMediaValidationError,
     );
 
-    const external = reliefEnvelope();
-    external.components[0] = {
-      ...external.components[0],
-      runtimeUrl: "https://cdn.example.invalid/color.webp",
+    const external = {
+      ...reliefEnvelope(),
+      components: reliefEnvelope().components.map((component) =>
+        component.role === "color"
+          ? { ...component, runtimeUrl: "https://cdn.example.invalid/color.webp" }
+          : component,
+      ),
     };
     expect(() => validateRuntimeMediaVersion(external, versionId)).toThrow(RuntimeMediaValidationError);
   });
@@ -122,8 +125,10 @@ describe("current relief runtime profile", () => {
     };
     expect(() => resolveCurrentReliefRuntimeBundle(glb, versionId)).toThrow(RuntimeMediaValidationError);
 
-    const missing = reliefEnvelope();
-    missing.components = missing.components.filter((item) => item.role !== "height");
+    const missing = {
+      ...reliefEnvelope(),
+      components: reliefEnvelope().components.filter((item) => item.role !== "height"),
+    };
     expect(() => resolveCurrentReliefRuntimeBundle(missing, versionId)).toThrow(RuntimeMediaValidationError);
 
     const uploaded = { ...reliefEnvelope(), provenance: "admin-upload" };
