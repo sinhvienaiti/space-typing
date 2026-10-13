@@ -64,8 +64,13 @@ describe("Shop runtime Admin preview", () => {
       configRevision: "shop-preview-test",
       applyBoundary: SHOP_RUNTIME_APPLY_BOUNDARY,
     });
+    expect(preview.policy).toEqual(session.policy);
     expect(preview.available).toBe(shopAvailable("normal", context, session.policy));
     expect(preview.instance).toEqual(production.instance);
+  });
+
+  it("exposes the canonical bundled policy when no draft is supplied", () => {
+    expect(previewShopRuntime().policy).toEqual(BUNDLED_SHOP_POLICY);
   });
 
   it("rejects a malformed draft instead of silently previewing the bundled fallback", () => {

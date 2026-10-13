@@ -5,6 +5,7 @@ import {
 import {
   BUNDLED_SHOP_POLICY,
   SHOP_POLICY_TYPES,
+  type ShopAdminPolicyV1,
   type ShopPolicyType,
 } from "../shops/policy";
 import {
@@ -42,6 +43,8 @@ export type ShopRuntimePreviewResult = Readonly<{
     configRevision: string;
     applyBoundary: typeof SHOP_RUNTIME_APPLY_BOUNDARY;
   }>;
+  /** Canonical effective policy used by the production materializer for this preview. */
+  policy: ShopAdminPolicyV1;
   request: Readonly<{
     shopType: ShopPolicyType;
     stage: number;
@@ -209,6 +212,7 @@ export function previewShopRuntime(input: unknown = {}): ShopRuntimePreviewResul
       configRevision: session.configRevision,
       applyBoundary: SHOP_RUNTIME_APPLY_BOUNDARY,
     },
+    policy: session.policy,
     request: {
       shopType: selectedShopType,
       stage: selectedStage,
