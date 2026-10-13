@@ -1,6 +1,7 @@
 export const ASSET_PREVIEW_PROTOCOL_VERSION = 1 as const;
 
 const TOKEN_PATTERN = /^[A-Za-z0-9._:-]{8,160}$/;
+const ASSET_VERSION_ID_PATTERN = /^media-version\.[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/;
 const COMMAND_TYPES = new Set([
   "LOAD_CANDIDATE",
   "SET_SCENARIO",
@@ -92,7 +93,10 @@ export function parseAssetPreviewCommand(value: unknown): AssetPreviewCommand {
       payload === null ||
       payload.domain !== "ship" ||
       typeof payload.characterId !== "string" ||
-      object(payload.visual) === null
+      object(payload.visual) === null ||
+      (payload.imageAssetVersionId !== undefined &&
+        (typeof payload.imageAssetVersionId !== "string" ||
+          !ASSET_VERSION_ID_PATTERN.test(payload.imageAssetVersionId)))
     ) {
       throw new AssetPreviewProtocolError("bad-message", "LOAD_CANDIDATE payload is invalid.");
     }
