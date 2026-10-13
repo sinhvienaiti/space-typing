@@ -1,0 +1,290 @@
+export const ASSET_TUNING_CAPABILITY_STATUSES = [
+  "SUPPORTED NOW",
+  "REQUIRES CANONICAL MIGRATION",
+  "READ-ONLY REFERENCE",
+  "DEFERRED / UNSUPPORTED",
+] as const;
+
+export type AssetTuningCapabilityStatus =
+  (typeof ASSET_TUNING_CAPABILITY_STATUSES)[number];
+
+export type AssetTuningRuntimeCapability = Readonly<{
+  id: string;
+  domain: "ship" | "ship-2d" | "ship-3d" | "projectile" | "vfx" | "sfx" | "skill" | "weapon";
+  persistedField: string | null;
+  canonicalOwner: string;
+  validator: string | null;
+  runtimeResolver: string | null;
+  productionConsumer: string | null;
+  previewConsumer: string | null;
+  applyBoundary: "new-session" | "runtime-state" | "build/static" | "none";
+  status: AssetTuningCapabilityStatus;
+  note: string;
+}>;
+
+function capability(value: AssetTuningRuntimeCapability): AssetTuningRuntimeCapability {
+  return Object.freeze(value);
+}
+
+/**
+ * A5.0 executable capability matrix.
+ *
+ * This is intentionally conservative: a renderer argument is not an Admin
+ * field, and a production-backed field is not Asset-Tuning-writable until a
+ * child-owned production preview consumer exists for it.
+ */
+export const ASSET_TUNING_RUNTIME_CAPABILITIES = Object.freeze([
+  capability({
+    id: "ship.visual.procedural-profile",
+    domain: "ship",
+    persistedField: "ships.<id>.visual.{silhouette,primary,secondary,accent,core,engine,glow,wingSpan,bodyLength,engineCount}",
+    canonicalOwner: "src/admin/ship-runtime-policy.ts",
+    validator: "sanitizeShipOverride() visual validation",
+    runtimeResolver: "src/characters/visuals.ts::characterVisualProfile()",
+    productionConsumer: "src/characters/renderer.ts::drawCharacterShip()",
+    previewConsumer: null,
+    applyBoundary: "new-session",
+    status: "REQUIRES CANONICAL MIGRATION",
+    note: "Production authority is canonical; A5 visual preview harness is still required before this becomes an Asset Tuning writable control.",
+  }),
+  capability({
+    id: "ship-2d.image-assignment",
+    domain: "ship-2d",
+    persistedField: null,
+    canonicalOwner: "src/characters/renderer.ts shared ship sheet",
+    validator: null,
+    runtimeResolver: "setCharacterShipSheet() + shipCell() static per-character index",
+    productionConsumer: "drawCharacterShip() illustrated ship path",
+    previewConsumer: null,
+    applyBoundary: "build/static",
+    status: "REQUIRES CANONICAL MIGRATION",
+    note: "No per-Ship exact assetVersionId field or Media V2 runtime resolver exists yet.",
+  }),
+  capability({
+    id: "ship.presentation.uniform-scale",
+    domain: "ship",
+    persistedField: null,
+    canonicalOwner: "src/characters/renderer.ts caller-owned CharacterDrawOptions.scale",
+    validator: null,
+    runtimeResolver: null,
+    productionConsumer: "drawCharacterShip() draw-time scale",
+    previewConsumer: null,
+    applyBoundary: "runtime-state",
+    status: "REQUIRES CANONICAL MIGRATION",
+    note: "A draw argument is not a canonical persisted Ship presentation field.",
+  }),
+  capability({
+    id: "ship.presentation.offset-x-y",
+    domain: "ship",
+    persistedField: null,
+    canonicalOwner: "gameplay/world placement",
+    validator: null,
+    runtimeResolver: null,
+    productionConsumer: "CharacterDrawOptions.x/y",
+    previewConsumer: null,
+    applyBoundary: "runtime-state",
+    status: "REQUIRES CANONICAL MIGRATION",
+    note: "Persistent art correction must be separated from gameplay/world coordinates before authoring.",
+  }),
+  capability({
+    id: "ship.presentation.rotation-pivot",
+    domain: "ship",
+    persistedField: null,
+    canonicalOwner: "gameplay flight pose",
+    validator: null,
+    runtimeResolver: null,
+    productionConsumer: "characterShipAngle() / drawCharacterShip()",
+    previewConsumer: null,
+    applyBoundary: "runtime-state",
+    status: "REQUIRES CANONICAL MIGRATION",
+    note: "No canonical persistent presentation rotation or pivot field exists.",
+  }),
+  capability({
+    id: "ship.motion.aim-recoil-boost",
+    domain: "ship",
+    persistedField: null,
+    canonicalOwner: "gameplay runtime state",
+    validator: null,
+    runtimeResolver: "CharacterDrawOptions scenario state",
+    productionConsumer: "drawCharacterShip() / characterShipPoint()",
+    previewConsumer: null,
+    applyBoundary: "runtime-state",
+    status: "READ-ONLY REFERENCE",
+    note: "Aim, recoil and boost are preview scenario inputs, not Admin-authored Ship fields.",
+  }),
+  capability({
+    id: "ship-3d.relief-current-bundle",
+    domain: "ship-3d",
+    persistedField: null,
+    canonicalOwner: "src/duel/relief-model.ts prepared relief bundle",
+    validator: "relief manifest + model.json structural checks + component byte checks",
+    runtimeResolver: "src/duel/relief-model.ts::loadReliefShip()",
+    productionConsumer: "src/duel/ship3d.ts::DuelShip3D.create()",
+    previewConsumer: null,
+    applyBoundary: "build/static",
+    status: "READ-ONLY REFERENCE",
+    note: "Existing generated bundle can be previewed through the real loader; assignment is not currently Admin-authored.",
+  }),
+  capability({
+    id: "ship-3d.relief-asset-version-assignment",
+    domain: "ship-3d",
+    persistedField: null,
+    canonicalOwner: "not yet canonical",
+    validator: null,
+    runtimeResolver: null,
+    productionConsumer: "src/duel/ship3d.ts relief path once migrated",
+    previewConsumer: null,
+    applyBoundary: "new-session",
+    status: "REQUIRES CANONICAL MIGRATION",
+    note: "Needs exact Media V2 assetVersionId resolution to a strict validated relief component bundle.",
+  }),
+  capability({
+    id: "ship-3d.arbitrary-glb",
+    domain: "ship-3d",
+    persistedField: null,
+    canonicalOwner: "none",
+    validator: null,
+    runtimeResolver: null,
+    productionConsumer: null,
+    previewConsumer: null,
+    applyBoundary: "none",
+    status: "DEFERRED / UNSUPPORTED",
+    note: "Production runtime has no canonical arbitrary GLB loader/profile.",
+  }),
+  capability({
+    id: "ship-3d.animated-glb-semantic-clips",
+    domain: "ship-3d",
+    persistedField: null,
+    canonicalOwner: "none",
+    validator: null,
+    runtimeResolver: null,
+    productionConsumer: null,
+    previewConsumer: null,
+    applyBoundary: "none",
+    status: "DEFERRED / UNSUPPORTED",
+    note: "No skeletal animation runtime or Idle/Attack/Cast/Hit/Death semantic clip mapping is canonical.",
+  }),
+  capability({
+    id: "projectile.profile",
+    domain: "projectile",
+    persistedField: null,
+    canonicalOwner: "src/characters/projectiles.ts code-owned PLAYER_PROJECTILES",
+    validator: null,
+    runtimeResolver: "src/characters/projectiles.ts::playerProjectileProfile()",
+    productionConsumer: "src/vfx/player-shots.ts production shot presentation",
+    previewConsumer: null,
+    applyBoundary: "build/static",
+    status: "REQUIRES CANONICAL MIGRATION",
+    note: "Runtime profile exists, but there is no canonical Admin persistence/materialization path.",
+  }),
+  capability({
+    id: "projectile.trail-impact-presentation",
+    domain: "projectile",
+    persistedField: null,
+    canonicalOwner: "src/vfx/player-shots.ts procedural production recipe",
+    validator: null,
+    runtimeResolver: "player projectile profile + production VFX recipe",
+    productionConsumer: "src/vfx/player-shots.ts",
+    previewConsumer: null,
+    applyBoundary: "runtime-state",
+    status: "READ-ONLY REFERENCE",
+    note: "Current trail/impact behavior is production-owned and may be previewed, not generically authored.",
+  }),
+  capability({
+    id: "vfx.current-production",
+    domain: "vfx",
+    persistedField: null,
+    canonicalOwner: "runtime-derived-readonly VFX contract + production VFX modules",
+    validator: "contracts/space-typing-admin-vfx.v1.json read-only contract",
+    runtimeResolver: "production VFX systems",
+    productionConsumer: "Game.ts + src/vfx/*",
+    previewConsumer: null,
+    applyBoundary: "runtime-state",
+    status: "READ-ONLY REFERENCE",
+    note: "A5 may preview current production VFX only through the child-owned harness.",
+  }),
+  capability({
+    id: "vfx.generic-authoring",
+    domain: "vfx",
+    persistedField: null,
+    canonicalOwner: "none",
+    validator: null,
+    runtimeResolver: null,
+    productionConsumer: null,
+    previewConsumer: null,
+    applyBoundary: "none",
+    status: "DEFERRED / UNSUPPORTED",
+    note: "Do not convert procedural VFX into generic uploaded-image CRUD.",
+  }),
+  capability({
+    id: "sfx.sample-backed-cue",
+    domain: "sfx",
+    persistedField: null,
+    canonicalOwner: "src/audio/Sfx.ts and domain-specific sound modules",
+    validator: "committed sample-bank/path checks where defined",
+    runtimeResolver: "production semantic SFX cue selection",
+    productionConsumer: "production audio playback path",
+    previewConsumer: null,
+    applyBoundary: "runtime-state",
+    status: "READ-ONLY REFERENCE",
+    note: "Some cues use samples, but A5 has no canonical generic Media binding field yet.",
+  }),
+  capability({
+    id: "sfx.synthesized-preset",
+    domain: "sfx",
+    persistedField: null,
+    canonicalOwner: "src/audio/Sfx.ts synthesized WebAudio behavior",
+    validator: null,
+    runtimeResolver: "production synthesized cue implementation",
+    productionConsumer: "production WebAudio path",
+    previewConsumer: null,
+    applyBoundary: "runtime-state",
+    status: "READ-ONLY REFERENCE",
+    note: "A synthesized cue is not an uploaded Media asset; future authoring needs a typed semantic binding.",
+  }),
+  capability({
+    id: "skill.gameplay-policy",
+    domain: "skill",
+    persistedField: "skills.<id>.{name,description,energyCost,cooldown,charges,perStageLimit,typingCondition}",
+    canonicalOwner: "src/admin/skill-runtime-policy.ts",
+    validator: "sanitizeOverride()",
+    runtimeResolver: "applySkillRuntimeOverride()",
+    productionConsumer: "Skill definitions consumed by src/skills/engine.ts / gameplay",
+    previewConsumer: "scripts/admin/skill-registry-preview.ts policy/data preview",
+    applyBoundary: "new-session",
+    status: "SUPPORTED NOW",
+    note: "Existing gameplay policy is canonical; this does not imply A5 media/VFX authoring support.",
+  }),
+  capability({
+    id: "skill.media-vfx-binding",
+    domain: "skill",
+    persistedField: null,
+    canonicalOwner: "not yet canonical",
+    validator: null,
+    runtimeResolver: null,
+    productionConsumer: "current skill/VFX production systems once migrated",
+    previewConsumer: null,
+    applyBoundary: "new-session",
+    status: "REQUIRES CANONICAL MIGRATION",
+    note: "Needs a domain-specific exact-version binding and production consumer before authoring.",
+  }),
+  capability({
+    id: "weapon.admin-entity",
+    domain: "weapon",
+    persistedField: null,
+    canonicalOwner: "none",
+    validator: null,
+    runtimeResolver: null,
+    productionConsumer: null,
+    previewConsumer: null,
+    applyBoundary: "none",
+    status: "DEFERRED / UNSUPPORTED",
+    note: "No first-class writable Weapon domain is proven; Fire preview must use the canonical Ship projectile path.",
+  }),
+] satisfies readonly AssetTuningRuntimeCapability[]);
+
+export function assetTuningRuntimeCapability(
+  id: string,
+): AssetTuningRuntimeCapability | undefined {
+  return ASSET_TUNING_RUNTIME_CAPABILITIES.find((entry) => entry.id === id);
+}
