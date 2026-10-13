@@ -12,10 +12,12 @@ import {
   type CharacterSilhouette,
   type CharacterVisualProfile,
 } from "../characters/visuals";
+import { isShipImageAssetVersionId } from "./ship-runtime-policy";
 
 export const SHIP_ADMIN_PREVIEW_PROTOCOL_VERSION = 1 as const;
 
 export type ShipAdminOverride = Partial<Omit<CharacterDefinition, "id">> & {
+  imageAssetVersionId?: string;
   statBonus?: Partial<Record<CoreStatKey, number>>;
   visual?: Partial<CharacterVisualProfile>;
 };
@@ -26,6 +28,7 @@ export type ShipAdminPolicy = {
 };
 
 export type ShipAdminPreviewItem = CharacterDefinition & {
+  imageAssetVersionId?: string;
   statBonus: StatBonus;
   visual: CharacterVisualProfile;
   assetId: string;
@@ -46,6 +49,7 @@ const DEFINITION_KEYS = new Set([
   "passiveName",
   "activeName",
   "ultimateName",
+  "imageAssetVersionId",
   "statBonus",
   "visual",
 ]);
@@ -137,6 +141,9 @@ export function validateShipAdminPolicy(policy: ShipAdminPolicy): void {
     }
     for (const key of ["role", "summary", "passiveName", "activeName", "ultimateName"] as const) {
       if (override[key] !== undefined) nonEmptyString(override[key], `ships.${id}.${key}`, key === "summary" ? 240 : 100);
+    }
+    if (override.imageAssetVersionId !== undefined && !isShipImageAssetVersionId(override.imageAssetVersionId)) {
+      throw new Error(`ships.${id}.imageAssetVersionId must be a canonical Media V2 version id`);
     }
     if (override.statBonus !== undefined) validateStatBonus(override.statBonus, `ships.${id}.statBonus`);
     if (override.visual !== undefined) validateVisual(override.visual, `ships.${id}.visual`);
