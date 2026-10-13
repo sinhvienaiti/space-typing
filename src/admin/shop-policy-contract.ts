@@ -23,7 +23,7 @@ export const SHOP_POLICY_ADMIN_CONTRACT = Object.freeze({
   }),
   previewProtocol: Object.freeze({
     version: SHOP_ADMIN_PREVIEW_PROTOCOL_VERSION,
-    available: false,
+    available: true,
     plannedCommand: "pnpm shop:admin-preview",
     mutation: false,
   }),

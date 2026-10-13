@@ -38,6 +38,7 @@ jobs:
           pnpm bosses:admin-preview </dev/null >/dev/null
           pnpm worlds:admin-preview </dev/null >/dev/null
           pnpm stages:admin-preview </dev/null >/dev/null
+          pnpm shop:admin-preview </dev/null >/dev/null
 
       - name: Audit Warp economy
         run: pnpm stamina:audit
