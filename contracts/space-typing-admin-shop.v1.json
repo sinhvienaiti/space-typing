@@ -8,7 +8,7 @@
   },
   "previewProtocol": {
     "version": 1,
-    "available": false,
+    "available": true,
     "plannedCommand": "pnpm shop:admin-preview",
     "mutation": false
   },
