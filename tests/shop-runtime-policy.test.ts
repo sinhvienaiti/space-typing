@@ -46,7 +46,7 @@ describe("Shop runtime policy", () => {
   });
 
   it("fails closed when the runtime boundary is not the supported boundary", () => {
-    const envelope = publishedEnvelope();
+    const envelope = publishedEnvelope() as Record<string, unknown>;
     envelope.applyBoundary = "immediate";
     expect(materializeShopRuntimeSession(envelope).source).toBe("bundled");
   });
