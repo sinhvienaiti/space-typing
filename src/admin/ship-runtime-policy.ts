@@ -132,7 +132,7 @@ function validNumber(value: unknown, min: number, max: number): value is number 
   return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
 }
 
-function validAssetVersionId(value: unknown): value is string {
+export function isShipImageAssetVersionId(value: unknown): value is string {
   return typeof value === "string" && ASSET_VERSION_ID_PATTERN.test(value);
 }
 
@@ -158,7 +158,7 @@ function sanitizeShipOverride(value: unknown): Readonly<ShipRuntimeOverride> | n
   }
 
   const imageAssetVersionId = input.imageAssetVersionId;
-  if (imageAssetVersionId !== undefined && !validAssetVersionId(imageAssetVersionId)) {
+  if (imageAssetVersionId !== undefined && !isShipImageAssetVersionId(imageAssetVersionId)) {
     return null;
   }
 
