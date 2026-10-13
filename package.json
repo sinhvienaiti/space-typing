@@ -48,6 +48,7 @@
     "worlds:admin-preview": "tsx scripts/admin/world-registry-preview.ts",
     "shop:admin-contract": "tsx scripts/admin/shop-policy-contract.ts",
     "shop:admin-preview": "tsx scripts/admin/shop-runtime-preview.ts",
+    "shop:revision-lifecycle-smoke": "vitest run tests/shop-revision-lifecycle.test.ts",
     "visual:shot": "node scripts/visual/shot.mjs",
     "visual:crop": "node scripts/visual/crop.mjs",
     "visual:r01-qa": "node scripts/visual/r01-campaign-qa.mjs",

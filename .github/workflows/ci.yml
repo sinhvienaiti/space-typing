@@ -40,6 +40,9 @@ jobs:
           pnpm stages:admin-preview </dev/null >/dev/null
           pnpm shop:admin-preview </dev/null >/dev/null
 
+      - name: Smoke Shop revision lifecycle
+        run: pnpm shop:revision-lifecycle-smoke
+
       - name: Audit Warp economy
         run: pnpm stamina:audit
 
