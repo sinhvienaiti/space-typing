@@ -10,6 +10,16 @@ import {
 
 const VERSION_ID = "media-version.11111111-2222-3333-4444-555555555555";
 
+type MutableImageStub = {
+  decoding: HTMLImageElement["decoding"];
+  naturalWidth: number;
+  naturalHeight: number;
+  onload: (() => void) | null;
+  onerror: (() => void) | null;
+  _src: string;
+  src: string;
+};
+
 function sessionWithImage(assetVersionId: string = VERSION_ID) {
   return materializeShipRuntimeSession({
     activeRevision: "revision-test",
@@ -100,12 +110,12 @@ describe("A5.2 exact-version Ship image runtime", () => {
     const session = sessionWithImage();
     const fetchImpl = (async () => runtimeResponse()) as typeof fetch;
 
-    const fake = {
+    const imageStub: MutableImageStub = {
       decoding: "auto",
       naturalWidth: 0,
       naturalHeight: 0,
-      onload: null as (() => void) | null,
-      onerror: null as (() => void) | null,
+      onload: null,
+      onerror: null,
       _src: "",
       set src(value: string) {
         this._src = value;
@@ -117,7 +127,8 @@ describe("A5.2 exact-version Ship image runtime", () => {
       get src() {
         return this._src;
       },
-    } as unknown as HTMLImageElement;
+    };
+    const fake = imageStub as unknown as HTMLImageElement;
 
     await preloadShipRuntimeImages(session, fetchImpl, () => fake);
     expect(characterShipRuntimeImage("vanguard", session)).toBe(fake);
