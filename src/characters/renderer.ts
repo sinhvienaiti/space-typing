@@ -4,6 +4,7 @@ import {
   type CharacterSilhouette,
   type CharacterVisualProfile,
 } from "./visuals";
+import { characterShipRuntimeImage } from "./ship-media-runtime";
 import {
   EQUIPMENT_AURA_COLORS,
   type EquipmentAuraProfile,
@@ -68,15 +69,17 @@ export function characterShipArtSource(): "v3" | "v2" | "procedural" {
   return characterShipSource;
 }
 
-export function hasCharacterShipImage(_id: CharacterId): boolean {
-  return characterShipSheet !== null;
+export function hasCharacterShipImage(id: CharacterId): boolean {
+  return characterShipRuntimeImage(id) !== null || characterShipSheet !== null;
 }
 
 /**
  * The light rig drawn with this ship right now: only over the V3 painted
- * sheet, whose sprite cells its anchor points were measured on.
+ * sheet, whose sprite cells its anchor points were measured on. Exact-version
+ * per-Ship images deliberately do not inherit those atlas-specific anchors.
  */
 export function activeShipLightRig(id: CharacterId): Readonly<ShipLightRig> | null {
+  if (characterShipRuntimeImage(id) !== null) return null;
   if (characterShipSheet === null || characterShipSource !== "v3") return null;
   return shipLightRig(id);
 }
@@ -139,8 +142,7 @@ function drawEquipmentAura(
     context.stroke();
     context.setLineDash([]);
   } else if (aura.primary === "storm") {
-    const stormPhases =
-      detailScale < 0.7 ? [0] : [0, Math.PI];
+    const stormPhases = detailScale < 0.7 ? [0] : [0, Math.PI];
     for (const phase of stormPhases) {
       const angle = time * 2.7 + phase;
       context.beginPath();
@@ -238,7 +240,6 @@ function drawIllustratedShip(
     context.globalCompositeOperation = "lighter";
     context.globalAlpha *= characterShipSource === "v3" ? 0.05 : 0.12;
     context.fillStyle = profile.glow;
-    // Premium sprites already contain painted light. Avoid double bloom.
     context.shadowBlur = (characterShipSource === "v3" ? 4 : 24) * glowScale;
     context.shadowColor = profile.glow;
     context.beginPath();
@@ -261,6 +262,35 @@ function drawIllustratedShip(
     size,
     size,
   );
+  context.restore();
+}
+
+function drawAssignedShipImage(
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  profile: Readonly<CharacterVisualProfile>,
+  glowScale: number,
+): void {
+  const maxSize = ILLUSTRATED_SHIP_SIZE;
+  const aspect = image.naturalWidth / image.naturalHeight;
+  const width = aspect >= 1 ? maxSize : maxSize * aspect;
+  const height = aspect >= 1 ? maxSize / aspect : maxSize;
+
+  context.save();
+  context.globalCompositeOperation = "lighter";
+  context.globalAlpha *= 0.1;
+  context.fillStyle = profile.glow;
+  context.shadowBlur = 18 * glowScale;
+  context.shadowColor = profile.glow;
+  context.beginPath();
+  context.ellipse(0, 2, Math.max(18, width * 0.42), Math.max(16, height * 0.38), 0, 0, Math.PI * 2);
+  context.fill();
+  context.restore();
+
+  context.save();
+  context.shadowBlur = 7 * glowScale;
+  context.shadowColor = profile.glow;
+  context.drawImage(image, -width / 2, -height / 2, width, height);
   context.restore();
 }
 
@@ -362,8 +392,7 @@ export function characterFlightPose(time: number): {
     banking:
       Math.sin(time * 1.8) * 0.05 +
       Math.sin(time * 0.52 + 0.4) * 0.015,
-    driftX:
-      Math.sin(time * 0.82) * 7.5,
+    driftX: Math.sin(time * 0.82) * 7.5,
     thrust:
       0.92 +
       (Math.sin(time * 9.2) + 1) * 0.1 +
@@ -466,7 +495,6 @@ export function drawCharacterShip(
     options.x + flightPose.driftX,
     options.y + flightPose.bob,
   );
-  // Keep in step with characterShipPoint.
   context.rotate(flightPose.banking + (options.aim ?? 0));
   context.translate(0, (options.recoil ?? 0) * SHIP_RECOIL_PX);
   context.scale(scale, scale);
@@ -482,11 +510,27 @@ export function drawCharacterShip(
     );
   }
 
+  const assigned = characterShipRuntimeImage(characterId);
+  if (assigned !== null) {
+    drawFlightTail(context, profile, options.time, glowScale, 0.92);
+    for (const [index, x] of engineOffsets(profile.engineCount).entries()) {
+      drawEngine(
+        context,
+        profile,
+        x,
+        options.time,
+        index,
+        flightPose.thrust,
+      );
+    }
+    drawAssignedShipImage(context, assigned, profile, glowScale);
+    context.restore();
+    return;
+  }
+
   const illustrated = characterShipSheet;
   const rig = activeShipLightRig(characterId);
   if (illustrated !== null && rig !== null) {
-    // Light rig: rim halo under the hull, then plumes, core and wing lights
-    // over it. Replaces the older centre tail, which sat between the nozzles.
     const lights = {
       time: options.time,
       boost: options.boost ?? 0,
@@ -507,8 +551,7 @@ export function drawCharacterShip(
     return;
   }
   if (illustrated !== null) {
-    const engineStrength =
-      characterShipSource === "v3" ? 0.62 : 0.96;
+    const engineStrength = characterShipSource === "v3" ? 0.62 : 0.96;
     drawFlightTail(
       context,
       profile,
@@ -527,9 +570,6 @@ export function drawCharacterShip(
       );
     }
 
-    // Premium V3 keeps low hull bloom, but painted thrusters are no longer
-    // treated as a substitute for real motion. Runtime exhaust supplies the
-    // flight cue while the sprite remains the sharp hull layer.
     drawIllustratedShip(
       context,
       illustrated,
