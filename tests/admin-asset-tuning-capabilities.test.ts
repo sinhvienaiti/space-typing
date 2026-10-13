@@ -41,6 +41,19 @@ describe("A5 asset tuning runtime capability matrix", () => {
     });
   });
 
+  it("promotes exact-version per-Ship 2D image assignment only after Media V2 closes the runtime and preview chain", () => {
+    expect(assetTuningRuntimeCapability("ship-2d.image-assignment")).toMatchObject({
+      persistedField: "ships.<id>.imageAssetVersionId",
+      canonicalOwner: expect.stringContaining("ship-runtime-policy.ts"),
+      validator: expect.stringContaining("assetVersionId"),
+      runtimeResolver: expect.stringContaining("resolveExactShipImageComponent"),
+      productionConsumer: expect.stringContaining("drawCharacterShip"),
+      previewConsumer: expect.stringContaining("asset-preview-main.ts"),
+      applyBoundary: "new-session",
+      status: "SUPPORTED NOW",
+    });
+  });
+
   it("does not promote draw-time motion arguments into persisted Admin fields", () => {
     expect(assetTuningRuntimeCapability("ship.motion.aim-recoil-boost")).toMatchObject({
       persistedField: null,
@@ -91,11 +104,7 @@ describe("A5 asset tuning runtime capability matrix", () => {
     );
   });
 
-  it("does not claim per-Ship 2D or relief Media assignment before exact-version migration", () => {
-    expect(assetTuningRuntimeCapability("ship-2d.image-assignment")).toMatchObject({
-      persistedField: null,
-      status: "REQUIRES CANONICAL MIGRATION",
-    });
+  it("keeps relief Media assignment gated until its own exact-version migration exists", () => {
     expect(assetTuningRuntimeCapability("ship-3d.relief-asset-version-assignment")).toMatchObject({
       persistedField: null,
       status: "REQUIRES CANONICAL MIGRATION",
