@@ -166,6 +166,25 @@ const RESOLVED_VISUALS_BY_SESSION = new WeakMap<
   ShipRuntimeSession,
   Map<CharacterId, Readonly<CharacterVisualProfile>>
 >();
+let scopedVisualRuntimeSession: ShipRuntimeSession | null = null;
+
+/**
+ * Runs a synchronous production-render operation against an isolated runtime
+ * session. The previous context is restored even when rendering throws, so an
+ * Admin preview candidate cannot leak into the active game session.
+ */
+export function withCharacterVisualRuntimeSession<T>(
+  session: ShipRuntimeSession,
+  render: () => T,
+): T {
+  const previous = scopedVisualRuntimeSession;
+  scopedVisualRuntimeSession = session;
+  try {
+    return render();
+  } finally {
+    scopedVisualRuntimeSession = previous;
+  }
+}
 
 /**
  * Canonical visual profile consumed by the production ship renderer.
@@ -174,7 +193,7 @@ const RESOLVED_VISUALS_BY_SESSION = new WeakMap<
  */
 export function characterVisualProfile(
   id: CharacterId,
-  session: ShipRuntimeSession = ACTIVE_SHIP_RUNTIME_SESSION,
+  session: ShipRuntimeSession = scopedVisualRuntimeSession ?? ACTIVE_SHIP_RUNTIME_SESSION,
 ): Readonly<CharacterVisualProfile> {
   let sessionCache = RESOLVED_VISUALS_BY_SESSION.get(session);
   if (sessionCache === undefined) {
