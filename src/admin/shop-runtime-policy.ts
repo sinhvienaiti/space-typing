@@ -299,19 +299,28 @@ function bundledSession(activeRevision: string | null = null): ShopRuntimeSessio
   });
 }
 
-export function materializeShopRuntimeSession(envelope: unknown): ShopRuntimeSession {
-  const runtime = object(envelope);
-  if (runtime === null || runtime.applyBoundary !== SHOP_RUNTIME_APPLY_BOUNDARY) return bundledSession();
-  const activeRevision = typeof runtime.activeRevision === "string" ? runtime.activeRevision : null;
-  if (!exactRequiredKeys(runtime, ["applyBoundary", "activeRevision", "policy"])) return bundledSession(activeRevision);
-  if (!validateShopRuntimePolicy(runtime.policy)) return bundledSession(activeRevision);
-  const policy = immutablePolicy(runtime.policy);
+function publishedSession(
+  activeRevision: string | null,
+  candidatePolicy: unknown,
+): ShopRuntimeSession | null {
+  if (!validateShopRuntimePolicy(candidatePolicy)) return null;
+  const policy: ShopAdminPolicyV1 = immutablePolicy(candidatePolicy);
+  const configRevision: string = policy.configRevision;
   return Object.freeze({
     source: "published" as const,
     activeRevision,
-    configRevision: policy.configRevision,
+    configRevision,
     policy,
   });
+}
+
+export function materializeShopRuntimeSession(envelope: unknown): ShopRuntimeSession {
+  const runtime = object(envelope);
+  if (runtime === null || runtime.applyBoundary !== SHOP_RUNTIME_APPLY_BOUNDARY) return bundledSession();
+  const activeRevision: string | null =
+    typeof runtime.activeRevision === "string" ? runtime.activeRevision : null;
+  if (!exactRequiredKeys(runtime, ["applyBoundary", "activeRevision", "policy"])) return bundledSession(activeRevision);
+  return publishedSession(activeRevision, runtime.policy) ?? bundledSession(activeRevision);
 }
 
 export async function fetchPublishedShopRuntimeSession(
