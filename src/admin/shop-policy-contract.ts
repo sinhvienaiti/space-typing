@@ -1,6 +1,6 @@
 import { EQUIPMENT_IDS, EQUIPMENT_REGISTRY } from "../equipment/registry";
-import { GRADE_IDS } from "../grades";
-import { ITEM_IDS } from "../items/registry";
+import { GRADE_IDS, GRADE_PRESENTATION } from "../grades";
+import { ITEM_IDS, ITEM_REGISTRY } from "../items/registry";
 import { SHOP_POLICY_TYPES } from "../shops/policy";
 
 export const SHOP_ADMIN_POLICY_SCHEMA_VERSION = 1 as const;
@@ -12,6 +12,39 @@ export const SHOP_ADMIN_CONFIG_NAMESPACE = "economy.shop" as const;
 export const SHOP_DISCOVERY_IDS = ["black-market-signal", "echo-rift"] as const;
 
 const EQUIPMENT_TIERS = [...new Set(EQUIPMENT_IDS.map((id) => EQUIPMENT_REGISTRY[id].tier))].sort((a, b) => a - b);
+
+const SHOP_ITEM_CATALOG = ITEM_IDS.map((id) => {
+  const item = ITEM_REGISTRY[id];
+  return Object.freeze({
+    id,
+    kind: "item" as const,
+    name: item.name,
+    category: item.category,
+    icon: item.icon,
+    grade: item.grade ?? null,
+  });
+});
+
+const SHOP_EQUIPMENT_CATALOG = EQUIPMENT_IDS.map((id) => {
+  const equipment = EQUIPMENT_REGISTRY[id];
+  return Object.freeze({
+    id,
+    kind: "equipment" as const,
+    name: equipment.name,
+    category: equipment.slot,
+    tier: equipment.tier,
+    icon: equipment.icon,
+  });
+});
+
+const SHOP_GRADE_CATALOG = GRADE_IDS.map((id) => {
+  const grade = GRADE_PRESENTATION[id];
+  return Object.freeze({
+    id,
+    label: grade.label,
+    icon: grade.icon,
+  });
+});
 
 export const SHOP_POLICY_ADMIN_CONTRACT = Object.freeze({
   schemaVersion: SHOP_ADMIN_POLICY_SCHEMA_VERSION,
@@ -34,6 +67,16 @@ export const SHOP_POLICY_ADMIN_CONTRACT = Object.freeze({
     gradeIds: Object.freeze([...GRADE_IDS]),
     equipmentTiers: Object.freeze(EQUIPMENT_TIERS),
     discoveryIds: Object.freeze([...SHOP_DISCOVERY_IDS]),
+  }),
+  catalog: Object.freeze({
+    items: Object.freeze(SHOP_ITEM_CATALOG),
+    equipment: Object.freeze(SHOP_EQUIPMENT_CATALOG),
+    grades: Object.freeze(SHOP_GRADE_CATALOG),
+    sourceOfTruth: Object.freeze({
+      items: "src/items/registry.ts#ITEM_REGISTRY",
+      equipment: "src/equipment/registry.ts#EQUIPMENT_REGISTRY",
+      grades: "src/grades.ts#GRADE_PRESENTATION",
+    }),
   }),
   currencies: Object.freeze(["credits", "alloy", "starCrystal", "quantumCore"] as const),
   authorableSections: Object.freeze(["generation", "pricing", "availability", "offers", "services"] as const),
