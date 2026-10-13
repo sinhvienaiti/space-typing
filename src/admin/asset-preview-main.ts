@@ -1,0 +1,294 @@
+import "./asset-preview.css";
+import {
+  AssetPreviewMessageGate,
+  AssetPreviewProtocolError,
+  assetPreviewScenario,
+  createAssetPreviewResponse,
+  type AssetPreviewCommand,
+  type AssetPreviewScenario,
+} from "./asset-preview-protocol";
+import { AssetPreviewResourceScope } from "./asset-preview-lifecycle";
+import {
+  createShipAssetPreviewCandidate,
+  shipAssetPreviewPresentation,
+  updateShipAssetPreviewCandidate,
+  withShipAssetPreviewRuntime,
+  type ShipAssetPreviewCandidate,
+} from "./ship-asset-preview";
+import {
+  characterShipAngle,
+  drawCharacterShip,
+  setCharacterShipSheet,
+} from "../characters/renderer";
+import { PlayerShotSystem } from "../vfx/player-shots";
+
+function object(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function requiredQueryToken(name: string): string {
+  const value = new URLSearchParams(window.location.search).get(name);
+  if (value === null || !/^[A-Za-z0-9._:-]{8,160}$/.test(value)) {
+    throw new Error(`Missing or invalid ${name}.`);
+  }
+  return value;
+}
+
+function exactParentOrigin(): string {
+  if (window.parent === window || document.referrer.length === 0) {
+    throw new Error("Admin preview must run inside its parent frame.");
+  }
+  const referrer = new URL(document.referrer);
+  if (referrer.protocol !== "http:" && referrer.protocol !== "https:") {
+    throw new Error("Admin preview parent origin is unsupported.");
+  }
+  return referrer.origin;
+}
+
+const canvas = document.querySelector<HTMLCanvasElement>("#assetPreviewCanvas");
+const status = document.querySelector<HTMLElement>("#assetPreviewStatus");
+if (canvas === null || status === null) throw new Error("Asset preview DOM is incomplete.");
+const context = canvas.getContext("2d");
+if (context === null) throw new Error("2D Canvas is unavailable.");
+
+const previewSessionId = requiredQueryToken("previewSession");
+const nonce = requiredQueryToken("nonce");
+const parentOrigin = exactParentOrigin();
+const parentSource = window.parent;
+const gate = new AssetPreviewMessageGate(parentOrigin, parentSource, previewSessionId, nonce);
+const resources = new AssetPreviewResourceScope();
+const shots = new PlayerShotSystem<number>();
+resources.addDisposer(() => shots.clear());
+
+// A5 Ship visual tuning currently targets the procedural profile. The real
+// production renderer owns this fallback; the preview does not copy it.
+setCharacterShipSheet(null);
+
+let candidate: ShipAssetPreviewCandidate | null = null;
+let scenario: AssetPreviewScenario = "idle";
+let paused = false;
+let simulationSeconds = 0;
+let previousFrameMs: number | null = null;
+let nextShotSeconds = 0;
+let lastShotSeconds = Number.NEGATIVE_INFINITY;
+let disposed = false;
+let viewWidth = 1;
+let viewHeight = 1;
+
+function post(type: "READY" | "APPLIED" | "ERROR" | "DISPOSED", requestId: number, payload?: unknown): void {
+  parentSource.postMessage(
+    createAssetPreviewResponse(previewSessionId, nonce, type, requestId, payload),
+    parentOrigin,
+  );
+}
+
+function resize(): void {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+  viewWidth = Math.max(1, rect.width);
+  viewHeight = Math.max(1, rect.height);
+  canvas.width = Math.max(1, Math.round(viewWidth * dpr));
+  canvas.height = Math.max(1, Math.round(viewHeight * dpr));
+  context.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function background(): void {
+  context.clearRect(0, 0, viewWidth, viewHeight);
+  const gradient = context.createRadialGradient(
+    viewWidth * 0.5,
+    viewHeight * 0.55,
+    10,
+    viewWidth * 0.5,
+    viewHeight * 0.55,
+    Math.max(viewWidth, viewHeight) * 0.7,
+  );
+  gradient.addColorStop(0, "#102840");
+  gradient.addColorStop(0.48, "#071321");
+  gradient.addColorStop(1, "#02060c");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, viewWidth, viewHeight);
+
+  context.save();
+  context.globalAlpha = 0.16;
+  context.strokeStyle = "#7edcff";
+  context.lineWidth = 1;
+  const step = 44;
+  for (let x = 0; x <= viewWidth; x += step) {
+    context.beginPath();
+    context.moveTo(x, 0);
+    context.lineTo(x, viewHeight);
+    context.stroke();
+  }
+  for (let y = 0; y <= viewHeight; y += step) {
+    context.beginPath();
+    context.moveTo(0, y);
+    context.lineTo(viewWidth, y);
+    context.stroke();
+  }
+  context.restore();
+}
+
+function maybeFire(activeCandidate: ShipAssetPreviewCandidate, shipX: number, shipY: number): void {
+  if (scenario !== "fire" || paused || simulationSeconds < nextShotSeconds) return;
+  const drawOptions = {
+    x: shipX,
+    y: shipY,
+    time: simulationSeconds,
+    scale: 1.55,
+    boost: 0.72,
+    recoil: 0.8,
+  };
+  shots.fire({
+    characterId: activeCandidate.characterId,
+    originX: shipX,
+    originY: shipY,
+    originAngle: characterShipAngle(drawOptions),
+    originScale: drawOptions.scale,
+    targetX: viewWidth * 0.5,
+    targetY: Math.max(52, viewHeight * 0.16),
+    viewHeight,
+    power: 1,
+    payload: 1,
+  });
+  lastShotSeconds = simulationSeconds;
+  nextShotSeconds = simulationSeconds + 0.65;
+}
+
+function drawFrame(frameMs: number): void {
+  if (disposed || resources.isDisposed) return;
+  if (previousFrameMs === null) previousFrameMs = frameMs;
+  const dt = Math.min(0.05, Math.max(0, (frameMs - previousFrameMs) / 1000));
+  previousFrameMs = frameMs;
+  if (!paused) simulationSeconds += dt;
+
+  background();
+  const shipX = viewWidth * 0.5;
+  const shipY = viewHeight * 0.72;
+  const activeCandidate = candidate;
+
+  if (activeCandidate === null) {
+    status.textContent = "READY · waiting for validated Ship candidate";
+  } else {
+    status.textContent = `${activeCandidate.characterId.toUpperCase()} · ${scenario.toUpperCase()} · production renderer`;
+    maybeFire(activeCandidate, shipX, shipY);
+    if (!paused) shots.update(dt, () => false, "high");
+    shots.drawShots(context, "high");
+
+    const recoil = scenario === "fire"
+      ? Math.max(0, 1 - (simulationSeconds - lastShotSeconds) / 0.12)
+      : 0;
+    const boost = scenario === "move" ? 1 : scenario === "fire" ? 0.72 : 0.35;
+    withShipAssetPreviewRuntime(activeCandidate, () => {
+      drawCharacterShip(context, activeCandidate.characterId, {
+        x: shipX,
+        y: shipY,
+        time: simulationSeconds,
+        scale: 1.55,
+        glowScale: 1,
+        detailScale: 1,
+        boost,
+        recoil: Math.min(1, recoil),
+      });
+    });
+    shots.drawMuzzleFlashes(context);
+    shots.drawImpacts(context, "high");
+  }
+
+  resources.setAnimationFrame(requestAnimationFrame(drawFrame));
+}
+
+function loadCandidate(payload: unknown): void {
+  const input = object(payload);
+  if (input === null || input.domain !== "ship" || typeof input.characterId !== "string") {
+    throw new Error("Invalid Ship preview candidate payload.");
+  }
+  candidate = createShipAssetPreviewCandidate(input.characterId, input.visual);
+  shots.clear();
+  lastShotSeconds = Number.NEGATIVE_INFINITY;
+  nextShotSeconds = simulationSeconds + 0.08;
+}
+
+function applyCommand(command: AssetPreviewCommand): void {
+  if (command.type === "LOAD_CANDIDATE") {
+    loadCandidate(command.payload);
+    const activeCandidate = candidate;
+    if (activeCandidate === null) throw new Error("Ship preview candidate did not materialize.");
+    post("APPLIED", command.requestId, {
+      characterId: activeCandidate.characterId,
+      presentation: shipAssetPreviewPresentation(activeCandidate),
+    });
+    return;
+  }
+  if (command.type === "SET_TUNING") {
+    if (candidate === null) throw new Error("SET_TUNING requires a loaded candidate.");
+    const input = object(command.payload);
+    candidate = updateShipAssetPreviewCandidate(candidate, input?.visual);
+    post("APPLIED", command.requestId, { presentation: shipAssetPreviewPresentation(candidate) });
+    return;
+  }
+  if (command.type === "SET_SCENARIO") {
+    const input = object(command.payload);
+    scenario = assetPreviewScenario(input?.scenario);
+    shots.clear();
+    lastShotSeconds = Number.NEGATIVE_INFINITY;
+    nextShotSeconds = simulationSeconds + 0.08;
+    post("APPLIED", command.requestId, { scenario });
+    return;
+  }
+  if (command.type === "PAUSE") {
+    const input = object(command.payload);
+    paused = input?.paused === true;
+    post("APPLIED", command.requestId, { paused });
+    return;
+  }
+  if (command.type === "RESET") {
+    candidate = null;
+    scenario = "idle";
+    paused = false;
+    shots.clear();
+    lastShotSeconds = Number.NEGATIVE_INFINITY;
+    post("APPLIED", command.requestId, { reset: true });
+    return;
+  }
+  if (command.type === "DISPOSE") {
+    post("DISPOSED", command.requestId);
+    disposed = true;
+    resources.dispose();
+  }
+}
+
+function requestIdFrom(value: unknown): number {
+  const input = object(value);
+  const requestId = input?.requestId;
+  return typeof requestId === "number" && Number.isSafeInteger(requestId) ? requestId : 0;
+}
+
+function onMessage(event: MessageEvent): void {
+  if (disposed) return;
+  try {
+    applyCommand(gate.accept(event));
+  } catch (error) {
+    if (
+      error instanceof AssetPreviewProtocolError &&
+      (error.code === "wrong-origin" || error.code === "wrong-source")
+    ) {
+      return;
+    }
+    const message = error instanceof Error ? error.message : "Preview command failed.";
+    post("ERROR", requestIdFrom(event.data), { message });
+  }
+}
+
+window.addEventListener("message", onMessage, { signal: resources.signal });
+window.addEventListener("resize", resize, { signal: resources.signal });
+window.addEventListener("pagehide", () => resources.dispose(), { signal: resources.signal, once: true });
+resize();
+resources.setAnimationFrame(requestAnimationFrame(drawFrame));
+post("READY", 0, {
+  domain: "ship",
+  scenarios: ["idle", "move", "fire"],
+  renderer: "production",
+  candidateState: "ephemeral",
+});

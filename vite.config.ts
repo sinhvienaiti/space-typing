@@ -1,4 +1,8 @@
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
+
+const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig({
   base: "/",
@@ -12,5 +16,11 @@ export default defineConfig({
   },
   build: {
     target: "es2022",
+    rollupOptions: {
+      input: {
+        game: resolve(projectRoot, "index.html"),
+        adminPreview: resolve(projectRoot, "admin-preview.html"),
+      },
+    },
   },
 });
