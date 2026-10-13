@@ -9,9 +9,15 @@ import {
   withCharacterVisualRuntimeSession,
   type CharacterVisualProfile,
 } from "../characters/visuals";
+import {
+  preloadShipRuntimeImages,
+  releaseShipRuntimeImages,
+  withCharacterShipMediaRuntimeSession,
+} from "../characters/ship-media-runtime";
 
 export type ShipAssetPreviewCandidate = Readonly<{
   characterId: CharacterId;
+  imageAssetVersionId: string | null;
   visual: Readonly<ShipRuntimeVisualOverride>;
   session: ShipRuntimeSession;
 }>;
@@ -27,6 +33,7 @@ function object(value: unknown): Record<string, unknown> | null {
 function materializeCandidate(
   characterId: CharacterId,
   visual: unknown,
+  imageAssetVersionId?: unknown,
 ): ShipAssetPreviewCandidate {
   if (object(visual) === null) throw new ShipAssetPreviewError("Ship preview visual must be an object.");
   const session = materializeShipRuntimeSession({
@@ -35,16 +42,27 @@ function materializeCandidate(
     policy: {
       configRevision: "admin-preview-ephemeral",
       ships: {
-        [characterId]: { visual },
+        [characterId]: {
+          visual,
+          ...(imageAssetVersionId === undefined ? {} : { imageAssetVersionId }),
+        },
       },
     },
   });
-  const sanitized = session.ships[characterId]?.visual;
+  const materialized = session.ships[characterId];
+  const sanitized = materialized?.visual;
   if (session.source !== "published" || sanitized === undefined) {
-    throw new ShipAssetPreviewError("Ship preview visual candidate was rejected by the canonical runtime validator.");
+    throw new ShipAssetPreviewError("Ship preview candidate was rejected by the canonical runtime validator.");
+  }
+  if (
+    imageAssetVersionId !== undefined &&
+    materialized?.imageAssetVersionId === undefined
+  ) {
+    throw new ShipAssetPreviewError("Ship preview image assignment was rejected by the canonical runtime validator.");
   }
   return Object.freeze({
     characterId,
+    imageAssetVersionId: materialized?.imageAssetVersionId ?? null,
     visual: sanitized,
     session,
   });
@@ -53,9 +71,10 @@ function materializeCandidate(
 export function createShipAssetPreviewCandidate(
   characterId: string,
   visual: unknown,
+  imageAssetVersionId?: unknown,
 ): ShipAssetPreviewCandidate {
   if (!isCharacterId(characterId)) throw new ShipAssetPreviewError("Unknown Ship preview characterId.");
-  return materializeCandidate(characterId, visual);
+  return materializeCandidate(characterId, visual, imageAssetVersionId);
 }
 
 export function updateShipAssetPreviewCandidate(
@@ -64,10 +83,29 @@ export function updateShipAssetPreviewCandidate(
 ): ShipAssetPreviewCandidate {
   const patch = object(visualPatch);
   if (patch === null) throw new ShipAssetPreviewError("Ship preview tuning patch must be an object.");
-  return materializeCandidate(candidate.characterId, {
-    ...candidate.visual,
-    ...patch,
-  });
+  return materializeCandidate(
+    candidate.characterId,
+    {
+      ...candidate.visual,
+      ...patch,
+    },
+    candidate.imageAssetVersionId ?? undefined,
+  );
+}
+
+export async function prepareShipAssetPreviewCandidate(
+  candidate: ShipAssetPreviewCandidate,
+  fetchImpl: typeof fetch,
+  imageFactory: () => HTMLImageElement,
+): Promise<ShipAssetPreviewCandidate> {
+  if (candidate.imageAssetVersionId !== null) {
+    await preloadShipRuntimeImages(candidate.session, fetchImpl, imageFactory);
+  }
+  return candidate;
+}
+
+export function releaseShipAssetPreviewCandidate(candidate: ShipAssetPreviewCandidate): void {
+  releaseShipRuntimeImages(candidate.session);
 }
 
 /** Exact presentation values consumed by the production renderer for this candidate. */
@@ -79,12 +117,13 @@ export function shipAssetPreviewPresentation(
 
 /**
  * Executes the real production renderer under the candidate's isolated visual
- * session. No PlayerSave, ShopInstance, published definition or active
- * runtime session is mutated.
+ * and Media runtime sessions. No PlayerSave, ShopInstance, published
+ * definition or active runtime session is mutated.
  */
 export function withShipAssetPreviewRuntime<T>(
   candidate: ShipAssetPreviewCandidate,
   render: () => T,
 ): T {
-  return withCharacterVisualRuntimeSession(candidate.session, render);
+  return withCharacterVisualRuntimeSession(candidate.session, () =>
+    withCharacterShipMediaRuntimeSession(candidate.session, render));
 }
