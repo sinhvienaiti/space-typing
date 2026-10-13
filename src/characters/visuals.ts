@@ -1,3 +1,7 @@
+import {
+  ACTIVE_SHIP_RUNTIME_SESSION,
+  type ShipRuntimeSession,
+} from "../admin/ship-runtime-policy";
 import type { CharacterId } from "./registry";
 
 export const CHARACTER_SHIP_SHEET_ASSET_ID = "player-ship-sheet-v2";
@@ -158,10 +162,40 @@ const CHARACTER_VISUALS: Record<CharacterId, CharacterVisualProfile> = {
   },
 };
 
+const RESOLVED_VISUALS_BY_SESSION = new WeakMap<
+  ShipRuntimeSession,
+  Map<CharacterId, Readonly<CharacterVisualProfile>>
+>();
+
+/**
+ * Canonical visual profile consumed by the production ship renderer.
+ * Runtime sessions are immutable, so resolved profiles are cached per session
+ * instead of allocating a merged object on every animation frame.
+ */
 export function characterVisualProfile(
   id: CharacterId,
+  session: ShipRuntimeSession = ACTIVE_SHIP_RUNTIME_SESSION,
 ): Readonly<CharacterVisualProfile> {
-  return CHARACTER_VISUALS[id];
+  let sessionCache = RESOLVED_VISUALS_BY_SESSION.get(session);
+  if (sessionCache === undefined) {
+    sessionCache = new Map();
+    RESOLVED_VISUALS_BY_SESSION.set(session, sessionCache);
+  }
+
+  const cached = sessionCache.get(id);
+  if (cached !== undefined) return cached;
+
+  const bundled = CHARACTER_VISUALS[id];
+  const override = session.ships[id]?.visual;
+  const resolved =
+    override === undefined
+      ? bundled
+      : Object.freeze({
+          ...bundled,
+          ...override,
+        });
+  sessionCache.set(id, resolved);
+  return resolved;
 }
 
 export function characterShipAssetId(id: CharacterId): string {
