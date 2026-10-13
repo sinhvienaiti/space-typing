@@ -249,13 +249,13 @@ function equipmentPriceTable(type: ShopPolicyType): Readonly<Record<GradeId, Sho
 }
 
 const SHOP_GENERATION: Readonly<Record<ShopPolicyType, ShopTypeGenerationRule>> = Object.freeze({
-  normal: Object.freeze({ itemPool: NORMAL_ITEM_POOL, itemCount: 3, itemStock: 2, equipmentCount: 3, allowedEquipmentTiers: [1, 2] }),
-  station: Object.freeze({ itemPool: STANDARD_ITEM_POOL, itemCount: 3, itemStock: 1, equipmentCount: 2, allowedEquipmentTiers: [1, 2] }),
-  traveling: Object.freeze({ itemPool: STANDARD_ITEM_POOL, itemCount: 3, itemStock: 2, equipmentCount: 2, allowedEquipmentTiers: [1, 2] }),
-  "black-market": Object.freeze({ itemPool: STANDARD_ITEM_POOL, itemCount: 3, itemStock: 1, equipmentCount: 3, allowedEquipmentTiers: [1, 2, 3] }),
-  hidden: Object.freeze({ itemPool: STANDARD_ITEM_POOL, itemCount: 2, itemStock: 1, equipmentCount: 3, allowedEquipmentTiers: [1, 2, 3] }),
-  event: Object.freeze({ itemPool: EVENT_ITEM_POOL, itemCount: 4, itemStock: 1, equipmentCount: 0, allowedEquipmentTiers: [1, 2] }),
-  service: Object.freeze({ itemPool: STANDARD_ITEM_POOL, itemCount: 3, itemStock: 1, equipmentCount: 2, allowedEquipmentTiers: [1, 2] }),
+  normal: Object.freeze({ itemPool: NORMAL_ITEM_POOL, itemCount: 3, itemStock: 2, equipmentCount: 3, allowedEquipmentTiers: [1, 2] as const }),
+  station: Object.freeze({ itemPool: STANDARD_ITEM_POOL, itemCount: 3, itemStock: 1, equipmentCount: 2, allowedEquipmentTiers: [1, 2] as const }),
+  traveling: Object.freeze({ itemPool: STANDARD_ITEM_POOL, itemCount: 3, itemStock: 2, equipmentCount: 2, allowedEquipmentTiers: [1, 2] as const }),
+  "black-market": Object.freeze({ itemPool: STANDARD_ITEM_POOL, itemCount: 3, itemStock: 1, equipmentCount: 3, allowedEquipmentTiers: [1, 2, 3] as const }),
+  hidden: Object.freeze({ itemPool: STANDARD_ITEM_POOL, itemCount: 2, itemStock: 1, equipmentCount: 3, allowedEquipmentTiers: [1, 2, 3] as const }),
+  event: Object.freeze({ itemPool: EVENT_ITEM_POOL, itemCount: 4, itemStock: 1, equipmentCount: 0, allowedEquipmentTiers: [1, 2] as const }),
+  service: Object.freeze({ itemPool: STANDARD_ITEM_POOL, itemCount: 3, itemStock: 1, equipmentCount: 2, allowedEquipmentTiers: [1, 2] as const }),
 });
 
 const EQUIPMENT_GRADE_BANDS: Readonly<Record<ShopPolicyType, readonly ShopEquipmentGradeBand[]>> = Object.freeze({
