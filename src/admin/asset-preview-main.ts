@@ -10,6 +10,8 @@ import {
 import { AssetPreviewResourceScope } from "./asset-preview-lifecycle";
 import {
   createShipAssetPreviewCandidate,
+  prepareShipAssetPreviewCandidate,
+  releaseShipAssetPreviewCandidate,
   shipAssetPreviewPresentation,
   updateShipAssetPreviewCandidate,
   withShipAssetPreviewRuntime,
@@ -72,11 +74,12 @@ const resources = new AssetPreviewResourceScope();
 const shots = new PlayerShotSystem<number>();
 resources.addDisposer(() => shots.clear());
 
-// A5 Ship visual tuning currently targets the procedural profile. The real
-// production renderer owns this fallback; the preview does not copy it.
+// The shared atlas is disabled in the isolated preview so the exact candidate
+// path or the production procedural fallback is always visible.
 setCharacterShipSheet(null);
 
 let candidate: ShipAssetPreviewCandidate | null = null;
+let candidateGeneration = 0;
 let scenario: AssetPreviewScenario = "idle";
 let paused = false;
 let simulationSeconds = 0;
@@ -86,6 +89,12 @@ let lastShotSeconds = Number.NEGATIVE_INFINITY;
 let disposed = false;
 let viewWidth = 1;
 let viewHeight = 1;
+
+resources.addDisposer(() => {
+  candidateGeneration += 1;
+  if (candidate !== null) releaseShipAssetPreviewCandidate(candidate);
+  candidate = null;
+});
 
 function post(type: "READY" | "APPLIED" | "ERROR" | "DISPOSED", requestId: number, payload?: unknown): void {
   parentSource.postMessage(
@@ -209,24 +218,47 @@ function drawFrame(frameMs: number): void {
   resources.setAnimationFrame(requestAnimationFrame(drawFrame));
 }
 
-function loadCandidate(payload: unknown): void {
+async function loadCandidate(payload: unknown): Promise<void> {
   const input = object(payload);
   if (input === null || input.domain !== "ship" || typeof input.characterId !== "string") {
     throw new Error("Invalid Ship preview candidate payload.");
   }
-  candidate = createShipAssetPreviewCandidate(input.characterId, input.visual);
+  const generation = ++candidateGeneration;
+  const next = createShipAssetPreviewCandidate(
+    input.characterId,
+    input.visual,
+    input.imageAssetVersionId,
+  );
+  try {
+    await prepareShipAssetPreviewCandidate(
+      next,
+      window.fetch.bind(window),
+      () => new Image(),
+    );
+  } catch (error) {
+    releaseShipAssetPreviewCandidate(next);
+    throw error;
+  }
+  if (disposed || resources.isDisposed || generation !== candidateGeneration) {
+    releaseShipAssetPreviewCandidate(next);
+    throw new Error("Ship preview candidate was superseded by a newer request.");
+  }
+  const previous = candidate;
+  candidate = next;
+  if (previous !== null) releaseShipAssetPreviewCandidate(previous);
   shots.clear();
   lastShotSeconds = Number.NEGATIVE_INFINITY;
   nextShotSeconds = simulationSeconds + 0.08;
 }
 
-function applyCommand(command: AssetPreviewCommand): void {
+async function applyCommand(command: AssetPreviewCommand): Promise<void> {
   if (command.type === "LOAD_CANDIDATE") {
-    loadCandidate(command.payload);
+    await loadCandidate(command.payload);
     const activeCandidate = candidate;
     if (activeCandidate === null) throw new Error("Ship preview candidate did not materialize.");
     post("APPLIED", command.requestId, {
       characterId: activeCandidate.characterId,
+      imageAssetVersionId: activeCandidate.imageAssetVersionId,
       presentation: shipAssetPreviewPresentation(activeCandidate),
     });
     return;
@@ -234,7 +266,20 @@ function applyCommand(command: AssetPreviewCommand): void {
   if (command.type === "SET_TUNING") {
     if (candidate === null) throw new Error("SET_TUNING requires a loaded candidate.");
     const input = object(command.payload);
+    const previous = candidate;
     candidate = updateShipAssetPreviewCandidate(candidate, input?.visual);
+    if (candidate.session !== previous.session) {
+      // Visual-only tuning creates a new isolated session; retain the exact
+      // image by resolving it for that session before it can render.
+      if (candidate.imageAssetVersionId !== null) {
+        await prepareShipAssetPreviewCandidate(
+          candidate,
+          window.fetch.bind(window),
+          () => new Image(),
+        );
+      }
+      releaseShipAssetPreviewCandidate(previous);
+    }
     post("APPLIED", command.requestId, { presentation: shipAssetPreviewPresentation(candidate) });
     return;
   }
@@ -254,6 +299,8 @@ function applyCommand(command: AssetPreviewCommand): void {
     return;
   }
   if (command.type === "RESET") {
+    candidateGeneration += 1;
+    if (candidate !== null) releaseShipAssetPreviewCandidate(candidate);
     candidate = null;
     scenario = "idle";
     paused = false;
@@ -277,8 +324,9 @@ function requestIdFrom(value: unknown): number {
 
 function onMessage(event: MessageEvent): void {
   if (disposed) return;
+  let command: AssetPreviewCommand;
   try {
-    applyCommand(gate.accept(event));
+    command = gate.accept(event);
   } catch (error) {
     if (
       error instanceof AssetPreviewProtocolError &&
@@ -288,7 +336,12 @@ function onMessage(event: MessageEvent): void {
     }
     const message = error instanceof Error ? error.message : "Preview command failed.";
     post("ERROR", requestIdFrom(event.data), { message });
+    return;
   }
+  void applyCommand(command).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : "Preview command failed.";
+    post("ERROR", command.requestId, { message });
+  });
 }
 
 window.addEventListener("message", onMessage, { signal: resources.signal });
@@ -301,4 +354,5 @@ post("READY", 0, {
   scenarios: ["idle", "move", "fire"],
   renderer: "production",
   candidateState: "ephemeral",
+  exactVersionMedia: true,
 });
