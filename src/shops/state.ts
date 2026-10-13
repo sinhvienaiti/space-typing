@@ -1,3 +1,4 @@
+import { ACTIVE_SHOP_RUNTIME_SESSION } from "../admin/shop-runtime-policy";
 import { galaxyForStage, normalizeStage } from "../campaign/stage";
 import type { HiddenDiscoveryState } from "../discovery/hidden-content";
 import {
@@ -19,12 +20,12 @@ import {
   type Inventory,
 } from "../items/inventory";
 import {
+  getItemDefinition,
   isItemId,
   type ItemId,
 } from "../items/registry";
 import { clamp } from "../logic";
 import {
-  BUNDLED_SHOP_POLICY,
   SHOP_POLICY_TYPES,
   resolveShopAvailability,
   resolveShopEquipmentGrade,
@@ -269,7 +270,7 @@ function itemEntry(
   remaining: number,
   suffix = "",
 ): ShopItemStock {
-  const grade = ITEM_GRADE_FOR_PRICE[itemId];
+  const grade = getItemDefinition(itemId).grade ?? "aluminum";
   return {
     key: "item-" + itemId + suffix,
     kind: "item",
@@ -278,21 +279,6 @@ function itemEntry(
     price: { ...resolveShopItemPrice(policy, type, itemId, grade) },
   };
 }
-
-const ITEM_GRADE_FOR_PRICE: Readonly<Record<ItemId, GradeId>> = Object.freeze({
-  "repair-kit": "aluminum",
-  "shield-cell": "aluminum",
-  "energy-cell": "aluminum",
-  "nova-bomb": "copper",
-  "emp-charge": "copper",
-  "time-crystal": "silver",
-  "word-bomb": "copper",
-  "supply-beacon": "copper",
-  "lucky-dice": "silver",
-  "salvage-anchor": "silver",
-  "stage-revival-core": "gold",
-  "phoenix-core": "diamond",
-});
 
 /** Equipment admission is policy-driven; registry remains the tier owner. */
 function shopEquipmentPool(
@@ -606,7 +592,7 @@ export function resolveShopInstance(
   stateInput: ShopState,
   type: ShopType,
   context: ShopRollContext,
-  policy: ShopAdminPolicyV1 = BUNDLED_SHOP_POLICY,
+  policy: ShopAdminPolicyV1 = ACTIVE_SHOP_RUNTIME_SESSION.policy,
 ): {
   state: ShopState;
   instance: ShopInstance;
@@ -644,7 +630,7 @@ export function resolveShopInstance(
 export function shopAvailable(
   type: ShopType,
   context: ShopRollContext,
-  policy: ShopAdminPolicyV1 = BUNDLED_SHOP_POLICY,
+  policy: ShopAdminPolicyV1 = ACTIVE_SHOP_RUNTIME_SESSION.policy,
 ): boolean {
   const availabilityRule = policy.availability[type];
   const roll = availabilityRule.kind === "seeded-chance"
