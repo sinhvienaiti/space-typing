@@ -47,11 +47,21 @@ function exactParentOrigin(): string {
   return referrer.origin;
 }
 
-const canvas = document.querySelector<HTMLCanvasElement>("#assetPreviewCanvas");
-const status = document.querySelector<HTMLElement>("#assetPreviewStatus");
-if (canvas === null || status === null) throw new Error("Asset preview DOM is incomplete.");
-const context = canvas.getContext("2d");
-if (context === null) throw new Error("2D Canvas is unavailable.");
+function requiredElement<T extends Element>(selector: string): T {
+  const element = document.querySelector<T>(selector);
+  if (element === null) throw new Error(`Asset preview DOM is missing ${selector}.`);
+  return element;
+}
+
+function requiredCanvasContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
+  const context = canvas.getContext("2d");
+  if (context === null) throw new Error("2D Canvas is unavailable.");
+  return context;
+}
+
+const canvas = requiredElement<HTMLCanvasElement>("#assetPreviewCanvas");
+const status = requiredElement<HTMLElement>("#assetPreviewStatus");
+const context = requiredCanvasContext(canvas);
 
 const previewSessionId = requiredQueryToken("previewSession");
 const nonce = requiredQueryToken("nonce");
