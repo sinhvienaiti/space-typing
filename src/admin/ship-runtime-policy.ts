@@ -36,6 +36,7 @@ export type ShipRuntimeVisualOverride = Partial<{
 }>;
 
 export type ShipRuntimeOverride = ShipRuntimeDefinitionOverride & {
+  imageAssetVersionId?: string;
   statBonus?: ShipRuntimeStatOverride;
   visual?: ShipRuntimeVisualOverride;
 };
@@ -49,6 +50,7 @@ export type ShipRuntimeSession = Readonly<{
 
 const RUNTIME_ENDPOINT = "/api/runtime/space-typing/ships";
 const APPLY_BOUNDARY = "new-session";
+const ASSET_VERSION_ID_PATTERN = /^media-version\.[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/;
 const SHIP_IDS = new Set([
   "vanguard",
   "aegis",
@@ -70,6 +72,7 @@ const DEFINITION_KEYS = new Set([
   "passiveName",
   "activeName",
   "ultimateName",
+  "imageAssetVersionId",
   "statBonus",
   "visual",
 ]);
@@ -129,6 +132,10 @@ function validNumber(value: unknown, min: number, max: number): value is number 
   return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
 }
 
+function validAssetVersionId(value: unknown): value is string {
+  return typeof value === "string" && ASSET_VERSION_ID_PATTERN.test(value);
+}
+
 function sanitizeShipOverride(value: unknown): Readonly<ShipRuntimeOverride> | null {
   const input = object(value);
   if (input === null || Object.keys(input).some((key) => !DEFINITION_KEYS.has(key))) {
@@ -148,6 +155,11 @@ function sanitizeShipOverride(value: unknown): Readonly<ShipRuntimeOverride> | n
       return null;
     }
     definition.unlockStage = input.unlockStage;
+  }
+
+  const imageAssetVersionId = input.imageAssetVersionId;
+  if (imageAssetVersionId !== undefined && !validAssetVersionId(imageAssetVersionId)) {
+    return null;
   }
 
   let statBonus: ShipRuntimeStatOverride | undefined;
@@ -203,6 +215,7 @@ function sanitizeShipOverride(value: unknown): Readonly<ShipRuntimeOverride> | n
 
   return Object.freeze({
     ...(definition as ShipRuntimeDefinitionOverride),
+    ...(imageAssetVersionId === undefined ? {} : { imageAssetVersionId }),
     ...(statBonus === undefined ? {} : { statBonus }),
     ...(visual === undefined ? {} : { visual }),
   });
@@ -299,8 +312,19 @@ export function activeShipRuntimeDefinitionOverride(
 ): Readonly<ShipRuntimeDefinitionOverride> | undefined {
   const override = ACTIVE_SHIP_RUNTIME_SESSION.ships[id];
   if (override === undefined) return undefined;
-  const { statBonus: _statBonus, visual: _visual, ...definition } = override;
+  const {
+    imageAssetVersionId: _imageAssetVersionId,
+    statBonus: _statBonus,
+    visual: _visual,
+    ...definition
+  } = override;
   return definition;
+}
+
+export function activeShipRuntimeImageAssetVersionId(
+  id: string,
+): string | undefined {
+  return ACTIVE_SHIP_RUNTIME_SESSION.ships[id]?.imageAssetVersionId;
 }
 
 export function activeShipRuntimeStatOverride(
