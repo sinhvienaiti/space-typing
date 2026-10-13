@@ -19,23 +19,26 @@ import {
   type Inventory,
 } from "../items/inventory";
 import {
-  getItemDefinition,
   isItemId,
   type ItemId,
 } from "../items/registry";
 import { clamp } from "../logic";
+import {
+  BUNDLED_SHOP_POLICY,
+  SHOP_POLICY_TYPES,
+  resolveShopAvailability,
+  resolveShopEquipmentGrade,
+  resolveShopEquipmentPrice,
+  resolveShopGenerationRule,
+  resolveShopItemPrice,
+  resolveShopRareItemChance,
+  type ShopAdminPolicyV1,
+  type ShopPolicyType,
+} from "./policy";
 
-export const SHOP_TYPES = [
-  "normal",
-  "station",
-  "traveling",
-  "black-market",
-  "hidden",
-  "event",
-  "service",
-] as const;
+export const SHOP_TYPES = SHOP_POLICY_TYPES;
 
-export type ShopType = (typeof SHOP_TYPES)[number];
+export type ShopType = ShopPolicyType;
 
 export type ShopPrice = {
   credits: number;
@@ -110,43 +113,6 @@ export type ShopPurchaseResult = {
     | "duplicate"
     | null;
 };
-
-const ITEM_POOL: readonly ItemId[] = [
-  "repair-kit",
-  "shield-cell",
-  "energy-cell",
-  "nova-bomb",
-  "emp-charge",
-  "time-crystal",
-  "word-bomb",
-  "supply-beacon",
-  "lucky-dice",
-];
-
-const TRAVELING_ITEM_POOL: readonly ItemId[] = [
-  "repair-kit",
-  "shield-cell",
-  "energy-cell",
-  "nova-bomb",
-  "emp-charge",
-  "time-crystal",
-  "word-bomb",
-  "supply-beacon",
-  "lucky-dice",
-];
-
-const EVENT_ITEM_POOL: readonly ItemId[] = [
-  "nova-bomb",
-  "emp-charge",
-  "time-crystal",
-  "word-bomb",
-  "supply-beacon",
-  "lucky-dice",
-];
-
-// Legacy Salvage Anchor / Stage Revival Core remain schema-compatible for old
-// saves but are no longer generated. Phoenix Core is the only death-revive item.
-const RESURRECTION_ITEMS: readonly ItemId[] = ["phoenix-core"];
 
 function emptyPrice(): ShopPrice {
   return {
@@ -249,141 +215,6 @@ export function shopInstanceId(
   return type + ":" + context.worldKey + ":sector-" + String(sectorStart);
 }
 
-function equipmentGradeForShop(
-  type: ShopType,
-  stage: number,
-  random: () => number,
-): GradeId {
-  const safeStage = normalizeStage(stage);
-  const roll = random();
-
-  if (type === "hidden") {
-    if (safeStage >= 700 && roll > 0.94) return "diamond";
-    if (safeStage >= 350 && roll > 0.6) return "gold";
-    return safeStage >= 120 ? "silver" : "copper";
-  }
-
-  if (type === "black-market") {
-    if (safeStage >= 800 && roll > 0.96) return "diamond";
-    if (safeStage >= 500 && roll > 0.7) return "gold";
-    return safeStage >= 180 ? "silver" : "copper";
-  }
-
-  if (type === "traveling") {
-    if (safeStage >= 500 && roll > 0.9) return "gold";
-    if (safeStage >= 150 && roll > 0.55) return "silver";
-    return "copper";
-  }
-
-  if (type === "station") {
-    return safeStage >= 250 && roll > 0.8 ? "silver" : "copper";
-  }
-
-  if (type === "event") {
-    return safeStage >= 300 && roll > 0.85 ? "gold" : "silver";
-  }
-
-  return safeStage >= 100 && roll > 0.72 ? "copper" : "aluminum";
-}
-
-function equipmentBaseCredits(grade: GradeId): number {
-  return grade === "diamond"
-    ? 2400
-    : grade === "gold"
-      ? 1250
-      : grade === "silver"
-        ? 650
-        : grade === "copper"
-          ? 260
-          : 150;
-}
-
-function priceForEquipment(
-  type: ShopType,
-  grade: GradeId,
-): ShopPrice {
-  const price = emptyPrice();
-  const base = equipmentBaseCredits(grade);
-
-  if (type === "black-market") {
-    price.credits = Math.floor(base * 0.9);
-    price.starCrystal =
-      grade === "diamond" ? 5 : grade === "gold" ? 3 : grade === "silver" ? 1 : 0;
-    return price;
-  }
-
-  if (type === "hidden") {
-    price.starCrystal =
-      grade === "diamond" ? 7 : grade === "gold" ? 4 : grade === "silver" ? 2 : 1;
-    if (grade === "diamond") price.quantumCore = 1;
-    return price;
-  }
-
-  if (type === "traveling" || type === "station") {
-    price.credits = Math.floor(base * 0.75);
-    price.alloy =
-      grade === "gold" ? 12 : grade === "silver" ? 7 : grade === "copper" ? 3 : 0;
-    return price;
-  }
-
-  price.credits = base;
-  return price;
-}
-
-function priceForItem(
-  type: ShopType,
-  itemId: ItemId,
-): ShopPrice {
-  const price = emptyPrice();
-  const grade = getItemDefinition(itemId).grade ?? "aluminum";
-  const base =
-    grade === "diamond"
-      ? 1700
-      : grade === "gold"
-        ? 900
-        : grade === "silver"
-          ? 320
-          : grade === "copper"
-            ? 110
-            : 45;
-
-  if (type === "black-market") {
-    price.credits = Math.floor(base * 0.75);
-    if (grade === "silver") price.starCrystal = 1;
-    if (grade === "gold") price.starCrystal = 3;
-    if (grade === "diamond") {
-      price.starCrystal = 5;
-      price.quantumCore = 1;
-    }
-    return price;
-  }
-
-  if (type === "hidden") {
-    price.starCrystal =
-      grade === "diamond" ? 6 : grade === "gold" ? 3 : grade === "silver" ? 1 : 0;
-    if (grade === "diamond") price.quantumCore = 1;
-    return price;
-  }
-
-  if (type === "event") {
-    price.starCrystal =
-      grade === "silver" || grade === "gold" || grade === "diamond"
-        ? 2
-        : 1;
-    return price;
-  }
-
-  if (type === "traveling" || type === "station") {
-    price.credits = Math.floor(base * 0.8);
-    price.alloy =
-      grade === "gold" ? 10 : grade === "silver" ? 5 : grade === "copper" ? 2 : 0;
-    return price;
-  }
-
-  price.credits = base;
-  return price;
-}
-
 function pickDistinct<T>(
   pool: readonly T[],
   count: number,
@@ -402,75 +233,84 @@ function pickDistinct<T>(
   return result;
 }
 
-function resurrectionChance(
+function itemAllowedInShop(
+  policy: ShopAdminPolicyV1,
   type: ShopType,
   itemId: ItemId,
-  luck: number,
-): number {
-  const safeLuck = clamp(luck, 0, 100);
-  const base =
-    itemId === "salvage-anchor"
-      ? type === "hidden"
-        ? 0.22
-        : type === "traveling"
-          ? 0.12
-          : type === "black-market"
-            ? 0.08
-            : 0
-      : itemId === "stage-revival-core"
-        ? type === "hidden"
-          ? 0.1
-          : type === "traveling"
-            ? 0.035
-            : type === "black-market"
-              ? 0.055
-              : 0
-        : type === "hidden"
-          ? 0.025
-          : type === "black-market"
-            ? 0.008
-            : 0;
+): boolean {
+  const override = policy.offers.items[itemId];
+  if (override?.enabled === false) return false;
+  return override?.shopTypes === undefined || override.shopTypes.includes(type);
+}
 
-  return Math.min(base * (1 + safeLuck * 0.004), base * 1.4);
+function equipmentAllowedInShop(
+  policy: ShopAdminPolicyV1,
+  type: ShopType,
+  definitionId: EquipmentId,
+): boolean {
+  const override = policy.offers.equipment[definitionId];
+  if (override?.enabled === false) return false;
+  return override?.shopTypes === undefined || override.shopTypes.includes(type);
+}
+
+function itemStockForShop(
+  policy: ShopAdminPolicyV1,
+  type: ShopType,
+  itemId: ItemId,
+  fallback: number,
+): number {
+  return policy.offers.items[itemId]?.stockByShopType?.[type] ?? fallback;
 }
 
 function itemEntry(
+  policy: ShopAdminPolicyV1,
   type: ShopType,
   itemId: ItemId,
   remaining: number,
   suffix = "",
 ): ShopItemStock {
+  const grade = ITEM_GRADE_FOR_PRICE[itemId];
   return {
     key: "item-" + itemId + suffix,
     kind: "item",
     itemId,
     remaining,
-    price: priceForItem(type, itemId),
+    price: { ...resolveShopItemPrice(policy, type, itemId, grade) },
   };
 }
 
-/** Mk.II and Mk.III parts carry perks, so they cost more than Mk.I. */
-const EQUIPMENT_TIER_PRICE = { 1: 1, 2: 1.5, 3: 2.2 } as const;
+const ITEM_GRADE_FOR_PRICE: Readonly<Record<ItemId, GradeId>> = Object.freeze({
+  "repair-kit": "aluminum",
+  "shield-cell": "aluminum",
+  "energy-cell": "aluminum",
+  "nova-bomb": "copper",
+  "emp-charge": "copper",
+  "time-crystal": "silver",
+  "word-bomb": "copper",
+  "supply-beacon": "copper",
+  "lucky-dice": "silver",
+  "salvage-anchor": "silver",
+  "stage-revival-core": "gold",
+  "phoenix-core": "diamond",
+});
 
-function tierPrice(price: ShopPrice, definitionId: EquipmentId): ShopPrice {
-  const tier = EQUIPMENT_REGISTRY[definitionId].tier;
-  if (tier === 1) return price;
-  const factor = EQUIPMENT_TIER_PRICE[tier];
-  return {
-    ...price,
-    credits: Math.floor(price.credits * factor),
-    alloy: Math.ceil(price.alloy * factor),
-    starCrystal: price.starCrystal + (tier === 3 && price.starCrystal > 0 ? 1 : 0),
-  };
-}
-
-/** Mk.III parts only turn up in hidden and black-market shops. */
-function shopEquipmentPool(type: ShopType): readonly EquipmentId[] {
-  if (type === "hidden" || type === "black-market") return EQUIPMENT_IDS;
-  return EQUIPMENT_IDS.filter((id) => EQUIPMENT_REGISTRY[id].tier < 3);
+/** Equipment admission is policy-driven; registry remains the tier owner. */
+function shopEquipmentPool(
+  policy: ShopAdminPolicyV1,
+  type: ShopType,
+): readonly EquipmentId[] {
+  const rule = resolveShopGenerationRule(policy, type);
+  const source = rule.equipmentPool ?? EQUIPMENT_IDS;
+  const allowedTiers = new Set(rule.allowedEquipmentTiers);
+  return source.filter(
+    (id) =>
+      allowedTiers.has(EQUIPMENT_REGISTRY[id].tier) &&
+      equipmentAllowedInShop(policy, type, id),
+  );
 }
 
 function equipmentEntry(
+  policy: ShopAdminPolicyV1,
   type: ShopType,
   definitionId: EquipmentId,
   grade: GradeId,
@@ -488,11 +328,20 @@ function equipmentEntry(
     definitionId,
     grade,
     remaining: 1,
-    price: tierPrice(priceForEquipment(type, grade), definitionId),
+    price: {
+      ...resolveShopEquipmentPrice(
+        policy,
+        type,
+        definitionId,
+        grade,
+        EQUIPMENT_REGISTRY[definitionId].tier,
+      ),
+    },
   };
 }
 
-function generateStock(
+export function generateShopStock(
+  policy: ShopAdminPolicyV1,
   type: ShopType,
   context: ShopRollContext,
   seed: number,
@@ -500,65 +349,53 @@ function generateStock(
   const random = createSeededRandom(seed);
   const stage = normalizeStage(context.stage);
   const stock: ShopStockEntry[] = [];
+  const rule = resolveShopGenerationRule(policy, type);
 
-  if (type === "normal") {
-    for (const itemId of pickDistinct(ITEM_POOL.slice(0, 5), 3, random)) {
-      stock.push(itemEntry(type, itemId, 2));
-    }
-    for (const [index, definitionId] of pickDistinct(
-      shopEquipmentPool(type),
-      3,
-      random,
-    ).entries()) {
-      stock.push(
-        equipmentEntry(
-          type,
-          definitionId,
-          equipmentGradeForShop(type, stage, random),
-          index,
-        ),
-      );
-    }
-  } else if (type === "event") {
-    for (const itemId of pickDistinct(EVENT_ITEM_POOL, 4, random)) {
-      stock.push(itemEntry(type, itemId, 1));
-    }
-  } else {
-    const itemPool =
-      type === "traveling" ? TRAVELING_ITEM_POOL : ITEM_POOL;
-    const itemCount = type === "hidden" ? 2 : 3;
-    for (const itemId of pickDistinct(itemPool, itemCount, random)) {
-      stock.push(itemEntry(type, itemId, type === "traveling" ? 2 : 1));
-    }
-
-    const equipmentCount =
-      type === "hidden" || type === "black-market" ? 3 : 2;
-    for (const [index, definitionId] of pickDistinct(
-      shopEquipmentPool(type),
-      equipmentCount,
-      random,
-    ).entries()) {
-      stock.push(
-        equipmentEntry(
-          type,
-          definitionId,
-          equipmentGradeForShop(type, stage, random),
-          index,
-        ),
-      );
-    }
+  const itemPool = rule.itemPool.filter((itemId) =>
+    itemAllowedInShop(policy, type, itemId),
+  );
+  for (const itemId of pickDistinct(itemPool, rule.itemCount, random)) {
+    stock.push(
+      itemEntry(
+        policy,
+        type,
+        itemId,
+        itemStockForShop(policy, type, itemId, rule.itemStock),
+      ),
+    );
   }
 
-  if (
-    type === "traveling" ||
-    type === "black-market" ||
-    type === "hidden"
-  ) {
-    for (const itemId of RESURRECTION_ITEMS) {
-      if (random() < resurrectionChance(type, itemId, context.luck)) {
-        stock.push(itemEntry(type, itemId, 1, "-protection"));
-      }
-    }
+  for (const [index, definitionId] of pickDistinct(
+    shopEquipmentPool(policy, type),
+    rule.equipmentCount,
+    random,
+  ).entries()) {
+    stock.push(
+      equipmentEntry(
+        policy,
+        type,
+        definitionId,
+        resolveShopEquipmentGrade(policy, type, stage, random()),
+        index,
+      ),
+    );
+  }
+
+  for (const rareRule of policy.generation.rareItems) {
+    if (!itemAllowedInShop(policy, type, rareRule.itemId)) continue;
+    const chance = resolveShopRareItemChance(
+      policy,
+      type,
+      rareRule.itemId,
+      context.luck,
+    );
+    if (chance <= 0 || random() >= chance) continue;
+    if (
+      stock.some(
+        (entry) => entry.kind === "item" && entry.itemId === rareRule.itemId,
+      )
+    ) continue;
+    stock.push(itemEntry(policy, type, rareRule.itemId, 1, "-protection"));
   }
 
   return stock;
@@ -769,6 +606,7 @@ export function resolveShopInstance(
   stateInput: ShopState,
   type: ShopType,
   context: ShopRollContext,
+  policy: ShopAdminPolicyV1 = BUNDLED_SHOP_POLICY,
 ): {
   state: ShopState;
   instance: ShopInstance;
@@ -790,7 +628,7 @@ export function resolveShopInstance(
     stage,
     sectorStart: Math.floor((stage - 1) / 10) * 10 + 1,
     seed,
-    stock: generateStock(type, context, seed),
+    stock: generateShopStock(policy, type, context, seed),
   };
 
   const next: ShopState = {
@@ -806,24 +644,17 @@ export function resolveShopInstance(
 export function shopAvailable(
   type: ShopType,
   context: ShopRollContext,
+  policy: ShopAdminPolicyV1 = BUNDLED_SHOP_POLICY,
 ): boolean {
-  if (type === "black-market") {
-    return context.hiddenDiscovery.discovered.includes(
-      "black-market-signal",
-    );
-  }
-  if (type === "hidden" || type === "event") {
-    return context.hiddenDiscovery.discovered.includes("echo-rift");
-  }
-  if (type !== "traveling") return true;
-
-  const seed = shopInstanceSeed(type, context);
-  const random = createSeededRandom(seed);
-  const chance = Math.min(
-    0.48,
-    0.28 + clamp(context.luck, 0, 100) * 0.0015,
-  );
-  return random() < chance;
+  const availabilityRule = policy.availability[type];
+  const roll = availabilityRule.kind === "seeded-chance"
+    ? createSeededRandom(shopInstanceSeed(type, context))()
+    : 0;
+  return resolveShopAvailability(policy, type, {
+    luck: context.luck,
+    roll,
+    discovered: context.hiddenDiscovery.discovered,
+  });
 }
 
 export function formatShopPrice(priceInput: ShopPrice): string {
