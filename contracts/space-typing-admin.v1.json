@@ -72,7 +72,7 @@
   },
   "ships": {
     "ids":["vanguard","aegis","volt","wraith","fortune","arsenal","oracle","bastion","reaper","celestial","zenith"],
-    "authorableFields":["name","unlockStage","role","summary","passiveName","activeName","ultimateName","statBonus","visual"],
+    "authorableFields":["name","unlockStage","role","summary","passiveName","activeName","ultimateName","imageAssetVersionId","statBonus","visual"],
     "coreStatKeys":["hull","shield","firepower","armor","energy","reactor","focus","ward","luck","salvage"],
     "constraints":{"unlockStage":{"min":1,"max":1000,"integer":true},"statBonus":{"min":-100,"max":100},"visual":{"silhouettes":["spear","fortress","arc","phantom","crown","blade"],"wingSpan":{"min":0.5,"max":2},"bodyLength":{"min":0.5,"max":2},"engineCounts":[1,2,3]}},
     "previewProtocol":{"version":1,"command":"pnpm ships:admin-preview"}
