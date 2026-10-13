@@ -235,8 +235,10 @@ function validateUpgradeCost(value: unknown): boolean {
 }
 
 function validateServices(value: unknown): boolean {
-  const services = object(value);
-  if (services === null || !exactRequiredKeys(services, ["repairPack", "equipmentEnhancement", "equipmentEvolution", "affixes", "dismantle", "progressionOwner"])) return false;
+  const maybeServices = object(value);
+  if (maybeServices === null) return false;
+  const services: Record<string, unknown> = maybeServices;
+  if (!exactRequiredKeys(services, ["repairPack", "equipmentEnhancement", "equipmentEvolution", "affixes", "dismantle", "progressionOwner"])) return false;
   if (services.progressionOwner !== "progression/upgrades") return false;
 
   const repair = object(services.repairPack);
@@ -247,8 +249,10 @@ function validateServices(value: unknown): boolean {
   if (!numericRecord(enhancement.gradeCreditMultiplier, GRADE_IDS, 0, 100) || !numericRecord(enhancement.gradeAlloyBase, GRADE_IDS, 0, MAX_CURRENCY)) return false;
   if (!integer(enhancement.creditBase, 0, MAX_CURRENCY) || !integer(enhancement.creditPerEnhancement, 0, MAX_CURRENCY) || !integer(enhancement.maxEnhancement, 0, 100)) return false;
 
-  const evolution = object(services.equipmentEvolution);
-  if (evolution === null || !exactKeys(evolution, GRADE_IDS)) return false;
+  const maybeEvolution = object(services.equipmentEvolution);
+  if (maybeEvolution === null) return false;
+  const evolution: Record<string, unknown> = maybeEvolution;
+  if (!exactKeys(evolution, GRADE_IDS)) return false;
   for (const cost of Object.values(evolution)) if (!validateUpgradeCost(cost)) return false;
 
   const affixes = object(services.affixes);
