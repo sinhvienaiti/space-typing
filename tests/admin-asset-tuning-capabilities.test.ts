@@ -30,14 +30,14 @@ describe("A5 asset tuning runtime capability matrix", () => {
     }
   });
 
-  it("keeps Ship visual tuning gated until the production preview harness exists", () => {
+  it("promotes Ship visual tuning only after the production preview harness closes the chain", () => {
     expect(assetTuningRuntimeCapability("ship.visual.procedural-profile")).toMatchObject({
       persistedField: expect.stringContaining("ships.<id>.visual"),
       runtimeResolver: expect.stringContaining("characterVisualProfile"),
       productionConsumer: expect.stringContaining("drawCharacterShip"),
-      previewConsumer: null,
+      previewConsumer: expect.stringContaining("asset-preview-main.ts"),
       applyBoundary: "new-session",
-      status: "REQUIRES CANONICAL MIGRATION",
+      status: "SUPPORTED NOW",
     });
   });
 
