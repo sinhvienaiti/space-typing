@@ -42,10 +42,10 @@ export const ASSET_TUNING_RUNTIME_CAPABILITIES = Object.freeze([
     validator: "sanitizeShipOverride() visual validation",
     runtimeResolver: "src/characters/visuals.ts::characterVisualProfile()",
     productionConsumer: "src/characters/renderer.ts::drawCharacterShip()",
-    previewConsumer: null,
+    previewConsumer: "src/admin/asset-preview-main.ts via withShipAssetPreviewRuntime() + drawCharacterShip()",
     applyBoundary: "new-session",
-    status: "REQUIRES CANONICAL MIGRATION",
-    note: "Production authority is canonical; A5 visual preview harness is still required before this becomes an Asset Tuning writable control.",
+    status: "SUPPORTED NOW",
+    note: "Canonical Admin visual policy reaches the production resolver/renderer. Unsaved preview stays ephemeral; published changes apply only at the new-session boundary.",
   }),
   capability({
     id: "ship-2d.image-assignment",
