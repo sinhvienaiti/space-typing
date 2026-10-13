@@ -1,3 +1,7 @@
+import {
+  ACTIVE_SHIP_RUNTIME_SESSION,
+  type ShipRuntimeSession,
+} from "../admin/ship-runtime-policy";
 import type { CharacterId } from "./registry";
 
 export type PlayerShotArchetype =
@@ -37,10 +41,7 @@ export type PlayerProjectileProfile = {
   impactVariant: PlayerImpactVariant;
 };
 
-const PLAYER_PROJECTILES: Record<
-  CharacterId,
-  PlayerProjectileProfile
-> = {
+const PLAYER_PROJECTILES: Record<CharacterId, PlayerProjectileProfile> = {
   vanguard: {
     archetype: "spear",
     impactVariant: "crystal",
@@ -142,8 +143,27 @@ const PLAYER_PROJECTILES: Record<
   },
 };
 
+let scopedShipRuntimeSession: ShipRuntimeSession | null = null;
+
+export function withPlayerProjectileRuntimeSession<T>(
+  session: ShipRuntimeSession,
+  resolve: () => T,
+): T {
+  const previous = scopedShipRuntimeSession;
+  scopedShipRuntimeSession = session;
+  try {
+    return resolve();
+  } finally {
+    scopedShipRuntimeSession = previous;
+  }
+}
+
 export function playerProjectileProfile(
   id: CharacterId,
 ): Readonly<PlayerProjectileProfile> {
-  return PLAYER_PROJECTILES[id];
+  const base = PLAYER_PROJECTILES[id];
+  const session = scopedShipRuntimeSession ?? ACTIVE_SHIP_RUNTIME_SESSION;
+  const archetype = session.ships[id]?.projectileArchetype;
+  if (archetype === undefined || archetype === base.archetype) return base;
+  return { ...base, archetype };
 }

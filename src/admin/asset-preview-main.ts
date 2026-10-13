@@ -191,7 +191,7 @@ function drawFrame(frameMs: number): void {
     status.textContent = "READY · waiting for validated Ship candidate";
   } else {
     status.textContent = `${activeCandidate.characterId.toUpperCase()} · ${scenario.toUpperCase()} · production renderer`;
-    maybeFire(activeCandidate, shipX, shipY);
+    withShipAssetPreviewRuntime(activeCandidate, () => maybeFire(activeCandidate, shipX, shipY));
     if (!paused) shots.update(dt, () => false, "high");
     shots.drawShots(context, "high");
 
@@ -228,6 +228,7 @@ async function loadCandidate(payload: unknown): Promise<void> {
     input.characterId,
     input.visual,
     input.imageAssetVersionId,
+    input.projectileArchetype,
   );
   try {
     await prepareShipAssetPreviewCandidate(
@@ -259,6 +260,7 @@ async function applyCommand(command: AssetPreviewCommand): Promise<void> {
     post("APPLIED", command.requestId, {
       characterId: activeCandidate.characterId,
       imageAssetVersionId: activeCandidate.imageAssetVersionId,
+      projectileArchetype: activeCandidate.projectileArchetype,
       presentation: shipAssetPreviewPresentation(activeCandidate),
     });
     return;
@@ -270,7 +272,7 @@ async function applyCommand(command: AssetPreviewCommand): Promise<void> {
     candidate = updateShipAssetPreviewCandidate(candidate, input?.visual);
     if (candidate.session !== previous.session) {
       // Visual-only tuning creates a new isolated session; retain the exact
-      // image by resolving it for that session before it can render.
+      // image and projectile binding while resolving the new session.
       if (candidate.imageAssetVersionId !== null) {
         await prepareShipAssetPreviewCandidate(
           candidate,
@@ -280,7 +282,10 @@ async function applyCommand(command: AssetPreviewCommand): Promise<void> {
       }
       releaseShipAssetPreviewCandidate(previous);
     }
-    post("APPLIED", command.requestId, { presentation: shipAssetPreviewPresentation(candidate) });
+    post("APPLIED", command.requestId, {
+      projectileArchetype: candidate.projectileArchetype,
+      presentation: shipAssetPreviewPresentation(candidate),
+    });
     return;
   }
   if (command.type === "SET_SCENARIO") {

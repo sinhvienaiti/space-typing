@@ -27,11 +27,9 @@ function capability(value: AssetTuningRuntimeCapability): AssetTuningRuntimeCapa
 }
 
 /**
- * A5.0 executable capability matrix.
- *
- * This is intentionally conservative: a renderer argument is not an Admin
- * field, and a production-backed field is not Asset-Tuning-writable until a
- * child-owned production preview consumer exists for it.
+ * A5 executable capability matrix. Renderer arguments and code constants do
+ * not become Admin fields until persistence, validation, production runtime,
+ * production-backed preview and an apply boundary all exist.
  */
 export const ASSET_TUNING_RUNTIME_CAPABILITIES = Object.freeze([
   capability({
@@ -167,28 +165,67 @@ export const ASSET_TUNING_RUNTIME_CAPABILITIES = Object.freeze([
   capability({
     id: "projectile.profile",
     domain: "projectile",
-    persistedField: null,
-    canonicalOwner: "src/characters/projectiles.ts code-owned PLAYER_PROJECTILES",
-    validator: null,
-    runtimeResolver: "src/characters/projectiles.ts::playerProjectileProfile()",
-    productionConsumer: "src/vfx/player-shots.ts production shot presentation",
-    previewConsumer: null,
-    applyBoundary: "build/static",
-    status: "REQUIRES CANONICAL MIGRATION",
-    note: "Runtime profile exists, but there is no canonical Admin persistence/materialization path.",
+    persistedField: "ships.<id>.projectileArchetype",
+    canonicalOwner: "src/admin/ship-runtime-policy.ts + src/characters/projectiles.ts",
+    validator: "sanitizeShipOverride() projectileArchetype enum validation",
+    runtimeResolver: "src/characters/projectiles.ts::playerProjectileProfile() + src/vfx/player-shots.ts::shotRecipeFor()",
+    productionConsumer: "src/vfx/player-shots.ts::PlayerShotSystem.fire()",
+    previewConsumer: "src/admin/asset-preview-main.ts via withShipAssetPreviewRuntime() + PlayerShotSystem.fire()",
+    applyBoundary: "new-session",
+    status: "SUPPORTED NOW",
+    note: "Ship Admin may bind one of the existing production projectile recipe archetypes. The selected recipe owns muzzle, trail, sprite bundle and motion; those internals are not independently writable fields.",
   }),
   capability({
     id: "projectile.trail-impact-presentation",
     domain: "projectile",
     persistedField: null,
-    canonicalOwner: "src/vfx/player-shots.ts procedural production recipe",
+    canonicalOwner: "src/vfx/player-shots.ts production ShotRecipe",
     validator: null,
-    runtimeResolver: "player projectile profile + production VFX recipe",
+    runtimeResolver: "selected projectile archetype -> production ShotRecipe",
     productionConsumer: "src/vfx/player-shots.ts",
-    previewConsumer: null,
+    previewConsumer: "Fire scenario through production PlayerShotSystem",
     applyBoundary: "runtime-state",
     status: "READ-ONLY REFERENCE",
-    note: "Current trail/impact behavior is production-owned and may be previewed, not generically authored.",
+    note: "Muzzle positions, trail mode/geometry, sprite bundle and impact geometry are recipe-owned derived presentation. Selecting a recipe may change them; Admin cannot edit them independently.",
+  }),
+  capability({
+    id: "projectile.impact-sfx-variant",
+    domain: "projectile",
+    persistedField: null,
+    canonicalOwner: "src/characters/projectiles.ts impactVariant + src/audio/Sfx.ts",
+    validator: null,
+    runtimeResolver: "playerProjectileProfile().impactVariant",
+    productionConsumer: "Game.ts applyShotImpact() -> Sfx.boltImpact()",
+    previewConsumer: null,
+    applyBoundary: "new-session",
+    status: "REQUIRES CANONICAL MIGRATION",
+    note: "Production impact audio identity exists, but no persisted Ship field and no production-backed Admin hit/audio preview chain exist yet.",
+  }),
+  capability({
+    id: "projectile.launch-sfx",
+    domain: "projectile",
+    persistedField: null,
+    canonicalOwner: "production audio call sites",
+    validator: null,
+    runtimeResolver: null,
+    productionConsumer: "Game.ts / production Sfx path",
+    previewConsumer: null,
+    applyBoundary: "runtime-state",
+    status: "REQUIRES CANONICAL MIGRATION",
+    note: "No canonical exact-version or semantic per-Ship launch-SFX binding exists.",
+  }),
+  capability({
+    id: "projectile.miss-presentation",
+    domain: "projectile",
+    persistedField: null,
+    canonicalOwner: "none for normal Ship projectile presentation",
+    validator: null,
+    runtimeResolver: null,
+    productionConsumer: null,
+    previewConsumer: null,
+    applyBoundary: "none",
+    status: "DEFERRED / UNSUPPORTED",
+    note: "The normal Ship PlayerShotSystem has no canonical per-Ship miss presentation binding; Duel typing-miss behavior is a separate runtime domain.",
   }),
   capability({
     id: "vfx.current-production",

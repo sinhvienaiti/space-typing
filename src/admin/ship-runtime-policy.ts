@@ -35,8 +35,22 @@ export type ShipRuntimeVisualOverride = Partial<{
   engineCount: 1 | 2 | 3;
 }>;
 
+export type ShipRuntimeProjectileArchetype =
+  | "spear"
+  | "heavy"
+  | "electric"
+  | "shadow"
+  | "star"
+  | "barrage"
+  | "mystic"
+  | "guard"
+  | "slash"
+  | "radiant"
+  | "cosmic";
+
 export type ShipRuntimeOverride = ShipRuntimeDefinitionOverride & {
   imageAssetVersionId?: string;
+  projectileArchetype?: ShipRuntimeProjectileArchetype;
   statBonus?: ShipRuntimeStatOverride;
   visual?: ShipRuntimeVisualOverride;
 };
@@ -73,6 +87,7 @@ const DEFINITION_KEYS = new Set([
   "activeName",
   "ultimateName",
   "imageAssetVersionId",
+  "projectileArchetype",
   "statBonus",
   "visual",
 ]);
@@ -117,6 +132,19 @@ const SILHOUETTES = new Set([
   "crown",
   "blade",
 ]);
+const PROJECTILE_ARCHETYPES = new Set<ShipRuntimeProjectileArchetype>([
+  "spear",
+  "heavy",
+  "electric",
+  "shadow",
+  "star",
+  "barrage",
+  "mystic",
+  "guard",
+  "slash",
+  "radiant",
+  "cosmic",
+]);
 
 function object(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -159,6 +187,15 @@ function sanitizeShipOverride(value: unknown): Readonly<ShipRuntimeOverride> | n
 
   const imageAssetVersionId = input.imageAssetVersionId;
   if (imageAssetVersionId !== undefined && !isShipImageAssetVersionId(imageAssetVersionId)) {
+    return null;
+  }
+
+  const projectileArchetype = input.projectileArchetype;
+  if (
+    projectileArchetype !== undefined &&
+    (typeof projectileArchetype !== "string" ||
+      !PROJECTILE_ARCHETYPES.has(projectileArchetype as ShipRuntimeProjectileArchetype))
+  ) {
     return null;
   }
 
@@ -216,6 +253,9 @@ function sanitizeShipOverride(value: unknown): Readonly<ShipRuntimeOverride> | n
   return Object.freeze({
     ...(definition as ShipRuntimeDefinitionOverride),
     ...(imageAssetVersionId === undefined ? {} : { imageAssetVersionId }),
+    ...(projectileArchetype === undefined
+      ? {}
+      : { projectileArchetype: projectileArchetype as ShipRuntimeProjectileArchetype }),
     ...(statBonus === undefined ? {} : { statBonus }),
     ...(visual === undefined ? {} : { visual }),
   });
@@ -314,6 +354,7 @@ export function activeShipRuntimeDefinitionOverride(
   if (override === undefined) return undefined;
   const {
     imageAssetVersionId: _imageAssetVersionId,
+    projectileArchetype: _projectileArchetype,
     statBonus: _statBonus,
     visual: _visual,
     ...definition
@@ -325,6 +366,12 @@ export function activeShipRuntimeImageAssetVersionId(
   id: string,
 ): string | undefined {
   return ACTIVE_SHIP_RUNTIME_SESSION.ships[id]?.imageAssetVersionId;
+}
+
+export function activeShipRuntimeProjectileArchetype(
+  id: string,
+): ShipRuntimeProjectileArchetype | undefined {
+  return ACTIVE_SHIP_RUNTIME_SESSION.ships[id]?.projectileArchetype;
 }
 
 export function activeShipRuntimeStatOverride(

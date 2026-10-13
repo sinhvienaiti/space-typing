@@ -1,9 +1,11 @@
 import {
   materializeShipRuntimeSession,
+  type ShipRuntimeProjectileArchetype,
   type ShipRuntimeSession,
   type ShipRuntimeVisualOverride,
 } from "./ship-runtime-policy";
 import { isCharacterId, type CharacterId } from "../characters/registry";
+import { withPlayerProjectileRuntimeSession } from "../characters/projectiles";
 import {
   characterVisualProfile,
   withCharacterVisualRuntimeSession,
@@ -18,6 +20,7 @@ import {
 export type ShipAssetPreviewCandidate = Readonly<{
   characterId: CharacterId;
   imageAssetVersionId: string | null;
+  projectileArchetype: ShipRuntimeProjectileArchetype | null;
   visual: Readonly<ShipRuntimeVisualOverride>;
   session: ShipRuntimeSession;
 }>;
@@ -34,6 +37,7 @@ function materializeCandidate(
   characterId: CharacterId,
   visual: unknown,
   imageAssetVersionId?: unknown,
+  projectileArchetype?: unknown,
 ): ShipAssetPreviewCandidate {
   if (object(visual) === null) throw new ShipAssetPreviewError("Ship preview visual must be an object.");
   const session = materializeShipRuntimeSession({
@@ -45,6 +49,7 @@ function materializeCandidate(
         [characterId]: {
           visual,
           ...(imageAssetVersionId === undefined ? {} : { imageAssetVersionId }),
+          ...(projectileArchetype === undefined ? {} : { projectileArchetype }),
         },
       },
     },
@@ -54,15 +59,16 @@ function materializeCandidate(
   if (session.source !== "published" || sanitized === undefined) {
     throw new ShipAssetPreviewError("Ship preview candidate was rejected by the canonical runtime validator.");
   }
-  if (
-    imageAssetVersionId !== undefined &&
-    materialized?.imageAssetVersionId === undefined
-  ) {
+  if (imageAssetVersionId !== undefined && materialized?.imageAssetVersionId === undefined) {
     throw new ShipAssetPreviewError("Ship preview image assignment was rejected by the canonical runtime validator.");
+  }
+  if (projectileArchetype !== undefined && materialized?.projectileArchetype === undefined) {
+    throw new ShipAssetPreviewError("Ship preview projectile recipe was rejected by the canonical runtime validator.");
   }
   return Object.freeze({
     characterId,
     imageAssetVersionId: materialized?.imageAssetVersionId ?? null,
+    projectileArchetype: materialized?.projectileArchetype ?? null,
     visual: sanitized,
     session,
   });
@@ -72,9 +78,10 @@ export function createShipAssetPreviewCandidate(
   characterId: string,
   visual: unknown,
   imageAssetVersionId?: unknown,
+  projectileArchetype?: unknown,
 ): ShipAssetPreviewCandidate {
   if (!isCharacterId(characterId)) throw new ShipAssetPreviewError("Unknown Ship preview characterId.");
-  return materializeCandidate(characterId, visual, imageAssetVersionId);
+  return materializeCandidate(characterId, visual, imageAssetVersionId, projectileArchetype);
 }
 
 export function updateShipAssetPreviewCandidate(
@@ -90,6 +97,7 @@ export function updateShipAssetPreviewCandidate(
       ...patch,
     },
     candidate.imageAssetVersionId ?? undefined,
+    candidate.projectileArchetype ?? undefined,
   );
 }
 
@@ -116,14 +124,15 @@ export function shipAssetPreviewPresentation(
 }
 
 /**
- * Executes the real production renderer under the candidate's isolated visual
- * and Media runtime sessions. No PlayerSave, ShopInstance, published
- * definition or active runtime session is mutated.
+ * Executes the real production renderer/projectile resolver under the
+ * candidate's isolated Ship runtime sessions. No PlayerSave, ShopInstance,
+ * published definition or active runtime session is mutated.
  */
 export function withShipAssetPreviewRuntime<T>(
   candidate: ShipAssetPreviewCandidate,
   render: () => T,
 ): T {
   return withCharacterVisualRuntimeSession(candidate.session, () =>
-    withCharacterShipMediaRuntimeSession(candidate.session, render));
+    withCharacterShipMediaRuntimeSession(candidate.session, () =>
+      withPlayerProjectileRuntimeSession(candidate.session, render)));
 }

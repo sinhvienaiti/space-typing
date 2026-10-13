@@ -7,6 +7,10 @@ import {
 } from "../characters/registry";
 import { characterStatBonus } from "../characters/stats";
 import {
+  playerProjectileProfile,
+  type PlayerShotArchetype,
+} from "../characters/projectiles";
+import {
   characterShipAssetId,
   characterVisualProfile,
   type CharacterSilhouette,
@@ -18,6 +22,7 @@ export const SHIP_ADMIN_PREVIEW_PROTOCOL_VERSION = 1 as const;
 
 export type ShipAdminOverride = Partial<Omit<CharacterDefinition, "id">> & {
   imageAssetVersionId?: string;
+  projectileArchetype?: PlayerShotArchetype;
   statBonus?: Partial<Record<CoreStatKey, number>>;
   visual?: Partial<CharacterVisualProfile>;
 };
@@ -29,6 +34,7 @@ export type ShipAdminPolicy = {
 
 export type ShipAdminPreviewItem = CharacterDefinition & {
   imageAssetVersionId?: string;
+  projectileArchetype: PlayerShotArchetype;
   statBonus: StatBonus;
   visual: CharacterVisualProfile;
   assetId: string;
@@ -50,6 +56,7 @@ const DEFINITION_KEYS = new Set([
   "activeName",
   "ultimateName",
   "imageAssetVersionId",
+  "projectileArchetype",
   "statBonus",
   "visual",
 ]);
@@ -72,6 +79,19 @@ const SILHOUETTES = new Set<CharacterSilhouette>([
   "phantom",
   "crown",
   "blade",
+]);
+const PROJECTILE_ARCHETYPES = new Set<PlayerShotArchetype>([
+  "spear",
+  "heavy",
+  "electric",
+  "shadow",
+  "star",
+  "barrage",
+  "mystic",
+  "guard",
+  "slash",
+  "radiant",
+  "cosmic",
 ]);
 const CORE_STATS = new Set<string>(CORE_STAT_KEYS);
 
@@ -145,6 +165,13 @@ export function validateShipAdminPolicy(policy: ShipAdminPolicy): void {
     if (override.imageAssetVersionId !== undefined && !isShipImageAssetVersionId(override.imageAssetVersionId)) {
       throw new Error(`ships.${id}.imageAssetVersionId must be a canonical Media V2 version id`);
     }
+    if (
+      override.projectileArchetype !== undefined &&
+      (typeof override.projectileArchetype !== "string" ||
+        !PROJECTILE_ARCHETYPES.has(override.projectileArchetype as PlayerShotArchetype))
+    ) {
+      throw new Error(`ships.${id}.projectileArchetype is invalid`);
+    }
     if (override.statBonus !== undefined) validateStatBonus(override.statBonus, `ships.${id}.statBonus`);
     if (override.visual !== undefined) validateVisual(override.visual, `ships.${id}.visual`);
   }
@@ -158,6 +185,7 @@ function mergedShip(id: CharacterId, override: ShipAdminOverride | undefined): S
     ...base,
     ...override,
     id,
+    projectileArchetype: override?.projectileArchetype ?? playerProjectileProfile(id).archetype,
     statBonus: { ...baseStats, ...(override?.statBonus ?? {}) },
     visual: { ...baseVisual, ...(override?.visual ?? {}) },
     assetId: characterShipAssetId(id),
