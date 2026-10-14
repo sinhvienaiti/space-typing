@@ -16,6 +16,11 @@ import {
   releaseShipRuntimeImages,
   withCharacterShipMediaRuntimeSession,
 } from "../characters/ship-media-runtime";
+import {
+  DuelShip3D,
+  type Ship3DFrame,
+  type Ship3DPose,
+} from "../duel/ship3d";
 
 export type ShipAssetPreviewCandidate = Readonly<{
   characterId: CharacterId;
@@ -28,6 +33,8 @@ export type ShipAssetPreviewCandidate = Readonly<{
 }>;
 
 export class ShipAssetPreviewError extends Error {}
+
+const reliefPreviewShips = new WeakMap<ShipAssetPreviewCandidate, DuelShip3D>();
 
 function object(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -130,14 +137,55 @@ export async function prepareShipAssetPreviewCandidate(
   fetchImpl: typeof fetch,
   imageFactory: () => HTMLImageElement,
 ): Promise<ShipAssetPreviewCandidate> {
-  if (candidate.imageAssetVersionId !== null) {
-    await preloadShipRuntimeImages(candidate.session, fetchImpl, imageFactory);
+  try {
+    if (candidate.imageAssetVersionId !== null) {
+      await preloadShipRuntimeImages(candidate.session, fetchImpl, imageFactory);
+    }
+    if (candidate.reliefPreviewRequested) {
+      const previous = reliefPreviewShips.get(candidate);
+      previous?.dispose();
+      reliefPreviewShips.delete(candidate);
+      const ship = await DuelShip3D.loadFresh(candidate.characterId, "self", {
+        reliefAssetVersionId: candidate.reliefAssetVersionId,
+      });
+      if (ship === null) {
+        throw new ShipAssetPreviewError(
+          "Ship relief preview could not materialize through the production 3D runtime.",
+        );
+      }
+      reliefPreviewShips.set(candidate, ship);
+    }
+    return candidate;
+  } catch (error) {
+    releaseShipRuntimeImages(candidate.session);
+    reliefPreviewShips.get(candidate)?.dispose();
+    reliefPreviewShips.delete(candidate);
+    throw error;
   }
-  return candidate;
 }
 
 export function releaseShipAssetPreviewCandidate(candidate: ShipAssetPreviewCandidate): void {
   releaseShipRuntimeImages(candidate.session);
+  reliefPreviewShips.get(candidate)?.dispose();
+  reliefPreviewShips.delete(candidate);
+}
+
+export function shipAssetPreviewHasRelief(candidate: ShipAssetPreviewCandidate): boolean {
+  return reliefPreviewShips.has(candidate);
+}
+
+export function renderShipAssetPreviewRelief(
+  candidate: ShipAssetPreviewCandidate,
+  pose: Ship3DPose,
+): Ship3DFrame | null {
+  return reliefPreviewShips.get(candidate)?.render(pose) ?? null;
+}
+
+export function flashShipAssetPreviewRelief(
+  candidate: ShipAssetPreviewCandidate,
+  gunIndex: number,
+): void {
+  reliefPreviewShips.get(candidate)?.flash(gunIndex);
 }
 
 /** Exact presentation values consumed by the production renderer for this candidate. */
