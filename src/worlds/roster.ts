@@ -7,6 +7,11 @@ import {
 } from "../enemies/registry";
 import { rewardEnemyChance } from "../enemies/spawn-profile";
 import { clamp } from "../logic";
+import {
+  activeWorldRuntimeOverride,
+  resolveWorldProfileForRuntime,
+  type WorldRuntimeOverride,
+} from "../admin/world-runtime-policy";
 import { worldForStage } from "./registry";
 import type { WorldProfile } from "./types";
 
@@ -32,6 +37,17 @@ const KIND_ROLE_PREFERENCES: Record<
 
 function safeRandom(value: number): number {
   return clamp(value, 0, 0.999999);
+}
+
+export function worldProfileForRuntimeStage(
+  stage: number,
+  override?: WorldRuntimeOverride,
+): WorldProfile {
+  const bundled = worldForStage(stage);
+  return resolveWorldProfileForRuntime(
+    bundled,
+    override ?? activeWorldRuntimeOverride(bundled.id),
+  );
 }
 
 function definitionsForWorld(
@@ -179,7 +195,7 @@ export function worldRuntimeEnemyDefinitionId(
   rosterRandom = Math.random(),
 ): EnemyDefinitionId {
   return worldRuntimeEnemyDefinitionIdForWorld(
-    worldForStage(stage),
+    worldProfileForRuntimeStage(stage),
     kind,
     elite,
     rosterRandom,
@@ -193,10 +209,11 @@ export function spawnWorldEnemyDefinitionId(
   rewardRandom = Math.random(),
   rosterRandom = Math.random(),
 ): EnemyDefinitionId {
-  const base = worldRuntimeEnemyDefinitionId(
+  const world = worldProfileForRuntimeStage(stage);
+  const base = worldRuntimeEnemyDefinitionIdForWorld(
+    world,
     kind,
     elite,
-    stage,
     rosterRandom,
   );
 
@@ -209,7 +226,7 @@ export function spawnWorldEnemyDefinitionId(
   }
 
   const reward = pickDefinition(
-    rewardCandidates(worldForStage(stage), kind),
+    rewardCandidates(world, kind),
     rosterRandom,
   );
   return reward?.id ?? base;
@@ -218,7 +235,7 @@ export function spawnWorldEnemyDefinitionId(
 export function worldRankDistributionForStage(
   stage: number,
 ): Readonly<Record<string, number>> {
-  return worldForStage(stage).rankDistribution;
+  return worldProfileForRuntimeStage(stage).rankDistribution;
 }
 
 export function worldEnemyFamilyForSpawn(
@@ -227,15 +244,16 @@ export function worldEnemyFamilyForSpawn(
   stage: number,
   rosterRandom = 0,
 ): EnemyDefinition["family"] {
-  const id = worldRuntimeEnemyDefinitionId(
+  const world = worldProfileForRuntimeStage(stage);
+  const id = worldRuntimeEnemyDefinitionIdForWorld(
+    world,
     kind,
     elite,
-    stage,
     rosterRandom,
   );
   return (
     enemyDefinition(id)?.family ??
-    worldForStage(stage).enemyFamilies[0] ??
+    world.enemyFamilies[0] ??
     "rainbow"
   );
 }
@@ -244,17 +262,17 @@ export function validateWorldRosterRuntime(): string[] {
   const errors: string[] = [];
 
   for (let stage = 1; stage <= 1000; stage += 1) {
-    const world = worldForStage(stage);
+    const world = worldProfileForRuntimeStage(stage);
     const kinds = Object.keys(
       KIND_ROLE_PREFERENCES,
     ) as EnemyKind[];
 
     for (const kind of kinds) {
       for (const elite of [false, true]) {
-        const id = worldRuntimeEnemyDefinitionId(
+        const id = worldRuntimeEnemyDefinitionIdForWorld(
+          world,
           kind,
           elite,
-          stage,
           0.37,
         );
         const definition = enemyDefinition(id);
