@@ -21,6 +21,8 @@ export type ShipAssetPreviewCandidate = Readonly<{
   characterId: CharacterId;
   imageAssetVersionId: string | null;
   projectileArchetype: ShipRuntimeProjectileArchetype | null;
+  reliefAssetVersionId: string | null;
+  reliefPreviewRequested: boolean;
   visual: Readonly<ShipRuntimeVisualOverride>;
   session: ShipRuntimeSession;
 }>;
@@ -38,8 +40,10 @@ function materializeCandidate(
   visual: unknown,
   imageAssetVersionId?: unknown,
   projectileArchetype?: unknown,
+  reliefAssetVersionId?: unknown,
 ): ShipAssetPreviewCandidate {
   if (object(visual) === null) throw new ShipAssetPreviewError("Ship preview visual must be an object.");
+  const reliefPreviewRequested = reliefAssetVersionId !== undefined;
   const session = materializeShipRuntimeSession({
     activeRevision: "admin-preview-ephemeral",
     applyBoundary: "new-session",
@@ -50,6 +54,9 @@ function materializeCandidate(
           visual,
           ...(imageAssetVersionId === undefined ? {} : { imageAssetVersionId }),
           ...(projectileArchetype === undefined ? {} : { projectileArchetype }),
+          ...(reliefAssetVersionId === undefined || reliefAssetVersionId === null
+            ? {}
+            : { reliefAssetVersionId }),
         },
       },
     },
@@ -65,10 +72,19 @@ function materializeCandidate(
   if (projectileArchetype !== undefined && materialized?.projectileArchetype === undefined) {
     throw new ShipAssetPreviewError("Ship preview projectile recipe was rejected by the canonical runtime validator.");
   }
+  if (
+    reliefAssetVersionId !== undefined &&
+    reliefAssetVersionId !== null &&
+    materialized?.reliefAssetVersionId === undefined
+  ) {
+    throw new ShipAssetPreviewError("Ship preview relief bundle was rejected by the canonical runtime validator.");
+  }
   return Object.freeze({
     characterId,
     imageAssetVersionId: materialized?.imageAssetVersionId ?? null,
     projectileArchetype: materialized?.projectileArchetype ?? null,
+    reliefAssetVersionId: materialized?.reliefAssetVersionId ?? null,
+    reliefPreviewRequested,
     visual: sanitized,
     session,
   });
@@ -79,9 +95,16 @@ export function createShipAssetPreviewCandidate(
   visual: unknown,
   imageAssetVersionId?: unknown,
   projectileArchetype?: unknown,
+  reliefAssetVersionId?: unknown,
 ): ShipAssetPreviewCandidate {
   if (!isCharacterId(characterId)) throw new ShipAssetPreviewError("Unknown Ship preview characterId.");
-  return materializeCandidate(characterId, visual, imageAssetVersionId, projectileArchetype);
+  return materializeCandidate(
+    characterId,
+    visual,
+    imageAssetVersionId,
+    projectileArchetype,
+    reliefAssetVersionId,
+  );
 }
 
 export function updateShipAssetPreviewCandidate(
@@ -98,6 +121,7 @@ export function updateShipAssetPreviewCandidate(
     },
     candidate.imageAssetVersionId ?? undefined,
     candidate.projectileArchetype ?? undefined,
+    candidate.reliefPreviewRequested ? candidate.reliefAssetVersionId : undefined,
   );
 }
 
