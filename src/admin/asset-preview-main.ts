@@ -10,8 +10,11 @@ import {
 import { AssetPreviewResourceScope } from "./asset-preview-lifecycle";
 import {
   createShipAssetPreviewCandidate,
+  flashShipAssetPreviewRelief,
   prepareShipAssetPreviewCandidate,
   releaseShipAssetPreviewCandidate,
+  renderShipAssetPreviewRelief,
+  shipAssetPreviewHasRelief,
   shipAssetPreviewPresentation,
   updateShipAssetPreviewCandidate,
   withShipAssetPreviewRuntime,
@@ -90,6 +93,7 @@ let simulationSeconds = 0;
 let previousFrameMs: number | null = null;
 let nextShotSeconds = 0;
 let lastShotSeconds = Number.NEGATIVE_INFINITY;
+let nextReliefGun = 0;
 let disposed = false;
 let viewWidth = 1;
 let viewHeight = 1;
@@ -175,7 +179,10 @@ function maybeFire(activeCandidate: ShipAssetPreviewCandidate, shipX: number, sh
     power: 1,
     payload: 1,
   });
-  if (fired) sfx.shot(1);
+  if (fired) {
+    sfx.shot(1);
+    flashShipAssetPreviewRelief(activeCandidate, nextReliefGun++);
+  }
   lastShotSeconds = simulationSeconds;
   nextShotSeconds = simulationSeconds + 0.65;
 }
@@ -207,7 +214,8 @@ function drawFrame(frameMs: number): void {
   if (activeCandidate === null) {
     status.textContent = "READY · waiting for validated Ship candidate";
   } else {
-    status.textContent = `${activeCandidate.characterId.toUpperCase()} · ${scenario.toUpperCase()} · production renderer`;
+    const relief = shipAssetPreviewHasRelief(activeCandidate);
+    status.textContent = `${activeCandidate.characterId.toUpperCase()} · ${scenario.toUpperCase()} · ${relief ? "production 3D renderer" : "production renderer"}`;
     withShipAssetPreviewRuntime(activeCandidate, () => maybeFire(activeCandidate, shipX, shipY));
     if (!paused) {
       const arrivals = shots.update(dt, () => false, "high");
@@ -221,18 +229,50 @@ function drawFrame(frameMs: number): void {
       ? Math.max(0, 1 - (simulationSeconds - lastShotSeconds) / 0.12)
       : 0;
     const boost = scenario === "move" ? 1 : scenario === "fire" ? 0.72 : 0.35;
-    withShipAssetPreviewRuntime(activeCandidate, () => {
-      drawCharacterShip(context, activeCandidate.characterId, {
-        x: shipX,
-        y: shipY,
+    let drewRelief = false;
+    if (relief) {
+      const presentation = shipAssetPreviewPresentation(activeCandidate);
+      const roll = scenario === "move" ? Math.sin(simulationSeconds * 1.7) * 0.18 : 0;
+      const yaw = scenario === "move" ? Math.sin(simulationSeconds * 1.1) * 0.07 : 0;
+      const frame = renderShipAssetPreviewRelief(activeCandidate, {
+        width: Math.max(150, Math.min(viewWidth * 0.5, viewHeight * 0.48)),
+        dpr: Math.min(2, Math.max(1, window.devicePixelRatio || 1)),
+        roll,
+        yaw,
+        pitch: -Math.min(1, recoil) * 0.08,
+        heat: scenario === "idle" ? 0.2 : scenario === "move" ? 0.62 : 0.82,
+        rim: presentation.glow,
+        blast: null,
+        engine: { power: boost, color: presentation.engine },
         time: simulationSeconds,
-        scale: 1.55,
-        glowScale: 1,
-        detailScale: 1,
-        boost,
-        recoil: Math.min(1, recoil),
+        dt,
+        quality: "high",
       });
-    });
+      if (frame !== null) {
+        context.drawImage(
+          frame.canvas,
+          shipX - frame.size / 2,
+          shipY - frame.size / 2,
+          frame.size,
+          frame.size,
+        );
+        drewRelief = true;
+      }
+    }
+    if (!drewRelief) {
+      withShipAssetPreviewRuntime(activeCandidate, () => {
+        drawCharacterShip(context, activeCandidate.characterId, {
+          x: shipX,
+          y: shipY,
+          time: simulationSeconds,
+          scale: 1.55,
+          glowScale: 1,
+          detailScale: 1,
+          boost,
+          recoil: Math.min(1, recoil),
+        });
+      });
+    }
     shots.drawMuzzleFlashes(context);
     shots.drawImpacts(context, "high");
   }
@@ -251,6 +291,7 @@ async function loadCandidate(payload: unknown): Promise<void> {
     input.visual,
     input.imageAssetVersionId,
     input.projectileArchetype,
+    input.reliefAssetVersionId,
   );
   try {
     await prepareShipAssetPreviewCandidate(
@@ -270,6 +311,7 @@ async function loadCandidate(payload: unknown): Promise<void> {
   candidate = next;
   if (previous !== null) releaseShipAssetPreviewCandidate(previous);
   shots.clear();
+  nextReliefGun = 0;
   lastShotSeconds = Number.NEGATIVE_INFINITY;
   nextShotSeconds = simulationSeconds + 0.08;
 }
@@ -282,6 +324,8 @@ async function applyCommand(command: AssetPreviewCommand): Promise<void> {
     post("APPLIED", command.requestId, {
       characterId: activeCandidate.characterId,
       imageAssetVersionId: activeCandidate.imageAssetVersionId,
+      reliefAssetVersionId: activeCandidate.reliefAssetVersionId,
+      reliefPreviewRequested: activeCandidate.reliefPreviewRequested,
       projectileArchetype: activeCandidate.projectileArchetype,
       presentation: shipAssetPreviewPresentation(activeCandidate),
     });
@@ -293,9 +337,9 @@ async function applyCommand(command: AssetPreviewCommand): Promise<void> {
     const previous = candidate;
     candidate = updateShipAssetPreviewCandidate(candidate, input?.visual);
     if (candidate.session !== previous.session) {
-      // Visual-only tuning creates a new isolated session; retain the exact
-      // image and projectile binding while resolving the new session.
-      if (candidate.imageAssetVersionId !== null) {
+      // Re-materialize all candidate-owned runtime resources. Exact image and
+      // relief bindings remain isolated from the published gameplay session.
+      if (candidate.imageAssetVersionId !== null || candidate.reliefPreviewRequested) {
         await prepareShipAssetPreviewCandidate(
           candidate,
           window.fetch.bind(window),
@@ -305,6 +349,7 @@ async function applyCommand(command: AssetPreviewCommand): Promise<void> {
       releaseShipAssetPreviewCandidate(previous);
     }
     post("APPLIED", command.requestId, {
+      reliefAssetVersionId: candidate.reliefAssetVersionId,
       projectileArchetype: candidate.projectileArchetype,
       presentation: shipAssetPreviewPresentation(candidate),
     });
@@ -314,6 +359,7 @@ async function applyCommand(command: AssetPreviewCommand): Promise<void> {
     const input = object(command.payload);
     scenario = assetPreviewScenario(input?.scenario);
     shots.clear();
+    nextReliefGun = 0;
     lastShotSeconds = Number.NEGATIVE_INFINITY;
     nextShotSeconds = simulationSeconds + 0.08;
     post("APPLIED", command.requestId, { scenario });
@@ -332,6 +378,7 @@ async function applyCommand(command: AssetPreviewCommand): Promise<void> {
     scenario = "idle";
     paused = false;
     shots.clear();
+    nextReliefGun = 0;
     lastShotSeconds = Number.NEGATIVE_INFINITY;
     post("APPLIED", command.requestId, { reset: true });
     return;
@@ -382,4 +429,5 @@ post("READY", 0, {
   renderer: "production",
   candidateState: "ephemeral",
   exactVersionMedia: true,
+  relief3d: true,
 });
