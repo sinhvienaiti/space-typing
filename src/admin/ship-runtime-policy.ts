@@ -50,6 +50,7 @@ export type ShipRuntimeProjectileArchetype =
 
 export type ShipRuntimeOverride = ShipRuntimeDefinitionOverride & {
   imageAssetVersionId?: string;
+  reliefAssetVersionId?: string;
   projectileArchetype?: ShipRuntimeProjectileArchetype;
   statBonus?: ShipRuntimeStatOverride;
   visual?: ShipRuntimeVisualOverride;
@@ -87,6 +88,7 @@ const DEFINITION_KEYS = new Set([
   "activeName",
   "ultimateName",
   "imageAssetVersionId",
+  "reliefAssetVersionId",
   "projectileArchetype",
   "statBonus",
   "visual",
@@ -160,8 +162,16 @@ function validNumber(value: unknown, min: number, max: number): value is number 
   return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
 }
 
-export function isShipImageAssetVersionId(value: unknown): value is string {
+function isExactMediaAssetVersionId(value: unknown): value is string {
   return typeof value === "string" && ASSET_VERSION_ID_PATTERN.test(value);
+}
+
+export function isShipImageAssetVersionId(value: unknown): value is string {
+  return isExactMediaAssetVersionId(value);
+}
+
+export function isShipReliefAssetVersionId(value: unknown): value is string {
+  return isExactMediaAssetVersionId(value);
 }
 
 function sanitizeShipOverride(value: unknown): Readonly<ShipRuntimeOverride> | null {
@@ -187,6 +197,11 @@ function sanitizeShipOverride(value: unknown): Readonly<ShipRuntimeOverride> | n
 
   const imageAssetVersionId = input.imageAssetVersionId;
   if (imageAssetVersionId !== undefined && !isShipImageAssetVersionId(imageAssetVersionId)) {
+    return null;
+  }
+
+  const reliefAssetVersionId = input.reliefAssetVersionId;
+  if (reliefAssetVersionId !== undefined && !isShipReliefAssetVersionId(reliefAssetVersionId)) {
     return null;
   }
 
@@ -253,6 +268,7 @@ function sanitizeShipOverride(value: unknown): Readonly<ShipRuntimeOverride> | n
   return Object.freeze({
     ...(definition as ShipRuntimeDefinitionOverride),
     ...(imageAssetVersionId === undefined ? {} : { imageAssetVersionId }),
+    ...(reliefAssetVersionId === undefined ? {} : { reliefAssetVersionId }),
     ...(projectileArchetype === undefined
       ? {}
       : { projectileArchetype: projectileArchetype as ShipRuntimeProjectileArchetype }),
@@ -354,6 +370,7 @@ export function activeShipRuntimeDefinitionOverride(
   if (override === undefined) return undefined;
   const {
     imageAssetVersionId: _imageAssetVersionId,
+    reliefAssetVersionId: _reliefAssetVersionId,
     projectileArchetype: _projectileArchetype,
     statBonus: _statBonus,
     visual: _visual,
@@ -366,6 +383,12 @@ export function activeShipRuntimeImageAssetVersionId(
   id: string,
 ): string | undefined {
   return ACTIVE_SHIP_RUNTIME_SESSION.ships[id]?.imageAssetVersionId;
+}
+
+export function activeShipRuntimeReliefAssetVersionId(
+  id: string,
+): string | undefined {
+  return ACTIVE_SHIP_RUNTIME_SESSION.ships[id]?.reliefAssetVersionId;
 }
 
 export function activeShipRuntimeProjectileArchetype(
