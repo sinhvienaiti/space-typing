@@ -29,7 +29,7 @@ describe("A5.3 Ship projectile recipe binding", () => {
     expect(invalid.ships.vanguard).toBeUndefined();
   });
 
-  it("routes the published binding through the production projectile resolver and recipe", () => {
+  it("routes the published binding through the production projectile recipe and impact identity", () => {
     const session = materializeShipRuntimeSession({
       activeRevision: "rev-projectile-recipe",
       applyBoundary: "new-session",
@@ -40,13 +40,19 @@ describe("A5.3 Ship projectile recipe binding", () => {
     });
 
     withPlayerProjectileRuntimeSession(session, () => {
-      expect(playerProjectileProfile("vanguard").archetype).toBe("heavy");
+      expect(playerProjectileProfile("vanguard")).toMatchObject({
+        archetype: "heavy",
+        impactVariant: "heavy",
+      });
       expect(shotRecipeFor("vanguard")).toMatchObject({
         trailMode: "ribbon",
         fx: "aegis",
       });
     });
-    expect(playerProjectileProfile("vanguard").archetype).toBe("spear");
+    expect(playerProjectileProfile("vanguard")).toMatchObject({
+      archetype: "spear",
+      impactVariant: "crystal",
+    });
   });
 
   it("uses the same scoped production resolver in the Admin Fire preview candidate", () => {
@@ -58,7 +64,10 @@ describe("A5.3 Ship projectile recipe binding", () => {
     );
     expect(candidate.projectileArchetype).toBe("electric");
     withShipAssetPreviewRuntime(candidate, () => {
-      expect(playerProjectileProfile("vanguard").archetype).toBe("electric");
+      expect(playerProjectileProfile("vanguard")).toMatchObject({
+        archetype: "electric",
+        impactVariant: "storm",
+      });
       expect(shotRecipeFor("vanguard")).toMatchObject({
         trailMode: "zigzag",
         fx: "volt",
@@ -66,15 +75,23 @@ describe("A5.3 Ship projectile recipe binding", () => {
     });
   });
 
-  it("keeps recipe internals, impact audio and miss behavior outside writable Admin fields", () => {
+  it("keeps recipe internals and miss behavior outside writable Admin fields while previewing production SFX", () => {
     expect(assetTuningRuntimeCapability("projectile.profile")).toMatchObject({
       persistedField: "ships.<id>.projectileArchetype",
       applyBoundary: "new-session",
       status: "SUPPORTED NOW",
     });
     expect(assetTuningRuntimeCapability("projectile.trail-impact-presentation")?.status).toBe("READ-ONLY REFERENCE");
-    expect(assetTuningRuntimeCapability("projectile.impact-sfx-variant")?.status).toBe("REQUIRES CANONICAL MIGRATION");
-    expect(assetTuningRuntimeCapability("projectile.launch-sfx")?.status).toBe("REQUIRES CANONICAL MIGRATION");
+    expect(assetTuningRuntimeCapability("projectile.impact-sfx-variant")).toMatchObject({
+      persistedField: null,
+      previewConsumer: expect.stringContaining("asset-preview-main.ts"),
+      status: "READ-ONLY REFERENCE",
+    });
+    expect(assetTuningRuntimeCapability("projectile.launch-sfx")).toMatchObject({
+      persistedField: null,
+      previewConsumer: expect.stringContaining("asset-preview-main.ts"),
+      status: "READ-ONLY REFERENCE",
+    });
     expect(assetTuningRuntimeCapability("projectile.miss-presentation")?.status).toBe("DEFERRED / UNSUPPORTED");
     expect(assetTuningRuntimeCapability("weapon.admin-entity")?.status).toBe("DEFERRED / UNSUPPORTED");
   });
