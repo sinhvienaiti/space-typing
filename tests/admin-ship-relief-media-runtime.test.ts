@@ -8,7 +8,12 @@ const VERSION = "media-version.11111111-2222-3333-4444-555555555555";
 const SHA = "a".repeat(64);
 const FINGERPRINT = "b".repeat(64);
 
-function runtimePayload(overrides: Record<string, unknown> = {}) {
+type RuntimeComponent = Record<string, unknown>;
+type RuntimePayload = Record<string, unknown> & {
+  components: RuntimeComponent[];
+};
+
+function runtimePayload(overrides: Record<string, unknown> = {}): RuntimePayload {
   return {
     schemaVersion: 1,
     assetId: "runtime.ship-model.vanguard",
@@ -73,7 +78,7 @@ describe("A5.4 exact relief Media bundle resolver", () => {
 
   it("rejects duplicate roles, unsafe URLs, wrong kind and wrong MIME", async () => {
     const duplicate = runtimePayload();
-    duplicate.components = [...duplicate.components, { ...duplicate.components[0] }];
+    duplicate.components = [...duplicate.components, { ...duplicate.components[0]! }];
     await expect(resolveExactShipReliefBundle(fetchJson(duplicate), VERSION))
       .rejects.toThrow(/duplicate color components/);
 
