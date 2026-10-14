@@ -1,3 +1,4 @@
+import { activeShipRuntimeDefinitionOverride } from "../admin/ship-runtime-policy";
 import {
   CHARACTER_IDS,
   getCharacter,
@@ -264,16 +265,25 @@ export type CharacterUnlockResult = {
   unlocked: CharacterId[];
 };
 
+function effectiveCharacterUnlockStage(id: CharacterId): number {
+  return (
+    activeShipRuntimeDefinitionOverride(id)?.unlockStage ??
+    getCharacter(id).unlockStage
+  );
+}
+
 export function unlockCharactersForStage(
   state: CharacterState,
   clearedStage: number,
 ): CharacterUnlockResult {
-  const newlyUnlocked = CHARACTER_IDS.filter(
-    (id) =>
-      getCharacter(id).unlockStage > 1 &&
-      getCharacter(id).unlockStage <= clearedStage &&
-      !state.unlocked.includes(id),
-  );
+  const newlyUnlocked = CHARACTER_IDS.filter((id) => {
+    const unlockStage = effectiveCharacterUnlockStage(id);
+    return (
+      unlockStage > 1 &&
+      unlockStage <= clearedStage &&
+      !state.unlocked.includes(id)
+    );
+  });
 
   if (newlyUnlocked.length === 0) {
     return {
