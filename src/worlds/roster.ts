@@ -193,9 +193,10 @@ export function worldRuntimeEnemyDefinitionId(
   elite: boolean,
   stage: number,
   rosterRandom = Math.random(),
+  override?: WorldRuntimeOverride,
 ): EnemyDefinitionId {
   return worldRuntimeEnemyDefinitionIdForWorld(
-    worldProfileForRuntimeStage(stage),
+    worldProfileForRuntimeStage(stage, override),
     kind,
     elite,
     rosterRandom,
