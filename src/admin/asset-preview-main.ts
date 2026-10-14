@@ -22,6 +22,8 @@ import {
   drawCharacterShip,
   setCharacterShipSheet,
 } from "../characters/renderer";
+import { playerProjectileProfile } from "../characters/projectiles";
+import { Sfx } from "../audio/Sfx";
 import { PlayerShotSystem } from "../vfx/player-shots";
 
 function object(value: unknown): Record<string, unknown> | null {
@@ -72,7 +74,9 @@ const parentSource = window.parent;
 const gate = new AssetPreviewMessageGate(parentOrigin, parentSource, previewSessionId, nonce);
 const resources = new AssetPreviewResourceScope();
 const shots = new PlayerShotSystem<number>();
+const sfx = new Sfx();
 resources.addDisposer(() => shots.clear());
+resources.addDisposer(() => sfx.destroy());
 
 // The shared atlas is disabled in the isolated preview so the exact candidate
 // path or the production procedural fallback is always visible.
@@ -159,7 +163,7 @@ function maybeFire(activeCandidate: ShipAssetPreviewCandidate, shipX: number, sh
     boost: 0.72,
     recoil: 0.8,
   };
-  shots.fire({
+  const fired = shots.fire({
     characterId: activeCandidate.characterId,
     originX: shipX,
     originY: shipY,
@@ -171,8 +175,21 @@ function maybeFire(activeCandidate: ShipAssetPreviewCandidate, shipX: number, sh
     power: 1,
     payload: 1,
   });
+  if (fired) sfx.shot(1);
   lastShotSeconds = simulationSeconds;
   nextShotSeconds = simulationSeconds + 0.65;
+}
+
+function previewImpactSound(
+  activeCandidate: ShipAssetPreviewCandidate,
+  power: number,
+  x: number,
+): void {
+  withShipAssetPreviewRuntime(activeCandidate, () => {
+    const variant = playerProjectileProfile(activeCandidate.characterId).impactVariant;
+    const pan = Math.max(-1, Math.min(1, (x / Math.max(1, viewWidth)) * 2 - 1)) * 0.6;
+    sfx.boltImpact(power, pan, variant);
+  });
 }
 
 function drawFrame(frameMs: number): void {
@@ -192,7 +209,12 @@ function drawFrame(frameMs: number): void {
   } else {
     status.textContent = `${activeCandidate.characterId.toUpperCase()} · ${scenario.toUpperCase()} · production renderer`;
     withShipAssetPreviewRuntime(activeCandidate, () => maybeFire(activeCandidate, shipX, shipY));
-    if (!paused) shots.update(dt, () => false, "high");
+    if (!paused) {
+      const arrivals = shots.update(dt, () => false, "high");
+      for (const arrival of arrivals) {
+        previewImpactSound(activeCandidate, arrival.power, arrival.x);
+      }
+    }
     shots.drawShots(context, "high");
 
     const recoil = scenario === "fire"
