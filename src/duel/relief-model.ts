@@ -223,9 +223,21 @@ async function loadBundledReliefShip(three: Three, id: CharacterId, maxAnisotrop
  * path; the active session's published Ship revision owns the assignment.
  * Invalid/unavailable bundle materialization fails soft to the bundled hull,
  * never to a logical id, latest alias, raw path or arbitrary URL.
+ *
+ * Isolated callers such as Admin preview may provide an explicit source:
+ * `undefined` follows published policy, `null` forces bundled fallback, and
+ * an exact Media version id goes through the same strict resolver.
  */
-export async function loadReliefShip(three: Three, id: CharacterId, maxAnisotropy: number, segments = 176): Promise<BuiltShip | null> {
-  const assetVersionId = activeShipRuntimeReliefAssetVersionId(id);
+export async function loadReliefShip(
+  three: Three,
+  id: CharacterId,
+  maxAnisotropy: number,
+  segments = 176,
+  reliefAssetVersionId?: string | null,
+): Promise<BuiltShip | null> {
+  const assetVersionId = reliefAssetVersionId === undefined
+    ? activeShipRuntimeReliefAssetVersionId(id)
+    : reliefAssetVersionId ?? undefined;
   if (assetVersionId !== undefined) {
     try {
       const bundle = await resolveExactShipReliefBundle(fetch, assetVersionId);
