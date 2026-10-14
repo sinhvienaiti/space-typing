@@ -16,12 +16,16 @@ import {
   type CharacterSilhouette,
   type CharacterVisualProfile,
 } from "../characters/visuals";
-import { isShipImageAssetVersionId } from "./ship-runtime-policy";
+import {
+  isShipImageAssetVersionId,
+  isShipReliefAssetVersionId,
+} from "./ship-runtime-policy";
 
 export const SHIP_ADMIN_PREVIEW_PROTOCOL_VERSION = 1 as const;
 
 export type ShipAdminOverride = Partial<Omit<CharacterDefinition, "id">> & {
   imageAssetVersionId?: string;
+  reliefAssetVersionId?: string;
   projectileArchetype?: PlayerShotArchetype;
   statBonus?: Partial<Record<CoreStatKey, number>>;
   visual?: Partial<CharacterVisualProfile>;
@@ -34,6 +38,7 @@ export type ShipAdminPolicy = {
 
 export type ShipAdminPreviewItem = CharacterDefinition & {
   imageAssetVersionId?: string;
+  reliefAssetVersionId?: string;
   projectileArchetype: PlayerShotArchetype;
   statBonus: StatBonus;
   visual: CharacterVisualProfile;
@@ -56,6 +61,7 @@ const DEFINITION_KEYS = new Set([
   "activeName",
   "ultimateName",
   "imageAssetVersionId",
+  "reliefAssetVersionId",
   "projectileArchetype",
   "statBonus",
   "visual",
@@ -164,6 +170,9 @@ export function validateShipAdminPolicy(policy: ShipAdminPolicy): void {
     }
     if (override.imageAssetVersionId !== undefined && !isShipImageAssetVersionId(override.imageAssetVersionId)) {
       throw new Error(`ships.${id}.imageAssetVersionId must be a canonical Media V2 version id`);
+    }
+    if (override.reliefAssetVersionId !== undefined && !isShipReliefAssetVersionId(override.reliefAssetVersionId)) {
+      throw new Error(`ships.${id}.reliefAssetVersionId must be a canonical Media V2 version id`);
     }
     if (
       override.projectileArchetype !== undefined &&
