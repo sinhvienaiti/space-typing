@@ -2,6 +2,7 @@ export const ASSET_PREVIEW_PROTOCOL_VERSION = 1 as const;
 
 const TOKEN_PATTERN = /^[A-Za-z0-9._:-]{8,160}$/;
 const ASSET_VERSION_ID_PATTERN = /^media-version\.[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/;
+const ENEMY_DEFINITION_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,95}$/;
 const COMMAND_TYPES = new Set([
   "LOAD_CANDIDATE",
   "SET_SCENARIO",
@@ -10,9 +11,9 @@ const COMMAND_TYPES = new Set([
   "PAUSE",
   "DISPOSE",
 ]);
-const SCENARIOS = new Set(["idle", "move", "fire"]);
+const SCENARIOS = new Set(["idle", "move", "fire", "hit", "death"]);
 
-export type AssetPreviewScenario = "idle" | "move" | "fire";
+export type AssetPreviewScenario = "idle" | "move" | "fire" | "hit" | "death";
 
 export type AssetPreviewCommand = Readonly<{
   protocolVersion: typeof ASSET_PREVIEW_PROTOCOL_VERSION;
@@ -60,6 +61,25 @@ function requiredToken(value: unknown, label: string): string {
   return value;
 }
 
+function validShipCandidate(payload: Record<string, unknown>): boolean {
+  return payload.domain === "ship" &&
+    typeof payload.characterId === "string" &&
+    object(payload.visual) !== null &&
+    (payload.imageAssetVersionId === undefined ||
+      (typeof payload.imageAssetVersionId === "string" &&
+        ASSET_VERSION_ID_PATTERN.test(payload.imageAssetVersionId))) &&
+    (payload.reliefAssetVersionId === undefined ||
+      payload.reliefAssetVersionId === null ||
+      (typeof payload.reliefAssetVersionId === "string" &&
+        ASSET_VERSION_ID_PATTERN.test(payload.reliefAssetVersionId)));
+}
+
+function validEnemyCandidate(payload: Record<string, unknown>): boolean {
+  return payload.domain === "enemy" &&
+    typeof payload.definitionId === "string" &&
+    ENEMY_DEFINITION_ID_PATTERN.test(payload.definitionId);
+}
+
 export function parseAssetPreviewCommand(value: unknown): AssetPreviewCommand {
   const input = object(value);
   if (input === null) throw new AssetPreviewProtocolError("bad-message", "Preview message must be an object.");
@@ -89,19 +109,7 @@ export function parseAssetPreviewCommand(value: unknown): AssetPreviewCommand {
   }
   if (input.type === "LOAD_CANDIDATE") {
     const payload = object(input.payload);
-    if (
-      payload === null ||
-      payload.domain !== "ship" ||
-      typeof payload.characterId !== "string" ||
-      object(payload.visual) === null ||
-      (payload.imageAssetVersionId !== undefined &&
-        (typeof payload.imageAssetVersionId !== "string" ||
-          !ASSET_VERSION_ID_PATTERN.test(payload.imageAssetVersionId))) ||
-      (payload.reliefAssetVersionId !== undefined &&
-        payload.reliefAssetVersionId !== null &&
-        (typeof payload.reliefAssetVersionId !== "string" ||
-          !ASSET_VERSION_ID_PATTERN.test(payload.reliefAssetVersionId)))
-    ) {
+    if (payload === null || (!validShipCandidate(payload) && !validEnemyCandidate(payload))) {
       throw new AssetPreviewProtocolError("bad-message", "LOAD_CANDIDATE payload is invalid.");
     }
   }

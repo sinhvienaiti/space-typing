@@ -8,6 +8,7 @@ import {
   type AssetPreviewScenario,
 } from "./asset-preview-protocol";
 import { AssetPreviewResourceScope } from "./asset-preview-lifecycle";
+import { EnemyAssetPreviewScene } from "./enemy-asset-preview";
 import {
   createShipAssetPreviewCandidate,
   flashShipAssetPreviewRelief,
@@ -66,6 +67,9 @@ function requiredCanvasContext(canvas: HTMLCanvasElement): CanvasRenderingContex
   return context;
 }
 
+type PreviewDomain = "ship" | "enemy";
+
+const SHIP_SCENARIOS = new Set<AssetPreviewScenario>(["idle", "move", "fire"]);
 const canvas = requiredElement<HTMLCanvasElement>("#assetPreviewCanvas");
 const status = requiredElement<HTMLElement>("#assetPreviewStatus");
 const context = requiredCanvasContext(canvas);
@@ -78,14 +82,17 @@ const gate = new AssetPreviewMessageGate(parentOrigin, parentSource, previewSess
 const resources = new AssetPreviewResourceScope();
 const shots = new PlayerShotSystem<number>();
 const sfx = new Sfx();
+const enemyScene = new EnemyAssetPreviewScene();
 resources.addDisposer(() => shots.clear());
 resources.addDisposer(() => sfx.destroy());
+resources.addDisposer(() => enemyScene.reset());
 
-// The shared atlas is disabled in the isolated preview so the exact candidate
-// path or the production procedural fallback is always visible.
+// The shared atlas is disabled in the isolated preview so the exact Ship
+// candidate path or the production procedural fallback is always visible.
 setCharacterShipSheet(null);
 
-let candidate: ShipAssetPreviewCandidate | null = null;
+let shipCandidate: ShipAssetPreviewCandidate | null = null;
+let activeDomain: PreviewDomain | null = null;
 let candidateGeneration = 0;
 let scenario: AssetPreviewScenario = "idle";
 let paused = false;
@@ -100,8 +107,9 @@ let viewHeight = 1;
 
 resources.addDisposer(() => {
   candidateGeneration += 1;
-  if (candidate !== null) releaseShipAssetPreviewCandidate(candidate);
-  candidate = null;
+  if (shipCandidate !== null) releaseShipAssetPreviewCandidate(shipCandidate);
+  shipCandidate = null;
+  activeDomain = null;
 });
 
 function post(type: "READY" | "APPLIED" | "ERROR" | "DISPOSED", requestId: number, payload?: unknown): void {
@@ -187,16 +195,73 @@ function maybeFire(activeCandidate: ShipAssetPreviewCandidate, shipX: number, sh
   nextShotSeconds = simulationSeconds + 0.65;
 }
 
-function previewImpactSound(
-  activeCandidate: ShipAssetPreviewCandidate,
-  power: number,
-  x: number,
-): void {
+function previewImpactSound(activeCandidate: ShipAssetPreviewCandidate, power: number, x: number): void {
   withShipAssetPreviewRuntime(activeCandidate, () => {
     const variant = playerProjectileProfile(activeCandidate.characterId).impactVariant;
     const pan = Math.max(-1, Math.min(1, (x / Math.max(1, viewWidth)) * 2 - 1)) * 0.6;
     sfx.boltImpact(power, pan, variant);
   });
+}
+
+function drawShipFrame(dt: number): void {
+  const activeCandidate = shipCandidate;
+  if (activeCandidate === null) return;
+
+  const shipX = viewWidth * 0.5;
+  const shipY = viewHeight * 0.72;
+  const relief = shipAssetPreviewHasRelief(activeCandidate);
+  status.textContent = `${activeCandidate.characterId.toUpperCase()} · ${scenario.toUpperCase()} · ${relief ? "production 3D renderer" : "production renderer"}`;
+  withShipAssetPreviewRuntime(activeCandidate, () => maybeFire(activeCandidate, shipX, shipY));
+  if (!paused) {
+    const arrivals = shots.update(dt, () => false, "high");
+    for (const arrival of arrivals) previewImpactSound(activeCandidate, arrival.power, arrival.x);
+  }
+  shots.drawShots(context, "high");
+
+  const recoil = scenario === "fire"
+    ? Math.max(0, 1 - (simulationSeconds - lastShotSeconds) / 0.12)
+    : 0;
+  const boost = scenario === "move" ? 1 : scenario === "fire" ? 0.72 : 0.35;
+  let drewRelief = false;
+  if (relief) {
+    const presentation = shipAssetPreviewPresentation(activeCandidate);
+    const roll = scenario === "move" ? Math.sin(simulationSeconds * 1.7) * 0.18 : 0;
+    const yaw = scenario === "move" ? Math.sin(simulationSeconds * 1.1) * 0.07 : 0;
+    const frame = renderShipAssetPreviewRelief(activeCandidate, {
+      width: Math.max(150, Math.min(viewWidth * 0.5, viewHeight * 0.48)),
+      dpr: Math.min(2, Math.max(1, window.devicePixelRatio || 1)),
+      roll,
+      yaw,
+      pitch: -Math.min(1, recoil) * 0.08,
+      heat: scenario === "idle" ? 0.2 : scenario === "move" ? 0.62 : 0.82,
+      rim: presentation.glow,
+      blast: null,
+      engine: { power: boost, color: presentation.engine },
+      time: simulationSeconds,
+      dt,
+      quality: "high",
+    });
+    if (frame !== null) {
+      context.drawImage(frame.canvas, shipX - frame.size / 2, shipY - frame.size / 2, frame.size, frame.size);
+      drewRelief = true;
+    }
+  }
+  if (!drewRelief) {
+    withShipAssetPreviewRuntime(activeCandidate, () => {
+      drawCharacterShip(context, activeCandidate.characterId, {
+        x: shipX,
+        y: shipY,
+        time: simulationSeconds,
+        scale: 1.55,
+        glowScale: 1,
+        detailScale: 1,
+        boost,
+        recoil: Math.min(1, recoil),
+      });
+    });
+  }
+  shots.drawMuzzleFlashes(context);
+  shots.drawImpacts(context, "high");
 }
 
 function drawFrame(frameMs: number): void {
@@ -207,84 +272,29 @@ function drawFrame(frameMs: number): void {
   if (!paused) simulationSeconds += dt;
 
   background();
-  const shipX = viewWidth * 0.5;
-  const shipY = viewHeight * 0.72;
-  const activeCandidate = candidate;
-
-  if (activeCandidate === null) {
-    status.textContent = "READY · waiting for validated Ship candidate";
+  if (activeDomain === "ship" && shipCandidate !== null) {
+    drawShipFrame(dt);
+  } else if (activeDomain === "enemy" && enemyScene.activeCandidate !== null) {
+    const enemy = enemyScene.activeCandidate;
+    status.textContent = `${enemy.definition.name.toUpperCase()} · ${enemyScene.activeScenario.toUpperCase()} · production enemy renderer`;
+    enemyScene.draw(context, viewWidth, viewHeight, simulationSeconds, dt, paused);
   } else {
-    const relief = shipAssetPreviewHasRelief(activeCandidate);
-    status.textContent = `${activeCandidate.characterId.toUpperCase()} · ${scenario.toUpperCase()} · ${relief ? "production 3D renderer" : "production renderer"}`;
-    withShipAssetPreviewRuntime(activeCandidate, () => maybeFire(activeCandidate, shipX, shipY));
-    if (!paused) {
-      const arrivals = shots.update(dt, () => false, "high");
-      for (const arrival of arrivals) {
-        previewImpactSound(activeCandidate, arrival.power, arrival.x);
-      }
-    }
-    shots.drawShots(context, "high");
-
-    const recoil = scenario === "fire"
-      ? Math.max(0, 1 - (simulationSeconds - lastShotSeconds) / 0.12)
-      : 0;
-    const boost = scenario === "move" ? 1 : scenario === "fire" ? 0.72 : 0.35;
-    let drewRelief = false;
-    if (relief) {
-      const presentation = shipAssetPreviewPresentation(activeCandidate);
-      const roll = scenario === "move" ? Math.sin(simulationSeconds * 1.7) * 0.18 : 0;
-      const yaw = scenario === "move" ? Math.sin(simulationSeconds * 1.1) * 0.07 : 0;
-      const frame = renderShipAssetPreviewRelief(activeCandidate, {
-        width: Math.max(150, Math.min(viewWidth * 0.5, viewHeight * 0.48)),
-        dpr: Math.min(2, Math.max(1, window.devicePixelRatio || 1)),
-        roll,
-        yaw,
-        pitch: -Math.min(1, recoil) * 0.08,
-        heat: scenario === "idle" ? 0.2 : scenario === "move" ? 0.62 : 0.82,
-        rim: presentation.glow,
-        blast: null,
-        engine: { power: boost, color: presentation.engine },
-        time: simulationSeconds,
-        dt,
-        quality: "high",
-      });
-      if (frame !== null) {
-        context.drawImage(
-          frame.canvas,
-          shipX - frame.size / 2,
-          shipY - frame.size / 2,
-          frame.size,
-          frame.size,
-        );
-        drewRelief = true;
-      }
-    }
-    if (!drewRelief) {
-      withShipAssetPreviewRuntime(activeCandidate, () => {
-        drawCharacterShip(context, activeCandidate.characterId, {
-          x: shipX,
-          y: shipY,
-          time: simulationSeconds,
-          scale: 1.55,
-          glowScale: 1,
-          detailScale: 1,
-          boost,
-          recoil: Math.min(1, recoil),
-        });
-      });
-    }
-    shots.drawMuzzleFlashes(context);
-    shots.drawImpacts(context, "high");
+    status.textContent = "READY · waiting for validated production candidate";
   }
 
   resources.setAnimationFrame(requestAnimationFrame(drawFrame));
 }
 
-async function loadCandidate(payload: unknown): Promise<void> {
-  const input = object(payload);
-  if (input === null || input.domain !== "ship" || typeof input.characterId !== "string") {
-    throw new Error("Invalid Ship preview candidate payload.");
-  }
+function releaseShip(): void {
+  if (shipCandidate !== null) releaseShipAssetPreviewCandidate(shipCandidate);
+  shipCandidate = null;
+  shots.clear();
+  nextReliefGun = 0;
+  lastShotSeconds = Number.NEGATIVE_INFINITY;
+}
+
+async function loadShipCandidate(input: Record<string, unknown>): Promise<Readonly<Record<string, unknown>>> {
+  if (typeof input.characterId !== "string") throw new Error("Invalid Ship preview candidate payload.");
   const generation = ++candidateGeneration;
   const next = createShipAssetPreviewCandidate(
     input.characterId,
@@ -294,11 +304,7 @@ async function loadCandidate(payload: unknown): Promise<void> {
     input.reliefAssetVersionId,
   );
   try {
-    await prepareShipAssetPreviewCandidate(
-      next,
-      window.fetch.bind(window),
-      () => new Image(),
-    );
+    await prepareShipAssetPreviewCandidate(next, window.fetch.bind(window), () => new Image());
   } catch (error) {
     releaseShipAssetPreviewCandidate(next);
     throw error;
@@ -307,61 +313,86 @@ async function loadCandidate(payload: unknown): Promise<void> {
     releaseShipAssetPreviewCandidate(next);
     throw new Error("Ship preview candidate was superseded by a newer request.");
   }
-  const previous = candidate;
-  candidate = next;
-  if (previous !== null) releaseShipAssetPreviewCandidate(previous);
-  shots.clear();
-  nextReliefGun = 0;
-  lastShotSeconds = Number.NEGATIVE_INFINITY;
+  releaseShip();
+  enemyScene.reset();
+  shipCandidate = next;
+  activeDomain = "ship";
+  scenario = "idle";
   nextShotSeconds = simulationSeconds + 0.08;
+  return Object.freeze({
+    domain: "ship",
+    characterId: next.characterId,
+    imageAssetVersionId: next.imageAssetVersionId,
+    reliefAssetVersionId: next.reliefAssetVersionId,
+    reliefPreviewRequested: next.reliefPreviewRequested,
+    projectileArchetype: next.projectileArchetype,
+    presentation: shipAssetPreviewPresentation(next),
+    scenarios: ["idle", "move", "fire"],
+  });
+}
+
+function loadEnemyCandidate(input: Record<string, unknown>): Readonly<Record<string, unknown>> {
+  if (typeof input.definitionId !== "string") throw new Error("Invalid Enemy preview candidate payload.");
+  candidateGeneration += 1;
+  releaseShip();
+  const metadata = enemyScene.load(input.definitionId, simulationSeconds);
+  activeDomain = "enemy";
+  scenario = "idle";
+  return Object.freeze({ domain: "enemy", ...metadata });
+}
+
+async function loadCandidate(payload: unknown): Promise<Readonly<Record<string, unknown>>> {
+  const input = object(payload);
+  if (input === null) throw new Error("Invalid production preview candidate payload.");
+  if (input.domain === "ship") return loadShipCandidate(input);
+  if (input.domain === "enemy") return loadEnemyCandidate(input);
+  throw new Error(`Unsupported production preview domain: ${String(input.domain)}.`);
 }
 
 async function applyCommand(command: AssetPreviewCommand): Promise<void> {
   if (command.type === "LOAD_CANDIDATE") {
-    await loadCandidate(command.payload);
-    const activeCandidate = candidate;
-    if (activeCandidate === null) throw new Error("Ship preview candidate did not materialize.");
-    post("APPLIED", command.requestId, {
-      characterId: activeCandidate.characterId,
-      imageAssetVersionId: activeCandidate.imageAssetVersionId,
-      reliefAssetVersionId: activeCandidate.reliefAssetVersionId,
-      reliefPreviewRequested: activeCandidate.reliefPreviewRequested,
-      projectileArchetype: activeCandidate.projectileArchetype,
-      presentation: shipAssetPreviewPresentation(activeCandidate),
-    });
+    const metadata = await loadCandidate(command.payload);
+    post("APPLIED", command.requestId, metadata);
     return;
   }
   if (command.type === "SET_TUNING") {
-    if (candidate === null) throw new Error("SET_TUNING requires a loaded candidate.");
+    if (activeDomain !== "ship" || shipCandidate === null) {
+      throw new Error("SET_TUNING is not supported by the active production preview domain.");
+    }
     const input = object(command.payload);
-    const previous = candidate;
-    candidate = updateShipAssetPreviewCandidate(candidate, input?.visual);
-    if (candidate.session !== previous.session) {
-      // Re-materialize all candidate-owned runtime resources. Exact image and
-      // relief bindings remain isolated from the published gameplay session.
-      if (candidate.imageAssetVersionId !== null || candidate.reliefPreviewRequested) {
-        await prepareShipAssetPreviewCandidate(
-          candidate,
-          window.fetch.bind(window),
-          () => new Image(),
-        );
+    const previous = shipCandidate;
+    shipCandidate = updateShipAssetPreviewCandidate(shipCandidate, input?.visual);
+    if (shipCandidate.session !== previous.session) {
+      if (shipCandidate.imageAssetVersionId !== null || shipCandidate.reliefPreviewRequested) {
+        await prepareShipAssetPreviewCandidate(shipCandidate, window.fetch.bind(window), () => new Image());
       }
       releaseShipAssetPreviewCandidate(previous);
     }
     post("APPLIED", command.requestId, {
-      reliefAssetVersionId: candidate.reliefAssetVersionId,
-      projectileArchetype: candidate.projectileArchetype,
-      presentation: shipAssetPreviewPresentation(candidate),
+      reliefAssetVersionId: shipCandidate.reliefAssetVersionId,
+      projectileArchetype: shipCandidate.projectileArchetype,
+      presentation: shipAssetPreviewPresentation(shipCandidate),
     });
     return;
   }
   if (command.type === "SET_SCENARIO") {
     const input = object(command.payload);
-    scenario = assetPreviewScenario(input?.scenario);
-    shots.clear();
-    nextReliefGun = 0;
-    lastShotSeconds = Number.NEGATIVE_INFINITY;
-    nextShotSeconds = simulationSeconds + 0.08;
+    const nextScenario = assetPreviewScenario(input?.scenario);
+    if (activeDomain === "ship") {
+      if (!SHIP_SCENARIOS.has(nextScenario)) {
+        throw new Error(`Ship production preview does not support scenario: ${nextScenario}.`);
+      }
+      scenario = nextScenario;
+      shots.clear();
+      nextReliefGun = 0;
+      lastShotSeconds = Number.NEGATIVE_INFINITY;
+      nextShotSeconds = simulationSeconds + 0.08;
+    } else if (activeDomain === "enemy") {
+      enemyScene.setScenario(nextScenario, simulationSeconds);
+      scenario = nextScenario;
+    } else {
+      throw new Error("SET_SCENARIO requires a loaded candidate.");
+    }
     post("APPLIED", command.requestId, { scenario });
     return;
   }
@@ -373,13 +404,11 @@ async function applyCommand(command: AssetPreviewCommand): Promise<void> {
   }
   if (command.type === "RESET") {
     candidateGeneration += 1;
-    if (candidate !== null) releaseShipAssetPreviewCandidate(candidate);
-    candidate = null;
+    releaseShip();
+    enemyScene.reset();
+    activeDomain = null;
     scenario = "idle";
     paused = false;
-    shots.clear();
-    nextReliefGun = 0;
-    lastShotSeconds = Number.NEGATIVE_INFINITY;
     post("APPLIED", command.requestId, { reset: true });
     return;
   }
@@ -424,10 +453,11 @@ window.addEventListener("pagehide", () => resources.dispose(), { signal: resourc
 resize();
 resources.setAnimationFrame(requestAnimationFrame(drawFrame));
 post("READY", 0, {
-  domain: "ship",
-  scenarios: ["idle", "move", "fire"],
+  domain: "multi",
+  domains: {
+    ship: { scenarios: ["idle", "move", "fire"], exactVersionMedia: true, relief3d: true },
+    enemy: { scenarios: ["idle", "hit", "death"], renderer: "production-modular-enemy" },
+  },
   renderer: "production",
   candidateState: "ephemeral",
-  exactVersionMedia: true,
-  relief3d: true,
 });
