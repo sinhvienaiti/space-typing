@@ -221,12 +221,12 @@ async function loadBundledReliefShip(three: Three, id: CharacterId, maxAnisotrop
  * Production relief source selection. A published Ship policy may bind one
  * exact immutable Media V2 bundle. Uploading Media alone never changes this
  * path; the active session's published Ship revision owns the assignment.
- * Invalid/unavailable bundle materialization fails soft to the bundled hull,
- * never to a logical id, latest alias, raw path or arbitrary URL.
+ * Invalid/unavailable published bundle materialization fails soft to the
+ * bundled hull, never to a logical id, latest alias, raw path or URL.
  *
  * Isolated callers such as Admin preview may provide an explicit source:
  * `undefined` follows published policy, `null` forces bundled fallback, and
- * an exact Media version id goes through the same strict resolver.
+ * an exact Media version id must materialize successfully or returns null.
  */
 export async function loadReliefShip(
   three: Three,
@@ -235,17 +235,20 @@ export async function loadReliefShip(
   segments = 176,
   reliefAssetVersionId?: string | null,
 ): Promise<BuiltShip | null> {
-  const assetVersionId = reliefAssetVersionId === undefined
-    ? activeShipRuntimeReliefAssetVersionId(id)
-    : reliefAssetVersionId ?? undefined;
+  const explicitSource = reliefAssetVersionId !== undefined;
+  const assetVersionId = explicitSource
+    ? reliefAssetVersionId ?? undefined
+    : activeShipRuntimeReliefAssetVersionId(id);
   if (assetVersionId !== undefined) {
     try {
       const bundle = await resolveExactShipReliefBundle(fetch, assetVersionId);
       const media = await loadReliefShipFromMediaBundle(three, bundle, maxAnisotropy, segments);
       if (media !== null) return media;
+      if (explicitSource) return null;
     } catch {
-      // Production remains playable if a referenced immutable bundle becomes
-      // unavailable; the exact assignment is never substituted with latest.
+      if (explicitSource) return null;
+      // Published gameplay remains playable if a referenced immutable bundle
+      // becomes unavailable; the assignment is never substituted with latest.
     }
   }
   return loadBundledReliefShip(three, id, maxAnisotropy, segments);
