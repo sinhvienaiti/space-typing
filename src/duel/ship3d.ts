@@ -112,6 +112,16 @@ export function rival3dEnabled(): boolean {
  */
 export type Ship3DRole = "self" | "rival";
 
+/**
+ * Explicit isolated source override for a fresh production renderer owner.
+ * `undefined` follows the active published Ship session; `null` forces the
+ * bundled relief fallback; an exact Media version id is materialized by the
+ * same production relief loader. Gameplay never supplies this override.
+ */
+export type Ship3DLoadOptions = Readonly<{
+  reliefAssetVersionId?: string | null;
+}>;
+
 const loads = new Map<string, Promise<DuelShip3D | null>>();
 
 /** Lets a frame through between heavy load steps. */
@@ -173,11 +183,19 @@ export class DuelShip3D {
    * It uses the same production loader/renderer but never shares a mutable
    * WebGL-backed instance with Duel gameplay; the caller must dispose it.
    */
-  static loadFresh(id: CharacterId, role: Ship3DRole = "self"): Promise<DuelShip3D | null> {
-    return DuelShip3D.create(id, role).catch(() => null);
+  static loadFresh(
+    id: CharacterId,
+    role: Ship3DRole = "self",
+    options: Ship3DLoadOptions = {},
+  ): Promise<DuelShip3D | null> {
+    return DuelShip3D.create(id, role, options).catch(() => null);
   }
 
-  private static async create(id: CharacterId, role: Ship3DRole): Promise<DuelShip3D | null> {
+  private static async create(
+    id: CharacterId,
+    role: Ship3DRole,
+    options: Ship3DLoadOptions = {},
+  ): Promise<DuelShip3D | null> {
     const mode = ship3dMode();
     if (typeof WebGLRenderingContext === "undefined" || typeof fetch !== "function" || typeof document === "undefined" || mode === "off") return null;
     const modelled = mode === "model" && id === "vanguard";
@@ -198,7 +216,13 @@ export class DuelShip3D {
     await step(role);
     const built = vanguard !== null
       ? vanguard.buildVanguard(three)
-      : await reliefModule!.loadReliefShip(three, id, renderer.capabilities.getMaxAnisotropy(), role === "self" ? 176 : 96);
+      : await reliefModule!.loadReliefShip(
+          three,
+          id,
+          renderer.capabilities.getMaxAnisotropy(),
+          role === "self" ? 176 : 96,
+          options.reliefAssetVersionId,
+        );
     if (built === null) {
       renderer.dispose();
       return null;
