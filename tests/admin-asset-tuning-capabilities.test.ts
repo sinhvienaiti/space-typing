@@ -104,10 +104,16 @@ describe("A5 asset tuning runtime capability matrix", () => {
     );
   });
 
-  it("keeps relief Media assignment gated until its own exact-version migration exists", () => {
+  it("promotes exact-version relief Media assignment only after A5.4 closes the canonical production chain", () => {
     expect(assetTuningRuntimeCapability("ship-3d.relief-asset-version-assignment")).toMatchObject({
-      persistedField: null,
-      status: "REQUIRES CANONICAL MIGRATION",
+      persistedField: "ships.<id>.reliefAssetVersionId",
+      canonicalOwner: expect.stringContaining("ship-runtime-policy.ts"),
+      validator: expect.stringContaining("exact Media V2 assetVersionId"),
+      runtimeResolver: expect.stringContaining("resolveExactShipReliefBundle"),
+      productionConsumer: expect.stringContaining("DuelShip3D.create"),
+      previewConsumer: expect.stringContaining("DuelShip3D.loadFresh"),
+      applyBoundary: "new-session",
+      status: "SUPPORTED NOW",
     });
   });
 });
