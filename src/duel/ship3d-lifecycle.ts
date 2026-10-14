@@ -7,6 +7,12 @@ type MeshLike = {
   material?: Disposable | readonly Disposable[];
 };
 
+function isDisposableList(
+  value: Disposable | readonly Disposable[],
+): value is readonly Disposable[] {
+  return Array.isArray(value);
+}
+
 /**
  * Dedupe only concurrent construction. Resolved WebGL-backed instances are
  * deliberately not retained globally: a later Duel/Admin preview receives a
@@ -43,11 +49,12 @@ export function disposeBuiltShipResources(built: BuiltShip): void {
     if (mesh.isMesh !== true) return;
     if (mesh.geometry?.dispose !== undefined) geometries.add(mesh.geometry);
     const material = mesh.material;
-    if (Array.isArray(material)) {
+    if (material === undefined) return;
+    if (isDisposableList(material)) {
       for (const entry of material) {
-        if (entry?.dispose !== undefined) materials.add(entry);
+        if (entry.dispose !== undefined) materials.add(entry);
       }
-    } else if (material?.dispose !== undefined) {
+    } else if (material.dispose !== undefined) {
       materials.add(material);
     }
   });
