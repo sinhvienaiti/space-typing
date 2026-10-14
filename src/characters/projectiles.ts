@@ -41,6 +41,26 @@ export type PlayerProjectileProfile = {
   impactVariant: PlayerImpactVariant;
 };
 
+const IMPACT_VARIANT_BY_ARCHETYPE: Readonly<Record<PlayerShotArchetype, PlayerImpactVariant>> = {
+  spear: "crystal",
+  heavy: "heavy",
+  electric: "storm",
+  shadow: "void",
+  star: "star",
+  barrage: "missile",
+  mystic: "mystic",
+  guard: "shield",
+  slash: "slash",
+  radiant: "radiant",
+  cosmic: "cosmic",
+};
+
+export function playerImpactVariantForArchetype(
+  archetype: PlayerShotArchetype,
+): PlayerImpactVariant {
+  return IMPACT_VARIANT_BY_ARCHETYPE[archetype];
+}
+
 const PLAYER_PROJECTILES: Record<CharacterId, PlayerProjectileProfile> = {
   vanguard: {
     archetype: "spear",
@@ -165,5 +185,9 @@ export function playerProjectileProfile(
   const session = scopedShipRuntimeSession ?? ACTIVE_SHIP_RUNTIME_SESSION;
   const archetype = session.ships[id]?.projectileArchetype;
   if (archetype === undefined || archetype === base.archetype) return base;
-  return { ...base, archetype };
+  return {
+    ...base,
+    archetype,
+    impactVariant: playerImpactVariantForArchetype(archetype),
+  };
 }
