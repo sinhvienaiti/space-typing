@@ -1,5 +1,9 @@
+import { activeShipRuntimeReliefAssetVersionId } from "../admin/ship-runtime-policy";
 import type { CharacterId } from "../characters/registry";
-import type { ReliefRuntimeMediaBundle } from "./relief-media-runtime";
+import {
+  resolveExactShipReliefBundle,
+  type ReliefRuntimeMediaBundle,
+} from "./relief-media-runtime";
 import type { BuiltShip } from "./vanguard-model";
 
 /**
@@ -195,8 +199,7 @@ async function buildReliefShip(
 }
 
 /** Loads the bundled prepared relief data, or null if the Ship has no bundle. */
-/** Mesh detail: your near ship 176 cells across, the small far rival 96. */
-export async function loadReliefShip(three: Three, id: CharacterId, maxAnisotropy: number, segments = 176): Promise<BuiltShip | null> {
+async function loadBundledReliefShip(three: Three, id: CharacterId, maxAnisotropy: number, segments = 176): Promise<BuiltShip | null> {
   if (!(await reliefIndex()).has(id)) return null;
   const base = ROOT + id + "/";
   const model = await fetchModel(base + "model.json");
@@ -212,6 +215,28 @@ export async function loadReliefShip(three: Three, id: CharacterId, maxAnisotrop
     maxAnisotropy,
     segments,
   );
+}
+
+/**
+ * Production relief source selection. A published Ship policy may bind one
+ * exact immutable Media V2 bundle. Uploading Media alone never changes this
+ * path; the active session's published Ship revision owns the assignment.
+ * Invalid/unavailable bundle materialization fails soft to the bundled hull,
+ * never to a logical id, latest alias, raw path or arbitrary URL.
+ */
+export async function loadReliefShip(three: Three, id: CharacterId, maxAnisotropy: number, segments = 176): Promise<BuiltShip | null> {
+  const assetVersionId = activeShipRuntimeReliefAssetVersionId(id);
+  if (assetVersionId !== undefined) {
+    try {
+      const bundle = await resolveExactShipReliefBundle(fetch, assetVersionId);
+      const media = await loadReliefShipFromMediaBundle(three, bundle, maxAnisotropy, segments);
+      if (media !== null) return media;
+    } catch {
+      // Production remains playable if a referenced immutable bundle becomes
+      // unavailable; the exact assignment is never substituted with latest.
+    }
+  }
+  return loadBundledReliefShip(three, id, maxAnisotropy, segments);
 }
 
 /**
