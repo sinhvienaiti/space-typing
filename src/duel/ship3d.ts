@@ -1,6 +1,10 @@
 import type { CharacterId } from "../characters/registry";
 import type { VisualQuality } from "../types";
 import type { BuiltShip } from "./vanguard-model";
+import {
+  dedupeShip3DInFlight,
+  disposeBuiltShipResources,
+} from "./ship3d-lifecycle";
 
 /**
  * Real-time 3D hull for your ship in the Duel Depth View (pilot: Vanguard,
@@ -151,17 +155,26 @@ export class DuelShip3D {
   private readonly scratch: V3;
   private readonly frame: Ship3DFrame;
   private lost = false;
+  private disposed = false;
   private pixels = 0;
   private frames = 0;
 
   static load(id: CharacterId, role: Ship3DRole = "self"): Promise<DuelShip3D | null> {
     const key = role + ":" + id;
-    let pending = loads.get(key);
-    if (pending === undefined) {
-      pending = DuelShip3D.create(id, role).catch(() => null);
-      loads.set(key, pending);
-    }
-    return pending;
+    return dedupeShip3DInFlight(
+      loads,
+      key,
+      () => DuelShip3D.create(id, role).catch(() => null),
+    );
+  }
+
+  /**
+   * Fresh production instance for an isolated owner such as Admin preview.
+   * It uses the same production loader/renderer but never shares a mutable
+   * WebGL-backed instance with Duel gameplay; the caller must dispose it.
+   */
+  static loadFresh(id: CharacterId, role: Ship3DRole = "self"): Promise<DuelShip3D | null> {
+    return DuelShip3D.create(id, role).catch(() => null);
   }
 
   private static async create(id: CharacterId, role: Ship3DRole): Promise<DuelShip3D | null> {
@@ -322,7 +335,7 @@ export class DuelShip3D {
     this.pixels = 16;
   }
 
-  get available(): boolean { return !this.lost; }
+  get available(): boolean { return !this.lost && !this.disposed; }
 
   /** The ship's engine and light colours, when its data gives them. */
   get colors(): BuiltShip["colors"] { return this.built.colors; }
@@ -332,13 +345,13 @@ export class DuelShip3D {
 
   /** A shot left gun `index`: flash its light on the hull. */
   flash(index: number): void {
-    if (this.gunFlash.length === 0) return;
+    if (this.disposed || this.gunFlash.length === 0) return;
     const at = ((index % this.gunFlash.length) + this.gunFlash.length) % this.gunFlash.length;
     this.gunFlash[at] = 1;
   }
 
   render(pose: Ship3DPose): Ship3DFrame | null {
-    if (this.lost) return null;
+    if (this.lost || this.disposed) return null;
     const size = pose.width * FRAME;
     const dpr = Math.min(pose.dpr, RESOLUTION[pose.quality], this.role === "rival" ? 1.5 : Infinity);
     const pixels = Math.max(32, Math.min(MAX_PIXELS, Math.round(size * dpr)));
@@ -400,6 +413,14 @@ export class DuelShip3D {
   }
 
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.lost = true;
+    const environment = this.scene.environment;
+    this.scene.environment = null;
+    environment?.dispose();
+    this.scene.remove(this.hull);
+    disposeBuiltShipResources(this.built);
     this.renderer.dispose();
   }
 }
