@@ -2,9 +2,19 @@ import {
   EXPEDITION_RUN_VERSION,
   type ExpeditionRun,
 } from "./core";
+import {
+  activateExpeditionStageRuntimeSession,
+  captureActiveStageRuntimeSession,
+  materializeStageRuntimeSessionSnapshot,
+  type StageRuntimeSession,
+} from "../admin/stage-runtime-policy";
 
 export const EXPEDITION_STORAGE_KEY = "spaceTypingExpeditionRunV1";
 const STORE_VERSION = 1 as const;
+
+type ExpeditionRunWithStageRuntimeSnapshot = ExpeditionRun & {
+  stageRuntimeSnapshot?: StageRuntimeSession;
+};
 
 export interface ExpeditionStorage {
   getItem(key: string): string | null;
@@ -41,6 +51,33 @@ export class ExpeditionStoreWriteError extends Error {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function stageRuntimeSnapshot(run: ExpeditionRun): unknown {
+  return (run as ExpeditionRunWithStageRuntimeSnapshot).stageRuntimeSnapshot;
+}
+
+function freezeNewRunStageRuntime(run: ExpeditionRun): ExpeditionRun {
+  const hasSnapshot = Object.prototype.hasOwnProperty.call(run, "stageRuntimeSnapshot");
+  const snapshot = hasSnapshot
+    ? materializeStageRuntimeSessionSnapshot(stageRuntimeSnapshot(run))
+    : captureActiveStageRuntimeSession();
+  return {
+    ...run,
+    stageRuntimeSnapshot: snapshot,
+  } as ExpeditionRun;
+}
+
+function normalizePersistedStageRuntime(run: ExpeditionRun): ExpeditionRun {
+  return {
+    ...run,
+    stageRuntimeSnapshot: materializeStageRuntimeSessionSnapshot(stageRuntimeSnapshot(run)),
+  } as ExpeditionRun;
+}
+
+function armEncounterStageRuntime(run: ExpeditionRun): void {
+  if (run.phase !== "encounter") return;
+  activateExpeditionStageRuntimeSession(stageRuntimeSnapshot(run));
 }
 
 function validRun(value: unknown): value is ExpeditionRun {
@@ -142,9 +179,10 @@ export function startExpeditionEnvelope(
     revision: loaded.status === "supported" ? loaded.envelope.revision + 1 : 1,
     writerId,
     updatedAt,
-    run,
+    run: freezeNewRunStageRuntime(run),
   };
   writeAndVerify(storage, envelope);
+  armEncounterStageRuntime(envelope.run);
   return envelope;
 }
 
@@ -201,9 +239,10 @@ export function writeExpeditionEnvelope(
     revision: input.expectedRevision + 1,
     writerId: input.writerId,
     updatedAt: input.updatedAt ?? new Date().toISOString(),
-    run: input.run,
+    run: normalizePersistedStageRuntime(input.run),
   };
   writeAndVerify(storage, envelope);
+  armEncounterStageRuntime(envelope.run);
   return envelope;
 }
 

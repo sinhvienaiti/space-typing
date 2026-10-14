@@ -19,6 +19,13 @@ const APPLY_BOUNDARY = "new-session";
 const MIN_STAGE = 1;
 const MAX_STAGE = 1000;
 const AUTHORABLE_KEYS = new Set(["stage", "enemyBudget", "eliteChance", "modifierSlots"]);
+const SNAPSHOT_KEYS = new Set([
+  "source",
+  "activeRevision",
+  "configRevision",
+  "difficultyPreset",
+  "stages",
+]);
 
 function object(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -118,6 +125,53 @@ export function materializeStageRuntimeSession(envelope: unknown): StageRuntimeS
   });
 }
 
+/** Re-validates the serializable Stage policy stored inside a long-lived run. */
+export function materializeStageRuntimeSessionSnapshot(value: unknown): StageRuntimeSession {
+  const raw = object(value);
+  if (raw === null || Object.keys(raw).some((key) => !SNAPSHOT_KEYS.has(key))) {
+    return bundledSession();
+  }
+
+  const activeRevision = raw.activeRevision === null
+    ? null
+    : validRevision(raw.activeRevision)
+      ? raw.activeRevision.trim()
+      : null;
+
+  if (raw.source === "bundled") return bundledSession(activeRevision);
+  if (raw.source !== "published" || !validRevision(raw.configRevision)) {
+    return bundledSession(activeRevision);
+  }
+
+  const difficultyPreset = raw.difficultyPreset === null
+    ? null
+    : sanitizeDifficultyPreset(raw.difficultyPreset);
+  if (raw.difficultyPreset !== null && difficultyPreset === null) {
+    return bundledSession(activeRevision);
+  }
+
+  const rawStages = object(raw.stages);
+  if (rawStages === null) return bundledSession(activeRevision);
+
+  const stages: Record<number, StageRuntimeOverride> = {};
+  for (const [stageKey, rawOverride] of Object.entries(rawStages)) {
+    const stage = Number(stageKey);
+    const override = object(rawOverride);
+    if (!validStage(stage) || override === null) return bundledSession(activeRevision);
+    const record = sanitizeRecord({ stage, ...override });
+    if (record === null || record.stage !== stage) return bundledSession(activeRevision);
+    stages[stage] = record.override;
+  }
+
+  return Object.freeze({
+    source: "published" as const,
+    activeRevision,
+    configRevision: raw.configRevision.trim(),
+    difficultyPreset,
+    stages: Object.freeze(stages),
+  });
+}
+
 export async function fetchPublishedStageRuntimeSession(
   fetchImpl: typeof fetch,
   endpoint = ENDPOINT,
@@ -149,6 +203,28 @@ async function loadInitialSession(): Promise<StageRuntimeSession> {
 /** Immutable for one page/game session: a publish applies on the next session. */
 export const ACTIVE_STAGE_RUNTIME_SESSION = await loadInitialSession();
 
+let expeditionStageRuntimeSession: StageRuntimeSession | null = null;
+
+/** Freeze the current page/session policy into a serializable Expedition snapshot. */
+export function captureActiveStageRuntimeSession(): StageRuntimeSession {
+  return materializeStageRuntimeSessionSnapshot(ACTIVE_STAGE_RUNTIME_SESSION);
+}
+
+/** Missing/legacy snapshots deliberately select bundled content. */
+export function activateExpeditionStageRuntimeSession(snapshot: unknown): StageRuntimeSession {
+  expeditionStageRuntimeSession = materializeStageRuntimeSessionSnapshot(snapshot);
+  return expeditionStageRuntimeSession;
+}
+
+export function clearExpeditionStageRuntimeSession(): void {
+  expeditionStageRuntimeSession = null;
+}
+
 export function activeStageRuntimeOverride(stage: number): StageRuntimeOverride | undefined {
+  if (expeditionStageRuntimeSession !== null) {
+    const override = expeditionStageRuntimeSession.stages[stage];
+    expeditionStageRuntimeSession = null;
+    return override;
+  }
   return ACTIVE_STAGE_RUNTIME_SESSION.stages[stage];
 }
