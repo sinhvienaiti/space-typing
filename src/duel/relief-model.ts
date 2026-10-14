@@ -1,4 +1,5 @@
 import type { CharacterId } from "../characters/registry";
+import type { ReliefRuntimeMediaBundle } from "./relief-media-runtime";
 import type { BuiltShip } from "./vanguard-model";
 
 /**
@@ -34,6 +35,13 @@ type Model = {
   emissive?: string;
   height: string;
 };
+
+type ReliefResourceUrls = Readonly<{
+  model: string;
+  color: string;
+  emissive: string | null;
+  height: string;
+}>;
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
@@ -77,26 +85,46 @@ function sample(field: HeightField, u: number, v: number): number {
   return top * (1 - fy) + bottom * fy;
 }
 
-/** Loads the prepared relief data and builds the hull, or null if missing. */
-/** Mesh detail: your near ship 176 cells across, the small far rival 96. */
-export async function loadReliefShip(three: Three, id: CharacterId, maxAnisotropy: number, segments = 176): Promise<BuiltShip | null> {
-  if (!(await reliefIndex()).has(id)) return null;
-  const base = ROOT + id + "/";
-  const response = await fetch(base + "model.json", { cache: "no-cache" });
+async function fetchModel(url: string): Promise<Partial<Model> | null> {
+  const response = await fetch(url, { cache: "no-cache", credentials: "same-origin" });
   if (!response.ok) return null;
-  const model = (await response.json()) as Partial<Model>;
+  return await response.json() as Partial<Model>;
+}
+
+function validatedGrid(model: Partial<Model>): [number, number] | null {
   const grid = model.heightGrid;
-  if (typeof model.aspect !== "number" || typeof model.color !== "string" || typeof model.height !== "string"
-    || !Array.isArray(grid) || typeof grid[0] !== "number" || typeof grid[1] !== "number") return null;
+  if (
+    typeof model.aspect !== "number" ||
+    typeof model.color !== "string" ||
+    typeof model.height !== "string" ||
+    !Array.isArray(grid) ||
+    typeof grid[0] !== "number" ||
+    typeof grid[1] !== "number"
+  ) return null;
+  return [grid[0], grid[1]];
+}
+
+async function buildReliefShip(
+  three: Three,
+  model: Partial<Model>,
+  resources: Omit<ReliefResourceUrls, "model">,
+  maxAnisotropy: number,
+  segments: number,
+): Promise<BuiltShip | null> {
+  const grid = validatedGrid(model);
+  if (grid === null) return null;
   const [colorImage, emissiveImage, bytes] = await Promise.all([
-    loadImage(base + model.color),
-    typeof model.emissive === "string" ? loadImage(base + model.emissive).catch(() => null) : Promise.resolve(null),
-    fetch(base + model.height).then((reply) => reply.ok ? reply.arrayBuffer() : Promise.reject(new Error("height"))),
+    loadImage(resources.color),
+    typeof model.emissive === "string" && resources.emissive !== null
+      ? loadImage(resources.emissive).catch(() => null)
+      : Promise.resolve(null),
+    fetch(resources.height, { cache: "no-cache", credentials: "same-origin" })
+      .then((reply) => reply.ok ? reply.arrayBuffer() : Promise.reject(new Error("height"))),
   ]);
   const [columns, rows] = grid;
   if (bytes.byteLength !== columns * rows) return null;
   const heights: HeightField = { width: columns, height: rows, data: Float32Array.from(new Uint8Array(bytes), (value) => value / 255) };
-  const aspect = model.aspect;
+  const aspect = model.aspect!;
   const heightScale = typeof model.heightScale === "number" ? model.heightScale : 0.2;
   const nozzles = Array.isArray(model.nozzles)
     ? model.nozzles.filter((point) => Array.isArray(point) && point.length >= 2 && point.every((value) => typeof value === "number"))
@@ -164,6 +192,53 @@ export async function loadReliefShip(three: Three, id: CharacterId, maxAnisotrop
       top.emissiveIntensity = 1.6 + heat * 1.4;
     },
   };
+}
+
+/** Loads the bundled prepared relief data, or null if the Ship has no bundle. */
+/** Mesh detail: your near ship 176 cells across, the small far rival 96. */
+export async function loadReliefShip(three: Three, id: CharacterId, maxAnisotropy: number, segments = 176): Promise<BuiltShip | null> {
+  if (!(await reliefIndex()).has(id)) return null;
+  const base = ROOT + id + "/";
+  const model = await fetchModel(base + "model.json");
+  if (model === null) return null;
+  return buildReliefShip(
+    three,
+    model,
+    {
+      color: base + model.color,
+      emissive: typeof model.emissive === "string" ? base + model.emissive : null,
+      height: base + model.height,
+    },
+    maxAnisotropy,
+    segments,
+  );
+}
+
+/**
+ * Loads one already-resolved immutable Media V2 relief bundle through the
+ * exact component URLs from the runtime resolver. Relative filenames inside
+ * model.json are retained only as structural metadata and are never used to
+ * escape the exact-version bundle selected by Admin.
+ */
+export async function loadReliefShipFromMediaBundle(
+  three: Three,
+  bundle: ReliefRuntimeMediaBundle,
+  maxAnisotropy: number,
+  segments = 176,
+): Promise<BuiltShip | null> {
+  const model = await fetchModel(bundle.components.model.runtimeUrl);
+  if (model === null) return null;
+  return buildReliefShip(
+    three,
+    model,
+    {
+      color: bundle.components.color.runtimeUrl,
+      emissive: bundle.components.emissive.runtimeUrl,
+      height: bundle.components.height.runtimeUrl,
+    },
+    maxAnisotropy,
+    segments,
+  );
 }
 
 /**
