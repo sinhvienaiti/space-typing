@@ -96,7 +96,11 @@ export function parseAssetPreviewCommand(value: unknown): AssetPreviewCommand {
       object(payload.visual) === null ||
       (payload.imageAssetVersionId !== undefined &&
         (typeof payload.imageAssetVersionId !== "string" ||
-          !ASSET_VERSION_ID_PATTERN.test(payload.imageAssetVersionId)))
+          !ASSET_VERSION_ID_PATTERN.test(payload.imageAssetVersionId))) ||
+      (payload.reliefAssetVersionId !== undefined &&
+        payload.reliefAssetVersionId !== null &&
+        (typeof payload.reliefAssetVersionId !== "string" ||
+          !ASSET_VERSION_ID_PATTERN.test(payload.reliefAssetVersionId)))
     ) {
       throw new AssetPreviewProtocolError("bad-message", "LOAD_CANDIDATE payload is invalid.");
     }
