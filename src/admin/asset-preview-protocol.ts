@@ -2,7 +2,7 @@ export const ASSET_PREVIEW_PROTOCOL_VERSION = 1 as const;
 
 const TOKEN_PATTERN = /^[A-Za-z0-9._:-]{8,160}$/;
 const ASSET_VERSION_ID_PATTERN = /^media-version\.[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/;
-const ENEMY_DEFINITION_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,95}$/;
+const DEFINITION_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,95}$/;
 const COMMAND_TYPES = new Set([
   "LOAD_CANDIDATE",
   "SET_SCENARIO",
@@ -11,9 +11,9 @@ const COMMAND_TYPES = new Set([
   "PAUSE",
   "DISPOSE",
 ]);
-const SCENARIOS = new Set(["idle", "move", "fire", "hit", "death"]);
+const SCENARIOS = new Set(["idle", "move", "fire", "hit", "phase", "death"]);
 
-export type AssetPreviewScenario = "idle" | "move" | "fire" | "hit" | "death";
+export type AssetPreviewScenario = "idle" | "move" | "fire" | "hit" | "phase" | "death";
 
 export type AssetPreviewCommand = Readonly<{
   protocolVersion: typeof ASSET_PREVIEW_PROTOCOL_VERSION;
@@ -74,10 +74,10 @@ function validShipCandidate(payload: Record<string, unknown>): boolean {
         ASSET_VERSION_ID_PATTERN.test(payload.reliefAssetVersionId)));
 }
 
-function validEnemyCandidate(payload: Record<string, unknown>): boolean {
-  return payload.domain === "enemy" &&
-    typeof payload.definitionId === "string" &&
-    ENEMY_DEFINITION_ID_PATTERN.test(payload.definitionId);
+function validDefinitionCandidate(payload: Record<string, unknown>, domain: "enemy" | "boss", key: string): boolean {
+  return payload.domain === domain &&
+    typeof payload[key] === "string" &&
+    DEFINITION_ID_PATTERN.test(payload[key] as string);
 }
 
 export function parseAssetPreviewCommand(value: unknown): AssetPreviewCommand {
@@ -109,7 +109,12 @@ export function parseAssetPreviewCommand(value: unknown): AssetPreviewCommand {
   }
   if (input.type === "LOAD_CANDIDATE") {
     const payload = object(input.payload);
-    if (payload === null || (!validShipCandidate(payload) && !validEnemyCandidate(payload))) {
+    if (
+      payload === null ||
+      (!validShipCandidate(payload) &&
+        !validDefinitionCandidate(payload, "enemy", "definitionId") &&
+        !validDefinitionCandidate(payload, "boss", "bossId"))
+    ) {
       throw new AssetPreviewProtocolError("bad-message", "LOAD_CANDIDATE payload is invalid.");
     }
   }

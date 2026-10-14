@@ -8,6 +8,7 @@ import {
   type AssetPreviewScenario,
 } from "./asset-preview-protocol";
 import { AssetPreviewResourceScope } from "./asset-preview-lifecycle";
+import { BossAssetPreviewScene } from "./boss-asset-preview";
 import { EnemyAssetPreviewScene } from "./enemy-asset-preview";
 import {
   createShipAssetPreviewCandidate,
@@ -67,7 +68,7 @@ function requiredCanvasContext(canvas: HTMLCanvasElement): CanvasRenderingContex
   return context;
 }
 
-type PreviewDomain = "ship" | "enemy";
+type PreviewDomain = "ship" | "enemy" | "boss";
 
 const SHIP_SCENARIOS = new Set<AssetPreviewScenario>(["idle", "move", "fire"]);
 const canvas = requiredElement<HTMLCanvasElement>("#assetPreviewCanvas");
@@ -83,9 +84,11 @@ const resources = new AssetPreviewResourceScope();
 const shots = new PlayerShotSystem<number>();
 const sfx = new Sfx();
 const enemyScene = new EnemyAssetPreviewScene();
+const bossScene = new BossAssetPreviewScene();
 resources.addDisposer(() => shots.clear());
 resources.addDisposer(() => sfx.destroy());
 resources.addDisposer(() => enemyScene.reset());
+resources.addDisposer(() => bossScene.reset());
 
 // The shared atlas is disabled in the isolated preview so the exact Ship
 // candidate path or the production procedural fallback is always visible.
@@ -278,6 +281,10 @@ function drawFrame(frameMs: number): void {
     const enemy = enemyScene.activeCandidate;
     status.textContent = `${enemy.definition.name.toUpperCase()} · ${enemyScene.activeScenario.toUpperCase()} · production enemy renderer`;
     enemyScene.draw(context, viewWidth, viewHeight, simulationSeconds, dt, paused);
+  } else if (activeDomain === "boss" && bossScene.activeCandidate !== null) {
+    const boss = bossScene.activeCandidate;
+    status.textContent = `${boss.identity.name.toUpperCase()} · ${bossScene.activeScenario.toUpperCase()} · production boss renderer`;
+    bossScene.draw(context, viewWidth, viewHeight, simulationSeconds, dt, paused);
   } else {
     status.textContent = "READY · waiting for validated production candidate";
   }
@@ -291,6 +298,11 @@ function releaseShip(): void {
   shots.clear();
   nextReliefGun = 0;
   lastShotSeconds = Number.NEGATIVE_INFINITY;
+}
+
+function clearNonShipScenes(): void {
+  enemyScene.reset();
+  bossScene.reset();
 }
 
 async function loadShipCandidate(input: Record<string, unknown>): Promise<Readonly<Record<string, unknown>>> {
@@ -314,7 +326,7 @@ async function loadShipCandidate(input: Record<string, unknown>): Promise<Readon
     throw new Error("Ship preview candidate was superseded by a newer request.");
   }
   releaseShip();
-  enemyScene.reset();
+  clearNonShipScenes();
   shipCandidate = next;
   activeDomain = "ship";
   scenario = "idle";
@@ -335,10 +347,22 @@ function loadEnemyCandidate(input: Record<string, unknown>): Readonly<Record<str
   if (typeof input.definitionId !== "string") throw new Error("Invalid Enemy preview candidate payload.");
   candidateGeneration += 1;
   releaseShip();
+  bossScene.reset();
   const metadata = enemyScene.load(input.definitionId, simulationSeconds);
   activeDomain = "enemy";
   scenario = "idle";
   return Object.freeze({ domain: "enemy", ...metadata });
+}
+
+function loadBossCandidate(input: Record<string, unknown>): Readonly<Record<string, unknown>> {
+  if (typeof input.bossId !== "string") throw new Error("Invalid Boss preview candidate payload.");
+  candidateGeneration += 1;
+  releaseShip();
+  enemyScene.reset();
+  const metadata = bossScene.load(input.bossId, simulationSeconds);
+  activeDomain = "boss";
+  scenario = "idle";
+  return Object.freeze({ domain: "boss", ...metadata });
 }
 
 async function loadCandidate(payload: unknown): Promise<Readonly<Record<string, unknown>>> {
@@ -346,6 +370,7 @@ async function loadCandidate(payload: unknown): Promise<Readonly<Record<string, 
   if (input === null) throw new Error("Invalid production preview candidate payload.");
   if (input.domain === "ship") return loadShipCandidate(input);
   if (input.domain === "enemy") return loadEnemyCandidate(input);
+  if (input.domain === "boss") return loadBossCandidate(input);
   throw new Error(`Unsupported production preview domain: ${String(input.domain)}.`);
 }
 
@@ -390,6 +415,9 @@ async function applyCommand(command: AssetPreviewCommand): Promise<void> {
     } else if (activeDomain === "enemy") {
       enemyScene.setScenario(nextScenario, simulationSeconds);
       scenario = nextScenario;
+    } else if (activeDomain === "boss") {
+      bossScene.setScenario(nextScenario, simulationSeconds);
+      scenario = nextScenario;
     } else {
       throw new Error("SET_SCENARIO requires a loaded candidate.");
     }
@@ -405,7 +433,7 @@ async function applyCommand(command: AssetPreviewCommand): Promise<void> {
   if (command.type === "RESET") {
     candidateGeneration += 1;
     releaseShip();
-    enemyScene.reset();
+    clearNonShipScenes();
     activeDomain = null;
     scenario = "idle";
     paused = false;
@@ -457,6 +485,7 @@ post("READY", 0, {
   domains: {
     ship: { scenarios: ["idle", "move", "fire"], exactVersionMedia: true, relief3d: true },
     enemy: { scenarios: ["idle", "hit", "death"], renderer: "production-modular-enemy" },
+    boss: { scenarios: ["idle", "phase", "hit", "death"], renderer: "production-painted-boss" },
   },
   renderer: "production",
   candidateState: "ephemeral",
