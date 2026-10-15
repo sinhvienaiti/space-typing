@@ -9,6 +9,9 @@ export default defineConfig({
   server: {
     allowedHosts: ["space.typing-game.local"],
     proxy: {
+      // Runtime Admin policy is read-only and same-origin in production; proxy
+      // it in dev so local game sessions exercise the identical contract.
+      "/api/runtime/space-typing": { target: "http://127.0.0.1:3199", changeOrigin: false },
       // Preserve the browser Host for the local session issuer's allowlist.
       "/api/duel/session": { target: "http://127.0.0.1:3014", changeOrigin: false },
       "/duel": { target: "ws://127.0.0.1:3014", ws: true, changeOrigin: false },
