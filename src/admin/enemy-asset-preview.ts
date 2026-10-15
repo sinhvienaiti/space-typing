@@ -5,8 +5,8 @@ import {
   paintedEnemySprite,
   preloadPaintedSprites,
 } from "../enemies/painted-sprites";
-import { drawModularEnemy, StaticEnemyBodyCache } from "../enemies/renderer";
 import { enemyDefinition, type EnemyDefinition } from "../enemies/registry";
+import type { EnemyRoleId } from "../enemies/roles";
 import type { EnemyKind } from "../types";
 import { CombatFxSystem } from "../vfx/combat-fx";
 import type { AssetPreviewScenario } from "./asset-preview-protocol";
@@ -31,17 +31,58 @@ const PAINTED_ENEMY_KINDS = [
   "commander",
 ] as const satisfies readonly EnemyKind[];
 
-export function enemyAssetPreviewPaintedKind(definitionId: string): EnemyKind | null {
+/**
+ * Registry identities and painted combat kinds are separate production taxonomies.
+ * Admin needs a deterministic presentation-only bridge so every canonical registry
+ * identity can be inspected with the painted family art already prepared for the
+ * production renderer. This mapping is never consumed by spawn/admission gameplay.
+ */
+const PREVIEW_KIND_BY_ID: Readonly<Partial<Record<string, EnemyKind>>> = Object.freeze({
+  "angel-guard": "shield",
+  "bomb-imp": "mine",
+  "freeze-burst-sprite": "jammer",
+  "frost-keeper": "shield",
+  "shade-wisp": "cloaker",
+  "night-wisp": "jammer",
+  "prism-sentinel": "shield",
+  "star-core": "carrier",
+  "archangel-core": "carrier",
+  "nova-core": "destroyer",
+  "berserk-devil": "destroyer",
+  "glacier-oracle": "jammer",
+  "void-eye": "oppressor",
+  "demon-lord-orb": "oppressor",
+});
+
+const PREVIEW_KIND_BY_ROLE: Readonly<Record<EnemyRoleId, EnemyKind>> = Object.freeze({
+  normal: "scout",
+  swift: "scout",
+  tank: "tank",
+  support: "healer",
+  burst: "destroyer",
+  control: "jammer",
+  reward: "scout",
+  elite: "commander",
+  "mini-boss": "commander",
+  boss: "commander",
+});
+
+export function enemyAssetPreviewPaintedKind(
+  definitionId: string,
+  role?: EnemyRoleId,
+): EnemyKind | null {
   for (const kind of PAINTED_ENEMY_KINDS) {
     if (definitionId === kind || definitionId.endsWith(`-${kind}`)) return kind;
   }
-  return null;
+  const explicit = PREVIEW_KIND_BY_ID[definitionId];
+  if (explicit !== undefined) return explicit;
+  return role === undefined ? null : PREVIEW_KIND_BY_ROLE[role];
 }
 
 export type EnemyAssetPreviewCandidate = Readonly<{
   definitionId: string;
   definition: EnemyDefinition;
-  paintedKind: EnemyKind | null;
+  paintedKind: EnemyKind;
 }>;
 
 function isEnemyScenario(value: AssetPreviewScenario): value is EnemyAssetPreviewScenario {
@@ -50,7 +91,6 @@ function isEnemyScenario(value: AssetPreviewScenario): value is EnemyAssetPrevie
 
 export class EnemyAssetPreviewScene {
   private readonly fx = new CombatFxSystem();
-  private readonly bodyCache = new StaticEnemyBodyCache(8);
   private candidate: EnemyAssetPreviewCandidate | null = null;
   private scenario: EnemyAssetPreviewScenario = "idle";
   private scenarioStartedAt = 0;
@@ -69,15 +109,18 @@ export class EnemyAssetPreviewScene {
     if (definition === undefined) {
       throw new Error(`Unknown production Enemy definition: ${definitionId}.`);
     }
-    const paintedKind = enemyAssetPreviewPaintedKind(definition.id);
-    if (paintedKind !== null) {
-      if (!hasPaintedEnemy(definition.family, paintedKind)) {
-        throw new Error(
-          `Enemy ${definition.id} expects production painted art ${definition.family}-${paintedKind}.webp, but this build does not contain it. Run pnpm art:prepare and rebuild Space Typing.`,
-        );
-      }
-      preloadPaintedSprites([definition.family], [paintedKind], [], "high");
+    const paintedKind = enemyAssetPreviewPaintedKind(definition.id, definition.role);
+    if (paintedKind === null) {
+      throw new Error(
+        `Enemy ${definition.id} has no Admin painted-preview presentation mapping. Add an explicit preview-kind mapping instead of silently using the modular base renderer.`,
+      );
     }
+    if (!hasPaintedEnemy(definition.family, paintedKind)) {
+      throw new Error(
+        `Enemy ${definition.id} expects production painted art ${definition.family}-${paintedKind}.webp, but this build does not contain it. Run pnpm art:prepare and rebuild Space Typing; Enemy Admin preview never silently falls back to the modular base renderer.`,
+      );
+    }
+    preloadPaintedSprites([definition.family], [paintedKind], [], "high");
     this.candidate = Object.freeze({ definitionId: definition.id, definition, paintedKind });
     this.scenario = "idle";
     this.scenarioStartedAt = simulationSeconds;
@@ -89,8 +132,9 @@ export class EnemyAssetPreviewScene {
       family: definition.family,
       role: definition.role,
       rarity: definition.rarity,
-      renderer: paintedKind === null ? "production-modular-enemy" : "production-painted-enemy",
+      renderer: "production-painted-enemy",
       paintedKind,
+      previewMapping: "admin-presentation-only",
       scenarios: ENEMY_ASSET_PREVIEW_SCENARIOS,
     });
   }
@@ -114,7 +158,6 @@ export class EnemyAssetPreviewScene {
     this.scenarioStartedAt = 0;
     this.eventFired = false;
     this.fx.clear();
-    this.bodyCache.clear();
   }
 
   draw(
@@ -155,39 +198,17 @@ export class EnemyAssetPreviewScene {
       context.translate(x, y);
       context.globalAlpha *= deathAlpha;
 
-      let drew = false;
-      if (candidate.paintedKind !== null) {
-        const painted = paintedEnemySprite(candidate.definition.family, candidate.paintedKind, "high");
-        if (painted !== null) {
-          drew = drawPaintedSprite(
-            context,
-            painted,
-            radius * 2.35,
-            flash,
-            Math.min(2, Math.max(1, window.devicePixelRatio || 1)),
-          );
-        }
-        // A definition that has a canonical painted mapping must never silently
-        // fall back to the modular body: that hides missing/stale prepared art.
-      } else {
-        drew = drawModularEnemy(
+      const painted = paintedEnemySprite(candidate.definition.family, candidate.paintedKind, "high");
+      if (painted !== null) {
+        drawPaintedSprite(
           context,
-          candidate.definition,
-          {
-            radius,
-            age: simulationSeconds,
-            flash,
-            targeted: false,
-            glowScale: 1,
-          },
-          this.bodyCache,
+          painted,
+          radius * 2.35,
+          flash,
           Math.min(2, Math.max(1, window.devicePixelRatio || 1)),
         );
       }
       context.restore();
-      if (candidate.paintedKind === null && !drew) {
-        throw new Error(`Production Enemy renderer rejected definition: ${candidate.definitionId}.`);
-      }
     }
 
     this.fx.draw(context, "high");
