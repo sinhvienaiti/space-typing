@@ -1,6 +1,7 @@
 import { familyStyle } from "../enemies/identity";
 import {
   drawPaintedSprite,
+  hasPaintedEnemy,
   paintedEnemySprite,
   preloadPaintedSprites,
 } from "../enemies/painted-sprites";
@@ -70,6 +71,11 @@ export class EnemyAssetPreviewScene {
     }
     const paintedKind = enemyAssetPreviewPaintedKind(definition.id);
     if (paintedKind !== null) {
+      if (!hasPaintedEnemy(definition.family, paintedKind)) {
+        throw new Error(
+          `Enemy ${definition.id} expects production painted art ${definition.family}-${paintedKind}.webp, but this build does not contain it. Run pnpm art:prepare and rebuild Space Typing.`,
+        );
+      }
       preloadPaintedSprites([definition.family], [paintedKind], [], "high");
     }
     this.candidate = Object.freeze({ definitionId: definition.id, definition, paintedKind });
@@ -83,7 +89,7 @@ export class EnemyAssetPreviewScene {
       family: definition.family,
       role: definition.role,
       rarity: definition.rarity,
-      renderer: paintedKind === null ? "production-modular-enemy" : "production-painted-enemy-with-modular-fallback",
+      renderer: paintedKind === null ? "production-modular-enemy" : "production-painted-enemy",
       paintedKind,
       scenarios: ENEMY_ASSET_PREVIEW_SCENARIOS,
     });
@@ -149,32 +155,37 @@ export class EnemyAssetPreviewScene {
       context.translate(x, y);
       context.globalAlpha *= deathAlpha;
 
-      const painted = candidate.paintedKind === null
-        ? null
-        : paintedEnemySprite(candidate.definition.family, candidate.paintedKind, "high");
-      const drew = painted !== null
-        ? drawPaintedSprite(
+      let drew = false;
+      if (candidate.paintedKind !== null) {
+        const painted = paintedEnemySprite(candidate.definition.family, candidate.paintedKind, "high");
+        if (painted !== null) {
+          drew = drawPaintedSprite(
             context,
             painted,
             radius * 2.35,
             flash,
             Math.min(2, Math.max(1, window.devicePixelRatio || 1)),
-          )
-        : drawModularEnemy(
-            context,
-            candidate.definition,
-            {
-              radius,
-              age: simulationSeconds,
-              flash,
-              targeted: false,
-              glowScale: 1,
-            },
-            this.bodyCache,
-            Math.min(2, Math.max(1, window.devicePixelRatio || 1)),
           );
+        }
+        // A definition that has a canonical painted mapping must never silently
+        // fall back to the modular body: that hides missing/stale prepared art.
+      } else {
+        drew = drawModularEnemy(
+          context,
+          candidate.definition,
+          {
+            radius,
+            age: simulationSeconds,
+            flash,
+            targeted: false,
+            glowScale: 1,
+          },
+          this.bodyCache,
+          Math.min(2, Math.max(1, window.devicePixelRatio || 1)),
+        );
+      }
       context.restore();
-      if (!drew) {
+      if (candidate.paintedKind === null && !drew) {
         throw new Error(`Production Enemy renderer rejected definition: ${candidate.definitionId}.`);
       }
     }
