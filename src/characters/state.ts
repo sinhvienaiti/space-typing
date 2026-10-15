@@ -1,3 +1,5 @@
+import "../admin/game-testing-policy-bootstrap";
+import { runtimeTestingPolicy } from "../admin/game-testing-policy";
 import { activeShipRuntimeDefinitionOverride } from "../admin/ship-runtime-policy";
 import {
   CHARACTER_IDS,
@@ -127,8 +129,6 @@ export function isValidLegacyCharacterState(value: unknown): boolean {
     seen.add(id);
   }
 
-  // "unlocked" remains progression/discovery metadata only. A ship may be
-  // selected for gameplay before its historical milestone has been cleared.
   return seen.has("vanguard");
 }
 
@@ -235,9 +235,16 @@ export function selectCharacter(
   state: CharacterState,
   id: CharacterId,
 ): CharacterState {
-  // Ship selection is independent of Campaign unlock milestones. Keep the
-  // unlocked list unchanged because Codex/meta progression still uses it as
-  // discovery/progression data.
+  if (
+    !runtimeTestingPolicy().unlockAllShips &&
+    !state.unlocked.includes(id)
+  ) {
+    return state;
+  }
+
+  // Admin testing may make every ship selectable for the current runtime, but
+  // the historical unlocked list remains progression/discovery metadata and is
+  // never mutated by the override.
   return {
     selected: id,
     unlocked: [...state.unlocked],
