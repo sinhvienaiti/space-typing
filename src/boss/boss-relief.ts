@@ -1,14 +1,15 @@
 import type { VisualQuality } from "../types";
+import { boss3DModelForPaintedArtUrl } from "./model-3d-contract";
+import { BossModel3D } from "./model-3d-runtime";
 
 /**
- * Campaign boss as a lit 3D relief (like the Duel hulls): the boss painting
- * is raised into a soft solid (height from its silhouette plus a little
- * luminance detail) and rendered by three.js on its own canvas, which
- * Game.ts draws far up the corridor (Depth View). Rendered at the on-screen
- * size × device pixel ratio, so the far boss stays sharp, never upscaled.
+ * Campaign boss depth renderer.
  *
- * three.js loads only when a boss stage starts; Low quality, WebGL errors or
- * a lost context fall back to the flat painting.
+ * Authored GLB models are preferred when a boss has a 3D runtime contract.
+ * If the GLB is absent, fails to load, WebGL is unavailable or the context is
+ * lost, the existing painted height-field relief remains the fail-soft path.
+ * Game.ts still receives one transparent canvas, so HUD/word/telegraph layers
+ * and quality behaviour do not need a second rendering pipeline.
  */
 export type BossReliefPose = {
   /** CSS px edge of the square box drawn on screen. */
@@ -36,6 +37,17 @@ const MAX_PIXELS = 1100;
 const GRID = 160;
 
 type Three = typeof import("three");
+
+type ReliefResources = {
+  three: Three;
+  renderer: import("three").WebGLRenderer;
+  scene: import("three").Scene;
+  camera: import("three").PerspectiveCamera;
+  mesh: import("three").Mesh;
+  material: import("three").MeshStandardMaterial;
+  flashLight: import("three").PointLight;
+  texture: import("three").Texture;
+};
 
 let threeModule: Promise<Three> | null = null;
 function loadThree(): Promise<Three> {
@@ -116,16 +128,10 @@ export class BossRelief {
   private lost = false;
 
   private constructor(
-    private readonly three: Three,
-    private readonly renderer: import("three").WebGLRenderer,
-    private readonly scene: import("three").Scene,
-    private readonly camera: import("three").PerspectiveCamera,
-    private readonly mesh: import("three").Mesh,
-    private readonly material: import("three").MeshStandardMaterial,
-    private readonly flashLight: import("three").PointLight,
-    private readonly texture: import("three").Texture,
+    private readonly authoredModel: BossModel3D | null,
+    private readonly relief: ReliefResources | null,
   ) {
-    renderer.domElement.addEventListener("webglcontextlost", (event) => {
+    relief?.renderer.domElement.addEventListener("webglcontextlost", (event) => {
       event.preventDefault();
       this.lost = true;
     });
@@ -136,13 +142,23 @@ export class BossRelief {
     return typeof document !== "undefined" && typeof WebGLRenderingContext !== "undefined";
   }
 
-  /** Builds the relief for one boss painting; null when 3D is unavailable. */
+  /**
+   * Builds the best depth representation for one boss. Tyrant G01 now prefers
+   * its real skinned GLB; every failure falls back to the previous relief.
+   */
   static async load(
     artUrl: string,
     primary: string,
     accent: string,
   ): Promise<BossRelief | null> {
     if (typeof document === "undefined") return null;
+
+    const authoredContract = boss3DModelForPaintedArtUrl(artUrl);
+    if (authoredContract !== null) {
+      const authoredModel = await BossModel3D.load(authoredContract, primary, accent);
+      if (authoredModel !== null) return new BossRelief(authoredModel, null);
+    }
+
     try {
       const [three, image] = await Promise.all([loadThree(), loadImage(artUrl)]);
       const renderer = new three.WebGLRenderer({ antialias: true, alpha: true, premultipliedAlpha: true, powerPreference: "high-performance" });
@@ -194,44 +210,61 @@ export class BossRelief {
       const flashLight = new three.PointLight(0xffffff, 0, 4, 1.6);
       flashLight.position.set(0, 0, 0.8);
       scene.add(flashLight);
-      return new BossRelief(three, renderer, scene, camera, mesh, material, flashLight, texture);
+      return new BossRelief(null, {
+        three,
+        renderer,
+        scene,
+        camera,
+        mesh,
+        material,
+        flashLight,
+        texture,
+      });
     } catch {
       return null;
     }
   }
 
   get available(): boolean {
-    return !this.lost;
+    return this.authoredModel?.available ?? !this.lost;
   }
 
   render(pose: BossReliefPose): HTMLCanvasElement | null {
-    if (this.lost) return null;
+    if (this.authoredModel !== null) return this.authoredModel.render(pose);
+    const relief = this.relief;
+    if (this.lost || relief === null) return null;
     const scale = Math.min(pose.dpr, RESOLUTION[pose.quality]);
     const pixels = Math.max(64, Math.min(MAX_PIXELS, Math.round(pose.size * scale)));
     if (pixels !== this.pixels) {
       this.pixels = pixels;
-      this.renderer.setSize(pixels, pixels, false);
+      relief.renderer.setSize(pixels, pixels, false);
     }
-    this.mesh.rotation.set(-0.12 - pose.pitch, pose.yaw, pose.roll, "XYZ");
-    this.mesh.scale.set(1, 1, 1 + pose.swell);
+    relief.mesh.rotation.set(-0.12 - pose.pitch, pose.yaw, pose.roll, "XYZ");
+    relief.mesh.scale.set(1, 1, 1 + pose.swell);
     // Kept low: the painting's detail must read through any glow.
-    this.material.emissiveIntensity = 0.05 + pose.glow * 0.14 + pose.flash * 0.6;
+    relief.material.emissiveIntensity = 0.05 + pose.glow * 0.14 + pose.flash * 0.6;
     if (pose.light !== null && pose.lightPower > 0.01) {
-      this.flashLight.color.set(pose.light);
-      this.flashLight.intensity = pose.lightPower * 1.8;
+      relief.flashLight.color.set(pose.light);
+      relief.flashLight.intensity = pose.lightPower * 1.8;
     } else {
-      this.flashLight.intensity = pose.flash * 3;
-      this.flashLight.color.set(0xffffff);
+      relief.flashLight.intensity = pose.flash * 3;
+      relief.flashLight.color.set(0xffffff);
     }
-    this.renderer.render(this.scene, this.camera);
-    return this.renderer.domElement;
+    relief.renderer.render(relief.scene, relief.camera);
+    return relief.renderer.domElement;
   }
 
   dispose(): void {
-    this.mesh.geometry.dispose();
-    this.material.dispose();
-    this.texture.dispose();
-    this.renderer.dispose();
-    void this.three;
+    if (this.authoredModel !== null) {
+      this.authoredModel.dispose();
+      return;
+    }
+    const relief = this.relief;
+    if (relief === null) return;
+    relief.mesh.geometry.dispose();
+    relief.material.dispose();
+    relief.texture.dispose();
+    relief.renderer.dispose();
+    void relief.three;
   }
 }
