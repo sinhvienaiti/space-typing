@@ -1,15 +1,46 @@
 import { familyStyle } from "../enemies/identity";
+import {
+  drawPaintedSprite,
+  paintedEnemySprite,
+  preloadPaintedSprites,
+} from "../enemies/painted-sprites";
 import { drawModularEnemy, StaticEnemyBodyCache } from "../enemies/renderer";
 import { enemyDefinition, type EnemyDefinition } from "../enemies/registry";
+import type { EnemyKind } from "../types";
 import { CombatFxSystem } from "../vfx/combat-fx";
 import type { AssetPreviewScenario } from "./asset-preview-protocol";
 
 export const ENEMY_ASSET_PREVIEW_SCENARIOS = ["idle", "hit", "death"] as const;
 export type EnemyAssetPreviewScenario = (typeof ENEMY_ASSET_PREVIEW_SCENARIOS)[number];
 
+const PAINTED_ENEMY_KINDS = [
+  "scout",
+  "mine",
+  "tank",
+  "destroyer",
+  "oppressor",
+  "shield",
+  "carrier",
+  "jammer",
+  "cloaker",
+  "healer",
+  "splitter",
+  "sniper",
+  "leech",
+  "commander",
+] as const satisfies readonly EnemyKind[];
+
+export function enemyAssetPreviewPaintedKind(definitionId: string): EnemyKind | null {
+  for (const kind of PAINTED_ENEMY_KINDS) {
+    if (definitionId === kind || definitionId.endsWith(`-${kind}`)) return kind;
+  }
+  return null;
+}
+
 export type EnemyAssetPreviewCandidate = Readonly<{
   definitionId: string;
   definition: EnemyDefinition;
+  paintedKind: EnemyKind | null;
 }>;
 
 function isEnemyScenario(value: AssetPreviewScenario): value is EnemyAssetPreviewScenario {
@@ -37,7 +68,11 @@ export class EnemyAssetPreviewScene {
     if (definition === undefined) {
       throw new Error(`Unknown production Enemy definition: ${definitionId}.`);
     }
-    this.candidate = Object.freeze({ definitionId: definition.id, definition });
+    const paintedKind = enemyAssetPreviewPaintedKind(definition.id);
+    if (paintedKind !== null) {
+      preloadPaintedSprites([definition.family], [paintedKind], [], "high");
+    }
+    this.candidate = Object.freeze({ definitionId: definition.id, definition, paintedKind });
     this.scenario = "idle";
     this.scenarioStartedAt = simulationSeconds;
     this.eventFired = false;
@@ -48,7 +83,8 @@ export class EnemyAssetPreviewScene {
       family: definition.family,
       role: definition.role,
       rarity: definition.rarity,
-      renderer: "production-modular-enemy",
+      renderer: paintedKind === null ? "production-modular-enemy" : "production-painted-enemy-with-modular-fallback",
+      paintedKind,
       scenarios: ENEMY_ASSET_PREVIEW_SCENARIOS,
     });
   }
@@ -112,19 +148,31 @@ export class EnemyAssetPreviewScene {
       context.save();
       context.translate(x, y);
       context.globalAlpha *= deathAlpha;
-      const drew = drawModularEnemy(
-        context,
-        candidate.definition,
-        {
-          radius,
-          age: simulationSeconds,
-          flash,
-          targeted: false,
-          glowScale: 1,
-        },
-        this.bodyCache,
-        Math.min(2, Math.max(1, window.devicePixelRatio || 1)),
-      );
+
+      const painted = candidate.paintedKind === null
+        ? null
+        : paintedEnemySprite(candidate.definition.family, candidate.paintedKind, "high");
+      const drew = painted !== null
+        ? drawPaintedSprite(
+            context,
+            painted,
+            radius * 2.35,
+            flash,
+            Math.min(2, Math.max(1, window.devicePixelRatio || 1)),
+          )
+        : drawModularEnemy(
+            context,
+            candidate.definition,
+            {
+              radius,
+              age: simulationSeconds,
+              flash,
+              targeted: false,
+              glowScale: 1,
+            },
+            this.bodyCache,
+            Math.min(2, Math.max(1, window.devicePixelRatio || 1)),
+          );
       context.restore();
       if (!drew) {
         throw new Error(`Production Enemy renderer rejected definition: ${candidate.definitionId}.`);
