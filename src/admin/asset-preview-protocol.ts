@@ -12,6 +12,7 @@ const COMMAND_TYPES = new Set([
   "DISPOSE",
 ]);
 const SCENARIOS = new Set(["idle", "move", "fire", "hit", "phase", "death"]);
+const MAX_CAMPAIGN_STAGE = 1000;
 
 export type AssetPreviewScenario = "idle" | "move" | "fire" | "hit" | "phase" | "death";
 
@@ -74,10 +75,21 @@ function validShipCandidate(payload: Record<string, unknown>): boolean {
         ASSET_VERSION_ID_PATTERN.test(payload.reliefAssetVersionId)));
 }
 
-function validDefinitionCandidate(payload: Record<string, unknown>, domain: "enemy" | "boss", key: string): boolean {
+function validDefinitionCandidate(
+  payload: Record<string, unknown>,
+  domain: "enemy" | "boss" | "world",
+  key: string,
+): boolean {
   return payload.domain === domain &&
     typeof payload[key] === "string" &&
     DEFINITION_ID_PATTERN.test(payload[key] as string);
+}
+
+function validStageCandidate(payload: Record<string, unknown>): boolean {
+  return payload.domain === "stage" &&
+    Number.isSafeInteger(payload.stage) &&
+    (payload.stage as number) >= 1 &&
+    (payload.stage as number) <= MAX_CAMPAIGN_STAGE;
 }
 
 export function parseAssetPreviewCommand(value: unknown): AssetPreviewCommand {
@@ -113,7 +125,9 @@ export function parseAssetPreviewCommand(value: unknown): AssetPreviewCommand {
       payload === null ||
       (!validShipCandidate(payload) &&
         !validDefinitionCandidate(payload, "enemy", "definitionId") &&
-        !validDefinitionCandidate(payload, "boss", "bossId"))
+        !validDefinitionCandidate(payload, "boss", "bossId") &&
+        !validDefinitionCandidate(payload, "world", "worldId") &&
+        !validStageCandidate(payload))
     ) {
       throw new AssetPreviewProtocolError("bad-message", "LOAD_CANDIDATE payload is invalid.");
     }

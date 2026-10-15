@@ -10,6 +10,7 @@ import {
 import { AssetPreviewResourceScope } from "./asset-preview-lifecycle";
 import { BossAssetPreviewScene } from "./boss-asset-preview";
 import { EnemyAssetPreviewScene } from "./enemy-asset-preview";
+import { WorldStageAssetPreviewScene } from "./world-stage-asset-preview";
 import {
   createShipAssetPreviewCandidate,
   flashShipAssetPreviewRelief,
@@ -68,9 +69,10 @@ function requiredCanvasContext(canvas: HTMLCanvasElement): CanvasRenderingContex
   return context;
 }
 
-type PreviewDomain = "ship" | "enemy" | "boss";
+type PreviewDomain = "ship" | "enemy" | "boss" | "world" | "stage";
 
 const SHIP_SCENARIOS = new Set<AssetPreviewScenario>(["idle", "move", "fire"]);
+const WORLD_STAGE_SCENARIOS = new Set<AssetPreviewScenario>(["idle"]);
 const canvas = requiredElement<HTMLCanvasElement>("#assetPreviewCanvas");
 const status = requiredElement<HTMLElement>("#assetPreviewStatus");
 const context = requiredCanvasContext(canvas);
@@ -85,13 +87,13 @@ const shots = new PlayerShotSystem<number>();
 const sfx = new Sfx();
 const enemyScene = new EnemyAssetPreviewScene();
 const bossScene = new BossAssetPreviewScene();
+const worldStageScene = new WorldStageAssetPreviewScene();
 resources.addDisposer(() => shots.clear());
 resources.addDisposer(() => sfx.destroy());
 resources.addDisposer(() => enemyScene.reset());
 resources.addDisposer(() => bossScene.reset());
+resources.addDisposer(() => worldStageScene.destroy());
 
-// The shared atlas is disabled in the isolated preview so the exact Ship
-// candidate path or the production procedural fallback is always visible.
 setCharacterShipSheet(null);
 
 let shipCandidate: ShipAssetPreviewCandidate | null = null;
@@ -107,6 +109,7 @@ let nextReliefGun = 0;
 let disposed = false;
 let viewWidth = 1;
 let viewHeight = 1;
+let viewDpr = 1;
 
 resources.addDisposer(() => {
   candidateGeneration += 1;
@@ -124,12 +127,12 @@ function post(type: "READY" | "APPLIED" | "ERROR" | "DISPOSED", requestId: numbe
 
 function resize(): void {
   const rect = canvas.getBoundingClientRect();
-  const dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+  viewDpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
   viewWidth = Math.max(1, rect.width);
   viewHeight = Math.max(1, rect.height);
-  canvas.width = Math.max(1, Math.round(viewWidth * dpr));
-  canvas.height = Math.max(1, Math.round(viewHeight * dpr));
-  context.setTransform(dpr, 0, 0, dpr, 0, 0);
+  canvas.width = Math.max(1, Math.round(viewWidth * viewDpr));
+  canvas.height = Math.max(1, Math.round(viewHeight * viewDpr));
+  context.setTransform(viewDpr, 0, 0, viewDpr, 0, 0);
 }
 
 function background(): void {
@@ -209,7 +212,6 @@ function previewImpactSound(activeCandidate: ShipAssetPreviewCandidate, power: n
 function drawShipFrame(dt: number): void {
   const activeCandidate = shipCandidate;
   if (activeCandidate === null) return;
-
   const shipX = viewWidth * 0.5;
   const shipY = viewHeight * 0.72;
   const relief = shipAssetPreviewHasRelief(activeCandidate);
@@ -232,7 +234,7 @@ function drawShipFrame(dt: number): void {
     const yaw = scenario === "move" ? Math.sin(simulationSeconds * 1.1) * 0.07 : 0;
     const frame = renderShipAssetPreviewRelief(activeCandidate, {
       width: Math.max(150, Math.min(viewWidth * 0.5, viewHeight * 0.48)),
-      dpr: Math.min(2, Math.max(1, window.devicePixelRatio || 1)),
+      dpr: viewDpr,
       roll,
       yaw,
       pitch: -Math.min(1, recoil) * 0.08,
@@ -274,21 +276,31 @@ function drawFrame(frameMs: number): void {
   previousFrameMs = frameMs;
   if (!paused) simulationSeconds += dt;
 
-  background();
-  if (activeDomain === "ship" && shipCandidate !== null) {
-    drawShipFrame(dt);
-  } else if (activeDomain === "enemy" && enemyScene.activeCandidate !== null) {
-    const enemy = enemyScene.activeCandidate;
-    status.textContent = `${enemy.definition.name.toUpperCase()} · ${enemyScene.activeScenario.toUpperCase()} · production enemy renderer`;
-    enemyScene.draw(context, viewWidth, viewHeight, simulationSeconds, dt, paused);
-  } else if (activeDomain === "boss" && bossScene.activeCandidate !== null) {
-    const boss = bossScene.activeCandidate;
-    status.textContent = `${boss.identity.name.toUpperCase()} · ${bossScene.activeScenario.toUpperCase()} · production boss renderer`;
-    bossScene.draw(context, viewWidth, viewHeight, simulationSeconds, dt, paused);
+  if (activeDomain === "world" || activeDomain === "stage") {
+    context.clearRect(0, 0, viewWidth, viewHeight);
+    const active = worldStageScene.activeCandidate;
+    if (active !== null) {
+      worldStageScene.draw(context, viewWidth, viewHeight, viewDpr, simulationSeconds);
+      status.textContent = active.domain === "world"
+        ? `${active.world.name.toUpperCase()} · AMBIENT · WorldSceneRenderer`
+        : `STAGE ${String(active.stage)} · ${active.world.name.toUpperCase()} · ${String(active.stageRole).toUpperCase()} · WorldSceneRenderer`;
+    }
   } else {
-    status.textContent = "READY · waiting for validated production candidate";
+    background();
+    if (activeDomain === "ship" && shipCandidate !== null) {
+      drawShipFrame(dt);
+    } else if (activeDomain === "enemy" && enemyScene.activeCandidate !== null) {
+      const enemy = enemyScene.activeCandidate;
+      status.textContent = `${enemy.definition.name.toUpperCase()} · ${enemyScene.activeScenario.toUpperCase()} · production enemy renderer`;
+      enemyScene.draw(context, viewWidth, viewHeight, simulationSeconds, dt, paused);
+    } else if (activeDomain === "boss" && bossScene.activeCandidate !== null) {
+      const boss = bossScene.activeCandidate;
+      status.textContent = `${boss.identity.name.toUpperCase()} · ${bossScene.activeScenario.toUpperCase()} · production boss renderer`;
+      bossScene.draw(context, viewWidth, viewHeight, simulationSeconds, dt, paused);
+    } else {
+      status.textContent = "READY · waiting for validated production candidate";
+    }
   }
-
   resources.setAnimationFrame(requestAnimationFrame(drawFrame));
 }
 
@@ -303,6 +315,7 @@ function releaseShip(): void {
 function clearNonShipScenes(): void {
   enemyScene.reset();
   bossScene.reset();
+  worldStageScene.reset();
 }
 
 async function loadShipCandidate(input: Record<string, unknown>): Promise<Readonly<Record<string, unknown>>> {
@@ -343,11 +356,15 @@ async function loadShipCandidate(input: Record<string, unknown>): Promise<Readon
   });
 }
 
-function loadEnemyCandidate(input: Record<string, unknown>): Readonly<Record<string, unknown>> {
-  if (typeof input.definitionId !== "string") throw new Error("Invalid Enemy preview candidate payload.");
+function prepareNonShipCandidate(): void {
   candidateGeneration += 1;
   releaseShip();
-  bossScene.reset();
+  clearNonShipScenes();
+}
+
+function loadEnemyCandidate(input: Record<string, unknown>): Readonly<Record<string, unknown>> {
+  if (typeof input.definitionId !== "string") throw new Error("Invalid Enemy preview candidate payload.");
+  prepareNonShipCandidate();
   const metadata = enemyScene.load(input.definitionId, simulationSeconds);
   activeDomain = "enemy";
   scenario = "idle";
@@ -356,13 +373,29 @@ function loadEnemyCandidate(input: Record<string, unknown>): Readonly<Record<str
 
 function loadBossCandidate(input: Record<string, unknown>): Readonly<Record<string, unknown>> {
   if (typeof input.bossId !== "string") throw new Error("Invalid Boss preview candidate payload.");
-  candidateGeneration += 1;
-  releaseShip();
-  enemyScene.reset();
+  prepareNonShipCandidate();
   const metadata = bossScene.load(input.bossId, simulationSeconds);
   activeDomain = "boss";
   scenario = "idle";
   return Object.freeze({ domain: "boss", ...metadata });
+}
+
+function loadWorldCandidate(input: Record<string, unknown>): Readonly<Record<string, unknown>> {
+  if (typeof input.worldId !== "string") throw new Error("Invalid World preview candidate payload.");
+  prepareNonShipCandidate();
+  const metadata = worldStageScene.loadWorld(input.worldId);
+  activeDomain = "world";
+  scenario = "idle";
+  return Object.freeze({ domain: "world", ...metadata });
+}
+
+function loadStageCandidate(input: Record<string, unknown>): Readonly<Record<string, unknown>> {
+  if (!Number.isSafeInteger(input.stage)) throw new Error("Invalid Stage preview candidate payload.");
+  prepareNonShipCandidate();
+  const metadata = worldStageScene.loadStage(input.stage as number);
+  activeDomain = "stage";
+  scenario = "idle";
+  return Object.freeze({ domain: "stage", ...metadata });
 }
 
 async function loadCandidate(payload: unknown): Promise<Readonly<Record<string, unknown>>> {
@@ -371,13 +404,14 @@ async function loadCandidate(payload: unknown): Promise<Readonly<Record<string, 
   if (input.domain === "ship") return loadShipCandidate(input);
   if (input.domain === "enemy") return loadEnemyCandidate(input);
   if (input.domain === "boss") return loadBossCandidate(input);
+  if (input.domain === "world") return loadWorldCandidate(input);
+  if (input.domain === "stage") return loadStageCandidate(input);
   throw new Error(`Unsupported production preview domain: ${String(input.domain)}.`);
 }
 
 async function applyCommand(command: AssetPreviewCommand): Promise<void> {
   if (command.type === "LOAD_CANDIDATE") {
-    const metadata = await loadCandidate(command.payload);
-    post("APPLIED", command.requestId, metadata);
+    post("APPLIED", command.requestId, await loadCandidate(command.payload));
     return;
   }
   if (command.type === "SET_TUNING") {
@@ -418,6 +452,11 @@ async function applyCommand(command: AssetPreviewCommand): Promise<void> {
     } else if (activeDomain === "boss") {
       bossScene.setScenario(nextScenario, simulationSeconds);
       scenario = nextScenario;
+    } else if (activeDomain === "world" || activeDomain === "stage") {
+      if (!WORLD_STAGE_SCENARIOS.has(nextScenario)) {
+        throw new Error(`${activeDomain === "world" ? "World" : "Stage"} production preview supports ambient/idle only.`);
+      }
+      scenario = "idle";
     } else {
       throw new Error("SET_SCENARIO requires a loaded candidate.");
     }
@@ -462,9 +501,7 @@ function onMessage(event: MessageEvent): void {
     if (
       error instanceof AssetPreviewProtocolError &&
       (error.code === "wrong-origin" || error.code === "wrong-source")
-    ) {
-      return;
-    }
+    ) return;
     const message = error instanceof Error ? error.message : "Preview command failed.";
     post("ERROR", requestIdFrom(event.data), { message });
     return;
@@ -486,6 +523,8 @@ post("READY", 0, {
     ship: { scenarios: ["idle", "move", "fire"], exactVersionMedia: true, relief3d: true },
     enemy: { scenarios: ["idle", "hit", "death"], renderer: "production-modular-enemy" },
     boss: { scenarios: ["idle", "phase", "hit", "death"], renderer: "production-painted-boss" },
+    world: { scenarios: ["idle"], renderer: "WorldSceneRenderer", animation: "production-ambient" },
+    stage: { scenarios: ["idle"], renderer: "WorldSceneRenderer", stageMapping: "worldForStage" },
   },
   renderer: "production",
   candidateState: "ephemeral",
