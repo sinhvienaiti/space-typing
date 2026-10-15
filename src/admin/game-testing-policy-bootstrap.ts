@@ -78,7 +78,9 @@ function installLegacySettingsCompatibilityBridge(): void {
 
 function hideLegacyPlayerTestingControl(): void {
   const legacy = document.getElementById("unlockAllStages");
-  legacy?.closest(".settings-section")?.setAttribute("hidden", "");
+  // Testing policy belongs to Admin. Hide only the obsolete player-preference
+  // row; never hide the surrounding Settings section or unrelated controls.
+  legacy?.closest(".setting-row")?.setAttribute("hidden", "");
 }
 
 if (typeof window !== "undefined") {
