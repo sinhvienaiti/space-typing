@@ -16,6 +16,14 @@ describe("A10 unlock/economy capability authority", () => {
       productionConsumer: "src/characters/state.ts::unlockCharactersForStage()",
     });
 
+    expect(a10UnlockEconomyCapability("ship.testing-selection-override")).toMatchObject({
+      status: "SUPPORTED NOW",
+      persistedField: "system.testing.unlockAllShips",
+      applyBoundary: "new-session",
+      runtimeResolver: "runtimeTestingPolicy()",
+      productionConsumer: "src/characters/state.ts::selectCharacter()",
+    });
+
     expect(a10UnlockEconomyCapability("shop.policy")).toMatchObject({
       status: "SUPPORTED NOW",
       persistedField: "ShopAdminPolicyV1.{stocks,repair,respec,offers}",
@@ -57,6 +65,10 @@ describe("A10 unlock/economy capability authority", () => {
       A10_UNLOCK_ECONOMY_CAPABILITIES.filter(
         (entry) => entry.status === "SUPPORTED NOW",
       ).map((entry) => entry.id),
-    ).toEqual(["ship.unlock-stage", "shop.policy"]);
+    ).toEqual([
+      "ship.unlock-stage",
+      "ship.testing-selection-override",
+      "shop.policy",
+    ]);
   });
 });
