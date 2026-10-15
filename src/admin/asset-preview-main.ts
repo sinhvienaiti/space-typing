@@ -8,6 +8,10 @@ import {
   type AssetPreviewScenario,
 } from "./asset-preview-protocol";
 import { AssetPreviewResourceScope } from "./asset-preview-lifecycle";
+import {
+  AssetPreviewMutationQueue,
+  AssetPreviewSupersededError,
+} from "./asset-preview-mutation-queue";
 import { BossAssetPreviewScene } from "./boss-asset-preview";
 import { EnemyAssetPreviewScene } from "./enemy-asset-preview";
 import { WorldStageAssetPreviewScene } from "./world-stage-asset-preview";
@@ -83,6 +87,7 @@ const parentOrigin = exactParentOrigin();
 const parentSource = window.parent;
 const gate = new AssetPreviewMessageGate(parentOrigin, parentSource, previewSessionId, nonce);
 const resources = new AssetPreviewResourceScope();
+const shipMutations = new AssetPreviewMutationQueue();
 const shots = new PlayerShotSystem<number>();
 const sfx = new Sfx();
 const enemyScene = new EnemyAssetPreviewScene();
@@ -318,41 +323,93 @@ function clearNonShipScenes(): void {
   worldStageScene.reset();
 }
 
+function superseded(message: string): AssetPreviewSupersededError {
+  return new AssetPreviewSupersededError(message);
+}
+
 async function loadShipCandidate(input: Record<string, unknown>): Promise<Readonly<Record<string, unknown>>> {
   if (typeof input.characterId !== "string") throw new Error("Invalid Ship preview candidate payload.");
   const generation = ++candidateGeneration;
-  const next = createShipAssetPreviewCandidate(
-    input.characterId,
-    input.visual,
-    input.imageAssetVersionId,
-    input.projectileArchetype,
-    input.reliefAssetVersionId,
-  );
-  try {
-    await prepareShipAssetPreviewCandidate(next, window.fetch.bind(window), () => new Image());
-  } catch (error) {
-    releaseShipAssetPreviewCandidate(next);
-    throw error;
-  }
-  if (disposed || resources.isDisposed || generation !== candidateGeneration) {
-    releaseShipAssetPreviewCandidate(next);
-    throw new Error("Ship preview candidate was superseded by a newer request.");
-  }
-  releaseShip();
-  clearNonShipScenes();
-  shipCandidate = next;
-  activeDomain = "ship";
-  scenario = "idle";
-  nextShotSeconds = simulationSeconds + 0.08;
-  return Object.freeze({
-    domain: "ship",
-    characterId: next.characterId,
-    imageAssetVersionId: next.imageAssetVersionId,
-    reliefAssetVersionId: next.reliefAssetVersionId,
-    reliefPreviewRequested: next.reliefPreviewRequested,
-    projectileArchetype: next.projectileArchetype,
-    presentation: shipAssetPreviewPresentation(next),
-    scenarios: ["idle", "move", "fire"],
+  return shipMutations.run(async () => {
+    if (disposed || resources.isDisposed || generation !== candidateGeneration) {
+      throw superseded("Ship preview candidate was superseded before materialization.");
+    }
+    const next = createShipAssetPreviewCandidate(
+      input.characterId as string,
+      input.visual,
+      input.imageAssetVersionId,
+      input.projectileArchetype,
+      input.reliefAssetVersionId,
+    );
+    try {
+      await prepareShipAssetPreviewCandidate(next, window.fetch.bind(window), () => new Image());
+    } catch (error) {
+      releaseShipAssetPreviewCandidate(next);
+      throw error;
+    }
+    if (disposed || resources.isDisposed || generation !== candidateGeneration) {
+      releaseShipAssetPreviewCandidate(next);
+      throw superseded("Ship preview candidate was superseded by a newer request.");
+    }
+    releaseShip();
+    clearNonShipScenes();
+    shipCandidate = next;
+    activeDomain = "ship";
+    scenario = "idle";
+    nextShotSeconds = simulationSeconds + 0.08;
+    return Object.freeze({
+      domain: "ship",
+      characterId: next.characterId,
+      imageAssetVersionId: next.imageAssetVersionId,
+      reliefAssetVersionId: next.reliefAssetVersionId,
+      reliefPreviewRequested: next.reliefPreviewRequested,
+      projectileArchetype: next.projectileArchetype,
+      presentation: shipAssetPreviewPresentation(next),
+      scenarios: ["idle", "move", "fire"],
+    });
+  });
+}
+
+async function tuneShipCandidate(payload: unknown): Promise<Readonly<Record<string, unknown>>> {
+  const generation = candidateGeneration;
+  return shipMutations.run(async () => {
+    if (
+      disposed ||
+      resources.isDisposed ||
+      generation !== candidateGeneration ||
+      activeDomain !== "ship" ||
+      shipCandidate === null
+    ) {
+      throw superseded("Ship preview tuning was superseded before it could be applied.");
+    }
+    const previous = shipCandidate;
+    const input = object(payload);
+    const next = updateShipAssetPreviewCandidate(previous, input?.visual);
+    try {
+      if (next.session !== previous.session && (next.imageAssetVersionId !== null || next.reliefPreviewRequested)) {
+        await prepareShipAssetPreviewCandidate(next, window.fetch.bind(window), () => new Image());
+      }
+    } catch (error) {
+      if (next.session !== previous.session) releaseShipAssetPreviewCandidate(next);
+      throw error;
+    }
+    if (
+      disposed ||
+      resources.isDisposed ||
+      generation !== candidateGeneration ||
+      activeDomain !== "ship" ||
+      shipCandidate !== previous
+    ) {
+      if (next.session !== previous.session) releaseShipAssetPreviewCandidate(next);
+      throw superseded("Ship preview tuning was superseded by a newer request.");
+    }
+    shipCandidate = next;
+    if (next.session !== previous.session) releaseShipAssetPreviewCandidate(previous);
+    return Object.freeze({
+      reliefAssetVersionId: next.reliefAssetVersionId,
+      projectileArchetype: next.projectileArchetype,
+      presentation: shipAssetPreviewPresentation(next),
+    });
   });
 }
 
@@ -415,23 +472,7 @@ async function applyCommand(command: AssetPreviewCommand): Promise<void> {
     return;
   }
   if (command.type === "SET_TUNING") {
-    if (activeDomain !== "ship" || shipCandidate === null) {
-      throw new Error("SET_TUNING is not supported by the active production preview domain.");
-    }
-    const input = object(command.payload);
-    const previous = shipCandidate;
-    shipCandidate = updateShipAssetPreviewCandidate(shipCandidate, input?.visual);
-    if (shipCandidate.session !== previous.session) {
-      if (shipCandidate.imageAssetVersionId !== null || shipCandidate.reliefPreviewRequested) {
-        await prepareShipAssetPreviewCandidate(shipCandidate, window.fetch.bind(window), () => new Image());
-      }
-      releaseShipAssetPreviewCandidate(previous);
-    }
-    post("APPLIED", command.requestId, {
-      reliefAssetVersionId: shipCandidate.reliefAssetVersionId,
-      projectileArchetype: shipCandidate.projectileArchetype,
-      presentation: shipAssetPreviewPresentation(shipCandidate),
-    });
+    post("APPLIED", command.requestId, await tuneShipCandidate(command.payload));
     return;
   }
   if (command.type === "SET_SCENARIO") {
@@ -508,7 +549,10 @@ function onMessage(event: MessageEvent): void {
   }
   void applyCommand(command).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : "Preview command failed.";
-    post("ERROR", command.requestId, { message });
+    post("ERROR", command.requestId, {
+      message,
+      ...(error instanceof AssetPreviewSupersededError ? { code: "STALE_PREVIEW_COMMAND" } : {}),
+    });
   });
 }
 
