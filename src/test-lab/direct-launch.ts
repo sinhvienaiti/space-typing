@@ -65,8 +65,8 @@ export function installDirectTestLabLaunch(
   if (!shouldDirectLaunchTestLab(runtime.search)) return () => undefined;
 
   let disposed = false;
-  let stopObserving = () => undefined;
-  let cancelTimeout = () => undefined;
+  let stopObserving: () => void = () => undefined;
+  let cancelTimeout: () => void = () => undefined;
 
   const dispose = (): void => {
     if (disposed) return;
