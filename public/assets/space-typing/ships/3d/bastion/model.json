@@ -1,0 +1,67 @@
+{
+  "id": "bastion",
+  "version": 3,
+  "aspect": 1.0653,
+  "heightScale": 0.2722,
+  "heightGrid": [
+    256,
+    240
+  ],
+  "nozzles": [
+    [
+      0.3343,
+      0.8067,
+      0.0698
+    ],
+    [
+      0.5,
+      0.8436,
+      0.0685
+    ],
+    [
+      0.6649,
+      0.8058,
+      0.0698
+    ]
+  ],
+  "anchors": {
+    "nose": [
+      0.5016,
+      0.0275
+    ],
+    "canopy": [
+      0.499,
+      0.5411
+    ],
+    "eyes": [],
+    "guns": [
+      [
+        0.2322,
+        0.3373
+      ],
+      [
+        0.7678,
+        0.3373
+      ]
+    ],
+    "wingtips": [
+      [
+        0.0265,
+        0.5889
+      ],
+      [
+        0.9727,
+        0.5855
+      ]
+    ]
+  },
+  "colors": {
+    "hot": "#deffec",
+    "plume": "#24ff83",
+    "outer": "#1ab85e",
+    "accent": "#27ff81"
+  },
+  "color": "color.webp?v=5e2b840a1127",
+  "emissive": "emissive.webp?v=74bb0621d0c6",
+  "height": "height.bin?v=7ea76f48340a"
+}

@@ -21,6 +21,7 @@ import {
   type GradeId,
 } from "../grades";
 import type { StatBonus } from "../stats/core";
+import type { EquipmentPerkId } from "./perks";
 import {
   equipmentAffixBonus,
   isEquipmentAffixId,
@@ -923,4 +924,18 @@ export function equipmentStatBonus(
   }
 
   return totals as StatBonus;
+}
+
+/** Perks of the equipped Mk.II / Mk.III parts, in slot order. */
+export function equippedPerkIds(state: EquipmentState): EquipmentPerkId[] {
+  const perks: EquipmentPerkId[] = [];
+  for (const slot of EQUIPMENT_SLOTS) {
+    const instanceId = state.loadout[slot];
+    if (instanceId === null) continue;
+    const instance = state.items.find((item) => item.instanceId === instanceId);
+    if (instance === undefined) continue;
+    const perk = getEquipmentDefinition(instance.definitionId).perk;
+    if (perk !== undefined) perks.push(perk);
+  }
+  return perks;
 }

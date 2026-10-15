@@ -16,7 +16,9 @@ export type DefensiveSkillId =
 export const DEFENSIVE_SKILLS: readonly SkillDefinition[] = [
   {
     id: "barrier",
-    name: "Barrier",
+    name: "Hex Shield",
+    description:
+      "Raises a hexagonal energy dome for 7 s that absorbs incoming damage before it reaches the hull.",
     energyCost: 28,
     cooldown: 9,
     charges: 4,
@@ -25,7 +27,9 @@ export const DEFENSIVE_SKILLS: readonly SkillDefinition[] = [
   },
   {
     id: "reflect-field",
-    name: "Reflect",
+    name: "Mirror Field",
+    description:
+      "Prism shards orbit the ship for 4.5 s and send hostile shots back at whoever fired them.",
     energyCost: 34,
     cooldown: 13,
     charges: 3,
@@ -34,7 +38,9 @@ export const DEFENSIVE_SKILLS: readonly SkillDefinition[] = [
   },
   {
     id: "time-shell",
-    name: "Time Shell",
+    name: "Stasis Field",
+    description:
+      "Bends local time for 5 s: enemies and their shots crawl at 42% speed while you keep typing at full speed.",
     energyCost: 40,
     cooldown: 18,
     charges: 2,
@@ -43,7 +49,9 @@ export const DEFENSIVE_SKILLS: readonly SkillDefinition[] = [
   },
   {
     id: "emergency-repair",
-    name: "Repair",
+    name: "Nanite Repair",
+    description:
+      "A swarm of repair nanites rebuilds 30% of the Hull and 50% of the Shield.",
     energyCost: 45,
     cooldown: 24,
     charges: 2,
@@ -51,7 +59,9 @@ export const DEFENSIVE_SKILLS: readonly SkillDefinition[] = [
   },
   {
     id: "guardian-drone",
-    name: "Guardian",
+    name: "Sentinel Drones",
+    description:
+      "Launches 3 escort drones for 12 s; each one intercepts a hit that would have reached the ship.",
     energyCost: 36,
     cooldown: 20,
     charges: 2,

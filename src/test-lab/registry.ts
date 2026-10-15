@@ -52,6 +52,9 @@ import {
   WORLD_MUSIC_PROFILES,
   validateWorldMusicProfiles,
 } from "../audio/music-profile";
+import { installDirectTestLabLaunch } from "./direct-launch";
+
+installDirectTestLabLaunch();
 
 export type TestLabCharacterSkill = {
   characterId: CharacterId;

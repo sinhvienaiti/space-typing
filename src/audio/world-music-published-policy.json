@@ -1,0 +1,14 @@
+{
+  "configRevision": "admin-published-world-music-v1",
+  "worlds": {
+    "world-10": {
+      "boss": {
+        "world": {
+          "kind": "replace",
+          "trackIds": ["world-10-boss-battle-theme-b"],
+          "selectionMode": "ordered"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,34 @@
+/*
+ * Player-facing settings authority boundary.
+ *
+ * These controls remain in the DOM temporarily because the legacy settings
+ * persistence/runtime still reads them. Hiding the owning sections keeps the
+ * current runtime behavior and saved values intact while removing gameplay
+ * balance/test controls from the production player Settings surface.
+ *
+ * Authoritative ownership:
+ * - difficulty / combat pacing: Admin + runtime policy
+ * - enemy projectile policy: Admin + runtime policy
+ * - unlock-all-stages: QA / developer tooling only
+ *
+ * Do not delete the underlying controls until the runtime policy migration no
+ * longer depends on their existing persistence bindings.
+ */
+#settingsDialog .settings-section:has(#difficultyMode),
+#settingsDialog .settings-section:has(#enemyProjectileMode),
+#settingsDialog .settings-section:has(#unlockAllStages) {
+  display: none !important;
+}
+
+/* Keep the remaining Settings screen explicitly player-preference oriented. */
+#settingsDialog::after {
+  content: "Gameplay difficulty, combat pacing and testing overrides are managed by game policy, not player preferences.";
+  display: block;
+  margin: 0 1.25rem 1rem;
+  padding: 0.7rem 0.85rem;
+  color: var(--holo-dim, #9fb3c4);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  border-left: 2px solid color-mix(in srgb, var(--holo-accent, #5fe3ff) 65%, transparent);
+  background: color-mix(in srgb, var(--holo-accent, #5fe3ff) 6%, transparent);
+}

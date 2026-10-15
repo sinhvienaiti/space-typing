@@ -1,0 +1,490 @@
+import { describe, expect, it } from "vitest";
+import { DuelEngine } from "../src/duel/engine";
+import type {
+  DuelActionOffer,
+  DuelPlayerId,
+} from "../src/duel/model";
+
+function offer(
+  ownerId: DuelPlayerId,
+  slotIndex: number,
+  actionId: string,
+): DuelActionOffer {
+  return {
+    instanceId: ownerId + "-" + String(slotIndex) + "-" + actionId,
+    actionId,
+    ownerId,
+    status: "available",
+    typedPrefix: "",
+    slotIndex,
+    shared: false,
+  };
+}
+
+function typeWord(
+  engine: DuelEngine,
+  playerId: DuelPlayerId,
+  startSequence: number,
+  word: string,
+): void {
+  let sequence = startSequence;
+  for (const char of word) {
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId,
+      sequence,
+      char,
+    });
+    sequence += 1;
+  }
+}
+
+describe("DuelEngine visible action presentation", () => {
+  it("emits a public fire signal for an instant attack", () => {
+    const engine = new DuelEngine({
+      maxShield: 0,
+      startingShield: 0,
+      startingEnergy: 100,
+    });
+    engine.setPrivateOffers("player-1", [
+      offer("player-1", 0, "laser"),
+    ]);
+
+    typeWord(engine, "player-1", 1, "laser");
+    const events = engine.step(0);
+
+    expect(events).toContainEqual({
+      type: "action-fired",
+      playerId: "player-1",
+      actionId: "laser",
+    });
+  });
+
+  it("does not expose banked attacks as fired before USE_ITEM", () => {
+    const engine = new DuelEngine({
+      startingEnergy: 100,
+    });
+    engine.setPrivateOffers("player-1", [
+      offer("player-1", 0, "missile"),
+    ]);
+
+    typeWord(engine, "player-1", 1, "missile");
+    const events = engine.step(0);
+
+    expect(
+      events.some((event) => event.type === "action-fired"),
+    ).toBe(false);
+    expect(
+      events.some((event) => event.type === "action-banked"),
+    ).toBe(true);
+  });
+});
+
+describe("DuelEngine M-DUEL-01 local simulation", () => {
+  it("tracks simultaneous typing for two logical players in one tick batch", () => {
+    const engine = new DuelEngine();
+    engine.setPrivateOffers("player-1", [
+      offer("player-1", 0, "laser"),
+    ]);
+    engine.setPrivateOffers("player-2", [
+      offer("player-2", 0, "repair"),
+    ]);
+
+    typeWord(engine, "player-1", 1, "laser");
+    typeWord(engine, "player-2", 1, "repair");
+    const events = engine.step(1 / 60);
+
+    expect(
+      events.filter((event) => event.type === "action-completed"),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          playerId: "player-1",
+          actionId: "laser",
+        }),
+        expect.objectContaining({
+          playerId: "player-2",
+          actionId: "repair",
+        }),
+      ]),
+    );
+  });
+
+  it("holds an ambiguous prefix until target ownership becomes deterministic", () => {
+    const engine = new DuelEngine();
+    engine.setPrivateOffers("player-1", [
+      offer("player-1", 0, "laser"),
+      offer("player-1", 1, "lock-on"),
+    ]);
+
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId: "player-1",
+      sequence: 1,
+      char: "l",
+    });
+    engine.step(1 / 60);
+    let player = engine.snapshot().players["player-1"];
+    expect(player.targetInstanceId).toBeNull();
+    expect(player.acquisitionPrefix).toBe("l");
+
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId: "player-1",
+      sequence: 2,
+      char: "a",
+    });
+    const events = engine.step(1 / 60);
+    player = engine.snapshot().players["player-1"];
+    expect(player.targetInstanceId).toContain("laser");
+    expect(player.acquisitionPrefix).toBe("la");
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "target-locked",
+        playerId: "player-1",
+      }),
+    );
+  });
+
+  it("preserves a locked target when another private-offer slot is refreshed", () => {
+    const engine = new DuelEngine();
+    const laser = offer("player-1", 0, "laser");
+    const repair = offer("player-1", 1, "repair");
+    engine.setPrivateOffers("player-1", [laser, repair]);
+
+    engine.enqueueIntent({
+      type: "SELECT_TARGET",
+      playerId: "player-1",
+      sequence: 1,
+      targetInstanceId: laser.instanceId,
+    });
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId: "player-1",
+      sequence: 2,
+      char: "l",
+      targetInstanceId: laser.instanceId,
+    });
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId: "player-1",
+      sequence: 3,
+      char: "a",
+      targetInstanceId: laser.instanceId,
+    });
+    engine.step(0);
+
+    const before = engine.snapshot().players["player-1"];
+    const locked = before.offers.find(
+      (candidate) => candidate.instanceId === laser.instanceId,
+    )!;
+    expect(before.targetInstanceId).toBe(laser.instanceId);
+    expect(before.acquisitionPrefix).toBe("la");
+    expect(locked.status).toBe("locked");
+    expect(locked.typedPrefix).toBe("la");
+
+    engine.setPrivateOffers("player-1", [
+      locked,
+      {
+        ...repair,
+        instanceId: repair.instanceId + ":refill",
+      },
+    ]);
+
+    const refreshed = engine.snapshot().players["player-1"];
+    expect(refreshed.targetInstanceId).toBe(laser.instanceId);
+    expect(refreshed.acquisitionPrefix).toBe("la");
+
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId: "player-1",
+      sequence: 4,
+      char: "s",
+      targetInstanceId: laser.instanceId,
+    });
+    engine.step(0);
+
+    expect(
+      engine.snapshot().players["player-1"].offers.find(
+        (candidate) => candidate.instanceId === laser.instanceId,
+      )?.typedPrefix,
+    ).toBe("las");
+  });
+
+  it("does not advance on a wrong key and counts the miss", () => {
+    const engine = new DuelEngine();
+    engine.setPrivateOffers("player-1", [
+      offer("player-1", 0, "laser"),
+    ]);
+
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId: "player-1",
+      sequence: 1,
+      char: "l",
+    });
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId: "player-1",
+      sequence: 2,
+      char: "x",
+    });
+    engine.step(1 / 60);
+
+    const player = engine.snapshot().players["player-1"];
+    expect(player.acquisitionPrefix).toBe("l");
+    expect(player.correctChars).toBe(1);
+    expect(player.wrongChars).toBe(1);
+  });
+
+  it("rejects stale or duplicate intent sequence numbers", () => {
+    const engine = new DuelEngine();
+    engine.setPrivateOffers("player-1", [
+      offer("player-1", 0, "laser"),
+    ]);
+
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId: "player-1",
+      sequence: 4,
+      char: "l",
+    });
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId: "player-1",
+      sequence: 4,
+      char: "a",
+    });
+    const events = engine.step(1 / 60);
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "intent-rejected",
+        reason: "stale-sequence",
+      }),
+    );
+    expect(
+      engine.snapshot().players["player-1"].acquisitionPrefix,
+    ).toBe("l");
+  });
+
+  it("keeps an acquired target locked until explicit cancel or completion", () => {
+    const engine = new DuelEngine();
+    const laser = offer("player-1", 0, "laser");
+    const repair = offer("player-1", 1, "repair");
+    engine.setPrivateOffers("player-1", [laser, repair]);
+
+    engine.enqueueIntent({
+      type: "SELECT_TARGET",
+      playerId: "player-1",
+      sequence: 1,
+      targetInstanceId: laser.instanceId,
+    });
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId: "player-1",
+      sequence: 2,
+      char: "l",
+    });
+    engine.step(1 / 60);
+
+    expect(
+      engine.snapshot().players["player-1"].targetInstanceId,
+    ).toBe(laser.instanceId);
+
+    engine.enqueueIntent({
+      type: "CANCEL_TARGET",
+      playerId: "player-1",
+      sequence: 3,
+      targetInstanceId: laser.instanceId,
+    });
+    engine.step(1 / 60);
+
+    const player = engine.snapshot().players["player-1"];
+    expect(player.targetInstanceId).toBeNull();
+    expect(player.offers[0]?.status).toBe("available");
+    expect(player.wrongChars).toBe(0);
+  });
+
+  it("resolves simultaneous lethal damage as a drawn round", () => {
+    const engine = new DuelEngine({
+      maxHull: 100,
+      maxShield: 0,
+      startingShield: 0,
+    });
+
+    const events = engine.applyTickEffects([
+      { type: "damage", targetId: "player-1", amount: 100 },
+      { type: "damage", targetId: "player-2", amount: 100 },
+    ]);
+
+    expect(engine.snapshot().round).toEqual({
+      status: "draw",
+      winnerId: null,
+    });
+    expect(events).toContainEqual({
+      type: "round-ended",
+      result: { status: "draw", winnerId: null },
+    });
+  });
+
+  it("applies shield before Hull and evaluates terminal state after the batch", () => {
+    const engine = new DuelEngine({
+      maxHull: 100,
+      maxShield: 40,
+      startingShield: 20,
+    });
+
+    engine.applyTickEffects([
+      { type: "damage", targetId: "player-2", amount: 50 },
+    ]);
+    const p2 = engine.snapshot().players["player-2"];
+    expect(p2.shield).toBe(0);
+    expect(p2.hull).toBe(70);
+    expect(engine.snapshot().round.status).toBe("active");
+  });
+
+  it("can rush escalation without shortening regulation or overtime", () => {
+    const engine = new DuelEngine({
+      regulationSeconds: 240,
+      escalationSeconds: 168,
+      hardOvertimeSeconds: 45,
+    });
+
+    engine.step(168);
+    expect(engine.phase()).toBe("cataclysm");
+    expect(engine.snapshot().round.status).toBe("active");
+
+    engine.step(116);
+    expect(engine.snapshot().round.status).toBe("active");
+    engine.step(1);
+    expect(engine.snapshot().round.status).toBe("draw");
+  });
+
+  it("enters Cataclysm after regulation and terminates at hard overtime ceiling", () => {
+    const engine = new DuelEngine({
+      regulationSeconds: 180,
+      hardOvertimeSeconds: 45,
+    });
+    engine.step(180);
+    expect(engine.snapshot().phase).toBe("cataclysm");
+    expect(engine.snapshot().round.status).toBe("active");
+
+    const events = engine.step(45);
+    expect(engine.snapshot().round).toEqual({
+      status: "draw",
+      winnerId: null,
+    });
+    expect(events.at(-1)).toEqual(
+      expect.objectContaining({ type: "round-ended" }),
+    );
+  });
+
+  it("resetRound clears temporary Duel state for both players", () => {
+    const engine = new DuelEngine();
+    engine.setPrivateOffers("player-1", [
+      offer("player-1", 0, "laser"),
+    ]);
+    engine.applyTickEffects([
+      { type: "damage", targetId: "player-1", amount: 30 },
+      { type: "energy", targetId: "player-2", amount: 30 },
+    ]);
+    engine.resetRound();
+
+    const snapshot = engine.snapshot();
+    expect(snapshot.elapsedSeconds).toBe(0);
+    expect(snapshot.round.status).toBe("active");
+    expect(snapshot.players["player-1"].hull).toBe(100);
+    expect(snapshot.players["player-1"].offers).toEqual([]);
+    expect(snapshot.players["player-2"].energy).toBe(25);
+  });
+
+  it("fires deterministic bonus ordnance at a clean 10-character streak", () => {
+    const engine = new DuelEngine({
+      maxShield: 0,
+      startingShield: 0,
+      startingEnergy: 100,
+    });
+
+    engine.setPrivateOffers("player-1", [
+      offer("player-1", 0, "laser"),
+    ]);
+    typeWord(engine, "player-1", 1, "laser");
+    engine.step(0);
+
+    engine.setPrivateOffers("player-1", [
+      {
+        ...offer("player-1", 0, "laser"),
+        instanceId: "player-1-0-laser-second",
+      },
+    ]);
+    typeWord(engine, "player-1", 6, "laser");
+    const events = engine.step(0);
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "precision-firepower",
+        playerId: "player-1",
+        streak: 10,
+        ordnance: "laser-burst",
+        accuracyTier: 3,
+      }),
+    );
+    expect(
+      engine.snapshot().players["player-1"].precisionStreak,
+    ).toBe(10);
+    expect(
+      engine.snapshot().players["player-2"].hull,
+    ).toBeLessThan(80);
+  });
+
+  it("breaks the precision streak on a wrong key", () => {
+    const engine = new DuelEngine({
+      startingEnergy: 100,
+    });
+
+    engine.setPrivateOffers("player-1", [
+      offer("player-1", 0, "laser"),
+    ]);
+    typeWord(engine, "player-1", 1, "laser");
+    engine.step(0);
+
+    engine.setPrivateOffers("player-1", [
+      {
+        ...offer("player-1", 0, "laser"),
+        instanceId: "player-1-0-laser-second",
+      },
+    ]);
+    for (const [index, char] of [..."lase"].entries()) {
+      engine.enqueueIntent({
+        type: "TYPE_CHAR",
+        playerId: "player-1",
+        sequence: 6 + index,
+        char,
+      });
+    }
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId: "player-1",
+      sequence: 10,
+      char: "x",
+    });
+    engine.enqueueIntent({
+      type: "TYPE_CHAR",
+      playerId: "player-1",
+      sequence: 11,
+      char: "r",
+    });
+    const events = engine.step(0);
+
+    expect(
+      events.some(
+        (event) => event.type === "precision-firepower",
+      ),
+    ).toBe(false);
+    expect(
+      engine.snapshot().players["player-1"].precisionStreak,
+    ).toBe(1);
+  });
+
+});

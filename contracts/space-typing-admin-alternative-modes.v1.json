@@ -1,0 +1,73 @@
+{
+  "contractRevision": "space-typing-admin-alternative-modes-v1",
+  "schemaVersion": 1,
+  "gameId": "space-typing",
+  "capability": "alternative-modes.read",
+  "route": {
+    "id": "alternative-modes",
+    "path": "/admin/space-typing/alternative-modes",
+    "label": "Alternative Modes"
+  },
+  "alternativeModes": {
+    "mode": "runtime-backed-readonly",
+    "runtimeSources": [
+      "src/duel/alternative-modes.ts",
+      "src/duel/alternative-match-runtime.ts",
+      "src/duel/alternative-protocol.ts",
+      "server/duel/alternative-service.ts",
+      "server/duel/alternative-coordinator.ts"
+    ],
+    "runtimeOwner": "AlternativeMatchRuntime",
+    "supportedDuelMatchModes": ["friend", "ranked", "practice"],
+    "requestedPrototypeModes": ["reflex", "word-chain"],
+    "runtimeImplementations": {
+      "reflex": true,
+      "word-chain": true
+    },
+    "implementations": [
+      {
+        "id": "reflex",
+        "available": true,
+        "supportedMatchTypes": ["friend", "practice"],
+        "rankedEligible": false,
+        "persistence": "snapshot-v1",
+        "reconnect": true
+      },
+      {
+        "id": "word-chain",
+        "available": true,
+        "supportedMatchTypes": ["friend", "practice"],
+        "rankedEligible": false,
+        "persistence": "snapshot-v1",
+        "reconnect": true
+      }
+    ],
+    "authorableFields": [],
+    "writeCapability": false,
+    "previewCapability": false,
+    "rankedAdmissionCapability": false,
+    "persistenceOwner": "AlternativeMatchRuntime snapshot-v1",
+    "applyBoundary": "none",
+    "unsupportedAdminMockFields": [
+      "reactionWindowMs",
+      "roundDamage",
+      "challengePool",
+      "botReactionMs",
+      "practiceEnabled",
+      "friendRoomEnabled",
+      "rankedEnabled",
+      "beatWindowMs",
+      "penaltyDamage",
+      "lexicon",
+      "chainRule"
+    ],
+    "diagnostic": "Reflex and Word Chain now have canonical friend/practice runtime owners. Ranked admission remains fail-closed and Admin authoring remains unavailable.",
+    "unsupportedAdminOperations": [
+      "enable Reflex or Word Chain in Ranked",
+      "author new alternative mode rules from Admin",
+      "mutate active alternative matches",
+      "bypass canonical Duel admission checks",
+      "claim unsupported alternative modes are available"
+    ]
+  }
+}

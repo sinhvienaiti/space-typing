@@ -1,9 +1,11 @@
 import type { KillTranslationSettings } from "./feedback/kill-translation";
+import type { MusicPlaybackMode } from "./audio/music-library";
 import type { EnemyDefinitionId } from "./enemies/registry";
 import type { EnemyRank } from "./enemies/rank";
 import type { EnemyLayerId } from "./enemies/layers";
 import type { EnemySkillId } from "./enemies/skills";
 import type { ThreatBudget } from "./enemies/threat";
+import type { EnemyFamilyId } from "./enemies/families";
 
 export type GamePhase =
   | "title"
@@ -33,11 +35,20 @@ export type EnemyKind =
 
 export type EliteModifier = "swift" | "armored" | "frenzy" | "volatile";
 
+export type LearningEntityType = "vocabulary" | "grammar" | "sentence";
+
+export type LearningMetadata = {
+  entityType: LearningEntityType;
+  entityId: string;
+  activityType: string;
+};
+
 export type VocabularyEntry = {
   id: string;
   en: string;
   vi: string;
   ipa: string;
+  learning?: LearningMetadata;
 };
 
 export type VocabularyLevel = {
@@ -57,6 +68,8 @@ export type VocabularyIndex = {
 
 export type GameSettings = {
   sfxVolume: number;
+  /** Credit crystal drop/pickup sounds on top of SFX volume (0–2, 1 = default). */
+  creditVolume?: number;
   musicVolume: number;
   ambientVolume: number;
   screenShake: boolean;
@@ -67,6 +80,8 @@ export type GameSettings = {
   pronunciationRate: number;
   pronunciationVolume: number;
   killTranslation?: KillTranslationSettings;
+  /** World music: each map's playlist, or shuffle every song. */
+  musicMode?: MusicPlaybackMode;
 };
 
 export type GameStats = {
@@ -93,6 +108,11 @@ export type Enemy = {
   definitionId?: EnemyDefinitionId;
   elite: boolean;
   golden?: boolean;
+  /**
+   * Explicit farm-control override for the FINAL V3 Combat Credit economy.
+   * Undefined means normal eligible combat target; carrier summons set false.
+   */
+  combatCreditEligible?: boolean;
   eliteModifiers: EliteModifier[];
   rank?: EnemyRank;
   wordDifficultyScore?: number;
@@ -115,6 +135,10 @@ export type Enemy = {
   radius: number;
   flash: number;
   kick: number;
+  /** Seconds a landed player bolt holds the enemy still (stagger). */
+  hitStun?: number;
+  /** Seconds of the body's sideways hit shake (the word label stays still). */
+  hitShake?: number;
   actionCooldown: number | null;
   rewardControlTimer?: number;
   rewardControlFactor?: number;
@@ -129,6 +153,8 @@ export type EnemyProjectile = {
   vx: number;
   vy: number;
   radius: number;
+  /** Shooter's family: gives the shot its look (fireball, ice shard…). */
+  family?: EnemyFamilyId;
 };
 
 export type Laser = {

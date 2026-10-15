@@ -1,0 +1,443 @@
+/*
+ * Stage clear report in the Holo Command style, with a real celebration:
+ * turning light rays, a confetti shower, stars that pop in one by one and a
+ * score that counts up (src/main.ts renderClearStars / countUpNumber /
+ * renderStageClearCelebration). The hero row shows the numbers that matter
+ * most; the measured detail stays below. Loaded after styles.css.
+ */
+.stage-results-card {
+  border-radius: 0;
+  border-color: rgba(111, 231, 255, 0.28);
+  clip-path: polygon(22px 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%, 0 22px);
+  animation: results-in 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes results-in {
+  from { opacity: 0; transform: translateY(26px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------- Header ---------- */
+.stage-results-header {
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 18% 0%, rgba(255, 209, 102, 0.16), transparent 55%),
+    linear-gradient(180deg, rgba(14, 30, 54, 0.9), rgba(7, 15, 28, 0.4));
+}
+.stage-results-title .eyebrow { color: #ffd166; }
+#clearTitle {
+  position: relative;
+  margin: 0.2rem 0 0.25rem;
+  font-family: var(--holo-display);
+  font-size: clamp(2rem, 4.4vw, 3.4rem);
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: transparent;
+  background: linear-gradient(100deg, #ffffff 0%, #bff6ff 35%, #ffffff 50%, #ffe7a3 65%, #ffffff 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 0 18px rgba(95, 227, 255, 0.35));
+  animation: results-title-shine 3.4s ease-in-out 0.4s infinite;
+}
+@keyframes results-title-shine {
+  0%, 45% { background-position: 100% 0; }
+  100% { background-position: -150% 0; }
+}
+.stage-results-meta { color: var(--holo-dim); font-size: 0.95rem; letter-spacing: 0.04em; }
+
+/* ---------- Stars ---------- */
+.stage-stars { text-align: right; }
+.stage-stars strong {
+  display: inline-flex;
+  gap: 0.25rem;
+  font-size: clamp(2.6rem, 5vw, 3.8rem);
+  line-height: 1;
+}
+.clear-star {
+  display: inline-block;
+  color: rgba(160, 180, 200, 0.22);
+  -webkit-text-stroke: 1px rgba(200, 220, 240, 0.35);
+  transform: scale(0);
+  animation: clear-star-pop 0.55s cubic-bezier(0.2, 1.6, 0.4, 1) calc(0.55s + var(--i) * 0.28s) forwards;
+}
+.clear-star.earned {
+  color: #ffd34d;
+  -webkit-text-stroke: 0;
+  text-shadow: 0 0 14px rgba(255, 196, 60, 0.9), 0 0 34px rgba(255, 150, 40, 0.55);
+}
+.clear-star.earned::after {
+  content: "";
+}
+@keyframes clear-star-pop {
+  0% { transform: scale(0) rotate(-40deg); }
+  70% { transform: scale(1.3) rotate(8deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+.stage-stars small { color: var(--holo-faint); font-size: 0.78rem; }
+
+/* ---------- Hero numbers ---------- */
+.stage-results-column-heading span,
+.stage-result-section-heading h3 {
+  color: var(--holo-accent);
+  font-family: var(--holo-display);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+.stage-results-column-heading small,
+.stage-result-section-heading small { color: var(--holo-faint); font-size: 0.78rem; }
+.stage-results-summary > div,
+.result-measured-grid > div {
+  position: relative;
+  border-radius: 0 !important;
+  border: 1px solid rgba(111, 231, 255, 0.14) !important;
+  background: linear-gradient(180deg, rgba(14, 28, 52, 0.85), rgba(7, 14, 28, 0.9)) !important;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  opacity: 0;
+  animation: results-tile-in 0.45s ease-out forwards;
+}
+.stage-results-summary > div:nth-child(2) { animation-delay: 0.08s; }
+.stage-results-summary > div:nth-child(3) { animation-delay: 0.16s; }
+.stage-results-summary > div:nth-child(4) { animation-delay: 0.24s; }
+.stage-results-summary > div:nth-child(5) { animation-delay: 0.32s; }
+.stage-results-summary > div:nth-child(6) { animation-delay: 0.4s; }
+.result-measured-grid > div { animation-delay: 0.5s; }
+@keyframes results-tile-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.stage-results-summary span,
+.result-measured-grid span {
+  color: var(--holo-faint);
+  font-family: var(--holo-display);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.stage-results-summary strong,
+.result-measured-grid strong {
+  font-family: var(--holo-display);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: var(--holo-text);
+}
+/* Score is the hero: biggest number, gold edge. */
+.stage-results-summary > div:first-child {
+  border-color: rgba(255, 209, 102, 0.55) !important;
+  background:
+    radial-gradient(ellipse at 0% 0%, rgba(255, 209, 102, 0.2), transparent 60%),
+    linear-gradient(180deg, rgba(30, 26, 20, 0.9), rgba(12, 12, 20, 0.92)) !important;
+  box-shadow: 0 0 26px rgba(255, 190, 70, 0.18);
+}
+.stage-results-summary > div:first-child strong {
+  font-size: clamp(2.2rem, 3.6vw, 3rem);
+  color: #ffe9a8;
+  text-shadow: 0 0 18px rgba(255, 200, 80, 0.5);
+}
+/* Accuracy and WPM: the two learning numbers, in cyan. */
+.stage-results-summary > div:nth-child(2) strong,
+.stage-results-summary > div:nth-child(3) strong {
+  font-size: clamp(1.9rem, 3vw, 2.5rem);
+  color: #bff6ff;
+  text-shadow: 0 0 14px rgba(95, 227, 255, 0.45);
+}
+.stage-results-summary > div:nth-child(n + 4) strong { font-size: clamp(1.4rem, 2.2vw, 1.8rem); }
+.result-measured-grid strong { font-size: 1.25rem; }
+.result-measured-grid small { color: var(--holo-faint); font-size: 0.74rem; }
+.stage-result-section {
+  border-radius: 0 !important;
+  border-color: rgba(111, 231, 255, 0.12) !important;
+  background: rgba(8, 16, 32, 0.55) !important;
+}
+.result-denominator-note { color: var(--holo-faint); font-size: 0.8rem; }
+
+/* ---------- Footer ---------- */
+.stage-results-footer {
+  background: linear-gradient(0deg, rgba(10, 22, 42, 0.95), rgba(6, 12, 24, 0.6));
+}
+.stage-results-footer-copy span {
+  font-family: var(--holo-display);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.stage-result-actions button {
+  min-height: 48px;
+  font-family: var(--holo-display);
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 0;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+.stage-result-actions button:not(.primary) {
+  color: var(--holo-text);
+  border-color: rgba(111, 231, 255, 0.22);
+  background: rgba(95, 227, 255, 0.05);
+}
+.stage-result-actions button.primary { font-size: 1.05rem; }
+
+/* ---------- Celebration layer: above the card, never catches clicks ---------- */
+#stageClearOverlay .stage-clear-celebration { z-index: 3; }
+.stage-clear-rays {
+  position: absolute;
+  left: 50%;
+  top: 14%;
+  width: min(120vw, 1500px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 226, 140, 0.11) 0deg 6deg, transparent 6deg 18deg);
+  -webkit-mask: radial-gradient(circle, #000 0%, transparent 48%);
+  mask: radial-gradient(circle, #000 0%, transparent 48%);
+  animation: clear-rays-in 0.8s ease-out 0.2s forwards, clear-rays-spin 24s linear infinite;
+}
+@keyframes clear-rays-in { to { opacity: 0.9; } }
+@keyframes clear-rays-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+.stage-clear-confetti {
+  position: absolute;
+  left: var(--x);
+  top: -24px;
+  width: 8px;
+  height: 14px;
+  background: var(--c);
+  box-shadow: 0 0 6px var(--c);
+  opacity: 0;
+  animation: clear-confetti var(--dur) cubic-bezier(0.3, 0.4, 0.6, 1) var(--delay) forwards;
+}
+.stage-clear-confetti:nth-child(3n) { width: 6px; height: 6px; border-radius: 50%; }
+.stage-clear-confetti:nth-child(4n) { width: 4px; height: 18px; }
+@keyframes clear-confetti {
+  0% { opacity: 0; transform: translate(0, 0) rotate(0); }
+  8% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--sway), 105vh) rotate(var(--spin)); }
+}
+#stageClearOverlay[data-visual-quality="low"] .stage-clear-rays { animation: clear-rays-in 0.8s ease-out 0.2s forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-clear-rays, .stage-clear-confetti, #clearTitle { animation: none; }
+  .clear-star { transform: none; animation: none; }
+  .stage-results-summary > div, .result-measured-grid > div { opacity: 1; animation: none; }
+}
+
+/* ---------- Stat icons (results card and Run over) ---------- */
+.stage-results-summary span[data-icon],
+.result-measured-grid span[data-icon],
+.game-over-card .results span[data-icon] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.stage-results-summary span[data-icon]::before,
+.result-measured-grid span[data-icon]::before,
+.game-over-card .results span[data-icon]::before {
+  width: 1.35em;
+  height: 1.35em;
+  color: var(--holo-accent);
+  filter: drop-shadow(0 0 4px rgba(95, 227, 255, 0.6));
+}
+.stage-results-summary > div:first-child span::before,
+.game-over-card .results > div:first-child span::before { color: #ffd166; filter: drop-shadow(0 0 5px rgba(255, 200, 80, 0.7)); }
+
+/* ---------- Run over: same family as the stage clear report ---------- */
+#gameOverOverlay {
+  padding: clamp(14px, 2vw, 28px);
+  background:
+    radial-gradient(ellipse at 50% 20%, rgba(120, 20, 40, 0.28), transparent 60%),
+    rgba(2, 4, 10, 0.86);
+  backdrop-filter: blur(12px) saturate(0.7) brightness(0.7);
+}
+.game-over-card {
+  position: relative;
+  width: min(1180px, calc(100vw - 40px));
+  max-width: none;
+  max-height: calc(100vh - 56px);
+  padding: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  text-align: left;
+  border: 1px solid rgba(255, 93, 108, 0.35);
+  border-radius: 0;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(255, 70, 90, 0.1), transparent 30rem),
+    linear-gradient(145deg, rgba(10, 14, 28, 0.985), rgba(5, 8, 18, 0.99));
+  clip-path: polygon(22px 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%, 0 22px);
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.64);
+  animation: results-in 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.game-over-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.6rem 2rem 1.25rem;
+  border-bottom: 1px solid rgba(255, 93, 108, 0.16);
+  background: linear-gradient(180deg, rgba(60, 14, 24, 0.55), rgba(10, 10, 22, 0.3));
+}
+.game-over-header .eyebrow { color: #ff8a96; }
+#gameOverTitle {
+  margin: 0.2rem 0 0;
+  font-family: var(--holo-display);
+  font-size: clamp(2rem, 4.4vw, 3.4rem);
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: transparent;
+  background: linear-gradient(100deg, #ffffff 0%, #ffc2c8 40%, #ff5d6c 70%, #ffffff 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 0 18px rgba(255, 70, 90, 0.4));
+  animation: results-title-shine 4s ease-in-out 0.4s infinite;
+}
+.game-over-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  font-family: var(--holo-display);
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ffd0d4;
+  border: 1px solid rgba(255, 93, 108, 0.55);
+  background: rgba(255, 60, 80, 0.12);
+}
+.game-over-badge::before { width: 1.4em; height: 1.4em; color: #ff5d6c; }
+.game-over-body {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.6fr);
+  gap: 1.4rem;
+  padding: 1.4rem 2rem;
+  overflow: auto;
+}
+.game-over-summary .results {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 0;
+}
+.game-over-card .results > div {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid rgba(111, 231, 255, 0.14);
+  background: linear-gradient(180deg, rgba(14, 28, 52, 0.85), rgba(7, 14, 28, 0.9));
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  opacity: 0;
+  animation: results-tile-in 0.45s ease-out forwards;
+}
+.game-over-card .results > div:nth-child(2) { animation-delay: 0.08s; }
+.game-over-card .results > div:nth-child(3) { animation-delay: 0.16s; }
+.game-over-card .results > div:nth-child(4) { animation-delay: 0.24s; }
+.game-over-card .results span {
+  color: var(--holo-faint);
+  font-family: var(--holo-display);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.game-over-card .results strong {
+  font-family: var(--holo-display);
+  font-size: clamp(1.6rem, 2.6vw, 2.2rem);
+  font-weight: 800;
+  color: var(--holo-text);
+}
+/* Score leads, as on the clear report. */
+.game-over-card .results > div:first-child {
+  grid-column: 1 / -1;
+  border-color: rgba(255, 209, 102, 0.5);
+  background:
+    radial-gradient(ellipse at 0% 0%, rgba(255, 209, 102, 0.18), transparent 60%),
+    linear-gradient(180deg, rgba(30, 26, 20, 0.9), rgba(12, 12, 20, 0.92));
+}
+.game-over-card .results > div:first-child strong {
+  font-size: clamp(2.4rem, 4vw, 3.2rem);
+  color: #ffe9a8;
+  text-shadow: 0 0 18px rgba(255, 200, 80, 0.45);
+}
+.game-over-detail h3 {
+  margin: 0 0 10px;
+  color: var(--holo-accent);
+  font-family: var(--holo-display);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+.game-over-detail .result-measured-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.game-over-detail .result-measured-grid > div { padding: 12px 14px; display: grid; gap: 4px; }
+.game-over-detail .death-protection-meta {
+  margin: 14px 0 8px;
+  color: var(--holo-dim);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.game-over-detail .death-protection-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.game-over-detail .death-protection-actions button {
+  font-family: var(--holo-display);
+  font-weight: 700;
+  border-radius: 0;
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+.game-over-footer {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 10px;
+  padding: 1rem 2rem 1.3rem;
+  border-top: 1px solid rgba(111, 231, 255, 0.1);
+  background: linear-gradient(0deg, rgba(10, 22, 42, 0.95), rgba(6, 12, 24, 0.6));
+}
+.game-over-footer button {
+  min-height: 50px;
+  margin: 0;
+  font-family: var(--holo-display);
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 0;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+.game-over-footer button:not(.primary) {
+  color: var(--holo-text);
+  border-color: rgba(111, 231, 255, 0.22);
+  background: rgba(95, 227, 255, 0.05);
+}
+/* Slow ash drifting down behind the card. */
+.game-over-embers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(255, 120, 100, 0.6) 1px, transparent 2px),
+    radial-gradient(circle at 70% 60%, rgba(255, 160, 120, 0.5) 1.5px, transparent 2.5px),
+    radial-gradient(circle at 45% 80%, rgba(255, 90, 90, 0.5) 1px, transparent 2px);
+  background-size: 180px 200px, 260px 240px, 220px 300px;
+  animation: game-over-ash 40s linear infinite;
+  opacity: 0.7;
+}
+@keyframes game-over-ash { to { background-position: 0 600px, 0 480px, 0 900px; } }
+@media (max-width: 860px) {
+  .game-over-body { grid-template-columns: 1fr; padding: 1rem; }
+  .game-over-footer { grid-template-columns: 1fr; padding: 1rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .game-over-embers, #gameOverTitle { animation: none; }
+  .game-over-card .results > div { opacity: 1; animation: none; }
+}
+/* Beats the old 580 px cap (#gameOverOverlay .pause-card in styles.css). */
+#gameOverOverlay .game-over-card { width: min(1180px, calc(100vw - 40px)); max-width: none; padding: 0; }

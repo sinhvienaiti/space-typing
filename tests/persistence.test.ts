@@ -27,9 +27,9 @@ describe("player save persistence model", () => {
     expect(save.updatedAt).toBe("2026-09-21T15:00:00.000Z");
   });
 
-  it("sanitizes malformed player save data", () => {
+  it("sanitizes malformed legacy player save data", () => {
     const save = sanitizePlayerSave({
-      version: PLAYER_SAVE_VERSION,
+      version: 27,
       campaign: {
         version: 1,
         highestUnlockedStage: 5000,

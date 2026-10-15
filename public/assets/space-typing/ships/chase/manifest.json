@@ -1,0 +1,25 @@
+{
+  "id": "ship-chase",
+  "version": 1,
+  "ships": {
+    "vanguard": {
+      "url": "vanguard.webp?v=ac07f0c9c5c47297",
+      "width": 512,
+      "height": 470,
+      "nozzles": [
+        [
+          0.2327,
+          0.8229
+        ],
+        [
+          0.4996,
+          0.8212
+        ],
+        [
+          0.7668,
+          0.822
+        ]
+      ]
+    }
+  }
+}

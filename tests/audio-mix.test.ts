@@ -24,6 +24,17 @@ describe("audio mix", () => {
     expect(warning).toBeGreaterThan(0);
   });
 
+  it("keeps Credit pickups audible while a word is spoken, still under warnings", () => {
+    const combat = mixedSfxGain(1, "combat", 1, true);
+    const rewards = mixedSfxGain(1, "rewards", 1, true);
+    const warning = mixedSfxGain(1, "warnings", 1, true);
+
+    expect(AUDIO_GROUP_GAIN.rewards).toBeGreaterThan(AUDIO_GROUP_GAIN.combat);
+    expect(AUDIO_GROUP_GAIN.rewards).toBeLessThan(AUDIO_GROUP_GAIN.warnings);
+    expect(rewards).toBeGreaterThan(combat);
+    expect(rewards).toBeLessThan(warning);
+  });
+
   it("clamps master and event gains", () => {
     expect(mixedSfxGain(5, "typing", 5)).toBe(
       AUDIO_GROUP_GAIN.typing,

@@ -1,69 +1,47 @@
 import { describe, expect, it } from "vitest";
 import {
-  advanceKillScorePopups,
-  killScorePopupOpacity,
-  scorePopupSafeY,
-  SCORE_POPUP_FLOAT_DISTANCE,
-  SCORE_POPUP_PROTECTED_TOP_Y,
-  type KillScorePopup,
-} from "../src/characters/projectile-renderer";
-import { CombatSfxCadenceLimiter } from "../src/audio/Sfx";
-import { SAMPLE_SFX } from "../src/audio/sample-bank";
+  CreditCrystalPickupSystem,
+  type CreditCrystalPoint,
+} from "../src/vfx/credit-crystal-pickups";
+import type { CombatCreditRewardReceipt } from "../src/rewards/combat-credit-drops";
 
-describe("combat feedback lifetimes", () => {
-  it("fades and removes kill score popups after about two seconds", () => {
-    const popup: KillScorePopup = {
-      x: 100,
-      y: 100,
-      value: 250,
-      life: 2,
-      maxLife: 2,
-    };
-    const popups = [popup];
-    const initial = killScorePopupOpacity(popup);
+function receipt(id: string): CombatCreditRewardReceipt {
+  return {
+    rewardId: id,
+    attemptId: "combat-feedback",
+    sourceKind: "enemy",
+    sourceInstanceId: id,
+    cause: "typed-kill",
+    mode: "campaign",
+    tier: "common",
+    variant: "standard",
+    nominalEarned: 1,
+    walletDeltaApplied: 1,
+  };
+}
 
-    advanceKillScorePopups(popups, 1.2);
-    expect(popups).toHaveLength(1);
-    expect(popups[0]?.value).toBe(250);
-    expect(killScorePopupOpacity(popups[0]!)).toBeLessThan(initial);
+function advance(
+  system: CreditCrystalPickupSystem,
+  seconds: number,
+  target: CreditCrystalPoint,
+): void {
+  let remaining = seconds;
+  while (remaining > 0) {
+    const dt = Math.min(1 / 60, remaining);
+    system.update(dt, target);
+    remaining -= dt;
+  }
+}
 
-    advanceKillScorePopups(popups, 0.81);
-    expect(popups).toHaveLength(0);
-  });
+describe("combat reward feedback", () => {
+  it("uses crystal pickup feedback instead of the removed kill-score popup", () => {
+    const system = new CreditCrystalPickupSystem();
+    system.spawn(receipt("enemy-1"), 120, 160, "high");
 
-  it("keeps score popup travel below the protected top learning zone", () => {
-    const safeY = scorePopupSafeY(40, 720);
-    expect(safeY).toBeGreaterThanOrEqual(
-      SCORE_POPUP_PROTECTED_TOP_Y + SCORE_POPUP_FLOAT_DISTANCE,
-    );
-    expect(safeY - SCORE_POPUP_FLOAT_DISTANCE).toBeGreaterThanOrEqual(
-      SCORE_POPUP_PROTECTED_TOP_Y,
-    );
+    expect(system.liveBurstCount()).toBe(1);
+    expect(system.phaseSnapshot()).toEqual(["scatter"]);
 
-    const bottomClamped = scorePopupSafeY(900, 720);
-    expect(bottomClamped).toBeLessThan(720);
-    expect(bottomClamped).toBeGreaterThanOrEqual(safeY);
-  });
-
-  it("keeps an audible sampled player-fire voice in the shared audio bank", () => {
-    expect(SAMPLE_SFX["player-fire"].poolSize).toBeGreaterThanOrEqual(4);
-    expect(SAMPLE_SFX["player-fire"].gain).toBeGreaterThanOrEqual(0.25);
-    expect(SAMPLE_SFX["player-fire"].group).toBe("typing");
-  });
-
-  it("bounds rapid fire/hit/kill audio cadence independently", () => {
-    const limiter = new CombatSfxCadenceLimiter();
-
-    expect(limiter.allow("fire", 100)).toBe(true);
-    expect(limiter.allow("fire", 110)).toBe(false);
-    expect(limiter.allow("fire", 125)).toBe(true);
-
-    expect(limiter.allow("hit", 100)).toBe(true);
-    expect(limiter.allow("hit", 120)).toBe(false);
-    expect(limiter.allow("hit", 131)).toBe(true);
-
-    expect(limiter.allow("kill", 100)).toBe(true);
-    expect(limiter.allow("kill", 160)).toBe(false);
-    expect(limiter.allow("kill", 173)).toBe(true);
+    advance(system, 0.35, { x: 640, y: 650 });
+    expect(system.phaseSnapshot()).toEqual(["magnet"]);
   });
 });

@@ -1,0 +1,70 @@
+{
+  "id": "arsenal",
+  "version": 3,
+  "aspect": 1.1149,
+  "heightScale": 0.2228,
+  "heightGrid": [
+    256,
+    230
+  ],
+  "nozzles": [
+    [
+      0.3235,
+      0.7873,
+      0.0597
+    ],
+    [
+      0.6745,
+      0.7873,
+      0.0593
+    ]
+  ],
+  "anchors": {
+    "nose": [
+      0.4996,
+      0.0292
+    ],
+    "canopy": [
+      0.4997,
+      0.5107
+    ],
+    "eyes": [],
+    "guns": [
+      [
+        0.1591,
+        0.3828
+      ],
+      [
+        0.319,
+        0.1575
+      ],
+      [
+        0.6916,
+        0.1647
+      ],
+      [
+        0.8442,
+        0.3919
+      ]
+    ],
+    "wingtips": [
+      [
+        0.0266,
+        0.8769
+      ],
+      [
+        0.9718,
+        0.8751
+      ]
+    ]
+  },
+  "colors": {
+    "hot": "#ffecdb",
+    "plume": "#ff7d10",
+    "outer": "#b85a0b",
+    "accent": "#ff5224"
+  },
+  "color": "color.webp?v=42ece92fed36",
+  "emissive": "emissive.webp?v=ab8982d5bd8b",
+  "height": "height.bin?v=05f010322824"
+}

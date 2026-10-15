@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 768 768" width="768" height="768">
+<defs>
+ <radialGradient id="hot"><stop offset="0" stop-color="#fff"/><stop offset=".12" stop-color="#fff7b1"/><stop offset=".35" stop-color="#ffb33b"/><stop offset=".62" stop-color="#ff4b20"/><stop offset="1" stop-color="#7b102d" stop-opacity="0"/></radialGradient>
+ <radialGradient id="blue"><stop offset="0" stop-color="#fff"/><stop offset=".18" stop-color="#bdf8ff"/><stop offset=".5" stop-color="#54d7ff"/><stop offset="1" stop-color="#3155ff" stop-opacity="0"/></radialGradient>
+ <radialGradient id="smoke"><stop offset="0" stop-color="#49535a" stop-opacity=".9"/><stop offset=".48" stop-color="#242b31" stop-opacity=".78"/><stop offset="1" stop-color="#070b0e" stop-opacity="0"/></radialGradient>
+ <linearGradient id="fire" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff2a19" stop-opacity=".2"/><stop offset=".38" stop-color="#ff5d24"/><stop offset=".68" stop-color="#ffd159"/><stop offset="1" stop-color="#fffbd6" stop-opacity=".9"/></linearGradient>
+ <filter id="g" x="-70%" y="-70%" width="240%" height="240%"><feGaussianBlur stdDeviation="12" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+ <filter id="b" x="-70%" y="-70%" width="240%" height="240%"><feGaussianBlur stdDeviation="24"/></filter>
+</defs><g>
+<g fill="url(#smoke)">
+<circle cx="310" cy="506" r="120"/><circle cx="438" cy="488" r="140"/><circle cx="374" cy="372" r="150"/><circle cx="286" cy="318" r="102"/><circle cx="486" cy="306" r="112"/>
+</g>
+<ellipse cx="382" cy="544" rx="102" ry="66" fill="#ff5a25" opacity=".34" filter="url(#b)"/>
+<circle cx="404" cy="482" r="48" fill="#ffbd50" opacity=".28" filter="url(#g)"/>
+</g></svg>

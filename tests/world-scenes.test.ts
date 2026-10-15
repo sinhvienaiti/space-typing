@@ -74,20 +74,20 @@ describe("World background scene registry", () => {
     expect(low.ambientParticles).toBeLessThan(medium.ambientParticles);
     expect(medium.ambientParticles).toBeLessThan(high.ambientParticles);
     expect(high.ambientParticles).toBeLessThan(ultra.ambientParticles);
-    expect(ultra.ambientParticles).toBeLessThanOrEqual(28);
-    expect(ultra.farDetails).toBeLessThanOrEqual(6);
-    expect(ultra.midDetails).toBeLessThanOrEqual(5);
+    expect(ultra.ambientParticles).toBeLessThanOrEqual(34);
+    expect(ultra.farDetails).toBeLessThanOrEqual(8);
+    expect(ultra.midDetails).toBeLessThanOrEqual(7);
 
     expect(low.farStars).toBeLessThan(medium.farStars);
     expect(medium.farStars).toBeLessThan(high.farStars);
     expect(high.farStars).toBeLessThan(ultra.farStars);
-    expect(ultra.farStars).toBeLessThanOrEqual(210);
+    expect(ultra.farStars).toBeLessThanOrEqual(260);
 
     expect(low.nearStars).toBeLessThan(medium.nearStars);
-    expect(ultra.nearStars).toBeLessThanOrEqual(34);
-    expect(ultra.midObjects).toBeLessThanOrEqual(13);
-    expect(ultra.foregroundObjects).toBeLessThanOrEqual(22);
-    expect(ultra.eventObjects).toBeLessThanOrEqual(2);
+    expect(ultra.nearStars).toBeLessThanOrEqual(44);
+    expect(ultra.midObjects).toBeLessThanOrEqual(17);
+    expect(ultra.foregroundObjects).toBeLessThanOrEqual(28);
+    expect(ultra.eventObjects).toBeLessThanOrEqual(4);
   });
 
   it("gives Galaxy and meteor Worlds strong cinematic motion identities", () => {

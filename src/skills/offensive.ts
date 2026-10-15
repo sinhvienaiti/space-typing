@@ -12,7 +12,9 @@ export type OffensiveSkillId =
 export const OFFENSIVE_SKILLS: readonly SkillDefinition[] = [
   {
     id: "emp-burst",
-    name: "EMP Burst",
+    name: "EMP Shockwave",
+    description:
+      "An electromagnetic shockwave from the hull: clears hostile shots, jams every enemy's weapons for 2.5 s and shuts down Jammer interference.",
     energyCost: 32,
     cooldown: 12,
     charges: 3,
@@ -21,7 +23,9 @@ export const OFFENSIVE_SKILLS: readonly SkillDefinition[] = [
   },
   {
     id: "chain-lightning",
-    name: "Chain Lightning",
+    name: "Arc Lance",
+    description:
+      "A Tesla arc leaps through the 4 closest enemies: each loses a shield layer or 2 letters. Against a lone boss it burns 4% of its hull.",
     energyCost: 38,
     cooldown: 11,
     charges: 4,
@@ -30,7 +34,9 @@ export const OFFENSIVE_SKILLS: readonly SkillDefinition[] = [
   },
   {
     id: "mark-of-weakness",
-    name: "Mark of Weakness",
+    name: "Target Lock",
+    description:
+      "Paints the target with a targeting laser for 8 s: it loses a shield layer, and a locked boss takes 35% more damage.",
     energyCost: 26,
     cooldown: 14,
     charges: 3,

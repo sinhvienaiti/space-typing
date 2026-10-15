@@ -1,0 +1,67 @@
+{
+  "id": "zenith",
+  "version": 3,
+  "aspect": 1.1635,
+  "heightScale": 0.174,
+  "heightGrid": [
+    256,
+    220
+  ],
+  "nozzles": [
+    [
+      0.2287,
+      0.6578,
+      0.0345
+    ],
+    [
+      0.4972,
+      0.7656,
+      0.0658
+    ],
+    [
+      0.7697,
+      0.656,
+      0.0345
+    ]
+  ],
+  "anchors": {
+    "nose": [
+      0.4988,
+      0.029
+    ],
+    "canopy": [
+      0.4993,
+      0.4362
+    ],
+    "eyes": [],
+    "guns": [
+      [
+        0.2266,
+        0.3251
+      ],
+      [
+        0.7725,
+        0.3261
+      ]
+    ],
+    "wingtips": [
+      [
+        0.0266,
+        0.8733
+      ],
+      [
+        0.9718,
+        0.8724
+      ]
+    ]
+  },
+  "colors": {
+    "hot": "#dcf3ff",
+    "plume": "#18aeff",
+    "outer": "#117db8",
+    "accent": "#4990ff"
+  },
+  "color": "color.webp?v=4b9f2a9f8f84",
+  "emissive": "emissive.webp?v=d225c371f341",
+  "height": "height.bin?v=8fec5fcb611c"
+}

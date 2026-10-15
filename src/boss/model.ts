@@ -1,6 +1,8 @@
 import type { StageRole } from "../campaign/types";
 import type { VocabularyEntry } from "../types";
 import type { BossTypingMechanicState } from "./typing-mechanics";
+import type { BossPartState } from "../expansion-v2/boss-parts";
+import { bossFullName, bossIdentityForStage } from "./identity";
 
 export type BossRole = Extract<
   StageRole,
@@ -23,6 +25,7 @@ export type BossState = {
   flash: number;
   kick: number;
   typingMechanic?: BossTypingMechanicState;
+  parts?: BossPartState[];
 };
 
 export type BossHudState = {
@@ -35,6 +38,13 @@ export type BossHudState = {
   mechanicLabel?: string;
   mechanicTimer?: number;
   mechanicProgress?: string;
+  parts?: Array<{
+    type: BossPartState["type"];
+    hp: number;
+    maxHp: number;
+    destroyed: boolean;
+    vulnerable: boolean;
+  }>;
 };
 
 export function isBossStageRole(role: StageRole): role is BossRole {
@@ -45,14 +55,18 @@ export function isBossStageRole(role: StageRole): role is BossRole {
   );
 }
 
+/**
+ * The boss met at `stage` (see ./identity: a unique Galaxy Tyrant per Galaxy,
+ * World Bosses and Mini Bosses from the World's leading family).
+ */
+export function bossNameForStage(stage: number, role: BossRole): string {
+  return bossFullName(bossIdentityForStage(stage, role));
+}
+
+/** The boss of a Galaxy's first World (kept for older callers). */
 export function bossName(role: BossRole, galaxy: number): string {
-  const prefix =
-    role === "major-boss"
-      ? "Galaxy Tyrant"
-      : role === "boss"
-        ? "Abyss Warden"
-        : "Vanguard Sentinel";
-  return prefix + " · G" + String(galaxy).padStart(2, "0");
+  const firstStage = (Math.max(1, Math.floor(galaxy)) - 1) * 100 + 1;
+  return bossNameForStage(role === "major-boss" ? firstStage + 99 : firstStage, role);
 }
 
 export function bossMaxHp(
@@ -74,9 +88,10 @@ export function createBossState(
   entry: VocabularyEntry,
 ): BossState {
   const maxHp = bossMaxHp(stage, role);
+  void galaxy;
   return {
     role,
-    name: bossName(role, galaxy),
+    name: bossNameForStage(stage, role),
     hp: maxHp,
     maxHp,
     entry,
@@ -158,6 +173,13 @@ export function toBossHud(state: BossState): BossHudState {
     phase: state.phase,
     shieldActive: state.shieldActive,
     staggered: state.staggerTimer > 0,
+    parts: state.parts?.map((part) => ({
+      type: part.type,
+      hp: part.hp,
+      maxHp: part.maxHp,
+      destroyed: part.destroyed,
+      vulnerable: part.vulnerable,
+    })),
     ...(mechanic === undefined
       ? {}
       : {

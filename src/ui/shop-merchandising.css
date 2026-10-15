@@ -1,0 +1,30 @@
+.shop-offer-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.38rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.shop-compare-at {
+  opacity: 0.64;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  text-decoration: line-through;
+  white-space: nowrap;
+}
+
+.shop-price .shop-offer-badge {
+  order: -1;
+}
+
+.shop-price .shop-compare-at {
+  width: 100%;
+  text-align: right;
+}

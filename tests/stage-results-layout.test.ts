@@ -8,6 +8,8 @@ describe("Stage clear desktop report presentation", () => {
     expect(html).toContain('class="stage-results-overview"');
     expect(html).toContain('class="stage-results-detail-column"');
     expect(html).toContain('class="stage-results-footer"');
+    expect(html).toContain('id="stageClearCelebration"');
+    expect(html).toContain('data-celebration-level="1"');
     expect(html).toContain('role="dialog"');
     expect(html).toContain('aria-modal="true"');
 

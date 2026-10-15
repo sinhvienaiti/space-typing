@@ -1,3 +1,5 @@
+import { createAccountState, isValidAccountState, type AccountState } from "./account-state";
+import { UnsupportedExpansionV2ProfileVersionError } from "../expansion-v2/profile-store";
 import {
   createDefaultCampaignProgress,
   loadCampaignProgress,
@@ -112,7 +114,49 @@ const STORE_NAME = "player";
 const SAVE_KEY = "main";
 const RECOVERY_SAVE_KEY = "spaceTypingPlayerSaveRecoveryV3";
 
-export const PLAYER_SAVE_VERSION = 27;
+export const PLAYER_SAVE_VERSION = 28;
+export class CorruptAccountStateError extends Error {
+  constructor() { super("Current save has missing or invalid account data. Restore a valid backup; no Warp was granted."); }
+}
+/** Stored canonical data must identify a supported schema; unknown records are not a new player. */
+export function readCanonicalPlayerSave(value: unknown): PlayerSave {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    !Number.isSafeInteger((value as { version?: unknown }).version)
+  )
+    throw new CorruptAccountStateError();
+  return migratePlayerSave(value).save;
+}
+export function validateAccountAuxiliary(value: unknown): void {
+  if (value === undefined) return;
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new CorruptAccountStateError();
+  const aux = value as PlayerSave["auxiliary"];
+  if (aux?.expansionV2 !== undefined) {
+    const profile = aux.expansionV2 as { version?: unknown };
+    if (typeof profile?.version === "number" && profile.version > 1)
+      throw new UnsupportedExpansionV2ProfileVersionError(profile.version);
+    if (
+      !profile ||
+      typeof profile !== "object" ||
+      Array.isArray(profile) ||
+      profile.version !== 1
+    )
+      throw new CorruptAccountStateError();
+  }
+  if (
+    aux?.difficulty !== undefined &&
+    (!aux.difficulty ||
+      typeof aux.difficulty !== "object" ||
+      Array.isArray(aux.difficulty))
+  )
+    throw new CorruptAccountStateError();
+}
+class MissingCanonicalSaveError extends Error {
+  constructor(readonly recovery: PlayerSave) { super("Canonical account missing. Explicit backup recovery is required."); }
+}
 
 export class UnsupportedPlayerSaveVersionError extends Error {
   constructor(readonly version: number) {
@@ -560,7 +604,7 @@ export type PlayerSaveV26 = {
 
 export type PlayerSaveV27 = Omit<PlayerSaveV26, "version"> & { version: 27 };
 
-export type PlayerSave = PlayerSaveV27;
+export type PlayerSave = Omit<PlayerSaveV27, "version"> & { version: 28; account: AccountState; auxiliary?: { expansionV2?: unknown; difficulty?: unknown } };
 export type PersistenceSource = "indexeddb" | "localStorage";
 
 export type LoadedPlayerSave = {
@@ -568,6 +612,8 @@ export type LoadedPlayerSave = {
   source: PersistenceSource;
   migrated: boolean;
   recoveryMode: "none" | "crash" | "death-rollback";
+  interrupted?: boolean;
+  mirrorRescue?: boolean;
 };
 
 export type MigrationResult = {
@@ -614,10 +660,11 @@ export function createPlayerSave(
   hiddenDiscovery: HiddenDiscoveryState = createHiddenDiscoveryState(),
   credits = 0,
   progression: ProgressionState = createProgressionState(),
-  expansionCurrencies: ExpansionCurrencyState =
-    createExpansionCurrencyState(),
-  campaignExpansion: CampaignExpansionState =
-    createCampaignExpansionState(campaign, updatedAt),
+  expansionCurrencies: ExpansionCurrencyState = createExpansionCurrencyState(),
+  campaignExpansion: CampaignExpansionState = createCampaignExpansionState(
+    campaign,
+    updatedAt,
+  ),
   checkpointSnapshot?: CheckpointSnapshot,
   crashRecoverySnapshot: CrashRecoverySnapshot | null = null,
   stageEntrySnapshot: StageEntrySnapshot | null = null,
@@ -628,6 +675,7 @@ export function createPlayerSave(
   codex: CodexState = createCodexState(),
   ascension: AscensionState = createAscensionState(campaign),
   hotbar: HotbarState = createDefaultHotbarState(),
+  account?: AccountState,
 ): PlayerSave {
   const safeCampaign = sanitizeCampaignProgress(campaign);
   const activeState: RunPersistentState = {
@@ -640,13 +688,9 @@ export function createPlayerSave(
     hiddenDiscovery: sanitizeHiddenDiscoveryState(hiddenDiscovery),
     credits: sanitizeCredits(credits),
     progression: sanitizeProgressionState(progression),
-    expansionCurrencies:
-      sanitizeExpansionCurrencyState(expansionCurrencies),
+    expansionCurrencies: sanitizeExpansionCurrencyState(expansionCurrencies),
     shops: sanitizeShopState(shops),
-    route: sanitizeRouteState(
-      route,
-      safeCampaign.highestUnlockedStage,
-    ),
+    route: sanitizeRouteState(route, safeCampaign.highestUnlockedStage),
     upgrades: sanitizeUpgradeState(upgrades),
     relics: sanitizeRelicState(relics),
     ascension: sanitizeAscensionState(ascension, safeCampaign),
@@ -668,15 +712,32 @@ export function createPlayerSave(
           safeCampaignExpansion.checkpoint.stage,
         );
 
+  const safeAccount = account ?? createAccountState();
+  if (account === undefined) {
+    for (const stage of safeCampaign.clearedStages)
+      if (stage % 10 === 0)
+        safeAccount.milestoneGrants.push(
+          `${safeAccount.policy}:sector:0:${stage}`,
+        );
+    const safeAscension = activeState.ascension;
+    for (let tier = 1; tier <= safeAscension.highestUnlockedTier; tier++) {
+      const frontier = safeAscension.completedTiers.includes(tier)
+        ? 1001
+        : (safeAscension.frontierByTier[String(tier)] ?? 1);
+      for (let stage = 10; stage < frontier; stage += 10)
+        safeAccount.milestoneGrants.push(
+          `${safeAccount.policy}:sector:${tier}:${stage}`,
+        );
+    }
+  }
   return {
     version: PLAYER_SAVE_VERSION,
+    account: structuredClone(safeAccount),
     ...activeState,
     campaignExpansion: safeCampaignExpansion,
     checkpointSnapshot: safeCheckpoint,
-    crashRecoverySnapshot:
-      sanitizeCrashRecoverySnapshot(crashRecoverySnapshot),
-    stageEntrySnapshot:
-      sanitizeStageEntrySnapshot(stageEntrySnapshot),
+    crashRecoverySnapshot: sanitizeCrashRecoverySnapshot(crashRecoverySnapshot),
+    stageEntrySnapshot: sanitizeStageEntrySnapshot(stageEntrySnapshot),
     codex: sanitizeCodexState(codex),
     ascension: sanitizeAscensionState(ascension, safeCampaign),
     hotbar: sanitizeHotbarState(hotbar),
@@ -717,6 +778,8 @@ export function migratePlayerSave(value: unknown): MigrationResult {
     codex?: unknown;
     ascension?: unknown;
     hotbar?: unknown;
+    account?: unknown;
+    auxiliary?: PlayerSave["auxiliary"];
     updatedAt?: unknown;
     lastSaveReason?: unknown;
   };
@@ -1349,9 +1412,11 @@ export function migratePlayerSave(value: unknown): MigrationResult {
     };
   }
 
-  if (raw.version === PLAYER_SAVE_VERSION) {
+  if (raw.version === 27 || raw.version === PLAYER_SAVE_VERSION) {
+    if (raw.version === PLAYER_SAVE_VERSION && !isValidAccountState(raw.account)) throw new CorruptAccountStateError();
+    validateAccountAuxiliary(raw.auxiliary);
     return {
-      save: createPlayerSave(
+      save: { ...createPlayerSave(
         sanitizeCampaignProgress(raw.campaign),
         typeof raw.updatedAt === "string" ? raw.updatedAt : "",
         normalizeSaveReason(raw.lastSaveReason),
@@ -1382,9 +1447,10 @@ export function migratePlayerSave(value: unknown): MigrationResult {
         sanitizeCodexState(raw.codex),
         sanitizeAscensionState(raw.ascension, sanitizeCampaignProgress(raw.campaign)),
         sanitizeHotbarState(raw.hotbar),
-      ),
-      migrated: false,
-      fromVersion: PLAYER_SAVE_VERSION,
+        raw.version === PLAYER_SAVE_VERSION ? raw.account as AccountState : undefined,
+      ), ...(raw.auxiliary ? { auxiliary: structuredClone(raw.auxiliary) } : {}) },
+      migrated: raw.version === 27,
+      fromVersion: raw.version as number,
     };
   }
 
@@ -1476,6 +1542,7 @@ function recoverySaveFromLegacy(): PlayerSave {
     }
 
     const recovery = migratePlayerSave(JSON.parse(raw)).save;
+    if (recovery.account.revision > 0) return recovery;
     const campaign = chooseFurthestCampaign(
       recovery.campaign,
       legacyCampaign,
@@ -1507,8 +1574,8 @@ function recoverySaveFromLegacy(): PlayerSave {
       recovery.hotbar,
     );
   } catch (error) {
-    if (error instanceof UnsupportedPlayerSaveVersionError) throw error;
-    return createPlayerSave(legacyCampaign, "", "migration");
+    if (error instanceof UnsupportedPlayerSaveVersionError || error instanceof CorruptAccountStateError) throw error;
+    throw new CorruptAccountStateError();
   }
 }
 
@@ -1548,6 +1615,7 @@ export function resolvePlayerSaveRecovery(
   save: PlayerSave;
   recoveryMode: LoadedPlayerSave["recoveryMode"];
 } {
+  if (save.account.revision > 0) return { save, recoveryMode: "none" };
   const resolution = resolveCrashRecovery(
     runStateFromSave(save),
     save.campaignExpansion,
@@ -1590,7 +1658,7 @@ export function resolvePlayerSaveRecovery(
   };
 }
 
-function openDatabase(): Promise<IDBDatabase> {
+export function openPlayerDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, INDEXED_DB_VERSION);
 
@@ -1606,360 +1674,85 @@ function openDatabase(): Promise<IDBDatabase> {
   });
 }
 
-function readSave(database: IDBDatabase): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(STORE_NAME, "readonly");
-    const request = transaction.objectStore(STORE_NAME).get(SAVE_KEY);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () =>
-      reject(request.error ?? new Error("Unable to read player save."));
-  });
-}
-
-function writeSave(database: IDBDatabase, save: PlayerSave): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(STORE_NAME, "readwrite");
-    transaction.objectStore(STORE_NAME).put(save, SAVE_KEY);
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () =>
-      reject(transaction.error ?? new Error("Unable to write player save."));
-    transaction.onabort = () =>
-      reject(transaction.error ?? new Error("Player save was aborted."));
-  });
-}
-
-async function writeIndexedDb(save: PlayerSave): Promise<void> {
-  const database = await openDatabase();
+/** Mutate synchronously inside get. The only success boundary is transaction.oncomplete. */
+export async function playerSaveTransaction(
+  mutate: (stored: unknown) => PlayerSave,
+): Promise<PlayerSave> {
+  const database = await openPlayerDatabase();
   try {
-    await writeSave(database, save);
+    return await new Promise<PlayerSave>((resolve, reject) => {
+      const transaction = database.transaction(STORE_NAME, "readwrite", {
+        durability: "strict",
+      });
+      const store = transaction.objectStore(STORE_NAME);
+      let next: PlayerSave, failure: unknown;
+      const request = store.get(SAVE_KEY);
+      request.onsuccess = () => {
+        try {
+          next = mutate(request.result);
+          store.put(next, SAVE_KEY);
+        } catch (error) {
+          failure = error;
+          transaction.abort();
+        }
+      };
+      transaction.oncomplete = () => resolve(next!);
+      transaction.onabort = transaction.onerror = () =>
+        reject(
+          failure ??
+            transaction.error ??
+            new Error("Account transaction aborted"),
+        );
+    });
   } finally {
     database.close();
   }
 }
-
 export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
-  const recovery = recoverySaveFromLegacy();
-
-  if (!("indexedDB" in window)) {
-    const resolved = resolvePlayerSaveRecovery(recovery);
-    try {
-      if (resolved.recoveryMode !== "none") {
-        saveRecovery(resolved.save);
-      }
-    } catch {
-      // The resolved in-memory state is still safe to use.
-    }
+  if (!("indexedDB" in window))
     return {
-      save: resolved.save,
+      save: recoverySaveFromLegacy(),
       source: "localStorage",
-      migrated: recovery.lastSaveReason === "migration",
-      recoveryMode: resolved.recoveryMode,
+      migrated: false,
+      recoveryMode: "none",
     };
-  }
-
-  let database: IDBDatabase | null = null;
-
+  let migrated = false;
+  let save: PlayerSave;
   try {
-    database = await openDatabase();
-    const stored = await readSave(database);
-
-    if (stored === undefined) {
-      const resolved = resolvePlayerSaveRecovery(recovery);
-      const migrated = createPlayerSave(
-        resolved.save.campaign,
-        new Date().toISOString(),
-        "migration",
-        resolved.save.inventory,
-        resolved.save.equipment,
-        resolved.save.supportSpells,
-        resolved.save.characters,
-        resolved.save.luckPity,
-        resolved.save.hiddenDiscovery,
-        resolved.save.credits,
-        resolved.save.progression,
-        resolved.save.expansionCurrencies,
-        resolved.save.campaignExpansion,
-        resolved.save.checkpointSnapshot,
-        resolved.save.crashRecoverySnapshot,
-        resolved.save.stageEntrySnapshot,
-        resolved.save.shops,
-        resolved.save.route,
-        resolved.save.upgrades,
-        resolved.save.relics,
-        resolved.save.codex,
-        resolved.save.ascension,
-        resolved.save.hotbar,
-      );
-      await writeSave(database, migrated);
-      try {
-        saveRecovery(migrated);
-      } catch {
-        // IndexedDB remains the source of truth.
+    save = await playerSaveTransaction((stored) => {
+      if (stored !== undefined) {
+        const result = {
+          save: readCanonicalPlayerSave(stored),
+          migrated:
+            (stored as { version: number }).version !== PLAYER_SAVE_VERSION,
+        };
+        migrated = result.migrated;
+        // Current canonical state always outranks a mirror or checkpoint, including its wallet.
+        if (!migrated) return result.save;
+        const resolved = resolvePlayerSaveRecovery(result.save);
+        return { ...resolved.save, account: result.save.account };
       }
-      return {
-        save: migrated,
-        source: "indexeddb",
-        migrated: true,
-        recoveryMode: resolved.recoveryMode,
-      };
-    }
-
-    const migration = migratePlayerSave(stored);
-    const preferredSave = choosePreferredPlayerSave(
-      migration.save,
-      recovery,
-    );
-    const useRecovery = preferredSave === recovery;
-    const campaign = preferredSave.campaign;
-    const inventory = useRecovery
-      ? recovery.inventory
-      : migration.save.inventory;
-    const equipment = useRecovery
-      ? recovery.equipment
-      : migration.save.equipment;
-    const supportSpells = useRecovery
-      ? recovery.supportSpells
-      : migration.save.supportSpells;
-    const characters = useRecovery
-      ? recovery.characters
-      : migration.save.characters;
-    const luckPity = useRecovery
-      ? recovery.luckPity
-      : migration.save.luckPity;
-    const hiddenDiscovery = useRecovery
-      ? recovery.hiddenDiscovery
-      : migration.save.hiddenDiscovery;
-    const credits = useRecovery
-      ? recovery.credits
-      : migration.save.credits;
-    const progression = useRecovery
-      ? recovery.progression
-      : migration.save.progression;
-    const expansionCurrencies = useRecovery
-      ? recovery.expansionCurrencies
-      : migration.save.expansionCurrencies;
-    const shops = useRecovery
-      ? recovery.shops
-      : migration.save.shops;
-    const route = useRecovery
-      ? recovery.route
-      : migration.save.route;
-    const upgrades = useRecovery
-      ? recovery.upgrades
-      : migration.save.upgrades;
-    const relics = useRecovery
-      ? recovery.relics
-      : migration.save.relics;
-    const codex = mergeCodexState(
-      recovery.codex,
-      migration.save.codex,
-    );
-    const ascension = useRecovery
-      ? recovery.ascension
-      : migration.save.ascension;
-    const hotbar = useRecovery
-      ? recovery.hotbar
-      : migration.save.hotbar;
-    const campaignExpansion = useRecovery
-      ? recovery.campaignExpansion
-      : migration.save.campaignExpansion;
-    const checkpointSnapshot = useRecovery
-      ? recovery.checkpointSnapshot
-      : migration.save.checkpointSnapshot;
-    const crashRecoverySnapshot = useRecovery
-      ? recovery.crashRecoverySnapshot
-      : migration.save.crashRecoverySnapshot;
-    const stageEntrySnapshot = useRecovery
-      ? recovery.stageEntrySnapshot
-      : migration.save.stageEntrySnapshot;
-
-    const recoveredProgress =
-      campaign !== migration.save.campaign ||
-      inventory !== migration.save.inventory ||
-      equipment !== migration.save.equipment ||
-      supportSpells !== migration.save.supportSpells ||
-      characters !== migration.save.characters ||
-      luckPity !== migration.save.luckPity ||
-      hiddenDiscovery !== migration.save.hiddenDiscovery ||
-      credits !== migration.save.credits ||
-      progression !== migration.save.progression ||
-      expansionCurrencies !== migration.save.expansionCurrencies ||
-      shops !== migration.save.shops ||
-      route !== migration.save.route ||
-      upgrades !== migration.save.upgrades ||
-      relics !== migration.save.relics ||
-      JSON.stringify(codex) !== JSON.stringify(migration.save.codex) ||
-      ascension !== migration.save.ascension ||
-      hotbar !== migration.save.hotbar ||
-      campaignExpansion !== migration.save.campaignExpansion ||
-      checkpointSnapshot !== migration.save.checkpointSnapshot ||
-      crashRecoverySnapshot !== migration.save.crashRecoverySnapshot ||
-      stageEntrySnapshot !== migration.save.stageEntrySnapshot;
-
-    const candidate = createPlayerSave(
-      campaign,
-      useRecovery ? recovery.updatedAt : migration.save.updatedAt,
-      useRecovery ? recovery.lastSaveReason : migration.save.lastSaveReason,
-      inventory,
-      equipment,
-      supportSpells,
-      characters,
-      luckPity,
-      hiddenDiscovery,
-      credits,
-      progression,
-      expansionCurrencies,
-      campaignExpansion,
-      checkpointSnapshot,
-      crashRecoverySnapshot,
-      stageEntrySnapshot,
-      shops,
-      route,
-      upgrades,
-      relics,
-      codex,
-      ascension,
-      hotbar,
-    );
-    const resolved = resolvePlayerSaveRecovery(candidate);
-
-    if (
-      migration.migrated ||
-      recoveredProgress ||
-      resolved.recoveryMode !== "none"
-    ) {
-      const recovered = createPlayerSave(
-        resolved.save.campaign,
-        new Date().toISOString(),
-        migration.migrated || recoveredProgress
-          ? "migration"
-          : resolved.save.lastSaveReason,
-        resolved.save.inventory,
-        resolved.save.equipment,
-        resolved.save.supportSpells,
-        resolved.save.characters,
-        resolved.save.luckPity,
-        resolved.save.hiddenDiscovery,
-        resolved.save.credits,
-        resolved.save.progression,
-        resolved.save.expansionCurrencies,
-        resolved.save.campaignExpansion,
-        resolved.save.checkpointSnapshot,
-        resolved.save.crashRecoverySnapshot,
-        resolved.save.stageEntrySnapshot,
-        resolved.save.shops,
-        resolved.save.route,
-        resolved.save.upgrades,
-        resolved.save.relics,
-        resolved.save.codex,
-        resolved.save.ascension,
-        resolved.save.hotbar,
-      );
-      await writeSave(database, recovered);
-      try {
-        saveRecovery(recovered);
-      } catch {
-        // IndexedDB remains the source of truth.
-      }
-      return {
-        save: recovered,
-        source: "indexeddb",
-        migrated: migration.migrated || recoveredProgress,
-        recoveryMode: resolved.recoveryMode,
-      };
-    }
-
-    try {
-      saveRecovery(resolved.save);
-    } catch {
-      // IndexedDB remains the source of truth if the mirror fails.
-    }
-
-    return {
-      save: resolved.save,
-      source: "indexeddb",
-      migrated: false,
-      recoveryMode: resolved.recoveryMode,
-    };
+      migrated = true;
+      const recovery = recoverySaveFromLegacy();
+      if (recovery.account.revision > 0)
+        throw new MissingCanonicalSaveError(recovery);
+      return recovery;
+    });
   } catch (error) {
-    if (error instanceof UnsupportedPlayerSaveVersionError) throw error;
-    const resolved = resolvePlayerSaveRecovery(recovery);
-    return {
-      save: resolved.save,
-      source: "localStorage",
-      migrated: false,
-      recoveryMode: resolved.recoveryMode,
-    };
-  } finally {
-    database?.close();
+    if (error instanceof MissingCanonicalSaveError)
+      return {
+        save: error.recovery,
+        source: "localStorage",
+        migrated: false,
+        recoveryMode: "none",
+        mirrorRescue: true,
+      };
+    throw error;
   }
-}
-
-export async function savePlayerProgress(
-  campaign: CampaignProgress,
-  inventory: Inventory,
-  equipment: EquipmentState,
-  supportSpells: SupportSpellState,
-  characters: CharacterState,
-  reason: SaveReason = "unknown",
-  luckPity: LuckPityState = createLuckPityState(),
-  hiddenDiscovery: HiddenDiscoveryState = createHiddenDiscoveryState(),
-  credits = 0,
-  progression: ProgressionState = createProgressionState(),
-  expansionCurrencies: ExpansionCurrencyState =
-    createExpansionCurrencyState(),
-  campaignExpansion?: CampaignExpansionState,
-  checkpointSnapshot?: CheckpointSnapshot,
-  crashRecoverySnapshot: CrashRecoverySnapshot | null = null,
-  stageEntrySnapshot: StageEntrySnapshot | null = null,
-  shops: ShopState = createShopState(),
-  route: RouteState = createRouteState(campaign.highestUnlockedStage),
-  upgrades: UpgradeState = createUpgradeState(),
-  relics: RelicState = createRelicState(),
-  codex: CodexState = createCodexState(),
-  ascension: AscensionState = createAscensionState(campaign),
-  hotbar: HotbarState = createDefaultHotbarState(),
-): Promise<PersistenceSource> {
-  const save = createPlayerSave(
-    campaign,
-    new Date().toISOString(),
-    reason,
-    inventory,
-    equipment,
-    supportSpells,
-    characters,
-    luckPity,
-    hiddenDiscovery,
-    credits,
-    progression,
-    expansionCurrencies,
-    campaignExpansion,
-    checkpointSnapshot,
-    crashRecoverySnapshot,
-    stageEntrySnapshot,
-    shops,
-    route,
-    upgrades,
-    relics,
-    codex,
-    ascension,
-    hotbar,
-  );
-
-  if ("indexedDB" in window) {
-    try {
-      await writeIndexedDb(save);
-      try {
-        saveRecovery(save);
-      } catch {
-        // IndexedDB already contains the valid save.
-      }
-      return "indexeddb";
-    } catch {
-      // Use recovery storage below.
-    }
+  try {
+    saveRecovery(save);
+  } catch {
+    /* A committed canonical revision remains authoritative. */
   }
-
-  saveRecovery(save);
-  return "localStorage";
+  return { save, source: "indexeddb", migrated, recoveryMode: "none" };
 }

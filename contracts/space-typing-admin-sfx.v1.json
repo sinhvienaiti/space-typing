@@ -1,0 +1,38 @@
+{
+  "contractRevision": "space-typing-admin-sfx-v1",
+  "schemaVersion": 1,
+  "gameId": "space-typing",
+  "capability": "sfx.read",
+  "route": {
+    "id": "sfx",
+    "path": "/admin/space-typing/sfx",
+    "label": "SFX"
+  },
+  "sfx": {
+    "mode": "runtime-backed-readonly",
+    "runtimeSources": [
+      "src/audio/sample-bank.ts",
+      "src/audio/Sfx.ts",
+      "src/audio/mix.ts"
+    ],
+    "runtimeOwner": "SampleSfxBank + SAMPLE_SFX",
+    "dataFlow": "SAMPLE_SFX -> SampleSfxBank.play -> mixedSfxGain -> HTMLAudioElement",
+    "persistenceOwner": "code-owned-runtime-sfx",
+    "eventBinding": "SampleSfxId",
+    "readableFields": ["id", "eventBinding", "source", "group", "runtimeGain", "poolSize"],
+    "authorableFields": [],
+    "writeCapability": false,
+    "adminPreviewWriteCapability": false,
+    "previewCapability": true,
+    "previewMutation": false,
+    "previewBoundary": "browser-local-production-sample-playback",
+    "applyBoundary": "none",
+    "unsupportedAdminMockFields": [
+      "cooldown",
+      "priority",
+      "enabled",
+      "gain override",
+      "source override"
+    ]
+  }
+}

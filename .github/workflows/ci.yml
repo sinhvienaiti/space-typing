@@ -23,8 +23,82 @@ jobs:
       - name: Install
         run: pnpm install --no-frozen-lockfile
 
+      - name: Validate music catalog
+        run: pnpm music:catalog:check
+
       - name: Test
         run: pnpm test
 
+      - name: Smoke canonical Admin preview bridges
+        run: |
+          pnpm ships:admin-preview </dev/null >/dev/null
+          pnpm equipment:admin-preview </dev/null >/dev/null
+          pnpm skills:admin-preview </dev/null >/dev/null
+          pnpm enemies:admin-preview </dev/null >/dev/null
+          pnpm bosses:admin-preview </dev/null >/dev/null
+          pnpm worlds:admin-preview </dev/null >/dev/null
+          pnpm stages:admin-preview </dev/null >/dev/null
+          pnpm shop:admin-preview </dev/null >/dev/null
+
+      - name: Smoke Shop revision lifecycle
+        run: pnpm shop:revision-lifecycle-smoke
+
+      - name: Audit Warp economy
+        run: pnpm stamina:audit
+
+      - name: Audit Missions contract
+        run: pnpm missions:audit
+
+      - name: Audit Feature Gates contract
+        run: pnpm feature-gates:audit
+
+      - name: Audit Events contract
+        run: pnpm events:audit
+
+      - name: Audit Duel contract
+        run: pnpm duel:audit
+
+      - name: Audit Ranked contract
+        run: pnpm ranked:audit
+
+      - name: Audit Alternative Modes contract
+        run: pnpm alternative-modes:audit
+
+      - name: Audit Backgrounds contract
+        run: pnpm backgrounds:audit
+
+      - name: Audit VFX contract
+        run: pnpm vfx:audit
+
+      - name: Audit UI Assets contract
+        run: pnpm ui-assets:audit
+
+      - name: Audit QA Sandbox contract
+        run: pnpm qa:audit
+
+      - name: Audit Telemetry contract
+        run: pnpm telemetry:audit
+
+      - name: Audit Expedition contract
+        run: pnpm expedition:audit
+
+      - name: Audit Daily / Weekly contract
+        run: pnpm daily-weekly:audit
+
       - name: Build
         run: pnpm build
+
+      - name: R01 browser QA
+        run: pnpm visual:r01-qa
+
+      - name: Upload R01 browser captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r01-campaign-map-${{ github.run_id }}
+          path: |
+            .visual/r01-desktop.png
+            .visual/r01-mobile.png
+            .visual/r01-vite.log
+          if-no-files-found: warn
+          retention-days: 7

@@ -1,0 +1,24 @@
+{
+  "contractRevision": "space-typing-admin-events-v1",
+  "schemaVersion": 1,
+  "capability": "events.read",
+  "route": {"id":"events","path":"/admin/space-typing/events","label":"Events"},
+  "events": {
+    "mode": "runtime-derived-readonly",
+    "runtimeSources": ["src/events/stage-scheduler.ts","src/events/galaxy-hazards.ts","src/events/rare-targets.ts","src/events/anomaly.ts","src/events/recall-bonus.ts","src/events/reward-choice.ts","src/Game.ts"],
+    "domains": ["stage-random-events","galaxy-stage-modifiers","rare-targets","anomaly-crate","recall-bonus","reward-choice"],
+    "authorableFields": [],
+    "runtimeDerivedFields": ["stageRandomEventDefinitions","galaxyStageModifiers","chanceCurves","rewardChoices"],
+    "stageRandomEventIds": ["fast-enemies","armored-enemies","low-shield","double-supply","projectile-storm"],
+    "stageRandomEventTones": ["hazard","mixed","benefit"],
+    "galaxyModifierIds": ["supply-run","training-window","ion-storm","debris-field","solar-flare","gravity-tide","gauntlet-pressure"],
+    "sourceFunctions": ["scheduleStageRandomEvents","combineStageEventEffects","galaxyStageModifiers","goldenEnemyChance","treasureDroneChance","anomalyCrateChance","shouldScheduleRecallBonus","rewardChoiceCrateChance"],
+    "gameplayConsumer": "src/Game.ts",
+    "persistenceOwner": "stage-session-runtime-only",
+    "scheduledLiveOpsService": false,
+    "calendarService": false,
+    "writeCapability": false,
+    "previewCapability": false,
+    "unsupportedMasterPlanFields": ["calendar","startAt","endAt","timezone","recurrence","audience","remoteOverride"]
+  }
+}

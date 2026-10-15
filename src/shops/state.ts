@@ -1,3 +1,4 @@
+import { ACTIVE_SHOP_RUNTIME_SESSION } from "../admin/shop-runtime-policy";
 import { galaxyForStage, normalizeStage } from "../campaign/stage";
 import type { HiddenDiscoveryState } from "../discovery/hidden-content";
 import {
@@ -10,6 +11,7 @@ import {
 } from "../equipment/loadout";
 import {
   EQUIPMENT_IDS,
+  EQUIPMENT_REGISTRY,
   type EquipmentId,
 } from "../equipment/registry";
 import { GRADE_IDS, type GradeId } from "../grades";
@@ -23,24 +25,38 @@ import {
   type ItemId,
 } from "../items/registry";
 import { clamp } from "../logic";
+import {
+  SHOP_POLICY_TYPES,
+  resolveShopAvailability,
+  resolveShopEquipmentGrade,
+  resolveShopEquipmentPrice,
+  resolveShopGenerationRule,
+  resolveShopItemPrice,
+  resolveShopRareItemChance,
+  type ShopAdminPolicyV1,
+  type ShopPolicyPrice,
+  type ShopPolicyType,
+} from "./policy";
 
-export const SHOP_TYPES = [
-  "normal",
-  "station",
-  "traveling",
-  "black-market",
-  "hidden",
-  "event",
-  "service",
-] as const;
+export const SHOP_TYPES = SHOP_POLICY_TYPES;
 
-export type ShopType = (typeof SHOP_TYPES)[number];
+export type ShopType = ShopPolicyType;
 
-export type ShopPrice = {
+export type ShopBasePrice = {
   credits: number;
   alloy: number;
   starCrystal: number;
   quantumCore: number;
+};
+
+/**
+ * Merchandising is snapshotted with the generated offer price. Existing
+ * ShopInstance records therefore keep the exact badge/compare-at presentation
+ * that was active when the sector shop was first materialized.
+ */
+export type ShopPrice = ShopBasePrice & {
+  compareAtPrice?: ShopBasePrice | null;
+  badge?: string | null;
 };
 
 export type ShopItemStock = {
@@ -110,44 +126,7 @@ export type ShopPurchaseResult = {
     | null;
 };
 
-const ITEM_POOL: readonly ItemId[] = [
-  "repair-kit",
-  "shield-cell",
-  "energy-cell",
-  "nova-bomb",
-  "emp-charge",
-  "time-crystal",
-  "word-bomb",
-  "supply-beacon",
-  "lucky-dice",
-];
-
-const TRAVELING_ITEM_POOL: readonly ItemId[] = [
-  "repair-kit",
-  "shield-cell",
-  "energy-cell",
-  "nova-bomb",
-  "emp-charge",
-  "time-crystal",
-  "word-bomb",
-  "supply-beacon",
-  "lucky-dice",
-];
-
-const EVENT_ITEM_POOL: readonly ItemId[] = [
-  "nova-bomb",
-  "emp-charge",
-  "time-crystal",
-  "word-bomb",
-  "supply-beacon",
-  "lucky-dice",
-];
-
-// Legacy Salvage Anchor / Stage Revival Core remain schema-compatible for old
-// saves but are no longer generated. Phoenix Core is the only death-revive item.
-const RESURRECTION_ITEMS: readonly ItemId[] = ["phoenix-core"];
-
-function emptyPrice(): ShopPrice {
+function emptyPrice(): ShopBasePrice {
   return {
     credits: 0,
     alloy: 0,
@@ -161,7 +140,7 @@ function sanitizeAmount(value: unknown): number {
   return Math.max(0, Math.floor(value));
 }
 
-export function sanitizeShopPrice(value: unknown): ShopPrice {
+function sanitizeBasePrice(value: unknown): ShopBasePrice {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return emptyPrice();
   }
@@ -174,11 +153,11 @@ export function sanitizeShopPrice(value: unknown): ShopPrice {
   };
 }
 
-export function isValidShopPrice(value: unknown): value is ShopPrice {
+function isValidBasePrice(value: unknown): value is ShopBasePrice {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return false;
   }
-  const raw = value as ShopPrice;
+  const raw = value as ShopBasePrice;
   return [
     raw.credits,
     raw.alloy,
@@ -190,6 +169,55 @@ export function isValidShopPrice(value: unknown): value is ShopPrice {
       Number.isInteger(amount) &&
       amount >= 0,
   );
+}
+
+function isValidBadge(value: unknown): value is string | null {
+  return value === null ||
+    (typeof value === "string" && value.trim().length > 0 && value.length <= 28);
+}
+
+export function sanitizeShopPrice(value: unknown): ShopPrice {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return emptyPrice();
+  }
+  const raw = value as Record<string, unknown>;
+  const price: ShopPrice = sanitizeBasePrice(raw);
+  if (Object.hasOwn(raw, "compareAtPrice")) {
+    price.compareAtPrice = raw.compareAtPrice === null
+      ? null
+      : sanitizeBasePrice(raw.compareAtPrice);
+  }
+  if (Object.hasOwn(raw, "badge")) {
+    price.badge = typeof raw.badge === "string" ? raw.badge : null;
+  }
+  return price;
+}
+
+export function isValidShopPrice(value: unknown): value is ShopPrice {
+  if (!isValidBasePrice(value)) return false;
+  const raw = value as Record<string, unknown>;
+  if (
+    Object.hasOwn(raw, "compareAtPrice") &&
+    raw.compareAtPrice !== null &&
+    !isValidBasePrice(raw.compareAtPrice)
+  ) {
+    return false;
+  }
+  if (Object.hasOwn(raw, "badge") && !isValidBadge(raw.badge)) return false;
+  return true;
+}
+
+function snapshotOfferPrice(
+  price: ShopPolicyPrice,
+  compareAtPrice: ShopPolicyPrice | undefined,
+  badge: string | null | undefined,
+): ShopPrice {
+  const snapshot: ShopPrice = { ...price };
+  if (compareAtPrice !== undefined) {
+    snapshot.compareAtPrice = { ...compareAtPrice };
+  }
+  if (badge !== undefined) snapshot.badge = badge;
+  return snapshot;
 }
 
 function hashString(value: string): number {
@@ -248,141 +276,6 @@ export function shopInstanceId(
   return type + ":" + context.worldKey + ":sector-" + String(sectorStart);
 }
 
-function equipmentGradeForShop(
-  type: ShopType,
-  stage: number,
-  random: () => number,
-): GradeId {
-  const safeStage = normalizeStage(stage);
-  const roll = random();
-
-  if (type === "hidden") {
-    if (safeStage >= 700 && roll > 0.94) return "diamond";
-    if (safeStage >= 350 && roll > 0.6) return "gold";
-    return safeStage >= 120 ? "silver" : "copper";
-  }
-
-  if (type === "black-market") {
-    if (safeStage >= 800 && roll > 0.96) return "diamond";
-    if (safeStage >= 500 && roll > 0.7) return "gold";
-    return safeStage >= 180 ? "silver" : "copper";
-  }
-
-  if (type === "traveling") {
-    if (safeStage >= 500 && roll > 0.9) return "gold";
-    if (safeStage >= 150 && roll > 0.55) return "silver";
-    return "copper";
-  }
-
-  if (type === "station") {
-    return safeStage >= 250 && roll > 0.8 ? "silver" : "copper";
-  }
-
-  if (type === "event") {
-    return safeStage >= 300 && roll > 0.85 ? "gold" : "silver";
-  }
-
-  return safeStage >= 100 && roll > 0.72 ? "copper" : "aluminum";
-}
-
-function equipmentBaseCredits(grade: GradeId): number {
-  return grade === "diamond"
-    ? 2400
-    : grade === "gold"
-      ? 1250
-      : grade === "silver"
-        ? 650
-        : grade === "copper"
-          ? 260
-          : 150;
-}
-
-function priceForEquipment(
-  type: ShopType,
-  grade: GradeId,
-): ShopPrice {
-  const price = emptyPrice();
-  const base = equipmentBaseCredits(grade);
-
-  if (type === "black-market") {
-    price.credits = Math.floor(base * 0.9);
-    price.starCrystal =
-      grade === "diamond" ? 5 : grade === "gold" ? 3 : grade === "silver" ? 1 : 0;
-    return price;
-  }
-
-  if (type === "hidden") {
-    price.starCrystal =
-      grade === "diamond" ? 7 : grade === "gold" ? 4 : grade === "silver" ? 2 : 1;
-    if (grade === "diamond") price.quantumCore = 1;
-    return price;
-  }
-
-  if (type === "traveling" || type === "station") {
-    price.credits = Math.floor(base * 0.75);
-    price.alloy =
-      grade === "gold" ? 12 : grade === "silver" ? 7 : grade === "copper" ? 3 : 0;
-    return price;
-  }
-
-  price.credits = base;
-  return price;
-}
-
-function priceForItem(
-  type: ShopType,
-  itemId: ItemId,
-): ShopPrice {
-  const price = emptyPrice();
-  const grade = getItemDefinition(itemId).grade ?? "aluminum";
-  const base =
-    grade === "diamond"
-      ? 1700
-      : grade === "gold"
-        ? 900
-        : grade === "silver"
-          ? 320
-          : grade === "copper"
-            ? 110
-            : 45;
-
-  if (type === "black-market") {
-    price.credits = Math.floor(base * 0.75);
-    if (grade === "silver") price.starCrystal = 1;
-    if (grade === "gold") price.starCrystal = 3;
-    if (grade === "diamond") {
-      price.starCrystal = 5;
-      price.quantumCore = 1;
-    }
-    return price;
-  }
-
-  if (type === "hidden") {
-    price.starCrystal =
-      grade === "diamond" ? 6 : grade === "gold" ? 3 : grade === "silver" ? 1 : 0;
-    if (grade === "diamond") price.quantumCore = 1;
-    return price;
-  }
-
-  if (type === "event") {
-    price.starCrystal =
-      grade === "silver" || grade === "gold" || grade === "diamond"
-        ? 2
-        : 1;
-    return price;
-  }
-
-  if (type === "traveling" || type === "station") {
-    price.credits = Math.floor(base * 0.8);
-    price.alloy =
-      grade === "gold" ? 10 : grade === "silver" ? 5 : grade === "copper" ? 2 : 0;
-    return price;
-  }
-
-  price.credits = base;
-  return price;
-}
-
 function pickDistinct<T>(
   pool: readonly T[],
   count: number,
@@ -401,59 +294,80 @@ function pickDistinct<T>(
   return result;
 }
 
-function resurrectionChance(
+function itemAllowedInShop(
+  policy: ShopAdminPolicyV1,
   type: ShopType,
   itemId: ItemId,
-  luck: number,
-): number {
-  const safeLuck = clamp(luck, 0, 100);
-  const base =
-    itemId === "salvage-anchor"
-      ? type === "hidden"
-        ? 0.22
-        : type === "traveling"
-          ? 0.12
-          : type === "black-market"
-            ? 0.08
-            : 0
-      : itemId === "stage-revival-core"
-        ? type === "hidden"
-          ? 0.1
-          : type === "traveling"
-            ? 0.035
-            : type === "black-market"
-              ? 0.055
-              : 0
-        : type === "hidden"
-          ? 0.025
-          : type === "black-market"
-            ? 0.008
-            : 0;
+): boolean {
+  const override = policy.offers.items[itemId];
+  if (override?.enabled === false) return false;
+  return override?.shopTypes === undefined || override.shopTypes.includes(type);
+}
 
-  return Math.min(base * (1 + safeLuck * 0.004), base * 1.4);
+function equipmentAllowedInShop(
+  policy: ShopAdminPolicyV1,
+  type: ShopType,
+  definitionId: EquipmentId,
+): boolean {
+  const override = policy.offers.equipment[definitionId];
+  if (override?.enabled === false) return false;
+  return override?.shopTypes === undefined || override.shopTypes.includes(type);
+}
+
+function itemStockForShop(
+  policy: ShopAdminPolicyV1,
+  type: ShopType,
+  itemId: ItemId,
+  fallback: number,
+): number {
+  return policy.offers.items[itemId]?.stockByShopType?.[type] ?? fallback;
 }
 
 function itemEntry(
+  policy: ShopAdminPolicyV1,
   type: ShopType,
   itemId: ItemId,
   remaining: number,
   suffix = "",
 ): ShopItemStock {
+  const grade = getItemDefinition(itemId).grade ?? "aluminum";
+  const offer = policy.offers.items[itemId];
   return {
     key: "item-" + itemId + suffix,
     kind: "item",
     itemId,
     remaining,
-    price: priceForItem(type, itemId),
+    price: snapshotOfferPrice(
+      resolveShopItemPrice(policy, type, itemId, grade),
+      offer?.compareAtPriceByShopType?.[type],
+      offer?.badge,
+    ),
   };
 }
 
+/** Equipment admission is policy-driven; registry remains the tier owner. */
+function shopEquipmentPool(
+  policy: ShopAdminPolicyV1,
+  type: ShopType,
+): readonly EquipmentId[] {
+  const rule = resolveShopGenerationRule(policy, type);
+  const source = rule.equipmentPool ?? EQUIPMENT_IDS;
+  const allowedTiers = new Set(rule.allowedEquipmentTiers);
+  return source.filter(
+    (id) =>
+      allowedTiers.has(EQUIPMENT_REGISTRY[id].tier) &&
+      equipmentAllowedInShop(policy, type, id),
+  );
+}
+
 function equipmentEntry(
+  policy: ShopAdminPolicyV1,
   type: ShopType,
   definitionId: EquipmentId,
   grade: GradeId,
   index: number,
 ): ShopEquipmentStock {
+  const offer = policy.offers.equipment[definitionId];
   return {
     key:
       "equipment-" +
@@ -466,11 +380,22 @@ function equipmentEntry(
     definitionId,
     grade,
     remaining: 1,
-    price: priceForEquipment(type, grade),
+    price: snapshotOfferPrice(
+      resolveShopEquipmentPrice(
+        policy,
+        type,
+        definitionId,
+        grade,
+        EQUIPMENT_REGISTRY[definitionId].tier,
+      ),
+      offer?.compareAtPriceByShopTypeAndGrade?.[type]?.[grade],
+      offer?.badge,
+    ),
   };
 }
 
-function generateStock(
+export function generateShopStock(
+  policy: ShopAdminPolicyV1,
   type: ShopType,
   context: ShopRollContext,
   seed: number,
@@ -478,65 +403,53 @@ function generateStock(
   const random = createSeededRandom(seed);
   const stage = normalizeStage(context.stage);
   const stock: ShopStockEntry[] = [];
+  const rule = resolveShopGenerationRule(policy, type);
 
-  if (type === "normal") {
-    for (const itemId of pickDistinct(ITEM_POOL.slice(0, 5), 3, random)) {
-      stock.push(itemEntry(type, itemId, 2));
-    }
-    for (const [index, definitionId] of pickDistinct(
-      EQUIPMENT_IDS,
-      3,
-      random,
-    ).entries()) {
-      stock.push(
-        equipmentEntry(
-          type,
-          definitionId,
-          equipmentGradeForShop(type, stage, random),
-          index,
-        ),
-      );
-    }
-  } else if (type === "event") {
-    for (const itemId of pickDistinct(EVENT_ITEM_POOL, 4, random)) {
-      stock.push(itemEntry(type, itemId, 1));
-    }
-  } else {
-    const itemPool =
-      type === "traveling" ? TRAVELING_ITEM_POOL : ITEM_POOL;
-    const itemCount = type === "hidden" ? 2 : 3;
-    for (const itemId of pickDistinct(itemPool, itemCount, random)) {
-      stock.push(itemEntry(type, itemId, type === "traveling" ? 2 : 1));
-    }
-
-    const equipmentCount =
-      type === "hidden" || type === "black-market" ? 3 : 2;
-    for (const [index, definitionId] of pickDistinct(
-      EQUIPMENT_IDS,
-      equipmentCount,
-      random,
-    ).entries()) {
-      stock.push(
-        equipmentEntry(
-          type,
-          definitionId,
-          equipmentGradeForShop(type, stage, random),
-          index,
-        ),
-      );
-    }
+  const itemPool = rule.itemPool.filter((itemId) =>
+    itemAllowedInShop(policy, type, itemId),
+  );
+  for (const itemId of pickDistinct(itemPool, rule.itemCount, random)) {
+    stock.push(
+      itemEntry(
+        policy,
+        type,
+        itemId,
+        itemStockForShop(policy, type, itemId, rule.itemStock),
+      ),
+    );
   }
 
-  if (
-    type === "traveling" ||
-    type === "black-market" ||
-    type === "hidden"
-  ) {
-    for (const itemId of RESURRECTION_ITEMS) {
-      if (random() < resurrectionChance(type, itemId, context.luck)) {
-        stock.push(itemEntry(type, itemId, 1, "-protection"));
-      }
-    }
+  for (const [index, definitionId] of pickDistinct(
+    shopEquipmentPool(policy, type),
+    rule.equipmentCount,
+    random,
+  ).entries()) {
+    stock.push(
+      equipmentEntry(
+        policy,
+        type,
+        definitionId,
+        resolveShopEquipmentGrade(policy, type, stage, random()),
+        index,
+      ),
+    );
+  }
+
+  for (const rareRule of policy.generation.rareItems) {
+    if (!itemAllowedInShop(policy, type, rareRule.itemId)) continue;
+    const chance = resolveShopRareItemChance(
+      policy,
+      type,
+      rareRule.itemId,
+      context.luck,
+    );
+    if (chance <= 0 || random() >= chance) continue;
+    if (
+      stock.some(
+        (entry) => entry.kind === "item" && entry.itemId === rareRule.itemId,
+      )
+    ) continue;
+    stock.push(itemEntry(policy, type, rareRule.itemId, 1, "-protection"));
   }
 
   return stock;
@@ -747,6 +660,7 @@ export function resolveShopInstance(
   stateInput: ShopState,
   type: ShopType,
   context: ShopRollContext,
+  policy: ShopAdminPolicyV1 = ACTIVE_SHOP_RUNTIME_SESSION.policy,
 ): {
   state: ShopState;
   instance: ShopInstance;
@@ -768,7 +682,7 @@ export function resolveShopInstance(
     stage,
     sectorStart: Math.floor((stage - 1) / 10) * 10 + 1,
     seed,
-    stock: generateStock(type, context, seed),
+    stock: generateShopStock(policy, type, context, seed),
   };
 
   const next: ShopState = {
@@ -784,28 +698,20 @@ export function resolveShopInstance(
 export function shopAvailable(
   type: ShopType,
   context: ShopRollContext,
+  policy: ShopAdminPolicyV1 = ACTIVE_SHOP_RUNTIME_SESSION.policy,
 ): boolean {
-  if (type === "black-market") {
-    return context.hiddenDiscovery.discovered.includes(
-      "black-market-signal",
-    );
-  }
-  if (type === "hidden" || type === "event") {
-    return context.hiddenDiscovery.discovered.includes("echo-rift");
-  }
-  if (type !== "traveling") return true;
-
-  const seed = shopInstanceSeed(type, context);
-  const random = createSeededRandom(seed);
-  const chance = Math.min(
-    0.48,
-    0.28 + clamp(context.luck, 0, 100) * 0.0015,
-  );
-  return random() < chance;
+  const availabilityRule = policy.availability[type];
+  const roll = availabilityRule.kind === "seeded-chance"
+    ? createSeededRandom(shopInstanceSeed(type, context))()
+    : 0;
+  return resolveShopAvailability(policy, type, {
+    luck: context.luck,
+    roll,
+    discovered: context.hiddenDiscovery.discovered,
+  });
 }
 
-export function formatShopPrice(priceInput: ShopPrice): string {
-  const price = sanitizeShopPrice(priceInput);
+function formatBaseShopPrice(price: ShopBasePrice): string {
   const parts: string[] = [];
   if (price.credits > 0) parts.push(price.credits.toLocaleString() + " Credits");
   if (price.alloy > 0) parts.push(price.alloy.toLocaleString() + " Alloy");
@@ -816,6 +722,16 @@ export function formatShopPrice(priceInput: ShopPrice): string {
     parts.push(price.quantumCore.toLocaleString() + " Quantum Core");
   }
   return parts.length > 0 ? parts.join(" + ") : "Free";
+}
+
+export function formatShopPrice(priceInput: ShopPrice): string {
+  const price = sanitizeShopPrice(priceInput);
+  const current = formatBaseShopPrice(price);
+  const compareAt = price.compareAtPrice === undefined || price.compareAtPrice === null
+    ? ""
+    : " · was " + formatBaseShopPrice(price.compareAtPrice);
+  const badge = typeof price.badge === "string" ? " · " + price.badge : "";
+  return current + compareAt + badge;
 }
 
 export function canAffordShopPrice(

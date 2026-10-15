@@ -4,7 +4,7 @@ export const ORACLE_ACTIVE_SKILL_ID = "oracle-mark-of-weakness" as const;
 
 export const ORACLE_ACTIVE_SKILL: SkillDefinition = {
   id: ORACLE_ACTIVE_SKILL_ID,
-  name: "Mark of Weakness",
+  name: "Deep Scan",
   energyCost: 28,
   cooldown: 13,
   charges: null,

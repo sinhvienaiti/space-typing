@@ -1,0 +1,79 @@
+.metric-warp strong {
+  font-size: 14px;
+}
+.metric-warp small {
+  display: block;
+  font-size: 9px;
+  color: #93c4da;
+}
+#titlePilotCard {
+  height: auto;
+  min-height: 100px;
+}
+#titlePilotCard .holo-pilot-text { min-width: 0; flex: 1; }
+.pilot-warp { margin-top: 9px; min-width: 190px; }
+.pilot-warp-heading, .pilot-warp-detail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.pilot-warp-heading { color: #79ead9; letter-spacing: .07em; }
+.pilot-warp-heading strong { color: #e8fff9; margin-left: auto; }
+#titleWarpManage { padding: 0 5px; line-height: 16px; min-height: 18px; font-size: 13px; }
+#warpDialog { width: min(460px, calc(100vw - 32px)); padding: 24px; }
+#warpDialog p { font-size: 12px; color: #a3c4d5; line-height: 1.7; }
+#warpDialog #warpActionNotice { color: #ffcd83; }
+#warpActionNotice:empty { display: none; }
+#warpDialog .warp-depot button { padding: 9px 12px; }
+#warpDialog form { margin-top: 20px; text-align: right; }
+.pilot-warp-detail { margin-top: 4px; color: #9ebdce; font-size: 9px; }
+.pilot-warp progress {
+  display: block;
+  appearance: none;
+  width: 100%;
+  height: 7px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #19303b;
+}
+.pilot-warp progress::-webkit-progress-bar { background: #19303b; }
+.pilot-warp progress::-webkit-progress-value { background: linear-gradient(90deg, #37bcac, #99f7ca); }
+.pilot-warp progress::-moz-progress-bar { background: linear-gradient(90deg, #37bcac, #99f7ca); }
+.pilot-warp[data-low="true"] progress::-webkit-progress-value { background: #f5b660; }
+.pilot-warp[data-low="true"] progress::-moz-progress-bar { background: #f5b660; }
+.warp-depot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 9px;
+}
+.warp-depot small {
+  flex-basis: 100%;
+  color: #b0c9da;
+  font-size: 11px;
+}
+.warp-depot button {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+.practice-banner {
+  position: absolute;
+  right: 12px;
+  top: 92px;
+  z-index: 8;
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: #092134e6;
+  color: #8fe4d5;
+  font-size: 10px;
+  pointer-events: none;
+}
+.practice-banner[hidden] {
+  display: none;
+}

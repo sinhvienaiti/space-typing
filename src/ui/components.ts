@@ -1,4 +1,5 @@
 import {
+  currencyAccessibleText,
   currencyChips,
   type CurrencyAmounts,
 } from "./currency";
@@ -7,6 +8,35 @@ import {
   GRADE_PRESENTATION,
   type GradeId,
 } from "../grades";
+import "./shop-merchandising.css";
+
+type MerchandisedCurrencyAmounts = CurrencyAmounts & {
+  compareAtPrice?: CurrencyAmounts | null;
+  badge?: string | null;
+};
+
+function appendMerchandising(
+  root: HTMLElement,
+  amounts: CurrencyAmounts,
+): void {
+  const offer = amounts as MerchandisedCurrencyAmounts;
+  if (typeof offer.badge === "string" && offer.badge.trim().length > 0) {
+    const badge = document.createElement("span");
+    badge.className = "shop-offer-badge";
+    badge.textContent = offer.badge;
+    badge.setAttribute("aria-label", "Offer badge: " + offer.badge);
+    root.append(badge);
+  }
+
+  if (offer.compareAtPrice !== undefined && offer.compareAtPrice !== null) {
+    const originalPrice = currencyAccessibleText(offer.compareAtPrice);
+    const compareAt = document.createElement("span");
+    compareAt.className = "shop-compare-at";
+    compareAt.textContent = "Was " + originalPrice;
+    compareAt.setAttribute("aria-label", "Original price: " + originalPrice);
+    root.append(compareAt);
+  }
+}
 
 export function replaceCurrencyChips(
   root: HTMLElement,
@@ -32,30 +62,31 @@ export function replaceCurrencyChips(
     free.className = "currency-chip currency-free";
     free.textContent = "Free";
     root.append(free);
-    return;
+  } else {
+    for (const chip of chips) {
+      const element = document.createElement("span");
+      element.className = "currency-chip " + chip.cssClass;
+      const prefix = options.signed === true ? "+" : "";
+      const accessible =
+        prefix + chip.amount.toLocaleString() + " " + chip.label;
+      element.title = accessible;
+      element.setAttribute("aria-label", accessible);
+
+      const icon = document.createElement("span");
+      icon.className = "currency-icon";
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = chip.icon;
+
+      const value = document.createElement("span");
+      value.className = "currency-value";
+      value.textContent = prefix + chip.amount.toLocaleString();
+
+      element.append(icon, value);
+      root.append(element);
+    }
   }
 
-  for (const chip of chips) {
-    const element = document.createElement("span");
-    element.className = "currency-chip " + chip.cssClass;
-    const prefix = options.signed === true ? "+" : "";
-    const accessible =
-      prefix + chip.amount.toLocaleString() + " " + chip.label;
-    element.title = accessible;
-    element.setAttribute("aria-label", accessible);
-
-    const icon = document.createElement("span");
-    icon.className = "currency-icon";
-    icon.setAttribute("aria-hidden", "true");
-    icon.textContent = chip.icon;
-
-    const value = document.createElement("span");
-    value.className = "currency-value";
-    value.textContent = prefix + chip.amount.toLocaleString();
-
-    element.append(icon, value);
-    root.append(element);
-  }
+  appendMerchandising(root, amounts);
 }
 
 export function createLocalIcon(

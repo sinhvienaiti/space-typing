@@ -72,6 +72,14 @@ https://typing-game.local/space-typing
 https://space.typing-game.local
 ~~~
 
+Voice/Hybrid and Warp Charge are implemented on `feat/bgv-integration-current`,
+with Portal hosting on parent `feat/space-voice-platform`. Enable Voice/Hybrid and
+Mic in the bottom-right controls through `https://typing-game.local/space-typing`.
+Use Practice for free microphone testing; Campaign deployment costs 10 Warp.
+
+- [Voice implementation and acceptance status](./docs/VOICE_FINAL_V2_IMPLEMENTATION_STATUS.md)
+- [Warp Charge implementation and economy bounds](./docs/WARP_CHARGE_IMPLEMENTATION_STATUS.md)
+
 
 ## Next implementation checkpoint
 

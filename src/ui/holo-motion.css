@@ -1,0 +1,214 @@
+/*
+ * Holo Command motion: hover, press and focus feedback for buttons, cards,
+ * the dock and dialogs. Loaded after holo.css. The click ripple and the
+ * card spotlight are set by src/ui/holo-motion.ts.
+ */
+:root {
+  --holo-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* ---------- Buttons ---------- */
+/* Colour changes ease everywhere; movement only on the Holo button kinds,
+   so buttons positioned with transforms elsewhere are left alone. */
+button {
+  transition:
+    box-shadow 0.2s var(--holo-ease),
+    border-color 0.2s var(--holo-ease),
+    background-color 0.2s var(--holo-ease),
+    color 0.2s var(--holo-ease),
+    filter 0.16s var(--holo-ease);
+}
+:is(button.primary, .holo-cta, .holo-ghost, .holo-tool, .holo-chip, .settings-dialog button:not(.rc-card), .holo-seg button) {
+  transition:
+    transform 0.16s var(--holo-ease),
+    filter 0.16s var(--holo-ease),
+    box-shadow 0.2s var(--holo-ease),
+    border-color 0.2s var(--holo-ease),
+    background-color 0.2s var(--holo-ease),
+    color 0.2s var(--holo-ease);
+}
+:is(button.primary, .holo-cta, .holo-ghost, .holo-tool, .holo-chip, .holo-dock-btn, .settings-dialog button:not(.rc-card)):not(:disabled):active {
+  transform: translateY(1px) scale(0.975);
+  filter: brightness(0.94);
+}
+
+/* Main buttons: a light sweep crosses on hover, they lift and glow. */
+button.primary,
+.holo-cta {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+button.primary::after,
+.holo-cta::after {
+  content: "";
+  position: absolute;
+  inset: -2px auto -2px -60%;
+  width: 45%;
+  z-index: -1;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: skewX(-18deg) translateX(0);
+  opacity: 0;
+  pointer-events: none;
+}
+button.primary:not(:disabled):hover,
+.holo-cta:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 26px rgba(95, 227, 255, 0.34),
+    0 0 0 1px rgba(200, 245, 255, 0.35) inset;
+}
+button.primary:not(:disabled):hover::after,
+.holo-cta:not(:disabled):hover::after {
+  opacity: 1;
+  animation: holo-sweep 0.75s var(--holo-ease) forwards;
+}
+@keyframes holo-sweep {
+  from { transform: skewX(-18deg) translateX(0); }
+  to { transform: skewX(-18deg) translateX(440%); }
+}
+/* The idle main action breathes softly so it reads as "the next step". */
+.holo-mode-featured .holo-cta:not(:disabled) {
+  animation: holo-breathe 3.2s ease-in-out infinite;
+}
+@keyframes holo-breathe {
+  0%, 100% { box-shadow: 0 0 16px rgba(95, 227, 255, 0.2); }
+  50% { box-shadow: 0 0 30px rgba(160, 123, 255, 0.42); }
+}
+
+/* Secondary buttons: glass tint, brighter edge, the icon lights up. */
+.holo-ghost {
+  position: relative;
+  overflow: hidden;
+  background-image: linear-gradient(90deg, rgba(95, 227, 255, 0), rgba(95, 227, 255, 0));
+}
+.holo-ghost:not(:disabled):hover {
+  color: #fff;
+  border-color: var(--holo-line-strong);
+  background-image: linear-gradient(90deg, rgba(95, 227, 255, 0.16), rgba(160, 123, 255, 0.12));
+  box-shadow: 0 0 18px rgba(95, 227, 255, 0.18);
+  transform: translateY(-1px);
+}
+.holo-ghost:not(:disabled):hover::before {
+  color: #fff;
+  filter: drop-shadow(0 0 6px rgba(95, 227, 255, 0.9));
+}
+
+/* Chips and segmented choices. */
+.holo-chip { transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.16s; }
+.holo-chip:not(:disabled):hover {
+  border-color: var(--holo-line-strong);
+  background: rgba(95, 227, 255, 0.12);
+  box-shadow: 0 0 12px rgba(95, 227, 255, 0.2);
+}
+
+/* Top-right tools: glow and a small tilt of the icon. */
+.holo-tool::before { transition: transform 0.25s var(--holo-ease), filter 0.2s; }
+.holo-tool:not(:disabled):hover {
+  border-color: var(--holo-line-strong);
+  box-shadow: 0 0 16px rgba(95, 227, 255, 0.28);
+}
+.holo-tool:not(:disabled):hover::before {
+  transform: scale(1.12) rotate(-6deg);
+  filter: drop-shadow(0 0 6px rgba(95, 227, 255, 0.9));
+}
+
+/* Dock: lifts, the icon glows, a light bar slides in along the bottom. */
+.holo-dock-btn {
+  background-image: linear-gradient(0deg, rgba(95, 227, 255, 0.85), rgba(95, 227, 255, 0.85));
+  background-size: 0% 2px;
+  background-position: 50% 100%;
+  background-repeat: no-repeat;
+  transition: transform 0.18s var(--holo-ease), background-size 0.25s var(--holo-ease), background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+.holo-dock-btn::before { transition: transform 0.22s var(--holo-ease), filter 0.2s; }
+.holo-dock-btn:not(:disabled):hover {
+  transform: translateY(-3px);
+  color: #fff;
+  background-color: rgba(95, 227, 255, 0.1);
+  border-color: var(--holo-line-strong);
+  background-size: 70% 2px;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35), 0 0 18px rgba(95, 227, 255, 0.16);
+}
+.holo-dock-btn:not(:disabled):hover::before {
+  transform: translateY(-2px) scale(1.1);
+  filter: drop-shadow(0 0 8px rgba(95, 227, 255, 0.95));
+}
+
+/* ---------- Click ripple (src/ui/holo-motion.ts) ---------- */
+.holo-ripple {
+  position: absolute;
+  left: var(--rx);
+  top: var(--ry);
+  width: var(--rs);
+  height: var(--rs);
+  margin: calc(var(--rs) / -2) 0 0 calc(var(--rs) / -2);
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.5), rgba(95, 227, 255, 0.18) 45%, transparent 70%);
+  transform: scale(0);
+  animation: holo-ripple 0.55s var(--holo-ease) forwards;
+}
+@keyframes holo-ripple {
+  to { transform: scale(1); opacity: 0; }
+}
+
+/* ---------- Mode cards ---------- */
+.holo-mode {
+  transition: transform 0.28s var(--holo-ease), border-color 0.25s, box-shadow 0.28s var(--holo-ease);
+}
+/* Spotlight that follows the pointer (--mx / --my from holo-motion.ts). */
+.holo-mode::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 30%), rgba(95, 227, 255, 0.12), transparent 55%);
+  transition: opacity 0.3s;
+}
+.holo-mode:hover {
+  transform: translateY(-4px);
+  border-color: var(--holo-line-strong);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45), 0 0 26px rgba(95, 227, 255, 0.14);
+}
+.holo-mode:hover::after { opacity: 1; }
+.holo-plate { transition: transform 0.9s var(--holo-ease), filter 0.6s; }
+.holo-mode:hover .holo-plate { transform: scale(1.07); filter: saturate(1.15) brightness(1.08); }
+.holo-hero { transition: transform 0.6s var(--holo-ease), filter 0.4s; }
+.holo-mode:hover .holo-hero-ship { transform: translateX(-50%) translateY(-6px) scale(1.04); }
+.holo-mode:hover .holo-hero-portal,
+.holo-mode:hover .holo-hero-crystal { transform: translateX(-50%) scale(1.06) rotate(2deg); }
+.holo-mode:hover .holo-hero-rival { transform: rotate(180deg) translateY(6px); }
+.holo-mode:hover .holo-hero-self { transform: translateY(-6px) scale(1.04); }
+.holo-mode:hover .holo-hero { filter: drop-shadow(0 14px 22px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 14px rgba(95, 227, 255, 0.35)); }
+
+/* ---------- Dialogs: open with a short rise and fade ---------- */
+.settings-dialog[open] { animation: holo-dialog-in 0.26s var(--holo-ease); }
+.settings-dialog[open]::backdrop { animation: holo-fade-in 0.26s ease-out; }
+@keyframes holo-dialog-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes holo-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Focus ring for keyboard users. */
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  box-shadow: 0 0 0 2px rgba(4, 18, 28, 0.9), 0 0 0 4px rgba(95, 227, 255, 0.9), 0 0 18px rgba(95, 227, 255, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

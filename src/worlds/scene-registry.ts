@@ -533,25 +533,25 @@ export function sceneQualityBudget(
   }
   if (quality === "high") {
     return {
-      ambientParticles: 20,
-      farDetails: 5,
-      midDetails: 4,
-      farStars: 155,
-      nearStars: 26,
-      midObjects: 10,
-      foregroundObjects: 16,
-      eventObjects: 2,
+      ambientParticles: 24,
+      farDetails: 6,
+      midDetails: 5,
+      farStars: 180,
+      nearStars: 30,
+      midObjects: 12,
+      foregroundObjects: 20,
+      eventObjects: 3,
     };
   }
   return {
-    ambientParticles: 28,
-    farDetails: 6,
-    midDetails: 5,
-    farStars: 210,
-    nearStars: 34,
-    midObjects: 13,
-    foregroundObjects: 22,
-    eventObjects: 2,
+    ambientParticles: 34,
+    farDetails: 8,
+    midDetails: 7,
+    farStars: 260,
+    nearStars: 44,
+    midObjects: 17,
+    foregroundObjects: 28,
+    eventObjects: 4,
   };
 }
 

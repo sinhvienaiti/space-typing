@@ -1,3 +1,4 @@
+import { activeStageRuntimeOverride } from "../admin/stage-runtime-policy";
 import type { StageConfig, StageRole } from "./types";
 
 export const MAX_CAMPAIGN_STAGE = 1000;
@@ -48,7 +49,7 @@ export function stageSeed(stage: number): number {
   return Math.imul(value, 0x9e3779b1) >>> 0;
 }
 
-export function createStageConfig(stage: number): StageConfig {
+function createBundledStageConfigInternal(stage: number): StageConfig {
   const safeStage = normalizeStage(stage);
   const galaxy = galaxyForStage(safeStage);
   const local = stageInGalaxy(safeStage);
@@ -106,6 +107,43 @@ export function createStageConfig(stage: number): StageConfig {
     eliteChance,
     modifierSlots,
   };
+}
+
+export type StageConfigOverride = Readonly<{
+  enemyBudget?: number;
+  eliteChance?: number;
+  modifierSlots?: number;
+}>;
+
+/** Apply an already-validated Admin override without changing structural fields. */
+export function resolveStageConfig(
+  bundled: StageConfig,
+  override?: StageConfigOverride,
+): StageConfig {
+  if (override === undefined) return bundled;
+  return {
+    ...bundled,
+    ...(override.enemyBudget === undefined ? {} : { enemyBudget: override.enemyBudget }),
+    ...(override.eliteChance === undefined ? {} : { eliteChance: override.eliteChance }),
+    ...(override.modifierSlots === undefined ? {} : { modifierSlots: override.modifierSlots }),
+  };
+}
+
+/**
+ * Production stage factory. The published Admin session is immutable for the
+ * current page/game session, so a Publish becomes authoritative on the next
+ * session without mutating an encounter already in progress.
+ */
+export function createStageConfig(
+  stage: number,
+  override: StageConfigOverride | undefined = activeStageRuntimeOverride(normalizeStage(stage)),
+): StageConfig {
+  return resolveStageConfig(createBundledStageConfigInternal(stage), override);
+}
+
+/** Canonical bundled baseline used by Admin preview and regression comparisons. */
+export function createBundledStageConfig(stage: number): StageConfig {
+  return createBundledStageConfigInternal(stage);
 }
 
 export function createCampaignStages(): StageConfig[] {

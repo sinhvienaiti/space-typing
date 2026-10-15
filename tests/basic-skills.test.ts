@@ -179,7 +179,7 @@ describe("P0 Basic Skill Points share existing character XP", () => {
     const migrated = migratePlayerSave(old);
     expect(migrated.fromVersion).toBe(26);
     expect(migrated.migrated).toBe(true);
-    expect(migrated.save.version).toBe(27);
+    expect(migrated.save.version).toBe(28);
     expect(migrated.save.upgrades.basicSkills.vanguard.ranks.barrier).toBe(5);
     expect(migrated.save.upgrades.basicSkills.zenith.ranks.barrier).toBe(5);
     expect(migrated.save.checkpointSnapshot.upgrades.basicSkills.vanguard.ranks.barrier).toBe(5);

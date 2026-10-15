@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+
+<defs>
+  <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#d9e5ec"/><stop offset=".18" stop-color="#6f8290"/>
+    <stop offset=".55" stop-color="#24303a"/><stop offset="1" stop-color="#0b1117"/>
+  </linearGradient>
+  <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#fff0a8"/><stop offset=".55" stop-color="#ff7a45"/><stop offset="1" stop-color="#e82a55"/>
+  </linearGradient>
+  <radialGradient id="core"><stop offset="0" stop-color="#fff"/><stop offset=".22" stop-color="#fff0a8"/><stop offset=".62" stop-color="#ff7a45" stop-opacity=".9"/><stop offset="1" stop-color="#e82a55" stop-opacity=".12"/></radialGradient>
+  <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+    <feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">
+    <feGaussianBlur stdDeviation="16"/>
+  </filter>
+</defs>
+<g stroke-linejoin="round" stroke-linecap="round">
+<circle cx="256" cy="270" r="130" fill="url(#metal)" stroke="#7e909c" stroke-width="9"/>
+<path d="M194 148 218 92h76l24 56" fill="#303e49" stroke="#8b9aa5" stroke-width="8"/>
+<path d="M171 228 116 198 90 248l57 28M341 228l55-30 26 50-57 28" fill="#26333b" stroke="#748590" stroke-width="7"/>
+<circle cx="256" cy="270" r="66" fill="#111820" stroke="#ff9a60" stroke-width="7"/>
+<circle cx="256" cy="270" r="42" fill="url(#core)" filter="url(#glow)"/>
+<path d="M212 330c28 22 60 22 88 0" fill="none" stroke="#ff664d" stroke-width="8"/>
+</g>
+</svg>

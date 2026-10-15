@@ -1,3 +1,6 @@
+import "../admin/game-testing-policy-bootstrap";
+import { runtimeTestingPolicy } from "../admin/game-testing-policy";
+import { activeShipRuntimeDefinitionOverride } from "../admin/ship-runtime-policy";
 import {
   CHARACTER_IDS,
   getCharacter,
@@ -85,8 +88,7 @@ export function sanitizeCharacterState(value: unknown): CharacterState {
   const unlocked = sanitizeUnlocked(raw.unlocked);
   const selected =
     typeof raw.selected === "string" &&
-    isCharacterId(raw.selected) &&
-    unlocked.includes(raw.selected)
+    isCharacterId(raw.selected)
       ? raw.selected
       : "vanguard";
 
@@ -127,7 +129,7 @@ export function isValidLegacyCharacterState(value: unknown): boolean {
     seen.add(id);
   }
 
-  return seen.has("vanguard") && seen.has(raw.selected);
+  return seen.has("vanguard");
 }
 
 function isValidPreTalentProgress(value: unknown): boolean {
@@ -233,8 +235,16 @@ export function selectCharacter(
   state: CharacterState,
   id: CharacterId,
 ): CharacterState {
-  if (!state.unlocked.includes(id)) return state;
+  if (
+    !runtimeTestingPolicy().unlockAllShips &&
+    !state.unlocked.includes(id)
+  ) {
+    return state;
+  }
 
+  // Admin testing may make every ship selectable for the current runtime, but
+  // the historical unlocked list remains progression/discovery metadata and is
+  // never mutated by the override.
   return {
     selected: id,
     unlocked: [...state.unlocked],
@@ -262,16 +272,25 @@ export type CharacterUnlockResult = {
   unlocked: CharacterId[];
 };
 
+function effectiveCharacterUnlockStage(id: CharacterId): number {
+  return (
+    activeShipRuntimeDefinitionOverride(id)?.unlockStage ??
+    getCharacter(id).unlockStage
+  );
+}
+
 export function unlockCharactersForStage(
   state: CharacterState,
   clearedStage: number,
 ): CharacterUnlockResult {
-  const newlyUnlocked = CHARACTER_IDS.filter(
-    (id) =>
-      getCharacter(id).unlockStage > 1 &&
-      getCharacter(id).unlockStage <= clearedStage &&
-      !state.unlocked.includes(id),
-  );
+  const newlyUnlocked = CHARACTER_IDS.filter((id) => {
+    const unlockStage = effectiveCharacterUnlockStage(id);
+    return (
+      unlockStage > 1 &&
+      unlockStage <= clearedStage &&
+      !state.unlocked.includes(id)
+    );
+  });
 
   if (newlyUnlocked.length === 0) {
     return {

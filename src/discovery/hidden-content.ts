@@ -1,3 +1,4 @@
+import { stageSeed } from "../campaign/stage";
 import { clamp } from "../logic";
 import {
   createHiddenEncounterState,
@@ -5,9 +6,11 @@ import {
   sanitizeHiddenEncounterState,
   type HiddenEncounterState,
 } from "./hidden-encounter";
+import { publishHiddenDiscoveryPresentation } from "./hidden-discovery-presentation";
 
 export const HIDDEN_CONTENT_IDS = [
   "black-market-signal",
+  "hidden-station-signal",
   "echo-rift",
   "void-warden",
   "phase-lance",
@@ -18,6 +21,7 @@ export const HIDDEN_CONTENT_IDS = [
 export type HiddenContentId = (typeof HIDDEN_CONTENT_IDS)[number];
 export type HiddenContentKind =
   | "shop"
+  | "station"
   | "event"
   | "boss"
   | "skill"
@@ -61,6 +65,22 @@ export const HIDDEN_CONTENT_REGISTRY: Record<
     baseChance: 0.012,
     maxChance: 0.1,
     guaranteeAfter: 26,
+  },
+  "hidden-station-signal": {
+    id: "hidden-station-signal",
+    kind: "station",
+    name: "Hidden Station Signal",
+    description:
+      "A low-power navigation beacon reveals a concealed rest station outside the numbered route.",
+    unlock: {
+      type: "station",
+      id: "hidden-station",
+      label: "Hidden Station route",
+    },
+    minStage: 40,
+    baseChance: 0.01,
+    maxChance: 0.085,
+    guaranteeAfter: 28,
   },
   "echo-rift": {
     id: "echo-rift",
@@ -146,8 +166,11 @@ export const HIDDEN_CONTENT_REGISTRY: Record<
 
 export type HiddenDiscoveryState = {
   discovered: HiddenContentId[];
+  discoveryStages: Partial<Record<HiddenContentId, number>>;
   drought: Record<HiddenContentId, number>;
+  seedIdentity: string;
   lastRollStage: number;
+  lastRollIdentity: string | null;
   encounter?: HiddenEncounterState;
 };
 
@@ -172,11 +195,63 @@ function createDroughtState(): Record<HiddenContentId, number> {
   ) as Record<HiddenContentId, number>;
 }
 
-export function createHiddenDiscoveryState(): HiddenDiscoveryState {
+function randomSeedIdentity(): string {
+  if (typeof window === "undefined") {
+    return "campaign-headless-simulation";
+  }
+
+  const cryptoSource = globalThis.crypto;
+  if (cryptoSource !== undefined && typeof cryptoSource.randomUUID === "function") {
+    return `campaign-${cryptoSource.randomUUID()}`;
+  }
+
+  return `campaign-${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 12)}`;
+}
+
+function isSeedIdentity(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.trim().length > 0 &&
+    value.trim().length <= 96
+  );
+}
+
+function legacySeedIdentity(state: Pick<
+  HiddenDiscoveryState,
+  "discovered" | "drought" | "lastRollStage"
+>): string {
+  let hash = (stageSeed(Math.max(1, state.lastRollStage)) ^ 0x4c454741) >>> 0;
+  for (let index = 0; index < HIDDEN_CONTENT_IDS.length; index += 1) {
+    const id = HIDDEN_CONTENT_IDS[index]!;
+    const discovered = state.discovered.includes(id) ? 1 : 0;
+    hash ^= Math.imul(
+      (index + 1) * 131 + discovered * 17 + state.drought[id],
+      0x45d9f3b,
+    );
+    hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b) >>> 0;
+  }
+  return `legacy-${hash.toString(16).padStart(8, "0")}`;
+}
+
+export function hiddenDiscoveryRollIdentity(
+  seedIdentity: string,
+  stage: number,
+): string {
+  return `${seedIdentity}:stage-${Math.floor(clamp(stage, 1, 1000))}`;
+}
+
+export function createHiddenDiscoveryState(
+  seedIdentity = randomSeedIdentity(),
+): HiddenDiscoveryState {
   return {
     discovered: [],
+    discoveryStages: {},
     drought: createDroughtState(),
+    seedIdentity,
     lastRollStage: 0,
+    lastRollIdentity: null,
     encounter: createHiddenEncounterState(),
   };
 }
@@ -186,13 +261,17 @@ export function sanitizeHiddenDiscoveryState(
 ): HiddenDiscoveryState {
   const result = createHiddenDiscoveryState();
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    publishHiddenDiscoveryPresentation(result);
     return result;
   }
 
   const raw = value as {
     discovered?: unknown;
+    discoveryStages?: unknown;
     drought?: unknown;
+    seedIdentity?: unknown;
     lastRollStage?: unknown;
+    lastRollIdentity?: unknown;
     encounter?: unknown;
   };
 
@@ -230,7 +309,33 @@ export function sanitizeHiddenDiscoveryState(
     result.lastRollStage = Math.floor(clamp(raw.lastRollStage, 0, 1000));
   }
 
+  result.seedIdentity = isSeedIdentity(raw.seedIdentity)
+    ? raw.seedIdentity.trim()
+    : legacySeedIdentity(result);
+  result.lastRollIdentity =
+    result.lastRollStage > 0
+      ? hiddenDiscoveryRollIdentity(result.seedIdentity, result.lastRollStage)
+      : null;
+
+  const rawDiscoveryStages =
+    raw.discoveryStages !== null &&
+    typeof raw.discoveryStages === "object" &&
+    !Array.isArray(raw.discoveryStages)
+      ? (raw.discoveryStages as Partial<Record<HiddenContentId, unknown>>)
+      : {};
+  const discoveryStages: Partial<Record<HiddenContentId, number>> = {};
+  for (const id of result.discovered) {
+    const definition = HIDDEN_CONTENT_REGISTRY[id];
+    const value = rawDiscoveryStages[id];
+    discoveryStages[id] =
+      typeof value === "number" && Number.isFinite(value)
+        ? Math.floor(clamp(value, definition.minStage, 1000))
+        : definition.minStage;
+  }
+  result.discoveryStages = discoveryStages;
+
   result.encounter = sanitizeHiddenEncounterState(raw.encounter);
+  publishHiddenDiscoveryPresentation(result);
   return result;
 }
 
@@ -277,10 +382,46 @@ export function isValidHiddenDiscoveryState(
     return false;
   }
 
+  if (
+    raw.discoveryStages === null ||
+    typeof raw.discoveryStages !== "object" ||
+    Array.isArray(raw.discoveryStages)
+  ) {
+    return false;
+  }
+
+  const discoveryStageKeys = Object.keys(raw.discoveryStages);
+  if (
+    discoveryStageKeys.length !== raw.discovered.length ||
+    !raw.discovered.every((id) => {
+      const stage = raw.discoveryStages[id];
+      return (
+        discoveryStageKeys.includes(id) &&
+        typeof stage === "number" &&
+        Number.isInteger(stage) &&
+        stage >= HIDDEN_CONTENT_REGISTRY[id].minStage &&
+        stage <= 1000
+      );
+    })
+  ) {
+    return false;
+  }
+
+  if (!isSeedIdentity(raw.seedIdentity)) {
+    return false;
+  }
+
+  const validRollIdentity =
+    raw.lastRollStage === 0
+      ? raw.lastRollIdentity === null
+      : raw.lastRollIdentity ===
+        hiddenDiscoveryRollIdentity(raw.seedIdentity, raw.lastRollStage);
+
   return (
     Number.isInteger(raw.lastRollStage) &&
     raw.lastRollStage >= 0 &&
     raw.lastRollStage <= 1000 &&
+    validRollIdentity &&
     (raw.encounter === undefined ||
       isValidHiddenEncounterState(raw.encounter))
   );
@@ -303,16 +444,62 @@ export function hiddenDiscoveryChance(
   );
 }
 
+function hashSeedIdentity(seedIdentity: string): number {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < seedIdentity.length; index += 1) {
+    hash ^= seedIdentity.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash >>> 0;
+}
+
+function hiddenDiscoveryRandom(
+  seedIdentity: string,
+  stage: number,
+): () => number {
+  let value = (
+    stageSeed(stage) ^
+    hashSeedIdentity(seedIdentity) ^
+    0x48494444
+  ) >>> 0;
+
+  return () => {
+    value = (value + 0x6d2b79f5) >>> 0;
+    let next = value;
+    next = Math.imul(next ^ (next >>> 15), next | 1);
+    next ^= next + Math.imul(next ^ (next >>> 7), next | 61);
+    return ((next ^ (next >>> 14)) >>> 0) / 0x100000000;
+  };
+}
+
+export function rollDeterministicHiddenDiscovery(
+  input: HiddenDiscoveryState,
+  stage: number,
+  luck: number,
+): HiddenDiscoveryRoll {
+  const state = sanitizeHiddenDiscoveryState(input);
+  const safeStage = Math.floor(clamp(stage, 1, 1000));
+  return rollHiddenDiscovery(
+    state,
+    safeStage,
+    luck,
+    hiddenDiscoveryRandom(state.seedIdentity, safeStage),
+  );
+}
+
 export function rollHiddenDiscovery(
   input: HiddenDiscoveryState,
   stage: number,
   luck: number,
-  random: () => number = Math.random,
+  random?: () => number,
 ): HiddenDiscoveryRoll {
   const state = sanitizeHiddenDiscoveryState(input);
   const safeStage = Math.floor(clamp(stage, 1, 1000));
+  const randomSource =
+    random ?? hiddenDiscoveryRandom(state.seedIdentity, safeStage);
 
   if (safeStage <= state.lastRollStage) {
+    publishHiddenDiscoveryPresentation(state);
     return { state, discovery: null, rolled: false };
   }
 
@@ -344,7 +531,7 @@ export function rollHiddenDiscovery(
   } else {
     for (const definition of eligible) {
       if (
-        clamp(random(), 0, 0.999999) <
+        clamp(randomSource(), 0, 0.999999) <
         hiddenDiscoveryChance(
           definition,
           luck,
@@ -370,14 +557,27 @@ export function rollHiddenDiscovery(
       : HIDDEN_CONTENT_IDS.filter(
           (id) => discovered.has(id) || id === discovery?.id,
         );
+  const discoveryStages = { ...state.discoveryStages };
+  if (discovery !== null) {
+    discoveryStages[discovery.id] = safeStage;
+  }
+
+  const nextState: HiddenDiscoveryState = {
+    discovered: nextDiscovered,
+    discoveryStages,
+    drought,
+    seedIdentity: state.seedIdentity,
+    lastRollStage: safeStage,
+    lastRollIdentity: hiddenDiscoveryRollIdentity(
+      state.seedIdentity,
+      safeStage,
+    ),
+    encounter: state.encounter,
+  };
+  publishHiddenDiscoveryPresentation(nextState);
 
   return {
-    state: {
-      discovered: nextDiscovered,
-      drought,
-      lastRollStage: safeStage,
-      encounter: state.encounter,
-    },
+    state: nextState,
     discovery,
     rolled: true,
   };
@@ -387,6 +587,7 @@ export function hiddenCodexEntries(
   input: HiddenDiscoveryState,
 ): HiddenCodexEntry[] {
   const state = sanitizeHiddenDiscoveryState(input);
+  publishHiddenDiscoveryPresentation(state);
   const discovered = new Set(state.discovered);
 
   return HIDDEN_CONTENT_IDS.map((id) => {

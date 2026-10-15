@@ -52,7 +52,7 @@ export const EQUIPMENT_AFFIX_REGISTRY: Record<
   },
   warded: {
     id: "warded",
-    name: "Warded",
+    name: "Hardened",
     stats: { ward: 3 },
   },
   lucky: {

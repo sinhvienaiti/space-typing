@@ -1,0 +1,40 @@
+{
+  "contractRevision": "space-typing-admin-vfx-v1",
+  "schemaVersion": 1,
+  "gameId": "space-typing",
+  "capability": "vfx.read",
+  "route": {
+    "id": "vfx",
+    "path": "/admin/space-typing/vfx",
+    "label": "VFX"
+  },
+  "vfx": {
+    "mode": "runtime-derived-readonly",
+    "runtimeSources": [
+      "src/Game.ts",
+      "src/vfx/combat-fx.ts",
+      "src/vfx/skill-fx.ts",
+      "src/vfx/player-shots.ts",
+      "src/performance/quality.ts"
+    ],
+    "runtimeOwner": "Game.ts direct VFX systems",
+    "qualityTiers": ["low", "medium", "high", "ultra"],
+    "qualityProfiles": {
+      "low": {"dprCap":1,"particleScale":0.35,"maxParticles":110,"minStars":36,"maxStars":90,"starAreaDivisor":18000,"glowScale":0.35,"gridStep":72,"maxCanvasPixels":3500000},
+      "medium": {"dprCap":1.5,"particleScale":0.65,"maxParticles":220,"minStars":56,"maxStars":140,"starAreaDivisor":13000,"glowScale":0.65,"gridStep":60,"maxCanvasPixels":5000000},
+      "high": {"dprCap":1.8,"particleScale":1,"maxParticles":340,"minStars":80,"maxStars":205,"starAreaDivisor":9400,"glowScale":1,"gridStep":50,"maxCanvasPixels":5900000},
+      "ultra": {"dprCap":2.1,"particleScale":1.3,"maxParticles":500,"minStars":112,"maxStars":300,"starAreaDivisor":7100,"glowScale":1.18,"gridStep":42,"maxCanvasPixels":8800000}
+    },
+    "combatFxLimits": {"maxParticles":360,"maxRings":48},
+    "combatEvents": ["hit","death","layerBreak","cast","bossEntrance","bossPhase","bossDeath","bossHit"],
+    "domains": ["combat","player-projectiles","enemy-projectiles","skill-effects","boss-effects","screen-feedback"],
+    "skillQualityDetailTier": {"low":0,"medium":1,"high":2,"ultra":3},
+    "dataFlow": "Game.ts -> VFX systems -> canvas draw/update",
+    "persistenceOwner": "code-owned-runtime-vfx",
+    "authorableFields": [],
+    "writeCapability": false,
+    "adminPreviewWriteCapability": false,
+    "applyBoundary": "none",
+    "unsupportedAdminMockFields": ["profile CRUD","scale slider","intensity slider","duration slider","opacity slider","blend selector","screen-shake slider"]
+  }
+}

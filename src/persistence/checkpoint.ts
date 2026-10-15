@@ -415,6 +415,7 @@ function mergeKnowledgeCampaign(
       ...committed.bestByStage,
       ...active.bestByStage,
     },
+    ...(committed.bestByInputProfile || active.bestByInputProfile ? { bestByInputProfile: Object.fromEntries([...new Set([...Object.keys(committed.bestByInputProfile ?? {}), ...Object.keys(active.bestByInputProfile ?? {})])].map(key => [key, { ...committed.bestByInputProfile?.[key], ...active.bestByInputProfile?.[key] }])) } : {}),
   };
 }
 

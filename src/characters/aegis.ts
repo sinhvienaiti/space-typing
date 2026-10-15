@@ -5,7 +5,7 @@ export const AEGIS_ACTIVE_SKILL_ID = "aegis-reflect-field" as const;
 
 export const AEGIS_ACTIVE_SKILL: SkillDefinition = {
   id: AEGIS_ACTIVE_SKILL_ID,
-  name: "Reflect Field",
+  name: "Aegis Mirror",
   energyCost: 34,
   cooldown: 14,
   charges: null,

@@ -1,0 +1,104 @@
+{
+  "contractRevision": "space-typing-admin-daily-weekly-v1",
+  "schemaVersion": 1,
+  "gameId": "space-typing",
+  "capability": "daily-weekly.read",
+  "route": {
+    "id": "daily-weekly",
+    "path": "/admin/space-typing/daily-weekly",
+    "label": "Daily / Weekly"
+  },
+  "liveOps": {
+    "mode": "runtime-readonly",
+    "runtimeSources": [
+      "src/expansion-v2/challenge.ts",
+      "src/expansion-v2/profile-store.ts",
+      "src/expansion-v2/weekly-challenge-runtime.ts",
+      "src/expansion-v2/weekly-challenge-admin.ts",
+      "src/expedition/core.ts",
+      "src/expedition/session.ts"
+    ],
+    "daily": {
+      "available": true,
+      "owner": "Expansion V2 Daily Expedition fixed challenge",
+      "challengeKind": "daily",
+      "cadence": "utc-day",
+      "dayKeyFormat": "YYYY-MM-DD",
+      "seedPolicy": "hash(dayKey|rulesetVersion)",
+      "identityFields": [
+        "dayKey",
+        "seed",
+        "rulesetVersion",
+        "contentVersion",
+        "wordPoolHash",
+        "startKitId",
+        "difficulty",
+        "assist",
+        "adaptivePolicy"
+      ],
+      "adaptivePolicy": "frozen",
+      "personalBest": true,
+      "personalGhost": true,
+      "profileStorageKey": "spaceTypingExpansionV2ProfileV1",
+      "remoteScheduler": false,
+      "remoteLeaderboard": false,
+      "adminMode": "read-only",
+      "writeCapability": false
+    },
+    "weekly": {
+      "available": true,
+      "owner": "Expansion V2 Weekly Challenge runtime",
+      "challengeKind": "weekly",
+      "cadence": "utc-iso-week",
+      "weekKeyFormat": "YYYY-Www",
+      "weekKeyOwner": "weeklyChallengeWeekKey(date)",
+      "seedPolicy": "hash(weekly|weekKey|rulesetVersion)",
+      "seedOwner": "weeklySeed(weekKey, rulesetVersion)",
+      "identityFields": [
+        "weekKey",
+        "seed",
+        "rulesetVersion",
+        "contentVersion",
+        "wordPoolHash",
+        "startKitId",
+        "difficulty",
+        "assist",
+        "adaptivePolicy"
+      ],
+      "adaptivePolicy": "frozen",
+      "personalBest": true,
+      "personalGhost": true,
+      "profileStorageKey": "spaceTypingExpansionV2ProfileV1",
+      "adminMode": "read-only",
+      "readableState": [
+        "weekKey",
+        "seed",
+        "identityKey",
+        "resumeStatus",
+        "rewardClaimed",
+        "personalBest",
+        "ghostPointCount",
+        "leaderboardEligible"
+      ],
+      "remoteScheduler": false,
+      "remoteLeaderboard": false,
+      "writeCapability": false,
+      "schedulerControlCapability": false,
+      "rewardAuthoringCapability": false,
+      "seedOverrideCapability": false
+    },
+    "adminWriteCapability": false,
+    "scheduleAuthoringCapability": false,
+    "rewardAuthoringCapability": false,
+    "publishCapability": false,
+    "applyBoundary": "none",
+    "unsupportedAdminOperations": [
+      "creating or editing Daily or Weekly schedules",
+      "changing deterministic Daily or Weekly seeds",
+      "editing player Personal Best or Personal Ghost records",
+      "claiming a remote leaderboard or scheduler backend",
+      "authoring or publishing Weekly rewards",
+      "mutating browser-local player challenge progress"
+    ]
+  }
+}

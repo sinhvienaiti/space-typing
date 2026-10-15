@@ -6,6 +6,7 @@ export const MAX_STAGE_WORD_ATTEMPTS = 600;
 export type StageWordSource = "enemy" | "boss";
 export type StageWordOutcome =
   | "perfect"
+  | "spoken"
   | "corrected"
   | "missed"
   | "skill-kill"
@@ -32,6 +33,7 @@ export type StageWordGroup = {
   missed: number;
   skillKilled: number;
   interrupted: number;
+  spoken?: number;
   correctKeys: number;
   wrongKeys: number;
 };
@@ -108,10 +110,11 @@ export function groupStageWordAttempts(
     group.correctKeys += attempt.correctKeys;
     group.wrongKeys += attempt.wrongKeys;
     if (attempt.outcome === "perfect") group.perfect += 1;
+    else if (attempt.outcome === "spoken") group.spoken = (group.spoken ?? 0) + 1;
     else if (attempt.outcome === "corrected") group.corrected += 1;
     else if (attempt.outcome === "missed") group.missed += 1;
     else if (attempt.outcome === "skill-kill") group.skillKilled += 1;
-    else group.interrupted += 1;
+    else if (attempt.outcome === "interrupted") group.interrupted += 1;
   }
 
   return [...grouped.values()].sort((left, right) =>
@@ -310,6 +313,10 @@ export class StageSessionTracker {
       this.perfectWordChain = 0;
     }
     this.finishAttempt(key, entry, source, outcome, elapsedSeconds);
+  }
+
+  completeVoiceWord(source: StageWordSource, targetId: number | string, entry: VocabularyEntry, elapsedSeconds: number): void {
+    this.finishAttempt(attemptKey(source, targetId), entry, source, "spoken", elapsedSeconds);
   }
 
   missWord(

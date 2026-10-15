@@ -1,13 +1,25 @@
+import { phoneticGroups } from "./input/phonetic-groups";
+import { VOICE_COMBAT_POLICY, voiceEffort, VoicePassiveCredit, NATO_LETTERS } from "./input/voice-combat-policy";
+import type { InputMode } from "./input/mode";
+import type { VoiceTarget } from "./input/platform/protocol.mjs";
+import { wordConflict } from "./input/word-conflict";
+import { TargetOwnership } from "./input/target-ownership";
+import { admissionConflict } from "./input/target-registry";
 import {
   hasVisibleKillTranslation,
   sanitizeKillTranslationSettings,
   usesKillPositionTranslation,
 } from "./feedback/kill-translation";
 import {
+  KILL_SPREE_LADDER,
   PriorityKillChain,
+  killSpreeRung,
   type AnnouncerEvent,
 } from "./audio/announcer";
-import { Sfx } from "./audio/Sfx";
+import { Sfx, type ImpactVariant } from "./audio/Sfx";
+import type { DuelTimedAudioCue } from "./duel/audio";
+import { DuelSoundEngine } from "./audio/duel-sound";
+import { FlightStreakField } from "./vfx/flight-field";
 import {
   bossActionInterval,
   bossKeyDamage,
@@ -23,6 +35,11 @@ import type {
   BossRole,
   BossState,
 } from "./boss/model";
+import {
+  createReferenceBossParts,
+  damageBossPart,
+  type BossPartState,
+} from "./expansion-v2/boss-parts";
 import {
   bossActionIntervalMultiplier,
   bossWordLengthPreference,
@@ -42,6 +59,25 @@ import {
   type StagePacingPlan,
 } from "./campaign/stage-pacing";
 import { canFinishCombatStage, canSpawnFinalBoss, type StageClearGate } from "./campaign/stage-clear-gate";
+import {
+  createCompletionId,
+  effortWeight,
+  type CombatCompletionFact,
+  type CombatCompletionTargetKind,
+} from "./combat/completion-events";
+import type {
+  EncounterRecipeId,
+  TypingPatternId,
+} from "./expansion-v2/contracts";
+import {
+  buildPatternVocabulary,
+  chainMinimumLayers,
+  sharedTargetEffect,
+} from "./expansion-v2/pattern-runtime";
+import {
+  recipeAllowsFormation,
+  recipeEnemyKind,
+} from "./expansion-v2/recipe-runtime";
 import {
   rageScaledCount,
   rageScaledValue,
@@ -69,27 +105,22 @@ import {
   WorldSceneRenderer,
 } from "./worlds/scene-renderer";
 import type { WorldSceneProfile } from "./worlds/scene-types";
+import {
+  BackgroundStage,
+  type BackgroundDiagnostics,
+  type BackgroundPresentation,
+} from "./background/stage";
 import type { CharacterId } from "./characters/registry";
 import {
-  characterAimTargetAngle,
+  activeShipLightRig,
+  characterShipAngle,
+  characterShipPoint,
   drawCharacterShip,
-  smoothCharacterAim,
+  type CharacterDrawOptions,
 } from "./characters/renderer";
+import { ShipMotion } from "./characters/ship-motion";
 import type { EquipmentAuraProfile } from "./characters/equipment-aura";
 import { playerProjectileProfile } from "./characters/projectiles";
-import {
-  advanceKillScorePopups,
-  drawKillScorePopup,
-  drawPlayerCombatImpact,
-  drawPlayerMuzzleFlash,
-  drawPlayerProjectile,
-  scorePopupSafeY,
-  type KillScorePopup,
-  type PlayerCombatImpact,
-  type PlayerMuzzleFlash,
-  type PlayerShotOutcome,
-  type PlayerVisualShot,
-} from "./characters/projectile-renderer";
 import {
   bossProjectilesEnabled,
   normalEnemyProjectilesEnabled,
@@ -337,6 +368,18 @@ import {
   enemyRankVisualProfile,
   type EnemyRank,
 } from "./enemies/rank";
+import type {
+  CombatCreditCause,
+  CombatCreditClaimRequest,
+  CombatCreditRewardReceipt,
+  CreditCrystalTier,
+  CreditCrystalVariant,
+} from "./rewards/combat-credit-drops";
+import {
+  CreditCrystalPickupSystem,
+  type CreditCrystalArrival,
+  type CreditCrystalCollectionEvent,
+} from "./vfx/credit-crystal-pickups";
 import {
   pickVocabularyEntryForRank,
   wordDifficultyScore,
@@ -345,9 +388,11 @@ import { resolveEnemyTypingProfile } from "./enemies/typing-profile";
 import { enemyKillRewardScore } from "./enemies/scoring";
 import { StageWordLedger } from "./enemies/stage-word-variety";
 import {
+  stageResultStars,
   StageSessionTracker,
   type StageSessionSnapshot,
 } from "./results/stage-session";
+import { stageClearCelebrationProfile } from "./results/stage-clear-celebration";
 import {
   enemySkillDefinition,
   type EnemySkillId,
@@ -389,6 +434,7 @@ import {
 import {
   getSupportSpell,
   isSupportSpellId,
+  strikeTypingAdvance,
   type SupportSpellId,
 } from "./skills/support";
 import {
@@ -414,6 +460,7 @@ import {
   multiplierForStreak,
   normalizeWord,
   splitDisplayByTypedLetters,
+  stageWordsPerMinute,
   typingText,
 } from "./logic";
 import {
@@ -423,7 +470,74 @@ import {
   telegraphStrength,
   type ImpactKind,
 } from "./vfx/polish";
-import { enemyFxProfile } from "./vfx/enemy-fx";
+import { enemyFxProfile, type EnemyFxProfile } from "./vfx/enemy-fx";
+import { PlayerShotSystem, preloadShotArt, type ShotAimPoint } from "./vfx/player-shots";
+import { ShipExhaust } from "./vfx/ship-exhaust";
+import {
+  SkillFxSystem,
+  distanceToSegment,
+  nearestPoint,
+  type FxPoint,
+  type PersistentFxState,
+} from "./vfx/skill-fx";
+import { characterVisualProfile } from "./characters/visuals";
+import { NO_EQUIPMENT_PERKS, type EquipmentPerkEffects } from "./equipment/perks";
+import { drawGlow, drawRingGlow } from "./vfx/light-sprites";
+import { CombatFxSystem, drawBossAura, drawEnemyShot } from "./vfx/combat-fx";
+import { familyStyle, kindArchetype, kindMotionPose, type MotionPose } from "./enemies/identity";
+import {
+  drawPaintedSprite,
+  paintedBossArtUrl,
+  paintedBossSprite,
+  paintedEnemySprite,
+  preloadPaintedSprites,
+} from "./enemies/painted-sprites";
+import { BossRelief, type BossReliefPose } from "./boss/boss-relief";
+import { drawBonusTarget, preloadBonusSprites } from "./vfx/bonus-sprites";
+import { RewardDrops, type RewardDropSpec } from "./vfx/reward-drops";
+import { paintedItemIcon } from "./ui/painted-icons";
+import {
+  BossCallouts,
+  COUNTER_COLOR,
+  depthLaneX,
+  depthMeteorPoint,
+  depthMeteorTarget,
+  drawBossCharge,
+  drawBossSkill,
+  drawCounterPrompt,
+  drawSkillCallout,
+  drawUltimateBanner,
+  drawUltimateFrame,
+  type DepthGeometry,
+} from "./boss/depth-view";
+import {
+  bossCounterOpen,
+  bossCounterPerfect,
+  bossSkillDamage,
+  bossSkillName,
+  bossSkillProgress,
+  bossUltimatePhase,
+  chooseBossSkill,
+  interceptBossMeteor,
+  seededBossRng,
+  startBossSkill,
+  COUNTER_WORDS,
+  tickBossSkill,
+  typeBossCounter,
+  type BossCounterKind,
+  type BossSkillEvent,
+  type BossSkillKind,
+  type BossSkillState,
+  type Rng as BossRng,
+} from "./boss/skills";
+import {
+  bossFullName,
+  bossIdentityForStage,
+  bossPatternForPhase,
+  bossShotGeometry,
+  type BossIdentity,
+  type BossPattern,
+} from "./boss/identity";
 import { rewardFxProfile } from "./vfx/reward-fx";
 import {
   FrameProfiler,
@@ -463,6 +577,40 @@ type EnemySpawnRequest = {
   yOffset?: number;
 };
 
+/**
+ * What a player shot does to the picture when it lands. Ships with a
+ * travelling bolt apply it on arrival, so the hit flash, bursts, sounds and
+ * death blast line up with the bolt; ships on the legacy laser apply it at
+ * once. Gameplay state (score, kills, removal) never waits for it.
+ */
+type ShotImpact =
+  | { kind: "enemy-hit"; enemyId: number; power: number }
+  | { kind: "enemy-layer"; enemyId: number; fx: EnemyFxProfile }
+  | {
+      kind: "enemy-kill";
+      enemy: Enemy;
+      fx: EnemyFxProfile;
+      shake: number;
+      creditReceipt: CombatCreditRewardReceipt | null;
+    }
+  | { kind: "boss-hit" }
+  | { kind: "intercept"; projectile: EnemyProjectile }
+  // Bonus targets (supply pod, treasure drone, crates, Recall bonus).
+  | { kind: "bonus-hit"; aim: BonusAim; hue: number; count: number }
+  | {
+      kind: "bonus-collect";
+      aim: BonusAim;
+      hue: number;
+      count: number;
+      /** Draws the collected bonus until the bolt lands. */
+      ghost: () => void;
+      /** What drops out and flies to the ship when the bolt lands. */
+      drop?: RewardDropSpec;
+    };
+
+/** Writes where a bonus target is drawn right now (its bob/sway included). */
+type BonusAim = (out: ShotAimPoint) => void;
+
 type LearningEcho = {
   entry: VocabularyEntry;
   x: number;
@@ -475,6 +623,19 @@ export type GameHooks = {
   onStats(stats: GameStats): void;
   onPhase(phase: GamePhase): void;
   onStage(stage: number): void;
+  onCombatCreditAttemptStart?(attempt: {
+    attemptId: string;
+    stage: number;
+    regularEnemyCount: number;
+    expectedEligibleKills: number;
+    bossRole: BossRole | null;
+  }): void;
+  onCombatCreditReward?(
+    request: CombatCreditClaimRequest,
+  ): CombatCreditRewardReceipt | null;
+  onCombatCreditPickupPresented?(
+    event: CreditCrystalCollectionEvent,
+  ): void;
   onStagePhase?(phase: StagePacingPhase): void;
   onStageEvents(events: readonly StageEventDefinition[]): void;
   onObjectiveUpdate(objective: StageObjectiveState | null): void;
@@ -482,7 +643,11 @@ export type GameHooks = {
   onBossUpdate(boss: BossHudState | null): void;
   onWordComplete(
     entry: VocabularyEntry,
-    outcome?: { perfect: boolean },
+    outcome?: {
+      perfect: boolean;
+      inputSource?: "typing" | "voice";
+      fact?: CombatCompletionFact;
+    },
   ): void;
   onRecallPrompt?(entry: VocabularyEntry): void;
   onRecallResult?(result: RecallAttemptResult): void;
@@ -511,6 +676,13 @@ export type TestLabEnemySpawn = {
   rank?: EnemyRank;
   layers?: 1 | 2 | 3;
   skillIds?: readonly EnemySkillId[];
+};
+
+export type TestLabCreditCrystalSpawn = {
+  tier: CreditCrystalTier;
+  variant?: CreditCrystalVariant;
+  count?: number;
+  amountEach?: number;
 };
 
 export type TestLabBossOverride = {
@@ -549,8 +721,13 @@ export type TestLabGameSnapshot = {
   statuses: ActiveStatus[];
   hardCc: HardCcState;
   projectiles: number;
-  playerShots: number;
   particles: number;
+  creditPickups: {
+    bursts: number;
+    pieces: number;
+    rewards: number;
+    walletDeltaApplied: number;
+  };
   activePressure: ActiveTypingPressureSnapshot;
   deathMode: TestLabDeathMode;
   lethalHits: number;
@@ -603,6 +780,136 @@ const FALLBACK_ENTRIES: VocabularyEntry[] = [
 ];
 
 const PLAYER_Y_OFFSET = 72;
+/**
+ * Stagger when a player bolt lands: the enemy stops advancing for a moment
+ * and its body shakes sideways (the word label stays still for reading).
+ */
+/** Bonus targets bob/sway on screen; drawing and bolt aim share these. */
+const supplyPodBob = (pod: SupplyPod): number => Math.sin(pod.age * 3.2) * 7;
+const treasureDroneBob = (drone: TreasureDrone): number => Math.sin(drone.age * 4) * 9;
+const recallBonusBob = (target: RecallBonusTarget): number => Math.sin(target.age * 3.8) * 7;
+const rewardCrateSway = (crate: RewardChoiceCrate): number => Math.sin(crate.age * 2.6) * 16;
+const anomalyCrateSway = (crate: AnomalyCrate): number => Math.sin(crate.age * 3.1) * 18;
+/** Nose tip ahead of the ship centre, px (legacy laser and target line start). */
+const SHIP_NOSE_OFFSET = 30;
+/** Wind-up colour of an enemy skill, by its category. */
+const SKILL_CHARGE_COLORS = {
+  attack: "#ff7a3d",
+  defense: "#7ff5ff",
+  control: "#c08bff",
+  support: "#6dffb4",
+} as const;
+/** Beam colour of enemy status skills (frost lock, silence, curse…). */
+const ENEMY_STATUS_COLORS: Partial<Record<string, string>> = {
+  frozen: "#8fe8ff",
+  silenced: "#c9b8ff",
+  cursed: "#ff5ad0",
+  bound: "#ffb45a",
+  jammed: "#d8ff66",
+  slowed: "#7fb8ff",
+};
+/** Painted enemy / boss sprites, as a multiple of the hit radius. */
+const ENEMY_SPRITE_SCALE = 2.7;
+
+/**
+ * Boss art gets a little more screen space as visual quality increases.
+ * Keep this presentation-only: hit radius and boss gameplay stay unchanged.
+ * High/Ultra also use the detailed @2x source in painted-sprites.ts.
+ */
+/** Vietnamese meanings and IPA: a font with full Vietnamese diacritics. */
+const VIETNAMESE_FONT = "'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, sans-serif";
+
+/**
+ * Meaning / IPA under a word: large enough to read at a glance, on a dark pill
+ * so it stays legible over bright backgrounds.
+ */
+function drawMeaningPill(
+  context: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  size: number,
+  accent = "#7fe8ff",
+): void {
+  context.save();
+  context.shadowBlur = 0;
+  context.font = "600 " + String(size) + "px " + VIETNAMESE_FONT;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  const width = context.measureText(text).width + size * 1.2;
+  const height = size * 1.7;
+  context.fillStyle = "rgba(4, 9, 20, 0.84)";
+  context.strokeStyle = accent;
+  context.globalAlpha = 0.96;
+  context.lineWidth = 1;
+  context.beginPath();
+  context.roundRect(x - width / 2, y - height / 2, width, height, height / 2);
+  context.fill();
+  context.globalAlpha = 0.45;
+  context.stroke();
+  context.globalAlpha = 1;
+  context.fillStyle = "#f2fbff";
+  context.fillText(text, x, y + size * 0.04);
+  context.restore();
+}
+
+/** Treasure pieces: the golden Credit crystal art. */
+const TREASURE_DROP_ART = new URL("./assets/pickups/credits/elite-golden.webp", import.meta.url).href;
+
+/** Item icon a supply chest drops for its reward. */
+function supplyRewardIcon(reward: string): string | null {
+  if (reward === "hull") return paintedItemIcon("repair-kit");
+  if (reward === "shield") return paintedItemIcon("shield-cell");
+  if (reward === "energy") return paintedItemIcon("energy-cell");
+  return paintedItemIcon("phoenix-core");
+}
+
+/** Glow colour of a supply chest by what it gives. */
+function supplyRewardGlow(reward: string): string {
+  if (reward === "shield") return "#5fb0ff";
+  if (reward === "hull" || reward === "repair") return "#5dffaa";
+  if (reward === "energy") return "#b48bff";
+  return "#ffd866";
+}
+
+/** Seconds the defeated boss relief tumbles away; the ultimate banner shows. */
+const BOSS_WRECK_SECONDS = 1.8;
+const BOSS_BANNER_SECONDS = 2.2;
+
+/** What to do, under a boss skill's name while its counter is open. */
+const BOSS_COUNTER_HINT: Readonly<Record<BossCounterKind, string>> = {
+  parry: "Type it to reflect the beam",
+  dodge: "Type it to dash to the safe lane",
+  brace: "Type it to brace, then strike back",
+  break: "Type it to break the chain",
+  intercept: "Type the letters to shoot the meteors down",
+};
+
+function bossSpriteScale(quality: GameSettings["visualQuality"]): number {
+  if (quality === "ultra") return 3.35;
+  if (quality === "high") return 3.25;
+  if (quality === "medium") return 3.08;
+  return 2.98;
+}
+const ALL_ENEMY_KINDS: readonly EnemyKind[] = [
+  "scout", "mine", "tank", "destroyer", "oppressor", "shield", "carrier",
+  "jammer", "cloaker", "healer", "splitter", "sniper", "leech", "commander",
+];
+/** Tactical systems tuning (see src/skills/support.ts descriptions). */
+const MISSILE_SWARM_COUNT = 8;
+const MISSILE_SWARM_TARGETS = 6;
+const MISSILE_SWARM_FLIGHT = 0.46;
+const MISSILE_SWARM_STAGGER = 0.055;
+const RAILGUN_LANE_HALF_WIDTH = 46;
+const TRACTOR_PULL_SECONDS = 0.8;
+const TRACTOR_PULL_SHARE = 0.22;
+const TRACTOR_MIN_Y = 90;
+const TRACTOR_HOLD_SECONDS = 4;
+const TRACTOR_HOLD_FACTOR = 0.45;
+const TRACTOR_STALL_SECONDS = 2;
+const HIT_STUN_SECONDS = 0.06;
+const LAYER_STUN_SECONDS = 0.16;
+const HIT_SHAKE_SECONDS = 0.12;
 
 function randomBetween(min: number, max: number): number {
   return min + Math.random() * (max - min);
@@ -645,6 +952,9 @@ export class Game {
   private readonly hooks: GameHooks;
   private readonly sfx = new Sfx();
   private readonly priorityKillChain = new PriorityKillChain();
+  /** DotA announcer: first kill of the stage, and the kill-spree ladder. */
+  private firstBloodThisStage = false;
+  private announcedSpreeRung = 0;
   private readonly skillEngine = new SkillEngine();
   private skillLevels: Record<UpgradeableSkillId, number> =
     Object.fromEntries(
@@ -655,6 +965,20 @@ export class Game {
   };
   private relicFirstWordTriggered = false;
   private relicMistakeGuardsUsed = 0;
+  private expansionEncounterContext: {
+    encounterId: string;
+    pattern: TypingPatternId;
+    recipe: EncounterRecipeId | "normal";
+    gameplayState: number;
+    patternSeed: number;
+    patternVocabulary: VocabularyEntry[];
+    bossParts: boolean;
+    wantedWordId: string | null;
+    wantedWordAssigned: boolean;
+  } | null = null;
+  private completionSequence = 0;
+  private relicPerfectWordCount = 0;
+  private relicRecoveryArmed = false;
 
   private characterId: CharacterId = "vanguard";
   private equipmentAura: EquipmentAuraProfile | null = null;
@@ -677,6 +1001,9 @@ export class Game {
   private recallPromptStartedAtSeconds = 0;
   private recallReplayCount = 0;
   private phase: GamePhase = "title";
+  private duelPresentationActive = false;
+  private duelCombatRenderer: ((context: CanvasRenderingContext2D, time: number, width: number, height: number) => void) | null = null;
+  private duelCamera: (() => { zoom: number; fx: number; fy: number }) | null = null;
   private playerStats: CoreStats = calculateEffectiveStats({
     base: DEFAULT_PLAYER_BASE_STATS,
   });
@@ -696,18 +1023,122 @@ export class Game {
   private bossSpawned = false;
   private bossDefeated = false;
   private bossRewardPending = false;
+  private bossRewardPrompt: {
+    stage: number;
+    role: BossRole;
+    remaining: number;
+  } | null = null;
   private seenEnemyDefinitions = new Set<EnemyDefinitionId>();
   private enemies: Enemy[] = [];
   private readonly stageWordLedger = new StageWordLedger();
+  private readonly targetOwnership = new TargetOwnership();
+  private inputMode: InputMode = "typing";
+  private voiceReadiness: () => boolean = () => false;
+  setVoiceReadiness(ready: () => boolean): void {
+    this.voiceReadiness = ready;
+  }
+  private voiceWorldReady: () => boolean = () => true;
+  setVoiceWorldReadiness(ready: () => boolean): void {
+    this.voiceWorldReady = ready;
+  }
+  private voiceCompletionActive = false;
+  private readonly voicePassiveCredit = new VoicePassiveCredit();
+  private voiceWordsCompleted = 0;
+  private voiceActionsCompleted = 0;
+  private voiceEffortStreak = 0;
+  private voiceCurrentEffort = 0;
+  private voiceVocabularyRevision = 0;
+  private readonly voiceRecallAssist = new WeakMap<object, { startedAt: number; replays: number }>();
+  getVoiceVocabularyRevision(): number {
+    return this.voiceVocabularyRevision;
+  }
+  private readonly voiceUnitWords = new WeakMap<object, string>();
+  private readonly voiceUnitEligibility = new WeakMap<object, boolean>();
+  private voiceConflictWords: string[] = [];
+  private voiceSafeRows: boolean[] = [];
+  private readonly voiceUnitSamples = new WeakMap<object, number>();
+  private readonly voiceUnitKnownIds = new WeakMap<object, string>();
+  private readonly voiceActionForms = new WeakMap<object, string>();
   private projectiles: EnemyProjectile[] = [];
-  // Laser is retained only for the dedicated hostile-projectile intercept tracer.
   private lasers: Laser[] = [];
-  private nextPlayerVisualShotId = 1;
-  private playerVisualShots: PlayerVisualShot[] = [];
-  private playerMuzzleFlashes: PlayerMuzzleFlash[] = [];
-  private playerCombatImpacts: PlayerCombatImpact[] = [];
-  private killScorePopups: KillScorePopup[] = [];
-  private playerAimAngle = 0;
+  private readonly playerShots = new PlayerShotSystem<ShotImpact>();
+  private readonly creditPickups = new CreditCrystalPickupSystem();
+  private readonly creditArrivals: CreditCrystalArrival[] = [];
+  /** Killed enemies stay on screen until the bolt that killed them lands. */
+  private dyingEnemies: Enemy[] = [];
+  /** Intercepted hostile shots stay on screen until the player's bolt reaches them. */
+  private interceptedProjectiles: EnemyProjectile[] = [];
+  /** Collected bonus targets stay on screen until the final bolt reaches them. */
+  private bonusGhosts: Array<() => void> = [];
+  /** Nose turn toward each shot's target, recoil and engine throttle. */
+  private readonly shipMotion = new ShipMotion();
+  private readonly shipExhaust = new ShipExhaust();
+  /** Big skill signatures: shockwaves, lances, missiles, shields, drones. */
+  private readonly skillFx = new SkillFxSystem();
+  /** Enemy and boss effects: material hits, family deaths, boss sequences. */
+  private readonly combatFx = new CombatFxSystem();
+  /** Who the current boss is (name, look, volley patterns, voice). */
+  private bossIdentity: BossIdentity | null = null;
+  /**
+   * Boss Depth View (campaign, not Recall): the boss far up the corridor as a
+   * lit 3D relief, skills with typed counters (src/boss/skills.ts) and their
+   * drawing (src/boss/depth-view.ts).
+   */
+  private bossSkill: BossSkillState | null = null;
+  private bossSkillCooldowns: Partial<Record<BossSkillKind, number>> = {};
+  private bossSkillLast: BossSkillKind | null = null;
+  private bossSkillRng: BossRng = seededBossRng(1);
+  private bossUltimateQueued = false;
+  private bossUltimateCast = false;
+  /** Successful counters in a row (more Rage each time; reset by a failed one). */
+  private bossCounterChain = 0;
+  /** After a braced rush: the boss takes ×1.5 damage. */
+  private bossExposedTimer = 0;
+  private bossRelief: BossRelief | null = null;
+  private bossReliefKey: string | null = null;
+  /** Fly-in from the vanishing point, 0 → 1. */
+  private bossIntro = 1;
+  /** The defeated boss tumbling away (keeps the relief on screen briefly). */
+  private bossWreck: { t: number; x: number; y: number; size: number; spin: number } | null = null;
+  private readonly bossCallouts = new BossCallouts();
+  /** Visible rewards from bonus targets flying to the ship. */
+  private readonly rewardDrops = new RewardDrops();
+  /** Ship side-step (CSS px) for a dodged quake. */
+  private bossDodge = 0;
+  private bossDodgeTarget = 0;
+  /** Ultimate letterbox 0 … 1 and the banner clock (seconds left). */
+  private bossUltimateK = 0;
+  private bossBanner = 0;
+  private bossBannerText = "";
+  /** Rush lunge 0 … 1 (the boss comes up close, then pulls back). */
+  private bossSurge = 0;
+  /** Flight-streak vanishing point at the boss (null = the default one). */
+  private bossVanish: { x: number; y: number } | null = null;
+  private readonly motionPose: MotionPose = { dx: 0, dy: 0, rotation: 0, scaleX: 1, scaleY: 1, alpha: 1 };
+  /** Tractor Beam: enemies being hauled back up the field. */
+  private tractorPulls: Array<{ enemyId: number; remaining: number; speed: number }> = [];
+  /** Skill hits waiting for their missiles to arrive. */
+  private pendingStrikes: Array<{ delay: number; enemyIds: number[]; letters: number; bossShare: number }> = [];
+  /** Equipment perks of the Mk.II / Mk.III parts (src/equipment/perks.ts). */
+  private perks: EquipmentPerkEffects = { ...NO_EQUIPMENT_PERKS };
+  private perkKills = 0;
+  private perkPerfectKills = 0;
+  private perkPerfectWords = 0;
+  private perkStageBlocks = 0;
+  private perkPhaseTimer = 0;
+  private perkEscortTimer = 0;
+  private perkEscortTurn = 0;
+  private perkInterceptTimer = 0;
+  /** Kill perks that fire when the killing bolt lands, keyed by enemy id. */
+  private perkKillQueue = new Map<number, { arc: boolean; pierce: boolean; plasma: boolean; missiles: boolean }>();
+  /** The last shot's target, which the ship keeps tracking for a moment. */
+  private shipAimImpact: ShotImpact | null = null;
+  /** Time of the last drawn frame; key presses place shots on that pose. */
+  private lastDrawTime = 0;
+  private readonly shipPoint: ShotAimPoint = { x: 0, y: 0 };
+  private readonly nozzlePoints: ShotAimPoint[] = [];
+  private readonly trackShipTarget = (out: ShotAimPoint): boolean =>
+    this.shipAimImpact !== null && this.aimPlayerShot(this.shipAimImpact, out);
   private projectileImpacts: Array<{
     x: number;
     y: number;
@@ -725,6 +1156,11 @@ export class Game {
   private stagePhaseBreakTimer = 0;
   private stagePhaseBreakArmed = false;
   private stageConfig: StageConfig | null = null;
+  private combatCreditAttemptSequence = 0;
+  private combatCreditAttemptId: string | null = null;
+  private readonly combatCreditRewardIds = new Set<string>();
+  private combatCreditsGrantedThisStage = 0;
+  private combatCreditsAppliedThisStage = 0;
   private difficulty: DifficultyProfile | null = null;
   private hiddenEncounterRuntime: HiddenEncounterRuntime | null = null;
   private shake = 0;
@@ -793,8 +1229,13 @@ export class Game {
   private readonly textWidthCache = new Map<string, number>();
   private lastTime = performance.now();
   private animationFrame = 0;
+  // Apply gameplay-canvas DPR changes at the start of the next rAF so a
+  // canvas resize is immediately followed by a complete draw before paint.
+  private adaptiveResizePending = false;
   private stars: Array<{ x: number; y: number; z: number }> = [];
   private readonly worldSceneRenderer = new WorldSceneRenderer();
+  /** WebGL BGV stage; null keeps the current WorldSceneRenderer as fallback. */
+  private readonly backgroundStage: BackgroundStage | null;
   private worldEnvironment: WorldEnvironmentProfile =
     environmentForWorld("world-01");
   private worldSceneProfile: WorldSceneProfile =
@@ -804,12 +1245,17 @@ export class Game {
   private testLabLethalHits = 0;
   private testLabTimeScale = 1;
   private testLabSchedulerFrozen = false;
+  private testLabCreditSequence = 0;
 
   constructor(
     canvas: HTMLCanvasElement,
     vocabulary: VocabularyEntry[],
     settings: GameSettings,
     hooks: GameHooks,
+    options: {
+      backgroundCanvas?: HTMLCanvasElement | null;
+      backgroundPresentation?: BackgroundPresentation;
+    } = {},
   ) {
     const context = canvas.getContext("2d");
     if (context === null) {
@@ -821,16 +1267,28 @@ export class Game {
     this.vocabulary = vocabulary.length > 0 ? vocabulary : FALLBACK_ENTRIES;
     this.settings = settings;
     this.hooks = hooks;
+    this.backgroundStage =
+      options.backgroundCanvas === undefined || options.backgroundCanvas === null
+        ? null
+        : new BackgroundStage(options.backgroundCanvas, {
+            presentation: options.backgroundPresentation ?? "blit",
+            quality: settings.visualQuality,
+          });
     this.refreshSkillDefinitions();
     this.sfx.setVolume(settings.sfxVolume);
+    this.sfx.setCreditVolume(settings.creditVolume ?? 1);
     this.resize();
+    this.backgroundStage?.setWorld(this.worldSceneProfile.worldId);
+    preloadShotArt(this.characterId);
     this.animationFrame = requestAnimationFrame(this.frame);
   }
 
   destroy(): void {
+    this.flushCombatCreditPresentation();
     cancelAnimationFrame(this.animationFrame);
     this.modularBodyCache.clear();
     this.worldSceneRenderer.destroy();
+    this.backgroundStage?.destroy();
     this.textWidthCache.clear();
     this.sfx.destroy();
   }
@@ -877,6 +1335,214 @@ export class Game {
     }
   }
 
+  setDuelPresentationActive(active: boolean): void {
+    this.duelPresentationActive = active;
+    // Leaving the Duel brings back the Campaign World's scene.
+    if (!active) this.setDuelBackdrop(null);
+  }
+
+  private duelBackdropWorld: string | null = null;
+
+  /**
+   * Shows a Duel map's scene behind the battle (src/duel/map-backdrop.ts);
+   * null returns to the Campaign World.
+   */
+  setDuelBackdrop(worldId: string | null): void {
+    if (worldId === this.duelBackdropWorld) return;
+    this.duelBackdropWorld = worldId;
+    this.backgroundStage?.setWorld(worldId ?? this.worldSceneProfile.worldId);
+  }
+
+  setDuelCombatRenderer(
+    draw: ((context: CanvasRenderingContext2D, time: number, width: number, height: number) => void) | null,
+    camera: (() => { zoom: number; fx: number; fy: number }) | null = null,
+  ): void {
+    this.duelCombatRenderer = draw;
+    this.duelCamera = draw === null ? null : camera;
+  }
+
+  private readonly flightField = new FlightStreakField();
+  private flightLastTime: number | null = null;
+  private readonly flightReducedMotion =
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia("(prefers-reduced-motion: reduce)")
+      : null;
+
+  /**
+   * Campaign flight motion: star streaks rushing past from ahead of the ship
+   * (the owner liked the Duel "wind, gliding" feel and asked for it here).
+   * Streaks hold still while paused and speed up with the kill streak.
+   */
+  private drawFlightStreaks(time: number): void {
+    const dt = this.flightLastTime === null ? 0 : Math.max(0, Math.min(0.1, time - this.flightLastTime));
+    this.flightLastTime = time;
+    if (this.flightReducedMotion?.matches === true) return;
+    const heat = clamp(this.stats.streak / 40, 0, 1);
+    const moving = this.phase === "playing" && this.hitStopTimer <= 0;
+    this.flightField.update(
+      moving ? dt : 0,
+      2.1 + heat * 2.2 + (this.overdriveTimer > 0 ? 1.4 : 0) + this.bossUltimateK * 1.6,
+    );
+    // Boss Depth View: the corridor runs to the boss (and stays there for the
+    // rest of the stage once it is down).
+    if (this.boss !== null && this.bossDepthActive()) this.bossVanish = this.bossPosition();
+    const vanish = this.bossVanish;
+    this.flightField.draw(
+      this.context,
+      this.settings.visualQuality,
+      vanish?.x ?? this.width / 2,
+      vanish?.y ?? this.height * 0.06,
+      Math.min(this.width, this.height) * 0.62,
+      Math.max(0.3, heat),
+      "#cfe6ff",
+      vanish === null,
+    );
+  }
+
+  /**
+   * Kill-spree announcer (DotA lines): each rung of KILL_SPREE_LADDER once
+   * per streak; a mistake or a hit taken resets the streak and the ladder.
+   */
+  private checkKillSpreeAnnouncer(): void {
+    const rung = killSpreeRung(this.stats.streak);
+    if (rung < this.announcedSpreeRung) {
+      this.announcedSpreeRung = rung;
+      return;
+    }
+    if (rung > this.announcedSpreeRung) {
+      this.announcedSpreeRung = rung;
+      const step = KILL_SPREE_LADDER[rung - 1];
+      if (step !== undefined) this.sfx.announcer(step.event);
+    }
+  }
+
+  /** Duel hit weight: camera shake (respects the Screen shake setting). */
+  duelShake(amount: number): void {
+    if (!this.duelPresentationActive || !Number.isFinite(amount)) return;
+    this.shakeFor(Math.min(20, Math.max(0, amount)));
+  }
+
+  private duelSound: DuelSoundEngine | null = null;
+
+  private duelSoundEngine(): DuelSoundEngine {
+    this.duelSound ??= new DuelSoundEngine({
+      context: () => this.sfx.audioContext(),
+      volume: () => this.sfx.masterVolume(),
+      pronunciationActive: () => this.sfx.isPronunciationActive(),
+    });
+    return this.duelSound;
+  }
+
+  /** Stereo placement for Duel: wide layout puts you left, the rival right. */
+  setDuelStereoLayout(horizontal: boolean): void {
+    this.duelSoundEngine().setHorizontal(horizontal);
+  }
+
+  playDuelCombatAudioCue(input: DuelTimedAudioCue): void {
+    this.sfx.unlock();
+    // Web Audio voices first; the legacy pool/synth below is the fallback.
+    if (this.duelSoundEngine().play(input)) return;
+    switch (input.cue) {
+      case "typing-miss":
+        if (!this.sfx.playSample("duel-typing-miss")) {
+          this.sfx.wrong();
+        }
+        return;
+      case "laser-launch":
+        if (!this.sfx.playSample("duel-laser-launch")) {
+          this.sfx.shot(1.15);
+        }
+        return;
+      case "missile-launch":
+        if (!this.sfx.playSample("duel-missile-launch")) {
+          this.sfx.shot(1.35);
+          this.sfx.power();
+        }
+        return;
+      case "heavy-launch":
+        if (!this.sfx.playSample("duel-heavy-launch")) {
+          this.sfx.shot(1.5);
+        }
+        return;
+      case "bomb-launch":
+        if (!this.sfx.playSample("duel-bomb-launch")) {
+          this.sfx.shot(1.25);
+          this.sfx.command();
+        }
+        return;
+      case "energy-impact":
+        if (!this.sfx.playSample("duel-energy-impact")) {
+          this.sfx.boltImpact(1, 0, "energy");
+        }
+        return;
+      case "missile-impact":
+        if (!this.sfx.playSample("duel-missile-impact")) {
+          this.sfx.boltImpact(1.35, 0, "missile");
+        }
+        return;
+      case "heavy-impact":
+        if (!this.sfx.playSample("duel-kinetic-impact")) {
+          this.sfx.boltImpact(1.45, 0, "heavy");
+        }
+        return;
+      case "bomb-impact":
+        if (!this.sfx.playSample("duel-bomb-impact")) {
+          this.sfx.boltImpact(1.5, 0, "heavy");
+          this.sfx.damage();
+        }
+        return;
+      case "support":
+        if (!this.sfx.playSample("duel-repair-energy")) {
+          this.sfx.support();
+        }
+        return;
+      case "bank":
+        this.sfx.uiConfirm();
+        return;
+      case "warning":
+        if (!this.sfx.playSample("duel-lock-acquire")) {
+          this.sfx.projectileWarning();
+        }
+        return;
+      case "intercept":
+        if (!this.sfx.playSample("duel-intercept")) {
+          this.sfx.projectileIntercept();
+        }
+        return;
+      case "precision":
+        if (!this.sfx.playSample("duel-precision")) {
+          this.sfx.power();
+        }
+        return;
+      case "cataclysm":
+        if (!this.sfx.playSample("duel-cataclysm")) {
+          this.sfx.bossEntrance(1.05);
+        }
+        return;
+      case "round-win":
+        if (!this.sfx.playSample("duel-round-win")) {
+          this.sfx.stageClear(3, 1, 1);
+        }
+        return;
+      case "round-loss":
+        if (!this.sfx.playSample("duel-round-loss")) {
+          this.sfx.stageFail();
+        }
+        return;
+      case "round-draw":
+        if (!this.sfx.playSample("duel-round-draw")) {
+          this.sfx.uiConfirm();
+        }
+        return;
+    }
+  }
+
+  /** Small HUD sounds triggered by the DOM layer (src/main.ts). */
+  playHudCue(cue: "heat-up" | "hotbar-ready", level = 1): void {
+    if (cue === "heat-up") this.sfx.heatUp(level);
+    else this.sfx.hotbarReady();
+  }
+
   testLabSetSfxVolume(volume: number): boolean {
     if (!this.testLabEnabled) return false;
     this.sfx.setVolume(clamp(volume, 0, 1));
@@ -904,6 +1570,7 @@ export class Game {
   getTestLabSnapshot(): TestLabGameSnapshot | null {
     if (!this.testLabEnabled) return null;
     const difficulty = this.difficulty;
+    const creditBursts = this.creditPickups.diagnosticSnapshot();
     return {
       phase: this.phase,
       characterId: this.characterId,
@@ -937,8 +1604,19 @@ export class Game {
         immunity: { ...this.hardCcState.immunity },
       },
       projectiles: this.projectiles.length,
-      playerShots: this.playerVisualShots.length,
       particles: this.particles.length,
+      creditPickups: {
+        bursts: creditBursts.length,
+        pieces: this.creditPickups.livePieceCount(),
+        rewards: creditBursts.reduce(
+          (total, burst) => total + burst.rewardCount,
+          0,
+        ),
+        walletDeltaApplied: creditBursts.reduce(
+          (total, burst) => total + burst.walletDeltaApplied,
+          0,
+        ),
+      },
       activePressure:
         difficulty === null
           ? emptyActivePressureSnapshot()
@@ -1076,6 +1754,7 @@ export class Game {
         ipa: "",
       };
       enemy.typed = 0;
+      this.targetOwnership.beginUnit(enemy);
       enemy.wordMissed = false;
       enemy.x = position.x;
       enemy.baseX = position.x;
@@ -1138,6 +1817,7 @@ export class Game {
     enemy.rank = rank;
     enemy.entry = entry;
     enemy.typed = 0;
+    this.targetOwnership.beginUnit(enemy);
     enemy.wordMissed = false;
     enemy.wordDifficultyScore = score;
     enemy.layersRemaining = layers;
@@ -1448,9 +2128,19 @@ export class Game {
     return true;
   }
 
+  /** Starts a boss skill now (Depth View), e.g. "lance", "quake", "cataclysm". */
+  testLabForceBossSkill(kind: BossSkillKind): boolean {
+    if (!this.testLabEnabled || this.boss === null || !this.bossDepthActive()) return false;
+    this.bossSkill = null;
+    this.bossIntro = 1;
+    this.startBossSkillCast(this.boss, kind);
+    return true;
+  }
+
   testLabClearBoss(): boolean {
     if (!this.testLabEnabled) return false;
     this.boss = null;
+    this.resetBossPresentation(1);
     this.bossSpawned = false;
     this.bossDefeated = false;
     this.bossRewardPending = false;
@@ -1519,9 +2209,7 @@ export class Game {
     if (!this.testLabEnabled) return false;
     this.projectiles = [];
     this.lasers = [];
-    this.playerVisualShots = [];
-    this.playerMuzzleFlashes = [];
-    this.playerCombatImpacts = [];
+    this.clearPlayerShots();
     this.projectileImpacts = [];
     return true;
   }
@@ -1529,8 +2217,132 @@ export class Game {
   testLabClearParticles(): boolean {
     if (!this.testLabEnabled) return false;
     this.particles = [];
-    this.killScorePopups = [];
     return true;
+  }
+
+  testLabSpawnCreditCrystals(
+    input: TestLabCreditCrystalSpawn,
+  ): number {
+    if (
+      !this.testLabEnabled ||
+      (this.phase !== "playing" && this.phase !== "paused")
+    ) {
+      return 0;
+    }
+    const count = Math.max(
+      1,
+      Math.min(
+        50,
+        Math.floor(
+          Number.isFinite(input.count) ? input.count ?? 1 : 1,
+        ),
+      ),
+    );
+    const amountEach = Math.max(
+      1,
+      Math.floor(
+        Number.isFinite(input.amountEach)
+          ? input.amountEach ?? 1
+          : 1,
+      ),
+    );
+    const variant = input.variant ?? "standard";
+
+    for (let index = 0; index < count; index += 1) {
+      const sequence = ++this.testLabCreditSequence;
+      const column = sequence % 7;
+      const row = Math.floor(sequence / 7) % 4;
+      const x =
+        this.width * (0.24 + (0.52 * column) / 6);
+      const y =
+        this.height * (0.2 + (0.34 * row) / 3);
+      const id = "test-lab-credit:" + String(sequence);
+      this.creditPickups.spawn(
+        {
+          rewardId: id,
+          attemptId: "test-lab-manual",
+          sourceKind: "enemy",
+          sourceInstanceId: id,
+          cause: "skill-kill",
+          mode: "test-lab",
+          tier: input.tier,
+          variant,
+          nominalEarned: amountEach,
+          walletDeltaApplied: amountEach,
+        },
+        x,
+        y,
+        this.settings.visualQuality,
+      );
+    }
+    return count;
+  }
+
+  testLabSpawnCreditStress(count = 50): number {
+    if (!this.testLabEnabled) return 0;
+    const requested = Math.max(
+      1,
+      Math.min(
+        50,
+        Math.floor(Number.isFinite(count) ? count : 50),
+      ),
+    );
+    const tiers: readonly CreditCrystalTier[] = [
+      "common",
+      "refined",
+      "common",
+      "high",
+      "elite",
+      "common",
+      "refined",
+      "high",
+      "common",
+      "boss",
+      "refined",
+      "elite",
+      "common",
+      "high",
+      "major-boss",
+    ];
+    let spawned = 0;
+    for (let index = 0; index < requested; index += 1) {
+      const tier = tiers[index % tiers.length]!;
+      spawned += this.testLabSpawnCreditCrystals({
+        tier,
+        variant:
+          tier === "elite" && index % 11 === 0
+            ? "golden"
+            : "standard",
+        count: 1,
+        amountEach: Math.max(1, 1 + Math.floor(index / 5)),
+      });
+    }
+    return spawned;
+  }
+
+  testLabForceCreditMagnet(): boolean {
+    if (!this.testLabEnabled || this.creditPickups.liveBurstCount() === 0) {
+      return false;
+    }
+    this.creditPickups.forceMagnet();
+    return true;
+  }
+
+  testLabCollectCreditPickups(): number {
+    if (!this.testLabEnabled) return 0;
+    const events = this.creditPickups.flush();
+    const ship = this.shipCenter();
+    for (const event of events) {
+      this.presentCombatCreditCollection(event, ship);
+    }
+    return events.length;
+  }
+
+  testLabClearCreditPickups(): number {
+    if (!this.testLabEnabled) return 0;
+    const removed = this.creditPickups.liveBurstCount();
+    this.creditPickups.clear();
+    return removed;
   }
 
   testLabResetSkillCooldowns(): boolean {
@@ -1601,19 +2413,20 @@ export class Game {
     this.enemies = [];
     this.projectiles = [];
     this.lasers = [];
-    this.playerVisualShots = [];
-    this.playerMuzzleFlashes = [];
-    this.playerCombatImpacts = [];
+    this.clearPlayerShots();
     this.projectileImpacts = [];
     this.particles = [];
-    this.killScorePopups = [];
+    this.flushCombatCreditPresentation();
     this.targetId = null;
     this.recallBonus = null;
     this.recallBonusPending = false;
     this.boss = null;
+    this.resetBossPresentation(1);
     this.bossSpawned = false;
     this.bossDefeated = false;
     this.bossRewardPending = false;
+    this.bossRewardPrompt = null;
+    this.testLabCreditSequence = 0;
     this.testLabLethalHits = 0;
     this.setStatusState(createStatusState());
     this.hardCcState = createHardCcState();
@@ -1673,6 +2486,8 @@ export class Game {
     const profile = recallDifficultyProfile(this.recallSettings.difficulty);
     if (!canReplayRecall(profile, this.recallReplayCount)) return null;
     this.recallReplayCount += 1;
+    const target = this.boss ?? this.currentTarget() ?? this.enemies[0];
+    if (target) { const assist = this.voiceRecallAssist.get(target); if (assist) assist.replays++; }
     return prompt.entry;
   }
 
@@ -1702,12 +2517,20 @@ export class Game {
   setCharacter(id: CharacterId): void {
     if (this.characterId === id) return;
     this.characterId = id;
+    preloadShotArt(id);
     this.refreshSkillDefinitions();
     this.hooks.onSkills();
   }
 
   setEquipmentAura(profile: EquipmentAuraProfile): void {
     this.equipmentAura = { ...profile };
+  }
+
+  /** Perks of the equipped parts; applies from the next stage start. */
+  setEquipmentPerks(effects: EquipmentPerkEffects): void {
+    this.perks = { ...effects };
+    this.refreshSkillDefinitions();
+    this.hooks.onSkills();
   }
 
   setSkills(definitions: readonly SkillDefinition[]): void {
@@ -1735,6 +2558,142 @@ export class Game {
       ...EMPTY_COMPILED_RELIC_EFFECTS,
       ...effects,
     };
+  }
+
+  setExpansionEncounterContext(
+    context: {
+      encounterId: string;
+      pattern: TypingPatternId;
+      recipe?: EncounterRecipeId | "normal";
+      gameplaySeed: number;
+      bossParts?: boolean;
+      wantedWordId?: string | null;
+    } | null,
+  ): void {
+    if (context === null) {
+      this.expansionEncounterContext = null;
+      this.completionSequence = 0;
+      return;
+    }
+    const patternSeed = (context.gameplaySeed >>> 0) || 1;
+    this.expansionEncounterContext = {
+      encounterId: context.encounterId,
+      pattern: context.pattern,
+      recipe: context.recipe ?? "normal",
+      gameplayState: patternSeed,
+      patternSeed,
+      patternVocabulary: buildPatternVocabulary(
+        this.vocabulary,
+        context.pattern,
+        patternSeed,
+      ),
+      bossParts: context.bossParts === true,
+      wantedWordId:
+        typeof context.wantedWordId === "string" &&
+        context.wantedWordId.length > 0
+          ? context.wantedWordId
+          : null,
+      wantedWordAssigned: false,
+    };
+    this.completionSequence = 0;
+  }
+
+  grantRunEnergy(amountInput: number): number {
+    const amount = Number.isFinite(amountInput)
+      ? Math.max(0, amountInput)
+      : 0;
+    if (amount <= 0) return 0;
+    const before = this.stats.energy;
+    this.stats.energy = clamp(
+      this.stats.energy + amount,
+      0,
+      this.stats.maxEnergy,
+    );
+    const granted = this.stats.energy - before;
+    if (granted > 0) this.emitStats();
+    return granted;
+  }
+
+  getCombatElapsedSeconds(): number {
+    return this.stageElapsedSeconds;
+  }
+
+  private nextExpansionGameplayRandom(): number {
+    const context = this.expansionEncounterContext;
+    if (context === null) return Math.random();
+    let state = context.gameplayState >>> 0 || 1;
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    state >>>= 0;
+    context.gameplayState = state || 1;
+    return state / 0x100000000;
+  }
+
+  private takeExpansionWantedWordEntry(): VocabularyEntry | null {
+    const context = this.expansionEncounterContext;
+    if (
+      context === null ||
+      context.wantedWordId === null ||
+      context.wantedWordAssigned
+    ) {
+      return null;
+    }
+    const entry = this.expansionVocabulary().find(
+      (candidate) => candidate.id === context.wantedWordId,
+    );
+    if (entry === undefined) return null;
+    if (!this.voiceCandidateAllowed(entry)) return null;
+    return entry;
+  }
+
+  private expansionVocabulary(
+    entries: readonly VocabularyEntry[] = this.vocabulary,
+  ): readonly VocabularyEntry[] {
+    const context = this.expansionEncounterContext;
+    if (context === null) return entries;
+    if (entries === this.vocabulary) {
+      return context.patternVocabulary.length > 0
+        ? context.patternVocabulary
+        : entries;
+    }
+    const patterned = buildPatternVocabulary(
+      entries,
+      context.pattern,
+      context.patternSeed,
+    );
+    return patterned.length > 0 ? patterned : entries;
+  }
+
+  private emitTypedCompletion(
+    entry: VocabularyEntry,
+    perfect: boolean,
+    targetKind: CombatCompletionTargetKind,
+    targetId: string,
+  ): void {
+    const context = this.expansionEncounterContext;
+    if (context === null) {
+      this.hooks.onWordComplete(entry, { perfect, ...(this.voiceCompletionActive ? { inputSource: "voice" as const } : {}) });
+      return;
+    }
+    this.completionSequence += 1;
+    const fact: CombatCompletionFact = {
+      completionId: createCompletionId(
+        context.encounterId,
+        this.completionSequence,
+      ),
+      encounterId: context.encounterId,
+      sequence: this.completionSequence,
+      origin: this.voiceCompletionActive ? "voice" : "typing",
+      targetKind,
+      targetId,
+      entry: { ...entry },
+      acceptedTypedLetters: this.voiceCompletionActive ? 0 : typingText(entry.en).length,
+      ...(this.voiceCompletionActive ? { acceptedVoiceWords: 1, voiceEffort: this.voiceCurrentEffort } : {}),
+      perfect,
+      sharedKillCount: 0,
+    };
+    this.hooks.onWordComplete(entry, { perfect, fact, ...(this.voiceCompletionActive ? { inputSource: "voice" as const } : {}) });
   }
 
   setSupportSpells(ids: readonly SupportSpellId[]): void {
@@ -1781,11 +2740,15 @@ export class Game {
         this.skillLevels,
       );
 
-    this.skillEngine.setDefinitions([
-      ...characterDefinitions,
-      ...coreDefinitions,
-      ...supportDefinitions,
-    ]);
+    // Low-Loss Capacitor (equipment perk) makes every skill cheaper.
+    const costScale = this.perks.skillCostMultiplier;
+    this.skillEngine.setDefinitions(
+      [...characterDefinitions, ...coreDefinitions, ...supportDefinitions].map((definition) =>
+        costScale === 1
+          ? definition
+          : { ...definition, energyCost: Math.max(0, Math.round(definition.energyCost * costScale)) },
+      ),
+    );
   }
 
   getSkillState(id: string): SkillRuntimeState | null {
@@ -1870,18 +2833,19 @@ export class Game {
     }
 
     if (
-      id === "meteor" &&
+      (id === "meteor" || id === "missile-swarm" || id === "railgun") &&
       this.enemies.length === 0 &&
       this.boss === null
     ) {
       return "effect-not-needed";
     }
 
+    if (id === "tractor-beam" && this.enemies.length === 0) {
+      return "effect-not-needed";
+    }
+
     return this.skillEngine.canActivate(id, {
-      energy: this.stats.energy,
-      streak: this.stats.streak,
-      hits: this.stats.hits,
-      misses: this.stats.misses,
+      ...this.skillInputContext(),
     });
   }
 
@@ -2011,10 +2975,7 @@ export class Game {
     }
 
     const result = this.skillEngine.activate(id, {
-      energy: this.stats.energy,
-      streak: this.stats.streak,
-      hits: this.stats.hits,
-      misses: this.stats.misses,
+      ...this.skillInputContext(),
     });
 
     if (result.ok) {
@@ -2044,6 +3005,8 @@ export class Game {
     );
 
     this.burst(playerX, playerY, 38, 188);
+    this.skillFx.pulse(playerX, playerY, "#5ce1ff", 200, 6);
+    this.skillFx.flash("#5ce1ff", 0.12, 0.3);
     this.sfx.power();
     this.emitStats();
   }
@@ -2059,6 +3022,8 @@ export class Game {
       36,
       300,
     );
+    this.skillFx.halo(() => this.shipCenter(), "#d98bff", 120, 10, 0.9);
+    this.skillFx.pulse(this.width / 2, this.height - PLAYER_Y_OFFSET, "#d98bff", 180, 5);
     this.sfx.power();
   }
 
@@ -2069,6 +3034,8 @@ export class Game {
   private activateWraithSkill(): void {
     this.cloakTimer = Math.max(this.cloakTimer, WRAITH_ACTIVE_CLOAK_DURATION);
     this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 30, 274);
+    this.skillFx.pulse(this.width / 2, this.height - PLAYER_Y_OFFSET, "#b98cff", 160, 4);
+    this.skillFx.flash("#6d4bff", 0.12, 0.35);
     this.sfx.support();
   }
 
@@ -2080,6 +3047,8 @@ export class Game {
       this.stats.maxShield,
     );
     this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 28, 48);
+    this.skillFx.halo(() => this.shipCenter(), "#ffd65a", 110, 8, 1);
+    this.skillFx.shower("#ffd65a", 1.1);
     this.sfx.support();
     this.emitStats();
   }
@@ -2090,6 +3059,8 @@ export class Game {
       ARSENAL_OVERCLOCK_DURATION,
     );
     this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 30, 18);
+    this.skillFx.halo(() => this.shipCenter(), "#ff8a3d", 100, 8, 0.8);
+    this.skillFx.pulse(this.width / 2, this.height - PLAYER_Y_OFFSET, "#ff8a3d", 140, 4);
     this.sfx.power();
   }
 
@@ -2107,6 +3078,7 @@ export class Game {
       BASTION_MATRIX_BLOCKS,
     );
     this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 30, 164);
+    this.skillFx.halo(() => this.shipCenter(), "#ffd76a", 110, 10, 1);
     this.sfx.support();
   }
 
@@ -2118,7 +3090,7 @@ export class Game {
           Math.round(this.boss.maxHp * REAPER_EXECUTE_BOSS_RATIO),
         ),
         this.playerStats,
-      ) * reaperStreakDamageMultiplier(this.stats.streak);
+      ) * reaperStreakDamageMultiplier(this.inputMode === "voice" ? this.voiceEffortStreak : this.stats.streak);
       this.boss.hp = Math.max(0, this.boss.hp - damage);
       this.boss.flash = 1;
       this.updateBossPhase(this.boss);
@@ -2142,6 +3114,9 @@ export class Game {
     target.flash = 1;
     target.kick = Math.max(target.kick, 1.2);
     this.burst(target.x, target.y, 22, 350);
+    this.skillFx.slash(target.x, target.y, "#ff4d6d");
+    this.skillFx.flash("#ff2a4a", 0.1, 0.25);
+    this.shakeFor(4);
     this.sfx.power();
   }
 
@@ -2177,6 +3152,7 @@ export class Game {
     );
     this.celestialCharge = spendCelestialCharge(this.celestialCharge);
     this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 34, 220);
+    this.skillFx.halo(() => this.shipCenter(), "#cfe0ff", 140, 12, 1.2);
     this.sfx.support();
     this.emitStats();
   }
@@ -2198,6 +3174,8 @@ export class Game {
       this.stats.maxEnergy,
     );
     this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 38, 190);
+    this.skillFx.halo(() => this.shipCenter(), "#8ff4ff", 130, 12, 1);
+    this.skillFx.pulse(this.width / 2, this.height - PLAYER_Y_OFFSET, "#9d8bff", 260, 5, 1);
     this.sfx.power();
     this.emitStats();
   }
@@ -2226,6 +3204,10 @@ export class Game {
       36 + Math.min(24, clearedProjectiles * 3),
       192,
     );
+    const ship = this.shipCenter();
+    this.skillFx.shockwave(ship.x, ship.y, "#7fdcff", Math.hypot(this.width, this.height) * 0.72, this.fxTargets(10), 3);
+    this.skillFx.flash("#7fdcff", 0.22, 0.4);
+    this.shakeFor(6);
     this.sfx.power();
   }
 
@@ -2251,6 +3233,7 @@ export class Game {
         );
       }
       this.burst(playerX, playerY, 28, 188);
+      this.skillFx.pulse(playerX, playerY, "#5ce1ff", 150, 5);
       this.sfx.support();
     } else if (id === "reflect-field") {
       this.reflectTimer = Math.max(
@@ -2258,6 +3241,7 @@ export class Game {
         4.5 * effectScale,
       );
       this.burst(playerX, playerY, 30, 300);
+      this.skillFx.pulse(playerX, playerY, "#d98bff", 170, 4);
       this.sfx.power();
     } else if (id === "time-shell") {
       this.timeShellTimer = Math.max(
@@ -2265,6 +3249,8 @@ export class Game {
         5 * effectScale,
       );
       this.burst(playerX, playerY, 34, 258);
+      this.skillFx.pulse(playerX, playerY, "#9d8bff", Math.max(this.width, this.height) * 0.6, 5, 1.1);
+      this.skillFx.flash("#9d8bff", 0.18, 0.5);
       this.sfx.support();
     } else if (id === "emergency-repair") {
       const repaired = emergencyRepair(
@@ -2284,6 +3270,7 @@ export class Game {
       this.stats.shield = repaired.shield;
       this.stats.energy = repaired.energy;
       this.burst(playerX, playerY, 34, 138);
+      this.skillFx.nanite(() => this.shipCenter());
       this.sfx.support();
     } else {
       this.guardianTimer = Math.max(
@@ -2295,6 +3282,7 @@ export class Game {
         3 + (mastery ? 1 : 0),
       );
       this.burst(playerX, playerY, 26, 48);
+      this.skillFx.pulse(playerX, playerY, "#ffd76a", 120, 3);
       this.sfx.support();
     }
 
@@ -2321,6 +3309,11 @@ export class Game {
       const targets = [...this.enemies]
         .sort((a, b) => b.y - a.y)
         .slice(0, chainTargets);
+      const arcPath: FxPoint[] = [this.shipNose(), ...targets.map((enemy) => ({ x: enemy.x, y: enemy.y }))];
+      if (targets.length === 0 && this.boss !== null) arcPath.push(this.bossPosition());
+      this.skillFx.lightning(arcPath, "#9ab8ff", 2.4, 0.6);
+      this.skillFx.flash("#9ab8ff", 0.12, 0.25);
+      this.shakeFor(3.5);
 
       for (const enemy of targets) {
         const wordLength = typingText(enemy.entry.en).length;
@@ -2376,6 +3369,8 @@ export class Game {
     if (this.boss !== null) {
       this.bossMarkTimer = Math.max(this.bossMarkTimer, duration);
       this.boss.flash = 1;
+      const at = this.bossPosition();
+      this.skillFx.pulse(at.x, at.y, "#ff5a6e", 140, 3);
       this.hooks.onBossUpdate(toBossHud(this.boss));
       this.sfx.support();
       return;
@@ -2397,6 +3392,8 @@ export class Game {
       target.flash = 1;
       target.kick = Math.max(target.kick, 1);
       this.burst(target.x, target.y, 22, 326);
+      this.skillFx.pulse(target.x, target.y, "#ff5a6e", 110, 3);
+      this.skillFx.zap(this.shipNose(), { x: target.x, y: target.y }, "#ff5a6e");
       this.sfx.support();
     }
   }
@@ -2434,6 +3431,9 @@ export class Game {
         "support:sanctuary",
       );
       this.burst(playerX, playerY, 34, 164);
+      this.skillFx.halo(() => this.shipCenter(), "#ffcf6a", 150, 14, 1.3);
+      this.skillFx.pulse(playerX, playerY, "#ffcf6a", 220, 5);
+      this.skillFx.flash("#ffcf6a", 0.16, 0.45);
       this.sfx.support();
       this.emitStats();
       return;
@@ -2442,6 +3442,10 @@ export class Game {
     if (id === "gravity-well") {
       this.gravityWellTimer = Math.max(this.gravityWellTimer, 5);
       this.burst(this.width / 2, this.height * 0.42, 42, 270);
+      const core = this.singularityCenter();
+      this.skillFx.pulse(core.x, core.y, "#b36bff", 260, 6, 0.8);
+      this.skillFx.flash("#6a2bff", 0.14, 0.4);
+      this.shakeFor(4);
       this.sfx.power();
       return;
     }
@@ -2452,13 +3456,35 @@ export class Game {
       );
       this.interferenceTimer = 0;
       this.burst(playerX, playerY, 24, 176);
+      this.skillFx.purge();
+      this.skillFx.flash("#9fffe0", 0.12, 0.3);
       this.sfx.support();
+      return;
+    }
+
+    if (id === "missile-swarm") {
+      this.launchMissileSwarm();
+      return;
+    }
+
+    if (id === "railgun") {
+      this.fireRailgun();
+      return;
+    }
+
+    if (id === "tractor-beam") {
+      this.fireTractorBeam();
       return;
     }
 
     const targets = [...this.enemies]
       .sort((a, b) => b.y - a.y)
       .slice(0, 3);
+    // Orbital Strike: target circles, then lances from the sky.
+    const lanes = targets.map((enemy) => ({ x: enemy.x, y: enemy.y }));
+    if (lanes.length === 0 && this.boss !== null) lanes.push(this.bossPosition());
+    this.skillFx.orbitalStrike(lanes, "#ffe2a0", 0.38);
+    this.shakeFor(8);
 
     for (const enemy of targets) {
       const wordLength = typingText(enemy.entry.en).length;
@@ -2734,7 +3760,16 @@ export class Game {
 
   setVocabulary(entries: VocabularyEntry[]): void {
     if (entries.length === 0) return;
+    this.voiceVocabularyRevision++;
     this.vocabulary = entries;
+    const context = this.expansionEncounterContext;
+    if (context !== null) {
+      context.patternVocabulary = buildPatternVocabulary(
+        entries,
+        context.pattern,
+        context.patternSeed,
+      );
+    }
     this.enemies = [];
     this.targetId = null;
     this.spawnTimer = 0.2;
@@ -2748,14 +3783,34 @@ export class Game {
     );
   }
 
+  private preloadStagePaintedSprites(stageNumber: number): void {
+    const world = worldForStage(stageNumber);
+    preloadPaintedSprites(
+      world.enemyFamilies,
+      ALL_ENEMY_KINDS,
+      [
+        bossIdentityForStage(stageNumber, "mini-boss").id,
+        bossIdentityForStage(stageNumber, "boss").id,
+        bossIdentityForStage(stageNumber, "major-boss").id,
+      ],
+      this.settings.visualQuality,
+    );
+  }
+
   updateSettings(settings: GameSettings): void {
     const qualityChanged =
       this.settings.visualQuality !== settings.visualQuality;
     this.settings = settings;
     this.sfx.setVolume(settings.sfxVolume);
+    this.sfx.setCreditVolume(settings.creditVolume ?? 1);
     if (qualityChanged) {
       this.adaptiveRenderBudget.reset();
+      this.adaptiveResizePending = false;
       this.modularBodyCache.clear();
+      this.backgroundStage?.setQuality(settings.visualQuality);
+      this.preloadStagePaintedSprites(
+        this.stageConfig?.stage ?? this.stats.stage,
+      );
       this.resize();
     }
   }
@@ -2764,7 +3819,15 @@ export class Game {
     stage: StageConfig,
     difficulty: DifficultyProfile,
     hiddenEncounterRuntime: HiddenEncounterRuntime | null = null,
+    startingResources: Pick<
+      GameStats,
+      "hull" | "shield" | "energy" | "power"
+    > | null = null,
   ): void {
+    if (this.inputMode !== "typing" && !this.voiceReadiness()) return;
+    this.flushCombatCreditPresentation();
+    this.targetOwnership.beginEncounter();
+    this.voicePassiveCredit.reset(); this.voiceWordsCompleted = 0; this.voiceActionsCompleted = 0; this.voiceEffortStreak = 0;
     this.sfx.unlock();
     this.stageConfig = stage;
     this.difficulty = difficulty;
@@ -2787,21 +3850,7 @@ export class Game {
       this.worldSceneRenderer.invalidate();
       this.seedStars();
     }
-
-    if (hiddenEncounterRuntime === null) {
-      const hiddenRoll = rollHiddenDiscovery(
-        this.hiddenDiscovery,
-        stage.stage,
-        this.playerStats.luck,
-      );
-      if (hiddenRoll.rolled) {
-        this.hiddenDiscovery = hiddenRoll.state;
-        this.hooks.onHiddenDiscoveryUpdate(
-          hiddenRoll.state,
-          hiddenRoll.discovery,
-        );
-      }
-    }
+    this.backgroundStage?.setWorld(nextWorld.id);
 
     this.stageEvents = [
       ...galaxyStageModifiers(stage),
@@ -2827,11 +3876,33 @@ export class Game {
 
     this.phase = "playing";
     this.stageElapsedSeconds = 0;
+    this.firstBloodThisStage = false;
+    this.announcedSpreeRung = 0;
     this.priorityKillChain.reset();
     this.relicFirstWordTriggered = false;
     this.relicMistakeGuardsUsed = 0;
+    this.relicPerfectWordCount = 0;
+    this.relicRecoveryArmed = false;
     this.stats = this.createGameStats(stage.stage);
     this.stageResultTracker.reset();
+    if (startingResources !== null) {
+      this.stats.hull = clamp(
+        startingResources.hull,
+        0,
+        this.stats.maxHull,
+      );
+      this.stats.shield = clamp(
+        startingResources.shield,
+        0,
+        this.stats.maxShield,
+      );
+      this.stats.energy = clamp(
+        startingResources.energy,
+        0,
+        this.stats.maxEnergy,
+      );
+      this.stats.power = clamp(startingResources.power, 0, 100);
+    }
     this.stats.shield = Math.min(
       this.stats.maxShield,
       this.stats.shield *
@@ -2848,12 +3919,9 @@ export class Game {
     this.recallReplayCount = 0;
     this.recallPromptStartedAtSeconds = 0;
     this.lasers = [];
-    this.playerVisualShots = [];
-    this.playerMuzzleFlashes = [];
-    this.playerCombatImpacts = [];
+    this.clearPlayerShots();
     this.projectileImpacts = [];
     this.particles = [];
-    this.killScorePopups = [];
     this.targetId = null;
     this.learningEcho = null;
     this.supplyPod = null;
@@ -2898,6 +3966,27 @@ export class Game {
       stage,
       runtimeEnemyBudget,
     );
+    this.combatCreditAttemptSequence += 1;
+    this.combatCreditAttemptId =
+      "stage:" +
+      String(stage.stage) +
+      ":attempt:" +
+      String(this.combatCreditAttemptSequence);
+    this.combatCreditRewardIds.clear();
+    this.combatCreditsGrantedThisStage = 0;
+    this.combatCreditsAppliedThisStage = 0;
+    const combatCreditBossRole = isBossStageRole(stage.role)
+      ? stage.role
+      : null;
+    this.hooks.onCombatCreditAttemptStart?.({
+      attemptId: this.combatCreditAttemptId,
+      stage: stage.stage,
+      regularEnemyCount: this.stagePacingPlan.totalBudget,
+      expectedEligibleKills:
+        this.stagePacingPlan.totalBudget +
+        (combatCreditBossRole === null ? 0 : 1),
+      bossRole: combatCreditBossRole,
+    });
     this.stagePhaseIndex = 0;
     this.stagePhaseSpawned = 0;
     this.stagePhaseBreakTimer = 0;
@@ -2910,6 +3999,7 @@ export class Game {
     this.bossSpawned = false;
     this.bossDefeated = false;
     this.bossRewardPending = false;
+    this.bossRewardPrompt = null;
     this.overdriveTimer = 0;
     this.novaPulseRemaining = 0;
     this.interferenceTimer = 0;
@@ -2930,6 +4020,23 @@ export class Game {
     this.rewardCreditsMultiplierTimer = 0;
     this.rewardNotice = null;
     this.celestialCharge = 0;
+    this.preloadStagePaintedSprites(stage.stage);
+    preloadBonusSprites();
+    this.rewardDrops.clear();
+    this.rewardDrops.preload(TREASURE_DROP_ART);
+    this.resetBossPresentation(stage.stage * 7919 + 13);
+    this.prepareBossDepth(stage);
+    this.perkKills = 0;
+    this.perkPerfectKills = 0;
+    this.perkPerfectWords = 0;
+    this.perkStageBlocks = this.perks.stageBlocks;
+    this.perkPhaseTimer = 0;
+    this.perkEscortTimer = 2;
+    this.perkEscortTurn = 0;
+    this.perkInterceptTimer = 0;
+    if (this.perks.startingRage > 0) {
+      this.stats.power = clamp(Math.max(this.stats.power, this.perks.startingRage), 0, 100);
+    }
     this.statusState = createStatusState();
     this.hardCcState = createHardCcState();
     this.interferenceTimer = 0;
@@ -3009,17 +4116,15 @@ export class Game {
   }
 
   backToTitle(): void {
+    this.flushCombatCreditPresentation();
     this.phase = "title";
     this.novaPulseRemaining = 0;
     this.enemies = [];
     this.projectiles = [];
     this.lasers = [];
-    this.playerVisualShots = [];
-    this.playerMuzzleFlashes = [];
-    this.playerCombatImpacts = [];
+    this.clearPlayerShots();
     this.projectileImpacts = [];
     this.particles = [];
-    this.killScorePopups = [];
     this.targetId = null;
     this.supplyPod = null;
     this.supplySpawnsRemaining = 0;
@@ -3034,12 +4139,438 @@ export class Game {
     this.anomalyResolutionPending = false;
     this.anomalyRiskRatio = 0;
     this.boss = null;
+    this.resetBossPresentation(1);
     this.bossRewardPending = false;
+    this.bossRewardPrompt = null;
     this.hooks.onBossUpdate(null);
     this.hooks.onPhase(this.phase);
   }
 
+  getInputMode(): InputMode {
+    return this.inputMode;
+  }
+  setInputMode(mode: InputMode): boolean {
+    if (this.phase === "playing" || this.phase === "paused")
+      return mode === this.inputMode;
+    this.inputMode = mode;
+    return true;
+  }
+  isVoiceCompletion(): boolean {
+    return this.voiceCompletionActive;
+  }
+  getVoiceMetrics() {
+    return {
+      words: this.voiceWordsCompleted,
+      actions: this.voiceActionsCompleted,
+      policyVersion: VOICE_COMBAT_POLICY.version,
+    };
+  }
+  getVoiceVocabularyForms(): string[] {
+    return [
+      ...new Set(
+        [
+          ...this.vocabulary.map((entry) => entry.en),
+          ...FALLBACK_ENTRIES.map((entry) => entry.en),
+          ...Object.values(COUNTER_WORDS).flat(),
+          ...Object.values(NATO_LETTERS).flatMap((code) => [
+            code,
+            "letter " + code,
+            "code " + code,
+          ]),
+        ].map((text) =>
+          text.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase(),
+        ),
+      ),
+    ];
+  }
+  private completionMultiplier(): number {
+    return this.voiceCompletionActive ? 1 : this.stats.multiplier;
+  }
+  private skillInputContext() {
+    return {
+      energy: this.stats.energy,
+      streak: this.stats.streak,
+      hits: this.stats.hits,
+      misses: this.stats.misses,
+      ...(this.inputMode === "typing"
+        ? {}
+        : {
+            inputMode: this.inputMode,
+            voiceEffortStreak: this.voiceEffortStreak,
+            voiceWords: this.voiceWordsCompleted,
+          }),
+    };
+  }
+  private resetVoiceCreditForMiss(target: object): void {
+    if (
+      this.inputMode !== "typing" &&
+      this.targetOwnership.current(target).owner === "available"
+    ) {
+      this.voicePassiveCredit.reset();
+      this.voiceEffortStreak = 0;
+    }
+  }
+  private voiceRows(): Array<{
+    object: object;
+    entry: VocabularyEntry;
+    kind: string;
+    remaining: number;
+    eligible: boolean;
+  }> {
+    const rows: Array<{
+      object: object;
+      entry: VocabularyEntry;
+      kind: string;
+      remaining: number;
+      eligible: boolean;
+    }> = [];
+    const add = (
+      object: object,
+      entry: VocabularyEntry,
+      kind: string,
+      typed: number,
+      eligible = true,
+    ) =>
+      rows.push({
+        object,
+        entry,
+        kind,
+        remaining: Math.max(0, typingText(entry.en).length - typed),
+        eligible,
+      });
+    for (const enemy of this.enemies)
+      add(
+        enemy,
+        enemy.entry,
+        "enemy",
+        enemy.typed,
+        enemy.y + enemy.radius >= 0 && enemy.y - enemy.radius < this.height,
+      );
+    if (this.boss) add(this.boss, this.boss.entry, "boss", this.boss.typed);
+    if (this.supplyPod)
+      add(this.supplyPod, this.supplyPod.entry, "supply", this.supplyPod.typed);
+    if (this.treasureDrone)
+      add(
+        this.treasureDrone,
+        this.treasureDrone.entry,
+        "treasure",
+        this.treasureDrone.typed,
+      );
+    if (this.recallBonus)
+      add(
+        this.recallBonus,
+        this.recallBonus.entry,
+        "recall-bonus",
+        this.recallBonus.typed,
+      );
+    if (this.rewardChoiceCrate)
+      add(
+        this.rewardChoiceCrate,
+        this.rewardChoiceCrate.entry,
+        "choice",
+        this.rewardChoiceCrate.typed,
+      );
+    if (this.anomalyCrate)
+      add(
+        this.anomalyCrate,
+        this.anomalyCrate.entry,
+        "anomaly",
+        this.anomalyCrate.typed,
+      );
+    if (this.bossSkill?.word)
+      add(
+        this.bossSkill,
+        { id: "counter", en: this.bossSkill.word, vi: "", ipa: "" },
+        "counter",
+        this.bossSkill.typed,
+        bossCounterOpen(this.bossSkill),
+      );
+    const addAction = (object: object, char: string, kind: string) => {
+      const code = NATO_LETTERS[char.toLowerCase()];
+      if (!code) return;
+      let form = this.voiceActionForms.get(object);
+      if (!form) {
+        const reserved = rows.map((row, i) => ({
+          unitId: String(i),
+          contextId: "combat",
+          text: row.entry.en,
+          phoneticGroups: phoneticGroups(row.entry.en),
+        }));
+        form = [code, "letter " + code, "code " + code].find(
+          (text) =>
+            wordConflict(
+              { unitId: "action", contextId: "combat", text },
+              reserved,
+            ) === null,
+        );
+        if (!form) return;
+        this.voiceActionForms.set(object, form);
+      }
+      add(object, { id: `action:${char}`, en: form, vi: "", ipa: "" }, kind, 0);
+    };
+    for (const projectile of this.projectiles)
+      addAction(projectile, projectile.char, "projectile");
+    if (this.bossSkill?.kind === "cataclysm" && this.boss)
+      for (const meteor of this.bossSkill.meteors) {
+        if (meteor.state === "falling") {
+          addAction(meteor, meteor.char, "meteor");
+          const row = rows.at(-1);
+          if (row?.object === meteor)
+            row.eligible =
+              this.bossSkill.stage !== "recovery" &&
+              depthMeteorPoint(
+                this.bossDepthGeometry(this.boss.role),
+                this.bossSkill,
+                meteor,
+              ) !== null;
+        }
+      }
+    return rows;
+  }
+  private voiceCandidateFilter(
+    exclude?: object,
+  ): (entry: VocabularyEntry) => boolean {
+    if (this.inputMode === "typing") return () => true;
+    const reservations = this.voiceRows()
+      .filter((row) => row.object !== exclude)
+      .map((row, i) => ({
+        unitId: String(i),
+        contextId: "combat",
+        text: row.entry.en,
+        phoneticGroups: phoneticGroups(row.entry.en),
+      }));
+    return (entry) =>
+      admissionConflict(this.inputMode, reservations, [
+        {
+          unitId: "candidate",
+          contextId: "combat",
+          text: entry.en,
+          phoneticGroups: phoneticGroups(entry.en),
+        },
+      ]) === null;
+  }
+  private voiceCandidateAllowed(
+    entry: VocabularyEntry,
+    exclude?: object,
+  ): boolean {
+    return this.voiceCandidateFilter(exclude)(entry);
+  }
+  private admitVoiceProjectile(projectile: EnemyProjectile): boolean {
+    if (this.inputMode === "typing") return true;
+    const allowed = this.voiceCandidateFilter();
+    const chars = [
+      projectile.char,
+      ...Object.keys(NATO_LETTERS).filter((char) => char !== projectile.char),
+    ];
+    for (const char of chars)
+      for (const form of [
+        NATO_LETTERS[char]!,
+        "letter " + NATO_LETTERS[char],
+        "code " + NATO_LETTERS[char],
+      ]) {
+        if (allowed({ id: "action", en: form, vi: "", ipa: "" })) {
+          projectile.char = char;
+          this.voiceActionForms.set(projectile, form);
+          return true;
+        }
+      }
+    return false;
+  }
+  getVoiceTargets(fromSample = 0): Array<
+    VoiceTarget & {
+      keyboardOwned: boolean;
+      terminal: boolean;
+      resolving: boolean;
+    }
+  > {
+    if (this.inputMode === "typing") return [];
+    const rows = this.voiceRows();
+    if (rows.length > 64) throw new Error("Voice target capacity exceeded");
+    // Readiness is checked each frame. Recompute pairwise admission only when
+    // the reservation words change, rather than normalizing every pair per frame.
+    if (
+      rows.length !== this.voiceConflictWords.length ||
+      rows.some((row, i) => row.entry.en !== this.voiceConflictWords[i])
+    ) {
+      this.voiceConflictWords = rows.map((row) => row.entry.en);
+      const reservations = rows.map((row, i) => ({
+        unitId: String(i),
+        contextId: "combat",
+        text: row.entry.en,
+        phoneticGroups: phoneticGroups(row.entry.en),
+      }));
+      this.voiceSafeRows = reservations.map(
+        (reservation, i) =>
+          wordConflict(reservation, reservations, String(i)) === null,
+      );
+    }
+    return rows.map((row, i) => {
+      const safe = this.voiceSafeRows[i] === true;
+      const priorWord = this.voiceUnitWords.get(row.object);
+      const current = this.targetOwnership.current(row.object);
+      if (
+        priorWord !== undefined &&
+        priorWord !== row.entry.en &&
+        this.voiceUnitKnownIds.get(row.object) === current.unitId
+      )
+        this.targetOwnership.beginUnit(row.object);
+      const unit = this.targetOwnership.current(row.object);
+      if (this.voiceUnitKnownIds.get(row.object) !== unit.unitId) {
+        this.voiceUnitEligibility.delete(row.object);
+        this.voiceUnitSamples.delete(row.object);
+      }
+      this.voiceUnitWords.set(row.object, row.entry.en);
+      this.voiceUnitKnownIds.set(row.object, unit.unitId);
+      const eligible =
+        this.phase === "playing" &&
+        safe &&
+        row.eligible &&
+        row.remaining > 0 &&
+        statusRemaining(this.statusState, "frozen") === 0 &&
+        unit.owner === "available";
+      const previous = this.voiceUnitEligibility.get(row.object);
+      if (previous !== undefined && previous !== eligible)
+        unit.eligibilityVersion++;
+      this.voiceUnitEligibility.set(row.object, eligible);
+      if (
+        eligible &&
+        (previous !== true || !this.voiceUnitSamples.has(row.object))
+      )
+        this.voiceUnitSamples.set(row.object, fromSample);
+      return {
+        unitId: unit.unitId,
+        unitVersion: unit.unitVersion,
+        eligibilityVersion: unit.eligibilityVersion,
+        capability:
+          row.kind === "projectile" || row.kind === "meteor"
+            ? ("action" as const)
+            : row.entry.en.includes(" ")
+              ? ("phrase" as const)
+              : ("word" as const),
+        forms: [
+          row.entry.en
+            .normalize("NFKC")
+            .trim()
+            .replace(/\s+/g, " ")
+            .toLowerCase(),
+        ],
+        eligible,
+        eligibleFromSample: this.voiceUnitSamples.get(row.object) ?? fromSample,
+        keyboardOwned: unit.owner === "keyboard",
+        terminal: unit.owner === "completed" || unit.owner === "invalidated",
+        resolving: unit.owner === "resolving",
+      };
+    });
+  }
+  completeVoiceUnit(
+    unitId: string,
+    unitVersion: number,
+    eligibilityVersion: number,
+  ): boolean {
+    if (
+      this.inputMode === "typing" ||
+      this.phase !== "playing" ||
+      statusRemaining(this.statusState, "frozen") > 0
+    )
+      return false;
+    const live = this.getVoiceTargets();
+    if (!live.some((target) => target.unitId === unitId && target.eligible))
+      return false;
+    const row = this.voiceRows().find(
+      (row) => this.targetOwnership.current(row.object).unitId === unitId,
+    );
+    if (!row || !row.eligible || row.remaining <= 0) return false;
+    const unit = this.targetOwnership.current(row.object);
+    if (
+      unit.unitVersion !== unitVersion ||
+      unit.eligibilityVersion !== eligibilityVersion ||
+      !this.targetOwnership.claimVoice(row.object)
+    )
+      return false;
+    this.voiceCompletionActive = true;
+    try {
+      const effort = voiceEffort(row.remaining);
+      this.voiceCurrentEffort = effort;
+      this.voiceEffortStreak = Math.min(10000, this.voiceEffortStreak + effort);
+      this.addScore(VOICE_COMBAT_POLICY.scorePerEffort * effort);
+      this.gainPower(VOICE_COMBAT_POLICY.powerPerEffort * effort);
+      const triggers = new Set<string>();
+      for (const [key, threshold] of [
+        ["vanguard", 20],
+        ["wraith", 30],
+        ["zenith", 25],
+      ] as const)
+        if (this.voicePassiveCredit.add(key, effort, threshold))
+          triggers.add(key);
+      this.applyCharacterCorrectKeyPassive(triggers);
+      if (
+        row.kind === "enemy" &&
+        this.voicePassiveCredit.add(
+          "relic-freeze",
+          effort,
+          this.relicEffects.streakFreezeInterval,
+        )
+      )
+        this.applyRelicCorrectKeyPassive(row.object as Enemy, true);
+      if (row.kind === "enemy") this.completeWord(row.object as Enemy);
+      else if (row.kind === "boss" && this.boss === row.object)
+        this.completeBossWord(this.boss);
+      else if (row.kind === "supply" && this.supplyPod === row.object)
+        this.collectSupplyPod(this.supplyPod);
+      else if (row.kind === "treasure" && this.treasureDrone === row.object)
+        this.completeTreasureDroneWord(this.treasureDrone);
+      else if (row.kind === "recall-bonus" && this.recallBonus === row.object)
+        this.completeRecallBonusWord(this.recallBonus);
+      else if (row.kind === "choice" && this.rewardChoiceCrate === row.object)
+        this.completeRewardChoiceWord(this.rewardChoiceCrate);
+      else if (row.kind === "anomaly" && this.anomalyCrate === row.object)
+        this.completeAnomalyWord(this.anomalyCrate);
+      else if (row.kind === "counter" && this.bossSkill === row.object) {
+        this.bossSkill.counterInputSource = "voice";
+        this.bossSkill.typed = this.bossSkill.word!.length;
+        this.bossSkill.result = "countered";
+        this.bossSkill.counteredWithLeft =
+          this.bossSkill.stage === "telegraph"
+            ? Math.max(0, this.bossSkill.spec.telegraph - this.bossSkill.t)
+            : 0;
+        this.completeBossCounter(this.bossSkill);
+      } else if (row.kind === "projectile") {
+        this.destroyProjectile(row.object as EnemyProjectile);
+        this.voiceActionsCompleted++;
+      } else if (
+        row.kind === "meteor" &&
+        this.bossSkill?.kind === "cataclysm" &&
+        this.boss
+      ) {
+        const meteor = this.bossSkill.meteors.find(
+          (item) => item === row.object,
+        );
+        if (!meteor) return false;
+        const point = depthMeteorPoint(
+          this.bossDepthGeometry(this.boss.role),
+          this.bossSkill,
+          meteor,
+        );
+        if (!point || this.bossSkill.stage === "recovery") return false;
+        meteor.state = "destroyed";
+        this.shootBossMeteor(point);
+        this.voiceActionsCompleted++;
+      } else return false;
+      if (row.kind !== "projectile" && row.kind !== "meteor")
+        this.voiceWordsCompleted++;
+      // A layer change has already replaced the ownership unit; do not finish its new word.
+      if (this.targetOwnership.current(row.object) === unit)
+        this.targetOwnership.finish(row.object, "completed");
+      this.emitStats();
+      return true;
+    } finally {
+      this.voiceCompletionActive = false;
+      this.voiceCurrentEffort = 0;
+    }
+  }
+
   handleKey(rawKey: string): void {
+    if (this.inputMode === "voice" && /^[a-z]$/i.test(rawKey)) return;
     if (rawKey === "Escape") {
       this.togglePause();
       return;
@@ -3065,7 +4596,11 @@ export class Game {
     if (!/^[a-z]$/.test(key)) return;
 
     this.sfx.unlock();
+    if (this.typeBossSkillKey(key)) return;
     const target = this.currentTarget();
+    // Recall locks onto its word from the first key, so bonus targets are
+    // checked before the locked-target branch below.
+    if (this.gameplayMode === "recall" && this.typeRecallBonusTargetKey(key, target)) return;
 
     if (target !== null) {
       const enemyExpected = typingText(target.entry.en)[target.typed];
@@ -3213,9 +4748,15 @@ export class Game {
   }
 
   resize(): void {
+    const previousWidth = this.width;
+    const previousHeight = this.height;
     const rect = this.canvas.getBoundingClientRect();
     this.width = Math.max(640, rect.width || window.innerWidth);
     this.height = Math.max(420, rect.height || window.innerHeight);
+    this.creditPickups.reframe(
+      { width: previousWidth, height: previousHeight },
+      { width: this.width, height: this.height },
+    );
     const profile = qualityProfile(this.settings.visualQuality);
     this.dpr = Math.max(0.5, resolveRenderDpr(
       profile,
@@ -3228,6 +4769,11 @@ export class Game {
     this.canvas.height = Math.floor(this.height * this.dpr);
     this.context.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     this.worldSceneRenderer.invalidate();
+    this.backgroundStage?.resize(
+      this.width,
+      this.height,
+      window.devicePixelRatio || 1,
+    );
     this.seedStars();
   }
 
@@ -3250,6 +4796,14 @@ export class Game {
   }
 
   private frame = (now: number): void => {
+    // Setting canvas.width/height clears the visible canvas. Apply a requested
+    // DPR change before this frame draws, not after the previous frame drew,
+    // so the browser never gets an intentional blank adaptive-resize frame.
+    if (this.adaptiveResizePending) {
+      this.adaptiveResizePending = false;
+      this.applyAdaptiveRenderScale();
+    }
+
     const rawDt = Math.max(0, (now - this.lastTime) / 1000);
     const dt =
       Math.min(0.05, rawDt) *
@@ -3257,7 +4811,9 @@ export class Game {
     this.lastTime = now;
     this.frameProfiler.pushFrame(rawDt);
 
-    this.advanceSimulation(dt);
+    if (!this.duelPresentationActive) this.advanceSimulation(dt);
+    // Duel skips the Campaign simulation, so its camera shake decays here.
+    else this.shake = Math.max(0, this.shake - dt * 30);
 
     const drawStart = performance.now();
     this.draw(now / 1000);
@@ -3265,15 +4821,20 @@ export class Game {
     this.drawProfiler.pushFrame(drawMs / 1000);
     if (
       this.phase === "playing" &&
-      this.adaptiveRenderBudget.observe(this.settings.visualQuality, rawDt, drawMs)
+      this.adaptiveRenderBudget.observe(
+        this.settings.visualQuality,
+        rawDt,
+        drawMs,
+        this.backgroundStage,
+      )
     ) {
-      this.applyAdaptiveRenderScale();
+      this.adaptiveResizePending = true;
     }
     this.animationFrame = requestAnimationFrame(this.frame);
   };
 
   private advanceSimulation(dt: number): void {
-    if (this.phase === "playing") {
+    if (this.phase === "playing" && (this.inputMode !== "voice" || this.voiceWorldReady())) {
       this.stageElapsedSeconds += dt;
       if (this.hitStopTimer > 0) {
         this.hitStopTimer = Math.max(0, this.hitStopTimer - dt);
@@ -3288,6 +4849,7 @@ export class Game {
 
   private update(dt: number): void {
     this.shake = Math.max(0, this.shake - dt * 28);
+    this.checkKillSpreeAnnouncer();
     this.overdriveTimer = Math.max(0, this.overdriveTimer - dt);
     this.statusState = tickStatuses(this.statusState, dt);
     this.hardCcState = tickHardCcState(this.hardCcState, dt);
@@ -3301,6 +4863,7 @@ export class Game {
     this.guardianTimer = Math.max(0, this.guardianTimer - dt);
     this.markTimer = Math.max(0, this.markTimer - dt);
     this.bossMarkTimer = Math.max(0, this.bossMarkTimer - dt);
+    this.bossExposedTimer = Math.max(0, this.bossExposedTimer - dt);
     this.gravityWellTimer = Math.max(0, this.gravityWellTimer - dt);
     this.cloakTimer = Math.max(0, this.cloakTimer - dt);
     this.phoenixGraceTimer = Math.max(
@@ -3331,7 +4894,7 @@ export class Game {
     if (this.guardianTimer <= 0) this.guardianBlocks = 0;
     if (this.markTimer <= 0) this.markedEnemyId = null;
 
-    this.skillEngine.tick(dt);
+    this.skillEngine.tick(dt * this.perks.cooldownRate);
     this.skillHudTimer -= dt;
     if (this.skillHudTimer <= 0) {
       this.skillHudTimer = 0.15;
@@ -3363,6 +4926,9 @@ export class Game {
     this.updateRecallBonus(dt);
     this.updateRewardChoiceCrate(dt);
     this.updateAnomalyCrate(dt);
+    this.updateTractorPulls(dt);
+    this.updatePendingStrikes(dt);
+    this.updatePerkSystems(dt);
     if (!(this.testLabEnabled && this.testLabSchedulerFrozen)) {
       this.spawnTimer -= dt * hostileTimeFactor;
       this.stagePhaseBreakTimer = Math.max(
@@ -3465,13 +5031,16 @@ export class Game {
       enemy.age += dt;
       enemy.flash = Math.max(0, enemy.flash - dt * 7);
       enemy.kick = Math.max(0, enemy.kick - dt * 4);
+      const staggered = (enemy.hitStun ?? 0) > 0;
+      if (enemy.hitStun !== undefined) enemy.hitStun = Math.max(0, enemy.hitStun - dt);
+      if (enemy.hitShake !== undefined) enemy.hitShake = Math.max(0, enemy.hitShake - dt);
       const rewardControl = tickEnemyRewardControl(enemy, dt);
       const markedSlow =
         enemy.id === this.markedEnemyId && this.markTimer > 0
           ? 0.72
           : 1;
       enemy.y +=
-        enemy.speed * speedFactor * markedSlow * rewardControl * dt;
+        enemy.speed * speedFactor * markedSlow * rewardControl * (staggered ? 0 : 1) * dt;
 
       const desiredX =
         enemy.baseX + Math.sin(enemy.age * 1.1 + enemy.id) * enemy.drift;
@@ -3530,8 +5099,9 @@ export class Game {
     }
     for (let index = this.projectiles.length - 1; index >= 0; index -= 1) {
       const projectile = this.projectiles[index]!;
-      projectile.x += projectile.vx * dt * hostileTimeFactor;
-      projectile.y += projectile.vy * dt * hostileTimeFactor;
+      const shotSpeed = hostileTimeFactor * this.perks.hostileShotSpeed;
+      projectile.x += projectile.vx * dt * shotSpeed;
+      projectile.y += projectile.vy * dt * shotSpeed;
 
       const dx = projectile.x - playerX;
       const dy = projectile.y - playerY;
@@ -3569,6 +5139,7 @@ export class Game {
       this.boss.flash = Math.max(0, this.boss.flash - dt * 7);
       this.boss.kick = Math.max(0, this.boss.kick - dt * 4);
     }
+    this.updateBossPresentation(dt);
 
     let liveLasers = 0;
     for (const laser of this.lasers) {
@@ -3577,9 +5148,6 @@ export class Game {
     }
     this.lasers.length = liveLasers;
 
-    // Player projectile presentation is visual-only, but it still needs to
-    // advance every simulation frame so shots travel, impact, fade and clean up.
-    this.updatePlayerCombatPresentation(dt);
 
     let liveImpacts = 0;
     for (const impact of this.projectileImpacts) {
@@ -3603,6 +5171,33 @@ export class Game {
       }
     }
     this.particles.length = liveParticles;
+
+    // After the decay passes, so rings and bursts spawned by a landing bolt
+    // start at full life.
+    for (const arrival of this.playerShots.update(
+      dt,
+      this.aimPlayerShot,
+      this.settings.visualQuality,
+    )) {
+      this.applyShotImpact(arrival.payload, arrival.x, arrival.y, true);
+    }
+    this.updateShipMotion(dt);
+    const ship = this.shipCenter();
+    const creditArrivals = this.creditArrivals;
+    creditArrivals.length = 0;
+    for (const event of this.creditPickups.update(dt, ship, creditArrivals)) {
+      this.presentCombatCreditCollection(event, ship);
+    }
+    for (const arrival of creditArrivals) {
+      this.presentCombatCreditArrival(arrival);
+    }
+    for (const drop of this.rewardDrops.update(dt, ship)) {
+      this.sfx.rewardPickup(drop.sound);
+      this.skillFx.pulse(ship.x, ship.y, drop.color, 96, 3, 0.5);
+    }
+    this.updateBossRewardPrompt(dt);
+    this.skillFx.update(dt);
+    this.combatFx.update(dt);
 
     if (this.learningEcho !== null) {
       this.learningEcho.remaining = Math.max(
@@ -3644,6 +5239,7 @@ export class Game {
       difficulty,
     );
     const entry = this.pickBossEntry(mechanic);
+    if (entry === null) return;
     this.boss = createBossState(
       stage.stage,
       stage.galaxy,
@@ -3661,16 +5257,27 @@ export class Game {
       );
       this.boss.hp = this.boss.maxHp;
     }
+    if (this.expansionEncounterContext?.bossParts === true) {
+      this.boss.parts = createReferenceBossParts(
+        "boss:" + String(stage.stage),
+        this.boss.maxHp,
+      ).parts;
+    }
+
     this.boss.typingMechanic =
       this.gameplayMode === "recall" ? undefined : mechanic;
     this.boss.shieldActive =
       mechanic.id === "shield-sequence" &&
       mechanic.active;
+    this.bossIdentity = bossIdentityForStage(bossVisualStage, this.boss.role);
+    this.resetBossPresentation(stage.stage * 7919 + 13);
+    if (this.bossDepthActive()) {
+      // Flies in from the vanishing point (the relief is usually preloaded).
+      this.bossIntro = 0;
+      this.loadBossRelief(this.bossIdentity);
+    }
     this.boss.name =
-      bossVisualNameForStage(
-        bossVisualStage,
-        this.boss.role,
-      ) +
+      bossFullName(this.bossIdentity) +
       (difficulty.bossMutationLabel === undefined
         ? ""
         : " · ASC " + difficulty.bossMutationLabel);
@@ -3697,6 +5304,7 @@ export class Game {
       const position = this.bossPosition();
       this.burst(position.x, position.y, fx.count, fx.hue);
       this.sfx.bossEntrance(fx.pitch);
+      this.presentBossEntrance();
     } else {
       this.sfx.bossEntrance();
     }
@@ -3753,6 +5361,11 @@ export class Game {
       }
     }
 
+    // Depth View skills (lance, quake, rush, siphon, ultimate) run first: a
+    // hit in flight still lands while the boss is staggered.
+    const skillBusy = this.updateBossSkill(boss, dt);
+    if (this.boss !== boss) return;
+
     if (boss.staggerTimer > 0) {
       const wasStaggered = boss.staggerTimer > 0;
       boss.staggerTimer = Math.max(0, boss.staggerTimer - dt);
@@ -3766,10 +5379,27 @@ export class Game {
       return;
     }
 
+    if (skillBusy) return;
+    if (this.bossUltimateQueued) {
+      this.bossUltimateQueued = false;
+      this.startBossSkillCast(boss, "cataclysm");
+      return;
+    }
+
     boss.actionCooldown -= dt;
     if (boss.actionCooldown > 0) return;
 
-    this.fireBossProjectiles(boss);
+    // Each action is a Glyph Volley (the classic letter shots) or a skill
+    // with a typed counter; the next action waits until a skill has ended.
+    const kind = chooseBossSkill(
+      boss.role,
+      boss.phase,
+      this.bossSkillCooldowns,
+      this.bossSkillLast,
+      this.bossSkillRng,
+    );
+    if (kind === "volley") this.fireBossProjectiles(boss);
+    else this.startBossSkillCast(boss, kind);
     boss.actionCooldown =
       (bossActionInterval(boss.role, boss.phase) *
         (boss.typingMechanic === undefined
@@ -3807,25 +5437,401 @@ export class Game {
       (this.difficulty.projectileSpeedScale ?? 1);
     const alphabet = "asdfjklqweruiopzxcvbnm";
 
+    // Each boss has its own volley shapes (src/boss/identity.ts); the number
+    // of shots stays exactly as before, only where they come from changes.
+    const identity = this.bossIdentity;
+    const pattern: BossPattern = identity === null ? "aimed" : bossPatternForPhase(identity, boss.phase);
+    const radius = this.bossRadius(boss.role);
+    void spread;
     for (let index = 0; index < count; index += 1) {
-      const offset = (index - (count - 1) / 2) * spread;
-      const angle = baseAngle + offset;
+      const shot = bossShotGeometry(pattern, index, count, x, y, radius, playerX, playerY, this.width);
       const char =
         alphabet[Math.floor(Math.random() * alphabet.length)] ?? "a";
 
-      this.projectiles.push({
+      const projectile: EnemyProjectile = {
         id: this.nextProjectileId++,
         ownerId: -1,
         char,
-        x,
-        y: y + 18,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
+        x: shot.x,
+        y: shot.y,
+        vx: Math.cos(shot.angle) * speed * shot.speed,
+        vy: Math.sin(shot.angle) * speed * shot.speed,
         radius: boss.phase >= 3 ? 15 : 13,
-      });
+        family: identity?.family,
+      };
+      if (this.admitVoiceProjectile(projectile)) this.projectiles.push(projectile);
+      if (identity !== null) this.combatFx.cast(shot.x, shot.y, identity.primary, 24);
     }
 
     this.sfx.enemyShot();
+  }
+
+  // --- Boss Depth View: skills and counters ----------------------------------
+
+  /** Campaign bosses use the Depth View; Recall keeps its word-card layout. */
+  private bossDepthActive(): boolean {
+    return this.gameplayMode !== "recall";
+  }
+
+  /**
+   * Box edge of the far boss (CSS px). Small enough to read as distant; the
+   * relief is rendered at this size × device pixels, so it stays sharp.
+   */
+  private bossDepthSize(role: BossState["role"]): number {
+    const factor = role === "major-boss" ? 0.3 : role === "boss" ? 0.28 : 0.25;
+    // Narrow (phone) screens: at most half the width, so it still reads as far.
+    const base = Math.min(clamp(this.height * factor, 150, 330), this.width * 0.5);
+    const intro = 1 - (1 - this.bossIntro) ** 3;
+    return base * (0.18 + 0.82 * intro) * (1 + this.bossSurge * 0.32);
+  }
+
+  private bossDepthGeometry(role: BossState["role"]): DepthGeometry {
+    const { x, y } = this.bossPosition();
+    const ship = this.shipCenter();
+    return {
+      width: this.width,
+      height: this.height,
+      bossX: x,
+      bossY: y,
+      bossSize: this.bossDepthSize(role),
+      shipX: ship.x,
+      shipY: ship.y,
+    };
+  }
+
+  /** Clears skills, fly-in, wreck and callouts (stage start, test lab). */
+  private resetBossPresentation(seed: number): void {
+    this.bossSkill = null;
+    this.bossSkillCooldowns = {};
+    this.bossSkillLast = null;
+    this.bossSkillRng = seededBossRng(seed);
+    this.bossUltimateQueued = false;
+    this.bossUltimateCast = false;
+    this.bossCounterChain = 0;
+    this.bossExposedTimer = 0;
+    this.bossIntro = 1;
+    this.bossWreck = null;
+    this.bossCallouts.clear();
+    this.bossDodge = 0;
+    this.bossDodgeTarget = 0;
+    this.bossUltimateK = 0;
+    this.bossBanner = 0;
+    this.bossSurge = 0;
+    this.bossVanish = null;
+  }
+
+  /** Builds this stage's boss relief ahead of the fight (not on Low). */
+  private prepareBossDepth(stage: StageConfig): void {
+    if (!isBossStageRole(stage.role) || !this.bossDepthActive()) return;
+    const visualStage = this.hiddenEncounterRuntime?.bossStageOverride ?? stage.stage;
+    this.loadBossRelief(bossIdentityForStage(visualStage, stage.role));
+  }
+
+  private loadBossRelief(identity: BossIdentity): void {
+    if (this.settings.visualQuality === "low" || !BossRelief.supported()) return;
+    const url = paintedBossArtUrl(identity.id);
+    if (url === undefined) return;
+    const key = identity.id + "|" + url;
+    if (this.bossReliefKey === key) return;
+    this.bossReliefKey = key;
+    this.bossRelief?.dispose();
+    this.bossRelief = null;
+    void BossRelief.load(url, identity.primary, identity.accent).then((relief) => {
+      if (this.bossReliefKey !== key) {
+        relief?.dispose();
+        return;
+      }
+      this.bossRelief = relief;
+    });
+  }
+
+  /** Telegraph length scales with the stage's pace, never below a typeable window. */
+  private startBossSkillCast(boss: BossState, kind: BossSkillKind): void {
+    const difficulty = this.difficulty;
+    const windup =
+      difficulty === null
+        ? 1
+        : clamp(
+            difficulty.attackIntervalFactor / Math.max(0.75, difficulty.bossPressure),
+            0.65,
+            1.2,
+          );
+    const skill = startBossSkill(kind, boss.role, boss.phase, this.bossSkillRng, windup, this.inputMode === "voice");
+    if (this.inputMode !== "typing") {
+      if (skill.word) {
+        const words = COUNTER_WORDS[skill.spec.counter as Exclude<BossCounterKind, "intercept">];
+        const safe = [skill.word, ...words].find(word => this.voiceCandidateAllowed({ id: "counter", en: word, vi: "", ipa: "" }, this.bossSkill ?? undefined));
+        if (!safe) return;
+        skill.word = safe;
+      }
+      const reservations = this.voiceRows().map((row, i) => ({ unitId: String(i), contextId: "combat", text: row.entry.en, phoneticGroups: phoneticGroups(row.entry.en) }));
+      if (skill.word) reservations.push({ unitId: "counter", contextId: "combat", text: skill.word, phoneticGroups: phoneticGroups(skill.word) });
+      for (const meteor of skill.meteors) {
+        const choice = Object.keys(NATO_LETTERS).flatMap(char => [NATO_LETTERS[char]!, "letter " + NATO_LETTERS[char], "code " + NATO_LETTERS[char]].map(form => ({ char, form }))).find(({ form }) => wordConflict({ unitId: "meteor", contextId: "combat", text: form, phoneticGroups: phoneticGroups(form) }, reservations) === null);
+        if (!choice || reservations.length >= 64) return;
+        meteor.char = choice.char; this.voiceActionForms.set(meteor, choice.form);
+        reservations.push({ unitId: "meteor:" + meteor.id, contextId: "combat", text: choice.form, phoneticGroups: phoneticGroups(choice.form) });
+      }
+    }
+    this.bossSkill = skill;
+    this.bossSkillCooldowns[kind] = skill.spec.cooldown;
+    if (kind !== "cataclysm") this.bossSkillLast = kind;
+    const identity = this.bossIdentity;
+    this.sfx.bossSkillCharge(kind, identity?.voice ?? 1);
+    if (kind === "cataclysm") {
+      this.bossBannerText =
+        "ULTIMATE · " + bossSkillName(kind, identity?.family ?? "devil").toUpperCase();
+      this.bossBanner = BOSS_BANNER_SECONDS;
+      if (identity !== null) {
+        this.sfx.bossRoar(identity.voice * 0.95, familyStyle(identity.family).material);
+      }
+      if (this.settings.screenShake) this.shake = Math.max(this.shake, 6);
+    }
+  }
+
+  /**
+   * Runs the active skill and the cooldowns. True while a skill plays (the
+   * boss takes no other action). A staggered boss holds its wind-up, which
+   * gives more time to counter; a hit already in flight still lands.
+   */
+  private updateBossSkill(boss: BossState, dt: number): boolean {
+    for (const kind of Object.keys(this.bossSkillCooldowns) as BossSkillKind[]) {
+      this.bossSkillCooldowns[kind] = Math.max(0, (this.bossSkillCooldowns[kind] ?? 0) - dt);
+    }
+    const skill = this.bossSkill;
+    if (skill === null) return false;
+    if (skill.stage === "telegraph" && boss.staggerTimer > 0) return true;
+    for (const event of tickBossSkill(skill, dt)) {
+      this.onBossSkillEvent(boss, skill, event);
+      // A reflected beam can finish the boss.
+      if (this.bossSkill !== skill) return false;
+    }
+    if (skill.ended) {
+      this.bossSkill = null;
+      this.bossDodgeTarget = 0;
+      return false;
+    }
+    return true;
+  }
+
+  private onBossSkillEvent(boss: BossState, skill: BossSkillState, event: BossSkillEvent): void {
+    const ship = this.shipCenter();
+    switch (event.type) {
+      case "release":
+        this.sfx.bossSkillRelease(skill.kind);
+        if (skill.kind === "tether" && event.countered) {
+          // Broken before it attached.
+          this.resolveBossCounter(boss, skill);
+        }
+        if (skill.kind === "surge" && this.settings.screenShake) {
+          this.shake = Math.max(this.shake, 4);
+        }
+        return;
+      case "impact": {
+        if (event.countered) {
+          this.resolveBossCounter(boss, skill);
+          return;
+        }
+        this.applyPlayerDamage(ship.x, ship.y - 24, bossSkillDamage(skill.spec, event.typedRatio));
+        this.sfx.bossSkillHit(skill.kind);
+        const color = this.bossIdentity?.primary ?? "#ff5d8f";
+        this.skillFx.flash(color, 0.22, 0.35);
+        if (this.settings.screenShake) {
+          this.shake = Math.max(this.shake, skill.kind === "quake" ? 12 : 9);
+        }
+        return;
+      }
+      case "drain": {
+        // Siphon: hull flows up the chain to the boss.
+        this.applyPlayerDamage(ship.x, ship.y - 24, skill.spec.damage);
+        boss.hp = Math.min(boss.maxHp, boss.hp + boss.maxHp * 0.006);
+        this.hooks.onBossUpdate(toBossHud(boss));
+        return;
+      }
+      case "meteor-land": {
+        const geometry = this.bossDepthGeometry(boss.role);
+        const target = depthMeteorTarget(geometry, event.meteor);
+        this.burst(target.x, target.y, 26, 24);
+        this.applyPlayerDamage(ship.x, ship.y - 24, skill.spec.damage);
+        this.sfx.bossSkillHit("cataclysm");
+        if (this.settings.screenShake) this.shake = Math.max(this.shake, 8);
+        return;
+      }
+      case "end":
+        if (skill.result === "failed") this.bossCounterChain = 0;
+        if (
+          skill.kind === "cataclysm" &&
+          skill.meteors.length > 0 &&
+          skill.meteors.every((meteor) => meteor.state === "destroyed")
+        ) {
+          // Every meteor shot down: the boss reels.
+          this.bossCallouts.add("FLAWLESS!", COUNTER_COLOR.intercept, ship.x, ship.y - 130);
+          this.sfx.bossCounter("parry", true);
+          this.hitBossWithCounter(boss, 0.04, 1.6);
+        }
+        return;
+    }
+  }
+
+  /** A counter landed: the reward depends on the skill. */
+  private resolveBossCounter(boss: BossState, skill: BossSkillState): void {
+    const perfect = bossCounterPerfect(skill);
+    this.bossCounterChain += 1;
+    this.gainPower(6 + Math.min(4, this.bossCounterChain) * 3 + (perfect ? 6 : 0));
+    this.addScore((perfect ? 260 : 160) * (skill.counterInputSource === "voice" ? 1 : this.stats.multiplier));
+    switch (skill.kind) {
+      case "lance": {
+        // The beam goes back up the corridor into the boss.
+        const share =
+          (boss.role === "mini-boss" ? 0.07 : boss.role === "boss" ? 0.055 : 0.045) *
+          (perfect ? 1.5 : 1);
+        this.hitBossWithCounter(boss, share, perfect ? 1.6 : 1.1);
+        break;
+      }
+      case "surge":
+        this.bossExposedTimer = perfect ? 5 : 3.5;
+        boss.staggerTimer = Math.max(boss.staggerTimer, 0.8);
+        this.hooks.onBossUpdate(toBossHud(boss));
+        break;
+      case "tether":
+        this.hitBossWithCounter(boss, 0.03, perfect ? 1.8 : 1.3);
+        break;
+      default:
+        break;
+    }
+    this.emitStats();
+  }
+
+  /**
+   * Counter damage follows the typing rules: a shield or an armour part takes
+   * no damage (the boss is still staggered).
+   */
+  private hitBossWithCounter(boss: BossState, share: number, stagger: number): void {
+    if (!boss.shieldActive && this.activeBossPart(boss) === null) {
+      boss.hp = Math.max(0, boss.hp - boss.maxHp * share * this.characterBossDamageMultiplier(this.bossSkill?.counterInputSource === "voice"));
+    }
+    boss.flash = 1;
+    boss.kick = 1.5;
+    boss.staggerTimer = Math.max(boss.staggerTimer, stagger);
+    const { x, y } = this.bossPosition();
+    this.burst(x, y, 30, 190);
+    this.sfx.bossStagger();
+    if (this.settings.screenShake) this.shake = Math.max(this.shake, 7);
+    this.hooks.onBossUpdate(toBossHud(boss));
+    if (boss.hp <= 0) {
+      this.defeatBoss();
+      return;
+    }
+    this.updateBossPhase(boss);
+  }
+
+  /**
+   * Boss skill keys come first: a counter word in its window, or a falling
+   * meteor's letter. A key that continues a word already in progress (an
+   * enemy, or the boss word) stays there until the counter has started.
+   */
+  private typeBossSkillKey(key: string): boolean {
+    const boss = this.boss;
+    const skill = this.bossSkill;
+    if (boss === null || skill === null) return false;
+    const target = this.currentTarget();
+    const targetWants =
+      target !== null && typingText(target.entry.en)[target.typed] === key;
+
+    if (skill.kind === "cataclysm") {
+      if (targetWants) return false;
+      const meteor = skill.meteors.find(
+        (item) => item.state === "falling" && item.char === key,
+      );
+      if (meteor === undefined) return false;
+      const point = depthMeteorPoint(this.bossDepthGeometry(boss.role), skill, meteor);
+      // Only meteors already on their way (their letter is visible).
+      if (point === null || interceptBossMeteor(skill, key) === null) return false;
+      this.shootBossMeteor(point);
+      return true;
+    }
+
+    if (!bossCounterOpen(skill) || skill.word === null || skill.word[skill.typed] !== key) {
+      return false;
+    }
+    if (skill.typed === 0) {
+      if (targetWants) return false;
+      if (boss.typed > 0 && typingText(boss.entry.en)[boss.typed] === key) return false;
+    }
+    if (!this.targetOwnership.claimKeyboard(skill)) return true;
+    const result = typeBossCounter(skill, key);
+    if (result === "ignored") return false;
+    this.countBossSkillKey();
+    this.sfx.bossCounterKey(skill.typed / skill.word.length);
+    if (result === "complete") {
+      this.targetOwnership.finish(skill, "completed");
+      this.completeBossCounter(skill);
+    }
+    this.emitStats();
+    return true;
+  }
+
+  /** Counter letters and meteor shots are correct keys (streak, accuracy). */
+  private countBossSkillKey(): void {
+    if (this.voiceCompletionActive) return;
+    this.stats.hits += 1;
+    this.stats.streak += 1;
+    this.stats.maxStreak = Math.max(this.stats.maxStreak, this.stats.streak);
+    this.stats.multiplier = multiplierForStreak(this.stats.streak);
+    this.applyCharacterCorrectKeyPassive();
+  }
+
+  /** The counter word is in: instant feedback (rewards land with the hit). */
+  private completeBossCounter(skill: BossSkillState): void {
+    const counter = skill.spec.counter;
+    if (counter === "intercept") return;
+    const ship = this.shipCenter();
+    const perfect = bossCounterPerfect(skill);
+    const color = COUNTER_COLOR[counter];
+    const label =
+      counter === "parry"
+        ? "PARRY!"
+        : counter === "dodge"
+          ? "DODGE!"
+          : counter === "brace"
+            ? "BRACED!"
+            : "CHAIN BROKEN!";
+    this.bossCallouts.add((perfect ? "PERFECT " : "") + label, color, ship.x, ship.y - 130);
+    this.sfx.bossCounter(counter, perfect);
+    this.skillFx.pulse(ship.x, ship.y, color, 120, 3, 0.5);
+    if (counter === "dodge" && this.boss !== null) {
+      const geometry = this.bossDepthGeometry(this.boss.role);
+      this.bossDodgeTarget = depthLaneX(geometry, skill.safeLane - 1) - this.width / 2;
+    } else if (counter === "brace" || counter === "parry") {
+      this.skillFx.halo(() => this.shipCenter(), color, 110, 10, 1.1);
+    }
+  }
+
+  private shootBossMeteor(point: { x: number; y: number }): void {
+    this.countBossSkillKey();
+    this.addScore(45 * this.stats.multiplier);
+    this.gainPower(3);
+    const x = point.x;
+    const y = point.y;
+    this.firePlayerShot(
+      x,
+      y,
+      1.2,
+      {
+        kind: "bonus-hit",
+        aim: (out) => {
+          out.x = x;
+          out.y = y;
+        },
+        hue: 24,
+        count: 22,
+      },
+      0.16,
+    );
+    this.projectileImpacts.push({ x, y, life: 0.34, maxLife: 0.34, radius: 26 });
+    if (this.projectileImpacts.length > 12) this.projectileImpacts.shift();
+    if (!this.sfx.playSample("duel-intercept")) this.sfx.projectileIntercept();
+    this.emitStats();
   }
 
   private updateStageObjective(
@@ -3881,6 +5887,22 @@ export class Game {
       return;
     }
 
+    if (this.hiddenEncounterRuntime === null && this.stageConfig !== null) {
+      const hiddenRoll = rollHiddenDiscovery(
+        this.hiddenDiscovery,
+        this.stageConfig.stage,
+        this.playerStats.luck,
+      );
+      if (hiddenRoll.rolled) {
+        this.hiddenDiscovery = hiddenRoll.state;
+        this.hooks.onHiddenDiscoveryUpdate(
+          hiddenRoll.state,
+          hiddenRoll.discovery,
+        );
+      }
+    }
+
+    this.flushCombatCreditPresentation();
     this.phase = "stageclear";
     this.projectiles = [];
     this.supplyPod = null;
@@ -3891,20 +5913,48 @@ export class Game {
     this.anomalyResolutionPending = false;
     this.anomalyRiskRatio = 0;
     this.boss = null;
+    this.resetBossPresentation(1);
     this.hooks.onBossUpdate(null);
-    this.sfx.stageClear();
+
+    const stageSession =
+      this.stageResultTracker.snapshot(this.stageElapsedSeconds);
+    const targetAccuracy = accuracyPercent(
+      stageSession.correctWordKeys,
+      stageSession.wrongWordKeys,
+    );
+    const targetWpm = stageWordsPerMinute(
+      stageSession.correctWordKeys,
+      stageSession.elapsedSeconds,
+    );
+    const rating = stageResultStars(
+      targetAccuracy,
+      this.stageObjective?.status ?? null,
+    );
+    const celebration = stageClearCelebrationProfile({
+      stars: rating.stars,
+      accuracy: targetAccuracy,
+      wpm: targetWpm,
+      score: this.stats.score,
+      elapsedSeconds: stageSession.elapsedSeconds,
+    });
+    this.sfx.stageClear(
+      celebration.level,
+      celebration.accuracyTier,
+      celebration.speedTier,
+    );
     this.hooks.onStageClear(this.getStats());
     this.hooks.onPhase(this.phase);
   }
 
   private pickBossEntry(
     mechanic?: BossTypingMechanicState,
-  ): VocabularyEntry {
+  ): VocabularyEntry | null {
     const preference =
       mechanic === undefined
         ? "normal"
         : bossWordLengthPreference(mechanic);
-    const candidates = this.vocabulary.filter((entry) => {
+    const patterned = this.expansionVocabulary();
+    const candidates = patterned.filter((entry) => {
       const length = typingText(entry.en).length;
       if (preference === "short") {
         return length >= 3 && length <= 6;
@@ -3914,25 +5964,34 @@ export class Game {
       }
       return length >= 5 && length <= 12;
     });
-    const source = candidates.length > 0 ? candidates : this.vocabulary;
+    const source = candidates.length > 0 ? candidates : patterned;
     const preferred =
-      source[Math.floor(Math.random() * source.length)] ??
+      source[
+        Math.floor(this.nextExpansionGameplayRandom() * source.length)
+      ] ??
       FALLBACK_ENTRIES[8]!;
+    const allowed = this.voiceCandidateFilter(this.boss ?? undefined);
     const varied =
-      this.selectVariedEnemyEntry(preferred, undefined, source) ?? preferred;
+      this.inputMode === "typing"
+        ? this.selectVariedEnemyEntry(preferred, undefined, source) ?? preferred
+        : this.selectVariedEnemyEntry(preferred, undefined, source.filter(allowed), this.boss ?? undefined) ?? source.find(allowed) ?? (this.boss && allowed(this.boss.entry) ? this.boss.entry : null);
+    if (varied === null) return null;
     this.stageWordLedger.record(varied);
     return varied;
   }
 
   private spawnSupplyPod(): void {
+    const allowed = this.voiceCandidateFilter();
     const candidates = this.vocabulary.filter((entry) => {
+      if (!allowed(entry)) return false;
       const length = typingText(entry.en).length;
       return length >= 4 && length <= 9;
     });
-    const source = candidates.length > 0 ? candidates : this.vocabulary;
+    const source = candidates.length > 0 ? candidates : this.vocabulary.filter(entry => allowed(entry));
     const entry =
       source[Math.floor(Math.random() * source.length)] ??
-      FALLBACK_ENTRIES[1]!;
+      null;
+    if (!entry) return;
 
     this.supplyPod = {
       entry,
@@ -3958,20 +6017,24 @@ export class Game {
       this.supplyPod.age >= this.supplyPod.lifetime ||
       this.supplyPod.x > this.width + 60
     ) {
+      if (this.supplyPod) this.resetVoiceCreditForMiss(this.supplyPod);
       this.stageResultTracker.recordBonusMissed();
       this.supplyPod = null;
     }
   }
 
   private spawnTreasureDrone(): void {
+    const allowed = this.voiceCandidateFilter();
     const candidates = this.vocabulary.filter((entry) => {
+      if (!allowed(entry)) return false;
       const length = typingText(entry.en).length;
       return length >= 5 && length <= 10;
     });
-    const source = candidates.length > 0 ? candidates : this.vocabulary;
+    const source = candidates.length > 0 ? candidates : this.vocabulary.filter(entry => allowed(entry));
     const entry =
       source[Math.floor(Math.random() * source.length)] ??
-      FALLBACK_ENTRIES[5]!;
+      null;
+    if (!entry) return;
 
     this.treasureDrone = {
       entry,
@@ -3996,6 +6059,7 @@ export class Game {
       this.treasureDrone.age >= this.treasureDrone.lifetime ||
       this.treasureDrone.x < -70
     ) {
+      if (this.treasureDrone) this.resetVoiceCreditForMiss(this.treasureDrone);
       this.stageResultTracker.recordBonusMissed();
       this.treasureDrone = null;
     }
@@ -4004,8 +6068,8 @@ export class Game {
   private createRecallBonusTarget(
     entry?: VocabularyEntry,
   ): RecallBonusTarget | null {
-    const candidates = this.vocabulary.filter(eligibleRecallBonusEntry);
-    const source = entry !== undefined && eligibleRecallBonusEntry(entry)
+    const candidates = this.vocabulary.filter(candidate => eligibleRecallBonusEntry(candidate) && this.voiceCandidateAllowed(candidate));
+    const source = entry !== undefined && eligibleRecallBonusEntry(entry) && this.voiceCandidateAllowed(entry)
       ? [entry]
       : candidates;
     const selected =
@@ -4047,13 +6111,15 @@ export class Game {
       target.age >= target.lifetime ||
       target.x < -86
     ) {
+      if (this.recallBonus) this.resetVoiceCreditForMiss(this.recallBonus);
       this.stageResultTracker.recordBonusMissed();
       this.recallBonus = null;
     }
   }
 
   private spawnRewardChoiceCrate(): void {
-    const entry = rewardChoiceWord(this.vocabulary);
+    const allowed = this.voiceCandidateFilter();
+    const entry = rewardChoiceWord(this.vocabulary.filter(entry => allowed(entry)));
     if (entry === null) {
       this.rewardChoicePending = false;
       return;
@@ -4082,13 +6148,15 @@ export class Game {
       this.rewardChoiceCrate.age >= this.rewardChoiceCrate.lifetime ||
       this.rewardChoiceCrate.y > this.height * 0.63
     ) {
+      if (this.rewardChoiceCrate) this.resetVoiceCreditForMiss(this.rewardChoiceCrate);
       this.stageResultTracker.recordBonusMissed();
       this.rewardChoiceCrate = null;
     }
   }
 
   private spawnAnomalyCrate(): void {
-    const entry = anomalyWord(this.vocabulary);
+    const allowed = this.voiceCandidateFilter();
+    const entry = anomalyWord(this.vocabulary.filter(entry => allowed(entry)));
     if (entry === null) {
       this.anomalyPending = false;
       return;
@@ -4117,6 +6185,7 @@ export class Game {
       this.anomalyCrate.age >= this.anomalyCrate.lifetime ||
       this.anomalyCrate.y > this.height * 0.62
     ) {
+      if (this.anomalyCrate) this.resetVoiceCreditForMiss(this.anomalyCrate);
       this.stageResultTracker.recordBonusMissed();
       this.anomalyCrate = null;
     }
@@ -4373,14 +6442,29 @@ export class Game {
     );
   }
 
+  private expansionRecipeEnemyKind(
+    stage: number,
+  ): EnemyKind {
+    const recipe = this.expansionEncounterContext?.recipe ?? "normal";
+    const roll = this.nextExpansionGameplayRandom();
+    return recipeEnemyKind(
+      recipe,
+      roll,
+      chooseEnemyKind(stage, roll),
+    );
+  }
+
   private trySpawnFormation(
     difficulty: DifficultyProfile,
     phaseBudgetRemaining = this.spawnRemaining,
   ): number {
+    const expansionRecipe =
+      this.expansionEncounterContext?.recipe ?? "normal";
     if (
       this.hiddenEncounterRuntime?.forcePriorityTargets ||
       objectiveForcesCommander(this.stageObjective) ||
-      objectiveForcesElite(this.stageObjective)
+      objectiveForcesElite(this.stageObjective) ||
+      !recipeAllowsFormation(expansionRecipe)
     ) {
       return 0;
     }
@@ -4478,7 +6562,7 @@ export class Game {
       request.kind ??
       (objectiveCommander
         ? "commander"
-        : chooseEnemyKind(stage));
+        : this.expansionRecipeEnemyKind(stage));
     if (
       !request.skipAdmission &&
       !this.canAdmitEnemyKind(kind, difficulty)
@@ -4586,10 +6670,13 @@ export class Game {
       rosterStage,
     );
     const minimumLayers = clamp(
-      eliteStats.layers +
-        (!elite && !golden
-          ? this.stageEventModifiers.extraEnemyLayers
-          : 0),
+      chainMinimumLayers(
+        this.expansionEncounterContext?.pattern ?? "normal-word",
+        eliteStats.layers +
+          (!elite && !golden
+            ? this.stageEventModifiers.extraEnemyLayers
+            : 0),
+      ),
       1,
       3,
     );
@@ -4599,14 +6686,22 @@ export class Game {
       elite,
       minimumLayers,
       vocabularyLevel: this.vocabularyLevel,
-      entries: this.vocabulary,
+      entries: this.expansionVocabulary(),
       wordScoreOffset: difficulty.wordScoreOffset,
       rankBonus: difficulty.enemyRankBonus ?? 0,
       clarity: {
         activeWords: this.activeEnemyWords(),
       },
+      random: () => this.nextExpansionGameplayRandom(),
     });
-    const varied = this.selectVariedEnemyEntry(typingProfile.entry);
+    const wanted = this.takeExpansionWantedWordEntry();
+    const varied =
+      wanted ??
+      this.selectVariedEnemyEntry(
+        typingProfile.entry,
+        undefined,
+        this.expansionVocabulary(),
+      );
     if (varied === null) return false;
     typingProfile.entry = varied;
     typingProfile.wordDifficultyScore = wordDifficultyScore(
@@ -4675,6 +6770,7 @@ export class Game {
       actionCooldown: resolvedActionCooldown,
     });
 
+    if (wanted !== null && this.expansionEncounterContext) this.expansionEncounterContext.wantedWordAssigned = true;
     this.stageWordLedger.record(typingProfile.entry);
     this.stageResultTracker.recordEnemySpawn();
     this.notifyEnemySeen(definitionId);
@@ -4721,9 +6817,10 @@ export class Game {
     preferred: VocabularyEntry,
     excludeEnemyId?: number,
     entries: readonly VocabularyEntry[] = this.vocabulary,
+    excludeObject?: object,
   ): VocabularyEntry | null {
     // Intentional same-prefix Test Lab scenarios must remain reproducible.
-    if (this.testLabEnabled) return preferred;
+    if (this.testLabEnabled && this.inputMode === "typing") return preferred;
     const activeWords = this.activeEnemyWords(excludeEnemyId);
     if (this.boss !== null) activeWords.push(this.boss.entry.en);
     return this.stageWordLedger.pick(
@@ -4731,11 +6828,14 @@ export class Game {
       preferred,
       this.vocabularyLevel,
       activeWords,
+      this.nextExpansionGameplayRandom(),
+      this.voiceCandidateFilter(excludeObject ?? this.enemies.find(enemy => enemy.id === excludeEnemyId)),
     );
   }
 
   private pickVocabularyEntry(kind: EnemyKind): VocabularyEntry {
-    const candidates = this.vocabulary.filter((entry) => {
+    const patterned = this.expansionVocabulary();
+    const candidates = patterned.filter((entry) => {
       const length = typingText(entry.en).length;
       if (length === 0) return false;
       if (kind === "mine") return length <= 6;
@@ -4745,9 +6845,11 @@ export class Game {
       return true;
     });
 
-    const source = candidates.length > 0 ? candidates : this.vocabulary;
+    const source = candidates.length > 0 ? candidates : patterned;
     return (
-      source[Math.floor(Math.random() * source.length)] ??
+      source[
+        Math.floor(this.nextExpansionGameplayRandom() * source.length)
+      ] ??
       FALLBACK_ENTRIES[0]!
     );
   }
@@ -4755,10 +6857,10 @@ export class Game {
   private pickEnemyLayerEntry(enemy: Enemy): VocabularyEntry {
     const entry =
       pickVocabularyEntryForRank(
-        this.vocabulary,
+        this.expansionVocabulary(),
         enemy.rank ?? "I",
         this.vocabularyLevel,
-        Math.random(),
+        this.nextExpansionGameplayRandom(),
         enemy.entry.id,
         this.difficulty?.wordScoreOffset ?? 0,
         {
@@ -4766,7 +6868,7 @@ export class Game {
         },
       ) ?? this.pickVocabularyEntry(enemy.kind);
 
-    const varied = this.selectVariedEnemyEntry(entry, enemy.id) ?? entry;
+    const varied = this.selectVariedEnemyEntry(entry, enemy.id) ?? (this.inputMode === "typing" ? entry : enemy.entry);
     enemy.wordDifficultyScore = wordDifficultyScore(
       varied,
       this.vocabularyLevel,
@@ -4791,6 +6893,7 @@ export class Game {
       true,
     );
     this.burst(jammer.x, jammer.y, 18, 74);
+    this.enemyCastFx(jammer, "#d8ff66", true);
     this.sfx.enemyShot();
   }
 
@@ -4807,6 +6910,9 @@ export class Game {
       286,
     );
     this.burst(leech.x, leech.y, 12, 286);
+    // The drain tether: Rage flows up from the ship into the leech.
+    this.skillFx.lightning([this.shipCenter(), { x: leech.x, y: leech.y }], "#bb72ff", 2.2, 0.45);
+    this.combatFx.cast(leech.x, leech.y, "#bb72ff", leech.radius * 1.8);
     this.sfx.drain();
 
     if (before !== this.stats.power) {
@@ -4831,6 +6937,9 @@ export class Game {
 
     this.spawnTimer = Math.min(this.spawnTimer, 0.12);
     this.burst(commander.x, commander.y, 24, 48);
+    // Rally: a gold pulse and a spark to each ally it orders forward.
+    this.combatFx.cast(commander.x, commander.y, "#ffd866", commander.radius * 2.4);
+    for (const ally of allies) this.skillFx.zap({ x: commander.x, y: commander.y }, { x: ally.x, y: ally.y }, "#ffd866");
     this.sfx.command();
   }
 
@@ -4860,6 +6969,10 @@ export class Game {
     ally.layersRemaining = reinforced.remaining;
     ally.flash = 1;
     this.burst(ally.x, ally.y, 20, 142);
+    // A healing beam from the mender to the ally it repairs.
+    this.skillFx.lightning([{ x: healer.x, y: healer.y }, { x: ally.x, y: ally.y }], "#6dffb4", 1.8, 0.5);
+    this.combatFx.cast(healer.x, healer.y, "#6dffb4", healer.radius * 1.9);
+    this.combatFx.cast(ally.x, ally.y, "#6dffb4", ally.radius * 1.6);
     this.sfx.support();
   }
 
@@ -4974,6 +7087,7 @@ export class Game {
       enemy.layersRemaining = reinforced.remaining;
       enemy.flash = 1;
       this.burst(enemy.x, enemy.y, 18, 185);
+      this.enemyCastFx(enemy, "#7ff5ff");
       this.sfx.support();
       return;
     }
@@ -4996,6 +7110,8 @@ export class Game {
     const duration = effect.duration *
       difficulty.hardCcDurationFactor;
     const source = "enemy-skill:" + skillId;
+    // Status skills reach the ship with a coloured beam from the caster.
+    this.enemyCastFx(enemy, ENEMY_STATUS_COLORS[effect.status] ?? "#ff5ad0", true);
 
     if (!effect.hardCc) {
       this.addStatus(effect.status, duration, source, true);
@@ -5072,6 +7188,8 @@ export class Game {
   private spawnCarrierChild(carrier: Enemy): void {
     if (this.difficulty === null) return;
     if (!this.canAdmitEnemyKind("scout", this.difficulty)) return;
+    // Hangar flash as the scout launches.
+    this.combatFx.cast(carrier.x, carrier.y + carrier.radius * 0.4, "#ffd866", carrier.radius * 1.5);
 
     const profile = enemyProfile("scout", this.stageConfig?.galaxy ?? 1);
     const baseX = clamp(
@@ -5094,13 +7212,18 @@ export class Game {
       elite: false,
       minimumLayers: 1,
       vocabularyLevel: this.vocabularyLevel,
-      entries: this.vocabulary,
+      entries: this.expansionVocabulary(),
       wordScoreOffset: this.difficulty.wordScoreOffset,
       clarity: {
         activeWords: this.activeEnemyWords(),
       },
+      random: () => this.nextExpansionGameplayRandom(),
     });
-    const varied = this.selectVariedEnemyEntry(typingProfile.entry);
+    const varied = this.selectVariedEnemyEntry(
+      typingProfile.entry,
+      undefined,
+      this.expansionVocabulary(),
+    );
     if (varied === null) return;
     typingProfile.entry = varied;
     typingProfile.wordDifficultyScore = wordDifficultyScore(
@@ -5122,6 +7245,7 @@ export class Game {
       kind: "scout",
       definitionId,
       elite: false,
+      combatCreditEligible: false,
       eliteModifiers: [],
       rank: typingProfile.rank,
       wordDifficultyScore: typingProfile.wordDifficultyScore,
@@ -5188,6 +7312,10 @@ export class Game {
       (enemy.kind === "sniper" ? 1.72 : 1);
     const alphabet = "asdfjklqweruiopzxcvbnm";
     const count = enemy.kind === "oppressor" ? 3 : 1;
+    const shooterFamily = this.visualDefinitionForEnemy(enemy)?.family;
+    if (shooterFamily !== undefined) {
+      this.combatFx.cast(enemy.x, enemy.y + enemy.radius * 0.45, familyStyle(shooterFamily).primary, enemy.radius * 0.9);
+    }
     const spreadStep = enemy.kind === "oppressor" ? 0.13 : 0;
 
     for (let index = 0; index < count; index += 1) {
@@ -5196,7 +7324,7 @@ export class Game {
       const char =
         alphabet[Math.floor(Math.random() * alphabet.length)] ?? "a";
 
-      this.projectiles.push({
+      const projectile: EnemyProjectile = {
         id: this.nextProjectileId++,
         ownerId: enemy.id,
         char,
@@ -5206,7 +7334,9 @@ export class Game {
         vy: Math.sin(angle) * speed,
         radius:
           enemy.kind === "oppressor" ? 15 : enemy.kind === "sniper" ? 11 : 14,
-      });
+        family: this.visualDefinitionForEnemy(enemy)?.family,
+      };
+      if (this.admitVoiceProjectile(projectile)) this.projectiles.push(projectile);
     }
 
     this.sfx.enemyShot();
@@ -5218,6 +7348,7 @@ export class Game {
       (item) => item.id !== projectile.id,
     );
 
+    if (!this.voiceCompletionActive) {
     this.stats.hits += 1;
     this.stats.streak += 1;
     this.stats.maxStreak = Math.max(
@@ -5229,31 +7360,133 @@ export class Game {
     this.gainPower(2.5);
     this.applyCharacterCorrectKeyPassive();
 
+    } else { this.addScore(35); this.gainPower(2.5); }
+
     // An intercept must read differently from a normal enemy hit: bright
-    // laser tracer plus a persistent cyan shield-break ring and sparks.
-    this.lasers.push({
-      x1: this.width / 2,
-      y1: this.height - PLAYER_Y_OFFSET,
-      x2: projectile.x,
-      y2: projectile.y,
-      life: 0.18,
-      maxLife: 0.18,
-      power: 1.35,
-    });
-    this.projectileImpacts.push({
-      x: projectile.x,
-      y: projectile.y,
-      life: 0.34,
-      maxLife: 0.34,
-      radius: Math.max(15, projectile.radius * 1.4),
-    });
-    if (this.projectileImpacts.length > 12) this.projectileImpacts.shift();
-    this.burst(projectile.x, projectile.y, 28, 190);
-    if (this.settings.screenShake) this.shake = Math.max(this.shake, 1.15);
+    // tracer (or bolt) plus a persistent cyan shield-break ring and sparks.
+    this.firePlayerShot(
+      projectile.x,
+      projectile.y,
+      1.35,
+      { kind: "intercept", projectile },
+      0.18,
+    );
     // Dedicated short laser + shatter sound; normal English pronunciation
     // and its audio priority remain untouched.
     this.sfx.projectileIntercept();
     this.emitStats();
+  }
+
+  private activeBossPart(boss: BossState): BossPartState | null {
+    return (
+      boss.parts?.find(
+        (part) => !part.destroyed && part.vulnerable,
+      ) ?? null
+    );
+  }
+
+  private damageBossPartTarget(
+    boss: BossState,
+    part: BossPartState,
+    damage: number,
+  ): void {
+    const currentParts = boss.parts ?? [];
+    const result = damageBossPart(
+      {
+        bossId: "boss:" + String(this.stageConfig?.stage ?? 1),
+        parts: currentParts,
+        interruptConsumed: false,
+      },
+      part.instanceId,
+      damage,
+    );
+    boss.parts = result.state.parts;
+    if (result.destroyedNow) {
+      const { x, y } = this.bossPosition();
+      this.burst(x, y, 38, part.type === "cannon" ? 18 : 190);
+      boss.staggerTimer = Math.max(boss.staggerTimer, 1.25);
+      boss.actionCooldown += 1.25;
+      this.sfx.bossStagger();
+    }
+  }
+
+  /**
+   * Recall: bonus targets (supply pod, drone, crates) stay typeable. The
+   * Recall word keeps every key it wants; any other key goes to a bonus
+   * target already being typed, or starts one whose word begins with it.
+   */
+  private typeRecallBonusTargetKey(key: string, target: Enemy | null): boolean {
+    const recallWord =
+      target ?? (this.boss === null ? (this.enemies[0] ?? null) : null);
+    const recallExpected =
+      recallWord !== null
+        ? typingText(recallWord.entry.en)[recallWord.typed]
+        : this.boss !== null
+          ? typingText(this.boss.entry.en)[this.boss.typed]
+          : undefined;
+    const started = this.startedBonusTargetExpected();
+    // A started bonus word keeps its own next letter even if Recall wants it too.
+    if (started !== null && started === key) return this.typeStartedBonusTarget(key);
+    if (recallExpected === key) return false;
+    if (started !== null) return this.typeStartedBonusTarget(key);
+    return this.typeNewBonusTarget(key);
+  }
+
+  /** Next letter of the bonus target being typed, or null when none is started. */
+  private startedBonusTargetExpected(): string | null {
+    const started =
+      this.supplyPod !== null && this.supplyPod.typed > 0
+        ? this.supplyPod
+        : this.treasureDrone !== null && this.treasureDrone.typed > 0
+          ? this.treasureDrone
+          : this.rewardChoiceCrate !== null && this.rewardChoiceCrate.typed > 0
+            ? this.rewardChoiceCrate
+            : this.anomalyCrate !== null && this.anomalyCrate.typed > 0
+              ? this.anomalyCrate
+              : null;
+    return started === null ? null : (typingText(started.entry.en)[started.typed] ?? null);
+  }
+
+  /** A bonus target that is already being typed takes the key. */
+  private typeStartedBonusTarget(key: string): boolean {
+    if (this.supplyPod !== null && this.supplyPod.typed > 0) {
+      this.typeSupplyPod(this.supplyPod, key);
+      return true;
+    }
+    if (this.treasureDrone !== null && this.treasureDrone.typed > 0) {
+      this.typeTreasureDrone(this.treasureDrone, key);
+      return true;
+    }
+    if (this.rewardChoiceCrate !== null && this.rewardChoiceCrate.typed > 0) {
+      this.typeRewardChoiceCrate(this.rewardChoiceCrate, key);
+      return true;
+    }
+    if (this.anomalyCrate !== null && this.anomalyCrate.typed > 0) {
+      this.typeAnomalyCrate(this.anomalyCrate, key);
+      return true;
+    }
+    return false;
+  }
+
+  /** An untouched bonus target whose word starts with `key`. */
+  private typeNewBonusTarget(key: string): boolean {
+    if (this.supplyPod !== null && typingText(this.supplyPod.entry.en)[0] === key) {
+      this.typeSupplyPod(this.supplyPod, key);
+      return true;
+    }
+    if (this.treasureDrone !== null && typingText(this.treasureDrone.entry.en)[0] === key) {
+      this.typeTreasureDrone(this.treasureDrone, key);
+      return true;
+    }
+    if (this.rewardChoiceCrate !== null && typingText(this.rewardChoiceCrate.entry.en)[0] === key) {
+      this.typeRewardChoiceCrate(this.rewardChoiceCrate, key);
+      return true;
+    }
+    if (this.anomalyCrate !== null && typingText(this.anomalyCrate.entry.en)[0] === key) {
+      this.typeAnomalyCrate(this.anomalyCrate, key);
+      return true;
+    }
+    return false;
   }
 
   private typeBoss(key: string): void {
@@ -5270,10 +7503,9 @@ export class Game {
       return;
     }
 
+    if (!this.targetOwnership.claimKeyboard(boss)) return;
     boss.typed += 1;
     this.stageResultTracker.recordWordCorrectKey("boss", "boss");
-    boss.flash = 1;
-    boss.kick = 1;
 
     this.stats.hits += 1;
     this.stats.streak += 1;
@@ -5286,7 +7518,11 @@ export class Game {
     this.gainPower(2);
     this.applyCharacterCorrectKeyPassive();
 
-    if (!boss.shieldActive && this.gameplayMode !== "recall") {
+    if (
+      !boss.shieldActive &&
+      this.gameplayMode !== "recall" &&
+      this.activeBossPart(boss) === null
+    ) {
       boss.hp = Math.max(
         0,
         boss.hp -
@@ -5300,122 +7536,127 @@ export class Game {
       this.updateBossPhase(boss);
     }
 
-    const bossShotPosition = this.bossPosition();
-    const bossVisualShot = this.firePlayerVisualShot(
-      bossShotPosition.x,
-      bossShotPosition.y,
-      0.9,
-      boss.hp <= 0 ? "boss-kill" : "boss-hit",
-    );
+    this.fireBossLaser(0.9);
+    this.sfx.shot(this.stats.multiplier);
 
     if (boss.hp <= 0) {
-      if (bossVisualShot !== null) bossVisualShot.outcome = "boss-kill";
       this.defeatBoss();
       this.emitStats();
       return;
     }
 
-    if (boss.typed >= word.length) {
-      this.triggerImpactFeedback("boss-word");
-      if (this.gameplayMode === "recall") {
-        this.resolveRecallPrompt(boss.entry, true, !boss.wordMissed);
-      }
-      const perfectWord = !boss.wordMissed;
-      this.hooks.onWordComplete(boss.entry, { perfect: perfectWord });
-      this.applyCharacterWordCompletePassive(word.length);
+    if (boss.typed >= word.length) this.completeBossWord(boss);
+
+    this.hooks.onBossUpdate(toBossHud(boss));
+    this.emitStats();
+  }
+
+  private completeBossWord(boss: BossState): void {
+    const word = typingText(boss.entry.en);
+    this.triggerImpactFeedback("boss-word");
+    if (this.gameplayMode === "recall") {
+      this.resolveRecallPrompt(boss.entry, true, !boss.wordMissed, boss);
+    }
+    const perfectWord =
+      !boss.wordMissed &&
+      (!this.voiceCompletionActive || this.voiceRecallUnassisted(boss));
+    const completedPart = this.activeBossPart(boss);
+    this.applyCharacterWordCompletePassive(word.length);
+    if (this.voiceCompletionActive) {
+      this.stageResultTracker.completeVoiceWord(
+        "boss",
+        "boss",
+        boss.entry,
+        this.stageElapsedSeconds,
+      );
+    } else {
       this.stageResultTracker.completeWord(
         "boss",
         "boss",
         boss.entry,
         this.stageElapsedSeconds,
       );
-      const mechanicResult =
-        boss.typingMechanic === undefined
-          ? null
-          : resolveBossWordMechanic(
-              boss.typingMechanic,
-              perfectWord,
-            );
-      if (mechanicResult !== null) {
-        boss.typingMechanic = mechanicResult.state;
-      }
+    }
+    const mechanicResult =
+      boss.typingMechanic === undefined
+        ? null
+        : resolveBossWordMechanic(boss.typingMechanic, perfectWord);
+    if (mechanicResult !== null) {
+      boss.typingMechanic = mechanicResult.state;
+    }
 
-      if (boss.shieldActive) {
-        const shieldBroken =
-          mechanicResult?.shieldBroken ?? true;
-        if (shieldBroken) {
-          boss.shieldActive = false;
-          this.sfx.bossShieldBreak();
-          const { x, y } = this.bossPosition();
-          this.burst(x, y, 36, 176);
-        }
+    if (boss.shieldActive) {
+      const shieldBroken = mechanicResult?.shieldBroken ?? true;
+      if (shieldBroken) {
+        boss.shieldActive = false;
+        this.sfx.bossShieldBreak();
+        const { x, y } = this.bossPosition();
+        this.burst(x, y, 36, 176);
+      }
+    } else {
+      const mechanicDamage = mechanicResult?.damageMultiplier ?? 1;
+      const wordDamage =
+        firepowerDamage(
+          bossWordDamage(boss.maxHp, boss.role),
+          this.playerStats,
+        ) *
+        mechanicDamage *
+        this.relicBossWordDamageMultiplier(word.length) *
+        markedBossDamageMultiplier(this.bossMarkTimer > 0) *
+        this.characterBossDamageMultiplier();
+      if (completedPart !== null) {
+        this.damageBossPartTarget(
+          boss,
+          completedPart,
+          Math.max(1, wordDamage * 1.45),
+        );
       } else {
-        const mechanicDamage =
-          mechanicResult?.damageMultiplier ?? 1;
-        boss.hp = Math.max(
-          0,
-          boss.hp -
-            firepowerDamage(
-              bossWordDamage(boss.maxHp, boss.role),
-              this.playerStats,
-            ) *
-              mechanicDamage *
-              this.relicBossWordDamageMultiplier(word.length) *
-              markedBossDamageMultiplier(this.bossMarkTimer > 0) *
-              this.characterBossDamageMultiplier(),
-        );
-      }
-
-      this.sfx.wordComplete(perfectWord);
-      this.applyCharacterPerfectWordPassive(perfectWord);
-      this.applyRelicWordComplete(word.length, perfectWord);
-      boss.wordsCompleted += 1;
-      const completedEntry = { ...boss.entry };
-      boss.typed = 0;
-      boss.entry = this.pickBossEntry(
-        boss.typingMechanic,
-      );
-      boss.flash = 1;
-      if (this.gameplayMode === "recall" && boss.hp > 0) {
-        this.activateBossRecallPrompt();
-      }
-      boss.kick = 1.5;
-      boss.wordMissed = false;
-
-      this.addScore(
-        (140 + word.length * 18) * this.stats.multiplier,
-      );
-      this.gainPower(perfectWord ? 11 : 8);
-
-      const staggerSeconds =
-        mechanicResult?.staggerSeconds ??
-        (perfectWord ? 1.05 : 0);
-      if (staggerSeconds > 0) {
-        boss.staggerTimer = Math.max(
-          boss.staggerTimer,
-          staggerSeconds,
-        );
-        this.sfx.bossStagger();
-      }
-
-      const { x, y } = this.bossPosition();
-      this.burst(x, y, perfectWord ? 34 : 28, 18);
-      this.sfx.bossHit();
-      this.updateBossPhase(boss);
-
-      if (boss.hp <= 0) {
-        if (bossVisualShot !== null) {
-          bossVisualShot.outcome = "boss-kill";
-          bossVisualShot.power = Math.max(bossVisualShot.power, 1.35);
-        }
-        this.defeatBoss(completedEntry);
-        this.emitStats();
-        return;
+        boss.hp = Math.max(0, boss.hp - wordDamage);
       }
     }
 
-    this.hooks.onBossUpdate(toBossHud(boss));
-    this.emitStats();
+    this.sfx.wordComplete(perfectWord);
+    this.applyCharacterPerfectWordPassive(perfectWord);
+    this.applyRelicWordComplete(word.length, perfectWord);
+    this.emitTypedCompletion(
+      boss.entry,
+      perfectWord,
+      "boss",
+      completedPart?.instanceId ??
+        "boss:" + String(this.stageConfig?.stage ?? 1),
+    );
+    boss.wordsCompleted += 1;
+    const completedEntry = { ...boss.entry };
+    boss.typed = 0;
+    boss.entry = this.pickBossEntry(boss.typingMechanic) ?? boss.entry;
+    this.targetOwnership.beginUnit(boss);
+    boss.flash = 1;
+    if (this.gameplayMode === "recall" && boss.hp > 0) {
+      this.activateBossRecallPrompt();
+    }
+    boss.kick = 1.5;
+    boss.wordMissed = false;
+
+    this.addScore((140 + word.length * 18) * this.completionMultiplier());
+    this.gainPower(perfectWord ? 11 : 8);
+
+    const staggerSeconds =
+      mechanicResult?.staggerSeconds ?? (perfectWord ? 1.05 : 0);
+    if (staggerSeconds > 0) {
+      boss.staggerTimer = Math.max(boss.staggerTimer, staggerSeconds);
+      this.sfx.bossStagger();
+    }
+
+    const { x, y } = this.bossPosition();
+    this.burst(x, y, perfectWord ? 34 : 28, 18);
+    this.sfx.bossHit();
+    this.updateBossPhase(boss);
+
+    if (boss.hp <= 0) {
+      this.defeatBoss(completedEntry);
+      this.emitStats();
+      return;
+    }
   }
 
   private applyBossPhase(
@@ -5454,8 +7695,9 @@ export class Game {
     }
     boss.entry = this.pickBossEntry(
       boss.typingMechanic,
-    );
+    ) ?? boss.entry;
     boss.typed = 0;
+    this.targetOwnership.beginUnit(boss);
     boss.wordMissed = false;
     boss.actionCooldown =
       (bossActionInterval(boss.role, boss.phase) *
@@ -5467,6 +7709,20 @@ export class Game {
       Math.max(0.75, this.difficulty?.bossPressure ?? 1) /
       Math.max(1, this.difficulty?.bossActionRateMultiplier ?? 1);
 
+    const ultimatePhase = bossUltimatePhase(boss.role);
+    if (
+      presentation &&
+      this.bossDepthActive() &&
+      !this.bossUltimateCast &&
+      ultimatePhase !== null &&
+      boss.phase >= ultimatePhase
+    ) {
+      // The ultimate opens the new phase once the current skill is done
+      // (once per fight, even when a big hit skips a phase).
+      this.bossUltimateQueued = true;
+      this.bossUltimateCast = true;
+    }
+
     if (presentation) {
       const { x, y } = this.bossPosition();
       const fx = enemyFxProfile(
@@ -5475,6 +7731,11 @@ export class Game {
       );
       this.burst(x, y, fx.count, fx.hue);
       this.sfx.bossPhase(fx.pitch);
+      const identity = this.bossIdentity;
+      if (identity !== null) {
+        this.combatFx.bossPhase(x, y, this.bossRadius(boss.role), identity.primary, identity.accent);
+        this.sfx.bossRoar(identity.voice * (boss.phase >= 3 ? 1.12 : 1.05), familyStyle(identity.family).material);
+      }
 
       if (this.settings.screenShake) {
         this.shake = Math.max(
@@ -5514,13 +7775,14 @@ export class Game {
   private defeatBoss(completedEntry?: VocabularyEntry): void {
     const boss = this.boss;
     if (boss === null) return;
+    this.targetOwnership.finish(boss, "invalidated");
 
     const { x, y } = this.bossPosition();
     this.triggerImpactFeedback("boss-defeat");
     // Only show translation if the kill completed a typed boss word.
     // Spell/Nova kills must not misrepresent untyped words as learned.
     if (completedEntry !== undefined) {
-      this.hooks.onKillTranslation?.({ ...completedEntry });
+      this.presentCombatTranslation(completedEntry, x, y - 86);
     } else {
       this.stageResultTracker.interruptWord(
         "boss",
@@ -5542,12 +7804,35 @@ export class Game {
         boss.role,
       ),
     );
+    const creditReceipt = this.claimCombatCreditBoss(boss);
+    this.presentCombatCreditReceipt(creditReceipt, x, y);
     const fx = enemyFxProfile(
       definition?.family ?? "devil",
       "boss-death",
     );
     this.burst(x, y, fx.count, fx.hue);
     this.sfx.bossDeath(fx.pitch);
+    const identity = this.bossIdentity;
+    if (identity !== null) {
+      const style = familyStyle(identity.family);
+      this.combatFx.bossDeath(x, y, this.bossRadius(boss.role), identity.primary, identity.accent, style.death, style);
+      this.sfx.enemyDeath(style.material, 1.6, 0);
+    }
+    if (this.bossDepthActive() && this.bossRelief !== null) {
+      // The relief tumbles away behind the explosion.
+      this.bossWreck = {
+        t: 0,
+        x,
+        y,
+        size: this.bossDepthSize(boss.role),
+        spin: Math.random() < 0.5 ? -1 : 1,
+      };
+    }
+    this.bossSkill = null;
+    this.bossUltimateQueued = false;
+    this.bossExposedTimer = 0;
+    this.bossDodgeTarget = 0;
+    this.bossIdentity = null;
     this.tryRollEquipmentDrop("boss");
     if (definition !== undefined) {
       this.activateDefinitionReward(definition, x, y);
@@ -5563,10 +7848,16 @@ export class Game {
 
     if (this.hiddenEncounterRuntime === null) {
       this.bossRewardPending = true;
-      this.hooks.onBossRewardChoice(
-        this.stageConfig?.stage ?? 1,
-        boss.role,
-      );
+      this.bossRewardPrompt = {
+        stage: this.stageConfig?.stage ?? 1,
+        role: boss.role,
+        remaining:
+          boss.role === "major-boss"
+            ? 1.8
+            : boss.role === "boss"
+              ? 1.55
+              : 1.35,
+      };
       return;
     }
 
@@ -5583,6 +7874,7 @@ export class Game {
     }
 
     this.bossRewardPending = false;
+    this.bossRewardPrompt = null;
     this.finishStage();
     return true;
   }
@@ -5638,6 +7930,7 @@ export class Game {
       return;
     }
 
+    if (!this.targetOwnership.claimKeyboard(pod)) return;
     pod.typed += 1;
     this.stats.hits += 1;
     this.stats.streak += 1;
@@ -5650,15 +7943,46 @@ export class Game {
     this.gainPower(1.2);
     this.applyCharacterCorrectKeyPassive();
 
-    const completed = pod.typed >= word.length;
-    this.fireBonusTargetShot(pod.x, pod.y, completed, 0.94);
-    this.burst(pod.x, pod.y, completed ? 10 : 5, 48);
+    if (pod.typed < word.length) this.fireBonusShot(this.supplyPodAim(pod), 48, 7, null);
+    this.sfx.shot(this.stats.multiplier);
 
-    if (completed) {
+    if (pod.typed >= word.length) {
+      this.targetOwnership.finish(pod, "completed");
       this.collectSupplyPod(pod);
     }
 
     this.emitStats();
+  }
+
+  /**
+   * Combat learning feedback shared by normal enemies, bosses and optional
+   * bonus targets. Pronunciation stays on onWordComplete; this helper only
+   * owns Vietnamese/IPA presentation so every typed target follows the same
+   * translation settings without leaking answers into Recall mode.
+   */
+  private presentCombatTranslation(
+    entry: VocabularyEntry,
+    x: number,
+    y: number,
+  ): void {
+    if (this.gameplayMode === "recall") return;
+
+    const translationSettings = sanitizeKillTranslationSettings(
+      this.settings.killTranslation,
+    );
+    if (
+      usesKillPositionTranslation(translationSettings) &&
+      hasVisibleKillTranslation(entry, translationSettings)
+    ) {
+      this.learningEcho = {
+        entry: { ...entry },
+        x,
+        y: Math.max(96, y),
+        remaining: translationSettings.durationSeconds,
+        duration: translationSettings.durationSeconds,
+      };
+    }
+    this.hooks.onKillTranslation?.({ ...entry });
   }
 
   private collectSupplyPod(pod: SupplyPod): void {
@@ -5677,14 +8001,31 @@ export class Game {
       this.stats.power,
     );
 
+    const gained =
+      pod.reward === "hull"
+        ? reward.resources.hull - this.stats.hull
+        : pod.reward === "shield"
+          ? reward.resources.shield - this.stats.shield
+          : pod.reward === "energy"
+            ? reward.resources.energy - this.stats.energy
+            : reward.power - this.stats.power;
     this.stats.hull = reward.resources.hull;
     this.stats.shield = reward.resources.shield;
     this.stats.energy = reward.resources.energy;
     this.stats.power = reward.power;
-    this.addScore(140 * this.stats.multiplier);
-    this.hooks.onWordComplete(pod.entry);
-    this.burst(pod.x, pod.y, 34, 48);
-    this.sfx.support();
+    this.addScore(140 * this.completionMultiplier());
+    this.emitTypedCompletion(pod.entry, true, "bonus", "bonus:" + pod.entry.id);
+    this.presentCombatTranslation(pod.entry, pod.x, pod.y - 54);
+    this.fireBonusShot(this.supplyPodAim(pod), 48, 34, () => this.drawSupplyPod(pod), {
+      icon: supplyRewardIcon(pod.reward),
+      color: supplyRewardGlow(pod.reward),
+      label:
+        (gained > 0 ? "+" + String(Math.round(gained)) + " " : "") +
+        (pod.reward === "power" ? "RAGE" : pod.reward.toUpperCase()),
+      pieces: 1,
+      size: 64,
+      sound: "item",
+    });
     this.stageResultTracker.recordBonusCollected();
     this.supplyPod = null;
     this.emitStats();
@@ -5700,35 +8041,54 @@ export class Game {
       return false;
     }
 
+    if (!this.targetOwnership.claimKeyboard(target)) return false;
     target.typed += 1;
-    const completed = target.typed >= word.length;
-    this.fireBonusTargetShot(target.x, target.y, completed, 0.98);
-    this.burst(target.x, target.y, completed ? 11 : 5, 292);
+    if (target.typed < word.length) this.fireBonusShot(this.recallBonusAim(target), 292, 7, null);
+    this.sfx.shot(Math.max(1, this.stats.multiplier));
 
-    if (completed) {
-      const score = recallBonusRewardScore(
-        target.entry.en,
-        target.hintIndices,
-      );
-      this.addScore(score * this.stats.multiplier);
-      this.gainPower(10);
-      this.tryRollEquipmentDrop("treasure");
-      this.hooks.onWordComplete(target.entry);
-      this.rewardNotice = {
-        label: "RECALL BONUS · TREASURE DROP",
-        x: target.x,
-        y: target.y,
-        hue: 292,
-        remaining: 1.8,
-      };
-      this.burst(target.x, target.y, 54, 292);
-      this.sfx.support();
-      this.stageResultTracker.recordBonusCollected();
-      this.recallBonus = null;
-      this.emitStats();
-    }
+    if (target.typed >= word.length) this.completeRecallBonusWord(target);
 
     return true;
+  }
+
+  private completeRecallBonusWord(target: RecallBonusTarget): void {
+    const word = typingText(target.entry.en);
+    this.targetOwnership.finish(target, "completed");
+    const score = recallBonusRewardScore(target.entry.en, target.hintIndices);
+    this.addScore(score * this.completionMultiplier());
+    this.gainPower(10);
+    this.tryRollEquipmentDrop("treasure");
+    this.emitTypedCompletion(
+      target.entry,
+      true,
+      "bonus",
+      "bonus:" + target.entry.id,
+    );
+    this.presentCombatTranslation(target.entry, target.x, target.y - 54);
+    this.rewardNotice = {
+      label: "RECALL BONUS · TREASURE DROP",
+      x: target.x,
+      y: target.y,
+      hue: 292,
+      remaining: 1.8,
+    };
+    this.fireBonusShot(
+      this.recallBonusAim(target),
+      292,
+      54,
+      () => this.drawRecallBonus(target),
+      {
+        icon: TREASURE_DROP_ART,
+        color: "#c08bff",
+        label: "RECALL BONUS",
+        pieces: 3,
+        size: 42,
+        sound: "treasure",
+      },
+    );
+    this.stageResultTracker.recordBonusCollected();
+    this.recallBonus = null;
+    this.emitStats();
   }
 
   private typeTreasureDrone(drone: TreasureDrone, key: string): void {
@@ -5740,6 +8100,7 @@ export class Game {
       return;
     }
 
+    if (!this.targetOwnership.claimKeyboard(drone)) return;
     drone.typed += 1;
     this.stats.hits += 1;
     this.stats.streak += 1;
@@ -5751,28 +8112,53 @@ export class Game {
     this.addScore(12 * this.stats.multiplier);
     this.gainPower(1.5);
     this.applyCharacterCorrectKeyPassive();
-    const completed = drone.typed >= word.length;
-    this.fireBonusTargetShot(drone.x, drone.y, completed, 1.02);
-    this.burst(drone.x, drone.y, completed ? 12 : 5, 48);
+    if (drone.typed < word.length) this.fireBonusShot(this.treasureDroneAim(drone), 48, 8, null);
+    this.sfx.shot(this.stats.multiplier);
 
-    if (completed) {
-      const drop = rollEquipmentDrop(
-        "treasure",
-        this.effectiveLuck(),
-        this.playerStats.salvage,
-      );
-      if (drop !== null) {
-        this.hooks.onEquipmentDrop(drop);
-      }
-      this.addScore(320 * this.stats.multiplier);
-      this.hooks.onWordComplete(drone.entry);
-      this.burst(drone.x, drone.y, 44, 48);
-      this.sfx.support();
-      this.stageResultTracker.recordBonusCollected();
-      this.treasureDrone = null;
-    }
+    if (drone.typed >= word.length) this.completeTreasureDroneWord(drone);
 
     this.emitStats();
+  }
+
+  private completeTreasureDroneWord(drone: TreasureDrone): void {
+    const word = typingText(drone.entry.en);
+    this.targetOwnership.finish(drone, "completed");
+    const drop = rollEquipmentDrop(
+      "treasure",
+      this.effectiveLuck(),
+      this.playerStats.salvage,
+    );
+    if (drop !== null) {
+      this.hooks.onEquipmentDrop(drop);
+    }
+    const treasureScore = 320 * this.completionMultiplier();
+    this.addScore(treasureScore);
+    this.emitTypedCompletion(
+      drone.entry,
+      true,
+      "bonus",
+      "bonus:" + drone.entry.id,
+    );
+    this.presentCombatTranslation(drone.entry, drone.x, drone.y - 54);
+    this.fireBonusShot(
+      this.treasureDroneAim(drone),
+      48,
+      44,
+      () => this.drawTreasureDrone(drone),
+      {
+        icon: TREASURE_DROP_ART,
+        color: "#ffd34d",
+        label:
+          drop !== null
+            ? "TREASURE · NEW GEAR"
+            : "+" + treasureScore.toLocaleString() + " TREASURE",
+        pieces: 4,
+        size: 44,
+        sound: "treasure",
+      },
+    );
+    this.stageResultTracker.recordBonusCollected();
+    this.treasureDrone = null;
   }
 
   private typeRewardChoiceCrate(
@@ -5787,6 +8173,7 @@ export class Game {
       return;
     }
 
+    if (!this.targetOwnership.claimKeyboard(crate)) return;
     crate.typed += 1;
     this.stats.hits += 1;
     this.stats.streak += 1;
@@ -5798,24 +8185,45 @@ export class Game {
     this.addScore(10 * this.stats.multiplier);
     this.gainPower(1.3);
     this.applyCharacterCorrectKeyPassive();
-    const completed = crate.typed >= word.length;
-    this.fireBonusTargetShot(crate.x, crate.y, completed, 0.98);
-    this.burst(crate.x, crate.y, completed ? 11 : 5, 286);
+    if (crate.typed < word.length) this.fireBonusShot(this.rewardCrateAim(crate), 286, 7, null);
+    this.sfx.shot(this.stats.multiplier);
 
-    if (completed) {
-      const options = createRewardChoiceOptions(this.effectiveLuck());
-      this.addScore(220 * this.stats.multiplier);
-      this.hooks.onWordComplete(crate.entry);
-      this.burst(crate.x, crate.y, 40, 286);
-      this.sfx.support();
-      this.stageResultTracker.recordBonusCollected();
-      this.rewardChoiceCrate = null;
-      if (options.length > 0) {
-        this.hooks.onRewardChoice(options);
-      }
-    }
+    if (crate.typed >= word.length) this.completeRewardChoiceWord(crate);
 
     this.emitStats();
+  }
+
+  private completeRewardChoiceWord(crate: RewardChoiceCrate): void {
+    const word = typingText(crate.entry.en);
+    this.targetOwnership.finish(crate, "completed");
+    const options = createRewardChoiceOptions(this.effectiveLuck());
+    this.addScore(220 * this.completionMultiplier());
+    this.emitTypedCompletion(
+      crate.entry,
+      true,
+      "bonus",
+      "bonus:" + crate.entry.id,
+    );
+    this.presentCombatTranslation(crate.entry, crate.x, crate.y - 54);
+    this.fireBonusShot(
+      this.rewardCrateAim(crate),
+      286,
+      40,
+      () => this.drawRewardChoiceCrate(crate),
+      {
+        icon: null,
+        color: "#b787ff",
+        label: "CHOICE CRATE OPEN",
+        pieces: 4,
+        size: 40,
+        sound: "crate",
+      },
+    );
+    this.stageResultTracker.recordBonusCollected();
+    this.rewardChoiceCrate = null;
+    if (options.length > 0) {
+      this.hooks.onRewardChoice(options);
+    }
   }
 
   private typeAnomalyCrate(crate: AnomalyCrate, key: string): void {
@@ -5827,6 +8235,7 @@ export class Game {
       return;
     }
 
+    if (!this.targetOwnership.claimKeyboard(crate)) return;
     crate.typed += 1;
     this.stats.hits += 1;
     this.stats.streak += 1;
@@ -5838,23 +8247,10 @@ export class Game {
     this.addScore(12 * this.stats.multiplier);
     this.gainPower(1.4);
     this.applyCharacterCorrectKeyPassive();
-    const completed = crate.typed >= word.length;
-    this.fireBonusTargetShot(crate.x, crate.y, completed, 1.04);
-    this.burst(crate.x, crate.y, completed ? 12 : 5, 322);
+    if (crate.typed < word.length) this.fireBonusShot(this.anomalyCrateAim(crate), 322, 8, null);
+    this.sfx.shot(this.stats.multiplier);
 
-    if (completed) {
-      this.addScore(260 * this.stats.multiplier);
-      this.hooks.onWordComplete(crate.entry);
-      this.burst(crate.x, crate.y, 44, 322);
-      this.sfx.support();
-      this.stageResultTracker.recordBonusCollected();
-      this.anomalyCrate = null;
-      this.anomalyResolutionPending = true;
-      this.anomalyRiskRatio = anomalyRiskHullRatio(
-        this.stageConfig?.stage ?? 1,
-      );
-      this.hooks.onAnomalyReady(this.anomalyRiskRatio);
-    }
+    if (crate.typed >= word.length) this.completeAnomalyWord(crate);
 
     this.emitStats();
   }
@@ -5892,6 +8288,38 @@ export class Game {
     return true;
   }
 
+  private completeAnomalyWord(crate: AnomalyCrate): void {
+    const word = typingText(crate.entry.en);
+    this.targetOwnership.finish(crate, "completed");
+    this.addScore(260 * this.completionMultiplier());
+    this.emitTypedCompletion(
+      crate.entry,
+      true,
+      "bonus",
+      "bonus:" + crate.entry.id,
+    );
+    this.presentCombatTranslation(crate.entry, crate.x, crate.y - 54);
+    this.fireBonusShot(
+      this.anomalyCrateAim(crate),
+      322,
+      44,
+      () => this.drawAnomalyCrate(crate),
+      {
+        icon: null,
+        color: "#ff65cc",
+        label: "ANOMALY CAPTURED",
+        pieces: 4,
+        size: 40,
+        sound: "crate",
+      },
+    );
+    this.stageResultTracker.recordBonusCollected();
+    this.anomalyCrate = null;
+    this.anomalyResolutionPending = true;
+    this.anomalyRiskRatio = anomalyRiskHullRatio(this.stageConfig?.stage ?? 1);
+    this.hooks.onAnomalyReady(this.anomalyRiskRatio);
+  }
+
   private resolveSkillEnemyKill(
     enemy: Enemy,
     options: {
@@ -5913,6 +8341,8 @@ export class Game {
       this.stageElapsedSeconds,
     );
     this.stageResultTracker.recordEnemyKill(enemy.elite);
+    const creditReceipt =
+      this.claimCombatCreditEnemy(enemy, "skill-kill");
     this.stats.kills += 1;
     this.addScore(
       (enemy.elite ? options.eliteScore : options.normalScore) *
@@ -5944,6 +8374,12 @@ export class Game {
       this.markedEnemyId = null;
       this.markTimer = 0;
     }
+
+    this.presentCombatCreditReceipt(
+      creditReceipt,
+      enemy.x,
+      enemy.y,
+    );
 
     if (options.playDeathFx ?? true) {
       const definition = this.visualDefinitionForEnemy(enemy);
@@ -5991,10 +8427,9 @@ export class Game {
       return;
     }
 
+    if (!this.targetOwnership.claimKeyboard(enemy)) return;
     enemy.typed += 1;
     this.stageResultTracker.recordWordCorrectKey("enemy", enemy.id);
-    enemy.flash = 1;
-    enemy.kick = 1;
 
     this.stats.hits += 1;
     this.stats.streak += 1;
@@ -6005,21 +8440,10 @@ export class Game {
     this.applyCharacterCorrectKeyPassive();
     this.applyRelicCorrectKeyPassive(enemy);
 
-    const completesWord = enemy.typed >= word.length;
-    const shotOutcome: PlayerShotOutcome =
-      completesWord && enemy.layersRemaining <= 1
-        ? "kill"
-        : completesWord
-          ? "layer"
-          : "hit";
-    this.firePlayerVisualShot(
-      enemy.x,
-      enemy.y,
-      completesWord ? (shotOutcome === "kill" ? 1.35 : 1.1) : 0.8,
-      shotOutcome,
-    );
+    this.fireLaser(enemy, 0.8);
+    this.sfx.shot(this.stats.multiplier);
 
-    if (completesWord) {
+    if (enemy.typed >= word.length) {
       this.completeWord(enemy);
     }
 
@@ -6027,31 +8451,64 @@ export class Game {
   }
 
   private completeWord(enemy: Enemy): void {
-    this.triggerImpactFeedback("word");
     const length = typingText(enemy.entry.en).length;
-    const perfectWord = !enemy.wordMissed;
+    const perfectWord = !enemy.wordMissed && (!this.voiceCompletionActive || this.voiceRecallUnassisted(enemy));
     if (this.gameplayMode === "recall") {
-      this.resolveRecallPrompt(enemy.entry, true, perfectWord);
+      this.resolveRecallPrompt(enemy.entry, true, perfectWord, enemy);
     }
-    this.stageResultTracker.completeWord(
+    if (this.voiceCompletionActive) { this.stageResultTracker.completeVoiceWord(
       "enemy",
       enemy.id,
       enemy.entry,
       this.stageElapsedSeconds,
-    );
+    ); } else { this.stageResultTracker.completeWord(
+      "enemy",
+      enemy.id,
+      enemy.entry,
+      this.stageElapsedSeconds,
+    ); }
     this.sfx.wordComplete(perfectWord);
-    this.hooks.onWordComplete(enemy.entry, { perfect: perfectWord });
     this.applyCharacterWordCompletePassive(length);
     this.applyCharacterPerfectWordPassive(perfectWord);
     this.applyRelicWordComplete(length, perfectWord, enemy);
+    const completedEntry = { ...enemy.entry };
+    this.emitTypedCompletion(
+      completedEntry,
+      perfectWord,
+      "enemy",
+      "enemy:" + String(enemy.id),
+    );
+    // Every typed semantic layer is a completed learning word, not only the
+    // final Core/kill layer. Keep pronunciation on onWordComplete and show
+    // the same Vietnamese/IPA feedback for shield/armor/ward layers too.
+    this.presentCombatTranslation(
+      completedEntry,
+      enemy.x,
+      enemy.y - enemy.radius - 18,
+    );
+
+    const sharedEffect = sharedTargetEffect(
+      this.expansionEncounterContext?.pattern ?? "normal-word",
+      Math.max(0, this.enemies.length - 1),
+    );
+    if (sharedEffect.linkedTargets > 0) {
+      const affected = softenNearbyEnemies(
+        this.voiceCompletionActive ? this.enemies.filter(target => !this.targetOwnership.isKeyboardOwned(target)) : this.enemies,
+        enemy,
+        sharedEffect.typedProgressRatio,
+        sharedEffect.linkedTargets,
+      );
+      if (affected > 0) {
+        this.burst(enemy.x, enemy.y, 10 + affected * 3, 192);
+      }
+    }
 
     if (enemy.layersRemaining > 1) {
       enemy.layersRemaining -= 1;
       enemy.entry = this.pickEnemyLayerEntry(enemy);
       enemy.typed = 0;
+      this.targetOwnership.beginUnit(enemy);
       enemy.wordMissed = false;
-      enemy.flash = 1;
-      enemy.kick = 1.45;
       if (this.gameplayMode === "recall") {
         this.activateEnemyRecallPrompt(enemy.id);
       }
@@ -6060,45 +8517,45 @@ export class Game {
         enemy.speed *= 1.2;
       }
 
-      this.addScore((45 + length * 8) * this.stats.multiplier);
+      this.addScore((45 + length * 8) * this.completionMultiplier());
       this.gainPower(4);
 
-      this.targetId = null;
+      const hitDefinition = this.visualDefinitionForEnemy(enemy);
+      this.firePlayerShot(enemy.x, enemy.y, 1.25, {
+        kind: "enemy-layer",
+        enemyId: enemy.id,
+        fx: enemyFxProfile(hitDefinition?.family ?? "rainbow", "hit"),
+      });
+      this.releaseCompletedEnemyLock(enemy.id);
       return;
     }
 
     this.stageResultTracker.recordEnemyKill(enemy.elite);
     this.stats.kills += 1;
-    const scoreBeforeKillReward = this.stats.score;
     const killReward = enemyKillRewardScore({
       wordLength: length,
       layerCount: enemy.layerPlan?.length ?? 1,
       rank: enemy.rank ?? "I",
       elite: enemy.elite,
     });
-    this.addScore(killReward * this.stats.multiplier);
+    this.addScore(killReward * this.completionMultiplier());
     this.gainPower(7);
-    if (this.gameplayMode !== "recall") {
-      // Combat learning feedback stays separate from Recall's configurable prompt.
-      const translationSettings = sanitizeKillTranslationSettings(
-        this.settings.killTranslation,
-      );
-      if (
-        usesKillPositionTranslation(translationSettings) &&
-        hasVisibleKillTranslation(enemy.entry, translationSettings)
-      ) {
-        this.learningEcho = {
-          entry: { ...enemy.entry },
-          x: enemy.x,
-          y: Math.max(96, enemy.y - enemy.radius - 18),
-          remaining: translationSettings.durationSeconds,
-          duration: translationSettings.durationSeconds,
-        };
-      }
-      this.hooks.onKillTranslation?.({ ...enemy.entry });
-    }
-
     const deathDefinition = this.visualDefinitionForEnemy(enemy);
+    const creditReceipt =
+      this.claimCombatCreditEnemy(enemy, this.voiceCompletionActive ? "voice-kill" : "typed-kill");
+    // The enemy leaves play now; its blast, sound and crystal drop wait for
+    // the final projectile impact so gameplay and presentation stay separate.
+    this.firePlayerShot(enemy.x, enemy.y, 1.45, {
+      kind: "enemy-kill",
+      enemy,
+      fx: enemyFxProfile(deathDefinition?.family ?? "rainbow", "death"),
+      shake: enemy.kind === "tank" ? 6.5 : 4.5,
+      creditReceipt,
+    });
+    if (!this.firstBloodThisStage) {
+      this.firstBloodThisStage = true;
+      this.sfx.announcer("first-blood");
+    }
     if (enemy.elite || deathDefinition?.rarity === "elite") {
       const announcerEvent = this.priorityKillChain.registerKill(
         this.stageElapsedSeconds,
@@ -6108,26 +8565,14 @@ export class Game {
       }
     }
     if (enemy.golden) {
-      this.addScore(260 * this.stats.multiplier);
+      this.addScore(260 * this.completionMultiplier());
     }
-    this.spawnKillScorePopup(
-      enemy.x,
-      enemy.y + enemy.radius + 30,
-      this.stats.score - scoreBeforeKillReward,
-    );
     this.tryRollEquipmentDrop(
       enemy.golden ? "golden" : enemy.elite ? "elite" : "normal",
     );
     this.activateEnemyReward(enemy);
 
     this.triggerEnemyDeathTraits(enemy);
-
-    if (this.settings.screenShake) {
-      this.shake = Math.max(
-        this.shake,
-        enemy.kind === "tank" ? 6.5 : 4.5,
-      );
-    }
 
     this.updateStageObjective({
       type: "enemy-kill",
@@ -6142,7 +8587,15 @@ export class Game {
       this.markedEnemyId = null;
       this.markTimer = 0;
     }
-    this.targetId = null;
+    this.queuePerkKill(enemy, perfectWord);
+    this.targetOwnership.finish(enemy, "completed");
+    this.releaseCompletedEnemyLock(enemy.id);
+  }
+
+  /** Completing another unit preserves an existing keyboard lock, unless gameplay removed it. */
+  private releaseCompletedEnemyLock(completedId: number): void {
+    if (this.targetId === completedId) this.targetId = null;
+    this.currentTarget();
   }
 
   private notifyEnemySeen(definitionId: EnemyDefinitionId): void {
@@ -6162,6 +8615,226 @@ export class Game {
             1,
         ),
     );
+  }
+
+  private recordCombatCreditReceipt(
+    receipt: CombatCreditRewardReceipt | null,
+  ): CombatCreditRewardReceipt | null {
+    if (
+      receipt === null ||
+      this.combatCreditRewardIds.has(receipt.rewardId)
+    ) {
+      return receipt;
+    }
+    this.combatCreditRewardIds.add(receipt.rewardId);
+    this.combatCreditsGrantedThisStage += receipt.nominalEarned;
+    this.combatCreditsAppliedThisStage += receipt.walletDeltaApplied;
+    return receipt;
+  }
+
+  private claimCombatCreditEnemy(
+    enemy: Enemy,
+    cause: Extract<CombatCreditCause, "typed-kill" | "voice-kill" | "skill-kill">,
+  ): CombatCreditRewardReceipt | null {
+    if (
+      this.combatCreditAttemptId === null ||
+      enemy.combatCreditEligible === false
+    ) {
+      return null;
+    }
+    const definition = this.visualDefinitionForEnemy(enemy);
+    return this.recordCombatCreditReceipt(
+      this.hooks.onCombatCreditReward?.({
+        attemptId: this.combatCreditAttemptId,
+        cause,
+        source: {
+          sourceKind: "enemy",
+          sourceInstanceId: String(enemy.id),
+          role: definition?.role,
+          rarity: definition?.rarity,
+          rank: enemy.rank,
+          elite: enemy.elite,
+          golden: enemy.golden,
+        },
+      }) ?? null,
+    );
+  }
+
+  private claimCombatCreditBoss(
+    boss: BossState,
+  ): CombatCreditRewardReceipt | null {
+    if (this.combatCreditAttemptId === null) return null;
+    const stage =
+      this.hiddenEncounterRuntime?.bossStageOverride ??
+      this.stageConfig?.stage ??
+      1;
+    const definition = enemyDefinition(
+      bossVisualDefinitionIdForStage(stage, boss.role),
+    );
+    return this.recordCombatCreditReceipt(
+      this.hooks.onCombatCreditReward?.({
+        attemptId: this.combatCreditAttemptId,
+        cause: "boss-kill",
+        source: {
+          sourceKind: "boss",
+          sourceInstanceId:
+            String(stage) + ":" + boss.role,
+          role: definition?.role,
+          rarity: definition?.rarity,
+          bossRole: boss.role,
+        },
+      }) ?? null,
+    );
+  }
+
+  private presentCombatCreditReceipt(
+    receipt: CombatCreditRewardReceipt | null,
+    x: number,
+    y: number,
+  ): void {
+    if (receipt === null) return;
+    this.creditPickups.spawn(
+      receipt,
+      x,
+      y,
+      this.settings.visualQuality,
+    );
+    this.sfx.creditDrop(
+      receipt.tier,
+      this.settings.visualQuality,
+      receipt.variant,
+      this.creditPan(x),
+    );
+  }
+
+  private creditPan(x: number): number {
+    return clamp((x / Math.max(1, this.width)) * 2 - 1, -1, 1) * 0.6;
+  }
+
+  /** One crystal entering the hull: a clink on the chain ladder. */
+  private presentCombatCreditArrival(arrival: CreditCrystalArrival): void {
+    const quality = this.settings.visualQuality;
+    const pan = this.creditPan(arrival.x);
+    this.sfx.creditTick({
+      tier: arrival.tier,
+      variant: arrival.variant,
+      quality,
+      anchor: arrival.anchor,
+      hero: arrival.hero,
+      step: arrival.step,
+      order: arrival.order,
+      chain: arrival.chain,
+      pan,
+    });
+    if (arrival.milestone) {
+      this.sfx.creditMilestone(arrival.step, quality, pan);
+    }
+  }
+
+  private presentCombatCreditCollection(
+    event: CreditCrystalCollectionEvent,
+    ship: { x: number; y: number },
+  ): void {
+    this.hooks.onCombatCreditPickupPresented?.(event);
+    const hue =
+      event.variant === "golden"
+        ? 48
+        : event.hero
+          ? 292
+          : event.tier === "high"
+            ? 218
+            : 274;
+    const quality = this.settings.visualQuality;
+    const qualityScale =
+      quality === "ultra"
+        ? 1.75
+        : quality === "high"
+          ? 1.45
+          : quality === "medium"
+            ? 1.2
+            : 1;
+    const tierScale =
+      event.tier === "major-boss"
+        ? 1.8
+        : event.tier === "boss"
+          ? 1.55
+          : event.tier === "mini-boss"
+            ? 1.35
+            : event.tier === "elite"
+              ? 1.18
+              : 1;
+
+    // Single crystals already flash on the hull as they land; the burst
+    // closes with a ring, and premium tiers add a particle bloom.
+    if (event.hero) {
+      this.burst(
+        ship.x,
+        ship.y,
+        Math.round(22 * qualityScale * tierScale),
+        hue,
+      );
+    }
+    this.sfx.creditPickup(
+      event.tier,
+      quality,
+      event.variant,
+      event.hero,
+      this.creditPickups.chainSnapshot().step,
+      this.creditPan(ship.x),
+    );
+
+    if (quality !== "low") {
+      const color =
+        event.variant === "golden" ? "#ffd46a" : "#dca8ff";
+      this.skillFx.pulse(
+        ship.x,
+        ship.y,
+        color,
+        (event.hero ? 118 : 58) * qualityScale * tierScale,
+        event.hero ? 4 : 1.6,
+        event.hero ? 0.52 : 0.26,
+      );
+
+      if (event.hero && (quality === "high" || quality === "ultra")) {
+        this.burst(
+          ship.x,
+          ship.y,
+          Math.round(18 * qualityScale),
+          event.variant === "golden" ? 54 : 204,
+        );
+      }
+
+      if (event.hero && quality === "ultra") {
+        this.skillFx.flash(
+          event.variant === "golden" ? "#ffd46a" : "#dca8ff",
+          0.07,
+          0.18,
+        );
+        this.shakeFor(event.tier === "major-boss" ? 2.2 : 1.4);
+      }
+    }
+  }
+
+  private flushCombatCreditPresentation(): void {
+    const ship = this.shipCenter();
+    for (const event of this.creditPickups.flush()) {
+      this.presentCombatCreditCollection(event, ship);
+    }
+  }
+
+  private updateBossRewardPrompt(dt: number): void {
+    const prompt = this.bossRewardPrompt;
+    if (!this.bossRewardPending || prompt === null) return;
+
+    prompt.remaining = Math.max(0, prompt.remaining - Math.max(0, dt));
+    if (prompt.remaining > 0) return;
+
+    // The modal pauses gameplay visually. Give the premium crystal its
+    // readable battlefield beat first, then compact-sync any remaining
+    // pickup value before the dialog can cover the canvas.
+    this.flushCombatCreditPresentation();
+    this.bossRewardPrompt = null;
+    this.hooks.onBossRewardChoice(prompt.stage, prompt.role);
   }
 
   private activateEnemyReward(enemy: Enemy): void {
@@ -6331,7 +9004,7 @@ export class Game {
         alphabet[Math.floor(Math.random() * alphabet.length)] ?? "a";
       const angle = baseAngle + offset;
 
-      this.projectiles.push({
+      const projectile: EnemyProjectile = {
         id: this.nextProjectileId++,
         ownerId: enemy.id,
         char,
@@ -6340,7 +9013,9 @@ export class Game {
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         radius: 12,
-      });
+        family: this.visualDefinitionForEnemy(enemy)?.family,
+      };
+      if (this.admitVoiceProjectile(projectile)) this.projectiles.push(projectile);
     }
 
     this.burst(enemy.x, enemy.y, 26, 48);
@@ -6372,13 +9047,17 @@ export class Game {
         elite: false,
         minimumLayers: 1,
         vocabularyLevel: this.vocabularyLevel,
-        entries: this.vocabulary,
+        entries: this.expansionVocabulary(),
         wordScoreOffset: this.difficulty.wordScoreOffset,
         clarity: {
           activeWords: this.activeEnemyWords(),
         },
       });
-      const varied = this.selectVariedEnemyEntry(typingProfile.entry);
+      const varied = this.selectVariedEnemyEntry(
+      typingProfile.entry,
+      undefined,
+      this.expansionVocabulary(),
+    );
       if (varied === null) continue;
       typingProfile.entry = varied;
       typingProfile.wordDifficultyScore = wordDifficultyScore(
@@ -6400,6 +9079,7 @@ export class Game {
         kind: "scout",
         definitionId,
         elite: false,
+        combatCreditEligible: true,
         eliteModifiers: [],
         rank: typingProfile.rank,
         wordDifficultyScore: typingProfile.wordDifficultyScore,
@@ -6438,12 +9118,12 @@ export class Game {
     this.burst(splitter.x, splitter.y, 30, 318);
   }
 
-  private applyRelicCorrectKeyPassive(source: Enemy): void {
+  private applyRelicCorrectKeyPassive(source: Enemy, voiceTrigger = false): void {
     const interval = this.relicEffects.streakFreezeInterval;
     if (
       interval <= 0 ||
-      this.stats.streak <= 0 ||
-      this.stats.streak % interval !== 0
+      (!voiceTrigger && (this.stats.streak <= 0 ||
+      this.stats.streak % interval !== 0))
     ) {
       return;
     }
@@ -6485,6 +9165,62 @@ export class Game {
       );
     }
 
+    const directWeight = effortWeight(this.voiceCompletionActive ? this.voiceCurrentEffort : length);
+    if (perfectWord) {
+      if (this.relicEffects.perfectWordEnergy > 0) {
+        this.stats.energy = clamp(
+          this.stats.energy +
+            this.relicEffects.perfectWordEnergy * directWeight,
+          0,
+          this.stats.maxEnergy,
+        );
+      }
+      if (this.relicEffects.perfectWordPower > 0) {
+        this.gainPower(
+          this.relicEffects.perfectWordPower * directWeight,
+        );
+      }
+
+      if (this.relicEffects.perfectWordInterval > 0) {
+        this.relicPerfectWordCount += 1;
+        if (
+          this.relicPerfectWordCount %
+            this.relicEffects.perfectWordInterval ===
+          0
+        ) {
+          this.gainPower(
+            this.relicEffects.perfectWordIntervalPower,
+          );
+        }
+      }
+
+      if (
+        this.relicRecoveryArmed &&
+        this.relicEffects.recoveryPerfectEnergy > 0
+      ) {
+        this.stats.energy = clamp(
+          this.stats.energy +
+            this.relicEffects.recoveryPerfectEnergy,
+          0,
+          this.stats.maxEnergy,
+        );
+        this.relicRecoveryArmed = false;
+      }
+    }
+
+    if (length >= 8) {
+      if (this.relicEffects.longWordShield > 0) {
+        this.stats.shield = clamp(
+          this.stats.shield + this.relicEffects.longWordShield,
+          0,
+          this.stats.maxShield,
+        );
+      }
+      if (this.relicEffects.longWordPower > 0) {
+        this.gainPower(this.relicEffects.longWordPower);
+      }
+    }
+
     if (
       perfectWord &&
       source !== undefined &&
@@ -6521,6 +9257,9 @@ export class Game {
   private registerMiss(): void {
     this.stats.misses += 1;
     this.updateStageObjective({ type: "miss" });
+    if (this.relicEffects.recoveryPerfectEnergy > 0) {
+      this.relicRecoveryArmed = true;
+    }
 
     const guardAvailable =
       this.relicMistakeGuardsUsed <
@@ -6582,6 +9321,14 @@ export class Game {
     return timedRewardMultiplier(this.rewardCreditsMultiplierTimer);
   }
 
+  getCombatCreditsGrantedThisStage(): number {
+    return this.combatCreditsGrantedThisStage;
+  }
+
+  getCombatCreditsAppliedThisStage(): number {
+    return this.combatCreditsAppliedThisStage;
+  }
+
   private addScore(amount: number): void {
     const multiplier = timedRewardMultiplier(
       this.rewardScoreMultiplierTimer,
@@ -6599,7 +9346,8 @@ export class Game {
   private gainPower(baseGain: number): void {
     this.stats.power = clamp(
       this.stats.power +
-        focusPowerGain(typedRageGain(baseGain), this.playerStats),
+        focusPowerGain(typedRageGain(baseGain), this.playerStats) *
+          this.perks.rageGainMultiplier,
       0,
       100,
     );
@@ -6626,7 +9374,20 @@ export class Game {
     this.stats.shield = next.shield;
     this.stats.energy = next.energy;
 
+    // Nanite Weave (equipment perk): the hull knits itself between hits.
+    let hullRepaired = false;
+    if (
+      this.perks.hullRegen > 0 &&
+      this.stats.hull > 0 &&
+      this.stats.hull < this.stats.maxHull &&
+      this.secondsSinceDamage >= this.perks.hullRegenDelay
+    ) {
+      this.stats.hull = Math.min(this.stats.maxHull, this.stats.hull + this.perks.hullRegen * dt);
+      hullRepaired = true;
+    }
+
     const changed =
+      hullRepaired ||
       Math.abs(beforeShield - next.shield) > 0.01 ||
       Math.abs(beforeEnergy - next.energy) > 0.01;
 
@@ -6663,6 +9424,7 @@ export class Game {
 
   private applyCharacterPerfectWordPassive(perfectWord: boolean): void {
     if (!perfectWord) return;
+    this.applyPerkPerfectWord();
 
     if (this.characterId === "aegis") {
       const nextShield = restoreAegisShield(
@@ -6707,10 +9469,10 @@ export class Game {
     }
   }
 
-  private applyCharacterCorrectKeyPassive(): void {
+  private applyCharacterCorrectKeyPassive(voiceTriggers?: ReadonlySet<string>): void {
     if (
       this.characterId === "vanguard" &&
-      shouldTriggerVanguardShieldRhythm(this.stats.streak)
+      (voiceTriggers ? voiceTriggers.has("vanguard") : shouldTriggerVanguardShieldRhythm(this.stats.streak))
     ) {
       const nextShield = restoreVanguardShield(this.stats.shield, this.stats.maxShield);
       if (nextShield > this.stats.shield) {
@@ -6722,7 +9484,7 @@ export class Game {
 
     if (
       this.characterId === "wraith" &&
-      shouldTriggerWraithCloak(this.stats.streak)
+      (voiceTriggers ? voiceTriggers.has("wraith") : shouldTriggerWraithCloak(this.stats.streak))
     ) {
       this.cloakTimer = Math.max(this.cloakTimer, WRAITH_PASSIVE_CLOAK_DURATION);
       this.burst(this.width / 2, this.height - PLAYER_Y_OFFSET, 12, 274);
@@ -6731,7 +9493,7 @@ export class Game {
 
     if (
       this.characterId === "zenith" &&
-      shouldTriggerZenithCore(this.stats.streak)
+      (voiceTriggers ? voiceTriggers.has("zenith") : shouldTriggerZenithCore(this.stats.streak))
     ) {
       this.stats.shield = clamp(
         this.stats.shield + this.stats.maxShield * 0.08,
@@ -6753,8 +9515,15 @@ export class Game {
     }
   }
 
-  private characterBossDamageMultiplier(): number {
+  private characterBossDamageMultiplier(voiceSource = this.voiceCompletionActive): number {
     let multiplier = 1;
+
+    // Braced a rush: the boss is open for a moment.
+    if (this.bossExposedTimer > 0) multiplier *= 1.5;
+
+    if (this.perks.momentumStreak > 0 && (voiceSource ? this.voiceEffortStreak : this.stats.streak) >= this.perks.momentumStreak) {
+      multiplier *= 1 + this.perks.momentumDamage;
+    }
 
     if (this.characterId === "arsenal" && this.weaponOverclockTimer > 0) {
       multiplier *= 1.35;
@@ -6763,7 +9532,7 @@ export class Game {
       multiplier *= 1.2;
     }
     if (this.characterId === "reaper") {
-      multiplier *= reaperStreakDamageMultiplier(this.stats.streak);
+      multiplier *= reaperStreakDamageMultiplier(voiceSource ? this.voiceEffortStreak : this.stats.streak);
     }
     if (
       (this.characterId === "celestial" ||
@@ -7024,7 +9793,7 @@ export class Game {
               ),
             ),
             this.playerStats,
-          ) * reaperStreakDamageMultiplier(this.stats.streak);
+          ) * reaperStreakDamageMultiplier(this.inputMode === "voice" ? this.voiceEffortStreak : this.stats.streak);
         this.boss.hp = Math.max(0, this.boss.hp - damage);
         this.boss.flash = 1;
         this.updateBossPhase(this.boss);
@@ -7129,12 +9898,16 @@ export class Game {
     if (this.settings.screenShake) {
       this.shake = Math.max(this.shake, visual.shake * scale);
     }
+    this.playUltimateFx(rage.segments);
 
     this.sfx.power();
     this.emitStats();
   }
 
   private releaseNovaPulse(): void {
+    const ship = this.shipCenter();
+    this.skillFx.shockwave(ship.x, ship.y, "#91fbff", Math.hypot(this.width, this.height), this.fxTargets(12), 4);
+    this.skillFx.flash("#bff8ff", 0.4, 0.5);
     this.projectiles = [];
     const victims = [...this.enemies];
     for (const enemy of victims) {
@@ -7177,8 +9950,9 @@ export class Game {
       (enemy) => enemy.id === enemyId,
     );
     if (escaped !== undefined) {
+      this.resetVoiceCreditForMiss(escaped);
       if (this.gameplayMode === "recall") {
-        this.resolveRecallPrompt(escaped.entry, false, false);
+        this.resolveRecallPrompt(escaped.entry, false, false, escaped);
         this.recallHintIndices.delete(escaped.id);
       }
       this.stageResultTracker.missWord(
@@ -7270,10 +10044,14 @@ export class Game {
           enemy.y = Math.max(-enemy.radius, enemy.y - 46);
         }
 
-        this.firePlayerVisualShot(enemy.x, enemy.y, 0.75, "hit");
+        this.fireLaser(enemy, 0.75);
       }
     }
 
+    this.skillFx.shieldHit(x, y, "#d98bff");
+    const owner = this.enemies.find((item) => item.id === projectile.ownerId);
+    const back = owner !== undefined ? { x: owner.x, y: owner.y } : this.boss !== null ? this.bossPosition() : null;
+    if (back !== null) this.skillFx.zap({ x, y }, back, "#e7b8ff");
     this.burst(x, y, 18, 300);
     this.sfx.hit();
   }
@@ -7295,11 +10073,35 @@ export class Game {
       return;
     }
 
+    if (this.perkStageBlocks > 0) {
+      // Ablative Plating (equipment perk): the first hit of the stage.
+      this.perkStageBlocks -= 1;
+      this.skillFx.shieldHit(x, y, "#ffb86b");
+      this.skillFx.shatter({ x, y }, 30, "#ffb86b");
+      this.burst(x, y, 16, 30);
+      this.sfx.shieldBreak();
+      return;
+    }
+
+    if (this.perks.phaseShieldInterval > 0 && this.perkPhaseTimer <= 0) {
+      // Phase Shift (equipment perk): this hit passes through.
+      this.perkPhaseTimer = this.perks.phaseShieldInterval;
+      const ship = this.shipCenter();
+      this.skillFx.pulse(ship.x, ship.y, "#b8a6ff", 110, 3, 0.55);
+      this.skillFx.shieldHit(x, y, "#b8a6ff");
+      this.sfx.support();
+      return;
+    }
+
     if (this.guardianTimer > 0 && this.guardianBlocks > 0) {
       this.guardianBlocks -= 1;
       if (this.guardianBlocks <= 0) {
         this.guardianTimer = 0;
       }
+      // The nearest escort drone shoots the threat down.
+      const drone = nearestPoint(this.skillFx.sentinelPositions, x, y) ?? this.shipCenter();
+      this.skillFx.zap(drone, { x, y }, "#ffd76a");
+      this.skillFx.blast(x, y, "#ffd76a", 34);
 
       this.burst(x, y, 22, 48);
       this.sfx.support();
@@ -7315,9 +10117,11 @@ export class Game {
       );
       this.barrierHp = barrier.barrierHp;
       damageRemaining = barrier.damageRemaining;
+      this.skillFx.shieldHit(x, y);
 
       if (this.barrierHp <= 0) {
         this.barrierTimer = 0;
+        this.skillFx.shatter(this.shipCenter(), 64);
       }
 
       this.burst(x, y, 18, 188);
@@ -7353,6 +10157,7 @@ export class Game {
     this.stats.streak = 0;
     this.stats.multiplier = 1;
     this.stats.power = clamp(this.stats.power - 30, 0, 100);
+    if (this.perks.reactivePulseRadius > 0) this.releaseReactivePulse();
 
     this.burst(x, y, 34, 2);
 
@@ -7362,6 +10167,7 @@ export class Game {
 
     if (shieldBefore > 0 && this.stats.shield <= 0) {
       this.sfx.shieldBreak();
+      if (this.perks.shieldBreakStall > 0) this.dischargeShield();
     }
     const criticalHullThreshold = this.stats.maxHull * 0.25;
     if (
@@ -7383,196 +10189,343 @@ export class Game {
     this.emitStats();
 
     if (this.stats.hull <= 0) {
+      this.flushCombatCreditPresentation();
       this.phase = "gameover";
       this.sfx.stageFail();
       this.hooks.onPhase(this.phase);
     }
   }
 
-  private fireBonusTargetShot(
-    targetX: number,
-    targetY: number,
-    completed: boolean,
-    power = 0.92,
-  ): PlayerVisualShot | null {
-    return this.firePlayerVisualShot(
-      targetX,
-      targetY,
-      completed ? Math.max(1.28, power) : power,
-      completed ? "kill" : "hit",
-    );
+  private fireBossLaser(power: number): void {
+    const { x, y } = this.bossPosition();
+    this.firePlayerShot(x, y, power, { kind: "boss-hit" }, 0.09);
   }
 
-  private firePlayerVisualShot(
-    targetX: number,
-    targetY: number,
-    power: number,
-    outcome: PlayerShotOutcome,
-  ): PlayerVisualShot | null {
-    if (this.gameplayMode === "recall") return null;
-
-    const profile = playerProjectileProfile(this.characterId);
-    const startX = this.width / 2;
-    const startY = this.height - PLAYER_Y_OFFSET - 27;
-    const distance = Math.hypot(targetX - startX, targetY - startY);
-    const shot: PlayerVisualShot = {
-      id: this.nextPlayerVisualShotId++,
-      characterId: this.characterId,
-      startX,
-      startY,
-      targetX,
-      targetY,
-      age: 0,
-      // Visual travel is deliberately slower than gameplay damage. The hit
-      // already resolved before this shot is created; this duration only keeps
-      // the energy projectile readable on a wide desktop canvas.
-      duration: clamp(
-        distance / Math.max(1, profile.presentationSpeed * 0.68),
-        0.16,
-        0.46,
-      ),
+  private fireLaser(enemy: Enemy, power: number): void {
+    this.firePlayerShot(enemy.x, enemy.y, power, {
+      kind: "enemy-hit",
+      enemyId: enemy.id,
       power,
-      outcome,
-    };
-    this.playerVisualShots.push(shot);
-    if (this.playerVisualShots.length > 40) {
-      this.playerVisualShots.shift();
-    }
+    });
+  }
 
-    this.playerMuzzleFlashes.push({
+  /**
+   * One player shot. Ships with a bolt recipe fire a travelling bolt and apply
+   * `impact` when it lands; the others draw the instant laser tracer and apply
+   * it at once.
+   */
+  private firePlayerShot(
+    x: number,
+    y: number,
+    power: number,
+    impact: ShotImpact,
+    laserLife = 0.085,
+  ): void {
+    // Turn toward the target first, so the shot leaves the hull as it will
+    // be drawn this frame.
+    this.shipMotion.fire(this.width / 2, this.height - PLAYER_Y_OFFSET, x, y, power);
+    this.shipAimImpact = impact;
+    const pose = this.shipDrawOptions(this.lastDrawTime);
+    characterShipPoint(pose, 0, 0, this.shipPoint);
+    const fired = this.playerShots.fire({
       characterId: this.characterId,
-      x: startX,
-      y: startY,
-      life: 0.075,
-      maxLife: 0.075,
+      originX: this.shipPoint.x,
+      originY: this.shipPoint.y,
+      originAngle: characterShipAngle(pose),
+      targetX: x,
+      targetY: y,
+      power,
+      viewHeight: this.height,
+      payload: impact,
     });
-    if (this.playerMuzzleFlashes.length > 14) {
-      this.playerMuzzleFlashes.shift();
+    if (fired) {
+      if (impact.kind === "enemy-kill") this.dyingEnemies.push(impact.enemy);
+      if (impact.kind === "intercept") this.interceptedProjectiles.push(impact.projectile);
+      if (impact.kind === "bonus-collect") this.bonusGhosts.push(impact.ghost);
+      return;
     }
-
-    this.sfx.playerFire(profile.firePitch);
-    return shot;
+    characterShipPoint(pose, 0, -SHIP_NOSE_OFFSET, this.shipPoint);
+    this.lasers.push({
+      x1: this.shipPoint.x,
+      y1: this.shipPoint.y,
+      x2: x,
+      y2: y,
+      life: laserLife,
+      maxLife: laserLife,
+      power,
+    });
+    this.applyShotImpact(impact, x, y, false);
   }
 
-  private queuePlayerCombatImpact(shot: PlayerVisualShot): void {
-    const kill = shot.outcome === "kill" || shot.outcome === "boss-kill";
-    const profile = playerProjectileProfile(shot.characterId);
-    const duration = kill ? 0.34 : shot.outcome === "layer" ? 0.24 : 0.18;
-    this.playerCombatImpacts.push({
-      characterId: shot.characterId,
-      x: shot.targetX,
-      y: shot.targetY,
-      life: duration,
-      maxLife: duration,
-      kill,
-      power: shot.power,
-    });
-    if (this.playerCombatImpacts.length > 28) {
-      this.playerCombatImpacts.shift();
+  /** Follows a bolt's target while it flies; false keeps the last known point. */
+  private readonly aimPlayerShot = (impact: ShotImpact, out: ShotAimPoint): boolean => {
+    switch (impact.kind) {
+      case "enemy-hit":
+      case "enemy-layer": {
+        const enemy = this.enemies.find((item) => item.id === impact.enemyId);
+        if (enemy === undefined) return false;
+        out.x = enemy.x;
+        out.y = enemy.y;
+        return true;
+      }
+      case "enemy-kill":
+        out.x = impact.enemy.x;
+        out.y = impact.enemy.y;
+        return true;
+      case "boss-hit": {
+        if (this.boss === null) return false;
+        const { x, y } = this.bossPosition();
+        out.x = x;
+        out.y = y;
+        return true;
+      }
+      case "intercept":
+        out.x = impact.projectile.x;
+        out.y = impact.projectile.y;
+        return true;
+      case "bonus-hit":
+      case "bonus-collect":
+        // A collected bonus stops updating, so it keeps its last position.
+        impact.aim(out);
+        return true;
     }
+  };
 
-    if (kill) this.sfx.playerKill(profile.killPitch);
-    else this.sfx.playerHit(profile.hitPitch);
+  /**
+   * `fromBolt`: a travelling bolt landed (stagger + impact sound); false for
+   * the legacy laser, which keeps its original feedback.
+   */
+  private applyShotImpact(impact: ShotImpact, x: number, y: number, fromBolt: boolean): void {
+    const projectileProfile = playerProjectileProfile(this.characterId);
+    const impactHue = projectileProfile.impactHue;
+    // Travelling projectiles use their ship identity; the legacy/failsafe
+    // tracer keeps the generic energy crack. Panned to the target.
+    const variant: ImpactVariant = fromBolt
+      ? projectileProfile.impactVariant
+      : "energy";
+    const pan = clamp((x / Math.max(1, this.width)) * 2 - 1, -1, 1) * 0.6;
+    switch (impact.kind) {
+      case "enemy-hit": {
+        const enemy = this.enemies.find((item) => item.id === impact.enemyId);
+        if (enemy !== undefined) {
+          enemy.flash = 1;
+          enemy.kick = Math.max(enemy.kick, fromBolt ? 1.6 : 1);
+          if (fromBolt) this.staggerEnemy(enemy, HIT_STUN_SECONDS);
+        }
+        this.burst(x, y, impact.power > 1 ? 12 : fromBolt ? 8 : 5, impactHue);
+        this.sfx.boltImpact(impact.power, pan, variant);
+        this.enemyImpactFx(enemy, x, y, impact.power, pan, "hit");
+        return;
+      }
+      case "enemy-layer": {
+        const enemy = this.enemies.find((item) => item.id === impact.enemyId);
+        if (enemy !== undefined) {
+          enemy.flash = 1;
+          enemy.kick = Math.max(enemy.kick, fromBolt ? 1.9 : 1.45);
+          if (fromBolt) this.staggerEnemy(enemy, LAYER_STUN_SECONDS);
+        }
+        this.triggerImpactFeedback("word");
+        this.burst(x, y, 12, impactHue);
+        // The family's layer-break shards and sound replace the generic ones.
+        this.enemyImpactFx(enemy, x, y, 1.25, pan, "layer");
+        this.sfx.boltImpact(1.25, pan, variant);
+        return;
+      }
+      case "enemy-kill": {
+        const ghost = this.dyingEnemies.indexOf(impact.enemy);
+        if (ghost >= 0) this.dyingEnemies.splice(ghost, 1);
+        this.releasePerkKill(impact.enemy.id, x, y);
+        this.triggerImpactFeedback("word");
+        this.burst(x, y, 12, impactHue);
+        // Family death burst + material break-up sound (bubble pop, ice
+        // shatter, ember blast…) instead of the generic burst and blip.
+        this.enemyImpactFx(impact.enemy, x, y, 1.45, pan, "kill");
+        this.presentCombatCreditReceipt(
+          impact.creditReceipt,
+          x,
+          y,
+        );
+        this.sfx.boltImpact(1.45, pan, variant);
+        if (this.settings.screenShake) {
+          this.shake = Math.max(this.shake, impact.shake);
+        }
+        return;
+      }
+      case "boss-hit": {
+        if (this.boss !== null) {
+          this.boss.flash = 1;
+          this.boss.kick = Math.max(this.boss.kick, fromBolt ? 1.4 : 1);
+        }
+        this.burst(x, y, 7, impactHue);
+        this.sfx.boltImpact(0.9, pan, variant);
+        this.bossImpactFx(x, y, pan);
+        return;
+      }
+      case "intercept": {
+        const ghost = this.interceptedProjectiles.indexOf(impact.projectile);
+        if (ghost >= 0) this.interceptedProjectiles.splice(ghost, 1);
+        this.projectileImpacts.push({
+          x,
+          y,
+          life: 0.34,
+          maxLife: 0.34,
+          radius: Math.max(15, impact.projectile.radius * 1.4),
+        });
+        if (this.projectileImpacts.length > 12) this.projectileImpacts.shift();
+        this.burst(x, y, 28, 190);
+        if (this.settings.screenShake) this.shake = Math.max(this.shake, 1.15);
+        return;
+      }
+      case "bonus-hit": {
+        this.burst(x, y, impact.count, impact.hue);
+        this.sfx.boltImpact(0.8, pan, variant);
+        return;
+      }
+      case "bonus-collect": {
+        const ghost = this.bonusGhosts.indexOf(impact.ghost);
+        if (ghost >= 0) this.bonusGhosts.splice(ghost, 1);
+        this.burst(x, y, impact.count, impact.hue);
+        this.sfx.support();
+        this.sfx.boltImpact(1.3, pan, variant);
+        if (impact.drop !== undefined) this.rewardDrops.spawn(x, y, impact.drop);
+        return;
+      }
+    }
   }
 
-  private updatePlayerCombatPresentation(dt: number): void {
-    let liveShots = 0;
-    for (const shot of this.playerVisualShots) {
-      shot.age += dt;
-      if (shot.age >= shot.duration) {
-        this.queuePlayerCombatImpact(shot);
-      } else {
-        this.playerVisualShots[liveShots++] = shot;
-      }
+  /**
+   * Bonus targets fire a real shot like enemies do (they used to show only a
+   * spark at the target). `collect` draws the collected bonus while the final
+   * bolt flies; its burst and pickup chime land with that bolt.
+   */
+  private fireBonusShot(
+    aim: BonusAim,
+    hue: number,
+    count: number,
+    collect: (() => void) | null,
+    drop: RewardDropSpec | null = null,
+  ): void {
+    const point = { x: 0, y: 0 };
+    aim(point);
+    if (collect === null) {
+      this.firePlayerShot(point.x, point.y, 0.8, { kind: "bonus-hit", aim, hue, count });
+      return;
     }
-    this.playerVisualShots.length = liveShots;
+    this.firePlayerShot(point.x, point.y, 1.45, {
+      kind: "bonus-collect",
+      aim,
+      hue,
+      count,
+      ghost: collect,
+      ...(drop === null ? {} : { drop }),
+    });
+  }
 
-    let liveFlashes = 0;
-    for (const flash of this.playerMuzzleFlashes) {
-      flash.life -= dt;
-      if (flash.life > 0) this.playerMuzzleFlashes[liveFlashes++] = flash;
-    }
-    this.playerMuzzleFlashes.length = liveFlashes;
+  private supplyPodAim(pod: SupplyPod): BonusAim {
+    return (out) => {
+      out.x = pod.x;
+      out.y = pod.y + supplyPodBob(pod);
+    };
+  }
 
-    let liveCombatImpacts = 0;
-    for (const impact of this.playerCombatImpacts) {
-      impact.life -= dt;
-      if (impact.life > 0) {
-        this.playerCombatImpacts[liveCombatImpacts++] = impact;
-      }
-    }
-    this.playerCombatImpacts.length = liveCombatImpacts;
-    advanceKillScorePopups(this.killScorePopups, dt);
+  private treasureDroneAim(drone: TreasureDrone): BonusAim {
+    return (out) => {
+      out.x = drone.x;
+      out.y = drone.y + treasureDroneBob(drone);
+    };
+  }
 
-    let aimTarget: { x: number; y: number } | null = null;
-    if (this.targetId !== null) {
-      const enemy = this.enemies.find((item) => item.id === this.targetId);
-      if (enemy !== undefined) aimTarget = enemy;
-    }
-    if (aimTarget === null && this.supplyPod !== null && this.supplyPod.typed > 0) {
-      aimTarget = this.supplyPod;
-    }
-    if (
-      aimTarget === null &&
-      this.treasureDrone !== null &&
-      this.treasureDrone.typed > 0
-    ) {
-      aimTarget = this.treasureDrone;
-    }
-    if (
-      aimTarget === null &&
-      this.rewardChoiceCrate !== null &&
-      this.rewardChoiceCrate.typed > 0
-    ) {
-      aimTarget = this.rewardChoiceCrate;
-    }
-    if (
-      aimTarget === null &&
-      this.anomalyCrate !== null &&
-      this.anomalyCrate.typed > 0
-    ) {
-      aimTarget = this.anomalyCrate;
-    }
-    if (
-      aimTarget === null &&
-      this.recallBonus !== null &&
-      this.recallBonus.typed > 0
-    ) {
-      aimTarget = this.recallBonus;
-    }
-    if (aimTarget === null && this.boss !== null) {
-      aimTarget = this.bossPosition();
-    }
+  private recallBonusAim(target: RecallBonusTarget): BonusAim {
+    return (out) => {
+      out.x = target.x;
+      out.y = target.y + recallBonusBob(target);
+    };
+  }
 
-    const desiredAim =
-      aimTarget === null
-        ? 0
-        : characterAimTargetAngle(
-            this.width / 2,
-            this.height - PLAYER_Y_OFFSET,
-            aimTarget.x,
-            aimTarget.y,
-          );
-    this.playerAimAngle = smoothCharacterAim(
-      this.playerAimAngle,
-      desiredAim,
+  private rewardCrateAim(crate: RewardChoiceCrate): BonusAim {
+    return (out) => {
+      out.x = crate.x + rewardCrateSway(crate);
+      out.y = crate.y;
+    };
+  }
+
+  private anomalyCrateAim(crate: AnomalyCrate): BonusAim {
+    return (out) => {
+      out.x = crate.x + anomalyCrateSway(crate);
+      out.y = crate.y;
+    };
+  }
+
+  private staggerEnemy(enemy: Enemy, seconds: number): void {
+    enemy.hitStun = Math.max(enemy.hitStun ?? 0, seconds);
+    enemy.hitShake = HIT_SHAKE_SECONDS;
+  }
+
+  /** Sideways body shake after a bolt lands; the word label is drawn unshaken. */
+  private hitShakeOffset(enemy: Enemy): number {
+    const shake = enemy.hitShake ?? 0;
+    if (shake <= 0) return 0;
+    return Math.sin(enemy.age * 95) * 2.8 * (shake / HIT_SHAKE_SECONDS);
+  }
+
+  /** Player ship draw options: flight pose plus aim, recoil and throttle. */
+  private shipDrawOptions(time: number): CharacterDrawOptions {
+    const quality = qualityProfile(this.settings.visualQuality);
+    return {
+      // A dodged boss quake side-steps the ship into the safe lane.
+      x: this.width / 2 + this.bossDodge,
+      y: this.height - PLAYER_Y_OFFSET,
+      time,
+      scale: 1,
+      glowScale: quality.glowScale,
+      detailScale: quality.particleScale,
+      aura: this.equipmentAura,
+      aim: this.shipMotion.aim,
+      recoil: this.shipMotion.recoil,
+      boost: this.shipMotion.boost,
+    };
+  }
+
+  private updateShipMotion(dt: number): void {
+    this.shipMotion.update(
       dt,
+      this.width / 2,
+      this.height - PLAYER_Y_OFFSET,
+      this.trackShipTarget,
+    );
+    const rig = activeShipLightRig(this.characterId);
+    if (rig === null) {
+      this.shipExhaust.clear();
+      return;
+    }
+    const pose = this.shipDrawOptions(this.lastDrawTime + dt);
+    rig.nozzles.forEach(([x, y], index) => {
+      const point = (this.nozzlePoints[index] ??= { x: 0, y: 0 });
+      characterShipPoint(pose, x, y, point);
+    });
+    this.nozzlePoints.length = rig.nozzles.length;
+    this.shipExhaust.update(
+      dt,
+      this.nozzlePoints,
+      characterShipAngle(pose),
+      this.shipMotion.boost,
+      this.settings.visualQuality,
     );
   }
 
-  private spawnKillScorePopup(x: number, y: number, value: number): void {
-    const safeValue = Math.max(0, value);
-    if (safeValue <= 0) return;
-    this.killScorePopups.push({
-      x,
-      y: scorePopupSafeY(y, this.height),
-      value: safeValue,
-      life: 2,
-      maxLife: 2,
-    });
-    if (this.killScorePopups.length > 18) {
-      this.killScorePopups.shift();
-    }
+  private clearPlayerShots(): void {
+    this.playerShots.clear();
+    this.dyingEnemies = [];
+    this.interceptedProjectiles = [];
+    this.bonusGhosts = [];
+    this.shipMotion.reset();
+    this.shipExhaust.clear();
+    this.shipAimImpact = null;
+    this.skillFx.clear();
+    this.combatFx.clear();
+    this.tractorPulls = [];
+    this.pendingStrikes = [];
+    this.perkKillQueue.clear();
   }
 
   private triggerImpactFeedback(kind: ImpactKind): void {
@@ -7655,29 +10608,79 @@ export class Game {
   }
 
   private draw(time: number): void {
+    this.lastDrawTime = time;
     const context = this.context;
+    const shake =
+      this.shake > 0 && this.settings.screenShake
+        ? cameraShakeOffset(this.shake, time)
+        : null;
+    const background = this.renderBackgroundStage(time, shake);
 
     context.save();
 
-    if (this.shake > 0 && this.settings.screenShake) {
-      const offset = cameraShakeOffset(this.shake, time);
-      context.translate(offset.x, offset.y);
+    if (shake !== null) {
+      context.translate(shake.x, shake.y);
+    }
+    // Duel camera (K.O. push-in, heavy-hit punch): zooms the whole scene,
+    // background included, around a focus. DOM HUD and words stay put.
+    if (this.duelPresentationActive && this.duelCamera !== null) {
+      const camera = this.duelCamera();
+      if (Number.isFinite(camera.zoom) && Math.abs(camera.zoom - 1) > 0.0005) {
+        const fx = camera.fx * this.width;
+        const fy = camera.fy * this.height;
+        context.translate(fx, fy);
+        context.scale(camera.zoom, camera.zoom);
+        context.translate(-fx, -fy);
+      }
     }
 
-    this.drawBackground(time);
+    if (background === "blit") {
+      context.drawImage(
+        this.backgroundStage!.canvas,
+        0,
+        0,
+        this.width,
+        this.height,
+      );
+    } else if (background === "legacy") {
+      this.drawBackground(time);
+    }
+    // Duel owns ships and combat FX. Keep both background presentation modes
+    // alive without drawing the campaign ship underneath the Duel battlefield.
+    if (this.duelPresentationActive) {
+      this.duelCombatRenderer?.(context, time, this.width, this.height);
+      context.restore();
+      return;
+    }
+    this.drawFlightStreaks(time);
+    // Boss ultimate: tint and cinematic bars under the combat layer.
+    if (this.bossUltimateK > 0.001) {
+      drawUltimateFrame(context, this.width, this.height, this.bossUltimateK);
+    }
     if (this.novaPulseRemaining > 0) this.drawNovaPulse();
     if (this.interferenceTimer > 0) {
       this.drawInterference(time);
     }
+    const fxState = this.persistentFxState(time);
+    // Singularity and overdrive glow sit under the enemies and the ship.
+    this.skillFx.drawPersistentUnder(context, fxState);
     this.drawLasers(time);
+    // Bolts fly under enemies so word labels always stay readable.
+    this.playerShots.drawShots(context, this.settings.visualQuality);
     this.drawParticles();
     this.drawProjectileImpacts();
+    this.creditPickups.draw(context, this.settings.visualQuality);
+    this.rewardDrops.draw(context, this.settings.visualQuality, this.shipCenter());
 
+    // Depth View: boss shots fly toward the camera, so they draw over the boss.
+    const bossShotsLate = this.boss !== null && this.bossDepthActive();
     for (const projectile of this.projectiles) {
+      if (bossShotsLate && projectile.ownerId === -1) continue;
       this.drawProjectile(projectile);
     }
-
-    this.drawPlayerCombatVfx(time);
+    for (const projectile of this.interceptedProjectiles) {
+      this.drawProjectile(projectile);
+    }
 
     if (this.supplyPod !== null) {
       this.drawSupplyPod(this.supplyPod);
@@ -7694,31 +10697,53 @@ export class Game {
     if (this.anomalyCrate !== null) {
       this.drawAnomalyCrate(this.anomalyCrate);
     }
+    for (const drawGhost of this.bonusGhosts) drawGhost();
 
     for (const enemy of this.enemies) {
       this.drawEnemy(enemy);
     }
+    for (const enemy of this.dyingEnemies) {
+      this.drawEnemy(enemy);
+    }
+    // Family death bursts and material sparks, over the enemies.
+    this.combatFx.draw(context, this.settings.visualQuality);
 
-    this.drawKillScorePopups();
     this.drawLearningEcho();
 
     if (this.boss !== null) {
       this.drawBoss(time);
+      if (bossShotsLate) {
+        for (const projectile of this.projectiles) {
+          if (projectile.ownerId === -1) this.drawProjectile(projectile);
+        }
+      }
+    } else if (this.bossWreck !== null) {
+      this.drawBossWreck();
     }
 
+    this.playerShots.drawImpacts(context, this.settings.visualQuality);
+    // Skill signatures (lances, missiles, arcs) over the enemies they hit.
+    this.skillFx.draw(context, this.settings.visualQuality, this.height);
+    const rig = activeShipLightRig(this.characterId);
+    if (rig !== null) this.shipExhaust.draw(context, rig);
     this.drawPlayer(time);
+    this.playerShots.drawMuzzleFlashes(context);
+    this.skillFx.drawPersistentOver(context, fxState);
     this.drawDefensiveEffects(time);
     this.drawTargetLine();
+    this.drawBossSkillLayer(time);
     this.drawRewardNotice();
     this.drawEnemyControlOverlay();
 
-    if (this.overdriveTimer > 0) {
-      context.fillStyle =
-        "rgba(65, 225, 255, " +
-        String(0.035 + Math.sin(time * 10) * 0.012) +
-        ")";
-      context.fillRect(0, 0, this.width, this.height);
-    }
+    // Flashes, the purge scan and showers: screen space, drawn last.
+    this.skillFx.drawScreen(
+      context,
+      this.width,
+      this.height,
+      this.settings.visualQuality,
+    );
+    // Boss title card.
+    this.combatFx.drawScreen(context, this.width, this.height);
 
     context.restore();
     this.drawRewardBuffTimers();
@@ -7762,6 +10787,39 @@ export class Game {
     }
 
     context.restore();
+  }
+
+  /**
+   * Advances the WebGL BGV scene when available. Worlds without a BGV
+   * composition (or a failed/lost WebGL context) keep the current renderer.
+   */
+  private renderBackgroundStage(
+    time: number,
+    shake: ReturnType<typeof cameraShakeOffset> | null,
+  ): BackgroundPresentation | "legacy" {
+    const stage = this.backgroundStage;
+    if (stage === null) return "legacy";
+
+    stage.setTimeScale(
+      this.phase === "playing" ? 1 : this.phase === "paused" ? 0.25 : 0.5,
+    );
+
+    const layered = stage.presentation === "layered";
+    stage.render(
+      time,
+      layered ? shake?.x ?? 0 : 0,
+      layered ? shake?.y ?? 0 : 0,
+    );
+
+    if (!stage.active) return "legacy";
+    if (layered) {
+      this.context.clearRect(0, 0, this.width, this.height);
+    }
+    return stage.presentation;
+  }
+
+  getBackgroundDiagnostics(): BackgroundDiagnostics | null {
+    return this.backgroundStage?.diagnostics() ?? null;
   }
 
   private drawBackground(time: number): void {
@@ -7827,42 +10885,6 @@ export class Game {
     context.arc(centerX, centerY, 9 + progress * maxRadius * 0.75, 0, Math.PI * 2);
     context.stroke();
     context.restore();
-  }
-
-  private drawPlayerCombatVfx(time: number): void {
-    const quality = qualityProfile(this.settings.visualQuality);
-    for (const flash of this.playerMuzzleFlashes) {
-      drawPlayerMuzzleFlash(
-        this.context,
-        flash,
-        time,
-        quality.glowScale,
-      );
-    }
-    for (const shot of this.playerVisualShots) {
-      drawPlayerProjectile(
-        this.context,
-        shot,
-        time,
-        quality.glowScale,
-        quality.particleScale,
-      );
-    }
-    for (const impact of this.playerCombatImpacts) {
-      drawPlayerCombatImpact(
-        this.context,
-        impact,
-        time,
-        quality.glowScale,
-        quality.particleScale,
-      );
-    }
-  }
-
-  private drawKillScorePopups(): void {
-    for (const popup of this.killScorePopups) {
-      drawKillScorePopup(this.context, popup);
-    }
   }
 
   private drawLasers(time: number): void {
@@ -8085,6 +11107,16 @@ export class Game {
 
     context.save();
     context.translate(projectile.x, projectile.y);
+    // Depth View: a boss shot starts small far away and grows as it nears
+    // (the letter keeps its size so it stays readable).
+    const depth =
+      projectile.ownerId === -1 && this.boss !== null && this.bossDepthActive()
+        ? this.bossShotDepthScale(projectile.y)
+        : 1;
+    if (depth !== 1) {
+      context.save();
+      context.scale(depth, depth);
+    }
 
     if (brightWorld) {
       context.globalCompositeOperation = "source-over";
@@ -8098,21 +11130,42 @@ export class Game {
       context.stroke();
     }
 
+    context.shadowBlur = 0;
+    // The shooter's family gives the shot its look (fireball, ice shard,
+    // feather of light…); a red warning halo keeps every shot readable.
     context.globalCompositeOperation = "lighter";
-    context.shadowBlur =
-      (brightWorld ? 23 : 18) *
-      qualityProfile(this.settings.visualQuality).glowScale;
-    context.shadowColor = "#ff386f";
-    context.fillStyle = brightWorld
-      ? "rgba(255, 48, 108, 0.24)"
-      : "rgba(255, 70, 118, 0.13)";
-    context.strokeStyle = brightWorld ? "#ff477c" : "#ff7298";
-    context.lineWidth = brightWorld ? 3 : 2;
+    drawGlow(
+      context,
+      "#ff386f",
+      0,
+      0,
+      projectile.radius * 2.7,
+      (brightWorld ? 0.75 : 0.6) * qualityProfile(this.settings.visualQuality).glowScale,
+    );
+    const skinned =
+      projectile.family !== undefined &&
+      drawEnemyShot(
+        context,
+        familyStyle(projectile.family).shot,
+        familyStyle(projectile.family),
+        projectile.radius * 1.12,
+        Math.atan2(projectile.vy, projectile.vx),
+        this.lastDrawTime,
+      );
+    if (!skinned) {
+      context.globalCompositeOperation = "lighter";
+      context.fillStyle = brightWorld
+        ? "rgba(255, 48, 108, 0.24)"
+        : "rgba(255, 70, 118, 0.13)";
+      context.strokeStyle = brightWorld ? "#ff477c" : "#ff7298";
+      context.lineWidth = brightWorld ? 3 : 2;
 
-    context.beginPath();
-    context.arc(0, 0, projectile.radius, 0, Math.PI * 2);
-    context.fill();
-    context.stroke();
+      context.beginPath();
+      context.arc(0, 0, projectile.radius, 0, Math.PI * 2);
+      context.fill();
+      context.stroke();
+    }
+    if (depth !== 1) context.restore();
 
     context.globalCompositeOperation = "source-over";
     context.fillStyle = "#fff8fb";
@@ -8122,28 +11175,628 @@ export class Game {
     context.shadowBlur = brightWorld ? 4 : 0;
     context.shadowColor = "rgba(0, 0, 0, 0.95)";
     context.fillText(projectile.char.toUpperCase(), 0, 0);
+    if (this.inputMode !== "typing") { context.font = "bold 10px monospace"; context.fillText(this.voiceActionForms.get(projectile) ?? NATO_LETTERS[projectile.char.toLowerCase()] ?? "", 0, 25); }
 
     context.restore();
   }
 
+  /** 0.6 at the boss … 1.05 at the ship row (perspective, far shrinks fast). */
+  private bossShotDepthScale(y: number): number {
+    const bossY = this.bossPosition().y;
+    const shipY = this.height - PLAYER_Y_OFFSET;
+    const u = clamp((y - bossY) / Math.max(1, shipY - bossY), 0, 1);
+    return 0.6 + 0.45 * u * u;
+  }
+
+  // --- Skill signatures -------------------------------------------------------
+
+  /** Ship centre as drawn this frame. */
+  private shipCenter(): FxPoint {
+    const point = { x: 0, y: 0 };
+    characterShipPoint(this.shipDrawOptions(this.lastDrawTime), 0, 0, point);
+    return point;
+  }
+
+  /** Ship nose as drawn this frame (where lances and arcs leave the hull). */
+  private shipNose(): FxPoint {
+    const point = { x: 0, y: 0 };
+    characterShipPoint(this.shipDrawOptions(this.lastDrawTime), 0, -SHIP_NOSE_OFFSET, point);
+    return point;
+  }
+
+  private singularityCenter(): FxPoint {
+    return { x: this.width / 2, y: this.height * 0.42 };
+  }
+
+  /** Closest enemies (and the boss) for shockwave hit sparks. */
+  private fxTargets(limit: number): FxPoint[] {
+    const points = [...this.enemies]
+      .sort((a, b) => b.y - a.y)
+      .slice(0, limit)
+      .map((enemy) => ({ x: enemy.x, y: enemy.y }));
+    if (this.boss !== null) points.push(this.bossPosition());
+    return points;
+  }
+
+  private shakeFor(amount: number): void {
+    if (this.settings.screenShake) this.shake = Math.max(this.shake, amount);
+  }
+
+  /** What the shields, fields and drones around the ship look like now. */
+  private persistentFxState(time: number): PersistentFxState {
+    const markedEnemy =
+      this.markTimer > 0 ? this.enemies.find((enemy) => enemy.id === this.markedEnemyId) : undefined;
+    const lock =
+      markedEnemy !== undefined
+        ? { x: markedEnemy.x, y: markedEnemy.y }
+        : this.bossMarkTimer > 0 && this.boss !== null
+          ? this.bossPosition()
+          : null;
+    return {
+      ship: this.shipCenter(),
+      width: this.width,
+      height: this.height,
+      time,
+      quality: this.settings.visualQuality,
+      hexShield: this.barrierTimer > 0 && this.barrierHp > 0 ? Math.min(1, this.barrierTimer / 0.6) : 0,
+      mirror: Math.min(1, Math.max(0, this.reflectTimer) / 0.5),
+      stasis: Math.min(1, Math.max(0, this.timeShellTimer) / 0.6),
+      singularity: Math.min(1, Math.max(0, this.gravityWellTimer) / 0.6),
+      singularityAt: this.singularityCenter(),
+      sentinels: this.guardianTimer > 0 ? Math.max(0, this.guardianBlocks) : 0,
+      lock,
+      overdrive:
+        this.overdriveTimer > 0
+          ? Math.min(1, this.overdriveTimer / 0.8)
+          : this.weaponOverclockTimer > 0
+            ? 0.6
+            : 0,
+      overdriveColor: characterVisualProfile(this.characterId).glow,
+      cloak: Math.min(1, Math.max(0, this.cloakTimer) / 0.5),
+      escortDrones: this.phase === "playing" || this.phase === "paused" ? this.perks.escortDrones : 0,
+      interceptorDrones: this.phase === "playing" || this.phase === "paused" ? this.perks.interceptorDrones : 0,
+      phaseReady: this.perks.phaseShieldInterval > 0 && this.perkPhaseTimer <= 0 ? 1 : 0,
+      platingBlocks: this.perkStageBlocks,
+    };
+  }
+
+  /** A skill hit on one enemy: strip a shield layer or type letters for the player. */
+  private strikeEnemy(enemy: Enemy, letters: number, kick: number, hue: number): void {
+    const wordLength = typingText(enemy.entry.en).length;
+    if (enemy.layersRemaining > 1) {
+      enemy.layersRemaining -= 1;
+    } else {
+      enemy.typed = strikeTypingAdvance(enemy.typed, wordLength, letters);
+    }
+    enemy.flash = 1;
+    enemy.kick = Math.max(enemy.kick, kick);
+    this.burst(enemy.x, enemy.y, 18, hue);
+  }
+
+  private damageBossBySkill(share: number): void {
+    const boss = this.boss;
+    if (boss === null) return;
+    const damage = firepowerDamage(Math.max(1, Math.round(boss.maxHp * share)), this.playerStats);
+    boss.hp = Math.max(0, boss.hp - damage);
+    boss.flash = 1;
+    this.updateBossPhase(boss);
+    this.hooks.onBossUpdate(toBossHud(boss));
+    if (boss.hp <= 0) this.defeatBoss();
+  }
+
+  /** Missile Swarm: 8 micro-missiles from both wings into up to 6 enemies. */
+  private launchMissileSwarm(): void {
+    const targets = [...this.enemies].sort((a, b) => b.y - a.y).slice(0, MISSILE_SWARM_TARGETS);
+    const points: FxPoint[] = targets.map((enemy) => ({ x: enemy.x, y: enemy.y }));
+    if (this.boss !== null) points.push(this.bossPosition());
+    if (points.length === 0) return;
+    const ship = this.shipCenter();
+    for (let index = 0; index < MISSILE_SWARM_COUNT; index += 1) {
+      const side = index % 2 === 0 ? -1 : 1;
+      const from = { x: ship.x + side * (18 + (index % 4) * 4), y: ship.y + 6 };
+      this.skillFx.missile(from, points[index % points.length]!, "#ff9a4a", index * MISSILE_SWARM_STAGGER, MISSILE_SWARM_FLIGHT, side);
+    }
+    // The hits land when the first missiles arrive, not at launch.
+    this.pendingStrikes.push({
+      delay: MISSILE_SWARM_FLIGHT + 0.04,
+      enemyIds: targets.map((enemy) => enemy.id),
+      letters: 2,
+      bossShare: this.boss !== null ? 0.05 : 0,
+    });
+    this.sfx.support();
+  }
+
+  private updatePendingStrikes(dt: number): void {
+    if (this.pendingStrikes.length === 0) return;
+    const due = this.pendingStrikes.filter((strike) => (strike.delay -= dt) <= 0);
+    if (due.length === 0) return;
+    this.pendingStrikes = this.pendingStrikes.filter((strike) => strike.delay > 0);
+    for (const strike of due) {
+      for (const id of strike.enemyIds) {
+        const enemy = this.enemies.find((item) => item.id === id);
+        if (enemy !== undefined) this.strikeEnemy(enemy, strike.letters, 1.2, 24);
+      }
+      if (strike.bossShare > 0) this.damageBossBySkill(strike.bossShare);
+      this.shakeFor(5);
+      this.sfx.power();
+    }
+  }
+
+  /** Railgun: one slug through the whole lane of the current target. */
+  private fireRailgun(): void {
+    const nose = this.shipNose();
+    const target = this.currentTarget() ?? [...this.enemies].sort((a, b) => b.y - a.y)[0] ?? null;
+    const aim = target !== null ? { x: target.x, y: target.y } : this.boss !== null ? this.bossPosition() : { x: nose.x, y: 0 };
+    // Extend the line to the top edge so the slug leaves the screen.
+    const dx = aim.x - nose.x;
+    const dy = Math.min(-1, aim.y - nose.y);
+    const reach = (nose.y + 40) / -dy;
+    const end = { x: nose.x + dx * reach, y: nose.y + dy * reach };
+    const hits = this.enemies.filter((enemy) => enemy.y < nose.y && distanceToSegment(enemy.x, enemy.y, nose, end) <= RAILGUN_LANE_HALF_WIDTH);
+    for (const enemy of hits) {
+      this.strikeEnemy(enemy, 3, 1.6, 196);
+      this.skillFx.blast(enemy.x, enemy.y, "#8fe8ff", 46);
+    }
+    if (this.boss !== null) {
+      const boss = this.bossPosition();
+      if (distanceToSegment(boss.x, boss.y, nose, end) <= RAILGUN_LANE_HALF_WIDTH + 70) {
+        this.damageBossBySkill(0.06);
+        this.skillFx.blast(boss.x, boss.y, "#8fe8ff", 90);
+      }
+    }
+    this.skillFx.railgun(nose, end);
+    this.skillFx.flash("#bff4ff", 0.2, 0.22);
+    this.shipMotion.fire(this.width / 2, this.height - PLAYER_Y_OFFSET, aim.x, aim.y, 1);
+    this.shakeFor(7);
+    this.sfx.power();
+  }
+
+  /** Tractor Beam: haul the closest enemy back up and hold it slowed. */
+  private fireTractorBeam(): void {
+    const target = [...this.enemies].sort((a, b) => b.y - a.y)[0];
+    if (target === undefined) return;
+    const distance = Math.max(0, Math.min(this.height * TRACTOR_PULL_SHARE, target.y - TRACTOR_MIN_Y));
+    this.tractorPulls = this.tractorPulls.filter((pull) => pull.enemyId !== target.id);
+    this.tractorPulls.push({ enemyId: target.id, remaining: TRACTOR_PULL_SECONDS, speed: distance / TRACTOR_PULL_SECONDS });
+    target.rewardControlTimer = Math.max(target.rewardControlTimer ?? 0, TRACTOR_HOLD_SECONDS);
+    target.rewardControlFactor = Math.min(target.rewardControlFactor ?? 1, TRACTOR_HOLD_FACTOR);
+    if (target.actionCooldown !== null) target.actionCooldown = Math.max(target.actionCooldown, TRACTOR_STALL_SECONDS);
+    if (target.pendingSkillId !== undefined && target.pendingSkillId !== null) {
+      target.skillTelegraphRemaining = Math.max(target.skillTelegraphRemaining ?? 0, TRACTOR_STALL_SECONDS);
+    }
+    target.flash = 1;
+    const id = target.id;
+    this.skillFx.tractor(
+      () => this.shipNose(),
+      () => {
+        const enemy = this.enemies.find((item) => item.id === id);
+        return enemy === undefined ? null : { x: enemy.x, y: enemy.y };
+      },
+      TRACTOR_PULL_SECONDS + 0.35,
+    );
+    this.sfx.support();
+  }
+
+  private updateTractorPulls(dt: number): void {
+    if (this.tractorPulls.length === 0) return;
+    for (const pull of this.tractorPulls) {
+      const enemy = this.enemies.find((item) => item.id === pull.enemyId);
+      if (enemy === undefined) {
+        pull.remaining = 0;
+        continue;
+      }
+      const step = Math.min(dt, pull.remaining);
+      enemy.y = Math.max(TRACTOR_MIN_Y, enemy.y - pull.speed * step);
+      pull.remaining -= step;
+    }
+    this.tractorPulls = this.tractorPulls.filter((pull) => pull.remaining > 0);
+  }
+
+  // --- Enemy and boss identity ---------------------------------------------------
+
+  /**
+   * While an enemy winds up a skill: a charge in the skill's colour that
+   * grows until it fires (attack: muzzle glow, defense: shell, control: a
+   * rune ring, support: a soft green ring). Two sprite draws, no blur.
+   */
+  private drawSkillCharge(enemy: Enemy, dx: number, dy: number): void {
+    if (enemy.pendingSkillId === undefined || enemy.pendingSkillId === null) return;
+    const remaining = enemy.skillTelegraphRemaining ?? 0;
+    if (remaining <= 0) return;
+    const definition = enemySkillDefinition(enemy.pendingSkillId);
+    const charge = 1 - Math.min(1, remaining / Math.max(0.1, definition.telegraph));
+    const color = SKILL_CHARGE_COLORS[definition.category];
+    const x = enemy.x + dx;
+    const y = enemy.y + dy;
+    const context = this.context;
+    context.save();
+    context.globalCompositeOperation = "lighter";
+    if (definition.category === "attack") {
+      const muzzleY = y + enemy.radius * 0.7;
+      drawGlow(context, color, x, muzzleY, enemy.radius * (0.5 + charge * 0.9), 0.35 + charge * 0.55);
+      drawRingGlow(context, color, x, muzzleY, enemy.radius * (1.4 - charge * 0.9), 0.3 + charge * 0.5);
+    } else if (definition.category === "control") {
+      drawRingGlow(context, color, x, y, enemy.radius * 1.55, 0.25 + charge * 0.5);
+      context.globalAlpha = 0.45 + charge * 0.45;
+      context.strokeStyle = color;
+      context.lineWidth = 1.6;
+      context.setLineDash([3, 6]);
+      context.lineDashOffset = -enemy.age * 40;
+      context.beginPath();
+      context.arc(x, y, enemy.radius * (1.75 - charge * 0.25), 0, Math.PI * 2);
+      context.stroke();
+    } else {
+      drawRingGlow(context, color, x, y, enemy.radius * (1.9 - charge * 0.5), 0.3 + charge * 0.55);
+      drawGlow(context, color, x, y, enemy.radius * 1.4, 0.12 + charge * 0.25);
+    }
+    context.restore();
+  }
+
+  /** A readable cast pulse at an enemy; `beam` also links it to the ship. */
+  private enemyCastFx(enemy: Enemy, color: string, beam = false): void {
+    this.combatFx.cast(enemy.x, enemy.y, color, enemy.radius * 1.9);
+    if (beam) this.skillFx.zap({ x: enemy.x, y: enemy.y }, this.shipCenter(), color);
+  }
+
+  private bossRadius(role: BossState["role"]): number {
+    return role === "major-boss" ? 82 : role === "boss" ? 70 : 60;
+  }
+
+  /** Material sparks and sound when a shot hits, strips or kills an enemy. */
+  private enemyImpactFx(
+    enemy: Enemy | undefined,
+    x: number,
+    y: number,
+    power: number,
+    pan: number,
+    event: "hit" | "layer" | "kill",
+  ): void {
+    if (enemy === undefined) return;
+    const family = this.visualDefinitionForEnemy(enemy)?.family ?? "rainbow";
+    const style = familyStyle(family);
+    const weight = kindArchetype(enemy.kind).weight;
+    const quality = this.settings.visualQuality;
+    if (event === "kill") {
+      this.combatFx.death(x, y, style.death, style, enemy.radius, quality);
+      this.sfx.kill(1, style.material, weight, pan);
+      return;
+    }
+    if (event === "layer") {
+      this.combatFx.layerBreak(x, y, enemy.radius, style);
+      this.sfx.layerBreak(style.material, pan);
+      return;
+    }
+    this.combatFx.hit(x, y, style.material, style, power, quality);
+    this.sfx.enemyHit(style.material, weight, pan);
+  }
+
+  private bossImpactFx(x: number, y: number, pan: number): void {
+    const identity = this.bossIdentity;
+    if (identity === null) return;
+    const style = familyStyle(identity.family);
+    this.combatFx.bossHit(x, y, style.material, style, this.settings.visualQuality);
+    this.sfx.bossImpact(style.material, identity.voice, pan);
+  }
+
+  /** Title card, light pillar and roar when a boss arrives. */
+  private presentBossEntrance(): void {
+    const boss = this.boss;
+    const identity = this.bossIdentity;
+    if (boss === null || identity === null) return;
+    const { x, y } = this.bossPosition();
+    this.combatFx.bossEntrance(x, y, this.bossRadius(boss.role), identity.primary, identity.accent, {
+      label: identity.rank,
+      name: identity.name,
+      title: identity.title,
+      color: identity.primary,
+    });
+    this.sfx.bossRoar(identity.voice, familyStyle(identity.family).material);
+    this.shakeFor(boss.role === "major-boss" ? 12 : 8);
+  }
+
+  // --- Equipment perks ---------------------------------------------------------
+
+  private closestEnemyTo(x: number, y: number, radius = Infinity): Enemy | null {
+    let best: Enemy | null = null;
+    let bestDistance = radius;
+    for (const enemy of this.enemies) {
+      const distance = Math.hypot(enemy.x - x, enemy.y - y);
+      if (distance < bestDistance) {
+        best = enemy;
+        bestDistance = distance;
+      }
+    }
+    return best;
+  }
+
+  private applyPerkPerfectWord(): void {
+    const perks = this.perks;
+    if (perks.perfectWordShield > 0 && this.stats.shield < this.stats.maxShield) {
+      this.stats.shield = Math.min(this.stats.maxShield, this.stats.shield + perks.perfectWordShield);
+      const ship = this.shipCenter();
+      this.skillFx.pulse(ship.x, ship.y, "#5ce1ff", 54, 2, 0.4);
+    }
+    if (perks.quantumEveryPerfect > 0) {
+      this.perkPerfectWords += 1;
+      if (this.perkPerfectWords % perks.quantumEveryPerfect === 0) {
+        this.skillEngine.reduceCooldowns(perks.quantumCooldownCut);
+        const ship = this.shipCenter();
+        this.skillFx.halo(() => this.shipCenter(), "#9fe8ff", 90, 8, 0.7);
+        this.skillFx.pulse(ship.x, ship.y, "#9fe8ff", 120, 3, 0.6);
+        this.hooks.onSkills();
+      }
+    }
+  }
+
+  /** Decide the kill perks now (counters), fire them when the bolt lands. */
+  private queuePerkKill(enemy: Enemy, perfectWord: boolean): void {
+    const perks = this.perks;
+    if (perks.killEnergy > 0) {
+      this.stats.energy = clamp(this.stats.energy + perks.killEnergy, 0, this.stats.maxEnergy);
+    }
+    this.perkKills += 1;
+    if (perfectWord) this.perkPerfectKills += 1;
+    const effect = {
+      arc: perks.arcEveryKills > 0 && this.perkKills % perks.arcEveryKills === 0,
+      pierce: perks.overpenetration,
+      plasma: perfectWord && perks.plasmaEveryPerfectKills > 0 && this.perkPerfectKills % perks.plasmaEveryPerfectKills === 0,
+      missiles: perks.missileEveryKills > 0 && this.perkKills % perks.missileEveryKills === 0,
+    };
+    if (effect.arc || effect.pierce || effect.plasma || effect.missiles) this.perkKillQueue.set(enemy.id, effect);
+  }
+
+  private releasePerkKill(enemyId: number, x: number, y: number): void {
+    const effect = this.perkKillQueue.get(enemyId);
+    if (effect === undefined) return;
+    this.perkKillQueue.delete(enemyId);
+    if (effect.arc) {
+      const next = this.closestEnemyTo(x, y, 520);
+      if (next !== null) {
+        this.skillFx.lightning([{ x, y }, { x: next.x, y: next.y }], "#9ab8ff", 2, 0.45);
+        this.strikeEnemy(next, 1, 0.9, 210);
+      }
+    }
+    if (effect.pierce) {
+      // The enemy further up the same lane (ship → kill point, extended).
+      const nose = this.shipNose();
+      const reach = { x: nose.x + (x - nose.x) * 4, y: nose.y + (y - nose.y) * 4 };
+      const behind = this.enemies
+        .filter((enemy) => enemy.y < y - 10 && distanceToSegment(enemy.x, enemy.y, { x, y }, reach) <= 48)
+        .sort((a, b) => b.y - a.y)[0];
+      if (behind !== undefined) {
+        this.skillFx.zap({ x, y }, { x: behind.x, y: behind.y }, "#8fe8ff");
+        this.skillFx.blast(behind.x, behind.y, "#8fe8ff", 30);
+        this.strikeEnemy(behind, 1, 1, 196);
+      }
+    }
+    if (effect.plasma) {
+      const radius = this.perks.plasmaRadius;
+      this.skillFx.shockwave(x, y, "#ff7ad9", radius, [], 2);
+      this.skillFx.blast(x, y, "#ff7ad9", 80);
+      for (const enemy of this.enemies) {
+        if (Math.hypot(enemy.x - x, enemy.y - y) <= radius) this.strikeEnemy(enemy, 1, 1.2, 320);
+      }
+      this.shakeFor(4);
+    }
+    if (effect.missiles) this.launchPerkMissiles();
+  }
+
+  /** Hunter-Killer Pod: two micro-missiles at the closest enemies. */
+  private launchPerkMissiles(): void {
+    const targets = [...this.enemies].sort((a, b) => b.y - a.y).slice(0, 2);
+    if (targets.length === 0) return;
+    const ship = this.shipCenter();
+    targets.forEach((enemy, index) => {
+      const side = index === 0 ? -1 : 1;
+      this.skillFx.missile({ x: ship.x + side * 20, y: ship.y + 4 }, { x: enemy.x, y: enemy.y }, "#ffb45a", index * 0.06, 0.4, side);
+    });
+    this.pendingStrikes.push({ delay: 0.44, enemyIds: targets.map((enemy) => enemy.id), letters: 1, bossShare: 0 });
+  }
+
+  /** Reactive Armor: a shock pulse that destroys nearby hostile shots. */
+  private releaseReactivePulse(): void {
+    const ship = this.shipCenter();
+    const radius = this.perks.reactivePulseRadius;
+    const before = this.projectiles.length;
+    this.projectiles = this.projectiles.filter((projectile) => {
+      const inside = Math.hypot(projectile.x - ship.x, projectile.y - ship.y) <= radius;
+      if (inside) this.skillFx.blast(projectile.x, projectile.y, "#ffb86b", 22);
+      return !inside;
+    });
+    this.skillFx.pulse(ship.x, ship.y, "#ffb86b", radius, 4, 0.5);
+    if (this.projectiles.length < before) this.sfx.projectileIntercept();
+  }
+
+  /** Shield Discharge: the collapsing Shield releases an EMP. */
+  private dischargeShield(): void {
+    const stall = this.perks.shieldBreakStall;
+    for (const enemy of this.enemies) {
+      if (enemy.actionCooldown !== null) enemy.actionCooldown = Math.max(enemy.actionCooldown, stall);
+      enemy.flash = 1;
+    }
+    if (this.boss !== null) this.boss.actionCooldown = Math.max(this.boss.actionCooldown, stall);
+    const ship = this.shipCenter();
+    this.skillFx.shockwave(ship.x, ship.y, "#7fdcff", Math.hypot(this.width, this.height) * 0.5, this.fxTargets(6), 2);
+    this.skillFx.flash("#7fdcff", 0.14, 0.3);
+  }
+
+  /** Escort and interceptor drones, and the phase-shift recharge. */
+  private updatePerkSystems(dt: number): void {
+    const perks = this.perks;
+    if (this.perkPhaseTimer > 0) this.perkPhaseTimer = Math.max(0, this.perkPhaseTimer - dt);
+
+    if (perks.escortDrones > 0 && perks.escortInterval > 0) {
+      this.perkEscortTimer -= dt;
+      if (this.perkEscortTimer <= 0) {
+        const target = [...this.enemies].sort((a, b) => b.y - a.y)[0];
+        if (target === undefined) {
+          this.perkEscortTimer = 0.5;
+        } else {
+          // Several drones take turns, so the shots are evenly spaced.
+          this.perkEscortTimer = perks.escortInterval / perks.escortDrones;
+          const drones = this.skillFx.escortPositions;
+          const from = drones[this.perkEscortTurn % Math.max(1, drones.length)] ?? this.shipNose();
+          this.perkEscortTurn += 1;
+          this.skillFx.zap(from, { x: target.x, y: target.y }, "#8fe8ff");
+          this.skillFx.blast(target.x, target.y, "#8fe8ff", 26);
+          this.strikeEnemy(target, 1, 0.8, 190);
+          this.sfx.boltImpact(0.7, clamp((target.x / Math.max(1, this.width)) * 2 - 1, -1, 1) * 0.6, "energy");
+        }
+      }
+    }
+
+    if (perks.interceptorDrones > 0 && perks.interceptorInterval > 0) {
+      this.perkInterceptTimer = Math.max(0, this.perkInterceptTimer - dt);
+      if (this.perkInterceptTimer <= 0 && this.projectiles.length > 0) {
+        const ship = this.shipCenter();
+        let index = -1;
+        let best = 460;
+        this.projectiles.forEach((projectile, candidate) => {
+          const distance = Math.hypot(projectile.x - ship.x, projectile.y - ship.y);
+          if (distance < best) {
+            best = distance;
+            index = candidate;
+          }
+        });
+        if (index >= 0) {
+          const projectile = this.projectiles[index]!;
+          this.projectiles.splice(index, 1);
+          const from = this.skillFx.interceptorPositions[0] ?? ship;
+          this.skillFx.zap(from, { x: projectile.x, y: projectile.y }, "#ffb45a");
+          this.skillFx.blast(projectile.x, projectile.y, "#ffb45a", 28);
+          this.sfx.projectileIntercept();
+          this.perkInterceptTimer = perks.interceptorInterval / perks.interceptorDrones;
+        }
+      }
+    }
+  }
+
+  /** Each ship's Rage ultimate gets its own screen-filling signature. */
+  private playUltimateFx(segments: number): void {
+    const ship = this.shipCenter();
+    const big = Math.hypot(this.width, this.height);
+    const scale = 0.8 + Math.min(3, Math.max(1, segments)) * 0.2;
+    const targets = this.fxTargets(8);
+    const color = characterVisualProfile(this.characterId).glow;
+    switch (this.characterId) {
+      case "vanguard":
+        this.skillFx.shockwave(ship.x, ship.y, "#8ff4ff", big * 0.8 * scale, targets, 4);
+        this.skillFx.halo(() => this.shipCenter(), "#8ff4ff", 150, 16, 1.4);
+        this.skillFx.flash("#bff8ff", 0.3, 0.45);
+        break;
+      case "aegis":
+        this.skillFx.halo(() => this.shipCenter(), "#ffd98a", 170, 18, 1.6);
+        this.skillFx.pulse(ship.x, ship.y, "#ffd98a", 260 * scale, 6, 0.9);
+        this.skillFx.flash("#fff0c0", 0.24, 0.45);
+        break;
+      case "volt":
+        this.skillFx.lightning([this.shipNose(), ...targets], "#9fd8ff", 3, 0.8);
+        this.skillFx.lightning([this.shipNose(), ...[...targets].reverse()], "#d6f1ff", 2, 0.7);
+        this.skillFx.shockwave(ship.x, ship.y, "#7fdcff", big * 0.6 * scale, [], 2);
+        this.skillFx.flash("#9fd8ff", 0.26, 0.4);
+        break;
+      case "wraith":
+        this.skillFx.pulse(ship.x, ship.y, "#b98cff", big * 0.5, 7, 1);
+        this.skillFx.flash("#4d2a9a", 0.34, 0.6);
+        break;
+      case "fortune":
+        this.skillFx.shower("#ffd65a", 2.2);
+        this.skillFx.halo(() => this.shipCenter(), "#ffd65a", 150, 14, 1.4);
+        this.skillFx.flash("#fff0b0", 0.2, 0.4);
+        break;
+      case "arsenal":
+        for (let index = 0; index < 12 && targets.length > 0; index += 1) {
+          const side = index % 2 === 0 ? -1 : 1;
+          this.skillFx.missile({ x: ship.x + side * 22, y: ship.y }, targets[index % targets.length]!, "#ff8a3d", index * 0.045, 0.5, side);
+        }
+        this.skillFx.flash("#ffb070", 0.2, 0.35);
+        break;
+      case "oracle":
+        this.skillFx.lightning([this.shipNose(), ...targets], "#ff6b9a", 2.6, 0.8);
+        for (const point of targets) this.skillFx.pulse(point.x, point.y, "#ff6b9a", 90, 3, 0.8);
+        this.skillFx.flash("#ff6b9a", 0.18, 0.4);
+        break;
+      case "bastion":
+        this.skillFx.halo(() => this.shipCenter(), "#6dffd0", 180, 18, 1.8);
+        this.skillFx.pulse(ship.x, ship.y, "#6dffd0", 300 * scale, 7, 1);
+        this.skillFx.flash("#b8ffe8", 0.22, 0.45);
+        break;
+      case "reaper":
+        for (const point of targets.slice(0, 5)) this.skillFx.slash(point.x, point.y, "#ff4d6d");
+        this.skillFx.lightning([this.shipNose(), ...targets], "#ff2a4a", 2.2, 0.6);
+        this.skillFx.flash("#5a0014", 0.36, 0.5);
+        break;
+      case "celestial":
+        this.skillFx.starfall(targets.length > 0 ? targets : [{ x: this.width / 2, y: this.height * 0.3 }]);
+        this.skillFx.halo(() => this.shipCenter(), "#cfe0ff", 160, 16, 1.6);
+        this.skillFx.flash("#e8f0ff", 0.22, 0.45);
+        break;
+      case "zenith":
+        this.skillFx.halo(() => this.shipCenter(), "#ffffff", 190, 20, 1.6);
+        this.skillFx.shockwave(ship.x, ship.y, "#8ff4ff", big * 0.85 * scale, targets, 4);
+        this.skillFx.flash("#ffffff", 0.34, 0.5);
+        break;
+      default:
+        this.skillFx.shockwave(ship.x, ship.y, color, big * 0.7, targets, 3);
+        this.skillFx.flash(color, 0.24, 0.4);
+    }
+  }
+
   private bossPosition(): { x: number; y: number } {
+    if (this.bossDepthActive()) {
+      // Depth View: far up the corridor, drifting slowly across it; flies in
+      // from the vanishing point and lunges closer during a rush.
+      const intro = 1 - (1 - this.bossIntro) ** 3;
+      const restY = clamp(this.height * 0.25, 140, 250);
+      const farY = this.height * 0.08;
+      const sway =
+        Math.sin(this.lastDrawTime * 0.38) *
+        Math.min(this.width * 0.06, 96) *
+        (1 - this.bossSurge);
+      return {
+        x: this.width / 2 + sway * intro,
+        y: farY + (restY - farY) * intro + this.bossSurge * this.height * 0.06,
+      };
+    }
     return {
       x: this.width / 2,
-      y: Math.max(190, Math.min(270, this.height * 0.31)),
+      // Keep the boss in the upper combat field so its artwork has room below
+      // for the typing prompt. This also separates it from the player's ship
+      // and lower HUD without changing any quality-dependent gameplay logic.
+      y: Math.max(178, Math.min(238, this.height * 0.285)),
     };
   }
 
   private drawBoss(time: number): void {
     const boss = this.boss;
     if (boss === null) return;
+    if (this.bossDepthActive()) {
+      this.drawBossDepth(boss, time);
+      return;
+    }
 
     const context = this.context;
     const { x, y } = this.bossPosition();
     const radius =
       boss.role === "major-boss" ? 82 : boss.role === "boss" ? 70 : 60;
-    const pulse = 0.88 + Math.sin(time * 4.5) * 0.12;
     const warning = telegraphStrength(boss.actionCooldown, 1.1);
     const warningPulse = telegraphPulse(warning, time);
+
+    const identity = this.bossIdentity;
+    if (identity !== null) {
+      drawBossAura(
+        context,
+        identity.aura,
+        x,
+        y - boss.kick * 8,
+        radius,
+        time,
+        identity.primary,
+        identity.accent,
+        boss.phase >= 3 ? 1.35 : boss.phase === 2 ? 1.15 : 1,
+        this.settings.visualQuality,
+      );
+    }
 
     context.save();
     context.translate(x, y - boss.kick * 8);
@@ -8179,15 +11832,27 @@ export class Game {
         boss.role,
       ),
     );
+    const paintedBoss =
+      identity === null
+        ? null
+        : paintedBossSprite(identity.id, this.settings.visualQuality);
+    const paintedScale = bossSpriteScale(this.settings.visualQuality);
+    // Keep painted boss artwork at a stable pixel size. Scaling it in/out every
+    // frame forced an additional resample and made fine armour/face detail look
+    // softer, especially on High/Ultra Retina rendering. Motion stays in the
+    // aura, telegraphs and hit kick instead.
+    const paintedSize = radius * paintedScale;
     const modularDrawn =
-      definition !== undefined &&
+      (paintedBoss !== null &&
+        drawPaintedSprite(context, paintedBoss, paintedSize, boss.flash, this.dpr)) ||
+      (definition !== undefined &&
       drawModularEnemy(context, definition, {
         radius,
         age: time,
         flash: boss.flash,
         targeted: false,
         glowScale: qualityProfile(this.settings.visualQuality).glowScale,
-      }, this.modularBodyCache, this.dpr);
+      }, this.modularBodyCache, this.dpr));
 
     if (!modularDrawn) {
       context.shadowBlur = boss.flash > 0 ? 36 : 24;
@@ -8216,22 +11881,9 @@ export class Game {
       context.stroke();
     }
 
-    context.strokeStyle =
-      "rgba(255, 178, 105, " + String(0.35 + pulse * 0.18) + ")";
-    context.lineWidth = 1.5;
-    context.beginPath();
-    context.arc(0, 0, radius * (0.56 + pulse * 0.04), 0, Math.PI * 2);
-    context.stroke();
-
-    context.fillStyle =
-      boss.phase >= 3
-        ? "rgba(255, 112, 157, 0.86)"
-        : boss.phase === 2
-          ? "rgba(119, 239, 255, 0.84)"
-          : "rgba(255, 222, 164, 0.75)";
-    context.beginPath();
-    context.arc(0, 0, 8 + pulse * 2, 0, Math.PI * 2);
-    context.fill();
+    // Do not draw the old centre ring/dot over painted boss art. It covered
+    // faces, cores and armour details. Readable state rings remain outside the
+    // artwork below (shield, mark and stagger).
 
     if (boss.shieldActive) {
       context.strokeStyle = "rgba(112, 235, 255, 0.62)";
@@ -8268,7 +11920,295 @@ export class Game {
 
     context.restore();
 
-    this.drawBossWord(boss, x, y, radius);
+    const wordClearance =
+      paintedBoss === null
+        ? radius
+        : Math.max(radius, paintedSize * 0.5);
+    this.drawBossWord(boss, x, y, wordClearance);
+  }
+
+  /** Depth View clocks: fly-in, dodge, rush lunge, ultimate frame, wreck. */
+  private updateBossPresentation(dt: number): void {
+    this.bossCallouts.update(dt);
+    this.bossIntro = Math.min(1, this.bossIntro + dt / 1.3);
+    this.bossDodge += (this.bossDodgeTarget - this.bossDodge) * Math.min(1, dt * 12);
+    const skill = this.bossSkill;
+    const ultimate =
+      skill !== null && skill.kind === "cataclysm" && skill.stage !== "recovery";
+    this.bossUltimateK = clamp(this.bossUltimateK + (ultimate ? dt * 3 : -dt * 2), 0, 1);
+    this.bossBanner = Math.max(0, this.bossBanner - dt);
+    let surge = 0;
+    if (skill !== null && skill.kind === "surge") {
+      // Pulls back while it winds up, then rushes the camera.
+      surge =
+        skill.stage === "release"
+          ? Math.sin(Math.PI * bossSkillProgress(skill))
+          : skill.stage === "telegraph"
+            ? -0.12 * bossSkillProgress(skill)
+            : 0;
+    }
+    this.bossSurge += (surge - this.bossSurge) * Math.min(1, dt * 14);
+    // The ship slides back once the quake has rolled past.
+    if (skill !== null && skill.kind === "quake" && skill.stage === "recovery") {
+      this.bossDodgeTarget = 0;
+    }
+    if (this.bossWreck !== null) {
+      this.bossWreck.t += dt;
+      if (this.bossWreck.t >= BOSS_WRECK_SECONDS) this.bossWreck = null;
+    }
+  }
+
+  /** Depth View boss: aura, 3D relief (the painting on Low), state rings, word. */
+  private drawBossDepth(boss: BossState, time: number): void {
+    const context = this.context;
+    const { x, y } = this.bossPosition();
+    const size = this.bossDepthSize(boss.role);
+    const lift = boss.kick * 6;
+    const identity = this.bossIdentity;
+    const quality = this.settings.visualQuality;
+    const skill = this.bossSkill;
+    const charging =
+      skill !== null && skill.kind !== "volley" && skill.stage === "telegraph"
+        ? bossSkillProgress(skill)
+        : 0;
+    // The siphon's long release keeps only a faint light.
+    const casting =
+      skill !== null && skill.kind !== "volley" && skill.stage === "release"
+        ? (1 - bossSkillProgress(skill)) * (skill.kind === "tether" ? 0.3 : 1)
+        : 0;
+
+    if (identity !== null) {
+      drawBossAura(
+        context,
+        identity.aura,
+        x,
+        y - lift,
+        size * 0.24,
+        time,
+        identity.primary,
+        identity.accent,
+        boss.phase >= 3 ? 1.3 : boss.phase === 2 ? 1.12 : 1,
+        quality,
+      );
+      if (skill !== null) {
+        drawBossCharge(
+          context,
+          skill,
+          this.bossDepthGeometry(boss.role),
+          { primary: identity.primary, accent: identity.accent },
+          time,
+          quality,
+        );
+      }
+    }
+
+    let drawn = false;
+    const relief = this.bossRelief;
+    if (relief !== null && relief.available && identity !== null) {
+      const lean =
+        skill !== null && skill.kind === "surge"
+          ? charging * 0.16 - Math.max(0, this.bossSurge) * 0.22
+          : 0;
+      const pose: BossReliefPose = {
+        size,
+        dpr: this.dpr,
+        quality,
+        // Turns toward the middle of the corridor as it drifts.
+        yaw: Math.sin(time * 0.5) * 0.18 - ((x - this.width / 2) / Math.max(1, this.width)) * 0.9,
+        pitch: Math.sin(time * 0.8) * 0.04 - boss.kick * 0.07 + lean,
+        roll:
+          Math.sin(time * 0.37) * 0.05 +
+          (boss.staggerTimer > 0 ? Math.sin(time * 34) * 0.035 : 0),
+        swell: Math.sin(time * 1.6) * 0.04 + charging * 0.3,
+        glow: Math.max(charging, casting * 0.8, this.bossExposedTimer > 0 ? 0.3 : 0),
+        flash: boss.flash,
+        light:
+          skill === null || skill.kind === "volley"
+            ? null
+            : skill.kind === "tether"
+              ? identity.accent
+              : identity.primary,
+        lightPower: Math.max(charging, casting),
+      };
+      const frame = relief.render(pose);
+      if (frame !== null) {
+        context.drawImage(frame, x - size / 2, y - size / 2 - lift, size, size);
+        drawn = true;
+      }
+    }
+    if (!drawn) {
+      // Low quality, no WebGL or still loading: the painting in the same box.
+      const painted =
+        identity === null ? null : paintedBossSprite(identity.id, quality);
+      const definition = enemyDefinition(
+        bossVisualDefinitionIdForStage(
+          this.hiddenEncounterRuntime?.bossStageOverride ??
+            this.stageConfig?.stage ??
+            1,
+          boss.role,
+        ),
+      );
+      context.save();
+      context.translate(x, y - lift);
+      if (painted === null || !drawPaintedSprite(context, painted, size * 0.92, boss.flash, this.dpr)) {
+        if (definition !== undefined) {
+          drawModularEnemy(context, definition, {
+            radius: size * 0.3,
+            age: time,
+            flash: boss.flash,
+            targeted: false,
+            glowScale: qualityProfile(quality).glowScale,
+          }, this.modularBodyCache, this.dpr);
+        }
+      }
+      context.restore();
+    }
+
+    // State rings outside the artwork (warning, shield, mark, stagger, exposed).
+    const ring = size * 0.42;
+    context.save();
+    context.translate(x, y - lift);
+    const warning =
+      skill === null
+        ? telegraphPulse(telegraphStrength(boss.actionCooldown, 1.1), time)
+        : 0;
+    if (warning > 0.02 && boss.staggerTimer <= 0) {
+      context.strokeStyle = "rgba(255, 83, 106, " + String(0.18 + warning * 0.62) + ")";
+      context.lineWidth = 1.4 + warning * 2.2;
+      context.setLineDash([7, 8]);
+      context.lineDashOffset = -time * 28;
+      context.beginPath();
+      context.arc(0, 0, ring * (1.05 + warning * 0.08), 0, Math.PI * 2);
+      context.stroke();
+      context.setLineDash([]);
+    }
+    if (boss.shieldActive) {
+      context.strokeStyle = "rgba(112, 235, 255, 0.62)";
+      context.lineWidth = 2.4;
+      context.beginPath();
+      context.arc(0, 0, ring * 0.98, 0, Math.PI * 2);
+      context.stroke();
+      context.strokeStyle = "rgba(112, 235, 255, 0.22)";
+      context.beginPath();
+      context.arc(0, 0, ring * 1.14, 0, Math.PI * 2);
+      context.stroke();
+    }
+    if (this.bossMarkTimer > 0) {
+      context.strokeStyle = "rgba(255, 103, 204, 0.62)";
+      context.lineWidth = 1.8;
+      context.setLineDash([5, 6]);
+      context.lineDashOffset = -time * 24;
+      context.beginPath();
+      context.arc(0, 0, ring * 1.18, 0, Math.PI * 2);
+      context.stroke();
+      context.setLineDash([]);
+    }
+    if (boss.staggerTimer > 0) {
+      context.strokeStyle = "rgba(255, 245, 178, 0.72)";
+      context.setLineDash([4, 5]);
+      context.lineWidth = 2;
+      context.beginPath();
+      context.arc(0, 0, ring * 0.88, 0, Math.PI * 2);
+      context.stroke();
+      context.setLineDash([]);
+    }
+    if (this.bossExposedTimer > 0) {
+      const pulse = 0.6 + 0.4 * Math.sin(time * 12);
+      context.strokeStyle = "rgba(255, 209, 102, " + String(0.5 + pulse * 0.4) + ")";
+      context.lineWidth = 2.6;
+      context.beginPath();
+      context.arc(0, 0, ring * 1.02, 0, Math.PI * 2);
+      context.stroke();
+      context.font = "800 13px 'Exo 2', ui-sans-serif, system-ui, sans-serif";
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.fillStyle = "#ffd166";
+      context.shadowColor = "#ffb020";
+      context.shadowBlur = 10;
+      context.fillText("EXPOSED ×1.5", 0, -ring * 1.02 - 12);
+    }
+    context.restore();
+
+    this.drawBossWord(boss, x, y, size * 0.4);
+  }
+
+  /** The defeated boss tumbling away behind its explosion (relief only). */
+  private drawBossWreck(): void {
+    const wreck = this.bossWreck;
+    const relief = this.bossRelief;
+    if (wreck === null || relief === null || !relief.available) return;
+    const k = Math.min(1, wreck.t / BOSS_WRECK_SECONDS);
+    const size = wreck.size * (1 - 0.4 * k);
+    const frame = relief.render({
+      size,
+      dpr: this.dpr,
+      quality: this.settings.visualQuality,
+      yaw: wreck.spin * k * 1.1,
+      pitch: -k * 0.7,
+      roll: wreck.spin * k * 2.4,
+      swell: -0.4 * k,
+      glow: 1 - k,
+      flash: Math.max(0, 1 - k * 4),
+      light: "#ffb066",
+      lightPower: 1 - k,
+    });
+    if (frame === null) return;
+    const context = this.context;
+    context.save();
+    context.globalAlpha = 1 - k * k;
+    context.drawImage(
+      frame,
+      wreck.x - size / 2,
+      wreck.y - size / 2 + k * k * this.height * 0.1,
+      size,
+      size,
+    );
+    context.restore();
+  }
+
+  /** Skill telegraphs and hits, counter prompt, callouts, banner: over the ship. */
+  private drawBossSkillLayer(time: number): void {
+    const context = this.context;
+    const boss = this.boss;
+    const skill = this.bossSkill;
+    if (boss !== null && skill !== null && skill.kind !== "volley") {
+      const geometry = this.bossDepthGeometry(boss.role);
+      const identity = this.bossIdentity;
+      const colors = {
+        primary: identity?.primary ?? "#ff5d8f",
+        accent: identity?.accent ?? "#ffd166",
+      };
+      drawBossSkill(context, skill, geometry, colors, time, this.settings.visualQuality);
+      if (this.inputMode !== "typing") for (const meteor of skill.meteors) {
+        if (meteor.state !== "falling") continue;
+        const point = depthMeteorPoint(geometry, skill, meteor); if (!point) continue;
+        context.save(); context.font = "bold 10px sans-serif"; context.textAlign = "center"; context.fillStyle = "#e6fffb";
+        context.fillText(this.voiceActionForms.get(meteor) ?? NATO_LETTERS[meteor.char] ?? "", point.x, point.y + 25); context.restore();
+      }
+      const promptY = Math.min(this.height * 0.6, geometry.shipY - 150);
+      const open = bossCounterOpen(skill);
+      // The ultimate's banner names it during the wind-up.
+      const callout =
+        skill.result !== "countered" &&
+        (skill.kind === "cataclysm" ? skill.stage === "release" : open);
+      if (callout) {
+        drawSkillCallout(
+          context,
+          bossSkillName(skill.kind, identity?.family ?? "devil"),
+          BOSS_COUNTER_HINT[skill.spec.counter],
+          this.width / 2,
+          open ? promptY - 84 : promptY,
+          COUNTER_COLOR[skill.spec.counter],
+        );
+      }
+      drawCounterPrompt(context, skill, this.width / 2, promptY, time);
+    }
+    this.bossCallouts.draw(context);
+    if (this.bossBanner > 0) {
+      const elapsed = BOSS_BANNER_SECONDS - this.bossBanner;
+      const k = Math.min(1, elapsed / 0.35) * Math.min(1, this.bossBanner / 0.4);
+      drawUltimateBanner(context, this.width, this.height, this.bossBannerText, k);
+    }
   }
 
   private drawBossWord(
@@ -8311,10 +12251,7 @@ export class Game {
       }
       if (meaningParts.length > 0) {
         context.shadowBlur = 0;
-        context.font =
-          "650 13px ui-sans-serif, system-ui, -apple-system, sans-serif";
-        context.fillStyle = "rgba(255, 226, 213, 0.9)";
-        context.fillText(meaningParts.join(" · "), x, wordY + 31);
+        drawMeaningPill(context, meaningParts.join(" · "), x, wordY + 36, 16, "#ff9d7d");
       }
       context.restore();
       return;
@@ -8352,34 +12289,40 @@ export class Game {
 
   private drawSupplyPod(pod: SupplyPod): void {
     const context = this.context;
-    const y = pod.y + Math.sin(pod.age * 3.2) * 7;
+    const y = pod.y + supplyPodBob(pod);
     const displayWord = normalizeWord(pod.entry.en);
     const split = splitDisplayByTypedLetters(displayWord, pod.typed);
 
-    context.save();
-    context.translate(pod.x, y);
-    context.globalCompositeOperation = "lighter";
-    context.shadowBlur = 20;
-    context.shadowColor = "#ffd866";
-
-    context.fillStyle = "rgba(255, 216, 102, 0.12)";
-    context.strokeStyle = "rgba(255, 225, 130, 0.9)";
-    context.lineWidth = 1.6;
-    context.beginPath();
-    context.roundRect(-31, -18, 62, 36, 8);
-    context.fill();
-    context.stroke();
-
-    context.fillStyle = "#fff1b0";
-    context.font =
-      "800 9px ui-monospace, SFMono-Regular, Menlo, monospace";
-    context.textAlign = "center";
-    context.fillText(
-      "SUPPLY · " + supplyRewardLabel(pod.reward),
-      0,
-      3,
-    );
-    context.restore();
+    // The painted supply chest (code box until the art has loaded).
+    const painted = drawBonusTarget(context, {
+      kind: "chest",
+      x: pod.x,
+      y,
+      size: 92,
+      glow: supplyRewardGlow(pod.reward),
+      tag: "Supply · " + supplyRewardLabel(pod.reward),
+      time: this.lastDrawTime,
+      progress: pod.typed / Math.max(1, displayWord.length),
+    });
+    if (!painted) {
+      context.save();
+      context.translate(pod.x, y);
+      context.globalCompositeOperation = "lighter";
+      context.shadowBlur = 20;
+      context.shadowColor = "#ffd866";
+      context.fillStyle = "rgba(255, 216, 102, 0.12)";
+      context.strokeStyle = "rgba(255, 225, 130, 0.9)";
+      context.lineWidth = 1.6;
+      context.beginPath();
+      context.roundRect(-31, -18, 62, 36, 8);
+      context.fill();
+      context.stroke();
+      context.fillStyle = "#fff1b0";
+      context.font = "800 9px ui-monospace, SFMono-Regular, Menlo, monospace";
+      context.textAlign = "center";
+      context.fillText("SUPPLY · " + supplyRewardLabel(pod.reward), 0, 3);
+      context.restore();
+    }
 
     context.save();
     context.font =
@@ -8388,7 +12331,7 @@ export class Game {
     const fullWidth = this.measureTextWidth(displayWord);
     const typedWidth = this.measureTextWidth(split.typed);
     const left = pod.x - fullWidth / 2;
-    const wordY = y - 36;
+    const wordY = y - (painted ? 48 : 36);
 
     context.fillStyle = "rgba(4, 8, 14, 0.88)";
     context.fillRect(left - 9, wordY - 14, fullWidth + 18, 28);
@@ -8404,35 +12347,45 @@ export class Game {
 
   private drawTreasureDrone(drone: TreasureDrone): void {
     const context = this.context;
-    const y = drone.y + Math.sin(drone.age * 4) * 9;
+    const y = drone.y + treasureDroneBob(drone);
     const displayWord = normalizeWord(drone.entry.en);
     const split = splitDisplayByTypedLetters(displayWord, drone.typed);
 
-    context.save();
-    context.translate(drone.x, y);
-    context.globalCompositeOperation = "lighter";
-    context.shadowBlur = 26;
-    context.shadowColor = "#ffe066";
-    context.fillStyle = "rgba(255, 224, 102, 0.18)";
-    context.strokeStyle = "#ffe98a";
-    context.lineWidth = 2;
-    context.beginPath();
-    context.moveTo(-28, 0);
-    context.lineTo(-12, -14);
-    context.lineTo(20, -10);
-    context.lineTo(31, 0);
-    context.lineTo(20, 10);
-    context.lineTo(-12, 14);
-    context.closePath();
-    context.fill();
-    context.stroke();
-
-    context.fillStyle = "#fff4bd";
-    context.font =
-      "850 9px ui-monospace, SFMono-Regular, Menlo, monospace";
-    context.textAlign = "center";
-    context.fillText("TREASURE DRONE", 0, 3);
-    context.restore();
+    const painted = drawBonusTarget(context, {
+      kind: "carrier",
+      x: drone.x,
+      y,
+      size: 96,
+      glow: "#ffd34d",
+      tag: "Treasure drone",
+      time: this.lastDrawTime,
+      progress: drone.typed / Math.max(1, displayWord.length),
+    });
+    if (!painted) {
+      context.save();
+      context.translate(drone.x, y);
+      context.globalCompositeOperation = "lighter";
+      context.shadowBlur = 26;
+      context.shadowColor = "#ffe066";
+      context.fillStyle = "rgba(255, 224, 102, 0.18)";
+      context.strokeStyle = "#ffe98a";
+      context.lineWidth = 2;
+      context.beginPath();
+      context.moveTo(-28, 0);
+      context.lineTo(-12, -14);
+      context.lineTo(20, -10);
+      context.lineTo(31, 0);
+      context.lineTo(20, 10);
+      context.lineTo(-12, 14);
+      context.closePath();
+      context.fill();
+      context.stroke();
+      context.fillStyle = "#fff4bd";
+      context.font = "850 9px ui-monospace, SFMono-Regular, Menlo, monospace";
+      context.textAlign = "center";
+      context.fillText("TREASURE DRONE", 0, 3);
+      context.restore();
+    }
 
     context.save();
     context.font =
@@ -8441,7 +12394,7 @@ export class Game {
     const fullWidth = this.measureTextWidth(displayWord);
     const typedWidth = this.measureTextWidth(split.typed);
     const left = drone.x - fullWidth / 2;
-    const wordY = y - 34;
+    const wordY = y - (painted ? 40 : 34);
     context.fillStyle = "rgba(4, 8, 14, 0.9)";
     context.fillRect(left - 9, wordY - 14, fullWidth + 18, 28);
     context.textAlign = "left";
@@ -8543,7 +12496,7 @@ export class Game {
 
   private drawRecallBonus(target: RecallBonusTarget): void {
     const context = this.context;
-    const bob = Math.sin(target.age * 3.8) * 7;
+    const bob = recallBonusBob(target);
     const x = target.x;
     const y = target.y + bob;
     const pulse = 0.92 + Math.sin(target.age * 5.2) * 0.08;
@@ -8629,45 +12582,56 @@ export class Game {
     context.fillStyle = "rgba(5, 9, 17, 0.86)";
     context.fillRect(x - meaningWidth / 2, y + 35, meaningWidth, 25);
     context.fillStyle = "#d9f8ff";
-    context.font =
-      "700 12px ui-sans-serif, system-ui, -apple-system, sans-serif";
+    context.font = "600 14px " + VIETNAMESE_FONT;
     context.fillText(meaning, x, y + 48);
     context.restore();
   }
 
   private drawRewardChoiceCrate(crate: RewardChoiceCrate): void {
     const context = this.context;
-    const x = crate.x + Math.sin(crate.age * 2.6) * 16;
+    const x = crate.x + rewardCrateSway(crate);
     const displayWord = normalizeWord(crate.entry.en);
     const split = splitDisplayByTypedLetters(displayWord, crate.typed);
 
-    context.save();
-    context.translate(x, crate.y);
-    context.globalCompositeOperation = "lighter";
-    context.shadowBlur = 22;
-    context.shadowColor = "#b787ff";
-    context.fillStyle = "rgba(151, 105, 255, 0.16)";
-    context.strokeStyle = "#d7bbff";
-    context.lineWidth = 2;
-    context.beginPath();
-    context.roundRect(-28, -22, 56, 44, 6);
-    context.fill();
-    context.stroke();
+    const painted = drawBonusTarget(context, {
+      kind: "chest",
+      x,
+      y: crate.y,
+      size: 84,
+      glow: "#b787ff",
+      tag: "Choice crate",
+      time: this.lastDrawTime,
+      progress: crate.typed / Math.max(1, displayWord.length),
+    });
+    if (!painted) {
+      context.save();
+      context.translate(x, crate.y);
+      context.globalCompositeOperation = "lighter";
+      context.shadowBlur = 22;
+      context.shadowColor = "#b787ff";
+      context.fillStyle = "rgba(151, 105, 255, 0.16)";
+      context.strokeStyle = "#d7bbff";
+      context.lineWidth = 2;
+      context.beginPath();
+      context.roundRect(-28, -22, 56, 44, 6);
+      context.fill();
+      context.stroke();
 
-    context.strokeStyle = "rgba(255, 236, 167, 0.8)";
-    context.beginPath();
-    context.moveTo(-18, -6);
-    context.lineTo(18, -6);
-    context.moveTo(0, -17);
-    context.lineTo(0, 17);
-    context.stroke();
+      context.strokeStyle = "rgba(255, 236, 167, 0.8)";
+      context.beginPath();
+      context.moveTo(-18, -6);
+      context.lineTo(18, -6);
+      context.moveTo(0, -17);
+      context.lineTo(0, 17);
+      context.stroke();
 
-    context.fillStyle = "#f0e4ff";
-    context.font =
-      "850 8px ui-monospace, SFMono-Regular, Menlo, monospace";
-    context.textAlign = "center";
-    context.fillText("CHOICE CRATE", 0, 34);
-    context.restore();
+      context.fillStyle = "#f0e4ff";
+      context.font =
+        "850 8px ui-monospace, SFMono-Regular, Menlo, monospace";
+      context.textAlign = "center";
+      context.fillText("CHOICE CRATE", 0, 34);
+      context.restore();
+    }
 
     context.save();
     context.font =
@@ -8676,7 +12640,7 @@ export class Game {
     const fullWidth = this.measureTextWidth(displayWord);
     const typedWidth = this.measureTextWidth(split.typed);
     const left = x - fullWidth / 2;
-    const wordY = crate.y - 38;
+    const wordY = crate.y - (painted ? 46 : 38);
     context.fillStyle = "rgba(4, 8, 14, 0.9)";
     context.fillRect(left - 9, wordY - 14, fullWidth + 18, 28);
     context.textAlign = "left";
@@ -8691,34 +12655,46 @@ export class Game {
 
   private drawAnomalyCrate(crate: AnomalyCrate): void {
     const context = this.context;
-    const x = crate.x + Math.sin(crate.age * 3.1) * 18;
+    const x = crate.x + anomalyCrateSway(crate);
     const displayWord = normalizeWord(crate.entry.en);
     const split = splitDisplayByTypedLetters(displayWord, crate.typed);
 
-    context.save();
-    context.translate(x, crate.y);
-    context.rotate(Math.sin(crate.age * 2.2) * 0.08);
-    context.globalCompositeOperation = "lighter";
-    context.shadowBlur = 28;
-    context.shadowColor = "#ff65cc";
-    context.fillStyle = "rgba(255, 83, 193, 0.15)";
-    context.strokeStyle = "#ff9bdd";
-    context.lineWidth = 2;
-    context.beginPath();
-    context.moveTo(0, -27);
-    context.lineTo(26, 0);
-    context.lineTo(0, 27);
-    context.lineTo(-26, 0);
-    context.closePath();
-    context.fill();
-    context.stroke();
+    const painted = drawBonusTarget(context, {
+      kind: "chest-open",
+      x,
+      y: crate.y,
+      size: 84,
+      glow: "#ff65cc",
+      tag: "Anomaly",
+      time: this.lastDrawTime,
+      progress: crate.typed / Math.max(1, displayWord.length),
+    });
+    if (!painted) {
+      context.save();
+      context.translate(x, crate.y);
+      context.rotate(Math.sin(crate.age * 2.2) * 0.08);
+      context.globalCompositeOperation = "lighter";
+      context.shadowBlur = 28;
+      context.shadowColor = "#ff65cc";
+      context.fillStyle = "rgba(255, 83, 193, 0.15)";
+      context.strokeStyle = "#ff9bdd";
+      context.lineWidth = 2;
+      context.beginPath();
+      context.moveTo(0, -27);
+      context.lineTo(26, 0);
+      context.lineTo(0, 27);
+      context.lineTo(-26, 0);
+      context.closePath();
+      context.fill();
+      context.stroke();
 
-    context.fillStyle = "#ffe0f5";
-    context.font =
-      "850 8px ui-monospace, SFMono-Regular, Menlo, monospace";
-    context.textAlign = "center";
-    context.fillText("ANOMALY", 0, 3);
-    context.restore();
+      context.fillStyle = "#ffe0f5";
+      context.font =
+        "850 8px ui-monospace, SFMono-Regular, Menlo, monospace";
+      context.textAlign = "center";
+      context.fillText("ANOMALY", 0, 3);
+      context.restore();
+    }
 
     context.save();
     context.font =
@@ -8727,7 +12703,7 @@ export class Game {
     const fullWidth = this.measureTextWidth(displayWord);
     const typedWidth = this.measureTextWidth(split.typed);
     const left = x - fullWidth / 2;
-    const wordY = crate.y - 40;
+    const wordY = crate.y - (painted ? 48 : 40);
     context.fillStyle = "rgba(4, 8, 14, 0.9)";
     context.fillRect(left - 9, wordY - 14, fullWidth + 18, 28);
     context.textAlign = "left";
@@ -8845,24 +12821,29 @@ export class Game {
     const targetColor = "#80f3ff";
 
     // Rank is communicated by bounded aura strength/thickness instead of
-    // another text label competing with the English typing target.
+    // another text label competing with the English typing target. The halo
+    // is a cached ring sprite: shadowBlur here cost most of the frame.
+    const qualityGlow = qualityProfile(this.settings.visualQuality).glowScale;
+    // Kind signature motion (sway, lunge, squash…): drawing only, the enemy's
+    // position, word label and hit box do not move.
+    const pose = kindMotionPose(enemy.kind, enemy.age, enemy.id, this.motionPose);
+    const auraColor = targeted ? targetColor : rankVisual.accentColor;
+    const auraRadius = enemy.radius * rankVisual.auraRadiusScale;
     context.save();
     context.globalCompositeOperation = "lighter";
-    context.globalAlpha = rankVisual.auraAlpha;
-    context.strokeStyle = targeted ? targetColor : rankVisual.accentColor;
-    context.lineWidth = 1 + rankVisual.lineWidthBoost;
-    context.shadowBlur =
-      (8 + rankVisual.intensity * 16) *
-      qualityProfile(this.settings.visualQuality).glowScale;
-    context.shadowColor = targeted ? targetColor : rankVisual.accentColor;
-    context.beginPath();
-    context.arc(
-      enemy.x,
-      enemy.y - kick,
-      enemy.radius * rankVisual.auraRadiusScale,
-      0,
-      Math.PI * 2,
+    drawRingGlow(
+      context,
+      auraColor,
+      enemy.x + pose.dx,
+      enemy.y - kick + pose.dy,
+      auraRadius,
+      rankVisual.auraAlpha * (0.45 + rankVisual.intensity * 0.9) * qualityGlow,
     );
+    context.globalAlpha = rankVisual.auraAlpha;
+    context.strokeStyle = auraColor;
+    context.lineWidth = 1 + rankVisual.lineWidthBoost;
+    context.beginPath();
+    context.arc(enemy.x + pose.dx, enemy.y - kick + pose.dy, auraRadius, 0, Math.PI * 2);
     context.stroke();
     context.restore();
 
@@ -8898,6 +12879,8 @@ export class Game {
       context.restore();
     }
 
+    this.drawSkillCharge(enemy, pose.dx, pose.dy - kick);
+
     if (enemy.id === this.markedEnemyId && this.markTimer > 0) {
       context.save();
       context.strokeStyle = "rgba(255, 105, 202, 0.62)";
@@ -8917,15 +12900,18 @@ export class Game {
     }
 
     context.save();
-    context.translate(enemy.x, enemy.y - kick);
-    if (enemy.kind === "cloaker" && !targeted) {
-      context.globalAlpha = 0.42;
-    }
+    context.translate(enemy.x + this.hitShakeOffset(enemy) + pose.dx, enemy.y - kick + pose.dy);
+    context.globalAlpha = (enemy.kind === "cloaker" && !targeted ? 0.42 : 1) * (targeted ? 1 : pose.alpha);
     context.globalCompositeOperation = "lighter";
-    context.shadowBlur =
-      (targeted ? 25 : enemy.kind === "tank" ? 20 : 14) *
-      rankVisual.glowScale;
-    context.shadowColor = targeted ? "#86f8ff" : baseColor;
+    context.shadowBlur = 0;
+    drawGlow(
+      context,
+      targeted ? "#86f8ff" : baseColor,
+      0,
+      0,
+      enemy.radius * (targeted ? 2.3 : enemy.kind === "tank" ? 2.15 : 1.95),
+      (targeted ? 0.42 : 0.3) * rankVisual.glowScale * qualityGlow,
+    );
     context.strokeStyle =
       enemy.flash > 0 ? "#ffffff" : targeted ? targetColor : baseColor;
     context.fillStyle = targeted
@@ -8953,8 +12939,24 @@ export class Game {
             1,
         ),
     );
+    // Rotation and squash apply to the body only (pips and rings stay level).
+    context.save();
+    if (pose.rotation !== 0) context.rotate(pose.rotation);
+    if (pose.scaleX !== 1 || pose.scaleY !== 1) context.scale(pose.scaleX, pose.scaleY);
+    // Painted art for this family and kind when the owner has made it
+    // (src/enemies/painted-sprites.ts), else the code-drawn body.
+    const painted =
+      visual === undefined
+        ? null
+        : paintedEnemySprite(
+            visual.family,
+            enemy.kind,
+            this.settings.visualQuality,
+          );
     const modularDrawn =
-      visual !== undefined &&
+      (painted !== null &&
+        drawPaintedSprite(context, painted, enemy.radius * ENEMY_SPRITE_SCALE, enemy.flash, this.dpr)) ||
+      (visual !== undefined &&
       drawModularEnemy(context, visual, {
         radius: enemy.radius,
         age: enemy.age,
@@ -8963,7 +12965,7 @@ export class Game {
         glowScale:
           qualityProfile(this.settings.visualQuality).glowScale *
           rankVisual.glowScale,
-      }, this.modularBodyCache, this.dpr);
+      }, this.modularBodyCache, this.dpr));
 
     if (!modularDrawn) {
       context.beginPath();
@@ -9086,6 +13088,7 @@ export class Game {
       context.fill();
       context.stroke();
     }
+    context.restore();
 
     if ((enemy.rewardControlTimer ?? 0) > 0) {
       const frozen = (enemy.rewardControlFactor ?? 1) <= 0.05;
@@ -9266,19 +13269,23 @@ export class Game {
     const arm = Math.max(5, radius * 0.34);
 
     context.save();
-    context.strokeStyle = "rgba(126, 244, 255, 0.78)";
-    context.lineWidth = 1.4;
-    context.shadowBlur = 8;
-    context.shadowColor = "#70eaff";
-    for (const sx of [-1, 1]) {
-      for (const sy of [-1, 1]) {
-        const x = centerX + sx * bracket;
-        const y = centerY + sy * bracket;
-        context.beginPath();
-        context.moveTo(x, y - sy * arm);
-        context.lineTo(x, y);
-        context.lineTo(x - sx * arm, y);
-        context.stroke();
+    context.lineCap = "round";
+    for (const [width, color] of [
+      [4.5, "rgba(112, 234, 255, 0.22)"],
+      [1.4, "rgba(126, 244, 255, 0.82)"],
+    ] as const) {
+      context.strokeStyle = color;
+      context.lineWidth = width;
+      for (const sx of [-1, 1]) {
+        for (const sy of [-1, 1]) {
+          const x = centerX + sx * bracket;
+          const y = centerY + sy * bracket;
+          context.beginPath();
+          context.moveTo(x, y - sy * arm);
+          context.lineTo(x, y);
+          context.lineTo(x - sx * arm, y);
+          context.stroke();
+        }
       }
     }
     context.restore();
@@ -9300,6 +13307,7 @@ export class Game {
     );
     this.recallReplayCount = 0;
     this.recallPromptStartedAtSeconds = this.stageElapsedSeconds;
+    this.voiceRecallAssist.set(enemy, { startedAt: this.stageElapsedSeconds, replays: 0 });
     this.hooks.onRecallPrompt?.({ ...enemy.entry });
   }
 
@@ -9314,16 +13322,31 @@ export class Game {
     );
     this.recallReplayCount = 0;
     this.recallPromptStartedAtSeconds = this.stageElapsedSeconds;
+    this.voiceRecallAssist.set(this.boss, { startedAt: this.stageElapsedSeconds, replays: 0 });
     this.hooks.onRecallPrompt?.({ ...this.boss.entry });
   }
 
+  private voiceRecallUnassisted(target: Enemy | BossState): boolean {
+    if (this.gameplayMode !== "recall") return true;
+    const hints =
+      target === this.boss
+        ? this.recallBossHintIndices.size
+        : (this.recallHintIndices.get((target as Enemy).id)?.size ?? 0);
+    return (
+      hints === 0 && (this.voiceRecallAssist.get(target)?.replays ?? 0) === 0
+    );
+  }
   private resolveRecallPrompt(
     entry: VocabularyEntry,
     completed: boolean,
     noTypingMiss: boolean,
+    source?: Enemy | BossState,
   ): void {
     if (this.gameplayMode !== "recall") return;
-    const hintCount =
+    const voiceSource = this.voiceCompletionActive || this.inputMode === "voice" || this.inputMode === "hybrid" && source !== undefined && !this.targetOwnership.isKeyboardOwned(source);
+    const hintCount = voiceSource && source
+      ? source === this.boss ? this.recallBossHintIndices.size : this.recallHintIndices.get((source as Enemy).id)?.size ?? 0
+      :
       this.boss !== null
         ? this.recallBossHintIndices.size
         : this.targetId === null
@@ -9331,18 +13354,20 @@ export class Game {
           : this.recallHintIndices.get(this.targetId)?.size ?? 0;
     const responseMs = Math.max(
       0,
-      (this.stageElapsedSeconds - this.recallPromptStartedAtSeconds) * 1_000,
+      (this.stageElapsedSeconds - (voiceSource && source ? this.voiceRecallAssist.get(source)?.startedAt ?? this.recallPromptStartedAtSeconds : this.recallPromptStartedAtSeconds)) * 1_000,
     );
+    const replayCount = voiceSource && source ? this.voiceRecallAssist.get(source)?.replays ?? 0 : this.recallReplayCount;
     this.hooks.onRecallResult?.({
       entry: { ...entry },
       completed,
+      ...(voiceSource ? { inputSource: "voice" as const } : {}),
       perfect:
         completed &&
         noTypingMiss &&
         hintCount === 0 &&
-        this.recallReplayCount === 0,
+        replayCount === 0,
       hintCount,
-      replayCount: this.recallReplayCount,
+      replayCount,
       responseMs,
       at: Date.now(),
     });
@@ -9668,16 +13693,7 @@ export class Game {
       meaningParts.push(enemy.entry.ipa.trim());
     }
     if (meaningParts.length > 0) {
-      context.shadowBlur = 0;
-      context.font =
-        "650 12px ui-sans-serif, system-ui, -apple-system, sans-serif";
-      context.fillStyle = "rgba(208, 232, 244, 0.88)";
-      context.textAlign = "center";
-      context.fillText(
-        meaningParts.join(" · "),
-        enemy.x,
-        enemy.y + enemy.radius + 23,
-      );
+      drawMeaningPill(context, meaningParts.join(" · "), enemy.x, enemy.y + enemy.radius + 25, 15);
     }
 
     context.shadowBlur = 0;
@@ -9762,20 +13778,7 @@ export class Game {
   }
 
   private drawPlayer(time: number): void {
-    drawCharacterShip(
-      this.context,
-      this.characterId,
-      {
-        x: this.width / 2,
-        y: this.height - PLAYER_Y_OFFSET,
-        time,
-        scale: 1,
-        glowScale: qualityProfile(this.settings.visualQuality).glowScale,
-        detailScale: qualityProfile(this.settings.visualQuality).particleScale,
-        aura: this.equipmentAura,
-        aimAngle: this.playerAimAngle,
-      },
-    );
+    drawCharacterShip(this.context, this.characterId, this.shipDrawOptions(time));
   }
 
   private drawDefensiveEffects(time: number): void {
@@ -9802,77 +13805,6 @@ export class Game {
       context.stroke();
     }
 
-    if (this.barrierTimer > 0 && this.barrierHp > 0) {
-      context.strokeStyle = "rgba(92, 225, 255, 0.72)";
-      context.lineWidth = 2.2;
-      context.shadowBlur = 18;
-      context.shadowColor = "#5ce1ff";
-      context.beginPath();
-      context.arc(
-        x,
-        y,
-        34 + Math.sin(time * 6) * 2,
-        0,
-        Math.PI * 2,
-      );
-      context.stroke();
-    }
-
-    if (this.reflectTimer > 0) {
-      context.strokeStyle = "rgba(211, 121, 255, 0.66)";
-      context.lineWidth = 1.7;
-      context.setLineDash([5, 7]);
-      context.lineDashOffset = -time * 28;
-      context.beginPath();
-      context.arc(x, y, 43, 0, Math.PI * 2);
-      context.stroke();
-      context.setLineDash([]);
-    }
-
-    if (this.guardianTimer > 0 && this.guardianBlocks > 0) {
-      for (let index = 0; index < this.guardianBlocks; index += 1) {
-        const angle =
-          time * 2.2 +
-          (Math.PI * 2 * index) /
-            Math.max(1, this.guardianBlocks);
-        const droneX = x + Math.cos(angle) * 48;
-        const droneY = y + Math.sin(angle) * 18;
-
-        context.fillStyle = "rgba(255, 226, 98, 0.88)";
-        context.beginPath();
-        context.arc(droneX, droneY, 3.2, 0, Math.PI * 2);
-        context.fill();
-      }
-    }
-
-    if (this.gravityWellTimer > 0) {
-      context.strokeStyle = "rgba(191, 95, 255, 0.28)";
-      context.lineWidth = 1.2;
-      context.beginPath();
-      context.arc(
-        x,
-        y,
-        68 + Math.sin(time * 2.6) * 7,
-        0,
-        Math.PI * 2,
-      );
-      context.stroke();
-    }
-
-    if (this.timeShellTimer > 0) {
-      context.strokeStyle = "rgba(152, 117, 255, 0.34)";
-      context.lineWidth = 1.2;
-      context.beginPath();
-      context.arc(
-        x,
-        y,
-        56 + Math.sin(time * 3.5) * 5,
-        0,
-        Math.PI * 2,
-      );
-      context.stroke();
-    }
-
     context.restore();
   }
 
@@ -9881,12 +13813,13 @@ export class Game {
     if (target === null) return;
 
     const context = this.context;
+    // From the nose, which faces the target while the word is typed.
+    characterShipPoint(this.shipDrawOptions(this.lastDrawTime), 0, -SHIP_NOSE_OFFSET, this.shipPoint);
     context.save();
-    context.strokeStyle = "rgba(91, 236, 255, 0.07)";
-    context.lineWidth = 1;
-    context.setLineDash([3, 12]);
+    context.strokeStyle = "rgba(91, 236, 255, 0.18)";
+    context.setLineDash([4, 8]);
     context.beginPath();
-    context.moveTo(this.width / 2, this.height - PLAYER_Y_OFFSET);
+    context.moveTo(this.shipPoint.x, this.shipPoint.y);
     context.lineTo(target.x, target.y);
     context.stroke();
     context.restore();

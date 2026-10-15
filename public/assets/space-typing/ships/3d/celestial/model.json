@@ -1,0 +1,57 @@
+{
+  "id": "celestial",
+  "version": 3,
+  "aspect": 0.9917,
+  "heightScale": 0.2096,
+  "heightGrid": [
+    256,
+    258
+  ],
+  "nozzles": [
+    [
+      0.4979,
+      0.7338,
+      0.0776
+    ]
+  ],
+  "anchors": {
+    "nose": [
+      0.4992,
+      0.027
+    ],
+    "canopy": [
+      0.4991,
+      0.4621
+    ],
+    "eyes": [],
+    "guns": [
+      [
+        0.2609,
+        0.3037
+      ],
+      [
+        0.7938,
+        0.3019
+      ]
+    ],
+    "wingtips": [
+      [
+        0.0271,
+        0.839
+      ],
+      [
+        0.9721,
+        0.839
+      ]
+    ]
+  },
+  "colors": {
+    "hot": "#e6e7ff",
+    "plume": "#5a5fff",
+    "outer": "#4144b8",
+    "accent": "#d7c9ff"
+  },
+  "color": "color.webp?v=3a3005978b4d",
+  "emissive": "emissive.webp?v=51a58f5810af",
+  "height": "height.bin?v=350de6ace784"
+}

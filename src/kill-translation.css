@@ -45,7 +45,7 @@
   line-height: 1.08;
   overflow-wrap: anywhere;
 }
-.kill-learning-text strong { font-family: ui-sans-serif, system-ui, sans-serif; font-weight: 820; text-wrap: balance; }
+.kill-learning-text strong { font-family: var(--holo-body, ui-sans-serif), system-ui, sans-serif; font-weight: 700; text-wrap: balance; }
 .kill-learning-ipa { color: #a1f0f9; }
 .kill-learning-vi { color: #fff3c9; }
 .kill-learning-strip.size-small .kill-learning-ipa { font-size: .84rem; }

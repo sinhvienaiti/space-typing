@@ -1,4 +1,5 @@
 import { MAX_CAMPAIGN_STAGE } from "../campaign/stage";
+import { isValidAccountState } from "./account-state";
 import {
   createStarterCharacterState,
   isValidCharacterState,
@@ -863,7 +864,10 @@ export function parsePlayerSaveJson(text: string): BackupParseResult {
     };
   }
 
-  const migration = migratePlayerSave(parsed);
+  if (version === PLAYER_SAVE_VERSION && !isValidAccountState(parsed.account)) return { ok: false, error: "Warp/account data is missing or corrupt. No migration grant is allowed." };
+  let migration;
+  try { migration = migratePlayerSave(parsed); }
+  catch (error) { return { ok: false, error: error instanceof Error ? error.message : "Invalid account data" }; }
   const resolved = resolvePlayerSaveRecovery(
     migration.save,
     migration.save.updatedAt,

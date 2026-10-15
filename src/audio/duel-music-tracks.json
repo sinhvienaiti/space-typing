@@ -1,0 +1,33 @@
+{
+  "generatedBy": "scripts/music/render-songs.mjs",
+  "tracks": [
+    {
+      "id": "neon-dogfight",
+      "title": "Neon Dogfight",
+      "mood": "fiery",
+      "key": "D major",
+      "bpm": 158,
+      "meter": 4,
+      "seconds": 119.943,
+      "mixOut": 108.943,
+      "stems": {
+        "calm": "/assets/audio/duel/music/songs/neon-dogfight/calm.ogg?v=53d940a064fb5407",
+        "intense": "/assets/audio/duel/music/songs/neon-dogfight/intense.ogg?v=9f781c797fc73cf2"
+      }
+    },
+    {
+      "id": "afterburner-finale",
+      "title": "Afterburner Finale",
+      "mood": "climactic",
+      "key": "A minor → C major",
+      "bpm": 168,
+      "meter": 4,
+      "seconds": 101.643,
+      "mixOut": 90.643,
+      "stems": {
+        "calm": "/assets/audio/duel/music/songs/afterburner-finale/calm.ogg?v=53b5f581441805d4",
+        "intense": "/assets/audio/duel/music/songs/afterburner-finale/intense.ogg?v=dbf725f6e84d732c"
+      }
+    }
+  ]
+}

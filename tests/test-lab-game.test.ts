@@ -2,10 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Game } from "../src/Game";
 import { createStageConfig } from "../src/campaign/stage";
 import { difficultyFor } from "../src/campaign/difficulty";
-import {
-  SCORE_POPUP_FLOAT_DISTANCE,
-  SCORE_POPUP_PROTECTED_TOP_Y,
-} from "../src/characters/projectile-renderer";
 import { VANGUARD_ACTIVE_SKILL_ID } from "../src/characters/vanguard";
 import { DEFAULT_RECALL_SETTINGS } from "../src/recall/model";
 import type { GameSettings, VocabularyEntry } from "../src/types";
@@ -368,6 +364,38 @@ describe("M21 gated Game Test Lab API", () => {
     game.destroy();
   });
 
+  it("provides dedicated Credit Crystal spawn, stress, magnet, collect and clear controls", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 100);
+    game.testLabSetSchedulerFrozen(true);
+
+    expect(
+      game.testLabSpawnCreditCrystals({
+        tier: "common",
+        count: 1,
+        amountEach: 3,
+      }),
+    ).toBe(1);
+    let snapshot = game.getTestLabSnapshot();
+    expect(snapshot?.creditPickups.rewards).toBe(1);
+    expect(snapshot?.creditPickups.walletDeltaApplied).toBe(3);
+
+    expect(game.testLabSpawnCreditStress(50)).toBe(50);
+    snapshot = game.getTestLabSnapshot();
+    expect(snapshot?.creditPickups.rewards).toBe(51);
+    expect(snapshot?.creditPickups.pieces ?? 999).toBeLessThanOrEqual(28);
+
+    expect(game.testLabForceCreditMagnet()).toBe(true);
+    expect(game.testLabCollectCreditPickups()).toBeGreaterThan(0);
+    expect(game.getTestLabSnapshot()?.creditPickups.bursts).toBe(0);
+
+    game.testLabSpawnCreditStress(10);
+    expect(game.testLabClearCreditPickups()).toBeGreaterThan(0);
+    expect(game.getTestLabSnapshot()?.creditPickups.bursts).toBe(0);
+    game.destroy();
+  });
+
   it("records lethal damage but keeps Immortal mode alive at one Hull", () => {
     const game = createTestGame();
     game.setTestLabMode(true, "immortal");
@@ -547,110 +575,23 @@ describe("M21 gated Game Test Lab API", () => {
     ]);
     expect(before?.scheduler.frozen).toBe(true);
 
-    const visualRuntime = game as unknown as { lasers: unknown[] };
-    expect(before?.playerShots).toBe(0);
-    expect(visualRuntime.lasers).toHaveLength(0);
-
     game.handleKey("m");
     const after = game.getTestLabSnapshot();
-    expect(after?.playerShots).toBe(1);
-    expect(visualRuntime.lasers).toHaveLength(0);
     const typed = after?.enemies.filter((enemy) => enemy.typed === 1) ?? [];
 
     expect(typed).toHaveLength(1);
     expect(typed[0]?.entry.en).toBe("month");
 
     game.handleKey("x");
-    expect(game.getTestLabSnapshot()?.playerShots).toBe(1);
 
     game.handleKey("o");
     const locked = game.getTestLabSnapshot();
-    expect(locked?.playerShots).toBe(2);
     expect(
       locked?.enemies.find((enemy) => enemy.entry.en === "month")?.typed,
     ).toBe(2);
     expect(
       locked?.enemies.find((enemy) => enemy.entry.en === "morning")?.typed,
     ).toBe(0);
-
-    game.destroy();
-  });
-
-  it("fires the player projectile for every typeable bonus target", () => {
-    const game = createTestGame();
-    game.setTestLabMode(true);
-    start(game, 50);
-    game.testLabSetSchedulerFrozen(true);
-
-    type MovingBonus = {
-      entry: VocabularyEntry;
-      typed: number;
-      x: number;
-      y: number;
-      speed: number;
-      age: number;
-      lifetime: number;
-    };
-    type BonusRuntime = {
-      typeSupplyPod(
-        target: MovingBonus & { reward: "shield" },
-        key: string,
-      ): void;
-      typeTreasureDrone(target: MovingBonus, key: string): void;
-      typeRewardChoiceCrate(target: MovingBonus, key: string): void;
-      typeAnomalyCrate(target: MovingBonus, key: string): void;
-      typeRecallBonus(
-        target: MovingBonus & { hintIndices: number[] },
-        key: string,
-      ): boolean;
-    };
-
-    const runtime = game as unknown as BonusRuntime;
-    const entry = vocabulary[0]!;
-    const makeTarget = (): MovingBonus => ({
-      entry,
-      typed: 0,
-      x: 710,
-      y: 260,
-      speed: 0,
-      age: 0,
-      lifetime: 20,
-    });
-
-    runtime.typeSupplyPod({ ...makeTarget(), reward: "shield" }, "o");
-    expect(game.getTestLabSnapshot()?.playerShots).toBe(1);
-
-    runtime.typeTreasureDrone(makeTarget(), "o");
-    expect(game.getTestLabSnapshot()?.playerShots).toBe(2);
-
-    runtime.typeRewardChoiceCrate(makeTarget(), "o");
-    expect(game.getTestLabSnapshot()?.playerShots).toBe(3);
-
-    runtime.typeAnomalyCrate(makeTarget(), "o");
-    expect(game.getTestLabSnapshot()?.playerShots).toBe(4);
-
-    expect(
-      runtime.typeRecallBonus(
-        { ...makeTarget(), hintIndices: [] },
-        "o",
-      ),
-    ).toBe(true);
-    expect(game.getTestLabSnapshot()?.playerShots).toBe(5);
-
-    game.destroy();
-  });
-
-  it("player projectile presentation expires through the real simulation loop", () => {
-    const game = createTestGame();
-    game.setTestLabMode(true);
-    start(game, 50);
-    game.testLabSpawnSamePrefixScenario();
-
-    game.handleKey("m");
-    expect(game.getTestLabSnapshot()?.playerShots).toBe(1);
-
-    expect(game.testLabAdvanceSimulation(0.65)).toBe(true);
-    expect(game.getTestLabSnapshot()?.playerShots).toBe(0);
 
     game.destroy();
   });
@@ -687,7 +628,7 @@ describe("M21 gated Game Test Lab API", () => {
 
     game.destroy();
   });
-  it("stores the actual kill reward in a bounded score popup", () => {
+  it("keeps kill Score logic but creates no legacy floating score popup state", () => {
     const game = createTestGame();
     game.setTestLabMode(true);
     start(game, 1);
@@ -702,32 +643,19 @@ describe("M21 gated Game Test Lab API", () => {
     expect(game.testLabKillEnemy(ids[0]!)).toBe(true);
     const afterScore = game.getTestLabSnapshot()?.stats.score ?? 0;
     const runtime = game as unknown as {
-      killScorePopups: Array<{
-        y: number;
-        value: number;
-        life: number;
-        maxLife: number;
-      }>;
+      killScorePopups?: unknown[];
     };
 
-    expect(runtime.killScorePopups).toHaveLength(1);
-    expect(runtime.killScorePopups[0]?.value).toBe(afterScore - beforeScore);
-    expect(runtime.killScorePopups[0]?.maxLife).toBe(2);
-    expect(runtime.killScorePopups[0]?.y).toBeGreaterThanOrEqual(
-      SCORE_POPUP_PROTECTED_TOP_Y + SCORE_POPUP_FLOAT_DISTANCE,
-    );
+    expect(afterScore).toBeGreaterThan(beforeScore);
+    expect(runtime.killScorePopups).toBeUndefined();
     game.destroy();
   });
 
-  it("shows a materially larger final score reward for a three-layer enemy", () => {
+  it("keeps a materially larger Score reward for a three-layer enemy", () => {
     const game = createTestGame();
     game.setTestLabMode(true);
     start(game, 1);
     game.testLabSetSchedulerFrozen(true);
-
-    const runtime = game as unknown as {
-      killScorePopups: Array<{ value: number }>;
-    };
 
     const oneLayerId = game.testLabSpawnEnemies({
       kind: "scout",
@@ -735,8 +663,10 @@ describe("M21 gated Game Test Lab API", () => {
       rank: "I",
       layers: 1,
     })[0]!;
+    const oneBefore = game.getTestLabSnapshot()?.stats.score ?? 0;
     expect(game.testLabKillEnemy(oneLayerId)).toBe(true);
-    const oneLayerReward = runtime.killScorePopups.at(-1)?.value ?? 0;
+    const oneLayerReward =
+      (game.getTestLabSnapshot()?.stats.score ?? 0) - oneBefore;
 
     game.testLabClearEnemies();
     game.testLabClearParticles();
@@ -747,11 +677,102 @@ describe("M21 gated Game Test Lab API", () => {
       rank: "I",
       layers: 3,
     })[0]!;
+    const threeBefore = game.getTestLabSnapshot()?.stats.score ?? 0;
     expect(game.testLabKillEnemy(threeLayerId)).toBe(true);
-    const threeLayerReward = runtime.killScorePopups.at(-1)?.value ?? 0;
+    const threeLayerReward =
+      (game.getTestLabSnapshot()?.stats.score ?? 0) - threeBefore;
 
     expect(oneLayerReward).toBeGreaterThan(0);
     expect(threeLayerReward).toBeGreaterThan(oneLayerReward * 1.35);
+    game.destroy();
+  });
+
+  it("emits pronunciation and IPA/Vietnamese learning feedback for every typed enemy layer", () => {
+    const game = createTestGame();
+    game.setTestLabMode(true);
+    start(game, 50);
+    game.testLabSetSchedulerFrozen(true);
+
+    const onWordComplete = vi.fn();
+    const onKillTranslation = vi.fn();
+    const runtime = game as unknown as {
+      hooks: {
+        onWordComplete: (
+          entry: VocabularyEntry,
+          outcome?: { perfect: boolean },
+        ) => void;
+        onKillTranslation?: (entry: VocabularyEntry) => void;
+      };
+    };
+    runtime.hooks.onWordComplete = onWordComplete;
+    runtime.hooks.onKillTranslation = onKillTranslation;
+
+    const enemyId = game.testLabSpawnEnemies({
+      kind: "scout",
+      count: 1,
+      rank: "X",
+      layers: 3,
+    })[0]!;
+
+    const completedEntries: VocabularyEntry[] = [];
+
+    for (const expectedLayers of [2, 1, 0]) {
+      const before = game
+        .getTestLabSnapshot()
+        ?.enemies.find((enemy) => enemy.id === enemyId);
+      expect(before).toBeDefined();
+      completedEntries.push({ ...before!.entry });
+
+      expect(game.testLabForceWordComplete(enemyId)).toBe(true);
+
+      const snapshot = game.getTestLabSnapshot();
+      if (expectedLayers > 0) {
+        const current = snapshot?.enemies.find(
+          (enemy) => enemy.id === enemyId,
+        );
+        expect(current?.layersRemaining).toBe(expectedLayers);
+      } else {
+        expect(
+          snapshot?.enemies.some((enemy) => enemy.id === enemyId),
+        ).toBe(false);
+      }
+
+      expect(snapshot?.learningEcho?.en).toBe(
+        completedEntries.at(-1)!.en,
+      );
+      expect(snapshot?.learningEcho?.ipa).toBe(
+        completedEntries.at(-1)!.ipa,
+      );
+      expect(snapshot?.learningEcho?.vi).toBe(
+        completedEntries.at(-1)!.vi,
+      );
+    }
+
+    expect(onWordComplete).toHaveBeenCalledTimes(3);
+    expect(onKillTranslation).toHaveBeenCalledTimes(3);
+
+    for (const [index, entry] of completedEntries.entries()) {
+      expect(onWordComplete).toHaveBeenNthCalledWith(
+        index + 1,
+        expect.objectContaining({
+          id: entry.id,
+          en: entry.en,
+          ipa: entry.ipa,
+          vi: entry.vi,
+        }),
+        expect.objectContaining({ perfect: true }),
+      );
+      expect(onKillTranslation).toHaveBeenNthCalledWith(
+        index + 1,
+        expect.objectContaining({
+          id: entry.id,
+          en: entry.en,
+          ipa: entry.ipa,
+          vi: entry.vi,
+        }),
+      );
+    }
+
     game.destroy();
   });
 

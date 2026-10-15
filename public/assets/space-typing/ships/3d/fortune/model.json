@@ -1,0 +1,62 @@
+{
+  "id": "fortune",
+  "version": 3,
+  "aspect": 1.0459,
+  "heightScale": 0.2269,
+  "heightGrid": [
+    256,
+    245
+  ],
+  "nozzles": [
+    [
+      0.3504,
+      0.8376,
+      0.0602
+    ],
+    [
+      0.6488,
+      0.8376,
+      0.0602
+    ]
+  ],
+  "anchors": {
+    "nose": [
+      0.5008,
+      0.0282
+    ],
+    "canopy": [
+      0.4999,
+      0.5189
+    ],
+    "eyes": [],
+    "guns": [
+      [
+        0.1927,
+        0.2713
+      ],
+      [
+        0.8203,
+        0.2925
+      ]
+    ],
+    "wingtips": [
+      [
+        0.0274,
+        0.7708
+      ],
+      [
+        0.9717,
+        0.7708
+      ]
+    ]
+  },
+  "colors": {
+    "hot": "#fff7df",
+    "plume": "#ffcd28",
+    "outer": "#b8941c",
+    "accent": "#ffc01d"
+  },
+  "color": "color.webp?v=51ddb6124fac",
+  "emissive": "emissive.webp?v=65034e7cc919",
+  "height": "height.bin?v=2736adb8567b"
+}
