@@ -1,0 +1,46 @@
+{
+  "id": "reaper",
+  "version": 3045288796,
+  "sprites": {
+    "bolt": {
+      "url": "bolt.webp",
+      "sha256": "6b13683c2cbe4b345794c1c26d66424449b2056bb046b47e7b9f2e211bb854d9",
+      "width": 768,
+      "height": 329,
+      "anchor": [
+        0.9653,
+        0.5984
+      ]
+    },
+    "finisher": {
+      "url": "finisher.webp",
+      "sha256": "6b2b2c4522fce459c6fd7b3950d589214aa50ef6a0f09f5a63fd84754a0170e4",
+      "width": 768,
+      "height": 417,
+      "anchor": [
+        0.9868,
+        0.55
+      ]
+    },
+    "impact": {
+      "url": "impact.webp",
+      "sha256": "07db7196f9f56e070870a7269277e1688dde51df1330909f4cb71793e1361fa0",
+      "width": 638,
+      "height": 640,
+      "anchor": [
+        0.5226,
+        0.4779
+      ]
+    },
+    "muzzle": {
+      "url": "muzzle.webp",
+      "sha256": "4a6c6823a0ab8ee845f86e004a3640ffabe2acba46ec2b15d1b6c9e6799b2aeb",
+      "width": 512,
+      "height": 281,
+      "anchor": [
+        0.0203,
+        0.4883
+      ]
+    }
+  }
+}

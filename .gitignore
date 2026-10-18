@@ -10,3 +10,14 @@ art-src/*
 # Screenshots from pnpm visual:shot (docs/VISUAL_TESTING.md).
 .visual/
 .duel-local/
+# Local account database (PGlite) and server log: pnpm account:local.
+.account-local/
+# Cloudflare local secrets and state (pnpm account:local).
+cloud/.dev.vars
+cloud/.wrangler/
+.wrangler/
+
+# Local archives and review outputs (not for git)
+/art.zip
+/art-src1310.zip
+/output/

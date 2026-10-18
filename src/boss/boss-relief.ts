@@ -1,6 +1,14 @@
 import type { VisualQuality } from "../types";
-import { boss3DModelForPaintedArtUrl } from "./model-3d-contract";
-import { BossModel3D } from "./model-3d-runtime";
+import { boss3DModelForId, boss3DModelForPaintedArtUrl } from "./model-3d-contract";
+import type { Boss3DAction } from "./model-3d-choreography";
+import { BOSS_3D_FRAME_SCALE, BossModel3D, type Boss3DSocketPoints } from "./model-3d-runtime";
+import {
+  loadThree,
+  renderShared,
+  sharedRenderer,
+  sharedRendererLost,
+  type Frame3D,
+} from "../render3d/shared-renderer";
 
 /**
  * Campaign boss depth renderer.
@@ -8,8 +16,9 @@ import { BossModel3D } from "./model-3d-runtime";
  * Authored GLB models are preferred when a boss has a 3D runtime contract.
  * If the GLB is absent, fails to load, WebGL is unavailable or the context is
  * lost, the existing painted height-field relief remains the fail-soft path.
- * Game.ts still receives one transparent canvas, so HUD/word/telegraph layers
- * and quality behaviour do not need a second rendering pipeline.
+ * Game.ts still receives one transparent frame (a region of the shared 3D
+ * canvas, src/render3d/shared-renderer.ts), so HUD/word/telegraph layers and
+ * quality behaviour do not need a second rendering pipeline.
  */
 export type BossReliefPose = {
   /** CSS px edge of the square box drawn on screen. */
@@ -29,6 +38,22 @@ export type BossReliefPose = {
   /** Coloured light from its own attack; null = off. */
   light: string | null;
   lightPower: number;
+  /** 0 → 1 while the boss flies in (authored Boss_Intro clip). */
+  intro?: number;
+  /** 0 → 1 while the wreck falls (authored Boss_Death clip). */
+  dying?: number;
+  /**
+   * GLB only (src/boss/model-3d-runtime.ts): seconds since arrival, sim
+   * clock, choreography, hit kick and heavy blows, rage, death cracks/dissolve.
+   */
+  introTime?: number;
+  clock?: number;
+  action?: Boss3DAction | null;
+  hit?: number;
+  heavyHits?: number;
+  enrage?: number;
+  crack?: number;
+  dissolve?: number;
 };
 
 /** Device px per CSS px cap: Medium 1, High 1.6, Ultra 2 (sharp but bounded). */
@@ -40,7 +65,6 @@ type Three = typeof import("three");
 
 type ReliefResources = {
   three: Three;
-  renderer: import("three").WebGLRenderer;
   scene: import("three").Scene;
   camera: import("three").PerspectiveCamera;
   mesh: import("three").Mesh;
@@ -48,12 +72,6 @@ type ReliefResources = {
   flashLight: import("three").PointLight;
   texture: import("three").Texture;
 };
-
-let threeModule: Promise<Three> | null = null;
-function loadThree(): Promise<Three> {
-  threeModule ??= import("three");
-  return threeModule;
-}
 
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -124,18 +142,10 @@ function heightField(image: HTMLImageElement): Float32Array {
 }
 
 export class BossRelief {
-  private pixels = 0;
-  private lost = false;
-
   private constructor(
     private readonly authoredModel: BossModel3D | null,
     private readonly relief: ReliefResources | null,
-  ) {
-    relief?.renderer.domElement.addEventListener("webglcontextlost", (event) => {
-      event.preventDefault();
-      this.lost = true;
-    });
-  }
+  ) {}
 
   /** WebGL exists here (false in tests and very old browsers). */
   static supported(): boolean {
@@ -147,26 +157,25 @@ export class BossRelief {
    * its real skinned GLB; every failure falls back to the previous relief.
    */
   static async load(
-    artUrl: string,
+    artUrl: string | undefined,
     primary: string,
     accent: string,
+    quality: VisualQuality = "high",
+    modelId?: string,
   ): Promise<BossRelief | null> {
     if (typeof document === "undefined") return null;
 
-    const authoredContract = boss3DModelForPaintedArtUrl(artUrl);
+    const authoredContract = (modelId ? boss3DModelForId(modelId) : null) ??
+      (artUrl === undefined ? null : boss3DModelForPaintedArtUrl(artUrl));
     if (authoredContract !== null) {
-      const authoredModel = await BossModel3D.load(authoredContract, primary, accent);
+      const authoredModel = await BossModel3D.load(authoredContract, primary, accent, quality);
       if (authoredModel !== null) return new BossRelief(authoredModel, null);
     }
 
+    if (artUrl === undefined) return null;
     try {
-      const [three, image] = await Promise.all([loadThree(), loadImage(artUrl)]);
-      const renderer = new three.WebGLRenderer({ antialias: true, alpha: true, premultipliedAlpha: true, powerPreference: "high-performance" });
-      renderer.setPixelRatio(1);
-      renderer.outputColorSpace = three.SRGBColorSpace;
-      renderer.toneMapping = three.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 0.95;
-      renderer.setClearColor(0x000000, 0);
+      const [three, image, renderer] = await Promise.all([loadThree(), loadImage(artUrl), sharedRenderer()]);
+      if (renderer === null) return null;
 
       const scene = new three.Scene();
       const camera = new three.PerspectiveCamera(30, 1, 0.1, 50);
@@ -212,7 +221,6 @@ export class BossRelief {
       scene.add(flashLight);
       return new BossRelief(null, {
         three,
-        renderer,
         scene,
         camera,
         mesh,
@@ -226,19 +234,25 @@ export class BossRelief {
   }
 
   get available(): boolean {
-    return this.authoredModel?.available ?? !this.lost;
+    return this.authoredModel?.available ?? !sharedRendererLost();
   }
 
-  render(pose: BossReliefPose): HTMLCanvasElement | null {
+  /** FX socket positions of the last GLB render (frame shares); null for the painted relief. */
+  get sockets(): Readonly<Boss3DSocketPoints> | null {
+    return this.authoredModel?.socketPoints ?? null;
+  }
+
+  /** The rendered frame's edge as a share of the pose size (the GLB keeps a margin). */
+  get frameScale(): number {
+    return this.authoredModel === null ? 1 : BOSS_3D_FRAME_SCALE;
+  }
+
+  render(pose: BossReliefPose): Frame3D | null {
     if (this.authoredModel !== null) return this.authoredModel.render(pose);
     const relief = this.relief;
-    if (this.lost || relief === null) return null;
+    if (sharedRendererLost() || relief === null) return null;
     const scale = Math.min(pose.dpr, RESOLUTION[pose.quality]);
     const pixels = Math.max(64, Math.min(MAX_PIXELS, Math.round(pose.size * scale)));
-    if (pixels !== this.pixels) {
-      this.pixels = pixels;
-      relief.renderer.setSize(pixels, pixels, false);
-    }
     relief.mesh.rotation.set(-0.12 - pose.pitch, pose.yaw, pose.roll, "XYZ");
     relief.mesh.scale.set(1, 1, 1 + pose.swell);
     // Kept low: the painting's detail must read through any glow.
@@ -250,8 +264,7 @@ export class BossRelief {
       relief.flashLight.intensity = pose.flash * 3;
       relief.flashLight.color.set(0xffffff);
     }
-    relief.renderer.render(relief.scene, relief.camera);
-    return relief.renderer.domElement;
+    return renderShared(relief.scene, relief.camera, pixels, pixels, { exposure: 0.95 });
   }
 
   dispose(): void {
@@ -264,7 +277,6 @@ export class BossRelief {
     relief.mesh.geometry.dispose();
     relief.material.dispose();
     relief.texture.dispose();
-    relief.renderer.dispose();
     void relief.three;
   }
 }

@@ -66,8 +66,13 @@ lsof -ti tcp:3098 | xargs kill
 | `--click` | — | Bộ chọn CSS để bấm, ví dụ `#startButton` để vào trận. Đây là **cú bấm chuột thật** (qua DevTools), được tính là thao tác của người dùng, nên Chrome cho phát tiếng và Web Audio bật được. Nếu nút bị ẩn thì lùi về `el.click()`. |
 | `--click-delay` | 4000 | Chờ bao lâu rồi mới bấm (để game nạp xong). |
 | `--eval` / `--eval-file` | — | Đoạn JS chạy ngay trước khi chụp; kết quả in trong JSON. Có thể trả về Promise. |
+| `--ready` | — | Biểu thức JS phải trả `true` trước khi bấm/chụp; dev game dùng `--ready="!!window.__spaceTypingGame"`. Tránh chụp HTML khi Vite chưa nạp xong JS/CSS. |
+| `--ready-timeout` | 120000 | Thời gian chờ biểu thức `--ready`, mili giây. |
+| `--protocol-timeout` | 120000 | Thời gian tối đa cho một lệnh Chrome, kể cả Promise của `--eval-file`. |
 
 `CHROME_PATH=<đường dẫn>` để dùng Chrome ở chỗ khác.
+
+**Windows + WSL:** chạy Vite/Worker bằng Node trong WSL; chạy `shot.mjs` bằng Node bản Windows để kết nối Chrome Windows. Dùng hồ sơ tạm do script tạo, không dùng hồ sơ chơi của chủ dự án. Script nay xin cổng CDP trống từ hệ điều hành để các lượt chụp không dùng nhầm cùng một Chrome. Nếu tắt theo dõi file của Vite để giảm tải máy, phải khởi động lại Vite sau khi sửa source.
 
 ## 4. Các công thức chụp hay dùng
 

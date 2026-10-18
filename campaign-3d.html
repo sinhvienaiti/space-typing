@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#03040b" />
+    <meta name="referrer" content="strict-origin" />
+    <title>Space Type Campaign 3D</title>
+  </head>
+  <body>
+    <canvas id="c3dCanvas" aria-label="Campaign 3D flight"></canvas>
+    <div id="c3dFlash" class="c3d-flash" aria-hidden="true"></div>
+    <div id="c3dLabels" class="c3d-labels" aria-hidden="true"></div>
+
+    <!-- In-flight HUD -->
+    <section id="c3dHud" class="c3d-hud" hidden>
+      <div class="c3d-panel c3d-stage">
+        <div class="c3d-stage-top">
+          <span id="c3dRole" class="c3d-role">Stage</span>
+          <span id="c3dWaveText" class="c3d-wave-text"></span>
+        </div>
+        <div class="c3d-stage-title">
+          <small>Stage</small>
+          <strong id="c3dStageName">001</strong>
+        </div>
+        <small id="c3dWorldName" class="c3d-stage-world">Rainbow Reach</small>
+        <div id="c3dWaves" class="c3d-waves" aria-label="Waves"></div>
+      </div>
+      <div id="c3dWordInfo" class="c3d-wordinfo" aria-live="polite">
+        <span id="c3dIpa" class="c3d-ipa"></span>
+        <span id="c3dMeaning" class="c3d-meaning"></span>
+      </div>
+      <dl class="c3d-panel c3d-stats">
+        <div><dt>Score</dt><dd id="c3dScore">0</dd></div>
+        <div><dt>Combo</dt><dd id="c3dCombo">0</dd></div>
+        <div><dt>Accuracy</dt><dd id="c3dAccuracy">100%</dd></div>
+        <div><dt>WPM</dt><dd id="c3dWpm">0</dd></div>
+      </dl>
+      <div id="c3dBoss" class="c3d-boss" hidden>
+        <span id="c3dBossName" class="c3d-boss-name"></span>
+        <div class="c3d-bar c3d-bar-boss"><i id="c3dBossFill"></i></div>
+      </div>
+      <div class="c3d-panel c3d-vitals">
+        <div class="c3d-vital c3d-vital-hp">
+          <svg class="c3d-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /></svg>
+          <span>HP</span><div class="c3d-bar c3d-bar-hull"><i id="c3dHullFill"></i></div><b id="c3dHull">100</b>
+        </div>
+        <div class="c3d-vital c3d-vital-shield">
+          <svg class="c3d-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+          <span>Shield</span><div class="c3d-bar c3d-bar-shield"><i id="c3dShieldFill"></i></div><b id="c3dShield">40</b>
+        </div>
+        <div class="c3d-vital c3d-vital-nova">
+          <svg class="c3d-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
+          <span>Nova</span><div class="c3d-bar c3d-bar-nova"><i id="c3dNovaFill"></i></div><b id="c3dNovaHint">0%</b>
+        </div>
+      </div>
+      <button id="c3dPauseButton" class="c3d-icon-button" type="button" aria-label="Pause"><i></i><i></i></button>
+      <p class="c3d-keys">Type the words · <kbd>Enter</kbd> Nova cast when charged · Drag or <kbd>←</kbd><kbd>→</kbd> look around · <kbd>Esc</kbd> pause</p>
+    </section>
+
+    <div id="c3dBanner" class="c3d-banner" aria-live="assertive"></div>
+    <div id="c3dImeNotice" class="c3d-panel c3d-ime-notice" role="status" hidden>
+      <strong>Vietnamese typing is on</strong>
+      <span>Bộ gõ tiếng Việt đang bật (UniKey, EVKey…). Hãy tắt để gõ từ tiếng Anh.</span>
+    </div>
+
+    <!-- Stage select / mode start -->
+    <section id="c3dMenu" class="c3d-overlay">
+      <div class="c3d-card c3d-menu">
+        <p class="c3d-eyebrow">Space Type · Campaign 3D <span>beta</span></p>
+        <h1>Fly <b>Draconis</b> through the Campaign</h1>
+        <p class="c3d-lead">The Campaign's stages, words and bosses in a 3D flight. Free to play: no Warp, and your Campaign save, rewards and wallet are not touched. Progress here is kept in this browser.</p>
+        <div class="c3d-pages">
+          <button id="c3dPrevPage" class="c3d-ghost" type="button" aria-label="Previous stages">‹</button>
+          <span id="c3dPageLabel">Stages 1–10</span>
+          <button id="c3dNextPage" class="c3d-ghost" type="button" aria-label="Next stages">›</button>
+        </div>
+        <div id="c3dStageGrid" class="c3d-grid" role="listbox" aria-label="Stages"></div>
+        <p id="c3dSelected" class="c3d-selected"></p>
+        <div class="c3d-actions">
+          <button id="c3dStartButton" class="c3d-primary" type="button">Launch</button>
+          <a class="c3d-ghost c3d-link" href="/">Back to Space Type</a>
+        </div>
+        <div class="c3d-options">
+          <label>Quality <select id="c3dQuality"><option value="medium">Medium</option><option value="high">High</option></select></label>
+          <label><input id="c3dSound" type="checkbox" checked /> Sound</label>
+          <a class="c3d-link" href="/?feedback=bug&amp;from=campaign-3d">Report a bug</a>
+          <span id="c3dStatus" class="c3d-status" role="status"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pause -->
+    <section id="c3dPause" class="c3d-overlay" hidden>
+      <div class="c3d-card c3d-small">
+        <h2>Paused</h2>
+        <div class="c3d-actions c3d-stack">
+          <button id="c3dResumeButton" class="c3d-primary" type="button">Resume</button>
+          <button id="c3dRetryButton" class="c3d-ghost" type="button">Restart stage</button>
+          <button id="c3dQuitButton" class="c3d-ghost" type="button">Stage select</button>
+          <a class="c3d-ghost c3d-link" href="/?feedback=bug&amp;from=campaign-3d">Report a bug</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Result -->
+    <!-- Result: .is-clear (gold, rising embers) or .is-fail (crimson, falling ash) -->
+    <section id="c3dResult" class="c3d-overlay c3d-result-overlay" hidden>
+      <div id="c3dResultCard" class="c3d-card c3d-result">
+        <div class="c3d-result-sky" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="c3d-result-emblem" aria-hidden="true">
+          <svg class="c3d-emblem-clear" viewBox="0 0 24 24"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
+          <svg class="c3d-emblem-fail" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m13 6-3 5h4l-3 5" /></svg>
+        </div>
+        <p id="c3dResultEyebrow" class="c3d-eyebrow">Stage 001</p>
+        <h2 id="c3dResultTitle">Stage clear</h2>
+        <p id="c3dResultSub" class="c3d-result-sub"></p>
+        <div class="c3d-result-score">
+          <span>Score</span>
+          <b id="c3dResultScore">0</b>
+          <em id="c3dResultBest"></em>
+        </div>
+        <dl class="c3d-result-stats">
+          <div><dt>WPM</dt><dd id="c3dResultWpm">0</dd></div>
+          <div><dt>Accuracy</dt><dd id="c3dResultAccuracy">0%</dd></div>
+          <div><dt>Words</dt><dd id="c3dResultWords">0</dd></div>
+          <div><dt>Best combo</dt><dd id="c3dResultCombo">0</dd></div>
+          <div><dt>Time</dt><dd id="c3dResultTime">0:00</dd></div>
+        </dl>
+        <p id="c3dResultTip" class="c3d-result-tip"></p>
+        <p id="c3dResultNote" class="c3d-note"></p>
+        <div class="c3d-actions c3d-result-actions">
+          <button id="c3dNextButton" class="c3d-primary" type="button">Next stage</button>
+          <button id="c3dAgainButton" class="c3d-ghost" type="button">Retry</button>
+          <button id="c3dSelectButton" class="c3d-ghost" type="button">Stage select</button>
+        </div>
+      </div>
+    </section>
+    <script type="module" src="/src/campaign3d/main.ts"></script>
+  </body>
+</html>

@@ -1,6 +1,7 @@
 import type { CharacterId } from "../characters/registry";
 import type { VisualQuality } from "../types";
 import type { BuiltShip } from "./vanguard-model";
+import { activeShipRuntimeReliefAssetVersionId } from "../admin/ship-runtime-policy";
 import {
   dedupeShip3DInFlight,
   disposeBuiltShipResources,
@@ -13,8 +14,9 @@ import {
  * momentum-tinted rim, blast flashes, the afterburner lighting the tail and
  * gun flashes lighting the pods.
  *
- * The hull is the owner's painting raised into a solid (relief-model.ts), the
- * look they approved from the A/B/C demo on 2026-10-03. The code-built model
+ * Prepared Meshy/Tripo GLBs take precedence when available; otherwise the
+ * owner's painting raised into a solid (relief-model.ts) remains the fallback.
+ * Exact Admin relief assignments keep their published source. The code-built model
  * (vanguard-model.ts) read as a plastic toy next to the painting; it stays
  * only behind `?ship3d=model`. `?ship3d=0` turns 3D off (chase sprite). Low
  * quality never loads it; without WebGL the chase sprite stays.
@@ -120,6 +122,7 @@ export type Ship3DRole = "self" | "rival";
  */
 export type Ship3DLoadOptions = Readonly<{
   reliefAssetVersionId?: string | null;
+  quality?: VisualQuality;
 }>;
 
 const loads = new Map<string, Promise<DuelShip3D | null>>();
@@ -157,6 +160,7 @@ export class DuelShip3D {
   private readonly camera: import("three").PerspectiveCamera;
   private readonly hull: import("three").Group;
   private readonly rim: import("three").DirectionalLight;
+  private readonly key: import("three").DirectionalLight;
   private readonly blast: import("three").PointLight;
   private readonly engine: import("three").PointLight;
   private readonly guns: import("three").PointLight[];
@@ -168,13 +172,15 @@ export class DuelShip3D {
   private disposed = false;
   private pixels = 0;
   private frames = 0;
+  private environmentTarget: import("three").WebGLRenderTarget | null = null;
+  private environmentRoom: typeof import("three/examples/jsm/environments/RoomEnvironment.js").RoomEnvironment | null = null;
 
-  static load(id: CharacterId, role: Ship3DRole = "self"): Promise<DuelShip3D | null> {
-    const key = role + ":" + id;
+  static load(id: CharacterId, role: Ship3DRole = "self", quality: VisualQuality = "high"): Promise<DuelShip3D | null> {
+    const key = role + ":" + id + ":" + quality;
     return dedupeShip3DInFlight(
       loads,
       key,
-      () => DuelShip3D.create(id, role).catch(() => null),
+      () => DuelShip3D.create(id, role, { quality }).catch(() => null),
     );
   }
 
@@ -213,8 +219,16 @@ export class DuelShip3D {
     } catch {
       return null;
     }
+    let ownedShip: DuelShip3D | null = null;
+    let ownedBuilt: BuiltShip | null = null;
+    try {
     await step(role);
-    const built = vanguard !== null
+    // Exact Admin relief assignments/previews retain their own source. With
+    // no assignment, prepared Meshy/Tripo GLBs take precedence over relief art.
+    const authored = !modelled && options.reliefAssetVersionId === undefined && activeShipRuntimeReliefAssetVersionId(id) === undefined
+      ? await import("./authored-ship").then(module => module.loadAuthoredShip(three, id, role === "rival" ? "medium" : options.quality ?? "high")).catch(() => null)
+      : null;
+    const built = authored ?? (vanguard !== null
       ? vanguard.buildVanguard(three)
       : await reliefModule!.loadReliefShip(
           three,
@@ -222,15 +236,27 @@ export class DuelShip3D {
           renderer.capabilities.getMaxAnisotropy(),
           role === "self" ? 176 : 96,
           options.reliefAssetVersionId,
-        );
+        ));
     if (built === null) {
       renderer.dispose();
+      renderer.forceContextLoss();
       return null;
     }
+    ownedBuilt = built;
     await step(role);
     const ship = new DuelShip3D(three, renderer, built, role);
+    ownedShip = ship;
     await ship.warm(three, environment.RoomEnvironment);
     return ship;
+    } catch (error) {
+      if (ownedShip !== null) ownedShip.dispose();
+      else {
+        if (ownedBuilt !== null) disposeBuiltShipResources(ownedBuilt);
+        renderer.dispose();
+        renderer.forceContextLoss();
+      }
+      throw error;
+    }
   }
 
   private constructor(
@@ -241,6 +267,7 @@ export class DuelShip3D {
   ) {
     const full = role === "self";
     renderer.setClearColor(0x000000, 0);
+    renderer.domElement.dataset.shipModel = built.group.userData.modelUrl ?? "fallback";
     renderer.outputColorSpace = three.SRGBColorSpace;
     // Neutral keeps the blues (ACES washed them towards white).
     renderer.toneMapping = three.NeutralToneMapping;
@@ -254,6 +281,11 @@ export class DuelShip3D {
       event.preventDefault();
       this.lost = true;
     });
+    renderer.domElement.addEventListener("webglcontextrestored", () => {
+      if (this.disposed) return;
+      this.lost = false;
+      if (this.environmentRoom) void this.warm(this.three, this.environmentRoom).catch(() => { this.lost = true; });
+    });
 
     this.hull = built.group;
     this.hull.traverse((object) => {
@@ -266,6 +298,7 @@ export class DuelShip3D {
     this.scene.add(this.hull);
     this.scene.add(new three.HemisphereLight(0xa9c8ff, 0x0d0a14, 0.35));
     const key = new three.DirectionalLight(0xfff4e8, 2.3);
+    this.key = key;
     key.position.set(-0.8, 1.2, 0.45).multiplyScalar(2);
     key.castShadow = full;
     key.shadow.mapSize.set(1024, 1024);
@@ -334,17 +367,22 @@ export class DuelShip3D {
    * does not stall the fight.
    */
   private async warm(three: Three, Room: typeof import("three/examples/jsm/environments/RoomEnvironment.js").RoomEnvironment): Promise<void> {
+    this.environmentRoom = Room;
     if (this.role === "self") {
       await step(this.role);
+      if (this.disposed) return;
+      this.environmentTarget?.dispose();
       const pmrem = new three.PMREMGenerator(this.renderer);
       const room = new Room();
-      this.scene.environment = pmrem.fromScene(room, 0.04).texture;
+      this.environmentTarget = pmrem.fromScene(room, 0.04);
+      this.scene.environment = this.environmentTarget.texture;
       this.scene.environmentIntensity = this.built.environment;
       room.dispose();
       pmrem.dispose();
     }
     for (const texture of this.built.textures) {
       await step(this.role);
+      if (this.disposed) return;
       this.renderer.initTexture(texture);
     }
     await step(this.role);
@@ -366,6 +404,7 @@ export class DuelShip3D {
 
   /** Number of guns (muzzle anchors) this hull has. */
   get gunCount(): number { return this.built.muzzles.length; }
+  get authoredModelUrl(): string | null { return this.built.group.userData.modelUrl ?? null; }
 
   /** A shot left gun `index`: flash its light on the hull. */
   flash(index: number): void {
@@ -440,11 +479,13 @@ export class DuelShip3D {
     if (this.disposed) return;
     this.disposed = true;
     this.lost = true;
-    const environment = this.scene.environment;
     this.scene.environment = null;
-    environment?.dispose();
+    this.environmentTarget?.dispose();
+    this.environmentTarget = null;
     this.scene.remove(this.hull);
     disposeBuiltShipResources(this.built);
+    this.key.shadow.dispose();
     this.renderer.dispose();
+    this.renderer.forceContextLoss();
   }
 }

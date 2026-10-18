@@ -1,0 +1,344 @@
+{
+  "version": 1,
+  "generatedAt": "2026-10-18T08:36:41.169Z",
+  "models": {
+    "bosses/auriel-hero": {
+      "kind": "bosses",
+      "id": "auriel-hero",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/auriel-hero/auriel-hero.high.glb?v=e98210b3ec",
+          "bytes": 4450808
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/auriel-hero/auriel-hero.medium.glb?v=3659afdd3d",
+          "bytes": 1991908
+        }
+      },
+      "triangles": 30150,
+      "sockets": [
+        "FX_HALO",
+        "FX_CAST_R",
+        "FX_CAST_L",
+        "FX_CORE"
+      ],
+      "clips": [
+        "__SPACE_TYPING_EXPORT__01_Boss_Skill_Prismatic_Burst_V3",
+        "__SPACE_TYPING_EXPORT__00_Boss_Idle_Hover_V3",
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Hero_Fly",
+        "Hero_Boost",
+        "Hero_Attack_L",
+        "Hero_Attack_R",
+        "Hero_Cast",
+        "Hero_Victory"
+      ],
+      "size": [
+        1.7485,
+        1.7,
+        0.6653
+      ]
+    },
+    "bosses/tyrant-g01": {
+      "kind": "bosses",
+      "id": "tyrant-g01",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/tyrant-g01/tyrant-g01.high.glb?v=d5caddcb73",
+          "bytes": 4224656
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/tyrant-g01/tyrant-g01.medium.glb?v=7d3db227c7",
+          "bytes": 1765760
+        }
+      },
+      "triangles": 30150,
+      "sockets": [
+        "FX_HALO",
+        "FX_CAST_R",
+        "FX_CAST_L",
+        "FX_CORE"
+      ],
+      "clips": [
+        "__SPACE_TYPING_EXPORT__01_Boss_Skill_Prismatic_Burst_V3",
+        "__SPACE_TYPING_EXPORT__00_Boss_Idle_Hover_V3",
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro"
+      ],
+      "size": [
+        1.7485,
+        1.7,
+        0.6653
+      ]
+    },
+    "enemies/rainbow-scout-3d": {
+      "kind": "enemies",
+      "id": "rainbow-scout-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/rainbow-scout-3d/rainbow-scout-3d.high.glb?v=f6206eba6c",
+          "bytes": 1005380
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/rainbow-scout-3d/rainbow-scout-3d.medium.glb?v=a3457c314e",
+          "bytes": 345936
+        }
+      },
+      "triangles": 7000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9971,
+        1.988,
+        1.5093
+      ]
+    },
+    "guides/draconis-v4": {
+      "kind": "guides",
+      "id": "draconis-v4",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/guides/draconis-v4/draconis-v4.high.glb?v=6ac4b16b57",
+          "bytes": 3690148
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/guides/draconis-v4/draconis-v4.medium.glb?v=37f0d78e94",
+          "bytes": 1586084
+        }
+      },
+      "triangles": 31226,
+      "sockets": [
+        "FX_HALO",
+        "FX_MOUTH",
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_WING_L2",
+        "FX_WING_L",
+        "FX_WING_R2",
+        "FX_WING_R",
+        "FX_CORE",
+        "FX_TAIL",
+        "FX_FOOT_L",
+        "FX_FOOT_R"
+      ],
+      "clips": [
+        "Guide_Idle",
+        "Guide_Wave",
+        "Guide_Flap",
+        "Guide_Hop",
+        "Guide_Bow",
+        "Guide_Talk"
+      ],
+      "size": [
+        2.0165,
+        2,
+        1.1757
+      ]
+    },
+    "heroes/draconis": {
+      "kind": "heroes",
+      "id": "draconis",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/heroes/draconis/draconis.high.glb?v=4539947ca7",
+          "bytes": 3677336
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/heroes/draconis/draconis.medium.glb?v=8f255fb159",
+          "bytes": 1573276
+        }
+      },
+      "triangles": 22000,
+      "sockets": [
+        "FX_HALO",
+        "FX_MOUTH",
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_WING_L",
+        "FX_WING_L2",
+        "FX_WING_R",
+        "FX_WING_R2",
+        "FX_TAIL",
+        "FX_FOOT_L",
+        "FX_FOOT_R",
+        "FX_CORE"
+      ],
+      "clips": [
+        "Hero_Idle_Hover",
+        "Hero_Hit",
+        "Hero_Death",
+        "Hero_Intro",
+        "Hero_Fly",
+        "Hero_Boost",
+        "Hero_Attack_L",
+        "Hero_Attack_R",
+        "Hero_Cast",
+        "Hero_Victory"
+      ],
+      "size": [
+        2.1826,
+        2.0027,
+        1.0518
+      ]
+    },
+    "heroes/draconis-v2": {
+      "kind": "heroes",
+      "id": "draconis-v2",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/heroes/draconis-v2/draconis-v2.high.glb?v=a08a065796",
+          "bytes": 4009564
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/heroes/draconis-v2/draconis-v2.medium.glb?v=d5363f9db7",
+          "bytes": 1444424
+        }
+      },
+      "triangles": 22000,
+      "sockets": [
+        "FX_HALO",
+        "FX_MOUTH",
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_WING_L2",
+        "FX_WING_L",
+        "FX_WING_R2",
+        "FX_WING_R",
+        "FX_CORE",
+        "FX_TAIL",
+        "FX_FOOT_L",
+        "FX_FOOT_R"
+      ],
+      "clips": [
+        "Hero_Fly",
+        "Hero_Idle_Hover",
+        "Hero_Boost",
+        "Hero_Attack_L",
+        "Hero_Attack_R",
+        "Hero_Attack_Both",
+        "Hero_Cast",
+        "Hero_Hit",
+        "Hero_Victory",
+        "Hero_Death",
+        "Hero_Intro"
+      ],
+      "size": [
+        2.2077,
+        2.0042,
+        1.5641
+      ]
+    },
+    "heroes/draconis-v3": {
+      "kind": "heroes",
+      "id": "draconis-v3",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/heroes/draconis-v3/draconis-v3.high.glb?v=3b1d7ce72b",
+          "bytes": 4362212
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/heroes/draconis-v3/draconis-v3.medium.glb?v=937aef0aff",
+          "bytes": 1565856
+        }
+      },
+      "triangles": 60000,
+      "sockets": [
+        "FX_JAW",
+        "FX_HALO",
+        "FX_MOUTH",
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_WING_L2",
+        "FX_WING_L",
+        "FX_WING_R2",
+        "FX_WING_R",
+        "FX_CORE",
+        "FX_TAIL",
+        "FX_FOOT_L",
+        "FX_FOOT_R"
+      ],
+      "clips": [
+        "Hero_Fly",
+        "Hero_Idle_Hover",
+        "Hero_Boost",
+        "Hero_Spit",
+        "Hero_Spit_Big",
+        "Hero_Cast",
+        "Hero_Hit",
+        "Hero_Victory",
+        "Hero_Death",
+        "Hero_Intro"
+      ],
+      "size": [
+        4.106,
+        1.9982,
+        2.7697
+      ]
+    },
+    "ships/vanguard": {
+      "kind": "ships",
+      "id": "vanguard",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/ships/vanguard/vanguard.high.glb?v=27ec9d5c04",
+          "bytes": 2748648
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/ships/vanguard/vanguard.medium.glb?v=5a48f7985c",
+          "bytes": 881140
+        }
+      },
+      "triangles": 12000,
+      "sockets": [
+        "FX_CORE",
+        "FX_ENGINE_L",
+        "FX_ENGINE_R",
+        "FX_MUZZLE",
+        "FX_MUZZLE_L",
+        "FX_MUZZLE_R",
+        "FX_WING_L",
+        "FX_WING_R"
+      ],
+      "clips": [
+        "Ship_Idle"
+      ],
+      "size": [
+        1.7563,
+        0.6153,
+        2.0006
+      ]
+    },
+    "skills/dragon-fireball": {
+      "kind": "skills",
+      "id": "dragon-fireball",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/skills/dragon-fireball/dragon-fireball.high.glb?v=c65f85d9d7",
+          "bytes": 277224
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/skills/dragon-fireball/dragon-fireball.medium.glb?v=87ae7bddb1",
+          "bytes": 138280
+        }
+      },
+      "triangles": 4000,
+      "sockets": [
+        "FX_TRAIL"
+      ],
+      "clips": [],
+      "size": [
+        0.7214,
+        0.745,
+        1.973
+      ]
+    }
+  }
+}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canSelectCampaignStageWithTestingUnlock,
   isTestingStagePreview,
+  testingStageUnlockEnabled,
 } from "../src/campaign/stage-selection-access";
 import {
   createCampaignExpansionState,
@@ -11,6 +12,12 @@ import {
 } from "../src/campaign/progress";
 
 describe("temporary all-stage testing access", () => {
+  it("ignores a local unlock switch in production while keeping published Admin authority", () => {
+    expect(testingStageUnlockEnabled(true,"bundled",{unlockAllStages:false,unlockAllShips:false},false)).toBe(false);
+    expect(testingStageUnlockEnabled(true,"bundled",{unlockAllStages:false,unlockAllShips:false},true)).toBe(true);
+    expect(testingStageUnlockEnabled(false,"published",{unlockAllStages:true,unlockAllShips:false},false)).toBe(true);
+    expect(testingStageUnlockEnabled(true,"published",{unlockAllStages:false,unlockAllShips:false},true)).toBe(false);
+  });
   it("keeps normal progression locks when disabled", () => {
     const campaign = createDefaultCampaignProgress();
     const expansion = createCampaignExpansionState(campaign);

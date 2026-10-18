@@ -4,7 +4,18 @@ let speechGeneration = 0;
 let speechActive = false;
 let speechGate: (play: () => Promise<void>) => Promise<void> = play => play();
 let cancelPlayback: (() => void) | null = null;
+let pronunciationRequest = 0;
+let speechNotice: (text: string) => void = () => {};
 const PRONUNCIATION_WATCHDOG_MS = 20_000;
+const VOICE_DISCOVERY_TIMEOUT_MS = 1_800;
+// Voice lists arrive asynchronously (and may gain cloud voices later). Once
+// chosen, keep one explicit voice for this browser/page session, even on stop.
+const sessionVoices = new WeakMap<SpeechSynthesis, SpeechSynthesisVoice>();
+export const SPEECH_VOICE_KEY = "spaceTypingEnglishVoiceURI";
+const discovery = new WeakMap<SpeechSynthesis, { promise: Promise<SpeechSynthesisVoice | null>; cancel(): void; warn(): void }>();
+const unavailableNoticed = new WeakSet<SpeechSynthesis>();
+
+export function setSpeechNotice(notice: (text: string) => void): void { speechNotice = notice; }
 
 export function setSpeechGate(gate: (play: () => Promise<void>) => Promise<void>): void {
   speechGate = gate;
@@ -60,8 +71,72 @@ export function selectEnglishVoice(
   return best;
 }
 
-function englishVoice(): SpeechSynthesisVoice | null {
-  return selectEnglishVoice(speechSynthesis.getVoices());
+/**
+ * Older Safari/iOS (before 16) has no event target on speechSynthesis; the
+ * 50 ms discovery poll covers those browsers, so the listener is optional.
+ */
+function voicesChangedListener(listener: () => void, add: boolean): void {
+  try {
+    const target = speechSynthesis as Partial<Pick<SpeechSynthesis, "addEventListener" | "removeEventListener">>;
+    if (add && typeof target.addEventListener === "function") speechSynthesis.addEventListener("voiceschanged", listener);
+    if (!add && typeof target.removeEventListener === "function") speechSynthesis.removeEventListener("voiceschanged", listener);
+  } catch {
+    // Discovery still polls.
+  }
+}
+
+/** Discover outside the microphone output gate. The first list may contain only OS voices. */
+export function prepareEnglishVoice(notifyMissing = false): Promise<SpeechSynthesisVoice | null> {
+  if (typeof speechSynthesis === "undefined") return Promise.resolve(null);
+  const synth = speechSynthesis;
+  const pinned = sessionVoices.get(synth);
+  if (pinned) return Promise.resolve(pinned);
+  const pending = discovery.get(synth);
+  if (pending) { if (notifyMissing) pending.warn(); return pending.promise; }
+  let shouldNotify = notifyMissing;
+  let saved: string | null = null;
+  try { saved = localStorage.getItem(SPEECH_VOICE_KEY); } catch { /* Optional preference. */ }
+  let cancel = (): void => {};
+  const promise = new Promise<SpeechSynthesisVoice | null>(resolve => {
+    const started = Date.now();
+    let events = 0;
+    let done = false;
+    let candidateAt: number | null = null;
+    let poll: ReturnType<typeof setInterval> | null = null;
+    const finish = (voice: SpeechSynthesisVoice | null, notify = true): void => {
+      if (done) return;
+      done = true;
+      if (poll !== null) clearInterval(poll);
+      voicesChangedListener(changed, false);
+      if (voice) {
+        sessionVoices.set(synth, voice);
+        try { localStorage.setItem(SPEECH_VOICE_KEY, voice.voiceURI); } catch { /* Optional preference. */ }
+      } else if (notify && shouldNotify && !unavailableNoticed.has(synth)) {
+        unavailableNoticed.add(synth);
+        speechNotice("Thiết bị không có giọng đọc tiếng Anh");
+      }
+      resolve(voice);
+    };
+    const check = (): void => {
+      let voices: SpeechSynthesisVoice[];
+      try { voices = synth.getVoices(); } catch { finish(null); return; }
+      const remembered = saved ? voices.find(voice => voice.voiceURI === saved && voice.lang.toLowerCase().startsWith("en")) : undefined;
+      if (remembered) { finish(remembered); return; }
+      const candidate = selectEnglishVoice(voices);
+      if (candidate && candidateAt === null) candidateAt = Date.now();
+      if (candidate && !saved && (events >= 2 || Date.now() - candidateAt! >= 300)) { finish(candidate); return; }
+      if (Date.now() - started >= VOICE_DISCOVERY_TIMEOUT_MS) finish(candidate);
+    };
+    function changed(): void { events++; check(); }
+    cancel = () => finish(null, false);
+    voicesChangedListener(changed, true);
+    poll = setInterval(check, 50);
+    check(); // Warm the native backend immediately, including startup without a user gesture.
+  });
+  const state = { promise, cancel, warn: () => { shouldNotify = true; } };
+  discovery.set(synth, state);
+  void promise.then(() => { if (discovery.get(synth) === state) discovery.delete(synth); });
+  return promise;
 }
 
 export function speakEnglish(text: string, settings: GameSettings): void {
@@ -75,10 +150,14 @@ export function speakEnglish(text: string, settings: GameSettings): void {
 
   // A rejected gate means this invocation never owned pronunciation playback.
   // Do not deactivate a newer pronunciation that may already be running.
-  void speechGate(() => playEnglish(text, settings)).catch(() => undefined);
+  const request = ++pronunciationRequest;
+  void prepareEnglishVoice(true).then(voice => {
+    if (voice === null || request !== pronunciationRequest) return;
+    return speechGate(() => request === pronunciationRequest ? playEnglish(text, settings, voice) : Promise.resolve());
+  }).catch(() => undefined);
 }
 
-function playEnglish(text: string, settings: GameSettings): Promise<void> {
+function playEnglish(text: string, settings: GameSettings, voice: SpeechSynthesisVoice): Promise<void> {
   return new Promise((resolve) => {
     speechGeneration += 1;
     const generation = speechGeneration;
@@ -94,26 +173,12 @@ function playEnglish(text: string, settings: GameSettings): Promise<void> {
       // remain usable even on browsers with a broken speechSynthesis backend.
     }
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "en-US";
-    utterance.rate = settings.pronunciationRate;
-    utterance.volume = clampVolume(settings.pronunciationVolume);
-
-    const voice = englishVoice();
-    if (voice !== null) utterance.voice = voice;
-
-    setSpeechActive(true);
-
     let finished = false;
     let watchdog: ReturnType<typeof setTimeout> | null = null;
     const finish = (): void => {
       if (finished) return;
       finished = true;
-
-      if (watchdog !== null) {
-        clearTimeout(watchdog);
-        watchdog = null;
-      }
+      if (watchdog !== null) clearTimeout(watchdog);
 
       resolve();
       if (generation === speechGeneration) {
@@ -123,28 +188,48 @@ function playEnglish(text: string, settings: GameSettings): Promise<void> {
     };
     cancelPlayback = finish;
 
-    utterance.onend = finish;
-    utterance.onerror = finish;
-    watchdog = setTimeout(() => {
-      if (generation === speechGeneration) {
-        try {
-          speechSynthesis.cancel();
-        } catch {
-          // The watchdog owns lifecycle cleanup even when native cancel fails.
-        }
-      }
-      finish();
-    }, PRONUNCIATION_WATCHDOG_MS);
-
+    const unpin = (): void => {
+      if (generation !== speechGeneration) return;
+      sessionVoices.delete(speechSynthesis);
+      try { localStorage.removeItem(SPEECH_VOICE_KEY); } catch { /* Optional preference. */ }
+    };
     try {
-      speechSynthesis.speak(utterance);
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = voice.lang;
+        utterance.rate = settings.pronunciationRate;
+        utterance.volume = clampVolume(settings.pronunciationVolume);
+        utterance.voice = voice;
+        utterance.onend = finish;
+        utterance.onerror = event => {
+          if (event?.error !== "interrupted" && event?.error !== "canceled") unpin();
+          finish();
+        };
+        setSpeechActive(true);
+        watchdog = setTimeout(() => {
+          if (generation === speechGeneration) {
+            try {
+              speechSynthesis.cancel();
+            } catch {
+              // Still release local lifecycle state if native cancel fails.
+            }
+          }
+          finish();
+        }, PRONUNCIATION_WATCHDOG_MS);
+        speechSynthesis.speak(utterance);
     } catch {
+      unpin();
       finish();
     }
   });
 }
 
 export function stopSpeech(): void {
+  pronunciationRequest++;
+  if (typeof speechSynthesis !== "undefined") {
+    const pending = discovery.get(speechSynthesis);
+    discovery.delete(speechSynthesis);
+    pending?.cancel();
+  }
   cancelPlayback?.();
   cancelPlayback = null;
   speechGeneration += 1;

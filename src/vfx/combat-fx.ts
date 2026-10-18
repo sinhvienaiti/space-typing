@@ -1,5 +1,6 @@
 import type { VisualQuality } from "../types";
 import type { EnemyDeathStyle, EnemyMaterial, EnemyShotSkin, FamilyStyle } from "../enemies/identity";
+import { drawShaft } from "./flare-sprites";
 import { drawGlow, drawRingGlow } from "./light-sprites";
 
 /**
@@ -242,6 +243,11 @@ export class CombatFxSystem {
     this.card = { ...card, t: 0, duration: 3.2 };
     this.ring(x, y, radius * 2.8, 5, primary, 0.9, 0.35);
     this.ring(x, y, radius * 4.2, 3, accent, 1.2, 0.5);
+  }
+
+  /** Only the title card (the Boss Depth View draws its own arrival on the model). */
+  titleCard(card: BossTitleCard): void {
+    this.card = { ...card, t: 0, duration: 3.2 };
   }
 
   bossPhase(x: number, y: number, radius: number, primary: string, accent: string): void {
@@ -661,6 +667,7 @@ function drawBossSigil(
   primary: string,
   accent: string,
   strength: number,
+  spin = 1,
 ): void {
   const alpha = Math.min(1, 0.55 * strength);
   drawRingGlow(context, primary, x, y, radius * 1.32, 0.45 * strength);
@@ -671,7 +678,7 @@ function drawBossSigil(
   ] as const) {
     context.save();
     context.translate(x, y);
-    context.rotate(time * speed);
+    context.rotate(time * speed * spin);
     context.globalAlpha = alpha;
     context.strokeStyle = color;
     context.lineWidth = scale < 1.4 ? 2.2 : 1.6;
@@ -685,7 +692,7 @@ function drawBossSigil(
   // Six rune marks riding the inner ring.
   context.save();
   context.translate(x, y);
-  context.rotate(-time * 0.35);
+  context.rotate(-time * 0.35 * spin);
   context.globalAlpha = alpha;
   context.strokeStyle = accent;
   context.lineWidth = 2;
@@ -707,6 +714,9 @@ function drawBossSigil(
  * A boss's ambient signature, drawn around it every frame from a few moving
  * sprites (deterministic in time, no state): rising embers, falling snow,
  * swirling petals, void tendrils, god rays…
+ *
+ * `enrage` 0 … 1 (last phase): a hot pulsing under-glow, a faster sigil and
+ * faster, redder light.
  */
 export function drawBossAura(
   context: CanvasRenderingContext2D,
@@ -719,6 +729,7 @@ export function drawBossAura(
   accent: string,
   strength: number,
   quality: VisualQuality,
+  enrage = 0,
 ): void {
   const count = quality === "low" ? 8 : quality === "medium" ? 14 : 22;
   context.save();
@@ -732,19 +743,28 @@ export function drawBossAura(
   context.fillRect(x - radius * 2.7, y - radius * 2.7, radius * 5.4, radius * 5.4);
   context.globalCompositeOperation = "lighter";
   drawGlow(context, primary, x, y, radius * 2.6, 0.3 * strength);
-  drawBossSigil(context, x, y, radius, time, primary, accent, strength);
+  if (enrage > 0) {
+    // Heartbeat: two quick throbs, then a rest.
+    const beat = Math.pow(Math.max(0, Math.sin(time * 5.2)), 6) + Math.pow(Math.max(0, Math.sin(time * 5.2 - 0.9)), 10) * 0.6;
+    drawGlow(context, "#ff3b5c", x, y, radius * (2.9 + beat * 0.6), enrage * (0.32 + beat * 0.38));
+    drawRingGlow(context, "#ff6a4d", x, y, radius * (1.2 + beat * 0.16), enrage * (0.25 + beat * 0.7));
+  }
+  const hot = enrage > 0.5;
+  drawBossSigil(context, x, y, radius, time, hot ? "#ff4d5e" : primary, hot ? "#ffb066" : accent, strength, 1 + enrage * 1.8);
   switch (style) {
     case "rays": {
-      context.globalAlpha = 0.16 * strength;
-      context.fillStyle = accent;
-      for (let ray = 0; ray < 10; ray += 1) {
-        const a = (ray / 10) * TAU + time * 0.18;
-        context.beginPath();
-        context.moveTo(x, y);
-        context.lineTo(x + Math.cos(a - 0.06) * radius * 3, y + Math.sin(a - 0.06) * radius * 3);
-        context.lineTo(x + Math.cos(a + 0.06) * radius * 3, y + Math.sin(a + 0.06) * radius * 3);
-        context.closePath();
-        context.fill();
+      // Soft light shafts slowly turning behind the boss, each breathing on
+      // its own (cached sprites; the old flat wedges read as grey slabs).
+      const shafts = quality === "low" ? 5 : quality === "medium" ? 7 : 10;
+      const colors = enrage > 0.5 ? ["#ff5a6a", "#ffb066", primary] : [primary, accent, "#ffe7a6"];
+      const turn = time * (0.1 + enrage * 0.22);
+      for (let ray = 0; ray < shafts; ray += 1) {
+        const seed = hash(ray * 1.37 + 0.2);
+        const a = (ray / shafts) * TAU + turn + Math.sin(time * 0.31 + ray * 1.9) * 0.07;
+        const breathe = 0.5 + 0.5 * Math.sin(time * (0.7 + seed * 0.9) + ray * 2.3);
+        const length = radius * (3.4 + seed * 2.1) * (0.82 + breathe * 0.22);
+        const width = radius * (0.7 + hash(ray * 3.1) * 0.55);
+        drawShaft(context, colors[ray % colors.length]!, x, y, a, length, width, (0.3 + breathe * 0.32) * strength);
       }
       break;
     }

@@ -22,6 +22,13 @@ export type DepthGeometry = {
   bossSize: number;
   shipX: number;
   shipY: number;
+  /** The model's FX sockets on the canvas (beams and chains leave from them). */
+  sockets?: {
+    core: { x: number; y: number };
+    left: { x: number; y: number };
+    right: { x: number; y: number };
+    halo: { x: number; y: number };
+  };
 };
 
 export type DepthColors = { primary: string; accent: string };
@@ -208,6 +215,9 @@ const METEOR_FALL = 0.9;
 
 /** Meteors leave from across the boss, not all from its centre. */
 function meteorStart(geometry: DepthGeometry, meteor: BossMeteor): { x: number; y: number } {
+  // From around the model's halo (its crown flares during the ultimate).
+  const halo = geometry.sockets?.halo;
+  if (halo !== undefined) return { x: halo.x + meteor.lane * geometry.bossSize * 0.5, y: halo.y + geometry.bossSize * 0.12 };
   return { x: geometry.bossX + meteor.lane * geometry.bossSize * 0.6, y: geometry.bossY + geometry.bossSize * 0.05 };
 }
 
@@ -281,7 +291,9 @@ export function drawBossSkill(
   quality: VisualQuality,
 ): void {
   const progress = bossSkillProgress(state);
-  const boss = { x: geometry.bossX, y: geometry.bossY };
+  const center = { x: geometry.bossX, y: geometry.bossY };
+  // The beam leaves the model's core, the chain its casting hand.
+  const boss = geometry.sockets?.core ?? center;
   const ship = { x: geometry.shipX, y: geometry.shipY - 34 };
   const pulse = 0.5 + 0.5 * Math.sin(time * 16);
   const rich = quality === "high" || quality === "ultra";
@@ -300,20 +312,31 @@ export function drawBossSkill(
       context.restore();
     } else if (state.stage === "release") {
       const fade = 1 - progress;
+      // The beam starts just in front of the core (its muzzle flare marks the
+      // root), so its wide glow never lies over the model's body.
+      const length = Math.max(1, Math.hypot(ship.x - boss.x, ship.y - boss.y));
+      const lead = geometry.bossSize * 0.07;
+      const from = { x: boss.x + ((ship.x - boss.x) / length) * lead, y: boss.y + ((ship.y - boss.y) / length) * lead };
       if (state.result === "countered") {
         const back = Math.min(1, progress * 3);
-        beam(context, boss.x, boss.y, ship.x, ship.y, 30 * (1 - back), colors.primary, (1 - back) * 0.9);
-        beam(context, ship.x, ship.y, boss.x, boss.y, 40 * fade + 6, "#6fe7ff", Math.min(1, back * 1.4) * fade + 0.2 * fade);
+        beam(context, from.x, from.y, ship.x, ship.y, 30 * (1 - back), colors.primary, (1 - back) * 0.9);
+        beam(context, ship.x, ship.y, from.x, from.y, 40 * fade + 6, "#6fe7ff", Math.min(1, back * 1.4) * fade + 0.2 * fade);
         context.save();
         context.globalCompositeOperation = "lighter";
         drawGlow(context, "#9ff4ff", ship.x, ship.y, 160 * fade + 40, fade);
-        drawGlow(context, "#ffffff", boss.x, boss.y, geometry.bossSize * 0.5 * back * fade, back * fade * 0.55);
+        drawGlow(context, "#9ff4ff", boss.x, boss.y, geometry.bossSize * 0.3 * back * fade, back * fade * 0.4);
         context.restore();
       } else {
-        beam(context, boss.x, boss.y, ship.x, ship.y, (44 + 10 * Math.sin(time * 60)) * fade + 8, colors.primary, fade);
+        beam(context, from.x, from.y, ship.x, ship.y, (44 + 10 * Math.sin(time * 60)) * fade + 8, colors.primary, fade);
+        if (quality !== "low") {
+          // Spectral fringes: the beam splits a little like light through a prism.
+          const spread = 6 + 5 * Math.sin(time * 23);
+          beam(context, from.x - 2, from.y, ship.x - spread * 3, ship.y, 9 * fade + 2, colors.accent, fade * 0.55);
+          beam(context, from.x + 2, from.y, ship.x + spread * 3, ship.y, 9 * fade + 2, "#ffe27a", fade * 0.45);
+        }
         context.save();
         context.globalCompositeOperation = "lighter";
-        drawGlow(context, colors.primary, boss.x, boss.y, geometry.bossSize * 0.45 * fade, fade * 0.45);
+        drawGlow(context, colors.primary, boss.x, boss.y, geometry.bossSize * 0.26 * fade, fade * 0.3);
         drawGlow(context, "#ffd2e6", ship.x, ship.y, 220 * fade, fade);
         context.restore();
       }
@@ -328,13 +351,13 @@ export function drawBossSkill(
       for (const lane of lanes) {
         const isSafe = lane === safe;
         const nearX = depthLaneX(geometry, lane);
-        const farX = boss.x + lane * geometry.bossSize * 0.12;
+        const farX = center.x + lane * geometry.bossSize * 0.12;
         const half = Math.min(150, geometry.width * 0.09);
         const alpha = state.stage === "telegraph" ? 0.26 + pulse * 0.2 : 0.14;
-        const farY = boss.y + geometry.bossSize * 0.2;
+        const farY = center.y + geometry.bossSize * 0.2;
         context.save();
         context.globalCompositeOperation = "lighter";
-        const gradient = context.createLinearGradient(0, boss.y, 0, geometry.height);
+        const gradient = context.createLinearGradient(0, center.y, 0, geometry.height);
         const color = isSafe ? "#5dffaa" : "#ff4646";
         gradient.addColorStop(0, rgba(color, 0));
         gradient.addColorStop(0.35, rgba(color, alpha * 0.6));
@@ -379,11 +402,13 @@ export function drawBossSkill(
         for (let wave = 0; wave < 3; wave += 1) {
           const u = Math.min(1, Math.max(0, (progress - wave * 0.12) / 0.62));
           if (u <= 0 || u >= 1) continue;
-          const p = depthFlight(u, { x: boss.x + lane * geometry.bossSize * 0.12, y: boss.y + geometry.bossSize * 0.2 }, { x: depthLaneX(geometry, lane), y: geometry.shipY + 10 });
-          ellipseRing(context, p.x, p.y, 160 * p.s, 48 * p.s, 5 * p.s + 1, "#ffb066", 1 - u * 0.35);
+          const p = depthFlight(u, { x: center.x + lane * geometry.bossSize * 0.12, y: center.y + geometry.bossSize * 0.2 }, { x: depthLaneX(geometry, lane), y: geometry.shipY + 10 });
+          // Fades in as it leaves the boss, so it never whites out the model.
+          const leave = Math.min(1, u / 0.16);
+          ellipseRing(context, p.x, p.y, 160 * p.s, 48 * p.s, 5 * p.s + 1, "#ffb066", (1 - u * 0.35) * (0.35 + 0.65 * leave));
           context.save();
           context.globalCompositeOperation = "lighter";
-          drawGlow(context, "#ffc58a", p.x, p.y, 200 * p.s, 0.8 - u * 0.5);
+          drawGlow(context, "#ffc58a", p.x, p.y, 200 * p.s, (0.8 - u * 0.5) * leave * leave);
           context.restore();
         }
       }
@@ -405,6 +430,7 @@ export function drawBossSkill(
   }
 
   if (state.kind === "tether") {
+    const hand = geometry.sockets?.left ?? boss;
     if (state.stage === "telegraph") {
       // The chain aims at the ship while the boss winds up.
       context.save();
@@ -413,12 +439,12 @@ export function drawBossSkill(
       context.strokeStyle = rgba(COUNTER_COLOR.break, 0.25 + pulse * 0.4);
       context.lineWidth = 1.5 + progress * 1.5;
       context.beginPath();
-      context.moveTo(boss.x, boss.y);
+      context.moveTo(hand.x, hand.y);
       context.lineTo(ship.x, ship.y);
       context.stroke();
       context.restore();
     } else if (state.stage === "release" && state.result !== "countered") {
-      drawChain(context, boss, ship, colors.accent, time, Math.min(1, state.t / 0.18), rich);
+      drawChain(context, hand, ship, colors.accent, time, Math.min(1, state.t / 0.18), rich);
     } else if (state.stage === "recovery" && state.result === "countered") {
       // Broken: the links scatter for a moment.
       const k = progress;
@@ -427,7 +453,7 @@ export function drawBossSkill(
       const links = rich ? 14 : 8;
       for (let index = 0; index < links; index += 1) {
         const u = (index + 0.5) / links;
-        const p = depthFlight(u, boss, ship);
+        const p = depthFlight(u, hand, ship);
         const spread = (index % 2 === 0 ? 1 : -1) * k * (30 + index * 4);
         drawGlow(context, COUNTER_COLOR.break, p.x + spread, p.y + k * 30 * u, 10 * p.s + 4, 1 - k);
       }

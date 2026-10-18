@@ -3979,3 +3979,93 @@ rerun with one worker, VFX alpha integrity still fails on existing media.
 Two synthetic-speech Portal+combat runs still overflow; standalone speech passes.
 Voice combat remains NOT ACCEPTED. Detailed evidence and next profiling gate are
 in `VOICE_WARP_FIX_REVIEW_2026-10-04.md`. No save reset, media edits, commit or push.
+
+## 2026-10-17 — Local wallet and G01 acceptance checkpoint
+
+Current working-tree continuation is documented in
+`CLAUDE_PROCESS_2026-10-17.md` and
+`CODEX_WALLET_BOSS_ACCEPTANCE_2026-10-17.md`.
+
+Server-wallet phases 1–3 now include shared catalogue price checks, pending purchase
+receipts with commit/refund recovery, fixed lesson receipts, account-response fences
+and stricter sortie validation. Local migrations 0005/0006 and the final Play build
+are applied. G01 GLB loading no longer requires a companion painted asset; its
+intro, five skills and death were inspected on Medium/High, with measured FX cost.
+
+Validation: 344 game test files / 2,107 tests; 112 online E2E checks; 3 Admin bridge
+tests; game/Duel/Worker type checks; game and Portal builds. Temporary-profile Play
+checks confirmed purchase persistence, free offline Practice and a 100→90 Warp
+Campaign deploy. No source commit, push or production deployment was performed.
+
+Inventory ownership and full gameplay evidence remain client-owned in these wallet
+phases. Published Admin prices need a trusted catalogue sync before being used for
+online purchases; mismatches are refused. Shared-device account/save isolation is
+still the next online task. These checks do not supersede the Voice acceptance
+limits above or constitute certification of monetized/ranked play.
+
+## 2026-10-17 — Follow-up: TTS voice, vocabulary repetition and Admin stage access
+
+See `CODEX_VOICE_VOCAB_STAGE_FIX_2026-10-17.md` for the current follow-up.
+Confirmed causes: asynchronous browser voice discovery plus per-word reselection;
+Level 1's 150 selected words reduced to six by Long word; and a published-stage
+authority guard that ignored the published Admin testing override itself.
+
+TTS now pins one explicit English voice per page session. Word selection exhausts
+fresh choices before repeating and uses the original selected source after a
+Long word/Short burst pool runs out. Published Admin stage unlock now grants the
+existing preview path, preserving Campaign saves/rewards and Warp. This changes
+pronunciation playback, not microphone recognition acceptance.
+
+Focused validation: 22 files / 158 tests, game/Duel TypeScript and build:space passed. Chrome checks
+confirmed three calls with the same voice, 150 unique assignments in Long word,
+and Stage 1000 preview Deploy with Warp 100→100. Final Play build/browser evidence
+is recorded in the follow-up report. Play independently confirmed the same voice
+through Start recall/Replay and Stage 1000 Deploy with Warp 100→100 and server
+maxStage 1→1. No owner save reset, commit or push.
+
+## 2026-10-17 — Vanguard Meshy GLB integrated locally
+
+Owner supplied `art-src/models/raw/ships/vanguard.meshy.glb` (SHA256
+87D4CC5694849BCCEC2B634DE8AF83479C00724E1C4A4A553E7D623ECC605A4A), preserved unchanged.
+Blender export: nose corrected from -X to +Y, 21,193→12,000 triangles, emissive,
+Ship_Idle and eight FX sockets. Editable source is in `art-src/models/blend/ships/`;
+runtime High/Medium GLBs are listed alongside G01 in the public model manifest.
+
+Campaign/Recall now use projected model gun sockets for bolts/aiming. Title and
+Duel renderers prefer prepared GLBs over bundled relief when no exact Admin relief
+source is assigned. Quality changes load the correct tier; stale loads are fenced.
+Low/fallback hides the old 3D layer. Existing card/icon illustrations remain.
+
+54 relevant tests, game/Duel TypeScript and build:space passed; final title
+visibility fix was included by a final Vite build. Play verified the authored ship,
+Medium→Low→High and real Deploy 100→90 Warp, with no page exceptions or console
+warnings. Isolated Duel renderer verified both roles. Campaign A/B CPU overhead:
+Medium +0.11–0.30 ms, High +0.13–0.16 ms in a fixed Stage 1 scene on RTX 3050 Ti;
+this is not every-device or crowded-combat FPS certification. Details and repeatable
+commands: `VANGUARD_MESHY_INTEGRATION_2026-10-17.md`. No owner save reset,
+database schema change, commit, push or production deployment.
+
+## 2026-10-17 — Claude review implemented, local acceptance
+
+Implemented the 12 follow-up steps in `CLAUDE_REVIEW_CODEX_2026-10-17.md`.
+New-account wallet seeds are denied; legacy migration uses a fixed cutoff and
+bounded stage/balances. Wallet operations have a per-isolate rate limit, pending
+purchase expiration/support controls, phase-2 earning checks, rollback recovery,
+fixed offline lesson receipts, stable sortie/refuel intents and account fencing.
+Additive migration 0007 applied locally, with no owner save reset or remote deploy.
+
+Authored bosses never substitute a modular body while waiting/failing. Campaign
+and the Duel rival use Medium; title and Duel release their owned GPU resources.
+GLB URLs carry content hashes. Browser inspection verified 8/8 ImageBitmaps closed
+and both owned renderers at zero geometries/textures after disposal. Voice persists
+its URI, waits for late saved voices outside the mic gate, and keeps cancellation
+separate from backend failure. Long Word uses 24 distinct longest prompts while
+preserving Recall weights; production ignores local unlock controls. Preview is
+visible, keeps Warp/progress unchanged, and clears on failed start/return to title.
+
+Account E2E 112/112 used isolated Worker 3026 and a separate D1 directory; no E2E
+broadcasts/bans touched Play's 3016 database. Game/Portal builds passed; Play
+verified Deploy 100→90, Preview 100→100, Medium→Low→High and title release/reload.
+Final source coverage verified all 352 test files / 2,167 tests, with no missing
+or extra paths; 3 Admin bridge tests passed. Counts and evidence are in
+`CODEX_CLAUDE_REVIEW_IMPLEMENTATION_2026-10-17.md`.

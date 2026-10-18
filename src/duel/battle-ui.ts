@@ -2993,6 +2993,7 @@ export function installDuelBattleUi(
     },
     hide() {
       active = false;
+      combatVisuals.dispose();
       setShip3DCalm(true);
       hooks.onCombatRenderer?.(null);
       paintedVfxGeneration += 1;

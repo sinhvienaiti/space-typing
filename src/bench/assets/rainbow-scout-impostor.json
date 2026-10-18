@@ -1,0 +1,14 @@
+{
+  "id": "rainbow-scout",
+  "yaws": 16,
+  "frames": 4,
+  "tile": 192,
+  "elevationDeg": 40.0,
+  "frameSize": 2.9583,
+  "size": [
+    1.9971,
+    1.5093,
+    1.988
+  ],
+  "flutter": true
+}

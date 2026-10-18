@@ -1,0 +1,46 @@
+{
+  "id": "celestial",
+  "version": 1775537053,
+  "sprites": {
+    "bolt": {
+      "url": "bolt.webp",
+      "sha256": "7da4d2a61f115dfac131c6e893d9779a00eb92f3e387f85ea77a68fe1bbf8db2",
+      "width": 768,
+      "height": 548,
+      "anchor": [
+        0.9724,
+        0.094
+      ]
+    },
+    "finisher": {
+      "url": "finisher.webp",
+      "sha256": "f6a74bc2586960846fba38baeab7fb69489f58e1dfc8fbd9d210d1ffd0344220",
+      "width": 768,
+      "height": 576,
+      "anchor": [
+        0.9834,
+        0.1344
+      ]
+    },
+    "impact": {
+      "url": "impact.webp",
+      "sha256": "3a64c788835b1cb7019197f029547b2cc2e97efa347240ef9eb685b903796eda",
+      "width": 640,
+      "height": 640,
+      "anchor": [
+        0.4951,
+        0.5015
+      ]
+    },
+    "muzzle": {
+      "url": "muzzle.webp",
+      "sha256": "a68e923d89291217a9627d25ba773881530443785435e6f2ec130c1ec7c544ef",
+      "width": 512,
+      "height": 290,
+      "anchor": [
+        0.0338,
+        0.4718
+      ]
+    }
+  }
+}

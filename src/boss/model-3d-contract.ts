@@ -33,6 +33,10 @@ export const TYRANT_G01_3D: Boss3DModelContract = {
 
 const MODELS = [TYRANT_G01_3D] as const;
 
+export function boss3DModelForId(id: string): Boss3DModelContract | null {
+  return MODELS.find((model) => model.id === id) ?? null;
+}
+
 /** Vite's hashed painted-art URL still contains the logical boss id. */
 export function boss3DModelForPaintedArtUrl(artUrl: string): Boss3DModelContract | null {
   return MODELS.find((model) => artUrl.includes(model.id)) ?? null;

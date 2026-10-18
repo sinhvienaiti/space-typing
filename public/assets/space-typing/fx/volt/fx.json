@@ -1,0 +1,46 @@
+{
+  "id": "volt",
+  "version": 1712441315,
+  "sprites": {
+    "bolt": {
+      "url": "bolt.webp",
+      "sha256": "7698ee0f80ebf4220d123b0a184b392515faab3e8e992a570669b279fadc6c5d",
+      "width": 768,
+      "height": 270,
+      "anchor": [
+        0.9621,
+        0.5188
+      ]
+    },
+    "finisher": {
+      "url": "finisher.webp",
+      "sha256": "71c4583d085dd9572d915b22f73411e8360fa7c49013f67bdcb8f13e25889725",
+      "width": 768,
+      "height": 304,
+      "anchor": [
+        0.9569,
+        0.4941
+      ]
+    },
+    "impact": {
+      "url": "impact.webp",
+      "sha256": "77e6303d17f8d173b5a85dab958e34bb727065359003d9157091a997424c694e",
+      "width": 640,
+      "height": 625,
+      "anchor": [
+        0.5041,
+        0.508
+      ]
+    },
+    "muzzle": {
+      "url": "muzzle.webp",
+      "sha256": "4d5ea99766d232f1f0132e82da94404f8a86680f1884db95c4ebceda1bd8caf1",
+      "width": 512,
+      "height": 280,
+      "anchor": [
+        0.0532,
+        0.5157
+      ]
+    }
+  }
+}

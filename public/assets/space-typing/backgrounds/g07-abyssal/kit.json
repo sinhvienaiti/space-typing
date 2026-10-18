@@ -1,0 +1,505 @@
+{
+  "id": "g07-abyssal",
+  "version": 1555620979,
+  "textures": {
+    "plate": {
+      "variants": [
+        {
+          "maxSize": 1280,
+          "url": "plate.1280.webp",
+          "sha256": "5d4d81034e2dc414c8e3a97a24e47c2fbe5c945f89c31d7456ca7a7b3d0108ed"
+        },
+        {
+          "maxSize": 1672,
+          "url": "plate.1672.webp",
+          "sha256": "4d87042892dad5bf75cbcb9b04ecfe5fd8bca39f6f4fa9603b1e937e8b2a9729"
+        }
+      ],
+      "aspect": 1.7768331562167907,
+      "wrap": "clamp",
+      "mipmaps": false
+    },
+    "plate-b": {
+      "variants": [
+        {
+          "maxSize": 1280,
+          "url": "plate-b.1280.webp",
+          "sha256": "2a78f8929468eb4133fe63a3e73223093523163c813ec57233d651fc1784cdc2"
+        },
+        {
+          "maxSize": 1672,
+          "url": "plate-b.1672.webp",
+          "sha256": "469e60f625d3e402161d82c1fe5c45f9a502cba670a6a16b1efd7dde24c282d6"
+        }
+      ],
+      "aspect": 1.7768331562167907,
+      "wrap": "clamp",
+      "mipmaps": false
+    },
+    "plate-c": {
+      "variants": [
+        {
+          "maxSize": 1280,
+          "url": "plate-c.1280.webp",
+          "sha256": "7640dbd79df3ac62502ba819d0ba1929df92c1e5f853018b3e5018e6eb813517"
+        },
+        {
+          "maxSize": 1672,
+          "url": "plate-c.1672.webp",
+          "sha256": "957bf292b223e2ef7bc6a3a5ae8c6a973b3b6070123f257b6541a08d2cdf0bc7"
+        }
+      ],
+      "aspect": 1.7768331562167907,
+      "wrap": "clamp",
+      "mipmaps": false
+    },
+    "plate-d": {
+      "variants": [
+        {
+          "maxSize": 1280,
+          "url": "plate-d.1280.webp",
+          "sha256": "9072292e85f828b8d896c9b68b69a602b2cfd28fb60b12b1b8940e4e2bc0b329"
+        },
+        {
+          "maxSize": 1672,
+          "url": "plate-d.1672.webp",
+          "sha256": "817576b95a736110620985291505f621c204033ca1683a1a2bd5cb140e865dad"
+        }
+      ],
+      "aspect": 1.7768331562167907,
+      "wrap": "clamp",
+      "mipmaps": false
+    },
+    "plate-e": {
+      "variants": [
+        {
+          "maxSize": 1280,
+          "url": "plate-e.1280.webp",
+          "sha256": "9ea360a2a71c32a1aca4d0a07cc235a410e36f585911471c0b7efb5ec3e9695f"
+        },
+        {
+          "maxSize": 1672,
+          "url": "plate-e.1672.webp",
+          "sha256": "d753047dc76d0669c8124a1e67fd46be25172b31d266299735c2d7b9e4269842"
+        }
+      ],
+      "aspect": 1.7768331562167907,
+      "wrap": "clamp",
+      "mipmaps": false
+    },
+    "glow-a": {
+      "variants": [
+        {
+          "maxSize": 1024,
+          "url": "glow-a.1024.webp",
+          "sha256": "6d6c143b5e7b55b8d54b6011f447e4db3f44f1b18f714d094e8a699620abc1d4"
+        },
+        {
+          "maxSize": 1254,
+          "url": "glow-a.1254.webp",
+          "sha256": "816e01dcad1ae4ad201dc62ec732139a822eaab5ffe7617580fcbf72d25726fd"
+        }
+      ],
+      "aspect": 1,
+      "wrap": "repeat",
+      "mipmaps": true
+    },
+    "glow-b": {
+      "variants": [
+        {
+          "maxSize": 1024,
+          "url": "glow-b.1024.webp",
+          "sha256": "47e8ac33e57207e2e3d7df229ebf8d4198099e762d332daea854470c456028c0"
+        },
+        {
+          "maxSize": 1254,
+          "url": "glow-b.1254.webp",
+          "sha256": "1f9816110e138d6250d49b59e18999a1ad5d70ea3e666e28022b8cb27718d3fd"
+        }
+      ],
+      "aspect": 1,
+      "wrap": "repeat",
+      "mipmaps": true
+    },
+    "dust": {
+      "variants": [
+        {
+          "maxSize": 1024,
+          "url": "dust.1024.webp",
+          "sha256": "ad5ff1097708fd0f8a254b81809fc0e3f3d721ffc71ecf136033f41747d6a520"
+        },
+        {
+          "maxSize": 1254,
+          "url": "dust.1254.webp",
+          "sha256": "e0dc7f9c2b9e3d103b2c6dc96285e8d45c08a58532716825948b8ca1fe5a2765"
+        }
+      ],
+      "aspect": 1,
+      "wrap": "repeat",
+      "mipmaps": true
+    },
+    "hero-w31": {
+      "variants": [
+        {
+          "maxSize": 512,
+          "url": "hero-w31.512.webp",
+          "sha256": "028c1fb7accdbf1a7a3571848fd32be938e01cfdf4394a8717ae250481ed6f1a"
+        },
+        {
+          "maxSize": 1024,
+          "url": "hero-w31.1024.webp",
+          "sha256": "13780953a68f14fdc2314346fba88c351425713542887911efd8c36c4cf7e6af"
+        },
+        {
+          "maxSize": 1254,
+          "url": "hero-w31.1254.webp",
+          "sha256": "9726774c7b6762dd41025c136d8ed734f2a198e22f42aca5ae3b1f2ef3e35425"
+        }
+      ],
+      "aspect": 1,
+      "wrap": "clamp",
+      "mipmaps": true
+    },
+    "hero-w32": {
+      "variants": [
+        {
+          "maxSize": 512,
+          "url": "hero-w32.512.webp",
+          "sha256": "29045e81401437cc855787f25dfcf967243cb1d1a163cf08e71cd6fbbfc0040c"
+        },
+        {
+          "maxSize": 1024,
+          "url": "hero-w32.1024.webp",
+          "sha256": "7c4371077d7b70c15155a68fa9e8ef662c19a05e9e56a5275ada9efe9c739aae"
+        },
+        {
+          "maxSize": 1201,
+          "url": "hero-w32.1201.webp",
+          "sha256": "53b9275a6076e3270cecf2150bfb53c3e17ee4a8f9bdc81083388837a094fe38"
+        }
+      ],
+      "aspect": 1.0416305290546402,
+      "wrap": "clamp",
+      "mipmaps": true
+    },
+    "hero-w33": {
+      "variants": [
+        {
+          "maxSize": 512,
+          "url": "hero-w33.512.webp",
+          "sha256": "7bfc620c9b565212e04d9b40e3d0ec5195256a973ec8a36158881933917cdae3"
+        },
+        {
+          "maxSize": 1024,
+          "url": "hero-w33.1024.webp",
+          "sha256": "c81aba61ae7abda4dc26bbab8bbb80a4920c155113cc30bcaeebadf305d37e8c"
+        },
+        {
+          "maxSize": 1254,
+          "url": "hero-w33.1254.webp",
+          "sha256": "c333f41894ebd757c86094a133ff3142208855c4ed005ee6d327ac384af34d66"
+        }
+      ],
+      "aspect": 1.0007980845969673,
+      "wrap": "clamp",
+      "mipmaps": true
+    },
+    "hero-w34": {
+      "variants": [
+        {
+          "maxSize": 512,
+          "url": "hero-w34.512.webp",
+          "sha256": "7792d1d9d14cfdc02a40b746f460646ff36e9d219723ae466a31e09365a7722f"
+        },
+        {
+          "maxSize": 1024,
+          "url": "hero-w34.1024.webp",
+          "sha256": "a1650b4c1eb1eb98d7334573ffa7d4b9acd302eaa54f80644bed0ba9607df231"
+        },
+        {
+          "maxSize": 1254,
+          "url": "hero-w34.1254.webp",
+          "sha256": "f2edf63cbfc22327097286a57566d5391ccfb8f953ef073adef2d6fda888dc91"
+        }
+      ],
+      "aspect": 1,
+      "wrap": "clamp",
+      "mipmaps": true
+    },
+    "hero-w35": {
+      "variants": [
+        {
+          "maxSize": 512,
+          "url": "hero-w35.512.webp",
+          "sha256": "e78e7e3b2e5e3e5c082ca7f5fa2b346b3835a0686205dd3498d2f704199ccefe"
+        },
+        {
+          "maxSize": 1024,
+          "url": "hero-w35.1024.webp",
+          "sha256": "c60f3a149e556a1ec5f669c6d3cf7293a0363ecb0c24b9eaa0fff8de9d5ba98f"
+        },
+        {
+          "maxSize": 1254,
+          "url": "hero-w35.1254.webp",
+          "sha256": "eba12902f17d1268f66d081c7e33a4e3fb428b12e2a5dfc6244fb8b35eb8bcbd"
+        }
+      ],
+      "aspect": 1,
+      "wrap": "clamp",
+      "mipmaps": true
+    },
+    "atlas-rocks": {
+      "variants": [
+        {
+          "maxSize": 1024,
+          "url": "atlas-rocks.1024.webp",
+          "sha256": "15a91a27e7e68047cebc36a5b5b886c46c01143b121fda0495b4b61e66d42aab"
+        },
+        {
+          "maxSize": 2048,
+          "url": "atlas-rocks.2048.webp",
+          "sha256": "c4fe4c6b3062169ad530440bebd002c6534e303d9883496e2edb8439faa8b59e"
+        }
+      ],
+      "aspect": 1,
+      "wrap": "clamp",
+      "mipmaps": true
+    },
+    "atlas-life": {
+      "variants": [
+        {
+          "maxSize": 1024,
+          "url": "atlas-life.1024.webp",
+          "sha256": "b8b532bdf9a7dc10e2f5d45e88030f40b3ac9b26653090f32700107647078dc2"
+        },
+        {
+          "maxSize": 2048,
+          "url": "atlas-life.2048.webp",
+          "sha256": "e2ab05f702aa012c0c5c437b9ecbf499bb4acf9d7f7f18157fa21b868faa1f39"
+        }
+      ],
+      "aspect": 1,
+      "wrap": "clamp",
+      "mipmaps": true
+    }
+  },
+  "atlases": {
+    "rocks": {
+      "texture": "atlas-rocks",
+      "frames": [
+        {
+          "id": "rocks-00",
+          "u0": 0.00390625,
+          "v0": 0.00390625,
+          "u1": 0.26171875,
+          "v1": 0.2236328125,
+          "aspect": 1.1733333333333333,
+          "sizeRank": 0
+        },
+        {
+          "id": "rocks-01",
+          "u0": 0.14990234375,
+          "v0": 0.2275390625,
+          "u1": 0.50732421875,
+          "v1": 0.3935546875,
+          "aspect": 2.152941176470588,
+          "sizeRank": 0.08333333333333333
+        },
+        {
+          "id": "rocks-02",
+          "u0": 0.5556640625,
+          "v0": 0.00390625,
+          "u1": 0.71923828125,
+          "v1": 0.1796875,
+          "aspect": 0.9305555555555556,
+          "sizeRank": 0.16666666666666666
+        },
+        {
+          "id": "rocks-03",
+          "u0": 0.72314453125,
+          "v0": 0.00390625,
+          "u1": 0.908203125,
+          "v1": 0.17236328125,
+          "aspect": 1.098550724637681,
+          "sizeRank": 0.25
+        },
+        {
+          "id": "rocks-04",
+          "u0": 0.265625,
+          "v0": 0.00390625,
+          "u1": 0.42724609375,
+          "v1": 0.1943359375,
+          "aspect": 0.8487179487179487,
+          "sizeRank": 0.3333333333333333
+        },
+        {
+          "id": "rocks-05",
+          "u0": 0.7080078125,
+          "v0": 0.2275390625,
+          "u1": 0.87939453125,
+          "v1": 0.3837890625,
+          "aspect": 1.096875,
+          "sizeRank": 0.4166666666666667
+        },
+        {
+          "id": "rocks-06",
+          "u0": 0.43115234375,
+          "v0": 0.00390625,
+          "u1": 0.5517578125,
+          "v1": 0.18408203125,
+          "aspect": 0.6693766937669376,
+          "sizeRank": 0.5
+        },
+        {
+          "id": "rocks-07",
+          "u0": 0.00390625,
+          "v0": 0.2275390625,
+          "u1": 0.14599609375,
+          "v1": 0.39404296875,
+          "aspect": 0.8533724340175953,
+          "sizeRank": 0.5833333333333334
+        },
+        {
+          "id": "rocks-08",
+          "u0": 0.00390625,
+          "v0": 0.39794921875,
+          "u1": 0.1376953125,
+          "v1": 0.54931640625,
+          "aspect": 0.8838709677419355,
+          "sizeRank": 0.6666666666666666
+        },
+        {
+          "id": "rocks-09",
+          "u0": 0.1416015625,
+          "v0": 0.39794921875,
+          "u1": 0.27490234375,
+          "v1": 0.53125,
+          "aspect": 1,
+          "sizeRank": 0.75
+        },
+        {
+          "id": "rocks-10",
+          "u0": 0.51123046875,
+          "v0": 0.2275390625,
+          "u1": 0.62158203125,
+          "v1": 0.39013671875,
+          "aspect": 0.6786786786786787,
+          "sizeRank": 0.8333333333333334
+        },
+        {
+          "id": "rocks-11",
+          "u0": 0.62548828125,
+          "v0": 0.2275390625,
+          "u1": 0.7041015625,
+          "v1": 0.38720703125,
+          "aspect": 0.4923547400611621,
+          "sizeRank": 0.9166666666666666
+        },
+        {
+          "id": "rocks-12",
+          "u0": 0.88330078125,
+          "v0": 0.2275390625,
+          "u1": 0.96044921875,
+          "v1": 0.3837890625,
+          "aspect": 0.49375,
+          "sizeRank": 1
+        }
+      ]
+    },
+    "life": {
+      "texture": "atlas-life",
+      "frames": [
+        {
+          "id": "life-00",
+          "u0": 0.00390625,
+          "v0": 0.00390625,
+          "u1": 0.37255859375,
+          "v1": 0.23046875,
+          "aspect": 1.6271551724137931,
+          "sizeRank": 0
+        },
+        {
+          "id": "life-01",
+          "u0": 0.37646484375,
+          "v0": 0.00390625,
+          "u1": 0.72607421875,
+          "v1": 0.22802734375,
+          "aspect": 1.5599128540305012,
+          "sizeRank": 0.1111111111111111
+        },
+        {
+          "id": "life-02",
+          "u0": 0.00390625,
+          "v0": 0.234375,
+          "u1": 0.34619140625,
+          "v1": 0.44482421875,
+          "aspect": 1.6264501160092808,
+          "sizeRank": 0.2222222222222222
+        },
+        {
+          "id": "life-03",
+          "u0": 0.72998046875,
+          "v0": 0.00390625,
+          "u1": 0.8857421875,
+          "v1": 0.21630859375,
+          "aspect": 0.7333333333333333,
+          "sizeRank": 0.3333333333333333
+        },
+        {
+          "id": "life-04",
+          "u0": 0.35009765625,
+          "v0": 0.234375,
+          "u1": 0.58740234375,
+          "v1": 0.33740234375,
+          "aspect": 2.3033175355450237,
+          "sizeRank": 0.4444444444444444
+        },
+        {
+          "id": "life-05",
+          "u0": 0.00390625,
+          "v0": 0.44873046875,
+          "u1": 0.22216796875,
+          "v1": 0.5458984375,
+          "aspect": 2.2462311557788945,
+          "sizeRank": 0.5555555555555556
+        },
+        {
+          "id": "life-06",
+          "u0": 0.708984375,
+          "v0": 0.234375,
+          "u1": 0.9111328125,
+          "v1": 0.33251953125,
+          "aspect": 2.0597014925373136,
+          "sizeRank": 0.6666666666666666
+        },
+        {
+          "id": "life-07",
+          "u0": 0.337890625,
+          "v0": 0.44873046875,
+          "u1": 0.57080078125,
+          "v1": 0.51953125,
+          "aspect": 3.2896551724137932,
+          "sizeRank": 0.7777777777777778
+        },
+        {
+          "id": "life-08",
+          "u0": 0.22607421875,
+          "v0": 0.44873046875,
+          "u1": 0.333984375,
+          "v1": 0.54443359375,
+          "aspect": 1.1275510204081634,
+          "sizeRank": 0.8888888888888888
+        },
+        {
+          "id": "life-09",
+          "u0": 0.59130859375,
+          "v0": 0.234375,
+          "u1": 0.705078125,
+          "v1": 0.33349609375,
+          "aspect": 1.1477832512315271,
+          "sizeRank": 1
+        }
+      ]
+    }
+  }
+}

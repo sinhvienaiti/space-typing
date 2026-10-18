@@ -74,10 +74,9 @@ export function installRuntimeQuickControls(root: Document = document): void {
       }
     }
 
-    @media (prefers-reduced-motion: reduce) {
-      #${QUICK_SETTINGS_ID} {
-        transition: none;
-      }
+    /* The game's own motion setting (src/ui/motion-preference.ts). */
+    [data-motion="reduced"] #${QUICK_SETTINGS_ID} {
+      transition: none;
     }
   `;
   root.head.appendChild(style);

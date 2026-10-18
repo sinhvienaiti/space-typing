@@ -1,0 +1,11 @@
+.testing-preview-badge {
+  max-width: 100%;
+  padding: 5px 12px;
+  border: 1px solid #f2c76b;
+  border-radius: 5px;
+  background: #101829eb;
+  color: #ffe4a8;
+  font-size: 12px;
+  text-align: center;
+  pointer-events: none;
+}

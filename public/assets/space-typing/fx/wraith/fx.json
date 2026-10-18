@@ -1,0 +1,46 @@
+{
+  "id": "wraith",
+  "version": 2502450397,
+  "sprites": {
+    "bolt": {
+      "url": "bolt.webp",
+      "sha256": "2712ef304017d3a513302bb6629e1e3e01242f978069a7cd1dd1f39f842f4c15",
+      "width": 768,
+      "height": 179,
+      "anchor": [
+        0.9617,
+        0.5215
+      ]
+    },
+    "finisher": {
+      "url": "finisher.webp",
+      "sha256": "1b250fab7d7ed83df5bc1fe8dd891b7761df97f17b9fdb12c8faea18bd2d1494",
+      "width": 768,
+      "height": 246,
+      "anchor": [
+        0.978,
+        0.4947
+      ]
+    },
+    "impact": {
+      "url": "impact.webp",
+      "sha256": "1a09696ca3443777d355e49d8267283fd05e87547755f825279f0481f841ad1a",
+      "width": 640,
+      "height": 555,
+      "anchor": [
+        0.5241,
+        0.5305
+      ]
+    },
+    "muzzle": {
+      "url": "muzzle.webp",
+      "sha256": "cc1af3a705866247933924a1cf879cb83f23c5dc8ff41be84c385f7fd33ee335",
+      "width": 512,
+      "height": 245,
+      "anchor": [
+        0.102,
+        0.6538
+      ]
+    }
+  }
+}

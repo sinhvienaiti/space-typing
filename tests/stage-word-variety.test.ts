@@ -8,6 +8,42 @@ function word(text: string, id = text): VocabularyEntry {
 }
 
 describe("per-stage enemy word variety", () => {
+  it("exhausts the selected source before repeating a narrow near-rank band", () => {
+    const entries = [word("go"), word("electromagnetism"), word("intercontinental flight")];
+    const ledger = new StageWordLedger();
+    const selected: string[] = [];
+    for (let i = 0; i < entries.length; i++) {
+      const entry = ledger.pick(entries, entries[0]!, 1, [], 0)!;
+      ledger.record(entry);
+      selected.push(entry.en);
+    }
+    expect(new Set(selected).size).toBe(entries.length);
+  });
+
+  it("uses fresh fallback words after a specialized pattern pool is exhausted", () => {
+    const selected = [word("afternoon"), word("question"), word("morning"), word("brother")];
+    const patterned = selected.slice(0, 2);
+    const ledger = new StageWordLedger();
+    const picks: string[] = [];
+    for (let i = 0; i < selected.length; i++) {
+      const entry = ledger.pick(patterned, patterned[0]!, 1, [], 0, () => true, selected)!;
+      ledger.record(entry);
+      picks.push(entry.en);
+    }
+    expect(new Set(picks.slice(0, 2))).toEqual(new Set(patterned.map(entry => entry.en)));
+    expect(new Set(picks).size).toBe(selected.length);
+  });
+
+  it("balances unavoidable repeats across the whole source after exhaustion", () => {
+    const entries = [word("go"), word("electromagnetism"), word("intercontinental flight")];
+    const ledger = new StageWordLedger();
+    for (let i = 0; i < 12; i++) {
+      const entry = ledger.pick(entries, entries[0]!, 1, [], 0)!;
+      ledger.record(entry);
+    }
+    expect(entries.map(entry => ledger.count(entry.en))).toEqual([4, 4, 4]);
+  });
+
   it("uses 100 distinct words when a selected vocabulary has 150 near-rank choices", () => {
     const entries = Array.from({ length: 150 }, (_, index) => {
       const a = String.fromCharCode(97 + Math.floor(index / 26));
@@ -70,6 +106,25 @@ describe("per-stage enemy word variety", () => {
     ledger.reset();
     expect(ledger.count("apple")).toBe(0);
     expect(ledger.pick(entries, entries[0]!, 1, [], 0)).not.toBeNull();
+  });
+
+  it("keeps the extra weight of a word the source repeats (Recall weak words)", () => {
+    const fresh = Array.from({ length: 10 }, (_, index) => word("plan" + String.fromCharCode(98 + index) + "ter", "w" + index));
+    const weak = word("planater", "weak");
+    const firstPickShare = (entries: VocabularyEntry[]): number => {
+      let hits = 0;
+      const draws = 1000;
+      for (let index = 0; index < draws; index += 1) {
+        const ledger = new StageWordLedger();
+        if (ledger.pick(entries, fresh[0]!, 1, [], (index + 0.5) / draws)?.id === "weak") hits += 1;
+      }
+      return hits / draws;
+    };
+    // buildAdaptiveRecallVocabulary adds copies of a weak word to favour it.
+    const once = firstPickShare([...fresh, weak]);
+    const favoured = firstPickShare([...fresh, weak, weak, weak, weak]);
+    expect(once).toBeGreaterThan(0);
+    expect(favoured).toBeGreaterThan(once * 2.5);
   });
 
   it("stays repeatable with the same stage order and random input", () => {

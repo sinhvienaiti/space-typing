@@ -116,6 +116,7 @@ import {
   characterShipAngle,
   characterShipPoint,
   drawCharacterShip,
+  withTrailRig,
   type CharacterDrawOptions,
 } from "./characters/renderer";
 import { ShipMotion } from "./characters/ship-motion";
@@ -493,6 +494,25 @@ import {
   preloadPaintedSprites,
 } from "./enemies/painted-sprites";
 import { BossRelief, type BossReliefPose } from "./boss/boss-relief";
+import {
+  BOSS_DEATH_FINAL_AT,
+  BossFxLayer,
+  bossFxPalette,
+  drawBossChargeFx,
+  drawBossCrystalShot,
+  drawBossEnrage,
+  fallbackBossSockets,
+  preloadBossPaintedFx,
+  type BossFxPalette,
+  type BossFxSockets,
+} from "./boss/boss-fx";
+import { BOSS_3D_STRIKE_SECONDS, type Boss3DAction } from "./boss/model-3d-choreography";
+import { BossGlow } from "./boss/boss-glow";
+import { drawFrame3D } from "./render3d/shared-renderer";
+import { setShip3DQuality, ship3DSockets } from "./render3d/ship-model";
+import { boss3DModelForId } from "./boss/model-3d-contract";
+import { ENEMY_MODEL_SCALE, enemyModelSheet } from "./render3d/enemy-models";
+import { drawModelSheet } from "./render3d/model-sheet";
 import { drawBonusTarget, preloadBonusSprites } from "./vfx/bonus-sprites";
 import { RewardDrops, type RewardDropSpec } from "./vfx/reward-drops";
 import { paintedItemIcon } from "./ui/painted-icons";
@@ -531,6 +551,7 @@ import {
   type Rng as BossRng,
 } from "./boss/skills";
 import {
+  bossFamilyStyle,
   bossFullName,
   bossIdentityForStage,
   bossPatternForPhase,
@@ -875,6 +896,10 @@ function supplyRewardGlow(reward: string): string {
 /** Seconds the defeated boss relief tumbles away; the ultimate banner shows. */
 const BOSS_WRECK_SECONDS = 1.8;
 const BOSS_BANNER_SECONDS = 2.2;
+/** Effect seconds of slow motion right after the killing blow (at 0.4×). */
+const BOSS_DEATH_SLOW_SECONDS = 0.2;
+/** Seconds of the arrival letterbox. */
+const BOSS_ARRIVAL_SECONDS = 2.6;
 
 /** What to do, under a boss skill's name while its counter is open. */
 const BOSS_COUNTER_HINT: Readonly<Record<BossCounterKind, string>> = {
@@ -1022,6 +1047,8 @@ export class Game {
   private bossHudTimer = 0;
   private bossSpawned = false;
   private bossDefeated = false;
+  /** Enemy words queued during draw() while a boss is on screen. */
+  private deferredEnemyWords: { enemy: Enemy; targeted: boolean }[] | null = null;
   private bossRewardPending = false;
   private bossRewardPrompt: {
     stage: number;
@@ -1031,6 +1058,7 @@ export class Game {
   private seenEnemyDefinitions = new Set<EnemyDefinitionId>();
   private enemies: Enemy[] = [];
   private readonly stageWordLedger = new StageWordLedger();
+  private readonly bossWordPools = new WeakMap<readonly VocabularyEntry[], Map<string, readonly VocabularyEntry[]>>();
   private readonly targetOwnership = new TargetOwnership();
   private inputMode: InputMode = "typing";
   private voiceReadiness: () => boolean = () => false;
@@ -1073,6 +1101,8 @@ export class Game {
   /** Nose turn toward each shot's target, recoil and engine throttle. */
   private readonly shipMotion = new ShipMotion();
   private readonly shipExhaust = new ShipExhaust();
+  /** Style Shop look of the player's ship (src/cosmetics); null keeps the ship's own colours. */
+  private cosmeticLook: { paint: string | null; trail: { hot: string; plume: string } | null; shot: { primary: string; secondary: string } | null } = { paint: null, trail: null, shot: null };
   /** Big skill signatures: shockwaves, lances, missiles, shields, drones. */
   private readonly skillFx = new SkillFxSystem();
   /** Enemy and boss effects: material hits, family deaths, boss sequences. */
@@ -1096,10 +1126,35 @@ export class Game {
   private bossExposedTimer = 0;
   private bossRelief: BossRelief | null = null;
   private bossReliefKey: string | null = null;
+  /** The boss's 3D model is still downloading (its arrival waits for it briefly). */
+  private bossReliefLoading = false;
   /** Fly-in from the vanishing point, 0 → 1. */
   private bossIntro = 1;
-  /** The defeated boss tumbling away (keeps the relief on screen briefly). */
-  private bossWreck: { t: number; x: number; y: number; size: number; spin: number } | null = null;
+  /**
+   * The defeated boss breaking apart (keeps the model on screen briefly):
+   * `t` is effect time (slow motion at first), `flash` lights the model on
+   * each blast of the death chain.
+   */
+  private bossWreck: { t: number; x: number; y: number; size: number; spin: number; flash: number } | null = null;
+  /** Effects on the boss, drawn after the model (src/boss/boss-fx.ts). */
+  private readonly bossFx = new BossFxLayer();
+  /** Soft bloom over the boss model on High/Ultra (src/boss/boss-glow.ts). */
+  private readonly bossGlow = new BossGlow();
+  /** Simulation seconds of the boss's own clock (its 3D animation follows it). */
+  private bossClock = 0;
+  /** Seconds since the last Glyph Volley (the model's quick cast). */
+  private bossVolleyAge = Number.POSITIVE_INFINITY;
+  /** Seconds since the boss appeared (arrival letterbox). */
+  private bossArrivalAge = Number.POSITIVE_INFINITY;
+  /** Effect seconds since the boss died (its first moment runs in slow motion). */
+  private bossDeathFxAge = Number.POSITIVE_INFINITY;
+  /** Heavy blows so far (words, counters, breaks): each plays the model's Boss_Hit. */
+  private bossHeavyHits = 0;
+  /** Canvas positions of the model's FX sockets, updated each boss frame. */
+  private readonly bossSockets: BossFxSockets = fallbackBossSockets(0, 0, 0);
+  /** False until the boss has been drawn once (then bossSockets is live). */
+  private bossSocketsReady = false;
+  private bossPaletteCache: { key: string; palette: BossFxPalette } | null = null;
   private readonly bossCallouts = new BossCallouts();
   /** Visible rewards from bonus targets flying to the ship. */
   private readonly rewardDrops = new RewardDrops();
@@ -1541,6 +1596,29 @@ export class Game {
   playHudCue(cue: "heat-up" | "hotbar-ready", level = 1): void {
     if (cue === "heat-up") this.sfx.heatUp(level);
     else this.sfx.hotbarReady();
+  }
+
+  /** Menu sounds (hover, tabs, panels, rewards) for the DOM layer. */
+  /** Ship paint (CSS filter), engine trail and shot colours from the Style Shop. */
+  setCosmeticLook(look: { paint: string | null; trail: { hot: string; plume: string } | null; shot: { primary: string; secondary: string } | null }): void {
+    this.cosmeticLook = look;
+  }
+
+  playUiCue(
+    cue: "hover" | "click" | "confirm" | "deploy" | "tab" | "open" | "close" | "error" | "reward" | "reward-big" | "streak" | "shatter",
+    pan = 0,
+  ): void {
+    if (cue === "hover") this.sfx.uiHover(pan);
+    else if (cue === "click") this.sfx.uiClick(pan);
+    else if (cue === "confirm") this.sfx.uiAccept();
+    else if (cue === "deploy") this.sfx.uiDeploy();
+    else if (cue === "shatter") this.sfx.shieldBreak();
+    else if (cue === "tab") this.sfx.uiTab();
+    else if (cue === "open") this.sfx.uiOpen();
+    else if (cue === "close") this.sfx.uiClose();
+    else if (cue === "error") this.sfx.uiError();
+    else if (cue === "streak") this.sfx.streakIgnite();
+    else this.sfx.rewardReveal(cue === "reward-big");
   }
 
   testLabSetSfxVolume(volume: number): boolean {
@@ -3795,6 +3873,10 @@ export class Game {
       ],
       this.settings.visualQuality,
     );
+    // Modelled enemies pre-render their frames while the World loads.
+    for (const family of world.enemyFamilies) {
+      for (const kind of ALL_ENEMY_KINDS) enemyModelSheet(family, kind, this.settings.visualQuality);
+    }
   }
 
   updateSettings(settings: GameSettings): void {
@@ -3811,7 +3893,22 @@ export class Game {
       this.preloadStagePaintedSprites(
         this.stageConfig?.stage ?? this.stats.stage,
       );
+      this.refreshBossReliefQuality();
       this.resize();
+    }
+  }
+
+  /** Low drops the boss model (painted relief only); Medium/High reload the matching tier. */
+  private refreshBossReliefQuality(): void {
+    if (this.settings.visualQuality === "low") {
+      this.bossRelief?.dispose();
+      this.bossRelief = null;
+      this.bossReliefKey = null;
+      this.bossReliefLoading = false;
+      return;
+    }
+    if (this.boss !== null && this.bossIdentity !== null && this.bossDepthActive()) {
+      this.loadBossRelief(this.bossIdentity);
     }
   }
 
@@ -4768,6 +4865,7 @@ export class Game {
     this.canvas.width = Math.floor(this.width * this.dpr);
     this.canvas.height = Math.floor(this.height * this.dpr);
     this.context.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    setShip3DQuality(this.settings.visualQuality, this.dpr);
     this.worldSceneRenderer.invalidate();
     this.backgroundStage?.resize(
       this.width,
@@ -5272,9 +5370,12 @@ export class Game {
     this.bossIdentity = bossIdentityForStage(bossVisualStage, this.boss.role);
     this.resetBossPresentation(stage.stage * 7919 + 13);
     if (this.bossDepthActive()) {
-      // Flies in from the vanishing point (the relief is usually preloaded).
+      // Flies in from the vanishing point (the relief is usually preloaded)
+      // through a rift and a light pillar, under a short letterbox.
       this.bossIntro = 0;
+      this.bossArrivalAge = 0;
       this.loadBossRelief(this.bossIdentity);
+      this.bossFx.arrive(this.bossPalette());
     }
     this.boss.name =
       bossFullName(this.bossIdentity) +
@@ -5302,7 +5403,7 @@ export class Game {
     if (bossDefinition !== undefined) {
       const fx = enemyFxProfile(bossDefinition.family, "boss-intro");
       const position = this.bossPosition();
-      this.burst(position.x, position.y, fx.count, fx.hue);
+      if (!this.bossDepthActive()) this.burst(position.x, position.y, fx.count, fx.hue);
       this.sfx.bossEntrance(fx.pitch);
       this.presentBossEntrance();
     } else {
@@ -5320,6 +5421,10 @@ export class Game {
   ): void {
     const boss = this.boss;
     if (boss === null) return;
+    // Only the simulation moves these, so pause and hit-stop freeze the model.
+    this.bossClock += dt;
+    this.bossVolleyAge += dt;
+    this.bossArrivalAge += dt;
 
     if (this.gameplayMode === "recall") {
       boss.actionCooldown -= dt;
@@ -5443,8 +5548,22 @@ export class Game {
     const pattern: BossPattern = identity === null ? "aimed" : bossPatternForPhase(identity, boss.phase);
     const radius = this.bossRadius(boss.role);
     void spread;
+    // Depth View: shots leave the model's hands (FX_CAST_L/R, alternating)
+    // or ring its core; the pattern's spread and aim stay the same.
+    const depth = this.bossDepthActive();
+    const sockets = depth ? this.liveBossSockets() : null;
+    if (depth) this.bossVolleyAge = 0;
     for (let index = 0; index < count; index += 1) {
-      const shot = bossShotGeometry(pattern, index, count, x, y, radius, playerX, playerY, this.width);
+      let shot = bossShotGeometry(pattern, index, count, x, y, radius, playerX, playerY, this.width);
+      if (sockets !== null && pattern !== "rain") {
+        const hand = index % 2 === 0 ? sockets.left : sockets.right;
+        shot =
+          pattern === "ring"
+            ? bossShotGeometry(pattern, index, count, sockets.core.x, sockets.core.y, radius, playerX, playerY, this.width)
+            : pattern === "twin"
+              ? { ...shot, x: hand.x, y: hand.y, angle: Math.atan2(playerY - hand.y, playerX - hand.x) + Math.floor(index / 2) * 0.08 * (index % 2 === 0 ? -1 : 1) }
+              : bossShotGeometry(pattern, index, count, hand.x, hand.y - 18, radius, playerX, playerY, this.width);
+      }
       const char =
         alphabet[Math.floor(Math.random() * alphabet.length)] ?? "a";
 
@@ -5460,10 +5579,37 @@ export class Game {
         family: identity?.family,
       };
       if (this.admitVoiceProjectile(projectile)) this.projectiles.push(projectile);
-      if (identity !== null) this.combatFx.cast(shot.x, shot.y, identity.primary, 24);
+      if (identity === null) continue;
+      if (depth) {
+        this.bossFx.muzzle(shot.x, shot.y, this.bossPalette(), shot.angle, 22, this.settings.visualQuality);
+      } else {
+        this.combatFx.cast(shot.x, shot.y, identity.primary, 24);
+      }
     }
 
     this.sfx.enemyShot();
+    if (depth) this.sfx.bossVolley();
+  }
+
+  /** The boss's FX sockets on the canvas (projected from the model, or box shares). */
+  private liveBossSockets(): BossFxSockets {
+    if (!this.bossSocketsReady) {
+      const { x, y } = this.bossPosition();
+      fallbackBossSockets(x, y, this.boss === null ? 200 : this.bossDepthSize(this.boss.role), this.bossSockets);
+    }
+    return this.bossSockets;
+  }
+
+  /** Effect colours of the current boss (rainbow bosses cycle prism colours). */
+  private bossPalette(): BossFxPalette {
+    const identity = this.bossIdentity;
+    const primary = identity?.primary ?? "#ff8ad8";
+    const accent = identity?.accent ?? "#8ff4ff";
+    const key = primary + accent;
+    if (this.bossPaletteCache === null || this.bossPaletteCache.key !== key) {
+      this.bossPaletteCache = { key, palette: bossFxPalette(primary, accent, identity?.family === "rainbow") };
+    }
+    return this.bossPaletteCache.palette;
   }
 
   // --- Boss Depth View: skills and counters ----------------------------------
@@ -5496,6 +5642,7 @@ export class Game {
       bossSize: this.bossDepthSize(role),
       shipX: ship.x,
       shipY: ship.y,
+      sockets: this.bossSocketsReady ? this.bossSockets : undefined,
     };
   }
 
@@ -5518,29 +5665,41 @@ export class Game {
     this.bossBanner = 0;
     this.bossSurge = 0;
     this.bossVanish = null;
+    this.bossFx.clear();
+    this.bossVolleyAge = Number.POSITIVE_INFINITY;
+    this.bossArrivalAge = Number.POSITIVE_INFINITY;
+    this.bossDeathFxAge = Number.POSITIVE_INFINITY;
+    this.bossSocketsReady = false;
   }
 
   /** Builds this stage's boss relief ahead of the fight (not on Low). */
   private prepareBossDepth(stage: StageConfig): void {
-    if (!isBossStageRole(stage.role) || !this.bossDepthActive()) return;
+    if (!isBossStageRole(stage.role)) return;
     const visualStage = this.hiddenEncounterRuntime?.bossStageOverride ?? stage.stage;
-    this.loadBossRelief(bossIdentityForStage(visualStage, stage.role));
+    const identity = bossIdentityForStage(visualStage, stage.role);
+    preloadPaintedSprites([], [], [identity.id], this.settings.visualQuality);
+    if (this.bossDepthActive()) this.loadBossRelief(identity);
   }
 
   private loadBossRelief(identity: BossIdentity): void {
     if (this.settings.visualQuality === "low" || !BossRelief.supported()) return;
+    // The painted blasts of the boss's hits and death (Medium+ only).
+    preloadBossPaintedFx();
     const url = paintedBossArtUrl(identity.id);
-    if (url === undefined) return;
-    const key = identity.id + "|" + url;
+    // The model tier is part of the key: Medium and High load different GLBs.
+    const tier = this.settings.visualQuality === "medium" ? "medium" : "high";
+    const key = identity.id + "|" + (url ?? "model-only") + "|" + tier;
     if (this.bossReliefKey === key) return;
     this.bossReliefKey = key;
     this.bossRelief?.dispose();
     this.bossRelief = null;
-    void BossRelief.load(url, identity.primary, identity.accent).then((relief) => {
+    this.bossReliefLoading = true;
+    void BossRelief.load(url, identity.primary, identity.accent, this.settings.visualQuality, identity.id).then((relief) => {
       if (this.bossReliefKey !== key) {
         relief?.dispose();
         return;
       }
+      this.bossReliefLoading = false;
       this.bossRelief = relief;
     });
   }
@@ -5619,6 +5778,10 @@ export class Game {
     switch (event.type) {
       case "release":
         this.sfx.bossSkillRelease(skill.kind);
+        if (this.bossDepthActive() && !(skill.kind === "tether" && event.countered)) {
+          // The strike lands on the model's sockets (frame 42 of the clip).
+          this.bossFx.release(skill.kind, this.liveBossSockets(), this.bossDepthSize(boss.role), this.bossPalette(), this.settings.visualQuality);
+        }
         if (skill.kind === "tether" && event.countered) {
           // Broken before it attached.
           this.resolveBossCounter(boss, skill);
@@ -5713,8 +5876,7 @@ export class Game {
     boss.flash = 1;
     boss.kick = 1.5;
     boss.staggerTimer = Math.max(boss.staggerTimer, stagger);
-    const { x, y } = this.bossPosition();
-    this.burst(x, y, 30, 190);
+    this.bossBurst(30, 190, 0.7);
     this.sfx.bossStagger();
     if (this.settings.screenShake) this.shake = Math.max(this.shake, 7);
     this.hooks.onBossUpdate(toBossHud(boss));
@@ -5954,7 +6116,12 @@ export class Game {
         ? "normal"
         : bossWordLengthPreference(mechanic);
     const patterned = this.expansionVocabulary();
-    const candidates = patterned.filter((entry) => {
+    const pattern = this.expansionEncounterContext?.pattern;
+    const mechanicSource = preference !== "normal" && (pattern === "long-word" || pattern === "short-burst") ? this.vocabulary : patterned;
+    let pools = this.bossWordPools.get(mechanicSource);
+    if (!pools) { pools = new Map(); this.bossWordPools.set(mechanicSource, pools); }
+    let candidates = pools.get(preference);
+    if (!candidates) { candidates = mechanicSource.filter((entry) => {
       const length = typingText(entry.en).length;
       if (preference === "short") {
         return length >= 3 && length <= 6;
@@ -5963,7 +6130,7 @@ export class Game {
         return length >= 9 && length <= 18;
       }
       return length >= 5 && length <= 12;
-    });
+    }); pools.set(preference, candidates); }
     const source = candidates.length > 0 ? candidates : patterned;
     const preferred =
       source[
@@ -5973,8 +6140,8 @@ export class Game {
     const allowed = this.voiceCandidateFilter(this.boss ?? undefined);
     const varied =
       this.inputMode === "typing"
-        ? this.selectVariedEnemyEntry(preferred, undefined, source) ?? preferred
-        : this.selectVariedEnemyEntry(preferred, undefined, source.filter(allowed), this.boss ?? undefined) ?? source.find(allowed) ?? (this.boss && allowed(this.boss.entry) ? this.boss.entry : null);
+        ? this.selectVariedEnemyEntry(preferred, undefined, source, undefined, preference !== "normal") ?? preferred
+        : this.selectVariedEnemyEntry(preferred, undefined, source, this.boss ?? undefined, preference !== "normal") ?? source.find(allowed) ?? (this.boss && allowed(this.boss.entry) ? this.boss.entry : null);
     if (varied === null) return null;
     this.stageWordLedger.record(varied);
     return varied;
@@ -6818,11 +6985,22 @@ export class Game {
     excludeEnemyId?: number,
     entries: readonly VocabularyEntry[] = this.vocabulary,
     excludeObject?: object,
+    strictPool = false,
   ): VocabularyEntry | null {
     // Intentional same-prefix Test Lab scenarios must remain reproducible.
     if (this.testLabEnabled && this.inputMode === "typing") return preferred;
     const activeWords = this.activeEnemyWords(excludeEnemyId);
     if (this.boss !== null) activeWords.push(this.boss.entry.en);
+    for (const target of [this.supplyPod, this.treasureDrone, this.recallBonus, this.rewardChoiceCrate, this.anomalyCrate]) {
+      if (target !== null && target !== excludeObject) activeWords.push(target.entry.en);
+    }
+    const pattern = this.expansionEncounterContext?.pattern;
+    // Long/short stages retain their theme first, then use fresh words from
+    // the player's selected source instead of cycling a tiny filtered pool.
+    // Phrase/sentence patterns keep their authored multiword prompts intact.
+    const fallbackEntries = !strictPool && (pattern === "long-word" || pattern === "short-burst")
+      ? this.vocabulary
+      : entries;
     return this.stageWordLedger.pick(
       entries,
       preferred,
@@ -6830,6 +7008,8 @@ export class Game {
       activeWords,
       this.nextExpansionGameplayRandom(),
       this.voiceCandidateFilter(excludeObject ?? this.enemies.find(enemy => enemy.id === excludeEnemyId)),
+      fallbackEntries,
+      pattern === "long-word" ? "length" : "difficulty",
     );
   }
 
@@ -7402,8 +7582,7 @@ export class Game {
     );
     boss.parts = result.state.parts;
     if (result.destroyedNow) {
-      const { x, y } = this.bossPosition();
-      this.burst(x, y, 38, part.type === "cannon" ? 18 : 190);
+      this.bossBurst(38, part.type === "cannon" ? 18 : 190, 0.8);
       boss.staggerTimer = Math.max(boss.staggerTimer, 1.25);
       boss.actionCooldown += 1.25;
       this.sfx.bossStagger();
@@ -7590,8 +7769,7 @@ export class Game {
       if (shieldBroken) {
         boss.shieldActive = false;
         this.sfx.bossShieldBreak();
-        const { x, y } = this.bossPosition();
-        this.burst(x, y, 36, 176);
+        this.bossBurst(36, 176, 0.75);
       }
     } else {
       const mechanicDamage = mechanicResult?.damageMultiplier ?? 1;
@@ -7647,8 +7825,7 @@ export class Game {
       this.sfx.bossStagger();
     }
 
-    const { x, y } = this.bossPosition();
-    this.burst(x, y, perfectWord ? 34 : 28, 18);
+    this.bossBurst(perfectWord ? 34 : 28, 18, perfectWord ? 0.75 : 0.6);
     this.sfx.bossHit();
     this.updateBossPhase(boss);
 
@@ -7729,12 +7906,20 @@ export class Game {
         definition?.family ?? "devil",
         "boss-phase",
       );
-      this.burst(x, y, fx.count, fx.hue);
+      const depth = this.bossDepthActive();
+      if (!depth) this.burst(x, y, fx.count, fx.hue);
       this.sfx.bossPhase(fx.pitch);
       const identity = this.bossIdentity;
       if (identity !== null) {
-        this.combatFx.bossPhase(x, y, this.bossRadius(boss.role), identity.primary, identity.accent);
-        this.sfx.bossRoar(identity.voice * (boss.phase >= 3 ? 1.12 : 1.05), familyStyle(identity.family).material);
+        if (depth) {
+          // Over the model: flash, shock rings, shards and a burst of shafts.
+          const core = this.liveBossSockets().core;
+          this.bossFx.phase(core.x, core.y, this.bossDepthSize(boss.role), this.bossPalette(), boss.phase >= 3, this.settings.visualQuality);
+          this.skillFx.flash(boss.phase >= 3 ? "#ff6a7a" : "#ffffff", boss.phase >= 3 ? 0.2 : 0.14, 0.35);
+        } else {
+          this.combatFx.bossPhase(x, y, this.bossRadius(boss.role), identity.primary, identity.accent);
+        }
+        this.sfx.bossRoar(identity.voice * (boss.phase >= 3 ? 1.12 : 1.05), bossFamilyStyle(identity).material);
       }
 
       if (this.settings.screenShake) {
@@ -7810,22 +7995,40 @@ export class Game {
       definition?.family ?? "devil",
       "boss-death",
     );
-    this.burst(x, y, fx.count, fx.hue);
+    const depth = this.bossDepthActive();
+    if (!depth) this.burst(x, y, fx.count, fx.hue);
     this.sfx.bossDeath(fx.pitch);
     const identity = this.bossIdentity;
     if (identity !== null) {
-      const style = familyStyle(identity.family);
-      this.combatFx.bossDeath(x, y, this.bossRadius(boss.role), identity.primary, identity.accent, style.death, style);
-      this.sfx.enemyDeath(style.material, 1.6, 0);
+      const style = bossFamilyStyle(identity);
+      if (depth) {
+        // Blasts hop across the model's sockets, then the final flash; the
+        // model cracks and dissolves meanwhile (drawBossWreck).
+        const size = this.bossDepthSize(boss.role);
+        // Where the sockets were at the killing blow (used without a 3D wreck).
+        const live = this.bossSockets;
+        const sockets: BossFxSockets = this.bossSocketsReady
+          ? { core: { ...live.core }, left: { ...live.left }, right: { ...live.right }, halo: { ...live.halo } }
+          : fallbackBossSockets(x, y, size);
+        const hasWreck = this.bossRelief !== null && this.bossRelief.available;
+        this.bossDeathFxAge = 0;
+        this.bossFx.death(x, y, size, this.bossPalette(), () => (hasWreck && this.bossWreck !== null ? this.bossSockets : sockets), this.settings.visualQuality);
+      } else {
+        this.combatFx.bossDeath(x, y, this.bossRadius(boss.role), identity.primary, identity.accent, style.death, style);
+      }
+      // The crystal death chain has its own crunches (the crystal enemy
+      // death is a high chime).
+      if (!(depth && style.material === "crystal")) this.sfx.enemyDeath(style.material, 1.6, 0);
     }
-    if (this.bossDepthActive() && this.bossRelief !== null) {
-      // The relief tumbles away behind the explosion.
+    if (depth && this.bossRelief !== null) {
+      // The model breaks apart behind its explosion.
       this.bossWreck = {
         t: 0,
         x,
         y,
         size: this.bossDepthSize(boss.role),
         spin: Math.random() < 0.5 ? -1 : 1,
+        flash: 1,
       };
     }
     this.bossSkill = null;
@@ -10227,11 +10430,17 @@ export class Game {
     this.shipAimImpact = impact;
     const pose = this.shipDrawOptions(this.lastDrawTime);
     characterShipPoint(pose, 0, 0, this.shipPoint);
+    const modelSockets = ship3DSockets(this.characterId);
     const fired = this.playerShots.fire({
       characterId: this.characterId,
+      palette: this.cosmeticLook.shot,
       originX: this.shipPoint.x,
       originY: this.shipPoint.y,
       originAngle: characterShipAngle(pose),
+      ...(modelSockets === null ? {} : {
+        muzzleOffsets: modelSockets.muzzles.length > 0 ? modelSockets.muzzles : modelSockets.muzzle ? [modelSockets.muzzle] : undefined,
+        finisherMuzzleOffset: modelSockets.muzzle ?? undefined,
+      }),
       targetX: x,
       targetY: y,
       power,
@@ -10244,7 +10453,7 @@ export class Game {
       if (impact.kind === "bonus-collect") this.bonusGhosts.push(impact.ghost);
       return;
     }
-    characterShipPoint(pose, 0, -SHIP_NOSE_OFFSET, this.shipPoint);
+    this.playerNosePoint(pose, this.shipPoint);
     this.lasers.push({
       x1: this.shipPoint.x,
       y1: this.shipPoint.y,
@@ -10274,7 +10483,8 @@ export class Game {
         return true;
       case "boss-hit": {
         if (this.boss === null) return false;
-        const { x, y } = this.bossPosition();
+        // Depth View: bolts strike the model's chest (FX_CORE), not the box centre.
+        const { x, y } = this.bossDepthActive() ? this.liveBossSockets().core : this.bossPosition();
         out.x = x;
         out.y = y;
         return true;
@@ -10356,7 +10566,7 @@ export class Game {
           this.boss.flash = 1;
           this.boss.kick = Math.max(this.boss.kick, fromBolt ? 1.4 : 1);
         }
-        this.burst(x, y, 7, impactHue);
+        if (!this.bossDepthActive()) this.burst(x, y, 7, impactHue);
         this.sfx.boltImpact(0.9, pan, variant);
         this.bossImpactFx(x, y, pan);
         return;
@@ -10469,6 +10679,11 @@ export class Game {
   }
 
   /** Player ship draw options: flight pose plus aim, recoil and throttle. */
+  private playerNosePoint(pose: CharacterDrawOptions, out: { x: number; y: number }): void {
+    const muzzle = ship3DSockets(this.characterId)?.muzzle;
+    characterShipPoint(pose, muzzle?.[0] ?? 0, muzzle?.[1] ?? -SHIP_NOSE_OFFSET, out);
+  }
+
   private shipDrawOptions(time: number): CharacterDrawOptions {
     const quality = qualityProfile(this.settings.visualQuality);
     return {
@@ -10483,6 +10698,8 @@ export class Game {
       aim: this.shipMotion.aim,
       recoil: this.shipMotion.recoil,
       boost: this.shipMotion.boost,
+      paint: this.cosmeticLook.paint,
+      trail: this.cosmeticLook.trail,
     };
   }
 
@@ -10499,11 +10716,12 @@ export class Game {
       return;
     }
     const pose = this.shipDrawOptions(this.lastDrawTime + dt);
-    rig.nozzles.forEach(([x, y], index) => {
+    const nozzles = ship3DSockets(this.characterId)?.nozzles ?? rig.nozzles;
+    nozzles.forEach(([x, y], index) => {
       const point = (this.nozzlePoints[index] ??= { x: 0, y: 0 });
       characterShipPoint(pose, x, y, point);
     });
-    this.nozzlePoints.length = rig.nozzles.length;
+    this.nozzlePoints.length = nozzles.length;
     this.shipExhaust.update(
       dt,
       this.nozzlePoints,
@@ -10653,9 +10871,11 @@ export class Game {
       return;
     }
     this.drawFlightStreaks(time);
-    // Boss ultimate: tint and cinematic bars under the combat layer.
-    if (this.bossUltimateK > 0.001) {
-      drawUltimateFrame(context, this.width, this.height, this.bossUltimateK);
+    // Boss ultimate (and the boss's arrival): tint and cinematic bars under
+    // the combat layer.
+    const cinema = Math.max(this.bossUltimateK, this.bossArrivalBars());
+    if (cinema > 0.001) {
+      drawUltimateFrame(context, this.width, this.height, cinema);
     }
     if (this.novaPulseRemaining > 0) this.drawNovaPulse();
     if (this.interferenceTimer > 0) {
@@ -10699,6 +10919,9 @@ export class Game {
     }
     for (const drawGhost of this.bonusGhosts) drawGhost();
 
+    // With a boss on screen, enemy words wait until after the boss so its
+    // body never hides a word you have to type.
+    this.deferredEnemyWords = this.boss !== null ? [] : null;
     for (const enemy of this.enemies) {
       this.drawEnemy(enemy);
     }
@@ -10717,15 +10940,23 @@ export class Game {
           if (projectile.ownerId === -1) this.drawProjectile(projectile);
         }
       }
-    } else if (this.bossWreck !== null) {
-      this.drawBossWreck();
+    } else {
+      if (this.bossWreck !== null) this.drawBossWreck();
+      // The death chain and its debris outlive the boss.
+      const wreck = this.bossWreck;
+      this.bossFx.draw(context, wreck === null ? null : { x: wreck.x, y: wreck.y }, wreck?.size ?? 200, this.settings.visualQuality);
+    }
+    const deferredWords = this.deferredEnemyWords;
+    this.deferredEnemyWords = null;
+    if (deferredWords !== null) {
+      for (const item of deferredWords) this.drawEnemyWord(item.enemy, item.targeted);
     }
 
     this.playerShots.drawImpacts(context, this.settings.visualQuality);
     // Skill signatures (lances, missiles, arcs) over the enemies they hit.
     this.skillFx.draw(context, this.settings.visualQuality, this.height);
     const rig = activeShipLightRig(this.characterId);
-    if (rig !== null) this.shipExhaust.draw(context, rig);
+    if (rig !== null) this.shipExhaust.draw(context, withTrailRig(rig, this.cosmeticLook.trail));
     this.drawPlayer(time);
     this.playerShots.drawMuzzleFlashes(context);
     this.skillFx.drawPersistentOver(context, fxState);
@@ -11142,8 +11373,24 @@ export class Game {
       projectile.radius * 2.7,
       (brightWorld ? 0.75 : 0.6) * qualityProfile(this.settings.visualQuality).glowScale,
     );
+    // A crystal boss (Auriel) throws faceted prism crystals with a short trail.
+    const crystalBoss =
+      projectile.ownerId === -1 &&
+      depth !== 1 &&
+      this.bossIdentity !== null &&
+      bossFamilyStyle(this.bossIdentity).shot === "prism";
     const skinned =
-      projectile.family !== undefined &&
+      (crystalBoss &&
+        drawBossCrystalShot(
+          context,
+          // Far shots stay at least as big as their (unscaled) letter.
+          (projectile.radius * 1.35) / Math.max(0.75, depth),
+          Math.atan2(projectile.vy, projectile.vx),
+          this.bossPalette(),
+          this.lastDrawTime,
+          this.settings.visualQuality,
+        )) ||
+      (projectile.family !== undefined &&
       drawEnemyShot(
         context,
         familyStyle(projectile.family).shot,
@@ -11151,7 +11398,7 @@ export class Game {
         projectile.radius * 1.12,
         Math.atan2(projectile.vy, projectile.vx),
         this.lastDrawTime,
-      );
+      ));
     if (!skinned) {
       context.globalCompositeOperation = "lighter";
       context.fillStyle = brightWorld
@@ -11200,7 +11447,7 @@ export class Game {
   /** Ship nose as drawn this frame (where lances and arcs leave the hull). */
   private shipNose(): FxPoint {
     const point = { x: 0, y: 0 };
-    characterShipPoint(this.shipDrawOptions(this.lastDrawTime), 0, -SHIP_NOSE_OFFSET, point);
+    this.playerNosePoint(this.shipDrawOptions(this.lastDrawTime), point);
     return point;
   }
 
@@ -11473,9 +11720,31 @@ export class Game {
   private bossImpactFx(x: number, y: number, pan: number): void {
     const identity = this.bossIdentity;
     if (identity === null) return;
-    const style = familyStyle(identity.family);
-    this.combatFx.bossHit(x, y, style.material, style, this.settings.visualQuality);
+    const style = bossFamilyStyle(identity);
+    if (this.bossDepthActive()) {
+      // Glint and crystal chips over the model, where the bolt struck.
+      this.bossFx.hit(x, y, this.bossPalette(), 1.2, this.settings.visualQuality);
+    } else {
+      this.combatFx.bossHit(x, y, style.material, style, this.settings.visualQuality);
+    }
     this.sfx.bossImpact(style.material, identity.voice, pan);
+  }
+
+  /**
+   * A heavy blow on the boss (word, counter, shield or part break): a burst
+   * on the model's core in the Depth View, the classic particles otherwise.
+   */
+  private bossBurst(count: number, hue: number, scale: number): void {
+    const boss = this.boss;
+    this.bossHeavyHits += 1;
+    if (boss !== null && this.bossDepthActive()) {
+      if (this.bossIdentity !== null && bossFamilyStyle(this.bossIdentity).material === "crystal") this.sfx.bossShatter();
+      const core = this.liveBossSockets().core;
+      this.bossFx.burst(core.x, core.y, this.bossPalette(), this.bossDepthSize(boss.role) * scale, this.settings.visualQuality);
+      return;
+    }
+    const { x, y } = this.bossPosition();
+    this.burst(x, y, count, hue);
   }
 
   /** Title card, light pillar and roar when a boss arrives. */
@@ -11484,13 +11753,16 @@ export class Game {
     const identity = this.bossIdentity;
     if (boss === null || identity === null) return;
     const { x, y } = this.bossPosition();
-    this.combatFx.bossEntrance(x, y, this.bossRadius(boss.role), identity.primary, identity.accent, {
+    const card = {
       label: identity.rank,
       name: identity.name,
       title: identity.title,
       color: identity.primary,
-    });
-    this.sfx.bossRoar(identity.voice, familyStyle(identity.family).material);
+    };
+    // The Depth View draws its rift and pillar on the boss as it flies in.
+    if (this.bossDepthActive()) this.combatFx.titleCard(card);
+    else this.combatFx.bossEntrance(x, y, this.bossRadius(boss.role), identity.primary, identity.accent, card);
+    this.sfx.bossRoar(identity.voice, bossFamilyStyle(identity).material);
     this.shakeFor(boss.role === "major-boss" ? 12 : 8);
   }
 
@@ -11842,10 +12114,11 @@ export class Game {
     // softer, especially on High/Ultra Retina rendering. Motion stays in the
     // aura, telegraphs and hit kick instead.
     const paintedSize = radius * paintedScale;
+    const authoredBody = identity !== null && (paintedBossArtUrl(identity.id) !== undefined || boss3DModelForId(identity.id) !== null);
     const modularDrawn =
       (paintedBoss !== null &&
         drawPaintedSprite(context, paintedBoss, paintedSize, boss.flash, this.dpr)) ||
-      (definition !== undefined &&
+      (!authoredBody && definition !== undefined &&
       drawModularEnemy(context, definition, {
         radius,
         age: time,
@@ -11854,7 +12127,7 @@ export class Game {
         glowScale: qualityProfile(this.settings.visualQuality).glowScale,
       }, this.modularBodyCache, this.dpr));
 
-    if (!modularDrawn) {
+    if (!modularDrawn && !authoredBody) {
       context.shadowBlur = boss.flash > 0 ? 36 : 24;
       context.shadowColor = boss.flash > 0 ? "#ffffff" : phaseColor;
       context.strokeStyle = boss.flash > 0 ? "#ffffff" : phaseColor;
@@ -11952,8 +12225,23 @@ export class Game {
     if (skill !== null && skill.kind === "quake" && skill.stage === "recovery") {
       this.bossDodgeTarget = 0;
     }
+    // The killing blow plays its first moment in slow motion (effects and
+    // the breaking model only; the simulation keeps its own time).
+    const fxDt = this.bossDeathFxAge < BOSS_DEATH_SLOW_SECONDS ? dt * 0.4 : dt;
+    this.bossDeathFxAge += fxDt;
+    for (const event of this.bossFx.update(fxDt)) {
+      if (this.bossWreck !== null) this.bossWreck.flash = event.final ? 1 : 0.6;
+      this.sfx.bossDeathBlast(event.final);
+      if (event.final) {
+        this.skillFx.flash("#ffffff", 0.3, 0.45);
+        if (this.settings.screenShake) this.shake = Math.max(this.shake, 14);
+      } else if (this.settings.screenShake) {
+        this.shake = Math.max(this.shake, 4.5);
+      }
+    }
     if (this.bossWreck !== null) {
-      this.bossWreck.t += dt;
+      this.bossWreck.t += fxDt;
+      this.bossWreck.flash = Math.max(0, this.bossWreck.flash - fxDt * 4.5);
       if (this.bossWreck.t >= BOSS_WRECK_SECONDS) this.bossWreck = null;
     }
   }
@@ -11977,6 +12265,8 @@ export class Game {
         ? (1 - bossSkillProgress(skill)) * (skill.kind === "tether" ? 0.3 : 1)
         : 0;
 
+    // Last phase: hot pulsing aura, faster sigil, heat sparks, red rim light.
+    const enrage = boss.phase >= 3 ? 1 : 0;
     if (identity !== null) {
       drawBossAura(
         context,
@@ -11989,7 +12279,9 @@ export class Game {
         identity.accent,
         boss.phase >= 3 ? 1.3 : boss.phase === 2 ? 1.12 : 1,
         quality,
+        enrage,
       );
+      drawBossEnrage(context, x, y - lift, size, time, enrage, quality);
       if (skill !== null) {
         drawBossCharge(
           context,
@@ -12001,10 +12293,15 @@ export class Game {
         );
       }
     }
+    this.bossFx.drawUnder(context, { x, y: y - lift }, size, quality);
 
     let drawn = false;
     const relief = this.bossRelief;
     if (relief !== null && relief.available && identity !== null) {
+      // The GLB frame keeps a margin around the box (same model size).
+      const frameSize = size * relief.frameScale;
+      const boxX = x - frameSize / 2;
+      const boxY = y - frameSize / 2 - lift;
       const lean =
         skill !== null && skill.kind === "surge"
           ? charging * 0.16 - Math.max(0, this.bossSurge) * 0.22
@@ -12015,12 +12312,13 @@ export class Game {
         quality,
         // Turns toward the middle of the corridor as it drifts.
         yaw: Math.sin(time * 0.5) * 0.18 - ((x - this.width / 2) / Math.max(1, this.width)) * 0.9,
-        pitch: Math.sin(time * 0.8) * 0.04 - boss.kick * 0.07 + lean,
+        pitch: Math.sin(time * 0.8) * 0.04 + lean,
         roll:
           Math.sin(time * 0.37) * 0.05 +
           (boss.staggerTimer > 0 ? Math.sin(time * 34) * 0.035 : 0),
         swell: Math.sin(time * 1.6) * 0.04 + charging * 0.3,
-        glow: Math.max(charging, casting * 0.8, this.bossExposedTimer > 0 ? 0.3 : 0),
+        // The release flashes at the sockets; the body itself stays readable.
+        glow: Math.max(charging, casting * 0.5, this.bossExposedTimer > 0 ? 0.3 : 0),
         flash: boss.flash,
         light:
           skill === null || skill.kind === "volley"
@@ -12029,13 +12327,41 @@ export class Game {
               ? identity.accent
               : identity.primary,
         lightPower: Math.max(charging, casting),
+        intro: this.bossIntro,
+        introTime: this.bossArrivalAge,
+        clock: this.bossClock,
+        action: this.bossModelAction(),
+        hit: boss.kick,
+        heavyHits: this.bossHeavyHits,
+        enrage,
       };
       const frame = relief.render(pose);
       if (frame !== null) {
-        context.drawImage(frame, x - size / 2, y - size / 2 - lift, size, size);
+        drawFrame3D(context, frame, boxX, boxY, frameSize, frameSize);
+        // High/Ultra: a soft bloom on the lit crystal (none on Medium/Low).
+        if (quality === "high" || quality === "ultra") {
+          // Constant strength: the brighter emissive while charging already
+          // passes more light through the bright pass.
+          const bloom = (quality === "ultra" ? 0.42 : 0.36) + boss.flash * 0.12;
+          this.bossGlow.draw(context, frame, boxX, boxY, frameSize, bloom);
+        }
         drawn = true;
+        // The model's FX sockets, from the frame shares of this very render.
+        const shares = relief.sockets;
+        if (shares !== null) {
+          for (const role of ["core", "left", "right", "halo"] as const) {
+            const share = shares[role];
+            if (share === null) continue;
+            this.bossSockets[role].x = boxX + share.x * frameSize;
+            this.bossSockets[role].y = boxY + share.y * frameSize;
+          }
+        } else {
+          fallbackBossSockets(x, y - lift, size, this.bossSockets);
+        }
       }
     }
+    if (!drawn) fallbackBossSockets(x, y - lift, size, this.bossSockets);
+    this.bossSocketsReady = true;
     if (!drawn) {
       // Low quality, no WebGL or still loading: the painting in the same box.
       const painted =
@@ -12050,7 +12376,9 @@ export class Game {
       );
       context.save();
       context.translate(x, y - lift);
-      if (painted === null || !drawPaintedSprite(context, painted, size * 0.92, boss.flash, this.dpr)) {
+      // Authored bosses wait for their model/painting, including Low, failed loads and context loss.
+      const authoredBody = identity !== null && (paintedBossArtUrl(identity.id) !== undefined || boss3DModelForId(identity.id) !== null);
+      if ((painted === null || !drawPaintedSprite(context, painted, size * 0.92, boss.flash, this.dpr)) && !authoredBody) {
         if (definition !== undefined) {
           drawModularEnemy(context, definition, {
             radius: size * 0.3,
@@ -12129,41 +12457,103 @@ export class Game {
     }
     context.restore();
 
+    // On the model, under its word: charge light at the firing sockets, then
+    // hits, muzzle flashes, phase blasts.
+    if (skill !== null && skill.kind !== "volley" && skill.stage === "telegraph") {
+      const strikeStart = skill.spec.telegraph - BOSS_3D_STRIKE_SECONDS;
+      drawBossChargeFx(
+        context,
+        skill.kind,
+        this.bossSockets,
+        size,
+        bossSkillProgress(skill),
+        clamp((skill.t - strikeStart) / BOSS_3D_STRIKE_SECONDS, 0, 1),
+        time,
+        this.bossPalette(),
+        quality,
+      );
+    }
+    this.bossFx.draw(context, { x, y: y - lift }, size, quality);
+
     this.drawBossWord(boss, x, y, size * 0.4);
   }
 
-  /** The defeated boss tumbling away behind its explosion (relief only). */
+  /** What the model is doing now (its skill clip follows this). */
+  private bossModelAction(): Boss3DAction | null {
+    const skill = this.bossSkill;
+    if (skill !== null && skill.kind !== "volley") {
+      return {
+        kind: "skill",
+        stage: skill.stage,
+        t: skill.t,
+        telegraph: skill.spec.telegraph,
+        release: skill.spec.release,
+        recovery: skill.spec.recovery,
+      };
+    }
+    return this.bossVolleyAge < 0.9 ? { kind: "volley", t: this.bossVolleyAge } : null;
+  }
+
+  /** Arrival letterbox 0 … 1: eases in, holds under the title card, eases out. */
+  private bossArrivalBars(): number {
+    const t = this.bossArrivalAge;
+    if (this.boss === null || !(t < BOSS_ARRIVAL_SECONDS)) return 0;
+    return clamp(Math.min(t / 0.35, (BOSS_ARRIVAL_SECONDS - t) / 0.7), 0, 1) * 0.85;
+  }
+
+  /**
+   * The defeated boss breaking apart (GLB or relief): it shudders and lights
+   * up with each blast of the death chain while fracture lines spread, then
+   * dissolves into light after the final blast and drifts back.
+   */
   private drawBossWreck(): void {
     const wreck = this.bossWreck;
     const relief = this.bossRelief;
     if (wreck === null || relief === null || !relief.available) return;
     const k = Math.min(1, wreck.t / BOSS_WRECK_SECONDS);
-    const size = wreck.size * (1 - 0.4 * k);
+    const final = BOSS_DEATH_FINAL_AT;
+    const crack = clamp(wreck.t / final, 0, 1);
+    const dissolve = clamp((wreck.t - final + 0.04) / (BOSS_WRECK_SECONDS - final - 0.15), 0, 1);
+    const shudder = (1 - dissolve) * (0.4 + crack * 0.6);
+    const size = wreck.size * (1 + dissolve * 0.08);
     const frame = relief.render({
       size,
       dpr: this.dpr,
       quality: this.settings.visualQuality,
-      yaw: wreck.spin * k * 1.1,
-      pitch: -k * 0.7,
-      roll: wreck.spin * k * 2.4,
-      swell: -0.4 * k,
-      glow: 1 - k,
-      flash: Math.max(0, 1 - k * 4),
-      light: "#ffb066",
-      lightPower: 1 - k,
+      yaw: wreck.spin * (0.08 * crack + dissolve * 0.25) + Math.sin(wreck.t * 47) * 0.02 * shudder,
+      pitch: 0.1 * crack + Math.sin(wreck.t * 61) * 0.02 * shudder,
+      roll: wreck.spin * 0.06 * crack + Math.sin(wreck.t * 53) * 0.03 * shudder,
+      swell: 0,
+      // Kept dim so the fracture lines read; each blast flashes it.
+      glow: 0.12,
+      flash: wreck.flash * 0.75,
+      light: null,
+      lightPower: 0,
+      dying: k,
+      clock: wreck.t,
+      crack: Math.sqrt(crack),
+      dissolve,
     });
     if (frame === null) return;
     const context = this.context;
+    const jitter = shudder * 3;
+    const frameSize = size * relief.frameScale;
+    const boxX = wreck.x - frameSize / 2 + Math.sin(wreck.t * 71) * jitter;
+    const boxY = wreck.y - frameSize / 2 + Math.cos(wreck.t * 67) * jitter - dissolve * 10;
+    const shares = relief.sockets;
+    // The painted relief has no dissolve shader: it fades instead.
     context.save();
-    context.globalAlpha = 1 - k * k;
-    context.drawImage(
-      frame,
-      wreck.x - size / 2,
-      wreck.y - size / 2 + k * k * this.height * 0.1,
-      size,
-      size,
-    );
+    if (shares === null) context.globalAlpha = 1 - dissolve;
+    drawFrame3D(context, frame, boxX, boxY, frameSize, frameSize);
     context.restore();
+    if (shares !== null) {
+      for (const role of ["core", "left", "right", "halo"] as const) {
+        const share = shares[role];
+        if (share === null) continue;
+        this.bossSockets[role].x = boxX + share.x * frameSize;
+        this.bossSockets[role].y = boxY + share.y * frameSize;
+      }
+    }
   }
 
   /** Skill telegraphs and hits, counter prompt, callouts, banner: over the ship. */
@@ -12953,7 +13343,16 @@ export class Game {
             enemy.kind,
             this.settings.visualQuality,
           );
+    // A modelled enemy (models/enemies/…, pre-rendered 3D frames) wins over the painting.
+    const modelled =
+      visual === undefined
+        ? null
+        : enemyModelSheet(visual.family, enemy.kind, this.settings.visualQuality);
+    if (modelled !== null) {
+      drawModelSheet(context, modelled, enemy.age, enemy.radius * ENEMY_SPRITE_SCALE * ENEMY_MODEL_SCALE, enemy.flash);
+    }
     const modularDrawn =
+      modelled !== null ||
       (painted !== null &&
         drawPaintedSprite(context, painted, enemy.radius * ENEMY_SPRITE_SCALE, enemy.flash, this.dpr)) ||
       (visual !== undefined &&
@@ -13256,7 +13655,8 @@ export class Game {
       );
     }
 
-    this.drawEnemyWord(enemy, targeted);
+    if (this.deferredEnemyWords !== null) this.deferredEnemyWords.push({ enemy, targeted });
+    else this.drawEnemyWord(enemy, targeted);
   }
 
   private drawEnemyTargetBrackets(
@@ -13814,7 +14214,7 @@ export class Game {
 
     const context = this.context;
     // From the nose, which faces the target while the word is typed.
-    characterShipPoint(this.shipDrawOptions(this.lastDrawTime), 0, -SHIP_NOSE_OFFSET, this.shipPoint);
+    this.playerNosePoint(this.shipDrawOptions(this.lastDrawTime), this.shipPoint);
     context.save();
     context.strokeStyle = "rgba(91, 236, 255, 0.18)";
     context.setLineDash([4, 8]);

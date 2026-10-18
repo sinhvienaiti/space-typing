@@ -125,6 +125,8 @@ export class DuelCombatVisuals {
   /** Depth View 3D hull for your ship (loaded on demand, null until ready). */
   private ship3d: DuelShip3D | null = null;
   private ship3dFor: CharacterId | null = null;
+  private ship3dTier = "";
+  private ship3dGeneration = 0;
   private ship3dLoading: Promise<void> = Promise.resolve();
   /** Typed weapons in flight, and each side's weapon colour (its shot colour). */
   private readonly ordnance = new DuelOrdnance();
@@ -144,6 +146,8 @@ export class DuelCombatVisuals {
   /** The far rival as a 3D hull too (nose towards you), when its data exists. */
   private rival3d: DuelShip3D | null = null;
   private rival3dFor: CharacterId | null = null;
+  private rival3dTier = "";
+  private rival3dGeneration = 0;
   private readonly rivalBurner = new DuelAfterburner();
   private readonly rivalBurners: AfterburnerNozzle[] = [];
   private rivalFrame: Ship3DFrame | null = null;
@@ -198,10 +202,12 @@ export class DuelCombatVisuals {
   /** Starts loading the 3D hull early (Duel lobby), so the fight never waits on it. */
   preload(quality: VisualQuality, self: CharacterId = this.ships.self.id, rival: CharacterId = this.ships.opponent.id): void {
     if (quality === "low" || !this.available) return;
+    this.quality = quality;
     // One after the other: two loads at once doubled the stalls and could
     // still be running when the fight started.
     const first = ship3dEnabled() ? this.requestShip3D(self) : Promise.resolve();
-    if (rival3dEnabled()) void first.then(() => this.requestRival3D(rival));
+    const generation = this.ship3dGeneration;
+    if (rival3dEnabled()) void first.then(() => { if (generation === this.ship3dGeneration) this.requestRival3D(rival); });
   }
 
   /** Camera shake goes to the Game canvas (background included), not the DOM. */
@@ -578,11 +584,19 @@ export class DuelCombatVisuals {
   }
 
   private requestShip3D(id: CharacterId): Promise<void> {
-    if (this.ship3dFor === id) return this.ship3dLoading;
+    const tier = this.quality === "medium" ? "medium" : "high";
+    if (this.ship3dFor === id && this.ship3dTier === tier) return this.ship3dLoading;
+    const generation = ++this.ship3dGeneration;
     this.ship3dFor = id;
+    this.ship3dTier = tier;
+    this.ship3d?.dispose();
     this.ship3d = null;
-    this.ship3dLoading = DuelShip3D.load(id).then((model) => {
-      if (this.ship3dFor === id) this.ship3d = model;
+    this.selfFrame = null;
+    // A fresh instance per request: a shared in-flight load could hand an older
+    // generation's (disposed) result to a newer request for the same id/tier.
+    this.ship3dLoading = DuelShip3D.loadFresh(id, "self", { quality: this.quality }).then((model) => {
+      if (generation === this.ship3dGeneration) this.ship3d = model;
+      else model?.dispose();
     });
     return this.ship3dLoading;
   }
@@ -740,11 +754,16 @@ export class DuelCombatVisuals {
   }
 
   private requestRival3D(id: CharacterId): void {
-    if (this.rival3dFor === id) return;
+    const tier = "medium";
+    if (this.rival3dFor === id && this.rival3dTier === tier) return;
+    const generation = ++this.rival3dGeneration;
     this.rival3dFor = id;
+    this.rival3dTier = tier;
+    this.rival3d?.dispose();
     this.rival3d = null;
-    void DuelShip3D.load(id, "rival").then((model) => {
-      if (this.rival3dFor === id) this.rival3d = model;
+    void DuelShip3D.loadFresh(id, "rival", { quality: "medium" }).then((model) => {
+      if (generation === this.rival3dGeneration) this.rival3d = model;
+      else model?.dispose();
     });
   }
 
@@ -987,6 +1006,19 @@ export class DuelCombatVisuals {
       selfHull: this.ship3d?.available === true ? "3d" : chaseSprite(this.ships.self.id) !== null ? "chase" : "top",
       rivalHull: this.rival3d?.available === true ? "3d" : "top",
       juice: this.juice.counts };
+  }
+
+  /** Release hull owners when leaving Duel; this instance can load again on the next visit. */
+  dispose(): void {
+    ++this.ship3dGeneration;
+    ++this.rival3dGeneration;
+    this.ship3d?.dispose();
+    this.rival3d?.dispose();
+    this.ship3d = this.rival3d = null;
+    this.ship3dFor = this.rival3dFor = null;
+    this.ship3dTier = this.rival3dTier = "";
+    this.selfFrame = this.rivalFrame = null;
+    this.clear();
   }
 
   clear(): void {

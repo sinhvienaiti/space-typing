@@ -1,0 +1,46 @@
+{
+  "id": "bastion",
+  "version": 1463619884,
+  "sprites": {
+    "bolt": {
+      "url": "bolt.webp",
+      "sha256": "9f9a495a978a8e6a3ce59a2f939db7b310653d9ddc2e2d6dfad6c327b4aeccd2",
+      "width": 768,
+      "height": 292,
+      "anchor": [
+        0.9599,
+        0.5087
+      ]
+    },
+    "finisher": {
+      "url": "finisher.webp",
+      "sha256": "41824cefa1ce377a3923f9611de8d5e354b4387270d5545dc4d389ae51d73ecf",
+      "width": 768,
+      "height": 378,
+      "anchor": [
+        0.9677,
+        0.508
+      ]
+    },
+    "impact": {
+      "url": "impact.webp",
+      "sha256": "5ab86626d33ad135d5fecb7cbbd9fda341c5b3cd1cc51587bf9c17cfa1e9b05e",
+      "width": 640,
+      "height": 640,
+      "anchor": [
+        0.5011,
+        0.4888
+      ]
+    },
+    "muzzle": {
+      "url": "muzzle.webp",
+      "sha256": "fcdf12ed7c4aa094b34c8377a4ecc9d2f15002e3bdae4d161179690e82e3c9a3",
+      "width": 512,
+      "height": 262,
+      "anchor": [
+        0.0306,
+        0.4552
+      ]
+    }
+  }
+}

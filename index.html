@@ -5,8 +5,52 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#05080f" />
     <title>Space Typing</title>
+    <!-- Boot splash (src/ui/boot-splash.ts): painted before any script runs and
+         kept until the save, Warp and the first smooth frames are in, so the
+         deck is never seen half-built. Inline so it shows on the first paint. -->
+    <style>
+      .boot-splash {
+        position: fixed; inset: 0; z-index: 2147483000; display: grid; place-items: center;
+        background: radial-gradient(ellipse at 50% 60%, #120a2a 0%, #05080f 70%); color: #eaf6ff;
+        font-family: "Segoe UI", system-ui, sans-serif; transition: opacity 0.55s ease, visibility 0s linear 0.55s;
+        animation: boot-autohide 0s linear 16s forwards;
+      }
+      .boot-splash.is-done { opacity: 0; visibility: hidden; pointer-events: none; }
+      @keyframes boot-autohide { to { opacity: 0; visibility: hidden; pointer-events: none; } }
+      .boot-art {
+        position: absolute; inset: -4%; background: url("/assets/space-typing/backgrounds/g01-celestial/plate.1280.webp") center / cover no-repeat;
+        opacity: 0.42; filter: saturate(1.15); animation: boot-drift 18s ease-in-out infinite alternate;
+      }
+      .boot-art::after {
+        content: ""; position: absolute; inset: 0;
+        background: radial-gradient(ellipse at 50% 55%, rgba(5, 8, 15, 0.1) 0%, rgba(5, 8, 15, 0.85) 75%), linear-gradient(180deg, rgba(5, 8, 15, 0.2), rgba(5, 8, 15, 0.9));
+      }
+      @keyframes boot-drift { from { transform: scale(1.02) translate3d(-1%, 0, 0); } to { transform: scale(1.08) translate3d(1%, -1%, 0); } }
+      .boot-core { position: relative; display: grid; justify-items: center; gap: 14px; padding: 24px; text-align: center; width: min(92vw, 560px); }
+      .boot-eyebrow { margin: 0; color: #5fe3ff; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.32em; text-transform: uppercase; }
+      .boot-logo { margin: 0; font-size: clamp(2.6rem, 9vw, 5rem); font-style: italic; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1; }
+      .boot-logo b { color: #ffffff; text-shadow: 0 0 24px rgba(95, 227, 255, 0.35); }
+      .boot-logo span { color: transparent; -webkit-text-stroke: 2px #5fe3ff; text-shadow: 0 0 22px rgba(95, 227, 255, 0.55); }
+      .boot-bar { position: relative; width: 100%; height: 6px; margin-top: 18px; border-radius: 999px; background: rgba(95, 227, 255, 0.12); box-shadow: inset 0 0 0 1px rgba(95, 227, 255, 0.25); overflow: hidden; }
+      .boot-bar i { position: absolute; inset: 0 auto 0 0; width: 6%; border-radius: inherit; background: linear-gradient(90deg, #5fe3ff, #a98bff 60%, #ffb062); box-shadow: 0 0 14px rgba(95, 227, 255, 0.7); transition: width 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
+      .boot-bar::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent); transform: translateX(-100%); animation: boot-sheen 1.6s ease-in-out infinite; }
+      @keyframes boot-sheen { to { transform: translateX(100%); } }
+      .boot-status { margin: 0; color: #cfe9ff; font-size: 0.86rem; letter-spacing: 0.04em; min-height: 1.3em; }
+      .boot-tip { margin: 6px 0 0; color: rgba(207, 233, 255, 0.62); font-size: 0.8rem; min-height: 1.3em; }
+      @media (prefers-reduced-motion: reduce) { .boot-art, .boot-bar::after { animation: none; } .boot-splash { transition: none; } }
+    </style>
   </head>
   <body>
+    <div id="bootSplash" class="boot-splash" role="status" aria-live="polite" aria-label="Loading Space Type">
+      <div class="boot-art" aria-hidden="true"></div>
+      <div class="boot-core">
+        <p class="boot-eyebrow">Typing combat · learn English</p>
+        <h1 class="boot-logo"><b>Space</b> <span>Type</span></h1>
+        <div class="boot-bar" aria-hidden="true"><i id="bootBarFill"></i></div>
+        <p id="bootStatus" class="boot-status">Loading your pilot…</p>
+        <p id="bootTip" class="boot-tip">Tip: type a word's first letter to lock on, then finish it.</p>
+      </div>
+    </div>
     <div id="app">
   <section id="killLearningStrip" class="kill-learning-strip hidden" aria-live="polite" aria-atomic="true">
     <span class="kill-learning-label" aria-hidden="true">IPA · NGHĨA TIẾNG VIỆT</span>
@@ -38,9 +82,9 @@
     <header class="hud">
       <div id="hudLeft" class="hud-side" data-heat="0">
         <i class="hud-flame" aria-hidden="true"></i>
-        <div class="metric"><span>score</span><strong id="score">0</strong></div>
-        <div class="metric"><span>streak</span><strong id="streak">0</strong></div>
-        <div class="metric"><span>multi</span><strong id="multiplier">x1</strong></div>
+        <div class="metric metric-score"><span data-icon="trophy">score</span><strong id="score">0</strong></div>
+        <div class="metric metric-streak"><span data-icon="flame">streak</span><strong id="streak">0</strong></div>
+        <div class="metric metric-multi"><span data-icon="zap">multi</span><strong id="multiplier">x1</strong></div>
       </div>
 
       <div id="waveBadge" class="wave-badge">stage 001</div>
@@ -48,13 +92,14 @@
       <div id="hudRight" class="hud-side hud-side-right" data-heat="0">
         <i class="hud-flame" aria-hidden="true"></i>
         <div class="metric metric-credits"><span>credits</span><strong id="creditsHud">0</strong><em id="creditsDelta" class="credit-delta" aria-hidden="true"></em></div>
-        <div class="metric"><span>accuracy</span><strong id="accuracy">100%</strong></div>
-        <div class="metric"><span>kills</span><strong id="kills">0</strong></div>
-        <div class="metric metric-warp"><span>Warp Charge</span><strong id="warpBalance">—</strong><small id="warpReserve">Reserve —</small></div>
+        <div id="accuracyMetric" class="metric metric-accuracy"><span data-icon="target">accuracy</span><strong id="accuracy">100%</strong></div>
+        <div class="metric metric-kills"><span data-icon="skull">kills</span><strong id="kills">0</strong></div>
+        <div class="metric metric-warp"><span data-icon="zap">Warp</span><strong id="warpBalance">—</strong><small id="warpReserve">Reserve —</small></div>
       </div>
     </header>
 
     <div class="combat-info-stack" aria-live="polite">
+      <div id="testingPreviewBadge" class="testing-preview-badge hidden" role="status">Preview · progress and rewards are not saved</div>
       <div
         id="stageEventBadge"
         class="stage-event-badge hidden"
@@ -86,11 +131,12 @@
     <aside id="playerStatusHud" class="player-status-hud hidden" aria-label="Player status">
       <div class="player-status-body">
         <div class="player-status-head">
+          <span class="player-status-portrait" aria-hidden="true"><img id="playerStatusShip" alt="" /></span>
           <strong id="playerStatusName">Vanguard</strong>
           <span id="playerStatusLevel">Lv 1</span>
         </div>
         <div class="resource-row hull-row">
-          <span>Hull</span>
+          <span data-icon="heart">Hull</span>
           <div class="resource-track">
             <i id="hullDamageFill" class="resource-fill resource-damage-fill"></i>
             <i id="hullFill" class="resource-fill hull-fill"></i>
@@ -98,14 +144,14 @@
           <strong id="hull">100 / 100</strong>
         </div>
         <div class="resource-row shield-row">
-          <span>Shield</span>
+          <span data-icon="shield">Shield</span>
           <div class="resource-track">
             <i id="shieldFill" class="resource-fill shield-fill"></i>
           </div>
           <strong id="shield">40 / 40</strong>
         </div>
         <div class="resource-row energy-row">
-          <span>Energy</span>
+          <span data-icon="zap">Energy</span>
           <div class="resource-track">
             <i id="energyFill" class="resource-fill energy-fill"></i>
           </div>
@@ -133,17 +179,51 @@
       <button id="recallHintButton" type="button">✦ Reveal letter</button>
     </div>
 
-    <dialog id="warpDialog" class="settings-dialog warp-dialog" aria-labelledby="warpDialogTitle">
-      <h2 id="warpDialogTitle">Warp Charge · Stamina</h2>
-      <p>Rewarded deployment costs 10 Warp. Practice is always free.</p>
-      <div class="warp-depot"><small id="warpStatus" role="status">Loading Warp Charge…</small><button id="warpRefuelButton" type="button">Refuel +20</button><button id="warpReserveToggle" type="button" aria-pressed="false">Reserve: off</button><button id="warpAbandonButton" type="button" hidden>Abandon prepared sortie</button><button id="warpClockButton" type="button" hidden>Correct clock</button></div>
+    <dialog id="warpDialog" class="settings-dialog warp-dialog wd" aria-labelledby="warpDialogTitle">
+      <form method="dialog" class="dialog-head wd-head">
+        <div class="wd-core" aria-hidden="true"><span class="wd-core-glow"></span><span id="warpCoreArt" class="wd-core-art"></span></div>
+        <div class="wd-title">
+          <p class="eyebrow">stamina</p>
+          <h2 id="warpDialogTitle">Warp Charge</h2>
+          <p class="wd-sub">Each rewarded Deploy uses 10 Warp. Practice and Review are always free.</p>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+      <section class="wd-gauges">
+        <div class="wd-gauge active">
+          <div class="wd-gauge-head"><span>Active</span><strong id="warpActiveValue">— / 100</strong></div>
+          <div class="wd-meter"><i id="warpActiveFill"></i><span class="wd-ticks"></span></div>
+          <small id="warpRegenText">+1 every 6 min</small>
+        </div>
+        <div class="wd-gauge reserve">
+          <div class="wd-gauge-head"><span>Reserve</span><strong id="warpReserveValue">— / 300</strong></div>
+          <div class="wd-meter"><i id="warpReserveFill"></i></div>
+          <small>Fills +1 every 12 min while Active is full</small>
+        </div>
+      </section>
+      <p class="wd-status"><small id="warpStatus" role="status">Loading Warp Charge…</small></p>
       <p id="warpActionNotice" role="alert"></p>
-      <p id="warpRefuelDetail"></p>
-      <p>Active: +1 / 6 min. When full, Reserve: +1 / 12 min. Refuel spends Star Crystals only after confirmation.</p>
-      <form method="dialog"><button type="submit">Close</button></form>
+      <section class="wd-actions warp-depot">
+        <article class="wd-card refuel">
+          <div class="wd-card-text"><strong>Quick refuel</strong><span id="warpRefuelDetail"></span><small id="warpRefillsText">3 refills a day · resets 04:00 Vietnam</small></div>
+          <button id="warpRefuelButton" class="holo-cta" type="button">Refuel +20</button>
+        </article>
+        <article class="wd-card reserve">
+          <div class="wd-card-text"><strong>Use Reserve when short</strong><span>Reserve covers a Deploy when Active runs out. Never spends Star Crystals.</span></div>
+          <button id="warpReserveToggle" class="wd-switch" type="button" aria-pressed="false">Reserve: off</button>
+        </article>
+        <article class="wd-card free">
+          <div class="wd-card-text"><strong>Free supply</strong><span>+30 Warp at 12:00–14:00 and 18:00–21:00 in the Daily Hub.</span></div>
+          <button id="warpFreeSupplyButton" class="holo-ghost" type="button">Open gifts</button>
+        </article>
+        <div class="wd-maintenance">
+          <button id="warpAbandonButton" class="holo-ghost" type="button" hidden>Abandon prepared sortie</button>
+          <button id="warpClockButton" class="holo-ghost" type="button" hidden>Correct clock</button>
+        </div>
+      </section>
     </dialog>
     <section id="titleOverlay" class="overlay holo-title-overlay">
-      <div class="holo-title">
+      <div id="titleScroll" class="holo-title">
         <header class="holo-topbar">
           <div id="titlePilotCard" class="holo-pilot holo-panel">
             <div class="holo-avatar"><img id="titlePilotShip" alt="" /></div>
@@ -175,9 +255,13 @@
           </div>
 
           <nav class="holo-tools" aria-label="Quick controls">
+            <button id="titleAccountButton" class="holo-tool" type="button" data-icon="user" data-tip="Pilot account · cloud save" data-tip-side="below" aria-label="Pilot account"></button>
+            <button id="titleChatButton" class="holo-tool" type="button" data-icon="chat" data-tip="Comms · world, groups, friends" data-tip-side="below" aria-label="Chat" aria-expanded="false"></button>
+            <button id="titleMailButton" class="holo-tool" type="button" data-icon="mail" data-tip="Mail and gift codes" data-tip-side="below" aria-label="Mail"></button>
             <button id="titleRecordsButton" class="holo-tool" type="button" data-icon="trophy" data-tip="Records" data-tip-side="below" aria-label="Records" aria-expanded="false"></button>
             <button id="titleOnlineButton" class="holo-tool" type="button" data-icon="users" data-tip="Duel lobby · play online" data-tip-side="below" aria-label="Duel lobby"></button>
             <button id="titleSoundButton" class="holo-tool" type="button" data-icon="volume" data-tip="Sound levels" data-tip-side="below" aria-label="Sound levels" aria-expanded="false"></button>
+            <button id="titleFeedbackButton" class="holo-tool" type="button" data-icon="feedback" data-tip="Feedback · report a bug" data-tip-side="below" aria-label="Feedback and bug report"></button>
             <button id="settingsButton" class="holo-tool" type="button" data-icon="gear" data-tip="Settings" data-tip-side="below" aria-label="Settings"></button>
 
             <div id="titleSoundPopover" class="holo-popover hidden" role="dialog" aria-label="Sound levels">
@@ -197,6 +281,11 @@
                 <span><small>Voice / Pronunciation</small><input id="quickVoiceVolume" type="range" min="0" max="1" step="0.05" /></span>
                 <output id="quickVoiceVolumeValue">100%</output>
               </div>
+              <div class="holo-slider" title="Music and effects step back while a word is spoken, so the voice stands out">
+                <span class="holo-slider-icon" data-icon="voice" aria-hidden="true"></span>
+                <span><small>Voice boost · up to 300%</small><input id="quickVoiceBoost" type="range" min="1" max="3" step="0.25" aria-label="Voice boost" /></span>
+                <output id="quickVoiceBoostValue">200%</output>
+              </div>
               <div class="holo-popover-foot">
                 <span>Tap an icon to mute</span>
                 <button id="titleAllSettingsButton" type="button" class="holo-link">All settings ›</button>
@@ -211,37 +300,67 @@
           </nav>
         </header>
 
-        <section class="holo-brand">
-          <p class="eyebrow">Typing combat · learn English</p>
-          <h1>Space <span>Type</span></h1>
-          <p id="titleModeIntro" class="holo-tagline"></p>
-        </section>
+        <!-- Command Deck (src/ui/title-home.ts, src/ui/title-home.css): the first
+             screen is mission · ship · today; the deck scrolls on to the
+             Galaxy route and the fleet. Every older id stays where code expects it. -->
+        <div class="th-hero">
+          <div class="th-left">
+            <section class="holo-brand">
+              <p class="eyebrow">Typing combat · learn English</p>
+              <h1><b>Space</b> <span>Type</span></h1>
+              <p id="titleModeIntro" class="holo-tagline"></p>
+            </section>
 
-        <main class="holo-modes">
-          <article class="holo-mode holo-mode-featured holo-panel">
-            <div class="holo-mode-art">
-              <img id="titleCampaignPlate" class="holo-plate" src="/assets/space-typing/backgrounds/g01-celestial/plate-c.1280.webp" alt="" />
-              <img id="titleCampaignShip" class="holo-hero holo-hero-ship" alt="" />
-              <span class="holo-tag" data-icon="rocket">Campaign</span>
-            </div>
-            <div class="holo-mode-body">
-              <h2>Campaign</h2>
-              <p class="holo-meta"><b id="titleWorldMeta">World 01 · Rainbow Reach · Stage 001-020</b></p>
-              <div class="holo-chips" role="group" aria-label="Game mode">
-                <!-- Recall has its own card; the mode chips stay for code paths only. -->
-                <button id="combatModeButton" class="holo-chip hidden" type="button" data-icon="swords">Combat</button>
-                <button id="recallModeButton" class="holo-chip hidden" type="button" data-icon="headphones">Recall</button>
-                <small id="titleModeMeta" class="holo-meta-small"></small>
+            <article class="holo-mode holo-mode-featured holo-panel th-campaign">
+              <div class="holo-mode-art">
+                <img id="titleCampaignPlate" class="holo-plate" src="/assets/space-typing/backgrounds/g01-celestial/plate.1280.webp" alt="" />
+                <img id="titleCampaignShip" class="holo-hero holo-hero-ship" alt="" />
+                <span class="holo-tag" data-icon="rocket">Campaign</span>
+                <span id="titleCampaignBoss" class="th-boss-chip" hidden></span>
               </div>
-              <div class="holo-actions title-play-actions">
-                <button id="startButton" class="primary holo-cta" data-icon="play">Continue · Stage 001</button>
-                <button id="practiceButton" class="holo-ghost" type="button">Practice · Free</button>
-                <button id="stageSelectButton" class="holo-ghost" data-icon="map">Stage select</button>
-                <button id="routeButton" class="holo-ghost" data-icon="compass">Briefing</button>
+              <div class="holo-mode-body">
+                <div class="th-campaign-head">
+                  <h2>Campaign</h2>
+                  <p class="holo-meta"><b id="titleWorldMeta">World 01 · Rainbow Reach · Stage 001-020</b></p>
+                </div>
+                <div id="titleWorldProgress" class="th-world-progress" aria-hidden="true"></div>
+                <div class="holo-chips" role="group" aria-label="Game mode">
+                  <!-- Recall has its own card; the mode chips stay for code paths only. -->
+                  <button id="combatModeButton" class="holo-chip hidden" type="button" data-icon="swords">Combat</button>
+                  <button id="recallModeButton" class="holo-chip hidden" type="button" data-icon="headphones">Recall</button>
+                  <small id="titleModeMeta" class="holo-meta-small"></small>
+                </div>
+                <div class="holo-actions title-play-actions">
+                  <button id="startButton" class="primary holo-cta" data-icon="play">Continue · Stage 001</button>
+                  <button id="practiceButton" class="holo-ghost" type="button">Practice · Free</button>
+                  <button id="hero3dButton" class="holo-ghost th-hero3d" type="button" data-icon="flame" data-tip="Campaign 3D (beta) · fly Draconis · own stage progress, Campaign save and Warp untouched" data-tip-side="below">3D · Draconis</button>
+                  <button id="stageSelectButton" class="holo-ghost" data-icon="map">Stage select</button>
+                  <button id="routeButton" class="holo-ghost" data-icon="compass">Briefing</button>
+                </div>
               </div>
-            </div>
-          </article>
+            </article>
+          </div>
 
+          <section id="titleShowcase" class="th-showcase" aria-label="Your ship">
+            <div class="th-halo" aria-hidden="true"></div>
+            <div class="th-orbit" aria-hidden="true"><i></i><i></i><i></i></div>
+            <div class="th-ship-wrap">
+              <span class="th-plume" aria-hidden="true"></span>
+              <img id="titleHeroShip" class="th-ship" alt="" />
+            </div>
+            <div class="th-pedestal" aria-hidden="true"><i></i></div>
+            <div class="th-ship-plate">
+              <span id="titleHeroShipRole" class="th-ship-role">Balanced starter</span>
+              <strong id="titleHeroShipName" class="th-ship-name">Vanguard</strong>
+              <span id="titleHeroShipLevel" class="th-ship-level">Lv 1</span>
+              <button id="titleHeroHangarButton" class="holo-ghost" type="button" data-icon="ship">Change ship</button>
+            </div>
+          </section>
+
+          <aside id="titleToday" class="th-today holo-panel" aria-label="Today's goals"></aside>
+        </div>
+
+        <main class="holo-modes th-modes">
           <article id="titleExpeditionCard" class="holo-mode holo-panel">
             <div class="holo-mode-art">
               <img class="holo-plate" src="/assets/space-typing/backgrounds/g08-aurora-cosmic/plate-c.1280.webp" alt="" />
@@ -250,7 +369,7 @@
             </div>
             <div class="holo-mode-body">
               <h2>Expedition</h2>
-              <p>Roguelike run through 8 encounters with a loaner build. Campaign progress stays safe.</p>
+              <p>Roguelike run with a loaner build. Campaign stays safe.</p>
               <div id="titleExpeditionActions" class="holo-actions holo-actions-expedition"></div>
             </div>
           </article>
@@ -263,11 +382,11 @@
             </div>
             <div class="holo-mode-body">
               <h2>Recall</h2>
-              <p>Hear the word, recall the spelling and type it from memory before contact.</p>
+              <p>Hear a word, then type it from memory before it hits.</p>
               <div class="holo-actions">
                 <button id="titleRecallStartButton" class="primary holo-cta" type="button" data-icon="headphones">Start recall</button>
                 <button id="titleRecallWordsButton" class="holo-ghost" type="button" data-icon="book">Word list</button>
-                <button id="titleRecallSettingsButton" class="holo-ghost" type="button" data-icon="sliders">Recall settings</button>
+                <button id="titleRecallSettingsButton" class="holo-ghost" type="button" data-icon="sliders" aria-label="Recall settings">Settings</button>
               </div>
             </div>
           </article>
@@ -291,6 +410,33 @@
           </article>
         </main>
 
+        <button id="titleScrollCue" class="th-scroll-cue" type="button" aria-label="Scroll to the Galaxy route">
+          <span>Galaxy route · fleet</span><i aria-hidden="true"></i>
+        </button>
+
+        <section id="titleRouteSection" class="th-section" aria-labelledby="titleRouteHeading">
+          <header class="th-section-head">
+            <p class="eyebrow">Campaign route</p>
+            <h2 id="titleRouteHeading">Ten galaxies · <span>1000 stages</span></h2>
+            <p id="titleRouteMeta" class="th-section-meta"></p>
+          </header>
+          <div id="titleRoute" class="th-route"></div>
+        </section>
+
+        <section id="titleFleetSection" class="th-section" aria-labelledby="titleFleetHeading">
+          <header class="th-section-head">
+            <p class="eyebrow">Hangar</p>
+            <h2 id="titleFleetHeading">Your <span>fleet</span></h2>
+            <p id="titleFleetMeta" class="th-section-meta"></p>
+          </header>
+          <div id="titleFleet" class="th-fleet"></div>
+        </section>
+
+        <footer class="th-foot">
+          <span>Space Type · typing combat for English learners</span>
+          <span>Practice and Review are always free · Warp only limits rewards</span>
+        </footer>
+
         <footer class="holo-dock holo-panel" aria-label="Hangar and progress">
           <button id="characterButton" class="holo-dock-btn" data-icon="ship">Hangar</button>
           <button id="equipmentButton" class="holo-dock-btn" data-icon="shield">Equipment</button>
@@ -298,6 +444,8 @@
           <button id="hotbarButton" class="holo-dock-btn" data-icon="grid">Hotbar</button>
           <span class="holo-dock-sep" aria-hidden="true"></span>
           <button id="vocabularyButton" class="holo-dock-btn" data-icon="book">Vocabulary</button>
+          <button id="lessonsButton" class="holo-dock-btn" type="button" data-icon="calendar">Lessons</button>
+          <button id="dailyHubButton" class="holo-dock-btn" type="button" data-icon="gift">Daily</button>
           <button id="progressionButton" class="holo-dock-btn" data-icon="target">Missions</button>
           <button id="codexButton" class="holo-dock-btn" data-icon="library">Codex</button>
           <button id="ascensionButton" class="holo-dock-btn hidden" data-icon="crown">Ascension</button>
@@ -307,6 +455,7 @@
             <div id="titleShopsMenu" class="holo-popover holo-popover-up hidden" role="menu" aria-label="Shops and services">
               <h4 data-icon="store">Shops &amp; services</h4>
               <div class="holo-menu-list title-more-actions">
+                <button id="styleShopButton" type="button" data-icon="sparkle">Style Shop · looks &amp; packs</button>
                 <button id="shopButton" data-icon="store">Normal Shop</button>
                 <button id="stationShopButton" data-icon="rocket">Station Shop</button>
                 <button id="serviceShopButton" data-icon="shield">Repair / Upgrade</button>
@@ -340,6 +489,7 @@
         <button id="pauseVocabularyButton">Vocabulary</button>
         <button id="pauseSettingsButton">Settings</button>
         <button id="pauseDataButton">Data</button>
+        <button id="pauseFeedbackButton">Report a bug</button>
         <button id="restartButton">Restart stage</button>
         <button id="pauseStageSelectButton">Stage Select</button>
         <button id="titleButton">Back to title</button>
@@ -354,7 +504,10 @@
             <p class="eyebrow">signal lost</p>
             <h2 id="gameOverTitle">Run over</h2>
           </div>
-          <span class="game-over-badge" data-icon="skull">Defeated</span>
+          <div class="game-over-mark">
+            <span class="game-over-badge" data-icon="skull">Defeated</span>
+            <span id="gameOverEmblem" class="game-over-emblem" aria-hidden="true"></span>
+          </div>
         </header>
         <div class="game-over-body">
           <section class="game-over-summary">
@@ -667,6 +820,43 @@
           <div id="achievementGrid" class="progression-grid"></div>
         </section>
       </div>
+    </dialog>
+
+    <dialog id="accountDialog" class="settings-dialog ac-dialog" aria-labelledby="accountTitle">
+      <form method="dialog" class="dialog-head">
+        <div>
+          <p class="eyebrow">online</p>
+          <h2 id="accountTitle">Pilot account</h2>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+      <div id="accountBody" class="ac-body"></div>
+    </dialog>
+
+    <dialog id="feedbackDialog" class="settings-dialog ac-dialog fb-dialog" aria-labelledby="feedbackTitle">
+      <form method="dialog" class="dialog-head">
+        <div>
+          <p class="eyebrow">fleet command</p>
+          <h2 id="feedbackTitle">Feedback &amp; bug report</h2>
+        </div>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+      <div id="feedbackBody" class="ac-body"></div>
+    </dialog>
+
+    <aside id="chatPanel" class="cp-panel" aria-label="Chat"></aside>
+
+    <dialog id="liveOpsDialog" class="settings-dialog lo-dialog" aria-labelledby="liveOpsTitle">
+      <form method="dialog" class="dialog-head lo-head">
+        <div>
+          <p class="eyebrow">fleet operations</p>
+          <h2 id="liveOpsTitle">Daily Hub</h2>
+        </div>
+        <span id="liveOpsReset" class="lo-reset"></span>
+        <button class="icon-button" aria-label="Close">×</button>
+      </form>
+      <nav id="liveOpsTabs" class="lo-tabs" role="tablist" aria-label="Daily Hub sections"></nav>
+      <div id="liveOpsBody" class="lo-body"></div>
     </dialog>
 
     <dialog id="rewardChoiceDialog" class="settings-dialog reward-choice-dialog">
@@ -1354,6 +1544,17 @@
             <output id="pronunciationVolumeValue">100%</output>
           </span>
         </label>
+
+        <label class="setting-row">
+          <span>
+            <strong>Voice boost</strong>
+            <small>Up to 300%. The browser voice tops out at 100%, so music and effects step back while a word is spoken (300% = they drop to a third)</small>
+          </span>
+          <span class="setting-control range-control">
+            <input id="pronunciationBoost" type="range" min="1" max="3" step="0.25" />
+            <output id="pronunciationBoostValue">200%</output>
+          </span>
+        </label>
       </div>
 
       <div class="settings-section">
@@ -1559,6 +1760,18 @@
             <option value="medium">Medium</option>
             <option value="high">High</option>
             <option value="ultra">Ultra</option>
+          </select>
+        </label>
+
+        <label class="setting-row">
+          <span>
+            <strong>Interface motion</strong>
+            <small id="motionPreferenceHint">Menu animations, hover and press effects, result cinematics</small>
+          </span>
+          <select id="motionPreference">
+            <option value="full">Full</option>
+            <option value="system">Follow device setting</option>
+            <option value="reduced">Reduced</option>
           </select>
         </label>
       </div>

@@ -2,3 +2,5 @@ allowBuilds:
   esbuild: true
   # sharp uses prebuilt libvips for this dev-only art pipeline.
   sharp: false
+  # Cloudflare's local runtime for wrangler dev (cloud/): installs its binary.
+  workerd: true

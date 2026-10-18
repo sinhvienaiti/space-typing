@@ -200,6 +200,18 @@ function paletteFor(characterId: CharacterId): ShotPalette {
   return palette;
 }
 
+const customPalettes = new Map<string, ShotPalette>();
+
+function customPalette(colors: { primary: string; secondary: string }): ShotPalette {
+  const key = colors.primary + colors.secondary;
+  let palette = customPalettes.get(key);
+  if (palette === undefined) {
+    palette = { primary: hexRgb(colors.primary), secondary: hexRgb(colors.secondary) };
+    customPalettes.set(key, palette);
+  }
+  return palette;
+}
+
 // ---------------------------------------------------------------------------
 // Cached glow sprites: one soft radial gradient per colour, drawn with
 // drawImage under "lighter". No shadowBlur (its cost scales with pixels).
@@ -291,6 +303,8 @@ function streak(
 
 export type ShotFireOptions<P> = {
   characterId: CharacterId;
+  /** Style Shop shot colour (#rrggbb) for the code-drawn trail, glow and sparkles. */
+  palette?: { primary: string; secondary: string } | null;
   /** Ship centre as drawn; the recipe's muzzle offsets are added to it. */
   originX: number;
   originY: number;
@@ -303,6 +317,9 @@ export type ShotFireOptions<P> = {
   originScale?: number;
   /** Independent gun cycle when one renderer presents multiple ships. */
   muzzleIndex?: number;
+  /** Authored model sockets, in the same ship-local CSS pixels as the recipe. */
+  muzzleOffsets?: readonly (readonly [number, number])[];
+  finisherMuzzleOffset?: readonly [number, number];
   /**
    * The origin already is the gun (the Duel 3D hull projects its muzzles):
    * do not add the recipe's muzzle offsets.
@@ -493,13 +510,14 @@ export class PlayerShotSystem<P> {
   fire(options: ShotFireOptions<P>): boolean {
     const recipe = shotRecipeFor(options.characterId);
     if (recipe === null) return false;
-    const palette = paletteFor(options.characterId);
+    const palette = options.palette ? customPalette(options.palette) : paletteFor(options.characterId);
     const power = Math.max(0.5, options.power);
-    let muzzle = recipe.finisherMuzzle;
+    let muzzle: readonly [number, number] = options.finisherMuzzleOffset ?? recipe.finisherMuzzle;
     if (power < FINISHER_POWER) {
       const cursor = options.muzzleIndex !== undefined && Number.isFinite(options.muzzleIndex)
         ? Math.max(0, Math.floor(options.muzzleIndex)) : this.muzzleCursor;
-      muzzle = recipe.muzzles[cursor % recipe.muzzles.length]!;
+      const offsets = options.muzzleOffsets?.length ? options.muzzleOffsets : recipe.muzzles;
+      muzzle = offsets[cursor % offsets.length]!;
       this.muzzleCursor += 1;
     }
     const turn = options.originAngle ?? 0;

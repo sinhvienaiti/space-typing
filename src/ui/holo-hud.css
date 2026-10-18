@@ -144,7 +144,6 @@
   background-clip: text;
   text-shadow: none;
   filter: drop-shadow(0 0 6px rgba(255, 120, 40, 0.75));
-  animation: hud-burn 0.9s ease-in-out infinite alternate;
 }
 .hud-side[data-heat]:not([data-heat="0"]) .metric span { color: #ffc58a; }
 @keyframes hud-burn {
@@ -383,10 +382,21 @@
 /* Panel edge glows and the hint and SPACE key call for the press. */
 .player-status-hud.rage-ready {
   box-shadow: 0 0 0 1px rgba(255, 150, 60, 0.75), 0 0 26px rgba(255, 110, 40, 0.45);
-  animation: rage-panel 1s ease-in-out infinite alternate;
 }
+/* The pulse animates only opacity of a pre-drawn glow, so the browser never repaints the blur. */
+.player-status-hud::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0;
+  box-shadow: 0 0 0 1px rgba(255, 210, 120, 0.95), 0 0 40px rgba(255, 120, 40, 0.7);
+}
+.player-status-hud.rage-ready::after { animation: rage-panel 1s ease-in-out infinite alternate; }
 @keyframes rage-panel {
-  to { box-shadow: 0 0 0 1px rgba(255, 210, 120, 0.95), 0 0 40px rgba(255, 120, 40, 0.7); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 .player-status-hud.rage-ready #powerHint {
   color: #fff3d6;
@@ -408,3 +418,110 @@
   .player-status-hud.rage-ready, .player-status-hud.rage-ready .rage-flames,
   .player-ultimate .power-fill.ready, .player-status-hud.rage-ready .player-ultimate kbd { animation: none; }
 }
+
+/* ---------- HUD v2 (16/10/2026): icons, rings, segmented bars ---------- */
+.metric span[data-icon] { display: inline-flex; align-items: center; gap: 4px; }
+.metric span[data-icon]::before { width: 11px; height: 11px; color: var(--holo-accent); opacity: 0.9; }
+.metric-streak span[data-icon]::before { color: #ffb547; }
+.metric-kills span[data-icon]::before { color: #ff8a9a; }
+.metric-warp span[data-icon]::before { color: #5fe3ff; }
+.metric-score strong {
+  background: linear-gradient(180deg, #ffffff, #bfefff 55%, #7fd8ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 10px rgba(95, 227, 255, 0.35));
+}
+.metric-multi strong { color: #e4dcff; text-shadow: 0 0 12px rgba(160, 123, 255, 0.55); }
+/* Accuracy ring: a conic gauge in front of the value. */
+.metric-accuracy strong { display: inline-flex; align-items: center; gap: 6px; }
+.metric-accuracy strong::before {
+  content: "";
+  width: 0.95em;
+  height: 0.95em;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(5, 11, 26, 1) 52%, transparent 54%),
+    conic-gradient(var(--acc-color, #5fe3ff) calc(var(--acc, 1) * 360deg), rgba(111, 231, 255, 0.14) 0);
+  box-shadow: 0 0 8px var(--acc-glow, rgba(95, 227, 255, 0.5));
+}
+.metric-accuracy[data-grade="s"] { --acc-color: #3dff95; --acc-glow: rgba(61, 255, 149, 0.55); }
+.metric-accuracy[data-grade="b"] { --acc-color: #ffb547; --acc-glow: rgba(255, 181, 71, 0.5); }
+.metric-accuracy[data-grade="c"] { --acc-color: #ff5d6c; --acc-glow: rgba(255, 93, 108, 0.55); }
+.hud-pop { animation: hud-pop 0.32s cubic-bezier(0.2, 1.6, 0.4, 1); }
+@keyframes hud-pop { 0% { transform: scale(1); } 40% { transform: scale(1.28); color: #fff; } 100% { transform: scale(1); } }
+.metric-warp { min-width: 88px; }
+/* The quick settings gear sits under the right panel, never on top of it. */
+#runtimeSettingsButton { top: 7.4rem !important; }
+
+/* Ship status panel */
+.player-status-head { display: flex; align-items: center; gap: 8px; }
+.player-status-portrait {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(95, 227, 255, 0.28), rgba(7, 16, 34, 0.9) 70%);
+  box-shadow: 0 0 0 1px rgba(95, 227, 255, 0.45), 0 0 14px rgba(95, 227, 255, 0.35);
+  overflow: hidden;
+}
+.player-status-portrait img { width: 30px; height: 30px; object-fit: contain; filter: drop-shadow(0 0 4px rgba(95, 227, 255, 0.8)); }
+.player-status-portrait img:not([src]) { display: none; }
+.resource-row > span[data-icon] { display: inline-flex; align-items: center; gap: 4px; }
+.resource-row > span[data-icon]::before { width: 11px; height: 11px; }
+.hull-row > span::before { color: #ff7d8f; }
+.shield-row > span::before { color: #7fe3ff; }
+.energy-row > span::before { color: #b48bff; }
+.resource-track { position: relative; overflow: hidden; }
+/* Segment ticks every 10%. */
+.resource-track::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(3, 9, 20, 0.7) calc(10% - 1px) 10%);
+  pointer-events: none;
+}
+.shield-fill { position: relative; overflow: hidden; }
+.shield-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.5) 50%, transparent 70%);
+  background-size: 240% 100%;
+  animation: lo-shine 3s linear infinite;
+}
+.energy-fill { box-shadow: 0 0 10px rgba(160, 123, 255, 0.5); }
+.player-status-hud::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0;
+  box-shadow: 0 0 26px rgba(255, 45, 75, 0.5), inset 0 0 18px rgba(255, 45, 75, 0.2);
+}
+.player-status-hud.hull-low::before { animation: hud-hull-alarm 1.1s ease-in-out infinite; }
+.player-status-hud.hull-low .hull-fill { background: linear-gradient(90deg, #ff2d4b, #ff7d8f) !important; box-shadow: 0 0 14px rgba(255, 45, 75, 0.8); }
+.player-status-hud.hull-low #hull { color: #ff8a9a; }
+@keyframes hud-hull-alarm {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .player-status-hud.hull-low::before, .player-status-hud.rage-ready::after, .shield-fill::after, .hud-pop { animation: none; }
+}
+
+/* ---------- GPU fire (src/vfx/hud-fire.ts) ---------- */
+.hud-fire-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9;
+  pointer-events: none;
+}
+/* The shader fire replaces the CSS flames at Medium quality and above. */
+.hud-fire-gpu .hud-flame,
+.hud-fire-gpu .rage-flames { display: none !important; }

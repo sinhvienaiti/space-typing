@@ -1,0 +1,46 @@
+{
+  "id": "aegis",
+  "version": 4065851374,
+  "sprites": {
+    "bolt": {
+      "url": "bolt.webp",
+      "sha256": "1c4e877499c8376832c015aa0ab59a3cc396d57b35ad19c858f704c011fb8901",
+      "width": 768,
+      "height": 336,
+      "anchor": [
+        0.9492,
+        0.4945
+      ]
+    },
+    "finisher": {
+      "url": "finisher.webp",
+      "sha256": "6127a8e55fc40de8c991f72fa5b13357bd7ec9969c4e01ba01aef270751e5601",
+      "width": 768,
+      "height": 331,
+      "anchor": [
+        0.9532,
+        0.492
+      ]
+    },
+    "impact": {
+      "url": "impact.webp",
+      "sha256": "d013b50ba2c191817be9d83093930e3b62d05467e8174771768c6270d730b0ef",
+      "width": 640,
+      "height": 629,
+      "anchor": [
+        0.5067,
+        0.4954
+      ]
+    },
+    "muzzle": {
+      "url": "muzzle.webp",
+      "sha256": "cb51e733ecc94ef7e060644835694dc681356754969e3bdc4681dca81c794fa4",
+      "width": 512,
+      "height": 290,
+      "anchor": [
+        0.0458,
+        0.5071
+      ]
+    }
+  }
+}

@@ -311,7 +311,7 @@ kbd {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: clamp(6px, 1.4vh, 14px);
-  padding: 14px 18px 16px;
+  padding: 14px clamp(18px, 2.2vw, 40px) 16px;
   color: var(--holo-text);
   overflow: hidden;
 }
@@ -501,7 +501,7 @@ kbd {
 .holo-brand h1 {
   margin: 2px 0 0;
   font-family: var(--holo-display);
-  font-size: clamp(2.5rem, 7.4vh, 4rem);
+  font-size: clamp(2.2rem, 6.6vh, 4rem);
   font-weight: 800;
   font-style: italic;
   line-height: 1.05;
@@ -518,14 +518,14 @@ kbd {
 .holo-modes {
   justify-self: center;
   align-self: center;
-  width: min(1480px, 100%);
-  height: min(400px, 100%);
-  min-height: 300px;
+  width: min(1400px, 100%);
+  height: min(clamp(300px, 46vh, 400px), 100%);
+  min-height: 290px;
   display: grid;
-  grid-template-columns: 1.45fr 1fr 1fr 1fr;
-  gap: 18px;
+  grid-template-columns: 1.32fr 1fr 1fr 1fr;
+  gap: clamp(14px, 1.5vw, 26px);
 }
-.holo-three-modes .holo-modes { grid-template-columns: 1.45fr 1fr 1fr; }
+.holo-three-modes .holo-modes { grid-template-columns: 1.32fr 1fr 1fr; }
 .holo-mode {
   position: relative;
   display: flex;
@@ -537,10 +537,10 @@ kbd {
 .holo-mode-art {
   position: relative;
   flex: 0 0 auto;
-  height: clamp(96px, 21vh, 170px);
+  height: clamp(92px, 18vh, 170px);
   overflow: hidden;
 }
-.holo-mode-featured .holo-mode-art { height: clamp(96px, 20vh, 164px); }
+.holo-mode-featured .holo-mode-art { height: clamp(92px, 17.5vh, 164px); }
 .holo-mode-art::after {
   content: "";
   position: absolute;
@@ -591,6 +591,16 @@ kbd {
 }
 .holo-mode-featured h2 { font-size: clamp(1.4rem, 3.8vh, 1.95rem); }
 .holo-mode p { margin: 0; color: var(--holo-dim); font-size: 0.86rem; line-height: 1.45; }
+/* Card copy never pushes the buttons down: two lines on laptops, three on tall screens. */
+.holo-mode-body > p:not(.holo-meta) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+@media (min-height: 900px) {
+  .holo-mode-body > p:not(.holo-meta) { -webkit-line-clamp: 3; }
+}
 .holo-meta { font-size: 0.8rem !important; }
 .holo-meta b { color: var(--holo-text); font-weight: 600; }
 .holo-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
@@ -603,7 +613,7 @@ kbd {
   gap: 8px;
 }
 .holo-actions > .holo-cta { grid-column: 1 / -1; width: 100%; }
-.holo-actions > .holo-ghost { justify-content: center; min-height: 38px; padding: 0 0.6rem; white-space: nowrap; }
+.holo-actions > .holo-ghost { justify-content: center; min-height: clamp(32px, 4.6vh, 38px); padding: 0 0.6rem; font-size: 0.8rem; white-space: nowrap; }
 .holo-actions > .hidden { display: none; }
 /* Expedition buttons are built by src/expedition/ui.ts. */
 .holo-actions-expedition .expansion-v2-icon { width: 20px; height: 20px; }
@@ -639,8 +649,8 @@ kbd {
 }
 .holo-dock-btn {
   position: relative;
-  width: 96px;
-  height: 66px;
+  width: clamp(70px, 5.4vw, 96px);
+  height: clamp(56px, 8vh, 66px);
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -678,7 +688,9 @@ kbd {
   color: var(--holo-faint);
   font-size: 0.72rem;
 }
-.holo-corner-left { left: 22px; display: flex; gap: 14px; margin: 0; }
+/* Gameplay key hints: the in-game HUD shows them (Rage bar has SPACE), so the
+   title keeps its corners clear. */
+.holo-corner-left { display: none; }
 .holo-corner-right { right: 22px; }
 .holo-corner-right summary { cursor: pointer; color: var(--holo-faint); }
 .holo-corner-right[open] .title-dev-actions {
@@ -693,15 +705,21 @@ kbd {
   background: var(--holo-panel-solid);
 }
 
+/* The info strip is a nice-to-have; below this width it would touch the tools. */
+@media (max-width: 1360px) {
+  .holo-strip { display: none; }
+  .holo-topbar > .holo-tools { grid-column: 3; }
+}
+
+/* Laptop widths: centre the dock in the space left of the voice box (bottom right). */
+@media (max-width: 1500px) and (min-width: 1181px) {
+  .holo-dock.holo-panel { margin-right: 200px; }
+}
+
 /* Shorter screens: tighter brand, smaller cards. */
 @media (max-height: 720px) {
   .holo-brand .eyebrow, .holo-tagline { display: none; }
   .holo-dock-btn { height: 56px; }
-}
-
-/* Mid widths: hide the key hints so they never sit under the dock. */
-@media (max-width: 1500px) {
-  .holo-corner-left { display: none; }
 }
 
 /* Narrow screens: a normal scrolling column, two cards per row. */

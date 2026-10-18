@@ -1,0 +1,175 @@
+/* Daily Lessons dialog (src/ui/daily-lessons.ts), Holo Command style. */
+.dl-dialog {
+  width: min(1180px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100vh - 32px);
+  padding: 0;
+  overflow: auto;
+  color: var(--holo-text);
+  border: 1px solid var(--holo-line-strong);
+  border-radius: 0;
+  background:
+    radial-gradient(ellipse at 0% 0%, rgba(125, 255, 181, 0.12), transparent 45%),
+    radial-gradient(ellipse at 100% 100%, rgba(95, 227, 255, 0.1), transparent 50%),
+    var(--holo-panel-solid);
+  clip-path: polygon(22px 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%, 0 22px);
+}
+.dl-shell { display: grid; gap: 16px; margin: 0; padding: 0 0 18px; }
+.dl-head { display: flex; align-items: center; gap: 18px; padding: 18px 24px 14px; border-bottom: 1px solid var(--holo-line); }
+.dl-title { flex: 1; }
+.dl-title .eyebrow { color: #7dffb5; }
+.dl-title h2 { margin: 2px 0 0; font-family: var(--holo-display); font-size: 1.9rem; font-style: italic; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.dl-streak {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 8px;
+  padding: 6px 14px;
+  color: var(--holo-dim);
+  border: 1px solid var(--holo-line);
+}
+.dl-streak-icon { grid-row: span 2; width: 26px; height: 26px; color: var(--holo-faint); }
+.dl-streak strong { font-family: var(--holo-display); font-size: 1.4rem; line-height: 1; }
+.dl-streak span { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }
+.dl-streak small { grid-column: 2; font-size: 0.7rem; }
+.dl-streak.on { color: #ffd9a0; border-color: rgba(255, 138, 61, 0.55); background: rgba(255, 138, 61, 0.08); }
+.dl-streak.on .dl-streak-icon { color: #ff8a3d; filter: drop-shadow(0 0 8px rgba(255, 138, 61, 0.7)); }
+.dl-close { display: grid; place-items: center; width: 38px; height: 38px; padding: 0; color: var(--holo-dim); font-size: 1.4rem; line-height: 1; border: 1px solid var(--holo-line); background: transparent; cursor: pointer; }
+.dl-close:hover, .dl-close:focus-visible { color: var(--holo-text); border-color: var(--holo-line-strong); }
+
+.dl-settings { display: grid; grid-template-columns: auto minmax(220px, 1fr); gap: 10px 24px; align-items: end; padding: 0 24px; }
+.dl-field { display: grid; gap: 6px; }
+.dl-label { color: var(--holo-faint); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; }
+.dl-levels { display: flex; flex-wrap: wrap; gap: 4px; }
+.dl-level {
+  min-width: 52px;
+  min-height: 36px;
+  padding: 0 12px;
+  color: var(--holo-dim);
+  font-family: var(--holo-display);
+  font-size: 0.82rem;
+  font-weight: 800;
+  border: 1px solid var(--holo-line);
+  background: rgba(7, 16, 34, 0.5);
+  cursor: pointer;
+}
+.dl-level:hover { color: var(--holo-text); }
+.dl-level.on { color: var(--holo-ink); border-color: transparent; background: linear-gradient(100deg, #7dffb5, #5fe3ff); }
+.dl-topic { min-height: 36px; padding: 0 10px; color: var(--holo-text); font: inherit; border: 1px solid var(--holo-line); background: var(--holo-field); }
+.dl-hint { grid-column: 1 / -1; margin: 0; color: var(--holo-faint); font-size: 0.74rem; }
+
+/* ---------- The chain ---------- */
+.dl-path {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 6px 24px 0;
+  list-style: none;
+}
+/* The rail behind the nodes. */
+.dl-path::before {
+  content: "";
+  position: absolute;
+  left: 60px;
+  right: 60px;
+  top: 52px;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(125, 255, 181, 0.6), rgba(95, 227, 255, 0.25));
+}
+.dl-node {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  justify-items: center;
+  gap: 8px;
+  padding: 12px 12px 14px;
+  text-align: center;
+  border: 1px solid var(--holo-line);
+  background: linear-gradient(180deg, rgba(14, 28, 52, 0.85), rgba(7, 14, 28, 0.92));
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+}
+.dl-number { color: var(--holo-faint); font-family: var(--holo-display); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.2em; }
+.dl-number::before { content: "LESSON "; }
+.dl-badge {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  color: var(--holo-faint);
+  border: 2px solid var(--holo-line);
+  border-radius: 50%;
+  background: #08132a;
+}
+.dl-badge-icon { width: 26px; height: 26px; }
+.dl-node-text { display: grid; gap: 4px; }
+.dl-node-text strong { font-family: var(--holo-display); font-size: 1rem; }
+.dl-node-text small { color: var(--holo-dim); font-size: 0.76rem; line-height: 1.35; }
+.dl-mode { color: var(--holo-faint); font-size: 0.66rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.dl-state { color: var(--holo-faint); font-size: 0.74rem; font-weight: 700; }
+.dl-start { width: 100%; min-height: 40px; font-size: 0.86rem; }
+.dl-node.done { border-color: rgba(61, 255, 149, 0.45); }
+.dl-node.done .dl-badge { color: #04121c; border-color: transparent; background: linear-gradient(140deg, #7dffb5, #3dff95); box-shadow: 0 0 16px rgba(61, 255, 149, 0.45); }
+.dl-node.done .dl-state { color: var(--holo-good); }
+.dl-node.current { border-color: var(--holo-line-strong); background: radial-gradient(ellipse at 50% 0%, rgba(95, 227, 255, 0.18), transparent 60%), linear-gradient(180deg, rgba(14, 32, 60, 0.95), rgba(7, 16, 32, 0.95)); }
+.dl-node.current .dl-badge { color: var(--holo-accent); border-color: var(--holo-accent); box-shadow: 0 0 18px rgba(95, 227, 255, 0.45); }
+/* A soft ring breathes on the next lesson (opacity only). */
+.dl-node.current .dl-badge::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border: 2px solid rgba(95, 227, 255, 0.5);
+  border-radius: 50%;
+  animation: dl-breathe 2.2s ease-in-out infinite;
+}
+@keyframes dl-breathe { 50% { opacity: 0.15; } }
+.dl-node.locked { opacity: 0.62; }
+
+/* ---------- Rewards ---------- */
+.dl-rewards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 24px; }
+.dl-chest {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--holo-line);
+  background: rgba(7, 16, 34, 0.6);
+}
+.dl-chest-icon { display: grid; place-items: center; width: 46px; height: 46px; color: var(--holo-faint); }
+.dl-chest-svg { width: 34px; height: 34px; }
+.dl-chest-text { display: grid; gap: 4px; }
+.dl-chest-text strong { font-family: var(--holo-display); }
+.dl-chest-text small { color: var(--holo-dim); font-size: 0.78rem; }
+.dl-chest-bar { position: relative; display: block; height: 5px; overflow: hidden; background: rgba(95, 227, 255, 0.12); }
+.dl-chest-bar i { position: absolute; inset: 0; transform-origin: left center; background: linear-gradient(90deg, #7dffb5, #5fe3ff); }
+.dl-claim {
+  min-width: 96px;
+  min-height: 38px;
+  color: var(--holo-ink);
+  font-family: var(--holo-display);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 0;
+  background: linear-gradient(100deg, #ffd166, #ff9a3d);
+  cursor: pointer;
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+.dl-claim:disabled { color: var(--holo-dim); background: rgba(95, 227, 255, 0.06); cursor: default; }
+.dl-chest.ready { border-color: rgba(255, 209, 102, 0.6); background: radial-gradient(ellipse at 0% 50%, rgba(255, 209, 102, 0.16), transparent 60%), rgba(20, 16, 10, 0.7); }
+.dl-chest.ready .dl-chest-icon { color: #ffd166; filter: drop-shadow(0 0 10px rgba(255, 209, 102, 0.7)); }
+.dl-chest.claimed .dl-chest-icon { color: var(--holo-good); }
+.dl-foot { margin: 0; padding: 0 24px; color: var(--holo-faint); font-size: 0.76rem; }
+
+@media (max-width: 900px) {
+  .dl-path { grid-template-columns: 1fr; }
+  .dl-path::before { display: none; }
+  .dl-node { grid-template-columns: auto auto 1fr auto; grid-template-rows: none; justify-items: start; align-items: center; text-align: left; }
+  .dl-settings, .dl-rewards { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { .dl-node.current .dl-badge::after { animation: none; } }

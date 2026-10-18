@@ -1,3 +1,6 @@
+// First: answers prefers-reduced-motion from the game's own setting for every module below.
+import "./ui/motion-preference";
+import "./ui/testing-preview.css";
 import { AccountTransactions, type AccountView } from "./persistence/account-transactions";
 import { WARP_POLICY, reconcileWarp, warpEtaMs } from "./economy/warp-charge";
 import type { AccountState, SortieContext, WriteTicket } from "./persistence/account-state";
@@ -39,6 +42,31 @@ import "./ui/voice-feedback.css";
 import "./ui/holo-dialogs.css";
 import "./ui/holo-results.css";
 import "./ui/reward-cards.css";
+import "./ui/daily-hub.css";
+import "./ui/online.css";
+import "./ui/style-shop.css";
+import "./ui/daily-lessons.css";
+import "./ui/title-home.css";
+import "./ui/ui-fx.css";
+import { OnlineSession } from "./online/session";
+import { CloudSave } from "./online/cloud-save";
+import { liveOpsRemote } from "./online/liveops-remote";
+import { WalletSync, type SpendResult, type WalletView } from "./online/wallet-sync";
+import type { WalletPurchase } from "./economy/wallet-price";
+import type { WalletDeltas } from "./economy/wallet-rules";
+import { installAccountDialog } from "./ui/account-dialog";
+import { installFeedbackDialog } from "./ui/feedback-dialog";
+import { installChatPanel } from "./ui/chat-panel";
+import { LiveOpsController } from "./liveops/controller";
+import { loadLiveOpsRuntime } from "./liveops/runtime";
+import { LIVE_OPS_POLICY } from "./liveops/policy";
+import { installDailyHub } from "./ui/daily-hub";
+import { liveOpsArt } from "./ui/liveops-art";
+import { installDialogMotion } from "./ui/dialog-motion";
+import { installHudFire } from "./vfx/hud-fire";
+import { installResultFx } from "./vfx/result-fx";
+import { holoConfirm } from "./ui/holo-confirm";
+import { attachModelTurntable } from "./ui/model-icon";
 import {
   installRewardCardKeys,
   renderRewardCards,
@@ -49,6 +77,10 @@ import {
 import { installIconStyles } from "./ui/icons";
 import { installHoloTooltips } from "./ui/holo-tooltip";
 import { installTitleHub, type TitleHub, type TitleHubPilot, shipArtUrl, galaxyPlateUrl } from "./ui/title-hub";
+import { installTitleHome, type TitleHome, type TitleHomeData, type TitleHomeToday } from "./ui/title-home";
+import { installBootSplash } from "./ui/boot-splash";
+import { activityPoints, warpWindowViews } from "./liveops/state";
+import { formatCountdown, nextDayResetMs, vietnamMinuteOfDay } from "./liveops/time";
 import { installDuelOnlineRoomController } from "./duel/online-room-controller";
 import { installDuelBattleUi } from "./duel/battle-ui";
 import { DuelLocalPracticeMatch } from "./duel/local-match";
@@ -132,6 +164,7 @@ import {
 import {
   canSelectCampaignStageWithTestingUnlock,
   isTestingStagePreview,
+  testingStageUnlockEnabled as hasTestingStageUnlock,
 } from "./campaign/stage-selection-access";
 import {
   createStageConfig,
@@ -222,11 +255,48 @@ import { EQUIPMENT_PERKS, resolveEquipmentPerks } from "./equipment/perks";
 import { equipmentStatLabel } from "./equipment/stat-labels";
 import { paintedEquipmentIcon, paintedItemIcon, paintedSkillIcon, setIconContent } from "./ui/painted-icons";
 import {
+  addItem,
   createEmptyInventory,
   inventoryTotal,
   itemCount,
   removeItem,
 } from "./items/inventory";
+import { bundleById, type CosmeticSlot } from "./cosmetics/catalog";
+import {
+  boostClearCredits,
+  buyBooster,
+  buyBundle,
+  buyCosmetic,
+  createCosmeticsState,
+  equipCosmetic,
+  profileLookIds,
+  resolveLook,
+  sanitizeCosmeticsState,
+  type CosmeticsProgress,
+  type CosmeticsState,
+  type Look,
+  type Purchase,
+} from "./cosmetics/state";
+import { bannerBackground, loadCosmeticArt, paintFilter, renderAvatar, renderTitle } from "./ui/cosmetic-look";
+import { installStyleShop } from "./ui/style-shop";
+import { installDailyLessons } from "./ui/daily-lessons";
+import {
+  CHAIN_LENGTH,
+  claimLessonReward,
+  completeLesson,
+  createLessonState,
+  lessonSeed,
+  lessonStage,
+  lessonSteps,
+  lessonsForDay,
+  nextLesson,
+  sanitizeLessonState,
+  type LessonState,
+  type LessonStep,
+  type WeakWord,
+} from "./lessons/chain";
+import { lessonContent, passageLevelFor } from "./lessons/content";
+import { gameDay } from "./economy/warp-charge";
 import type { Inventory } from "./items/inventory";
 import {
   COMBAT_CONSUMABLE_IDS,
@@ -304,6 +374,7 @@ import {
   maxAffixesForGrade,
 } from "./equipment/affixes";
 import { MusicController, type NowPlaying } from "./audio/MusicController";
+import { setPronunciationBoost } from "./audio/mix";
 import type { MusicPlaybackMode } from "./audio/music-library";
 import {
   musicProfileForWorld,
@@ -598,9 +669,10 @@ import {
 } from "./persistence/player-save";
 import type {
   PersistenceSource,
+  PlayerSave,
   SaveReason,
 } from "./persistence/player-save";
-import { speakEnglish, stopSpeech, setSpeechGate } from "./speech";
+import { speakEnglish, stopSpeech, setSpeechGate, prepareEnglishVoice, setSpeechNotice } from "./speech";
 import {
   loadVocabularyGrammarIndex,
   loadVocabularyGrammarModule,
@@ -678,6 +750,7 @@ const defaultSettings: GameSettings = {
   pronunciationEnabled: true,
   pronunciationRate: 1,
   pronunciationVolume: 1,
+  pronunciationBoost: 2,
   killTranslation: { ...DEFAULT_KILL_TRANSLATION_SETTINGS },
   musicMode: "map",
 };
@@ -744,6 +817,10 @@ function loadSettings(): GameSettings {
         typeof parsed.pronunciationVolume === "number"
           ? Math.min(1, Math.max(0, parsed.pronunciationVolume))
           : defaultSettings.pronunciationVolume,
+      pronunciationBoost:
+        typeof parsed.pronunciationBoost === "number" && Number.isFinite(parsed.pronunciationBoost)
+          ? Math.min(3, Math.max(1, parsed.pronunciationBoost))
+          : defaultSettings.pronunciationBoost,
       killTranslation: sanitizeKillTranslationSettings(parsed.killTranslation),
       musicMode: sanitizeMusicMode(parsed.musicMode),
     };
@@ -863,6 +940,7 @@ function byId<T extends HTMLElement = HTMLElement>(id: string): T {
 let settings = loadSettings();
 /** Title hub controls (src/ui/title-hub.ts), installed once the game exists. */
 let titleHub: TitleHub | null = null;
+let titleHome: TitleHome | null = null;
 let difficultySettings = loadDifficultySettings();
 let activeStageDifficulty: DifficultyProfile | null = null;
 let campaign = createDefaultCampaignProgress();
@@ -903,6 +981,28 @@ musicController.setMusicVolume(settings.musicVolume);
 musicController.setAmbientVolume(settings.ambientVolume);
 musicController.setPlaybackMode(sanitizeMusicMode(settings.musicMode));
 musicController.onNowPlaying(showNowPlaying);
+/**
+ * Voice boost: the browser voice tops out at 100%, so while a word is spoken
+ * the music and effects step back (to 1 / boost). The music comes back a
+ * moment after the word, so a burst of kills does not pump it.
+ */
+let voiceBoostRelease: number | null = null;
+function applyVoiceBoost(): void {
+  const boost = settings.pronunciationBoost ?? 1;
+  setPronunciationBoost(boost);
+  musicController.setPronunciationDepth(boost > 1 ? 1 / boost : null);
+}
+applyVoiceBoost();
+window.addEventListener("space-typing:pronunciation", (event) => {
+  const active = (event as CustomEvent<{ active?: boolean }>).detail?.active === true;
+  if (voiceBoostRelease !== null) window.clearTimeout(voiceBoostRelease);
+  voiceBoostRelease = null;
+  if (active && (settings.pronunciationBoost ?? 1) > 1) musicController.duck("pronunciation");
+  else if (!active) voiceBoostRelease = window.setTimeout(() => {
+    voiceBoostRelease = null;
+    musicController.releaseDuck("pronunciation");
+  }, 320);
+});
 if (import.meta.env.DEV) {
   // Dev-only handle for scripts/visual checks (docs/MUSIC_SYSTEM.md).
   (window as unknown as { __spaceTypingMusic?: MusicController }).__spaceTypingMusic = musicController;
@@ -937,6 +1037,8 @@ let checkpointSnapshot: CheckpointSnapshot =
 let crashRecoverySnapshot: CrashRecoverySnapshot | null = null;
 let stageEntrySnapshot: StageEntrySnapshot | null = null;
 let persistenceReady = false;
+// The boot splash stays until the save, Warp and smooth frames are in (src/ui/boot-splash.ts).
+const bootSplash = installBootSplash();
 let vocabularyReady = false;
 let equipmentDropCounter = 0;
 let shopPurchaseCounter = 0;
@@ -972,6 +1074,8 @@ let vocabularyGrammarIndex: VocabularyGrammarIndex | null = null;
 let configuredVocabulary: VocabularyEntry[] = [];
 let activeReviewGoal: SpaceReviewGoal | undefined;
 let activeReviewVocabulary: VocabularyEntry[] = [];
+/** The Daily Lesson being played (a Smart Review practice stage), or null. */
+let lessonRun: { step: LessonStep; stage: number; label: string; hasPassages: boolean } | null = null;
 let activeReviewLevel = 1;
 let gameplayModeBeforeReview: GameplayMode | null = null;
 let learningRequestSequence = 0;
@@ -1111,9 +1215,16 @@ setSpeechGate(async play => {
   const pausedForVoice = game.getInputMode() === "voice" && game.getPhase() === "playing";
   if (pausedForVoice) game.pause();
   try { await voiceSession.withAudioOutput(play); }
-  catch (error) { voiceSession.stop(); showNotice(error instanceof Error ? error.message : "Pronunciation unavailable"); }
+  catch (error) {
+    if (!(error instanceof Error && error.message === "Pronunciation already playing")) {
+      voiceSession.stop(); showNotice(error instanceof Error ? error.message : "Pronunciation unavailable");
+    }
+  }
   finally { if (pausedForVoice && game.getPhase() === "paused") game.resume(); }
 });
+setSpeechNotice(showNotice);
+void prepareEnglishVoice();
+document.addEventListener("pointerdown", () => { void prepareEnglishVoice(); }, { once: true });
 const settingsDialog = byId<HTMLDialogElement>("settingsDialog");
 const vocabularyDialog = byId<HTMLDialogElement>("vocabularyDialog");
 const stageSelectDialog = byId<HTMLDialogElement>("stageSelectDialog");
@@ -1421,7 +1532,19 @@ let currentEncounterToken = "";
 let settledEncounterToken = "";
 let pendingMilestoneGrants: string[] = [];
 let committedCredits = 0;
+/** Latest committed save object, for the cloud copy. */
+let lastCommittedSave: PlayerSave | null = null;
+let cloudSave: CloudSave | null = null;
+/** Server wallet (src/online/wallet-sync.ts); null until the online session exists. */
+let walletSync: WalletSync | null = null;
+let walletPurchaseBusy = false;
+let walletPurchaseReceipts: string[] = [];
+let walletLessonRewards: { day: number; tier: "three" | "five" }[] = [];
 const accountTransactions = new AccountTransactions((save) => {
+  lastCommittedSave = save;
+  cloudSave?.noteCommitted();
+  // Only the writing tab reports money changes (a read-only tab just mirrors them).
+  if (accountTransactions.canWrite()) walletSync?.onCommitted(save);
   warpAccount = save.account;
   committedCredits = save.credits;
   if (
@@ -1439,6 +1562,10 @@ const accountTransactions = new AccountTransactions((save) => {
       difficultySettings = sanitizeDifficultySettings(
         save.auxiliary.difficulty,
       );
+    liveOps.load(save.auxiliary?.liveOps);
+    loadCosmetics(save.auxiliary?.cosmetics);
+    lessons = sanitizeLessonState(save.auxiliary?.lessons);
+    renderLessonsBadge();
     refreshPersistentStateUi();
   }
   try {
@@ -1457,6 +1584,436 @@ const accountTransactions = new AccountTransactions((save) => {
   }
   renderWarpHud();
 });
+// ---------- Live-ops: Daily Hub (src/liveops, src/ui/daily-hub.ts) ----------
+/** Last key press or spoken word; play time only counts within a minute of it. */
+let liveOpsLastInputAt = 0;
+let dailyHub: ReturnType<typeof installDailyHub> | null = null;
+let chatPanel: ReturnType<typeof installChatPanel> | null = null;
+const resultFx = installResultFx(() => settings.visualQuality, (cue) => game.playUiCue(cue));
+
+// ---------- Style Shop: cosmetics, packs, boosters (src/cosmetics, src/ui/style-shop.ts) ----------
+let cosmetics: CosmeticsState = createCosmeticsState();
+
+function cosmeticsProgress(): CosmeticsProgress {
+  return { highestStage: campaign.highestUnlockedStage, bestStreak: liveOps.state().streak.best };
+}
+
+function loadCosmetics(raw: unknown): void {
+  cosmetics = sanitizeCosmeticsState(raw);
+  applyCosmeticLook();
+}
+
+/** Pushes the worn look to the ship renderer, the pilot card and chat. */
+function applyCosmeticLook(): void {
+  const look = resolveLook(cosmetics, cosmeticsProgress());
+  game.setCosmeticLook({
+    paint: paintFilter(look.paint),
+    trail: look.trail === null ? null : { hot: look.trail.hot, plume: look.trail.plume },
+    shot: look.shot === null ? null : { primary: look.shot.primary, secondary: look.shot.secondary },
+  });
+  renderPilotLook(look);
+  chatPanel?.setLook(profileLookIds(look));
+}
+
+function renderPilotLook(look: Look): void {
+  const card = document.getElementById("titlePilotCard");
+  const holder = card?.querySelector<HTMLElement>(".holo-avatar");
+  if (!card || !holder) return;
+  holder.classList.add("has-look");
+  holder.querySelector(".cl-avatar")?.remove();
+  holder.prepend(renderAvatar(look.avatar, look.frame, 50));
+  holder.title = "Style Shop · change your look";
+  holder.setAttribute("role", "button");
+  holder.tabIndex = 0;
+  card.classList.add("has-look");
+  card.style.setProperty("--pilot-banner", bannerBackground(look.banner));
+  const title = renderTitle(look.title);
+  title.classList.add("pilot-look-title");
+  const old = card.querySelector(".pilot-look-title");
+  if (old) old.replaceWith(title);
+  else card.querySelector(".holo-pilot-name")?.after(title);
+}
+
+/** Same rules as the Daily Hub: between sorties, on the title screen, writable account. */
+function styleShopBlocker(): string | null {
+  if (!persistenceReady) return "Loading your account…";
+  if (!accountTransactions.canWrite()) return "Read-only account in this tab. Close other Space Typing tabs.";
+  if (warpAccount?.attempt) return "Finish the current sortie first.";
+  if (game.getPhase() !== "title") return "Shop from the hangar.";
+  if (practiceRestorePending || clearSettlementPending || accountTransactions.busy()) return "Saving… try again in a moment.";
+  return null;
+}
+
+/**
+ * Applies a purchase: spend the price, take the new state, run `extra`, save.
+ * A failed save puts everything back, so nothing is kept without payment.
+ */
+async function settleStylePurchase(result: Purchase, label: string, purchase: WalletPurchase, extra?: () => void): Promise<string | null> {
+  if (!result.ok) return result.reason;
+  const costs: WalletDeltas = { credits: result.price.credits, starCrystal: result.price.starCrystal };
+  const paid = await payFirst(costs, "style-shop", purchase);
+  if (!paid.ok) return paid.reason;
+  const before = { credits, expansionCurrencies, cosmetics, inventory };
+  credits = Math.max(0, credits - result.price.credits);
+  expansionCurrencies = { ...expansionCurrencies, starCrystal: Math.max(0, expansionCurrencies.starCrystal - result.price.starCrystal) };
+  cosmetics = result.state;
+  extra?.();
+  const saved = await finishWalletPurchase(paid, costs, "shop", label, "shop", () => {
+    ({ credits, expansionCurrencies, cosmetics, inventory } = before);
+  });
+  applyCosmeticLook();
+  refreshPersistentStateUi();
+  return saved ? null : "Could not save. The purchase was rolled back; any pending refund will retry on reconnect.";
+}
+
+/**
+ * Server wallet (phase ≥ 2): the server takes the price before a purchase
+ * is applied, and refuses what the account cannot pay (or anything while
+ * offline once this device has a server wallet). Otherwise: allowed.
+ */
+async function payFirst(costs: WalletDeltas, source: string, purchase?: WalletPurchase): Promise<SpendResult> {
+  if (!accountTransactions.canWrite() || practiceActive || activeReviewGoal !== undefined || practiceRestorePending || testingStagePreviewActive() || clearSettlementPending || expeditionSession.ownsCampaignPersistence()) {
+    return { ok: false, reason: "Return to the hangar and finish saving before purchasing." };
+  }
+  if (walletPurchaseBusy) return { ok: false, reason: "Please wait for the current purchase to finish." };
+  walletPurchaseBusy = true;
+  const balanceBefore = JSON.stringify({ credits, expansionCurrencies });
+  const positive: WalletDeltas = {};
+  for (const [key, value] of Object.entries(costs) as [keyof WalletDeltas, number | undefined][]) if ((value ?? 0) > 0) positive[key] = value;
+  if (walletSync === null) return { ok: true, opId: null };
+  try {
+    const result = await walletSync.spend(positive, source, purchase);
+    if (result.ok && JSON.stringify({ credits, expansionCurrencies }) !== balanceBefore) {
+      await walletSync.refund(result.opId, positive);
+      walletPurchaseBusy = false;
+      return { ok: false, reason: "Your balance changed while buying. Please reopen the offer and retry." };
+    }
+    if (!result.ok) walletPurchaseBusy = false;
+    return result;
+  } catch (error) {
+    walletPurchaseBusy = false;
+    return { ok: false, reason: error instanceof Error ? error.message : "Purchase failed. Please retry." };
+  }
+}
+
+/** Commit the item and receipt together, or restore its entire local state before refunding. */
+async function finishWalletPurchase(
+  paid: Extract<SpendResult, { ok: true }>, costs: WalletDeltas, reason: SaveReason,
+  message: string, recovery: CrashRecoveryReason, rollback: () => void,
+): Promise<boolean> {
+  const receipts = walletPurchaseReceipts;
+  const recoveryBefore = { campaignExpansion, crashRecoverySnapshot };
+  if (paid.opId !== null) walletPurchaseReceipts = [...receipts, paid.opId].slice(-100);
+  try {
+    const saved = (await autosaveCampaign(reason, message, recovery)) &&
+      (paid.opId === null || lastCommittedSave?.auxiliary?.walletPurchases?.includes(paid.opId) === true);
+    if (!saved) {
+      walletPurchaseReceipts = receipts;
+      rollback();
+      ({ campaignExpansion, crashRecoverySnapshot } = recoveryBefore);
+      await walletSync?.refund(paid.opId, costs);
+      refreshPersistentStateUi();
+      return false;
+    }
+    await walletSync?.settle();
+    return true;
+  } finally {
+    walletPurchaseBusy = false;
+  }
+}
+
+function purchaseRollback(): () => void {
+  const before = { credits, expansionCurrencies, inventory, equipment, shops, upgrades, progression };
+  return () => {
+    ({ credits, expansionCurrencies, inventory, equipment, shops, upgrades, progression } = before);
+    applyEquipmentStats();
+  };
+}
+
+/** What moving from the current balances to `next` costs (positive amounts only). */
+function purchaseCosts(next: { credits: number; expansionCurrencies: ExpansionCurrencyState }): WalletDeltas {
+  return {
+    credits: Math.max(0, credits - next.credits),
+    alloy: Math.max(0, expansionCurrencies.alloy - next.expansionCurrencies.alloy),
+    starCrystal: Math.max(0, expansionCurrencies.starCrystal - next.expansionCurrencies.starCrystal),
+    quantumCore: Math.max(0, expansionCurrencies.quantumCore - next.expansionCurrencies.quantumCore),
+  };
+}
+
+const styleShop = installStyleShop({
+  state: () => cosmetics,
+  progress: cosmeticsProgress,
+  wallet: () => ({ credits, starCrystal: expansionCurrencies.starCrystal }),
+  pilotName: () => onlineSession.account?.displayName ?? getCharacter(characters.selected).name,
+  shipArt: () => "/assets/space-typing/ships/3d/" + characters.selected + "/color.webp",
+  gameDay: () => gameDay(accountTransactions.now()),
+  blocker: styleShopBlocker,
+  buy: (id) => settleStylePurchase(buyCosmetic(cosmetics, id, { credits, starCrystal: expansionCurrencies.starCrystal }, cosmeticsProgress()), "✓ Style Shop purchase saved", { kind: "cosmetic", id }),
+  equip: async (slot: CosmeticSlot, id) => {
+    const next = equipCosmetic(cosmetics, slot, id, cosmeticsProgress());
+    if (next === null) return;
+    cosmetics = next;
+    applyCosmeticLook();
+    await autosaveCampaign("shop");
+  },
+  buyBundle: (id) => {
+    const bundle = bundleById(id);
+    const result = buyBundle(cosmetics, id, { credits, starCrystal: expansionCurrencies.starCrystal }, gameDay(accountTransactions.now()));
+    return settleStylePurchase(result, "✓ " + (bundle?.name ?? "Pack") + " added to inventory", { kind: "bundle", id }, () => {
+      for (const [item, amount] of Object.entries(bundle?.items ?? {})) inventory = addItem(inventory, item as Parameters<typeof addItem>[1], amount).inventory;
+    });
+  },
+  buyBooster: (id) => settleStylePurchase(buyBooster(cosmetics, id, { credits, starCrystal: expansionCurrencies.starCrystal }), "✓ Booster active", { kind: "booster", id }),
+  sound: {
+    tab: () => game.playUiCue("tab"),
+    reveal: (big) => game.playUiCue(big ? "reward-big" : "reward"),
+    error: () => game.playUiCue("error"),
+  },
+  notice: (message) => showNotice(message),
+});
+void loadCosmeticArt().then(() => applyCosmeticLook());
+function openStyleShop(): void {
+  if (!persistenceReady || !canOpenBetweenStageMenu()) return;
+  game.playUiCue("open");
+  styleShop.open();
+}
+byId("styleShopButton").addEventListener("click", openStyleShop);
+
+// ---------- Daily Lessons (src/lessons, src/ui/daily-lessons.ts) ----------
+let lessons: LessonState = createLessonState();
+
+function lessonDay(): number {
+  return gameDay(accountTransactions.now());
+}
+
+/** Lessons rolled to today (a new day clears yesterday's chain). */
+function lessonsToday(): LessonState {
+  lessons = lessonsForDay(lessons, lessonDay());
+  return lessons;
+}
+
+function renderLessonsBadge(): void {
+  const today = lessonsToday();
+  const left = CHAIN_LENGTH - today.done.length;
+  const claimable = (today.done.length >= 3 && !today.claimed.three) || (today.done.length >= CHAIN_LENGTH && !today.claimed.five);
+  const button = document.getElementById("lessonsButton");
+  if (button === null) return;
+  button.classList.toggle("has-news", left > 0 || claimable);
+  button.title = left > 0 ? left + " lesson" + (left === 1 ? "" : "s") + " left today" : claimable ? "Reward ready" : "All lessons done today";
+  if (game.getPhase() === "title") titleHub?.render();
+}
+
+async function startLesson(index: number): Promise<string | null> {
+  const today = lessonsToday();
+  if (!today.done.includes(index) && nextLesson(today) !== index) return "Play the lessons in order.";
+  const hasPassages = (await passageLevelFor(today.settings.level).catch(() => null)) !== null;
+  const step = lessonSteps(today.settings.level, hasPassages)[index];
+  if (step === undefined) return "Unknown lesson.";
+  let content: Awaited<ReturnType<typeof lessonContent>>;
+  try {
+    content = await lessonContent(step, today.settings, today.weak, lessonSeed(lessonDay(), today.settings), configuredVocabulary);
+  } catch {
+    return "Could not load the lesson words. Check your connection and try again.";
+  }
+  if (content.entries.length < 3) return "Not enough words for this lesson yet. Try another topic.";
+  // Smart Review practice with the lesson words; the gameplay mode is set
+  // directly so the player's saved mode preference does not change.
+  leaveReviewMode();
+  gameplayModeBeforeReview = gameplayMode;
+  gameplayMode = step.gameplay;
+  activeReviewGoal = "mixed";
+  activeReviewVocabulary = content.entries;
+  activeReviewLevel = content.level;
+  game.setVocabulary(content.entries);
+  game.setVocabularyLevel(content.level);
+  lessonRun = { step, stage: lessonStage(step, campaign.highestUnlockedStage), label: content.label, hasPassages };
+  renderGameplayMode();
+  const dialog = document.getElementById("dailyLessonsDialog") as HTMLDialogElement | null;
+  if (dialog?.open) dialog.close();
+  await startSelectedStage(true);
+  if (game.getPhase() !== "playing") {
+    endLessonRun();
+    return "The lesson could not start right now. Try again from the hangar.";
+  }
+  return null;
+}
+
+/** Saves a finished lesson (after the practice state has reloaded). */
+async function finishLessonStep(run: { step: LessonStep }, weak: WeakWord[]): Promise<void> {
+  lessons = completeLesson(lessonsToday(), lessonDay(), run.step.index, weak);
+  renderLessonsBadge();
+  renderLessonClearActions();
+  // Still in Smart Review here, where autosave skips by design, so the
+  // lessons go straight into the account save.
+  try {
+    await accountTransactions.updateAuxiliary({ lessons });
+    showNotice("✓ Lesson " + (run.step.index + 1) + "/5 saved");
+  } catch (error) {
+    showNotice(error instanceof Error ? "Lesson not saved: " + error.message : "Lesson not saved");
+  }
+}
+
+function renderLessonClearActions(): void {
+  if (lessonRun === null) return;
+  const today = lessonsToday();
+  const next = nextLesson(today);
+  const steps = lessonSteps(today.settings.level, lessonRun.hasPassages);
+  const button = byId<HTMLButtonElement>("nextStageButton");
+  button.textContent = next === null ? "Chain complete · claim rewards" : "Next lesson · " + (steps[next]?.title ?? "continue");
+  byId("clearRetryButton").textContent = "Replay lesson";
+}
+
+async function continueLessonChain(): Promise<void> {
+  await practiceReload;
+  const next = nextLesson(lessonsToday());
+  if (next === null) {
+    game.backToTitle();
+    dailyLessons.open();
+    return;
+  }
+  const error = await startLesson(next);
+  if (error !== null) showNotice(error);
+}
+
+/** Leaves lesson mode: the player's own vocabulary and mode come back. */
+function endLessonRun(): void {
+  lessonRun = null;
+  leaveReviewMode();
+  renderLessonsBadge();
+}
+
+function lessonBlocker(): string | null {
+  if (!persistenceReady) return "Loading your account…";
+  if (!accountTransactions.canWrite()) return "Read-only account in this tab. Close other Space Typing tabs.";
+  if (game.getPhase() !== "title") return "Open lessons from the hangar.";
+  if (practiceRestorePending || clearSettlementPending || stageStartPending || accountTransactions.busy()) return "Saving… try again in a moment.";
+  if (!vocabularyReady) return "Loading words…";
+  return null;
+}
+
+const dailyLessons = installDailyLessons({
+  state: lessonsToday,
+  topics: async () => {
+    try {
+      vocabularyTopicIndex ??= await loadVocabularyTopicIndex();
+      return vocabularyTopicIndex;
+    } catch {
+      return null;
+    }
+  },
+  hasPassages: async (level) => (await passageLevelFor(level).catch(() => null)) !== null,
+  setSettings: async (next) => {
+    lessons = { ...lessonsToday(), settings: next };
+    await autosaveCampaign("progression");
+  },
+  start: (index) => startLesson(index),
+  claim: async (tier) => {
+    const result = claimLessonReward(lessonsToday(), lessonDay(), tier);
+    if (!result.ok) return result.reason;
+    // This receipt and its currencies commit together; WalletSync reads it only after success.
+    const previousRewards = walletLessonRewards;
+    walletLessonRewards = [...previousRewards, { day: lessonDay(), tier }].filter(reward => reward.day > lessonDay() - 90);
+    const before = { lessons, credits, expansionCurrencies };
+    lessons = result.state;
+    credits = addCredits(credits, result.reward.credits);
+    expansionCurrencies = addExpansionCurrencyReward(expansionCurrencies, { alloy: 0, starCrystal: result.reward.starCrystal, quantumCore: 0 });
+    const label = "✓ Lesson reward · +" + result.reward.credits + " Credits" + (result.reward.starCrystal > 0 ? " · +" + result.reward.starCrystal + " Star Crystals" : "");
+    if (!(await autosaveCampaign("progression", label))) {
+      walletLessonRewards = previousRewards;
+      ({ lessons, credits, expansionCurrencies } = before);
+      refreshPersistentStateUi();
+      return "Could not save. Try again.";
+    }
+    refreshPersistentStateUi();
+    renderLessonsBadge();
+    return null;
+  },
+  blocker: lessonBlocker,
+  sound: {
+    tab: () => game.playUiCue("tab"),
+    error: () => game.playUiCue("error"),
+    reveal: (big) => game.playUiCue(big ? "reward-big" : "reward"),
+  },
+  notice: (message) => showNotice(message),
+});
+if (import.meta.env.DEV) {
+  // Dev-only: finish the running lesson without playing it (save-path checks).
+  (window as unknown as { __lessons?: unknown }).__lessons = {
+    state: () => lessonsToday(),
+    complete: (weak: WeakWord[] = []) => (lessonRun === null ? Promise.resolve(false) : finishLessonStep(lessonRun, weak).then(() => true)),
+  };
+}
+byId("lessonsButton").addEventListener("click", () => {
+  if (!persistenceReady || !canOpenBetweenStageMenu()) return;
+  game.playUiCue("open");
+  dailyLessons.open();
+});
+document.querySelector<HTMLElement>("#titlePilotCard .holo-avatar")?.addEventListener("click", openStyleShop);
+document.querySelector<HTMLElement>("#titlePilotCard .holo-avatar")?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    openStyleShop();
+  }
+});
+const liveOps = new LiveOpsController({
+  localNow: () => accountTransactions.now(),
+  claimBlocker: () => {
+    if (!persistenceReady) return "Loading your account…";
+    if (!accountTransactions.canWrite())
+      return "Read-only account in this tab. Close other Space Typing tabs.";
+    if (warpAccount?.attempt) return "Finish the current sortie first.";
+    if (game.getPhase() !== "title") return "Claim rewards from the hangar.";
+    if (walletPurchaseBusy || practiceRestorePending || clearSettlementPending || accountTransactions.busy())
+      return "Saving… try again in a moment.";
+    return null;
+  },
+  starCrystals: () => expansionCurrencies.starCrystal,
+  spendStarCrystals: (amount) => {
+    expansionCurrencies = {
+      ...expansionCurrencies,
+      starCrystal: Math.max(0, expansionCurrencies.starCrystal - amount),
+    };
+  },
+  grantCurrencies: (reward) => {
+    credits = addCredits(credits, reward.credits ?? 0);
+    expansionCurrencies = addExpansionCurrencyReward(expansionCurrencies, {
+      alloy: reward.alloy ?? 0,
+      starCrystal: reward.starCrystal ?? 0,
+      quantumCore: reward.quantumCore ?? 0,
+    });
+    refreshPersistentStateUi();
+  },
+  grantWarp: async (key, amount) => {
+    await accountTransactions.giftWarp(key, amount);
+    renderWarpHud();
+  },
+  // Free room in both Warp tanks: a gift that cannot fit is refused before the server pays it.
+  warpRoom: () => {
+    if (!warpAccount) return null;
+    const warp = reconcileWarp(warpAccount.warp, accountTransactions.now());
+    return WARP_POLICY.activeCap + WARP_POLICY.reserveCap - warp.current - warp.reserve;
+  },
+  // Server wallet (phase ≥ 2): claims are paid there; take its balances and Warp.
+  adoptWallet: async (view) => {
+    await walletSync?.acceptView(view as WalletView);
+  },
+  persist: (message) => autosaveCampaign("progression", message),
+  changed: () => {
+    dailyHub?.refreshBadges();
+    if (game.getPhase() === "title") titleHub?.render();
+  },
+});
+
+/** Progress from play: words, clears, play time. Test Lab previews do not count. */
+function recordLiveOps(progress: Parameters<LiveOpsController["record"]>[0]): void {
+  if (!persistenceReady || testingStagePreviewActive()) return;
+  if (liveOps.record(progress)) {
+    const streak = liveOps.state().streak.count;
+    showNotice("🔥 Daily goal reached · " + streak + "-day streak");
+    game.playUiCue("streak");
+  }
+}
+
 function renderWarpHud(): void {
   if (!warpAccount) return;
   const warp = reconcileWarp(warpAccount.warp, accountTransactions.now());
@@ -1468,6 +2025,13 @@ function renderWarpHud(): void {
   bar.value = hud.value;
   bar.parentElement!.dataset.low = String(hud.low);
   bar.title = `${hud.balance} Warp · ${hud.reserve} · ${hud.regen} · Deploy costs 10`;
+  byId("warpActiveValue").textContent = `${warp.current} / ${WARP_POLICY.activeCap}`;
+  byId("warpReserveValue").textContent = `${warp.reserve} / ${WARP_POLICY.reserveCap}`;
+  byId("warpActiveFill").style.setProperty("--p", String(warp.current / WARP_POLICY.activeCap));
+  byId("warpReserveFill").style.setProperty("--p", String(warp.reserve / WARP_POLICY.reserveCap));
+  byId("warpRegenText").textContent = hud.regen === "Storage full" ? "Tanks full" : "Next " + hud.regen;
+  byId("warpRefillsText").textContent = `${warp.refills} / ${WARP_POLICY.prices.length} refills used today · resets 04:00 Vietnam`;
+  byId("warpDialog").dataset.low = String(hud.low);
   byId("warpBalance").textContent = `${warp.current}/100`;
   byId("warpReserve").textContent = `Reserve ${warp.reserve}/300`;
   const eta = Math.ceil(warpEtaMs(warp, accountTransactions.now()) / 1000);
@@ -1542,6 +2106,7 @@ async function deploySortie(
   difficulty: unknown,
   simulated: boolean,
 ): Promise<void> {
+  if (walletPurchaseBusy) throw new Error("Please wait for the purchase to finish saving.");
   if (simulated) {
     renderWarpHud();
     return;
@@ -1568,14 +2133,24 @@ async function deploySortie(
     warp.current + warp.reserve >= WARP_POLICY.cost
   ) {
     if (
-      !window.confirm(
-        `Use ${WARP_POLICY.cost - warp.current} Reserve Warp for this sortie and allow Reserve to cover future shortages? No Star Crystals will be spent.`,
-      )
+      !(await holoConfirm({
+        title: "Use Reserve Warp?",
+        message: `This sortie needs ${WARP_POLICY.cost - warp.current} Warp from your Reserve. Reserve will also cover future shortages. No Star Crystals are spent.`,
+        icon: "warp",
+        tone: "warp",
+        confirmLabel: "Use Reserve",
+      }))
     )
       throw new Error("Deploy cancelled · Practice is free");
     await accountTransactions.reserveConsent(true);
   }
-  const prepared = await accountTransactions.admit(context);
+  // Server wallet: the sortie starts on the server, which spends its Warp (refused: nothing is charged here).
+  const intent = accountTransactions.intent();
+  intent.id = walletSync?.startAttemptId(intent.id, stage, activity) ?? intent.id;
+  const serverWarp = walletSync === null
+    ? null
+    : await walletSync.startSortie(intent.id, stage, activity, reconcileWarp(warpAccount!.warp, accountTransactions.now()).reserveConsent);
+  const prepared = await accountTransactions.admit(context, intent, serverWarp);
   await accountTransactions.activate(prepared.account.attempt!.id, context);
 }
 let testingStageOverride: number | null = null;
@@ -1690,6 +2265,7 @@ const campaignAutosave = new AutosaveQueue<AutosaveSnapshot, PersistenceSource>(
   const { ticket, attemptId, transition, grants, auxiliary, ...fields } = snapshot;
   if (!ticket) throw new Error("Canonical account unavailable");
   await accountTransactions.save({ ...fields, version: PLAYER_SAVE_VERSION, updatedAt: new Date().toISOString(), lastSaveReason: reason as SaveReason, auxiliary }, ticket, attemptId ?? null, transition, grants);
+  liveOps.markSaved();
   if (transition === "cleared") pendingMilestoneGrants = [];
   return "indexeddb";
 });
@@ -1774,6 +2350,11 @@ function currentAutosaveSnapshot(terminalClear = false): AutosaveSnapshot {
     auxiliary: {
       expansionV2: expansionV2Profile,
       difficulty: difficultySettings,
+      liveOps: liveOps.snapshot(),
+      cosmetics,
+      lessons,
+      walletPurchases: walletPurchaseReceipts,
+      walletLessonRewards,
     },
     campaign,
     inventory,
@@ -1800,7 +2381,7 @@ function currentAutosaveSnapshot(terminalClear = false): AutosaveSnapshot {
 }
 
 function testingStageUnlockEnabled(): boolean {
-  return settings.unlockAllStages === true && ascension.selectedTier === 0;
+  return hasTestingStageUnlock(settings.unlockAllStages === true) && ascension.selectedTier === 0;
 }
 
 function canSelectStageFromJourney(stage: number): boolean {
@@ -1872,8 +2453,10 @@ function restoreTestingStagePersistentState(): void {
 }
 
 function clearTestingStagePreview(): void {
+  const hadOverride = testingStageOverride !== null;
   restoreTestingStagePersistentState();
   testingStageOverride = null;
+  if (hadOverride) updateCampaignUi();
 }
 
 
@@ -2054,6 +2637,31 @@ function renderHudHeat(stats: GameStats): void {
   hudHeatCoolTimer = fast > 0 ? window.setTimeout(() => setHudHeat("hudRight", 0, ""), 2600) : null;
 }
 
+let hudLastKills = -1;
+let hudLastHullLow = false;
+/** Accuracy ring, low-hull alarm and a small pop when a kill lands. */
+function renderHudAccents(stats: GameStats): void {
+  const accuracy = accuracyPercent(stats.hits, stats.misses);
+  const ring = byId("accuracyMetric");
+  const value = (Math.round(accuracy * 10) / 1000).toFixed(3);
+  if (ring.style.getPropertyValue("--acc") !== value) ring.style.setProperty("--acc", value);
+  ring.dataset.grade = accuracy >= 97 ? "s" : accuracy >= 90 ? "a" : accuracy >= 75 ? "b" : "c";
+  if (stats.kills !== hudLastKills) {
+    if (hudLastKills >= 0 && stats.kills > hudLastKills) {
+      const kills = byId("kills");
+      kills.classList.remove("hud-pop");
+      void kills.offsetWidth;
+      kills.classList.add("hud-pop");
+    }
+    hudLastKills = stats.kills;
+  }
+  const low = stats.maxHull > 0 && stats.hull / stats.maxHull < 0.3;
+  if (low !== hudLastHullLow) {
+    byId("playerStatusHud").classList.toggle("hull-low", low);
+    hudLastHullLow = low;
+  }
+}
+
 function renderStats(stats: GameStats): void {
   const startedAt = performance.now();
   hudDomMetrics.renderCalls += 1;
@@ -2071,6 +2679,7 @@ function renderStats(stats: GameStats): void {
   );
   hudText("kills", String(stats.kills));
   hudText("waveBadge", stageBadgeText(stats.stage));
+  renderHudAccents(stats);
   renderHudHeat(stats);
 
   hudText(
@@ -2622,13 +3231,33 @@ function showNotice(message: string): void {
 }
 
 function renderPhase(phase: GamePhase): void {
+  const titleWasHidden = titleOverlay.classList.contains("hidden");
   titleOverlay.classList.toggle("hidden", phase !== "title");
+  titleOverlay.classList.remove("th-launching");
+  titleHome?.setActive(phase === "title");
+  if (phase === "title" && titleWasHidden) {
+    // Back on the deck: start at the top and let the panels slide in.
+    titleHome?.resetScroll();
+    titleOverlay.classList.remove("th-entering");
+    void titleOverlay.offsetWidth;
+    titleOverlay.classList.add("th-entering");
+    window.setTimeout(() => titleOverlay.classList.remove("th-entering"), 1200);
+  }
+  document.body.classList.toggle("title-active", phase === "title");
+  if (phase !== "title") chatPanel?.close();
   if (phase === "title") titleHub?.render();
   else titleHub?.closePopovers();
   pauseOverlay.classList.toggle("hidden", phase !== "paused");
+  const wasGameOver = !gameOverOverlay.classList.contains("hidden");
   gameOverOverlay.classList.toggle("hidden", phase !== "gameover");
   stageClearOverlay.classList.toggle("hidden", phase !== "stageclear");
+  if (phase === "gameover" && !wasGameOver) resultFx.defeat();
+  else if (phase !== "gameover" && phase !== "stageclear") resultFx.stop();
+  if (phase === "title" && lessonRun !== null) endLessonRun();
+  if (phase === "gameover" && lessonRun !== null) byId("againButton").textContent = "Retry lesson";
+  if (phase === "stageclear" && lessonRun !== null) renderLessonClearActions();
   byId("playerStatusHud").classList.toggle("hidden", phase !== "playing");
+  byId("testingPreviewBadge").classList.toggle("hidden", !["playing", "paused"].includes(phase) || testingStageOverride === null);
   byId("combatHotbar").classList.toggle("hidden", phase !== "playing");
   voiceFeedback.state.setGameplayActive(phase === "playing");
 
@@ -3076,6 +3705,7 @@ function renderProgression(): void {
     claim.addEventListener("click", () => {
       const result = claimMission(progression, id);
       if (!result.claimed) return;
+      walletSync?.hint("mission", "mission:" + id);
       progression = result.state;
       credits = addCredits(credits, result.rewardCredits);
       renderProgression();
@@ -3127,6 +3757,7 @@ function renderProgression(): void {
 }
 
 function selectedGameplayStage(): number {
+  if (lessonRun !== null) return lessonRun.stage;
   if (testingStageUnlockEnabled() && testingStageOverride !== null) {
     return testingStageOverride;
   }
@@ -3585,6 +4216,7 @@ function renderClearStars(stars: number): void {
     star.textContent = "★";
     root.append(star);
   }
+  resultFx.victory(stars, Number(stageClearOverlay.dataset.celebrationLevel ?? "1"));
 }
 
 /** Counts a number up from 0 (score on the results card). */
@@ -4286,6 +4918,7 @@ const game = new Game(
         musicController.setPaused(false);
         musicController.transitionTo("VICTORY", 0.35);
       } else if (phase === "title") {
+        clearTestingStagePreview();
         restoreTitleMusic();
       }
 
@@ -4339,7 +4972,7 @@ const game = new Game(
           const wasPractice = practiceActive || activeReviewGoal !== undefined;
           restoreTestingStagePersistentState();
           byId("againButton").textContent =
-            wasPractice ? "Retry Rewarded · 10 Warp" : "Retry Testing Stage " + String(stats.stage).padStart(3, "0");
+            lessonRun !== null ? "Retry lesson" : wasPractice ? "Retry Rewarded · 10 Warp" : "Retry Testing Stage " + String(stats.stage).padStart(3, "0");
           byId("gameOverStageSelectButton").textContent =
             "Choose any testing stage";
           byId("deathProtectionMeta").textContent =
@@ -4464,6 +5097,16 @@ const game = new Game(
         stageSession.correctWordKeys,
         stageSession.wrongWordKeys,
       );
+      recordLiveOps({
+        clears: 1,
+        accurateClears: accuracy >= LIVE_OPS_POLICY.accurateClearPercent ? 1 : 0,
+        bossKills: stageSession.bossKills,
+        eliteKills: stageSession.eliteKills,
+        skills: stageSession.skillsUsed,
+        bonus: stageSession.bonusCollected,
+      });
+      // Online: send the stage's progress now instead of at the next 60 s flush.
+      void liveOps.flushNow();
 
       const activeExpedition = expeditionSession.currentRun();
       if (
@@ -4589,6 +5232,16 @@ const game = new Game(
           accuracy,
         );
         if (wasPractice) { byId("clearTitle").textContent = `Practice Stage ${completedStage} complete`; byId("clearMeta").textContent = "Learning saved · simulated rewards · no Campaign unlock"; }
+        if (lessonRun !== null) {
+          const run = lessonRun;
+          const weak: WeakWord[] = stageSession.wordGroups
+            .filter((group) => group.missed > 0 || group.corrected > 0)
+            .map((group) => ({ en: group.en, vi: group.vi, ipa: group.ipa }));
+          byId("clearTitle").textContent = "Lesson " + (run.step.index + 1) + "/5 complete";
+          byId("clearMeta").textContent = run.step.title + " · " + (weak.length === 0 ? "no mistakes" : weak.length + " word" + (weak.length === 1 ? "" : "s") + " saved for review");
+          // Practice state reloads first; the lesson is saved on top of it.
+          void practiceReload.then(() => finishLessonStep(run, weak));
+        }
         if (testingStageOverride !== null) testingStageOverride = Math.min(1000, completedStage + 1);
         updateCampaignUi();
         return;
@@ -4711,6 +5364,10 @@ const game = new Game(
           : performance.credits * difficultyRewardMultiplier;
       let totalCreditReward =
         baseCreditReward + performanceCredits;
+      // Style Shop Credit Booster: extra Credits for its remaining clears.
+      const boostedClear = boostClearCredits(cosmetics, totalCreditReward);
+      cosmetics = boostedClear.state;
+      totalCreditReward += boostedClear.bonus;
       credits = addCredits(credits, totalCreditReward);
 
       const stageConfig = createStageConfig(stats.stage);
@@ -5065,6 +5722,8 @@ const game = new Game(
       } finally { clearSettlementPending = false; renderWarpHud(); }
     },
     onWordComplete: (entry, outcome) => {
+      liveOpsLastInputAt = performance.now();
+      recordLiveOps({ words: 1, perfectWords: outcome?.perfect === true ? 1 : 0 });
       if (outcome?.inputSource === "voice" && gameplayMode === "combat") {
         postLearningEvent(buildCombatLearningEvent({ entry, perfect: true, inputSource: "voice" }));
         renderActiveKillTranslation();
@@ -5894,6 +6553,111 @@ function titlePilot(): TitleHubPilot {
   };
 }
 
+/** Whether a lesson level has reading passages (async; the label settles on the next render). */
+const lessonPassageLevels = new Map<string, boolean>();
+function lessonHasPassages(level: LessonState["settings"]["level"]): boolean {
+  const known = lessonPassageLevels.get(level);
+  if (known !== undefined) return known;
+  lessonPassageLevels.set(level, false);
+  void passageLevelFor(level)
+    .then((found) => found !== null, () => false)
+    .then((has) => {
+      lessonPassageLevels.set(level, has);
+      if (has) titleHub?.render();
+    });
+  return false;
+}
+
+function titleToday(): TitleHomeToday {
+  const state = liveOps.state();
+  const now = liveOps.now();
+  const day = liveOps.today();
+  const badges = liveOps.badges();
+  const lessonState = lessonsToday();
+  const next = nextLesson(lessonState);
+  const steps = lessonSteps(lessonState.settings.level, lessonHasPassages(lessonState.settings.level));
+  const windows = warpWindowViews(state, now);
+  const chests = LIVE_OPS_POLICY.dailyChests;
+  const done = lessonState.done.length;
+  const current = state.day === day;
+  return {
+    streak: {
+      count: state.streak.count,
+      best: state.streak.best,
+      goal: state.streak.goal,
+      words: current ? state.daily.counters.words : 0,
+      goalMet: current && state.daily.goalMet,
+      shields: state.streak.shields,
+    },
+    lessons: {
+      done,
+      total: CHAIN_LENGTH,
+      next: next === null ? null : steps[next]?.title ?? null,
+      streak: lessonState.streak,
+      rewardReady: (done >= 3 && !lessonState.claimed.three) || (done >= CHAIN_LENGTH && !lessonState.claimed.five),
+    },
+    missions: {
+      points: activityPoints(state, "daily", day),
+      maxPoints: chests[chests.length - 1]?.points ?? 100,
+      claimable: badges.missions,
+    },
+    signIn: {
+      ready: badges.calendar > 0,
+      newbieDay: state.newbie.claimed,
+      newbieTotal: LIVE_OPS_POLICY.newbie.length,
+      monthlyClaimed: state.monthly.claimed,
+      monthlyTotal: LIVE_OPS_POLICY.monthly.length,
+    },
+    // Open now, else the next one today, else the first one tomorrow.
+    warp: windows.find((window) => window.state === "open") ?? windows.find((window) => window.state === "upcoming") ?? windows[0] ?? null,
+    minuteOfDay: vietnamMinuteOfDay(now),
+    mail: badges.mail,
+    newDayIn: formatCountdown(nextDayResetMs(now) - now),
+  };
+}
+
+function titleHomeData(): TitleHomeData {
+  return {
+    highestStage: campaign.highestUnlockedStage,
+    selectedStage: selectedGameplayStage(),
+    maxStage: MAX_CAMPAIGN_STAGE,
+    clearedStages: campaign.clearedStages,
+    ships: CHARACTER_IDS.map((id) => {
+      const definition = getCharacter(id);
+      return {
+        id,
+        name: definition.name,
+        role: definition.role,
+        unlockStage: definition.unlockStage,
+        unlocked: characters.unlocked.includes(id),
+        selected: characters.selected === id,
+        level: characters.progress[id]?.level ?? 1,
+      };
+    }),
+    today: persistenceReady ? titleToday() : null,
+    quality: settings.visualQuality,
+  };
+}
+
+titleHome = installTitleHome({
+  openLessons: () => byId<HTMLButtonElement>("lessonsButton").click(),
+  openDaily: (tab) => {
+    if (tab === "mail") byId<HTMLButtonElement>("titleMailButton").click();
+    else byId<HTMLButtonElement>("dailyHubButton").click();
+  },
+  openStageSelect: (stage) => {
+    byId<HTMLButtonElement>("stageSelectButton").click();
+    const galaxy = Math.ceil(stage / STAGES_PER_GALAXY);
+    const select = byId<HTMLSelectElement>("galaxySelect");
+    const option = Array.from(select.options).find((item) => Number(item.value) === galaxy);
+    if (stageSelectDialog.open && option !== undefined && !option.disabled && Number(select.value) !== galaxy) {
+      select.value = String(galaxy);
+      select.dispatchEvent(new Event("change"));
+    }
+  },
+  openHangar: () => byId<HTMLButtonElement>("characterButton").click(),
+});
+
 titleHub = installTitleHub({
   getSettings: () => settings,
   applySettings: (next) => {
@@ -5908,6 +6672,7 @@ titleHub = installTitleHub({
     selectGameplayMode("recall");
     byId<HTMLButtonElement>("startButton").click();
   },
+  renderHome: () => titleHome?.render(titleHomeData()),
 });
 titleHub.render();
 
@@ -6340,6 +7105,7 @@ function canOpenBetweenStageMenu(): boolean {
   const phase = game.getPhase();
   return (
     (phase === "title" || phase === "stageclear") &&
+    !walletPurchaseBusy &&
     accountTransactions.canWrite() &&
     !warpAccount?.attempt &&
     !testingStagePreviewActive() &&
@@ -6506,6 +7272,7 @@ function renderEquipment(): void {
     );
     if (definition !== null) {
       setIconContent(visual, definition.icon, paintedEquipmentIcon(definition.id));
+      attachModelTurntable(visual, definition.id, settings.visualQuality);
     }
     const identity = document.createElement("div");
     identity.className = "equipment-card-identity";
@@ -6646,6 +7413,13 @@ async function presentStageTransition(
   const reducedMotion =
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
   const fadeMs = reducedMotion ? 20 : 170;
+  // Leaving the Command Deck: the ship launches and the deck falls away, then
+  // the stage card fades in over it.
+  if (!titleOverlay.classList.contains("hidden")) {
+    titleOverlay.classList.add("th-launching");
+    game.playUiCue("deploy");
+    if (!reducedMotion) await new Promise<void>((resolve) => window.setTimeout(resolve, 420));
+  }
   const durationMs = reducedMotion
     ? Math.min(180, spec.durationMs)
     : spec.durationMs;
@@ -6878,6 +7652,11 @@ function appendShopStockCards(
         ? paintedEquipmentIcon(entry.definitionId)
         : paintedItemIcon(entry.itemId),
     );
+    attachModelTurntable(
+      visual,
+      entry.kind === "equipment" ? entry.definitionId : entry.itemId,
+      settings.visualQuality,
+    );
 
     const body = document.createElement("div");
     body.className = "item-card-body";
@@ -6950,20 +7729,32 @@ function appendShopStockCards(
         return;
       }
 
-      applyShopPurchaseState(purchase.state);
-      recordShopProgress();
-      renderProgression();
-      rerender();
-      updateShopAccess();
-      void autosaveCampaign(
-        "shop",
-        "✓ Purchased " +
-          shopStockName(entry) +
-          " · stock " +
-          String(Math.max(0, entry.remaining - 1)) +
-          " left",
-        "shop",
-      );
+      buy.disabled = true;
+      const costs = purchaseCosts(purchase.state);
+      const rollback = purchaseRollback();
+      void payFirst(costs, "shop:" + instance.id, { kind: "stock", shop: instance.type, item: entry.kind === "item" ? entry.itemId : entry.definitionId, grade: shopStockGrade(entry) }).then(async (paid) => {
+        if (!paid.ok) {
+          showNotice(paid.reason);
+          rerender();
+          return;
+        }
+        applyShopPurchaseState(purchase.state);
+        recordShopProgress();
+        renderProgression();
+        rerender();
+        updateShopAccess();
+        await finishWalletPurchase(paid, costs,
+          "shop",
+          "✓ Purchased " +
+            shopStockName(entry) +
+            " · stock " +
+            String(Math.max(0, entry.remaining - 1)) +
+            " left",
+          "shop",
+          rollback,
+        );
+        rerender();
+      });
     });
 
     body.append(meta, title, description, buy);
@@ -7059,6 +7850,7 @@ function commitUpgradeService(
   result: ReturnType<typeof buySkillUpgrade>,
   message: string,
   countAsPurchase = true,
+  purchase?: WalletPurchase,
 ): void {
   if (!result.applied) {
     showNotice(serviceFailureText(result.reason));
@@ -7066,13 +7858,23 @@ function commitUpgradeService(
     return;
   }
 
-  applyServiceShopState(result.state);
-  if (countAsPurchase) {
-    recordShopProgress();
-    renderProgression();
-  }
-  renderServiceShop();
-  void autosaveCampaign("upgrade", message, "upgrade");
+  const costs = purchaseCosts(result.state);
+  const rollback = purchaseRollback();
+  void payFirst(costs, "service", purchase).then(async (paid) => {
+    if (!paid.ok) {
+      showNotice(paid.reason);
+      renderServiceShop();
+      return;
+    }
+    applyServiceShopState(result.state);
+    if (countAsPurchase) {
+      recordShopProgress();
+      renderProgression();
+    }
+    renderServiceShop();
+    await finishWalletPurchase(paid, costs, "upgrade", message, "upgrade", rollback);
+    renderServiceShop();
+  });
 }
 
 function renderServiceShop(): void {
@@ -7134,15 +7936,26 @@ function renderServiceShop(): void {
       return;
     }
 
-    applyServiceShopState(result.state);
-    recordShopProgress();
-    renderProgression();
-    renderServiceShop();
-    void autosaveCampaign(
-      "shop",
-      "✓ Repair Station pack purchased · Credits + Alloy deducted",
-      "shop",
-    );
+    const costs = purchaseCosts(result.state);
+    const rollback = purchaseRollback();
+    void payFirst(costs, "service:repair", { kind: "repair" }).then(async (paid) => {
+      if (!paid.ok) {
+        showNotice(paid.reason);
+        renderServiceShop();
+        return;
+      }
+      applyServiceShopState(result.state);
+      recordShopProgress();
+      renderProgression();
+      renderServiceShop();
+      await finishWalletPurchase(paid, costs,
+        "shop",
+        "✓ Repair Station pack purchased · Credits + Alloy deducted",
+        "shop",
+        rollback,
+      );
+      renderServiceShop();
+    });
   });
 
   repairBody.append(repairTitle, repairDescription, repairButton);
@@ -7209,6 +8022,8 @@ function renderServiceShop(): void {
           key +
           " Lv" +
           String(level + 1),
+        true,
+        { kind: "attribute", key: key as CoreStatKey, level },
       );
     });
 
@@ -7377,17 +8192,28 @@ function renderServiceShop(): void {
         return;
       }
 
-      applyServiceShopState(result.state);
-      recordShopProgress();
-      renderProgression();
-      renderServiceShop();
-      void autosaveCampaign(
-        "shop",
-        "✓ Upgraded " +
-          definition.name +
-          " · Credits + Alloy deducted",
-        "upgrade",
-      );
+      const costs = purchaseCosts(result.state);
+      const rollback = purchaseRollback();
+      void payFirst(costs, "service:upgrade", { kind: "enhance", grade: item.grade, enhancement: item.enhancement }).then(async (paid) => {
+        if (!paid.ok) {
+          showNotice(paid.reason);
+          renderServiceShop();
+          return;
+        }
+        applyServiceShopState(result.state);
+        recordShopProgress();
+        renderProgression();
+        renderServiceShop();
+        await finishWalletPurchase(paid, costs,
+          "shop",
+          "✓ Upgraded " +
+            definition.name +
+            " · Credits + Alloy deducted",
+          "upgrade",
+          rollback,
+        );
+        renderServiceShop();
+      });
     });
 
     cardBody.append(titleRow, detail, button);
@@ -7417,6 +8243,8 @@ function renderServiceShop(): void {
             campaign.highestUnlockedStage,
           ),
           "✓ Equipment grade evolved · " + definition.name,
+          true,
+          { kind: "evolve", grade: item.grade, enhancement: item.enhancement },
         );
       });
       cardBody.append(evolve);
@@ -7454,6 +8282,8 @@ function renderServiceShop(): void {
             campaign.highestUnlockedStage,
           ),
           "✓ Equipment affix rolled · " + definition.name,
+          true,
+          { kind: "affix", grade: item.grade, enhancement: item.enhancement },
         );
       });
       cardBody.append(rollAffix);
@@ -7484,6 +8314,8 @@ function renderServiceShop(): void {
             campaign.highestUnlockedStage,
           ),
           "✓ Equipment affix rerolled · " + definition.name,
+          true,
+          { kind: "reroll", grade: item.grade, enhancement: item.enhancement },
         );
       });
       cardBody.append(reroll);
@@ -7673,11 +8505,13 @@ async function prepareStageVocabulary(
         : activeReviewVocabulary,
     );
     badge.textContent =
-      "SMART REVIEW // " +
-      activeReviewGoal.replaceAll("-", " ") +
-      " · " +
-      String(activeReviewVocabulary.length) +
-      " selected words";
+      lessonRun !== null
+        ? lessonRun.label + " · " + String(activeReviewVocabulary.length) + " words"
+        : "SMART REVIEW // " +
+          activeReviewGoal.replaceAll("-", " ") +
+          " · " +
+          String(activeReviewVocabulary.length) +
+          " selected words";
     badge.classList.remove("hidden");
     return;
   }
@@ -8800,6 +9634,12 @@ async function initializePlayerProgress(): Promise<void> {
 
   try {
     const loaded = await accountTransactions.initialize();
+    liveOps.load(loaded.save.auxiliary?.liveOps);
+    loadCosmetics(loaded.save.auxiliary?.cosmetics);
+    walletPurchaseReceipts = (loaded.save.auxiliary?.walletPurchases ?? []).filter((id): id is string => typeof id === "string").slice(-100);
+    walletLessonRewards = loaded.save.auxiliary?.walletLessonRewards ?? [];
+    lessons = sanitizeLessonState(loaded.save.auxiliary?.lessons);
+    renderLessonsBadge();
     if (loaded.save.auxiliary?.expansionV2)
       expansionV2Profile = sanitizeExpansionV2Profile(
         loaded.save.auxiliary.expansionV2,
@@ -8850,6 +9690,9 @@ async function initializePlayerProgress(): Promise<void> {
     applyRelicEffects();
     currentGalaxy = Math.ceil(campaign.selectedStage / STAGES_PER_GALAXY);
     persistenceReady = true;
+    bootSplash.ready("save");
+    // The server wallet opens only once the local balances are known (its first seed).
+    void walletSync?.accountReady();
 
     syncWorldMusicProfile(campaign.selectedStage);
     musicController.transitionTo("WORLD_NORMAL", 0.8);
@@ -8889,6 +9732,8 @@ async function initializePlayerProgress(): Promise<void> {
     }
 
     renderWarpHud();
+    liveOps.sync();
+    dailyHub?.refreshBadges();
     if (loaded.interrupted) {
       showNotice(
         "Interrupted sortie closed · Warp was already spent. Retry rewarded costs 10; Practice is free.",
@@ -8923,6 +9768,7 @@ async function initializePlayerProgress(): Promise<void> {
     }
 
     persistenceReady = true;
+    bootSplash.ready("save");
     for (const button of dataButtons) button.disabled = false;
     showNotice(
       "Account storage needs recovery · Practice is free. Open Save data to import a valid backup; paid Deploy remains blocked.",
@@ -9439,6 +10285,7 @@ function saveSettings(): void {
   musicController.setMusicVolume(settings.musicVolume);
   musicController.setAmbientVolume(settings.ambientVolume);
   musicController.setPlaybackMode(sanitizeMusicMode(settings.musicMode));
+  applyVoiceBoost();
   updateKillTranslationVisibility(game.getPhase());
 }
 
@@ -9494,6 +10341,7 @@ function renderSettings(): void {
     sanitizeEnemyProjectileMode(renderedSettings.enemyProjectileMode);
   byId<HTMLSelectElement>("unlockAllStages").value =
     String(renderedSettings.unlockAllStages === true);
+  byId("unlockAllStages").closest(".settings-section")?.classList.toggle("hidden", !import.meta.env.DEV);
 
   byId<HTMLSelectElement>("pronunciationEnabled").value =
     String(renderedSettings.pronunciationEnabled);
@@ -9519,6 +10367,9 @@ function renderSettings(): void {
   voiceVolume.value = String(renderedSettings.pronunciationVolume);
   byId<HTMLOutputElement>("pronunciationVolumeValue").value =
     String(Math.round(renderedSettings.pronunciationVolume * 100)) + "%";
+  const voiceBoost = renderedSettings.pronunciationBoost ?? 1;
+  byId<HTMLInputElement>("pronunciationBoost").value = String(voiceBoost);
+  byId<HTMLOutputElement>("pronunciationBoostValue").value = String(Math.round(voiceBoost * 100)) + "%";
 
   const difficultyMode = byId<HTMLSelectElement>("difficultyMode");
   difficultyMode.value = renderedDifficulty.mode;
@@ -9604,25 +10455,28 @@ async function commitSettingsDraft(): Promise<void> {
 
   if (
     shouldReloadStage &&
-    !window.confirm(
-      testingStagePreviewActive()
+    !(await holoConfirm({
+      title: "Reload the stage?",
+      message: testingStagePreviewActive()
         ? "Difficulty changed. Save and reload this free Practice stage?"
-        : "Difficulty changed. The current sortie ends without refund; a new Deploy costs 10 Warp. Save and reload?",
-    )
+        : "Difficulty changed. The current sortie ends without refund; a new Deploy costs 10 Warp.",
+      icon: "warning",
+      confirmLabel: "Save and reload",
+    }))
   ) {
     byId("settingsSaveStatus").textContent =
       "Not saved · difficulty changes still require a stage reload.";
     return;
   }
 
-  const unlockAllStagesWasEnabled = settings.unlockAllStages === true;
+  const unlockAllStagesWasEnabled = testingStageUnlockEnabled();
   const testingPreviewWasActive = testingStagePreviewActive();
 
   settings = structuredClone(settingsDraft);
   difficultySettings = structuredClone(difficultySettingsDraft);
   recallSettings = structuredClone(recallSettingsDraft);
 
-  if (unlockAllStagesWasEnabled && settings.unlockAllStages !== true) {
+  if (unlockAllStagesWasEnabled && !testingStageUnlockEnabled()) {
     clearTestingStagePreview();
     if (testingPreviewWasActive && game.getPhase() !== "title") {
       game.backToTitle();
@@ -9635,14 +10489,17 @@ async function commitSettingsDraft(): Promise<void> {
   settingsDialog.close();
   updateCampaignUi();
   showNotice(
-    settings.unlockAllStages === true
+    testingStageUnlockEnabled()
       ? "✓ Settings saved · all stages available for testing"
       : "✓ Settings saved",
   );
 
   if (shouldReloadStage) {
+    const previewStage = testingStageOverride;
     game.backToTitle();
+    if (previewStage !== null && testingStageUnlockEnabled()) beginTestingStagePreview(previewStage);
     await startSelectedStage();
+    if (game.getPhase() === "title") clearTestingStagePreview();
   }
 }
 
@@ -10008,9 +10865,13 @@ async function importSaveFile(file: File): Promise<void> {
     }
     const stage = result.save.campaign.highestUnlockedStage;
     if (
-      !window.confirm(
-        `Restore the whole profile at Stage ${String(stage).padStart(3, "0")}? Current progress will be replaced. This may undo spending. A new save generation will be created and the game will reload.`,
-      )
+      !(await holoConfirm({
+        title: `Restore Stage ${String(stage).padStart(3, "0")} backup?`,
+        message: "Current progress will be replaced and may undo spending. A new save generation is created and the game reloads.",
+        tone: "danger",
+        icon: "warning",
+        confirmLabel: "Restore backup",
+      }))
     ) {
       status.textContent = "Import cancelled.";
       return;
@@ -10110,7 +10971,7 @@ async function applyClassLevel(level: number): Promise<void> {
             " entries",
     );
   } catch (error) {
-    alert(error instanceof Error ? error.message : "Unable to apply vocabulary level.");
+    showNotice(error instanceof Error ? error.message : "Unable to apply vocabulary level.");
   } finally {
     button.disabled = false;
     button.textContent = "Use level";
@@ -10151,7 +11012,7 @@ async function applyTopicVocabulary(topicId: string): Promise<void> {
         String(loaded.representativeLevel).padStart(3, "0"),
     );
   } catch (error) {
-    alert(
+    showNotice(
       error instanceof Error
         ? error.message
         : "Unable to apply vocabulary topic.",
@@ -10196,7 +11057,7 @@ async function applyWordTypeVocabulary(posId: string): Promise<void> {
         String(loaded.representativeLevel).padStart(3, "0"),
     );
   } catch (error) {
-    alert(
+    showNotice(
       error instanceof Error
         ? error.message
         : "Unable to apply vocabulary word type.",
@@ -10247,7 +11108,7 @@ async function applyGrammarVocabulary(grammarId: string): Promise<void> {
         String(loaded.representativeLevel).padStart(3, "0"),
     );
   } catch (error) {
-    alert(
+    showNotice(
       error instanceof Error
         ? error.message
         : "Unable to apply vocabulary grammar module.",
@@ -10427,9 +11288,25 @@ byId("startButton").addEventListener("click", () => {
   recallLaunchPending = false;
   void startSelectedStage();
 });
-byId("nextStageButton").addEventListener("click", () => void startSelectedStage());
+// Campaign 3D (beta) is its own page (campaign-3d.html): it never touches
+// this page's Campaign, Warp, wallet or save.
+byId("hero3dButton").addEventListener("click", () => {
+  window.location.assign("/campaign-3d.html");
+});
+byId("nextStageButton").addEventListener("click", () => {
+  if (lessonRun !== null) {
+    void continueLessonChain();
+    return;
+  }
+  void startSelectedStage();
+});
 for (const id of ["restartButton", "clearRetryButton"]) {
   byId(id).addEventListener("click", () => {
+    if (id === "clearRetryButton" && lessonRun !== null) {
+      const index = lessonRun.step.index;
+      void practiceReload.then(() => startLesson(index)).then((error) => error && showNotice(error));
+      return;
+    }
     if (testingStageUnlockEnabled() && testingStageOverride !== null) {
       testingStageOverride = game.getStats().stage;
       void startSelectedStage();
@@ -10495,6 +11372,11 @@ byId("routeSupportAction").addEventListener("click", () => {
 byId("resumeButton").addEventListener("click", () => game.resume());
 
 byId("againButton").addEventListener("click", () => {
+  if (lessonRun !== null) {
+    const index = lessonRun.step.index;
+    void practiceReload.then(() => startLesson(index)).then((error) => error && showNotice(error));
+    return;
+  }
   void resolveCheckpointDeath("retry");
 });
 byId("gameOverStageSelectButton").addEventListener("click", () => {
@@ -10656,11 +11538,15 @@ byId("journeyStartButton").addEventListener("click", () => {
         testingStageUnlockEnabled(),
       );
       if (testingPreview) {
+        game.backToTitle();
         beginTestingStagePreview(stage);
         updateCampaignUi();
         stageSelectDialog.close();
-        game.backToTitle();
         await startSelectedStage();
+        if (game.getPhase() !== "playing" && game.getPhase() !== "paused") {
+          clearTestingStagePreview();
+          updateCampaignUi();
+        }
         return;
       }
 
@@ -10743,7 +11629,7 @@ byId("saveCustom").addEventListener("click", () => {
   const input = byId<HTMLTextAreaElement>("customVocabulary");
   const entries = parseCustomVocabulary(input.value);
   if (entries.length === 0) {
-    alert("Add at least one valid English vocabulary entry.");
+    showNotice("Add at least one valid English vocabulary entry.");
     return;
   }
 
@@ -10821,6 +11707,7 @@ for (const [id, field] of [
   ["creditVolume", "creditVolume"],
   ["pronunciationRate", "pronunciationRate"],
   ["pronunciationVolume", "pronunciationVolume"],
+  ["pronunciationBoost", "pronunciationBoost"],
 ] as const) {
   byId<HTMLInputElement>(id).addEventListener("input", (event) => {
     const current = settingsDraft ?? settings;
@@ -11164,17 +12051,29 @@ installWarpControls(
       if (!canOpenBetweenStageMenu())
         throw new Error("Refuel is available between rewarded sorties");
       if (!(await autosaveCampaign("manual"))) return;
+      const offline = walletSync?.blocker() ?? null;
+      if (offline !== null) throw new Error(offline);
       const quote = accountTransactions.quote();
       if (
-        !window.confirm(
-          `Spend ${quote.price} Star Crystals for +20 Warp now? Refill ${quote.index + 1}/3. Daily reset: 04:00 Vietnam.`,
-        )
+        !(await holoConfirm({
+          title: "Refuel +20 Warp?",
+          message: `Spend ${quote.price} Star Crystals now. Refill ${quote.index + 1} of 3 today · resets 04:00 Vietnam time.`,
+          icon: "warp",
+          tone: "warp",
+          confirmLabel: `Refuel · ${quote.price} ✧`,
+        }))
       )
         return;
-      const saved = await accountTransactions.refuel(quote);
-      expansionCurrencies = saved.expansionCurrencies;
+      let price = quote.price;
+      if (walletSync?.authoritative()) {
+        // Server wallet: the server prices it, takes the Star Crystals and adds the Warp; the game adopts both.
+        price = (await walletSync.refuel(quote)).price;
+      } else {
+        const saved = await accountTransactions.refuel(quote);
+        expansionCurrencies = saved.expansionCurrencies;
+      }
       refreshPersistentStateUi();
-      const message = `+20 Warp · ${quote.price} Star Crystals spent`;
+      const message = `+20 Warp · ${price} Star Crystals spent`;
       byId("warpActionNotice").textContent = message;
       showNotice(message);
     },
@@ -11184,9 +12083,13 @@ installWarpControls(
       const consent = !warpAccount!.warp.reserveConsent;
       if (
         consent &&
-        !window.confirm(
-          "Allow Reserve Warp to cover Active Warp shortages? No Star Crystals are spent automatically.",
-        )
+        !(await holoConfirm({
+          title: "Turn on Reserve Warp?",
+          message: "When Active Warp runs short, Reserve covers the rest of a Deploy. No Star Crystals are spent automatically.",
+          icon: "warp",
+          tone: "warp",
+          confirmLabel: "Turn on",
+        }))
       )
         return;
       await accountTransactions.reserveConsent(consent);
@@ -11200,7 +12103,7 @@ installWarpControls(
         warpAccount?.attempt?.phase !== "prepared"
       )
         return;
-      if (!window.confirm("Abandon the prepared sortie without a Warp refund?"))
+      if (!(await holoConfirm({ title: "Abandon the prepared sortie?", message: "The Warp already spent is not refunded.", tone: "danger", icon: "warning", confirmLabel: "Abandon" })))
         return;
       await accountTransactions.finish("abandoned", warpAccount.attempt.id);
       showNotice("Prepared sortie abandoned · no refund");
@@ -11209,9 +12112,12 @@ installWarpControls(
       if (!canOpenBetweenStageMenu())
         throw new Error("Correct the clock between rewarded sorties");
       if (
-        !window.confirm(
-          "Re-anchor to this device's current clock? Balances and used refill quota stay unchanged; no retrospective Warp is granted.",
-        )
+        !(await holoConfirm({
+          title: "Re-anchor the clock?",
+          message: "Uses this device's current time. Balances and today's refills stay the same; no Warp is added for past time.",
+          icon: "info",
+          confirmLabel: "Re-anchor",
+        }))
       )
         return;
       await accountTransactions.reanchor();
@@ -11249,6 +12155,221 @@ window.addEventListener("pagehide", () => {
   window.clearInterval(warpPersistenceInterval);
 }, { once: true });
 
+installHudFire(() => settings.visualQuality);
+// Result-screen cinematics: built while the title idles, so the first
+// Stage Complete / Run Over starts on its first frame.
+if (typeof window.requestIdleCallback === "function") window.requestIdleCallback(() => resultFx.prewarm(), { timeout: 5000 });
+else window.setTimeout(() => resultFx.prewarm(), 2500);
+
+// ---------- Daily Hub, menu motion and menu sounds ----------
+dailyHub = installDailyHub({
+  controller: liveOps,
+  sound: {
+    tab: () => game.playUiCue("tab"),
+    reveal: (big) => game.playUiCue(big ? "reward-big" : "reward"),
+    error: () => game.playUiCue("error"),
+  },
+  notice: showNotice,
+});
+byId("dailyHubButton").addEventListener("click", () => dailyHub?.open());
+
+// ---------- Online: account, cloud save, server Daily Hub, chat ----------
+const onlineSession = new OnlineSession();
+const accountDialog = installAccountDialog({
+  session: onlineSession,
+  notice: showNotice,
+  sound: {
+    tab: () => game.playUiCue("tab"),
+    error: () => game.playUiCue("error"),
+    reveal: (big) => game.playUiCue(big ? "reward-big" : "reward"),
+  },
+  cloudStatus: () => cloudStatusText,
+});
+// Ideas, bug reports and contact messages to the team (Admin > Feedback).
+const feedbackDialog = installFeedbackDialog({
+  session: onlineSession,
+  notice: showNotice,
+  sound: {
+    tab: () => game.playUiCue("tab"),
+    error: () => game.playUiCue("error"),
+    reveal: (big) => game.playUiCue(big ? "reward-big" : "reward"),
+  },
+  context: () => ({
+    phase: game.getPhase(),
+    mode: game.getGameplayMode(),
+    stage: game.getStats().stage,
+    ship: characters.selected,
+    quality: settings.visualQuality,
+    saveVersion: PLAYER_SAVE_VERSION,
+  }),
+});
+byId("titleFeedbackButton").addEventListener("click", () => feedbackDialog.open(undefined, "title"));
+byId("pauseFeedbackButton").addEventListener("click", () => feedbackDialog.open("bug", "pause"));
+feedbackDialog.handleLinks();
+let cloudStatusText = "Not synced yet.";
+cloudSave = new CloudSave(onlineSession, {
+  currentSave: () => lastCommittedSave as unknown as { version: number; [key: string]: unknown } | null,
+  canSync: () => persistenceReady && accountTransactions.canWrite() && !practiceRestorePending && !walletPurchaseBusy,
+  restore: async (data) => {
+    const parsed = parsePlayerSaveJson(JSON.stringify(data));
+    if (!parsed.ok) throw new Error("Cloud save is damaged: " + parsed.error);
+    if (accountTransactions.canWrite()) await accountTransactions.restore(parsed.save, parsed.migrated);
+    else await accountTransactions.recover(parsed.save, parsed.migrated);
+    window.location.reload();
+  },
+  conflict: (conflict) => accountDialog.conflict(conflict),
+  status: (text, tone) => {
+    cloudStatusText = text;
+    if (tone !== "info") showNotice(text);
+  },
+});
+walletSync = new WalletSync(onlineSession, {
+  hasPurchaseReceipt: (id) => lastCommittedSave?.auxiliary?.walletPurchases?.includes(id) === true,
+  saveGeneration: () => lastCommittedSave?.account?.generation ?? null,
+  lessonRewards: () => lastCommittedSave?.auxiliary?.walletLessonRewards ?? [],
+  committedBalances: () =>
+    !persistenceReady || !accountTransactions.canWrite() || lastCommittedSave === null
+      ? null
+      : { credits: lastCommittedSave.credits, ...lastCommittedSave.expansionCurrencies },
+  liveBalances: () => (persistenceReady ? { credits, ...expansionCurrencies } : null),
+  localWarp: () => warpAccount?.warp ?? null,
+  highestStage: () => campaign.highestUnlockedStage,
+  adoptBalances: async (balances) => {
+    const same =
+      balances.credits === credits &&
+      balances.alloy === expansionCurrencies.alloy &&
+      balances.starCrystal === expansionCurrencies.starCrystal &&
+      balances.quantumCore === expansionCurrencies.quantumCore;
+    if (same) return;
+    credits = balances.credits;
+    expansionCurrencies = { alloy: balances.alloy, starCrystal: balances.starCrystal, quantumCore: balances.quantumCore };
+    refreshPersistentStateUi();
+    // Mid-sortie the next autosave carries it; between sorties save now (quietly).
+    if (!warpAccount?.attempt && game.getPhase() === "title" && accountTransactions.canWrite() && !accountTransactions.busy()) {
+      await autosaveCampaign("progression");
+    }
+  },
+  adoptWarp: async (warp) => {
+    if (!accountTransactions.canWrite() || warpAccount?.attempt) return;
+    if (JSON.stringify(warpAccount?.warp) === JSON.stringify(warp)) return;
+    await accountTransactions.adoptServerWarp(warp);
+    renderWarpHud();
+  },
+  sortieActive: () => Boolean(warpAccount?.attempt),
+  lastSortieWords: () => game.getStageSessionSnapshot().wordsCompleted,
+  notice: showNotice,
+  changed: () => dailyHub?.refreshBadges(),
+});
+chatPanel = installChatPanel({
+  session: onlineSession,
+  openAccount: () => accountDialog.open("create"),
+  notice: showNotice,
+  sound: {
+    tab: () => game.playUiCue("tab"),
+    error: () => game.playUiCue("error"),
+    message: () => game.playUiCue("hover"),
+  },
+});
+chatPanel.setLook(profileLookIds(resolveLook(cosmetics, cosmeticsProgress())));
+byId("titleAccountButton").addEventListener("click", () => accountDialog.open());
+byId("warpFreeSupplyButton").addEventListener("click", () => {
+  byId<HTMLDialogElement>("warpDialog").close();
+  dailyHub?.open("gifts");
+});
+{
+  const art = liveOpsArt("currency-warp");
+  if (art !== null) byId("warpCoreArt").style.backgroundImage = 'url("' + art + '")';
+}
+function renderOnlineButton(): void {
+  const button = byId("titleAccountButton");
+  const account = onlineSession.account;
+  button.dataset.state = onlineSession.status === "online" ? (account?.kind === "registered" ? "registered" : "guest") : onlineSession.status;
+  const tip =
+    onlineSession.status === "offline"
+      ? "Offline · progress is saved on this device"
+      : account?.kind === "registered"
+        ? account.displayName + " · cloud save on"
+        : "Guest · create an account to keep progress on every device";
+  button.dataset.tip = tip;
+  button.setAttribute("aria-label", tip);
+}
+onlineSession.onChange(() => {
+  renderOnlineButton();
+  void liveOps.setRemote(onlineSession.online ? liveOpsRemote : null).then(() => dailyHub?.refreshBadges());
+  if (onlineSession.online) cloudStatusText = "Connected · uploads at most once a minute.";
+});
+renderOnlineButton();
+void onlineSession.start().then(() => accountDialog.handleLinks());
+byId("titleMailButton").addEventListener("click", () => dailyHub?.open("mail"));
+/** Gameplay dialogs have their own sounds. */
+const QUIET_DIALOGS = new Set(["rewardChoiceDialog", "anomalyDialog"]);
+installDialogMotion({
+  opened: (dialog) => {
+    if (dialog.classList.contains("settings-dialog") && !QUIET_DIALOGS.has(dialog.id)) game.playUiCue("open");
+  },
+  closed: (dialog) => {
+    if (dialog.classList.contains("settings-dialog") && !QUIET_DIALOGS.has(dialog.id)) game.playUiCue("close");
+  },
+});
+const UI_HOVER_TARGETS =
+  ".holo-cta, .holo-ghost, .holo-dock-btn, .holo-tool, .holo-chip, .holo-mode, .lo-tab, .lo-chest-button, .icon-button, .th-row, .th-streak, .th-galaxy, .th-ship-card";
+/** UI sounds sit a little toward the pointer's side of the screen. */
+const uiPan = (clientX: number): number =>
+  Math.max(-1, Math.min(1, (clientX / Math.max(1, window.innerWidth)) * 2 - 1)) * 0.35;
+document.addEventListener(
+  "pointerover",
+  (event) => {
+    if (game.getPhase() === "playing") return;
+    const target = event.target instanceof Element ? event.target.closest(UI_HOVER_TARGETS) : null;
+    if (target === null || (event.relatedTarget instanceof Node && target.contains(event.relatedTarget))) return;
+    if (target instanceof HTMLButtonElement && target.disabled) return;
+    game.playUiCue("hover", uiPan(event.clientX));
+  },
+  { passive: true },
+);
+// Every menu press clicks; panels add their own open/close sweep on top.
+document.addEventListener(
+  "pointerdown",
+  (event) => {
+    if (event.button !== 0 || game.getPhase() === "playing") return;
+    const target = event.target instanceof Element ? event.target.closest("button, summary") : null;
+    if (target === null || (target instanceof HTMLButtonElement && target.disabled)) return;
+    game.playUiCue("click", uiPan(event.clientX));
+  },
+  { passive: true, capture: true },
+);
+window.addEventListener("keydown", () => { liveOpsLastInputAt = performance.now(); }, { capture: true, passive: true });
+// Active play time for the flight-time gifts, plus red dots and quiet saves on the title.
+let liveOpsTickAt = performance.now();
+let liveOpsSeconds = 0;
+let liveOpsTicks = 0;
+const liveOpsInterval = window.setInterval(() => {
+  const now = performance.now();
+  const elapsed = Math.min(5, (now - liveOpsTickAt) / 1000);
+  liveOpsTickAt = now;
+  if (game.getPhase() === "playing" && !document.hidden && now - liveOpsLastInputAt <= LIVE_OPS_POLICY.activeInputWindowMs) {
+    liveOpsSeconds += elapsed;
+    const whole = Math.floor(liveOpsSeconds);
+    if (whole >= 5) {
+      liveOpsSeconds -= whole;
+      recordLiveOps({ activeSeconds: whole });
+    }
+  }
+  if (++liveOpsTicks % 30 !== 0 || game.getPhase() !== "title" || !persistenceReady) return;
+  liveOps.sync();
+  dailyHub?.refreshBadges();
+  if (
+    liveOps.isDirty() && accountTransactions.canWrite() && !accountTransactions.busy() && !warpAccount?.attempt &&
+    !testingStagePreviewActive() && !practiceRestorePending && !clearSettlementPending
+  ) void autosaveCampaign("progression");
+}, 1000);
+window.addEventListener("pagehide", () => window.clearInterval(liveOpsInterval), { once: true });
+void loadLiveOpsRuntime().then(() => {
+  if (!persistenceReady) return;
+  liveOps.sync();
+  dailyHub?.refreshBadges();
+});
+
 renderSettings();
 renderGameplayMode();
 renderRecallSetup();
@@ -11257,6 +12378,32 @@ renderPlayerStatusIdentity();
 renderStats(game.getStats());
 renderPhase(game.getPhase());
 renderAllSkills();
+if (import.meta.env.DEV) {
+  // Dev-only: show a results screen with sample numbers, for VFX screenshots
+  // (scripts/visual/evals/result-fx.js). Not reachable in a build.
+  (window as unknown as { __resultPreview?: (kind: "clear" | "over", stars?: number, level?: number) => void }).__resultPreview = (kind, stars = 3, level = 5) => {
+    titleOverlay.classList.add("hidden");
+    document.body.classList.remove("title-active");
+    if (kind === "over") {
+      stageClearOverlay.classList.add("hidden");
+      gameOverOverlay.classList.remove("hidden");
+      byId("resultScore").textContent = "12,480";
+      byId("resultWave").textContent = "014";
+      byId("resultAccuracy").textContent = "91.4%";
+      byId("resultStreak").textContent = "38";
+      resultFx.defeat();
+      return;
+    }
+    gameOverOverlay.classList.add("hidden");
+    stageClearOverlay.classList.remove("hidden");
+    const accuracy = level >= 5 ? 99.4 : 96;
+    renderStageClearCelebration(stageClearCelebrationProfile({ stars: Math.max(1, Math.min(3, stars)) as 1 | 2 | 3, accuracy, wpm: level >= 4 ? 92 : 48, score: level >= 4 ? 26_000 : 6_000, elapsedSeconds: 120 }));
+    byId("clearTitle").textContent = "Stage 014 complete";
+    countUpNumber(byId("clearScore"), level >= 4 ? 26_000 : 6_000);
+    byId("clearAccuracy").textContent = accuracy + "%";
+    renderClearStars(stars);
+  };
+}
 void initializeArtPipeline();
 void initializePlayerProgress();
 void loadInitialVocabulary();

@@ -41,3 +41,9 @@
 .voice-input-controls small { display: block; font-size: 10px; line-height: 1.3; margin-top: 5px; max-height: 42px; overflow: auto; }
 .voice-input-controls[data-state="listening"] { border-color: #68cda5; }
 .voice-input-controls[data-state="error"] { border-color: #dc9d54; }
+
+/* Title screen: a compact pill beside the dock, status text only when the mic
+   is doing something, so it never covers the last dock buttons. */
+body.title-active .voice-input-controls { width: 176px; padding: 6px 7px; right: 14px; bottom: 14px; }
+body.title-active .voice-input-controls[data-state="off"] small,
+body.title-active .voice-input-controls:not([data-state]) small { display: none; }

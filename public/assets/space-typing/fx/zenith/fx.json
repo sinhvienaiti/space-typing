@@ -1,0 +1,46 @@
+{
+  "id": "zenith",
+  "version": 4117060096,
+  "sprites": {
+    "bolt": {
+      "url": "bolt.webp",
+      "sha256": "3d286f84740254e78cc0d697651ac03c48d31e4da4f25a0b8d4b8c46b7ecca1c",
+      "width": 768,
+      "height": 551,
+      "anchor": [
+        0.9616,
+        0.1933
+      ]
+    },
+    "finisher": {
+      "url": "finisher.webp",
+      "sha256": "e17b6cdb1160394092627d975feb82bfaf1406cbbf66037539c8e75e76669545",
+      "width": 768,
+      "height": 576,
+      "anchor": [
+        0.98,
+        0.2804
+      ]
+    },
+    "impact": {
+      "url": "impact.webp",
+      "sha256": "895f32073f9a0a777464049fab3c1fe4d17668d13ab818f0eb0c52d099be6e6b",
+      "width": 640,
+      "height": 640,
+      "anchor": [
+        0.514,
+        0.4855
+      ]
+    },
+    "muzzle": {
+      "url": "muzzle.webp",
+      "sha256": "d1daf4c7b02807c4e45c732c7d3b8010cb88232a3f06397873e1664efe558a50",
+      "width": 512,
+      "height": 296,
+      "anchor": [
+        0.0362,
+        0.4374
+      ]
+    }
+  }
+}

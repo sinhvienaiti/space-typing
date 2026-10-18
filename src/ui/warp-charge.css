@@ -77,3 +77,74 @@
 .practice-banner[hidden] {
   display: none;
 }
+
+/* ---------- Warp dialog (Holo Command) ---------- */
+#warpDialog.wd { width: min(560px, calc(100vw - 32px)); padding: 18px 22px 22px; }
+.wd-head { display: flex; align-items: center; gap: 16px; }
+.wd-title { flex: 1; min-width: 0; }
+.wd-title h2 { margin: 0; }
+.wd-sub { margin: 4px 0 0; color: var(--holo-dim); font-size: 0.86rem !important; line-height: 1.45 !important; }
+.wd-core { position: relative; flex: none; width: 76px; height: 76px; display: grid; place-items: center; }
+.wd-core-glow { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(95, 227, 255, 0.55), rgba(95, 227, 255, 0.08) 55%, transparent 70%); animation: wd-breathe 2.6s ease-in-out infinite; }
+.wd-core-art {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  background: center / contain no-repeat;
+  filter: drop-shadow(0 0 12px rgba(95, 227, 255, 0.9));
+}
+.wd-core-art:not([style*="background-image"]) {
+  background: linear-gradient(180deg, #e9fdff, #5fe3ff 45%, #2a63c9);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 2 3 14h9l-1 8 10-12h-9l1-8z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 2 3 14h9l-1 8 10-12h-9l1-8z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+#warpDialog[data-low="true"] .wd-core-glow { background: radial-gradient(circle, rgba(255, 181, 71, 0.55), rgba(255, 181, 71, 0.08) 55%, transparent 70%); }
+@keyframes wd-breathe { 50% { transform: scale(1.12); opacity: 0.75; } }
+.wd-gauges { display: grid; grid-template-columns: 1.3fr 1fr; gap: 12px; margin-top: 14px; }
+.wd-gauge { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid rgba(111, 231, 255, 0.16); background: rgba(3, 9, 20, 0.5); }
+.wd-gauge-head { display: flex; justify-content: space-between; align-items: baseline; }
+.wd-gauge-head span { color: var(--holo-accent); font: 800 0.66rem var(--holo-display); letter-spacing: 0.18em; text-transform: uppercase; }
+.wd-gauge-head strong { font: 900 1.35rem var(--holo-display); font-variant-numeric: tabular-nums; }
+.wd-gauge small { color: var(--holo-faint); font-size: 0.74rem; }
+.wd-meter { position: relative; height: 14px; overflow: hidden; border: 1px solid rgba(111, 231, 255, 0.25); background: rgba(3, 9, 20, 0.85); }
+.wd-meter i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--p, 0) * 100%);
+  background: linear-gradient(90deg, #2f9fd8, #5fe3ff 60%, #d9fbff);
+  box-shadow: 0 0 16px rgba(95, 227, 255, 0.7);
+  transition: width 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.wd-meter i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.55) 50%, transparent 70%); background-size: 220% 100%; animation: lo-shine 2.2s linear infinite; }
+.wd-gauge.reserve .wd-meter i { background: linear-gradient(90deg, #5a3fd1, #a07bff 60%, #e4dcff); box-shadow: 0 0 14px rgba(160, 123, 255, 0.6); }
+#warpDialog[data-low="true"] .wd-gauge.active .wd-meter i { background: linear-gradient(90deg, #c96a1c, #ffb547); box-shadow: 0 0 14px rgba(255, 181, 71, 0.7); }
+.wd-ticks { position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(3, 9, 20, 0.85) calc(10% - 1px) 10%); pointer-events: none; }
+.wd-status { margin: 10px 0 0 !important; }
+.wd-status small { color: var(--holo-dim); font-size: 0.78rem; }
+.wd-actions.warp-depot { display: grid; gap: 8px; margin-top: 12px; }
+.wd-card { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; padding: 12px 14px; border: 1px solid rgba(111, 231, 255, 0.14); background: linear-gradient(90deg, rgba(95, 227, 255, 0.05), rgba(3, 9, 20, 0.45)); transition: border-color 0.2s; }
+.wd-card:hover { border-color: rgba(111, 231, 255, 0.32); }
+.wd-card.free { background: linear-gradient(90deg, rgba(255, 215, 106, 0.08), rgba(3, 9, 20, 0.45)); }
+.wd-card-text { display: grid; gap: 3px; }
+.wd-card-text strong { font: 800 0.92rem var(--holo-display); }
+.wd-card-text span { color: var(--holo-dim); font-size: 0.82rem; line-height: 1.4; }
+.wd-card-text small { color: var(--holo-faint); font-size: 0.72rem; }
+#warpDialog .wd-card button { min-height: 40px; padding: 0 16px; font-size: 0.8rem; white-space: nowrap; }
+.wd-switch {
+  position: relative;
+  min-width: 112px;
+  padding-left: 44px !important;
+  color: var(--holo-dim);
+  border: 1px solid var(--holo-line);
+  background: rgba(7, 16, 34, 0.7);
+  font: 800 0.76rem var(--holo-display);
+  text-transform: uppercase;
+}
+.wd-switch::before { content: ""; position: absolute; left: 10px; top: 50%; width: 26px; height: 14px; margin-top: -7px; border-radius: 7px; background: rgba(143, 176, 200, 0.3); transition: background-color 0.2s; }
+.wd-switch::after { content: ""; position: absolute; left: 12px; top: 50%; width: 10px; height: 10px; margin-top: -5px; border-radius: 50%; background: #cfe3ef; transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.wd-switch[aria-pressed="true"] { color: var(--holo-good); border-color: rgba(61, 255, 149, 0.4); }
+.wd-switch[aria-pressed="true"]::before { background: rgba(61, 255, 149, 0.55); }
+.wd-switch[aria-pressed="true"]::after { transform: translateX(12px); background: #fff; }
+.wd-maintenance { display: flex; gap: 8px; justify-content: flex-end; }
+.wd-maintenance:not(:has(button:not([hidden]))) { display: none; }
+@media (max-width: 560px) { .wd-gauges { grid-template-columns: 1fr; } .wd-card { grid-template-columns: 1fr; } }

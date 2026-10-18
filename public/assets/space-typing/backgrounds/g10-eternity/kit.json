@@ -1,0 +1,523 @@
+{
+  "id": "g10-eternity",
+  "version": 1738990603,
+  "textures": {
+    "plate": {
+      "variants": [
+        {
+          "maxSize": 1280,
+          "url": "plate.1280.webp",
+          "sha256": "544fe9a49e3684dd412aa8b2e067aac9464ba21a71161c9a7d9f2e8850c5eef0"
+        },
+        {
+          "maxSize": 1672,
+          "url": "plate.1672.webp",
+          "sha256": "52cc7a848bb714f1edf6340bdd5901db01efd2c6a3a52396092b4bbfb7642d6b"
+        }
+      ],
+      "aspect": 1.7768331562167907,
+      "wrap": "clamp",
+      "mipmaps": false
+    },
+    "plate-b": {
+      "variants": [
+        {
+          "maxSize": 1280,
+          "url": "plate-b.1280.webp",
+          "sha256": "8efe71c0ac4abc929ea3bdfa749a27d533bb5438c37aef43e878314d41fdc7b4"
+        },
+        {
+          "maxSize": 1672,
+          "url": "plate-b.1672.webp",
+          "sha256": "43c9ddbd838447bc32f9a4ee4856e9b95e5c7d8fa0063aba331535c4d656c7f7"
+        }
+      ],
+      "aspect": 1.7768331562167907,
+      "wrap": "clamp",
+      "mipmaps": false
+    },
+    "plate-c": {
+      "variants": [
+        {
+          "maxSize": 1280,
+          "url": "plate-c.1280.webp",
+          "sha256": "8c31759c89283d42ee24e9aeb68aaddd7b1ed651efe8011031559acc82df7f6d"
+        },
+        {
+          "maxSize": 1672,
+          "url": "plate-c.1672.webp",
+          "sha256": "c49acc456f3354154b52d61eab2974386ed913030e767e535d71a4ad3ecf4038"
+        }
+      ],
+      "aspect": 1.7768331562167907,
+      "wrap": "clamp",
+      "mipmaps": false
+    },
+    "plate-d": {
+      "variants": [
+        {
+          "maxSize": 1280,
+          "url": "plate-d.1280.webp",
+          "sha256": "720e24bdc43f1d25dd1aa5e664d464d3ae1d00d0dbd3e8bf681717f344ffe2de"
+        },
+        {
+          "maxSize": 1672,
+          "url": "plate-d.1672.webp",
+          "sha256": "31f41389533b78cc2dfae74a801b25b3e0e2a684b8daf7ac1d0c19913fa18057"
+        }
+      ],
+      "aspect": 1.7768331562167907,
+      "wrap": "clamp",
+      "mipmaps": false
+    },
+    "plate-e": {
+      "variants": [
+        {
+          "maxSize": 1280,
+          "url": "plate-e.1280.webp",
+          "sha256": "e759473d257552c43579cb51ac13077ae479907b6dccae3121fc4535fa160a5c"
+        },
+        {
+          "maxSize": 1672,
+          "url": "plate-e.1672.webp",
+          "sha256": "bf1ee8ecc13eda8c9ce0b1313d78998eac652dd897496641536f4cdbbf469d4f"
+        }
+      ],
+      "aspect": 1.7768331562167907,
+      "wrap": "clamp",
+      "mipmaps": false
+    },
+    "glow-a": {
+      "variants": [
+        {
+          "maxSize": 1024,
+          "url": "glow-a.1024.webp",
+          "sha256": "1007ae756f324f83231540089ae258b73c3210ba6aaa7fc9a19168f641b2a0cb"
+        },
+        {
+          "maxSize": 1254,
+          "url": "glow-a.1254.webp",
+          "sha256": "363d06b2c0e87245c5960073917f4c2d38d8098db508699c96a9f6544e5c6dfe"
+        }
+      ],
+      "aspect": 1,
+      "wrap": "repeat",
+      "mipmaps": true
+    },
+    "glow-b": {
+      "variants": [
+        {
+          "maxSize": 1024,
+          "url": "glow-b.1024.webp",
+          "sha256": "468ba6899574af7242308f67b5c149e216a80a208f9f5db4cc72f84935ff8cc4"
+        },
+        {
+          "maxSize": 1254,
+          "url": "glow-b.1254.webp",
+          "sha256": "e766859988189c5feee5e1b1acb8246613dfba08e240202da7c9b3538429770e"
+        }
+      ],
+      "aspect": 1,
+      "wrap": "repeat",
+      "mipmaps": true
+    },
+    "dust": {
+      "variants": [
+        {
+          "maxSize": 1024,
+          "url": "dust.1024.webp",
+          "sha256": "d30be5cc184f15e25f0f5139307fa93c3c79197721b025e7db869749bbea69f5"
+        },
+        {
+          "maxSize": 1254,
+          "url": "dust.1254.webp",
+          "sha256": "647c9994430ac3d88161daa359da9278cd33d44e839e5b0b21bc3e02ccb2a1ff"
+        }
+      ],
+      "aspect": 1,
+      "wrap": "repeat",
+      "mipmaps": true
+    },
+    "hero-w46": {
+      "variants": [
+        {
+          "maxSize": 512,
+          "url": "hero-w46.512.webp",
+          "sha256": "912de8d585cad17dc73b12ab4d5176840d6ccaff4350a2e5ad956edcec1490c5"
+        },
+        {
+          "maxSize": 1024,
+          "url": "hero-w46.1024.webp",
+          "sha256": "7ba837fb0f25644ed1388542dfcc1c6cdc7cc0bd3f197cf4a422adda5bbcd73c"
+        },
+        {
+          "maxSize": 1201,
+          "url": "hero-w46.1201.webp",
+          "sha256": "29272c9bb60ec927dc030d48dd81b443b9ad1e3e6834bf205cbde62b350b8f1d"
+        }
+      ],
+      "aspect": 1.0177966101694915,
+      "wrap": "clamp",
+      "mipmaps": true
+    },
+    "hero-w47": {
+      "variants": [
+        {
+          "maxSize": 512,
+          "url": "hero-w47.512.webp",
+          "sha256": "558c36bc214f7fdc4a18dcbb557468fcd707ec616c00fe0fd0d91e21ae32c5a5"
+        },
+        {
+          "maxSize": 1024,
+          "url": "hero-w47.1024.webp",
+          "sha256": "db9c1ac02d53de0b7655035d581686f5547e10b85e3fa478646699913ce72d9e"
+        },
+        {
+          "maxSize": 1225,
+          "url": "hero-w47.1225.webp",
+          "sha256": "a20a096ef401701fd8b5cda3e10d7cb9a6aba064f56bd6d7bb345f078b583d8c"
+        }
+      ],
+      "aspect": 1.008230452674897,
+      "wrap": "clamp",
+      "mipmaps": true
+    },
+    "hero-w48": {
+      "variants": [
+        {
+          "maxSize": 512,
+          "url": "hero-w48.512.webp",
+          "sha256": "6c102887a6a2a091f6f6e3f8abe7e0ba9856ea1aa318d7353727954270325424"
+        },
+        {
+          "maxSize": 1024,
+          "url": "hero-w48.1024.webp",
+          "sha256": "095ddcef51f57397a41b18c5738710d091904e420adbd3b1534ada3839ba830d"
+        },
+        {
+          "maxSize": 1244,
+          "url": "hero-w48.1244.webp",
+          "sha256": "1c4a580070d8bd99ebdcd5909496bbb44846b3198c144c724b648ba11bc4a145"
+        }
+      ],
+      "aspect": 0.9228295819935691,
+      "wrap": "clamp",
+      "mipmaps": true
+    },
+    "hero-w49": {
+      "variants": [
+        {
+          "maxSize": 512,
+          "url": "hero-w49.512.webp",
+          "sha256": "3f1cd8134d236857a3cf4dcfe5e6d020f1dfe1e6a60073137c19185a83f3755d"
+        },
+        {
+          "maxSize": 1024,
+          "url": "hero-w49.1024.webp",
+          "sha256": "4ef489f17ba182ddc0651aff622a8fca3cce1306162226eae55172b3844566c5"
+        },
+        {
+          "maxSize": 1233,
+          "url": "hero-w49.1233.webp",
+          "sha256": "c2ceda271019839ce2f449d4f0cc4be8a1d0126a57808948fa378edba78fe259"
+        }
+      ],
+      "aspect": 0.9935117599351176,
+      "wrap": "clamp",
+      "mipmaps": true
+    },
+    "hero-w50": {
+      "variants": [
+        {
+          "maxSize": 512,
+          "url": "hero-w50.512.webp",
+          "sha256": "c522028df4d2b77d5e3cebf385204a99431a6b1157102912c67359163ac40669"
+        },
+        {
+          "maxSize": 1024,
+          "url": "hero-w50.1024.webp",
+          "sha256": "07e0526bcb2204f2a30bb797b5a34aa1e3f3d5d34ad989e118c47d3b526148a2"
+        },
+        {
+          "maxSize": 1254,
+          "url": "hero-w50.1254.webp",
+          "sha256": "c59fe616ac897d59d2ee077f394753cd594a28ebce90a8f6eb9bd4e878996537"
+        }
+      ],
+      "aspect": 0.9992025518341308,
+      "wrap": "clamp",
+      "mipmaps": true
+    },
+    "atlas-rocks": {
+      "variants": [
+        {
+          "maxSize": 1024,
+          "url": "atlas-rocks.1024.webp",
+          "sha256": "e84b16793fce86cc8b4254c6f94e9c950812c49231fcf1d879c6341036f4875d"
+        },
+        {
+          "maxSize": 2048,
+          "url": "atlas-rocks.2048.webp",
+          "sha256": "c8d8c71d35ed3b439aa7c10f692376f43fcbdc4893c312ebdbbe6e9bf1a4da08"
+        }
+      ],
+      "aspect": 1,
+      "wrap": "clamp",
+      "mipmaps": true
+    },
+    "atlas-life": {
+      "variants": [
+        {
+          "maxSize": 1024,
+          "url": "atlas-life.1024.webp",
+          "sha256": "d29a5b737a5328459bb5a72a1d83241eafcde94bae73629bb184be164a83b8cb"
+        },
+        {
+          "maxSize": 2048,
+          "url": "atlas-life.2048.webp",
+          "sha256": "427f67bf0d3edf725e30e4504ecf5356aca178656a9c970793fe251a7c8986d5"
+        }
+      ],
+      "aspect": 1,
+      "wrap": "clamp",
+      "mipmaps": true
+    }
+  },
+  "atlases": {
+    "rocks": {
+      "texture": "atlas-rocks",
+      "frames": [
+        {
+          "id": "rocks-00",
+          "u0": 0.1484375,
+          "v0": 0.00390625,
+          "u1": 0.3349609375,
+          "v1": 0.2880859375,
+          "aspect": 0.6563573883161512,
+          "sizeRank": 0
+        },
+        {
+          "id": "rocks-01",
+          "u0": 0.3388671875,
+          "v0": 0.00390625,
+          "u1": 0.52880859375,
+          "v1": 0.28759765625,
+          "aspect": 0.6695352839931153,
+          "sizeRank": 0.08333333333333333
+        },
+        {
+          "id": "rocks-02",
+          "u0": 0.53271484375,
+          "v0": 0.00390625,
+          "u1": 0.70751953125,
+          "v1": 0.28173828125,
+          "aspect": 0.6291739894551845,
+          "sizeRank": 0.16666666666666666
+        },
+        {
+          "id": "rocks-03",
+          "u0": 0.00390625,
+          "v0": 0.00390625,
+          "u1": 0.14453125,
+          "v1": 0.28955078125,
+          "aspect": 0.49230769230769234,
+          "sizeRank": 0.25
+        },
+        {
+          "id": "rocks-04",
+          "u0": 0.71142578125,
+          "v0": 0.00390625,
+          "u1": 0.84375,
+          "v1": 0.26513671875,
+          "aspect": 0.5065420560747663,
+          "sizeRank": 0.3333333333333333
+        },
+        {
+          "id": "rocks-05",
+          "u0": 0.00390625,
+          "v0": 0.29345703125,
+          "u1": 0.15380859375,
+          "v1": 0.47705078125,
+          "aspect": 0.8164893617021277,
+          "sizeRank": 0.4166666666666667
+        },
+        {
+          "id": "rocks-06",
+          "u0": 0.3125,
+          "v0": 0.29345703125,
+          "u1": 0.51171875,
+          "v1": 0.4423828125,
+          "aspect": 1.337704918032787,
+          "sizeRank": 0.5
+        },
+        {
+          "id": "rocks-07",
+          "u0": 0.15771484375,
+          "v0": 0.29345703125,
+          "u1": 0.30859375,
+          "v1": 0.4521484375,
+          "aspect": 0.9507692307692308,
+          "sizeRank": 0.5833333333333334
+        },
+        {
+          "id": "rocks-08",
+          "u0": 0.611328125,
+          "v0": 0.29345703125,
+          "u1": 0.71875,
+          "v1": 0.3984375,
+          "aspect": 1.0232558139534884,
+          "sizeRank": 0.6666666666666666
+        },
+        {
+          "id": "rocks-09",
+          "u0": 0.72265625,
+          "v0": 0.29345703125,
+          "u1": 0.81982421875,
+          "v1": 0.39794921875,
+          "aspect": 0.9299065420560748,
+          "sizeRank": 0.75
+        },
+        {
+          "id": "rocks-10",
+          "u0": 0.00390625,
+          "v0": 0.48095703125,
+          "u1": 0.10400390625,
+          "v1": 0.57373046875,
+          "aspect": 1.0789473684210527,
+          "sizeRank": 0.8333333333333334
+        },
+        {
+          "id": "rocks-11",
+          "u0": 0.82373046875,
+          "v0": 0.29345703125,
+          "u1": 0.919921875,
+          "v1": 0.39501953125,
+          "aspect": 0.9471153846153846,
+          "sizeRank": 0.9166666666666666
+        },
+        {
+          "id": "rocks-12",
+          "u0": 0.515625,
+          "v0": 0.29345703125,
+          "u1": 0.607421875,
+          "v1": 0.39892578125,
+          "aspect": 0.8703703703703703,
+          "sizeRank": 1
+        }
+      ]
+    },
+    "life": {
+      "texture": "atlas-life",
+      "frames": [
+        {
+          "id": "life-00",
+          "u0": 0.20263671875,
+          "v0": 0.00390625,
+          "u1": 0.4306640625,
+          "v1": 0.2666015625,
+          "aspect": 0.8680297397769516,
+          "sizeRank": 0
+        },
+        {
+          "id": "life-01",
+          "u0": 0.4345703125,
+          "v0": 0.00390625,
+          "u1": 0.72802734375,
+          "v1": 0.24853515625,
+          "aspect": 1.1996007984031936,
+          "sizeRank": 0.09090909090909091
+        },
+        {
+          "id": "life-02",
+          "u0": 0.00390625,
+          "v0": 0.00390625,
+          "u1": 0.19873046875,
+          "v1": 0.27001953125,
+          "aspect": 0.7321100917431193,
+          "sizeRank": 0.18181818181818182
+        },
+        {
+          "id": "life-03",
+          "u0": 0.73193359375,
+          "v0": 0.00390625,
+          "u1": 0.9658203125,
+          "v1": 0.16064453125,
+          "aspect": 1.4922118380062306,
+          "sizeRank": 0.2727272727272727
+        },
+        {
+          "id": "life-04",
+          "u0": 0.00390625,
+          "v0": 0.27392578125,
+          "u1": 0.25390625,
+          "v1": 0.41259765625,
+          "aspect": 1.8028169014084507,
+          "sizeRank": 0.36363636363636365
+        },
+        {
+          "id": "life-05",
+          "u0": 0.5361328125,
+          "v0": 0.27392578125,
+          "u1": 0.7412109375,
+          "v1": 0.40185546875,
+          "aspect": 1.6030534351145038,
+          "sizeRank": 0.45454545454545453
+        },
+        {
+          "id": "life-06",
+          "u0": 0.2578125,
+          "v0": 0.27392578125,
+          "u1": 0.427734375,
+          "v1": 0.41015625,
+          "aspect": 1.2473118279569892,
+          "sizeRank": 0.5454545454545454
+        },
+        {
+          "id": "life-07",
+          "u0": 0.853515625,
+          "v0": 0.27392578125,
+          "u1": 0.984375,
+          "v1": 0.37744140625,
+          "aspect": 1.2641509433962264,
+          "sizeRank": 0.6363636363636364
+        },
+        {
+          "id": "life-08",
+          "u0": 0.00390625,
+          "v0": 0.41650390625,
+          "u1": 0.15478515625,
+          "v1": 0.515625,
+          "aspect": 1.522167487684729,
+          "sizeRank": 0.7272727272727273
+        },
+        {
+          "id": "life-09",
+          "u0": 0.7451171875,
+          "v0": 0.27392578125,
+          "u1": 0.849609375,
+          "v1": 0.39306640625,
+          "aspect": 0.8770491803278688,
+          "sizeRank": 0.8181818181818182
+        },
+        {
+          "id": "life-10",
+          "u0": 0.15869140625,
+          "v0": 0.41650390625,
+          "u1": 0.31982421875,
+          "v1": 0.509765625,
+          "aspect": 1.7277486910994764,
+          "sizeRank": 0.9090909090909091
+        },
+        {
+          "id": "life-11",
+          "u0": 0.431640625,
+          "v0": 0.27392578125,
+          "u1": 0.5322265625,
+          "v1": 0.40234375,
+          "aspect": 0.7832699619771863,
+          "sizeRank": 1
+        }
+      ]
+    }
+  }
+}

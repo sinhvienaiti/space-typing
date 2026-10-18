@@ -16,6 +16,13 @@ const words = [
 ];
 
 describe("Expansion V2 pattern runtime", () => {
+  it("preserves weak-word weights while choosing 24 distinct long prompts", () => {
+    const weak={id:"weak",en:"interstellar",vi:"",ipa:""};
+    const source=[...words,weak,weak,weak];
+    const pool=buildPatternVocabulary(source,"long-word",42);
+    expect(pool.filter(entry=>entry.id==="weak")).toHaveLength(3);
+    expect(new Set(pool.map(entry=>entry.en)).size).toBe(new Set(source.map(entry=>entry.en)).size);
+  });
   it("builds deterministic phrase and boss-sentence prompts", () => {
     const phraseA = buildPatternVocabulary(words, "phrase", 42);
     const phraseB = buildPatternVocabulary(words, "phrase", 42);

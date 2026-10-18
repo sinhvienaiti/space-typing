@@ -1,4 +1,5 @@
 import { ACTIVE_STAGE_RUNTIME_SESSION } from "../admin/stage-runtime-policy";
+import { runtimeTestingPolicy, type RuntimeTestingPolicy } from "../admin/game-testing-policy";
 import { canSelectCampaignStage, type CampaignExpansionState } from "./expansion-state";
 import { MAX_CAMPAIGN_STAGE } from "./stage";
 import type { CampaignProgress } from "./types";
@@ -12,23 +13,23 @@ export function validCampaignStage(stage: number): boolean {
 }
 
 /**
- * Keep the legacy local testing switch available only when the child is
- * running from bundled/standalone policy. Once a valid published platform
- * runtime is present, local storage or DevTools cannot grant campaign access.
+ * Published Admin testing policy grants preview access. A legacy local switch
+ * is honored only in standalone/bundled development, never over published OFF.
  */
 export function testingStageUnlockEnabled(
   unlockAllStages: boolean,
   runtimeSource: "bundled" | "published" = ACTIVE_STAGE_RUNTIME_SESSION.source,
+  policy: RuntimeTestingPolicy = runtimeTestingPolicy(),
+  dev = (import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV === true,
 ): boolean {
-  return runtimeSource === "bundled" && unlockAllStages;
+  return policy.unlockAllStages || (dev && runtimeSource === "bundled" && unlockAllStages);
 }
 
 /**
- * Optional local testing override for Stage Select.
+ * Temporary testing access for Stage Select.
  *
- * This grants temporary access only in standalone/bundled development. It
- * never mutates CampaignProgress, highestUnlockedStage, checkpoint state,
- * cleared stages, or rewards, and it is ignored under published Admin policy.
+ * It never mutates CampaignProgress, highestUnlockedStage, checkpoint state,
+ * cleared stages, or rewards. Published sessions follow the Admin switch.
  */
 export function canSelectCampaignStageWithTestingUnlock(
   progress: CampaignProgress,
@@ -38,7 +39,7 @@ export function canSelectCampaignStageWithTestingUnlock(
 ): boolean {
   if (!validCampaignStage(stage)) return false;
   return (
-    testingStageUnlockEnabled(unlockAllStages) ||
+    (unlockAllStages && testingStageUnlockEnabled(unlockAllStages)) ||
     canSelectCampaignStage(progress, expansion, stage)
   );
 }
@@ -50,7 +51,7 @@ export function isTestingStagePreview(
   unlockAllStages: boolean,
 ): boolean {
   return (
-    testingStageUnlockEnabled(unlockAllStages) &&
+    unlockAllStages && testingStageUnlockEnabled(unlockAllStages) &&
     validCampaignStage(stage) &&
     !canSelectCampaignStage(progress, expansion, stage)
   );

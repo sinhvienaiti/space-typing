@@ -30,6 +30,13 @@ export const PRONUNCIATION_DUCK: Record<AudioGroup, number> = {
   rewards: 0.7,
 };
 
+let pronunciationBoost = 1;
+
+/** Voice boost from settings (1–3): effects drop to at most 1 / boost while a word is spoken. */
+export function setPronunciationBoost(boost: number): void {
+  pronunciationBoost = Number.isFinite(boost) ? clamp(boost, 1, 3) : 1;
+}
+
 export function mixedSfxGain(
   master: number,
   group: AudioGroup,
@@ -38,6 +45,6 @@ export function mixedSfxGain(
 ): number {
   const safeMaster = clamp(master, 0, 1);
   const safeEvent = clamp(eventGain, 0, 1);
-  const duck = pronunciationActive ? PRONUNCIATION_DUCK[group] : 1;
+  const duck = pronunciationActive ? Math.min(PRONUNCIATION_DUCK[group], 1 / pronunciationBoost) : 1;
   return safeMaster * AUDIO_GROUP_GAIN[group] * safeEvent * duck;
 }

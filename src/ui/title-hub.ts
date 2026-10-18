@@ -27,13 +27,16 @@ export type TitleHubDeps = {
   openSettings(): void;
   openDuel(): void;
   startRecall(): void;
+  /** Command Deck sections (src/ui/title-home.ts), refreshed with the hub. */
+  renderHome?(): void;
 };
 
 type VolumeField =
   | "musicVolume"
   | "sfxVolume"
   | "creditVolume"
-  | "pronunciationVolume";
+  | "pronunciationVolume"
+  | "pronunciationBoost";
 
 const QUICK_SLIDERS: ReadonlyArray<{
   field: VolumeField;
@@ -43,6 +46,7 @@ const QUICK_SLIDERS: ReadonlyArray<{
   { field: "musicVolume", input: "quickMusicVolume", fallback: 0.26 },
   { field: "sfxVolume", input: "quickSfxVolume", fallback: 0.5 },
   { field: "pronunciationVolume", input: "quickVoiceVolume", fallback: 1 },
+  { field: "pronunciationBoost", input: "quickVoiceBoost", fallback: 2 },
 ];
 
 /** Galaxy background kits, one per 100 stages (public/assets/.../backgrounds). */
@@ -66,7 +70,9 @@ export function galaxyPlateUrl(stage: number): string {
     GALAXY_KITS.length - 1,
     Math.max(0, Math.ceil(Math.max(1, stage) / 100) - 1),
   );
-  return "/assets/space-typing/backgrounds/" + GALAXY_KITS[index] + "/plate-c.1280.webp";
+  // g01 shipped before the plate-b…e variants, so it only has the base plate.
+  const kit = GALAXY_KITS[index];
+  return "/assets/space-typing/backgrounds/" + kit + (kit === "g01-celestial" ? "/plate.1280.webp" : "/plate-c.1280.webp");
 }
 
 export function shipArtUrl(shipId: string): string {
@@ -333,7 +339,7 @@ export function installTitleHub(deps: TitleHubDeps): TitleHub {
     if (pilot.shipId !== lastShip) {
       lastShip = pilot.shipId;
       const url = shipArtUrl(pilot.shipId);
-      for (const id of ["titlePilotShip", "titleCampaignShip"]) {
+      for (const id of ["titlePilotShip", "titleCampaignShip", "titleHeroShip", "playerStatusShip"]) {
         const image = byId<HTMLImageElement>(id);
         if (image !== null) image.src = url;
       }
@@ -342,7 +348,11 @@ export function installTitleHub(deps: TitleHubDeps): TitleHub {
     if (plate !== lastPlate) {
       lastPlate = plate;
       const image = byId<HTMLImageElement>("titleCampaignPlate");
-      if (image !== null) image.src = plate;
+      if (image !== null) {
+        image.hidden = false;
+        image.onerror = () => { image.hidden = true; };
+        image.src = plate;
+      }
     }
     const best = byId("titleBestStage");
     if (best !== null) best.textContent = stageLabel(pilot.highestStage);
@@ -353,6 +363,7 @@ export function installTitleHub(deps: TitleHubDeps): TitleHub {
     const reset = byId("titleDailyReset");
     if (reset !== null) reset.textContent = dailyResetLabel();
     renderTools();
+    deps.renderHome?.();
   }
 
   // Keep the Daily countdown current while the hub is on screen.
@@ -361,6 +372,8 @@ export function installTitleHub(deps: TitleHubDeps): TitleHub {
     if (overlay === null || overlay.classList.contains("hidden")) return;
     const reset = byId("titleDailyReset");
     if (reset !== null) reset.textContent = dailyResetLabel();
+    // Countdowns on the Today panel (new day, Warp windows).
+    deps.renderHome?.();
   }, 30_000);
 
   return { render, closePopovers: () => closePopovers() };

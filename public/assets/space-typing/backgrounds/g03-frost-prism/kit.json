@@ -1,0 +1,496 @@
+{
+  "id": "g03-frost-prism",
+  "version": 1885773843,
+  "textures": {
+    "plate": {
+      "variants": [
+        {
+          "maxSize": 1280,
+          "url": "plate.1280.webp",
+          "sha256": "bc3932dde164fcf2ba7a806179b6036045dd4fcb45f2e2ded8ee1ce6f3a07978"
+        },
+        {
+          "maxSize": 1672,
+          "url": "plate.1672.webp",
+          "sha256": "2d0156e663555c2a2e23dd50e3f9df740c915bf07d0e1fdfda4ff1e35247dbb2"
+        }
+      ],
+      "aspect": 1.7768331562167907,
+      "wrap": "clamp",
+      "mipmaps": false
+    },
+    "plate-b": {
+      "variants": [
+        {
+          "maxSize": 1280,
+          "url": "plate-b.1280.webp",
+          "sha256": "a23371c2ec23486d2309db0e7d39f8c3a614cd92f25ad35f7e7c4127a74b1d76"
+        },
+        {
+          "maxSize": 1672,
+          "url": "plate-b.1672.webp",
+          "sha256": "f337f9841fc508fdabbb185295939847c6c78148f8b80664869b6cd2fa416024"
+        }
+      ],
+      "aspect": 1.7768331562167907,
+      "wrap": "clamp",
+      "mipmaps": false
+    },
+    "plate-c": {
+      "variants": [
+        {
+          "maxSize": 1280,
+          "url": "plate-c.1280.webp",
+          "sha256": "2c18b137205c889eba74fe010c3ffb1a669573c05d8354d0b241939ab812c185"
+        },
+        {
+          "maxSize": 1672,
+          "url": "plate-c.1672.webp",
+          "sha256": "c3c9b3afb516698fd41954c56a5ab1acbb10fb19885a0d56bea1fabaf0269e29"
+        }
+      ],
+      "aspect": 1.7768331562167907,
+      "wrap": "clamp",
+      "mipmaps": false
+    },
+    "plate-d": {
+      "variants": [
+        {
+          "maxSize": 1280,
+          "url": "plate-d.1280.webp",
+          "sha256": "d4274af7b72610e81b2dbf043d3e88cc60f20f4f9ca438d4805d2f22b1dbbfff"
+        },
+        {
+          "maxSize": 1672,
+          "url": "plate-d.1672.webp",
+          "sha256": "ec2fef531de48fb9dc5a17af9f9945ea15f29fa8c4637c427b3ce70122ee57be"
+        }
+      ],
+      "aspect": 1.7768331562167907,
+      "wrap": "clamp",
+      "mipmaps": false
+    },
+    "plate-e": {
+      "variants": [
+        {
+          "maxSize": 1280,
+          "url": "plate-e.1280.webp",
+          "sha256": "31d3ed8e8edbd2de2fa58b62f95fb66c2917594e90db827e8e9c3ae90879f36c"
+        },
+        {
+          "maxSize": 1672,
+          "url": "plate-e.1672.webp",
+          "sha256": "34535f2a293411f8fee5bebf47018f76baa9c5285aa5cb8549c05a25afe1808a"
+        }
+      ],
+      "aspect": 1.7768331562167907,
+      "wrap": "clamp",
+      "mipmaps": false
+    },
+    "glow-a": {
+      "variants": [
+        {
+          "maxSize": 1024,
+          "url": "glow-a.1024.webp",
+          "sha256": "f2d89cba849606249c8191aa38b5f4bf61b62d9b78edc6c18ee1e4201b5dd3f3"
+        },
+        {
+          "maxSize": 1254,
+          "url": "glow-a.1254.webp",
+          "sha256": "e403fecae72999541022436f8d544e8faff5cee4e4b004a44c982f229b6f7e09"
+        }
+      ],
+      "aspect": 1,
+      "wrap": "repeat",
+      "mipmaps": true
+    },
+    "glow-b": {
+      "variants": [
+        {
+          "maxSize": 1024,
+          "url": "glow-b.1024.webp",
+          "sha256": "86fe80bd99c18c409aebdf97fe3a8d5a8071fa8b38ed602c6a9a91a8161e38b1"
+        },
+        {
+          "maxSize": 1254,
+          "url": "glow-b.1254.webp",
+          "sha256": "982c9656482e941d984a93c2cbd9841dbd537cefb15c914a53c3da4788dfd6f9"
+        }
+      ],
+      "aspect": 1,
+      "wrap": "repeat",
+      "mipmaps": true
+    },
+    "dust": {
+      "variants": [
+        {
+          "maxSize": 1024,
+          "url": "dust.1024.webp",
+          "sha256": "e2a98010ed3cf0d25ca9f2c4458b1a4785ea2b98971f0f758db9858cd4dcf1e7"
+        },
+        {
+          "maxSize": 1254,
+          "url": "dust.1254.webp",
+          "sha256": "41cd29c041e145c8802fdcb131d83544318f26acd94c11a0e39e80834333e01d"
+        }
+      ],
+      "aspect": 1,
+      "wrap": "repeat",
+      "mipmaps": true
+    },
+    "hero-w11": {
+      "variants": [
+        {
+          "maxSize": 512,
+          "url": "hero-w11.512.webp",
+          "sha256": "913532fde5178c0508a1eb717f29fb957559ffa3990c4ff9b83cf6432239bd90"
+        },
+        {
+          "maxSize": 1024,
+          "url": "hero-w11.1024.webp",
+          "sha256": "f191bcb92b046b929793d02e2625218de31f83181e2d86d30404637145d15bf8"
+        },
+        {
+          "maxSize": 1217,
+          "url": "hero-w11.1217.webp",
+          "sha256": "623d732efd2a1050bd902d4f94b5cb9a5c698b1f6990b656be78fff5c37ea16f"
+        }
+      ],
+      "aspect": 1.0278716216216217,
+      "wrap": "clamp",
+      "mipmaps": true
+    },
+    "hero-w12": {
+      "variants": [
+        {
+          "maxSize": 512,
+          "url": "hero-w12.512.webp",
+          "sha256": "507ed84398b4f201f956116cdcfbe442723486979c033982e72b114b28080614"
+        },
+        {
+          "maxSize": 1024,
+          "url": "hero-w12.1024.webp",
+          "sha256": "5b59b8e789ef1402e34a37649721e78fd8afd1c847e9c501dd451161f9836495"
+        },
+        {
+          "maxSize": 1206,
+          "url": "hero-w12.1206.webp",
+          "sha256": "c0d218d8e289034dd0c4a0ddc15371419c57bec2941281346fafb26902fac383"
+        }
+      ],
+      "aspect": 0.9701492537313433,
+      "wrap": "clamp",
+      "mipmaps": true
+    },
+    "hero-w13": {
+      "variants": [
+        {
+          "maxSize": 512,
+          "url": "hero-w13.512.webp",
+          "sha256": "54aff03c8bc6fb6c08636f737021b5c7ad2d74482a37f1e5d0d4d28ae17fd7bc"
+        },
+        {
+          "maxSize": 1024,
+          "url": "hero-w13.1024.webp",
+          "sha256": "91efd83331829d183fbd8ea3ede4520abd62ce721fc2830f41c70c4e7475ed0f"
+        },
+        {
+          "maxSize": 1215,
+          "url": "hero-w13.1215.webp",
+          "sha256": "cbf998ec27dfb5ad47a2253363cee4a70e13273d620936f8a48ebffaca746732"
+        }
+      ],
+      "aspect": 1.0384615384615385,
+      "wrap": "clamp",
+      "mipmaps": true
+    },
+    "hero-w14": {
+      "variants": [
+        {
+          "maxSize": 512,
+          "url": "hero-w14.512.webp",
+          "sha256": "5cebb342442be2a7434cc10f1aabf31880ff2da84861586ad8faa62d370bdcc1"
+        },
+        {
+          "maxSize": 1024,
+          "url": "hero-w14.1024.webp",
+          "sha256": "9f840986ca836463f39c91d332a007ac30745d2f13e5feee3bc347a47e9cb4bc"
+        },
+        {
+          "maxSize": 1245,
+          "url": "hero-w14.1245.webp",
+          "sha256": "e3ce492e619100db150f377d7a8ca683ce49d34025372ecf2d29a2f2a12cce6f"
+        }
+      ],
+      "aspect": 1.022167487684729,
+      "wrap": "clamp",
+      "mipmaps": true
+    },
+    "hero-w15": {
+      "variants": [
+        {
+          "maxSize": 512,
+          "url": "hero-w15.512.webp",
+          "sha256": "79b9c525ade76a626dd201b100bb2d181b6cc1dcfc026785c767499f5a51b8bb"
+        },
+        {
+          "maxSize": 1024,
+          "url": "hero-w15.1024.webp",
+          "sha256": "5c0d3e3ea46c8cb077263fbedffd0e4f9664d5ee4795f0df2887ec44a28ccefd"
+        },
+        {
+          "maxSize": 1254,
+          "url": "hero-w15.1254.webp",
+          "sha256": "8dfd9c46725f12efedef408df49156dcf6de8b4c08bc444b4aa058edd9314e9f"
+        }
+      ],
+      "aspect": 1.0380794701986755,
+      "wrap": "clamp",
+      "mipmaps": true
+    },
+    "atlas-rocks": {
+      "variants": [
+        {
+          "maxSize": 1024,
+          "url": "atlas-rocks.1024.webp",
+          "sha256": "7f1b161b1454e580156cb5c1d582817df603fde78fe3c33794b6a9c3ef26cebe"
+        },
+        {
+          "maxSize": 2048,
+          "url": "atlas-rocks.2048.webp",
+          "sha256": "165c2d3fe248a61c2cf42306ca9eaebb1b964958ebc3a93530b35ab837f580da"
+        }
+      ],
+      "aspect": 1,
+      "wrap": "clamp",
+      "mipmaps": true
+    },
+    "atlas-life": {
+      "variants": [
+        {
+          "maxSize": 1024,
+          "url": "atlas-life.1024.webp",
+          "sha256": "c51c201952e9210d69b806084513e91468643baab2f6d00d4bd3be2027a5cbe5"
+        },
+        {
+          "maxSize": 2048,
+          "url": "atlas-life.2048.webp",
+          "sha256": "6814c797fad49247b334125d7ffbdea89042e42dd60c7f7f3b7057eb5e5aedd6"
+        }
+      ],
+      "aspect": 1,
+      "wrap": "clamp",
+      "mipmaps": true
+    }
+  },
+  "atlases": {
+    "rocks": {
+      "texture": "atlas-rocks",
+      "frames": [
+        {
+          "id": "rocks-00",
+          "u0": 0.263671875,
+          "v0": 0.00390625,
+          "u1": 0.51953125,
+          "v1": 0.21630859375,
+          "aspect": 1.2045977011494253,
+          "sizeRank": 0
+        },
+        {
+          "id": "rocks-01",
+          "u0": 0.5234375,
+          "v0": 0.00390625,
+          "u1": 0.78466796875,
+          "v1": 0.201171875,
+          "aspect": 1.3242574257425743,
+          "sizeRank": 0.08333333333333333
+        },
+        {
+          "id": "rocks-02",
+          "u0": 0.00390625,
+          "v0": 0.00390625,
+          "u1": 0.259765625,
+          "v1": 0.22412109375,
+          "aspect": 1.1618625277161863,
+          "sizeRank": 0.16666666666666666
+        },
+        {
+          "id": "rocks-03",
+          "u0": 0.78857421875,
+          "v0": 0.00390625,
+          "u1": 0.9248046875,
+          "v1": 0.14892578125,
+          "aspect": 0.9393939393939394,
+          "sizeRank": 0.25
+        },
+        {
+          "id": "rocks-04",
+          "u0": 0.00390625,
+          "v0": 0.22802734375,
+          "u1": 0.12353515625,
+          "v1": 0.349609375,
+          "aspect": 0.9839357429718876,
+          "sizeRank": 0.3333333333333333
+        },
+        {
+          "id": "rocks-05",
+          "u0": 0.12744140625,
+          "v0": 0.22802734375,
+          "u1": 0.25927734375,
+          "v1": 0.3369140625,
+          "aspect": 1.210762331838565,
+          "sizeRank": 0.4166666666666667
+        },
+        {
+          "id": "rocks-06",
+          "u0": 0.26318359375,
+          "v0": 0.22802734375,
+          "u1": 0.35693359375,
+          "v1": 0.330078125,
+          "aspect": 0.9186602870813397,
+          "sizeRank": 0.5
+        },
+        {
+          "id": "rocks-07",
+          "u0": 0.44921875,
+          "v0": 0.22802734375,
+          "u1": 0.548828125,
+          "v1": 0.3134765625,
+          "aspect": 1.1657142857142857,
+          "sizeRank": 0.5833333333333334
+        },
+        {
+          "id": "rocks-08",
+          "u0": 0.36083984375,
+          "v0": 0.22802734375,
+          "u1": 0.4453125,
+          "v1": 0.31640625,
+          "aspect": 0.9558011049723757,
+          "sizeRank": 0.6666666666666666
+        },
+        {
+          "id": "rocks-09",
+          "u0": 0.64697265625,
+          "v0": 0.22802734375,
+          "u1": 0.7265625,
+          "v1": 0.30078125,
+          "aspect": 1.0939597315436242,
+          "sizeRank": 0.75
+        },
+        {
+          "id": "rocks-10",
+          "u0": 0.552734375,
+          "v0": 0.22802734375,
+          "u1": 0.64306640625,
+          "v1": 0.3125,
+          "aspect": 1.069364161849711,
+          "sizeRank": 0.8333333333333334
+        },
+        {
+          "id": "rocks-11",
+          "u0": 0.73046875,
+          "v0": 0.22802734375,
+          "u1": 0.79443359375,
+          "v1": 0.2958984375,
+          "aspect": 0.9424460431654677,
+          "sizeRank": 0.9166666666666666
+        },
+        {
+          "id": "rocks-12",
+          "u0": 0.79833984375,
+          "v0": 0.22802734375,
+          "u1": 0.8271484375,
+          "v1": 0.27197265625,
+          "aspect": 0.6555555555555556,
+          "sizeRank": 1
+        }
+      ]
+    },
+    "life": {
+      "texture": "atlas-life",
+      "frames": [
+        {
+          "id": "life-00",
+          "u0": 0.20263671875,
+          "v0": 0.00390625,
+          "u1": 0.7646484375,
+          "v1": 0.27001953125,
+          "aspect": 2.1119266055045873,
+          "sizeRank": 0
+        },
+        {
+          "id": "life-01",
+          "u0": 0.00390625,
+          "v0": 0.294921875,
+          "u1": 0.3974609375,
+          "v1": 0.53857421875,
+          "aspect": 1.6152304609218437,
+          "sizeRank": 0.125
+        },
+        {
+          "id": "life-02",
+          "u0": 0.00390625,
+          "v0": 0.00390625,
+          "u1": 0.19873046875,
+          "v1": 0.291015625,
+          "aspect": 0.6785714285714286,
+          "sizeRank": 0.25
+        },
+        {
+          "id": "life-03",
+          "u0": 0.4013671875,
+          "v0": 0.294921875,
+          "u1": 0.49560546875,
+          "v1": 0.4130859375,
+          "aspect": 0.7975206611570248,
+          "sizeRank": 0.375
+        },
+        {
+          "id": "life-04",
+          "u0": 0.49951171875,
+          "v0": 0.294921875,
+          "u1": 0.59130859375,
+          "v1": 0.36181640625,
+          "aspect": 1.3722627737226278,
+          "sizeRank": 0.5
+        },
+        {
+          "id": "life-05",
+          "u0": 0.7998046875,
+          "v0": 0.294921875,
+          "u1": 0.90283203125,
+          "v1": 0.34521484375,
+          "aspect": 2.0485436893203883,
+          "sizeRank": 0.625
+        },
+        {
+          "id": "life-06",
+          "u0": 0.69287109375,
+          "v0": 0.294921875,
+          "u1": 0.7958984375,
+          "v1": 0.34814453125,
+          "aspect": 1.9357798165137614,
+          "sizeRank": 0.75
+        },
+        {
+          "id": "life-07",
+          "u0": 0.59521484375,
+          "v0": 0.294921875,
+          "u1": 0.68896484375,
+          "v1": 0.353515625,
+          "aspect": 1.6,
+          "sizeRank": 0.875
+        },
+        {
+          "id": "life-08",
+          "u0": 0.90673828125,
+          "v0": 0.294921875,
+          "u1": 0.98828125,
+          "v1": 0.33544921875,
+          "aspect": 2.0120481927710845,
+          "sizeRank": 1
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "id": "oracle",
+  "version": 1762491666,
+  "sprites": {
+    "bolt": {
+      "url": "bolt.webp",
+      "sha256": "504b6404262a3e6f997ebc47043ff11dd9ee0b729a242b09bfcf298e55179168",
+      "width": 768,
+      "height": 331,
+      "anchor": [
+        0.9562,
+        0.5057
+      ]
+    },
+    "finisher": {
+      "url": "finisher.webp",
+      "sha256": "6c7f69b2a550ccf95f2a9a9bfe02d209a4c419867c54bd92ce408fbb37325238",
+      "width": 768,
+      "height": 385,
+      "anchor": [
+        0.9568,
+        0.5399
+      ]
+    },
+    "impact": {
+      "url": "impact.webp",
+      "sha256": "4524693d54c738ee9ee59d78cb006001d7e134ec822dae3f3cf5c22378c9b31b",
+      "width": 640,
+      "height": 637,
+      "anchor": [
+        0.4996,
+        0.5021
+      ]
+    },
+    "muzzle": {
+      "url": "muzzle.webp",
+      "sha256": "3d350df48dc626b2922f3cfa0bbde0699b8bdd3a0c90d8fa3640402492f8f376",
+      "width": 512,
+      "height": 279,
+      "anchor": [
+        0.0524,
+        0.4828
+      ]
+    }
+  }
+}

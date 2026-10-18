@@ -44,6 +44,9 @@ const NON_BLOCKING_PATTERNS = [
   /^No Recall replay available$/i,
   /^Item cannot be used right now$/i,
   /^Skill unavailable for the selected character$/i,
+  // Cloud sync state is a heads-up; progress is already safe on the device.
+  /^Cloud save\b/i,
+  /\bsaved on this device\b/i,
 ] as const;
 
 function byId<T extends HTMLElement = HTMLElement>(id: string): T | null {

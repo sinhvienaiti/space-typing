@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Defense Render Bench</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #02030a; }
+      canvas { display: block; width: 100vw; height: 100vh; }
+      #benchHud {
+        position: fixed; left: 12px; top: 10px; padding: 8px 12px;
+        color: #f3f6ff; font: 600 13px/1.45 ui-monospace, Consolas, monospace;
+        background: rgba(6, 8, 18, 0.72); border: 1px solid rgba(255, 170, 110, 0.35); white-space: pre;
+      }
+      .bench-label {
+        position: fixed; left: 0; top: 0; padding: 2px 8px; color: #fff;
+        font: 700 15px ui-monospace, Consolas, monospace; background: rgba(8, 6, 16, 0.78);
+        border: 1px solid rgba(255, 190, 120, 0.55); pointer-events: none; will-change: transform;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="benchCanvas"></canvas>
+    <div id="benchHud">loading…</div>
+    <script type="module" src="/src/bench/defense-bench.ts"></script>
+  </body>
+</html>

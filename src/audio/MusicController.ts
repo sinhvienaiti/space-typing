@@ -269,6 +269,8 @@ export class MusicController {
   private paused = false;
   private destroyed = false;
   private readonly duckReasons = new Set<MusicDuckReason>();
+  /** Voice boost depth for the "pronunciation" duck; null keeps the world profile's. */
+  private pronunciationDepth: number | null = null;
   private readonly warningTimers = new Map<string, number>();
   private readonly audioFactory: AudioFactory;
 
@@ -563,6 +565,12 @@ export class MusicController {
     if (next !== null) this.syncWithActive(next);
     this.fadeMusicTo(next, crossfadeSeconds, "state");
     this.notifyNowPlaying();
+  }
+
+  /** Music level while a word is spoken (Voice boost); null = the world profile's level. */
+  setPronunciationDepth(level: number | null): void {
+    this.pronunciationDepth = level === null ? null : clamp(level, 0.05, 1);
+    if (this.duckReasons.has("pronunciation")) this.applyVolumes();
   }
 
   duck(reason: MusicDuckReason): void {
@@ -1379,7 +1387,7 @@ export class MusicController {
     if (this.duckReasons.has("pronunciation")) {
       multiplier = Math.min(
         multiplier,
-        this.profile.duckingProfile.pronunciation,
+        this.pronunciationDepth ?? this.profile.duckingProfile.pronunciation,
       );
     }
     if (this.duckReasons.has("announcer")) {

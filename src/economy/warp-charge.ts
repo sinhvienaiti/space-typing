@@ -150,6 +150,19 @@ export function refuelWarp(
     w.activeProgressMs = w.reserveProgressMs = 0;
   return { warp: w, crystals: crystals - quote.price };
 }
+/** Free Warp from a gift (calendar, mission, supply window): Active first, then Reserve. */
+export function giftWarp(input: WarpCharge, now: number, amount: number): WarpCharge {
+  if (!integer(amount, 1, 400)) throw new Error("Invalid Warp gift");
+  const w = reconcileWarp(input, now);
+  if (400 - w.current - w.reserve < amount)
+    throw new Error("Warp tanks are full. Deploy first, then claim.");
+  const active = Math.min(100 - w.current, amount);
+  w.current += active;
+  w.reserve += amount - active;
+  if (w.current === 100) w.activeProgressMs = 0;
+  if (w.reserve === 300) w.reserveProgressMs = 0;
+  return w;
+}
 export function warpEtaMs(input: WarpCharge, now: number): number {
   const w = reconcileWarp(input, now);
   const available = w.current + (w.reserveConsent ? w.reserve : 0);

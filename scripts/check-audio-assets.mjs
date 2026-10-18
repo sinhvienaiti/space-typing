@@ -20,6 +20,15 @@ const AUDIO_FILES = [
   "public/assets/audio/sfx/kenney/thruster.ogg",
   "public/assets/audio/sfx/kenney/confirm.ogg",
   "public/assets/audio/sfx/kenney/error.ogg",
+  // Campaign 3D dragon (Freesound CC0 HQ previews, src/scene3d/sfx.ts DRAGON_SAMPLES).
+  ...["fire-burst", "fireball-explosion", "fire-explosion", "combust", "roar", "fire-breath", "fireball-swell"].map(
+    (name) => "public/assets/audio/dragon/" + name + ".mp3",
+  ),
+  // Menu sounds bundled by Vite (src/audio/Sfx.ts, ATTRIBUTION.md).
+  ...[
+    "hover", "click", "tab", "open", "close", "error", "confirm",
+    "reward-small", "reward-big", "reward-shimmer", "streak", "deploy", "deploy-thump",
+  ].map((name) => "src/assets/audio/ui/" + name + ".ogg"),
 ];
 
 function hasMp3Header(data) {

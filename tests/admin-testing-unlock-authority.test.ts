@@ -2,8 +2,13 @@ import { describe, expect, it } from "vitest";
 import { testingStageUnlockEnabled } from "../src/campaign/stage-selection-access";
 
 describe("published campaign access authority", () => {
-  it("ignores the local unlock-all switch when platform policy is published", () => {
-    expect(testingStageUnlockEnabled(true, "published")).toBe(false);
+  it("ignores local settings when the published Admin switch is off", () => {
+    expect(testingStageUnlockEnabled(true, "published", { unlockAllStages: false, unlockAllShips: true })).toBe(false);
+  });
+
+  it("honors the published Admin switch independently of player settings", () => {
+    expect(testingStageUnlockEnabled(false, "published", { unlockAllStages: true, unlockAllShips: true })).toBe(true);
+    expect(testingStageUnlockEnabled(true, "published", { unlockAllStages: true, unlockAllShips: true })).toBe(true);
   });
 
   it("preserves the legacy QA switch for bundled standalone development", () => {

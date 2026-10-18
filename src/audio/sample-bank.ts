@@ -46,6 +46,40 @@ export const SAMPLE_SFX = {
     gain: 0.34,
     poolSize: 3,
   },
+  // Crystal boss (Auriel): glass crunches instead of the pitched crystal
+  // chime (no high bells), a force-field cast and a heavier death chain.
+  // Gains offset each file's loudness (the Kenney files are peak-normalised,
+  // RMS −11 … −24 dBFS) so they sit with the explosion and laser samples.
+  "boss-crystal-hit": {
+    path: "/assets/audio/sfx/kenney/crystal-hit.ogg",
+    group: "combat",
+    gain: 0.5,
+    poolSize: 4,
+  },
+  "boss-crystal-break": {
+    path: "/assets/audio/sfx/kenney/crystal-break.ogg",
+    group: "combat",
+    gain: 0.6,
+    poolSize: 3,
+  },
+  "boss-cast": {
+    path: "/assets/audio/sfx/kenney/force-field-cast.ogg",
+    group: "combat",
+    gain: 0.24,
+    poolSize: 3,
+  },
+  "boss-death-chain": {
+    path: "/assets/audio/sfx/kenney/explosion-crunch-chain.ogg",
+    group: "combat",
+    gain: 0.36,
+    poolSize: 4,
+  },
+  "boss-death-final": {
+    path: "/assets/audio/sfx/kenney/explosion-crunch-big.ogg",
+    group: "combat",
+    gain: 0.44,
+    poolSize: 1,
+  },
   confirm: {
     path: "/assets/audio/sfx/kenney/confirm.ogg",
     group: "ui",

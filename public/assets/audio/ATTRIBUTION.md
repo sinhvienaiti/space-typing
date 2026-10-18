@@ -71,6 +71,56 @@ and include laser, force-field, explosion, engine, thruster, confirmation and wa
 
 The original source pack contains normalized sci-fi engine, explosion and laser OGG files and is published as CC0. Attribution is not required by the license, but is retained here for provenance.
 
+## Menu / UI SFX — Kenney Interface Sounds and Sci-Fi Sounds (CC0)
+
+Creator: Kenney / kenney.nl
+
+Original sources (downloaded 2026-10-16):
+- https://kenney.nl/assets/interface-sounds (Interface Sounds 1.0, 100 files)
+- https://kenney.nl/assets/sci-fi-sounds (Sci-Fi Sounds, 73 files)
+
+License: **CC0** (https://creativecommons.org/publicdomain/zero/1.0/)
+
+Curated, renamed copies live in `src/assets/audio/ui/` (bundled by Vite, played by `src/audio/Sfx.ts` through Web Audio):
+
+| File | Source file |
+|---|---|
+| `hover.ogg` | Interface `select_001.ogg` |
+| `click.ogg` | Interface `click_002.ogg` |
+| `tab.ogg` | Interface `switch_002.ogg` |
+| `open.ogg` | Interface `maximize_006.ogg` |
+| `close.ogg` | Interface `minimize_006.ogg` |
+| `error.ogg` | Interface `error_004.ogg` |
+| `confirm.ogg` | Interface `confirmation_001.ogg` |
+| `reward-small.ogg` | Interface `confirmation_003.ogg` |
+| `reward-big.ogg` | Interface `confirmation_004.ogg` |
+| `reward-shimmer.ogg` | Interface `glass_004.ogg` |
+| `streak.ogg` | Sci-Fi `forceField_001.ogg` |
+| `deploy.ogg` | Sci-Fi `forceField_000.ogg` |
+| `deploy-thump.ogg` | Sci-Fi `lowFrequency_explosion_001.ogg` |
+
+All files are normalised near 0 dBFS by the source; each cue's level is set in `Sfx.ts` (comment above `uiHover`).
+
+## Boss SFX — Kenney Impact Sounds and Sci-Fi Sounds (CC0)
+
+Creator: Kenney / kenney.nl
+
+Original sources (downloaded 2026-10-16):
+- https://kenney.nl/assets/impact-sounds (Impact Sounds)
+- https://kenney.nl/assets/sci-fi-sounds (Sci-Fi Sounds)
+
+License: **CC0** (https://creativecommons.org/publicdomain/zero/1.0/)
+
+Curated, renamed copies in `sfx/kenney/`, registered in `src/audio/sample-bank.ts` (levels set there):
+
+| File | Source file | Use |
+|---|---|---|
+| `crystal-hit.ogg` | Impact `impactGlass_heavy_000.ogg` | bolt hits on a crystal boss |
+| `crystal-break.ogg` | Impact `impactGlass_heavy_004.ogg` | heavy blows, death chain |
+| `force-field-cast.ogg` | Sci-Fi `forceField_002.ogg` | boss volley / lance cast |
+| `explosion-crunch-chain.ogg` | Sci-Fi `explosionCrunch_002.ogg` | boss death chain blasts |
+| `explosion-crunch-big.ogg` | Sci-Fi `explosionCrunch_004.ogg` | boss final blast |
+
 ## Import integrity
 
 The repository intentionally commits only a curated subset needed by the runtime. It does not vendor entire upstream packs.
@@ -99,3 +149,17 @@ Audio files are content-preserving imports of the referenced CC0 assets. Applica
 | `laser-impact.ogg` | Laser Impact (#440668) | SeanSecret | https://freesound.org/people/SeanSecret/sounds/440668/ |
 | `shield.ogg` | shield guard (#370203) | nekoninja | https://freesound.org/people/nekoninja/sounds/370203/ |
 | `impact-design.ogg` | Sound Design Elements Impact SFX PS 086 (#812752) | AudioPapkin | https://freesound.org/people/AudioPapkin/sounds/812752/ |
+
+## Campaign 3D dragon SFX — Freesound (CC0)
+
+`public/assets/audio/dragon/*.mp3` (2026-10-18), the fire dragon Draconis in Campaign 3D (`src/scene3d/sfx.ts` DRAGON_SAMPLES). Every source is **CC0 (public domain)** on freesound.org; the license was read on each sound's own page, and no other license appears there. They replace a synthesized set the owner found weak ("xoẹt xoẹt", gun-like blasts). Files are the untouched 128 kbps HQ MP3 previews; the game plays a trimmed stretch of each with short fades, over a synthesized sub-bass, through a soft saturation and a compressor.
+
+| File | Freesound sound | Author | Link |
+| --- | --- | --- | --- |
+| `fire-burst.mp3` | Fire Burst Flash (#539972) | Za-Games | https://freesound.org/people/Za-Games/sounds/539972/ |
+| `fireball-explosion.mp3` | Fireball Explosion.wav (#431174) | Blankened | https://freesound.org/people/Blankened/sounds/431174/ |
+| `fire-explosion.mp3` | Fire Explosion (#855898) | qubodup | https://freesound.org/people/qubodup/sounds/855898/ |
+| `combust.mp3` | Combust.wav (#412558) | GrimGrum | https://freesound.org/people/GrimGrum/sounds/412558/ |
+| `roar.mp3` | Dragon roar 1.wav (#651817) | AMWD_Mortsel-Edegem-Kontich | https://freesound.org/people/AMWD_Mortsel-Edegem-Kontich/sounds/651817/ |
+| `fire-breath.mp3` | Fire Breath.wav (#157616) | bspiller5 | https://freesound.org/people/bspiller5/sounds/157616/ |
+| `fireball-swell.mp3` | JM_FX_Fireball 02.wav (#346917) | Julien_Matthey | https://freesound.org/people/Julien_Matthey/sounds/346917/ |

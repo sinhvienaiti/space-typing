@@ -1,4 +1,5 @@
 import type { EnemyFamilyId } from "../enemies/families";
+import { familyStyle, type FamilyStyle } from "../enemies/identity";
 import type { BossAuraStyle } from "../vfx/combat-fx";
 import { galaxyForStage } from "../campaign/stage";
 import { worldForStage } from "../worlds/registry";
@@ -44,13 +45,19 @@ export type BossIdentity = {
   patterns: readonly BossPattern[];
   /** Pitch of its roar and hit sounds (1 = neutral). */
   voice: number;
+  /**
+   * What it is made of when that differs from its family: Auriel is a
+   * radiant crystal seraph, so prism hits, shards and crystal sounds rather
+   * than the rainbow family's bubbles.
+   */
+  style?: Partial<Pick<FamilyStyle, "material" | "death" | "shot">>;
 };
 
 type IdentitySpec = Omit<BossIdentity, "role" | "rank">;
 
 /** One per Galaxy, in order G01 … G10. */
 const GALAXY_TYRANTS: readonly IdentitySpec[] = [
-  { id: "tyrant-g01", name: "Auriel", title: "the Rainbow Sovereign", family: "rainbow", primary: "#ff8ad8", accent: "#8ff4ff", aura: "rays", patterns: ["fan", "ring", "stream"], voice: 1.2 },
+  { id: "tyrant-g01", name: "Auriel", title: "the Rainbow Sovereign", family: "rainbow", primary: "#ff8ad8", accent: "#8ff4ff", aura: "rays", patterns: ["fan", "ring", "stream"], voice: 1.2, style: { material: "crystal", death: "prisms", shot: "prism" } },
   { id: "tyrant-g02", name: "Vorgrath", title: "Crown of Cinders", family: "devil", primary: "#ff4a1f", accent: "#ffb03a", aura: "embers", patterns: ["twin", "rain", "fan"], voice: 0.72 },
   { id: "tyrant-g03", name: "Nivalis", title: "Voice of the Frozen Choir", family: "frost", primary: "#7fe3ff", accent: "#e6fbff", aura: "snow", patterns: ["ring", "stream", "fan"], voice: 1.1 },
   { id: "tyrant-g04", name: "Sylvarch", title: "Heart of the Ancient Grove", family: "nature", primary: "#6fdc5a", accent: "#ffc1e0", aura: "petals", patterns: ["rain", "twin", "ring"], voice: 0.86 },
@@ -105,6 +112,12 @@ export function bossIdentityForStage(stage: number, role: BossRole): BossIdentit
   if (role === "major-boss") return galaxyTyrant(galaxyForStage(stage));
   const family = worldForStage(stage).enemyFamilies[0] ?? "rainbow";
   return withRole(role === "boss" ? WARDENS[family] : LIEUTENANTS[family], role);
+}
+
+/** The family's look with the boss's own material, death and shot (if any). */
+export function bossFamilyStyle(identity: BossIdentity): FamilyStyle {
+  const base = familyStyle(identity.family);
+  return identity.style === undefined ? base : { ...base, ...identity.style };
 }
 
 /** "Vorgrath, Crown of Cinders" (HUD and title card). */

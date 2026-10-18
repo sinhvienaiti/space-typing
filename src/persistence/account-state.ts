@@ -26,6 +26,7 @@ export type Sortie = {
   reviveSequence: number;
 };
 export type AccountReceipt = {
+  stage?: number;
   id: string;
   fingerprint: string;
   kind: string;
@@ -111,6 +112,7 @@ export function isValidAccountState(v: unknown): v is AccountState {
         text(r.id) &&
         text(r.fingerprint, 10_000) &&
         text(r.kind) &&
+        (r.stage === undefined || (Number.isInteger(r.stage) && r.stage >= 1 && r.stage <= 1000)) &&
         count(r.revision) &&
         r.revision <= a.revision,
     ) ||

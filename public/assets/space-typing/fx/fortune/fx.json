@@ -1,0 +1,46 @@
+{
+  "id": "fortune",
+  "version": 3915294622,
+  "sprites": {
+    "bolt": {
+      "url": "bolt.webp",
+      "sha256": "c3d6424fb14c0dba25f221138cb669f951589cd78f08c1f26585b6bbe38de7a0",
+      "width": 768,
+      "height": 268,
+      "anchor": [
+        0.969,
+        0.4956
+      ]
+    },
+    "finisher": {
+      "url": "finisher.webp",
+      "sha256": "4cf63b70e45b2166c6270ce3e1738b45fabb42258156d031345fae3d4f4d846b",
+      "width": 768,
+      "height": 384,
+      "anchor": [
+        0.9887,
+        0.477
+      ]
+    },
+    "impact": {
+      "url": "impact.webp",
+      "sha256": "027ed4bc2c434113718a1fcbd8951e48e79ab80467e8da898a920db9ff83e2e3",
+      "width": 640,
+      "height": 635,
+      "anchor": [
+        0.5026,
+        0.4884
+      ]
+    },
+    "muzzle": {
+      "url": "muzzle.webp",
+      "sha256": "fd8d056dcf53b4162a998d70b9b6e3a95b6da59a6395431d07b8bce1a62ceac3",
+      "width": 512,
+      "height": 248,
+      "anchor": [
+        0.0497,
+        0.4894
+      ]
+    }
+  }
+}

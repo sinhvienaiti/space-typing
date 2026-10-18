@@ -89,8 +89,9 @@ function load(url: string): Loaded | null {
     image.decoding = "async";
     entry = { image, ready: false, failed: false };
     const loaded = entry;
-    image.onload = () => {
-      loaded.ready = true;
+    image.onload = async () => {
+      try { await image.decode?.(); loaded.ready = true; }
+      catch { loaded.failed = true; }
     };
     image.onerror = () => {
       loaded.failed = true;
@@ -142,10 +143,22 @@ export function paintedEnemySprite(
   );
 }
 
+/** URL of the sharpest enemy painting (Campaign 3D billboards), or undefined. */
+export function paintedEnemyArtUrl(family: EnemyFamilyId, kind: EnemyKind): string | undefined {
+  const variants = ENEMY_URLS.get(family + "-" + kind) ?? ENEMY_URLS.get(kind);
+  return variants?.detailed ?? variants?.standard;
+}
+
 /** URL of the sharpest boss painting (for the 3D relief, src/boss/boss-relief.ts). */
 export function paintedBossArtUrl(id: string): string | undefined {
   const variants = BOSS_URLS.get(id);
   return variants?.detailed ?? variants?.standard;
+}
+
+/** The lighter standard painting, for menu thumbnails. */
+export function paintedBossThumbUrl(id: string): string | undefined {
+  const variants = BOSS_URLS.get(id);
+  return variants?.standard ?? variants?.detailed;
 }
 
 export function paintedBossSprite(

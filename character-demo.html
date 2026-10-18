@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#03040b" />
+    <meta name="referrer" content="strict-origin" />
+    <title>Space Type Character Demo</title>
+  </head>
+  <body>
+    <canvas id="demoCanvas" aria-label="Nhân vật có cánh bay trong không gian"></canvas>
+    <div id="demoFlash" class="cd-flash" aria-hidden="true"></div>
+    <div id="demoLabels" class="cd-labels" aria-hidden="true"></div>
+
+    <header class="cd-panel cd-intro">
+      <p class="cd-eyebrow">Space Type · Character demo</p>
+      <h1>Auriel <span>nhân vật có cánh (bản thử)</span></h1>
+      <p class="cd-note">
+        Mô hình tạm mượn khung xương boss G01 để thử bay, cánh, đòn đánh và VFX trên web.
+        Nhân vật rồng thật sẽ tạo bằng Meshy/Tripo rồi chỉnh trong Blender theo cùng quy trình.
+      </p>
+      <p id="demoStatus" class="cd-status" role="status" aria-live="polite">Đang tải mô hình…</p>
+    </header>
+
+    <aside class="cd-panel cd-side">
+      <dl class="cd-stats">
+        <div><dt>FPS</dt><dd id="statFps">–</dd></div>
+        <div><dt>Draw</dt><dd id="statCalls">–</dd></div>
+        <div><dt>Tam giác</dt><dd id="statTris">–</dd></div>
+        <div><dt>Model</dt><dd id="statModel">–</dd></div>
+      </dl>
+      <div class="cd-group" role="group" aria-label="Chất lượng">
+        <span>Chất lượng</span>
+        <button type="button" data-quality="medium">Medium</button>
+        <button type="button" data-quality="high">High</button>
+      </div>
+      <div class="cd-group" role="group" aria-label="Góc máy">
+        <span>Góc máy <kbd>Tab</kbd></span>
+        <button type="button" data-camera="play">Góc chơi</button>
+        <button type="button" data-camera="show">Trưng bày</button>
+        <button type="button" data-camera="side">Bên hông</button>
+        <button type="button" data-camera="orbit">Xoay quanh</button>
+      </div>
+      <div class="cd-group" role="group" aria-label="Âm thanh">
+        <span>Âm thanh</span>
+        <button type="button" id="soundToggle" aria-pressed="true">Bật</button>
+      </div>
+    </aside>
+
+    <div class="cd-score" aria-live="polite"><span id="demoKills">0</span> mục tiêu đã hạ</div>
+
+    <footer class="cd-dock">
+      <p class="cd-hint">
+        Gõ chữ trên các tinh thể để bắn · <kbd>←</kbd> <kbd>→</kbd> hoặc rê chuột để lượn ·
+        giữ <kbd>Shift</kbd> để tăng tốc · <kbd>Enter</kbd> tung chiêu
+      </p>
+      <nav class="cd-actions" aria-label="Hành động">
+        <button type="button" data-action="idle"><kbd>1</kbd>Bay lượn<small>Idle · Hover</small></button>
+        <button type="button" data-action="fly"><kbd>2</kbd>Bay<small>Fly</small></button>
+        <button type="button" data-action="boost"><kbd>3</kbd>Tăng tốc<small>Boost</small></button>
+        <button type="button" data-action="attack"><kbd>4</kbd>Tấn công<small>Attack</small></button>
+        <button type="button" data-action="cast"><kbd>5</kbd>Tung chiêu<small>Skill cast</small></button>
+        <button type="button" data-action="burst"><kbd>6</kbd>Bùng nổ<small>Prismatic burst</small></button>
+        <button type="button" data-action="hit"><kbd>7</kbd>Trúng đòn<small>Hit reaction</small></button>
+        <button type="button" data-action="victory"><kbd>8</kbd>Chiến thắng<small>Victory</small></button>
+        <button type="button" data-action="death"><kbd>9</kbd>Gục ngã<small>Death</small></button>
+        <button type="button" data-action="auto" class="cd-auto"><kbd>0</kbd>Tự trình diễn<small>Auto</small></button>
+      </nav>
+    </footer>
+    <script type="module" src="/src/demo/character-demo.ts"></script>
+  </body>
+</html>

@@ -134,6 +134,10 @@ export function validateAccountAuxiliary(value: unknown): void {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new CorruptAccountStateError();
   const aux = value as PlayerSave["auxiliary"];
+  if (aux?.walletPurchases !== undefined &&
+      (!Array.isArray(aux.walletPurchases) || aux.walletPurchases.length > 100 ||
+       aux.walletPurchases.some((id) => typeof id !== "string" || !/^[A-Za-z0-9:._-]{6,120}$/.test(id))))
+    throw new CorruptAccountStateError();
   if (aux?.expansionV2 !== undefined) {
     const profile = aux.expansionV2 as { version?: unknown };
     if (typeof profile?.version === "number" && profile.version > 1)
@@ -146,6 +150,31 @@ export function validateAccountAuxiliary(value: unknown): void {
     )
       throw new CorruptAccountStateError();
   }
+  if (
+    aux?.liveOps !== undefined &&
+    (!aux.liveOps ||
+      typeof aux.liveOps !== "object" ||
+      Array.isArray(aux.liveOps))
+  )
+    throw new CorruptAccountStateError();
+  if (
+    aux?.lessons !== undefined &&
+    (!aux.lessons ||
+      typeof aux.lessons !== "object" ||
+      Array.isArray(aux.lessons))
+  )
+    throw new CorruptAccountStateError();
+  if (aux?.walletLessonRewards !== undefined &&
+    (!Array.isArray(aux.walletLessonRewards) || aux.walletLessonRewards.length > 180 || aux.walletLessonRewards.some(reward =>
+      !reward || !Number.isSafeInteger(reward.day) || reward.day < 0 || !["three", "five"].includes(reward.tier))))
+    throw new CorruptAccountStateError();
+  if (
+    aux?.cosmetics !== undefined &&
+    (!aux.cosmetics ||
+      typeof aux.cosmetics !== "object" ||
+      Array.isArray(aux.cosmetics))
+  )
+    throw new CorruptAccountStateError();
   if (
     aux?.difficulty !== undefined &&
     (!aux.difficulty ||
@@ -604,7 +633,7 @@ export type PlayerSaveV26 = {
 
 export type PlayerSaveV27 = Omit<PlayerSaveV26, "version"> & { version: 27 };
 
-export type PlayerSave = Omit<PlayerSaveV27, "version"> & { version: 28; account: AccountState; auxiliary?: { expansionV2?: unknown; difficulty?: unknown } };
+export type PlayerSave = Omit<PlayerSaveV27, "version"> & { version: 28; account: AccountState; auxiliary?: { expansionV2?: unknown; difficulty?: unknown; liveOps?: unknown; cosmetics?: unknown; lessons?: unknown; walletPurchases?: string[]; walletLessonRewards?: { day: number; tier: "three" | "five" }[] } };
 export type PersistenceSource = "indexeddb" | "localStorage";
 
 export type LoadedPlayerSave = {

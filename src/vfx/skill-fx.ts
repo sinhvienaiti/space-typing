@@ -1,4 +1,8 @@
 import type { VisualQuality } from "../types";
+import { drawModelSheet, modelSheet, type SheetLook } from "../render3d/model-sheet";
+
+/** Modelled micro-missile (models/skills/micro-missile): rolls about its axis in flight. */
+const MISSILE_LOOK: SheetLook = { primary: "#ff9a4a", accent: "#ffe0a0", frames: 12, tilt: 0.2, roll: true };
 
 /**
  * Skill VFX: the big, readable signatures of ship systems (EMP shockwaves,
@@ -304,7 +308,12 @@ type Smoke = { x: number; y: number; vx: number; vy: number; life: number; max: 
 type Flash = { color: string; alpha: number; t: number; duration: number };
 
 const MAX_EFFECTS = 96;
-const MAX_SMOKE = 260;
+/**
+ * Smoke puffs per tier and the path share between two puffs: dense enough
+ * that neighbours overlap into one trail (sparser puffs read as beads).
+ */
+const MAX_SMOKE: Readonly<Record<VisualQuality, number>> = { low: 120, medium: 260, high: 440, ultra: 560 };
+const SMOKE_STEP: Readonly<Record<VisualQuality, number>> = { low: 0.05, medium: 0.03, high: 0.02, ultra: 0.016 };
 
 export type PersistentFxState = {
   /** Ship centre and the playfield size. */
@@ -495,35 +504,44 @@ export class SkillFxSystem {
   private missileSmoke(missile: Missile): void {
     if (missile.t <= 0 || missile.t > missile.flight) return;
     const p = missile.t / missile.flight;
-    while (missile.smokeCursor < p && this.smoke.length < MAX_SMOKE) {
+    const step = SMOKE_STEP[this.quality];
+    const cap = MAX_SMOKE[this.quality];
+    while (missile.smokeCursor < p && this.smoke.length < cap) {
       const q = missile.smokeCursor;
-      const point = quadratic(missile.from, missile.control, missile.to, q);
+      // The drawn missile follows the eased path; the smoke must start behind it.
+      const eased = q * q * (3 - 2 * q);
+      const point = quadratic(missile.from, missile.control, missile.to, eased);
       this.smoke.push({
         x: point.x,
         y: point.y,
-        vx: (hash(q * 91 + missile.from.x) - 0.5) * 34,
-        vy: 10 + hash(q * 37) * 22,
-        life: 0.75,
-        max: 0.75,
-        size: 5 + hash(q * 13) * 4,
+        vx: (hash(q * 91 + missile.from.x) - 0.5) * 26,
+        vy: 8 + hash(q * 37) * 16,
+        life: 0.95,
+        max: 0.95,
+        size: 6.5 + hash(q * 13) * 4,
       });
-      missile.smokeCursor += 0.035;
+      missile.smokeCursor += step;
     }
   }
 
   // --- Drawing ---------------------------------------------------------------
 
   /** Transient effects (over enemies). */
+  private quality: VisualQuality = "medium";
+
   draw(context: CanvasRenderingContext2D, quality: VisualQuality, height: number): void {
+    this.quality = quality;
     const detail = fxDetailTier(quality);
     context.save();
     // Missile smoke: soft source-over puffs so it reads as smoke, not light.
     const puffSprite = smokeSprite();
     if (puffSprite !== null) {
+      // Denser puffs overlap, so each is fainter; they swell and thin out with age.
+      const density = SMOKE_STEP.medium / SMOKE_STEP[quality];
       for (const puff of this.smoke) {
         const k = 1 - puff.life / puff.max;
-        const size = puff.size * (1.2 + k * 2.2);
-        context.globalAlpha = (1 - k) * 0.5;
+        const size = puff.size * (1.1 + k * 2.6);
+        context.globalAlpha = (1 - k) * (1 - k * 0.4) * 0.5 / Math.sqrt(density);
         context.drawImage(puffSprite, puff.x - size, puff.y - size, size * 2, size * 2);
       }
     }
@@ -790,6 +808,17 @@ export class SkillFxSystem {
       strokePath(context, trail.slice(-6), "#ffffff", 1.6, 0.9);
       ellipseGlow(context, effect.color, point.x, point.y, 26, 9, angle, 0.95);
       ellipseGlow(context, "#ffe0a0", point.x - Math.cos(angle) * 12, point.y - Math.sin(angle) * 12, 18, 6, angle, 0.8);
+      const body = modelSheet("skills", ["micro-missile"], this.quality, MISSILE_LOOK);
+      if (body !== null) {
+        // The modelled missile over its flame; the white core moves to the exhaust.
+        context.save();
+        context.translate(point.x, point.y);
+        context.rotate(angle + Math.PI / 2);
+        drawModelSheet(context, body, effect.t * 2, 26, 0);
+        context.restore();
+        glow(context, "#ffffff", point.x - Math.cos(angle) * 10, point.y - Math.sin(angle) * 10, 6, 1);
+        return;
+      }
       glow(context, "#ffffff", point.x, point.y, 8, 1);
       return;
     }

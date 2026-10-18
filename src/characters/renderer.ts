@@ -15,6 +15,38 @@ import {
   shipLightRig,
   type ShipLightRig,
 } from "./ship-lights";
+import { drawShip3D, type ShipSocketPoints } from "../render3d/ship-model";
+
+/** Light rig for a modelled hull: the painted rig's look on the model's sockets. */
+function modelLightRig(
+  characterId: CharacterId,
+  profile: Readonly<CharacterVisualProfile>,
+  sockets: ShipSocketPoints,
+): ShipLightRig {
+  const painted = shipLightRig(characterId);
+  const base: ShipLightRig = painted ?? {
+    nozzles: [],
+    plumeWidth: 4,
+    plumeLength: 26,
+    core: [0, -10],
+    coreRadius: 11,
+    glint: [0, -20],
+    tips: [],
+    hot: "#effcff",
+    plume: profile.engine,
+    outer: profile.secondary,
+    halo: profile.glow,
+    light: "#ffffff",
+  };
+  const core = sockets.core ?? base.core;
+  return {
+    ...base,
+    nozzles: sockets.nozzles.length > 0 ? sockets.nozzles : base.nozzles,
+    core,
+    glint: [core[0], core[1] - base.coreRadius],
+    tips: sockets.tips.length > 0 ? sockets.tips : base.tips,
+  };
+}
 
 export type CharacterDrawOptions = {
   x: number;
@@ -31,7 +63,74 @@ export type CharacterDrawOptions = {
   recoil?: number;
   /** 0–1 engine throttle: longer, brighter plumes. */
   boost?: number;
+  /** Style Shop ship paint: a CSS filter baked once into a copy of the painted hull. */
+  paint?: string | null;
+  /** Style Shop engine trail colours (#rrggbb) for the drawn engines and tail. */
+  trail?: { hot: string; plume: string } | null;
 };
+
+const PAINT_CACHE_LIMIT = 24;
+const paintedHulls = new Map<string, HTMLCanvasElement>();
+
+/**
+ * The painted hull region recoloured by `filter`, made once and reused: the
+ * filter never runs per frame. Null when the browser has no canvas filter.
+ */
+function paintedHull(image: HTMLImageElement, sx: number, sy: number, sw: number, sh: number, filter: string): HTMLCanvasElement | null {
+  const key = image.src + "|" + sx + "," + sy + "," + sw + "," + sh + "|" + filter;
+  const cached = paintedHulls.get(key);
+  if (cached !== undefined) return cached;
+  if (!image.complete || image.naturalWidth === 0 || typeof document === "undefined") return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(sw));
+  canvas.height = Math.max(1, Math.round(sh));
+  const context = canvas.getContext("2d");
+  if (context === null || !("filter" in context)) return null;
+  context.filter = filter;
+  context.drawImage(image, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  if (paintedHulls.size >= PAINT_CACHE_LIMIT) paintedHulls.delete(paintedHulls.keys().next().value!);
+  paintedHulls.set(key, canvas);
+  return canvas;
+}
+
+const trailRigs = new WeakMap<Readonly<ShipLightRig>, Map<string, Readonly<ShipLightRig>>>();
+
+/** A light rig with its plume colours swapped for a Style Shop trail (cached). */
+export function withTrailRig(rig: Readonly<ShipLightRig>, trail: { hot: string; plume: string } | null | undefined): Readonly<ShipLightRig> {
+  if (!trail) return rig;
+  let byTrail = trailRigs.get(rig);
+  if (byTrail === undefined) {
+    byTrail = new Map();
+    trailRigs.set(rig, byTrail);
+  }
+  const key = trail.hot + trail.plume;
+  let next = byTrail.get(key);
+  if (next === undefined) {
+    next = Object.freeze({ ...rig, hot: trail.hot, plume: trail.plume, outer: trail.plume });
+    byTrail.set(key, next);
+  }
+  return next;
+}
+
+const trailProfiles = new WeakMap<Readonly<CharacterVisualProfile>, Map<string, Readonly<CharacterVisualProfile>>>();
+
+/** The visual profile with the engine colours swapped for a Style Shop trail (cached). */
+function withTrail(profile: Readonly<CharacterVisualProfile>, trail: { hot: string; plume: string } | null | undefined): Readonly<CharacterVisualProfile> {
+  if (!trail) return profile;
+  let byTrail = trailProfiles.get(profile);
+  if (byTrail === undefined) {
+    byTrail = new Map();
+    trailProfiles.set(profile, byTrail);
+  }
+  const key = trail.hot + trail.plume;
+  let next = byTrail.get(key);
+  if (next === undefined) {
+    // Only `engine` changes: it feeds the drawn engines, the tail and the model's engine lights, never the hull.
+    next = Object.freeze({ ...profile, engine: trail.plume });
+    byTrail.set(key, next);
+  }
+  return next;
+}
 
 /** Hull kick-back at full recoil, px along the ship's axis. */
 export const SHIP_RECOIL_PX = 2.4;
@@ -232,9 +331,11 @@ function drawIllustratedShip(
   profile: Readonly<CharacterVisualProfile>,
   glowScale: number,
   bloom = true,
+  paint: string | null = null,
 ): void {
   const size = ILLUSTRATED_SHIP_SIZE;
   const [sourceX, sourceY, cellWidth, cellHeight] = shipCell(image, characterId);
+  const painted = paint === null ? null : paintedHull(image, sourceX, sourceY, cellWidth, cellHeight, paint);
   if (bloom) {
     context.save();
     context.globalCompositeOperation = "lighter";
@@ -251,7 +352,8 @@ function drawIllustratedShip(
   context.save();
   context.shadowBlur = (characterShipSource === "v3" ? 0 : 9 * glowScale);
   context.shadowColor = profile.glow;
-  context.drawImage(
+  if (painted !== null) context.drawImage(painted, -size / 2, -size / 2, size, size);
+  else context.drawImage(
     image,
     sourceX,
     sourceY,
@@ -270,6 +372,7 @@ function drawAssignedShipImage(
   image: HTMLImageElement,
   profile: Readonly<CharacterVisualProfile>,
   glowScale: number,
+  paint: string | null = null,
 ): void {
   const maxSize = ILLUSTRATED_SHIP_SIZE;
   const aspect = image.naturalWidth / image.naturalHeight;
@@ -290,7 +393,8 @@ function drawAssignedShipImage(
   context.save();
   context.shadowBlur = 7 * glowScale;
   context.shadowColor = profile.glow;
-  context.drawImage(image, -width / 2, -height / 2, width, height);
+  const painted = paint === null ? null : paintedHull(image, 0, 0, image.naturalWidth, image.naturalHeight, paint);
+  context.drawImage(painted ?? image, -width / 2, -height / 2, width, height);
   context.restore();
 }
 
@@ -483,7 +587,9 @@ export function drawCharacterShip(
   characterId: CharacterId,
   options: CharacterDrawOptions,
 ): void {
-  const profile = characterVisualProfile(characterId);
+  const hullProfile = characterVisualProfile(characterId);
+  const profile = withTrail(hullProfile, options.trail);
+  const paint = options.paint ?? null;
   const scale = options.scale ?? 1;
   const glowScale = options.glowScale ?? 1;
   const alpha = options.alpha ?? 1;
@@ -510,7 +616,27 @@ export function drawCharacterShip(
     );
   }
 
+  // Modelled hull (models/ships/<id> prepared): real 3D with the light rig on its sockets.
+  // An exact image from Admin (published, or the candidate under preview) wins over it.
   const assigned = characterShipRuntimeImage(characterId);
+  const modelled = assigned !== null ? null : drawShip3D(context, characterId, {
+    size: ILLUSTRATED_SHIP_SIZE,
+    banking: flightPose.banking,
+    time: options.time,
+    boost: options.boost ?? 0,
+    recoil: options.recoil ?? 0,
+  });
+  if (modelled !== null) {
+    drawShipLights(context, withTrailRig(modelLightRig(characterId, profile, modelled), options.trail), {
+      time: options.time,
+      boost: options.boost ?? 0,
+      recoil: options.recoil ?? 0,
+      detail: detailScale,
+    });
+    context.restore();
+    return;
+  }
+
   if (assigned !== null) {
     drawFlightTail(context, profile, options.time, glowScale, 0.92);
     for (const [index, x] of engineOffsets(profile.engineCount).entries()) {
@@ -523,7 +649,7 @@ export function drawCharacterShip(
         flightPose.thrust,
       );
     }
-    drawAssignedShipImage(context, assigned, profile, glowScale);
+    drawAssignedShipImage(context, assigned, hullProfile, glowScale, paint);
     context.restore();
     return;
   }
@@ -545,8 +671,8 @@ export function drawCharacterShip(
       ILLUSTRATED_SHIP_SIZE,
       lights,
     );
-    drawIllustratedShip(context, illustrated, characterId, profile, glowScale, false);
-    drawShipLights(context, rig, lights);
+    drawIllustratedShip(context, illustrated, characterId, hullProfile, glowScale, false, paint);
+    drawShipLights(context, withTrailRig(rig, options.trail), lights);
     context.restore();
     return;
   }

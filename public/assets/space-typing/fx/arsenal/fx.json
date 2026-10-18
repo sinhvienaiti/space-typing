@@ -1,0 +1,46 @@
+{
+  "id": "arsenal",
+  "version": 3495723970,
+  "sprites": {
+    "bolt": {
+      "url": "bolt.webp",
+      "sha256": "0c28da4ecdb0ee082e10d9a26e972b9f1e2284cab86c45246072efec95d9b435",
+      "width": 768,
+      "height": 205,
+      "anchor": [
+        0.9688,
+        0.4332
+      ]
+    },
+    "finisher": {
+      "url": "finisher.webp",
+      "sha256": "fe63559c8a6b0b52c439191c5f845b181d9c51c57b69d222c4cc3b039bc5c00c",
+      "width": 768,
+      "height": 385,
+      "anchor": [
+        0.9565,
+        0.3965
+      ]
+    },
+    "impact": {
+      "url": "impact.webp",
+      "sha256": "7c444e82c76c97e6dcac3d5506ef6be696a3e42f4df884a064188ee06de1a0a7",
+      "width": 640,
+      "height": 616,
+      "anchor": [
+        0.509,
+        0.5041
+      ]
+    },
+    "muzzle": {
+      "url": "muzzle.webp",
+      "sha256": "ca147272b8fef4b08a60b7bc77bc2f787041adffba1e60678e139f38a21ad50c",
+      "width": 512,
+      "height": 233,
+      "anchor": [
+        0.0296,
+        0.4517
+      ]
+    }
+  }
+}

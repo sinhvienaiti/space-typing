@@ -53,3 +53,24 @@
     transition: none;
   }
 }
+
+/* The help mark floats in the corner and shows on hover/focus, so it never
+   takes a grid row of its own (it used to push every HUD value down). */
+[data-holo-help="resource"] > .holo-help-mark {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  font-size: 9px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+[data-holo-help="resource"]:hover > .holo-help-mark,
+[data-holo-help="resource"]:focus-visible > .holo-help-mark {
+  opacity: 0.9;
+}
+@media (hover: none) {
+  [data-holo-help="resource"] > .holo-help-mark { opacity: 0.45; }
+}

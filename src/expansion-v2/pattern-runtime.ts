@@ -2,7 +2,7 @@ import { typingText } from "../logic";
 import type { VocabularyEntry } from "../types";
 import type { TypingPatternId } from "./contracts";
 
-export const LONG_WORD_MIN_DIVERSITY = 6;
+export const LONG_WORD_MIN_DIVERSITY = 24;
 
 function unit(seedInput: number): number {
   let value = (Math.floor(seedInput) >>> 0) || 1;
@@ -57,23 +57,17 @@ export function buildPatternVocabulary(
   }
 
   if (pattern === "long-word") {
-    const longWords = valid.filter(
-      (entry) => typingText(entry.en).length >= 8,
-    );
-    const diversityTarget = Math.min(LONG_WORD_MIN_DIVERSITY, valid.length);
-    if (longWords.length >= diversityTarget) return longWords;
-
-    const longSet = new Set(longWords);
-    const fallback = rotated(
-      valid.filter((entry) => !longSet.has(entry)),
-      seed,
-    ).sort(
-      (left, right) => typingText(right.en).length - typingText(left.en).length,
-    );
-    return [
-      ...longWords,
-      ...fallback.slice(0, diversityTarget - longWords.length),
-    ];
+    // Stable tie shuffle, then the 24 longest distinct prompts in the selected source.
+    const grouped = new Map<string, VocabularyEntry[]>();
+    for (const entry of valid) {
+      const key = typingText(entry.en);
+      const copies = grouped.get(key) ?? [];
+      copies.push(entry);
+      grouped.set(key, copies);
+    }
+    const selected = rotated([...grouped.keys()], seed).sort((a, b) => b.length - a.length).slice(0, LONG_WORD_MIN_DIVERSITY);
+    // Preserve deliberate copies as Recall weights inside the 24 distinct prompts.
+    return selected.flatMap(key => grouped.get(key)!);
   }
 
   if (pattern === "phrase") {

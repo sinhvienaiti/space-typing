@@ -1,0 +1,1159 @@
+/*
+ * Command Deck: the title hub as a scrolling page over the live background
+ * (layout in index.html #titleOverlay, data in src/ui/title-home.ts).
+ * First screen: mission · ship · today, then the three other modes; the deck
+ * scrolls on to the Galaxy route and the fleet. Holo Command style (holo.css)
+ * is kept; new panels avoid backdrop blur because the background redraws
+ * every frame. Motion is transform/opacity only and stops for reduced motion.
+ */
+#titleOverlay.holo-title-overlay {
+  --th-scroll: 0;
+  --th-gutter: clamp(16px, 2.2vw, 40px);
+  --th-dock: 84px;
+  --th-top: 70px;
+  overflow: hidden;
+}
+/* The deeper the scroll, the darker the live scene behind the text. */
+#titleOverlay.holo-title-overlay::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(3, 5, 14, 0.25), rgba(3, 5, 14, 0.82));
+  opacity: var(--th-scroll);
+}
+
+#titleOverlay .holo-title {
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0 var(--th-gutter);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(95, 227, 255, 0.32) transparent;
+}
+#titleOverlay .holo-title > * { flex-shrink: 0; }
+#titleOverlay .holo-title::-webkit-scrollbar { width: 8px; }
+#titleOverlay .holo-title::-webkit-scrollbar-thumb { background: rgba(95, 227, 255, 0.28); border-radius: 8px; }
+
+/* ---------- Top bar: sticky, turns to glass once the deck scrolls ---------- */
+#titleOverlay .holo-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  margin: 0 calc(-1 * var(--th-gutter));
+  padding: 10px var(--th-gutter) 8px;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+#titleOverlay.th-scrolled .holo-topbar {
+  background-color: rgba(4, 9, 22, 0.86);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38), inset 0 -1px 0 rgba(111, 231, 255, 0.14);
+}
+/* Pilot card on one row: identity · Warp · Credits (it used to stack 100 px tall). */
+#titleOverlay #titlePilotCard {
+  min-height: 0;
+  height: auto;
+  padding: 7px 12px 7px 8px;
+}
+#titleOverlay #titlePilotCard .holo-pilot-text {
+  display: grid;
+  grid-template-columns: minmax(150px, auto) minmax(190px, 230px);
+  grid-template-rows: auto auto auto;
+  column-gap: 16px;
+  align-items: center;
+}
+#titleOverlay #titlePilotCard .holo-pilot-text > * { grid-column: 1; }
+#titleOverlay #titlePilotCard .pilot-warp {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  margin-top: 0;
+  padding-left: 14px;
+  border-left: 1px solid rgba(111, 231, 255, 0.14);
+}
+#titleOverlay #titlePilotCard .holo-pilot-progress { margin-top: 3px; }
+
+/* ---------- First screen ---------- */
+.th-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(380px, 1.05fr) minmax(280px, 0.95fr) minmax(320px, 0.82fr);
+  gap: clamp(14px, 1.5vw, 28px);
+  align-items: stretch;
+  /* Top bar + hero + modes + cue fill the first screen above the dock. */
+  min-height: clamp(380px, calc(100vh - var(--th-top) - var(--th-dock) - 290px), 600px);
+  margin-top: 4px;
+}
+.th-left {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1.4vh, 14px);
+  min-width: 0;
+}
+
+/* Logo: "SPACE" in moving silver light, "TYPE" as a cyan outline. */
+.th-left .holo-brand { text-align: left; }
+.th-left .holo-brand .eyebrow { margin: 0; font-size: 0.7rem; }
+.th-left .holo-brand h1 {
+  position: relative;
+  margin: 2px 0 0;
+  font-size: clamp(2.5rem, 7.6vh, 4.9rem);
+  line-height: 0.98;
+  letter-spacing: 0.06em;
+  text-shadow: none;
+  white-space: nowrap;
+}
+.holo-brand h1 b {
+  font-weight: 800;
+  color: transparent;
+  background: linear-gradient(100deg, #ffffff 0%, #d9f6ff 30%, #ffffff 44%, #8fe9ff 50%, #ffffff 56%, #e6dcff 74%, #ffffff 100%);
+  background-size: 260% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 0 18px rgba(95, 227, 255, 0.32));
+  animation: th-logo-shine 7s linear infinite;
+}
+.holo-brand h1 span {
+  -webkit-text-stroke: 2px var(--holo-accent);
+  filter: drop-shadow(0 0 12px rgba(95, 227, 255, 0.55));
+}
+@keyframes th-logo-shine {
+  from { background-position: 130% 0; }
+  to { background-position: -130% 0; }
+}
+.th-left .holo-tagline {
+  margin: 6px 0 0;
+  max-width: 34em;
+  color: #a9c6da;
+  font-size: 0.92rem;
+}
+
+/* Campaign mission card. */
+.th-campaign {
+  flex: 1;
+  min-height: 0;
+  border-color: rgba(111, 231, 255, 0.42);
+  background:
+    linear-gradient(160deg, rgba(95, 227, 255, 0.08), transparent 42%),
+    var(--holo-panel);
+}
+.th-campaign .holo-mode-art { height: clamp(58px, 9vh, 96px); }
+.th-campaign .holo-mode-art::after { background: linear-gradient(180deg, rgba(5, 8, 22, 0.05) 20%, rgba(5, 8, 22, 0.92)); }
+.th-campaign .holo-plate { object-position: 50% 42%; }
+/* The ship has its own stage in the showcase. */
+.th-campaign .holo-hero-ship { display: none; }
+.th-boss-chip {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 62%;
+  padding: 5px 10px 5px 8px;
+  border: 1px solid rgba(255, 138, 216, 0.45);
+  border-radius: 99px;
+  background: rgba(30, 6, 26, 0.72);
+  color: #ffd6f1;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.th-boss-chip::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: #ff5ea8;
+  box-shadow: 0 0 8px #ff5ea8;
+  animation: th-pulse 1.6s ease-in-out infinite;
+}
+.th-campaign .holo-mode-body { gap: 9px; padding: 10px 18px 16px; }
+.th-campaign-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.th-campaign h2 { font-size: clamp(1.25rem, 3.2vh, 1.7rem); }
+.th-campaign .holo-meta { margin: 0; }
+.th-campaign .holo-chips:has(> small:empty) { display: none; }
+/* The selected World's 20 stages; bosses at 10 and 20. */
+.th-world-progress {
+  display: grid;
+  grid-template-columns: repeat(20, 1fr);
+  gap: 3px;
+  height: 8px;
+}
+.th-world-progress i {
+  position: relative;
+  border-radius: 2px;
+  background: rgba(143, 176, 200, 0.18);
+}
+.th-world-progress i.is-cleared { background: linear-gradient(90deg, #5fe3ff, #8fb6ff); box-shadow: 0 0 6px rgba(95, 227, 255, 0.4); }
+.th-world-progress i.is-mini { background-color: rgba(255, 181, 71, 0.32); }
+.th-world-progress i.is-boss { background-color: rgba(255, 94, 168, 0.4); }
+.th-world-progress i.is-cleared.is-mini,
+.th-world-progress i.is-cleared.is-boss { background: linear-gradient(90deg, #ffd36a, #ff7ab6); }
+.th-world-progress i.is-locked { opacity: 0.45; }
+.th-world-progress i.is-current {
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(95, 227, 255, 0.5), 0 0 12px rgba(95, 227, 255, 0.9);
+  animation: th-pulse 1.4s ease-in-out infinite;
+}
+/* Deploy across the top; the visible secondary actions share the row below. */
+.th-campaign .holo-actions { display: flex; flex-wrap: wrap; gap: 8px; position: relative; }
+.th-campaign .holo-actions > .holo-cta { flex: 1 1 100%; }
+.th-campaign .holo-actions > .holo-ghost { flex: 1 1 0; }
+/* Campaign 3D (beta): the fire hero's own entry, warm against the cyan deck. */
+.th-campaign .holo-actions > .th-hero3d {
+  color: #ffd9a8;
+  background: linear-gradient(100deg, rgba(255, 122, 48, 0.2), rgba(255, 190, 90, 0.08));
+  box-shadow: inset 0 0 0 1px rgba(255, 150, 70, 0.6);
+}
+.th-campaign .holo-actions > .th-hero3d::before { color: #ffb062; }
+.th-campaign .holo-actions > .th-hero3d:not(:disabled):hover {
+  color: #1a0a02;
+  background: linear-gradient(100deg, #ff8a3a, #ffd36b);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45), 0 0 18px rgba(255, 140, 60, 0.45);
+}
+.th-campaign .holo-actions > .th-hero3d:not(:disabled):hover::before { color: #1a0a02; }
+/* The main action: taller, a soft energy glow behind it (outside the chamfer clip). */
+.th-campaign .holo-actions > .holo-cta {
+  min-height: clamp(48px, 7vh, 60px);
+  font-size: clamp(0.92rem, 2vh, 1.08rem);
+  letter-spacing: 0.1em;
+  background:
+    linear-gradient(100deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0.35) 50%, rgba(255, 255, 255, 0) 70%) -150% 0 / 60% 100% no-repeat,
+    linear-gradient(100deg, #5fe3ff, #8fb6ff 45%, #b08bff);
+  animation: th-cta-idle 4.5s ease-in-out infinite;
+}
+.th-campaign .holo-actions::before {
+  content: "";
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  top: 4px;
+  height: clamp(44px, 6.4vh, 54px);
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(95, 227, 255, 0.55), rgba(160, 123, 255, 0.25) 60%, transparent);
+  filter: blur(14px);
+  opacity: 0.55;
+  animation: th-glow 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+.th-campaign .holo-actions:has(> .holo-cta:disabled)::before { display: none; }
+@keyframes th-cta-idle {
+  0%, 62% { background-position: -150% 0, 0 0; }
+  82%, 100% { background-position: 250% 0, 0 0; }
+}
+@keyframes th-glow {
+  0%, 100% { opacity: 0.4; transform: scaleX(0.92); }
+  50% { opacity: 0.8; transform: scaleX(1.04); }
+}
+
+/* ---------- Ship showcase ---------- */
+.th-showcase {
+  --th-tx: 0;
+  --th-ty: 0;
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  justify-items: center;
+  align-items: end;
+  min-width: 0;
+  min-height: 0;
+  isolation: isolate;
+}
+.th-halo {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: min(118%, 560px);
+  aspect-ratio: 1;
+  z-index: -2;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background:
+    radial-gradient(closest-side, rgba(95, 227, 255, 0.26), rgba(120, 110, 255, 0.12) 46%, transparent 72%);
+  pointer-events: none;
+}
+.th-halo::before {
+  content: "";
+  position: absolute;
+  inset: 6%;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, rgba(160, 230, 255, 0.13) 0deg 3deg, transparent 3deg 18deg);
+  -webkit-mask: radial-gradient(closest-side, transparent 30%, #000 52%, transparent 100%);
+  mask: radial-gradient(closest-side, transparent 30%, #000 52%, transparent 100%);
+  animation: th-spin 60s linear infinite;
+}
+.th-orbit {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: min(104%, 500px);
+  aspect-ratio: 1;
+  z-index: -1;
+  transform: translate(-50%, -50%) scaleY(0.38);
+  pointer-events: none;
+}
+.th-orbit i {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(111, 231, 255, 0.22);
+}
+.th-orbit i:nth-child(1) { border-top-color: rgba(160, 240, 255, 0.85); animation: th-spin 9s linear infinite; }
+.th-orbit i:nth-child(2) { inset: 9%; border-color: rgba(160, 123, 255, 0.2); border-left-color: rgba(200, 170, 255, 0.85); animation: th-spin 14s linear infinite reverse; }
+.th-orbit i:nth-child(3) { inset: 20%; border-style: dashed; border-color: rgba(111, 231, 255, 0.18); animation: th-spin 30s linear infinite; }
+
+.th-ship-wrap {
+  position: relative;
+  align-self: center;
+  width: min(80%, 340px);
+  transform:
+    translate3d(calc(var(--th-tx) * -18px), calc(var(--th-ty) * -12px), 0)
+    rotate(calc(var(--th-tx) * 7deg));
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+.th-ship {
+  display: block;
+  width: 100%;
+  max-height: clamp(180px, 40vh, 380px);
+  object-fit: contain;
+  filter: drop-shadow(0 26px 30px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 22px rgba(95, 227, 255, 0.22));
+  animation: th-float 6s ease-in-out infinite;
+  cursor: pointer;
+}
+/* 3D hull (src/ui/title-ship3d.ts): a square wider than the painting, centred on it. */
+.th-ship3d {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 160%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  pointer-events: none;
+  animation: th-float 6s ease-in-out infinite;
+}
+/* No CSS filter on the live canvases: it would be recomputed every frame. */
+.th-ship3d canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.th-ship-wrap.has-ship3d .th-plume { opacity: 0.6; }
+
+/* Engine glow under the hull (the art points up; nozzles near the bottom). */
+.th-plume {
+  position: absolute;
+  left: 50%;
+  bottom: 2%;
+  width: 46%;
+  height: 34%;
+  z-index: -1;
+  /* `translate` centres it; the float animation owns `transform`. */
+  translate: -50% 40%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(220, 250, 255, 0.9), rgba(95, 220, 255, 0.55) 35%, rgba(63, 109, 255, 0.18) 65%, transparent);
+  filter: blur(6px);
+  animation: th-plume 0.22s steps(2, jump-none) infinite alternate, th-float 6s ease-in-out infinite;
+  pointer-events: none;
+}
+/* ---------- The guide (src/ui/title-guide.ts): Draconis standing by the ship ---------- */
+.th-guide {
+  position: absolute;
+  left: -11%;
+  bottom: clamp(18px, 3.4vh, 40px);
+  z-index: 3;
+  width: min(50%, 290px);
+  aspect-ratio: 3 / 4;
+  pointer-events: none;
+}
+.th-guide[hidden] { display: none; }
+.th-guide.is-in { animation: th-guide-in 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes th-guide-in {
+  from { opacity: 0; transform: translateY(18px) scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+/* The deck's buttons paint a panel on focus and press; the guide stays a figure. */
+#titleOverlay .th-guide-stage,
+#titleOverlay .th-guide-stage:hover,
+#titleOverlay .th-guide-stage:focus,
+#titleOverlay .th-guide-stage:active {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 40% 40% 18% 18%;
+  background: transparent;
+  box-shadow: none;
+  clip-path: none;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: filter 0.25s ease, transform 0.2s ease;
+}
+#titleOverlay .th-guide-stage::before,
+#titleOverlay .th-guide-stage::after { display: none; }
+#titleOverlay .th-guide-stage:hover { filter: drop-shadow(0 0 14px rgba(255, 160, 80, 0.35)); }
+#titleOverlay .th-guide-stage:focus-visible { outline: 2px solid var(--holo-accent); outline-offset: 4px; }
+#titleOverlay .th-guide-stage:active { transform: scale(0.985); }
+.th-guide-canvas { display: block; width: 100%; height: 100%; }
+/* The speech bubble, above the guide's shoulder, pointing down at it. */
+.th-guide-bubble {
+  position: absolute;
+  left: 56%;
+  bottom: 80%;
+  width: max-content;
+  max-width: clamp(190px, 17vw, 260px);
+  padding: 9px 13px 10px;
+  border: 1px solid rgba(255, 170, 90, 0.55);
+  border-radius: 14px 14px 14px 4px;
+  background: linear-gradient(160deg, rgba(30, 16, 10, 0.92), rgba(8, 14, 28, 0.92));
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 18px rgba(255, 140, 60, 0.18);
+  color: #fff3e6;
+  opacity: 0;
+  transform: translateY(6px) scale(0.96);
+  transform-origin: 0 100%;
+  transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+}
+.th-guide-bubble.is-on { opacity: 1; transform: none; }
+.th-guide-bubble::after {
+  content: "";
+  position: absolute;
+  left: -1px;
+  bottom: -9px;
+  width: 14px;
+  height: 10px;
+  background: rgba(22, 15, 18, 0.95);
+  border-left: 1px solid rgba(255, 170, 90, 0.55);
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+.th-guide-name {
+  display: block;
+  margin-bottom: 3px;
+  color: #ffb062;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.th-guide-line {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.38;
+  min-height: 1.38em;
+}
+
+.th-pedestal {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(62px, 9vh, 86px);
+  width: min(92%, 420px);
+  height: 64px;
+  z-index: -1;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.th-pedestal::before,
+.th-pedestal::after,
+.th-pedestal i {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+.th-pedestal::before {
+  background: radial-gradient(closest-side, rgba(95, 227, 255, 0.4), rgba(95, 227, 255, 0.08) 60%, transparent);
+}
+.th-pedestal::after {
+  border: 1px solid rgba(160, 240, 255, 0.55);
+  box-shadow: 0 0 18px rgba(95, 227, 255, 0.35), inset 0 0 18px rgba(95, 227, 255, 0.25);
+}
+.th-pedestal i {
+  inset: -14px -28px;
+  border: 1px dashed rgba(111, 231, 255, 0.3);
+  animation: th-spin-flat 18s linear infinite;
+}
+.th-ship-plate {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas: "role role" "name level" "button button";
+  justify-items: center;
+  align-items: baseline;
+  column-gap: 8px;
+  row-gap: 2px;
+  padding-bottom: 4px;
+  text-align: center;
+}
+.th-ship-role {
+  grid-area: role;
+  color: var(--holo-accent);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+.th-ship-name {
+  grid-area: name;
+  justify-self: end;
+  font-family: var(--holo-display);
+  font-size: clamp(1.15rem, 2.8vh, 1.5rem);
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.th-ship-level { grid-area: level; justify-self: start; color: var(--holo-dim); font-size: 0.78rem; font-weight: 700; }
+.th-ship-plate .holo-ghost { grid-area: button; margin-top: 6px; min-height: 32px; font-size: 0.76rem; }
+@keyframes th-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+@keyframes th-plume {
+  from { opacity: 0.75; scale: 0.94 1; }
+  to { opacity: 1; scale: 1.04 1.08; }
+}
+@keyframes th-spin { to { rotate: 360deg; } }
+@keyframes th-spin-flat { to { rotate: 360deg; } }
+@keyframes th-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* ---------- Today panel ---------- */
+.th-today {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(6px, 1vh, 10px);
+  min-width: 0;
+  padding: 12px 14px 14px;
+  background:
+    linear-gradient(200deg, rgba(160, 123, 255, 0.1), transparent 40%),
+    var(--holo-panel);
+}
+.th-today-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.th-today-head .eyebrow { margin: 0; font-size: 0.7rem; }
+.th-today-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--holo-dim);
+  font-size: 0.7rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.th-today-reset .holo-ic { width: 13px; height: 13px; color: var(--holo-accent); }
+.th-today-loading { margin: auto; color: var(--holo-dim); font-size: 0.84rem; }
+
+.th-streak {
+  --fx-color: 255, 170, 80;
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  text-align: left;
+  border: 1px solid rgba(255, 170, 90, 0.26);
+  border-radius: 0;
+  background: linear-gradient(100deg, rgba(255, 140, 60, 0.12), rgba(255, 90, 140, 0.06) 60%, rgba(10, 20, 38, 0.6));
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+.th-streak:not(:disabled):hover {
+  border-color: rgba(255, 190, 110, 0.6);
+  background: linear-gradient(100deg, rgba(255, 140, 60, 0.2), rgba(255, 90, 140, 0.1) 60%, rgba(16, 32, 56, 0.7));
+}
+.th-flame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: #7d8ea0;
+}
+.th-flame .holo-ic { width: 30px; height: 30px; position: relative; z-index: 1; }
+.th-flame i {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 170, 60, 0.6), rgba(255, 80, 60, 0.18) 60%, transparent);
+  opacity: 0;
+}
+.th-streak[data-heat="1"] .th-flame { color: #ffb547; }
+.th-streak[data-heat="2"] .th-flame { color: #ff8a3d; }
+.th-streak[data-heat="3"] .th-flame { color: #ff5ea8; }
+.th-streak:not([data-heat="0"]) .th-flame i { opacity: 1; animation: th-flicker 1.3s ease-in-out infinite; }
+.th-streak:not([data-heat="0"]) .th-flame .holo-ic { animation: th-flicker-icon 1.3s ease-in-out infinite; transform-origin: 50% 90%; }
+@keyframes th-flicker {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  40% { transform: scale(1.12); opacity: 1; }
+  70% { transform: scale(0.95); opacity: 0.7; }
+}
+@keyframes th-flicker-icon {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  35% { transform: scale(1.06, 1.1) rotate(-3deg); }
+  70% { transform: scale(0.97, 1.02) rotate(2deg); }
+}
+.th-streak-count { display: grid; line-height: 1; }
+.th-streak-count b {
+  font-family: var(--holo-display);
+  font-size: 1.9rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #fff4e4;
+}
+.th-streak-count small { margin-top: 4px; color: #e9b98a; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; }
+.th-goal { position: relative; display: grid; place-items: center; width: 70px; height: 70px; }
+.th-ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.th-ring circle { fill: none; stroke-width: 4; stroke-linecap: round; }
+.th-ring-track { stroke: rgba(255, 255, 255, 0.1); }
+.th-ring-fill { stroke: #ffb547; transition: stroke-dasharray 0.8s cubic-bezier(0.2, 0.8, 0.2, 1); filter: drop-shadow(0 0 4px rgba(255, 181, 71, 0.6)); }
+.th-streak[data-done="true"] .th-ring-fill { stroke: #3dff95; filter: drop-shadow(0 0 5px rgba(61, 255, 149, 0.7)); }
+.th-goal-text { display: block; text-align: center; line-height: 1.1; font-size: 0.64rem; color: var(--holo-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.th-goal-text b { color: #fff; font-size: 0.95rem; }
+.th-goal-text small { display: block; font-size: 0.52rem; letter-spacing: 0.04em; text-transform: uppercase; }
+.th-shields {
+  position: absolute;
+  top: 6px;
+  right: 76px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: #8fe9ff;
+  font-size: 0.66rem;
+  font-weight: 800;
+}
+.th-shields .holo-ic { width: 12px; height: 12px; }
+
+.th-rows { display: flex; flex-direction: column; gap: clamp(4px, 0.8vh, 7px); min-height: 0; }
+.th-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto auto 12px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: clamp(40px, 6vh, 50px);
+  padding: 4px 10px 4px 8px;
+  text-align: left;
+  border: 1px solid rgba(111, 231, 255, 0.12);
+  border-radius: 0;
+  background: linear-gradient(90deg, rgba(95, 227, 255, 0.05), rgba(10, 20, 38, 0.5));
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  transition: transform 0.18s var(--holo-ease), border-color 0.2s, background-color 0.2s;
+}
+.th-row-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  color: var(--holo-accent);
+  background: rgba(95, 227, 255, 0.08);
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+}
+.th-row-icon .holo-ic { width: 17px; height: 17px; }
+.th-row-text { display: grid; min-width: 0; line-height: 1.2; }
+.th-row-text strong { font-size: 0.82rem; font-weight: 700; color: var(--holo-text); }
+.th-row-text small { color: var(--holo-dim); font-size: 0.7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.th-row-go { color: var(--holo-faint); display: grid; }
+.th-row-go .holo-ic { width: 12px; height: 12px; transition: transform 0.2s var(--holo-ease); }
+.th-row-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border-radius: 99px;
+  background: #ff4d6d;
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 800;
+  box-shadow: 0 0 10px rgba(255, 77, 109, 0.7);
+}
+.th-row:not(:disabled):hover {
+  transform: translateX(3px);
+  border-color: var(--holo-line-strong);
+  background-color: rgba(95, 227, 255, 0.08);
+}
+.th-row:hover .th-row-go .holo-ic { transform: translateX(3px); color: var(--holo-accent); }
+.th-row:hover .th-row-icon { color: #fff; background: rgba(95, 227, 255, 0.2); }
+.th-row[data-tone="ready"] {
+  border-color: rgba(61, 255, 149, 0.4);
+  background: linear-gradient(90deg, rgba(61, 255, 149, 0.12), rgba(10, 20, 38, 0.5));
+}
+.th-row[data-tone="ready"] .th-row-icon { color: #3dff95; background: rgba(61, 255, 149, 0.12); animation: th-ready 1.8s ease-in-out infinite; }
+@keyframes th-ready {
+  0%, 100% { filter: none; }
+  50% { filter: drop-shadow(0 0 6px rgba(61, 255, 149, 0.9)); }
+}
+.th-dots { display: inline-flex; gap: 4px; }
+.th-dots i {
+  width: 9px;
+  height: 9px;
+  border: 1px solid rgba(111, 231, 255, 0.4);
+  transform: rotate(45deg);
+}
+.th-dots i.is-done { background: var(--holo-accent); border-color: var(--holo-accent); box-shadow: 0 0 6px rgba(95, 227, 255, 0.8); }
+.th-dots i.is-next { border-color: #fff; animation: th-pulse 1.4s ease-in-out infinite; }
+.th-meter { width: 58px; height: 5px; border-radius: 99px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.th-meter i { display: block; height: 100%; border-radius: inherit; background: var(--holo-gradient); }
+
+/* ---------- Other modes: wide cards, art on the left ---------- */
+#titleOverlay .holo-modes.th-modes {
+  justify-self: stretch;
+  align-self: stretch;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  margin-top: clamp(12px, 2vh, 20px);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(12px, 1.4vw, 22px);
+}
+#titleOverlay.holo-three-modes .holo-modes.th-modes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.th-modes .holo-mode {
+  --mode-accent: 95, 227, 255;
+  --fx-color: var(--mode-accent);
+  flex-direction: row;
+  min-height: clamp(150px, 22vh, 196px);
+}
+.th-modes .holo-mode:has(#expeditionButton),
+.th-modes #titleExpeditionCard { --mode-accent: 255, 196, 92; }
+.th-modes .holo-mode:has(#titleRecallStartButton) { --mode-accent: 82, 255, 184; }
+.th-modes .holo-mode:has(#duelModeButton) { --mode-accent: 255, 96, 110; }
+.th-modes .holo-mode-art { flex: 0 0 40%; width: 40%; height: auto; }
+.th-modes .holo-mode-art::after { background: linear-gradient(90deg, transparent 45%, rgba(6, 10, 24, 0.92)); }
+.th-modes .holo-tag { border-color: rgba(var(--mode-accent), 0.45); }
+.th-modes .holo-tag::before { color: rgb(var(--mode-accent)); }
+.th-modes .holo-mode-body { padding: 12px 16px 14px 10px; gap: 6px; }
+.th-modes .holo-mode h2 { font-size: clamp(1.05rem, 2.6vh, 1.35rem); }
+.th-modes .holo-mode p { font-size: 0.8rem; line-height: 1.4; }
+/* Only Deploy is filled above the fold; the other modes use accent glass. */
+.th-modes .holo-actions > .holo-cta {
+  min-height: 40px;
+  font-size: 0.82rem;
+  color: rgb(var(--mode-accent));
+  background: linear-gradient(100deg, rgba(var(--mode-accent), 0.16), rgba(var(--mode-accent), 0.06));
+  box-shadow: inset 0 0 0 1px rgba(var(--mode-accent), 0.55);
+}
+.th-modes .holo-actions > .holo-cta::before { color: rgb(var(--mode-accent)); }
+.th-modes .holo-actions > .holo-cta:not(:disabled):hover {
+  color: #061018;
+  background: linear-gradient(100deg, rgb(var(--mode-accent)), rgba(var(--mode-accent), 0.78));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+.th-modes .holo-actions > .holo-cta:not(:disabled):hover::before { color: #061018; }
+.th-modes .holo-actions > .holo-ghost { min-height: 32px; font-size: 0.74rem; }
+.th-modes .holo-mode:hover { border-color: rgba(var(--mode-accent), 0.6); box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45), 0 0 26px rgba(var(--mode-accent), 0.16); }
+.th-modes .holo-mode::after { background: radial-gradient(360px circle at var(--mx, 50%) var(--my, 30%), rgba(var(--mode-accent), 0.12), transparent 55%); }
+
+/* ---------- Scroll cue (bottom left of the first screen, beside the dock) ---------- */
+#titleOverlay .holo-modes.th-modes { margin-bottom: calc(var(--th-dock) + 22px); }
+.th-scroll-cue {
+  position: absolute;
+  left: var(--th-gutter);
+  bottom: 30px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 6px 4px;
+  border: 0;
+  background: none;
+  color: var(--holo-dim);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.th-scroll-cue i {
+  width: 14px;
+  height: 14px;
+  border-right: 2px solid var(--holo-accent);
+  border-bottom: 2px solid var(--holo-accent);
+  transform: rotate(45deg);
+  animation: th-cue 1.6s ease-in-out infinite;
+}
+.th-scroll-cue:hover { color: #fff; background: none; }
+@keyframes th-cue {
+  0%, 100% { translate: 0 -2px; opacity: 0.5; }
+  50% { translate: 0 4px; opacity: 1; }
+}
+#titleOverlay.th-scrolled .th-scroll-cue { opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+
+/* ---------- Sections below the fold ---------- */
+.th-section {
+  margin-top: 8px;
+  padding-bottom: 34px;
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s ease, transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.th-section.th-in { opacity: 1; transform: none; }
+.th-section-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(111, 231, 255, 0.12);
+}
+.th-section-head .eyebrow { flex-basis: 100%; margin: 0; font-size: 0.68rem; }
+.th-section-head h2 {
+  margin: 0;
+  font-family: var(--holo-display);
+  font-size: clamp(1.4rem, 3.6vh, 2rem);
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.th-section-head h2 span { color: transparent; -webkit-text-stroke: 1.5px var(--holo-accent); }
+.th-section-meta { margin: 0 0 0 auto; color: var(--holo-dim); font-size: 0.8rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Galaxy route: ten cards, the Tyrant of each one in front of its sky. */
+.th-route { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: clamp(10px, 1.2vw, 18px); }
+.th-galaxy {
+  --g-primary: #5fe3ff;
+  --g-accent: #a07bff;
+  position: relative;
+  display: block;
+  aspect-ratio: 5 / 6;
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  color: var(--holo-text);
+  border: 1px solid rgba(111, 231, 255, 0.16);
+  border-radius: 0;
+  background: #060b18;
+  clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.3s;
+}
+.th-galaxy-art,
+.th-galaxy-art img { position: absolute; inset: 0; width: 100%; height: 100%; }
+.th-galaxy-art img { object-fit: cover; filter: saturate(1.1) brightness(0.78); transition: transform 1.2s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.6s; }
+.th-galaxy::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(70% 40% at 50% 46%, color-mix(in srgb, var(--g-primary) 32%, transparent), transparent 70%),
+    linear-gradient(180deg, rgba(4, 7, 18, 0.5) 0%, transparent 22%, transparent 42%, rgba(4, 7, 18, 0.94) 78%);
+  pointer-events: none;
+}
+.th-galaxy-boss {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 9%;
+  height: 58%;
+  max-width: 96%;
+  object-fit: contain;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 0 16px color-mix(in srgb, var(--g-primary) 55%, transparent)) drop-shadow(0 14px 18px rgba(0, 0, 0, 0.55));
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.4s;
+}
+.th-galaxy-top {
+  position: absolute;
+  z-index: 3;
+  top: 10px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.th-galaxy-no {
+  font-family: var(--holo-display);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--g-accent);
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+}
+.th-galaxy-here {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  background: rgba(95, 227, 255, 0.18);
+  border: 1px solid rgba(95, 227, 255, 0.6);
+  color: #dffaff;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  animation: th-pulse 1.8s ease-in-out infinite;
+}
+.th-galaxy-here.is-cleared { animation: none; background: rgba(61, 255, 149, 0.16); border-color: rgba(61, 255, 149, 0.55); color: #c9ffe1; }
+.th-galaxy-here .holo-ic { width: 11px; height: 11px; }
+.th-galaxy-lock { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: rgba(0, 0, 0, 0.55); color: var(--holo-dim); }
+.th-galaxy-lock .holo-ic { width: 14px; height: 14px; }
+.th-galaxy-body {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  gap: 3px;
+  padding: 0 14px 14px;
+}
+.th-galaxy-body strong {
+  font-family: var(--holo-display);
+  font-size: clamp(1rem, 2.4vh, 1.25rem);
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.th-galaxy-body small { color: var(--holo-dim); font-size: 0.7rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.th-galaxy-worlds {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: #b7cbe0;
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+.th-galaxy-bar { height: 4px; margin-top: 4px; border-radius: 99px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+.th-galaxy-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--g-primary), var(--g-accent)); }
+.th-galaxy-tyrant {
+  color: color-mix(in srgb, var(--g-primary) 70%, #fff);
+  font-size: 0.66rem;
+  font-style: normal;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.th-galaxy:not([data-state="locked"]):hover {
+  transform: translateY(-6px);
+  border-color: color-mix(in srgb, var(--g-primary) 70%, transparent);
+}
+.th-galaxy:not([data-state="locked"]):hover .th-galaxy-art img { transform: scale(1.08); filter: saturate(1.25) brightness(0.92); }
+.th-galaxy:not([data-state="locked"]):hover .th-galaxy-boss {
+  transform: translateX(-50%) translateY(-6px) scale(1.05);
+  filter: drop-shadow(0 0 26px color-mix(in srgb, var(--g-primary) 80%, transparent)) drop-shadow(0 18px 22px rgba(0, 0, 0, 0.6));
+}
+.th-galaxy[data-state="current"] { border-color: rgba(95, 227, 255, 0.7); }
+.th-galaxy[data-state="current"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(160, 240, 255, 0.6), inset 0 0 30px rgba(95, 227, 255, 0.28);
+  animation: th-pulse 2.4s ease-in-out infinite;
+}
+.th-galaxy[data-state="locked"] { cursor: default; }
+.th-galaxy[data-state="locked"] .th-galaxy-art img { filter: grayscale(0.8) brightness(0.36); }
+/* Locked Tyrants show only their silhouette. */
+.th-galaxy[data-state="locked"] .th-galaxy-boss { filter: brightness(0) drop-shadow(0 0 1px rgba(160, 200, 230, 0.55)) drop-shadow(0 0 12px rgba(120, 160, 220, 0.25)); opacity: 0.85; }
+.th-galaxy[data-state="locked"] .th-galaxy-body strong { color: var(--holo-dim); }
+
+/* Fleet: one row of hangar cards. */
+.th-fleet { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.th-ship-card {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: 6px;
+  padding: 10px 10px 12px;
+  text-align: center;
+  color: var(--holo-text);
+  border: 1px solid rgba(111, 231, 255, 0.14);
+  border-radius: 0;
+  background: radial-gradient(80% 60% at 50% 40%, rgba(95, 227, 255, 0.1), transparent 70%), rgba(6, 12, 26, 0.72);
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.25s, background-color 0.25s;
+}
+.th-ship-card-art {
+  display: block;
+  width: 78%;
+  margin: 0 auto;
+  aspect-ratio: 1;
+  background-image: url("/assets/space-typing/ships/player-ships-v3.webp");
+  background-repeat: no-repeat;
+  background-size: 400% 300%;
+  filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.5));
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.3s;
+}
+.th-ship-card-text { display: grid; gap: 1px; }
+.th-ship-card-text strong { font-family: var(--holo-display); font-size: 0.88rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.th-ship-card-text small { color: var(--holo-dim); font-size: 0.66rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.th-ship-card-tag {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: var(--holo-gradient);
+  color: var(--holo-ink);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.th-ship-card-tag.is-level { background: rgba(95, 227, 255, 0.14); color: var(--holo-accent); }
+.th-ship-card-lock { position: absolute; top: 8px; right: 8px; color: var(--holo-faint); }
+.th-ship-card-lock .holo-ic { width: 14px; height: 14px; }
+.th-ship-card:hover { transform: translateY(-4px); border-color: var(--holo-line-strong); background-color: rgba(10, 22, 44, 0.85); }
+.th-ship-card:hover .th-ship-card-art { transform: translateY(-6px) scale(1.06); filter: drop-shadow(0 14px 14px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 14px rgba(95, 227, 255, 0.4)); }
+.th-ship-card[data-state="selected"] { border-color: rgba(95, 227, 255, 0.75); box-shadow: inset 0 0 26px rgba(95, 227, 255, 0.16); }
+.th-ship-card[data-state="locked"] .th-ship-card-art { filter: brightness(0.12) drop-shadow(0 0 1px rgba(160, 200, 230, 0.6)); }
+.th-ship-card[data-state="locked"] .th-ship-card-text strong { color: var(--holo-dim); }
+
+.th-foot {
+  display: flex;
+  justify-content: center;
+  gap: 8px 28px;
+  flex-wrap: wrap;
+  padding: 10px 0 calc(var(--th-dock) + 24px);
+  color: var(--holo-faint);
+  font-size: 0.7rem;
+  opacity: 0;
+  transition: opacity 0.6s;
+}
+.th-foot.th-in { opacity: 1; }
+
+/* Developer corner (dev builds) sits at the end of the deck, not over the route. */
+#titleOverlay .holo-corner-right {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  order: 98;
+  align-self: flex-end;
+  margin: -16px 0 calc(var(--th-dock) + 18px);
+}
+#titleOverlay .title-developer:not(:has(.title-dev-actions > *)) { display: none; }
+#titleOverlay .th-foot { padding-bottom: 18px; }
+#titleOverlay .holo-title:not(:has(.title-developer .title-dev-actions > *)) .th-foot { padding-bottom: calc(var(--th-dock) + 24px); }
+
+/* ---------- Dock: stays on screen while the deck scrolls ---------- */
+#titleOverlay .holo-dock.holo-panel {
+  position: sticky;
+  bottom: 12px;
+  z-index: 30;
+  align-self: center;
+  order: 99;
+  margin-top: calc(-1 * var(--th-dock) - 12px);
+  margin-bottom: 12px;
+}
+#titleOverlay .holo-dock.holo-panel::before { background: rgba(6, 13, 30, 0.88); }
+
+/* ---------- Enter and launch ---------- */
+#titleOverlay.th-entering .th-left { animation: th-in-left 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+#titleOverlay.th-entering .th-showcase { animation: th-in-scale 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 0.08s both; }
+#titleOverlay.th-entering .th-today { animation: th-in-right 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 0.12s both; }
+#titleOverlay.th-entering .th-modes > * { animation: th-in-up 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+#titleOverlay.th-entering .th-modes > :nth-child(2) { animation-delay: 0.22s; }
+#titleOverlay.th-entering .th-modes > :nth-child(3) { animation-delay: 0.3s; }
+#titleOverlay.th-entering .th-modes > :nth-child(1) { animation-delay: 0.16s; }
+#titleOverlay.th-entering .holo-topbar { animation: th-in-down 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes th-in-left { from { opacity: 0; transform: translateX(-36px); } }
+@keyframes th-in-right { from { opacity: 0; transform: translateX(36px); } }
+@keyframes th-in-up { from { opacity: 0; transform: translateY(26px); } }
+@keyframes th-in-down { from { opacity: 0; transform: translateY(-18px); } }
+@keyframes th-in-scale { from { opacity: 0; transform: scale(0.86); } }
+
+/* Deploy: the ship climbs out of frame, the deck drops away. */
+#titleOverlay.th-launching .th-ship-wrap { animation: th-launch 0.75s cubic-bezier(0.55, 0, 0.75, 0.2) forwards; }
+#titleOverlay.th-launching .th-plume { animation: th-launch-plume 0.75s ease-in forwards; }
+#titleOverlay.th-launching .th-left,
+#titleOverlay.th-launching .th-today,
+#titleOverlay.th-launching .th-modes,
+#titleOverlay.th-launching .th-ship-plate,
+#titleOverlay.th-launching .holo-dock { transition: opacity 0.35s ease, transform 0.45s ease; opacity: 0; transform: translateY(18px); }
+#titleOverlay.th-launching::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: radial-gradient(60% 50% at 50% 40%, rgba(180, 245, 255, 0.5), transparent 70%);
+  animation: th-flash 0.75s ease-out forwards;
+}
+@keyframes th-launch {
+  0% { transform: translateY(0) scale(1); }
+  25% { transform: translateY(18px) scale(0.98); }
+  100% { transform: translateY(-75vh) scale(0.72); opacity: 0.2; }
+}
+@keyframes th-launch-plume {
+  0% { opacity: 1; }
+  30% { opacity: 1; scale: 1.6 2.4; }
+  100% { opacity: 0; scale: 0.8 5; translate: -50% -40vh; }
+}
+@keyframes th-flash {
+  0% { opacity: 0; }
+  35% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1500px) {
+  .th-hero { grid-template-columns: minmax(360px, 1fr) minmax(220px, 0.8fr) minmax(300px, 0.86fr); }
+  /* The one-row pilot card needs the room; the strip's facts live on the deck below. */
+  #titleOverlay .holo-strip { display: none; }
+  #titleOverlay .holo-topbar > .holo-tools { grid-column: 3; }
+  /* The dock shifts left of the voice box here, over the cue's corner. */
+  .th-scroll-cue span { display: none; }
+}
+/* Laptop heights: tighter first screen so the mode cards clear the dock. */
+@media (max-height: 820px) {
+  .th-hero { min-height: 0; }
+  .th-left .holo-brand h1 { font-size: clamp(2.3rem, 6.6vh, 3.6rem); }
+  .th-left .holo-tagline { margin-top: 2px; font-size: 0.84rem; }
+  .th-campaign .holo-mode-art { height: 54px; }
+  .th-campaign .holo-mode-body { gap: 7px; padding: 8px 16px 12px; }
+  .th-campaign .holo-chips { display: none; }
+  .th-streak { padding: 6px 10px; }
+  .th-goal { width: 58px; height: 58px; }
+  .th-row { min-height: 38px; }
+  .th-ship-plate .holo-ghost { display: none; }
+  .th-modes .holo-mode { min-height: 140px; }
+  .th-modes .holo-mode-body { gap: 4px; padding: 9px 14px 10px 8px; }
+  .th-modes .holo-mode-body > p:not(.holo-meta) { -webkit-line-clamp: 1; }
+  #titleOverlay .holo-modes.th-modes { margin-top: 10px; }
+}
+@media (max-height: 740px) {
+  .th-left .holo-tagline,
+  .th-left .holo-brand .eyebrow { display: none; }
+  .th-today-head { display: none; }
+  .th-modes .holo-mode-body > p:not(.holo-meta) { display: none; }
+}
+@media (max-width: 1180px) {
+  .th-hero { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: 0; }
+  .th-showcase { display: none; }
+  .th-campaign .holo-hero-ship { display: block; }
+  #titleOverlay .holo-modes.th-modes { grid-template-columns: minmax(0, 1fr); }
+  #titleOverlay.holo-three-modes .holo-modes.th-modes { grid-template-columns: minmax(0, 1fr); }
+  .th-route { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .th-hero { grid-template-columns: minmax(0, 1fr); }
+  .th-left .holo-brand { text-align: center; }
+  .th-modes .holo-mode { flex-direction: column; }
+  .th-modes .holo-mode-art { flex: 0 0 110px; width: 100%; }
+  .th-route { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .th-section-meta { margin-left: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .holo-brand h1 b,
+  .th-ship,
+  .th-plume,
+  .th-halo::before,
+  .th-orbit i,
+  .th-pedestal i { animation: none !important; }
+  .th-section, .th-foot { opacity: 1; transform: none; }
+}

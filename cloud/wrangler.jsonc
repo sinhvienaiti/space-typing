@@ -1,0 +1,45 @@
+// Space Typing online API on Cloudflare Workers (free plan).
+//   Local:  pnpm account:local   (wrangler dev on 127.0.0.1:3016, local D1 + Durable Objects)
+//   Deploy: see docs/ONLINE_CLOUDFLARE_DEPLOY.md (create the D1 database, set the secrets,
+//           replace database_id, then `wrangler deploy -c cloud/wrangler.jsonc`).
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "space-typing-api",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": [],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "space-typing",
+      // Local development ignores this; replace it with the id from `wrangler d1 create space-typing`.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // Chat rooms: one Durable Object per channel (world, group, private).
+  // SQLite-backed Durable Objects are available on the Workers Free plan.
+  "durable_objects": {
+    "bindings": [{ "name": "CHAT", "class_name": "ChatChannel" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ChatChannel"] }],
+  "vars": {
+    "PUBLIC_URL": "https://space.typing-game.local",
+    "SESSION_DAYS": "30",
+    // Hourly cloud-save backups kept per player (1–24). Storage math: docs/ONLINE_CLOUDFLARE_DEPLOY.md §6.
+    "SAVE_BACKUPS": "6",
+    // Server wallet rollout (docs/ONLINE_SERVER_WALLET_DESIGN_2026-10-16.md §9). Roll back by lowering it:
+    // 0 off (old local economy) · 1 shadow (server records, never refuses) · 2 purchases, Warp and
+    // Daily Hub claims through the server · 3 also checks sortie earnings and the daily caps.
+    "WALLET_PHASE": "3",
+    // Fixed migration cutoff. Set once to the production wallet launch instant; never advance it on redeploy.
+    // This local cutoff does not authorize new accounts or uploaded saves to seed money.
+    "WALLET_SEED_BEFORE": "2026-10-17T00:00:00.000Z"
+  },
+  // Daily clean-up of expired sessions, email links and rate-limit rows (cloud/src/maintenance.ts),
+  // 03:23 Vietnam time. Cron Triggers are included in the Workers Free plan.
+  "triggers": { "crons": ["23 20 * * *"] },
+  // Secrets (wrangler secret put …): ADMIN_TOKEN, PASSWORD_PEPPER, optional RESEND_API_KEY + MAIL_FROM.
+  // Local development reads them from cloud/.dev.vars (created by scripts/local-account.mjs).
+  "observability": { "enabled": true }
+}

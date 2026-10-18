@@ -17,6 +17,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { createServer } from "node:net";
 
 const DEFAULT_CHROME = {
   darwin: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -65,7 +66,15 @@ const audioFixture = flag("audio-fixture", null);
 const expression = evalFile !== null ? readFileSync(resolve(evalFile), "utf8") : flag("eval", "null");
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
-const port = 9300 + Math.floor(Math.random() * 600);
+// Ask the OS for a free port. Random ports could attach two simultaneous
+// screenshots to the same Chrome, mixing their temporary profiles and evals.
+const portProbe = createServer();
+await new Promise((done, fail) => {
+  portProbe.once("error", fail);
+  portProbe.listen(0, "127.0.0.1", done);
+});
+const port = portProbe.address().port;
+await new Promise((done) => portProbe.close(done));
 const profile = mkdtempSync(join(tmpdir(), "space-typing-shot-"));
 const browser = spawn(
   chrome,
@@ -78,6 +87,8 @@ const browser = spawn(
     "--ignore-gpu-blocklist",
     "--no-first-run",
     "--no-default-browser-check",
+    // SHOT_INSECURE=1: accept a local self-signed certificate (a temporary nginx on a spare port).
+    ...(process.env.SHOT_INSECURE === "1" ? ["--ignore-certificate-errors"] : []),
     ...(fakeMic ? ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] : []),
     ...(fakeMic && fakeMicFile ? ["--use-file-for-fake-audio-capture=" + resolve(fakeMicFile)] : []),
     "--user-data-dir=" + profile,
@@ -86,13 +97,20 @@ const browser = spawn(
   { stdio: "ignore" },
 );
 
-function cleanup() {
+async function cleanup() {
   try {
     browser.kill("SIGKILL");
   } catch {
     // already gone
   }
-  rmSync(profile, { recursive: true, force: true });
+  // Windows keeps profile files open briefly while Chrome's child processes exit.
+  // This path is the exact directory returned by mkdtempSync above.
+  await sleep(500);
+  try {
+    rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  } catch (error) {
+    console.warn("Temporary Chrome profile could not be removed: " + profile + " (" + error.code + ")");
+  }
 }
 
 async function main() {
@@ -123,7 +141,9 @@ async function main() {
   socket.addEventListener("message", (event) => {
     const message = JSON.parse(event.data);
     if (message.id !== undefined && pending.has(message.id)) {
-      pending.get(message.id)(message);
+      const call = pending.get(message.id);
+      clearTimeout(call.timer);
+      call.done(message);
       pending.delete(message.id);
       return;
     }
@@ -145,10 +165,21 @@ async function main() {
       exceptions.push((details.exception?.description ?? details.text ?? "").slice(0, 400));
     }
   });
+  socket.addEventListener("close", () => {
+    for (const call of pending.values()) {
+      clearTimeout(call.timer);
+      call.fail(new Error("Chrome connection closed before the capture finished."));
+    }
+    pending.clear();
+  });
   const send = (method, params = {}) =>
-    new Promise((done) => {
+    new Promise((done, fail) => {
       const id = ++nextId;
-      pending.set(id, done);
+      const timer = setTimeout(() => {
+        pending.delete(id);
+        fail(new Error("Chrome command timed out: " + method));
+      }, Number(flag("protocol-timeout", "120000")));
+      pending.set(id, { done, fail, timer });
       socket.send(JSON.stringify({ id, method, params }));
     });
 
@@ -162,6 +193,18 @@ async function main() {
   });
   await send("Page.navigate", { url });
   for (let waited = 0; !loaded && waited < 20000; waited += 100) await sleep(100);
+
+  const readyExpression = flag("ready", null);
+  if (readyExpression !== null) {
+    let ready = false;
+    const timeout = Number(flag("ready-timeout", "120000"));
+    for (let waited = 0; waited < timeout; waited += 500) {
+      const state = await send("Runtime.evaluate", { expression: readyExpression, returnByValue: true });
+      if (state.result?.result?.value === true) { ready = true; break; }
+      await sleep(500);
+    }
+    if (!ready) throw new Error("Page readiness timed out: " + readyExpression);
+  }
 
   if (clickSelector !== null) {
     await sleep(clickDelay);

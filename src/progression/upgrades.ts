@@ -1,3 +1,5 @@
+import { maxAttributeLevel, attributeUpgradeCost } from "./attribute-price";
+export { maxAttributeLevel, attributeUpgradeCost, MAX_ATTRIBUTE_LEVEL, MAX_ECONOMY_ATTRIBUTE_LEVEL } from "./attribute-price";
 import {
   CORE_STAT_KEYS,
   type CoreStatKey,
@@ -16,8 +18,6 @@ import {
 } from "./basic-skills";
 
 export const MAX_SKILL_LEVEL = 5;
-export const MAX_ATTRIBUTE_LEVEL = 20;
-export const MAX_ECONOMY_ATTRIBUTE_LEVEL = 10;
 
 export type UpgradeState = {
   skillLevels: Record<UpgradeableSkillId, number>;
@@ -66,11 +66,7 @@ export function createUpgradeState(): UpgradeState {
   };
 }
 
-export function maxAttributeLevel(key: CoreStatKey): number {
-  return key === "luck" || key === "salvage"
-    ? MAX_ECONOMY_ATTRIBUTE_LEVEL
-    : MAX_ATTRIBUTE_LEVEL;
-}
+
 
 export function sanitizeSkillLevel(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value)
@@ -238,38 +234,7 @@ export function skillUpgradeCost(
   };
 }
 
-export function attributeUpgradeCost(
-  key: CoreStatKey,
-  currentLevel: number,
-): UpgradeCost | null {
-  const level = sanitizeAttributeLevel(key, currentLevel);
-  if (level >= maxAttributeLevel(key)) return null;
 
-  const target = level + 1;
-  const economy = key === "luck" || key === "salvage";
-  const curve = economy ? 1.65 : 1;
-  const requiredStage = economy
-    ? Math.max(1, (target - 2) * 80 + 1)
-    : Math.max(1, (target - 5) * 35 + 1);
-
-  return {
-    credits: Math.round(
-      (90 + target * target * 26) * curve,
-    ),
-    alloy: Math.round(
-      (1 + Math.floor(target / 3)) * curve,
-    ),
-    starCrystal:
-      target >= (economy ? 8 : 16)
-        ? economy
-          ? 2
-          : 1
-        : 0,
-    quantumCore:
-      target === maxAttributeLevel(key) && economy ? 1 : 0,
-    requiredStage: clamp(requiredStage, 1, 1000),
-  };
-}
 
 export function upgradeSkillLevel(
   stateInput: UpgradeState,

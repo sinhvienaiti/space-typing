@@ -79,6 +79,11 @@ export type GameSettings = {
   pronunciationEnabled: boolean;
   pronunciationRate: number;
   pronunciationVolume: number;
+  /**
+   * Voice boost, 1–3. The browser voice cannot play above 100%, so the boost
+   * lowers music and effects while a word is spoken (3 = they drop to a third).
+   */
+  pronunciationBoost?: number;
   killTranslation?: KillTranslationSettings;
   /** World music: each map's playlist, or shuffle every song. */
   musicMode?: MusicPlaybackMode;

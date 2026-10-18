@@ -6,8 +6,11 @@ import {
   spendWarp,
   refuelWarp,
   refuelQuote,
+  giftWarp,
+  isValidWarpCharge,
   WarpClock,
   type RefuelQuote,
+  type WarpCharge,
 } from "../economy/warp-charge";
 import {
   isValidAccountState,
@@ -322,6 +325,7 @@ export class AccountTransactions {
             id: `${attemptId}:clear`,
             fingerprint: "cleared",
             kind: "clear",
+            stage: a.attempt!.context.stage,
             revision: a.revision,
           });
           a.receipts = a.receipts.slice(-64);
@@ -341,8 +345,13 @@ export class AccountTransactions {
       }),
     );
   }
-  admit(context: SortieContext, intent = this.intent()): Promise<PlayerSave> {
+  /**
+   * `serverWarp` (server wallet, phase ≥ 2): the server already spent this
+   * sortie's Warp; its tanks replace this device's instead of spending here.
+   */
+  admit(context: SortieContext, intent = this.intent(), serverWarp: WarpCharge | null = null): Promise<PlayerSave> {
     context = structuredClone(context);
+    if (serverWarp !== null && !isValidWarpCharge(serverWarp)) return Promise.reject(new Error("Invalid server Warp"));
     return this.transaction(intent, "admit", context, (s) => {
       if (!isValidSortieContext(context))
         throw new Error("Invalid sortie context");
@@ -371,7 +380,19 @@ export class AccountTransactions {
         throw new Error("Stage is not unlocked");
       if (context.activity === "hidden" && !s.hiddenDiscovery.encounter?.active)
         throw new Error("Hidden route is no longer active");
-      const cost = spendWarp(a.warp, this.now());
+      let cost: { warp: WarpCharge; active: number; reserve: number };
+      if (serverWarp === null) cost = spendWarp(a.warp, this.now());
+      else {
+        // Same split the server used where this device agrees; the server's tanks win either way.
+        let split = { active: 10, reserve: 0 };
+        try {
+          const local = spendWarp(a.warp, this.now());
+          split = { active: local.active, reserve: local.reserve };
+        } catch {
+          /* This device's tanks were behind the server's. */
+        }
+        cost = { warp: { ...structuredClone(serverWarp), reserveConsent: serverWarp.reserveConsent || a.warp.reserveConsent }, ...split };
+      }
       a.warp = cost.warp;
       a.attempt = {
         id: intent.id,
@@ -444,6 +465,34 @@ export class AccountTransactions {
       s.account.warp = result.warp;
       s.expansionCurrencies.starCrystal = result.crystals;
     });
+  }
+  /** Live-ops Warp gift, paid once per key (a retried claim is a no-op). */
+  giftWarp(key: string, amount: number, intent = this.intent()): Promise<PlayerSave> {
+    return this.transaction(intent, "liveops-warp", { key, amount }, (s) => {
+      if (s.account.attempt)
+        throw new Error("Claim Warp gifts between sorties");
+      if (s.account.milestoneGrants.includes(key)) return;
+      s.account.warp = giftWarp(s.account.warp, this.now(), amount);
+      s.account.milestoneGrants.push(key);
+    });
+  }
+  /**
+   * Server wallet (phase ≥ 2): the server's Warp replaces this device's.
+   * Allowed during a sortie too (it only replaces the tanks); the
+   * monotonic clock is re-anchored if the server's watermark is ahead.
+   */
+  adoptServerWarp(warp: WarpCharge, intent = this.intent()): Promise<PlayerSave> {
+    if (!isValidWarpCharge(warp)) return Promise.reject(new Error("Invalid server Warp"));
+    const frozen = structuredClone(warp);
+    return this.transaction(intent, "server-warp", frozen, (s) => {
+      s.account.warp = { ...frozen, reserveConsent: frozen.reserveConsent || s.account.warp.reserveConsent };
+    }).then((s) => {
+      if (s.account.warp.watermarkMs > this.now()) this.clock = new WarpClock(s.account.warp.watermarkMs);
+      return s;
+    });
+  }
+  hasGrant(key: string): boolean {
+    return this.state?.milestoneGrants.includes(key) ?? false;
   }
   reserveConsent(
     consent: boolean,

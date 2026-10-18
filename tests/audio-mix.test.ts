@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   AUDIO_GROUP_GAIN,
   mixedSfxGain,
+  PRONUNCIATION_DUCK,
+  setPronunciationBoost,
 } from "../src/audio/mix";
 
 describe("audio mix", () => {
@@ -40,5 +42,20 @@ describe("audio mix", () => {
       AUDIO_GROUP_GAIN.typing,
     );
     expect(mixedSfxGain(-1, "typing", 1)).toBe(0);
+  });
+
+  it("Voice boost ducks effects deeper while a word is spoken, never when silent", () => {
+    try {
+      setPronunciationBoost(1);
+      expect(mixedSfxGain(1, "warnings", 1, true)).toBeCloseTo(AUDIO_GROUP_GAIN.warnings * PRONUNCIATION_DUCK.warnings);
+      setPronunciationBoost(3);
+      expect(mixedSfxGain(1, "warnings", 1, true)).toBeCloseTo(AUDIO_GROUP_GAIN.warnings / 3);
+      expect(mixedSfxGain(1, "typing", 1, true)).toBeCloseTo(AUDIO_GROUP_GAIN.typing * Math.min(PRONUNCIATION_DUCK.typing, 1 / 3));
+      expect(mixedSfxGain(1, "combat", 1, false)).toBeCloseTo(AUDIO_GROUP_GAIN.combat);
+      setPronunciationBoost(9);
+      expect(mixedSfxGain(1, "warnings", 1, true)).toBeCloseTo(AUDIO_GROUP_GAIN.warnings / 3);
+    } finally {
+      setPronunciationBoost(1);
+    }
   });
 });

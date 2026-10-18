@@ -27,6 +27,46 @@ import type {
 import type { VisualQuality } from "../types";
 
 /** Boss skill ids (src/boss/skills.ts BossSkillKind) for the skill sounds. */
+/**
+ * Recorded UI sounds (Kenney Interface / Sci-Fi Sounds, CC0; see
+ * public/assets/audio/ATTRIBUTION.md). A file in src/assets/audio/ui/<name>.ogg
+ * replaces the synthesized fallback at the next build; the files are decoded
+ * into Web Audio buffers on unlock (about 150 KB) for low latency.
+ */
+const UI_SOUND_FILES = import.meta.glob<string>("../assets/audio/ui/*.ogg", {
+  eager: true,
+  query: "?url",
+  import: "default",
+});
+const UI_SOUNDS = new Map(
+  Object.entries(UI_SOUND_FILES).map(([path, url]) => [path.slice(path.lastIndexOf("/") + 1, -4), url]),
+);
+export type UiSoundName =
+  | "hover"
+  | "click"
+  | "tab"
+  | "open"
+  | "close"
+  | "confirm"
+  | "deploy"
+  | "deploy-thump"
+  | "reward-small"
+  | "reward-big"
+  | "reward-shimmer"
+  | "streak"
+  | "error";
+
+/** Shaping for one recorded UI sound. */
+type UiSoundShape = {
+  /** Stereo position, -1 (left) … 1 (right). */
+  pan?: number;
+  /** Seconds after now. */
+  delay?: number;
+  /** Random playback-rate spread (0.05 = ±5 %), so repeats never sound identical. */
+  jitter?: number;
+  rate?: number;
+};
+
 type BossSkillSoundKind = "volley" | "lance" | "quake" | "surge" | "tether" | "cataclysm";
 
 /** Optional shaping for one synthesized voice. */
@@ -195,6 +235,7 @@ export class Sfx {
       if (this.context.state === "suspended") {
         void this.context.resume();
       }
+      this.loadUiBuffers(this.context);
     }
     this.samples.preload();
     this.loadLocalAnnouncer();
@@ -529,6 +570,12 @@ export class Sfx {
     this.tone(470, 0.1, "triangle", 0.025, 740, "ui");
   }
 
+  /** Menu confirmation (claim, buy, save). Duel banking keeps uiConfirm below. */
+  uiAccept(): void {
+    if (this.uiFile("confirm", 0.32, { jitter: 0.03 })) return;
+    this.uiConfirm();
+  }
+
   uiConfirm(): void {
     this.samples.play(
       "confirm",
@@ -537,6 +584,157 @@ export class Sfx {
       1.05,
     );
     this.tone(540, 0.06, "sine", 0.018, 700, "ui");
+  }
+
+  private readonly uiVoices = new Map<string, HTMLAudioElement[]>();
+  private readonly uiBuffers = new Map<string, AudioBuffer>();
+  private uiBuffersRequested = false;
+  private lastUiHover = 0;
+  private lastUiClick = 0;
+
+  /** Decodes every recorded UI sound once, after the first user gesture. */
+  private loadUiBuffers(context: AudioContext): void {
+    if (this.uiBuffersRequested || UI_SOUNDS.size === 0 || typeof fetch !== "function") return;
+    this.uiBuffersRequested = true;
+    for (const [name, url] of UI_SOUNDS) {
+      void fetch(url)
+        .then((response) => response.arrayBuffer())
+        .then((data) => context.decodeAudioData(data))
+        .then((buffer) => {
+          if (!this.destroyed) this.uiBuffers.set(name, buffer);
+        })
+        .catch(() => {
+          // The HTMLAudio pool below (or the synth) still plays this cue.
+        });
+    }
+  }
+
+  /**
+   * Plays src/assets/audio/ui/<name>.ogg when it exists: a decoded Web Audio
+   * buffer when ready (pitch spread, panning, the shared limiter), else an
+   * HTMLAudio voice. Returns false only when there is no such file.
+   */
+  private uiFile(name: UiSoundName, gain: number, shape: UiSoundShape = {}): boolean {
+    const url = UI_SOUNDS.get(name);
+    if (url === undefined || this.destroyed) return false;
+    const context = this.context;
+    const buffer = this.uiBuffers.get(name);
+    if (context !== null && buffer !== undefined) {
+      const level = mixedSfxGain(this.volume, "ui", gain, this.pronunciationActive);
+      if (level <= 0) return true;
+      const source = context.createBufferSource();
+      source.buffer = buffer;
+      const spread = shape.jitter ?? 0;
+      source.playbackRate.value = (shape.rate ?? 1) * (1 + (Math.random() * 2 - 1) * spread);
+      const amp = context.createGain();
+      amp.gain.value = level;
+      source.connect(amp).connect(this.voiceOutput(context, { pan: shape.pan }));
+      source.start(context.currentTime + Math.max(0, shape.delay ?? 0));
+      return true;
+    }
+    if (typeof Audio === "undefined") return false;
+    if ((shape.delay ?? 0) > 0) {
+      this.schedule(() => void this.uiFile(name, gain, { ...shape, delay: 0 }), (shape.delay ?? 0) * 1000);
+      return true;
+    }
+    let pool = this.uiVoices.get(name);
+    if (pool === undefined) {
+      pool = [new Audio(url), new Audio(url)];
+      for (const voice of pool) voice.preload = "auto";
+      this.uiVoices.set(name, pool);
+    }
+    const voice = pool.find((item) => item.paused || item.ended) ?? pool[0]!;
+    voice.currentTime = 0;
+    // Files are normalised near 0 dBFS, so the cue gain is the level directly.
+    voice.volume = Math.max(0, Math.min(1, mixedSfxGain(this.volume, "ui", gain, this.pronunciationActive)));
+    void voice.play().catch(() => {});
+    return true;
+  }
+
+  /**
+   * Pointer enters a button or card: a faint holo blip, rate-limited.
+   * Levels (peak at the default 50 % SFX volume): hover about -34 dBFS,
+   * click -26, panels -24, confirm -20, big reward -14, deploy -12.
+   */
+  uiHover(pan = 0): void {
+    const now = this.clock();
+    if (now - this.lastUiHover < 70) return;
+    this.lastUiHover = now;
+    if (this.uiFile("hover", 0.065, { jitter: 0.07, pan })) return;
+    this.tone(1900, 0.025, "sine", 0.005, 2300, "ui", { attack: 0.002 });
+  }
+
+  /** A button press: a crisp tick with a little body under it. */
+  uiClick(pan = 0): void {
+    const now = this.clock();
+    if (now - this.lastUiClick < 40) return;
+    this.lastUiClick = now;
+    if (this.uiFile("click", 0.16, { jitter: 0.05, pan })) {
+      this.tone(720, 0.05, "sine", 0.012, 430, "ui", { pan });
+      return;
+    }
+    this.noise(0.03, 0.02, "ui", { filter: "bandpass", frequency: 3200, q: 1.2, pan });
+    this.tone(760, 0.05, "triangle", 0.016, 460, "ui", { pan });
+  }
+
+  /** Deploy: the launch whoosh with a low thump under it (stage start). */
+  uiDeploy(): void {
+    if (this.uiFile("deploy", 0.42, { jitter: 0.02 })) {
+      this.uiFile("deploy-thump", 0.5, { delay: 0.12 });
+      return;
+    }
+    this.noise(0.7, 0.05, "ui", { filter: "bandpass", frequency: 900, q: 0.5, attack: 0.18 });
+    this.tone(70, 0.8, "sine", 0.06, 190, "ui", { attack: 0.2 });
+  }
+
+  /** A tab or segmented choice changes. */
+  uiTab(): void {
+    if (this.uiFile("tab", 0.24, { jitter: 0.04 })) return;
+    this.noise(0.05, 0.012, "ui", { filter: "bandpass", frequency: 2600, q: 1.4 });
+    this.tone(640, 0.05, "triangle", 0.012, 820, "ui");
+  }
+
+  /** A panel opens: a soft rising holo sweep. */
+  uiOpen(): void {
+    if (this.uiFile("open", 0.2, { jitter: 0.03 })) return;
+    this.noise(0.18, 0.014, "ui", { filter: "bandpass", frequency: 1800, q: 0.8, attack: 0.04 });
+    this.tone(260, 0.16, "sine", 0.014, 520, "ui", { attack: 0.03 });
+  }
+
+  /** A panel closes: the same sweep falling. */
+  uiClose(): void {
+    if (this.uiFile("close", 0.17, { jitter: 0.03 })) return;
+    this.noise(0.14, 0.01, "ui", { filter: "bandpass", frequency: 1300, q: 0.8 });
+    this.tone(480, 0.12, "sine", 0.011, 240, "ui");
+  }
+
+  uiError(): void {
+    if (this.uiFile("error", 0.26)) return;
+    this.tone(180, 0.12, "square", 0.012, 140, "ui");
+    this.schedule(() => this.tone(150, 0.14, "square", 0.01, 120, "ui"), 90);
+  }
+
+  /** A reward crate opens: small for missions, big for chests and milestones. */
+  rewardReveal(big: boolean): void {
+    if (big && this.uiFile("reward-big", 0.62)) {
+      this.uiFile("reward-shimmer", 0.34, { delay: 0.07, jitter: 0.03 });
+      return;
+    }
+    if (!big && this.uiFile("reward-small", 0.4, { jitter: 0.03 })) return;
+    this.noise(big ? 0.5 : 0.28, big ? 0.03 : 0.02, "rewards", { filter: "bandpass", frequency: big ? 900 : 1500, q: 0.6, attack: 0.02 });
+    this.tone(big ? 130 : 196, big ? 0.5 : 0.3, "triangle", big ? 0.04 : 0.028, big ? 260 : 294, "rewards", { attack: 0.015 });
+    this.schedule(() => this.tone(big ? 196 : 294, 0.36, "sine", 0.024, big ? 392 : 440, "rewards"), 80);
+    if (big) this.schedule(() => this.noise(0.4, 0.016, "rewards", { filter: "highpass", frequency: 3200, q: 0.5 }), 140);
+  }
+
+  /** The daily goal is reached and the streak grows: an ignition whoosh. */
+  streakIgnite(): void {
+    if (this.uiFile("streak", 0.4)) {
+      this.tone(90, 0.5, "sine", 0.03, 180, "rewards", { attack: 0.06 });
+      return;
+    }
+    this.noise(0.55, 0.035, "rewards", { filter: "bandpass", frequency: 700, q: 0.6, attack: 0.1 });
+    this.tone(90, 0.5, "sine", 0.04, 180, "rewards", { attack: 0.06 });
   }
 
   /** A Credit crystal burst breaking out of a kill (`pan` -1 … 1). */
@@ -761,6 +959,33 @@ export class Sfx {
     this.tone(250, 0.14, "sine", 0.03, 120, "combat");
   }
 
+  /** One blast of a boss's death chain; the last one is the big one. */
+  bossDeathBlast(final: boolean): void {
+    if (final) {
+      if (!this.playSample("boss-death-final", 0.86)) this.playSample("explosion-accent", 0.72);
+      this.playSample("boss-death", 0.8);
+      this.noise(0.6, 0.08, "combat", { filter: "lowpass", frequency: 380, q: 0.6 });
+      this.tone(52, 0.8, "sine", 0.09, 26, "combat");
+      return;
+    }
+    if (!this.playSample("boss-death-chain", 0.9 + Math.random() * 0.25)) {
+      this.playSample("explosion-accent", 0.92 + Math.random() * 0.22);
+    }
+    this.playSample("boss-crystal-break", 0.78 + Math.random() * 0.12);
+    this.noise(0.14, 0.045, "combat", { filter: "bandpass", frequency: 900, q: 0.7 });
+  }
+
+  /** A Glyph Volley leaves the boss's hands: a low force-field cast. */
+  bossVolley(): void {
+    this.playSample("boss-cast", 1.12);
+  }
+
+  /** A heavy blow on a crystal boss (word, counter, break): glass crunch, low. */
+  bossShatter(): void {
+    this.playSample("boss-crystal-break", 0.82 + Math.random() * 0.1);
+    this.tone(64, 0.22, "sine", 0.07, 38, "combat");
+  }
+
   // --- HUD cues -----------------------------------------------------------------
 
   private lastHudCue = 0;
@@ -840,6 +1065,8 @@ export class Sfx {
     switch (kind) {
       case "lance":
         if (!this.playSample("duel-heavy-launch", 0.78)) this.tone(150, 0.3, "sawtooth", 0.05, 50, "combat");
+        // The strike leaving the boss's core (in step with the model's frame 42).
+        this.playSample("boss-cast", 0.86);
         this.noise(0.32, 0.05, "combat", { filter: "bandpass", frequency: 700, q: 0.6 });
         return;
       case "quake":
@@ -990,7 +1217,11 @@ export class Sfx {
     if (now - this.lastBossImpact < 45) return;
     this.lastBossImpact = now;
     const shape: VoiceShape = { pan };
-    this.materialStrike(material, 1.6, pan, 0.75 * voice);
+    // A crystal boss crunches like heavy glass; the pitched crystal chime
+    // rang like a bell on every bolt (the audio direction rules that out).
+    if (material !== "crystal" || !this.playSample("boss-crystal-hit", 0.8 + Math.random() * 0.12)) {
+      this.materialStrike(material, 1.6, pan, 0.75 * voice);
+    }
     this.tone(72 * voice, 0.2, "sine", 0.12, 40, "combat", shape);
     this.noise(0.1, 0.09, "combat", { ...shape, filter: "lowpass", frequency: 900 });
   }
@@ -1002,7 +1233,11 @@ export class Sfx {
     this.tone(70 * voice, 0.9, "sawtooth", 0.07, 48 * voice, "warnings", warm);
     this.tone(104 * voice, 0.8, "sawtooth", 0.05, 70 * voice, "warnings", { attack: 0.1 });
     this.noise(0.8, 0.08, "warnings", { filter: "bandpass", frequency: 700 * voice, q: 3, attack: 0.15 });
-    this.schedule(() => this.materialStrike(material, 1.4, 0, 0.8 * voice), 120);
+    this.schedule(() => {
+      // Crystal: a low force-field swell and a glass crunch, not a chime.
+      if (material === "crystal" && this.playSample("boss-cast", 0.8)) this.playSample("boss-crystal-break", 0.76);
+      else this.materialStrike(material, 1.4, 0, 0.8 * voice);
+    }, 120);
   }
 
   /** The material's own voice, shared by hits, layer breaks and bosses. */

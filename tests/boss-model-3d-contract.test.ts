@@ -2,10 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   TYRANT_G01_3D,
   boss3DFrameSeconds,
+  boss3DModelForId,
   boss3DModelForPaintedArtUrl,
 } from "../src/boss/model-3d-contract";
 
 describe("boss 3D runtime contract", () => {
+  it("resolves the authored model without depending on a painted sprite", () => {
+    expect(boss3DModelForId("tyrant-g01")).toBe(TYRANT_G01_3D);
+    expect(boss3DModelForId("tyrant-g02")).toBeNull();
+  });
   it("maps the hashed tyrant-g01 painted asset to its authored GLB", () => {
     expect(boss3DModelForPaintedArtUrl("/assets/tyrant-g01-CmL9.webp")).toBe(TYRANT_G01_3D);
     expect(boss3DModelForPaintedArtUrl("/assets/tyrant-g02.webp")).toBeNull();

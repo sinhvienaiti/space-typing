@@ -173,6 +173,18 @@ describe("boss depth skills in the game loop", () => {
     game.destroy();
   });
 
+  it("plays the death chain over the boss and lets the effects run out (Low, no 3D model)", () => {
+    const { game, state } = createBossGame();
+    const internals = game as unknown as { bossFx: { active: number }; defeatBoss: () => void };
+    state.boss!.hp = 1;
+    internals.defeatBoss();
+    expect(state.boss).toBeNull();
+    expect(internals.bossFx.active).toBeGreaterThan(0);
+    game.testLabAdvanceSimulation(4);
+    expect(internals.bossFx.active).toBe(0);
+    game.destroy();
+  });
+
   it("queues the ultimate entering the Galaxy Tyrant's third phase", () => {
     const { game, state } = createBossGame();
     game.testLabSetBoss({ phase: 3 });
