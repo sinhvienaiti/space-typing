@@ -21,3 +21,8 @@ cloud/.wrangler/
 /art.zip
 /art-src1310.zip
 /output/
+
+# Local archives and review outputs (not for git)
+/art.zip
+/art-src1310.zip
+/output/
