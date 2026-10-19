@@ -158,3 +158,38 @@ còn đang giải mã. Đăng ký listener Duel được hủy khi rời và kh�
 
 Các log build/test/batch trong `/private/tmp/space-typing-*`. Binary runtime và
 source code được lưu trong commit bàn giao; ảnh QA và source art không đưa vào Git.
+
+## Bổ sung theo VISUAL_TESTING.md
+
+Đối chiếu trực tiếp [VISUAL_TESTING.md](VISUAL_TESTING.md), build lại bằng
+`pnpm build:space` từ repo cha và bổ sung ảnh Play sau **20 giây trong trận**.
+Ảnh phải xác nhận đang trong trận; chờ splash đóng và nút Deploy sẵn sàng bằng
+`--ready`, vì click quá sớm có thể bị splash chặn dù công cụ vẫn chụp thành công.
+
+- Gallery và ảnh trong trận đều 1642×799 DPR 2, PNG 3284×1598.
+- Đã tự mở xem ba ảnh phóng to: `detail-title-hull.jpg`,
+  `detail-combat-hull.jpg`, `detail-low-alpha.jpg` trong `.visual/ships-fleet/`.
+  Kiểm tra viền thân, alpha, hai miệng xả và sự tách biệt lớp 2D/3D;
+  không thấy nền xám hình chữ nhật, viền lem màu hoặc hai thân tàu chồng nhau.
+- Ảnh mới và JSON: `.visual/ships-fleet/guideline-qa/`, gồm Vanguard và
+  Eternal sau Deploy 20 giây, cùng ảnh crop `detail-combat-20s.jpg` đã mở xem.
+  `exceptions` rỗng; bản Play không có console warning/error. Các dòng
+  `click fallback` chỉ ghi cách harness bấm nút Hangar ngoài vùng nhìn thấy.
+
+Đã đo `bg-gpu-stress.js` ba lần liên tiếp trên M4: High, buffer 2053×999,
+x1/x3/x6/x10 đều 60 FPS. Sau đó A/B trong cùng phiên Chrome, Stage 1 với
+8 quái cố định, Aegis mang skin Eternal, quality High, viewport DPR 2
+(DPR canvas game được quality policy giới hạn 1.8):
+
+| Chế độ | FPS đo bằng rAF | Frame p95 | CPU vẽ trung bình / p95 |
+|---|---:|---:|---:|
+| GLB | 60 | 18.1 ms | 1.44 / 2.4 ms |
+| Cùng ngoại hình bằng fallback 2D | 60 | 17.9 ms | 0.63 / 1.0 ms |
+
+Đổi luân phiên 16 block, mỗi block 1.5 giây; bỏ ba frame chuyển chế độ.
+Không dùng GPU timer qua Metal. Đây là A/B hai chế độ render của bản hiện tại,
+không phải số đo lịch sử trước tích hợp và không dùng để khẳng định hiệu năng
+của mọi thiết bị/cảnh chơi. FPS thật nằm ở `ship.frame` trong JSON;
+`ship.draw` là thời gian CPU vẽ, không phải GPU frame time.
+Bằng chứng: `.visual/ships-fleet/perf-results.json`, `perf-review.mjs`,
+`perf-scene.png`. Máy chủ Vite kiểm thử cổng 3098 đã được tắt.
