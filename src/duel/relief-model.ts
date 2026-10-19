@@ -5,6 +5,7 @@ import {
   type ReliefRuntimeMediaBundle,
 } from "./relief-media-runtime";
 import type { BuiltShip } from "./vanguard-model";
+import { resolveShipVisualId } from "../characters/ship-visual";
 
 /**
  * Relief hull (first 3D pilot, 2026-10-03): the owner's painted top view
@@ -199,7 +200,7 @@ async function buildReliefShip(
 }
 
 /** Loads the bundled prepared relief data, or null if the Ship has no bundle. */
-async function loadBundledReliefShip(three: Three, id: CharacterId, maxAnisotropy: number, segments = 176): Promise<BuiltShip | null> {
+async function loadBundledReliefShip(three: Three, id: string, maxAnisotropy: number, segments = 176): Promise<BuiltShip | null> {
   if (!(await reliefIndex()).has(id)) return null;
   const base = ROOT + id + "/";
   const model = await fetchModel(base + "model.json");
@@ -234,6 +235,7 @@ export async function loadReliefShip(
   maxAnisotropy: number,
   segments = 176,
   reliefAssetVersionId?: string | null,
+  visualId = resolveShipVisualId(id),
 ): Promise<BuiltShip | null> {
   const explicitSource = reliefAssetVersionId !== undefined;
   const assetVersionId = explicitSource
@@ -251,7 +253,9 @@ export async function loadReliefShip(
       // becomes unavailable; the assignment is never substituted with latest.
     }
   }
-  return loadBundledReliefShip(three, id, maxAnisotropy, segments);
+  // Exact Admin previews keep their CharacterId's original bundled source;
+  // ordinary gameplay follows the cosmetic identity captured by its owner.
+  return loadBundledReliefShip(three, explicitSource ? id : visualId, maxAnisotropy, segments);
 }
 
 /**

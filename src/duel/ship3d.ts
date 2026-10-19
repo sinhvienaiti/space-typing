@@ -2,6 +2,9 @@ import type { CharacterId } from "../characters/registry";
 import type { VisualQuality } from "../types";
 import type { BuiltShip } from "./vanguard-model";
 import { activeShipRuntimeReliefAssetVersionId } from "../admin/ship-runtime-policy";
+import { resolveShipVisualId } from "../characters/ship-visual";
+import { shipVisualRuntimeKey } from "../characters/ship-art";
+import { shipRuntimeImageAssetVersionId } from "../characters/ship-media-runtime";
 import {
   dedupeShip3DInFlight,
   disposeBuiltShipResources,
@@ -176,7 +179,7 @@ export class DuelShip3D {
   private environmentRoom: typeof import("three/examples/jsm/environments/RoomEnvironment.js").RoomEnvironment | null = null;
 
   static load(id: CharacterId, role: Ship3DRole = "self", quality: VisualQuality = "high"): Promise<DuelShip3D | null> {
-    const key = role + ":" + id + ":" + quality;
+    const key = role + ":" + shipVisualRuntimeKey(id) + ":" + quality;
     return dedupeShip3DInFlight(
       loads,
       key,
@@ -203,8 +206,11 @@ export class DuelShip3D {
     options: Ship3DLoadOptions = {},
   ): Promise<DuelShip3D | null> {
     const mode = ship3dMode();
-    if (typeof WebGLRenderingContext === "undefined" || typeof fetch !== "function" || typeof document === "undefined" || mode === "off") return null;
-    const modelled = mode === "model" && id === "vanguard";
+    if (options.quality === "low" || typeof WebGLRenderingContext === "undefined" || typeof fetch !== "function" || typeof document === "undefined" || mode === "off") return null;
+    if (options.reliefAssetVersionId === undefined && shipRuntimeImageAssetVersionId(id) !== null) return null;
+    const visualId = resolveShipVisualId(id);
+    const exactRelief = options.reliefAssetVersionId !== undefined || activeShipRuntimeReliefAssetVersionId(id) !== undefined;
+    const modelled = mode === "model" && visualId === "vanguard" && !exactRelief;
     const [three, environment, vanguard, reliefModule] = await Promise.all([
       import("three"),
       import("three/examples/jsm/environments/RoomEnvironment.js"),
@@ -226,7 +232,7 @@ export class DuelShip3D {
     // Exact Admin relief assignments/previews retain their own source. With
     // no assignment, prepared Meshy/Tripo GLBs take precedence over relief art.
     const authored = !modelled && options.reliefAssetVersionId === undefined && activeShipRuntimeReliefAssetVersionId(id) === undefined
-      ? await import("./authored-ship").then(module => module.loadAuthoredShip(three, id, role === "rival" ? "medium" : options.quality ?? "high")).catch(() => null)
+      ? await import("./authored-ship").then(module => module.loadAuthoredShip(three, id, role === "rival" ? "medium" : options.quality ?? "high", visualId)).catch(() => null)
       : null;
     const built = authored ?? (vanguard !== null
       ? vanguard.buildVanguard(three)
@@ -236,6 +242,7 @@ export class DuelShip3D {
           renderer.capabilities.getMaxAnisotropy(),
           role === "self" ? 176 : 96,
           options.reliefAssetVersionId,
+          visualId,
         ));
     if (built === null) {
       renderer.dispose();
@@ -414,7 +421,7 @@ export class DuelShip3D {
   }
 
   render(pose: Ship3DPose): Ship3DFrame | null {
-    if (this.lost || this.disposed) return null;
+    if (this.lost || this.disposed || pose.quality === "low") return null;
     const size = pose.width * FRAME;
     const dpr = Math.min(pose.dpr, RESOLUTION[pose.quality], this.role === "rival" ? 1.5 : Infinity);
     const pixels = Math.max(32, Math.min(MAX_PIXELS, Math.round(size * dpr)));

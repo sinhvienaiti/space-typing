@@ -1,0 +1,71 @@
+{
+  "id": "phantom-wraith",
+  "version": 3,
+  "aspect": 0.7169,
+  "heightScale": 0.1715,
+  "heightGrid": [
+    256,
+    357
+  ],
+  "nozzles": [
+    [
+      0.4106,
+      0.9525,
+      0.0239
+    ],
+    [
+      0.5951,
+      0.9525,
+      0.0239
+    ]
+  ],
+  "anchors": {
+    "nose": [
+      0.4949,
+      0.0336
+    ],
+    "canopy": [
+      0.5,
+      0.5341
+    ],
+    "eyes": [],
+    "guns": [
+      [
+        0.3026,
+        0.6477
+      ],
+      [
+        0.6989,
+        0.6477
+      ]
+    ],
+    "wingtips": [
+      [
+        0.0371,
+        0.7575
+      ],
+      [
+        0.9551,
+        0.7587
+      ]
+    ]
+  },
+  "colors": {
+    "hot": "#fbe9ff",
+    "plume": "#e76dff",
+    "outer": "#a74eb8",
+    "accent": "#e56dff"
+  },
+  "color": "color.webp?v=076f8d9e5dec",
+  "emissive": "emissive.webp?v=8299e53ae3a8",
+  "height": "height.bin?v=58daeea843d2",
+  "source": {
+    "image": "art-src/ships/ship-04-phantom-wraith-2d.png",
+    "imageSha256": "a559202ad3d02324e5114b44e7f1bfbe24df054ad48af74a5f890175cb8bccc9",
+    "renderedImage": "art-src/ships/rendered/phantom-wraith-top.png",
+    "renderedImageSha256": "7cb4406e93714ae9cd8f925ea1c8e4aff8da0ef471e3d1907ce6d4fadc29d61e",
+    "projectionMetadata": "art-src/ships/rendered/phantom-wraith-top.json",
+    "projectionMetadataSha256": "8971a6bc3162352f54b1253c24503bb36159ebab80d9a6fb62d0f3fbaf9401fb",
+    "normalizedModelSha256": "b774c6a1b1324e12dda939c2f8d212b5da33632a1db06e7f9f987289fba6393f"
+  }
+}

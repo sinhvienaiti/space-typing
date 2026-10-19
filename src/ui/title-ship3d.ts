@@ -1,6 +1,8 @@
 import type { CharacterId } from "../characters/registry";
 import type { DuelShip3D } from "../duel/ship3d";
 import type { VisualQuality } from "../types";
+import { shipVisualRuntimeKey } from "../characters/ship-art";
+import { subscribeShipVisuals } from "../characters/ship-visual";
 
 /**
  * The title showcase in 3D: the selected ship as the Duel relief hull (real
@@ -33,6 +35,7 @@ export function installTitleShip3D(host: HTMLElement, fallback: HTMLImageElement
 
   let ship: DuelShip3D | null = null;
   let shipId = "";
+  let visualKey = "";
   let quality: VisualQuality = "high";
   let token = 0;
   let active = true;
@@ -189,6 +192,8 @@ export function installTitleShip3D(host: HTMLElement, fallback: HTMLImageElement
 
   async function load(id: string): Promise<void> {
     const mine = ++token;
+    const requestedKey = shipVisualRuntimeKey(id as CharacterId);
+    visualKey = requestedKey;
     ship?.dispose();
     ship = null;
     useFallback(true);
@@ -196,13 +201,13 @@ export function installTitleShip3D(host: HTMLElement, fallback: HTMLImageElement
     // The boot splash (boot-splash.ts) waits while this says "wait".
     host.dataset.ship3d = "wait";
     const module = await import("../duel/ship3d").catch(() => null);
-    if (mine !== token) return;
+    if (mine !== token || requestedKey !== shipVisualRuntimeKey(id as CharacterId)) return;
     if (module === null) {
       host.dataset.ship3d = "off";
       return;
     }
     const loaded = await module.DuelShip3D.loadFresh(id as CharacterId, "self", { quality });
-    if (mine !== token) {
+    if (mine !== token || requestedKey !== shipVisualRuntimeKey(id as CharacterId)) {
       loaded?.dispose();
       return;
     }
@@ -219,6 +224,11 @@ export function installTitleShip3D(host: HTMLElement, fallback: HTMLImageElement
     }, { threshold: 0.05 }).observe(host);
   }
   document.addEventListener("visibilitychange", schedule);
+  subscribeShipVisuals(() => {
+    if (!shipId || visualKey === shipVisualRuntimeKey(shipId as CharacterId)) return;
+    if (active && quality !== "low") void load(shipId);
+    else release();
+  });
 
   return {
     show(id, nextQuality) {
@@ -229,7 +239,7 @@ export function installTitleShip3D(host: HTMLElement, fallback: HTMLImageElement
         release();
         return;
       }
-      if (id !== shipId || tierChanged) {
+      if (id !== shipId || visualKey !== shipVisualRuntimeKey(id as CharacterId) || tierChanged) {
         shipId = id;
         void load(id);
       } else {

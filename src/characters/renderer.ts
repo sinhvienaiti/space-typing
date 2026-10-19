@@ -16,6 +16,7 @@ import {
   type ShipLightRig,
 } from "./ship-lights";
 import { drawShip3D, type ShipSocketPoints } from "../render3d/ship-model";
+import { shipVisualImage, shipVisualLightRig } from "./ship-art";
 
 /** Light rig for a modelled hull: the painted rig's look on the model's sockets. */
 function modelLightRig(
@@ -23,7 +24,7 @@ function modelLightRig(
   profile: Readonly<CharacterVisualProfile>,
   sockets: ShipSocketPoints,
 ): ShipLightRig {
-  const painted = shipLightRig(characterId);
+  const painted = shipVisualLightRig(characterId) ?? shipLightRig(characterId);
   const base: ShipLightRig = painted ?? {
     nozzles: [],
     plumeWidth: 4,
@@ -169,7 +170,7 @@ export function characterShipArtSource(): "v3" | "v2" | "procedural" {
 }
 
 export function hasCharacterShipImage(id: CharacterId): boolean {
-  return characterShipRuntimeImage(id) !== null || characterShipSheet !== null;
+  return characterShipRuntimeImage(id) !== null || shipVisualImage(id) !== null || characterShipSheet !== null;
 }
 
 /**
@@ -179,6 +180,7 @@ export function hasCharacterShipImage(id: CharacterId): boolean {
  */
 export function activeShipLightRig(id: CharacterId): Readonly<ShipLightRig> | null {
   if (characterShipRuntimeImage(id) !== null) return null;
+  if (shipVisualImage(id) !== null) return shipVisualLightRig(id);
   if (characterShipSheet === null || characterShipSource !== "v3") return null;
   return shipLightRig(id);
 }
@@ -650,6 +652,19 @@ export function drawCharacterShip(
       );
     }
     drawAssignedShipImage(context, assigned, hullProfile, glowScale, paint);
+    context.restore();
+    return;
+  }
+
+  // Low quality, unavailable WebGL, and GLB load failures keep the same
+  // selected hull identity through its generated transparent top view.
+  const canonical = shipVisualImage(characterId);
+  if (canonical !== null) {
+    drawAssignedShipImage(context, canonical, hullProfile, glowScale, paint);
+    const canonicalRig = shipVisualLightRig(characterId);
+    if (canonicalRig !== null) drawShipLights(context, withTrailRig(canonicalRig, options.trail), {
+      time: options.time, boost: options.boost ?? 0, recoil: options.recoil ?? 0, detail: detailScale,
+    });
     context.restore();
     return;
   }

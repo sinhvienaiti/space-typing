@@ -74,6 +74,7 @@
     "chase:prepare": "node scripts/bg-art/prepare-ship-chase.mjs",
     "ship3d:prepare": "node scripts/bg-art/prepare-ship-3d.mjs",
     "models:prepare": "node --import tsx scripts/models/prepare-models.ts",
+    "ships:models:prepare": "node scripts/models/prepare-ship-models.mjs",
     "cosmetics:manifest": "node scripts/cosmetics-manifest.mjs",
     "liveops-art:prepare": "node scripts/bg-art/prepare-liveops-art.mjs"
   },

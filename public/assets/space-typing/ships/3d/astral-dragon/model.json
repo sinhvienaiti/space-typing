@@ -1,0 +1,71 @@
+{
+  "id": "astral-dragon",
+  "version": 3,
+  "aspect": 0.9724,
+  "heightScale": 0.1905,
+  "heightGrid": [
+    256,
+    263
+  ],
+  "nozzles": [
+    [
+      0.4295,
+      0.9427,
+      0.0175
+    ],
+    [
+      0.5652,
+      0.9427,
+      0.0175
+    ]
+  ],
+  "anchors": {
+    "nose": [
+      0.4998,
+      0.0316
+    ],
+    "canopy": [
+      0.5,
+      0.564
+    ],
+    "eyes": [],
+    "guns": [
+      [
+        0.0821,
+        0.4719
+      ],
+      [
+        0.9189,
+        0.4719
+      ]
+    ],
+    "wingtips": [
+      [
+        0.0365,
+        0.446
+      ],
+      [
+        0.9698,
+        0.4248
+      ]
+    ]
+  },
+  "colors": {
+    "hot": "#e7eaff",
+    "plume": "#5e72ff",
+    "outer": "#4452b8",
+    "accent": "#638cff"
+  },
+  "color": "color.webp?v=813987d41db8",
+  "emissive": "emissive.webp?v=72a274b99c0b",
+  "height": "height.bin?v=c1a2c6e54f49",
+  "source": {
+    "image": "art-src/ships/ship-08-astral-dragon-2d.png",
+    "imageSha256": "668f0720b8509a7b266cde9ef13a91080ab59bce953188a12fd0fd9b51523f4c",
+    "renderedImage": "art-src/ships/rendered/astral-dragon-top.png",
+    "renderedImageSha256": "e32559f0f368affde0c68cafcac2b1e426a70065b7cbcf22ec05efcd24b4b41d",
+    "projectionMetadata": "art-src/ships/rendered/astral-dragon-top.json",
+    "projectionMetadataSha256": "f34a14a704d9a27079affff9cb3471f7ae586d0e5f01e6149ce1e62834dbab27",
+    "normalizedModelSha256": "9551b0a1afd97cc5c10c54f99fcfc922776ebb76c57fb72adf99e3863fa0659c"
+  }
+}

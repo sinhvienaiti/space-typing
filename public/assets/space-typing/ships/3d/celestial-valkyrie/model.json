@@ -1,0 +1,76 @@
+{
+  "id": "celestial-valkyrie",
+  "version": 3,
+  "aspect": 1.0328,
+  "heightScale": 0.1382,
+  "heightGrid": [
+    256,
+    248
+  ],
+  "nozzles": [
+    [
+      0.3699,
+      0.8836,
+      0.017
+    ],
+    [
+      0.5,
+      0.9704,
+      0.017
+    ],
+    [
+      0.6342,
+      0.8836,
+      0.017
+    ]
+  ],
+  "anchors": {
+    "nose": [
+      0.4992,
+      0.0362
+    ],
+    "canopy": [
+      0.5,
+      0.5291
+    ],
+    "eyes": [],
+    "guns": [
+      [
+        0.3648,
+        0.3651
+      ],
+      [
+        0.6353,
+        0.3651
+      ]
+    ],
+    "wingtips": [
+      [
+        0.0291,
+        0.6668
+      ],
+      [
+        0.9714,
+        0.6667
+      ]
+    ]
+  },
+  "colors": {
+    "hot": "#ffe1de",
+    "plume": "#ff3925",
+    "outer": "#b8291a",
+    "accent": "#ff7f5a"
+  },
+  "color": "color.webp?v=4f37ff9c2e54",
+  "emissive": "emissive.webp?v=94937e6c455f",
+  "height": "height.bin?v=1a45330239f3",
+  "source": {
+    "image": "art-src/ships/ship-10-celestial-valkyrie-2d.png",
+    "imageSha256": "7576c5dc479b8ecf71cdc0ab0eda9b9312d1b1e0f47e7e95090952aed68b1d2c",
+    "renderedImage": "art-src/ships/rendered/celestial-valkyrie-top.png",
+    "renderedImageSha256": "3e2720a04fbb294d4adbbe8fd2897fd786333a21ba127c65159bba23ab68b997",
+    "projectionMetadata": "art-src/ships/rendered/celestial-valkyrie-top.json",
+    "projectionMetadataSha256": "b916cb2fd02db3d4d2ec8df31fb7fb0b88105bff4e3dbfe2e709bb864fd8caf8",
+    "normalizedModelSha256": "75eb21cacd8252fa7431ab70b40f965b23bdef142bed436a6e87a8f7fbfef6ff"
+  }
+}

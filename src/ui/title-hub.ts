@@ -1,4 +1,7 @@
 import type { GameSettings } from "../types";
+import { isCharacterId } from "../characters/registry";
+import { resolveShipVisualId } from "../characters/ship-visual";
+import { characterShipRuntimeImage } from "../characters/ship-media-runtime";
 
 /**
  * Title hub controls (Holo Command layout in index.html #titleOverlay):
@@ -76,7 +79,11 @@ export function galaxyPlateUrl(stage: number): string {
 }
 
 export function shipArtUrl(shipId: string): string {
-  return "/assets/space-typing/ships/3d/" + shipId + "/color.webp";
+  if (isCharacterId(shipId)) {
+    const assigned = characterShipRuntimeImage(shipId);
+    if (assigned !== null) return assigned.src;
+  }
+  return "/assets/space-typing/ships/3d/" + (isCharacterId(shipId) ? resolveShipVisualId(shipId) : shipId) + "/color.webp";
 }
 
 /** Time until the next UTC midnight (Daily Expedition reset) as HH:MM. */
@@ -336,12 +343,20 @@ export function installTitleHub(deps: TitleHubDeps): TitleHub {
       bar.style.width =
         String(Math.max(1, Math.min(100, (pilot.highestStage / pilot.maxStage) * 100))) + "%";
     }
-    if (pilot.shipId !== lastShip) {
-      lastShip = pilot.shipId;
+    const shipUrl = shipArtUrl(pilot.shipId);
+    if (shipUrl !== lastShip) {
+      lastShip = shipUrl;
       const url = shipArtUrl(pilot.shipId);
       for (const id of ["titlePilotShip", "titleCampaignShip", "titleHeroShip", "playerStatusShip"]) {
         const image = byId<HTMLImageElement>(id);
-        if (image !== null) image.src = url;
+        if (image !== null) {
+          image.onerror = () => {
+            const legacy = "/assets/space-typing/ships/3d/" + pilot.shipId + "/color.webp";
+            if (image.getAttribute("src") !== legacy) image.src = legacy;
+            else image.onerror = null;
+          };
+          image.src = url;
+        }
       }
     }
     const plate = galaxyPlateUrl(pilot.selectedStage);

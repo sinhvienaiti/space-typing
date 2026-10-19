@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-18T08:36:41.169Z",
+  "generatedAt": "2026-10-19T18:11:51.902Z",
   "models": {
     "bosses/auriel-hero": {
       "kind": "bosses",
@@ -281,6 +281,373 @@
         4.106,
         1.9982,
         2.7697
+      ]
+    },
+    "ships/astral-dragon": {
+      "kind": "ships",
+      "id": "astral-dragon",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/ships/astral-dragon/astral-dragon.high.glb?v=183e20c754",
+          "bytes": 2656832
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/ships/astral-dragon/astral-dragon.medium.glb?v=815b44723a",
+          "bytes": 925100
+        }
+      },
+      "triangles": 12000,
+      "sockets": [
+        "FX_CORE",
+        "FX_ENGINE_L",
+        "FX_ENGINE_R",
+        "FX_MUZZLE",
+        "FX_MUZZLE_L",
+        "FX_MUZZLE_R",
+        "FX_WING_L",
+        "FX_WING_R"
+      ],
+      "clips": [
+        "Ship_Idle"
+      ],
+      "size": [
+        1.9415,
+        0.4516,
+        1.9994
+      ]
+    },
+    "ships/celestial-valkyrie": {
+      "kind": "ships",
+      "id": "celestial-valkyrie",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/ships/celestial-valkyrie/celestial-valkyrie.high.glb?v=298e662ca4",
+          "bytes": 2602640
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/ships/celestial-valkyrie/celestial-valkyrie.medium.glb?v=209120fbfd",
+          "bytes": 921572
+        }
+      },
+      "triangles": 12000,
+      "sockets": [
+        "FX_CORE",
+        "FX_ENGINE_C",
+        "FX_ENGINE_L",
+        "FX_ENGINE_R",
+        "FX_MUZZLE",
+        "FX_MUZZLE_L",
+        "FX_MUZZLE_R",
+        "FX_WING_L",
+        "FX_WING_R"
+      ],
+      "clips": [
+        "Ship_Idle"
+      ],
+      "size": [
+        1.9993,
+        0.4468,
+        1.9346
+      ]
+    },
+    "ships/crimson-talon": {
+      "kind": "ships",
+      "id": "crimson-talon",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/ships/crimson-talon/crimson-talon.high.glb?v=2281a05a46",
+          "bytes": 2469408
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/ships/crimson-talon/crimson-talon.medium.glb?v=6866fa4e22",
+          "bytes": 877692
+        }
+      },
+      "triangles": 12000,
+      "sockets": [
+        "FX_CORE",
+        "FX_ENGINE_C",
+        "FX_ENGINE_L",
+        "FX_ENGINE_R",
+        "FX_MUZZLE",
+        "FX_MUZZLE_L",
+        "FX_MUZZLE_R",
+        "FX_WING_L",
+        "FX_WING_R"
+      ],
+      "clips": [
+        "Ship_Idle"
+      ],
+      "size": [
+        1.8961,
+        0.4311,
+        2.0007
+      ]
+    },
+    "ships/eclipse-monarch": {
+      "kind": "ships",
+      "id": "eclipse-monarch",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/ships/eclipse-monarch/eclipse-monarch.high.glb?v=03069677cd",
+          "bytes": 2715056
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/ships/eclipse-monarch/eclipse-monarch.medium.glb?v=f1fb68ab9c",
+          "bytes": 950356
+        }
+      },
+      "triangles": 12000,
+      "sockets": [
+        "FX_CORE",
+        "FX_ENGINE_C",
+        "FX_ENGINE_L",
+        "FX_ENGINE_R",
+        "FX_MUZZLE",
+        "FX_MUZZLE_L",
+        "FX_MUZZLE_R",
+        "FX_WING_L",
+        "FX_WING_R"
+      ],
+      "clips": [
+        "Ship_Idle"
+      ],
+      "size": [
+        1.964,
+        0.3745,
+        2.0036
+      ]
+    },
+    "ships/eternal-sovereign": {
+      "kind": "ships",
+      "id": "eternal-sovereign",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/ships/eternal-sovereign/eternal-sovereign.high.glb?v=cb890acef4",
+          "bytes": 3658356
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/ships/eternal-sovereign/eternal-sovereign.medium.glb?v=fc57e4efcf",
+          "bytes": 1212100
+        }
+      },
+      "triangles": 12000,
+      "sockets": [
+        "FX_CORE",
+        "FX_ENGINE_L",
+        "FX_ENGINE_R",
+        "FX_MUZZLE",
+        "FX_MUZZLE_L",
+        "FX_MUZZLE_R",
+        "FX_WING_L",
+        "FX_WING_R"
+      ],
+      "clips": [
+        "Ship_Idle"
+      ],
+      "size": [
+        1.9847,
+        0.3571,
+        2.0028
+      ]
+    },
+    "ships/frost-seraph": {
+      "kind": "ships",
+      "id": "frost-seraph",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/ships/frost-seraph/frost-seraph.high.glb?v=faeb9f0634",
+          "bytes": 3259252
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/ships/frost-seraph/frost-seraph.medium.glb?v=3e7ff69d8c",
+          "bytes": 1139236
+        }
+      },
+      "triangles": 12000,
+      "sockets": [
+        "FX_CORE",
+        "FX_ENGINE_L",
+        "FX_ENGINE_R",
+        "FX_MUZZLE",
+        "FX_MUZZLE_L",
+        "FX_MUZZLE_R",
+        "FX_WING_L",
+        "FX_WING_R"
+      ],
+      "clips": [
+        "Ship_Idle"
+      ],
+      "size": [
+        1.7625,
+        0.4945,
+        1.9891
+      ]
+    },
+    "ships/genesis-phoenix": {
+      "kind": "ships",
+      "id": "genesis-phoenix",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/ships/genesis-phoenix/genesis-phoenix.high.glb?v=5971902d25",
+          "bytes": 3540440
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/ships/genesis-phoenix/genesis-phoenix.medium.glb?v=364703c354",
+          "bytes": 1150680
+        }
+      },
+      "triangles": 12000,
+      "sockets": [
+        "FX_CORE",
+        "FX_ENGINE_L",
+        "FX_ENGINE_R",
+        "FX_MUZZLE",
+        "FX_MUZZLE_L",
+        "FX_MUZZLE_R",
+        "FX_WING_L",
+        "FX_WING_R"
+      ],
+      "clips": [
+        "Ship_Idle"
+      ],
+      "size": [
+        1.5818,
+        0.401,
+        1.9998
+      ]
+    },
+    "ships/nova-reaper": {
+      "kind": "ships",
+      "id": "nova-reaper",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/ships/nova-reaper/nova-reaper.high.glb?v=3cd0296729",
+          "bytes": 3792084
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/ships/nova-reaper/nova-reaper.medium.glb?v=8600ac80d3",
+          "bytes": 1347332
+        }
+      },
+      "triangles": 11999,
+      "sockets": [
+        "FX_CORE",
+        "FX_ENGINE_L",
+        "FX_ENGINE_R",
+        "FX_MUZZLE",
+        "FX_MUZZLE_L",
+        "FX_MUZZLE_R",
+        "FX_WING_L",
+        "FX_WING_R"
+      ],
+      "clips": [
+        "Ship_Idle"
+      ],
+      "size": [
+        1.7103,
+        0.631,
+        2.0016
+      ]
+    },
+    "ships/phantom-wraith": {
+      "kind": "ships",
+      "id": "phantom-wraith",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/ships/phantom-wraith/phantom-wraith.high.glb?v=82cd4200a0",
+          "bytes": 2352964
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/ships/phantom-wraith/phantom-wraith.medium.glb?v=50d6788b09",
+          "bytes": 829584
+        }
+      },
+      "triangles": 12000,
+      "sockets": [
+        "FX_CORE",
+        "FX_ENGINE_L",
+        "FX_ENGINE_R",
+        "FX_MUZZLE",
+        "FX_MUZZLE_L",
+        "FX_MUZZLE_R",
+        "FX_WING_L",
+        "FX_WING_R"
+      ],
+      "clips": [
+        "Ship_Idle"
+      ],
+      "size": [
+        1.4201,
+        0.2748,
+        2.0008
+      ]
+    },
+    "ships/razorwing": {
+      "kind": "ships",
+      "id": "razorwing",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/ships/razorwing/razorwing.high.glb?v=fd59181661",
+          "bytes": 2761144
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/ships/razorwing/razorwing.medium.glb?v=2fd8be33fd",
+          "bytes": 1005172
+        }
+      },
+      "triangles": 12000,
+      "sockets": [
+        "FX_CORE",
+        "FX_ENGINE_L",
+        "FX_ENGINE_R",
+        "FX_MUZZLE",
+        "FX_MUZZLE_L",
+        "FX_MUZZLE_R",
+        "FX_WING_L",
+        "FX_WING_R"
+      ],
+      "clips": [
+        "Ship_Idle"
+      ],
+      "size": [
+        1.7717,
+        0.4422,
+        2.0006
+      ]
+    },
+    "ships/solar-lance": {
+      "kind": "ships",
+      "id": "solar-lance",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/ships/solar-lance/solar-lance.high.glb?v=937b9764fb",
+          "bytes": 3172824
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/ships/solar-lance/solar-lance.medium.glb?v=28b763d856",
+          "bytes": 1173520
+        }
+      },
+      "triangles": 12000,
+      "sockets": [
+        "FX_CORE",
+        "FX_ENGINE_C",
+        "FX_ENGINE_L",
+        "FX_ENGINE_R",
+        "FX_MUZZLE",
+        "FX_MUZZLE_L",
+        "FX_MUZZLE_R",
+        "FX_WING_L",
+        "FX_WING_R"
+      ],
+      "clips": [
+        "Ship_Idle"
+      ],
+      "size": [
+        1.1639,
+        0.3188,
+        2.0121
       ]
     },
     "ships/vanguard": {

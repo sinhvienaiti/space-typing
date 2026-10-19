@@ -1,4 +1,7 @@
 import type { CharacterId } from "./registry";
+import { resolveShipVisualId } from "./ship-visual";
+import { shipVisualImage } from "./ship-art";
+import { shipRuntimeImageAssetVersionId } from "./ship-media-runtime";
 
 /**
  * Rear "chase camera" ship sprites for the Duel Depth View (pilot: Vanguard,
@@ -20,7 +23,7 @@ export type ChaseSprite = {
 };
 
 const ROOT = "/assets/space-typing/ships/chase/";
-const sprites = new Map<CharacterId, ChaseSprite>();
+const sprites = new Map<string, ChaseSprite>();
 let loading: Promise<void> | null = null;
 
 export function chaseArtEnabled(): boolean {
@@ -58,7 +61,7 @@ export function loadChaseArt(): Promise<void> {
         image.src = ROOT + entry.url;
         try {
           await image.decode();
-          sprites.set(id as CharacterId, { image, aspect: entry.width / entry.height, nozzles });
+          sprites.set(id, { image, aspect: entry.width / entry.height, nozzles });
         } catch {
           // A broken sprite leaves that ship on the normal renderer.
         }
@@ -71,5 +74,6 @@ export function loadChaseArt(): Promise<void> {
 }
 
 export function chaseSprite(id: CharacterId): ChaseSprite | null {
-  return sprites.get(id) ?? null;
+  if (shipRuntimeImageAssetVersionId(id) !== null) return null;
+  return sprites.get(resolveShipVisualId(id)) ?? (shipVisualImage(id) === null ? sprites.get(id) ?? null : null);
 }

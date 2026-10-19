@@ -3,7 +3,11 @@ import type { VisualQuality } from "../types";
 import { loadModel, modelEntry, pickModelTier } from "./model-loader";
 import { drawFrame3D, loadThree, renderShared, sharedRenderer, sharedRendererLost } from "./shared-renderer";
 import { disposeObjectResources } from "./dispose-resources";
-import { characterShipRuntimeImage } from "../characters/ship-media-runtime";
+import { shipRuntimeImageAssetVersionId } from "../characters/ship-media-runtime";
+import { resolveShipVisualId, subscribeShipVisuals } from "../characters/ship-visual";
+import { shipVisualRuntimeKey } from "../characters/ship-art";
+import { MODEL_CONTRACTS, missingSockets } from "./model-contracts";
+import { activeShipRuntimeReliefAssetVersionId } from "../admin/ship-runtime-policy";
 
 /**
  * Modelled 3D player ships (pilot: Vanguard), drawn in place of the painted
@@ -47,18 +51,37 @@ const RENDER_OPTIONS = { exposure: 1.05 };
 
 let quality: VisualQuality = "medium";
 let dpr = 1;
-const ships = new Map<CharacterId, ShipModel3D | "loading" | "missing">();
+type CachedShip = { key: string; value: ShipModel3D | "loading" | "missing" };
+const ships = new Map<CharacterId, CachedShip>();
 let loadGeneration = 0;
+
+function releaseShips(): void {
+  loadGeneration += 1;
+  for (const cached of ships.values()) if (cached.value instanceof ShipModel3D) cached.value.dispose();
+  ships.clear();
+}
+subscribeShipVisuals(releaseShips);
+
+/**
+ * The active Campaign/Recall owner retains only its selected hull. Galleries
+ * can still draw several ships because drawing alone does not claim ownership.
+ * Deleting a pending entry also makes its eventual result dispose itself.
+ */
+export function setShip3DCharacter(id: CharacterId): void {
+  for (const [otherId, cached] of ships) {
+    if (otherId === id) continue;
+    if (cached.value instanceof ShipModel3D) cached.value.dispose();
+    ships.delete(otherId);
+  }
+}
 
 const disabledByUrl = typeof location !== "undefined" && new URLSearchParams(location.search).get("model3d") === "off";
 
 /** Game.ts calls this when quality or device pixel ratio changes. */
 export function setShip3DQuality(next: VisualQuality, nextDpr: number): void {
   if (next !== quality) {
-    loadGeneration += 1;
     // Tier files differ per quality: drop loaded ships so they reload.
-    for (const value of ships.values()) if (value instanceof ShipModel3D) value.dispose();
-    ships.clear();
+    releaseShips();
   }
   quality = next;
   dpr = Math.max(1, Math.min(3, nextDpr));
@@ -96,8 +119,8 @@ export class ShipModel3D {
     this.points.muzzle = bind("FX_MUZZLE");
   }
 
-  static async load(id: CharacterId, tierQuality: VisualQuality): Promise<ShipModel3D | null> {
-    const entry = await modelEntry("ships", id);
+  static async load(id: CharacterId, tierQuality: VisualQuality, visualId = resolveShipVisualId(id)): Promise<ShipModel3D | null> {
+    const entry = await modelEntry("ships", visualId);
     if (entry === null) return null;
     // The Campaign hull is about 113 px: 1K textures are ample even at High.
     const url = pickModelTier(entry, tierQuality === "low" ? "low" : "medium");
@@ -106,6 +129,12 @@ export class ShipModel3D {
     if (renderer === null) return null;
     const gltf = await loadModel(url);
     const model = gltf.scene;
+    const socketNames: string[] = [];
+    model.traverse(object => { if (object.name.startsWith("FX_")) socketNames.push(object.name); });
+    if (missingSockets(MODEL_CONTRACTS.ships, socketNames).length > 0) {
+      disposeObjectResources(model);
+      return null;
+    }
     const scene = new three.Scene();
     const pivot = new three.Group();
     scene.add(pivot);
@@ -115,6 +144,10 @@ export class ShipModel3D {
     const box = new three.Box3().setFromObject(model);
     const center = box.getCenter(new three.Vector3());
     const size = box.getSize(new three.Vector3());
+    if (![size.x, size.y, size.z].every(Number.isFinite) || Math.max(size.x, size.z) <= 0) {
+      disposeObjectResources(model);
+      return null;
+    }
     model.position.sub(center);
     pivot.scale.setScalar(1 / Math.max(size.x, size.z, 0.001));
 
@@ -206,30 +239,40 @@ export function drawShip3D(
   pose: Ship3DPose,
 ): ShipSocketPoints | null {
   if (quality === "low" || disabledByUrl) return null;
-  const current = ships.get(id);
-  if (current === undefined) {
-    ships.set(id, "loading");
+  if (shipRuntimeImageAssetVersionId(id) !== null) return null;
+  if (activeShipRuntimeReliefAssetVersionId(id) !== undefined) return null;
+  const key = shipVisualRuntimeKey(id);
+  let cached = ships.get(id);
+  if (cached !== undefined && cached.key !== key) {
+    if (cached.value instanceof ShipModel3D) cached.value.dispose();
+    ships.delete(id);
+    cached = undefined;
+  }
+  if (cached === undefined) {
+    const pending: CachedShip = { key, value: "loading" };
+    ships.set(id, pending);
     const generation = loadGeneration;
-    void ShipModel3D.load(id, quality)
+    void ShipModel3D.load(id, quality, resolveShipVisualId(id))
       .then((model) => {
-        if (generation !== loadGeneration) { model?.dispose(); return; }
-        ships.set(id, model ?? "missing");
+        if (generation !== loadGeneration || ships.get(id) !== pending || shipVisualRuntimeKey(id) !== key) { model?.dispose(); return; }
+        pending.value = model ?? "missing";
       })
       .catch(error => {
-        if (generation !== loadGeneration) return;
-        ships.set(id, "missing");
+        if (generation !== loadGeneration || ships.get(id) !== pending || shipVisualRuntimeKey(id) !== key) return;
+        pending.value = "missing";
         if ((import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV) console.warn("Authored ship model unavailable:", id, error);
       });
     return null;
   }
-  if (!(current instanceof ShipModel3D)) return null;
-  return current.draw(context, pose);
+  if (!(cached.value instanceof ShipModel3D)) return null;
+  return cached.value.draw(context, pose);
 }
 
 /** Last projected local anchors, also used by Campaign bolts and aiming beams. */
 export function ship3DSockets(id: CharacterId): ShipSocketPoints | null {
-  if (characterShipRuntimeImage(id) !== null) return null;
+  if (shipRuntimeImageAssetVersionId(id) !== null) return null;
+  if (activeShipRuntimeReliefAssetVersionId(id) !== undefined) return null;
   if (quality === "low" || disabledByUrl || sharedRendererLost()) return null;
-  const current = ships.get(id);
-  return current instanceof ShipModel3D ? current.socketPoints : null;
+  const cached = ships.get(id);
+  return cached?.key === shipVisualRuntimeKey(id) && cached.value instanceof ShipModel3D ? cached.value.socketPoints : null;
 }

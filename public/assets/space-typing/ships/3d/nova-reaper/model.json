@@ -1,0 +1,71 @@
+{
+  "id": "nova-reaper",
+  "version": 3,
+  "aspect": 0.8589,
+  "heightScale": 0.1397,
+  "heightGrid": [
+    256,
+    298
+  ],
+  "nozzles": [
+    [
+      0.3801,
+      0.9691,
+      0.0199
+    ],
+    [
+      0.6175,
+      0.9691,
+      0.0199
+    ]
+  ],
+  "anchors": {
+    "nose": [
+      0.5077,
+      0.0253
+    ],
+    "canopy": [
+      0.5,
+      0.4717
+    ],
+    "eyes": [],
+    "guns": [
+      [
+        0.2578,
+        0.4871
+      ],
+      [
+        0.7434,
+        0.4871
+      ]
+    ],
+    "wingtips": [
+      [
+        0.0636,
+        0.6201
+      ],
+      [
+        0.9385,
+        0.6195
+      ]
+    ]
+  },
+  "colors": {
+    "hot": "#e8f4ff",
+    "plume": "#67b7ff",
+    "outer": "#4a84b8",
+    "accent": "#ffe1a2"
+  },
+  "color": "color.webp?v=3395873dab2f",
+  "emissive": "emissive.webp?v=feb43d5aa5e5",
+  "height": "height.bin?v=435d9485089b",
+  "source": {
+    "image": "art-src/ships/ship-07-nova-reaper-2d.png",
+    "imageSha256": "24db35912a27b1c1a0eb89b824a59c0cdd0c83179f26ccbc3bbc0e16700ed9f8",
+    "renderedImage": "art-src/ships/rendered/nova-reaper-top.png",
+    "renderedImageSha256": "ddbe2f51da9e184596250a5afacf370d18cdb36083a06009120be08bd668d0f2",
+    "projectionMetadata": "art-src/ships/rendered/nova-reaper-top.json",
+    "projectionMetadataSha256": "d3a5678acbe97c8bc9cf3a983f3806f832ce64b023ae50dfbe87880824ae5619",
+    "normalizedModelSha256": "297f50c4482a206d880f15bfe3da6e50f1a8268cfd8496c9b2110eb96f8ddb8e"
+  }
+}

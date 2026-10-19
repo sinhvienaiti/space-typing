@@ -1,0 +1,71 @@
+{
+  "id": "razorwing",
+  "version": 3,
+  "aspect": 0.8882,
+  "heightScale": 0.1375,
+  "heightGrid": [
+    256,
+    288
+  ],
+  "nozzles": [
+    [
+      0.3707,
+      0.9692,
+      0.0192
+    ],
+    [
+      0.6247,
+      0.9692,
+      0.0192
+    ]
+  ],
+  "anchors": {
+    "nose": [
+      0.5009,
+      0.0203
+    ],
+    "canopy": [
+      0.5,
+      0.4667
+    ],
+    "eyes": [],
+    "guns": [
+      [
+        0.3245,
+        0.5282
+      ],
+      [
+        0.6767,
+        0.5282
+      ]
+    ],
+    "wingtips": [
+      [
+        0.0225,
+        0.4865
+      ],
+      [
+        0.9766,
+        0.4831
+      ]
+    ]
+  },
+  "colors": {
+    "hot": "#e1f4ff",
+    "plume": "#37b5ff",
+    "outer": "#2882b8",
+    "accent": "#4ec1ff"
+  },
+  "color": "color.webp?v=1991b5ebc1ef",
+  "emissive": "emissive.webp?v=5799bc037d14",
+  "height": "height.bin?v=4fb8c48bbc6f",
+  "source": {
+    "image": "art-src/ships/ship-02-razorwing-2d.png",
+    "imageSha256": "68e396eefa684e8cd3ecf347f7fa108447b57e9206037fb17c658e672ae35173",
+    "renderedImage": "art-src/ships/rendered/razorwing-top.png",
+    "renderedImageSha256": "04a8f188aa3b7dd9469d7d254523d4a34b28776d296b7a243d15c5dcb4ef7a72",
+    "projectionMetadata": "art-src/ships/rendered/razorwing-top.json",
+    "projectionMetadataSha256": "3387e219c3c2961829955a65a15533f31ca16744eaa91fd32d9985fffe1369db",
+    "normalizedModelSha256": "2ca9c30d92b36d1f1e6ffc6aa4a82cb4098fcc24ea2a6d852d1d23443c078724"
+  }
+}

@@ -1,0 +1,14 @@
+[
+  {"order":1,"id":"vanguard","name":"Vanguard","legacyCharacterId":"vanguard","imageSources":["vanguard-top-hd.png","ship-01-vanguard-2d.png"],"rawModelSources":["vanguard.meshy.glb","ship-01-vanguard.glb"]},
+  {"order":2,"id":"razorwing","name":"Razorwing","legacyCharacterId":"aegis","imageSources":["ship-02-razorwing-2d.png","razorwing-top-hd.png"],"rawModelSources":["ship-02-razorwing.glb","razorwing.meshy.glb"]},
+  {"order":3,"id":"solar-lance","name":"Solar Lance","legacyCharacterId":"volt","imageSources":["ship-03-solar-lance-2d.png","solar-lance-top-hd.png"],"rawModelSources":["ship-03-solar-lance.glb","solar-lance.meshy.glb"]},
+  {"order":4,"id":"phantom-wraith","name":"Phantom Wraith","legacyCharacterId":"wraith","imageSources":["ship-04-phantom-wraith-2d.png","phantom-wraith-top-hd.png"],"rawModelSources":["ship-04-phantom-wraith.glb","phantom-wraith.meshy.glb"]},
+  {"order":5,"id":"crimson-talon","name":"Crimson Talon","legacyCharacterId":"fortune","imageSources":["ship-05-crimson-talon-2d.png","crimson-talon-top-hd.png"],"rawModelSources":["ship-05-crimson-talon.glb","crimson-talon.meshy.glb"]},
+  {"order":6,"id":"frost-seraph","name":"Frost Seraph","legacyCharacterId":"arsenal","imageSources":["ship-06-frost-seraph-2d.png","frost-seraph-top-hd.png"],"rawModelSources":["ship-06-frost-seraph.glb","frost-seraph.meshy.glb"]},
+  {"order":7,"id":"nova-reaper","name":"Nova Reaper","legacyCharacterId":"oracle","imageSources":["ship-07-nova-reaper-2d.png","nova-reaper-top-hd.png"],"rawModelSources":["ship-07-nova-reaper.glb","nova-reaper.meshy.glb"]},
+  {"order":8,"id":"astral-dragon","name":"Astral Dragon","legacyCharacterId":"bastion","imageSources":["ship-08-astral-dragon-2d.png","astral-dragon-top-hd.png"],"rawModelSources":["ship-08-astral-dragon.glb","astral-dragon.meshy.glb"]},
+  {"order":9,"id":"eclipse-monarch","name":"Eclipse Monarch","legacyCharacterId":"reaper","imageSources":["ship-09-eclipse-monarch-2d.png","eclipse-monarch-top-hd.png"],"rawModelSources":["ship-09-eclipse-monarch.glb","eclipse-monarch.meshy.glb"]},
+  {"order":10,"id":"celestial-valkyrie","name":"Celestial Valkyrie","legacyCharacterId":"celestial","imageSources":["ship-10-celestial-valkyrie-2d.png","celestial-valkyrie-top-hd.png"],"rawModelSources":["ship-10-celestial-valkyrie.glb","celestial-valkyrie.meshy.glb"]},
+  {"order":11,"id":"genesis-phoenix","name":"Genesis Phoenix","legacyCharacterId":"zenith","imageSources":["ship-11-genesis-phoenix-2d.png","genesis-phoenix-top-hd.png"],"rawModelSources":["ship-11-genesis-phoenix.glb","genesis-phoenix.meshy.glb"]},
+  {"order":12,"id":"eternal-sovereign","name":"Eternal Sovereign","legacyCharacterId":null,"imageSources":["ship-12-eternal-sovereign-2d.png","eternal-sovereign-top-hd.png"],"rawModelSources":["ship-12-eternal-sovereign.glb","eternal-sovereign.meshy.glb"]}
+]

@@ -509,7 +509,7 @@ import {
 import { BOSS_3D_STRIKE_SECONDS, type Boss3DAction } from "./boss/model-3d-choreography";
 import { BossGlow } from "./boss/boss-glow";
 import { drawFrame3D } from "./render3d/shared-renderer";
-import { setShip3DQuality, ship3DSockets } from "./render3d/ship-model";
+import { setShip3DCharacter, setShip3DQuality, ship3DSockets } from "./render3d/ship-model";
 import { boss3DModelForId } from "./boss/model-3d-contract";
 import { ENEMY_MODEL_SCALE, enemyModelSheet } from "./render3d/enemy-models";
 import { drawModelSheet } from "./render3d/model-sheet";
@@ -2593,6 +2593,7 @@ export class Game {
   }
 
   setCharacter(id: CharacterId): void {
+    setShip3DCharacter(id);
     if (this.characterId === id) return;
     this.characterId = id;
     preloadShotArt(id);

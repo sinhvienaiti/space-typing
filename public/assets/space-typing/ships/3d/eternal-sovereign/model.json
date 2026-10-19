@@ -1,0 +1,71 @@
+{
+  "id": "eternal-sovereign",
+  "version": 3,
+  "aspect": 0.9918,
+  "heightScale": 0.1047,
+  "heightGrid": [
+    256,
+    258
+  ],
+  "nozzles": [
+    [
+      0.3988,
+      0.8453,
+      0.0171
+    ],
+    [
+      0.6012,
+      0.8453,
+      0.0171
+    ]
+  ],
+  "anchors": {
+    "nose": [
+      0.4986,
+      0.0294
+    ],
+    "canopy": [
+      0.5,
+      0.5379
+    ],
+    "eyes": [],
+    "guns": [
+      [
+        0.3068,
+        0.4354
+      ],
+      [
+        0.6942,
+        0.4354
+      ]
+    ],
+    "wingtips": [
+      [
+        0.0893,
+        0.6323
+      ],
+      [
+        0.9254,
+        0.6294
+      ]
+    ]
+  },
+  "colors": {
+    "hot": "#f3f6ff",
+    "plume": "#aec5ff",
+    "outer": "#7d8eb8",
+    "accent": "#81a6ff"
+  },
+  "color": "color.webp?v=b37d6766d724",
+  "emissive": "emissive.webp?v=08ce455221b7",
+  "height": "height.bin?v=65fb67348c67",
+  "source": {
+    "image": "art-src/ships/ship-12-eternal-sovereign-2d.png",
+    "imageSha256": "665a85c92a9ce1f0c3380a0fe89f80ad8b6c36d5dc999ce75f1360429d8ebef5",
+    "renderedImage": "art-src/ships/rendered/eternal-sovereign-top.png",
+    "renderedImageSha256": "fab2b1cc3b8c96b60cfb492f817d19cb5f5bd0e7c6ce359a152b99202d1d8447",
+    "projectionMetadata": "art-src/ships/rendered/eternal-sovereign-top.json",
+    "projectionMetadataSha256": "9e7a1fdbc3b976de75e56afe430ccbbd93ddd54907d3bb42423d09f431e07b36",
+    "normalizedModelSha256": "ac707a72481be02ac557500345a2eacba18651f907db993ba7b2566db64cd84d"
+  }
+}

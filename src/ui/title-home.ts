@@ -1,5 +1,6 @@
 import { galaxyTyrant } from "../boss/identity";
 import { paintedBossThumbUrl } from "../enemies/painted-sprites";
+import { shipArtUrl } from "./title-hub";
 import type { VisualQuality } from "../types";
 import { WORLD_REGISTRY } from "../worlds/registry";
 import { iconSvg, type IconName } from "./icons";
@@ -90,12 +91,6 @@ const GALAXY_KITS = [
 ] as const;
 
 const STAGES_PER_GALAXY = 100;
-/** Ship order in /assets/space-typing/ships/player-ships-v3.webp (4 × 3). */
-const SHIP_ATLAS_ORDER = [
-  "vanguard", "aegis", "volt", "wraith",
-  "fortune", "arsenal", "oracle", "bastion",
-  "reaper", "celestial", "zenith",
-] as const;
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => "&#" + char.charCodeAt(0) + ";");
@@ -113,11 +108,6 @@ function clockLabel(minute: number): string {
 function durationLabel(minutes: number): string {
   if (minutes < 60) return String(Math.max(1, minutes)) + "m";
   return String(Math.floor(minutes / 60)) + "h " + String(minutes % 60).padStart(2, "0") + "m";
-}
-
-function atlasPosition(shipId: string): string {
-  const index = Math.max(0, SHIP_ATLAS_ORDER.indexOf(shipId as (typeof SHIP_ATLAS_ORDER)[number]));
-  return String((index % 4) * 33.333) + "% " + String(Math.floor(index / 4) * 50) + "%";
 }
 
 /** Flame level of the streak badge: 0 cold, 1 lit, 2 hot (7+), 3 blazing (30+). */
@@ -269,7 +259,7 @@ function renderFleet(ships: readonly TitleHomeShip[]): string {
     return (
       '<button type="button" class="th-ship-card" data-ship="' + escapeHtml(ship.id) + '" data-state="' + state + '"' +
       ' aria-label="' + escapeHtml(ship.name + (ship.unlocked ? ", " + ship.role : ", unlocks at stage " + pad3(ship.unlockStage))) + '">' +
-      '<span class="th-ship-card-art" style="background-position:' + atlasPosition(ship.id) + '"></span>' +
+      '<span class="th-ship-card-art" style="background-image:url(&quot;' + escapeHtml(shipArtUrl(ship.id)) + '&quot;);background-size:contain;background-position:center"></span>' +
       '<span class="th-ship-card-text"><strong>' + escapeHtml(ship.name) + "</strong>" +
       "<small>" + escapeHtml(ship.unlocked ? ship.role : "Stage " + pad3(ship.unlockStage)) + "</small></span>" +
       (ship.selected ? '<span class="th-ship-card-tag">Flying</span>' : ship.unlocked ? '<span class="th-ship-card-tag is-level">Lv ' + String(ship.level) + "</span>" : '<span class="th-ship-card-lock">' + iconSvg("lock") + "</span>") +

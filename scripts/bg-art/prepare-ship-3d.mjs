@@ -4,7 +4,11 @@
  * lit relief hull (the owner's pick "B", 2026-10-03), so the 3D hull keeps
  * the painting:
  *
- *   art-src/ships/<id>-top-hd.png  (ChatGPT/Gemini art, transparent or #FF00FF, gitignored)
+ *   art-src/ships/<id>-top-hd.png  (transparent or #FF00FF, gitignored)
+ *   art-src/ships/ship-XX-<id>-2d.png  (catalogued numbered sources)
+ *   art-src/ships/rendered/<id>-top.png  (transparent GLB top projection,
+ *     used when the supplied perspective/studio image has an opaque backdrop)
+ *     + <id>-top.json (authored socket UVs and normalized model content hash)
  *     → public/assets/space-typing/ships/3d/<id>/color.webp     hull paint, painted flames removed
  *     → public/assets/space-typing/ships/3d/<id>/emissive.webp  glowing parts only
  *     → public/assets/space-typing/ships/3d/<id>/height.bin     hull height (raw bytes, heightGrid in model.json)
@@ -16,20 +20,23 @@
  * away, and their tops become the nozzles. Their colour becomes the
  * afterburner colour, the hull's glow colour the light colour. Nose, canopy
  * and wingtips are found on the outline; guns follow the ship's shot recipe.
+ * Art without painted flames uses measured rear-hull spans, with a warning
+ * in the generation log so its nozzle positions can be checked on the overlay.
  * ANCHORS below overrides any of them by hand (Vanguard is measured).
  *
  * Usage:
- *   pnpm ship3d:prepare            every art-src/ships/<id>-top-hd.*
+ *   pnpm ship3d:prepare            every catalogued source (keeps approved Vanguard)
  *   pnpm ship3d:prepare aegis volt only these
+ *   pnpm ship3d:prepare razorwing eternal-sovereign  canonical visual identities
  *   pnpm ship3d:prepare --sheet-test  dry run on the small V3 sprites into .visual/ (detection check only)
  */
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import sharp from "sharp";
 
 const ROOT = resolve(import.meta.dirname, "../..");
-const SRC = join(ROOT, "art-src/ships");
 const OUT_ROOT = join(ROOT, "public/assets/space-typing/ships/3d");
 const SHEET = join(ROOT, "public/assets/space-typing/ships/player-ships-v3.webp");
 const TEST_ROOT = join(ROOT, ".visual/ship3d-sheet-test");
@@ -104,11 +111,18 @@ function hsv(r, g, b) {
 }
 
 /** RGBA of a source: real alpha, or #FF00FF keyed out. */
-async function loadRgba(file) {
+export async function loadRgba(file) {
   const { data, info } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   let transparent = 0;
-  for (let i = 3; i < data.length; i += 4) if (data[i] < 250) transparent += 1;
+  for (let i = 3; i < data.length; i += 4) if (data[i] < 24) transparent += 1;
   if (transparent < info.width * info.height * 0.05) {
+    let magenta = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (Math.hypot(data[i] - 255, data[i + 1], data[i + 2] - 255) < 90) magenta += 1;
+    }
+    if (magenta < info.width * info.height * 0.05) {
+      throw new Error(`${file}: opaque background; relief art requires true transparency or a flat #FF00FF background. Use the GLB for perspective/studio renders.`);
+    }
     // No real alpha: key out the flat magenta background, soft at the edge.
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i], g = data[i + 1], b = data[i + 2];
@@ -123,6 +137,7 @@ async function loadRgba(file) {
 /** One V3 sheet cell, enlarged 4× (detection test only: too soft to ship). */
 async function sheetCell(id) {
   const index = IDS.indexOf(id);
+  if (index < 0) throw new Error(`No V3 sheet cell for ship ${id}`);
   const cell = await sharp(SHEET).extract({ left: (index % 4) * 256, top: Math.floor(index / 4) * 256, width: 256, height: 256 })
     .resize(1024, 1024, { kernel: "lanczos3" }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   return { data: cell.data, width: 1024, height: 1024 };
@@ -131,6 +146,7 @@ async function sheetCell(id) {
 /** Opaque bounding box of a V3 sheet cell (for mapping recipe muzzles). */
 async function sheetBox(id) {
   const index = IDS.indexOf(id);
+  if (index < 0) return null;
   const { data } = await sharp(SHEET).extract({ left: (index % 4) * 256, top: Math.floor(index / 4) * 256, width: 256, height: 256 })
     .ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   let minX = 256, minY = 256, maxX = -1, maxY = -1;
@@ -199,13 +215,14 @@ function findFlames(px, w, h) {
   return { flames: flames.filter((f) => f.keep), label };
 }
 
-async function prepare(id, rgba, outDir, sheetBoxForId) {
+export async function prepare(id, rgba, outDir, sheetBoxForId = null, { legacyCharacterId = id, log = console, source, projection } = {}) {
   const { data: src, width: W, height: H } = rgba;
   let minX = W, minY = H, maxX = -1, maxY = -1;
   for (let y = 0; y < H; y += 1) for (let x = 0; x < W; x += 1) {
     if (src[(y * W + x) * 4 + 3] < 24) continue;
     if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y;
   }
+  if (maxX < minX || maxY < minY) throw new Error(`${id}: source contains no visible hull pixels`);
   const pad = Math.round((maxX - minX) * 0.015);
   const left = Math.max(0, minX - pad), top = Math.max(0, minY - pad);
   const w = Math.min(W - left, maxX - minX + 1 + pad * 2), h = Math.min(H - top, maxY - minY + 1 + pad * 2);
@@ -213,8 +230,11 @@ async function prepare(id, rgba, outDir, sheetBoxForId) {
   for (let y = 0; y < h; y += 1) src.copy(px, y * w * 4, ((top + y) * W + left) * 4, ((top + y) * W + left + w) * 4);
 
   // 1) Painted flames → nozzles and engine colour; then cut them away.
-  const { flames } = findFlames(px, w, h);
-  const nozzles = [];
+  // A GLB top projection contains the hull and its engine rims, with no
+  // painted exhaust to remove. Its authored sockets are the exact exits.
+  const { flames } = projection ? { flames: [] } : findFlames(px, w, h);
+  const mapProjectionPoint = ([u, v]) => [round((u * W - left) / w), round((v * H - top) / h)];
+  const nozzles = projection ? projection.nozzles.map(([u, v, r]) => [...mapProjectionPoint([u, v]), round(r * W / w)]) : [];
   let flameRgb = [0, 0, 0], flameWeight = 0;
   const fringe = Math.max(2, Math.round(w * 0.004));
   for (const f of flames) {
@@ -251,13 +271,44 @@ async function prepare(id, rgba, outDir, sheetBoxForId) {
   }
   // Ships are symmetric: a nozzle found on one side only gets its mirror,
   // when the hull is there to carry it (opaque just above the exit).
-  for (const [u, vv, r] of [...nozzles]) {
+  for (const [u, vv, r] of projection ? [] : [...nozzles]) {
     if (Math.abs(u - 0.5) < 0.04) continue;
     const mirrored = nozzles.some(([u2, v2]) => Math.abs(u2 - (1 - u)) < 0.05 && Math.abs(v2 - vv) < 0.05);
     if (!mirrored && opaqueAt(px, w, h, Math.round((1 - u) * w), Math.round(vv * h - h * 0.01))) nozzles.push([round(1 - u), vv, r]);
   }
+  if (nozzles.length === 0 && !Array.isArray(ANCHORS[id]?.nozzles)) {
+    // Art without painted flames still needs an engine exit. Use actual
+    // rear silhouette spans, rather than emitting an empty nozzle array.
+    let rear = h - 1;
+    const rowHasHull = (row) => {
+      for (let x = 0; x < w; x += 1) if (opaqueAt(px, w, h, x, row)) return true;
+      return false;
+    };
+    while (rear > h * 0.5 && !rowHasHull(rear)) rear -= 1;
+    let row = rear - Math.max(1, Math.round(h * 0.015)), spans = [];
+    for (; row >= Math.floor(h * 0.5); row -= 1) {
+      for (let x = Math.floor(w * 0.12); x < w * 0.88; x += 1) {
+        if (!opaqueAt(px, w, h, x, row)) continue;
+        const start = x;
+        while (x + 1 < w * 0.88 && opaqueAt(px, w, h, x + 1, row)) x += 1;
+        if (x - start + 1 >= Math.max(1, w * 0.01)) {
+          const previous = spans.at(-1);
+          // A nozzle rim can have tiny transparent mesh seams. Merge those
+          // so one engine does not acquire several adjacent exhaust jets.
+          if (previous && start - previous[1] < w * 0.025) previous[1] = x;
+          else spans.push([start, x]);
+        }
+      }
+      if (spans.length > 0) break;
+    }
+    if (spans.length === 0) throw new Error(`${id}: no flames or usable rear hull; provide measured nozzles in ANCHORS`);
+    for (const [start, end] of spans) {
+      nozzles.push([round((start + end) / 2 / w), round(row / h), round(Math.max(0.01, Math.min(0.08, (end - start + 1) / 2 / w)))]);
+    }
+    log.warn(`${id}: no painted flames detected; using ${nozzles.length} rear-hull nozzle(s). Check the overlay before publishing.`);
+  }
   nozzles.sort((a, b) => a[0] - b[0]);
-  const plume = flameWeight > 0 ? flameRgb.map((c) => c / flameWeight) : [95, 220, 255];
+  let plume = flameWeight > 0 ? flameRgb.map((c) => c / flameWeight) : [95, 220, 255];
 
   // 2) Emissive: saturated bright glow of any colour; its mean is the light colour.
   const em = Buffer.alloc(w * h * 3);
@@ -266,12 +317,37 @@ async function prepare(id, rgba, outDir, sheetBoxForId) {
     const r = px[p * 4], g = px[p * 4 + 1], b = px[p * 4 + 2], a = px[p * 4 + 3];
     if (a <= 128) continue;
     const { s, v } = hsv(r, g, b);
-    if (s > 0.45 && v > 0.7) {
+    // Workbench studio illumination darkens the material texture. Projected
+    // accents remain useful below the bright painted-art cutoff.
+    if (s > 0.45 && v > (projection ? 0.35 : 0.7)) {
       em[p * 3] = r; em[p * 3 + 1] = g; em[p * 3 + 2] = b;
       accentRgb = [accentRgb[0] + r, accentRgb[1] + g, accentRgb[2] + b]; accentCount += 1;
     }
   }
   const accent = accentCount > 0 ? accentRgb.map((c) => c / accentCount) : plume;
+  // GLB projections have lit engine rims but no painted exhaust: retain the
+  // ship's own glow hue instead of giving every projected ship cyan flames.
+  if (flameWeight === 0 && accentCount > 0) plume = accent;
+  if (projection) {
+    let rgb = [0, 0, 0], weight = 0;
+    for (const [u, v, radius] of nozzles) {
+      const cx = u * w, cy = v * h, reach = Math.max(w * 0.025, radius * w * 2.5);
+      for (let y = Math.max(0, Math.floor(cy - reach)); y <= Math.min(h - 1, Math.ceil(cy + reach)); y += 1) {
+        for (let x = Math.max(0, Math.floor(cx - reach)); x <= Math.min(w - 1, Math.ceil(cx + reach)); x += 1) {
+          const distance = Math.hypot(x - cx, y - cy) / reach;
+          const p = (y * w + x) * 4;
+          if (distance >= 1 || px[p + 3] <= 128) continue;
+          const { s, v: value } = hsv(px[p], px[p + 1], px[p + 2]);
+          if (s < 0.3 || value < 0.18) continue;
+          const contribution = s * value * value * (1 - distance) ** 2;
+          rgb = rgb.map((c, channel) => c + px[p + channel] * contribution);
+          weight += contribution;
+        }
+      }
+    }
+    // Gold wing trim must not turn a ship's blue engine exhaust orange.
+    if (weight > 0) plume = rgb.map((c) => c / weight);
+  }
   const boost = (rgb, k) => { const m = Math.max(...rgb, 1); return rgb.map((c) => Math.min(255, c * (255 / m) * k)); };
   const colors = COLORS[id] ?? {
     hot: hex(boost(plume, 1).map((c) => c * 0.15 + 255 * 0.85)),
@@ -318,19 +394,33 @@ async function prepare(id, rgba, outDir, sheetBoxForId) {
     }
   }
   let guns = [];
-  if (sheetBoxForId !== null && MUZZLES[id] !== undefined) {
+  if (sheetBoxForId !== null && MUZZLES[legacyCharacterId] !== undefined) {
     const box = sheetBoxForId;
-    guns = MUZZLES[id].map(([mx, my]) => {
+    guns = MUZZLES[legacyCharacterId].map(([mx, my]) => {
       const cx = 128 + mx * 256 / 78, cy = 128 + my * 256 / 78;
       // Same share of the outline box on the new art; outline pad included.
       const u = ((cx - box.left) / box.width * (maxX - minX + 1) + (minX - left)) / w;
       const v = ((cy - box.top) / box.height * (maxY - minY + 1) + (minY - top)) / h;
-      return snapToHull(px, w, h, [round(u), round(v)]);
+      // The new visual can have a very different silhouette from its old
+      // gameplay slot; keep all recipe muzzles on the projected hull.
+      return snapToHull(px, w, h, [round(u), round(v)], projection ? 0.35 : 0.08);
     });
   }
+  if (guns.length === 0) {
+    guns = [[0.28, 0.4], [0.72, 0.4]].map((point) => snapToHull(px, w, h, point, 0.25));
+  }
   const detected = { nose, canopy, eyes: [], guns, wingtips: [wingtip(-1), wingtip(1)].filter((p) => p !== null) };
+  const projectedAnchors = {};
+  for (const [key, value] of Object.entries(projection?.anchors ?? {})) {
+    if (!Array.isArray(value)) continue;
+    if (key === "guns" && MUZZLES[legacyCharacterId] && value.length !== MUZZLES[legacyCharacterId].length) {
+      log.warn(`${id}: projection has ${value.length} gun sockets; preserving ${MUZZLES[legacyCharacterId].length} muzzles from its gameplay recipe.`);
+      continue;
+    }
+    projectedAnchors[key] = typeof value[0] === "number" ? mapProjectionPoint(value) : value.map(mapProjectionPoint);
+  }
   const { nozzles: handNozzles, ...handAnchors } = ANCHORS[id] ?? {};
-  const anchors = { ...detected, ...handAnchors };
+  const anchors = { ...detected, ...projectedAnchors, ...handAnchors };
   if (Array.isArray(handNozzles)) nozzles.splice(0, nozzles.length, ...handNozzles);
 
   // 4) Height: inflate the silhouette as a union of balls (thick fuselage,
@@ -382,6 +472,7 @@ async function prepare(id, rgba, outDir, sheetBoxForId) {
     }
   }
   for (const v of tube) if (v > peak) peak = v;
+  if (!(peak > 0)) throw new Error(`${id}: source hull is too small to build a relief`);
   const height = Buffer.alloc(gw * gh);
   for (let i = 0; i < d.length; i += 1) height[i] = Math.round(255 * tube[i] / peak);
   const heightScale = round(peak / gh);
@@ -402,14 +493,61 @@ async function prepare(id, rgba, outDir, sheetBoxForId) {
   const model = {
     id, version: 3, aspect: round(w / h), heightScale, heightGrid: [gw, gh], nozzles, anchors, colors,
     color: "color.webp?v=" + v("color.webp"), emissive: "emissive.webp?v=" + v("emissive.webp"), height: "height.bin?v=" + v("height.bin"),
+    ...(source === undefined ? {} : { source }),
   };
   writeFileSync(join(outDir, "model.json"), JSON.stringify(model, null, 2) + "\n");
-  console.log(JSON.stringify({ id, texture: [cw, ch], flames: nozzles.length, nozzles, colors }));
+  log.log(JSON.stringify({ id, texture: [cw, ch], flames: flames.length, nozzles, colors }));
   return { model, px, w, h };
 }
 
+/** Use transparent GLB top projections when supplied studio art cannot be keyed safely. */
+export async function prepareSource(source, { outRoot = OUT_ROOT, root = ROOT, log = console } = {}) {
+  let rgba;
+  let projected = false;
+  let projection;
+  let projectionMetadataPath;
+  const sha256 = (file) => createHash("sha256").update(readFileSync(file)).digest("hex");
+  try {
+    rgba = await loadRgba(source.path);
+  } catch (error) {
+    if (!source.renderedImagePath || !existsSync(source.renderedImagePath)) throw error;
+    log.warn(`${source.id}: source image unsuitable (${error.message}); using transparent GLB top projection ${source.renderedImagePath}`);
+    rgba = await loadRgba(source.renderedImagePath);
+    projectionMetadataPath = source.renderedImagePath.replace(/\.png$/i, ".json");
+    if (!existsSync(projectionMetadataPath)) throw new Error(`${source.id}: top projection metadata missing; rerun ships:models:prepare`);
+    projection = JSON.parse(readFileSync(projectionMetadataPath, "utf8"));
+    if (projection.version !== 1 || projection.projection !== "orthographic-top") {
+      throw new Error(`${source.id}: unsupported top projection metadata; rerun ships:models:prepare`);
+    }
+    const normalizedModel = join(root, "art-src/models/ships", `${source.id}.glb`);
+    if (!existsSync(normalizedModel) || projection.modelSha256 !== sha256(normalizedModel)) {
+      throw new Error(`${source.id}: top projection is stale for its normalized GLB; rerun ships:models:prepare`);
+    }
+    if (!Array.isArray(projection.nozzles) || projection.nozzles.length === 0 || projection.nozzles.some((point) =>
+      !Array.isArray(point) || point.length !== 3 || point.some((v) => !Number.isFinite(v)) || point[2] <= 0)) {
+      throw new Error(`${source.id}: top projection has no valid authored engine sockets`);
+    }
+    log.log(`${source.id}: using ${projection.nozzles.length} authored GLB engine sockets from the top projection.`);
+    projected = true;
+  }
+  return prepare(source.id, rgba, join(outRoot, source.id), await sheetBox(source.legacyCharacterId), {
+    legacyCharacterId: source.legacyCharacterId,
+    log,
+    projection,
+    source: {
+      image: relative(root, source.path), imageSha256: sha256(source.path),
+      ...(projected ? {
+        renderedImage: relative(root, source.renderedImagePath), renderedImageSha256: sha256(source.renderedImagePath),
+        projectionMetadata: relative(root, projectionMetadataPath), projectionMetadataSha256: sha256(projectionMetadataPath),
+        normalizedModelSha256: projection.modelSha256,
+      } : {}),
+    },
+  });
+}
+
 /** Detection check: each ship with its nozzles, anchors and colours marked. */
-async function overlay(results, file) {
+export async function overlay(results, file) {
+  mkdirSync(dirname(file), { recursive: true });
   const cell = 300;
   const tiles = [];
   for (const [index, { model, px, w, h }] of results.entries()) {
@@ -436,7 +574,7 @@ async function overlay(results, file) {
   console.log("overlay: " + file);
 }
 
-const args = process.argv.slice(2);
+export async function main(args = process.argv.slice(2)) {
 const sheetTest = args.includes("--sheet-test");
 const only = args.filter((a) => !a.startsWith("--"));
 const results = [];
@@ -446,16 +584,26 @@ if (sheetTest) {
   }
   await overlay(results, join(TEST_ROOT, "overlay.jpg"));
 } else {
-  const files = existsSync(SRC) ? readdirSync(SRC).filter((f) => /-top-hd\.(png|webp|jpe?g)$/i.test(f)) : [];
-  const todo = files.map((f) => [f.replace(/-top-hd\.(png|webp|jpe?g)$/i, ""), f])
-    .filter(([id]) => (only.length === 0 ? !KEEP.has(id) || !existsSync(join(OUT_ROOT, id, "model.json")) : only.includes(id)));
+  const { discoverShipSources } = await import("../ships/ship-sources.mjs");
+  const { sources, missing, warnings } = discoverShipSources(ROOT, { kind: "image", ...(only.length > 0 ? { ids: only } : {}) });
+  for (const warning of warnings) console.warn(warning);
+  const todo = sources.filter(({ id }) => only.length > 0 || !KEEP.has(id) || !existsSync(join(OUT_ROOT, id, "model.json")));
+  const errors = [];
+  for (const id of missing) {
+    const message = `${id}: no matching source image found`;
+    if (only.length > 0) errors.push(message);
+    else console.warn(message);
+  }
   if (todo.length === 0) {
-    console.log(files.length === 0 ? "No art-src/ships/<id>-top-hd.png found; nothing to prepare."
+    console.log(sources.length === 0 ? "No ship source images found; nothing to prepare."
       : "Nothing new to prepare (kept as approved: " + [...KEEP].join(", ") + "; name an id to force it).");
   }
-  for (const [id, file] of todo) {
-    if (!IDS.includes(id)) { console.log("skip " + file + ": unknown ship id"); continue; }
-    results.push(await prepare(id, await loadRgba(join(SRC, file)), join(OUT_ROOT, id), await sheetBox(id)));
+  for (const source of todo) {
+    try {
+      results.push(await prepareSource(source));
+    } catch (error) {
+      errors.push(`${source.id}: ${error.message}`);
+    }
   }
   if (results.length > 0) await overlay(results, join(ROOT, ".visual/ship3d-overlay.jpg"));
   // Which ships have a model, so the game never requests a missing one.
@@ -463,4 +611,12 @@ if (sheetTest) {
     const ships = readdirSync(OUT_ROOT).filter((id) => existsSync(join(OUT_ROOT, id, "model.json"))).sort();
     writeFileSync(join(OUT_ROOT, "manifest.json"), JSON.stringify({ ships }, null, 2) + "\n");
   }
+  for (const error of errors) console.error(error);
+  return { prepared: results.map(({ model }) => model.id), errors };
+}
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  main().then((result) => { if (result?.errors.length > 0) process.exitCode = 1; })
+    .catch((error) => { console.error(error.message); process.exitCode = 1; });
 }

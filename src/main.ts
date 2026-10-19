@@ -198,7 +198,9 @@ import {
   parseShipArtPreference,
   PREMIUM_SHIP_SHEET_ASSET_ID,
   selectCharacterShipSheet,
+  loadShipVisualArt,
 } from "./characters/ship-art";
+import { defaultShipVisualId, getShipVisual, resolveShipVisualId, setShipVisualOverride } from "./characters/ship-visual";
 import { CHARACTER_SHIP_SHEET_ASSET_ID } from "./characters/visuals";
 import { deriveEquipmentAura } from "./characters/equipment-aura";
 import { AEGIS_ACTIVE_SKILL_ID } from "./characters/aegis";
@@ -6719,6 +6721,7 @@ byId<HTMLButtonElement>("anomalyOverload").addEventListener(
 );
 
 function applySelectedCharacter(): void {
+  void loadShipVisualArt(resolveShipVisualId(characters.selected));
   game.setCharacter(characters.selected);
   applyEquipmentStats();
   renderPlayerStatusIdentity();
@@ -6728,6 +6731,25 @@ function applySelectedCharacter(): void {
 function renderCharacters(): void {
   const grid = byId("characterGrid");
   grid.replaceChildren();
+
+  const skin = byId<HTMLSelectElement>("characterVisualSkin");
+  const defaultVisual = defaultShipVisualId(characters.selected);
+  skin.replaceChildren();
+  for (const visualId of [defaultVisual, "eternal-sovereign"]) {
+    const option = document.createElement("option");
+    option.value = visualId;
+    option.textContent = getShipVisual(visualId)?.name ?? visualId;
+    option.selected = resolveShipVisualId(characters.selected) === visualId;
+    skin.append(option);
+  }
+  skin.onchange = () => {
+    if (setShipVisualOverride(characters.selected, skin.value)) {
+      void loadShipVisualArt(resolveShipVisualId(characters.selected));
+      renderCharacters();
+      renderPlayerStatusIdentity();
+      updateCampaignUi();
+    }
+  };
 
   CHARACTER_IDS.forEach((id, index) => {
     const definition = getCharacter(id);
@@ -6770,7 +6792,7 @@ function renderCharacters(): void {
 
     const role = document.createElement("span");
     role.className = "character-role";
-    role.textContent = definition.role;
+    role.textContent = (getShipVisual(resolveShipVisualId(id))?.name ?? definition.name) + " · " + definition.role;
 
     nameWrap.append(name, role);
 
@@ -11120,6 +11142,7 @@ async function applyGrammarVocabulary(grammarId: string): Promise<void> {
 }
 
 async function initializeArtPipeline(): Promise<void> {
+  void loadShipVisualArt(resolveShipVisualId(characters.selected));
   try {
     const manifest = await loadArtAssetManifest();
     // QA-only A/B comparison: ?shipArt=v2 excludes V3 from the preload so the

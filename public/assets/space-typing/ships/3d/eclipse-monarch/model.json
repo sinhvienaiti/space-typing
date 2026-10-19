@@ -1,0 +1,76 @@
+{
+  "id": "eclipse-monarch",
+  "version": 3,
+  "aspect": 0.9805,
+  "heightScale": 0.206,
+  "heightGrid": [
+    256,
+    261
+  ],
+  "nozzles": [
+    [
+      0.3877,
+      0.9539,
+      0.0173
+    ],
+    [
+      0.4995,
+      0.9672,
+      0.0173
+    ],
+    [
+      0.6123,
+      0.9539,
+      0.0173
+    ]
+  ],
+  "anchors": {
+    "nose": [
+      0.4981,
+      0.0365
+    ],
+    "canopy": [
+      0.4995,
+      0.6055
+    ],
+    "eyes": [],
+    "guns": [
+      [
+        0.2779,
+        0.5646
+      ],
+      [
+        0.721,
+        0.5646
+      ]
+    ],
+    "wingtips": [
+      [
+        0.034,
+        0.7545
+      ],
+      [
+        0.9641,
+        0.7529
+      ]
+    ]
+  },
+  "colors": {
+    "hot": "#e0fffc",
+    "plume": "#2fffeb",
+    "outer": "#22b8aa",
+    "accent": "#4efff1"
+  },
+  "color": "color.webp?v=f6db8716091a",
+  "emissive": "emissive.webp?v=66309431a461",
+  "height": "height.bin?v=19333391ab5b",
+  "source": {
+    "image": "art-src/ships/ship-09-eclipse-monarch-2d.png",
+    "imageSha256": "c288e347271c32334ca61ddea2ef110b26895b1ecfec767e8a0e4c3a6f1c9a55",
+    "renderedImage": "art-src/ships/rendered/eclipse-monarch-top.png",
+    "renderedImageSha256": "256f068d7817f820044b211a0c5d4c170c5c654e0c745ace902e61db7fd3b2d0",
+    "projectionMetadata": "art-src/ships/rendered/eclipse-monarch-top.json",
+    "projectionMetadataSha256": "9208b811234ec1c51073b45a2eff1582ec177adb38f0865e8371c46c716890e3",
+    "normalizedModelSha256": "5eb2203cca88a24895913922addfd0d888a06cef8f07ad6d7c0f1e465404b5c2"
+  }
+}

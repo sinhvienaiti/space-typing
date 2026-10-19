@@ -4,6 +4,8 @@ import { MODEL_CONTRACTS, missingSockets } from "../render3d/model-contracts";
 import { loadModel, modelUrl } from "../render3d/model-loader";
 import { disposeBuiltShipResources } from "./ship3d-lifecycle";
 import type { BuiltShip } from "./vanguard-model";
+import { resolveShipVisualId } from "../characters/ship-visual";
+import { loadShipVisualArt, shipVisualColors } from "../characters/ship-art";
 
 type Three = typeof import("three");
 
@@ -89,13 +91,19 @@ export function buildAuthoredShip(
   };
 }
 
-export async function loadAuthoredShip(three: Three, id: CharacterId, quality: VisualQuality): Promise<BuiltShip | null> {
+export async function loadAuthoredShip(three: Three, id: CharacterId, quality: VisualQuality, visualId = resolveShipVisualId(id)): Promise<BuiltShip | null> {
   if (quality === "low" || (typeof location !== "undefined" && new URLSearchParams(location.search).get("model3d") === "off")) return null;
-  const url = await modelUrl("ships", id, quality);
+  // Prepare a fail-soft fallback independently, even when no GLB is listed.
+  // A missing or slow image must never delay an otherwise valid model.
+  void loadShipVisualArt(visualId);
+  const url = await modelUrl("ships", visualId, quality);
   if (!url) return null;
   const gltf = await loadModel(url);
   const built = buildAuthoredShip(three, gltf.scene, gltf.animations);
   if (!built) disposeBuiltShipResources({ group: gltf.scene, textures: texturesOf(gltf.scene) });
-  else built.group.userData.modelUrl = url;
+  else {
+    built.group.userData.modelUrl = url;
+    built.colors = shipVisualColors(visualId) ?? built.colors;
+  }
   return built;
 }

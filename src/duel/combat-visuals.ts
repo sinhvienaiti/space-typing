@@ -19,6 +19,8 @@ import { DuelAfterburner, drawFlameStreak, type AfterburnerColors, type Afterbur
 import { drawGlow } from "../vfx/light-sprites";
 import { DuelOrdnance, type OrdnanceKind } from "./ordnance";
 import { DUEL_SHOT_FLIGHT_EASE } from "./presentation-timing";
+import { loadShipVisualArt, shipVisualRuntimeKey } from "../characters/ship-art";
+import { resolveShipVisualId, subscribeShipVisuals } from "../characters/ship-visual";
 
 type Side = "self" | "opponent";
 type Payload = { target: Side; shotId?: string; variant: string; lead: boolean; heat: number; originScale: number };
@@ -103,6 +105,7 @@ export class DuelCombatVisuals {
   private readonly shots = new PlayerShotSystem<Payload>();
   private readonly ships: Record<Side, Ship>;
   private readonly observer: ResizeObserver;
+  private unsubscribeShipVisuals: (() => void) | null = null;
   private readonly shield: Record<Side, number> = { self: 0, opponent: 0 };
   private shakeSink: (amount: number) => void = () => {};
   private dirty = true;
@@ -126,6 +129,7 @@ export class DuelCombatVisuals {
   private ship3d: DuelShip3D | null = null;
   private ship3dFor: CharacterId | null = null;
   private ship3dTier = "";
+  private ship3dVisual = "";
   private ship3dGeneration = 0;
   private ship3dLoading: Promise<void> = Promise.resolve();
   /** Typed weapons in flight, and each side's weapon colour (its shot colour). */
@@ -147,6 +151,7 @@ export class DuelCombatVisuals {
   private rival3d: DuelShip3D | null = null;
   private rival3dFor: CharacterId | null = null;
   private rival3dTier = "";
+  private rival3dVisual = "";
   private rival3dGeneration = 0;
   private readonly rivalBurner = new DuelAfterburner();
   private readonly rivalBurners: AfterburnerNozzle[] = [];
@@ -186,7 +191,28 @@ export class DuelCombatVisuals {
     arena.append(this.canvas);
     this.canvas.hidden = external;
     void loadChaseArt();
+    this.observeShipVisuals();
     if (this.available) arena.classList.add("duel-campaign-renderer");
+  }
+
+  private observeShipVisuals(): void {
+    if (this.unsubscribeShipVisuals !== null) return;
+    this.unsubscribeShipVisuals = subscribeShipVisuals(() => {
+      // A cosmetic switch invalidates completed and pending hull owners.
+      // The next draw/preload requests fresh instances through the same path.
+      ++this.ship3dGeneration;
+      ++this.rival3dGeneration;
+      this.ship3d?.dispose();
+      this.rival3d?.dispose();
+      this.ship3d = this.rival3d = null;
+      this.ship3dFor = this.rival3dFor = null;
+      this.ship3dVisual = this.rival3dVisual = "";
+      this.selfFrame = this.rivalFrame = null;
+      for (const ship of Object.values(this.ships)) {
+        ship.paintedAt = -Infinity;
+        void loadShipVisualArt(resolveShipVisualId(ship.id));
+      }
+    });
   }
 
   get available(): boolean { return this.context !== null && this.ships.self.context !== null && this.ships.opponent.context !== null; }
@@ -201,6 +227,9 @@ export class DuelCombatVisuals {
 
   /** Starts loading the 3D hull early (Duel lobby), so the fight never waits on it. */
   preload(quality: VisualQuality, self: CharacterId = this.ships.self.id, rival: CharacterId = this.ships.opponent.id): void {
+    this.observeShipVisuals();
+    void loadShipVisualArt(resolveShipVisualId(self));
+    void loadShipVisualArt(resolveShipVisualId(rival));
     if (quality === "low" || !this.available) return;
     this.quality = quality;
     // One after the other: two loads at once doubled the stalls and could
@@ -220,6 +249,8 @@ export class DuelCombatVisuals {
     if (this.ships.opponent.id !== opponent) this.ships.opponent.paintedAt = -Infinity;
     this.ships.self.id = self;
     this.ships.opponent.id = opponent;
+    void loadShipVisualArt(resolveShipVisualId(self));
+    void loadShipVisualArt(resolveShipVisualId(opponent));
     preloadShotArt(self);
     preloadShotArt(opponent);
     for (const side of ["self", "opponent"] as const) {
@@ -436,6 +467,7 @@ export class DuelCombatVisuals {
   render(now: number, quality: VisualQuality, externalContext?: CanvasRenderingContext2D, viewport?: { width: number; height: number }): void {
     const context = this.context;
     if (context === null) return;
+    this.observeShipVisuals();
     this.nowMs = now;
     if (quality !== this.quality) { this.quality = quality; this.dirty = true; }
     if (!this.flipbooksRequested && (quality === "high" || quality === "ultra")) {
@@ -513,7 +545,7 @@ export class DuelCombatVisuals {
       // ready (not on Low), else the painted rear sprite, else the top view.
       if (this.layout === "depth" && side === "self" && externalContext !== undefined) {
         if (quality !== "low" && ship3dEnabled()) this.requestShip3D(ship.id);
-        const model = quality !== "low" && this.ship3d?.available === true ? this.ship3d : null;
+        const model = quality !== "low" && this.ship3dVisual === shipVisualRuntimeKey(ship.id) && this.ship3d?.available === true ? this.ship3d : null;
         if (model !== null && this.drawShip3D(externalContext, ship, model, drawn, offset, fxDt, quality, reduced)) continue;
         const chase = chaseSprite(ship.id);
         if (chase !== null) {
@@ -525,7 +557,7 @@ export class DuelCombatVisuals {
       // It loads only from preload() (lobby, between rounds): if it is not
       // ready when a round starts, the 2D rival stays until the next break.
       if (this.layout === "depth" && side === "opponent" && externalContext !== undefined && quality !== "low" && rival3dEnabled()) {
-        const model = this.rival3dFor === ship.id && this.rival3d?.available === true ? this.rival3d : null;
+        const model = this.rival3dFor === ship.id && this.rival3dVisual === shipVisualRuntimeKey(ship.id) && this.rival3d?.available === true ? this.rival3d : null;
         if (model !== null && this.drawRival3D(externalContext, ship, model, drawn, offset, fxDt, quality, reduced)) continue;
       }
       const rig = activeShipLightRig(ship.id);
@@ -584,18 +616,21 @@ export class DuelCombatVisuals {
   }
 
   private requestShip3D(id: CharacterId): Promise<void> {
+    if (this.quality === "low") return Promise.resolve();
     const tier = this.quality === "medium" ? "medium" : "high";
-    if (this.ship3dFor === id && this.ship3dTier === tier) return this.ship3dLoading;
+    const visual = shipVisualRuntimeKey(id);
+    if (this.ship3dFor === id && this.ship3dTier === tier && this.ship3dVisual === visual) return this.ship3dLoading;
     const generation = ++this.ship3dGeneration;
     this.ship3dFor = id;
     this.ship3dTier = tier;
+    this.ship3dVisual = visual;
     this.ship3d?.dispose();
     this.ship3d = null;
     this.selfFrame = null;
     // A fresh instance per request: a shared in-flight load could hand an older
     // generation's (disposed) result to a newer request for the same id/tier.
     this.ship3dLoading = DuelShip3D.loadFresh(id, "self", { quality: this.quality }).then((model) => {
-      if (generation === this.ship3dGeneration) this.ship3d = model;
+      if (generation === this.ship3dGeneration && visual === shipVisualRuntimeKey(id)) this.ship3d = model;
       else model?.dispose();
     });
     return this.ship3dLoading;
@@ -748,21 +783,25 @@ export class DuelCombatVisuals {
 
   /** Engine colours: the 3D hull's own (from its painting), else the light rig, else Vanguard cyan. */
   private engineColors(id: CharacterId): AfterburnerColors {
-    const own = this.ship3dFor === id && this.ship3d?.available === true ? this.ship3d.colors
-      : this.rival3dFor === id && this.rival3d?.available === true ? this.rival3d.colors : undefined;
+    const visual = shipVisualRuntimeKey(id);
+    const own = this.ship3dFor === id && this.ship3dVisual === visual && this.ship3d?.available === true ? this.ship3d.colors
+      : this.rival3dFor === id && this.rival3dVisual === visual && this.rival3d?.available === true ? this.rival3d.colors : undefined;
     return own ?? activeShipLightRig(id) ?? ENGINE_COLORS;
   }
 
   private requestRival3D(id: CharacterId): void {
+    if (this.quality === "low") return;
     const tier = "medium";
-    if (this.rival3dFor === id && this.rival3dTier === tier) return;
+    const visual = shipVisualRuntimeKey(id);
+    if (this.rival3dFor === id && this.rival3dTier === tier && this.rival3dVisual === visual) return;
     const generation = ++this.rival3dGeneration;
     this.rival3dFor = id;
     this.rival3dTier = tier;
+    this.rival3dVisual = visual;
     this.rival3d?.dispose();
     this.rival3d = null;
     void DuelShip3D.loadFresh(id, "rival", { quality: "medium" }).then((model) => {
-      if (generation === this.rival3dGeneration) this.rival3d = model;
+      if (generation === this.rival3dGeneration && visual === shipVisualRuntimeKey(id)) this.rival3d = model;
       else model?.dispose();
     });
   }
@@ -1010,6 +1049,8 @@ export class DuelCombatVisuals {
 
   /** Release hull owners when leaving Duel; this instance can load again on the next visit. */
   dispose(): void {
+    this.unsubscribeShipVisuals?.();
+    this.unsubscribeShipVisuals = null;
     ++this.ship3dGeneration;
     ++this.rival3dGeneration;
     this.ship3d?.dispose();
@@ -1017,6 +1058,7 @@ export class DuelCombatVisuals {
     this.ship3d = this.rival3d = null;
     this.ship3dFor = this.rival3dFor = null;
     this.ship3dTier = this.rival3dTier = "";
+    this.ship3dVisual = this.rival3dVisual = "";
     this.selfFrame = this.rivalFrame = null;
     this.clear();
   }

@@ -2484,4 +2484,5 @@ def main():
         export(kind, CONFIG["id"], CONFIG["project"])
 
 
-main()
+if __name__ == "__main__":
+    main()

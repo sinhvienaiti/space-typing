@@ -1,0 +1,79 @@
+{
+  "id": "frost-seraph",
+  "version": 3,
+  "aspect": 0.889,
+  "heightScale": 0.1032,
+  "heightGrid": [
+    256,
+    288
+  ],
+  "nozzles": [
+    [
+      0.3595,
+      0.925,
+      0.0193
+    ],
+    [
+      0.6485,
+      0.925,
+      0.0193
+    ]
+  ],
+  "anchors": {
+    "nose": [
+      0.501,
+      0.0296
+    ],
+    "canopy": [
+      0.5006,
+      0.4779
+    ],
+    "eyes": [],
+    "guns": [
+      [
+        0.0855,
+        0.371
+      ],
+      [
+        0.4728,
+        0.1747
+      ],
+      [
+        0.5272,
+        0.1686
+      ],
+      [
+        0.9156,
+        0.3731
+      ]
+    ],
+    "wingtips": [
+      [
+        0.053,
+        0.7008
+      ],
+      [
+        0.9526,
+        0.7111
+      ]
+    ]
+  },
+  "colors": {
+    "hot": "#ece9ff",
+    "plume": "#7f6aff",
+    "outer": "#5c4cb8",
+    "accent": "#deadff"
+  },
+  "color": "color.webp?v=e37f0b856c7d",
+  "emissive": "emissive.webp?v=77a6965e0488",
+  "height": "height.bin?v=2c8f38bf6a44",
+  "source": {
+    "image": "art-src/ships/ship-06-frost-seraph-2d.png",
+    "imageSha256": "4db5c08f2562c4dea9cca8932dd93c308eb8172c8618ad043184b355719813d6",
+    "renderedImage": "art-src/ships/rendered/frost-seraph-top.png",
+    "renderedImageSha256": "1227f5df4f7c5ee42c6dc03c7d3a918c28fc1bc79027ffa3577acfd52fc0729f",
+    "projectionMetadata": "art-src/ships/rendered/frost-seraph-top.json",
+    "projectionMetadataSha256": "15050795e891fa0651d366cf05e9980307a0dd39271f8a8cfa27e3a5687d811d",
+    "normalizedModelSha256": "d1025304f3aeeaffb5b27cb5cf9d33d5ee66951a3a0dd9f825eed3cbbde3a209"
+  }
+}

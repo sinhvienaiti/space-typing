@@ -1,0 +1,71 @@
+{
+  "id": "genesis-phoenix",
+  "version": 3,
+  "aspect": 0.7959,
+  "heightScale": 0.1266,
+  "heightGrid": [
+    256,
+    322
+  ],
+  "nozzles": [
+    [
+      0.3821,
+      0.7763,
+      0.0215
+    ],
+    [
+      0.6373,
+      0.7763,
+      0.0215
+    ]
+  ],
+  "anchors": {
+    "nose": [
+      0.5037,
+      0.0251
+    ],
+    "canopy": [
+      0.5,
+      0.5237
+    ],
+    "eyes": [],
+    "guns": [
+      [
+        0.2578,
+        0.4979
+      ],
+      [
+        0.7436,
+        0.4979
+      ]
+    ],
+    "wingtips": [
+      [
+        0.0283,
+        0.5569
+      ],
+      [
+        0.9597,
+        0.5631
+      ]
+    ]
+  },
+  "colors": {
+    "hot": "#fff7ee",
+    "plume": "#ffc990",
+    "outer": "#b89168",
+    "accent": "#ffbd78"
+  },
+  "color": "color.webp?v=603f238b8a09",
+  "emissive": "emissive.webp?v=bcc4b274bd38",
+  "height": "height.bin?v=64ffc5d94b8f",
+  "source": {
+    "image": "art-src/ships/ship-11-genesis-phoenix-2d.png",
+    "imageSha256": "745f49443ca66e3fbdbf69e27bc8262880d27ef889fb692ab070bc102a5a2da1",
+    "renderedImage": "art-src/ships/rendered/genesis-phoenix-top.png",
+    "renderedImageSha256": "cafb5935a419fd18a8ebbee82175ce13dbacb828cf09894b37143bc5ccdf0468",
+    "projectionMetadata": "art-src/ships/rendered/genesis-phoenix-top.json",
+    "projectionMetadataSha256": "1bd8964a39207b953aba42cebc36df7057f253ae10ee1eefaa734cd600c3691f",
+    "normalizedModelSha256": "c44821ef8082caff8dbbc6c2bee02764b2787a98dd73b8a28472daa3974858c2"
+  }
+}

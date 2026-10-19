@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DuelCombatVisuals } from "../src/duel/combat-visuals";
 import { duelArenaLayout } from "../src/duel/combat-layout";
 import { drawCharacterShip } from "../src/characters/renderer";
+import { setShipVisualOverride } from "../src/characters/ship-visual";
+
+const mountedVisuals: DuelCombatVisuals[] = [];
 
 vi.mock("../src/characters/renderer", () => ({
   activeShipLightRig: () => null,
@@ -35,13 +38,37 @@ function setup(width = 390, height = 350) {
   const ship = (y: number) => ({ append: vi.fn(), getBoundingClientRect: () => ({ left: width / 2 - 40, top: y, width: 80, height: 80 }) });
   const visuals = new DuelCombatVisuals(arena as unknown as HTMLElement,
     ship(height - 100) as unknown as HTMLElement, ship(20) as unknown as HTMLElement, vi.fn(), true);
+  mountedVisuals.push(visuals);
   const output = context();
   return { visuals, output, bounds, resize: () => onResize(), ctx: output as unknown as CanvasRenderingContext2D };
 }
 
-afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
+afterEach(() => {
+  for (const visuals of mountedVisuals.splice(0)) visuals.dispose();
+  setShipVisualOverride("vanguard", null);
+  vi.unstubAllGlobals();
+  vi.clearAllMocks();
+});
 
 describe("Duel canvas composition", () => {
+  it("unsubscribes hidden owners and resumes observing on the next preload", () => {
+    const { visuals } = setup();
+    const state = visuals as unknown as { ship3dGeneration: number; rival3dGeneration: number };
+    const before = state.ship3dGeneration;
+    setShipVisualOverride("vanguard", "eternal-sovereign");
+    expect(state.ship3dGeneration).toBe(before + 1);
+    visuals.dispose();
+    const disposedGeneration = state.ship3dGeneration;
+    const disposedRivalGeneration = state.rival3dGeneration;
+    setShipVisualOverride("vanguard", null);
+    expect(state.ship3dGeneration).toBe(disposedGeneration);
+    expect(state.rival3dGeneration).toBe(disposedRivalGeneration);
+    visuals.preload("low");
+    setShipVisualOverride("vanguard", "eternal-sovereign");
+    expect(state.ship3dGeneration).toBe(disposedGeneration + 1);
+    expect(state.rival3dGeneration).toBe(disposedRivalGeneration + 1);
+  });
+
   it("maps CSS positions into the minimum logical Game viewport and restores the context", () => {
     const { visuals, output, ctx } = setup();
     visuals.render(1000, "high", ctx, { width: 640, height: 420 });

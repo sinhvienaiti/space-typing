@@ -1,0 +1,76 @@
+{
+  "id": "solar-lance",
+  "version": 3,
+  "aspect": 0.5857,
+  "heightScale": 0.0934,
+  "heightGrid": [
+    256,
+    437
+  ],
+  "nozzles": [
+    [
+      0.3635,
+      0.9273,
+      0.0292
+    ],
+    [
+      0.5,
+      0.9823,
+      0.0292
+    ],
+    [
+      0.6418,
+      0.9273,
+      0.0292
+    ]
+  ],
+  "anchors": {
+    "nose": [
+      0.4974,
+      0.0122
+    ],
+    "canopy": [
+      0.5,
+      0.4756
+    ],
+    "eyes": [],
+    "guns": [
+      [
+        0.1241,
+        0.4289
+      ],
+      [
+        0.8759,
+        0.4289
+      ]
+    ],
+    "wingtips": [
+      [
+        0.0281,
+        0.8761
+      ],
+      [
+        0.9624,
+        0.8512
+      ]
+    ]
+  },
+  "colors": {
+    "hot": "#fff6e6",
+    "plume": "#ffc65c",
+    "outer": "#b88e42",
+    "accent": "#ffc662"
+  },
+  "color": "color.webp?v=08549f80ae75",
+  "emissive": "emissive.webp?v=be2d435090f3",
+  "height": "height.bin?v=e6dce8834199",
+  "source": {
+    "image": "art-src/ships/ship-03-solar-lance-2d.png",
+    "imageSha256": "e870416494d825722da6ba64f9fae2b0d8167c243c8c550e42e428852ac9ee16",
+    "renderedImage": "art-src/ships/rendered/solar-lance-top.png",
+    "renderedImageSha256": "a13c78737456df4cae616650b42bd81b459531c438dead4047cef4b6e2fc66d9",
+    "projectionMetadata": "art-src/ships/rendered/solar-lance-top.json",
+    "projectionMetadataSha256": "7841d782f8d23273723831e6a7be635b12613f807dfe8026ec62e5321a489a49",
+    "normalizedModelSha256": "bcaaea8688118f0d71fe682d99d7bc63e56c77657bffa6c1fe9620c31f729048"
+  }
+}

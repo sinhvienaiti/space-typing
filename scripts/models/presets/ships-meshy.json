@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "ships": {
+    "vanguard": {
+      "nose": "-X",
+      "yaw": 0,
+      "triangles": 12000,
+      "autoEmissive": 0.08,
+      "sockets": "vanguard-meshy-sockets.json",
+      "reviewed": true,
+      "note": "Reviewed Vanguard orientation and authored sockets: docs/VANGUARD_MESHY_INTEGRATION_2026-10-17.md",
+      "preserveRawSha256": "87d4cc5694849bccec2b634de8af83479c00724e1c4a4a553e7d623ecc605a4a"
+    },
+    "razorwing": {
+      "nose": "-X",
+      "yaw": 0,
+      "triangles": 12000,
+      "autoEmissive": 0.08,
+      "sockets": "razorwing-meshy-sockets.json",
+      "reviewed": true,
+      "note": "Raw nose individually reviewed: Blender -X, Z up. Engines/core/side muzzles authored against transparent top projection on 2026-10-20; see fleet integration QA."
+    },
+    "solar-lance": {
+      "nose": "-X",
+      "yaw": 0,
+      "triangles": 12000,
+      "autoEmissive": 0.08,
+      "sockets": "solar-lance-meshy-sockets.json",
+      "reviewed": true,
+      "note": "Raw nose individually reviewed: Blender -X, Z up. Engines/core/side muzzles authored against transparent top projection on 2026-10-20; see fleet integration QA."
+    },
+    "phantom-wraith": {
+      "nose": "-X",
+      "yaw": 0,
+      "triangles": 12000,
+      "autoEmissive": 0.08,
+      "sockets": "phantom-wraith-meshy-sockets.json",
+      "reviewed": true,
+      "note": "Raw nose individually reviewed: Blender -X, Z up. Engines/core/side muzzles authored against transparent top projection on 2026-10-20; see fleet integration QA."
+    },
+    "crimson-talon": {
+      "nose": "-X",
+      "yaw": 0,
+      "triangles": 12000,
+      "autoEmissive": 0.08,
+      "sockets": "crimson-talon-meshy-sockets.json",
+      "reviewed": true,
+      "note": "Raw nose individually reviewed: Blender -X, Z up. Engines/core/side muzzles authored against transparent top projection on 2026-10-20; see fleet integration QA."
+    },
+    "frost-seraph": {
+      "nose": "-X",
+      "yaw": 0,
+      "triangles": 12000,
+      "autoEmissive": 0.08,
+      "sockets": "frost-seraph-meshy-sockets.json",
+      "reviewed": true,
+      "note": "Raw nose individually reviewed: Blender -X, Z up. Engines/core/side muzzles authored against transparent top projection on 2026-10-20; see fleet integration QA."
+    },
+    "nova-reaper": {
+      "nose": "-X",
+      "yaw": 0,
+      "triangles": 12000,
+      "autoEmissive": 0.08,
+      "sockets": "nova-reaper-meshy-sockets.json",
+      "reviewed": true,
+      "note": "Raw nose individually reviewed: Blender -X, Z up. Engines/core/side muzzles authored against transparent top projection on 2026-10-20; see fleet integration QA."
+    },
+    "astral-dragon": {
+      "nose": "-X",
+      "yaw": 0,
+      "triangles": 12000,
+      "autoEmissive": 0.08,
+      "sockets": "astral-dragon-meshy-sockets.json",
+      "reviewed": true,
+      "note": "Raw nose individually reviewed: Blender -X, Z up. Engines/core/side muzzles authored against transparent top projection on 2026-10-20; see fleet integration QA."
+    },
+    "eclipse-monarch": {
+      "nose": "-X",
+      "yaw": 0,
+      "triangles": 12000,
+      "autoEmissive": 0.08,
+      "sockets": "eclipse-monarch-meshy-sockets.json",
+      "reviewed": true,
+      "note": "Raw nose individually reviewed: Blender -X, Z up. Engines/core/side muzzles authored against transparent top projection on 2026-10-20; see fleet integration QA."
+    },
+    "celestial-valkyrie": {
+      "nose": "-X",
+      "yaw": 0,
+      "triangles": 12000,
+      "autoEmissive": 0.08,
+      "sockets": "celestial-valkyrie-meshy-sockets.json",
+      "reviewed": true,
+      "note": "Raw nose individually reviewed: Blender -X, Z up. Engines/core/side muzzles authored against transparent top projection on 2026-10-20; see fleet integration QA."
+    },
+    "genesis-phoenix": {
+      "nose": "-X",
+      "yaw": 0,
+      "triangles": 12000,
+      "autoEmissive": 0.08,
+      "sockets": "genesis-phoenix-meshy-sockets.json",
+      "reviewed": true,
+      "note": "Raw nose individually reviewed: Blender -X, Z up. Engines/core/side muzzles authored against transparent top projection on 2026-10-20; see fleet integration QA."
+    },
+    "eternal-sovereign": {
+      "nose": "-X",
+      "yaw": 0,
+      "triangles": 12000,
+      "autoEmissive": 0.08,
+      "sockets": "eternal-sovereign-meshy-sockets.json",
+      "reviewed": true,
+      "note": "Raw nose individually reviewed: Blender -X, Z up. Engines/core/side muzzles authored against transparent top projection on 2026-10-20; see fleet integration QA."
+    }
+  }
+}
