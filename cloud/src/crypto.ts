@@ -14,7 +14,7 @@ function toHex(bytes: ArrayBuffer | Uint8Array): string {
   return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function toBase64Url(bytes: Uint8Array): string {
+export function toBase64Url(bytes: Uint8Array): string {
   let text = "";
   for (const byte of bytes) text += String.fromCharCode(byte);
   return btoa(text).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -28,7 +28,7 @@ export async function sha256Hex(text: string): Promise<string> {
   return toHex(await crypto.subtle.digest("SHA-256", encoder.encode(text)));
 }
 
-async function hmacHex(secret: string, message: string): Promise<string> {
+export async function hmacHex(secret: string, message: string): Promise<string> {
   const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   return toHex(await crypto.subtle.sign("HMAC", key, encoder.encode(message)));
 }

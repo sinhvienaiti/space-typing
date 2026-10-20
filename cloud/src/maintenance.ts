@@ -21,7 +21,7 @@ export const WALLET_DAYS_KEPT = 90;
 export const RESOLVED_FEEDBACK_DAYS_KEPT = 365;
 
 export async function cleanup(db: Sql, now: number): Promise<Record<string, number>> {
-  const [sessions, tokens, limits, outbox, links, walletDays, feedback] = await db.batch([
+  const [sessions, tokens, limits, outbox, links, walletDays, feedback, oauth] = await db.batch([
     // Expired, or signed out more than a week ago (kept a week for the Admin's session list).
     db.stmt(
       `delete from sessions where rowid in (select rowid from sessions
@@ -57,6 +57,7 @@ export async function cleanup(db: Sql, now: number): Promise<Record<string, numb
          where status = 'resolved' and handled_at < ?1 limit ${BATCH})`,
       nowIso(now - RESOLVED_FEEDBACK_DAYS_KEPT * DAY),
     ),
+    db.stmt(`delete from oauth_attempts where state_hash in (select state_hash from oauth_attempts where expires_at < ?1 limit ${BATCH})`, now),
   ]);
   return {
     sessions: sessions ?? 0,
@@ -66,5 +67,6 @@ export async function cleanup(db: Sql, now: number): Promise<Record<string, numb
     expiredLinks: links ?? 0,
     walletDays: walletDays ?? 0,
     feedback: feedback ?? 0,
+    oauthAttempts: oauth ?? 0,
   };
 }

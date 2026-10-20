@@ -72,6 +72,18 @@
 }
 .ac-avatar.big { width: 72px; height: 72px; font-size: 2rem; }
 .ac-tabs { display: inline-flex; justify-self: start; }
+.ac-social { display: grid; gap: 8px; }
+.ac-social-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ac-social-button { display: flex; gap: 10px; align-items: center; justify-content: center; min-height: 46px; padding: 9px 12px; color: var(--holo-text); font: 700 0.86rem var(--holo-body); border: 1px solid rgba(111, 231, 255, 0.32); background: rgba(12, 24, 43, 0.9); cursor: pointer; transition: border-color 0.18s, background-color 0.18s; }
+.ac-social-button:hover:not(:disabled), .ac-social-button:focus-visible { border-color: var(--holo-line-strong); background: rgba(95, 227, 255, 0.1); outline: 2px solid rgba(95, 227, 255, 0.25); outline-offset: 2px; }
+.ac-social-button:disabled { color: var(--holo-dim); border-color: rgba(111, 231, 255, 0.16); background: rgba(7, 16, 34, 0.65); cursor: not-allowed; }
+.ac-social-mark { flex: none; display: grid; place-items: center; width: 23px; height: 23px; border-radius: 50%; color: #202124; background: #fff; font: 800 1rem Arial, sans-serif; }
+.ac-social-facebook .ac-social-mark { color: #fff; background: #1877f2; font-size: 1.25rem; }
+.ac-social-button:disabled .ac-social-mark { opacity: 0.6; }
+.ac-social-hint { margin: 0; line-height: 1.45; }
+.ac-social .ac-status:empty { display: none; }
+.ac-divider { display: flex; gap: 12px; align-items: center; margin: 2px 0; color: var(--holo-faint); font-size: 0.78rem; }
+.ac-divider::before, .ac-divider::after { content: ""; flex: 1; height: 1px; background: rgba(111, 231, 255, 0.14); }
 .ac-form { display: grid; gap: 12px; }
 .ac-form.inline { grid-template-columns: 1fr 1fr; align-items: end; }
 .ac-form.inline .ac-status, .ac-form.inline .ac-submit { grid-column: 1 / -1; justify-self: start; }
@@ -192,6 +204,10 @@ body:not(.title-active) .cp-panel { display: none; }
 @media (max-width: 700px) {
   .cp-panel { top: 70px; right: 8px; bottom: 90px; width: calc(100vw - 16px); }
   .ac-form.inline, .ac-choice-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 420px) {
+  .ac-dialog { padding-right: 16px; padding-left: 16px; }
+  .ac-social-buttons { grid-template-columns: 1fr; }
 }
 
 /* ---------- Feedback dialog (feedback-dialog.ts) ---------- */

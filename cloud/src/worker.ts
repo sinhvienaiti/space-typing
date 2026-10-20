@@ -8,7 +8,7 @@ import {
   listSessions,
   login,
   logout,
-  publicAccount,
+  publicAccountDetails,
   register,
   resendVerification,
   resetLinkEmail,
@@ -30,6 +30,7 @@ import { cleanup } from "./maintenance";
 import { backupsKept, getSaveText, putSave } from "./saves";
 import { confirmPurchase, earn, getWallet, openWallet, refuel, refund, sortie, spend, walletPhase } from "./wallet";
 import { walletRateLimit } from "./wallet-rate-limit";
+import { handleOAuth } from "./oauth";
 import { answerFriend, createGroup, groupMembers, joinGroup, kickFromGroup, leaveGroup, requestFriend, resolveChannel, socialOverview } from "./social";
 
 export { ChatChannel } from "./chat";
@@ -111,9 +112,15 @@ async function player(request: Request, env: Env, ctx: ExecutionContext, db: Sql
     return auth;
   };
 
+  const oauth = await handleOAuth(request, env, db, path, auth, context);
+  if (oauth !== null) {
+    if (path.endsWith("/callback") && oauth.status === 303) ctx.waitUntil(flushOutbox(env, db));
+    return oauth;
+  }
+
   switch (method + " " + path) {
     case "GET /me":
-      return json({ account: auth === null ? null : publicAccount(auth.account), serverTime: now });
+      return json({ account: auth === null ? null : await publicAccountDetails(db, auth.account), serverTime: now });
     case "POST /guest": {
       const body = await readJson(request);
       const result = await guest(db, env, body.deviceKey, context);

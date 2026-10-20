@@ -19,4 +19,11 @@ export type Env = {
   WALLET_PHASE?: string;
   /** Only accounts created before this fixed ISO instant may migrate a legacy balance. Missing/invalid denies migration. */
   WALLET_SEED_BEFORE?: string;
+  /** Social sign-in credentials stay in Worker secrets / cloud/.dev.vars. */
+  OAUTH_GOOGLE_CLIENT_ID?: string;
+  OAUTH_GOOGLE_CLIENT_SECRET?: string;
+  OAUTH_FACEBOOK_APP_ID?: string;
+  OAUTH_FACEBOOK_APP_SECRET?: string;
+  /** A currently supported Graph API version selected in the Meta app dashboard. */
+  OAUTH_FACEBOOK_API_VERSION?: string;
 };

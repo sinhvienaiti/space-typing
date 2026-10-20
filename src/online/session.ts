@@ -17,6 +17,18 @@ export type OnlineAccount = {
   emailVerified: boolean;
   displayName: string;
   createdAt: string;
+  /** Older API versions omit these fields and use email/password only. */
+  hasPassword?: boolean;
+  oauthProviders?: OAuthProviderId[];
+};
+
+export type OAuthProviderId = "google" | "facebook";
+export type OAuthProvider = { id: OAuthProviderId; name: string; enabled: boolean };
+export type OAuthStartInput = {
+  intent: "login" | "register" | "link";
+  acceptTerms: boolean;
+  displayName?: string;
+  birthYear?: string;
 };
 
 export type OnlineStatus = "starting" | "online" | "offline" | "banned";
@@ -113,6 +125,27 @@ export class OnlineSession {
     const key = await derivePasswordKey(email, password);
     const result = await onlineRequest<{ account: OnlineAccount }>("/login", { body: { email, key } });
     this.set(result.account, "online");
+  }
+
+  async oauthProviders(): Promise<OAuthProvider[]> {
+    return (await onlineRequest<{ providers: OAuthProvider[] }>("/oauth/providers")).providers;
+  }
+
+  /** Only the server handles provider credentials, OAuth state and the callback. */
+  async startOAuth(provider: OAuthProviderId, input: OAuthStartInput): Promise<string> {
+    if (input.intent === "register" && !input.acceptTerms) {
+      throw new OnlineError(400, "terms_required", "Agree to the terms and privacy policy before creating an account.");
+    }
+    if (input.intent === "link" && !this.registered) {
+      throw new OnlineError(401, "unauthorized", "Sign in before linking another sign-in method.");
+    }
+    const { url } = await onlineRequest<{ url: string }>("/oauth/" + provider + "/start", { body: input });
+    const destination = new URL(url);
+    const expectedHost = provider === "google" ? "accounts.google.com" : "www.facebook.com";
+    if (destination.protocol !== "https:" || destination.hostname !== expectedHost) {
+      throw new OnlineError(502, "oauth_unavailable", "This sign-in provider is temporarily unavailable.");
+    }
+    return destination.href;
   }
 
   async logout(): Promise<void> {

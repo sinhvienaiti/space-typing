@@ -40,6 +40,9 @@
   // 03:23 Vietnam time. Cron Triggers are included in the Workers Free plan.
   "triggers": { "crons": ["23 20 * * *"] },
   // Secrets (wrangler secret put …): ADMIN_TOKEN, PASSWORD_PEPPER, optional RESEND_API_KEY + MAIL_FROM.
+  // Optional social login: OAUTH_GOOGLE_CLIENT_ID + OAUTH_GOOGLE_CLIENT_SECRET;
+  // OAUTH_FACEBOOK_APP_ID + OAUTH_FACEBOOK_APP_SECRET, plus vars.OAUTH_FACEBOOK_API_VERSION.
+  // Same-origin game + API on workers.dev: Static Assets setup in the deploy guide §4.1.
   // Local development reads them from cloud/.dev.vars (created by scripts/local-account.mjs).
   "observability": { "enabled": true }
 }

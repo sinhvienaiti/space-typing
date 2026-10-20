@@ -15,6 +15,7 @@ import { feedbackForExport, forgetFeedbackSender } from "./feedback";
 import { ApiError, nowIso } from "./http";
 import { storedSaveText } from "./saves";
 import { loadWallet, releaseHeld, walletPhase } from "./wallet";
+import type { SocialAttempt, SocialIdentity, SocialProvider } from "./oauth";
 
 export type AccountRow = {
   id: string;
@@ -34,6 +35,7 @@ export type AccountRow = {
   created_at: string;
   last_login_at: string | null;
   last_seen_at: string | null;
+  password_login_enabled?: number;
 };
 
 export type PublicAccount = {
@@ -44,6 +46,8 @@ export type PublicAccount = {
   emailVerified: boolean;
   displayName: string;
   createdAt: string;
+  hasPassword: boolean;
+  oauthProviders?: SocialProvider[];
 };
 
 /** `renewed`: the session's expiry was just moved forward, so the cookie should be re-sent too. */
@@ -61,7 +65,15 @@ export function publicAccount(row: AccountRow): PublicAccount {
     emailVerified: row.email_verified_at !== null,
     displayName: row.display_name,
     createdAt: row.created_at,
+    hasPassword: row.password_login_enabled !== 0 && row.password_hash !== null,
   };
+}
+
+export async function publicAccountDetails(db: Sql, row: AccountRow): Promise<PublicAccount> {
+  const identities = await db.all<{ provider: SocialProvider }>(
+    "select provider from auth_identities where account_id = ?1 and provider in ('google', 'facebook') order by provider", row.id,
+  );
+  return { ...publicAccount(row), oauthProviders: [...new Set(identities.map(identity => identity.provider))] };
 }
 
 function pepper(env: Env): string {
@@ -84,25 +96,149 @@ function bannedError(row: AccountRow): ApiError {
   });
 }
 
-async function newSession(db: Sql, env: Env, accountId: string, context: Context): Promise<{ token: string; statements: D1PreparedStatement[] }> {
+async function newSession(db: Sql, env: Env, accountId: string, context: Context, identity?: SocialIdentity, sourceSessionId?: string): Promise<{ token: string; statements: D1PreparedStatement[] }> {
   const token = randomToken();
+  const sessionId = crypto.randomUUID();
   const at = nowIso(context.now);
   return {
     token,
     statements: [
       db.stmt(
-        "insert into sessions (id, account_id, token_hash, created_at, expires_at, last_seen_at, ip, user_agent) values (?1, ?2, ?3, ?4, ?5, ?4, ?6, ?7)",
-        crypto.randomUUID(),
+        `insert into sessions (id, account_id, token_hash, created_at, expires_at, last_seen_at, ip, user_agent)
+         select ?1, ?2, ?3, ?4, ?5, ?4, ?6, ?7 where (?8 is null or exists
+         (select 1 from auth_identities i join accounts a on a.id = i.account_id
+          where i.provider = ?8 and i.subject = ?9 and i.account_id = ?2 and a.status <> 'deleted'
+          and (a.status <> 'banned' or (a.banned_until is not null and a.banned_until <= ?4))))
+          and (?10 is null or exists (select 1 from sessions where id = ?10 and account_id = ?2 and revoked_at is null and expires_at > ?4))`,
+        sessionId,
         accountId,
         await sha256Hex(token),
         at,
         nowIso(context.now + sessionMs(env)),
         context.ip,
         context.userAgent.slice(0, 300),
+        identity?.provider ?? null,
+        identity?.subject ?? null,
+        sourceSessionId ?? null,
       ),
-      db.stmt("update accounts set last_login_at = ?2, last_seen_at = ?2 where id = ?1", accountId, at),
+      db.stmt("update accounts set last_login_at = ?2, last_seen_at = ?2 where id = ?1 and exists (select 1 from sessions where id = ?3)", accountId, at, sessionId),
     ],
   };
+}
+
+/** Provider subject owns identity. Matching email alone never grants another account. */
+export async function finishSocialIdentity(
+  db: Sql, env: Env, identity: SocialIdentity, attempt: SocialAttempt, context: Context,
+): Promise<{ account: PublicAccount; token: string }> {
+  if (!["google", "facebook"].includes(identity.provider) || !identity.subject || identity.subject.length > 255) {
+    throw new ApiError(400, "oauth-provider", "Invalid provider identity.");
+  }
+  const linked = await db.first<AccountRow>(
+    "select a.* from auth_identities i join accounts a on a.id = i.account_id where i.provider = ?1 and i.subject = ?2",
+    identity.provider, identity.subject,
+  );
+  if (linked?.status === "deleted") throw new ApiError(403, "account-deleted", "This account was deleted.");
+  if (linked && banned(linked, context.now)) throw bannedError(linked);
+  const current = attempt.accountId ? await db.first<AccountRow>("select * from accounts where id = ?1", attempt.accountId) : null;
+  if (current && banned(current, context.now)) throw bannedError(current);
+  const at = nowIso(context.now);
+
+  if (attempt.intent === "link") {
+    if (!current || current.kind !== "registered" || current.status === "deleted" || !attempt.sessionId) {
+      throw new ApiError(401, "signed-out", "Sign in before linking another sign-in method.");
+    }
+    if (linked && linked.id !== current.id) throw new ApiError(409, "oauth-linked", "That sign-in is already linked to a different account.");
+    const session = await newSession(db, env, current.id, context, identity, attempt.sessionId);
+    try {
+      const statements = linked ? [] : [db.stmt(
+        `insert into auth_identities (provider, subject, account_id, created_at) select ?1, ?2, ?3, ?4
+         where exists (select 1 from sessions s join accounts a on a.id = s.account_id
+           where s.id = ?5 and s.account_id = ?3 and s.revoked_at is null and s.expires_at > ?4
+             and a.kind = 'registered' and a.status <> 'deleted'
+             and (a.status <> 'banned' or (a.banned_until is not null and a.banned_until <= ?4)))`,
+        identity.provider, identity.subject, current.id, at, attempt.sessionId,
+      )];
+      const result = await db.batch([...statements, ...session.statements]);
+      if (result[statements.length] !== 1) throw new ApiError(401, "oauth-session", "Your session changed while linking. Sign in and try again.");
+    } catch (error) {
+      if (isUniqueViolation(error)) throw new ApiError(409, "oauth-linked", "That sign-in is already linked. Try again.");
+      throw error;
+    }
+    return { account: await publicAccountDetails(db, current), token: session.token };
+  }
+
+  if (linked) {
+    const session = await newSession(db, env, linked.id, context, identity);
+    const changes = await db.batch(session.statements);
+    if (changes[0] !== 1) throw new ApiError(401, "oauth-session", "The account changed while signing in. Try again.");
+    return { account: await publicAccountDetails(db, linked), token: session.token };
+  }
+  if (attempt.intent !== "register") {
+    throw new ApiError(400, "oauth-account-required", "No pilot is connected to this sign-in yet. Choose Create account first.");
+  }
+  if (!attempt.acceptTerms) {
+    throw new ApiError(400, "terms", "Create an account and accept the terms before using this sign-in for the first time.");
+  }
+  if (emailProblem(identity.email) !== null) throw new ApiError(400, "oauth-email-required", "The provider did not share an email. Use Google or email, or allow Facebook to share your email.");
+  if (identity.provider === "google" && !identity.emailVerified) throw new ApiError(400, "oauth-email-unverified", "Confirm your Google email before creating an account.");
+  if (current && current.kind !== "guest") throw new ApiError(409, "oauth-linked", "Use Link in your profile to add this sign-in to your current account.");
+  if (current && current.status !== "active") throw new ApiError(401, "signed-out", "Sign in again before creating an account.");
+  const email = identity.email!.trim();
+  const normalized = normalizeEmail(email);
+  const verifiedEmail = identity.emailVerified && identity.emailAuthoritative !== false;
+  if (await db.first("select id from accounts where email_normalized = ?1 and status <> 'deleted'", normalized)) {
+    throw new ApiError(409, "email-taken", "An account already uses this email. Sign in with its current method, then link this provider in your profile.");
+  }
+  if ((await hitRateLimit(db, "register:" + context.ip, 3_600_000, context.now)) > 10) {
+    throw new ApiError(429, "rate-limited", "Too many sign-ups from this network. Try again later.");
+  }
+  const name = attempt.displayName ?? identity.displayName ?? "Pilot";
+  const nameProblem = displayNameProblem(name);
+  if (nameProblem) throw new ApiError(400, "invalid", nameProblem);
+  const id = current?.id ?? crypto.randomUUID();
+  // Preserve the original SQLite CHECK without inventing a login password or email.
+  // This inaccessible random value is disabled explicitly until an email reset sets a password.
+  const disabledHash = await sha256Hex(randomToken());
+  const disabledSalt = randomToken(16);
+  const session = await newSession(db, env, id, context, identity);
+  const verify = verifiedEmail ? [] : (await emailToken(db, env, id, email, "verify-email", context.now)).statements;
+  try {
+    if (current) {
+      // D1 batch is atomic but has no interactive transaction. The existing
+      // kind CHECK is a transactional assertion: a concurrently upgraded or
+      // suspended guest aborts every identity/session/email write in this batch.
+      const changes = await db.batch([
+        db.stmt(`update accounts set kind = case when kind = 'guest' and status = 'active' and exists
+                 (select 1 from sessions where id = ?10 and account_id = ?1 and revoked_at is null and expires_at > ?8)
+                 then 'registered' else 'oauth-conflict' end,
+                 email = ?2, email_normalized = ?3, password_hash = ?4, password_salt = ?5,
+                 password_login_enabled = 0, display_name = ?6, birth_year = ?7, terms_accepted_at = ?8, email_verified_at = ?9
+                 where id = ?1`, id, email, normalized, disabledHash, disabledSalt, name.trim(), attempt.birthYear, at, verifiedEmail ? at : null, attempt.sessionId),
+        db.stmt("insert into auth_identities (provider, subject, account_id, created_at) values (?1, ?2, ?3, ?4)", identity.provider, identity.subject, id, at),
+        db.stmt("delete from auth_identities where account_id = ?1 and provider = 'device'", id),
+        db.stmt("update sessions set revoked_at = ?2 where account_id = ?1 and revoked_at is null", id, at),
+        ...session.statements,
+        // Email links are attached only to a successfully upgraded account.
+        ...verify,
+      ]);
+      if (changes[0] !== 1 || changes[1] !== 1) throw new ApiError(409, "oauth-session", "Your account changed during sign-in. Please try again.");
+    } else {
+      await uniqueCodeInsert(db, code => [
+        db.stmt(`insert into accounts (id, kind, pilot_code, email, email_normalized, password_hash, password_salt, password_login_enabled,
+                 display_name, birth_year, terms_accepted_at, created_at, email_verified_at)
+                 values (?1, 'registered', ?2, ?3, ?4, ?5, ?6, 0, ?7, ?8, ?9, ?9, ?10)`,
+          id, code, email, normalized, disabledHash, disabledSalt, name.trim(), attempt.birthYear, at, verifiedEmail ? at : null),
+        db.stmt("insert into auth_identities (provider, subject, account_id, created_at) values (?1, ?2, ?3, ?4)", identity.provider, identity.subject, id, at),
+        ...session.statements, ...verify,
+      ]);
+    }
+  } catch (error) {
+    if (/CHECK constraint failed/i.test(String(error))) throw new ApiError(409, "oauth-session", "Your account changed during sign-in. Please try again.");
+    if (isUniqueViolation(error)) throw new ApiError(409, "email-taken", "This email or sign-in is already in use. Sign in with the existing method and link it from your profile.");
+    throw error;
+  }
+  const row = (await db.first<AccountRow>("select * from accounts where id = ?1", id))!;
+  return { account: await publicAccountDetails(db, row), token: session.token };
 }
 
 /** The account behind a session cookie, or null. Throws 403 for a banned account. */
@@ -178,7 +314,7 @@ export async function guest(db: Sql, env: Env, deviceKey: unknown, context: Cont
   }
   const session = await newSession(db, env, row.id, context);
   await db.batch(session.statements);
-  return { account: publicAccount(row), token: session.token };
+  return { account: await publicAccountDetails(db, row), token: session.token };
 }
 
 async function emailToken(db: Sql, env: Env, accountId: string, email: string, purpose: "verify-email" | "reset-password", now: number): Promise<{ token: string; statements: D1PreparedStatement[] }> {
@@ -264,7 +400,7 @@ export async function register(
     throw error;
   }
   const row = (await db.first<AccountRow>("select * from accounts where id = ?1", id))!;
-  return { account: publicAccount(row), token: session.token };
+  return { account: await publicAccountDetails(db, row), token: session.token };
 }
 
 export async function login(db: Sql, env: Env, input: Record<string, unknown>, context: Context): Promise<{ account: PublicAccount; token: string }> {
@@ -276,14 +412,14 @@ export async function login(db: Sql, env: Env, input: Record<string, unknown>, c
   }
   const row = await db.first<AccountRow>("select * from accounts where email_normalized = ?1 and status <> 'deleted'", normalized);
   const ok = await verifyClientKey(pepper(env), input.key, row?.password_salt ?? null, row?.password_hash ?? null);
-  if (!ok || row === null) {
+  if (!ok || row === null || row.password_login_enabled === 0) {
     await hitRateLimit(db, failKey, 300_000, context.now);
     throw new ApiError(401, "wrong-login", "Email or password is not correct.");
   }
   if (banned(row, context.now)) throw bannedError(row);
   const session = await newSession(db, env, row.id, context);
   await db.batch(session.statements);
-  return { account: publicAccount(row), token: session.token };
+  return { account: await publicAccountDetails(db, row), token: session.token };
 }
 
 export async function changePassword(db: Sql, env: Env, auth: Auth, input: Record<string, unknown>, now: number): Promise<void> {
@@ -350,7 +486,7 @@ export async function resetPassword(db: Sql, env: Env, input: Record<string, unk
   const changes = await db.batch([
     db.stmt("update one_time_tokens set used_at = ?2 where token_hash = ?1 and used_at is null and expires_at > ?2", tokenHash, at),
     db.stmt(
-      "update accounts set password_hash = ?2, password_salt = ?3 where id = ?1 and exists (select 1 from one_time_tokens where token_hash = ?4 and used_at = ?5)",
+      "update accounts set password_hash = ?2, password_salt = ?3, password_login_enabled = 1, email_verified_at = coalesce(email_verified_at, ?5) where id = ?1 and exists (select 1 from one_time_tokens where token_hash = ?4 and used_at = ?5)",
       row.account_id, hash, salt, tokenHash, at,
     ),
     db.stmt(
@@ -393,7 +529,7 @@ export async function updateProfile(db: Sql, auth: Auth, input: Record<string, u
   const problem = displayNameProblem(input.displayName);
   if (problem !== null) throw new ApiError(400, "invalid", problem);
   const row = await db.first<AccountRow>("update accounts set display_name = ?2 where id = ?1 returning *", auth.account.id, (input.displayName as string).trim());
-  return publicAccount(row!);
+  return publicAccountDetails(db, row!);
 }
 
 export async function listSessions(db: Sql, accountId: string, now: number): Promise<Record<string, unknown>[]> {
@@ -411,6 +547,7 @@ export async function revokeOtherSessions(db: Sql, auth: Auth, now: number): Pro
 /** Soft delete: sign-in stops at once, personal fields and saves are removed. */
 export async function deleteAccount(db: Sql, env: Env, auth: Auth, input: Record<string, unknown>, now: number): Promise<void> {
   if (auth.account.kind === "registered") {
+    if (auth.account.password_login_enabled === 0) throw new ApiError(400, "password-required", "Set a password through your email before deleting this account.");
     if (!isClientKey(input.key) || !(await verifyClientKey(pepper(env), input.key, auth.account.password_salt, auth.account.password_hash))) {
       throw new ApiError(401, "wrong-password", "Password is not correct.");
     }
@@ -450,7 +587,7 @@ export async function exportAccount(db: Sql, auth: Auth, now: number): Promise<R
     feedbackForExport(db, id),
   ]);
   return {
-    account: publicAccount(auth.account),
+    account: await publicAccountDetails(db, auth.account),
     birthYear: auth.account.birth_year,
     save:
       save === null

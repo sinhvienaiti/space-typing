@@ -1,0 +1,25 @@
+# Example only. Never commit cloud/.dev.vars or production secrets.
+# scripts/local-account.mjs creates local-only defaults if .dev.vars is absent.
+# If it already exists, merge the optional settings below into it; do not replace
+# an existing PASSWORD_PEPPER or you will invalidate existing password accounts.
+LOCAL_DEV=1
+ADMIN_TOKEN=local-account-admin
+PASSWORD_PEPPER=local-dev-pepper
+
+# Canonical browser origin. For Google local testing, open the game at this
+# exact localhost origin, then register the matching Google callback URL:
+# http://localhost:3004/api/account/oauth/google/callback
+# PUBLIC_URL=http://localhost:3004
+
+# Optional: fill locally to enable each provider, then account:local:restart.
+# Production: use wrangler secret put, not this file and not VITE_* variables.
+# OAUTH_GOOGLE_CLIENT_ID=
+# OAUTH_GOOGLE_CLIENT_SECRET=
+# OAUTH_FACEBOOK_APP_ID=
+# OAUTH_FACEBOOK_APP_SECRET=
+# OAUTH_FACEBOOK_API_VERSION=v26.0
+# Choose a version supported by your Meta app dashboard; do not leave it blank.
+
+# Optional: email verification and password reset delivery.
+# RESEND_API_KEY=
+# MAIL_FROM="Space Typing <noreply@your-domain.example>"

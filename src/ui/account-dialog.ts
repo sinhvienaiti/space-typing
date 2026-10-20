@@ -1,6 +1,6 @@
 import { onlineRequest, OnlineError } from "../online/api";
 import type { CloudConflict } from "../online/cloud-save";
-import type { OnlineSession } from "../online/session";
+import type { OAuthProvider, OAuthStartInput, OnlineSession } from "../online/session";
 import { holoConfirm } from "./holo-confirm";
 
 /**
@@ -79,6 +79,9 @@ export function installAccountDialog(deps: AccountDialogDeps): {
   let view: View = "auto";
   let resetToken = "";
   let pendingConflict: CloudConflict | null = null;
+  let providersRequest: Promise<OAuthProvider[]> | null = null;
+  let pendingOAuthRefresh: (() => void) | null = null;
+  let pendingOAuthExpiry: number | undefined;
 
   function message(text: string, tone: "bad" | "good" | "info" = "bad"): HTMLElement {
     const box = el("p", "ac-message " + tone, text);
@@ -88,7 +91,7 @@ export function installAccountDialog(deps: AccountDialogDeps): {
 
   async function busy<T>(button: HTMLButtonElement, status: HTMLElement, work: () => Promise<T>): Promise<T | null> {
     button.disabled = true;
-    const label = button.textContent;
+    const contents = [...button.childNodes];
     button.textContent = "Please wait…";
     status.replaceChildren();
     try {
@@ -99,8 +102,120 @@ export function installAccountDialog(deps: AccountDialogDeps): {
       return null;
     } finally {
       button.disabled = false;
-      button.textContent = label;
+      button.replaceChildren(...contents);
     }
+  }
+
+  function watchOAuthReturn(provider: "google" | "facebook", intent: OAuthStartInput["intent"]): void {
+    if (pendingOAuthRefresh !== null) {
+      window.removeEventListener("focus", pendingOAuthRefresh);
+      document.removeEventListener("visibilitychange", pendingOAuthRefresh);
+      window.clearTimeout(pendingOAuthExpiry);
+    }
+    let refreshing = false;
+    const stop = () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+      window.clearTimeout(pendingOAuthExpiry);
+      pendingOAuthRefresh = null;
+    };
+    const refresh = () => {
+      if (document.visibilityState === "hidden" || refreshing) return;
+      refreshing = true;
+      void session.refresh().then(() => {
+        if (pendingOAuthRefresh !== refresh) return;
+        const complete = intent === "link" ? session.account?.oauthProviders?.includes(provider) : session.registered;
+        if (complete) {
+          stop();
+          deps.notice(intent === "link" ? "✓ Sign-in method connected" : "✓ Signed in · checking your cloud save");
+        }
+      }).finally(() => { refreshing = false; });
+    };
+    pendingOAuthRefresh = refresh;
+    pendingOAuthExpiry = window.setTimeout(stop, 15 * 60_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+  }
+
+  function socialButtons(intent: OAuthStartInput["intent"], details: () => Partial<OAuthStartInput> = () => ({})): HTMLElement {
+    const root = el("section", "ac-social");
+    root.setAttribute("aria-label", intent === "link" ? "Connected sign-in methods" : "Social sign-in");
+    const buttons = el("div", "ac-social-buttons");
+    const hint = el("p", "ac-hint ac-social-hint", "Checking sign-in options…");
+    const status = el("div", "ac-status");
+    const entries = (["google", "facebook"] as const).map((provider) => {
+      const name = provider === "google" ? "Google" : "Facebook";
+      const linked = intent === "link" && session.account?.oauthProviders?.includes(provider) === true;
+      const button = el("button", "ac-social-button ac-social-" + provider);
+      button.type = "button";
+      button.dataset.provider = provider;
+      button.disabled = true;
+      const mark = el("span", "ac-social-mark", provider === "google" ? "G" : "f");
+      mark.setAttribute("aria-hidden", "true");
+      button.append(mark, el("span", "", linked ? name + " connected" : (intent === "link" ? "Link " : "Continue with ") + name));
+      button.addEventListener("click", async () => {
+        const input: OAuthStartInput = { intent, acceptTerms: false, ...details() };
+        if (intent === "register" && !input.acceptTerms) {
+          status.replaceChildren(message("Agree to the terms and privacy policy before creating an account."));
+          return;
+        }
+        // Providers cannot display their consent screen in the Portal iframe.
+        // Open while the click is active so a browser can allow the new tab.
+        const embedded = window.self !== window.top;
+        const popup = embedded ? window.open("about:blank", "_blank") : null;
+        if (popup !== null) popup.opener = null;
+        const url = await busy(button, status, () => session.startOAuth(provider, input));
+        if (url === null) {
+          popup?.close();
+          return;
+        }
+        if (!embedded) {
+          location.assign(url);
+          return;
+        }
+        if (popup === null || popup.closed) {
+          const continueLink = el("a", "holo-ghost ac-ghost ac-oauth-continue", "Continue to " + name + " sign-in");
+          continueLink.href = url;
+          continueLink.target = "_top";
+          continueLink.rel = "noreferrer";
+          status.replaceChildren(message("A new tab was blocked. Continue below to sign in in this tab.", "info"), continueLink);
+          return;
+        }
+        popup.location.replace(url);
+        status.replaceChildren(message("Finish sign-in in the new tab, then return here.", "info"));
+        watchOAuthReturn(provider, intent);
+      });
+      buttons.append(button);
+      return { provider, name, button, linked };
+    });
+    root.append(buttons, hint, status);
+    providersRequest ??= session.oauthProviders().catch((error: unknown) => {
+      providersRequest = null;
+      throw error;
+    });
+    void providersRequest.then((providers) => {
+      const unavailable: string[] = [];
+      for (const { provider, name, button, linked } of entries) {
+        const enabled = providers.some((option) => option.id === provider && option.enabled);
+        button.disabled = linked || !enabled;
+        if (!enabled) unavailable.push(name);
+        button.title = linked ? name + " is connected to this pilot." : enabled ? "" : name + " sign-in is not enabled on this server yet.";
+      }
+      hint.textContent = unavailable.length > 0
+        ? unavailable.join(" and ") + " sign-in is not enabled here yet."
+        : intent === "link"
+          ? "Connect a provider while signed in to use it with this pilot."
+          : intent === "register"
+            ? "Your provider can supply your pilot name. No game password is needed."
+            : "Use a provider already connected to your pilot. New here? Choose Create account.";
+    }).catch(() => {
+      hint.textContent = "Social sign-in is temporarily unavailable. Try email sign-in or reopen this dialog later.";
+    });
+    return root;
+  }
+
+  function emailDivider(): HTMLElement {
+    return el("p", "ac-divider", "or use email");
   }
 
   // ---------- Guest views ----------
@@ -151,11 +266,13 @@ export function installAccountDialog(deps: AccountDialogDeps): {
     const status = el("div", "ac-status");
     const submit = primary("Create account");
     form.append(
-      field("Email", email),
-      field("Pilot name", name, "2–24 characters, shown in chat and rankings."),
-      field("Password", password.root, "At least 8 characters. It never leaves your device in plain text."),
+      field("Pilot name", name, "2–24 characters, shown in chat and rankings. Optional for Google or Facebook."),
       field("Birth year (optional)", birth, "Used for age-appropriate play time limits."),
       termsLabel,
+      socialButtons("register", () => ({ acceptTerms: terms.checked, displayName: name.value, birthYear: birth.value })),
+      emailDivider(),
+      field("Email", email),
+      field("Password", password.root, "At least 8 characters. It never leaves your device in plain text."),
       status,
       submit,
     );
@@ -184,7 +301,7 @@ export function installAccountDialog(deps: AccountDialogDeps): {
       view = "forgot";
       render();
     });
-    form.append(field("Email", email), field("Password", password.root), status, submit, forgot);
+    form.append(socialButtons("login"), emailDivider(), field("Email", email), field("Password", password.root), status, submit, forgot);
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const ok = await busy(submit, status, () => session.login(email.value, password.input.value));
@@ -327,7 +444,26 @@ export function installAccountDialog(deps: AccountDialogDeps): {
       if (ok !== null) status.replaceChildren(message("✓ Password changed. Other devices were signed out.", "good"));
     });
     security.append(form);
+    if (account.hasPassword === false) {
+      const setupStatus = el("div", "ac-status");
+      const setup = ghost("Email me a password setup link", async () => {
+        if (!account.email) return;
+        const ok = await busy(setup, setupStatus, () => session.forgotPassword(account.email!));
+        if (ok !== null) setupStatus.replaceChildren(message("Check your email for a link to set a password. Your connected sign-in methods will still work.", "good"));
+      });
+      security.replaceChildren(
+        el("h3", "", "Password"),
+        el("p", "ac-muted", "You sign in with a connected provider. To add an email password, confirm the setup link sent to your account email."),
+        setup,
+        setupStatus,
+      );
+      setup.disabled = !account.email;
+    }
     root.append(security);
+
+    const connected = el("section", "ac-card");
+    connected.append(el("h3", "", "Connected sign-in methods"), socialButtons("link"));
+    root.append(connected);
 
     const data = el("section", "ac-card");
     data.append(el("h3", "", "Your data"));
@@ -336,7 +472,20 @@ export function installAccountDialog(deps: AccountDialogDeps): {
       ghost("Download my data", () => {
         window.open("/api/account/export", "_blank", "noopener");
       }),
-      ghost("Delete account…", async () => {
+      ghost(account.hasPassword === false ? "Add a password before deleting…" : "Delete account…", async () => {
+        if (account.hasPassword === false) {
+          if (!account.email) {
+            deps.notice("A verified account email is needed to set a password before deletion.");
+            return;
+          }
+          try {
+            await session.forgotPassword(account.email);
+            deps.notice("Check your email to add a password, then sign in with it to delete this account.");
+          } catch (error) {
+            deps.notice(error instanceof Error ? error.message : "Could not send a password setup link.");
+          }
+          return;
+        }
         const password =
           account.kind === "registered"
             ? await holoConfirm({
@@ -464,10 +613,14 @@ export function installAccountDialog(deps: AccountDialogDeps): {
       const params = new URLSearchParams(location.search);
       const verify = params.get("verify");
       const reset = params.get("reset");
-      if (verify === null && reset === null) return;
+      const oauth = params.get("oauth");
+      const oauthError = params.get("oauth_error");
+      if (verify === null && reset === null && oauth === null && oauthError === null) return;
       // Remove the token from the address bar right away.
       params.delete("verify");
       params.delete("reset");
+      params.delete("oauth");
+      params.delete("oauth_error");
       history.replaceState(null, "", location.pathname + (params.size > 0 ? "?" + params.toString() : "") + location.hash);
       if (verify !== null) {
         void session
@@ -478,6 +631,37 @@ export function installAccountDialog(deps: AccountDialogDeps): {
       if (reset !== null) {
         resetToken = reset;
         open("reset");
+      }
+      if (oauth !== null || oauthError !== null) {
+        const notices: Record<string, string> = {
+          success: "✓ Signed in · checking your cloud save",
+          linked: "✓ Sign-in method connected to this pilot",
+          cancelled: "Sign-in was cancelled. You can try again any time.",
+          denied: "Sign-in was cancelled. You can try again any time.",
+          not_registered: "No pilot is connected to this provider yet. Choose Create account first.",
+          email_exists: "This email already has a pilot. Sign in with its current method, then link the provider in Pilot account.",
+          email_required: "Your provider did not share an email address. Allow email access or use email sign-up.",
+          invalid_state: "This sign-in attempt expired. Please start again.",
+          provider_disabled: "This sign-in provider is not enabled here yet.",
+          "oauth-cancelled": "Sign-in was cancelled. You can try again any time.",
+          "oauth-state": "This sign-in attempt expired. Please start again.",
+          "oauth-session": "Your session changed during sign-in. Please start again.",
+          "oauth-unavailable": "This sign-in provider is not enabled here yet.",
+          "oauth-email-required": "Your provider did not share an email address. Allow email access or use email sign-up.",
+          "oauth-email-unverified": "Confirm your email with the provider before using it to create a pilot.",
+          "oauth-linked": "This provider is connected to another pilot. Sign in to that pilot or choose a different provider.",
+          "email-taken": "This email already has a pilot. Sign in with its current method, then link the provider in Pilot account.",
+          "oauth-account-required": "No pilot is connected to this provider yet. Choose Create account first.",
+          "signed-out": "Sign in to your pilot before linking another sign-in method.",
+          "rate-limited": "Too many sign-in attempts. Please wait a few minutes and try again.",
+          banned: "This account is suspended.",
+          "account-deleted": "This pilot no longer exists. You can create a new account.",
+          terms: "Agree to the terms and privacy policy before creating an account.",
+        };
+        const result = oauth === "error" ? oauthError : oauth ?? oauthError;
+        deps.notice(notices[result ?? ""] ?? "Could not complete social sign-in. Please try again.");
+        // CloudSave may already have opened its choice dialog after /me.
+        if (pendingConflict === null && reset === null) open(session.registered ? "auto" : "login");
       }
     },
   };
