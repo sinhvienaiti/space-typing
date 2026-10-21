@@ -53,6 +53,33 @@ export function sanitizeInventory(value: unknown): Inventory {
   return result;
 }
 
+const FOREIGN_ITEM_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
+const MAX_FOREIGN_ITEMS = 32;
+
+/**
+ * Well-formed entries whose id this build does not know (an item a newer
+ * build added). They are never used here, only kept in storage.
+ */
+export function foreignInventoryEntries(value: unknown): Record<string, number> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  const result: Record<string, number> = {};
+  let kept = 0;
+
+  for (const [rawId, rawCount] of Object.entries(value)) {
+    if (kept >= MAX_FOREIGN_ITEMS) break;
+    if (isItemId(rawId) || !FOREIGN_ITEM_ID.test(rawId)) continue;
+    if (typeof rawCount !== "number" || !Number.isSafeInteger(rawCount) || rawCount <= 0) continue;
+
+    result[rawId] = rawCount;
+    kept += 1;
+  }
+
+  return result;
+}
+
 export function isValidInventory(value: unknown): value is Inventory {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return false;
