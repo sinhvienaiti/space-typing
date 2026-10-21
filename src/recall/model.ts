@@ -306,3 +306,24 @@ export function sanitizeRecallMemory(value: unknown): RecallMemoryState {
   }
   return output;
 }
+
+/** Words kept in recall memory (about 400 KB of local storage at most). */
+export const RECALL_MEMORY_LIMIT = 2_000;
+
+/** Keeps the most recently seen words, so recall memory cannot fill local storage. */
+export function limitRecallMemory(
+  state: RecallMemoryState,
+  limit = RECALL_MEMORY_LIMIT,
+): RecallMemoryState {
+  const entries = Object.entries(state);
+  if (entries.length <= limit) return state;
+
+  return Object.fromEntries(
+    entries
+      .sort(
+        ([leftKey, left], [rightKey, right]) =>
+          right.lastSeenAt - left.lastSeenAt || leftKey.localeCompare(rightKey),
+      )
+      .slice(0, Math.max(0, Math.floor(limit))),
+  );
+}
