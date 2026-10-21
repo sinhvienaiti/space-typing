@@ -54,8 +54,9 @@ import { liveOpsRemote } from "./online/liveops-remote";
 import { WalletSync, type SpendResult, type WalletView } from "./online/wallet-sync";
 import type { WalletPurchase } from "./economy/wallet-price";
 import { runWalletPurchase, type WalletPurchaseOutcome } from "./economy/wallet-purchase";
-import { claimWithRollback } from "./rewards/reward-claim";
+import { claimMissionWithRollback } from "./rewards/mission-claim";
 import {
+  commitStageClear,
   settleStageClear,
   StageClearLedger,
   type StageClearRecord,
@@ -466,7 +467,6 @@ import {
   ACHIEVEMENT_REGISTRY,
   MISSION_IDS,
   MISSION_REGISTRY,
-  claimMission,
   createProgressionState,
   missionClaimable,
   missionProgress,
@@ -2115,8 +2115,13 @@ async function finishManagedSortie(
       game.getPhase() === "stageclear" &&
       warpAccount.attempt.phase === "active"
     ) {
-      await retryUnsettledStageClear();
-      return autosaveCampaign("stage-clear", "✓ Clear and rewards committed");
+      if (await retryUnsettledStageClear()) {
+        return autosaveCampaign("stage-clear", "✓ Clear and rewards committed");
+      }
+      // Settling threw again: commit the clear, but never as "rewards committed".
+      const saved = await autosaveCampaign("stage-clear");
+      if (saved) showNotice("Stage rewards could not be settled · this clear's rewards were not granted");
+      return saved;
     }
     if (
       warpAccount.attempt.phase !== "prepared" &&
@@ -3689,34 +3694,24 @@ function recordShopProgress(): void {
 
 /** The reward and the claimed mark are kept together with their save, or the mission stays claimable. */
 async function claimMissionReward(id: MissionId): Promise<void> {
-  const result = claimMission(progression, id);
-  if (!result.claimed) return;
-  const outcome = await claimWithRollback({
+  const outcome = await claimMissionWithRollback({
     blocker: rewardClaimBlocker,
     lock: (held) => {
       rewardClaimPending = held;
     },
-    capture: () => ({ progression, credits }),
-    apply: () => {
-      walletSync?.hint("mission", "mission:" + id);
-      progression = result.state;
-      credits = addCredits(credits, result.rewardCredits);
+    read: () => ({ progression, credits, recovery: { campaignExpansion, crashRecoverySnapshot } }),
+    write: (account) => {
+      ({ progression, credits } = account);
+      ({ campaignExpansion, crashRecoverySnapshot } = account.recovery);
+    },
+    hint: (source, opId) => walletSync?.hint(source, opId),
+    save: (message) => autosaveCampaign("progression", message, "progression"),
+    render: () => {
       renderProgression();
       updateDataSummary();
     },
-    save: () =>
-      autosaveCampaign(
-        "progression",
-        "✓ Mission reward · +" +
-          result.rewardCredits.toLocaleString() +
-          " Credits",
-        "progression",
-      ),
-    restore: (before) => {
-      ({ progression, credits } = before);
-    },
-  });
-  if (outcome.ok) return;
+  }, id);
+  if (outcome === null || outcome.ok) return;
   showNotice(outcome.reason);
   renderProgression();
   updateDataSummary();
@@ -4952,43 +4947,33 @@ function activeCombatCreditMode(): CombatCreditMode {
  * the clear is committed (finishManagedSortie); a failed save keeps the clear
  * in this session for that commit, as before.
  */
-async function settleCampaignStageClear(
+function settleCampaignStageClear(
   encounter: string,
   clear: StageClearRecord,
 ): Promise<StageClearSettlement | null> {
-  let settlement: StageClearSettlement;
-  try {
-    settlement = settleStageClear({
-      run: currentRunPersistentState(),
-      cosmetics,
-      codex,
-      campaignExpansion,
-      difficultySettings,
-      milestoneGrants: warpAccount?.milestoneGrants ?? [],
-    }, clear);
-  } catch (error) {
-    console.error("Unable to settle the stage clear.", error);
-    stageClearLedger.defer(encounter, () => settleCampaignStageClear(encounter, clear));
-    showNotice("Stage rewards are not settled yet · retrying when you leave this screen");
-    return null;
-  }
-
-  applyStageClearSettlement(settlement);
-  stageClearLedger.settle(encounter);
-  try {
-    if (
-      (await autosaveCampaign("stage-clear", settlement.message, "stage-clear")) &&
-      pendingRestHubStage(shops) === clear.stats.stage
-    ) {
-      openRestHub();
-    }
-  } finally {
-    // After the clear's own save, so neither can stop it.
-    storeRecallMemory();
-    if (settlement.relic !== null) applyRelicEffects();
-    renderPlayerStatusIdentity();
-  }
-  return settlement;
+  return commitStageClear(stageClearLedger, encounter, {
+    settle: () =>
+      settleStageClear({
+        run: currentRunPersistentState(),
+        cosmetics,
+        codex,
+        campaignExpansion,
+        difficultySettings,
+        milestoneGrants: warpAccount?.milestoneGrants ?? [],
+      }, clear),
+    apply: applyStageClearSettlement,
+    save: (settlement) => autosaveCampaign("stage-clear", settlement.message, "stage-clear"),
+    openRestHub: () => {
+      if (pendingRestHubStage(shops) === clear.stats.stage) openRestHub();
+    },
+    afterSave: (settlement) => {
+      // After the clear's own save, so neither can stop it.
+      storeRecallMemory();
+      if (settlement.relic !== null) applyRelicEffects();
+      renderPlayerStatusIdentity();
+    },
+    notice: showNotice,
+  });
 }
 
 /** Plain assignments only, so a clear is applied completely or not at all. */
@@ -5012,12 +4997,12 @@ function applyStageClearSettlement(settlement: StageClearSettlement): void {
   stageEntrySnapshot = null;
 }
 
-/** Before a clear is committed: one more try at its settlement if that threw. */
-async function retryUnsettledStageClear(): Promise<void> {
-  if (clearSettlementPending) return;
+/** Before a clear is committed: one more try at its settlement if that threw; false while it stays unsettled. */
+async function retryUnsettledStageClear(): Promise<boolean> {
+  if (clearSettlementPending) return stageClearLedger.isSettled(currentEncounterToken);
   clearSettlementPending = true;
   try {
-    await stageClearLedger.retry(currentEncounterToken);
+    return await stageClearLedger.retry(currentEncounterToken);
   } finally {
     clearSettlementPending = false;
     renderWarpHud();

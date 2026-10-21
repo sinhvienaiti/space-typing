@@ -419,3 +419,51 @@ export class StageClearLedger {
     return this.isSettled(encounter);
   }
 }
+
+/** How src/main.ts settles, applies and saves one Campaign clear. */
+export type StageClearCommitSteps = {
+  /** Works the clear out from the current state (settleStageClear); may throw. */
+  settle(): StageClearSettlement;
+  /** Plain assignments of the whole settlement. */
+  apply(settlement: StageClearSettlement): void;
+  /** The clear's own save; true once kept. */
+  save(settlement: StageClearSettlement): Promise<boolean>;
+  /** Opens the Rest Hub if this clear made one pending. */
+  openRestHub(): void;
+  /** After the save, kept or not (best-effort device state, effects, HUD). */
+  afterSave(settlement: StageClearSettlement): void;
+  notice(text: string): void;
+};
+
+/**
+ * Settles one clear into the ledger: worked out, applied, only then counted
+ * as settled, and saved. A settlement that throws changes nothing and is
+ * owed a retry before the clear is committed. That retry is already leaving
+ * the clear screen: it opens no Rest Hub (it stays pending for the hangar)
+ * and leaves the notice to its caller.
+ */
+export async function commitStageClear(
+  ledger: StageClearLedger,
+  encounter: string,
+  steps: StageClearCommitSteps,
+  retry = false,
+): Promise<StageClearSettlement | null> {
+  let settlement: StageClearSettlement;
+  try {
+    settlement = steps.settle();
+  } catch (error) {
+    console.error("Unable to settle the stage clear.", error);
+    ledger.defer(encounter, () => commitStageClear(ledger, encounter, steps, true));
+    if (!retry) steps.notice("Stage rewards are not settled yet · retrying when you leave this screen");
+    return null;
+  }
+
+  steps.apply(settlement);
+  ledger.settle(encounter);
+  try {
+    if ((await steps.save(settlement)) && !retry) steps.openRestHub();
+  } finally {
+    steps.afterSave(settlement);
+  }
+  return settlement;
+}

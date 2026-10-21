@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { createDifficultySettings } from "../src/campaign/difficulty-settings";
+import { difficultyFor } from "../src/campaign/difficulty";
+import { createDifficultySettings, difficultyInputFromSettings } from "../src/campaign/difficulty-settings";
 import { createCampaignExpansionState } from "../src/campaign/expansion-state";
 import { createRouteState } from "../src/campaign/route";
 import type { CampaignProgress } from "../src/campaign/types";
@@ -21,9 +22,12 @@ import { awardRelicReward, createRelicState, MAX_EQUIPPED_RELICS } from "../src/
 import { sectorCheckpointReward } from "../src/rewards/campaign-rewards";
 import { settleCombatCreditStageBase } from "../src/rewards/combat-credit-drops";
 import {
+  commitStageClear,
   settleStageClear,
   StageClearLedger,
+  type StageClearCommitSteps,
   type StageClearRecord,
+  type StageClearSettlement,
   type StageClearState,
 } from "../src/rewards/stage-clear-settlement";
 import { createShopState } from "../src/shops/state";
@@ -212,6 +216,107 @@ describe("stage-clear settlement", () => {
   });
 });
 
+function objectiveOf(status: "complete" | "failed"): StageClearRecord["objective"] {
+  return { status, definition: { rewardFactor: 0.2 } } as unknown as StageClearRecord["objective"];
+}
+
+function difficultyAt(stage: number, mode: "typing" | "voice" | "hybrid") {
+  return difficultyFor(difficultyInputFromSettings(createDifficultySettings(), stage, 2, mode));
+}
+
+/**
+ * Clears worked out by the inline onStageClear code that settleStageClear
+ * replaced (src/main.ts before 2026-10-21), kept as fixed results.
+ */
+describe("stage-clear settlement matches the inline code it replaced", () => {
+  const sector = (tier: number, stage: number) => `${WARP_POLICY.version}:sector:${tier}:${stage}`;
+  const fields = (settlement: StageClearSettlement) => ({
+    message: settlement.message,
+    credits: settlement.state.run.credits,
+    reward: settlement.credits,
+    currencies: settlement.state.run.expansionCurrencies,
+    relic: settlement.relic,
+    milestoneKey: settlement.milestoneKey,
+    checkpoint: settlement.state.campaignExpansion.checkpoint.stage,
+    restHub: settlement.state.run.shops.pendingRestHub ?? null,
+    booster: settlement.state.cosmetics.booster?.clearsLeft ?? null,
+    codex: settlement.state.codex.rewards,
+    xp: settlement.progressAward.xpGained,
+    snapshotCredits: settlement.checkpointSnapshot?.credits ?? null,
+    selectedStage: settlement.state.run.campaign.selectedStage,
+  });
+
+  it("a first clear with perfect typing", () => {
+    expect(fields(settleStageClear(accountAt(1, 1234), clearOf(1, { accuracy: 100, wpm: 90 })))).toEqual({
+      message: "✓ Saved · Stage 001 cleared · +30 Credits · +1 Alloy · Achievement: Launch Confirmed, Precision Pilot",
+      credits: 1264, reward: 30, currencies: { alloy: 1, starCrystal: 0, quantumCore: 0 },
+      relic: null, milestoneKey: null, checkpoint: 1, restHub: null, booster: null, codex: [],
+      xp: 137, snapshotCredits: null, selectedStage: 2,
+    });
+  });
+
+  it("a sector checkpoint with a difficulty profile and a completed objective", () => {
+    const clear = clearOf(10, {
+      accuracy: 97, wpm: 55, difficulty: difficultyAt(10, "typing"), objective: objectiveOf("complete"),
+      salvage: 3, combatCreditsGranted: 4, creditsMultiplier: 1.1,
+    });
+    expect(fields(settleStageClear(accountAt(10, 0), clear))).toEqual({
+      message: "✓ Saved · Stage 010 cleared · +150 Credits · +10 Alloy · +1 Star Crystal · Objective +20% · " +
+        "Performance: Objective · Achievement: Launch Confirmed · Checkpoint 011 committed · Sector +98 Credits · Relic: First Light Seed",
+      credits: 150, reward: 150, currencies: { alloy: 10, starCrystal: 1, quantumCore: 0 },
+      relic: "first-light-seed", milestoneKey: sector(0, 10), checkpoint: 11, restHub: 10, booster: null,
+      codex: ["performance-objective", "sector-cache"], xp: 128, snapshotCredits: 150, selectedStage: 11,
+    });
+  });
+
+  it("a voice clear with a failed objective and the Credit Booster", () => {
+    const account = accountAt(20, 300);
+    account.cosmetics = { ...account.cosmetics, booster: { id: "booster-credits", bonus: 0.5, clearsLeft: 3 } };
+    const clear = clearOf(20, {
+      accuracy: 80, wpm: 20, inputMode: "voice", voiceWords: 12, correctWordKeys: 0,
+      difficulty: difficultyAt(20, "voice"), objective: objectiveOf("failed"),
+    });
+    expect(fields(settleStageClear(account, clear))).toEqual({
+      message: "✓ Saved · Stage 020 cleared · +163 Credits · +11 Alloy · +2 Star Crystal · Objective failed · " +
+        "Achievement: Launch Confirmed · Checkpoint 021 committed · Sector +106 Credits · Relic: First Light Seed",
+      credits: 463, reward: 163, currencies: { alloy: 11, starCrystal: 2, quantumCore: 0 },
+      relic: "first-light-seed", milestoneKey: sector(0, 20), checkpoint: 21, restHub: 20, booster: 2,
+      codex: ["sector-cache"], xp: 110, snapshotCredits: 463, selectedStage: 21,
+    });
+  });
+
+  it("an Ascension 1 sector checkpoint", () => {
+    const account = accountAt(10, 50);
+    account.run.ascension = {
+      ...account.run.ascension, highestUnlockedTier: 1, selectedTier: 1,
+      frontierByTier: { ...account.run.ascension.frontierByTier, "1": 10 },
+    };
+    const clear = clearOf(10, { accuracy: 97, wpm: 55, inputMode: "hybrid", voiceWords: 12, difficulty: difficultyAt(10, "hybrid") });
+    const settlement = settleStageClear(account, clear);
+    expect(fields(settlement)).toEqual({
+      message: "✓ Saved · Stage 010 cleared · +133 Credits · +9 Alloy · +1 Star Crystal · Achievement: Launch Confirmed · " +
+        "Ascension A1 checkpoint 010 committed · Sector +98 Credits · Relic: First Light Seed",
+      credits: 183, reward: 133, currencies: { alloy: 9, starCrystal: 1, quantumCore: 0 },
+      relic: "first-light-seed", milestoneKey: sector(1, 10), checkpoint: 1, restHub: null, booster: null,
+      codex: ["sector-cache"], xp: 128, snapshotCredits: 183, selectedStage: 11,
+    });
+    expect(settlement.state.run.ascension.frontierByTier).toEqual({ "1": 11 });
+  });
+
+  it("a sector whose reward the account already had", () => {
+    const account = accountAt(100, 9000);
+    account.milestoneGrants = [sector(0, 100)];
+    const clear = clearOf(100, { difficulty: difficultyAt(100, "typing"), combatCreditsGranted: 5, creditsMultiplier: 1.1 });
+    expect(fields(settleStageClear(account, clear))).toEqual({
+      message: "✓ Saved · Stage 100 cleared · Aegis unlocked · +106 Credits · +10 Alloy · +4 Star Crystal · +1 Quantum Core · " +
+        "Achievement: Launch Confirmed, Galaxy One, Centurion · Checkpoint 101 committed",
+      credits: 9106, reward: 106, currencies: { alloy: 10, starCrystal: 4, quantumCore: 1 },
+      relic: null, milestoneKey: null, checkpoint: 101, restHub: null, booster: null, codex: [],
+      xp: 152, snapshotCredits: null, selectedStage: 101,
+    });
+  });
+});
+
 describe("stage-clear ledger", () => {
   it("leaves an encounter open until its clear is settled", () => {
     const ledger = new StageClearLedger();
@@ -275,5 +380,105 @@ describe("awardRelicReward", () => {
 
     const full = { ...state, owned: [...RELIC_IDS] };
     expect(awardRelicReward(full, 1000, "sector:none")).toEqual({ state: full, id: null });
+  });
+});
+
+describe("committing a stage clear", () => {
+  /** The game's side of one clear (src/main.ts settleCampaignStageClear); `log` records what ran, in order. */
+  function steps(ledger: StageClearLedger, overrides: Partial<StageClearCommitSteps> = {}) {
+    const log: string[] = [];
+    const notices: string[] = [];
+    const commitSteps: StageClearCommitSteps = {
+      settle: () => settleStageClear(accountAt(10, 0), clearOf(10)),
+      apply: () => {
+        log.push("apply" + (ledger.isSettled("attempt-1") ? " (already settled)" : ""));
+      },
+      save: async () => {
+        log.push("save" + (ledger.isSettled("attempt-1") ? "" : " (not settled)"));
+        return true;
+      },
+      openRestHub: () => {
+        log.push("rest hub");
+      },
+      afterSave: () => {
+        log.push("after save");
+      },
+      notice: (text) => {
+        notices.push(text);
+      },
+      ...overrides,
+    };
+    return { commitSteps, log, notices };
+  }
+
+  it("counts the encounter as settled only once the clear is applied, then saves and opens the Rest Hub", async () => {
+    const ledger = new StageClearLedger();
+    const { commitSteps, log, notices } = steps(ledger);
+
+    const settlement = await commitStageClear(ledger, "attempt-1", commitSteps);
+
+    expect(settlement?.milestoneKey).toBe(`${WARP_POLICY.version}:sector:0:10`);
+    expect(log).toEqual(["apply", "save", "rest hub", "after save"]);
+    expect(ledger.isSettled("attempt-1")).toBe(true);
+    expect(notices).toEqual([]);
+  });
+
+  it("a save that is not kept opens no Rest Hub, and the clear stays settled for its commit", async () => {
+    const ledger = new StageClearLedger();
+    const { commitSteps, log } = steps(ledger, { save: async () => false });
+
+    await commitStageClear(ledger, "attempt-1", commitSteps);
+
+    expect(log).toEqual(["apply", "after save"]);
+    expect(ledger.isSettled("attempt-1")).toBe(true);
+  });
+
+  it("runs the after-save steps even when the save throws", async () => {
+    const ledger = new StageClearLedger();
+    const { commitSteps, log } = steps(ledger, { save: () => Promise.reject(new Error("QuotaExceededError")) });
+
+    await expect(commitStageClear(ledger, "attempt-1", commitSteps)).rejects.toThrow("QuotaExceededError");
+    expect(log).toEqual(["apply", "after save"]);
+  });
+
+  it("a settlement that throws changes nothing; its retry while leaving applies it without opening the Rest Hub", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const ledger = new StageClearLedger();
+    let attempts = 0;
+    const { commitSteps, log, notices } = steps(ledger, {
+      settle: () => {
+        attempts += 1;
+        if (attempts === 1) throw new Error("settlement failed");
+        return settleStageClear(accountAt(10, 0), clearOf(10));
+      },
+    });
+
+    await expect(commitStageClear(ledger, "attempt-1", commitSteps)).resolves.toBeNull();
+    expect(log).toEqual([]);
+    expect(ledger.isSettled("attempt-1")).toBe(false);
+    expect(notices).toEqual(["Stage rewards are not settled yet · retrying when you leave this screen"]);
+
+    await expect(ledger.retry("attempt-1")).resolves.toBe(true);
+    expect(log).toEqual(["apply", "save", "after save"]);
+    expect(notices).toHaveLength(1);
+    error.mockRestore();
+  });
+
+  it("a retry that throws again stays unsettled and owed, without a second 'retrying' notice", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const ledger = new StageClearLedger();
+    const settle = vi.fn((): StageClearSettlement => {
+      throw new Error("settlement failed");
+    });
+    const { commitSteps, log, notices } = steps(ledger, { settle });
+
+    await commitStageClear(ledger, "attempt-1", commitSteps);
+    await expect(ledger.retry("attempt-1")).resolves.toBe(false);
+    await expect(ledger.retry("attempt-1")).resolves.toBe(false);
+
+    expect(settle).toHaveBeenCalledTimes(3);
+    expect(log).toEqual([]);
+    expect(notices).toEqual(["Stage rewards are not settled yet · retrying when you leave this screen"]);
+    error.mockRestore();
   });
 });
