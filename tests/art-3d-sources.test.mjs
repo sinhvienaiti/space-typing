@@ -44,5 +44,6 @@ describe("3D sources mirror their 2D art", () => {
     expect(noImage).toEqual([]);
     expect(out.files).toEqual(sources.files);
     expect(out.notMadeYet).toEqual(sources.notMadeYet);
-  });
+    // Hashes about 2 GB of models: give it room when the whole suite runs in parallel.
+  }, 120_000);
 });
