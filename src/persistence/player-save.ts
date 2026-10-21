@@ -2,6 +2,7 @@ import { createAccountState, isValidAccountState, type AccountState } from "./ac
 import { safeLocalStorage } from "../platform/safe-storage";
 import { UnsupportedExpansionV2ProfileVersionError } from "../expansion-v2/profile-store";
 import {
+  CAMPAIGN_STORAGE_KEY,
   createDefaultCampaignProgress,
   loadCampaignProgress,
   sanitizeCampaignProgress,
@@ -1564,13 +1565,14 @@ export function choosePreferredPlayerSave(
 }
 
 function recoverySaveFromLegacy(): PlayerSave {
-  const legacyCampaign = loadCampaignProgress();
+  // Unreadable storage is not an empty one: a fresh save here could
+  // later replace the mirror once the browser allows access again.
+  const raw = safeLocalStorage.readItem(RECOVERY_SAVE_KEY);
+  const legacyRaw = safeLocalStorage.readItem(CAMPAIGN_STORAGE_KEY);
+  if (raw === undefined || legacyRaw === undefined) throw new CorruptAccountStateError();
+  const legacyCampaign = loadCampaignProgress({ getItem: () => legacyRaw });
 
   try {
-    // Unreachable storage is not an empty one: a fresh save here could
-    // later replace the mirror once the browser allows access again.
-    if (!safeLocalStorage.available()) throw new CorruptAccountStateError();
-    const raw = safeLocalStorage.getItem(RECOVERY_SAVE_KEY);
     if (raw === null) {
       return createPlayerSave(legacyCampaign, "", "migration");
     }

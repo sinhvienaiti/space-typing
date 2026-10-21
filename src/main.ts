@@ -1105,6 +1105,7 @@ const typingChallengeCache = new Map<
 >();
 let stageStartPending = false;
 let noticeTimer: number | null = null;
+const NOTICE_MS = 2400;
 let currentGalaxy = Math.ceil(campaign.selectedStage / STAGES_PER_GALAXY);
 let selectedJourneyWorld = Math.ceil(campaign.selectedStage / 20);
 let selectedJourneyStage = campaign.selectedStage;
@@ -3361,20 +3362,22 @@ function showNotice(message: string): void {
   noticeTimer = window.setTimeout(() => {
     notice.classList.remove("visible");
     noticeTimer = null;
-  }, 2400);
+  }, NOTICE_MS);
 }
 
 // Blocked or full browser storage is said once, after the notice of the
-// action that met it; the game keeps what it wrote for this visit.
+// action that met it has had its time on screen. Account progress has its
+// own store; what may not outlast this visit is the player's preferences.
 onStorageTrouble((trouble) => {
   if (trouble.area !== "local") return;
-  window.setTimeout(() =>
-    showNotice(
-      "Browser storage is " +
-        (trouble.kind === "full" ? "full" : "blocked") +
-        " · changes last for this visit only",
-    ),
-  );
+  const message =
+    "Browser storage is " +
+    (trouble.kind === "full" ? "full" : "blocked") +
+    " · preferences may last for this visit only";
+  window.setTimeout(() => {
+    if (noticeTimer === null) showNotice(message);
+    else window.setTimeout(() => showNotice(message), NOTICE_MS);
+  });
 });
 
 function renderPhase(phase: GamePhase): void {
@@ -6422,6 +6425,9 @@ if (import.meta.env.DEV || import.meta.env.SPACE_TEST_LAB) {
       },
     }),
   );
+} else if (new URLSearchParams(window.location.search).get("testLab") === "1") {
+  // The Admin QA Sandbox embeds ?testLab=1: say why nothing opens here.
+  showNotice("No Test Lab in this build · use the dev server or a SPACE_TEST_LAB=1 build");
 }
 
 expeditionUi = mountExpeditionUi({

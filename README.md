@@ -83,6 +83,14 @@ and `build:local`). To keep the private audio there, that script has to pass
 the flag (`SPACE_LOCAL_ASSETS=1 pnpm --dir games/space-typing build`). `play.sh`
 rebuilds only when sources change, so delete `dist` once after changing a flag.
 
+The Admin QA Sandbox embeds `https://space.typing-game.local/?testLab=1`. In
+local Play mode Nginx serves that host from `dist`
+(`infra/nginx/typing-game.local.play.conf`), so the Sandbox works there only
+when `build:space` also passes `SPACE_TEST_LAB=1`; otherwise use dev mode
+(`typing-game.local.dev.conf` proxies the host to Vite, which always has the
+Test Lab). Whether local Play builds keep the Test Lab is the owner's call. A
+build without it answers `?testLab=1` with a notice instead of opening nothing.
+
 ## Platform integration
 
 Parent integration is now enabled through the `sinhvienaiti/typing-game` platform as a Git submodule.

@@ -4,7 +4,9 @@
  * `localStorage` is touched, and a full one throws on `setItem`: either used
  * to stop the whole boot or leave a change half-applied.
  *
- * - Reads answer null instead of throwing.
+ * - Reads answer null instead of throwing; `readItem` tells a refused read
+ *   apart from a missing key, for journals that must not treat one as the
+ *   other.
  * - `setItem` answers whether the value reached the browser's storage. When
  *   it did not, this page keeps the value in memory, so the rest of the visit
  *   reads what it wrote; the next visit reads the last value that was stored.
@@ -22,9 +24,9 @@ export type StorageArea = "local" | "session";
 export type StorageTrouble = { area: StorageArea; kind: "blocked" | "full" };
 
 export type SafeStorage = {
-  /** Whether the browser's storage can be reached at all. */
-  available(): boolean;
   getItem(key: string): string | null;
+  /** Like getItem, but undefined when the browser refused the read. */
+  readItem(key: string): string | null | undefined;
   /** true when stored in the browser; false when kept in this page's memory only. */
   setItem(key: string, value: string): boolean;
   removeItem(key: string): boolean;
@@ -57,7 +59,7 @@ function report(area: StorageArea, error: unknown): void {
   const trouble: StorageTrouble = { area, kind };
   troubles.push(trouble);
   console.warn(
-    "Browser " + area + "Storage is " + (kind === "full" ? "full" : "unavailable") + "; changes last for this visit only.",
+    "Browser " + area + "Storage is " + (kind === "full" ? "full" : "unavailable") + "; what it refuses lasts for this visit only.",
     error,
   );
   for (const listener of listeners) listener(trouble);
@@ -112,11 +114,15 @@ function createSafeStorage(area: StorageArea): SafeStorage {
     }
   }
 
-  function getItem(key: string): string | null {
+  function readItem(key: string): string | null | undefined {
     const store = backing(area);
     const memory = memoryOf(area, store);
     if (memory.has(key)) return memory.get(key) ?? null;
-    return store === null ? null : peek(store, key) ?? null;
+    return store === null ? undefined : peek(store, key);
+  }
+
+  function getItem(key: string): string | null {
+    return readItem(key) ?? null;
   }
 
   function setItem(key: string, value: string): boolean {
@@ -131,8 +137,8 @@ function createSafeStorage(area: StorageArea): SafeStorage {
   }
 
   return {
-    available: () => backing(area) !== null,
     getItem,
+    readItem,
     setItem,
     removeItem(key) {
       const store = backing(area);

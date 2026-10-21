@@ -28,6 +28,7 @@ import {
   startExpeditionEnvelope,
   writeExpeditionEnvelope,
   type ExpeditionEnvelope,
+  type ExpeditionLoadResult,
   type ExpeditionStorage,
 } from "./store";
 import type { SafeStorage } from "../platform/safe-storage";
@@ -45,11 +46,15 @@ export class ExpeditionStorageAdapter implements ExpeditionStorage {
   private failNextQaWrite = false;
 
   constructor(
-    private readonly storage: Pick<SafeStorage, "getItem" | "commitItem">,
+    private readonly storage: Pick<SafeStorage, "readItem" | "commitItem">,
   ) {}
 
   getItem(key: string): string | null {
-    return this.storage.getItem(key);
+    // A save the browser will not let us read is not an empty one: starting
+    // over it would replace the run that is there.
+    const value = this.storage.readItem(key);
+    if (value === undefined) throw new Error("Unable to read Expedition save.");
+    return value;
   }
 
   setItem(key: string, value: string): void {
@@ -125,8 +130,17 @@ export class ExpeditionSession {
     return this.envelope !== null;
   }
 
+  /** For the read-only checks: an unreadable save offers nothing to resume. */
+  private inspect(): ExpeditionLoadResult {
+    try {
+      return loadExpeditionEnvelope(this.storage);
+    } catch {
+      return { status: "empty" };
+    }
+  }
+
   hasResumableRun(): boolean {
-    const loaded = loadExpeditionEnvelope(this.storage);
+    const loaded = this.inspect();
     return (
       loaded.status === "supported" &&
       loaded.envelope.run.terminal === null &&
@@ -137,7 +151,7 @@ export class ExpeditionSession {
   weeklyResumeStatus(
     binding: WeeklyChallengeRunBinding,
   ): WeeklyChallengeResumeStatus {
-    const loaded = loadExpeditionEnvelope(this.storage);
+    const loaded = this.inspect();
     if (loaded.status !== "supported") return "none";
     return weeklyChallengeResumeStatus(loaded.envelope.run, binding);
   }

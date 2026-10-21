@@ -183,7 +183,7 @@ describe("P10 ExpeditionSession", () => {
   it("an injected QA save failure never reaches a Daily run", () => {
     const values = new Map<string, string>();
     const adapter = new ExpeditionStorageAdapter({
-      getItem: (key) => values.get(key) ?? null,
+      readItem: (key) => values.get(key) ?? null,
       commitItem: (key, value) => {
         values.set(key, value);
         return true;
@@ -204,12 +204,38 @@ describe("P10 ExpeditionSession", () => {
 
   it("a save the browser refuses throws instead of advancing the run", () => {
     const adapter = new ExpeditionStorageAdapter({
-      getItem: () => null,
+      readItem: () => null,
       commitItem: () => false,
     });
     const session = new ExpeditionSession(adapter, "tab-a");
 
     expect(() => session.start(createRun("blocked"), ["a"])).toThrow();
     expect(session.currentRun()).toBeNull();
+  });
+
+  it("a save the browser will not let us read is never started over", () => {
+    const values = new Map<string, string>();
+    let readable = true;
+    const adapter = new ExpeditionStorageAdapter({
+      readItem: (key) => (readable ? values.get(key) ?? null : undefined),
+      commitItem: (key, value) => {
+        values.set(key, value);
+        return true;
+      },
+    });
+    new ExpeditionSession(adapter, "tab-a").start(createRun("running"), ["a"]);
+    const saved = values.get(EXPEDITION_STORAGE_KEY);
+
+    readable = false;
+    const next = new ExpeditionSession(adapter, "tab-b");
+    expect(next.hasResumableRun()).toBe(false);
+    expect(() => next.start(createRun("other"), ["a"]))
+      .toThrow("Unable to read Expedition save.");
+    expect(() => next.resume(["a"])).toThrow("Unable to read Expedition save.");
+    expect(values.get(EXPEDITION_STORAGE_KEY)).toBe(saved);
+    expect(next.currentRun()).toBeNull();
+
+    readable = true;
+    expect(next.hasResumableRun()).toBe(true);
   });
 });

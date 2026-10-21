@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join, relative } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /** A localStorage stand-in; `refuse` makes the next writes of these keys fail as a full storage does. */
@@ -28,6 +30,16 @@ function blockStorage(): void {
   });
 }
 
+/** Firefox with a damaged or busy profile store: localStorage is there, its reads throw. */
+function refuseReads(storage: ReturnType<typeof memoryStorage>) {
+  return {
+    ...storage,
+    getItem: (): string | null => {
+      throw new DOMException("The storage is busy.", "NS_ERROR_STORAGE_BUSY");
+    },
+  };
+}
+
 async function safeStorage() {
   vi.resetModules();
   return import("../src/platform/safe-storage");
@@ -50,7 +62,7 @@ describe("safe browser storage", () => {
     blockStorage();
     const { safeLocalStorage, onStorageTrouble } = await safeStorage();
 
-    expect(safeLocalStorage.available()).toBe(false);
+    expect(safeLocalStorage.readItem("spaceTypingGameplayModeV1")).toBeUndefined();
     expect(safeLocalStorage.getItem("spaceTypingGameplayModeV1")).toBeNull();
     expect(safeLocalStorage.setItem("spaceTypingGameplayModeV1", "recall")).toBe(false);
     expect(safeLocalStorage.getItem("spaceTypingGameplayModeV1")).toBe("recall");
@@ -170,5 +182,97 @@ describe("safe browser storage", () => {
     expect(safeLocalStorage.getItem("space-typing:duel-reconnect-token")).toBeNull();
     // No storage at all (not a browser) is not a failure to report.
     expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe("a browser that refuses reads", () => {
+  it("readItem tells a refused read apart from a missing key", async () => {
+    const storage = memoryStorage();
+    vi.stubGlobal("localStorage", storage);
+    const { safeLocalStorage } = await safeStorage();
+    expect(safeLocalStorage.readItem("spaceTypingPlayerSaveRecoveryV3")).toBeNull();
+
+    vi.stubGlobal("localStorage", refuseReads(storage));
+    expect(safeLocalStorage.readItem("spaceTypingPlayerSaveRecoveryV3")).toBeUndefined();
+    expect(safeLocalStorage.getItem("spaceTypingPlayerSaveRecoveryV3")).toBeNull();
+  });
+
+  it("an unreadable recovery mirror stops the account load instead of starting a new save", async () => {
+    const storage = memoryStorage();
+    vi.stubGlobal("localStorage", refuseReads(storage));
+    await safeStorage();
+    const { CorruptAccountStateError, resolveStoredPlayerSave } = await import("../src/persistence/player-save");
+
+    expect(() => resolveStoredPlayerSave(undefined)).toThrow(CorruptAccountStateError);
+    expect(storage.data.size).toBe(0);
+
+    // Readable and empty: the first save of a new player.
+    vi.stubGlobal("localStorage", storage);
+    expect(resolveStoredPlayerSave(undefined).save.lastSaveReason).toBe("migration");
+  });
+});
+
+describe("boot with blocked storage", () => {
+  it("the storage reads made while the game's modules load never throw", async () => {
+    blockStorage();
+    const { safeLocalStorage } = await safeStorage();
+    // Reads its preference as the module loads.
+    await import("../src/ui/motion-preference");
+    const { expansionV2FeatureEnabled } = await import("../src/expansion-v2/feature-flags");
+    const { createExpansionV2Profile, loadExpansionV2Profile } = await import("../src/expansion-v2/profile-store");
+    const { createDefaultCampaignProgress, loadCampaignProgress } = await import("../src/campaign/progress");
+    const { ExpeditionSession, ExpeditionStorageAdapter } = await import("../src/expedition/session");
+
+    expect(expansionV2FeatureEnabled(safeLocalStorage, "")).toBe(true);
+    expect(loadExpansionV2Profile(safeLocalStorage)).toEqual(createExpansionV2Profile());
+    expect(loadCampaignProgress()).toEqual(createDefaultCampaignProgress());
+    const session = new ExpeditionSession(new ExpeditionStorageAdapter(safeLocalStorage), "tab-a");
+    expect(session.hasResumableRun()).toBe(false);
+  });
+});
+
+describe("the game's storage wiring", () => {
+  const SRC = join(__dirname, "..", "src");
+  const main = readFileSync(join(SRC, "main.ts"), "utf8");
+
+  function sources(dir: string): string[] {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+      entry.isDirectory()
+        ? sources(join(dir, entry.name))
+        : /\.tsx?$/.test(entry.name) ? [join(dir, entry.name)] : [],
+    );
+  }
+
+  /** A top-level function or listener of main.ts, up to its closing line. */
+  function body(signature: string, end = "\n}\n"): string {
+    const start = main.indexOf(signature);
+    expect(start, signature).toBeGreaterThan(-1);
+    return main.slice(start, main.indexOf(end, start));
+  }
+
+  it("reaches browser storage only through platform/safe-storage", () => {
+    const direct = sources(SRC)
+      .filter((file) => !file.endsWith(join("platform", "safe-storage.ts")))
+      .filter((file) => {
+        // Code only: comments and strings may name the storage.
+        const code = readFileSync(file, "utf8")
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+          .replace(/"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'/g, "\"\"")
+          .replace(/\/\/.*$/gm, "");
+        return /\b(?:localStorage|sessionStorage)\b/.test(code);
+      })
+      .map((file) => relative(SRC, file));
+    expect(direct).toEqual([]);
+  });
+
+  it("stores the Settings dialog in one write, and a vocabulary source with its words", () => {
+    const commit = body("async function commitSettingsDraft(");
+    expect(commit.match(/safeLocalStorage\.setItems\(/g)).toHaveLength(1);
+    expect(commit).toContain("...settingsEntries(),");
+    expect(commit).toContain("...recallPreferenceEntries(),");
+    expect(commit).not.toMatch(/\bsetItem\(|saveSettings\(\)|saveRecallPreferences\(\)/);
+
+    expect(main).not.toMatch(/setItem\((?:SETTINGS_KEY|GAMEPLAY_MODE_KEY|RECALL_SETTINGS_KEY|SOURCE_KEY|CUSTOM_KEY)\b/);
+    expect(body('byId("saveCustom").addEventListener(', "\n});\n")).toContain("saveVocabularySource(input.value);");
   });
 });
