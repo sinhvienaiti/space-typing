@@ -11,6 +11,11 @@ art-src/*
 art-src/3d/*
 !art-src/3d/README.md
 !art-src/3d/SOURCES.json
+# Stamp written by pnpm media:pull (parent repo) so ./play.sh rebuilds after a pull.
+/.media-pulled
+# rclone credentials (pnpm media:setup) never belong in a repo.
+rclone.conf
+*.rclone.conf
 # Screenshots from pnpm visual:shot (docs/VISUAL_TESTING.md).
 .visual/
 .duel-local/

@@ -1,0 +1,2 @@
+# Media lock (pnpm media:push in the parent typing-game repo): always LF, on every OS.
+media.md5 text eol=lf
