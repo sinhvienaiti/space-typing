@@ -7,9 +7,13 @@ import type { AccountState, SortieContext, WriteTicket } from "./persistence/acc
 import {
   LaunchTransaction,
   deployWarpBlocker,
+  deployWarpRefusal,
+  openSortieStep,
   resumablePreparedSortie,
+  runLaunch,
   type LaunchSortie,
 } from "./campaign/launch-transaction";
+import { captureLaunchPresentation } from "./campaign/launch-presentation";
 import { compositionForWorld } from "./background/compositions";
 import { InputController } from "./input/input-controller";
 import { VoiceSession } from "./input/voice-session";
@@ -2125,6 +2129,44 @@ async function finishManagedSortie(
 function stageStartBlocker(): string | null {
   return game.canStartStage() ? null : "Microphone is not ready";
 }
+/** Why no paid Deploy can start in this tab right now: a read-only tab or the microphone. */
+function paidDeployBlocker(): string | null {
+  if (!accountTransactions.canWrite())
+    return "Account is read-only. Choose Practice · Free.";
+  const blocked = stageStartBlocker();
+  return blocked === null ? null : blocked + "; no Warp charged.";
+}
+/**
+ * The tanks for a new sortie. A local wallet refuses a Deploy they cannot
+ * cover (a server wallet decides itself), and Reserve is used only after the
+ * player agrees. True: the player agreed, to be saved once no sortie is open.
+ */
+async function confirmDeployWarp(): Promise<boolean> {
+  const warp = reconcileWarp(warpAccount!.warp, accountTransactions.now());
+  const short = deployWarpRefusal(warp, {
+    free: false,
+    prepared: false,
+    serverWallet: walletSync?.authoritative() === true,
+  });
+  if (short !== null) throw new Error(short);
+  if (
+    warp.current >= WARP_POLICY.cost ||
+    warp.reserveConsent ||
+    warp.current + warp.reserve < WARP_POLICY.cost
+  )
+    return false;
+  if (
+    !(await holoConfirm({
+      title: "Use Reserve Warp?",
+      message: `This sortie needs ${WARP_POLICY.cost - warp.current} Warp from your Reserve. Reserve will also cover future shortages. No Star Crystals are spent.`,
+      icon: "warp",
+      tone: "warp",
+      confirmLabel: "Use Reserve",
+    }))
+  )
+    throw new Error("Deploy cancelled · Practice is free");
+  return true;
+}
 /**
  * Everything that can refuse a Deploy, before anything is saved, spent or
  * shown: the purchase lock, a read-only tab, the microphone, the Warp tanks
@@ -2142,10 +2184,8 @@ async function preflightSortie(
     renderWarpHud();
     return null;
   }
-  if (!accountTransactions.canWrite())
-    throw new Error("Account is read-only. Choose Practice · Free.");
-  const blocked = stageStartBlocker();
-  if (blocked !== null) throw new Error(blocked + "; no Warp charged.");
+  const blocked = paidDeployBlocker();
+  if (blocked !== null) throw new Error(blocked);
   const context: SortieContext = {
     stage,
     tier: ascension.selectedTier,
@@ -2159,27 +2199,19 @@ async function preflightSortie(
   };
   if (resumablePreparedSortie(warpAccount!.attempt, context) !== null)
     return context;
-  const warp = reconcileWarp(warpAccount!.warp, accountTransactions.now());
-  const short = deployWarpBlocker(warp, { free: false, prepared: false });
-  if (short !== null) throw new Error(short);
-  if (
-    warp.current < WARP_POLICY.cost &&
-    !warp.reserveConsent &&
-    warp.current + warp.reserve >= WARP_POLICY.cost
-  ) {
-    if (
-      !(await holoConfirm({
-        title: "Use Reserve Warp?",
-        message: `This sortie needs ${WARP_POLICY.cost - warp.current} Warp from your Reserve. Reserve will also cover future shortages. No Star Crystals are spent.`,
-        icon: "warp",
-        tone: "warp",
-        confirmLabel: "Use Reserve",
-      }))
-    )
-      throw new Error("Deploy cancelled · Practice is free");
-    await accountTransactions.reserveConsent(true);
-  }
+  if (await confirmDeployWarp()) await accountTransactions.reserveConsent(true);
   return context;
+}
+/**
+ * A restart closes the running sortie before the next one is admitted, so
+ * what can refuse that Deploy here is asked first. True: the player agreed
+ * to use Reserve (saved once the running sortie is closed).
+ */
+async function preflightRestart(): Promise<boolean> {
+  if (walletPurchaseBusy) throw new Error("Please wait for the purchase to finish saving.");
+  const blocked = paidDeployBlocker();
+  if (blocked !== null) throw new Error(blocked);
+  return confirmDeployWarp();
 }
 /**
  * Spends the sortie's Warp: the sortie is prepared, and the launch puts it
@@ -2200,6 +2232,7 @@ async function prepareSortie(context: SortieContext): Promise<LaunchSortie> {
   }
   const attemptId = id;
   return {
+    inputMode: context.inputMode,
     activate: () => accountTransactions.activate(attemptId, context),
     deactivate: () => accountTransactions.deactivate(attemptId),
   };
@@ -6107,74 +6140,88 @@ async function startExpeditionEncounter(
   );
   activeStageDifficulty = difficulty;
 
-  const launch = new LaunchTransaction();
-  launch.onAbort(launchPresentationUndo());
-  syncWorldMusicProfile(stage.stage);
-  musicController.setBossPhase(1);
-  const musicState = musicStateForStageRole(stage.role);
-  musicController.transitionTo(
-    musicState,
-    musicCrossfadeSeconds(musicState),
-  );
-  musicController.setPaused(false);
-
   const design = encounter.design;
   const pattern = (design?.pattern ?? "normal-word") as TypingPatternId;
   const condition = (design?.condition ?? null) as SectorConditionId | null;
-  game.setExpansionEncounterContext({
-    encounterId: encounter.id,
-    pattern,
-    recipe:
-      (design?.recipe ?? "normal") as EncounterRecipeId | "normal",
-    gameplaySeed: encounter.gameplaySeed,
-    bossParts: design?.recipe === "boss-prelude",
-    wantedWordId:
-      encounter.index === 0 &&
-      run.challenge?.kind !== "daily"
-        ? run.learning?.wantedWordId ?? null
-        : null,
-  });
-  expansionEncounterRuntime = createExpansionEncounterRuntime(
-    encounter.id,
-    condition,
-  );
-
   const isFinalEncounter =
     encounter.index === run.encounterPlan.length - 1;
-  if (isFinalEncounter && !replay) {
-    stopExpansionCinematicQa();
-    await playExpansionReferenceCinematic({
-      title: "Final Approach",
-      subtitle:
-        "Your run build is locked. Break the reference boss and its targetable parts.",
-    });
-    persistExpansionV2Profile(
-      markExpansionCinematicSeen(
-        expansionV2Profile,
-        "expedition-v2-final-reference",
-      ),
-    );
-  }
-
   const world = worldForStage(stage.stage);
-  await presentStageTransition(
-    createStageTransitionSpec({
-      stage: stage.stage,
-      galaxy: stage.galaxy,
-      stageInGalaxy: stage.stageInGalaxy,
-      stageInWorld: stageInWorld(stage.stage),
-      worldName: world.name,
-      role: stage.role,
-    }),
-  );
-
+  const launch = new LaunchTransaction();
   try {
-    await launch.start(null, stageStartBlocker, () =>
-      game.startStage(stage, difficulty, null, run.resources),
-    );
+    await runLaunch(launch, {
+      // Expedition encounters spend no Warp; the run saved its own safe boundary.
+      preflight: async () => {
+        const blocked = stageStartBlocker();
+        if (blocked !== null) throw new Error(blocked);
+        return null;
+      },
+      save: async () => true,
+      presentationUndo: launchPresentationUndo,
+      present: async () => {
+        syncWorldMusicProfile(stage.stage);
+        musicController.setBossPhase(1);
+        const musicState = musicStateForStageRole(stage.role);
+        musicController.transitionTo(
+          musicState,
+          musicCrossfadeSeconds(musicState),
+        );
+        musicController.setPaused(false);
+
+        game.setExpansionEncounterContext({
+          encounterId: encounter.id,
+          pattern,
+          recipe:
+            (design?.recipe ?? "normal") as EncounterRecipeId | "normal",
+          gameplaySeed: encounter.gameplaySeed,
+          bossParts: design?.recipe === "boss-prelude",
+          wantedWordId:
+            encounter.index === 0 &&
+            run.challenge?.kind !== "daily"
+              ? run.learning?.wantedWordId ?? null
+              : null,
+        });
+        expansionEncounterRuntime = createExpansionEncounterRuntime(
+          encounter.id,
+          condition,
+        );
+
+        if (isFinalEncounter && !replay) {
+          stopExpansionCinematicQa();
+          await playExpansionReferenceCinematic({
+            title: "Final Approach",
+            subtitle:
+              "Your run build is locked. Break the reference boss and its targetable parts.",
+          });
+          persistExpansionV2Profile(
+            markExpansionCinematicSeen(
+              expansionV2Profile,
+              "expedition-v2-final-reference",
+            ),
+          );
+        }
+
+        await presentStageTransition(
+          createStageTransitionSpec({
+            stage: stage.stage,
+            galaxy: stage.galaxy,
+            stageInGalaxy: stage.stageInGalaxy,
+            stageInWorld: stageInWorld(stage.stage),
+            worldName: world.name,
+            role: stage.role,
+          }),
+        );
+      },
+      blocker: stageStartBlocker,
+      startStage: () =>
+        game.startStage(stage, difficulty, null, run.resources),
+    });
   } catch (error) {
+    // Back on the deck with the Campaign restored (the loaner is not left on
+    // it, and a later Resume snapshots the real Campaign); the run stays saved
+    // at this encounter, so Resume Expedition retries it.
+    releaseExpeditionOwnershipForTitle();
+    if (game.getPhase() !== "title") game.backToTitle();
     launch.abort();
-    expeditionUi?.setResumeAvailable(expeditionSession.hasResumableRun());
     showNotice(
       (error instanceof Error ? error.message : "Unable to start the encounter") +
         " · Resume Expedition when ready",
@@ -7500,22 +7547,14 @@ function playTitleEntrance(): void {
  * animation and the stage music. Read before the music changes.
  */
 function launchPresentationUndo(): () => void {
-  const music = musicController.getState();
-  const profile = musicController.getWorldProfile();
-  return () => {
-    if (titleOverlay.classList.contains("th-launching")) {
-      // The ship and panels come back instead of leaving a faded deck.
-      titleOverlay.classList.remove("th-launching");
-      playTitleEntrance();
-    }
-    if (game.getPhase() === "title") {
-      restoreTitleMusic();
-      return;
-    }
-    musicController.setWorldProfile(profile);
-    musicController.transitionTo(music, musicCrossfadeSeconds(music));
-    musicController.setPaused(game.getPhase() === "paused");
-  };
+  return captureLaunchPresentation({
+    deck: titleOverlay,
+    playDeckEntrance: playTitleEntrance,
+    music: musicController,
+    phase: () => game.getPhase(),
+    restoreTitleMusic,
+    crossfade: musicCrossfadeSeconds,
+  });
 }
 
 async function presentStageTransition(
@@ -9393,54 +9432,112 @@ async function startActiveHiddenEncounter(
   );
   activeStageDifficulty = difficulty;
 
-  // What can refuse the sortie runs before the save, the music and the launch animation.
-  const context = await preflightSortie(stage.stage, "hidden", stage.seed, difficulty, testingStagePreviewActive());
-
-  const stageEntryAt = new Date().toISOString();
-  stageEntrySnapshot = createStageEntrySnapshot(
-    currentRunPersistentState(),
-    campaignExpansion,
-    checkpointSnapshot,
-    stageEntryAt,
-  );
-
-  const recoverySaved = warpAccount?.attempt?.phase === "prepared" || await autosaveCampaign(
-    "hidden-transition",
-    undefined,
-    "hidden-transition",
-  );
-  if (!recoverySaved) return;
-  const sortie = context === null ? null : await prepareSortie(context);
-
   const musicStage =
     runtime.environmentStageOverride ??
     active.sourceStage;
-  launch.onAbort(launchPresentationUndo());
-  musicController.setWorldProfile(
-    musicProfileForWorld(worldForStage(musicStage)),
-  );
-  musicController.setBossPhase(1);
-  const state = hiddenMusicState(active.kind);
-  musicController.transitionTo(
-    state,
-    musicCrossfadeSeconds(state),
-  );
-  musicController.setPaused(false);
+  await runLaunch(launch, {
+    preflight: async () => {
+      const context = await preflightSortie(stage.stage, "hidden", stage.seed, difficulty, testingStagePreviewActive());
+      return context === null ? null : () => prepareSortie(context);
+    },
+    save: async () => {
+      const stageEntryAt = new Date().toISOString();
+      stageEntrySnapshot = createStageEntrySnapshot(
+        currentRunPersistentState(),
+        campaignExpansion,
+        checkpointSnapshot,
+        stageEntryAt,
+      );
+      return warpAccount?.attempt?.phase === "prepared" || await autosaveCampaign(
+        "hidden-transition",
+        undefined,
+        "hidden-transition",
+      );
+    },
+    presentationUndo: launchPresentationUndo,
+    present: async () => {
+      musicController.setWorldProfile(
+        musicProfileForWorld(worldForStage(musicStage)),
+      );
+      musicController.setBossPhase(1);
+      const state = hiddenMusicState(active.kind);
+      musicController.transitionTo(
+        state,
+        musicCrossfadeSeconds(state),
+      );
+      musicController.setPaused(false);
 
-  await presentStageTransition(
-    createHiddenTransitionSpec(
-      hiddenEncounterLabel(active),
-      active.sourceStage,
-    ),
-  );
+      await presentStageTransition(
+        createHiddenTransitionSpec(
+          hiddenEncounterLabel(active),
+          active.sourceStage,
+        ),
+      );
+    },
+    blocker: stageStartBlocker,
+    startStage: () =>
+      game.startStage(
+        stage,
+        difficulty,
+        runtime,
+      ),
+  });
+}
 
-  await launch.start(sortie, stageStartBlocker, () =>
-    game.startStage(
-      stage,
-      difficulty,
-      runtime,
-    ),
-  );
+/**
+ * Settles the account's open sortie before a launch (see openSortieStep).
+ * False: the launch stops; nothing was closed unless the player agreed.
+ */
+async function settleOpenSortie(practice: boolean): Promise<boolean> {
+  const step = openSortieStep({
+    practice,
+    canWrite: accountTransactions.canWrite(),
+    phase: game.getPhase(),
+    attempt: warpAccount?.attempt?.phase ?? null,
+  });
+  switch (step) {
+    case "none":
+      return true;
+    case "drop-prepared":
+      if (
+        !(await holoConfirm({
+          title: "Practice instead?",
+          message: "The prepared sortie ends without a refund of the Warp it holds. Deploy resumes it at no cost instead.",
+          tone: "danger",
+          icon: "warning",
+          confirmLabel: "End it and practice",
+        }))
+      )
+        return false;
+      return finishManagedSortie("failed");
+    case "fail":
+      return finishManagedSortie("failed");
+    case "commit-clear":
+      // The clear and its rewards are saved first; the next Deploy then checks its own Warp.
+      return finishManagedSortie("abandoned");
+    case "abandon": {
+      // A restart: the next Deploy's own refusals (tanks, Reserve prompt) come before the close.
+      let reserveAgreed = false;
+      if (!testingStagePreviewActive()) {
+        try {
+          reserveAgreed = await preflightRestart();
+        } catch (error) {
+          showNotice(error instanceof Error ? error.message : "Unable to deploy sortie");
+          return false;
+        }
+      }
+      if (!(await finishManagedSortie("abandoned"))) return false;
+      if (reserveAgreed) {
+        try {
+          await accountTransactions.reserveConsent(true);
+        } catch (error) {
+          showNotice(error instanceof Error ? error.message : "Unable to save Reserve consent");
+          return false;
+        }
+      }
+      return true;
+    }
+  }
 }
 
 async function startSelectedStage(practice = false): Promise<void> {
@@ -9473,37 +9570,13 @@ async function launchSelectedStage(
   practice: boolean,
   launch: LaunchTransaction,
 ): Promise<void> {
-  if (practice) {
-    if (
-      accountTransactions.canWrite() &&
-      warpAccount?.attempt &&
-      !(await finishManagedSortie("failed"))
-    )
-      return;
-    if (!practiceActive) {
-      practiceActive = true;
-      launch.onAbort(() => {
-        practiceActive = false;
-        renderWarpHud();
-      });
-    }
-  }
-  if (
-    !practice &&
-    accountTransactions.canWrite() &&
-    warpAccount?.attempt &&
-    warpAccount.attempt.phase !== "prepared"
-  ) {
-    // A restart closes the running sortie first: without Warp for the next one, nothing is closed.
-    const short = deployWarpBlocker(
-      reconcileWarp(warpAccount.warp, accountTransactions.now()),
-      { free: testingStagePreviewActive(), prepared: false },
-    );
-    if (short !== null) {
-      showNotice(short);
-      return;
-    }
-    if (!(await finishManagedSortie("abandoned"))) return;
+  if (!(await settleOpenSortie(practice))) return;
+  if (practice && !practiceActive) {
+    practiceActive = true;
+    launch.onAbort(() => {
+      practiceActive = false;
+      renderWarpHud();
+    });
   }
   const testingPreview = testingStagePreviewActive();
   if (testingPreview && testingStageSnapshot === null) {
@@ -9600,80 +9673,81 @@ async function launchSelectedStage(
     );
     activeStageDifficulty = difficulty;
 
-    // What can refuse the sortie runs before the save, the music and the launch animation.
-    const context = await preflightSortie(
-      stage.stage,
-      "campaign",
-      stage.seed,
-      difficulty,
-      testingPreview,
-    );
+    await runLaunch(launch, {
+      preflight: async () => {
+        const context = await preflightSortie(
+          stage.stage,
+          "campaign",
+          stage.seed,
+          difficulty,
+          testingPreview,
+        );
+        return context === null ? null : () => prepareSortie(context);
+      },
+      save: async () => {
+        if (testingPreview) return true;
+        const stageEntryAt = new Date().toISOString();
+        stageEntrySnapshot = createStageEntrySnapshot(
+          currentRunPersistentState(),
+          campaignExpansion,
+          checkpointSnapshot,
+          stageEntryAt,
+        );
+        return (
+          warpAccount?.attempt?.phase === "prepared" ||
+          (await autosaveCampaign("stage-entry", undefined, "stage-entry"))
+        );
+      },
+      presentationUndo: launchPresentationUndo,
+      present: async () => {
+        syncWorldMusicProfile(stage.stage);
+        musicController.setBossPhase(1);
+        const musicState = musicStateForStageRole(stage.role);
+        musicController.transitionTo(musicState, musicCrossfadeSeconds(musicState));
+        musicController.setPaused(false);
 
-    if (!testingPreview) {
-      const stageEntryAt = new Date().toISOString();
-      stageEntrySnapshot = createStageEntrySnapshot(
-        currentRunPersistentState(),
-        campaignExpansion,
-        checkpointSnapshot,
-        stageEntryAt,
-      );
+        if (world.stageEnd < 1000 && stageInWorld(stage.stage) >= 18) {
+          musicController.preloadNext(
+            musicProfileForWorld(worldForStage(world.stageEnd + 1)),
+          );
+        }
 
-      const recoverySaved =
-        warpAccount?.attempt?.phase === "prepared" ||
-        (await autosaveCampaign("stage-entry", undefined, "stage-entry"));
-      if (!recoverySaved) return;
-    }
-    const sortie = context === null ? null : await prepareSortie(context);
+        const expansionProfile = campaignStageExpansionProfile(stage.stage);
+        if (
+          expansionV2Enabled &&
+          !testingPreview &&
+          stage.stage >= 11 &&
+          stage.stage <= 100
+        ) {
+          game.setExpansionEncounterContext({
+            encounterId: "campaign:" + String(stage.stage),
+            pattern:
+              campaignReferencePatternOverride(
+                stage.stage,
+                expansionV2Profile.campaignEventFlags,
+              ) ?? expansionProfile.pattern,
+            recipe: expansionProfile.recipe,
+            gameplaySeed: stage.seed,
+            bossParts: false,
+          });
+        } else {
+          game.setExpansionEncounterContext(null);
+        }
 
-    launch.onAbort(launchPresentationUndo());
-    syncWorldMusicProfile(stage.stage);
-    musicController.setBossPhase(1);
-    const musicState = musicStateForStageRole(stage.role);
-    musicController.transitionTo(musicState, musicCrossfadeSeconds(musicState));
-    musicController.setPaused(false);
-
-    if (world.stageEnd < 1000 && stageInWorld(stage.stage) >= 18) {
-      musicController.preloadNext(
-        musicProfileForWorld(worldForStage(world.stageEnd + 1)),
-      );
-    }
-
-    const expansionProfile = campaignStageExpansionProfile(stage.stage);
-    if (
-      expansionV2Enabled &&
-      !testingPreview &&
-      stage.stage >= 11 &&
-      stage.stage <= 100
-    ) {
-      game.setExpansionEncounterContext({
-        encounterId: "campaign:" + String(stage.stage),
-        pattern:
-          campaignReferencePatternOverride(
-            stage.stage,
-            expansionV2Profile.campaignEventFlags,
-          ) ?? expansionProfile.pattern,
-        recipe: expansionProfile.recipe,
-        gameplaySeed: stage.seed,
-        bossParts: false,
-      });
-    } else {
-      game.setExpansionEncounterContext(null);
-    }
-
-    await presentStageTransition(
-      createStageTransitionSpec({
-        stage: stage.stage,
-        galaxy: stage.galaxy,
-        stageInGalaxy: stage.stageInGalaxy,
-        stageInWorld: stageInWorld(stage.stage),
-        worldName: world.name,
-        role: stage.role,
-      }),
-    );
-
-    await launch.start(sortie, stageStartBlocker, () =>
-      game.startStage(stage, difficulty),
-    );
+        await presentStageTransition(
+          createStageTransitionSpec({
+            stage: stage.stage,
+            galaxy: stage.galaxy,
+            stageInGalaxy: stage.stageInGalaxy,
+            stageInWorld: stageInWorld(stage.stage),
+            worldName: world.name,
+            role: stage.role,
+          }),
+        );
+      },
+      blocker: stageStartBlocker,
+      startStage: () => game.startStage(stage, difficulty),
+    });
   } catch (error) {
     showNotice(
       error instanceof Error ? error.message : "Unable to deploy sortie",

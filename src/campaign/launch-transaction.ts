@@ -1,8 +1,10 @@
 import { WARP_POLICY, type WarpCharge } from "../economy/warp-charge";
+import type { InputMode } from "../input/mode";
 import type { Sortie, SortieContext } from "../persistence/account-state";
+import type { GamePhase } from "../types";
 
 /**
- * Why a paid Deploy cannot start, or null. `warp` is already reconciled.
+ * Why a paid Deploy looks unavailable, or null. `warp` is already reconciled.
  * Free runs (Practice, reviews, Test Lab previews) and a prepared sortie,
  * paid when it was admitted, need no Warp. Reserve counts: Deploy asks
  * before it uses Reserve.
@@ -16,6 +18,19 @@ export function deployWarpBlocker(
   return missing > 0
     ? `Not enough Warp · ${missing} more to Deploy. Practice is free.`
     : null;
+}
+
+/**
+ * Why a Deploy click is refused before anything is saved, or null. A server
+ * wallet decides itself: this device's tanks may be behind the server's
+ * (a gift or a refuel elsewhere), and the server refuses a Deploy it
+ * cannot cover without charging anything.
+ */
+export function deployWarpRefusal(
+  warp: WarpCharge,
+  options: { free: boolean; prepared: boolean; serverWallet: boolean },
+): string | null {
+  return options.serverWallet ? null : deployWarpBlocker(warp, options);
 }
 
 /**
@@ -33,15 +48,55 @@ export function resumablePreparedSortie(
   return attempt.id;
 }
 
+/**
+ * What a launch does first with the account's open sortie:
+ * - none: nothing open, or a prepared sortie this Deploy resumes;
+ * - drop-prepared: Practice ends a prepared (paid) sortie, once the player agrees;
+ * - fail: Practice ends the running sortie as failed;
+ * - commit-clear: a cleared stage whose settlement has not saved yet saves it;
+ * - abandon: a restart closes the running sortie, once the next Deploy passed its preflight.
+ */
+export type OpenSortieStep =
+  | "none"
+  | "drop-prepared"
+  | "fail"
+  | "commit-clear"
+  | "abandon";
+
+export function openSortieStep(input: {
+  practice: boolean;
+  canWrite: boolean;
+  phase: GamePhase;
+  attempt: Sortie["phase"] | null;
+}): OpenSortieStep {
+  if (!input.canWrite || input.attempt === null) return "none";
+  if (input.practice)
+    return input.attempt === "prepared" ? "drop-prepared" : "fail";
+  if (input.attempt === "prepared") return "none";
+  if (input.phase === "stageclear" && input.attempt === "active")
+    return "commit-clear";
+  return "abandon";
+}
+
 /** The paid sortie a launch puts live just before its stage starts. */
 export type LaunchSortie = {
+  /** The input mode the sortie was paid for; a kept sortie resumes only in it. */
+  inputMode: InputMode;
   /** Prepared → active. */
   activate(): Promise<unknown>;
   /** Active → prepared again, for a stage that never started. */
   deactivate(): Promise<unknown>;
 };
 
-const SORTIE_KEPT = "Sortie kept: Deploy again resumes it, no new Warp";
+/** Spends the Warp for a paid sortie, or resumes the prepared sortie holding it. */
+export type LaunchPayment = () => Promise<LaunchSortie>;
+
+function sortieKept(mode: InputMode): string {
+  if (mode === "typing")
+    return "Sortie kept: Deploy again resumes it, no new Warp";
+  const label = mode === "voice" ? "Voice" : "Hybrid";
+  return `Sortie kept for ${label}: connect the microphone and Deploy again, no new Warp`;
+}
 
 /**
  * One launch from the hangar or a result screen. Every change the launch
@@ -59,24 +114,39 @@ export class LaunchTransaction {
   }
 
   /**
-   * Puts the sortie live and starts the stage. `blocker` is read right
-   * before activation, so a refusal there keeps the sortie prepared. If the
-   * stage still refuses after activation (the microphone dropped while it
-   * was saved), the sortie goes back to prepared: its Warp is never spent on
-   * a stage that did not start.
+   * Pays for the sortie, puts it live and starts the stage. `blocker` is read
+   * before the Warp is spent and again before activation, so a refusal there
+   * spends nothing or keeps the paid sortie prepared. If the stage still
+   * refuses (or throws) after activation, the sortie goes back to prepared:
+   * its Warp is never spent on a stage that did not start.
    */
   async start(
-    sortie: LaunchSortie | null,
+    prepare: LaunchPayment | null,
     blocker: () => string | null,
     startStage: () => boolean,
   ): Promise<void> {
     if (this.settled) throw new Error("This launch is already settled");
-    const refused = (reason: string): Error =>
-      new Error(sortie === null ? reason : `${reason} · ${SORTIE_KEPT}`);
     const before = blocker();
-    if (before !== null) throw refused(before);
+    if (before !== null) throw new Error(before);
+    const sortie = prepare === null ? null : await prepare();
+    const refused = (reason: string): Error =>
+      new Error(
+        sortie === null ? reason : `${reason} · ${sortieKept(sortie.inputMode)}`,
+      );
+    const ready = blocker();
+    if (ready !== null) throw refused(ready);
     if (sortie !== null) await sortie.activate();
-    if (!startStage()) {
+    let started: boolean;
+    try {
+      started = startStage();
+    } catch (error) {
+      if (sortie !== null)
+        await sortie.deactivate().catch((reason: unknown) => {
+          console.error("Unable to keep the sortie after a failed start.", reason);
+        });
+      throw error;
+    }
+    if (!started) {
       if (sortie !== null) await sortie.deactivate();
       throw refused(blocker() ?? "The stage could not start");
     }
@@ -98,4 +168,40 @@ export class LaunchTransaction {
       }
     }
   }
+}
+
+/** The steps of one launch, in the order `runLaunch` runs them. */
+export type LaunchPlan = {
+  /**
+   * Every refusal, before anything is saved, spent or shown. Returns how the
+   * sortie is paid for; null: a free run.
+   */
+  preflight(): Promise<LaunchPayment | null>;
+  /** The stage-entry recovery save; false stops the launch (it says why). */
+  save(): Promise<boolean>;
+  /** Read before `present`: how to put back what it shows. */
+  presentationUndo(): () => void;
+  /** Stage music and the launch animation. */
+  present(): Promise<void>;
+  /** Why the stage cannot start right now, or null. */
+  blocker(): string | null;
+  /** False: the stage refused to start and nothing changed. */
+  startStage(): boolean;
+};
+
+/**
+ * Runs a launch: preflight → save → presentation → Warp → stage. The Warp is
+ * spent after the animation, right before the stage starts, so a microphone
+ * that drops during the animation costs nothing. True when the stage runs.
+ */
+export async function runLaunch(
+  launch: LaunchTransaction,
+  plan: LaunchPlan,
+): Promise<boolean> {
+  const payment = await plan.preflight();
+  if (!(await plan.save())) return false;
+  launch.onAbort(plan.presentationUndo());
+  await plan.present();
+  await launch.start(payment, plan.blocker, plan.startStage);
+  return true;
 }
