@@ -329,3 +329,19 @@ export function selectRelicReward(
   const index = rewardHash(sourceKey, safeStage) % available.length;
   return available[index] ?? null;
 }
+
+/** A reward relic: granted, and equipped while a slot is free (null when none is left to give). */
+export function awardRelicReward(
+  stateInput: RelicState,
+  sourceStage: number,
+  sourceKey: string,
+): { state: RelicState; id: RelicId | null } {
+  const id = selectRelicReward(stateInput, sourceStage, sourceKey);
+  if (id === null) return { state: stateInput, id: null };
+
+  let state = grantRelic(stateInput, id).state;
+  if (state.equipped.length < MAX_EQUIPPED_RELICS) {
+    state = equipRelic(state, id).state;
+  }
+  return { state, id };
+}

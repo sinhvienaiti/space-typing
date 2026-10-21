@@ -53,6 +53,15 @@ import { CloudSave } from "./online/cloud-save";
 import { liveOpsRemote } from "./online/liveops-remote";
 import { WalletSync, type SpendResult, type WalletView } from "./online/wallet-sync";
 import type { WalletPurchase } from "./economy/wallet-price";
+import { runWalletPurchase, type WalletPurchaseOutcome } from "./economy/wallet-purchase";
+import { claimMissionWithRollback } from "./rewards/mission-claim";
+import {
+  commitStageClear,
+  settleStageClear,
+  StageClearLedger,
+  type StageClearRecord,
+  type StageClearSettlement,
+} from "./rewards/stage-clear-settlement";
 import type { WalletDeltas } from "./economy/wallet-rules";
 import { installAccountDialog } from "./ui/account-dialog";
 import { installFeedbackDialog } from "./ui/feedback-dialog";
@@ -107,6 +116,7 @@ import {
 import {
   DEFAULT_RECALL_SETTINGS,
   buildAdaptiveRecallVocabulary,
+  limitRecallMemory,
   recallDifficultyProfile,
   recordRecallAttempt,
   sanitizeRecallMemory,
@@ -144,18 +154,15 @@ import type {
 import {
   createDifficultySettings,
   difficultyInputFromSettings,
-  recordDifficultyResult,
   sanitizeDifficultySettings,
   type DifficultySettings,
 } from "./campaign/difficulty-settings";
 import {
   createDefaultCampaignProgress,
   inputProfileKey,
-  recordStageClear,
   selectCampaignStage,
 } from "./campaign/progress";
 import {
-  advanceCampaignExpansionOnStageClear,
   canSelectCampaignStage,
   createCampaignExpansionState,
   type CampaignExpansionState,
@@ -214,12 +221,10 @@ import {
   createStarterCharacterState,
   selectCharacter,
   syncCharacterUnlocks,
-  unlockCharactersForStage,
   updateCharacterProgress,
   type CharacterState,
 } from "./characters/state";
 import {
-  awardCharacterProgress,
   characterProgressStatBonus,
   MAX_CHARACTER_LEVEL,
   xpNeededForLevel,
@@ -265,7 +270,6 @@ import {
 } from "./items/inventory";
 import { bundleById, type CosmeticSlot } from "./cosmetics/catalog";
 import {
-  boostClearCredits,
   buyBooster,
   buyBundle,
   buyCosmetic,
@@ -313,15 +317,11 @@ import {
   CombatCreditRewardLedger,
   combatCreditExpectedWeight,
   combatCreditStageBudget,
-  settleCombatCreditStageBase,
   type CombatCreditMode,
 } from "./rewards/combat-credit-drops";
 import {
   addExpansionCurrencyReward,
   createExpansionCurrencyState,
-  expansionCurrencyRewardText,
-  scaleExpansionCurrencyReward,
-  stageClearExpansionCurrencyReward,
   type ExpansionCurrencyState,
 } from "./economy/currencies";
 import { gradeLabel, type GradeId } from "./grades";
@@ -363,11 +363,11 @@ import {
 } from "./relics/registry";
 import {
   MAX_EQUIPPED_RELICS,
+  awardRelicReward,
   compileRelicEffects,
   createRelicState,
   equipRelic,
   grantRelic,
-  selectRelicReward,
   unequipRelic,
   type RelicState,
 } from "./relics/state";
@@ -399,7 +399,6 @@ import {
   canAffordShopPrice,
   createShopState,
   dismissRestHub,
-  markRestHubPending,
   pendingRestHubStage,
   formatShopPrice,
   resolveShopInstance,
@@ -439,22 +438,15 @@ import {
   type BossRewardChoiceOption,
 } from "./events/reward-choice";
 import {
-  performanceReward,
-  performanceRewardText,
-  sectorCheckpointReward,
-} from "./rewards/campaign-rewards";
-import {
   createCodexState,
   discoverCodexEnemy,
   discoverCodexReward,
   discoverCodexWorld,
-  type CodexRewardId,
   type CodexState,
 } from "./codex/state";
 import type { StageEventDefinition } from "./events/stage-scheduler";
 import {
   objectiveProgressText,
-  objectiveRewardFactor,
   type StageObjectiveState,
 } from "./events/objectives";
 import {
@@ -475,12 +467,12 @@ import {
   ACHIEVEMENT_REGISTRY,
   MISSION_IDS,
   MISSION_REGISTRY,
-  claimMission,
   createProgressionState,
   missionClaimable,
   missionProgress,
   recordProgressionEvent,
   syncAchievements,
+  type MissionId,
   type ProgressionState,
 } from "./progression/missions";
 import {
@@ -497,8 +489,6 @@ import {
 import { ActionGate } from "./ui/action-gate";
 import {
   applyAscensionDifficulty,
-  advanceAscensionOnStageClear,
-  ascensionCompletionReward,
   ascensionProfile,
   canSwitchAscensionTier,
   createAscensionState,
@@ -1531,7 +1521,8 @@ let practiceReload: Promise<void> = Promise.resolve();
 let encounterWasFree = false;
 let clearSettlementPending = false;
 let currentEncounterToken = "";
-let settledEncounterToken = "";
+/** Which encounter's clear is settled, and a settlement owed a retry (src/rewards/stage-clear-settlement.ts). */
+const stageClearLedger = new StageClearLedger();
 let pendingMilestoneGrants: string[] = [];
 let committedCredits = 0;
 /** Latest committed save object, for the cloud copy. */
@@ -1540,6 +1531,8 @@ let cloudSave: CloudSave | null = null;
 /** Server wallet (src/online/wallet-sync.ts); null until the online session exists. */
 let walletSync: WalletSync | null = null;
 let walletPurchaseBusy = false;
+/** A mission reward is saving (src/rewards/reward-claim.ts): no purchase or other claim until it is kept or undone. */
+let rewardClaimPending = false;
 let walletPurchaseReceipts: string[] = [];
 let walletLessonRewards: { day: number; tier: "three" | "five" }[] = [];
 const accountTransactions = new AccountTransactions((save) => {
@@ -1653,19 +1646,33 @@ function styleShopBlocker(): string | null {
 async function settleStylePurchase(result: Purchase, label: string, purchase: WalletPurchase, extra?: () => void): Promise<string | null> {
   if (!result.ok) return result.reason;
   const costs: WalletDeltas = { credits: result.price.credits, starCrystal: result.price.starCrystal };
-  const paid = await payFirst(costs, "style-shop", purchase);
-  if (!paid.ok) return paid.reason;
-  const before = { credits, expansionCurrencies, cosmetics, inventory };
-  credits = Math.max(0, credits - result.price.credits);
-  expansionCurrencies = { ...expansionCurrencies, starCrystal: Math.max(0, expansionCurrencies.starCrystal - result.price.starCrystal) };
-  cosmetics = result.state;
-  extra?.();
-  const saved = await finishWalletPurchase(paid, costs, "shop", label, "shop", () => {
-    ({ credits, expansionCurrencies, cosmetics, inventory } = before);
+  let before = { credits, expansionCurrencies, cosmetics, inventory };
+  const outcome = await buyWithWallet(costs, "style-shop", purchase, { reason: "shop", message: label, recovery: "shop" }, {
+    apply: () => {
+      before = { credits, expansionCurrencies, cosmetics, inventory };
+      credits = Math.max(0, credits - result.price.credits);
+      expansionCurrencies = { ...expansionCurrencies, starCrystal: Math.max(0, expansionCurrencies.starCrystal - result.price.starCrystal) };
+      cosmetics = result.state;
+      extra?.();
+    },
+    rollback: () => {
+      ({ credits, expansionCurrencies, cosmetics, inventory } = before);
+    },
   });
+  if (outcome.status === "refused") return outcome.reason;
   applyCosmeticLook();
   refreshPersistentStateUi();
-  return saved ? null : "Could not save. The purchase was rolled back; any pending refund will retry on reconnect.";
+  return outcome.status === "saved" ? null : "Could not save. The purchase was rolled back; any pending refund will retry on reconnect.";
+}
+
+/** Why no wallet purchase may start now: unsaved or practice state, or a purchase or claim still saving. */
+function purchaseBlocker(): string | null {
+  if (!accountTransactions.canWrite() || practiceActive || activeReviewGoal !== undefined || practiceRestorePending || testingStagePreviewActive() || clearSettlementPending || expeditionSession.ownsCampaignPersistence()) {
+    return "Return to the hangar and finish saving before purchasing.";
+  }
+  if (walletPurchaseBusy) return "Please wait for the current purchase to finish.";
+  if (rewardClaimPending) return "Saving… try again in a moment.";
+  return null;
 }
 
 /**
@@ -1674,11 +1681,6 @@ async function settleStylePurchase(result: Purchase, label: string, purchase: Wa
  * offline once this device has a server wallet). Otherwise: allowed.
  */
 async function payFirst(costs: WalletDeltas, source: string, purchase?: WalletPurchase): Promise<SpendResult> {
-  if (!accountTransactions.canWrite() || practiceActive || activeReviewGoal !== undefined || practiceRestorePending || testingStagePreviewActive() || clearSettlementPending || expeditionSession.ownsCampaignPersistence()) {
-    return { ok: false, reason: "Return to the hangar and finish saving before purchasing." };
-  }
-  if (walletPurchaseBusy) return { ok: false, reason: "Please wait for the current purchase to finish." };
-  walletPurchaseBusy = true;
   const balanceBefore = JSON.stringify({ credits, expansionCurrencies });
   const positive: WalletDeltas = {};
   for (const [key, value] of Object.entries(costs) as [keyof WalletDeltas, number | undefined][]) if ((value ?? 0) > 0) positive[key] = value;
@@ -1687,41 +1689,66 @@ async function payFirst(costs: WalletDeltas, source: string, purchase?: WalletPu
     const result = await walletSync.spend(positive, source, purchase);
     if (result.ok && JSON.stringify({ credits, expansionCurrencies }) !== balanceBefore) {
       await walletSync.refund(result.opId, positive);
-      walletPurchaseBusy = false;
       return { ok: false, reason: "Your balance changed while buying. Please reopen the offer and retry." };
     }
-    if (!result.ok) walletPurchaseBusy = false;
     return result;
   } catch (error) {
-    walletPurchaseBusy = false;
     return { ok: false, reason: error instanceof Error ? error.message : "Purchase failed. Please retry." };
   }
 }
 
-/** Commit the item and receipt together, or restore its entire local state before refunding. */
-async function finishWalletPurchase(
-  paid: Extract<SpendResult, { ok: true }>, costs: WalletDeltas, reason: SaveReason,
-  message: string, recovery: CrashRecoveryReason, rollback: () => void,
-): Promise<boolean> {
-  const receipts = walletPurchaseReceipts;
-  const recoveryBefore = { campaignExpansion, crashRecoverySnapshot };
-  if (paid.opId !== null) walletPurchaseReceipts = [...receipts, paid.opId].slice(-100);
-  try {
-    const saved = (await autosaveCampaign(reason, message, recovery)) &&
-      (paid.opId === null || lastCommittedSave?.auxiliary?.walletPurchases?.includes(paid.opId) === true);
-    if (!saved) {
-      walletPurchaseReceipts = receipts;
-      rollback();
-      ({ campaignExpansion, crashRecoverySnapshot } = recoveryBefore);
-      await walletSync?.refund(paid.opId, costs);
-      refreshPersistentStateUi();
-      return false;
-    }
-    await walletSync?.settle();
-    return true;
-  } finally {
-    walletPurchaseBusy = false;
-  }
+/**
+ * One wallet purchase under the purchase lock (src/economy/wallet-purchase.ts):
+ * pay first, apply, then commit the item and receipt together. Anything after
+ * payment that fails or throws restores the entire local state and refunds;
+ * the lock is always released before the offer is redrawn.
+ */
+function buyWithWallet(
+  costs: WalletDeltas, source: string, purchase: WalletPurchase | undefined,
+  save: { reason: SaveReason; message: string; recovery: CrashRecoveryReason },
+  steps: { apply: () => void; rollback: () => void; rerender?: () => void },
+): Promise<WalletPurchaseOutcome> {
+  let undoSave = (): void => {};
+  return runWalletPurchase({
+    blocker: purchaseBlocker,
+    lock: (held) => {
+      walletPurchaseBusy = held;
+    },
+    pay: () => payFirst(costs, source, purchase),
+    apply: steps.apply,
+    save: async (paid) => {
+      const receipts = walletPurchaseReceipts;
+      const recoveryBefore = { campaignExpansion, crashRecoverySnapshot };
+      undoSave = () => {
+        walletPurchaseReceipts = receipts;
+        ({ campaignExpansion, crashRecoverySnapshot } = recoveryBefore);
+      };
+      if (paid.opId !== null) walletPurchaseReceipts = [...receipts, paid.opId].slice(-100);
+      return (await autosaveCampaign(save.reason, save.message, save.recovery)) &&
+        (paid.opId === null || lastCommittedSave?.auxiliary?.walletPurchases?.includes(paid.opId) === true);
+    },
+    rollback: () => {
+      undoSave();
+      steps.rollback();
+    },
+    refund: async (paid) => {
+      try {
+        await walletSync?.refund(paid.opId, costs);
+      } finally {
+        refreshPersistentStateUi();
+      }
+    },
+    settle: async () => {
+      await walletSync?.settle();
+    },
+    rerender: steps.rerender,
+  });
+}
+
+/** Shop notices: a refused purchase says why; one undone by an error says it was not kept. */
+function noticePurchaseOutcome(outcome: WalletPurchaseOutcome): void {
+  if (outcome.status === "refused") showNotice(outcome.reason);
+  else if (outcome.status === "rolled-back" && outcome.threw) showNotice("Purchase failed · nothing was kept and the price is being refunded");
 }
 
 function purchaseRollback(): () => void {
@@ -1957,18 +1984,21 @@ document.querySelector<HTMLElement>("#titlePilotCard .holo-avatar")?.addEventLis
     openStyleShop();
   }
 });
+/** Shared by Daily Hub and mission claims: between sorties, on the title screen, writable account, nothing saving. */
+function rewardClaimBlocker(): string | null {
+  if (!persistenceReady) return "Loading your account…";
+  if (!accountTransactions.canWrite())
+    return "Read-only account in this tab. Close other Space Typing tabs.";
+  if (warpAccount?.attempt) return "Finish the current sortie first.";
+  if (game.getPhase() !== "title") return "Claim rewards from the hangar.";
+  if (rewardClaimPending || walletPurchaseBusy || practiceRestorePending || clearSettlementPending || accountTransactions.busy())
+    return "Saving… try again in a moment.";
+  return null;
+}
+
 const liveOps = new LiveOpsController({
   localNow: () => accountTransactions.now(),
-  claimBlocker: () => {
-    if (!persistenceReady) return "Loading your account…";
-    if (!accountTransactions.canWrite())
-      return "Read-only account in this tab. Close other Space Typing tabs.";
-    if (warpAccount?.attempt) return "Finish the current sortie first.";
-    if (game.getPhase() !== "title") return "Claim rewards from the hangar.";
-    if (walletPurchaseBusy || practiceRestorePending || clearSettlementPending || accountTransactions.busy())
-      return "Saving… try again in a moment.";
-    return null;
-  },
+  claimBlocker: rewardClaimBlocker,
   starCrystals: () => expansionCurrencies.starCrystal,
   spendStarCrystals: (amount) => {
     expansionCurrencies = {
@@ -2085,7 +2115,13 @@ async function finishManagedSortie(
       game.getPhase() === "stageclear" &&
       warpAccount.attempt.phase === "active"
     ) {
-      return autosaveCampaign("stage-clear", "✓ Clear and rewards committed");
+      if (await retryUnsettledStageClear()) {
+        return autosaveCampaign("stage-clear", "✓ Clear and rewards committed");
+      }
+      // Settling threw again: commit the clear, but never as "rewards committed".
+      const saved = await autosaveCampaign("stage-clear");
+      if (saved) showNotice("Stage rewards could not be settled · this clear's rewards were not granted");
+      return saved;
     }
     if (
       warpAccount.attempt.phase !== "prepared" &&
@@ -3656,6 +3692,31 @@ function recordShopProgress(): void {
   });
 }
 
+/** The reward and the claimed mark are kept together with their save, or the mission stays claimable. */
+async function claimMissionReward(id: MissionId): Promise<void> {
+  const outcome = await claimMissionWithRollback({
+    blocker: rewardClaimBlocker,
+    lock: (held) => {
+      rewardClaimPending = held;
+    },
+    read: () => ({ progression, credits, recovery: { campaignExpansion, crashRecoverySnapshot } }),
+    write: (account) => {
+      ({ progression, credits } = account);
+      ({ campaignExpansion, crashRecoverySnapshot } = account.recovery);
+    },
+    hint: (source, opId) => walletSync?.hint(source, opId),
+    save: (message) => autosaveCampaign("progression", message, "progression"),
+    render: () => {
+      renderProgression();
+      updateDataSummary();
+    },
+  }, id);
+  if (outcome === null || outcome.ok) return;
+  showNotice(outcome.reason);
+  renderProgression();
+  updateDataSummary();
+}
+
 function renderProgression(): void {
   const missionGrid = byId("missionGrid");
   missionGrid.replaceChildren();
@@ -3705,20 +3766,7 @@ function renderProgression(): void {
     claim.disabled = claimed || !claimable;
     claim.textContent = claimed ? "Claimed" : "Claim reward";
     claim.addEventListener("click", () => {
-      const result = claimMission(progression, id);
-      if (!result.claimed) return;
-      walletSync?.hint("mission", "mission:" + id);
-      progression = result.state;
-      credits = addCredits(credits, result.rewardCredits);
-      renderProgression();
-      updateDataSummary();
-      void autosaveCampaign(
-        "progression",
-        "✓ Mission reward · +" +
-          result.rewardCredits.toLocaleString() +
-          " Credits",
-        "progression",
-      );
+      void claimMissionReward(id);
     });
 
     card.title =
@@ -4892,6 +4940,85 @@ function activeCombatCreditMode(): CombatCreditMode {
   return "campaign";
 }
 
+/**
+ * Settles a Campaign clear (src/rewards/stage-clear-settlement.ts): every
+ * reward is worked out first without touching state, then applied together
+ * and saved. A settlement that throws changes nothing and is retried before
+ * the clear is committed (finishManagedSortie); a failed save keeps the clear
+ * in this session for that commit, as before.
+ */
+function settleCampaignStageClear(
+  encounter: string,
+  clear: StageClearRecord,
+): Promise<StageClearSettlement | null> {
+  return commitStageClear(stageClearLedger, encounter, {
+    settle: () =>
+      settleStageClear({
+        run: currentRunPersistentState(),
+        cosmetics,
+        codex,
+        campaignExpansion,
+        difficultySettings,
+        milestoneGrants: warpAccount?.milestoneGrants ?? [],
+      }, clear),
+    apply: applyStageClearSettlement,
+    save: (settlement) => autosaveCampaign("stage-clear", settlement.message, "stage-clear"),
+    openRestHub: () => {
+      if (pendingRestHubStage(shops) === clear.stats.stage) openRestHub();
+    },
+    afterSave: (settlement) => {
+      // After the clear's own save, so neither can stop it.
+      storeRecallMemory();
+      if (settlement.relic !== null) applyRelicEffects();
+      renderPlayerStatusIdentity();
+    },
+    notice: showNotice,
+  });
+}
+
+/** Plain assignments only, so a clear is applied completely or not at all. */
+function applyStageClearSettlement(settlement: StageClearSettlement): void {
+  const { run } = settlement.state;
+  campaign = run.campaign;
+  route = run.route;
+  characters = run.characters;
+  credits = run.credits;
+  progression = run.progression;
+  expansionCurrencies = run.expansionCurrencies;
+  shops = run.shops;
+  relics = run.relics;
+  ascension = run.ascension;
+  cosmetics = settlement.state.cosmetics;
+  codex = settlement.state.codex;
+  campaignExpansion = settlement.state.campaignExpansion;
+  difficultySettings = settlement.state.difficultySettings;
+  if (settlement.checkpointSnapshot !== null) checkpointSnapshot = settlement.checkpointSnapshot;
+  if (settlement.milestoneKey !== null) pendingMilestoneGrants.push(settlement.milestoneKey);
+  stageEntrySnapshot = null;
+}
+
+/** Before a clear is committed: one more try at its settlement if that threw; false while it stays unsettled. */
+async function retryUnsettledStageClear(): Promise<boolean> {
+  if (clearSettlementPending) return stageClearLedger.isSettled(currentEncounterToken);
+  clearSettlementPending = true;
+  try {
+    return await stageClearLedger.retry(currentEncounterToken);
+  } finally {
+    clearSettlementPending = false;
+    renderWarpHud();
+  }
+}
+
+/** Recall stats are a device convenience (capped): full or blocked storage never stops play or a clear. */
+function storeRecallMemory(): void {
+  recallMemory = limitRecallMemory(recallMemory);
+  try {
+    saveRecallMemory();
+  } catch (error) {
+    console.error("Unable to save recall memory.", error);
+  }
+}
+
 const game = new Game(
   byId<HTMLCanvasElement>("gameCanvas"),
   [],
@@ -5087,8 +5214,10 @@ const game = new Game(
     onBossUpdate: renderBoss,
     onSkills: renderAllSkills,
     onStageClear: async (stats) => {
-      if (currentEncounterToken === settledEncounterToken || clearSettlementPending) return;
-      settledEncounterToken = currentEncounterToken; clearSettlementPending = true;
+      if (stageClearLedger.isSettled(currentEncounterToken) || clearSettlementPending) return;
+      // The encounter counts as settled only once its clear is applied (a throw stays retryable).
+      const encounter = currentEncounterToken;
+      clearSettlementPending = true;
       try {
       const stageSession = game.getStageSessionSnapshot();
       const wpm = stageWordsPerMinute(
@@ -5115,6 +5244,7 @@ const game = new Game(
         activeExpedition !== null &&
         activeExpedition.phase === "encounter"
       ) {
+        stageClearLedger.settle(encounter);
         try {
           const nextActiveSeconds =
             expeditionActiveSecondsTotal +
@@ -5221,9 +5351,9 @@ const game = new Game(
         }
       }
 
-      saveRecallMemory();
-
       if (testingStagePreviewActive()) {
+        stageClearLedger.settle(encounter);
+        storeRecallMemory();
         const wasPractice = practiceActive || activeReviewGoal !== undefined;
         const completedStage = stats.stage;
         restoreTestingStagePersistentState();
@@ -5251,341 +5381,41 @@ const game = new Game(
 
       const activeHidden = currentHiddenEncounterState().active;
       if (activeHidden !== null) {
-        await handleHiddenEncounterClear(
-          activeHidden,
-          stats,
-          wpm,
-          accuracy,
-        );
+        stageClearLedger.settle(encounter);
+        try {
+          await handleHiddenEncounterClear(
+            activeHidden,
+            stats,
+            wpm,
+            accuracy,
+          );
+        } finally {
+          storeRecallMemory();
+        }
         return;
       }
 
-      difficultySettings = recordDifficultyResult(
-        difficultySettings,
-        wpm,
-        accuracy,
-        { mode: game.getInputMode(), voiceWords: game.getVoiceMetrics().words, elapsedSeconds: stageSession.elapsedSeconds },
-      );
-      saveDifficultySettings();
-
-      const clearedAt = new Date().toISOString();
-      campaign = recordStageClear(campaign, stats.stage, {
-        score: stats.score,
-        accuracy,
-        wpm,
-        clearedAt,
-        inputMode: game.getInputMode(), voiceWords: game.getVoiceMetrics().words, voicePolicy: game.getVoiceMetrics().policyVersion,
-      }, inputProfileKey(game.getInputMode(), gameplayMode, difficultySettings.mode, ascension.selectedTier, selectedVocabularyLevel()));
-      if (ascension.selectedTier === 0) {
-        route = syncRouteStateForStage(
-          route,
-          campaign.highestUnlockedStage,
-        );
-      }
-
-      const characterUnlock = unlockCharactersForStage(
-        characters,
-        stats.stage,
-      );
-      characters = characterUnlock.state;
-
-      const activeCharacterId = characters.selected;
-      const progressAward = awardCharacterProgress(
-        characters.progress[activeCharacterId],
-        {
-          stage: stats.stage,
-          accuracy,
-          wpm,
-        },
-      );
-      characters = updateCharacterProgress(
-        characters,
-        activeCharacterId,
-        progressAward.progress,
-      );
-      renderPlayerStatusIdentity();
-
-      const unlockedNames = characterUnlock.unlocked.map(
-        (id) => getCharacter(id).name,
-      );
-      const unlockText =
-        unlockedNames.length > 0
-          ? " · " + unlockedNames.join(", ") + " unlocked"
-          : "";
-      const progressText =
-        progressAward.levelUps > 0 || progressAward.masteryUps > 0
-          ? " · " +
-            getCharacter(activeCharacterId).name +
-            " Lv " +
-            String(progressAward.progress.level) +
-            " · Mastery " +
-            String(progressAward.progress.mastery)
-          : "";
-      const difficultyRewardMultiplier =
-        activeStageDifficulty?.rewardMultiplier ?? 1;
       const objective = game.getStageObjective();
-      const objectiveBonusFactor =
-        activeStageDifficulty === null
-          ? 0
-          : objectiveRewardFactor(
-              objective,
-              activeStageDifficulty,
-            );
-      const combinedRewardMultiplier =
-        difficultyRewardMultiplier *
-        (1 + objectiveBonusFactor);
-      const stageBaseCreditTarget =
-        stageClearCreditReward({
-          stage: stats.stage,
-          accuracy,
-          salvage: game.getPlayerStats().salvage,
-        }) * combinedRewardMultiplier;
-      const combatCreditSettlement =
-        settleCombatCreditStageBase({
-          stageBaseCredits: stageBaseCreditTarget,
-          combatCreditsGranted:
-            game.getCombatCreditsGrantedThisStage(),
-          creditsMultiplier: game.getCreditsMultiplier(),
-        });
-      const baseCreditReward =
-        combatCreditSettlement.settlementCredits;
-      const performance =
-        activeStageDifficulty === null
-          ? null
-          : performanceReward({
-              stats,
-              accuracy,
-              wpm,
-              difficulty: activeStageDifficulty,
-              objectiveComplete: objective?.status === "complete",
-              typingEvidence: game.getInputMode() !== "voice" && stageSession.correctWordKeys > 0,
-            });
-      const performanceCredits =
-        performance === null
-          ? 0
-          : performance.credits * difficultyRewardMultiplier;
-      let totalCreditReward =
-        baseCreditReward + performanceCredits;
-      // Style Shop Credit Booster: extra Credits for its remaining clears.
-      const boostedClear = boostClearCredits(cosmetics, totalCreditReward);
-      cosmetics = boostedClear.state;
-      totalCreditReward += boostedClear.bonus;
-      credits = addCredits(credits, totalCreditReward);
-
-      const stageConfig = createStageConfig(stats.stage);
-      const baseCurrencyReward = scaleExpansionCurrencyReward(
-        stageClearExpansionCurrencyReward(
-          stats.stage,
-          stageConfig.role,
-          accuracy,
-        ),
-        combinedRewardMultiplier,
-      );
-      let totalCurrencyReward = baseCurrencyReward;
-      expansionCurrencies = addExpansionCurrencyReward(
-        expansionCurrencies,
-        baseCurrencyReward,
-      );
-
-      if (performance !== null) {
-        const performanceCurrencies =
-          scaleExpansionCurrencyReward(
-            performance.currencies,
-            difficultyRewardMultiplier,
-          );
-        expansionCurrencies = addExpansionCurrencyReward(
-          expansionCurrencies,
-          performanceCurrencies,
-        );
-        totalCurrencyReward = addExpansionCurrencyReward(
-          totalCurrencyReward,
-          performanceCurrencies,
-        );
-        for (const id of performance.earned) {
-          codex = discoverCodexReward(
-            codex,
-            ("performance-" + id) as CodexRewardId,
-          ).state;
-        }
-      }
-      const performanceText =
-        performance === null
-          ? ""
-          : performanceRewardText(performance);
-      const objectiveText =
-        objective?.status === "complete"
-          ? " · Objective +" +
-            Math.round(objectiveBonusFactor * 100) +
-            "%"
-          : objective?.status === "failed"
-            ? " · Objective failed"
-            : "";
-      progression = recordProgressionEvent(progression, {
-        type: "stage-clear",
+      const settlement = await settleCampaignStageClear(encounter, {
+        stats,
         accuracy,
+        wpm,
+        elapsedSeconds: stageSession.elapsedSeconds,
+        correctWordKeys: stageSession.correctWordKeys,
+        inputMode: game.getInputMode(),
+        voiceWords: game.getVoiceMetrics().words,
+        voicePolicy: game.getVoiceMetrics().policyVersion,
+        gameplayMode,
+        vocabularyLevel: selectedVocabularyLevel(),
+        objective,
+        difficulty: activeStageDifficulty,
+        salvage: game.getPlayerStats().salvage,
+        combatCreditsGranted: game.getCombatCreditsGrantedThisStage(),
+        creditsMultiplier: game.getCreditsMultiplier(),
+        clearedAt: new Date().toISOString(),
       });
-      const achievementNames = syncProgressionAchievements();
-      const achievementText =
-        achievementNames.length > 0
-          ? " · Achievement: " + achievementNames.join(", ")
-          : "";
-
-      const completedTier = ascension.selectedTier;
-      const ascensionResult = advanceAscensionOnStageClear(
-        ascension,
-        stats.stage,
-      );
-      ascension = ascensionResult.state;
-      const nextAscensionStage = currentAscensionStage(ascension);
-      if (completedTier > 0) {
-        campaign = {
-          ...campaign,
-          selectedStage:
-            nextAscensionStage ?? campaign.highestUnlockedStage,
-        };
-      }
-
-      let ascensionText = "";
-      if (completedTier === 0 && ascensionResult.unlockedTier === 1) {
-        ascensionText = " · Ascension 1 unlocked";
-      } else if (
-        completedTier > 0 &&
-        ascensionResult.newlyCompleted
-      ) {
-        const reward = ascensionCompletionReward(completedTier);
-        credits = addCredits(credits, reward.credits);
-        expansionCurrencies = addExpansionCurrencyReward(
-          expansionCurrencies,
-          reward.currencies,
-        );
-        totalCreditReward += reward.credits;
-        totalCurrencyReward = addExpansionCurrencyReward(
-          totalCurrencyReward,
-          reward.currencies,
-        );
-        ascensionText =
-          " · Ascension " +
-          String(completedTier) +
-          " complete" +
-          (ascensionResult.unlockedTier === null
-            ? " · all tiers complete"
-            : " · Tier " +
-              String(ascensionResult.unlockedTier) +
-              " unlocked");
-      }
-
-      let checkpointCommitted = ascensionResult.checkpointCommitted;
-      if (completedTier === 0) {
-        const expansionResult =
-          advanceCampaignExpansionOnStageClear(
-            campaignExpansion,
-            campaign,
-            stats.stage,
-            clearedAt,
-          );
-        campaignExpansion = expansionResult.state;
-        checkpointCommitted = expansionResult.checkpointCommitted;
-      } else if (checkpointCommitted) {
-        campaignExpansion = {
-          ...campaignExpansion,
-          crashRecovery: null,
-        };
-      }
-
-      const milestoneKey = `${WARP_POLICY.version}:sector:${completedTier}:${stats.stage}`;
-      const sectorRewardEligible = checkpointCommitted && !warpAccount?.milestoneGrants.includes(milestoneKey);
-      if (sectorRewardEligible) pendingMilestoneGrants.push(milestoneKey);
-      const sectorRelic = sectorRewardEligible
-        ? grantRelicReward(
-            stats.stage,
-            completedTier > 0
-              ? "ascension:" +
-                  String(completedTier) +
-                  ":sector:" +
-                  String(stats.stage)
-              : "sector:" + String(stats.stage),
-          )
-        : null;
-      let sectorRewardText = "";
-      if (sectorRewardEligible) {
-        if (completedTier === 0) {
-          shops = markRestHubPending(shops, stats.stage);
-        }
-        const sectorReward = sectorCheckpointReward(stats.stage);
-        const ascensionRewardMultiplier =
-          activeStageDifficulty?.ascensionRewardMultiplier ?? 1;
-        const sectorCredits = Math.round(
-          sectorReward.credits * ascensionRewardMultiplier,
-        );
-        const sectorCurrencies = scaleExpansionCurrencyReward(
-          sectorReward.currencies,
-          ascensionRewardMultiplier,
-        );
-        credits = addCredits(credits, sectorCredits);
-        expansionCurrencies = addExpansionCurrencyReward(
-          expansionCurrencies,
-          sectorCurrencies,
-        );
-        totalCreditReward += sectorCredits;
-        totalCurrencyReward = addExpansionCurrencyReward(
-          totalCurrencyReward,
-          sectorCurrencies,
-        );
-        codex = discoverCodexReward(codex, "sector-cache").state;
-        sectorRewardText =
-          " · Sector +" +
-          sectorCredits.toLocaleString() +
-          " Credits";
-        checkpointSnapshot = createCheckpointSnapshot(
-          currentRunPersistentState(),
-          campaignExpansion.checkpoint.stage,
-        );
-      }
-      stageEntrySnapshot = null;
-      const currencyRewardText =
-        expansionCurrencyRewardText(totalCurrencyReward);
-      const checkpointText = checkpointCommitted
-        ? completedTier > 0
-          ? " · Ascension A" +
-            String(completedTier) +
-            " checkpoint " +
-            String(stats.stage).padStart(3, "0") +
-            " committed" +
-            sectorRewardText +
-            relicRewardText(sectorRelic)
-          : " · Checkpoint " +
-            String(campaignExpansion.checkpoint.stage).padStart(3, "0") +
-            " committed" +
-            sectorRewardText +
-            relicRewardText(sectorRelic)
-        : "";
-
-      await autosaveCampaign(
-        "stage-clear",
-        "✓ Saved · Stage " +
-          String(stats.stage).padStart(3, "0") +
-          " cleared" +
-          unlockText +
-          progressText +
-          " · +" +
-          totalCreditReward.toLocaleString() +
-          " Credits" +
-          (currencyRewardText.length > 0
-            ? " · " + currencyRewardText
-            : "") +
-          objectiveText +
-          (performanceText.length > 0
-            ? " · Performance: " + performanceText
-            : "") +
-          achievementText +
-          ascensionText +
-          checkpointText,
-        "stage-clear",
-      ).then((saved) => {
-        if (saved && pendingRestHubStage(shops) === stats.stage) {
-          openRestHub();
-        }
-      });
+      if (settlement === null) return;
+      const { progressAward, characterId: activeCharacterId } = settlement;
 
       const world = worldForStage(stats.stage);
       const rating = stageResultStars(
@@ -5635,10 +5465,10 @@ const game = new Game(
       replaceCurrencyChips(
         rewardContainer,
         {
-          credits: totalCreditReward,
-          alloy: totalCurrencyReward.alloy,
-          starCrystal: totalCurrencyReward.starCrystal,
-          quantumCore: totalCurrencyReward.quantumCore,
+          credits: settlement.credits,
+          alloy: settlement.currencies.alloy,
+          starCrystal: settlement.currencies.starCrystal,
+          quantumCore: settlement.currencies.quantumCore,
         },
         {
           signed: true,
@@ -5646,8 +5476,8 @@ const game = new Game(
         },
       );
       byId("clearDetails").textContent =
-        [objectiveText, performanceText ? "Performance: " + performanceText : "",
-          ascensionText, checkpointText]
+        [settlement.objectiveText, settlement.performanceText ? "Performance: " + settlement.performanceText : "",
+          settlement.ascensionText, settlement.checkpointText]
           .filter(Boolean).join(" · ").replace(/^\s*·\s*/, "");
       byId("clearStreak").textContent = String(stats.maxStreak);
 
@@ -5721,6 +5551,8 @@ const game = new Game(
         applyEquipmentStats();
       }
       updateCampaignUi();
+      } catch (error) {
+        console.error("Unable to finish the stage clear.", error);
       } finally { clearSettlementPending = false; renderWarpHud(); }
     },
     onWordComplete: (entry, outcome) => {
@@ -5804,7 +5636,7 @@ const game = new Game(
           ),
         );
       }
-      if (recallStage.attempts % 6 === 0) saveRecallMemory();
+      if (recallStage.attempts % 6 === 0) storeRecallMemory();
       renderRecallAssistUi();
     },
     onKillTranslation: (entry) => {
@@ -7184,15 +7016,12 @@ function grantRelicReward(
   sourceStage: number,
   sourceKey: string,
 ): RelicId | null {
-  const id = selectRelicReward(relics, sourceStage, sourceKey);
-  if (id === null) return null;
+  const award = awardRelicReward(relics, sourceStage, sourceKey);
+  if (award.id === null) return null;
 
-  relics = grantRelic(relics, id).state;
-  if (relics.equipped.length < MAX_EQUIPPED_RELICS) {
-    relics = equipRelic(relics, id).state;
-  }
+  relics = award.state;
   applyRelicEffects();
-  return id;
+  return award.id;
 }
 
 function relicRewardText(id: RelicId | null): string {
@@ -7752,31 +7581,32 @@ function appendShopStockCards(
       }
 
       buy.disabled = true;
-      const costs = purchaseCosts(purchase.state);
-      const rollback = purchaseRollback();
-      void payFirst(costs, "shop:" + instance.id, { kind: "stock", shop: instance.type, item: entry.kind === "item" ? entry.itemId : entry.definitionId, grade: shopStockGrade(entry) }).then(async (paid) => {
-        if (!paid.ok) {
-          showNotice(paid.reason);
-          rerender();
-          return;
-        }
-        applyShopPurchaseState(purchase.state);
-        recordShopProgress();
-        renderProgression();
-        rerender();
-        updateShopAccess();
-        await finishWalletPurchase(paid, costs,
-          "shop",
-          "✓ Purchased " +
+      void buyWithWallet(
+        purchaseCosts(purchase.state),
+        "shop:" + instance.id,
+        { kind: "stock", shop: instance.type, item: entry.kind === "item" ? entry.itemId : entry.definitionId, grade: shopStockGrade(entry) },
+        {
+          reason: "shop",
+          message:
+            "✓ Purchased " +
             shopStockName(entry) +
             " · stock " +
             String(Math.max(0, entry.remaining - 1)) +
             " left",
-          "shop",
-          rollback,
-        );
-        rerender();
-      });
+          recovery: "shop",
+        },
+        {
+          apply: () => {
+            applyShopPurchaseState(purchase.state);
+            recordShopProgress();
+            renderProgression();
+            rerender();
+            updateShopAccess();
+          },
+          rollback: purchaseRollback(),
+          rerender,
+        },
+      ).then(noticePurchaseOutcome);
     });
 
     body.append(meta, title, description, buy);
@@ -7880,23 +7710,24 @@ function commitUpgradeService(
     return;
   }
 
-  const costs = purchaseCosts(result.state);
-  const rollback = purchaseRollback();
-  void payFirst(costs, "service", purchase).then(async (paid) => {
-    if (!paid.ok) {
-      showNotice(paid.reason);
-      renderServiceShop();
-      return;
-    }
-    applyServiceShopState(result.state);
-    if (countAsPurchase) {
-      recordShopProgress();
-      renderProgression();
-    }
-    renderServiceShop();
-    await finishWalletPurchase(paid, costs, "upgrade", message, "upgrade", rollback);
-    renderServiceShop();
-  });
+  void buyWithWallet(
+    purchaseCosts(result.state),
+    "service",
+    purchase,
+    { reason: "upgrade", message, recovery: "upgrade" },
+    {
+      apply: () => {
+        applyServiceShopState(result.state);
+        if (countAsPurchase) {
+          recordShopProgress();
+          renderProgression();
+        }
+        renderServiceShop();
+      },
+      rollback: purchaseRollback(),
+      rerender: renderServiceShop,
+    },
+  ).then(noticePurchaseOutcome);
 }
 
 function renderServiceShop(): void {
@@ -7958,26 +7789,26 @@ function renderServiceShop(): void {
       return;
     }
 
-    const costs = purchaseCosts(result.state);
-    const rollback = purchaseRollback();
-    void payFirst(costs, "service:repair", { kind: "repair" }).then(async (paid) => {
-      if (!paid.ok) {
-        showNotice(paid.reason);
-        renderServiceShop();
-        return;
-      }
-      applyServiceShopState(result.state);
-      recordShopProgress();
-      renderProgression();
-      renderServiceShop();
-      await finishWalletPurchase(paid, costs,
-        "shop",
-        "✓ Repair Station pack purchased · Credits + Alloy deducted",
-        "shop",
-        rollback,
-      );
-      renderServiceShop();
-    });
+    void buyWithWallet(
+      purchaseCosts(result.state),
+      "service:repair",
+      { kind: "repair" },
+      {
+        reason: "shop",
+        message: "✓ Repair Station pack purchased · Credits + Alloy deducted",
+        recovery: "shop",
+      },
+      {
+        apply: () => {
+          applyServiceShopState(result.state);
+          recordShopProgress();
+          renderProgression();
+          renderServiceShop();
+        },
+        rollback: purchaseRollback(),
+        rerender: renderServiceShop,
+      },
+    ).then(noticePurchaseOutcome);
   });
 
   repairBody.append(repairTitle, repairDescription, repairButton);
@@ -8214,28 +8045,29 @@ function renderServiceShop(): void {
         return;
       }
 
-      const costs = purchaseCosts(result.state);
-      const rollback = purchaseRollback();
-      void payFirst(costs, "service:upgrade", { kind: "enhance", grade: item.grade, enhancement: item.enhancement }).then(async (paid) => {
-        if (!paid.ok) {
-          showNotice(paid.reason);
-          renderServiceShop();
-          return;
-        }
-        applyServiceShopState(result.state);
-        recordShopProgress();
-        renderProgression();
-        renderServiceShop();
-        await finishWalletPurchase(paid, costs,
-          "shop",
-          "✓ Upgraded " +
+      void buyWithWallet(
+        purchaseCosts(result.state),
+        "service:upgrade",
+        { kind: "enhance", grade: item.grade, enhancement: item.enhancement },
+        {
+          reason: "shop",
+          message:
+            "✓ Upgraded " +
             definition.name +
             " · Credits + Alloy deducted",
-          "upgrade",
-          rollback,
-        );
-        renderServiceShop();
-      });
+          recovery: "upgrade",
+        },
+        {
+          apply: () => {
+            applyServiceShopState(result.state);
+            recordShopProgress();
+            renderProgression();
+            renderServiceShop();
+          },
+          rollback: purchaseRollback(),
+          rerender: renderServiceShop,
+        },
+      ).then(noticePurchaseOutcome);
     });
 
     cardBody.append(titleRow, detail, button);
