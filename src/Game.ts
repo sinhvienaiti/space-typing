@@ -3922,6 +3922,12 @@ export class Game {
     }
   }
 
+  /** Voice and Hybrid stages need a ready microphone before they start. */
+  canStartStage(): boolean {
+    return this.inputMode === "typing" || this.voiceReadiness();
+  }
+
+  /** False (nothing changed) when the stage cannot start; see canStartStage. */
   startStage(
     stage: StageConfig,
     difficulty: DifficultyProfile,
@@ -3930,8 +3936,8 @@ export class Game {
       GameStats,
       "hull" | "shield" | "energy" | "power"
     > | null = null,
-  ): void {
-    if (this.inputMode !== "typing" && !this.voiceReadiness()) return;
+  ): boolean {
+    if (!this.canStartStage()) return false;
     this.flushCombatCreditPresentation();
     this.targetOwnership.beginEncounter();
     this.voicePassiveCredit.reset(); this.voiceWordsCompleted = 0; this.voiceActionsCompleted = 0; this.voiceEffortStreak = 0;
@@ -4159,6 +4165,7 @@ export class Game {
     if (openingPhase !== null) {
       this.hooks.onStagePhase?.({ ...openingPhase });
     }
+    return true;
   }
 
   reviveCurrentEncounter(): boolean {

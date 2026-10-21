@@ -247,6 +247,9 @@
   pointer-events: none;
 }
 .th-campaign .holo-actions:has(> .holo-cta:disabled)::before { display: none; }
+/* Deploy without the Warp for it: dimmed like a disabled button, but a click still says why. */
+.th-campaign .holo-actions > .holo-cta[aria-disabled="true"] { cursor: not-allowed; opacity: 0.5; }
+.th-campaign .holo-actions:has(> .holo-cta[aria-disabled="true"])::before { display: none; }
 @keyframes th-cta-idle {
   0%, 62% { background-position: -150% 0, 0 0; }
   82%, 100% { background-position: 250% 0, 0 0; }

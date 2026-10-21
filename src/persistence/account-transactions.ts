@@ -422,6 +422,15 @@ export class AccountTransactions {
       a.phase = "active";
     });
   }
+  /** An activated sortie whose stage never started goes back to prepared; its Warp stays on it for the next Deploy. */
+  deactivate(id: string, intent = this.intent()): Promise<PlayerSave> {
+    return this.transaction(intent, "deactivate", { id }, (s) => {
+      const a = s.account.attempt;
+      if (!a || a.id !== id || a.phase !== "active")
+        throw new Error("Sortie already closed");
+      a.phase = "prepared";
+    });
+  }
   finish(
     kind: "failed" | "abandoned",
     id: string,

@@ -362,6 +362,10 @@ export class MusicController {
     return this.profile;
   }
 
+  getBossPhase(): number {
+    return this.bossPhase;
+  }
+
   getPlaybackMode(): MusicPlaybackMode {
     return this.mode;
   }
