@@ -1,3 +1,5 @@
+import { safeLocalStorage } from "../platform/safe-storage";
+
 /**
  * Interface motion preference: "full" (default), "system" or "reduced".
  *
@@ -18,12 +20,8 @@ const STORAGE_KEY = "spaceTypingMotionV1";
 const QUERY = /prefers-reduced-motion\s*:\s*reduce/;
 
 function readPreference(): MotionPreference {
-  try {
-    const value = localStorage.getItem(STORAGE_KEY);
-    return value === "system" || value === "reduced" ? value : "full";
-  } catch {
-    return "full";
-  }
+  const value = safeLocalStorage.getItem(STORAGE_KEY);
+  return value === "system" || value === "reduced" ? value : "full";
 }
 
 let preference: MotionPreference = readPreference();
@@ -64,11 +62,8 @@ function notify(): void {
 
 export function setMotionPreference(next: MotionPreference): void {
   preference = next;
-  try {
-    localStorage.setItem(STORAGE_KEY, next);
-  } catch {
-    // Blocked storage: the choice lasts for this page.
-  }
+  // Blocked storage: the choice lasts for this page.
+  safeLocalStorage.setItem(STORAGE_KEY, next);
   notify();
 }
 

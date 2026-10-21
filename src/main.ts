@@ -559,8 +559,12 @@ import {
 
 type CombatSkillId = DefensiveSkillId | OffensiveSkillId;
 import { DEFAULT_PLAYER_BASE_STATS } from "./stats/player";
-import { mountTestLab } from "./test-lab/controller";
 import { AutosaveQueue } from "./persistence/autosave";
+import { onStorageTrouble, safeLocalStorage } from "./platform/safe-storage";
+import {
+  settingsWithAdminStagePolicy,
+  settingsWithoutTestingOverrides,
+} from "./admin/game-testing-policy-bootstrap";
 import {
   EXPEDITION_CONTENT_VERSION,
   EXPEDITION_RULESET_VERSION,
@@ -763,9 +767,8 @@ function sanitizeMusicMode(value: unknown): MusicPlaybackMode {
 
 function loadSettings(): GameSettings {
   try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw === null) return { ...defaultSettings };
-
+    // Stage testing access comes from the Admin testing policy, not storage.
+    const raw = settingsWithAdminStagePolicy(safeLocalStorage.getItem(SETTINGS_KEY));
     const parsed = JSON.parse(raw) as Partial<GameSettings> & {
       enemyProjectiles?: unknown;
       enemyProjectilesEnabled?: unknown;
@@ -832,14 +835,14 @@ function loadSettings(): GameSettings {
 }
 
 function loadGameplayMode(): GameplayMode {
-  return localStorage.getItem(GAMEPLAY_MODE_KEY) === "recall"
+  return safeLocalStorage.getItem(GAMEPLAY_MODE_KEY) === "recall"
     ? "recall"
     : "combat";
 }
 
 function loadRecallSettings(): RecallSettings {
   try {
-    const raw = localStorage.getItem(RECALL_SETTINGS_KEY);
+    const raw = safeLocalStorage.getItem(RECALL_SETTINGS_KEY);
     return raw === null
       ? { ...DEFAULT_RECALL_SETTINGS }
       : sanitizeRecallSettings(JSON.parse(raw));
@@ -850,22 +853,28 @@ function loadRecallSettings(): RecallSettings {
 
 function loadRecallMemory(): RecallMemoryState {
   try {
-    const raw = localStorage.getItem(RECALL_MEMORY_KEY);
+    const raw = safeLocalStorage.getItem(RECALL_MEMORY_KEY);
     return raw === null ? {} : sanitizeRecallMemory(JSON.parse(raw));
   } catch {
     return {};
   }
 }
 
+function recallPreferenceEntries(): Record<string, string> {
+  return {
+    [GAMEPLAY_MODE_KEY]: gameplayMode,
+    [RECALL_SETTINGS_KEY]: JSON.stringify(recallSettings),
+  };
+}
+
 function saveRecallPreferences(): void {
-  localStorage.setItem(GAMEPLAY_MODE_KEY, gameplayMode);
-  localStorage.setItem(RECALL_SETTINGS_KEY, JSON.stringify(recallSettings));
   game.updateRecallSettings(recallSettings);
+  safeLocalStorage.setItems(recallPreferenceEntries());
 }
 
 function loadDifficultySettings(): DifficultySettings {
   try {
-    const raw = localStorage.getItem(DIFFICULTY_KEY);
+    const raw = safeLocalStorage.getItem(DIFFICULTY_KEY);
     if (raw === null) return createDifficultySettings();
     return sanitizeDifficultySettings(JSON.parse(raw));
   } catch {
@@ -887,7 +896,7 @@ function saveDifficultySettings(): void {
 
 function loadSource(): VocabularySource {
   try {
-    const parsed = JSON.parse(localStorage.getItem(SOURCE_KEY) ?? "") as VocabularySource;
+    const parsed = JSON.parse(safeLocalStorage.getItem(SOURCE_KEY) ?? "") as VocabularySource;
     if (
       parsed.mode === "class" &&
       Number.isInteger(parsed.level) &&
@@ -927,6 +936,14 @@ function loadSource(): VocabularySource {
     // Use default source.
   }
   return { mode: "class", level: 1 };
+}
+
+/** The source and its custom words are stored together, or neither is. */
+function saveVocabularySource(customWords?: string): void {
+  safeLocalStorage.setItems({
+    ...(customWords === undefined ? {} : { [CUSTOM_KEY]: customWords }),
+    [SOURCE_KEY]: JSON.stringify(sourceState),
+  });
 }
 
 function byId<T extends HTMLElement = HTMLElement>(id: string): T {
@@ -1065,7 +1082,7 @@ let recallMemory: RecallMemoryState = loadRecallMemory();
 let recallStage = { attempts: 0, perfect: 0, hints: 0, replays: 0, responseMs: 0 };
 
 function saveRecallMemory(): void {
-  localStorage.setItem(RECALL_MEMORY_KEY, JSON.stringify(recallMemory));
+  safeLocalStorage.setItem(RECALL_MEMORY_KEY, JSON.stringify(recallMemory));
 }
 let sourceState = loadSource();
 let sourceTab: VocabularySourceTab = sourceState.mode;
@@ -1573,20 +1590,17 @@ const accountTransactions = new AccountTransactions((save) => {
     renderLessonsBadge();
     refreshPersistentStateUi();
   }
-  try {
-    if (save.auxiliary?.expansionV2)
-      localStorage.setItem(
-        "spaceTypingExpansionV2ProfileV1",
-        JSON.stringify(save.auxiliary.expansionV2),
-      );
-    if (save.auxiliary?.difficulty)
-      localStorage.setItem(
-        DIFFICULTY_KEY,
-        JSON.stringify(save.auxiliary.difficulty),
-      );
-  } catch {
-    /* Auxiliary mirrors are rebuildable from the committed account. */
-  }
+  // Auxiliary mirrors are rebuildable from the committed account.
+  if (save.auxiliary?.expansionV2)
+    safeLocalStorage.setItem(
+      "spaceTypingExpansionV2ProfileV1",
+      JSON.stringify(save.auxiliary.expansionV2),
+    );
+  if (save.auxiliary?.difficulty)
+    safeLocalStorage.setItem(
+      DIFFICULTY_KEY,
+      JSON.stringify(save.auxiliary.difficulty),
+    );
   renderWarpHud();
 });
 // ---------- Live-ops: Daily Hub (src/liveops, src/ui/daily-hub.ts) ----------
@@ -2286,10 +2300,10 @@ function createExpeditionWriterId(): string {
 }
 
 const expansionV2Enabled = expansionV2FeatureEnabled(
-  localStorage,
+  safeLocalStorage,
   window.location.search,
 );
-const expeditionStorage = new ExpeditionStorageAdapter(localStorage);
+const expeditionStorage = new ExpeditionStorageAdapter(safeLocalStorage);
 const expeditionSession = new ExpeditionSession(
   expeditionStorage,
   createExpeditionWriterId(),
@@ -2301,7 +2315,7 @@ let expeditionStartPending = false;
 let expansionEncounterRuntime: ExpansionEncounterRuntime | null = null;
 let expansionQaCinematicAbort: AbortController | null = null;
 let expansionV2Profile: ExpansionV2Profile =
-  loadExpansionV2Profile(localStorage);
+  loadExpansionV2Profile(safeLocalStorage);
 let expeditionActiveSecondsTotal = 0;
 
 function persistExpansionV2Profile(next: ExpansionV2Profile): void {
@@ -3349,6 +3363,19 @@ function showNotice(message: string): void {
     noticeTimer = null;
   }, 2400);
 }
+
+// Blocked or full browser storage is said once, after the notice of the
+// action that met it; the game keeps what it wrote for this visit.
+onStorageTrouble((trouble) => {
+  if (trouble.area !== "local") return;
+  window.setTimeout(() =>
+    showNotice(
+      "Browser storage is " +
+        (trouble.kind === "full" ? "full" : "blocked") +
+        " · changes last for this visit only",
+    ),
+  );
+});
 
 function renderPhase(phase: GamePhase): void {
   const titleWasHidden = titleOverlay.classList.contains("hidden");
@@ -6309,7 +6336,7 @@ function forceExpeditionQaPhase(
   try {
     const run = expeditionSession.testForcePhase(phase, RELIC_IDS);
     if (run === null) {
-      showNotice("Start or resume an Expedition before forcing its phase");
+      showNotice("Start a Test Lab Expedition before forcing its phase");
       return;
     }
     if (run.phase === "draft") {
@@ -6361,35 +6388,41 @@ async function returnFromExpedition(): Promise<void> {
   showNotice("Campaign restored · Expedition did not change Campaign economy");
 }
 
-const testLab = mountTestLab({
-  getSettings: () => settings,
-  getVocabulary: () => configuredVocabulary,
-  showNotice,
-  duelQa: {
-    performance: () =>
-      duelBattle.isActive()
-        ? duelBattle.getPerformanceDiagnostics()
-        : null,
-    resetPerformance: () =>
-      duelBattle.resetPerformanceDiagnostics(),
-    startStress: startDuelVisualStress,
-  },
-  expeditionQa: {
-    startWithSeed: (seed) => void startNewExpedition(seed, "qa"),
-    forcePhase: forceExpeditionQaPhase,
-    forceEncounter: forceExpeditionQaEncounter,
-    failNextSave: () => expeditionStorage.injectFailureOnce(),
-    startCinematic: startExpansionCinematicQa,
-    stopCinematic: stopExpansionCinematicQa,
-    snapshot: () => ({
-      run: expeditionSession.currentRun(),
-      revision: expeditionSession.currentRevision(),
-      ownsCampaignPersistence:
-        expeditionSession.ownsCampaignPersistence(),
-      resumable: expeditionSession.hasResumableRun(),
+// Developer QA only: the dev server and internal QA builds (SPACE_TEST_LAB=1)
+// load the Test Lab as a separate chunk; a player build carries none of it.
+if (import.meta.env.DEV || import.meta.env.SPACE_TEST_LAB) {
+  void import("./test-lab/controller").then(({ mountTestLab }) =>
+    mountTestLab({
+      getSettings: () => settings,
+      getVocabulary: () => configuredVocabulary,
+      showNotice,
+      duelQa: {
+        performance: () =>
+          duelBattle.isActive()
+            ? duelBattle.getPerformanceDiagnostics()
+            : null,
+        resetPerformance: () =>
+          duelBattle.resetPerformanceDiagnostics(),
+        startStress: startDuelVisualStress,
+      },
+      expeditionQa: {
+        startWithSeed: (seed) => void startNewExpedition(seed, "qa"),
+        forcePhase: forceExpeditionQaPhase,
+        forceEncounter: forceExpeditionQaEncounter,
+        failNextSave: () => expeditionStorage.injectFailureOnce(),
+        startCinematic: startExpansionCinematicQa,
+        stopCinematic: stopExpansionCinematicQa,
+        snapshot: () => ({
+          run: expeditionSession.currentRun(),
+          revision: expeditionSession.currentRevision(),
+          ownsCampaignPersistence:
+            expeditionSession.ownsCampaignPersistence(),
+          resumable: expeditionSession.hasResumableRun(),
+        }),
+      },
     }),
-  },
-});
+  );
+}
 
 expeditionUi = mountExpeditionUi({
   onStart: () => void startNewExpedition(),
@@ -10341,14 +10374,24 @@ function showNowPlaying(value: NowPlaying | null): void {
   musicToastTimer = window.setTimeout(() => toast.classList.remove("visible"), 4200);
 }
 
-function saveSettings(): void {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+function settingsEntries(): Record<string, string> {
+  return {
+    [SETTINGS_KEY]: settingsWithoutTestingOverrides(JSON.stringify(settings)),
+  };
+}
+
+function applySettings(): void {
   game.updateSettings(settings);
   musicController.setMusicVolume(settings.musicVolume);
   musicController.setAmbientVolume(settings.ambientVolume);
   musicController.setPlaybackMode(sanitizeMusicMode(settings.musicMode));
   applyVoiceBoost();
   updateKillTranslationVisibility(game.getPhase());
+}
+
+function saveSettings(): void {
+  applySettings();
+  safeLocalStorage.setItems(settingsEntries());
 }
 
 function renderSettings(): void {
@@ -10545,15 +10588,23 @@ async function commitSettingsDraft(): Promise<void> {
     }
   }
 
-  saveSettings();
+  // Applied in full first; then one write for the whole dialog, so a full
+  // or blocked storage keeps the previous settings whole for the next visit.
+  applySettings();
+  game.updateRecallSettings(recallSettings);
   saveDifficultySettings();
-  saveRecallPreferences();
+  const stored = safeLocalStorage.setItems({
+    ...settingsEntries(),
+    ...recallPreferenceEntries(),
+  });
   settingsDialog.close();
   updateCampaignUi();
   showNotice(
-    testingStageUnlockEnabled()
-      ? "✓ Settings saved · all stages available for testing"
-      : "✓ Settings saved",
+    !stored
+      ? "Settings applied for this visit · browser storage is full or blocked"
+      : testingStageUnlockEnabled()
+        ? "✓ Settings saved · all stages available for testing"
+        : "✓ Settings saved",
   );
 
   if (shouldReloadStage) {
@@ -10620,7 +10671,7 @@ function renderSourceTabs(): void {
   byId("customPanel").classList.toggle("hidden", sourceTab !== "custom");
   if (sourceTab === "custom") {
     byId<HTMLTextAreaElement>("customVocabulary").value =
-      localStorage.getItem(CUSTOM_KEY) ?? "";
+      safeLocalStorage.getItem(CUSTOM_KEY) ?? "";
   }
 }
 
@@ -11019,7 +11070,7 @@ async function applyClassLevel(level: number): Promise<void> {
     leaveReviewMode();
     sourceState = { mode: "class", level };
     sourceTab = "class";
-    localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
+    saveVocabularySource();
     game.setVocabulary(entries);
     vocabularyDialog.close();
 
@@ -11061,7 +11112,7 @@ async function applyTopicVocabulary(topicId: string): Promise<void> {
       level: loaded.representativeLevel,
     };
     sourceTab = "topic";
-    localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
+    saveVocabularySource();
     game.setVocabulary(loaded.entries);
     game.setVocabularyLevel(loaded.representativeLevel);
     vocabularyDialog.close();
@@ -11106,7 +11157,7 @@ async function applyWordTypeVocabulary(posId: string): Promise<void> {
       level: loaded.representativeLevel,
     };
     sourceTab = "word-type";
-    localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
+    saveVocabularySource();
     game.setVocabulary(loaded.entries);
     game.setVocabularyLevel(loaded.representativeLevel);
     vocabularyDialog.close();
@@ -11157,7 +11208,7 @@ async function applyGrammarVocabulary(grammarId: string): Promise<void> {
       level: loaded.representativeLevel,
     };
     sourceTab = "grammar";
-    localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
+    saveVocabularySource();
     game.setVocabulary(loaded.entries);
     game.setVocabularyLevel(loaded.representativeLevel);
     vocabularyDialog.close();
@@ -11233,7 +11284,7 @@ async function loadInitialVocabulary(): Promise<void> {
   try {
     if (sourceState.mode === "custom") {
       const custom = parseCustomVocabulary(
-        localStorage.getItem(CUSTOM_KEY) ?? "",
+        safeLocalStorage.getItem(CUSTOM_KEY) ?? "",
       );
       if (custom.length > 0) {
         configuredVocabulary = custom;
@@ -11242,7 +11293,7 @@ async function loadInitialVocabulary(): Promise<void> {
       }
 
       sourceState = { mode: "class", level: 1 };
-      localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
+      saveVocabularySource();
     }
 
     const index = await ensureVocabularyIndex();
@@ -11259,7 +11310,7 @@ async function loadInitialVocabulary(): Promise<void> {
         topicId: loaded.topic.id,
         level: loaded.representativeLevel,
       };
-      localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
+      saveVocabularySource();
       game.setVocabulary(configuredVocabulary);
       game.setVocabularyLevel(loaded.representativeLevel);
     } else if (sourceState.mode === "word-type") {
@@ -11275,7 +11326,7 @@ async function loadInitialVocabulary(): Promise<void> {
         posId: loaded.category.id,
         level: loaded.representativeLevel,
       };
-      localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
+      saveVocabularySource();
       game.setVocabulary(configuredVocabulary);
       game.setVocabularyLevel(loaded.representativeLevel);
     } else if (sourceState.mode === "grammar") {
@@ -11295,7 +11346,7 @@ async function loadInitialVocabulary(): Promise<void> {
         grammarId: loaded.module.id,
         level: loaded.representativeLevel,
       };
-      localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
+      saveVocabularySource();
       game.setVocabulary(configuredVocabulary);
       game.setVocabularyLevel(loaded.representativeLevel);
     } else {
@@ -11699,13 +11750,12 @@ byId("saveCustom").addEventListener("click", () => {
     return;
   }
 
-  localStorage.setItem(CUSTOM_KEY, input.value);
   configuredVocabulary = entries;
   typingChallengeCache.clear();
   leaveReviewMode();
   sourceState = { mode: "custom" };
   sourceTab = "custom";
-  localStorage.setItem(SOURCE_KEY, JSON.stringify(sourceState));
+  saveVocabularySource(input.value);
   game.setVocabulary(entries);
   vocabularyDialog.close();
   showNotice("Custom vocabulary applied · " + String(entries.length) + " entries");
@@ -11966,8 +12016,7 @@ byId("settingsSaveButton").addEventListener("click", () => {
 settingsDialog.addEventListener("close", discardSettingsDraft);
 
 const inputController = new InputController((key) => game.handleKey(key));
-let preferredInputMode: InputMode = "typing";
-try { preferredInputMode = sanitizeInputMode(localStorage.getItem("spaceTypingInputMode")); } catch { /* Private storage may be unavailable. */ }
+let preferredInputMode: InputMode = sanitizeInputMode(safeLocalStorage.getItem("spaceTypingInputMode"));
 const voiceModeSelect = byId<HTMLSelectElement>("voiceInputMode");
 voiceModeSelect.value = preferredInputMode;
 game.setInputMode(preferredInputMode); inputController.setMode(preferredInputMode); voiceSession.setMode(preferredInputMode);
@@ -11982,7 +12031,7 @@ voiceModeSelect.addEventListener("change", () => {
   if (run && !run.terminal && mode !== (run.profile.inputMode ?? "typing")) { voiceModeSelect.value = game.getInputMode(); showNotice("Change input mode after finishing or abandoning this Expedition"); return; }
   if (!game.setInputMode(mode)) { voiceModeSelect.value = game.getInputMode(); showNotice("Change input mode between encounters"); return; }
   preferredInputMode = mode; inputController.setMode(mode); voiceSession.setMode(mode);
-  try { localStorage.setItem("spaceTypingInputMode", mode); } catch { /* Mode remains available for this session. */ }
+  safeLocalStorage.setItem("spaceTypingInputMode", mode); // Blocked storage: the mode lasts for this visit.
 });
 byId("voiceMicToggle").addEventListener("click", () => {
   if (voiceSession.isRunning()) { if (game.getInputMode() === "voice" && game.getPhase() === "playing") game.pause(); voiceSession.stop(); }

@@ -1,5 +1,6 @@
 import type { PerformanceReport } from "../performance/quality";
 import type { VisualQuality } from "../types";
+import { safeLocalStorage } from "../platform/safe-storage";
 
 export const BATCH_F_MIN_PERFORMANCE_SAMPLES = 120;
 export const BATCH_F_P95_REGRESSION_LIMIT_MS = 1;
@@ -310,7 +311,7 @@ export function batchFPerformanceMarkdown(
 
 function loadState(): BatchFPerformanceState {
   try {
-    const raw = localStorage.getItem(BATCH_F_PERFORMANCE_STORAGE_KEY);
+    const raw = safeLocalStorage.getItem(BATCH_F_PERFORMANCE_STORAGE_KEY);
     return raw === null
       ? createBatchFPerformanceState()
       : sanitizeBatchFPerformanceState(JSON.parse(raw));
@@ -320,14 +321,8 @@ function loadState(): BatchFPerformanceState {
 }
 
 function saveState(state: BatchFPerformanceState): void {
-  try {
-    localStorage.setItem(
-      BATCH_F_PERFORMANCE_STORAGE_KEY,
-      JSON.stringify(state),
-    );
-  } catch {
-    // QA-only storage must never affect gameplay.
-  }
+  // QA-only storage must never affect gameplay.
+  safeLocalStorage.writeJson(BATCH_F_PERFORMANCE_STORAGE_KEY, state);
 }
 
 function copyText(value: string): Promise<void> {

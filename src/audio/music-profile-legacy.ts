@@ -1,6 +1,7 @@
 import type { StageRole } from "../campaign/types";
 import type { WorldProfile } from "../worlds/types";
 import { WORLD_REGISTRY } from "../worlds/registry";
+import { localAssetsEnabled } from "./local-assets";
 
 export const MUSIC_STATES = [
   "SILENT",
@@ -323,7 +324,7 @@ export function assetCandidates(
 ): string[] {
   if (assetRef === null) return [];
   return [
-    assetRef.localPath,
+    localAssetsEnabled() ? assetRef.localPath : undefined,
     assetRef.defaultPath,
   ].filter(
     (value): value is string =>

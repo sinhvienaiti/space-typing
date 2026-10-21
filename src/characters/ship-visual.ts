@@ -1,5 +1,6 @@
 import catalog from "./ship-visual-catalog.json";
 import { isCharacterId, type CharacterId } from "./registry";
+import { safeLocalStorage } from "../platform/safe-storage";
 
 export const SHIP_VISUAL_CATALOG = catalog;
 export type ShipVisualId = (typeof catalog)[number]["id"];
@@ -17,7 +18,7 @@ function loadOverrides(): void {
   if (loaded) return;
   loaded = true;
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
+    const raw: unknown = JSON.parse(safeLocalStorage.getItem(STORAGE_KEY) ?? "{}");
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return;
     for (const [id, visual] of Object.entries(raw)) {
       if (isCharacterId(id) && typeof visual === "string" && getShipVisual(visual)) overrides[id] = visual;
@@ -40,7 +41,7 @@ export function setShipVisualOverride(id: CharacterId, visual: ShipVisualId | nu
   loadOverrides();
   if (visual === null || visual === defaultShipVisualId(id)) delete overrides[id];
   else overrides[id] = visual;
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides)); } catch { /* In-memory selection still works. */ }
+  safeLocalStorage.writeJson(STORAGE_KEY, overrides); // In-memory selection still works when storage refuses it.
   for (const listener of listeners) listener();
   return true;
 }

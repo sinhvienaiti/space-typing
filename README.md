@@ -61,6 +61,28 @@ pnpm test
 pnpm build
 ~~~
 
+## Build flags
+
+`pnpm build` makes a player build: no Developer Test Lab and none of the
+private `public/local-assets` audio (DotA announcer lines, personal music;
+see [local assets](./docs/LOCAL_ASSETS_README.md)). `pnpm dev` has both.
+Two environment switches, read by `vite.config.ts` at build time, change that:
+
+| Flag | Build |
+| --- | --- |
+| `SPACE_LOCAL_ASSETS=1` | Copies `public/local-assets` into `dist` and plays it before the bundled audio. For the owner's local Play mode only; never for a build that leaves this machine. |
+| `SPACE_TEST_LAB=1` | Internal QA build: keeps the Developer Test Lab, in its own chunk loaded after the game starts (`?testLab=1` opens it). |
+
+~~~bash
+SPACE_LOCAL_ASSETS=1 pnpm build
+~~~
+
+The parent repository's local Play mode builds this game through its root
+`build:space` script (`pnpm --dir games/space-typing build`, run by `play.sh`
+and `build:local`). To keep the private audio there, that script has to pass
+the flag (`SPACE_LOCAL_ASSETS=1 pnpm --dir games/space-typing build`). `play.sh`
+rebuilds only when sources change, so delete `dist` once after changing a flag.
+
 ## Platform integration
 
 Parent integration is now enabled through the `sinhvienaiti/typing-game` platform as a Git submodule.

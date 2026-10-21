@@ -1,8 +1,19 @@
+import { rmSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 
 const projectRoot = fileURLToPath(new URL(".", import.meta.url));
+
+/**
+ * Build switches (README "Build flags"). A player build has neither:
+ * - SPACE_TEST_LAB=1: an internal QA build that keeps the Developer Test Lab
+ *   (the dev server always has it);
+ * - SPACE_LOCAL_ASSETS=1: the owner's local Play build, which ships and plays
+ *   the private, gitignored public/local-assets audio (docs/LOCAL_ASSETS_README.md).
+ */
+const testLabBuild = process.env.SPACE_TEST_LAB === "1";
+const localAssetsBuild = process.env.SPACE_LOCAL_ASSETS === "1";
 
 type CssNode = { type: string; name?: string; params?: string; selectors?: string[]; parent?: CssNode; nodes?: CssNode[] };
 type CssAtRule = CssNode & {
@@ -41,8 +52,32 @@ function reducedMotionAttribute() {
 }
 reducedMotionAttribute.postcss = true;
 
+/**
+ * Vite copies all of public/ into dist, including the private local-assets
+ * folder (DotA announcer lines, personal music). Removed after the build
+ * unless SPACE_LOCAL_ASSETS=1 asks for it.
+ */
+function privateLocalAssets(): Plugin {
+  let outDir = "";
+  return {
+    name: "space-typing-private-local-assets",
+    apply: "build",
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
+    closeBundle() {
+      if (!localAssetsBuild) rmSync(resolve(outDir, "local-assets"), { recursive: true, force: true });
+    },
+  };
+}
+
 export default defineConfig({
   base: "/",
+  define: {
+    "import.meta.env.SPACE_TEST_LAB": JSON.stringify(testLabBuild),
+    "import.meta.env.SPACE_LOCAL_ASSETS": JSON.stringify(localAssetsBuild),
+  },
+  plugins: [privateLocalAssets()],
   css: {
     postcss: { plugins: [reducedMotionAttribute()] },
   },

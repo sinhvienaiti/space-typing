@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   MUSIC_STATES,
   WORLD_MUSIC_PROFILES,
@@ -124,6 +124,26 @@ describe("M08 World music profiles", () => {
     expect(stateLoops("VICTORY")).toBe(false);
     expect(stateLoops("TRANSITION")).toBe(false);
     expect(musicAssetForState(profile, "SILENT")).toBeNull();
+  });
+
+  it("a player build plays only bundled music, never the private local overrides", async () => {
+    vi.resetModules();
+    vi.doMock("../src/audio/local-assets", () => ({ localAssetsEnabled: () => false }));
+    try {
+      const music = await import("../src/audio/music-profile");
+      const profile = music.musicProfileForWorld("world-02");
+      expect(music.assetCandidates(music.musicAssetForState(profile, "WORLD_NORMAL"))).toEqual([
+        "/assets/audio/music/mysterious-ambience.mp3",
+      ]);
+      expect(music.assetCandidates(music.musicAssetForState(profile, "WORLD_INTENSE"))).toEqual([
+        "/assets/audio/music/battle-theme-b.mp3",
+      ]);
+      // The per-World ambient exists only as a local override: no track at all.
+      expect(music.assetCandidates(profile.ambientLayers[0] ?? null)).toEqual([]);
+    } finally {
+      vi.doUnmock("../src/audio/local-assets");
+      vi.resetModules();
+    }
   });
 
   it("keeps the shared tracks as the fallback when the song library is empty", () => {

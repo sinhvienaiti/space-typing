@@ -1,5 +1,6 @@
 import { onlineRequest, OnlineError } from "./api";
 import { derivePasswordKey, passwordProblem } from "./password-key";
+import { safeLocalStorage } from "../platform/safe-storage";
 
 /**
  * The player's online identity. On start the game asks who is signed in;
@@ -36,16 +37,13 @@ export type OnlineStatus = "starting" | "online" | "offline" | "banned";
 const DEVICE_KEY = "spaceTypingDeviceKeyV1";
 
 function deviceKey(): string {
-  try {
-    const existing = localStorage.getItem(DEVICE_KEY);
-    if (existing !== null && existing.length >= 32) return existing;
-    const bytes = crypto.getRandomValues(new Uint8Array(32));
-    const created = [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-    localStorage.setItem(DEVICE_KEY, created);
-    return created;
-  } catch {
-    return [...crypto.getRandomValues(new Uint8Array(32))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-  }
+  const existing = safeLocalStorage.getItem(DEVICE_KEY);
+  if (existing !== null && existing.length >= 32) return existing;
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  const created = [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  // Blocked storage keeps it for this visit.
+  safeLocalStorage.setItem(DEVICE_KEY, created);
+  return created;
 }
 
 export class OnlineSession {

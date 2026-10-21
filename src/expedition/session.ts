@@ -30,27 +30,54 @@ import {
   type ExpeditionEnvelope,
   type ExpeditionStorage,
 } from "./store";
+import type { SafeStorage } from "../platform/safe-storage";
+
+function savesQaRun(value: string): boolean {
+  try {
+    const envelope = JSON.parse(value) as { run?: Partial<ExpeditionRun> } | null;
+    return envelope?.run?.challenge?.kind === "qa";
+  } catch {
+    return false;
+  }
+}
 
 export class ExpeditionStorageAdapter implements ExpeditionStorage {
-  private failNextWrite = false;
+  private failNextQaWrite = false;
 
-  constructor(private readonly storage: Storage) {}
+  constructor(
+    private readonly storage: Pick<SafeStorage, "getItem" | "commitItem">,
+  ) {}
 
   getItem(key: string): string | null {
     return this.storage.getItem(key);
   }
 
   setItem(key: string, value: string): void {
-    if (this.failNextWrite) {
-      this.failNextWrite = false;
+    if (this.failNextQaWrite && savesQaRun(value)) {
+      this.failNextQaWrite = false;
       throw new Error("Expedition QA storage failure.");
     }
-    this.storage.setItem(key, value);
+    // Stored or not written at all: the session keeps its last safe boundary.
+    if (!this.storage.commitItem(key, value)) {
+      throw new Error("Unable to write Expedition save.");
+    }
   }
 
+  /** QA: the next save of a QA run fails once; other runs are never touched. */
   injectFailureOnce(): void {
-    this.failNextWrite = true;
+    this.failNextQaWrite = true;
   }
+}
+
+/** QA overrides act on Test Lab runs only, never on a Daily, Weekly or player run. */
+function qaEnvelope(
+  envelope: ExpeditionEnvelope | null,
+): envelope is ExpeditionEnvelope {
+  return (
+    envelope !== null &&
+    envelope.run.terminal === null &&
+    envelope.run.challenge?.kind === "qa"
+  );
 }
 
 function setupBoundary(run: ExpeditionRun): ExpeditionRun {
@@ -315,7 +342,7 @@ export class ExpeditionSession {
     indexInput: number,
   ): ExpeditionRun | null {
     const envelope = this.envelope;
-    if (envelope === null || envelope.run.terminal !== null) return null;
+    if (!qaEnvelope(envelope)) return null;
 
     const index = Math.max(
       0,
@@ -352,7 +379,7 @@ export class ExpeditionSession {
     eligibleRelicIds: readonly string[] = this.eligibleRelicIds,
   ): ExpeditionRun | null {
     const envelope = this.envelope;
-    if (envelope === null || envelope.run.terminal !== null) return null;
+    if (!qaEnvelope(envelope)) return null;
 
     this.eligibleRelicIds = [...eligibleRelicIds];
     let run = envelope.run;

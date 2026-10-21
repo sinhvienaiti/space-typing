@@ -90,6 +90,12 @@ local asset missing
 
 Do not commit third-party binary assets to Git unless their redistribution rights have been verified.
 
+## Builds
+
+`pnpm build` leaves `public/local-assets/` out of `dist`, and a player build
+never requests `/local-assets/` (the dev server still does). The owner's local
+Play build opts in with `SPACE_LOCAL_ASSETS=1` (README "Build flags").
+
 ## Public-release checklist
 
 Before public deployment or distribution:
