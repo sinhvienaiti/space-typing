@@ -61,6 +61,36 @@ pnpm test
 pnpm build
 ~~~
 
+## Build flags
+
+`pnpm build` makes a player build: no Developer Test Lab and none of the
+private `public/local-assets` audio (DotA announcer lines, personal music;
+see [local assets](./docs/LOCAL_ASSETS_README.md)). `pnpm dev` has both.
+Two environment switches, read by `vite.config.ts` at build time, change that:
+
+| Flag | Build |
+| --- | --- |
+| `SPACE_LOCAL_ASSETS=1` | Copies `public/local-assets` into `dist` and plays it before the bundled audio. For the owner's local Play mode only; never for a build that leaves this machine. |
+| `SPACE_TEST_LAB=1` | Internal QA build: keeps the Developer Test Lab, in its own chunk loaded after the game starts (`?testLab=1` opens it). |
+
+~~~bash
+SPACE_LOCAL_ASSETS=1 pnpm build
+~~~
+
+The parent repository's local Play mode builds this game through its root
+`build:space` script (`pnpm --dir games/space-typing build`, run by `play.sh`
+and `build:local`). To keep the private audio there, that script has to pass
+the flag (`SPACE_LOCAL_ASSETS=1 pnpm --dir games/space-typing build`). `play.sh`
+rebuilds only when sources change, so delete `dist` once after changing a flag.
+
+The Admin QA Sandbox embeds `https://space.typing-game.local/?testLab=1`. In
+local Play mode Nginx serves that host from `dist`
+(`infra/nginx/typing-game.local.play.conf`), so the Sandbox works there only
+when `build:space` also passes `SPACE_TEST_LAB=1`; otherwise use dev mode
+(`typing-game.local.dev.conf` proxies the host to Vite, which always has the
+Test Lab). Whether local Play builds keep the Test Lab is the owner's call. A
+build without it answers `?testLab=1` with a notice instead of opening nothing.
+
 ## Platform integration
 
 Parent integration is now enabled through the `sinhvienaiti/typing-game` platform as a Git submodule.

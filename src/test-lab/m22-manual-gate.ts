@@ -1,3 +1,5 @@
+import { safeLocalStorage } from "../platform/safe-storage";
+
 export type M22ManualGateStatus = "pending" | "pass" | "fail";
 
 export type M22ManualGateRow = {
@@ -572,12 +574,12 @@ export function m22ManualGateMarkdown(
 
 function loadStoredState(): M22ManualGateState {
   try {
-    const current = localStorage.getItem(M22_MANUAL_GATE_STORAGE_KEY);
+    const current = safeLocalStorage.getItem(M22_MANUAL_GATE_STORAGE_KEY);
     if (current !== null) {
       return sanitizeM22ManualGateState(JSON.parse(current));
     }
 
-    const legacy = localStorage.getItem(
+    const legacy = safeLocalStorage.getItem(
       M22_MANUAL_GATE_LEGACY_STORAGE_KEY,
     );
     return legacy === null
@@ -589,14 +591,8 @@ function loadStoredState(): M22ManualGateState {
 }
 
 function storeState(state: M22ManualGateState): void {
-  try {
-    localStorage.setItem(
-      M22_MANUAL_GATE_STORAGE_KEY,
-      JSON.stringify(state),
-    );
-  } catch {
-    // Manual QA recording must never break the Test Lab runtime.
-  }
+  // Manual QA recording must never break the Test Lab runtime.
+  safeLocalStorage.writeJson(M22_MANUAL_GATE_STORAGE_KEY, state);
 }
 
 function copyText(text: string): Promise<void> {

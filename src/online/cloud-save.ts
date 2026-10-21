@@ -1,4 +1,5 @@
 import { KEEPALIVE_MAX_BODY, onlineRequest, OnlineError } from "./api";
+import { safeLocalStorage } from "../platform/safe-storage";
 import type { OnlineSession } from "./session";
 
 /**
@@ -58,7 +59,7 @@ function stateKey(accountId: string): string {
 
 function readState(accountId: string): SyncState {
   try {
-    const raw = JSON.parse(localStorage.getItem(stateKey(accountId)) ?? "{}") as Partial<SyncState>;
+    const raw = JSON.parse(safeLocalStorage.getItem(stateKey(accountId)) ?? "{}") as Partial<SyncState>;
     const pending = raw.pending;
     return {
       revision: Number(raw.revision ?? 0) || 0,
@@ -149,11 +150,8 @@ export class CloudSave {
   private remember(pending?: SyncState["pending"]): void {
     if (this.accountId === null) return;
     const state: SyncState = { revision: this.revision, ...(this.uploaded !== undefined ? { uploaded: this.uploaded } : {}), ...(pending ? { pending } : {}) };
-    try {
-      localStorage.setItem(stateKey(this.accountId), JSON.stringify(state));
-    } catch {
-      /* Private mode: the next start asks the server again. */
-    }
+    // Not stored (private mode, full storage): the next start asks the server again.
+    safeLocalStorage.commitItem(stateKey(this.accountId), JSON.stringify(state));
   }
 
   /**

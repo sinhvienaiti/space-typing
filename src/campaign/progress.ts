@@ -1,3 +1,4 @@
+import { safeLocalStorage } from "../platform/safe-storage";
 import { MAX_CAMPAIGN_STAGE, normalizeStage } from "./stage";
 import type { CampaignProgress, StageBest } from "./types";
 
@@ -170,7 +171,7 @@ export function selectCampaignStage(
 }
 
 export function loadCampaignProgress(
-  storage: Pick<Storage, "getItem"> = localStorage,
+  storage: Pick<Storage, "getItem"> = safeLocalStorage,
 ): CampaignProgress {
   try {
     const raw = storage.getItem(CAMPAIGN_STORAGE_KEY);
@@ -183,7 +184,7 @@ export function loadCampaignProgress(
 
 export function saveCampaignProgress(
   progress: CampaignProgress,
-  storage: Pick<Storage, "setItem"> = localStorage,
+  storage: Pick<Storage, "setItem"> = safeLocalStorage,
 ): void {
   storage.setItem(
     CAMPAIGN_STORAGE_KEY,

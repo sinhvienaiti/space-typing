@@ -13,6 +13,7 @@ import { allBossIdentities, bossFullName } from "../boss/identity";
 import { paintedEnemyArtUrl } from "../enemies/painted-sprites";
 import { buildCombatLearningEvent, LEARNING_ATTEMPT_MESSAGE, PARENT_ORIGIN } from "../learning/shared";
 import { handleEach, runFrameLoop } from "../platform/frame-loop";
+import { safeLocalStorage } from "../platform/safe-storage";
 import { loadModel, modelEntry, pickModelTier } from "../render3d/model-loader";
 import { HeroFx } from "../scene3d/fx";
 import { Hero } from "../scene3d/hero";
@@ -74,29 +75,8 @@ function byId<T extends HTMLElement = HTMLElement>(id: string): T {
   return element as T;
 }
 
-function storage(): Storage | null {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-}
-
 function readJson<T>(key: string): T | null {
-  try {
-    return JSON.parse(storage()?.getItem(key) ?? "null") as T | null;
-  } catch {
-    return null;
-  }
-}
-
-/** A storage write that may fail (blocked or full storage): then it lasts for this visit only. */
-function safely(write: () => void): void {
-  try {
-    write();
-  } catch {
-    // Kept for this visit only.
-  }
+  return safeLocalStorage.readJson(key) as T | null;
 }
 
 function gameSettings(): GameSettings {
@@ -125,7 +105,7 @@ const settings = gameSettings();
 const reduced = motionReduced();
 const canvas = byId<HTMLCanvasElement>("dfCanvas");
 const quality0: Quality = ((): Quality => {
-  const chosen = storage()?.getItem(QUALITY_KEY);
+  const chosen = safeLocalStorage.getItem(QUALITY_KEY);
   if (chosen === "medium" || chosen === "high") return chosen;
   return settings.visualQuality === "high" || settings.visualQuality === "ultra" ? "high" : "medium";
 })();
@@ -139,7 +119,7 @@ try {
 const world = new FlightWorld(stage.scene, stage.quality);
 world.skyOnly = true;
 const audio = new SceneAudio(clamp(settings.sfxVolume, 0, 1) * 0.7, clamp(settings.musicVolume, 0, 1) * 0.45);
-audio.enabled = storage()?.getItem(SOUND_KEY) !== "off";
+audio.enabled = safeLocalStorage.getItem(SOUND_KEY) !== "off";
 const sounds = new DefenseSounds(audio);
 const heroFx = new HeroFx(stage, audio);
 heroFx.showHalo = false;
@@ -166,9 +146,9 @@ let picker: WordPicker | null = null;
 let entries: VocabularyEntry[] = [];
 let vocabularyLevel = 1;
 let engine: DefenseEngine | null = null;
-let map: MapSpec = mapById(storage()?.getItem(MAP_KEY));
+let map: MapSpec = mapById(safeLocalStorage.getItem(MAP_KEY));
 let difficulty: Difficulty = ((): Difficulty => {
-  const saved = storage()?.getItem(DIFFICULTY_KEY);
+  const saved = safeLocalStorage.getItem(DIFFICULTY_KEY);
   return saved === "easy" || saved === "hard" ? saved : "normal";
 })();
 let paused = false;
@@ -365,7 +345,7 @@ function paintThumbs(): void {
 function chooseMap(next: MapSpec): void {
   if (next.id === map.id) return;
   map = next;
-  safely(() => storage()?.setItem(MAP_KEY, next.id));
+  safeLocalStorage.setItem(MAP_KEY, next.id);
   renderMaps();
   byId("dfStatus").textContent = "Loading " + next.name + "…";
   void prepareMap(next).then(() => {
@@ -1080,7 +1060,7 @@ function showResult(): void {
     const key = map.id + ":" + difficulty;
     if ((best[key] ?? 0) < stars) {
       best[key] = stars;
-      safely(() => storage()?.setItem(BEST_KEY, JSON.stringify(best)));
+      safeLocalStorage.writeJson(BEST_KEY, best);
     }
   }
   showOverlay("dfResult");
@@ -1656,7 +1636,7 @@ for (const image of document.querySelectorAll<HTMLImageElement>("img[data-icon]"
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-difficulty]")) {
   button.addEventListener("click", () => {
     difficulty = button.dataset.difficulty as Difficulty;
-    safely(() => storage()?.setItem(DIFFICULTY_KEY, difficulty));
+    safeLocalStorage.setItem(DIFFICULTY_KEY, difficulty);
     renderMaps();
   });
 }
@@ -1708,7 +1688,7 @@ const soundToggle = byId<HTMLInputElement>("dfSound");
 soundToggle.checked = audio.enabled;
 soundToggle.addEventListener("change", () => {
   audio.setEnabled(soundToggle.checked);
-  safely(() => storage()?.setItem(SOUND_KEY, soundToggle.checked ? "on" : "off"));
+  safeLocalStorage.setItem(SOUND_KEY, soundToggle.checked ? "on" : "off");
 });
 
 function togglePause(): void {
@@ -1718,7 +1698,7 @@ function togglePause(): void {
 }
 
 function setQuality(quality: Quality, save: boolean): void {
-  if (save) safely(() => storage()?.setItem(QUALITY_KEY, quality));
+  if (save) safeLocalStorage.setItem(QUALITY_KEY, quality);
   stage.setQuality(quality);
   heroFx.setQuality(quality);
   fx.setQuality(quality === "high");

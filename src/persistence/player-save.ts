@@ -1,6 +1,8 @@
 import { createAccountState, isValidAccountState, type AccountState } from "./account-state";
+import { safeLocalStorage } from "../platform/safe-storage";
 import { UnsupportedExpansionV2ProfileVersionError } from "../expansion-v2/profile-store";
 import {
+  CAMPAIGN_STORAGE_KEY,
   createDefaultCampaignProgress,
   loadCampaignProgress,
   sanitizeCampaignProgress,
@@ -1563,10 +1565,14 @@ export function choosePreferredPlayerSave(
 }
 
 function recoverySaveFromLegacy(): PlayerSave {
-  const legacyCampaign = loadCampaignProgress();
+  // Unreadable storage is not an empty one: a fresh save here could
+  // later replace the mirror once the browser allows access again.
+  const raw = safeLocalStorage.readItem(RECOVERY_SAVE_KEY);
+  const legacyRaw = safeLocalStorage.readItem(CAMPAIGN_STORAGE_KEY);
+  if (raw === undefined || legacyRaw === undefined) throw new CorruptAccountStateError();
+  const legacyCampaign = loadCampaignProgress({ getItem: () => legacyRaw });
 
   try {
-    const raw = localStorage.getItem(RECOVERY_SAVE_KEY);
     if (raw === null) {
       return createPlayerSave(legacyCampaign, "", "migration");
     }
@@ -1609,9 +1615,20 @@ function recoverySaveFromLegacy(): PlayerSave {
   }
 }
 
+/**
+ * The mirror is stored or not written: a copy kept only in this page's
+ * memory would steer the next load's recovery choice.
+ */
+const mirrorStorage = {
+  setItem(key: string, value: string): void {
+    if (!safeLocalStorage.commitItem(key, value))
+      throw new Error("Unable to write the recovery mirror.");
+  },
+};
+
 function saveRecovery(save: PlayerSave): void {
-  localStorage.setItem(RECOVERY_SAVE_KEY, JSON.stringify(save));
-  saveCampaignProgress(save.campaign);
+  mirrorStorage.setItem(RECOVERY_SAVE_KEY, JSON.stringify(save));
+  saveCampaignProgress(save.campaign, mirrorStorage);
 }
 
 export function savePlayerRecoveryMirrorSync(save: PlayerSave): void {

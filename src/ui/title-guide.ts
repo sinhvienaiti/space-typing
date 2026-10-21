@@ -1,4 +1,5 @@
 import type { VisualQuality } from "../types";
+import { safeLocalStorage } from "../platform/safe-storage";
 import { clickReaction, loadGuideMemory, saveGuideMemory, visitLines, type GuideAction } from "./title-guide-lines";
 import type { GuideScene } from "./title-guide-scene";
 
@@ -15,14 +16,6 @@ export type TitleGuide = {
   setQuality(quality: VisualQuality): void;
   setPointer(x: number, y: number): void;
 };
-
-function storage(): Storage | null {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-}
 
 export function installTitleGuide(host: HTMLElement): TitleGuide {
   const root = document.createElement("div");
@@ -114,9 +107,9 @@ export function installTitleGuide(host: HTMLElement): TitleGuide {
     schedule();
     if (!greeted) {
       greeted = true;
-      const memory = loadGuideMemory(storage());
+      const memory = loadGuideMemory(safeLocalStorage);
       const visit = visitLines(memory, new Date());
-      saveGuideMemory(storage(), visit.memory);
+      saveGuideMemory(safeLocalStorage, visit.memory);
       queue = visit.lines.slice(1);
       window.setTimeout(() => act("wave", visit.lines[0]!), 450);
     }
@@ -153,9 +146,9 @@ export function installTitleGuide(host: HTMLElement): TitleGuide {
   stage.addEventListener("click", () => {
     if (scene === null) return;
     queue = [];
-    const memory = loadGuideMemory(storage());
+    const memory = loadGuideMemory(safeLocalStorage);
     const reaction = clickReaction(memory);
-    saveGuideMemory(storage(), reaction.memory);
+    saveGuideMemory(safeLocalStorage, reaction.memory);
     act(reaction.action, reaction.line);
   });
 

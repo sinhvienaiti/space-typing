@@ -39,8 +39,8 @@ for (const evidence of [
   'data-action="start"',
   'data-action="pause"',
   'data-action="reset-arena"',
-  "localStorage.setItem(",
-  "localStorage.getItem(TEST_LAB_PRESET_KEY)",
+  "safeLocalStorage.writeJson(TEST_LAB_PRESET_KEY",
+  "safeLocalStorage.getItem(TEST_LAB_PRESET_KEY)",
 ]) {
   assert.ok(controller.includes(evidence), `QA controller ownership evidence missing: ${evidence}`);
 }
@@ -90,9 +90,13 @@ for (const evidence of [
   assert.ok(game.includes(evidence), `Game Test Lab guard evidence missing: ${evidence}`);
 }
 
+// The dev server and SPACE_TEST_LAB=1 builds load the Test Lab as its own
+// chunk; a player build carries none of it (tests/production-build.test.ts).
 const main = await read("src/main.ts");
-assert.ok(main.includes('import { mountTestLab } from "./test-lab/controller"'));
-assert.ok(main.includes("const testLab = mountTestLab({"));
+assert.ok(main.includes("if (import.meta.env.DEV || import.meta.env.SPACE_TEST_LAB) {"));
+assert.ok(main.includes('void import("./test-lab/controller").then(({ mountTestLab }) =>'));
+assert.ok(main.includes("mountTestLab({"));
+assert.ok(!/^import\b[^;]*from\s+"\.\/test-lab\//m.test(main), "main.ts must not import the Test Lab statically");
 
 for (const source of contract.qa.runtimeSources) {
   const content = await read(source);
@@ -109,4 +113,4 @@ for (const unsupported of [
   assert.ok(contract.qa.unsupportedAdminOperations.includes(unsupported));
 }
 
-console.log("Admin QA audit passed: production Test Lab is isolated, executable, and blocked from production persistence/publish paths.");
+console.log("Admin QA audit passed: the Test Lab (dev server and SPACE_TEST_LAB=1 builds only) runs the production game runtime in isolation and is blocked from production persistence/publish paths.");

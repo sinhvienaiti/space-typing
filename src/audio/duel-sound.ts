@@ -1,3 +1,4 @@
+import { localAssetsEnabled } from "./local-assets";
 import { mixedSfxGain, type AudioGroup } from "./mix";
 import type { DuelTimedAudioCue } from "../duel/audio";
 
@@ -88,17 +89,20 @@ export class DuelSoundEngine {
     if (context === null || this.loadStarted || typeof fetch !== "function") return;
     this.loadStarted = true;
     // Announcer lines are optional local files listed in one manifest, so a
-    // machine without them costs one 404 instead of one per line.
-    void fetch(ANNOUNCER_ROOT + "manifest.json")
-      .then((response) => (response.ok ? response.json() : null))
-      .then((manifest: { lines?: unknown } | null) => {
-        const lines = Array.isArray(manifest?.lines) ? manifest.lines.filter((line): line is string => typeof line === "string") : [];
-        this.availableLines = new Set(lines);
-        this.preloadAnnouncer(lines);
-      })
-      .catch(() => {
-        this.availableLines = new Set();
-      });
+    // machine without them costs one 404 instead of one per line. A player
+    // build has none to ask for.
+    if (localAssetsEnabled()) {
+      void fetch(ANNOUNCER_ROOT + "manifest.json")
+        .then((response) => (response.ok ? response.json() : null))
+        .then((manifest: { lines?: unknown } | null) => {
+          const lines = Array.isArray(manifest?.lines) ? manifest.lines.filter((line): line is string => typeof line === "string") : [];
+          this.availableLines = new Set(lines);
+          this.preloadAnnouncer(lines);
+        })
+        .catch(() => {
+          this.availableLines = new Set();
+        });
+    }
     for (const [name, path] of Object.entries(DUEL_SFX) as Array<[SampleName, string]>) {
       void fetch(path)
         .then((response) => (response.ok ? response.arrayBuffer() : Promise.reject(new Error(path))))
@@ -376,7 +380,7 @@ export class DuelSoundEngine {
 
   private announce(voice: string, priority: number): void {
     const context = this.host.context();
-    if (context === null || voice === "") return;
+    if (context === null || voice === "" || !localAssetsEnabled()) return;
     if (this.availableLines !== null && !this.availableLines.has(voice)) return;
     const now = context.currentTime;
     if (now < this.voiceUntil && priority < this.voicePriority) return;

@@ -21,6 +21,7 @@ import { DUEL_TYPING_LEXICON } from "./word-lexicon";
 import type { AlternativeMatchView } from "./alternative-presentation";
 import type { DuelRoomSnapshot } from "./room";
 import type { DuelRoomListing } from "./protocol";
+import { safeSessionStorage } from "../platform/safe-storage";
 
 export type DuelOnlineRoomControllerConfig = {
   clientVersion: string;
@@ -108,7 +109,7 @@ export function defaultDuelWebSocketUrl(): string {
 
 async function fetchSessionToken(): Promise<string> {
   const devToken =
-    sessionStorage.getItem(
+    safeSessionStorage.getItem(
       DEV_SESSION_TOKEN_KEY,
     );
   if (
@@ -225,7 +226,7 @@ export function installDuelOnlineRoomController(
   const client = new DuelNetworkClient({
     url: defaultDuelWebSocketUrl(),
     clientVersion: config.clientVersion,
-    reconnectStorage: sessionStorage,
+    reconnectStorage: safeSessionStorage,
     callbacks: {
       onStatus(status) {
         ui?.setConnectionLabel(

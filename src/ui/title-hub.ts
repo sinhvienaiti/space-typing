@@ -2,6 +2,7 @@ import type { GameSettings } from "../types";
 import { isCharacterId } from "../characters/registry";
 import { resolveShipVisualId } from "../characters/ship-visual";
 import { characterShipRuntimeImage } from "../characters/ship-media-runtime";
+import { safeLocalStorage } from "../platform/safe-storage";
 
 /**
  * Title hub controls (Holo Command layout in index.html #titleOverlay):
@@ -100,23 +101,15 @@ function stageLabel(stage: number): string {
 }
 
 function readRestore(): Partial<Record<VolumeField, number>> {
-  try {
-    const raw = localStorage.getItem(RESTORE_KEY);
-    const parsed: unknown = raw === null ? null : JSON.parse(raw);
-    return parsed !== null && typeof parsed === "object"
-      ? (parsed as Partial<Record<VolumeField, number>>)
-      : {};
-  } catch {
-    return {};
-  }
+  const parsed = safeLocalStorage.readJson(RESTORE_KEY);
+  return parsed !== null && typeof parsed === "object"
+    ? (parsed as Partial<Record<VolumeField, number>>)
+    : {};
 }
 
 function writeRestore(value: Partial<Record<VolumeField, number>>): void {
-  try {
-    localStorage.setItem(RESTORE_KEY, JSON.stringify(value));
-  } catch {
-    // Storage full or blocked: the toggle still works for this session.
-  }
+  // Storage full or blocked: the toggle still works for this session.
+  safeLocalStorage.writeJson(RESTORE_KEY, value);
 }
 
 export type TitleHub = {

@@ -1,6 +1,7 @@
 import { onlineRequest, OnlineError } from "../online/api";
 import { checkFeedback, FEEDBACK_MAX, FEEDBACK_MIN, type FeedbackCategory } from "../online/feedback-rules";
 import type { OnlineSession } from "../online/session";
+import { safeLocalStorage } from "../platform/safe-storage";
 
 /**
  * Feedback dialog (#feedbackDialog): players send an idea, a bug report or a
@@ -62,30 +63,14 @@ if (typeof window !== "undefined") {
   });
 }
 
-function storage(): Storage | null {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-}
-
 function readJson<T>(key: string): T | null {
-  try {
-    const text = storage()?.getItem(key);
-    return text ? (JSON.parse(text) as T) : null;
-  } catch {
-    return null;
-  }
+  return safeLocalStorage.readJson(key) as T | null;
 }
 
+/** Storage blocked or full: the draft lives only in this page. */
 function writeJson(key: string, value: unknown): void {
-  try {
-    if (value === null) storage()?.removeItem(key);
-    else storage()?.setItem(key, JSON.stringify(value));
-  } catch {
-    // Storage blocked or full: the draft lives only in the open dialog.
-  }
+  if (value === null) safeLocalStorage.removeItem(key);
+  else safeLocalStorage.writeJson(key, value);
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text?: string): HTMLElementTagNameMap[K] {

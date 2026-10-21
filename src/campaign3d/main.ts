@@ -12,6 +12,7 @@ import { bossFullName } from "../boss/identity";
 import type { EnemyFamilyId } from "../enemies/families";
 import { splitDisplayByTypedLetters } from "../logic";
 import { runFrameLoop } from "../platform/frame-loop";
+import { safeLocalStorage } from "../platform/safe-storage";
 import { loadModel, modelEntry, pickModelTier } from "../render3d/model-loader";
 import { HeroFx } from "../scene3d/fx";
 import { Hero, type Locomotion } from "../scene3d/hero";
@@ -160,20 +161,8 @@ function byId<T extends HTMLElement = HTMLElement>(id: string): T {
   return element as T;
 }
 
-function storage(): Storage | null {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-}
-
 function readJson<T>(key: string): T | null {
-  try {
-    return JSON.parse(storage()?.getItem(key) ?? "null") as T | null;
-  } catch {
-    return null;
-  }
+  return safeLocalStorage.readJson(key) as T | null;
 }
 
 /** The game's own settings (volumes, quality, pronunciation), read only. */
@@ -192,7 +181,7 @@ function gameSettings(): GameSettings {
 }
 
 function initialQuality(settings: GameSettings): Quality {
-  const chosen = storage()?.getItem(QUALITY_KEY);
+  const chosen = safeLocalStorage.getItem(QUALITY_KEY);
   if (chosen === "medium" || chosen === "high") return chosen;
   return settings.visualQuality === "high" || settings.visualQuality === "ultra" ? "high" : "medium";
 }
@@ -209,8 +198,7 @@ function roleLabel(plan: StagePlan3D): string {
 // ------------------------------------------------------------------ setup
 
 const settings = gameSettings();
-const progressStore = storage();
-let progress: Progress3D = loadProgress3D(progressStore);
+let progress: Progress3D = loadProgress3D(safeLocalStorage);
 let selectedStage = progress.highestUnlocked;
 let page = Math.floor((selectedStage - 1) / PAGE);
 
@@ -226,18 +214,14 @@ try {
 const flightWorld = new FlightWorld(stage.scene, stage.quality);
 void flightWorld.setStage(selectedStage);
 const audio = new SceneAudio(clamp(settings.sfxVolume, 0, 1) * 0.7, clamp(settings.musicVolume, 0, 1) * 0.45);
-audio.enabled = storage()?.getItem(SOUND_KEY) !== "off";
+audio.enabled = safeLocalStorage.getItem(SOUND_KEY) !== "off";
 
 function setViewYaw(yaw: number, save: boolean): void {
   stage.viewYaw = clamp(yaw, -VIEW_YAW_MAX, VIEW_YAW_MAX);
-  if (!save) return;
-  try {
-    storage()?.setItem(VIEW_YAW_KEY, stage.viewYaw.toFixed(3));
-  } catch {
-    // Storage blocked or full: the swing lasts for this visit.
-  }
+  // Storage blocked or full: the swing lasts for this visit.
+  if (save) safeLocalStorage.setItem(VIEW_YAW_KEY, stage.viewYaw.toFixed(3));
 }
-setViewYaw(Number(storage()?.getItem(VIEW_YAW_KEY)) || 0, false);
+setViewYaw(Number(safeLocalStorage.getItem(VIEW_YAW_KEY)) || 0, false);
 const fx = new HeroFx(stage, audio);
 fx.showHalo = false;
 fx.trailDrift = 0.08;
@@ -248,7 +232,7 @@ const banner = byId("c3dBanner");
 
 let hero: Hero | null = null;
 let heroId = "";
-let pilot: Pilot = pilotById(storage()?.getItem(PILOT_KEY));
+let pilot: Pilot = pilotById(safeLocalStorage.getItem(PILOT_KEY));
 /** A ship pilot fires its own projectile model from its guns. */
 let shipShots = false;
 /** The latest hero/projectile load: an older one that finishes later is dropped. */
@@ -530,11 +514,8 @@ function renderPilots(): void {
 function selectPilot(next: Pilot): void {
   if (next.id === pilot.id) return;
   pilot = next;
-  try {
-    storage()?.setItem(PILOT_KEY, next.id);
-  } catch {
-    // Storage blocked or full: the choice lasts for this visit.
-  }
+  // Storage blocked or full: the choice lasts for this visit.
+  safeLocalStorage.setItem(PILOT_KEY, next.id);
   renderPilots();
   placeHangar();
   byId("c3dStatus").textContent = "Loading " + next.name + "…";
@@ -1250,7 +1231,7 @@ function showResult(cleared: boolean): void {
   byId("c3dResultTip").textContent = cleared ? "" : "Tip: " + FALL_TIPS[fallTip++ % FALL_TIPS.length];
   if (cleared) {
     progress = recordClear3D(progress, plan.stage, { score: current.score, wpm, accuracy });
-    const saved = saveProgress3D(progressStore, progress);
+    const saved = saveProgress3D(safeLocalStorage, progress);
     byId("c3dResultNote").textContent = (saved ? "Saved in this browser" : "Not saved: browser storage is blocked") + " · Campaign save, Warp and rewards unchanged.";
   } else {
     byId("c3dResultNote").textContent = "Retry from the start of the stage. Campaign save, Warp and rewards unchanged.";
@@ -1717,11 +1698,7 @@ const qualitySelect = byId<HTMLSelectElement>("c3dQuality");
 qualitySelect.value = stage.quality;
 qualitySelect.addEventListener("change", () => {
   const quality: Quality = qualitySelect.value === "medium" ? "medium" : "high";
-  try {
-    storage()?.setItem(QUALITY_KEY, quality);
-  } catch {
-    /* Not remembered. */
-  }
+  safeLocalStorage.setItem(QUALITY_KEY, quality);
   stage.setQuality(quality);
   fx.setQuality(quality);
   flightWorld.setQuality(quality);
@@ -1732,11 +1709,7 @@ const soundToggle = byId<HTMLInputElement>("c3dSound");
 soundToggle.checked = audio.enabled;
 soundToggle.addEventListener("change", () => {
   audio.setEnabled(soundToggle.checked);
-  try {
-    storage()?.setItem(SOUND_KEY, soundToggle.checked ? "on" : "off");
-  } catch {
-    /* Not remembered. */
-  }
+  safeLocalStorage.setItem(SOUND_KEY, soundToggle.checked ? "on" : "off");
 });
 
 // ------------------------------------------------------------------ boot

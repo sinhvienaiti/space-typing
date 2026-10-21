@@ -1,4 +1,5 @@
 import type { GameSettings } from "./types";
+import { safeLocalStorage } from "./platform/safe-storage";
 
 let speechGeneration = 0;
 let speechActive = false;
@@ -94,8 +95,7 @@ export function prepareEnglishVoice(notifyMissing = false): Promise<SpeechSynthe
   const pending = discovery.get(synth);
   if (pending) { if (notifyMissing) pending.warn(); return pending.promise; }
   let shouldNotify = notifyMissing;
-  let saved: string | null = null;
-  try { saved = localStorage.getItem(SPEECH_VOICE_KEY); } catch { /* Optional preference. */ }
+  const saved = safeLocalStorage.getItem(SPEECH_VOICE_KEY);
   let cancel = (): void => {};
   const promise = new Promise<SpeechSynthesisVoice | null>(resolve => {
     const started = Date.now();
@@ -110,7 +110,7 @@ export function prepareEnglishVoice(notifyMissing = false): Promise<SpeechSynthe
       voicesChangedListener(changed, false);
       if (voice) {
         sessionVoices.set(synth, voice);
-        try { localStorage.setItem(SPEECH_VOICE_KEY, voice.voiceURI); } catch { /* Optional preference. */ }
+        safeLocalStorage.setItem(SPEECH_VOICE_KEY, voice.voiceURI);
       } else if (notify && shouldNotify && !unavailableNoticed.has(synth)) {
         unavailableNoticed.add(synth);
         speechNotice("Thiết bị không có giọng đọc tiếng Anh");
@@ -191,7 +191,7 @@ function playEnglish(text: string, settings: GameSettings, voice: SpeechSynthesi
     const unpin = (): void => {
       if (generation !== speechGeneration) return;
       sessionVoices.delete(speechSynthesis);
-      try { localStorage.removeItem(SPEECH_VOICE_KEY); } catch { /* Optional preference. */ }
+      safeLocalStorage.removeItem(SPEECH_VOICE_KEY);
     };
     try {
         const utterance = new SpeechSynthesisUtterance(text);

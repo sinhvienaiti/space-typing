@@ -71,7 +71,7 @@ describe("Campaign 3D stays apart from the 2D game", () => {
     const own = files.filter((file) => file.path.startsWith("campaign3d/") || file.path.startsWith("scene3d/"));
     const constants = new Map<string, string>();
     for (const file of own) for (const match of file.text.matchAll(/const\s+([A-Z0-9_]+)\s*=\s*"([^"]+)"/g)) constants.set(match[1]!, match[2]!);
-    const written = own.flatMap((file) => [...file.text.matchAll(/setItem\(\s*([A-Za-z0-9_]+|"[^"]+")/g)].map((match) => match[1]!));
+    const written = own.flatMap((file) => [...file.text.matchAll(/(?:setItem|writeJson|commitItem)\(\s*([A-Za-z0-9_]+|"[^"]+")/g)].map((match) => match[1]!));
     expect(written.length).toBeGreaterThan(0);
     for (const key of written) {
       const value = key.startsWith('"') ? key.slice(1, -1) : constants.get(key);
@@ -84,7 +84,7 @@ describe("Campaign 3D stays apart from the 2D game", () => {
     const own = files.filter((file) => file.path.startsWith("defense/"));
     const constants = new Map<string, string>();
     for (const file of own) for (const match of file.text.matchAll(/const\s+([A-Z0-9_]+)\s*=\s*"([^"]+)"/g)) constants.set(match[1]!, match[2]!);
-    const written = own.flatMap((file) => [...file.text.matchAll(/setItem\(\s*([A-Za-z0-9_]+|"[^"]+")/g)].map((match) => match[1]!));
+    const written = own.flatMap((file) => [...file.text.matchAll(/(?:setItem|writeJson|commitItem)\(\s*([A-Za-z0-9_]+|"[^"]+")/g)].map((match) => match[1]!));
     for (const key of written) {
       const value = key.startsWith('"') ? key.slice(1, -1) : constants.get(key);
       expect(value, key).toMatch(/^spaceTypingDefense/);

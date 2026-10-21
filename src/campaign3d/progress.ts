@@ -16,7 +16,11 @@ export type Progress3D = {
   best: Record<string, StageBest3D>;
 };
 
-type Storage = Pick<globalThis.Storage, "getItem" | "setItem">;
+type Storage = {
+  getItem: (key: string) => string | null;
+  /** The safe storage (platform/safe-storage.ts) answers false when the browser refused it. */
+  setItem: (key: string, value: string) => unknown;
+};
 
 export function emptyProgress3D(): Progress3D {
   return { version: 1, highestUnlocked: 1, cleared: [], best: {} };
@@ -46,8 +50,7 @@ export function loadProgress3D(storage: Storage | null): Progress3D {
 
 export function saveProgress3D(storage: Storage | null, progress: Progress3D): boolean {
   try {
-    storage?.setItem(PROGRESS_KEY_3D, JSON.stringify(progress));
-    return storage !== null;
+    return storage !== null && storage.setItem(PROGRESS_KEY_3D, JSON.stringify(progress)) !== false;
   } catch {
     return false;
   }

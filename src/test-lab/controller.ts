@@ -5,6 +5,7 @@ import {
   type TestLabGameSnapshot,
 } from "../Game";
 import { MusicController } from "../audio/MusicController";
+import { safeLocalStorage } from "../platform/safe-storage";
 import {
   ANNOUNCER_EVENTS,
   type AnnouncerEvent,
@@ -1813,36 +1814,33 @@ export function mountTestLab(
   }
 
   function savePreset(): void {
-    localStorage.setItem(
-      TEST_LAB_PRESET_KEY,
-      JSON.stringify({
-        session,
-        controls: {
-          world: worldSelect.value,
-          stage: inputValue(dialog, '[data-field="stage"]'),
-          checkpoint: inputValue(dialog, '[data-field="checkpoint"]'),
-          difficulty: difficultySelect.value,
-          vocabLevel: inputValue(dialog, '[data-field="vocab-level"]'),
-          deathMode: inputValue(dialog, '[data-field="death-mode"]'),
-          enemy: enemySelect.value,
-          rank: rankSelect.value,
-          layers: inputValue(dialog, '[data-field="layers"]'),
-          enemyCount: inputValue(dialog, '[data-field="enemy-count"]'),
-          enemySkill: skillSelect.value,
-          status: statusSelect.value,
-          statusDuration: inputValue(dialog, '[data-field="status-duration"]'),
-          item: itemSelect.value,
-          musicState: musicStateSelect.value,
-        },
-      }),
-    );
-    notice("local preset saved");
+    const saved = safeLocalStorage.writeJson(TEST_LAB_PRESET_KEY, {
+      session,
+      controls: {
+        world: worldSelect.value,
+        stage: inputValue(dialog, '[data-field="stage"]'),
+        checkpoint: inputValue(dialog, '[data-field="checkpoint"]'),
+        difficulty: difficultySelect.value,
+        vocabLevel: inputValue(dialog, '[data-field="vocab-level"]'),
+        deathMode: inputValue(dialog, '[data-field="death-mode"]'),
+        enemy: enemySelect.value,
+        rank: rankSelect.value,
+        layers: inputValue(dialog, '[data-field="layers"]'),
+        enemyCount: inputValue(dialog, '[data-field="enemy-count"]'),
+        enemySkill: skillSelect.value,
+        status: statusSelect.value,
+        statusDuration: inputValue(dialog, '[data-field="status-duration"]'),
+        item: itemSelect.value,
+        musicState: musicStateSelect.value,
+      },
+    });
+    notice(saved ? "local preset saved" : "local preset kept for this visit only");
   }
 
   function loadPreset(): void {
     try {
       const parsed = JSON.parse(
-        localStorage.getItem(TEST_LAB_PRESET_KEY) ?? "",
+        safeLocalStorage.getItem(TEST_LAB_PRESET_KEY) ?? "",
       ) as {
         session?: TestLabSession;
         controls?: Record<string, string>;

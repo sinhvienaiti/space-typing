@@ -11,6 +11,7 @@ import {
   type WalletDeltas,
 } from "../economy/wallet-rules";
 import { onlineRequest, OnlineError } from "./api";
+import { safeLocalStorage } from "../platform/safe-storage";
 import type { OnlineSession } from "./session";
 
 /**
@@ -222,12 +223,7 @@ export class WalletSync {
     if (this.opening) return "Loading your server wallet. Please try again in a moment.";
     if (this.session.online && this.view !== null) return null;
     if (this.session.online && !this.disabled) return "Your server wallet is unavailable. Reconnect before spending; free practice is still available.";
-    let known: string | null = null;
-    try {
-      known = localStorage.getItem(WALLET_DEVICE_KEY);
-    } catch {
-      known = null;
-    }
+    const known = safeLocalStorage.getItem(WALLET_DEVICE_KEY);
     return known === null
       ? null
       : "Your wallet is on the server: Campaign and shops need a connection. Practice, Recall review and Daily Lessons work offline.";
@@ -244,7 +240,7 @@ export class WalletSync {
 
   private load(accountId: string): Stored | null {
     try {
-      const raw = JSON.parse(localStorage.getItem(storageKey(accountId)) ?? "null") as Partial<Stored> | null;
+      const raw = JSON.parse(safeLocalStorage.getItem(storageKey(accountId)) ?? "null") as Partial<Stored> | null;
       if (raw === null || typeof raw !== "object") return null;
       return { reported: sanitizeBalances(raw.reported), queue: Array.isArray(raw.queue) ? raw.queue.slice(0, MAX_QUEUE) : [],
         ...(typeof raw.purchase?.id === "string" ? { purchase: { id: raw.purchase.id, costs: sanitizeBalances(raw.purchase.costs) } } : {}),
@@ -261,12 +257,7 @@ export class WalletSync {
 
   private store(): boolean {
     if (this.accountId === null || this.reported === null) return false;
-    try {
-      localStorage.setItem(storageKey(this.accountId), JSON.stringify({ reported: this.reported, queue: this.queue, purchase: this.pendingPurchase, refuelId: this.pendingRefuel, refuelQuote: this.pendingRefuelQuote, start: this.pendingStart, lessonClaims: this.lessonClaims, generation: this.host.saveGeneration?.() ?? undefined, awaitingSignIn: this.awaitingSignIn || undefined }));
-      return true;
-    } catch {
-      return false;
-    }
+    return safeLocalStorage.commitItem(storageKey(this.accountId), JSON.stringify({ reported: this.reported, queue: this.queue, purchase: this.pendingPurchase, refuelId: this.pendingRefuel, refuelQuote: this.pendingRefuelQuote, start: this.pendingStart, lessonClaims: this.lessonClaims, generation: this.host.saveGeneration?.() ?? undefined, awaitingSignIn: this.awaitingSignIn || undefined }));
   }
 
   private async attach(): Promise<void> {
@@ -340,12 +331,7 @@ export class WalletSync {
     if ((this.purchaseInFlight || this.actionBusy) && this.accountId === accountId) return;
     const epoch = this.epoch;
     const local = this.host.committedBalances();
-    let lastDeviceWallet: string | null = null;
-    try {
-      lastDeviceWallet = localStorage.getItem(WALLET_DEVICE_KEY);
-    } catch {
-      lastDeviceWallet = null;
-    }
+    const lastDeviceWallet = safeLocalStorage.getItem(WALLET_DEVICE_KEY);
     // This save last followed another account's server wallet (shared device,
     // "Sign out" to a new guest): its balances are that account's, not a seed.
     const otherWallet = lastDeviceWallet !== null && lastDeviceWallet !== accountId;
@@ -359,11 +345,7 @@ export class WalletSync {
       if (error instanceof OnlineError && error.code === "wallet-off") {
         this.disabled = true;
         // Phase 0: the server wallet is off; offline play needs no connection either.
-        try {
-          localStorage.removeItem(WALLET_DEVICE_KEY);
-        } catch {
-          /* Nothing stored. */
-        }
+        safeLocalStorage.removeItem(WALLET_DEVICE_KEY);
       } else {
         this.host.notice("Server wallet unavailable · free practice remains available");
         this.scheduleReopen();
@@ -395,11 +377,8 @@ export class WalletSync {
     // First wallet of this account on this device: what the game holds is what the server was given.
     this.reported = carried?.reported ?? (replaced ? local ?? view.balances : stored?.reported ?? local ?? view.balances);
     if (view.phase >= 2) {
-      try {
-        localStorage.setItem(WALLET_DEVICE_KEY, accountId);
-      } catch {
-        /* Not remembered: an offline start keeps the old local path. */
-      }
+      // Not stored: an offline start keeps the old local path.
+      safeLocalStorage.commitItem(WALLET_DEVICE_KEY, accountId);
     }
     // Earned here but never reported (offline, closed tab): reported at the next commit.
     if (stored !== null && !replaced) this.hint("resync");

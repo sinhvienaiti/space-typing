@@ -134,6 +134,25 @@ describe("Duel firepower sound engine", () => {
     expect(calls.some((url) => url.endsWith("holy-shit.ogg"))).toBe(false);
   });
 
+  it("a player build never asks for the private announcer lines", async () => {
+    vi.resetModules();
+    vi.doMock("../src/audio/local-assets", () => ({ localAssetsEnabled: () => false }));
+    try {
+      const { DuelSoundEngine: PlayerBuildEngine } = await import("../src/audio/duel-sound");
+      const calls = stubFetch();
+      const fake = fakeContext();
+      const sound = new PlayerBuildEngine({ context: () => fake.context, volume: () => 0.5, pronunciationActive: () => false });
+      sound.preload();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      sound.play(cue("announce", { voice: "double-kill", priority: 3 }));
+      expect(calls.length).toBeGreaterThan(0);
+      expect(calls.filter((url) => url.includes("/local-assets/"))).toEqual([]);
+    } finally {
+      vi.doUnmock("../src/audio/local-assets");
+      vi.resetModules();
+    }
+  });
+
   it("handles every Duel cue", async () => {
     const cues: DuelTimedAudioCue["cue"][] = [
       "typing-miss", "laser-launch", "missile-launch", "heavy-launch", "bomb-launch", "energy-impact", "missile-impact",

@@ -28,29 +28,61 @@ import {
   startExpeditionEnvelope,
   writeExpeditionEnvelope,
   type ExpeditionEnvelope,
+  type ExpeditionLoadResult,
   type ExpeditionStorage,
 } from "./store";
+import type { SafeStorage } from "../platform/safe-storage";
+
+function savesQaRun(value: string): boolean {
+  try {
+    const envelope = JSON.parse(value) as { run?: Partial<ExpeditionRun> } | null;
+    return envelope?.run?.challenge?.kind === "qa";
+  } catch {
+    return false;
+  }
+}
 
 export class ExpeditionStorageAdapter implements ExpeditionStorage {
-  private failNextWrite = false;
+  private failNextQaWrite = false;
 
-  constructor(private readonly storage: Storage) {}
+  constructor(
+    private readonly storage: Pick<SafeStorage, "readItem" | "commitItem">,
+  ) {}
 
   getItem(key: string): string | null {
-    return this.storage.getItem(key);
+    // A save the browser will not let us read is not an empty one: starting
+    // over it would replace the run that is there.
+    const value = this.storage.readItem(key);
+    if (value === undefined) throw new Error("Unable to read Expedition save.");
+    return value;
   }
 
   setItem(key: string, value: string): void {
-    if (this.failNextWrite) {
-      this.failNextWrite = false;
+    if (this.failNextQaWrite && savesQaRun(value)) {
+      this.failNextQaWrite = false;
       throw new Error("Expedition QA storage failure.");
     }
-    this.storage.setItem(key, value);
+    // Stored or not written at all: the session keeps its last safe boundary.
+    if (!this.storage.commitItem(key, value)) {
+      throw new Error("Unable to write Expedition save.");
+    }
   }
 
+  /** QA: the next save of a QA run fails once; other runs are never touched. */
   injectFailureOnce(): void {
-    this.failNextWrite = true;
+    this.failNextQaWrite = true;
   }
+}
+
+/** QA overrides act on Test Lab runs only, never on a Daily, Weekly or player run. */
+function qaEnvelope(
+  envelope: ExpeditionEnvelope | null,
+): envelope is ExpeditionEnvelope {
+  return (
+    envelope !== null &&
+    envelope.run.terminal === null &&
+    envelope.run.challenge?.kind === "qa"
+  );
 }
 
 function setupBoundary(run: ExpeditionRun): ExpeditionRun {
@@ -98,8 +130,17 @@ export class ExpeditionSession {
     return this.envelope !== null;
   }
 
+  /** For the read-only checks: an unreadable save offers nothing to resume. */
+  private inspect(): ExpeditionLoadResult {
+    try {
+      return loadExpeditionEnvelope(this.storage);
+    } catch {
+      return { status: "empty" };
+    }
+  }
+
   hasResumableRun(): boolean {
-    const loaded = loadExpeditionEnvelope(this.storage);
+    const loaded = this.inspect();
     return (
       loaded.status === "supported" &&
       loaded.envelope.run.terminal === null &&
@@ -110,7 +151,7 @@ export class ExpeditionSession {
   weeklyResumeStatus(
     binding: WeeklyChallengeRunBinding,
   ): WeeklyChallengeResumeStatus {
-    const loaded = loadExpeditionEnvelope(this.storage);
+    const loaded = this.inspect();
     if (loaded.status !== "supported") return "none";
     return weeklyChallengeResumeStatus(loaded.envelope.run, binding);
   }
@@ -315,7 +356,7 @@ export class ExpeditionSession {
     indexInput: number,
   ): ExpeditionRun | null {
     const envelope = this.envelope;
-    if (envelope === null || envelope.run.terminal !== null) return null;
+    if (!qaEnvelope(envelope)) return null;
 
     const index = Math.max(
       0,
@@ -352,7 +393,7 @@ export class ExpeditionSession {
     eligibleRelicIds: readonly string[] = this.eligibleRelicIds,
   ): ExpeditionRun | null {
     const envelope = this.envelope;
-    if (envelope === null || envelope.run.terminal !== null) return null;
+    if (!qaEnvelope(envelope)) return null;
 
     this.eligibleRelicIds = [...eligibleRelicIds];
     let run = envelope.run;

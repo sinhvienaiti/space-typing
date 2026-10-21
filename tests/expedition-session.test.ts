@@ -4,8 +4,14 @@ import {
   createExpeditionRun,
   type ExpeditionResources,
 } from "../src/expedition/core";
-import { ExpeditionSession } from "../src/expedition/session";
-import type { ExpeditionStorage } from "../src/expedition/store";
+import {
+  ExpeditionSession,
+  ExpeditionStorageAdapter,
+} from "../src/expedition/session";
+import {
+  EXPEDITION_STORAGE_KEY,
+  type ExpeditionStorage,
+} from "../src/expedition/store";
 
 class MemoryStorage implements ExpeditionStorage {
   private values = new Map<string, string>();
@@ -34,10 +40,23 @@ const resources: ExpeditionResources = {
   power: 0,
 };
 
-function createRun(id: string, seed = 77) {
+function createRun(
+  id: string,
+  seed = 77,
+  kind?: "daily" | "qa",
+) {
   return createExpeditionRun({
     runId: id,
     seed,
+    ...(kind === undefined
+      ? {}
+      : {
+          challenge: {
+            kind,
+            dayKey: kind === "daily" ? "2026-10-21" : null,
+            identityKey: kind === "daily" ? "daily:2026-10-21" : null,
+          },
+        }),
     wordPool: {
       hash: "pool",
       entries: [
@@ -137,7 +156,7 @@ describe("P10 ExpeditionSession", () => {
   it("QA phase forcing stays inside Expedition storage", () => {
     const storage = new MemoryStorage();
     const session = new ExpeditionSession(storage, "tab-a");
-    session.start(createRun("qa"), ["a", "b"]);
+    session.start(createRun("qa", 77, "qa"), ["a", "b"]);
 
     expect(session.testForcePhase("encounter", ["a", "b"])?.phase)
       .toBe("encounter");
@@ -145,5 +164,78 @@ describe("P10 ExpeditionSession", () => {
       .toBe("draft");
     expect(session.testForcePhase("defeat", ["a", "b"])?.phase)
       .toBe("defeat");
+  });
+
+  it("QA overrides refuse Daily and player runs and leave their saves untouched", () => {
+    for (const run of [createRun("daily", 77, "daily"), createRun("player")]) {
+      const storage = new MemoryStorage();
+      const session = new ExpeditionSession(storage, "tab-a");
+      session.start(run, ["a", "b"]);
+      const saved = storage.getItem(EXPEDITION_STORAGE_KEY);
+
+      expect(session.testForcePhase("defeat", ["a", "b"])).toBeNull();
+      expect(session.testForceEncounterIndex(3)).toBeNull();
+      expect(storage.getItem(EXPEDITION_STORAGE_KEY)).toBe(saved);
+      expect(session.currentRun()?.terminal).toBeNull();
+    }
+  });
+
+  it("an injected QA save failure never reaches a Daily run", () => {
+    const values = new Map<string, string>();
+    const adapter = new ExpeditionStorageAdapter({
+      readItem: (key) => values.get(key) ?? null,
+      commitItem: (key, value) => {
+        values.set(key, value);
+        return true;
+      },
+    });
+    adapter.injectFailureOnce();
+
+    const daily = new ExpeditionSession(adapter, "tab-a");
+    const draft = daily.start(createRun("daily", 77, "daily"), ["a"]);
+    expect(daily.confirmDraft(draft.draftOffer!.choices[0]!.id)?.phase)
+      .toBe("encounter");
+    expect(daily.abandon()?.terminal).not.toBeNull();
+
+    const qa = new ExpeditionSession(adapter, "tab-b");
+    expect(() => qa.start(createRun("qa", 78, "qa"), ["a"]))
+      .toThrow("Expedition QA storage failure.");
+  });
+
+  it("a save the browser refuses throws instead of advancing the run", () => {
+    const adapter = new ExpeditionStorageAdapter({
+      readItem: () => null,
+      commitItem: () => false,
+    });
+    const session = new ExpeditionSession(adapter, "tab-a");
+
+    expect(() => session.start(createRun("blocked"), ["a"])).toThrow();
+    expect(session.currentRun()).toBeNull();
+  });
+
+  it("a save the browser will not let us read is never started over", () => {
+    const values = new Map<string, string>();
+    let readable = true;
+    const adapter = new ExpeditionStorageAdapter({
+      readItem: (key) => (readable ? values.get(key) ?? null : undefined),
+      commitItem: (key, value) => {
+        values.set(key, value);
+        return true;
+      },
+    });
+    new ExpeditionSession(adapter, "tab-a").start(createRun("running"), ["a"]);
+    const saved = values.get(EXPEDITION_STORAGE_KEY);
+
+    readable = false;
+    const next = new ExpeditionSession(adapter, "tab-b");
+    expect(next.hasResumableRun()).toBe(false);
+    expect(() => next.start(createRun("other"), ["a"]))
+      .toThrow("Unable to read Expedition save.");
+    expect(() => next.resume(["a"])).toThrow("Unable to read Expedition save.");
+    expect(values.get(EXPEDITION_STORAGE_KEY)).toBe(saved);
+    expect(next.currentRun()).toBeNull();
+
+    readable = true;
+    expect(next.hasResumableRun()).toBe(true);
   });
 });
