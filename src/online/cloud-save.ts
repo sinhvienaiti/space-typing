@@ -33,6 +33,8 @@ export type CloudSaveHost = {
   currentSave(): { version: number; [key: string]: unknown } | null;
   /** Commits a save object as a new generation; throws when it cannot now (still loading, mid-sortie, mid-purchase). */
   restore(save: unknown): Promise<void>;
+  /** Why a restore cannot run now (shown to the player), or null. */
+  restoreBlocker(): string | null;
   /** Starts the game again on the restored save. */
   reload(): void;
   /** May uploads run now (not mid-sortie restore, not a read-only tab)? */
@@ -125,6 +127,8 @@ export class CloudSave {
   private lastUploadAt = 0;
   /** Fingerprint of the save the cloud copy holds (as far as this device knows). */
   private uploaded: string | undefined;
+  /** The cloud copy should replace this device's save, but the game refused for now (reason already shown). */
+  private restoreWaiting = false;
 
   constructor(
     private readonly session: OnlineSession,
@@ -161,8 +165,35 @@ export class CloudSave {
     await this.host.restore(data);
     this.revision = revision;
     this.uploaded = undefined;
+    this.restoreWaiting = false;
     this.remember();
     this.host.reload();
+  }
+
+  /**
+   * Takes the cloud copy without being asked (this device has no progress
+   * worth keeping). If the game refuses now (still loading, mid-sortie,
+   * mid-purchase), its reason is shown once and uploads wait until it allows
+   * a restore; the next upload then meets the conflict and offers the copy
+   * again. Network errors of `load` reach the caller.
+   */
+  private async takeCloudWhenAllowed(load: () => Promise<{ revision: number; data: unknown }>): Promise<void> {
+    let reason = this.host.restoreBlocker();
+    if (reason === null) {
+      this.host.status("Loading your cloud save…", "info");
+      const cloud = await load();
+      try {
+        await this.takeCloud(cloud.revision, cloud.data);
+        return;
+      } catch (error) {
+        reason = error instanceof Error ? error.message : "The cloud save could not be loaded.";
+      }
+    }
+    this.blocked = false;
+    this.dirty = true;
+    if (!this.restoreWaiting) this.host.status(reason, "warn");
+    this.restoreWaiting = true;
+    this.schedule(UPLOAD_EVERY_MS);
   }
 
   /** Called when the signed-in account changes: reconcile with the cloud copy. */
@@ -175,6 +206,7 @@ export class CloudSave {
     if (account.id === this.accountId) return;
     this.accountId = account.id;
     this.blocked = true;
+    this.restoreWaiting = false;
     const known = readState(account.id);
     // Until the cloud answers, upload only on top of what this device last confirmed for this account.
     this.revision = known.revision;
@@ -196,8 +228,7 @@ export class CloudSave {
       }
       const choice = chooseCopy(summary(local), summary(cloud.data));
       if (choice === "cloud") {
-        this.host.status("Loading your cloud save…", "info");
-        await this.takeCloud(cloud.revision, cloud.data);
+        await this.takeCloudWhenAllowed(async () => cloud);
         return;
       }
       if (choice === "local") {
@@ -257,7 +288,8 @@ export class CloudSave {
    */
   async upload(force: boolean, pageClosing = false): Promise<void> {
     if (this.accountId === null || this.uploading || (this.blocked && !force) || (!this.dirty && !force)) return;
-    if (!this.host.canSync()) {
+    // A cloud copy waits for its restore: uploading would only meet the conflict again.
+    if (!this.host.canSync() || (this.restoreWaiting && !force && this.host.restoreBlocker() !== null)) {
       if (!pageClosing) this.schedule(5000);
       return;
     }
@@ -278,6 +310,7 @@ export class CloudSave {
       this.uploaded = print;
       this.lastUploadAt = Date.now();
       this.blocked = false;
+      this.restoreWaiting = false;
       this.remember();
       if (force) this.host.status("✓ Cloud save updated from this device", "good");
     } catch (error) {
@@ -295,6 +328,7 @@ export class CloudSave {
           this.schedule(5000);
           return;
         }
+        if (choice !== "cloud") this.restoreWaiting = false;
         if (choice === "local") {
           this.revision = details?.revision ?? this.revision;
           this.schedule(0);
@@ -303,13 +337,11 @@ export class CloudSave {
         this.blocked = true;
         if (choice === "cloud") {
           try {
-            this.host.status("Loading your cloud save…", "info");
-            const cloud = await onlineRequest<{ revision: number; data: unknown }>("/save");
-            await this.takeCloud(cloud.revision, cloud.data);
+            await this.takeCloudWhenAllowed(() => onlineRequest<{ revision: number; data: unknown }>("/save"));
           } catch {
             this.blocked = false;
             this.host.status("Cloud save unavailable · progress is saved on this device", "warn");
-            // Not restored (offline, or refused mid-sortie): meet the conflict again in a minute.
+            // Not loaded (offline): meet the conflict again in a minute.
             this.schedule(UPLOAD_EVERY_MS);
           }
           return;

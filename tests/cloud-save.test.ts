@@ -34,6 +34,7 @@ function fakeServer(initial: { revision: number; data: Record<string, unknown>; 
     fetch,
     calls,
     puts: () => calls.filter((call) => call.method === "PUT"),
+    gets: () => calls.filter((call) => call.method === "GET"),
     cloud: () => cloud,
     setCloud: (value: typeof cloud) => (cloud = value),
     respond: (fn: typeof next) => (next = fn),
@@ -55,13 +56,15 @@ function setup(local: Record<string, unknown> | null, server: ReturnType<typeof 
   const conflicts: CloudConflict[] = [];
   const restored: unknown[] = [];
   const statuses: string[] = [];
-  const host = { refuse: false, reloads: 0 };
+  /** `blocker`: why the game refuses a restore now; `refuse`: restore() itself throws (a race, or a damaged copy). */
+  const host = { blocker: null as string | null, refuse: false, reloads: 0 };
   const sync = new CloudSave(session, {
     currentSave: () => local as { version: number },
     restore: async (save) => {
       if (host.refuse) throw new Error("Finish the current sortie first.");
       restored.push(save);
     },
+    restoreBlocker: () => host.blocker,
     reload: () => {
       host.reloads += 1;
     },
@@ -126,22 +129,73 @@ describe("cloud save sync", () => {
   it("a refused restore keeps the old revision, so this device cannot overwrite the other device's progress", async () => {
     const server = fakeServer({ revision: 4, data: PLAYED });
     const t = setup(FRESH, server);
-    t.host.refuse = true; // The local account is still loading, or a sortie runs.
+    t.host.blocker = "Cloud save found · it loads after this sortie";
     await t.attach();
     expect(t.restored).toEqual([]);
     expect(t.memory.has("spaceTypingCloudSaveV1:acc")).toBe(false);
+    // Commits during the sortie upload nothing: the upload would only meet the conflict again.
     t.sync.noteCommitted();
-    await vi.advanceTimersByTimeAsync(1_000);
-    expect(server.puts().map((call) => call.body?.baseRevision)).toEqual([0]);
+    await vi.advanceTimersByTimeAsync(180_000);
+    expect(server.puts()).toEqual([]);
     expect(server.cloud()).toMatchObject({ revision: 4, data: PLAYED });
     expect(t.host.reloads).toBe(0);
-    t.host.refuse = false; // Next try a minute later, once the sortie has ended.
-    await vi.advanceTimersByTimeAsync(61_000);
-    expect(server.puts().map((call) => call.body?.baseRevision)).toEqual([0, 0]);
+    expect(t.statuses.filter((text) => text === "Cloud save found · it loads after this sortie")).toHaveLength(1);
+    expect(t.statuses.some((text) => /unavailable/.test(text))).toBe(false);
+    t.host.blocker = null; // The sortie ended: the next upload meets the conflict and takes the cloud copy.
+    await vi.advanceTimersByTimeAsync(6_000);
+    expect(server.puts().map((call) => call.body?.baseRevision)).toEqual([0]);
     expect(server.cloud()).toMatchObject({ revision: 4, data: PLAYED });
     expect(t.restored).toEqual([PLAYED]);
     expect(t.host.reloads).toBe(1);
     expect(JSON.parse(t.memory.get("spaceTypingCloudSaveV1:acc")!).revision).toBe(4);
+  });
+
+  it("a restore refused while the device saves is offered again without another commit", async () => {
+    const server = fakeServer({ revision: 4, data: PLAYED });
+    const t = setup(FRESH, server);
+    t.host.blocker = "Cloud save found · it loads once this device's save is ready";
+    await t.attach();
+    t.host.blocker = null;
+    await vi.advanceTimersByTimeAsync(61_000);
+    expect(server.puts().map((call) => call.body?.baseRevision)).toEqual([0]);
+    expect(t.restored).toEqual([PLAYED]);
+    expect(t.host.reloads).toBe(1);
+  });
+
+  it("a restore the game throws on (a race with a sortie start) waits the same way and says why once", async () => {
+    const server = fakeServer({ revision: 4, data: PLAYED });
+    const t = setup(FRESH, server);
+    t.host.refuse = true;
+    await t.attach();
+    await vi.advanceTimersByTimeAsync(130_000);
+    expect(t.restored).toEqual([]);
+    expect(t.statuses.filter((text) => text === "Finish the current sortie first.")).toHaveLength(1);
+    expect(server.cloud()).toMatchObject({ revision: 4, data: PLAYED });
+    t.host.refuse = false;
+    await vi.advanceTimersByTimeAsync(61_000);
+    expect(t.restored).toEqual([PLAYED]);
+    expect(t.host.reloads).toBe(1);
+  });
+
+  it("a conflict met mid-sortie neither downloads the cloud copy nor warns every minute", async () => {
+    const server = fakeServer({ revision: 1, data: FRESH });
+    const t = setup(FRESH, server, { revision: 1 });
+    await t.attach(); // Uploads on top of revision 1 → revision 2.
+    server.setCloud({ revision: 3, data: PLAYED }); // Another device saved progress.
+    t.host.blocker = "Cloud save found · it loads after this sortie";
+    t.sync.noteCommitted();
+    await vi.advanceTimersByTimeAsync(61_000);
+    const gets = server.gets().length;
+    await vi.advanceTimersByTimeAsync(240_000);
+    expect(server.gets()).toHaveLength(gets);
+    expect(server.puts().map((call) => call.body?.baseRevision)).toEqual([1, 2]);
+    expect(t.statuses.filter((text) => text === "Cloud save found · it loads after this sortie")).toHaveLength(1);
+    expect(t.restored).toEqual([]);
+    t.host.blocker = null;
+    await vi.advanceTimersByTimeAsync(6_000);
+    expect(t.restored).toEqual([PLAYED]);
+    expect(t.host.reloads).toBe(1);
+    expect(JSON.parse(t.memory.get("spaceTypingCloudSaveV1:acc")!).revision).toBe(3);
   });
 
   it("asks when both copies have progress", async () => {
