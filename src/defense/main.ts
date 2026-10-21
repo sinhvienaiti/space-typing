@@ -12,6 +12,7 @@ import * as THREE from "three";
 import { allBossIdentities, bossFullName } from "../boss/identity";
 import { paintedEnemyArtUrl } from "../enemies/painted-sprites";
 import { buildCombatLearningEvent, LEARNING_ATTEMPT_MESSAGE, PARENT_ORIGIN } from "../learning/shared";
+import { runFrameLoop } from "../platform/frame-loop";
 import { loadModel, modelEntry, pickModelTier } from "../render3d/model-loader";
 import { HeroFx } from "../scene3d/fx";
 import { Hero } from "../scene3d/hero";
@@ -1756,9 +1757,15 @@ function effectState(): void {
   }
 }
 
-function frame(now: number): void {
+/** Wall time of the current frame, from its update to its render. */
+let frameReal = 0;
+
+// A frame is an update then a render, each kept running by runFrameLoop
+// when the other throws.
+function updateFrame(now: number): void {
   const real = Math.min(0.1, Math.max(0, (now - last) / 1000));
   last = now;
+  frameReal = real;
   hitstop = Math.max(0, hitstop - real);
   const scale = paused ? 0 : (hitstop > 0 ? 0.12 : 1) * slowmo * devScale;
   const dt = real * scale;
@@ -1843,8 +1850,10 @@ function frame(now: number): void {
     updateHud();
   }
   updateFloaters(real);
-  stage.render(real);
-  window.requestAnimationFrame(frame);
+}
+
+function drawFrame(): void {
+  stage.render(frameReal);
 }
 
 /** Auto quality: after 5 s of a wave, an average over 20 ms drops High to Medium. */
@@ -1868,7 +1877,14 @@ byId("dfStatus").textContent = "Loading the rift…";
 renderMaps();
 showOverlay("dfMenu");
 byId("dfHud").hidden = true;
-window.requestAnimationFrame(frame);
+runFrameLoop({
+  update: updateFrame,
+  draw: drawFrame,
+  // A throwing frame pauses the run, so the player keeps it.
+  onError: () => {
+    if (!paused) togglePause();
+  },
+});
 window.setTimeout(paintThumbs, 400);
 void Promise.all([loadDragon(stage.quality), loadFireball(stage.quality).catch(() => undefined), towerViews.load(stage.quality), prepareMap(map), loadWords()])
   .then(([, , , , words]) => {

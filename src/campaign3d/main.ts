@@ -11,6 +11,7 @@ import * as THREE from "three";
 import { bossFullName } from "../boss/identity";
 import type { EnemyFamilyId } from "../enemies/families";
 import { splitDisplayByTypedLetters } from "../logic";
+import { runFrameLoop } from "../platform/frame-loop";
 import { loadModel, modelEntry, pickModelTier } from "../render3d/model-loader";
 import { HeroFx } from "../scene3d/fx";
 import { Hero, type Locomotion } from "../scene3d/hero";
@@ -1555,12 +1556,18 @@ function updateHud(current: Run): void {
 let last = performance.now();
 /** Screenshots only (__campaign3d.slow): the scene's clock against the wall clock. */
 let timeScale = 1;
-function frame(now: number): void {
-  window.requestAnimationFrame(frame);
-  const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)) * timeScale;
+/** Scene time of the current frame, from its step to its render. */
+let frameDt = 0;
+// A frame is a step then a render, each kept running by runFrameLoop when
+// the other throws.
+function updateFrame(now: number): void {
+  frameDt = Math.min(0.05, Math.max(0, (now - last) / 1000)) * timeScale;
   last = now;
-  step(dt);
-  stage.render(dt);
+  step(frameDt);
+}
+
+function drawFrame(): void {
+  stage.render(frameDt);
 }
 
 // ------------------------------------------------------------------ input
@@ -1738,7 +1745,14 @@ let currentEntries: VocabularyEntry[] = [];
 const startButton = byId<HTMLButtonElement>("c3dStartButton");
 startButton.disabled = true;
 byId("c3dStatus").textContent = "Loading " + pilot.name + " and your words…";
-window.requestAnimationFrame(frame);
+runFrameLoop({
+  update: updateFrame,
+  draw: drawFrame,
+  // A throwing frame pauses the run, so the player keeps it.
+  onError: () => {
+    if (!paused) setPaused(true);
+  },
+});
 renderMenu();
 renderPilots();
 window.requestAnimationFrame(placeHangar);
