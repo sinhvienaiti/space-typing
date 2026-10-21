@@ -85,10 +85,10 @@ export type WalletHost = {
   lessonRewards?(): { day: number; tier: "three" | "five" }[];
 };
 
-type QueuedOp = { path: "/wallet/op" | "/wallet/sortie"; body: Record<string, unknown>; reports: WalletBalances };
+export type QueuedOp = { path: "/wallet/op" | "/wallet/sortie"; body: Record<string, unknown>; reports: WalletBalances };
 type PendingPurchase = { id: string; costs: WalletDeltas };
 type PendingStart = { attemptId: string; stage: number; activity: string; reserveConsent: boolean };
-type Stored = { reported: WalletBalances; queue: QueuedOp[]; purchase?: PendingPurchase; refuelId?: string; refuelQuote?: { index: number; price: number }; start?: PendingStart; lessonClaims?: string[]; generation?: string };
+type Stored = { reported: WalletBalances; queue: QueuedOp[]; purchase?: PendingPurchase; refuelId?: string; refuelQuote?: { index: number; price: number }; start?: PendingStart; lessonClaims?: string[]; generation?: string; awaitingSignIn?: boolean };
 export type SpendResult = { ok: true; opId: string | null } | { ok: false; reason: string };
 
 /** The account id of the last server wallet (phase ≥ 2) on this device. */
@@ -97,6 +97,9 @@ const MAX_QUEUE = 20;
 /** A failed /wallet/open is retried after this, doubling up to REOPEN_MAX_MS. */
 const REOPEN_FIRST_MS = 5_000;
 const REOPEN_MAX_MS = 120_000;
+/** A queued op that failed goes again after this; after an unexpected answer, doubling up to RETRY_MAX_MS. */
+const RETRY_MS = 15_000;
+const RETRY_MAX_MS = 300_000;
 
 /**
  * Server refusals that end a queued op for good (the server's balances
@@ -108,12 +111,39 @@ const REFUSED_OP_CODES = new Set([
   "sortie-unknown", "no-warp", "stage-locked", "refuel-refused", "wallet-off", "no-wallet",
 ]);
 
-/** A queued op that failed: refused for good, waiting for the player to sign in again, or worth a retry. */
-export function queuedOpFailure(error: unknown): "refused" | "signed-out" | "retry" {
-  if (!(error instanceof OnlineError) || error.status < 400 || error.status >= 500) return "retry";
+/**
+ * A queued op that failed: refused for good; held until the account can sign
+ * in again (an expired or revoked session, or a suspended account, is not a
+ * verdict on the op); an unexpected answer (unknown route or code) that is
+ * asked again less often; or plain trouble worth a retry.
+ */
+export function queuedOpFailure(error: unknown): "refused" | "signed-out" | "suspended" | "unexpected" | "retry" {
+  if (!(error instanceof OnlineError) || error.code === "offline" || error.status < 400 || error.status >= 500) return "retry";
   if (REFUSED_OP_CODES.has(error.code)) return "refused";
-  // An expired or revoked session (or a suspended account) is not a verdict on the op.
-  return error.status === 401 || error.status === 403 ? "signed-out" : "retry";
+  if (error.status === 401) return "signed-out";
+  if (error.code === "banned" || error.code === "account-deleted") return "suspended";
+  return error.status === 429 || error.code === "busy" ? "retry" : "unexpected";
+}
+
+/** `balances` plus `deltas`, unclamped: a baseline may sit below zero until the server's balances replace it. */
+function shift(balances: WalletBalances, deltas: WalletDeltas): WalletBalances {
+  const out = { ...balances };
+  for (const key of WALLET_CURRENCIES) out[key] += deltas[key] ?? 0;
+  return out;
+}
+
+/**
+ * Moves queued ops from the baseline they were reported against onto a
+ * local balance that does not hold them (another wallet wrote into the save
+ * since). Each op still adds what it added; the new baseline sits below
+ * `local` by the queue's total, so once the server's balances arrive the
+ * game shows them plus what the queue still owes.
+ */
+export function carryQueue(queue: QueuedOp[], reported: WalletBalances, local: WalletBalances): { reported: WalletBalances; queue: QueuedOp[] } {
+  const last = queue[queue.length - 1];
+  if (last === undefined) return { reported: local, queue: [] };
+  const base = shift(local, negate(diffBalances(last.reports, reported)));
+  return { reported: base, queue: queue.map((op) => ({ ...op, reports: shift(base, diffBalances(op.reports, reported)) })) };
 }
 
 function storageKey(accountId: string): string {
@@ -164,8 +194,12 @@ export class WalletSync {
   private actionBusy = false;
   private reopenTimer: ReturnType<typeof setTimeout> | null = null;
   private reopenDelay = REOPEN_FIRST_MS;
-  /** The server answered "signed out": the queue waits for the next sign-in. */
-  private signedOut = false;
+  /**
+   * The server ended the session (or suspended the account): the queue is
+   * held for this account, also across account switches, until it is sent.
+   */
+  private awaitingSignIn = false;
+  private retryDelay = RETRY_MS;
 
   constructor(
     private readonly session: OnlineSession,
@@ -218,7 +252,8 @@ export class WalletSync {
         ...(raw.refuelQuote ? { refuelQuote: raw.refuelQuote } : {}),
         ...(typeof raw.start?.attemptId === "string" ? { start: raw.start } : {}),
         lessonClaims: Array.isArray(raw.lessonClaims) ? raw.lessonClaims.filter(x => typeof x === "string").slice(-180) : [],
-        ...(typeof raw.generation === "string" ? { generation: raw.generation } : {}) };
+        ...(typeof raw.generation === "string" ? { generation: raw.generation } : {}),
+        ...(raw.awaitingSignIn === true ? { awaitingSignIn: true } : {}) };
     } catch {
       return null;
     }
@@ -227,7 +262,7 @@ export class WalletSync {
   private store(): boolean {
     if (this.accountId === null || this.reported === null) return false;
     try {
-      localStorage.setItem(storageKey(this.accountId), JSON.stringify({ reported: this.reported, queue: this.queue, purchase: this.pendingPurchase, refuelId: this.pendingRefuel, refuelQuote: this.pendingRefuelQuote, start: this.pendingStart, lessonClaims: this.lessonClaims, generation: this.host.saveGeneration?.() ?? undefined }));
+      localStorage.setItem(storageKey(this.accountId), JSON.stringify({ reported: this.reported, queue: this.queue, purchase: this.pendingPurchase, refuelId: this.pendingRefuel, refuelQuote: this.pendingRefuelQuote, start: this.pendingStart, lessonClaims: this.lessonClaims, generation: this.host.saveGeneration?.() ?? undefined, awaitingSignIn: this.awaitingSignIn || undefined }));
       return true;
     } catch {
       return false;
@@ -241,7 +276,8 @@ export class WalletSync {
       this.accountId = null;
       this.view = null;
       this.opening = false;
-      this.signedOut = false;
+      this.awaitingSignIn = false;
+      this.retryDelay = RETRY_MS;
       this.queue = [];
       this.sending = null;
       this.actionBusy = false;
@@ -254,14 +290,15 @@ export class WalletSync {
     }
     if (account.id === this.accountId && (this.opening || this.view !== null || this.disabled)) {
       // Signed in again after the server ended the session: send what waited.
-      if (this.signedOut && this.view !== null) void this.flush();
+      if (this.awaitingSignIn && this.view !== null) void this.flush();
       return;
     }
     // The first wallet of a device is seeded from its balances: wait until the account has loaded.
     if (this.host.committedBalances() === null) return;
     this.accountId = account.id;
     this.purchaseInFlight = false;
-    this.signedOut = false;
+    this.awaitingSignIn = false;
+    this.retryDelay = RETRY_MS;
     this.epoch++;
     this.opening = true;
     this.disabled = false;
@@ -337,20 +374,26 @@ export class WalletSync {
     if (this.accountId !== accountId || epoch !== this.epoch) return;
     const stored = this.load(accountId);
     const generation = this.host.saveGeneration?.() ?? null;
+    const sameSave = stored?.generation === undefined || generation === null || stored.generation === generation;
     // The local save was replaced (cloud or backup restore) or another wallet
     // has written into it since: what this account reported no longer
     // describes it, so its gap must not be reported again as an earning.
-    const replaced =
-      stored !== null &&
-      (view.reconciled === true || otherWallet || (stored.generation !== undefined && generation !== null && stored.generation !== generation));
-    this.queue = replaced ? [] : stored?.queue ?? [];
+    const replaced = stored !== null && (view.reconciled === true || otherWallet || !sameSave);
+    // Ops held while the session was ended are still owed to this account after
+    // another wallet wrote into the save (sign-in goes through a guest), unless
+    // the player replaced the save or the server just took this device's
+    // balances (a reconciled wallet with a seed), which already hold them.
+    const held = replaced && stored.awaitingSignIn === true && sameSave && !(view.reconciled === true && local !== null && !otherWallet);
+    const carried = held ? carryQueue(stored.queue, stored.reported, local ?? view.balances) : null;
+    this.queue = carried?.queue ?? (replaced ? [] : stored?.queue ?? []);
+    this.awaitingSignIn = this.queue.length > 0 && stored?.awaitingSignIn === true;
     this.pendingPurchase = stored?.purchase;
     this.pendingRefuel = stored?.refuelId;
     this.pendingRefuelQuote = stored?.refuelQuote;
     this.pendingStart = replaced ? undefined : stored?.start;
     this.lessonClaims = stored?.lessonClaims ?? [];
     // First wallet of this account on this device: what the game holds is what the server was given.
-    this.reported = replaced ? local ?? view.balances : stored?.reported ?? local ?? view.balances;
+    this.reported = carried?.reported ?? (replaced ? local ?? view.balances : stored?.reported ?? local ?? view.balances);
     if (view.phase >= 2) {
       try {
         localStorage.setItem(WALLET_DEVICE_KEY, accountId);
@@ -462,7 +505,8 @@ export class WalletSync {
         try {
           const view = await onlineRequest<WalletView>(op.path, { body: op.body });
           if (epoch !== this.epoch) return;
-          this.signedOut = false;
+          this.awaitingSignIn = false;
+          this.retryDelay = RETRY_MS;
           this.queue.shift();
           this.reported = op.reports;
           this.report(view);
@@ -478,18 +522,25 @@ export class WalletSync {
             await this.refresh();
             continue;
           }
-          if (failure === "signed-out") {
-            // Kept on this device (same opId) until the player signs in again.
-            if (!this.signedOut) this.host.notice("Signed out · your rewards wait on this device until you sign in again");
-            this.signedOut = true;
+          if (failure === "signed-out" || failure === "suspended") {
+            // Kept on this device (same opId) until this account can sign in again.
+            if (!this.awaitingSignIn) this.host.notice(failure === "suspended" ? (error as OnlineError).message : this.signedOutNotice());
+            this.awaitingSignIn = true;
             break;
           }
           // Network or server trouble: keep it; the same opId goes again later.
+          // An unexpected answer is said once and asked again less and less often.
+          let delay = RETRY_MS;
+          if (failure === "unexpected") {
+            if (this.retryDelay === RETRY_MS) this.host.notice("A reward is waiting for the server · it stays on this device and is sent again later");
+            delay = this.retryDelay;
+            this.retryDelay = Math.min(RETRY_MAX_MS, this.retryDelay * 2);
+          }
           if (this.retryTimer === null) {
             this.retryTimer = setTimeout(() => {
               this.retryTimer = null;
               void this.flush();
-            }, 15_000);
+            }, delay);
           }
           break;
         }
@@ -499,6 +550,13 @@ export class WalletSync {
       if (epoch === this.epoch) this.sending = null;
     });
     return this.sending;
+  }
+
+  /** A guest gets its session back by reloading (same device key); an account signs in again. */
+  private signedOutNotice(): string {
+    return this.session.account?.kind === "guest"
+      ? "Session ended · your rewards wait on this device; reload the game to send them"
+      : "Signed out · your rewards wait on this device until you sign in again";
   }
 
   private report(view: WalletView): void {
