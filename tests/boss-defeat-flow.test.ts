@@ -85,7 +85,8 @@ describe("boss defeat flow", () => {
   });
 
   it("records the word as completed when the last key's own damage defeats the boss", () => {
-    // Phase 1: at 0 HP the boss falls; it does not first open its last phase.
+    // Phase 1: at 0 HP the boss falls without opening its last phase first
+    // (no phase roar, no 0 HP bar).
     const { game, boss, hud, completed } = bossFight(1);
     const damage = keyDamage(game, boss);
     for (const letter of word.slice(1, -1)) game.handleKey(letter);
@@ -95,11 +96,34 @@ describe("boss defeat flow", () => {
     game.handleKey(word.at(-1)!);
 
     expect((game as unknown as BossInternals).boss).toBeNull();
-    expect(hud.at(-1)).toBeNull();
+    // Only the closing HUD: no 0 HP bar of a last phase.
+    expect(hud).toEqual([null]);
+    expect(boss.phase).toBe(1);
     expect(completed).toEqual([word]);
     expect(bossAttempts(game)).toEqual([{ en: word, outcome: "perfect" }]);
     expect(game.getStageSessionSnapshot().interruptedWords).toBe(0);
     expect(game.getStageSessionSnapshot().bossKills).toBe(1);
+    game.destroy();
+  });
+
+  it("completes the word when the last key's damage opens the next phase", () => {
+    // Phase 1 just above two thirds of its HP: the last key alone crosses into phase 2.
+    const { game, boss, hud, completed } = bossFight(1);
+    const damage = keyDamage(game, boss);
+    for (const letter of word.slice(1, -1)) game.handleKey(letter);
+    boss.hp = boss.maxHp * 0.66 + damage * 0.5;
+    hud.length = 0;
+
+    game.handleKey(word.at(-1)!);
+
+    expect(completed).toEqual([word]);
+    expect(bossAttempts(game)).toEqual([{ en: word, outcome: "perfect" }]);
+    expect(game.getStageSessionSnapshot().interruptedWords).toBe(0);
+    // The phase opens after the word's damage, on a fresh word.
+    expect((game as unknown as BossInternals).boss).toBe(boss);
+    expect(boss.phase).toBe(2);
+    expect(boss.typed).toBe(0);
+    expect(hud.at(-1)).toMatchObject({ phase: 2 });
     game.destroy();
   });
 

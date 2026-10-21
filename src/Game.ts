@@ -7725,9 +7725,10 @@ export class Game {
             markedBossDamageMultiplier(this.bossMarkTimer > 0) *
             this.characterBossDamageMultiplier(),
       );
-      // A killing key opens no new phase (that would reset the word): the
-      // boss falls below.
-      if (boss.hp > 0) this.updateBossPhase(boss);
+      // A new phase resets the word, so the last letter completes it first
+      // (completeBossWord opens the phase after the word's damage), and a
+      // killing key opens none: the boss falls below.
+      if (boss.hp > 0 && boss.typed < word.length) this.updateBossPhase(boss);
     }
 
     this.fireBossLaser(0.9);
@@ -7841,7 +7842,8 @@ export class Game {
 
     this.bossBurst(perfectWord ? 34 : 28, 18, perfectWord ? 0.75 : 0.6);
     this.sfx.bossHit();
-    this.updateBossPhase(boss);
+    // A defeated boss opens no last phase (its roar, effects and a 0 HP HUD).
+    if (boss.hp > 0) this.updateBossPhase(boss);
 
     if (boss.hp <= 0) {
       this.defeatBoss(completedEntry);
