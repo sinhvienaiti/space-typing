@@ -4,6 +4,12 @@ import "./ui/testing-preview.css";
 import { AccountTransactions, type AccountView } from "./persistence/account-transactions";
 import { WARP_POLICY, reconcileWarp, warpEtaMs } from "./economy/warp-charge";
 import type { AccountState, SortieContext, WriteTicket } from "./persistence/account-state";
+import {
+  LaunchTransaction,
+  deployWarpBlocker,
+  resumablePreparedSortie,
+  type LaunchSortie,
+} from "./campaign/launch-transaction";
 import { compositionForWorld } from "./background/compositions";
 import { InputController } from "./input/input-controller";
 import { VoiceSession } from "./input/voice-session";
@@ -2044,6 +2050,20 @@ function renderWarpHud(): void {
       : `${warp.current}/100 Warp · Reserve ${warp.reserve}/300 · ${warp.refills}/3 refills${eta > 0 ? ` · Deploy in ${Math.floor(eta / 60)}m ${eta % 60}s` : " · Deploy costs 10"}`;
   byId("practiceBanner").hidden =
     !practiceActive && activeReviewGoal === undefined;
+  // Deploy without 10 Warp looks unavailable, yet a click (or the Recall card) still says why.
+  // A free preview or a prepared (already paid) sortie can always go.
+  const deployShort = deployWarpBlocker(warp, {
+    free: testingStagePreviewActive(),
+    prepared: warpAccount.attempt?.phase === "prepared",
+  });
+  const deployButton = byId("startButton");
+  if (deployShort === null) {
+    deployButton.removeAttribute("aria-disabled");
+    deployButton.removeAttribute("title");
+  } else {
+    deployButton.setAttribute("aria-disabled", "true");
+    deployButton.title = deployShort;
+  }
   const busy =
     accountTransactions.busy() ||
     clearSettlementPending ||
@@ -2101,22 +2121,31 @@ async function finishManagedSortie(
     return false;
   }
 }
-async function deploySortie(
+/** Why the stage cannot start right now (Game.startStage would refuse it), or null. */
+function stageStartBlocker(): string | null {
+  return game.canStartStage() ? null : "Microphone is not ready";
+}
+/**
+ * Everything that can refuse a Deploy, before anything is saved, spent or
+ * shown: the purchase lock, a read-only tab, the microphone, the Warp tanks
+ * and the Reserve prompt. Null: a free (simulated) run.
+ */
+async function preflightSortie(
   stage: number,
   activity: "campaign" | "hidden",
   seed: number,
   difficulty: unknown,
   simulated: boolean,
-): Promise<void> {
+): Promise<SortieContext | null> {
   if (walletPurchaseBusy) throw new Error("Please wait for the purchase to finish saving.");
   if (simulated) {
     renderWarpHud();
-    return;
+    return null;
   }
   if (!accountTransactions.canWrite())
     throw new Error("Account is read-only. Choose Practice · Free.");
-  if (game.getInputMode() !== "typing" && !voiceSession.isReady())
-    throw new Error("Microphone is not ready; no Warp charged.");
+  const blocked = stageStartBlocker();
+  if (blocked !== null) throw new Error(blocked + "; no Warp charged.");
   const context: SortieContext = {
     stage,
     tier: ascension.selectedTier,
@@ -2128,7 +2157,11 @@ async function deploySortie(
     contentVersion: "space-sortie-v1",
     seed,
   };
+  if (resumablePreparedSortie(warpAccount!.attempt, context) !== null)
+    return context;
   const warp = reconcileWarp(warpAccount!.warp, accountTransactions.now());
+  const short = deployWarpBlocker(warp, { free: false, prepared: false });
+  if (short !== null) throw new Error(short);
   if (
     warp.current < WARP_POLICY.cost &&
     !warp.reserveConsent &&
@@ -2146,14 +2179,30 @@ async function deploySortie(
       throw new Error("Deploy cancelled · Practice is free");
     await accountTransactions.reserveConsent(true);
   }
-  // Server wallet: the sortie starts on the server, which spends its Warp (refused: nothing is charged here).
-  const intent = accountTransactions.intent();
-  intent.id = walletSync?.startAttemptId(intent.id, stage, activity) ?? intent.id;
-  const serverWarp = walletSync === null
-    ? null
-    : await walletSync.startSortie(intent.id, stage, activity, reconcileWarp(warpAccount!.warp, accountTransactions.now()).reserveConsent);
-  const prepared = await accountTransactions.admit(context, intent, serverWarp);
-  await accountTransactions.activate(prepared.account.attempt!.id, context);
+  return context;
+}
+/**
+ * Spends the sortie's Warp: the sortie is prepared, and the launch puts it
+ * live just before its stage starts. A prepared sortie for the same context
+ * was paid already (the server holds it too) and is resumed as it is.
+ */
+async function prepareSortie(context: SortieContext): Promise<LaunchSortie> {
+  let id = resumablePreparedSortie(warpAccount!.attempt, context);
+  if (id === null) {
+    // Server wallet: the sortie starts on the server, which spends its Warp (refused: nothing is charged here).
+    const intent = accountTransactions.intent();
+    intent.id = walletSync?.startAttemptId(intent.id, context.stage, context.activity) ?? intent.id;
+    const serverWarp = walletSync === null
+      ? null
+      : await walletSync.startSortie(intent.id, context.stage, context.activity, reconcileWarp(warpAccount!.warp, accountTransactions.now()).reserveConsent);
+    const prepared = await accountTransactions.admit(context, intent, serverWarp);
+    id = prepared.account.attempt!.id;
+  }
+  const attemptId = id;
+  return {
+    activate: () => accountTransactions.activate(attemptId, context),
+    deactivate: () => accountTransactions.deactivate(attemptId),
+  };
 }
 let testingStageOverride: number | null = null;
 let testingStageSnapshot: AutosaveSnapshot | null = null;
@@ -3240,10 +3289,7 @@ function renderPhase(phase: GamePhase): void {
   if (phase === "title" && titleWasHidden) {
     // Back on the deck: start at the top and let the panels slide in.
     titleHome?.resetScroll();
-    titleOverlay.classList.remove("th-entering");
-    void titleOverlay.offsetWidth;
-    titleOverlay.classList.add("th-entering");
-    window.setTimeout(() => titleOverlay.classList.remove("th-entering"), 1200);
+    playTitleEntrance();
   }
   document.body.classList.toggle("title-active", phase === "title");
   if (phase !== "title") chatPanel?.close();
@@ -6061,6 +6107,8 @@ async function startExpeditionEncounter(
   );
   activeStageDifficulty = difficulty;
 
+  const launch = new LaunchTransaction();
+  launch.onAbort(launchPresentationUndo());
   syncWorldMusicProfile(stage.stage);
   musicController.setBossPhase(1);
   const musicState = musicStateForStageRole(stage.role);
@@ -6120,7 +6168,19 @@ async function startExpeditionEncounter(
     }),
   );
 
-  game.startStage(stage, difficulty, null, run.resources);
+  try {
+    await launch.start(null, stageStartBlocker, () =>
+      game.startStage(stage, difficulty, null, run.resources),
+    );
+  } catch (error) {
+    launch.abort();
+    expeditionUi?.setResumeAvailable(expeditionSession.hasResumableRun());
+    showNotice(
+      (error instanceof Error ? error.message : "Unable to start the encounter") +
+        " · Resume Expedition when ready",
+    );
+    return;
+  }
   if (replay) {
     showNotice("Expedition resumed from the encounter safe boundary");
   }
@@ -7426,6 +7486,36 @@ function worldLabel(world: WorldProfile): string {
     " · " +
     world.name
   );
+}
+
+function playTitleEntrance(): void {
+  titleOverlay.classList.remove("th-entering");
+  void titleOverlay.offsetWidth;
+  titleOverlay.classList.add("th-entering");
+  window.setTimeout(() => titleOverlay.classList.remove("th-entering"), 1200);
+}
+
+/**
+ * Undo for what a launch shows before its stage starts: the deck's launch
+ * animation and the stage music. Read before the music changes.
+ */
+function launchPresentationUndo(): () => void {
+  const music = musicController.getState();
+  const profile = musicController.getWorldProfile();
+  return () => {
+    if (titleOverlay.classList.contains("th-launching")) {
+      // The ship and panels come back instead of leaving a faded deck.
+      titleOverlay.classList.remove("th-launching");
+      playTitleEntrance();
+    }
+    if (game.getPhase() === "title") {
+      restoreTitleMusic();
+      return;
+    }
+    musicController.setWorldProfile(profile);
+    musicController.transitionTo(music, musicCrossfadeSeconds(music));
+    musicController.setPaused(game.getPhase() === "paused");
+  };
 }
 
 async function presentStageTransition(
@@ -9270,6 +9360,7 @@ function hiddenStageConfig(
 
 async function startActiveHiddenEncounter(
   active: ActiveHiddenEncounter,
+  launch: LaunchTransaction,
 ): Promise<void> {
   game.setGameplayMode(gameplayMode, recallSettings);
   game.setCharacter(characters.selected);
@@ -9302,6 +9393,9 @@ async function startActiveHiddenEncounter(
   );
   activeStageDifficulty = difficulty;
 
+  // What can refuse the sortie runs before the save, the music and the launch animation.
+  const context = await preflightSortie(stage.stage, "hidden", stage.seed, difficulty, testingStagePreviewActive());
+
   const stageEntryAt = new Date().toISOString();
   stageEntrySnapshot = createStageEntrySnapshot(
     currentRunPersistentState(),
@@ -9316,10 +9410,12 @@ async function startActiveHiddenEncounter(
     "hidden-transition",
   );
   if (!recoverySaved) return;
+  const sortie = context === null ? null : await prepareSortie(context);
 
   const musicStage =
     runtime.environmentStageOverride ??
     active.sourceStage;
+  launch.onAbort(launchPresentationUndo());
   musicController.setWorldProfile(
     musicProfileForWorld(worldForStage(musicStage)),
   );
@@ -9338,11 +9434,12 @@ async function startActiveHiddenEncounter(
     ),
   );
 
-  await deploySortie(stage.stage, "hidden", stage.seed, difficulty, testingStagePreviewActive());
-  game.startStage(
-    stage,
-    difficulty,
-    runtime,
+  await launch.start(sortie, stageStartBlocker, () =>
+    game.startStage(
+      stage,
+      difficulty,
+      runtime,
+    ),
   );
 }
 
@@ -9363,6 +9460,19 @@ async function startSelectedStage(practice = false): Promise<void> {
   )
     return;
 
+  // A launch that does not start its stage puts back what it changed.
+  const launch = new LaunchTransaction();
+  try {
+    await launchSelectedStage(practice, launch);
+  } finally {
+    launch.abort();
+  }
+}
+
+async function launchSelectedStage(
+  practice: boolean,
+  launch: LaunchTransaction,
+): Promise<void> {
   if (practice) {
     if (
       accountTransactions.canWrite() &&
@@ -9370,19 +9480,37 @@ async function startSelectedStage(practice = false): Promise<void> {
       !(await finishManagedSortie("failed"))
     )
       return;
-    practiceActive = true;
+    if (!practiceActive) {
+      practiceActive = true;
+      launch.onAbort(() => {
+        practiceActive = false;
+        renderWarpHud();
+      });
+    }
   }
   if (
     !practice &&
     accountTransactions.canWrite() &&
     warpAccount?.attempt &&
-    warpAccount.attempt.phase !== "prepared" &&
-    !(await finishManagedSortie("abandoned"))
-  )
-    return;
+    warpAccount.attempt.phase !== "prepared"
+  ) {
+    // A restart closes the running sortie first: without Warp for the next one, nothing is closed.
+    const short = deployWarpBlocker(
+      reconcileWarp(warpAccount.warp, accountTransactions.now()),
+      { free: testingStagePreviewActive(), prepared: false },
+    );
+    if (short !== null) {
+      showNotice(short);
+      return;
+    }
+    if (!(await finishManagedSortie("abandoned"))) return;
+  }
   const testingPreview = testingStagePreviewActive();
   if (testingPreview && testingStageSnapshot === null) {
     testingStageSnapshot = structuredClone(currentAutosaveSnapshot());
+    launch.onAbort(() => {
+      testingStageSnapshot = null;
+    });
   }
 
   const pendingCampaignStage = selectedGameplayStage();
@@ -9415,7 +9543,7 @@ async function startSelectedStage(practice = false): Promise<void> {
   if (activeHidden !== null && testingStageOverride === null) {
     stageStartPending = true;
     try {
-      await startActiveHiddenEncounter(activeHidden);
+      await startActiveHiddenEncounter(activeHidden, launch);
     } catch (error) {
       showNotice(
         error instanceof Error
@@ -9472,6 +9600,15 @@ async function startSelectedStage(practice = false): Promise<void> {
     );
     activeStageDifficulty = difficulty;
 
+    // What can refuse the sortie runs before the save, the music and the launch animation.
+    const context = await preflightSortie(
+      stage.stage,
+      "campaign",
+      stage.seed,
+      difficulty,
+      testingPreview,
+    );
+
     if (!testingPreview) {
       const stageEntryAt = new Date().toISOString();
       stageEntrySnapshot = createStageEntrySnapshot(
@@ -9486,7 +9623,9 @@ async function startSelectedStage(practice = false): Promise<void> {
         (await autosaveCampaign("stage-entry", undefined, "stage-entry"));
       if (!recoverySaved) return;
     }
+    const sortie = context === null ? null : await prepareSortie(context);
 
+    launch.onAbort(launchPresentationUndo());
     syncWorldMusicProfile(stage.stage);
     musicController.setBossPhase(1);
     const musicState = musicStateForStageRole(stage.role);
@@ -9532,14 +9671,9 @@ async function startSelectedStage(practice = false): Promise<void> {
       }),
     );
 
-    await deploySortie(
-      stage.stage,
-      "campaign",
-      stage.seed,
-      difficulty,
-      testingPreview,
+    await launch.start(sortie, stageStartBlocker, () =>
+      game.startStage(stage, difficulty),
     );
-    game.startStage(stage, difficulty);
   } catch (error) {
     showNotice(
       error instanceof Error ? error.message : "Unable to deploy sortie",
