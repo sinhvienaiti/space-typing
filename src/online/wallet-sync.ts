@@ -98,6 +98,24 @@ const MAX_QUEUE = 20;
 const REOPEN_FIRST_MS = 5_000;
 const REOPEN_MAX_MS = 120_000;
 
+/**
+ * Server refusals that end a queued op for good (the server's balances
+ * follow). Anything else keeps the op, and the same opId goes again later.
+ */
+const REFUSED_OP_CODES = new Set([
+  "invalid", "invalid-op-kind", "invalid-offer", "invalid-reward-day", "bad-json", "too-large",
+  "insufficient", "price-changed", "pending-purchases", "purchase-saved", "purchase-missing",
+  "sortie-unknown", "no-warp", "stage-locked", "refuel-refused", "wallet-off", "no-wallet",
+]);
+
+/** A queued op that failed: refused for good, waiting for the player to sign in again, or worth a retry. */
+export function queuedOpFailure(error: unknown): "refused" | "signed-out" | "retry" {
+  if (!(error instanceof OnlineError) || error.status < 400 || error.status >= 500) return "retry";
+  if (REFUSED_OP_CODES.has(error.code)) return "refused";
+  // An expired or revoked session (or a suspended account) is not a verdict on the op.
+  return error.status === 401 || error.status === 403 ? "signed-out" : "retry";
+}
+
 function storageKey(accountId: string): string {
   return "spaceTypingWalletV1:" + accountId;
 }
@@ -146,6 +164,8 @@ export class WalletSync {
   private actionBusy = false;
   private reopenTimer: ReturnType<typeof setTimeout> | null = null;
   private reopenDelay = REOPEN_FIRST_MS;
+  /** The server answered "signed out": the queue waits for the next sign-in. */
+  private signedOut = false;
 
   constructor(
     private readonly session: OnlineSession,
@@ -221,6 +241,7 @@ export class WalletSync {
       this.accountId = null;
       this.view = null;
       this.opening = false;
+      this.signedOut = false;
       this.queue = [];
       this.sending = null;
       this.actionBusy = false;
@@ -231,11 +252,16 @@ export class WalletSync {
       this.host.changed();
       return;
     }
-    if (account.id === this.accountId && (this.opening || this.view !== null || this.disabled)) return;
+    if (account.id === this.accountId && (this.opening || this.view !== null || this.disabled)) {
+      // Signed in again after the server ended the session: send what waited.
+      if (this.signedOut && this.view !== null) void this.flush();
+      return;
+    }
     // The first wallet of a device is seeded from its balances: wait until the account has loaded.
     if (this.host.committedBalances() === null) return;
     this.accountId = account.id;
     this.purchaseInFlight = false;
+    this.signedOut = false;
     this.epoch++;
     this.opening = true;
     this.disabled = false;
@@ -436,19 +462,27 @@ export class WalletSync {
         try {
           const view = await onlineRequest<WalletView>(op.path, { body: op.body });
           if (epoch !== this.epoch) return;
+          this.signedOut = false;
           this.queue.shift();
           this.reported = op.reports;
           this.report(view);
           await this.adopt(view, op.path === "/wallet/sortie");
         } catch (error) {
           if (epoch !== this.epoch) return;
-          if (error instanceof OnlineError && error.status >= 400 && error.status < 500 && error.status !== 429 && error.code !== "busy") {
+          const failure = queuedOpFailure(error);
+          if (failure === "refused") {
             // Refused for good: drop it; the server's balances follow.
             this.queue.shift();
             this.reported = op.reports;
             this.store();
             await this.refresh();
             continue;
+          }
+          if (failure === "signed-out") {
+            // Kept on this device (same opId) until the player signs in again.
+            if (!this.signedOut) this.host.notice("Signed out · your rewards wait on this device until you sign in again");
+            this.signedOut = true;
+            break;
           }
           // Network or server trouble: keep it; the same opId goes again later.
           if (this.retryTimer === null) {

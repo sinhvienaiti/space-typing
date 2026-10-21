@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createWarpCharge, type WarpCharge } from "../src/economy/warp-charge";
 import { addDeltas, type WalletBalances, type WalletDeltas } from "../src/economy/wallet-rules";
+import { OnlineError } from "../src/online/api";
 import type { OnlineSession } from "../src/online/session";
-import { WALLET_DEVICE_KEY, WalletSync, type CommittedSave } from "../src/online/wallet-sync";
+import { queuedOpFailure, WALLET_DEVICE_KEY, WalletSync, type CommittedSave } from "../src/online/wallet-sync";
 
 /** The game's side of the server wallet (src/online/wallet-sync.ts) against a small fake server. */
 
@@ -10,7 +11,7 @@ const NOW = Date.UTC(2026, 9, 17, 3, 0);
 type Call = { path: string; body: Record<string, unknown> };
 
 function fakeServer(start: WalletBalances, phase = 3) {
-  const state = { balances: { ...start }, warp: createWarpCharge(NOW) as WarpCharge, seen: new Set<string>(), spends: new Map<string, WalletDeltas>(), offline: false, decay: 1, loseSpendReply: false, confirmed: new Set<string>(), openFailures: 0, rateLimited: false, reconciled: false };
+  const state = { balances: { ...start }, warp: createWarpCharge(NOW) as WarpCharge, seen: new Set<string>(), spends: new Map<string, WalletDeltas>(), offline: false, decay: 1, loseSpendReply: false, confirmed: new Set<string>(), openFailures: 0, rateLimited: false, reconciled: false, signedOut: false, refuse: null as string | null };
   const calls: Call[] = [];
   const view = (extra: Record<string, unknown> = {}) => ({ phase, balances: { ...state.balances }, warp: state.warp, warpPending: 0, held: [], sortie: null, maxStage: 1, earnedToday: {}, dailyCap: {}, flagged: 0, version: 1, serverTime: NOW, reconciled: state.reconciled, ...extra });
   const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -19,7 +20,9 @@ function fakeServer(start: WalletBalances, phase = 3) {
     const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
     calls.push({ path, body });
     if (state.offline) throw new TypeError("Failed to fetch");
+    if (state.signedOut && path.startsWith("/wallet")) return json(401, { error: "signed-out", message: "Please sign in again." });
     if (path === "/wallet/op" && state.rateLimited) return json(429, { error: "rate-limited", message: "Retry later" });
+    if (path === "/wallet/op" && state.refuse !== null) return json(400, { error: state.refuse, message: "Refused" });
     const opId = String(body.opId ?? "");
     if (opId !== "" && state.seen.has(opId)) return json(200, view({ duplicate: true }));
     if (opId !== "") state.seen.add(opId);
@@ -154,6 +157,69 @@ describe("server wallet on the client", () => {
     expect(server.state.balances.credits).toBe(50);
     const ids = server.calls.filter(c => c.body.kind === "earn").map(c => c.body.opId);
     expect(new Set(ids).size).toBe(1);
+  });
+  it("keeps earnings queued while the session is signed out and sends them after signing in again", async () => {
+    const server = fakeServer({ ...ZERO });
+    const t = setup({ ...ZERO }, server);
+    await t.open();
+    server.state.signedOut = true;
+    t.game.balances.credits += 50;
+    t.commit();
+    await vi.advanceTimersByTimeAsync(16_000);
+    t.game.balances.credits += 10;
+    t.commit();
+    await vi.advanceTimersByTimeAsync(16_000);
+    expect(JSON.parse(t.memory.get("spaceTypingWalletV1:acc")!).queue).toHaveLength(2);
+    expect(t.game.notices.filter((text) => /sign in again/.test(text))).toHaveLength(1);
+    expect(t.game.balances.credits).toBe(60);
+    server.state.signedOut = false;
+    await t.open(); // The same account signs in again.
+    expect(server.state.balances.credits).toBe(60);
+    expect(t.game.balances.credits).toBe(60);
+    expect(JSON.parse(t.memory.get("spaceTypingWalletV1:acc")!).queue).toHaveLength(0);
+    const ids = server.calls.filter((call) => call.body.kind === "earn" && call.body.deltas !== undefined).map((call) => call.body.opId);
+    expect(new Set(ids).size).toBe(2);
+  });
+  it("an expired session followed by a fresh sign-in reopens the wallet with the waiting earnings", async () => {
+    const server = fakeServer({ ...ZERO });
+    const t = setup({ ...ZERO }, server);
+    await t.open();
+    server.state.signedOut = true;
+    t.game.balances.credits += 50;
+    t.commit();
+    await vi.advanceTimersByTimeAsync(50);
+    const session = t.session as unknown as { account: { id: string } | null };
+    session.account = null;
+    await t.open();
+    server.state.signedOut = false;
+    session.account = { id: "acc" };
+    await t.open();
+    expect(server.state.balances.credits).toBe(50);
+    expect(t.game.balances.credits).toBe(50);
+  });
+  it("still drops an operation the server refuses for good", async () => {
+    const server = fakeServer({ ...ZERO });
+    const t = setup({ ...ZERO }, server);
+    await t.open();
+    server.state.refuse = "invalid-reward-day";
+    t.game.balances.credits += 50;
+    t.commit();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(JSON.parse(t.memory.get("spaceTypingWalletV1:acc")!).queue).toHaveLength(0);
+    expect(t.game.balances.credits).toBe(0);
+  });
+  it("classifies queued-op failures: only business refusals drop an operation", () => {
+    expect(queuedOpFailure(new OnlineError(401, "signed-out", ""))).toBe("signed-out");
+    expect(queuedOpFailure(new OnlineError(403, "banned", ""))).toBe("signed-out");
+    expect(queuedOpFailure(new OnlineError(403, "stage-locked", ""))).toBe("refused");
+    expect(queuedOpFailure(new OnlineError(409, "sortie-unknown", ""))).toBe("refused");
+    expect(queuedOpFailure(new OnlineError(409, "insufficient", ""))).toBe("refused");
+    expect(queuedOpFailure(new OnlineError(409, "busy", ""))).toBe("retry");
+    expect(queuedOpFailure(new OnlineError(429, "rate-limited", ""))).toBe("retry");
+    expect(queuedOpFailure(new OnlineError(404, "offline", ""))).toBe("retry");
+    expect(queuedOpFailure(new OnlineError(503, "unavailable", ""))).toBe("retry");
+    expect(queuedOpFailure(new OnlineError(0, "offline", ""))).toBe("retry");
+    expect(queuedOpFailure(new TypeError("Failed to fetch"))).toBe("retry");
   });
   it("persists an uncertain sortie start and reuses its id after reload", async () => {
     const server = fakeServer({ ...ZERO });
