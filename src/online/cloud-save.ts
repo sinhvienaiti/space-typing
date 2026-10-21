@@ -31,8 +31,10 @@ export type CloudConflict = {
 export type CloudSaveHost = {
   /** The latest committed save object, or null before the account loaded. */
   currentSave(): { version: number; [key: string]: unknown } | null;
-  /** Restores a save object as a new generation and reloads. */
+  /** Commits a save object as a new generation; throws when it cannot now (still loading, mid-sortie, mid-purchase). */
   restore(save: unknown): Promise<void>;
+  /** Starts the game again on the restored save. */
+  reload(): void;
   /** May uploads run now (not mid-sortie restore, not a read-only tab)? */
   canSync(): boolean;
   conflict(conflict: CloudConflict): void;
@@ -150,6 +152,19 @@ export class CloudSave {
     }
   }
 
+  /**
+   * Replaces this device's save with the cloud copy. The cloud revision is
+   * remembered only once the restore committed: a refused restore keeps the
+   * old one, so the next upload meets a conflict instead of overwriting it.
+   */
+  private async takeCloud(revision: number, data: unknown): Promise<void> {
+    await this.host.restore(data);
+    this.revision = revision;
+    this.uploaded = undefined;
+    this.remember();
+    this.host.reload();
+  }
+
   /** Called when the signed-in account changes: reconcile with the cloud copy. */
   private async attach(): Promise<void> {
     const account = this.session.account;
@@ -161,6 +176,8 @@ export class CloudSave {
     this.accountId = account.id;
     this.blocked = true;
     const known = readState(account.id);
+    // Until the cloud answers, upload only on top of what this device last confirmed for this account.
+    this.revision = known.revision;
     try {
       const cloud = await onlineRequest<{ revision: number; data: Record<string, unknown>; updatedAt: string; uploadId?: string | null }>("/save");
       const local = this.host.currentSave() as Record<string, unknown> | null;
@@ -179,11 +196,8 @@ export class CloudSave {
       }
       const choice = chooseCopy(summary(local), summary(cloud.data));
       if (choice === "cloud") {
-        this.revision = cloud.revision;
-        this.uploaded = undefined;
-        this.remember();
         this.host.status("Loading your cloud save…", "info");
-        await this.host.restore(cloud.data);
+        await this.takeCloud(cloud.revision, cloud.data);
         return;
       }
       if (choice === "local") {
@@ -199,12 +213,7 @@ export class CloudSave {
       this.host.conflict({
         cloud: { ...summary(cloud.data), revision: cloud.revision, updatedAt: cloud.updatedAt },
         local: summary(local),
-        useCloud: async () => {
-          this.revision = cloud.revision;
-          this.uploaded = undefined;
-          this.remember();
-          await this.host.restore(cloud.data);
-        },
+        useCloud: () => this.takeCloud(cloud.revision, cloud.data),
         useLocal: async () => {
           this.revision = cloud.revision;
           this.blocked = false;
@@ -296,13 +305,12 @@ export class CloudSave {
           try {
             this.host.status("Loading your cloud save…", "info");
             const cloud = await onlineRequest<{ revision: number; data: unknown }>("/save");
-            this.revision = cloud.revision;
-            this.uploaded = undefined;
-            this.remember();
-            await this.host.restore(cloud.data);
+            await this.takeCloud(cloud.revision, cloud.data);
           } catch {
             this.blocked = false;
             this.host.status("Cloud save unavailable · progress is saved on this device", "warn");
+            // Not restored (offline, or refused mid-sortie): meet the conflict again in a minute.
+            this.schedule(UPLOAD_EVERY_MS);
           }
           return;
         }
@@ -311,10 +319,7 @@ export class CloudSave {
           local: summary(save as Record<string, unknown>),
           useCloud: async () => {
             const cloud = await onlineRequest<{ revision: number; data: unknown }>("/save");
-            this.revision = cloud.revision;
-            this.uploaded = undefined;
-            this.remember();
-            await this.host.restore(cloud.data);
+            await this.takeCloud(cloud.revision, cloud.data);
           },
           useLocal: async () => {
             this.revision = details?.revision ?? this.revision;

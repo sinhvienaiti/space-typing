@@ -34,6 +34,7 @@ function fakeServer(initial: { revision: number; data: Record<string, unknown>; 
     fetch,
     calls,
     puts: () => calls.filter((call) => call.method === "PUT"),
+    cloud: () => cloud,
     setCloud: (value: typeof cloud) => (cloud = value),
     respond: (fn: typeof next) => (next = fn),
   };
@@ -54,10 +55,15 @@ function setup(local: Record<string, unknown> | null, server: ReturnType<typeof 
   const conflicts: CloudConflict[] = [];
   const restored: unknown[] = [];
   const statuses: string[] = [];
+  const host = { refuse: false, reloads: 0 };
   const sync = new CloudSave(session, {
     currentSave: () => local as { version: number },
     restore: async (save) => {
+      if (host.refuse) throw new Error("Finish the current sortie first.");
       restored.push(save);
+    },
+    reload: () => {
+      host.reloads += 1;
     },
     canSync: () => true,
     conflict: (conflict) => conflicts.push(conflict),
@@ -67,7 +73,7 @@ function setup(local: Record<string, unknown> | null, server: ReturnType<typeof 
     listeners.forEach((fn) => fn());
     await vi.advanceTimersByTimeAsync(100);
   };
-  return { sync, conflicts, restored, statuses, attach, memory };
+  return { sync, conflicts, restored, statuses, attach, memory, host };
 }
 
 beforeEach(() => {
@@ -113,6 +119,29 @@ describe("cloud save sync", () => {
     await t.attach();
     expect(t.restored).toEqual([PLAYED]);
     expect(t.conflicts).toEqual([]);
+    expect(t.host.reloads).toBe(1);
+    expect(JSON.parse(t.memory.get("spaceTypingCloudSaveV1:acc")!).revision).toBe(4);
+  });
+
+  it("a refused restore keeps the old revision, so this device cannot overwrite the other device's progress", async () => {
+    const server = fakeServer({ revision: 4, data: PLAYED });
+    const t = setup(FRESH, server);
+    t.host.refuse = true; // The local account is still loading, or a sortie runs.
+    await t.attach();
+    expect(t.restored).toEqual([]);
+    expect(t.memory.has("spaceTypingCloudSaveV1:acc")).toBe(false);
+    t.sync.noteCommitted();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(server.puts().map((call) => call.body?.baseRevision)).toEqual([0]);
+    expect(server.cloud()).toMatchObject({ revision: 4, data: PLAYED });
+    expect(t.host.reloads).toBe(0);
+    t.host.refuse = false; // Next try a minute later, once the sortie has ended.
+    await vi.advanceTimersByTimeAsync(61_000);
+    expect(server.puts().map((call) => call.body?.baseRevision)).toEqual([0, 0]);
+    expect(server.cloud()).toMatchObject({ revision: 4, data: PLAYED });
+    expect(t.restored).toEqual([PLAYED]);
+    expect(t.host.reloads).toBe(1);
+    expect(JSON.parse(t.memory.get("spaceTypingCloudSaveV1:acc")!).revision).toBe(4);
   });
 
   it("asks when both copies have progress", async () => {

@@ -12237,12 +12237,15 @@ cloudSave = new CloudSave(onlineSession, {
   currentSave: () => lastCommittedSave as unknown as { version: number; [key: string]: unknown } | null,
   canSync: () => persistenceReady && accountTransactions.canWrite() && !practiceRestorePending && !walletPurchaseBusy,
   restore: async (data) => {
+    // Refused while the account loads, a sortie runs or a purchase saves: CloudSave keeps its old revision.
+    if (!persistenceReady || warpAccount?.attempt || accountTransactions.busy() || walletPurchaseBusy || clearSettlementPending || practiceRestorePending)
+      throw new Error("Finish the current sortie or purchase before loading the cloud save.");
     const parsed = parsePlayerSaveJson(JSON.stringify(data));
     if (!parsed.ok) throw new Error("Cloud save is damaged: " + parsed.error);
     if (accountTransactions.canWrite()) await accountTransactions.restore(parsed.save, parsed.migrated);
     else await accountTransactions.recover(parsed.save, parsed.migrated);
-    window.location.reload();
   },
+  reload: () => window.location.reload(),
   conflict: (conflict) => accountDialog.conflict(conflict),
   status: (text, tone) => {
     cloudStatusText = text;
@@ -12325,7 +12328,6 @@ onlineSession.onChange(() => {
   if (onlineSession.online) cloudStatusText = "Connected · uploads at most once a minute.";
 });
 renderOnlineButton();
-void onlineSession.start().then(() => accountDialog.handleLinks());
 byId("titleMailButton").addEventListener("click", () => dailyHub?.open("mail"));
 /** Gameplay dialogs have their own sounds. */
 const QUIET_DIALOGS = new Set(["rewardChoiceDialog", "anomalyDialog"]);
@@ -12431,5 +12433,7 @@ if (import.meta.env.DEV) {
   };
 }
 void initializeArtPipeline();
-void initializePlayerProgress();
+// Cloud save and the server wallet compare against the local account, so the
+// online session starts only once it has loaded.
+void initializePlayerProgress().finally(() => void onlineSession.start().then(() => accountDialog.handleLinks()));
 void loadInitialVocabulary();
