@@ -1,137 +1,197 @@
-# Prompt tài sản cho Rift Defense (21/10/2026)
+# Prompt ảnh 2D → mô hình 3D cho Rift Defense (21/10/2026, bản V4)
 
-> **Dành cho:** chủ dự án (tạo ảnh và mô hình), AI làm tiếp (đưa vào game).
-> **Kế hoạch:** `docs/SPACE_TYPING_DEFENSE_PLAN_V3_2026-10-21.md`, mục 17.
-> **Hiện tại:** Rift Defense đã chạy bằng tài sản có sẵn:
-> - Lõi, cổng và 3 trụ dùng model relic và duel-target chủ dự án đã tạo;
-> - quái và boss dùng model quái và boss đã đóng gói.
->
-> Tài sản trong tài liệu này để **thay dần** cho đẹp và riêng hơn. Không có thì game vẫn chạy.
->
-> **Cập nhật V4 (21/10):**
-> - Game có **6 trụ**. Trụ Sét, Đền Hồi Phục, Trụ Thu Năng dùng tạm model có sẵn của chủ dự án (Trụ Sét: duel-target `disrupt`; hai trụ kia: relic). Prompt model riêng cho 3 trụ này ở `DEFENSE_MAPS_PROMPTS_2026-10-21.md` mục 6.
-> - **Ảnh bản đồ** (8 đảo, có ảnh khung bố cục) ở `DEFENSE_MAPS_PROMPTS_2026-10-21.md`. Mục 3.7 "Đảo nổi" dưới đây không cần làm nữa.
-> - Drone đàn bầy (mục 3.8) vẫn có ích: hiện drone dùng model Trinh Sát thu nhỏ của từng họ.
+> **Dành cho:** chủ dự án (tạo ảnh 2D, rồi tạo mô hình 3D), AI làm tiếp (đưa vào game).
+> **Kế hoạch:** `docs/SPACE_TYPING_DEFENSE_PLAN_V4_2026-10-21.md`.
+> **Hiện tại:** game đã chạy đủ. 6 trụ, Lõi và cổng đang dùng tạm model relic và duel-target của chủ dự án. Ảnh và model trong tài liệu này để **thay** bản tạm cho đúng chất Defense.
+> **Ảnh bản đồ** (8 đảo): `DEFENSE_MAPS_PROMPTS_2026-10-21.md`.
 
-## 1. Thứ tự đề xuất
+## 1. Cần làm gì
 
-| Đợt | Món | Vì sao |
+| Đợt | Món | Ảnh 2D lưu ở | Model 3D lưu ở | Đang dùng tạm |
+|---|---|---|---|---|
+| 1 | Lõi Rift | `art-src/defense/defense-core.png` | `art-src/3d/defense/defense-core.glb` | duel-target fate-crystal |
+| 1 | Cổng Rift | `art-src/defense/defense-gate.png` | `art-src/3d/defense/defense-gate.glb` | duel-target black-hole |
+| 1 | Trụ Băng (Frost Spire) | `art-src/defense/tower-frost.png` | `art-src/3d/defense/tower-frost.glb` | relic frost-rhythm |
+| 1 | Trụ Hút (Gravity Well) | `art-src/defense/tower-gravity.png` | `art-src/3d/defense/tower-gravity.glb` | duel-target gravity |
+| 2 | Trụ Sét (Arc Pylon) | `art-src/defense/tower-arc.png` | `art-src/3d/defense/tower-arc.glb` | duel-target disrupt |
+| 2 | Trụ Mồi Nổ (Volatile Beacon) | `art-src/defense/tower-beacon.png` | `art-src/3d/defense/tower-beacon.glb` | duel-target lock-on |
+| 2 | Đền Hồi Phục (Sanctum) | `art-src/defense/tower-sanctum.png` | `art-src/3d/defense/tower-sanctum.glb` | relic first-light-seed |
+| 2 | Trụ Thu Năng (Energy Siphon) | `art-src/defense/tower-siphon.png` | `art-src/3d/defense/tower-siphon.glb` | relic perfect-capacitor |
+| 3 | Quái Rainbow Scout, Rainbow Tank (vẽ lại 2D) | `art-src/enemies/rainbow-scout.png`, `rainbow-tank.png` | `art-src/3d/enemies/rainbow-scout.glb`, `rainbow-tank.glb` | model của họ prism |
+| 3 | 8 quái và 1 boss đã có ảnh 2D | (đã có) | xem mục 5 | model gần giống |
+
+- **Mỗi trụ chỉ cần một model.** Game tự thể hiện cấp và nhánh bằng kích thước, độ sáng, vòng sáng và màu.
+- Thư mục `art-src/defense/` chưa có thì tạo mới.
+
+## 2. Cách làm
+
+1. **Ảnh 2D** (ChatGPT hoặc Gemini): ảnh vuông 1024×1024. Prompt = **phần chung** (mục 3.1) + **phần riêng** của món đó + **dòng nền**.
+2. Chọn ảnh đẹp nhất, lưu đúng tên ở bảng mục 1.
+3. **Model 3D** (Meshy hoặc Tripo): chọn **Image to 3D**, tải ảnh 2D vừa lưu lên. Thiết lập như mục 2 của `3D_TRIPO_MESHY_PROMPTS_2026-10-16.md` (PBR bật, tam giác).
+   - Bật **tách nền** khi tải ảnh (Meshy: Remove Background), để không sót viền xanh hay hồng. Viền sót sẽ thành vệt phát sáng trên model.
+   - Meshy bản mới bỏ qua nút đối xứng và nút Remove lighting, nên ảnh 2D phải tự đối xứng và sáng đều. Prompt ở mục 3 đã dặn sẵn.
+   - Số tam giác: Lõi và cổng **9.000**; trụ **7.000**; quái **6.000**; boss **30.000**.
+   - Tải về **GLB**, đặt cùng tên ảnh 2D (đuôi `.glb`), lưu đúng chỗ ở bảng mục 1.
+4. Báo AI. AI trỏ preset sang file mới, chỉnh hướng, build và chụp kiểm tra.
+
+## 3. Prompt ảnh 2D
+
+### 3.1 Phần chung (dán đầu mọi prompt ở mục 3)
+
+```
+Single game asset concept for a fantasy tower-defense game: one structure standing on a low,
+compact hexagonal base of dark obsidian stone with thin gold trim, the base about half as wide
+as the structure is tall, one corner of the hexagon pointing straight at the viewer, seen from
+the front and slightly above (3/4 view, about 25 degrees down, near-orthographic, no perspective
+distortion), centred with a small margin, the whole object visible from base to tip, symmetrical,
+one connected solid piece with every part touching (nothing floating, no thin wires or gaps),
+bold readable silhouette that still reads from high above, painterly cinematic fantasy game art,
+crisp clean edges, solid opaque materials (no glass, no transparency), soft even front lighting
+with no harsh shadows or bright highlights, any energy, frost or lightning painted as glowing
+veins on the surface (no loose bolts, sparks, smoke or debris), no motion blur, no glow spilling
+onto the background, no text, no frame, no ground, no shadow.
+```
+
+### 3.2 Dòng nền (dán cuối)
+
+- Mọi món **trừ Trụ Thu Năng**:
+  `Flat pure #00FF00 green background, perfectly uniform, no gradient, no shadow; the subject contains no green at all.`
+- **Trụ Thu Năng** (năng lượng màu ngọc lam, dễ lẫn nền xanh):
+  `Flat pure #FF00FF magenta background, perfectly uniform, no gradient, no shadow; the subject contains no pink or magenta at all.`
+
+### 3.3 Phần riêng
+
+Mỗi trụ có **đỉnh khác hẳn nhau** để nhìn từ trên cao vẫn phân biệt: Băng là ngôi sao 6 cánh, Hút là quả cầu đen, Sét là vòng xuyến sáng, Mồi Nổ là con mắt đỏ, Đền là mái vòm vàng, Thu Năng là cột ngọc lam. Thân trụ dùng kim loại sáng (bạc, đồng, thép) để nổi trên nền map tối.
+
+**Lõi Rift — `defense-core.png`** (thứ quái muốn phá, phải to và nổi bật nhất):
+```
+The Rift Core: a tall faceted violet-pink crystal heart held up by four thick curved obsidian
+claws, two broad engraved gold rune bands wrapped tight around the crystal, the solid crystal
+glowing bright magenta-white, the base is a wide round obsidian dais with gold runes instead
+of the hexagon. Majestic, the heart of the island.
+```
+
+**Cổng Rift — `defense-gate.png`** (nơi quái đi ra; màu đỏ thẫm để khác Lõi):
+```
+The Rift Gate: a tall vertical ring portal of jagged black stone and short thick dark crimson
+crystal spikes, a solid opaque swirling crimson, violet and black vortex disc filling the ring
+edge to edge, two thick crystal pylons at its feet, cracked scorched rock instead of the hexagon
+base. Menacing, an open wound in space.
+```
+
+**Trụ Băng — `tower-frost.png`** (làm chậm, màu băng `#7fd8ff`):
+```
+Frost Spire tower: a tall slender spire of frosted, opaque pale ice-blue crystal rising from the
+base, surrounded at mid-height by a crown of six thick jagged ice shards splaying outward and up
+like a snowflake (a six-pointed star when seen from above), frosted silver bands at its foot,
+cyan frost runes carved and glowing along the facets, a sharp faceted crystal tip. Cold, elegant,
+icy cyan glow.
+```
+
+**Trụ Hút — `tower-gravity.png`** (gom quái lại, màu tím `#b07bff`):
+```
+Gravity Well tower: a squat heavy pylon of polished silver-grey metal with violet enamel plates,
+four thick curved claw arms holding a large charcoal-black sphere on top, open to the sky, with
+glowing violet swirls on its surface, a thick violet band set flush around the sphere's equator
+and fused to the arms, violet glowing seams on the pylon. Heavy, ominous, deep violet glow.
+```
+
+**Trụ Sét — `tower-arc.png`** (phá giáp, sét lan, màu trắng xanh `#9fc4ff`):
+```
+Arc Pylon tower: a tall tesla-coil tower of polished bronze with three thick stacked
+copper-and-crystal coil rings hugging the column, topped by a thick glowing blue-white torus
+(a doughnut-shaped discharge crown) with a short thick lightning rod rising from its centre,
+short thick lightning-rod spikes around the base, electricity painted as bright blue-white veins
+along the coils. Charged, technical, crackling blue-white glow.
+```
+
+**Trụ Mồi Nổ — `tower-beacon.png`** (đánh dấu quái để nổ, màu cam đỏ `#ff6a3d`):
+```
+Volatile Beacon tower: a short sturdy armoured mast of polished steel topped by a large red-orange
+targeting lens like a single eye, tilted up toward the sky and framed by a thick metal reticle ring
+fused to its rim, glowing ember-orange vents along the mast, orange warning chevrons on the plates,
+small round bomb pods clamped to the base. Dangerous, alert, hot orange glow.
+```
+
+**Đền Hồi Phục — `tower-sanctum.png`** (hồi máu Lõi và sửa trụ, màu vàng ấm `#ffd36b`):
+```
+Sanctum tower: a small open shrine of white marble and gold with four sturdy pillars under a
+domed gold canopy, a warm golden healing crystal standing on a short pedestal in the centre,
+a short gold spire crowning the dome, leaf-shaped gold ornaments on the pillars. Holy, calm,
+warm golden light.
+```
+
+**Trụ Thu Năng — `tower-siphon.png`** (kiếm thêm năng lượng, màu ngọc lam `#5cf2c8`; dùng nền hồng tím):
+```
+Energy Siphon tower: a squat reactor of polished silver metal with a tall solid column of opaque
+glowing teal crystal in the middle, swirling energy patterns painted on it, three thick curved
+collector arms hugging the column, glowing teal pipes running down the base, small gold energy
+cells set around the rim. Busy, valuable, teal and gold glow.
+```
+
+### 3.4 Prompt dự phòng cho Text to 3D (khi không dùng ảnh)
+
+Mỗi món dùng phần riêng ở trên, thêm đuôi:
+`Stylized fantasy game asset, hand-painted PBR textures, single object, symmetrical, no ground, no text, energy only as painted glow.`
+
+## 4. Quái Rainbow Scout và Rainbow Tank: vẽ lại 2D
+
+Ảnh hiện tại của hai quái này là cùng một con bọ tím tối, quay ngang, không giống bộ Rainbow (vỏ kẹo thủy tinh óng ánh, viền vàng). Vẽ lại theo công thức của `ENEMIES_BOSSES.md`.
+
+Ảnh mẫu đúng bộ: `art-src/enemies/rainbow-shield.png`. Nếu công cụ cho đính kèm ảnh, gửi kèm ảnh này và thêm dòng `Use the attached image only as a reference for material and colours, not for shape.` Hai prompt này giữ "rim light", vì ảnh còn dùng làm sprite cho game 2D.
+
+> Lưu ý: ảnh trong `art-src/enemies/` cũng là ảnh quái của **game 2D**. Thay ảnh rồi chạy `pnpm sprites:prepare` thì quái Rainbow Scout và Tank trong Campaign 2D cũng đổi theo (đúng bộ Rainbow hơn).
+
+**Rainbow Scout — `art-src/enemies/rainbow-scout.png`:**
+```
+Single game sprite for a vertical space shooter: one alien creature-craft seen from slightly
+above and in front (3/4 top-down view), facing DOWN toward the viewer, centred with a small
+margin, whole body visible, bold readable silhouette that still reads at 64 px,
+painterly cinematic fantasy game art, crisp clean edges, solid opaque body, rim light,
+no motion blur, no glow spilling onto the background, no text, no frame, no shadow on the ground.
+Made of glossy iridescent candy-glass and soap-bubble membranes, pastel pink, sky cyan, gold
+and lavender, tiny star sparkles on the shell. A small agile dart-shaped flyer with swept-back
+wings, built for speed.
+Flat pure #00FF00 green background, perfectly uniform, no gradient, no shadow; the subject contains no green at all.
+```
+
+**Rainbow Tank — `art-src/enemies/rainbow-tank.png`:**
+```
+Single game sprite for a vertical space shooter: one alien creature-craft seen from slightly
+above and in front (3/4 top-down view), facing DOWN toward the viewer, centred with a small
+margin, whole body visible, bold readable silhouette that still reads at 64 px,
+painterly cinematic fantasy game art, crisp clean edges, solid opaque body, rim light,
+no motion blur, no glow spilling onto the background, no text, no frame, no shadow on the ground.
+Made of glossy iridescent candy-glass and soap-bubble membranes, pastel pink, sky cyan, gold
+and lavender, tiny star sparkles on the shell. A heavy armoured juggernaut, broad and bulky,
+with thick layered armour plates.
+Flat pure #00FF00 green background, perfectly uniform, no gradient, no shadow; the subject contains no green at all.
+```
+
+Sau đó tạo model 3D từ ảnh mới (6.000 tam giác), lưu `art-src/3d/enemies/rainbow-scout.glb` và `rainbow-tank.glb`.
+
+## 5. Đã có ảnh 2D, chỉ cần tạo 3D
+
+Tải thẳng ảnh có sẵn lên Meshy/Tripo (Image to 3D), lưu model cùng tên:
+
+| Ảnh 2D có sẵn | Lưu model ở | Đang dùng tạm |
 |---|---|---|
-| 1 | Lõi (3.1), cổng (3.2), Trụ Băng 3 cấp (3.3) | Thấy nhiều nhất, quyết định "chất" của chế độ |
-| 2 | Trụ Xích và Trụ Mồi Nổ 3 cấp (3.4, 3.5), ô đặt trụ (3.6) | Hoàn thiện bộ trụ |
-| 3 | Drone đàn bầy theo họ quái (3.8) | Đàn bầy đẹp và đúng màu từng World |
-| 4 | Đảo nổi (3.7), biểu tượng 2D (mục 4) | Hoàn thiện khung cảnh và giao diện |
+| `art-src/enemies/devil-destroyer.png` | `art-src/3d/enemies/devil-destroyer.glb` | devil-cloaker |
+| `art-src/enemies/frost-destroyer.png` | `art-src/3d/enemies/frost-destroyer.glb` | frost-commander |
+| `art-src/enemies/frost-leech.png` | `art-src/3d/enemies/frost-leech.glb` | frost-healer |
+| `art-src/enemies/prism-splitter.png` | `art-src/3d/enemies/prism-splitter.glb` | prism-healer |
+| `art-src/enemies/rainbow-cloaker.png` | `art-src/3d/enemies/rainbow-cloaker.glb` | rainbow-commander |
+| `art-src/enemies/rainbow-destroyer.png` | `art-src/3d/enemies/rainbow-destroyer.glb` | rainbow-shield |
+| `art-src/enemies/shadow-destroyer.png` | `art-src/3d/enemies/shadow-destroyer.glb` | shadow-cloaker |
+| `art-src/enemies/magma-tank.png` | `art-src/3d/enemies/magma-tank.glb` | (chưa dùng trong game) |
+| `art-src/bosses/tyrant-g03.png` (30.000 tam giác) | `art-src/3d/bosses/tyrant-g03.glb` | warden-frost |
 
-## 2. Cách tạo
+## 6. Không bắt buộc: drone đàn bầy theo họ
 
-- **Mô hình 3D:** dùng Meshy hoặc Tripo, thiết lập như mục 2 của `3D_TRIPO_MESHY_PROMPTS_2026-10-16.md`.
-  - Mục 3 có cả prompt ảnh 2D. Nên tạo ảnh 2D trước (Gemini/ChatGPT), chọn ảnh đẹp, rồi dùng **Image to 3D**. Không có ảnh thì dán prompt 3D vào **Text to 3D**.
-  - Ảnh 2D: **nhìn thẳng từ trước, hơi chếch từ trên (khoảng 20°)**, vật thể nằm trọn trong khung, **nền xanh lá trơn #00FF00**, không chữ, không khung.
-  - Số tam giác: Lõi và cổng 9.000; trụ 7.000; ô đặt trụ 2.000; drone 1.500; đảo nổi 20.000.
-- **Tải về GLB**, đặt tên đúng như tên file ở tiêu đề mỗi mục, để vào `art-src/3d/defense/` (cả drone), rồi báo AI.
-  - Ảnh 2D dùng để tạo model thì để vào `art-src/defense/`, cùng tên (đuôi `.png`).
-  - Không lưu vào `~/Downloads/img-typing/` hay `art-src/models/raw/` nữa.
-- **AI làm phần còn lại:**
-  - file chưa nằm đúng chỗ thì chép vào `art-src/3d/defense/`;
-  - trỏ trường `source` của mục `items/<id>` (drone: `enemies/<id>`) trong `scripts/models/presets/campaign3d-models.json` tới `defense/<tên file>.glb`;
-  - dò hướng, giảm tam giác, thêm phát sáng;
-  - đóng gói bằng `node scripts/models/prepare-campaign3d-models.mjs --only=<loại>/<id>` (`items` hoặc `enemies`). Bản đã xử lý ra `art-src/models/<loại>/`, bản chạy game ra `public/assets/space-typing/models/<loại>/`;
-  - trụ 3 cấp: game hiện chỉ tải một model mỗi loại trụ (`items/tower-<loại>`, xem `src/defense/view/towers.ts`), nên cần thêm mã chọn model theo cấp;
-  - chụp kiểm tra.
+Hiện drone của quái Carrier dùng model Trinh Sát thu nhỏ của từng họ. Muốn drone riêng: phần chung quái ở mục 4 + phần họ trong `ENEMIES_BOSSES.md` mục 4 + `A tiny insect-like swarm drone with two pairs of thin wings and a small glowing core, readable at a very small size.` + dòng nền. Lưu `art-src/defense/<họ>-drone.png`, model `art-src/3d/defense/<họ>-drone.glb` (1.500 tam giác).
 
-## 3. Mô hình 3D
+## 7. AI đưa vào game
 
-Phong cách chung (đã có trong mỗi prompt): cosmic fantasy, crystal and dark metal, glowing energy, đọc rõ từ góc nhìn chéo trên cao.
-
-### 3.1 Lõi Rift — `defense-core.glb`
-
-**Ảnh 2D:**
-> Game asset concept, a floating "Rift Core": a tall faceted violet crystal heart wrapped in three slowly orbiting gold rings with engraved runes, a cradle of dark obsidian claws holding it from below, inner light pulsing magenta and white, small crystal shards hovering around. Front view slightly from above, whole object in frame, centered, symmetrical, plain #00FF00 background, no text, painterly high-detail sci-fi fantasy style.
-
-**3D (Text to 3D):**
-> Floating rift core crystal: tall faceted violet crystal heart, three thin gold rune rings around it, dark obsidian claw cradle below, small hovering crystal shards, glowing magenta-white core, symmetrical, game prop, PBR, clean silhouette, no base plate.
-
-### 3.2 Cổng Rift — `defense-gate.glb`
-
-**Ảnh 2D:**
-> Game asset concept, a "Rift Gate" portal: a vertical ring of jagged black stone and crystal spikes, a swirling vortex of violet, pink and cyan light inside, chains of floating rock fragments around the rim, two crystal pylons at the base. Front view slightly from above, whole object in frame, symmetrical, plain #00FF00 background, no text.
-
-**3D:**
-> Vertical rift portal gate: ring of jagged black stone with crystal spikes, swirling violet-pink vortex membrane inside, floating rock fragments around the rim, two crystal pylons at the base, symmetrical, game prop, PBR, readable silhouette from above.
-
-### 3.3 Trụ Băng 3 cấp — `tower-frost-1.glb`, `tower-frost-2.glb`, `tower-frost-3.glb`
-
-Cùng một thiết kế, cấp sau to và nhiều chi tiết hơn. Tạo ảnh cấp 1 trước, rồi sửa prompt để có cấp 2 và cấp 3.
-
-**Ảnh 2D (cấp 1):**
-> Game asset concept, "Frost Spire" tower level 1: a slim pale-blue ice crystal obelisk on a round dark-metal base with silver trim, a ring of frost runes glowing cyan around the middle, cold mist at the foot. Front view slightly from above, whole tower in frame, symmetrical, plain #00FF00 background, no text.
-
-- **Cấp 2:** thêm *"two smaller crystal spikes flanking the obelisk, a floating snowflake halo above the tip"*.
-- **Cấp 3:** thêm *"a crown of six ice spikes, a large rotating snowflake halo, frozen shards orbiting, brighter cyan core"*.
-
-**3D (cấp 1):**
-> Frost spire tower: slim pale-blue ice crystal obelisk on a round dark metal base with silver trim, glowing cyan frost rune ring around the middle, symmetrical, game tower, PBR, clean silhouette from above.
-
-### 3.4 Trụ Xích 3 cấp — `tower-gravity-1/2/3.glb`
-
-**Ảnh 2D (cấp 1):**
-> Game asset concept, "Gravity Well" tower level 1: a squat dark-metal pylon holding a small black-violet singularity sphere between two curved arms, a faint violet distortion ring around the sphere, purple glow lines on the base. Front view slightly from above, whole tower in frame, symmetrical, plain #00FF00 background, no text.
-
-- **Cấp 2:** *"four curved arms, a larger singularity, two orbiting rings"*.
-- **Cấp 3:** *"an open cage of arms, a big singularity with a bright accretion disk, gravity chains hanging down"*.
-
-**3D (cấp 1):**
-> Gravity well tower: squat dark metal pylon with two curved arms holding a black-violet singularity sphere, violet distortion ring, purple glow lines, symmetrical, game tower, PBR.
-
-### 3.5 Trụ Mồi Nổ 3 cấp — `tower-beacon-1/2/3.glb`
-
-**Ảnh 2D (cấp 1):**
-> Game asset concept, "Volatile Beacon" tower level 1: a narrow dark tower with a red-orange targeting lens on top like an eye, a rotating reticle ring around the lens, ember vents on the sides, warning chevrons in orange. Front view slightly from above, whole tower in frame, symmetrical, plain #00FF00 background, no text.
-
-- **Cấp 2:** *"twin lenses, a taller mast, a bigger reticle ring"*.
-- **Cấp 3:** *"a large burning lens, three reticle rings, small bomb pods on the base"*.
-
-**3D (cấp 1):**
-> Volatile beacon tower: narrow dark metal tower topped by a glowing red-orange targeting lens eye, a reticle ring around it, ember vents, orange warning chevrons, symmetrical, game tower, PBR.
-
-### 3.6 Ô đặt trụ — `tower-pad.glb`
-
-> Hexagonal tower build pad: low dark obsidian hexagon platform with thin glowing violet circuit lines, a recessed center circle, four small crystal studs on the corners, flat top, game prop, PBR, top-down readable.
-
-### 3.7 Đảo nổi làm bản đồ — `defense-island.glb`
-
-> Large floating island battlefield seen from above: a flat wide plateau of dark rock and violet crystal veins, smooth flat top area for a winding road, broken jagged underside with hanging crystals and roots, small crystal clusters on the edges, game environment piece, PBR.
-
-### 3.8 Drone đàn bầy theo họ — `<họ>-drone.glb` (8 file)
-
-Prompt chung, thay phần trong ngoặc theo họ:
-
-> Tiny swarm drone creature, insect-like, two pairs of thin wings and a small glowing core, (STYLE), symmetrical, readable at small size, game enemy, PBR.
-
-| Họ | STYLE |
-|---|---|
-| rainbow | pearlescent white shell with rainbow iridescent wings |
-| angel | gold and ivory plates with feather-shaped wings |
-| devil | black and crimson horned shell with lava-red glow |
-| frost | ice-blue crystal shell with frosted transparent wings |
-| prism | violet-blue prism crystal shell with rainbow refractions |
-| nature | green leaf wings and wooden shell with glowing seeds |
-| shadow | dark purple smoke-like shell with violet flame wings |
-| cosmic | deep blue starry shell with gold trims and nebula wings |
-
-## 4. Biểu tượng 2D (Gemini / ChatGPT)
-
-- Cỡ 512×512, nền trong suốt (hoặc nền xanh #00FF00 để AI tách), không chữ.
-- Phong cách Holo Command của game: viền phát sáng, kim loại tối, năng lượng tím, cam và xanh.
-- Đặt tên như bảng, để vào `art-src/defense/icons/` (tạo thư mục nếu chưa có).
-
-| Tên file | Prompt |
-|---|---|
-| `icon-tower-frost.png` | Game UI icon, a slim ice crystal obelisk tower with a cyan rune ring, glowing frost aura, dark holographic frame, centered. |
-| `icon-tower-gravity.png` | Game UI icon, a dark pylon holding a black-violet singularity sphere with a distortion ring, purple glow, centered. |
-| `icon-tower-beacon.png` | Game UI icon, a dark tower with a red-orange targeting lens eye inside a rotating reticle, ember glow, centered. |
-| `icon-skill-breath.png` | Game UI icon, a dragon head breathing a cone of fire full of tiny bomb sparks, orange and gold, centered. |
-| `icon-skill-roar.png` | Game UI icon, a dragon roaring with golden shockwave rings pushing outward, centered. |
-| `icon-skill-nova.png` | Game UI icon, a bright white-violet nova burst with short letter glyphs flying out, centered. |
-| `boon-wide-blast.png` … `boon-eager-dragon.png` (9 tấm) | Game card art, (TÊN PHƯỚC LÀNH: mô tả ở V3 mục 9), dark violet card background with glowing rune border, centered emblem. |
-| `rift-defense-keyart.png` (1600×900) | Key art: a winged fire dragon hovering over a glowing violet crystal core on a floating island, a winding energy road to a swirling rift portal, a horde of crystal creatures pouring out, frost and gravity towers along the road, cosmic nebula sky, epic, cinematic. |
+- Trỏ `source` của `items/<id>` (quái: `enemies/<id>-3d`; boss: `bosses/<id>`) trong `scripts/models/presets/campaign3d-models.json` sang file mới; bỏ `placeholder` nếu có.
+- Chạy `node scripts/models/index-3d-sources.mjs`, rồi `node scripts/models/prepare-campaign3d-models.mjs`. Pipeline báo REVIEW cho model mới: chỉnh `rotate` cho đúng hướng, chạy lại với `--force --only=<khóa>`.
+- Chụp kiểm tra trong Defense và Campaign 3D.

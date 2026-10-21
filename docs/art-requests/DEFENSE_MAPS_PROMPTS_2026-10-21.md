@@ -79,20 +79,6 @@
 3. Chụp kiểm tra bằng `scripts/visual/scenarios/defense.mjs`.
 4. Muốn xuất lại ảnh khung (khi đổi bố cục): `URL=http://127.0.0.1:3098/ node scripts/visual/cdp-run.mjs scripts/visual/scenarios/defense-map-guides.mjs`.
 
-## 6. Mô hình 3D cho 3 trụ mới (không bắt buộc)
+## 6. Mô hình 3D cho trụ, Lõi và cổng
 
-Trụ Sét, Đền Hồi Phục và Trụ Thu Năng đang dùng tạm model của chủ dự án:
-- Trụ Sét: duel-target `disrupt` (`art-src/3d/duel-targets/disrupt.glb`);
-- Đền Hồi Phục: relic `first-light-seed`, hạt sáng (`art-src/3d/relics/relic-first-light-seed.glb`);
-- Trụ Thu Năng: relic `perfect-capacitor`, bình năng lượng (`art-src/3d/relics/relic-perfect-capacitor.glb`).
-
-Muốn có model riêng, tạo theo `DEFENSE_ASSETS_PROMPTS_2026-10-21.md` mục 2 (cách tạo), với prompt dưới đây. Tên file `tower-arc.glb`, `tower-sanctum.glb`, `tower-siphon.glb`; để vào `art-src/3d/defense/`.
-
-**Trụ Sét (Arc Pylon):**
-> Arc pylon tower: tall dark metal tesla coil with three stacked copper-and-crystal rings, a glowing blue-white orb on top crackling with lightning, small lightning rods around the base, symmetrical, game tower, PBR, clean silhouette from above.
-
-**Đền Hồi Phục (Sanctum):**
-> Healing sanctum tower: small white-and-gold marble shrine with four slim pillars around a floating golden-green healing crystal, soft halo ring above it, leaf-shaped gold ornaments, symmetrical, game tower, PBR, readable from above.
-
-**Trụ Thu Năng (Energy Siphon):**
-> Energy siphon tower: squat dark metal reactor with a glass cylinder of swirling teal energy in the middle, three curved collector arms on top, glowing teal pipes on the base, symmetrical, game tower, PBR, clean silhouette from above.
+Prompt ảnh 2D và cách tạo model cho cả 6 trụ, Lõi và cổng nay ở `DEFENSE_ASSETS_PROMPTS_2026-10-21.md` (mục 3). Ảnh lưu ở `art-src/defense/`, model ở `art-src/3d/defense/`.

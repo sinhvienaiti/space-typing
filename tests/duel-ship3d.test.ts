@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DuelShip3D, ship3dEnabled, ship3dMode } from "../src/duel/ship3d";
@@ -57,17 +57,22 @@ describe("Duel 3D hull", () => {
       };
       expect(model.aspect).toBeGreaterThan(0.5);
       expect(model.heightScale).toBeGreaterThan(0);
-      const bytes = readFileSync(join(ROOT, id, model.height.split("?")[0]!));
-      expect(bytes.length).toBe(model.heightGrid[0] * model.heightGrid[1]);
-      const colorBytes = readFileSync(join(ROOT, id, model.color.split("?")[0]!));
-      expect(colorBytes.length).toBeGreaterThan(1000);
-      const color = await sharp(colorBytes).metadata();
-      const emissive = await sharp(join(ROOT, id, model.emissive.split("?")[0]!)).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-      // Emission intentionally uses a smaller texture than the hull paint.
-      expect(emissive.info.width).toBeGreaterThan(0);
-      expect(emissive.info.height).toBeGreaterThan(0);
-      expect(Math.abs(emissive.info.width / emissive.info.height - color.width! / color.height!)).toBeLessThan(0.01);
-      expect(emissive.data.some(value => value > 0)).toBe(true);
+      // Relief textures made since 21/10/2026 stay out of Git (owner rule), so a bare checkout
+      // checks their metadata only; the default hull is tracked and always checked in full.
+      const heightPath = join(ROOT, id, model.height.split("?")[0]!);
+      if (id === "vanguard" || existsSync(heightPath)) {
+        const bytes = readFileSync(heightPath);
+        expect(bytes.length).toBe(model.heightGrid[0] * model.heightGrid[1]);
+        const colorBytes = readFileSync(join(ROOT, id, model.color.split("?")[0]!));
+        expect(colorBytes.length).toBeGreaterThan(1000);
+        const color = await sharp(colorBytes).metadata();
+        const emissive = await sharp(join(ROOT, id, model.emissive.split("?")[0]!)).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+        // Emission intentionally uses a smaller texture than the hull paint.
+        expect(emissive.info.width).toBeGreaterThan(0);
+        expect(emissive.info.height).toBeGreaterThan(0);
+        expect(Math.abs(emissive.info.width / emissive.info.height - color.width! / color.height!)).toBeLessThan(0.01);
+        expect(emissive.data.some(value => value > 0)).toBe(true);
+      }
       // Engine colours from the painting (Vanguard: its light rig), as #rrggbb.
       const colors = (model as unknown as { colors?: Record<string, string> }).colors;
       for (const key of ["hot", "plume", "outer"]) expect(colors?.[key]).toMatch(/^#[0-9a-f]{6}$/i);
