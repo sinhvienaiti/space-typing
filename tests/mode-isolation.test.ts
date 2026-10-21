@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { describe, expect, it } from "vitest";
+import { storageKeys } from "./td/source-scan";
 
 /**
  * Campaign 3D (campaign-3d.html: src/campaign3d) and Rift Defense
@@ -107,14 +108,13 @@ describe("Typing Defense stays apart", () => {
     expect(crossing).toEqual([]);
   });
 
-  it("writes only keys that start with td. (docs/td/TYPING_DEFENSE_DESIGN.md 25.13)", () => {
-    const constants = new Map<string, string>();
-    for (const file of own) for (const match of file.text.matchAll(/const\s+([A-Z0-9_]+)\s*=\s*"([^"]+)"/g)) constants.set(match[1]!, match[2]!);
-    const written = own.flatMap((file) => [...file.text.matchAll(/(?:setItem|writeJson|commitItem)\(\s*([A-Za-z0-9_]+|"[^"]+")/g)].map((match) => match[1]!));
-    for (const key of written) {
-      const value = key.startsWith('"') ? key.slice(1, -1) : constants.get(key);
-      expect(value, key).toMatch(/^td\./);
-    }
+  it("reads and writes only keys that start with td. (docs/td/TYPING_DEFENSE_DESIGN.md 25.13)", () => {
+    const found = own.flatMap((file) =>
+      storageKeys(file.text)
+        .filter(({ key }) => key === null || !key.startsWith("td."))
+        .map(({ method, key }) => file.path + ": " + method + "(" + (key ?? "a key the scan cannot read") + ")"),
+    );
+    expect(found).toEqual([]);
   });
 
   it("goes through src/platform/safe-storage and never names a Space Typing key", () => {
@@ -122,5 +122,41 @@ describe("Typing Defense stays apart", () => {
       [...file.text.matchAll(/\b(?:localStorage|sessionStorage)\s*[.[]|\bindexedDB\b|\bonlineRequest\b|["'`]spaceTyping\w*/g)].map((match) => file.path + ": " + match[0]),
     );
     expect(found).toEqual([]);
+  });
+});
+
+describe("the storage key scan itself", () => {
+  const keys = (text: string) => storageKeys(text).map(({ method, key }) => method + ": " + key);
+
+  it("reads literal, template and constant keys of every SafeStorage method", () => {
+    const text = [
+      'const RUN = "td.run.v1";',
+      "const OTHER: string = 'campaign3d.save';",
+      'store.setItem("td.settings.v1", a); store.readJson(RUN); store.writeJson(`td.profile.${slot}`, b);',
+      "store.getItem('td.a'); store.readItem(OTHER); store.commitItem(`td.b`, c); store.removeItem(\"campaign3d.save\");",
+    ].join("\n");
+    expect(keys(text)).toEqual([
+      "setItem: td.settings.v1", "readJson: td.run.v1", "writeJson: td.profile.${slot}",
+      "getItem: td.a", "readItem: campaign3d.save", "commitItem: td.b", "removeItem: campaign3d.save",
+    ]);
+  });
+
+  it("reads every key of a setItems object", () => {
+    expect(keys('const RUN = "td.run.v1";\nstore.setItems({ "other.key2": "1", \'td.a\': f(x, y), plain: v, [RUN]: w, shorthand, ...rest, });')).toEqual([
+      "setItems: other.key2", "setItems: td.a", "setItems: plain", "setItems: td.run.v1", "setItems: shorthand", "setItems: null",
+    ]);
+  });
+
+  it("fails closed on a key it cannot read", () => {
+    expect(keys('store.setItem(key, v); store.commitItem("td." + id, v); store.setItem(`other.${x}`, v); store.setItems(entries);')).toEqual([
+      "setItem: null", "commitItem: null", "setItem: other.${x}", "setItems: null",
+    ]);
+    expect(keys('const { setItem } = store; store["readItem"]("td.a"); store.removeItem.call(store, "td.a"); store.getItem?.("td.a");')).toEqual([
+      "setItem: null", "readItem: null", "removeItem: null", "getItem: null",
+    ]);
+  });
+
+  it("skips comments and prose in strings", () => {
+    expect(keys('// store.setItem("other", v)\n/* removeItem("x") */\nconst label = "setItem(other) failed";')).toEqual([]);
   });
 });

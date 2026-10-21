@@ -1,6 +1,8 @@
 // Typing Defense 1A (docs/td/BUILD_NOW.md §6.2): td.html?sandbox=1 boots with
 // no media at all, draws its ground, shows its HUD in Be Vietnam Pro, and logs
-// no console error or page exception. Exits 1 when a check fails.
+// no console error or page exception. A request the server refuses (a 403 or
+// 404 font) reaches no console API, so the resource timings are read too.
+// Exits 1 when a check fails.
 //   URL=http://127.0.0.1:3110/ OUT_DIR=… node scripts/visual/cdp-run.mjs scripts/visual/scenarios/td-1a-boot.mjs --width=1280 --height=720
 import { DEV_URL, gesture, out } from "./common.mjs";
 
@@ -9,6 +11,8 @@ const td = (code) => "(() => { const t = window.__td; if (!t) return null; " + c
 export default async function (page) {
   const base = DEV_URL.replace(/\/$/, "");
   const size = page.width + "x" + page.height;
+  // The dev server's module requests would fill the default 250-entry buffer and hide later failures.
+  await page.send("Page.addScriptToEvaluateOnNewDocument", { source: "performance.setResourceTimingBufferSize(100000);" });
   await page.goto(base + "/td.html?sandbox=1", { settle: 300 });
   await gesture(page);
   let ready = false;
@@ -32,6 +36,7 @@ export default async function (page) {
       font: document.fonts.check("700 14px 'Be Vietnam Pro'", "Typing Defense") && document.fonts.check("800 12px 'Be Vietnam Pro'", "Hộp cát") &&
         getComputedStyle(hud).fontFamily.startsWith('"Be Vietnam Pro"'),
       media,
+      failed: performance.getEntriesByType("resource").filter((entry) => entry.responseStatus >= 400).map((entry) => entry.responseStatus + " " + entry.name),
       scroll: [document.documentElement.scrollWidth, document.documentElement.scrollHeight],
     };
   })()`);
@@ -44,6 +49,7 @@ export default async function (page) {
     hudShown: (state?.hud?.width ?? 0) > 0 && (state?.hud?.height ?? 0) > 0,
     fontLoaded: state?.font === true,
     noMedia: (state?.media?.length ?? 1) === 0,
+    noFailedLoads: (state?.failed?.length ?? 1) === 0,
     noPageScroll: state?.scroll?.[0] <= page.width && state?.scroll?.[1] <= page.height,
     noConsoleErrors: page.logs.filter((line) => line.startsWith("error")).length === 0,
     noExceptions: page.exceptions.length === 0,

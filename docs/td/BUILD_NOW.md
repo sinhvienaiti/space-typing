@@ -79,7 +79,8 @@ Mục tiêu ≤ 5.000 dòng mã (không tính test). Trần cứng 5.500; chạm
 - `src/scene3d/keys.ts` (`typedLetter`, `isComposingKey`, `vietnameseInputSign`) — dùng ở `app/input.ts`.
 - `src/logic.ts` (`typingText`) — dùng ở `app/vocab.ts`.
 - `src/vocabulary.ts` (`loadVocabularyIndex`, `loadVocabularyLevel`) — dùng ở `app/vocab.ts`.
-- `@fontsource/be-vietnam-pro` — ở `ui/td.css`.
+
+Phông `@fontsource/be-vietnam-pro` ở `ui/td.css` không phải ngoại lệ: TK 25.3 luật 1 đã cho mọi `@fontsource/*`. Test đọc danh sách trên, đòi `LEGACY_IMPORTS` khớp đúng, và giữ một trần cố định để danh sách chỉ ngắn đi.
 
 **Sửa file có sẵn:**
 - `tests/mode-isolation.test.ts`: thêm `"td/"` vào danh sách được import `scene3d/`; thêm ca "không file nào ngoài `td/` import `td/`" và "`td/` chỉ ghi khóa lưu bắt đầu bằng `td.`".

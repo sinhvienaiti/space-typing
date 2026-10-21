@@ -1,6 +1,8 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
+import { blank } from "./td/source-scan";
 
 /**
  * Typing Defense's boundary (docs/td/TYPING_DEFENSE_DESIGN.md 25.3,
@@ -23,78 +25,64 @@ function sources(dir: string): Source[] {
   });
 }
 
+type LegacyImport = { module: string; names: readonly string[]; from: readonly string[] };
+
 /**
- * Space Typing modules src/td may still load, by whom and which exports
- * (BUILD_NOW §2). Only app/, view/ and legacy/ hold them, and the list may only
- * get shorter. @fontsource/be-vietnam-pro, also named there, is a package
- * that rule 1 allows everywhere, so it needs no entry.
+ * Space Typing modules src/td may still load, by whom and which exports: the
+ * list in BUILD_NOW §2. Only app/, view/ and legacy/ hold them. Fonts are no
+ * entry: rule 1 allows @fontsource/* everywhere.
  */
-const LEGACY_IMPORTS: readonly { module: string; names: readonly string[]; from: readonly string[] }[] = [
+const LEGACY_IMPORTS: readonly LegacyImport[] = [
   { module: "src/scene3d/keys", names: ["typedLetter", "isComposingKey", "vietnameseInputSign"], from: ["src/td/app/input.ts"] },
   { module: "src/logic", names: ["typingText"], from: ["src/td/app/vocab.ts"] },
   { module: "src/vocabulary", names: ["loadVocabularyIndex", "loadVocabularyLevel"], from: ["src/td/app/vocab.ts"] },
 ];
+
+/**
+ * The 1A list, the most LEGACY_IMPORTS may ever hold: TK 25.3 rule 1 lets it
+ * only get shorter. Delete what goes away; never add here, since a new
+ * exception is a design change (TK 25.3), not a fix.
+ */
+const LEGACY_CEILING: readonly LegacyImport[] = [
+  { module: "src/scene3d/keys", names: ["typedLetter", "isComposingKey", "vietnameseInputSign"], from: ["src/td/app/input.ts"] },
+  { module: "src/logic", names: ["typingText"], from: ["src/td/app/vocab.ts"] },
+  { module: "src/vocabulary", names: ["loadVocabularyIndex", "loadVocabularyLevel"], from: ["src/td/app/vocab.ts"] },
+];
+
+const legacyKey = (entry: LegacyImport) => entry.module + " (" + entry.names.join(", ") + ") ← " + entry.from.join(", ");
+
+/** BUILD_NOW §2's "Ngoại lệ import cho 1A" bullets; one the pattern cannot read throws. */
+function documentedLegacy(markdown: string): LegacyImport[] {
+  const block = markdown.split("**Ngoại lệ import cho 1A**")[1]?.split(/\n\s*\n/)[0] ?? "";
+  return block
+    .split("\n")
+    .filter((line) => line.startsWith("- "))
+    .map((line) => {
+      const match = /^- `(src\/[^`]+)\.ts` \(([^)]*)\) — dùng ở `([^`]+)`/.exec(line);
+      if (match === null) throw new Error("BUILD_NOW §2: unreadable exception: " + line);
+      return { module: match[1]!, names: [...match[2]!.matchAll(/`([^`]+)`/g)].map((name) => name[1]!), from: ["src/td/" + match[3]!] };
+    });
+}
+
 const PACKAGES = /^(three|three\/examples\/jsm\/.+|@fontsource\/.+)$/;
 const PURE_ROOTS = ["src/td/sim/", "src/td/typing/", "src/td/content/"];
 const PURE_PLATFORM = ["src/platform/rng"];
 const ALLOWED_MATH = ["sqrt", "floor", "ceil", "round", "trunc", "abs", "min", "max", "sign", "imul", "clz32"];
-const FORBIDDEN_GLOBALS = [
-  "window", "document", "performance", "Date", "localStorage", "sessionStorage", "requestAnimationFrame",
-  "setTimeout", "setInterval", "globalThis", "navigator", "crypto",
-];
-
 /**
- * Blanks comments and, with `strings`, what string and template literals
- * hold (not a template's `${…}` code), keeping every offset and line break.
+ * Globals the rules may not name. After a dot a name is a property
+ * (`point.window`), so `self.Date` is caught by `self`. The ES library's
+ * clock, random, locale, code-from-strings and garbage-collector hooks, plus
+ * host names that are rarely a local's. Every other host global (top,
+ * parent, frames, name, console…) is caught by compiling the rules without
+ * the DOM and Node libraries (hostProblems).
  */
-function blank(text: string, strings: boolean): string {
-  const out = text.split("");
-  const hide = (from: number, to: number) => {
-    for (let index = from; index < to; index += 1) if (out[index] !== "\n") out[index] = " ";
-  };
-  const open: number[] = [];
-  let inTemplate = false;
-  let index = 0;
-  while (index < text.length) {
-    const char = text[index]!;
-    const next = text[index + 1];
-    if (inTemplate) {
-      if (char === "`") inTemplate = false;
-      else if (char === "$" && next === "{") {
-        open.push(0);
-        inTemplate = false;
-        index += 2;
-        continue;
-      } else if (strings) hide(index, char === "\\" ? index + 2 : index + 1);
-      index += char === "\\" ? 2 : 1;
-      continue;
-    }
-    if (char === "/" && (next === "/" || next === "*")) {
-      const end = next === "/" ? text.indexOf("\n", index) : text.indexOf("*/", index + 2);
-      const stop = end < 0 ? text.length : next === "/" ? end : end + 2;
-      hide(index, stop);
-      index = stop;
-      continue;
-    }
-    if (char === '"' || char === "'") {
-      let end = index + 1;
-      while (end < text.length && text[end] !== char && text[end] !== "\n") end += text[end] === "\\" ? 2 : 1;
-      if (strings) hide(index + 1, end);
-      index = end + 1;
-      continue;
-    }
-    if (char === "`") inTemplate = true;
-    else if (open.length > 0 && char === "{") open[open.length - 1]! += 1;
-    else if (open.length > 0 && char === "}") {
-      if (open[open.length - 1] === 0) {
-        open.pop();
-        inTemplate = true;
-      } else open[open.length - 1]! -= 1;
-    }
-    index += 1;
-  }
-  return out.join("");
-}
+const FORBIDDEN_GLOBALS = [
+  "window", "self", "document", "performance", "Date", "localStorage", "sessionStorage", "requestAnimationFrame",
+  "setTimeout", "setInterval", "setImmediate", "queueMicrotask", "structuredClone", "globalThis", "navigator", "crypto",
+  "process", "require", "Intl", "eval", "Function", "WeakRef", "FinalizationRegistry",
+];
+/** ICU- and locale-dependent: Node and Chrome may sort or print differently. Banned on any object. */
+const FORBIDDEN_METHODS = ["localeCompare", "toLocaleString", "toLocaleUpperCase", "toLocaleLowerCase", "toLocaleDateString", "toLocaleTimeString"];
 
 type Import = { spec: string; names: string[] };
 
@@ -135,12 +123,47 @@ function target(file: string, spec: string): string {
 function purityProblems(text: string): string[] {
   const code = blank(text, true);
   const problems: string[] = [];
-  const globals = new RegExp("(?<![\\w$.])(" + FORBIDDEN_GLOBALS.join("|") + ")(?![\\w$])", "g");
-  for (const match of code.matchAll(globals)) problems.push(match[1]!);
+  const globals = new RegExp("(?<![\\w$.])(" + FORBIDDEN_GLOBALS.join("|") + ")(?![\\w$])|(?<![\\w$])(" + FORBIDDEN_METHODS.join("|") + ")(?![\\w$])", "g");
+  for (const match of code.matchAll(globals)) problems.push(match[1] ?? match[2]!);
   const math = new RegExp("\\bMath\\b(?!\\s*\\.\\s*(?:" + ALLOWED_MATH.join("|") + ")\\b)(\\s*\\.\\s*\\w+)?", "g");
   for (const match of code.matchAll(math)) problems.push(match[0].replace(/\s/g, ""));
   if (code.includes("**")) problems.push("**");
   return problems;
+}
+
+const configured = ts.parseJsonConfigFileContent(ts.readConfigFile(join(ROOT, "tsconfig.json"), ts.sys.readFile).config, ts.sys, ROOT).options;
+/** tsconfig.json without the DOM libraries and with no @types: what a browser or Node supplies is undeclared. */
+const HOSTLESS: ts.CompilerOptions = { ...configured, lib: (configured.lib ?? []).filter((lib) => !/dom|webworker|scripthost/i.test(lib)), types: [], noEmit: true };
+const libraries = new Map<string, ts.SourceFile | undefined>();
+
+/**
+ * Compiles the given files with HOSTLESS. A host global (window, self, top,
+ * parent, frames, name, performance, process, structuredClone, console…)
+ * then fails as an undeclared name, while a local of the same name (an A*
+ * `parent` array) still compiles. Reports the name, or the message of any
+ * other error.
+ */
+function hostProblems(files: readonly Source[]): { path: string; problem: string }[] {
+  const own = new Map(files.map((file) => [join(ROOT, file.path), file]));
+  const host = ts.createCompilerHost(HOSTLESS);
+  const read = host.getSourceFile.bind(host);
+  const exists = host.fileExists.bind(host);
+  host.fileExists = (name) => own.has(name) || exists(name);
+  host.getSourceFile = (name, language, ...rest) => {
+    const file = own.get(name);
+    if (file !== undefined) return ts.createSourceFile(name, file.text, language);
+    if (!libraries.has(name)) libraries.set(name, read(name, language, ...rest));
+    return libraries.get(name);
+  };
+  const program = ts.createProgram({ rootNames: [...own.keys()], options: HOSTLESS, host });
+  return [...own].flatMap(([name, file]) => {
+    const source = program.getSourceFile(name)!;
+    return [...program.getSyntacticDiagnostics(source), ...program.getSemanticDiagnostics(source)].map((diagnostic) => {
+      const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, " ");
+      const start = diagnostic.start ?? 0;
+      return { path: file.path, problem: message.startsWith("Cannot find name") ? source.text.slice(start, start + (diagnostic.length ?? 0)) : message };
+    });
+  });
 }
 
 const isPure = (path: string) => PURE_ROOTS.some((root) => path.startsWith(root)) || PURE_PLATFORM.some((module) => path.replace(/\.ts$/, "") === module);
@@ -179,6 +202,22 @@ describe("Typing Defense boundary (TK 25.3)", () => {
     }
   });
 
+  it("LEGACY_IMPORTS is BUILD_NOW §2's list and never outgrows the 1A ceiling", () => {
+    const documented = documentedLegacy(readFileSync(join(ROOT, "docs/td/BUILD_NOW.md"), "utf8"));
+    expect(LEGACY_IMPORTS.map(legacyKey)).toEqual(documented.map(legacyKey));
+    for (const entry of LEGACY_IMPORTS) {
+      const ceiling = LEGACY_CEILING.find((bound) => bound.module === entry.module);
+      expect(ceiling, entry.module).toBeDefined();
+      expect(entry.names.filter((name) => !ceiling!.names.includes(name)), entry.module).toEqual([]);
+      expect(entry.from.filter((path) => !ceiling!.from.includes(path)), entry.module).toEqual([]);
+    }
+    expect(LEGACY_CEILING.map(legacyKey)).toEqual([
+      "src/scene3d/keys (typedLetter, isComposingKey, vietnameseInputSign) ← src/td/app/input.ts",
+      "src/logic (typingText) ← src/td/app/vocab.ts",
+      "src/vocabulary (loadVocabularyIndex, loadVocabularyLevel) ← src/td/app/vocab.ts",
+    ]);
+  });
+
   it("src/td never loads Rift Defense V4 (src/defense)", () => {
     const crossing = td.flatMap((source) =>
       importsOf(source)
@@ -201,9 +240,11 @@ describe("Typing Defense boundary (TK 25.3)", () => {
     expect(crossing).toEqual([]);
   });
 
-  it("the rules use no clock, DOM, storage, Math.random, trigonometry, powers or logarithms", () => {
+  it("the rules use no clock, host global, storage, locale, Math.random, trigonometry, powers or logarithms", () => {
     const found = pure.flatMap((source) => purityProblems(source.text).map((problem) => source.path + ": " + problem));
     expect(found).toEqual([]);
+    const typescript = pure.filter((source) => source.path.endsWith(".ts"));
+    expect(hostProblems(typescript).map(({ path, problem }) => path + ": " + problem)).toEqual([]);
   });
 
   it("asset URLs stay under /assets/td/ or /assets/shared/ (legacy/ aside)", () => {
@@ -234,6 +275,40 @@ describe("the boundary checks themselves", () => {
     expect(purityProblems("const label = `${Math.cos(a)}`;")).toEqual(["Math.cos"]);
     expect(purityProblems("const r = Math.sqrt(x * x + y * y) + Math.imul(a, b) + Math.floor(c);")).toEqual([]);
     expect(purityProblems("// Math.random() and a ** b\n/** Date.now() */\nconst s = \"window Math.sin\" + `Date ${x}`;\nconst t = point.window;")).toEqual([]);
+  });
+
+  it("find the ways around a banned name", () => {
+    expect(purityProblems("const t = self.performance.now() + self.Date.now();")).toEqual(["self", "self"]);
+    expect(purityProblems('const r = Reflect.get(self, "Math").random();')).toEqual(["self"]);
+    expect(purityProblems("globalThis.Math.random();")).toEqual(["globalThis", "Math.random"]);
+    expect(purityProblems("queueMicrotask(step); setImmediate(step); const c = structuredClone(state);")).toEqual(["queueMicrotask", "setImmediate", "structuredClone"]);
+    expect(purityProblems('const f = new Function("return Math.random()"); eval("Date.now()"); require("perf_hooks");')).toEqual(["Function", "eval", "require"]);
+    expect(purityProblems("const t = process.hrtime(); const n = new Intl.NumberFormat(); const w = new WeakRef(o); new FinalizationRegistry(f);")).toEqual(["process", "Intl", "WeakRef", "FinalizationRegistry"]);
+    expect(purityProblems("words.sort((a, b) => a.localeCompare(b)); const { localeCompare } = String.prototype;")).toEqual(["localeCompare", "localeCompare"]);
+    expect(purityProblems("n.toLocaleString(); s?.toLocaleUpperCase(); s.toLocaleLowerCase(); d.toLocaleDateString(); d.toLocaleTimeString();")).toEqual([
+      "toLocaleString", "toLocaleUpperCase", "toLocaleLowerCase", "toLocaleDateString", "toLocaleTimeString",
+    ]);
+    expect(purityProblems("words.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)); const s = word.normalize(\"NFC\").toLowerCase();")).toEqual([]);
+  });
+
+  it("find every host global by compiling without the DOM and Node libraries", () => {
+    const names = (text: string) => hostProblems([{ path: "src/td/sim/probe.ts", text }]).map(({ problem }) => problem);
+    expect(names("export const t = top.length + parent.x + frames + name + status + origin;")).toEqual(["top", "parent", "frames", "name", "status", "origin"]);
+    expect(names("export const t = self.Date.now() + performance.now() + structuredClone(1) + process.hrtime()[0]; console.log(t);")).toEqual([
+      "self", "performance", "structuredClone", "process", "console",
+    ]);
+    expect(names("const parent = new Int32Array(4);\nconst top = parent[0]!;\nexport const step = (frames: number) => frames + top;")).toEqual([]);
+    expect(names('import { createRng } from "../../platform/rng";\nexport const draw = createRng(1).spawn.next();')).toEqual([]);
+    expect(names("export const n: number = \"x\";")).toEqual(["Type 'string' is not assignable to type 'number'."]);
+  });
+
+  it("read BUILD_NOW §2's exception list", () => {
+    const markdown = "**Ngoại lệ import cho 1A** (…):\n- `src/logic.ts` (`typingText`) — dùng ở `app/vocab.ts`.\n- `src/a/b.ts` (`x`, `y`) — dùng ở `view/c.ts`.\n\nPhông theo luật `@fontsource/*`.";
+    expect(documentedLegacy(markdown)).toEqual([
+      { module: "src/logic", names: ["typingText"], from: ["src/td/app/vocab.ts"] },
+      { module: "src/a/b", names: ["x", "y"], from: ["src/td/view/c.ts"] },
+    ]);
+    expect(() => documentedLegacy("**Ngoại lệ import cho 1A**:\n- `@fontsource/be-vietnam-pro` — ở `ui/td.css`.")).toThrow(/unreadable/);
   });
 
   it("read every kind of import", () => {
