@@ -63,5 +63,9 @@
   },
   "color": "color.webp?v=5e2b840a1127",
   "emissive": "emissive.webp?v=74bb0621d0c6",
-  "height": "height.bin?v=7ea76f48340a"
+  "height": "height.bin?v=7ea76f48340a",
+  "source": {
+    "image": "art-src/ships/bastion-top-hd.png",
+    "imageSha256": "44a955a9d92a88cb3136b6e02bf18c13f5434bf314be3a367dc42af4feafa69c"
+  }
 }

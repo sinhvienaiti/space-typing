@@ -25,7 +25,7 @@ describe("shared ship source catalog", () => {
     expect(resolveShipSourceFilename("solar-lance-top-hd.JPEG")).toBe("solar-lance");
   });
   it("discovers ignored source files directly and preserves deterministic alias priority", () => {
-    const root = fixture(["art-src/ships/razorwing-top-hd.png","art-src/ships/ship-02-razorwing-2d.png","art-src/models/raw/ships/ship-12-eternal-sovereign.glb"]);
+    const root = fixture(["art-src/ships/razorwing-top-hd.png","art-src/ships/ship-02-razorwing-2d.png","art-src/3d/ships/ship-12-eternal-sovereign.glb"]);
     const image = discoverShipSources(root,{kind:"image",ids:["razorwing"]});
     expect(image.sources[0].path).toBe(join(root,"art-src/ships/ship-02-razorwing-2d.png"));
     expect(image.sources[0].legacyCharacterId).toBe("aegis");
@@ -33,6 +33,12 @@ describe("shared ship source catalog", () => {
     const models = discoverShipSources(root,{kind:"rawModel",ids:["eternal-sovereign","vanguard"]});
     expect(models.sources.map(s=>s.id)).toEqual(["eternal-sovereign"]);
     expect(models.missing).toEqual(["vanguard"]);
+  });
+  it("prefers Vanguard's numbered model over its legacy Meshy name", () => {
+    const root = fixture(["art-src/3d/ships/vanguard.meshy.glb","art-src/3d/ships/ship-01-vanguard.glb"]);
+    const models = discoverShipSources(root,{kind:"rawModel",ids:["vanguard"]});
+    expect(models.sources[0].path).toBe(join(root,"art-src/3d/ships/ship-01-vanguard.glb"));
+    expect(models.warnings).toHaveLength(1);
   });
   it("rejects explicit unknown IDs and reports filename/order conflicts", () => {
     expect(resolveShipSourceFilename("ship-03-razorwing-2d.png")).toBeNull();

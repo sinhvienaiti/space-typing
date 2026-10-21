@@ -25,6 +25,9 @@ type Bolt = {
   /** Fireballs: the fireball model (setFireballModel) and the streak of light along its path. */
   model: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial> | null;
   light: LightTrail | null;
+  /** Ship shots: the ship's own projectile model (setShotModel) and its length; 0 when unused. */
+  shot: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial> | null;
+  shotLength: number;
   /** The model's heading (eased toward the path) and its roll round it. */
   aim: THREE.Quaternion;
   roll: number;
@@ -47,6 +50,8 @@ const CAST_RELEASE = 1.04;
 const LIGHT_SPAN = 0.42;
 /** The fireball model's length per unit of fireball radius. */
 const FIREBALL_LENGTH = 6.2;
+/** How far a ship's shot turns from its heading into the screen plane (0 … 1). */
+const SHOT_FLATTEN = 0.7;
 const Z_AXIS = new THREE.Vector3(0, 0, 1);
 const ORIGIN = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
@@ -142,12 +147,16 @@ export class HeroFx {
   private readonly jawAhead = new THREE.Vector3();
   /** The fireball model, normalized (setFireballModel); each fireball draws it with its own material. */
   private fireballShape: { geometry: THREE.BufferGeometry; material: THREE.ShaderMaterial } | null = null;
+  /** The flown ship's projectile model, normalized like the fireball (setShotModel). */
+  private shotShape: { geometry: THREE.BufferGeometry; material: THREE.MeshStandardMaterial } | null = null;
   private readonly aimMatrix = new THREE.Matrix4();
   private readonly aimTarget = new THREE.Quaternion();
   private readonly rollTurn = new THREE.Quaternion();
   private readonly aimDirection = new THREE.Vector3();
   private readonly curveSpan = new THREE.Vector3();
   private readonly modelAhead = new THREE.Vector3();
+  private readonly shotView = new THREE.Vector3();
+  private readonly shotAt = new THREE.Vector3();
   private time = 0;
 
   constructor(private readonly stage: SpaceStage, private readonly audio: SceneAudio) {
@@ -199,7 +208,7 @@ export class HeroFx {
       core.renderOrder = 5;
       return {
         live: false, head, core, fire: 0, prev: new THREE.Vector3(), blaze, flame: null, ember: 0, ribbon,
-        model: null, light: null, aim: new THREE.Quaternion(), roll: 0, spin: 0, age: 0,
+        model: null, light: null, shot: null, shotLength: 0, aim: new THREE.Quaternion(), roll: 0, spin: 0, age: 0,
         from: new THREE.Vector3(), bend: new THREE.Vector3(), to: new THREE.Vector3(), track: null, t: 0, duration: 0.3, onArrive: () => undefined,
       };
     });
@@ -268,34 +277,8 @@ export class HeroFx {
     });
     const mesh = found as THREE.Mesh | null;
     const map = mesh !== null && mesh.material instanceof THREE.MeshStandardMaterial ? mesh.material.map : null;
-    if (mesh === null || map === null) return;
-    // Float copies: the optimized GLB stores quantized attributes, which the
-    // transforms below would clip.
-    const geometry = new THREE.BufferGeometry();
-    for (const name of ["position", "normal", "uv"] as const) {
-      const attribute = mesh.geometry.getAttribute(name);
-      if (attribute === undefined) return;
-      const size = attribute.itemSize;
-      const values = new Float32Array(attribute.count * size);
-      for (let index = 0; index < attribute.count; index += 1) {
-        values[index * size] = attribute.getX(index);
-        values[index * size + 1] = attribute.getY(index);
-        if (size > 2) values[index * size + 2] = attribute.getZ(index);
-      }
-      geometry.setAttribute(name, new THREE.BufferAttribute(values, size));
-    }
-    const index = mesh.geometry.getIndex();
-    if (index !== null) geometry.setIndex(Array.from(index.array as ArrayLike<number>));
-    geometry.applyMatrix4(mesh.matrixWorld);
-    // The GLB's nose is at -z (Blender +Y): turned to +z, centred, length 1.
-    geometry.rotateY(Math.PI);
-    geometry.computeBoundingBox();
-    const box = geometry.boundingBox!;
-    const centre = box.getCenter(new THREE.Vector3());
-    geometry.translate(-centre.x, -centre.y, -centre.z);
-    const length = Math.max(0.001, box.max.z - box.min.z);
-    geometry.scale(1 / length, 1 / length, 1 / length);
-    geometry.computeBoundingSphere();
+    const geometry = mesh === null || map === null ? null : noseForward(mesh);
+    if (geometry === null || map === null) return;
     map.updateMatrix();
     const material = new THREE.ShaderMaterial({
       uniforms: {
@@ -316,6 +299,43 @@ export class HeroFx {
 
   hasFireballModel(): boolean {
     return this.fireballShape !== null;
+  }
+
+  /**
+   * The flown ship's projectile model (skills/<ship>-bolt), or null for plain
+   * bolts. Normalized like the fireball (length 1, nose at +z) and lit with its
+   * own textures, glowing in the ship's shot colour.
+   */
+  setShotModel(scene: THREE.Object3D | null, color: THREE.Color): void {
+    for (const bolt of this.bolts) {
+      bolt.shot?.removeFromParent();
+      bolt.shot = null;
+    }
+    this.shotShape?.geometry.dispose();
+    this.shotShape?.material.dispose();
+    this.shotShape = null;
+    if (scene === null) return;
+    scene.updateMatrixWorld(true);
+    let found: THREE.Mesh | null = null;
+    scene.traverse((object) => {
+      if (found === null && (object as THREE.Mesh).isMesh) found = object as THREE.Mesh;
+    });
+    const mesh = found as THREE.Mesh | null;
+    const source = mesh?.material;
+    const geometry = mesh === null ? null : noseForward(mesh);
+    if (geometry === null || !(source instanceof THREE.MeshStandardMaterial)) return;
+    const material = source.clone();
+    // Lit by the scene, but always reads as a charged shot against deep space:
+    // its own glow map keeps the detail of its art, leaning to the shot
+    // colour; without one it glows in the shot colour.
+    if (material.emissiveMap === null) material.emissive.copy(color);
+    else material.emissive.lerp(color, 0.5);
+    material.emissiveIntensity = Math.max(material.emissiveIntensity, 0.55);
+    this.shotShape = { geometry, material };
+  }
+
+  hasShotModel(): boolean {
+    return this.shotShape !== null;
   }
 
   /** Colour of the chest glow and the hand glows (a fire hero glows warm). */
@@ -461,6 +481,8 @@ export class HeroFx {
     bolt.flame?.hide();
     bolt.light?.hide();
     if (bolt.model !== null) bolt.model.visible = false;
+    if (bolt.shot !== null) bolt.shot.visible = false;
+    bolt.shotLength = 0;
     bolt.ribbon.setColor(color);
     bolt.ribbon.reset(from);
     bolt.ribbon.mesh.visible = true;
@@ -520,6 +542,61 @@ export class HeroFx {
       bolt.model.visible = false;
       bolt.blaze.scale.setScalar(radius * 2.8);
     }
+  }
+
+  /**
+   * A ship's shot: its projectile model (setShotModel) flies the bolt's curve
+   * nose first, rolling, inside a glow of `color` with a light ribbon behind;
+   * a plain bolt when the ship has no model.
+   */
+  shipShot(from: THREE.Vector3, track: () => THREE.Vector3 | null, color: THREE.Color, length: number, duration: number, curve: number, onArrive: (at: THREE.Vector3) => void): void {
+    const bolt = this.launch(from, track, color, duration, curve, onArrive);
+    const shape = this.shotShape;
+    if (bolt === null || shape === null) return;
+    if (bolt.shot === null) {
+      bolt.shot = new THREE.Mesh(shape.geometry, shape.material);
+      bolt.shot.frustumCulled = false;
+      bolt.shot.renderOrder = 3;
+      this.stage.scene.add(bolt.shot);
+    }
+    bolt.shotLength = length;
+    bolt.age = 0;
+    bolt.roll = rand(0, Math.PI * 2);
+    bolt.spin = rand(1.5, 3) * (Math.random() < 0.5 ? -1 : 1);
+    bolt.prev.copy(from);
+    // A small glow at the nose: the model itself is the shot, not a ball of light.
+    bolt.head.scale.setScalar(length * 0.3);
+    this.aimAlong(this.screenTangent(bolt, 0, this.stage.camera.position), bolt.aim);
+    bolt.shot.visible = false;
+  }
+
+  /**
+   * A shot's heading, tilted toward the screen: a long shot flying away from
+   * the chase camera is seen end on (a dot), so it turns most of the way
+   * into the screen plane and its length reads; its nose still points where
+   * it goes on screen.
+   */
+  private screenTangent(bolt: Bolt, p: number, eye: THREE.Vector3): THREE.Vector3 {
+    const tangent = this.curveTangent(bolt, p, this.aimDirection).normalize();
+    const view = this.shotView.subVectors(this.curvePoint(bolt, p, this.shotAt), eye).normalize();
+    return tangent.addScaledVector(view, -SHOT_FLATTEN * tangent.dot(view));
+  }
+
+  /** A ship's projectile model in flight: nose down the curve, rolling, grown out of the muzzle. */
+  private placeShot(bolt: Bolt, p: number, dt: number, eye: THREE.Vector3): void {
+    const shot = bolt.shot!;
+    this.aimAlong(this.screenTangent(bolt, p, eye), this.aimTarget);
+    bolt.aim.slerp(this.aimTarget, 1 - Math.exp(-dt * 18));
+    bolt.roll += bolt.spin * dt;
+    shot.quaternion.copy(bolt.aim).multiply(this.rollTurn.setFromAxisAngle(Z_AXIS, bolt.roll));
+    // It slides out of the gun: no longer than the way it has flown, so its
+    // tail never reaches back into the hull.
+    const flown = bolt.head.position.distanceTo(bolt.from);
+    const length = Math.min(bolt.shotLength, Math.max(bolt.shotLength * 0.2, flown / 0.85));
+    shot.scale.setScalar(length);
+    // The glowing head sits at the nose; the body trails behind it.
+    shot.position.copy(bolt.head.position).addScaledVector(this.modelAhead.copy(Z_AXIS).applyQuaternion(bolt.aim), -0.35 * length);
+    shot.visible = true;
   }
 
   /** A point of a bolt's curve at `p` (0 … 1). */
@@ -955,7 +1032,22 @@ export class HeroFx {
         }
         bolt.prev.copy(at);
       } else {
-        bolt.ribbon.update(at, dt, 0, eye, 1);
+        // A ship's shot: its model with a short, faint light trail and sparks
+        // of its colour streaming off it (as its art draws it), not a laser.
+        const shaped = bolt.shot !== null && bolt.shotLength > 0;
+        bolt.ribbon.update(at, dt, 0, eye, shaped ? 0.3 : 1, shaped ? 0.35 : 1);
+        if (shaped) {
+          bolt.age += dt;
+          this.placeShot(bolt, p, dt, eye);
+          const size = bolt.shotLength;
+          for (let index = 0; index < emitCount((this.high ? 90 : 45) * size / 2, dt); index += 1) {
+            const back = scratch.c.copy(at).lerp(bolt.prev, Math.random());
+            randomUnit(scratch.b).multiplyScalar(rand(0.3, 1.2) * size);
+            const color = index % 3 === 0 ? COLORS.white : bolt.head.material.color;
+            this.glows.spawn(back, scratch.b, color, rand(0.06, 0.13) * size, rand(0.14, 0.26), { drag: 3, flow: 0.4, alpha: 0.75 });
+          }
+          bolt.prev.copy(at);
+        }
       }
       if (bolt.t >= 1) {
         bolt.live = false;
@@ -964,6 +1056,7 @@ export class HeroFx {
         bolt.blaze.visible = false;
         bolt.ribbon.mesh.visible = false;
         if (bolt.model !== null) bolt.model.visible = false;
+        if (bolt.shot !== null) bolt.shot.visible = false;
         if (bolt.fire > 0 && bolt.flame !== null) bolt.ember = 0.22;
         bolt.onArrive(at.clone());
       }
@@ -1170,6 +1263,7 @@ export class HeroFx {
       bolt.flame?.hide();
       bolt.light?.hide();
       if (bolt.model !== null) bolt.model.visible = false;
+      if (bolt.shot !== null) bolt.shot.visible = false;
       bolt.ribbon.mesh.visible = false;
     }
     for (const slot of this.charges) slot.live = false;
@@ -1182,4 +1276,37 @@ export class HeroFx {
     this.sparks.clear();
     this.flames.clear();
   }
+}
+
+/**
+ * A projectile mesh as float geometry (the optimized GLB stores quantized
+ * attributes, which the transforms would clip), its nose turned from -z
+ * (Blender +Y) to +z, centred and scaled to length 1; null without uvs.
+ */
+function noseForward(mesh: THREE.Mesh): THREE.BufferGeometry | null {
+  const geometry = new THREE.BufferGeometry();
+  for (const name of ["position", "normal", "uv"] as const) {
+    const attribute = mesh.geometry.getAttribute(name);
+    if (attribute === undefined) return null;
+    const size = attribute.itemSize;
+    const values = new Float32Array(attribute.count * size);
+    for (let index = 0; index < attribute.count; index += 1) {
+      values[index * size] = attribute.getX(index);
+      values[index * size + 1] = attribute.getY(index);
+      if (size > 2) values[index * size + 2] = attribute.getZ(index);
+    }
+    geometry.setAttribute(name, new THREE.BufferAttribute(values, size));
+  }
+  const index = mesh.geometry.getIndex();
+  if (index !== null) geometry.setIndex(Array.from(index.array as ArrayLike<number>));
+  geometry.applyMatrix4(mesh.matrixWorld);
+  geometry.rotateY(Math.PI);
+  geometry.computeBoundingBox();
+  const box = geometry.boundingBox!;
+  const centre = box.getCenter(new THREE.Vector3());
+  geometry.translate(-centre.x, -centre.y, -centre.z);
+  const length = Math.max(0.001, box.max.z - box.min.z);
+  geometry.scale(1 / length, 1 / length, 1 / length);
+  geometry.computeBoundingSphere();
+  return geometry;
 }

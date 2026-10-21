@@ -46,8 +46,12 @@ Giữ convention cũ `vanguard-top-hd.png`, `vanguard.meshy.glb` và các
 `<legacy-id>-top-hd.*`. Bộ mới nhận trực tiếp `ship-XX-<slug>-2d.png` và
 `ship-XX-<slug>.glb`. Source gốc và dữ liệu Blender vẫn ở `art-src/`, gitignored.
 
+> Cập nhật 21/10: GLB gốc của tàu chuyển từ `art-src/models/raw/ships/` sang
+> `art-src/3d/ships/`. Tàu mới đặt ở đó, tên `ship-XX-<slug>.glb`. Vanguard là
+> `ship-01-vanguard.glb`. Thư mục `raw/` cũ không còn được đọc.
+
 ```text
-art-src/models/raw/ships/ship-XX-<slug>.glb
+art-src/3d/ships/ship-XX-<slug>.glb
     → space_typing_model_tools.py (helper Vanguard)
 art-src/models/ships/<slug>.glb
     → render_ship_top.py (chiếu orthographic, alpha thật, socket metadata)

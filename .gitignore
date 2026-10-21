@@ -4,9 +4,13 @@ coverage/
 .DS_Store
 public/local-assets/
 # Owner's original art for scripts/bg-art: not served, back it up separately.
-# Only the README (where the files go) is tracked.
+# Only the READMEs (where the files go) and the 3D source list are tracked.
 art-src/*
 !art-src/README.md
+!art-src/3d/
+art-src/3d/*
+!art-src/3d/README.md
+!art-src/3d/SOURCES.json
 # Screenshots from pnpm visual:shot (docs/VISUAL_TESTING.md).
 .visual/
 .duel-local/

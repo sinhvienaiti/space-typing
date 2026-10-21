@@ -230,6 +230,12 @@ export class FlightWorld {
   private worldId = "";
   /** The World's painted sky is up (the default nebula can step aside). */
   ready = false;
+  /**
+   * Only the sky and the landmark (Rift Defense looks down on an island):
+   * the cloud banks, debris and flybys are made for a forward flight and
+   * would drift between the camera and the ground.
+   */
+  skyOnly = false;
 
   constructor(scene: THREE.Scene, private quality: Quality) {
     scene.add(this.group);
@@ -473,12 +479,17 @@ export class FlightWorld {
       this.sky.position.z = camera.position.z * 0.6;
     }
     const camZ = camera.position.z;
+    if (this.skyOnly) {
+      for (const field of this.sheets) field.write(() => 0);
+      for (const { field } of this.fields) field.write(() => 0);
+      for (const pass of this.passes) pass.field.write(() => 0);
+    }
     const fadeFor = (item: Item): number => {
       const ahead = THREE.MathUtils.smoothstep(item.pos.z, FAR, FAR + 60);
       const behind = 1 - THREE.MathUtils.smoothstep(item.pos.z, camZ - 6, camZ + 4);
       return ahead * behind * this.opacity;
     };
-    for (const field of this.sheets) {
+    for (const field of this.skyOnly ? [] : this.sheets) {
       for (const item of field.items) {
         item.pos.z += speed * 0.9 * dt;
         item.pos.addScaledVector(item.vel, dt);
@@ -490,7 +501,7 @@ export class FlightWorld {
       }
       field.write(fadeFor);
     }
-    for (const { field, spec, frames } of this.fields) {
+    for (const { field, spec, frames } of this.skyOnly ? [] : this.fields) {
       for (const item of field.items) {
         item.pos.z += speed * dt * (spec.band === "far" ? 0.95 : 1);
         item.pos.addScaledVector(item.vel, dt);
@@ -516,7 +527,7 @@ export class FlightWorld {
         this.landmarkGlow.write(fade);
       }
     }
-    for (const pass of this.passes) {
+    for (const pass of this.skyOnly ? [] : this.passes) {
       pass.next -= dt;
       if (pass.next <= 0) {
         pass.next = rand(pass.spec.interval[0], pass.spec.interval[1]);

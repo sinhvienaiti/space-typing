@@ -18,7 +18,7 @@ Low dùng hình minh họa cũ. Mở trực tiếp
 
 | File | Vai trò |
 |---|---|
-| `art-src/models/raw/ships/vanguard.meshy.glb` | Bản Meshy gốc của chủ dự án, giữ nguyên |
+| `art-src/3d/ships/ship-01-vanguard.glb` | Bản Meshy gốc của chủ dự án, giữ nguyên. Trước 21/10 nằm ở `art-src/models/raw/ships/vanguard.meshy.glb` |
 | `art-src/models/blend/ships/vanguard.blend` | Bản làm việc để mở trong Blender |
 | `art-src/models/ships/vanguard.glb` | Bản đã căn hướng, tối ưu, thêm phát sáng/idle/socket |
 | `scripts/models/presets/vanguard-meshy-sockets.json` | Vị trí động cơ, nòng súng, lõi và đầu cánh dành riêng model này |
@@ -26,7 +26,7 @@ Low dùng hình minh họa cũ. Mở trực tiếp
 | `public/assets/space-typing/models/ships/vanguard/vanguard.medium.glb` | Bản Medium, texture tối đa 1K, khoảng 0,84 MiB |
 | `public/assets/space-typing/models/manifest.json` | Danh sách model mà game thực sự đọc |
 
-Chỉ đặt file vào `raw/` chưa làm đổi game: đó là đầu vào để xử lý. Game đọc
+Chỉ đặt file vào `art-src/3d/` chưa làm đổi game: đó là đầu vào để xử lý. Game đọc
 bản đã đóng gói trong `public/` qua manifest và cần build lại bản Play.
 
 ## Đã xử lý model
@@ -68,7 +68,7 @@ Từ PowerShell, chạy Blender bằng script của dự án (đường dẫn tu
 ```powershell
 & 'D:\Blender\blender.exe' -b --factory-startup `
   -P 'D:\typing-game\games\space-typing\scripts\models\blender\space_typing_model_tools.py' -- `
-  --input 'D:\typing-game\games\space-typing\art-src\models\raw\ships\vanguard.meshy.glb' `
+  --input 'D:\typing-game\games\space-typing\art-src\3d\ships\ship-01-vanguard.glb' `
   --kind ships --id vanguard --project 'D:\typing-game\games\space-typing' `
   --nose=-X --tris 12000 --auto-emissive 0.08 `
   --sockets-json 'D:\typing-game\games\space-typing\scripts\models\presets\vanguard-meshy-sockets.json' `
@@ -86,7 +86,7 @@ pnpm build:space
 
 Tải lại game bằng Ctrl+F5. Nếu dùng một thiết kế Meshy mới có hình dáng khác,
 cần kiểm tra lại hướng mũi và vị trí socket trong Blender trước khi đóng gói.
-Thư mục `raw/` và file `.blend` là dữ liệu làm việc; bản game dùng hai GLB trong `public/`.
+File gốc trong `art-src/3d/` và file `.blend` là dữ liệu làm việc; bản game dùng hai GLB trong `public/`.
 
 ## Kiểm tra đã thực hiện
 

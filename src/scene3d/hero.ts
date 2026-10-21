@@ -52,6 +52,11 @@ export type HeroOptions = {
   bob?: boolean;
   /** How hard a hit knocks the body back (1 = the original jolt). */
   knock?: number;
+  /**
+   * Turn the model half round to fly away from the play camera (-Z). Heroes
+   * are generated facing +Z; ships are authored nose -Z already (false).
+   */
+  faceAway?: boolean;
 };
 
 /**
@@ -61,7 +66,8 @@ export type HeroOptions = {
  * anchors the VFX follow.
  *
  * Clip names: heroes (blender tool --kind heroes) use Hero_*; the G01 stand-in
- * keeps Boss_Hit / Boss_Death / Boss_Intro and its Idle_Hover / Prismatic_Burst.
+ * keeps Boss_Hit / Boss_Death / Boss_Intro and its Idle_Hover / Prismatic_Burst;
+ * a flown ship has only Ship_Idle (the code banks, bobs and knocks it).
  */
 export class Hero {
   readonly root = new THREE.Group();
@@ -143,7 +149,7 @@ export class Hero {
       };
     };
     this.loops = {
-      idle: layer(find("Idle_Hover"), true),
+      idle: layer(find("Idle_Hover", "Ship_Idle"), true),
       fly: layer(find("Hero_Fly"), true),
       boost: layer(find("Hero_Boost"), true),
     };
@@ -175,7 +181,7 @@ export class Hero {
     const scale = (options.fitSize ?? 2.5) / Math.max(size.x, size.y, size.z, 0.001);
     model.position.sub(center);
     fit.scale.setScalar(scale);
-    fit.rotation.y = Math.PI;
+    fit.rotation.y = options.faceAway === false ? 0 : Math.PI;
     fit.add(model);
     this.root.add(fit);
     this.root.updateMatrixWorld(true);
@@ -198,9 +204,10 @@ export class Hero {
     this.sockets = {
       core: socket("FX_CORE"),
       halo: socket("FX_HALO"),
-      castL: socket("FX_CAST_L"),
-      castR: socket("FX_CAST_R"),
-      mouth: socket("FX_MOUTH"),
+      // A ship has no hands or jaws: its guns stand in for them.
+      castL: socket("FX_CAST_L") ?? socket("FX_MUZZLE_L") ?? socket("FX_MUZZLE"),
+      castR: socket("FX_CAST_R") ?? socket("FX_MUZZLE_R") ?? socket("FX_MUZZLE"),
+      mouth: socket("FX_MOUTH") ?? socket("FX_MUZZLE"),
     };
     // Authored trail sockets win (pairs left/right, then the tail); else leaf bones.
     const authored = (options.trailSockets ?? ["FX_WING_L", "FX_WING_R", "FX_WING_L2", "FX_WING_R2", "FX_TAIL"])
@@ -274,13 +281,16 @@ export class Hero {
     this.knockVelocity += (-this.knock * stiffness - this.knockVelocity * damping) * dt;
     this.knock += this.knockVelocity * dt;
     // Wing-beat bob: rises on each down-stroke of Hero_Fly (two beats a loop).
+    // A rig with no fly loop (a ship) has no beat to bounce on: it glides on
+    // a slow float instead.
     const fly = this.loops.fly;
-    const beat = fly === null ? time * 1.9 : (fly.action.time / fly.duration) * 2;
     const bob = !this.bob
       ? 0
-      : Math.sin(time * 1.7) * 0.07 * this.loopWeight.idle +
-        Math.sin(beat * Math.PI * 2 + 2.2) * 0.075 * this.loopWeight.fly +
-        Math.sin(time * 17) * 0.012 * this.loopWeight.boost;
+      : fly === null
+        ? Math.sin(time * 1.3) * 0.035 + Math.sin(time * 0.6 + 1.3) * 0.025
+        : Math.sin(time * 1.7) * 0.07 * this.loopWeight.idle +
+          Math.sin((fly.action.time / fly.duration) * 2 * Math.PI * 2 + 2.2) * 0.075 * this.loopWeight.fly +
+          Math.sin(time * 17) * 0.012 * this.loopWeight.boost;
     this.root.position.set(this.x, bob, this.knock * 0.6);
     this.root.rotation.set(this.pitch + this.knock * 0.5, -this.vx * 0.04 + this.turnYaw, this.bank + this.turnBank, "YXZ");
     this.animate(dt);

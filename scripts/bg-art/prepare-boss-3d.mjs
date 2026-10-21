@@ -3,7 +3,7 @@
  * Install and verify the authored Tyrant G01 GLB used by the runtime.
  *
  * Default source:
- *   art-src/bosses/3d/tyrant-g01.glb
+ *   art-src/3d/bosses/tyrant-g01.glb (art-src/3d mirrors the 2D art: art-src/bosses/tyrant-g01.png)
  *
  * Override for a local Blender/Meshy export:
  *   BOSS3D_SOURCE="/mnt/d/Meshy/tyrant-g01-boss10-v3-allinone-20261015.glb" \
@@ -15,7 +15,7 @@ import { dirname, resolve } from "node:path";
 const ROOT = resolve(import.meta.dirname, "../..");
 const source = process.env.BOSS3D_SOURCE
   ? resolve(process.env.BOSS3D_SOURCE)
-  : resolve(ROOT, "art-src/bosses/3d/tyrant-g01.glb");
+  : resolve(ROOT, "art-src/3d/bosses/tyrant-g01.glb");
 const output = resolve(ROOT, "public/assets/space-typing/bosses/3d/tyrant-g01.glb");
 
 const REQUIRED_ANIMATIONS = [

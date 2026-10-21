@@ -32,6 +32,28 @@ Git bỏ qua mọi thứ ở đây, trừ file README này. Lý do:
 | `ships/` | Tàu 3D trong Duel (`pnpm ship3d:prepare <id>`) | `<id>-top-hd.png`: bức vẽ nhìn thẳng từ trên, mũi lên, ≥1254 px, nền trong suốt hoặc `#FF00FF`, giữ lửa động cơ ngắn. Prompt: `docs/art-requests/ship-top-hd/SHIP_TOP_HD_PROMPTS.md`. `vanguard-chase-C00.png` là ảnh nhìn từ sau (`pnpm chase:prepare`). |
 | `duel-targets/` | 18 world target PvP (`pnpm duel-targets:prepare`) | Tên file đúng action ID: `laser`, `missile`, `railgun`, `bomb`, `siege-lance`, `shield`, `reflect`, `barrier`, `repair`, `energy`, `amplify`, `drone`, `lock-on`, `gravity`, `disrupt`, `scan`, `fate-crystal`, `black-hole`. **Bắt buộc transparent alpha thật**, không nền đen/trắng, không chữ. |
 
+## Mô hình 3D gốc: `3d/`
+
+File GLB gốc từ Tripo/Meshy nằm trong `art-src/3d/`, cùng đường dẫn với ảnh 2D của nó:
+
+```
+art-src/<đường dẫn>/<tên>.png  →  art-src/3d/<đường dẫn>/<tên>.glb
+```
+
+- Ví dụ: `art-src/enemies/frost-healer.png` → `art-src/3d/enemies/frost-healer.glb`.
+- Phi thuyền: `art-src/ships/ship-NN-<id>-2d.png` → `art-src/3d/ships/ship-NN-<id>.glb`.
+- Đạn phi thuyền: ảnh 2D ở `art-src/projectiles/`, mô hình ở `art-src/3d/projectiles/`.
+- `art-src/3d/defense/` để dành cho mô hình riêng của Defense.
+- Nhân vật (hero, guide) là ngoại lệ: `art-src/3d/heroes/<id>.glb`.
+
+Không sửa file gốc. `scripts/models/prepare-campaign3d-models.mjs` và `scripts/models/prepare-ship-models.mjs` đọc từ đây, rồi ghi bản đã xử lý vào `art-src/models/<loại>/` và `public/assets/space-typing/models/`.
+Cache build dựa trên nội dung file, nên dời hoặc đổi tên file không cần build lại.
+
+Ảnh 2D chưa có mô hình riêng thì dùng mô hình tạm, ghi ở trường `placeholder` trong `scripts/models/presets/campaign3d-models.json`. Khi file đúng tên được thêm, pipeline báo REVIEW. Kiểm tra hướng mô hình, rồi xóa trường `placeholder` để build từ file mới.
+
+Build lại sau khi thêm file: `node scripts/models/prepare-campaign3d-models.mjs` (mục không đổi báo CACHED). `--only` nhận khóa trong preset (ví dụ `enemies/frost-healer-3d`), không phải tên ảnh 2D.
+Chi tiết: `art-src/3d/README.md` và `art-src/3d/SOURCES.json` (mã băm, tên lúc tải về, mô hình nào dùng file nào).
+
 Thêm Galaxy mới: tạo thư mục `gNN/`, rồi khai báo trong `KITS` của `scripts/bg-art/prepare-kit.mjs` cùng dải `heroWorlds`. G02 còn kiểm tra đúng 12 object ở atlas rocks và 11 object ở atlas life để bắt lỗi tách vật thể trước khi build runtime kit.
 
 Chi tiết về tỉ lệ, loại nền và prompt: [G01_CHATGPT_PROMPT_PACK.md](../docs/background-reboot/G01_CHATGPT_PROMPT_PACK.md), bộ G02 tương ứng trong `docs/background-reboot/G02_CHATGPT_PROMPT_PACK.md`, và [BACKGROUND_VISUAL_REBOOT_HANDOFF.md](../docs/BACKGROUND_VISUAL_REBOOT_HANDOFF.md) (mục 6).

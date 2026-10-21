@@ -1,0 +1,1269 @@
+{
+ "version": 1,
+ "note": "Campaign 3D authored models. Sources live in art-src/3d/<source> (local, not in Git), laid out like the 2D art: the model of art-src/enemies/rainbow-scout.png is art-src/3d/enemies/rainbow-scout.glb (art-src/3d/README.md). placeholder: the nearest existing model, built while the entry's own model is not made yet. rotate is a row-major Blender world rotation found by matching axis renders to the 2D art; bosses face glTF +Z (Campaign 3D does not turn them), enemies and skills face glTF -Z.",
+ "models": {
+  "enemies/rainbow-mine-3d": {
+   "source": "enemies/rainbow-mine.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/rainbow-tank-3d": {
+   "source": "enemies/rainbow-tank.glb",
+   "placeholder": "enemies/prism-scout.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "note": "placeholder: copy of prism-scout (no generated model yet)",
+   "reviewed": false
+  },
+  "enemies/rainbow-shield-3d": {
+   "source": "enemies/rainbow-shield.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/rainbow-sniper-3d": {
+   "source": "enemies/rainbow-sniper.glb",
+   "rotate": [0, 0, 1, 0, -1, 0, 1, 0, 0],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/rainbow-splitter-3d": {
+   "source": "enemies/rainbow-splitter.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/rainbow-destroyer-3d": {
+   "source": "enemies/rainbow-destroyer.glb",
+   "placeholder": "enemies/rainbow-shield.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "note": "placeholder: copy of rainbow-shield (no generated model yet)",
+   "reviewed": false
+  },
+  "enemies/rainbow-healer-3d": {
+   "source": "enemies/rainbow-healer.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/rainbow-jammer-3d": {
+   "source": "enemies/rainbow-jammer.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/rainbow-cloaker-3d": {
+   "source": "enemies/rainbow-cloaker.glb",
+   "placeholder": "enemies/rainbow-commander.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "note": "placeholder: copy of rainbow-commander (no generated model yet)",
+   "reviewed": false
+  },
+  "enemies/rainbow-leech-3d": {
+   "source": "enemies/rainbow-leech.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/rainbow-carrier-3d": {
+   "source": "enemies/rainbow-carrier.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/rainbow-oppressor-3d": {
+   "source": "enemies/rainbow-oppressor.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/rainbow-commander-3d": {
+   "source": "enemies/rainbow-commander.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/angel-scout-3d": {
+   "source": "enemies/angel-scout.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/angel-mine-3d": {
+   "source": "enemies/angel-mine.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/angel-tank-3d": {
+   "source": "enemies/angel-tank.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/angel-shield-3d": {
+   "source": "enemies/angel-shield.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/angel-sniper-3d": {
+   "source": "enemies/angel-sniper.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/angel-splitter-3d": {
+   "source": "enemies/angel-splitter.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/angel-destroyer-3d": {
+   "source": "enemies/angel-destroyer.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/angel-healer-3d": {
+   "source": "enemies/angel-healer.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/angel-jammer-3d": {
+   "source": "enemies/angel-jammer.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/angel-cloaker-3d": {
+   "source": "enemies/angel-cloaker.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/angel-leech-3d": {
+   "source": "enemies/angel-leech.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/angel-carrier-3d": {
+   "source": "enemies/angel-carrier.glb",
+   "rotate": [0, 1, 0, 0, 0, 1, 1, 0, 0],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/angel-oppressor-3d": {
+   "source": "enemies/angel-oppressor.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/angel-commander-3d": {
+   "source": "enemies/angel-commander.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/devil-scout-3d": {
+   "source": "enemies/devil-scout.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/devil-mine-3d": {
+   "source": "enemies/devil-mine.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/devil-tank-3d": {
+   "source": "enemies/devil-tank.glb",
+   "rotate": [-1, 0, 0, 0, 0, 1, 0, 1, 0],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/devil-shield-3d": {
+   "source": "enemies/devil-shield.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/devil-sniper-3d": {
+   "source": "enemies/devil-sniper.glb",
+   "rotate": [0, 1, 0, 0, 0, 1, 1, 0, 0],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/devil-splitter-3d": {
+   "source": "enemies/devil-splitter.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/devil-destroyer-3d": {
+   "source": "enemies/devil-destroyer.glb",
+   "placeholder": "enemies/devil-cloaker.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "note": "placeholder: copy of devil-cloaker (no generated model yet)",
+   "reviewed": false
+  },
+  "enemies/devil-healer-3d": {
+   "source": "enemies/devil-healer.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/devil-jammer-3d": {
+   "source": "enemies/devil-jammer.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/devil-cloaker-3d": {
+   "source": "enemies/devil-cloaker.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/devil-leech-3d": {
+   "source": "enemies/devil-leech.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/devil-carrier-3d": {
+   "source": "enemies/devil-carrier.glb",
+   "rotate": [0, 1, 0, 0, 0, 1, 1, 0, 0],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/devil-oppressor-3d": {
+   "source": "enemies/devil-oppressor.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/devil-commander-3d": {
+   "source": "enemies/devil-commander.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/frost-scout-3d": {
+   "source": "enemies/frost-scout.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/frost-mine-3d": {
+   "source": "enemies/frost-mine.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/frost-tank-3d": {
+   "source": "enemies/frost-tank.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/frost-shield-3d": {
+   "source": "enemies/frost-shield.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/frost-sniper-3d": {
+   "source": "enemies/frost-sniper.glb",
+   "rotate": [0, 0, 1, 0, -1, 0, 1, 0, 0],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/frost-splitter-3d": {
+   "source": "enemies/frost-splitter.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/frost-destroyer-3d": {
+   "source": "enemies/frost-destroyer.glb",
+   "placeholder": "enemies/frost-commander.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "note": "placeholder: copy of frost-commander (no generated model yet)",
+   "reviewed": false
+  },
+  "enemies/frost-healer-3d": {
+   "source": "enemies/frost-healer.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/frost-jammer-3d": {
+   "source": "enemies/frost-jammer.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/frost-cloaker-3d": {
+   "source": "enemies/frost-cloaker.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/frost-leech-3d": {
+   "source": "enemies/frost-leech.glb",
+   "placeholder": "enemies/frost-healer.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "note": "placeholder: copy of frost-healer (no generated model yet)",
+   "reviewed": false
+  },
+  "enemies/frost-carrier-3d": {
+   "source": "enemies/frost-carrier.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/frost-oppressor-3d": {
+   "source": "enemies/frost-oppressor.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/frost-commander-3d": {
+   "source": "enemies/frost-commander.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/prism-scout-3d": {
+   "source": "enemies/prism-scout.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/prism-mine-3d": {
+   "source": "enemies/prism-mine.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/prism-tank-3d": {
+   "source": "enemies/prism-tank.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/prism-shield-3d": {
+   "source": "enemies/prism-shield.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/prism-sniper-3d": {
+   "source": "enemies/prism-sniper.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/prism-splitter-3d": {
+   "source": "enemies/prism-splitter.glb",
+   "placeholder": "enemies/prism-healer.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "note": "placeholder: copy of prism-healer (no generated model yet)",
+   "reviewed": false
+  },
+  "enemies/prism-destroyer-3d": {
+   "source": "enemies/prism-destroyer.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/prism-healer-3d": {
+   "source": "enemies/prism-healer.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/prism-jammer-3d": {
+   "source": "enemies/prism-jammer.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/prism-cloaker-3d": {
+   "source": "enemies/prism-cloaker.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/prism-leech-3d": {
+   "source": "enemies/prism-leech.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/prism-carrier-3d": {
+   "source": "enemies/prism-carrier.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/prism-oppressor-3d": {
+   "source": "enemies/prism-oppressor.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/prism-commander-3d": {
+   "source": "enemies/prism-commander.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/nature-scout-3d": {
+   "source": "enemies/nature-scout.glb",
+   "rotate": [1, 0, 0, 0, 0, 1, 0, -1, 0],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/nature-mine-3d": {
+   "source": "enemies/nature-mine.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/nature-tank-3d": {
+   "source": "enemies/nature-tank.glb",
+   "rotate": [1, 0, 0, 0, 0, 1, 0, -1, 0],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/nature-shield-3d": {
+   "source": "enemies/nature-shield.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/nature-sniper-3d": {
+   "source": "enemies/nature-sniper.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/nature-splitter-3d": {
+   "source": "enemies/nature-splitter.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/nature-destroyer-3d": {
+   "source": "enemies/nature-destroyer.glb",
+   "rotate": [0, -1, 0, 0, 0, 1, -1, 0, 0],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/nature-healer-3d": {
+   "source": "enemies/nature-healer.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/nature-jammer-3d": {
+   "source": "enemies/nature-jammer.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/nature-cloaker-3d": {
+   "source": "enemies/nature-cloaker.glb",
+   "rotate": [1, 0, 0, 0, 0, 1, 0, -1, 0],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/nature-leech-3d": {
+   "source": "enemies/nature-leecher.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "note": "art nature-leecher stands in for leech",
+   "reviewed": false
+  },
+  "enemies/nature-carrier-3d": {
+   "source": "enemies/nature-carrier.glb",
+   "rotate": [1, 0, 0, 0, -1, 0, 0, 0, -1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/nature-oppressor-3d": {
+   "source": "enemies/nature-oppressor.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/nature-commander-3d": {
+   "source": "enemies/nature-boss.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "note": "art nature-boss stands in for commander",
+   "reviewed": false
+  },
+  "enemies/shadow-scout-3d": {
+   "source": "enemies/shadow-scout.glb",
+   "rotate": [0, -1, 0, 1, 0, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/shadow-mine-3d": {
+   "source": "enemies/shadow-mine.glb",
+   "rotate": [0, -1, 0, 1, 0, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/shadow-tank-3d": {
+   "source": "enemies/shadow-tank.glb",
+   "rotate": [0, -1, 0, 1, 0, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/shadow-shield-3d": {
+   "source": "enemies/shadow-shield.glb",
+   "rotate": [0, -1, 0, 1, 0, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/shadow-sniper-3d": {
+   "source": "enemies/shadow-sniper.glb",
+   "rotate": [0, -1, 0, 1, 0, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/shadow-splitter-3d": {
+   "source": "enemies/shadow-splitter.glb",
+   "rotate": [0, -1, 0, 1, 0, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/shadow-destroyer-3d": {
+   "source": "enemies/shadow-destroyer.glb",
+   "placeholder": "enemies/shadow-cloaker.glb",
+   "rotate": [0, -1, 0, 1, 0, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "note": "placeholder: copy of shadow-cloaker (no generated model yet)",
+   "reviewed": false
+  },
+  "enemies/shadow-healer-3d": {
+   "source": "enemies/shadow-healer.glb",
+   "rotate": [0, -1, 0, 1, 0, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/shadow-jammer-3d": {
+   "source": "enemies/shadow-jammer.glb",
+   "rotate": [0, 0, -1, 1, 0, 0, 0, -1, 0],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/shadow-cloaker-3d": {
+   "source": "enemies/shadow-cloaker.glb",
+   "rotate": [0, -1, 0, 1, 0, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/shadow-leech-3d": {
+   "source": "enemies/shadow-leech.glb",
+   "rotate": [0, -1, 0, 1, 0, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/shadow-carrier-3d": {
+   "source": "enemies/shadow-carrier.glb",
+   "rotate": [0, -1, 0, 1, 0, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/shadow-oppressor-3d": {
+   "source": "enemies/shadow-oppressor.glb",
+   "rotate": [0, -1, 0, 1, 0, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/shadow-commander-3d": {
+   "source": "enemies/shadow-commander.glb",
+   "rotate": [0, -1, 0, 1, 0, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/cosmic-scout-3d": {
+   "source": "enemies/cosmic-fast.glb",
+   "rotate": [-1, 0, 0, 0, 0, 1, 0, 1, 0],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "note": "art cosmic-fast stands in for scout",
+   "reviewed": false
+  },
+  "enemies/cosmic-mine-3d": {
+   "source": "enemies/cosmic-core.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "note": "art cosmic-core stands in for mine",
+   "reviewed": false
+  },
+  "enemies/cosmic-tank-3d": {
+   "source": "enemies/cosmic-tank.glb",
+   "rotate": [1, 0, 0, 0, 0, 1, 0, -1, 0],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/cosmic-shield-3d": {
+   "source": "enemies/cosmic-shield.glb",
+   "rotate": [1, 0, 0, 0, 0, 1, 0, -1, 0],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/cosmic-sniper-3d": {
+   "source": "enemies/cosmic-sniper.glb",
+   "rotate": [0, 1, 0, 0, 0, -1, -1, 0, 0],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/cosmic-splitter-3d": {
+   "source": "enemies/cosmic-beast.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "note": "art cosmic-beast stands in for splitter",
+   "reviewed": false
+  },
+  "enemies/cosmic-destroyer-3d": {
+   "source": "enemies/cosmic-dreadnought.glb",
+   "rotate": [0, 1, 0, 0, 0, 1, 1, 0, 0],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "note": "art cosmic-dreadnought stands in for destroyer",
+   "reviewed": false
+  },
+  "enemies/cosmic-healer-3d": {
+   "source": "enemies/cosmic-sorcerer.glb",
+   "rotate": [1, 0, 0, 0, 0, 1, 0, -1, 0],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "note": "art cosmic-sorcerer stands in for healer",
+   "reviewed": false
+  },
+  "enemies/cosmic-jammer-3d": {
+   "source": "enemies/cosmic-jammer.glb",
+   "rotate": [1, 0, 0, 0, 0, 1, 0, -1, 0],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/cosmic-cloaker-3d": {
+   "source": "enemies/cosmic-cloaker.glb",
+   "rotate": [0, -1, 0, 0, 0, 1, -1, 0, 0],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/cosmic-leech-3d": {
+   "source": "enemies/cosmic-leecher.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "note": "art cosmic-leecher stands in for leech",
+   "reviewed": false
+  },
+  "enemies/cosmic-carrier-3d": {
+   "source": "enemies/cosmic-carrier.glb",
+   "rotate": [-1, 0, 0, 0, 0, 1, 0, 1, 0],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "reviewed": false
+  },
+  "enemies/cosmic-oppressor-3d": {
+   "source": "enemies/cosmic-grunt.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "note": "art cosmic-grunt stands in for oppressor",
+   "reviewed": false
+  },
+  "enemies/cosmic-commander-3d": {
+   "source": "enemies/cosmic-elite.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 6000,
+   "autoEmissive": 0.06,
+   "note": "art cosmic-elite stands in for commander",
+   "reviewed": false
+  },
+  "bosses/lieutenant-angel": {
+   "source": "bosses/lieutenant-angel.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/lieutenant-cosmic": {
+   "source": "bosses/lieutenant-cosmic.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/lieutenant-devil": {
+   "source": "bosses/lieutenant-devil.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/lieutenant-frost": {
+   "source": "bosses/lieutenant-frost.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/lieutenant-nature": {
+   "source": "bosses/lieutenant-nature.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/lieutenant-prism": {
+   "source": "bosses/lieutenant-prism.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/lieutenant-rainbow": {
+   "source": "bosses/lieutenant-rainbow.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/lieutenant-shadow": {
+   "source": "bosses/lieutenant-shadow.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/tyrant-g02": {
+   "source": "bosses/tyrant-g02.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/tyrant-g03": {
+   "source": "bosses/tyrant-g03.glb",
+   "placeholder": "bosses/warden-frost.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "note": "placeholder: copy of warden-frost (no generated model yet)",
+   "reviewed": false
+  },
+  "bosses/tyrant-g04": {
+   "source": "bosses/tyrant-g04.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/tyrant-g05": {
+   "source": "bosses/tyrant-g05.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/tyrant-g06": {
+   "source": "bosses/tyrant-g06.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/tyrant-g07": {
+   "source": "bosses/tyrant-g07.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/tyrant-g08": {
+   "source": "bosses/tyrant-g08.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/tyrant-g09": {
+   "source": "bosses/tyrant-g09.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/tyrant-g10": {
+   "source": "bosses/tyrant-g10.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/warden-angel": {
+   "source": "bosses/warden-angel.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/warden-cosmic": {
+   "source": "bosses/warden-cosmic.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/warden-devil": {
+   "source": "bosses/warden-devil.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/warden-frost": {
+   "source": "bosses/warden-frost.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/warden-nature": {
+   "source": "bosses/warden-nature.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/warden-prism": {
+   "source": "bosses/warden-prism.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/warden-rainbow": {
+   "source": "bosses/warden-rainbow.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "bosses/warden-shadow": {
+   "source": "bosses/warden-shadow.glb",
+   "rotate": [1, 0, 0, 0, 1, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 30000,
+   "autoEmissive": 0.05,
+   "reviewed": false
+  },
+  "skills/vanguard-bolt": {
+   "source": "projectiles/01-vanguard-vanguard-bolt.glb",
+   "nose": "+X",
+   "triangles": 3000,
+   "autoEmissive": 0.15,
+   "reviewed": false
+  },
+  "skills/razorwing-bolt": {
+   "source": "projectiles/02-razorwing-razor-dart.glb",
+   "nose": "+X",
+   "triangles": 3000,
+   "autoEmissive": 0.15,
+   "reviewed": false
+  },
+  "skills/solar-lance-bolt": {
+   "source": "projectiles/03-solar-lance-solar-needle.glb",
+   "nose": "+X",
+   "triangles": 3000,
+   "autoEmissive": 0.15,
+   "reviewed": false
+  },
+  "skills/phantom-wraith-bolt": {
+   "source": "projectiles/04-phantom-wraith-phase-needle.glb",
+   "nose": "+X",
+   "triangles": 3000,
+   "autoEmissive": 0.15,
+   "reviewed": false
+  },
+  "skills/crimson-talon-bolt": {
+   "source": "projectiles/05-crimson-talon-crimson-bolt.glb",
+   "nose": "+X",
+   "triangles": 3000,
+   "autoEmissive": 0.15,
+   "reviewed": false
+  },
+  "skills/frost-seraph-bolt": {
+   "source": "projectiles/06-frost-seraph-frost-shard.glb",
+   "nose": "+X",
+   "triangles": 3000,
+   "autoEmissive": 0.15,
+   "reviewed": false
+  },
+  "skills/nova-reaper-bolt": {
+   "source": "projectiles/07-nova-reaper-nova-fang.glb",
+   "nose": "+X",
+   "triangles": 3000,
+   "autoEmissive": 0.15,
+   "reviewed": false
+  },
+  "skills/astral-dragon-bolt": {
+   "source": "projectiles/08-astral-dragon-astral-pulse.glb",
+   "nose": "+X",
+   "triangles": 3000,
+   "autoEmissive": 0.15,
+   "reviewed": false
+  },
+  "skills/eclipse-monarch-bolt": {
+   "source": "projectiles/09-eclipse-monarch-eclipse-bolt.glb",
+   "nose": "+X",
+   "triangles": 3000,
+   "autoEmissive": 0.15,
+   "reviewed": false
+  },
+  "skills/celestial-valkyrie-bolt": {
+   "source": "projectiles/10-celestial-valkyrie-valkyrie-bolt.glb",
+   "nose": "+X",
+   "triangles": 3000,
+   "autoEmissive": 0.15,
+   "reviewed": false
+  },
+  "skills/genesis-phoenix-bolt": {
+   "source": "projectiles/11-genesis-phoenix-genesis-ember.glb",
+   "nose": "+X",
+   "triangles": 3000,
+   "autoEmissive": 0.15,
+   "reviewed": false
+  },
+  "skills/eternal-sovereign-bolt": {
+   "source": "projectiles/12-eternal-sovereign-sovereign-ray.glb",
+   "nose": "+X",
+   "triangles": 3000,
+   "autoEmissive": 0.15,
+   "reviewed": false
+  },
+  "items/defense-core": {
+   "source": "duel-targets/fate-crystal.glb",
+   "rotate": [0, 1, 0, -1, 0, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 9000,
+   "autoEmissive": 0.12,
+   "note": "Defense Core (owner model: duel-target fate-crystal)",
+   "reviewed": false
+  },
+  "items/defense-gate": {
+   "source": "duel-targets/black-hole.glb",
+   "rotate": [0, 1, 0, -1, 0, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 9000,
+   "autoEmissive": 0.12,
+   "note": "Defense rift gate (owner model: duel-target black-hole)",
+   "reviewed": false
+  },
+  "items/tower-frost": {
+   "source": "relics/relic-frost-rhythm.glb",
+   "rotate": [1, 0, 0, 0, 0, -1, 0, 1, 0],
+   "facing": "-Y",
+   "triangles": 7000,
+   "autoEmissive": 0.1,
+   "note": "Defense Frost Spire (owner model: relic frost-rhythm)",
+   "reviewed": false
+  },
+  "items/tower-gravity": {
+   "source": "duel-targets/gravity.glb",
+   "rotate": [0, 1, 0, -1, 0, 0, 0, 0, 1],
+   "facing": "-Y",
+   "triangles": 7000,
+   "autoEmissive": 0.1,
+   "note": "Defense Gravity Well (owner model: duel-target gravity)",
+   "reviewed": false
+  },
+  "items/tower-beacon": {
+   "source": "duel-targets/lock-on.glb",
+   "rotate": [0, 0, 1, -1, 0, 0, 0, -1, 0],
+   "facing": "-Y",
+   "triangles": 7000,
+   "autoEmissive": 0.1,
+   "note": "Defense Volatile Beacon (owner model: duel-target lock-on)",
+   "reviewed": false
+  },
+  "enemies/angel-scout-lod": {
+   "source": "enemies/angel-scout.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 1000,
+   "autoEmissive": 0.06,
+   "note": "Defense crowd level of detail (instanced)",
+   "reviewed": false
+  },
+  "enemies/angel-tank-lod": {
+   "source": "enemies/angel-tank.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 1200,
+   "autoEmissive": 0.06,
+   "note": "Defense crowd level of detail (instanced)",
+   "reviewed": false
+  },
+  "enemies/rainbow-mine-lod": {
+   "source": "enemies/rainbow-mine.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 1000,
+   "autoEmissive": 0.06,
+   "note": "Defense crowd level of detail (instanced)",
+   "reviewed": false
+  },
+  "enemies/prism-scout-lod": {
+   "source": "enemies/prism-scout.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 800,
+   "autoEmissive": 0.06,
+   "note": "Defense crowd level of detail (instanced)",
+   "reviewed": false
+  },
+  "items/tower-arc": {
+   "source": "duel-targets/disrupt.glb",
+   "facing": "-Y",
+   "triangles": 7000,
+   "autoEmissive": 0.1,
+   "note": "Defense Arc Pylon (owner model: duel-target disrupt)",
+   "reviewed": false
+  },
+  "items/tower-sanctum": {
+   "source": "relics/relic-first-light-seed.glb",
+   "facing": "-Y",
+   "triangles": 7000,
+   "autoEmissive": 0.14,
+   "note": "Defense Sanctum (owner model: relic first-light-seed)",
+   "reviewed": false
+  },
+  "items/tower-siphon": {
+   "source": "relics/relic-perfect-capacitor.glb",
+   "facing": "-Y",
+   "triangles": 7000,
+   "autoEmissive": 0.1,
+   "note": "Defense Energy Siphon (owner model: relic perfect-capacitor)",
+   "reviewed": false
+  },
+  "items/prop-crystal-a": {
+   "source": "pickups/credits/boss.glb",
+   "facing": "-Y",
+   "triangles": 1500,
+   "autoEmissive": 0.16,
+   "note": "Defense island crystal prop (owner model: credits boss gem)",
+   "reviewed": false
+  },
+  "items/prop-crystal-b": {
+   "source": "pickups/credits/elite.glb",
+   "facing": "-Y",
+   "triangles": 1500,
+   "autoEmissive": 0.16,
+   "note": "Defense island crystal prop (owner model: credits elite gem)",
+   "reviewed": false
+  },
+  "items/prop-crystal-c": {
+   "source": "pickups/credits/refined.glb",
+   "facing": "-Y",
+   "triangles": 1500,
+   "autoEmissive": 0.16,
+   "note": "Defense island crystal prop (owner model: credits refined gem)",
+   "reviewed": false
+  },
+  "enemies/rainbow-scout-lod": {
+   "source": "enemies/rainbow-scout.glb",
+   "placeholder": "enemies/prism-destroyer.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 1000,
+   "autoEmissive": 0.06,
+   "note": "Defense crowd level of detail (instanced)",
+   "reviewed": false
+  },
+  "enemies/devil-scout-lod": {
+   "source": "enemies/devil-scout.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 1000,
+   "autoEmissive": 0.06,
+   "reviewed": false,
+   "note": "Defense crowd level of detail (instanced)"
+  },
+  "enemies/frost-scout-lod": {
+   "source": "enemies/frost-scout.glb",
+   "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
+   "triangles": 1000,
+   "autoEmissive": 0.06,
+   "reviewed": false,
+   "note": "Defense crowd level of detail (instanced)"
+  },
+  "enemies/nature-scout-lod": {
+   "source": "enemies/nature-scout.glb",
+   "rotate": [1, 0, 0, 0, 0, 1, 0, -1, 0],
+   "triangles": 1000,
+   "autoEmissive": 0.06,
+   "reviewed": false,
+   "note": "Defense crowd level of detail (instanced)"
+  },
+  "enemies/shadow-scout-lod": {
+   "source": "enemies/shadow-scout.glb",
+   "rotate": [0, -1, 0, 1, 0, 0, 0, 0, 1],
+   "triangles": 1000,
+   "autoEmissive": 0.06,
+   "reviewed": false,
+   "note": "Defense crowd level of detail (instanced)"
+  },
+  "enemies/cosmic-scout-lod": {
+   "source": "enemies/cosmic-fast.glb",
+   "rotate": [-1, 0, 0, 0, 0, 1, 0, 1, 0],
+   "triangles": 1000,
+   "autoEmissive": 0.06,
+   "note": "Defense crowd level of detail (instanced)",
+   "reviewed": false
+  }
+ }
+}

@@ -66,5 +66,9 @@
   },
   "color": "color.webp?v=42ece92fed36",
   "emissive": "emissive.webp?v=ab8982d5bd8b",
-  "height": "height.bin?v=05f010322824"
+  "height": "height.bin?v=05f010322824",
+  "source": {
+    "image": "art-src/ships/arsenal-top-hd.png",
+    "imageSha256": "574c87fec045475fc8229cfabe1fb8e00d900275076e36f64844b20f0cd2dd03"
+  }
 }

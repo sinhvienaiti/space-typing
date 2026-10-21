@@ -543,6 +543,49 @@ export class SceneAudio {
     source.start();
   }
 
+  /** Starts loading another mode's sound files (paths under /assets/audio/ or bundled URLs) for `playFile`. */
+  preload(urls: readonly string[]): void {
+    for (const url of urls) void this.buffer(url);
+  }
+
+  /** Like `play`, for a file `preload` loaded; `gap` is kept per file. */
+  playFile(url: string, gain = 1, options: { rate?: number; pan?: number; gap?: number } = {}): void {
+    if (!this.enabled || this.context === null || this.master === null) return;
+    const buffer = this.buffers.get(url);
+    if (buffer === undefined) {
+      void this.buffer(url);
+      return;
+    }
+    const now = this.context.currentTime;
+    if (now - (this.last.get(url) ?? -1) < (options.gap ?? 0.03)) return;
+    this.last.set(url, now);
+    const source = this.context.createBufferSource();
+    source.buffer = buffer;
+    source.playbackRate.value = (options.rate ?? 1) * rand(0.95, 1.05);
+    const volume = this.context.createGain();
+    volume.gain.value = gain;
+    const panner = this.context.createStereoPanner();
+    panner.pan.value = clamp(options.pan ?? 0, -1, 1);
+    source.connect(volume).connect(panner).connect(this.master);
+    source.start();
+  }
+
+  /** A sound built on the spot: `build` wires Web Audio nodes into `out` (on the effects bus), from `now`. */
+  synth(key: string, build: (context: AudioContext, out: AudioNode, noise: AudioBuffer, now: number) => void, gain = 1, options: { pan?: number; gap?: number } = {}): void {
+    const context = this.context;
+    if (!this.enabled || context === null || this.master === null) return;
+    const now = context.currentTime;
+    if (now - (this.last.get("synth:" + key) ?? -1) < (options.gap ?? 0.03)) return;
+    this.last.set("synth:" + key, now);
+    this.noise ??= noiseBuffer(context);
+    const out = context.createGain();
+    out.gain.value = gain;
+    const panner = context.createStereoPanner();
+    panner.pan.value = clamp(options.pan ?? 0, -1, 1);
+    out.connect(panner).connect(this.master);
+    build(context, out, this.noise, now);
+  }
+
   /** A dragon's sound: from its recordings once loaded (`recordedVoice`), synthesized until then. */
   voice(name: SceneVoice, gain = 1, options: { pan?: number; gap?: number } = {}): void {
     const context = this.context;

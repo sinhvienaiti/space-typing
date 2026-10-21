@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { clampStage, comboMultiplier, MAX_STAGE_3D, stagePlan3D, wordScore, wordsPerMinute } from "../src/campaign3d/plan";
 import { emptyProgress3D, loadProgress3D, PROGRESS_KEY_3D, recordClear3D, saveProgress3D } from "../src/campaign3d/progress";
-import { WordPicker } from "../src/campaign3d/words";
+import { WordPicker } from "../src/scene3d/words";
 import type { VocabularyEntry } from "../src/types";
 
 function entries(words: string[]): VocabularyEntry[] {

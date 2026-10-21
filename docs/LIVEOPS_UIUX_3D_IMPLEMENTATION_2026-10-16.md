@@ -117,7 +117,7 @@ Test Lab xem trước (`testingStagePreviewActive`) không tính.
 
 ### 3.2 Script
 - **`pnpm models:prepare`** (`scripts/models/prepare-models.ts`):
-  - Đọc `art-src/models/<kind>/<id>.glb`, và bản G01 cũ ở `art-src/bosses/3d/`.
+  - Đọc `art-src/models/<kind>/<id>.glb`, và bản G01 ở `art-src/3d/bosses/tyrant-g01.glb` (trước 21/10 ở `art-src/bosses/3d/`).
   - Kiểm tra theo hợp đồng.
   - Xử lý: dedup, prune (**giữ node lá**, vì các Empty `FX_` là lá; lần đầu chạy đã bị xóa mất 4 điểm gắn của G01, đã sửa và có kiểm tra chặn), weld, resample, texture WebP theo tầng, meshopt.
   - Ghi `manifest.json`.

@@ -4069,3 +4069,39 @@ verified Deploy 100→90, Preview 100→100, Medium→Low→High and title relea
 Final source coverage verified all 352 test files / 2,167 tests, with no missing
 or extra paths; 3 Admin bridge tests passed. Counts and evidence are in
 `CODEX_CLAUDE_REVIEW_IMPLEMENTATION_2026-10-17.md`.
+
+## 2026-10-21 — 3D source models moved to art-src/3d
+
+Owner Tripo/Meshy GLB originals now live in `art-src/3d/`, mirroring the 2D art:
+`art-src/<path>/<name>.png` → `art-src/3d/<path>/<name>.glb`. Ships drop `-2d`
+(`ship-NN-<id>.glb`; Vanguard is `ship-01-vanguard.glb`). Projectile models sit in
+`art-src/3d/projectiles/`; `art-src/3d/defense/` is reserved for Defense-only models.
+G01 moved to `art-src/3d/bosses/tyrant-g01.glb`. Rules, hashes and download names:
+`art-src/3d/README.md` and `art-src/3d/SOURCES.json`. Processed copies in
+`art-src/models/<kind>/` and the runtime tier/manifest paths are unchanged.
+
+Each `campaign3d-models.json` entry names its `source` under `art-src/3d`. Nine enemies
+and tyrant-g03 (→ warden-frost) build from a `placeholder` until a correctly named file
+appears; magma-tank also lacks a model but has no game use. The build cache (signature
+v2) keys on file content, preset numbers and tool hashes, not paths, so moves need no
+rebuild. Owner projectile files 05/06 and 10/11 held each other's model; they were
+renamed to match the 2D art. tower-arc now uses `duel-targets/disrupt`: its old source
+was byte-identical to tower-frost's, so Arc and Frost looked the same.
+
+`art-src/models/raw/` stays on disk as an unused duplicate (deletion was not permitted).
+No original exists here for heroes draconis/-v2/-v3, guides/draconis-v4,
+bosses/auriel-hero, enemies/rainbow-scout-3d or skills/dragon-fireball; only packaged
+runtime copies in `public/`. New hero originals go to `art-src/3d/heroes/<id>.glb`.
+Art-request docs now point to the new paths.
+
+When an entry's own model arrives while the preset still names a placeholder, the
+build stops with REVIEW (its rotate was tuned for the stand-in) until the placeholder
+is dropped; if a built own model later goes missing, the build reports MISSING and
+keeps it instead of falling back.
+
+Owner decision (21/10): images, audio, GLB models and height maps are not pushed to
+Git. Code, tests, scripts, docs and JSON (including the model manifest) are; a fresh
+clone needs the local `public/` media and `art-src/` backup to show the 3D models.
+The three unpushed 20/10 commits were rebuilt without their 55 media files (same
+messages and authors); the originals stay at
+`refs/backup/feat/space-typing-2026-10-18-before-media-strip`.

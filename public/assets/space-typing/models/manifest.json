@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-19T18:11:51.902Z",
+  "generatedAt": "2026-10-21T03:32:58.804Z",
   "models": {
     "bosses/auriel-hero": {
       "kind": "bosses",
@@ -41,6 +41,262 @@
         0.6653
       ]
     },
+    "bosses/lieutenant-angel": {
+      "kind": "bosses",
+      "id": "lieutenant-angel",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/lieutenant-angel/lieutenant-angel.high.glb?v=fba5de17f7",
+          "bytes": 3191704
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/lieutenant-angel/lieutenant-angel.medium.glb?v=cc4813e753",
+          "bytes": 1200484
+        }
+      },
+      "triangles": 30000,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.8069,
+        2,
+        0.9728
+      ]
+    },
+    "bosses/lieutenant-cosmic": {
+      "kind": "bosses",
+      "id": "lieutenant-cosmic",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/lieutenant-cosmic/lieutenant-cosmic.high.glb?v=58bb9f032e",
+          "bytes": 3365336
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/lieutenant-cosmic/lieutenant-cosmic.medium.glb?v=15867c6aad",
+          "bytes": 1307344
+        }
+      },
+      "triangles": 29701,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.9332,
+        2,
+        1.4889
+      ]
+    },
+    "bosses/lieutenant-devil": {
+      "kind": "bosses",
+      "id": "lieutenant-devil",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/lieutenant-devil/lieutenant-devil.high.glb?v=36f2b9f6c4",
+          "bytes": 3440240
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/lieutenant-devil/lieutenant-devil.medium.glb?v=3f53987ca6",
+          "bytes": 1217620
+        }
+      },
+      "triangles": 30000,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        2,
+        1.7699,
+        1.5804
+      ]
+    },
+    "bosses/lieutenant-frost": {
+      "kind": "bosses",
+      "id": "lieutenant-frost",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/lieutenant-frost/lieutenant-frost.high.glb?v=15fd40b6c7",
+          "bytes": 3629196
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/lieutenant-frost/lieutenant-frost.medium.glb?v=9d0b6e88e1",
+          "bytes": 1328048
+        }
+      },
+      "triangles": 30000,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.1977,
+        2.0005,
+        0.6855
+      ]
+    },
+    "bosses/lieutenant-nature": {
+      "kind": "bosses",
+      "id": "lieutenant-nature",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/lieutenant-nature/lieutenant-nature.high.glb?v=98fc7cabba",
+          "bytes": 3330936
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/lieutenant-nature/lieutenant-nature.medium.glb?v=05c6b895fc",
+          "bytes": 1256628
+        }
+      },
+      "triangles": 30000,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.8349,
+        2,
+        1.1703
+      ]
+    },
+    "bosses/lieutenant-prism": {
+      "kind": "bosses",
+      "id": "lieutenant-prism",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/lieutenant-prism/lieutenant-prism.high.glb?v=7595f6a0e4",
+          "bytes": 3200868
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/lieutenant-prism/lieutenant-prism.medium.glb?v=836724f1ae",
+          "bytes": 1208672
+        }
+      },
+      "triangles": 30000,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.0847,
+        2,
+        0.3407
+      ]
+    },
+    "bosses/lieutenant-rainbow": {
+      "kind": "bosses",
+      "id": "lieutenant-rainbow",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/lieutenant-rainbow/lieutenant-rainbow.high.glb?v=0041c2f895",
+          "bytes": 3479984
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/lieutenant-rainbow/lieutenant-rainbow.medium.glb?v=aa5c0b8529",
+          "bytes": 1332092
+        }
+      },
+      "triangles": 30000,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.8923,
+        2,
+        1
+      ]
+    },
+    "bosses/lieutenant-shadow": {
+      "kind": "bosses",
+      "id": "lieutenant-shadow",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/lieutenant-shadow/lieutenant-shadow.high.glb?v=d895d83fcd",
+          "bytes": 2687596
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/lieutenant-shadow/lieutenant-shadow.medium.glb?v=30a6ab408b",
+          "bytes": 1094816
+        }
+      },
+      "triangles": 30000,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.9897,
+        2,
+        0.9282
+      ]
+    },
     "bosses/tyrant-g01": {
       "kind": "bosses",
       "id": "tyrant-g01",
@@ -74,6 +330,3277 @@
         0.6653
       ]
     },
+    "bosses/tyrant-g02": {
+      "kind": "bosses",
+      "id": "tyrant-g02",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/tyrant-g02/tyrant-g02.high.glb?v=1f97b85eba",
+          "bytes": 3131276
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/tyrant-g02/tyrant-g02.medium.glb?v=dfafe9a10a",
+          "bytes": 989372
+        }
+      },
+      "triangles": 29999,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.5842,
+        2,
+        0.8346
+      ]
+    },
+    "bosses/tyrant-g03": {
+      "kind": "bosses",
+      "id": "tyrant-g03",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/tyrant-g03/tyrant-g03.high.glb?v=74043f7eaf",
+          "bytes": 3650000
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/tyrant-g03/tyrant-g03.medium.glb?v=38d4c6b26e",
+          "bytes": 1329808
+        }
+      },
+      "triangles": 30000,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.7494,
+        2,
+        0.528
+      ]
+    },
+    "bosses/tyrant-g04": {
+      "kind": "bosses",
+      "id": "tyrant-g04",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/tyrant-g04/tyrant-g04.high.glb?v=b215c930b8",
+          "bytes": 3311676
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/tyrant-g04/tyrant-g04.medium.glb?v=bbfbf89594",
+          "bytes": 1206844
+        }
+      },
+      "triangles": 28825,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.432,
+        2,
+        0.5412
+      ]
+    },
+    "bosses/tyrant-g05": {
+      "kind": "bosses",
+      "id": "tyrant-g05",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/tyrant-g05/tyrant-g05.high.glb?v=41c13404a5",
+          "bytes": 3029836
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/tyrant-g05/tyrant-g05.medium.glb?v=91b183200f",
+          "bytes": 956920
+        }
+      },
+      "triangles": 29999,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.4126,
+        2.0002,
+        0.216
+      ]
+    },
+    "bosses/tyrant-g06": {
+      "kind": "bosses",
+      "id": "tyrant-g06",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/tyrant-g06/tyrant-g06.high.glb?v=9be9b5f289",
+          "bytes": 3496840
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/tyrant-g06/tyrant-g06.medium.glb?v=c5b9cadaee",
+          "bytes": 1317180
+        }
+      },
+      "triangles": 30000,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.7567,
+        2,
+        0.9979
+      ]
+    },
+    "bosses/tyrant-g07": {
+      "kind": "bosses",
+      "id": "tyrant-g07",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/tyrant-g07/tyrant-g07.high.glb?v=89c0b9d9e2",
+          "bytes": 3723988
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/tyrant-g07/tyrant-g07.medium.glb?v=0ec961975a",
+          "bytes": 1427076
+        }
+      },
+      "triangles": 30000,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.8492,
+        2.001,
+        0.6903
+      ]
+    },
+    "bosses/tyrant-g08": {
+      "kind": "bosses",
+      "id": "tyrant-g08",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/tyrant-g08/tyrant-g08.high.glb?v=3ef4a606cd",
+          "bytes": 3768884
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/tyrant-g08/tyrant-g08.medium.glb?v=14c2472c1d",
+          "bytes": 1305884
+        }
+      },
+      "triangles": 30000,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.6728,
+        2,
+        0.9282
+      ]
+    },
+    "bosses/tyrant-g09": {
+      "kind": "bosses",
+      "id": "tyrant-g09",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/tyrant-g09/tyrant-g09.high.glb?v=8d155bf996",
+          "bytes": 3284484
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/tyrant-g09/tyrant-g09.medium.glb?v=cb3095e45d",
+          "bytes": 1349608
+        }
+      },
+      "triangles": 30000,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        2,
+        1.9468,
+        1.1405
+      ]
+    },
+    "bosses/tyrant-g10": {
+      "kind": "bosses",
+      "id": "tyrant-g10",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/tyrant-g10/tyrant-g10.high.glb?v=6e1c80d3c4",
+          "bytes": 3464916
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/tyrant-g10/tyrant-g10.medium.glb?v=6b2f493baa",
+          "bytes": 1257120
+        }
+      },
+      "triangles": 29999,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.5257,
+        2,
+        0.5031
+      ]
+    },
+    "bosses/warden-angel": {
+      "kind": "bosses",
+      "id": "warden-angel",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/warden-angel/warden-angel.high.glb?v=f8c3464b4b",
+          "bytes": 3733164
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/warden-angel/warden-angel.medium.glb?v=1ddb3b508d",
+          "bytes": 1451212
+        }
+      },
+      "triangles": 30000,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        2,
+        1.9423,
+        0.5458
+      ]
+    },
+    "bosses/warden-cosmic": {
+      "kind": "bosses",
+      "id": "warden-cosmic",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/warden-cosmic/warden-cosmic.high.glb?v=142e4ac4e8",
+          "bytes": 3438344
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/warden-cosmic/warden-cosmic.medium.glb?v=b044549330",
+          "bytes": 1268756
+        }
+      },
+      "triangles": 29999,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.4728,
+        2,
+        0.8356
+      ]
+    },
+    "bosses/warden-devil": {
+      "kind": "bosses",
+      "id": "warden-devil",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/warden-devil/warden-devil.high.glb?v=bc712e7ebd",
+          "bytes": 3459976
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/warden-devil/warden-devil.medium.glb?v=9a41bafb02",
+          "bytes": 1254084
+        }
+      },
+      "triangles": 30000,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.8665,
+        2,
+        0.8802
+      ]
+    },
+    "bosses/warden-frost": {
+      "kind": "bosses",
+      "id": "warden-frost",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/warden-frost/warden-frost.high.glb?v=4053e39abb",
+          "bytes": 3650004
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/warden-frost/warden-frost.medium.glb?v=bb6dfa645b",
+          "bytes": 1329808
+        }
+      },
+      "triangles": 30000,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.7494,
+        2,
+        0.528
+      ]
+    },
+    "bosses/warden-nature": {
+      "kind": "bosses",
+      "id": "warden-nature",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/warden-nature/warden-nature.high.glb?v=0cd07c116b",
+          "bytes": 3401196
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/warden-nature/warden-nature.medium.glb?v=4ac2d7e775",
+          "bytes": 1294760
+        }
+      },
+      "triangles": 28705,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.6511,
+        2,
+        0.6075
+      ]
+    },
+    "bosses/warden-prism": {
+      "kind": "bosses",
+      "id": "warden-prism",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/warden-prism/warden-prism.high.glb?v=c1d83c50a9",
+          "bytes": 4090660
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/warden-prism/warden-prism.medium.glb?v=bc51dfc714",
+          "bytes": 1588356
+        }
+      },
+      "triangles": 30000,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.5046,
+        2,
+        0.4687
+      ]
+    },
+    "bosses/warden-rainbow": {
+      "kind": "bosses",
+      "id": "warden-rainbow",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/warden-rainbow/warden-rainbow.high.glb?v=70f3b3b6c6",
+          "bytes": 3130976
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/warden-rainbow/warden-rainbow.medium.glb?v=27f4e81487",
+          "bytes": 1197980
+        }
+      },
+      "triangles": 30000,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.6946,
+        2,
+        0.4203
+      ]
+    },
+    "bosses/warden-shadow": {
+      "kind": "bosses",
+      "id": "warden-shadow",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/bosses/warden-shadow/warden-shadow.high.glb?v=7b7c262b85",
+          "bytes": 2909320
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/bosses/warden-shadow/warden-shadow.medium.glb?v=d8216e26ca",
+          "bytes": 1037300
+        }
+      },
+      "triangles": 29999,
+      "sockets": [
+        "FX_CAST_L",
+        "FX_CAST_R",
+        "FX_CORE",
+        "FX_HALO"
+      ],
+      "clips": [
+        "Boss_Hit",
+        "Boss_Death",
+        "Boss_Intro",
+        "Boss_Idle_Hover"
+      ],
+      "size": [
+        1.7893,
+        2.0001,
+        0.4053
+      ]
+    },
+    "enemies/angel-carrier-3d": {
+      "kind": "enemies",
+      "id": "angel-carrier-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/angel-carrier-3d/angel-carrier-3d.high.glb?v=50a64c381b",
+          "bytes": 1128560
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/angel-carrier-3d/angel-carrier-3d.medium.glb?v=41ba6128cb",
+          "bytes": 410936
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.8583,
+        2.0084,
+        0.7994
+      ]
+    },
+    "enemies/angel-cloaker-3d": {
+      "kind": "enemies",
+      "id": "angel-cloaker-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/angel-cloaker-3d/angel-cloaker-3d.high.glb?v=e9aeda2dff",
+          "bytes": 958308
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/angel-cloaker-3d/angel-cloaker-3d.medium.glb?v=1b9414c55a",
+          "bytes": 357584
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0049,
+        1.8591,
+        0.3861
+      ]
+    },
+    "enemies/angel-commander-3d": {
+      "kind": "enemies",
+      "id": "angel-commander-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/angel-commander-3d/angel-commander-3d.high.glb?v=a24ea02da8",
+          "bytes": 1354488
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/angel-commander-3d/angel-commander-3d.medium.glb?v=a6b182d566",
+          "bytes": 461452
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2,
+        1.96,
+        0.8734
+      ]
+    },
+    "enemies/angel-destroyer-3d": {
+      "kind": "enemies",
+      "id": "angel-destroyer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/angel-destroyer-3d/angel-destroyer-3d.high.glb?v=e2d0ca5962",
+          "bytes": 1148088
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/angel-destroyer-3d/angel-destroyer-3d.medium.glb?v=3761340952",
+          "bytes": 402032
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.2229,
+        2.0022,
+        0.7436
+      ]
+    },
+    "enemies/angel-healer-3d": {
+      "kind": "enemies",
+      "id": "angel-healer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/angel-healer-3d/angel-healer-3d.high.glb?v=a4d5eabe00",
+          "bytes": 1004188
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/angel-healer-3d/angel-healer-3d.medium.glb?v=dc9d8853c2",
+          "bytes": 332236
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.4645,
+        2.0013,
+        0.7578
+      ]
+    },
+    "enemies/angel-jammer-3d": {
+      "kind": "enemies",
+      "id": "angel-jammer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/angel-jammer-3d/angel-jammer-3d.high.glb?v=95541cb5b0",
+          "bytes": 1264120
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/angel-jammer-3d/angel-jammer-3d.medium.glb?v=2c9efc92c5",
+          "bytes": 441484
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.8395,
+        1.9843,
+        0.8765
+      ]
+    },
+    "enemies/angel-leech-3d": {
+      "kind": "enemies",
+      "id": "angel-leech-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/angel-leech-3d/angel-leech-3d.high.glb?v=3af2b683d2",
+          "bytes": 1127852
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/angel-leech-3d/angel-leech-3d.medium.glb?v=9ec9fb68ab",
+          "bytes": 390356
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0086,
+        1.9671,
+        1.1605
+      ]
+    },
+    "enemies/angel-mine-3d": {
+      "kind": "enemies",
+      "id": "angel-mine-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/angel-mine-3d/angel-mine-3d.high.glb?v=2f9b288ffc",
+          "bytes": 1105848
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/angel-mine-3d/angel-mine-3d.medium.glb?v=6436c49998",
+          "bytes": 398504
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0046,
+        1.9791,
+        1.5213
+      ]
+    },
+    "enemies/angel-oppressor-3d": {
+      "kind": "enemies",
+      "id": "angel-oppressor-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/angel-oppressor-3d/angel-oppressor-3d.high.glb?v=d3d31a7e76",
+          "bytes": 1136636
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/angel-oppressor-3d/angel-oppressor-3d.medium.glb?v=39310a604b",
+          "bytes": 404908
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.3837,
+        1.9954,
+        0.8549
+      ]
+    },
+    "enemies/angel-scout-3d": {
+      "kind": "enemies",
+      "id": "angel-scout-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/angel-scout-3d/angel-scout-3d.high.glb?v=ae9d3e84d5",
+          "bytes": 1025024
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/angel-scout-3d/angel-scout-3d.medium.glb?v=2d16d2a44a",
+          "bytes": 374804
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9916,
+        1.5529,
+        1.3994
+      ]
+    },
+    "enemies/angel-scout-lod": {
+      "kind": "enemies",
+      "id": "angel-scout-lod",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/angel-scout-lod/angel-scout-lod.high.glb?v=229dbebfd5",
+          "bytes": 898688
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/angel-scout-lod/angel-scout-lod.medium.glb?v=f8d3895a4f",
+          "bytes": 248464
+        }
+      },
+      "triangles": 999,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9924,
+        1.5354,
+        1.399
+      ]
+    },
+    "enemies/angel-shield-3d": {
+      "kind": "enemies",
+      "id": "angel-shield-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/angel-shield-3d/angel-shield-3d.high.glb?v=fdf3ffe561",
+          "bytes": 1137920
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/angel-shield-3d/angel-shield-3d.medium.glb?v=8fb154ca37",
+          "bytes": 415640
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.6604,
+        2.0193,
+        1.1592
+      ]
+    },
+    "enemies/angel-sniper-3d": {
+      "kind": "enemies",
+      "id": "angel-sniper-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/angel-sniper-3d/angel-sniper-3d.high.glb?v=ccf37cd8e6",
+          "bytes": 1106300
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/angel-sniper-3d/angel-sniper-3d.medium.glb?v=d6904275ed",
+          "bytes": 368180
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9484,
+        2.0006,
+        0.5948
+      ]
+    },
+    "enemies/angel-splitter-3d": {
+      "kind": "enemies",
+      "id": "angel-splitter-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/angel-splitter-3d/angel-splitter-3d.high.glb?v=35ba8ea575",
+          "bytes": 1181440
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/angel-splitter-3d/angel-splitter-3d.medium.glb?v=8c3ed32751",
+          "bytes": 430272
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9642,
+        2.0156,
+        0.9544
+      ]
+    },
+    "enemies/angel-tank-3d": {
+      "kind": "enemies",
+      "id": "angel-tank-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/angel-tank-3d/angel-tank-3d.high.glb?v=953dda12ee",
+          "bytes": 482296
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/angel-tank-3d/angel-tank-3d.medium.glb?v=d47e639942",
+          "bytes": 220488
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.8569,
+        1.4222,
+        1.9884
+      ]
+    },
+    "enemies/angel-tank-lod": {
+      "kind": "enemies",
+      "id": "angel-tank-lod",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/angel-tank-lod/angel-tank-lod.high.glb?v=954ed0b4bd",
+          "bytes": 386832
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/angel-tank-lod/angel-tank-lod.medium.glb?v=89ac23c6db",
+          "bytes": 125020
+        }
+      },
+      "triangles": 1199,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.7488,
+        1.4372,
+        1.9574
+      ]
+    },
+    "enemies/cosmic-carrier-3d": {
+      "kind": "enemies",
+      "id": "cosmic-carrier-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/cosmic-carrier-3d/cosmic-carrier-3d.high.glb?v=47ea82198f",
+          "bytes": 1105100
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/cosmic-carrier-3d/cosmic-carrier-3d.medium.glb?v=2166aff942",
+          "bytes": 377332
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0038,
+        1.4541,
+        0.8771
+      ]
+    },
+    "enemies/cosmic-cloaker-3d": {
+      "kind": "enemies",
+      "id": "cosmic-cloaker-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/cosmic-cloaker-3d/cosmic-cloaker-3d.high.glb?v=37f9c68274",
+          "bytes": 676744
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/cosmic-cloaker-3d/cosmic-cloaker-3d.medium.glb?v=a0b7f8dd77",
+          "bytes": 280444
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.003,
+        1.6466,
+        0.3379
+      ]
+    },
+    "enemies/cosmic-commander-3d": {
+      "kind": "enemies",
+      "id": "cosmic-commander-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/cosmic-commander-3d/cosmic-commander-3d.high.glb?v=e6101c9afd",
+          "bytes": 992768
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/cosmic-commander-3d/cosmic-commander-3d.medium.glb?v=1feb588980",
+          "bytes": 375908
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9122,
+        2.0187,
+        1.0565
+      ]
+    },
+    "enemies/cosmic-destroyer-3d": {
+      "kind": "enemies",
+      "id": "cosmic-destroyer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/cosmic-destroyer-3d/cosmic-destroyer-3d.high.glb?v=b4b75bc4d9",
+          "bytes": 1191768
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/cosmic-destroyer-3d/cosmic-destroyer-3d.medium.glb?v=e6aee000a5",
+          "bytes": 432664
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.4081,
+        2.0001,
+        0.8036
+      ]
+    },
+    "enemies/cosmic-healer-3d": {
+      "kind": "enemies",
+      "id": "cosmic-healer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/cosmic-healer-3d/cosmic-healer-3d.high.glb?v=27a087d9a0",
+          "bytes": 825436
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/cosmic-healer-3d/cosmic-healer-3d.medium.glb?v=fe30c4b648",
+          "bytes": 275052
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.65,
+        1.5942,
+        2.0011
+      ]
+    },
+    "enemies/cosmic-jammer-3d": {
+      "kind": "enemies",
+      "id": "cosmic-jammer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/cosmic-jammer-3d/cosmic-jammer-3d.high.glb?v=c2aac54840",
+          "bytes": 1024352
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/cosmic-jammer-3d/cosmic-jammer-3d.medium.glb?v=f8cddba0f4",
+          "bytes": 380716
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0046,
+        1.5228,
+        0.3113
+      ]
+    },
+    "enemies/cosmic-leech-3d": {
+      "kind": "enemies",
+      "id": "cosmic-leech-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/cosmic-leech-3d/cosmic-leech-3d.high.glb?v=aaa51633ef",
+          "bytes": 908032
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/cosmic-leech-3d/cosmic-leech-3d.medium.glb?v=dd411e8806",
+          "bytes": 297540
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0113,
+        1.9846,
+        0.9876
+      ]
+    },
+    "enemies/cosmic-mine-3d": {
+      "kind": "enemies",
+      "id": "cosmic-mine-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/cosmic-mine-3d/cosmic-mine-3d.high.glb?v=aa155d4423",
+          "bytes": 985340
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/cosmic-mine-3d/cosmic-mine-3d.medium.glb?v=c380ea5404",
+          "bytes": 360652
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9764,
+        1.9995,
+        0.2998
+      ]
+    },
+    "enemies/cosmic-oppressor-3d": {
+      "kind": "enemies",
+      "id": "cosmic-oppressor-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/cosmic-oppressor-3d/cosmic-oppressor-3d.high.glb?v=dbcebcef1b",
+          "bytes": 824492
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/cosmic-oppressor-3d/cosmic-oppressor-3d.medium.glb?v=db1b7cac1f",
+          "bytes": 286304
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.7607,
+        1.9961,
+        0.9456
+      ]
+    },
+    "enemies/cosmic-scout-3d": {
+      "kind": "enemies",
+      "id": "cosmic-scout-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/cosmic-scout-3d/cosmic-scout-3d.high.glb?v=9183ceca72",
+          "bytes": 906296
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/cosmic-scout-3d/cosmic-scout-3d.medium.glb?v=d2b2081fd0",
+          "bytes": 343604
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.4314,
+        1.9728,
+        0.4964
+      ]
+    },
+    "enemies/cosmic-scout-lod": {
+      "kind": "enemies",
+      "id": "cosmic-scout-lod",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/cosmic-scout-lod/cosmic-scout-lod.high.glb?v=b257ba64e5",
+          "bytes": 791092
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/cosmic-scout-lod/cosmic-scout-lod.medium.glb?v=6eadacf0f6",
+          "bytes": 228400
+        }
+      },
+      "triangles": 999,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.4827,
+        1.9614,
+        0.4946
+      ]
+    },
+    "enemies/cosmic-shield-3d": {
+      "kind": "enemies",
+      "id": "cosmic-shield-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/cosmic-shield-3d/cosmic-shield-3d.high.glb?v=53a1fbf0e4",
+          "bytes": 1312540
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/cosmic-shield-3d/cosmic-shield-3d.medium.glb?v=7fec477317",
+          "bytes": 455132
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.8905,
+        2.0002,
+        1.3008
+      ]
+    },
+    "enemies/cosmic-sniper-3d": {
+      "kind": "enemies",
+      "id": "cosmic-sniper-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/cosmic-sniper-3d/cosmic-sniper-3d.high.glb?v=dbc3078336",
+          "bytes": 974416
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/cosmic-sniper-3d/cosmic-sniper-3d.medium.glb?v=ac82a8924b",
+          "bytes": 363664
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.7069,
+        1.5788,
+        2.0073
+      ]
+    },
+    "enemies/cosmic-splitter-3d": {
+      "kind": "enemies",
+      "id": "cosmic-splitter-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/cosmic-splitter-3d/cosmic-splitter-3d.high.glb?v=4505ad5676",
+          "bytes": 960100
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/cosmic-splitter-3d/cosmic-splitter-3d.medium.glb?v=2c4ca8e3c5",
+          "bytes": 292692
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9984,
+        1.9809,
+        0.8098
+      ]
+    },
+    "enemies/cosmic-tank-3d": {
+      "kind": "enemies",
+      "id": "cosmic-tank-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/cosmic-tank-3d/cosmic-tank-3d.high.glb?v=5b9d80ed77",
+          "bytes": 625188
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/cosmic-tank-3d/cosmic-tank-3d.medium.glb?v=98d832cc8a",
+          "bytes": 265640
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.7922,
+        2.0114,
+        1.4815
+      ]
+    },
+    "enemies/devil-carrier-3d": {
+      "kind": "enemies",
+      "id": "devil-carrier-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/devil-carrier-3d/devil-carrier-3d.high.glb?v=16d735b179",
+          "bytes": 1042288
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/devil-carrier-3d/devil-carrier-3d.medium.glb?v=8d3b03bc95",
+          "bytes": 400640
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.6692,
+        2,
+        0.6132
+      ]
+    },
+    "enemies/devil-cloaker-3d": {
+      "kind": "enemies",
+      "id": "devil-cloaker-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/devil-cloaker-3d/devil-cloaker-3d.high.glb?v=242a1527b2",
+          "bytes": 1130112
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/devil-cloaker-3d/devil-cloaker-3d.medium.glb?v=5c96cf6daf",
+          "bytes": 411520
+        }
+      },
+      "triangles": 5999,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9977,
+        1.8125,
+        0.4781
+      ]
+    },
+    "enemies/devil-commander-3d": {
+      "kind": "enemies",
+      "id": "devil-commander-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/devil-commander-3d/devil-commander-3d.high.glb?v=46a9bd6f76",
+          "bytes": 1224220
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/devil-commander-3d/devil-commander-3d.medium.glb?v=1e49f13a7f",
+          "bytes": 437084
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0033,
+        1.8247,
+        1.0752
+      ]
+    },
+    "enemies/devil-destroyer-3d": {
+      "kind": "enemies",
+      "id": "devil-destroyer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/devil-destroyer-3d/devil-destroyer-3d.high.glb?v=fd8305725f",
+          "bytes": 1130116
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/devil-destroyer-3d/devil-destroyer-3d.medium.glb?v=26421b9a14",
+          "bytes": 411524
+        }
+      },
+      "triangles": 5999,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9977,
+        1.8125,
+        0.4781
+      ]
+    },
+    "enemies/devil-healer-3d": {
+      "kind": "enemies",
+      "id": "devil-healer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/devil-healer-3d/devil-healer-3d.high.glb?v=1407f09253",
+          "bytes": 1145984
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/devil-healer-3d/devil-healer-3d.medium.glb?v=32632511b2",
+          "bytes": 378272
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.8704,
+        1.9946,
+        0.5789
+      ]
+    },
+    "enemies/devil-jammer-3d": {
+      "kind": "enemies",
+      "id": "devil-jammer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/devil-jammer-3d/devil-jammer-3d.high.glb?v=04f65b501a",
+          "bytes": 1241196
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/devil-jammer-3d/devil-jammer-3d.medium.glb?v=01d25946dd",
+          "bytes": 426016
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9991,
+        1.6845,
+        1.381
+      ]
+    },
+    "enemies/devil-leech-3d": {
+      "kind": "enemies",
+      "id": "devil-leech-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/devil-leech-3d/devil-leech-3d.high.glb?v=c77be702db",
+          "bytes": 1131276
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/devil-leech-3d/devil-leech-3d.medium.glb?v=abbb03c771",
+          "bytes": 384508
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.8633,
+        2.0051,
+        0.9186
+      ]
+    },
+    "enemies/devil-mine-3d": {
+      "kind": "enemies",
+      "id": "devil-mine-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/devil-mine-3d/devil-mine-3d.high.glb?v=d26d25b06e",
+          "bytes": 1371484
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/devil-mine-3d/devil-mine-3d.medium.glb?v=d576e1d412",
+          "bytes": 480880
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0075,
+        1.9503,
+        1.5621
+      ]
+    },
+    "enemies/devil-oppressor-3d": {
+      "kind": "enemies",
+      "id": "devil-oppressor-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/devil-oppressor-3d/devil-oppressor-3d.high.glb?v=6979ad6654",
+          "bytes": 1100112
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/devil-oppressor-3d/devil-oppressor-3d.medium.glb?v=854cba494e",
+          "bytes": 402156
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.7613,
+        2.0057,
+        1.7404
+      ]
+    },
+    "enemies/devil-scout-3d": {
+      "kind": "enemies",
+      "id": "devil-scout-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/devil-scout-3d/devil-scout-3d.high.glb?v=b6448353c8",
+          "bytes": 1060524
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/devil-scout-3d/devil-scout-3d.medium.glb?v=f06e198be7",
+          "bytes": 380020
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0141,
+        1.3181,
+        1.5999
+      ]
+    },
+    "enemies/devil-scout-lod": {
+      "kind": "enemies",
+      "id": "devil-scout-lod",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/devil-scout-lod/devil-scout-lod.high.glb?v=22a74615b8",
+          "bytes": 926612
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/devil-scout-lod/devil-scout-lod.medium.glb?v=06c2c44529",
+          "bytes": 246108
+        }
+      },
+      "triangles": 999,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9778,
+        1.3081,
+        1.5916
+      ]
+    },
+    "enemies/devil-shield-3d": {
+      "kind": "enemies",
+      "id": "devil-shield-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/devil-shield-3d/devil-shield-3d.high.glb?v=594f63e7d8",
+          "bytes": 1166952
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/devil-shield-3d/devil-shield-3d.medium.glb?v=e064833398",
+          "bytes": 466064
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9522,
+        2.0009,
+        2.2442
+      ]
+    },
+    "enemies/devil-sniper-3d": {
+      "kind": "enemies",
+      "id": "devil-sniper-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/devil-sniper-3d/devil-sniper-3d.high.glb?v=5d70b01d49",
+          "bytes": 1034124
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/devil-sniper-3d/devil-sniper-3d.medium.glb?v=dadd2b1029",
+          "bytes": 380084
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.4891,
+        1.9981,
+        0.475
+      ]
+    },
+    "enemies/devil-splitter-3d": {
+      "kind": "enemies",
+      "id": "devil-splitter-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/devil-splitter-3d/devil-splitter-3d.high.glb?v=2a3cebbd34",
+          "bytes": 1063212
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/devil-splitter-3d/devil-splitter-3d.medium.glb?v=7f6319ac10",
+          "bytes": 413124
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9301,
+        1.9973,
+        0.7535
+      ]
+    },
+    "enemies/devil-tank-3d": {
+      "kind": "enemies",
+      "id": "devil-tank-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/devil-tank-3d/devil-tank-3d.high.glb?v=8948858680",
+          "bytes": 1054880
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/devil-tank-3d/devil-tank-3d.medium.glb?v=5a6ce7631b",
+          "bytes": 399616
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.7036,
+        2.0143,
+        0.9051
+      ]
+    },
+    "enemies/frost-carrier-3d": {
+      "kind": "enemies",
+      "id": "frost-carrier-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/frost-carrier-3d/frost-carrier-3d.high.glb?v=19b978706c",
+          "bytes": 1277316
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/frost-carrier-3d/frost-carrier-3d.medium.glb?v=1a14ae5606",
+          "bytes": 457600
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9932,
+        1.9972,
+        1.159
+      ]
+    },
+    "enemies/frost-cloaker-3d": {
+      "kind": "enemies",
+      "id": "frost-cloaker-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/frost-cloaker-3d/frost-cloaker-3d.high.glb?v=bbc265511d",
+          "bytes": 1019016
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/frost-cloaker-3d/frost-cloaker-3d.medium.glb?v=04716bacae",
+          "bytes": 360308
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0026,
+        1.9564,
+        0.4527
+      ]
+    },
+    "enemies/frost-commander-3d": {
+      "kind": "enemies",
+      "id": "frost-commander-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/frost-commander-3d/frost-commander-3d.high.glb?v=fb1fa477d0",
+          "bytes": 1310360
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/frost-commander-3d/frost-commander-3d.medium.glb?v=ed8dcc68c5",
+          "bytes": 460836
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9704,
+        2.0028,
+        0.5338
+      ]
+    },
+    "enemies/frost-destroyer-3d": {
+      "kind": "enemies",
+      "id": "frost-destroyer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/frost-destroyer-3d/frost-destroyer-3d.high.glb?v=1fce5fabef",
+          "bytes": 1310360
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/frost-destroyer-3d/frost-destroyer-3d.medium.glb?v=c4b8c59508",
+          "bytes": 460836
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9704,
+        2.0028,
+        0.5338
+      ]
+    },
+    "enemies/frost-healer-3d": {
+      "kind": "enemies",
+      "id": "frost-healer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/frost-healer-3d/frost-healer-3d.high.glb?v=6da0c10da9",
+          "bytes": 1122152
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/frost-healer-3d/frost-healer-3d.medium.glb?v=d480802abb",
+          "bytes": 365120
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.8661,
+        1.9808,
+        1.301
+      ]
+    },
+    "enemies/frost-jammer-3d": {
+      "kind": "enemies",
+      "id": "frost-jammer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/frost-jammer-3d/frost-jammer-3d.high.glb?v=feee1905ef",
+          "bytes": 1272092
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/frost-jammer-3d/frost-jammer-3d.medium.glb?v=98593b04bb",
+          "bytes": 444264
+        }
+      },
+      "triangles": 5999,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9588,
+        2.0004,
+        0.8955
+      ]
+    },
+    "enemies/frost-leech-3d": {
+      "kind": "enemies",
+      "id": "frost-leech-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/frost-leech-3d/frost-leech-3d.high.glb?v=33acd9b5c2",
+          "bytes": 1122152
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/frost-leech-3d/frost-leech-3d.medium.glb?v=31bc527b95",
+          "bytes": 365120
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.8661,
+        1.9808,
+        1.301
+      ]
+    },
+    "enemies/frost-mine-3d": {
+      "kind": "enemies",
+      "id": "frost-mine-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/frost-mine-3d/frost-mine-3d.high.glb?v=4cc0f4969b",
+          "bytes": 1074444
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/frost-mine-3d/frost-mine-3d.medium.glb?v=b84b7bafc2",
+          "bytes": 401476
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9949,
+        1.9927,
+        0.773
+      ]
+    },
+    "enemies/frost-oppressor-3d": {
+      "kind": "enemies",
+      "id": "frost-oppressor-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/frost-oppressor-3d/frost-oppressor-3d.high.glb?v=9d839a3a50",
+          "bytes": 1114940
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/frost-oppressor-3d/frost-oppressor-3d.medium.glb?v=60e96d00c0",
+          "bytes": 386868
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.6717,
+        1.9991,
+        1.6958
+      ]
+    },
+    "enemies/frost-scout-3d": {
+      "kind": "enemies",
+      "id": "frost-scout-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/frost-scout-3d/frost-scout-3d.high.glb?v=6a5fc56dfa",
+          "bytes": 883696
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/frost-scout-3d/frost-scout-3d.medium.glb?v=12ad6816f4",
+          "bytes": 321116
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0024,
+        1.9507,
+        0.2586
+      ]
+    },
+    "enemies/frost-scout-lod": {
+      "kind": "enemies",
+      "id": "frost-scout-lod",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/frost-scout-lod/frost-scout-lod.high.glb?v=a8a939ddd4",
+          "bytes": 762616
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/frost-scout-lod/frost-scout-lod.medium.glb?v=fe7ac01a60",
+          "bytes": 200032
+        }
+      },
+      "triangles": 1000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9964,
+        1.9437,
+        0.2567
+      ]
+    },
+    "enemies/frost-shield-3d": {
+      "kind": "enemies",
+      "id": "frost-shield-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/frost-shield-3d/frost-shield-3d.high.glb?v=de43728ead",
+          "bytes": 1304028
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/frost-shield-3d/frost-shield-3d.medium.glb?v=08c08e8ec7",
+          "bytes": 463052
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.8828,
+        2.0255,
+        1.5255
+      ]
+    },
+    "enemies/frost-sniper-3d": {
+      "kind": "enemies",
+      "id": "frost-sniper-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/frost-sniper-3d/frost-sniper-3d.high.glb?v=f8ff713005",
+          "bytes": 1082828
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/frost-sniper-3d/frost-sniper-3d.medium.glb?v=f035a41970",
+          "bytes": 381628
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        0.4684,
+        0.9432,
+        1.9921
+      ]
+    },
+    "enemies/frost-splitter-3d": {
+      "kind": "enemies",
+      "id": "frost-splitter-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/frost-splitter-3d/frost-splitter-3d.high.glb?v=660066fd19",
+          "bytes": 1222440
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/frost-splitter-3d/frost-splitter-3d.medium.glb?v=bac4800bb7",
+          "bytes": 440908
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9687,
+        2.0211,
+        0.6788
+      ]
+    },
+    "enemies/frost-tank-3d": {
+      "kind": "enemies",
+      "id": "frost-tank-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/frost-tank-3d/frost-tank-3d.high.glb?v=823cb462ba",
+          "bytes": 1225304
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/frost-tank-3d/frost-tank-3d.medium.glb?v=518a63d1c2",
+          "bytes": 463008
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.8979,
+        2,
+        0.9608
+      ]
+    },
+    "enemies/nature-carrier-3d": {
+      "kind": "enemies",
+      "id": "nature-carrier-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/nature-carrier-3d/nature-carrier-3d.high.glb?v=2830c52517",
+          "bytes": 1148612
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/nature-carrier-3d/nature-carrier-3d.medium.glb?v=54235f9c1a",
+          "bytes": 432300
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9945,
+        0.8601,
+        0.9334
+      ]
+    },
+    "enemies/nature-cloaker-3d": {
+      "kind": "enemies",
+      "id": "nature-cloaker-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/nature-cloaker-3d/nature-cloaker-3d.high.glb?v=73a5c4f0f7",
+          "bytes": 959024
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/nature-cloaker-3d/nature-cloaker-3d.medium.glb?v=fa73fb1c7d",
+          "bytes": 378836
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0016,
+        1.2819,
+        0.3552
+      ]
+    },
+    "enemies/nature-commander-3d": {
+      "kind": "enemies",
+      "id": "nature-commander-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/nature-commander-3d/nature-commander-3d.high.glb?v=5b02781b1f",
+          "bytes": 912200
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/nature-commander-3d/nature-commander-3d.medium.glb?v=f22df63d13",
+          "bytes": 347084
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0029,
+        1.6539,
+        1.0879
+      ]
+    },
+    "enemies/nature-destroyer-3d": {
+      "kind": "enemies",
+      "id": "nature-destroyer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/nature-destroyer-3d/nature-destroyer-3d.high.glb?v=a5166fa3d4",
+          "bytes": 1061140
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/nature-destroyer-3d/nature-destroyer-3d.medium.glb?v=067c958115",
+          "bytes": 405268
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.8884,
+        1.4131,
+        2.0233
+      ]
+    },
+    "enemies/nature-healer-3d": {
+      "kind": "enemies",
+      "id": "nature-healer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/nature-healer-3d/nature-healer-3d.high.glb?v=79289854b8",
+          "bytes": 927292
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/nature-healer-3d/nature-healer-3d.medium.glb?v=9a006d59c0",
+          "bytes": 354432
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.6709,
+        1.9993,
+        1.0298
+      ]
+    },
+    "enemies/nature-jammer-3d": {
+      "kind": "enemies",
+      "id": "nature-jammer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/nature-jammer-3d/nature-jammer-3d.high.glb?v=00b4eb07f5",
+          "bytes": 1082512
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/nature-jammer-3d/nature-jammer-3d.medium.glb?v=f9d14b2de2",
+          "bytes": 401708
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.969,
+        2.0092,
+        0.736
+      ]
+    },
+    "enemies/nature-leech-3d": {
+      "kind": "enemies",
+      "id": "nature-leech-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/nature-leech-3d/nature-leech-3d.high.glb?v=8b5e76cc73",
+          "bytes": 1014756
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/nature-leech-3d/nature-leech-3d.medium.glb?v=59c8adaf4e",
+          "bytes": 378876
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0004,
+        1.9086,
+        0.992
+      ]
+    },
+    "enemies/nature-mine-3d": {
+      "kind": "enemies",
+      "id": "nature-mine-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/nature-mine-3d/nature-mine-3d.high.glb?v=ebbda6ecbc",
+          "bytes": 902560
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/nature-mine-3d/nature-mine-3d.medium.glb?v=674a473469",
+          "bytes": 346772
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9847,
+        1.8551,
+        1.2737
+      ]
+    },
+    "enemies/nature-oppressor-3d": {
+      "kind": "enemies",
+      "id": "nature-oppressor-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/nature-oppressor-3d/nature-oppressor-3d.high.glb?v=2959ac326e",
+          "bytes": 902800
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/nature-oppressor-3d/nature-oppressor-3d.medium.glb?v=a31d87f8ab",
+          "bytes": 333296
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.3288,
+        2.0049,
+        1.3087
+      ]
+    },
+    "enemies/nature-scout-3d": {
+      "kind": "enemies",
+      "id": "nature-scout-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/nature-scout-3d/nature-scout-3d.high.glb?v=30408a0b8f",
+          "bytes": 838076
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/nature-scout-3d/nature-scout-3d.medium.glb?v=19f370eba9",
+          "bytes": 341272
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.7735,
+        1.9982,
+        0.3976
+      ]
+    },
+    "enemies/nature-scout-lod": {
+      "kind": "enemies",
+      "id": "nature-scout-lod",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/nature-scout-lod/nature-scout-lod.high.glb?v=056b3b637b",
+          "bytes": 684900
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/nature-scout-lod/nature-scout-lod.medium.glb?v=b72b0b17d3",
+          "bytes": 188092
+        }
+      },
+      "triangles": 1000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.763,
+        1.9891,
+        0.4023
+      ]
+    },
+    "enemies/nature-shield-3d": {
+      "kind": "enemies",
+      "id": "nature-shield-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/nature-shield-3d/nature-shield-3d.high.glb?v=0c565639ec",
+          "bytes": 996088
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/nature-shield-3d/nature-shield-3d.medium.glb?v=59aaf6ce0c",
+          "bytes": 372088
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0051,
+        1.7995,
+        1.3039
+      ]
+    },
+    "enemies/nature-sniper-3d": {
+      "kind": "enemies",
+      "id": "nature-sniper-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/nature-sniper-3d/nature-sniper-3d.high.glb?v=596a0f73fa",
+          "bytes": 1094316
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/nature-sniper-3d/nature-sniper-3d.medium.glb?v=f236a11e48",
+          "bytes": 410480
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.6363,
+        2.0339,
+        0.6468
+      ]
+    },
+    "enemies/nature-splitter-3d": {
+      "kind": "enemies",
+      "id": "nature-splitter-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/nature-splitter-3d/nature-splitter-3d.high.glb?v=df5cafc312",
+          "bytes": 776432
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/nature-splitter-3d/nature-splitter-3d.medium.glb?v=8a2dbcd369",
+          "bytes": 310948
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9982,
+        1.8338,
+        0.5108
+      ]
+    },
+    "enemies/nature-tank-3d": {
+      "kind": "enemies",
+      "id": "nature-tank-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/nature-tank-3d/nature-tank-3d.high.glb?v=5b8268e86e",
+          "bytes": 834456
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/nature-tank-3d/nature-tank-3d.medium.glb?v=d5281d8eb3",
+          "bytes": 335092
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.8011,
+        1.9969,
+        0.5005
+      ]
+    },
+    "enemies/prism-carrier-3d": {
+      "kind": "enemies",
+      "id": "prism-carrier-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/prism-carrier-3d/prism-carrier-3d.high.glb?v=0532242479",
+          "bytes": 1217188
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/prism-carrier-3d/prism-carrier-3d.medium.glb?v=3e5869c8b5",
+          "bytes": 430344
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0037,
+        1.4059,
+        1.3376
+      ]
+    },
+    "enemies/prism-cloaker-3d": {
+      "kind": "enemies",
+      "id": "prism-cloaker-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/prism-cloaker-3d/prism-cloaker-3d.high.glb?v=8c384b6f27",
+          "bytes": 961864
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/prism-cloaker-3d/prism-cloaker-3d.medium.glb?v=3ebb27733d",
+          "bytes": 348364
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0038,
+        1.8727,
+        1.1013
+      ]
+    },
+    "enemies/prism-commander-3d": {
+      "kind": "enemies",
+      "id": "prism-commander-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/prism-commander-3d/prism-commander-3d.high.glb?v=c3ebaec0ca",
+          "bytes": 1263268
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/prism-commander-3d/prism-commander-3d.medium.glb?v=6f274e5065",
+          "bytes": 440760
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9189,
+        2.0005,
+        0.5945
+      ]
+    },
+    "enemies/prism-destroyer-3d": {
+      "kind": "enemies",
+      "id": "prism-destroyer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/prism-destroyer-3d/prism-destroyer-3d.high.glb?v=1c22ab50b0",
+          "bytes": 1080656
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/prism-destroyer-3d/prism-destroyer-3d.medium.glb?v=3bded6ba7b",
+          "bytes": 388696
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.8329,
+        2.001,
+        1.3382
+      ]
+    },
+    "enemies/prism-healer-3d": {
+      "kind": "enemies",
+      "id": "prism-healer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/prism-healer-3d/prism-healer-3d.high.glb?v=ea5b6b0749",
+          "bytes": 1093280
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/prism-healer-3d/prism-healer-3d.medium.glb?v=19e26463d2",
+          "bytes": 392616
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0024,
+        1.9941,
+        0.9481
+      ]
+    },
+    "enemies/prism-jammer-3d": {
+      "kind": "enemies",
+      "id": "prism-jammer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/prism-jammer-3d/prism-jammer-3d.high.glb?v=b638cc07c2",
+          "bytes": 1141964
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/prism-jammer-3d/prism-jammer-3d.medium.glb?v=65323e2f8e",
+          "bytes": 353744
+        }
+      },
+      "triangles": 5999,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.8008,
+        2.0013,
+        1.3435
+      ]
+    },
+    "enemies/prism-leech-3d": {
+      "kind": "enemies",
+      "id": "prism-leech-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/prism-leech-3d/prism-leech-3d.high.glb?v=952ed1ffa7",
+          "bytes": 1234620
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/prism-leech-3d/prism-leech-3d.medium.glb?v=dd91a73ea3",
+          "bytes": 409656
+        }
+      },
+      "triangles": 5999,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.2727,
+        0.7679,
+        2.0032
+      ]
+    },
+    "enemies/prism-mine-3d": {
+      "kind": "enemies",
+      "id": "prism-mine-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/prism-mine-3d/prism-mine-3d.high.glb?v=a7d21cc7de",
+          "bytes": 1271284
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/prism-mine-3d/prism-mine-3d.medium.glb?v=6fdb9be389",
+          "bytes": 399956
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.001,
+        1.9949,
+        2.0002
+      ]
+    },
+    "enemies/prism-oppressor-3d": {
+      "kind": "enemies",
+      "id": "prism-oppressor-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/prism-oppressor-3d/prism-oppressor-3d.high.glb?v=642516b8fa",
+          "bytes": 1205960
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/prism-oppressor-3d/prism-oppressor-3d.medium.glb?v=95038643b8",
+          "bytes": 428836
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.2098,
+        2.0029,
+        0.7665
+      ]
+    },
+    "enemies/prism-scout-3d": {
+      "kind": "enemies",
+      "id": "prism-scout-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/prism-scout-3d/prism-scout-3d.high.glb?v=247cdb5edb",
+          "bytes": 950164
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/prism-scout-3d/prism-scout-3d.medium.glb?v=cb6d53d68c",
+          "bytes": 347168
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.997,
+        1.8929,
+        0.3561
+      ]
+    },
+    "enemies/prism-scout-lod": {
+      "kind": "enemies",
+      "id": "prism-scout-lod",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/prism-scout-lod/prism-scout-lod.high.glb?v=301f731782",
+          "bytes": 825812
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/prism-scout-lod/prism-scout-lod.medium.glb?v=f97d1fcfd5",
+          "bytes": 222820
+        }
+      },
+      "triangles": 1008,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9992,
+        1.8915,
+        0.3575
+      ]
+    },
+    "enemies/prism-shield-3d": {
+      "kind": "enemies",
+      "id": "prism-shield-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/prism-shield-3d/prism-shield-3d.high.glb?v=67ace7814a",
+          "bytes": 1043360
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/prism-shield-3d/prism-shield-3d.medium.glb?v=1f76508499",
+          "bytes": 375380
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.4738,
+        2.0056,
+        0.7778
+      ]
+    },
+    "enemies/prism-sniper-3d": {
+      "kind": "enemies",
+      "id": "prism-sniper-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/prism-sniper-3d/prism-sniper-3d.high.glb?v=95681f8c2e",
+          "bytes": 1188148
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/prism-sniper-3d/prism-sniper-3d.medium.glb?v=0df2276f0a",
+          "bytes": 384496
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.6213,
+        2.0027,
+        0.3182
+      ]
+    },
+    "enemies/prism-splitter-3d": {
+      "kind": "enemies",
+      "id": "prism-splitter-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/prism-splitter-3d/prism-splitter-3d.high.glb?v=c76fff9f8b",
+          "bytes": 1093284
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/prism-splitter-3d/prism-splitter-3d.medium.glb?v=a89753c405",
+          "bytes": 392620
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0024,
+        1.9941,
+        0.9481
+      ]
+    },
+    "enemies/prism-tank-3d": {
+      "kind": "enemies",
+      "id": "prism-tank-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/prism-tank-3d/prism-tank-3d.high.glb?v=12d93094b8",
+          "bytes": 1218844
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/prism-tank-3d/prism-tank-3d.medium.glb?v=1ebe4bb7c9",
+          "bytes": 452492
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2,
+        1.7282,
+        1.5712
+      ]
+    },
+    "enemies/rainbow-carrier-3d": {
+      "kind": "enemies",
+      "id": "rainbow-carrier-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/rainbow-carrier-3d/rainbow-carrier-3d.high.glb?v=63e17bce2c",
+          "bytes": 1171276
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/rainbow-carrier-3d/rainbow-carrier-3d.medium.glb?v=5e39b77759",
+          "bytes": 380776
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9896,
+        1.4568,
+        1.7172
+      ]
+    },
+    "enemies/rainbow-cloaker-3d": {
+      "kind": "enemies",
+      "id": "rainbow-cloaker-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/rainbow-cloaker-3d/rainbow-cloaker-3d.high.glb?v=584f62df29",
+          "bytes": 1070880
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/rainbow-cloaker-3d/rainbow-cloaker-3d.medium.glb?v=03ea3dc673",
+          "bytes": 374336
+        }
+      },
+      "triangles": 5999,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9988,
+        1.6839,
+        1.0309
+      ]
+    },
+    "enemies/rainbow-commander-3d": {
+      "kind": "enemies",
+      "id": "rainbow-commander-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/rainbow-commander-3d/rainbow-commander-3d.high.glb?v=ce7e1d1ce0",
+          "bytes": 1070880
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/rainbow-commander-3d/rainbow-commander-3d.medium.glb?v=6bb3a63eb6",
+          "bytes": 374340
+        }
+      },
+      "triangles": 5999,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9988,
+        1.6839,
+        1.0309
+      ]
+    },
+    "enemies/rainbow-destroyer-3d": {
+      "kind": "enemies",
+      "id": "rainbow-destroyer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/rainbow-destroyer-3d/rainbow-destroyer-3d.high.glb?v=ec72684fd3",
+          "bytes": 991380
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/rainbow-destroyer-3d/rainbow-destroyer-3d.medium.glb?v=0550a5add3",
+          "bytes": 311648
+        }
+      },
+      "triangles": 5999,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.6514,
+        1.9877,
+        1.4031
+      ]
+    },
+    "enemies/rainbow-healer-3d": {
+      "kind": "enemies",
+      "id": "rainbow-healer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/rainbow-healer-3d/rainbow-healer-3d.high.glb?v=ddd0c19014",
+          "bytes": 861152
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/rainbow-healer-3d/rainbow-healer-3d.medium.glb?v=db2fcefc79",
+          "bytes": 271452
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9082,
+        2.009,
+        0.9462
+      ]
+    },
+    "enemies/rainbow-jammer-3d": {
+      "kind": "enemies",
+      "id": "rainbow-jammer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/rainbow-jammer-3d/rainbow-jammer-3d.high.glb?v=9ae75a0a1c",
+          "bytes": 1111312
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/rainbow-jammer-3d/rainbow-jammer-3d.medium.glb?v=7ff103e1b2",
+          "bytes": 342800
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0036,
+        1.6737,
+        1.4877
+      ]
+    },
+    "enemies/rainbow-leech-3d": {
+      "kind": "enemies",
+      "id": "rainbow-leech-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/rainbow-leech-3d/rainbow-leech-3d.high.glb?v=612697c85d",
+          "bytes": 920380
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/rainbow-leech-3d/rainbow-leech-3d.medium.glb?v=0f55624f3e",
+          "bytes": 279844
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0064,
+        1.857,
+        1.3648
+      ]
+    },
+    "enemies/rainbow-mine-3d": {
+      "kind": "enemies",
+      "id": "rainbow-mine-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/rainbow-mine-3d/rainbow-mine-3d.high.glb?v=0f5a9e9038",
+          "bytes": 827972
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/rainbow-mine-3d/rainbow-mine-3d.medium.glb?v=ba00c1016a",
+          "bytes": 301076
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9886,
+        1.9992,
+        1.3136
+      ]
+    },
+    "enemies/rainbow-mine-lod": {
+      "kind": "enemies",
+      "id": "rainbow-mine-lod",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/rainbow-mine-lod/rainbow-mine-lod.high.glb?v=c023bb5b8f",
+          "bytes": 711832
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/rainbow-mine-lod/rainbow-mine-lod.medium.glb?v=13300e94c8",
+          "bytes": 184940
+        }
+      },
+      "triangles": 1000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9791,
+        1.991,
+        1.3204
+      ]
+    },
+    "enemies/rainbow-oppressor-3d": {
+      "kind": "enemies",
+      "id": "rainbow-oppressor-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/rainbow-oppressor-3d/rainbow-oppressor-3d.high.glb?v=c516d6a6a8",
+          "bytes": 1012028
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/rainbow-oppressor-3d/rainbow-oppressor-3d.medium.glb?v=7d7d139263",
+          "bytes": 309560
+        }
+      },
+      "triangles": 5999,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.4652,
+        1.9925,
+        1.0256
+      ]
+    },
     "enemies/rainbow-scout-3d": {
       "kind": "enemies",
       "id": "rainbow-scout-3d",
@@ -99,6 +3626,546 @@
         1.9971,
         1.988,
         1.5093
+      ]
+    },
+    "enemies/rainbow-scout-lod": {
+      "kind": "enemies",
+      "id": "rainbow-scout-lod",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/rainbow-scout-lod/rainbow-scout-lod.high.glb?v=69d8d93b3b",
+          "bytes": 951304
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/rainbow-scout-lod/rainbow-scout-lod.medium.glb?v=3b42a5b467",
+          "bytes": 259348
+        }
+      },
+      "triangles": 1000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.8439,
+        1.9847,
+        1.3701
+      ]
+    },
+    "enemies/rainbow-shield-3d": {
+      "kind": "enemies",
+      "id": "rainbow-shield-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/rainbow-shield-3d/rainbow-shield-3d.high.glb?v=0ac2a2a6e0",
+          "bytes": 991376
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/rainbow-shield-3d/rainbow-shield-3d.medium.glb?v=f0f3996320",
+          "bytes": 311644
+        }
+      },
+      "triangles": 5999,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.6514,
+        1.9877,
+        1.4031
+      ]
+    },
+    "enemies/rainbow-sniper-3d": {
+      "kind": "enemies",
+      "id": "rainbow-sniper-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/rainbow-sniper-3d/rainbow-sniper-3d.high.glb?v=6bf56f2e70",
+          "bytes": 960168
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/rainbow-sniper-3d/rainbow-sniper-3d.medium.glb?v=e0d59d6ade",
+          "bytes": 331628
+        }
+      },
+      "triangles": 5999,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.0024,
+        1.1394,
+        2.0004
+      ]
+    },
+    "enemies/rainbow-splitter-3d": {
+      "kind": "enemies",
+      "id": "rainbow-splitter-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/rainbow-splitter-3d/rainbow-splitter-3d.high.glb?v=cb85975744",
+          "bytes": 615648
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/rainbow-splitter-3d/rainbow-splitter-3d.medium.glb?v=e92db8b3d0",
+          "bytes": 216852
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0013,
+        1.8131,
+        1.2197
+      ]
+    },
+    "enemies/rainbow-tank-3d": {
+      "kind": "enemies",
+      "id": "rainbow-tank-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/rainbow-tank-3d/rainbow-tank-3d.high.glb?v=210a12d609",
+          "bytes": 950164
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/rainbow-tank-3d/rainbow-tank-3d.medium.glb?v=e6ebe745cc",
+          "bytes": 347168
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.997,
+        1.8929,
+        0.3561
+      ]
+    },
+    "enemies/shadow-carrier-3d": {
+      "kind": "enemies",
+      "id": "shadow-carrier-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/shadow-carrier-3d/shadow-carrier-3d.high.glb?v=207ddffb2a",
+          "bytes": 603036
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/shadow-carrier-3d/shadow-carrier-3d.medium.glb?v=e3070a48b1",
+          "bytes": 250432
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9972,
+        1.6612,
+        1.9987
+      ]
+    },
+    "enemies/shadow-cloaker-3d": {
+      "kind": "enemies",
+      "id": "shadow-cloaker-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/shadow-cloaker-3d/shadow-cloaker-3d.high.glb?v=1e7cb860f9",
+          "bytes": 468644
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/shadow-cloaker-3d/shadow-cloaker-3d.medium.glb?v=cdc022a3e6",
+          "bytes": 216812
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0052,
+        1.6546,
+        1.0825
+      ]
+    },
+    "enemies/shadow-commander-3d": {
+      "kind": "enemies",
+      "id": "shadow-commander-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/shadow-commander-3d/shadow-commander-3d.high.glb?v=92288d7d76",
+          "bytes": 674596
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/shadow-commander-3d/shadow-commander-3d.medium.glb?v=47a2589c66",
+          "bytes": 281520
+        }
+      },
+      "triangles": 5999,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9999,
+        1.9078,
+        1.1554
+      ]
+    },
+    "enemies/shadow-destroyer-3d": {
+      "kind": "enemies",
+      "id": "shadow-destroyer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/shadow-destroyer-3d/shadow-destroyer-3d.high.glb?v=65fe75e626",
+          "bytes": 468648
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/shadow-destroyer-3d/shadow-destroyer-3d.medium.glb?v=0a1b2b5861",
+          "bytes": 216812
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0052,
+        1.6546,
+        1.0825
+      ]
+    },
+    "enemies/shadow-healer-3d": {
+      "kind": "enemies",
+      "id": "shadow-healer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/shadow-healer-3d/shadow-healer-3d.high.glb?v=c3aa2550d1",
+          "bytes": 673264
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/shadow-healer-3d/shadow-healer-3d.medium.glb?v=751a789686",
+          "bytes": 264232
+        }
+      },
+      "triangles": 5999,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9885,
+        1.9433,
+        1.201
+      ]
+    },
+    "enemies/shadow-jammer-3d": {
+      "kind": "enemies",
+      "id": "shadow-jammer-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/shadow-jammer-3d/shadow-jammer-3d.high.glb?v=ef5c52b5ed",
+          "bytes": 641960
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/shadow-jammer-3d/shadow-jammer-3d.medium.glb?v=fc9df8d6aa",
+          "bytes": 270956
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9173,
+        2.0088,
+        0.9804
+      ]
+    },
+    "enemies/shadow-leech-3d": {
+      "kind": "enemies",
+      "id": "shadow-leech-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/shadow-leech-3d/shadow-leech-3d.high.glb?v=6af4e9e067",
+          "bytes": 602288
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/shadow-leech-3d/shadow-leech-3d.medium.glb?v=67c2d70925",
+          "bytes": 249324
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0124,
+        2.0001,
+        1.8145
+      ]
+    },
+    "enemies/shadow-mine-3d": {
+      "kind": "enemies",
+      "id": "shadow-mine-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/shadow-mine-3d/shadow-mine-3d.high.glb?v=315edc1ff9",
+          "bytes": 659144
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/shadow-mine-3d/shadow-mine-3d.medium.glb?v=95a2f8b744",
+          "bytes": 263348
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.993,
+        1.9967,
+        1.1193
+      ]
+    },
+    "enemies/shadow-oppressor-3d": {
+      "kind": "enemies",
+      "id": "shadow-oppressor-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/shadow-oppressor-3d/shadow-oppressor-3d.high.glb?v=aeff6649ba",
+          "bytes": 566492
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/shadow-oppressor-3d/shadow-oppressor-3d.medium.glb?v=5cc8ab1bc3",
+          "bytes": 233148
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.7647,
+        1.996,
+        1.417
+      ]
+    },
+    "enemies/shadow-scout-3d": {
+      "kind": "enemies",
+      "id": "shadow-scout-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/shadow-scout-3d/shadow-scout-3d.high.glb?v=30240be0d3",
+          "bytes": 544916
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/shadow-scout-3d/shadow-scout-3d.medium.glb?v=428f2bf223",
+          "bytes": 226224
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9567,
+        1.9308,
+        1.9856
+      ]
+    },
+    "enemies/shadow-scout-lod": {
+      "kind": "enemies",
+      "id": "shadow-scout-lod",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/shadow-scout-lod/shadow-scout-lod.high.glb?v=53e3407fd1",
+          "bytes": 468872
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/shadow-scout-lod/shadow-scout-lod.medium.glb?v=5910c740ca",
+          "bytes": 150180
+        }
+      },
+      "triangles": 1000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9341,
+        1.8648,
+        1.9694
+      ]
+    },
+    "enemies/shadow-shield-3d": {
+      "kind": "enemies",
+      "id": "shadow-shield-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/shadow-shield-3d/shadow-shield-3d.high.glb?v=fb004f7d67",
+          "bytes": 561096
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/shadow-shield-3d/shadow-shield-3d.medium.glb?v=2b352ee93e",
+          "bytes": 241264
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9909,
+        1.9324,
+        1.172
+      ]
+    },
+    "enemies/shadow-sniper-3d": {
+      "kind": "enemies",
+      "id": "shadow-sniper-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/shadow-sniper-3d/shadow-sniper-3d.high.glb?v=e4f92c5912",
+          "bytes": 553548
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/shadow-sniper-3d/shadow-sniper-3d.medium.glb?v=3839e08861",
+          "bytes": 242960
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9237,
+        2.0041,
+        0.893
+      ]
+    },
+    "enemies/shadow-splitter-3d": {
+      "kind": "enemies",
+      "id": "shadow-splitter-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/shadow-splitter-3d/shadow-splitter-3d.high.glb?v=301cf6ac2f",
+          "bytes": 597596
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/shadow-splitter-3d/shadow-splitter-3d.medium.glb?v=cbe3402db7",
+          "bytes": 250000
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        1.9995,
+        1.9256,
+        0.4769
+      ]
+    },
+    "enemies/shadow-tank-3d": {
+      "kind": "enemies",
+      "id": "shadow-tank-3d",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/enemies/shadow-tank-3d/shadow-tank-3d.high.glb?v=a1335969fb",
+          "bytes": 698856
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/enemies/shadow-tank-3d/shadow-tank-3d.medium.glb?v=7a67dbc511",
+          "bytes": 287080
+        }
+      },
+      "triangles": 6000,
+      "sockets": [
+        "FX_CORE",
+        "FX_MUZZLE"
+      ],
+      "clips": [
+        "Enemy_Idle"
+      ],
+      "size": [
+        2.0056,
+        1.9507,
+        0.869
       ]
     },
     "guides/draconis-v4": {
@@ -281,6 +4348,270 @@
         4.106,
         1.9982,
         2.7697
+      ]
+    },
+    "items/defense-core": {
+      "kind": "items",
+      "id": "defense-core",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/items/defense-core/defense-core.high.glb?v=c3276b3a22",
+          "bytes": 659272
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/items/defense-core/defense-core.medium.glb?v=6fd387da22",
+          "bytes": 265148
+        }
+      },
+      "triangles": 8999,
+      "sockets": [],
+      "clips": [
+        "Item_Idle"
+      ],
+      "size": [
+        1.24,
+        2.0026,
+        1.0579
+      ]
+    },
+    "items/defense-gate": {
+      "kind": "items",
+      "id": "defense-gate",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/items/defense-gate/defense-gate.high.glb?v=c8fc472a99",
+          "bytes": 648908
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/items/defense-gate/defense-gate.medium.glb?v=b6a9646f8c",
+          "bytes": 265472
+        }
+      },
+      "triangles": 8999,
+      "sockets": [],
+      "clips": [
+        "Item_Idle"
+      ],
+      "size": [
+        1.9998,
+        1.8555,
+        1.4816
+      ]
+    },
+    "items/prop-crystal-a": {
+      "kind": "items",
+      "id": "prop-crystal-a",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/items/prop-crystal-a/prop-crystal-a.high.glb?v=567b3d9807",
+          "bytes": 545252
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/items/prop-crystal-a/prop-crystal-a.medium.glb?v=e5b624fdbd",
+          "bytes": 177352
+        }
+      },
+      "triangles": 1500,
+      "sockets": [],
+      "clips": [
+        "Item_Idle"
+      ],
+      "size": [
+        0.7938,
+        1.9838,
+        1.9002
+      ]
+    },
+    "items/prop-crystal-b": {
+      "kind": "items",
+      "id": "prop-crystal-b",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/items/prop-crystal-b/prop-crystal-b.high.glb?v=fd03ab5170",
+          "bytes": 424260
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/items/prop-crystal-b/prop-crystal-b.medium.glb?v=6e60a0b809",
+          "bytes": 134508
+        }
+      },
+      "triangles": 1500,
+      "sockets": [],
+      "clips": [
+        "Item_Idle"
+      ],
+      "size": [
+        0.9464,
+        1.9833,
+        1.1035
+      ]
+    },
+    "items/prop-crystal-c": {
+      "kind": "items",
+      "id": "prop-crystal-c",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/items/prop-crystal-c/prop-crystal-c.high.glb?v=2a8ad9458b",
+          "bytes": 327680
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/items/prop-crystal-c/prop-crystal-c.medium.glb?v=e4d8097f29",
+          "bytes": 121228
+        }
+      },
+      "triangles": 1827,
+      "sockets": [],
+      "clips": [
+        "Item_Idle"
+      ],
+      "size": [
+        0.7488,
+        1.9549,
+        0.8424
+      ]
+    },
+    "items/tower-arc": {
+      "kind": "items",
+      "id": "tower-arc",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/items/tower-arc/tower-arc.high.glb?v=6e64cc960d",
+          "bytes": 577160
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/items/tower-arc/tower-arc.medium.glb?v=f2cefe4466",
+          "bytes": 237660
+        }
+      },
+      "triangles": 6999,
+      "sockets": [],
+      "clips": [
+        "Item_Idle"
+      ],
+      "size": [
+        1.1854,
+        2.0062,
+        1.4288
+      ]
+    },
+    "items/tower-beacon": {
+      "kind": "items",
+      "id": "tower-beacon",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/items/tower-beacon/tower-beacon.high.glb?v=946ec6858e",
+          "bytes": 539632
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/items/tower-beacon/tower-beacon.medium.glb?v=e7afb9333c",
+          "bytes": 237932
+        }
+      },
+      "triangles": 7000,
+      "sockets": [],
+      "clips": [
+        "Item_Idle"
+      ],
+      "size": [
+        1.4828,
+        1.5394,
+        2.0045
+      ]
+    },
+    "items/tower-frost": {
+      "kind": "items",
+      "id": "tower-frost",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/items/tower-frost/tower-frost.high.glb?v=7754b0a210",
+          "bytes": 909244
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/items/tower-frost/tower-frost.medium.glb?v=eef14fa7c5",
+          "bytes": 334664
+        }
+      },
+      "triangles": 7000,
+      "sockets": [],
+      "clips": [
+        "Item_Idle"
+      ],
+      "size": [
+        1.2635,
+        1.1229,
+        2.0003
+      ]
+    },
+    "items/tower-gravity": {
+      "kind": "items",
+      "id": "tower-gravity",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/items/tower-gravity/tower-gravity.high.glb?v=cbbf6ff4b8",
+          "bytes": 679052
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/items/tower-gravity/tower-gravity.medium.glb?v=6e90aef043",
+          "bytes": 259744
+        }
+      },
+      "triangles": 7000,
+      "sockets": [],
+      "clips": [
+        "Item_Idle"
+      ],
+      "size": [
+        2.0157,
+        1.9683,
+        0.8859
+      ]
+    },
+    "items/tower-sanctum": {
+      "kind": "items",
+      "id": "tower-sanctum",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/items/tower-sanctum/tower-sanctum.high.glb?v=4c2e1da0b5",
+          "bytes": 827304
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/items/tower-sanctum/tower-sanctum.medium.glb?v=1daa317c70",
+          "bytes": 314276
+        }
+      },
+      "triangles": 7000,
+      "sockets": [],
+      "clips": [
+        "Item_Idle"
+      ],
+      "size": [
+        0.5712,
+        2,
+        1.2133
+      ]
+    },
+    "items/tower-siphon": {
+      "kind": "items",
+      "id": "tower-siphon",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/items/tower-siphon/tower-siphon.high.glb?v=6691718c56",
+          "bytes": 649496
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/items/tower-siphon/tower-siphon.medium.glb?v=727291ce16",
+          "bytes": 246972
+        }
+      },
+      "triangles": 6999,
+      "sockets": [],
+      "clips": [
+        "Item_Idle"
+      ],
+      "size": [
+        1.108,
+        2.0052,
+        1.3248
       ]
     },
     "ships/astral-dragon": {
@@ -683,6 +5014,78 @@
         2.0006
       ]
     },
+    "skills/astral-dragon-bolt": {
+      "kind": "skills",
+      "id": "astral-dragon-bolt",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/skills/astral-dragon-bolt/astral-dragon-bolt.high.glb?v=2bc4f5f37c",
+          "bytes": 354760
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/skills/astral-dragon-bolt/astral-dragon-bolt.medium.glb?v=b413376e34",
+          "bytes": 150360
+        }
+      },
+      "triangles": 2999,
+      "sockets": [
+        "FX_TRAIL"
+      ],
+      "clips": [],
+      "size": [
+        0.2312,
+        0.3558,
+        1.9955
+      ]
+    },
+    "skills/celestial-valkyrie-bolt": {
+      "kind": "skills",
+      "id": "celestial-valkyrie-bolt",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/skills/celestial-valkyrie-bolt/celestial-valkyrie-bolt.high.glb?v=c9fd75808b",
+          "bytes": 451204
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/skills/celestial-valkyrie-bolt/celestial-valkyrie-bolt.medium.glb?v=3adeaccbba",
+          "bytes": 173356
+        }
+      },
+      "triangles": 3000,
+      "sockets": [
+        "FX_TRAIL"
+      ],
+      "clips": [],
+      "size": [
+        0.3472,
+        0.7372,
+        2.0042
+      ]
+    },
+    "skills/crimson-talon-bolt": {
+      "kind": "skills",
+      "id": "crimson-talon-bolt",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/skills/crimson-talon-bolt/crimson-talon-bolt.high.glb?v=95fa560139",
+          "bytes": 339404
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/skills/crimson-talon-bolt/crimson-talon-bolt.medium.glb?v=5ca976ce22",
+          "bytes": 149952
+        }
+      },
+      "triangles": 3000,
+      "sockets": [
+        "FX_TRAIL"
+      ],
+      "clips": [],
+      "size": [
+        0.3572,
+        0.4585,
+        2
+      ]
+    },
     "skills/dragon-fireball": {
       "kind": "skills",
       "id": "dragon-fireball",
@@ -705,6 +5108,222 @@
         0.7214,
         0.745,
         1.973
+      ]
+    },
+    "skills/eclipse-monarch-bolt": {
+      "kind": "skills",
+      "id": "eclipse-monarch-bolt",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/skills/eclipse-monarch-bolt/eclipse-monarch-bolt.high.glb?v=3c3afc2027",
+          "bytes": 417032
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/skills/eclipse-monarch-bolt/eclipse-monarch-bolt.medium.glb?v=da0d496400",
+          "bytes": 165348
+        }
+      },
+      "triangles": 3000,
+      "sockets": [
+        "FX_TRAIL"
+      ],
+      "clips": [],
+      "size": [
+        0.288,
+        0.3696,
+        1.9979
+      ]
+    },
+    "skills/eternal-sovereign-bolt": {
+      "kind": "skills",
+      "id": "eternal-sovereign-bolt",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/skills/eternal-sovereign-bolt/eternal-sovereign-bolt.high.glb?v=d4010c2501",
+          "bytes": 441540
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/skills/eternal-sovereign-bolt/eternal-sovereign-bolt.medium.glb?v=1c366d5318",
+          "bytes": 175536
+        }
+      },
+      "triangles": 2999,
+      "sockets": [
+        "FX_TRAIL"
+      ],
+      "clips": [],
+      "size": [
+        0.3151,
+        0.6264,
+        2.0002
+      ]
+    },
+    "skills/frost-seraph-bolt": {
+      "kind": "skills",
+      "id": "frost-seraph-bolt",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/skills/frost-seraph-bolt/frost-seraph-bolt.high.glb?v=4d37c7ddf1",
+          "bytes": 397600
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/skills/frost-seraph-bolt/frost-seraph-bolt.medium.glb?v=af0edf77d6",
+          "bytes": 161396
+        }
+      },
+      "triangles": 3000,
+      "sockets": [
+        "FX_TRAIL"
+      ],
+      "clips": [],
+      "size": [
+        0.4863,
+        0.465,
+        1.9913
+      ]
+    },
+    "skills/genesis-phoenix-bolt": {
+      "kind": "skills",
+      "id": "genesis-phoenix-bolt",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/skills/genesis-phoenix-bolt/genesis-phoenix-bolt.high.glb?v=369c8f46ac",
+          "bytes": 431372
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/skills/genesis-phoenix-bolt/genesis-phoenix-bolt.medium.glb?v=3e456f9604",
+          "bytes": 170096
+        }
+      },
+      "triangles": 3000,
+      "sockets": [
+        "FX_TRAIL"
+      ],
+      "clips": [],
+      "size": [
+        0.3009,
+        0.4049,
+        1.9993
+      ]
+    },
+    "skills/nova-reaper-bolt": {
+      "kind": "skills",
+      "id": "nova-reaper-bolt",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/skills/nova-reaper-bolt/nova-reaper-bolt.high.glb?v=0ef09e2938",
+          "bytes": 382792
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/skills/nova-reaper-bolt/nova-reaper-bolt.medium.glb?v=0fb102668a",
+          "bytes": 160416
+        }
+      },
+      "triangles": 3000,
+      "sockets": [
+        "FX_TRAIL"
+      ],
+      "clips": [],
+      "size": [
+        0.3725,
+        0.6567,
+        2.0013
+      ]
+    },
+    "skills/phantom-wraith-bolt": {
+      "kind": "skills",
+      "id": "phantom-wraith-bolt",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/skills/phantom-wraith-bolt/phantom-wraith-bolt.high.glb?v=7c5afec4c3",
+          "bytes": 333692
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/skills/phantom-wraith-bolt/phantom-wraith-bolt.medium.glb?v=ef34ff5865",
+          "bytes": 147788
+        }
+      },
+      "triangles": 3000,
+      "sockets": [
+        "FX_TRAIL"
+      ],
+      "clips": [],
+      "size": [
+        0.3078,
+        0.4225,
+        2.0007
+      ]
+    },
+    "skills/razorwing-bolt": {
+      "kind": "skills",
+      "id": "razorwing-bolt",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/skills/razorwing-bolt/razorwing-bolt.high.glb?v=89a1177efa",
+          "bytes": 354800
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/skills/razorwing-bolt/razorwing-bolt.medium.glb?v=31780f517f",
+          "bytes": 151420
+        }
+      },
+      "triangles": 2999,
+      "sockets": [
+        "FX_TRAIL"
+      ],
+      "clips": [],
+      "size": [
+        0.3505,
+        0.4302,
+        1.9986
+      ]
+    },
+    "skills/solar-lance-bolt": {
+      "kind": "skills",
+      "id": "solar-lance-bolt",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/skills/solar-lance-bolt/solar-lance-bolt.high.glb?v=d62a7a3619",
+          "bytes": 309304
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/skills/solar-lance-bolt/solar-lance-bolt.medium.glb?v=19a52189f5",
+          "bytes": 134232
+        }
+      },
+      "triangles": 2999,
+      "sockets": [
+        "FX_TRAIL"
+      ],
+      "clips": [],
+      "size": [
+        0.2643,
+        0.4631,
+        1.9958
+      ]
+    },
+    "skills/vanguard-bolt": {
+      "kind": "skills",
+      "id": "vanguard-bolt",
+      "tiers": {
+        "high": {
+          "url": "/assets/space-typing/models/skills/vanguard-bolt/vanguard-bolt.high.glb?v=3e167f0997",
+          "bytes": 354216
+        },
+        "medium": {
+          "url": "/assets/space-typing/models/skills/vanguard-bolt/vanguard-bolt.medium.glb?v=12bb060aec",
+          "bytes": 147288
+        }
+      },
+      "triangles": 3000,
+      "sockets": [
+        "FX_TRAIL"
+      ],
+      "clips": [],
+      "size": [
+        0.3583,
+        0.6658,
+        1.9963
       ]
     }
   }

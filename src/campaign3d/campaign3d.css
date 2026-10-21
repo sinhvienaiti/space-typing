@@ -627,6 +627,11 @@ kbd {
   background: radial-gradient(ellipse at center, rgba(3, 6, 14, 0.35), rgba(3, 4, 11, 0.86));
 }
 
+/* A ship waits in the hangar strip right of the menu card: the scrim clears there. */
+#c3dMenu.is-hangar {
+  background: linear-gradient(90deg, rgba(3, 4, 11, 0.82), rgba(3, 5, 12, 0.5) 45%, rgba(3, 5, 12, 0.32) 66%, rgba(3, 5, 12, 0.04) 84%);
+}
+
 .c3d-card {
   position: relative;
   width: min(760px, 100%);
@@ -675,6 +680,83 @@ kbd {
 .c3d-note {
   margin: 0 0 14px;
   color: var(--c3d-dim);
+}
+
+.c3d-pilots {
+  margin: 0 0 14px;
+}
+
+.c3d-pilots-label {
+  margin: 0 0 6px;
+  color: var(--c3d-dim);
+  font: 700 11px var(--c3d-display);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* One row of pilots; it scrolls sideways on narrow screens. */
+.c3d-pilot-list {
+  position: relative;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 2px 6px;
+  scrollbar-width: thin;
+}
+
+.c3d-pilot {
+  --pilot-shot: #38d4ff;
+  display: grid;
+  flex: 0 0 auto;
+  justify-items: center;
+  gap: 3px;
+  width: 74px;
+  padding: 6px 4px 5px;
+  border: 0;
+  background: rgba(14, 18, 34, 0.78);
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+  box-shadow: inset 0 0 0 1px rgba(160, 180, 220, 0.18);
+  color: var(--c3d-ink);
+  font: inherit;
+  cursor: pointer;
+  transition: box-shadow 0.15s, background 0.15s, transform 0.12s;
+}
+
+.c3d-pilot img,
+.c3d-pilot.is-dragon::before {
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+}
+
+/* Draconis has no top-view art: an ember emblem stands in. */
+.c3d-pilot.is-dragon::before {
+  content: "";
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 42%, #ffe2a0 0 12%, #ff9a4a 28%, rgba(255, 90, 42, 0.45) 52%, transparent 70%);
+}
+
+.c3d-pilot span {
+  overflow: hidden;
+  max-width: 100%;
+  font: 700 10px/1.2 var(--c3d-display);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.c3d-pilot:hover {
+  box-shadow: inset 0 0 0 1px var(--c3d-line-strong), inset 0 0 14px color-mix(in srgb, var(--pilot-shot) 25%, transparent);
+  transform: translateY(-1px);
+}
+
+.c3d-pilot[aria-selected="true"] {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--pilot-shot) 26%, transparent), rgba(10, 12, 24, 0.9));
+  box-shadow: inset 0 0 0 1px var(--pilot-shot), 0 0 16px color-mix(in srgb, var(--pilot-shot) 35%, transparent);
+}
+
+.c3d-pilot:focus-visible {
+  outline: 2px solid var(--pilot-shot);
+  outline-offset: 2px;
 }
 
 .c3d-pages {

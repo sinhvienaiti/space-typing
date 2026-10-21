@@ -63,5 +63,9 @@
   },
   "color": "color.webp?v=87e359fd2343",
   "emissive": "emissive.webp?v=50297a914c7a",
-  "height": "height.bin?v=aeaf2bfcd136"
+  "height": "height.bin?v=aeaf2bfcd136",
+  "source": {
+    "image": "art-src/ships/aegis-top-hd.png",
+    "imageSha256": "334c6dabdd5e44cbab13b9751a5cc721e513d75c983b3a88b425d489a3e5f450"
+  }
 }

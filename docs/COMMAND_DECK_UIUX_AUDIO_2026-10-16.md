@@ -126,7 +126,7 @@
 - Bản Play (`https://typing-game.local/space-typing`) cần `pnpm build:space` rồi tải lại trang.
 
 ## 9. Mô hình 3D: quy trình Tripo3D / Meshy → Blender (cập nhật 17/10)
-- **Chia việc:** chủ dự án tạo mô hình trên Tripo3D/Meshy theo prompt ở `docs/art-requests/3D_TRIPO_MESHY_PROMPTS_2026-10-16.md` (109 món, tạo tự động bằng `node scripts/models/build-3d-prompt-pack.mjs`), tải GLB vào `art-src/models/raw/<loại>/`. AI chỉnh trong Blender rồi đưa vào game.
+- **Chia việc:** chủ dự án tạo mô hình trên Tripo3D/Meshy theo prompt ở `docs/art-requests/3D_TRIPO_MESHY_PROMPTS_2026-10-16.md` (109 món, tạo tự động bằng `node scripts/models/build-3d-prompt-pack.mjs`), tải GLB vào `art-src/3d/`, cùng đường dẫn và cùng tên với ảnh 2D (từ 21/10; quy tắc ở `art-src/README.md`). AI chỉnh trong Blender rồi đưa vào game.
 - **Script Blender** `scripts/models/blender/space_typing_model_tools.py` chạy được không giao diện:
   - `blender -b --factory-startup -P … -- --input <file> --kind <loại> --id <id> --project <games/space-typing>`;
   - tuỳ chọn: `--auto-emissive <tỉ lệ>`, `--boss-clips`, `--keep-geometry`, `--preview <thư mục>`.

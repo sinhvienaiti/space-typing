@@ -68,8 +68,12 @@
     <section id="c3dMenu" class="c3d-overlay">
       <div class="c3d-card c3d-menu">
         <p class="c3d-eyebrow">Space Type · Campaign 3D <span>beta</span></p>
-        <h1>Fly <b>Draconis</b> through the Campaign</h1>
+        <h1>Fly <b id="c3dPilotName">Draconis</b> through the Campaign</h1>
         <p class="c3d-lead">The Campaign's stages, words and bosses in a 3D flight. Free to play: no Warp, and your Campaign save, rewards and wallet are not touched. Progress here is kept in this browser.</p>
+        <div class="c3d-pilots">
+          <p class="c3d-pilots-label">Pilot</p>
+          <div id="c3dPilotList" class="c3d-pilot-list" role="listbox" aria-label="Pilot"></div>
+        </div>
         <div class="c3d-pages">
           <button id="c3dPrevPage" class="c3d-ghost" type="button" aria-label="Previous stages">‹</button>
           <span id="c3dPageLabel">Stages 1–10</span>

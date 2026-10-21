@@ -53,5 +53,9 @@
   },
   "color": "color.webp?v=3a3005978b4d",
   "emissive": "emissive.webp?v=51a58f5810af",
-  "height": "height.bin?v=350de6ace784"
+  "height": "height.bin?v=350de6ace784",
+  "source": {
+    "image": "art-src/ships/celestial-top-hd.png",
+    "imageSha256": "e6d35d5fb8eeb2e9d4ae0237a21ac49665354ffcf9e5057d71a773501c1c473f"
+  }
 }

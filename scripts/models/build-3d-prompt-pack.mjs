@@ -92,13 +92,40 @@ const SHORT_TAIL =
   "Stylized sci-fi game asset, PBR textures, glowing emissive parts, single object, no base, no text, fire or smoke only as painted glow.";
 const MAX_PROMPT = 600;
 
+const SHIP_VISUALS = JSON.parse(read("src/characters/ship-visual-catalog.json"));
+
+/** The 3D model a ship shows since the Fleet of 12 (20/10/2026): `art-src/3d/ships/ship-NN-<visual>.glb`. */
+function shipModel(id) {
+  const visual = SHIP_VISUALS.find((item) => item.legacyCharacterId === id || item.id === id);
+  if (!visual) throw new Error("ships/" + id + ": not in src/characters/ship-visual-catalog.json");
+  return { file: "art-src/3d/ships/ship-" + String(visual.order).padStart(2, "0") + "-" + visual.id + ".glb", visual };
+}
+
+/**
+ * Where the downloaded model goes: art-src/3d mirrors the 2D art. The runtime
+ * image src/assets/enemies/rainbow-scout@2x.webp comes from
+ * art-src/enemies/rainbow-scout.png, so its model is
+ * art-src/3d/enemies/rainbow-scout.glb. Text to 3D (no image): art-src/3d/<kind>/<id>.glb.
+ */
+function saveAs(kind, id, image) {
+  const art = image.replace(/^src\/assets\//, "art-src/").replace(/@2x(?=\.[a-z]+$)/i, "");
+  if (!art.startsWith("art-src/")) return "art-src/3d/" + kind + "/" + id + ".glb";
+  return art.replace(/^art-src\//, "art-src/3d/").replace(/\.(png|jpe?g|webp)$/i, ".glb");
+}
+
+/** Every ship already has its model (Fleet of 12); a legacy ship shows its catalog visual. */
+function shipLine(id) {
+  const { file, visual } = shipModel(id);
+  return "- Mô hình 3D: `" + file + "` (đã có" + (visual.id === id ? "" : "; tàu này hiển thị bằng " + visual.id) + ", không cần tạo lại)";
+}
+
 function block(kind, id, name, image, budget, full, note = "") {
   const prompt = full.length <= MAX_PROMPT ? full : full.replace(TAIL, SHORT_TAIL);
   if (prompt.length > MAX_PROMPT) throw new Error(kind + "/" + id + ": prompt too long (" + prompt.length + ")");
   return [
     "#### `" + kind + "/" + id + "` — " + name,
     "- Ảnh tải lên: `" + image + "` · Số mặt: **" + budget.toLocaleString("en-US") + "**" + (note ? " · " + note : ""),
-    "- Lưu về: `art-src/models/raw/" + kind + "/" + id + ".tripo.glb` hoặc `" + id + ".meshy.glb`",
+    kind === "ships" ? shipLine(id) : "- Lưu về: `" + saveAs(kind, id, image) + "`",
     "",
     "```text",
     prompt,
@@ -110,6 +137,10 @@ function block(kind, id, name, image, budget, full, note = "") {
 const sections = [];
 
 sections.push("### 4.1 Phi thuyền (11) — `ships/<id>`\n");
+sections.push(
+  "Cả 12 phi thuyền đã có mô hình Meshy từ 20/10/2026 (`docs/FLEET_12_MESHY_INTEGRATION_2026-10-20.md`). " +
+    "Prompt dưới đây là thiết kế cũ, chỉ giữ để tham khảo.\n",
+);
 for (const [id, name, engines, text] of SHIPS) {
   const prompt =
     name + ", " + text + ". Player starfighter for a top-down space shooter, nose pointing forward, symmetrical, " +
@@ -219,16 +250,16 @@ Tên nút có thể đổi theo phiên bản. Giá trị dưới đây lấy t�
 
 **Mẹo:**
 - Ảnh tải lên là tranh 2D hiện có của game. Nếu ảnh có lửa động cơ hay tia sáng, mô hình có thể có một khối "lửa": **không sao, AI cắt bỏ trong Blender**.
-- Có thể tạo **cả hai** (Tripo và Meshy) cho cùng một món, lưu \`<id>.tripo.glb\` và \`<id>.meshy.glb\`: AI chọn bản đẹp hơn.
+- Có thể tạo **cả hai** (Tripo và Meshy) cho cùng một món, để cả hai ngoài \`art-src/3d/\` (ví dụ trong \`~/Downloads\`), chọn bản đẹp hơn, rồi đặt bản đó đúng tên ảnh 2D.
 - Nếu bản tạo ra sai dáng, chạy lại (Tripo: Regenerate; Meshy: Retry) hoặc thử Text to 3D với cùng prompt.
 
 ## 3. Sau khi tải về (AI làm)
 
-1. Đặt file vào \`games/space-typing/art-src/models/raw/<loại>/\` (ví dụ \`art-src/models/raw/ships/vanguard.tripo.glb\`), báo AI.
+1. Đặt file vào \`games/space-typing/art-src/3d/\`, **cùng đường dẫn với ảnh 2D đã tải lên**, đổi đuôi thành \`.glb\` (ví dụ ảnh \`art-src/enemies/rainbow-scout.png\` → \`art-src/3d/enemies/rainbow-scout.glb\`; phi thuyền: \`art-src/3d/ships/ship-01-vanguard.glb\`), báo AI. Quy tắc: \`art-src/3d/README.md\`.
 2. AI chạy Blender không giao diện, ví dụ:
    \`\`\`
    blender -b --factory-startup -P scripts/models/blender/space_typing_model_tools.py -- \\
-     --input art-src/models/raw/ships/vanguard.tripo.glb --kind ships --id vanguard \\
+     --input art-src/3d/ships/ship-01-vanguard.glb --kind ships --id vanguard \\
      --project . --auto-emissive 0.08 --preview .visual/models/vanguard
    \`\`\`
    Script tự làm:

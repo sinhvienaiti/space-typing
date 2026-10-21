@@ -58,5 +58,9 @@
   },
   "color": "color.webp?v=4cb91c1aa896",
   "emissive": "emissive.webp?v=54d37aab7f3b",
-  "height": "height.bin?v=c56bf05e761d"
+  "height": "height.bin?v=c56bf05e761d",
+  "source": {
+    "image": "art-src/ships/volt-top-hd.png",
+    "imageSha256": "4e79432cdef62b90c1a083631b760280eea37c65890fd60877c05b165787c997"
+  }
 }

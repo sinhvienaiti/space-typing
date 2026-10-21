@@ -32,7 +32,7 @@
 | Bước | Công cụ | Đầu ra (đường dẫn tính từ `games/space-typing/`) |
 |---|---|---|
 | 1. Ảnh khái niệm | ChatGPT Images | `art-src/models/concepts/<kind>/<id>-front.png`, `-left.png`, `-back.png`, `-right.png`, `-34.png` |
-| 2. Tạo mô hình | Tripo3D hoặc Meshy | `art-src/models/raw/<kind>/<id>.glb` (bản gốc tải về, giữ để làm lại) |
+| 2. Tạo mô hình | Tripo3D hoặc Meshy | `art-src/3d/<đường dẫn ảnh 2D>/<tên ảnh 2D>.glb` (bản gốc tải về, giữ để làm lại; xem ghi chú dưới bảng) |
 | 3. Chỉnh trong Blender | Blender + script có sẵn + ChatGPT hướng dẫn | `art-src/models/blend/<kind>/<id>.blend` (file làm việc) |
 | 4. Xuất file game | Blender (script tự xuất) | **`art-src/models/<kind>/<id>.glb`** |
 | 5. Đóng gói | `pnpm models:prepare` | `public/assets/space-typing/models/<kind>/<id>/<id>.high.glb`, `.medium.glb` và `models/manifest.json` |
@@ -40,6 +40,10 @@
 - `<kind>` là một trong: `ships`, `enemies`, `bosses`, `skills`, `items`.
 - `<id>` viết thường, chỉ chữ, số và gạch ngang (ví dụ `vanguard`, `tyrant-g01`, `pulse-laser-mk1`).
 - Thư mục `art-src/` không đưa lên Git (đã có trong `.gitignore`). Chỉ thư mục `public/assets/space-typing/models/` cần commit.
+- Bản gốc ở bước 2 nằm cùng đường dẫn với ảnh 2D: `art-src/<đường dẫn>/<tên>.png` → `art-src/3d/<đường dẫn>/<tên>.glb`.
+  - Ví dụ: `art-src/enemies/frost-healer.png` → `art-src/3d/enemies/frost-healer.glb`.
+  - Tàu: `art-src/ships/ship-NN-<id>-2d.png` → `art-src/3d/ships/ship-NN-<id>.glb`. Vanguard: `art-src/3d/ships/ship-01-vanguard.glb`.
+  - Quy tắc đầy đủ: `art-src/3d/README.md`.
 
 **Bước 5 làm gì:**
 - Kiểm tra mô hình đủ điểm gắn, đủ hoạt ảnh và đúng số tam giác.
@@ -117,7 +121,7 @@ Tên nút và chế độ có thể đổi theo phiên bản. Ý chính như sau
 3. Giới hạn số mặt (face limit) theo ngân sách ở mục 2 (ví dụ tàu 15000).
 4. Hình học: dạng **tam giác**. Không cần quad.
 5. **Auto-rig:** chỉ bật cho boss có tay chân (dạng người hoặc thú). Tàu, quái nhỏ, đạn, vật phẩm thì tắt.
-6. Tải về dạng **GLB**, lưu `art-src/models/raw/<kind>/<id>.glb`.
+6. Tải về dạng **GLB**, lưu vào `art-src/3d/`, cùng đường dẫn và cùng tên với ảnh 2D (xem mục 1).
 
 **Meshy (ưu tiên cho boss lớn, nhiều chi tiết):**
 1. Chọn **Image to 3D** (hoặc Multi-image, tối đa 4 ảnh).
@@ -140,7 +144,7 @@ File: **`games/space-typing/scripts/models/blender/space_typing_model_tools.py`*
 
 Cách chạy:
 1. Mở Blender, xóa cảnh mặc định: **File > New > General**, rồi xóa Cube, Light, Camera.
-2. **File > Import > glTF 2.0**, chọn file trong `art-src/models/raw/...`.
+2. **File > Import > glTF 2.0**, chọn file gốc trong `art-src/3d/...`.
 3. Mở tab **Scripting**, mở script, sửa khối `CONFIG` (`kind`, `id`, `target_triangles`…) theo bảng của từng món.
 4. Bấm **Run**.
 
@@ -243,7 +247,7 @@ joints, the core and the wing edges glowing pure white. Cute but dangerous, chun
   - `Boss_Intro` (60 khung = 2,5 s): từ xa bay tới, cánh xòe dần, kết thúc đúng tư thế đầu của `Boss_Idle_Hover`.
 - **Cách nhanh:** chạy script với `kind="bosses"`, `id="tyrant-g01"`, `join_meshes=False`, `normalize=False`, `target_triangles=0`, `make_sockets=False`. Script sẽ tạo 3 đoạn bằng chuyển động thân (không động vào xương).
 - **Cách đẹp hơn:** nhờ ChatGPT hướng dẫn tạo 3 đoạn bằng **xương cánh và thân**, dùng lời nhắn ở 5.2.
-- **Xuất:** `art-src/models/bosses/tyrant-g01.glb` (file này được ưu tiên hơn bản cũ trong `art-src/bosses/3d/`).
+- **Xuất:** `art-src/models/bosses/tyrant-g01.glb` (file này được ưu tiên hơn bản gốc `art-src/3d/bosses/tyrant-g01.glb`).
 - **Trong game (code đã có):**
   - `Boss_Intro` chạy khi boss bay vào;
   - `Boss_Hit` chạy mỗi lần boss nhận sát thương (gõ xong từ, trúng kỹ năng, phản đòn);

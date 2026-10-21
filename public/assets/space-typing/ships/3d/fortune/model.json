@@ -58,5 +58,9 @@
   },
   "color": "color.webp?v=51ddb6124fac",
   "emissive": "emissive.webp?v=65034e7cc919",
-  "height": "height.bin?v=2736adb8567b"
+  "height": "height.bin?v=2736adb8567b",
+  "source": {
+    "image": "art-src/ships/fortune-top-hd.png",
+    "imageSha256": "a2df23229e1272d75d371180c387d1afcce454d4d4e2a2105144e5f7b9ed8275"
+  }
 }

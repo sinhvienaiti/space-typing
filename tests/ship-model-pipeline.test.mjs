@@ -24,7 +24,7 @@ async function fixture() {
   await put(root, 'src/render3d/model-contracts.ts', 'fixture contracts');
   const preset = { nose: '-Y', yaw: 5, triangles: 12000, autoEmissive: 0.08, sockets: null, reviewed: true };
   const presetFile = await put(root, 'scripts/models/presets/ships-meshy.json', { version: 1, ships: { razorwing: preset } });
-  await put(root, 'art-src/models/raw/ships/ship-02-razorwing.glb', 'raw razorwing');
+  await put(root, 'art-src/3d/ships/ship-02-razorwing.glb', 'raw razorwing');
   return { root, preset, presetFile };
 }
 async function runtime(root, id) {
@@ -77,7 +77,7 @@ describe('raw ship batch', () => {
     expect(execute).toHaveBeenCalledTimes(3);
     expect((await prepareShipModels(options)).results[0].status).toBe('cached');
     expect(execute).toHaveBeenCalledTimes(3);
-    await put(root, 'art-src/models/raw/ships/ship-02-razorwing.glb', 'changed content');
+    await put(root, 'art-src/3d/ships/ship-02-razorwing.glb', 'changed content');
     expect((await prepareShipModels(options)).results[0].status).toBe('pass');
     expect(execute).toHaveBeenCalledTimes(6);
     await rm(join(root, 'art-src/ships/rendered/razorwing-top.png'));
@@ -94,7 +94,7 @@ describe('raw ship batch', () => {
   it('keeps the reviewed original Vanguard binary and does not invoke Blender', async () => {
     const { root, presetFile, preset } = await fixture();
     const raw = 'original reviewed Vanguard';
-    await put(root, 'art-src/models/raw/ships/vanguard.meshy.glb', raw);
+    await put(root, 'art-src/3d/ships/ship-01-vanguard.glb', raw);
     await put(root, 'scripts/models/presets/ships-meshy.json', { version: 1, ships: { vanguard: { ...preset, nose: '-X', preserveRawSha256: sha(raw) } } });
     await runtime(root, 'vanguard');
     const execute = vi.fn();
@@ -104,7 +104,7 @@ describe('raw ship batch', () => {
 
   it('reports a failed model and continues to a later source', async () => {
     const { root, presetFile, preset } = await fixture();
-    await put(root, 'art-src/models/raw/ships/ship-03-solar-lance.glb', 'raw');
+    await put(root, 'art-src/3d/ships/ship-03-solar-lance.glb', 'raw');
     await put(root, 'scripts/models/presets/ships-meshy.json', { version: 1, ships: { razorwing: preset, 'solar-lance': { ...preset, nose: '+Y' } } });
     const execute = vi.fn(async (_command, args) => {
       const id = args[args.indexOf('--id') + 1];

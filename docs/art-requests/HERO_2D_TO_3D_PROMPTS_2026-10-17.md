@@ -126,10 +126,12 @@ Chỉ đưa ảnh vào Meshy/Tripo khi đạt **đủ** các điểm sau:
 | Tệp | Nơi lưu |
 |---|---|
 | Ảnh 2D (trước, sau, hông, dáng trong game) | `art-src/concepts/heroes/draconis-v2-front.png`, `-back.png`, `-side.png`, `-flight.png` |
-| Mô hình không xương | `art-src/models/raw/heroes/draconis-v2.meshy.glb` (hoặc `.tripo.glb`) |
-| Mô hình có xương (nếu có) | `art-src/models/raw/heroes/draconis-v2.meshy-rigged.glb` |
+| Mô hình không xương | `art-src/3d/heroes/draconis-v2.glb` |
+| Mô hình có xương (nếu có) | `art-src/3d/heroes/draconis-v2-rigged.glb` |
 
-Giữ nguyên tệp Draconis cũ (`raw/ships/Draconis.meshy.glb`), để còn so sánh.
+Bản gốc nhân vật lưu ở `art-src/3d/heroes/<id>.glb`. Từ 21/10/2026 không dùng `art-src/models/raw/` nữa.
+
+Máy này không còn bản gốc của Draconis cũ, chỉ còn bản đóng gói trong `public/`. Nếu tìm lại được, lưu ở `art-src/3d/heroes/draconis.glb` để còn so sánh.
 
 ## 5b. Kết quả (18/10/2026)
 

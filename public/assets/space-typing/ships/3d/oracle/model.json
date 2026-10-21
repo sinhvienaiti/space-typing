@@ -63,5 +63,9 @@
   },
   "color": "color.webp?v=a78a851740fb",
   "emissive": "emissive.webp?v=0af638aaaacf",
-  "height": "height.bin?v=fbd42a201d71"
+  "height": "height.bin?v=fbd42a201d71",
+  "source": {
+    "image": "art-src/ships/oracle-top-hd.png",
+    "imageSha256": "b6d5c9c1ca717f5eb98b930cc2e409dc573dd7b40cb4fd26f3823b79fbfb67b3"
+  }
 }

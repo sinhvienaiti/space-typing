@@ -69,6 +69,8 @@ export default defineConfig({
         characterDemo: resolve(projectRoot, "character-demo.html"),
         // Campaign 3D (beta): the Campaign flown by Draconis (docs/CAMPAIGN_3D_2026-10-17.md).
         campaign3d: resolve(projectRoot, "campaign-3d.html"),
+        // Rift Defense (beta): typing tower defense (docs/SPACE_TYPING_DEFENSE_PLAN_V4_2026-10-21.md).
+        defense: resolve(projectRoot, "defense.html"),
         // Defense render bench: only when asked for (SPACE_BENCH=1), never in a normal build.
         ...(process.env.SPACE_BENCH === "1" ? { defenseBench: resolve(projectRoot, "defense-bench.html") } : {}),
       },

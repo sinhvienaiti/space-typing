@@ -1,5 +1,5 @@
 [
-  {"order":1,"id":"vanguard","name":"Vanguard","legacyCharacterId":"vanguard","imageSources":["vanguard-top-hd.png","ship-01-vanguard-2d.png"],"rawModelSources":["vanguard.meshy.glb","ship-01-vanguard.glb"]},
+  {"order":1,"id":"vanguard","name":"Vanguard","legacyCharacterId":"vanguard","imageSources":["vanguard-top-hd.png","ship-01-vanguard-2d.png"],"rawModelSources":["ship-01-vanguard.glb","vanguard.meshy.glb"]},
   {"order":2,"id":"razorwing","name":"Razorwing","legacyCharacterId":"aegis","imageSources":["ship-02-razorwing-2d.png","razorwing-top-hd.png"],"rawModelSources":["ship-02-razorwing.glb","razorwing.meshy.glb"]},
   {"order":3,"id":"solar-lance","name":"Solar Lance","legacyCharacterId":"volt","imageSources":["ship-03-solar-lance-2d.png","solar-lance-top-hd.png"],"rawModelSources":["ship-03-solar-lance.glb","solar-lance.meshy.glb"]},
   {"order":4,"id":"phantom-wraith","name":"Phantom Wraith","legacyCharacterId":"wraith","imageSources":["ship-04-phantom-wraith-2d.png","phantom-wraith-top-hd.png"],"rawModelSources":["ship-04-phantom-wraith.glb","phantom-wraith.meshy.glb"]},

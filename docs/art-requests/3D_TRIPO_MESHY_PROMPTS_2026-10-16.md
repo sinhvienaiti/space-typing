@@ -42,16 +42,16 @@ Tên nút có thể đổi theo phiên bản. Giá trị dưới đây lấy t�
 
 **Mẹo:**
 - Ảnh tải lên là tranh 2D hiện có của game. Nếu ảnh có lửa động cơ hay tia sáng, mô hình có thể có một khối "lửa": **không sao, AI cắt bỏ trong Blender**.
-- Có thể tạo **cả hai** (Tripo và Meshy) cho cùng một món, lưu `<id>.tripo.glb` và `<id>.meshy.glb`: AI chọn bản đẹp hơn.
+- Có thể tạo **cả hai** (Tripo và Meshy) cho cùng một món, để cả hai ngoài `art-src/3d/` (ví dụ trong `~/Downloads`), chọn bản đẹp hơn, rồi đặt bản đó đúng tên ảnh 2D.
 - Nếu bản tạo ra sai dáng, chạy lại (Tripo: Regenerate; Meshy: Retry) hoặc thử Text to 3D với cùng prompt.
 
 ## 3. Sau khi tải về (AI làm)
 
-1. Đặt file vào `games/space-typing/art-src/models/raw/<loại>/` (ví dụ `art-src/models/raw/ships/vanguard.tripo.glb`), báo AI.
+1. Đặt file vào `games/space-typing/art-src/3d/`, **cùng đường dẫn với ảnh 2D đã tải lên**, đổi đuôi thành `.glb` (ví dụ ảnh `art-src/enemies/rainbow-scout.png` → `art-src/3d/enemies/rainbow-scout.glb`; phi thuyền: `art-src/3d/ships/ship-01-vanguard.glb`), báo AI. Quy tắc: `art-src/3d/README.md`.
 2. AI chạy Blender không giao diện, ví dụ:
    ```
    blender -b --factory-startup -P scripts/models/blender/space_typing_model_tools.py -- \
-     --input art-src/models/raw/ships/vanguard.tripo.glb --kind ships --id vanguard \
+     --input art-src/3d/ships/ship-01-vanguard.glb --kind ships --id vanguard \
      --project . --auto-emissive 0.08 --preview .visual/models/vanguard
    ```
    Script tự làm:
@@ -86,9 +86,11 @@ Bảng chất liệu theo họ, dùng khi muốn **bản riêng cho một họ**
 
 ### 4.1 Phi thuyền (11) — `ships/<id>`
 
+Cả 12 phi thuyền đã có mô hình Meshy từ 20/10/2026 (`docs/FLEET_12_MESHY_INTEGRATION_2026-10-20.md`). Prompt dưới đây là thiết kế cũ, chỉ giữ để tham khảo.
+
 #### `ships/vanguard` — Vanguard
 - Ảnh tải lên: `art-src/ships/vanguard-top-hd.png` · Số mặt: **15,000**
-- Lưu về: `art-src/models/raw/ships/vanguard.tripo.glb` hoặc `vanguard.meshy.glb`
+- Mô hình 3D: `art-src/3d/ships/ship-01-vanguard.glb` (đã có, không cần tạo lại)
 
 ```text
 Vanguard, a sleek spear-shaped starter interceptor: long pointed nose, a glowing cyan crystal spine along the top centre, swept-back wings with small upturned tips, pearl-white ceramic armour with royal blue panels and thin glowing cyan lines, dark blue glass canopy, twin small cannons under the nose. Player starfighter for a top-down space shooter, nose pointing forward, symmetrical, two engine nozzles at the rear with glowing rims and no exhaust flame. Stylized sci-fi game asset, PBR textures, glowing emissive parts, single object, no base, no text, fire or smoke only as painted glow.
@@ -96,7 +98,7 @@ Vanguard, a sleek spear-shaped starter interceptor: long pointed nose, a glowing
 
 #### `ships/aegis` — Aegis
 - Ảnh tải lên: `art-src/ships/aegis-top-hd.png` · Số mặt: **15,000**
-- Lưu về: `art-src/models/raw/ships/aegis.tripo.glb` hoặc `aegis.meshy.glb`
+- Mô hình 3D: `art-src/3d/ships/ship-02-razorwing.glb` (đã có; tàu này hiển thị bằng razorwing, không cần tạo lại)
 
 ```text
 Aegis, a heavy defensive frigate shaped like a flying fortress: broad armoured hull, layered shield plates on both flanks, mint and teal armour with a warm gold core. Player starfighter for a top-down space shooter, nose pointing forward, symmetrical, three engine nozzles at the rear with glowing rims and no exhaust flame. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -104,7 +106,7 @@ Aegis, a heavy defensive frigate shaped like a flying fortress: broad armoured h
 
 #### `ships/volt` — Volt
 - Ảnh tải lên: `art-src/ships/volt-top-hd.png` · Số mặt: **15,000**
-- Lưu về: `art-src/models/raw/ships/volt.tripo.glb` hoặc `volt.meshy.glb`
+- Mô hình 3D: `art-src/3d/ships/ship-03-solar-lance.glb` (đã có; tàu này hiển thị bằng solar-lance, không cần tạo lại)
 
 ```text
 Volt, an energy caster ship with curved arc-shaped wings holding tesla coils, crackling yellow-white core, cyan and indigo armour. Player starfighter for a top-down space shooter, nose pointing forward, symmetrical, two engine nozzles at the rear with glowing rims and no exhaust flame. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -112,7 +114,7 @@ Volt, an energy caster ship with curved arc-shaped wings holding tesla coils, cr
 
 #### `ships/wraith` — Wraith
 - Ảnh tải lên: `art-src/ships/wraith-top-hd.png` · Số mặt: **15,000**
-- Lưu về: `art-src/models/raw/ships/wraith.tripo.glb` hoặc `wraith.meshy.glb`
+- Mô hình 3D: `art-src/3d/ships/ship-04-phantom-wraith.glb` (đã có; tàu này hiển thị bằng phantom-wraith, không cần tạo lại)
 
 ```text
 Wraith, a stealth phantom ship with thin blade-like wings and a narrow body, smoky violet armour, cyan glowing slits. Player starfighter for a top-down space shooter, nose pointing forward, symmetrical, two engine nozzles at the rear with glowing rims and no exhaust flame. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -120,7 +122,7 @@ Wraith, a stealth phantom ship with thin blade-like wings and a narrow body, smo
 
 #### `ships/fortune` — Fortune
 - Ảnh tải lên: `art-src/ships/fortune-top-hd.png` · Số mặt: **15,000**
-- Lưu về: `art-src/models/raw/ships/fortune.tripo.glb` hoặc `fortune.meshy.glb`
+- Mô hình 3D: `art-src/3d/ships/ship-05-crimson-talon.glb` (đã có; tàu này hiển thị bằng crimson-talon, không cần tạo lại)
 
 ```text
 Fortune, a lucky treasure-hunter ship with a crown-shaped bow, gold and bronze plating, mint gem core. Player starfighter for a top-down space shooter, nose pointing forward, symmetrical, two engine nozzles at the rear with glowing rims and no exhaust flame. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -128,7 +130,7 @@ Fortune, a lucky treasure-hunter ship with a crown-shaped bow, gold and bronze p
 
 #### `ships/arsenal` — Arsenal
 - Ảnh tải lên: `art-src/ships/arsenal-top-hd.png` · Số mặt: **15,000**
-- Lưu về: `art-src/models/raw/ships/arsenal.tripo.glb` hoặc `arsenal.meshy.glb`
+- Mô hình 3D: `art-src/3d/ships/ship-06-frost-seraph.glb` (đã có; tàu này hiển thị bằng frost-seraph, không cần tạo lại)
 
 ```text
 Arsenal, a weapon platform ship with blade wings carrying many gun pods, coral orange and wine red armour. Player starfighter for a top-down space shooter, nose pointing forward, symmetrical, three engine nozzles at the rear with glowing rims and no exhaust flame. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -136,7 +138,7 @@ Arsenal, a weapon platform ship with blade wings carrying many gun pods, coral o
 
 #### `ships/oracle` — Oracle
 - Ảnh tải lên: `art-src/ships/oracle-top-hd.png` · Số mặt: **15,000**
-- Lưu về: `art-src/models/raw/ships/oracle.tripo.glb` hoặc `oracle.meshy.glb`
+- Mô hình 3D: `art-src/3d/ships/ship-07-nova-reaper.glb` (đã có; tàu này hiển thị bằng nova-reaper, không cần tạo lại)
 
 ```text
 Oracle, a precision seer ship with a large lens eye at the nose and a crown crest, orchid and violet armour. Player starfighter for a top-down space shooter, nose pointing forward, symmetrical, one large engine nozzle at the rear with glowing rims and no exhaust flame. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -144,7 +146,7 @@ Oracle, a precision seer ship with a large lens eye at the nose and a crown cres
 
 #### `ships/bastion` — Bastion
 - Ảnh tải lên: `art-src/ships/bastion-top-hd.png` · Số mặt: **15,000**
-- Lưu về: `art-src/models/raw/ships/bastion.tripo.glb` hoặc `bastion.meshy.glb`
+- Mô hình 3D: `art-src/3d/ships/ship-08-astral-dragon.glb` (đã có; tàu này hiển thị bằng astral-dragon, không cần tạo lại)
 
 ```text
 Bastion, a shield support carrier with four floating shield emitters around a square fortress hull, seafoam armour. Player starfighter for a top-down space shooter, nose pointing forward, symmetrical, three engine nozzles at the rear with glowing rims and no exhaust flame. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -152,7 +154,7 @@ Bastion, a shield support carrier with four floating shield emitters around a sq
 
 #### `ships/reaper` — Reaper
 - Ảnh tải lên: `art-src/ships/reaper-top-hd.png` · Số mặt: **15,000**
-- Lưu về: `art-src/models/raw/ships/reaper.tripo.glb` hoặc `reaper.meshy.glb`
+- Mô hình 3D: `art-src/3d/ships/ship-09-eclipse-monarch.glb` (đã có; tàu này hiển thị bằng eclipse-monarch, không cần tạo lại)
 
 ```text
 Reaper, an aggressive raider with scythe-shaped wings and a sharp hooked nose, crimson-pink and dark plum armour. Player starfighter for a top-down space shooter, nose pointing forward, symmetrical, two engine nozzles at the rear with glowing rims and no exhaust flame. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -160,7 +162,7 @@ Reaper, an aggressive raider with scythe-shaped wings and a sharp hooked nose, c
 
 #### `ships/celestial` — Celestial
 - Ảnh tải lên: `art-src/ships/celestial-top-hd.png` · Số mặt: **15,000**
-- Lưu về: `art-src/models/raw/ships/celestial.tripo.glb` hoặc `celestial.meshy.glb`
+- Mô hình 3D: `art-src/3d/ships/ship-10-celestial-valkyrie.glb` (đã có; tàu này hiển thị bằng celestial-valkyrie, không cần tạo lại)
 
 ```text
 Celestial, a late-game hybrid ship with halo-like arc wings and star motifs, periwinkle and indigo armour, pale gold star core. Player starfighter for a top-down space shooter, nose pointing forward, symmetrical, two engine nozzles at the rear with glowing rims and no exhaust flame. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -168,7 +170,7 @@ Celestial, a late-game hybrid ship with halo-like arc wings and star motifs, per
 
 #### `ships/zenith` — Zenith
 - Ảnh tải lên: `art-src/ships/zenith-top-hd.png` · Số mặt: **15,000**
-- Lưu về: `art-src/models/raw/ships/zenith.tripo.glb` hoặc `zenith.meshy.glb`
+- Mô hình 3D: `art-src/3d/ships/ship-11-genesis-phoenix.glb` (đã có; tàu này hiển thị bằng genesis-phoenix, không cần tạo lại)
 
 ```text
 Zenith, the apex flagship: long spear hull with prism fins, white-cyan and violet armour, radiant gold core. Player starfighter for a top-down space shooter, nose pointing forward, symmetrical, three engine nozzles at the rear with glowing rims and no exhaust flame. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -180,7 +182,7 @@ Một mô hình cho mỗi loại, dùng cho cả 8 họ: game tô màu họ bằ
 
 #### `enemies/scout` — Scout (nhanh, đông)
 - Ảnh tải lên: `src/assets/enemies/rainbow-scout@2x.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/enemies/scout.tripo.glb` hoặc `scout.meshy.glb`
+- Lưu về: `art-src/3d/enemies/rainbow-scout.glb`
 
 ```text
 A small agile dart-shaped flyer with swept-back wings, built for speed. Small alien enemy for a space shooter, seen mostly from above, chunky readable shape, symmetrical. Neutral materials so the game can recolour it: pearl-white ceramic shell, light silver metal joints, the core and edge lights glowing pure white. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -188,7 +190,7 @@ A small agile dart-shaped flyer with swept-back wings, built for speed. Small al
 
 #### `enemies/mine` — Mine (bom trôi)
 - Ảnh tải lên: `src/assets/enemies/rainbow-mine@2x.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/enemies/mine.tripo.glb` hoặc `mine.meshy.glb`
+- Lưu về: `art-src/3d/enemies/rainbow-mine.glb`
 
 ```text
 A round floating mine covered in thick spikes with a glowing core in the middle. Small alien enemy for a space shooter, seen mostly from above, chunky readable shape, symmetrical. Neutral materials so the game can recolour it: pearl-white ceramic shell, light silver metal joints, the core and edge lights glowing pure white. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -196,7 +198,7 @@ A round floating mine covered in thick spikes with a glowing core in the middle.
 
 #### `enemies/tank` — Tank (tường giáp)
 - Ảnh tải lên: `src/assets/enemies/rainbow-tank@2x.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/enemies/tank.tripo.glb` hoặc `tank.meshy.glb`
+- Lưu về: `art-src/3d/enemies/rainbow-tank.glb`
 
 ```text
 A heavy armoured juggernaut, broad and bulky, with thick layered armour plates. Small alien enemy for a space shooter, seen mostly from above, chunky readable shape, symmetrical. Neutral materials so the game can recolour it: pearl-white ceramic shell, light silver metal joints, the core and edge lights glowing pure white. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -204,7 +206,7 @@ A heavy armoured juggernaut, broad and bulky, with thick layered armour plates. 
 
 #### `enemies/destroyer` — Destroyer (tấn công dồn dập)
 - Ảnh tải lên: `src/assets/enemies/rainbow-destroyer@2x.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/enemies/destroyer.tripo.glb` hoặc `destroyer.meshy.glb`
+- Lưu về: `art-src/3d/enemies/rainbow-destroyer.glb`
 
 ```text
 An aggressive attack craft with two long forward blades like pincers. Small alien enemy for a space shooter, seen mostly from above, chunky readable shape, symmetrical. Neutral materials so the game can recolour it: pearl-white ceramic shell, light silver metal joints, the core and edge lights glowing pure white. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -212,7 +214,7 @@ An aggressive attack craft with two long forward blades like pincers. Small alie
 
 #### `enemies/oppressor` — Oppressor (bắn loạt)
 - Ảnh tải lên: `src/assets/enemies/rainbow-oppressor@2x.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/enemies/oppressor.tripo.glb` hoặc `oppressor.meshy.glb`
+- Lưu về: `art-src/3d/enemies/rainbow-oppressor.glb`
 
 ```text
 A tall floating obelisk with one menacing eye and floating rune rings. Small alien enemy for a space shooter, seen mostly from above, chunky readable shape, symmetrical. Neutral materials so the game can recolour it: pearl-white ceramic shell, light silver metal joints, the core and edge lights glowing pure white. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -220,7 +222,7 @@ A tall floating obelisk with one menacing eye and floating rune rings. Small ali
 
 #### `enemies/shield` — Shield (mang khiên)
 - Ảnh tải lên: `src/assets/enemies/rainbow-shield@2x.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/enemies/shield.tripo.glb` hoặc `shield.meshy.glb`
+- Lưu về: `art-src/3d/enemies/rainbow-shield.glb`
 
 ```text
 A guardian holding a large curved shield plate in front of its body. Small alien enemy for a space shooter, seen mostly from above, chunky readable shape, symmetrical. Neutral materials so the game can recolour it: pearl-white ceramic shell, light silver metal joints, the core and edge lights glowing pure white. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -228,7 +230,7 @@ A guardian holding a large curved shield plate in front of its body. Small alien
 
 #### `enemies/carrier` — Carrier (thả quân)
 - Ảnh tải lên: `src/assets/enemies/rainbow-carrier@2x.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/enemies/carrier.tripo.glb` hoặc `carrier.meshy.glb`
+- Lưu về: `art-src/3d/enemies/rainbow-carrier.glb`
 
 ```text
 A wide flat mothership with glowing hangar bays underneath. Small alien enemy for a space shooter, seen mostly from above, chunky readable shape, symmetrical. Neutral materials so the game can recolour it: pearl-white ceramic shell, light silver metal joints, the core and edge lights glowing pure white. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -236,7 +238,7 @@ A wide flat mothership with glowing hangar bays underneath. Small alien enemy fo
 
 #### `enemies/jammer` — Jammer (gây nhiễu)
 - Ảnh tải lên: `src/assets/enemies/rainbow-jammer@2x.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/enemies/jammer.tripo.glb` hoặc `jammer.meshy.glb`
+- Lưu về: `art-src/3d/enemies/rainbow-jammer.glb`
 
 ```text
 A creature covered in antenna arrays and small radar dishes. Small alien enemy for a space shooter, seen mostly from above, chunky readable shape, symmetrical. Neutral materials so the game can recolour it: pearl-white ceramic shell, light silver metal joints, the core and edge lights glowing pure white. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -244,7 +246,7 @@ A creature covered in antenna arrays and small radar dishes. Small alien enemy f
 
 #### `enemies/cloaker` — Cloaker (tàng hình)
 - Ảnh tải lên: `src/assets/enemies/rainbow-cloaker@2x.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/enemies/cloaker.tripo.glb` hoặc `cloaker.meshy.glb`
+- Lưu về: `art-src/3d/enemies/rainbow-cloaker.glb`
 
 ```text
 A sleek manta-ray stealth flyer with thin fins and a narrow body. Small alien enemy for a space shooter, seen mostly from above, chunky readable shape, symmetrical. Neutral materials so the game can recolour it: pearl-white ceramic shell, light silver metal joints, the core and edge lights glowing pure white. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -252,7 +254,7 @@ A sleek manta-ray stealth flyer with thin fins and a narrow body. Small alien en
 
 #### `enemies/healer` — Healer (hồi máu đồng đội)
 - Ảnh tải lên: `src/assets/enemies/rainbow-healer@2x.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/enemies/healer.tripo.glb` hoặc `healer.meshy.glb`
+- Lưu về: `art-src/3d/enemies/rainbow-healer.glb`
 
 ```text
 A gentle floating jellyfish with glowing tendrils and a healing cross mark on its dome. Small alien enemy for a space shooter, seen mostly from above, chunky readable shape, symmetrical. Neutral materials so the game can recolour it: pearl-white ceramic shell, light silver metal joints, the core and edge lights glowing pure white. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -260,7 +262,7 @@ A gentle floating jellyfish with glowing tendrils and a healing cross mark on it
 
 #### `enemies/splitter` — Splitter (chết thì tách đôi)
 - Ảnh tải lên: `src/assets/enemies/rainbow-splitter@2x.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/enemies/splitter.tripo.glb` hoặc `splitter.meshy.glb`
+- Lưu về: `art-src/3d/enemies/rainbow-splitter.glb`
 
 ```text
 A blobby cell-like creature with two nuclei visible inside, about to divide. Small alien enemy for a space shooter, seen mostly from above, chunky readable shape, symmetrical. Neutral materials so the game can recolour it: pearl-white ceramic shell, light silver metal joints, the core and edge lights glowing pure white. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -268,7 +270,7 @@ A blobby cell-like creature with two nuclei visible inside, about to divide. Sma
 
 #### `enemies/sniper` — Sniper (bắn tỉa xa)
 - Ảnh tải lên: `src/assets/enemies/rainbow-sniper@2x.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/enemies/sniper.tripo.glb` hoặc `sniper.meshy.glb`
+- Lưu về: `art-src/3d/enemies/rainbow-sniper.glb`
 
 ```text
 A long-barrelled marksman with one big lens eye and a thin cannon pointing down. Small alien enemy for a space shooter, seen mostly from above, chunky readable shape, symmetrical. Neutral materials so the game can recolour it: pearl-white ceramic shell, light silver metal joints, the core and edge lights glowing pure white. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -276,7 +278,7 @@ A long-barrelled marksman with one big lens eye and a thin cannon pointing down.
 
 #### `enemies/leech` — Leech (hút năng lượng)
 - Ảnh tải lên: `src/assets/enemies/rainbow-leech@2x.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/enemies/leech.tripo.glb` hoặc `leech.meshy.glb`
+- Lưu về: `art-src/3d/enemies/rainbow-leech.glb`
 
 ```text
 A tentacled parasite with a round sucker mouth facing down. Small alien enemy for a space shooter, seen mostly from above, chunky readable shape, symmetrical. Neutral materials so the game can recolour it: pearl-white ceramic shell, light silver metal joints, the core and edge lights glowing pure white. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -284,7 +286,7 @@ A tentacled parasite with a round sucker mouth facing down. Small alien enemy fo
 
 #### `enemies/commander` — Commander (chỉ huy)
 - Ảnh tải lên: `src/assets/enemies/rainbow-commander@2x.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/enemies/commander.tripo.glb` hoặc `commander.meshy.glb`
+- Lưu về: `art-src/3d/enemies/rainbow-commander.glb`
 
 ```text
 A regal flagship with a crown-like crest and a flowing banner. Small alien enemy for a space shooter, seen mostly from above, chunky readable shape, symmetrical. Neutral materials so the game can recolour it: pearl-white ceramic shell, light silver metal joints, the core and edge lights glowing pure white. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -294,7 +296,7 @@ A regal flagship with a crown-like crest and a flowing banner. Small alien enemy
 
 #### `bosses/tyrant-g02` — Vorgrath, Crown of Cinders
 - Ảnh tải lên: `src/assets/bosses/tyrant-g02@2x.webp` · Số mặt: **40,000** · Meshy: **Pose A-pose**, rồi Auto-Rig
-- Lưu về: `art-src/models/raw/bosses/tyrant-g02.tripo.glb` hoặc `tyrant-g02.meshy.glb`
+- Lưu về: `art-src/3d/bosses/tyrant-g02.glb`
 
 ```text
 A colossal four-armed demon king of obsidian and magma, a burning crown of horns, molten cracks across his chest, crimson and fiery orange. Giant boss for a space shooter, full body facing the viewer, standing in a relaxed A-pose with the arms slightly away from the body, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -302,7 +304,7 @@ A colossal four-armed demon king of obsidian and magma, a burning crown of horns
 
 #### `bosses/tyrant-g03` — Nivalis, Voice of the Frozen Choir
 - Ảnh tải lên: `src/assets/bosses/tyrant-g03@2x.webp` · Số mặt: **40,000** · Meshy: **Pose A-pose**, rồi Auto-Rig
-- Lưu về: `art-src/models/raw/bosses/tyrant-g03.tripo.glb` hoặc `tyrant-g03.meshy.glb`
+- Lưu về: `art-src/3d/bosses/tyrant-g03.glb`
 
 ```text
 A towering ice empress made of solid frosted crystal, a cathedral-like crown of icicles, singing, pale cyan, white and silver. Giant boss for a space shooter, full body facing the viewer, standing in a relaxed A-pose with the arms slightly away from the body, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -310,7 +312,7 @@ A towering ice empress made of solid frosted crystal, a cathedral-like crown of 
 
 #### `bosses/tyrant-g04` — Sylvarch, Heart of the Ancient Grove
 - Ảnh tải lên: `src/assets/bosses/tyrant-g04@2x.webp` · Số mặt: **40,000** · không cần khung xương
-- Lưu về: `art-src/models/raw/bosses/tyrant-g04.tripo.glb` hoặc `tyrant-g04.meshy.glb`
+- Lưu về: `art-src/3d/bosses/tyrant-g04.glb`
 
 ```text
 An ancient colossal tree titan with a mossy bark body, glowing amber heart, antler branches with yellow blossoms, green and bark brown. Giant boss for a space shooter, full body facing the viewer, floating as one solid body, wings spread wide, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -318,7 +320,7 @@ An ancient colossal tree titan with a mossy bark body, glowing amber heart, antl
 
 #### `bosses/tyrant-g05` — Umbraxis, the Eclipse Hollow
 - Ảnh tải lên: `src/assets/bosses/tyrant-g05@2x.webp` · Số mặt: **40,000** · Meshy: **Pose A-pose**, rồi Auto-Rig
-- Lưu về: `art-src/models/raw/bosses/tyrant-g05.tripo.glb` hoặc `tyrant-g05.meshy.glb`
+- Lưu về: `art-src/3d/bosses/tyrant-g05.glb`
 
 ```text
 A looming eclipse wraith with a black sun for a head, a ring of violet fire, long clawed shadow arms, black, violet and hot pink. Giant boss for a space shooter, full body facing the viewer, standing in a relaxed A-pose with the arms slightly away from the body, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -326,7 +328,7 @@ A looming eclipse wraith with a black sun for a head, a ring of violet fire, lon
 
 #### `bosses/tyrant-g06` — Novakern, Forgemaster of the Cosmic Engine
 - Ảnh tải lên: `src/assets/bosses/tyrant-g06@2x.webp` · Số mặt: **40,000** · Meshy: **Pose A-pose**, rồi Auto-Rig
-- Lưu về: `art-src/models/raw/bosses/tyrant-g06.tripo.glb` hoặc `tyrant-g06.meshy.glb`
+- Lưu về: `art-src/3d/bosses/tyrant-g06.glb`
 
 ```text
 A gigantic star-forge golem of dark star-metal, a blazing reactor core in its chest, hammer arms, lightning arcs, deep blue and gold. Giant boss for a space shooter, full body facing the viewer, standing in a relaxed A-pose with the arms slightly away from the body, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -334,7 +336,7 @@ A gigantic star-forge golem of dark star-metal, a blazing reactor core in its ch
 
 #### `bosses/tyrant-g07` — Abyssion, Maw of the Black Halo
 - Ảnh tải lên: `src/assets/bosses/tyrant-g07@2x.webp` · Số mặt: **40,000** · không cần khung xương
-- Lưu về: `art-src/models/raw/bosses/tyrant-g07.tripo.glb` hoặc `tyrant-g07.meshy.glb`
+- Lưu về: `art-src/3d/bosses/tyrant-g07.glb`
 
 ```text
 A horrifying abyssal beast with a huge fanged maw ringed by a black halo, obsidian scales and crimson glowing veins, dark red and ember orange. Giant boss for a space shooter, full body facing the viewer, floating as one solid body, wings spread wide, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -342,7 +344,7 @@ A horrifying abyssal beast with a huge fanged maw ringed by a black halo, obsidi
 
 #### `bosses/tyrant-g08` — Polaris, the Frozen Singularity
 - Ảnh tải lên: `src/assets/bosses/tyrant-g08@2x.webp` · Số mặt: **40,000** · Meshy: **Pose A-pose**, rồi Auto-Rig
-- Lưu về: `art-src/models/raw/bosses/tyrant-g08.tripo.glb` hoặc `tyrant-g08.meshy.glb`
+- Lưu về: `art-src/3d/bosses/tyrant-g08.glb`
 
 ```text
 A celestial ice guardian holding a frozen black hole between its hands, star-dust cloak, crystal armour, periwinkle blue and white. Giant boss for a space shooter, full body facing the viewer, standing in a relaxed A-pose with the arms slightly away from the body, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -350,7 +352,7 @@ A celestial ice guardian holding a frozen black hole between its hands, star-dus
 
 #### `bosses/tyrant-g09` — Eventide, the Silent Throne
 - Ảnh tải lên: `src/assets/bosses/tyrant-g09@2x.webp` · Số mặt: **40,000** · Meshy: **Pose A-pose**, rồi Auto-Rig
-- Lưu về: `art-src/models/raw/bosses/tyrant-g09.tripo.glb` hoặc `tyrant-g09.meshy.glb`
+- Lưu về: `art-src/3d/bosses/tyrant-g09.glb`
 
 ```text
 A fallen archangel seated on a floating throne of dusk, golden broken halo, dark-violet feathered wings, gold and dusk violet. Giant boss for a space shooter, full body facing the viewer, standing in a relaxed A-pose with the arms slightly away from the body, wings spread wide, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -358,7 +360,7 @@ A fallen archangel seated on a floating throne of dusk, golden broken halo, dark
 
 #### `bosses/tyrant-g10` — Aeternus, the Cosmic Crown
 - Ảnh tải lên: `src/assets/bosses/tyrant-g10@2x.webp` · Số mặt: **40,000** · Meshy: **Pose A-pose**, rồi Auto-Rig
-- Lưu về: `art-src/models/raw/bosses/tyrant-g10.tripo.glb` hoặc `tyrant-g10.meshy.glb`
+- Lưu về: `art-src/3d/bosses/tyrant-g10.glb`
 
 ```text
 The ultimate cosmic emperor, a crown of floating prism shards and galaxies, armour of every realm fused together, violet, cyan and gold. Giant boss for a space shooter, full body facing the viewer, standing in a relaxed A-pose with the arms slightly away from the body, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -366,7 +368,7 @@ The ultimate cosmic emperor, a crown of floating prism shards and galaxies, armo
 
 #### `bosses/warden-rainbow` — Iridessa, Warden of the Prismatic Tide
 - Ảnh tải lên: `src/assets/bosses/warden-rainbow@2x.webp` · Số mặt: **30,000** · Meshy: **Pose A-pose**, rồi Auto-Rig
-- Lưu về: `art-src/models/raw/bosses/warden-rainbow.tripo.glb` hoặc `warden-rainbow.meshy.glb`
+- Lưu về: `art-src/3d/bosses/warden-rainbow.glb`
 
 ```text
 A graceful bubble-glass siren with flowing iridescent fins and a pearl crown, pastel pink and cyan. Giant boss for a space shooter, full body facing the viewer, standing in a relaxed A-pose with the arms slightly away from the body, wings spread wide, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -374,7 +376,7 @@ A graceful bubble-glass siren with flowing iridescent fins and a pearl crown, pa
 
 #### `bosses/warden-angel` — Seraphiel, Archangel of the Halo Garden
 - Ảnh tải lên: `src/assets/bosses/warden-angel@2x.webp` · Số mặt: **30,000** · Meshy: **Pose A-pose**, rồi Auto-Rig
-- Lưu về: `art-src/models/raw/bosses/warden-angel.tripo.glb` hoặc `warden-angel.meshy.glb`
+- Lưu về: `art-src/3d/bosses/warden-angel.glb`
 
 ```text
 A noble armoured archangel with four golden wings and a radiant double halo, ivory and gold. Giant boss for a space shooter, full body facing the viewer, standing in a relaxed A-pose with the arms slightly away from the body, wings spread wide, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -382,7 +384,7 @@ A noble armoured archangel with four golden wings and a radiant double halo, ivo
 
 #### `bosses/warden-devil` — Malgorath, Demon Lord of the Furnace
 - Ảnh tải lên: `src/assets/bosses/warden-devil@2x.webp` · Số mặt: **30,000** · Meshy: **Pose A-pose**, rồi Auto-Rig
-- Lưu về: `art-src/models/raw/bosses/warden-devil.tripo.glb` hoặc `warden-devil.meshy.glb`
+- Lưu về: `art-src/3d/bosses/warden-devil.glb`
 
 ```text
 A hulking demon lord with a forge furnace in his belly, iron horns, chains, black and molten orange. Giant boss for a space shooter, full body facing the viewer, standing in a relaxed A-pose with the arms slightly away from the body, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -390,7 +392,7 @@ A hulking demon lord with a forge furnace in his belly, iron horns, chains, blac
 
 #### `bosses/warden-frost` — Glacia, Queen of the Glacier Choir
 - Ảnh tải lên: `src/assets/bosses/warden-frost@2x.webp` · Số mặt: **30,000** · Meshy: **Pose A-pose**, rồi Auto-Rig
-- Lưu về: `art-src/models/raw/bosses/warden-frost.tripo.glb` hoặc `warden-frost.meshy.glb`
+- Lưu về: `art-src/3d/bosses/warden-frost.glb`
 
 ```text
 An ice queen with a gown of solid frosted crystal and a snowflake crown, pale cyan and white. Giant boss for a space shooter, full body facing the viewer, standing in a relaxed A-pose with the arms slightly away from the body, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -398,7 +400,7 @@ An ice queen with a gown of solid frosted crystal and a snowflake crown, pale cy
 
 #### `bosses/warden-prism` — Prismarch, Archon of Refracted Light
 - Ảnh tải lên: `src/assets/bosses/warden-prism@2x.webp` · Số mặt: **30,000** · Meshy: **Pose A-pose**, rồi Auto-Rig
-- Lưu về: `art-src/models/raw/bosses/warden-prism.tripo.glb` hoặc `warden-prism.meshy.glb`
+- Lưu về: `art-src/3d/bosses/warden-prism.glb`
 
 ```text
 A faceted crystal archon with a prism head that splits light, floating shard armour, violet and cyan. Giant boss for a space shooter, full body facing the viewer, standing in a relaxed A-pose with the arms slightly away from the body, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -406,7 +408,7 @@ A faceted crystal archon with a prism head that splits light, floating shard arm
 
 #### `bosses/warden-nature` — Elder Bloomheart, Keeper of the Ancient Grove
 - Ảnh tải lên: `src/assets/bosses/warden-nature@2x.webp` · Số mặt: **30,000** · Meshy: **Pose A-pose**, rồi Auto-Rig
-- Lưu về: `art-src/models/raw/bosses/warden-nature.tripo.glb` hoặc `warden-nature.meshy.glb`
+- Lưu về: `art-src/3d/bosses/warden-nature.glb`
 
 ```text
 A gentle giant of living wood and vines with a blooming flower heart, yellow and white flowers, green and brown. Giant boss for a space shooter, full body facing the viewer, standing in a relaxed A-pose with the arms slightly away from the body, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -414,7 +416,7 @@ A gentle giant of living wood and vines with a blooming flower heart, yellow and
 
 #### `bosses/warden-shadow` — The Umbral Eye, Watcher of the Eclipse
 - Ảnh tải lên: `src/assets/bosses/warden-shadow@2x.webp` · Số mặt: **30,000** · không cần khung xương
-- Lưu về: `art-src/models/raw/bosses/warden-shadow.tripo.glb` hoặc `warden-shadow.meshy.glb`
+- Lưu về: `art-src/3d/bosses/warden-shadow.glb`
 
 ```text
 A giant floating eye of shadow wrapped in black tendrils, violet iris, pink glowing runes. Giant boss for a space shooter, full body facing the viewer, floating as one solid body, wings spread wide, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -422,7 +424,7 @@ A giant floating eye of shadow wrapped in black tendrils, violet iris, pink glow
 
 #### `bosses/warden-cosmic` — Astraeon, Emperor of the Star Forge
 - Ảnh tải lên: `src/assets/bosses/warden-cosmic@2x.webp` · Số mặt: **30,000** · Meshy: **Pose A-pose**, rồi Auto-Rig
-- Lưu về: `art-src/models/raw/bosses/warden-cosmic.tripo.glb` hoặc `warden-cosmic.meshy.glb`
+- Lưu về: `art-src/3d/bosses/warden-cosmic.glb`
 
 ```text
 A star-metal emperor mech with a nebula glass cape and a crown of tiny stars, deep blue and gold. Giant boss for a space shooter, full body facing the viewer, standing in a relaxed A-pose with the arms slightly away from the body, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -430,7 +432,7 @@ A star-metal emperor mech with a nebula glass cape and a crown of tiny stars, de
 
 #### `bosses/lieutenant-rainbow` — Chroma Knight
 - Ảnh tải lên: `src/assets/bosses/lieutenant-rainbow@2x.webp` · Số mặt: **20,000** · Meshy: **Pose A-pose**, rồi Auto-Rig
-- Lưu về: `art-src/models/raw/bosses/lieutenant-rainbow.tripo.glb` hoặc `lieutenant-rainbow.meshy.glb`
+- Lưu về: `art-src/3d/bosses/lieutenant-rainbow.glb`
 
 ```text
 A candy-glass knight with a rainbow lance and a bubble shield, pastel pink and gold. Giant boss for a space shooter, full body facing the viewer, standing in a relaxed A-pose with the arms slightly away from the body, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -438,7 +440,7 @@ A candy-glass knight with a rainbow lance and a bubble shield, pastel pink and g
 
 #### `bosses/lieutenant-angel` — Choir Sentinel
 - Ảnh tải lên: `src/assets/bosses/lieutenant-angel@2x.webp` · Số mặt: **20,000** · Meshy: **Pose A-pose**, rồi Auto-Rig
-- Lưu về: `art-src/models/raw/bosses/lieutenant-angel.tripo.glb` hoặc `lieutenant-angel.meshy.glb`
+- Lưu về: `art-src/3d/bosses/lieutenant-angel.glb`
 
 ```text
 A porcelain sentinel with a golden bell for a head and small light wings, ivory and gold. Giant boss for a space shooter, full body facing the viewer, standing in a relaxed A-pose with the arms slightly away from the body, wings spread wide, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -446,7 +448,7 @@ A porcelain sentinel with a golden bell for a head and small light wings, ivory 
 
 #### `bosses/lieutenant-devil` — Brimstone Baron
 - Ảnh tải lên: `src/assets/bosses/lieutenant-devil@2x.webp` · Số mặt: **20,000** · Meshy: **Pose A-pose**, rồi Auto-Rig
-- Lưu về: `art-src/models/raw/bosses/lieutenant-devil.tripo.glb` hoặc `lieutenant-devil.meshy.glb`
+- Lưu về: `art-src/3d/bosses/lieutenant-devil.glb`
 
 ```text
 A stout imp noble in lava-cracked armour with a smoking top hat of obsidian, crimson and orange. Giant boss for a space shooter, full body facing the viewer, standing in a relaxed A-pose with the arms slightly away from the body, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -454,7 +456,7 @@ A stout imp noble in lava-cracked armour with a smoking top hat of obsidian, cri
 
 #### `bosses/lieutenant-frost` — Frost Oracle
 - Ảnh tải lên: `src/assets/bosses/lieutenant-frost@2x.webp` · Số mặt: **20,000** · Meshy: **Pose A-pose**, rồi Auto-Rig
-- Lưu về: `art-src/models/raw/bosses/lieutenant-frost.tripo.glb` hoặc `lieutenant-frost.meshy.glb`
+- Lưu về: `art-src/3d/bosses/lieutenant-frost.glb`
 
 ```text
 A hooded ice oracle holding a glowing frost orb, crystal robes, cyan and white. Giant boss for a space shooter, full body facing the viewer, standing in a relaxed A-pose with the arms slightly away from the body, wings spread wide, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -462,7 +464,7 @@ A hooded ice oracle holding a glowing frost orb, crystal robes, cyan and white. 
 
 #### `bosses/lieutenant-prism` — Prism Sentinel
 - Ảnh tải lên: `src/assets/bosses/lieutenant-prism@2x.webp` · Số mặt: **20,000** · không cần khung xương
-- Lưu về: `art-src/models/raw/bosses/lieutenant-prism.tripo.glb` hoặc `lieutenant-prism.meshy.glb`
+- Lưu về: `art-src/3d/bosses/lieutenant-prism.glb`
 
 ```text
 A floating crystal sentinel made of stacked prisms with one lens eye, violet and cyan. Giant boss for a space shooter, full body facing the viewer, floating as one solid body, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -470,7 +472,7 @@ A floating crystal sentinel made of stacked prisms with one lens eye, violet and
 
 #### `bosses/lieutenant-nature` — Thornback
 - Ảnh tải lên: `src/assets/bosses/lieutenant-nature@2x.webp` · Số mặt: **20,000** · không cần khung xương
-- Lưu về: `art-src/models/raw/bosses/lieutenant-nature.tripo.glb` hoặc `lieutenant-nature.meshy.glb`
+- Lưu về: `art-src/3d/bosses/lieutenant-nature.glb`
 
 ```text
 A thorn-covered beetle guardian with a mossy shell and yellow flowers, green and brown. Giant boss for a space shooter, full body facing the viewer, floating as one solid body, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -478,7 +480,7 @@ A thorn-covered beetle guardian with a mossy shell and yellow flowers, green and
 
 #### `bosses/lieutenant-shadow` — Night Stalker
 - Ảnh tải lên: `src/assets/bosses/lieutenant-shadow@2x.webp` · Số mặt: **20,000** · Meshy: **Pose A-pose**, rồi Auto-Rig
-- Lưu về: `art-src/models/raw/bosses/lieutenant-shadow.tripo.glb` hoặc `lieutenant-shadow.meshy.glb`
+- Lưu về: `art-src/3d/bosses/lieutenant-shadow.glb`
 
 ```text
 A lean shadow hunter with long blade arms and violet glowing eyes. Giant boss for a space shooter, full body facing the viewer, standing in a relaxed A-pose with the arms slightly away from the body, wings spread wide, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -486,7 +488,7 @@ A lean shadow hunter with long blade arms and violet glowing eyes. Giant boss fo
 
 #### `bosses/lieutenant-cosmic` — Forge Golem
 - Ảnh tải lên: `src/assets/bosses/lieutenant-cosmic@2x.webp` · Số mặt: **20,000** · Meshy: **Pose A-pose**, rồi Auto-Rig
-- Lưu về: `art-src/models/raw/bosses/lieutenant-cosmic.tripo.glb` hoặc `lieutenant-cosmic.meshy.glb`
+- Lưu về: `art-src/3d/bosses/lieutenant-cosmic.glb`
 
 ```text
 A compact star-metal golem with a glowing reactor chest and gold rivets, deep blue and gold. Giant boss for a space shooter, full body facing the viewer, standing in a relaxed A-pose with the arms slightly away from the body, wings spread wide, a wide dramatic silhouette, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -498,7 +500,7 @@ Chỉ những kỹ năng có vật thể (tên lửa, đạn, drone). Khiên, s�
 
 #### `skills/micro-missile` — Missile Swarm
 - Ảnh tải lên: `(không có ảnh: dùng Text to 3D)` · Số mặt: **1,500**
-- Lưu về: `art-src/models/raw/skills/micro-missile.tripo.glb` hoặc `micro-missile.meshy.glb`
+- Lưu về: `art-src/3d/skills/micro-missile.glb`
 
 ```text
 A compact homing micro-missile: slim white body with orange warning bands, a dark sensor tip, four small swept tail fins, a glowing orange exhaust nozzle at the rear, a tiny blue status light on the side, pointing forward along its length, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -506,7 +508,7 @@ A compact homing micro-missile: slim white body with orange warning bands, a dar
 
 #### `skills/railgun-slug` — Railgun
 - Ảnh tải lên: `(không có ảnh: dùng Text to 3D)` · Số mặt: **1,500**
-- Lưu về: `art-src/models/raw/skills/railgun-slug.tripo.glb` hoặc `railgun-slug.meshy.glb`
+- Lưu về: `art-src/3d/skills/railgun-slug.glb`
 
 ```text
 A glowing magnetic railgun slug: elongated tungsten dart with blue-white plasma rings around it, pointing forward along its length, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -514,7 +516,7 @@ A glowing magnetic railgun slug: elongated tungsten dart with blue-white plasma 
 
 #### `skills/orbital-lance` — Orbital Strike
 - Ảnh tải lên: `(không có ảnh: dùng Text to 3D)` · Số mặt: **1,500**
-- Lưu về: `art-src/models/raw/skills/orbital-lance.tripo.glb` hoặc `orbital-lance.meshy.glb`
+- Lưu về: `art-src/3d/skills/orbital-lance.glb`
 
 ```text
 A long orbital strike lance: white-gold spear-shaped kinetic rod with glowing runes and stabiliser fins, pointing forward along its length, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -522,7 +524,7 @@ A long orbital strike lance: white-gold spear-shaped kinetic rod with glowing ru
 
 #### `skills/sentinel-drone` — Sentinel Drones
 - Ảnh tải lên: `(không có ảnh: dùng Text to 3D)` · Số mặt: **1,500**
-- Lưu về: `art-src/models/raw/skills/sentinel-drone.tripo.glb` hoặc `sentinel-drone.meshy.glb`
+- Lưu về: `art-src/3d/skills/sentinel-drone.glb`
 
 ```text
 A small round escort drone with a single cyan lens eye, two side thrusters and a tiny shield emitter, pointing forward along its length, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -530,7 +532,7 @@ A small round escort drone with a single cyan lens eye, two side thrusters and a
 
 #### `skills/gravity-core` — Singularity
 - Ảnh tải lên: `(không có ảnh: dùng Text to 3D)` · Số mặt: **1,500**
-- Lưu về: `art-src/models/raw/skills/gravity-core.tripo.glb` hoặc `gravity-core.meshy.glb`
+- Lưu về: `art-src/3d/skills/gravity-core.glb`
 
 ```text
 A fist-sized gravity bomb: dark metal cage holding a swirling black sphere with a violet accretion ring, pointing forward along its length, symmetrical. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -540,7 +542,7 @@ A fist-sized gravity bomb: dark metal cage holding a swirling black sphere with 
 
 #### `items/pulse-laser-mk1` — Pulse Laser Mk.I
 - Ảnh tải lên: `src/assets/icons/equipment/pulse-laser-mk1.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/pulse-laser-mk1.tripo.glb` hoặc `pulse-laser-mk1.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/pulse-laser-mk1.glb`
 
 ```text
 Pulse Laser Mk.I: compact twin-barrel pulse laser cannon, cyan muzzle glow. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -548,7 +550,7 @@ Pulse Laser Mk.I: compact twin-barrel pulse laser cannon, cyan muzzle glow. A co
 
 #### `items/precision-laser-mk1` — Precision Laser Mk.I
 - Ảnh tải lên: `src/assets/icons/equipment/precision-laser-mk1.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/precision-laser-mk1.tripo.glb` hoặc `precision-laser-mk1.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/precision-laser-mk1.glb`
 
 ```text
 Precision Laser Mk.I: long slim precision laser with scope rings, green-cyan glow. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -556,7 +558,7 @@ Precision Laser Mk.I: long slim precision laser with scope rings, green-cyan glo
 
 #### `items/ion-cannon-mk1` — Ion Cannon Mk.I
 - Ảnh tải lên: `src/assets/icons/equipment/ion-cannon-mk1.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/ion-cannon-mk1.tripo.glb` hoặc `ion-cannon-mk1.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/ion-cannon-mk1.glb`
 
 ```text
 Ion Cannon Mk.I: heavy ion cannon with glowing blue coils along the barrel. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -564,7 +566,7 @@ Ion Cannon Mk.I: heavy ion cannon with glowing blue coils along the barrel. A co
 
 #### `items/arc-projector-mk2` — Arc Projector Mk.II
 - Ảnh tải lên: `src/assets/icons/equipment/arc-projector-mk2.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/arc-projector-mk2.tripo.glb` hoặc `arc-projector-mk2.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/arc-projector-mk2.glb`
 
 ```text
 Arc Projector Mk.II: fork-tipped arc projector weapon crackling with lightning between its prongs, accent colour electric blue with violet sparks. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -572,7 +574,7 @@ Arc Projector Mk.II: fork-tipped arc projector weapon crackling with lightning b
 
 #### `items/rail-driver-mk2` — Rail Driver Mk.II
 - Ảnh tải lên: `src/assets/icons/equipment/rail-driver-mk2.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/rail-driver-mk2.tripo.glb` hoặc `rail-driver-mk2.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/rail-driver-mk2.glb`
 
 ```text
 Rail Driver Mk.II: long magnetic rail cannon with two parallel rails and a glowing slug between them, ice blue. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -580,7 +582,7 @@ Rail Driver Mk.II: long magnetic rail cannon with two parallel rails and a glowi
 
 #### `items/plasma-lance-mk3` — Plasma Lance Mk.III
 - Ảnh tải lên: `src/assets/icons/equipment/plasma-lance-mk3.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/plasma-lance-mk3.tripo.glb` hoặc `plasma-lance-mk3.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/plasma-lance-mk3.glb`
 
 ```text
 Plasma Lance Mk.III: ornate plasma lance with a magenta-white plasma core and heat vents, premium. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -588,7 +590,7 @@ Plasma Lance Mk.III: ornate plasma lance with a magenta-white plasma core and he
 
 #### `items/plated-armor-mk1` — Plated Armor Mk.I
 - Ảnh tải lên: `src/assets/icons/equipment/plated-armor-mk1.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/plated-armor-mk1.tripo.glb` hoặc `plated-armor-mk1.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/plated-armor-mk1.glb`
 
 ```text
 Plated Armor Mk.I: layered riveted steel armour plates. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -596,7 +598,7 @@ Plated Armor Mk.I: layered riveted steel armour plates. A compact spaceship equi
 
 #### `items/adaptive-armor-mk1` — Adaptive Armor Mk.I
 - Ảnh tải lên: `src/assets/icons/equipment/adaptive-armor-mk1.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/adaptive-armor-mk1.tripo.glb` hoặc `adaptive-armor-mk1.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/adaptive-armor-mk1.glb`
 
 ```text
 Adaptive Armor Mk.I: segmented armour plate with shifting panels and teal seams. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -604,7 +606,7 @@ Adaptive Armor Mk.I: segmented armour plate with shifting panels and teal seams.
 
 #### `items/kinetic-shell-mk1` — Kinetic Shell Mk.I
 - Ảnh tải lên: `src/assets/icons/equipment/kinetic-shell-mk1.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/kinetic-shell-mk1.tripo.glb` hoặc `kinetic-shell-mk1.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/kinetic-shell-mk1.glb`
 
 ```text
 Kinetic Shell Mk.I: thick rounded kinetic hull shell section, dark grey, lightly dented. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -612,7 +614,7 @@ Kinetic Shell Mk.I: thick rounded kinetic hull shell section, dark grey, lightly
 
 #### `items/ablative-plating-mk2` — Ablative Plating Mk.II
 - Ảnh tải lên: `src/assets/icons/equipment/ablative-plating-mk2.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/ablative-plating-mk2.tripo.glb` hoặc `ablative-plating-mk2.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/ablative-plating-mk2.glb`
 
 ```text
 Ablative Plating Mk.II: sacrificial ablative armour tiles with orange-hot scorched edges, one tile flaking off. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -620,7 +622,7 @@ Ablative Plating Mk.II: sacrificial ablative armour tiles with orange-hot scorch
 
 #### `items/reactive-armor-mk2` — Reactive Armor Mk.II
 - Ảnh tải lên: `src/assets/icons/equipment/reactive-armor-mk2.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/reactive-armor-mk2.tripo.glb` hoặc `reactive-armor-mk2.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/reactive-armor-mk2.glb`
 
 ```text
 Reactive Armor Mk.II: explosive-reactive armour blocks with small glowing amber charges. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -628,7 +630,7 @@ Reactive Armor Mk.II: explosive-reactive armour blocks with small glowing amber 
 
 #### `items/nanoweave-hull-mk3` — Nanoweave Hull Mk.III
 - Ảnh tải lên: `src/assets/icons/equipment/nanoweave-hull-mk3.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/nanoweave-hull-mk3.tripo.glb` hoặc `nanoweave-hull-mk3.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/nanoweave-hull-mk3.glb`
 
 ```text
 Nanoweave Hull Mk.III: hull lattice woven from glowing green nanite threads, premium. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -636,7 +638,7 @@ Nanoweave Hull Mk.III: hull lattice woven from glowing green nanite threads, pre
 
 #### `items/deflector-shield-mk1` — Deflector Shield Mk.I
 - Ảnh tải lên: `src/assets/icons/equipment/deflector-shield-mk1.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/deflector-shield-mk1.tripo.glb` hoặc `deflector-shield-mk1.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/deflector-shield-mk1.glb`
 
 ```text
 Deflector Shield Mk.I: round shield emitter projecting a cyan energy disc. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -644,7 +646,7 @@ Deflector Shield Mk.I: round shield emitter projecting a cyan energy disc. A com
 
 #### `items/prism-shield-mk1` — Prism Shield Mk.I
 - Ảnh tải lên: `src/assets/icons/equipment/prism-shield-mk1.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/prism-shield-mk1.tripo.glb` hoặc `prism-shield-mk1.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/prism-shield-mk1.glb`
 
 ```text
 Prism Shield Mk.I: prism crystal emitter splitting light into a shield. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -652,7 +654,7 @@ Prism Shield Mk.I: prism crystal emitter splitting light into a shield. A compac
 
 #### `items/capacitor-shield-mk1` — Capacitor Shield Mk.I
 - Ảnh tải lên: `src/assets/icons/equipment/capacitor-shield-mk1.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/capacitor-shield-mk1.tripo.glb` hoặc `capacitor-shield-mk1.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/capacitor-shield-mk1.glb`
 
 ```text
 Capacitor Shield Mk.I: cylindrical capacitor bank with a hexagonal shield glow. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -660,7 +662,7 @@ Capacitor Shield Mk.I: cylindrical capacitor bank with a hexagonal shield glow. 
 
 #### `items/discharge-shield-mk2` — Discharge Shield Mk.II
 - Ảnh tải lên: `src/assets/icons/equipment/discharge-shield-mk2.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/discharge-shield-mk2.tripo.glb` hoặc `discharge-shield-mk2.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/discharge-shield-mk2.glb`
 
 ```text
 Discharge Shield Mk.II: shield generator crackling with stored electricity, blue-white arcs. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -668,7 +670,7 @@ Discharge Shield Mk.II: shield generator crackling with stored electricity, blue
 
 #### `items/harmonic-shield-mk2` — Harmonic Shield Mk.II
 - Ảnh tải lên: `src/assets/icons/equipment/harmonic-shield-mk2.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/harmonic-shield-mk2.tripo.glb` hoặc `harmonic-shield-mk2.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/harmonic-shield-mk2.glb`
 
 ```text
 Harmonic Shield Mk.II: tuning-fork shaped shield emitter with concentric cyan wave rings. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -676,7 +678,7 @@ Harmonic Shield Mk.II: tuning-fork shaped shield emitter with concentric cyan wa
 
 #### `items/phase-shield-mk3` — Phase Shield Mk.III
 - Ảnh tải lên: `src/assets/icons/equipment/phase-shield-mk3.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/phase-shield-mk3.tripo.glb` hoặc `phase-shield-mk3.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/phase-shield-mk3.glb`
 
 ```text
 Phase Shield Mk.III: phase shield emitter with a shimmering violet rift in front of it, premium. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -684,7 +686,7 @@ Phase Shield Mk.III: phase shield emitter with a shimmering violet rift in front
 
 #### `items/compact-reactor-mk1` — Compact Reactor Mk.I
 - Ảnh tải lên: `src/assets/icons/equipment/compact-reactor-mk1.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/compact-reactor-mk1.tripo.glb` hoặc `compact-reactor-mk1.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/compact-reactor-mk1.glb`
 
 ```text
 Compact Reactor Mk.I: small cylindrical ship reactor with a yellow glowing core. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -692,7 +694,7 @@ Compact Reactor Mk.I: small cylindrical ship reactor with a yellow glowing core.
 
 #### `items/overclock-reactor-mk1` — Overclock Reactor Mk.I
 - Ảnh tải lên: `src/assets/icons/equipment/overclock-reactor-mk1.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/overclock-reactor-mk1.tripo.glb` hoặc `overclock-reactor-mk1.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/overclock-reactor-mk1.glb`
 
 ```text
 Overclock Reactor Mk.I: reactor with red-hot overclocked coils and heat sinks. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -700,7 +702,7 @@ Overclock Reactor Mk.I: reactor with red-hot overclocked coils and heat sinks. A
 
 #### `items/fusion-reactor-mk1` — Fusion Reactor Mk.I
 - Ảnh tải lên: `src/assets/icons/equipment/fusion-reactor-mk1.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/fusion-reactor-mk1.tripo.glb` hoặc `fusion-reactor-mk1.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/fusion-reactor-mk1.glb`
 
 ```text
 Fusion Reactor Mk.I: spherical fusion reactor with a white-gold core inside a torus. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -708,7 +710,7 @@ Fusion Reactor Mk.I: spherical fusion reactor with a white-gold core inside a to
 
 #### `items/efficient-reactor-mk2` — Efficient Reactor Mk.II
 - Ảnh tải lên: `src/assets/icons/equipment/efficient-reactor-mk2.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/efficient-reactor-mk2.tripo.glb` hoặc `efficient-reactor-mk2.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/efficient-reactor-mk2.glb`
 
 ```text
 Efficient Reactor Mk.II: sleek reactor with clean blue energy lines and cooling fins. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -716,7 +718,7 @@ Efficient Reactor Mk.II: sleek reactor with clean blue energy lines and cooling 
 
 #### `items/siphon-reactor-mk2` — Siphon Reactor Mk.II
 - Ảnh tải lên: `src/assets/icons/equipment/siphon-reactor-mk2.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/siphon-reactor-mk2.tripo.glb` hoặc `siphon-reactor-mk2.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/siphon-reactor-mk2.glb`
 
 ```text
 Siphon Reactor Mk.II: reactor with siphon tubes drawing glowing scrap particles in, teal. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -724,7 +726,7 @@ Siphon Reactor Mk.II: reactor with siphon tubes drawing glowing scrap particles 
 
 #### `items/cryo-reactor-mk3` — Cryo Reactor Mk.III
 - Ảnh tải lên: `src/assets/icons/equipment/cryo-reactor-mk3.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/cryo-reactor-mk3.tripo.glb` hoặc `cryo-reactor-mk3.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/cryo-reactor-mk3.glb`
 
 ```text
 Cryo Reactor Mk.III: frost-covered reactor with an icy blue core and ice crystals, premium. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -732,7 +734,7 @@ Cryo Reactor Mk.III: frost-covered reactor with an icy blue core and ice crystal
 
 #### `items/targeting-module-mk1` — Targeting Module Mk.I
 - Ảnh tải lên: `src/assets/icons/equipment/targeting-module-mk1.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/targeting-module-mk1.tripo.glb` hoặc `targeting-module-mk1.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/targeting-module-mk1.glb`
 
 ```text
 Targeting Module Mk.I: targeting module with a lens and a red reticle. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -740,7 +742,7 @@ Targeting Module Mk.I: targeting module with a lens and a red reticle. A compact
 
 #### `items/salvage-module-mk1` — Salvage Module Mk.I
 - Ảnh tải lên: `src/assets/icons/equipment/salvage-module-mk1.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/salvage-module-mk1.tripo.glb` hoặc `salvage-module-mk1.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/salvage-module-mk1.glb`
 
 ```text
 Salvage Module Mk.I: mechanical salvage claw module. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -748,7 +750,7 @@ Salvage Module Mk.I: mechanical salvage claw module. A compact spaceship equipme
 
 #### `items/fortune-module-mk1` — Fortune Module Mk.I
 - Ảnh tải lên: `src/assets/icons/equipment/fortune-module-mk1.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/fortune-module-mk1.tripo.glb` hoặc `fortune-module-mk1.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/fortune-module-mk1.glb`
 
 ```text
 Fortune Module Mk.I: ship module with a golden four-leaf circuit pattern. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -756,7 +758,7 @@ Fortune Module Mk.I: ship module with a golden four-leaf circuit pattern. A comp
 
 #### `items/hunter-killer-pod-mk2` — Hunter-Killer Pod Mk.II
 - Ảnh tải lên: `src/assets/icons/equipment/hunter-killer-pod-mk2.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/hunter-killer-pod-mk2.tripo.glb` hoặc `hunter-killer-pod-mk2.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/hunter-killer-pod-mk2.glb`
 
 ```text
 Hunter-Killer Pod Mk.II: wing pod with a rack of micro-missiles with orange tips. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -764,7 +766,7 @@ Hunter-Killer Pod Mk.II: wing pod with a rack of micro-missiles with orange tips
 
 #### `items/threat-scanner-mk2` — Threat Scanner Mk.II
 - Ảnh tải lên: `src/assets/icons/equipment/threat-scanner-mk2.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/threat-scanner-mk2.tripo.glb` hoặc `threat-scanner-mk2.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/threat-scanner-mk2.glb`
 
 ```text
 Threat Scanner Mk.II: radar dish scanner with a sweeping green scan and jamming waves. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -772,7 +774,7 @@ Threat Scanner Mk.II: radar dish scanner with a sweeping green scan and jamming 
 
 #### `items/overcharge-module-mk3` — Overcharge Module Mk.III
 - Ảnh tải lên: `src/assets/icons/equipment/overcharge-module-mk3.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/overcharge-module-mk3.tripo.glb` hoặc `overcharge-module-mk3.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/overcharge-module-mk3.glb`
 
 ```text
 Overcharge Module Mk.III: module with a crimson capacitor overflowing with energy, premium. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -780,7 +782,7 @@ Overcharge Module Mk.III: module with a crimson capacitor overflowing with energ
 
 #### `items/support-drone-mk1` — Support Drone Mk.I
 - Ảnh tải lên: `src/assets/icons/equipment/support-drone-mk1.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/support-drone-mk1.tripo.glb` hoặc `support-drone-mk1.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/support-drone-mk1.glb`
 
 ```text
 Support Drone Mk.I: small round support drone with a green repair light. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -788,7 +790,7 @@ Support Drone Mk.I: small round support drone with a green repair light. A compa
 
 #### `items/assault-drone-mk1` — Assault Drone Mk.I
 - Ảnh tải lên: `src/assets/icons/equipment/assault-drone-mk1.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/assault-drone-mk1.tripo.glb` hoặc `assault-drone-mk1.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/assault-drone-mk1.glb`
 
 ```text
 Assault Drone Mk.I: small aggressive drone with twin guns and red lights. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -796,7 +798,7 @@ Assault Drone Mk.I: small aggressive drone with twin guns and red lights. A comp
 
 #### `items/ward-drone-mk1` — ECM Drone Mk.I
 - Ảnh tải lên: `src/assets/icons/equipment/ward-drone-mk1.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/ward-drone-mk1.tripo.glb` hoặc `ward-drone-mk1.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/ward-drone-mk1.glb`
 
 ```text
 ECM Drone Mk.I: drone with an antenna array emitting purple jamming waves. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -804,7 +806,7 @@ ECM Drone Mk.I: drone with an antenna array emitting purple jamming waves. A com
 
 #### `items/escort-drone-mk2` — Escort Drone Mk.II
 - Ảnh tải lên: `src/assets/icons/equipment/escort-drone-mk2.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/escort-drone-mk2.tripo.glb` hoặc `escort-drone-mk2.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/escort-drone-mk2.glb`
 
 ```text
 Escort Drone Mk.II: sleek arrowhead escort drone with twin cyan engines, flying nose up, accent colour cyan #8fe8ff. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -812,7 +814,7 @@ Escort Drone Mk.II: sleek arrowhead escort drone with twin cyan engines, flying 
 
 #### `items/interceptor-drone-mk2` — Interceptor Drone Mk.II
 - Ảnh tải lên: `src/assets/icons/equipment/interceptor-drone-mk2.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/interceptor-drone-mk2.tripo.glb` hoặc `interceptor-drone-mk2.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/interceptor-drone-mk2.glb`
 
 ```text
 Interceptor Drone Mk.II: point-defence drone with a small turret and amber lights. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -820,7 +822,7 @@ Interceptor Drone Mk.II: point-defence drone with a small turret and amber light
 
 #### `items/wing-drones-mk3` — Wing Drones Mk.III
 - Ảnh tải lên: `src/assets/icons/equipment/wing-drones-mk3.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/wing-drones-mk3.tripo.glb` hoặc `wing-drones-mk3.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/wing-drones-mk3.glb`
 
 ```text
 Wing Drones Mk.III: pair of elegant white escort drones flying in formation, cyan engines, premium. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -828,7 +830,7 @@ Wing Drones Mk.III: pair of elegant white escort drones flying in formation, cya
 
 #### `items/overdrive-core-mk1` — Overdrive Core Mk.I
 - Ảnh tải lên: `src/assets/icons/equipment/overdrive-core-mk1.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/overdrive-core-mk1.tripo.glb` hoặc `overdrive-core-mk1.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/overdrive-core-mk1.glb`
 
 ```text
 Overdrive Core Mk.I: glowing hexagonal core crystal, orange. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -836,7 +838,7 @@ Overdrive Core Mk.I: glowing hexagonal core crystal, orange. A compact spaceship
 
 #### `items/salvage-core-mk1` — Salvage Core Mk.I
 - Ảnh tải lên: `src/assets/icons/equipment/salvage-core-mk1.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/salvage-core-mk1.tripo.glb` hoặc `salvage-core-mk1.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/salvage-core-mk1.glb`
 
 ```text
 Salvage Core Mk.I: ship core assembled from salvaged brass parts. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -844,7 +846,7 @@ Salvage Core Mk.I: ship core assembled from salvaged brass parts. A compact spac
 
 #### `items/balanced-core-mk1` — Balanced Core Mk.I
 - Ảnh tải lên: `src/assets/icons/equipment/balanced-core-mk1.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/balanced-core-mk1.tripo.glb` hoặc `balanced-core-mk1.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/balanced-core-mk1.glb`
 
 ```text
 Balanced Core Mk.I: round core with two-tone swirling energy, blue and gold. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -852,7 +854,7 @@ Balanced Core Mk.I: round core with two-tone swirling energy, blue and gold. A c
 
 #### `items/ignition-core-mk2` — Ignition Core Mk.II
 - Ảnh tải lên: `src/assets/icons/equipment/ignition-core-mk2.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/ignition-core-mk2.tripo.glb` hoặc `ignition-core-mk2.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/ignition-core-mk2.glb`
 
 ```text
 Ignition Core Mk.II: ship core with a fiery orange ignition chamber. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -860,7 +862,7 @@ Ignition Core Mk.II: ship core with a fiery orange ignition chamber. A compact s
 
 #### `items/momentum-core-mk2` — Momentum Core Mk.II
 - Ảnh tải lên: `src/assets/icons/equipment/momentum-core-mk2.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/momentum-core-mk2.tripo.glb` hoặc `momentum-core-mk2.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/momentum-core-mk2.glb`
 
 ```text
 Momentum Core Mk.II: ship core with spinning flywheel rings and motion streaks. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -868,7 +870,7 @@ Momentum Core Mk.II: ship core with spinning flywheel rings and motion streaks. 
 
 #### `items/quantum-core-mk3` — Quantum Core Mk.III
 - Ảnh tải lên: `src/assets/icons/equipment/quantum-core-mk3.webp` · Số mặt: **5,000**
-- Lưu về: `art-src/models/raw/items/quantum-core-mk3.tripo.glb` hoặc `quantum-core-mk3.meshy.glb`
+- Lưu về: `art-src/3d/icons/equipment/quantum-core-mk3.glb`
 
 ```text
 Quantum Core Mk.III: quantum core with floating fragments around a white-violet singularity, premium. A compact spaceship equipment module shown as a floating game item, three-quarter view friendly, clean mechanical detail. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -878,7 +880,7 @@ Quantum Core Mk.III: quantum core with floating fragments around a white-violet 
 
 #### `items/repair-kit` — Repair Kit
 - Ảnh tải lên: `src/assets/icons/items/repair-kit.webp` · Số mặt: **4,000**
-- Lưu về: `art-src/models/raw/items/repair-kit.tripo.glb` hoặc `repair-kit.meshy.glb`
+- Lưu về: `art-src/3d/icons/items/repair-kit.glb`
 
 ```text
 Repair Kit: a compact armoured field repair kit case with a glowing green cross panel and nanite sparks. A consumable game item, small and iconic, three-quarter view friendly. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -886,7 +888,7 @@ Repair Kit: a compact armoured field repair kit case with a glowing green cross 
 
 #### `items/nova-bomb` — Nova Bomb
 - Ảnh tải lên: `src/assets/icons/items/nova-bomb.webp` · Số mặt: **4,000**
-- Lưu về: `art-src/models/raw/items/nova-bomb.tripo.glb` hoặc `nova-bomb.meshy.glb`
+- Lưu về: `art-src/3d/icons/items/nova-bomb.glb`
 
 ```text
 Nova Bomb: a spherical nova bomb core with a white-hot star inside a cage of curved plates, light bursting through the seams. A consumable game item, small and iconic, three-quarter view friendly. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -894,7 +896,7 @@ Nova Bomb: a spherical nova bomb core with a white-hot star inside a cage of cur
 
 #### `items/shield-cell` — Shield Cell
 - Ảnh tải lên: `src/assets/icons/items/shield-cell.webp` · Số mặt: **4,000**
-- Lưu về: `art-src/models/raw/items/shield-cell.tripo.glb` hoặc `shield-cell.meshy.glb`
+- Lưu về: `art-src/3d/icons/items/shield-cell.glb`
 
 ```text
 Shield Cell: a hexagonal shield battery cell with a glowing blue hex-grid core. A consumable game item, small and iconic, three-quarter view friendly. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -902,7 +904,7 @@ Shield Cell: a hexagonal shield battery cell with a glowing blue hex-grid core. 
 
 #### `items/energy-cell` — Energy Cell
 - Ảnh tải lên: `src/assets/icons/items/energy-cell.webp` · Số mặt: **4,000**
-- Lưu về: `art-src/models/raw/items/energy-cell.tripo.glb` hoặc `energy-cell.meshy.glb`
+- Lưu về: `art-src/3d/icons/items/energy-cell.glb`
 
 ```text
 Energy Cell: a slim cylindrical energy cell with a crackling violet lightning core in a glass tube. A consumable game item, small and iconic, three-quarter view friendly. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -910,7 +912,7 @@ Energy Cell: a slim cylindrical energy cell with a crackling violet lightning co
 
 #### `items/emp-charge` — EMP Charge
 - Ảnh tải lên: `src/assets/icons/items/emp-charge.webp` · Số mặt: **4,000**
-- Lưu về: `art-src/models/raw/items/emp-charge.tripo.glb` hoặc `emp-charge.meshy.glb`
+- Lưu về: `art-src/3d/icons/items/emp-charge.glb`
 
 ```text
 EMP Charge: a disc-shaped EMP grenade with electric arcs jumping between three prongs. A consumable game item, small and iconic, three-quarter view friendly. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -918,7 +920,7 @@ EMP Charge: a disc-shaped EMP grenade with electric arcs jumping between three p
 
 #### `items/time-crystal` — Time Crystal
 - Ảnh tải lên: `src/assets/icons/items/time-crystal.webp` · Số mặt: **4,000**
-- Lưu về: `art-src/models/raw/items/time-crystal.tripo.glb` hoặc `time-crystal.meshy.glb`
+- Lưu về: `art-src/3d/icons/items/time-crystal.glb`
 
 ```text
 Time Crystal: a floating hourglass-shaped crystal with slow-motion light rings around it. A consumable game item, small and iconic, three-quarter view friendly. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -926,7 +928,7 @@ Time Crystal: a floating hourglass-shaped crystal with slow-motion light rings a
 
 #### `items/word-bomb` — Word Bomb
 - Ảnh tải lên: `src/assets/icons/items/word-bomb.webp` · Số mặt: **4,000**
-- Lưu về: `art-src/models/raw/items/word-bomb.tripo.glb` hoặc `word-bomb.meshy.glb`
+- Lưu về: `art-src/3d/icons/items/word-bomb.glb`
 
 ```text
 Word Bomb: a round bomb whose fuse spark is a glowing letter glyph, rune letters etched on the shell. A consumable game item, small and iconic, three-quarter view friendly. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -934,7 +936,7 @@ Word Bomb: a round bomb whose fuse spark is a glowing letter glyph, rune letters
 
 #### `items/supply-beacon` — Supply Beacon
 - Ảnh tải lên: `src/assets/icons/items/supply-beacon.webp` · Số mặt: **4,000**
-- Lưu về: `art-src/models/raw/items/supply-beacon.tripo.glb` hoặc `supply-beacon.meshy.glb`
+- Lưu về: `art-src/3d/icons/items/supply-beacon.glb`
 
 ```text
 Supply Beacon: a small orbital supply beacon with a pulsing gold light on an antenna mast. A consumable game item, small and iconic, three-quarter view friendly. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -942,7 +944,7 @@ Supply Beacon: a small orbital supply beacon with a pulsing gold light on an ant
 
 #### `items/lucky-dice` — Lucky Dice
 - Ảnh tải lên: `src/assets/icons/items/lucky-dice.webp` · Số mặt: **4,000**
-- Lưu về: `art-src/models/raw/items/lucky-dice.tripo.glb` hoặc `lucky-dice.meshy.glb`
+- Lưu về: `art-src/3d/icons/items/lucky-dice.glb`
 
 ```text
 Lucky Dice: a pair of glowing crystal dice tumbling, star-shaped pips shining. A consumable game item, small and iconic, three-quarter view friendly. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -950,7 +952,7 @@ Lucky Dice: a pair of glowing crystal dice tumbling, star-shaped pips shining. A
 
 #### `items/salvage-anchor` — Salvage Anchor
 - Ảnh tải lên: `src/assets/icons/items/salvage-anchor.webp` · Số mặt: **4,000**
-- Lưu về: `art-src/models/raw/items/salvage-anchor.tripo.glb` hoặc `salvage-anchor.meshy.glb`
+- Lưu về: `art-src/3d/icons/items/salvage-anchor.glb`
 
 ```text
 Salvage Anchor: a heavy magnetic salvage anchor with a tractor-beam glow at its tip. A consumable game item, small and iconic, three-quarter view friendly. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -958,7 +960,7 @@ Salvage Anchor: a heavy magnetic salvage anchor with a tractor-beam glow at its 
 
 #### `items/stage-revival-core` — Stage Revival Core
 - Ảnh tải lên: `src/assets/icons/items/stage-revival-core.webp` · Số mặt: **4,000**
-- Lưu về: `art-src/models/raw/items/stage-revival-core.tripo.glb` hoặc `stage-revival-core.meshy.glb`
+- Lưu về: `art-src/3d/icons/items/stage-revival-core.glb`
 
 ```text
 Stage Revival Core: a pulsing heart-shaped reactor core in a protective cage, rebirth light rising from it. A consumable game item, small and iconic, three-quarter view friendly. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.
@@ -966,7 +968,7 @@ Stage Revival Core: a pulsing heart-shaped reactor core in a protective cage, re
 
 #### `items/phoenix-core` — Phoenix Core
 - Ảnh tải lên: `src/assets/icons/items/phoenix-core.webp` · Số mặt: **4,000**
-- Lưu về: `art-src/models/raw/items/phoenix-core.tripo.glb` hoặc `phoenix-core.meshy.glb`
+- Lưu về: `art-src/3d/icons/items/phoenix-core.glb`
 
 ```text
 Phoenix Core: a fiery phoenix-feather reactor core with flame wings wrapping around it. A consumable game item, small and iconic, three-quarter view friendly. Stylized sci-fi fantasy game asset, hand-painted PBR textures, crisp readable silhouette, glowing emissive energy parts, single object centred, no base, no ground, no text, any fire, lightning or smoke painted as glow on the surface, not as separate shapes.

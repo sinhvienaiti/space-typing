@@ -6,7 +6,7 @@ Two ways to run it (Blender 4.x and 5.x):
   * In the Blender UI: Scripting tab → open this file → edit the CONFIG block → Run.
   * Headless (what the AI uses), from any shell:
       blender --background --factory-startup --python space_typing_model_tools.py -- \
-        --input art-src/models/raw/ships/vanguard.glb --kind ships --id vanguard \
+        --input art-src/3d/ships/ship-01-vanguard.glb --kind ships --id vanguard \
         --project <games/space-typing> [--nose +Y] [--tris 12000] [--auto-emissive 0.1] \
         [--boss-clips] [--keep-geometry] [--preview <dir>] \
         [--sockets-json <positions.json>] [--save-blend <work.blend>]
@@ -114,6 +114,10 @@ def apply_command_line():
     parser.add_argument("--nose", default="+Y", choices=["+Y", "-Y", "+X", "-X"])
     parser.add_argument("--yaw", type=float, default=0.0,
                         help="extra turn about Z in degrees, for models generated slightly turned (Meshy/Tripo)")
+    parser.add_argument("--rotate", default="",
+                        help="row-major 3x3 world rotation applied before --nose, e.g. for generated models lying on their back")
+    parser.add_argument("--facing", default="+Y", choices=["+Y", "-Y"],
+                        help="side the visible front faces after normalizing; -Y (glTF +Z) mirrors socket fractions front/back")
     parser.add_argument("--rig-json", default="",
                         help="heroes: build a winged-biped armature (bones, part split, sockets) from this JSON")
     parser.add_argument("--tris", type=int, default=None, help="triangle budget (0 = keep)")
@@ -141,6 +145,7 @@ def apply_command_line():
         "input": os.path.abspath(args.input) if args.input else "",
         "nose_axis": args.nose,
         "yaw": args.yaw,
+        "facing": args.facing,
         "target_triangles": budgets[args.kind] if args.tris is None else args.tris,
         "emission_strength": args.emission,
         "auto_emissive": args.auto_emissive,
@@ -168,6 +173,15 @@ def apply_command_line():
         ):
             raise SystemExit("Socket positions must map FX_ names to three finite coordinates")
         CONFIG["socket_positions"] = positions
+    if args.rotate:
+        values = [float(part) for part in args.rotate.split(",")]
+        if len(values) != 9 or any(not math.isfinite(value) for value in values):
+            raise SystemExit("--rotate needs nine finite numbers (row-major 3x3)")
+        from mathutils import Matrix
+        rows = Matrix((values[0:3], values[3:6], values[6:9]))
+        if abs(rows.determinant() - 1.0) > 1e-3:
+            raise SystemExit("--rotate must be a proper rotation (determinant 1)")
+        CONFIG["pre_rotation"] = rows
     if args.rig_json:
         import json
         with open(args.rig_json, encoding="utf-8") as handle:
@@ -269,6 +283,9 @@ def normalize(obj_list):
     rotations = {"+Y": 0.0, "-Y": math.pi, "+X": math.pi / 2, "-X": -math.pi / 2}
     turn = rotations.get(CONFIG["nose_axis"], 0.0) + math.radians(CONFIG.get("yaw", 0.0))
     root = root_object()
+    if CONFIG.get("pre_rotation") is not None and root is not None:
+        root.matrix_world = CONFIG["pre_rotation"].to_4x4() @ root.matrix_world
+        bpy.context.view_layer.update()
     if turn != 0.0 and root is not None:
         # glTF imports often use QUATERNION rotation mode. Updating Euler
         # angles alone has no effect on those objects; rotate in world space.
@@ -495,7 +512,9 @@ def make_sockets(kind):
     half = (hi - lo) / 2
     found = ship_socket_spots(meshes[0]) if kind == "ships" and len(meshes) == 1 else {}
     parent = root_object()
+    front = -1.0 if CONFIG.get("facing") == "-Y" else 1.0
     for name, (fx, fy, fz) in spots.items():
+        fy *= front
         empty = bpy.data.objects.get(name)
         if empty is not None:
             print(f"  socket {name} kept")
@@ -2339,6 +2358,16 @@ def make_clips(kind):
             (1, (0, 0.6, 0.4), (20, 0, 0), 0.4),
             (36, (0, -0.05, 0), (-4, 0, 0), 1.04),
             (60, (0, 0, 0), (0, 0, 0), 1.0),
+        ])
+        # 3 s hover with a slow sway; the contract requires it on every boss.
+        # Pushed last: the top NLA track's first frame is the exported rest pose,
+        # and Boss_Intro starts shrunken.
+        clip(obj, "Boss_Idle_Hover", 72, [
+            (1, (0, 0, 0), (0, 0, 0), 1.0),
+            (18, (0, 0, 0.035), (1.2, 0, 1.5), 1.0),
+            (36, (0, 0, 0.06), (0, 0, 0), 1.0),
+            (54, (0, 0, 0.035), (-1.2, 0, -1.5), 1.0),
+            (72, (0, 0, 0), (0, 0, 0), 1.0),
         ])
     elif kind in ("heroes", "guides"):
         if obj.type != "ARMATURE":

@@ -63,5 +63,9 @@
   },
   "color": "color.webp?v=4b9f2a9f8f84",
   "emissive": "emissive.webp?v=d225c371f341",
-  "height": "height.bin?v=8fec5fcb611c"
+  "height": "height.bin?v=8fec5fcb611c",
+  "source": {
+    "image": "art-src/ships/zenith-top-hd.png",
+    "imageSha256": "9c7a30d38cbfbcead7e4ccfc630463f01310e441a4f76bf7d152f824e2fee29d"
+  }
 }

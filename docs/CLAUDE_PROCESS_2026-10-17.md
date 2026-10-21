@@ -243,7 +243,7 @@
 1b. **Nhân vật có cánh** (khi chủ dự án gửi GLB Solar Wyvern): làm mục 5.2 rồi 5.3 của `docs/CHARACTER_DEMO_2026-10-17.md`, theo đúng thứ tự.
    - **Draconis đã xong** và chạy trong chế độ riêng Campaign 3D (mục 4c). Nhân vật mới nên dùng lại `--rig-json`, theo mục 4 của `docs/CAMPAIGN_3D_2026-10-17.md`.
 1c. **Campaign 3D:** làm theo mục 8 của `docs/CAMPAIGN_3D_2026-10-17.md`. Mô hình quái `enemies/<loại>` dùng cho cả Campaign 2D và 3D, nên phải chụp kiểm tra cả hai.
-2. **Mô hình 3D đợt 1** (khi chủ dự án gửi GLB vào `art-src/models/raw/<loại>/`): Vanguard, Scout, Vorgrath (G02), micro-missile, Pulse Laser Mk.I, Repair Kit.
+2. **Mô hình 3D đợt 1** (khi chủ dự án gửi GLB vào `art-src/3d/<đường dẫn ảnh 2D>.glb`; trước 21/10 là `art-src/models/raw/<loại>/`): Vanguard, Scout, Vorgrath (G02), micro-missile, Pulse Laser Mk.I, Repair Kit.
    - **Vanguard đã được Codex tích hợp ngày 17/10 từ `raw/ships/vanguard.meshy.glb`:** có bản Blender, GLB High/Medium, màn chính, Campaign/Recall và renderer Duel; đã build và kiểm tra Play. Xem `VANGUARD_MESHY_INTEGRATION_2026-10-17.md`. Các model khác trong đợt này vẫn làm khi có file nguồn.
    - Blender: `D:\Blender\blender.exe -b --factory-startup -P scripts/models/blender/space_typing_model_tools.py -- --input … --kind … --id … --project <games/space-typing> --auto-emissive 0.08 --preview .visual/models/<id>`;
    - quái: thêm `--neutralize` (đổi màu gốc sang trắng gốm, giữ sáng tối; vùng phát sáng thành trắng; đã thử trên Blender 5.2);
@@ -430,3 +430,26 @@ Sau đó chụp ảnh bằng Chrome thật (mục 1), xem ảnh và so sánh tr�
   - Không commit/push/deploy, không reset save, không chạy `account-e2e`.
   - Còn chờ chủ dự án nghe thử âm thanh mới và xem cú rẽ trong lúc chơi thật.
 - **17/10/2026 khuya — chủ dự án báo Draconis không hợp góc máy:** Claude tìm ra nguyên nhân (dáng đứng, thân chỉ nghiêng 24°, hoạt ảnh lấy từ khung của boss, tay ra đòn ở ngang hông). Theo yêu cầu của chủ dự án, Claude viết prompt tạo ảnh 2D → 3D cho nhân vật bay (`docs/art-requests/HERO_2D_TO_3D_PROMPTS_2026-10-17.md`). Chưa sửa hoạt ảnh của Draconis cũ.
+- **21/10/2026 — Claude: Campaign 3D chọn 12 phi thuyền, model 3D cho quái/boss/đạn, và Rift Defense bản A+:**
+  - **Campaign 3D** (`docs/CAMPAIGN_3D_FLEET_MODELS_2026-10-21.md`):
+    - chọn pilot gồm Draconis và 12 phi thuyền;
+    - camera `chase` khi bay và `hangar` ở menu;
+    - mỗi tàu có đạn 3D riêng, màu riêng;
+    - 148 model Meshy/Tripo của chủ dự án đã được dò hướng tự động và đóng gói (`scripts/models/prepare-campaign3d-models.mjs`);
+    - sửa tên boss bị tráo nhau.
+  - **Rift Defense** (`docs/SPACE_TYPING_DEFENSE_PLAN_V3_2026-10-21.md`):
+    - kế hoạch V3, rồi mã ở `src/defense/` và trang `defense.html`;
+    - nút "Rift Defense" ở màn hình chính;
+    - 10 đợt, 3 trụ, 4 loại quái, đàn bầy, từ bom, nổ dây chuyền, boss, phước lành, combo;
+    - tới 400+ quái cùng lúc ở khoảng 3 ms/khung.
+  - **Prompt tài sản Defense:** `docs/art-requests/DEFENSE_ASSETS_PROMPTS_2026-10-21.md`.
+  - **Kiểm tra:** TypeScript sạch; vitest đầy đủ 369 tệp / 2.282 test đạt; `pnpm build` đạt. Đã chụp và tự xem bằng Chrome thật (dev server, High).
+  - **Sự cố:** lúc 03:06, tệp `SPACE_TYPING_DEFENSE_PLAN_V2_2026-10-18.md` trong working tree bị cắt còn 17 dòng đầu, không rõ do tiến trình nào. Claude không ghi vào tệp này. Nội dung chỉ bị cắt, không có gì mới, nên Claude khôi phục từ bản đã commit.
+  - Không commit/push/deploy, không reset save.
+- **21/10/2026 (sáng) — Claude: sửa Campaign 3D theo phản hồi, làm lại Rift Defense (V4):**
+  - **Campaign 3D:** tàu hết "nhảy"; đạn 3D thấy rõ (to hơn, chậm hơn, nghiêng theo màn hình); đổi lại 4 đạn bị tráo trong file của chủ dự án (05↔06, 10↔11); quái và boss nhìn vào tàu; menu thấy trọn tàu. Chi tiết: `docs/CAMPAIGN_3D_FLEET_MODELS_2026-10-21.md` (mục cuối).
+  - **Rift Defense V4:** chủ dự án đánh giá bản A+ chưa đạt mọi mặt. Kế hoạch mới `docs/SPACE_TYPING_DEFENSE_PLAN_V4_2026-10-21.md` (tham khảo game thủ thành, 6 trụ có nhánh, 13 quái, 8 bản đồ, kinh tế khan hiếm, quái đánh trụ, máu trụ, camera tự do, hiệu ứng, âm thanh). Mục 16a ghi đã làm và số đo.
+  - Giữ luật đã chốt 18/10: trụ không kết liễu. Trụ có đòn đánh nhìn thấy được (sóng băng, lốc hút, chuỗi sét, tia ngắm, tia hồi máu, dòng năng lượng).
+  - **Ảnh bản đồ:** game vẽ tạm. Ảnh khung bố cục và prompt: `docs/art-requests/DEFENSE_MAPS_PROMPTS_2026-10-21.md`, `docs/art-requests/defense-maps/`.
+  - **Kiểm tra:** TypeScript sạch; vitest 369 tệp / 2.296 test đạt; chụp và tự xem bằng Chrome thật (8 đảo, pha xây, đòn trụ, trụ cháy, thẻ, boss); 442 quái ≈ 3,7 ms/khung (CPU chậm 4 lần ≈ 6,6 ms).
+  - Không commit/push/deploy, không reset save.

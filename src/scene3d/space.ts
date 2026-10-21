@@ -14,9 +14,10 @@ export type Quality = "medium" | "high";
 /**
  * play: chase camera behind and above; flank: three-quarter, behind and to
  * the right; profile: from the right side, the hero on the left of the frame
- * flying right; show / side / orbit: close views of the hero.
+ * flying right; show / side / orbit: close views of the hero; chase / hangar:
+ * the fight and menu views of a flown ship.
  */
-export type CameraMode = "play" | "rear" | "flank" | "profile" | "show" | "side" | "orbit";
+export type CameraMode = "play" | "rear" | "flank" | "profile" | "show" | "side" | "orbit" | "chase" | "hangar";
 
 export const TIERS: Record<Quality, { dpr: number; stars: number; dust: number; particles: number; tipsPerSide: number; trail: number; bloom: boolean }> = {
   medium: { dpr: 1, stars: 900, dust: 140, particles: 1000, tipsPerSide: 2, trail: 18, bloom: false },
@@ -24,6 +25,11 @@ export const TIERS: Record<Quality, { dpr: number; stars: number; dust: number; 
 };
 export const MAX_PARTICLES = 2400;
 const UP = new THREE.Vector3(0, 1, 0);
+/**
+ * The hangar camera's side of a ship: in front, about 43° up (a ship's art
+ * is drawn from above, so its top is its face) and 42° round to its right.
+ */
+const HANGAR_VIEW = new THREE.Vector3(0.9, 1.25, -1).normalize();
 const MAX_STARS = 1800;
 const MAX_DUST = 260;
 
@@ -47,6 +53,13 @@ export class SpaceStage {
   viewYaw = 0;
   /** The camera's roll round its line of sight (it leans into a turn of the flight), radians. */
   roll = 0;
+  /**
+   * Where the hangar view shows the ship: the centre and width of the free
+   * strip beside the menu, as shares of the viewport width (null: centred).
+   */
+  hangarSpot: { x: number; width: number } | null = null;
+  /** The lens shift that moves the hangar view's subject off centre (share of the width). */
+  private shift = 0;
   private readonly stars: Streaks;
   private readonly dust: Streaks;
   private readonly puffs: THREE.Sprite[] = [];
@@ -235,6 +248,25 @@ export class SpaceStage {
         this.desiredPos.set(hx + 13.5, 2.4, -4.2);
         this.desiredLook.set(hx, 1.3, -6.2);
         break;
+      case "chase":
+        // A ship: straight behind and about 24° above, so its top (the side
+        // its art is drawn from) reads, the hull low in the frame and the
+        // targets in depth ahead. Centred: a ship has no wing to show off.
+        this.desiredPos.set(hx * 0.55, 2.6, 5.9);
+        this.desiredLook.set(hx * 0.75, 0.45, -7);
+        break;
+      case "hangar": {
+        // The menu's look at a ship: front three-quarter from above, the key
+        // light on its top and the cyan rim on the flank toward us, far
+        // enough back that the whole hull fits the free strip beside the
+        // menu; the lens shift (below) moves it there without skewing it.
+        const tanHalf = Math.tan(THREE.MathUtils.degToRad(this.fov) / 2) * this.camera.aspect;
+        const strip = this.hangarSpot === null ? 0.5 : Math.max(0.16, this.hangarSpot.width);
+        const distance = clamp(2.6 / (2 * tanHalf * strip * 0.75), 4.6, 12);
+        this.desiredPos.copy(HANGAR_VIEW).multiplyScalar(distance).add(scratch.b.set(hx, 0, 0));
+        this.desiredLook.set(hx, 0.05, 0);
+        break;
+      }
       case "show":
         this.desiredPos.set(hx + 2.7, 0.75, -3.8);
         this.desiredLook.set(hx, 0.2, 0);
@@ -253,7 +285,7 @@ export class SpaceStage {
     // The player's own swing (dragging the view): the camera goes round the
     // hero by `viewYaw` and turns back toward the fight by part of it, so
     // the targets stay in the frame. Cinematics keep their own framing.
-    if (this.viewYaw !== 0 && (mode === "play" || mode === "rear" || mode === "flank" || mode === "profile")) {
+    if (this.viewYaw !== 0 && (mode === "play" || mode === "rear" || mode === "flank" || mode === "profile" || mode === "chase")) {
       const pivot = scratch.b.set(hx, 0.2, 0);
       this.desiredPos.sub(pivot).applyAxisAngle(UP, this.viewYaw).add(pivot);
       this.desiredLook.sub(pivot).applyAxisAngle(UP, this.viewYaw * 0.45).add(pivot);
@@ -270,6 +302,12 @@ export class SpaceStage {
     this.camera.position.copy(pos).add(scratch.a.set(rand(-1, 1) * shake, rand(-1, 1) * shake, rand(-1, 1) * shake * 0.5));
     this.camera.lookAt(look);
     if (this.roll !== 0) this.camera.rotateZ(this.roll);
+    // The hangar view's subject sits in the strip beside the menu: a lens
+    // shift of the projection, eased back to centre in the other views.
+    const shift = mode === "hangar" && this.hangarSpot !== null ? 0.5 - this.hangarSpot.x : 0;
+    this.shift = damp(this.shift, shift, 3, dt);
+    if (Math.abs(this.shift) > 1e-4) this.camera.setViewOffset(1, 1, this.shift, 0, 1, 1);
+    else if (this.camera.view?.enabled) this.camera.clearViewOffset();
     const fov = 50 + (locomotion === "boost" ? 13 : locomotion === "fly" ? 3 : 0) + glow * 2;
     this.fov = damp(this.fov, fov, 4, dt);
     if (Math.abs(this.camera.fov - this.fov) > 0.01) {

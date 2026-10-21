@@ -197,7 +197,8 @@ export class Ribbon {
     for (const point of this.points) point.copy(at);
   }
 
-  update(head: THREE.Vector3, dt: number, drift: number, eye: THREE.Vector3, intensity: number): void {
+  /** `reach` (0 … 1): the share of the points that shows; a short trail fades out sooner. */
+  update(head: THREE.Vector3, dt: number, drift: number, eye: THREE.Vector3, intensity: number, reach = 1): void {
     for (const point of this.points) point.z += drift;
     this.clock += dt;
     if (this.clock >= 1 / 60) {
@@ -217,7 +218,7 @@ export class Ribbon {
       toEye.subVectors(eye, point);
       side.crossVectors(tangent, toEye);
       if (side.lengthSq() < 1e-10) side.set(1, 0, 0);
-      const k = i / (n - 1);
+      const k = Math.min(1, i / (n - 1) / reach);
       side.normalize().multiplyScalar(this.width * (1 - 0.75 * k));
       const o = i * 6;
       this.position[o] = point.x - side.x;

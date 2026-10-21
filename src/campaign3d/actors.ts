@@ -82,6 +82,21 @@ function fitModel(model: THREE.Object3D, height: number): THREE.Group {
 type Lit = { material: THREE.MeshStandardMaterial; glow: number };
 
 /**
+ * The turn that faces a model at `from` on the hero at `to`, eased from
+ * `gaze` (null: at once). yaw: about +y from facing +z (targets are ahead
+ * of the hero, so it never wraps); pitch: up toward it (+) or down (−), only
+ * part of the way, so a model above the hero still shows its face.
+ */
+function facing(from: THREE.Vector3, to: THREE.Vector3, gaze: { yaw: number; pitch: number } | null, dt: number): { yaw: number; pitch: number } {
+  const dx = to.x - from.x;
+  const dz = to.z - from.z;
+  const yaw = Math.atan2(dx, dz);
+  const pitch = Math.atan2(to.y - from.y, Math.hypot(dx, dz)) * 0.6;
+  if (gaze === null) return { yaw, pitch };
+  return { yaw: damp(gaze.yaw, yaw, 5, dt), pitch: damp(gaze.pitch, pitch, 5, dt) };
+}
+
+/**
  * Models whose wings beat in the vertex shader (they have no wing bones): the
  * parts out to the sides and above the body's middle swing up and down,
  * further toward the tips. Model space is about −1 … 1 (2 m longest edge).
@@ -166,6 +181,8 @@ export class EnemyActor {
   private readonly beat = { value: 0 };
   private disposed = false;
   private time = Math.random() * 10;
+  /** Where it looks (yaw, pitch), easing after the hero; null until the first frame. */
+  private gaze: { yaw: number; pitch: number } | null = null;
 
   constructor(family: EnemyFamilyId, kind: EnemyKind, quality: Quality, private readonly height: number, elite: boolean) {
     const style = familyStyle(family);
@@ -178,6 +195,11 @@ export class EnemyActor {
     this.halo.renderOrder = 0;
     this.group.add(this.halo);
     void this.load(family, kind, quality);
+  }
+
+  /** What is drawn: the authored model, the painting on a billboard, or nothing yet (checks, screenshots). */
+  get look(): "model" | "painting" | "loading" {
+    return this.lit.length > 0 || this.mixer !== null ? "model" : this.overlay !== null ? "painting" : "loading";
   }
 
   private async load(family: EnemyFamilyId, kind: EnemyKind, quality: Quality): Promise<void> {
@@ -206,7 +228,8 @@ export class EnemyActor {
     this.group.add(body, overlay);
   }
 
-  update(dt: number, locked: boolean): void {
+  /** `hero`: where the flown hero is; the model keeps its face on it. */
+  update(dt: number, locked: boolean, hero: THREE.Vector3): void {
     this.time += dt;
     this.flash = Math.max(0, this.flash - dt * 4);
     this.mixer?.update(dt);
@@ -214,10 +237,18 @@ export class EnemyActor {
     for (const { material, glow } of this.lit) material.emissiveIntensity = glow + this.flash * 2.5;
     this.halo.material.color.copy(locked ? this.accent : this.color);
     this.halo.material.opacity = (locked ? 0.62 : 0.38) + this.flash * 0.4 + Math.sin(this.time * 3) * 0.04;
-    // A model's nose is -z (model-contracts): turned to face the dragon, it
-    // weaves, banks and dips a little as it hovers.
+    // A model's nose is -z (model-contracts): turned half round, it faces the
+    // hero and eases after it as either moves, with only a slight sway and
+    // bank as it hovers.
     if (this.body !== null && !(this.body instanceof THREE.Sprite)) {
-      this.body.rotation.set(0.12 + Math.sin(this.time * 0.9) * 0.06, Math.PI + Math.sin(this.time * 0.7) * 0.3, Math.sin(this.time * 1.1 + 1) * 0.12, "YXZ");
+      const gaze = facing(this.group.position, hero, this.gaze, dt);
+      this.gaze = gaze;
+      this.body.rotation.set(
+        gaze.pitch + Math.sin(this.time * 0.9) * 0.03,
+        Math.PI + gaze.yaw + Math.sin(this.time * 0.7) * 0.05,
+        Math.sin(this.time * 1.1 + 1) * 0.1,
+        "YXZ",
+      );
       this.beat.value = this.time * 21;
     }
   }
@@ -248,6 +279,8 @@ export class BossActor {
   private mixer: THREE.AnimationMixer | null = null;
   private clips: THREE.AnimationClip[] = [];
   private idle: THREE.AnimationAction | null = null;
+  private body: THREE.Object3D | null = null;
+  private gaze: { yaw: number; pitch: number } | null = null;
   private disposed = false;
   private time = 0;
   private sway = 0;
@@ -267,12 +300,18 @@ export class BossActor {
     void this.load(identity, quality);
   }
 
+  /** What is drawn: the authored model, the painting on a billboard, or nothing yet (checks, screenshots). */
+  get look(): "model" | "painting" | "loading" {
+    return this.mixer !== null ? "model" : this.overlay !== null ? "painting" : "loading";
+  }
+
   private async load(identity: BossIdentity, quality: Quality): Promise<void> {
     const template = await modelTemplate("bosses", [identity.id], quality);
     if (this.disposed) return;
     if (template !== null) {
       const model = cloneRig(template.scene);
-      this.group.add(fitModel(model, this.height));
+      this.body = fitModel(model, this.height);
+      this.group.add(this.body);
       this.mixer = new THREE.AnimationMixer(model);
       this.clips = template.clips;
       const idle = this.clips.find((clip) => clip.name.includes("Idle"));
@@ -315,13 +354,18 @@ export class BossActor {
     this.play("Death");
   }
 
-  update(dt: number): void {
+  /** `hero`: where the flown hero is; the model (authored facing +z) keeps its face on it. */
+  update(dt: number, hero: THREE.Vector3): void {
     this.time += dt;
     this.flash = Math.max(0, this.flash - dt * 3);
     this.mixer?.update(dt);
     this.sway = damp(this.sway, Math.sin(this.time * 0.45) * 2.2, 1.5, dt);
     this.group.position.x = this.sway;
     this.group.position.y = 2.2 + Math.sin(this.time * 0.9) * 0.35;
+    if (this.body !== null) {
+      this.gaze = facing(this.group.position, hero, this.gaze, dt);
+      this.body.rotation.set(-this.gaze.pitch, this.gaze.yaw, 0, "YXZ");
+    }
     if (this.overlay !== null) this.overlay.material.opacity = Math.min(1, this.flash * 0.8 + this.charge * 0.35);
     this.halo.material.opacity = 0.35 + this.charge * 0.45 + this.flash * 0.3;
     this.aura.material.rotation += dt * (0.4 + this.charge * 3);

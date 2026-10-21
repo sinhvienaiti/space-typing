@@ -44,7 +44,7 @@ export function resolveShipSourceFilename(file, kind = "image") {
 /** Ordered candidates are intentional; ambiguous aliases are reported, never dependent on readdir order. */
 export function discoverShipSources(root, { kind = "image", ids } = {}) {
   if (!["image", "rawModel"].includes(kind)) throw new Error(`Unknown ship source kind: ${kind}`);
-  const dir = resolve(root, kind === "image" ? "art-src/ships" : "art-src/models/raw/ships");
+  const dir = resolve(root, kind === "image" ? "art-src/ships" : "art-src/3d/ships");
   const sources = [], missing = [], warnings = [];
   const known = new Set(SHIP_VISUAL_CATALOG.map(v => v.id));
   if (kind === "image") for (const id of LEGACY_SHIP_IDS) known.add(id);

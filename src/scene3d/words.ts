@@ -2,12 +2,13 @@ import { typingText } from "../logic";
 import type { VocabularyEntry } from "../types";
 
 /**
- * Words for Campaign 3D targets, from the player's chosen vocabulary.
+ * Words for the 3D modes' targets (Campaign 3D, Defense), from the player's chosen vocabulary.
  * A target's first letter is unique among the targets on screen (so the
  * first key press says which one you aim at), and a word comes back only
  * after the rest of its band has been used.
  */
-export type WordBand = "enemy" | "elite" | "boss";
+/** short: 3–4 letters (Defense Nova); enemy: up to the stage's length; elite: longer; boss: the longest and phrases. */
+export type WordBand = "short" | "enemy" | "elite" | "boss";
 
 export type PickedWord = { entry: VocabularyEntry; text: string };
 
@@ -25,10 +26,12 @@ export class WordPicker {
       all.push({ entry, text });
     }
     const enemy = all.filter((word) => word.text.length >= 3 && word.text.length <= maxEnemyLength);
+    const short = all.filter((word) => word.text.length >= 3 && word.text.length <= 4);
     const elite = all.filter((word) => word.text.length >= 6 && word.text.length <= maxEnemyLength + 3);
     // Bosses: phrases first, then the longest words.
     const boss = [...all].sort((a, b) => score(b) - score(a)).slice(0, Math.max(12, Math.round(all.length * 0.25)));
     this.pools = {
+      short: short.length >= 6 ? short : enemy.length >= 6 ? enemy : all,
       enemy: enemy.length >= 6 ? enemy : all,
       elite: elite.length >= 4 ? elite : enemy.length >= 6 ? enemy : all,
       boss: boss.length > 0 ? boss : all,

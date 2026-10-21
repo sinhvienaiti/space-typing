@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#05040d" />
+    <meta name="referrer" content="strict-origin" />
+    <title>Space Type Rift Defense</title>
+  </head>
+  <body>
+    <canvas id="dfCanvas" aria-label="Rift Defense battlefield"></canvas>
+    <div id="dfVignette" class="df-vignette" aria-hidden="true"></div>
+    <div id="dfBars" class="df-bars" aria-hidden="true"></div>
+    <div id="dfLabels" class="df-labels" aria-hidden="true"></div>
+    <div id="dfFloaters" class="df-floaters" aria-hidden="true"></div>
+    <div id="dfBanner" class="df-banner" aria-live="polite"></div>
+    <div id="dfChain" class="df-chain" aria-hidden="true"></div>
+    <div id="dfWordInfo" class="df-wordinfo" aria-live="polite"><strong id="dfWordEn"></strong><span id="dfWordIpa"></span><em id="dfWordVi"></em></div>
+
+    <!-- HUD -->
+    <section id="dfHud" class="df-hud" hidden>
+      <div class="df-panel df-wave">
+        <small id="dfMapName">Rainbow Reach</small>
+        <strong>Wave <b id="dfWaveNo">1</b><span>/10</span></strong>
+        <em id="dfWaveName">First light</em>
+        <div id="dfNext" class="df-next" aria-label="Next wave"></div>
+        <button id="dfCallWave" class="df-call" type="button"><span id="dfCallText">Start wave</span> <kbd>Enter</kbd></button>
+      </div>
+      <div class="df-panel df-stats">
+        <div class="df-stat df-energy"><span>Energy</span><b id="dfEnergy">120</b></div>
+        <div class="df-stat df-lives"><span>Core</span><b id="dfLives">20</b><div class="df-bar"><i id="dfLivesFill"></i></div></div>
+        <div class="df-stat df-combo"><span>Combo</span><b id="dfCombo">0</b><em id="dfTier"></em></div>
+        <div class="df-stat"><span>WPM</span><b id="dfWpm">0</b></div>
+        <div class="df-stat"><span>Rift</span><b id="dfAlive">0</b></div>
+      </div>
+
+      <!-- Wave phase: the dragon's skills -->
+      <div id="dfSkills" class="df-skills">
+        <div class="df-charge"><div class="df-bar df-bar-charge"><i id="dfChargeFill"></i></div><span id="dfChargeText">0</span></div>
+        <button class="df-skill" type="button" data-skill="breath"><img data-icon="items/word-bomb" alt="" /><kbd>1</kbd><b>Dragon Breath</b><small>50 · every word a bomb, 6 s</small><i class="df-cool"></i></button>
+        <button class="df-skill" type="button" data-skill="roar"><img data-icon="skills/vanguard-barrier-pulse" alt="" /><kbd>2</kbd><b>Roar</b><small>35 · throws the rift back</small><i class="df-cool"></i></button>
+        <button class="df-skill" type="button" data-skill="nova"><img data-icon="items/nova-bomb" alt="" /><kbd>Space</kbd><b>Nova</b><small>100 · short words, 8 s</small><i class="df-cool"></i></button>
+      </div>
+
+      <!-- Build phase: tower cards for the chosen pad -->
+      <div id="dfBuild" class="df-build" hidden>
+        <div class="df-build-head">
+          <strong id="dfPadTitle">Choose a pad</strong>
+          <span id="dfPadTrait" class="df-trait"></span>
+          <span id="dfFitReason" class="df-fit-reason"></span>
+          <span id="dfBuildTimer" class="df-timer"></span>
+        </div>
+        <div id="dfTowerCards" class="df-tower-cards"></div>
+        <p class="df-build-keys">Click a pad or <kbd>Tab</kbd> · <kbd>1</kbd>–<kbd>6</kbd> build · <kbd>U</kbd> upgrade · <kbd>R</kbd> repair · <kbd>Del</kbd> sell · <kbd>Enter</kbd> start the wave</p>
+      </div>
+
+      <!-- A chosen tower -->
+      <aside id="dfInspector" class="df-inspector" hidden>
+        <div class="df-inspect-head"><img id="dfInspectIcon" alt="" /><div><strong id="dfInspectName"></strong><small id="dfInspectLevel"></small></div></div>
+        <div class="df-hp"><div class="df-bar df-bar-hp"><i id="dfInspectHp"></i></div><span id="dfInspectHpText"></span></div>
+        <p id="dfInspectText" class="df-inspect-text"></p>
+        <ul id="dfInspectStats" class="df-inspect-stats"></ul>
+        <div class="df-inspect-actions">
+          <button id="dfUpgrade" class="df-primary" type="button">Upgrade <kbd>U</kbd></button>
+          <button id="dfRepair" class="df-ghost" type="button">Repair <kbd>R</kbd></button>
+          <button id="dfSell" class="df-ghost" type="button">Sell <kbd>Del</kbd></button>
+          <button id="dfClear" class="df-ghost" type="button" hidden>Clear rubble · 40</button>
+        </div>
+      </aside>
+
+      <!-- Camera -->
+      <div class="df-camera" role="group" aria-label="Camera">
+        <button type="button" data-camera="left" title="Turn left (Q)">⟲</button>
+        <button type="button" data-camera="right" title="Turn right (E)">⟳</button>
+        <button type="button" data-camera="up" title="Look from higher">▲</button>
+        <button type="button" data-camera="down" title="Look from lower">▼</button>
+        <button type="button" data-camera="in" title="Zoom in (wheel)">+</button>
+        <button type="button" data-camera="out" title="Zoom out (wheel)">−</button>
+        <button type="button" data-camera="home" title="Default view (Home)">⌂</button>
+        <small>Right-drag: turn · Wheel: zoom · Shift-drag: move</small>
+      </div>
+      <button id="dfPauseButton" class="df-icon" type="button" aria-label="Pause"><i></i><i></i></button>
+    </section>
+
+    <!-- Map select -->
+    <section id="dfMenu" class="df-overlay">
+      <div class="df-card df-menu">
+        <p class="df-eyebrow">Space Type · Rift Defense <span>beta</span></p>
+        <h1>Hold the <b>Rift</b></h1>
+        <p class="df-lead">Monsters pour out of the rift toward your Core. Type the word on one and Draconis burns it. Towers do the rest: they slow, pull, strip armour, mark bombs, heal and earn — but only your words kill. Some monsters will come for your towers.</p>
+        <div id="dfMaps" class="df-maps" role="radiogroup" aria-label="Map"></div>
+        <div class="df-menu-foot">
+          <div class="df-difficulty" role="radiogroup" aria-label="Difficulty">
+            <button type="button" data-difficulty="easy" role="radio">Easy<small>Slower, more Energy</small></button>
+            <button type="button" data-difficulty="normal" role="radio">Normal<small>The intended fight</small></button>
+            <button type="button" data-difficulty="hard" role="radio">Hard<small>Faster, bigger waves</small></button>
+          </div>
+          <div class="df-actions">
+            <button id="dfStartButton" class="df-primary" type="button" disabled>Defend <kbd>Enter</kbd></button>
+            <a class="df-ghost df-link" href="/">Back to Space Type</a>
+          </div>
+        </div>
+        <div class="df-options">
+          <label>Quality <select id="dfQuality"><option value="medium">Medium</option><option value="high">High</option></select></label>
+          <label><input id="dfSound" type="checkbox" checked /> Sound</label>
+          <a class="df-link" href="/?feedback=bug&amp;from=rift-defense">Report a bug</a>
+          <span id="dfStatus" class="df-status" role="status"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Boons and branches: the game's reward cards -->
+    <section id="dfCards" class="df-overlay df-soft" hidden>
+      <div class="df-cards-box">
+        <p id="dfCardsEyebrow" class="df-eyebrow">Rift boon · choose one</p>
+        <h2 id="dfCardsTitle">Choose a boon</h2>
+        <div id="dfCardGrid" class="reward-choice-grid rc-row"></div>
+        <button id="dfCardsCancel" class="df-ghost" type="button" hidden>Not now <kbd>Esc</kbd></button>
+      </div>
+    </section>
+
+    <!-- Quick review -->
+    <section id="dfReview" class="df-overlay df-soft" hidden>
+      <div class="df-card df-small">
+        <p class="df-eyebrow">Quick review</p>
+        <h2>Words to keep</h2>
+        <ul id="dfReviewList" class="df-review"></ul>
+        <div class="df-actions"><button id="dfReviewDone" class="df-primary" type="button">Continue <kbd>Enter</kbd></button></div>
+      </div>
+    </section>
+
+    <!-- Pause -->
+    <section id="dfPause" class="df-overlay" hidden>
+      <div class="df-card df-small">
+        <h2>Paused</h2>
+        <div class="df-actions df-stack">
+          <button id="dfResume" class="df-primary" type="button">Resume <kbd>Esc</kbd></button>
+          <button id="dfRestart" class="df-ghost" type="button">Restart this map</button>
+          <button id="dfQuit" class="df-ghost" type="button">Leave to the maps</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Result -->
+    <section id="dfResult" class="df-overlay" hidden>
+      <div class="df-card df-result">
+        <p id="dfResultEyebrow" class="df-eyebrow">Rift held</p>
+        <h2 id="dfResultTitle">Victory</h2>
+        <div id="dfStars" class="df-stars" aria-label="Stars"></div>
+        <dl id="dfResultStats" class="df-result-stats"></dl>
+        <p id="dfResultTip" class="df-lead"></p>
+        <div class="df-actions">
+          <button id="dfAgain" class="df-primary" type="button">Play again</button>
+          <button id="dfNextMap" class="df-primary" type="button" hidden>Next map</button>
+          <button id="dfToMenu" class="df-ghost" type="button">Maps</button>
+        </div>
+      </div>
+    </section>
+
+    <script type="module" src="/src/defense/main.ts"></script>
+  </body>
+</html>

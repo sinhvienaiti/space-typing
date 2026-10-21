@@ -58,5 +58,9 @@
   },
   "color": "color.webp?v=4290ecf9300c",
   "emissive": "emissive.webp?v=ad2e741c123a",
-  "height": "height.bin?v=fc712a0f75a7"
+  "height": "height.bin?v=fc712a0f75a7",
+  "source": {
+    "image": "art-src/ships/reaper-top-hd.png",
+    "imageSha256": "c133fdf2fdeae3b52646e403ce6411c6ed081e78362ac5016af7fe1734d1070e"
+  }
 }

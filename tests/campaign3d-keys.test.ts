@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isComposingKey, typedLetter, vietnameseInputSign } from "../src/campaign3d/keys";
+import { isComposingKey, typedLetter, vietnameseInputSign } from "../src/scene3d/keys";
 
 describe("Campaign 3D keys", () => {
   it("types plain letters, lower-cased", () => {

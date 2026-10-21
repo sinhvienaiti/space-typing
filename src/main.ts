@@ -11316,6 +11316,9 @@ byId("startButton").addEventListener("click", () => {
 byId("hero3dButton").addEventListener("click", () => {
   window.location.assign("/campaign-3d.html");
 });
+byId("defenseButton").addEventListener("click", () => {
+  window.location.assign("/defense.html");
+});
 byId("nextStageButton").addEventListener("click", () => {
   if (lessonRun !== null) {
     void continueLessonChain();

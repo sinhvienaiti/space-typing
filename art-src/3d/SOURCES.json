@@ -1,0 +1,2126 @@
+{
+ "version": 1,
+ "written": "2026-10-21",
+ "rule": "art-src/<path>/<name>.png -> art-src/3d/<path>/<name>.glb (ships: art-src/ships/ship-NN-<id>-2d.png -> art-src/3d/ships/ship-NN-<id>.glb). Owner originals from Tripo/Meshy, never edited; pipelines read them and write processed copies elsewhere.",
+ "files": {
+  "bosses/lieutenant-angel.glb": {
+   "md5": "17fd39c535ddd976da4900fed0e78ffe",
+   "bytes": 11157216,
+   "image": "art-src/bosses/lieutenant-angel.png",
+   "usedBy": [
+    "bosses/lieutenant-angel"
+   ]
+  },
+  "bosses/lieutenant-cosmic.glb": {
+   "md5": "34ff99e3e0f04754cf01e493e36f9951",
+   "bytes": 11964372,
+   "image": "art-src/bosses/lieutenant-cosmic.png",
+   "usedBy": [
+    "bosses/lieutenant-cosmic"
+   ]
+  },
+  "bosses/lieutenant-devil.glb": {
+   "md5": "a539779bb783c75386f2217d4e62f6ac",
+   "bytes": 11867620,
+   "image": "art-src/bosses/lieutenant-devil.png",
+   "usedBy": [
+    "bosses/lieutenant-devil"
+   ]
+  },
+  "bosses/lieutenant-frost.glb": {
+   "md5": "6c05d48dac279a712a3a1d0194ba9e7b",
+   "bytes": 11435804,
+   "image": "art-src/bosses/lieutenant-frost.png",
+   "usedBy": [
+    "bosses/lieutenant-frost"
+   ]
+  },
+  "bosses/lieutenant-nature.glb": {
+   "md5": "3e107226f483b416a784074c54f170d6",
+   "bytes": 11392632,
+   "image": "art-src/bosses/lieutenant-nature.png",
+   "usedBy": [
+    "bosses/lieutenant-nature"
+   ]
+  },
+  "bosses/lieutenant-prism.glb": {
+   "md5": "216946813a00c94869115225c6752a66",
+   "bytes": 11430056,
+   "image": "art-src/bosses/lieutenant-prism.png",
+   "usedBy": [
+    "bosses/lieutenant-prism"
+   ]
+  },
+  "bosses/lieutenant-rainbow.glb": {
+   "md5": "9d9bed20815c795dc0f5d9efabd9701c",
+   "bytes": 11261040,
+   "image": "art-src/bosses/lieutenant-rainbow.png",
+   "usedBy": [
+    "bosses/lieutenant-rainbow"
+   ]
+  },
+  "bosses/lieutenant-shadow.glb": {
+   "md5": "43a69998cc62c293d9ae848ddefb85f1",
+   "bytes": 10166156,
+   "image": "art-src/bosses/lieutenant-shadow.png",
+   "usedBy": [
+    "bosses/lieutenant-shadow"
+   ]
+  },
+  "bosses/tyrant-g01.glb": {
+   "md5": "14e5898666bf27430e39306ee2d8c2dc",
+   "bytes": 12551540,
+   "image": "art-src/bosses/tyrant-g01.png",
+   "usedBy": [
+    "bosses/tyrant-g01"
+   ]
+  },
+  "bosses/tyrant-g02.glb": {
+   "md5": "0a27777b046ca54efaffb3fa99da92c1",
+   "bytes": 11178396,
+   "image": "art-src/bosses/tyrant-g02.png",
+   "usedBy": [
+    "bosses/tyrant-g02"
+   ]
+  },
+  "bosses/tyrant-g04.glb": {
+   "md5": "79f35368cdf45019abe6a8ede0f6595c",
+   "bytes": 11514484,
+   "image": "art-src/bosses/tyrant-g04.png",
+   "usedBy": [
+    "bosses/tyrant-g04"
+   ]
+  },
+  "bosses/tyrant-g05.glb": {
+   "md5": "eb8e640af4272b9356b377f63f03e4e2",
+   "bytes": 10750220,
+   "image": "art-src/bosses/tyrant-g05.png",
+   "usedBy": [
+    "bosses/tyrant-g05"
+   ]
+  },
+  "bosses/tyrant-g06.glb": {
+   "md5": "36cc7dd8b956514d489c801c9f2bb618",
+   "bytes": 12214876,
+   "image": "art-src/bosses/tyrant-g06.png",
+   "usedBy": [
+    "bosses/tyrant-g06"
+   ]
+  },
+  "bosses/tyrant-g07.glb": {
+   "md5": "f874e4757bcd2247a318ae80db78dbdd",
+   "bytes": 12357160,
+   "image": "art-src/bosses/tyrant-g07.png",
+   "usedBy": [
+    "bosses/tyrant-g07"
+   ]
+  },
+  "bosses/tyrant-g08.glb": {
+   "md5": "1effd2eb59d52792e3920ca510f5646c",
+   "bytes": 11893968,
+   "image": "art-src/bosses/tyrant-g08.png",
+   "usedBy": [
+    "bosses/tyrant-g08"
+   ]
+  },
+  "bosses/tyrant-g09.glb": {
+   "md5": "ea8a30ee1b8ce65f744816af637d4766",
+   "bytes": 11346628,
+   "image": "art-src/bosses/tyrant-g09.png",
+   "usedBy": [
+    "bosses/tyrant-g09"
+   ]
+  },
+  "bosses/tyrant-g10.glb": {
+   "md5": "52843462e4224cdca6ed99679a79e797",
+   "bytes": 11923140,
+   "image": "art-src/bosses/tyrant-g10.png",
+   "usedBy": [
+    "bosses/tyrant-g10"
+   ]
+  },
+  "bosses/warden-angel.glb": {
+   "md5": "d03a5c4d2130f59b6606f40bef5592a7",
+   "bytes": 12138500,
+   "image": "art-src/bosses/warden-angel.png",
+   "usedBy": [
+    "bosses/warden-angel"
+   ]
+  },
+  "bosses/warden-cosmic.glb": {
+   "md5": "4bfcbbf2e97c4317b1f5324c8f7f4afd",
+   "bytes": 12035432,
+   "image": "art-src/bosses/warden-cosmic.png",
+   "usedBy": [
+    "bosses/warden-cosmic"
+   ]
+  },
+  "bosses/warden-devil.glb": {
+   "md5": "c34aeda02e9e691c67911611b7ed60fd",
+   "bytes": 11931708,
+   "image": "art-src/bosses/warden-devil.png",
+   "usedBy": [
+    "bosses/warden-devil"
+   ]
+  },
+  "bosses/warden-frost.glb": {
+   "md5": "c0b61e755e0fa548f2fa0f56d165d834",
+   "bytes": 11274700,
+   "image": "art-src/bosses/warden-frost.png",
+   "usedBy": [
+    "bosses/tyrant-g03 (placeholder)",
+    "bosses/warden-frost"
+   ]
+  },
+  "bosses/warden-nature.glb": {
+   "md5": "6aa6d7d5582a38cb10c69d1fa46ad206",
+   "bytes": 11638868,
+   "image": "art-src/bosses/warden-nature.png",
+   "usedBy": [
+    "bosses/warden-nature"
+   ]
+  },
+  "bosses/warden-prism.glb": {
+   "md5": "948246a23016cdec00fc027262a85092",
+   "bytes": 12986528,
+   "image": "art-src/bosses/warden-prism.png",
+   "usedBy": [
+    "bosses/warden-prism"
+   ]
+  },
+  "bosses/warden-rainbow.glb": {
+   "md5": "895fd9a1a2af814befc65ac1fe066723",
+   "bytes": 10431464,
+   "image": "art-src/bosses/warden-rainbow.png",
+   "usedBy": [
+    "bosses/warden-rainbow"
+   ]
+  },
+  "bosses/warden-shadow.glb": {
+   "md5": "6bdbd33b30e7c0b11785b7dfa2410a45",
+   "bytes": 10148712,
+   "image": "art-src/bosses/warden-shadow.png",
+   "usedBy": [
+    "bosses/warden-shadow"
+   ]
+  },
+  "duel-targets/amplify.glb": {
+   "md5": "75d1a6711574bea3bf0b711378626705",
+   "bytes": 5128508,
+   "image": "art-src/duel-targets/amplify.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "futuristic+energy+core+3d+model.glb"
+   ]
+  },
+  "duel-targets/barrier.glb": {
+   "md5": "8b19c1080c31b8400b3a1a3332698ffd",
+   "bytes": 4306100,
+   "image": "art-src/duel-targets/barrier.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "futuristic+energy+core+3d+modelv1.glb"
+   ]
+  },
+  "duel-targets/black-hole.glb": {
+   "md5": "a2d21eff84d85bfb178185376fcf70eb",
+   "bytes": 4753856,
+   "image": "art-src/duel-targets/black-hole.png",
+   "usedBy": [
+    "items/defense-gate"
+   ],
+   "downloadedAs": [
+    "portal+ring+3d+model.glb"
+   ]
+  },
+  "duel-targets/bomb.glb": {
+   "md5": "221926e64a81ddd3fa93577ec6594c6c",
+   "bytes": 5366844,
+   "image": "art-src/duel-targets/bomb.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "futuristic+grenade+3d+model.glb"
+   ]
+  },
+  "duel-targets/disrupt.glb": {
+   "md5": "4f6cef93d760fd29e1d81b64227623e4",
+   "bytes": 4588188,
+   "image": "art-src/duel-targets/disrupt.png",
+   "usedBy": [
+    "items/tower-arc"
+   ],
+   "downloadedAs": [
+    "futuristic+sci-fi+machine+3d+model.glb"
+   ]
+  },
+  "duel-targets/drone.glb": {
+   "md5": "67f878a74911776415aa4174116ecd1b",
+   "bytes": 4957324,
+   "image": "art-src/duel-targets/drone.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "sci-fi+drone+3d+model copy.glb"
+   ]
+  },
+  "duel-targets/energy.glb": {
+   "md5": "600b880e980c7d4e57e7b4cd3eea7af8",
+   "bytes": 5211660,
+   "image": "art-src/duel-targets/energy.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "glowing+energy+capsule+3d+model.glb"
+   ]
+  },
+  "duel-targets/fate-crystal.glb": {
+   "md5": "d259fec663835d93a733e5a1bfbcdb7c",
+   "bytes": 4913784,
+   "image": "art-src/duel-targets/fate-crystal.png",
+   "usedBy": [
+    "items/defense-core"
+   ],
+   "downloadedAs": [
+    "ornate+crystal+3d+model.glb"
+   ]
+  },
+  "duel-targets/gravity.glb": {
+   "md5": "f45efed4b4030af0b9b519d0abc03e4e",
+   "bytes": 5322260,
+   "image": "art-src/duel-targets/gravity.png",
+   "usedBy": [
+    "items/tower-gravity"
+   ],
+   "downloadedAs": [
+    "sci-fi+portal+device+3d+model.glb"
+   ]
+  },
+  "duel-targets/laser.glb": {
+   "md5": "e15bd895054803b2b4ce1f0908576e6b",
+   "bytes": 4927932,
+   "image": "art-src/duel-targets/laser.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "sci-fi+energy+blaster+3d+model.glb"
+   ]
+  },
+  "duel-targets/lock-on.glb": {
+   "md5": "9bc7fb590adf57a74f893730ff5a2a05",
+   "bytes": 4548044,
+   "image": "art-src/duel-targets/lock-on.png",
+   "usedBy": [
+    "items/tower-beacon"
+   ],
+   "downloadedAs": [
+    "futuristic+drone+3d+model.glb"
+   ]
+  },
+  "duel-targets/missile.glb": {
+   "md5": "5950639a00c4429755373accb2e8a985",
+   "bytes": 5252324,
+   "image": "art-src/duel-targets/missile.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "space+rocket+3d+model.glb"
+   ]
+  },
+  "duel-targets/railgun.glb": {
+   "md5": "cbcf7901045b6f78a3e9c423307a8207",
+   "bytes": 4420344,
+   "image": "art-src/duel-targets/railgun.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "futuristic+railgun+3d+model.glb"
+   ]
+  },
+  "duel-targets/reflect.glb": {
+   "md5": "b57a5fcb73e9d27366ced23c7dab2917",
+   "bytes": 5405540,
+   "image": "art-src/duel-targets/reflect.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "futuristic+shuriken+3d+model.glb"
+   ]
+  },
+  "duel-targets/repair.glb": {
+   "md5": "dcf0cdfca0a3b5a6192ceb6fd77d7b37",
+   "bytes": 5521796,
+   "image": "art-src/duel-targets/repair.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "futuristic+robot+3d+model.glb"
+   ]
+  },
+  "duel-targets/scan.glb": {
+   "md5": "44fbac8a3813de4bfcf16b72cb2a032d",
+   "bytes": 4178880,
+   "image": "art-src/duel-targets/scan.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "futuristic+satellite+dish+3d+model.glb"
+   ]
+  },
+  "duel-targets/shield.glb": {
+   "md5": "e34e101ccc32c85dc67bcb8754e43c90",
+   "bytes": 5045224,
+   "image": "art-src/duel-targets/shield.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "sci-fi+drone+3d+model.glb"
+   ]
+  },
+  "duel-targets/siege-lance.glb": {
+   "md5": "5f031f693c0c3f61494117331fee2c7c",
+   "bytes": 3791856,
+   "image": "art-src/duel-targets/siege-lance.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "sci-fi+energy+blade+3d+model.glb"
+   ]
+  },
+  "enemies/angel-carrier.glb": {
+   "md5": "a04c8cfac268abd92afc36a8ea6988d3",
+   "bytes": 11639604,
+   "image": "art-src/enemies/angel-carrier.png",
+   "usedBy": [
+    "enemies/angel-carrier-3d"
+   ]
+  },
+  "enemies/angel-cloaker.glb": {
+   "md5": "82973712e9e812e270e35f0107f172d4",
+   "bytes": 10117636,
+   "image": "art-src/enemies/angel-cloaker.png",
+   "usedBy": [
+    "enemies/angel-cloaker-3d"
+   ]
+  },
+  "enemies/angel-commander.glb": {
+   "md5": "895a8998b5d72467882fd0548c51058d",
+   "bytes": 12923080,
+   "image": "art-src/enemies/angel-commander.png",
+   "usedBy": [
+    "enemies/angel-commander-3d"
+   ]
+  },
+  "enemies/angel-destroyer.glb": {
+   "md5": "40270fd8b8fb6a81570a36ddabbd9a7b",
+   "bytes": 11759204,
+   "image": "art-src/enemies/angel-destroyer.png",
+   "usedBy": [
+    "enemies/angel-destroyer-3d"
+   ]
+  },
+  "enemies/angel-healer.glb": {
+   "md5": "1c74bc690a8b3fbaa1e8c3284071fa19",
+   "bytes": 10553792,
+   "image": "art-src/enemies/angel-healer.png",
+   "usedBy": [
+    "enemies/angel-healer-3d"
+   ]
+  },
+  "enemies/angel-jammer.glb": {
+   "md5": "5cee135af33fd0e1e34b89156ade0d7d",
+   "bytes": 12419824,
+   "image": "art-src/enemies/angel-jammer.png",
+   "usedBy": [
+    "enemies/angel-jammer-3d"
+   ]
+  },
+  "enemies/angel-leech.glb": {
+   "md5": "00d921e087e6c0d946b03d80494d3c5e",
+   "bytes": 11159532,
+   "image": "art-src/enemies/angel-leech.png",
+   "usedBy": [
+    "enemies/angel-leech-3d"
+   ]
+  },
+  "enemies/angel-mine.glb": {
+   "md5": "9989ab29f440fc6534aca00cb234452c",
+   "bytes": 10692932,
+   "image": "art-src/enemies/angel-mine.png",
+   "usedBy": [
+    "enemies/angel-mine-3d"
+   ]
+  },
+  "enemies/angel-oppressor.glb": {
+   "md5": "ae6d9f1053adc3e13c5bb6e59f8c9a98",
+   "bytes": 11477248,
+   "image": "art-src/enemies/angel-oppressor.png",
+   "usedBy": [
+    "enemies/angel-oppressor-3d"
+   ]
+  },
+  "enemies/angel-scout.glb": {
+   "md5": "c6775991831337b245f92b263c5797de",
+   "bytes": 10610140,
+   "image": "art-src/enemies/angel-scout.png",
+   "usedBy": [
+    "enemies/angel-scout-3d",
+    "enemies/angel-scout-lod"
+   ]
+  },
+  "enemies/angel-shield.glb": {
+   "md5": "90b01f75cfe726273edbd5a7333d3671",
+   "bytes": 11491816,
+   "image": "art-src/enemies/angel-shield.png",
+   "usedBy": [
+    "enemies/angel-shield-3d"
+   ]
+  },
+  "enemies/angel-sniper.glb": {
+   "md5": "ae8f8430ab29185839c5df634e8023f8",
+   "bytes": 11011188,
+   "image": "art-src/enemies/angel-sniper.png",
+   "usedBy": [
+    "enemies/angel-sniper-3d"
+   ]
+  },
+  "enemies/angel-splitter.glb": {
+   "md5": "879f06fc9788252a80d3685b33c43da4",
+   "bytes": 11726584,
+   "image": "art-src/enemies/angel-splitter.png",
+   "usedBy": [
+    "enemies/angel-splitter-3d"
+   ]
+  },
+  "enemies/angel-tank.glb": {
+   "md5": "1cd1612bc009cec687de68844d00d896",
+   "bytes": 5046552,
+   "image": "art-src/enemies/angel-tank.png",
+   "usedBy": [
+    "enemies/angel-tank-3d",
+    "enemies/angel-tank-lod"
+   ]
+  },
+  "enemies/cosmic-beast.glb": {
+   "md5": "802fa131e467c198b99c38a2f72f6246",
+   "bytes": 11181264,
+   "image": "art-src/enemies/cosmic-beast.png",
+   "usedBy": [
+    "enemies/cosmic-splitter-3d"
+   ]
+  },
+  "enemies/cosmic-carrier.glb": {
+   "md5": "403e1b0e9ed555dd169db64da175a788",
+   "bytes": 11513852,
+   "image": "art-src/enemies/cosmic-carrier.png",
+   "usedBy": [
+    "enemies/cosmic-carrier-3d"
+   ]
+  },
+  "enemies/cosmic-cloaker.glb": {
+   "md5": "5cc0796e66357620a2dca6233a59bf08",
+   "bytes": 7549940,
+   "image": "art-src/enemies/cosmic-cloaker.png",
+   "usedBy": [
+    "enemies/cosmic-cloaker-3d"
+   ]
+  },
+  "enemies/cosmic-core.glb": {
+   "md5": "4ba1a1dd924188cd6e7979fb81f3687c",
+   "bytes": 10306820,
+   "image": "art-src/enemies/cosmic-core.png",
+   "usedBy": [
+    "enemies/cosmic-mine-3d"
+   ]
+  },
+  "enemies/cosmic-dreadnought.glb": {
+   "md5": "e5cfb0f23705ed31fdfc04eda89bdeb5",
+   "bytes": 11744756,
+   "image": "art-src/enemies/cosmic-dreadnought.png",
+   "usedBy": [
+    "enemies/cosmic-destroyer-3d"
+   ]
+  },
+  "enemies/cosmic-elite.glb": {
+   "md5": "a43329c347ac1a33f0674d90b261d95e",
+   "bytes": 10945772,
+   "image": "art-src/enemies/cosmic-elite.png",
+   "usedBy": [
+    "enemies/cosmic-commander-3d"
+   ]
+  },
+  "enemies/cosmic-fast.glb": {
+   "md5": "e4561f1d2ccc09629e3b9de842282346",
+   "bytes": 10084108,
+   "image": "art-src/enemies/cosmic-fast.png",
+   "usedBy": [
+    "enemies/cosmic-scout-3d",
+    "enemies/cosmic-scout-lod"
+   ]
+  },
+  "enemies/cosmic-grunt.glb": {
+   "md5": "17725a8e4d2f60f1ad98702b0370c209",
+   "bytes": 9459164,
+   "image": "art-src/enemies/cosmic-grunt.png",
+   "usedBy": [
+    "enemies/cosmic-oppressor-3d"
+   ]
+  },
+  "enemies/cosmic-jammer.glb": {
+   "md5": "33e24e3645c28329513010a29c336801",
+   "bytes": 10940056,
+   "image": "art-src/enemies/cosmic-jammer.png",
+   "usedBy": [
+    "enemies/cosmic-jammer-3d"
+   ]
+  },
+  "enemies/cosmic-leecher.glb": {
+   "md5": "7d803afbbf7082c60c33615a70f5bc6c",
+   "bytes": 10708448,
+   "image": "art-src/enemies/cosmic-leecher.png",
+   "usedBy": [
+    "enemies/cosmic-leech-3d"
+   ]
+  },
+  "enemies/cosmic-shield.glb": {
+   "md5": "2c0069fffd9ba1a95d2ee83fed88dc90",
+   "bytes": 12812772,
+   "image": "art-src/enemies/cosmic-shield.png",
+   "usedBy": [
+    "enemies/cosmic-shield-3d"
+   ]
+  },
+  "enemies/cosmic-sniper.glb": {
+   "md5": "978a367a491ce81c08386c9534d55b9e",
+   "bytes": 10647648,
+   "image": "art-src/enemies/cosmic-sniper.png",
+   "usedBy": [
+    "enemies/cosmic-sniper-3d"
+   ]
+  },
+  "enemies/cosmic-sorcerer.glb": {
+   "md5": "052ac2b63c526b44a245f76e5c94fee9",
+   "bytes": 9562136,
+   "image": "art-src/enemies/cosmic-sorcerer.png",
+   "usedBy": [
+    "enemies/cosmic-healer-3d"
+   ]
+  },
+  "enemies/cosmic-tank.glb": {
+   "md5": "a7b90b68b04bbe8d8b1dc7f52221a082",
+   "bytes": 7775928,
+   "image": "art-src/enemies/cosmic-tank.png",
+   "usedBy": [
+    "enemies/cosmic-tank-3d"
+   ]
+  },
+  "enemies/devil-carrier.glb": {
+   "md5": "63f248aef2f07ec603ba98830a15ab88",
+   "bytes": 11350788,
+   "image": "art-src/enemies/devil-carrier.png",
+   "usedBy": [
+    "enemies/devil-carrier-3d"
+   ]
+  },
+  "enemies/devil-cloaker.glb": {
+   "md5": "d1476fe4999a4753166cfce628cebab0",
+   "bytes": 11438916,
+   "image": "art-src/enemies/devil-cloaker.png",
+   "usedBy": [
+    "enemies/devil-destroyer-3d (placeholder)",
+    "enemies/devil-cloaker-3d"
+   ]
+  },
+  "enemies/devil-commander.glb": {
+   "md5": "3675a1a6b3b3f98c41e7c1e3f0f0d6ba",
+   "bytes": 12412160,
+   "image": "art-src/enemies/devil-commander.png",
+   "usedBy": [
+    "enemies/devil-commander-3d"
+   ]
+  },
+  "enemies/devil-healer.glb": {
+   "md5": "1a677bcc6c67f6f2b89ddf193531c72d",
+   "bytes": 11585612,
+   "image": "art-src/enemies/devil-healer.png",
+   "usedBy": [
+    "enemies/devil-healer-3d"
+   ]
+  },
+  "enemies/devil-jammer.glb": {
+   "md5": "ed7adf9f246992eabaf237a2146e1947",
+   "bytes": 12421948,
+   "image": "art-src/enemies/devil-jammer.png",
+   "usedBy": [
+    "enemies/devil-jammer-3d"
+   ]
+  },
+  "enemies/devil-leech.glb": {
+   "md5": "16ca42329126c96e5539f92003540503",
+   "bytes": 11424804,
+   "image": "art-src/enemies/devil-leech.png",
+   "usedBy": [
+    "enemies/devil-leech-3d"
+   ]
+  },
+  "enemies/devil-mine.glb": {
+   "md5": "274838fbddfca9c94a7b286a88042999",
+   "bytes": 12836408,
+   "image": "art-src/enemies/devil-mine.png",
+   "usedBy": [
+    "enemies/devil-mine-3d"
+   ]
+  },
+  "enemies/devil-oppressor.glb": {
+   "md5": "ef198e681c826c3044e5b551d486557e",
+   "bytes": 11251748,
+   "image": "art-src/enemies/devil-oppressor.png",
+   "usedBy": [
+    "enemies/devil-oppressor-3d"
+   ]
+  },
+  "enemies/devil-scout.glb": {
+   "md5": "8ee982613e23392961f465100b4b6821",
+   "bytes": 11262072,
+   "image": "art-src/enemies/devil-scout.png",
+   "usedBy": [
+    "enemies/devil-scout-3d",
+    "enemies/devil-scout-lod"
+   ]
+  },
+  "enemies/devil-shield.glb": {
+   "md5": "32dfbc06c9f96d1a8cffb292c1f1ad30",
+   "bytes": 12046912,
+   "image": "art-src/enemies/devil-shield.png",
+   "usedBy": [
+    "enemies/devil-shield-3d"
+   ]
+  },
+  "enemies/devil-sniper.glb": {
+   "md5": "f981e45107cefba526d3463b2a494ce2",
+   "bytes": 11110500,
+   "image": "art-src/enemies/devil-sniper.png",
+   "usedBy": [
+    "enemies/devil-sniper-3d"
+   ]
+  },
+  "enemies/devil-splitter.glb": {
+   "md5": "069e0156c2ebbe312872855de7f7c224",
+   "bytes": 11298252,
+   "image": "art-src/enemies/devil-splitter.png",
+   "usedBy": [
+    "enemies/devil-splitter-3d"
+   ]
+  },
+  "enemies/devil-tank.glb": {
+   "md5": "221341b0167654200f9ae41a057c1f1a",
+   "bytes": 11247224,
+   "image": "art-src/enemies/devil-tank.png",
+   "usedBy": [
+    "enemies/devil-tank-3d"
+   ]
+  },
+  "enemies/frost-carrier.glb": {
+   "md5": "8805bfc2bd0da7a60ffcfff5d546f048",
+   "bytes": 12860012,
+   "image": "art-src/enemies/frost-carrier.png",
+   "usedBy": [
+    "enemies/frost-carrier-3d"
+   ]
+  },
+  "enemies/frost-cloaker.glb": {
+   "md5": "20e4bd7ef793cd8e01a13247bb6dcf4e",
+   "bytes": 10815520,
+   "image": "art-src/enemies/frost-cloaker.png",
+   "usedBy": [
+    "enemies/frost-cloaker-3d"
+   ]
+  },
+  "enemies/frost-commander.glb": {
+   "md5": "9d151939f2db9606d99048c244a62fed",
+   "bytes": 12919960,
+   "image": "art-src/enemies/frost-commander.png",
+   "usedBy": [
+    "enemies/frost-destroyer-3d (placeholder)",
+    "enemies/frost-commander-3d"
+   ]
+  },
+  "enemies/frost-healer.glb": {
+   "md5": "bb61848bc033df3ba3ae714aa50294ee",
+   "bytes": 11412108,
+   "image": "art-src/enemies/frost-healer.png",
+   "usedBy": [
+    "enemies/frost-healer-3d",
+    "enemies/frost-leech-3d (placeholder)"
+   ]
+  },
+  "enemies/frost-jammer.glb": {
+   "md5": "e54596917af6d428400d5de3a5ab109e",
+   "bytes": 12322588,
+   "image": "art-src/enemies/frost-jammer.png",
+   "usedBy": [
+    "enemies/frost-jammer-3d"
+   ]
+  },
+  "enemies/frost-mine.glb": {
+   "md5": "d21beb4109384fa4589905fde0736873",
+   "bytes": 10950680,
+   "image": "art-src/enemies/frost-mine.png",
+   "usedBy": [
+    "enemies/frost-mine-3d"
+   ]
+  },
+  "enemies/frost-oppressor.glb": {
+   "md5": "6b46de8df977f562d74a9ce98038751f",
+   "bytes": 11500996,
+   "image": "art-src/enemies/frost-oppressor.png",
+   "usedBy": [
+    "enemies/frost-oppressor-3d"
+   ]
+  },
+  "enemies/frost-scout.glb": {
+   "md5": "d268d088aae15e3aa813dc9ead64416d",
+   "bytes": 9452712,
+   "image": "art-src/enemies/frost-scout.png",
+   "usedBy": [
+    "enemies/frost-scout-3d",
+    "enemies/frost-scout-lod"
+   ]
+  },
+  "enemies/frost-shield.glb": {
+   "md5": "5f369f194e02e6e9e4c868c937f182e1",
+   "bytes": 12839632,
+   "image": "art-src/enemies/frost-shield.png",
+   "usedBy": [
+    "enemies/frost-shield-3d"
+   ]
+  },
+  "enemies/frost-sniper.glb": {
+   "md5": "cb4fc7e22ca1460cebf11780ee6afec5",
+   "bytes": 11207648,
+   "image": "art-src/enemies/frost-sniper.png",
+   "usedBy": [
+    "enemies/frost-sniper-3d"
+   ]
+  },
+  "enemies/frost-splitter.glb": {
+   "md5": "39fe8bd21705857cb80d1a1cf492cc22",
+   "bytes": 12297160,
+   "image": "art-src/enemies/frost-splitter.png",
+   "usedBy": [
+    "enemies/frost-splitter-3d"
+   ]
+  },
+  "enemies/frost-tank.glb": {
+   "md5": "68ad9652665809edee657e96f0d63e5e",
+   "bytes": 11772048,
+   "image": "art-src/enemies/frost-tank.png",
+   "usedBy": [
+    "enemies/frost-tank-3d"
+   ]
+  },
+  "enemies/magma-carrier.glb": {
+   "md5": "ed9bb1278f6956adc97a8995bae5a3e1",
+   "bytes": 12462512,
+   "image": "art-src/enemies/magma-carrier.png",
+   "usedBy": []
+  },
+  "enemies/magma-cloaker.glb": {
+   "md5": "d600a4ae00664b25ffa293e353831fb1",
+   "bytes": 11477856,
+   "image": "art-src/enemies/magma-cloaker.png",
+   "usedBy": []
+  },
+  "enemies/magma-destroyer.glb": {
+   "md5": "de635a86b8c110143fccfabc3cfa8757",
+   "bytes": 11734968,
+   "image": "art-src/enemies/magma-destroyer.png",
+   "usedBy": []
+  },
+  "enemies/magma-healer.glb": {
+   "md5": "a978f30e4b054573c5912a324fa001b0",
+   "bytes": 11752096,
+   "image": "art-src/enemies/magma-healer.png",
+   "usedBy": []
+  },
+  "enemies/magma-jammer.glb": {
+   "md5": "5045a1a816d86b7b512130f4bc56fdfa",
+   "bytes": 11383964,
+   "image": "art-src/enemies/magma-jammer.png",
+   "usedBy": []
+  },
+  "enemies/magma-mine.glb": {
+   "md5": "afba8736d11aef7277211a7f98cce471",
+   "bytes": 10767604,
+   "image": "art-src/enemies/magma-mine.png",
+   "usedBy": []
+  },
+  "enemies/magma-oppressor.glb": {
+   "md5": "2c1776332195463fbc3c25350cb20a3e",
+   "bytes": 12410176,
+   "image": "art-src/enemies/magma-oppressor.png",
+   "usedBy": []
+  },
+  "enemies/magma-scout.glb": {
+   "md5": "2451d968f0c38724f1587333ffd860d1",
+   "bytes": 11643512,
+   "image": "art-src/enemies/magma-scout.png",
+   "usedBy": []
+  },
+  "enemies/magma-shield.glb": {
+   "md5": "32fcf8a6270de243b086a811c5f20d5b",
+   "bytes": 10736552,
+   "image": "art-src/enemies/magma-shield.png",
+   "usedBy": []
+  },
+  "enemies/magma-sniper.glb": {
+   "md5": "6922722a4b9906b02fc97ff3ce49c38c",
+   "bytes": 11999116,
+   "image": "art-src/enemies/magma-sniper.png",
+   "usedBy": []
+  },
+  "enemies/magma-splitter.glb": {
+   "md5": "4753c8d5618126259edeadd0e8798bec",
+   "bytes": 11115060,
+   "image": "art-src/enemies/magma-splitter.png",
+   "usedBy": []
+  },
+  "enemies/nature-boss.glb": {
+   "md5": "4d9db9ced2f52a0cb7324f37563f435c",
+   "bytes": 10201488,
+   "image": "art-src/enemies/nature-boss.png",
+   "usedBy": [
+    "enemies/nature-commander-3d"
+   ]
+  },
+  "enemies/nature-carrier.glb": {
+   "md5": "7fe91c6460ee1ead0e627d0584cecd98",
+   "bytes": 11685100,
+   "image": "art-src/enemies/nature-carrier.png",
+   "usedBy": [
+    "enemies/nature-carrier-3d"
+   ]
+  },
+  "enemies/nature-cloaker.glb": {
+   "md5": "4ae8e387ac291fe383e5368ba2061396",
+   "bytes": 10042204,
+   "image": "art-src/enemies/nature-cloaker.png",
+   "usedBy": [
+    "enemies/nature-cloaker-3d"
+   ]
+  },
+  "enemies/nature-destroyer.glb": {
+   "md5": "b558c4836e245d5dfa3433021e5e85f9",
+   "bytes": 10876404,
+   "image": "art-src/enemies/nature-destroyer.png",
+   "usedBy": [
+    "enemies/nature-destroyer-3d"
+   ]
+  },
+  "enemies/nature-healer.glb": {
+   "md5": "48ce419fbe084147b0cdd1d49b742c24",
+   "bytes": 10278012,
+   "image": "art-src/enemies/nature-healer.png",
+   "usedBy": [
+    "enemies/nature-healer-3d"
+   ]
+  },
+  "enemies/nature-jammer.glb": {
+   "md5": "1e6bf109ba7b9090da1ff3fc30c27e65",
+   "bytes": 11164284,
+   "image": "art-src/enemies/nature-jammer.png",
+   "usedBy": [
+    "enemies/nature-jammer-3d"
+   ]
+  },
+  "enemies/nature-leecher.glb": {
+   "md5": "155f39fbbe44a1b331a55ffe3b8274fa",
+   "bytes": 11062792,
+   "image": "art-src/enemies/nature-leecher.png",
+   "usedBy": [
+    "enemies/nature-leech-3d"
+   ]
+  },
+  "enemies/nature-mine.glb": {
+   "md5": "bfe67f3ffce60f5ee0c0368f18c9560b",
+   "bytes": 10076204,
+   "image": "art-src/enemies/nature-mine.png",
+   "usedBy": [
+    "enemies/nature-mine-3d"
+   ]
+  },
+  "enemies/nature-oppressor.glb": {
+   "md5": "dfecb6eee9a1c321bb3000d8ecc2ba72",
+   "bytes": 9976524,
+   "image": "art-src/enemies/nature-oppressor.png",
+   "usedBy": [
+    "enemies/nature-oppressor-3d"
+   ]
+  },
+  "enemies/nature-scout.glb": {
+   "md5": "52c3d32b6a72d6afd1df6d4ad25a945b",
+   "bytes": 9419672,
+   "image": "art-src/enemies/nature-scout.png",
+   "usedBy": [
+    "enemies/nature-scout-3d",
+    "enemies/nature-scout-lod"
+   ]
+  },
+  "enemies/nature-shield.glb": {
+   "md5": "511b6ba01e883509545807b3df8e68a3",
+   "bytes": 10672944,
+   "image": "art-src/enemies/nature-shield.png",
+   "usedBy": [
+    "enemies/nature-shield-3d"
+   ]
+  },
+  "enemies/nature-sniper.glb": {
+   "md5": "8e434cc48d14829929852f2bd8b6a035",
+   "bytes": 11274592,
+   "image": "art-src/enemies/nature-sniper.png",
+   "usedBy": [
+    "enemies/nature-sniper-3d"
+   ]
+  },
+  "enemies/nature-splitter.glb": {
+   "md5": "64d500b5cca4a2f4339f89e30b46cbd2",
+   "bytes": 9319908,
+   "image": "art-src/enemies/nature-splitter.png",
+   "usedBy": [
+    "enemies/nature-splitter-3d"
+   ]
+  },
+  "enemies/nature-tank.glb": {
+   "md5": "c2b1e58f48ef7f4a3e14f85380a30bf9",
+   "bytes": 9693980,
+   "image": "art-src/enemies/nature-tank.png",
+   "usedBy": [
+    "enemies/nature-tank-3d"
+   ]
+  },
+  "enemies/prism-carrier.glb": {
+   "md5": "8f5eda45c0939fd63436653eed4269b5",
+   "bytes": 12283240,
+   "image": "art-src/enemies/prism-carrier.png",
+   "usedBy": [
+    "enemies/prism-carrier-3d"
+   ]
+  },
+  "enemies/prism-cloaker.glb": {
+   "md5": "f957fd694db054567c53a2523d70b081",
+   "bytes": 10368416,
+   "image": "art-src/enemies/prism-cloaker.png",
+   "usedBy": [
+    "enemies/prism-cloaker-3d"
+   ]
+  },
+  "enemies/prism-commander.glb": {
+   "md5": "fa3cb856951c2a61f830ec34c1138a9e",
+   "bytes": 12350496,
+   "image": "art-src/enemies/prism-commander.png",
+   "usedBy": [
+    "enemies/prism-commander-3d"
+   ]
+  },
+  "enemies/prism-destroyer.glb": {
+   "md5": "95ad7dc9a31e5b483abed0044ca9840e",
+   "bytes": 11479456,
+   "image": "art-src/enemies/prism-destroyer.png",
+   "usedBy": [
+    "enemies/prism-destroyer-3d",
+    "enemies/rainbow-scout-lod (placeholder)"
+   ]
+  },
+  "enemies/prism-healer.glb": {
+   "md5": "40f246fea99cb710eaf3ba416bd59896",
+   "bytes": 11571860,
+   "image": "art-src/enemies/prism-healer.png",
+   "usedBy": [
+    "enemies/prism-splitter-3d (placeholder)",
+    "enemies/prism-healer-3d"
+   ]
+  },
+  "enemies/prism-jammer.glb": {
+   "md5": "f617e6f59a5783dfb75a30949dbc5354",
+   "bytes": 11898756,
+   "image": "art-src/enemies/prism-jammer.png",
+   "usedBy": [
+    "enemies/prism-jammer-3d"
+   ]
+  },
+  "enemies/prism-leech.glb": {
+   "md5": "d1b6718cb1e9cd42e79cf34a37aa0c8c",
+   "bytes": 12213292,
+   "image": "art-src/enemies/prism-leech.png",
+   "usedBy": [
+    "enemies/prism-leech-3d"
+   ]
+  },
+  "enemies/prism-mine.glb": {
+   "md5": "3c9db9aa150aaea4c868ba276a3ffd92",
+   "bytes": 12463040,
+   "image": "art-src/enemies/prism-mine.png",
+   "usedBy": [
+    "enemies/prism-mine-3d"
+   ]
+  },
+  "enemies/prism-oppressor.glb": {
+   "md5": "1d7e9f0440d0ff61eb856b8fe84f7bc3",
+   "bytes": 12205920,
+   "image": "art-src/enemies/prism-oppressor.png",
+   "usedBy": [
+    "enemies/prism-oppressor-3d"
+   ]
+  },
+  "enemies/prism-scout.glb": {
+   "md5": "ba5600e7248c12316ca79ebe2ad1b4ed",
+   "bytes": 10474324,
+   "image": "art-src/enemies/prism-scout.png",
+   "usedBy": [
+    "enemies/rainbow-tank-3d (placeholder)",
+    "enemies/prism-scout-3d",
+    "enemies/prism-scout-lod"
+   ]
+  },
+  "enemies/prism-shield.glb": {
+   "md5": "33a6220cd78703b7373aaafea642a7ec",
+   "bytes": 11277868,
+   "image": "art-src/enemies/prism-shield.png",
+   "usedBy": [
+    "enemies/prism-shield-3d"
+   ]
+  },
+  "enemies/prism-sniper.glb": {
+   "md5": "2bd6b17da2e356f404f4b59109e60d78",
+   "bytes": 11661520,
+   "image": "art-src/enemies/prism-sniper.png",
+   "usedBy": [
+    "enemies/prism-sniper-3d"
+   ]
+  },
+  "enemies/prism-tank.glb": {
+   "md5": "0e73b88e4c31aab4e5779081ff908c4b",
+   "bytes": 12469036,
+   "image": "art-src/enemies/prism-tank.png",
+   "usedBy": [
+    "enemies/prism-tank-3d"
+   ]
+  },
+  "enemies/rainbow-carrier.glb": {
+   "md5": "d00abcb66ad672205153139d201c7117",
+   "bytes": 12187424,
+   "image": "art-src/enemies/rainbow-carrier.png",
+   "usedBy": [
+    "enemies/rainbow-carrier-3d"
+   ]
+  },
+  "enemies/rainbow-commander.glb": {
+   "md5": "1b799e2acb1079c574e69e1686c2c0c2",
+   "bytes": 11066828,
+   "image": "art-src/enemies/rainbow-commander.png",
+   "usedBy": [
+    "enemies/rainbow-cloaker-3d (placeholder)",
+    "enemies/rainbow-commander-3d"
+   ]
+  },
+  "enemies/rainbow-healer.glb": {
+   "md5": "2c333abc4d37d42ede4de2dfdf1e771a",
+   "bytes": 10095168,
+   "image": "art-src/enemies/rainbow-healer.png",
+   "usedBy": [
+    "enemies/rainbow-healer-3d"
+   ]
+  },
+  "enemies/rainbow-jammer.glb": {
+   "md5": "d3f7d767042d86a55ac015575c5ca01e",
+   "bytes": 11383224,
+   "image": "art-src/enemies/rainbow-jammer.png",
+   "usedBy": [
+    "enemies/rainbow-jammer-3d"
+   ]
+  },
+  "enemies/rainbow-leech.glb": {
+   "md5": "423640331331d3a9ba6e22be93789e40",
+   "bytes": 10363712,
+   "image": "art-src/enemies/rainbow-leech.png",
+   "usedBy": [
+    "enemies/rainbow-leech-3d"
+   ]
+  },
+  "enemies/rainbow-mine.glb": {
+   "md5": "16eef9009a31a7c9301b90256be03ed5",
+   "bytes": 9353004,
+   "image": "art-src/enemies/rainbow-mine.png",
+   "usedBy": [
+    "enemies/rainbow-mine-3d",
+    "enemies/rainbow-mine-lod"
+   ]
+  },
+  "enemies/rainbow-oppressor.glb": {
+   "md5": "e7d63a48b5f16c6779dbe8c74fb06ce3",
+   "bytes": 10721692,
+   "image": "art-src/enemies/rainbow-oppressor.png",
+   "usedBy": [
+    "enemies/rainbow-oppressor-3d"
+   ]
+  },
+  "enemies/rainbow-shield.glb": {
+   "md5": "8813130e9cb2b2e3b823fcb0ed0bee90",
+   "bytes": 10567412,
+   "image": "art-src/enemies/rainbow-shield.png",
+   "usedBy": [
+    "enemies/rainbow-shield-3d",
+    "enemies/rainbow-destroyer-3d (placeholder)"
+   ]
+  },
+  "enemies/rainbow-sniper.glb": {
+   "md5": "9885989fc95d34f8f2d5a318b1852dc8",
+   "bytes": 10069436,
+   "image": "art-src/enemies/rainbow-sniper.png",
+   "usedBy": [
+    "enemies/rainbow-sniper-3d"
+   ]
+  },
+  "enemies/rainbow-splitter.glb": {
+   "md5": "b8b8303cac6daa153d136d069b8d0629",
+   "bytes": 8530660,
+   "image": "art-src/enemies/rainbow-splitter.png",
+   "usedBy": [
+    "enemies/rainbow-splitter-3d"
+   ]
+  },
+  "enemies/shadow-carrier.glb": {
+   "md5": "33a1dfe3633817f8d944813fb2c3bf3e",
+   "bytes": 4506224,
+   "image": "art-src/enemies/shadow-carrier.png",
+   "usedBy": [
+    "enemies/shadow-carrier-3d"
+   ]
+  },
+  "enemies/shadow-cloaker.glb": {
+   "md5": "5a689bad136778175905b065252ff709",
+   "bytes": 3744896,
+   "image": "art-src/enemies/shadow-cloaker.png",
+   "usedBy": [
+    "enemies/shadow-destroyer-3d (placeholder)",
+    "enemies/shadow-cloaker-3d"
+   ]
+  },
+  "enemies/shadow-commander.glb": {
+   "md5": "cbfb9fa90b213338da1b56c51e9eb313",
+   "bytes": 4568252,
+   "image": "art-src/enemies/shadow-commander.png",
+   "usedBy": [
+    "enemies/shadow-commander-3d"
+   ]
+  },
+  "enemies/shadow-healer.glb": {
+   "md5": "0d4e72765355c95790c8637e5211bb40",
+   "bytes": 4641224,
+   "image": "art-src/enemies/shadow-healer.png",
+   "usedBy": [
+    "enemies/shadow-healer-3d"
+   ]
+  },
+  "enemies/shadow-jammer.glb": {
+   "md5": "f509c620d61df4ad772f1b763d6a199c",
+   "bytes": 4495692,
+   "image": "art-src/enemies/shadow-jammer.png",
+   "usedBy": [
+    "enemies/shadow-jammer-3d"
+   ]
+  },
+  "enemies/shadow-leech.glb": {
+   "md5": "6c622b50fb148eac80ae05697ab005bf",
+   "bytes": 4648740,
+   "image": "art-src/enemies/shadow-leech.png",
+   "usedBy": [
+    "enemies/shadow-leech-3d"
+   ]
+  },
+  "enemies/shadow-mine.glb": {
+   "md5": "688fb1c7af55a4ddf1e69ce748d46b63",
+   "bytes": 4940032,
+   "image": "art-src/enemies/shadow-mine.png",
+   "usedBy": [
+    "enemies/shadow-mine-3d"
+   ]
+  },
+  "enemies/shadow-oppressor.glb": {
+   "md5": "c6496f7352b499b2f8ada28706034a30",
+   "bytes": 4358064,
+   "image": "art-src/enemies/shadow-oppressor.png",
+   "usedBy": [
+    "enemies/shadow-oppressor-3d"
+   ]
+  },
+  "enemies/shadow-scout.glb": {
+   "md5": "9fb8e54ee2b5e844fa2243acb4123045",
+   "bytes": 4280688,
+   "image": "art-src/enemies/shadow-scout.png",
+   "usedBy": [
+    "enemies/shadow-scout-3d",
+    "enemies/shadow-scout-lod"
+   ]
+  },
+  "enemies/shadow-shield.glb": {
+   "md5": "2b346af0790741c55f4acef4f03a7134",
+   "bytes": 4329648,
+   "image": "art-src/enemies/shadow-shield.png",
+   "usedBy": [
+    "enemies/shadow-shield-3d"
+   ]
+  },
+  "enemies/shadow-sniper.glb": {
+   "md5": "da0ea691f693e6cb7cf063ad9e64cf53",
+   "bytes": 4154100,
+   "image": "art-src/enemies/shadow-sniper.png",
+   "usedBy": [
+    "enemies/shadow-sniper-3d"
+   ]
+  },
+  "enemies/shadow-splitter.glb": {
+   "md5": "9a20de023befccad30285999859d89c2",
+   "bytes": 4583796,
+   "image": "art-src/enemies/shadow-splitter.png",
+   "usedBy": [
+    "enemies/shadow-splitter-3d"
+   ]
+  },
+  "enemies/shadow-tank.glb": {
+   "md5": "7da6fd5cb4c76f94bda253ae54590a59",
+   "bytes": 4939968,
+   "image": "art-src/enemies/shadow-tank.png",
+   "usedBy": [
+    "enemies/shadow-tank-3d"
+   ]
+  },
+  "pickups/credits/boss.glb": {
+   "md5": "2964627f37cee2d35d058ed33ffc1951",
+   "bytes": 4878808,
+   "image": "art-src/pickups/credits/boss.png",
+   "usedBy": [
+    "items/prop-crystal-a"
+   ],
+   "downloadedAs": [
+    "crystal+shard+3d+model.glb"
+   ]
+  },
+  "pickups/credits/common.glb": {
+   "md5": "ce63ff780809b17e5abbbd1b5d068a38",
+   "bytes": 2787460,
+   "image": "art-src/pickups/credits/common.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "crystal+gem+3d+modelv1.glb"
+   ]
+  },
+  "pickups/credits/elite-golden.glb": {
+   "md5": "ee212a136f85acb8a44d80b92fbbd701",
+   "bytes": 4483320,
+   "image": "art-src/pickups/credits/elite-golden.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "crystal+gemstone+3d+modelv1.glb"
+   ]
+  },
+  "pickups/credits/elite.glb": {
+   "md5": "92b139b343daa2a1cea8526db4b10ad5",
+   "bytes": 4171552,
+   "image": "art-src/pickups/credits/elite.png",
+   "usedBy": [
+    "items/prop-crystal-b"
+   ],
+   "downloadedAs": [
+    "neon+crystal+3d+model.glb"
+   ]
+  },
+  "pickups/credits/high.glb": {
+   "md5": "4fa504adc5e56640aea5db0682bc6afe",
+   "bytes": 3917148,
+   "image": "art-src/pickups/credits/high.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "crystal+gem+3d+model.glb"
+   ]
+  },
+  "pickups/credits/major-boss.glb": {
+   "md5": "031bf49364380e3a5fc6d9f1cd447704",
+   "bytes": 5122900,
+   "image": "art-src/pickups/credits/major-boss.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "crystal+diamond+3d+model.glb"
+   ]
+  },
+  "pickups/credits/mini-boss.glb": {
+   "md5": "b91de4a448ef0c34264edaf85abfef38",
+   "bytes": 4732644,
+   "image": "art-src/pickups/credits/mini-boss.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "crystal+gemstone+3d+modelv2.glb"
+   ]
+  },
+  "pickups/credits/refined.glb": {
+   "md5": "067542009b0461e83792c2dc57e14326",
+   "bytes": 3319232,
+   "image": "art-src/pickups/credits/refined.png",
+   "usedBy": [
+    "items/prop-crystal-c"
+   ],
+   "downloadedAs": [
+    "crystal+gemstone+3d+model.glb"
+   ]
+  },
+  "projectiles/01-vanguard-vanguard-bolt.glb": {
+   "md5": "3a7683550bf41e50e5356399f8f58ae8",
+   "bytes": 9773980,
+   "image": "art-src/projectiles/01-vanguard-vanguard-bolt.png",
+   "usedBy": [
+    "skills/vanguard-bolt"
+   ]
+  },
+  "projectiles/02-razorwing-razor-dart.glb": {
+   "md5": "e67ada8036d12e65cb2301857828159e",
+   "bytes": 10047704,
+   "image": "art-src/projectiles/02-razorwing-razor-dart.png",
+   "usedBy": [
+    "skills/razorwing-bolt"
+   ]
+  },
+  "projectiles/03-solar-lance-solar-needle.glb": {
+   "md5": "c1b0c1927d1b387769b5b555380e3895",
+   "bytes": 9366944,
+   "image": "art-src/projectiles/03-solar-lance-solar-needle.png",
+   "usedBy": [
+    "skills/solar-lance-bolt"
+   ]
+  },
+  "projectiles/04-phantom-wraith-phase-needle.glb": {
+   "md5": "6a015a747dad17bf2bd9399d62b59476",
+   "bytes": 9910824,
+   "image": "art-src/projectiles/04-phantom-wraith-phase-needle.png",
+   "usedBy": [
+    "skills/phantom-wraith-bolt"
+   ]
+  },
+  "projectiles/05-crimson-talon-crimson-bolt.glb": {
+   "md5": "acda1c7e4534800e2e0d9cc46cac329b",
+   "bytes": 10080504,
+   "image": "art-src/projectiles/05-crimson-talon-crimson-bolt.png",
+   "usedBy": [
+    "skills/crimson-talon-bolt"
+   ],
+   "downloadedAs": [
+    "06-frost-seraph-frost-shard.glb (mislabelled: held the crimson-talon-crimson-bolt model)"
+   ]
+  },
+  "projectiles/06-frost-seraph-frost-shard.glb": {
+   "md5": "40e5d66ab4a04c207cf7b4bfd0d72517",
+   "bytes": 10633624,
+   "image": "art-src/projectiles/06-frost-seraph-frost-shard.png",
+   "usedBy": [
+    "skills/frost-seraph-bolt"
+   ],
+   "downloadedAs": [
+    "05-crimson-talon-crimson-bolt.glb (mislabelled: held the frost-seraph-frost-shard model)"
+   ]
+  },
+  "projectiles/07-nova-reaper-nova-fang.glb": {
+   "md5": "77762a3f44a197a06136c6f58ab0a4ca",
+   "bytes": 10388780,
+   "image": "art-src/projectiles/07-nova-reaper-nova-fang.png",
+   "usedBy": [
+    "skills/nova-reaper-bolt"
+   ]
+  },
+  "projectiles/08-astral-dragon-astral-pulse.glb": {
+   "md5": "a11a9a45ae809e6105d6740774e882f9",
+   "bytes": 9857140,
+   "image": "art-src/projectiles/08-astral-dragon-astral-pulse.png",
+   "usedBy": [
+    "skills/astral-dragon-bolt"
+   ]
+  },
+  "projectiles/09-eclipse-monarch-eclipse-bolt.glb": {
+   "md5": "98640cedf32b3cf02762d5f025e54f58",
+   "bytes": 11491060,
+   "image": "art-src/projectiles/09-eclipse-monarch-eclipse-bolt.png",
+   "usedBy": [
+    "skills/eclipse-monarch-bolt"
+   ]
+  },
+  "projectiles/10-celestial-valkyrie-valkyrie-bolt.glb": {
+   "md5": "4c1b4b38ad682aaa4cbd1ba3c10a3f76",
+   "bytes": 11608404,
+   "image": "art-src/projectiles/10-celestial-valkyrie-valkyrie-bolt.png",
+   "usedBy": [
+    "skills/celestial-valkyrie-bolt"
+   ],
+   "downloadedAs": [
+    "11-genesis-phoenix-genesis-ember.glb (mislabelled: held the celestial-valkyrie-valkyrie-bolt model)"
+   ]
+  },
+  "projectiles/11-genesis-phoenix-genesis-ember.glb": {
+   "md5": "a562c0f3ce8e31497475c2ea6129145a",
+   "bytes": 11342736,
+   "image": "art-src/projectiles/11-genesis-phoenix-genesis-ember.png",
+   "usedBy": [
+    "skills/genesis-phoenix-bolt"
+   ],
+   "downloadedAs": [
+    "10-celestial-valkyrie-valkyrie-bolt.glb (mislabelled: held the genesis-phoenix-genesis-ember model)"
+   ]
+  },
+  "projectiles/12-eternal-sovereign-sovereign-ray.glb": {
+   "md5": "8eb74c21ff761e2931ea585bb6b0360a",
+   "bytes": 11284824,
+   "image": "art-src/projectiles/12-eternal-sovereign-sovereign-ray.png",
+   "usedBy": [
+    "skills/eternal-sovereign-bolt"
+   ]
+  },
+  "puzzle/puzzle-carrier.glb": {
+   "md5": "7bc1ea20c3fcad06652d24ef9b5eccb4",
+   "bytes": 4314444,
+   "image": "art-src/puzzle/puzzle-carrier.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "futuristic+spaceship+3d+model.glb"
+   ]
+  },
+  "puzzle/puzzle-chest-closed.glb": {
+   "md5": "e7f5e0fa32a7bac4a6332b28674ac5b9",
+   "bytes": 3925204,
+   "image": "art-src/puzzle/puzzle-chest-closed.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "futuristic+loot+box+3d+model.glb"
+   ]
+  },
+  "puzzle/puzzle-chest-open.glb": {
+   "md5": "01bb70b0db648e01aa2fe799d7ea2200",
+   "bytes": 3877848,
+   "image": "art-src/puzzle/puzzle-chest-open.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "futuristic+treasure+chest+3d+model.glb"
+   ]
+  },
+  "relics/relic-combo-coil.glb": {
+   "md5": "a2e8e7a80c1e56ea6f587fd00aeb47f2",
+   "bytes": 5573344,
+   "image": "art-src/relics/relic-combo-coil.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "magical+staff+3d+model.glb"
+   ]
+  },
+  "relics/relic-cosmic-conductor.glb": {
+   "md5": "e842fae54b51381de964cbcfe02480e0",
+   "bytes": 5074768,
+   "image": "art-src/relics/relic-cosmic-conductor.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "fantasy+weapon+3d+model.glb"
+   ]
+  },
+  "relics/relic-echo-core.glb": {
+   "md5": "63b25d905da1c893baed056401156a1e",
+   "bytes": 5095544,
+   "image": "art-src/relics/relic-echo-core.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "fantasy+crystal+emblem+3d+model.glb"
+   ]
+  },
+  "relics/relic-first-light-seed.glb": {
+   "md5": "e34f70cca3928b3f44369484a64abecd",
+   "bytes": 5731736,
+   "image": "art-src/relics/relic-first-light-seed.png",
+   "usedBy": [
+    "items/tower-sanctum"
+   ],
+   "downloadedAs": [
+    "fiery+flame+weapon+3d+model.glb"
+   ]
+  },
+  "relics/relic-frost-rhythm.glb": {
+   "md5": "73a8e15c8ff18a15b6ff899535f128c1",
+   "bytes": 6336940,
+   "image": "art-src/relics/relic-frost-rhythm.png",
+   "usedBy": [
+    "items/tower-frost"
+   ],
+   "downloadedAs": [
+    "crystal+tower+3d+model.glb"
+   ]
+  },
+  "relics/relic-giant-word-lens.glb": {
+   "md5": "e9f7ec1091941d2757161b9e73b4cd0f",
+   "bytes": 5960320,
+   "image": "art-src/relics/relic-giant-word-lens.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "ornate+magic+staff+3d+model.glb"
+   ]
+  },
+  "relics/relic-heavy-core.glb": {
+   "md5": "30d58542b8bbe4d1582d7c8ed2f5250f",
+   "bytes": 6222960,
+   "image": "art-src/relics/relic-heavy-core.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "golden+energy+cube+3d+model.glb"
+   ]
+  },
+  "relics/relic-mirror-vow.glb": {
+   "md5": "cefef74d83e49686717778ccee47ac65",
+   "bytes": 5611620,
+   "image": "art-src/relics/relic-mirror-vow.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "golden+emblem+3d+model.glb"
+   ]
+  },
+  "relics/relic-perfect-capacitor.glb": {
+   "md5": "3c1df6318a62b5ba2220dc0f695ec834",
+   "bytes": 4993088,
+   "image": "art-src/relics/relic-perfect-capacitor.png",
+   "usedBy": [
+    "items/tower-siphon"
+   ],
+   "downloadedAs": [
+    "futuristic+energy+container+3d+model.glb"
+   ]
+  },
+  "relics/relic-precision-lens.glb": {
+   "md5": "225fdf02f9207c8dc9e5d6a078c3bb37",
+   "bytes": 5686256,
+   "image": "art-src/relics/relic-precision-lens.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "futuristic+targeting+ring+3d+model.glb"
+   ]
+  },
+  "relics/relic-storm-script.glb": {
+   "md5": "edab2bbed8d28ad61f61d34217da7ef4",
+   "bytes": 6275012,
+   "image": "art-src/relics/relic-storm-script.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "fantasy+staff+3d+model.glb"
+   ]
+  },
+  "relics/relic-syllable-forge.glb": {
+   "md5": "f55f8b02f22ad9798ef8f39b3047533e",
+   "bytes": 4804208,
+   "image": "art-src/relics/relic-syllable-forge.png",
+   "usedBy": [],
+   "downloadedAs": [
+    "golden+forge+3d+model.glb"
+   ]
+  },
+  "ships/ship-01-vanguard.glb": {
+   "md5": "6e1dd82849fe2789beebd073fd692077",
+   "bytes": 10358880,
+   "image": "art-src/ships/vanguard-top-hd.png",
+   "usedBy": [
+    "ships/vanguard"
+   ],
+   "downloadedAs": [
+    "vanguard.meshy.glb"
+   ]
+  },
+  "ships/ship-02-razorwing.glb": {
+   "md5": "e34c128c7fc455ee5f70b96e791e708d",
+   "bytes": 10198696,
+   "image": "art-src/ships/ship-02-razorwing-2d.png",
+   "usedBy": [
+    "ships/razorwing"
+   ]
+  },
+  "ships/ship-03-solar-lance.glb": {
+   "md5": "773663be01108f554be3f96a20351c0a",
+   "bytes": 12075288,
+   "image": "art-src/ships/ship-03-solar-lance-2d.png",
+   "usedBy": [
+    "ships/solar-lance"
+   ]
+  },
+  "ships/ship-04-phantom-wraith.glb": {
+   "md5": "8a3cd5e46f5e8d4f7a0241673a4e8fc5",
+   "bytes": 9736336,
+   "image": "art-src/ships/ship-04-phantom-wraith-2d.png",
+   "usedBy": [
+    "ships/phantom-wraith"
+   ]
+  },
+  "ships/ship-05-crimson-talon.glb": {
+   "md5": "debe72f8f6124c49a9ba116b72c016fe",
+   "bytes": 10128944,
+   "image": "art-src/ships/ship-05-crimson-talon-2d.png",
+   "usedBy": [
+    "ships/crimson-talon"
+   ]
+  },
+  "ships/ship-06-frost-seraph.glb": {
+   "md5": "c74411b55c4ee659dd50acd239e87e44",
+   "bytes": 11874764,
+   "image": "art-src/ships/ship-06-frost-seraph-2d.png",
+   "usedBy": [
+    "ships/frost-seraph"
+   ]
+  },
+  "ships/ship-07-nova-reaper.glb": {
+   "md5": "4e0de42c9214273f19c35b5ba0c2e9e6",
+   "bytes": 13387476,
+   "image": "art-src/ships/ship-07-nova-reaper-2d.png",
+   "usedBy": [
+    "ships/nova-reaper"
+   ]
+  },
+  "ships/ship-08-astral-dragon.glb": {
+   "md5": "86e70a70b16109526f9316cf8f6f4982",
+   "bytes": 10502492,
+   "image": "art-src/ships/ship-08-astral-dragon-2d.png",
+   "usedBy": [
+    "ships/astral-dragon"
+   ]
+  },
+  "ships/ship-09-eclipse-monarch.glb": {
+   "md5": "a9030d9dae3fa8488eb7a4cbb053e2ed",
+   "bytes": 10304460,
+   "image": "art-src/ships/ship-09-eclipse-monarch-2d.png",
+   "usedBy": [
+    "ships/eclipse-monarch"
+   ]
+  },
+  "ships/ship-10-celestial-valkyrie.glb": {
+   "md5": "25ed4d83ff23cd0cec02d08071ca2763",
+   "bytes": 10316208,
+   "image": "art-src/ships/ship-10-celestial-valkyrie-2d.png",
+   "usedBy": [
+    "ships/celestial-valkyrie"
+   ]
+  },
+  "ships/ship-11-genesis-phoenix.glb": {
+   "md5": "907f27ab85c6632ca9ff554a876b8184",
+   "bytes": 12185624,
+   "image": "art-src/ships/ship-11-genesis-phoenix-2d.png",
+   "usedBy": [
+    "ships/genesis-phoenix"
+   ]
+  },
+  "ships/ship-12-eternal-sovereign.glb": {
+   "md5": "1d4860394794c1c57db15f01bee9d994",
+   "bytes": 12440692,
+   "image": "art-src/ships/ship-12-eternal-sovereign-2d.png",
+   "usedBy": [
+    "ships/eternal-sovereign"
+   ]
+  }
+ },
+ "notMadeYet": {
+  "enemies/devil-destroyer.glb": {
+   "image": "art-src/enemies/devil-destroyer.png",
+   "standIn": "enemies/devil-cloaker.glb",
+   "usedBy": [
+    "enemies/devil-destroyer-3d"
+   ]
+  },
+  "enemies/frost-destroyer.glb": {
+   "image": "art-src/enemies/frost-destroyer.png",
+   "standIn": "enemies/frost-commander.glb",
+   "usedBy": [
+    "enemies/frost-destroyer-3d"
+   ]
+  },
+  "enemies/frost-leech.glb": {
+   "image": "art-src/enemies/frost-leech.png",
+   "standIn": "enemies/frost-healer.glb",
+   "usedBy": [
+    "enemies/frost-leech-3d"
+   ]
+  },
+  "enemies/magma-tank.glb": {
+   "image": "art-src/enemies/magma-tank.png",
+   "standIn": "enemies/magma-shield.glb",
+   "usedBy": []
+  },
+  "enemies/prism-splitter.glb": {
+   "image": "art-src/enemies/prism-splitter.png",
+   "standIn": "enemies/prism-healer.glb",
+   "usedBy": [
+    "enemies/prism-splitter-3d"
+   ]
+  },
+  "enemies/rainbow-cloaker.glb": {
+   "image": "art-src/enemies/rainbow-cloaker.png",
+   "standIn": "enemies/rainbow-commander.glb",
+   "usedBy": [
+    "enemies/rainbow-cloaker-3d"
+   ]
+  },
+  "enemies/rainbow-destroyer.glb": {
+   "image": "art-src/enemies/rainbow-destroyer.png",
+   "standIn": "enemies/rainbow-shield.glb",
+   "usedBy": [
+    "enemies/rainbow-destroyer-3d"
+   ]
+  },
+  "enemies/rainbow-scout.glb": {
+   "image": "art-src/enemies/rainbow-scout.png",
+   "standIn": "enemies/prism-destroyer.glb",
+   "usedBy": [
+    "enemies/rainbow-scout-lod"
+   ]
+  },
+  "enemies/rainbow-tank.glb": {
+   "image": "art-src/enemies/rainbow-tank.png",
+   "standIn": "enemies/prism-scout.glb",
+   "usedBy": [
+    "enemies/rainbow-tank-3d"
+   ]
+  },
+  "enemies/shadow-destroyer.glb": {
+   "image": "art-src/enemies/shadow-destroyer.png",
+   "standIn": "enemies/shadow-cloaker.glb",
+   "usedBy": [
+    "enemies/shadow-destroyer-3d"
+   ]
+  },
+  "bosses/tyrant-g03.glb": {
+   "image": "art-src/bosses/tyrant-g03.png",
+   "standIn": "bosses/warden-frost.glb",
+   "usedBy": [
+    "bosses/tyrant-g03"
+   ]
+  }
+ },
+ "noOriginalOnThisMachine": {
+  "heroes/draconis, heroes/draconis-v2, heroes/draconis-v3, guides/draconis-v4": "only the packaged runtime copies in public/assets/space-typing/models remain",
+  "bosses/auriel-hero": "only the packaged runtime copy remains",
+  "enemies/rainbow-scout-3d": "only the packaged runtime copy remains (the Campaign 3D scout of the first slice)",
+  "skills/dragon-fireball": "only the packaged runtime copy remains"
+ },
+ "history": {
+  "from": "art-src/img-3d (the owner's copy of ~/Downloads/img-typing), renamed art-src/3d on 2026-10-21",
+  "moved": [
+   [
+    "art-src/img-3d",
+    "art-src/3d"
+   ],
+   [
+    "art-src/3d/boss",
+    "art-src/3d/bosses"
+   ],
+   [
+    "art-src/bosses/3d/tyrant-g01.glb",
+    "art-src/3d/bosses/tyrant-g01.glb"
+   ],
+   [
+    "art-src/3d/credits",
+    "art-src/3d/pickups/credits"
+   ],
+   [
+    "art-src/3d/fx/01-vanguard-vanguard-bolt.glb",
+    "art-src/3d/projectiles/01-vanguard-vanguard-bolt.glb"
+   ],
+   [
+    "art-src/3d/fx/02-razorwing-razor-dart.glb",
+    "art-src/3d/projectiles/02-razorwing-razor-dart.glb"
+   ],
+   [
+    "art-src/3d/fx/03-solar-lance-solar-needle.glb",
+    "art-src/3d/projectiles/03-solar-lance-solar-needle.glb"
+   ],
+   [
+    "art-src/3d/fx/04-phantom-wraith-phase-needle.glb",
+    "art-src/3d/projectiles/04-phantom-wraith-phase-needle.glb"
+   ],
+   [
+    "art-src/3d/fx/05-crimson-talon-crimson-bolt.glb",
+    "art-src/3d/projectiles/06-frost-seraph-frost-shard.glb"
+   ],
+   [
+    "art-src/3d/fx/06-frost-seraph-frost-shard.glb",
+    "art-src/3d/projectiles/05-crimson-talon-crimson-bolt.glb"
+   ],
+   [
+    "art-src/3d/fx/07-nova-reaper-nova-fang.glb",
+    "art-src/3d/projectiles/07-nova-reaper-nova-fang.glb"
+   ],
+   [
+    "art-src/3d/fx/08-astral-dragon-astral-pulse.glb",
+    "art-src/3d/projectiles/08-astral-dragon-astral-pulse.glb"
+   ],
+   [
+    "art-src/3d/fx/09-eclipse-monarch-eclipse-bolt.glb",
+    "art-src/3d/projectiles/09-eclipse-monarch-eclipse-bolt.glb"
+   ],
+   [
+    "art-src/3d/fx/10-celestial-valkyrie-valkyrie-bolt.glb",
+    "art-src/3d/projectiles/11-genesis-phoenix-genesis-ember.glb"
+   ],
+   [
+    "art-src/3d/fx/11-genesis-phoenix-genesis-ember.glb",
+    "art-src/3d/projectiles/10-celestial-valkyrie-valkyrie-bolt.glb"
+   ],
+   [
+    "art-src/3d/fx/12-eternal-sovereign-sovereign-ray.glb",
+    "art-src/3d/projectiles/12-eternal-sovereign-sovereign-ray.glb"
+   ],
+   [
+    "art-src/models/raw/ships/ship-02-razorwing.glb",
+    "art-src/3d/ships/ship-02-razorwing.glb"
+   ],
+   [
+    "art-src/models/raw/ships/ship-03-solar-lance.glb",
+    "art-src/3d/ships/ship-03-solar-lance.glb"
+   ],
+   [
+    "art-src/models/raw/ships/ship-04-phantom-wraith.glb",
+    "art-src/3d/ships/ship-04-phantom-wraith.glb"
+   ],
+   [
+    "art-src/models/raw/ships/ship-05-crimson-talon.glb",
+    "art-src/3d/ships/ship-05-crimson-talon.glb"
+   ],
+   [
+    "art-src/models/raw/ships/ship-06-frost-seraph.glb",
+    "art-src/3d/ships/ship-06-frost-seraph.glb"
+   ],
+   [
+    "art-src/models/raw/ships/ship-07-nova-reaper.glb",
+    "art-src/3d/ships/ship-07-nova-reaper.glb"
+   ],
+   [
+    "art-src/models/raw/ships/ship-08-astral-dragon.glb",
+    "art-src/3d/ships/ship-08-astral-dragon.glb"
+   ],
+   [
+    "art-src/models/raw/ships/ship-09-eclipse-monarch.glb",
+    "art-src/3d/ships/ship-09-eclipse-monarch.glb"
+   ],
+   [
+    "art-src/models/raw/ships/ship-10-celestial-valkyrie.glb",
+    "art-src/3d/ships/ship-10-celestial-valkyrie.glb"
+   ],
+   [
+    "art-src/models/raw/ships/ship-11-genesis-phoenix.glb",
+    "art-src/3d/ships/ship-11-genesis-phoenix.glb"
+   ],
+   [
+    "art-src/models/raw/ships/ship-12-eternal-sovereign.glb",
+    "art-src/3d/ships/ship-12-eternal-sovereign.glb"
+   ],
+   [
+    "art-src/models/raw/ships/vanguard.meshy.glb",
+    "art-src/3d/ships/ship-01-vanguard.glb"
+   ]
+  ],
+  "droppedDuplicates": [
+   [
+    "art-src/3d/enemies/devil-destroyer.glb",
+    "placeholder copy of enemies/devil-cloaker.glb"
+   ],
+   [
+    "art-src/3d/enemies/frost-destroyer.glb",
+    "placeholder copy of enemies/frost-commander.glb"
+   ],
+   [
+    "art-src/3d/enemies/frost-leech.glb",
+    "placeholder copy of enemies/frost-healer.glb"
+   ],
+   [
+    "art-src/3d/enemies/magma-tank.glb",
+    "placeholder copy of enemies/magma-shield.glb"
+   ],
+   [
+    "art-src/3d/enemies/prism-splitter.glb",
+    "placeholder copy of enemies/prism-healer.glb"
+   ],
+   [
+    "art-src/3d/enemies/rainbow-cloaker.glb",
+    "placeholder copy of enemies/rainbow-commander.glb"
+   ],
+   [
+    "art-src/3d/enemies/rainbow-destroyer.glb",
+    "placeholder copy of enemies/rainbow-shield.glb"
+   ],
+   [
+    "art-src/3d/enemies/rainbow-scout.glb",
+    "placeholder copy of enemies/prism-destroyer.glb"
+   ],
+   [
+    "art-src/3d/enemies/rainbow-tank.glb",
+    "placeholder copy of enemies/prism-scout.glb"
+   ],
+   [
+    "art-src/3d/enemies/shadow-destroyer.glb",
+    "placeholder copy of enemies/shadow-cloaker.glb"
+   ],
+   [
+    "art-src/3d/bosses/tyrant-g03.glb",
+    "placeholder copy of bosses/warden-frost.glb"
+   ],
+   [
+    "art-src/3d/relics/golden+energy+cube+3d+model.glb",
+    "download-name copy of relics/relic-heavy-core.glb"
+   ],
+   [
+    "art-src/3d/relics/magical+staff+3d+model.glb",
+    "download-name copy of relics/relic-combo-coil.glb"
+   ],
+   [
+    "art-src/3d/relics/fantasy+crystal+emblem+3d+model.glb",
+    "download-name copy of relics/relic-echo-core.glb"
+   ],
+   [
+    "art-src/3d/relics/futuristic+targeting+ring+3d+model.glb",
+    "download-name copy of relics/relic-precision-lens.glb"
+   ],
+   [
+    "art-src/3d/relics/golden+forge+3d+model.glb",
+    "download-name copy of relics/relic-syllable-forge.glb"
+   ],
+   [
+    "art-src/3d/relics/crystal+tower+3d+model.glb",
+    "download-name copy of relics/relic-frost-rhythm.glb"
+   ],
+   [
+    "art-src/3d/relics/fantasy+staff+3d+model.glb",
+    "download-name copy of relics/relic-storm-script.glb"
+   ],
+   [
+    "art-src/3d/relics/ornate+magic+staff+3d+model.glb",
+    "download-name copy of relics/relic-giant-word-lens.glb"
+   ],
+   [
+    "art-src/3d/relics/fiery+flame+weapon+3d+model.glb",
+    "download-name copy of relics/relic-first-light-seed.glb"
+   ],
+   [
+    "art-src/3d/relics/fantasy+weapon+3d+model.glb",
+    "download-name copy of relics/relic-cosmic-conductor.glb"
+   ],
+   [
+    "art-src/3d/relics/golden+emblem+3d+model.glb",
+    "download-name copy of relics/relic-mirror-vow.glb"
+   ],
+   [
+    "art-src/3d/relics/futuristic+energy+container+3d+model.glb",
+    "download-name copy of relics/relic-perfect-capacitor.glb"
+   ],
+   [
+    "art-src/3d/duel-targets/ornate+crystal+3d+model.glb",
+    "download-name copy of duel-targets/fate-crystal.glb"
+   ],
+   [
+    "art-src/3d/duel-targets/sci-fi+drone+3d+model copy.glb",
+    "download-name copy of duel-targets/drone.glb"
+   ],
+   [
+    "art-src/3d/duel-targets/sci-fi+energy+blade+3d+model.glb",
+    "download-name copy of duel-targets/siege-lance.glb"
+   ],
+   [
+    "art-src/3d/duel-targets/futuristic+energy+core+3d+modelv1.glb",
+    "download-name copy of duel-targets/barrier.glb"
+   ],
+   [
+    "art-src/3d/duel-targets/sci-fi+portal+device+3d+model.glb",
+    "download-name copy of duel-targets/gravity.glb"
+   ],
+   [
+    "art-src/3d/duel-targets/futuristic+drone+3d+model.glb",
+    "download-name copy of duel-targets/lock-on.glb"
+   ],
+   [
+    "art-src/3d/duel-targets/futuristic+satellite+dish+3d+model.glb",
+    "download-name copy of duel-targets/scan.glb"
+   ],
+   [
+    "art-src/3d/duel-targets/sci-fi+drone+3d+model.glb",
+    "download-name copy of duel-targets/shield.glb"
+   ],
+   [
+    "art-src/3d/duel-targets/futuristic+sci-fi+machine+3d+model.glb",
+    "download-name copy of duel-targets/disrupt.glb"
+   ],
+   [
+    "art-src/3d/duel-targets/futuristic+shuriken+3d+model.glb",
+    "download-name copy of duel-targets/reflect.glb"
+   ],
+   [
+    "art-src/3d/duel-targets/futuristic+grenade+3d+model.glb",
+    "download-name copy of duel-targets/bomb.glb"
+   ],
+   [
+    "art-src/3d/duel-targets/futuristic+energy+core+3d+model.glb",
+    "download-name copy of duel-targets/amplify.glb"
+   ],
+   [
+    "art-src/3d/duel-targets/portal+ring+3d+model.glb",
+    "download-name copy of duel-targets/black-hole.glb"
+   ],
+   [
+    "art-src/3d/duel-targets/sci-fi+energy+blaster+3d+model.glb",
+    "download-name copy of duel-targets/laser.glb"
+   ],
+   [
+    "art-src/3d/duel-targets/glowing+energy+capsule+3d+model.glb",
+    "download-name copy of duel-targets/energy.glb"
+   ],
+   [
+    "art-src/3d/duel-targets/futuristic+robot+3d+model.glb",
+    "download-name copy of duel-targets/repair.glb"
+   ],
+   [
+    "art-src/3d/duel-targets/futuristic+railgun+3d+model.glb",
+    "download-name copy of duel-targets/railgun.glb"
+   ],
+   [
+    "art-src/3d/duel-targets/space+rocket+3d+model.glb",
+    "download-name copy of duel-targets/missile.glb"
+   ],
+   [
+    "art-src/3d/puzzle/futuristic+treasure+chest+3d+model.glb",
+    "download-name copy of puzzle/puzzle-chest-open.glb"
+   ],
+   [
+    "art-src/3d/puzzle/futuristic+spaceship+3d+model.glb",
+    "download-name copy of puzzle/puzzle-carrier.glb"
+   ],
+   [
+    "art-src/3d/puzzle/futuristic+loot+box+3d+model.glb",
+    "download-name copy of puzzle/puzzle-chest-closed.glb"
+   ],
+   [
+    "art-src/3d/pickups/credits/crystal+gem+3d+model.glb",
+    "download-name copy of pickups/credits/high.glb"
+   ],
+   [
+    "art-src/3d/pickups/credits/crystal+diamond+3d+model.glb",
+    "download-name copy of pickups/credits/major-boss.glb"
+   ],
+   [
+    "art-src/3d/pickups/credits/crystal+gem+3d+modelv1.glb",
+    "download-name copy of pickups/credits/common.glb"
+   ],
+   [
+    "art-src/3d/pickups/credits/crystal+gemstone+3d+model.glb",
+    "download-name copy of pickups/credits/refined.glb"
+   ],
+   [
+    "art-src/3d/pickups/credits/neon+crystal+3d+model.glb",
+    "download-name copy of pickups/credits/elite.glb"
+   ],
+   [
+    "art-src/3d/pickups/credits/crystal+gemstone+3d+modelv2.glb",
+    "download-name copy of pickups/credits/mini-boss.glb"
+   ],
+   [
+    "art-src/3d/pickups/credits/crystal+shard+3d+model.glb",
+    "download-name copy of pickups/credits/boss.glb"
+   ],
+   [
+    "art-src/3d/pickups/credits/crystal+gemstone+3d+modelv1.glb",
+    "download-name copy of pickups/credits/elite-golden.glb"
+   ]
+  ],
+  "projectileSwap": "The downloaded files 05/06 and 10/11 held each other's model; they were renamed to match the 2D art (checked side by side on 2026-10-21).",
+  "projectileImages": "art-src/projectiles/*.png copied from ~/Downloads/space-typing-projectiles-01-12"
+ }
+}

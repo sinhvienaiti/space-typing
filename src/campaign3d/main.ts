@@ -22,14 +22,16 @@ import { speakEnglish } from "../speech";
 import type { EnemyKind, GameSettings, VocabularyEntry } from "../types";
 import { loadVocabularyIndex, loadVocabularyLevel } from "../vocabulary";
 import { BossActor, EnemyActor } from "./actors";
-import { isComposingKey, typedLetter, vietnameseInputSign } from "./keys";
+import { isComposingKey, typedLetter, vietnameseInputSign } from "../scene3d/keys";
+import { PILOTS, pilotById, pilotShotModelId, type Pilot } from "./pilots";
 import { comboMultiplier, MAX_STAGE_3D, stagePlan3D, wordScore, wordsPerMinute, type StagePlan3D } from "./plan";
 import { loadProgress3D, recordClear3D, saveProgress3D, type Progress3D } from "./progress";
-import { WordPicker, type PickedWord } from "./words";
+import { WordPicker, type PickedWord } from "../scene3d/words";
 
 /**
  * Campaign 3D (beta), campaign-3d.html: the Campaign's stages flown in 3D by
- * the rigged hero Draconis, on the character demo's engine (src/scene3d).
+ * the rigged hero Draconis or one of the twelve Fleet ships (pilots.ts), on
+ * the character demo's engine (src/scene3d).
  *
  * A stage comes from the Campaign tables (plan.ts); words from the player's
  * chosen vocabulary level. Enemies fly in from far ahead, hold a firing
@@ -47,6 +49,8 @@ const QUALITY_KEY = "spaceTyping3dQualityV1";
 const SOUND_KEY = "spaceTyping3dSoundV1";
 /** The player's swing of the camera (radians), kept between visits. */
 const VIEW_YAW_KEY = "spaceTyping3dViewYawV1";
+/** The chosen pilot (pilots.ts): Draconis or a Fleet ship. */
+const PILOT_KEY = "spaceTyping3dPilotV1";
 const VIEW_YAW_MAX = 0.5;
 const VIEW_YAW_STEP = 0.08;
 const PAGE = 10;
@@ -55,11 +59,13 @@ const PAGE = 10;
  * right) — the owner's pick on 18/10 for the four-legged dragon: its back,
  * both wings and the tail read in depth. (The straight chase view read the
  * upright first models as standing; `flank`, well to the side, was used
- * before.) ?cam=play|rear|flank|profile picks another, for comparing angles.
+ * before.) A ship flies under the chase camera instead (space.ts), its top
+ * in view. ?cam=play|rear|flank|profile|chase picks one for any pilot, for
+ * comparing angles.
  */
-const PLAY_CAMERA: CameraMode = ((): CameraMode => {
+const ASKED_CAMERA: CameraMode | null = ((): CameraMode | null => {
   const asked = new URLSearchParams(window.location.search).get("cam");
-  return asked === "play" || asked === "rear" || asked === "flank" || asked === "profile" ? asked : "rear";
+  return asked === "play" || asked === "rear" || asked === "flank" || asked === "profile" || asked === "chase" ? asked : null;
 })();
 /** Enemies fly in from this far ahead; their word shows (and can be typed) past LABEL_AT of the approach. */
 /**
@@ -71,6 +77,13 @@ const LABEL_AT = 0.07;
 const SPEED: Record<Locomotion, number> = { idle: 6, fly: 18, boost: 52 };
 const HULL = 100;
 const SHIELD = 40;
+/**
+ * A ship's shots (fx.shipShot): its projectile model, long and slow enough
+ * to be seen flying; the word's last letter fires a bigger pair, and the
+ * target blows up once they land.
+ */
+const SHIP_SHOT = { length: 1.9, flight: 0.36, curve: 1.2 };
+const SHIP_FINAL = { length: 2.5, flight: 0.42, curve: 1.5 };
 const FALLBACK_WORDS = [
   "star", "orbit", "comet", "planet", "rocket", "galaxy", "meteor", "signal", "engine", "shield", "laser", "pilot", "moon", "solar",
   "nebula", "light", "space", "wing", "flame", "dragon", "power", "speed", "focus", "energy", "crystal", "storm", "thunder", "ocean",
@@ -234,6 +247,12 @@ const banner = byId("c3dBanner");
 
 let hero: Hero | null = null;
 let heroId = "";
+let pilot: Pilot = pilotById(storage()?.getItem(PILOT_KEY));
+/** A ship pilot fires its own projectile model from its guns. */
+let shipShots = false;
+/** The latest hero/projectile load: an older one that finishes later is dropped. */
+let heroLoad = 0;
+let shotLoad = 0;
 /** Ordinary bolts: fire for Draconis v2, the first model's cyan otherwise. */
 let boltColor = COLORS.cyan;
 /** Draconis v2 and v3 throw fireballs; the first model fires small bolts. */
@@ -252,6 +271,8 @@ let wordInfoTimer = 0;
 let prevLocomotion: Locomotion = "idle";
 
 async function loadHero(quality: Quality): Promise<void> {
+  if (pilot.ship) return loadShip(pilot, quality);
+  const token = ++heroLoad;
   // The newest Draconis in the manifest: v3 (the four-legged dragon), then v2, then the first.
   let id: string = HERO_IDS[0];
   let entry = null;
@@ -263,6 +284,7 @@ async function loadHero(quality: Quality): Promise<void> {
   const url = entry === null ? null : pickModelTier(entry, quality);
   if (url === null) throw new Error("The Draconis model is not in the model manifest.");
   const gltf = await loadModel(url);
+  if (token !== heroLoad) return;
   const previous = hero;
   const dragon = id === "draconis-v3";
   const flight = dragon || id === "draconis-v2";
@@ -330,26 +352,88 @@ async function loadHero(quality: Quality): Promise<void> {
   fx.setCastColor(flight ? COLORS.ember : COLORS.cyan);
   boltColor = flight ? COLORS.ember : COLORS.cyan;
   fireballs = flight;
+  shipShots = false;
+  fx.setGlowColor(new THREE.Color("#ff9a4a"));
+  mountHero(hero, previous);
+}
+
+/**
+ * A Fleet ship as the flown hero: authored nose -Z (no half turn), its gun
+ * sockets standing in for hands and jaws, engine ribbons in its shot colour.
+ * Ships have only Ship_Idle: the code banks, bobs and knocks the hull.
+ */
+async function loadShip(chosen: Pilot, quality: Quality): Promise<void> {
+  const token = ++heroLoad;
+  const entry = await modelEntry("ships", chosen.id);
+  const url = entry === null ? null : pickModelTier(entry, quality);
+  if (url === null) throw new Error("The " + chosen.name + " model is not in the model manifest.");
+  const gltf = await loadModel(url);
+  if (token !== heroLoad) return;
+  const previous = hero;
+  const shot = new THREE.Color(chosen.shot);
+  heroId = "ships/" + chosen.id;
+  spits = false;
+  fireballs = false;
+  shipShots = true;
+  hero = new Hero(gltf.scene, gltf.animations, {
+    tipsPerSide: 0,
+    trail: TIERS[quality].trail,
+    palette: [shot, COLORS.white],
+    fitSize: 2.3,
+    trailSockets: ["FX_ENGINE_L", "FX_ENGINE_R", "FX_ENGINE_C"],
+    // Level in a cruise, the nose dipping a little into a boost.
+    pitch: { idle: 0, fly: -0.03, boost: -0.1 },
+    // The stiff spring: a gun's recoil is a crisp kick, not a slow rock.
+    knock: 1,
+    faceAway: false,
+  });
+  fx.gait = null;
+  for (const light of stage.handLights) light.color.copy(shot);
+  fx.hitStrength = 0.8;
+  fx.voiced = false;
+  // Nova: the rune circle and beam open ahead of the guns, in the ship's colour
+  // (the mouth cast is the dragon's fire breath).
+  fx.castFrom = "hands";
+  fx.castRelease = 1.04;
+  fx.setCastColor(shot);
+  fx.setGlowColor(shot);
+  boltColor = shot;
+  mountHero(hero, previous);
+}
+
+/** Puts a newly loaded hero in the scene where the previous one flew. */
+function mountHero(next: Hero, previous: Hero | null): void {
   if (previous !== null) {
-    hero.x = previous.x;
+    next.x = previous.x;
     previous.dispose();
   }
-  stage.scene.add(hero.root);
-  for (const ribbon of hero.ribbons) stage.scene.add(ribbon.mesh);
-  hero.play("intro");
+  stage.scene.add(next.root);
+  for (const ribbon of next.ribbons) stage.scene.add(ribbon.mesh);
+  next.play("intro");
   fx.warpIn(fx.core);
 }
 
 /**
- * The owner's fireball model (skills/dragon-fireball), drawn by every
- * fireball; until it loads, or without it, the photographed fire alone.
+ * The pilot's projectile model. Draconis: the owner's fireball model
+ * (skills/dragon-fireball), drawn by every fireball; until it loads, or
+ * without it, the photographed fire alone. A ship: its own projectile
+ * (skills/<ship>-bolt); without it, plain bolts in its shot colour.
  */
-async function loadFireball(quality: Quality): Promise<void> {
-  const entry = await modelEntry("skills", FIREBALL_ID);
+async function loadProjectile(quality: Quality): Promise<void> {
+  const token = ++shotLoad;
+  const chosen = pilot;
+  const shotId = pilotShotModelId(chosen);
+  if (shotId === null) fx.setShotModel(null, COLORS.white);
+  const entry = await modelEntry("skills", shotId ?? FIREBALL_ID);
   const url = entry === null ? null : pickModelTier(entry, quality);
-  if (url === null) return;
+  if (url === null) {
+    if (shotId !== null && token === shotLoad) fx.setShotModel(null, COLORS.white);
+    return;
+  }
   const gltf = await loadModel(url);
-  fx.setFireballModel(gltf.scene);
+  if (token !== shotLoad) return;
+  if (shotId === null) fx.setFireballModel(gltf.scene);
+  else fx.setShotModel(gltf.scene, new THREE.Color(chosen.shot));
 }
 
 async function loadWords(): Promise<VocabularyEntry[]> {
@@ -410,6 +494,58 @@ function renderMenu(): void {
     (plan.boss !== null ? " · " + bossFullName(plan.boss.identity) : " · " + plan.enemies + " targets in " + plan.waves + " waves");
 }
 
+/** The pilot list in the menu: Draconis and the Fleet, the chosen one flying behind the menu. */
+function renderPilots(): void {
+  const list = byId("c3dPilotList");
+  const items = PILOTS.map((option) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "c3d-pilot" + (option.ship ? "" : " is-dragon");
+    item.setAttribute("role", "option");
+    item.setAttribute("aria-selected", String(option.id === pilot.id));
+    item.title = option.name;
+    item.style.setProperty("--pilot-shot", option.shot);
+    if (option.thumb !== null) {
+      const image = document.createElement("img");
+      image.src = option.thumb;
+      image.alt = "";
+      image.loading = "lazy";
+      image.decoding = "async";
+      item.append(image);
+    }
+    const name = document.createElement("span");
+    name.textContent = option.name;
+    item.append(name);
+    item.addEventListener("click", () => selectPilot(option));
+    return item;
+  });
+  list.replaceChildren(...items);
+  // The chosen pilot in view: the row scrolls sideways past the first nine.
+  const chosen = items[PILOTS.indexOf(pilot)];
+  if (chosen !== undefined) list.scrollLeft = Math.max(0, chosen.offsetLeft - list.offsetLeft - (list.clientWidth - chosen.offsetWidth) / 2);
+  byId("c3dPilotName").textContent = pilot.name;
+}
+
+function selectPilot(next: Pilot): void {
+  if (next.id === pilot.id) return;
+  pilot = next;
+  try {
+    storage()?.setItem(PILOT_KEY, next.id);
+  } catch {
+    // Storage blocked or full: the choice lasts for this visit.
+  }
+  renderPilots();
+  placeHangar();
+  byId("c3dStatus").textContent = "Loading " + next.name + "…";
+  void Promise.all([loadHero(stage.quality), loadProjectile(stage.quality)])
+    .then(() => {
+      if (pilot === next) byId("c3dStatus").textContent = next.name + " ready · vocabulary level " + vocabularyLevel;
+    })
+    .catch((error: unknown) => {
+      if (pilot === next) byId("c3dStatus").textContent = "Could not load " + next.name + ": " + (error instanceof Error ? error.message : String(error));
+    });
+}
+
 function showMenu(): void {
   clearRun();
   setPhaseUi("menu");
@@ -423,6 +559,19 @@ function setPhaseUi(phase: Phase): void {
   byId("c3dResult").hidden = phase !== "result";
   byId("c3dPause").hidden = true;
   labelLayer.hidden = phase === "menu" || phase === "result";
+  if (phase === "menu") window.requestAnimationFrame(placeHangar);
+  else stage.hangarSpot = null;
+}
+
+/** The hangar view shows a ship in the free strip right of the menu card (centred when there is none). */
+function placeHangar(): void {
+  const card = document.querySelector<HTMLElement>("#c3dMenu .c3d-menu");
+  const width = window.innerWidth;
+  if (card === null || byId("c3dMenu").hidden || width <= 0) return;
+  const right = card.getBoundingClientRect().right;
+  const free = width - right;
+  stage.hangarSpot = free < width * 0.14 ? null : { x: (right + width) / 2 / width, width: free / width };
+  byId("c3dMenu").classList.toggle("is-hangar", stage.hangarSpot !== null && pilot.ship);
 }
 
 // ------------------------------------------------------------------ run
@@ -806,9 +955,37 @@ function spitFireball(big: boolean, track: () => THREE.Vector3 | null, radius: n
   }, delay * 1000);
 }
 
+/**
+ * A ship's guns: its projectile model from one gun after the other, both on
+ * a word's last letter (bigger), with a small recoil of the hull.
+ */
+function fireShip(target: Target, final: boolean): void {
+  if (run === null || hero === null) return;
+  if (!final) run.side = run.side === 0 ? 1 : 0;
+  const sides: (0 | 1)[] = final ? [0, 1] : [run.side];
+  const color = boltColor;
+  const shot = final ? SHIP_FINAL : SHIP_SHOT;
+  hero.hurt(final ? 0.05 : 0.025);
+  sides.forEach((side, index) => {
+    const from = fx.muzzle(side).clone();
+    if (index === 0) audio.play("shot", final ? 0.46 : 0.38, { pan: from.x / 5, gap: 0.035 });
+    fx.shipShot(from, () => (target.alive ? target.pos : null), color, shot.length, shot.flight, shot.curve, (at) => {
+      if (index > 0) return;
+      fx.spray(at, color, final ? 16 : 10, 5, 0.12);
+      fx.wave(at, color, 0.1, final ? 1.5 : 1.1, 0.22, 0.6);
+      audio.play("impact", 0.3, { pan: at.x / 6, gap: 0.03 });
+      if (target.kind === "enemy" && target.actor !== null) target.actor.flash = 1;
+    });
+  });
+}
+
 function shoot(target: Target, final: boolean): void {
   if (run === null || hero === null) return;
   const current = run;
+  if (shipShots) {
+    fireShip(target, final);
+    return;
+  }
   if (spits) {
     spitFireball(final, () => (target.alive ? target.pos : null), final ? 0.55 : 0.34, (at) => {
       audio.voice("fireImpact", final ? 0.7 : 0.5, { pan: at.x / 6, gap: 0.03 });
@@ -881,7 +1058,8 @@ function completeWord(target: Target): void {
     return;
   }
   target.dying = true;
-  run.pendingKills.push({ target, at: run.time + 0.3 });
+  // A ship's last pair is still in flight: the target goes up as it lands.
+  run.pendingKills.push({ target, at: run.time + (shipShots ? SHIP_FINAL.flight + 0.02 : 0.3) });
 }
 
 function killTarget(target: Target, scale = 1): void {
@@ -926,10 +1104,12 @@ function bossWordDone(): void {
       if (run?.boss !== boss || hero === null) return;
       const hand = (index % 2) as 0 | 1;
       const from = fx.muzzle(hand).clone();
-      fx.fireBolt(from, () => boss.target.pos, COLORS.gold, 0.42, 2.2, (at) => {
+      const arrive = (at: THREE.Vector3): void => {
         fx.explode(at, boss.actor.color, 0.7, false);
         audio.play("bossHit", 0.5, { gap: 0.06 });
-      });
+      };
+      if (shipShots) fx.shipShot(from, () => boss.target.pos, boltColor, SHIP_FINAL.length, 0.42, 2.2, arrive);
+      else fx.fireBolt(from, () => boss.target.pos, COLORS.gold, 0.42, 2.2, arrive);
     }, index * 90);
   }
   window.setTimeout(() => {
@@ -1048,7 +1228,7 @@ function showResult(cleared: boolean): void {
   void card.offsetWidth;
   card.classList.add(cleared ? "is-clear" : "is-fail");
   byId("c3dResultEyebrow").textContent = "Stage " + pad(plan.stage) + " · " + plan.worldName;
-  byId("c3dResultTitle").textContent = cleared ? "Stage clear" : "Draconis fell";
+  byId("c3dResultTitle").textContent = cleared ? "Stage clear" : pilot.name + (pilot.ship ? " went down" : " fell");
   const bossName = plan.boss === null ? "" : bossFullName(plan.boss.identity);
   byId("c3dResultSub").textContent = cleared
     ? "All " + plan.waves + " waves cleared" + (bossName ? " · " + bossName + " defeated" : "")
@@ -1137,7 +1317,7 @@ function step(dt: number): void {
   flightWorld.update(paused ? 0 : dt, stageSpeed, stage.camera);
   stage.setDefaultScenery(!flightWorld.ready);
   fx.update(paused ? 0 : dt, hero, drift, locomotion, stageSpeed);
-  const mode: CameraMode = cinematic !== null && clock < cinematic.until ? cinematic.mode : phase === "menu" ? "show" : PLAY_CAMERA;
+  const mode = viewFor(cinematic !== null && clock < cinematic.until ? cinematic.mode : phase === "menu" ? "show" : ASKED_CAMERA ?? "rear");
   if (cinematic !== null && clock >= cinematic.until) cinematic = null;
   stage.updateCamera(dt, mode, hero?.x ?? 0, locomotion, fx.glow);
   flashLayer.style.opacity = String(fx.hurt * 0.8);
@@ -1147,6 +1327,13 @@ function step(dt: number): void {
   }
 }
 let stageSpeed = SPEED.fly;
+
+/** A ship is framed by its own views: the chase camera in the fight, the hangar look for close-ups. */
+function viewFor(mode: CameraMode): CameraMode {
+  if (!pilot.ship) return mode;
+  if (mode === "show") return "hangar";
+  return mode === "rear" && ASKED_CAMERA === null ? "chase" : mode;
+}
 
 function updateRun(current: Run, dt: number): void {
   current.time += dt;
@@ -1218,6 +1405,13 @@ function updateRun(current: Run, dt: number): void {
   current.targets = current.targets.filter((target) => target.alive);
 }
 
+const heroAt = new THREE.Vector3();
+
+/** Where the flown hero is now: targets keep their faces on it. */
+function heroPoint(): THREE.Vector3 {
+  return hero === null ? heroAt.set(0, 0, 0) : heroAt.copy(hero.root.position);
+}
+
 function updateEnemies(current: Run, dt: number): void {
   const plan = current.plan;
   for (const target of current.targets) {
@@ -1231,7 +1425,7 @@ function updateEnemies(current: Run, dt: number): void {
     target.actor.group.position.copy(target.pos);
     // Grown in by the time its word shows, so a target is never a dot with a label.
     target.actor.group.scale.setScalar(Math.max(0.01, Math.min(1, target.approach * 12)) * (1 + target.actor.flash * 0.15));
-    target.actor.update(dt, current.locked === target);
+    target.actor.update(dt, current.locked === target, heroPoint());
     if (target.approach >= 1 && !target.dying && (current.phase === "wave" || current.phase === "boss")) {
       target.fireTimer -= dt;
       if (target.fireTimer <= 0) {
@@ -1247,7 +1441,7 @@ function updateBoss(current: Run, dt: number): void {
   const boss = current.boss;
   const bossPlan = current.plan.boss;
   if (boss === null || bossPlan === null) return;
-  boss.actor.update(dt);
+  boss.actor.update(dt, heroPoint());
   boss.target.pos.copy(boss.actor.group.position).add(new THREE.Vector3(0, 1.2, 0.5));
   if (boss.dying > 0) {
     boss.dying += dt;
@@ -1480,7 +1674,10 @@ canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) setPaused(true);
 });
-window.addEventListener("resize", () => stage.resize());
+window.addEventListener("resize", () => {
+  stage.resize();
+  placeHangar();
+});
 
 byId("c3dStartButton").addEventListener("click", () => void startRun(selectedStage));
 byId("c3dPrevPage").addEventListener("click", () => {
@@ -1522,7 +1719,7 @@ qualitySelect.addEventListener("change", () => {
   fx.setQuality(quality);
   flightWorld.setQuality(quality);
   void loadHero(quality).catch(() => undefined);
-  void loadFireball(quality).catch(() => undefined);
+  void loadProjectile(quality).catch(() => undefined);
 });
 const soundToggle = byId<HTMLInputElement>("c3dSound");
 soundToggle.checked = audio.enabled;
@@ -1540,10 +1737,12 @@ soundToggle.addEventListener("change", () => {
 let currentEntries: VocabularyEntry[] = [];
 const startButton = byId<HTMLButtonElement>("c3dStartButton");
 startButton.disabled = true;
-byId("c3dStatus").textContent = "Loading Draconis and your words…";
+byId("c3dStatus").textContent = "Loading " + pilot.name + " and your words…";
 window.requestAnimationFrame(frame);
 renderMenu();
-void loadFireball(stage.quality).catch(() => undefined);
+renderPilots();
+window.requestAnimationFrame(placeHangar);
+void loadProjectile(stage.quality).catch(() => undefined);
 void Promise.all([loadHero(stage.quality), loadWords()])
   .then(([, entries]) => {
     currentEntries = entries;
@@ -1594,6 +1793,18 @@ void Promise.all([loadHero(stage.quality), loadWords()])
     timeScale = clamp(k, 0.02, 1);
   },
   fireballModel: () => fx.hasFireballModel(),
+  shotModel: () => fx.hasShotModel(),
+  /** Screenshots: fly `id` (a pilots.ts id); resolves once its hull and projectile are in. */
+  pilot: async (id: string) => {
+    selectPilot(pilotById(id));
+    await Promise.all([loadHero(stage.quality), loadProjectile(stage.quality)]);
+    return { pilot: pilot.id, hero: heroId, shotModel: fx.hasShotModel() };
+  },
+  /** Checks: each live target's family/kind and whether its authored model is drawn. */
+  looks: () => ({
+    enemies: (run?.targets ?? []).flatMap((target) => (target.actor === null ? [] : [target.actor.look])),
+    boss: run?.boss?.actor.look ?? null,
+  }),
   /** Audio checks: a dragon sound rendered offline, or a recorded sample, measured. */
   voiceStats: (name: SceneVoice) => voiceStats(name),
   sampleStats: async (path: string) => {

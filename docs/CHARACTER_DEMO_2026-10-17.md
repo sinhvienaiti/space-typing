@@ -92,7 +92,7 @@ Phần khó **không nằm ở nền tảng**. Phần khó là:
   - nếu công cụ có auto-rig dạng người (humanoid/biped) thì bật, và xuất GLB **có xương**;
   - nếu không có, xuất GLB không xương; AI sẽ gắn xương trong Blender.
 - **Xuất file:** GLB.
-- **Nơi đặt file:** `art-src/models/raw/heroes/<id>.meshy.glb` (hoặc `.tripo.glb`).
+- **Nơi đặt file:** `art-src/3d/heroes/<id>.glb` (bản gốc, không sửa). Bản có xương: `art-src/3d/heroes/<id>-rigged.glb`.
 
 **Prompt (Text to 3D, hoặc kèm ảnh khi làm Image to 3D):**
 
@@ -152,7 +152,7 @@ Script `scripts/models/blender/space_typing_model_tools.py` đã có:
 ```powershell
 & 'D:\Blender\blender.exe' -b --factory-startup `
   -P 'D:\typing-game\games\space-typing\scripts\models\blender\space_typing_model_tools.py' -- `
-  --input 'D:\typing-game\games\space-typing\art-src\models\raw\heroes\solar-wyvern.meshy.glb' `
+  --input 'D:\typing-game\games\space-typing\art-src\3d\heroes\solar-wyvern.glb' `
   --kind heroes --id solar-wyvern --project 'D:\typing-game\games\space-typing' `
   --tris 30000 --auto-emissive 0.08 --boss-clips --hero-clips `
   --preview 'D:\typing-game\games\space-typing\.visual\models\solar-wyvern'

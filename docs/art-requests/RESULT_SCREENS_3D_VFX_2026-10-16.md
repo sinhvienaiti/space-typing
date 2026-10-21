@@ -125,7 +125,8 @@ insignia clearly.
 
 **Tripo3D / Meshy:**
 - Image to 3D, PBR, face limit 4000 (khiên còn nguyên).
-- Tải về `art-src/models/raw/items/result-shield.glb`.
+- Tải về, lưu bản gốc ở `art-src/3d/items/result-shield.glb`. Không sửa file này.
+- Món này không có ảnh 2D trong `art-src/`, nên dùng thư mục theo loại (`items`). Quy tắc chung: `art-src/3d/README.md`.
 
 **Blender – cắt vỡ bằng Cell Fracture:**
 1. Import file, chạy script với `kind="items"`, `id="result-shield"`, `target_triangles=3000`, `make_sockets=False`, `export=False`. Xoay lại cho đúng hướng ở trên.

@@ -3,7 +3,7 @@
  *
  * Turns Blender/Meshy/Tripo exports into game-ready GLB files:
  *   art-src/models/<kind>/<id>.glb  (kind: ships, enemies, bosses, skills, items)
- *   art-src/bosses/3d/tyrant-g01.glb (legacy G01 source, still read)
+ *   art-src/3d/bosses/tyrant-g01.glb (the G01 boss: packaged as authored, no Blender pass)
  * →
  *   public/assets/space-typing/models/<kind>/<id>/<id>.high.glb
  *   public/assets/space-typing/models/<kind>/<id>/<id>.medium.glb
@@ -56,7 +56,7 @@ type Source = { kind: ModelKind; id: string; path: string };
 
 export async function findSources(root = ROOT, only = ""): Promise<Source[]> {
   const found = new Map<string, Source>();
-  for (const legacy of [{ kind: "bosses" as ModelKind, id: "tyrant-g01", path: join(root, "art-src/bosses/3d/tyrant-g01.glb") }]) {
+  for (const legacy of [{ kind: "bosses" as ModelKind, id: "tyrant-g01", path: join(root, "art-src/3d/bosses/tyrant-g01.glb") }]) {
     if (existsSync(legacy.path)) found.set(modelKey(legacy.kind, legacy.id), legacy);
   }
   for (const kind of KINDS) {

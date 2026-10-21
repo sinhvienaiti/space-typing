@@ -58,5 +58,9 @@
   },
   "color": "color.webp?v=80c253c3c807",
   "emissive": "emissive.webp?v=6ffec819ed90",
-  "height": "height.bin?v=c869e1cf11d4"
+  "height": "height.bin?v=c869e1cf11d4",
+  "source": {
+    "image": "art-src/ships/wraith-top-hd.png",
+    "imageSha256": "66c1afe37241a180620e9f7004859854de77ce0c5988171660c46df93c82bc99"
+  }
 }
