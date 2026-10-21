@@ -1,5 +1,7 @@
 # Prompt ảnh bản đồ cho Rift Defense (21/10/2026)
 
+> **ĐÃ THAY — đừng tạo ảnh theo tài liệu này.** Bản đồ V5 không còn đảo nổi và ô xây: mỗi bản đồ là một vùng đất thật, đường và mép nước do game vẽ. Prompt mới ở `docs/RIFT_DEFENSE_PLAN_V5_2026-10-21.md`, mục 19 và 23. Ảnh khung bố cục mới sẽ được gửi khi bước vùng đất xong.
+
 > **Dành cho:** chủ dự án (tạo ảnh), AI làm tiếp (đưa ảnh vào game).
 > **Kế hoạch:** `docs/SPACE_TYPING_DEFENSE_PLAN_V4_2026-10-21.md`, mục 8.
 > **Hiện tại:** game tự vẽ tạm mặt đảo của 8 bản đồ bằng mã. Ảnh trong tài liệu này để **thay** ảnh tạm cho đẹp và chân thật hơn. Chưa có ảnh thì game vẫn chạy.

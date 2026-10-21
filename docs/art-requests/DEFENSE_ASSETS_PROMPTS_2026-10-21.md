@@ -1,5 +1,7 @@
 # Prompt ảnh 2D → mô hình 3D cho Rift Defense (21/10/2026, bản V4)
 
+> **Cập nhật V5:** prompt trụ, Lõi, cổng ở đây là phong cách neon của Space Typing, dùng cho bản đồ neon (vùng 7–8). Bản đồ sách tranh (vùng 1–6) có Lõi, cổng và trụ kiểu sách tranh, prompt ở `docs/RIFT_DEFENSE_PLAN_V5_2026-10-21.md`, mục 23. Danh sách quái "đã có 2D, chỉ cần tạo 3D" (mục 5) vẫn đúng cho Campaign 3D. Bộ quái riêng của Defense V5 ở mục 13 của bản V5.
+
 > **Dành cho:** chủ dự án (tạo ảnh 2D, rồi tạo mô hình 3D), AI làm tiếp (đưa vào game).
 > **Kế hoạch:** `docs/SPACE_TYPING_DEFENSE_PLAN_V4_2026-10-21.md`.
 > **Hiện tại:** game đã chạy đủ. 6 trụ, Lõi và cổng đang dùng tạm model relic và duel-target của chủ dự án. Ảnh và model trong tài liệu này để **thay** bản tạm cho đúng chất Defense.

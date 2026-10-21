@@ -20,4 +20,6 @@ Mỗi bản cập nhật có một file trong thư mục này. File ghi rõ đã
 
 | Ngày | Bản cập nhật | Mục review đã xử lý |
 |---|---|---|
+| 2026-10-21 | [Đợt sửa 1: chống đứng hình, chống mất tiến độ và tiền](./2026-10-21-fix-batch-1.md) | 4, 6, 13 (một phần), 17, 18 (một phần), 19, 20, 21, 29, 30, 32, 35 |
+| 2026-10-21 | [Thiết kế Rift Defense V5](../RIFT_DEFENSE_PLAN_V5_2026-10-21.md) | (thiết kế; các lỗi Defense 5, 7, 8, 14, 16 nằm trong kế hoạch V5) |
 | 2026-10-21 | [Review mã nguồn](./2026-10-21-code-review.md) | (chỉ báo cáo, chưa sửa) |
