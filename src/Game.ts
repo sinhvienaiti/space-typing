@@ -567,6 +567,8 @@ import {
   type PerformanceReport,
 } from "./performance/quality";
 import { AdaptiveRenderBudget } from "./performance/adaptive-resolution";
+import { resetCanvas2D } from "./platform/canvas-state";
+import { runFrameLoop, type FrameLoop } from "./platform/frame-loop";
 import type {
   Enemy,
   EnemyKind,
@@ -1283,7 +1285,9 @@ export class Game {
   private readonly modularBodyCache = new StaticEnemyBodyCache();
   private readonly textWidthCache = new Map<string, number>();
   private lastTime = performance.now();
-  private animationFrame = 0;
+  /** Wall time of the current frame, from its update to its draw. */
+  private frameSeconds = 0;
+  private readonly frameLoop: FrameLoop;
   // Apply gameplay-canvas DPR changes at the start of the next rAF so a
   // canvas resize is immediately followed by a complete draw before paint.
   private adaptiveResizePending = false;
@@ -1335,12 +1339,17 @@ export class Game {
     this.resize();
     this.backgroundStage?.setWorld(this.worldSceneProfile.worldId);
     preloadShotArt(this.characterId);
-    this.animationFrame = requestAnimationFrame(this.frame);
+    this.frameLoop = runFrameLoop({
+      update: this.updateFrame,
+      draw: this.drawFrame,
+      // A throwing frame pauses the run, so the player keeps it.
+      onError: () => this.pause(),
+    });
   }
 
   destroy(): void {
     this.flushCombatCreditPresentation();
-    cancelAnimationFrame(this.animationFrame);
+    this.frameLoop.stop();
     this.modularBodyCache.clear();
     this.worldSceneRenderer.destroy();
     this.backgroundStage?.destroy();
@@ -4894,7 +4903,23 @@ export class Game {
     // must not reseed gameplay VFX or change movement/physics timing.
   }
 
-  private frame = (now: number): void => {
+  // A frame is an update then a draw, each kept running by runFrameLoop when
+  // the other throws.
+  private updateFrame = (now: number): void => {
+    const rawDt = Math.max(0, (now - this.lastTime) / 1000);
+    const dt =
+      Math.min(0.05, rawDt) *
+      (this.testLabEnabled ? this.testLabTimeScale : 1);
+    this.lastTime = now;
+    this.frameSeconds = rawDt;
+    this.frameProfiler.pushFrame(rawDt);
+
+    if (!this.duelPresentationActive) this.advanceSimulation(dt);
+    // Duel skips the Campaign simulation, so its camera shake decays here.
+    else this.shake = Math.max(0, this.shake - dt * 30);
+  };
+
+  private drawFrame = (now: number): void => {
     // Setting canvas.width/height clears the visible canvas. Apply a requested
     // DPR change before this frame draws, not after the previous frame drew,
     // so the browser never gets an intentional blank adaptive-resize frame.
@@ -4903,33 +4928,27 @@ export class Game {
       this.applyAdaptiveRenderScale();
     }
 
-    const rawDt = Math.max(0, (now - this.lastTime) / 1000);
-    const dt =
-      Math.min(0.05, rawDt) *
-      (this.testLabEnabled ? this.testLabTimeScale : 1);
-    this.lastTime = now;
-    this.frameProfiler.pushFrame(rawDt);
-
-    if (!this.duelPresentationActive) this.advanceSimulation(dt);
-    // Duel skips the Campaign simulation, so its camera shake decays here.
-    else this.shake = Math.max(0, this.shake - dt * 30);
-
     const drawStart = performance.now();
-    this.draw(now / 1000);
+    try {
+      this.draw(now / 1000);
+    } catch (error) {
+      // The draw restores its canvas state only at its end.
+      resetCanvas2D(this.canvas, this.context, this.dpr);
+      throw error;
+    }
     const drawMs = Math.max(0, performance.now() - drawStart);
     this.drawProfiler.pushFrame(drawMs / 1000);
     if (
       this.phase === "playing" &&
       this.adaptiveRenderBudget.observe(
         this.settings.visualQuality,
-        rawDt,
+        this.frameSeconds,
         drawMs,
         this.backgroundStage,
       )
     ) {
       this.adaptiveResizePending = true;
     }
-    this.animationFrame = requestAnimationFrame(this.frame);
   };
 
   private advanceSimulation(dt: number): void {
@@ -7713,21 +7732,23 @@ export class Game {
             markedBossDamageMultiplier(this.bossMarkTimer > 0) *
             this.characterBossDamageMultiplier(),
       );
-      this.updateBossPhase(boss);
+      // A new phase resets the word, so the last letter completes it first
+      // (completeBossWord opens the phase after the word's damage), and a
+      // killing key opens none: the boss falls below.
+      if (boss.hp > 0 && boss.typed < word.length) this.updateBossPhase(boss);
     }
 
     this.fireBossLaser(0.9);
     this.sfx.shot(this.stats.multiplier);
 
-    if (boss.hp <= 0) {
-      this.defeatBoss();
-      this.emitStats();
-      return;
-    }
-
+    // The last letter completes the word before the boss falls, so the word
+    // counts as typed even when this key's damage was the kill;
+    // completeBossWord defeats the boss itself once its HP is gone.
     if (boss.typed >= word.length) this.completeBossWord(boss);
+    if (this.boss === boss && boss.hp <= 0) this.defeatBoss();
 
-    this.hooks.onBossUpdate(toBossHud(boss));
+    // A defeated boss has already closed its HUD.
+    if (this.boss === boss) this.hooks.onBossUpdate(toBossHud(boss));
     this.emitStats();
   }
 
@@ -7828,7 +7849,8 @@ export class Game {
 
     this.bossBurst(perfectWord ? 34 : 28, 18, perfectWord ? 0.75 : 0.6);
     this.sfx.bossHit();
-    this.updateBossPhase(boss);
+    // A defeated boss opens no last phase (its roar, effects and a 0 HP HUD).
+    if (boss.hp > 0) this.updateBossPhase(boss);
 
     if (boss.hp <= 0) {
       this.defeatBoss(completedEntry);

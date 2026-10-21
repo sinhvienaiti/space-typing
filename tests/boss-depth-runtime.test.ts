@@ -175,9 +175,13 @@ describe("boss depth skills in the game loop", () => {
 
   it("plays the death chain over the boss and lets the effects run out (Low, no 3D model)", () => {
     const { game, state } = createBossGame();
-    const internals = game as unknown as { bossFx: { active: number }; defeatBoss: () => void };
-    state.boss!.hp = 1;
-    internals.defeatBoss();
+    const internals = game as unknown as { bossFx: { active: number } };
+    const boss = state.boss!;
+    boss.hp = 1;
+    boss.shieldActive = false;
+    boss.parts = [];
+    // The killing blow is a typed key, as in play.
+    game.handleKey(boss.entry.en[boss.typed]!);
     expect(state.boss).toBeNull();
     expect(internals.bossFx.active).toBeGreaterThan(0);
     game.testLabAdvanceSimulation(4);
