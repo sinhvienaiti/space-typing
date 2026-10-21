@@ -1,0 +1,69 @@
+/*
+ * Typing Defense 1A: a top-down 2D test field. Paper and ink on a bright
+ * map (docs/td/TYPING_DEFENSE_DESIGN.md 23.3–23.5); word cards sit above
+ * every drawing, the HUD above the cards.
+ */
+@import "@fontsource/be-vietnam-pro/500.css";
+@import "@fontsource/be-vietnam-pro/700.css";
+@import "@fontsource/be-vietnam-pro/800.css";
+
+:root {
+  --td-grass: #7dba5a;
+  --td-paper: #fff4d6;
+  --td-ink: #2b2118;
+  --td-jade: #0b8a78;
+  --td-font: "Be Vietnam Pro", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--td-grass);
+  color: var(--td-ink);
+  font: 500 14px/1.4 var(--td-font);
+}
+
+#tdCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.td-words,
+.td-hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.td-hud > * {
+  pointer-events: auto;
+}
+
+.td-chip {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 6px 12px;
+  border: 2px solid var(--td-ink);
+  border-radius: 8px;
+  background: var(--td-paper);
+  box-shadow: 3px 3px 0 var(--td-ink);
+  font-weight: 700;
+}
+
+.td-chip small {
+  margin-left: 8px;
+  color: var(--td-jade);
+  font-size: 12px;
+  font-weight: 800;
+}

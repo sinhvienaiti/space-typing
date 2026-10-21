@@ -6,8 +6,10 @@ import { describe, expect, it } from "vitest";
  * Campaign 3D (campaign-3d.html: src/campaign3d) and Rift Defense
  * (defense.html: src/defense), with their shared engine src/scene3d, are
  * separate modes: the 2D game must not load them, and they must not write the
- * 2D game's storage. These checks fail as soon as an import or a storage write
- * crosses that line, so the modes cannot start to affect each other unnoticed.
+ * 2D game's storage. Typing Defense (td.html: src/td) is a game of its own;
+ * tests/td-boundary.test.ts holds the rest of its boundary. These checks fail
+ * as soon as an import or a storage write crosses that line, so the modes
+ * cannot start to affect each other unnoticed.
  */
 const SRC = join(__dirname, "..", "src");
 
@@ -20,16 +22,17 @@ function sources(dir: string): string[] {
 }
 
 const files = sources(SRC).map((path) => ({ path: relative(SRC, path).split(sep).join("/"), text: readFileSync(path, "utf8") }));
-const IMPORT = /(?:import|export)\s[^"';]*?from\s+["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)/g;
+// Also side-effect imports (`import "../td/main"`), which load a module as surely as a named one.
+const IMPORT = /(?:import|export)\s[^"';]*?from\s+["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)|\bimport\s*["']([^"']+)["']/g;
 
 function importsOf(text: string): string[] {
-  return [...text.matchAll(IMPORT)].map((match) => match[1] ?? match[2] ?? "");
+  return [...text.matchAll(IMPORT)].map((match) => match[1] ?? match[2] ?? match[3] ?? "");
 }
 
 describe("Campaign 3D stays apart from the 2D game", () => {
-  it("only the 3D modes (and the dev-only render bench) load the 3D dragon engine (src/scene3d)", () => {
+  it("only the 3D modes, Typing Defense (its key filter) and the dev-only render bench load the 3D dragon engine (src/scene3d)", () => {
     const crossing = files
-      .filter((file) => !["campaign3d/", "defense/", "scene3d/", "bench/"].some((root) => file.path.startsWith(root)))
+      .filter((file) => !["campaign3d/", "defense/", "scene3d/", "bench/", "td/"].some((root) => file.path.startsWith(root)))
       .filter((file) => importsOf(file.text).some((spec) => /(^|\/)scene3d\//.test(spec)))
       .map((file) => file.path);
     expect(crossing).toEqual([]);
@@ -90,5 +93,34 @@ describe("Campaign 3D stays apart from the 2D game", () => {
       expect(value, key).toMatch(/^spaceTypingDefense/);
     }
     expect(own.some((file) => /indexedDB|onlineRequest/.test(file.text))).toBe(false);
+  });
+});
+
+describe("Typing Defense stays apart", () => {
+  const own = files.filter((file) => file.path.startsWith("td/"));
+
+  it("nothing outside Typing Defense loads its modules", () => {
+    const crossing = files
+      .filter((file) => !file.path.startsWith("td/"))
+      .filter((file) => importsOf(file.text).some((spec) => /(^|\/)td\//.test(spec)))
+      .map((file) => file.path);
+    expect(crossing).toEqual([]);
+  });
+
+  it("writes only keys that start with td. (docs/td/TYPING_DEFENSE_DESIGN.md 25.13)", () => {
+    const constants = new Map<string, string>();
+    for (const file of own) for (const match of file.text.matchAll(/const\s+([A-Z0-9_]+)\s*=\s*"([^"]+)"/g)) constants.set(match[1]!, match[2]!);
+    const written = own.flatMap((file) => [...file.text.matchAll(/(?:setItem|writeJson|commitItem)\(\s*([A-Za-z0-9_]+|"[^"]+")/g)].map((match) => match[1]!));
+    for (const key of written) {
+      const value = key.startsWith('"') ? key.slice(1, -1) : constants.get(key);
+      expect(value, key).toMatch(/^td\./);
+    }
+  });
+
+  it("goes through src/platform/safe-storage and never names a Space Typing key", () => {
+    const found = own.flatMap((file) =>
+      [...file.text.matchAll(/\b(?:localStorage|sessionStorage)\s*[.[]|\bindexedDB\b|\bonlineRequest\b|["'`]spaceTyping\w*/g)].map((match) => file.path + ": " + match[0]),
+    );
+    expect(found).toEqual([]);
   });
 });
