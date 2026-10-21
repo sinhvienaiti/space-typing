@@ -3,7 +3,7 @@
 > **Dành cho:** chủ dự án và AI làm tiếp.
 > **Cách làm:** 14 agent rà soát 14 vùng code. Mỗi phát hiện được một agent khác đọc lại code để bác bỏ. Sau đó gộp theo nguyên nhân gốc và xếp hạng.
 > **Kết quả:** 185 phát hiện, 173 xác nhận, 10 có khả năng (plausible), 2 bị bác. Gộp lại còn **85 vấn đề**.
-> **Mã nguồn tại:** commit `f19a4ebf` (nhánh `feat/space-typing-2026-10-18`). Chưa sửa gì trong code.
+> **Mã nguồn tại:** commit `f19a4ebf` (nhánh `feat/space-typing-2026-10-18`). Báo cáo không sửa code; các bản sửa ghi trong `docs/changelog/README.md`, trỏ tới số mục ở đây.
 
 ## 1. Tóm tắt
 
