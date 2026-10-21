@@ -26,6 +26,7 @@ import {
 } from "../equipment/loadout";
 import {
   createEmptyInventory,
+  foreignInventoryEntries,
   sanitizeInventory,
   type Inventory,
 } from "../items/inventory";
@@ -1703,6 +1704,26 @@ export function openPlayerDatabase(): Promise<IDBDatabase> {
   });
 }
 
+/**
+ * Items a newer build added are unknown here and dropped by the sanitizer;
+ * a write from this build keeps them as stored instead of deleting them.
+ * Only within the same schema and generation: a migration or a whole-profile
+ * restore replaces the inventory on purpose. So a retired item id stays in
+ * storage until the next PLAYER_SAVE_VERSION bump cleans it.
+ * Covers the top-level inventory only: equipment, characters, relics, shops
+ * and snapshot inventories of an older writer still follow its sanitizer
+ * (follow-up: a build stamp in the record that older writers refuse).
+ */
+export function keepForeignInventory(next: PlayerSave, stored: unknown): PlayerSave {
+  const raw = stored as { version?: unknown; account?: { generation?: unknown }; inventory?: unknown } | null | undefined;
+  if (raw?.version !== PLAYER_SAVE_VERSION || raw.account?.generation !== next.account.generation)
+    return next;
+  const foreign = foreignInventoryEntries(raw.inventory);
+  return Object.keys(foreign).length === 0
+    ? next
+    : { ...next, inventory: { ...foreign, ...next.inventory } };
+}
+
 /** Mutate synchronously inside get. The only success boundary is transaction.oncomplete. */
 export async function playerSaveTransaction(
   mutate: (stored: unknown) => PlayerSave,
@@ -1719,7 +1740,7 @@ export async function playerSaveTransaction(
       request.onsuccess = () => {
         try {
           next = mutate(request.result);
-          store.put(next, SAVE_KEY);
+          store.put(keepForeignInventory(next, request.result), SAVE_KEY);
         } catch (error) {
           failure = error;
           transaction.abort();
@@ -1737,6 +1758,54 @@ export async function playerSaveTransaction(
     database.close();
   }
 }
+
+/** The stored canonical record, read without a write lock. */
+async function readStoredPlayerSave(): Promise<unknown> {
+  const database = await openPlayerDatabase();
+  try {
+    return await new Promise<unknown>((resolve, reject) => {
+      const request = database
+        .transaction(STORE_NAME, "readonly")
+        .objectStore(STORE_NAME)
+        .get(SAVE_KEY);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () =>
+        reject(request.error ?? new Error("Unable to read the player save."));
+    });
+  } finally {
+    database.close();
+  }
+}
+
+/**
+ * The canonical save a stored record stands for: migrated in memory, or
+ * built from the legacy mirror when no record exists yet. Only the account
+ * writer persists the result (AccountTransactions.initialize).
+ */
+export function resolveStoredPlayerSave(stored: unknown): MigrationResult {
+  if (stored === undefined) {
+    const recovery = recoverySaveFromLegacy();
+    if (recovery.account.revision > 0)
+      throw new MissingCanonicalSaveError(recovery);
+    return { save: recovery, migrated: true, fromVersion: null };
+  }
+  const save = readCanonicalPlayerSave(stored);
+  const version = (stored as { version: number }).version;
+  // Current canonical state always outranks a mirror or checkpoint, including its wallet.
+  if (version === PLAYER_SAVE_VERSION)
+    return { save, migrated: false, fromVersion: version };
+  const resolved = resolvePlayerSaveRecovery(save);
+  return {
+    save: { ...resolved.save, account: save.account },
+    migrated: true,
+    fromVersion: version,
+  };
+}
+
+/**
+ * Reads the account without writing it, so a read-only tab (or one running
+ * another build) never rewrites the canonical save with its own sanitizer.
+ */
 export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
   if (!("indexedDB" in window))
     return {
@@ -1745,28 +1814,9 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
       migrated: false,
       recoveryMode: "none",
     };
-  let migrated = false;
-  let save: PlayerSave;
+  let resolved: MigrationResult;
   try {
-    save = await playerSaveTransaction((stored) => {
-      if (stored !== undefined) {
-        const result = {
-          save: readCanonicalPlayerSave(stored),
-          migrated:
-            (stored as { version: number }).version !== PLAYER_SAVE_VERSION,
-        };
-        migrated = result.migrated;
-        // Current canonical state always outranks a mirror or checkpoint, including its wallet.
-        if (!migrated) return result.save;
-        const resolved = resolvePlayerSaveRecovery(result.save);
-        return { ...resolved.save, account: result.save.account };
-      }
-      migrated = true;
-      const recovery = recoverySaveFromLegacy();
-      if (recovery.account.revision > 0)
-        throw new MissingCanonicalSaveError(recovery);
-      return recovery;
-    });
+    resolved = resolveStoredPlayerSave(await readStoredPlayerSave());
   } catch (error) {
     if (error instanceof MissingCanonicalSaveError)
       return {
@@ -1778,10 +1828,10 @@ export async function loadPlayerSave(): Promise<LoadedPlayerSave> {
       };
     throw error;
   }
-  try {
-    saveRecovery(save);
-  } catch {
-    /* A committed canonical revision remains authoritative. */
-  }
-  return { save, source: "indexeddb", migrated, recoveryMode: "none" };
+  return {
+    save: resolved.save,
+    source: "indexeddb",
+    migrated: resolved.migrated,
+    recoveryMode: "none",
+  };
 }

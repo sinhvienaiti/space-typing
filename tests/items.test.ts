@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   addItem,
   createEmptyInventory,
+  foreignInventoryEntries,
   inventoryTotal,
   isValidInventory,
   itemCount,
@@ -72,6 +73,25 @@ describe("item registry and inventory", () => {
     expect(isValidInventory({ "repair-kit": 3 })).toBe(true);
     expect(isValidInventory({ "unknown-item": 1 })).toBe(false);
     expect(isValidInventory({ "repair-kit": 999 })).toBe(false);
+  });
+
+  it("keeps well-formed entries a newer build added, apart from the known inventory", () => {
+    expect(
+      foreignInventoryEntries({
+        "repair-kit": 3,
+        "quantum-anchor": 2,
+        "bad id": 1,
+        "zero-item": 0,
+        "half-item": 1.5,
+        "text-item": "4",
+      }),
+    ).toEqual({ "quantum-anchor": 2 });
+    expect(foreignInventoryEntries(null)).toEqual({});
+    expect(foreignInventoryEntries(["quantum-anchor"])).toEqual({});
+    const many = Object.fromEntries(
+      Array.from({ length: 50 }, (_, index) => ["future-" + index, 1]),
+    );
+    expect(Object.keys(foreignInventoryEntries(many))).toHaveLength(32);
   });
 
   it("counts all stored items", () => {

@@ -12273,16 +12273,28 @@ byId("titleFeedbackButton").addEventListener("click", () => feedbackDialog.open(
 byId("pauseFeedbackButton").addEventListener("click", () => feedbackDialog.open("bug", "pause"));
 feedbackDialog.handleLinks();
 let cloudStatusText = "Not synced yet.";
+/**
+ * Why the cloud copy cannot replace this device's save now, or null. Saves
+ * already queued are fine: AccountTransactions.restore runs after them.
+ */
+function cloudRestoreBlocker(): string | null {
+  if (warpAccount?.attempt || clearSettlementPending) return "Cloud save found · it loads after this sortie";
+  if (!persistenceReady || walletPurchaseBusy || practiceRestorePending) return "Cloud save found · it loads once this device's save is ready";
+  return null;
+}
 cloudSave = new CloudSave(onlineSession, {
   currentSave: () => lastCommittedSave as unknown as { version: number; [key: string]: unknown } | null,
   canSync: () => persistenceReady && accountTransactions.canWrite() && !practiceRestorePending && !walletPurchaseBusy,
+  restoreBlocker: cloudRestoreBlocker,
   restore: async (data) => {
+    // Refused while the account loads, a sortie runs or a purchase saves: CloudSave keeps its old revision.
+    if (cloudRestoreBlocker() !== null) throw new Error("Finish the current sortie or purchase before loading the cloud save.");
     const parsed = parsePlayerSaveJson(JSON.stringify(data));
     if (!parsed.ok) throw new Error("Cloud save is damaged: " + parsed.error);
     if (accountTransactions.canWrite()) await accountTransactions.restore(parsed.save, parsed.migrated);
     else await accountTransactions.recover(parsed.save, parsed.migrated);
-    window.location.reload();
   },
+  reload: () => window.location.reload(),
   conflict: (conflict) => accountDialog.conflict(conflict),
   status: (text, tone) => {
     cloudStatusText = text;
@@ -12365,7 +12377,6 @@ onlineSession.onChange(() => {
   if (onlineSession.online) cloudStatusText = "Connected · uploads at most once a minute.";
 });
 renderOnlineButton();
-void onlineSession.start().then(() => accountDialog.handleLinks());
 byId("titleMailButton").addEventListener("click", () => dailyHub?.open("mail"));
 /** Gameplay dialogs have their own sounds. */
 const QUIET_DIALOGS = new Set(["rewardChoiceDialog", "anomalyDialog"]);
@@ -12471,5 +12482,18 @@ if (import.meta.env.DEV) {
   };
 }
 void initializeArtPipeline();
-void initializePlayerProgress();
+// Cloud save and the server wallet compare against the local account, so the
+// online session starts once it has loaded. If storage hangs, chat and account
+// links still start after a while: cloud restore and the wallet's first seed
+// wait for persistenceReady on their own.
+{
+  let onlineStarted = false;
+  const startOnline = (): void => {
+    if (onlineStarted) return;
+    onlineStarted = true;
+    void onlineSession.start().then(() => accountDialog.handleLinks());
+  };
+  window.setTimeout(startOnline, 10_000);
+  void initializePlayerProgress().finally(startOnline);
+}
 void loadInitialVocabulary();

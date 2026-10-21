@@ -107,6 +107,15 @@ async function raw(value: unknown) {
   });
   db.close();
 }
+async function storedRecord(): Promise<PlayerSave & { inventory: Record<string, number> }> {
+  const db = await openPlayerDatabase();
+  const value = await new Promise<PlayerSave & { inventory: Record<string, number> }>((resolve) => {
+    const get = db.transaction("player", "readonly").objectStore("player").get("main");
+    get.onsuccess = () => resolve(get.result);
+  });
+  db.close();
+  return value;
+}
 describe("canonical admission and fenced writer", () => {
   it("snapshots caller context and intent before queued admission and activation", async () => {
     await seed();
@@ -681,5 +690,71 @@ describe("settlement, Phoenix, refuel and migration", () => {
     expect(readonly.canWrite()).toBe(false);
     expect(published).toHaveBeenCalled();
     await expect(readonly.admit(context)).rejects.toThrow(/another tab/);
+  });
+});
+describe("only the account writer writes the canonical save", () => {
+  const legacy = () => {
+    const { account: _account, ...fields } = createPlayerSave(
+      createDefaultCampaignProgress(),
+    );
+    return { ...fields, version: 27 };
+  };
+  it("loading resolves a legacy record in memory without writing it or the mirror", async () => {
+    await raw(legacy());
+    const put = vi.spyOn(IDBObjectStore.prototype, "put");
+    const loaded = await loadPlayerSave();
+    expect(loaded).toMatchObject({
+      source: "indexeddb",
+      migrated: true,
+      save: { version: 28, account: { warp: { current: 100 } } },
+    });
+    expect(put).not.toHaveBeenCalled();
+    expect(memory.size).toBe(0);
+    expect((await storedRecord()).version).toBe(27);
+  });
+  it("a read-only tab leaves the migration to the tab that holds the writer lock", async () => {
+    await raw(legacy());
+    locks.held = true;
+    const { s: readonly, loaded } = await store();
+    expect(readonly.canWrite()).toBe(false);
+    expect(loaded.save.version).toBe(28);
+    expect((await storedRecord()).version).toBe(27);
+    locks.held = false;
+    const { s: writer } = await store();
+    expect(writer.canWrite()).toBe(true);
+    expect(await storedRecord()).toMatchObject({
+      version: 28,
+      account: { owner: writer.writerId, warp: { current: 100 } },
+    });
+  });
+  it("a first-run writer creates the canonical record from the legacy mirror", async () => {
+    const { s } = await store();
+    expect(s.canWrite()).toBe(true);
+    expect(await storedRecord()).toMatchObject({
+      version: 28,
+      account: { owner: s.writerId },
+    });
+  });
+  it("an older build's writes keep the items a newer build added", async () => {
+    const save = await seed((next) => {
+      next.inventory = { "phoenix-core": 1 };
+    });
+    await raw({ ...save, inventory: { "phoenix-core": 1, "quantum-anchor": 2 } });
+    const { s, loaded } = await store();
+    expect(loaded.save.inventory).toEqual({ "phoenix-core": 1 });
+    await s.admit(context);
+    expect(s.account()!.attempt?.phase).toBe("prepared");
+    expect((await storedRecord()).inventory).toEqual({
+      "phoenix-core": 1,
+      "quantum-anchor": 2,
+    });
+    expect((await loadPlayerSave()).save.inventory).toEqual({ "phoenix-core": 1 });
+  });
+  it("a whole-profile restore replaces the inventory, unknown items included", async () => {
+    const save = await seed();
+    await raw({ ...save, inventory: { "quantum-anchor": 2 } });
+    const { s, loaded } = await store();
+    await s.restore(loaded.save);
+    expect((await storedRecord()).inventory).toEqual({});
   });
 });

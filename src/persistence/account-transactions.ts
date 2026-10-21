@@ -25,6 +25,7 @@ import {
 import {
   loadPlayerSave,
   readCanonicalPlayerSave,
+  resolveStoredPlayerSave,
   validateAccountAuxiliary,
   playerSaveTransaction,
   savePlayerRecoveryMirrorSync,
@@ -70,10 +71,13 @@ export class AccountTransactions {
     this.state = structuredClone(save.account);
     if (!this.writable)
       this.clock = new WarpClock(save.account.warp.watermarkMs);
-    try {
-      savePlayerRecoveryMirrorSync(save);
-    } catch {
-      /* Mirror failure never refunds a canonical commit. */
+    // Only the writer keeps the mirror; a read-only tab may run another build.
+    if (this.writable) {
+      try {
+        savePlayerRecoveryMirrorSync(save);
+      } catch {
+        /* Mirror failure never refunds a canonical commit. */
+      }
     }
     try {
       this.committed(save);
@@ -107,8 +111,9 @@ export class AccountTransactions {
     let interrupted = false;
     let save: PlayerSave;
     try {
+      // The writer persists the migration (or first record) the read-only load only resolved.
       save = await playerSaveTransaction((stored) => {
-        const s = readCanonicalPlayerSave(stored),
+        const s = resolveStoredPlayerSave(stored).save,
           a = s.account;
         a.owner = this.writerId;
         a.fence++;

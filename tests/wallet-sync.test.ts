@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createWarpCharge, type WarpCharge } from "../src/economy/warp-charge";
 import { addDeltas, type WalletBalances, type WalletDeltas } from "../src/economy/wallet-rules";
+import { OnlineError } from "../src/online/api";
 import type { OnlineSession } from "../src/online/session";
-import { WALLET_DEVICE_KEY, WalletSync, type CommittedSave } from "../src/online/wallet-sync";
+import { carryQueue, queuedOpFailure, WALLET_DEVICE_KEY, WalletSync, type CommittedSave } from "../src/online/wallet-sync";
 
 /** The game's side of the server wallet (src/online/wallet-sync.ts) against a small fake server. */
 
@@ -10,7 +11,7 @@ const NOW = Date.UTC(2026, 9, 17, 3, 0);
 type Call = { path: string; body: Record<string, unknown> };
 
 function fakeServer(start: WalletBalances, phase = 3) {
-  const state = { balances: { ...start }, warp: createWarpCharge(NOW) as WarpCharge, seen: new Set<string>(), spends: new Map<string, WalletDeltas>(), offline: false, decay: 1, loseSpendReply: false, confirmed: new Set<string>(), openFailures: 0, rateLimited: false, reconciled: false };
+  const state = { balances: { ...start }, warp: createWarpCharge(NOW) as WarpCharge, seen: new Set<string>(), spends: new Map<string, WalletDeltas>(), offline: false, decay: 1, loseSpendReply: false, confirmed: new Set<string>(), openFailures: 0, rateLimited: false, reconciled: false, signedOut: false, refuse: null as string | null, answer: null as { status: number; error: string; message: string } | null };
   const calls: Call[] = [];
   const view = (extra: Record<string, unknown> = {}) => ({ phase, balances: { ...state.balances }, warp: state.warp, warpPending: 0, held: [], sortie: null, maxStage: 1, earnedToday: {}, dailyCap: {}, flagged: 0, version: 1, serverTime: NOW, reconciled: state.reconciled, ...extra });
   const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -19,7 +20,10 @@ function fakeServer(start: WalletBalances, phase = 3) {
     const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
     calls.push({ path, body });
     if (state.offline) throw new TypeError("Failed to fetch");
+    if (state.signedOut && path.startsWith("/wallet")) return json(401, { error: "signed-out", message: "Please sign in again." });
     if (path === "/wallet/op" && state.rateLimited) return json(429, { error: "rate-limited", message: "Retry later" });
+    if (path === "/wallet/op" && state.refuse !== null) return json(400, { error: state.refuse, message: "Refused" });
+    if (path === "/wallet/op" && state.answer !== null) return json(state.answer.status, { error: state.answer.error, message: state.answer.message });
     const opId = String(body.opId ?? "");
     if (opId !== "" && state.seen.has(opId)) return json(200, view({ duplicate: true }));
     if (opId !== "") state.seen.add(opId);
@@ -154,6 +158,174 @@ describe("server wallet on the client", () => {
     expect(server.state.balances.credits).toBe(50);
     const ids = server.calls.filter(c => c.body.kind === "earn").map(c => c.body.opId);
     expect(new Set(ids).size).toBe(1);
+  });
+  it("keeps earnings queued while the session is signed out and sends them after signing in again", async () => {
+    const server = fakeServer({ ...ZERO });
+    const t = setup({ ...ZERO }, server);
+    await t.open();
+    server.state.signedOut = true;
+    t.game.balances.credits += 50;
+    t.commit();
+    await vi.advanceTimersByTimeAsync(16_000);
+    t.game.balances.credits += 10;
+    t.commit();
+    await vi.advanceTimersByTimeAsync(16_000);
+    expect(JSON.parse(t.memory.get("spaceTypingWalletV1:acc")!).queue).toHaveLength(2);
+    expect(t.game.notices.filter((text) => /sign in again/.test(text))).toHaveLength(1);
+    expect(t.game.balances.credits).toBe(60);
+    server.state.signedOut = false;
+    await t.open(); // The same account signs in again.
+    expect(server.state.balances.credits).toBe(60);
+    expect(t.game.balances.credits).toBe(60);
+    expect(JSON.parse(t.memory.get("spaceTypingWalletV1:acc")!).queue).toHaveLength(0);
+    const ids = server.calls.filter((call) => call.body.kind === "earn" && call.body.deltas !== undefined).map((call) => call.body.opId);
+    expect(new Set(ids).size).toBe(2);
+  });
+  it("an expired session followed by a fresh sign-in reopens the wallet with the waiting earnings", async () => {
+    const server = fakeServer({ ...ZERO });
+    const t = setup({ ...ZERO }, server);
+    await t.open();
+    server.state.signedOut = true;
+    t.game.balances.credits += 50;
+    t.commit();
+    await vi.advanceTimersByTimeAsync(50);
+    const session = t.session as unknown as { account: { id: string } | null };
+    session.account = null;
+    await t.open();
+    server.state.signedOut = false;
+    session.account = { id: "acc" };
+    await t.open();
+    expect(server.state.balances.credits).toBe(50);
+    expect(t.game.balances.credits).toBe(50);
+  });
+  it("signing in again through a new guest still sends the earnings held for the account", async () => {
+    // Each account has its own server wallet; the device's guest became this account, so a reload makes a new guest.
+    const servers: Record<string, ReturnType<typeof fakeServer>> = { acc: fakeServer({ ...ZERO, credits: 100 }), "guest-2": fakeServer({ ...ZERO }) };
+    const t = setup({ ...ZERO, credits: 100 }, servers.acc!);
+    const session = t.session as unknown as { account: { id: string; kind?: string } | null };
+    vi.stubGlobal("fetch", (url: string, init: RequestInit) => servers[session.account!.id]!.fetch(url, init));
+    await t.open();
+    servers.acc!.state.signedOut = true; // The session expires on the server.
+    t.game.balances.credits += 50;
+    t.commit();
+    await vi.advanceTimersByTimeAsync(50);
+    const opId = servers.acc!.calls.find((call) => call.body.kind === "earn")?.body.opId;
+    expect(opId).toBeTypeOf("string");
+    session.account = null; // Reload: /me answers nobody…
+    await t.open();
+    session.account = { id: "guest-2", kind: "guest" }; // …so the game signs in as a new guest, whose wallet opens.
+    await t.open();
+    expect(t.memory.get(WALLET_DEVICE_KEY)).toBe("guest-2");
+    expect(t.game.balances.credits).toBe(0);
+    servers.acc!.state.signedOut = false;
+    session.account = { id: "acc", kind: "registered" }; // The player signs in again.
+    await t.open();
+    const earns = servers.acc!.calls.filter((call) => call.body.kind === "earn");
+    expect(earns.map((call) => call.body.opId)).toEqual([opId, opId]);
+    expect(servers.acc!.state.balances.credits).toBe(150);
+    expect(t.game.balances.credits).toBe(150);
+    expect(JSON.parse(t.memory.get("spaceTypingWalletV1:acc")!).queue).toHaveLength(0);
+    // Nothing is left to report: the next commit sends no spend for the guest's balances.
+    t.commit();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(servers.acc!.calls.filter((call) => call.path === "/wallet/op")).toHaveLength(2);
+    expect(servers["guest-2"]!.calls.some((call) => call.path === "/wallet/op")).toBe(false);
+  });
+  it("held earnings are dropped when the save was replaced since (the player chose another copy)", async () => {
+    const server = fakeServer({ ...ZERO, credits: 100 });
+    const t = setup({ ...ZERO, credits: 100 }, server);
+    t.game.generation = "before-restore";
+    await t.open();
+    server.state.signedOut = true;
+    t.game.balances.credits += 50;
+    t.commit();
+    await vi.advanceTimersByTimeAsync(50);
+    t.memory.set(WALLET_DEVICE_KEY, "guest-2"); // A guest's wallet wrote into the save…
+    t.game.generation = "after-restore"; // …and the cloud copy replaced it.
+    server.state.signedOut = false;
+    await (t.sync as unknown as { open(id: string): Promise<void> }).open("acc");
+    await vi.advanceTimersByTimeAsync(50);
+    expect(server.calls.filter((call) => call.body.kind === "earn")).toHaveLength(1);
+    expect(server.state.balances.credits).toBe(100);
+  });
+  it("tells a guest to reload, not to sign in, when its session ends", async () => {
+    const server = fakeServer({ ...ZERO });
+    const t = setup({ ...ZERO }, server);
+    (t.session as unknown as { account: { id: string; kind: string } }).account = { id: "acc", kind: "guest" };
+    await t.open();
+    server.state.signedOut = true;
+    t.game.balances.credits += 50;
+    t.commit();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(t.game.notices).toEqual(["Session ended · your rewards wait on this device; reload the game to send them"]);
+  });
+  it("keeps the earnings of a suspended account and shows the server's reason once", async () => {
+    const server = fakeServer({ ...ZERO });
+    const t = setup({ ...ZERO }, server);
+    await t.open();
+    server.state.answer = { status: 403, error: "banned", message: "This account is suspended." };
+    t.game.balances.credits += 50;
+    t.commit();
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(server.calls.filter((call) => call.body.kind === "earn")).toHaveLength(1);
+    expect(t.game.notices).toEqual(["This account is suspended."]);
+    expect(JSON.parse(t.memory.get("spaceTypingWalletV1:acc")!)).toMatchObject({ queue: [{ body: { kind: "earn" } }], awaitingSignIn: true });
+  });
+  it("an unexpected answer keeps the earning, says so once and asks again less often", async () => {
+    const server = fakeServer({ ...ZERO });
+    const t = setup({ ...ZERO }, server);
+    await t.open();
+    server.state.answer = { status: 404, error: "not-found", message: "Unknown account endpoint." };
+    t.game.balances.credits += 50;
+    t.commit();
+    const earns = () => server.calls.filter((call) => call.body.kind === "earn").length;
+    await vi.advanceTimersByTimeAsync(50);
+    expect(earns()).toBe(1);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(earns()).toBe(2);
+    await vi.advanceTimersByTimeAsync(29_000);
+    expect(earns()).toBe(2);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(earns()).toBe(3);
+    expect(t.game.notices.filter((text) => /waiting for the server/.test(text))).toHaveLength(1);
+    server.state.answer = null;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(server.state.balances.credits).toBe(50);
+    expect(JSON.parse(t.memory.get("spaceTypingWalletV1:acc")!).queue).toHaveLength(0);
+  });
+  it("moves held operations onto a balance that does not hold them, below zero if needed", () => {
+    const op = (credits: number) => ({ path: "/wallet/op" as const, body: {}, reports: { ...ZERO, credits } });
+    const carried = carryQueue([op(150), op(170)], { ...ZERO, credits: 100 }, { ...ZERO });
+    expect(carried.reported.credits).toBe(-70);
+    expect(carried.queue.map((entry) => entry.reports.credits)).toEqual([-20, 0]);
+    expect(carryQueue([], { ...ZERO, credits: 100 }, { ...ZERO, credits: 5 })).toEqual({ reported: { ...ZERO, credits: 5 }, queue: [] });
+  });
+  it("still drops an operation the server refuses for good", async () => {
+    const server = fakeServer({ ...ZERO });
+    const t = setup({ ...ZERO }, server);
+    await t.open();
+    server.state.refuse = "invalid-reward-day";
+    t.game.balances.credits += 50;
+    t.commit();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(JSON.parse(t.memory.get("spaceTypingWalletV1:acc")!).queue).toHaveLength(0);
+    expect(t.game.balances.credits).toBe(0);
+  });
+  it("classifies queued-op failures: only business refusals drop an operation", () => {
+    expect(queuedOpFailure(new OnlineError(401, "signed-out", ""))).toBe("signed-out");
+    expect(queuedOpFailure(new OnlineError(403, "banned", ""))).toBe("suspended");
+    expect(queuedOpFailure(new OnlineError(403, "account-deleted", ""))).toBe("suspended");
+    expect(queuedOpFailure(new OnlineError(403, "stage-locked", ""))).toBe("refused");
+    expect(queuedOpFailure(new OnlineError(409, "sortie-unknown", ""))).toBe("refused");
+    expect(queuedOpFailure(new OnlineError(409, "insufficient", ""))).toBe("refused");
+    expect(queuedOpFailure(new OnlineError(409, "busy", ""))).toBe("retry");
+    expect(queuedOpFailure(new OnlineError(429, "rate-limited", ""))).toBe("retry");
+    expect(queuedOpFailure(new OnlineError(404, "offline", ""))).toBe("retry");
+    expect(queuedOpFailure(new OnlineError(404, "not-found", ""))).toBe("unexpected");
+    expect(queuedOpFailure(new OnlineError(400, "a-new-code", ""))).toBe("unexpected");
+    expect(queuedOpFailure(new OnlineError(503, "unavailable", ""))).toBe("retry");
+    expect(queuedOpFailure(new OnlineError(0, "offline", ""))).toBe("retry");
+    expect(queuedOpFailure(new TypeError("Failed to fetch"))).toBe("retry");
   });
   it("persists an uncertain sortie start and reuses its id after reload", async () => {
     const server = fakeServer({ ...ZERO });
