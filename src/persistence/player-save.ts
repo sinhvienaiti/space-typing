@@ -1708,7 +1708,11 @@ export function openPlayerDatabase(): Promise<IDBDatabase> {
  * Items a newer build added are unknown here and dropped by the sanitizer;
  * a write from this build keeps them as stored instead of deleting them.
  * Only within the same schema and generation: a migration or a whole-profile
- * restore replaces the inventory on purpose.
+ * restore replaces the inventory on purpose. So a retired item id stays in
+ * storage until the next PLAYER_SAVE_VERSION bump cleans it.
+ * Covers the top-level inventory only: equipment, characters, relics, shops
+ * and snapshot inventories of an older writer still follow its sanitizer
+ * (follow-up: a build stamp in the record that older writers refuse).
  */
 export function keepForeignInventory(next: PlayerSave, stored: unknown): PlayerSave {
   const raw = stored as { version?: unknown; account?: { generation?: unknown }; inventory?: unknown } | null | undefined;
