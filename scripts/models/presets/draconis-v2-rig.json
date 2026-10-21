@@ -1,5 +1,5 @@
 {
-  "comment": "Winged biped rig for raw/heroes/draconis-v2.meshy.glb (Meshy, Blender Z up, faces -Y, no yaw). Coordinates are the source file's, before normalizing; measured from horizontal vertex slices (18/10/2026). L is the -X side. 'flight' asks for the chase-camera flight clips (make_flight_clips).",
+  "comment": "Winged biped rig for art-src/3d/heroes/draconis-v2.glb (was raw/heroes/draconis-v2.meshy.glb; not on the Mac) (Meshy, Blender Z up, faces -Y, no yaw). Coordinates are the source file's, before normalizing; measured from horizontal vertex slices (18/10/2026). L is the -X side. 'flight' asks for the chase-camera flight clips (make_flight_clips).",
   "yaw": 0,
   "flight": true,
   "weights": "heat",

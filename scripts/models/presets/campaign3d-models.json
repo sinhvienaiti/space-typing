@@ -15,7 +15,7 @@
    "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
    "triangles": 6000,
    "autoEmissive": 0.06,
-   "note": "placeholder: copy of prism-scout (no generated model yet)",
+   "note": "placeholder: prism-scout model until rainbow-tank.glb exists",
    "reviewed": false
   },
   "enemies/rainbow-shield-3d": {
@@ -45,7 +45,7 @@
    "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
    "triangles": 6000,
    "autoEmissive": 0.06,
-   "note": "placeholder: copy of rainbow-shield (no generated model yet)",
+   "note": "placeholder: rainbow-shield model until rainbow-destroyer.glb exists",
    "reviewed": false
   },
   "enemies/rainbow-healer-3d": {
@@ -68,7 +68,7 @@
    "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
    "triangles": 6000,
    "autoEmissive": 0.06,
-   "note": "placeholder: copy of rainbow-commander (no generated model yet)",
+   "note": "placeholder: rainbow-commander model until rainbow-cloaker.glb exists",
    "reviewed": false
   },
   "enemies/rainbow-leech-3d": {
@@ -245,7 +245,7 @@
    "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
    "triangles": 6000,
    "autoEmissive": 0.06,
-   "note": "placeholder: copy of devil-cloaker (no generated model yet)",
+   "note": "placeholder: devil-cloaker model until devil-destroyer.glb exists",
    "reviewed": false
   },
   "enemies/devil-healer-3d": {
@@ -345,7 +345,7 @@
    "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
    "triangles": 6000,
    "autoEmissive": 0.06,
-   "note": "placeholder: copy of frost-commander (no generated model yet)",
+   "note": "placeholder: frost-commander model until frost-destroyer.glb exists",
    "reviewed": false
   },
   "enemies/frost-healer-3d": {
@@ -375,7 +375,7 @@
    "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
    "triangles": 6000,
    "autoEmissive": 0.06,
-   "note": "placeholder: copy of frost-healer (no generated model yet)",
+   "note": "placeholder: frost-healer model until frost-leech.glb exists",
    "reviewed": false
   },
   "enemies/frost-carrier-3d": {
@@ -440,7 +440,7 @@
    "rotate": [-1, 0, 0, 0, -1, 0, 0, 0, 1],
    "triangles": 6000,
    "autoEmissive": 0.06,
-   "note": "placeholder: copy of prism-healer (no generated model yet)",
+   "note": "placeholder: prism-healer model until prism-splitter.glb exists",
    "reviewed": false
   },
   "enemies/prism-destroyer-3d": {
@@ -647,7 +647,7 @@
    "rotate": [0, -1, 0, 1, 0, 0, 0, 0, 1],
    "triangles": 6000,
    "autoEmissive": 0.06,
-   "note": "placeholder: copy of shadow-cloaker (no generated model yet)",
+   "note": "placeholder: shadow-cloaker model until shadow-destroyer.glb exists",
    "reviewed": false
   },
   "enemies/shadow-healer-3d": {
@@ -884,7 +884,7 @@
    "facing": "-Y",
    "triangles": 30000,
    "autoEmissive": 0.05,
-   "note": "placeholder: copy of warden-frost (no generated model yet)",
+   "note": "placeholder: warden-frost model until tyrant-g03.glb exists",
    "reviewed": false
   },
   "bosses/tyrant-g04": {

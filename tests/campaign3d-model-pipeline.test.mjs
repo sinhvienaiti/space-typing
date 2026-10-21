@@ -65,7 +65,7 @@ describe("Campaign 3D model preparation", () => {
   it("every preset source sits where its 2D art is mirrored", () => {
     for (const [key, value] of Object.entries(preset.models)) {
       const top = value.source.split("/")[0];
-      expect(["enemies", "bosses", "projectiles", "relics", "duel-targets", "pickups", "puzzle", "defense"], key).toContain(top);
+      expect(["enemies", "bosses", "projectiles", "relics", "duel-targets", "pickups", "puzzle", "defense", "icons", "skills", "items"], key).toContain(top);
     }
   });
 
@@ -123,14 +123,29 @@ describe("Campaign 3D model preparation", () => {
       expect(inputs.at(-1)).toBe(join(root, "art-src/3d/enemies/frost-leech.glb"));
       expect(readFileSync(runtime("high"), "utf8")).toBe("leech");
 
+      // The same file regenerated: its rotate was tuned for the old model, so it waits for review until --force.
+      put("art-src/3d/enemies/frost-leech.glb", "leech v2");
+      const changed = await run();
+      expect([changed.status, changed.failures]).toEqual(["review", 1]);
+      expect(readFileSync(runtime("high"), "utf8")).toBe("leech");
+      expect((await run({ force: true })).status).toBe("pass");
+      expect(readFileSync(runtime("high"), "utf8")).toBe("leech v2");
+      expect((await run()).status).toBe("cached");
+
+      // Files no entry reads (a new one, and the stand-in nobody names now) are reported, without failing the run.
+      put("art-src/3d/enemies/frost-newcomer.glb", "new");
+      const unread = await prepareCampaign3DModels({ root, runCommand, log: () => {}, blender: "blender" });
+      expect(unread.results.filter((result) => result.status === "unread").map((result) => result.key)).toEqual(["enemies/frost-healer.glb", "enemies/frost-newcomer.glb"]);
+      expect(unread.failures).toBe(0);
+
       // The own file disappears while the preset still names a placeholder: the built model is kept.
       presetWith(entry);
       unlinkSync(join(root, "art-src/3d/enemies/frost-leech.glb"));
       const gone = await run();
       expect([gone.status, gone.failures]).toEqual(["missing", 1]);
-      expect(readFileSync(runtime("high"), "utf8")).toBe("leech");
+      expect(readFileSync(runtime("high"), "utf8")).toBe("leech v2");
       expect(existsSync(runtime("medium"))).toBe(true);
-      expect(inputs).toHaveLength(2);
+      expect(inputs).toHaveLength(3);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

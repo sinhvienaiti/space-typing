@@ -39,11 +39,12 @@
 
 - `<kind>` là một trong: `ships`, `enemies`, `bosses`, `skills`, `items`.
 - `<id>` viết thường, chỉ chữ, số và gạch ngang (ví dụ `vanguard`, `tyrant-g01`, `pulse-laser-mk1`).
-- Thư mục `art-src/` không đưa lên Git (đã có trong `.gitignore`). Chỉ thư mục `public/assets/space-typing/models/` cần commit.
+- Thư mục `art-src/` không đưa lên Git (đã có trong `.gitignore`). Từ 21/10/2026 các file GLB trong `public/assets/space-typing/models/` cũng không đưa lên Git; chỉ `manifest.json` được commit.
 - Bản gốc ở bước 2 nằm cùng đường dẫn với ảnh 2D: `art-src/<đường dẫn>/<tên>.png` → `art-src/3d/<đường dẫn>/<tên>.glb`.
   - Ví dụ: `art-src/enemies/frost-healer.png` → `art-src/3d/enemies/frost-healer.glb`.
   - Tàu: `art-src/ships/ship-NN-<id>-2d.png` → `art-src/3d/ships/ship-NN-<id>.glb`. Vanguard: `art-src/3d/ships/ship-01-vanguard.glb`.
   - Quy tắc đầy đủ: `art-src/3d/README.md`.
+  - Bước 2 lấy đường dẫn của **ảnh 2D trong game** (`art-src/enemies/…`, `art-src/bosses/…`), không phải ảnh khái niệm ở bước 1. Bước 1 nay thay bằng `docs/art-requests/3D_TRIPO_MESHY_PROMPTS_2026-10-16.md` (tải thẳng ảnh 2D của game lên Tripo/Meshy).
 
 **Bước 5 làm gì:**
 - Kiểm tra mô hình đủ điểm gắn, đủ hoạt ảnh và đúng số tam giác.

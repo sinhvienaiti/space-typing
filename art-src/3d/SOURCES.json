@@ -1,7 +1,6 @@
 {
  "version": 1,
- "written": "2026-10-21",
- "rule": "art-src/<path>/<name>.png -> art-src/3d/<path>/<name>.glb (ships: art-src/ships/ship-NN-<id>-2d.png -> art-src/3d/ships/ship-NN-<id>.glb). Owner originals from Tripo/Meshy, never edited; pipelines read them and write processed copies elsewhere.",
+ "rule": "art-src/<path>/<name>.png -> art-src/3d/<path>/<name>.glb (ships: art-src/ships/ship-NN-<id>-2d.png -> art-src/3d/ships/ship-NN-<id>.glb; skills/ and items/ hold Text to 3D models with no 2D image). Owner originals from Tripo/Meshy, never edited; pipelines read them and write processed copies elsewhere. Regenerate: node scripts/models/index-3d-sources.mjs",
  "files": {
   "bosses/lieutenant-angel.glb": {
    "md5": "17fd39c535ddd976da4900fed0e78ffe",
@@ -72,7 +71,9 @@
    "bytes": 12551540,
    "image": "art-src/bosses/tyrant-g01.png",
    "usedBy": [
-    "bosses/tyrant-g01"
+    "bosses/tyrant-g01",
+    "bosses/3d/tyrant-g01 (prepare-boss-3d)",
+    "bosses/auriel-hero (--hero-clips)"
    ]
   },
   "bosses/tyrant-g02.glb": {
@@ -1712,6 +1713,13 @@
   }
  },
  "notMadeYet": {
+  "bosses/tyrant-g03.glb": {
+   "image": "art-src/bosses/tyrant-g03.png",
+   "standIn": "bosses/warden-frost.glb",
+   "usedBy": [
+    "bosses/tyrant-g03"
+   ]
+  },
   "enemies/devil-destroyer.glb": {
    "image": "art-src/enemies/devil-destroyer.png",
    "standIn": "enemies/devil-cloaker.glb",
@@ -1779,20 +1787,13 @@
    "usedBy": [
     "enemies/shadow-destroyer-3d"
    ]
-  },
-  "bosses/tyrant-g03.glb": {
-   "image": "art-src/bosses/tyrant-g03.png",
-   "standIn": "bosses/warden-frost.glb",
-   "usedBy": [
-    "bosses/tyrant-g03"
-   ]
   }
  },
  "noOriginalOnThisMachine": {
-  "heroes/draconis, heroes/draconis-v2, heroes/draconis-v3, guides/draconis-v4": "only the packaged runtime copies in public/assets/space-typing/models remain",
-  "bosses/auriel-hero": "only the packaged runtime copy remains",
-  "enemies/rainbow-scout-3d": "only the packaged runtime copy remains (the Campaign 3D scout of the first slice)",
-  "skills/dragon-fireball": "only the packaged runtime copy remains"
+  "heroes/draconis, heroes/draconis-v2, heroes/draconis-v3, guides/draconis-v4": "Only the packaged runtime copies in public/assets/space-typing/models remain. The Meshy originals were on the old Windows machine (D:\\typing-game\\games\\space-typing\\art-src\\models\\raw\\heroes\\, art-src\\models\\heroes\\). If found, save them as art-src/3d/heroes/<id>.glb.",
+  "enemies/rainbow-scout-3d": "Only the packaged runtime copy remains (the Campaign 3D scout of the first slice, made from art-src/enemies/rainbow-scout.png; once at art-src/concepts/enemies/rainbow-scout-3d.glb on the Windows machine). If found, save it as art-src/3d/enemies/rainbow-scout.glb: that also replaces the rainbow-scout placeholder.",
+  "skills/dragon-fireball": "Only the packaged runtime copy remains (once at art-src/concepts/attack/fire-ball.glb on the Windows machine). It has no 2D image: if found, save it as art-src/3d/skills/dragon-fireball.glb.",
+  "bosses/auriel-hero": "Built from art-src/3d/bosses/tyrant-g01.glb with --hero-clips; only the intermediate Blender file is missing."
  },
  "history": {
   "from": "art-src/img-3d (the owner's copy of ~/Downloads/img-typing), renamed art-src/3d on 2026-10-21",

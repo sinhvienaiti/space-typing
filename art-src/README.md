@@ -2,9 +2,9 @@
 
 Thư mục này chứa **ảnh gốc** do chủ dự án tạo bằng Gemini hoặc ChatGPT Images.
 
-Game không đọc trực tiếp các ảnh gốc này. Các pipeline `*:prepare` đọc chúng và tạo asset runtime trong `public/assets/space-typing/` hoặc `src/assets/`. Bộ ảnh runtime đã xử lý **có** trong Git.
+Game không đọc trực tiếp các ảnh gốc này. Các pipeline `*:prepare` đọc chúng và tạo asset runtime trong `public/assets/space-typing/` hoặc `src/assets/`. Bộ ảnh runtime làm trước 21/10/2026 **có** trong Git. Từ 21/10/2026, chủ dự án chốt: ảnh, nhạc, mô hình GLB và height map mới **không** đưa lên Git, chỉ giữ ở máy.
 
-Git bỏ qua mọi thứ ở đây, trừ file README này. Lý do:
+Git bỏ qua mọi thứ ở đây, trừ file README này, `3d/README.md` và `3d/SOURCES.json`. Lý do:
 - ảnh gốc nặng, khoảng 22 MB cho mỗi Galaxy;
 - Git giữ mọi phiên bản cũ, nên mỗi lần tạo lại ảnh repo lại nặng thêm.
 
@@ -43,8 +43,10 @@ art-src/<đường dẫn>/<tên>.png  →  art-src/3d/<đường dẫn>/<tên>.g
 - Ví dụ: `art-src/enemies/frost-healer.png` → `art-src/3d/enemies/frost-healer.glb`.
 - Phi thuyền: `art-src/ships/ship-NN-<id>-2d.png` → `art-src/3d/ships/ship-NN-<id>.glb`.
 - Đạn phi thuyền: ảnh 2D ở `art-src/projectiles/`, mô hình ở `art-src/3d/projectiles/`.
-- `art-src/3d/defense/` để dành cho mô hình riêng của Defense.
+- Defense: ảnh 2D ở `art-src/defense/` (`maps/`, `icons/`), mô hình riêng ở `art-src/3d/defense/<tên>.glb`.
 - Nhân vật (hero, guide) là ngoại lệ: `art-src/3d/heroes/<id>.glb`.
+- Món không có ảnh 2D (tạo bằng Text to 3D): `art-src/3d/<loại>/<id>.glb`, ví dụ `art-src/3d/skills/<id>.glb`.
+- Ảnh tàu cũ `art-src/ships/<id>-top-hd.png` không có mô hình riêng. Tàu hiển thị bằng `ship-NN-<visual>.glb` theo `src/characters/ship-visual-catalog.json`.
 
 Không sửa file gốc. `scripts/models/prepare-campaign3d-models.mjs` và `scripts/models/prepare-ship-models.mjs` đọc từ đây, rồi ghi bản đã xử lý vào `art-src/models/<loại>/` và `public/assets/space-typing/models/`.
 Cache build dựa trên nội dung file, nên dời hoặc đổi tên file không cần build lại.
@@ -52,7 +54,10 @@ Cache build dựa trên nội dung file, nên dời hoặc đổi tên file khô
 Ảnh 2D chưa có mô hình riêng thì dùng mô hình tạm, ghi ở trường `placeholder` trong `scripts/models/presets/campaign3d-models.json`. Khi file đúng tên được thêm, pipeline báo REVIEW. Kiểm tra hướng mô hình, rồi xóa trường `placeholder` để build từ file mới.
 
 Build lại sau khi thêm file: `node scripts/models/prepare-campaign3d-models.mjs` (mục không đổi báo CACHED). `--only` nhận khóa trong preset (ví dụ `enemies/frost-healer-3d`), không phải tên ảnh 2D.
+Thêm, đổi tên hay thay file xong thì chạy `node scripts/models/index-3d-sources.mjs` để cập nhật `art-src/3d/SOURCES.json`.
 Chi tiết: `art-src/3d/README.md` và `art-src/3d/SOURCES.json` (mã băm, tên lúc tải về, mô hình nào dùng file nào).
+
+`art-src/3d/` là bản gốc duy nhất của các mô hình (không có trên Git). **Hãy sao lưu nó ra ngoài máy.** `SOURCES.json` có md5 để kiểm tra bản sao.
 
 Thêm Galaxy mới: tạo thư mục `gNN/`, rồi khai báo trong `KITS` của `scripts/bg-art/prepare-kit.mjs` cùng dải `heroWorlds`. G02 còn kiểm tra đúng 12 object ở atlas rocks và 11 object ở atlas life để bắt lỗi tách vật thể trước khi build runtime kit.
 

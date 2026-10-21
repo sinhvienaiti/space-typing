@@ -9,13 +9,15 @@
  * own model is not made yet names a `placeholder` (the nearest existing
  * model); it builds from that until its own file appears. Then the entry
  * waits for review (its rotate was tuned for the stand-in) until the
- * placeholder is dropped from the preset.
+ * placeholder is dropped from the preset. A source file whose content
+ * changed since its last build also waits for review (--force accepts it).
+ * Files under art-src/3d that no entry reads are listed as UNREAD.
  * Presets: scripts/models/presets/campaign3d-models.json.
  */
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findBlender, PROJECT_ROOT, runCommand } from './prepare-ship-models.mjs';
 import { MODEL_CONTRACTS } from '../../src/render3d/model-contracts.ts';
@@ -83,6 +85,15 @@ async function writeJsonAtomic(path, value) {
   await rename(temporary, path);
 }
 
+/** GLBs under art-src/3d as paths relative to it, with / separators. */
+async function sourceFiles(root) {
+  const base = join(root, SOURCE_ROOT);
+  if (!existsSync(base)) return [];
+  const entries = await readdir(base, { recursive: true, withFileTypes: true });
+  return entries.filter((entry) => entry.isFile() && entry.name.endsWith('.glb'))
+    .map((entry) => relative(base, join(entry.parentPath ?? entry.path, entry.name)).split(sep).join('/')).sort();
+}
+
 async function validRuntimeEntry(root, kind, id) {
   const entry = (await readJson(join(root, 'public/assets/space-typing/models/manifest.json')))?.models?.[kind + '/' + id];
   if (!entry || MODEL_CONTRACTS[kind].requiredSockets.some((socket) => !entry.sockets?.includes(socket))) return false;
@@ -124,11 +135,16 @@ export async function prepareCampaign3DModels(options = {}) {
         // The preset's rotate was tuned for the stand-in: look at the new model before it replaces the runtime one.
         results.push({ key, status: 'review' }); log('REVIEW ' + key + ': its own model ' + entry.source + ' is in; check its orientation (rotate, facing), then drop "placeholder" from ' + presetFile + ' (or rerun with --force)'); continue;
       }
+      const sourceHash = await fileHash(source.path);
+      if (!options.force && typeof cache?.sourceHash === 'string' && cache.sourceHash !== sourceHash && cache.source === source.path) {
+        // Same file, new content (a regenerated model): its rotate was tuned for the old one.
+        results.push({ key, status: 'review' }); log('REVIEW ' + key + ': ' + (source.placeholder ? entry.placeholder : entry.source) + ' changed since its last build; check its orientation (rotate, facing), then rerun with --force --only=' + key); continue;
+      }
       if (source.placeholder) log('NOTE ' + key + ': its own model ' + entry.source + ' is not made yet; building from the placeholder ' + entry.placeholder);
       if (!entry.reviewed) log('NOTE ' + key + ': orientation not yet marked reviewed in ' + presetFile);
       const processed = join(root, 'art-src/models', entry.kind, entry.id + '.glb');
       const outputs = [processed, ...(!options.noPackage ? runtimePaths(root, entry.kind, entry.id) : [])];
-      const signature = cacheSignature(preset.models[key], await fileHash(source.path), shared, !options.noPackage);
+      const signature = cacheSignature(preset.models[key], sourceHash, shared, !options.noPackage);
       let cached = !options.force && cache?.signature === signature && (options.noPackage || await validRuntimeEntry(root, entry.kind, entry.id));
       if (cached) for (const path of outputs) {
         if (!existsSync(path) || await fileHash(path) !== cache.outputs?.[path]) { cached = false; break; }
@@ -145,11 +161,18 @@ export async function prepareCampaign3DModels(options = {}) {
       }
       const hashes = {};
       for (const path of outputs) hashes[path] = await fileHash(path);
-      await writeJsonAtomic(cacheFile, { version: 2, signature, source: source.path, outputs: hashes });
+      await writeJsonAtomic(cacheFile, { version: 2, signature, source: source.path, sourceHash, outputs: hashes });
       results.push({ key, status: 'pass' }); log('PASS ' + key);
     } catch (error) {
       results.push({ key, status: 'failed', detail: error.message }); log('FAIL ' + key + ': ' + error.message);
     }
+  }
+  // A new file nothing reads would otherwise pass silently; ships and tyrant-g01 have their own pipelines.
+  const read = new Set(Object.values(preset.models).flatMap((value) => [value.source, value.placeholder].filter(Boolean)));
+  const known = new Set(Object.keys((await readJson(join(root, SOURCE_ROOT, 'SOURCES.json')))?.files ?? {}));
+  if (!only && !options.kind) for (const file of await sourceFiles(root)) {
+    if (read.has(file) || known.has(file) || file.startsWith('ships/') || file === 'bosses/tyrant-g01.glb') continue;
+    results.push({ key: file, status: 'unread' }); log('UNREAD ' + SOURCE_ROOT + '/' + file + ': no preset entry reads it; add one to ' + presetFile);
   }
   const failures = results.filter((result) => ['failed', 'missing', 'review'].includes(result.status)).length;
   const counts = results.reduce((all, result) => ({ ...all, [result.status]: (all[result.status] ?? 0) + 1 }), {});

@@ -1,5 +1,5 @@
 {
-  "comment": "Quadruped winged dragon rig for raw/heroes/draconis-v3.meshy.glb (Meshy, Blender Z up, faces -Y, no yaw). Coordinates are the source file's, before normalizing; read off 1 px = 1 mm orthographic renders with a grid and vertex slices (18/10/2026). L is the -X side. The mouth is modelled open (~30°): the jaw bone closes it. 'flight': 'dragon' asks for make_dragon_clips; 'body': 'quadruped' for the nearest-bone part split.",
+  "comment": "Quadruped winged dragon rig for art-src/3d/heroes/draconis-v3.glb (was raw/heroes/draconis-v3.meshy.glb; not on the Mac) (Meshy, Blender Z up, faces -Y, no yaw). Coordinates are the source file's, before normalizing; read off 1 px = 1 mm orthographic renders with a grid and vertex slices (18/10/2026). L is the -X side. The mouth is modelled open (~30°): the jaw bone closes it. 'flight': 'dragon' asks for make_dragon_clips; 'body': 'quadruped' for the nearest-bone part split.",
   "yaw": 0,
   "flight": "dragon",
   "body": "quadruped",

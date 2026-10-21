@@ -441,7 +441,7 @@ Mỗi bản đồ dùng model của **một họ** (ví dụ bản đồ 2 dùng
 - Luật: `src/defense/rules/` — `data.ts` (quái, 6 trụ với nhánh, kinh tế, phước lành), `maps.ts` (8 bản đồ và đợt quái), `engine.ts` (đòn trụ, quái đánh trụ, máu trụ, hồi sinh, Lõi), `fit.ts` (độ hợp ô xây).
 - Hình: `src/defense/view/` — `painter.ts` (ảnh đảo tạm và ảnh khung), `terrain.ts` (đảo có độ cao, vực, đá treo, pha lê, đá vụn), `camera.ts`, `crowd.ts` (quái theo họ, bóng đổ, viền sáng, khiên, tàng hình), `towers.ts`, `vfx.ts` (nổ, khói, lửa, sét, tia, vòng), `sounds.ts`.
 - Trang: `src/defense/main.ts`, `defense.html`, `src/defense/defense.css`. Thẻ phước lành và thẻ nhánh dùng `src/ui/reward-card.ts` của game.
-- Model mới đóng gói: `items/tower-arc`, `items/tower-sanctum`, `items/tower-siphon` (model relic của chủ dự án), `items/prop-crystal-a/b/c` (pha lê), `enemies/<họ>-scout-lod` cho 6 họ còn thiếu.
+- Model mới đóng gói: `items/tower-arc` (duel-target `disrupt` của chủ dự án, từ 21/10), `items/tower-sanctum`, `items/tower-siphon` (model relic của chủ dự án), `items/prop-crystal-a/b/c` (pha lê), `enemies/<họ>-scout-lod` cho 6 họ còn thiếu.
 - `FlightWorld.skyOnly` (chỉ vẽ trời và hành tinh mốc) và `SceneAudio.preload/playFile/synth` thêm cho Defense; Campaign 3D không đổi.
 
 **Cân bằng (bot gõ máy, độ chính xác 96 %, mức Thường, 3 seed):**

@@ -1,5 +1,5 @@
 {
-  "comment": "Winged biped rig for raw/heroes/draconis-v4.meshy.glb (Meshy, Blender Z up, faces -Y, no yaw; 0.71 tall), the title-page guide. Coordinates are the source file's, before normalizing; read off 1 px = 0.5 mm orthographic renders with a grid (18/10/2026). L is the -X side. 'flight': 'guide' asks for make_guide_clips (standing idle and click actions).",
+  "comment": "Winged biped rig for art-src/3d/heroes/draconis-v4.glb (was raw/heroes/draconis-v4.meshy.glb; not on the Mac) (Meshy, Blender Z up, faces -Y, no yaw; 0.71 tall), the title-page guide. Coordinates are the source file's, before normalizing; read off 1 px = 0.5 mm orthographic renders with a grid (18/10/2026). L is the -X side. 'flight': 'guide' asks for make_guide_clips (standing idle and click actions).",
   "yaw": 0,
   "flight": "guide",
   "bones": {

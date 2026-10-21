@@ -1,5 +1,5 @@
 {
-  "comment": "Winged biped rig for raw/ships/Draconis.meshy.glb. Coordinates are the Meshy file's (Blender, Z up, face -Y) after --yaw 23, before normalizing. Measured from front/side/top renders and vertex slices (17/10/2026).",
+  "comment": "Winged biped rig for the Draconis Meshy original (was raw/ships/Draconis.meshy.glb; hero originals now go to art-src/3d/heroes/<id>.glb, and this one is not on the Mac). Coordinates are the Meshy file's (Blender, Z up, face -Y) after --yaw 23, before normalizing. Measured from front/side/top renders and vertex slices (17/10/2026).",
   "yaw": 23,
   "bones": {
     "hips": [[0.005, -0.04, -0.06], [0.005, -0.045, 0.0], null],

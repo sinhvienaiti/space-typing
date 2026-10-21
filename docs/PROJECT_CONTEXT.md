@@ -4097,7 +4097,11 @@ Art-request docs now point to the new paths.
 When an entry's own model arrives while the preset still names a placeholder, the
 build stops with REVIEW (its rotate was tuned for the stand-in) until the placeholder
 is dropped; if a built own model later goes missing, the build reports MISSING and
-keeps it instead of falling back.
+keeps it instead of falling back. A source whose content changed since its last build
+(a regenerated model) also stops with REVIEW until rerun with `--force --only=<key>`;
+files under art-src/3d that no entry reads are listed as UNREAD.
+`node scripts/models/index-3d-sources.mjs` regenerates the tracked SOURCES.json, and
+`tests/art-3d-sources.test.mjs` checks the mirror rule from it without the models.
 
 Owner decision (21/10): images, audio, GLB models and height maps are not pushed to
 Git. Code, tests, scripts, docs and JSON (including the model manifest) are; a fresh
