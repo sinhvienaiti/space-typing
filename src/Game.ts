@@ -7713,21 +7713,22 @@ export class Game {
             markedBossDamageMultiplier(this.bossMarkTimer > 0) *
             this.characterBossDamageMultiplier(),
       );
-      this.updateBossPhase(boss);
+      // A killing key opens no new phase (that would reset the word): the
+      // boss falls below.
+      if (boss.hp > 0) this.updateBossPhase(boss);
     }
 
     this.fireBossLaser(0.9);
     this.sfx.shot(this.stats.multiplier);
 
-    if (boss.hp <= 0) {
-      this.defeatBoss();
-      this.emitStats();
-      return;
-    }
-
+    // The last letter completes the word before the boss falls, so the word
+    // counts as typed even when this key's damage was the kill;
+    // completeBossWord defeats the boss itself once its HP is gone.
     if (boss.typed >= word.length) this.completeBossWord(boss);
+    if (this.boss === boss && boss.hp <= 0) this.defeatBoss();
 
-    this.hooks.onBossUpdate(toBossHud(boss));
+    // A defeated boss has already closed its HUD.
+    if (this.boss === boss) this.hooks.onBossUpdate(toBossHud(boss));
     this.emitStats();
   }
 
