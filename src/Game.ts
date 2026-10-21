@@ -567,6 +567,7 @@ import {
   type PerformanceReport,
 } from "./performance/quality";
 import { AdaptiveRenderBudget } from "./performance/adaptive-resolution";
+import { resetCanvas2D } from "./platform/canvas-state";
 import { runFrameLoop, type FrameLoop } from "./platform/frame-loop";
 import type {
   Enemy,
@@ -4928,7 +4929,13 @@ export class Game {
     }
 
     const drawStart = performance.now();
-    this.draw(now / 1000);
+    try {
+      this.draw(now / 1000);
+    } catch (error) {
+      // The draw restores its canvas state only at its end.
+      resetCanvas2D(this.canvas, this.context, this.dpr);
+      throw error;
+    }
     const drawMs = Math.max(0, performance.now() - drawStart);
     this.drawProfiler.pushFrame(drawMs / 1000);
     if (

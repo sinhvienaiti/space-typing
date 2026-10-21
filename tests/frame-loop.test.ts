@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { runFrameLoop, type FrameError, type FrameLoopOptions, type FrameScheduler } from "../src/platform/frame-loop";
+import { handleEach, runFrameLoop, type FrameError, type FrameLoopOptions, type FrameScheduler } from "../src/platform/frame-loop";
 
 /** A hand-cranked requestAnimationFrame: `tick(now)` runs the pending frame. */
 function manualFrames(): FrameScheduler & { pending: number; cancelled: number[]; tick(now: number): void } {
@@ -154,13 +154,17 @@ describe("resilient frame loop", () => {
   });
 
   it("stops cleanly: cancels the pending frame, also when stopped inside a frame", () => {
-    const outside = loop({});
+    const outsideUpdate = vi.fn();
+    const outsideDraw = vi.fn();
+    const outside = loop({ update: outsideUpdate, draw: outsideDraw });
     outside.handle.stop();
     outside.handle.stop();
     expect(outside.frames.cancelled).toEqual([1]);
-    const draw = vi.fn();
     outside.frames.tick(16);
+    expect(outsideUpdate).not.toHaveBeenCalled();
+    expect(outsideDraw).not.toHaveBeenCalled();
 
+    const draw = vi.fn();
     const inside = loop({
       update: () => inside.handle.stop(),
       draw,
@@ -170,5 +174,26 @@ describe("resilient frame loop", () => {
     expect(inside.frames.cancelled).toEqual([2]);
     inside.frames.tick(32);
     expect(draw).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleEach (a frame's events)", () => {
+  it("handles every event after one throws, then rethrows the first error", () => {
+    const handled: string[] = [];
+    const first = new Error("bad tower");
+    const handle = (event: string): void => {
+      handled.push(event);
+      if (event === "collapse") throw first;
+      if (event === "horizon") throw new Error("second");
+    };
+
+    expect(() => handleEach(["collapse", "horizon", "waveEnd", "defeat"], handle)).toThrow(first);
+    expect(handled).toEqual(["collapse", "horizon", "waveEnd", "defeat"]);
+  });
+
+  it("returns quietly when every event is handled", () => {
+    const handle = vi.fn();
+    expect(() => handleEach(["waveStart", "waveEnd"], handle)).not.toThrow();
+    expect(handle).toHaveBeenCalledTimes(2);
   });
 });

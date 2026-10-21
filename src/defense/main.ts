@@ -12,7 +12,7 @@ import * as THREE from "three";
 import { allBossIdentities, bossFullName } from "../boss/identity";
 import { paintedEnemyArtUrl } from "../enemies/painted-sprites";
 import { buildCombatLearningEvent, LEARNING_ATTEMPT_MESSAGE, PARENT_ORIGIN } from "../learning/shared";
-import { runFrameLoop } from "../platform/frame-loop";
+import { handleEach, runFrameLoop } from "../platform/frame-loop";
 import { loadModel, modelEntry, pickModelTier } from "../render3d/model-loader";
 import { HeroFx } from "../scene3d/fx";
 import { Hero } from "../scene3d/hero";
@@ -27,6 +27,7 @@ import type { EnemyKind, GameSettings, VocabularyEntry } from "../types";
 import { paintedEquipmentIcon, paintedItemIcon, paintedSkillIcon } from "../ui/painted-icons";
 import { renderRewardCards, type RewardCardInput } from "../ui/reward-card";
 import { loadVocabularyIndex, loadVocabularyLevel } from "../vocabulary";
+import { pausesOnFrameError } from "./frame-error";
 import { ABILITY, BOONS, ENEMIES, RUBBLE_COST, SKILLS, TOWER_ORDER, TOWERS, type Branch, type Difficulty, type EnemyType, type SkillId, type TowerType } from "./rules/data";
 import { DefenseEngine, STEP, type DefenseEvent, type Enemy, type Tower } from "./rules/engine";
 import { towerFit } from "./rules/fit";
@@ -414,9 +415,10 @@ function clearRun(): void {
   document.body.classList.remove("df-tier-1", "df-tier-2", "df-tier-3");
 }
 
-type Overlay = "dfMenu" | "dfCards" | "dfReview" | "dfPause" | "dfResult";
+const OVERLAYS = ["dfMenu", "dfCards", "dfReview", "dfPause", "dfResult"] as const;
+type Overlay = (typeof OVERLAYS)[number];
 function showOverlay(id: Overlay | null): void {
-  for (const name of ["dfMenu", "dfCards", "dfReview", "dfPause", "dfResult"] as const) byId(name).hidden = name !== id;
+  for (const name of OVERLAYS) byId(name).hidden = name !== id;
 }
 
 function showBanner(text: string, small = "", fire = false, seconds = 1.8): void {
@@ -1775,13 +1777,20 @@ function updateFrame(now: number): void {
   if (engine !== null) {
     accumulator += dt;
     let steps = 0;
-    while (accumulator >= STEP && steps < 10) {
-      engine.step(STEP);
-      accumulator -= STEP;
-      steps += 1;
+    try {
+      while (accumulator >= STEP && steps < 10) {
+        engine.step(STEP);
+        accumulator -= STEP;
+        steps += 1;
+      }
+    } catch (error) {
+      // A throwing step drops the time it was given, so the paused frames
+      // after it do not step the run on.
+      accumulator = 0;
+      throw error;
     }
     if (steps === 10) accumulator = 0;
-    for (const event of engine.events.splice(0)) handle(event);
+    handleEach(engine.events.splice(0), handle);
     if (endTimer > 0) {
       endTimer -= real;
       if (endTimer <= 0) {
@@ -1882,7 +1891,8 @@ runFrameLoop({
   draw: drawFrame,
   // A throwing frame pauses the run, so the player keeps it.
   onError: () => {
-    if (!paused) togglePause();
+    const overlayOpen = OVERLAYS.some((name) => !byId(name).hidden);
+    if (pausesOnFrameError({ phase: engine?.phase ?? null, paused, overlayOpen })) togglePause();
   },
 });
 window.setTimeout(paintThumbs, 400);

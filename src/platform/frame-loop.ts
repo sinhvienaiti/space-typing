@@ -65,6 +65,23 @@ function reportFrameError(error: unknown): void {
   else console.error(error);
 }
 
+/**
+ * Calls `handle` on every item, also after one throws (a frame's events: a
+ * broken one must not drop the wave end or the defeat behind it), then
+ * rethrows the first error for the frame loop to report.
+ */
+export function handleEach<T>(items: readonly T[], handle: (item: T) => void): void {
+  let failure: { error: unknown } | null = null;
+  for (const item of items) {
+    try {
+      handle(item);
+    } catch (error) {
+      failure ??= { error };
+    }
+  }
+  if (failure !== null) throw failure.error;
+}
+
 type StageState = { streak: number; haltedAt: number | null };
 
 export function runFrameLoop(options: FrameLoopOptions): FrameLoop {

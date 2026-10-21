@@ -3,6 +3,7 @@ import { createTestGame } from "./helpers/game-harness";
 import { createStageConfig } from "../src/campaign/stage";
 import { difficultyFor } from "../src/campaign/difficulty";
 import type { GamePhase } from "../src/types";
+import { fakeContext2D, type FakeContext2D } from "./helpers/fake-context-2d";
 
 /** The Campaign canvas loop through a throwing frame: it pauses the run and keeps drawing. */
 type FrameInternals = {
@@ -76,6 +77,30 @@ describe("Campaign frame loop", () => {
 
     expect(game.getPhase()).toBe("paused");
     expect(simulate).toHaveBeenCalledTimes(2);
+    game.destroy();
+  });
+
+  it("starts the frame after a throwing draw from a clean canvas state", () => {
+    const { game, internals, draw, runFrame } = playingGame();
+    const { context } = fakeContext2D({ reset: true });
+    (internals as unknown as { context: FakeContext2D }).context = context;
+    // A HiDPI canvas: a bare reset would leave it unscaled.
+    (internals as unknown as { dpr: number }).dpr = 2;
+    draw.mockImplementationOnce(() => {
+      context.save();
+      context.translate(9, -5);
+      context.globalAlpha = 0.2;
+      throw new Error("bad sprite");
+    });
+    const entered: { transform: number[]; globalAlpha: number; depth: number }[] = [];
+    draw.mockImplementation(() => {
+      entered.push({ transform: [...context.transform], globalAlpha: context.globalAlpha, depth: context.stack.length });
+    });
+
+    runFrame(1000);
+    runFrame(1016);
+
+    expect(entered).toEqual([{ transform: [2, 0, 0, 2, 0, 0], globalAlpha: 1, depth: 0 }]);
     game.destroy();
   });
 
