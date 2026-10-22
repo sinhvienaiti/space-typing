@@ -20,6 +20,7 @@ Mỗi bản cập nhật có một file trong thư mục này. File ghi rõ đã
 
 | Ngày | Bản cập nhật | Mục review đã xử lý |
 |---|---|---|
+| 2026-10-22 | [Typing Defense 1A.5: sửa sau review (luật bot riêng mỗi lượt, file vàng so đủ trường, luồng chính của Chrome trong cổng 5, test người đọc và gợi ý nhịp, Nhanh ẩu ở cùng tải, tải đầy TK 25.12)](./2026-10-22-td-1a5-review.md) | (review mốc 1A.5, mục 1–7) |
 | 2026-10-22 | [Typing Defense 1A.5: bot, báo cáo `td:balance`, test vàng, đo hiệu năng, cổng cứng §7, bộ ảnh cho chủ dự án](./2026-10-22-td-1a5-bot.md) | (mã mới TD) |
 | 2026-10-22 | [Typing Defense 1A.4: sửa sau review (vàng gọi sớm, Tab không có ân hạn, chỗ trống gợi ý nhanh, chip lý do, test, chuột trên trình duyệt, thẻ trên HUD, Dải Chữ, Delete)](./2026-10-22-td-1a4-review.md) | (review mốc 1A.4, mục 1–10) |
 | 2026-10-22 | [Typing Defense 1A.4: điều khiển, HUD, hộp cát (bàn phím đủ đường, chuột, camera, thẻ nhà, 4 chân dung, Tải, Chuỗi, ân hạn, `move`, Đặt sẵn 4 ô)](./2026-10-22-td-1a4-controls.md) | (mã mới TD) |

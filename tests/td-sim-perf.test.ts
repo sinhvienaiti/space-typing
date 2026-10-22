@@ -1,16 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { STORE } from "../src/td/content/rules";
+import { CAP, STORE } from "../src/td/content/rules";
 import { hashHex } from "../src/td/sim/hash";
 import { STAT } from "../src/td/sim/stats";
 import { createWorld, runLog } from "../src/td/sim/world";
 import { send, world } from "./td/fixtures";
-import { loadedWorld, stepCost } from "./td/perf";
+import { fullWorld, loadedWorld, stepCost } from "./td/perf";
 
 /**
  * One simulation step under load (BUILD_NOW §6.1, §7 gate 5: ≤ 0.5 ms on the
  * owner's machine, ≤ 2 ms on CI): 300 enemies, 9 soldiers, 200 shots in
- * flight, 10 buildings, 4 assisted at 1 s on the real vocabulary; then the
- * stores full (TK 25.12: 640 enemies, 512 shots), held to the same CI bound.
+ * flight, 10 buildings, 4 assisted at 1 s on the real vocabulary; then TK
+ * 25.12's full load (640 enemies, 64 soldiers, 512 shots, 20 buildings; the
+ * 1A caps lifted), held to the same CI bound.
  * The medians are printed; `pnpm td:balance` prints them too.
  */
 describe("simulation step cost", () => {
@@ -25,12 +26,18 @@ describe("simulation step cost", () => {
     expect(cost.median).toBeLessThanOrEqual(2);
   });
 
-  it("steps the stores full (640 enemies, 512 shots in flight) in ≤ 2 ms", () => {
-    const w = loadedWorld(STORE.enemies, STORE.projectiles);
+  it("steps TK 25.12's full load (640 enemies, 64 soldiers, 512 shots, 20 buildings, 4 slots at 1 s) in ≤ 2 ms", () => {
+    const w = fullWorld();
     expect(w.enemies.count).toBe(STORE.enemies);
     expect(w.projectiles.count).toBe(STORE.projectiles);
+    expect(w.buildings.live(1).length).toBe(20);
+    expect(w.units.count).toBe(CAP.soldiers);
+    expect(w.units.live().every((s) => w.units.hp[s]! > 0)).toBe(true);
+    expect(w.agents.live().filter((a) => w.agents.at[a]! >= 0).length).toBe(4);
     const cost = stepCost(w, 300, 100);
-    console.log("td sim step (640 enemies, 512 shots): median " + cost.median.toFixed(3) + " ms, p95 " + cost.p95.toFixed(3) + " ms");
+    expect(w.units.count).toBe(CAP.soldiers);
+    expect(w.stats[STAT.blocks]).toBeGreaterThan(0);
+    console.log("td sim step (640 enemies, 64 soldiers, 512 shots, 20 buildings): median " + cost.median.toFixed(3) + " ms, p95 " + cost.p95.toFixed(3) + " ms");
     expect(cost.median).toBeLessThanOrEqual(2);
   });
 

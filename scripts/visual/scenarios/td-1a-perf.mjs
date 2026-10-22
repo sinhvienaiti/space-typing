@@ -4,7 +4,12 @@
 // while words are typed for real at 70 WPM through CDP. For ~10 s the page's
 // own frame costs (__td.costs: the 2D view with the word cards, and the steps
 // with the HUD and sound) are read: the 2D view and the cards must take
-// ≤ 8 ms a frame (p95) at 1280 × 720. Picture td-1a-perf.
+// ≤ 8 ms a frame (p95) at 1280 × 720. That is script time only, so Chrome's
+// own count (CDP Performance.getMetrics) is gated too: the renderer's whole
+// main thread (script, style, layout, paint, the scenario's own polling) a
+// frame, over the window and over each ~0.5 s of it (p95), ≤ 8 ms, at
+// ≥ 55 frames a second (raster and the GPU run on other threads; a frame
+// rate held shows they keep up). Picture td-1a-perf.
 // Gate 4: the golden run's command log (tests/golden/td-1a.json, made by Node
 // through scripts/td/golden.ts --log) is stepped in Chrome by the same modules
 // (Vite serves /src), and every 60-tick hash must be Node's; the scenario's
@@ -22,6 +27,10 @@ const WPM = Number(process.env.WPM ?? 70);
 const FLOOD = 300;
 const WINDOW_MS = 10000;
 const DRAW_P95_MS = 8;
+const FRAME_MS = 8;
+const SAMPLE_MS = 500;
+/** TEMPO index of 1 s (src/td/content/rules.ts). */
+const ONE_SECOND = 6;
 
 async function press(page, letter) {
   const code = "Key" + letter.toUpperCase();
@@ -65,6 +74,9 @@ export default async function (page) {
   await page.eval(td(`t.flood(${FLOOD}); return true;`));
   await page.sleep(100);
   await page.eval(`window.__perfFrames = 0; (function count() { window.__perfFrames += 1; requestAnimationFrame(count); })(); true`);
+  await page.send("Performance.enable", { timeDomain: "timeTicks" });
+  const metrics = async () => Object.fromEntries((await page.send("Performance.getMetrics")).metrics.map((m) => [m.name, m.value]));
+  const samples = [{ frames: await page.eval("window.__perfFrames"), ...(await metrics()) }];
 
   // The window: type for real, watch the field.
   const keyMs = 60000 / (WPM * 5);
@@ -73,11 +85,14 @@ export default async function (page) {
   let maxEnemies = 0;
   let maxWords = 0;
   const dealers = new Set();
+  const tempoLooks = [];
   const started = Date.now();
   while (Date.now() - started < WINDOW_MS) {
     const at = Date.now();
-    const look = await page.eval(td("const s = t.state(); return { words: t.liveWords(), enemies: s.enemies };"));
+    const look = await page.eval(td(`const s = t.state(); return { words: t.liveWords(), enemies: s.enemies, frames: window.__perfFrames, tempos: s.buildings.filter((b) => b.def !== "keep").map((b) => b.tempo) };`));
     if (look === null) break;
+    if (at - samples.at(-1).at >= SAMPLE_MS || samples.length === 1) samples.push({ at, frames: look.frames, ...(await metrics()) });
+    tempoLooks.push(look.tempos);
     minEnemies = Math.min(minEnemies, look.enemies);
     maxEnemies = Math.max(maxEnemies, look.enemies);
     maxWords = Math.max(maxWords, look.words.length);
@@ -97,8 +112,19 @@ export default async function (page) {
     await page.sleep(Math.max(0, keyMs - (Date.now() - at)));
   }
   const frames = await page.eval("window.__perfFrames");
+  samples.push({ frames, ...(await metrics()) });
   const costs = await page.eval(td("return t.costs();"));
   const seconds = (Date.now() - started) / 1000;
+  // Chrome's main thread a frame: the window's mean by kind, and each sample interval's whole task time a frame.
+  const [first, last] = [samples[1], samples.at(-1)];
+  const perFrame = (name) => +(((last[name] - first[name]) * 1000) / Math.max(1, last.frames - first.frames)).toFixed(3);
+  const intervals = samples.slice(2).map((sample, k) => ((sample.TaskDuration - samples[k + 1].TaskDuration) * 1000) / Math.max(1, sample.frames - samples[k + 1].frames));
+  const main = {
+    frames: last.frames - first.frames,
+    taskMean: perFrame("TaskDuration"), scriptMean: perFrame("ScriptDuration"), styleMean: perFrame("RecalcStyleDuration"), layoutMean: perFrame("LayoutDuration"),
+    // Over each sample interval (~0.5 s): count, mean, median, p95, max.
+    intervals: (({ frames: count, ...rest }) => ({ count, ...rest }))(stats(intervals)),
+  };
   const take = (list) => list.slice(-Math.min(list.length, frames));
   const draw = stats(take(costs?.draw ?? []));
   const update = stats(take(costs?.update ?? []));
@@ -147,9 +173,11 @@ export default async function (page) {
   const checks = {
     ready,
     presetAssisted: arrived && ids.length === 4,
-    fourBuildingsDealtAt1s: dealers.size >= 4,
+    fourBuildingsDealtAt1s: dealers.size >= 4 && tempoLooks.length > 0 && tempoLooks.every((tempos) => tempos.length === 4 && tempos.every((tempo) => tempo === ONE_SECOND)),
     floodOnTheField: minEnemies >= FLOOD * 0.8,
     drawAndCardsWithin8msP95: draw.frames >= 200 && draw.p95 <= DRAW_P95_MS,
+    mainThreadWithin8msPerFrame: main.frames >= 200 && main.intervals.count >= 10 && main.taskMean <= FRAME_MS && main.intervals.p95 <= FRAME_MS,
+    holds55fps: frames / seconds >= 55,
     goldenSameInNodeAndChrome: nodeGolden?.same === true && chrome?.deck === golden.deck && chrome?.content === golden.content && chrome?.hashes?.length === golden.hashes.length && firstDiff < 0,
     nodeReplaysToBrowserHash: replay?.match === true,
     noRejectedCommand: (final?.rejected ?? []).length === 0,
@@ -164,6 +192,7 @@ export default async function (page) {
     window: { seconds: +seconds.toFixed(1), frames, fps: +(frames / seconds).toFixed(1), enemies: [minEnemies, maxEnemies], maxLiveWords: maxWords, keysSent: keys, wpm: WPM },
     drawAndCardsMs: draw,
     stepsAndHudMs: update,
+    chromeMainThreadMsPerFrame: main,
     golden: { node: nodeGolden, chromeHashes: chrome?.hashes?.length ?? chrome, firstDiffAtTick: firstDiff < 0 ? null : (firstDiff + 1) * golden.every, log: goldenFile },
     vocabulary: final?.flags?.vocabulary,
     stats: { kills: final?.stats?.kills, streamDone: final?.stats?.streamDone, keys: final?.stats?.keys },
