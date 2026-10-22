@@ -56,7 +56,7 @@ export function stripHtml(w: World, note: string): string {
 }
 
 export const actionsHtml = (w: World): string =>
-  button("build", "Xây", "Insert") + (w.typing.allStopped ? button("restore", "Trả lại nhịp", "⇧ =") : button("stopAll", "Dừng tất cả", "⇧ −"));
+  button("build", "Xây", "Insert / \\") + (w.typing.allStopped ? button("restore", "Trả lại nhịp", "⇧ =") : button("stopAll", "Dừng tất cả", "⇧ −"));
 
 export class Hud {
   private readonly panels: HTMLElement[];

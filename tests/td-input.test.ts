@@ -29,7 +29,7 @@ describe("keys by event.code (BUILD_NOW §5.4)", () => {
       [{ key: "Enter", code: "Enter" }, "send"], [{ key: "Enter", code: "NumpadEnter" }, "send"], [{ key: "Enter", code: "Enter", shiftKey: true }, "wave"],
       [{ key: "-", code: "Minus" }, "slower"], [{ key: "=", code: "Equal" }, "denser"], [{ key: "-", code: "NumpadSubtract" }, "slower"],
       [{ key: "+", code: "NumpadAdd" }, "denser"], [{ key: "_", code: "Minus", shiftKey: true }, "stopAll"], [{ key: "+", code: "Equal", shiftKey: true }, "restore"],
-      [{ key: "Insert", code: "Insert" }, "build"], [{ key: "Delete", code: "Delete" }, "undo"], [{ key: "Escape", code: "Escape" }, "escape"], [{ key: "Pause", code: "Pause" }, "pause"],
+      [{ key: "Insert", code: "Insert" }, "build"], [{ key: "\\", code: "Backslash" }, "build"], [{ key: "Delete", code: "Delete" }, "undo"], [{ key: "Escape", code: "Escape" }, "escape"], [{ key: "Pause", code: "Pause" }, "pause"],
       [{ key: "F9", code: "F9" }, "sandbox"], [{ key: " ", code: "Space" }, ""], [{ key: "ArrowLeft", code: "ArrowLeft" }, "pan:1:0"],
       [{ key: "ArrowDown", code: "ArrowDown" }, "pan:0:-1"], [{ key: "Backspace", code: "Backspace" }, "backspace"],
     ];
