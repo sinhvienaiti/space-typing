@@ -1,6 +1,6 @@
 /**
- * Layouts on the sandbox field (BUILD_NOW §3.1, BUILD_1A6 §4): where the bots build and whom the helpers stand
- * by. Spots are checked by canPlace in the tests that use them; mines sit on the ore nodes' centres.
+ * Layouts on the sandbox field (BUILD_NOW §3.1, BUILD_1A6 §4, §12 gate 4): where the bots build and whom the
+ * helpers stand by. Spots are checked by canPlace in the tests that use them; mines sit on the ore nodes' centres.
  */
 import type { Layout, Spot } from "./stand";
 
@@ -18,20 +18,31 @@ export const MINE_N2: Spot = { id: "gold-mine", x: -12, z: 32 };
 export const MINE_N3: Spot = { id: "gold-mine", x: -34, z: 8 };
 /** The farm by the Bastion (the sandbox preset's). */
 export const FARM_KEEP: Spot = { id: "farm", x: -17, z: 40 };
-/** The stream's east bank: five trees (map indices 17–21). */
-export const EAST_BANK = [17, 18, 19, 20, 21] as const;
+/** The farm by the south-east trees, the cluster nearest the Bastion (14–22 m): fields and wood in one ring. */
+export const FARM_EAST: Spot = { id: "farm", x: 18, z: 30 };
+/** A second farm south of it, its fields 6.5 m off: the hero's ring holds both. */
+export const FARM_SOUTH: Spot = { id: "farm", x: 18, z: 23.5 };
+/** Where marks go, cluster by cluster: the south-east trees, the stream's east bank, its west bank, the gate's west side, the gate, the north-east corner. */
+export const WOOD = [[17, 38], [-18.5, -26], [-29, -29], [-18, -41], [6, -43], [38, -40]] as const;
 
 /**
- * The balanced bot's build (BUILD_1A6 §12 gate 4's "standard" policy, cut to 1A.6 R1): a farm first, the merge's
- * archer and barracks, the mine by the Bastion, then the roads' towers as gold and wood come; Chấm by the farm
- * (its passive), the Bastion at level 2 from night 2; the east bank's trees marked; up to 4 villagers.
+ * The standard build (BUILD_1A6 §12 gate 4: a farm, trees chopped, towers, barracks, a mine, the Bastion raised with
+ * gold): the farm by the south-east trees, the merge's archer and barracks, the rich mine on N1, the Bastion to
+ * level 2 (Chấm out, by the farm), the east road's archer and the cannon, a second farm, the Bastion to level 3
+ * (Phẩy out, by the mine), then level 2 for the merge's archer, the west archer, level 2 for the cannon, the mine
+ * and the barracks. Marked
+ * trees: the villagers' count and 2 more, cluster by cluster from the south-east trees; up to 4 villagers, 20 gold
+ * kept back; food past 20 sold; the days run out (no early night).
  */
-export const BALANCED: Layout = {
-  name: "Cân bằng",
-  builds: [FARM_KEEP, ARCHER_MERGE, BARRACKS, MINE_N2, ARCHER_EAST, CANNON, ARCHER_WEST],
-  helpers: [0],
-  keep: [[1, 1], [2, 2]],
-  marks: EAST_BANK,
+export const STANDARD: Layout = {
+  name: "Chuẩn",
+  builds: [
+    FARM_EAST, ARCHER_MERGE, BARRACKS, MINE_N1, { keep: 2 }, ARCHER_EAST, CANNON, { keep: 3 },
+    { upgrade: 1, level: 2 }, ARCHER_WEST, { upgrade: 6, level: 2 }, { upgrade: 3, level: 2 }, { upgrade: 2, level: 2 },
+  ],
+  helpers: [0, 3],
+  marks: { spare: 2, woodAt: WOOD },
   villagers: 4,
-  callAfterS: 45,
+  hireReserve: 20,
+  foodKeep: 20,
 };

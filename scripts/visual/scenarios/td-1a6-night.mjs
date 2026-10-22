@@ -69,6 +69,8 @@ export default async function (page) {
   const replay = await replayOnNode(page, "td-1a6-night");
   const checks = {
     ready,
+    // Live cards never overlap, sit clear of the HUD panels, ≥ 18 px, on screen (the locked card's ×1.2 included, review R3).
+    cardsClean: cardsClean(cards),
     nightByShiftEnter: called === "night" && seen.of("nightCalled").length >= 1,
     powerTyped: seen.hits(KIND.power).length >= 1,
     chargesSeen: maxCharges >= 2,

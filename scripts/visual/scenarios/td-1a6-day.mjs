@@ -107,6 +107,8 @@ export default async function (page) {
   const typed = { harvest: seen.hits(KIND.harvest).length, chop: seen.hits(KIND.chop).length, build: seen.hits(KIND.build).length };
   const checks = {
     ready,
+    // Live cards never overlap, sit clear of the HUD panels, ≥ 18 px, on screen (the locked card's ×1.2 included, review R3).
+    cardsClean: cardsClean(cards),
     farmCardShown: plotsBefore !== null,
     harvestTyped: typed.harvest >= 1,
     harvestFinishedByTyping: finishedBy(KIND.harvest),

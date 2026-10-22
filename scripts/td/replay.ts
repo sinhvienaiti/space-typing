@@ -5,7 +5,7 @@
  * screenshots: { seed, sandbox, content, deck, vocabulary, tick, hash, log }.
  * The deck is rebuilt from shared/vocabulary (or the built-in list the page
  * fell back to) and must have the browser's deck hash.
- *   node --import tsx scripts/td/replay.ts <OUT_DIR>/td-1a-combat-replay-1280x720.json
+ *   node --import tsx scripts/td/replay.ts <OUT_DIR>/td-1a6-day-replay-1280x720.json
  * Prints one JSON line; exits 1 when the content or the hash differs.
  */
 import { readFileSync } from "node:fs";

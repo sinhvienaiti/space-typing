@@ -1,16 +1,19 @@
 /**
- * A player's eyes for the Typing Defense bots (docs/td/BUILD_NOW.md §6.3, BUILD_1A6 §5): a call's word is seen
- * 0.35–0.6 s after it appears, one word is typed at a time, and the next is a power word first (they run out),
- * else the oldest word seen; a power word that cannot be finished in time is let go. The reader only reads the
- * world; its reaction times come from its own stream.
+ * A player's eyes for the Typing Defense bots (docs/td/BUILD_NOW.md §6.3, BUILD_1A6 §5, §7): a bright call's word
+ * is seen 0.35–0.6 s after it lights, the next word of the call being typed 0.15–0.3 s after the last one ends (the
+ * eyes are already there), and a quiz's word is recalled from its meaning in 0.8–1.6 s. One word is typed at a time;
+ * the next is a power word first (they run out; one that cannot be finished in time is let go), else the oldest word
+ * seen. The reader only reads the world; its reaction times come from its own stream.
  */
 import type { RngStream } from "../../src/platform/rng";
 import { TICK_HZ } from "../../src/td/content/rules";
+import { CALL_KIND } from "../../src/td/sim/stores/calls";
 import type { World } from "../../src/td/sim/world";
 
 const STEP_MS = 1000 / TICK_HZ;
-/** Reaction to a new word, in ticks: 0.35–0.6 s. */
-const SEE_TICKS = [Math.round(350 / STEP_MS), Math.round(600 / STEP_MS)] as const;
+const span = (lo: number, hi: number) => [Math.round((lo * 1000) / STEP_MS), Math.round((hi * 1000) / STEP_MS)] as const;
+/** Reaction, in ticks: to a new word, to the next word of the locked call, to a quiz (the word recalled from its meaning). */
+export const SEE = { word: span(0.35, 0.6), next: span(0.15, 0.3), quiz: span(0.8, 1.6) } as const;
 
 export class Reader {
   /** Word id → the tick it is seen. */
@@ -25,7 +28,9 @@ export class Reader {
     for (const s of W.live()) {
       const id = W.id(s);
       live.add(id);
-      if (!this.seenAt.has(id)) this.seenAt.set(id, W.born[s]! + this.rng.int(SEE_TICKS[0], SEE_TICKS[1]));
+      if (this.seenAt.has(id)) continue;
+      const [lo, hi] = w.calls.kind[W.call[s]!] === CALL_KIND.quiz ? SEE.quiz : w.typing.router.lock === s ? SEE.next : SEE.word;
+      this.seenAt.set(id, W.born[s]! + this.rng.int(lo, hi));
     }
     for (const id of this.seenAt.keys()) if (!live.has(id)) this.seenAt.delete(id);
   }

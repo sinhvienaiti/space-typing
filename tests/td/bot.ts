@@ -1,17 +1,19 @@
 /**
- * The Typing Defense bot (docs/td/BUILD_NOW.md §6.3, TK 19.1; BUILD_1A6 §12): a plan (what to build, where the
- * helpers stand, trees, villagers, the night call, the hero following the calls) and a typist (eyes that see a
- * call's word late and pick one, hands with a speed, an accuracy and a Backspace habit) play a world tick by tick
- * through the same commands a player sends. Every command is logged, so a run replays; the bot's own randomness
- * comes from a seed of its own and never touches the world's. A run may check the call invariants every tick
- * (BUILD_1A6 §12 gate 6). R3 grows this into the report's bots.
+ * The Typing Defense bot (docs/td/BUILD_NOW.md §6.3, TK 19.1; BUILD_1A6 §12): a plan (what to build, the Bastion's
+ * level bought with gold, trees, villagers, where the hero and the helpers stand, day and night) and a typist (eyes
+ * that see a bright call's word late and pick one, hands with a speed, an accuracy and a Backspace habit) play a
+ * world tick by tick through the same commands a player sends. Every command is logged, so a run replays; the bot's
+ * own randomness comes from a seed of its own and never touches the world's. A run meters what the report reads:
+ * typing ticks by day and night (and by day number), the director's 20 s typing count at its highest, what was
+ * earned (gold from every source, wood, food, knowledge) at each nightfall and dawn, what became of the calls, and
+ * the cost of a step; it may check the call invariants every tick (§12 gate 6).
  */
 import { createRng } from "../../src/platform/rng";
 import { MODES, TICK_HZ } from "../../src/td/content/rules";
 import type { Mode } from "../../src/td/content/types";
 import type { Command, CommandBody } from "../../src/td/sim/commands";
 import { hashHex } from "../../src/td/sim/hash";
-import { statsObject, type StatName } from "../../src/td/sim/stats";
+import { STAT, statsObject, type StatName } from "../../src/td/sim/stats";
 import { CALL_STATE } from "../../src/td/sim/stores/calls";
 import { createWorld, step, type World } from "../../src/td/sim/world";
 import { wordText, type Deck } from "../../src/td/typing/decks";
@@ -41,8 +43,16 @@ export type BotSpec = {
   hashEvery?: number;
   /** Check the call invariants every tick. */
   check?: boolean;
+  /** Time every step (performance.now): the report's sim cost. */
+  timeSteps?: boolean;
   maxTicks?: number;
 };
+
+/** Resources earned since the start (not spent, not the starting stock): gold from every source, wood, food, knowledge. */
+export type Earned = { gold: number; wood: number; food: number; knowledge: number };
+
+/** What became of the calls that ended: made, lit at least once, a word typed, finished by a typed word, whole Perfect, lit but left untyped, never lit. */
+export type CallTally = { made: number; bright: number; typed: number; finished: number; perfect: number; ignored: number; dark: number };
 
 export type BotRun = {
   world: World;
@@ -50,9 +60,21 @@ export type BotRun = {
   hashes: string[];
   stats: Record<StatName, number>;
   ticks: number;
-  /** Ticks with a lock, by phase: day, night. */
+  /** Ticks with a lock, and ticks, by phase: day, night (dawn in neither). */
   typedTicks: [number, number];
   phaseTicks: [number, number];
+  /** The same by day number (index n: day n, night n). */
+  byDay: { dayTyped: number; dayTicks: number; nightTyped: number; nightTicks: number }[];
+  /** The director's count of typing ticks in the last 20 s (BUILD_1A6 §5.3), at its highest, and the tick it was. */
+  windowMax: number;
+  windowAt: number;
+  /** Earned so far when night n falls (index n) and when day n begins (index n; 1 is the start). */
+  atNightfall: Earned[];
+  atDawn: Earned[];
+  calls: CallTally;
+  callsByKind: CallTally[];
+  /** Milliseconds a step: mean, 95th percentile, worst (timeSteps only). */
+  stepMs: { mean: number; p95: number; max: number } | null;
   /** Lives left as each night ended (index: wave). */
   livesAtWaveEnd: number[];
   /** Commands the world refused (reason), and invariant breaks. */
@@ -61,7 +83,7 @@ export type BotRun = {
   defeat: boolean;
 };
 
-/** Eyes and hands: one key a tick at most, when the hands are free and there is something to type. */
+/** Eyes and hands: one key a tick at most, when the hands are free and there is something seen to type. */
 class Typist {
   private handsAt = 0;
   private backspace = false;
@@ -89,12 +111,12 @@ class Typist {
     return { t: "key", letter, atMs: at };
   }
 
-  /** The letter to aim at: the locked word's next; else the first of the word the eyes pick. */
+  /** The letter to aim at: the locked word's next once it is read; else the first of the word the eyes pick. */
   private aim(w: World): number {
     const { router, deck } = w.typing;
     const W = w.words;
     const letterOf = (s: number, k: number): number => deck.letters[deck.start[W.word[s]!]! + k]!;
-    if (router.lock >= 0) return letterOf(router.lock, W.typed[router.lock]!);
+    if (router.lock >= 0) return this.eyes.seen(w, router.lock) ? letterOf(router.lock, W.typed[router.lock]!) : -1;
     const s = this.eyes.pick(w, this.hands.meanMs);
     return s >= 0 ? letterOf(s, 0) : -1;
   }
@@ -129,6 +151,49 @@ export function callProblems(w: World): string[] {
 const worldOf = (spec: Pick<BotSpec, "seed" | "deck" | "expected" | "vocab" | "mode" | "hands">): World =>
   createWorld({ seed: spec.seed, deck: spec.deck, expected: spec.expected ?? spec.hands?.wpm ?? 35, vocab: spec.vocab, mode: spec.mode });
 
+/** What the world has earned so far (Earned). */
+export function earned(w: World): Earned {
+  const s = w.stats;
+  const gold = s[STAT.goldKill]! + s[STAT.goldProduce]! + s[STAT.goldWave]! + s[STAT.goldEarly]! + s[STAT.goldWord]!;
+  return { gold: gold / 1000, wood: s[STAT.wood]!, food: s[STAT.food]!, knowledge: w.knowledge };
+}
+
+const tally = (): CallTally => ({ made: 0, bright: 0, typed: 0, finished: 0, perfect: 0, ignored: 0, dark: 0 });
+
+/** Reads a tick's rare events into the run: refusals, lives at a night's end, nightfall and dawn, the calls' lives. */
+class Meter {
+  private readonly open = new Map<number, { kind: number; bright: boolean; typed: number }>();
+
+  constructor(private readonly run: BotRun) {}
+
+  read(w: World): void {
+    const run = this.run;
+    for (const event of w.events.rare) {
+      if (event.t === "rejected") run.rejected.push(event.command + ": " + event.reason);
+      else if (event.t === "waveEnd") run.livesAtWaveEnd[event.wave] = w.lives;
+      else if (event.t === "phase" && event.phase === "night") run.atNightfall[event.day] = earned(w);
+      else if (event.t === "phase" && event.phase === "day") run.atDawn[event.day] = earned(w);
+      else if (event.t === "call" && event.state === "made") this.open.set(event.call, { kind: event.kind, bright: false, typed: 0 });
+      else if (event.t === "call" && event.state === "bright") this.open.get(event.call)!.bright = true;
+      else if (event.t === "wordHit") this.open.get(event.call)!.typed += 1;
+      else if (event.t === "callEnd") {
+        const call = this.open.get(event.call)!;
+        this.open.delete(event.call);
+        for (const into of [run.calls, (run.callsByKind[call.kind] ??= tally())]) {
+          into.made += 1;
+          if (call.bright) into.bright += 1;
+          else into.dark += 1;
+          if (call.typed > 0) into.typed += 1;
+          else if (call.bright) into.ignored += 1;
+          if (event.finished && call.typed > 0) into.finished += 1;
+          if (event.perfect) into.perfect += 1;
+        }
+      }
+    }
+    w.events.rare.length = 0;
+  }
+}
+
 export function runBot(spec: BotSpec): BotRun {
   const world = worldOf(spec);
   const bot = createRng(spec.botSeed ?? spec.seed);
@@ -137,8 +202,12 @@ export function runBot(spec: BotSpec): BotRun {
   const queue: CommandBody[] = [];
   const view = { w: world, send: (body: CommandBody) => void queue.push(body) };
   const run: BotRun = {
-    world, log: [], hashes: [], stats: statsObject(world.stats), ticks: 0, typedTicks: [0, 0], phaseTicks: [0, 0], livesAtWaveEnd: [], rejected: [], problems: [], defeat: false,
+    world, log: [], hashes: [], stats: statsObject(world.stats), ticks: 0, typedTicks: [0, 0], phaseTicks: [0, 0], byDay: [], windowMax: 0, windowAt: 0,
+    atNightfall: [], atDawn: [], calls: tally(), callsByKind: [], stepMs: null, livesAtWaveEnd: [], rejected: [], problems: [], defeat: false,
   };
+  run.atDawn[1] = earned(world);
+  const meter = new Meter(run);
+  const times: number[] = [];
   const maxTicks = spec.maxTicks ?? 60 * 60 * 30;
   while (world.tick < maxTicks) {
     plan.tick(view);
@@ -146,15 +215,21 @@ export function runBot(spec: BotSpec): BotRun {
     if (key !== null) queue.push(key);
     const commands = queue.splice(0).map((body) => ({ ...body, tick: world.tick }) as Command);
     run.log.push(...commands);
-    const phase = world.phase === "night" ? 1 : 0;
+    const phase = world.phase;
+    const day = (run.byDay[world.day] ??= { dayTyped: 0, dayTicks: 0, nightTyped: 0, nightTicks: 0 });
+    const started = spec.timeSteps === true ? performance.now() : 0;
     step(world, commands);
-    run.phaseTicks[phase] += 1;
-    if (world.typing.router.lock >= 0) run.typedTicks[phase] += 1;
-    for (const event of world.events.rare) {
-      if (event.t === "rejected") run.rejected.push(event.command + ": " + event.reason);
-      else if (event.t === "waveEnd") run.livesAtWaveEnd[event.wave] = world.lives;
+    if (spec.timeSteps === true) times.push(performance.now() - started);
+    const typed = world.typing.router.lock >= 0 ? 1 : 0;
+    if (phase === "day" || phase === "night") {
+      const k = phase === "day" ? 0 : 1;
+      run.phaseTicks[k] += 1;
+      run.typedTicks[k] += typed;
+      if (k === 0) [day.dayTicks, day.dayTyped] = [day.dayTicks + 1, day.dayTyped + typed];
+      else [day.nightTicks, day.nightTyped] = [day.nightTicks + 1, day.nightTyped + typed];
     }
-    world.events.rare.length = 0;
+    if (world.typing.typedSum > run.windowMax) [run.windowMax, run.windowAt] = [world.typing.typedSum, world.tick];
+    meter.read(world);
     if (spec.check === true && run.problems.length < 20) run.problems.push(...callProblems(world).map((p) => "tick " + world.tick + ": " + p));
     if (spec.hashEvery !== undefined && world.tick % spec.hashEvery === 0) run.hashes.push(hashHex(world));
     if (world.phase === "defeat" || (world.wave >= spec.nights && world.waveEnded[spec.nights] === 1)) break;
@@ -162,6 +237,11 @@ export function runBot(spec: BotSpec): BotRun {
   run.ticks = world.tick;
   run.stats = statsObject(world.stats);
   run.defeat = world.phase === "defeat";
+  if (times.length > 0) {
+    const mean = times.reduce((sum, t) => sum + t, 0) / times.length;
+    times.sort((a, b) => a - b);
+    run.stepMs = { mean, p95: times[Math.floor(times.length * 0.95)]!, max: times[times.length - 1]! };
+  }
   return run;
 }
 

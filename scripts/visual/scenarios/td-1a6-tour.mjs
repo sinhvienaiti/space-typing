@@ -154,7 +154,8 @@ export default async function (page) {
   const learned = await until(page, `const s = t.state(); return s.knowledge > ${quiz?.knowledge ?? 1e9} ? s.knowledge : null;`, 4000, 200);
   shown.quiz = quiz !== null && quizCard.includes("_") && learned !== null;
 
-  // 10: the tactical pause.
+  // 10: the tactical pause (a Space within 0.8 s of a typed letter is a word gap, swallowed: review R2).
+  await page.sleep(1000);
   await key(page, "Space", { pause: 300 });
   const paused = await page.eval(td("const a = t.state().tick; return new Promise((r) => setTimeout(() => r({ a, b: t.state().tick, tactical: t.ui().tactical }), 500));"));
   await shot("10-tactical-pause");
@@ -205,6 +206,8 @@ export default async function (page) {
 
   const checks = {
     ready,
+    // Live cards never overlap, sit clear of the HUD panels, ≥ 18 px, on screen (the locked card's ×1.2 included, review R3).
+    cardsClean: cardsClean(cards),
     sitesPlaced: sites.every((spot) => spot !== null),
     ...Object.fromEntries(["village", "zoomArrows", "bright", "dim", "tabCall", "farmCard", "keepCard", "learn", "quiz", "pause", "power", "charges", "nightZoom", "sandbox"].map((name) => [name, shown[name] === true])),
     ...consoleChecks(page),

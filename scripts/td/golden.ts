@@ -8,7 +8,7 @@
  * the same way and writes nothing (exit 1 when anything differs, which is
  * when tests/td-golden.test.ts fails). --log <file> also writes the run
  * with its command log, which the browser replays to show Chrome reaches the
- * same hashes (scripts/visual/scenarios/td-1a-perf.mjs, BUILD_NOW §7 gate 4).
+ * same hashes (scripts/visual/scenarios/td-1a6-perf.mjs; BUILD_NOW §7 gate 4, BUILD_1A6 §12 gate 2).
  *   node --import tsx scripts/td/golden.ts [--check] [--fresh-words] [--log <file>]
  */
 import { existsSync, writeFileSync } from "node:fs";

@@ -80,7 +80,9 @@ export default async function (page) {
     quizDone = await until(page, `const s = t.state(); return s.knowledge > ${quiz.knowledge} ? { knowledge: s.knowledge, review: s.review } : null;`, 5000, 150);
   }
 
-  // 3. Space: the tactical pause of the learn mode, and on again.
+  // 3. Space: the tactical pause of the learn mode, and on again. A Space within 0.8 s of a typed letter is a word
+  // gap, swallowed (review R2: WORD_SPACE_MS), so the hands rest first.
+  await page.sleep(1000);
   await key(page, "Space", { pause: 300 });
   const paused = await page.eval(td("const a = t.state().tick; return new Promise((r) => setTimeout(() => r({ a, b: t.state().tick, tactical: t.ui().tactical, chip: document.querySelector('.td-chip')?.textContent ?? '' }), 600));"));
   shots.push(await page.shot(out("td-1a6-learn-pause-" + size + ".png")));

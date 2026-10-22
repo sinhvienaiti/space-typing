@@ -1,6 +1,7 @@
 /**
  * The golden run (docs/td/BUILD_NOW.md §6.1 td-golden, §7 gate 4; BUILD_1A6
- * §12 gate 2): the balanced bot plays three days and nights from seed 1 and
+ * §12 gate 2): the standard bot plays three days and nights from seed 1 (the
+ * nights called early, so the log has callNight) and
  * the world is hashed every 60 ticks. tests/golden/td-1a.json keeps those
  * hashes with the words the run used (levels 1–3 of the shared vocabulary when
  * it was made), so a new vocabulary in the parent repository never moves it;
@@ -10,8 +11,8 @@
 import { readFileSync } from "node:fs";
 import { compileDeck, wordText, type Deck } from "../../src/td/typing/decks";
 import { runBot, type BotRun, type BotSpec } from "./bot";
-import { followCalls } from "./policies/hero";
-import { ARCHER_WEST, BALANCED } from "./policies/layouts";
+import { heroDay, heroNight } from "./policies/hero";
+import { ARCHER_WEST, STANDARD } from "./policies/layouts";
 import { Plan, type Rule } from "./policies/stand";
 import { realDeck } from "./typing";
 
@@ -59,13 +60,13 @@ const undoOnce: Rule = (bot) => {
   if (w.tick === 300 && built !== undefined) bot.send({ t: "sell", building: w.buildings.id(built) });
 };
 
-/** The balanced bot at 35 WPM, 95 %, its hero following the calls, three days and nights, every invariant checked. */
+/** The standard bot at 35 WPM, 95 % (BUILD_1A6 §12 gate 2), its hero where the calls gather, three days and nights, every invariant checked. */
 export function goldenSpec(deck: Deck): BotSpec {
   return {
     seed: 1,
     deck,
     hands: { wpm: 35, accuracy: 0.95, backspace: 0.3 },
-    plan: () => new Plan(BALANCED, [undoOnce, followCalls()]),
+    plan: () => new Plan({ ...STANDARD, callAfterS: 60 }, [undoOnce, heroDay(), heroNight()]),
     nights: 3,
     hashEvery: GOLDEN_EVERY,
     check: true,
